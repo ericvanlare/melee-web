@@ -7,8 +7,10 @@
 #include <stdlib.h>
 #include "hsd_probe.h"
 #include "asset_scene.h"
+#include "browser_input.h"
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
+#include <SDL3/SDL_hints.h>
 #endif
 
 static int exiting;
@@ -75,10 +77,12 @@ static void tick(void)
     for (; event && event->type != AURORA_NONE; ++event) {
         if (event->type == AURORA_EXIT) exiting = 1;
     }
+    melee_web_input_poll();
     if (exiting) {
 #ifdef __EMSCRIPTEN__
         emscripten_cancel_main_loop();
 #endif
+        melee_web_input_shutdown();
         aurora_shutdown();
         return;
     }
@@ -104,9 +108,17 @@ int main(int argc, char** argv)
         .logCallback = log_message,
         .logLevel = LOG_INFO,
     };
+#ifdef __EMSCRIPTEN__
+    /* SDL must not consume keyboard events from the surrounding import UI. */
+    if (!SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT, "#canvas")) {
+        fputs("Unable to bind browser keyboard events to the canvas\n", stderr);
+        return 1;
+    }
+#endif
     aurora_initialize(argc, argv, &config);
     /* Aurora owns transport; GXInit initializes the SDK's shadow registers. */
     GXInit(fifo_buffer, sizeof(fifo_buffer));
+    melee_web_input_startup();
 #ifdef __EMSCRIPTEN__
     emscripten_set_main_loop(tick, 0, 1);
 #else

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "dat_archive.hpp"
-#include "dat_texture.hpp"
+#include "dat_material.hpp"
 #include "hsd_pobj_bridge.h"
 #include <array>
 #include <memory>
@@ -18,12 +18,11 @@ struct RigidJoint {
 struct RigidMesh {
     uint32_t joint_index = 0;
     std::array<float, 3> minimum{}, maximum{};
-    std::optional<DatTexture> texture;
+    std::shared_ptr<const DatMaterial> material;
     std::vector<MeleeWebPObjAttribute> attributes;
     const void* display = nullptr;
     uint32_t display_bytes = 0;
     uint16_t flags = 0;
-    std::array<uint8_t, 4> diffuse{};
 };
 
 // CPU-only decoded static graph. Archive-backed geometry/texture spans remain

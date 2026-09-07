@@ -38,7 +38,8 @@ def main():
     binary.parent.mkdir(parents=True, exist_ok=True)
     # Recompile once per invocation so dependency/flag changes cannot leave a
     # stale parser binary producing misleading corpus results.
-    sources = ["src/dat_archive.cpp", "src/dat_texture.cpp", "src/rigid_model.cpp", "tools/asset_check.cpp"]
+    sources = ["src/dat_archive.cpp", "src/dat_texture.cpp", "src/dat_material.cpp",
+               "src/rigid_model.cpp", "tools/asset_check.cpp"]
     try:
         compiled = subprocess.run(
             [compiler, "-std=c++20", "-Wall", "-Wextra", "-Werror", "-O1",

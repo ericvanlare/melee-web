@@ -23,6 +23,7 @@ class RigidModelTests(unittest.TestCase):
             [compiler, "-std=c++20", "-Wall", "-Wextra", "-Werror", "-O1", "-g",
              "-I", str(ROOT / "src"), str(ROOT / "src/dat_archive.cpp"),
              str(ROOT / "src/dat_texture.cpp"),
+             str(ROOT / "src/dat_material.cpp"),
              str(ROOT / "src/rigid_model.cpp"), str(ROOT / "tests/rigid_model_test.cpp"),
              "-o", str(cls.binary)], capture_output=True, text=True, timeout=120,
         )
@@ -71,6 +72,9 @@ class RigidModelTests(unittest.TestCase):
 
     def test_unsupported_material_and_polygon_features(self):
         self.run_case("materials_and_polygon_modes")
+
+    def test_reflection_normal_and_actual_uv_source_requirements(self):
+        self.run_case("material_vertex_dependencies")
 
     def test_descriptor_order_types_stride_scale_and_termination(self):
         self.run_case("descriptor_formats")

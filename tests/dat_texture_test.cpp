@@ -16,7 +16,6 @@
 using melee_web::DatArchive;
 using melee_web::DatError;
 using melee_web::DatTexture;
-using melee_web::TextureOperation;
 using Bytes = std::vector<std::uint8_t>;
 
 namespace {
@@ -130,7 +129,9 @@ struct Fixture {
     std::pair<std::shared_ptr<const DatArchive>, DatTexture> read() const
     {
         auto owner = archive();
-        auto texture = melee_web::read_dat_texture(*owner, tobj);
+        auto textures = melee_web::read_dat_texture_chain(*owner, tobj);
+        check(textures.size() == 1, "single-texture fixture must retain one descriptor");
+        auto texture = std::move(textures.front());
         return {std::move(owner), std::move(texture)};
     }
 };
@@ -146,10 +147,9 @@ void real_shape_metadata()
           "four GameCube tiles, not a linear RGBA size");
     check(texture.image.bytes.data() == owner->data().data() && texture.image.bytes[127] == 127,
           "unchanged tiles owned by the archive, including relocated target zero");
-    check(texture.color_operation == TextureOperation::replace &&
-          texture.alpha_operation == TextureOperation::pass && texture.source_flags == 0x30010,
-          "HSD blend endpoint one lowers exactly to texture replacement");
-    check(texture.sampler.min_filter == 1 && texture.sampler.mag_filter == 1 &&
+    check(texture.blending == 1 && texture.source_flags == 0x30010,
+          "original HSD flags and blend inputs are preserved without approximation");
+    check(texture.sampler.min_filter == 5 && texture.sampler.mag_filter == 1 &&
           !texture.palette, "HSD non-mipmapped default sampler");
 }
 
@@ -252,7 +252,8 @@ void lod_sampler()
     put32(fixture.data, Fixture::image + 12, 1);
     putf32(fixture.data, Fixture::image + 20, 2.F);
     auto result = fixture.read();
-    check(result.second.sampler.min_filter == 3, "HSD changes CI trilinear default to linear mip-nearest");
+    check(result.second.sampler.min_filter == 5 && !result.second.lod_descriptor_offset,
+          "source CI sampler default is preserved for original HSD adjustment");
     fixture.add_lod(4);
     putf32(fixture.data, Fixture::lod + 4, -.5F);
     fixture.data[Fixture::lod + 8] = fixture.data[Fixture::lod + 9] = 1;
@@ -260,7 +261,8 @@ void lod_sampler()
     result = fixture.read();
     check(result.second.sampler.min_filter == 4 && result.second.sampler.lod_bias == -.5F &&
           result.second.sampler.bias_clamp && result.second.sampler.edge_lod &&
-          result.second.sampler.anisotropy == 2, "explicit LOD fields survive parsing");
+          result.second.sampler.anisotropy == 2 && result.second.lod_descriptor_offset == Fixture::lod,
+          "explicit LOD fields survive parsing");
     for (const auto& [offset, value] : std::array<std::pair<std::uint32_t, std::uint32_t>, 2>{
              {{0, 6}, {12, 3}}}) {
         auto invalid = fixture;
@@ -281,25 +283,20 @@ void lod_sampler()
 
 void operations_and_modes()
 {
-    for (const auto& [flags, color, alpha] :
-         std::vector<std::tuple<std::uint32_t, TextureOperation, TextureOperation>>{
-             {0x340010, TextureOperation::modulate, TextureOperation::modulate},
-             {0x450010, TextureOperation::replace, TextureOperation::replace},
-             {0x560010, TextureOperation::pass, TextureOperation::pass}}) {
-        Fixture fixture;
-        put32(fixture.data, Fixture::tobj + 64, flags);
-        const auto result = fixture.read();
-        check(result.second.color_operation == color && result.second.alpha_operation == alpha,
-              "independent original color and alpha operations");
+    for (std::uint32_t color = 0; color <= 8; ++color) {
+        for (std::uint32_t alpha = 0; alpha <= 7; ++alpha) {
+            Fixture fixture;
+            const auto flags = (color << 16) | (alpha << 20) | 0x10;
+            put32(fixture.data, Fixture::tobj + 64, flags);
+            putf32(fixture.data, Fixture::tobj + 68, .25F);
+            const auto result = fixture.read();
+            check(result.second.source_flags == flags && result.second.blending == .25F,
+                  "all standard HSD operations and intermediate blend inputs remain raw");
+        }
     }
-    Fixture fixture;
-    putf32(fixture.data, Fixture::tobj + 68, 0.F);
-    check(fixture.read().second.color_operation == TextureOperation::pass, "zero blend preserves prior color");
-    putf32(fixture.data, Fixture::tobj + 68, .5F);
-    rejects([&] { (void) fixture.read(); });
-    for (const auto flags : {0x70010U, 0x10010U, 0x130010U, 0x30020U, 0x30011U,
+    for (const auto flags : {0x90010U, 0x830010U, 0x30012U, 0x30110U,
                             0x1030010U, 0x30000U, 0x10030010U}) {
-        fixture = Fixture();
+        Fixture fixture;
         put32(fixture.data, Fixture::tobj + 64, flags);
         rejects([&] { (void) fixture.read(); });
     }
@@ -313,14 +310,14 @@ void unsupported_graphs_and_transforms()
         rejects([&] { (void) fixture.read(); });
     }
     for (const auto& [offset, value] : std::array<std::pair<std::uint32_t, std::uint32_t>, 5>{
-             {{8, 1}, {12, 0}, {52, 3}, {56, 2}, {72, 2}}}) {
+             {{8, 8}, {12, 0}, {52, 3}, {56, 3}, {72, 2}}}) {
         Fixture fixture;
         put32(fixture.data, Fixture::tobj + offset, value);
         rejects([&] { (void) fixture.read(); });
     }
     for (const auto offset : {16U, 28U, 40U}) {
         Fixture fixture;
-        putf32(fixture.data, Fixture::tobj + offset, 2.F);
+        putf32(fixture.data, Fixture::tobj + offset, 1e20F);
         rejects([&] { (void) fixture.read(); });
     }
     for (const auto offset : {60U, 61U}) {
@@ -328,6 +325,51 @@ void unsupported_graphs_and_transforms()
         fixture.data[Fixture::tobj + offset] = 0;
         rejects([&] { (void) fixture.read(); });
     }
+}
+
+void reflection_srt_and_chains()
+{
+    Fixture fixture;
+    put32(fixture.data, Fixture::tobj + 8, 1);
+    put32(fixture.data, Fixture::tobj + 12, 5); // Raw source is ignored by HSD reflection mode.
+    put32(fixture.data, Fixture::tobj + 64, 0x30081); // Extension lightmap and reflection.
+    putf32(fixture.data, Fixture::tobj + 68, .2F);
+    putf32(fixture.data, Fixture::tobj + 16, .5F);
+    putf32(fixture.data, Fixture::tobj + 28, 2.F);
+    putf32(fixture.data, Fixture::tobj + 40, -3.F);
+    put32(fixture.data, Fixture::tobj + 52, 2);
+    put32(fixture.data, Fixture::tobj + 56, 2);
+    fixture.data[Fixture::tobj + 60] = fixture.data[Fixture::tobj + 61] = 2;
+    const auto result = fixture.read();
+    check(result.second.source_flags == 0x30081 && result.second.blending == .2F &&
+          result.second.rotation[0] == .5F && result.second.scale[0] == 2.F &&
+          result.second.translation[0] == -3.F && result.second.repeat_t == 2 &&
+          result.second.sampler.wrap_t == 2,
+          "reflection inputs retain full SRT, mirror repeats and intermediate blend");
+
+    fixture = Fixture();
+    fixture.data.resize(0x29000, 0);
+    auto previous = Fixture::tobj;
+    for (std::uint32_t index = 1; index <= 8; ++index) {
+        const auto next = 0x28000U + (index - 1) * 96;
+        std::copy_n(fixture.data.begin() + Fixture::tobj, 92, fixture.data.begin() + next);
+        put32(fixture.data, next + 4, 0);
+        fixture.link(next + 76, Fixture::image);
+        fixture.link(previous + 4, next);
+        previous = next;
+        const auto owner = fixture.archive();
+        if (index < 8) {
+            const auto chain = melee_web::read_dat_texture_chain(*owner, Fixture::tobj);
+            check(chain.size() == index + 1 && chain.back().descriptor_offset == next,
+                  "ordered chain preserves shared image payloads and source IDs");
+        } else {
+            rejects([&] { (void) melee_web::read_dat_texture_chain(*owner, Fixture::tobj); });
+        }
+    }
+    fixture.unlink(previous + 76);
+    fixture.link(Fixture::tobj + 4, Fixture::tobj); // A cycle fails independently of count.
+    const auto cyclic = fixture.archive();
+    rejects([&] { (void) melee_web::read_dat_texture_chain(*cyclic, Fixture::tobj); });
 }
 
 void dimensions_and_finite_values()
@@ -396,6 +438,7 @@ int main(int argc, char** argv)
         {"mip_chains", mip_chains}, {"palette_formats_and_counts", palette_formats_and_counts},
         {"palette_indices", palette_indices}, {"lod_sampler", lod_sampler},
         {"operations_and_modes", operations_and_modes},
+        {"reflection_srt_and_chains", reflection_srt_and_chains},
         {"unsupported_graphs_and_transforms", unsupported_graphs_and_transforms},
         {"dimensions_and_finite_values", dimensions_and_finite_values},
         {"pointers_and_region_bounds", pointers_and_region_bounds},

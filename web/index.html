@@ -14,17 +14,23 @@
   label {display:block;margin:8px 0} select {max-width:100%;padding:6px}
 </style>
 <h1>Melee web: asset feasibility</h1>
-<p>Original Melee HSD state and polygon code → Aurora GX → WebGPU, compiled to WebAssembly.</p>
+<p>Original Melee HSD transforms, materials and polygons → Aurora GX → WebGPU, compiled to WebAssembly.</p>
 <fieldset>
   <legend>Local asset inspection</legend>
   <label>Extracted DAT file <input id="asset-file" type="file" accept=".dat" disabled></label>
   <label>Public model symbol <select id="asset-symbol" disabled><option>Load a DAT file first</option></select></label>
   <output id="asset-status">No asset loaded. The canvas shows the synthetic GX probe.</output>
-  <p>Supports rigid joint trees and opaque diffuse meshes with one UV texture per material. Lighting, reflections, skinning and animation are not implemented; this is an asset inspection camera, not gameplay. Unsupported features produce an error. Files stay in this tab and are never uploaded.</p>
+  <p>Supports rigid joint trees and opaque HSD materials, including lighting, reflections and texture layers. Uses an inspection camera and lights; skinning, animation and gameplay are not implemented. Unsupported features produce an error. Files stay in this tab and are never uploaded.</p>
 </fieldset>
 <output id="status">Checking browser support…</output>
 <canvas id="canvas" width="640" height="480" tabindex="0" aria-label="Aurora GX rendering probe"></canvas>
 <output id="metrics">Waiting for the first frame.</output>
+<fieldset>
+  <legend>Controller input</legend>
+  <label><input id="keyboard" type="checkbox" disabled> Enable keyboard controls</label>
+  <p>Click the canvas to activate input. WASD: stick · TGFH: C-stick · J/K/U/I: A/B/X/Y · O: Z · Q/E: L/R · Enter: Start · arrows: D-pad. A connected controller takes priority. Input is sampled for inspection; it does not move this static model.</p>
+  <pre id="input-status" aria-label="Controller status">Waiting for input service.</pre>
+</fieldset>
 <p>CPU timings measure submission, not GPU execution or input latency. Foreground measurements only.</p>
 <pre id="log" aria-label="Runtime log"></pre>
 <script>
@@ -34,20 +40,67 @@
   const fileEl = document.querySelector('#asset-file');
   const symbolEl = document.querySelector('#asset-symbol');
   const assetStatus = document.querySelector('#asset-status');
+  const canvasEl = document.querySelector('#canvas');
+  const keyboardEl = document.querySelector('#keyboard');
+  const inputStatus = document.querySelector('#input-status');
   const cpu = [], intervals = [];
   let previous = null, lastUpdate = 0, hidden = document.hidden;
   let failed = false;
+  let runtimeReady = false, lastInputUpdate = 0;
+  function updateInputActivity() {
+    if (!runtimeReady) return;
+    Module._melee_web_input_set_activity(document.hasFocus() && document.activeElement === canvasEl ? 1 : 0,
+                                         document.hidden ? 0 : 1);
+    showInput();
+  }
+  function showInput() {
+    if (!runtimeReady) return;
+    const state = JSON.parse(Module.UTF8ToString(Module._melee_web_input_message()));
+    const lines = [state.error || (state.active ? 'Input active' : 'Input paused — focus the canvas'),
+      `Samples: ${state.samples} · keyboard: ${state.keyboard_active ? 'active' : 'inactive'}`];
+    state.pads.forEach((pad, port) => {
+      if (pad.source === 'none') return;
+      lines.push(`Port ${port + 1} (${pad.source}) · buttons: 0x${pad.buttons.toString(16)} · stick: ${pad.stick} · C-stick: ${pad.cstick} · triggers: ${pad.triggers}`);
+      lines.push(`  PADClamp copy · stick: ${pad.clamped.stick} · triggers: ${pad.clamped.triggers}`);
+    });
+    const last = state.last_non_neutral;
+    if (last) lines.push(`Last sampled activity: port ${last.port + 1} (${last.source}) · sample ${last.sample} · buttons: 0x${last.buttons.toString(16)} · stick: ${last.stick} · triggers: ${last.triggers} · clamped stick: ${last.clamped.stick} · clamped triggers: ${last.clamped.triggers}`);
+    inputStatus.textContent = lines.join('\n');
+  }
+  keyboardEl.addEventListener('change', () => {
+    if (!runtimeReady) return;
+    Module._melee_web_input_set_keyboard(keyboardEl.checked ? 1 : 0);
+    updateInputActivity();
+  });
+  canvasEl.addEventListener('focus', updateInputActivity);
+  canvasEl.addEventListener('blur', updateInputActivity);
+  canvasEl.addEventListener('pointerdown', () => canvasEl.focus());
+  window.addEventListener('focus', updateInputActivity);
+  window.addEventListener('blur', updateInputActivity);
+  canvasEl.addEventListener('keydown', event => {
+    // SDL consumes Tab by default. Let the browser move focus out of the
+    // canvas; its blur callback immediately neutralizes the PAD snapshot.
+    if (event.key === 'Tab') { event.stopImmediatePropagation(); return; }
+    if (keyboardEl.checked && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', ' '].includes(event.key))
+      event.preventDefault();
+  });
   function log(value) {
     const lines = (logEl.textContent + String(value) + '\n').split('\n');
     logEl.textContent = lines.slice(-80).join('\n');
   }
-  function fail(message) { failed = true; statusEl.textContent = 'Failed: ' + message; log(message); }
+  function fail(message) {
+    failed = true; runtimeReady = false;
+    fileEl.disabled = symbolEl.disabled = keyboardEl.disabled = true;
+    inputStatus.textContent = 'Input unavailable: runtime stopped.';
+    statusEl.textContent = 'Failed: ' + message;
+    log(message);
+  }
   window.assetFailed = message => { assetStatus.textContent = 'Asset rejected: ' + message; };
   const assetMessage = () => Module.UTF8ToString(Module._melee_web_asset_message());
   function selectModel() {
-    if (symbolEl.value === '') return;
+    if (!runtimeReady || symbolEl.value === '') return;
     const ok = Module._melee_web_asset_select(Number(symbolEl.value));
-    assetStatus.textContent = ok ? assetMessage() + ' · unlit diffuse preview' : 'Asset rejected: ' + assetMessage();
+    assetStatus.textContent = ok ? assetMessage() + ' · original HSD material preview' : 'Asset rejected: ' + assetMessage();
   }
   symbolEl.addEventListener('change', selectModel);
   fileEl.addEventListener('change', async () => {
@@ -81,13 +134,14 @@
     } catch (error) {
       window.assetFailed(error.message);
     } finally {
-      if (pointer) Module._free(pointer);
+      if (pointer && runtimeReady) Module._free(pointer);
       fileEl.disabled = failed;
       fileEl.value = '';
     }
   });
   document.addEventListener('visibilitychange', () => {
     hidden = document.hidden;
+    updateInputActivity();
     previous = null; cpu.length = 0; intervals.length = 0;
     metricsEl.textContent = hidden ? 'Timing paused while the tab is hidden.' : 'Collecting foreground samples…';
   });
@@ -99,6 +153,7 @@
     if (failed) return;
     if (frame === 1) statusEl.textContent = 'Rendering through Aurora GX / WebGPU';
     if (hidden) return;
+    if (now - lastInputUpdate >= 100) { lastInputUpdate = now; showInput(); }
     cpu.push(ms); if (cpu.length > 600) cpu.shift();
     if (previous !== null) intervals.push(now-previous);
     if (intervals.length > 600) intervals.shift();
@@ -113,7 +168,10 @@
     print: log,
     printErr: log,
     onAbort: (reason) => fail(reason),
-    onRuntimeInitialized: () => { fileEl.disabled = false; },
+    onRuntimeInitialized: () => {
+      runtimeReady = true; fileEl.disabled = false; keyboardEl.disabled = false;
+      updateInputActivity();
+    },
   };
   window.addEventListener('error', event => fail(event.message));
   window.addEventListener('unhandledrejection', event => fail(String(event.reason)));

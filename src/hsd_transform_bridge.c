@@ -8,6 +8,33 @@
 #include <stdio.h>
 #include <string.h>
 
+int melee_web_joint_normal_matrix(const float view[3][4], float output[3][4],
+                                  char* error, size_t error_size)
+{
+    if (!view || !output) {
+        if (error && error_size) snprintf(error, error_size, "Missing normal-matrix input or output");
+        return 0;
+    }
+    Mtx input, result;
+    for (size_t r = 0; r < 3; ++r) for (size_t c = 0; c < 4; ++c) {
+        if (!isfinite(view[r][c])) {
+            if (error && error_size) snprintf(error, error_size, "Normal-matrix input is nonfinite");
+            return 0;
+        }
+        input[r][c] = view[r][c];
+    }
+    HSD_MtxInverseTranspose(input, result);
+    for (size_t r = 0; r < 3; ++r) for (size_t c = 0; c < 4; ++c) {
+        if (!isfinite(result[r][c])) {
+            if (error && error_size) snprintf(error, error_size, "Normal-matrix output is nonfinite");
+            return 0;
+        }
+    }
+    memcpy(output, result, sizeof(result));
+    if (error && error_size) error[0] = '\0';
+    return 1;
+}
+
 static int reject(char* error, size_t error_size, const char* reason)
 {
     if (error != NULL && error_size != 0) {

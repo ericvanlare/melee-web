@@ -2,11 +2,12 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <map>
 #include <set>
 
 namespace melee_web {
 namespace {
-constexpr uint32_t va_pos = 9, va_nrm = 10, va_tex0 = 13, va_null = 255;
+constexpr uint32_t va_pos = 9, va_nrm = 10, va_tex0 = 13, va_tex7 = 20, va_null = 255;
 constexpr uint32_t index8 = 2, index16 = 3, type_s16 = 3, type_f32 = 4;
 constexpr size_t max_joints = 4096, max_meshes = 4096, max_packets = 65536, max_vertices = 1000000;
 
@@ -38,23 +39,6 @@ float component(const DatArchive& a, uint32_t base, uint32_t type, uint8_t frac)
     return result;
 }
 
-void material(const DatArchive& a, uint32_t offset, RigidMesh& mesh) {
-    (void) a.range(offset, 24);
-    absent(a, offset, "Custom material classes are unsupported");
-    const auto mode = a.be32(offset + 4);
-    if (mode != 4 && mode != 0x14) reject("Material requires the full HSD material path (only opaque diffuse/TEX0 supported)");
-    const auto texture = a.pointer(offset + 8, 92);
-    if (bool(texture) != bool(mode & 0x10)) reject("Material texture flag and descriptor disagree");
-    if (texture) mesh.texture = read_dat_texture(a, *texture);
-    const auto mat = required(a, offset + 12, 20);
-    absent(a, offset + 16, "Custom material rendering is unsupported");
-    absent(a, offset + 20, "Custom pixel-engine state is unsupported");
-    if (a.f32(mat + 12) != 1.f) reject("Transparent materials are unsupported");
-    auto color = a.range(mat + 4, 4);
-    std::copy(color.begin(), color.end(), mesh.diffuse.begin());
-    mesh.diffuse[3] = 255;
-}
-
 void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel& model) {
     (void) a.range(offset, 24);
     absent(a, offset, "Custom polygon classes are unsupported");
@@ -72,29 +56,30 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
         reject("Display list crosses another referenced data region");
     mesh.display = a.range(display, mesh.display_bytes).data();
     const auto descriptors = required(a, offset + 8, 24);
-    std::array<uint32_t, 3> array_offsets{}, maximum_index{}, widths{}, components{};
+    std::array<uint32_t, 10> array_offsets{}, maximum_index{}, widths{}, components{};
     mesh.minimum = {INFINITY, INFINITY, INFINITY};
     mesh.maximum = {-INFINITY, -INFINITY, -INFINITY};
     bool found_end = false;
-    for (uint32_t i = 0; i < 4; ++i) {
+    for (uint32_t i = 0; i < 11; ++i) {
         const auto d = descriptors + i * 24;
         (void) a.range(d, 24);
         const auto attr = a.be32(d);
         if (attr == va_null) { found_end = true; break; }
         // Fixed ordering also establishes the byte layout of each vertex packet.
-        if ((i == 0 && attr != va_pos) || i == 3 ||
-            (attr != va_pos && attr != va_nrm && attr != va_tex0) ||
+        const bool uv = attr >= va_tex0 && attr <= va_tex7;
+        if ((i == 0 && attr != va_pos) || i == 10 ||
+            (attr != va_pos && attr != va_nrm && !uv) ||
             (i && attr <= mesh.attributes.back().attr))
-            reject("Only ordered POS, optional NRM and TEX0 descriptors are supported");
+            reject("Only ordered POS, optional NRM and TEX0 through TEX7 descriptors are supported");
         const auto mode = a.be32(d + 4), count = a.be32(d + 8), type = a.be32(d + 12);
         const auto frac = a.range(d + 16, 1)[0];
         const auto stride = a.be16(d + 18);
         if (mode != index8 && mode != index16) reject("Only indexed vertex attributes are supported");
         if (count != (attr == va_nrm ? 0u : 1u)) reject("Only XYZ position/normal and ST texture coordinates are supported");
-        if (type > type_f32 || (attr != va_tex0 && type != type_s16 && type != type_f32))
+        if (type > type_f32 || (!uv && type != type_s16 && type != type_f32))
             reject("Unsupported vertex component format");
         if (frac > 31 || (type == type_f32 && frac != 0)) reject("Unsupported vertex fractional scale");
-        components[i] = attr == va_tex0 ? 2 : 3;
+        components[i] = uv ? 2 : 3;
         const uint32_t component_size = type < 2 ? 1 : type < 4 ? 2 : 4;
         const uint32_t width = components[i] * component_size;
         widths[i] = width;
@@ -108,8 +93,20 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
                                    a.range(*array, width).data(), 0});
     }
     if (!found_end || mesh.attributes.empty()) reject("Unterminated or missing vertex descriptors");
-    if (mesh.texture && mesh.attributes.back().attr != va_tex0)
-        reject("Textured material requires TEX0 coordinates");
+    const auto has_attribute = [&](uint32_t attr) {
+        return std::any_of(mesh.attributes.begin(), mesh.attributes.end(),
+                           [&](const auto& descriptor) { return descriptor.attr == attr; });
+    };
+    if ((((mesh.material->render_mode & 7U) == 4U) || (mesh.material->render_mode & 8U)) &&
+        !has_attribute(va_nrm))
+        reject("Diffuse or specular lighting requires normal coordinates");
+    for (const auto& texture : mesh.material->textures) {
+        if ((texture.source_flags & 15U) == 1) {
+            if (!has_attribute(va_nrm)) reject("Reflection texture requires normal coordinates");
+        } else if (!has_attribute(va_tex0 + texture.source - 4)) {
+            reject("Texture requires a missing UV vertex source");
+        }
+    }
 
     size_t cursor = 0;
     const auto packets_before = model.draw_packets;
@@ -181,6 +178,8 @@ RigidModel::RigidModel(std::shared_ptr<const DatArchive> source, const std::stri
     struct PendingJoint { uint32_t offset, parent; };
     std::vector<PendingJoint> pending{{root->data_offset, RigidJoint::no_parent}};
     std::set<uint32_t> visited_joints;
+    std::map<uint32_t, std::shared_ptr<const DatMaterial>> material_cache;
+    size_t texture_bytes = 0;
     while (!pending.empty()) {
         const auto [joint, parent] = pending.back();
         pending.pop_back();
@@ -217,6 +216,18 @@ RigidModel::RigidModel(std::shared_ptr<const DatArchive> source, const std::stri
                 reject("Cyclic, unaligned or oversized display-object chain");
             absent(a, *dobj, "Custom display-object classes are unsupported");
             const auto mat = required(a, *dobj + 8, 24);
+            auto cached = material_cache.find(mat);
+            if (cached == material_cache.end()) {
+                auto decoded = std::make_shared<DatMaterial>(read_dat_material(a, mat));
+                for (const auto& texture : decoded->textures) {
+                    const auto bytes = texture.image.bytes.size() +
+                        (texture.palette ? texture.palette->bytes.size() : 0);
+                    if (bytes > 64 * 1024 * 1024 - texture_bytes)
+                        reject("Model exceeds texture validation byte budget");
+                    texture_bytes += bytes;
+                }
+                cached = material_cache.emplace(mat, std::move(decoded)).first;
+            }
             std::set<uint32_t> polygons;
             auto pobj = a.pointer(*dobj + 12, 24);
             while (pobj) {
@@ -224,7 +235,7 @@ RigidModel::RigidModel(std::shared_ptr<const DatArchive> source, const std::stri
                     reject("Cyclic, unaligned or oversized polygon chain");
                 RigidMesh mesh;
                 mesh.joint_index = joint_index;
-                material(a, mat, mesh);
+                mesh.material = cached->second;
                 geometry(a, *pobj, mesh, *this);
                 meshes.push_back(std::move(mesh));
                 pobj = a.pointer(*pobj + 4, 24);

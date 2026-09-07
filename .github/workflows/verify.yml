@@ -28,6 +28,8 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_hsd_*_bridge.py' -v
       - name: Compile browser probe
         run: python3 scripts/build.py --jobs 2
+      - name: Validate browser input adapter with configured SDL headers
+        run: python3 -m unittest discover -s tests -p test_browser_input.py -v
 
 # This checks compilation only. Real WebGPU rendering still needs the documented
 # browser smoke test; do not describe a green build as gameplay validation.

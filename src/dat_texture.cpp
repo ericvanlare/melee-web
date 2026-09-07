@@ -153,72 +153,44 @@ DatTexturePalette palette(const DatArchive& archive, std::uint32_t offset,
     return result;
 }
 
-TextureOperation endpoint_blend(float blending)
-{
-    if (blending == 0) return TextureOperation::pass;
-    if (blending == 1) return TextureOperation::replace;
-    reject("Intermediate texture blend constants are unsupported");
-}
-
-TextureOperation color_operation(std::uint32_t operation, float blending)
-{
-    switch (operation) {
-    case 0: case 6: return TextureOperation::pass;
-    case 3: return endpoint_blend(blending);
-    case 4: return TextureOperation::modulate;
-    case 5: return TextureOperation::replace;
-    default: reject("Unsupported texture color operation");
-    }
-}
-
-TextureOperation alpha_operation(std::uint32_t operation, float blending)
-{
-    switch (operation) {
-    case 0: case 5: return TextureOperation::pass;
-    case 2: return endpoint_blend(blending);
-    case 3: return TextureOperation::modulate;
-    case 4: return TextureOperation::replace;
-    default: reject("Unsupported texture alpha operation");
-    }
-}
-
-} // namespace
-
-DatTexture read_dat_texture(const DatArchive& archive, std::uint32_t offset)
+DatTexture read_texture(const DatArchive& archive, std::uint32_t offset)
 {
     descriptor(archive, offset, 92);
     absent(archive, offset, "Custom texture classes are unsupported");
-    absent(archive, offset + 4, "Multiple texture objects are unsupported");
     absent(archive, offset + 88, "Custom texture TEV expressions are unsupported");
     DatTexture result;
     result.descriptor_offset = offset;
     result.id = archive.be32(offset + 8);
     result.source = archive.be32(offset + 12);
-    if (result.id != 0 || result.source != 4) reject("Only texture map zero with TEX0 UV coordinates is supported");
+    if ((result.id > 7 && result.id != 255) || result.source > 20)
+        reject("Invalid source texture map or coordinate source");
     for (std::uint32_t axis = 0; axis < 3; ++axis) {
         result.rotation[axis] = archive.f32(offset + 16 + axis * 4);
         result.scale[axis] = archive.f32(offset + 28 + axis * 4);
         result.translation[axis] = archive.f32(offset + 40 + axis * 4);
-        if (result.rotation[axis] != 0 || result.scale[axis] != 1 || result.translation[axis] != 0)
-            reject("Nonidentity texture transforms are unsupported");
+        for (const auto value : {result.rotation[axis], result.scale[axis], result.translation[axis]})
+            if (!std::isfinite(value) || std::abs(value) > 1000000.F)
+                reject("Texture transform is nonfinite or exceeds the supported magnitude");
     }
     auto& sampler = result.sampler;
     sampler.wrap_s = archive.be32(offset + 52);
     sampler.wrap_t = archive.be32(offset + 56);
     if (sampler.wrap_s > 2 || sampler.wrap_t > 2) reject("Invalid texture wrap mode");
-    if (sampler.wrap_t == 2) reject("Mirror-T requires the HSD texture-matrix translation path");
     result.repeat_s = archive.range(offset + 60, 1)[0];
     result.repeat_t = archive.range(offset + 61, 1)[0];
-    if (result.repeat_s != 1 || result.repeat_t != 1) reject("Repeated texture matrices are unsupported");
+    if (!result.repeat_s || !result.repeat_t) reject("Texture repeat values must be nonzero");
     result.source_flags = archive.be32(offset + 64);
-    constexpr std::uint32_t allowed_flags = 0x80000000U | 0x00ff0000U | 0x10U;
-    if ((result.source_flags & ~allowed_flags) || !(result.source_flags & 0x10U))
-        reject("Only UV diffuse texture flags are supported");
+    constexpr std::uint32_t allowed_flags = 0x80000000U | 0x00ff0000U | 0xf0U | 0xfU;
+    const auto coordinates = result.source_flags & 15U;
+    if ((result.source_flags & ~allowed_flags) || !(result.source_flags & 0xf0U) || coordinates > 1)
+        reject("Unsupported texture coordinate, lightmap or behavior flags");
+    if (coordinates == 0 && (result.source < 4 || result.source > 11))
+        reject("UV texture requires a TEX0 through TEX7 vertex source");
+    if (((result.source_flags >> 16) & 15U) > 8 || ((result.source_flags >> 20) & 15U) > 7)
+        reject("Unknown HSD texture color or alpha operation");
     result.blending = archive.f32(offset + 68);
     if (!std::isfinite(result.blending) || result.blending < 0 || result.blending > 1)
         reject("Texture blending value must be finite and between zero and one");
-    result.color_operation = color_operation((result.source_flags >> 16) & 15U, result.blending);
-    result.alpha_operation = alpha_operation((result.source_flags >> 20) & 15U, result.blending);
     sampler.mag_filter = archive.be32(offset + 72);
     if (sampler.mag_filter > 1) reject("Invalid texture magnification filter");
     result.image = image(archive, required(archive, offset + 76, 24));
@@ -228,9 +200,11 @@ DatTexture read_dat_texture(const DatArchive& archive, std::uint32_t offset)
         result.palette = palette(archive, *tlut, result.image);
     } else if (tlut) reject("A palette on a nonindexed texture is unsupported");
 
-    // Preserve HSD's default and its CI/non-mipmap filter adjustments.
+    // Preserve the source default; the original HSD material engine applies
+    // CI and non-mipmap filter adjustments when it sets up this texture.
     sampler.min_filter = 5; // GX_LIN_MIP_LIN.
     if (const auto lod = archive.pointer(offset + 84, 16)) {
+        result.lod_descriptor_offset = *lod;
         descriptor(archive, *lod, 16);
         sampler.min_filter = archive.be32(*lod);
         sampler.lod_bias = archive.f32(*lod + 4);
@@ -244,9 +218,25 @@ DatTexture read_dat_texture(const DatArchive& archive, std::uint32_t offset)
         sampler.bias_clamp = clamp != 0;
         sampler.edge_lod = edge != 0;
     }
-    if (result.palette && sampler.min_filter == 5) sampler.min_filter = 3;
-    if (!result.image.mipmap) sampler.min_filter &= 1U;
     return result;
+}
+
+} // namespace
+
+std::vector<DatTexture> read_dat_texture_chain(const DatArchive& archive,
+                                               std::uint32_t first_offset)
+{
+    std::vector<DatTexture> textures;
+    std::optional<std::uint32_t> offset = first_offset;
+    while (offset) {
+        if (textures.size() >= 8) reject("Texture chain exceeds the eight-texture resource limit");
+        if (std::any_of(textures.begin(), textures.end(), [&](const auto& texture) {
+                return texture.descriptor_offset == *offset;
+            })) reject("Texture descriptor chain is cyclic");
+        textures.push_back(read_texture(archive, *offset));
+        offset = archive.pointer(*offset + 4, 92);
+    }
+    return textures;
 }
 
 } // namespace melee_web

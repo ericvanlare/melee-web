@@ -45,6 +45,10 @@ int melee_web_joint_view_matrix(const float camera[3][4],
                                 float output[3][4], char* error,
                                 size_t error_size);
 
+/* Original HSD inverse-transpose path, with checked finite output. */
+int melee_web_joint_normal_matrix(const float view[3][4], float output[3][4],
+                                  char* error, size_t error_size);
+
 #ifdef __cplusplus
 }
 #endif

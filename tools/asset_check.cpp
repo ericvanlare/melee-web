@@ -54,11 +54,15 @@ int main(int argc, char** argv)
             std::cout << ",\"offset\":" << root.data_offset;
             try {
                 const melee_web::RigidModel model(archive, root.name);
-                std::set<std::uint32_t> textures;
-                for (const auto& mesh : model.meshes)
-                    if (mesh.texture) textures.insert(mesh.texture->descriptor_offset);
+                std::set<std::uint32_t> materials, textures;
+                for (const auto& mesh : model.meshes) {
+                    materials.insert(mesh.material->descriptor_offset);
+                    for (const auto& texture : mesh.material->textures)
+                        textures.insert(texture.descriptor_offset);
+                }
                 std::cout << ",\"status\":\"accepted\",\"joints\":" << model.joints.size()
                           << ",\"meshes\":" << model.meshes.size()
+                          << ",\"materials\":" << materials.size()
                           << ",\"textures\":" << textures.size()
                           << ",\"packets\":" << model.draw_packets
                           << ",\"submitted_vertices\":" << model.submitted_vertices;

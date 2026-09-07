@@ -67,7 +67,7 @@ struct Fixture {
         link(joint + 16, dobj);
         link(dobj + 8, mobj);
         link(dobj + 12, pobj);
-        put32(data, mobj + 4, 4); // RENDER_DIFFUSE.
+        put32(data, mobj + 4, normals ? 4 : 1); // Lit diffuse requiresNRM; otherwise constant color.
         link(mobj + 12, material);
         data[material + 4] = 0x12;
         data[material + 5] = 0x34;
@@ -150,7 +150,7 @@ void valid_zero_offset_array()
     check(model.minimum == std::array<float, 3>{-1.F, -.5F, 0.F} &&
           model.maximum == std::array<float, 3>{1.F, 1.5F, .5F}, "signed fixed-point bounds");
     const auto& mesh = model.meshes[0];
-    check(mesh.diffuse == std::array<std::uint8_t, 4>{0x12, 0x34, 0x56, 0xff}, "material color");
+    check(mesh.material->diffuse == std::array<std::uint8_t, 4>{0x12, 0x34, 0x56, 0xff}, "material color");
     check(mesh.attributes.size() == 1 && mesh.attributes[0].byte_size == 18,
           "required indexed array span");
     check(mesh.attributes[0].data == model.archive->data().data(),
@@ -346,6 +346,7 @@ void joint_hierarchy()
               "each decoded mesh records exactly its owning joint");
         owns_geometry[mesh.joint_index] = true;
         check(mesh.display == model.meshes[0].display &&
+              mesh.material == model.meshes[0].material &&
               mesh.attributes[0].data == model.meshes[0].attributes[0].data &&
               mesh.minimum == model.meshes[0].minimum && mesh.maximum == model.meshes[0].maximum,
               "repeated geometry keeps immutable shared bytes and local bounds");
@@ -414,7 +415,7 @@ void indexed_uv_geometry()
         }
         const auto model = fixture.model();
         const auto& mesh = model.meshes[0];
-        check(!mesh.texture && mesh.attributes.size() == 2 && mesh.attributes[1].attr == 13,
+        check(mesh.material->textures.empty() && mesh.attributes.size() == 2 && mesh.attributes[1].attr == 13,
               "an untextured material may retain an unused TEX0 vertex stream");
         check(model.draw_packets == 1 && model.submitted_vertices == 3 &&
               mesh.attributes[0].byte_size == 18 &&
@@ -451,7 +452,7 @@ void materials_and_polygon_modes()
         fixture.link(Fixture::mobj + offset, Fixture::material);
         rejects([&] { (void) fixture.model(); });
     }
-    for (const auto render_mode : {0U, 5U, 0x80000004U}) {
+    for (const auto render_mode : {2U, 0x2004U, 0x80000004U}) {
         Fixture fixture;
         put32(fixture.data, Fixture::mobj + 4, render_mode);
         rejects([&] { (void) fixture.model(); });
@@ -466,6 +467,67 @@ void materials_and_polygon_modes()
     }
     fixture = Fixture();
     fixture.link(Fixture::pobj + 20, Fixture::joint);
+    rejects([&] { (void) fixture.model(); });
+}
+
+void attach_texture(Fixture& fixture, bool reflection, std::uint32_t source)
+{
+    constexpr std::uint32_t texture = 320, image = 416, pixels = 448;
+    fixture.data.resize(480, 0);
+    fixture.link(Fixture::mobj + 8, texture);
+    put32(fixture.data, Fixture::mobj + 4, reflection ? 0x1c : 0x11);
+    put32(fixture.data, texture + 12, source);
+    for (std::uint32_t axis = 0; axis < 3; ++axis)
+        putf32(fixture.data, texture + 28 + 4 * axis, 1.F);
+    fixture.data[texture + 60] = fixture.data[texture + 61] = 1;
+    put32(fixture.data, texture + 64, reflection ? 0x30081 : 0x30010);
+    putf32(fixture.data, texture + 68, reflection ? .2F : 1.F);
+    put32(fixture.data, texture + 72, 1);
+    fixture.link(texture + 76, image);
+    fixture.link(image, pixels);
+    put16(fixture.data, image + 4, 1);
+    put16(fixture.data, image + 6, 1); // A complete 1x1 I4 image occupies one32-byte tile.
+}
+
+void material_vertex_dependencies()
+{
+    Fixture constant;
+    put32(constant.data, Fixture::mobj + 4, 5);
+    check(constant.model().meshes[0].attributes.size() == 1,
+          "original channel mode5 uses constant color and does not need normals");
+    for (const auto lighting : {4U, 8U, 0xcU}) {
+        Fixture invalid;
+        put32(invalid.data, Fixture::mobj + 4, lighting);
+        rejects([&] { (void) invalid.model(); });
+    }
+    Fixture fixture(true);
+    attach_texture(fixture, true, 5);
+    const auto reflection = fixture.model();
+    check(reflection.meshes[0].attributes.size() == 2 &&
+          reflection.meshes[0].material->textures[0].source == 5 &&
+          reflection.meshes[0].material->textures[0].blending == .2F,
+          "reflection uses normals even when the preserved source enum namesTEX1");
+    fixture = Fixture();
+    attach_texture(fixture, true, 5);
+    rejects([&] { (void) fixture.model(); });
+    fixture = Fixture();
+    attach_texture(fixture, false, 4);
+    rejects([&] { (void) fixture.model(); });
+
+    fixture = Fixture();
+    fixture.attribute(Fixture::descriptors + 24, 20, 2, 1, 0, 7, 2, 32);
+    put32(fixture.data, Fixture::descriptors + 48, 255);
+    std::fill(fixture.data.begin() + Fixture::display + 3, fixture.data.begin() + Fixture::display + 32, 0);
+    for (std::uint8_t index = 0; index < 3; ++index) {
+        fixture.data[Fixture::display + 3 + index * 2] = index;
+        fixture.data[Fixture::display + 4 + index * 2] = index;
+    }
+    attach_texture(fixture, false, 11);
+    const auto uv7 = fixture.model();
+    check(uv7.meshes[0].attributes[1].attr == 20 &&
+          uv7.meshes[0].material->textures[0].source == 11,
+          "UV texture sourceTEX7 requires and preserves the matching vertex attribute");
+    put32(fixture.data, Fixture::descriptors + 24, 13);
     rejects([&] { (void) fixture.model(); });
 }
 
@@ -536,6 +598,7 @@ int main(int argc, char** argv)
         {"invalid_joint_graphs", invalid_joint_graphs},
         {"indexed_uv_geometry", indexed_uv_geometry},
         {"materials_and_polygon_modes", materials_and_polygon_modes},
+        {"material_vertex_dependencies", material_vertex_dependencies},
         {"descriptor_formats", descriptor_formats}, {"finite_geometry", finite_geometry},
         {"missing_model_content", missing_model_content},
     };

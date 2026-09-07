@@ -150,12 +150,31 @@ static void check_view_matrix_overflow(void)
     assert(memcmp(output, before, sizeof output) == 0);
 }
 
+static void check_normal_matrix(void)
+{
+    float matrix[3][4] = {{2, 0, 0, 5}, {0, 3, 0, 6}, {0, 0, 4, 7}};
+    float output[3][4];
+    const float expected[3][4] = {{.5f, 0, 0, 0}, {0, 1.f / 3.f, 0, 0}, {0, 0, .25f, 0}};
+    char error[128];
+    assert(melee_web_joint_normal_matrix(matrix, output, error, sizeof error));
+    for (unsigned r = 0; r < 3; ++r) for (unsigned c = 0; c < 4; ++c)
+        assert(fabsf(output[r][c] - expected[r][c]) < .00002f);
+    assert(melee_web_joint_normal_matrix(matrix, matrix, error, sizeof error));
+    assert(memcmp(matrix, output, sizeof output) == 0);
+    matrix[0][0] = NAN;
+    float before[3][4];
+    memcpy(before, output, sizeof output);
+    assert(!melee_web_joint_normal_matrix(matrix, output, error, sizeof error));
+    assert(memcmp(before, output, sizeof output) == 0);
+}
+
 int main(void)
 {
     check_root_and_rotation_order();
     check_scale_inheritance();
     check_rejections();
     check_view_matrix_overflow();
+    check_normal_matrix();
     puts("HSD original joint transform trace: passed");
     return 0;
 }

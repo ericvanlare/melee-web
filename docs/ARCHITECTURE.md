@@ -40,3 +40,28 @@ reference tests before relying on gameplay math.
 The first probe reports CPU submission and requestAnimationFrame intervals only.
 They are not GPU duration, physical display latency, or a full-game benchmark.
 Keep shader validation enabled during bring-up. Measure release builds separately.
+
+## 007 — Reuse HSD behavior behind typed ownership boundaries
+
+Immutable CPU descriptors are decoded from checked DAT offsets. Prepared scenes
+own hydrated HSD materials and keep their archive alive until those resources
+are destroyed. Original MObj/TObj expression compilation and TEV setup implement
+material behavior; do not grow a second collection of approximated shader rules.
+The host piece allocator provides real aligned allocation and verifies size
+buckets on free. Original assertions remain fatal, never successful no-ops.
+
+Texture SDK base objects have stable identities across frames. The adapter copies
+them when original HSD requests a temporary GX object, while original filtering,
+binding and texture-matrix code still executes. Static joint, normal and texture
+matrices are prepared once. The inspection camera and lights are explicitly
+authored context, separate from the future game scene loader and scheduler.
+
+## 008 — One input sample boundary
+
+Poll Aurora PAD once after its event update, independently of whether a frame can
+be presented. Preserve raw PADStatus values for future game code. A separately
+clamped diagnostic copy uses the original provider's PADClamp; game code must not
+receive an already-clamped value and apply its own clamp again. Keyboard fallback
+is explicit, gives a physical port-0 controller priority, and requires canvas,
+window and document activity. Losing activity immediately neutralizes input even
+if the browser suspends rendering.

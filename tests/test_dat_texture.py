@@ -32,7 +32,7 @@ class DatTextureTests(unittest.TestCase):
         result = subprocess.run([str(self.binary), name], capture_output=True, text=True, timeout=20)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-    def test_cmpr_metadata_original_tiles_and_hsd_blend_endpoint(self):
+    def test_cmpr_metadata_original_tiles_and_unmodified_hsd_inputs(self):
         self.run_case("real_shape_metadata")
 
     def test_all_supported_tiled_formats_and_partial_tiles(self):
@@ -47,14 +47,17 @@ class DatTextureTests(unittest.TestCase):
     def test_palette_indices_across_tiles_and_mips_exclude_padding(self):
         self.run_case("palette_indices")
 
-    def test_hsd_sampler_defaults_adjustments_and_explicit_lod(self):
+    def test_hsd_source_sampler_defaults_and_explicit_lod(self):
         self.run_case("lod_sampler")
 
     def test_supported_operations_and_rejection_of_unknown_semantics(self):
         self.run_case("operations_and_modes")
 
-    def test_custom_tev_multitexture_coordinate_and_matrix_rejections(self):
+    def test_custom_tev_invalid_coordinates_and_transform_rejections(self):
         self.run_case("unsupported_graphs_and_transforms")
+
+    def test_reflection_full_srt_raw_blending_and_bounded_texture_chains(self):
+        self.run_case("reflection_srt_and_chains")
 
     def test_dimension_format_lod_and_nonfinite_rejections(self):
         self.run_case("dimensions_and_finite_values")
