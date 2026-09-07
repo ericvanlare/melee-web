@@ -6,9 +6,9 @@
 
 namespace melee_web {
 namespace {
-constexpr uint32_t va_pos = 9, va_nrm = 10, va_null = 255;
+constexpr uint32_t va_pos = 9, va_nrm = 10, va_tex0 = 13, va_null = 255;
 constexpr uint32_t index8 = 2, index16 = 3, type_s16 = 3, type_f32 = 4;
-constexpr size_t max_meshes = 256, max_packets = 65536, max_vertices = 1000000;
+constexpr size_t max_joints = 4096, max_meshes = 4096, max_packets = 65536, max_vertices = 1000000;
 
 [[noreturn]] void reject(const char* reason) { throw DatError(reason); }
 
@@ -25,9 +25,10 @@ void absent(const DatArchive& a, uint32_t slot, const char* message) {
 
 float component(const DatArchive& a, uint32_t base, uint32_t type, uint8_t frac) {
     float result;
-    if (type == type_s16) {
-        const auto raw = a.be16(base);
-        const int value = raw < 0x8000 ? int(raw) : int(raw) - 65536;
+    if (type < type_f32) {
+        const auto raw = type < 2 ? uint32_t(a.range(base, 1)[0]) : uint32_t(a.be16(base));
+        const int value = type == 1 && raw >= 0x80 ? int(raw) - 256 :
+                          type == type_s16 && raw >= 0x8000 ? int(raw) - 65536 : int(raw);
         result = std::ldexp(float(value), -int(frac));
     } else {
         result = a.f32(base);
@@ -40,8 +41,11 @@ float component(const DatArchive& a, uint32_t base, uint32_t type, uint8_t frac)
 void material(const DatArchive& a, uint32_t offset, RigidMesh& mesh) {
     (void) a.range(offset, 24);
     absent(a, offset, "Custom material classes are unsupported");
-    if (a.be32(offset + 4) != 4) reject("Only opaque diffuse materials are supported");
-    absent(a, offset + 8, "Textured models are unsupported");
+    const auto mode = a.be32(offset + 4);
+    if (mode != 4 && mode != 0x14) reject("Material requires the full HSD material path (only opaque diffuse/TEX0 supported)");
+    const auto texture = a.pointer(offset + 8, 92);
+    if (bool(texture) != bool(mode & 0x10)) reject("Material texture flag and descriptor disagree");
+    if (texture) mesh.texture = read_dat_texture(a, *texture);
     const auto mat = required(a, offset + 12, 20);
     absent(a, offset + 16, "Custom material rendering is unsupported");
     absent(a, offset + 20, "Custom pixel-engine state is unsupported");
@@ -68,34 +72,44 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
         reject("Display list crosses another referenced data region");
     mesh.display = a.range(display, mesh.display_bytes).data();
     const auto descriptors = required(a, offset + 8, 24);
-    std::array<uint32_t, 2> array_offsets{}, maximum_index{};
+    std::array<uint32_t, 3> array_offsets{}, maximum_index{}, widths{}, components{};
+    mesh.minimum = {INFINITY, INFINITY, INFINITY};
+    mesh.maximum = {-INFINITY, -INFINITY, -INFINITY};
     bool found_end = false;
-    for (uint32_t i = 0; i < 3; ++i) {
+    for (uint32_t i = 0; i < 4; ++i) {
         const auto d = descriptors + i * 24;
         (void) a.range(d, 24);
         const auto attr = a.be32(d);
         if (attr == va_null) { found_end = true; break; }
         // Fixed ordering also establishes the byte layout of each vertex packet.
-        if ((i == 0 && attr != va_pos) || (i == 1 && attr != va_nrm) || i == 2)
-            reject("Only ordered POS and optional NRM descriptors are supported");
+        if ((i == 0 && attr != va_pos) || i == 3 ||
+            (attr != va_pos && attr != va_nrm && attr != va_tex0) ||
+            (i && attr <= mesh.attributes.back().attr))
+            reject("Only ordered POS, optional NRM and TEX0 descriptors are supported");
         const auto mode = a.be32(d + 4), count = a.be32(d + 8), type = a.be32(d + 12);
         const auto frac = a.range(d + 16, 1)[0];
         const auto stride = a.be16(d + 18);
         if (mode != index8 && mode != index16) reject("Only indexed vertex attributes are supported");
-        if (count != (attr == va_pos ? 1u : 0u)) reject("Only XYZ position and normal attributes are supported");
-        if (type != type_s16 && type != type_f32) reject("Only S16 and F32 vertex components are supported");
+        if (count != (attr == va_nrm ? 0u : 1u)) reject("Only XYZ position/normal and ST texture coordinates are supported");
+        if (type > type_f32 || (attr != va_tex0 && type != type_s16 && type != type_f32))
+            reject("Unsupported vertex component format");
         if (frac > 31 || (type == type_f32 && frac != 0)) reject("Unsupported vertex fractional scale");
-        const uint32_t width = type == type_s16 ? 6 : 12;
+        components[i] = attr == va_tex0 ? 2 : 3;
+        const uint32_t component_size = type < 2 ? 1 : type < 4 ? 2 : 4;
+        const uint32_t width = components[i] * component_size;
+        widths[i] = width;
         if (stride < width || stride > 255) reject("Vertex stride is out of range");
         auto array = a.pointer(d + 20, width);
         if (!array) reject("Vertex array pointer is null");
-        const uint32_t alignment = type == type_s16 ? 2 : 4;
+        const uint32_t alignment = component_size;
         if (*array % alignment) reject("Vertex array alignment is invalid");
         array_offsets[i] = *array;
         mesh.attributes.push_back({attr, mode, count, type, frac, stride,
                                    a.range(*array, width).data(), 0});
     }
     if (!found_end || mesh.attributes.empty()) reject("Unterminated or missing vertex descriptors");
+    if (mesh.texture && mesh.attributes.back().attr != va_tex0)
+        reject("Textured material requires TEX0 coordinates");
 
     size_t cursor = 0;
     const auto packets_before = model.draw_packets;
@@ -128,16 +142,18 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
                 uint32_t index = bytes[cursor++];
                 if (encoded == 2) index = index * 256 + bytes[cursor++];
                 maximum_index[i] = std::max(maximum_index[i], index);
-                const uint32_t width = attr.comp_type == type_s16 ? 6 : 12;
+                const uint32_t width = widths[i];
                 const uint64_t location = uint64_t(array_offsets[i]) + uint64_t(index) * attr.stride;
                 if (location > std::numeric_limits<uint32_t>::max()) reject("Vertex index address overflow");
                 if (location + width > a.next_target_offset(array_offsets[i]))
                     reject("Vertex index crosses another referenced data region");
                 (void) a.range(uint32_t(location), width);
-                for (size_t axis = 0; axis < 3; ++axis) {
-                    const auto value = component(a, uint32_t(location) + uint32_t(axis) * (width / 3),
+                for (size_t axis = 0; axis < components[i]; ++axis) {
+                    const auto value = component(a, uint32_t(location) + uint32_t(axis) * (width / components[i]),
                                                  attr.comp_type, attr.frac);
                     if (attr.attr == va_pos) {
+                        mesh.minimum[axis] = std::min(mesh.minimum[axis], value);
+                        mesh.maximum[axis] = std::max(mesh.maximum[axis], value);
                         model.minimum[axis] = std::min(model.minimum[axis], value);
                         model.maximum[axis] = std::max(model.maximum[axis], value);
                     }
@@ -148,7 +164,7 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
     if (model.draw_packets == packets_before) reject("Polygon has no draw primitives");
     for (size_t i = 0; i < mesh.attributes.size(); ++i) {
         auto& attr = mesh.attributes[i];
-        attr.byte_size = maximum_index[i] * uint32_t(attr.stride) + (attr.comp_type == type_s16 ? 6 : 12);
+        attr.byte_size = maximum_index[i] * uint32_t(attr.stride) + widths[i];
         (void) a.range(array_offsets[i], attr.byte_size);
     }
 }
@@ -162,41 +178,61 @@ RigidModel::RigidModel(std::shared_ptr<const DatArchive> source, const std::stri
     const auto& roots = a.public_symbols();
     const auto root = std::find_if(roots.begin(), roots.end(), [&](const auto& s) { return s.name == symbol; });
     if (root == roots.end()) reject("Public model symbol is missing");
-    const auto joint = root->data_offset;
-    if (joint % 4) reject("Joint root is unaligned");
-    (void) a.range(joint, 64);
-    absent(a, joint, "Custom joint classes are unsupported");
-    // Root visibility/lighting metadata seen in rigid assets. Matrix-dependent
-    // and particle/spline/instance flags require the full HSD joint path.
-    if (a.be32(joint + 4) & ~0x70040088u) reject("Joint flags require unsupported HSD behavior");
-    absent(a, joint + 8, "Joint hierarchies are not supported by this target");
-    absent(a, joint + 12, "Sibling joints are not supported by this target");
-    for (uint32_t i = 0; i < 9; ++i) {
-        const auto expected = i >= 3 && i < 6 ? 1.f : 0.f;
-        if (a.f32(joint + 20 + 4 * i) != expected) reject("Only identity joint transforms are supported");
-    }
-    absent(a, joint + 56, "Joint inverse matrices are unsupported");
-    absent(a, joint + 60, "Joint references are unsupported");
-    std::set<uint32_t> objects, polygons;
-    auto dobj = a.pointer(joint + 16, 16);
-    while (dobj) {
-        if (*dobj % 4 || !objects.insert(*dobj).second || objects.size() > max_meshes)
-            reject("Cyclic, unaligned or oversized display-object chain");
-        absent(a, *dobj, "Custom display-object classes are unsupported");
-        const auto mat = required(a, *dobj + 8, 24);
-        auto pobj = a.pointer(*dobj + 12, 24);
-        while (pobj) {
-            if (*pobj % 4 || !polygons.insert(*pobj).second || meshes.size() >= max_meshes)
-                reject("Cyclic, shared, unaligned or oversized polygon chain");
-            RigidMesh mesh;
-            material(a, mat, mesh);
-            geometry(a, *pobj, mesh, *this);
-            meshes.push_back(std::move(mesh));
-            pobj = a.pointer(*pobj + 4, 24);
+    struct PendingJoint { uint32_t offset, parent; };
+    std::vector<PendingJoint> pending{{root->data_offset, RigidJoint::no_parent}};
+    std::set<uint32_t> visited_joints;
+    while (!pending.empty()) {
+        const auto [joint, parent] = pending.back();
+        pending.pop_back();
+        if (joint % 4 || !visited_joints.insert(joint).second || joints.size() >= max_joints)
+            reject("Cyclic, shared, unaligned or oversized joint graph");
+        (void) a.range(joint, 64);
+        absent(a, joint, "Custom joint classes are unsupported");
+        RigidJoint node;
+        node.descriptor_offset = joint;
+        node.parent = parent;
+        node.flags = a.be32(joint + 4);
+        // Ordinary Euler transforms and render metadata. Original HSD transform
+        // code performs scale inheritance; special matrix/IK modes need more HSD.
+        if (node.flags & ~0x701D01D8u) reject("Joint flags require unsupported HSD behavior");
+        for (uint32_t axis = 0; axis < 3; ++axis) {
+            node.rotation[axis] = a.f32(joint + 20 + 4 * axis);
+            node.scale[axis] = a.f32(joint + 32 + 4 * axis);
+            node.translation[axis] = a.f32(joint + 44 + 4 * axis);
+            if (!std::isfinite(node.rotation[axis]) || !std::isfinite(node.scale[axis]) ||
+                !std::isfinite(node.translation[axis])) reject("Joint SRT values must be finite");
         }
-        dobj = a.pointer(*dobj + 4, 16);
+        absent(a, joint + 56, "Joint inverse matrices are unsupported");
+        absent(a, joint + 60, "Joint references are unsupported");
+        const auto joint_index = uint32_t(joints.size());
+        joints.push_back(node);
+        // Siblings inherit this node's parent, not this node. Push child last so
+        // the iterative traversal visits parents before descendants without recursion.
+        if (auto next = a.pointer(joint + 12, 64)) pending.push_back({*next, parent});
+        if (auto child = a.pointer(joint + 8, 64)) pending.push_back({*child, joint_index});
+        std::set<uint32_t> objects;
+        auto dobj = a.pointer(joint + 16, 16);
+        while (dobj) {
+            if (*dobj % 4 || !objects.insert(*dobj).second || objects.size() > max_meshes)
+                reject("Cyclic, unaligned or oversized display-object chain");
+            absent(a, *dobj, "Custom display-object classes are unsupported");
+            const auto mat = required(a, *dobj + 8, 24);
+            std::set<uint32_t> polygons;
+            auto pobj = a.pointer(*dobj + 12, 24);
+            while (pobj) {
+                if (*pobj % 4 || !polygons.insert(*pobj).second || meshes.size() >= max_meshes)
+                    reject("Cyclic, unaligned or oversized polygon chain");
+                RigidMesh mesh;
+                mesh.joint_index = joint_index;
+                material(a, mat, mesh);
+                geometry(a, *pobj, mesh, *this);
+                meshes.push_back(std::move(mesh));
+                pobj = a.pointer(*pobj + 4, 24);
+            }
+            dobj = a.pointer(*dobj + 4, 16);
+        }
     }
-    if (meshes.empty() || !draw_packets || maximum[0] == minimum[0] || maximum[1] == minimum[1])
-        reject("Model has no drawable surface extent");
+    if (meshes.empty() || !draw_packets)
+        reject("Model has no draw primitives");
 }
 }

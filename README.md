@@ -5,7 +5,8 @@ in a desktop browser using WebAssembly and WebGPU.
 
 **This is not a playable game yet.** The browser can render a real rigid Melee
 DAT model using original HSD polygon code and Aurora's GX renderer. The current
-preview supports one identity joint and opaque, untextured diffuse meshes.
+preview supports ordinary rigid joint trees and opaque diffuse meshes with one
+UV texture per material.
 It does not establish complete scene fidelity or full-game performance.
 
 ## Build and inspect
@@ -34,8 +35,18 @@ python3 scripts/extract_disc_file.py /path/to/game.ciso TyTarget.dat --output as
 
 The extractor reads the disc without modifying it. Extracted data stays in ignored
 `assets-local/`; the browser reads the selected file locally without uploading it.
-The target appears with unlit diffuse colors and an inspection camera. Joint
-hierarchies, textures, skinning and animation are not supported yet.
+Use the same command with `TyHarise.dat` to inspect the textured fan. Both models
+use an inspection camera and unlit materials. Skinning, animation, reflection,
+multiple texture layers and complete HSD material lighting remain to be integrated.
+
+For a growing local asset corpus, run the actual CPU parser in a batch:
+
+```sh
+python3 scripts/check_assets.py assets-local/
+```
+
+This emits JSON lines with supported roots/counts or exact rejection reasons.
+It measures parser coverage; browser rendering is verified separately.
 
 Bootstrap downloads pinned Aurora, Melee, and Emscripten sources into `.deps/`
 and CMake/Ninja into `.venv/`. The build downloads Aurora's transitive dependencies;

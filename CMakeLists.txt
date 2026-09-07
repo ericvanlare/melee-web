@@ -46,17 +46,18 @@ if(EMSCRIPTEN)
   endif()
 endif()
 
-add_library(hsd_state STATIC .deps/melee/src/sysdolphin/baselib/state.c src/hsd_pobj_bridge.c)
+add_library(hsd_state STATIC .deps/melee/src/sysdolphin/baselib/state.c src/hsd_pobj_bridge.c
+  src/hsd_transform_bridge.c .deps/melee/src/sysdolphin/baselib/mtx.c)
 target_include_directories(hsd_state PRIVATE .deps/melee/src .deps/aurora/include)
 target_compile_definitions(hsd_state PRIVATE TARGET_PC)
 target_compile_options(hsd_state PRIVATE -ffunction-sections -fdata-sections
   -ffp-contract=off -include "${CMAKE_CURRENT_SOURCE_DIR}/src/hsd_probe_compat.h")
 
 add_executable(gx_probe src/gx_probe.c src/hsd_probe.c src/dat_archive.cpp
-  src/rigid_model.cpp src/asset_scene.cpp)
+  src/rigid_model.cpp src/asset_scene.cpp src/dat_texture.cpp src/gx_material.cpp)
 target_include_directories(gx_probe PRIVATE .deps/melee/src)
 target_link_libraries(gx_probe PRIVATE hsd_state)
-target_link_libraries(gx_probe PRIVATE aurora::core aurora::gx aurora::main aurora::vi)
+target_link_libraries(gx_probe PRIVATE aurora::core aurora::gx aurora::main aurora::vi aurora::mtx)
 target_compile_options(gx_probe PRIVATE -Wall -Wextra -Werror -ffp-contract=off)
 if(EMSCRIPTEN)
   set_target_properties(gx_probe PROPERTIES SUFFIX ".js")

@@ -20,7 +20,7 @@
   <label>Extracted DAT file <input id="asset-file" type="file" accept=".dat" disabled></label>
   <label>Public model symbol <select id="asset-symbol" disabled><option>Load a DAT file first</option></select></label>
   <output id="asset-status">No asset loaded. The canvas shows the synthetic GX probe.</output>
-  <p>Supports one rigid identity joint with opaque, untextured diffuse meshes. Colors are shown without lighting; this is an asset inspection camera, not gameplay. Unsupported features produce an error. Files stay in this tab and are never uploaded.</p>
+  <p>Supports rigid joint trees and opaque diffuse meshes with one UV texture per material. Lighting, reflections, skinning and animation are not implemented; this is an asset inspection camera, not gameplay. Unsupported features produce an error. Files stay in this tab and are never uploaded.</p>
 </fieldset>
 <output id="status">Checking browser support…</output>
 <canvas id="canvas" width="640" height="480" tabindex="0" aria-label="Aurora GX rendering probe"></canvas>

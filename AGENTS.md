@@ -5,6 +5,11 @@ through compiled source, without a PowerPC CPU interpreter or JIT.
 
 - Read README.md and STATUS.md before work. Keep status backed by observed evidence.
 - Make small coherent changes; inspect actual APIs and compiler output before changing code.
+- Prioritize runnable milestones and parallelize work across bounded interfaces. Once
+  relevant checks pass, integrate; defer cleanup that does not unblock the port.
+- Reuse original HSD/game routines for shared behavior. Keep archive decoding separate
+  from GPU resource lifetime; use the batch asset checker to identify the next missing
+  capability across a corpus. Do not add per-asset exemptions or guessed success paths.
 - Keep original upstream checkouts intact. Pin dependencies in dependencies.lock.json;
   store explained, reviewable downstream changes under patches/.
 - Never describe a successful compile, synthetic scene, or average FPS as gameplay validation.

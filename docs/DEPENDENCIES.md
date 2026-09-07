@@ -5,7 +5,7 @@ revisions inspected for the current probe.
 
 | Dependency | Pinned source revision | Role |
 | --- | --- | --- |
-| [doldecomp/melee](https://github.com/doldecomp/melee) | `b43912cc78606f96c9569f5d6229bc9d7e265ea5` | Recovered game and HSD C; current target retains HSD state and rigid polygon code |
+| [doldecomp/melee](https://github.com/doldecomp/melee) | `b43912cc78606f96c9569f5d6229bc9d7e265ea5` | Recovered game and HSD C; current target retains HSD state, rigid polygon and SRT code |
 | [encounter/aurora](https://github.com/encounter/aurora) | `749d6ee7a22bdfab78c8ece9047bca5d79aa72ca` | Source-level GX renderer and platform services |
 | [emscripten-core/emsdk](https://github.com/emscripten-core/emsdk) | `5eb0bde7585670252e8ba05e9d361627bffd08b5` | Installer for Emscripten **6.0.9**, including its compiler and browser WebGPU bindings |
 
@@ -65,6 +65,19 @@ arguments, and clears HSD descriptor caches when temporary descriptors are reuse
 The default triangle is authored test geometry; local DAT import uses original
 display-list and vertex bytes after validating their typed descriptors and indices.
 
+`src/hsd_transform_bridge.c` calls original `HSD_MtxSRT` from `mtx.c` and Aurora's
+SDK matrix concatenation. It preserves `HSD_JObjMakeMatrix`'s accumulated-scale
+policy explicitly. The CPU decoder stores the joint graph and immutable raw
+asset spans; `PreparedScene` owns transform state and GPU-facing resources.
+This separates archive interpretation from device lifetime and keeps decoding
+available to both browser import and the native batch checker.
+
+`dat_texture.cpp` checks original tiled images, mip chains and palettes before
+upload. `gx_material.cpp` implements only the validated single diffuse texture
+operations for the unlit preview. Complete HSD material expressions are the next
+source-integration boundary; this small preview material path is not a substitute
+for the original game renderer.
+
 `src/hsd_probe_compat.h` adapts observed header differences only for that HSD
 translation units: the `Vec3` name, missing `GXTevClampMode` declaration, `va_list`
 include order, and Melee's conflicting local `ssize_t` typedef. The latter is
@@ -99,10 +112,10 @@ game traces.
 
 ## Next asset gate
 
-The first local DAT model now renders through the rigid polygon seam. Next add
-joint transforms and textured materials to reach a representative static scene.
+Untextured and textured local DAT models now render through the rigid polygon
+seam. Next integrate original HSD material code to reach a representative scene.
 The full `jobj.c` → `dobj.c` loader/display path remains to be integrated; the
-current typed decoder walks only a validated identity joint's rigid objects.
+current typed decoder walks validated ordinary joint trees and their rigid objects.
 Relocation metadata does not describe every field's type, and raw GX geometry
 bytes retain their original byte order. See [ROADMAP.md](ROADMAP.md) for acceptance
 criteria and [STATUS.md](../STATUS.md) for observed results.

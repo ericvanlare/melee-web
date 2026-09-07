@@ -265,23 +265,183 @@ void cyclic_graphs()
     rejects([&] { (void) fixture.model(); });
 }
 
-void hierarchy_and_matrices()
+void raw_joint_srt()
+{
+    Fixture fixture;
+    const std::array<float, 3> rotation{.25F, -.5F, .75F};
+    const std::array<float, 3> scale{2.F, 3.F, 4.F};
+    const std::array<float, 3> translation{-5.F, 6.F, 7.F};
+    constexpr std::uint32_t flags = 0x10040088;
+    put32(fixture.data, Fixture::joint + 4, flags);
+    for (std::size_t axis = 0; axis < 3; ++axis) {
+        putf32(fixture.data, Fixture::joint + 20 + axis * 4, rotation[axis]);
+        putf32(fixture.data, Fixture::joint + 32 + axis * 4, scale[axis]);
+        putf32(fixture.data, Fixture::joint + 44 + axis * 4, translation[axis]);
+    }
+    const auto model = fixture.model();
+    check(model.joints.size() == 1, "one decoded joint");
+    const auto& node = model.joints[0];
+    check(node.descriptor_offset == Fixture::joint &&
+          node.parent == melee_web::RigidJoint::no_parent && node.flags == flags,
+          "root identity and original flags survive typed decoding");
+    check(node.rotation == rotation && node.scale == scale && node.translation == translation,
+          "Euler SRT is preserved for original HSD transform evaluation");
+    check(model.meshes[0].joint_index == 0 &&
+          model.meshes[0].minimum == std::array<float, 3>{-1.F, -.5F, 0.F} &&
+          model.meshes[0].maximum == std::array<float, 3>{1.F, 1.5F, .5F},
+          "mesh bounds stay local; the decoder must not apply SRT a second time");
+}
+
+void add_joint(Fixture& fixture, std::uint32_t offset)
+{
+    fixture.data.resize(std::max(fixture.data.size(), std::size_t(offset) + 64), 0);
+    for (std::size_t axis = 0; axis < 3; ++axis)
+        putf32(fixture.data, offset + 32 + axis * 4, 1.F);
+}
+
+void joint_hierarchy()
+{
+    Fixture fixture;
+    constexpr std::uint32_t child = 320, sibling = 384, grandchild = 448, root_sibling = 512;
+    for (const auto offset : {child, sibling, grandchild, root_sibling}) {
+        add_joint(fixture, offset);
+        // These are separate joint instances of the same immutable geometry.
+        fixture.link(offset + 16, Fixture::dobj);
+    }
+    fixture.link(Fixture::joint + 8, child);
+    fixture.link(Fixture::joint + 12, root_sibling);
+    fixture.link(child + 8, grandchild);
+    fixture.link(child + 12, sibling);
+    putf32(fixture.data, child + 44, 3.F);
+    putf32(fixture.data, sibling + 44, -3.F);
+    const auto model = fixture.model();
+    check(model.joints.size() == 5 && model.meshes.size() == 5 &&
+          model.draw_packets == 5 && model.submitted_vertices == 15,
+          "five distinct joints can share one DObj/PObj/vertex/display data graph");
+    const auto index_of = [&](std::uint32_t offset) {
+        const auto it = std::find_if(model.joints.begin(), model.joints.end(),
+            [&](const auto& node) { return node.descriptor_offset == offset; });
+        check(it != model.joints.end(), "expected joint descriptor retained");
+        return static_cast<std::uint32_t>(it - model.joints.begin());
+    };
+    const auto root_index = index_of(Fixture::joint);
+    const auto child_index = index_of(child);
+    const auto sibling_index = index_of(sibling);
+    const auto grandchild_index = index_of(grandchild);
+    check(model.joints[root_index].parent == melee_web::RigidJoint::no_parent &&
+          model.joints[index_of(root_sibling)].parent == melee_web::RigidJoint::no_parent,
+          "root siblings have no parent");
+    check(model.joints[child_index].parent == root_index &&
+          model.joints[sibling_index].parent == root_index &&
+          model.joints[grandchild_index].parent == child_index,
+          "a sibling inherits the shared parent, not its preceding sibling");
+    check(root_index < child_index && root_index < sibling_index && child_index < grandchild_index,
+          "parents precede children for original HSD matrix evaluation");
+    check(model.joints[child_index].translation[0] == 3.F &&
+          model.joints[sibling_index].translation[0] == -3.F,
+          "shared geometry retains each owning joint's independent transform");
+    std::vector<bool> owns_geometry(model.joints.size(), false);
+    for (const auto& mesh : model.meshes) {
+        check(mesh.joint_index < model.joints.size() && !owns_geometry[mesh.joint_index],
+              "each decoded mesh records exactly its owning joint");
+        owns_geometry[mesh.joint_index] = true;
+        check(mesh.display == model.meshes[0].display &&
+              mesh.attributes[0].data == model.meshes[0].attributes[0].data &&
+              mesh.minimum == model.meshes[0].minimum && mesh.maximum == model.meshes[0].maximum,
+              "repeated geometry keeps immutable shared bytes and local bounds");
+    }
+}
+
+void invalid_joint_graphs()
 {
     for (const auto offset : {8U, 12U, 56U, 60U}) {
         Fixture fixture;
         fixture.link(Fixture::joint + offset, Fixture::joint);
         rejects([&] { (void) fixture.model(); });
     }
+    // Two parent chains may share geometry, but sharing a joint descriptor is
+    // ambiguous parentage and requires HSD instance semantics we do not support.
+    Fixture shared;
+    add_joint(shared, 320);
+    add_joint(shared, 384);
+    shared.link(Fixture::joint + 8, 320);
+    shared.link(Fixture::joint + 12, 384);
+    shared.link(384 + 8, 320);
+    rejects([&] { (void) shared.model(); });
     for (const auto offset : {20U, 32U, 44U}) {
-        Fixture fixture;
-        putf32(fixture.data, Fixture::joint + offset, 2.F);
-        rejects([&] { (void) fixture.model(); });
+        for (const auto bits : {0x7f800000U, 0xff800000U, 0x7fc00001U}) {
+            Fixture fixture;
+            add_joint(fixture, 320);
+            fixture.link(Fixture::joint + 8, 320);
+            put32(fixture.data, 320 + offset, bits);
+            rejects([&] { (void) fixture.model(); });
+        }
     }
-    for (const auto flag : {1U << 4, 1U << 5, 1U << 9, 1U << 12, 1U << 17, 1U << 23}) {
+    for (const auto flag : {1U << 5, 1U << 9, 1U << 12, 1U << 17, 1U << 23}) {
         Fixture fixture;
         put32(fixture.data, Fixture::joint + 4, flag);
         rejects([&] { (void) fixture.model(); });
     }
+    Fixture custom_class;
+    custom_class.link(Fixture::joint, Fixture::material);
+    rejects([&] { (void) custom_class.model(); });
+}
+
+void indexed_uv_geometry()
+{
+    for (const auto type : {0U, 3U, 4U}) {
+        Fixture fixture;
+        constexpr std::uint32_t uv_array = 32;
+        const bool floats = type == 4, unsigned_bytes = type == 0;
+        const auto stride = std::uint16_t(unsigned_bytes ? 2 : floats ? 12 : 6);
+        fixture.attribute(Fixture::descriptors + 24, 13, 3, 1,
+                          type, unsigned_bytes ? 7 : floats ? 0 : 2, stride, uv_array);
+        put32(fixture.data, Fixture::descriptors + 48, 255);
+        const std::array<float, 6> uv = {-.5F, .25F, 1.5F, 2.F, 0.F, -1.F};
+        for (std::size_t i = 0; i < uv.size(); ++i) {
+            const auto offset = uv_array + (i / 2) * stride + (i % 2) * (unsigned_bytes ? 1 : floats ? 4 : 2);
+            if (unsigned_bytes) {
+                const std::array<std::uint8_t, 6> encoded{0, 32, 64, 128, 16, 112};
+                fixture.data[offset] = encoded[i];
+            } else if (floats) putf32(fixture.data, offset, uv[i]);
+            else put16(fixture.data, offset, static_cast<std::uint16_t>(static_cast<std::int16_t>(uv[i] * 4)));
+        }
+        std::fill(fixture.data.begin() + Fixture::display + 3, fixture.data.end(), 0);
+        const std::array<std::uint16_t, 3> uv_indices{2, 0, 1};
+        for (std::size_t vertex = 0; vertex < 3; ++vertex) {
+            fixture.data[Fixture::display + 3 + vertex * 3] = static_cast<std::uint8_t>(vertex);
+            put16(fixture.data, Fixture::display + 4 + vertex * 3, uv_indices[vertex]);
+        }
+        const auto model = fixture.model();
+        const auto& mesh = model.meshes[0];
+        check(!mesh.texture && mesh.attributes.size() == 2 && mesh.attributes[1].attr == 13,
+              "an untextured material may retain an unused TEX0 vertex stream");
+        check(model.draw_packets == 1 && model.submitted_vertices == 3 &&
+              mesh.attributes[0].byte_size == 18 &&
+              mesh.attributes[1].byte_size == (unsigned_bytes ? 6U : floats ? 32U : 16U),
+              "mixed POS8/UV16 indices use ST width and preserve padded array strides");
+        if (unsigned_bytes)
+            check(mesh.attributes[1].comp_type == 0 && mesh.attributes[1].frac == 7 &&
+                  mesh.attributes[1].stride == 2,
+                  "U8 frac7 ST coordinates retain their original compact format");
+        check(mesh.attributes[1].data == model.archive->data().data() + uv_array &&
+              mesh.minimum == std::array<float, 3>{-1.F, -.5F, 0.F} &&
+              mesh.maximum == std::array<float, 3>{1.F, 1.5F, .5F},
+              "UV bytes remain big-endian and do not alter position bounds");
+        put16(fixture.data, Fixture::display + 4, 16);
+        rejects([&] { (void) fixture.model(); }); // UV index enters the joint descriptor.
+        put16(fixture.data, Fixture::display + 4, 2);
+        if (floats) {
+            put32(fixture.data, uv_array, 0x7fc00001U);
+            rejects([&] { (void) fixture.model(); });
+        }
+    }
+    Fixture fixture;
+    fixture.attribute(Fixture::descriptors + 24, 13, 2, 0, 3, 2, 4, 32);
+    put32(fixture.data, Fixture::descriptors + 48, 255);
+    rejects([&] { (void) fixture.model(); }); // One-component texture coordinates are unsupported.
+    fixture.attribute(Fixture::descriptors + 24, 13, 2, 1, 3, 2, 3, 32);
+    rejects([&] { (void) fixture.model(); }); // A stride cannot truncate ST components.
 }
 
 void materials_and_polygon_modes()
@@ -372,7 +532,9 @@ int main(int argc, char** argv)
         {"valid_f32_geometry", valid_f32_geometry}, {"display_commands", display_commands},
         {"surface_counts", surface_counts}, {"truncated_packets", truncated_packets},
         {"indexed_array_bounds", indexed_array_bounds}, {"cyclic_graphs", cyclic_graphs},
-        {"hierarchy_and_matrices", hierarchy_and_matrices},
+        {"raw_joint_srt", raw_joint_srt}, {"joint_hierarchy", joint_hierarchy},
+        {"invalid_joint_graphs", invalid_joint_graphs},
+        {"indexed_uv_geometry", indexed_uv_geometry},
         {"materials_and_polygon_modes", materials_and_polygon_modes},
         {"descriptor_formats", descriptor_formats}, {"finite_geometry", finite_geometry},
         {"missing_model_content", missing_model_content},

@@ -22,6 +22,7 @@ class RigidModelTests(unittest.TestCase):
         result = subprocess.run(
             [compiler, "-std=c++20", "-Wall", "-Wextra", "-Werror", "-O1", "-g",
              "-I", str(ROOT / "src"), str(ROOT / "src/dat_archive.cpp"),
+             str(ROOT / "src/dat_texture.cpp"),
              str(ROOT / "src/rigid_model.cpp"), str(ROOT / "tests/rigid_model_test.cpp"),
              "-o", str(cls.binary)], capture_output=True, text=True, timeout=120,
         )
@@ -56,10 +57,19 @@ class RigidModelTests(unittest.TestCase):
     def test_display_object_and_polygon_cycles(self):
         self.run_case("cyclic_graphs")
 
-    def test_unsupported_hierarchies_transforms_and_joint_flags(self):
-        self.run_case("hierarchy_and_matrices")
+    def test_joint_srt_and_mesh_bounds_remain_untransformed(self):
+        self.run_case("raw_joint_srt")
 
-    def test_unsupported_material_texture_and_polygon_features(self):
+    def test_sibling_parentage_and_geometry_shared_between_distinct_joints(self):
+        self.run_case("joint_hierarchy")
+
+    def test_joint_cycles_nonfinite_transforms_and_unsupported_modes(self):
+        self.run_case("invalid_joint_graphs")
+
+    def test_optional_uv_indices_spans_and_finite_components(self):
+        self.run_case("indexed_uv_geometry")
+
+    def test_unsupported_material_and_polygon_features(self):
         self.run_case("materials_and_polygon_modes")
 
     def test_descriptor_order_types_stride_scale_and_termination(self):

@@ -24,8 +24,8 @@ jobs:
         run: python3 -m unittest discover -s tests -v
       - name: Install pinned dependencies
         run: python3 scripts/bootstrap.py
-      - name: Trace original HSD polygon calls
-        run: python3 -m unittest discover -s tests -p test_hsd_pobj_bridge.py -v
+      - name: Validate original HSD polygon and transform paths
+        run: python3 -m unittest discover -s tests -p 'test_hsd_*_bridge.py' -v
       - name: Compile browser probe
         run: python3 scripts/build.py --jobs 2
 
