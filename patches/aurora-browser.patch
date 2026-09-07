@@ -1,0 +1,564 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 8bc473c..a7f111b 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -5,7 +5,14 @@ if (APPLE)
+ endif()
+ set(CMAKE_C_STANDARD 11)
+ set(CMAKE_CXX_STANDARD 20)
+-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
++if (EMSCRIPTEN)
++    # This target links a static Wasm module. Avoid LLVM's PIC function-pointer
++    # devirtualization bug (a direct call with R_WASM_GLOBAL_INDEX_LEB).
++    # https://github.com/emscripten-core/emscripten/issues/27525
++    set(CMAKE_POSITION_INDEPENDENT_CODE OFF)
++else ()
++    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
++endif ()
+ 
+ option(AURORA_ENABLE_GX "Enable GX implementation and WebGPU renderer" ON)
+ option(AURORA_ENABLE_DVD "Enable DVD implementation backed by nod" ON)
+@@ -28,7 +35,7 @@ endif ()
+ # Dawn/WebGPU (if AURORA_ENABLE_GX)
+ set(AURORA_DAWN_PROVIDER "${_default_provider}" CACHE STRING
+   "How to provide Dawn: auto, vendor (build from source), system (find_package/imported), package (download prebuilt)")
+-set_property(CACHE AURORA_DAWN_PROVIDER PROPERTY STRINGS auto vendor system package)
++set_property(CACHE AURORA_DAWN_PROVIDER PROPERTY STRINGS auto vendor system package emscripten)
+ set(AURORA_DAWN_LINKAGE "${_default_linkage}" CACHE STRING "Dawn linkage type preference")
+ set_property(CACHE AURORA_DAWN_LINKAGE PROPERTY STRINGS shared static)
+ 
+diff --git a/cmake/AuroraDawnProvider.cmake b/cmake/AuroraDawnProvider.cmake
+index 184d0ee..abc9c5e 100644
+--- a/cmake/AuroraDawnProvider.cmake
++++ b/cmake/AuroraDawnProvider.cmake
+@@ -104,7 +104,20 @@ if (_aurora_dawn_provider STREQUAL "auto")
+   message(STATUS "aurora: Dawn auto-resolved provider: ${_aurora_dawn_provider}")
+ endif ()
+ 
+-if (_aurora_dawn_provider STREQUAL "vendor")
++if (_aurora_dawn_provider STREQUAL "emscripten")
++  if (NOT EMSCRIPTEN)
++    message(FATAL_ERROR "The emscripten Dawn provider requires the Emscripten toolchain")
++  endif ()
++  foreach (_backend D3D12 D3D11 VULKAN METAL DESKTOP_GL OPENGLES NULL)
++    set(DAWN_ENABLE_${_backend} OFF CACHE INTERNAL "" FORCE)
++  endforeach ()
++  add_library(aurora_emdawnwebgpu INTERFACE)
++  target_compile_options(aurora_emdawnwebgpu INTERFACE --use-port=emdawnwebgpu)
++  target_link_options(aurora_emdawnwebgpu INTERFACE --use-port=emdawnwebgpu)
++  target_compile_definitions(aurora_emdawnwebgpu INTERFACE ENABLE_BACKEND_WEBGPU)
++  add_library(dawn::webgpu_dawn ALIAS aurora_emdawnwebgpu)
++  set(AURORA_DAWN_IS_SHARED FALSE)
++elseif (_aurora_dawn_provider STREQUAL "vendor")
+   # ── Vendor: FetchContent build from source ──
+   if (NOT TARGET webgpu_dawn)
+     message(STATUS "aurora: Fetching Dawn (provider=vendor, linkage=${AURORA_DAWN_LINKAGE})")
+diff --git a/cmake/aurora_core.cmake b/cmake/aurora_core.cmake
+index 5ef636d..1e6f619 100644
+--- a/cmake/aurora_core.cmake
++++ b/cmake/aurora_core.cmake
+@@ -63,7 +63,10 @@ if(AURORA_ENABLE_RMLUI)
+ endif ()
+ 
+ if (AURORA_ENABLE_GX)
+-    target_compile_definitions(aurora_core PUBLIC AURORA_ENABLE_GX WEBGPU_DAWN)
++    target_compile_definitions(aurora_core PUBLIC AURORA_ENABLE_GX)
++    if (NOT EMSCRIPTEN)
++      target_compile_definitions(aurora_core PUBLIC WEBGPU_DAWN)
++    endif ()
+     target_sources(aurora_core PRIVATE
+             lib/webgpu/gpu.cpp
+             lib/webgpu/gpu_cache.cpp
+diff --git a/cmake/aurora_gx.cmake b/cmake/aurora_gx.cmake
+index f8f9461..dcaaf02 100644
+--- a/cmake/aurora_gx.cmake
++++ b/cmake/aurora_gx.cmake
+@@ -51,7 +51,9 @@ set_target_properties(aurora_gx PROPERTIES FOLDER "aurora")
+ 
+ target_link_libraries(aurora_gx PUBLIC aurora::core dawn::webgpu_dawn xxhash)
+ target_link_libraries(aurora_gx PRIVATE absl::btree absl::flat_hash_map sqlite3 TracyClient PNG::PNG)
+-target_compile_definitions(aurora_gx PRIVATE WEBGPU_DAWN)
++if (NOT EMSCRIPTEN)
++  target_compile_definitions(aurora_gx PRIVATE WEBGPU_DAWN)
++endif ()
+ 
+ if (AURORA_ENABLE_RMLUI)
+     target_sources(aurora_gx PRIVATE
+diff --git a/extern/CMakeLists.txt b/extern/CMakeLists.txt
+index e1feaca..5051b3e 100644
+--- a/extern/CMakeLists.txt
++++ b/extern/CMakeLists.txt
+@@ -213,11 +213,29 @@ if (AURORA_ENABLE_GX)
+     )
+     target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR})
+ 
++    set(_aurora_imgui_wgpu_source "${imgui_SOURCE_DIR}/backends/imgui_impl_wgpu.cpp")
++    if (EMSCRIPTEN)
++      # This pinned ImGui version predates emdawnwebgpu. Its Dawn ABI branch
++      # already uses the modern shared webgpu.h types; permit that branch
++      # under Emscripten in a generated copy, retaining the full renderer.
++      file(READ "${_aurora_imgui_wgpu_source}" _aurora_imgui_wgpu)
++      string(REPLACE "#ifndef __EMSCRIPTEN__"
++        "#if !defined(__EMSCRIPTEN__) || defined(IMGUI_IMPL_WEBGPU_BACKEND_DAWN)"
++        _aurora_imgui_wgpu "${_aurora_imgui_wgpu}")
++      # The modern layout has a nextInChain member absent from this backend's
++      # original API. Value-initialize it instead of passing stack garbage.
++      string(REPLACE "WGPUVertexBufferLayout buffer_layouts[1];"
++        "WGPUVertexBufferLayout buffer_layouts[1] = {};"
++        _aurora_imgui_wgpu "${_aurora_imgui_wgpu}")
++      set(_aurora_imgui_wgpu_source "${CMAKE_CURRENT_BINARY_DIR}/imgui_impl_wgpu_emdawn.cpp")
++      file(WRITE "${_aurora_imgui_wgpu_source}" "${_aurora_imgui_wgpu}")
++    endif ()
+     add_library(imgui_backends STATIC
+       ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp
+       ${imgui_SOURCE_DIR}/backends/imgui_impl_sdlrenderer3.cpp
+-      ${imgui_SOURCE_DIR}/backends/imgui_impl_wgpu.cpp
++      ${_aurora_imgui_wgpu_source}
+     )
++    target_include_directories(imgui_backends PRIVATE "${imgui_SOURCE_DIR}/backends")
+     target_compile_definitions(imgui_backends PRIVATE IMGUI_IMPL_WEBGPU_BACKEND_DAWN)
+     target_link_libraries(imgui_backends PRIVATE imgui ${AURORA_SDL3_TARGET} dawn::webgpu_dawn)
+     target_link_libraries(imgui PUBLIC imgui_backends)
+diff --git a/lib/aurora.cpp b/lib/aurora.cpp
+index 9430842..ef51e7c 100644
+--- a/lib/aurora.cpp
++++ b/lib/aurora.cpp
+@@ -380,7 +380,12 @@ void end_frame() noexcept {
+       {
+         window::SurfaceLock surfaceLock;
+         if (window::is_presentable()) {
++#ifdef __EMSCRIPTEN__
++          // Browser presentation happens when control returns to its event loop.
++          status = wgpu::Status::Success;
++#else
+           status = g_surface.Present();
++#endif
+         }
+       }
+       if (status) {
+diff --git a/lib/dawn/BackendBinding.cpp b/lib/dawn/BackendBinding.cpp
+index 447ead8..8514c86 100644
+--- a/lib/dawn/BackendBinding.cpp
++++ b/lib/dawn/BackendBinding.cpp
+@@ -23,6 +23,10 @@ std::shared_ptr<wgpu::ChainedStruct> SetupWindowAndGetSurfaceDescriptor(SDL_Wind
+       std::make_shared<wgpu::SurfaceSourceAndroidNativeWindow>();
+   desc->window = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_ANDROID_WINDOW_POINTER, nullptr);
+   return std::move(desc);
++#elif defined(SDL_PLATFORM_EMSCRIPTEN)
++  auto desc = std::make_shared<wgpu::EmscriptenSurfaceSourceCanvasHTMLSelector>();
++  desc->selector = "#canvas";
++  return desc;
+ #elif defined(SDL_PLATFORM_WIN32)
+   std::shared_ptr<wgpu::SurfaceSourceWindowsHWND> desc = std::make_shared<wgpu::SurfaceSourceWindowsHWND>();
+   desc->hwnd = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr);
+diff --git a/lib/gfx/frame.cpp b/lib/gfx/frame.cpp
+index 9fd83ef..2e0e62a 100644
+--- a/lib/gfx/frame.cpp
++++ b/lib/gfx/frame.cpp
+@@ -27,6 +27,9 @@
+ #include <utility>
+ #include <vector>
+ 
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++#endif
+ #include <tracy/Tracy.hpp>
+ #include <magic_enum.hpp>
+ 
+@@ -179,7 +182,12 @@ void wait_for_gpu_progress(std::chrono::nanoseconds sleepDuration) {
+   if (render_worker::is_idle()) {
+     enqueue_process_events();
+   }
++#ifdef __EMSCRIPTEN__
++  // ProcessEvents cannot settle JavaScript promises until the browser gets control.
++  emscripten_sleep(0);
++#else
+   std::this_thread::sleep_for(sleepDuration);
++#endif
+ }
+ 
+ void pace_frame_start() {
+diff --git a/lib/gfx/pipeline_cache.cpp b/lib/gfx/pipeline_cache.cpp
+index bff9b47..8b55cd4 100644
+--- a/lib/gfx/pipeline_cache.cpp
++++ b/lib/gfx/pipeline_cache.cpp
+@@ -928,8 +928,14 @@ static void pipeline_cache_writer() {
+     std::deque<PipelineCacheWrite> batch;
+     {
+       std::unique_lock lock{g_pipelineCacheWriterMutex};
++#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++      if (g_pipelineCacheWriteQueue.empty()) {
++        return;
++      }
++#else
+       g_pipelineCacheWriterCv.wait(lock,
+                                    [] { return g_pipelineCacheWriterStop || !g_pipelineCacheWriteQueue.empty(); });
++#endif
+       if (g_pipelineCacheWriterStop && g_pipelineCacheWriteQueue.empty()) {
+         return;
+       }
+@@ -1081,10 +1087,15 @@ static void start_pipeline_cache_writer() {
+   }
+ 
+   g_pipelineCacheWriterStop = false;
++#if !defined(__EMSCRIPTEN__) || defined(__EMSCRIPTEN_PTHREADS__)
+   g_pipelineCacheWriterThread = std::thread(pipeline_cache_writer);
++#endif
+ }
+ 
+ static void stop_pipeline_cache_writer() {
++#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  pipeline_cache_writer();
++#endif
+   if (g_pipelineCacheWriterThread.joinable()) {
+     {
+       std::lock_guard lock{g_pipelineCacheWriterMutex};
+@@ -1172,6 +1183,9 @@ void end_pipeline_frame() {
+   if (!g_hasPipelineThread) {
+     pipeline_worker();
+   }
++#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  pipeline_cache_writer();
++#endif
+ }
+ 
+ bool get_pipeline(PipelineRef ref, wgpu::RenderPipeline& pipeline) {
+diff --git a/lib/gfx/render_worker.cpp b/lib/gfx/render_worker.cpp
+index 85783b6..2698e96 100644
+--- a/lib/gfx/render_worker.cpp
++++ b/lib/gfx/render_worker.cpp
+@@ -191,6 +191,13 @@ size_t FrameSlotPool::free_count() const {
+ }
+ 
+ void initialize() {
++#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  // Keep executing every queued callback inline on the browser thread.
++  // enqueue() already has an inline path; identifying this thread preserves
++  // the render-worker ownership checks used by queue writes.
++  g_workerThreadId = std::this_thread::get_id();
++  return;
++#endif
+   if (g_running.exchange(true, std::memory_order_acq_rel)) {
+     return;
+   }
+@@ -204,6 +211,10 @@ void initialize() {
+ }
+ 
+ void shutdown() {
++#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  g_workerThreadId = {};
++  return;
++#endif
+   if (!g_running.load(std::memory_order_acquire)) {
+     return;
+   }
+diff --git a/lib/gfx/texture.cpp b/lib/gfx/texture.cpp
+index 029a3d0..6ad1ff1 100644
+--- a/lib/gfx/texture.cpp
++++ b/lib/gfx/texture.cpp
+@@ -30,6 +30,7 @@ wgpu::Extent3D physical_size(wgpu::Extent3D size, TextureFormatInfo info) {
+   return {.width = width, .height = height, .depthOrArrayLayers = size.depthOrArrayLayers};
+ }
+ 
++#ifndef __EMSCRIPTEN__
+ bool setup_swizzle(wgpu::TextureComponentSwizzleDescriptor& swizzle, u32 format) noexcept {
+   if (!webgpu::g_textureComponentSwizzleSupported) {
+     return false;
+@@ -53,6 +54,8 @@ bool setup_swizzle(wgpu::TextureComponentSwizzleDescriptor& swizzle, u32 format)
+   }
+ }
+ 
++#endif
++
+ wgpu::AddressMode wgpu_address_mode(GXTexWrapMode mode) {
+   switch (mode) {
+     DEFAULT_FATAL("invalid wrap mode {}", underlying(mode));
+@@ -181,10 +184,12 @@ TextureHandle new_dynamic_texture_2d(uint32_t width, uint32_t height, uint32_t m
+       .dimension = wgpu::TextureViewDimension::e2D,
+       .mipLevelCount = mips,
+   };
++#ifndef __EMSCRIPTEN__
+   wgpu::TextureComponentSwizzleDescriptor swizzle;
+   if (setup_swizzle(swizzle, gxFormat)) {
+     textureViewDescriptor.nextInChain = &swizzle;
+   }
++#endif
+   auto textureView = texture.CreateView(&textureViewDescriptor);
+   return std::make_shared<TextureRef>(std::move(texture), std::move(textureView), wgpu::TextureView{}, size, wgpuFormat,
+                                       mips, gxFormat);
+diff --git a/lib/gfx/texture_replacement.cpp b/lib/gfx/texture_replacement.cpp
+index 03dda46..c810993 100644
+--- a/lib/gfx/texture_replacement.cpp
++++ b/lib/gfx/texture_replacement.cpp
+@@ -462,7 +462,8 @@ bool remove_mipmaps(gfx::ConvertedTexture& texture) noexcept {
+     return false;
+   }
+ 
+-  ByteBuffer data{size};
++  // The bounds check above proves this fits the source buffer's size_t.
++  ByteBuffer data{static_cast<size_t>(size)};
+   std::memcpy(data.data(), texture.data.data(), size);
+   texture.mips = 1;
+   texture.data = std::move(data);
+@@ -681,11 +682,11 @@ std::optional<gfx::ConvertedTexture> load_encoded_replacement(Source&& src) noex
+ 
+   const uint32_t mips = 1u + static_cast<uint32_t>(more.size());
+   const uint64_t n = gfx::calc_texture_size(base->format, base->width, base->height, mips);
+-  if (n == 0) {
++  if (n == 0 || n > SIZE_MAX) {
+     return std::nullopt;
+   }
+ 
+-  ByteBuffer blob{n};
++  ByteBuffer blob{static_cast<size_t>(n)};
+   uint8_t* const dst = blob.data();
+   uint64_t o = 0;
+   const auto append = [&](const ByteBuffer& d) noexcept -> bool {
+diff --git a/lib/gx/command_processor.cpp b/lib/gx/command_processor.cpp
+index b0dce17..ae03ada 100644
+--- a/lib/gx/command_processor.cpp
++++ b/lib/gx/command_processor.cpp
+@@ -457,7 +457,11 @@ static void push_gx_draw(GXPrimitive prim, GXVtxFmt fmt, u16 vtxCount, gfx::Rang
+       .vertRange = vertRange,
+       .idxRange = idxRange,
+       .uniformRange = cache.uniformRange,
++#ifdef __EMSCRIPTEN__
++      .immediateUniformRange = gfx::push_uniform(immediates),
++#else
+       .immediateData = immediates,
++#endif
+       .vtxCount = vtxCount,
+       .indexCount = numIndices,
+       .instanceCount = instanceCount,
+diff --git a/lib/gx/fifo.cpp b/lib/gx/fifo.cpp
+index bcaba60..b20f78d 100644
+--- a/lib/gx/fifo.cpp
++++ b/lib/gx/fifo.cpp
+@@ -24,7 +24,13 @@ uint32_t sDlWritePos = 0;
+ 
+ namespace {
+ constexpr Module Log{"aurora::gx::fifo"};
++#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++// Use the existing synchronous command processor: publish() and drain() both
++// execute process_to(), preserving draw commands and draw-done callbacks.
++constexpr auto kProcessingMode = ProcessingMode::Inline;
++#else
+ constexpr auto kProcessingMode = ProcessingMode::Thread;
++#endif
+ constexpr uint32_t kDrawBatchSize = 1;
+ 
+ bool sFrameActive = false;
+diff --git a/lib/gx/gx.cpp b/lib/gx/gx.cpp
+index b12b327..0fbfa77 100644
+--- a/lib/gx/gx.cpp
++++ b/lib/gx/gx.cpp
+@@ -567,12 +567,17 @@ void initialize() noexcept {
+         gfx::detail::resources().staticBindGroupLayout,
+         gfx::detail::resources().uniformBindGroupLayout,
+         sTextureBindGroupLayout,
++#ifdef __EMSCRIPTEN__
++        gfx::detail::resources().uniformBindGroupLayout,
++#endif
+     };
+     const wgpu::PipelineLayoutDescriptor desc{
+         .label = "GX Pipeline Layout",
+         .bindGroupLayoutCount = layouts.size(),
+         .bindGroupLayouts = layouts.data(),
++#ifndef __EMSCRIPTEN__
+         .immediateSize = sizeof(DrawImmediateData),
++#endif
+     };
+     sPipelineLayout = g_device.CreatePipelineLayout(&desc);
+   }
+diff --git a/lib/gx/pipeline.cpp b/lib/gx/pipeline.cpp
+index 0c3631c..4be6cda 100644
+--- a/lib/gx/pipeline.cpp
++++ b/lib/gx/pipeline.cpp
+@@ -27,7 +27,13 @@ void render(const DrawData& data, const wgpu::RenderPassEncoder& pass) {
+   }
+ 
+   const auto& resources = gfx::detail::resources();
++#ifdef __EMSCRIPTEN__
++  // Browser WebGPU uses a dynamic uniform for the same 64-byte draw data.
++  const std::array immediateOffsets{data.immediateUniformRange.offset};
++  pass.SetBindGroup(3, resources.uniformBindGroup, immediateOffsets.size(), immediateOffsets.data());
++#else
+   pass.SetImmediates(0, &data.immediateData, sizeof(data.immediateData));
++#endif
+   const std::array offsets{data.uniformRange.offset};
+   pass.SetBindGroup(1, resources.uniformBindGroup, offsets.size(), offsets.data());
+   if (data.bindGroups.textureBindGroup) {
+diff --git a/lib/gx/pipeline.hpp b/lib/gx/pipeline.hpp
+index 1abcbd5..6b839c6 100644
+--- a/lib/gx/pipeline.hpp
++++ b/lib/gx/pipeline.hpp
+@@ -9,7 +9,11 @@ struct DrawData {
+   gfx::Range vertRange;
+   gfx::Range idxRange;
+   gfx::Range uniformRange;
++#ifdef __EMSCRIPTEN__
++  gfx::Range immediateUniformRange;
++#else
+   DrawImmediateData immediateData;
++#endif
+   uint32_t vtxCount;
+   uint32_t indexCount;
+   uint32_t instanceCount;
+@@ -17,7 +21,13 @@ struct DrawData {
+   uint32_t dstAlpha;
+ };
+ 
++#ifdef __EMSCRIPTEN__
++// Browser shaders bind draw immediates as uniforms; keep transferable pipeline
++// entries separate from native shaders generated from the same GX state.
++constexpr uint32_t GXPipelineConfigVersion = 0x10000 + 13;
++#else
+ constexpr uint32_t GXPipelineConfigVersion = 13;
++#endif
+ struct PipelineConfig {
+   uint32_t version = GXPipelineConfigVersion;
+   uint32_t msaaSamples = 1;
+diff --git a/lib/gx/shader.cpp b/lib/gx/shader.cpp
+index 92f358b..c6683db 100644
+--- a/lib/gx/shader.cpp
++++ b/lib/gx/shader.cpp
+@@ -1628,6 +1628,11 @@ std::string build_shader_source(const ShaderConfig& config) noexcept {
+     fragmentFn += "\n    prev = vec4f(in.nrm, prev.a);";
+   }
+ 
++#ifdef __EMSCRIPTEN__
++  constexpr auto immediateDeclaration = "@group(3) @binding(0) var<uniform> imm: Immediate;";
++#else
++  constexpr auto immediateDeclaration = "var<immediate> imm: Immediate;";
++#endif
+   const auto shaderSource = fmt::format(R"""(
+ fn bswap32(v: u32, le: bool) -> u32 {{
+   if (le) {{
+@@ -1966,7 +1971,7 @@ struct Immediate {{
+     array_start1: vec4u,
+     array_start2: vec4u,
+ }};
+-var<immediate> imm: Immediate;
++{9}
+ 
+ struct Uniform {{
+     render_viewport_size: vec2f,
+@@ -1997,7 +2002,7 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4f {{{6}{5}
+ }}
+ )""",
+                                         uniBufAttrs, texBindings, vtxOutAttrs, vtxInAttrs, vtxXfrAttrs, fragmentFn,
+-                                        fragmentFnPre, vtxXfrAttrsPre, uniformPre);
++                                        fragmentFnPre, vtxXfrAttrsPre, uniformPre, immediateDeclaration);
+   if (EnableDebugPrints) {
+     Log.info("Generated shader (hash {:x}): {}", hash, shaderSource);
+   }
+diff --git a/lib/gx/texture.hpp b/lib/gx/texture.hpp
+index 29c9a48..deeb0aa 100644
+--- a/lib/gx/texture.hpp
++++ b/lib/gx/texture.hpp
+@@ -26,7 +26,11 @@ const TextureStats& texture_stats() noexcept;
+ namespace texture {
+ constexpr uint64_t ContentCacheBudgetBytes = 128ull * 1024ull * 1024ull;
+ constexpr uint64_t ObjectCacheIdleFrames = 600;
++#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++constexpr bool AsyncTextureReplacements = false;
++#else
+ constexpr bool AsyncTextureReplacements = true;
++#endif
+ constexpr uint32_t ReplacementThumbnailDim = 64;
+ constexpr uint64_t ReplacementPublishBudgetBytes = 12ull * 1024ull * 1024ull;
+ 
+diff --git a/lib/webgpu/gpu.cpp b/lib/webgpu/gpu.cpp
+index 592b8ab..5570baa 100644
+--- a/lib/webgpu/gpu.cpp
++++ b/lib/webgpu/gpu.cpp
+@@ -73,6 +73,7 @@ static std::atomic_bool g_vsyncEnabled = true;
+ 
+ namespace {
+ 
++#ifdef WEBGPU_DAWN
+ AuroraLogLevel wgpu_log_level(wgpu::LoggingType type) {
+   switch (type) {
+   case wgpu::LoggingType::Verbose:
+@@ -92,6 +93,8 @@ void wgpu_log(wgpu::LoggingType type, wgpu::StringView message) {
+   Log.report(wgpu_log_level(type), "WebGPU message: {}", message);
+ }
+ 
++#endif
++
+ struct ResampleUniformBlock {
+   uint32_t samplerMode = 0;
+   float frameWidth = 0.f;
+@@ -872,7 +875,9 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
+             supportedLimits.minUniformBufferOffsetAlignment < 64 ? 64 : supportedLimits.minUniformBufferOffsetAlignment,
+         .minStorageBufferOffsetAlignment =
+             supportedLimits.minStorageBufferOffsetAlignment < 16 ? 16 : supportedLimits.minStorageBufferOffsetAlignment,
++#ifndef __EMSCRIPTEN__
+         .maxImmediateSize = sizeof(gx::DrawImmediateData),
++#endif
+     };
+     Log.info(
+         "Using limits:"
+@@ -882,12 +887,11 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
+         "\n  maxTextureArrayLayers: {}"
+         "\n  maxStorageBuffersPerShaderStage: {}"
+         "\n  minUniformBufferOffsetAlignment: {}"
+-        "\n  minStorageBufferOffsetAlignment: {}"
+-        "\n  maxImmediateSize: {}",
++        "\n  minStorageBufferOffsetAlignment: {}",
+         requiredLimits.maxTextureDimension1D, requiredLimits.maxTextureDimension2D,
+         requiredLimits.maxTextureDimension3D, requiredLimits.maxTextureArrayLayers,
+         requiredLimits.maxStorageBuffersPerShaderStage, requiredLimits.minUniformBufferOffsetAlignment,
+-        requiredLimits.minStorageBufferOffsetAlignment, requiredLimits.maxImmediateSize);
++        requiredLimits.minStorageBufferOffsetAlignment);
+     std::vector<wgpu::FeatureName> requiredFeatures;
+     g_hasCoreFeatures = false;
+     g_bcTexturesSupported = false;
+@@ -898,16 +902,21 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
+     for (size_t i = 0; i < supportedFeatures.featureCount; ++i) {
+       const auto feature = supportedFeatures.features[i];
+       if (feature == wgpu::FeatureName::CoreFeaturesAndLimits || feature == wgpu::FeatureName::TextureCompressionBC ||
+-          feature == wgpu::FeatureName::TextureCompressionASTC ||
+-          feature == wgpu::FeatureName::TextureComponentSwizzle) {
++          feature == wgpu::FeatureName::TextureCompressionASTC
++#ifndef __EMSCRIPTEN__
++          || feature == wgpu::FeatureName::TextureComponentSwizzle
++#endif
++      ) {
+         if (feature == wgpu::FeatureName::CoreFeaturesAndLimits) {
+           g_hasCoreFeatures = true;
+         } else if (feature == wgpu::FeatureName::TextureCompressionBC) {
+           g_bcTexturesSupported = true;
+         } else if (feature == wgpu::FeatureName::TextureCompressionASTC) {
+           g_astcTexturesSupported = true;
++#ifndef __EMSCRIPTEN__
+         } else if (feature == wgpu::FeatureName::TextureComponentSwizzle) {
+           g_textureComponentSwizzleSupported = true;
++#endif
+         }
+         requiredFeatures.push_back(feature);
+       }
+@@ -1006,7 +1015,9 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
+     if (!g_device) {
+       return false;
+     }
++#ifdef WEBGPU_DAWN
+     g_device.SetLoggingCallback(wgpu_log);
++#endif
+   }
+   g_queue = g_device.GetQueue();
+ 
+diff --git a/lib/window.cpp b/lib/window.cpp
+index 2a4aadf..540854e 100644
+--- a/lib/window.cpp
++++ b/lib/window.cpp
+@@ -33,7 +33,9 @@ extern "C" void Android_UnlockActivityMutex(void);
+ #include <string>
+ #include <vector>
+ 
++#ifdef AURORA_ENABLE_RMLUI
+ #include "rmlui.hpp"
++#endif
+ #include "time_internal.hpp"
+ #include "dolphin/vi/vi_internal.hpp"
+ 

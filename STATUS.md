@@ -1,0 +1,59 @@
+# Current status
+
+This is an early source-port feasibility repository. It does **not** boot Melee,
+load a game scene, or run a match. It contains no emulator and no game assets.
+
+## Implemented
+
+- Pinned Melee, Aurora, and Emscripten revisions with a project-local toolchain.
+- Explicit Aurora browser patch: WebGPU canvas surface, browser event-loop
+  integration, inline execution of renderer work, and uniform-buffer replacement
+  for desktop-only draw immediates.
+- A synthetic GX triangle using the original Melee HSD render-state functions.
+- Diagnostic page with errors and rolling CPU/frame-interval measurements.
+- Loopback server with WebAssembly MIME type and cross-origin isolation headers.
+- Setup/server tests and a compile-only GitHub Actions workflow.
+
+## Validation record
+
+Verified locally on **2026-09-07**, from the standalone `~/Workspace/melee-web`
+repository on Apple Silicon macOS:
+
+- **25 tests passed**, using real temporary Git repositories and loopback HTTP.
+- Project-local bootstrap succeeded; the Emscripten **6.0.9** / CMake **3.31.6**
+  `RelWithDebInfo` build compiled and linked the complete graphics probe.
+- The Codex in-app Chromium browser visibly rendered the expected red/green/blue
+  gradient triangle through HSD → GX → WebGPU. The runtime reported a 1280×960
+  framebuffer at scale 2; more than 1,300 frames were observed on a fresh page.
+- Reload and a separate fresh tab both initialized successfully. The fresh
+  tab's captured warning/error console was empty. Its page log contained no
+  WebGPU validation failures or aborts. The message about an absent bundled
+  initial pipeline cache is expected; no cache is bundled with this probe.
+- An independent review checked command execution, the C++/WGSL uniform layout,
+  alignment, uploads and browser waits. Runtime inspection caught and resolved
+  missing FIFO inline processing and missing `GXInit` in the harness.
+
+Known build warnings are upstream Abseil's deprecated Emscripten version macros,
+an unused HSD inline helper's integer `fabs` call, and limited post-link
+optimization while preserving DWARF. They are not suppressed globally.
+
+This is a functional graphics smoke test, **not a performance benchmark**. GPU
+identity is privacy-limited in this browser. No release-performance, background
+tab recovery, input, audio, real asset, game-state fidelity, native-host or Linux
+validation has been completed. CI has not run on GitHub because this repository
+has not been published. Follow [docs/TESTING.md](docs/TESTING.md) for repeatable
+checks as coverage expands.
+
+## Next acceptance gate
+
+Render one real static Melee DAT model using its HSD object/display path. Start
+with a bounds-checked, schema-aware big-endian archive reader and explicitly
+typed pointer relocation. Preserve the original asset bytes separately. Texture,
+display-list and animation data cannot be fixed by swapping every 32-bit word.
+
+After that, integrate the scheduling, disc I/O, input, audio and scene services
+needed for a complete versus loop. Track absent services as absent; a silent
+stub must never turn an incomplete path into a passing milestone.
+
+The full acceptance sequence is in [docs/ROADMAP.md](docs/ROADMAP.md), with
+portability findings in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md).

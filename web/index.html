@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Melee web • graphics feasibility</title>
+<style>
+  :root {color-scheme:dark;font:16px/1.5 system-ui;background:#10141e;color:#dce4f2}
+  body {max-width:900px;margin:40px auto;padding:0 24px}
+  h1 {font-size:26px;margin-bottom:8px} p {color:#a9b6cc}
+  canvas {width:min(100%,640px);height:auto;display:block;background:#000;border:1px solid #39465e}
+  pre {white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow:auto;font-size:12px}
+  output {display:block;margin:12px 0;font-variant-numeric:tabular-nums}
+</style>
+<h1>Melee web: graphics feasibility</h1>
+<p>Tests original Melee HSD render-state code → Aurora GX → WebGPU, compiled to WebAssembly. Synthetic geometry; this is not a game scene or gameplay.</p>
+<output id="status">Checking browser support…</output>
+<canvas id="canvas" width="640" height="480" tabindex="0" aria-label="Aurora GX rendering probe"></canvas>
+<output id="metrics">Waiting for the first frame.</output>
+<p>CPU timings measure submission, not GPU execution or input latency. Foreground measurements only.</p>
+<pre id="log" aria-label="Runtime log"></pre>
+<script>
+  const statusEl = document.querySelector('#status');
+  const metricsEl = document.querySelector('#metrics');
+  const logEl = document.querySelector('#log');
+  const cpu = [], intervals = [];
+  let previous = null, lastUpdate = 0, hidden = document.hidden;
+  let failed = false;
+  function log(value) {
+    const lines = (logEl.textContent + String(value) + '\n').split('\n');
+    logEl.textContent = lines.slice(-80).join('\n');
+  }
+  function fail(message) { failed = true; statusEl.textContent = 'Failed: ' + message; log(message); }
+  document.addEventListener('visibilitychange', () => {
+    hidden = document.hidden;
+    previous = null; cpu.length = 0; intervals.length = 0;
+    metricsEl.textContent = hidden ? 'Timing paused while the tab is hidden.' : 'Collecting foreground samples…';
+  });
+  function p95(values) {
+    const sorted = [...values].sort((a,b) => a-b);
+    return sorted.length ? sorted[Math.ceil(sorted.length * .95)-1].toFixed(2) : '—';
+  }
+  window.probeFrame = (frame, now, ms) => {
+    if (failed) return;
+    if (frame === 1) statusEl.textContent = 'Rendering through Aurora GX / WebGPU';
+    if (hidden) return;
+    cpu.push(ms); if (cpu.length > 600) cpu.shift();
+    if (previous !== null) intervals.push(now-previous);
+    if (intervals.length > 600) intervals.shift();
+    previous = now;
+    if (now-lastUpdate < 500 && frame > 1) return;
+    lastUpdate = now;
+    statusEl.textContent = 'Rendering through Aurora GX / WebGPU';
+    metricsEl.textContent = `Frames: ${frame} · CPU submission p95: ${p95(cpu)} ms · frame interval p95: ${p95(intervals)} ms · samples: ${cpu.length}`;
+  };
+  var Module = {
+    canvas: document.querySelector('#canvas'),
+    print: log,
+    printErr: log,
+    onAbort: (reason) => fail(reason),
+  };
+  window.addEventListener('error', event => fail(event.message));
+  window.addEventListener('unhandledrejection', event => fail(String(event.reason)));
+  if (!navigator.gpu) {
+    fail('WebGPU unavailable. Use a supported desktop browser on localhost or HTTPS.');
+  } else if (!crossOriginIsolated) {
+    fail('Cross-origin isolation missing. Use scripts/serve.py.');
+  } else {
+    statusEl.textContent = 'Loading the compiled graphics probe…';
+    const engine = document.createElement('script');
+    engine.src = './gx_probe.js';
+    engine.onerror = () => fail('Build output missing: gx_probe.js');
+    document.body.append(engine);
+  }
+</script>
+</html>
