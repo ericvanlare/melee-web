@@ -2,7 +2,7 @@
 <html lang="en">
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Melee web • graphics feasibility</title>
+<title>Melee web • asset feasibility</title>
 <style>
   :root {color-scheme:dark;font:16px/1.5 system-ui;background:#10141e;color:#dce4f2}
   body {max-width:900px;margin:40px auto;padding:0 24px}
@@ -10,9 +10,18 @@
   canvas {width:min(100%,640px);height:auto;display:block;background:#000;border:1px solid #39465e}
   pre {white-space:pre-wrap;overflow-wrap:anywhere;max-height:240px;overflow:auto;font-size:12px}
   output {display:block;margin:12px 0;font-variant-numeric:tabular-nums}
+  fieldset {border:1px solid #39465e;margin:20px 0;padding:16px}
+  label {display:block;margin:8px 0} select {max-width:100%;padding:6px}
 </style>
-<h1>Melee web: graphics feasibility</h1>
-<p>Tests original Melee HSD render-state code → Aurora GX → WebGPU, compiled to WebAssembly. Synthetic geometry; this is not a game scene or gameplay.</p>
+<h1>Melee web: asset feasibility</h1>
+<p>Original Melee HSD state and polygon code → Aurora GX → WebGPU, compiled to WebAssembly.</p>
+<fieldset>
+  <legend>Local asset inspection</legend>
+  <label>Extracted DAT file <input id="asset-file" type="file" accept=".dat" disabled></label>
+  <label>Public model symbol <select id="asset-symbol" disabled><option>Load a DAT file first</option></select></label>
+  <output id="asset-status">No asset loaded. The canvas shows the synthetic GX probe.</output>
+  <p>Supports one rigid identity joint with opaque, untextured diffuse meshes. Colors are shown without lighting; this is an asset inspection camera, not gameplay. Unsupported features produce an error. Files stay in this tab and are never uploaded.</p>
+</fieldset>
 <output id="status">Checking browser support…</output>
 <canvas id="canvas" width="640" height="480" tabindex="0" aria-label="Aurora GX rendering probe"></canvas>
 <output id="metrics">Waiting for the first frame.</output>
@@ -22,6 +31,9 @@
   const statusEl = document.querySelector('#status');
   const metricsEl = document.querySelector('#metrics');
   const logEl = document.querySelector('#log');
+  const fileEl = document.querySelector('#asset-file');
+  const symbolEl = document.querySelector('#asset-symbol');
+  const assetStatus = document.querySelector('#asset-status');
   const cpu = [], intervals = [];
   let previous = null, lastUpdate = 0, hidden = document.hidden;
   let failed = false;
@@ -30,6 +42,50 @@
     logEl.textContent = lines.slice(-80).join('\n');
   }
   function fail(message) { failed = true; statusEl.textContent = 'Failed: ' + message; log(message); }
+  window.assetFailed = message => { assetStatus.textContent = 'Asset rejected: ' + message; };
+  const assetMessage = () => Module.UTF8ToString(Module._melee_web_asset_message());
+  function selectModel() {
+    if (symbolEl.value === '') return;
+    const ok = Module._melee_web_asset_select(Number(symbolEl.value));
+    assetStatus.textContent = ok ? assetMessage() + ' · unlit diffuse preview' : 'Asset rejected: ' + assetMessage();
+  }
+  symbolEl.addEventListener('change', selectModel);
+  fileEl.addEventListener('change', async () => {
+    const file = fileEl.files[0];
+    if (!file) return;
+    Module._melee_web_asset_clear();
+    assetStatus.textContent = 'Reading local asset…';
+    symbolEl.disabled = true;
+    symbolEl.replaceChildren();
+    fileEl.disabled = true;
+    let pointer = 0;
+    try {
+      if (file.size > 64 * 1024 * 1024) throw new Error('DAT limit is 64 MiB. Extract a single asset from the disc first.');
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      pointer = Module._malloc(bytes.length || 1);
+      if (!pointer) throw new Error('Unable to allocate import memory.');
+      Module.HEAPU8.set(bytes, pointer);
+      const count = Module._melee_web_asset_open(pointer, bytes.length);
+      if (count < 0) throw new Error(assetMessage());
+      if (count > 4096) throw new Error('Archive exceeds the model-symbol selection limit.');
+      let jointIndex = -1;
+      for (let i = 0; i < count; ++i) {
+        const name = Module.UTF8ToString(Module._melee_web_asset_symbol(i));
+        symbolEl.add(new Option(name, String(i)));
+        if (jointIndex < 0 && name.endsWith('_joint')) jointIndex = i;
+      }
+      if (!count) throw new Error('Archive has no public model symbols.');
+      symbolEl.disabled = false;
+      if (jointIndex >= 0) symbolEl.value = String(jointIndex);
+      selectModel();
+    } catch (error) {
+      window.assetFailed(error.message);
+    } finally {
+      if (pointer) Module._free(pointer);
+      fileEl.disabled = failed;
+      fileEl.value = '';
+    }
+  });
   document.addEventListener('visibilitychange', () => {
     hidden = document.hidden;
     previous = null; cpu.length = 0; intervals.length = 0;
@@ -57,6 +113,7 @@
     print: log,
     printErr: log,
     onAbort: (reason) => fail(reason),
+    onRuntimeInitialized: () => { fileEl.disabled = false; },
   };
   window.addEventListener('error', event => fail(event.message));
   window.addEventListener('unhandledrejection', event => fail(String(event.reason)));

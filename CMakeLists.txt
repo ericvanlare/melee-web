@@ -46,13 +46,14 @@ if(EMSCRIPTEN)
   endif()
 endif()
 
-add_library(hsd_state STATIC .deps/melee/src/sysdolphin/baselib/state.c)
+add_library(hsd_state STATIC .deps/melee/src/sysdolphin/baselib/state.c src/hsd_pobj_bridge.c)
 target_include_directories(hsd_state PRIVATE .deps/melee/src .deps/aurora/include)
 target_compile_definitions(hsd_state PRIVATE TARGET_PC)
 target_compile_options(hsd_state PRIVATE -ffunction-sections -fdata-sections
   -ffp-contract=off -include "${CMAKE_CURRENT_SOURCE_DIR}/src/hsd_probe_compat.h")
 
-add_executable(gx_probe src/gx_probe.c src/hsd_probe.c)
+add_executable(gx_probe src/gx_probe.c src/hsd_probe.c src/dat_archive.cpp
+  src/rigid_model.cpp src/asset_scene.cpp)
 target_include_directories(gx_probe PRIVATE .deps/melee/src)
 target_link_libraries(gx_probe PRIVATE hsd_state)
 target_link_libraries(gx_probe PRIVATE aurora::core aurora::gx aurora::main aurora::vi)
@@ -62,6 +63,7 @@ if(EMSCRIPTEN)
   target_link_options(gx_probe PRIVATE
     -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=134217728
     -sSTACK_SIZE=8388608 -sASSERTIONS=1
-    -sEXPORTED_RUNTIME_METHODS=FS -sEXIT_RUNTIME=0)
+    -sEXPORTED_RUNTIME_METHODS=FS,HEAPU8,UTF8ToString -sEXIT_RUNTIME=0
+    -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_melee_web_asset_clear,_melee_web_asset_open,_melee_web_asset_symbol,_melee_web_asset_select,_melee_web_asset_message)
   configure_file(web/index.html index.html COPYONLY)
 endif()

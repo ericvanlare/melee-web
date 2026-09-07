@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "hsd_probe.h"
+#include "asset_scene.h"
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
 #endif
@@ -49,6 +50,7 @@ static void draw(void)
     GXSetTevOrder(GX_TEVSTAGE0, GX_TEXCOORD_NULL, GX_TEXMAP_NULL, GX_COLOR0A0);
     GXSetTevOp(GX_TEVSTAGE0, GX_PASSCLR);
     melee_web_hsd_apply_render_state();
+    if (melee_web_asset_draw()) return;
     GXClearVtxDesc();
     GXSetVtxDesc(GX_VA_POS, GX_DIRECT);
     GXSetVtxDesc(GX_VA_CLR0, GX_DIRECT);

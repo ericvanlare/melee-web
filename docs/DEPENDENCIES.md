@@ -1,11 +1,11 @@
 # Dependencies and portability boundaries
 
 Audit date: 2026-09-07. `dependencies.lock.json` is authoritative; these are the
-revisions inspected for the first probe.
+revisions inspected for the current probe.
 
 | Dependency | Pinned source revision | Role |
 | --- | --- | --- |
-| [doldecomp/melee](https://github.com/doldecomp/melee) | `006b50d24cce1b6385d0bacea0af8f1e6d02b4f4` | Recovered game and HSD C; current target compiles only HSD `state.c` |
+| [doldecomp/melee](https://github.com/doldecomp/melee) | `b43912cc78606f96c9569f5d6229bc9d7e265ea5` | Recovered game and HSD C; current target retains HSD state and rigid polygon code |
 | [encounter/aurora](https://github.com/encounter/aurora) | `749d6ee7a22bdfab78c8ece9047bca5d79aa72ca` | Source-level GX renderer and platform services |
 | [emscripten-core/emsdk](https://github.com/emscripten-core/emsdk) | `5eb0bde7585670252e8ba05e9d361627bffd08b5` | Installer for Emscripten **6.0.9**, including its compiler and browser WebGPU bindings |
 
@@ -57,13 +57,16 @@ coverage; it does not demonstrate a linked executable, rendering or gameplay.
 
 ## Narrow HSD integration
 
-The current seam is original `src/sysdolphin/baselib/state.c`, called by our
-`src/hsd_probe.c`. Function/data sections allow unused HSD systems to be discarded
-when linking the synthetic GX scene. The probe calls the original render-state
-cache invalidators and setters; its triangle is authored test geometry.
+The current seams are original `src/sysdolphin/baselib/state.c`, called by our
+`src/hsd_probe.c`, and `PObjDispSimplePrimitive` from original `pobj.c`, compiled
+inside `src/hsd_pobj_bridge.c`. Function/data sections discard unused HSD systems.
+The bridge adapts `GXSetArray` to Aurora's explicit byte length and byte-order
+arguments, and clears HSD descriptor caches when temporary descriptors are reused.
+The default triangle is authored test geometry; local DAT import uses original
+display-list and vertex bytes after validating their typed descriptors and indices.
 
 `src/hsd_probe_compat.h` adapts observed header differences only for that HSD
-translation unit: the `Vec3` name, missing `GXTevClampMode` declaration, `va_list`
+translation units: the `Vec3` name, missing `GXTevClampMode` declaration, `va_list`
 include order, and Melee's conflicting local `ssize_t` typedef. The latter is
 renamed only while including `Runtime/platform.h`; libc keeps its system type.
 No SDK runtime calls are replaced with success stubs.
@@ -96,12 +99,10 @@ game traces.
 
 ## Next asset gate
 
-After the synthetic GX/HSD state probe, render an authored static descriptor
-through the original HSD `jobj.c` → `dobj.c` → `pobj.c` path. Then load one static
-model from a player-supplied DAT using a bounded, schema-aware decoder and a fixed
-camera. Relocation metadata does not describe every field's type: swapping the
-header or every 32-bit word is insufficient, and raw GX command bytes may need to
-retain their original byte order. This gate exercises the real asset and polygon
-boundaries before adding the scene scheduler, audio and match logic. See
-[ROADMAP.md](ROADMAP.md) for acceptance criteria and [STATUS.md](STATUS.md) for
-observed results.
+The first local DAT model now renders through the rigid polygon seam. Next add
+joint transforms and textured materials to reach a representative static scene.
+The full `jobj.c` → `dobj.c` loader/display path remains to be integrated; the
+current typed decoder walks only a validated identity joint's rigid objects.
+Relocation metadata does not describe every field's type, and raw GX geometry
+bytes retain their original byte order. See [ROADMAP.md](ROADMAP.md) for acceptance
+criteria and [STATUS.md](../STATUS.md) for observed results.

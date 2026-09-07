@@ -3,10 +3,10 @@
 A source-port feasibility project for running vanilla Super Smash Bros. Melee
 in a desktop browser using WebAssembly and WebGPU.
 
-**This is not a playable game yet.** The initial target is a synthetic graphics
-probe using original Melee HSD render-state functions and Aurora's GX renderer.
-It verifies an integration boundary; it does not establish game-scene fidelity,
-audio, physics, controller latency, or full-game performance.
+**This is not a playable game yet.** The browser can render a real rigid Melee
+DAT model using original HSD polygon code and Aurora's GX renderer. The current
+preview supports one identity joint and opaque, untextured diffuse meshes.
+It does not establish complete scene fidelity or full-game performance.
 
 ## Build and inspect
 
@@ -23,7 +23,19 @@ python3 scripts/serve.py --directory build/browser
 
 Open http://127.0.0.1:8787. Keep the tab visible for timing measurements. The
 server binds to loopback and supplies cross-origin isolation headers. The probe
-requires no game image and contains no extracted game assets.
+starts with a synthetic triangle and contains no extracted game assets.
+
+To inspect the first validated model, extract it from your own GALE01 revision 2
+ISO or CISO, then choose `assets-local/TyTarget.dat` in the page's file picker:
+
+```sh
+python3 scripts/extract_disc_file.py /path/to/game.ciso TyTarget.dat --output assets-local/TyTarget.dat
+```
+
+The extractor reads the disc without modifying it. Extracted data stays in ignored
+`assets-local/`; the browser reads the selected file locally without uploading it.
+The target appears with unlit diffuse colors and an inspection camera. Joint
+hierarchies, textures, skinning and animation are not supported yet.
 
 Bootstrap downloads pinned Aurora, Melee, and Emscripten sources into `.deps/`
 and CMake/Ninja into `.venv/`. The build downloads Aurora's transitive dependencies;
@@ -36,7 +48,7 @@ their versions are controlled by the pinned Aurora tree and our patch. See
 - Aurora supplies a source-level GX-to-WebGPU implementation.
 - Browser-specific scheduling, audio and asset conversion are explicit port work.
 - The original GameCube build remains the behavioral reference.
-- User-supplied disc content will stay local; asset import is not implemented yet.
+- User-supplied disc content stays local and outside Git.
 
 See [current evidence and limitations](STATUS.md),
 [milestones](docs/ROADMAP.md), and [architecture decisions](docs/ARCHITECTURE.md).

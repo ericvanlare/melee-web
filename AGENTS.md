@@ -3,7 +3,7 @@
 Goal: full vanilla Melee running accurately and performantly in a desktop browser
 through compiled source, without a PowerPC CPU interpreter or JIT.
 
-- Read README.md and docs/STATUS.md before work. Keep status backed by observed evidence.
+- Read README.md and STATUS.md before work. Keep status backed by observed evidence.
 - Make small coherent changes; inspect actual APIs and compiler output before changing code.
 - Keep original upstream checkouts intact. Pin dependencies in dependencies.lock.json;
   store explained, reviewable downstream changes under patches/.

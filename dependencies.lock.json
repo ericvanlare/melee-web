@@ -1,10 +1,22 @@
 {
   "schema": 1,
   "repositories": {
-    "aurora": {"url": "https://github.com/encounter/aurora.git", "commit": "749d6ee7a22bdfab78c8ece9047bca5d79aa72ca"},
-    "melee": {"url": "https://github.com/doldecomp/melee.git", "commit": "006b50d24cce1b6385d0bacea0af8f1e6d02b4f4"},
-    "emsdk": {"url": "https://github.com/emscripten-core/emsdk.git", "commit": "5eb0bde7585670252e8ba05e9d361627bffd08b5"}
+    "aurora": {
+      "url": "https://github.com/encounter/aurora.git",
+      "commit": "749d6ee7a22bdfab78c8ece9047bca5d79aa72ca"
+    },
+    "melee": {
+      "url": "https://github.com/doldecomp/melee.git",
+      "commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5"
+    },
+    "emsdk": {
+      "url": "https://github.com/emscripten-core/emsdk.git",
+      "commit": "5eb0bde7585670252e8ba05e9d361627bffd08b5"
+    }
   },
   "emscripten": "6.0.9",
-  "python_build_packages": ["cmake==3.31.6", "ninja==1.13.0"]
+  "python_build_packages": [
+    "cmake==3.31.6",
+    "ninja==1.13.0"
+  ]
 }

@@ -1,6 +1,8 @@
 # Validation
 
-Run `python3 -m unittest discover -s tests -v` for setup and real HTTP tests.
+Run `python3 -m unittest discover -s tests -v` for setup, real HTTP, synthetic disc,
+DAT and model tests. Native parser tests require a C++20 compiler. The original
+HSD call-trace test uses the pinned project SDK and skips if it is not installed.
 Run `python3 scripts/build.py` for the actual WebAssembly link.
 
 ## Browser smoke test
@@ -10,9 +12,12 @@ Run `python3 scripts/build.py` for the actual WebAssembly link.
 2. Check that the page renders a three-color triangle and increments frames.
 3. Inspect the page log and browser console. Treat a WebGPU validation error,
    uncaught exception, or abort as failure even if the frame counter advances.
-4. Reload once and check initialization again. Hide and restore the tab; samples
+4. Extract `TyTarget.dat` as described in README.md and choose it in the page.
+   Expect a red/gray bullseye, 2 meshes, 11 primitive packets and 676 submitted
+   vertices. It is an unlit diffuse preview. No game bytes are included in tests.
+5. Reload once and check initialization again. Hide and restore the tab; samples
    should reset and rendering should resume without including the hidden interval.
-5. Record OS, hardware/browser identification available from the runtime, build
+6. Record OS, hardware/browser identification available from the runtime, build
    type, observed duration and any errors in STATUS.md. Do not convert this
    trivial draw's CPU submission time into a claim about full-game performance.
 
