@@ -103,6 +103,8 @@ checks as coverage expands.
 Move from rigid inspection assets toward a real fighter/stage scene. Prioritize
 typed joint/envelope and animation loading plus original HSD evaluation, using
 batch rejection evidence to select representative assets and shared boundaries.
+The selected next gate is Mario's complete neutral costume in its bind pose,
+followed by an idle animation; see [the corpus findings and work boundaries](docs/NEXT_PHASE.md).
 
 The current decoder handles ordinary joint SRT, opaque constant/diffuse/specular
 materials and up to eight ordinary UV/reflection texture layers per material.
