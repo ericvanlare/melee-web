@@ -5,6 +5,8 @@
 #include "hsd_transform_bridge.h"
 #include "dat_animation.hpp"
 #include "dat_fighter.hpp"
+#include "fighter_binding.hpp"
+#include "dat_stage.hpp"
 #include "animation_clock.hpp"
 #include <dolphin/gx.h>
 #include <dolphin/mtx.h>
@@ -23,8 +25,9 @@ namespace {
 using melee_web::DatError;
 using melee_web::AnimationPose;
 constexpr float identity[3][4] = {{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}};
-std::shared_ptr<const melee_web::DatArchive> loaded_archive;
-bool animation_visible = true;
+std::shared_ptr<const melee_web::DatArchive> loaded_archive, common_archive;
+std::unique_ptr<melee_web::DatStage> loaded_stage;
+bool animation_visible = true, animation_error = false;
 struct PreparedScene {
     struct ViewMatrix { Mtx value; };
     struct PreparedMesh {
@@ -34,7 +37,12 @@ struct PreparedScene {
     };
     // Archive-backed spans outlive every hydrated material and envelope view.
     melee_web::RigidModel model;
-    std::vector<AnimationPose> bind_pose;
+    std::vector<AnimationPose> bind_pose, posed;
+    std::vector<uint32_t> animation_to_joint;
+    std::unique_ptr<melee_web::DatFighterActions> actions;
+    std::vector<uint8_t> animation_container;
+    std::vector<std::string> action_labels;
+    bool is_stage = false, is_fighter = false;
     std::vector<MeleeWebJointTransform> joints;
     std::vector<ViewMatrix> view_matrices, normal_matrices;
     std::vector<melee_web::HsdMaterialHandle> materials;
@@ -53,10 +61,13 @@ struct PreparedScene {
     Mtx camera{};
     Mtx44 projection{};
 
-    PreparedScene(std::shared_ptr<const melee_web::DatArchive> archive, const char* name)
-        : model(std::move(archive), name), bind_pose(model.joints.size()), joints(model.joints.size()),
+    explicit PreparedScene(melee_web::RigidModel decoded)
+        : model(std::move(decoded)), bind_pose(model.joints.size()), posed(model.joints.size()), joints(model.joints.size()),
           view_matrices(joints.size()), normal_matrices(joints.size()), meshes(model.meshes.size()),
           visible_dobjs(model.dobj_count, true) {
+        const auto costumes = melee_web::fighter_costumes();
+        is_fighter = std::any_of(costumes.begin(), costumes.end(),
+            [&](const auto& costume) { return costume.model_symbol == model.symbol; });
         for (size_t i = 0; i < model.joints.size(); ++i) {
             const auto& node = model.joints[i];
             auto& pose = bind_pose[i];
@@ -87,7 +98,13 @@ struct PreparedScene {
 
     void update_world() {
         char error[256];
-        const auto pose = animation ? animation->pose() : std::span<const AnimationPose>(bind_pose);
+        std::copy(bind_pose.begin(), bind_pose.end(), posed.begin());
+        if (animation) {
+            const auto animated = animation->pose();
+            if (animated.size() != animation_to_joint.size()) throw DatError("Animation mapping size changed");
+            for (size_t i = 0; i < animated.size(); ++i) posed.at(animation_to_joint[i]) = animated[i];
+        }
+        const auto& pose = posed;
         for (size_t i = 0; i < joints.size(); ++i) {
             const auto& node = model.joints[i];
             const auto* parent = node.parent == melee_web::RigidJoint::no_parent ? nullptr : &joints.at(node.parent);
@@ -181,121 +198,229 @@ struct PreparedScene {
     }
 };
 std::unique_ptr<PreparedScene> scene;
-std::string message, animation_message = "Load a model, then its animation archive.";
+std::string message, stage_message;
+std::string animation_message = "Load fighter metadata, common data and an animation container.";
 std::string fighter_message = "Load a fighter model, then its fighter metadata.";
+std::string common_message = "Common fighter data has not been loaded.";
 
 void discard_animation() {
     if (!scene) return;
-    scene->animation.reset(); scene->playing = false; scene->clock.reset();
+    scene->animation.reset(); scene->animation_to_joint.clear(); scene->playing = false; scene->clock.reset();
     scene->animation_name.clear(); scene->playback_notice.clear();
     scene->update_world(); scene->update_view();
+}
+void reset_scene() {
+    scene.reset();
+    animation_error = false;
+    animation_message = "Load fighter metadata, common data and an animation container.";
+    fighter_message = "Load a fighter model, then its fighter metadata.";
+}
+void reject_animation(const std::string& reason) {
+    try { discard_animation(); } catch (...) { reset_scene(); }
+    animation_error = true;
+    animation_message = "Animation rejected: " + reason;
+}
+std::string model_stats() {
+    return "Decoded: " + std::to_string(scene->model.joints.size()) + " joints · " +
+        std::to_string(scene->model.meshes.size()) + " meshes (" + std::to_string(scene->skinned_meshes) + " skinned) · " +
+        std::to_string(scene->texture_count) + " textures · " +
+        std::to_string(scene->model.draw_packets) + " primitive packets · " +
+        std::to_string(scene->model.submitted_vertices) + " vertices before visibility";
+}
+void load_animation(std::span<const uint8_t> bytes, std::string_view expected_symbol = {}) {
+    if (!scene || !scene->actions) throw DatError("Load fighter metadata before its animation");
+    if (!common_archive) throw DatError("Load common fighter data (PlCo.dat) before animation");
+    discard_animation();
+    if (bytes.empty()) throw DatError("Animation archive is empty");
+    const auto& costume = melee_web::resolve_fighter_costume(scene->model.symbol);
+    const melee_web::DatCommonFighterLayout common(*common_archive, costume);
+    const melee_web::DatArchive archive(bytes);
+    const melee_web::DatPublicSymbol* selected = nullptr;
+    for (const auto& symbol : archive.public_symbols()) {
+        if ((!expected_symbol.empty() && symbol.name != expected_symbol) || !scene->actions->contains(symbol.name)) continue;
+        if (selected) throw DatError("Animation archive contains multiple registered action roots");
+        selected = &symbol;
+    }
+    if (!selected) throw DatError("Animation root does not match the fighter's action table");
+    const melee_web::DatAnimation data(archive, selected->data_offset);
+    auto binding = melee_web::bind_fighter_animation(costume, common, *scene->actions,
+        scene->model.symbol, scene->model.joints.size(), selected->name, data, bytes.size());
+    std::vector<AnimationPose> bind;
+    bind.reserve(binding.animation_node_to_model_joint.size());
+    for (auto joint : binding.animation_node_to_model_joint) bind.push_back(scene->bind_pose.at(joint));
+    auto animation = std::make_unique<melee_web::HsdAnimation>(data, bind);
+    animation->request(0); animation->advance();
+    scene->animation_to_joint = std::move(binding.animation_node_to_model_joint);
+    scene->animation = std::move(animation); scene->animation_name = selected->name;
+    scene->end_frame = data.end_frame;
+    scene->update_world(); scene->update_view();
+    animation_error = false;
+    animation_message = "Animation loaded at frame 0. Press Play.";
 }
 }
 
 extern "C" {
 void melee_web_asset_clear(void) {
-    scene.reset(); loaded_archive.reset(); message.clear();
-    animation_message = "Load a model, then its animation archive.";
-    fighter_message = "Load a fighter model, then its fighter metadata.";
+    reset_scene(); loaded_stage.reset(); loaded_archive.reset(); message.clear(); stage_message.clear();
+    // Common data is reusable across model imports and stays local to this tab.
 }
+int melee_web_asset_ready(void) { return scene != nullptr; }
+int melee_web_asset_kind(void) { return !scene ? 0 : scene->is_stage ? 3 : scene->is_fighter ? 2 : 1; }
 int melee_web_asset_open(const void* bytes, uint32_t size) {
     melee_web_asset_clear();
     try {
         if (!bytes || !size) throw DatError("Asset is empty");
         loaded_archive = std::make_shared<melee_web::DatArchive>(std::span(static_cast<const uint8_t*>(bytes), size));
-        message = "Archive validated. Select a supported model symbol.";
+        for (const auto& root : loaded_archive->public_symbols()) {
+            if (root.name == "map_head") {
+                loaded_stage = std::make_unique<melee_web::DatStage>(*loaded_archive, root.name);
+                break;
+            }
+        }
+        message = "Archive validated. Select a model or stage entry.";
         return static_cast<int>(loaded_archive->public_symbols().size());
-    } catch (const std::exception& error) { message = error.what(); return -1; }
+    } catch (const std::exception& error) {
+        loaded_stage.reset(); loaded_archive.reset(); message = error.what(); return -1;
+    }
 }
 const char* melee_web_asset_symbol(uint32_t index) {
     if (!loaded_archive || index >= loaded_archive->public_symbols().size()) return nullptr;
     return loaded_archive->public_symbols()[index].name.c_str();
 }
 int melee_web_asset_select(uint32_t index) {
-    scene.reset(); animation_message = "Load a model, then its animation archive.";
-    fighter_message = "Load a fighter model, then its fighter metadata.";
+    reset_scene(); stage_message.clear();
     try {
         const char* name = melee_web_asset_symbol(index);
         if (!name) throw DatError("Select a public model symbol");
-        scene = std::make_unique<PreparedScene>(loaded_archive, name);
-        fighter_message = scene->skinned_meshes ? "Raw model: alternate representations may overlap. Load fighter metadata to select normal geometry." : "Ordinary model loaded; fighter metadata is optional.";
-        message = std::to_string(scene->model.joints.size()) + " joints · " +
-                  std::to_string(scene->model.meshes.size()) + " meshes (" + std::to_string(scene->skinned_meshes) + " skinned) · " +
-                  std::to_string(scene->texture_count) + " textures · " +
-                  std::to_string(scene->model.draw_packets) + " primitive packets · " +
-                  std::to_string(scene->model.submitted_vertices) + " submitted vertices";
+        scene = std::make_unique<PreparedScene>(melee_web::RigidModel(loaded_archive, name));
+        fighter_message = scene->is_fighter ? "Raw fighter model: load metadata to select normal geometry and register actions." : "Fighter controls do not apply to this model.";
+        message = model_stats();
         return 1;
     } catch (const std::exception& error) { message = error.what(); return 0; }
 }
 const char* melee_web_asset_message(void) { return message.c_str(); }
-
+int melee_web_asset_stage_count(void) { return loaded_stage ? int(loaded_stage->entries.size()) : 0; }
+int melee_web_asset_stage_select(uint32_t index, int opaque_only) {
+    reset_scene(); stage_message.clear();
+    try {
+        if (!loaded_stage || index >= loaded_stage->entries.size()) throw DatError("Select a stage entry");
+        const auto& entry = loaded_stage->entries[index];
+        stage_message = "Static entry inspection. Stage callbacks and game-scene selection are not running.";
+        const auto services = loaded_stage->unapplied_services(index);
+        if (!services.empty()) {
+            stage_message += " Present services not applied: ";
+            for (size_t i = 0; i < services.size(); ++i) {
+                if (i) stage_message += ", ";
+                stage_message += services[i];
+            }
+            stage_message += ".";
+        }
+        if (!entry.joint_offset) throw DatError("Stage entry has no joint root");
+        scene = std::make_unique<PreparedScene>(melee_web::RigidModel(loaded_archive, *entry.joint_offset,
+            "Stage entry " + std::to_string(entry.index), opaque_only ? melee_web::ModelRenderPass::Opaque : melee_web::ModelRenderPass::All));
+        scene->is_stage = true;
+        fighter_message = "Fighter controls do not apply to stage entries.";
+        message = model_stats();
+        stage_message = std::string(opaque_only ? "Opaque pass" : "Complete model") + " · " +
+            std::to_string(scene->model.meshes.size()) + " decoded meshes · " +
+            std::to_string(scene->model.omitted_translucent_meshes) + " translucent meshes and " +
+            std::to_string(scene->model.omitted_texture_edge_meshes) + " texture-edge meshes omitted · " +
+            std::to_string(scene->model.omitted_joints) + " unused joints omitted. " + stage_message;
+        return 1;
+    } catch (const std::exception& error) { message = error.what(); return 0; }
+}
+const char* melee_web_asset_stage_message(void) { return stage_message.c_str(); }
 int melee_web_asset_fighter_open(const void* bytes, uint32_t size) {
     try {
-        if (!scene) throw DatError("Load a fighter model before its metadata");
+        if (!scene || !scene->is_fighter) throw DatError("Load a registered fighter model before its metadata");
         if (!bytes || !size) throw DatError("Fighter metadata archive is empty");
-        // Source binding: ftMr_Init_DataName and ftMr_Init_CostumeStrings[0]
-        // in ftmariostrings.c. Costume identity is not stored in the DAT.
-        if (scene->model.symbol != "PlyMario5K_Share_joint")
-            throw DatError("Fighter metadata binding is currently verified for default Mario only");
+        const auto& costume = melee_web::resolve_fighter_costume(scene->model.symbol);
         const melee_web::DatArchive archive(std::span(static_cast<const uint8_t*>(bytes), size));
-        const melee_web::DatFighterParts parts(archive, "ftDataMario", 0);
+        const melee_web::DatFighterParts parts(archive, std::string(costume.fighter_symbol), costume.costume_index);
         const auto indices = parts.normal_dobj_indices(scene->model.dobj_count);
+        auto actions = std::make_unique<melee_web::DatFighterActions>(archive, costume);
+        std::vector<std::string> labels;
+        for (const auto& action : actions->actions) labels.push_back(std::to_string(action.motion_id) + " · " + action.symbol);
         std::vector<bool> selected(scene->model.dobj_count, false);
         for (auto index : indices) selected[index] = true;
-        // Commit a complete checked mask. Keep the inspection camera fixed so
-        // loading metadata during animation cannot change its framing.
-        scene->visible_dobjs = std::move(selected);
+        // Commit complete checked metadata, preserving the camera's framing.
+        discard_animation();
+        scene->visible_dobjs = std::move(selected); scene->actions = std::move(actions);
+        scene->action_labels = std::move(labels); scene->animation_container.clear();
         size_t count = 0;
         for (const auto& mesh : scene->model.meshes) count += scene->visible_dobjs[mesh.dobj_index];
-        fighter_message = "Normal representation · " + std::to_string(indices.size()) + " / " +
+        fighter_message = std::string(costume.kind_name) + " costume " + std::to_string(costume.costume_index) +
+            " · normal representation: " + std::to_string(indices.size()) + " / " +
             std::to_string(scene->model.dobj_count) + " display objects · " + std::to_string(count) +
-            " / " + std::to_string(scene->model.meshes.size()) + " meshes · category 0, variant 0";
+            " / " + std::to_string(scene->model.meshes.size()) + " meshes · " +
+            std::to_string(scene->actions->actions.size()) + " animation records";
+        animation_message = "Fighter actions registered. Load common data and its animation container.";
         return 1;
     } catch (const std::exception& error) {
-        fighter_message = "Metadata rejected; previous visibility retained: " + std::string(error.what());
+        fighter_message = "Metadata rejected; previous metadata retained: " + std::string(error.what());
         return 0;
     }
 }
 const char* melee_web_asset_fighter_message(void) { return fighter_message.c_str(); }
-
-int melee_web_asset_animation_open(const void* bytes, uint32_t size) {
+int melee_web_asset_common_open(const void* bytes, uint32_t size) {
     try {
-        if (!scene) throw DatError("Load a model before its animation");
-        discard_animation();
-        if (!bytes || !size) throw DatError("Animation archive is empty");
-        // This initial binding is proven from PlCo's Mario parts table and the
-        // original ftParts preorder walk. A matching count alone cannot prove
-        // other fighters' alternate mappings; their typed mapping loader remains
-        // required. The generic decoder/evaluator performs every validation.
-        if (scene->model.symbol != "PlyMario5K_Share_joint" || scene->bind_pose.size() != 61)
-            throw DatError("Animation binding is currently verified for the default Mario hierarchy only");
-        const melee_web::DatArchive archive(std::span(static_cast<const uint8_t*>(bytes), size));
-        const melee_web::DatPublicSymbol* selected = nullptr;
-        for (const auto& symbol : archive.public_symbols()) {
-            if (symbol.name.starts_with("PlyMario5K_Share_ACTION_") && symbol.name.ends_with("_figatree")) {
-                if (selected) throw DatError("Animation archive contains multiple matching action roots");
-                selected = &symbol;
-            }
-        }
-        if (!selected) throw DatError("Animation does not match the loaded default Mario model");
-        const melee_web::DatAnimation data(archive, selected->data_offset);
-        if (data.node_counts.size() != scene->bind_pose.size()) throw DatError("Animation node count differs from the model");
-        auto animation = std::make_unique<melee_web::HsdAnimation>(data, scene->bind_pose);
-        animation->request(0); animation->advance();
-        scene->animation = std::move(animation); scene->animation_name = selected->name;
-        scene->end_frame = data.end_frame;
-        scene->update_world(); scene->update_view();
-        animation_message = "Animation loaded at frame 0. Press Play.";
+        if (!scene || !scene->is_fighter) throw DatError("Load a fighter before common data");
+        if (!bytes || !size) throw DatError("Common fighter archive is empty");
+        auto common = std::make_shared<melee_web::DatArchive>(std::span(static_cast<const uint8_t*>(bytes), size));
+        const auto& costume = melee_web::resolve_fighter_costume(scene->model.symbol);
+        const melee_web::DatCommonFighterLayout layout(*common, costume);
+        if (layout.has_alternate_descriptor) throw DatError("Alternate fighter part insertion is not supported yet");
+        if (layout.part_count != scene->model.joints.size()) throw DatError("Common part count differs from the loaded model");
+        discard_animation(); common_archive = std::move(common);
+        common_message = "Common fighter data loaded locally and reusable across models.";
+        animation_message = "Common mapping validated. Select an animation to evaluate.";
         return 1;
     } catch (const std::exception& error) {
-        const std::string reason = error.what();
-        try { discard_animation(); } catch (...) { scene.reset(); }
-        animation_message = "Animation rejected: " + reason;
-        return 0;
+        common_message = "Common data rejected; previous data retained: " + std::string(error.what()); return 0;
     }
+}
+const char* melee_web_asset_common_message(void) { return common_message.c_str(); }
+int melee_web_asset_action_count(void) { return scene && scene->actions ? int(scene->actions->actions.size()) : 0; }
+const char* melee_web_asset_action_name(uint32_t index) {
+    return scene && index < scene->action_labels.size() ? scene->action_labels[index].c_str() : nullptr;
+}
+int melee_web_asset_container_ready(void) { return scene && !scene->animation_container.empty(); }
+int melee_web_asset_container_open(const void* bytes, uint32_t size) {
+    try {
+        if (!scene || !scene->actions) throw DatError("Load fighter metadata before the animation container");
+        if (!bytes || !size || size > melee_web::DatArchive::max_archive_bytes) throw DatError("Animation container must be nonempty and at most 64 MiB");
+        const std::span<const uint8_t> data(static_cast<const uint8_t*>(bytes), size);
+        scene->actions->validate_container(data);
+        std::vector<uint8_t> owned(data.begin(), data.end());
+        discard_animation(); scene->animation_container = std::move(owned);
+        animation_error = false;
+        animation_message = "Container loaded. Select an action; each clip is validated before evaluation.";
+        return 1;
+    } catch (const std::exception& error) {
+        animation_error = true;
+        animation_message = "Container rejected; previous container retained: " + std::string(error.what()); return 0;
+    }
+}
+int melee_web_asset_action_select(uint32_t index) {
+    try {
+        if (!scene || !scene->actions || index >= scene->actions->actions.size()) throw DatError("Select a registered action");
+        if (scene->animation_container.empty()) throw DatError("Load the registered fighter animation container");
+        const auto& action = scene->actions->actions[index];
+        const auto bytes = scene->actions->slice(scene->animation_container, action.motion_id);
+        load_animation(bytes, action.symbol);
+        return 1;
+    } catch (const std::exception& error) { reject_animation(error.what()); return 0; }
+}
+int melee_web_asset_animation_open(const void* bytes, uint32_t size) {
+    try {
+        if (!bytes || !size) throw DatError("Animation archive is empty");
+        load_animation(std::span(static_cast<const uint8_t*>(bytes), size));
+        return 1;
+    } catch (const std::exception& error) { reject_animation(error.what()); return 0; }
 }
 int melee_web_asset_animation_play(int enabled) {
     if (!scene || !scene->animation) return 0;
+    animation_error = false;
     scene->playing = enabled != 0; scene->clock.reset(); scene->playback_notice.clear();
     return scene->playing;
 }
@@ -306,7 +431,7 @@ void melee_web_asset_animation_visible(int visible) {
     if (scene) scene->clock.reset();
 }
 const char* melee_web_asset_animation_message(void) {
-    if (scene && scene->animation) {
+    if (scene && scene->animation && !animation_error) {
         animation_message = scene->animation_name + " · frame " + std::to_string(scene->animation->frame()) +
             " / " + std::to_string(scene->end_frame) + " · " + (scene->playing ? "playing at 60 Hz" : "paused");
         if (!scene->playback_notice.empty()) animation_message += " · " + scene->playback_notice;
@@ -321,15 +446,9 @@ void melee_web_asset_tick(double now_ms) {
     }
     if (!tick.steps) return;
     try {
-        for (unsigned i = 0; i < tick.steps; ++i) {
-            melee_web::advance_inspection_loop(*scene->animation);
-        }
+        for (unsigned i = 0; i < tick.steps; ++i) melee_web::advance_inspection_loop(*scene->animation);
         scene->update_world(); scene->update_view();
-    } catch (const std::exception& error) {
-        const std::string reason = error.what();
-        try { discard_animation(); } catch (...) { scene.reset(); }
-        animation_message = "Animation stopped: " + reason;
-    }
+    } catch (const std::exception& error) { reject_animation(error.what()); }
 }
 
 int melee_web_asset_draw(void) {

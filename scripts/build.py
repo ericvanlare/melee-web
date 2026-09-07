@@ -14,6 +14,10 @@ ROOT = Path(__file__).resolve().parents[1]
 def build(jobs, root=ROOT):
     lock = read_lock(root)
     verify_sources(root, lock)
+    # Registry strings/counts are generated from the pinned source, not game
+    # bytes. Fail on source drift before compiling an outdated binding table.
+    subprocess.run([sys.executable, str(root / "scripts/generate_fighter_registry.py"), "--check"],
+                   cwd=root, check=True)
     if (root / ".venv").is_symlink():
         raise ValueError(".venv must be a local directory, not a symlink")
     bins = root / ".venv" / ("Scripts" if os.name == "nt" else "bin")

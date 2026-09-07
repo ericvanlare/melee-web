@@ -7,6 +7,7 @@
 #include <functional>
 #include <iostream>
 #include <map>
+#include <limits>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -84,7 +85,7 @@ void preserves_material_inputs()
           "all original RGBA components survive without forcing alpha to255");
     check(material.alpha == 1 && material.shininess == 50 && material.render_mode == 0xc &&
           material.textures.empty(), "original opaque specular inputs");
-    for (const auto flags : {0U, 1U, 4U, 5U, 8U, 0xcU, 0x14U, 0x1cU, 0x3cU, 0xffdU}) {
+    for (const auto flags : {0U, 1U, 2U, 4U, 5U, 8U, 0xcU, 0x14U, 0x1cU, 0x3cU, 0xfffU}) {
         Fixture fixture;
         put32(fixture.data, Fixture::mobj + 4, flags);
         const auto owner = fixture.archive();
@@ -101,7 +102,7 @@ void unsupported_material_services()
         const auto archive = fixture.archive();
         rejects([&] { (void) melee_web::read_dat_material(archive, Fixture::mobj); });
     }
-    for (const auto flags : {2U, 0x1000U, 0x2000U, 0x04000000U, 0x08000000U,
+    for (const auto flags : {0x1000U, 0x2000U, 0x04000000U, 0x08000000U,
                             0x20000000U, 0x40000000U, 0x80000000U}) {
         Fixture fixture;
         put32(fixture.data, Fixture::mobj + 4, flags);
@@ -126,11 +127,36 @@ void finite_material_parameters()
         const auto archive = fixture.archive();
         rejects([&] { (void) melee_web::read_dat_material(archive, Fixture::mobj); });
     }
-    for (const auto shine : {-1.F, 129.F}) {
+    for (const auto shine : {-1.F}) {
         Fixture fixture;
         put32(fixture.data, 16, std::bit_cast<std::uint32_t>(shine));
         const auto archive = fixture.archive();
         rejects([&] { (void) melee_web::read_dat_material(archive, Fixture::mobj); });
+    }
+}
+
+void source_render_passes()
+{
+    using melee_web::DatMaterialPass;
+    for (const auto& [flags, expected] : std::map<std::uint32_t, DatMaterialPass>{
+        {0xcU, DatMaterialPass::Opaque}, {0x60000002U, DatMaterialPass::Translucent},
+        {0x40000001U, DatMaterialPass::TextureEdge}}) {
+        Fixture fixture;
+        put32(fixture.data, Fixture::mobj + 4, flags);
+        const auto archive = fixture.archive();
+        check(melee_web::read_dat_material_pass(archive, Fixture::mobj) == expected,
+              "original DObjLoad blend flags determine the pass before payload hydration");
+    }
+    Fixture invalid;
+    put32(invalid.data, Fixture::mobj + 4, 0x20000001U);
+    const auto archive = invalid.archive();
+    rejects([&] { (void) melee_web::read_dat_material_pass(archive, Fixture::mobj); });
+    for (const float shine : {129.F, 296.363586F, std::numeric_limits<float>::max()}) {
+        Fixture fixture;
+        put32(fixture.data, 16, std::bit_cast<std::uint32_t>(shine));
+        const auto owner = fixture.archive();
+        check(melee_web::read_dat_material(owner, Fixture::mobj).shininess == shine,
+              "source shininess survives without an invented format cap or normalization");
     }
 }
 
@@ -166,6 +192,7 @@ int main(int argc, char** argv)
         {"unsupported_material_services", unsupported_material_services},
         {"finite_material_parameters", finite_material_parameters},
         {"material_pointer_bounds", material_pointer_bounds},
+        {"source_render_passes", source_render_passes},
     };
     if (argc != 2 || !cases.contains(argv[1])) return 2;
     try { cases.at(argv[1])(); }

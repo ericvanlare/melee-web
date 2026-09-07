@@ -39,8 +39,11 @@ class DatMaterialTests(unittest.TestCase):
     def test_custom_state_and_absent_rendering_services_fail_explicitly(self):
         self.run_case("unsupported_material_services")
 
-    def test_opaque_alpha_and_finite_bounded_shininess(self):
+    def test_opaque_alpha_and_finite_nonnegative_shininess(self):
         self.run_case("finite_material_parameters")
+
+    def test_original_source_pass_classification_and_uncapped_shininess(self):
+        self.run_case("source_render_passes")
 
     def test_required_material_pointer_alignment_and_referenced_region_bounds(self):
         self.run_case("material_pointer_bounds")

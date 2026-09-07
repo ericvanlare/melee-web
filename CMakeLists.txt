@@ -63,7 +63,8 @@ target_compile_options(hsd_state PRIVATE -ffunction-sections -fdata-sections
 
 add_executable(gx_probe src/gx_probe.c src/hsd_probe.c src/dat_archive.cpp
   src/rigid_model.cpp src/asset_scene.cpp src/dat_texture.cpp src/dat_material.cpp
-  src/hsd_material.cpp src/browser_input.cpp src/dat_animation.cpp src/dat_fighter.cpp src/hsd_animation_bridge.cpp)
+  src/hsd_material.cpp src/browser_input.cpp src/dat_animation.cpp src/dat_fighter.cpp
+  src/dat_stage.cpp src/fighter_binding.cpp src/hsd_animation_bridge.cpp)
 target_include_directories(gx_probe PRIVATE .deps/melee/src)
 target_link_libraries(gx_probe PRIVATE hsd_state)
 target_link_libraries(gx_probe PRIVATE aurora::core aurora::gx aurora::main aurora::vi aurora::mtx aurora::pad)
@@ -74,6 +75,6 @@ if(EMSCRIPTEN)
     -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=134217728
     -sSTACK_SIZE=8388608 -sASSERTIONS=1
     -sEXPORTED_RUNTIME_METHODS=FS,HEAPU8,UTF8ToString -sEXIT_RUNTIME=0
-    -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_melee_web_asset_clear,_melee_web_asset_open,_melee_web_asset_symbol,_melee_web_asset_select,_melee_web_asset_message,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_message,_melee_web_asset_animation_open,_melee_web_asset_animation_play,_melee_web_asset_animation_playing,_melee_web_asset_animation_loaded,_melee_web_asset_animation_visible,_melee_web_asset_animation_message,_melee_web_asset_fighter_open,_melee_web_asset_fighter_message)
+    -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_melee_web_asset_clear,_melee_web_asset_open,_melee_web_asset_symbol,_melee_web_asset_select,_melee_web_asset_message,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_message,_melee_web_asset_animation_open,_melee_web_asset_animation_play,_melee_web_asset_animation_playing,_melee_web_asset_animation_loaded,_melee_web_asset_animation_visible,_melee_web_asset_animation_message,_melee_web_asset_fighter_open,_melee_web_asset_fighter_message,_melee_web_asset_ready,_melee_web_asset_kind,_melee_web_asset_stage_count,_melee_web_asset_stage_select,_melee_web_asset_stage_message,_melee_web_asset_common_open,_melee_web_asset_common_message,_melee_web_asset_action_count,_melee_web_asset_action_name,_melee_web_asset_container_ready,_melee_web_asset_container_open,_melee_web_asset_action_select)
   configure_file(web/index.html index.html COPYONLY)
 endif()

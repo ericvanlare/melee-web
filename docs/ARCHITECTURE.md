@@ -58,6 +58,12 @@ destroyed with their owner. Joint and normal matrices are refreshed when the pos
 changes. The inspection camera and lights are authored context, separate from the
 future game scene loader and scheduler.
 
+Direct RGBA8 vertex colors remain in the original GX display-list bytes and
+follow HSD's vertex-color material path. Material shininess remains finite and
+nonnegative but has no invented 128 cap: original `HSD_LObjSetup` uses
+`shininess / 2` and `1 - shininess / 2`. Fox's value near 296 therefore reaches
+the original lighting calculation unchanged.
+
 ## 008 — One input sample boundary
 
 Poll Aurora PAD once after its event update, independently of whether a frame can
@@ -94,9 +100,9 @@ unchanged skeleton size also reuses owned joint storage during animation.
 ## 010 — Fighter visibility indexes display objects
 
 `DatFighterParts` decodes `ftData` to `FtPartsDesc`, costume fallback, representation
-groups and variant lists into checked types. The decoder is generic; the viewer's
-costume/model binding remains explicit and is currently restricted to default
-Mario. It does not replace fighter initialization or action visibility commands.
+groups and variant lists into checked types. A generated original-source registry
+binds the exact model symbol to fighter kind and costume index. This does not
+replace fighter initialization or action visibility commands.
 
 A DObj can own multiple PObjs. The model therefore records preorder DObj
 occurrences separately from mesh indices, following `ftParts_80074194`. Normal
@@ -104,7 +110,8 @@ inspection hides the listed main-model alternates and enables the sole normal
 variant in each group; unlisted DObjs keep their default visibility. Ambiguous
 variant groups reject until an explicit selector exists. Metal indices refer to
 a separate DObj list and must never be applied to the main model. Default Mario's
-normal selection is 43 DObjs covering 52 meshes out of the 68 decoded meshes.
+normal selection is 43 DObjs covering 52 meshes out of the 68 decoded meshes;
+default Fox selects 45 of its 77 DObjs.
 
 ## 011 — Source animation evaluation before gameplay scheduling
 
@@ -115,11 +122,26 @@ The pose callback supports ordinary Euler rotation, translation and scale;
 untracked values retain their bind pose. Classical-scale flags follow the
 original animation loader's policy for animated nodes. Visibility tracks,
 gameplay events, transition blending and non-SRT channels remain unsupported.
+FigaTrack byte 7 is unnamed C-struct alignment padding, ignored by original
+`lbAnim_InitFrames`; it is not a channel flag. Nonzero padding in WalkSlow does
+not bypass checks on named fields or packed operands.
 
-Default Mario's 61-node preorder animation mapping is established from the
-original fighter-part traversal and `PlCo` metadata, including its absent
-alternate-parts table. Equal node counts alone do not establish a mapping for
-other fighters, so the viewer does not generalize that binding by guesswork.
+`generate_fighter_registry.py` reads narrow, checked original C initializers for
+fighter data, costume identities, motion counts and animation-container names.
+The build checks the generated table against the pinned source; unexpected syntax
+or ambiguous model identities reject. `DatCommonFighterLayout` reads the selected
+kind's `PlCo.dat` part count and alternate-parts metadata. Ordinary initial parts
+follow `ftParts_SetupParts` preorder and `ftAnim_8006F4C8` node consumption. Binding
+requires that layout, the exact source costume identity, matching part/model/node
+counts and exact action-table symbol and archive length. Nonnull alternate-parts
+descriptors reject until original insertion and motion-mask behavior is supported.
+
+`DatFighterActions` retains source motion IDs while omitting empty archive records.
+The viewer retains the imported full AJ container, validates every declared range,
+and slices the explicitly selected action by its source offset and length. Shared
+archive aliases retain their separate motion IDs and flags. This enables Mario
+and Fox Wait1 and WalkSlow without filename-derived animation binding or a growing
+fighter whitelist; it does not execute action commands or transitions.
 
 Inspection playback advances at fixed 60 Hz, independently of presentation rate,
 with at most eight catch-up steps per tick. Larger stalls pause playback with a
@@ -132,3 +154,18 @@ The inspection projection uses the SDK's `C_MTXOrtho`. GX clip depth spans
 `[-w, 0]`; Aurora applies its reversed-depth conversion and comparison mapping.
 A trace checks that front geometry wins the resulting depth test. Camera fitting
 stays fixed while playing animation or changing representation metadata.
+
+## 012 — Explicit stage entry and render-pass inspection
+
+`DatStage` decodes `map_head` and its counted 0x34-byte map-entry table. The viewer
+enumerates entries and requires a selected entry; it does not assume every joint
+tree is simultaneously visible. Camera, lights, fog, animation, collision and
+other referenced stage services are reported as unapplied.
+
+Complete-model decoding remains strict. The explicit opaque pass follows original
+DObj material classification and reports omitted texture-edge and translucent
+DObjs and meshes. It retains mesh owners, referenced envelope joints and all their
+ancestors, remaps that transform closure, and validates the retained joint behavior.
+Unsupported flags on a required ancestor are never cleared to make a draw pass.
+The GrNLa entry-3 gate retains 13 opaque meshes and reports 13 omitted meshes.
+That partial draw is stage inspection, not complete stage loading or gameplay.

@@ -2,9 +2,11 @@
  * texture and state code is linked below them. No GPU or proprietary data. */
 #include "hsd_material_bridge.h"
 #include "hsd_host_support.h"
+#include "hsd_inspection.h"
 #include <dolphin/gx.h>
 #include <assert.h>
 #include <float.h>
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -16,6 +18,7 @@ static unsigned ids[16], next_id;
 static unsigned palette_ids[4], palette_loads, active_texture_count = 2;
 static unsigned expected_uv_coord = 1;
 static int saw_blend_constant, saw_diffuse_color, saw_specular_color;
+static int saw_fox_attenuation, saw_vertex_channel, saw_vertex_raster;
 
 typedef struct TestTexture { unsigned id, tlut; const void* data; } TestTexture;
 typedef struct TestPalette { unsigned id; const void* data; u16 entries; } TestPalette;
@@ -133,7 +136,21 @@ void GXSetTexCoordGen2(GXTexCoordID coord, GXTexGenType function, GXTexGenSrc so
     }
 }
 
-void GXInitLightAttn(GXLightObj* lt_obj, f32 a0, f32 a1, f32 a2, f32 k0, f32 k1, f32 k2) { ++gx_calls; }
+void GXInitLightAttn(GXLightObj* lt_obj, f32 a0, f32 a1, f32 a2, f32 k0, f32 k1, f32 k2)
+{
+    const float half = 296.363586f * .5f;
+    if (a0 == 0 && a1 == 0 && a2 == 1 && k0 == half && k1 == 0 && k2 == 1 - half)
+        saw_fox_attenuation = 1;
+    ++gx_calls;
+}
+void GXInitLightDir(GXLightObj* object, f32 x, f32 y, f32 z)
+{ assert(isfinite(x) && isfinite(y) && isfinite(z)); ++gx_calls; }
+void GXInitLightPos(GXLightObj* object, f32 x, f32 y, f32 z)
+{ assert(isfinite(x) && isfinite(y) && isfinite(z)); ++gx_calls; }
+void GXInitLightDistAttn(GXLightObj* object, f32 distance, f32 brightness, GXDistAttnFn function)
+{ assert(0 && "inspection fixture contains no point lights"); }
+void GXInitLightSpot(GXLightObj* object, f32 cutoff, GXSpotFn function)
+{ assert(0 && "inspection fixture contains no spot lights"); }
 void GXInitLightColor(GXLightObj* lt_obj, GXColor color) { ++gx_calls; }
 void GXLoadLightObjImm(GXLightObj* lt_obj, GXLightID light) { ++gx_calls; }
 void GXLoadTexMtxImm(const void* mtx, u32 id, GXTexMtxType type) { ++gx_calls; }
@@ -142,7 +159,12 @@ void GXSetAlphaCompare(GXCompare comp0, u8 ref0, GXAlphaOp op, GXCompare comp1, 
 void GXSetAlphaUpdate(GXBool update_enable) { ++gx_calls; }
 void GXSetBlendMode(GXBlendMode type, GXBlendFactor src_factor, GXBlendFactor dst_factor, GXLogicOp op) { ++gx_calls; }
 void GXSetChanAmbColor(GXChannelID chan, GXColor amb_color) { ++gx_calls; }
-void GXSetChanCtrl(GXChannelID chan, GXBool enable, GXColorSrc amb_src, GXColorSrc mat_src, u32 light_mask, GXDiffuseFn diff_fn, GXAttnFn attn_fn) { ++gx_calls; }
+void GXSetChanCtrl(GXChannelID chan, GXBool enable, GXColorSrc amb_src, GXColorSrc mat_src, u32 light_mask, GXDiffuseFn diff_fn, GXAttnFn attn_fn)
+{
+    if ((chan == GX_COLOR0A0 || chan == GX_COLOR0) && !enable && mat_src == GX_SRC_VTX)
+        saw_vertex_channel = 1;
+    ++gx_calls;
+}
 void GXSetChanMatColor(GXChannelID chan, GXColor mat_color) { ++gx_calls; }
 void GXSetColorUpdate(GXBool update_enable) { ++gx_calls; }
 void GXSetDither(GXBool dither) { ++gx_calls; }
@@ -150,7 +172,12 @@ void GXSetDstAlpha(GXBool enable, u8 alpha) { ++gx_calls; }
 void GXSetNumChans(u8 nChans) { ++gx_calls; }
 void GXSetTevAlphaIn(GXTevStageID stage, GXTevAlphaArg a, GXTevAlphaArg b, GXTevAlphaArg c, GXTevAlphaArg d) { ++gx_calls; }
 void GXSetTevAlphaOp(GXTevStageID stage, GXTevOp op, GXTevBias bias, GXTevScale scale, GXBool clamp, GXTevRegID out_reg) { ++gx_calls; }
-void GXSetTevColorIn(GXTevStageID stage, GXTevColorArg a, GXTevColorArg b, GXTevColorArg c, GXTevColorArg d) { ++gx_calls; }
+void GXSetTevColorIn(GXTevStageID stage, GXTevColorArg a, GXTevColorArg b, GXTevColorArg c, GXTevColorArg d)
+{
+    if (a == GX_CC_RASC || b == GX_CC_RASC || c == GX_CC_RASC || d == GX_CC_RASC)
+        saw_vertex_raster = 1;
+    ++gx_calls;
+}
 void GXSetTevColorOp(GXTevStageID stage, GXTevOp op, GXTevBias bias, GXTevScale scale, GXBool clamp, GXTevRegID out_reg) { ++gx_calls; }
 void GXSetTevColorS10(GXTevRegID id, GXColorS10 color) { ++gx_calls; }
 void GXSetTevKAlphaSel(GXTevStageID stage, GXTevKAlphaSel sel) { ++gx_calls; }
@@ -255,6 +282,31 @@ int main(void)
     assert(!melee_web_hsd_material_create(&descriptor, error, sizeof error));
     assert(strstr(error, "matrix") && melee_web_hsd_allocation_bytes() == 0);
     assert(texture_destroys == texture_initializations && palette_destroys == palette_initializations);
+    // Exercise original light attenuation with the actual Fox material value.
+    const float view[3][4] = {{1,0,0,0}, {0,1,0,0}, {0,0,1,-10}};
+    assert(melee_web_inspection_begin(view, error, sizeof error));
+    assert(melee_web_inspection_specular(view, error, sizeof error));
+    const size_t context_bytes = melee_web_hsd_allocation_bytes();
+    descriptor.texture_count = 0;
+    descriptor.rendermode = 0xc;
+    descriptor.shininess = 296.363586f;
+    material = melee_web_hsd_material_create(&descriptor, error, sizeof error);
+    assert(material);
+    melee_web_hsd_material_setup(material);
+    assert(saw_fox_attenuation);
+    melee_web_hsd_material_unset(material);
+    melee_web_hsd_material_destroy(material);
+    assert(melee_web_hsd_allocation_bytes() == context_bytes);
+
+    descriptor.rendermode = 2; // Original RENDER_VERTEX uses the raster channel.
+    saw_vertex_channel = saw_vertex_raster = 0;
+    material = melee_web_hsd_material_create(&descriptor, error, sizeof error);
+    assert(material);
+    melee_web_hsd_material_setup(material);
+    assert(saw_vertex_channel && saw_vertex_raster);
+    melee_web_hsd_material_unset(material);
+    melee_web_hsd_material_destroy(material);
+    assert(melee_web_hsd_allocation_bytes() == context_bytes);
     puts("HSD original material compile/setup/cache/free trace: passed");
     return 0;
 }

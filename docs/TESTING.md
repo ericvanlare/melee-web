@@ -8,6 +8,9 @@ CI runs them again after installing the SDK. Input adapter tests use a controlle
 PAD provider; they need the configured SDL headers and CI
 runs them after the browser build. They do not validate physical controllers.
 Run `python3 scripts/build.py` for the actual WebAssembly link.
+The build also runs the source-registry drift check. After an intentional upstream
+registry change, run `python3 scripts/generate_fighter_registry.py`, review the
+generated diff, then run it again with `--check`.
 
 The source traces check envelope blending and model-node transforms, captured
 normal/reflection palettes, pose updates and nonfinite rejection; they also check
@@ -16,6 +19,11 @@ GX calls are recorded in tests, so these establish source/SDK behavior rather
 than GPU rendering. Synthetic visibility tests cover costume fallback, distinct
 main/metal DObj lists, ambiguous variants and DObj-to-PObj mapping. Clock tests
 cover cadence, pause, hidden time and bounded catch-up.
+Binding tests cover exact source identities, common part layouts, rejected
+alternate mappings, action aliases and holes, and bounded container slices.
+Stage tests cover counted entry tables and malformed service references; model
+tests cover explicit pass omissions and retained transform dependencies. Original
+material and polygon traces check shininess above 128 and direct RGBA8 colors.
 
 ## Prepare local fighter and animation inputs
 
@@ -26,15 +34,21 @@ image read-only and refuses to replace existing output or write outside ignored
 ```sh
 python3 scripts/extract_disc_file.py "/path/to/your/melee.ciso" PlMrNr.dat --output assets-local/next-gate/PlMrNr.dat
 python3 scripts/extract_disc_file.py "/path/to/your/melee.ciso" PlMr.dat --output assets-local/next-gate/PlMr.dat
-python3 scripts/extract_disc_file.py "/path/to/your/melee.ciso" PlMrAJ.dat --offset 0 --length 4239 --output assets-local/next-gate/MarioWait1.dat
+python3 scripts/extract_disc_file.py "/path/to/your/melee.ciso" PlCo.dat --output assets-local/next-gate/PlCo.dat
+python3 scripts/extract_disc_file.py "/path/to/your/melee.ciso" PlMrAJ.dat --output assets-local/next-gate/PlMrAJ.dat
 ```
 
-The last command selects the embedded Wait1 archive using its offset and length
-from Mario's fighter metadata. `--offset` is relative to the selected FST file,
-not the disc; omitting `--length` selects the remainder. Decimal and `0x` values
-are accepted. The selected nonempty range must fit inside that file and be at
-most 64 MiB. The tool reports the exact range and SHA-256 without interpreting
-the selected payload as a DAT.
+For Fox, also extract `PlFxNr.dat`, `PlFx.dat` and `PlFxAJ.dat`; the same `PlCo.dat`
+supplies common layouts for both fighters. Full AJ containers hold multiple DAT
+archives and are sliced by the imported fighter action table, not parsed as one
+archive. Selecting an action remains explicit.
+
+The extractor can still select one embedded clip: add `--offset 0 --length 4239`
+to the PlMrAJ command and choose a new output such as `MarioWait1.dat`. Offsets
+are relative to the selected FST file, not the disc; omitting `--length` selects
+the remainder. Decimal and `0x` values are accepted. A selected nonempty range
+must fit inside the file and be at most 64 MiB. Output includes its range and
+SHA-256 without interpreting the payload as a DAT.
 
 No game content is required by the synthetic tests. If the explicitly extracted
 `assets-local/next-gate/MarioWait1.dat` exists, the original animation trace also
@@ -64,21 +78,32 @@ evaluates that local clip. Its expected structure is 61 nodes, 111 tracks and a
    43 DObjs and 52 meshes. Verify the visible fighter uses the normal body parts
    rather than drawing every alternate representation together. These indices
    address DObjs, so filtering by individual PObj/mesh number is incorrect.
-7. Load the extracted `MarioWait1.dat`, then press Play. Check that the pose
+7. Choose `PlCo.dat` in **Common fighter DAT** and `PlMrAJ.dat` in **Animation
+   container DAT**. Explicitly select Wait1 under **Fighter action**, then press
+   Play. Repeat by explicitly selecting WalkSlow. Expect 50- and 60-frame clips,
+   respectively. Repeat the complete flow with `PlFxNr.dat`, `PlFx.dat` and
+   `PlFxAJ.dat`: expect 73 joints, 45 normal DObjs, a 120-frame Wait1 and a
+   50-frame WalkSlow. Selecting a container alone must not choose an action.
+   Check that the pose
    changes and loops while the frame display advances at 60 Hz; Pause should
    hold the pose. Hide and restore the tab and verify there is no hidden-time
    catch-up. A stall requiring more than eight animation steps must pause with
    a message instead of blocking the browser. Reject incompatible fighter
    mappings, unsupported channels and malformed streams visibly. Replacing a
    model must clear the old animation and its visibility selection.
-8. Enable keyboard controls and focus the canvas. D should produce raw stick
+8. Extract and import `GrNLa.dat`; `map_head` is recognized automatically. Select **Stage entry** 3 and
+   **Opaque only**. Expect 13 retained opaque meshes and 13 omitted meshes, with
+   unapplied stage services listed. Verify that other entries remain selectable
+   and an unsupported complete model produces an explicit rejection. Do not
+   record this partial pass as a complete stage or collision/animation test.
+9. Enable keyboard controls and focus the canvas. D should produce raw stick
    `[127, 0]` and a separate PADClamp result `[72, 0]`; Q should produce raw left
    trigger 255 and clamped 150. Release controls, then move focus to a page control:
    current input must be neutral. Also test a physical gamepad and disconnect it
    before recording physical-device support as verified.
-9. Reload once and check initialization again. Hide and restore the tab; samples
+10. Reload once and check initialization again. Hide and restore the tab; samples
    should reset and rendering should resume without including the hidden interval.
-10. Record OS, hardware/browser identification available from the runtime, build
+11. Record OS, hardware/browser identification available from the runtime, build
     type, observed duration and any errors in STATUS.md. Do not convert this
     inspection draw's CPU submission time into a claim about full-game performance.
 
@@ -98,3 +123,14 @@ material, texture and primitive counts; other roots report their exact rejection
 status is nonzero if any input/root is rejected. Redirect reports into ignored
 `work/` or `build/` when comparing a local corpus across changes. A parser pass
 does not validate source HSD transforms, GPU output or game-scene behavior.
+
+For a stage, select one entry explicitly; `--symbol` selects the header symbol:
+
+```sh
+python3 scripts/check_assets.py assets-local/next-gate/GrNLa.dat --symbol map_head --stage-entry 3 --opaque
+```
+
+The report includes the selected pass, retained geometry, omitted DObjs/meshes
+and joints, and unapplied stage services. Omit `--opaque` to check the complete
+selected model strictly. `--opaque` requires `--stage-entry` and never silently
+changes the material or joint behavior of retained geometry.

@@ -155,9 +155,11 @@ void local_clip(const char* path)
     HsdAnimation animation(data, bind_pose(data.node_counts.size()));
     animation.request(0); animation.advance();
     const std::vector<AnimationPose> initial(animation.pose().begin(), animation.pose().end());
-    for (unsigned frame = 1; frame <= 50; ++frame) {
+    const auto final_frame = static_cast<unsigned>(std::ceil(data.end_frame));
+    const auto sample_frame = std::max(1U, final_frame / 2);
+    for (unsigned frame = 1; frame <= final_frame; ++frame) {
         animation.advance();
-        if (frame == 25) {
+        if (frame == sample_frame) {
             unsigned changed = 0;
             for (std::size_t n = 0; n < animation.pose().size(); ++n)
                 for (unsigned axis = 0; axis < 3; ++axis)
@@ -165,7 +167,7 @@ void local_clip(const char* path)
                         initial[n].translation[axis] != animation.pose()[n].translation[axis]) ++changed;
             check(changed > 0, "real clip changes ordinary joint channels");
             std::cout << symbol.name << ": " << data.node_counts.size() << " nodes, " << data.tracks.size()
-                      << " tracks; " << changed << " changed channel axes at frame 25\n";
+                      << " tracks; " << changed << " changed channel axes at frame " << sample_frame << '\n';
         }
     }
     check(animation.finished(), "real nonlooping clip reaches its original end frame");
@@ -181,7 +183,7 @@ int main(int argc, char** argv)
         inspection_loop_boundary();
         signed_stream_and_startframe();
         rejected_construction_and_failed_evaluation();
-        if (argc == 2) local_clip(argv[1]);
+        for (int i = 1; i < argc; ++i) local_clip(argv[i]);
         std::cout << "Original HSD animation trace: passed\n";
     } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }

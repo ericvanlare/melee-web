@@ -161,7 +161,8 @@ DatAnimation::DatAnimation(const DatArchive& archive, std::uint32_t root)
             const auto record = archive.range(offset, 12);
             const auto length = archive.be16(offset);
             DatAnimationTrack track{offset, archive.be16(offset + 2), record[4], record[5], record[6], {}};
-            require(record[7] == 0, "FigaTrack reserved byte is nonzero");
+            // Byte 7 is unnamed alignment padding in original FigaTrack.
+            // lbAnim_InitFrames copies the named fields and never consumes it.
             require(srt_channel(track.type), "Unsupported animation channel (requires ordinary joint SRT)");
             require(!(channels & (1U << track.type)), "Animation node has duplicate SRT channels");
             channels |= 1U << track.type;

@@ -4,6 +4,9 @@
 Pass explicit DAT paths or one directory (nonrecursive .dat/.usd selection).
 Every public root is attempted as an HSD joint; other root types can be rejected.
 Use --symbol to select one known model root without attempting other root types.
+Use --stage-entry N to decode one map_head entry; --symbol then selects the exact
+stage header symbol. --opaque selects only the explicit opaque inspection pass
+for a stage entry. Stage services are reported as present but unapplied.
 Textures counts distinct TObj descriptors. Exit 1 means a parser rejection or
 input error; exit 2 means the compiler/checking process could not complete.
 """
@@ -23,7 +26,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("paths", nargs="+", type=Path)
     parser.add_argument("--symbol", help="check only this exact public model symbol")
+    parser.add_argument("--stage-entry", type=int, help="check this zero-based map_head entry")
+    parser.add_argument("--opaque", action="store_true", help="select a stage entry's opaque pass")
     args = parser.parse_args()
+    if args.stage_entry is not None and not 0 <= args.stage_entry <= 0xffffffff:
+        parser.error("--stage-entry must be an unsigned 32-bit index")
+    if args.opaque and args.stage_entry is None:
+        parser.error("--opaque requires --stage-entry")
     paths = args.paths
     if len(paths) == 1 and paths[0].is_dir():
         paths = sorted(path for path in paths[0].iterdir()
@@ -41,7 +50,7 @@ def main():
     # Recompile once per invocation so dependency/flag changes cannot leave a
     # stale parser binary producing misleading corpus results.
     sources = ["src/dat_archive.cpp", "src/dat_texture.cpp", "src/dat_material.cpp",
-               "src/rigid_model.cpp", "tools/asset_check.cpp"]
+               "src/dat_stage.cpp", "src/rigid_model.cpp", "tools/asset_check.cpp"]
     try:
         compiled = subprocess.run(
             [compiler, "-std=c++20", "-Wall", "-Wextra", "-Werror", "-O1",
@@ -53,7 +62,13 @@ def main():
             return 2
         status = 0
         for path in paths:
-            command = [str(binary), str(path)] + ([args.symbol] if args.symbol else [])
+            command = [str(binary), str(path)]
+            if args.symbol:
+                command += ["--symbol", args.symbol]
+            if args.stage_entry is not None:
+                command += ["--stage-entry", str(args.stage_entry)]
+            if args.opaque:
+                command.append("--opaque")
             result = subprocess.run(command, capture_output=True, timeout=60)
             if result.returncode not in (0, 1):
                 sys.stderr.buffer.write(result.stderr)

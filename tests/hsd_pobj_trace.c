@@ -181,6 +181,14 @@ int main(void) {
     attributes[0].byte_size = 6;
     view = (MeleeWebPObjView){attributes, 2, display, sizeof display, 0x8000};
     assert(melee_web_pobj_draw(&view, error, sizeof error));
+    // Original PObj descriptor setup forwards direct RGBA8 without a GX array.
+    MeleeWebPObjAttribute color_attributes[] = {
+        attributes[0], {GX_VA_CLR0, GX_DIRECT, GX_CLR_RGBA, GX_RGBA8, 0, 4, NULL, 0},
+    };
+    view = (MeleeWebPObjView){color_attributes, 2, display, sizeof display, 0x8000};
+    const unsigned old_arrays = arrays, old_formats = formats, old_descriptors = descriptors;
+    assert(melee_web_pobj_draw(&view, error, sizeof error));
+    assert(arrays == old_arrays + 1 && formats == old_formats + 2 && descriptors == old_descriptors + 2);
     puts("HSD original PObj bridge trace: passed");
     return 0;
 }

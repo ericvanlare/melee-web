@@ -4,6 +4,18 @@
 extern "C" {
 #endif
 void melee_web_asset_clear(void);
+int melee_web_asset_ready(void);
+int melee_web_asset_kind(void); // 0 none, 1 ordinary, 2 registered fighter, 3 stage entry.
+int melee_web_asset_stage_count(void);
+int melee_web_asset_stage_select(uint32_t index, int opaque_only);
+const char* melee_web_asset_stage_message(void);
+int melee_web_asset_common_open(const void* bytes, uint32_t size);
+const char* melee_web_asset_common_message(void);
+int melee_web_asset_action_count(void);
+const char* melee_web_asset_action_name(uint32_t index);
+int melee_web_asset_container_ready(void);
+int melee_web_asset_container_open(const void* bytes, uint32_t size);
+int melee_web_asset_action_select(uint32_t index);
 int melee_web_asset_open(const void* bytes, uint32_t size);
 const char* melee_web_asset_symbol(uint32_t index);
 int melee_web_asset_select(uint32_t index);

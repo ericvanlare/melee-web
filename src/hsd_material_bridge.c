@@ -129,9 +129,9 @@ MeleeWebHsdMaterial* melee_web_hsd_material_create(const MeleeWebHsdMaterialDesc
     if (desc == NULL || desc->texture_count > material_max_textures ||
         (desc->texture_count && desc->textures == NULL))
         return reject(error, error_size, "Invalid material texture array");
-    if ((desc->rendermode & ~(RENDER_CONSTANT | RENDER_DIFFUSE | RENDER_SPECULAR | RENDER_TEXTURES)) ||
+    if ((desc->rendermode & ~(RENDER_CONSTANT | RENDER_VERTEX | RENDER_DIFFUSE | RENDER_SPECULAR | RENDER_TEXTURES)) ||
         !isfinite(desc->alpha) || desc->alpha != 1.0f ||
-        !isfinite(desc->shininess) || desc->shininess < 0 || desc->shininess > 128)
+        !isfinite(desc->shininess) || desc->shininess < 0)
         return reject(error, error_size, "Unsupported material mode, alpha or shininess");
     for (uint32_t i = 0; i < desc->texture_count; ++i) {
         const MeleeWebHsdTextureDesc* t = &desc->textures[i];

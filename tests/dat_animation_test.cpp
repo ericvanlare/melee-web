@@ -42,7 +42,8 @@ void tree_bounds()
     rejects([&] { (void) fixture.animation(); });
     fixture = Fixture();
     fixture.data[Fixture::track + 7] = 1;
-    rejects([&] { (void) fixture.animation(); });
+    check(fixture.animation().tracks[0].bytes == segment(2, 0, 10, 10),
+          "unnamed FigaTrack alignment padding is ignored like lbAnim_InitFrames");
 }
 
 void unsupported_channels_and_formats()

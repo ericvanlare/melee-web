@@ -7,6 +7,12 @@
 #include <vector>
 
 namespace melee_web {
+enum class DatMaterialPass { Opaque, Translucent, TextureEdge };
+
+// Source DObjLoad classification, without loading services of an omitted pass.
+// Invalid blend-bit combinations and custom material classes still reject.
+[[nodiscard]] DatMaterialPass read_dat_material_pass(const DatArchive& archive,
+                                                     std::uint32_t offset);
 
 // CPU metadata hydrated into the original HSD material engine by the renderer.
 // The model shares const instances by descriptor offset. Image/palette spans
@@ -18,8 +24,8 @@ struct DatMaterial {
     std::vector<DatTexture> textures;
 };
 
-// Current original-HSD bridge subset: opaque constant/diffuse/specular materials
-// and ordinary texture chains. Vertex color, custom class/render/PE state,
+// Current original-HSD bridge subset: opaque constant/vertex/diffuse/specular
+// materials and ordinary texture chains. Custom class/render/PE state,
 // translucency, toon/shadow and special depth flags are rejected explicitly.
 [[nodiscard]] DatMaterial read_dat_material(const DatArchive& archive,
                                             std::uint32_t material_offset);

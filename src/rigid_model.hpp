@@ -10,6 +10,9 @@
 #include <vector>
 
 namespace melee_web {
+// All remains strict: every referenced mesh must be supported. Opaque selects
+// the source DObjLoad OPA class and reports omitted TEXEDGE/XLU occurrences.
+enum class ModelRenderPass { All, Opaque };
 struct RigidJoint {
     static constexpr uint32_t no_parent = UINT32_MAX;
     uint32_t descriptor_offset = 0, parent = no_parent, flags = 0;
@@ -46,13 +49,23 @@ struct RigidMesh {
 class RigidModel {
 public:
     RigidModel(std::shared_ptr<const DatArchive> archive, const std::string& symbol);
+    RigidModel(std::shared_ptr<const DatArchive> archive, uint32_t joint_offset,
+               const std::string& label, ModelRenderPass pass = ModelRenderPass::All);
     std::shared_ptr<const DatArchive> archive;
     std::vector<RigidJoint> joints; // Parent precedes child; siblings keep their actual parent.
     std::vector<RigidMesh> meshes;
     std::array<float, 3> minimum, maximum;
     uint32_t draw_packets = 0;
-    uint32_t dobj_count = 0;
+    uint32_t dobj_count = 0; // Original occurrence space, including omitted passes.
     uint32_t submitted_vertices = 0;
+    uint32_t root_offset = 0;
+    ModelRenderPass render_pass = ModelRenderPass::All;
+    // Only Opaque prunes joints; owners, envelope bones and their ancestors stay.
+    uint32_t omitted_dobjs = 0, omitted_joints = 0;
+    uint32_t omitted_translucent_meshes = 0, omitted_texture_edge_meshes = 0;
+    [[nodiscard]] uint32_t omitted_meshes() const noexcept {
+        return omitted_translucent_meshes + omitted_texture_edge_meshes;
+    }
     std::string symbol;
 };
 }

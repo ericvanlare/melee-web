@@ -7,7 +7,8 @@
 
 namespace melee_web {
 namespace {
-constexpr uint32_t va_pos = 9, va_nrm = 10, va_tex0 = 13, va_tex7 = 20, va_null = 255;
+constexpr uint32_t va_pos = 9, va_nrm = 10, va_clr0 = 11, va_clr1 = 12,
+                   va_tex0 = 13, va_tex7 = 20, va_null = 255;
 constexpr uint32_t direct = 1, index8 = 2, index16 = 3, type_s16 = 3, type_f32 = 4;
 constexpr size_t max_joints = MELEE_WEB_SKIN_MAX_JOINTS, max_meshes = 4096, max_packets = 65536, max_vertices = 1000000;
 
@@ -115,11 +116,12 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
         if (attr == va_null) { found_end = true; break; }
         // Fixed ordering also establishes the byte layout of each vertex packet.
         const bool matrix = attr <= 8;
+        const bool color = attr == va_clr0 || attr == va_clr1;
         const bool uv = attr >= va_tex0 && attr <= va_tex7;
         if (i == MELEE_WEB_POBJ_MAX_ATTRIBUTES ||
-            (!matrix && attr != va_pos && attr != va_nrm && !uv) ||
+            (!matrix && attr != va_pos && attr != va_nrm && !color && !uv) ||
             (i && attr <= mesh.attributes.back().attr))
-            reject("Only ordered matrix indices, POS, NRM and TEX0 through TEX7 descriptors are supported");
+            reject("Only ordered matrix indices, POS, NRM, CLR and TEX0 through TEX7 descriptors are supported");
         const auto mode = a.be32(d + 4), count = a.be32(d + 8), type = a.be32(d + 12);
         const auto frac = a.range(d + 16, 1)[0];
         const auto stride = a.be16(d + 18);
@@ -127,6 +129,15 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
             if (mesh.envelopes.empty() || mode != direct || stride != 0)
                 reject("Direct matrix indices require an envelope palette and zero array stride");
             absent(a, d + 20, "Direct matrix indices cannot reference a vertex array");
+            mesh.attributes.push_back({attr, mode, count, type, frac, stride, nullptr, 0});
+            continue;
+        }
+        if (color) {
+            if (mode != direct || count != 1 || type != 5 || frac != 0 ||
+                (stride != 0 && stride != 4))
+                reject("Only direct RGBA8 vertex colors are supported");
+            absent(a, d + 20, "Direct vertex colors cannot reference a vertex array");
+            widths[i] = 4;
             mesh.attributes.push_back({attr, mode, count, type, frac, stride, nullptr, 0});
             continue;
         }
@@ -155,6 +166,8 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
                            [&](const auto& descriptor) { return descriptor.attr == attr; });
     };
     if (!has_attribute(va_pos)) reject("Position attribute is missing");
+    if ((mesh.material->render_mode & 2U) && !has_attribute(va_clr0))
+        reject("Vertex-color material requires CLR0 geometry");
     if (!mesh.envelopes.empty() && !has_attribute(0))
         reject("Envelope geometry requires a position matrix index");
     const bool lit = ((mesh.material->render_mode & 7U) == 4U) ||
@@ -215,6 +228,11 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
             uint32_t palette_slot = 0;
             for (size_t i = 0; i < mesh.attributes.size(); ++i) {
                 const auto& attr = mesh.attributes[i];
+                if (attr.attr_type == direct && attr.attr >= va_pos) {
+                    if (bytes.size() - cursor < widths[i]) reject("Truncated direct RGBA8 vertex packet");
+                    cursor += widths[i];
+                    continue;
+                }
                 const size_t encoded = attr.attr_type == index16 ? 2 : 1;
                 if (bytes.size() - cursor < encoded) reject("Truncated indexed vertex packet");
                 uint32_t index = bytes[cursor++];
@@ -258,26 +276,40 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
     if (model.draw_packets == packets_before) reject("Polygon has no draw primitives");
     for (size_t i = 0; i < mesh.attributes.size(); ++i) {
         auto& attr = mesh.attributes[i];
-        if (attr.attr <= 8) continue;
+        if (attr.attr_type == direct) continue;
         attr.byte_size = maximum_index[i] * uint32_t(attr.stride) + widths[i];
         (void) a.range(array_offsets[i], attr.byte_size);
     }
 }
+
+uint32_t public_joint_offset(const std::shared_ptr<const DatArchive>& archive,
+                             const std::string& name) {
+    if (!archive) reject("Archive is missing");
+    const auto& roots = archive->public_symbols();
+    const auto root = std::find_if(roots.begin(), roots.end(), [&](const auto& s) { return s.name == name; });
+    if (root == roots.end()) reject("Public model symbol is missing");
+    return root->data_offset;
+}
 }
 
 RigidModel::RigidModel(std::shared_ptr<const DatArchive> source, const std::string& root_name)
+    : RigidModel(source, public_joint_offset(source, root_name), root_name, ModelRenderPass::All) {}
+
+RigidModel::RigidModel(std::shared_ptr<const DatArchive> source, uint32_t joint_offset,
+                       const std::string& label, ModelRenderPass pass)
     : archive(std::move(source)),
-      minimum{INFINITY, INFINITY, INFINITY}, maximum{-INFINITY, -INFINITY, -INFINITY}, symbol(root_name) {
+      minimum{INFINITY, INFINITY, INFINITY}, maximum{-INFINITY, -INFINITY, -INFINITY},
+      root_offset(joint_offset), render_pass(pass), symbol(label) {
     if (!archive) reject("Archive is missing");
+    if (pass != ModelRenderPass::All && pass != ModelRenderPass::Opaque)
+        reject("Unsupported model render-pass selection");
     const auto& a = *archive;
-    const auto& roots = a.public_symbols();
-    const auto root = std::find_if(roots.begin(), roots.end(), [&](const auto& s) { return s.name == symbol; });
-    if (root == roots.end()) reject("Public model symbol is missing");
     struct PendingJoint { uint32_t offset, parent; };
-    std::vector<PendingJoint> pending{{root->data_offset, RigidJoint::no_parent}};
+    std::vector<PendingJoint> pending{{joint_offset, RigidJoint::no_parent}};
     std::set<uint32_t> visited_joints;
     std::map<uint32_t, std::shared_ptr<const DatMaterial>> material_cache;
     size_t texture_bytes = 0;
+    size_t source_mesh_count = 0;
     while (!pending.empty()) {
         const auto [joint, parent] = pending.back();
         pending.pop_back();
@@ -289,9 +321,9 @@ RigidModel::RigidModel(std::shared_ptr<const DatArchive> source, const std::stri
         node.descriptor_offset = joint;
         node.parent = parent;
         node.flags = a.be32(joint + 4);
-        // Ordinary Euler transforms and render metadata. Original HSD transform
-        // code performs scale inheritance; special matrix/IK modes need more HSD.
-        if (node.flags & ~0x701D01DFu) reject("Joint flags require unsupported HSD behavior");
+        // These flags change the descriptor union itself, so this is not a
+        // DObj graph whose render pass we can classify without another loader.
+        if (node.flags & (0x20U | 0x4000U)) reject("Particle and spline joint graphs are unsupported");
         for (uint32_t axis = 0; axis < 3; ++axis) {
             node.rotation[axis] = a.f32(joint + 20 + 4 * axis);
             node.scale[axis] = a.f32(joint + 32 + 4 * axis);
@@ -310,7 +342,7 @@ RigidModel::RigidModel(std::shared_ptr<const DatArchive> source, const std::stri
             }
             node.inverse_bind = matrix;
         }
-        absent(a, joint + 60, "Joint references are unsupported");
+        (void) a.pointer(joint + 60); // Retained dependencies are validated below.
         const auto joint_index = uint32_t(joints.size());
         joints.push_back(node);
         // Siblings inherit this node's parent, not this node. Push child last so
@@ -325,8 +357,11 @@ RigidModel::RigidModel(std::shared_ptr<const DatArchive> source, const std::stri
             const auto dobj_index = dobj_count++;
             absent(a, *dobj, "Custom display-object classes are unsupported");
             const auto mat = required(a, *dobj + 8, 24);
+            const auto material_pass = read_dat_material_pass(a, mat);
+            const bool omitted = pass == ModelRenderPass::Opaque && material_pass != DatMaterialPass::Opaque;
+            if (omitted) ++omitted_dobjs;
             auto cached = material_cache.find(mat);
-            if (cached == material_cache.end()) {
+            if (!omitted && cached == material_cache.end()) {
                 auto decoded = std::make_shared<DatMaterial>(read_dat_material(a, mat));
                 for (const auto& texture : decoded->textures) {
                     const auto bytes = texture.image.bytes.size() +
@@ -340,8 +375,14 @@ RigidModel::RigidModel(std::shared_ptr<const DatArchive> source, const std::stri
             std::set<uint32_t> polygons;
             auto pobj = a.pointer(*dobj + 12, 24);
             while (pobj) {
-                if (*pobj % 4 || !polygons.insert(*pobj).second || meshes.size() >= max_meshes)
+                if (*pobj % 4 || !polygons.insert(*pobj).second || source_mesh_count++ >= max_meshes)
                     reject("Cyclic, unaligned or oversized polygon chain");
+                if (omitted) {
+                    if (material_pass == DatMaterialPass::Translucent) ++omitted_translucent_meshes;
+                    else ++omitted_texture_edge_meshes;
+                    pobj = a.pointer(*pobj + 4, 24);
+                    continue;
+                }
                 RigidMesh mesh;
                 mesh.joint_index = joint_index;
                 mesh.dobj_index = dobj_index;
@@ -355,6 +396,44 @@ RigidModel::RigidModel(std::shared_ptr<const DatArchive> source, const std::stri
     }
     if (meshes.empty() || !draw_packets)
         reject("Model has no draw primitives");
+    if (pass == ModelRenderPass::Opaque) {
+        // Preserve the transform closure, including joints used by retained
+        // envelopes even if all of their own geometry belongs to another pass.
+        std::map<uint32_t, uint32_t> source_indices;
+        for (uint32_t i = 0; i < joints.size(); ++i) source_indices.emplace(joints[i].descriptor_offset, i);
+        std::vector<bool> keep(joints.size(), false);
+        const auto retain_ancestors = [&](uint32_t index) {
+            while (index != RigidJoint::no_parent && !keep[index]) {
+                keep[index] = true;
+                index = joints[index].parent;
+            }
+        };
+        for (const auto& mesh : meshes) {
+            retain_ancestors(mesh.joint_index);
+            for (const auto& envelope : mesh.envelopes) for (const auto& influence : envelope.influences) {
+                const auto found = source_indices.find(influence.joint);
+                if (found == source_indices.end()) reject("Envelope references a joint outside the selected model");
+                retain_ancestors(found->second);
+            }
+        }
+        std::vector<uint32_t> remap(joints.size(), RigidJoint::no_parent);
+        std::vector<RigidJoint> retained;
+        for (uint32_t index = 0; index < joints.size(); ++index) {
+            if (!keep[index]) { ++omitted_joints; continue; }
+            auto node = joints[index];
+            remap[index] = uint32_t(retained.size());
+            if (node.parent != RigidJoint::no_parent) node.parent = remap[node.parent];
+            retained.push_back(std::move(node));
+        }
+        for (auto& mesh : meshes) mesh.joint_index = remap[mesh.joint_index];
+        joints = std::move(retained);
+    }
+    for (const auto& node : joints) {
+        // Never clear unsupported transform flags. An omitted billboard leaf
+        // is safe only when neither a selected mesh nor an envelope needs it.
+        if (node.flags & ~0x701D01DFu) reject("Joint flags require unsupported HSD behavior");
+        absent(a, node.descriptor_offset + 60, "Joint references are unsupported");
+    }
     std::map<uint32_t, uint32_t> joint_indices;
     for (uint32_t index = 0; index < joints.size(); ++index)
         joint_indices.emplace(joints[index].descriptor_offset, index);

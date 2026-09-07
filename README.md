@@ -5,8 +5,9 @@ in a desktop browser using WebAssembly and WebGPU.
 
 **This is not a playable game yet.** The browser renders Melee DAT models
 through original HSD transforms, skinning, materials and polygon code, using
-Aurora's GX renderer. Default Mario can play his original idle animation, with
-normal geometry selected from the fighter visibility tables.
+Aurora's GX renderer. Mario and Fox can play original idle and walking animations
+from their action containers. The viewer also renders Final Destination's opaque
+platform geometry, with omitted passes and unapplied stage services reported.
 It does not establish complete scene fidelity or full-game performance.
 
 ## Build and inspect
@@ -41,19 +42,33 @@ Use the same command with `TyHarise.dat` to inspect the textured fan or
 run through Melee's original HSD expression compiler and setup code, with an
 authored inspection camera and lights.
 
-To inspect Mario, extract his neutral costume, fighter metadata and the Wait1
-animation slice identified by the original action table:
+To inspect Mario, extract his neutral costume, fighter metadata, common data and
+animation container:
 
 ```sh
 python3 scripts/extract_disc_file.py /path/to/game.ciso PlMrNr.dat --output assets-local/PlMrNr.dat
 python3 scripts/extract_disc_file.py /path/to/game.ciso PlMr.dat --output assets-local/PlMr.dat
-python3 scripts/extract_disc_file.py /path/to/game.ciso PlMrAJ.dat --offset 0 --length 4239 --output assets-local/MarioWait1.dat
+python3 scripts/extract_disc_file.py /path/to/game.ciso PlCo.dat --output assets-local/PlCo.dat
+python3 scripts/extract_disc_file.py /path/to/game.ciso PlMrAJ.dat --output assets-local/PlMrAJ.dat
 ```
 
-Choose `PlMrNr.dat` as the model, `PlMr.dat` as fighter metadata, then
-`MarioWait1.dat` as the animation and press Play. The inspection player evaluates
-original HSD animation at 60 Hz independently of presentation. Other fighter
-bindings, action transitions and complete game scenes remain to be integrated.
+Choose `PlMrNr.dat` as the model, `PlMr.dat` as fighter metadata, `PlCo.dat` as
+common data, and `PlMrAJ.dat` as the animation container. Select action 2 (Wait1)
+or 7 (WalkSlow), then press Play. Fox uses `PlFxNr.dat`, `PlFx.dat` and
+`PlFxAJ.dat`; common data remains reusable in the tab. Identity, part mappings
+and animation slices come from checked original source/data tables. Playback
+uses original HSD evaluation at 60 Hz; gameplay commands and transitions are
+not running.
+
+For Final Destination, extract `GrNLa.dat`, load it as the model, select stage
+entry 3 and **Opaque only**. The viewer renders all 13 opaque meshes from that
+entry and reports 13 omitted translucent meshes. It uses an inspection camera
+and lights; stage animation, effects, collision and callbacks remain unapplied.
+The batch checker supports the same explicit selection:
+
+```sh
+python3 scripts/check_assets.py assets-local/GrNLa.dat --stage-entry 3 --opaque
+```
 
 Enable keyboard controls and click the canvas to inspect the SDL/Aurora PAD input
 path. The page lists bindings and current raw/clamped samples; input does not

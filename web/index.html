@@ -18,7 +18,14 @@
 <fieldset>
   <legend>Local asset inspection</legend>
   <label>Extracted DAT file <input id="asset-file" type="file" accept=".dat" disabled></label>
-  <label>Public model symbol <select id="asset-symbol" disabled><option>Load a DAT file first</option></select></label>
+  <label id="symbol-label">Public model symbol <select id="asset-symbol" disabled><option>Load a DAT file first</option></select></label>
+  <div id="stage-controls" hidden>
+    <label>Stage entry <select id="stage-entry" disabled></select></label>
+    <label>Stage render pass <select id="stage-pass" disabled>
+      <option value="opaque">Opaque only</option><option value="all">Complete model</option>
+    </select></label>
+    <output id="stage-status"></output>
+  </div>
   <output id="asset-status">No asset loaded. The canvas shows the synthetic GX probe.</output>
   <p>Supports ordinary joint trees, envelope skinning and opaque HSD materials, including lighting, reflections and texture layers. Uses an inspection camera and lights; gameplay is not implemented. Unsupported features produce an error. Files stay in this tab and are never uploaded.</p>
 </fieldset>
@@ -29,11 +36,14 @@
   <legend>Fighter inspection</legend>
   <label>Fighter metadata DAT <input id="fighter-file" type="file" accept=".dat" disabled></label>
   <output id="fighter-status">Load a fighter model, then its fighter metadata.</output>
-  <p>For default Mario, load PlMr.dat to select the normal representation from its visibility tables.</p>
-  <label>Extracted animation DAT <input id="animation-file" type="file" accept=".dat" disabled></label>
+  <p>Load the fighter's metadata to select normal geometry and register its actions. Mario uses PlMr.dat; Fox uses PlFx.dat.</p>
+  <label>Common fighter DAT <input id="common-file" type="file" accept=".dat" disabled></label>
+  <output id="common-status">Common fighter data has not been loaded.</output>
+  <label>Animation container DAT <input id="animation-file" type="file" accept=".dat" disabled></label>
+  <label>Fighter action <select id="fighter-action" disabled><option value="">Load fighter metadata first</option></select></label>
   <button id="animation-play" disabled>Play</button>
-  <output id="animation-status">Load a model, then its animation archive.</output>
-  <p>Default Mario animations use the original HSD evaluator at 60 Hz. The inspection player loops the selected animation and pauses while hidden. Other fighter animation mappings, gameplay transitions and animation blending remain to be integrated.</p>
+  <output id="animation-status">Load fighter metadata, common data and an animation container.</output>
+  <p>Load PlCo.dat once per tab, then the registered animation container (PlMrAJ.dat or PlFxAJ.dat). Source tables establish fighter identity and action membership. The player evaluates joint animation at 60 Hz and pauses while hidden. Gameplay commands, action transitions, blending and alternate joint insertion are not running.</p>
 </fieldset>
 <fieldset>
   <legend>Controller input</legend>
@@ -53,6 +63,14 @@
   const canvasEl = document.querySelector('#canvas');
   const keyboardEl = document.querySelector('#keyboard');
   const inputStatus = document.querySelector('#input-status');
+  const stageControls = document.querySelector('#stage-controls');
+  const stageEntry = document.querySelector('#stage-entry');
+  const stagePass = document.querySelector('#stage-pass');
+  const stageStatus = document.querySelector('#stage-status');
+  const symbolLabel = document.querySelector('#symbol-label');
+  const commonFile = document.querySelector('#common-file');
+  const commonStatus = document.querySelector('#common-status');
+  const actionEl = document.querySelector('#fighter-action');
   const fighterFile = document.querySelector('#fighter-file');
   const fighterStatus = document.querySelector('#fighter-status');
   const animationFile = document.querySelector('#animation-file');
@@ -62,31 +80,57 @@
   let previous = null, lastUpdate = 0, hidden = document.hidden;
   let failed = false;
   let runtimeReady = false, lastInputUpdate = 0;
-  let modelReady = false, importing = false, animationError = '', fighterError = '';
+  let importing = false, animationError = '', fighterError = '', commonError = '';
   function showAnimation() {
     if (!runtimeReady) return;
+    const fighter = Module._melee_web_asset_kind() === 2;
     const loaded = !!Module._melee_web_asset_animation_loaded();
-    animationFile.disabled = fighterFile.disabled = !modelReady || importing;
+    const actions = Module._melee_web_asset_action_count();
+    fighterFile.disabled = commonFile.disabled = !fighter || importing;
+    animationFile.disabled = !fighter || !actions || importing;
+    actionEl.disabled = !fighter || !Module._melee_web_asset_container_ready() || importing;
     fighterStatus.textContent = fighterError || Module.UTF8ToString(Module._melee_web_asset_fighter_message());
+    commonStatus.textContent = commonError || Module.UTF8ToString(Module._melee_web_asset_common_message());
     animationPlay.disabled = !loaded || importing;
     animationPlay.textContent = Module._melee_web_asset_animation_playing() ? 'Pause' : 'Play';
     animationStatus.textContent = animationError || Module.UTF8ToString(Module._melee_web_asset_animation_message());
+    stageStatus.textContent = Module.UTF8ToString(Module._melee_web_asset_stage_message());
   }
-  animationPlay.addEventListener('click', () => {
+  function refreshActions() {
     if (!runtimeReady) return;
+    actionEl.replaceChildren();
+    const count = Module._melee_web_asset_action_count();
+    actionEl.add(new Option(count ? 'Select an action' : 'Load fighter metadata first', ''));
+    for (let i = 0; i < count; ++i)
+      actionEl.add(new Option(Module.UTF8ToString(Module._melee_web_asset_action_name(i)), String(i)));
+  }
+  function selectAction() {
+    if (!runtimeReady || importing || actionEl.value === '' || !Module._melee_web_asset_container_ready()) return;
+    animationError = '';
+    Module._melee_web_asset_action_select(Number(actionEl.value));
+    showAnimation();
+  }
+  actionEl.addEventListener('change', selectAction);
+  animationPlay.addEventListener('click', () => {
+    if (!runtimeReady || importing) return;
     animationError = '';
     Module._melee_web_asset_animation_play(!Module._melee_web_asset_animation_playing() ? 1 : 0);
     showAnimation();
   });
-  // Both supplemental archives use the same bounded import and ownership path.
+  function setModelControls() {
+    fileEl.disabled = failed || importing;
+    symbolEl.disabled = failed || importing || !symbolEl.options.length;
+    stageEntry.disabled = stagePass.disabled = failed || importing || !stageEntry.options.length;
+  }
+  // All supplemental files share one bounded import and ownership path.
   async function importSupplement(input, kind, open) {
     const file = input.files[0];
-    if (!file || !runtimeReady || !modelReady || importing) return;
-    importing = true; animationError = ''; fighterError = '';
-    fileEl.disabled = symbolEl.disabled = true;
+    if (!file || !runtimeReady || !Module._melee_web_asset_ready() || importing) return;
+    importing = true; animationError = fighterError = commonError = '';
+    setModelControls();
     Module._melee_web_asset_animation_play(0);
     showAnimation();
-    let pointer = 0;
+    let pointer = 0, accepted = false;
     try {
       if (file.size > 64 * 1024 * 1024) throw new Error('DAT limit is 64 MiB.');
       const bytes = new Uint8Array(await file.arrayBuffer());
@@ -94,21 +138,23 @@
       pointer = Module._malloc(bytes.length || 1);
       if (!pointer) throw new Error('Unable to allocate import memory.');
       Module.HEAPU8.set(bytes, pointer);
-      open(pointer, bytes.length);
+      accepted = !!open(pointer, bytes.length);
+      if (accepted && kind === 'fighter') refreshActions();
     } catch (error) {
       if (kind === 'animation') animationError = 'Animation rejected: ' + error.message;
+      else if (kind === 'common') commonError = 'Common data rejected: ' + error.message;
       else fighterError = 'Metadata rejected: ' + error.message;
     } finally {
       if (pointer && runtimeReady) Module._free(pointer);
-      importing = false;
-      fileEl.disabled = failed;
-      symbolEl.disabled = failed || !symbolEl.options.length;
-      input.value = '';
+      importing = false; setModelControls(); input.value = '';
+      if (accepted && (kind === 'animation' || kind === 'common')) selectAction();
       showAnimation();
     }
   }
   animationFile.addEventListener('change', () => importSupplement(animationFile, 'animation',
-    (pointer, length) => Module._melee_web_asset_animation_open(pointer, length)));
+    (pointer, length) => Module._melee_web_asset_container_open(pointer, length)));
+  commonFile.addEventListener('change', () => importSupplement(commonFile, 'common',
+    (pointer, length) => Module._melee_web_asset_common_open(pointer, length)));
   fighterFile.addEventListener('change', () => importSupplement(fighterFile, 'fighter',
     (pointer, length) => Module._melee_web_asset_fighter_open(pointer, length)));
   function updateInputActivity() {
@@ -154,32 +200,41 @@
   }
   function fail(message) {
     failed = true; runtimeReady = false;
-    fileEl.disabled = symbolEl.disabled = keyboardEl.disabled = fighterFile.disabled = animationFile.disabled = animationPlay.disabled = true;
+    fileEl.disabled = symbolEl.disabled = keyboardEl.disabled = fighterFile.disabled = commonFile.disabled =
+      animationFile.disabled = animationPlay.disabled = actionEl.disabled = stageEntry.disabled = stagePass.disabled = true;
     inputStatus.textContent = 'Input unavailable: runtime stopped.';
     statusEl.textContent = 'Failed: ' + message;
     log(message);
   }
   window.assetFailed = message => {
-    modelReady = false; assetStatus.textContent = 'Asset rejected: ' + message; showAnimation();
+    assetStatus.textContent = 'Asset rejected: ' + message; showAnimation();
   };
   const assetMessage = () => Module.UTF8ToString(Module._melee_web_asset_message());
   function selectModel() {
-    if (!runtimeReady || symbolEl.value === '') return;
-    const ok = Module._melee_web_asset_select(Number(symbolEl.value));
-    modelReady = !!ok; animationError = fighterError = ''; showAnimation();
+    if (!runtimeReady || importing) return;
+    let ok;
+    if (Module._melee_web_asset_stage_count()) {
+      if (stageEntry.value === '') return;
+      ok = Module._melee_web_asset_stage_select(Number(stageEntry.value), stagePass.value === 'opaque' ? 1 : 0);
+    } else {
+      if (symbolEl.value === '') return;
+      ok = Module._melee_web_asset_select(Number(symbolEl.value));
+    }
+    animationError = fighterError = commonError = ''; refreshActions(); showAnimation();
     assetStatus.textContent = ok ? assetMessage() + ' · original HSD material preview' : 'Asset rejected: ' + assetMessage();
   }
   symbolEl.addEventListener('change', selectModel);
+  stageEntry.addEventListener('change', selectModel);
+  stagePass.addEventListener('change', selectModel);
   fileEl.addEventListener('change', async () => {
     const file = fileEl.files[0];
-    if (!file || !runtimeReady) return;
-    importing = true; modelReady = false; animationError = fighterError = ''; showAnimation();
-    Module._melee_web_asset_clear();
+    if (!file || !runtimeReady || importing) return;
+    importing = true; animationError = fighterError = commonError = '';
+    Module._melee_web_asset_clear(); refreshActions(); showAnimation();
     assetStatus.textContent = 'Reading local asset…';
-    symbolEl.disabled = true;
-    symbolEl.replaceChildren();
-    fileEl.disabled = true;
-    let pointer = 0;
+    symbolEl.replaceChildren(); stageEntry.replaceChildren();
+    stageControls.hidden = true; symbolLabel.hidden = false; setModelControls();
+    let pointer = 0, accepted = false;
     try {
       if (file.size > 64 * 1024 * 1024) throw new Error('DAT limit is 64 MiB. Extract a single asset from the disc first.');
       const bytes = new Uint8Array(await file.arrayBuffer());
@@ -196,17 +251,19 @@
         symbolEl.add(new Option(name, String(i)));
         if (jointIndex < 0 && name.endsWith('_joint')) jointIndex = i;
       }
-      if (!count) throw new Error('Archive has no public model symbols.');
-      symbolEl.disabled = false;
+      if (!count) throw new Error('Archive has no public symbols.');
       if (jointIndex >= 0) symbolEl.value = String(jointIndex);
-      selectModel();
+      const entries = Module._melee_web_asset_stage_count();
+      for (let i = 0; i < entries; ++i) stageEntry.add(new Option('Entry ' + i, String(i)));
+      stageControls.hidden = !entries; symbolLabel.hidden = !!entries;
+      stagePass.value = 'opaque'; accepted = true;
     } catch (error) {
       window.assetFailed(error.message);
     } finally {
       if (pointer && runtimeReady) Module._free(pointer);
-      importing = false; showAnimation();
-      fileEl.disabled = failed;
-      fileEl.value = '';
+      importing = false; setModelControls(); fileEl.value = '';
+      if (accepted) selectModel();
+      showAnimation();
     }
   });
   document.addEventListener('visibilitychange', () => {

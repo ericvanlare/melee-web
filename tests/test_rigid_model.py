@@ -82,6 +82,15 @@ class RigidModelTests(unittest.TestCase):
     def test_nonfinite_and_unbounded_position_and_normal_geometry(self):
         self.run_case("finite_geometry")
 
+    def test_direct_rgba8_packet_layout_and_original_vertex_material_requirements(self):
+        self.run_case("direct_rgba8_geometry")
+
+    def test_explicit_opaque_pass_counts_source_identity_and_unused_billboard_pruning(self):
+        self.run_case("explicit_opaque_pass")
+
+    def test_opaque_pass_retains_envelope_bones_and_unsupported_dependency_rejections(self):
+        self.run_case("opaque_envelope_dependency_closure")
+
     def test_absent_root_or_required_model_content(self):
         self.run_case("missing_model_content")
 

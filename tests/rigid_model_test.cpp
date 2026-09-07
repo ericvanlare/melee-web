@@ -858,6 +858,105 @@ void active_texture_matrix_contract()
           "reflection-first generator assignment supports the loaded matrix palette");
 }
 
+void direct_rgba8_geometry()
+{
+    Fixture fixture;
+    put32(fixture.data, Fixture::mobj + 4, 2);
+    fixture.attribute(Fixture::descriptors + 24, 11, 1, 1, 5, 0, 4, 0);
+    fixture.unlink(Fixture::descriptors + 44);
+    put32(fixture.data, Fixture::descriptors + 48, 255);
+    for (uint8_t i = 0; i < 3; ++i) {
+        const auto cursor = Fixture::display + 3 + i * 5;
+        fixture.data[cursor] = i;
+        fixture.data[cursor + 1] = 10 + i;
+        fixture.data[cursor + 2] = 20 + i;
+        fixture.data[cursor + 3] = 30 + i;
+        fixture.data[cursor + 4] = 40 + i;
+    }
+    const auto model = fixture.model();
+    const auto& mesh = model.meshes[0];
+    check(mesh.attributes.size() == 2 && mesh.attributes[1].attr == 11 &&
+          mesh.attributes[1].attr_type == 1 && mesh.attributes[1].data == nullptr &&
+          mesh.attributes[1].byte_size == 0 && mesh.material->render_mode == 2,
+          "direct RGBA8 stays in the display list with no fabricated vertex array");
+    check(mesh.minimum == std::array<float, 3>{-1.F, -.5F, 0.F} &&
+          mesh.maximum == std::array<float, 3>{1.F, 1.5F, .5F} && model.submitted_vertices == 3,
+          "packet scanner advances over RGBA bytes without corrupting subsequent position indices");
+    for (uint8_t i = 0; i < 3; ++i)
+        check(static_cast<const uint8_t*>(mesh.display)[3 + i * 5 + 4] == 40 + i, "original alpha bytes survive");
+    const auto valid = fixture;
+    put16(fixture.data, Fixture::display + 1, 6);
+    rejects([&] { (void) fixture.model(); }); // 6*(index+RGBA) exceeds the32-byte display span.
+    fixture = valid; put32(fixture.data, Fixture::descriptors + 24, 12);
+    rejects([&] { (void) fixture.model(); }); // RENDER_VERTEX needs CLR0, not only CLR1.
+    fixture = valid; put32(fixture.data, Fixture::descriptors + 36, 4);
+    rejects([&] { (void) fixture.model(); }); // Packed RGBA6 is not this supported packet format.
+    fixture = valid; fixture.link(Fixture::descriptors + 44, 0);
+    rejects([&] { (void) fixture.model(); }); // DIRECT has no external array even at relocated zero.
+}
+
+void explicit_opaque_pass()
+{
+    using melee_web::ModelRenderPass;
+    Fixture fixture;
+    constexpr uint32_t billboard = 320, empty = 384, retained = 448,
+        xlu_dobj = 512, xlu_mobj = 528, edge_dobj = 552, edge_mobj = 568;
+    fixture.data.resize(608);
+    for (const auto offset : {billboard, empty, retained}) add_joint(fixture, offset);
+    fixture.link(Fixture::joint + 8, billboard);
+    fixture.link(billboard + 12, empty); fixture.link(empty + 12, retained);
+    fixture.link(retained + 16, Fixture::dobj);
+    put32(fixture.data, billboard + 4, 0x200); // Unsupported camera-dependent billboard.
+    fixture.link(billboard + 16, xlu_dobj);
+    fixture.link(xlu_dobj + 8, xlu_mobj); fixture.link(xlu_dobj + 12, Fixture::pobj);
+    put32(fixture.data, xlu_mobj + 4, 0x60000001);
+    fixture.link(Fixture::dobj + 4, edge_dobj);
+    fixture.link(edge_dobj + 8, edge_mobj); fixture.link(edge_dobj + 12, Fixture::pobj);
+    put32(fixture.data, edge_mobj + 4, 0x40000001);
+    // Omitted materials intentionally have no supported color payload. Selection
+    // uses original flags before hydration; strict full loading still rejects.
+    rejects([&] { (void) fixture.model(); });
+    const auto archive = fixture.archive();
+    const RigidModel model(archive, Fixture::joint, "stage entry 3", ModelRenderPass::Opaque);
+    check(model.root_offset == Fixture::joint && model.symbol == "stage entry 3" &&
+          model.render_pass == ModelRenderPass::Opaque,
+          "explicit source root and pass survive independently of public symbol names");
+    check(model.meshes.size() == 2 && model.dobj_count == 5 && model.omitted_dobjs == 3 &&
+          model.omitted_translucent_meshes == 1 && model.omitted_texture_edge_meshes == 2 &&
+          model.omitted_meshes() == 3, "omission counts include original shared DObj occurrences");
+    check(model.joints.size() == 2 && model.omitted_joints == 2 &&
+          model.joints[1].descriptor_offset == retained && model.joints[1].parent == 0 &&
+          model.meshes[0].dobj_index == 0 && model.meshes[1].dobj_index == 3 &&
+          model.meshes[1].joint_index == 1,
+          "pruning remaps transforms while preserving source identity and flat DObj indices");
+    put32(fixture.data, Fixture::joint + 4, 0x200);
+    rejects([&] { (void) RigidModel(fixture.archive(), Fixture::joint, "stage", ModelRenderPass::Opaque); });
+    put32(fixture.data, Fixture::joint + 4, 0);
+    put32(fixture.data, xlu_mobj + 4, 0x20000001);
+    rejects([&] { (void) RigidModel(fixture.archive(), Fixture::joint, "stage", ModelRenderPass::Opaque); });
+    rejects([&] { (void) RigidModel(archive, Fixture::joint + 1, "unaligned", ModelRenderPass::Opaque); });
+}
+
+void opaque_envelope_dependency_closure()
+{
+    using melee_web::ModelRenderPass;
+    SkinFixture fixture;
+    constexpr uint32_t unused = 800;
+    add_joint(fixture, unused);
+    put32(fixture.data, unused + 4, 0x200);
+    fixture.link(Fixture::joint + 8, unused);
+    fixture.link(unused + 12, SkinFixture::bone0);
+    const RigidModel model(fixture.archive(), Fixture::joint, "skin", ModelRenderPass::Opaque);
+    check(model.joints.size() == 3 && model.omitted_joints == 1 &&
+          model.joints[1].descriptor_offset == SkinFixture::bone0 &&
+          model.joints[2].descriptor_offset == SkinFixture::bone1 &&
+          model.joints[1].parent == 0 && model.joints[2].parent == 0 &&
+          model.meshes[0].envelopes[1].influences[1].joint == 2,
+          "envelope-only bones and their skeleton ancestors survive unrelated billboard pruning");
+    put32(fixture.data, SkinFixture::bone0 + 4, 9 | 0x200);
+    rejects([&] { (void) RigidModel(fixture.archive(), Fixture::joint, "skin", ModelRenderPass::Opaque); });
+}
+
 void missing_model_content()
 {
     rejects([] { (void) RigidModel(nullptr, "fixture_joint"); });
@@ -890,6 +989,9 @@ int main(int argc, char** argv)
         {"material_vertex_dependencies", material_vertex_dependencies},
         {"descriptor_formats", descriptor_formats}, {"finite_geometry", finite_geometry},
         {"missing_model_content", missing_model_content},
+        {"direct_rgba8_geometry", direct_rgba8_geometry},
+        {"explicit_opaque_pass", explicit_opaque_pass},
+        {"opaque_envelope_dependency_closure", opaque_envelope_dependency_closure},
         {"skin_metadata_and_bounds", skin_metadata_and_bounds},
         {"inverse_bind_requirements", inverse_bind_requirements},
         {"envelope_reference_validation", envelope_reference_validation},

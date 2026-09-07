@@ -18,7 +18,7 @@ load a game scene, or run a match. It contains no emulator and no game assets.
   classical/nonclassical scale inheritance. View matrices are validated and prepared
   when a scene loads or its pose changes.
 - Typed texture/image/palette/LOD/material decoding and checked POS/NRM/TEX0–7
-  arrays. Original MObj/TObj expression compilation, TEV, diffuse/specular lighting
+  arrays plus direct RGBA8 vertex colors. Original MObj/TObj expression compilation, TEV, diffuse/specular lighting
   and reflection setup execute against owned static HSD objects. Original tiled
   bytes go to Aurora unchanged; SDK texture identities are stable across frames
   and material instances are shared by descriptor within each scene.
@@ -29,13 +29,21 @@ load a game scene, or run a match. It contains no emulator and no game assets.
   original HSD envelope palette setup against owned skeletons. Per-pose palettes
   are cached and reused while the pose is unchanged.
 - Typed fighter visibility tables and separate DObj occurrence numbering. The
-  default Mario binding selects normal geometry from `ftDataMario`, keeping
-  shadow/reflection and metal representations separate.
+  original source registry resolves fighter kind and costume identity; normal
+  selection keeps shadow/reflection and metal representations separate.
 - Checked FigaTree/FigaTrack decoding with original HSD AObj/FObj/spline evaluation.
-  The default Mario node mapping is verified against original source and common
-  fighter data. The viewer loops at fixed 60 Hz, resets its clock when hidden or
+  Generic ordinary part mappings are checked against original source and common
+  fighter data; action roots and slice lengths must match the fighter action table. The viewer loops at fixed 60 Hz, resets its clock when hidden or
   paused, and pauses explicitly after long stalls. This is inspection playback,
   not the game simulation scheduler.
+- Source-generated fighter/costume/action-count registry checked for drift at
+  build time. The viewer retains full local animation containers and slices
+  explicitly selected actions using source offsets and lengths. Common data can
+  be reused when switching fighters.
+- Typed stage entry loading and explicit render-pass selection. Opaque inspection
+  preserves required transform/envelope ancestry and reports omitted geometry;
+  unsupported behavior on retained dependencies still rejects. Stage services
+  are enumerated without pretending they have been applied.
 - A browser input boundary using SDL/Aurora PAD, explicit keyboard fallback,
   physical-port priority, immediate focus/visibility neutralization and separate
   raw versus PADClamp diagnostic samples.
@@ -51,7 +59,7 @@ load a game scene, or run a match. It contains no emulator and no game assets.
 Verified locally on **2026-09-07**, from the standalone `~/Workspace/melee-web`
 repository on Apple Silicon macOS:
 
-- **115 tests passed**, covering setup, real loopback HTTP, synthetic disc/archive
+- **132 tests passed**, covering setup, real loopback HTTP, synthetic disc/archive
   fixtures, joint/UV/material/texture validation, the input adapter contract, and
   Wasm tests of original HSD polygon, transform, material and animation code. Material traces
   verify fractional blend constants, reflection texture assignment, palette/filter
@@ -97,6 +105,30 @@ repository on Apple Silicon macOS:
   browser background/resume exercise remains outstanding.
 - Range extraction reproduced the exact 4,239-byte Wait1 archive used by the
   evaluator and browser. No extracted data is tracked.
+- The generic loader rendered **Fox Wait1 and WalkSlow**, then **Mario Wait1
+  and WalkSlow**, using full AJ containers and the same common-data import.
+  Fox decodes 73 joints, 91 meshes (86 skinned), 77 texture objects, 418 packets
+  and 7,602 vertices; normal visibility selects **45 DObjs / 59 meshes**.
+  His shininess value 296.363586 reaches the original HSD attenuation unchanged.
+  Original-evaluator traces also exercised all four clips through their own end
+  frames (Mario 50/60; Fox 120/50). These are joint-animation checks, not complete
+  action-command or gameplay fidelity checks.
+- Imported Final Destination's **stage entry 3 opaque pass**: **4 retained joints,
+  13 meshes, 5 textures, 84 packets and 4,619 vertices**. The browser visibly
+  rendered the platform structure and vertex-colored trim. It reported **13
+  omitted translucent meshes** and one unused joint, along with unapplied stage
+  animation/camera/light and other services. Selecting the complete model rejected
+  transparency; switching back to opaque recovered successfully.
+- On the final viewer build, loading a container left Play disabled until an
+  action was explicitly selected. An undersized container, another fighter's
+  metadata and an invalid common archive each produced visible rejection while
+  retaining previously valid data. Fox's walking pose held frame 16 while paused,
+  and valid action selection resumed evaluation afterward.
+- Bucket, fan and bullseye rendered again after these imports. The final page
+  exceeded 5,000 observed frames with an empty captured warning/error console;
+  the preceding fighter/stage page exceeded 28,000 frames, also without warnings
+  or errors. Reload initialized successfully. Both pages used authored inspection
+  context and were not performance or original-game image comparisons.
 - Joint tests exercise Euler rotation order, multigeneration scale inheritance,
   sibling parentage, shared geometry and inverse-transpose normal matrices.
 - Browser keyboard presses reached the real SDL/Aurora PAD provider: D recorded
@@ -121,28 +153,30 @@ optimization while preserving DWARF. They are not suppressed globally.
 This is a functional graphics smoke test, **not a performance benchmark**. GPU
 identity is privacy-limited in this browser. No release-performance, physical-controller, audio, game-state fidelity or
 native-host game validation has been completed. The private GitHub repository's
-first clean Ubuntu 24.04 CI run passed tests and the browser build; it does not
+clean Ubuntu 24.04 CI runs have passed tests and the browser build; it does not
 exercise a real GPU browser. Follow [docs/TESTING.md](docs/TESTING.md) for repeatable
 checks as coverage expands.
 
 ## Next acceptance gate
 
-Generalize the proven fighter path using original costume/animation-part mappings,
-and load a typed stage scene. The Mario bind-pose and idle gate establishes the
-shared skinning, visibility and animation boundaries; it does not run fighter
-initialization, action transitions, physics or collisions. See
-[the next work boundaries](docs/NEXT_PHASE.md).
+The generic Mario/Fox animation and opaque stage-entry inspection gate is complete.
+Next, support the platform's translucent pass and original stage animation,
+then compose a fighter and stage with source scene context. Source action commands,
+physics, collision and audio are still absent. See [the next work boundaries](docs/NEXT_PHASE.md).
 
-The current decoder handles ordinary joint SRT, envelope skinning, opaque
-constant/diffuse/specular materials and up to eight ordinary UV/reflection layers.
-It rejects external links, special joint modes, active custom TEV/PE, transparency,
-shape deformation, shared-joint skinning and nested GX commands. Animation supports
-ordinary SRT tracks and an explicitly verified default Mario mapping; arbitrary
-fighter mappings are not inferred from matching node counts. Referenced-region
-bounds remain conservative. Parser acceptance and browser rendering are separate
-checks.
+The current decoder handles ordinary joint SRT, envelope skinning, direct RGBA8
+vertex colors, opaque constant/diffuse/specular materials and up to eight ordinary
+UV/reflection layers. Complete-model loading rejects transparency, external links,
+active custom TEV/PE, shape deformation, shared-joint skinning and unsupported joint
+modes. An explicitly selected opaque pass omits other pass geometry with counts;
+it does not modify unsupported flags on retained transforms.
 
-Then integrate scheduling, disc I/O, audio and the scene services needed for a
-complete versus loop. Absent services remain explicit. The full acceptance
-sequence is in [docs/ROADMAP.md](docs/ROADMAP.md), with portability findings in
-[docs/DEPENDENCIES.md](docs/DEPENDENCIES.md).
+Animation supports ordinary SRT tracks and checked common-part layouts without
+alternate insertion. A source-registry entry establishes identity, not proof that
+that fighter's complete assets, action visibility or gameplay already work.
+Stage cameras, lights, animation, fog, collision and callbacks remain unapplied.
+Referenced-region bounds are conservative. Parser acceptance and browser rendering
+remain separate checks.
+
+The full acceptance sequence is in [docs/ROADMAP.md](docs/ROADMAP.md), with
+portability findings in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md).
