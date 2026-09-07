@@ -11,12 +11,12 @@ load a game scene, or run a match. It contains no emulator and no game assets.
   for desktop-only draw immediates.
 - A synthetic GX triangle using the original Melee HSD render-state functions.
 - Local ISO/CISO extraction and a bounded, typed big-endian DAT reader.
-- A real rigid DAT model through original HSD `PObjDispSimplePrimitive`, with
+- Rigid and envelope-skinned DAT models through original HSD `PObjDispSimplePrimitive`, with
   explicit indexed-array lengths and unchanged big-endian geometry bytes.
 - File-picker import with visible rejection of unsupported model features.
 - Ordinary rigid joint trees, including original HSD Euler transforms and
-  classical/nonclassical scale inheritance. Static view matrices are validated
-  and prepared once when a scene is loaded.
+  classical/nonclassical scale inheritance. View matrices are validated and prepared
+  when a scene loads or its pose changes.
 - Typed texture/image/palette/LOD/material decoding and checked POS/NRM/TEX0–7
   arrays. Original MObj/TObj expression compilation, TEV, diffuse/specular lighting
   and reflection setup execute against owned static HSD objects. Original tiled
@@ -24,7 +24,18 @@ load a game scene, or run a match. It contains no emulator and no game assets.
   and material instances are shared by descriptor within each scene.
 - Original inverse-transpose normal transforms and camera/light routines with
   an authored inspection camera and light rig. Joint and normal matrices are
-  prepared once; fitting the model changes projection, not lighting space.
+  prepared once per pose; fitting the model changes projection, not lighting space.
+- Typed inverse-bind/envelope decoding, direct matrix-index attributes, and
+  original HSD envelope palette setup against owned skeletons. Per-pose palettes
+  are cached and reused while the pose is unchanged.
+- Typed fighter visibility tables and separate DObj occurrence numbering. The
+  default Mario binding selects normal geometry from `ftDataMario`, keeping
+  shadow/reflection and metal representations separate.
+- Checked FigaTree/FigaTrack decoding with original HSD AObj/FObj/spline evaluation.
+  The default Mario node mapping is verified against original source and common
+  fighter data. The viewer loops at fixed 60 Hz, resets its clock when hidden or
+  paused, and pauses explicitly after long stalls. This is inspection playback,
+  not the game simulation scheduler.
 - A browser input boundary using SDL/Aurora PAD, explicit keyboard fallback,
   physical-port priority, immediate focus/visibility neutralization and separate
   raw versus PADClamp diagnostic samples.
@@ -33,16 +44,16 @@ load a game scene, or run a match. It contains no emulator and no game assets.
 - Diagnostic page with errors and rolling CPU/frame-interval measurements.
 - Loopback server with WebAssembly MIME type and cross-origin isolation headers.
 - Setup, server, disc, DAT, model and original-HSD call-trace tests; a compile-only
-  GitHub Actions workflow.
+  GitHub Actions workflow, published in a private repository.
 
 ## Validation record
 
 Verified locally on **2026-09-07**, from the standalone `~/Workspace/melee-web`
 repository on Apple Silicon macOS:
 
-- **94 tests passed**, covering setup, real loopback HTTP, synthetic disc/archive
+- **115 tests passed**, covering setup, real loopback HTTP, synthetic disc/archive
   fixtures, joint/UV/material/texture validation, the input adapter contract, and
-  Wasm tests of original HSD polygon, transform and material code. Material traces
+  Wasm tests of original HSD polygon, transform, material and animation code. Material traces
   verify fractional blend constants, reflection texture assignment, palette/filter
   handling, stable SDK identities across frames and complete expression freeing.
 - Updated Melee to `b43912cc78606f96c9569f5d6229bc9d7e265ea5`, including the final
@@ -71,6 +82,21 @@ repository on Apple Silicon macOS:
   This exercises real layered/specular material metadata and a nonidentity child
   joint through original HSD code. It uses authored inspection lighting, so it is
   not evidence of pixel equivalence to the game's camera/light setup.
+- Imported the complete default Mario costume: **61 joints, 53 inverse binds,
+  68 skinned meshes, 60 texture objects, 314 packets and 6,982 submitted vertices**.
+  Loading `PlMr.dat` selected the normal **43 DObjs / 52 meshes** from metadata.
+  His bind pose and original **50-frame Wait1 idle** rendered visibly with the
+  normal face, hands and clothing. The browser exposed reversed inspection depth;
+  using SDK orthographic projection fixed it, with a depth-order regression test.
+- The animation held frame 6 while paused and advanced after resuming. Wrong
+  metadata was rejected while retaining visibility; a wrong animation was
+  rejected and removed. Replacing Mario with the bucket, fan and bullseye rendered
+  all three correctly and cleared animation state. More than 4,600 frames were
+  observed on this page with an empty captured warning/error console. Reload
+  initialized successfully. Hidden-tab timing is covered by clock tests; a real
+  browser background/resume exercise remains outstanding.
+- Range extraction reproduced the exact 4,239-byte Wait1 archive used by the
+  evaluator and browser. No extracted data is tracked.
 - Joint tests exercise Euler rotation order, multigeneration scale inheritance,
   sibling parentage, shared geometry and inverse-transpose normal matrices.
 - Browser keyboard presses reached the real SDL/Aurora PAD provider: D recorded
@@ -78,8 +104,9 @@ repository on Apple Silicon macOS:
   150. Releasing keys returned the current sample to zero, and focusing a page
   control paused input. A retained last-activity diagnostic distinguishes these
   observed samples from current held state. Physical devices remain untested.
-- Replacing the bucket with the fan, rejecting Mario's currently unsupported
-  skeletal costume, and importing the bucket again all completed without browser
+- At the earlier rigid-only milestone, replacing the bucket with the fan,
+  rejecting the then-unsupported Mario costume, and importing the bucket again
+  all completed without browser
   warnings/errors. Tab moved focus from the canvas to the keyboard-control
   checkbox and paused input as intended.
 - An independent review checked command execution, the C++/WGSL uniform layout,
@@ -92,30 +119,30 @@ switch cases against Aurora's texture enum, and limited post-link
 optimization while preserving DWARF. They are not suppressed globally.
 
 This is a functional graphics smoke test, **not a performance benchmark**. GPU
-identity is privacy-limited in this browser. No release-performance, background
-tab recovery, physical-controller, audio, game-state fidelity, native-host or Linux
-validation has been completed. CI has not run on GitHub because this repository
-has not been published. Follow [docs/TESTING.md](docs/TESTING.md) for repeatable
+identity is privacy-limited in this browser. No release-performance, physical-controller, audio, game-state fidelity or
+native-host game validation has been completed. The private GitHub repository's
+first clean Ubuntu 24.04 CI run passed tests and the browser build; it does not
+exercise a real GPU browser. Follow [docs/TESTING.md](docs/TESTING.md) for repeatable
 checks as coverage expands.
 
 ## Next acceptance gate
 
-Move from rigid inspection assets toward a real fighter/stage scene. Prioritize
-typed joint/envelope and animation loading plus original HSD evaluation, using
-batch rejection evidence to select representative assets and shared boundaries.
-The selected next gate is Mario's complete neutral costume in its bind pose,
-followed by an idle animation; see [the corpus findings and work boundaries](docs/NEXT_PHASE.md).
+Generalize the proven fighter path using original costume/animation-part mappings,
+and load a typed stage scene. The Mario bind-pose and idle gate establishes the
+shared skinning, visibility and animation boundaries; it does not run fighter
+initialization, action transitions, physics or collisions. See
+[the next work boundaries](docs/NEXT_PHASE.md).
 
-The current decoder handles ordinary joint SRT, opaque constant/diffuse/specular
-materials and up to eight ordinary UV/reflection texture layers per material.
-It rejects external links, special joint modes, custom material classes/TEV/PE,
-transparency, nested GX commands, skinning and animation. Referenced-region bounds
-are conservative, not inferred allocation sizes. CPU parser acceptance and GPU
-render acceptance remain separate evidence.
+The current decoder handles ordinary joint SRT, envelope skinning, opaque
+constant/diffuse/specular materials and up to eight ordinary UV/reflection layers.
+It rejects external links, special joint modes, active custom TEV/PE, transparency,
+shape deformation, shared-joint skinning and nested GX commands. Animation supports
+ordinary SRT tracks and an explicitly verified default Mario mapping; arbitrary
+fighter mappings are not inferred from matching node counts. Referenced-region
+bounds remain conservative. Parser acceptance and browser rendering are separate
+checks.
 
-Then integrate the scheduling, disc I/O, audio and complete scene services
-needed for a complete versus loop. Track absent services as absent; a silent
-stub must never turn an incomplete path into a passing milestone.
-
-The full acceptance sequence is in [docs/ROADMAP.md](docs/ROADMAP.md), with
-portability findings in [docs/DEPENDENCIES.md](docs/DEPENDENCIES.md).
+Then integrate scheduling, disc I/O, audio and the scene services needed for a
+complete versus loop. Absent services remain explicit. The full acceptance
+sequence is in [docs/ROADMAP.md](docs/ROADMAP.md), with portability findings in
+[docs/DEPENDENCIES.md](docs/DEPENDENCIES.md).

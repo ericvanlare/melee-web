@@ -40,6 +40,8 @@ struct DatTexture {
     std::array<float, 3> rotation{}, scale{}, translation{};
     std::uint8_t repeat_s = 0, repeat_t = 0;
     std::optional<std::uint32_t> lod_descriptor_offset;
+    // Active-zero descriptors do not affect original HSD expression generation.
+    std::optional<std::uint32_t> inactive_tev_descriptor_offset;
     DatTextureImage image;
     std::optional<DatTexturePalette> palette;
     DatTextureSampler sampler;
@@ -51,7 +53,7 @@ struct DatTexture {
 // repeat/wrap modes, standard HSD color/alpha operations and diffuse, specular,
 // ambient or extension lightmaps. Raw flags/blend values are preserved for the
 // original HSD expression compiler; no effective-operation approximation is made.
-// Custom classes/TEV, toon, bump, shadow and highlight coordinate modes remain
+// Custom classes/active TEV, toon, bump, shadow and highlight coordinate modes remain
 // unsupported. Referenced-region bounds are conservative, not allocation sizes.
 // Source IDs are preserved, but HSD assigns actual texture resources at runtime.
 [[nodiscard]] std::vector<DatTexture> read_dat_texture_chain(const DatArchive& archive,

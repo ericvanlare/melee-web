@@ -39,8 +39,8 @@ std::shared_ptr<const melee_web::DatArchive> load(const char* path)
 
 int main(int argc, char** argv)
 {
-    if (argc != 2) {
-        std::cerr << "Usage: asset_check <local DAT>\n";
+    if (argc != 2 && argc != 3) {
+        std::cerr << "Usage: asset_check <local DAT> [public model symbol]\n";
         return 2;
     }
     try {
@@ -48,14 +48,21 @@ int main(int argc, char** argv)
         if (archive->public_symbols().empty())
             throw melee_web::DatError("DAT has no public roots to check");
         bool rejected = false;
+        bool found = false;
         for (const auto& root : archive->public_symbols()) {
+            if (argc == 3 && root.name != argv[2]) continue;
+            found = true;
             std::cout << "{\"scope\":\"rigid_model\",\"root\":";
             json_string(root.name);
             std::cout << ",\"offset\":" << root.data_offset;
             try {
                 const melee_web::RigidModel model(archive, root.name);
                 std::set<std::uint32_t> materials, textures;
+                size_t envelope_count = 0, influences = 0, inverse_binds = 0;
+                for (const auto& joint : model.joints) inverse_binds += joint.inverse_bind.has_value();
                 for (const auto& mesh : model.meshes) {
+                    envelope_count += mesh.envelopes.size();
+                    for (const auto& envelope : mesh.envelopes) influences += envelope.influences.size();
                     materials.insert(mesh.material->descriptor_offset);
                     for (const auto& texture : mesh.material->textures)
                         textures.insert(texture.descriptor_offset);
@@ -64,6 +71,9 @@ int main(int argc, char** argv)
                           << ",\"meshes\":" << model.meshes.size()
                           << ",\"materials\":" << materials.size()
                           << ",\"textures\":" << textures.size()
+                          << ",\"inverse_binds\":" << inverse_binds
+                          << ",\"envelopes\":" << envelope_count
+                          << ",\"influences\":" << influences
                           << ",\"packets\":" << model.draw_packets
                           << ",\"submitted_vertices\":" << model.submitted_vertices;
             } catch (const std::exception& error) {
@@ -73,6 +83,7 @@ int main(int argc, char** argv)
             }
             std::cout << "}\n";
         }
+        if (!found) throw melee_web::DatError("Requested public model symbol is missing");
         return rejected ? 1 : 0;
     } catch (const std::exception& error) {
         std::cout << "{\"scope\":\"archive\",\"status\":\"rejected\",\"reason\":";

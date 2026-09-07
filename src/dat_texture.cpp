@@ -157,8 +157,16 @@ DatTexture read_texture(const DatArchive& archive, std::uint32_t offset)
 {
     descriptor(archive, offset, 92);
     absent(archive, offset, "Custom texture classes are unsupported");
-    absent(archive, offset + 88, "Custom texture TEV expressions are unsupported");
     DatTexture result;
+    if (const auto tev = archive.pointer(offset + 88, 32)) {
+        descriptor(archive, *tev, 32);
+        // HSD_TObjMakeTExp only enters custom expressions when active flags are
+        // set. Preserve this descriptor's identity; its inactive byte fields
+        // are intentionally not interpreted as GX commands.
+        if (archive.be32(*tev + 28) != 0)
+            reject("Active custom texture TEV expressions are unsupported");
+        result.inactive_tev_descriptor_offset = *tev;
+    }
     result.descriptor_offset = offset;
     result.id = archive.be32(offset + 8);
     result.source = archive.be32(offset + 12);

@@ -85,6 +85,30 @@ class RigidModelTests(unittest.TestCase):
     def test_absent_root_or_required_model_content(self):
         self.run_case("missing_model_content")
 
+    def test_skin_joint_mapping_raw_weights_inverse_binds_and_per_palette_bounds(self):
+        self.run_case("skin_metadata_and_bounds")
+
+    def test_inverse_bind_semantic_requirements_and_matrix_bounds(self):
+        self.run_case("inverse_bind_requirements")
+
+    def test_envelope_pointer_termination_weights_and_joint_membership(self):
+        self.run_case("envelope_reference_validation")
+
+    def test_original_hsd_palette_and_influence_resource_limits(self):
+        self.run_case("envelope_resource_limits")
+
+    def test_direct_position_texture_matrix_indices_and_packet_layout(self):
+        self.run_case("matrix_index_validation")
+
+    def test_lit_envelope_owner_has_original_normal_palette_upload_flag(self):
+        self.run_case("envelope_lighting_contract")
+
+    def test_dobj_preorder_identity_with_multiple_and_shared_polygon_lists(self):
+        self.run_case("dobj_preorder_mapping")
+
+    def test_active_uv_matrix_indices_cannot_consume_unloaded_palette_state(self):
+        self.run_case("active_texture_matrix_contract")
+
 
 if __name__ == "__main__":
     unittest.main()

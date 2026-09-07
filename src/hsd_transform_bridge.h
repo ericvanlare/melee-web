@@ -24,7 +24,9 @@ typedef struct MeleeWebJointTransform {
  * parent-matrix concatenation. The state is not simply the world matrix's
  * column lengths, so keep it with the joint while traversing the tree.
  *
- * Billboard, quaternion, instance, skeletal/IK, user matrix, independent
+ * Skeleton/root/envelope markers do not change this original SRT path; envelope drawing
+ * interprets them separately when preparing the skinning palette.
+ * Billboard, quaternion, instance, IK, user matrix, independent
  * matrix/SRT and unknown modes are unsupported. Animation/constraint refs
  * and graph validity must be checked by the importer. Visibility/material
  * flags are accepted here but must still be honored by the rendering caller.
@@ -48,6 +50,12 @@ int melee_web_joint_view_matrix(const float camera[3][4],
 /* Original HSD inverse-transpose path, with checked finite output. */
 int melee_web_joint_normal_matrix(const float view[3][4], float output[3][4],
                                   char* error, size_t error_size);
+
+/* Checked SDK orthographic fitting for the inspection camera, which looks
+ * along negative view Z. GX maps near to -1 and far to 0; Aurora performs the
+ * subsequent WebGPU/reversed-depth conversion. Output is atomic on failure. */
+int melee_web_inspection_projection(float extent, float maximum_dimension,
+    float distance, float output[4][4], char* error, size_t error_size);
 
 #ifdef __cplusplus
 }

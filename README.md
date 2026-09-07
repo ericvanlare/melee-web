@@ -3,17 +3,18 @@
 A source-port feasibility project for running vanilla Super Smash Bros. Melee
 in a desktop browser using WebAssembly and WebGPU.
 
-**This is not a playable game yet.** The browser can render a real rigid Melee
-DAT model using original HSD polygon code and Aurora's GX renderer. The current
-preview supports ordinary rigid joint trees and opaque original HSD materials,
-including lighting, reflection and multiple texture layers.
+**This is not a playable game yet.** The browser renders Melee DAT models
+through original HSD transforms, skinning, materials and polygon code, using
+Aurora's GX renderer. Default Mario can play his original idle animation, with
+normal geometry selected from the fighter visibility tables.
 It does not establish complete scene fidelity or full-game performance.
 
 ## Build and inspect
 
 Initial reference environment: Apple Silicon macOS, Python 3, Git, and desktop
 Chromium with WebGPU. No global SDK installation or shell-profile edits required.
-Other build hosts have not yet been validated.
+The pinned build and automated checks also pass on Ubuntu 24.04 in GitHub Actions;
+real browser graphics are currently checked on macOS.
 
 ```sh
 python3 scripts/bootstrap.py
@@ -38,12 +39,25 @@ The extractor reads the disc without modifying it. Extracted data stays in ignor
 Use the same command with `TyHarise.dat` to inspect the textured fan or
 `TyBacket.dat` for a reflective bucket with a transformed child joint. Materials
 run through Melee's original HSD expression compiler and setup code, with an
-authored inspection camera and lights. Skinning, animation and full game scenes
-remain to be integrated.
+authored inspection camera and lights.
+
+To inspect Mario, extract his neutral costume, fighter metadata and the Wait1
+animation slice identified by the original action table:
+
+```sh
+python3 scripts/extract_disc_file.py /path/to/game.ciso PlMrNr.dat --output assets-local/PlMrNr.dat
+python3 scripts/extract_disc_file.py /path/to/game.ciso PlMr.dat --output assets-local/PlMr.dat
+python3 scripts/extract_disc_file.py /path/to/game.ciso PlMrAJ.dat --offset 0 --length 4239 --output assets-local/MarioWait1.dat
+```
+
+Choose `PlMrNr.dat` as the model, `PlMr.dat` as fighter metadata, then
+`MarioWait1.dat` as the animation and press Play. The inspection player evaluates
+original HSD animation at 60 Hz independently of presentation. Other fighter
+bindings, action transitions and complete game scenes remain to be integrated.
 
 Enable keyboard controls and click the canvas to inspect the SDL/Aurora PAD input
 path. The page lists bindings and current raw/clamped samples; input does not
-control the static model. Physical controller support uses Aurora's existing
+control the inspected model. Physical controller support uses Aurora's existing
 provider and still needs hardware validation.
 
 For a growing local asset corpus, run the actual CPU parser in a batch:

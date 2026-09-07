@@ -4,6 +4,7 @@
 #include <array>
 #include <bit>
 #include <cstdint>
+#include <cmath>
 #include <functional>
 #include <iostream>
 #include <map>
@@ -355,7 +356,7 @@ void joint_hierarchy()
 
 void invalid_joint_graphs()
 {
-    for (const auto offset : {8U, 12U, 56U, 60U}) {
+    for (const auto offset : {8U, 12U, 60U}) {
         Fixture fixture;
         fixture.link(Fixture::joint + offset, Fixture::joint);
         rejects([&] { (void) fixture.model(); });
@@ -569,6 +570,294 @@ void finite_geometry()
     }
 }
 
+// The skin specimen has a skeleton-root mesh and two later bones, so envelope
+// references must resolve after traversal. Two palettes exercise both original
+// HSD branches: one rigid weight1, one ordered .25/.75 weighted blend.
+struct SkinFixture : Fixture {
+    static constexpr uint32_t attrs = 320, commands = 416, bone0 = 480,
+        bone1 = 544, inverse0 = 608, inverse1 = 656,
+        envelope0 = 704, envelope1 = 720, table = 744;
+    SkinFixture() : Fixture(true) {
+        data.resize(1024, 0);
+        put32(data, joint + 4, 0x86); // Skeleton root + envelope model + lighting.
+        add_joint(*this, bone0); add_joint(*this, bone1);
+        link(joint + 8, bone0); link(bone0 + 12, bone1);
+        put32(data, bone0 + 4, 9); put32(data, bone1 + 4, 9);
+        link(bone0 + 56, inverse0); link(bone1 + 56, inverse1);
+        for (const auto matrix : {inverse0, inverse1})
+            for (uint32_t axis = 0; axis < 3; ++axis) putf32(data, matrix + axis * 20, 1.F);
+        putf32(data, inverse1 + 12, -3.F);
+        link(pobj + 8, attrs); link(pobj + 16, commands); link(pobj + 20, table);
+        put16(data, pobj + 12, 0xa001);
+        attribute(attrs, 0, 1, 0, 4, 0, 0, 0); unlink(attrs + 20);
+        attribute(attrs + 24, 9, 2, 1, 3, 1, 6, 0);
+        attribute(attrs + 48, 10, 2, 0, 1, 6, 3, 32);
+        put32(data, attrs + 72, 255);
+        std::fill(data.begin() + 32, data.begin() + 41, 0);
+        for (uint32_t i = 0; i < 3; ++i) data[32 + i * 3 + 2] = 64;
+        link(table, envelope0); link(table + 4, envelope1);
+        link(envelope0, bone0); putf32(data, envelope0 + 4, 1.F);
+        link(envelope1, bone0); putf32(data, envelope1 + 4, .25F);
+        link(envelope1 + 8, bone1); putf32(data, envelope1 + 12, .75F);
+        data[commands] = 0x90; put16(data, commands + 1, 3);
+        for (uint8_t i = 0; i < 3; ++i) {
+            data[commands + 3 + i * 3] = i ? 3 : 0;
+            data[commands + 4 + i * 3] = i;
+            data[commands + 5 + i * 3] = i;
+        }
+    }
+};
+
+void skin_metadata_and_bounds()
+{
+    const auto model = SkinFixture().model();
+    check(model.joints.size() == 3 && model.joints[1].parent == 0 && model.joints[2].parent == 0,
+          "skeletal flags and forward envelope references retain preorder parentage");
+    const auto& mesh = model.meshes[0];
+    check(mesh.descriptor_offset == Fixture::pobj && mesh.flags == 0xa001 &&
+          mesh.envelopes.size() == 2 && mesh.envelopes[1].influences.size() == 2,
+          "original envelope palette order and source polygon flags");
+    check(mesh.envelopes[0].influences[0].joint == 1 &&
+          mesh.envelopes[1].influences[0].joint == 1 &&
+          mesh.envelopes[1].influences[1].joint == 2 &&
+          mesh.envelopes[1].influences[0].weight == .25F &&
+          mesh.envelopes[1].influences[1].weight == .75F,
+          "joint offsets resolve to indices without reordering or normalizing weights");
+    check(model.joints[2].inverse_bind && (*model.joints[2].inverse_bind)[3] == -3.F &&
+          (*model.joints[2].inverse_bind)[0] == 1.F && (*model.joints[2].inverse_bind)[5] == 1.F,
+          "row-major inverse bind floats remain original values");
+    check(mesh.attributes[0].attr == 0 && mesh.attributes[0].attr_type == 1 &&
+          mesh.attributes[0].data == nullptr && mesh.attributes[0].byte_size == 0 &&
+          mesh.attributes[2].comp_type == 1 && mesh.attributes[2].byte_size == 9,
+          "direct PN matrix bytes and compact signed-byte normal arrays");
+    check(mesh.palette_used_mask == 3 &&
+          mesh.palette_minimum[0] == std::array<float, 3>{-1.F, -.5F, 0.F} &&
+          mesh.palette_maximum[0] == mesh.palette_minimum[0] &&
+          mesh.palette_minimum[1] == std::array<float, 3>{0.F, -.5F, 0.F} &&
+          mesh.palette_maximum[1] == std::array<float, 3>{1.F, 1.5F, .5F} &&
+          mesh.palette_minimum[2] == std::array<float, 3>{},
+          "bounds use only positions submitted through each actual palette slot");
+}
+
+void inverse_bind_requirements()
+{
+    SkinFixture fixture;
+    fixture.unlink(SkinFixture::bone0 + 56);
+    rejects([&] { (void) fixture.model(); }); // Weighted slot needs both inverse binds.
+    fixture.unlink(SkinFixture::table + 4);
+    for (uint32_t i = 0; i < 3; ++i) fixture.data[SkinFixture::commands + 3 + i * 3] = 0;
+    check(fixture.model().meshes[0].envelopes.size() == 1,
+          "skeleton-root weight1 branch uses world matrix without requiring inverse bind");
+    put32(fixture.data, Fixture::joint + 4, 0x81); // A skeleton bone is not a skeleton root.
+    rejects([&] { (void) fixture.model(); });
+    fixture = SkinFixture();
+    for (const auto bad : {0x7fc00000U, 0x7f800000U, 0x4b000000U}) {
+        put32(fixture.data, SkinFixture::inverse0, bad);
+        rejects([&] { (void) fixture.model(); });
+    }
+    fixture = SkinFixture();
+    fixture.link(SkinFixture::bone0 + 56, 1000); // Only24bytes remain in archive.
+    rejects([&] { (void) fixture.model(); });
+    fixture = SkinFixture();
+    fixture.link(SkinFixture::bone0 + 56, SkinFixture::inverse0 + 2);
+    rejects([&] { (void) fixture.model(); });
+    fixture = SkinFixture();
+    fixture.link(1000, SkinFixture::inverse0 + 32); // Referenced region bisects matrix.
+    rejects([&] { (void) fixture.model(); });
+}
+
+void envelope_reference_validation()
+{
+    for (const auto weight : {-1.F, 1.01F, INFINITY, NAN}) {
+        SkinFixture fixture;
+        putf32(fixture.data, SkinFixture::envelope1 + 4, weight);
+        rejects([&] { (void) fixture.model(); });
+    }
+    SkinFixture fixture;
+    putf32(fixture.data, SkinFixture::envelope1 + 4, 0.F);
+    putf32(fixture.data, SkinFixture::envelope1 + 12, 0.F);
+    rejects([&] { (void) fixture.model(); });
+    fixture = SkinFixture();
+    // Positive nonunit totals keep their original semantics; do not normalize.
+    putf32(fixture.data, SkinFixture::envelope1 + 12, .5F);
+    check(fixture.model().meshes[0].envelopes[1].influences[1].weight == .5F,
+          "parser does not invent a normalization requirement");
+    fixture = SkinFixture();
+    add_joint(fixture, 800);
+    fixture.link(SkinFixture::envelope0, 800); // Wellformed joint outside chosen graph.
+    rejects([&] { (void) fixture.model(); });
+    fixture = SkinFixture();
+    fixture.unlink(SkinFixture::envelope0);
+    rejects([&] { (void) fixture.model(); });
+    fixture = SkinFixture();
+    fixture.unlink(SkinFixture::table);
+    rejects([&] { (void) fixture.model(); });
+    fixture = SkinFixture();
+    fixture.link(SkinFixture::envelope1 + 16, SkinFixture::bone0);
+    putf32(fixture.data, SkinFixture::envelope1 + 20, .5F);
+    rejects([&] { (void) fixture.model(); }); // Influence list crosses next table region.
+    fixture = SkinFixture();
+    fixture.link(1000, SkinFixture::table + 8);
+    rejects([&] { (void) fixture.model(); }); // Table lacks terminator inside referenced span.
+    fixture = SkinFixture();
+    put32(fixture.data, Fixture::joint + 4, 0x80);
+    rejects([&] { (void) fixture.model(); }); // No skeleton ancestor for mesh transform.
+}
+
+void envelope_resource_limits()
+{
+    SkinFixture fixture;
+    constexpr uint32_t table = 1024, influences = 1080;
+    fixture.data.resize(1400, 0);
+    fixture.link(Fixture::pobj + 20, table);
+    for (uint32_t i = 0; i < 11; ++i) fixture.link(table + i * 4, SkinFixture::envelope0);
+    rejects([&] { (void) fixture.model(); }); //11palette entries.
+    fixture.unlink(table + 10 * 4);
+    check(fixture.model().meshes[0].envelopes.size() == 10, "ten palette slots are supported");
+    fixture.link(table, influences);
+    for (uint32_t i = 0; i < 32; ++i) {
+        fixture.link(influences + i * 8, SkinFixture::bone0);
+        putf32(fixture.data, influences + i * 8 + 4, 1.F / 32);
+    }
+    rejects([&] { (void) fixture.model(); });
+    fixture.unlink(influences + 31 * 8);
+    check(fixture.model().meshes[0].envelopes[0].influences.size() == 31,
+          "original HSD performance counter supports at most31 influences");
+}
+
+void matrix_index_validation()
+{
+    for (const auto value : {1U, 2U, 6U, 30U, 255U}) {
+        SkinFixture fixture;
+        fixture.data[SkinFixture::commands + 3] = static_cast<uint8_t>(value);
+        rejects([&] { (void) fixture.model(); });
+    }
+    SkinFixture fixture;
+    put32(fixture.data, SkinFixture::attrs + 4, 2);
+    rejects([&] { (void) fixture.model(); }); // Matrix indices are immediate bytes, not arrays.
+    fixture = SkinFixture();
+    fixture.link(SkinFixture::attrs + 20, 0);
+    rejects([&] { (void) fixture.model(); });
+    fixture = SkinFixture();
+    put16(fixture.data, SkinFixture::attrs + 18, 1);
+    rejects([&] { (void) fixture.model(); }); // Direct matrix bytes have no array stride.
+    fixture = SkinFixture();
+    fixture.link(Fixture::pobj + 8, SkinFixture::attrs + 24);
+    rejects([&] { (void) fixture.model(); }); // Envelope with no PN index stream.
+    fixture = SkinFixture();
+    constexpr uint32_t attrs = 800;
+    fixture.link(Fixture::pobj + 8, attrs);
+    fixture.attribute(attrs, 0, 1, 0, 4, 0, 0, 0); fixture.unlink(attrs + 20);
+    fixture.attribute(attrs + 24, 1, 1, 0, 4, 0, 0, 0); fixture.unlink(attrs + 44);
+    fixture.attribute(attrs + 48, 9, 2, 1, 3, 1, 6, 0);
+    fixture.attribute(attrs + 72, 10, 2, 0, 1, 6, 3, 32);
+    put32(fixture.data, attrs + 96, 255);
+    std::fill(fixture.data.begin() + SkinFixture::commands + 3,
+              fixture.data.begin() + SkinFixture::commands + 32, 0);
+    for (uint8_t i = 0; i < 3; ++i) {
+        const auto cursor = SkinFixture::commands + 3 + 4 * i;
+        fixture.data[cursor] = i ? 3 : 0;
+        fixture.data[cursor + 1] = 30;
+        fixture.data[cursor + 2] = fixture.data[cursor + 3] = i;
+    }
+    check(fixture.model().meshes[0].attributes[1].attr == 1,
+          "direct texture matrix stream participates in the original packet layout");
+    for (const auto value : {0U, 31U, 36U, 60U, 255U}) {
+        fixture.data[SkinFixture::commands + 4] = static_cast<uint8_t>(value);
+        rejects([&] { (void) fixture.model(); });
+    }
+    fixture.data[SkinFixture::commands + 4] = 30;
+    fixture.data[SkinFixture::commands] = 0x20; // Indexed XF matrix-load command not needed by this path.
+    rejects([&] { (void) fixture.model(); });
+}
+
+void envelope_lighting_contract()
+{
+    for (const auto mode : {4U, 8U, 0xcU}) {
+        SkinFixture fixture;
+        put32(fixture.data, Fixture::mobj + 4, mode);
+        put32(fixture.data, Fixture::joint + 4, 6); // Skeleton root without LIGHTING.
+        rejects([&] { (void) fixture.model(); });
+        put32(fixture.data, Fixture::joint + 4, 0x86);
+        check(fixture.model().joints[0].flags == 0x86,
+              "lit envelope owner retains the source lighting flag for normal palette uploads");
+    }
+    for (const auto mode : {1U, 5U}) {
+        SkinFixture fixture;
+        put32(fixture.data, Fixture::mobj + 4, mode);
+        put32(fixture.data, Fixture::joint + 4, 6);
+        check(fixture.model().joints[0].flags == 6,
+              "original constant channel modes do not require unused normal palette uploads");
+    }
+}
+
+void dobj_preorder_mapping()
+{
+    Fixture fixture;
+    fixture.data.resize(360);
+    constexpr uint32_t second_dobj = 320, second_pobj = 336;
+    std::copy_n(fixture.data.begin() + Fixture::pobj, 24, fixture.data.begin() + second_pobj);
+    fixture.link(second_pobj + 8, Fixture::descriptors);
+    fixture.link(second_pobj + 16, Fixture::display);
+    fixture.link(Fixture::pobj + 4, second_pobj);
+    fixture.link(Fixture::dobj + 4, second_dobj);
+    fixture.link(second_dobj + 8, Fixture::mobj);
+    fixture.link(second_dobj + 12, second_pobj);
+    const auto model = fixture.model();
+    check(model.dobj_count == 2 && model.meshes.size() == 3 &&
+          model.meshes[0].dobj_index == 0 && model.meshes[1].dobj_index == 0 &&
+          model.meshes[2].dobj_index == 1,
+          "visibility indexes DObj occurrences, not individual or shared PObj descriptors");
+}
+
+void active_texture_matrix_contract()
+{
+    SkinFixture fixture;
+    fixture.data.resize(1664);
+    constexpr uint32_t attrs = 1024, texture = 1280, image = 1376,
+        pixels = 1408, uv = 1440, reflected = 1536;
+    fixture.link(Fixture::pobj + 8, attrs);
+    fixture.attribute(attrs, 0, 1, 0, 4, 0, 0, 0); fixture.unlink(attrs + 20);
+    fixture.attribute(attrs + 24, 1, 1, 0, 4, 0, 0, 0); fixture.unlink(attrs + 44);
+    fixture.attribute(attrs + 48, 9, 2, 1, 3, 1, 6, 0);
+    fixture.attribute(attrs + 72, 10, 2, 0, 1, 6, 3, 32);
+    fixture.attribute(attrs + 96, 20, 2, 1, 0, 7, 2, uv);
+    put32(fixture.data, attrs + 120, 255);
+    fixture.link(Fixture::mobj + 8, texture);
+    put32(fixture.data, Fixture::mobj + 4, 0x14);
+    put32(fixture.data, texture + 8, 7); // Resource assignment replaces this source map ID.
+    put32(fixture.data, texture + 12, 11); // TEX7 source still gets TexGen0 in a UV-only chain.
+    for (uint32_t axis = 0; axis < 3; ++axis) putf32(fixture.data, texture + 28 + axis * 4, 1.F);
+    fixture.data[texture + 60] = fixture.data[texture + 61] = 1;
+    put32(fixture.data, texture + 64, 0x30010);
+    putf32(fixture.data, texture + 68, 1.F);
+    fixture.link(texture + 76, image); fixture.link(image, pixels);
+    put16(fixture.data, image + 4, 1); put16(fixture.data, image + 6, 1);
+    std::fill(fixture.data.begin() + SkinFixture::commands + 3,
+              fixture.data.begin() + SkinFixture::commands + 32, 0);
+    for (uint8_t i = 0; i < 3; ++i) {
+        const auto cursor = SkinFixture::commands + 3 + i * 5;
+        fixture.data[cursor] = i ? 3 : 0;
+        fixture.data[cursor + 1] = 30;
+        fixture.data[cursor + 2] = fixture.data[cursor + 3] = fixture.data[cursor + 4] = i;
+    }
+    rejects([&] { (void) fixture.model(); }); // Active TexGen0 would consume an unloaded matrix.
+    put32(fixture.data, attrs + 24, 2);
+    check(fixture.model().meshes[0].attributes[1].attr == 2,
+          "unused TexGen1 matrix stream is harmless even though source coordinates are TEX7");
+    // Reflection is assigned TexGen0 before the earlier UV node, and original
+    // HSD uploads the entire texture-normal palette for it.
+    fixture.link(texture + 4, reflected);
+    std::copy_n(fixture.data.begin() + texture, 92, fixture.data.begin() + reflected);
+    put32(fixture.data, reflected + 4, 0);
+    fixture.link(reflected + 76, image);
+    put32(fixture.data, reflected + 12, 5);
+    put32(fixture.data, reflected + 64, 0x30081);
+    put32(fixture.data, attrs + 24, 1);
+    check(fixture.model().meshes[0].material->textures.size() == 2,
+          "reflection-first generator assignment supports the loaded matrix palette");
+}
+
 void missing_model_content()
 {
     rejects([] { (void) RigidModel(nullptr, "fixture_joint"); });
@@ -601,6 +890,14 @@ int main(int argc, char** argv)
         {"material_vertex_dependencies", material_vertex_dependencies},
         {"descriptor_formats", descriptor_formats}, {"finite_geometry", finite_geometry},
         {"missing_model_content", missing_model_content},
+        {"skin_metadata_and_bounds", skin_metadata_and_bounds},
+        {"inverse_bind_requirements", inverse_bind_requirements},
+        {"envelope_reference_validation", envelope_reference_validation},
+        {"envelope_resource_limits", envelope_resource_limits},
+        {"matrix_index_validation", matrix_index_validation},
+        {"envelope_lighting_contract", envelope_lighting_contract},
+        {"dobj_preorder_mapping", dobj_preorder_mapping},
+        {"active_texture_matrix_contract", active_texture_matrix_contract},
     };
     if (argc != 2 || !cases.contains(argv[1])) {
         std::cerr << "Usage: rigid_model_test <known case name>\n";

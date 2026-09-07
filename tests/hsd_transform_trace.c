@@ -38,6 +38,11 @@ static void check_root_and_rotation_order(void)
     assert(melee_web_joint_transform(8, scale, rotation, translation, NULL, &result, error, sizeof error));
     expect_matrix(&result, expected);
 
+    /* Skeleton markers affect envelope matrix selection, not local SRT. */
+    assert(melee_web_joint_transform(8 | 1 | 2 | 4, scale, rotation, translation,
+                                    NULL, &result, error, sizeof error));
+    expect_matrix(&result, expected);
+
     /* Y rotates positive X toward negative Z, before the positive Z turn. */
     const float yz_rotation[3] = {0, half_pi, half_pi};
     const float yz_expected[3][4] = {{0, -3, 0, 5}, {0, 0, 4, 6}, {-2, 0, 0, 7}};
@@ -92,7 +97,7 @@ static void check_rejections(void)
     MeleeWebJointTransform output;
     memset(&output, 0x5a, sizeof output);
     const MeleeWebJointTransform before = output;
-    const uint32_t unsupported[] = {1, 2, 4, 0x20, 0x200, 0x1000, 0x2000, 0x4000,
+    const uint32_t unsupported[] = {0x20, 0x200, 0x1000, 0x2000, 0x4000,
                                    0x8000, 0x20000, 0x200000, 0x800000, 0x1000000,
                                    0x2000000, 0x80000000};
     for (size_t i = 0; i < sizeof unsupported / sizeof unsupported[0]; ++i) {
@@ -168,6 +173,40 @@ static void check_normal_matrix(void)
     assert(memcmp(before, output, sizeof output) == 0);
 }
 
+static void check_inspection_depth_order(void)
+{
+    float projection[4][4];
+    char error[128];
+    const float extent = 10, dimension = 10, distance = 21;
+    assert(melee_web_inspection_projection(extent, dimension, distance,
+                                           projection, error, sizeof error));
+    assert(!error[0]);
+    assert(fabsf(projection[0][0] - .12f) < .00001f);
+    assert(fabsf(projection[1][1] - .16f) < .00001f);
+    // The camera sits on +Z. Front and rear overlapping surfaces must retain
+    // GX near=-1/far=0 ordering, before Aurora negates Z and maps LEQUAL to
+    // GEQUAL. The former positive-Z projection let the rear surface win.
+    const float front_view_z = -distance + dimension * .5f;
+    const float rear_view_z = -distance - dimension * .5f;
+    const float front_gx_z = projection[2][2] * front_view_z + projection[2][3];
+    const float rear_gx_z = projection[2][2] * rear_view_z + projection[2][3];
+    assert(front_gx_z < rear_gx_z && front_gx_z >= -1 && rear_gx_z <= 0);
+    assert(fabsf(front_gx_z + .9f) < .00001f && fabsf(rear_gx_z + .1f) < .00001f);
+    const float front_webgpu_depth = -front_gx_z, rear_webgpu_depth = -rear_gx_z;
+    assert(front_webgpu_depth > rear_webgpu_depth);
+    // Bounds too small to produce distinct float clipping planes must reject
+    // before the SDK assertion, preserving the previous usable projection.
+    float before[4][4];
+    memcpy(before, projection, sizeof before);
+    assert(!melee_web_inspection_projection(1e-30f, 1e-30f, 1,
+                                            projection, error, sizeof error));
+    assert(!melee_web_inspection_projection(0, dimension, distance,
+                                            projection, error, sizeof error));
+    assert(!melee_web_inspection_projection(10, FLT_MAX, FLT_MAX,
+                                            projection, error, sizeof error));
+    assert(memcmp(before, projection, sizeof before) == 0);
+}
+
 int main(void)
 {
     check_root_and_rotation_order();
@@ -175,6 +214,7 @@ int main(void)
     check_rejections();
     check_view_matrix_overflow();
     check_normal_matrix();
+    check_inspection_depth_order();
     puts("HSD original joint transform trace: passed");
     return 0;
 }

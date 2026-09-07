@@ -8,8 +8,8 @@
 namespace melee_web {
 namespace {
 constexpr uint32_t va_pos = 9, va_nrm = 10, va_tex0 = 13, va_tex7 = 20, va_null = 255;
-constexpr uint32_t index8 = 2, index16 = 3, type_s16 = 3, type_f32 = 4;
-constexpr size_t max_joints = 4096, max_meshes = 4096, max_packets = 65536, max_vertices = 1000000;
+constexpr uint32_t direct = 1, index8 = 2, index16 = 3, type_s16 = 3, type_f32 = 4;
+constexpr size_t max_joints = MELEE_WEB_SKIN_MAX_JOINTS, max_meshes = 4096, max_packets = 65536, max_vertices = 1000000;
 
 [[noreturn]] void reject(const char* reason) { throw DatError(reason); }
 
@@ -39,12 +39,57 @@ float component(const DatArchive& a, uint32_t base, uint32_t type, uint8_t frac)
     return result;
 }
 
+void envelopes(const DatArchive& a, uint32_t table, RigidMesh& mesh) {
+    const auto table_end = a.next_target_offset(table);
+    for (uint32_t slot = 0; slot <= MELEE_WEB_POBJ_MAX_PALETTE; ++slot) {
+        const auto pointer_slot = table + slot * 4;
+        if (pointer_slot > table_end || table_end - pointer_slot < 4)
+            reject("Unterminated envelope palette table");
+        const auto entry = a.pointer(pointer_slot, 8);
+        if (!entry) {
+            if (mesh.envelopes.empty()) reject("Envelope palette is empty");
+            return;
+        }
+        if (slot == MELEE_WEB_POBJ_MAX_PALETTE) reject("Envelope palette exceeds ten matrix slots");
+        if (*entry % 4) reject("Envelope descriptor is unaligned");
+        RigidEnvelope envelope;
+        envelope.descriptor_offset = *entry;
+        const auto end = a.next_target_offset(*entry);
+        bool terminated = false;
+        float total = 0;
+        for (uint32_t influence = 0; influence <= MELEE_WEB_POBJ_MAX_INFLUENCES; ++influence) {
+            const auto d = *entry + influence * 8;
+            if (d > end || end - d < 8) reject("Unterminated envelope influence array");
+            const auto joint = a.pointer(d, 64);
+            if (!joint) { terminated = true; break; }
+            if (influence == MELEE_WEB_POBJ_MAX_INFLUENCES)
+                reject("Envelope exceeds thirty-one joint influences");
+            if (*joint % 4) reject("Envelope joint reference is unaligned");
+            const auto weight = a.f32(d + 4);
+            if (!std::isfinite(weight) || weight < 0 || weight > 1)
+                reject("Envelope weight must be finite and between zero and one");
+            total += weight;
+            // Resolve descriptor offsets after the complete joint traversal.
+            envelope.influences.push_back({*joint, weight});
+        }
+        if (!terminated || envelope.influences.empty() || total <= 0)
+            reject("Envelope must contain a terminated, nonzero weighted influence list");
+        mesh.envelopes.push_back(std::move(envelope));
+    }
+}
+
 void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel& model) {
     (void) a.range(offset, 24);
     absent(a, offset, "Custom polygon classes are unsupported");
+    mesh.descriptor_offset = offset;
     mesh.flags = a.be16(offset + 12);
-    if (mesh.flags & ~uint16_t(0xC000)) reject("Skinned or shape-animated polygons are unsupported");
-    absent(a, offset + 20, "Referenced joints, envelopes and shape animation are unsupported");
+    // Bit zero is retained source metadata; HSD's primitive and setup paths
+    // ignore it. The type field selects rigid skin (0) or envelope (0x2000).
+    if (mesh.flags & ~uint16_t(0xE001)) reject("Unsupported polygon flags or shape animation");
+    if ((mesh.flags & 0x3000) == 0x2000)
+        envelopes(a, required(a, offset + 20, 4), mesh);
+    else
+        absent(a, offset + 20, "Shared-joint skinning is unsupported");
     const auto units = a.be16(offset + 14);
     if (!units) reject("Polygon display list is empty");
     mesh.display_bytes = uint32_t(units) * 32;
@@ -56,27 +101,39 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
         reject("Display list crosses another referenced data region");
     mesh.display = a.range(display, mesh.display_bytes).data();
     const auto descriptors = required(a, offset + 8, 24);
-    std::array<uint32_t, 10> array_offsets{}, maximum_index{}, widths{}, components{};
+    const auto descriptors_end = a.next_target_offset(descriptors);
+    std::array<uint32_t, MELEE_WEB_POBJ_MAX_ATTRIBUTES> array_offsets{}, maximum_index{}, widths{}, components{};
     mesh.minimum = {INFINITY, INFINITY, INFINITY};
     mesh.maximum = {-INFINITY, -INFINITY, -INFINITY};
     bool found_end = false;
-    for (uint32_t i = 0; i < 11; ++i) {
+    for (uint32_t i = 0; i <= MELEE_WEB_POBJ_MAX_ATTRIBUTES; ++i) {
         const auto d = descriptors + i * 24;
+        if (d > descriptors_end || descriptors_end - d < 24)
+            reject("Vertex descriptors cross another referenced data region");
         (void) a.range(d, 24);
         const auto attr = a.be32(d);
         if (attr == va_null) { found_end = true; break; }
         // Fixed ordering also establishes the byte layout of each vertex packet.
+        const bool matrix = attr <= 8;
         const bool uv = attr >= va_tex0 && attr <= va_tex7;
-        if ((i == 0 && attr != va_pos) || i == 10 ||
-            (attr != va_pos && attr != va_nrm && !uv) ||
+        if (i == MELEE_WEB_POBJ_MAX_ATTRIBUTES ||
+            (!matrix && attr != va_pos && attr != va_nrm && !uv) ||
             (i && attr <= mesh.attributes.back().attr))
-            reject("Only ordered POS, optional NRM and TEX0 through TEX7 descriptors are supported");
+            reject("Only ordered matrix indices, POS, NRM and TEX0 through TEX7 descriptors are supported");
         const auto mode = a.be32(d + 4), count = a.be32(d + 8), type = a.be32(d + 12);
         const auto frac = a.range(d + 16, 1)[0];
         const auto stride = a.be16(d + 18);
+        if (matrix) {
+            if (mesh.envelopes.empty() || mode != direct || stride != 0)
+                reject("Direct matrix indices require an envelope palette and zero array stride");
+            absent(a, d + 20, "Direct matrix indices cannot reference a vertex array");
+            mesh.attributes.push_back({attr, mode, count, type, frac, stride, nullptr, 0});
+            continue;
+        }
         if (mode != index8 && mode != index16) reject("Only indexed vertex attributes are supported");
         if (count != (attr == va_nrm ? 0u : 1u)) reject("Only XYZ position/normal and ST texture coordinates are supported");
-        if (type > type_f32 || (!uv && type != type_s16 && type != type_f32))
+        if (type > type_f32 || (!uv && type != type_s16 && type != type_f32 &&
+                                !(attr == va_nrm && type == 1)))
             reject("Unsupported vertex component format");
         if (frac > 31 || (type == type_f32 && frac != 0)) reject("Unsupported vertex fractional scale");
         components[i] = uv ? 2 : 3;
@@ -97,14 +154,37 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
         return std::any_of(mesh.attributes.begin(), mesh.attributes.end(),
                            [&](const auto& descriptor) { return descriptor.attr == attr; });
     };
-    if ((((mesh.material->render_mode & 7U) == 4U) || (mesh.material->render_mode & 8U)) &&
-        !has_attribute(va_nrm))
+    if (!has_attribute(va_pos)) reject("Position attribute is missing");
+    if (!mesh.envelopes.empty() && !has_attribute(0))
+        reject("Envelope geometry requires a position matrix index");
+    const bool lit = ((mesh.material->render_mode & 7U) == 4U) ||
+                     (mesh.material->render_mode & 8U);
+    if (lit && !has_attribute(va_nrm))
         reject("Diffuse or specular lighting requires normal coordinates");
+    // Original SetupEnvelopeModelMtx uploads normal matrices only when the
+    // owning JObj has LIGHTING. A lit material without it would consume stale
+    // GX state even with a valid normal vertex stream.
+    if (lit && !mesh.envelopes.empty() && !(model.joints[mesh.joint_index].flags & 0x80U))
+        reject("Lit envelope geometry requires its owning joint lighting flag");
     for (const auto& texture : mesh.material->textures) {
         if ((texture.source_flags & 15U) == 1) {
             if (!has_attribute(va_nrm)) reject("Reflection texture requires normal coordinates");
         } else if (!has_attribute(va_tex0 + texture.source - 4)) {
             reject("Texture requires a missing UV vertex source");
+        }
+    }
+    const bool reflection = std::any_of(mesh.material->textures.begin(), mesh.material->textures.end(),
+        [](const auto& texture) { return (texture.source_flags & 15U) == 1; });
+    if (!reflection) {
+        // HSD_TObjAssignResources assigns supported UV-only chains consecutive
+        // generator IDs starting at zero, regardless of source UV or map IDs.
+        // An active per-vertex texture matrix overrides GX_IDENTITY, but this
+        // envelope path uploads those matrices only for reflection. Otherwise
+        // it would read stale state. Attributes beyond active generators are
+        // unused and do not require a texture palette.
+        for (const auto& attr : mesh.attributes) {
+            if (attr.attr >= 1 && attr.attr <= 8 && attr.attr <= mesh.material->textures.size())
+                reject("Active indexed texture generator requires an uploaded reflection palette");
         }
     }
 
@@ -132,12 +212,21 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
             reject("Model exceeds primitive or vertex budget");
         model.submitted_vertices += count;
         for (uint32_t vertex = 0; vertex < count; ++vertex) {
+            uint32_t palette_slot = 0;
             for (size_t i = 0; i < mesh.attributes.size(); ++i) {
                 const auto& attr = mesh.attributes[i];
-                const size_t encoded = attr.attr_type == index8 ? 1 : 2;
+                const size_t encoded = attr.attr_type == index16 ? 2 : 1;
                 if (bytes.size() - cursor < encoded) reject("Truncated indexed vertex packet");
                 uint32_t index = bytes[cursor++];
                 if (encoded == 2) index = index * 256 + bytes[cursor++];
+                if (attr.attr <= 8) {
+                    const auto base = attr.attr == 0 ? 0U : 30U;
+                    if (index < base || (index - base) % 3 ||
+                        (index - base) / 3 >= mesh.envelopes.size())
+                        reject("Vertex matrix index is outside its loaded palette");
+                    if (attr.attr == 0) palette_slot = index / 3;
+                    continue;
+                }
                 maximum_index[i] = std::max(maximum_index[i], index);
                 const uint32_t width = widths[i];
                 const uint64_t location = uint64_t(array_offsets[i]) + uint64_t(index) * attr.stride;
@@ -149,18 +238,27 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
                     const auto value = component(a, uint32_t(location) + uint32_t(axis) * (width / components[i]),
                                                  attr.comp_type, attr.frac);
                     if (attr.attr == va_pos) {
+                        if (!mesh.envelopes.empty()) {
+                            auto& low = mesh.palette_minimum[palette_slot][axis];
+                            auto& high = mesh.palette_maximum[palette_slot][axis];
+                            if (!(mesh.palette_used_mask & (1U << palette_slot))) low = high = value;
+                            else { low = std::min(low, value); high = std::max(high, value); }
+                        }
                         mesh.minimum[axis] = std::min(mesh.minimum[axis], value);
                         mesh.maximum[axis] = std::max(mesh.maximum[axis], value);
                         model.minimum[axis] = std::min(model.minimum[axis], value);
                         model.maximum[axis] = std::max(model.maximum[axis], value);
                     }
                 }
+                if (attr.attr == va_pos && !mesh.envelopes.empty())
+                    mesh.palette_used_mask |= uint16_t(1U << palette_slot);
             }
         }
     }
     if (model.draw_packets == packets_before) reject("Polygon has no draw primitives");
     for (size_t i = 0; i < mesh.attributes.size(); ++i) {
         auto& attr = mesh.attributes[i];
+        if (attr.attr <= 8) continue;
         attr.byte_size = maximum_index[i] * uint32_t(attr.stride) + widths[i];
         (void) a.range(array_offsets[i], attr.byte_size);
     }
@@ -193,7 +291,7 @@ RigidModel::RigidModel(std::shared_ptr<const DatArchive> source, const std::stri
         node.flags = a.be32(joint + 4);
         // Ordinary Euler transforms and render metadata. Original HSD transform
         // code performs scale inheritance; special matrix/IK modes need more HSD.
-        if (node.flags & ~0x701D01D8u) reject("Joint flags require unsupported HSD behavior");
+        if (node.flags & ~0x701D01DFu) reject("Joint flags require unsupported HSD behavior");
         for (uint32_t axis = 0; axis < 3; ++axis) {
             node.rotation[axis] = a.f32(joint + 20 + 4 * axis);
             node.scale[axis] = a.f32(joint + 32 + 4 * axis);
@@ -201,7 +299,17 @@ RigidModel::RigidModel(std::shared_ptr<const DatArchive> source, const std::stri
             if (!std::isfinite(node.rotation[axis]) || !std::isfinite(node.scale[axis]) ||
                 !std::isfinite(node.translation[axis])) reject("Joint SRT values must be finite");
         }
-        absent(a, joint + 56, "Joint inverse matrices are unsupported");
+        if (const auto inverse = a.pointer(joint + 56, 48)) {
+            if (*inverse % 4 || a.next_target_offset(*inverse) - *inverse < 48)
+                reject("Joint inverse bind matrix is unaligned or crosses a referenced region");
+            std::array<float, 12> matrix;
+            for (uint32_t element = 0; element < matrix.size(); ++element) {
+                matrix[element] = a.f32(*inverse + 4 * element);
+                if (!std::isfinite(matrix[element]) || std::abs(matrix[element]) > 1000000.F)
+                    reject("Joint inverse bind matrix must be finite and bounded");
+            }
+            node.inverse_bind = matrix;
+        }
         absent(a, joint + 60, "Joint references are unsupported");
         const auto joint_index = uint32_t(joints.size());
         joints.push_back(node);
@@ -212,8 +320,9 @@ RigidModel::RigidModel(std::shared_ptr<const DatArchive> source, const std::stri
         std::set<uint32_t> objects;
         auto dobj = a.pointer(joint + 16, 16);
         while (dobj) {
-            if (*dobj % 4 || !objects.insert(*dobj).second || objects.size() > max_meshes)
+            if (*dobj % 4 || !objects.insert(*dobj).second || dobj_count >= max_meshes)
                 reject("Cyclic, unaligned or oversized display-object chain");
+            const auto dobj_index = dobj_count++;
             absent(a, *dobj, "Custom display-object classes are unsupported");
             const auto mat = required(a, *dobj + 8, 24);
             auto cached = material_cache.find(mat);
@@ -235,6 +344,7 @@ RigidModel::RigidModel(std::shared_ptr<const DatArchive> source, const std::stri
                     reject("Cyclic, unaligned or oversized polygon chain");
                 RigidMesh mesh;
                 mesh.joint_index = joint_index;
+                mesh.dobj_index = dobj_index;
                 mesh.material = cached->second;
                 geometry(a, *pobj, mesh, *this);
                 meshes.push_back(std::move(mesh));
@@ -245,5 +355,34 @@ RigidModel::RigidModel(std::shared_ptr<const DatArchive> source, const std::stri
     }
     if (meshes.empty() || !draw_packets)
         reject("Model has no draw primitives");
+    std::map<uint32_t, uint32_t> joint_indices;
+    for (uint32_t index = 0; index < joints.size(); ++index)
+        joint_indices.emplace(joints[index].descriptor_offset, index);
+    for (auto& mesh : meshes) {
+        if (mesh.envelopes.empty()) continue;
+        const auto& owner = joints[mesh.joint_index];
+        // _HSD_mkEnvelopeModelNodeMtx requires a skeleton ancestor unless the
+        // owning node is itself the skeleton root.
+        if (!(owner.flags & 2U)) {
+            auto ancestor = mesh.joint_index;
+            while (ancestor != RigidJoint::no_parent && !(joints[ancestor].flags & 3U))
+                ancestor = joints[ancestor].parent;
+            if (ancestor == RigidJoint::no_parent)
+                reject("Envelope model has no skeleton ancestor");
+            if (!(joints[ancestor].flags & 2U) && !joints[ancestor].inverse_bind)
+                reject("Envelope skeleton ancestor requires an inverse bind matrix");
+        }
+        for (auto& envelope : mesh.envelopes) {
+            const bool inverse_required = !(owner.flags & 2U) ||
+                envelope.influences.front().weight < 1.F - std::numeric_limits<float>::epsilon();
+            for (auto& influence : envelope.influences) {
+                const auto found = joint_indices.find(influence.joint);
+                if (found == joint_indices.end()) reject("Envelope references a joint outside the selected model");
+                influence.joint = found->second;
+                if (inverse_required && !joints[influence.joint].inverse_bind)
+                    reject("Weighted envelope joint requires an inverse bind matrix");
+            }
+        }
+    }
 }
 }

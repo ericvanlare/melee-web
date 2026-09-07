@@ -65,6 +65,9 @@ class DatTextureTests(unittest.TestCase):
     def test_pointer_alignment_missing_content_and_referenced_regions(self):
         self.run_case("pointers_and_region_bounds")
 
+    def test_inactive_tev_semantics_active_rejection_and_descriptor_bounds(self):
+        self.run_case("inactive_tev_descriptors")
+
 
 if __name__ == "__main__":
     unittest.main()

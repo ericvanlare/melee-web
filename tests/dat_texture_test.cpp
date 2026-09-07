@@ -327,6 +327,32 @@ void unsupported_graphs_and_transforms()
     }
 }
 
+void inactive_tev_descriptors()
+{
+    Fixture fixture;
+    constexpr std::uint32_t tev = Fixture::palette;
+    fixture.link(Fixture::tobj + 88, tev);
+    // Disabled source expression bytes may contain enum-looking values; HSD
+    // does not interpret them when active==0. Preserve descriptor identity.
+    std::fill_n(fixture.data.begin() + tev, 28, 0xff);
+    const auto result = fixture.read();
+    check(result.second.inactive_tev_descriptor_offset == tev &&
+          result.second.source_flags == 0x30010,
+          "inactive custom expression retains identity and standard source behavior");
+    for (const auto active : {1U, 0x40000000U, 0x80000000U, 0xffffffffU}) {
+        put32(fixture.data, tev + 28, active);
+        rejects([&] { (void) fixture.read(); });
+    }
+    put32(fixture.data, tev + 28, 0);
+    fixture.link(Fixture::tobj + 88, static_cast<std::uint32_t>(fixture.data.size() - 28));
+    rejects([&] { (void) fixture.read(); });
+    fixture.link(Fixture::tobj + 88, tev + 1);
+    rejects([&] { (void) fixture.read(); });
+    fixture.link(Fixture::tobj + 88, tev);
+    fixture.link(Fixture::tobj + 84, tev + 16); // A referenced region truncates TEV.
+    rejects([&] { (void) fixture.read(); });
+}
+
 void reflection_srt_and_chains()
 {
     Fixture fixture;
@@ -439,6 +465,7 @@ int main(int argc, char** argv)
         {"palette_indices", palette_indices}, {"lod_sampler", lod_sampler},
         {"operations_and_modes", operations_and_modes},
         {"reflection_srt_and_chains", reflection_srt_and_chains},
+        {"inactive_tev_descriptors", inactive_tev_descriptors},
         {"unsupported_graphs_and_transforms", unsupported_graphs_and_transforms},
         {"dimensions_and_finite_values", dimensions_and_finite_values},
         {"pointers_and_region_bounds", pointers_and_region_bounds},

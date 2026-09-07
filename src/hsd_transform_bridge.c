@@ -43,13 +43,37 @@ static int reject(char* error, size_t error_size, const char* reason)
     return 0;
 }
 
+int melee_web_inspection_projection(float extent, float maximum_dimension,
+    float distance, float output[4][4], char* error, size_t error_size)
+{
+    if (error && error_size) error[0] = 0;
+    if (!output || !isfinite(extent) || extent <= 0 ||
+        !isfinite(maximum_dimension) || maximum_dimension <= 0 ||
+        !isfinite(distance) || distance <= 0)
+        return reject(error, error_size, "Invalid inspection projection dimensions");
+    const float x_half = extent / 1.2f, y_half = extent / 1.6f;
+    const float near_plane = distance - maximum_dimension * 0.625f;
+    const float far_plane = distance + maximum_dimension * 0.625f;
+    if (x_half <= 0 || y_half <= 0 || !isfinite(near_plane) ||
+        !isfinite(far_plane) || near_plane < 0 || near_plane >= far_plane)
+        return reject(error, error_size, "Invalid inspection projection clipping planes");
+    Mtx44 result;
+    C_MTXOrtho(result, y_half, -y_half, -x_half, x_half, near_plane, far_plane);
+    for (size_t row = 0; row < 4; ++row) for (size_t column = 0; column < 4; ++column)
+        if (!isfinite(result[row][column]))
+            return reject(error, error_size, "Inspection projection computation produced a nonfinite value");
+    memcpy(output, result, sizeof(result));
+    return 1;
+}
+
 int melee_web_joint_transform(uint32_t flags, const float scale[3],
                               const float rotation[3], const float translation[3],
                               const MeleeWebJointTransform* parent,
                               MeleeWebJointTransform* output,
                               char* error, size_t error_size)
 {
-    const uint32_t allowed_flags = JOBJ_CLASSICAL_SCALE | JOBJ_HIDDEN |
+    const uint32_t allowed_flags = JOBJ_SKELETON | JOBJ_SKELETON_ROOT | JOBJ_ENVELOPE_MODEL |
+        JOBJ_CLASSICAL_SCALE | JOBJ_HIDDEN |
         JOBJ_MTX_DIRTY | JOBJ_LIGHTING | JOBJ_TEXGEN | JOBJ_SPECULAR |
         JOBJ_OPA | JOBJ_XLU | JOBJ_TEXEDGE | JOBJ_ROOT_MASK;
     if (error != NULL && error_size != 0) {

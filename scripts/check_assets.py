@@ -3,6 +3,7 @@
 
 Pass explicit DAT paths or one directory (nonrecursive .dat/.usd selection).
 Every public root is attempted as an HSD joint; other root types can be rejected.
+Use --symbol to select one known model root without attempting other root types.
 Textures counts distinct TObj descriptors. Exit 1 means a parser rejection or
 input error; exit 2 means the compiler/checking process could not complete.
 """
@@ -21,6 +22,7 @@ ROOT = Path(__file__).resolve().parents[1]
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("paths", nargs="+", type=Path)
+    parser.add_argument("--symbol", help="check only this exact public model symbol")
     args = parser.parse_args()
     paths = args.paths
     if len(paths) == 1 and paths[0].is_dir():
@@ -51,7 +53,8 @@ def main():
             return 2
         status = 0
         for path in paths:
-            result = subprocess.run([str(binary), str(path)], capture_output=True, timeout=60)
+            command = [str(binary), str(path)] + ([args.symbol] if args.symbol else [])
+            result = subprocess.run(command, capture_output=True, timeout=60)
             if result.returncode not in (0, 1):
                 sys.stderr.buffer.write(result.stderr)
                 return 2

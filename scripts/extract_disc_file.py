@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Extract one user-selected file from a local Melee 1.02 ISO/GCM/CISO.
+"""Extract one user-selected file or byte range from a local Melee 1.02 ISO/GCM/CISO.
 
 The image is opened read-only. Output must be explicitly placed in the ignored
 assets-local directory. This is an asset preparation tool, not an emulator.
@@ -182,8 +182,13 @@ class DiscImage:
         return result
 
 
-def extract_file(image: Path, disc_path: str, output: Path, *, assets_root: Path = ROOT / "assets-local") -> DiscFile:
-    """Extract exactly one file without overwriting existing output."""
+def extract_file(image: Path, disc_path: str, output: Path, *, offset: int = 0,
+                 length: int | None = None, assets_root: Path = ROOT / "assets-local") -> DiscFile:
+    """Extract a nonempty file-relative range without overwriting output.
+
+    The returned DiscFile describes the selected range's absolute disc offset
+    and byte length. Omitting both range options selects the complete file.
+    """
     relative_disc_path(disc_path)
     destination = output.resolve()
     allowed = assets_root.resolve()
@@ -193,8 +198,16 @@ def extract_file(image: Path, disc_path: str, output: Path, *, assets_root: Path
         selected = disc.files().get(disc_path)
         if selected is None:
             raise DiscFormatError(f"disc file was not found: {disc_path}")
-        if selected.size > MAX_EXTRACT_SIZE:
-            raise DiscFormatError("selected file exceeds the 64 MiB extraction limit")
+        if offset < 0 or offset > selected.size:
+            raise DiscFormatError("selected byte range is outside the disc file")
+        size = selected.size - offset if length is None else length
+        if size <= 0:
+            raise DiscFormatError("selected byte range length must be positive")
+        if size > selected.size - offset:
+            raise DiscFormatError("selected byte range is outside the disc file")
+        if size > MAX_EXTRACT_SIZE:
+            raise DiscFormatError("selected byte range exceeds the 64 MiB extraction limit")
+        selected = DiscFile(selected.path, selected.offset + offset, size)
         data = disc.read(selected.offset, selected.size)
     destination.parent.mkdir(parents=True, exist_ok=True)
     # Exclusive creation protects an existing extracted file from replacement.
@@ -213,13 +226,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("image", type=Path, help="local GALE01 1.02 ISO, GCM, or Wii-style CISO")
     parser.add_argument("disc_path", help="exact case-sensitive relative disc path, for example TyTarget.dat")
     parser.add_argument("--output", required=True, type=Path, help="new file inside this repository's assets-local directory")
+    parser.add_argument("--offset", type=lambda value: int(value, 0), default=0,
+                        help="file-relative starting byte (decimal or 0x-prefixed; default: 0)")
+    parser.add_argument("--length", type=lambda value: int(value, 0),
+                        help="number of bytes to extract (default: rest of selected file)")
     args = parser.parse_args(argv)
     try:
-        selected = extract_file(args.image, args.disc_path, args.output)
+        selected = extract_file(args.image, args.disc_path, args.output,
+                                offset=args.offset, length=args.length)
         digest = hashlib.sha256(args.output.read_bytes()).hexdigest()
     except (OSError, ValueError) as exc:
         parser.exit(1, f"Extraction failed: {exc}\n")
-    print(f"Extracted {selected.path}: {selected.size} bytes; SHA-256 {digest}")
+    print(f"Extracted {selected.path} file bytes [{args.offset}, {args.offset + selected.size}): "
+          f"{selected.size} bytes; SHA-256 {digest}")
     return 0
 
 

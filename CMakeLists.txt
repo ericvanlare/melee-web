@@ -49,9 +49,13 @@ endif()
 add_library(hsd_state STATIC .deps/melee/src/sysdolphin/baselib/state.c src/hsd_pobj_bridge.c
   src/hsd_transform_bridge.c src/hsd_material_bridge.c src/hsd_host_support.c
   src/hsd_inspection_camera.c src/hsd_inspection_lights.c
+  src/hsd_animation_bridge.c
   .deps/melee/src/sysdolphin/baselib/mtx.c .deps/melee/src/sysdolphin/baselib/mobj.c
   .deps/melee/src/sysdolphin/baselib/texp.c .deps/melee/src/sysdolphin/baselib/texpdag.c
-  .deps/melee/src/sysdolphin/baselib/tev.c .deps/melee/src/sysdolphin/baselib/util.c)
+  .deps/melee/src/sysdolphin/baselib/tev.c .deps/melee/src/sysdolphin/baselib/util.c
+  .deps/melee/src/sysdolphin/baselib/displayfunc.c .deps/melee/src/sysdolphin/baselib/perf.c
+  .deps/melee/src/sysdolphin/baselib/aobj.c .deps/melee/src/sysdolphin/baselib/fobj.c
+  .deps/melee/src/sysdolphin/baselib/spline.c)
 target_include_directories(hsd_state PRIVATE .deps/melee/src .deps/aurora/include)
 target_compile_definitions(hsd_state PRIVATE TARGET_PC)
 target_compile_options(hsd_state PRIVATE -ffunction-sections -fdata-sections
@@ -59,7 +63,7 @@ target_compile_options(hsd_state PRIVATE -ffunction-sections -fdata-sections
 
 add_executable(gx_probe src/gx_probe.c src/hsd_probe.c src/dat_archive.cpp
   src/rigid_model.cpp src/asset_scene.cpp src/dat_texture.cpp src/dat_material.cpp
-  src/hsd_material.cpp src/browser_input.cpp)
+  src/hsd_material.cpp src/browser_input.cpp src/dat_animation.cpp src/dat_fighter.cpp src/hsd_animation_bridge.cpp)
 target_include_directories(gx_probe PRIVATE .deps/melee/src)
 target_link_libraries(gx_probe PRIVATE hsd_state)
 target_link_libraries(gx_probe PRIVATE aurora::core aurora::gx aurora::main aurora::vi aurora::mtx aurora::pad)
@@ -70,6 +74,6 @@ if(EMSCRIPTEN)
     -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=134217728
     -sSTACK_SIZE=8388608 -sASSERTIONS=1
     -sEXPORTED_RUNTIME_METHODS=FS,HEAPU8,UTF8ToString -sEXIT_RUNTIME=0
-    -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_melee_web_asset_clear,_melee_web_asset_open,_melee_web_asset_symbol,_melee_web_asset_select,_melee_web_asset_message,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_message)
+    -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_melee_web_asset_clear,_melee_web_asset_open,_melee_web_asset_symbol,_melee_web_asset_select,_melee_web_asset_message,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_message,_melee_web_asset_animation_open,_melee_web_asset_animation_play,_melee_web_asset_animation_playing,_melee_web_asset_animation_loaded,_melee_web_asset_animation_visible,_melee_web_asset_animation_message,_melee_web_asset_fighter_open,_melee_web_asset_fighter_message)
   configure_file(web/index.html index.html COPYONLY)
 endif()

@@ -78,6 +78,9 @@ static void tick(void)
         if (event->type == AURORA_EXIT) exiting = 1;
     }
     melee_web_input_poll();
+#ifdef __EMSCRIPTEN__
+    melee_web_asset_tick(started);
+#endif
     if (exiting) {
 #ifdef __EMSCRIPTEN__
         emscripten_cancel_main_loop();

@@ -1,6 +1,9 @@
 """Disc boundary tests use authored bytes, never extracted game content."""
 
 import importlib.util
+import contextlib
+import hashlib
+import io
 from pathlib import Path
 import struct
 import sys
@@ -68,9 +71,10 @@ class DiscExtractTests(unittest.TestCase):
         path.write_bytes(data)
         return path
 
-    def extract(self, source, path="models/target.dat", output=None):
+    def extract(self, source, path="models/target.dat", output=None, **range_options):
         return disc_extract.extract_file(
             source, path, self.output if output is None else output, assets_root=self.assets,
+            **range_options,
         )
 
     def test_raw_image_exact_selection_and_source_preserved(self):
@@ -223,6 +227,58 @@ class DiscExtractTests(unittest.TestCase):
             with self.assertRaisesRegex(disc_extract.DiscFormatError, "extraction limit"):
                 self.extract(source)
         self.assertFalse(self.assets.exists())
+
+    def test_selected_slice_and_default_remainder(self):
+        data = sparse_ciso(raw_image())
+        source = self.image(data)
+        selected = self.extract(source, offset=4, length=9)
+        self.assertEqual(selected, disc_extract.DiscFile("models/target.dat", PAYLOAD_OFFSET + 4, 9))
+        self.assertEqual(self.output.read_bytes(), PAYLOAD[4:13])
+        tail = self.assets / "tail.dat"
+        selected = self.extract(source, output=tail, offset=13)
+        self.assertEqual(selected.size, len(PAYLOAD) - 13)
+        self.assertEqual(tail.read_bytes(), PAYLOAD[13:])
+        self.assertEqual(source.read_bytes(), data)
+        with self.assertRaises(FileExistsError):
+            self.extract(source, offset=1, length=2)
+        self.assertEqual(self.output.read_bytes(), PAYLOAD[4:13])
+
+    def test_rejects_negative_empty_and_out_of_file_segments(self):
+        source = self.image(raw_image())
+        for options in [
+            {"offset": -1}, {"length": -1}, {"length": 0},
+            {"offset": len(PAYLOAD)}, {"offset": len(PAYLOAD) + 1},
+            {"offset": len(PAYLOAD), "length": 1},
+            {"offset": 1, "length": len(PAYLOAD)},
+        ]:
+            with self.subTest(options=options):
+                with self.assertRaises(disc_extract.DiscFormatError):
+                    self.extract(source, **options)
+        self.assertFalse(self.assets.exists())
+
+    def test_segment_cap_applies_to_selected_bytes_not_whole_file(self):
+        source = self.image(raw_image())
+        with patch.object(disc_extract, "MAX_EXTRACT_SIZE", 8):
+            with self.assertRaisesRegex(disc_extract.DiscFormatError, "extraction limit"):
+                self.extract(source, offset=1, length=9)
+            self.assertFalse(self.assets.exists())
+            self.extract(source, offset=1, length=8)
+        self.assertEqual(self.output.read_bytes(), PAYLOAD[1:9])
+
+    def test_cli_reports_file_relative_selected_range_and_digest(self):
+        source = self.image(raw_image())
+        extract_file = disc_extract.extract_file
+        def extract_local(image, disc_path, output, **options):
+            return extract_file(image, disc_path, output, assets_root=self.assets, **options)
+        report = io.StringIO()
+        with patch.object(disc_extract, "extract_file", side_effect=extract_local):
+            with contextlib.redirect_stdout(report):
+                self.assertEqual(disc_extract.main([
+                    str(source), "models/target.dat", "--output", str(self.output),
+                    "--offset", "0x4", "--length", "9",
+                ]), 0)
+        self.assertIn("file bytes [4, 13): 9 bytes", report.getvalue())
+        self.assertIn(hashlib.sha256(PAYLOAD[4:13]).hexdigest(), report.getvalue())
 
 
 if __name__ == "__main__":

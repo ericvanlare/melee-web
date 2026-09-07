@@ -3,27 +3,41 @@
  * These doubles are confined to this test executable. */
 #include "hsd_pobj_bridge.h"
 #include <dolphin/gx.h>
+#include <sysdolphin/baselib/jobj.h>
+#include <sysdolphin/baselib/tobj.h>
 #include <assert.h>
+#include <float.h>
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
 static const MeleeWebPObjView* expected;
 static unsigned arrays, descriptors, formats, clears, lists, culls;
 static unsigned total_calls;
+static unsigned position_loads, normal_loads, texture_loads;
+static const MeleeWebPObjPalette* expected_palette;
+// Original TObjSetup owns this source context; only the fixture is hydrated here.
+extern HSD_TObj* tobj_head;
+
+static const MeleeWebPObjAttribute* expected_attribute(GXAttr attr) {
+    for (unsigned i = 0; i < expected->attribute_count; ++i)
+        if (expected->attributes[i].attr == attr) return &expected->attributes[i];
+    assert(0);
+    return NULL;
+}
 
 void GXClearVtxDesc(void) { ++clears; ++total_calls; }
 void GXSetVtxDesc(GXAttr attr, GXAttrType type) {
-    assert(attr == expected->attributes[descriptors % 2].attr);
-    assert(type == expected->attributes[descriptors % 2].attr_type);
+    assert(type == expected_attribute(attr)->attr_type);
     ++descriptors; ++total_calls;
 }
 void GXSetVtxAttrFmt(GXVtxFmt fmt, GXAttr attr, GXCompCnt cnt, GXCompType type, u8 frac) {
-    const MeleeWebPObjAttribute* a = &expected->attributes[formats % 2];
+    const MeleeWebPObjAttribute* a = expected_attribute(attr);
     assert(fmt == GX_VTXFMT0 && attr == a->attr && cnt == a->comp_cnt && type == a->comp_type && frac == a->frac);
     ++formats; ++total_calls;
 }
 void GXSetArray(GXAttr attr, const void* data, u32 size, u8 stride, bool le) {
-    const MeleeWebPObjAttribute* a = &expected->attributes[arrays % 2];
+    const MeleeWebPObjAttribute* a = expected_attribute(attr);
     assert(attr == a->attr && data == a->data && size == a->byte_size && stride == a->stride && !le);
     ++arrays; ++total_calls;
 }
@@ -33,6 +47,23 @@ void GXSetCullMode(GXCullMode mode) {
 void GXCallDisplayList(const void* data, u32 size) {
     assert(data == expected->display && size == expected->display_byte_size);
     ++lists; ++total_calls;
+}
+void GXSetCurrentMtx(u32 id) { assert(id == GX_PNMTX0); ++total_calls; }
+void GXLoadPosMtxImm(const void* matrix, u32 id) {
+    assert(expected_palette && id / 3 < expected_palette->count && id % 3 == 0);
+    assert(memcmp(matrix, expected_palette->position[id / 3], sizeof(Mtx)) == 0);
+    ++position_loads; ++total_calls;
+}
+void GXLoadNrmMtxImm(const void* matrix, u32 id) {
+    assert(expected_palette && id / 3 < expected_palette->count && id % 3 == 0);
+    assert(memcmp(matrix, expected_palette->normal[id / 3], sizeof(Mtx)) == 0);
+    ++normal_loads; ++total_calls;
+}
+void GXLoadTexMtxImm(const void* matrix, u32 id, GXTexMtxType type) {
+    assert(expected_palette && id >= GX_TEXMTX0 && type == GX_MTX3x4);
+    assert((id - GX_TEXMTX0) / 3 < expected_palette->count);
+    assert(memcmp(matrix, expected_palette->texture[(id - GX_TEXMTX0) / 3], sizeof(Mtx)) == 0);
+    ++texture_loads; ++total_calls;
 }
 
 int main(void) {
@@ -79,6 +110,77 @@ int main(void) {
     view.flags = 0xc000;
     assert(melee_web_pobj_draw(&view, error, sizeof error));
     assert(before == total_calls);
+
+    // The source's single-influence root path uses world directly; weighted
+    // envelopes use world times inverse bind before blending and the camera.
+    MeleeWebSkinJoint joints[3] = {0};
+    const float identity[3][4] = {{1,0,0,0},{0,1,0,0},{0,0,1,0}};
+    for (unsigned i = 0; i < 3; ++i) {
+        joints[i].parent = i ? 0 : UINT32_MAX;
+        joints[i].flags = JOBJ_LIGHTING | (i ? JOBJ_SKELETON : JOBJ_SKELETON_ROOT);
+        joints[i].has_inverse_bind = 1;
+        memcpy(joints[i].world, identity, sizeof identity);
+        memcpy(joints[i].inverse_bind, identity, sizeof identity);
+    }
+    joints[1].world[0][3] = 10;
+    joints[1].inverse_bind[0][3] = -8;
+    joints[2].world[0][3] = 20;
+    joints[2].inverse_bind[0][3] = -12;
+    MeleeWebSkinSkeleton* skeleton = melee_web_skin_create(joints, 3, error, sizeof error);
+    assert(skeleton && !error[0]);
+    const MeleeWebSkinInfluence single[] = {{1, 1}};
+    const MeleeWebSkinInfluence blended[] = {{1, .25f}, {2, .75f}};
+    const MeleeWebSkinEnvelope envelopes[] = {{single, 1}, {blended, 2}};
+    MeleeWebPObjPalette palette;
+    HSD_TObj reflection = {.flags = TEX_COORD_REFLECTION};
+    tobj_head = &reflection;
+    assert(melee_web_pobj_prepare_palette(skeleton, 0, envelopes, 2, identity, 4,
+                                          &palette, error, sizeof error));
+    assert(palette.count == 2 && palette.normal_mask == 3 && palette.texture_mask == 3);
+    assert(palette.position[0][0][3] == 10 && palette.position[1][0][3] == 6.5f);
+    assert(palette.normal[0][0][0] == 1 && palette.normal[1][0][3] == 0);
+    assert(before == total_calls); // preparation does not mutate GX.
+    // Non-root skeleton ownership applies the original model-node right matrix.
+    assert(melee_web_pobj_prepare_palette(skeleton, 1, envelopes, 2, identity, 4,
+                                          &palette, error, sizeof error));
+    assert(palette.position[0][0][3] == 10 && palette.position[1][0][3] == 14.5f);
+    assert(melee_web_pobj_prepare_palette(skeleton, 0, envelopes, 2, identity, 4,
+                                          &palette, error, sizeof error));
+
+    MeleeWebPObjAttribute skin_attributes[] = {
+        {GX_VA_PNMTXIDX, GX_DIRECT, 0, GX_F32, 0, 0, NULL, 0},
+        attributes[0], attributes[1],
+    };
+    view = (MeleeWebPObjView){skin_attributes, 3, display, sizeof display, 0xa000};
+    expected_palette = &palette;
+    assert(melee_web_pobj_draw_palette(&view, &palette, error, sizeof error));
+    assert(position_loads == 2 && normal_loads == 2 && texture_loads == 2);
+
+    joints[1].world[0][3] = 12;
+    assert(melee_web_skin_update(skeleton, joints, 3, error, sizeof error));
+    assert(melee_web_pobj_prepare_palette(skeleton, 0, envelopes, 2, identity, 4,
+                                          &palette, error, sizeof error));
+    assert(palette.position[0][0][3] == 12 && palette.position[1][0][3] == 7);
+    joints[1].parent = 2; // bad replacement must leave the previous pose intact.
+    assert(!melee_web_skin_update(skeleton, joints, 3, error, sizeof error));
+    assert(melee_web_pobj_prepare_palette(skeleton, 0, envelopes, 2, identity, 4,
+                                          &palette, error, sizeof error));
+    assert(palette.position[0][0][3] == 12);
+    joints[1].parent = 0;
+    joints[1].world[0][0] = FLT_MAX;
+    joints[1].inverse_bind[0][0] = 2;
+    assert(melee_web_skin_update(skeleton, joints, 3, error, sizeof error));
+    MeleeWebPObjPalette unchanged = palette;
+    assert(!melee_web_pobj_prepare_palette(skeleton, 0, envelopes, 2, identity, 4,
+                                           &palette, error, sizeof error));
+    assert(memcmp(&unchanged, &palette, sizeof palette) == 0 && strstr(error, "nonfinite"));
+    tobj_head = NULL;
+    melee_web_skin_destroy(skeleton);
+    // Referencing only index0 needs its components, not unused stride padding.
+    attributes[0].stride = 12;
+    attributes[0].byte_size = 6;
+    view = (MeleeWebPObjView){attributes, 2, display, sizeof display, 0x8000};
+    assert(melee_web_pobj_draw(&view, error, sizeof error));
     puts("HSD original PObj bridge trace: passed");
     return 0;
 }
