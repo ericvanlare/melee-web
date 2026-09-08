@@ -14,6 +14,21 @@ the reference machine. The smaller gates below are checkpoints, not completion.
 
 ## Active integration
 
+- A fresh-origin stock run without persisted application pipelines passed at
+  32.46 ms worst interval with no audio underruns; Cape, Super Jump Punch and
+  Tornado also stayed below 33.3 ms. The browser driver cache was not reset.
+  A longer run after fireballs reproduced four gaps (74.58 ms worst) around
+  tick 3,740, with zero texture upload/new pipelines and 64 audio-underrun frames.
+  The first prior frame spent 49.715 ms in end-frame; later gaps exceeded native
+  work. No further long frames appeared through tick 21,188. This does not prove
+  that first-use stalls are solved, and does not justify speculative texture
+  warmup. An opt-in queue-completion sampler now distinguishes asynchronous
+  queue/callback latency from native frame work; it is not GPU execution timing.
+  Its isolated stock check passed at 1,985 ticks: 17.81 ms worst interval, zero
+  long frames/underruns, and 33 successful queue samples (15.83 ms p95, 16.68 ms
+  worst). Enable/disable, unload and restart discard stale samples correctly.
+  All 237 regression tests and the Release browser build pass.
+
 - Direct browser ISO/GCM/CISO import validates GALE01 revision 2 and the original
   executable, selects the English audio paths, extracts the font from that
   executable, and generates Dolphin's free replacement DSP coefficients.

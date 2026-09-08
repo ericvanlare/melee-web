@@ -65,6 +65,11 @@ through the normal GX path, independent of match simulation and imported game
 assets. Aurora currently exposes CPU pipeline-queue drainage but no browser GPU
 completion boundary; a future preparation gate must account for that distinction.
 The local persisted cache is useful evidence, not a universal first-visit fix.
+Runtime diagnostics can sample queue-completion callback latency at most once per
+60 submitted frames, with only one sample outstanding. Sampling is off by default,
+never waits for the GPU, and drops prior-match results on restart. Its latency
+includes browser callback scheduling; compare it with CPU phases and long tasks
+rather than treating it as a GPU timer.
 
 ## 2 — Complete versus loop
 

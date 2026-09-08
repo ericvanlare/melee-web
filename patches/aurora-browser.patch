@@ -120,10 +120,63 @@ index e1feaca..5051b3e 100644
      target_link_libraries(imgui_backends PRIVATE imgui ${AURORA_SDL3_TARGET} dawn::webgpu_dawn)
      target_link_libraries(imgui PUBLIC imgui_backends)
 diff --git a/lib/aurora.cpp b/lib/aurora.cpp
-index 9430842..ef51e7c 100644
 --- a/lib/aurora.cpp
 +++ b/lib/aurora.cpp
-@@ -380,7 +380,12 @@ void end_frame() noexcept {
+@@ -1,5 +1,9 @@
+ #include <aurora/aurora.h>
+ #include <aurora/time.hpp>
++
++#ifdef __EMSCRIPTEN__
++#include <emscripten.h>
++#endif
+ 
+ #ifdef AURORA_ENABLE_GX
+ #include "gfx/resources.hpp"
+@@ -44,6 +48,33 @@
+ using webgpu::g_device;
+ using webgpu::g_queue;
+ using webgpu::g_surface;
++
++#ifdef __EMSCRIPTEN__
++// Opt-in observation only: never wait for the queue or retain gameplay objects.
++// Latency includes GPU work and browser callback scheduling, not GPU time alone.
++void sample_browser_queue() {
++  static uint32_t submitFrame = 0;
++  static bool pending = false;
++  ++submitFrame;
++  if (pending || submitFrame % 60 != 0) return;
++  const int token = EM_ASM_INT({
++    return window.runtimeGPUProbeRequest ? window.runtimeGPUProbeRequest() : 0;
++  });
++  if (!token) return;
++  pending = true;
++  const double started = emscripten_get_now();
++  g_queue.OnSubmittedWorkDone(wgpu::CallbackMode::AllowSpontaneous,
++      [token, frame = submitFrame, started](wgpu::QueueWorkDoneStatus status, wgpu::StringView) {
++        pending = false;
++        EM_ASM({
++          if (window.runtimeGPUProbeResult) window.runtimeGPUProbeResult({
++            token:$0, submit_frame:$1, latency_ms:$2, status:$3, success:!!$4
++          });
++        }, token, frame, emscripten_get_now() - started, static_cast<int>(status),
++           status == wgpu::QueueWorkDoneStatus::Success);
++      });
++}
++#endif
+ 
+ uint32_t clamp_scissor_coord(double value, uint32_t maximum) noexcept {
+   if (!std::isfinite(value)) {
+@@ -372,6 +403,9 @@
+     {
+       ZoneScopedN("Queue Submit");
+       g_queue.Submit(1, &buffer);
++#ifdef __EMSCRIPTEN__
++      sample_browser_queue();
++#endif
+     }
+     webgpu::gpu_prof::after_submit();
+     if (canPresent && g_surface) {
+@@ -380,7 +414,12 @@
        {
          window::SurfaceLock surfaceLock;
          if (window::is_presentable()) {

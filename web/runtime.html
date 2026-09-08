@@ -15,11 +15,20 @@
 <p id="score" aria-live="off"></p>
 <p id="metrics">No match loaded.</p>
 <p id="audio-metrics">Audio output is not initialized.</p>
-<details><summary>Runtime diagnostics</summary><label>Developer: extracted files <input id="files" type="file" webkitdirectory multiple></label><label>Special move <select id="combat-kind"><option value="0">Fireball</option><option value="1">Cape</option><option value="2">Super Jump Punch</option><option value="3">Mario Tornado</option></select></label><button id="combat-check" disabled>Restart + combat check</button><p>Diagnostic only: restarts this match, then supplies ground and air special inputs for four to eight seconds.</p><button id="stock-check" disabled>Restart + stock check</button><p>Diagnostic only: uses movement and jump inputs to test four stock losses and three respawns, then the original match outcome.</p><label>Test delay <select id="delay-ms"><option value="200">200 ms</option><option value="800">800 ms</option></select></label><button id="delay-check">Inject frame delay</button><p>Diagnostic only: blocks one browser callback to check bounded recovery. The delay remains counted in timing and audio diagnostics.</p><pre id="render-state"></pre><pre id="cache-status">Render cache is initializing.</pre><pre id="environment"></pre><pre id="timing-events"></pre><pre id="state"></pre><pre id="input-state"></pre><pre id="log"></pre></details>
+<details><summary>Runtime diagnostics</summary><label>Developer: extracted files <input id="files" type="file" webkitdirectory multiple></label><label>Special move <select id="combat-kind"><option value="0">Fireball</option><option value="1">Cape</option><option value="2">Super Jump Punch</option><option value="3">Mario Tornado</option></select></label><button id="combat-check" disabled>Restart + combat check</button><p>Diagnostic only: restarts this match, then supplies ground and air special inputs for four to eight seconds.</p><button id="stock-check" disabled>Restart + stock check</button><p>Diagnostic only: uses movement and jump inputs to test four stock losses and three respawns, then the original match outcome.</p><label>Test delay <select id="delay-ms"><option value="200">200 ms</option><option value="800">800 ms</option></select></label><button id="delay-check">Inject frame delay</button><p>Diagnostic only: blocks one browser callback to check bounded recovery. The delay remains counted in timing and audio diagnostics.</p><label><input id="gpu-probe" type="checkbox"> Sample queue completion latency</label><p>Diagnostic only: includes GPU queue work and browser callback scheduling; it is not pure GPU execution time.</p><pre id="gpu-metrics">Queue completion sampling is off.</pre><pre id="render-state"></pre><pre id="cache-status">Render cache is initializing.</pre><pre id="environment"></pre><pre id="timing-events"></pre><pre id="state"></pre><pre id="input-state"></pre><pre id="log"></pre></details>
 <script src="runtime-cache.js"></script>
 <script>
 const $=id=>document.getElementById(id),required=['PlCo.dat','PlMr.dat','PlMrNr.dat','PlMrAJ.dat','GrNLa.dat','ItCo.usd','EfMrData.dat','EfCoData.dat','PdPm.dat','sislib_font.bin','smash2.sem','main.ssm','mario.ssm','dsp_coef.bin','sp_end.hps'];
 let ready=false,importing=false,bundleReady=false,fatal=false,last=0,intervals=[],costs=[],wasRunning=false,activeFrames=0,worstInterval=0,longFrames=0,previousCost=0,timingEvents=[],renderTiming=null,previousRenderTiming=null,longTasks=[];
+let gpuProbeEpoch=1,gpuProbeSamples=[];
+window.runtimeGPUProbeRequest=()=>!fatal&&wasRunning&&$('gpu-probe').checked?gpuProbeEpoch:0;
+window.runtimeGPUProbeResult=sample=>{
+  if(sample.token!==gpuProbeEpoch||!$('gpu-probe').checked)return;
+  gpuProbeSamples.push(sample);if(gpuProbeSamples.length>120)gpuProbeSamples.shift();
+  const ordered=gpuProbeSamples.map(s=>s.latency_ms).sort((a,b)=>a-b);
+  $('gpu-metrics').textContent=`Queue + callback latency: ${gpuProbeSamples.length} recent samples · p95 ${ordered[Math.floor((ordered.length-1)*0.95)].toFixed(2)} ms · worst ${ordered.at(-1).toFixed(2)} ms\nLast sample: ${JSON.stringify(sample)}\nWorst recent sample: ${JSON.stringify(gpuProbeSamples.reduce((a,b)=>a.latency_ms>b.latency_ms?a:b))}`;
+};
+$('gpu-probe').onchange=()=>{++gpuProbeEpoch;gpuProbeSamples=[];$('gpu-metrics').textContent=$('gpu-probe').checked?'Waiting for queue completion samples…':'Queue completion sampling is off.';};
 let audioContext=null,audioNode=null,audioEnabled=false,audioCatchingUp=false;
 const pendingCommands=[];
 let inputDirty=true,createdPipelineCount=0;
@@ -57,7 +66,7 @@ setInterval(()=>{$('state').dataset.boundary=window.runtimeBoundary||'startup';$
 const log=text=>{$('log').textContent=($('log').textContent+'\n'+text).slice(-24000);};
 function update(){if(!ready||fatal)return;syncAudio(!!Module._melee_web_game_running()&&!document.hidden);$('status').textContent=Module.UTF8ToString(Module._melee_web_game_message());const state=Module.UTF8ToString(Module._melee_web_game_stats());$('state').textContent=state;$('input-state').textContent=Module.UTF8ToString(Module._melee_web_input_message());const data=JSON.parse(state);$('score').textContent=data.players?data.players.map((p,i)=>`P${i+1} Mario · ${Math.floor(p.percent)}% · ${p.stocks} stocks`).join('     |     '):'';$('pause').disabled=importing||!data.loaded||!!data.finished;$('pause').textContent=Module._melee_web_game_running()?'Pause':'Resume';}
 function activity(){inputDirty=true;}
-function resetMetrics(){last=0;intervals=[];costs=[];wasRunning=false;activeFrames=0;worstInterval=0;longFrames=0;previousCost=0;timingEvents=[];renderTiming=null;previousRenderTiming=null;longTasks=[];$('timing-events').textContent='No active-frame intervals above 33.3 ms.';
+function resetMetrics(){++gpuProbeEpoch;gpuProbeSamples=[];$('gpu-metrics').textContent=$('gpu-probe').checked?'Waiting for queue completion samples…':'Queue completion sampling is off.';last=0;intervals=[];costs=[];wasRunning=false;activeFrames=0;worstInterval=0;longFrames=0;previousCost=0;timingEvents=[];renderTiming=null;previousRenderTiming=null;longTasks=[];$('timing-events').textContent='No active-frame intervals above 33.3 ms.';
   $('environment').textContent=`${navigator.userAgent}\nCanvas ${$('canvas').width}×${$('canvas').height}; device pixel ratio ${window.devicePixelRatio}`;
 }
 window.runtimeFrame=(frames,now,cost)=>{
@@ -67,7 +76,7 @@ window.runtimeFrame=(frames,now,cost)=>{
     if(interval>1000/30){
       ++longFrames;
       const snapshot=JSON.parse(Module.UTF8ToString(Module._melee_web_game_stats()));
-      timingEvents.push({tick:snapshot.ticks,interval_ms:+interval.toFixed(3),previous_frame_work_ms:+previousCost.toFixed(3),current_frame_work_ms:+cost.toFixed(3),previous_render:previousRenderTiming,current_render:renderTiming,recent_long_tasks:longTasks.filter(task=>task.start_ms+task.duration_ms>=last-100),visible:!document.hidden,focused:document.hasFocus()});
+      timingEvents.push({tick:snapshot.ticks,interval_ms:+interval.toFixed(3),previous_frame_work_ms:+previousCost.toFixed(3),current_frame_work_ms:+cost.toFixed(3),previous_render:previousRenderTiming,current_render:renderTiming,recent_queue_completions:gpuProbeSamples.slice(-3),recent_long_tasks:longTasks.filter(task=>task.start_ms+task.duration_ms>=last-100),visible:!document.hidden,focused:document.hasFocus()});
       if(timingEvents.length>50)timingEvents.shift();
       $('timing-events').textContent=timingEvents.map(event=>JSON.stringify(event)).join('\n');
     }
