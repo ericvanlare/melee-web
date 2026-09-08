@@ -16,6 +16,37 @@ remain required acceptance work under [the accuracy contract](docs/ACCURACY_CONT
 
 ## Active integration
 
+The `native-menu.html` integration preview now renders the original CSS and SSS
+and enters the actual Mario/FD match with menu-selected costumes. The first
+browser route used an explicitly labeled raw-PAD Start diagnostic; automated
+key taps are not accepted as physical-input evidence. The configured keyboard
+ports now stay connected with neutral input on focus loss, so inspecting controls
+does not cause original CSS disconnect logic to turn humans into CPUs.
+
+The shared production owners also pass **two original CSS → SSS → four-stock
+match → CSS cycles under Node/Wasm**, including three respawns, stock elimination,
+winner, audio rendering, source RNG handoff and full scene teardown. This is a
+source lifecycle check, not an original-equivalence claim. The test also
+passes original SSS B cancellation, CSS re-entry and stage confirmation.
+The real browser separately completed two four-stock diagnostic cycles through
+these original scenes, each with three respawns and automatic return to CSS
+at 2,011 input ticks. These runs use labeled raw-PAD diagnostics; manual
+keyboard/controller and cold-performance acceptance are still open. The full
+regression suite passed 251 tests without skips; the added cancellation check
+and Release browser build also pass.
+All five Mario costume assets are supported with shared fighter data and distinct
+owned models; the local costume regression runs stock/respawn/teardown twice.
+
+Original HUD startup and ordinary input acceptance are still being worked
+on. First-use CSS/SSS/game graphics cause explicit timing pauses. The native
+preview retains the strict pause policy and nominal 60 Hz clock; neither that
+policy nor the existing catch-up path establishes original timing equivalence.
+The original menu preloader is not supplied by this resident-asset integration.
+The temporary HTML player flow remains until native acceptance is complete.
+
+The bullets below include earlier checkpoints; their narrower evidence must not
+be mistaken for newer browser or full-loop acceptance.
+
 - Native-menu preparation now passes both complete scene tables: CSS nine and
   SSS twelve model groups with camera/lights/fog, material animation and original
   PObj morphing descriptors. Every referenced CPU morph scalar is compared bit
@@ -36,8 +67,9 @@ remain required acceptance work under [the accuracy contract](docs/ACCURACY_CONT
   still owns queues, accounting and sample publication; host bridges provide
   checked bytes, native descriptor fields and scoped auxiliary storage. The full
   regression suite passed 245 tests before the new focused bank/CSS checks.
-  Browser menu rendering, real selection, scene preloading, availability guards
-  and match handoff are still open. The HTML selector remains disposable scaffolding.
+  That checkpoint did not yet render menus or enter a match; the later native
+  preview and source-loop checks above extend it. The original scene preloader
+  remains open. The HTML selector remains disposable scaffolding.
   Shared typed archive handles and a checked CSS/SSS lifecycle boundary are
   integrated. Texture indices are checked before original table access; unused
   authored values are preserved. The accuracy contract records catch-up

@@ -18,6 +18,18 @@ class MatchCompletion(unittest.TestCase):
         self.assertIn(expected,result.stdout)
     def test_four_stock_elimination_respawn_and_winner(self):
         self.run_trace('gameplay_stock_trace','four-stock elimination, three respawns and winner passed in two worlds')
+
+    def test_all_mario_costumes_repeat_source_lifecycle(self):
+        assets=ROOT/'assets-local/next-gate'
+        costumes=ROOT/'assets-local/native-menus'
+        binary=ROOT/'build/browser/gameplay_stock_trace.js'
+        names=('PlCo.dat','PlMr.dat','PlMrNr.dat','PlMrAJ.dat','GrNLa.dat','ItCo.usd','EfMrData.dat','EfCoData.dat','PdPm.dat','sislib_font.bin')
+        extra=('PlMrYe.dat','PlMrBk.dat','PlMrBu.dat','PlMrGr.dat')
+        if not binary.is_file() or not all((assets/name).is_file() for name in names) or not all((costumes/name).is_file() for name in extra):
+            self.skipTest('Built stock trace and owned Mario costume archives required')
+        result=subprocess.run([str(node_runtime()),str(binary),str(assets),str(costumes)],cwd=ROOT,capture_output=True,text=True,timeout=180)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertIn('Five Mario costume sources hydrated, selected, respawned and torn down twice',result.stdout)
     def test_ground_and_air_fireball(self):
         self.run_trace('gameplay_article_trace','ground and air PAD_BUTTON_B Article paths passed in two worlds')
 
@@ -39,7 +51,7 @@ class MatchCompletion(unittest.TestCase):
         result=self.run_edge_trace()
         self.assertIn('Original post-respawn raw-stick edge trace captured',result.stdout)
 
-    def test_controller_port_does_not_change_costume_color(self):
+    def test_controller_port_and_costume_are_distinct(self):
         binary=ROOT/'build/browser/gameplay_player_context_trace.js'
         if not binary.is_file():self.skipTest('Built original player context trace required')
         result=subprocess.run([str(node_runtime()),str(binary)],cwd=ROOT,capture_output=True,text=True,timeout=30)

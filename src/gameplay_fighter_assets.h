@@ -14,6 +14,10 @@ typedef void (*MeleeWebFighterAssetUnbind)(void*,struct Fighter*);
 MeleeWebFighterAssetScope* melee_web_fighter_assets_begin(uint32_t kind,uint32_t costume,
     void* data,void* joint,void* material_animation,uint32_t motion_count,void* context,
     MeleeWebFighterAssetBind,MeleeWebFighterAssetUnbind,char*,size_t);
+/* Add another costume of the same decoded kind before creating Fighters.
+ * Shares ftData and action ownership while retaining distinct native models. */
+int melee_web_fighter_assets_add_costume(MeleeWebFighterAssetScope*,uint32_t costume,
+    void* joint,void* material_animation,char*,size_t);
 int melee_web_fighter_assets_end(MeleeWebFighterAssetScope*,char*,size_t);
 uint32_t melee_web_fighter_assets_live(const MeleeWebFighterAssetScope*);
 /* Storage hooks for the original constructor/loader/unload call sites. */

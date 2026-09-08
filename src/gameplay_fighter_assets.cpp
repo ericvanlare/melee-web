@@ -15,9 +15,41 @@ namespace melee_web {
 namespace {
 uint32_t root(const DatArchive& archive,std::string_view name)
 {for(const auto& s:archive.public_symbols())if(s.name==name)return s.data_offset;throw DatError("Fighter asset root is missing: "+std::string(name));}
+bool canonical_costume(const FighterCostume& candidate) noexcept
+{
+    for(const auto& value:fighter_costumes()) {
+        if(value.fighter_kind!=candidate.fighter_kind || value.costume_index!=candidate.costume_index ||
+           value.motion_count!=candidate.motion_count || value.kind_name!=candidate.kind_name ||
+           value.fighter_filename!=candidate.fighter_filename || value.fighter_symbol!=candidate.fighter_symbol ||
+           value.animation_filename!=candidate.animation_filename || value.model_filename!=candidate.model_filename ||
+           value.model_symbol!=candidate.model_symbol ||
+           value.material_animation_symbol!=candidate.material_animation_symbol) continue;
+        return true;
+    }
+    return false;
+}
 void destroy_joint(MeleeWebNativeJoint* joint)
 {char error[128];if(!melee_web_native_joint_destroy(joint,error,sizeof(error))){std::fprintf(stderr,"%s\n",error);std::abort();}}
 }
+struct OwnedAdditionalCostume {
+    FighterCostume identity;
+    DatNativeJoint model;
+    DatMaterialAnimation material;
+    std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> native{nullptr,destroy_joint};
+    OwnedAdditionalCostume(std::shared_ptr<const DatArchive> archive,const FighterCostume& id,
+                           const MeleeWebNativeGraph& base)
+        :identity(id),model(archive,root(*archive,id.model_symbol)),
+         material(archive,root(*archive,id.material_animation_symbol),model.graph())
+    {
+        const auto& graph=model.graph();
+        if(graph.joint_count!=base.joint_count)throw DatError("Additional costume joint count differs from shared metal/guard topology");
+        for(uint32_t j=0;j<graph.joint_count;j++)
+            if(graph.joints[j].child!=base.joints[j].child||graph.joints[j].next!=base.joints[j].next)
+                throw DatError("Additional costume differs from shared metal/guard topology");
+        char error[256];native.reset(melee_web_native_joint_hydrate(&graph,error,sizeof(error)));
+        if(!native)throw DatError(error);
+    }
+};
 struct GameplayFighterAssets::Storage {
     std::shared_ptr<const DatArchive> fighter;
     FighterCostume identity;
@@ -32,6 +64,7 @@ struct GameplayFighterAssets::Storage {
     std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> metal_native;
     std::unique_ptr<DatNativeJoint> guard_model;
     std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> guard_native{nullptr,destroy_joint};
+    std::array<std::unique_ptr<OwnedAdditionalCostume>,16> additional;
     std::array<std::unique_ptr<GameplayActionStore>,6> bindings;
     std::array<Fighter*,6> fighters{};
     uint32_t unresolved=0;
@@ -126,6 +159,18 @@ GameplayFighterAssets::GameplayFighterAssets(std::shared_ptr<const DatArchive> f
 {
     if(!fighter || !costume)throw DatError("Fighter asset archives are missing");
     storage_=std::make_unique<Storage>(std::move(fighter),std::move(costume),animation,identity);
+}
+void GameplayFighterAssets::add_costume(std::shared_ptr<const DatArchive> archive,const FighterCostume& id)
+{
+    if(!storage_||!archive||!canonical_costume(id)||live_fighters()||id.fighter_kind!=storage_->identity.fighter_kind||
+       id.costume_index>=storage_->additional.size()||id.costume_index==storage_->identity.costume_index||
+       storage_->additional[id.costume_index])throw DatError("Additional costume identity is invalid or already owned");
+    auto value=std::make_unique<OwnedAdditionalCostume>(std::move(archive),id,storage_->model.graph());
+    char error[256];
+    if(!melee_web_fighter_assets_add_costume(storage_->scope,id.costume_index,
+       melee_web_native_joint_descriptor(value->native.get(),error,sizeof(error)),value->material.descriptor(),error,sizeof(error)))
+        throw DatError(error);
+    storage_->additional[id.costume_index]=std::move(value);
 }
 GameplayFighterAssets::~GameplayFighterAssets()
 {

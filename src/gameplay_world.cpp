@@ -116,6 +116,11 @@ struct GameplayWorld::Storage {
                 std::string_view(name)=="ItCo.usd"?DatExternalPolicy::PreserveUnresolved:DatExternalPolicy::Reject);
             snapshots[name]={value->data().begin(),value->data().end()};archives.emplace(name,std::move(value));
         }
+        for(const auto& costume:fighter_costumes())if(costume.fighter_kind==0&&costume.costume_index!=0&&files.contains(costume.model_filename)) {
+            auto value=std::make_shared<const DatArchive>(file(files,costume.model_filename));
+            snapshots[std::string(costume.model_filename)]={value->data().begin(),value->data().end()};
+            archives.emplace(costume.model_filename,std::move(value));
+        }
         // Decode before acquiring the source world whenever possible.
         DatCommon common_data(*archive("PlCo.dat"));
         if(!common_data.roots[20].data_offset)throw DatError("Missing common root20");
@@ -163,6 +168,8 @@ struct GameplayWorld::Storage {
         for(const auto& costume:fighter_costumes())if(costume.fighter_kind==0&&costume.costume_index==0)mario=&costume;
         if(!mario)throw DatError("Pinned Mario identity missing");
         fighter=std::make_unique<GameplayFighterAssets>(archive("PlMr.dat"),archive("PlMrNr.dat"),animations,*mario);
+        for(const auto& costume:fighter_costumes())if(costume.fighter_kind==0&&costume.costume_index!=0&&archives.contains(costume.model_filename))
+            fighter->add_costume(archive(costume.model_filename),costume);
         check(melee_web_effect_runtime_begin(error,sizeof(error)),error);effect_started=true;
         common_effects=std::make_unique<DatEffectEntries>(archive("EfCoData.dat"),"effCommonDataTable",0,47,true);
         check(common_effects->load(error,sizeof(error)),error);

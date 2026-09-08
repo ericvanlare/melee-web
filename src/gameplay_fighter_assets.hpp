@@ -4,7 +4,7 @@
 #include "native_dat.hpp"
 #include "dat_material_animation.hpp"
 namespace melee_web {
-// Full ownership chain for one published costume. Construct after original
+// Full ownership chain for one fighter kind and its published costumes. Construct after original
 // common initialization; destroy all source Fighter GObjs before close/destruction.
 // Up to six Fighters retain independent animation slots and command cursors.
 class GameplayFighterAssets {
@@ -15,6 +15,7 @@ public:
     ~GameplayFighterAssets();
     GameplayFighterAssets(const GameplayFighterAssets&)=delete;
     GameplayFighterAssets& operator=(const GameplayFighterAssets&)=delete;
+    void add_costume(std::shared_ptr<const DatArchive>,const FighterCostume&);
     void close();
     uint32_t live_fighters() const noexcept;
     uint32_t unresolved_fields() const noexcept;

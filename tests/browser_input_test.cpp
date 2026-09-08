@@ -15,8 +15,8 @@ namespace {
 std::array<PADStatus, 4> supplied{};
 std::array<int, 4> connected{-1, -1, -1, -1};
 std::array<bool, 4> keyboard{};
-std::vector<PADKeyButtonBinding> buttons;
-std::vector<PADKeyAxisBinding> axes;
+std::array<std::vector<PADKeyButtonBinding>, 4> buttons;
+std::array<std::vector<PADKeyAxisBinding>, 4> axes;
 bool init_ok = true, bindings_ok = true, blocked = false;
 int reads = 0, clamps = 0, key_resets = 0;
 PADStatus* read_destination = nullptr;
@@ -57,10 +57,12 @@ void keyboard_preference()
 void binding_mapping()
 {
     startup();
-    check(buttons.size() == PAD_BUTTON_COUNT && axes.size() == PAD_AXIS_COUNT,
-          "all default keyboard slots explicitly configured");
+    check(buttons[0].size() == PAD_BUTTON_COUNT && axes[0].size() == PAD_AXIS_COUNT,
+          "all default P1 keyboard slots explicitly configured");
+    check(buttons[1].empty() && axes[1].empty(),
+          "P2 keyboard bindings stay absent until explicitly requested");
     std::map<int, unsigned> actual_buttons;
-    for (const auto& binding : buttons) actual_buttons[binding.scancode] = binding.padButton;
+    for (const auto& binding : buttons[0]) actual_buttons[binding.scancode] = binding.padButton;
     const std::map<int, unsigned> expected_buttons{
         {SDL_SCANCODE_J, PAD_BUTTON_A}, {SDL_SCANCODE_K, PAD_BUTTON_B},
         {SDL_SCANCODE_U, PAD_BUTTON_X}, {SDL_SCANCODE_I, PAD_BUTTON_Y},
@@ -71,7 +73,7 @@ void binding_mapping()
     };
     check(actual_buttons == expected_buttons, "documented keys map to GameCube digital buttons");
     std::map<int, unsigned> actual_axes;
-    for (const auto& binding : axes) actual_axes[binding.scancode] = binding.padAxis;
+    for (const auto& binding : axes[0]) actual_axes[binding.scancode] = binding.padAxis;
     const std::map<int, unsigned> expected_axes{
         {SDL_SCANCODE_D, PAD_AXIS_LEFT_X_POS}, {SDL_SCANCODE_A, PAD_AXIS_LEFT_X_NEG},
         {SDL_SCANCODE_W, PAD_AXIS_LEFT_Y_POS}, {SDL_SCANCODE_S, PAD_AXIS_LEFT_Y_NEG},
@@ -82,6 +84,92 @@ void binding_mapping()
     check(actual_axes == expected_axes, "keyboard axis signs follow GameCube coordinates");
     check(keyboard[0] && !keyboard[1] && !keyboard[2] && !keyboard[3],
           "keyboard fallback is explicit and only occupies port zero");
+}
+
+void keyboard_port_two_profile()
+{
+    startup();
+    const auto resets = key_resets;
+    check(melee_web_input_set_keyboard_port(1, 1) == 1,
+          "explicit P2 keyboard profile can be enabled");
+    const auto* snapshot = melee_web_input_snapshot();
+    check(snapshot->keyboard_requested_mask == 3 && snapshot->keyboard_active_mask == 3 &&
+              keyboard[0] && keyboard[1] && key_resets > resets,
+          "P1 and P2 keyboard profiles become active independently");
+
+    std::map<int, unsigned> p1_buttons;
+    for (const auto& binding : buttons[0]) p1_buttons[binding.scancode] = binding.padButton;
+    check(p1_buttons.at(SDL_SCANCODE_Z) == PAD_BUTTON_UP &&
+              p1_buttons.at(SDL_SCANCODE_X) == PAD_BUTTON_DOWN &&
+              p1_buttons.at(SDL_SCANCODE_C) == PAD_BUTTON_LEFT &&
+              p1_buttons.at(SDL_SCANCODE_V) == PAD_BUTTON_RIGHT &&
+              !p1_buttons.contains(SDL_SCANCODE_UP),
+          "P1 arrows move to non-overlapping D-pad keys in the P2 profile");
+
+    std::map<int, unsigned> p2_buttons;
+    for (const auto& binding : buttons[1]) p2_buttons[binding.scancode] = binding.padButton;
+    check(p2_buttons.size() == 7 && p2_buttons.at(SDL_SCANCODE_RSHIFT) == PAD_BUTTON_A &&
+              p2_buttons.at(SDL_SCANCODE_RCTRL) == PAD_BUTTON_B &&
+              p2_buttons.at(SDL_SCANCODE_END) == PAD_BUTTON_START &&
+              p2_buttons.at(SDL_SCANCODE_DELETE) == PAD_BUTTON_X &&
+              p2_buttons.at(SDL_SCANCODE_PAGEDOWN) == PAD_TRIGGER_Z &&
+              p2_buttons.at(SDL_SCANCODE_HOME) == PAD_TRIGGER_L &&
+              p2_buttons.at(SDL_SCANCODE_PAGEUP) == PAD_TRIGGER_R,
+          "P2 buttons use the documented laptop-friendly keys");
+
+    std::map<int, unsigned> p2_axes;
+    for (const auto& binding : axes[1]) p2_axes[binding.scancode] = binding.padAxis;
+    check(p2_axes.size() == 8 && p2_axes.at(SDL_SCANCODE_RIGHT) == PAD_AXIS_LEFT_X_POS &&
+              p2_axes.at(SDL_SCANCODE_LEFT) == PAD_AXIS_LEFT_X_NEG &&
+              p2_axes.at(SDL_SCANCODE_UP) == PAD_AXIS_LEFT_Y_POS &&
+              p2_axes.at(SDL_SCANCODE_DOWN) == PAD_AXIS_LEFT_Y_NEG &&
+              p2_axes.at(SDL_SCANCODE_KP_6) == PAD_AXIS_RIGHT_X_POS &&
+              p2_axes.at(SDL_SCANCODE_KP_4) == PAD_AXIS_RIGHT_X_NEG &&
+              p2_axes.at(SDL_SCANCODE_KP_8) == PAD_AXIS_RIGHT_Y_POS &&
+              p2_axes.at(SDL_SCANCODE_KP_2) == PAD_AXIS_RIGHT_Y_NEG,
+          "P2 arrows and keypad map to left and c-stick axes");
+
+    const auto focus_resets = key_resets;
+    melee_web_input_set_activity(0, 1);
+    check(melee_web_input_snapshot()->keyboard_active_mask == 0 && !keyboard[0] &&
+              !keyboard[1] && key_resets > focus_resets,
+          "focus loss clears both keyboard profiles immediately");
+    for(unsigned port=0;port<2;port++) {
+        check(melee_web_input_snapshot()->raw[port].err==PAD_ERR_NONE,
+              "focus loss preserves configured keyboard connectivity");
+        check(melee_web_input_poll()->raw[port].err==PAD_ERR_NONE,
+              "blocked polling preserves configured keyboard connectivity");
+    }
+    melee_web_input_set_activity(1, 1);
+    check(melee_web_input_snapshot()->keyboard_active_mask == 3 && keyboard[0] &&
+              keyboard[1], "both keyboard profiles resume after focus returns");
+
+    check(melee_web_input_set_keyboard_port(2, 1) == 0 &&
+              std::string(melee_web_input_message()).find("ports 0 and 1") !=
+                  std::string::npos,
+          "keyboard profile rejects unsupported ports truthfully");
+    check(melee_web_input_set_keyboard_port(1, 0) == 1 &&
+              melee_web_input_snapshot()->keyboard_requested_mask == 1 &&
+              buttons[1].empty() && buttons[0].at(8).scancode == SDL_SCANCODE_UP,
+          "disabling P2 restores the original P1 arrow-D-pad profile");
+}
+
+void per_port_physical_priority()
+{
+    startup();
+    check(melee_web_input_set_keyboard_port(1, 1) == 1, "enable P2 keyboard");
+    connected[1] = 12;
+    supplied[1].button = PAD_BUTTON_A;
+    (void) melee_web_input_poll();
+    const auto* snapshot = melee_web_input_snapshot();
+    check(snapshot->physical_mask == 2 && snapshot->keyboard_active_mask == 1 &&
+              keyboard[0] && !keyboard[1] && snapshot->raw[1].button == PAD_BUTTON_A,
+          "a physical P2 takes precedence without disabling keyboard P1");
+    connected[1] = -1;
+    supplied[1] = {};
+    (void) melee_web_input_poll();
+    check(melee_web_input_snapshot()->keyboard_active_mask == 3 && keyboard[1],
+          "P2 keyboard resumes after its physical device disconnects");
 }
 
 void raw_and_clamped()
@@ -225,17 +313,22 @@ void startup_failure_and_shutdown()
 } // namespace
 
 extern "C" BOOL PADInit() { return init_ok; }
-extern "C" void PADClearKeyBindings(u32) { buttons.clear(); axes.clear(); }
+extern "C" void PADClearKeyBindings(u32 port)
+{
+    check(port < buttons.size(), "keyboard binding port is in range");
+    buttons.at(port).clear();
+    axes.at(port).clear();
+}
 extern "C" BOOL PADSetKeyButtonBinding(u32 port, PADKeyButtonBinding binding)
 {
-    check(port == 0, "bindings only target the fallback port");
-    buttons.push_back(binding);
+    check(port < buttons.size(), "button binding port is in range");
+    buttons.at(port).push_back(binding);
     return bindings_ok;
 }
 extern "C" BOOL PADSetKeyAxisBinding(u32 port, PADKeyAxisBinding binding)
 {
-    check(port == 0, "axis bindings only target the fallback port");
-    axes.push_back(binding);
+    check(port < axes.size(), "axis binding port is in range");
+    axes.at(port).push_back(binding);
     return bindings_ok;
 }
 extern "C" void PADSetKeyboardActive(u32 port, BOOL active) { keyboard.at(port) = active != 0; }
@@ -265,7 +358,10 @@ extern "C" void SDL_ResetKeyboard(void) { ++key_resets; }
 int main(int argc, char** argv)
 {
     const std::map<std::string, void (*)()> cases{
-        {"binding_mapping", binding_mapping}, {"raw_and_clamped", raw_and_clamped},
+        {"binding_mapping", binding_mapping},
+        {"keyboard_port_two_profile", keyboard_port_two_profile},
+        {"per_port_physical_priority", per_port_physical_priority},
+        {"raw_and_clamped", raw_and_clamped},
         {"keyboard_preference", keyboard_preference},
         {"last_non_neutral", last_non_neutral},
         {"focus_and_visibility", focus_and_visibility}, {"disconnect_and_errors", disconnect_and_errors},

@@ -41,6 +41,7 @@ static MeleeWebAudioResidencyInfo info(int file){
 }
 int melee_web_audio_bank_transport_active(void){return state.audio!=NULL;}
 int melee_web_audio_bank_transport_busy(void){return state.pending||state.pumping;}
+int melee_web_audio_bank_transport_configured(void){return state.configured;}
 int melee_web_audio_bank_transport_begin(MeleeWebAudio* audio,MeleeWebAudioResidency* registry,const char* sem_path,char* e,size_t n){
  if(state.audio||!melee_web_audio_is_active(audio)||melee_web_audio_stream_owned(audio)||!registry||!sem_path||!*sem_path||strlen(sem_path)>=sizeof(state.sem_path))return fail(e,n,"Invalid or already active source audio bank transport");
  MeleeWebAudioResidencyInfo reserved;

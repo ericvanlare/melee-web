@@ -10,8 +10,8 @@ struct MeleeWebFighterAssetScope {
     uint32_t kind,costume,motion_count;
     ftData* data;
     ftData* previous_data;
-    UnkCostumeStruct previous_costume;
-    UnkCostumeStruct published_costume;
+    UnkCostumeStruct previous_costume[16],published_costume[16];
+    unsigned char costume_owned[16];
     void* context;
     MeleeWebFighterAssetBind bind;
     MeleeWebFighterAssetUnbind unbind;
@@ -27,7 +27,7 @@ MeleeWebFighterAssetScope* melee_web_fighter_assets_begin(uint32_t kind,uint32_t
     MeleeWebFighterAssetBind bind,MeleeWebFighterAssetUnbind unbind,char* error,size_t size)
 {
     if(current || kind!=FTKIND_MARIO || !data || !joint || !mat || !context || !bind || !unbind ||
-        costume>=CostumeListsForeachCharacter[kind].numCostumes ||
+        costume>=16 || costume>=CostumeListsForeachCharacter[kind].numCostumes ||
         count!=(uint32_t)ftData_Table_Unk0[kind].count) {
         fail(error,size,"Fighter asset scope identity is invalid or another scope is active");return NULL;
     }
@@ -38,20 +38,38 @@ MeleeWebFighterAssetScope* melee_web_fighter_assets_begin(uint32_t kind,uint32_t
     MeleeWebFighterAssetScope* h=calloc(1,sizeof(*h));
     if(!h){fail(error,size,"Fighter asset scope allocation failed");return NULL;}
     h->kind=kind;h->costume=costume;h->motion_count=count;h->data=data;h->context=context;h->bind=bind;h->unbind=unbind;
-    h->previous_data=gFtDataList[kind];h->previous_costume=CostumeListsForeachCharacter[kind].costume_list[costume];
-    h->published_costume=(UnkCostumeStruct){joint,mat,0,0,0,NULL};
-    gFtDataList[kind]=data;CostumeListsForeachCharacter[kind].costume_list[costume]=h->published_costume;
+    h->previous_data=gFtDataList[kind];h->previous_costume[costume]=CostumeListsForeachCharacter[kind].costume_list[costume];
+    h->published_costume[costume]=(UnkCostumeStruct){joint,mat,0,0,0,NULL};h->costume_owned[costume]=1;
+    gFtDataList[kind]=data;CostumeListsForeachCharacter[kind].costume_list[costume]=h->published_costume[costume];
     current=h;if(error && size)error[0]=0;return h;
 }
 uint32_t melee_web_fighter_assets_live(const MeleeWebFighterAssetScope* h)
 { uint32_t n=0;if(h)for(unsigned i=0;i<6;++i)n+=h->fighters[i]!=NULL;return n; }
+int melee_web_fighter_assets_add_costume(MeleeWebFighterAssetScope* h,uint32_t costume,
+    void* joint,void* mat,char* error,size_t size)
+{
+    if(!h || h!=current || melee_web_fighter_assets_live(h) || !joint || !mat ||
+       costume>=16 || costume>=CostumeListsForeachCharacter[h->kind].numCostumes ||
+       h->costume_owned[costume] || gFtDataList[h->kind]!=h->data)
+        return fail(error,size,"Additional costume requires an idle owned fighter scope and distinct valid identity");
+    h->previous_costume[costume]=CostumeListsForeachCharacter[h->kind].costume_list[costume];
+    h->published_costume[costume]=(UnkCostumeStruct){joint,mat,0,0,0,NULL};
+    CostumeListsForeachCharacter[h->kind].costume_list[costume]=h->published_costume[costume];
+    h->costume_owned[costume]=1;if(error&&size)*error=0;return 1;
+}
 int melee_web_fighter_assets_end(MeleeWebFighterAssetScope* h,char* error,size_t size)
 {
     if(!h)return 1;
     if(h!=current || melee_web_fighter_assets_live(h))return fail(error,size,"Fighter assets still have live source Fighters");
-    if(gFtDataList[h->kind]!=h->data || CostumeListsForeachCharacter[h->kind].costume_list[h->costume].joint!=h->published_costume.joint)
-        return fail(error,size,"Published fighter asset globals changed unexpectedly");
-    gFtDataList[h->kind]=h->previous_data;CostumeListsForeachCharacter[h->kind].costume_list[h->costume]=h->previous_costume;
+    if(gFtDataList[h->kind]!=h->data)
+        return fail(error,size,"Published fighter data changed unexpectedly");
+    for(unsigned c=0;c<16;c++)if(h->costume_owned[c] &&
+        (CostumeListsForeachCharacter[h->kind].costume_list[c].joint!=h->published_costume[c].joint ||
+         CostumeListsForeachCharacter[h->kind].costume_list[c].x4!=h->published_costume[c].x4))
+        return fail(error,size,"Published costume changed unexpectedly");
+    gFtDataList[h->kind]=h->previous_data;
+    for(unsigned c=0;c<16;c++)if(h->costume_owned[c])
+        CostumeListsForeachCharacter[h->kind].costume_list[c]=h->previous_costume[c];
     current=NULL;free(h);if(error && size)error[0]=0;return 1;
 }
 void melee_web_fighter_assets_require_kind(uint32_t kind)
@@ -62,7 +80,7 @@ void melee_web_fighter_assets_require_kind(uint32_t kind)
 void melee_web_fighter_assets_require_costume(uint32_t kind,int costume)
 {
     melee_web_fighter_assets_require_kind(kind);
-    if(costume<0 || (uint32_t)costume!=current->costume)
+    if(costume<0 || costume>=16 || !current->costume_owned[costume])
         fatal("Requested costume is not hydrated in this asset scope");
 }
 void melee_web_fighter_assets_bind_created(Fighter* fp)

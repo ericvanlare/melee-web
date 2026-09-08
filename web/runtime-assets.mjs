@@ -13,10 +13,33 @@ export const ORIGINAL_DOL_SHA1='08e0bf20134dfcb260699671004527b2d6bb1a45';
 const MAX_FILE=64*1024*1024,MAX_BUNDLE=128*1024*1024;
 async function digest(kind,bytes){return Array.from(new Uint8Array(await crypto.subtle.digest(kind,bytes)),x=>x.toString(16).padStart(2,'0')).join('');}
 
-/** Read only the current match's data; no upload or persistent storage. */
-export async function loadRuntimeDisc(file,report=()=>{}) {
+export const NATIVE_MENU_DISC_FILES=Object.freeze({
+  'MnSlChr.usd':'MnSlChr.usd','MnSlMap.usd':'MnSlMap.usd',
+  'SdSlChr.usd':'SdSlChr.usd','MnExtAll.usd':'MnExtAll.usd',
+  'LbMcGame.usd':'LbMcGame.usd','NtMemAc.usd':'NtMemAc.usd',
+  'menu01.hps':'audio/menu01.hps','smash2.sem':'audio/us/smash2.sem',
+  ...Object.fromEntries(['main','mario','nr_select','nr_title','nr_name','pokemon','end']
+    .map(name=>[name+'.ssm','audio/us/'+name+'.ssm']))
+});
+export const NATIVE_GAME_DISC_FILES=Object.freeze({
+  ...NATIVE_MENU_DISC_FILES,...RUNTIME_DISC_FILES,
+  'PlMrYe.dat':'PlMrYe.dat','PlMrBk.dat':'PlMrBk.dat',
+  'PlMrBu.dat':'PlMrBu.dat','PlMrGr.dat':'PlMrGr.dat',
+});
+export function loadNativeGameDisc(file,report=()=>{}) {
+  return loadDiscBundle(file,report,NATIVE_GAME_DISC_FILES);
+}
+/** Read only the selected source scene's data; no upload or persistence. */
+export function loadRuntimeDisc(file,report=()=>{}) {
+  return loadDiscBundle(file,report,RUNTIME_DISC_FILES);
+}
+export function loadNativeMenuDisc(file,report=()=>{}) {
+  return loadDiscBundle(file,report,NATIVE_MENU_DISC_FILES);
+}
+async function loadDiscBundle(file,report,paths) {
+  const total=Object.keys(paths).length+2;
   if(/\.rvz$/i.test(file.name??''))throw Error('RVZ is not supported yet. Choose an ISO, GCM, or CISO image.');
-  report({phase:'validate',complete:0,total:15});
+  report({phase:'validate',complete:0,total});
   const disc=await openDiscImage(file);
   const pointer=await disc.read(0x420,4),dolOffset=new DataView(pointer.buffer,pointer.byteOffset,4).getUint32(0);
   if(dolOffset<0x440)throw Error('Invalid game executable location.');
@@ -29,7 +52,7 @@ export async function loadRuntimeDisc(file,report=()=>{}) {
   const dol=await disc.read(dolOffset,dolSize);
   if(await digest('SHA-1',dol)!==ORIGINAL_DOL_SHA1)throw Error('This build requires the unmodified USA revision 1.02 executable. This disc does not match.');
   const entries=await disc.files();let totalBytes=0;
-  for(const path of Object.values(RUNTIME_DISC_FILES)){
+  for(const path of Object.values(paths)){
     const entry=entries.get(path);
     if(!entry)throw Error('Required game data is missing: '+path);
     if(!entry.size||entry.size>MAX_FILE)throw Error('Invalid game file size: '+path);
@@ -37,8 +60,8 @@ export async function loadRuntimeDisc(file,report=()=>{}) {
   }
   if(totalBytes>MAX_BUNDLE)throw Error('Required game data exceeds the current import budget.');
   const result=new Map();
-  for(const [name,path] of Object.entries(RUNTIME_DISC_FILES)){
-    report({phase:'read',file:name,complete:result.size,total:15});
+  for(const [name,path] of Object.entries(paths)){
+    report({phase:'read',file:name,complete:result.size,total});
     result.set(name,await disc.readFile(path));
   }
   const font=fontFileRange(header);
@@ -47,6 +70,6 @@ export async function loadRuntimeDisc(file,report=()=>{}) {
   const coefficients=replacementDspCoefficients();
   if(await digest('SHA-256',coefficients)!==DSP_COEFFICIENT_SHA256)throw Error('Generated audio coefficients failed their integrity check.');
   result.set('dsp_coef.bin',coefficients);
-  report({phase:'complete',complete:15,total:15});
+  report({phase:'complete',complete:total,total});
   return result;
 }

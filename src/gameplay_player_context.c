@@ -1,5 +1,6 @@
 #include "gameplay_player_context.h"
 #include <melee/pl/player.h>
+#include <melee/ft/ftdata.h>
 #include <melee/pl/plstale.h>
 #include <melee/gm/forward.h>
 #include <math.h>
@@ -13,8 +14,8 @@ static int ok(char* e,size_t n){if(e&&n)*e=0;return 1;}
 MeleeWebPlayerContext* melee_web_player_context_begin(const MeleeWebPlayerSettings* s,char* e,size_t n)
 {
     if(!s||s->slot>=Gm_Player_NumMax||s->controller>=4||s->stocks<1||s->stocks>99||
-       (s->facing!=1&&s->facing!=-1)){
-        fail(e,n,"Player settings require a valid slot/controller, 1..99 stocks and facing +/-1");return NULL;
+       (s->facing!=1&&s->facing!=-1)||s->costume>=CostumeListsForeachCharacter[FTKIND_MARIO].numCostumes||s->sub_color>4){
+        fail(e,n,"Player settings require a valid slot/controller, 1..99 stocks, an original Mario costume/tint and facing +/-1");return NULL;
     }
     for(int i=0;i<3;i++)if(!isfinite(s->position[i])){fail(e,n,"Player position must be finite");return NULL;}
     StaticPlayer* p=Player_GetPtrForSlot(s->slot);
@@ -31,12 +32,12 @@ MeleeWebPlayerContext* melee_web_player_context_begin(const MeleeWebPlayerSettin
     plStale_ResetStaleMoveTableForPlayer(s->slot);
     Player_SetPlayerCharacter(s->slot,CKIND_MARIO);
     Player_SetSlottype(s->slot,Gm_PKind_Human);
+    Player_SetCostumeId(s->slot,s->costume);
     /* gm_16AE fn_8016D8AC supplies PlayerInitData.sub_color here. Despite
-     * its decompiled name this field tints the costume, not the input port.
-     * The match owner routes the configured controller into this slot's PAD. */
-    Player_SetControllerIndex(s->slot,0);
+     * its recovered name, fighter.c/ftmaterial.c use this field as a tint.
+     * PlayerId and the match's raw PAD mapping own controller routing. */
+    Player_SetControllerIndex(s->slot,s->sub_color);
     Player_SetPlayerId(s->slot,s->slot);
-    Player_SetCostumeId(s->slot,0);
     Player_SetTeam(s->slot,0);
     Player_SetStocks(s->slot,s->stocks);
     Player_SetFacingDirection(s->slot,s->facing);

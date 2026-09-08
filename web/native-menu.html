@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><title>Melee native menu integration</title>
+<style>:root{color-scheme:dark;font:15px system-ui;background:#10141e;color:#e7ebf4}body{max-width:900px;margin:24px auto;padding:0 18px}canvas{width:100%;aspect-ratio:4/3;background:black;outline:none}button,input{font:inherit}button{margin:12px 8px 12px 0;padding:8px 14px}pre{white-space:pre-wrap;font-size:12px;max-height:140px;overflow:auto}</style>
+<p>Native menu integration preview · Original screens and callbacks. Four-stock Mario/FD loop under validation.</p>
+<label>Melee disc image <input id="disc" type="file" accept=".iso,.gcm,.ciso" disabled></label>
+<div><button id="launch" disabled>Open character select</button><button id="pause" disabled>Pause / resume</button><button id="unload" disabled>Unload</button><label><input id="keyboard" type="checkbox" checked> P1 keyboard</label><label><input id="keyboard2" type="checkbox" checked> P2 keyboard</label></div>
+<p id="status">Starting WebGPU…</p>
+<canvas id="canvas" width="640" height="480" tabindex="0"></canvas>
+<p>Click the game for input. Move: WASD · A: J · B: K · Start: Enter. P2: arrows · A/B: right Shift/Ctrl · Start: End · Jump: Delete. Controller ports use the original PAD path.</p>
+<details><summary>Diagnostics</summary><button id="confirm-check">Start input (diagnostic)</button><button id="stock-check" disabled>Four-stock input check</button><p id="scene-check"></p><p>Injects three raw PAD Start samples for scene testing; this does not validate keyboard or controller hardware.</p><pre id="input"></pre><pre id="log"></pre></details>
+<script>
+const $=id=>document.getElementById(id);let ready=false,fatal=false,bundle=false,inputDirty=true,importing=false,uiMessage="";
+const commands=[];
+const boundary=run=>fatal?Promise.reject(Error("Reload after the runtime fault.")):new Promise((resolve,reject)=>commands.push({run,resolve,reject}));
+const log=text=>$('log').textContent=($('log').textContent+'\n'+text).slice(-16000);
+let audioContext=null,audioNode=null,audioEnabled=false;
+async function prepareAudio(){
+ if(!audioContext){audioContext=new AudioContext({sampleRate:32000,latencyHint:'interactive'});if(audioContext.sampleRate!==32000)throw Error('Expected 32000 Hz audio context');await audioContext.audioWorklet.addModule('audio-worklet.js');audioNode=new AudioWorkletNode(audioContext,'melee-audio-output',{numberOfInputs:0,numberOfOutputs:1,outputChannelCount:[2]});audioNode.connect(audioContext.destination);}
+ await audioContext.resume();
+}
+function syncAudio(){const value=ready&&!fatal&&!!Module._melee_web_native_menu_running()&&!document.hidden;if(value!==audioEnabled){audioEnabled=value;audioNode?.port.postMessage({type:'state',enabled:value});}}
+window.menuAudio=pcm=>{if(audioEnabled)audioNode?.port.postMessage({type:'pcm',pcm},[pcm.buffer]);};
+window.menuServiceCommands=()=>{
+ if(fatal)return;
+ for(const c of commands.splice(0)){try{c.resolve(c.run());}catch(e){c.reject(e);}}
+ if(inputDirty){inputDirty=false;Module._melee_web_input_set_keyboard($('keyboard').checked?1:0);Module._melee_web_input_set_keyboard_port(1,$('keyboard2').checked?1:0);Module._melee_web_input_set_activity(document.hasFocus()&&document.activeElement===$('canvas')?1:0,document.hidden?0:1);}
+};
+window.menuFrame=()=>{if(!ready||fatal)return;if(!importing&&!uiMessage)$('status').textContent=Module.UTF8ToString(Module._melee_web_native_menu_message());$('status').dataset.phase=Module._melee_web_native_menu_phase();$('stock-check').disabled=Module._melee_web_native_menu_phase()!==7;$('scene-check').textContent=Module.UTF8ToString(Module._melee_web_native_menu_diagnostics());if($('input').closest('details').open)$('input').textContent=Module.UTF8ToString(Module._melee_web_input_message());syncAudio();};
+function stop(error){fatal=true;for(const id of ['disc','launch','pause','unload','keyboard','keyboard2','confirm-check','stock-check'])$(id).disabled=true;log(error);$('status').textContent='Stopped: '+error;syncAudio();for(const c of commands.splice(0))c.reject(Error(error));}
+window.addEventListener('error',e=>stop(e.error?.stack||e.message));window.addEventListener('unhandledrejection',e=>stop(e.reason?.stack||String(e.reason)));
+for(const type of ['focus','blur','visibilitychange','focusin','focusout'])window.addEventListener(type,()=>inputDirty=true,true);
+$('stock-check').onclick=()=>boundary(()=>check(Module._melee_web_native_menu_stock_check())).then(()=>{$('canvas').focus();inputDirty=true;});
+$('confirm-check').onclick=()=>boundary(()=>Module._melee_web_native_menu_confirm_check()).then(()=>{$('canvas').focus();inputDirty=true;});
+$('keyboard').onchange=$('keyboard2').onchange=()=>inputDirty=true;
+function status(){return Module.UTF8ToString(Module._melee_web_native_menu_message());}
+function check(result){if(!result)throw Error(status());}
+async function put(name,bytes){await boundary(()=>{const encoded=new TextEncoder().encode(name+'\0');const np=Module._malloc(encoded.length),bp=Module._malloc(bytes.length);try{if(!np||!bp)throw Error('Allocation failed');Module.HEAPU8.set(encoded,np);Module.HEAPU8.set(bytes,bp);check(Module._melee_web_native_menu_file(np,bp,bytes.length));}finally{Module._free(np);Module._free(bp);}});}
+$('disc').onchange=async()=>{try{
+ const file=$('disc').files[0];if(!file)return;bundle=false;importing=true;uiMessage='';$('launch').disabled=true;$('disc').disabled=true;
+ await boundary(()=>check(Module._melee_web_native_menu_unload()));
+ const {loadNativeGameDisc}=await import('./runtime-assets.mjs');const files=await loadNativeGameDisc(file,p=>$('status').textContent=`Reading local data ${p.complete}/${p.total}`);
+ for(const [name,bytes] of files)await put(name,bytes);bundle=true;uiMessage='Local menu data loaded.';$('status').textContent=uiMessage;
+}catch(e){uiMessage=e.message;log(e.message);$('status').textContent=e.message;}finally{importing=false;$('disc').disabled=fatal;$('launch').disabled=fatal||!bundle;}};
+$('launch').onclick=async()=>{try{uiMessage='';await prepareAudio();await boundary(()=>check(Module._melee_web_native_menu_launch()));$('pause').disabled=$('unload').disabled=false;$('canvas').focus();inputDirty=true;syncAudio();}catch(e){log(e.message);$('status').textContent=e.message;}};
+$('pause').onclick=()=>boundary(()=>Module._melee_web_native_menu_pause(Module._melee_web_native_menu_running())).then(()=>{$('canvas').focus();inputDirty=true;});
+$('unload').onclick=()=>{uiMessage='';return boundary(()=>check(Module._melee_web_native_menu_unload()));};
+var Module={canvas:$('canvas'),print:log,printErr:log,onAbort:stop,onRuntimeInitialized(){ready=true;$('disc').disabled=false;}};
+</script><script src="gameplay_menu_browser.js"></script></html>

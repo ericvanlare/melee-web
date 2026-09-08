@@ -10,12 +10,17 @@ using namespace melee_web;
 static void check(int ok,const char* why){if(!ok){std::cerr<<why<<'\n';throw DatError(why);}}
 static std::vector<uint8_t> bytes(const std::filesystem::path& p){std::ifstream f(p,std::ios::binary);check(bool(f),"Open owned stock-test asset");return {std::istreambuf_iterator<char>(f),{}};}
 int main(int argc,char** argv){try{
- check(argc==2,"Expected local asset directory");RuntimeFiles files;
+ check(argc==2||argc==3,"Expected base asset directory and optional Mario costume directory");RuntimeFiles files;
  for(const char* name:{"PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","sislib_font.bin"})files[name]=bytes(std::filesystem::path(argv[1])/name);
+ const bool extra_costumes=argc==3;
+ if(extra_costumes)for(const char* name:{"PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat"})
+   files[name]=bytes(std::filesystem::path(argv[2])/name);
  char error[256];
  for(unsigned cycle=0;cycle<2;cycle++){
-  GameplayWorld world(files);
-  MeleeWebPlayerSettings players[2]={{0,0,4,{-20,world.floor_height(-20)+1,0},1},{1,1,4,{20,world.floor_height(20)+1,0},-1}};
+  const unsigned costume_last=extra_costumes?5:1;
+  for(unsigned selected=0;selected<costume_last;selected++){
+   GameplayWorld world(files);
+   MeleeWebPlayerSettings players[2]={{0,0,4,{-20,world.floor_height(-20)+1,0},1,selected,0},{1,1,4,{20,world.floor_height(20)+1,0},-1,0,0}};
   auto* match=melee_web_match_begin_players(players,2,70,1,world.collision(),error,sizeof(error));check(match!=nullptr,error);
   check(melee_web_match_create_fighters(match,error,sizeof(error)),error);
   MeleeWebRenderSettings settings{640,480,{0,25,180},{0,15,0},30,1,1000,(UINT64_C(1)<<3)|(UINT64_C(1)<<5)};
@@ -43,6 +48,8 @@ int main(int argc,char** argv){try{
   check(returned&&respawns==3&&finished,"Original four-stock elimination and three grounded respawns did not complete");
   world.end_stage();
   check(melee_web_render_end(camera,error,sizeof(error)),error);check(melee_web_match_end(match,error,sizeof(error)),error);world.close();
+  }
  }
  std::cout<<"Original input four-stock elimination, three respawns and winner passed in two worlds\n";
+ if(extra_costumes)std::cout<<"Five Mario costume sources hydrated, selected, respawned and torn down twice\n";
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

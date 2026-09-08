@@ -138,6 +138,7 @@ int melee_web_menu_css_selection_valid(const CSSData* css)
 
     if (css == NULL || css->match_type != VS_MELEE ||
         css->vs.start.rules.match_kind != MatchKind_Stock ||
+        css->vs.start.rules.is_teams ||
         css->vs.start.rules.stkind != MELEE_WEB_MENU_FD_ST_KIND)
     {
         return 0;
@@ -156,12 +157,30 @@ int melee_web_menu_css_selection_valid(const CSSData* css)
     {
         return 0;
     }
+    for (i = 0; i < 2; i++) {
+        const PlayerInitData* player=&css->vs.start.players[i];
+        if((player->slot?player->slot-1:i)!=i || player->color>=5 || player->sub_color>4) return 0;
+    }
     for (i = 2; i < GM_MAX_PLAYERS; i++) {
         if (css->vs.start.players[i].slot_type != Gm_PKind_NA) {
             return 0;
         }
     }
     return 1;
+}
+
+/* Picking up a token and unplugging a controller are legitimate in-progress
+ * CSS states. Only a completed selection may enter SSS or a match. */
+static int css_progress_valid(const CSSData* css)
+{
+    CSSData view = *css;
+    for (unsigned i=0; i<2; i++) {
+        PlayerInitData* p=&view.vs.start.players[i];
+        if (p->ckind==CHKIND_NONE) p->ckind=CKIND_MARIO;
+        if (p->slot_type==Gm_PKind_NA || p->slot_type==Gm_PKind_Cpu)
+            p->slot_type=Gm_PKind_Human;
+    }
+    return melee_web_menu_css_selection_valid(&view);
 }
 
 static int vs_selection_valid(const VsModeData* vs)
@@ -233,7 +252,9 @@ MeleeWebMenuSession* melee_web_menu_session_create(
         player->slot_type = Gm_PKind_Human;
         player->stocks = (s8) selected->stocks;
         player->color = i == 0 ? selected->player0_color : selected->player1_color;
-        player->slot = (u8) i;
+        /* Original slot 0 means use this player index; nonzero is port + 1. */
+        player->slot = 0;
+        player->nametag = 0x78;
     }
     session->sss.unk_stage = 0;
     session->sss.x1 = 0;
@@ -402,7 +423,7 @@ int melee_web_menu_tick(MeleeWebMenuSession* session, char* error,
     }
 
     if (scene == MELEE_WEB_MENU_SCENE_CSS) {
-        if (!melee_web_menu_css_selection_valid(&session->css)) {
+        if (!css_progress_valid(&session->css)) {
             rejected = 1;
         }
     } else if (!melee_web_menu_sss_selection_valid(&session->sss)) {

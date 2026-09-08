@@ -3701,14 +3701,19 @@ diff --git a/src/sysdolphin/baselib/archive.c b/src/sysdolphin/baselib/archive.c
 diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
 --- a/src/melee/mn/mncharsel.c
 +++ b/src/melee/mn/mncharsel.c
-@@ -1,3 +1,6 @@
+@@ -1,3 +1,11 @@
 +#if defined(MELEE_WEB_MENU_MARIO_FD)
 +#include "gameplay_platform.h"
++#include "gameplay_menu.h"
++#define MELEE_WEB_MENU_CHARACTER_AVAILABLE(value) \
++    melee_web_menu_character_available(value)
++#else
++#define MELEE_WEB_MENU_CHARACTER_AVAILABLE(value) (1)
 +#endif
  #include "mncharsel.h"
  
  #include <melee/ft/forward.h>
-@@ -308,17 +311,9 @@
+@@ -308,17 +316,9 @@
      },
  };
  
@@ -3729,7 +3734,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
  
  TextKerning* mnCharSel_8025BC20(TextKerning* arg0, u32 arg1)
  {
-@@ -2032,7 +2027,6 @@
+@@ -2032,14 +2032,14 @@
  {
      s32 icon_idx;
      s32 icon_offset;
@@ -3737,7 +3742,16 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
      HSD_JObj* icon_jobj;
  
      do {
-@@ -2058,8 +2052,8 @@
+         s32 temp = HSD_Randi(0x19);
+         icon_idx = temp;
+         icon_offset = getIconOffset(icon_idx);
+-    } while (icons[icon_idx].state == 0);
++    } while (icons[icon_idx].state == 0 ||
++             !MELEE_WEB_MENU_CHARACTER_AVAILABLE(icons[icon_idx].char_kind));
+ 
+     mnCharSel_804D6CB0->vs.start.players[getPlayerForDoor(door)].ckind =
+         (&icons[0].char_kind)[icon_offset];
+@@ -2058,8 +2058,8 @@
      }
  
      mnCharSel_804A0BD0[door]->x5 = 0;
@@ -3748,7 +3762,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
      if (arg1 != 0) {
          mnCharSel_804A0BD0[door]->x10 = mnCharSel_804A0BD0[door]->x8;
          mnCharSel_804A0BD0[door]->x14 = mnCharSel_804A0BD0[door]->xC;
-@@ -2069,20 +2063,20 @@
+@@ -2069,20 +2069,20 @@
  
      if (mnCharSel_804D6CF5 == 1) {
          lb_80011E24(mnCharSel_804D6CC0, &icon_jobj,
@@ -3773,7 +3787,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
          gm_80168C5C((u32) char_kinds[sel * sizeof(CSSIcon)]);
      }
  }
-@@ -2097,7 +2091,6 @@
+@@ -2097,7 +2097,6 @@
      int player;
      s8 c_kind;
      int icon_idx;
@@ -3781,8 +3795,14 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
  
      if (mnCharSel_804D6CF5 == 1) {
          if (door != 0) {
-@@ -2114,13 +2107,13 @@
+@@ -2112,15 +2111,19 @@
+     css = mnCharSel_804D6CB0;
+     c_kind = css->vs.start.players[player].ckind;
  
++    if (!MELEE_WEB_MENU_CHARACTER_AVAILABLE((int) c_kind)) {
++        return 1;
++    }
++
      if (c_kind < CKIND_PLAYABLE_COUNT) {
          if (c_kind !=
 -            all_data->icons[mnCharSel_803F0DFC.doors[door].sel_icon].char_kind)
@@ -3797,7 +3817,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
              for (icon_idx = 0; icon_idx < 0x19; icon_idx++) {
                  if (css->vs.start.players[player].ckind ==
                      icon[icon_idx].char_kind)
-@@ -2131,9 +2124,9 @@
+@@ -2131,9 +2134,9 @@
          }
  
          mnCharSel_804A0BD0[door]->x8 =
@@ -3809,7 +3829,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
  
          mnCharSel_803F0DFC.doors[door].sel_icon_prev = icon_idx;
          mnCharSel_803F0DFC.doors[door].sel_icon = icon_idx;
-@@ -2146,15 +2139,15 @@
+@@ -2146,15 +2149,15 @@
  
          if (mnCharSel_804D6CF5 == 1) {
              lb_80011E24(mnCharSel_804D6CC0, &sp10,
@@ -3828,7 +3848,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
  
          {
              int door_idx = door;
-@@ -2172,9 +2165,9 @@
+@@ -2172,9 +2175,9 @@
  
          if (mnCharSel_804D6CF6 != 3 && mnCharSel_804D6CF6 != 4) {
              u8 sel = mnCharSel_803F0DFC.doors[door].sel_icon;
@@ -3840,7 +3860,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
          }
          return 0;
      }
-@@ -2224,7 +2217,6 @@
+@@ -2224,7 +2227,6 @@
                                         HSD_JObj** state_jobj,
                                         HSD_JObj** color_jobj)
  {
@@ -3848,7 +3868,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
  
      if (cursor->x5 != 1) {
          f32 y = cursor->x10;
-@@ -2255,7 +2247,7 @@
+@@ -2255,7 +2257,7 @@
              color_idx = cursor->x4;
          } else {
              color_idx =
@@ -3857,7 +3877,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                                         .team];
          }
  
-@@ -2401,7 +2393,6 @@
+@@ -2401,7 +2403,6 @@
      u32 next_port;
      HSD_JObj* jobj = GET_JOBJ(gobj);
      struct CSSCursorData* cursor = gobj->user_data;
@@ -3865,7 +3885,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
      u32 trigger;
      int n_doors;
      u32 buttons;
-@@ -2457,32 +2448,32 @@
+@@ -2457,32 +2458,32 @@
                              }
                          } else if (door <= 7U) {
                              cpu_door = door - 4;
@@ -3907,7 +3927,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                          .is_hold_handicap_slider = 0;
                  }
                  cursor->x5 = 3;
-@@ -2514,27 +2505,27 @@
+@@ -2514,27 +2515,27 @@
          cursor->xC = (f32) ((0.0002f * dx) + cursor->xC);
          cursor->x10 = (f32) ((0.0002f * dy) + cursor->x10);
  
@@ -3941,7 +3961,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                          (f32) (cursor->x10 - (-14.8f + sp88.y));
                      cursor->x10 = (f32) (-14.8f + sp88.y);
                  }
-@@ -2562,7 +2553,7 @@
+@@ -2562,7 +2563,7 @@
  
          {
              u8 port = cursor->x4;
@@ -3950,7 +3970,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
              if (tag->state == 0) {
                  if (cursor->x5 == 1) {
                      door = cursor->x6;
-@@ -2574,13 +2565,13 @@
+@@ -2574,13 +2575,13 @@
                          if (cursor->x10 < 0.2f) {
                              if ((s32) port != (s32) door ||
                                  ((s32) port == (s32) door &&
@@ -3966,7 +3986,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                                      0x19;
                                  {
                                      s32 player_idx;
-@@ -2650,7 +2641,7 @@
+@@ -2650,7 +2651,7 @@
                                          m2->xC > icons[i].bound_d &&
                                          icons[i].state >= 1)
                                      {
@@ -3975,7 +3995,18 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                                              .sel_icon = (u8) i;
                                          mnCharSel_8025DB34(door);
                                          if (trigger & HSD_PAD_A) {
-@@ -2669,7 +2660,7 @@
+@@ -2666,10 +2667,18 @@
+                                             } else {
+                                                 player_idx = door;
+                                             }
++                                            if (!MELEE_WEB_MENU_CHARACTER_AVAILABLE(
++                                                    icons[mnCharSel_803F0DFC
++                                                              .doors[door]
++                                                              .sel_icon]
++                                                        .char_kind)) {
++                                                lbAudioAx_80024030(3);
++                                                goto update_display;
++                                            }
                                              mnCharSel_804D6CB0->vs.start
                                                  .players[player_idx]
                                                  .ckind =
@@ -3984,7 +4015,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                                                                 .doors[door]
                                                                 .sel_icon]
                                                      .char_kind;
-@@ -2693,19 +2684,19 @@
+@@ -2693,19 +2702,19 @@
                                                  mnCharSel_804A0BC0
                                                      [mnCharSel_804D6CF5 - 1]
                                                          ->gobj);
@@ -4008,7 +4039,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                                                          .char_kind);
                                              }
                                              lbAudioAx_800237A8(0xB8, 0x7F,
-@@ -2718,12 +2709,12 @@
+@@ -2718,12 +2727,12 @@
  
                                  mnCharSel_8025D5AC((s32) door, 0, 1);
                                  {
@@ -4023,7 +4054,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                                      .sel_icon_prev = 0x19;
                                  if (trigger & HSD_PAD_A) {
                                      lbAudioAx_80024030(3);
-@@ -2748,7 +2739,7 @@
+@@ -2748,7 +2757,7 @@
                      case 7: {
                          s32 slider_door = door - 4;
                          updateGrabbedSlider(
@@ -4032,7 +4063,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                              slider_door, trigger, &sp98, &sp88, false);
                      } break;
                      case 8:
-@@ -2757,7 +2748,7 @@
+@@ -2757,7 +2766,7 @@
                      case 0xB: {
                          s32 hc_door = door - 8;
                          updateGrabbedSlider(
@@ -4041,7 +4072,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                              hc_door, trigger, &sp98, &sp88, true);
                      } break;
                      }
-@@ -2817,24 +2808,24 @@
+@@ -2817,24 +2826,24 @@
                      cpu_level_widget:
                          if (mnCharSel_804D6CB0->match_type <= 0xDU) {
                              f32 cy2 = cursor->x10;
@@ -4072,7 +4103,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                                              mnCharSel_804D6CB0->vs.start
                                                  .players
                                                      [(s8) (u8)
-@@ -2847,20 +2838,20 @@
+@@ -2847,20 +2856,20 @@
                                      } else {
                                          goto door_clicks;
                                      }
@@ -4097,7 +4128,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                                              mnCharSel_804D6CB0->vs.start
                                                  .players
                                                      [(s8) (u8)
-@@ -2886,6 +2877,7 @@
+@@ -2886,6 +2895,7 @@
                      goto update_display;
                  }
  
@@ -4105,7 +4136,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                  if (mnCharSel_804D6CB0->match_type != 2) {
                      f32 cx3 = cursor->xC;
                      if (cx3 > -17.0f && cx3 < 15.0f && cursor->x10 > 22.0f) {
-@@ -2907,6 +2899,8 @@
+@@ -2907,6 +2917,8 @@
                          }
                      }
                  }
@@ -4114,7 +4145,19 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
  
                  if (cursor->xC < -25.5f && cursor->x10 > 22.0f) {
                      switch ((s32) mnCharSel_804D6CB0->match_type) {
-@@ -2971,7 +2965,7 @@
+@@ -2923,6 +2935,11 @@
+                     case VS_SLOWMO:
+                         cursor->x8 = 1;
+                         if (trigger & HSD_PAD_A) {
++#if defined(MELEE_WEB_MENU_MARIO_FD)
++                            /* Team rules are outside this two-human stock slice. */
++                            lbAudioAx_80024030(3);
++                            goto update_display;
++#endif
+                             sfxMove();
+                             {
+                                 u8* is_teams = &mnCharSel_804D6CB0->vs.start
+@@ -2971,7 +2988,7 @@
                      u8 cport2 = cursor->x4;
                      if (mnCharSel_804A0BD0[cport2]->x5 == 0 &&
                          mnCharSel_804D6CB0->vs.start.rules.is_teams == 0 &&
@@ -4123,7 +4166,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                      {
                          mnCharSel_CostumeChange((s32) cport2, trigger);
                      }
-@@ -3183,18 +3177,17 @@
+@@ -3183,18 +3200,17 @@
                          {
                              if ((cursor->x4 != 3 ||
                                   mnCharSel_804D6CB0->match_type != 1) &&
@@ -4145,7 +4188,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                                              .name_jointl,
                                          -1);
                                  }
-@@ -3209,13 +3202,13 @@
+@@ -3209,13 +3225,13 @@
                                              if (mnCharSel_804D6CF5 == 1) {
                                                  lb_80011E24(
                                                      mnCharSel_804D6CC0, &sp74,
@@ -4161,7 +4204,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                                                          .list_joint,
                                                      -1);
                                              }
-@@ -3223,7 +3216,7 @@
+@@ -3223,7 +3239,7 @@
                                              cursor->xC = sp88.x;
                                              cursor->x10 =
                                                  (f32) (sp88.y - 5.0f);
@@ -4170,7 +4213,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                                                  .data->state = 1;
                                          }
                                      }
-@@ -3317,10 +3310,10 @@
+@@ -3317,10 +3333,10 @@
                              if (cport6 != 3 ||
                                  mnCharSel_804D6CB0->match_type != 1)
                              {
@@ -4183,7 +4226,20 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                                          0;
                                      mnCharSel_804D6CB0->vs.start
                                          .players[cursor->x4]
-@@ -4052,6 +4045,7 @@
+@@ -3735,6 +3751,12 @@
+ 
+         if (mnCharSel_804D6CF2 == 0 && (trigger & HSD_PAD_START)) {
+             if (mnCharSel_804D6CF7 != 0) {
++#if defined(MELEE_WEB_MENU_MARIO_FD)
++                if (!melee_web_menu_css_selection_valid(mnCharSel_804D6CB0)) {
++                    lbAudioAx_80024030(3);
++                    return;
++                }
++#endif
+                 mnCharSel_804D6CF6 = 1;
+                 mnCharSel_804D6CF2 = 0xFF;
+                 if (mnCharSel_804D6CF5 == 1) {
+@@ -4052,6 +4074,7 @@
              }
  
              if ((s32) tag->next_tag == row) {
@@ -4191,7 +4247,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                  if (IsNameListFull() == 0) {
                      if (mnCharSel_804D6CF5 == 1) {
                          mnCharSel_804D6CF9 = mnCharSel_804D6CF0;
-@@ -4072,6 +4066,8 @@
+@@ -4072,6 +4095,8 @@
                      }
                      return;
                  }
@@ -4200,7 +4256,17 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                  goto check_cancel;
              }
  
-@@ -5456,14 +5452,22 @@
+@@ -4316,7 +4341,8 @@
+         HSD_Fog* fog = HSD_FogLoadDesc(MODELS->fog);
+         HSD_GObjObject_80390A70(gobj, HSD_GObj_FogKind, fog);
+     }
+-    GObj_SetupGXLink(gobj, (GObj_RenderFunc) (Event) fn_8026407C, 0, 0x80);
++    /* Same original fog operation, with the declared two-argument GX ABI. */
++    GObj_SetupGXLink(gobj, HSD_GObj_FogCallback, 0, 0x80);
+ 
+     gobj = GObj_Create(4, 5, 0x80);
+     jobj = HSD_JObjLoadJoint(ANIM[0].joint);
+@@ -5456,14 +5482,22 @@
      case 3:
          mn_8022F138(1, 8);
          HSD_SisLib_803A5E70();
@@ -4243,3 +4309,174 @@ diff --git a/src/melee/lb/lb_0195.c b/src/melee/lb/lb_0195.c
      lb_800192A8(lb_8001955C);
      lb_8001CC84();
  }
+diff --git a/src/melee/gm/gm_1A45.c b/src/melee/gm/gm_1A45.c
+--- a/src/melee/gm/gm_1A45.c
++++ b/src/melee/gm/gm_1A45.c
+@@ -376,3 +376,52 @@
+     }
+     HSD_VIWaitXFBFlush();
+ }
++
++#if defined(MELEE_WEB_GAMEPLAY)
++/* Browser scene ownership exposes the actual transition request and counters.
++ * It never infers completion from a CSS/SSS payload. */
++static struct gm_80479D58_t melee_menu_clock_saved;
++static int melee_menu_clock_active;
++int melee_web_menu_clock_begin(void)
++{
++    if (melee_menu_clock_active) return 0;
++    melee_menu_clock_saved = gm_80479D58;
++    gm_801677C0(&gm_80479D58.unk_10);
++    gm_80479D58.unk_0 = gm_80479D58.unk_4 = gm_80479D58.unk_8 = 0;
++    gm_80479D58.unk_C = 0;
++    melee_menu_clock_active = 1;
++    return 1;
++}
++int melee_web_menu_clock_request(int* request)
++{
++    if (!melee_menu_clock_active || !request || gm_80479D58.unk_C < 0 ||
++        gm_80479D58.unk_C > 2) return 0;
++    *request = gm_80479D58.unk_C;
++    gm_80479D58.unk_C = 0;
++    return 1;
++}
++int melee_web_menu_clock_tick(void)
++{
++    if (!melee_menu_clock_active || gm_80479D58.unk_10.x0 ||
++        gm_80479D58.unk_10.x2 || gm_80479D58.unk_10.unk_30) return 0;
++    /* This menu slice has no game/debug pause callback. These are the original
++     * unpaused counters after one consumed raw PAD sample and scheduler tick. */
++    gm_80479D58.unk_10.unk_38_0 = true;
++    if (gm_80479D58.unk_0 != (u32)-2) gm_80479D58.unk_0++;
++    if (gm_80479D58.unk_8 != (u32)-2) gm_80479D58.unk_8++;
++    return 1;
++}
++int melee_web_menu_clock_present(void)
++{
++    if (!melee_menu_clock_active) return 0;
++    if (gm_80479D58.unk_4 != (u32)-2) gm_80479D58.unk_4++;
++    return 1;
++}
++int melee_web_menu_clock_end(void)
++{
++    if (!melee_menu_clock_active) return 0;
++    gm_80479D58 = melee_menu_clock_saved;
++    melee_menu_clock_active = 0;
++    return 1;
++}
++#endif
+diff --git a/src/melee/mn/mnstagesel.c b/src/melee/mn/mnstagesel.c
+--- a/src/melee/mn/mnstagesel.c
++++ b/src/melee/mn/mnstagesel.c
+@@ -1,4 +1,12 @@
+ #include "mnstagesel.h"
++
++#if defined(MELEE_WEB_MENU_MARIO_FD)
++#include "gameplay_menu.h"
++#define MELEE_WEB_MENU_STAGE_AVAILABLE(value) \
++    melee_web_menu_stage_available(value)
++#else
++#define MELEE_WEB_MENU_STAGE_AVAILABLE(value) (1)
++#endif
+ 
+ #include <placeholder.h>
+ 
+@@ -47,7 +55,8 @@
+ 
+     for (i = 0; i < NUM_STAGES; i++) {
+         if (mnStageSel_803F06D0[i].x4 >= 0 &&
+-            (u8) gm_80164330(mnStageSel_803F06D0[i].xA))
++            (u8) gm_80164330(mnStageSel_803F06D0[i].xA) &&
++            MELEE_WEB_MENU_STAGE_AVAILABLE(mnStageSel_803F06D0[i].xB))
+         {
+             break;
+         }
+@@ -56,6 +65,18 @@
+         for (i = 0; i < NUM_STAGES; i++) {
+             mnStageSel_803F06D0[i].x4 = 0;
+         }
++#if defined(MELEE_WEB_MENU_MARIO_FD)
++        for (i = 0; i < NUM_STAGES; i++) {
++            if ((u8) gm_80164330(mnStageSel_803F06D0[i].xA) &&
++                MELEE_WEB_MENU_STAGE_AVAILABLE(mnStageSel_803F06D0[i].xB))
++            {
++                break;
++            }
++        }
++        if (i == NUM_STAGES) {
++            return -1;
++        }
++#endif
+     }
+     while (var_r29) {
+         for (i = 0; i < NUM_STAGES; i++) {
+@@ -65,7 +86,8 @@
+         }
+         for (i = 0; i < NUM_STAGES; i++) {
+             if (mnStageSel_803F06D0[i].x4 == 0 &&
+-                (u8) gm_80164330(mnStageSel_803F06D0[i].xA))
++                (u8) gm_80164330(mnStageSel_803F06D0[i].xA) &&
++                MELEE_WEB_MENU_STAGE_AVAILABLE(mnStageSel_803F06D0[i].xB))
+             {
+                 var_r29 = false;
+             }
+@@ -74,14 +96,19 @@
+     for (iter = 0; iter < MAX_ITER; iter++) {
+         int tmp = HSD_Randi(NUM_STAGES);
+         i = tmp;
+-        if (mnStageSel_803F06D0[i].x4 == 0) {
++        if (mnStageSel_803F06D0[i].x4 == 0 &&
++            MELEE_WEB_MENU_STAGE_AVAILABLE(mnStageSel_803F06D0[i].xB)) {
+             if ((u8) gm_80164330(mnStageSel_803F06D0[i].xA)) {
+                 break;
+             }
+         }
+     }
+     if (iter >= MAX_ITER) {
++#if defined(MELEE_WEB_MENU_MARIO_FD)
++        return -1;
++#else
+         i = 0;
++#endif
+     }
+     mnStageSel_803F06D0[i].x4 = -1;
+     if (i < 22) {
+@@ -124,12 +151,24 @@
+         if (mnStageSel_804D6CAE < 0x1E &&
+             mnStageSel_803F06D0[mnStageSel_804D6CAE].x8 >= 2)
+         {
++            if (!MELEE_WEB_MENU_STAGE_AVAILABLE(
++                    mnStageSel_803F06D0[mnStageSel_804D6CAE].xB)) {
++                lbAudioAx_80024030(3);
++                return;
++            }
+             goto skip_randomize;
+         }
+         lbAudioAx_80024030(3);
+         return;
+     }
+-    mnStageSel_804D6CAE = mnStageSel_802599EC();
++    {
++        int candidate = mnStageSel_802599EC();
++        if (candidate < 0) {
++            lbAudioAx_80024030(3);
++            return;
++        }
++        mnStageSel_804D6CAE = candidate;
++    }
+ skip_randomize:
+ 
+     gobj = GObj_Create(HSD_GOBJ_CLASS_FIGHTER, 5, 0x80);
+@@ -851,7 +890,11 @@
+ 
+ int mnStageSel_8025BBD4(void)
+ {
+-    return mnStageSel_803F06D0[mnStageSel_802599EC()].xB;
++    int index = mnStageSel_802599EC();
++    if (index < 0) {
++        return -1;
++    }
++    return mnStageSel_803F06D0[index].xB;
+ }
+ 
+ int mnStageSel_8025BC08(int idx)

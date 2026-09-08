@@ -9,6 +9,7 @@ typedef struct MeleeWebPlayerContext MeleeWebPlayerContext;
 typedef struct MeleeWebPlayerSettings {
     uint32_t slot, controller, stocks;
     float position[3], facing;
+    uint32_t costume,sub_color; /* Original selected costume and duplicate tint. */
 } MeleeWebPlayerSettings;
 typedef struct MeleeWebPlayerStats {
     int32_t slot_type, character, controller, player_id, costume, stocks;
@@ -16,7 +17,7 @@ typedef struct MeleeWebPlayerStats {
     float position[3], facing, model_scale, attack_ratio, defense_ratio;
     uint32_t stale_index, live_entities;
 } MeleeWebPlayerStats;
-/* Scoped source StaticPlayer initialization for human neutral-costume Mario.
+/* Scoped source StaticPlayer initialization for human Mario with an explicit costume.
  * Uses original reset/setters/getters and stale-table reset. Owns no Fighter;
  * original Player_80031AD0(slot) can subsequently create and publish one.
  * Existing entity/state or overlapping context ownership rejects. */

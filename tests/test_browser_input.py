@@ -48,6 +48,15 @@ class BrowserInputTests(unittest.TestCase):
     def test_keyboard_default_and_prestartup_frontend_preference(self):
         self.run_case("keyboard_preference")
 
+    def test_explicit_p2_profile_and_p1_restore(self):
+        result = self.run_case("keyboard_port_two_profile")
+        self.assertEqual(result["keyboard_requested_mask"], 1)
+
+    def test_physical_p2_precedes_keyboard_only_on_port_two(self):
+        result = self.run_case("per_port_physical_priority")
+        self.assertEqual(result["keyboard_active_mask"], 3)
+        self.assertEqual(result["physical_mask"], 0)
+
     def test_raw_sampling_and_separate_provider_clamp(self):
         result = self.run_case("raw_and_clamped")
         self.assertEqual(result["physical_mask"], 1)
