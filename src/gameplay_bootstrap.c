@@ -23,6 +23,8 @@ static void* arena;
 static OSHeapHandle heap = -1;
 static uint64_t ticks, disabled_links, generation;
 static int stepping, shutting_down, tables_live;
+static unsigned object_kind_count;
+static void (*finish_hsd_objects)(void);
 
 static int fail(char* error, size_t size, const char* text)
 {
@@ -45,7 +47,8 @@ static int has_render_objects(void)
 {
     for (unsigned link = 0; link <= HSD_GObjLibInitData.p_link_max; ++link)
         for (HSD_GObj* object = ((HSD_GObj**) HSD_GObj_Entities)[link]; object; object = object->next)
-            if (object->obj_kind != HSD_GOBJ_OBJ_NONE) return 1;
+            if (object->obj_kind != HSD_GOBJ_OBJ_NONE &&
+                object->obj_kind >= object_kind_count) return 1;
     return 0;
 }
 
@@ -70,7 +73,8 @@ int melee_web_gameplay_startup(size_t bytes, char* error, size_t error_size)
 
     /* The table ownership mirrors gobjinit.c. Registering its default graphics
      * destructors would pull in uninitialized HSD render-object lifetimes. This
-     * scoped world has no such object kinds; original GObj/proc allocation,
+     * scoped world starts without such kinds; the optional native HSD lane
+     * installs their real registry explicitly. Original GObj/proc allocation,
      * insertion, mutation, deletion and invocation execute unchanged below.
      * Source defaults are p/gx link max63; gm_1A45.c sets process max0x18. */
     HSD_GObjLibInitData = (HSD_GObjLibInitDataType) {63, 63, 0x18, NULL, &disabled_links};
@@ -81,6 +85,8 @@ int melee_web_gameplay_startup(size_t bytes, char* error, size_t error_size)
     HSD_GObj_804D7840 = zero_table(25, sizeof(HSD_GObjProc*));
     HSD_GObj_804D7844 = zero_table(25 * 64, sizeof(HSD_GObjProc*));
     HSD_GObj_804D7810 = NULL;
+    object_kind_count = 0;
+    finish_hsd_objects = NULL;
     HSD_ObjAllocInit(&gobj_alloc_data, sizeof(HSD_GObj), 4);
     HSD_ObjAllocInit(&gobjproc_alloc_data, sizeof(HSD_GObjProc), 4);
     HSD_GObj_804D783C = 0;
@@ -92,6 +98,32 @@ int melee_web_gameplay_startup(size_t bytes, char* error, size_t error_size)
     ++generation;
     stepping = shutting_down = 0;
     tables_live = 1;
+    return success(error, error_size);
+}
+
+int melee_web_gameplay_enable_hsd_objects(void (*after_objects)(void),
+                                         char* error, size_t error_size)
+{
+    if (!tables_live || shutting_down || stepping ||
+        !melee_web_gameplay_heap_owns(arena))
+        return fail(error, error_size, "An idle owned gameplay world is required for HSD lifetimes");
+    if (!after_objects)
+        return fail(error, error_size, "Native HSD lifetimes require post-object class cleanup");
+    if (finish_hsd_objects)
+        return finish_hsd_objects == after_objects ? success(error, error_size) :
+            fail(error, error_size, "Native HSD lifetime ownership is already registered");
+    if (HSD_GObjLibInitData.funcs || HSD_GObj_804D7810 || has_render_objects())
+        return fail(error, error_size, "Cannot replace an existing HSD object-kind registry");
+    /* Exact registry setup and flattening used by original gobjinit.c. */
+    HSD_GObj_80391260(&HSD_GObjLibInitData);
+    for (GObjFuncs* p = HSD_GObjLibInitData.funcs; p; p = p->next)
+        object_kind_count += p->size;
+    HSD_GObj_804D7810 = zero_table(object_kind_count, sizeof(GObjFunc));
+    unsigned offset = 0;
+    for (GObjFuncs* p = HSD_GObjLibInitData.funcs; p; p = p->next)
+        for (unsigned i = 0; i < p->size; ++i)
+            HSD_GObj_804D7810[offset++] = p->funcs[i];
+    finish_hsd_objects = after_objects;
     return success(error, error_size);
 }
 
@@ -143,6 +175,12 @@ int melee_web_gameplay_shutdown(char* error, size_t error_size)
     for (unsigned link = 0; link <= HSD_GObjLibInitData.p_link_max; ++link)
         while (((HSD_GObj**) HSD_GObj_Entities)[link])
             HSD_GObjPLink_80390228(((HSD_GObj**) HSD_GObj_Entities)[link]);
+    if (finish_hsd_objects) finish_hsd_objects();
+    finish_hsd_objects = NULL;
+    if (HSD_GObj_804D7810) HSD_Free(HSD_GObj_804D7810);
+    HSD_GObj_804D7810 = NULL;
+    HSD_GObjLibInitData.funcs = NULL;
+    object_kind_count = 0;
     HSD_Free(HSD_GObj_Entities); HSD_Free(plinklow_gobjs);
     HSD_Free(HSD_GObjGXLinkHead); HSD_Free(HSD_GObj_804D7820);
     HSD_Free(HSD_GObj_804D7840); HSD_Free(HSD_GObj_804D7844);

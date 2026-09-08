@@ -25,6 +25,8 @@ through compiled source, without a PowerPC CPU interpreter or JIT.
 - Run `python3 -m unittest discover -s tests -v`, build the affected target, inspect diffs.
 - A dependency upgrade requires revalidation. Do not reset or overwrite unexplained changes.
 - Subagents may own bounded files. The lead integrates, reviews, and verifies their results.
+- Use GPT-6 Astra with medium reasoning for subagents unless the user changes this
+  preference. Keep assignments bounded and avoid duplicate audits or idle workers.
 
 The current probe is a feasibility artifact, not a playable port. Refer to docs/ROADMAP.md
 for the acceptance criteria before broadening its scope.

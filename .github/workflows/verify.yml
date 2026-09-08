@@ -31,6 +31,8 @@ jobs:
       - name: Run original gameplay runtime and ABI checks
         run: |
           python3 -m unittest discover -s tests -p 'test_gameplay_*.py' -v
+          python3 -m unittest discover -s tests -p 'test_common_tables.py' -v
+          python3 -m unittest discover -s tests -p 'test_hsd_native*.py' -v
           python3 scripts/check_gameplay.py
           python3 scripts/gameplay_census.py --jobs 2
       - name: Validate browser input adapter with configured SDL headers

@@ -1,0 +1,265 @@
+#include "dat_fighter_runtime.hpp"
+#include <algorithm>
+#include <bit>
+#include <cmath>
+#include <limits>
+
+namespace melee_web {
+namespace {
+void require(bool value, const char* message) { if (!value) throw DatError(message); }
+const DatArchive& checked_archive(const std::shared_ptr<const DatArchive>& archive)
+{
+    require(bool(archive), "Fighter runtime archive is null");
+    return *archive;
+}
+const FighterCostume* canonical_costume(const FighterCostume& value)
+{
+    for (const auto& entry : fighter_costumes()) {
+        if (entry.fighter_kind == value.fighter_kind && entry.costume_index == value.costume_index &&
+            entry.motion_count == value.motion_count && entry.kind_name == value.kind_name &&
+            entry.fighter_filename == value.fighter_filename && entry.fighter_symbol == value.fighter_symbol &&
+            entry.animation_filename == value.animation_filename && entry.model_filename == value.model_filename &&
+            entry.model_symbol == value.model_symbol && entry.material_animation_symbol == value.material_animation_symbol)
+            return &entry;
+    }
+    throw DatError("Fighter runtime identity differs from the source registry");
+}
+void region(const DatArchive& archive, std::uint32_t offset, std::size_t bytes, bool aligned = true)
+{
+    require(!aligned || offset % 4 == 0, "Fighter runtime descriptor is unaligned");
+    (void) archive.range(offset, bytes);
+    require(bytes <= archive.next_target_offset(offset) - offset,
+            "Fighter runtime descriptor crosses a referenced region");
+}
+std::uint32_t pointer(const DatArchive& archive, std::uint32_t slot, std::size_t bytes)
+{
+    const auto result = archive.pointer(slot, bytes);
+    require(result.has_value(), "Required fighter runtime pointer is null");
+    return *result;
+}
+std::uint32_t scalar(const DatArchive& archive, std::uint32_t at)
+{
+    require(!archive.has_relocation(at), "Fighter scalar unexpectedly contains a relocation");
+    return archive.be32(at);
+}
+std::uint32_t read_U32(const DatArchive& archive, std::uint32_t at) { return scalar(archive, at); }
+std::int32_t read_I32(const DatArchive& archive, std::uint32_t at)
+{
+    return std::bit_cast<std::int32_t>(scalar(archive, at));
+}
+float read_F32(const DatArchive& archive, std::uint32_t at)
+{
+    const float value = std::bit_cast<float>(scalar(archive, at));
+    require(std::isfinite(value), "Fighter attribute is nonfinite");
+    return value;
+}
+std::uint8_t read_U8(const DatArchive& archive, std::uint32_t at)
+{
+    (void) scalar(archive, at); // Both source byte fields occupy aligned tail words.
+    return archive.range(at, 1)[0];
+}
+std::uint32_t root(const DatArchive& archive, std::string_view symbol)
+{
+    for (const auto& entry : archive.public_symbols()) if (entry.name == symbol) return entry.data_offset;
+    throw DatError("Fighter runtime public symbol is missing");
+}
+}
+
+DatPackedCommands::DatPackedCommands(std::shared_ptr<const DatArchive> archive, std::uint32_t offset)
+    : archive_(std::move(archive)), offset_(offset), byte_count_(archive_->next_target_offset(offset) - offset)
+{
+    region(*archive_, offset, 4);
+}
+std::span<const std::uint8_t> DatPackedCommands::bytes() const { return archive_->range(offset_, byte_count_); }
+std::uint32_t DatPackedCommands::word(std::size_t index) const
+{
+    require(index < byte_count_ / 4, "Packed command word exceeds its referenced region");
+    return archive_->be32(offset_ + std::uint32_t(index * 4));
+}
+std::optional<std::uint32_t> DatPackedCommands::relocated_target(std::size_t index) const
+{
+    (void) word(index);
+    const auto slot = offset_ + std::uint32_t(index * 4);
+    return archive_->has_relocation(slot) ? archive_->pointer(slot) : std::nullopt;
+}
+
+DatFighterRuntime::DatFighterRuntime(std::shared_ptr<const DatArchive> archive, const FighterCostume& costume)
+    : archive_(std::move(archive)), costume_(canonical_costume(costume)),
+      archive_actions_(checked_archive(archive_), *costume_)
+{
+    const auto& data = *archive_;
+    root_ = root(data, costume_->fighter_symbol);
+    region(data, root_, 0x60);
+    auto offset = pointer(data, root_, 0x184);
+    region(data, offset, 0x184);
+#define READ_CO(at, type, name, original) base_.co.name = read_##type(data, offset + at);
+    MELEE_WEB_CO_ATTRIBUTE_FIELDS(READ_CO)
+#undef READ_CO
+    offset = pointer(data, root_ + 0x40, 0x30);
+    region(data, offset, 0x30);
+#define READ_PICKUP(at, type, name, original) base_.pickup.name = read_##type(data, offset + at);
+    MELEE_WEB_PICKUP_ATTRIBUTE_FIELDS(READ_PICKUP)
+#undef READ_PICKUP
+    offset = pointer(data, root_ + 0x50, 8);
+    region(data, offset, 8);
+    base_.x2c4_x = read_F32(data, offset);
+    base_.x2c4_y = read_F32(data, offset + 4);
+    extension_ = pointer(data, root_ + 4, 1);
+    // Kind-specific schema, not a filename exception. Other kinds retain only
+    // the checked extension identity; they are not native-extension-ready.
+    if (costume_->kind_name == "FTKIND_MARIO") {
+        region(data, extension_, 0x84);
+        mario_.emplace();
+#define READ_MARIO(at, type, name, original) mario_->name = read_##type(data, extension_ + at);
+        MELEE_WEB_MARIO_ATTRIBUTE_FIELDS(READ_MARIO)
+#undef READ_MARIO
+    }
+    // ftColl_8007B320 enforces 15 hurt capsules and 11 dynamics spheres;
+    // ftCo_8009CF84 enforces strictly fewer than 10 dynamics sets.
+    const auto hurt = pointer(data, root_ + 0x30, 8);
+    region(data, hurt, 8);
+    const auto hurt_count = read_I32(data, hurt);
+    require(hurt_count >= 0 && hurt_count <= 15, "Fighter hurtbox count exceeds source capacity");
+    const auto hurt_rows = data.pointer(hurt + 4, hurt_count ? std::size_t(hurt_count) * 40 : 1);
+    require(hurt_rows || !hurt_count, "Fighter hurtbox records are missing");
+    if (hurt_count) region(data, *hurt_rows, std::size_t(hurt_count) * 40);
+    for (std::int32_t i = 0; i < hurt_count; ++i) {
+        const auto at = *hurt_rows + std::uint32_t(i) * 40;
+        DatFighterHurtbox box{};
+        box.descriptor_offset = at; box.bone_index = read_U32(data, at);
+        box.height = read_U32(data, at + 4); box.is_grabbable = read_U32(data, at + 8);
+        require(box.bone_index < 140 && box.height <= 2, "Fighter hurtbox bone or height is invalid");
+        for (std::uint32_t axis = 0; axis < 3; ++axis) {
+            box.a_offset[axis] = read_F32(data, at + 12 + axis * 4);
+            box.b_offset[axis] = read_F32(data, at + 24 + axis * 4);
+        }
+        box.scale = read_F32(data, at + 36);
+        hurtboxes_.push_back(box);
+    }
+    const auto dyn = pointer(data, root_ + 0x2c, 20);
+    dynamics_.descriptor_offset = dyn;
+    region(data, dyn, 20);
+    const auto bone_count = read_I32(data, dyn), sphere_count = read_I32(data, dyn + 8);
+    require(bone_count >= 0 && bone_count < 10 && sphere_count >= 0 && sphere_count <= 11,
+            "Fighter dynamics count exceeds source capacity");
+    const auto bones = data.pointer(dyn + 4, bone_count ? std::size_t(bone_count) * 24 : 1);
+    const auto spheres = data.pointer(dyn + 12, sphere_count ? std::size_t(sphere_count) * 20 : 1);
+    require((bones || !bone_count) && (spheres || !sphere_count), "Fighter dynamics records are missing");
+    if (bone_count) region(data, *bones, std::size_t(bone_count) * 24);
+    if (sphere_count) region(data, *spheres, std::size_t(sphere_count) * 20);
+    dynamics_.animation_table_offset = data.pointer(dyn + 16, 4);
+    std::uint32_t total_parameters = 0;
+    for (std::int32_t i = 0; i < bone_count; ++i) {
+        const auto at = *bones + std::uint32_t(i) * 24;
+        DatFighterDynamicsBone bone{};
+        bone.descriptor_offset = at; bone.bone_index = read_U32(data, at);
+        const auto count = read_U32(data, at + 8);
+        // The original pool has 0x140 entries across the world. This only caps
+        // a decoded fighter's demand; allocation must account for other users.
+        require(bone.bone_index < 140 && count > 0 && count <= 140 && total_parameters + count <= 320,
+                "Fighter bone dynamics parameters exceed checked part/pool bounds");
+        total_parameters += count;
+        const auto parameters = pointer(data, at + 4, std::size_t(count) * 60);
+        region(data, parameters, std::size_t(count) * 60);
+        for (std::uint32_t axis = 0; axis < 3; ++axis) bone.position[axis] = read_F32(data, at + 12 + axis * 4);
+        for (std::uint32_t n = 0; n < count; ++n) {
+            std::array<float, 15> values{};
+            for (std::uint32_t field = 0; field < 15; ++field)
+                values[field] = read_F32(data, parameters + n * 60 + field * 4);
+            bone.parameters.push_back(values);
+        }
+        dynamics_.bones.push_back(std::move(bone));
+    }
+    for (std::int32_t i = 0; i < sphere_count; ++i) {
+        const auto at = *spheres + std::uint32_t(i) * 20;
+        DatFighterDynamicsSphere sphere{};
+        sphere.descriptor_offset = at; sphere.bone_index = read_U32(data, at);
+        require(sphere.bone_index < 140, "Fighter dynamics sphere bone exceeds checked part bounds");
+        for (std::uint32_t axis = 0; axis < 3; ++axis) sphere.offset[axis] = read_F32(data, at + 4 + axis * 4);
+        sphere.size = read_F32(data, at + 16);
+        dynamics_.spheres.push_back(sphere);
+    }
+    const auto table = pointer(data, root_ + 0xc, std::size_t(costume_->motion_count) * 24);
+    const auto blends = pointer(data, root_ + 0x10, std::size_t(costume_->motion_count) * 2);
+    region(data, blends, std::size_t(costume_->motion_count) * 2, false);
+    // Blend/dynamics records are two raw bytes, never packed host bitfields.
+    for (std::uint32_t slot = blends & ~3U; slot < blends + costume_->motion_count * 2; slot += 4)
+        if (std::size_t(slot) + 4 <= data.data().size())
+            require(!data.has_relocation(slot), "Fighter blend bytes contain a relocation");
+    for (std::uint32_t id = 0; id < costume_->motion_count; ++id) {
+        const auto row = table + id * 24;
+        DatRuntimeAction action{};
+        action.motion_id = id;
+        action.descriptor_offset = row;
+        action.container_offset = scalar(data, row + 4);
+        action.archive_bytes = scalar(data, row + 8);
+        action.motion_flags = scalar(data, row + 16);
+        action.command_offset = data.pointer(row + 12, 4);
+        if (action.command_offset) region(data, *action.command_offset, 4);
+        const auto blend = data.range(blends + id * 2, 2);
+        std::copy(blend.begin(), blend.end(), action.blend_dynamics.begin());
+        actions_.push_back(std::move(action));
+    }
+    for (const auto& action : archive_actions_.actions) actions_[action.motion_id].symbol = action.symbol;
+    if (const auto choices = data.pointer(root_ + 0x24, 8)) {
+        require(*choices % 4 == 0, "Fighter Wait choices are unaligned");
+        const auto capacity = std::min<std::uint32_t>(1025, (data.next_target_offset(*choices) - *choices) / 8);
+        std::uint64_t total = 0;
+        bool terminated = false;
+        for (std::uint32_t i = 0; i < capacity; ++i) {
+            const auto at = *choices + i * 8;
+            const auto id = read_I32(data, at);
+            if (id == -1) { terminated = true; break; }
+            const auto weight = read_I32(data, at + 4);
+            require(i < 1024 && id >= 0 && std::uint32_t(id) < actions_.size() && weight >= 0,
+                    "Fighter Wait choice has invalid motion ID or weight");
+            total += std::uint32_t(weight);
+            require(total <= std::numeric_limits<std::int32_t>::max(), "Fighter Wait cumulative weight overflows original int");
+            wait_choices_.push_back({std::uint32_t(id), std::uint32_t(weight)});
+        }
+        require(terminated && total >= 100, "Fighter Wait choices do not terminate or cover source random range 1..100");
+    }
+}
+const DatRuntimeAction& DatFighterRuntime::action(std::uint32_t id) const
+{
+    require(id < actions_.size(), "Fighter motion ID is outside the source action table");
+    return actions_[id];
+}
+void DatFighterRuntime::validate_part_indices(std::size_t count) const
+{
+    require(count > 0 && count <= 140, "Fighter part count exceeds the checked animation boundary");
+    for (const auto& box : hurtboxes_) require(box.bone_index < count, "Fighter hurtbox bone is outside the bound skeleton");
+    for (const auto& bone : dynamics_.bones) require(bone.bone_index < count, "Fighter dynamics bone is outside the bound skeleton");
+    for (const auto& sphere : dynamics_.spheres) require(sphere.bone_index < count, "Fighter sphere bone is outside the bound skeleton");
+    if (mario_) require(mario_->cape_reflection_x0_bone_id < count, "Fighter reflector bone is outside the bound skeleton");
+}
+std::optional<DatPackedCommands> DatFighterRuntime::commands(std::uint32_t id) const
+{
+    const auto offset = action(id).command_offset;
+    return offset ? std::optional(DatPackedCommands(archive_, *offset)) : std::nullopt;
+}
+
+DatFighterAnimationStore::DatFighterAnimationStore(std::shared_ptr<const DatFighterRuntime> fighter,
+                                                 std::span<const std::uint8_t> container)
+    : fighter_(std::move(fighter))
+{
+    require(bool(fighter_), "Fighter animation store has no fighter metadata");
+    fighter_->archive_actions().validate_container(container);
+    container_.assign(container.begin(), container.end());
+}
+DatSelectedAction DatFighterAnimationStore::select(std::uint32_t id)
+{
+    DatSelectedAction result{fighter_->action(id), {}, fighter_->commands(id)};
+    if (!result.action.archive_bytes) return result;
+    for (const auto& entry : cache_) {
+        if (entry.animation && entry.offset == result.action.container_offset && entry.size == result.action.archive_bytes &&
+            entry.symbol == result.action.symbol) { result.animation = entry.animation; return result; }
+    }
+    const DatArchive archive(fighter_->archive_actions().slice(container_, id));
+    const auto offset = root(archive, result.action.symbol);
+    result.animation = std::make_shared<const DatAnimation>(archive, offset);
+    cache_[next_] = {result.action.container_offset, result.action.archive_bytes, result.action.symbol, result.animation};
+    next_ = (next_ + 1) % cache_.size();
+    return result;
+}
+} // namespace melee_web

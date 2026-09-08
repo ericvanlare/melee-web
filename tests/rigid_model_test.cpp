@@ -182,6 +182,30 @@ void valid_f32_geometry()
           model.meshes[0].attributes[0].byte_size == 36, "binary32 coordinates and stride");
 }
 
+void signed_byte_geometry()
+{
+    for (bool index16 : {false, true}) {
+        Fixture fixture(true, index16);
+        fixture.attribute(Fixture::descriptors, 9, index16 ? 3 : 2, 1, 1, 4, 3, 0);
+        fixture.attribute(Fixture::descriptors + 24, 10, index16 ? 3 : 2, 0, 1, 6, 3, 32);
+        const std::array<std::uint8_t, 9> positions = {0x80, 0xf0, 0, 0x7f, 0xf0, 0, 0, 0x30, 0x10};
+        std::copy(positions.begin(), positions.end(), fixture.data.begin());
+        for (std::size_t i = 0; i < 3; ++i) {
+            fixture.data[32 + i * 3] = fixture.data[33 + i * 3] = 0;
+            fixture.data[34 + i * 3] = 64;
+        }
+        const auto model = fixture.model();
+        check(model.minimum == std::array<float, 3>{-8.F, -1.F, 0.F} &&
+              model.maximum == std::array<float, 3>{7.9375F, 3.F, 1.F},
+              "signed8 extremes retain source fractional position scale");
+        check(model.meshes[0].attributes[0].byte_size == 9 &&
+              model.meshes[0].attributes[1].byte_size == 9,
+              "signed8 position and normal arrays retain exact byte spans");
+        put16(fixture.data, Fixture::descriptors + 18, 2);
+        rejects([&] { (void) fixture.model(); });
+    }
+}
+
 void display_commands()
 {
     for (const auto opcode : {0x08, 0x48, 0x61, 0x91, 0xa8, 0xb8}) {
@@ -535,7 +559,7 @@ void material_vertex_dependencies()
 void descriptor_formats()
 {
     for (const auto& [offset, value] : std::vector<std::pair<std::uint32_t, std::uint32_t>>{
-             {0, 10}, {0, 11}, {0, 255}, {4, 1}, {8, 0}, {12, 1}, {12, 5}}) {
+             {0, 10}, {0, 11}, {0, 255}, {4, 1}, {8, 0}, {12, 0}, {12, 5}}) {
         Fixture fixture;
         put32(fixture.data, Fixture::descriptors + offset, value);
         rejects([&] { (void) fixture.model(); });
@@ -980,6 +1004,7 @@ int main(int argc, char** argv)
         {"valid_zero_offset_array", valid_zero_offset_array},
         {"normals_and_index_widths", normals_and_index_widths},
         {"valid_f32_geometry", valid_f32_geometry}, {"display_commands", display_commands},
+        {"signed_byte_geometry", signed_byte_geometry},
         {"surface_counts", surface_counts}, {"truncated_packets", truncated_packets},
         {"indexed_array_bounds", indexed_array_bounds}, {"cyclic_graphs", cyclic_graphs},
         {"raw_joint_srt", raw_joint_srt}, {"joint_hierarchy", joint_hierarchy},

@@ -11,18 +11,35 @@ Mario/Fox clip playback and opaque stage inspection remain regression fixtures.
   already drive the browser inspector. Aurora supplies GX/WebGPU and PAD.
 - The isolated gameplay target owns a real SDK heap and executes original HSD
   GObj allocation, process ordering and lifetime behavior. It intentionally has
-  no initialized graphics-object kinds or full fighter/stage lifecycle.
+  an optional original graphics-object lifetime registry; full fighter/stage
+  lifecycle remains incomplete.
 - Checked Wasm ABI patches preserve fighter animation-flag aliases. Packed
   imported command words still require explicit decoding; native bitfield casts
   are not valid just because pointer width matches.
-- PlCo root0 has a source-generated scalar schema. The other 22 roots retain
-  explicit readiness. Original input reset and walk-threshold logic consume
+- PlCo root0 has a source-generated scalar schema, 15 static roots have owned
+  typed graphs, and root20 has a separate original native-constructor probe.
+  Remaining roots retain explicit readiness. Original input reset and walk-threshold logic consume
   scoped typed data without pretending full common initialization has happened.
 - Typed collision data feeds original static loading/pruning/island/query code.
   Stage scale and original stage kind are explicit. Joint bindings, callbacks,
   dynamic geometry and fighter ECB/physics remain separate requirements.
 
-## Parallel implementation batches
+## Next integration order
+
+The data and native-construction batches below now have bounded implementations.
+Connect them in this order rather than extending inspection-only features:
+
+1. Publish owned common/fighter/costume registries under one world lifetime.
+   The fighter registry reset's console adjacency assumption is patched and tested.
+2. Hydrate material-animation descriptors and route the original action loader
+   through owned decoded clips. Decode packed commands before executing Wait.
+3. Initialize required item registration, player context and stage lighting.
+   Mario's OnLoad calls item registration unconditionally; its destination table
+   must be initialized even before a projectile is spawned.
+4. Call original Fighter_Create, tick neutral Wait, unload and restart. Then
+   advance to controllable movement with original-game state comparisons.
+
+## Implementation boundaries
 
 1. **Common data and named parts.** Hydrate common roots1–5,9–15,18–19,21 as
    owned typed graphs: item/staling tables, named part maps, counted shake vectors,

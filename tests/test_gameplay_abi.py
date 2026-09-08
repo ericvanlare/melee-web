@@ -36,6 +36,16 @@ class GameplayAbiTests(unittest.TestCase):
         cls.temp = tempfile.TemporaryDirectory(prefix="melee gameplay ABI ")
         cls.addClassCleanup(cls.temp.cleanup)
         cls.directory = Path(cls.temp.name)
+        table = (ROOT / ".deps/melee/src/melee/ft/ftmotionstates.c").read_text()
+        wait = re.search(r"// ftCo_MS_Wait = 14\s+([^,]+),\s+([^,]+),\s+([^,]+),", table)
+        if wait is None:
+            raise AssertionError("Original Wait initializer not found")
+        # Keep original enum expressions and numeric initializer; callbacks are
+        # irrelevant to layout and deliberately excluded from this compile probe.
+        (cls.directory / "motion_wait_fixture.h").write_text(
+            '#include <melee/ft/kinds/ftCommon/forward.h>\n'
+            + 'static const MotionState motion_wait = {'
+            + ','.join(wait.groups()) + ',0,0,0,0,0};\n')
 
     def run_command(self, command):
         result = subprocess.run(command, cwd=self.directory, env=self.env, capture_output=True,
@@ -61,7 +71,7 @@ class GameplayAbiTests(unittest.TestCase):
         output = self.directory / (label + ".ll")
         self.run_command([str(self.sdk / "upstream/bin/clang"), "--target=" + target,
             "-ffreestanding", "-isystem", str(self.emscripten / "cache/sysroot/include"),
-            *self.common(source), "-O2", "-S", "-emit-llvm",
+            *self.common(source), "-O2", "-S", "-emit-llvm", "-I", str(self.directory),
             str(ROOT / "tests/gameplay_abi_reference.c"), "-o", str(output)])
         values = {}
         for name, body in re.findall(r"define[^\n]* @([a-z_0-9]+)\([^\n]*\)[^{]*\{(.*?)\n\}",
@@ -69,7 +79,7 @@ class GameplayAbiTests(unittest.TestCase):
             value = re.search(r"ret i32 (-?\d+)", body)
             self.assertIsNotNone(value, "Expected a compiler constant for " + name)
             values[name] = int(value.group(1)) & 0xffffffff
-        self.assertEqual(len(values), 21)
+        self.assertEqual(len(values), 50)
         return values
 
     def test_original_powerpc_and_patched_wasm_agree_with_explicit_negative_control(self):
@@ -84,13 +94,27 @@ class GameplayAbiTests(unittest.TestCase):
                     "flag_nested0":0xfe00, "flag_nested7":0x1c0,
                     "fighter_size":0x23ec, "command_size":0x24, "command_tail_offset":0x1c,
                     "gobj_size":0x38}
+        expected.update({f"stage_flag_{bit}": 1 << (31-bit) for bit in range(8)})
+        expected.update(stage_callbacks_size=20, stage_flags_offset=16)
+        expected.update(motion_move_id=0xff000000, motion_xa=0xff00, motion_xb=255,
+                        motion_size=32, motion_word_offset=8, motion_callback_offset=12,
+                        motion_wait_b0=1, motion_wait_b1=1,
+                        motion_wait_default=ppc["motion_wait_default"],
+                        motion_wait_move=ppc["motion_wait_default"],
+                        motion_wait_word=(ppc["motion_wait_default"] << 24) | (1 << 22) | (1 << 23))
+        expected.update({f"motion_b{bit}": 1 << (23-bit) for bit in range(8)})
         for key, value in expected.items():
             with self.subTest(field=key):
                 self.assertEqual(ppc[key], value)
                 self.assertEqual(wasm[key], value)
+        for key in ("motion_move_id", "motion_b0", "motion_b1", "motion_wait_move",
+                    "motion_wait_b0", "motion_wait_b1"):
+            self.assertNotEqual(broken[key], ppc[key])
         self.assertNotEqual(broken["flag_loop"], ppc["flag_loop"])
         self.assertNotEqual(broken["flag_mask"], ppc["flag_mask"])
         self.assertNotEqual(broken["flag_kind"], ppc["flag_kind"])
+        for bit in range(8):
+            self.assertNotEqual(broken[f"stage_flag_{bit}"], ppc[f"stage_flag_{bit}"])
         self.assertEqual((ppc["nested_offset"], wasm["nested_offset"]), (0x596, 0x594))
         self.assertEqual((ppc["throw_flag_word"], wasm["throw_flag_word"]), (0x80000000, 1))
         self.assertEqual(ppc["command_word"], 0x0c000007)

@@ -26,6 +26,13 @@ int melee_web_gameplay_step(char* error, size_t error_size);
 int melee_web_gameplay_shutdown(char* error, size_t error_size);
 MeleeWebGameplayStats melee_web_gameplay_stats(void);
 
+/* Optional native HSD lifetime lane. Installs the original camera/light/joint/
+ * fog destructor registry, without creating or rendering any such objects.
+ * A single owner supplies the post-object class/ID cleanup before arena release.
+ * Re-registering the same callback is idempotent within the current world. */
+int melee_web_gameplay_enable_hsd_objects(void (*after_objects)(void),
+                                         char* error, size_t error_size);
+
 #ifdef __cplusplus
 }
 #endif

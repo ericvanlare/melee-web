@@ -34,27 +34,45 @@ def main():
     parser.add_argument("--common", type=Path, help="Optional local PlCo.dat")
     parser.add_argument("--stage", type=Path, help="Optional local stage DAT for collision decoding")
     parser.add_argument("--stage-kind", type=int, help="Explicit original GrKind to run static collision queries (FD: 37)")
+    parser.add_argument("--fighter", type=Path, help="Optional local fighter metadata DAT")
+    parser.add_argument("--fighter-symbol", help="Exact source costume model symbol for fighter metadata")
+    parser.add_argument("--animations", type=Path, help="Optional local full fighter animation container")
+    parser.add_argument("--motion", type=int, help="Exact source motion ID to decode from the container")
+    parser.add_argument("--costume", type=Path, help="Optional local costume DAT for original native HSD loading")
     args = parser.parse_args()
     try:
         if args.stage_kind is not None and args.stage is None:
             raise ValueError("--stage-kind requires --stage")
+        if args.costume is not None and (args.common is None or not args.fighter_symbol):
+            raise ValueError("--costume requires --common and --fighter-symbol")
         node = node_runtime()
         build = ROOT / "build/browser"
         if (ROOT / "build").is_symlink() or build.is_symlink():
             raise ValueError("Build output must be a local directory")
         targets = [build / (name + ".js") for name in
-                   ("gameplay_abi_trace", "gameplay_scheduler_trace", "gameplay_collision_trace", "gameplay_probe")]
+                   ("gameplay_abi_trace", "gameplay_scheduler_trace", "gameplay_collision_trace", "hsd_native_trace", "gameplay_probe")]
         if not all(target.is_file() for target in targets):
             raise ValueError("Gameplay checks are not built; run scripts/build.py --target gameplay")
         arguments = []
-        for option, path in (("--common", args.common), ("--stage", args.stage)):
+        for option, path in (("--common", args.common), ("--stage", args.stage),
+                             ("--fighter", args.fighter), ("--animations", args.animations)):
             if path is not None:
                 arguments.extend((option, str(path.expanduser().resolve(strict=True))))
         if args.stage_kind is not None:
             arguments.extend(("--stage-kind", str(args.stage_kind)))
+        if args.fighter_symbol is not None:
+            arguments.extend(("--fighter-symbol", args.fighter_symbol))
+        if args.motion is not None:
+            arguments.extend(("--motion", str(args.motion)))
         env = dict(os.environ)
         for target in targets:
             subprocess.run([str(node), str(target), *(arguments if target == targets[-1] else [])],
+                           cwd=ROOT, env=env, check=True, timeout=60)
+        if args.common is not None:
+            native_arguments = [str(args.common.expanduser().resolve(strict=True))]
+            if args.costume is not None:
+                native_arguments += [str(args.costume.expanduser().resolve(strict=True)), args.fighter_symbol]
+            subprocess.run([str(node), str(build / "hsd_native_dat_probe.js"), *native_arguments],
                            cwd=ROOT, env=env, check=True, timeout=60)
     except (OSError, ValueError, SyntaxError, subprocess.SubprocessError) as error:
         parser.exit(1, f"gameplay checks: {error}\n")

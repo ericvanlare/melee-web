@@ -13,6 +13,12 @@ extern "C" {
  * or a guarantee that other original bitfield overlays are portable. */
 int melee_web_gameplay_check_fighter_flags(char* error, size_t error_size);
 
+/* Verify original StageCallbacks numeric flag initializers and native aliases. */
+int melee_web_gameplay_check_stage_flags(char* error, size_t error_size);
+
+/* Verify MotionState source-table numeric words and native aliases. */
+int melee_web_gameplay_check_motion_flags(char* error, size_t error_size);
+
 /* Original CmdUnion members are serialized bitfield overlays. A false result
  * forbids interpreting imported command words through those native structs;
  * command execution needs an explicit decoder or a separately verified port. */

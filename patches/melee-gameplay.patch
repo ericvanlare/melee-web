@@ -57,3 +57,105 @@ diff --git a/src/melee/gr/grlast.c b/src/melee/gr/grlast.c
  /* 21B920 */ static void grLast_8021B920(Ground_GObj*, int);
  /* 21C40C */ static void grLast_8021C40C(Ground_GObj*, GXColor, float);
  /* 21C500 */ static void grLast_8021C500(Ground_GObj*);
+diff --git a/src/melee/gr/types.h b/src/melee/gr/types.h
+--- a/src/melee/gr/types.h
++++ b/src/melee/gr/types.h
+@@ -135,6 +135,20 @@
+     /*  +C */ void (*callback3)(Ground_GObj*);
+     /* +10 */ union {
+         /* +10 */ u32 flags;
++#if defined(MELEE_WEB_GAMEPLAY) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++        /* Keep source numeric flag initializers at their PPC bit positions. */
++        struct {
++            u32 _host_padding : 24;
++            u32 flags_b7 : 1;
++            u32 flags_b6 : 1;
++            u32 flags_b5 : 1;
++            u32 flags_b4 : 1;
++            u32 flags_b3 : 1;
++            u32 flags_b2 : 1;
++            u32 flags_b1 : 1;
++            u32 flags_b0 : 1;
++        };
++#else
+         struct {
+             /* +10:0 */ u8 flags_b0 : 1;
+             /* +10:1 */ u8 flags_b1 : 1;
+@@ -145,6 +159,7 @@
+             /* +10:6 */ u8 flags_b6 : 1;
+             /* +10:7 */ u8 flags_b7 : 1;
+         };
++#endif
+     };
+ } StageCallbacks;
+ 
+diff --git a/src/melee/ft/ftdata.c b/src/melee/ft/ftdata.c
+--- a/src/melee/ft/ftdata.c
++++ b/src/melee/ft/ftdata.c
+@@ -168,19 +168,32 @@
+ 
+ static inline void ft_800852B0_Reset_ft_8045993C(ftData** list, int i)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    /* Wasm globals have no console linker adjacency contract. */
++    (void) list;
++    ft_8045993C[i].pad_x0 = 0;
++    ft_8045993C[i].x6_b0 = 0;
++    ft_8045993C[i].x6_b1_b2 = 0;
++#else
+     /// @todo Bitfields seem off
+     ((ft_8045993C_t*) &list[FTKIND_MAX])[i].pad_x0 = 0;
+     ((ft_8045993C_t*) &list[FTKIND_MAX])[i].x6_b0 = 0;
+     ((ft_8045993C_t*) &list[FTKIND_MAX])[i].x6_b1_b2 = 0;
++#endif
+ }
+ 
+ void ft_800852B0(void)
+ {
+     ftData** list;
++#if defined(MELEE_WEB_GAMEPLAY)
++    ftData_UnkCountStruct* unk0 = ftData_Table_Unk0;
++    ftData_UnkCountStruct* pairs = ftData_UnkIntPairs;
++#else
+     ftData_UnkCountStruct* unk0 =
+         (ftData_UnkCountStruct*) &CostumeListsForeachCharacter[FTKIND_MAX];
+     ftData_UnkCountStruct* pairs =
+         (ftData_UnkCountStruct*) ((u8*) CostumeListsForeachCharacter + 5940);
++#endif
+     int i;
+     int new_var = 0;
+ 
+diff --git a/src/melee/ft/types.h b/src/melee/ft/types.h
+--- a/src/melee/ft/types.h
++++ b/src/melee/ft/types.h
+@@ -858,6 +858,22 @@
+     union {
+         /// @todo Try to match without this being a @c union.
+         u32 _;
++#if defined(MELEE_WEB_GAMEPLAY) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++        /* Source tables initialize the numeric word; retain PPC aliases. */
++        struct {
++            u32 xB : 8;
++            u32 xA : 8;
++            u32 x9_b7 : 1;
++            u32 x9_b6 : 1;
++            u32 x9_b5 : 1;
++            u32 x9_b4 : 1;
++            u32 x9_b3 : 1;
++            u32 x9_b2 : 1;
++            u32 x9_b1 : 1;
++            u32 x9_b0 : 1;
++            u32 move_id : 8;
++        };
++#else
+         struct {
+             u8 move_id : 8;
+             struct {
+@@ -873,6 +889,7 @@
+             u8 xA;
+             u8 xB;
+         };
++#endif
+     };
+ 
+     HSD_GObjEvent anim_cb;

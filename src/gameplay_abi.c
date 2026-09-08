@@ -2,6 +2,7 @@
 #include "gameplay_compat.h"
 
 #include <melee/ft/types.h>
+#include <melee/gr/types.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/gobjproc.h>
 #include <stdint.h>
@@ -39,6 +40,10 @@ OFFSET(HSD_GObj, gxlink_prios, 0x20); OFFSET(HSD_GObj, hsd_obj, 0x28);
 OFFSET(HSD_GObj, user_data, 0x2c); OFFSET(HSD_GObj, user_data_remove_func, 0x30);
 _Static_assert(sizeof(HSD_GObjProc) == 0x18, "HSD_GObjProc layout changed");
 OFFSET(HSD_GObjProc, gobj, 0x10); OFFSET(HSD_GObjProc, on_invoke, 0x14);
+_Static_assert(sizeof(StageCallbacks) == 20, "StageCallbacks layout changed");
+OFFSET(StageCallbacks, flags, 0x10);
+_Static_assert(sizeof(MotionState) == 0x20, "MotionState layout changed");
+OFFSET(MotionState, _, 8); OFFSET(MotionState, anim_cb, 0xc);
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
 OFFSET(Fighter, x596_bits, 0x594);
 #else
@@ -91,4 +96,51 @@ int melee_web_gameplay_native_command_overlay_compatible(void)
     command.Command_00.value = 0x123456;
     memcpy(&word, &command, sizeof(word));
     return word == ((UINT32_C(0x2d) << 26) | UINT32_C(0x123456));
+}
+
+int melee_web_gameplay_check_stage_flags(char* error, size_t error_size)
+{
+    StageCallbacks callbacks = {0};
+    for (unsigned bit = 0; bit < 32; ++bit) {
+        for (unsigned complement = 0; complement < 2; ++complement) {
+            const uint32_t one = UINT32_C(1) << bit;
+            callbacks.flags = complement ? ~one : one;
+            const uint32_t actual = ((uint32_t)callbacks.flags_b0 << 31) |
+                ((uint32_t)callbacks.flags_b1 << 30) | ((uint32_t)callbacks.flags_b2 << 29) |
+                ((uint32_t)callbacks.flags_b3 << 28) | ((uint32_t)callbacks.flags_b4 << 27) |
+                ((uint32_t)callbacks.flags_b5 << 26) | ((uint32_t)callbacks.flags_b6 << 25) |
+                ((uint32_t)callbacks.flags_b7 << 24);
+            if (actual != (callbacks.flags & UINT32_C(0xff000000))) {
+                if (error && error_size) snprintf(error, error_size,
+                    "Stage callback flag overlay differs at bit %u", bit);
+                return 0;
+            }
+        }
+    }
+    if (error && error_size) error[0] = 0;
+    return 1;
+}
+
+int melee_web_gameplay_check_motion_flags(char* error, size_t error_size)
+{
+    MotionState state = {0};
+    for (unsigned bit = 0; bit < 32; ++bit) {
+        for (unsigned complement = 0; complement < 2; ++complement) {
+            const uint32_t one = UINT32_C(1) << bit;
+            state._ = complement ? ~one : one;
+            const uint32_t actual = ((uint32_t)state.move_id << 24) |
+                ((uint32_t)state.x9_b0 << 23) | ((uint32_t)state.x9_b1 << 22) |
+                ((uint32_t)state.x9_b2 << 21) | ((uint32_t)state.x9_b3 << 20) |
+                ((uint32_t)state.x9_b4 << 19) | ((uint32_t)state.x9_b5 << 18) |
+                ((uint32_t)state.x9_b6 << 17) | ((uint32_t)state.x9_b7 << 16) |
+                ((uint32_t)state.xA << 8) | state.xB;
+            if (actual != state._) {
+                if (error && error_size) snprintf(error, error_size,
+                    "MotionState flag overlay differs at bit %u", bit);
+                return 0;
+            }
+        }
+    }
+    if (error && error_size) error[0] = 0;
+    return 1;
 }

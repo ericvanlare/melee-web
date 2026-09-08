@@ -14,7 +14,8 @@ from their action containers. The viewer also renders Final Destination's opaque
 platform geometry, with omitted passes and unapplied stage services reported.
 It does not establish complete scene fidelity or full-game performance.
 Separate Wasm checks now execute original HSD object scheduling, fighter input
-reset and walk-threshold logic, and static collision initialization/query code.
+reset and walk-threshold logic, static collision initialization/query code,
+common part mapping, attribute copying and native HSD object construction.
 They do not call a completed `Fighter_Create` or run a match.
 
 ## Build and inspect

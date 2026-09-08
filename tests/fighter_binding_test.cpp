@@ -64,6 +64,8 @@ void registry_identity() {
     check(fox.fighter_kind == 1 && fox.costume_index == 0 && fox.motion_count == 327 &&
           fox.fighter_symbol == "ftDataFox" && fox.animation_filename == "PlFxAJ.dat",
           "exact source registries bind model, data, motion count and container");
+    check(mario().material_animation_symbol == "PlyMario5K_Share_matanim_joint",
+          "material animation identity is the actual third source costume string");
     rejects([] { (void) resolve_fighter_costume("PlyFox5K_Share_ACTION_Wait1_figatree"); });
     const auto shared = std::find_if(fighter_costumes().begin(), fighter_costumes().end(),
                                    [](const auto& item) { return item.fighter_kind == 24; });

@@ -143,8 +143,7 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
         }
         if (mode != index8 && mode != index16) reject("Only indexed vertex attributes are supported");
         if (count != (attr == va_nrm ? 0u : 1u)) reject("Only XYZ position/normal and ST texture coordinates are supported");
-        if (type > type_f32 || (!uv && type != type_s16 && type != type_f32 &&
-                                !(attr == va_nrm && type == 1)))
+        if (type > type_f32 || (!uv && type != type_s16 && type != type_f32 && type != 1))
             reject("Unsupported vertex component format");
         if (frac > 31 || (type == type_f32 && frac != 0)) reject("Unsupported vertex fractional scale");
         components[i] = uv ? 2 : 3;

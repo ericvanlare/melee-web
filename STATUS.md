@@ -54,16 +54,24 @@ Final Destination at 60 fps. The current work establishes its runtime foundation
   reasons as JSON lines, so the same parser can check an expanding local corpus.
 - A separate Wasm gameplay target using original HSD GObj allocation, process
   ordering, deferred mutation and destruction. Its SDK heap has exclusive
-  ownership checks, explicit teardown and restart; graphics-object lifetimes
-  remain outside this isolated scheduler world.
+  ownership checks, explicit teardown and restart. An optional native HSD world
+  registers original graphics-object destructors and clears class/ID state before
+  releasing its arena. Checked typed descriptors feed original JObj construction.
 - A checked generated gameplay source tree with narrow downstream ABI patches.
   PowerPC/Wasm compiler comparisons verify the canonical fighter animation-flag
   aliases. Native packed command overlays are explicitly identified as incompatible.
 - Source-generated common-data scalar layout and a checked inventory of all 23
-  PlCo roots. Root0 is decoded; the other 22 remain unresolved native graphs.
+  PlCo roots. Root0 and 15 static roots are decoded, including owned named-part
+  maps consumed by original bone lookup/remapping. A separate native root20
+  probe executes original common-material initialization; full common loading
+  remains incomplete.
   An owned source Fighter/GObj probe executes original input reset and the walk
   threshold predicate with a scoped common context, without publishing partial
   common initialization.
+- Typed fighter attributes, all source motion rows, weighted Wait choices,
+  hurtboxes and dynamics descriptors. Original attribute copying consumes real
+  Mario data. Owned decoded clips retain exact action identity across aliases;
+  command execution and original action-loader routing remain pending.
 - Typed stage collision vertices, lines, categories and joints, plus an isolated
   bridge to original `mpLibLoad`, empty-line pruning, island initialization and
   static line/floor queries. Original stage scale is an explicit input. Stage
@@ -76,18 +84,28 @@ Final Destination at 60 fps. The current work establishes its runtime foundation
 
 ## Validation record
 
-Current gameplay work has focused Wasm traces for ABI, real SDK heap ownership,
-original scheduler lifecycle, and original fighter input/reset behavior. Local
-PlCo decoding reached the original walk predicate at its exact 0.18 threshold,
-including adjacent-float comparisons and teardown/restart. The local common
-archive has 23 present roots but only root0 is scalar-ready. Full-suite and final
-build validation completed: **158 tests passed**, and the graphics plus gameplay
-build passed. The gameplay runner executes four built Wasm targets: ABI,
-scheduler, collision and the optional local-data probe. The combined real PlCo
-and Final Destination probe passed, as did the focused original collision trace
-after allocator-lifetime review. The current core source census compiled 34/34
-translation units; this is compilation coverage, not `Fighter_Create` or match
-acceptance. No gameplay accuracy or performance claim follows from these checks.
+Current integration checks execute original common part lookup/remapping, Mario
+attribute copying, and native HSD construction/destruction against local data.
+PlCo root20 loads through original `ftCo_800C8F6C`, applies its source color, and
+survives shutdown/restart. Mario's native costume loads 61 joints, 59 DObjs,
+68 PObjs, 60 textures and 379 resolved envelope influences in the same world.
+Native handles reject stale world access, callback-time destruction and replaced
+heap ownership. The combined
+PlCo/Mario/Final Destination probe preserves 303 motion rows, resolves Wait1's
+61 nodes and 111 tracks, and executes original static floor queries. It explicitly
+reports that no fighter or match has been initialized.
+
+The fighter-registry reset now uses named source globals instead of GameCube
+linker adjacency. Its Wasm trace checks all 33 registry entries, preserved fields,
+and repeated reset; an unpatched negative control fails. Stage callback and MotionState numeric
+flag aliases also agree with the original PowerPC compiler, including the actual
+Wait initializer. Final integration validation passed: **168 tests**, the graphics and gameplay
+build, and the combined local PlCo/Mario/Final Destination runner. CI repeats
+asset-free native lifetime, ABI and common-table checks after building.
+
+The updated browser build visibly rendered Mario's Wait1 with normal geometry
+and an empty captured warning/error console. This is inspection playback, not
+fighter simulation or an original-game fidelity comparison.
 
 Earlier graphics evidence follows.
 
@@ -215,9 +233,8 @@ alternate insertion. A source-registry entry establishes identity, not proof tha
 that fighter's complete assets, action visibility or gameplay already work.
 Stage cameras, lights, animation, fog and callbacks remain unapplied in the viewer.
 The separate collision probe does not establish stage binding or fighter physics.
-The original `StageCallbacks` numeric-flag/bitfield overlay is another pending
-Wasm ABI boundary; the fighter animation-flag patch does not make stage callback
-dispatch safe automatically.
+The `StageCallbacks` numeric-flag/bitfield overlay is covered by a checked
+Wasm ABI patch; full stage callback dispatch still requires initialized services.
 Referenced-region bounds are conservative. Parser acceptance and browser rendering
 remain separate checks.
 

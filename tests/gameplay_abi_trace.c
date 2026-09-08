@@ -1,6 +1,7 @@
 #include "gameplay_abi.h"
 #include "gameplay_compat.h"
 #include <melee/ft/types.h>
+#include <melee/gr/types.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -18,6 +19,30 @@ int main(void)
     Fighter fp = {0};
     char error[128];
     CHECK(melee_web_gameplay_check_fighter_flags(error, sizeof(error)));
+    CHECK(melee_web_gameplay_check_stage_flags(error, sizeof(error)));
+    CHECK(melee_web_gameplay_check_motion_flags(error, sizeof(error)));
+    MotionState state = {0};
+#define MOTION_WRITE(field, maximum, mask) do { \
+    state._ = 0; state.field = maximum; CHECK(state._ == UINT32_C(mask)); \
+    state._ = UINT32_MAX; state.field = 0; CHECK(state._ == ~UINT32_C(mask)); \
+} while (0)
+    MOTION_WRITE(move_id, 255, 0xff000000);
+    MOTION_WRITE(x9_b0, 1, 0x00800000); MOTION_WRITE(x9_b1, 1, 0x00400000);
+    MOTION_WRITE(x9_b2, 1, 0x00200000); MOTION_WRITE(x9_b3, 1, 0x00100000);
+    MOTION_WRITE(x9_b4, 1, 0x00080000); MOTION_WRITE(x9_b5, 1, 0x00040000);
+    MOTION_WRITE(x9_b6, 1, 0x00020000); MOTION_WRITE(x9_b7, 1, 0x00010000);
+    MOTION_WRITE(xA, 255, 0x0000ff00); MOTION_WRITE(xB, 255, 0x000000ff);
+#undef MOTION_WRITE
+    StageCallbacks callbacks = {0};
+#define STAGE_WRITE(bit, mask) do { \
+    callbacks.flags = 0; callbacks.flags_b##bit = 1; CHECK(callbacks.flags == UINT32_C(mask)); \
+    callbacks.flags = UINT32_MAX; callbacks.flags_b##bit = 0; CHECK(callbacks.flags == ~UINT32_C(mask)); \
+} while (0)
+    STAGE_WRITE(0, 0x80000000); STAGE_WRITE(1, 0x40000000);
+    STAGE_WRITE(2, 0x20000000); STAGE_WRITE(3, 0x10000000);
+    STAGE_WRITE(4, 0x08000000); STAGE_WRITE(5, 0x04000000);
+    STAGE_WRITE(6, 0x02000000); STAGE_WRITE(7, 0x01000000);
+#undef STAGE_WRITE
     WRITE_VIEW(x594_b0, 1, 0x80000000); WRITE_VIEW(x594_b1_loop, 1, 0x40000000);
     WRITE_VIEW(x594_b2, 1, 0x20000000); WRITE_VIEW(x594_b3, 1, 0x10000000);
     WRITE_VIEW(x594_b4, 1, 0x08000000); WRITE_VIEW(x594_b5, 1, 0x04000000);

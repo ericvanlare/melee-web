@@ -1,6 +1,8 @@
 #include "dat_common.hpp"
 #include "dat_collision.hpp"
 #include "dat_stage.hpp"
+#include "dat_fighter_runtime.hpp"
+#include "gameplay_fighter_attributes.h"
 #include "gameplay_abi.h"
 #include "gameplay_bootstrap.h"
 #include "gameplay_collision.h"
@@ -11,13 +13,14 @@
 #include <fstream>
 #include <iostream>
 #include <memory>
+#include <map>
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
 namespace {
-melee_web::DatArchive read_archive(const std::string& filename)
+std::vector<std::uint8_t> read_bytes(const std::string& filename)
 {
     std::ifstream file(filename, std::ios::binary | std::ios::ate);
     if (!file) throw std::runtime_error("Unable to open local DAT file");
@@ -28,7 +31,11 @@ melee_web::DatArchive read_archive(const std::string& filename)
     file.seekg(0);
     if (!file.read(reinterpret_cast<char*>(bytes.data()), std::streamsize(bytes.size())))
         throw std::runtime_error("Unable to read complete local DAT file");
-    return melee_web::DatArchive(bytes);
+    return bytes;
+}
+melee_web::DatArchive read_archive(const std::string& filename)
+{
+    return melee_web::DatArchive(read_bytes(filename));
 }
 void require(int result, const char* error)
 {
@@ -89,34 +96,76 @@ CollisionOwner load_collision(const melee_web::DatCollision& data, int stage_kin
 int main(int argc, char** argv)
 {
     try {
-        std::string common_path, stage_path;
-        std::optional<int> stage_kind;
+        std::string common_path, stage_path, fighter_path, fighter_symbol, animation_path;
+        std::optional<int> stage_kind, motion_id;
+        const std::map<std::string, std::string*> paths = {
+            {"--common", &common_path}, {"--stage", &stage_path},
+            {"--fighter", &fighter_path}, {"--fighter-symbol", &fighter_symbol},
+            {"--animations", &animation_path}};
         for (int i = 1; i < argc; ++i) {
             const std::string option = argv[i];
-            if ((option != "--common" && option != "--stage" && option != "--stage-kind") || i + 1 >= argc)
-                throw std::runtime_error("Usage: gameplay_probe [--common PlCo.dat] [--stage stage.dat [--stage-kind GrKind]]");
-            if (option == "--stage-kind") {
-                if (stage_kind) throw std::runtime_error("Duplicate input option");
+            if ((!paths.contains(option) && option != "--stage-kind" && option != "--motion") || i + 1 >= argc)
+                throw std::runtime_error("Usage: gameplay_probe [--common PlCo.dat] [--stage stage.dat --stage-kind GrKind] [--fighter fighter.dat --fighter-symbol model_symbol [--animations container.dat --motion ID]]");
+            if (option == "--stage-kind" || option == "--motion") {
+                auto& selected = option == "--stage-kind" ? stage_kind : motion_id;
+                if (selected) throw std::runtime_error("Duplicate input option");
                 const std::string value = argv[++i];
                 int parsed;
                 const auto result = std::from_chars(value.data(), value.data() + value.size(), parsed);
                 if (result.ec != std::errc{} || result.ptr != value.data() + value.size())
-                    throw std::runtime_error("Stage kind must be an original GrKind integer");
-                stage_kind = parsed;
+                    throw std::runtime_error("Stage kind and motion ID must be original source integers");
+                selected = parsed;
                 continue;
             }
-            auto& value = option == "--common" ? common_path : stage_path;
+            auto& value = *paths.at(option);
             if (!value.empty()) throw std::runtime_error("Duplicate input option");
             value = argv[++i];
+            if (value.empty()) throw std::runtime_error("Input option cannot be empty");
         }
         if (stage_kind && stage_path.empty()) throw std::runtime_error("--stage-kind requires --stage");
+        if (fighter_path.empty() != fighter_symbol.empty())
+            throw std::runtime_error("--fighter and --fighter-symbol are required together");
+        if ((!animation_path.empty() || motion_id) && fighter_path.empty())
+            throw std::runtime_error("Animation selection requires fighter metadata and source model identity");
+        if (animation_path.empty() != !motion_id.has_value() || (motion_id && *motion_id < 0))
+            throw std::runtime_error("--animations requires a nonnegative --motion ID");
         char error[256];
         require(melee_web_gameplay_check_fighter_flags(error, sizeof(error)), error);
+        require(melee_web_gameplay_check_stage_flags(error, sizeof(error)), error);
+        require(melee_web_gameplay_check_motion_flags(error, sizeof(error)), error);
         std::unique_ptr<melee_web::DatCommon> common;
         std::unique_ptr<melee_web::DatCollision> collision;
+        std::unique_ptr<MeleeWebCommonNative, decltype(&melee_web_common_tables_destroy)>
+            common_native(nullptr, melee_web_common_tables_destroy);
+        std::shared_ptr<melee_web::DatFighterRuntime> fighter_data;
+        MeleeWebFighterBaseAttributes copied_attributes{};
+        std::optional<melee_web::DatSelectedAction> selected_action;
+        std::optional<std::uint32_t> named_joint;
         std::size_t archive_bindings = 0;
         float stage_scale = 0;
         if (!common_path.empty()) common = std::make_unique<melee_web::DatCommon>(read_archive(common_path));
+        if (common) {
+            common_native.reset(melee_web_common_tables_create(&common->tables, error, sizeof(error)));
+            if (!common_native) throw std::runtime_error(error);
+        }
+        if (!fighter_path.empty()) {
+            const auto& costume = melee_web::resolve_fighter_costume(fighter_symbol);
+            fighter_data = std::make_shared<melee_web::DatFighterRuntime>(
+                std::make_shared<const melee_web::DatArchive>(read_archive(fighter_path)), costume);
+            require(melee_web_fighter_copy_base_attributes(&fighter_data->base_attributes(),
+                    &copied_attributes, error, sizeof(error)), error);
+            if (common && (common->tables.ready_mask & (1u << 4))) {
+                std::uint32_t joint;
+                require(melee_web_common_parts_lookup(common_native.get(), costume.fighter_kind,
+                        53, &joint, error, sizeof(error)), error);
+                named_joint = joint;
+            }
+            if (motion_id) {
+                melee_web::DatFighterAnimationStore store(fighter_data, read_bytes(animation_path));
+                selected_action = store.select(std::uint32_t(*motion_id));
+                // The selected data must retain its lifetime after the store.
+            }
+        }
         if (!stage_path.empty()) {
             const auto archive = read_archive(stage_path);
             collision = std::make_unique<melee_web::DatCollision>(archive);
@@ -178,9 +227,33 @@ int main(int argc, char** argv)
             std::cout << "{\"index\":" << root.index << ",\"source\":\"" << root.source_global
                       << "\",\"present\":" << (root.data_offset ? "true" : "false")
                       << ",\"scalars_decoded\":"
-                      << (root.readiness == melee_web::DatCommonReadiness::ScalarsDecoded ? "true" : "false") << '}';
+                      << (root.readiness == melee_web::DatCommonReadiness::ScalarsDecoded ? "true" : "false")
+                      << ",\"static_tables_decoded\":"
+                      << (root.readiness == melee_web::DatCommonReadiness::StaticTablesDecoded ? "true" : "false") << '}';
         }
-        std::cout << "],\"original_walk_predicate_samples\":[";
+        std::cout << "],\"fighter_data\":";
+        if (fighter_data) {
+            std::cout << "{\"symbol\":\"" << fighter_data->costume().fighter_symbol
+                      << "\",\"material_animation_symbol\":\"" << fighter_data->costume().material_animation_symbol
+                      << "\",\"source_motion_rows\":" << fighter_data->actions().size()
+                      << ",\"wait_choices\":" << fighter_data->wait_choices().size()
+                      << ",\"original_attributes_copied\":true,\"weight\":" << copied_attributes.co.weight
+                      << ",\"gravity\":" << copied_attributes.co.gravity << ",\"native_fighter_ready\":false";
+            if (named_joint) std::cout << ",\"original_named_part_53\":" << *named_joint;
+            if (selected_action) {
+                const auto& selected = *selected_action;
+                std::cout << ",\"selected_motion\":" << selected.action.motion_id
+                          << ",\"motion_flags\":" << selected.action.motion_flags
+                          << ",\"original_action_execution_ready\":false";
+                if (selected.animation)
+                    std::cout << ",\"animation_nodes\":" << selected.animation->node_counts.size()
+                              << ",\"animation_tracks\":" << selected.animation->tracks.size()
+                              << ",\"animation_end_frame\":" << selected.animation->end_frame;
+                if (selected.commands) std::cout << ",\"command_offset\":" << selected.commands->offset();
+            }
+            std::cout << '}';
+        } else std::cout << "null";
+        std::cout << ",\"original_walk_predicate_samples\":[";
         for (std::size_t i = 0; i < samples.size(); ++i) {
             if (i) std::cout << ',';
             const auto& sample = samples[i];

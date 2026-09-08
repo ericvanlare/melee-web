@@ -2,6 +2,7 @@
  * return values expose compiler bitfield layout independently of our checks. */
 #include "gameplay_compat.h"
 #include <melee/ft/types.h>
+#include <melee/gr/types.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <stdint.h>
 #include <string.h>
@@ -33,3 +34,28 @@ uint32_t command_word(void) {
     value.command.Command_00.code = 3; value.command.Command_00.value = 7;
     return value.word;
 }
+#define STAGE_REFERENCE(bit) \
+uint32_t stage_flag_##bit(void) { StageCallbacks value = {0}; value.flags_b##bit = 1; return value.flags; }
+STAGE_REFERENCE(0) STAGE_REFERENCE(1) STAGE_REFERENCE(2) STAGE_REFERENCE(3)
+STAGE_REFERENCE(4) STAGE_REFERENCE(5) STAGE_REFERENCE(6) STAGE_REFERENCE(7)
+uint32_t stage_callbacks_size(void) { return sizeof(StageCallbacks); }
+uint32_t stage_flags_offset(void) { return offsetof(StageCallbacks, flags); }
+
+#define MOTION_REFERENCE(name, field, maximum) \
+uint32_t motion_##name(void) { MotionState value = {0}; value.field = maximum; return value._; }
+MOTION_REFERENCE(move_id, move_id, 255)
+MOTION_REFERENCE(b0, x9_b0, 1) MOTION_REFERENCE(b1, x9_b1, 1)
+MOTION_REFERENCE(b2, x9_b2, 1) MOTION_REFERENCE(b3, x9_b3, 1)
+MOTION_REFERENCE(b4, x9_b4, 1) MOTION_REFERENCE(b5, x9_b5, 1)
+MOTION_REFERENCE(b6, x9_b6, 1) MOTION_REFERENCE(b7, x9_b7, 1)
+MOTION_REFERENCE(xa, xA, 255) MOTION_REFERENCE(xb, xB, 255)
+uint32_t motion_size(void) { return sizeof(MotionState); }
+uint32_t motion_word_offset(void) { return offsetof(MotionState, _); }
+uint32_t motion_callback_offset(void) { return offsetof(MotionState, anim_cb); }
+/* Test harness extracts this initializer directly from original ftmotionstates.c. */
+#include "motion_wait_fixture.h"
+uint32_t motion_wait_word(void) { return motion_wait._; }
+uint32_t motion_wait_move(void) { return motion_wait.move_id; }
+uint32_t motion_wait_default(void) { return FtMoveId_Default; }
+uint32_t motion_wait_b0(void) { return motion_wait.x9_b0; }
+uint32_t motion_wait_b1(void) { return motion_wait.x9_b1; }

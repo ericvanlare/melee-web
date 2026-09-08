@@ -12,6 +12,7 @@ struct FighterCostume {
     std::uint32_t fighter_kind, costume_index, motion_count;
     std::string_view kind_name, fighter_filename, fighter_symbol;
     std::string_view animation_filename, model_filename, model_symbol;
+    std::string_view material_animation_symbol;
 };
 [[nodiscard]] std::span<const FighterCostume> fighter_costumes() noexcept;
 [[nodiscard]] std::uint32_t fighter_kind_count() noexcept;

@@ -48,14 +48,5 @@ void hsdFreeMemPiece(void* memory, s32 size)
     free(header);
 }
 
-void HSD_Panic(char* file, u32 line, char* reason)
-{
-    fprintf(stderr, "HSD panic at %s:%u: %s\n", file, line, reason);
-    abort();
-}
-
-void __assert(char* file, u32 line, char* condition)
-{
-    fprintf(stderr, "HSD assertion at %s:%u: %s\n", file, line, condition);
-    abort();
-}
+/* Keep the existing inspection/test translation-unit interface. */
+#include "hsd_debug.c"

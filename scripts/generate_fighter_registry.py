@@ -143,11 +143,12 @@ def generate(melee):
         for costume, values in enumerate(variants):
             if len(values) != 3:
                 raise RegistryError("Costume record must contain exactly three strings")
-            model_file, model_symbol, _ = [string(value, path) for value in values]
+            model_file, model_symbol, material_animation_symbol = [string(value, path) for value in values]
             if not model_file or not model_symbol:
                 raise RegistryError("Costume has no model identity")
             rows.append((kind, costume, count, name, string(pairs[kind][0]),
-                         string(pairs[kind][1]), string(animations[kind]), model_file, model_symbol))
+                         string(pairs[kind][1]), string(animations[kind]), model_file, model_symbol,
+                         material_animation_symbol))
     digest = hashlib.sha256()
     paths = sorted(used)
     for path in paths:

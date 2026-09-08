@@ -134,3 +134,26 @@ The report includes the selected pass, retained geometry, omitted DObjs/meshes
 and joints, and unapplied stage services. Omit `--opaque` to check the complete
 selected model strictly. `--opaque` requires `--stage-entry` and never silently
 changes the material or joint behavior of retained geometry.
+
+## Native construction and fighter-data gate
+
+The gameplay runner also executes original native HSD class allocation and
+reference/destruction tests. With `--common`, it loads root20 through the original
+common-material consumer and checks shutdown/restart. Add the costume and fighter
+inputs to exercise native skeleton construction and exact motion selection:
+
+```sh
+python3 scripts/check_gameplay.py --common assets-local/next-gate/PlCo.dat --fighter assets-local/next-gate/PlMr.dat --fighter-symbol PlyMario5K_Share_joint --costume assets-local/next-gate/PlMrNr.dat --animations assets-local/next-gate/PlMrAJ.dat --motion 2
+```
+
+The native graph must outlive its native handle because geometry and texture
+spans remain borrowed from its owned archive. Destruction returns an explicit
+error while its GObj callback is executing or SDK heap ownership is lost; callers
+must retain the handle in either case. World shutdown destroys runtime objects
+before class caches and arena memory. A surviving descriptor handle rejects stale
+runtime access and can then be freed.
+
+The native constructor target deliberately rejects drawing until bounded GX
+arrays are registered. The browser inspector remains a separate rendering path.
+Neither target currently calls full Fighter_Create. Packed action commands and
+original RAM/ARAM loader routing remain integration work.

@@ -11,6 +11,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class RigidModelTests(unittest.TestCase):
+    def test_signed_byte_position_normal_scales_and_bounds(self):
+        self.run_case("signed_byte_geometry")
+
     @classmethod
     def setUpClass(cls):
         compiler = shutil.which("clang++") or shutil.which("c++")

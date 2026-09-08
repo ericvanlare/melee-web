@@ -31,7 +31,8 @@ class DatCommonTests(unittest.TestCase):
 
     def test_authored_mixed_types_inventory_and_unsupported_boundaries(self):
         for case in ("typed_fields_and_lifetime", "root_identity_and_readiness",
-                     "pointer_and_layout_bounds", "internal_relocations_and_nonfinite"):
+                     "pointer_and_layout_bounds", "internal_relocations_and_nonfinite",
+                     "static_graphs_and_ownership", "malformed_static_graphs"):
             with self.subTest(case=case):
                 result = subprocess.run([str(self.binary), case], capture_output=True, text=True, timeout=20)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
