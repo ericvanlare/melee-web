@@ -143,6 +143,8 @@ int melee_web_gameplay_step(char* error, size_t error_size)
     return success(error, error_size);
 }
 
+int melee_web_gameplay_world_exists(void) { return arena != NULL; }
+
 MeleeWebGameplayStats melee_web_gameplay_stats(void)
 {
     MeleeWebGameplayStats result = {0};

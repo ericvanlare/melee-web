@@ -34,6 +34,7 @@ jobs:
       - name: Run original gameplay runtime and ABI checks
         run: |
           python3 -m unittest discover -s tests -p 'test_gameplay_*.py' -v
+          python3 -m unittest discover -s tests -p 'test_dat_menu_support.py' -v
           python3 -m unittest discover -s tests -p 'test_audio_transport.py' -v
           python3 -m unittest discover -s tests -p 'test_common_tables.py' -v
           python3 -m unittest discover -s tests -p 'test_hsd_native*.py' -v

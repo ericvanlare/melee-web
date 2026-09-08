@@ -35,6 +35,18 @@ typedef struct MeleeWebPObjView {
     uint16_t flags;
 } MeleeWebPObjView;
 
+/* Checked source HSD_ShapeSetDesc payload. Index-list bytes remain in the
+ * immutable DAT owner; the pointer tables are host-owned descriptors and are
+ * kept alive through original HSD_PObj destruction. Attribute indices select
+ * the POS/NRM entries in the owning PObj's descriptor list. */
+typedef struct MeleeWebNativeShapeDesc {
+    uint16_t flags, shape_count;
+    uint32_t vertex_index_count, normal_index_count;
+    uint32_t vertex_attribute, normal_attribute;
+    const uint8_t* const* vertex_index_lists;
+    const uint8_t* const* normal_index_lists;
+} MeleeWebNativeShapeDesc;
+
 /* Draw a rigid, unanimated PObj through original HSD descriptor/display-list
  * code. Matrix, lighting and material state must already be set by the caller.
  * Original cull flags and source-inert bit0 are supported; both cull flags skip drawing.

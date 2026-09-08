@@ -61,6 +61,12 @@ struct DatTexture {
 [[nodiscard]] DatTextureImage read_dat_texture_image(const DatArchive&, std::uint32_t);
 [[nodiscard]] DatTexturePalette read_dat_texture_palette(const DatArchive&, std::uint32_t,
                                                         const DatTextureImage&);
+// Descriptor-only palette read and exact maximum over visible indexed texels
+// (including mips). Animated tables can validate each image once and compare
+// that maximum against every palette, without rescanning the same tiled bytes.
+[[nodiscard]] DatTexturePalette read_dat_texture_palette_descriptor(
+    const DatArchive&, std::uint32_t, std::uint32_t image_format);
+[[nodiscard]] std::uint32_t dat_texture_max_palette_index(const DatTextureImage&);
 [[nodiscard]] std::vector<DatTexture> read_dat_texture_chain(const DatArchive& archive,
                                                            std::uint32_t first_offset,
                                                            bool native_descriptors = false);

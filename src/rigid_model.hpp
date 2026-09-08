@@ -25,6 +25,14 @@ struct RigidEnvelope {
     std::vector<MeleeWebSkinInfluence> influences; // Joint indices in model preorder.
 };
 
+struct RigidShape {
+    uint16_t flags = 0, shape_count = 0;
+    uint32_t vertex_index_count = 0, normal_index_count = 0;
+    uint32_t vertex_attribute = UINT32_MAX, normal_attribute = UINT32_MAX;
+    std::vector<const uint8_t*> vertex_index_lists;
+    std::vector<const uint8_t*> normal_index_lists;
+};
+
 struct RigidMesh {
     uint32_t descriptor_offset = 0;
     uint32_t joint_index = 0;
@@ -35,6 +43,7 @@ struct RigidMesh {
     const void* display = nullptr;
     uint32_t display_bytes = 0;
     uint16_t flags = 0;
+    std::optional<RigidShape> shape;
     std::vector<RigidEnvelope> envelopes; // Original ordered GX matrix palette.
     uint16_t palette_used_mask = 0;
     // Local submitted-position bounds for each referenced PN matrix slot.

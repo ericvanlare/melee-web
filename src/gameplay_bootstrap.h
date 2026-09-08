@@ -25,6 +25,8 @@ int melee_web_gameplay_startup(size_t heap_bytes, char* error, size_t error_size
 int melee_web_gameplay_step(char* error, size_t error_size);
 int melee_web_gameplay_shutdown(char* error, size_t error_size);
 MeleeWebGameplayStats melee_web_gameplay_stats(void);
+/* Remains true during teardown, until the owned SDK arena is released. */
+int melee_web_gameplay_world_exists(void);
 
 /* Optional native HSD lifetime lane. Installs the original camera/light/joint/
  * fog destructor registry, without creating or rendering any such objects.

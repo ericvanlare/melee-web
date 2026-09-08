@@ -62,7 +62,7 @@ if(EMSCRIPTEN)
   target_link_libraries(gameplay_runtime PUBLIC aurora::os aurora::mtx PRIVATE fmt::fmt)
   # Native class construction retains original virtual callbacks. Link their
   # real SDK providers even when the diagnostic exercises load/free only.
-  add_library(hsd_native_runtime STATIC src/hsd_native_camera.c src/hsd_native_arrays.c src/hsd_native_pobj.c src/hsd_native_joint.c src/hsd_native_common.c
+  add_library(hsd_native_runtime STATIC src/hsd_texture_bounds.c src/hsd_native_camera.c src/hsd_native_arrays.c src/hsd_native_pobj.c src/hsd_native_joint.c src/hsd_native_common.c
     src/gameplay_stage_context.c src/gameplay_common_context.c "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/lb/lbspdisplay.c")
   foreach(unit class object hash id list jobj dobj mobj tobj texp texpdag tev
       displayfunc state aobj fobj robj wobj lobj spline mtx util quatlib

@@ -1,8 +1,10 @@
 # Core gameplay loop and the first menus
 
 The browser now runs a two-player Mario stock match on Final Destination.
-The immediate cycle is direct disc import, first-use rendering preparation,
-and complete match/restart verification. The full acceptance milestone remains
+The active deliverable is original in-game CSS → original SSS → a playable
+four-stock Mario/FD match → original CSS, while preserving the
+[accuracy contract](ACCURACY_CONTRACT.md). Direct disc import is integrated.
+Native menu archives, scene lifetime and transitions are the immediate work. The full acceptance milestone remains
 open until the checks in [ROADMAP.md](ROADMAP.md) pass, including physical
 controllers, audible output, and cold and warm performance.
 
@@ -34,11 +36,87 @@ mapping with release required across screen transitions. Physical controller
 acceptance remains pending. Falco is the first planned roster expansion after
 this flow and the core loop are stable.
 
+## Native menu work now implemented
+
+- `DatNativeMenu` hydrates CSS nine and SSS twelve model groups, joint/material/
+  shape animations, camera, two lights and fog. Original HSD loading, animation
+  and teardown pass across two SDK worlds. The shared shape path retains source
+  morph interpolation and canonical GPU bytes, with host-order copies only for
+  the original CPU scalar reader. Referenced scalar bits are checked against the
+  original arrays. This descriptor gate does not render a screen.
+- `native_sss_callbacks` runs original SSS entry, 120 neutral input/scheduler/audio
+  ticks and exit across two SDK worlds with original menu music. It does not test
+  selection or rendering. Its linked preload-alarm entry points fail explicitly
+  if reached and exist only in the test harness; they are not runtime services.
+- `DatMenuSupport` supplies the original card icon table and the camera/model
+  subset consumed by `lb_8001CF18`. The original card archive loader, camera,
+  model and animation consumers pass twice; this does not establish card saving
+  or general SceneDesc light/fog support.
+- Shared archive publication supports checked opaque handles and original locale
+  filename resolution. Explicit handles must close before their asset scope.
+  Original heap-scoped card handles are reclaimed only after SDK teardown; early
+  release, shared ownership and stale handle access are rejected. Catalog-only
+  public names may be declared, but accessing an unhydrated root fails explicitly.
+- Palette validation scans each unique indexed image once. Exact synchronized
+  TIMG/TCLT programs permit checking the image/palette pairs the original HSD
+  animation selects; other programs retain Cartesian validation. Pixel bounds
+  and precision remain checked.
+  Material trees use the native joint loader's existing 256-node bound; the CSS
+  contains a 173-node graph exceeding the earlier fighter-only 140-node limit.
+- `DatSis` hydrates the CSS font/text pointer table while keeping bytecode and
+  font bytes in their original representation. The original layout interpreter
+  now reads its big-endian operands and style stack explicitly. Synthetic
+  scaling/spacing/pointer-stack tests and all 85 original CSS text entries pass
+  through the real SIS loading/layout/release routines across two SDK lifetimes.
+  The local text gate measures the first line of each entry; it does not render
+  every string or establish pixel equivalence. Branch bytecode in imported SIS
+  archives remains explicitly unsupported.
+- `gameplay_menu.c` prepares the source CSS/SSS configuration and lifecycle
+  boundary, with explicit runtime/scheduler/transition prerequisites and fixed
+  four-stock Mario/FD validation. Its stubbed contract test is not native-scene
+  execution evidence. Browser scene ownership and source availability guards are
+  still to be integrated.
+
+SSS x20 has seven image/palette entries but retains an authored value seven at
+frame seven. Original `mnstagesel.c` selects only frames two through six for
+these five unlocked icons, then `do_anim` stops every TObj AObj. Neutral source
+scene ticks therefore never dispatch seven. Native menus preserve those bytes;
+the TObj boundary checks every dispatched index before conversion/table access.
+Other decoder callers default to validating all encoded values. Synthetic tests
+exercise both fatal image and palette dispatches, rebind/release, and strict
+decoder rejection. No table padding, value clamping or skipped animation is used.
+
+Next bounded integration work:
+
+1. Supply real named audio-bank residency and original load callbacks for CSS
+   entry/exit. The current match audio is preloaded; it does not implement the
+   dynamic bank requests. Preserve real readiness, capacity and unload behavior.
+   Then complete scene preloading against owned, validated runtime assets.
+2. Install the SDK menu world, save/unlock state, raw PAD queue and source scene
+   transition observer. Enforce Mario/FD availability before original selection
+   or archive requests; rejecting an unsupported selection after its callbacks
+   ran is only a diagnostic, not a safe UI filter. Preserve all-unlocked status.
+3. Run actual CSS/SSS callbacks and rendering, then hand their selected state to
+   the native match owner and return after teardown. Replace the HTML selector
+   only after the original visible chain works twice with normal input.
+
+Reproduce the local CSS descriptor/consumer gate after extracting `MnSlChr.usd`
+into ignored local assets:
+
+```sh
+.venv/bin/cmake --build build/browser-release --target native_menu_scene_trace
+python3 scripts/check_native_menu.py --css assets-local/native-menus/MnSlChr.usd \
+  --sis assets-local/native-menus/SdSlChr.usd \
+  --sss assets-local/native-menus/MnSlMap.usd \
+  --cards assets-local/native-menus/LbMcGame.usd assets-local/native-menus/NtMemAc.usd
+```
+
 ## Original menu integration boundary
 
 A strict link probe retaining both `mnCharSel_Scene_OnEnter` and
 `mnStageSel_Scene_OnEnter` passes against the current Release runtime libraries.
-This is link evidence only; neither original menu has run in the port yet.
+The original neutral SSS callback gate now runs as described above. CSS callbacks
+and rendered menu selection remain untested.
 
 The source VS scene chain is in `melee/gm/gmvsmode.c`, with hooks in `gmscdata.c`.
 Use `CSSData`, `SSSData`, `VsModeData`, `PlayerInitData`, and original stock-rule
@@ -59,11 +137,13 @@ prefix followed by the model/animation table in `mnstagesel.static.h`.
 Other named roots include `SIS_SelCharData`, `MemCardIconData` and
 `ScNtcCommon_scene_data`. All archive bytes must remain owned locally.
 
-The checked archive adapter currently intercepts only `lbArchive_80017040`.
-Menus also use raw `lbArchive_LoadArchive`, `lbArchive_LoadSymbols`,
-`lbArchive_80016DBC`, and later `HSD_ArchiveGetPublicAddress`. Extend this shared
-boundary with owned, checked typed data and explicit lifetime; do not overlay
-big-endian archive bytes with host structs or introduce successful file stubs.
+The checked archive adapter now supports `lbArchive_80017040`,
+`lbArchive_LoadArchive`, `lbArchive_LoadSymbols`, `lbArchive_80016DBC`,
+`HSD_ArchiveGetPublicAddress`, and explicit release through owned typed symbols
+and checked opaque handles. CSS, SSS, SIS and the consumed card graphics are
+hydrated. Unused MnExtAll subscene roots remain unhydrated and must be guarded
+from entry; do not overlay big-endian bytes with host structs or introduce
+successful file stubs.
 
 Neither screen exposes a roster/visible-stage filter. Initializing Mario and FD
 only seeds selection; original cursor code can still select other entries.
@@ -85,3 +165,15 @@ this gate. FD is stage-menu entry 25, `St_Kind_Last=0x20`, mapped to runtime
 
 Keep worker assignments independent and bounded. Use GPT-5.6 Luna xhigh unless
 Eric changes that preference; the lead reviews and integrates their work.
+
+The original neutral SSS callback gate uses separately extracted owned audio:
+
+```sh
+.venv/bin/cmake --build build/browser-release --target native_sss_callbacks
+.deps/emsdk/node/24.19.0_64bit/bin/node build/browser-release/native_sss_callbacks.js \
+  assets-local/native-menus assets-local/next-gate
+```
+
+The menu directory contains `MnSlMap.usd` and `menu01.hps`; the audio directory
+contains `smash2.sem`, `main.ssm` and locally supplied DSP coefficients. This is a
+neutral scene fixture with all-unlocked save settings, not an accepted game flow.

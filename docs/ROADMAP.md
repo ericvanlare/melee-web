@@ -26,7 +26,9 @@ Launch Mario versus Mario on Final Destination from user-supplied local data.
 Both local players must use the original action/state, input, physics, collision,
 attack and damage paths. Validate movement, jump/landing, shields/grabs/attacks,
 KO, stock loss, respawn, match outcome and restart, with required audio behavior.
-Direct launch is sufficient; full menus are a later gate.
+Direct launch is historical partial evidence. The active first deliverable now
+requires original in-game CSS → original SSS → four-stock Mario/FD → original CSS,
+without a results screen. See [the accuracy contract](ACCURACY_CONTRACT.md).
 
 The normal browser launch now uses the authored Final Destination player markers
 `(-60, 10, 0)` and `(60, 10, 0)` through the original Ground API. Close-range
@@ -56,7 +58,8 @@ unload when the pipeline queue is idle, and restores 81 cached pipelines before
 assets on the next page startup. Game assets are not persisted. The first cold
 visit still has unresolved rendering stalls. Browser audio uses a 1536-sample
 prefill and per-frame transport gating; the saved-cache runs had no underruns.
-The selectable 2× SDL render scale remains available for scale-specific checks.
+Internal framebuffer scale is explicitly 640×480 at 1× and 1280×960 at 2×;
+presentation density does not define the internal resolution.
 Future non-FD stages still need the original scene-level `fn_8016758C` reservation
 counter tick; FD uses direct player-index respawns and is covered by this trace.
 

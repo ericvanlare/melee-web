@@ -23,9 +23,17 @@
 #include <stdlib.h>
 #include <string.h>
 
+typedef struct NativeShape {
+    HSD_ShapeSetDesc desc;
+    HSD_VtxDescList vertex_desc, normal_desc;
+    void* vertex_data;
+    void* normal_data;
+    u8** vertex_idx_list;
+    u8** normal_idx_list;
+} NativeShape;
 typedef struct NativeJ { HSD_Joint desc; HSD_Spline spline; Mtx inverse; uint32_t source_offset; } NativeJ;
 typedef struct NativeP { HSD_PObjDesc desc; HSD_VtxDescList* attributes; u8* display; MeleeWebNativeArrays* arrays;
-    HSD_EnvelopeDesc** envelopes; uint32_t envelope_count; } NativeP;
+    HSD_EnvelopeDesc** envelopes; uint32_t envelope_count; NativeShape* shape; } NativeP;
 typedef struct NativeT { HSD_TObjDesc desc; HSD_ImageDesc image;
     HSD_TlutDesc palette; HSD_TexLODDesc lod; HSD_TObjTevDesc tev; } NativeT;
 typedef struct NativeM { HSD_MObjDesc desc; HSD_Material material; HSD_PEDesc pixel_engine;
@@ -77,6 +85,11 @@ static void free_descriptors(MeleeWebNativeJoint* handle)
         free(p->attributes); free(p->display);
         if (p->envelopes) for (uint32_t j = 0; j < p->envelope_count; ++j) free(p->envelopes[j]);
         free(p->envelopes);
+        if (p->shape) {
+            free(p->shape->vertex_data); free(p->shape->normal_data);
+            free(p->shape->vertex_idx_list); free(p->shape->normal_idx_list);
+            free(p->shape);
+        }
     }
     if (handle->materials) for (uint32_t i = 0; i < handle->material_count; ++i)
         free(handle->materials[i].textures);
@@ -96,6 +109,37 @@ int melee_web_native_joint_destroy(MeleeWebNativeJoint* handle, char* error, siz
     return 1;
 }
 static int valid_index(uint32_t index, uint32_t count) { return index == UINT32_MAX || index < count; }
+
+/* Original drawShapeAnim reads the source shape arrays through host scalar
+ * pointers (memcpy for F32 and typed u16/s16 reads for 16-bit values). DAT
+ * payloads remain canonical big-endian bytes for the GX array path, so give
+ * only the temporary CPU morph reader a host-order copy. Index-list bytes stay
+ * canonical: pobj.c decodes INDEX16 explicitly as big-endian bytes. */
+static void* shape_host_data(const MeleeWebPObjAttribute* source)
+{
+    if (!source || !source->data || !source->byte_size) return NULL;
+    void* output = malloc(source->byte_size);
+    if (!output) return NULL;
+    memcpy(output, source->data, source->byte_size);
+    uint32_t scalar = 1;
+    if (source->comp_type == GX_U16 || source->comp_type == GX_S16) scalar = 2;
+    else if (source->comp_type == GX_F32) scalar = 4;
+    if (scalar == 1 || source->byte_size < scalar * 3U) return output;
+    const uint16_t endian_probe = 1;
+    if (*(const uint8_t*) &endian_probe != 1) return output;
+    const uint32_t width = scalar * 3;
+    for (uint32_t base = 0; base <= source->byte_size - width; base += source->stride) {
+        for (uint32_t component = 0; component < width; component += scalar) {
+            uint8_t* bytes = (uint8_t*) output + base + component;
+            for (uint32_t i = 0; i < scalar / 2; ++i) {
+                const uint8_t swap = bytes[i];
+                bytes[i] = bytes[scalar - 1U - i];
+                bytes[scalar - 1U - i] = swap;
+            }
+        }
+    }
+    return output;
+}
 static int visit_joint(const MeleeWebNativeGraph* g, uint32_t i, uint8_t* seen, uint32_t* visited)
 {
     if (i == UINT32_MAX) return 1;
@@ -155,10 +199,36 @@ static int validate(const MeleeWebNativeGraph* g, char* error, size_t size)
         if (!valid_index(p->next, g->pobj_count) || !v->attributes || !v->attribute_count ||
             v->attribute_count > 21 || !v->display || !v->display_byte_size ||
             v->display_byte_size % 32 || v->display_byte_size / 32 > UINT16_MAX ||
-            (v->flags & ~0xe001U) || p->envelope_count > 10 ||
+            (v->flags & ~0xf001U) || (v->flags & 0x3000U) == 0x3000U || p->envelope_count > 10 ||
             ((v->flags & 0x3000U) == 0x2000U) != (p->envelope_count != 0) ||
             (p->envelope_count && !p->envelopes))
-            return fail(error, size, "Native PObj requires checked rigid/envelope geometry");
+            return fail(error, size, "Native PObj requires checked rigid/envelope/shape geometry");
+        const uint32_t type = v->flags & 0x3000U;
+        if (type == POBJ_SHAPEANIM) {
+            const MeleeWebNativeShapeDesc* shape = p->shape;
+            const uint32_t lists = shape && (shape->flags & SHAPESET_ADDITIVE)
+                ? (uint32_t) shape->shape_count + 1U : shape ? shape->shape_count : 0U;
+            if (!shape || !shape->shape_count || lists > 4096 ||
+                !shape->vertex_index_count ||
+                ((shape->flags & 3U) != SHAPESET_AVERAGE &&
+                 (shape->flags & 3U) != SHAPESET_ADDITIVE) ||
+                (shape->flags & ~(uint16_t)7) || shape->vertex_index_count > 2000 ||
+                shape->normal_index_count > 2000 || shape->vertex_attribute >= v->attribute_count ||
+                !shape->vertex_index_lists ||
+                (shape->normal_index_count &&
+                 (shape->normal_attribute >= v->attribute_count || !shape->normal_index_lists)))
+                return fail(error, size, "Native shape set metadata is incomplete");
+            if (v->attributes[shape->vertex_attribute].attr != GX_VA_POS ||
+                (shape->normal_index_count && v->attributes[shape->normal_attribute].attr != GX_VA_NRM))
+                return fail(error, size, "Native shape set attributes do not match POS/NRM");
+            for (uint32_t j = 0; j < lists; ++j) {
+                if (!shape->vertex_index_lists[j] ||
+                    (shape->normal_index_count && !shape->normal_index_lists[j]))
+                    return fail(error, size, "Native shape index list is absent");
+            }
+        } else if (p->shape) {
+            return fail(error, size, "Native shape metadata is attached to a non-shape PObj");
+        }
         display_bytes += v->display_byte_size;
         if (display_bytes > 64U * 1024U * 1024U)
             return fail(error, size, "Native display-list ownership exceeds memory budget");
@@ -281,6 +351,45 @@ static MeleeWebNativeJoint* create_joint(const MeleeWebNativeGraph* g, const uin
             p->attributes[j] = (HSD_VtxDescList) {a->attr, a->attr_type, a->comp_cnt, a->comp_type, a->frac, a->stride, (void*) a->data};
         }
         p->attributes[s->geometry.attribute_count].attr = GX_VA_NULL;
+        if (s->shape) {
+            const MeleeWebNativeShapeDesc* in = s->shape;
+            const uint32_t lists = (in->flags & SHAPESET_ADDITIVE)
+                ? (uint32_t) in->shape_count + 1U : in->shape_count;
+            p->shape = calloc(1, sizeof(*p->shape));
+            if (!p->shape) goto oom;
+            p->shape->vertex_idx_list = calloc(lists, sizeof(*p->shape->vertex_idx_list));
+            if (!p->shape->vertex_idx_list) goto oom;
+            for (uint32_t j = 0; j < lists; ++j)
+                p->shape->vertex_idx_list[j] = (u8*) in->vertex_index_lists[j];
+            if (in->normal_index_count) {
+                p->shape->normal_idx_list = calloc(lists, sizeof(*p->shape->normal_idx_list));
+                if (!p->shape->normal_idx_list) goto oom;
+                for (uint32_t j = 0; j < lists; ++j)
+                    p->shape->normal_idx_list[j] = (u8*) in->normal_index_lists[j];
+            }
+            const MeleeWebPObjAttribute* vertex_source = &s->geometry.attributes[in->vertex_attribute];
+            p->shape->vertex_data = shape_host_data(vertex_source);
+            if (!p->shape->vertex_data) goto oom;
+            p->shape->vertex_desc = p->attributes[in->vertex_attribute];
+            p->shape->vertex_desc.vertex = p->shape->vertex_data;
+            if (in->normal_index_count) {
+                const MeleeWebPObjAttribute* normal_source = &s->geometry.attributes[in->normal_attribute];
+                p->shape->normal_data = shape_host_data(normal_source);
+                if (!p->shape->normal_data) goto oom;
+                p->shape->normal_desc = p->attributes[in->normal_attribute];
+                p->shape->normal_desc.vertex = p->shape->normal_data;
+            }
+            p->shape->desc.flags = in->flags;
+            p->shape->desc.nb_shape = in->shape_count;
+            p->shape->desc.nb_vertex_index = (s32) in->vertex_index_count;
+            p->shape->desc.vertex_desc = &p->shape->vertex_desc;
+            p->shape->desc.vertex_idx_list = p->shape->vertex_idx_list;
+            p->shape->desc.nb_normal_index = (s32) in->normal_index_count;
+            p->shape->desc.normal_desc = in->normal_index_count
+                ? &p->shape->normal_desc : NULL;
+            p->shape->desc.normal_idx_list = p->shape->normal_idx_list;
+            p->desc.u.shape_set = &p->shape->desc;
+        }
         if (s->envelope_count) {
             p->envelope_count = s->envelope_count;
             p->envelopes = calloc(s->envelope_count + 1, sizeof(HSD_EnvelopeDesc*));

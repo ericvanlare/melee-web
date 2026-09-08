@@ -7,12 +7,34 @@ renderer cache are integrated, while cold first-use stalls, audible and physical
 controller verification, and full original-game equivalence remain open. No
 emulator is shipped; Dolphin is used only as a separate original-game reference.
 
-The current stopping milestone is the **complete local Mario-versus-Mario stock
-match on Final Destination**, including original gameplay behavior, two local
-controllers, camera, sound, match outcome/restart, and measured stable 60 fps on
-the reference machine. The smaller gates below are checkpoints, not completion.
+The active first deliverable is **original in-game CSS → original in-game SSS
+→ a playable four-stock Mario-versus-Mario match on Final Destination → original
+CSS**, without a results screen. Real menu assets, original scene/input behavior,
+transitions and repeat-match lifetime are required. The HTML selector is temporary
+scaffolding. Full accuracy, physical controllers, sound and stable performance
+remain required acceptance work under [the accuracy contract](docs/ACCURACY_CONTRACT.md).
 
 ## Active integration
+
+- Native-menu preparation now passes both complete scene tables: CSS nine and
+  SSS twelve model groups with camera/lights/fog, material animation and original
+  PObj morphing descriptors. Every referenced CPU morph scalar is compared bit
+  for bit against the original big-endian array. Original HSD loading/animation
+  and teardown pass across two SDK worlds. Original SIS loading/layout/release
+  passes for all 85 CSS text entries, plus scaling, spacing and style-stack checks.
+  The original SSS OnEnter, 120 neutral raw-PAD/scheduler/audio ticks and OnExit
+  also pass twice with original menu music. This diagnostic does not render or
+  confirm a stage; scene preloading remains an explicit unsupported path.
+  Original card archive loading and camera/model/animation consumers also pass
+  across two worlds with checked scene-heap ownership. The full regression suite
+  passed 243 tests; subsequent focused lifetime/card checks and the Release build
+  pass. CSS callbacks, browser menu rendering, availability guards and match handoff
+  are still open. The HTML selector remains disposable scaffolding.
+  Shared typed archive handles and a checked CSS/SSS lifecycle boundary are
+  integrated. Texture indices are checked before original table access; unused
+  authored values are preserved. The accuracy contract records catch-up
+  input/audio, nominal cadence, approximate DSP coefficients and missing
+  reference/device evidence as open gaps; no tournament-acceptance claim is made.
 
 - Temporary browser selection scaffolding now exercises character selection →
   stage selection → original stock match → character selection, without a results

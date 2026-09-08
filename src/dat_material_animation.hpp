@@ -2,6 +2,12 @@
 #include "dat_native_joint.hpp"
 
 namespace melee_web {
+enum class TextureIndexValidation {
+    AllEncodedValues,
+    // Preserve authoring values that the source does not select. The native
+    // TObj adapter must check every dispatched index before table access.
+    DispatchedValues,
+};
 // Owned native HSD_MatAnimJoint descriptors, checked against the exact model
 // topology. This gate supports constant/key texture-image and palette indices plus numeric texture transforms/blend;
 // material alpha uses the original numeric channel; RGB/TEV uses original interpolation with guarded u8 conversion. Other active material/render
@@ -10,7 +16,8 @@ namespace melee_web {
 class DatMaterialAnimation {
 public:
     DatMaterialAnimation(std::shared_ptr<const DatArchive>, uint32_t root,
-                         const MeleeWebNativeGraph& model);
+                         const MeleeWebNativeGraph& model,
+                         TextureIndexValidation = TextureIndexValidation::AllEncodedValues);
     ~DatMaterialAnimation();
     DatMaterialAnimation(const DatMaterialAnimation&) = delete;
     DatMaterialAnimation& operator=(const DatMaterialAnimation&) = delete;

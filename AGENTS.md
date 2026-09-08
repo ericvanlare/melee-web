@@ -4,6 +4,9 @@ Goal: full vanilla Melee running accurately and performantly in a desktop browse
 through compiled source, without a PowerPC CPU interpreter or JIT.
 
 - Read README.md and STATUS.md before work. Keep status backed by observed evidence.
+- Follow docs/ACCURACY_CONTRACT.md. The next deliverable is original in-game CSS
+  → original SSS → four-stock Mario/FD gameplay → original CSS. Temporary HTML
+  menus do not satisfy it. Preserve accuracy; record and resolve existing deviations.
 - Make small coherent changes; inspect actual APIs and compiler output before changing code.
 - Prioritize runnable milestones and parallelize work across bounded interfaces. Once
   relevant checks pass, integrate; defer cleanup that does not unblock the port.
@@ -28,5 +31,6 @@ through compiled source, without a PowerPC CPU interpreter or JIT.
 - Use GPT-5.6 Luna with xhigh reasoning for subagents unless the user changes this
   preference. Keep assignments bounded and avoid duplicate audits or idle workers.
 
-The current probe is a feasibility artifact, not a playable port. Refer to docs/ROADMAP.md
-for the acceptance criteria before broadening its scope.
+The browser has limited playable integration, not an accepted accurate or
+tournament-ready port. Refer to docs/ROADMAP.md and docs/ACCURACY_CONTRACT.md
+for acceptance criteria before broadening its scope.

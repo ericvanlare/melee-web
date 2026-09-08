@@ -5,7 +5,9 @@ in a desktop browser using WebAssembly and WebGPU.
 
 The first playable goal is an accurate local **Mario-versus-Mario stock match on
 Final Destination at 60 fps**, using original gameplay code. Full vanilla Melee
-remains the goal; menus, other matchups and modes follow this initial match gate.
+remains the goal. The active first deliverable includes the original in-game
+CSS → original SSS → four-stock Mario/FD match → original CSS. See the
+[accuracy contract](docs/ACCURACY_CONTRACT.md).
 
 **The complete playable-match milestone is still open.** The browser currently
 runs two original Mario instances on Final Destination, with source controller

@@ -31,6 +31,7 @@ typedef struct MeleeWebNativePObjDesc {
     MeleeWebPObjView geometry;
     const MeleeWebSkinEnvelope* envelopes;
     uint32_t envelope_count;
+    const MeleeWebNativeShapeDesc* shape;
 } MeleeWebNativePObjDesc;
 typedef struct MeleeWebNativeTextureDesc {
     MeleeWebHsdTextureDesc texture;

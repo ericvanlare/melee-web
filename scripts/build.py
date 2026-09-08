@@ -52,7 +52,8 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo"):
     targets = {"graphics": ["gx_probe"], "gameplay": ["gameplay_checks"],
                "runtime": ["gameplay_browser"],
                "fighter": ["fighter_runtime_probe", "gameplay_effect_banks_trace",
-                           "gameplay_bonus_data_trace", "gameplay_stage_numeric_trace"],
+                           "gameplay_bonus_data_trace", "gameplay_stage_numeric_trace",
+                           "native_menu_scene_trace", "dat_menu_support_trace"],
                "all": ["gx_probe", "gameplay_checks"]}[target]
     subprocess.run([str(cmake), "--build", str(build_dir), "--target", *targets, "-j", str(jobs)],
                    cwd=root, env=env, check=True)

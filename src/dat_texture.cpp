@@ -105,16 +105,17 @@ DatTextureImage image(const DatArchive& archive, std::uint32_t offset)
     return result;
 }
 
-DatTexturePalette palette(const DatArchive& archive, std::uint32_t offset,
-                           const DatTextureImage& image)
+DatTexturePalette palette_descriptor(const DatArchive& archive, std::uint32_t offset,
+                           std::uint32_t image_format)
 {
+    if (!indexed(image_format)) reject("Palette requires an indexed image format");
     descriptor(archive, offset, 16);
     DatTexturePalette result;
     result.descriptor_offset = offset;
     result.format = archive.be32(offset + 4);
     result.source_name = archive.be32(offset + 8);
     result.entries = archive.be16(offset + 12);
-    const std::uint32_t capacity = image.format == 8 ? 16 : image.format == 9 ? 256 : 16384;
+    const std::uint32_t capacity = image_format == 8 ? 16 : image_format == 9 ? 256 : 16384;
     if (result.format > 2) reject("Unsupported TLUT palette format");
     if (!result.entries || result.entries > capacity) reject("TLUT entry count is invalid for its image format");
     result.data_offset = required(archive, offset, std::size_t{result.entries} * 2);
@@ -122,6 +123,16 @@ DatTexturePalette palette(const DatArchive& archive, std::uint32_t offset,
     region(archive, result.data_offset, std::size_t{result.entries} * 2);
     result.bytes = archive.range(result.data_offset, std::size_t{result.entries} * 2);
 
+    return result;
+}
+
+std::uint32_t maximum_palette_index(const DatTextureImage& image)
+{
+    if (!indexed(image.format) || !image.width || !image.height ||
+        image.width > max_dimension || image.height > max_dimension ||
+        !image.mip_levels || image.mip_levels > 11)
+        reject("Invalid indexed image dimensions or format");
+    std::uint32_t maximum = 0;
     // Check referenced indices, not padding texels outside the dimensions.
     // All tiled source bytes are still preserved for Aurora's upload path.
     const auto block = tile(image.format);
@@ -129,6 +140,9 @@ DatTexturePalette palette(const DatArchive& archive, std::uint32_t offset,
     for (std::uint32_t level = 0; level < image.mip_levels; ++level) {
         const auto width = std::max(std::uint32_t{image.width} >> level, 1U);
         const auto height = std::max(std::uint32_t{image.height} >> level, 1U);
+        const auto bytes = level_bytes(width, height, block);
+        if (level_start > image.bytes.size() || bytes > image.bytes.size() - level_start)
+            reject("Indexed image tile bytes are truncated");
         const auto columns = (width + block.width - 1) / block.width;
         for (std::uint32_t y = 0; y < height; ++y) {
             for (std::uint32_t x = 0; x < width; ++x) {
@@ -145,11 +159,20 @@ DatTexturePalette palette(const DatArchive& archive, std::uint32_t offset,
                     index = ((std::uint32_t{image.bytes[start + pixel * 2]} << 8) |
                              image.bytes[start + pixel * 2 + 1]) & 0x3fffU;
                 }
-                if (index >= result.entries) reject("Image references an index outside its TLUT palette");
+                maximum = std::max(maximum, index);
             }
         }
         level_start += level_bytes(width, height, block);
     }
+    return maximum;
+}
+
+DatTexturePalette palette(const DatArchive& archive, std::uint32_t offset,
+                           const DatTextureImage& image)
+{
+    auto result = palette_descriptor(archive, offset, image.format);
+    if (maximum_palette_index(image) >= result.entries)
+        reject("Image references an index outside its TLUT palette");
     return result;
 }
 
@@ -246,6 +269,16 @@ DatTexture read_texture(const DatArchive& archive, std::uint32_t offset, bool na
 }
 
 } // namespace
+
+DatTexturePalette read_dat_texture_palette_descriptor(const DatArchive& archive,
+    std::uint32_t offset, std::uint32_t image_format)
+{
+    return palette_descriptor(archive, offset, image_format);
+}
+std::uint32_t dat_texture_max_palette_index(const DatTextureImage& image)
+{
+    return maximum_palette_index(image);
+}
 
 DatTextureImage read_dat_texture_image(const DatArchive& archive, std::uint32_t offset)
 {

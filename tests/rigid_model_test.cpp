@@ -495,6 +495,52 @@ void materials_and_polygon_modes()
     rejects([&] { (void) fixture.model(); });
 }
 
+Fixture shape_fixture()
+{
+    Fixture fixture;
+    constexpr std::uint32_t shape = 320, index_table = 352, indices0 = 360,
+        indices1 = 364;
+    fixture.data.resize(400, 0);
+    put16(fixture.data, Fixture::pobj + 12, 0x1000);
+    fixture.link(Fixture::pobj + 20, shape);
+    put16(fixture.data, shape, 1);       // SHAPESET_AVERAGE.
+    put16(fixture.data, shape + 2, 2);   // Two source shape positions.
+    put32(fixture.data, shape + 4, 3);   // Three blended position entries.
+    fixture.link(shape + 8, Fixture::descriptors);
+    fixture.link(shape + 12, index_table);
+    fixture.link(index_table, indices0);
+    fixture.link(index_table + 4, indices1);
+    for (std::uint32_t i = 0; i < 3; ++i) {
+        fixture.data[indices0 + i] = static_cast<std::uint8_t>(i);
+        fixture.data[indices1 + i] = static_cast<std::uint8_t>(i);
+    }
+    return fixture;
+}
+
+void shape_geometry_and_logical_bounds()
+{
+    auto fixture = shape_fixture();
+    const auto model = RigidModel(fixture.archive(), Fixture::joint, "shape",
+                                  melee_web::ModelRenderPass::All,
+                                  melee_web::DatMaterialPolicy::NativeDescriptors);
+    const auto& mesh = model.meshes[0];
+    check(mesh.shape && mesh.shape->flags == 1 && mesh.shape->shape_count == 2 &&
+          mesh.shape->vertex_index_count == 3 && mesh.shape->vertex_index_lists.size() == 2,
+          "average shape metadata retains its source blend set and index lists");
+
+    fixture = shape_fixture();
+    fixture.data[Fixture::display + 3] = 3;
+    rejects([&] { (void) RigidModel(fixture.archive(), Fixture::joint, "shape",
+                                   melee_web::ModelRenderPass::All,
+                                   melee_web::DatMaterialPolicy::NativeDescriptors); });
+
+    fixture = shape_fixture();
+    put16(fixture.data, 320, 4); // Neither average nor additive.
+    rejects([&] { (void) RigidModel(fixture.archive(), Fixture::joint, "shape",
+                                   melee_web::ModelRenderPass::All,
+                                   melee_web::DatMaterialPolicy::NativeDescriptors); });
+}
+
 void attach_texture(Fixture& fixture, bool reflection, std::uint32_t source)
 {
     constexpr std::uint32_t texture = 320, image = 416, pixels = 448;
@@ -1011,6 +1057,7 @@ int main(int argc, char** argv)
         {"invalid_joint_graphs", invalid_joint_graphs},
         {"indexed_uv_geometry", indexed_uv_geometry},
         {"materials_and_polygon_modes", materials_and_polygon_modes},
+        {"shape_geometry_and_logical_bounds", shape_geometry_and_logical_bounds},
         {"material_vertex_dependencies", material_vertex_dependencies},
         {"descriptor_formats", descriptor_formats}, {"finite_geometry", finite_geometry},
         {"missing_model_content", missing_model_content},

@@ -76,6 +76,9 @@ class RigidModelTests(unittest.TestCase):
     def test_unsupported_material_and_polygon_features(self):
         self.run_case("materials_and_polygon_modes")
 
+    def test_shape_geometry_and_logical_display_bounds(self):
+        self.run_case("shape_geometry_and_logical_bounds")
+
     def test_reflection_normal_and_actual_uv_source_requirements(self):
         self.run_case("material_vertex_dependencies")
 

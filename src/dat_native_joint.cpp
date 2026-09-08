@@ -33,6 +33,8 @@ struct DatNativeJoint::Storage {
     std::vector<MeleeWebNativeJointDesc> joints;
     std::vector<MeleeWebNativeDObjDesc> dobjs;
     std::vector<MeleeWebNativePObjDesc> pobjs;
+    std::vector<MeleeWebNativeShapeDesc> shapes;
+    std::vector<std::vector<const uint8_t*>> shape_vertex_lists, shape_normal_lists;
     std::vector<MeleeWebNativeMaterialDesc> materials;
     std::vector<std::vector<MeleeWebNativeTextureDesc>> textures;
     std::vector<std::vector<MeleeWebSkinEnvelope>> envelopes;
@@ -75,6 +77,8 @@ DatNativeJoint::DatNativeJoint(std::shared_ptr<const DatArchive> archive, uint32
     };
     s.joints.resize(joint_ids.size()); s.dobjs.resize(dobj_ids.size());
     s.pobjs.resize(pobj_ids.size()); s.envelopes.resize(pobj_ids.size());
+    s.shapes.reserve(pobj_ids.size());
+    s.shape_vertex_lists.reserve(pobj_ids.size()); s.shape_normal_lists.reserve(pobj_ids.size());
     s.materials.resize(material_ids.size()); s.textures.resize(material_ids.size());
     for (const auto& j : s.model.joints) {
         auto& out = s.joints.at(joint_ids.at(j.descriptor_offset));
@@ -108,6 +112,15 @@ DatNativeJoint::DatNativeJoint(std::shared_ptr<const DatArchive> archive, uint32
             s.envelopes.at(id).push_back({e.influences.data(), uint32_t(e.influences.size())});
         out.envelopes = s.envelopes.at(id).data();
         out.envelope_count = uint32_t(s.envelopes.at(id).size());
+        if (mesh.shape) {
+            s.shape_vertex_lists.push_back(mesh.shape->vertex_index_lists);
+            s.shape_normal_lists.push_back(mesh.shape->normal_index_lists);
+            s.shapes.push_back({mesh.shape->flags, mesh.shape->shape_count,
+                mesh.shape->vertex_index_count, mesh.shape->normal_index_count,
+                mesh.shape->vertex_attribute, mesh.shape->normal_attribute,
+                s.shape_vertex_lists.back().data(), s.shape_normal_lists.back().data()});
+            out.shape = &s.shapes.back();
+        }
     }
     std::vector<bool> copied_materials(s.materials.size(), false);
     const auto copy_material = [&](const DatMaterial& m) {

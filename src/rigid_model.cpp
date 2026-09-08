@@ -84,13 +84,16 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
     absent(a, offset, "Custom polygon classes are unsupported");
     mesh.descriptor_offset = offset;
     mesh.flags = a.be16(offset + 12);
+    const bool shape_animation = (mesh.flags & 0x3000U) == 0x1000U;
     // Bit zero is retained source metadata; HSD's primitive and setup paths
-    // ignore it. The type field selects rigid skin (0) or envelope (0x2000).
-    if (mesh.flags & ~uint16_t(0xE001)) reject("Unsupported polygon flags or shape animation");
+    // ignore it. The type field selects rigid skin (0), shape animation
+    // (0x1000), or envelope (0x2000).
+    if (mesh.flags & ~uint16_t(0xF001)) reject("Unsupported polygon flags or shape animation");
     if ((mesh.flags & 0x3000) == 0x2000)
         envelopes(a, required(a, offset + 20, 4), mesh);
-    else
+    else if (!shape_animation)
         absent(a, offset + 20, "Shared-joint skinning is unsupported");
+    const auto shape_set_offset = shape_animation ? required(a, offset + 20, 28) : 0;
     const auto units = a.be16(offset + 14);
     if (!units) reject("Polygon display list is empty");
     mesh.display_bytes = uint32_t(units) * 32;
@@ -102,7 +105,12 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
         reject("Display list crosses another referenced data region");
     mesh.display = a.range(display, mesh.display_bytes).data();
     const auto descriptors = required(a, offset + 8, 24);
-    const auto descriptors_end = a.next_target_offset(descriptors);
+    // Shared shape sets point back into the descriptor list (the NRM pointer
+    // commonly targets the second descriptor), so relocation boundaries can
+    // occur inside this fixed-size 24-byte record array. The null attr is the
+    // source terminator; range() still enforces the archive data bound and
+    // the attribute count cap below limits the scan.
+    const auto descriptors_end = uint32_t(a.data().size());
     std::array<uint32_t, MELEE_WEB_POBJ_MAX_ATTRIBUTES> array_offsets{}, maximum_index{}, widths{}, components{};
     mesh.minimum = {INFINITY, INFINITY, INFINITY};
     mesh.maximum = {-INFINITY, -INFINITY, -INFINITY};
@@ -170,6 +178,93 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
         reject("Vertex-color material requires CLR0 geometry");
     if (!mesh.envelopes.empty() && !has_attribute(0))
         reject("Envelope geometry requires a position matrix index");
+    if (shape_animation) {
+        if (policy != DatMaterialPolicy::NativeDescriptors)
+            reject("Shape animation requires the original native PObj path");
+        RigidShape shape;
+        shape.flags = a.be16(shape_set_offset);
+        shape.shape_count = a.be16(shape_set_offset + 2);
+        const auto shape_lists = (shape.flags & 2U) ? uint32_t(shape.shape_count) + 1U : shape.shape_count;
+        if (!shape.shape_count || !a.be32(shape_set_offset + 4) ||
+            ((shape.flags & 3U) != 1U && (shape.flags & 3U) != 2U) ||
+            shape_lists > 4096 || (shape.flags & ~uint16_t(7)) ||
+            a.be32(shape_set_offset + 4) > 2000U || a.be32(shape_set_offset + 16) > 2000U)
+            reject("Shape set count or flags exceed the original morph buffer");
+        shape.vertex_index_count = a.be32(shape_set_offset + 4);
+        shape.normal_index_count = a.be32(shape_set_offset + 16);
+        const auto vertex_desc = required(a, shape_set_offset + 8, 24);
+        const auto normal_desc = a.pointer(shape_set_offset + 20, 24);
+        const auto descriptor_index = [&](uint32_t target, bool normal) {
+            if (target < descriptors || (target - descriptors) % 24)
+                reject("Shape set attribute descriptor is outside the PObj list");
+            const auto index = (target - descriptors) / 24;
+            if (index >= mesh.attributes.size() ||
+                (normal ? mesh.attributes[index].attr != va_nrm
+                        : mesh.attributes[index].attr != va_pos))
+                reject("Shape set attribute descriptor does not name POS/NRM data");
+            return index;
+        };
+        shape.vertex_attribute = descriptor_index(vertex_desc, false);
+        if (mesh.attributes[shape.vertex_attribute].attr_type != index8 &&
+            mesh.attributes[shape.vertex_attribute].attr_type != index16)
+            reject("Shape vertex data must use indexed POS storage");
+        if (normal_desc) {
+            shape.normal_attribute = descriptor_index(*normal_desc, true);
+            if (mesh.attributes[shape.normal_attribute].attr_type != index8 &&
+                mesh.attributes[shape.normal_attribute].attr_type != index16)
+                reject("Shape normal data must use indexed NRM storage");
+        } else if (shape.normal_index_count) {
+            reject("Shape normal indices require a normal descriptor");
+        }
+        const auto validate_shape_indices = [&](uint32_t attribute, uint32_t table,
+                                                 uint32_t index_count,
+                                                 std::vector<const uint8_t*>& output) {
+            const auto& descriptor = mesh.attributes[attribute];
+            const auto bytes_per_index = descriptor.attr_type == index16 ? 2U : 1U;
+            const auto table_end = a.next_target_offset(table);
+            if (shape_lists > (table_end - table) / 4U)
+                reject("Shape index pointer table is truncated");
+            output.reserve(shape_lists);
+            for (uint32_t shape_id = 0; shape_id < shape_lists; ++shape_id) {
+                const auto indices = a.pointer(table + 4U * shape_id,
+                                               index_count * bytes_per_index);
+                if (!indices || index_count * bytes_per_index >
+                                    a.next_target_offset(*indices) - *indices)
+                    reject("Shape index list is truncated or crosses a referenced region");
+                output.push_back(a.range(*indices, index_count * bytes_per_index).data());
+                for (uint32_t item = 0; item < index_count; ++item) {
+                    const auto raw = descriptor.attr_type == index16
+                        ? a.be16(*indices + 2U * item) : a.range(*indices + item, 1)[0];
+                    maximum_index[attribute] = std::max(maximum_index[attribute], uint32_t(raw));
+                    const auto location = uint64_t(array_offsets[attribute]) +
+                        uint64_t(raw) * descriptor.stride;
+                    if (location > UINT32_MAX || location + widths[attribute] >
+                                                a.next_target_offset(array_offsets[attribute]))
+                        reject("Shape index references data outside its vertex array");
+                    for (uint32_t axis = 0; axis < components[attribute]; ++axis) {
+                        const auto value = component(a, uint32_t(location) +
+                            axis * (widths[attribute] / components[attribute]),
+                            descriptor.comp_type, descriptor.frac);
+                        if (descriptor.attr == va_pos) {
+                            mesh.minimum[axis] = std::min(mesh.minimum[axis], value);
+                            mesh.maximum[axis] = std::max(mesh.maximum[axis], value);
+                            model.minimum[axis] = std::min(model.minimum[axis], value);
+                            model.maximum[axis] = std::max(model.maximum[axis], value);
+                        }
+                    }
+                }
+            }
+        };
+        const auto vertex_table = required(a, shape_set_offset + 12, shape_lists * 4U);
+        validate_shape_indices(shape.vertex_attribute, vertex_table,
+                               shape.vertex_index_count, shape.vertex_index_lists);
+        if (shape.normal_index_count) {
+            const auto normal_table = required(a, shape_set_offset + 24, shape_lists * 4U);
+            validate_shape_indices(shape.normal_attribute, normal_table,
+                                   shape.normal_index_count, shape.normal_index_lists);
+        }
+        mesh.shape = std::move(shape);
+    }
     const bool lit = ((mesh.material->render_mode & 7U) == 4U) ||
                      (mesh.material->render_mode & 8U);
     if (lit && !has_attribute(va_nrm))
@@ -237,6 +332,13 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
                 if (bytes.size() - cursor < encoded) reject("Truncated indexed vertex packet");
                 uint32_t index = bytes[cursor++];
                 if (encoded == 2) index = index * 256 + bytes[cursor++];
+                if (shape_animation && attr.attr == va_pos &&
+                    index >= mesh.shape->vertex_index_count)
+                    reject("Shape display position index exceeds its blended buffer");
+                if (shape_animation && attr.attr == va_nrm &&
+                    (!mesh.shape->normal_index_count ||
+                     index >= mesh.shape->normal_index_count))
+                    reject("Shape display normal index exceeds its blended buffer");
                 if (attr.attr <= 8) {
                     const auto base = attr.attr == 0 ? 0U : 30U;
                     if (index < base || (index - base) % 3 ||

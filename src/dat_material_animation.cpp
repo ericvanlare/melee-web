@@ -34,9 +34,9 @@ struct NativeTextureAnimation {
     std::vector<HSD_TlutDesc*> palette_table;
 };
 // Original TObjUpdateFunc directly indexes its tables. Restrict index channels
-// to constant/key opcodes and validate every decoded value before HSD sees it;
-// no interpolated curve can overshoot a checked table bound.
-void validate_indices(const NativeTrack& track, uint32_t count, bool normalized_color=false)
+// to constant/key opcodes. Strict consumers reject all out-of-table values;
+// native menus preserve unselected authoring values with a per-dispatch guard.
+void validate_indices(const NativeTrack& track, uint32_t count, bool normalized_color=false, bool dispatched_only=false)
 {
     require(count > 0, "Texture animation index has no table");
     const auto format = track.descriptor.frac_value;
@@ -73,7 +73,8 @@ void validate_indices(const NativeTrack& track, uint32_t count, bool normalized_
                 value = double(integer) / double(uint32_t(1) << (format & 31));
             }
             require(std::isfinite(value) && value >= 0 &&
-                    (normalized_color ? value <= 1 : value < count && std::floor(value) == value),
+                    (normalized_color ? value <= 1 :
+                     value <= 65535 && (dispatched_only || value < count) && std::floor(value) == value),
                     "Texture animation index is outside its table");
             ++values;
             if (cursor < track.bytes.size()) { const auto first = byte(); (void)varint(first & 127, 7, first); }
@@ -95,7 +96,8 @@ struct DatMaterialAnimation::Storage {
     uint32_t images = 0;
 };
 DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> archive, uint32_t root,
-                                         const MeleeWebNativeGraph& model)
+                                         const MeleeWebNativeGraph& model,
+                                         TextureIndexValidation index_validation)
     : storage_(std::make_unique<Storage>())
 {
     auto& s = *storage_; s.archive = std::move(archive);
@@ -103,6 +105,7 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
     const auto& a = *s.archive;
     std::set<uint32_t> joint_seen, material_seen, texture_seen, track_seen;
     size_t stream_bytes = 0, palette_validation_bytes = 0;
+    std::map<uint32_t,uint32_t> image_max_indices;
     auto record = [&](uint32_t offset, size_t length) {
         require(!(offset & 3), "Material animation descriptor is not aligned");
         (void)a.range(offset, length);
@@ -137,20 +140,6 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
             t.image_table[i] = &t.images[i];
         }
         t.palettes.resize(np); t.palette_table.resize(np);
-        for (uint32_t p=0;p<np;++p) {
-            const auto offset_palette = required(*pt+4*p,16);
-            // Index and palette channels can be independently requested. Every
-            // image must be valid with every available palette.
-            for (const auto& im : images) {
-                require(im.format == 8 || im.format == 9 || im.format == 10, "Palette animation requires indexed images");
-                palette_validation_bytes += im.bytes.size();
-                require(palette_validation_bytes <= 256U * 1024U * 1024U,
-                        "Material animation palette validation exceeds work limit");
-                const auto pal = read_dat_texture_palette(a,offset_palette,im);
-                t.palettes[p] = {const_cast<uint8_t*>(pal.bytes.data()),static_cast<GXTlutFmt>(pal.format),pal.source_name,pal.entries};
-            }
-            t.palette_table[p] = &t.palettes[p];
-        }
         for (const auto& im : images)
             require(np || (im.format != 8 && im.format != 9 && im.format != 10), "Indexed animated image requires palettes");
         const auto ao = required(*offset+8,16); record(ao,16);
@@ -179,12 +168,72 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
                 const MeleeWebAnimationTrack view{track->bytes.data(),track->bytes.size(),0,1,f.frac_value,f.frac_slope};
                 char error[256];
                 require(melee_web_animation_validate_native_track(&view,error,sizeof(error)),error);
-            } else validate_indices(*track,f.type==1?ni:np);
+            } else validate_indices(*track,f.type==1?ni:np,false,
+                index_validation==TextureIndexValidation::DispatchedValues);
             if (!t.tracks.empty()) t.tracks.back()->descriptor.next = &f;
             else t.animation.fobjdesc = &f;
             t.tracks.push_back(std::move(track)); fo=a.pointer(*fo,20);
         }
         require(!t.tracks.empty(), "Texture animation has no supported channels");
+
+        // TIMG and TCLT are evaluated independently by HSD_TObjUpdateFunc,
+        // but both FObj tracks read the same HSD_AObj clock. An exact track
+        // program match therefore proves that their selected image and
+        // palette indices are identical at every update. Only in that case
+        // may the image/palette capacity check follow the diagonal pairs.
+        // validate_indices already restricts these tracks to CON/KEY, whose
+        // original FObj decoders never read frac_slope. Authoring metadata may
+        // differ there without changing either program's values or timing.
+        // Otherwise retain the Cartesian validation required by independently
+        // animated channels.
+        const NativeTrack* image_track = nullptr;
+        const NativeTrack* palette_track = nullptr;
+        for (const auto& track : t.tracks) {
+            if (track->descriptor.type == 1) image_track = track.get();
+            if (track->descriptor.type == 10) palette_track = track.get();
+        }
+        const bool synchronized_index_tracks =
+            ni == np && image_track != nullptr && palette_track != nullptr &&
+            std::bit_cast<uint32_t>(image_track->descriptor.startframe) ==
+                std::bit_cast<uint32_t>(palette_track->descriptor.startframe) &&
+            image_track->descriptor.length == palette_track->descriptor.length &&
+            image_track->descriptor.frac_value ==
+                palette_track->descriptor.frac_value &&
+            image_track->bytes == palette_track->bytes;
+
+        auto validate_image_palette = [&](uint32_t image_index,
+                                          uint32_t palette_index) {
+            const auto& im = images[image_index];
+            require(im.format == 8 || im.format == 9 || im.format == 10,
+                    "Palette animation requires indexed images");
+            auto found = image_max_indices.find(im.descriptor_offset);
+            if (found == image_max_indices.end()) {
+                palette_validation_bytes += im.bytes.size();
+                require(palette_validation_bytes <= 256U * 1024U * 1024U,
+                        "Material animation palette validation exceeds work limit");
+                found = image_max_indices.emplace(im.descriptor_offset,
+                    dat_texture_max_palette_index(im)).first;
+            }
+            const auto offset_palette = required(*pt + 4 * palette_index, 16);
+            const auto pal = read_dat_texture_palette_descriptor(
+                a, offset_palette, im.format);
+            require(found->second < pal.entries,
+                    "Image references an index outside its TLUT palette");
+            t.palettes[palette_index] = {
+                const_cast<uint8_t*>(pal.bytes.data()),
+                static_cast<GXTlutFmt>(pal.format), pal.source_name, pal.entries};
+            t.palette_table[palette_index] = &t.palettes[palette_index];
+        };
+
+        if (synchronized_index_tracks) {
+            for (uint32_t i = 0; i < ni; ++i)
+                validate_image_palette(i, i);
+        } else {
+            for (uint32_t p = 0; p < np; ++p)
+                for (uint32_t i = 0; i < ni; ++i)
+                    validate_image_palette(i, p);
+        }
+
         t.descriptor.aobjdesc=&t.animation; t.descriptor.imagetbl=ni?t.image_table.data():nullptr;
         t.descriptor.tluttbl=np?t.palette_table.data():nullptr; t.descriptor.n_imagetbl=ni; t.descriptor.n_tluttbl=np;
         auto* result=&t.descriptor; s.images+=ni; s.textures.push_back(std::move(owner));
@@ -237,7 +286,7 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
     std::function<HSD_MatAnimJoint*(std::optional<uint32_t>,uint32_t)> joint_tree;
     joint_tree = [&](std::optional<uint32_t> offset,uint32_t joint) -> HSD_MatAnimJoint* {
         if (!offset) { require(joint==UINT32_MAX,"Material animation joint topology is incomplete"); return nullptr; }
-        require(joint<model.joint_count && s.joints.size()<140 && joint_seen.insert(*offset).second,
+        require(joint<model.joint_count && s.joints.size()<256 && joint_seen.insert(*offset).second,
                 "Material animation joint topology/cycle/count is invalid"); record(*offset,12);
         auto j=std::make_unique<HSD_MatAnimJoint>(); auto* result=j.get();indices[result]=joint;contiguous=contiguous&&*offset==root+joint*12;s.joints.push_back(std::move(j));
         result->matanim=material_chain(a.pointer(*offset+8,16),model.joints[joint].dobj);
