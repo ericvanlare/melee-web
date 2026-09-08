@@ -1,6 +1,8 @@
 #include "hsd_native_joint.h"
 #include "gameplay_bootstrap.h"
 #include <sysdolphin/baselib/class.h>
+#include <sysdolphin/baselib/aobj.h>
+#include <sysdolphin/baselib/fobj.h>
 #include <sysdolphin/baselib/dobj.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/gobjobject.h>
@@ -19,11 +21,11 @@
 #include <string.h>
 
 typedef struct NativeJ { HSD_Joint desc; Mtx inverse; uint32_t source_offset; } NativeJ;
-typedef struct NativeP { HSD_PObjDesc desc; HSD_VtxDescList* attributes;
+typedef struct NativeP { HSD_PObjDesc desc; HSD_VtxDescList* attributes; u8* display;
     HSD_EnvelopeDesc** envelopes; uint32_t envelope_count; } NativeP;
 typedef struct NativeT { HSD_TObjDesc desc; HSD_ImageDesc image;
-    HSD_TlutDesc palette; HSD_TexLODDesc lod; } NativeT;
-typedef struct NativeM { HSD_MObjDesc desc; HSD_Material material;
+    HSD_TlutDesc palette; HSD_TexLODDesc lod; HSD_TObjTevDesc tev; } NativeT;
+typedef struct NativeM { HSD_MObjDesc desc; HSD_Material material; HSD_PEDesc pixel_engine;
     NativeT* textures; uint32_t texture_count; } NativeM;
 struct MeleeWebNativeJoint {
     NativeJ* joints; HSD_DObjDesc* dobjs; NativeP* pobjs; NativeM* materials;
@@ -32,6 +34,7 @@ struct MeleeWebNativeJoint {
     uint64_t generation;
 };
 static uint64_t native_generation;
+extern HSD_IDTable default_table;
 HSD_JObj* melee_web_native_common_load(HSD_Joint* descriptor, const uint8_t diffuse[4]);
 static int fail(char* error, size_t size, const char* message)
 {
@@ -40,8 +43,18 @@ static int fail(char* error, size_t size, const char* message)
 }
 static void finish_native_world(void)
 {
-    /* GObj shutdown has already invoked each real object destructor. Original
-     * amnesia clears class allocator/hash caches before their arena disappears. */
+    /* GObj shutdown has invoked real object destructors. Source consumers such
+     * as ft_800C85B8 also register descriptor aliases; JObjRelease only removes
+     * the object's primary ID. Release those remaining owned table entries
+     * through the original allocator before forgetting its hash buckets. The
+     * original _HSD_IDForgetMemory alone does not decrement allocator.used. */
+    for (size_t bucket = 0; bucket < sizeof(default_table.table) / sizeof(default_table.table[0]); ++bucket)
+        while (default_table.table[bucket])
+            HSD_IDRemoveByIDFromTable(NULL, default_table.table[bucket]->id);
+    if (HSD_IDGetAllocData()->used) {
+        fputs("Native HSD shutdown retains descriptor IDs outside its owned default table\n", stderr);
+        abort();
+    }
     _HSD_IDForgetMemory(NULL, NULL);
     hsdForgetClassLibrary(NULL);
     native_generation = 0;
@@ -57,7 +70,7 @@ static void free_descriptors(MeleeWebNativeJoint* handle)
     if (!handle) return;
     if (handle->pobjs) for (uint32_t i = 0; i < handle->pobj_count; ++i) {
         NativeP* p = &handle->pobjs[i];
-        free(p->attributes);
+        free(p->attributes); free(p->display);
         if (p->envelopes) for (uint32_t j = 0; j < p->envelope_count; ++j) free(p->envelopes[j]);
         free(p->envelopes);
     }
@@ -118,6 +131,7 @@ static int validate(const MeleeWebNativeGraph* g, char* error, size_t size)
             cursor = g->dobjs[cursor].next;
         }
     }
+    size_t display_bytes = 0;
     for (uint32_t i = 0; i < g->pobj_count; ++i) {
         const MeleeWebNativePObjDesc* p = &g->pobjs[i];
         const MeleeWebPObjView* v = &p->geometry;
@@ -128,6 +142,9 @@ static int validate(const MeleeWebNativeGraph* g, char* error, size_t size)
             ((v->flags & 0x3000U) == 0x2000U) != (p->envelope_count != 0) ||
             (p->envelope_count && !p->envelopes))
             return fail(error, size, "Native PObj requires checked rigid/envelope geometry");
+        display_bytes += v->display_byte_size;
+        if (display_bytes > 64U * 1024U * 1024U)
+            return fail(error, size, "Native display-list ownership exceeds memory budget");
         uint32_t cursor = i;
         for (unsigned depth = 0; cursor != UINT32_MAX; ++depth) {
             if (depth >= 256 || cursor >= g->pobj_count)
@@ -152,11 +169,30 @@ static int validate(const MeleeWebNativeGraph* g, char* error, size_t size)
         const MeleeWebNativeMaterialDesc* m = &g->materials[i];
         if (!isfinite(m->material.alpha) || m->material.alpha < 0 || m->material.alpha > 1 ||
             !isfinite(m->material.shininess) || m->material.shininess < 0 ||
-            (m->material.rendermode & ~0xfffU) || m->material.texture_count > 8 ||
+            (m->material.rendermode & ~0x68006fffU) || m->material.texture_count > 8 ||
             (m->material.texture_count && !m->textures))
             return fail(error, size, "Native material requires checked opaque material metadata");
+        if(m->has_pixel_engine) {
+            const uint8_t* pe=m->pixel_engine;
+            if((pe[0]&0x80)||pe[4]>3||pe[5]>7||pe[6]>7||pe[7]>15||pe[8]>7||pe[9]>7||pe[10]>3||pe[11]>7)
+                return fail(error,size,"Native pixel-engine descriptor has invalid GX enums");
+        }
         for (uint32_t j = 0; j < m->material.texture_count; ++j) {
             const MeleeWebHsdTextureDesc* t = &m->textures[j].texture;
+            const MeleeWebNativeTextureDesc* n=&m->textures[j];
+            if(n->has_tev) {
+                if(n->tev_active&~0xc0000fffU)return fail(error,size,"Native TEV active flags are unsupported");
+                for(unsigned ch=0;ch<2;++ch)if(n->tev_active&(1u<<(30+ch))) {
+                    const uint8_t* v=n->tev_fields;
+                    if(v[ch]>1||v[2+ch]>2||v[4+ch]>3||v[6+ch]>1)return fail(error,size,"Native TEV operation is unsupported");
+                    for(unsigned k=0;k<4;++k) {
+                        const unsigned x=v[8+ch*4+k];
+                        const int valid=ch?(x==4||x==7||(x>=0x40&&x<=0x45)):
+                            (x==8||x==9||x==12||x==13||x==15||(x>=0x80&&x<=0x88));
+                        if(!valid)return fail(error,size,"Native TEV expression input is unsupported");
+                    }
+                }
+            }
             if (!t->image_data || !t->image_bytes || !t->width || !t->height)
                 return fail(error, size, "Native texture requires a checked image span");
         }
@@ -164,15 +200,15 @@ static int validate(const MeleeWebNativeGraph* g, char* error, size_t size)
     return 1;
 }
 
-static MeleeWebNativeJoint* create_joint(const MeleeWebNativeGraph* g, const uint8_t* diffuse, char* error, size_t size)
+static MeleeWebNativeJoint* create_joint(const MeleeWebNativeGraph* g, const uint8_t* diffuse, int load, char* error, size_t size)
 {
     if (!validate(g, error, size)) return NULL;
     MeleeWebGameplayStats world = melee_web_gameplay_stats();
     /* This is an explicit resource gate, not a prediction of allocator success.
      * Fragmentation or a genuine source heap OOM retains original HSD failure. */
-    if (!world.generation || world.heap_free_bytes < 1024 * 1024)
+    if (load && (!world.generation || world.heap_free_bytes < 1024 * 1024))
         { fail(error, size, "Native HSD loading requires an owned world with at least 1 MiB free"); return NULL; }
-    if (native_generation != world.generation && HSD_IDGetAllocData()->used)
+    if (load && native_generation != world.generation && HSD_IDGetAllocData()->used)
         { fail(error, size, "Native HSD cannot replace an existing descriptor ID context"); return NULL; }
     if (diffuse && g->joints[g->root].dobj == UINT32_MAX)
         { fail(error, size, "Original common material consumer requires a root DObj"); return NULL; }
@@ -206,7 +242,13 @@ static MeleeWebNativeJoint* create_joint(const MeleeWebNativeGraph* g, const uin
         const MeleeWebNativePObjDesc* s = &g->pobjs[i]; NativeP* p = &h->pobjs[i];
         p->desc.next = s->next == UINT32_MAX ? NULL : &h->pobjs[s->next].desc;
         p->desc.flags = s->geometry.flags; p->desc.n_display = s->geometry.display_byte_size / 32;
-        p->desc.display = (u8*) s->geometry.display;
+        /* The original fighter/refraction PObj loader rewrites texture matrix
+         * indices in place. Its mutable display storage belongs to this native
+         * descriptor owner, never to the reusable immutable DAT archive. */
+        p->display = aligned_alloc(32, s->geometry.display_byte_size);
+        if (!p->display) goto oom;
+        memcpy(p->display, s->geometry.display, s->geometry.display_byte_size);
+        p->desc.display = p->display;
         p->attributes = calloc(s->geometry.attribute_count + 1, sizeof(HSD_VtxDescList));
         if (!p->attributes) goto oom;
         p->desc.verts = p->attributes;
@@ -236,6 +278,10 @@ static MeleeWebNativeJoint* create_joint(const MeleeWebNativeGraph* g, const uin
         memcpy(&m->material.diffuse, s->material.diffuse, sizeof(GXColor));
         memcpy(&m->material.specular, s->material.specular, sizeof(GXColor));
         m->material.alpha = s->material.alpha; m->material.shininess = s->material.shininess;
+        if(s->has_pixel_engine) {
+            _Static_assert(sizeof(HSD_PEDesc)==12,"Original pixel-engine byte descriptor");
+            memcpy(&m->pixel_engine,s->pixel_engine,12);m->desc.pedesc=&m->pixel_engine;
+        }
         m->texture_count = s->material.texture_count;
         if (m->texture_count) {
             m->textures = calloc(m->texture_count, sizeof(NativeT)); if (!m->textures) goto oom;
@@ -256,18 +302,18 @@ static MeleeWebNativeJoint* create_joint(const MeleeWebNativeGraph* g, const uin
                 t->palette = (HSD_TlutDesc) {(void*) in->palette_data, in->palette_format, n->palette_name, in->palette_entries};
                 d->tlutdesc = &t->palette;
             }
+            if(n->has_tev) {
+                _Static_assert(offsetof(HSD_TObjTevDesc,active)==28&&sizeof(HSD_TObjTevDesc)==32,"Original native TEV descriptor");
+                memcpy(&t->tev,n->tev_fields,28);t->tev.active=n->tev_active;d->tev=&t->tev;
+            }
             if (n->has_lod) {
                 t->lod = (HSD_TexLODDesc) {in->min_filter, in->lod_bias, in->bias_clamp, in->edge_lod, in->anisotropy};
                 d->lod = &t->lod;
             }
         }
     }
-    if (!melee_web_gameplay_enable_hsd_objects(finish_native_world, error, size)) { free_descriptors(h); return NULL; }
-    if (native_generation != world.generation) {
-        HSD_IDInitAllocData(); HSD_IDSetup();
-        HSD_ListInitAllocData(); HSD_MtxInitAllocData(); HSD_VecInitAllocData();
-        native_generation = world.generation;
-    }
+    if (!load) { if (error && size) error[0] = 0; return h; }
+    if (!melee_web_native_world_enable(error, size)) { free_descriptors(h); return NULL; }
     HSD_JObj* loaded = diffuse ? melee_web_native_common_load(&h->joints[g->root].desc, diffuse) :
                                 HSD_JObjLoadJoint(&h->joints[g->root].desc);
     if (!loaded) { fail(error, size, "Original HSD_JObjLoadJoint returned no object"); free_descriptors(h); return NULL; }
@@ -284,13 +330,13 @@ oom:
 
 MeleeWebNativeJoint* melee_web_native_joint_create(const MeleeWebNativeGraph* g, char* error, size_t size)
 {
-    return create_joint(g, NULL, error, size);
+    return create_joint(g, NULL, 1, error, size);
 }
 MeleeWebNativeJoint* melee_web_native_common_joint_create(const MeleeWebNativeGraph* g,
     const uint8_t diffuse[4], char* error, size_t size)
 {
     if (!diffuse) { fail(error, size, "Common material consumer requires root0.x7D8 color"); return NULL; }
-    return create_joint(g, diffuse, error, size);
+    return create_joint(g, diffuse, 1, error, size);
 }
 
 int melee_web_native_joint_stats(const MeleeWebNativeJoint* h, MeleeWebNativeJointStats* out, char* error, size_t size)
@@ -324,5 +370,68 @@ int melee_web_native_joint_stats(const MeleeWebNativeJoint* h, MeleeWebNativeJoi
     }
     *out = result;
     if (error && size) error[0] = 0;
+    return 1;
+}
+
+int melee_web_native_world_enable(char* error, size_t size)
+{
+    const MeleeWebGameplayStats world = melee_web_gameplay_stats();
+    if (!world.generation || world.heap_free_bytes < 1024 * 1024)
+        return fail(error, size, "Native HSD requires an owned world with at least 1 MiB free");
+    if (native_generation != world.generation && HSD_IDGetAllocData()->used)
+        return fail(error, size, "Native HSD cannot replace an existing descriptor ID context");
+    if (!melee_web_gameplay_enable_hsd_objects(finish_native_world, error, size)) return 0;
+    if (native_generation != world.generation) {
+        HSD_IDInitAllocData(); HSD_IDSetup();
+        HSD_ListInitAllocData(); HSD_MtxInitAllocData(); HSD_VecInitAllocData();
+        HSD_AObjInitAllocData(); HSD_FObjInitAllocData();
+        native_generation = world.generation;
+    }
+    if (error && size) error[0] = 0;
+    return 1;
+}
+MeleeWebNativeJoint* melee_web_native_joint_hydrate(const MeleeWebNativeGraph* g, char* error, size_t size)
+{
+    return create_joint(g, NULL, 0, error, size);
+}
+void* melee_web_native_joint_descriptor(MeleeWebNativeJoint* h, char* error, size_t size)
+{
+    if (!h || (h->generation && (!h->owner || h->generation != melee_web_gameplay_stats().generation))) {
+        fail(error, size, "Native joint descriptor requires a live owner"); return NULL;
+    }
+    if (error && size) error[0] = 0;
+    return &h->joints[h->root].desc;
+}
+void* melee_web_native_joint_object(MeleeWebNativeJoint* h, char* error, size_t size)
+{
+    if (!h || !h->owner || h->generation != melee_web_gameplay_stats().generation) {
+        fail(error, size, "Native joint object requires its original live world"); return NULL;
+    }
+    if (error && size) error[0] = 0;
+    return h->owner->hsd_obj;
+}
+
+int melee_web_native_joint_add_material_animation(MeleeWebNativeJoint* h, void* descriptor, char* error, size_t size)
+{
+    HSD_JObj* root = melee_web_native_joint_object(h, error, size);
+    if (!root) return 0;
+    if (!descriptor) return fail(error, size, "Material animation requires checked native descriptors");
+    HSD_JObjAddAnimAll(root, NULL, descriptor, NULL);
+    return 1;
+}
+int melee_web_native_joint_request_animation(MeleeWebNativeJoint* h, float frame, char* error, size_t size)
+{
+    HSD_JObj* root = melee_web_native_joint_object(h, error, size);
+    if (!root) return 0;
+    if (!isfinite(frame) || frame < 0 || frame > 32767)
+        return fail(error, size, "Native animation request frame is invalid");
+    HSD_JObjReqAnimAll(root, frame);
+    return 1;
+}
+int melee_web_native_joint_animate(MeleeWebNativeJoint* h, char* error, size_t size)
+{
+    HSD_JObj* root = melee_web_native_joint_object(h, error, size);
+    if (!root) return 0;
+    HSD_JObjAnimAll(root);
     return 1;
 }

@@ -7,12 +7,20 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#include <utility>
 
 namespace melee_web {
 
 class DatError : public std::runtime_error {
 public:
     using std::runtime_error::runtime_error;
+};
+
+enum class DatExternalPolicy { Reject, PreserveUnresolved };
+
+struct DatExternalSymbol {
+    std::string name;
+    std::vector<std::uint32_t> slots;
 };
 
 struct DatPublicSymbol {
@@ -31,9 +39,13 @@ public:
     static constexpr std::size_t max_symbol_name_bytes = 4096U;
 
     // Limits also bound total copied symbol-name bytes to max_archive_bytes.
-    // External links require another archive and are explicitly unsupported.
-    explicit DatArchive(std::span<const std::uint8_t> input);
+    // External links default to rejection. The explicit PreserveUnresolved policy
+// keeps validated named slot chains without binding or emulating their values.
+    explicit DatArchive(std::span<const std::uint8_t> input,
+                        DatExternalPolicy external_policy = DatExternalPolicy::Reject);
 
+    // Raw byte inspection does not resolve external links. Typed scalar and
+    // pointer reads reject any overlap with unresolved external slots.
     [[nodiscard]] std::span<const std::uint8_t> data() const noexcept;
     [[nodiscard]] std::span<const std::uint8_t>
     range(std::uint32_t offset, std::size_t length) const;
@@ -42,12 +54,15 @@ public:
     [[nodiscard]] float f32(std::uint32_t offset) const;
     [[nodiscard]] const std::vector<DatPublicSymbol>& public_symbols() const noexcept;
 
+    [[nodiscard]] const std::vector<DatExternalSymbol>& external_symbols() const noexcept;
+
     // First referenced target strictly after offset, or the data-section end.
     // offset must name a byte inside data. This is a conservative region bound
     // from validated relocations/public symbols, not proof of allocation size:
     // aliases or references into an array can divide a legitimate allocation.
     [[nodiscard]] std::uint32_t next_target_offset(std::uint32_t offset) const;
 
+    // Includes unresolved external slots: these must not be decoded as scalars.
     // Query relocation metadata without interpreting a scalar word as a
     // pointer. The slot must be aligned and contain four bytes inside data.
     [[nodiscard]] bool has_relocation(std::uint32_t slot) const;
@@ -60,11 +75,15 @@ public:
     pointer(std::uint32_t slot, std::size_t minbytes = 1) const;
 
 private:
+    void require_resolved(std::uint32_t offset, std::size_t length) const;
     std::vector<std::uint8_t> bytes_;
     std::uint32_t data_size_ = 0;
     std::vector<std::uint32_t> relocation_slots_;
     std::vector<std::uint32_t> referenced_targets_;
     std::vector<DatPublicSymbol> public_symbols_;
+    std::vector<DatExternalSymbol> external_symbols_;
+    // Sorted pairs of (unresolved slot, external symbol index).
+    std::vector<std::pair<std::uint32_t, std::uint32_t>> external_slots_;
 };
 
 } // namespace melee_web

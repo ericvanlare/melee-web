@@ -34,18 +34,19 @@ DatMaterialPass read_dat_material_pass(const DatArchive& archive, std::uint32_t 
     }
 }
 
-DatMaterial read_dat_material(const DatArchive& archive, std::uint32_t offset)
+DatMaterial read_dat_material(const DatArchive& archive, std::uint32_t offset, DatMaterialPolicy policy)
 {
     descriptor(archive, offset, 24);
     absent(archive, offset, "Custom material classes are unsupported");
     absent(archive, offset + 16, "Custom material render descriptors are unsupported");
-    absent(archive, offset + 20, "Custom material pixel-engine state is unsupported");
+    if(policy == DatMaterialPolicy::ViewerOpaque)
+        absent(archive, offset + 20, "Custom material pixel-engine state is unsupported");
     DatMaterial material;
     material.descriptor_offset = offset;
     material.render_mode = archive.be32(offset + 4);
-    // Original HSD receives these bits unchanged. No translucent
-    // sorting, toon/shadow services or special depth modes exist in this target.
-    constexpr std::uint32_t supported = 0xfffU;
+    // Native descriptors retain supported source render flags for the original
+    // HSD consumer; the viewer policy keeps its opaque-only rendering boundary.
+    const std::uint32_t supported = policy == DatMaterialPolicy::NativeDescriptors ? 0x68006fffU : 0xfffU;
     if (material.render_mode & ~supported)
         throw DatError("Material requires unsupported transparency, toon, shadow or depth behavior");
     const auto data = archive.pointer(offset + 12, 20);
@@ -60,13 +61,27 @@ DatMaterial read_dat_material(const DatArchive& archive, std::uint32_t offset)
     std::copy(specular.begin(), specular.end(), material.specular.begin());
     material.alpha = archive.f32(*data + 12);
     material.shininess = archive.f32(*data + 16);
-    if (material.alpha != 1.F) throw DatError("Only opaque material alpha is supported");
+    if(policy == DatMaterialPolicy::ViewerOpaque && material.alpha != 1.F)
+        throw DatError("Only opaque material alpha is supported");
+    if(!std::isfinite(material.alpha)||material.alpha<0||material.alpha>1)
+        throw DatError("Material alpha is outside its finite unit range");
+    if(policy == DatMaterialPolicy::NativeDescriptors) {
+        (void)read_dat_material_pass(archive,offset);
+        if(const auto pe=archive.pointer(offset+20,12)) {
+            descriptor(archive,*pe,12);
+            const auto bytes=archive.range(*pe,12);
+            if((bytes[0]&0x80)||bytes[4]>3||bytes[5]>7||bytes[6]>7||bytes[7]>15||
+               bytes[8]>7||bytes[9]>7||bytes[10]>3||bytes[11]>7)
+                throw DatError("Native pixel-engine descriptor has invalid GX enums");
+            std::array<uint8_t,12> fields{};std::copy(bytes.begin(),bytes.end(),fields.begin());material.pixel_engine=fields;
+        }
+    }
     // Original HSD_LObjSetup uses shininess/2 and 1-shininess/2 without a
     // 128 cap. Finite nonnegative input keeps both derived coefficients finite.
     if (!std::isfinite(material.shininess) || material.shininess < 0)
         throw DatError("Material shininess is nonfinite or outside the supported range");
     if (const auto first = archive.pointer(offset + 8, 92))
-        material.textures = read_dat_texture_chain(archive, *first);
+        material.textures = read_dat_texture_chain(archive, *first, policy==DatMaterialPolicy::NativeDescriptors);
     return material;
 }
 

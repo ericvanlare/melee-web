@@ -7,18 +7,23 @@
 
 static HSD_Joint* expected_descriptor;
 static HSD_JObj* captured_root;
+static void (*persistent_capture)(void*, void*);
+static void* persistent_context;
 static HSD_JObj* capture_joint_load(HSD_Joint* descriptor)
 {
-    if (!expected_descriptor || descriptor != expected_descriptor || captured_root)
+    if (!expected_descriptor || descriptor != expected_descriptor || (captured_root && !persistent_capture))
         HSD_Panic(__FILE__, __LINE__, "Unexpected native common joint load");
-    captured_root = HSD_JObjLoadJoint(descriptor);
-    return captured_root;
+    HSD_JObj* root = HSD_JObjLoadJoint(descriptor);
+    if (persistent_capture) persistent_capture(persistent_context, root);
+    else captured_root = root;
+    return root;
 }
 /* The original consumer discards its returned root after retaining its MObj.
  * Capture that real loader return solely to give the native GObj ownership;
  * no constructor or common-material behavior is substituted. */
 #define HSD_JObjLoadJoint capture_joint_load
 #include <melee/ft/ft_0C8C.c>
+#include <melee/ft/ftCo_800C7CA0.c>
 #undef HSD_JObjLoadJoint
 
 HSD_JObj* melee_web_native_common_load(HSD_Joint* descriptor, const uint8_t diffuse[4])
@@ -44,4 +49,22 @@ HSD_JObj* melee_web_native_common_load(HSD_Joint* descriptor, const uint8_t diff
     captured_root = NULL;
     expected_descriptor = NULL;
     return result;
+}
+
+int melee_web_native_common_capture_begin(void* descriptor,
+    void (*capture)(void*, void*), void* context)
+{
+    if (expected_descriptor || !descriptor || !capture || !context) return 0;
+    expected_descriptor = descriptor;
+    persistent_capture = capture;
+    persistent_context = context;
+    return 1;
+}
+int melee_web_native_common_capture_end(void* context)
+{
+    if (!persistent_capture || persistent_context != context) return 0;
+    expected_descriptor = NULL;
+    persistent_capture = NULL;
+    persistent_context = NULL;
+    return 1;
 }

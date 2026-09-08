@@ -12,44 +12,44 @@
 /* Original source field annotations, checked independently of ASSERT_SIZE:
  * upstream disables that macro outside MUST_MATCH/LINT. CommandInfo's trailing
  * comments predate event_return[3]; actual source/PPC layout is 0x24 bytes. */
-#define OFFSET(type, field, value) \
+#define ABI_OFFSET(type, field, value) \
     _Static_assert(offsetof(type, field) == value, #type "." #field " layout changed")
 _Static_assert(sizeof(void*) == 4 && sizeof(int) == 4 && sizeof(float) == 4,
                "Gameplay boundary requires Wasm32-width pointers and scalars");
 _Static_assert(sizeof(Fighter) == 0x23ec && _Alignof(Fighter) == 4, "Fighter layout changed");
-OFFSET(Fighter, gobj, 0); OFFSET(Fighter, motion_id, 0x10);
-OFFSET(Fighter, facing_dir, 0x2c); OFFSET(Fighter, self_vel, 0x80);
-OFFSET(Fighter, cur_pos, 0xb0); OFFSET(Fighter, ground_or_air, 0xe0);
-OFFSET(Fighter, ft_data, 0x10c); OFFSET(Fighter, co_attrs, 0x110);
-OFFSET(Fighter, x3E4_fighterCmdScript, 0x3e4);
-OFFSET(Fighter, x590, 0x590); OFFSET(Fighter, x594_s32, 0x594);
-OFFSET(Fighter, x598, 0x598); OFFSET(Fighter, parts, 0x5e8);
-OFFSET(Fighter, coll_data, 0x6f0); OFFSET(Fighter, anim_cb, 0x21a0);
-OFFSET(Fighter, phys_cb, 0x21a4); OFFSET(Fighter, coll_cb, 0x21a8);
-OFFSET(Fighter, cmd_vars, 0x2200); OFFSET(Fighter, throw_flags, 0x2210);
-OFFSET(Fighter, cmd_timer, 0x2214); OFFSET(Fighter, u, 0x222c);
-OFFSET(Fighter, mv, 0x2340);
+ABI_OFFSET(Fighter, gobj, 0); ABI_OFFSET(Fighter, motion_id, 0x10);
+ABI_OFFSET(Fighter, facing_dir, 0x2c); ABI_OFFSET(Fighter, self_vel, 0x80);
+ABI_OFFSET(Fighter, cur_pos, 0xb0); ABI_OFFSET(Fighter, ground_or_air, 0xe0);
+ABI_OFFSET(Fighter, ft_data, 0x10c); ABI_OFFSET(Fighter, co_attrs, 0x110);
+ABI_OFFSET(Fighter, x3E4_fighterCmdScript, 0x3e4);
+ABI_OFFSET(Fighter, x590, 0x590); ABI_OFFSET(Fighter, x594_s32, 0x594);
+ABI_OFFSET(Fighter, x598, 0x598); ABI_OFFSET(Fighter, parts, 0x5e8);
+ABI_OFFSET(Fighter, coll_data, 0x6f0); ABI_OFFSET(Fighter, anim_cb, 0x21a0);
+ABI_OFFSET(Fighter, phys_cb, 0x21a4); ABI_OFFSET(Fighter, coll_cb, 0x21a8);
+ABI_OFFSET(Fighter, cmd_vars, 0x2200); ABI_OFFSET(Fighter, throw_flags, 0x2210);
+ABI_OFFSET(Fighter, cmd_timer, 0x2214); ABI_OFFSET(Fighter, u, 0x222c);
+ABI_OFFSET(Fighter, mv, 0x2340);
 _Static_assert(sizeof(CommandInfo) == 0x24 && _Alignof(CommandInfo) == 4, "CommandInfo layout changed");
-OFFSET(CommandInfo, timer, 0); OFFSET(CommandInfo, frame_count, 4);
-OFFSET(CommandInfo, u, 8); OFFSET(CommandInfo, ptr, 8);
-OFFSET(CommandInfo, loop_count, 0xc); OFFSET(CommandInfo, event_return, 0x10);
-OFFSET(CommandInfo, loop_count_dup, 0x1c); OFFSET(CommandInfo, unk_x18, 0x20);
+ABI_OFFSET(CommandInfo, timer, 0); ABI_OFFSET(CommandInfo, frame_count, 4);
+ABI_OFFSET(CommandInfo, u, 8); ABI_OFFSET(CommandInfo, ptr, 8);
+ABI_OFFSET(CommandInfo, loop_count, 0xc); ABI_OFFSET(CommandInfo, event_return, 0x10);
+ABI_OFFSET(CommandInfo, loop_count_dup, 0x1c); ABI_OFFSET(CommandInfo, unk_x18, 0x20);
 _Static_assert(sizeof(HSD_GObj) == 0x38 && _Alignof(HSD_GObj) == 8, "HSD_GObj layout changed");
-OFFSET(HSD_GObj, next, 8); OFFSET(HSD_GObj, proc, 0x18);
-OFFSET(HSD_GObj, gxlink_prios, 0x20); OFFSET(HSD_GObj, hsd_obj, 0x28);
-OFFSET(HSD_GObj, user_data, 0x2c); OFFSET(HSD_GObj, user_data_remove_func, 0x30);
+ABI_OFFSET(HSD_GObj, next, 8); ABI_OFFSET(HSD_GObj, proc, 0x18);
+ABI_OFFSET(HSD_GObj, gxlink_prios, 0x20); ABI_OFFSET(HSD_GObj, hsd_obj, 0x28);
+ABI_OFFSET(HSD_GObj, user_data, 0x2c); ABI_OFFSET(HSD_GObj, user_data_remove_func, 0x30);
 _Static_assert(sizeof(HSD_GObjProc) == 0x18, "HSD_GObjProc layout changed");
-OFFSET(HSD_GObjProc, gobj, 0x10); OFFSET(HSD_GObjProc, on_invoke, 0x14);
+ABI_OFFSET(HSD_GObjProc, gobj, 0x10); ABI_OFFSET(HSD_GObjProc, on_invoke, 0x14);
 _Static_assert(sizeof(StageCallbacks) == 20, "StageCallbacks layout changed");
-OFFSET(StageCallbacks, flags, 0x10);
+ABI_OFFSET(StageCallbacks, flags, 0x10);
 _Static_assert(sizeof(MotionState) == 0x20, "MotionState layout changed");
-OFFSET(MotionState, _, 8); OFFSET(MotionState, anim_cb, 0xc);
+ABI_OFFSET(MotionState, _, 8); ABI_OFFSET(MotionState, anim_cb, 0xc);
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-OFFSET(Fighter, x596_bits, 0x594);
+ABI_OFFSET(Fighter, x596_bits, 0x594);
 #else
-OFFSET(Fighter, x596_bits, 0x596);
+ABI_OFFSET(Fighter, x596_bits, 0x596);
 #endif
-#undef OFFSET
+#undef ABI_OFFSET
 
 static int aliases_match(const Fighter* fp, uint32_t word)
 {

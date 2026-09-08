@@ -27,6 +27,12 @@ class NativeJointDescriptorTests(unittest.TestCase):
             result = subprocess.run([str(output)], capture_output=True, text=True, timeout=20)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("typed native graph identity/lifetime/rejection checks passed", result.stdout)
+            fighter=ROOT/"assets-local/next-gate/PlMr.dat"
+            costume=ROOT/"assets-local/next-gate/PlMrNr.dat"
+            if fighter.is_file() and costume.is_file():
+                result=subprocess.run([str(output),str(fighter),str(costume)],capture_output=True,text=True,timeout=20)
+                self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+                self.assertIn("Local Mario metal graph:61 matching joints,8 DObj occurrences,21 PObjs passed",result.stdout)
 
 
 class NativeJointRuntimeTests(unittest.TestCase):
@@ -67,6 +73,8 @@ class NativeJointRuntimeTests(unittest.TestCase):
         self.assertEqual(result.stdout.count("root20 native original consumer:"), 2)
         self.assertEqual(result.stdout.count("costume native original loader: 61 joints"), 2)
         self.assertRegex(result.stdout, r"[1-9][0-9]* resolved influences")
+        self.assertEqual(result.stdout.count("Mario original material animation: two eye textures"), 2)
+        self.assertEqual(result.stdout.count("Local common context: 17 copied roots"), 2)
         self.assertIn("Original common root20 initialization/destruction/restart passed", result.stdout)
 
     def test_local_costume_requires_exact_public_symbol(self):

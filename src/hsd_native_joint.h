@@ -27,12 +27,14 @@ typedef struct MeleeWebNativePObjDesc {
 typedef struct MeleeWebNativeTextureDesc {
     MeleeWebHsdTextureDesc texture;
     uint32_t source_offset, source_id, palette_name;
-    uint8_t has_lod;
+    uint8_t has_lod, has_tev, tev_fields[28];
+    uint32_t tev_active;
 } MeleeWebNativeTextureDesc;
 typedef struct MeleeWebNativeMaterialDesc {
     uint32_t source_offset;
     MeleeWebHsdMaterialDesc material;
     const MeleeWebNativeTextureDesc* textures;
+    uint8_t has_pixel_engine, pixel_engine[12];
 } MeleeWebNativeMaterialDesc;
 typedef struct MeleeWebNativeGraph {
     const MeleeWebNativeJointDesc* joints;
@@ -47,6 +49,20 @@ typedef struct MeleeWebNativeJointStats {
     uint8_t first_diffuse[4];
     uint64_t generation;
 } MeleeWebNativeJointStats;
+
+/* Descriptor-only hydration performs no HSD allocation. Mutable display lists
+ * are copied into owned aligned buffers; source loaders may rewrite them. Keep its owner and
+ * checked input payloads alive until every source-created JObj is destroyed.
+ * The descriptor pointer is HSD_Joint*, the object pointer is HSD_JObj*. */
+int melee_web_native_world_enable(char* error, size_t error_size);
+MeleeWebNativeJoint* melee_web_native_joint_hydrate(const MeleeWebNativeGraph*, char*, size_t);
+void* melee_web_native_joint_descriptor(MeleeWebNativeJoint*, char*, size_t);
+void* melee_web_native_joint_object(MeleeWebNativeJoint*, char*, size_t);
+/* Material descriptors must come from DatMaterialAnimation and remain alive
+ * through runtime removal. These calls execute original HSD animation code. */
+int melee_web_native_joint_add_material_animation(MeleeWebNativeJoint*, void*, char*, size_t);
+int melee_web_native_joint_request_animation(MeleeWebNativeJoint*, float, char*, size_t);
+int melee_web_native_joint_animate(MeleeWebNativeJoint*, char*, size_t);
 
 /* Original HSD_JObjLoadJoint/ResolveRefs/class methods execute against owned
  * typed descriptors. The original GObj object destructor owns the loaded root.

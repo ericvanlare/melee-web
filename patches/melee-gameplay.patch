@@ -159,3 +159,763 @@ diff --git a/src/melee/ft/types.h b/src/melee/ft/types.h
      };
  
      HSD_GObjEvent anim_cb;
+diff --git a/src/melee/ft/ftdata.c b/src/melee/ft/ftdata.c
+--- a/src/melee/ft/ftdata.c
++++ b/src/melee/ft/ftdata.c
+@@ -1,3 +1,6 @@
++#if defined(MELEE_WEB_GAMEPLAY)
++#include "gameplay_action_store.h"
++#endif
+ #include "ftdata.h"
+ 
+ #include <Runtime/platform.h>
+@@ -1728,6 +1731,9 @@
+ 
+ void ftData_80085CD8(Fighter* fp, Fighter* arg1, int msid)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_action_load(fp, arg1, msid, 0);
++#else
+     HSD_Archive sp14;
+     Fighter* temp_r3_3;
+     s32 temp_ret;
+@@ -1777,10 +1783,15 @@
+             fp->x5A4 = (void*) temp_r3->x14;
+         }
+     }
++#endif
+ }
+ 
+ FigaTree* ftData_80085E50(Fighter* arg0, int msid)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_action_load(arg0, arg0, msid, 1);
++    return arg0->x598;
++#else
+     HSD_Archive sp10;
+     Fighter* temp_r3_3;
+     int temp_ret;
+@@ -1832,6 +1843,7 @@
+         return arg0->x598;
+     }
+     return NULL;
++#endif
+ }
+ 
+ struct ftData_80085FD4_ret* ftData_80085FD4(Fighter* fp, int msid)
+diff --git a/src/melee/ft/ftaction.c b/src/melee/ft/ftaction.c
+--- a/src/melee/ft/ftaction.c
++++ b/src/melee/ft/ftaction.c
+@@ -1,3 +1,6 @@
++#if defined(MELEE_WEB_GAMEPLAY)
++#include "gameplay_action_store.h"
++#endif
+ #include "ftaction.h"
+ 
+ #include <Runtime/platform.h>
+@@ -1339,6 +1342,9 @@
+             }
+             eventCode =
+                 gmScriptEventCast(ftCommand->u, gmScriptEventDefault)->opcode;
++#if defined(MELEE_WEB_GAMEPLAY)
++            melee_web_command_require_supported(eventCode);
++#endif
+             if (Command_Execute(ftCommand, eventCode) == false) {
+                 eventCode -= 0xA;
+                 ftAction_803C06E8[eventCode](fighter_gobj, ftCommand);
+@@ -1375,6 +1381,9 @@
+                 float timer = cmd->timer;
+                 eventCode =
+                     gmScriptEventCast(cmd->u, gmScriptEventDefault)->opcode;
++#if defined(MELEE_WEB_GAMEPLAY)
++            melee_web_command_require_supported(eventCode);
++#endif
+                 if (Command_Execute(cmd, eventCode) == false) {
+                     eventCode -= 0xA;
+                     ftAction_803C07AC[eventCode](gobj, cmd);
+@@ -1413,6 +1422,9 @@
+         }
+         {
+             u32 id = cmd->u->Command_09.id;
++#if defined(MELEE_WEB_GAMEPLAY)
++            melee_web_command_require_supported(id);
++#endif
+             if (!Command_Execute(cmd, id)) {
+                 cmd->u += ftAction_803C0870[id - 10];
+             }
+diff --git a/src/melee/ft/types.h b/src/melee/ft/types.h
+--- a/src/melee/ft/types.h
++++ b/src/melee/ft/types.h
+@@ -1830,8 +1830,14 @@
+     /* +4 */ UNK_T x4;
+     /* +8 */ size_t x8;
+     /* +C */ UNK_T xC;
++#if defined(MELEE_WEB_GAMEPLAY) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++    u32 x10_padding : 30;
++    u32 x10_b1 : 1;
++    u32 x10_b0 : 1;
++#else
+     /* +10:0 */ u8 x10_b0 : 1;
+     /* +10:1 */ u8 x10_b1 : 1;
++#endif
+     /* +14 */ u32 x14;
+ };
+ 
+diff --git a/src/melee/if/textlib.c b/src/melee/if/textlib.c
+--- a/src/melee/if/textlib.c
++++ b/src/melee/if/textlib.c
+@@ -2,7 +2,9 @@
+ 
+ #include <Runtime/platform.h>
+ 
++#if !defined(MELEE_WEB_GAMEPLAY)
+ #include <printf.h> // IWYU pragma: keep
++#endif
+ #include <stdarg.h>
+ #include <stdio.h>
+ #include <string.h>
+diff --git a/src/melee/ft/fighter.c b/src/melee/ft/fighter.c
+--- a/src/melee/ft/fighter.c
++++ b/src/melee/ft/fighter.c
+@@ -179,7 +179,12 @@
+ void Fighter_LoadCommonData(void)
+ {
+     void** pData;
++#if defined(MELEE_WEB_GAMEPLAY)
++    extern void** melee_web_common_context_source_roots(void);
++    pData = melee_web_common_context_source_roots();
++#else
+     lbArchive_LoadSymbols("PlCo.dat", (void**) &pData, "ftLoadCommonData", 0);
++#endif
+ 
+     // copy 23 4-byte chunks from pData to p_ftCommonData in reverse order,
+     // equivalent to this: for(i=0; i<23; i++)
+diff --git a/src/melee/ef/efalt.c b/src/melee/ef/efalt.c
+--- a/src/melee/ef/efalt.c
++++ b/src/melee/ef/efalt.c
+@@ -9,7 +9,11 @@
+ #include <sysdolphin/baselib/gobj.h>
+ #include <sysdolphin/baselib/jobj.h>
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++#define EFALT_VA_ARG(t) va_arg(vlist, t)
++#else
+ #define EFALT_VA_ARG(t) (*((t*) __va_arg(vlist_arg, _var_arg_typeof(t))))
++#endif
+ 
+ extern volatile u32 efLib_LoadKind;
+ extern volatile s32 efLib_AnimCount;
+diff --git a/src/melee/it/item.c b/src/melee/it/item.c
+--- a/src/melee/it/item.c
++++ b/src/melee/it/item.c
+@@ -1,3 +1,6 @@
++#if defined(MELEE_WEB_GAMEPLAY)
++#include "gameplay_article_data.h"
++#endif
+ #include "item.h"
+ 
+ #include <melee/lb/forward.h>
+@@ -557,6 +560,9 @@
+                 686, 0, "not found zako model data! check ground dat file!\n");
+         }
+     }
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_article_require_ready(item_data->xC4_article_data);
++#endif
+     item_data->xBC_itemStateContainer = item_data->xB8_itemLogicTable->states;
+ }
+ 
+diff --git a/src/melee/gr/grbigblue.c b/src/melee/gr/grbigblue.c
+--- a/src/melee/gr/grbigblue.c
++++ b/src/melee/gr/grbigblue.c
+@@ -214,7 +214,7 @@
+     50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65,
+ } };
+ 
+-void grBigBlue_801E57BC(bool arg) {}
++void grBigBlue_801E57BC(int arg) {}
+ 
+ void grBigBlue_801E57C0(void)
+ {
+diff --git a/src/melee/gr/grbigblue.h b/src/melee/gr/grbigblue.h
+--- a/src/melee/gr/grbigblue.h
++++ b/src/melee/gr/grbigblue.h
+@@ -7,7 +7,7 @@
+ 
+ #include <dolphin/mtx.h>
+ 
+-/* 1E57BC */ void grBigBlue_801E57BC(bool);
++/* 1E57BC */ void grBigBlue_801E57BC(int);
+ /* 1E57C0 */ void grBigBlue_801E57C0(void);
+ /* 1E59C8 */ void grBigBlue_801E59C8(void);
+ /* 1E59CC */ void grBigBlue_801E59CC(void);
+diff --git a/src/melee/gr/grbigblueroute.c b/src/melee/gr/grbigblueroute.c
+--- a/src/melee/gr/grbigblueroute.c
++++ b/src/melee/gr/grbigblueroute.c
+@@ -153,7 +153,7 @@
+ }
+ #endif
+ 
+-void grBigBlueRoute_8020B864(bool arg)
++void grBigBlueRoute_8020B864(int arg)
+ {
+     HSD_GObj* gobj;
+     gobj = Ground_GetMapGObj(0x1F);
+diff --git a/src/melee/gr/grbigblueroute.h b/src/melee/gr/grbigblueroute.h
+--- a/src/melee/gr/grbigblueroute.h
++++ b/src/melee/gr/grbigblueroute.h
+@@ -9,7 +9,7 @@
+ 
+ #include <dolphin/mtx.h>
+ 
+-/* 20B864 */ void grBigBlueRoute_8020B864(bool);
++/* 20B864 */ void grBigBlueRoute_8020B864(int);
+ /* 20B89C */ void grBigBlueRoute_8020B89C(void);
+ /* 20B920 */ void grBigBlueRoute_8020B920(void);
+ /* 20B95C */ void grBigBlueRoute_8020B95C(void);
+diff --git a/src/melee/gr/grcastle.c b/src/melee/gr/grcastle.c
+--- a/src/melee/gr/grcastle.c
++++ b/src/melee/gr/grcastle.c
+@@ -214,7 +214,7 @@
+     f32 v[6];
+ } grCastle_YOffsets;
+ 
+-void grCastle_801CD338(bool arg0)
++void grCastle_801CD338(int arg0)
+ {
+     HSD_GObj* gobj;
+     HSD_JObj* jobj;
+diff --git a/src/melee/gr/grcastle.h b/src/melee/gr/grcastle.h
+--- a/src/melee/gr/grcastle.h
++++ b/src/melee/gr/grcastle.h
+@@ -10,7 +10,7 @@
+ 
+ #include <dolphin/mtx.h>
+ 
+-/* 1CD338 */ void grCastle_801CD338(bool);
++/* 1CD338 */ void grCastle_801CD338(int);
+ /* 1CD37C */ void grCastle_801CD37C(void);
+ /* 1CD4A0 */ void grCastle_801CD4A0(void);
+ /* 1CD4A4 */ void grCastle_801CD4A4(void);
+diff --git a/src/melee/gr/granime.c b/src/melee/gr/granime.c
+--- a/src/melee/gr/granime.c
++++ b/src/melee/gr/granime.c
+@@ -52,7 +52,11 @@
+ /* 4D695C */ static float grAnime_804D695C;
+ 
+ struct padded_jmp_buf {
++#if defined(MELEE_WEB_GAMEPLAY)
++    jmp_buf buf;
++#else
+     __jmp_buf buf;
++#endif
+     u8 pad[0x118 - 0xF8];
+ };
+ 
+@@ -1050,7 +1054,11 @@
+ void fn_801C82E8(int arg0, int* arg1)
+ {
+     *arg1 = arg0;
++#if defined(MELEE_WEB_GAMEPLAY)
++    longjmp(grAnime_8049EE40.buf, 1);
++#else
+     longjmp(&grAnime_8049EE40.buf, 1);
++#endif
+ }
+ 
+ HSD_AObj* grAnime_801C8318(HSD_GObj* gobj, int arg1, u32 arg2)
+@@ -1071,7 +1079,11 @@
+     if (arg2 & 4) {
+         var_r30 |= 0x100;
+     }
++#if defined(MELEE_WEB_GAMEPLAY)
++    if (setjmp(grAnime_8049EE40.buf) == 0) {
++#else
+     if (__setjmp(&grAnime_8049EE40.buf) == 0) {
++#endif
+         HSD_ForeachAnim(jobj, JOBJ_TYPE, var_r30, fn_801C82E8, AOBJ_ARG_AV,
+                         &sp14);
+     }
+diff --git a/src/melee/if/textlib_1.c b/src/melee/if/textlib_1.c
+--- a/src/melee/if/textlib_1.c
++++ b/src/melee/if/textlib_1.c
+@@ -1,6 +1,8 @@
+ #include <Runtime/platform.h>
+ 
++#if !defined(MELEE_WEB_GAMEPLAY)
+ #include <printf.h> // IWYU pragma: keep
++#endif
+ 
+ #include "textdraw.h"
+ #include "textlib.h"
+diff --git a/src/sysdolphin/baselib/sislib.c b/src/sysdolphin/baselib/sislib.c
+--- a/src/sysdolphin/baselib/sislib.c
++++ b/src/sysdolphin/baselib/sislib.c
+@@ -1,6 +1,8 @@
+ #include "sislib.h"
+ 
++#if !defined(MELEE_WEB_GAMEPLAY)
+ #include <printf.h> // IWYU pragma: keep
++#endif
+ #include <stdio.h>
+ 
+ #include "cobj.h"
+diff --git a/src/melee/lb/lbcollision.c b/src/melee/lb/lbcollision.c
+--- a/src/melee/lb/lbcollision.c
++++ b/src/melee/lb/lbcollision.c
+@@ -2130,8 +2130,16 @@
+     PSMTXConcat(sp44, sp74, sp74);
+     GXSetCullMode(GX_CULL_BACK);
+     GXClearVtxDesc();
++    #if defined(MELEE_WEB_GAMEPLAY)
++    GXSetArray(GX_VA_POS, lbColl_SpherePositions, sizeof(lbColl_SpherePositions), 6, false);
++    #else
+     GXSetArray(GX_VA_POS, lbColl_SpherePositions, 6);
++    #endif
++    #if defined(MELEE_WEB_GAMEPLAY)
++    GXSetArray(GX_VA_NRM, lbColl_SphereNormals, sizeof(lbColl_SphereNormals), 6, false);
++    #else
+     GXSetArray(GX_VA_NRM, lbColl_SphereNormals, 6);
++    #endif
+     GXSetVtxDesc(GX_VA_POS, GX_INDEX8);
+     GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_TEX_ST, GX_RGBA4, 0xE);
+     GXSetVtxDesc(GX_VA_NRM, GX_INDEX8);
+@@ -2143,8 +2151,16 @@
+     GXLoadNrmMtxImm(spD4, 0);
+     GXCallDisplayList(lbColl_SphereDisplayList, 0x120);
+     GXClearVtxDesc();
++    #if defined(MELEE_WEB_GAMEPLAY)
++    GXSetArray(GX_VA_POS, lbColl_SpherePositions, sizeof(lbColl_SpherePositions), 6, false);
++    #else
+     GXSetArray(GX_VA_POS, lbColl_SpherePositions, 6);
++    #endif
++    #if defined(MELEE_WEB_GAMEPLAY)
++    GXSetArray(GX_VA_NRM, lbColl_SphereNormals, sizeof(lbColl_SphereNormals), 6, false);
++    #else
+     GXSetArray(GX_VA_NRM, lbColl_SphereNormals, 6);
++    #endif
+     GXSetVtxDesc(GX_VA_POS, GX_INDEX8);
+     GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_TEX_ST, GX_RGBA4, 0xE);
+     GXSetVtxDesc(GX_VA_NRM, GX_INDEX8);
+@@ -2157,8 +2173,16 @@
+     GXCallDisplayList(lbColl_SphereDisplayList, 0x120);
+     if (!isSmall(var_f31)) {
+         GXClearVtxDesc();
++        #if defined(MELEE_WEB_GAMEPLAY)
++        GXSetArray(GX_VA_POS, lbColl_CylinderPositions, sizeof(lbColl_CylinderPositions), 6, false);
++        #else
+         GXSetArray(GX_VA_POS, lbColl_CylinderPositions, 6);
++        #endif
++        #if defined(MELEE_WEB_GAMEPLAY)
++        GXSetArray(GX_VA_NRM, lbColl_CylinderNormals, sizeof(lbColl_CylinderNormals), 6, false);
++        #else
+         GXSetArray(GX_VA_NRM, lbColl_CylinderNormals, 6);
++        #endif
+         GXSetVtxDesc(GX_VA_POS, GX_INDEX8);
+         GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_TEX_ST, GX_RGBA4, 0xE);
+         GXSetVtxDesc(GX_VA_NRM, GX_INDEX8);
+@@ -2259,8 +2283,16 @@
+     PSMTXConcat(arg0, sp78, sp78);
+     GXSetCullMode(GX_CULL_BACK);
+     GXClearVtxDesc();
++    #if defined(MELEE_WEB_GAMEPLAY)
++    GXSetArray(GX_VA_POS, lbColl_SpherePositions, sizeof(lbColl_SpherePositions), 6, false);
++    #else
+     GXSetArray(GX_VA_POS, lbColl_SpherePositions, 6);
++    #endif
++    #if defined(MELEE_WEB_GAMEPLAY)
++    GXSetArray(GX_VA_NRM, lbColl_SphereNormals, sizeof(lbColl_SphereNormals), 6, false);
++    #else
+     GXSetArray(GX_VA_NRM, lbColl_SphereNormals, 6);
++    #endif
+     GXSetVtxDesc(GX_VA_POS, GX_INDEX8);
+     GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_TEX_ST, GX_RGBA4, 0xE);
+     GXSetVtxDesc(GX_VA_NRM, GX_INDEX8);
+@@ -2272,8 +2304,16 @@
+     GXLoadNrmMtxImm(spD8, 0);
+     GXCallDisplayList(lbColl_SphereDisplayList, 0x120);
+     GXClearVtxDesc();
++    #if defined(MELEE_WEB_GAMEPLAY)
++    GXSetArray(GX_VA_POS, lbColl_SpherePositions, sizeof(lbColl_SpherePositions), 6, false);
++    #else
+     GXSetArray(GX_VA_POS, lbColl_SpherePositions, 6);
++    #endif
++    #if defined(MELEE_WEB_GAMEPLAY)
++    GXSetArray(GX_VA_NRM, lbColl_SphereNormals, sizeof(lbColl_SphereNormals), 6, false);
++    #else
+     GXSetArray(GX_VA_NRM, lbColl_SphereNormals, 6);
++    #endif
+     GXSetVtxDesc(GX_VA_POS, GX_INDEX8);
+     GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_TEX_ST, GX_RGBA4, 0xE);
+     GXSetVtxDesc(GX_VA_NRM, GX_INDEX8);
+@@ -2286,8 +2326,16 @@
+     GXCallDisplayList(lbColl_SphereDisplayList, 0x120);
+     if (!isSmall(var_f31)) {
+         GXClearVtxDesc();
++        #if defined(MELEE_WEB_GAMEPLAY)
++        GXSetArray(GX_VA_POS, lbColl_CylinderPositions, sizeof(lbColl_CylinderPositions), 6, false);
++        #else
+         GXSetArray(GX_VA_POS, lbColl_CylinderPositions, 6);
++        #endif
++        #if defined(MELEE_WEB_GAMEPLAY)
++        GXSetArray(GX_VA_NRM, lbColl_CylinderNormals, sizeof(lbColl_CylinderNormals), 6, false);
++        #else
+         GXSetArray(GX_VA_NRM, lbColl_CylinderNormals, 6);
++        #endif
+         GXSetVtxDesc(GX_VA_POS, GX_INDEX8);
+         GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_TEX_ST, GX_RGBA4, 0xE);
+         GXSetVtxDesc(GX_VA_NRM, GX_INDEX8);
+diff --git a/src/melee/gr/grmutecity.c b/src/melee/gr/grmutecity.c
+--- a/src/melee/gr/grmutecity.c
++++ b/src/melee/gr/grmutecity.c
+@@ -1902,6 +1902,11 @@
+ 
+ s32 grMuteCity_801F2AB0(s32 arg0, HSD_JObj* arg1)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    /* Source leaves its return register implicit; require a verified adapter. */
++    HSD_Panic(__FILE__, __LINE__, "Mute City particle result ABI is not ported");
++    return 0;
++#else
+     HSD_Generator* gen;
+     HSD_psAppSRT* appsrt;
+ 
+@@ -1920,6 +1925,7 @@
+         gen->type |= PSAPPSRT_UNK_B11;
+         appsrt->gp = gen;
+     }
++#endif
+ }
+ 
+ /// @copydoc mpLib_JointCollisionCallback
+diff --git a/src/melee/gr/ground.c b/src/melee/gr/ground.c
+--- a/src/melee/gr/ground.c
++++ b/src/melee/gr/ground.c
+@@ -1187,6 +1187,17 @@
+                                        HSD_LightDesc* desc, bool* b6, bool* b7,
+                                        bool* b5)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    extern int melee_web_stage_lights_lookup_override(void*, int*, unsigned char*);
++    int found;
++    unsigned char flags;
++    if (melee_web_stage_lights_lookup_override(desc, &found, &flags)) {
++        *b6 = (flags & 0x40) != 0;
++        *b7 = (flags & 0x80) != 0;
++        *b5 = (flags & 0x20) != 0;
++        return found;
++    }
++#endif
+     UnkStageDat* dat = archive->unk4;
+     s32 count = dat->unk1C;
+     s32 i;
+@@ -1210,6 +1221,17 @@
+                                               HSD_LightDesc* desc, bool* b6,
+                                               bool* b7, bool* b5)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    extern int melee_web_stage_lights_lookup_override(void*, int*, unsigned char*);
++    int found;
++    unsigned char flags;
++    if (melee_web_stage_lights_lookup_override(desc, &found, &flags)) {
++        *b6 = (flags & 0x40) != 0;
++        *b7 = (flags & 0x80) != 0;
++        *b5 = (flags & 0x20) != 0;
++        return found;
++    }
++#endif
+     s32 count = dat->unk1C;
+     s32 i;
+ 
+diff --git a/src/melee/ft/ftdata.c b/src/melee/ft/ftdata.c
+--- a/src/melee/ft/ftdata.c
++++ b/src/melee/ft/ftdata.c
+@@ -8,6 +8,9 @@
+ 
+ #include "fighter.h"
+ #include "forward.h"
++#if defined(MELEE_WEB_GAMEPLAY)
++#include "gameplay_fighter_assets.h"
++#endif
+ #include "ft_0877.h"
+ #include "inlines.h"
+ #include "kinds/ftCaptain/ftcaptain.h"
+@@ -1565,6 +1568,9 @@
+ 
+ void ftData_8008572C(FighterKind kind)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_fighter_assets_require_kind(kind);
++#endif
+     if (gFtDataList[kind] == NULL) {
+         lbArchive_80017040(NULL, ftData_803C1F40[kind].a, &gFtDataList[kind],
+                            ftData_803C1F40[kind].b, 0);
+@@ -1591,6 +1597,9 @@
+ 
+ void ftData_80085820(FighterKind kind, int costume_id)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_fighter_assets_require_costume(kind, costume_id);
++#endif
+     UnkCostumeStruct* temp_r5 =
+         &CostumeListsForeachCharacter[kind].costume_list[costume_id];
+     if (temp_r5->joint == NULL) {
+@@ -1653,6 +1662,9 @@
+ 
+ void ftData_80085A14(FighterKind kind)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_fighter_assets_require_kind(kind);
++#else
+     void* sp18;
+     void* a_head;
+     ftData* temp_r27 = gFtDataList[kind];
+@@ -1680,10 +1692,14 @@
+         }
+         ftData_Table_Unk0[kind].data = a_head;
+     }
++#endif
+ }
+ 
+ void ftData_80085B10(Fighter* fp)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_fighter_assets_bind_created(fp);
++#else
+     FighterKind kind = fp->kind;
+     fp->x59C = HSD_ObjAlloc(&fighter_x59C_alloc_data);
+     fp->x5A0 = HSD_ObjAlloc(&fighter_x59C_alloc_data);
+@@ -1691,6 +1707,7 @@
+     fp->x5A8 = NULL;
+     fp->x58C = ftData_Table_Unk0[kind].count;
+     ftData_80085A14(kind);
++#endif
+ }
+ 
+ void ftData_80085B98(Fighter* fp, int arg1, int arg2)
+diff --git a/src/melee/ft/fighter.c b/src/melee/ft/fighter.c
+--- a/src/melee/ft/fighter.c
++++ b/src/melee/ft/fighter.c
+@@ -1,4 +1,7 @@
+ #include "fighter.h"
++#if defined(MELEE_WEB_GAMEPLAY)
++#include "gameplay_fighter_assets.h"
++#endif
+ 
+ #include <math.h>
+ #include <placeholder.h>
+@@ -3112,8 +3115,12 @@
+     HSD_LObjRemoveAll(fp->x588);
+     Player_80031FB0(fp->player_id, fp->x221F_b4);
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_fighter_assets_unbind_destroying(fp);
++#else
+     HSD_ObjFree(&fighter_x59C_alloc_data, fp->x59C);
+     HSD_ObjFree(&fighter_x59C_alloc_data, fp->x5A0);
++#endif
+     HSD_ObjFree(&fighter_parts_alloc_data, fp->parts);
+     HSD_ObjFree(&fighter_dobj_list_alloc_data, fp->dobj_list.data);
+     HSD_ObjFree(&fighter_x2040_alloc_data, fp->x203C.data);
+diff --git a/src/melee/it/kinds/itcoin.c b/src/melee/it/kinds/itcoin.c
+--- a/src/melee/it/kinds/itcoin.c
++++ b/src/melee/it/kinds/itcoin.c
+@@ -141,7 +141,7 @@
+     return false;
+ }
+ 
+-void inline itCoin_ResetRotation(Item_GObj* gobj)
++static inline void itCoin_ResetRotation(Item_GObj* gobj)
+ {
+     HSD_JObj* jobj;
+     jobj = GET_JOBJ(gobj);
+diff --git a/src/melee/lb/lbarchive.c b/src/melee/lb/lbarchive.c
+--- a/src/melee/lb/lbarchive.c
++++ b/src/melee/lb/lbarchive.c
+@@ -181,6 +181,14 @@
+ bool lbArchive_80017040(HSD_Archive** dst, const char* filename, void* symbols,
+                         ...)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    extern void melee_web_archive_sections_load(void*, const char*, void*, va_list);
++    va_list native_args;
++    va_start(native_args, symbols);
++    melee_web_archive_sections_load(dst, filename, symbols, native_args);
++    va_end(native_args);
++    return true;
++#else
+     void* tmp;
+     HSD_Archive* archive2;
+     HSD_Archive* archive;
+@@ -217,6 +225,7 @@
+         *dst = archive;
+     }
+     return preloaded;
++#endif
+ }
+ 
+ bool lbArchive_800171CC(HSD_Archive** dst, const char* filename, void* symbols,
+diff --git a/src/sysdolphin/baselib/hsd_3A64.c b/src/sysdolphin/baselib/hsd_3A64.c
+--- a/src/sysdolphin/baselib/hsd_3A64.c
++++ b/src/sysdolphin/baselib/hsd_3A64.c
+@@ -1,4 +1,6 @@
+-#include <printf.h> // IWYU pragma: keep
++#if !defined(MELEE_WEB_GAMEPLAY)
++#include <printf.h>
++#endif // IWYU pragma: keep
+ #include <stdarg.h>
+ #include <stdio.h>
+ 
+diff --git a/src/sysdolphin/baselib/hsd_3A76.c b/src/sysdolphin/baselib/hsd_3A76.c
+--- a/src/sysdolphin/baselib/hsd_3A76.c
++++ b/src/sysdolphin/baselib/hsd_3A76.c
+@@ -1,5 +1,7 @@
+ #include <m2c_macros.h>
+-#include <printf.h> // IWYU pragma: keep
++#if !defined(MELEE_WEB_GAMEPLAY)
++#include <printf.h>
++#endif // IWYU pragma: keep
+ 
+ #include "cobj.h"
+ #include "gobj.h"
+--- a/src/sysdolphin/baselib/sislib_font.h
++++ b/src/sysdolphin/baselib/sislib_font.h
+@@ -7,6 +7,14 @@
+     /*0x00*/ u8 data[512];
+ } TextGlyphTexture;
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++/* Preserve the original array type (including sizeof/ARRAY_SIZE). Storage is
++ * supplied by an owned local asset; evaluating it before registration fails. */
++extern void* melee_web_font_atlas_data(void);
++#define HSD_SisLib_FontAtlas \
++    (*(TextGlyphTexture (*)[287]) melee_web_font_atlas_data())
++#else
+ /* 40CD40 */ extern TextGlyphTexture HSD_SisLib_FontAtlas[287];
++#endif
+ 
+ #endif
+--- a/src/sysdolphin/baselib/sislib_font.c
++++ b/src/sysdolphin/baselib/sislib_font.c
+@@ -1,5 +1,8 @@
+ #include "sislib_font.h"
+ 
++#if !defined(MELEE_WEB_GAMEPLAY)
+ TextGlyphTexture HSD_SisLib_FontAtlas[] ATTRIBUTE_ALIGN(32) = {
+ #include <sysdolphin/baselib/sislib_font.inc>
+ };
++
++#endif
+--- a/src/melee/cm/camera.c
++++ b/src/melee/cm/camera.c
+@@ -52,6 +52,10 @@
+ 
+ /* 452C68 */ static Camera cm_80452C68;
+ /* 453004 */ CameraDebugMode cm_80453004;
++#if defined(MELEE_WEB_GAMEPLAY)
++/* Host lifetime owner snapshots the actual source camera between matches. */
++void* melee_web_camera_state(void) { return &cm_80452C68; }
++#endif
+ 
+ /* 3BCB18 */ static CameraModeCallbacks cm_803BCB18 = {
+     Camera_8002B3D4,
+diff --git a/src/melee/gr/ground.c b/src/melee/gr/ground.c
+--- a/src/melee/gr/ground.c
++++ b/src/melee/gr/ground.c
+@@ -1523,6 +1523,13 @@
+     panicMissingStageParam(stkind, count);
+ }
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++void melee_web_ground_stage_parameters(int kind)
++{
++    Ground_801C28CC(&stage_info.xA0, kind);
++}
++#endif
++
+ s32* Ground_801C2AD8(void)
+ {
+     return &stage_info.xA0;
+diff --git a/src/melee/mp/mplib.c b/src/melee/mp/mplib.c
+--- a/src/melee/mp/mplib.c
++++ b/src/melee/mp/mplib.c
+@@ -5967,7 +5967,7 @@
+     grDynamicAttr_801CA224();
+ }
+ 
+-void mpLib_80058820(void)
++static HSD_GObj* mpLib_80058820_owned(void)
+ {
+     mpCollisionBox* box = mpLib_80458868;
+     HSD_GObj* gobj = GObj_Create(1, 6, 0);
+@@ -5978,6 +5978,12 @@
+     box[0].left = -10000.0F;
+     box[0].bottom = -10000.0F;
+     box[1] = box[0];
++    return gobj;
++}
++
++void mpLib_80058820(void)
++{
++    mpLib_80058820_owned();
+ }
+ 
+ bool mpCheckedBounding(void)
+--- a/src/melee/mn/mnmainrule.c
++++ b/src/melee/mn/mnmainrule.c
+@@ -152,7 +152,7 @@
+ void mnItemSw_802358C0(void);
+ void mn_802339FC(void);
+ void mnCharSel_80264070(void);
+-void mnCharSel_802640A0(void);
++s32 mnCharSel_802640A0(void);
+ 
+ static inline u8 mn_8022F538_GetHoveredSelection(void)
+ {
+--- a/src/melee/mn/mnhyaku.c
++++ b/src/melee/mn/mnhyaku.c
+@@ -16,7 +16,7 @@
+ 
+ static HSD_GObj* mnHyaku_804D6C58;
+ 
+-void gm_801677E8(void);
++void gm_801677E8(s8 port);
+ 
+ static AnimLoopSettings mnHyaku_803EF668 = { 0.0f, 19.0f, -0.1f };
+ static AnimLoopSettings mnHyaku_803EF674 = { 20.0f, 29.0f, -0.1f };
+@@ -69,8 +69,7 @@
+     }
+     if (events & MenuInput_Confirm) {
+         sfxForward();
+-        mn_802295AC();
+-        gm_801677E8();
++        gm_801677E8(mn_802295AC());
+         // load the different multi-man melee modes
+         switch (menu->cursor) {
+         case 0:
+--- a/src/melee/ft/ftlib.c
++++ b/src/melee/ft/ftlib.c
+@@ -971,9 +971,9 @@
+     }
+ }
+ 
+-void ftLib_800876B4(HSD_GObj* gobj)
+-{
+-    ftAnim_IsFramesRemaining(gobj);
++s32 ftLib_800876B4(HSD_GObj* gobj)
++{
++    return ftAnim_IsFramesRemaining(gobj);
+ }
+ 
+ bool ftLib_800876D4(HSD_GObj* gobj)
+--- a/src/melee/ft/ftlib.h
++++ b/src/melee/ft/ftlib.h
+@@ -97,7 +97,7 @@
+ /* 087574 */ void ftLib_80087574(s8);
+ /// /* 087574 */ void ftLib_80087574(FighterKind);
+ /* 087610 */ void ftLib_80087610(u8);
+-/* 0876B4 */ void ftLib_800876B4(HSD_GObj*);
++/* 0876B4 */ s32 ftLib_800876B4(HSD_GObj*);
+ /* 0876D4 */ bool ftLib_800876D4(HSD_GObj*);
+ /* 0876F4 */ s32 ftLib_800876F4(HSD_GObj*);
+ /* 087700 */ s32 ftLib_80087700(HSD_GObj*);

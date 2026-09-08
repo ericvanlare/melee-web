@@ -50,7 +50,8 @@ class RigidModel {
 public:
     RigidModel(std::shared_ptr<const DatArchive> archive, const std::string& symbol);
     RigidModel(std::shared_ptr<const DatArchive> archive, uint32_t joint_offset,
-               const std::string& label, ModelRenderPass pass = ModelRenderPass::All);
+               const std::string& label, ModelRenderPass pass = ModelRenderPass::All,
+               DatMaterialPolicy materials = DatMaterialPolicy::ViewerOpaque);
     std::shared_ptr<const DatArchive> archive;
     std::vector<RigidJoint> joints; // Parent precedes child; siblings keep their actual parent.
     std::vector<RigidMesh> meshes;

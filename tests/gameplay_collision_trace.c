@@ -3,6 +3,9 @@
 #include <melee/gr/ground.h>
 #include <melee/gr/types.h>
 #include <melee/mp/mplib.h>
+#include <melee/gr/grdynamicattr.h>
+#include <sysdolphin/baselib/gobj.h>
+#include <sysdolphin/baselib/gobjproc.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -52,6 +55,24 @@ int main(void)
     stage_info.param = &saved; stage_info.grkind = Gr_Kind_Pura;
     MeleeWebCollision* owner = melee_web_collision_create(&input, error, sizeof(error));
     check(owner != NULL, "original mpLibLoad and island initialization");
+    HSD_GObj* updater=((HSD_GObj**)HSD_GObj_Entities)[6];
+    check(updater && updater->proc && updater->proc->s_link==4,
+          "original collision updater uses link6 and priority4");
+    check(melee_web_gameplay_stats().objects==1 && melee_web_gameplay_stats().processes==1,
+          "one shared collision storage/update lifetime");
+    check(mpLib_80458868[1].left==-10000 && mpLib_80458868[1].right==10000,
+          "original updater initializes floor bounds");
+    Vec3 attribute_position={-10,0,0};
+    check(grDynamicAttr_801CA0F8(17,&attribute_position,0,3,1)!=NULL,
+          "real timed dynamic attribute allocated");
+    check(grDynamicAttr_801CA284(&attribute_position,0)==17,
+          "dynamic attribute active before scheduler tick");
+    check(melee_web_gameplay_step(error,sizeof(error)),"original priority4 collision process executes");
+    check(mpLib_80458868[1].left==-20 && mpLib_80458868[1].right==20 &&
+          mpLib_80458868[1].bottom==0 && mpLib_80458868[1].top==10,
+          "original process derives floor extents from scaled source geometry");
+    check(grDynamicAttr_801CA284(&attribute_position,0)==0,
+          "original process expires the one-tick dynamic attribute");
     check(stage_info.param == &saved && stage_info.grkind == Gr_Kind_Pura, "source stage context restored after scoped load");
     check(!melee_web_collision_create(&input, error, sizeof(error)), "exclusive original collision storage enforced");
     MeleeWebCollisionReadiness state;
@@ -80,6 +101,9 @@ int main(void)
     check(melee_web_collision_destroy(owner, error, sizeof(error)), "normal owner destruction");
     check(mpLib_8004D164() == NULL && mpGetGroundCollVtx() == NULL && mpGetGroundCollLine() == NULL &&
           mpGetGroundCollJoint() == NULL, "original private pointers cleared after storage release");
+    check(melee_web_gameplay_stats().objects==0 && melee_web_gameplay_stats().processes==0,
+          "collision teardown removes update process and storage owner");
+    check(melee_web_gameplay_step(error,sizeof(error)),"scheduler safely ticks after collision destruction");
     const int free_before_reload = melee_web_gameplay_stats().heap_free_bytes;
     for (int i = 0; i < 3; ++i) {
         owner = melee_web_collision_create(&input, error, sizeof(error));

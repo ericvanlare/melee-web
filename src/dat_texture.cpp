@@ -153,7 +153,7 @@ DatTexturePalette palette(const DatArchive& archive, std::uint32_t offset,
     return result;
 }
 
-DatTexture read_texture(const DatArchive& archive, std::uint32_t offset)
+DatTexture read_texture(const DatArchive& archive, std::uint32_t offset, bool native_descriptors)
 {
     descriptor(archive, offset, 92);
     absent(archive, offset, "Custom texture classes are unsupported");
@@ -163,9 +163,25 @@ DatTexture read_texture(const DatArchive& archive, std::uint32_t offset)
         // HSD_TObjMakeTExp only enters custom expressions when active flags are
         // set. Preserve this descriptor's identity; its inactive byte fields
         // are intentionally not interpreted as GX commands.
-        if (archive.be32(*tev + 28) != 0)
-            reject("Active custom texture TEV expressions are unsupported");
-        result.inactive_tev_descriptor_offset = *tev;
+        const auto active=archive.be32(*tev+28);
+        if(active && !native_descriptors) reject("Active custom texture TEV expressions are unsupported");
+        if(!active) result.inactive_tev_descriptor_offset=*tev;
+        else {
+            const auto fields=archive.range(*tev,28);
+            if(active&~0xc0000fffU) reject("Native texture TEV active flags are unsupported");
+            for(unsigned channel=0;channel<2;++channel) if(active&(1u<<(30+channel))) {
+                if(fields[channel]>1||fields[2+channel]>2||fields[4+channel]>3||fields[6+channel]>1)
+                    reject("Native texture TEV operation/bias/scale/clamp is unsupported");
+                for(unsigned i=0;i<4;++i) {
+                    const auto v=fields[8+4*channel+i];
+                    const bool valid=channel ? (v==4||v==7||(v>=0x40&&v<=0x45)) :
+                        (v==8||v==9||v==12||v==13||v==15||(v>=0x80&&v<=0x88));
+                    if(!valid) reject("Native texture TEV input is unsupported by original expression compiler");
+                }
+            }
+            DatTextureTev value;std::copy(fields.begin(),fields.end(),value.fields.begin());value.active=active;
+            result.native_tev=value;
+        }
     }
     result.descriptor_offset = offset;
     result.id = archive.be32(offset + 8);
@@ -231,8 +247,18 @@ DatTexture read_texture(const DatArchive& archive, std::uint32_t offset)
 
 } // namespace
 
+DatTextureImage read_dat_texture_image(const DatArchive& archive, std::uint32_t offset)
+{
+    return image(archive, offset);
+}
+DatTexturePalette read_dat_texture_palette(const DatArchive& archive, std::uint32_t offset,
+                                           const DatTextureImage& source_image)
+{
+    return palette(archive, offset, source_image);
+}
+
 std::vector<DatTexture> read_dat_texture_chain(const DatArchive& archive,
-                                               std::uint32_t first_offset)
+                                               std::uint32_t first_offset, bool native_descriptors)
 {
     std::vector<DatTexture> textures;
     std::optional<std::uint32_t> offset = first_offset;
@@ -241,7 +267,7 @@ std::vector<DatTexture> read_dat_texture_chain(const DatArchive& archive,
         if (std::any_of(textures.begin(), textures.end(), [&](const auto& texture) {
                 return texture.descriptor_offset == *offset;
             })) reject("Texture descriptor chain is cyclic");
-        textures.push_back(read_texture(archive, *offset));
+        textures.push_back(read_texture(archive, *offset, native_descriptors));
         offset = archive.pointer(*offset + 4, 92);
     }
     return textures;

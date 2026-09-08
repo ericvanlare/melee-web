@@ -50,6 +50,8 @@ def build(jobs, root=ROOT, target="all"):
                     f"-DMELEE_WEB_GAMEPLAY_SOURCE_DIR={gameplay_source}",
                     f"-DCMAKE_MAKE_PROGRAM={ninja}"], cwd=root, env=env, check=True)
     targets = {"graphics": ["gx_probe"], "gameplay": ["gameplay_checks"],
+               "fighter": ["fighter_runtime_probe", "gameplay_effect_banks_trace",
+                           "gameplay_bonus_data_trace", "gameplay_stage_numeric_trace"],
                "all": ["gx_probe", "gameplay_checks"]}[target]
     subprocess.run([str(cmake), "--build", str(build_dir), "--target", *targets, "-j", str(jobs)],
                    cwd=root, env=env, check=True)
@@ -58,7 +60,7 @@ def build(jobs, root=ROOT, target="all"):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--jobs", type=int, default=min(os.cpu_count() or 2, 6))
-    parser.add_argument("--target", choices=("graphics", "gameplay", "all"), default="all")
+    parser.add_argument("--target", choices=("graphics", "gameplay", "fighter", "all"), default="all")
     args = parser.parse_args()
     if args.jobs < 1:
         parser.error("--jobs must be positive")

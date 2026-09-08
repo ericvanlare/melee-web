@@ -146,8 +146,9 @@ inputs to exercise native skeleton construction and exact motion selection:
 python3 scripts/check_gameplay.py --common assets-local/next-gate/PlCo.dat --fighter assets-local/next-gate/PlMr.dat --fighter-symbol PlyMario5K_Share_joint --costume assets-local/next-gate/PlMrNr.dat --animations assets-local/next-gate/PlMrAJ.dat --motion 2
 ```
 
-The native graph must outlive its native handle because geometry and texture
-spans remain borrowed from its owned archive. Destruction returns an explicit
+The native graph must outlive its native handle because vertex and texture
+spans remain borrowed from its owned archive. Display lists have mutable aligned
+copies for original reflection-loader edits. Destruction returns an explicit
 error while its GObj callback is executing or SDK heap ownership is lost; callers
 must retain the handle in either case. World shutdown destroys runtime objects
 before class caches and arena memory. A surviving descriptor handle rejects stale
@@ -155,5 +156,15 @@ runtime access and can then be freed.
 
 The native constructor target deliberately rejects drawing until bounded GX
 arrays are registered. The browser inspector remains a separate rendering path.
-Neither target currently calls full Fighter_Create. Packed action commands and
-original RAM/ARAM loader routing remain integration work.
+The full fighter gate is separate:
+
+```sh
+python3 scripts/build.py --target fighter
+python3 scripts/check_fighter.py assets-local/next-gate
+python3 -m unittest discover -s tests -v
+```
+
+It calls original Fighter_Create and all its processes, then checks unload and
+complete-world restart. See [required assets and exact acceptance](FIGHTER_RUNTIME.md).
+Wait/Fall commands and owned action-loader routing are implemented for this gate;
+other scripts and required services remain explicitly unsupported.

@@ -43,7 +43,7 @@ std::size_t table_end(std::size_t file_size, std::size_t offset,
 
 } // namespace
 
-DatArchive::DatArchive(std::span<const std::uint8_t> input)
+DatArchive::DatArchive(std::span<const std::uint8_t> input, DatExternalPolicy external_policy)
 {
     if (input.size() > max_archive_bytes) {
         throw DatError("DAT archive exceeds the 64 MiB limit");
@@ -66,7 +66,7 @@ DatArchive::DatArchive(std::span<const std::uint8_t> input)
                                           public_count, 8);
     const auto names_start = table_end(input.size(), external_start,
                                        external_count, 8);
-    if (external_count != 0) {
+    if (external_count != 0 && external_policy == DatExternalPolicy::Reject) {
         throw DatError("DAT external links are unsupported; resolve them explicitly");
     }
 
@@ -124,6 +124,50 @@ DatArchive::DatArchive(std::span<const std::uint8_t> input)
         public_symbols_.push_back({std::string{name}, target});
         referenced_targets_.push_back(target);
     }
+    // Original HSD_ArchiveLocateExtern follows a linked list of data-section
+    // pointer slots. Their raw words are next-slot offsets, not usable pointers.
+    // Validate all chains before exposing any unresolved archive to a decoder.
+    external_symbols_.reserve(external_count);
+    std::unordered_set<std::string_view> external_names;
+    std::unordered_set<std::uint32_t> used_external_slots;
+    for (std::uint32_t i = 0; i < external_count; ++i) {
+        const auto entry = external_start + std::size_t{i} * 8;
+        auto slot = read_be32(bytes_, entry);
+        const auto name_offset = read_be32(bytes_, entry + 4);
+        require_range(bytes_.size() - names_start, name_offset, 1);
+        const auto name_start = names_start + name_offset;
+        const auto available = bytes_.size() - name_start;
+        const auto search_size = std::min(available, max_symbol_name_bytes + 1);
+        const auto* begin = bytes_.data() + name_start;
+        const auto* end = std::find(begin, begin + search_size, std::uint8_t{0});
+        if (end == begin + search_size)
+            throw DatError("DAT external name is unterminated or exceeds the name limit");
+        const auto length = static_cast<std::size_t>(end - begin);
+        if (!length) throw DatError("DAT external name is empty");
+        if (length > max_archive_bytes - copied_name_bytes)
+            throw DatError("DAT total symbol-name byte limit exceeded");
+        copied_name_bytes += length;
+        const std::string_view name(reinterpret_cast<const char*>(begin), length);
+        if (!external_names.insert(name).second) throw DatError("DAT external name is duplicated");
+        DatExternalSymbol symbol{std::string{name}, {}};
+        while (slot != UINT32_MAX) {
+            if (slot % 4) throw DatError("DAT external slot is not four-byte aligned");
+            require_range(data_size_, slot, 4);
+            if (used_external_slots.size() >= max_table_entries)
+                throw DatError("DAT external linked-slot limit exceeded");
+            if (std::binary_search(relocation_slots_.begin(), relocation_slots_.end(), slot))
+                throw DatError("DAT external slot overlaps an internal relocation");
+            if (!used_external_slots.insert(slot).second)
+                throw DatError("DAT external linked slots contain a cycle or overlapping chains");
+            symbol.slots.push_back(slot);
+            external_slots_.emplace_back(slot, i);
+            // Deliberately bypass typed be32: this reads the archive's linked
+            // list encoding, not an unresolved pointer or scalar field.
+            slot = read_be32(data(), slot);
+        }
+        external_symbols_.push_back(std::move(symbol));
+    }
+    std::sort(external_slots_.begin(), external_slots_.end());
     referenced_targets_.push_back(data_size_);
     std::sort(referenced_targets_.begin(), referenced_targets_.end());
     referenced_targets_.erase(std::unique(referenced_targets_.begin(), referenced_targets_.end()),
@@ -144,6 +188,7 @@ std::span<const std::uint8_t> DatArchive::range(std::uint32_t offset,
 
 std::uint16_t DatArchive::be16(std::uint32_t offset) const
 {
+    require_resolved(offset, 2);
     const auto bytes = range(offset, 2);
     return static_cast<std::uint16_t>((std::uint16_t{bytes[0]} << 8U) |
                                       std::uint16_t{bytes[1]});
@@ -151,6 +196,7 @@ std::uint16_t DatArchive::be16(std::uint32_t offset) const
 
 std::uint32_t DatArchive::be32(std::uint32_t offset) const
 {
+    require_resolved(offset, 4);
     return read_be32(data(), offset);
 }
 
@@ -167,6 +213,22 @@ const std::vector<DatPublicSymbol>& DatArchive::public_symbols() const noexcept
     return public_symbols_;
 }
 
+const std::vector<DatExternalSymbol>& DatArchive::external_symbols() const noexcept
+{
+    return external_symbols_;
+}
+
+void DatArchive::require_resolved(std::uint32_t offset, std::size_t length) const
+{
+    require_range(data_size_, offset, length);
+    if (!length || external_slots_.empty()) return;
+    const auto first = offset > 3 ? offset - 3 : 0;
+    const auto it = std::lower_bound(external_slots_.begin(), external_slots_.end(),
+        std::pair<std::uint32_t, std::uint32_t>{first, 0});
+    if (it != external_slots_.end() && it->first < std::size_t{offset} + length)
+        throw DatError("DAT unresolved external symbol: " + external_symbols_.at(it->second).name);
+}
+
 std::uint32_t DatArchive::next_target_offset(std::uint32_t offset) const
 {
     (void) range(offset, 1);
@@ -179,7 +241,10 @@ bool DatArchive::has_relocation(std::uint32_t slot) const
         throw DatError("DAT pointer slot is not four-byte aligned");
     }
     (void) range(slot, 4);
-    return std::binary_search(relocation_slots_.begin(), relocation_slots_.end(), slot);
+    const auto external = std::lower_bound(external_slots_.begin(), external_slots_.end(),
+        std::pair<std::uint32_t, std::uint32_t>{slot, 0});
+    return (external != external_slots_.end() && external->first == slot) ||
+        std::binary_search(relocation_slots_.begin(), relocation_slots_.end(), slot);
 }
 
 std::optional<std::uint32_t> DatArchive::pointer(std::uint32_t slot,

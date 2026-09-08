@@ -13,7 +13,7 @@ struct DatNativeJoint::Storage {
     std::vector<std::vector<MeleeWebNativeTextureDesc>> textures;
     std::vector<std::vector<MeleeWebSkinEnvelope>> envelopes;
     Storage(std::shared_ptr<const DatArchive> a, uint32_t root)
-        : model(std::move(a), root, "native HSD joint", ModelRenderPass::All) {}
+        : model(std::move(a), root, "native HSD joint", ModelRenderPass::All, DatMaterialPolicy::NativeDescriptors) {}
 };
 
 DatNativeJoint::DatNativeJoint(std::shared_ptr<const DatArchive> archive, uint32_t root)
@@ -41,7 +41,7 @@ DatNativeJoint::DatNativeJoint(std::shared_ptr<const DatArchive> archive, uint32
         const auto material = *a.pointer(offset + 8, 24);
         if (!material_ids.contains(material)) {
             material_ids.emplace(material, uint32_t(material_ids.size()));
-            empty_materials.emplace(material, read_dat_material(a, material));
+            empty_materials.emplace(material, read_dat_material(a, material, DatMaterialPolicy::NativeDescriptors));
         }
     }
     const auto index = [&](const auto& ids, uint32_t slot) {
@@ -86,6 +86,8 @@ DatNativeJoint::DatNativeJoint(std::shared_ptr<const DatArchive> archive, uint32
         if (copied_materials.at(id)) return;
         copied_materials.at(id) = true;
         out.source_offset = m.descriptor_offset;
+        out.has_pixel_engine = m.pixel_engine.has_value();
+        if(m.pixel_engine) std::copy(m.pixel_engine->begin(),m.pixel_engine->end(),out.pixel_engine);
         auto& mat = out.material;
         mat.rendermode = m.render_mode; mat.alpha = m.alpha; mat.shininess = m.shininess;
         std::copy(m.ambient.begin(), m.ambient.end(), mat.ambient);
@@ -93,6 +95,8 @@ DatNativeJoint::DatNativeJoint(std::shared_ptr<const DatArchive> archive, uint32
         std::copy(m.specular.begin(), m.specular.end(), mat.specular);
         for (const auto& t : m.textures) {
             MeleeWebNativeTextureDesc n{};
+            n.has_tev=t.native_tev.has_value();
+            if(t.native_tev) {std::copy(t.native_tev->fields.begin(),t.native_tev->fields.end(),n.tev_fields);n.tev_active=t.native_tev->active;}
             n.source_offset = t.descriptor_offset; n.source_id = t.id; n.has_lod = t.lod_descriptor_offset.has_value();
             auto& o = n.texture;
             o.flags = t.source_flags; o.source = t.source;

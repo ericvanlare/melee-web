@@ -31,14 +31,18 @@ class GameplayCollisionTests(unittest.TestCase):
         self.assertEqual((compiler / "emscripten-version.txt").read_text().strip().strip('"'), lock["emscripten"])
         env = dict(os.environ, EMSDK=str(sdk), EM_CONFIG=str(config),
                    EM_CACHE=str(compiler / "cache"), EMSDK_PYTHON=sys.executable)
-        source = ROOT / ".deps/melee/src"
+        source = ROOT / "build/gameplay-source/src"
+        if not (source / "melee/mp/mplib.c").is_file():
+            self.skipTest("Prepare checked gameplay sources first")
+        if "mpLib_80058820_owned" not in (source / "melee/mp/mplib.c").read_text():
+            self.skipTest("Prepare checked collision update ownership patch first")
         original = source / "sysdolphin/baselib"
         c_sources = [ROOT / "src/gameplay_bootstrap.c", ROOT / "src/hsd_host_support.c",
                      ROOT / "src/gameplay_collision.c", ROOT / "tests/gameplay_collision_trace.c"]
         c_sources += [original / (name + ".c") for name in (
             "gobj", "gobjproc", "gobjplink", "gobjgxlink", "gobjobject", "gobjuserdata",
             "objalloc", "memory", "initialize")]
-        c_sources += [ROOT / ".deps/melee/src/melee" / path for path in (
+        c_sources += [source / "melee" / path for path in (
             "mp/mpisland.c", "gr/grdynamicattr.c", "gr/ground.c", "lb/lb_00B0.c")]
         c_sources += [ROOT / ".deps/aurora/lib/dolphin/mtx/vec.c"]
         with tempfile.TemporaryDirectory(prefix="melee gameplay collision ") as directory:

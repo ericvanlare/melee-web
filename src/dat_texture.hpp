@@ -34,6 +34,7 @@ struct DatTextureSampler {
     bool bias_clamp = false, edge_lod = false;
 };
 
+struct DatTextureTev { std::array<uint8_t,28> fields{}; uint32_t active=0; };
 struct DatTexture {
     std::uint32_t descriptor_offset = 0, id = 0, source = 0, source_flags = 0;
     float blending = 0;
@@ -45,6 +46,7 @@ struct DatTexture {
     DatTextureImage image;
     std::optional<DatTexturePalette> palette;
     DatTextureSampler sampler;
+    std::optional<DatTextureTev> native_tev;
 };
 
 // Reads checked descriptors without converting the original GameCube tiles or
@@ -56,7 +58,11 @@ struct DatTexture {
 // Custom classes/active TEV, toon, bump, shadow and highlight coordinate modes remain
 // unsupported. Referenced-region bounds are conservative, not allocation sizes.
 // Source IDs are preserved, but HSD assigns actual texture resources at runtime.
+[[nodiscard]] DatTextureImage read_dat_texture_image(const DatArchive&, std::uint32_t);
+[[nodiscard]] DatTexturePalette read_dat_texture_palette(const DatArchive&, std::uint32_t,
+                                                        const DatTextureImage&);
 [[nodiscard]] std::vector<DatTexture> read_dat_texture_chain(const DatArchive& archive,
-                                                           std::uint32_t first_offset);
+                                                           std::uint32_t first_offset,
+                                                           bool native_descriptors = false);
 
 } // namespace melee_web

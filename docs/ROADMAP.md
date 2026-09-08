@@ -8,15 +8,15 @@ not the number of supported inspection assets.
 ## 0 — Rendering and runtime foundation
 
 Established: pinned tools/source, original HSD model/material/skin/animation
-rendering, local asset import, and browser PAD sampling. Separate Wasm checks
-exercise original object allocation/scheduling, fighter input consumers and
-static collision code. Full common-data hydration, fighter creation and stage
-initialization are still incomplete; see [STATUS.md](../STATUS.md) for evidence.
+rendering, local asset import and browser PAD sampling. The separate Wasm runtime
+now passes original `Fighter_Create` → source Fall/Wait settling → 120 neutral
+Wait ticks → unload → restart, four times across two complete SDK worlds.
+See [the runtime gate](FIGHTER_RUNTIME.md) and [STATUS.md](../STATUS.md).
 
-The next gate is original `Fighter_Create` → deterministic neutral Wait ticks →
-unload → restart. It requires owned typed data, real HSD object lifetimes, source
-player/stage context and explicit service completion. Compile/link coverage and
-individual source predicates do not satisfy it.
+Next: connect this same source runtime to browser presentation and fixed-tick
+controller input, and establish original-game state comparisons before expanding
+movement and combat. Rendered inspection animation is still separate from the
+validated fighter process loop.
 
 ## 1 — Playable local stock match
 

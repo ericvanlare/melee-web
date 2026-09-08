@@ -295,7 +295,7 @@ RigidModel::RigidModel(std::shared_ptr<const DatArchive> source, const std::stri
     : RigidModel(source, public_joint_offset(source, root_name), root_name, ModelRenderPass::All) {}
 
 RigidModel::RigidModel(std::shared_ptr<const DatArchive> source, uint32_t joint_offset,
-                       const std::string& label, ModelRenderPass pass)
+                       const std::string& label, ModelRenderPass pass, DatMaterialPolicy materials)
     : archive(std::move(source)),
       minimum{INFINITY, INFINITY, INFINITY}, maximum{-INFINITY, -INFINITY, -INFINITY},
       root_offset(joint_offset), render_pass(pass), symbol(label) {
@@ -361,7 +361,7 @@ RigidModel::RigidModel(std::shared_ptr<const DatArchive> source, uint32_t joint_
             if (omitted) ++omitted_dobjs;
             auto cached = material_cache.find(mat);
             if (!omitted && cached == material_cache.end()) {
-                auto decoded = std::make_shared<DatMaterial>(read_dat_material(a, mat));
+                auto decoded = std::make_shared<DatMaterial>(read_dat_material(a, mat, materials));
                 for (const auto& texture : decoded->textures) {
                     const auto bytes = texture.image.bytes.size() +
                         (texture.palette ? texture.palette->bytes.size() : 0);

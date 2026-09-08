@@ -103,7 +103,7 @@ def census(root, names, jobs, link_root):
                EM_CACHE=str(compiler.parent / "cache"), EMSDK_PYTHON=sys.executable)
     common = [sys.executable, str(compiler), "-std=c11", "-DTARGET_PC", "-O1",
               "-ffunction-sections", "-fdata-sections", "-ffp-contract=off",
-              "-I", str(source_root), "-I", str(root / ".deps/aurora/include"),
+              "-I", str(root / "src"), "-I", str(source_root), "-I", str(root / ".deps/aurora/include"),
               "-include", str(root / "src/gameplay_compat.h")]
     normalized = lambda value: str(value).replace(str(root), "${ROOT}")
     # Dependency pins alone do not identify downstream compiler inputs. Hash

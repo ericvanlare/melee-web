@@ -42,7 +42,8 @@ if(EMSCRIPTEN)
   endif()
   add_library(gameplay_runtime STATIC src/gameplay_bootstrap.c src/gameplay_abi.c
     src/gameplay_heap.cpp src/gameplay_fighter_probe.c src/gameplay_collision.c src/hsd_debug.c
-    src/common_tables.c src/gameplay_fighter_attributes.c
+    src/common_tables.c src/gameplay_fighter_attributes.c src/gameplay_fighter_data.c
+    src/gameplay_article_data.c
     "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/ft/fighter.c"
     "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/ft/ftwalkcommon.c"
     "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/ft/ftparts.c"
@@ -61,7 +62,8 @@ if(EMSCRIPTEN)
   target_link_libraries(gameplay_runtime PUBLIC aurora::os aurora::mtx PRIVATE fmt::fmt)
   # Native class construction retains original virtual callbacks. Link their
   # real SDK providers even when the diagnostic exercises load/free only.
-  add_library(hsd_native_runtime STATIC src/hsd_native_pobj.c src/hsd_native_joint.c src/hsd_native_common.c)
+  add_library(hsd_native_runtime STATIC src/hsd_native_pobj.c src/hsd_native_joint.c src/hsd_native_common.c
+    src/gameplay_stage_context.c src/gameplay_common_context.c "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/lb/lbspdisplay.c")
   foreach(unit class object hash id list jobj dobj mobj tobj texp texpdag tev
       displayfunc state aobj fobj robj wobj cobj lobj spline mtx util quatlib
       bytecode perf random)
@@ -72,6 +74,13 @@ if(EMSCRIPTEN)
   target_compile_options(hsd_native_runtime PRIVATE -ffunction-sections -fdata-sections -ffp-contract=off
     -include "${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h")
   target_link_libraries(hsd_native_runtime PUBLIC gameplay_runtime aurora::core aurora::gx aurora::mtx aurora::vi)
+  add_executable(gameplay_common_context_trace tests/gameplay_common_context_trace.c)
+  target_link_libraries(gameplay_common_context_trace PRIVATE hsd_native_runtime)
+  target_compile_options(gameplay_common_context_trace PRIVATE -ffp-contract=off
+    -include "${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h")
+  target_link_options(gameplay_common_context_trace PRIVATE -sENVIRONMENT=node -sEXIT_RUNTIME=1
+    -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+  set_target_properties(gameplay_common_context_trace PROPERTIES SUFFIX ".js")
   add_executable(hsd_native_trace tests/hsd_native_trace.c)
   target_link_libraries(hsd_native_trace PRIVATE hsd_native_runtime)
   target_compile_options(hsd_native_trace PRIVATE -ffp-contract=off
@@ -80,12 +89,20 @@ if(EMSCRIPTEN)
     -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
   set_target_properties(hsd_native_trace PROPERTIES SUFFIX ".js")
   add_executable(hsd_native_dat_probe tests/hsd_native_dat_probe.cpp src/dat_archive.cpp
-    src/dat_common.cpp src/dat_texture.cpp src/dat_material.cpp src/rigid_model.cpp src/dat_native_joint.cpp)
+    src/dat_common.cpp src/dat_texture.cpp src/dat_material.cpp src/rigid_model.cpp src/dat_native_joint.cpp
+    src/dat_material_animation.cpp src/dat_animation.cpp)
   target_link_libraries(hsd_native_dat_probe PRIVATE hsd_native_runtime)
   target_compile_options(hsd_native_dat_probe PRIVATE -Wall -Wextra -Werror -ffp-contract=off)
   target_link_options(hsd_native_dat_probe PRIVATE -sENVIRONMENT=node -sNODERAWFS=1 -sEXIT_RUNTIME=1
     -sALLOW_MEMORY_GROWTH=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
   set_target_properties(hsd_native_dat_probe PROPERTIES SUFFIX ".js")
+  add_executable(gameplay_stage_lights_trace tests/gameplay_stage_lights_trace.cpp
+    src/dat_lights.cpp src/dat_archive.cpp)
+  target_link_libraries(gameplay_stage_lights_trace PRIVATE hsd_native_runtime)
+  target_compile_options(gameplay_stage_lights_trace PRIVATE -Wall -Wextra -Werror -ffp-contract=off)
+  target_link_options(gameplay_stage_lights_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1 -sEXIT_RUNTIME=1
+    -sALLOW_MEMORY_GROWTH=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+  set_target_properties(gameplay_stage_lights_trace PROPERTIES SUFFIX ".js")
   add_executable(gameplay_scheduler_trace tests/gameplay_bootstrap_trace.c)
   add_executable(gameplay_abi_trace tests/gameplay_abi_trace.c)
   add_executable(gameplay_collision_trace tests/gameplay_collision_trace.c)
@@ -105,7 +122,8 @@ if(EMSCRIPTEN)
   target_link_options(gameplay_probe PRIVATE -sENVIRONMENT=node -sNODERAWFS=1 -sEXIT_RUNTIME=1
     -sALLOW_MEMORY_GROWTH=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
   set_target_properties(gameplay_probe PROPERTIES SUFFIX ".js")
-  add_custom_target(gameplay_checks DEPENDS gameplay_scheduler_trace gameplay_abi_trace gameplay_collision_trace gameplay_probe hsd_native_trace hsd_native_dat_probe)
+  include(cmake/FighterRuntime.cmake)
+  add_custom_target(gameplay_checks DEPENDS gameplay_scheduler_trace gameplay_abi_trace gameplay_collision_trace gameplay_probe hsd_native_trace hsd_native_dat_probe gameplay_stage_lights_trace gameplay_common_context_trace)
 endif()
 
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.deps/aurora/CMakeLists.txt")

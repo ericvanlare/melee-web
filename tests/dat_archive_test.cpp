@@ -266,6 +266,51 @@ void external_links()
     });
 }
 
+Bytes external_specimen()
+{
+    Bytes data(32);put32(data,0,8);put32(data,8,UINT32_MAX);put32(data,16,24);put32(data,24,0x3f800000);
+    auto b=archive(data,{16},{{16,0}},{'r',0,'e','x','t',0},1);
+    put32(b,32+32+4+8,0);put32(b,32+32+4+8+4,2);return b;
+}
+void preserved_external_links()
+{
+    using melee_web::DatExternalPolicy;
+    auto b=external_specimen();DatArchive a(b,DatExternalPolicy::PreserveUnresolved);
+    check(a.external_symbols().size()==1&&a.external_symbols()[0].name=="ext"&&
+          a.external_symbols()[0].slots==std::vector<uint32_t>{0,8},"External linked-slot ownership and order");
+    check(a.has_relocation(0)&&a.has_relocation(8)&&a.has_relocation(16),"External slots participate in pointer metadata");
+    check(a.pointer(16)==24&&a.f32(24)==1&&a.be32(4)==0,"Unrelated fields remain usable");
+    for(uint32_t p:{0U,8U}){
+        rejects([&]{(void)a.pointer(p);});rejects([&]{(void)a.be32(p);});
+        rejects([&]{(void)a.be16(p+2);});rejects([&]{(void)a.f32(p);});
+    }
+    rejects([&]{(void)a.be32(6);});rejects([&]{(void)a.be16(7);});
+    try{(void)a.pointer(0);throw std::runtime_error("Expected named unresolved error");}
+    catch(const DatError& e){check(std::string(e.what()).find("ext")!=std::string::npos,"Unresolved error names the external symbol");}
+    auto copied=a;b.clear();a=DatArchive(archive({}, {}, {}, {}));
+    check(copied.external_symbols()[0].name=="ext","External metadata owns names after copy");
+    rejects([&]{(void)copied.be32(0);});
+    auto empty=external_specimen();put32(empty,76,UINT32_MAX);
+    check(DatArchive(empty,DatExternalPolicy::PreserveUnresolved).external_symbols()[0].slots.empty(),"Original empty external chain sentinel");
+}
+void malformed_external_links()
+{
+    using melee_web::DatExternalPolicy;
+    const auto bad=[](Bytes b){rejects([&]{DatArchive a(b,DatExternalPolicy::PreserveUnresolved);});};
+    auto b=external_specimen();put32(b,32+8,0);bad(b); // Cycle.
+    b=external_specimen();put32(b,76,1);bad(b); // Unaligned head.
+    b=external_specimen();put32(b,32,6);bad(b); // Unaligned next slot.
+    b=external_specimen();put32(b,32,32);bad(b); // Out-of-bounds next slot.
+    b=external_specimen();put32(b,76,32);bad(b); // Out-of-bounds head.
+    b=external_specimen();put32(b,76,16);bad(b); // Internal relocation overlap.
+    b=external_specimen();put32(b,80,UINT32_MAX);bad(b); // Name bounds.
+    b=external_specimen();put32(b,80,1);bad(b); // Empty name.
+    b=external_specimen();b.back()='z';bad(b); // Unterminated name.
+    Bytes data(16);put32(data,0,8);put32(data,8,UINT32_MAX);
+    b=archive(data,{}, {},{'a',0,'b',0},2);put32(b,48,0);put32(b,56,8);put32(b,60,2);bad(b); // Cross-chain overlap.
+    b=archive(data,{}, {},{'a',0},2);put32(b,48,UINT32_MAX);put32(b,56,UINT32_MAX);bad(b); // Duplicate names.
+}
+
 void referenced_region_boundaries()
 {
     Bytes data(40, 0);
@@ -317,7 +362,8 @@ int main(int argc, char** argv)
         {"file_and_header_sizes", file_and_header_sizes}, {"table_counts", table_counts},
         {"relocation_slots", relocation_slots}, {"relocation_targets", relocation_targets},
         {"public_targets", public_targets}, {"public_names", public_names},
-        {"external_links", external_links}, {"resource_limits", resource_limits},
+        {"external_links", external_links}, {"preserved_external_links", preserved_external_links},
+        {"malformed_external_links", malformed_external_links}, {"resource_limits", resource_limits},
         {"referenced_region_boundaries", referenced_region_boundaries},
     };
     if (argc != 2 || !cases.contains(argv[1])) {

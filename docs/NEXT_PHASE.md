@@ -1,97 +1,49 @@
-# From source probes to a playable stock match
+# From a live fighter to a playable stock match
 
-The target is an accurate local Mario-versus-Mario stock match on Final
-Destination at 60 fps. The immediate gate is smaller and concrete: call original
-`Fighter_Create`, run its source processes in neutral Wait, unload and restart.
-Mario/Fox clip playback and opaque stage inspection remain regression fixtures.
+The constructor/neutral/restart gate is complete. The next concrete gate is one
+controllable Mario on Final Destination in the browser, using the same original
+fighter process loop, with original-game movement comparisons.
 
-## Foundation available
+## Parallel work with bounded interfaces
 
-- Original HSD transforms, skinning, materials, polygons and animation evaluation
-  already drive the browser inspector. Aurora supplies GX/WebGPU and PAD.
-- The isolated gameplay target owns a real SDK heap and executes original HSD
-  GObj allocation, process ordering and lifetime behavior. It intentionally has
-  an optional original graphics-object lifetime registry; full fighter/stage
-  lifecycle remains incomplete.
-- Checked Wasm ABI patches preserve fighter animation-flag aliases. Packed
-  imported command words still require explicit decoding; native bitfield casts
-  are not valid just because pointer width matches.
-- PlCo root0 has a source-generated scalar schema, 15 static roots have owned
-  typed graphs, and root20 has a separate original native-constructor probe.
-  Remaining roots retain explicit readiness. Original input reset and walk-threshold logic consume
-  scoped typed data without pretending full common initialization has happened.
-- Typed collision data feeds original static loading/pruning/island/query code.
-  Stage scale and original stage kind are explicit. Joint bindings, callbacks,
-  dynamic geometry and fighter ECB/physics remain separate requirements.
+1. **Browser runtime integration.** Share the owned runtime and asset bundle with
+   a browser entry point. Present the actual fighter GObj and source stage through
+   HSD/Aurora. Keep simulation at 60 Hz, independent of rendering; preserve pause,
+   focus loss, explicit errors, teardown and restart. Avoid copying gameplay into
+   the existing inspection animation player.
+2. **Input and movement.** Feed the original controller path from the existing
+   Aurora PAD boundary. Enable checked action scripts and services for Wait,
+   walk/run, jump, fall and landing. Landing's effect/audio command needs real
+   operands and providers before it is enabled. Extend through shared schema and
+   service boundaries rather than fighter-specific successful substitutes.
+3. **Reference traces.** Capture the original game's per-tick actions, position,
+   velocity, collision state and RNG for identical initial conditions and input.
+   Compare the Wasm runtime before claiming movement accuracy. Review floating
+   point primitives where the PowerPC source and host math differ.
 
-## Next integration order
+The lead integrates one runnable browser slice across these lanes and keeps the
+constructor/restart regression passing. Full menus, AI, other characters and
+content coverage are downstream of a local Mario-versus-Mario stock match.
 
-The data and native-construction batches below now have bounded implementations.
-Connect them in this order rather than extending inspection-only features:
+## Acceptance for the next gate
 
-1. Publish owned common/fighter/costume registries under one world lifetime.
-   The fighter registry reset's console adjacency assumption is patched and tested.
-2. Hydrate material-animation descriptors and route the original action loader
-   through owned decoded clips. Decode packed commands before executing Wait.
-3. Initialize required item registration, player context and stage lighting.
-   Mario's OnLoad calls item registration unconditionally; its destination table
-   must be initialized even before a projectile is spawned.
-4. Call original Fighter_Create, tick neutral Wait, unload and restart. Then
-   advance to controllable movement with original-game state comparisons.
+Import local owned data, launch a visible Mario on Final Destination, control
+movement and jump/landing through source callbacks, pause/resume safely, unload,
+and restart without a reload. Require original state comparisons for the named
+movement cases. Measure release-build frame intervals and memory on identified
+browser/hardware; debug Wasm or viewer FPS cannot establish match performance.
 
-## Implementation boundaries
+## Foundation to reuse
 
-1. **Common data and named parts.** Hydrate common roots1–5,9–15,18–19,21 as
-   owned typed graphs: item/staling tables, named part maps, counted shake vectors,
-   scale/status modifiers and palettes/crowd configuration. Existing animation
-   binding keeps part counts but does not supply the named maps required by
-   `ftParts_80074E58`. Use exact source counts and real null alternates; reject
-   unsupported alternate insertion. Root17 has no established source consumer
-   and remains unresolved, not guessed from its palette-like bytes.
-2. **Original HSD construction and lifetime.** Hydrate common root20 and the
-   Mario costume/material-animation graph for original HSD constructors.
-   `Fighter_800679B0` unconditionally loads root20 in `ftCo_800C8064` and
-   `ftCo_800C8F6C`, and creates stage lighting in `ftCo_8009F4A4`. Establish real
-   graphics-kind destruction, class ownership, part setup and texture AObjs.
-   Entry/respawn roots8/16 reuse this graph capability. More inspector passes
-   are useful only when they unblock this runtime path.
-3. **Mario data and action loading.** Decode Mario's ftData, common/special
-   attributes, hurtboxes, dynamics, item Article registrations, blend maps and
-   weighted Wait choices. Extend the source registry with the actual costume
-   material-animation identity. Preserve the explicitly selected source motion
-   record even when another record shares its figatree bytes. Implement checked
-   packed action/color-command graphs and original execution; Wait's blink must
-   reach real texture animation. CPU root22 is a distinct future AI dependency.
-4. **Player/stage/services integration.** Supply real player settings, stage
-   collision-to-joint bindings, camera/lighting and required service ownership.
-   Final Destination's source binding maps collision joint0 to stage entry3,
-   render joint0; empty archive binding tables do not remove that requirement.
-   Run original fighter processes at 60 Hz and establish deterministic traces.
-   Audio and effects that the retained path calls need actual implementations
-   or an explicit unsupported result, never successful no-ops.
+- [Fighter runtime](FIGHTER_RUNTIME.md): owned common/fighter/costume/metal graphs,
+  action identity, native commands, stage lights/bounds/collision, player data,
+  item registration, effect banks and full GObj process/destructor execution.
+- Checked archive extern preservation and typed named-section publication.
+  Unsupported references and services still fail explicitly.
+- Immutable original archive bytes, mutable owned native display lists and
+  descriptor-ID cleanup across complete heap restarts.
+- [Testing](TESTING.md): source ABI comparisons, focused native tests, real-data
+  probes, browser rendering checks and fixed dependency pins.
 
-The loader is a concrete portability blocker: `ftData_80085E50` classifies
-addresses below `0x80000000` as ARAM, which includes ordinary Wasm pointers.
-It also expects in-place big-endian archive relocation. Replace that storage
-classification with checked owned decoded-clip identity while preserving source
-record, cache and completion semantics. Do not fake ARAM transfers or bias
-pointer values. Reuse the existing FigaTree decoder and original evaluator.
-
-## Integration checks
-
-```sh
-python3 scripts/build.py --target gameplay
-python3 scripts/check_gameplay.py
-python3 scripts/check_gameplay.py --common assets-local/PlCo.dat --stage assets-local/GrNLa.dat --stage-kind 37
-```
-
-These run Wasm foundation checks with the pinned local Node runtime. Optional
-inputs remain local; `37` is original `GrKind`, not viewer entry3. The output
-must continue to distinguish decoded data, initialized subsystems and a running
-match. Source compilation counts are diagnostic coverage only.
-
-Accept creation only after allocation→creation→neutral ticks→unload→restart
-works with owned data and no half-ready fighter publication. Then advance the
-same runtime through walk/dash/jump/land, attacks and damage, and stock-match
-completion. Compare original-game state traces before accuracy claims, and use
-release measurements on named reference devices before a 60 fps claim.
+Broaden behavior only when it unlocks this gate or catches a demonstrated bug.
+Keep workers on independent files and use GPT-6 Astra medium as configured.

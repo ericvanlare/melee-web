@@ -7,6 +7,7 @@
 #include <vector>
 
 namespace melee_web {
+enum class DatMaterialPolicy { ViewerOpaque, NativeDescriptors };
 enum class DatMaterialPass { Opaque, Translucent, TextureEdge };
 
 // Source DObjLoad classification, without loading services of an omitted pass.
@@ -22,12 +23,14 @@ struct DatMaterial {
     std::array<std::uint8_t, 4> ambient{}, diffuse{}, specular{};
     float alpha = 0, shininess = 0;
     std::vector<DatTexture> textures;
+    std::optional<std::array<uint8_t,12>> pixel_engine;
 };
 
 // Current original-HSD bridge subset: opaque constant/vertex/diffuse/specular
 // materials and ordinary texture chains. Custom class/render/PE state,
 // translucency, toon/shadow and special depth flags are rejected explicitly.
 [[nodiscard]] DatMaterial read_dat_material(const DatArchive& archive,
-                                            std::uint32_t material_offset);
+                                            std::uint32_t material_offset,
+                                            DatMaterialPolicy policy = DatMaterialPolicy::ViewerOpaque);
 
 } // namespace melee_web

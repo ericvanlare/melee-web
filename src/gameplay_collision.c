@@ -162,12 +162,12 @@ MeleeWebCollision* melee_web_collision_create(const MeleeWebCollisionInput* in, 
     }
     if (!collision_input(in, error, size)) return NULL;
     /* Original mpLibLoad allocates fixed-capacity arrays even for a tiny map.
-     * Include conservative SDK cell headers/rounding, one GObj, and at most
+     * Include conservative SDK cell headers/rounding, one GObj and its update process, and at most
      * one 0x2c island per floor/ceiling line. This catches undersized worlds;
      * genuine allocation failure/fragmentation retains HSD's explicit panic. */
     const size_t heap_budget = sizeof(CollVtx) * groundCollVtx_count +
         sizeof(CollLine) * groundCollLine_count + sizeof(CollJoint) * groundCollJoint_count +
-        3 * 64 + 128 + (size_t) (in->ranges[0].count + in->ranges[1].count) * 128;
+        3 * 64 + 256 + (size_t) (in->ranges[0].count + in->ranges[1].count) * 128;
     const int32_t heap_free = melee_web_gameplay_stats().heap_free_bytes;
     if (heap_free < 0 || (size_t) heap_free < heap_budget) {
         collision_fail(error, size, "Gameplay heap has insufficient free space for original collision capacities"); return NULL;
@@ -201,19 +201,17 @@ MeleeWebCollision* melee_web_collision_create(const MeleeWebCollisionInput* in, 
         dst->right_bound = src->right; dst->top_bound = src->top;
         dst->vtx_start = src->vertices.start; dst->vtx_count = src->vertices.count;
     }
-    owner->object = GObj_Create(HSD_GOBJ_CLASS_STAGE, 3, 0);
-    if (!owner->object) {
-        free(owner->map.verts); free(owner->map.lines); free(owner->map.joints); free(owner);
-        collision_fail(error, size, "Unable to allocate collision lifetime GObj"); return NULL;
-    }
     owner->generation = generation; collision_owner = owner;
-    GObj_InitUserData(owner->object, 0, collision_release, owner);
     GroundParam param = {0}; param.y = in->stage_scale;
     GroundParam* saved_param = stage_info.param;
     GrKind saved_kind = stage_info.grkind;
     stage_info.param = &param; stage_info.grkind = (GrKind) in->stage_kind;
     mpLibLoad(&owner->map);
     stage_info.param = saved_param; stage_info.grkind = saved_kind;
+    /* Original class-1/link-6 owner and priority-4 update process. Sharing this
+     * object's userdata lifetime prevents updates after collision storage dies. */
+    owner->object = mpLib_80058820_owned();
+    GObj_InitUserData(owner->object, 0, collision_release, owner);
     /* Static adjacency selection can use alternate links. Check those actual
      * original selections before allowing an unbounded floor traversal. */
     for (int start = 0; start < owner->map.line_count; ++start)

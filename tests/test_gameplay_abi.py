@@ -128,10 +128,17 @@ class GameplayAbiTests(unittest.TestCase):
                     "-c", str(self.source / f"melee/ft/{name}.c"),
                     "-o", str(self.directory / (name + ".o"))])
         self.assertEqual(hashlib.sha256(self.original_header.read_bytes()).digest(), self.original_digest)
-        # The patch is applicable to pristine upstream and reverses exactly in
-        # the generated tree; neither check mutates either source checkout.
-        patch = ROOT / "patches/melee-gameplay.patch"
-        for source, reverse in [(ROOT / ".deps/melee", False), (self.source.parent, True)]:
+        # Preparation composes the reviewed adapter patch with the source bool
+        # ABI transform. Check both forward patches against pristine upstream,
+        # and reverse the exact composed patch that owns the generated tree.
+        # These checks do not mutate either checkout.
+        reviewed = ROOT / "patches/melee-gameplay.patch"
+        composed = self.source.parent / ".git/melee-web-gameplay.patch"
+        self.assertTrue(composed.is_file(), "Prepared source ownership patch is missing")
+        for source, patch, reverse in [
+                (ROOT / ".deps/melee", reviewed, False),
+                (ROOT / ".deps/melee", composed, False),
+                (self.source.parent, composed, True)]:
             result = subprocess.run(["git", "apply", "--check", *( ["--reverse"] if reverse else []),
                                      str(patch)], cwd=source, capture_output=True, text=True, timeout=30)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

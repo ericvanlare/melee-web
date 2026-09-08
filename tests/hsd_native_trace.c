@@ -6,6 +6,8 @@
 #include <sysdolphin/baselib/gobjproc.h>
 #include <sysdolphin/baselib/id.h>
 #include <sysdolphin/baselib/jobj.h>
+#include <sysdolphin/baselib/dobj.h>
+#include <sysdolphin/baselib/pobj.h>
 #include <stdlib.h>
 #define CHECK(c) do { if (!(c)) { fprintf(stderr, "CHECK failed: %s at %d\n", #c, __LINE__); abort(); } } while (0)
 #include <stdio.h>
@@ -69,6 +71,12 @@ static void managed_native_lifetimes(int replace_heap)
         CHECK(melee_web_native_joint_stats(handle, &stats, error, sizeof(error)));
         CHECK(stats.joints == 2 && stats.dobjs == 1 && stats.pobjs == 1 && stats.materials == 1);
         CHECK(stats.resolved_envelopes == 1 && memcmp(stats.first_diffuse, diffuse, 4) == 0);
+        HSD_Joint* descriptor = melee_web_native_joint_descriptor(handle,error,sizeof(error));
+        HSD_PObjDesc* native_polygon = descriptor->u.dobjdesc->pobjdesc;
+        CHECK(native_polygon->display != display && !((uintptr_t)native_polygon->display & 31));
+        CHECK(!memcmp(native_polygon->display,display,sizeof(display)));
+        native_polygon->display[31] = 0xa5;
+        CHECK(display[31] == 0); /* Source-loader writes cannot poison archive input. */
         HSD_GObj* owner = ((HSD_GObj**) HSD_GObj_Entities)[0];
         while (owner && owner->user_data != handle) owner = owner->next;
         CHECK(owner && HSD_GObj_SetupProc(owner, callback_deletion, 0));
@@ -94,6 +102,9 @@ static void managed_native_lifetimes(int replace_heap)
         // descriptor addresses/ID entries even with identical archive offsets.
         MeleeWebNativeJoint* other = melee_web_native_joint_create(&graph, error, sizeof(error));
         CHECK(other);
+        HSD_Joint* other_descriptor = melee_web_native_joint_descriptor(other,error,sizeof(error));
+        CHECK(other_descriptor->u.dobjdesc->pobjdesc->display[31] == 0);
+        CHECK(native_polygon->display[31] == 0xa5);
         CHECK(melee_web_native_joint_stats(other, &stats, error, sizeof(error)) && stats.first_diffuse[0] == 123);
         CHECK(melee_web_native_joint_destroy(other, error, sizeof(error)));
         CHECK(melee_web_native_joint_stats(handle, &stats, error, sizeof(error)));
@@ -102,6 +113,43 @@ static void managed_native_lifetimes(int replace_heap)
         stale = handle;
     }
     CHECK(melee_web_native_joint_destroy(stale, error, sizeof(error)));
+}
+
+static void descriptor_only_source_lifetime(void)
+{
+    char error[256];
+    MeleeWebNativeJointDesc joint = {0};
+    joint.child = joint.next = joint.dobj = UINT32_MAX;
+    joint.scale[0] = joint.scale[1] = joint.scale[2] = 1;
+    MeleeWebNativeGraph graph = {&joint, NULL, NULL, NULL, 1, 0, 0, 0, 0};
+    MeleeWebNativeJoint* descriptors = melee_web_native_joint_hydrate(&graph, error, sizeof(error));
+    CHECK(descriptors);
+    HSD_Joint* descriptor = melee_web_native_joint_descriptor(descriptors, error, sizeof(error));
+    CHECK(descriptor && !melee_web_native_joint_object(descriptors, error, sizeof(error)));
+    for (unsigned pass = 0; pass < 2; ++pass) {
+        CHECK(melee_web_gameplay_startup(4U * 1024U * 1024U, error, sizeof(error)));
+        CHECK(melee_web_native_world_enable(error, sizeof(error)));
+        CHECK(melee_web_native_world_enable(error, sizeof(error)));
+        HSD_JObj* object = HSD_JObjLoadJoint(descriptor);
+        CHECK(object && HSD_IDGetData((u32)descriptor, NULL) == object);
+        /* Original metal initialization registers descriptor aliases whose
+         * identity differs from jobj->id. JObjRelease leaves those entries. */
+        HSD_Joint aliases[3] = {0};
+        for (unsigned i = 0; i < 3; ++i)
+            HSD_IDInsertToTable(NULL, (u32)&aliases[i], object);
+        CHECK(HSD_IDGetAllocData()->used == 4);
+        HSD_JObjRemoveAll(object);
+        CHECK(!HSD_IDGetData((u32)descriptor, NULL));
+        CHECK(HSD_IDGetAllocData()->used == 3);
+        for (unsigned i = 0; i < 3; ++i)
+            CHECK(HSD_IDGetData((u32)&aliases[i], NULL) == object);
+        CHECK(melee_web_gameplay_shutdown(error, sizeof(error)));
+        CHECK(HSD_IDGetAllocData()->used == 0);
+        for (unsigned i = 0; i < 3; ++i)
+            CHECK(!HSD_IDGetData((u32)&aliases[i], NULL));
+        CHECK(melee_web_native_joint_descriptor(descriptors,error,sizeof(error)) == descriptor);
+    }
+    CHECK(melee_web_native_joint_destroy(descriptors,error,sizeof(error)));
 }
 
 /* Authored data only. Tests original class allocation, descriptor identity,
@@ -134,6 +182,7 @@ int main(int argc, char** argv)
         CHECK(melee_web_gameplay_shutdown(error, sizeof(error)));
     }
     managed_native_lifetimes(0);
+    descriptor_only_source_lifetime();
     puts("original native joint allocation/reference/destruction/restart passed");
     return 0;
 }

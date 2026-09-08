@@ -179,8 +179,10 @@ ordering, deferred mutation and userdata destruction. A wrapper around Aurora's
 actual OS allocator claims one exclusive arena, rejects foreign initialization,
 and clears allocator metadata before freeing owned memory. World generations
 invalidate surviving handles and private pools across teardown/restart. The
-current world excludes graphics-object kinds until their real lifecycle exists;
-it does not substitute for full `Fighter_Create` or a match scheduler.
+base world excludes graphics-object kinds; the native world registers their
+original destructors. The full fighter gate uses this native world for original
+Fighter_Create, source processes and teardown. Browser presentation remains a
+separate integration boundary.
 
 `gameplay_sources.py` prepares a checked downstream source tree under `build/`
 and applies `patches/melee-gameplay.patch`; pristine `.deps/melee` is unchanged.
