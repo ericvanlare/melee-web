@@ -24,6 +24,44 @@ After this cycle, build Mario-only character selection → FD-only stage selecti
 menu and roster interfaces. Falco is the first planned roster expansion after
 that flow and the core loop are stable.
 
+## Original menu integration boundary
+
+A strict link probe retaining both `mnCharSel_Scene_OnEnter` and
+`mnStageSel_Scene_OnEnter` passes against the current Release runtime libraries.
+This is link evidence only; neither original menu has run in the port yet.
+
+The source VS scene chain is in `melee/gm/gmvsmode.c`, with hooks in `gmscdata.c`.
+Use `CSSData`, `SSSData`, `VsModeData`, `PlayerInitData`, and original stock-rule
+setup to carry configuration into the current match. The match currently owns
+its SDK arena, rendering, audio and stage lifetime; a menu must not initialize
+another source scene inside that live world.
+
+The visible screens require these English disc files (all verified present):
+
+- CSS: `MnSlChr.usd`, `MnExtAll.usd`, `SdSlChr.usd`.
+- CSS initialization also loads `LbMcGame.usd` and `NtMemAc.usd` through
+  `lbCardGame_LoadArchive`; loading their graphics does not establish save support.
+- SSS: `MnSlMap.usd`.
+
+`MnSelectChrDataTable` begins with camera, two lights and fog, followed by nine
+CSS animation sets at offset 0x10. `MnSelectStageDataTable` has the same scene
+prefix followed by the model/animation table in `mnstagesel.static.h`.
+Other named roots include `SIS_SelCharData`, `MemCardIconData` and
+`ScNtcCommon_scene_data`. All archive bytes must remain owned locally.
+
+The checked archive adapter currently intercepts only `lbArchive_80017040`.
+Menus also use raw `lbArchive_LoadArchive`, `lbArchive_LoadSymbols`,
+`lbArchive_80016DBC`, and later `HSD_ArchiveGetPublicAddress`. Extend this shared
+boundary with owned, checked typed data and explicit lifetime; do not overlay
+big-endian archive bytes with host structs or introduce successful file stubs.
+
+Neither screen exposes a roster/visible-stage filter. Initializing Mario and FD
+only seeds selection; original cursor code can still select other entries.
+A narrow menu restriction must preserve the original input and confirmation paths.
+Keep SSS `force_stage_id=-1`: forcing FD skips the visible screen and does not meet
+this gate. FD is stage-menu entry 25, `St_Kind_Last=0x20`, mapped to runtime
+`Gr_Kind_Last=0x25` (37). Do not conflate these identifiers.
+
 ## Foundation to reuse
 
 - [Fighter runtime](FIGHTER_RUNTIME.md): common/fighter/costume graphs, native action
