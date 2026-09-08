@@ -102,9 +102,10 @@ void validate(const MeleeWebAnimationTrack& track, bool native_state_guard=false
         }
     }
     require(has_value, "Animation track contains no value");
-    // FObj assigns op_intrp when loading the next datum. A single non-key
-    // datum reaches FObjUpdateAnim with op_intrp=NONE and an unset output.
-    require(native_state_guard || operands >= 2 || first_opcode == 6,
+    // FObj assigns op_intrp when loading the next datum. A single CON datum
+    // reaches the guarded native FObjUpdateAnim terminal path with
+    // op_intrp=NONE; a single LIN/SPL datum would still have no valid output.
+    require((native_state_guard && first_opcode == 1) || operands >= 2 || first_opcode == 6,
             "Animation interpolation requires a value pair or a key opcode");
 }
 } // namespace

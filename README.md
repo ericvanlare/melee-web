@@ -7,20 +7,17 @@ The first playable goal is an accurate local **Mario-versus-Mario stock match on
 Final Destination at 60 fps**, using original gameplay code. Full vanilla Melee
 remains the goal; menus, other matchups and modes follow this initial match gate.
 
-**This is not a playable game yet.** The browser renders Melee DAT models
-through original HSD transforms, skinning, materials and polygon code, using
-Aurora's GX renderer. Mario and Fox can play original idle and walking animations
-from their action containers. The viewer also renders Final Destination's opaque
-platform geometry, with omitted passes and unapplied stage services reported.
-It does not establish complete scene fidelity or full-game performance.
-The separate Wasm runtime now executes original `Fighter_Create`, settles Mario
-into Wait through source physics, runs 120 neutral ticks, unloads, and restarts.
-The gate passes four fighter lifecycles across two complete worlds using owned
-local assets. A separate browser runtime now connects two fighters, original controller
-processing and camera, and source audio. Scene and combat integration remain
-incomplete, and a scoped 102-frame original-game jump comparison passes; full-match
-equivalence and performance remain unverified.
-See [the runtime gate](docs/FIGHTER_RUNTIME.md) for reproduction and limits.
+**The complete playable-match milestone is still open.** The browser currently
+runs two original Mario instances on Final Destination, with source controller
+processing, camera, stage rendering, stock/respawn logic and audio transport.
+Rendered ground/air fireballs now survive impact, restart and unload. This is an
+integration build: longer stage animation, broader combat, edge collision,
+audible output and physical controllers still need acceptance checks.
+
+A scoped 102-frame original-game jump comparison passes; this does not establish
+full-match equivalence. See [current evidence](STATUS.md),
+[the runtime gate](docs/FIGHTER_RUNTIME.md) and
+[original-game comparison](docs/ORIGINAL_COMPARISON.md).
 
 ## Build and inspect
 

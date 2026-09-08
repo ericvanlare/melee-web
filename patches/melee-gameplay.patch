@@ -2121,7 +2121,7 @@ index 72776f8..7177d58 100644
 +}
 +#endif
 diff --git a/src/sysdolphin/baselib/fobj.c b/src/sysdolphin/baselib/fobj.c
-index fb87d01..9fcff88 100644
+index fb87d01..ba1ad1e 100644
 --- a/src/sysdolphin/baselib/fobj.c
 +++ b/src/sysdolphin/baselib/fobj.c
 @@ -1,6 +1,9 @@
@@ -2134,11 +2134,22 @@ index fb87d01..9fcff88 100644
  
  #include "debug.h"
  #include "spline.h"
-@@ -341,6 +344,14 @@ void FObjUpdateAnim(HSD_FObj* fobj, void* obj, HSD_ObjUpdateFunc obj_update)
+@@ -341,6 +344,25 @@ void FObjUpdateAnim(HSD_FObj* fobj, void* obj, HSD_ObjUpdateFunc obj_update)
      if (obj_update == NULL) {
          return;
      }
 +#ifdef TARGET_PC
++    /* A terminal single-CON stream has no interpolation pair. The original
++     * passes an uninitialized stack word here. Use its authored constant;
++     * the observed FD visibility transition remains hidden (see port docs). */
++    if (fobj->op_intrp == HSD_A_OP_NONE && fobj->op == HSD_A_OP_CON &&
++        HSD_FObjGetState(fobj) == FOBJ_LOAD_DATA && fobj->nb_pack == 0 &&
++        fobj->fterm == 0 && fobj->time >= 0 &&
++        fobj->ad == fobj->ad_head + fobj->length) {
++        fobjdata.fv = fobj->p1;
++        obj_update(obj, fobj->obj_type, &fobjdata);
++        return;
++    }
 +    if (fobj->op_intrp < HSD_A_OP_CON || fobj->op_intrp > HSD_A_OP_KEY) {
 +        fprintf(stderr,"Native FObj: type=%u interpolation=%u op=%u state=%u length=%u offset=%u start=%d time=%g term=%u p0=%g p1=%g\n",
 +                fobj->obj_type,fobj->op_intrp,fobj->op,HSD_FObjGetState(fobj),fobj->length,

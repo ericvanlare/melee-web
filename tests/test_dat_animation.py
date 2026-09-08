@@ -44,6 +44,9 @@ class DatAnimationTests(unittest.TestCase):
     def test_fixed_point_widths_and_largest_bounded_wait(self):
         self.run_case("encoding_and_integer_edges")
 
+    def test_native_single_value_guard_only_allows_constant_or_key(self):
+        self.run_case("native_single_value_guard")
+
 
 if __name__ == "__main__":
     unittest.main()

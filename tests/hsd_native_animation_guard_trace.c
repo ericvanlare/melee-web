@@ -18,7 +18,7 @@ int main(int argc,char** argv){char error[256];
  HSD_AObjDesc desc={0};desc.flags=AOBJ_LOOP;desc.end_frame=3;desc.fobjdesc=&track;
  HSD_AObj* a=HSD_AObjLoadDesc(&desc);HSD_AObjReqAnim(a,0);
  if(argc==2&&!strcmp(argv[1],"--undefined-state")){
-  HSD_FObjReqAnimAll(a->fobj,3);HSD_FObjInterpretAnimAll(a->fobj,NULL,update,0);
+  a->fobj->op=HSD_A_OP_LIN;FObjUpdateAnim(a->fobj,NULL,update);
   check(0,"undefined source FObj state must fail before callback");
  }
  for(unsigned i=0;i<100;i++)HSD_AObjInterpretAnim(a,NULL,update);

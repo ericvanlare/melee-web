@@ -2,7 +2,8 @@
 
 The browser runs two original Mario instances on Final Destination through
 compiled WebAssembly. The complete acceptance milestone below is still open:
-playtesting exposed projectile and post-respawn collision failures. No emulator
+the reported projectile and post-respawn crashes have fixes, while broader
+combat, edge collision and long stage-animation validation remain open. No emulator
 is shipped; Dolphin is used only as a separate original-game reference.
 
 The current stopping milestone is the **complete local Mario-versus-Mario stock
@@ -10,7 +11,7 @@ match on Final Destination**, including original gameplay behavior, two local
 controllers, camera, sound, match outcome/restart, and measured stable 60 fps on
 the reference machine. The smaller gates below are checkpoints, not completion.
 
-## Active integration (not yet checkpointed)
+## Active integration
 
 - One shared asset/world owner now serves the browser and Node regression harness.
 - Two original fighters run together. Raw PAD input uses the original HSD queue,
@@ -22,8 +23,11 @@ the reference machine. The smaller gates below are checkpoints, not completion.
   Ground startup and rendering passes. The stage advances at tick1801 and passes
   3600 scheduled ticks and teardown in two worlds. A longer probe found that
   the first-animation lookup lost its result across longjmp. The corrected
-  volatile pointer and typed callback advance through state9; a later FObj
-  interpolation failure is under investigation. Full-cycle fidelity is open.
+  volatile pointer and typed callback restore the lookup. A terminal single-CON
+  compatibility rule removes an original uninitialized visibility output while
+  preserving the observed hidden result. Two worlds each pass 36,000 frames,
+  every background state, cycle restart, archive immutability and teardown.
+  Full rendered-cycle fidelity still needs browser/original comparison.
 - Original SEM/synth/AX source produces SFX PCM with original SDK reverb/delay.
   The integrated HPS stream runs the original three-slot scheduler through the
   FD intro and loop, with identical complete PCM hashes across two 100-second
@@ -50,14 +54,20 @@ the reference machine. The smaller gates below are checkpoints, not completion.
 - Corrected the source secondary-costume-color setting: its recovered function
   name says ControllerIndex, but gm_16AE supplies sub_color. Controller routing
   remains owned by the raw PAD queue.
+- Original raw-input jab, shield, grab and all four throw directions pass in two
+  worlds. Cross-fighter animation streams, row identities and commands remain
+  owned after the source fighter store is destroyed. Importing the shared
+  FTKIND_NONE part-remap row fixes the grab/throw crash without changing roster size.
 - Workers use GPT-5.6 Luna xhigh; the lead handles integration and difficult blockers.
+- The integrated runtime is checkpointed on the private remote. A clean Ubuntu
+  GitHub Actions run builds the browser runtime and passes the source/ABI checks.
 - A 102-frame retail comparison of a full jump/landing matches source motion IDs,
   non-idle animation frames, and vertical-velocity bits on every frame. The
   original match counter removes duplicate scheduler samples. Retail uses the
   unlocked Stadium side platform; the port uses FD, so this is a scoped vertical
   movement comparison, not full match equivalence. A second retail capture repeats
   all 102 frames, and the updated intrinsic build still matches the comparison.
-- Local suite: 218 tests passed without skips after refreshing the affected
+- Local suite: 221 tests passed without skips after refreshing the affected
   source trace binaries. The strengthened projectile regression passes actual P2 impact,
   expiry and teardown in two worlds. All six ground/air side/up/down specials
   also pass source action entry, finite state and two-world teardown checks.
@@ -123,7 +133,8 @@ fighter now uses this browser input/presentation path; visual correctness remain
 
 ## Next
 
-Connect the validated fighter world to browser rendering and original controller
-processing while capturing original-game movement traces. Expand the shared
-command/service boundaries needed for movement, jumping and landing. See the
-[bounded parallel plan](docs/NEXT_PHASE.md) and [acceptance roadmap](docs/ROADMAP.md).
+Finish the long FD stage cycle and broader raw-input combat regressions, resolve
+the phase-dependent edge collision against an FD original-game trace, then run
+a sustained release-browser match and measure active-frame timing. Verify audible
+output and two physical controllers before closing the playable-match milestone.
+See [the acceptance roadmap](docs/ROADMAP.md).

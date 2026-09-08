@@ -105,12 +105,30 @@ void encoding_and_integer_edges()
     check(melee_web_animation_validate_track(&track, nullptr, 0), "extended packet count uses HSD's three-bit first group");
 }
 
+void native_single_value_guard()
+{
+    auto native_valid=[](Bytes& bytes) {
+        const MeleeWebAnimationTrack track{bytes.data(), bytes.size(), 0, 1, 0, 0};
+        char error[256];
+        return melee_web_animation_validate_native_track(&track, error, sizeof(error));
+    };
+    Bytes con{0x01}; little_float(con, 2.5f);
+    Bytes lin{0x02}; little_float(lin, 2.5f);
+    Bytes spl0{0x03}; little_float(spl0, 2.5f);
+    Bytes key{0x06}; little_float(key, 2.5f);
+    check(native_valid(con), "native terminal single-CON stream uses the guarded constant path");
+    check(!native_valid(lin), "native terminal single-LIN stream cannot produce an interpolation value");
+    check(!native_valid(spl0), "native terminal single-SPL stream cannot produce an interpolation value");
+    check(native_valid(key), "native single-KEY stream retains source key semantics");
+}
+
 int main(int argc, char** argv)
 {
     const std::map<std::string, void (*)()> cases{
         {"preserves_channels", preserves_channels}, {"tree_bounds", tree_bounds},
         {"unsupported_channels_and_formats", unsupported_channels_and_formats},
         {"malformed_operands", malformed_operands}, {"encoding_and_integer_edges", encoding_and_integer_edges},
+        {"native_single_value_guard", native_single_value_guard},
     };
     try {
         if (argc == 3 && std::string(argv[1]) == "local") {
