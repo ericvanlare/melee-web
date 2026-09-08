@@ -13,7 +13,9 @@ extern "C" int lbAudioAx_80023F28(int);
 #include <aurora/main.h>
 #include <dolphin/gx.h>
 #include <emscripten.h>
+#include <SDL3/SDL_error.h>
 #include <SDL3/SDL_hints.h>
+#include <SDL3/SDL_video.h>
 #include <array>
 #include <cstdio>
 #include <cstdlib>
@@ -36,6 +38,8 @@ FixedTickClock simulation_clock;
 std::string message="Import local runtime assets to launch.";
 bool running=false,ready=false,exiting=false;
 unsigned frames=0;
+SDL_Window* runtime_window=nullptr;
+int render_scale=1;
 bool finished=false;
 int winner=-1;
 int combat_check=-1;
@@ -202,16 +206,27 @@ int melee_web_game_file(const char* name,const uint8_t* data,uint32_t size){
         message="Imported "+std::to_string(files.size())+" of "+std::to_string(required.size())+" required files.";return 1;
     }catch(const std::exception& e){message=e.what();return 0;}
 }
-int melee_web_game_launch(){
+int melee_web_game_set_render_scale(int scale){
+    if(scale!=1&&scale!=2){message="Render scale must be 1 or 2.";return 0;}
+    render_scale=scale;return 1;
+}
+static int launch_game(bool fixture){
     try{
         if(!ready)throw std::runtime_error("WebGPU is still initializing.");
-        close_game();world=std::make_unique<GameplayWorld>(files);char error[256];
+        close_game();
+        if(!SDL_SetWindowSize(runtime_window,640*render_scale,480*render_scale))throw std::runtime_error(SDL_GetError());
+        world=std::make_unique<GameplayWorld>(files);char error[256];
         audio_bank=std::make_unique<GameplayAudioBank>(files.at("smash2.sem"),
             std::vector<std::span<const uint8_t>>{files.at("main.ssm"),files.at("mario.ssm")},files.at("dsp_coef.bin"));
         require(melee_web_audio_enable_effects(audio_bank->get(),error,sizeof(error)),error);
         music=std::make_unique<GameplayAudioStream>(audio_bank->get(),"/audio/sp_end.hps",files.at("sp_end.hps"));
         require(lbAudioAx_80023F28(78)==0,"Original Final Destination music did not start");
-        MeleeWebPlayerSettings players[2]={{0,0,4,{-20,world->floor_height(-20)+1,0},1},{1,1,4,{20,world->floor_height(20)+1,0},-1}};
+        MeleeWebPlayerSettings players[2]{};
+        for(unsigned i=0;i<2;++i){
+            auto position=world->player_spawn(i);
+            if(fixture){position={i?20.0f:-20.0f,0,0};position[1]=world->floor_height(position[0])+1;}
+            players[i]={i,i,4,{position[0],position[1],position[2]},position[0]<0?1.0f:-1.0f};
+        }
         match=melee_web_match_begin_players(players,2,70,0x13579bdf,world->collision(),error,sizeof(error));require(match!=nullptr,error);
         require(melee_web_match_create_fighters(match,error,sizeof(error)),error);
         MeleeWebRenderSettings settings{640,480,{0,25,180},{0,15,0},30,1,1000,(uint64_t(1)<<5)|(uint64_t(1)<<3)};
@@ -221,6 +236,8 @@ int melee_web_game_launch(){
         running=true;simulation_clock.reset();message="Original two-player runtime running.";return 1;
     }catch(const std::exception& e){message=e.what();running=false;return 0;}
 }
+int melee_web_game_launch(){return launch_game(false);}
+int melee_web_game_launch_fixture(){return launch_game(true);}
 int melee_web_game_unload(){
     try{close_game();message="Unloaded. Imported assets are retained for restart.";return 1;}
     catch(const std::exception& e){message=e.what();return 0;}
@@ -228,6 +245,10 @@ int melee_web_game_unload(){
 void melee_web_game_pause(int paused){if(finished)return;running=match&&render&&!paused;simulation_clock.reset();message=running?"Original two-player runtime running.":"Paused.";}
 const char* melee_web_game_message(){return message.c_str();}
 int melee_web_game_running(){return running;}
+int melee_web_game_cache_idle(){
+    const AuroraStats* stats=aurora_get_stats();
+    return match==nullptr&&stats!=nullptr&&stats->queuedPipelines==0;
+}
 const char* melee_web_game_stats(){
     static char output[1024];MeleeWebMatchStats players[2]{};char error[256];
     if(!match)return "{\"loaded\":false}";
@@ -241,10 +262,11 @@ const char* melee_web_game_stats(){
 }
 int main(int argc,char** argv){
     AuroraConfig config{};config.appName="Melee source runtime";config.desiredBackend=BACKEND_WEBGPU;
+    config.cachePath="/melee-render-cache";
     config.windowWidth=640;config.windowHeight=480;config.msaa=1;config.vsync=true;
     config.logCallback=log_message;config.logLevel=LOG_INFO;
     if(!SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT,"#canvas"))return 1;
-    aurora_initialize(argc,argv,&config);GXInit(fifo_buffer,sizeof(fifo_buffer));
+    runtime_window=aurora_initialize(argc,argv,&config).window;GXInit(fifo_buffer,sizeof(fifo_buffer));
     if(!melee_web_input_startup())return 1;
     ready=true;emscripten_set_main_loop(tick,0,1);return 0;
 }

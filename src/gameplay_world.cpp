@@ -266,6 +266,12 @@ float GameplayWorld::floor_height(float x)const{
     check(melee_web_collision_floor(storage_->collision,storage_->floor_start,x,20,&floor,error,sizeof(error)),error);
     if(floor.line<0)throw DatError("No source floor at requested position");return 20+floor.displacement_y;
 }
+std::array<float, 3> GameplayWorld::player_spawn(unsigned slot)const{
+    float position[3];
+    char error[256];
+    check(melee_web_stage_numeric_spawn(storage_->numeric,slot,position,error,sizeof(error)),error);
+    return {position[0],position[1],position[2]};
+}
 uint32_t GameplayWorld::unresolved_fighter_fields()const{return storage_->fighter?storage_->fighter->unresolved_fields():0;}
 void GameplayWorld::verify_immutable_archives()const{storage_->verify();}
 }

@@ -5,6 +5,8 @@
 #include <fstream>
 #include <iterator>
 #include <iostream>
+#include <cmath>
+#include <string>
 using namespace melee_web;
 static void put(std::vector<uint8_t>& b,uint32_t o,uint32_t v){for(int i=0;i<4;i++)b[32+o+i]=v>>(24-8*i);}
 int main(int argc,char** argv){
@@ -27,6 +29,14 @@ int main(int argc,char** argv){
   if(!(cam[0]==-170&&cam[1]==170&&cam[2]==102&&cam[3]==-92&&
        blast[0]==-246&&blast[1]==246&&blast[2]==176&&blast[3]==-152&&
        offset[0]==0&&offset[1]==12))return 3;
+  float spawns[4][3];
+  for(unsigned slot=0;slot<4;slot++){
+   if(!melee_web_stage_numeric_spawn(context,slot,spawns[slot],error,sizeof(error)))return 7;
+   for(float value:spawns[slot])if(!std::isfinite(value))return 8;
+  }
+  if(!(spawns[0][0]==-60&&spawns[1][0]==60&&spawns[0][0]<spawns[1][0]))return 9;
+  if(melee_web_stage_numeric_spawn(context,4,spawns[0],error,sizeof(error)))return 10;
+  if(std::string(error).find("0..3")==std::string::npos)return 11;
   if(!melee_web_stage_numeric_end(context,error,sizeof(error)))throw std::runtime_error(error);
   if(melee_web_ground_data_publish(previous)!=param)return 4;
   if(melee_web_gameplay_stats().objects!=0)return 5;

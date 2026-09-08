@@ -12,3 +12,22 @@ assert.equal(q.push(new Float32Array([NaN,0])),false);q.reset();assert.equal(q.a
 assert.throws(()=>q.push(new Float32Array([NaN,0])),RangeError);
 q.push(source);q.consume(l,r);q.push(source.subarray(0,256));q.consume(l,r);assert.deepEqual(Array.from(l),Array.from(source.filter((_,i)=>i>=256&&i%2===0)));
 console.log('Audio transport partitioning, stereo order, priming, wraparound and explicit underrun/overflow passed');
+
+// A delayed presentation batch defers two source ticks until the next callback.
+// AudioWorklet output continues every 4 ms while the browser callback is late.
+function presentationGap(prefill){
+  const queue=prefill===undefined?new AudioRing():new AudioRing(16384,prefill);
+  const left=new Float32Array(128),right=new Float32Array(128);
+  let tick=0,phase=0;
+  for(let ms=0;ms<1000;ms+=4){
+    while(tick<60&&(tick===30||tick===31?32:tick)*1000/60<=ms){
+      phase+=32000;const frames=Math.floor(phase/60);phase%=60;
+      assert(queue.push(new Float32Array(frames*2).fill(0.25)));
+      ++tick;
+    }
+    queue.consume(left,right);
+  }
+  return queue.underruns;
+}
+assert(presentationGap(1024)>0,'Fixture must reproduce the former buffer shortfall');
+assert.equal(presentationGap(),0,'Default buffer must survive one delayed presentation callback');

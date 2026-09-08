@@ -9,10 +9,13 @@ remains the goal; menus, other matchups and modes follow this initial match gate
 
 **The complete playable-match milestone is still open.** The browser currently
 runs two original Mario instances on Final Destination, with source controller
-processing, camera, stage rendering, stock/respawn logic and audio transport.
-Rendered ground/air fireballs now survive impact, restart and unload. This is an
-integration build: full rendered stage cycles, broader rendered combat, sustained frame timing,
-audible output and physical controllers still need acceptance checks.
+processing, camera, authored stage markers, stage/item rendering, stock/respawn
+logic, match outcome and audio transport. Ground/air fireballs survive impact,
+restart and unload. An optional IDBFS renderer cache saves compiled pipelines
+after native unload and restores them on the next page startup without
+persisting game assets. Cold first-use stalls, broader
+rendered combat, audible output, physical controllers and full original-game
+equivalence still need acceptance checks.
 
 A scoped 102-frame original-game jump comparison passes; this does not establish
 full-match equivalence. See [current evidence](STATUS.md),
@@ -85,9 +88,10 @@ uses original HSD evaluation at 60 Hz; gameplay commands and transitions are
 not running.
 
 For Final Destination, extract `GrNLa.dat`, load it as the model, select stage
-entry 3 and **Opaque only**. The viewer renders all 13 opaque meshes from that
-entry and reports 13 omitted translucent meshes. It uses an inspection camera
-and lights; stage animation, effects, collision and callbacks remain unapplied.
+entry 3 and **Opaque only**. The static viewer renders all 13 opaque meshes from
+that entry and reports 13 omitted translucent meshes. It uses an inspection
+camera and lights; gameplay stage animation, effects, collision and callbacks
+belong to the separate runtime path.
 The batch checker supports the same explicit selection:
 
 ```sh

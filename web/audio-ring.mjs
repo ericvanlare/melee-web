@@ -1,6 +1,8 @@
 // Fixed-capacity stereo transport; simulation owns the source audio clock.
+// Three source chunks prime about 48 ms at 32 kHz, providing one extra 60 Hz
+// tick of headroom for browser presentation jitter without resampling PCM.
 export class AudioRing {
-  constructor(capacity = 16384, prefill = 1024) {
+  constructor(capacity = 16384, prefill = 1536) {
     if (!Number.isInteger(capacity) || capacity < 128 || !Number.isInteger(prefill) || prefill < 0 || prefill > capacity) throw new RangeError('Invalid audio queue bounds');
     this.capacity = capacity; this.prefill = prefill;
     this.data = new Float32Array(capacity * 2); this.underruns = 0; this.overflows = 0;

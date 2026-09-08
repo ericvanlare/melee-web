@@ -14,6 +14,16 @@ translation leaves small floating-point position differences (up to roughly
 The comparison excludes idle animation phase, camera, horizontal movement,
 collision at edges, damage and audio. It must not stand in for an FD match oracle.
 
+## Final Destination spawn evidence
+
+The normal browser launch now reads the authored FD player markers through the
+original Ground marker API. The source positions are `(-60, 10, 0)` for slot 0
+and `(60, 10, 0)` for slot 1; the runtime derives the default facing from each
+marker's x sign. Close-range `+/-20` positions remain explicit fixtures used by
+combat and diagnostic traces. This verifies source stage-point selection for
+launch, while the complete original `gm_16AE` match setup remains outside the
+scope of the movement comparison.
+
 ## Provenance and capture
 
 - Original: owned GALE01 revision2, main.dol SHA1
@@ -111,3 +121,19 @@ removes the artificial floor regrab without changing gameplay collision code.
 The regression now checks continuous run-off and the first stock loss at this
 initial position, plus a separate post-respawn running scenario. These checks
 establish the observed behavior, not bitwise equality of every fighter field.
+
+## Current browser runtime evidence
+
+The latest saved-cache renderer run, captured in Chrome 152's IAB at DPR1,
+completes a 14,452-tick full FD cycle at
+1280×960 with a 30.50 ms worst interval, no interval above 33.3 ms and no audio
+underruns. A separate saved-cache raw-input stock run completes 1,985 ticks,
+three respawns, four losses and the normal P2 winner with a 22.23 ms worst
+interval, no interval above 33.3 ms and no audio underruns. The renderer-only
+`/melee-render-cache` restores 81 cached pipelines before assets on the next
+page startup and persists no game files. Browser audio uses a 1536-sample
+prefill and per-frame transport gating; these runs had no underruns. Cold
+first-use stalls remain unresolved, and these warm browser runs do not establish
+full original-game equivalence, audible output or physical two-controller
+behavior. The selectable 2× SDL render scale remains available for
+scale-specific checks.

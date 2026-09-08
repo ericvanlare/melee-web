@@ -100,6 +100,16 @@ int melee_web_stage_numeric_bounds(MeleeWebStageNumeric* h,float camera[4],float
     if(!h||active!=h||!h->owner||!camera||!blast||!offset)return fail(e,n,"Stage numeric context is not live");
     memcpy(camera,&stage_info.cam_info.cam_bounds,16);memcpy(blast,&stage_info.blast_zone,16);offset[0]=stage_info.cam_info.cam_x_offset;offset[1]=stage_info.cam_info.cam_y_offset;if(e&&n)*e=0;return 1;
 }
+int melee_web_stage_numeric_spawn(MeleeWebStageNumeric* h,uint32_t slot,float position[3],char* e,size_t n){
+    if(!h||active!=h||!h->owner)return fail(e,n,"Stage numeric context is not live");
+    if(slot>3)return fail(e,n,"Player spawn marker slot must be 0..3");
+    if(!position)return fail(e,n,"Player spawn output is required");
+    Vec3 source;
+    if(!Ground_801C2D24((enum_t)slot,&source))return fail(e,n,"Original player spawn marker is unavailable");
+    if(!isfinite(source.x)||!isfinite(source.y)||!isfinite(source.z))return fail(e,n,"Original player spawn marker is nonfinite");
+    position[0]=source.x;position[1]=source.y;position[2]=source.z;
+    if(e&&n)*e=0;return 1;
+}
 int melee_web_stage_numeric_end(MeleeWebStageNumeric* h,char* e,size_t n){
     if(!h)return 1;if(active!=h)return fail(e,n,"Stage numeric scope is not active");
     stage_info=h->saved;active=NULL;if(h->owner)HSD_GObjPLink_80390228(h->owner);free(h);if(e&&n)*e=0;return 1;

@@ -15,6 +15,9 @@ void* melee_web_stage_markers_descriptor(MeleeWebStageMarkers*);
  * snapshot: close before removing any pre-existing stage resource owners. */
 MeleeWebStageNumeric* melee_web_stage_numeric_begin(MeleeWebStageMarkers*,char*,size_t);
 int melee_web_stage_numeric_bounds(MeleeWebStageNumeric*,float camera[4],float blast[4],float offset[2],char*,size_t);
+/* Reads one of the four original player spawn markers while this numeric
+ * stage scope owns the published Ground marker table. */
+int melee_web_stage_numeric_spawn(MeleeWebStageNumeric*,uint32_t slot,float position[3],char*,size_t);
 int melee_web_stage_numeric_end(MeleeWebStageNumeric*,char*,size_t);
 #ifdef __cplusplus
 }

@@ -1,5 +1,6 @@
 #pragma once
 #include "gameplay_collision.h"
+#include <array>
 #include <map>
 #include <memory>
 #include <string>
@@ -22,6 +23,7 @@ public:
     void end_stage();
     MeleeWebCollision* collision() const;
     float floor_height(float x) const;
+    std::array<float, 3> player_spawn(unsigned slot) const;
     uint32_t unresolved_fighter_fields() const;
     void verify_immutable_archives() const;
 private:
