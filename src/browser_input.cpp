@@ -189,3 +189,21 @@ extern "C" void melee_web_input_shutdown(void)
     state = {};
     neutral_snapshot();
 }
+
+// Menu navigation reuses the same SDL/GameCube mapping as gameplay. Keyboard
+// focus/navigation stays in the DOM; only physical ports contribute here.
+extern "C" unsigned melee_web_input_menu_buttons(void)
+{
+    if (!state.active) return 0;
+    unsigned buttons = 0;
+    for (unsigned port = 0; port < 2; ++port) {
+        if (!(state.physical_mask & (1U << port)) || state.clamped[port].err != PAD_ERR_NONE) continue;
+        const auto& pad = state.clamped[port];
+        buttons |= pad.button;
+        if (pad.stickX < -40) buttons |= 1;
+        if (pad.stickX > 40) buttons |= 2;
+        if (pad.stickY < -40) buttons |= 4;
+        if (pad.stickY > 40) buttons |= 8;
+    }
+    return buttons;
+}

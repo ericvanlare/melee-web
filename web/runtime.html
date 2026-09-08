@@ -1,25 +1,34 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Melee source runtime</title>
 <style>
-:root{color-scheme:dark;font:15px system-ui;background:#10141e;color:#e7ebf4}body{max-width:1000px;margin:30px auto;padding:0 20px}h1{font-size:25px}p{line-height:1.5;color:#b9c4d6}button,input{font:inherit}button{padding:9px 16px;background:#29374b;border:1px solid #5a6c87;border-radius:5px;color:inherit;cursor:pointer}button:disabled{opacity:.45;cursor:default}.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:18px 0}canvas{display:block;width:100%;aspect-ratio:4/3;background:#10141e;outline:none;border:1px solid #3d4a60}canvas:focus{border-color:#80b8ff}pre{white-space:pre-wrap;overflow-wrap:anywhere;color:#9caec7;font:12px ui-monospace;max-height:180px;overflow:auto}#status{color:#e7ebf4}label{display:block}summary{cursor:pointer}
+:root{color-scheme:dark;font:15px system-ui;background:#10141e;color:#e7ebf4}body{max-width:1000px;margin:30px auto;padding:0 20px}h1{font-size:25px}p{line-height:1.5;color:#b9c4d6}button,input{font:inherit}button{padding:9px 16px;background:#29374b;border:1px solid #5a6c87;border-radius:5px;color:inherit;cursor:pointer}button:disabled{opacity:.45;cursor:default}.toolbar{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:18px 0}canvas{display:block;width:100%;aspect-ratio:4/3;background:#10141e;outline:none;box-shadow:0 0 0 1px #3d4a60}canvas:focus{box-shadow:0 0 0 1px #80b8ff}pre{white-space:pre-wrap;overflow-wrap:anywhere;color:#9caec7;font:12px ui-monospace;max-height:180px;overflow:auto}#status{color:#e7ebf4}label{display:block}summary{cursor:pointer}
+
+[hidden]{display:none!important}.menu-background{position:absolute;left:-10000px;width:640px;visibility:hidden;pointer-events:none}.menu-shell{border:1px solid #35455e;border-radius:16px;padding:24px;background:linear-gradient(135deg,#17233a,#141923);margin:20px 0}.menu-heading span{font-size:12px;letter-spacing:.18em;color:#9cb5de}.menu-heading h2{font-size:30px;margin:8px 0}.player-slots{display:flex;gap:12px}.player-slots button{flex:1;font-size:20px;border-top:4px solid #e55c6e}.player-slots button+button{border-top-color:#639afa}.player-slots [aria-pressed=true]{background:#344b6c}.roster{display:grid;grid-template-columns:repeat(auto-fit,minmax(90px,1fr));gap:8px;max-height:260px;overflow:auto}.fighter-card{min-height:64px;text-align:left;padding:8px;font-size:13px}.fighter-card strong,.fighter-card span{display:block}.fighter-card span{font-size:11px;margin-top:5px;color:#a8b8cf}.fighter-card.available{border-color:#eac969;background:#51432c}.fighter-card:disabled{opacity:.55}.menu-actions{display:flex;gap:16px;align-items:center;justify-content:space-between;margin-top:22px}.menu-actions input{width:60px;padding:8px}.primary{background:#bd3e65;border-color:#e67b9a}.stage-card{display:flex;flex-direction:column;gap:14px;align-items:center;width:100%;max-width:600px;margin:auto;padding:24px;background:radial-gradient(ellipse at center,#302458,#101522);border-color:#bf89ef}.stage-card strong{font-size:26px}.stage-art{display:block;width:90%;height:100px;background:linear-gradient(165deg,#73549e,#da77e4 48%,#36364c 50%,#171827);clip-path:polygon(14% 25%,86% 25%,100% 50%,82% 68%,67% 100%,33% 100%,18% 68%,0 50%)}button:focus-visible,input:focus-visible{outline:3px solid #f4d982;outline-offset:3px}
 </style></head><body>
-<h1>Melee source runtime</h1>
+<h1>Melee Web</h1>
 <p>Two-player stock-match integration on Final Destination. Original-game accuracy and hardware acceptance checks are still in progress.</p>
 <label>Melee disc image <input id="disc" type="file" accept=".iso,.gcm,.ciso"></label>
 <p>Choose your USA revision 1.02 ISO, GCM, or CISO. Game data is read locally and stays in this tab.</p>
 <p id="import-status" role="status"></p>
-<div class="toolbar"><label>Render scale <select id="render-scale"><option value="1">1×</option><option value="2">2×</option></select></label><button id="launch" disabled>Launch / restart</button><button id="pause" disabled>Pause</button><button id="unload" disabled>Unload</button><label><input id="keyboard" type="checkbox"> Keyboard for player 1</label></div>
-<p id="status" role="status">Initializing WebGPU…</p>
+<div class="toolbar"><label>Render resolution <select id="render-scale"><option value="1">640 × 480 (1×)</option><option value="2">1280 × 960 (2×)</option></select></label><label><input id="keyboard" type="checkbox" checked> Keyboard for player 1</label></div>
+<div id="match-menu" class="menu-shell">Loading menus…</div>
+<section id="game-panel" class="menu-background" inert>
+<div class="toolbar"><button id="launch" disabled>Restart match</button><button id="pause" disabled>Pause</button><button id="return-css">Character select</button></div>
+
 <canvas id="canvas" width="640" height="480" tabindex="0" aria-label="Original Melee runtime"></canvas>
 <p>Click the canvas for input. WASD: stick · J/K/U/I: A/B/X/Y · Q/E: L/R · O: Z · Enter: Start. A connected controller takes priority; player 2 uses controller port 2.</p>
 <p id="score" aria-live="off"></p>
+</section>
+<p id="status" role="status">Initializing WebGPU…</p>
 <p id="metrics">No match loaded.</p>
 <p id="audio-metrics">Audio output is not initialized.</p>
-<details><summary>Runtime diagnostics</summary><label>Developer: extracted files <input id="files" type="file" webkitdirectory multiple></label><label>Special move <select id="combat-kind"><option value="0">Fireball</option><option value="1">Cape</option><option value="2">Super Jump Punch</option><option value="3">Mario Tornado</option></select></label><button id="combat-check" disabled>Restart + combat check</button><p>Diagnostic only: restarts this match, then supplies ground and air special inputs for four to eight seconds.</p><button id="stock-check" disabled>Restart + stock check</button><p>Diagnostic only: uses movement and jump inputs to test four stock losses and three respawns, then the original match outcome.</p><label>Test delay <select id="delay-ms"><option value="200">200 ms</option><option value="800">800 ms</option></select></label><button id="delay-check">Inject frame delay</button><p>Diagnostic only: blocks one browser callback to check bounded recovery. The delay remains counted in timing and audio diagnostics.</p><label><input id="gpu-probe" type="checkbox"> Sample queue completion latency</label><p>Diagnostic only: includes GPU queue work and browser callback scheduling; it is not pure GPU execution time.</p><pre id="gpu-metrics">Queue completion sampling is off.</pre><pre id="render-state"></pre><pre id="cache-status">Render cache is initializing.</pre><pre id="environment"></pre><pre id="timing-events"></pre><pre id="state"></pre><pre id="input-state"></pre><pre id="log"></pre></details>
+<details id="diagnostics"><summary>Runtime diagnostics</summary><button id="unload" disabled>Unload match</button><pre id="last-match"></pre><label>Developer: extracted files <input id="files" type="file" webkitdirectory multiple></label><label>Special move <select id="combat-kind"><option value="0">Fireball</option><option value="1">Cape</option><option value="2">Super Jump Punch</option><option value="3">Mario Tornado</option></select></label><button id="combat-check" disabled>Restart + combat check</button><p>Diagnostic only: restarts this match, then supplies ground and air special inputs for four to eight seconds.</p><button id="stock-check" disabled>Restart + stock check</button><p>Diagnostic only: uses movement and jump inputs to test four stock losses and three respawns, then the original match outcome.</p><label>Test delay <select id="delay-ms"><option value="200">200 ms</option><option value="800">800 ms</option></select></label><button id="delay-check">Inject frame delay</button><p>Diagnostic only: blocks one browser callback to check bounded recovery. The delay remains counted in timing and audio diagnostics.</p><label><input id="gpu-probe" type="checkbox"> Sample queue completion latency</label><p>Diagnostic only: includes GPU queue work and browser callback scheduling; it is not pure GPU execution time.</p><pre id="gpu-metrics">Queue completion sampling is off.</pre><pre id="render-state"></pre><pre id="cache-status">Render cache is initializing.</pre><pre id="environment"></pre><pre id="timing-events"></pre><pre id="state"></pre><pre id="input-state"></pre><pre id="log"></pre></details>
 <script src="runtime-cache.js"></script>
 <script>
 const $=id=>document.getElementById(id),required=['PlCo.dat','PlMr.dat','PlMrNr.dat','PlMrAJ.dat','GrNLa.dat','ItCo.usd','EfMrData.dat','EfCoData.dat','PdPm.dat','sislib_font.bin','smash2.sem','main.ssm','mario.ssm','dsp_coef.bin','sp_end.hps'];
 let ready=false,importing=false,bundleReady=false,fatal=false,last=0,intervals=[],costs=[],wasRunning=false,activeFrames=0,worstInterval=0,longFrames=0,previousCost=0,timingEvents=[],renderTiming=null,previousRenderTiming=null,longTasks=[];
+let menu=null,rendererSize='pending';
+window.runtimeRendererSize=(width,height)=>{rendererSize=`${width}×${height}`;};
 let gpuProbeEpoch=1,gpuProbeSamples=[];
 window.runtimeGPUProbeRequest=()=>!fatal&&wasRunning&&$('gpu-probe').checked?gpuProbeEpoch:0;
 window.runtimeGPUProbeResult=sample=>{
@@ -43,7 +52,7 @@ window.runtimeServiceCommands=()=>{
   // lifetime-changing exports, once all source callbacks have returned.
   const commands=pendingCommands.splice(0);
   for(const command of commands){try{command.resolve(command.run());}catch(error){command.reject(error);}}
-  if(inputDirty){inputDirty=false;Module._melee_web_input_set_keyboard($('keyboard').checked?1:0);Module._melee_web_input_set_activity(document.hasFocus()&&document.activeElement===$('canvas')?1:0,!document.hidden?1:0);}
+  if(inputDirty){inputDirty=false;Module._melee_web_input_set_keyboard($('keyboard').checked?1:0);Module._melee_web_input_set_activity(document.hasFocus()&&(document.activeElement===$('canvas')||$('match-menu').contains(document.activeElement))?1:0,!document.hidden?1:0);}
 };
 async function prepareAudio(){
   if(!audioContext){
@@ -59,17 +68,18 @@ async function prepareAudio(){
 function syncAudio(enabled){enabled=enabled&&!audioCatchingUp;if(audioEnabled===enabled)return;audioEnabled=enabled;audioNode?.port.postMessage({type:'state',enabled});}
 window.runtimeAudioCatchup=active=>{audioCatchingUp=!!active;syncAudio(ready&&!fatal&&!!Module._melee_web_game_running()&&!document.hidden);};
 window.runtimeAudio=pcm=>{if(audioNode&&audioEnabled)audioNode.port.postMessage({type:'pcm',pcm},[pcm.buffer]);};
-function stopRuntime(reason){fatal=true;for(const command of pendingCommands.splice(0))command.reject(Error(reason));syncAudio(false);$('status').textContent='Runtime stopped: '+reason;for(const id of ['launch','pause','unload','files','disc','combat-check','stock-check'])$(id).disabled=true;log(reason);}
+function stopRuntime(reason){fatal=true;menu?.setEnabled(false);$('return-css').disabled=true;for(const command of pendingCommands.splice(0))command.reject(Error(reason));syncAudio(false);$('status').textContent='Runtime stopped: '+reason;for(const id of ['launch','pause','unload','files','disc','combat-check','stock-check'])$(id).disabled=true;log(reason);}
 window.addEventListener('error',e=>stopRuntime(e.error?.stack||e.message));
 window.addEventListener('unhandledrejection',e=>stopRuntime(e.reason?.stack||String(e.reason)));
 setInterval(()=>{$('state').dataset.boundary=window.runtimeBoundary||'startup';$('state').title='Runtime boundary: '+(window.runtimeBoundary||'startup');},1000);
 const log=text=>{$('log').textContent=($('log').textContent+'\n'+text).slice(-24000);};
-function update(){if(!ready||fatal)return;syncAudio(!!Module._melee_web_game_running()&&!document.hidden);$('status').textContent=Module.UTF8ToString(Module._melee_web_game_message());const state=Module.UTF8ToString(Module._melee_web_game_stats());$('state').textContent=state;$('input-state').textContent=Module.UTF8ToString(Module._melee_web_input_message());const data=JSON.parse(state);$('score').textContent=data.players?data.players.map((p,i)=>`P${i+1} Mario · ${Math.floor(p.percent)}% · ${p.stocks} stocks`).join('     |     '):'';$('pause').disabled=importing||!data.loaded||!!data.finished;$('pause').textContent=Module._melee_web_game_running()?'Pause':'Resume';}
+function update(){if(!ready||fatal)return;syncAudio(!!Module._melee_web_game_running()&&!document.hidden);$('status').textContent=Module.UTF8ToString(Module._melee_web_game_message());const state=Module.UTF8ToString(Module._melee_web_game_stats());$('state').textContent=state;if($('diagnostics').open)$('input-state').textContent=Module.UTF8ToString(Module._melee_web_input_message());const data=JSON.parse(state);$('score').textContent=data.players?data.players.map((p,i)=>`P${i+1} Mario · ${Math.floor(p.percent)}% · ${p.stocks} stocks`).join('     |     '):'';$('pause').disabled=importing||!data.loaded||!!data.finished;$('pause').textContent=Module._melee_web_game_running()?'Pause':'Resume';menu?.observeMatch(data);}
 function activity(){inputDirty=true;}
 function resetMetrics(){++gpuProbeEpoch;gpuProbeSamples=[];$('gpu-metrics').textContent=$('gpu-probe').checked?'Waiting for queue completion samples…':'Queue completion sampling is off.';last=0;intervals=[];costs=[];wasRunning=false;activeFrames=0;worstInterval=0;longFrames=0;previousCost=0;timingEvents=[];renderTiming=null;previousRenderTiming=null;longTasks=[];$('timing-events').textContent='No active-frame intervals above 33.3 ms.';
-  $('environment').textContent=`${navigator.userAgent}\nCanvas ${$('canvas').width}×${$('canvas').height}; device pixel ratio ${window.devicePixelRatio}`;
+  $('environment').textContent=`${navigator.userAgent}\nInternal render ${rendererSize}; canvas ${$('canvas').width}×${$('canvas').height}; device pixel ratio ${window.devicePixelRatio}`;
 }
 window.runtimeFrame=(frames,now,cost)=>{
+  if(ready&&menu)menu.pollButtons(Module._melee_web_input_menu_buttons());
   if(wasRunning&&last&&now>=last){
     const interval=now-last;intervals.push(interval);costs.push(cost);++activeFrames;
     worstInterval=Math.max(worstInterval,interval);
@@ -78,13 +88,13 @@ window.runtimeFrame=(frames,now,cost)=>{
       const snapshot=JSON.parse(Module.UTF8ToString(Module._melee_web_game_stats()));
       timingEvents.push({tick:snapshot.ticks,interval_ms:+interval.toFixed(3),previous_frame_work_ms:+previousCost.toFixed(3),current_frame_work_ms:+cost.toFixed(3),previous_render:previousRenderTiming,current_render:renderTiming,recent_queue_completions:gpuProbeSamples.slice(-3),recent_long_tasks:longTasks.filter(task=>task.start_ms+task.duration_ms>=last-100),visible:!document.hidden,focused:document.hasFocus()});
       if(timingEvents.length>50)timingEvents.shift();
-      $('timing-events').textContent=timingEvents.map(event=>JSON.stringify(event)).join('\n');
+      // Keep the stall callback bounded; format history only in the open diagnostics panel.
     }
     if(intervals.length>600){intervals.shift();costs.shift();}
   }
   previousRenderTiming=renderTiming;previousCost=cost;last=now;wasRunning=ready&&!fatal&&!!Module._melee_web_game_running()&&!document.hidden;
   syncAudio(wasRunning);
-  if(frames%15===0){update();if(ready)$('environment').textContent=`${navigator.userAgent}\nCanvas ${$('canvas').width}×${$('canvas').height}; device pixel ratio ${window.devicePixelRatio}`;$('render-state').textContent=`Pipelines created this page: ${createdPipelineCount} · last draw calls: ${renderTiming?.draw_calls??0} · last texture upload: ${renderTiming?.texture_upload_bytes??0} bytes`;const p95=a=>a.length?[...a].sort((a,b)=>a-b)[Math.floor((a.length-1)*.95)].toFixed(2):'—';
+  if(frames%15===0){update();if($('diagnostics').open)$('timing-events').textContent=timingEvents.length?timingEvents.map(event=>JSON.stringify(event)).join('\n'):'No active-frame intervals above 33.3 ms.';if(ready)$('environment').textContent=`${navigator.userAgent}\nInternal render ${rendererSize}; canvas ${$('canvas').width}×${$('canvas').height}; device pixel ratio ${window.devicePixelRatio}`;$('render-state').textContent=`Pipelines created this page: ${createdPipelineCount} · last draw calls: ${renderTiming?.draw_calls??0} · last texture upload: ${renderTiming?.texture_upload_bytes??0} bytes`;const p95=a=>a.length?[...a].sort((a,b)=>a-b)[Math.floor((a.length-1)*.95)].toFixed(2):'—';
     $('metrics').textContent=`Active frames ${activeFrames} · recent interval p95 ${p95(intervals)} ms · worst since launch ${worstInterval.toFixed(2)} ms · >33.3 ms ${longFrames} · recent CPU p95 ${p95(costs)} ms · @MELEE_WEB_BUILD_LABEL@`;
   }
 };
@@ -103,6 +113,8 @@ function setImportControls(){
   const blocked=!ready||fatal||importing;
   for(const id of ['files','disc','render-scale'])$(id).disabled=blocked;
   for(const id of ['launch','combat-check','stock-check'])$(id).disabled=blocked||!bundleReady;
+  menu?.setEnabled(!blocked&&bundleReady);
+  $('return-css').disabled=blocked;
   if(blocked)$('pause').disabled=$('unload').disabled=true;
 }
 async function importBundle(read){
@@ -110,13 +122,14 @@ async function importBundle(read){
   importing=true;bundleReady=false;setImportControls();
   try{
     if(!await unloadAndSave())throw Error(Module.UTF8ToString(Module._melee_web_game_message()));
+    await menuReady;menu.reset();
     const selected=await read();
     for(const name of required)if(!selected.has(name))throw Error('Missing game data: '+name);
     for(let i=0;i<required.length;i++){
       $('import-status').textContent=`Preparing game data ${i+1} of ${required.length}…`;
       await put(required[i],selected.get(required[i]));
     }
-    bundleReady=true;$('import-status').textContent='Ready. Select Launch / restart to play.';
+    bundleReady=true;$('import-status').textContent='Disc loaded. Choose your fighters below.';
   }catch(error){$('import-status').textContent='Import failed: '+error.message;}
   finally{importing=false;setImportControls();update();}
 }
@@ -141,31 +154,46 @@ $('files').onchange=()=>importBundle(async()=>{
   }
   return selected;
 });
-async function launchMatch(fixture=false){
+async function launchMatch(fixture=false,stocks=4){
   if(!ready||fatal||importing||!bundleReady)return false;
   importing=true;setImportControls();
   try{
     await prepareAudio();
-    const launched=await atBoundary(()=>{syncAudio(false);return Module._melee_web_game_set_render_scale(Number($('render-scale').value))&&(fixture?Module._melee_web_game_launch_fixture():Module._melee_web_game_launch());});
+    const launched=await atBoundary(()=>{syncAudio(false);return Module._melee_web_game_set_stocks(stocks)&&Module._melee_web_game_set_render_scale(Number($('render-scale').value))&&(fixture?Module._melee_web_game_launch_fixture():Module._melee_web_game_launch());});
     if(!launched)return false;
     resetMetrics();$('unload').disabled=false;$('canvas').focus();activity();return true;
   }catch(error){$('import-status').textContent=error.message;return false;}
   finally{importing=false;setImportControls();update();}
 }
-$('launch').onclick=()=>launchMatch();
-$('combat-check').onclick=async()=>{if(await launchMatch(true))await atBoundary(()=>Module._melee_web_game_combat_check(Number($('combat-kind').value)));update();};
-$('stock-check').onclick=async()=>{if(await launchMatch(true))await atBoundary(()=>Module._melee_web_game_stock_check());update();};
+$('launch').onclick=()=>menu?.startDiagnostic('restart');
+$('combat-check').onclick=()=>menu?.startDiagnostic('combat');
+$('stock-check').onclick=()=>menu?.startDiagnostic('stock');
+$('return-css').onclick=()=>menu?.returnToCharacters();
 $('pause').onclick=async()=>{await atBoundary(()=>{Module._melee_web_game_pause(Module._melee_web_game_running()?1:0);last=0;wasRunning=false;});if(Module._melee_web_game_running())$('canvas').focus();activity();update();};
-$('unload').onclick=async()=>{
-  if(!ready||fatal||importing)return;importing=true;setImportControls();
-  try{await unloadAndSave();}catch(error){$('import-status').textContent=error.message;}
-  finally{importing=false;setImportControls();$('unload').disabled=true;update();}
-};
+$('unload').onclick=()=>menu?.returnToCharacters();
 $('delay-check').onclick=()=>{if(!ready||fatal||!Module._melee_web_game_running())return;atBoundary(()=>{const ms=Number($('delay-ms').value);if(ms!==200&&ms!==800)throw Error('Unsupported test delay');const end=performance.now()+ms;while(performance.now()<end){};}).catch(error=>log(error.message));};
 $('keyboard').onchange=activity;
 $('canvas').addEventListener('pointerdown',()=>{$('canvas').focus();activity();});
 for(const event of ['focus','blur']){window.addEventListener(event,activity);$('canvas').addEventListener(event,activity);}document.addEventListener('visibilitychange',()=>{activity();last=0;wasRunning=false;update();if(document.hidden)audioContext?.suspend();else if(audioEnabled)audioContext?.resume().catch(error=>log(error.message));});
 var Module={canvas:$('canvas'),print:log,printErr:log,onRuntimeInitialized(){ready=true;setImportControls();activity();update();},onAbort:stopRuntime};
+const menuReady=import('./match-menu.mjs').then(({mountMatchMenu})=>{
+  menu=mountMatchMenu({root:$('match-menu'),gamePanel:$('game-panel'),
+    onPhase:phase=>{activity();if(phase==='playing')$('canvas').focus();},
+    launch:async(snapshot,options)=>{
+      if(snapshot.players.some(p=>p.characterId!=='mario')||snapshot.stage.id!=='final-destination')throw Error('This runtime supports Mario and Final Destination only.');
+      const fixture=options.diagnostic==='stock'||options.diagnostic==='combat';
+      if(!await launchMatch(fixture,snapshot.stocks))return false;
+      if(options.diagnostic==='stock')await atBoundary(()=>Module._melee_web_game_stock_check());
+      if(options.diagnostic==='combat')await atBoundary(()=>Module._melee_web_game_combat_check(Number($('combat-kind').value)));
+      return true;
+    },
+    unload:async()=>{
+      importing=true;setImportControls();
+      try{return await unloadAndSave();}
+      finally{importing=false;setImportControls();update();}
+    },
+  });setImportControls();
+}).catch(error=>{stopRuntime(error.message);throw error;});
 setImportControls();
 installRuntimeCache(Module,report=>{$('cache-status').textContent=report.message;});
 </script><script src="gameplay_browser.js"></script></body></html>

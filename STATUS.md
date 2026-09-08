@@ -14,6 +14,30 @@ the reference machine. The smaller gates below are checkpoints, not completion.
 
 ## Active integration
 
+- Temporary browser selection scaffolding now exercises character selection →
+  stage selection → original stock match → character selection, without a results
+  screen. This is **not the original in-game CSS/SSS** and will be removed when
+  those scenes, assets and behavior are ported. All 26 source character entries
+  are unlocked; only Mario is available, with FD as the only stage. An immutable
+  configuration boundary separates unlocks, availability and original source IDs.
+  Real-browser checks passed one-stock launch, selection preservation, invalid
+  stock rejection, stage back-navigation and repeated automatic outcome returns.
+  The original stock diagnostic reached 1,985 ticks, three respawns and P2 winner
+  on both cycles. Physical menu/controller acceptance is still pending.
+
+- Render scale now controls the internal framebuffer through Aurora's VI API,
+  independently of Retina presentation density. The former 1× window setting
+  still incurred approximately 1280×960 internal rendering on this display;
+  explicit 1× now reports 640×480 and 2× reports 1280×960. This reduces default
+  pixel workload without changing the 60 Hz simulation. Long-frame diagnostics
+  also defer formatting their history until the diagnostics panel is open.
+  A warm 1× stock cycle measured 17.68 ms worst interval, zero intervals above
+  33.3 ms and zero audio underruns. A final exact-2× stock cycle measured
+  17.84 ms worst with zero long frames or underruns. These short warm runs do not
+  establish a rendering-speed comparison. This does not resolve the user's reported
+  175.14 ms worst interval / seven long frames in 3,207 frames, nor establish
+  cold-cache performance. All 238 regression tests and the Release build pass.
+
 - A fresh-origin stock run without persisted application pipelines passed at
   32.46 ms worst interval with no audio underruns; Cape, Super Jump Punch and
   Tornado also stayed below 33.3 ms. The browser driver cache was not reset.

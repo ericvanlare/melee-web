@@ -25,7 +25,16 @@ full-match equivalence. See [current evidence](STATUS.md),
 ## Play the current match
 
 Open `runtime.html` on the local build server and choose your own unmodified
-USA revision 1.02 Melee ISO, GCM, or CISO. Select **Launch / restart** after import.
+USA revision 1.02 Melee ISO, GCM, or CISO. Choose fighters and stocks, select
+**Choose stage**, then **Final Destination** to start. A finished match returns
+directly to character select; **Character select** also leaves a match early.
+Selections survive each return. These browser menus are temporary, disposable
+test scaffolding around the original match. They will be removed when the original in-game CSS and SSS
+scenes, assets, and behavior are ported; they do not fulfill menu accuracy.
+All roster entries are unlocked, with availability tracked separately: Mario
+and Final Destination are currently playable. Stocks range from 1 to 99.
+Render resolution controls the internal framebuffer: 1× is 640×480 and 2× is
+1280×960, independently of the display's pixel density.
 The browser reads only the required disc ranges; game data stays in the tab and
 is neither uploaded nor persisted. RVZ is not supported. Extracted-folder loading
 remains available under Runtime diagnostics for development.

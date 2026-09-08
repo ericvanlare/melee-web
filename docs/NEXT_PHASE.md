@@ -19,10 +19,20 @@ controllers, audible output, and cold and warm performance.
    keyboard and physical controllers. Preserve original-game trace comparisons;
    successful rendering or average FPS does not establish gameplay equivalence.
 
-After this cycle, build Mario-only character selection → FD-only stage selection
-→ stock match → return, initially without the full rules menu. Use shared original
-menu and roster interfaces. Falco is the first planned roster expansion after
-that flow and the core loop are stable.
+The first browser character selection → stage selection → stock match → character
+selection loop is implemented alongside performance work. It deliberately uses
+HTML presentation around the original native match, without a results screen or
+full rules menu. This is disposable scaffolding, not the menu deliverable. Replace it with the
+original HSD CSS/SSS scenes, assets, and input behavior; remove the HTML selection
+UI after that transition. Do not invest in expanding its presentation.
+`web/match-flow.mjs` owns immutable selections, phase guards, original selection
+IDs, and separate unlock/availability flags. All characters are unlocked; only
+Mario and FD are available. `web/match-menu.mjs` owns presentation and delegates
+launch/unload through the native command boundary. Stocks range from 1 to 99.
+Selections survive return, and controller navigation reuses the gameplay PAD
+mapping with release required across screen transitions. Physical controller
+acceptance remains pending. Falco is the first planned roster expansion after
+this flow and the core loop are stable.
 
 ## Original menu integration boundary
 

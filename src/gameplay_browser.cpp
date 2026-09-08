@@ -12,6 +12,7 @@ extern "C" int lbAudioAx_80023F28(int);
 #include <aurora/gfx.h>
 #include <aurora/main.h>
 #include <dolphin/gx.h>
+#include <dolphin/vi.h>
 #include <emscripten.h>
 #include <SDL3/SDL_error.h>
 #include <SDL3/SDL_hints.h>
@@ -41,6 +42,7 @@ unsigned frames=0;
 unsigned catchup_frames=0,max_backlog_ticks=0;
 SDL_Window* runtime_window=nullptr;
 int render_scale=1;
+uint32_t selected_stocks=4;
 bool finished=false;
 int winner=-1;
 int combat_check=-1,combat_kind=0;
@@ -72,8 +74,12 @@ void tick(){
     double input_done=started,simulation_done=started,
            begin_done=started,draw_done=started,end_done=started;
     int began=0,drawn=1,timing_valid=1;
-    for(const AuroraEvent* event=aurora_update();event&&event->type!=AURORA_NONE;++event)
+    for(const AuroraEvent* event=aurora_update();event&&event->type!=AURORA_NONE;++event){
         if(event->type==AURORA_EXIT)exiting=true;
+        if(event->type==AURORA_WINDOW_RESIZED)EM_ASM({
+            if(window.runtimeRendererSize)window.runtimeRendererSize($0,$1);
+        },event->windowSize.fb_width,event->windowSize.fb_height);
+    }
     EM_ASM({window.runtimeBoundary="input";});
     const auto* input=melee_web_input_poll();
     input_done=emscripten_get_now();
@@ -226,6 +232,10 @@ int melee_web_game_file(const char* name,const uint8_t* data,uint32_t size){
         message="Imported "+std::to_string(files.size())+" of "+std::to_string(required.size())+" required files.";return 1;
     }catch(const std::exception& e){message=e.what();return 0;}
 }
+int melee_web_game_set_stocks(int stocks){
+    if(stocks<1||stocks>99){message="Stocks must be between 1 and 99.";return 0;}
+    selected_stocks=stocks;return 1;
+}
 int melee_web_game_set_render_scale(int scale){
     if(scale!=1&&scale!=2){message="Render scale must be 1 or 2.";return 0;}
     render_scale=scale;return 1;
@@ -234,7 +244,9 @@ static int launch_game(bool fixture){
     try{
         if(!ready)throw std::runtime_error("WebGPU is still initializing.");
         close_game();
-        if(!SDL_SetWindowSize(runtime_window,640*render_scale,480*render_scale))throw std::runtime_error(SDL_GetError());
+        // Scale the internal EFB, not the high-DPI presentation window. A 1x
+        // setting must not silently become 2x on a Retina display.
+        VISetFrameBufferScale(float(render_scale));
         world=std::make_unique<GameplayWorld>(files);char error[256];
         audio_bank=std::make_unique<GameplayAudioBank>(files.at("smash2.sem"),
             std::vector<std::span<const uint8_t>>{files.at("main.ssm"),files.at("mario.ssm")},files.at("dsp_coef.bin"));
@@ -245,7 +257,7 @@ static int launch_game(bool fixture){
         for(unsigned i=0;i<2;++i){
             auto position=world->player_spawn(i);
             if(fixture){position={i?20.0f:-20.0f,0,0};position[1]=world->floor_height(position[0])+1;}
-            players[i]={i,i,4,{position[0],position[1],position[2]},position[0]<0?1.0f:-1.0f};
+            players[i]={i,i,fixture?4U:selected_stocks,{position[0],position[1],position[2]},position[0]<0?1.0f:-1.0f};
         }
         match=melee_web_match_begin_players(players,2,70,0x13579bdf,world->collision(),error,sizeof(error));require(match!=nullptr,error);
         require(melee_web_match_create_fighters(match,error,sizeof(error)),error);

@@ -42,6 +42,8 @@ void melee_web_input_set_activity(int focused, int visible);
 void melee_web_input_set_keyboard(int enabled);
 /* Small JSON diagnostic. No physical-device or gameplay validation is implied. */
 const char* melee_web_input_message(void);
+/* Menu buttons from physical ports 0/1 using the same mapped PAD snapshot. */
+unsigned melee_web_input_menu_buttons(void);
 void melee_web_input_shutdown(void);
 
 #ifdef __cplusplus

@@ -110,7 +110,7 @@ target_link_options(gameplay_browser PRIVATE -sENVIRONMENT=web -sALLOW_MEMORY_GR
   -sINITIAL_MEMORY=134217728 -sSTACK_SIZE=8388608 -sEXIT_RUNTIME=0
   -sEXPORTED_RUNTIME_METHODS=FS,IDBFS,addRunDependency,removeRunDependency,HEAPU8,UTF8ToString
   -lidbfs.js
-  -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_melee_web_game_file,_melee_web_game_launch,_melee_web_game_launch_fixture,_melee_web_game_set_render_scale,_melee_web_game_unload,_melee_web_game_pause,_melee_web_game_message,_melee_web_game_stats,_melee_web_game_running,_melee_web_game_cache_idle,_melee_web_game_combat_check,_melee_web_game_stock_check,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_message)
+  -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_melee_web_game_file,_melee_web_game_launch,_melee_web_game_launch_fixture,_melee_web_game_set_render_scale,_melee_web_game_set_stocks,_melee_web_game_unload,_melee_web_game_pause,_melee_web_game_message,_melee_web_game_stats,_melee_web_game_running,_melee_web_game_cache_idle,_melee_web_game_combat_check,_melee_web_game_stock_check,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_message,_melee_web_input_menu_buttons)
 set_target_properties(gameplay_browser PROPERTIES SUFFIX ".js")
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
   target_link_options(gameplay_browser PRIVATE -sASSERTIONS=0 -sSAFE_HEAP=0)
@@ -121,7 +121,7 @@ else()
 endif()
 configure_file(web/runtime.html runtime.html @ONLY)
 configure_file(web/runtime-cache.js runtime-cache.js COPYONLY)
-foreach(module disc-image dsp-coefficients runtime-assets)
+foreach(module disc-image dsp-coefficients runtime-assets match-flow match-menu)
   configure_file(web/${module}.mjs ${module}.mjs COPYONLY)
 endforeach()
 configure_file(web/audio-ring.mjs audio-ring.mjs COPYONLY)
