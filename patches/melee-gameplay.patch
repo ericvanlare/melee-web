@@ -1,0 +1,59 @@
+diff --git a/src/melee/ft/types.h b/src/melee/ft/types.h
+--- a/src/melee/ft/types.h
++++ b/src/melee/ft/types.h
+@@ -1197,6 +1197,35 @@
+     /*  fp+58C */ u32 x58C;
+     /*  fp+590 */ FigaTree* x590;
+     /*  fp+594 */ union {
++#if defined(MELEE_WEB_GAMEPLAY) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++        /* Host-native overlay of the canonical numeric animation flag word.
++         * Original PPC bitfields run most-significant first. Keep all aliases
++         * at the same numeric bit positions on little-endian gameplay builds;
++         * x596_bits is consequently at +0 within this union, not +2. This is
++         * runtime state, not permission to memcpy serialized Fighter bytes. */
++        struct {
++            struct {
++                u16 _low_padding : 6;
++                u16 x7 : 3;
++                u16 x0 : 7;
++            } x596_bits;
++            u8 _middle_padding;
++            u8 x594_b7 : 1;
++            u8 x594_b6 : 1;
++            u8 x594_b5 : 1;
++            u8 x594_b4 : 1;
++            u8 x594_b3 : 1;
++            u8 x594_b2 : 1;
++            u8 x594_b1_loop : 1;
++            u8 x594_b0 : 1;
++        };
++        struct {
++            u32 x597_bits : 6;
++            u32 x594_pad2 : 3;
++            u32 x594_bits : 13;
++            u32 x594_pad : 10;
++        };
++#else
+         struct {
+             /* fp+594:0 */ u8 x594_b0 : 1;
+             /* fp+594:1 */ u8 x594_b1_loop : 1;
+@@ -1217,6 +1246,7 @@
+             u32 x594_pad2 : 3;
+             u32 x597_bits : 6; // FighterKind of this fighter's x590 FigaTree
+         };
++#endif
+         /* fp+594 */ s32 x594_s32;
+     };
+     /*  fp+598 */ FigaTree* x598;
+diff --git a/src/melee/gr/grlast.c b/src/melee/gr/grlast.c
+--- a/src/melee/gr/grlast.c
++++ b/src/melee/gr/grlast.c
+@@ -70,7 +70,7 @@
+ /* 21B2E0 */ static void grLast_8021B2E0(Ground_GObj*);
+ /* 21B2E4 */ static void grLast_8021B2E4(Ground_GObj*);
+ /* 21B2E8 */ static void grLast_8021B2E8(Ground_GObj*);
+-/* 21B5C4 */ static bool grLast_8021B5C4(Ground_GObj*);
++/* 21B5C4 */ static int grLast_8021B5C4(Ground_GObj*);
+ /* 21B920 */ static void grLast_8021B920(Ground_GObj*, int);
+ /* 21C40C */ static void grLast_8021C40C(Ground_GObj*, GXColor, float);
+ /* 21C500 */ static void grLast_8021C500(Ground_GObj*);

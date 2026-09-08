@@ -1,7 +1,10 @@
 # Current status
 
-This is an early source-port feasibility repository. It does **not** boot Melee,
+This is a source-port repository. It does **not** boot Melee,
 load a game scene, or run a match. It contains no emulator and no game assets.
+The first playable target is an accurate local Mario-versus-Mario stock match on
+Final Destination at 60 fps. The current work establishes its runtime foundation;
+`Fighter_Create`, full common initialization and the match loop remain incomplete.
 
 ## Implemented
 
@@ -49,17 +52,49 @@ load a game scene, or run a match. It contains no emulator and no game assets.
   raw versus PADClamp diagnostic samples.
 - A batch CPU asset checker that reports supported roots and exact rejection
   reasons as JSON lines, so the same parser can check an expanding local corpus.
+- A separate Wasm gameplay target using original HSD GObj allocation, process
+  ordering, deferred mutation and destruction. Its SDK heap has exclusive
+  ownership checks, explicit teardown and restart; graphics-object lifetimes
+  remain outside this isolated scheduler world.
+- A checked generated gameplay source tree with narrow downstream ABI patches.
+  PowerPC/Wasm compiler comparisons verify the canonical fighter animation-flag
+  aliases. Native packed command overlays are explicitly identified as incompatible.
+- Source-generated common-data scalar layout and a checked inventory of all 23
+  PlCo roots. Root0 is decoded; the other 22 remain unresolved native graphs.
+  An owned source Fighter/GObj probe executes original input reset and the walk
+  threshold predicate with a scoped common context, without publishing partial
+  common initialization.
+- Typed stage collision vertices, lines, categories and joints, plus an isolated
+  bridge to original `mpLibLoad`, empty-line pruning, island initialization and
+  static line/floor queries. Original stage scale is an explicit input. Stage
+  joint bindings, callbacks, dynamic lines and fighter ECB/physics are still pending.
 - Diagnostic page with errors and rolling CPU/frame-interval measurements.
 - Loopback server with WebAssembly MIME type and cross-origin isolation headers.
-- Setup, server, disc, DAT, model and original-HSD call-trace tests; a compile-only
-  GitHub Actions workflow, published in a private repository.
+- Setup, server, disc, DAT, model and original-HSD call-trace tests; a GitHub
+  Actions workflow that builds both targets and executes scoped Wasm traces,
+  published in a private repository.
 
 ## Validation record
+
+Current gameplay work has focused Wasm traces for ABI, real SDK heap ownership,
+original scheduler lifecycle, and original fighter input/reset behavior. Local
+PlCo decoding reached the original walk predicate at its exact 0.18 threshold,
+including adjacent-float comparisons and teardown/restart. The local common
+archive has 23 present roots but only root0 is scalar-ready. Full-suite and final
+build validation completed: **158 tests passed**, and the graphics plus gameplay
+build passed. The gameplay runner executes four built Wasm targets: ABI,
+scheduler, collision and the optional local-data probe. The combined real PlCo
+and Final Destination probe passed, as did the focused original collision trace
+after allocator-lifetime review. The current core source census compiled 34/34
+translation units; this is compilation coverage, not `Fighter_Create` or match
+acceptance. No gameplay accuracy or performance claim follows from these checks.
+
+Earlier graphics evidence follows.
 
 Verified locally on **2026-09-07**, from the standalone `~/Workspace/melee-web`
 repository on Apple Silicon macOS:
 
-- **132 tests passed**, covering setup, real loopback HTTP, synthetic disc/archive
+- Graphics-phase checks passed, covering setup, real loopback HTTP, synthetic disc/archive
   fixtures, joint/UV/material/texture validation, the input adapter contract, and
   Wasm tests of original HSD polygon, transform, material and animation code. Material traces
   verify fractional blend constants, reflection texture assignment, palette/filter
@@ -150,7 +185,7 @@ an unused HSD inline helper's integer `fabs` call, original TObj indexed-format
 switch cases against Aurora's texture enum, and limited post-link
 optimization while preserving DWARF. They are not suppressed globally.
 
-This is a functional graphics smoke test, **not a performance benchmark**. GPU
+The browser remains a functional graphics inspection tool, **not a performance benchmark**. GPU
 identity is privacy-limited in this browser. No release-performance, physical-controller, audio, game-state fidelity or
 native-host game validation has been completed. The private GitHub repository's
 clean Ubuntu 24.04 CI runs have passed tests and the browser build; it does not
@@ -159,10 +194,14 @@ checks as coverage expands.
 
 ## Next acceptance gate
 
-The generic Mario/Fox animation and opaque stage-entry inspection gate is complete.
-Next, support the platform's translucent pass and original stage animation,
-then compose a fighter and stage with source scene context. Source action commands,
-physics, collision and audio are still absent. See [the next work boundaries](docs/NEXT_PHASE.md).
+The next gate is actual original Mario creation, neutral Wait ticks, unload and
+restart under source player/stage context. Parallel work must hydrate common part
+maps and required roots, initialize real HSD object lifetimes, and load Mario's
+ftData, material animation and action commands. The animation loader also needs
+an explicit storage contract because its GameCube RAM/ARAM address test is wrong
+for ordinary Wasm pointers. Then extend the same runtime to movement, landing,
+attacks, damage, KO/respawn and a complete local stock match. See
+[the next work boundaries](docs/NEXT_PHASE.md).
 
 The current decoder handles ordinary joint SRT, envelope skinning, direct RGBA8
 vertex colors, opaque constant/diffuse/specular materials and up to eight ordinary
@@ -174,7 +213,11 @@ it does not modify unsupported flags on retained transforms.
 Animation supports ordinary SRT tracks and checked common-part layouts without
 alternate insertion. A source-registry entry establishes identity, not proof that
 that fighter's complete assets, action visibility or gameplay already work.
-Stage cameras, lights, animation, fog, collision and callbacks remain unapplied.
+Stage cameras, lights, animation, fog and callbacks remain unapplied in the viewer.
+The separate collision probe does not establish stage binding or fighter physics.
+The original `StageCallbacks` numeric-flag/bitfield overlay is another pending
+Wasm ABI boundary; the fighter animation-flag patch does not make stage callback
+dispatch safe automatically.
 Referenced-region bounds are conservative. Parser acceptance and browser rendering
 remain separate checks.
 

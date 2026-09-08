@@ -48,6 +48,10 @@ public:
     // aliases or references into an array can divide a legitimate allocation.
     [[nodiscard]] std::uint32_t next_target_offset(std::uint32_t offset) const;
 
+    // Query relocation metadata without interpreting a scalar word as a
+    // pointer. The slot must be aligned and contain four bytes inside data.
+    [[nodiscard]] bool has_relocation(std::uint32_t slot) const;
+
     // A zero word is null only if the slot is absent from the relocation table.
     // A relocated zero instead names data offset zero. Nonzero unrelocated
     // words are not accepted as pointers. Slots must be four-byte aligned;

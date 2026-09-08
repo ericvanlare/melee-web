@@ -5,13 +5,17 @@ revisions inspected for the current probe.
 
 | Dependency | Pinned source revision | Role |
 | --- | --- | --- |
-| [doldecomp/melee](https://github.com/doldecomp/melee) | `b43912cc78606f96c9569f5d6229bc9d7e265ea5` | Recovered game and HSD C; current target retains HSD state, rigid polygon and SRT code |
+| [doldecomp/melee](https://github.com/doldecomp/melee) | `b43912cc78606f96c9569f5d6229bc9d7e265ea5` | Recovered game/HSD C; retained rendering, animation, object scheduling and focused fighter/collision consumers |
 | [encounter/aurora](https://github.com/encounter/aurora) | `749d6ee7a22bdfab78c8ece9047bca5d79aa72ca` | Source-level GX renderer and platform services |
 | [emscripten-core/emsdk](https://github.com/emscripten-core/emsdk) | `5eb0bde7585670252e8ba05e9d361627bffd08b5` | Installer for Emscripten **6.0.9**, including its compiler and browser WebGPU bindings |
 
 Build tools: CMake **3.31.6** and Ninja **1.13.0**, installed in the local virtual
 environment. Aurora browser adaptations belong in `patches/aurora-browser.patch`;
 the upstream commit alone does not describe the browser implementation.
+Gameplay ABI corrections belong in `patches/melee-gameplay.patch`, applied only
+to the checked generated `build/gameplay-source` tree. The current patch preserves
+canonical fighter animation-flag aliases on little-endian Wasm and corrects the
+Final Destination callback declaration to match its original definition.
 
 ## Reproducibility and provenance
 
@@ -73,10 +77,12 @@ This separates archive interpretation from device lifetime and keeps decoding
 available to both browser import and the native batch checker.
 
 `dat_texture.cpp` checks original tiled images, mip chains and palettes before
-upload. `gx_material.cpp` implements only the validated single diffuse texture
-operations for the unlit preview. Complete HSD material expressions are the next
-source-integration boundary; this small preview material path is not a substitute
-for the original game renderer.
+upload. Original HSD MObj/TObj expression compilation, TEV setup, diffuse/specular
+lighting and reflection execute through `hsd_material_bridge.c` and the scoped
+GX adapter. The earlier single-texture preview approximation has been replaced.
+Owned material instances, stable texture identities and original geometry feed
+Aurora; the inspection camera/light rig is still authored context, not a loaded
+game scene.
 
 `src/hsd_probe_compat.h` adapts observed header differences only for that HSD
 translation units: the `Vec3` name, missing `GXTevClampMode` declaration, `va_list`
@@ -88,6 +94,30 @@ The simple `DrawRectangle` function in original HSD `hsd_3915.c` is another poss
 geometry seam, but that whole file requires disc-derived `debug_font.inc` during
 compilation. The initial probe does not fabricate that asset to make it compile.
 
+## Gameplay execution boundary
+
+`scripts/build.py --target gameplay` builds separate Wasm ABI, scheduler, collision
+and local-data probe executables. `scripts/check_gameplay.py` runs them with the
+pinned Node runtime; optional `--common`, `--stage` and `--stage-kind` inputs remain
+local. Final Destination is original `GrKind`37, distinct from viewer map entry3.
+
+The scheduler retains original GObj/proc/ObjAlloc/memory routines. Its C++ heap
+wrapper includes Aurora's unchanged OS allocator and adds exclusive ownership
+and metadata release; it replaces that allocator translation unit in this target,
+so both providers must not be linked together. Scoped source includes retain
+original collision initialization/pruning/query behavior without successful
+stubs for unreachable stage services.
+
+`gameplay_compat.h` supplies observed vector/header differences and original math
+constants. Generated common-field layout assertions and PowerPC/Wasm compiler
+comparisons validate the reached ABI. They do not validate every Fighter union,
+packed command stream or gameplay numerical path. The source census records
+compile/link blockers independently from executable acceptance.
+In particular, `melee/gr/types.h`'s `StageCallbacks` overlays a numeric `flags`
+word with byte bitfields. Its PowerPC/Wasm correspondence remains to be corrected
+and verified before executing stage callbacks; the fighter flag patch covers a
+different structure.
+
 ## Portability work still required
 
 All paths below refer to the pinned original Melee tree.
@@ -96,6 +126,7 @@ All paths below refer to the pinned original Melee tree.
 | --- | --- | --- |
 | Asset layout | HSD `archive.c`, `archive.h`; `src/melee/lb/lbarchive.c` | Big-endian DAT headers and payload structures, plus in-place 32-bit pointer relocation; decode with explicit types and bounds |
 | Memory regions | `src/melee/lb/lbfile.c`, `lbmemory.c`, `lbheap.c`; HSD `initialize.c` | Numeric addresses distinguish GameCube RAM/ARAM; browser pointers do not carry those meanings |
+| Fighter animation storage | `src/melee/ft/ftdata.c`, `ftData_80085E50` | Values below `0x80000000` select ARAM, including ordinary Wasm pointers; replace address classification and raw archive relocation with explicit checked storage/decoded-clip ownership |
 | Scheduling | `src/melee/gm/gmmain.c`, `gm_1A3F.c`, `gm_1A45.c`; HSD `video.c` | Infinite scene loops, controller-sample queues and retrace waits require an explicit browser lifecycle |
 | File completion | `src/melee/lb/lbfile.c`; HSD `devcom.c` | Busy waits depend on asynchronous DVD/ARAM callbacks; preserve completion ordering |
 | Audio | `src/melee/lb/lbaudio_ax.c`; HSD `synth.c`, `axdriver.c` | AX voices, ADPCM, looping, effects and ARAM sample storage need a software backend; an audio output device alone is insufficient |
@@ -110,12 +141,14 @@ validated before gameplay. Successful host compilation cannot establish numeric
 equivalence; avoid fast-math and validate floating-point behavior against original
 game traces.
 
-## Next asset gate
+## Next runtime gate
 
-Untextured and textured local DAT models now render through the rigid polygon
-seam. Next integrate original HSD material code to reach a representative scene.
-The full `jobj.c` → `dobj.c` loader/display path remains to be integrated; the
-current typed decoder walks validated ordinary joint trees and their rigid objects.
-Relocation metadata does not describe every field's type, and raw GX geometry
-bytes retain their original byte order. See [ROADMAP.md](ROADMAP.md) for acceptance
-criteria and [STATUS.md](../STATUS.md) for observed results.
+The first playable target is original Mario versus Mario on Final Destination.
+Next hydrate named common part maps and required common roots, Mario ftData and
+costume material animation, then integrate actual HSD constructors/destructors
+and player/stage services. Common root20 is loaded unconditionally by the original
+fighter initializer; model inspection alone does not satisfy that lifetime.
+Full fighter creation, action commands, physics, audio and match outcomes remain
+unvalidated. See [NEXT_PHASE.md](NEXT_PHASE.md) for parallel work boundaries,
+[ROADMAP.md](ROADMAP.md) for acceptance criteria and [STATUS.md](../STATUS.md)
+for observed results.

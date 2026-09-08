@@ -1,7 +1,11 @@
 # Melee Web
 
-A source-port feasibility project for running vanilla Super Smash Bros. Melee
+A source-port project for running vanilla Super Smash Bros. Melee
 in a desktop browser using WebAssembly and WebGPU.
+
+The first playable goal is an accurate local **Mario-versus-Mario stock match on
+Final Destination at 60 fps**, using original gameplay code. Full vanilla Melee
+remains the goal; menus, other matchups and modes follow this initial match gate.
 
 **This is not a playable game yet.** The browser renders Melee DAT models
 through original HSD transforms, skinning, materials and polygon code, using
@@ -9,6 +13,9 @@ Aurora's GX renderer. Mario and Fox can play original idle and walking animation
 from their action containers. The viewer also renders Final Destination's opaque
 platform geometry, with omitted passes and unapplied stage services reported.
 It does not establish complete scene fidelity or full-game performance.
+Separate Wasm checks now execute original HSD object scheduling, fighter input
+reset and walk-threshold logic, and static collision initialization/query code.
+They do not call a completed `Fighter_Create` or run a match.
 
 ## Build and inspect
 
@@ -23,6 +30,21 @@ python3 scripts/build.py
 python3 -m unittest discover -s tests -v
 python3 scripts/serve.py --directory build/browser
 ```
+
+To build and run the separate gameplay foundation checks with the project-local
+Node runtime:
+
+```sh
+python3 scripts/build.py --target gameplay
+python3 scripts/check_gameplay.py
+python3 scripts/check_gameplay.py --common assets-local/PlCo.dat --stage assets-local/GrNLa.dat --stage-kind 37
+```
+
+The data arguments are optional and stay local. `--stage-kind 37` is the original
+Final Destination `GrKind`, distinct from viewer map entry 3. The runner reports
+common-root readiness and source-consumer results; successful checks do not mean
+a fighter or stage is fully initialized. `--target graphics` builds only the
+browser viewer; the default build includes both targets.
 
 Open http://127.0.0.1:8787. Keep the tab visible for timing measurements. The
 server binds to loopback and supplies cross-origin isolation headers. The probe
@@ -91,7 +113,8 @@ their versions are controlled by the pinned Aurora tree and our patch. See
 
 ## Architecture and scope
 
-- Melee's recovered C logic will compile directly to WebAssembly.
+- Melee's recovered C compiles directly to WebAssembly; source runtime integration
+  proceeds through checked ownership and data boundaries.
 - Aurora supplies a source-level GX-to-WebGPU implementation.
 - Browser-specific scheduling, audio and asset conversion are explicit port work.
 - The original GameCube build remains the behavioral reference.

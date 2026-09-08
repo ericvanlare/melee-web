@@ -26,10 +26,16 @@ jobs:
         run: python3 scripts/bootstrap.py
       - name: Validate original HSD polygon and transform paths
         run: python3 -m unittest discover -s tests -p 'test_hsd_*_bridge.py' -v
-      - name: Compile browser probe
+      - name: Compile browser and gameplay targets
         run: python3 scripts/build.py --jobs 2
+      - name: Run original gameplay runtime and ABI checks
+        run: |
+          python3 -m unittest discover -s tests -p 'test_gameplay_*.py' -v
+          python3 scripts/check_gameplay.py
+          python3 scripts/gameplay_census.py --jobs 2
       - name: Validate browser input adapter with configured SDL headers
         run: python3 -m unittest discover -s tests -p test_browser_input.py -v
 
-# This checks compilation only. Real WebGPU rendering still needs the documented
-# browser smoke test; do not describe a green build as gameplay validation.
+# GPU rendering and original-game behavioral comparisons need the documented
+# acceptance checks. The gameplay traces validate only their named boundaries;
+# a green build does not mean a fighter was initialized or a match was played.

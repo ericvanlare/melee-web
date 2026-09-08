@@ -32,6 +32,51 @@ if(EMSCRIPTEN)
   add_link_options(-fexceptions -sASYNCIFY=1)
 endif()
 
+# The gameplay runtime is separate from the inspection renderer. Original
+# source is copied at its pin and patched by scripts/gameplay_sources.py;
+# gameplay-only ABI fixes must never silently alter the graphics dependency.
+if(EMSCRIPTEN)
+  set(MELEE_WEB_GAMEPLAY_SOURCE_DIR "" CACHE PATH "Verified generated Melee source tree")
+  if(NOT EXISTS "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/ft/types.h")
+    message(FATAL_ERROR "Generated gameplay source missing; use scripts/build.py")
+  endif()
+  add_library(gameplay_runtime STATIC src/gameplay_bootstrap.c src/gameplay_abi.c
+    src/gameplay_heap.cpp src/gameplay_fighter_probe.c src/gameplay_collision.c src/hsd_host_support.c
+    "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/ft/fighter.c"
+    "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/ft/ftwalkcommon.c"
+    "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/mp/mpisland.c"
+    "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/gr/ground.c"
+    "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/gr/grdynamicattr.c"
+    "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/lb/lb_00B0.c")
+  foreach(unit gobj gobjproc gobjplink gobjgxlink gobjobject gobjuserdata objalloc memory initialize)
+    target_sources(gameplay_runtime PRIVATE "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/${unit}.c")
+  endforeach()
+  target_include_directories(gameplay_runtime PUBLIC src "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}")
+  target_compile_definitions(gameplay_runtime PUBLIC TARGET_PC)
+  target_compile_options(gameplay_runtime PRIVATE -ffunction-sections -fdata-sections -ffp-contract=off
+    "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
+  target_link_libraries(gameplay_runtime PUBLIC aurora::os aurora::mtx PRIVATE fmt::fmt)
+  add_executable(gameplay_scheduler_trace tests/gameplay_bootstrap_trace.c)
+  add_executable(gameplay_abi_trace tests/gameplay_abi_trace.c)
+  add_executable(gameplay_collision_trace tests/gameplay_collision_trace.c)
+  foreach(target gameplay_scheduler_trace gameplay_abi_trace gameplay_collision_trace)
+    target_link_libraries(${target} PRIVATE gameplay_runtime)
+    target_compile_options(${target} PRIVATE -ffp-contract=off
+      -include "${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h")
+    target_link_options(${target} PRIVATE -sENVIRONMENT=node -sEXIT_RUNTIME=1
+      -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+    set_target_properties(${target} PROPERTIES SUFFIX ".js")
+  endforeach()
+  add_executable(gameplay_probe src/gameplay_probe.cpp src/dat_archive.cpp src/dat_common.cpp
+    src/dat_collision.cpp src/dat_stage.cpp)
+  target_link_libraries(gameplay_probe PRIVATE gameplay_runtime)
+  target_compile_options(gameplay_probe PRIVATE -Wall -Wextra -Werror -ffp-contract=off)
+  target_link_options(gameplay_probe PRIVATE -sENVIRONMENT=node -sNODERAWFS=1 -sEXIT_RUNTIME=1
+    -sALLOW_MEMORY_GROWTH=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+  set_target_properties(gameplay_probe PROPERTIES SUFFIX ".js")
+  add_custom_target(gameplay_checks DEPENDS gameplay_scheduler_trace gameplay_abi_trace gameplay_collision_trace gameplay_probe)
+endif()
+
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.deps/aurora/CMakeLists.txt")
   message(FATAL_ERROR "Dependencies missing. Run python3 scripts/bootstrap.py first.")
 endif()

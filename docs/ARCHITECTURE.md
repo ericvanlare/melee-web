@@ -5,6 +5,8 @@
 Use doldecomp/melee source with a separate platform layer and browser build target.
 No PowerPC CPU emulator, JIT, or hidden interpreter fallback. The original binary
 is an offline validation reference. Keep downstream patches reviewable and small.
+The first playable target is an accurate local Mario-versus-Mario stock match on
+Final Destination at 60 fps; full vanilla Melee remains the overall goal.
 
 ## 002 — Evaluate Aurora before writing a renderer
 
@@ -169,3 +171,46 @@ ancestors, remaps that transform closure, and validates the retained joint behav
 Unsupported flags on a required ancestor are never cleared to make a draw pass.
 The GrNLa entry-3 gate retains 13 opaque meshes and reports 13 omitted meshes.
 That partial draw is stage inspection, not complete stage loading or gameplay.
+
+## 013 — Original runtime with explicit ownership
+
+The separate gameplay Wasm target executes original HSD GObj allocation, process
+ordering, deferred mutation and userdata destruction. A wrapper around Aurora's
+actual OS allocator claims one exclusive arena, rejects foreign initialization,
+and clears allocator metadata before freeing owned memory. World generations
+invalidate surviving handles and private pools across teardown/restart. The
+current world excludes graphics-object kinds until their real lifecycle exists;
+it does not substitute for full `Fighter_Create` or a match scheduler.
+
+`gameplay_sources.py` prepares a checked downstream source tree under `build/`
+and applies `patches/melee-gameplay.patch`; pristine `.deps/melee` is unchanged.
+Compiler comparisons against PowerPC establish canonical fighter animation-flag
+aliases on Wasm. Imported packed command unions still require explicit field
+decoding; swapping a word and casting it to a native bitfield struct is invalid.
+
+## 014 — Data readiness precedes native publication
+
+`DatCommon` owns typed root0 scalars and an inventory of all23 common roots. Its
+schema is generated from the pinned source and asserts every original Wasm field
+offset/width. Unknown scalar words remain opaque integers, not invented pointers.
+Other roots remain unresolved graphs. The focused Fighter probe allocates real
+source storage, executes original input reset and walk-threshold logic, and
+restores the previous common context afterward. This scoped consumer is not
+`Fighter_LoadCommonData` and must not publish a half-ready root table.
+
+`DatCollision` preserves source line categories, adjacency, material flags and
+counted joints. The runtime bridge copies mutable native arrays, then invokes
+original `mpLibLoad`, pruning, island initialization and static queries. Stage
+kind and source `grGroundParam.y` scale are explicit inputs. GObj userdata owns
+teardown; stage joint bindings, callbacks, dynamic lines and fighter ECB/physics
+remain pending. Empty archive binding tables do not eliminate source C bindings:
+Final Destination maps collision joint0 to stage entry3/render joint0.
+
+The next integration joins named common part maps, original HSD constructors,
+Mario ftData/costume/material animation and source player/stage services. Preserve
+the selected source motion record independently of shared figatree aliases.
+Original `ftData_80085E50` distinguishes RAM/ARAM by numeric address; ordinary Wasm
+pointers fail that test. Port storage identity and completion explicitly, reusing
+checked decoded clips without pretending raw BE archive relocation is valid.
+Acceptance is real creation, neutral source ticks, unload and restart before
+movement/combat and the local stock-match gate.

@@ -173,14 +173,21 @@ std::uint32_t DatArchive::next_target_offset(std::uint32_t offset) const
     return *std::upper_bound(referenced_targets_.begin(), referenced_targets_.end(), offset);
 }
 
-std::optional<std::uint32_t> DatArchive::pointer(std::uint32_t slot,
-                                               std::size_t minbytes) const
+bool DatArchive::has_relocation(std::uint32_t slot) const
 {
     if (slot % 4 != 0) {
         throw DatError("DAT pointer slot is not four-byte aligned");
     }
+    (void) range(slot, 4);
+    return std::binary_search(relocation_slots_.begin(), relocation_slots_.end(), slot);
+}
+
+std::optional<std::uint32_t> DatArchive::pointer(std::uint32_t slot,
+                                               std::size_t minbytes) const
+{
+    const bool relocated = has_relocation(slot);
     const auto target = be32(slot);
-    if (!std::binary_search(relocation_slots_.begin(), relocation_slots_.end(), slot)) {
+    if (!relocated) {
         if (target == 0) {
             return std::nullopt;
         }

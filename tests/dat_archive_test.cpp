@@ -111,6 +111,13 @@ void pointer_semantics()
     check(dat.pointer(4).has_value() && *dat.pointer(4) == 0,
           "relocated zero names data offset zero, not null");
     check(!dat.pointer(8), "unrelocated zero is null");
+    check(dat.has_relocation(0) && dat.has_relocation(4),
+          "metadata query distinguishes ordinary and zero-target relocations");
+    check(!dat.has_relocation(8) && !dat.has_relocation(12),
+          "metadata query accepts null and nonzero scalar slots without pointer interpretation");
+    rejects([&] { (void) dat.has_relocation(1); });
+    rejects([&] { (void) dat.has_relocation(32); });
+    rejects([&] { (void) dat.has_relocation(0xfffffffcU); });
     rejects([&] { (void) dat.pointer(12); });
     rejects([&] { (void) dat.pointer(1); });
     rejects([&] { (void) dat.pointer(32); });
