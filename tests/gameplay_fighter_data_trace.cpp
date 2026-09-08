@@ -8,6 +8,7 @@
 #include <iterator>
 using namespace fighter_runtime_test;
 extern "C" void melee_web_test_fighter_data(void*,int);
+extern "C" void melee_web_test_guard_data(const MeleeWebNativeDat*,uint32_t,void*,uint32_t*);
 namespace {
 Bytes read_file(const char* path) {
     std::ifstream f(path,std::ios::binary|std::ios::ate);
@@ -21,7 +22,9 @@ FighterFixture native_fixture() {
     auto model=append(24), vis=append(80), textures=append(20);
     f.link(8,model);f.link(model+4,vis);f.link(model+12,textures);
     for(auto [slot,size]:std::initializer_list<std::pair<uint32_t,size_t>>{
-        {0x34,8},{0x38,40},{0x3c,24},{0x44,28},{0x4c,56},{0x54,8},{0x58,28}})f.link(slot,append(size));
+        {0x34,8},{0x38,40},{0x3c,24},{0x44,28},{0x4c,56},{0x58,28}})f.link(slot,append(size));
+    const auto effect_parts=append(5*4); f.link(0x54,effect_parts);
+    for(unsigned i=0;i<5;++i)put32(f.data,effect_parts+i*4,i+1);
     auto items=append(16);f.link(0x48,items);
     for(auto i:{0U,2U}){auto article=append(24),attr=append(0x84);f.link(items+i*4,article);f.link(article,attr);}
     return f;
@@ -35,7 +38,11 @@ void verify(std::shared_ptr<const DatArchive> archive,const Bytes& container,int
     archive.reset(); // Reader and action store retain the backing archive independently.
     melee_web_test_fighter_data(data,actual);
     check((unresolved&((1U<<3)|(1U<<4)|(1U<<9)|(1U<<18)|(1U<<22)))==0,"Reached fields remain unresolved");
-    if(actual)check(unresolved==0x8001e0,"Unexpected unhydrated fields changed");
+    if(actual){
+        check(unresolved==0x8001e0,"Unexpected unhydrated fields changed");
+        melee_web_test_guard_data(owner.reader(),root,data,&unresolved);
+        check(unresolved==0x8000e0,"Guard descriptor was not published");
+    }
     std::cout<<"Native fighter data unresolved mask: "<<std::hex<<unresolved<<std::dec<<'\n';
 }
 }

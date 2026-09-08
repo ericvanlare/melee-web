@@ -4,10 +4,10 @@
 #include <optional>
 
 namespace melee_web {
-// Inspection playback only. Simulation scheduling remains a separate game
-// integration task. A long stall pauses playback explicitly instead of dropping
-// animation frames or doing unbounded catch-up work on the browser thread.
-class AnimationClock {
+// Fixed 60 Hz clock for source simulation and inspection playback. A long
+// stall asks the caller to pause explicitly rather than discard simulation
+// ticks or perform unbounded catch-up work on the browser thread.
+class FixedTickClock {
 public:
     struct Tick { unsigned steps = 0; bool stalled = false; };
     void reset() noexcept { previous_.reset(); pending_ = 0; }
@@ -28,4 +28,5 @@ private:
     std::optional<double> previous_;
     double pending_ = 0;
 };
+using AnimationClock = FixedTickClock;
 } // namespace melee_web

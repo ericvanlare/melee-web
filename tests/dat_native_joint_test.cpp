@@ -67,6 +67,55 @@ int main(int argc,char** argv) {
         rejected=false;
         try { melee_web::DatNativeJoint instance(unsupported.archive(),24); } catch(const melee_web::DatError&) {rejected=true;}
         check(rejected,"instance graph rejected before native loader");
+        Fixture billboard; put32(billboard.data,24+4,0x280);
+        melee_web::DatNativeJoint native_billboard(billboard.archive(),24);
+        check(native_billboard.graph().joints[0].flags==0x280,"native ordinary billboard retained");
+        rejected=false;
+        try { melee_web::RigidModel viewer(billboard.archive(),24,"billboard"); } catch(const melee_web::DatError&) { rejected=true; }
+        check(rejected,"inspection viewer still rejects camera-dependent billboard");
+        put32(billboard.data,24+4,0x880);
+        melee_web::DatNativeJoint native_rotation_billboard(billboard.archive(),24);
+        check(native_rotation_billboard.graph().joints[0].flags==0x880,"native rotation billboard retained");
+        rejected=false;
+        try { melee_web::RigidModel viewer(billboard.archive(),24,"rotation billboard"); } catch(const melee_web::DatError&) { rejected=true; }
+        check(rejected,"inspection viewer still rejects rotation billboard");
+        for(uint32_t mode:{0x400u,0x600u}){
+            put32(billboard.data,24+4,0x80|mode);
+            melee_web::DatNativeJoint axis_billboard(billboard.archive(),24);
+            check(axis_billboard.graph().joints[0].flags==(0x80|mode),"native source axis billboard retained");
+            rejected=false;
+            try { melee_web::RigidModel viewer(billboard.archive(),24,"axis billboard"); } catch(const melee_web::DatError&) { rejected=true; }
+            check(rejected,"inspection viewer rejects axis billboard");
+        }
+        put32(billboard.data,24+4,0xa80);rejected=false;
+        try { melee_web::DatNativeJoint invalid(billboard.archive(),24); } catch(const melee_web::DatError&) { rejected=true; }
+        check(rejected,"undefined mixed billboard mode rejected");
+        Fixture transforms;
+        put32(transforms.data,24+16,0);
+        std::erase(transforms.relocations,24+16);
+        melee_web::DatNativeJoint transform_graph(transforms.archive(),24);
+        check(transform_graph.graph().joint_count==2 && transform_graph.graph().dobj_count==0 &&
+              transform_graph.graph().pobj_count==0,"native transform-only graph retains complete joints");
+        rejected=false;
+        try { melee_web::RigidModel viewer(transforms.archive(),24,"transforms"); } catch(const melee_web::DatError&) { rejected=true; }
+        check(rejected,"viewer rejects transform-only model");
+        transforms.link(88+8,24);
+        rejected=false;
+        try { melee_web::DatNativeJoint cycle(transforms.archive(),24); } catch(const melee_web::DatError&) { rejected=true; }
+        check(rejected,"transform-only native graph still rejects joint cycles");
+        Fixture spline; spline.data.resize(600);
+        put32(spline.data,88+4,0x4008);spline.link(88+16,544);
+        put32(spline.data,544,2);spline.number(548,0);spline.link(552,568);spline.number(556,10);spline.link(560,592);
+        spline.number(580,10);spline.number(592,0);spline.number(596,1);
+        melee_web::DatNativeJoint spline_graph(spline.archive(),24);
+        const auto* curve=spline_graph.graph().joints[1].spline;
+        check(curve&&curve->type==0&&curve->control_count==2&&curve->points[3]==10&&curve->segment_lengths[1]==1&&spline_graph.graph().joints[1].dobj==UINT32_MAX,"native spline union retains bounded curve instead of DObj data");
+        rejected=false;
+        try { melee_web::RigidModel viewer(spline.archive(),24,"spline"); } catch(const melee_web::DatError&) { rejected=true; }
+        check(rejected,"inspection viewer rejects spline union");
+        spline.number(596,0);rejected=false;
+        try { melee_web::DatNativeJoint invalid(spline.archive(),24); } catch(const melee_web::DatError&) { rejected=true; }
+        check(rejected,"native spline rejects degenerate arc boundaries");
         Fixture effect; effect.data.resize(588);effect.link(20,544);effect.link(380+88,556);
         put32(effect.data,4,0x60000011);effect.number(196,0);
         const uint8_t pe[]={0x19,0,0,0,1,4,1,5,3,7,0,7};
@@ -107,6 +156,13 @@ int main(int argc,char** argv) {
                 for(uint32_t d=mg.joints[i].dobj;d!=UINT32_MAX;d=mg.dobjs[d].next)++occurrences;
             }
             check(occurrences==8&&mg.pobj_count==21&&mg.material_count==1,"actual metal geometry counts");
+            const auto guard_data=fighter->pointer(symbol(*fighter,"ftDataMario")+0x20,4);
+            check(bool(guard_data),"actual Mario guard data present");
+            melee_web::DatNativeJoint guard(fighter,*fighter->pointer(*guard_data,64));
+            const auto& gg=guard.graph();
+            check(gg.joint_count==cg.joint_count&&gg.dobj_count==0,"actual guard pose shape");
+            for(uint32_t i=0;i<gg.joint_count;i++)
+                check(gg.joints[i].child==cg.joints[i].child&&gg.joints[i].next==cg.joints[i].next,"actual guard/costume topology");
             std::cout<<"Local Mario metal graph:61 matching joints,8 DObj occurrences,21 PObjs passed\n";
         }else check(argc==1,"unexpected native descriptor test arguments");
         std::cout<<"typed native graph identity/lifetime/rejection checks passed\n";

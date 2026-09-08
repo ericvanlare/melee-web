@@ -51,10 +51,10 @@ class GameplayActionStoreTests(unittest.TestCase):
                 return text[start:end]
             subset = directory / "action_consumers.c"
             subset.write_text('#include "gameplay_compat.h"\n#include "gameplay_action_store.h"\n'
-                '#include <melee/ft/types.h>\n#include <melee/ft/inlines.h>\n'
+                '#include <melee/ft/types.h>\n#include <melee/ft/inlines.h>\n#include <melee/ft/ft_0DF0.h>\n'
                 '#include <melee/lb/inlines.h>\n#include <melee/lb/lbcommand.h>\n'
                 'void ftAnim_800704F0(HSD_GObj*, int, float);\nvoid ft_8008A1B8(HSD_GObj*, int);\n'
-                + function("ftAction_800726F4") + '\n' + function("ftAction_80072C6C")
+                + function("ftAction_80071974") + '\n' + function("ftAction_80073008") + '\n' + function("ftAction_80071820") + '\n' + function("ftAction_800726F4") + '\n' + function("ftAction_80072C6C")
                 + '\nstatic void (*ftAction_803C06E8[49])(HSD_GObj*, CommandInfo*) = '
                 '{[30]=ftAction_800726F4,[42]=ftAction_80072C6C};\n'
                 + function("ftAction_80073240"))
@@ -62,7 +62,7 @@ class GameplayActionStoreTests(unittest.TestCase):
                 [sys.executable, str(compiler / "emcc.py"), *common, "-std=c11", "-I", str(source),
                  "-include", str(ROOT / "src/gameplay_compat.h"), "-c",
                  str(ROOT / "tests/gameplay_action_store_trace.c"), str(subset),
-                 str(source / "melee/ft/ftdata.c"), str(source / "melee/lb/lbanim.c"), str(source / "melee/lb/lbcommand.c")],
+                 str(source / "melee/ft/ftdata.c"), str(source / "melee/ft/ft_0DF0.c"), str(source / "melee/lb/lbanim.c"), str(source / "melee/lb/lbcommand.c")],
                 [sys.executable, str(compiler / "em++.py"), *common, "-std=c++20", "-c",
                  *[str(ROOT / "src" / (name + ".cpp")) for name in
                    ("dat_archive", "dat_animation", "fighter_binding", "dat_fighter_runtime", "dat_commands", "gameplay_action_store")],

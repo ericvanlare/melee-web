@@ -1,9 +1,67 @@
 # Current status
 
-Melee is not yet playable in the browser. The browser inspector renders original
-models and animations; a separate Wasm runtime now completes original Mario
-construction, neutral simulation, teardown and restart. No emulator is shipped.
-The first playable goal remains Mario versus Mario on Final Destination at 60 fps.
+The browser runs two original Mario instances on Final Destination through
+compiled WebAssembly. The complete acceptance milestone below is still open:
+playtesting exposed projectile and post-respawn collision failures. No emulator
+is shipped; Dolphin is used only as a separate original-game reference.
+
+The current stopping milestone is the **complete local Mario-versus-Mario stock
+match on Final Destination**, including original gameplay behavior, two local
+controllers, camera, sound, match outcome/restart, and measured stable 60 fps on
+the reference machine. The smaller gates below are checkpoints, not completion.
+
+## Active integration (not yet checkpointed)
+
+- One shared asset/world owner now serves the browser and Node regression harness.
+- Two original fighters run together. Raw PAD input uses the original HSD queue,
+  clamp/scale processing, player activation and fighter processes. A 60-frame
+  walking trace moves only the selected fighter and survives world restart.
+- The browser imports fifteen local runtime files, starts/stops/restarts the world,
+  and runs the original standard/fixed camera initialization and controller.
+- All nine initial FD objects and native background graphs now run original
+  Ground startup and rendering passes. The stage advances at tick1801 and passes
+  3600 scheduled ticks and teardown in two worlds. A longer probe found that
+  the first-animation lookup lost its result across longjmp. The corrected
+  volatile pointer and typed callback advance through state9; a later FObj
+  interpolation failure is under investigation. Full-cycle fidelity is open.
+- Original SEM/synth/AX source produces SFX PCM with original SDK reverb/delay.
+  The integrated HPS stream runs the original three-slot scheduler through the
+  FD intro and loop, with identical complete PCM hashes across two 100-second
+  runs. Browser AudioWorklet transport is connected; audible browser verification
+  is pending the current scene-loading fixes. Replacement DSP coefficients are
+  identified explicitly; full hardware DSP equivalence is not established.
+- Source action readiness now covers 160 Mario submotions. All47 common effect entries and both Mario effect entries are hydrated.
+  Original jab, jump/landing, shield and damage traces pass across two worlds. Actual damage,
+  stocks and shield values are exposed directly for observation.
+- Original run-off, stock loss, respawn platform and grounded return pass in two
+  worlds after hydrating common root8. Certain run-off positions expose an
+  edge collision oscillation. An independent four-stock run with jumps passes
+  three respawns and the original elimination outcome in two worlds; it does
+  not resolve the plain-running collision defect.
+- B-button failures reached missing Mario article publication and original item
+  common-data/allocator startup. Ground/air B simulation now passes in two
+  worlds. A subsequent browser-only particle crash exposed raw GameCube FIFO
+  stores and a mismatched item material callback. Both are repaired: the rendered
+  ground/air B sequence reaches impact. Correcting the shared reciprocal-square-root
+  intrinsic restores fireball bounce velocity and P2 damage (6%); the full browser
+  subsequently exposed a burn-effect table copied as two instead of five bones.
+  All five are now owned; the browser ground/air B sequence completes twice with
+  6% P2 damage, and restart/unload succeed.
+- Corrected the source secondary-costume-color setting: its recovered function
+  name says ControllerIndex, but gm_16AE supplies sub_color. Controller routing
+  remains owned by the raw PAD queue.
+- Workers use GPT-5.6 Luna xhigh; the lead handles integration and difficult blockers.
+- A 102-frame retail comparison of a full jump/landing matches source motion IDs,
+  non-idle animation frames, and vertical-velocity bits on every frame. The
+  original match counter removes duplicate scheduler samples. Retail uses the
+  unlocked Stadium side platform; the port uses FD, so this is a scoped vertical
+  movement comparison, not full match equivalence. A second retail capture repeats
+  all 102 frames, and the updated intrinsic build still matches the comparison.
+- Local suite: 218 tests passed without skips after refreshing the affected
+  source trace binaries. The strengthened projectile regression passes actual P2 impact,
+  expiry and teardown in two worlds. All six ground/air side/up/down specials
+  also pass source action entry, finite state and two-world teardown checks.
+  Browser rendering remains a separate gate for those additional specials.
 
 ## Latest runtime evidence
 
@@ -61,7 +119,7 @@ The current build also passes a real-browser synthetic rendering smoke check.
 
 Browser keyboard input reaches Aurora PAD with distinct raw/clamped diagnostics
 and focus neutralization. Physical controllers remain untested. The runtime
-fighter is not yet connected to this browser input/presentation path.
+fighter now uses this browser input/presentation path; visual correctness remains open.
 
 ## Next
 

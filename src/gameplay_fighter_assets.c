@@ -2,6 +2,7 @@
 #include "gameplay_action_store.h"
 #include <melee/ft/ftdata.h>
 #include <melee/ft/types.h>
+#include <melee/it/it_26B1.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -78,6 +79,12 @@ void melee_web_fighter_assets_bind_created(Fighter* fp)
         fp->x24=actions;fp->x28=blends;
         current->fighters[i]=fp;
         fp->x590=fp->x598=NULL;fp->x59C=fp->x5A0=NULL;fp->x5A4=fp->x5A8=NULL;fp->x58C=current->motion_count;
+        /* The source Mario OnLoad normally publishes these identities into
+         * the character-item table. The browser-owned item registry is
+         * installed after the fighter data scope, so repeat that publication
+         * at the source Fighter bind boundary once the registry is live. */
+        it_8026B3F8(fp->ft_data->x48_items[0], It_Kind_Mario_Fire);
+        it_8026B3F8(fp->ft_data->x48_items[2], It_Kind_Mario_Cape);
         return;
     }
     fatal("Source Fighter action binding capacity exceeded");

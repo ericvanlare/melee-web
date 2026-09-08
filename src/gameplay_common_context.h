@@ -11,6 +11,12 @@ typedef struct MeleeWebCommonContext MeleeWebCommonContext;
  * The resulting owner is independent of the input archive and model lifetime. */
 MeleeWebCommonContext* melee_web_common_context_create(const MeleeWebCommonScalars*,
     const MeleeWebCommonTables*, const MeleeWebNativeGraph*, char*, size_t);
+/* Borrows fully hydrated source ColorOverlay tables through context destruction.
+ * Call before attach; common counts are source123 and6. */
+typedef struct MeleeWebColorRow {void* program; uint8_t priority,layer;} MeleeWebColorRow;
+int melee_web_common_context_set_color_tables(MeleeWebCommonContext*,const MeleeWebColorRow*,const MeleeWebColorRow*,char*,size_t);
+/* Borrows checked respawn platform descriptors until context destruction. */
+int melee_web_common_context_set_respawn(MeleeWebCommonContext*,void* joint,void* animation,char*,size_t);
 int melee_web_common_context_attach(MeleeWebCommonContext*, char*, size_t);
 int melee_web_common_context_require(MeleeWebCommonContext*, uint32_t mask, char*, size_t);
 /* Exact initialized root table for the source Fighter_LoadCommonData storage

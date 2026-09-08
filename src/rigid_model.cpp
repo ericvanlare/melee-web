@@ -79,7 +79,7 @@ void envelopes(const DatArchive& a, uint32_t table, RigidMesh& mesh) {
     }
 }
 
-void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel& model) {
+void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel& model, DatMaterialPolicy policy) {
     (void) a.range(offset, 24);
     absent(a, offset, "Custom polygon classes are unsupported");
     mesh.descriptor_offset = offset;
@@ -133,11 +133,12 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
             continue;
         }
         if (color) {
-            if (mode != direct || count != 1 || type != 5 || frac != 0 ||
+            const bool rgba6 = type == 4 && policy == DatMaterialPolicy::NativeDescriptors;
+            if (mode != direct || count != 1 || (type != 5 && !rgba6) || frac != 0 ||
                 (stride != 0 && stride != 4))
                 reject("Only direct RGBA8 vertex colors are supported");
             absent(a, d + 20, "Direct vertex colors cannot reference a vertex array");
-            widths[i] = 4;
+            widths[i] = rgba6 ? 3 : 4;
             mesh.attributes.push_back({attr, mode, count, type, frac, stride, nullptr, 0});
             continue;
         }
@@ -322,7 +323,7 @@ RigidModel::RigidModel(std::shared_ptr<const DatArchive> source, uint32_t joint_
         node.flags = a.be32(joint + 4);
         // These flags change the descriptor union itself, so this is not a
         // DObj graph whose render pass we can classify without another loader.
-        if (node.flags & (0x20U | 0x4000U)) reject("Particle and spline joint graphs are unsupported");
+        if ((node.flags & 0x20U) || ((node.flags & 0x4000U) && materials != DatMaterialPolicy::NativeDescriptors)) reject("Particle and spline joint graphs are unsupported");
         for (uint32_t axis = 0; axis < 3; ++axis) {
             node.rotation[axis] = a.f32(joint + 20 + 4 * axis);
             node.scale[axis] = a.f32(joint + 32 + 4 * axis);
@@ -348,6 +349,7 @@ RigidModel::RigidModel(std::shared_ptr<const DatArchive> source, uint32_t joint_
         // the iterative traversal visits parents before descendants without recursion.
         if (auto next = a.pointer(joint + 12, 64)) pending.push_back({*next, parent});
         if (auto child = a.pointer(joint + 8, 64)) pending.push_back({*child, joint_index});
+        if (node.flags & 0x4000U) continue; // Native owner validates the spline union separately.
         std::set<uint32_t> objects;
         auto dobj = a.pointer(joint + 16, 16);
         while (dobj) {
@@ -386,14 +388,14 @@ RigidModel::RigidModel(std::shared_ptr<const DatArchive> source, uint32_t joint_
                 mesh.joint_index = joint_index;
                 mesh.dobj_index = dobj_index;
                 mesh.material = cached->second;
-                geometry(a, *pobj, mesh, *this);
+                geometry(a, *pobj, mesh, *this, materials);
                 meshes.push_back(std::move(mesh));
                 pobj = a.pointer(*pobj + 4, 24);
             }
             dobj = a.pointer(*dobj + 4, 16);
         }
     }
-    if (meshes.empty() || !draw_packets)
+    if ((meshes.empty() || !draw_packets) && materials != DatMaterialPolicy::NativeDescriptors)
         reject("Model has no draw primitives");
     if (pass == ModelRenderPass::Opaque) {
         // Preserve the transform closure, including joints used by retained
@@ -430,7 +432,11 @@ RigidModel::RigidModel(std::shared_ptr<const DatArchive> source, uint32_t joint_
     for (const auto& node : joints) {
         // Never clear unsupported transform flags. An omitted billboard leaf
         // is safe only when neither a selected mesh nor an envelope needs it.
-        if (node.flags & ~0x701D01DFu) reject("Joint flags require unsupported HSD behavior");
+        // Native HSD computes ordinary, vertical, horizontal and rotation billboards.
+        // The inspection renderer still rejects that camera-dependent behavior.
+        const uint32_t allowed = 0x701D01DFu |
+            (materials == DatMaterialPolicy::NativeDescriptors ? 0x4e00u : 0u);
+        if ((node.flags & ~allowed) || (node.flags & 0xe00u)>0x800u) reject("Joint flags require unsupported HSD behavior");
         absent(a, node.descriptor_offset + 60, "Joint references are unsupported");
     }
     std::map<uint32_t, uint32_t> joint_indices;

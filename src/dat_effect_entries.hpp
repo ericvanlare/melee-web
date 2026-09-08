@@ -7,7 +7,7 @@ namespace melee_web {
 class DatEffectEntries {
 public:
     DatEffectEntries(std::shared_ptr<const DatArchive>,std::string_view exact_symbol,
-                     uint32_t bank,uint32_t source_entry_count);
+                     uint32_t bank,uint32_t source_entry_count,bool particle_descriptors=false);
     ~DatEffectEntries();
     DatEffectEntries(const DatEffectEntries&)=delete;
     DatEffectEntries& operator=(const DatEffectEntries&)=delete;

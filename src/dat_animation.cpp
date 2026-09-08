@@ -64,7 +64,7 @@ void check_format(std::uint8_t format)
             "Unsupported animation scalar encoding");
 }
 
-void validate(const MeleeWebAnimationTrack& track)
+void validate(const MeleeWebAnimationTrack& track, bool native_state_guard=false)
 {
     require(srt_channel(track.type), "Unsupported animation channel (requires ordinary joint SRT)");
     require(track.bytes && track.length > 0 && track.length <= 65535,
@@ -104,7 +104,7 @@ void validate(const MeleeWebAnimationTrack& track)
     require(has_value, "Animation track contains no value");
     // FObj assigns op_intrp when loading the next datum. A single non-key
     // datum reaches FObjUpdateAnim with op_intrp=NONE and an unset output.
-    require(operands >= 2 || first_opcode == 6,
+    require(native_state_guard || operands >= 2 || first_opcode == 6,
             "Animation interpolation requires a value pair or a key opcode");
 }
 } // namespace
@@ -115,6 +115,20 @@ extern "C" int melee_web_animation_validate_track(const MeleeWebAnimationTrack* 
     try {
         require(track != nullptr, "Missing animation track");
         validate(*track);
+        if (error && error_size) error[0] = '\0';
+        return 1;
+    } catch (const std::exception& exception) {
+        if (error && error_size) std::snprintf(error, error_size, "%s", exception.what());
+        return 0;
+    }
+}
+
+extern "C" int melee_web_animation_validate_native_track(const MeleeWebAnimationTrack* track,
+                                                   char* error, std::size_t error_size)
+{
+    try {
+        require(track != nullptr, "Missing animation track");
+        validate(*track,true);
         if (error && error_size) error[0] = '\0';
         return 1;
     } catch (const std::exception& exception) {

@@ -13,6 +13,19 @@ DatEffectBanks::DatEffectBanks(std::shared_ptr<const DatArchive> archive,std::st
         archive->next_target_offset(*commands)-*commands,
         archive->next_target_offset(*textures)-*textures,bank);
 }
+DatEffectBanks::DatEffectBanks(std::shared_ptr<const DatArchive> archive,std::string_view command_symbol,
+    std::string_view texture_symbol,uint32_t bank):arena_(archive)
+{
+    std::optional<uint32_t> commands,textures;
+    for(const auto& entry:archive->public_symbols()) {
+        if(entry.name==command_symbol)commands=entry.data_offset;
+        if(entry.name==texture_symbol)textures=entry.data_offset;
+    }
+    if(!commands||!textures)throw DatError("Exact particle command/texture public symbols are absent");
+    bank_=melee_web_effect_bank_decode_roots(arena_.reader(),*commands,*textures,
+        archive->next_target_offset(*commands)-*commands,
+        archive->next_target_offset(*textures)-*textures,bank);
+}
 DatEffectBanks::~DatEffectBanks()
 {
     // Continuing would release native pointers still published to original

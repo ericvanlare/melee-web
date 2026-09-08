@@ -16,7 +16,26 @@
 
 int main(void)
 {
+    union ColorOverlay_x8_t overlay={0};
+    uint32_t canonical=0xa7fff123;memcpy(&overlay,&canonical,4);
+    CHECK(overlay.unk.unk==41&&overlay.unk.timer==0x3fff123);
+    CHECK(overlay.light_rot2.x==-1&&overlay.light_rot2.yz==0x123&&overlay.light_rot2.light_enable==1);
+    const unsigned char rgba[4]={1,19,97,255};memcpy(&overlay,rgba,4);
+    CHECK(overlay.light_color.r==1&&overlay.light_color.g==19&&overlay.light_color.b==97&&overlay.light_color.a==255);
+    UnkFlagStruct byte_flags={0};
+#define BYTE_WRITE(bit) do { \
+    byte_flags.u8=0;byte_flags.b##bit=1;CHECK(byte_flags.u8==(1U<<(7-bit))); \
+    byte_flags.u8=255;byte_flags.b##bit=0;CHECK(byte_flags.u8==(255U^(1U<<(7-bit)))); \
+    byte_flags.u8=1U<<(7-bit);CHECK(byte_flags.b##bit==1); \
+    byte_flags.u8=255U^(1U<<(7-bit));CHECK(byte_flags.b##bit==0); \
+} while(0)
+    BYTE_WRITE(0);BYTE_WRITE(1);BYTE_WRITE(2);BYTE_WRITE(3);
+    BYTE_WRITE(4);BYTE_WRITE(5);BYTE_WRITE(6);BYTE_WRITE(7);
+#undef BYTE_WRITE
+    CHECK(sizeof(UnkFlagStruct)==1);
     Fighter fp = {0};
+    fp.x21FC_flag.u8=1;CHECK(fp.x21FC_flag.b7&&!fp.x21FC_flag.b0);
+    fp.x21FC_flag.u8=0x80;CHECK(!fp.x21FC_flag.b7&&fp.x21FC_flag.b0);
     char error[128];
     CHECK(melee_web_gameplay_check_fighter_flags(error, sizeof(error)));
     CHECK(melee_web_gameplay_check_stage_flags(error, sizeof(error)));

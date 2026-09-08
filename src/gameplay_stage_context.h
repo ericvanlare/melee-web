@@ -30,6 +30,8 @@ void* melee_web_stage_lights_descriptors(MeleeWebStageLights* lights);
 int melee_web_stage_lights_load(MeleeWebStageLights*, char*, size_t);
 int melee_web_stage_lights_stats(MeleeWebStageLights*, uint32_t* count,
     uint16_t* flags, uint8_t* rgba, uint32_t capacity, char*, size_t);
+/* Selects the published, loaded source LObj chain for an owned render pass. */
+int melee_web_stage_lights_select_current(char*, size_t);
 int melee_web_stage_lights_attach(MeleeWebStageLights*, char*, size_t);
 int melee_web_stage_lights_detach(MeleeWebStageLights*, char*, size_t);
 int melee_web_stage_lights_destroy(MeleeWebStageLights*, char*, size_t);

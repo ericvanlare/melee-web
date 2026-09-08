@@ -25,6 +25,11 @@ class EffectContextTests(unittest.TestCase):
     def test_authored_bank_bounds_lifetimes_and_restart(self):
         self.assertIn("Original particle bank ownership, bounds, readiness and restoration passed",self.run_trace())
 
+    def test_local_common_descriptors_and_original_spline_path(self):
+        asset=ROOT/"assets-local/next-gate/EfCoData.dat"
+        if not asset.is_file():self.skipTest("Owned common effect archive unavailable")
+        self.assertIn("Common47 descriptors and original PATH reference/evaluation/restart passed",self.run_trace("--common",asset))
+
     def test_local_mario_original_loader_and_native_animations(self):
         asset=ROOT/"assets-local/next-gate/EfMrData.dat"
         if not asset.is_file():

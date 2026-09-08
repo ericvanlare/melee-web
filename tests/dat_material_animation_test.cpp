@@ -42,6 +42,27 @@ int main() {
             try {melee_web::DatMaterialAnimation invalid(bad.archive(),0,model);}catch(const melee_web::DatError&){failed=true;}
             check(failed,"malformed material animation must reject before native evaluation");
         };
+        for(unsigned channel=2;channel<=9;channel++){
+            Fixture numeric;numeric.data[88]=channel;numeric.data[96]=0x12;
+            melee_web::DatMaterialAnimation transform(numeric.archive(),0,model);
+            check(transform.texture_animation_count()==1,"numeric texture transforms and blend permit checked interpolation");
+        }
+        Fixture unsupported_texture;unsupported_texture.data[88]=11;rejected(unsupported_texture);
+        Fixture alpha;
+        alpha.relocations.erase(std::remove(alpha.relocations.begin(),alpha.relocations.end(),20),alpha.relocations.end());
+        put32(alpha.data,20,0);alpha.link(16,52);alpha.data[88]=10;
+        melee_web::DatMaterialAnimation native_alpha(alpha.archive(),0,model);
+        check(native_alpha.descriptor()&&native_alpha.texture_animation_count()==0,"native material alpha owns numeric stream without texture tables");
+        Fixture unsupported_alpha=alpha;unsupported_alpha.data[88]=11;rejected(unsupported_alpha);
+        Fixture color=alpha;color.data[88]=9;
+        melee_web::DatMaterialAnimation native_color(color.archive(),0,model);
+        check(native_color.descriptor(),"bounded material RGB channel");
+        Fixture color_overflow=color;color_overflow.data[99]=64;
+        melee_web::DatMaterialAnimation runtime_checked_color(color_overflow.archive(),0,model);
+        Fixture color_interpolation=color;color_interpolation.data[96]=0x12;
+        melee_web::DatMaterialAnimation interpolated_color(color_interpolation.archive(),0,model);
+        check(interpolated_color.descriptor()&&runtime_checked_color.descriptor(),"original runtime guards validate produced color values");
+        Fixture broken_alpha=alpha;put32(broken_alpha.data,80,2);rejected(broken_alpha);
         Fixture bad;bad.data[99]=64;rejected(bad); // table index2 into two entries
         bad=Fixture();bad.data[96]=0x12;rejected(bad); // interpolated index could overshoot
         bad=Fixture();put32(bad.data,80,2);rejected(bad); // packet advertises two values

@@ -16,8 +16,10 @@ It does not establish complete scene fidelity or full-game performance.
 The separate Wasm runtime now executes original `Fighter_Create`, settles Mario
 into Wait through source physics, runs 120 neutral ticks, unloads, and restarts.
 The gate passes four fighter lifecycles across two complete worlds using owned
-local assets. It is not yet connected to browser rendering or controller input,
-and has not been compared against an original-game state trace.
+local assets. A separate browser runtime now connects two fighters, original controller
+processing and camera, and source audio. Scene and combat integration remain
+incomplete, and a scoped 102-frame original-game jump comparison passes; full-match
+equivalence and performance remain unverified.
 See [the runtime gate](docs/FIGHTER_RUNTIME.md) for reproduction and limits.
 
 ## Build and inspect

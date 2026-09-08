@@ -23,17 +23,28 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     : runtime_(std::make_shared<const DatFighterRuntime>(archive, costume)), store_(runtime_, container),
       rows_(nullptr, melee_web_action_rows_destroy)
 {
-    require(costume.fighter_kind == 0, "Native action store currently requires Mario Wait command semantics");
+    require(costume.fighter_kind == 0, "Native action store currently requires Mario common-action command semantics");
     std::vector<uint32_t> roots;
-    std::set<uint32_t> supported_motions{2, 6, 20};
-    for (auto choice : runtime_->wait_choices()) supported_motions.insert(choice.motion_id);
-    for (auto id : supported_motions) if (auto offset = runtime_->action(id).command_offset) roots.push_back(*offset);
+    // Explicit source ftCo submotion groups. This certifies command operand
+    // graphs only, not readiness of every original world service they invoke.
+    command_motions_ = {0,1,2,3,6};
+    auto group=[&](uint32_t first,uint32_t last){for(uint32_t id=first;id<=last;++id)command_motions_.insert(id);};
+    group(7,31);group(34,48);                     // locomotion, crouch, shield, dodge, jab
+    group(52,77);                                // grounded/aerial attacks and their landings
+    for(auto absent:{54U,56U,61U,63U,65U})command_motions_.erase(absent);
+    group(165,181);group(183,204);                // damage, knockdown and techs
+    command_motions_.insert(205);group(209,217);group(219,228);                // ledge actions
+    group(242,258);group(262,265);                // grab, pummel, throws and Mario capture reactions
+    group(286,291);                              // shield-break knockdown
+    group(295,302);                              // Mario special scripts; Article creation remains a service gate
+    for (auto choice : runtime_->wait_choices()) command_motions_.insert(choice.motion_id);
+    for (auto id : command_motions_) if (auto offset = runtime_->action(id).command_offset) roots.push_back(*offset);
     if (!roots.empty()) commands_ = std::make_unique<DatCommands>(archive, roots);
     std::vector<MeleeWebActionRow> rows;
     std::vector<MeleeWebWaitChoice> waits;
     for (const auto& a : runtime_->actions()) {
         void* command = nullptr;
-        if (a.command_offset) command = supported_motions.contains(a.motion_id) ? commands_->at(*a.command_offset) : melee_web_commands_unsupported();
+        if (a.command_offset) command = command_motions_.contains(a.motion_id) ? commands_->at(*a.command_offset) : melee_web_commands_unsupported();
         rows.push_back({a.symbol.c_str(), a.container_offset, a.archive_bytes, a.motion_flags, command,
                        {a.blend_dynamics[0], a.blend_dynamics[1]}});
     }

@@ -23,6 +23,8 @@ BOOL OSRestoreInterrupts(BOOL level){int previous=interrupts_enabled;interrupts_
  * CPU cache lines to flush. Preserve compiler ordering without changing bytes.
  * GPU upload/synchronization remains the renderer's responsibility. */
 void DCFlushRange(void* addr,u32 bytes){(void)addr;(void)bytes;atomic_signal_fence(memory_order_seq_cst);}
+void DCInvalidateRange(void* addr,u32 bytes){(void)addr;(void)bytes;atomic_signal_fence(memory_order_seq_cst);}
+void DCFlushRangeNoSync(void* addr,u32 bytes){(void)addr;(void)bytes;atomic_signal_fence(memory_order_seq_cst);}
 
 _Noreturn void melee_web_platform_unavailable(const char* operation)
 {
@@ -63,11 +65,14 @@ STOP(s32,CARDRenameAsync,(s32 chan U,const char* old_name U,const char* new_name
 STOP(s32,CARDUnmount,(s32 chan U))
 STOP(DVDDiskID*,DVDGetCurrentDiskID,(void))
 STOP(s32,DVDGetDriveStatus,(void))
+#if !defined(MELEE_WEB_AUDIO_STREAM)
 STOP(s32,DVDConvertPathToEntrynum,(const char* path U))
+#endif
 STOP(BOOL,DVDFastOpen,(s32 entry U,DVDFileInfo* file U))
 STOP(BOOL,DVDClose,(DVDFileInfo* file U))
 STOP(void,AISetStreamVolLeft,(u8 volume U))
 STOP(void,AISetStreamVolRight,(u8 volume U))
+#if !defined(MELEE_WEB_AUDIO)
 typedef void (*VoiceCallback)(void*);
 STOP(AXVPB*,AXAcquireVoice,(u32 priority U,VoiceCallback callback U,u32 context U))
 STOP(void,AXFreeVoice,(AXVPB* voice U))
@@ -84,11 +89,14 @@ STOP(void,AXSetVoiceSrc,(AXVPB* voice U,AXPBSRC* src U))
 STOP(void,AXSetVoiceSrcRatio,(AXVPB* voice U,float ratio U))
 STOP(void,AXSetVoiceState,(AXVPB* voice U,u16 state U))
 STOP(void,AXSetVoiceVe,(AXVPB* voice U,AXPBVE* envelope U))
+#endif
 /* These two missing declarations match original GXPixel.h/GXManage.h. */
 STOP(void,GXInitFogAdjTable,(GXFogAdjTable* table U,u16 width U,float projection[4][4] U))
 STOP(void,GXWaitDrawDone,(void))
 STOP(void,GXSetCopyClamp,(GXFBClamp clamp U))
+#if !defined(MELEE_WEB_AUDIO_STREAM)
 STOP(int,HSD_DevComRequest,(int file U,uintptr_t src U,uintptr_t dst U,size_t bytes U,int type U,int priority U,HSD_DevComCallback callback U,void* args U))
 STOP(int,HSD_DevComCancelEx,(int request U,u32 flags U,HSD_DevComCallback callback U,void* args U))
+#endif
 #undef STOP
 #undef U

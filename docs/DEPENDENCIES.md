@@ -96,6 +96,11 @@ compilation. The initial probe does not fabricate that asset to make it compile.
 
 ## Gameplay execution boundary
 
+The particle renderer’s direct GameCube write-gather stores are mapped to the
+equivalent GX position, texture-coordinate, and indexed-coordinate calls on PC.
+This preserves component order and expressions while routing every particle
+vertex through Aurora; the original PowerPC stores remain unchanged.
+
 `scripts/build.py --target gameplay` builds separate Wasm ABI, scheduler, collision
 and local-data probe executables. `scripts/check_gameplay.py` runs them with the
 pinned Node runtime; optional `--common`, `--stage` and `--stage-kind` inputs remain
@@ -152,3 +157,10 @@ Full fighter creation, action commands, physics, audio and match outcomes remain
 unvalidated. See [NEXT_PHASE.md](NEXT_PHASE.md) for parallel work boundaries,
 [ROADMAP.md](ROADMAP.md) for acceptance criteria and [STATUS.md](../STATUS.md)
 for observed results.
+
+The executable stage animation lookup uses a volatile local pointer across
+`setjmp`/`longjmp` and a pointer-typed traversal callback. Without volatility,
+the Wasm compiler returns the initial null pointer even after the callback
+finds an animation, stopping Final Destination at background state2. The
+regression runs the original lookup at optimization level O2 and verifies
+that removing volatility fails. Original PPC code remains unchanged.

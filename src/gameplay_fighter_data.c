@@ -3,6 +3,8 @@
 #include "gameplay_article_data.h"
 #include <melee/ft/types.h>
 #include <melee/ft/kinds/ftMario/types.h>
+#include <sysdolphin/baselib/jobj.h>
+#include <stddef.h>
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -149,8 +151,10 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     d->x4C_sfx->x1C=(int)(uintptr_t)sound_array(r,at+28);
     for(unsigned i=1;i<14;++i) if(i!=7 && i!=8) ((int*)d->x4C_sfx)[i]=(int)WORD(at+i*4);
     at=required(r,root+0x50,8); d->x50=NEW(Vec2,1); d->x50->x=floating(r,at); d->x50->y=floating(r,at+4);
-    at=required(r,root+0x54,8); int* light_parts=NEW(int,2); light_parts[0]=WORD(at); light_parts[1]=WORD(at+4);
-    d->x54=(int)(uintptr_t)light_parts;
+    /* ftCo_8009F834 rotates through five Fighter_Part entries for effect 0x8D. */
+    at=required(r,root+0x54,5*sizeof(int)); int* effect_parts=NEW(int,5);
+    for(unsigned i=0;i<5;++i) effect_parts[i]=(int)WORD(at+i*4);
+    d->x54=(int)(uintptr_t)effect_parts;
     at=required(r,root+0x58,28); d->x58=NEW(struct ftData_x58_t,1);
     d->x58->x0=BYTE(at); d->x58->x1=BYTE(at+1); d->x58->x4=floating(r,at+4);
     d->x58->x8=BYTE(at+8); d->x58->x9=BYTE(at+9); d->x58->xC=floating(r,at+12);
@@ -169,6 +173,12 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     if(blends) *unresolved &= ~(1U<<4);
     if(choices) *unresolved &= ~(1U<<9);
     return d;
+}
+
+void* melee_web_fighter_data_article(void* data, uint32_t index)
+{
+    if (!data || index >= 4) return NULL;
+    return ((ftData*)data)->x48_items[index];
 }
 
 int melee_web_fighter_data_set_metal(void* data,void* joint,uint32_t costumes,
@@ -196,4 +206,20 @@ int melee_web_fighter_data_set_metal(void* data,void* joint,uint32_t costumes,
     }
     d->x5C=joint;*unresolved&=~(1U<<23);if(error&&size)*error=0;return 1;
 #undef METAL_REQUIRE
+}
+
+void melee_web_fighter_data_set_guard(const MeleeWebNativeDat* r,uint32_t root,
+    void* data,void* joint,uint32_t* unresolved)
+{
+    _Static_assert(offsetof(HSD_Joint,child)==2*sizeof(HSD_Joint*),"Source guard child alias");
+    ftData* d=data; HSD_Joint* pose=joint;
+    REQUIRE(d&&pose&&pose->child&&unresolved&&(*unresolved&(1U<<8))&&!d->x20,
+            "Guard pose requires an unresolved source descriptor with a child");
+    uint32_t at=required(r,root+0x20,4);
+    required(r,at,64);
+    /* Source guard consumers read only x0. The next relocated object starts
+     * at +4; the decompiler's unused x8 member is not serialized here. */
+    struct ftData_x20* guard=NEW(struct ftData_x20,1);
+    guard->x0=(HSD_Joint**)pose;
+    d->x20=guard; *unresolved&=~(1U<<8);
 }

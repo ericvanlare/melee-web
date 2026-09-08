@@ -12,6 +12,14 @@ extern "C" {
 void* melee_web_fighter_data_decode(const MeleeWebNativeDat*, uint32_t root,
     uint32_t kind, uint32_t costume_count, void* actions, void* blends,
     void* wait_choices, uint32_t* unresolved_fields);
+/* Return one of the four source Article identities retained in ftData x48.
+ * The returned Article is allocated by the same reader arena as the ftData
+ * root, so callers must keep that arena alive while the source Fighter runs. */
+void* melee_web_fighter_data_article(void* data, uint32_t index);
+/* Publish the owned guard pose descriptor; source x0[2] aliases Joint.child.
+ * The descriptor owner must outlive source fighters, like the costume owner. */
+void melee_web_fighter_data_set_guard(const MeleeWebNativeDat*,uint32_t root,
+    void* data,void* joint,uint32_t* unresolved);
 /* Borrow the checked native metal descriptor until every source Fighter is
  * destroyed. Validates category2 visibility indices against the real DObj
  * occurrence count before marking the constructor-reachable x5C field ready. */

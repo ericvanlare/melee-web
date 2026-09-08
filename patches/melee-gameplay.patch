@@ -1,7 +1,969 @@
+diff --git a/extern/dolphin/src/dolphin/ax/AXAux.c b/extern/dolphin/src/dolphin/ax/AXAux.c
+index f78f8f9..4424b86 100644
+--- a/extern/dolphin/src/dolphin/ax/AXAux.c
++++ b/extern/dolphin/src/dolphin/ax/AXAux.c
+@@ -124,3 +124,62 @@ void AXRegisterAuxBCallback(void (*callback)(void*, void*), void* context)
+     __AXCallbackAuxB = callback;
+     __AXContextAuxB = context;
+ }
++
++/* Native output must reject effects until their buffers are implemented. */
++u32 melee_web_audio_aux_enabled(void)
++{
++    return __AXCallbackAuxA != NULL || __AXCallbackAuxB != NULL;
++}
++
++#include <string.h>
++static struct {
++    __typeof__(__AXBufferAuxA) __AXBufferAuxA;
++    __typeof__(__AXBufferAuxB) __AXBufferAuxB;
++    __typeof__(__AXCallbackAuxA) __AXCallbackAuxA;
++    __typeof__(__AXCallbackAuxB) __AXCallbackAuxB;
++    __typeof__(__AXContextAuxA) __AXContextAuxA;
++    __typeof__(__AXContextAuxB) __AXContextAuxB;
++    __typeof__(__AXAuxADspWrite) __AXAuxADspWrite;
++    __typeof__(__AXAuxADspRead) __AXAuxADspRead;
++    __typeof__(__AXAuxBDspWrite) __AXAuxBDspWrite;
++    __typeof__(__AXAuxBDspRead) __AXAuxBDspRead;
++    __typeof__(__AXAuxDspWritePosition) __AXAuxDspWritePosition;
++    __typeof__(__AXAuxDspReadPosition) __AXAuxDspReadPosition;
++    __typeof__(__AXAuxCpuReadWritePosition) __AXAuxCpuReadWritePosition;
++} melee_aux_saved;
++void melee_web_audio_aux_begin(void)
++{
++    memcpy(&melee_aux_saved.__AXBufferAuxA,&__AXBufferAuxA,sizeof(__AXBufferAuxA));
++    memcpy(&melee_aux_saved.__AXBufferAuxB,&__AXBufferAuxB,sizeof(__AXBufferAuxB));
++    memcpy(&melee_aux_saved.__AXCallbackAuxA,&__AXCallbackAuxA,sizeof(__AXCallbackAuxA));
++    memcpy(&melee_aux_saved.__AXCallbackAuxB,&__AXCallbackAuxB,sizeof(__AXCallbackAuxB));
++    memcpy(&melee_aux_saved.__AXContextAuxA,&__AXContextAuxA,sizeof(__AXContextAuxA));
++    memcpy(&melee_aux_saved.__AXContextAuxB,&__AXContextAuxB,sizeof(__AXContextAuxB));
++    memcpy(&melee_aux_saved.__AXAuxADspWrite,&__AXAuxADspWrite,sizeof(__AXAuxADspWrite));
++    memcpy(&melee_aux_saved.__AXAuxADspRead,&__AXAuxADspRead,sizeof(__AXAuxADspRead));
++    memcpy(&melee_aux_saved.__AXAuxBDspWrite,&__AXAuxBDspWrite,sizeof(__AXAuxBDspWrite));
++    memcpy(&melee_aux_saved.__AXAuxBDspRead,&__AXAuxBDspRead,sizeof(__AXAuxBDspRead));
++    memcpy(&melee_aux_saved.__AXAuxDspWritePosition,&__AXAuxDspWritePosition,sizeof(__AXAuxDspWritePosition));
++    memcpy(&melee_aux_saved.__AXAuxDspReadPosition,&__AXAuxDspReadPosition,sizeof(__AXAuxDspReadPosition));
++    memcpy(&melee_aux_saved.__AXAuxCpuReadWritePosition,&__AXAuxCpuReadWritePosition,sizeof(__AXAuxCpuReadWritePosition));
++    memset(__AXBufferAuxA,0,sizeof(__AXBufferAuxA));
++    memset(__AXBufferAuxB,0,sizeof(__AXBufferAuxB));
++    __AXAuxInit();
++}
++void melee_web_audio_aux_end(void)
++{
++    __AXAuxQuit();
++    memcpy(&__AXBufferAuxA,&melee_aux_saved.__AXBufferAuxA,sizeof(__AXBufferAuxA));
++    memcpy(&__AXBufferAuxB,&melee_aux_saved.__AXBufferAuxB,sizeof(__AXBufferAuxB));
++    memcpy(&__AXCallbackAuxA,&melee_aux_saved.__AXCallbackAuxA,sizeof(__AXCallbackAuxA));
++    memcpy(&__AXCallbackAuxB,&melee_aux_saved.__AXCallbackAuxB,sizeof(__AXCallbackAuxB));
++    memcpy(&__AXContextAuxA,&melee_aux_saved.__AXContextAuxA,sizeof(__AXContextAuxA));
++    memcpy(&__AXContextAuxB,&melee_aux_saved.__AXContextAuxB,sizeof(__AXContextAuxB));
++    memcpy(&__AXAuxADspWrite,&melee_aux_saved.__AXAuxADspWrite,sizeof(__AXAuxADspWrite));
++    memcpy(&__AXAuxADspRead,&melee_aux_saved.__AXAuxADspRead,sizeof(__AXAuxADspRead));
++    memcpy(&__AXAuxBDspWrite,&melee_aux_saved.__AXAuxBDspWrite,sizeof(__AXAuxBDspWrite));
++    memcpy(&__AXAuxBDspRead,&melee_aux_saved.__AXAuxBDspRead,sizeof(__AXAuxBDspRead));
++    memcpy(&__AXAuxDspWritePosition,&melee_aux_saved.__AXAuxDspWritePosition,sizeof(__AXAuxDspWritePosition));
++    memcpy(&__AXAuxDspReadPosition,&melee_aux_saved.__AXAuxDspReadPosition,sizeof(__AXAuxDspReadPosition));
++    memcpy(&__AXAuxCpuReadWritePosition,&melee_aux_saved.__AXAuxCpuReadWritePosition,sizeof(__AXAuxCpuReadWritePosition));
++}
+diff --git a/extern/dolphin/src/dolphin/ax/AXVPB.c b/extern/dolphin/src/dolphin/ax/AXVPB.c
+index 730ce47..14fe959 100644
+--- a/extern/dolphin/src/dolphin/ax/AXVPB.c
++++ b/extern/dolphin/src/dolphin/ax/AXVPB.c
+@@ -1,4 +1,5 @@
+ #include "__ax.h"
++#include <string.h>
+ 
+ #include <dolphin.h>
+ #include <dolphin/ax.h>
+@@ -1026,18 +1027,9 @@ void AXSetVoiceAddr(AXVPB* p, AXPBADDR* addr)
+     src = (void*) addr;
+ 
+     old = OSDisableInterrupts();
+-    {
+-        *(dst) = *(src);
+-        dst += 1;
+-        src += 1;
+-        *(dst) = *(src);
+-        dst += 1;
+-        src += 1;
+-        *(dst) = *(src);
+-        dst += 1;
+-        src += 1;
+-        *(dst) = *(src);
+-    }
++    p->pb.addr = *addr;
++    dst += 3;
++
+     switch (addr->format) {
+     case 0:
+         ASSERTMSGLINE(0x4BA, (addr->loopAddressLo & 0xF) > 1,
+@@ -1157,38 +1149,8 @@ void AXSetVoiceAdpcm(AXVPB* p, AXPBADPCM* adpcm)
+ 
+     old = OSDisableInterrupts();
+ 
+-    {
+-        *(dst) = *(src);
+-        dst += 1;
+-        src += 1;
+-        *(dst) = *(src);
+-        dst += 1;
+-        src += 1;
+-        *(dst) = *(src);
+-        dst += 1;
+-        src += 1;
+-        *(dst) = *(src);
+-        dst += 1;
+-        src += 1;
+-        *(dst) = *(src);
+-        dst += 1;
+-        src += 1;
+-        *(dst) = *(src);
+-        dst += 1;
+-        src += 1;
+-        *(dst) = *(src);
+-        dst += 1;
+-        src += 1;
+-        *(dst) = *(src);
+-        dst += 1;
+-        src += 1;
+-        *(dst) = *(src);
+-        dst += 1;
+-        src += 1;
+-        *(dst) = *(src);
+-        dst += 1;
+-        src += 1;
+-    }
++    p->pb.adpcm = *adpcm;
++
+     p->sync |= AX_SYNC_FLAG_COPYADPCM;
+     OSRestoreInterrupts(old);
+ }
+diff --git a/extern/dolphin/src/dolphin/axfx/delay.c b/extern/dolphin/src/dolphin/axfx/delay.c
+index 7f34645..b2a3579 100644
+--- a/extern/dolphin/src/dolphin/axfx/delay.c
++++ b/extern/dolphin/src/dolphin/axfx/delay.c
+@@ -90,7 +90,7 @@ int AXFXDelayInit(struct AXFX_DELAY* delay)
+     delay->right = NULL;
+     delay->sur = NULL;
+     OSRestoreInterrupts(old);
+-    AXFXDelaySettings(delay);
++    return AXFXDelaySettings(delay);
+ }
+ 
+ int AXFXDelayShutdown(struct AXFX_DELAY* delay)
+diff --git a/extern/dolphin/src/dolphin/axfx/reverb_std.c b/extern/dolphin/src/dolphin/axfx/reverb_std.c
+index f8a271e..ccc61db 100644
+--- a/extern/dolphin/src/dolphin/axfx/reverb_std.c
++++ b/extern/dolphin/src/dolphin/axfx/reverb_std.c
+@@ -136,269 +136,10 @@ const static float value0_3 = 0.3f;
+ const static float value0_6 = 0.6f;
+ const static double i2fMagic = 4503601774854144.0;
+ 
+-asm static void HandleReverb(register long* sptr,
+-                             register struct AXFX_REVSTD_WORK* rv)
++extern void melee_web_audio_handle_reverb(long*,struct AXFX_REVSTD_WORK*);
++static void HandleReverb(long* samples,struct AXFX_REVSTD_WORK* work)
+ {
+-    // clang-format off
+-    nofralloc
+-	stwu r1, -144(r1)
+-	stmw r17, 8(r1)
+-	stfd f14, 88(r1)
+-	stfd f15, 96(r1)
+-	stfd f16, 104(r1)
+-	stfd f17, 112(r1)
+-	stfd f18, 120(r1)
+-	stfd f19, 128(r1)
+-	stfd f20, 136(r1)
+-	lis r31, value0_3@ha
+-	lfs f6, value0_3@l(r31)
+-	lis r31, value0_6@ha
+-	lfs f9, value0_6@l(r31)
+-	lis r31, i2fMagic@ha
+-	lfd f5, i2fMagic@l(r31)
+-	lfs f2, AXFX_REVSTD_WORK.allPassCoeff(rv)
+-	lfs f11, AXFX_REVSTD_WORK.damping(rv)
+-	lfs f8, AXFX_REVSTD_WORK.level(rv)
+-	fmuls f3, f8, f9
+-	fsubs f4, f9, f3
+-	lis r30, 0x4330 // 176.0f (0x43300000)
+-	stw r30, 80(r1)
+-	li r5, 0
+-L_00000638:
+-	slwi r31, r5, 3
+-	add r31, r31, rv
+-	lfs f19, AXFX_REVSTD_WORK.combCoef[0](r31)
+-	lfs f20, AXFX_REVSTD_WORK.combCoef[1](r31)
+-	slwi r31, r5, 2
+-	add r31, r31, rv
+-	lfs f7, AXFX_REVSTD_WORK.lpLastout[0](r31)
+-	lwz r27, AXFX_REVSTD_WORK.preDelayLine[0](r31)
+-	lwz r28, AXFX_REVSTD_WORK.preDelayPtr[0](r31)
+-	lwz r31, AXFX_REVSTD_WORK.preDelayTime(rv)
+-	subi r22, r31, 1
+-	slwi r22, r22, 2
+-	add r22, r22, r27
+-	cmpwi cr7, r31, 0
+-	mulli r31, r5, 0x28 // sizeof(struct AXFX_REVSTD_DELAYLINE * 2)
+-	addi r29, rv, AXFX_REVSTD_WORK.C
+-	add r29, r29, r31
+-	addi r30, rv, AXFX_REVSTD_WORK.AP
+-	add r30, r30, r31
+-	lwz r21, AXFX_REVSTD_DELAYLINE.inPoint    + 0x00(r29) // C array + 0
+-	lwz r20, AXFX_REVSTD_DELAYLINE.outPoint   + 0x00(r29) // C array + 0
+-	lwz r19, AXFX_REVSTD_DELAYLINE.inPoint    + 0x14(r29) // C array + 1
+-	lwz r18, AXFX_REVSTD_DELAYLINE.outPoint   + 0x14(r29) // C array + 1
+-	lfs f15, AXFX_REVSTD_DELAYLINE.lastOutput + 0x00(r29) // C array + 0
+-	lfs f16, AXFX_REVSTD_DELAYLINE.lastOutput + 0x14(r29) // C array + 1
+-	lwz r26, AXFX_REVSTD_DELAYLINE.length     + 0x00(r29) // C array + 0
+-	lwz r25, AXFX_REVSTD_DELAYLINE.length     + 0x14(r29) // C array + 1
+-	lwz r7,  AXFX_REVSTD_DELAYLINE.inputs     + 0x00(r29) // C array + 0
+-	lwz r8,  AXFX_REVSTD_DELAYLINE.inputs     + 0x14(r29) // C array + 1
+-	lwz r12, AXFX_REVSTD_DELAYLINE.inPoint    + 0x00(r30) // AP array + 0
+-	lwz r11, AXFX_REVSTD_DELAYLINE.outPoint   + 0x00(r30) // AP array + 0
+-	lwz r10, AXFX_REVSTD_DELAYLINE.inPoint    + 0x14(r30) // AP array + 1
+-	lwz r9,  AXFX_REVSTD_DELAYLINE.outPoint   + 0x14(r30) // AP array + 1
+-	lfs f17, AXFX_REVSTD_DELAYLINE.lastOutput + 0x00(r30) // AP array + 0
+-	lfs f18, AXFX_REVSTD_DELAYLINE.lastOutput + 0x14(r30) // AP array + 1
+-	lwz r24, AXFX_REVSTD_DELAYLINE.length     + 0x00(r30) // AP array + 0
+-	lwz r23, AXFX_REVSTD_DELAYLINE.length     + 0x14(r30) // AP array + 1
+-	lwz r17, AXFX_REVSTD_DELAYLINE.inputs     + 0x00(r30) // AP array + 0
+-	lwz r6,  AXFX_REVSTD_DELAYLINE.inputs     + 0x14(r30) // AP array + 1
+-	lwz r30, 0(sptr)
+-	xoris r30, r30, 0x8000
+-	stw r30, 84(r1)
+-	lfd f12, 80(r1)
+-	fsubs f12, f12, f5
+-	li r31, 159
+-	mtctr r31
+-L_000006F0:
+-	fmr f13, f12
+-	beq cr7, L_00000710
+-	lfs f13, 0(r28)
+-	addi r28, r28, 4
+-	cmpw r28, r22
+-	stfs f12, -4(r28)
+-	bne+ L_00000710
+-	mr r28, r27
+-L_00000710:
+-	fmadds f8, f19, f15, f13
+-	lwzu r29, 4(sptr)
+-	fmadds f9, f20, f16, f13
+-	stfsx f8, r7, r21
+-	addi r21, r21, 4
+-	stfsx f9, r8, r19
+-	lfsx f14, r7, r20
+-	addi r20, r20, 4
+-	lfsx f16, r8, r18
+-	cmpw r21, r26
+-	cmpw cr1, r20, r26
+-	addi r19, r19, 4
+-	addi r18, r18, 4
+-	fmr f15, f14
+-	cmpw cr5, r19, r25
+-	fadds f14, f14, f16
+-	cmpw cr6, r18, r25
+-	bne+ L_0000075C
+-	li r21, 0
+-L_0000075C:
+-	xoris r29, r29, 0x8000
+-	fmadds f9, f2, f17, f14
+-	bne+ cr1, L_0000076C
+-	li r20, 0
+-L_0000076C:
+-	stw r29, 84(r1)
+-	bne+ cr5, L_00000778
+-	li r19, 0
+-L_00000778:
+-	stfsx f9, r17, r12
+-	fnmsubs f14, f2, f9, f17
+-	addi r12, r12, 4
+-	bne+ cr6, L_0000078C
+-	li r18, 0
+-L_0000078C:
+-	lfsx f17, r17, r11
+-	cmpw cr5, r12, r24
+-	addi r11, r11, 4
+-	cmpw cr6, r11, r24
+-	bne+ cr5, L_000007A4
+-	li r12, 0
+-L_000007A4:
+-	bne+ cr6, L_000007AC
+-	li r11, 0
+-L_000007AC:
+-	fmuls f14, f14, f6
+-	lfd f10, 80(r1)
+-	fmadds f14, f11, f7, f14
+-	fmadds f9, f2, f18, f14
+-	fmr f7, f14
+-	stfsx f9, r6, r10
+-	fnmsubs f14, f2, f9, f18
+-	fmuls f8, f4, f12
+-	lfsx f18, r6, r9
+-	addi r10, r10, 4
+-	addi r9, r9, 4
+-	fmadds f14, f3, f14, f8
+-	cmpw cr5, r10, r23
+-	cmpw cr6, r9, r23
+-	fctiwz f14, f14
+-	bne+ cr5, L_000007F0
+-	li r10, 0
+-L_000007F0:
+-	bne+ cr6, L_000007F8
+-	li r9, 0
+-L_000007F8:
+-	li r31, -4
+-	fsubs f12, f10, f5
+-	stfiwx f14, sptr, r31
+-	bdnz L_000006F0
+-	fmr f13, f12
+-	beq cr7, L_00000828
+-	lfs f13, 0(r28)
+-	addi r28, r28, 4
+-	cmpw r28, r22
+-	stfs f12, -4(r28)
+-	bne+ L_00000828
+-	mr r28, r27
+-L_00000828:
+-	fmadds f8, f19, f15, f13
+-	fmadds f9, f20, f16, f13
+-	stfsx f8, r7, r21
+-	addi r21, r21, 4
+-	stfsx f9, r8, r19
+-	lfsx f14, r7, r20
+-	addi r20, r20, 4
+-	lfsx f16, r8, r18
+-	cmpw r21, r26
+-	cmpw cr1, r20, r26
+-	addi r19, r19, 4
+-	addi r18, r18, 4
+-	fmr f15, f14
+-	cmpw cr5, r19, r25
+-	fadds f14, f14, f16
+-	cmpw cr6, r18, r25
+-	bne+ L_00000870
+-	li r21, 0
+-L_00000870:
+-	fmadds f9, f2, f17, f14
+-	bne+ cr1, L_0000087C
+-	li r20, 0
+-L_0000087C:
+-	bne+ cr5, L_00000884
+-	li r19, 0
+-L_00000884:
+-	stfsx f9, r17, r12
+-	fnmsubs f14, f2, f9, f17
+-	addi r12, r12, 4
+-	bne+ cr6, L_00000898
+-	li r18, 0
+-L_00000898:
+-	lfsx f17, r17, r11
+-	cmpw cr5, r12, r24
+-	addi r11, r11, 4
+-	cmpw cr6, r11, r24
+-	bne+ cr5, L_000008B0
+-	li r12, 0
+-L_000008B0:
+-	bne+ cr6, L_000008B8
+-	li r11, 0
+-L_000008B8:
+-	fmuls f14, f14, f6
+-	fmadds f14, f11, f7, f14
+-	mulli r31, r5, 0x28 // sizeof(struct AXFX_REVSTD_DELAYLINE * 2)
+-	fmadds f9, f2, f18, f14
+-	fmr f7, f14
+-	addi r29, rv, AXFX_REVSTD_WORK.C
+-	add r29, r29, r31
+-	stfsx f9, r6, r10
+-	fnmsubs f14, f2, f9, f18
+-	fmuls f8, f4, f12
+-	lfsx f18, r6, r9
+-	addi r10, r10, 4
+-	addi r9, r9, 4
+-	fmadds f14, f3, f14, f8
+-	cmpw cr5, r10, r23
+-	cmpw cr6, r9, r23
+-	fctiwz f14, f14
+-	bne+ cr5, L_00000904
+-	li r10, 0
+-L_00000904:
+-	bne+ cr6, L_0000090C
+-	li r9, 0
+-L_0000090C:
+-	addi r30, rv, AXFX_REVSTD_WORK.AP
+-	add r30, r30, r31
+-	stfiwx f14, r0, sptr
+-	stw r21, AXFX_REVSTD_DELAYLINE.inPoint  + 0x00(r29) // C array + 0
+-	stw r20, AXFX_REVSTD_DELAYLINE.outPoint + 0x00(r29) // C array + 0
+-	stw r19, AXFX_REVSTD_DELAYLINE.inPoint  + 0x14(r29) // C array + 1
+-	stw r18, AXFX_REVSTD_DELAYLINE.outPoint + 0x14(r29) // C array + 1
+-	addi sptr, sptr, 4
+-	stfs f15, AXFX_REVSTD_DELAYLINE.lastOutput + 0x00(r29) // C array + 0
+-	stfs f16, AXFX_REVSTD_DELAYLINE.lastOutput + 0x14(r29) // C array + 1
+-	slwi r31, r5, 2
+-	add r31, r31, rv
+-	addi r5, r5, 1
+-	stw r12, AXFX_REVSTD_DELAYLINE.inPoint  + 0x00(r30) // AP array + 0
+-	stw r11, AXFX_REVSTD_DELAYLINE.outPoint + 0x00(r30) // AP array + 0
+-	stw r10, AXFX_REVSTD_DELAYLINE.inPoint  + 0x14(r30) // AP array + 1
+-	stw r9, AXFX_REVSTD_DELAYLINE.outPoint  + 0x14(r30) // AP array + 1
+-	cmpwi r5, 3
+-	stfs f17, AXFX_REVSTD_DELAYLINE.lastOutput + 0x00(r30) // AP array + 0
+-	stfs f18, AXFX_REVSTD_DELAYLINE.lastOutput + 0x14(r30) // AP array + 1
+-	stfs f7, AXFX_REVSTD_WORK.lpLastout(r31)
+-	stw r28, AXFX_REVSTD_WORK.preDelayPtr(r31)
+-	bne L_00000638
+-	lfd f14, 88(r1)
+-	lfd f15, 96(r1)
+-	lfd f16, 104(r1)
+-	lfd f17, 112(r1)
+-	lfd f18, 120(r1)
+-	lfd f19, 128(r1)
+-	lfd f20, 136(r1)
+-	lmw r17, 8(r1)
+-	addi r1, r1, 144
+-	blr
+-    // clang-format on
++    melee_web_audio_handle_reverb(samples,work);
+ }
+ 
+ static void ReverbSTDCallback(long* left, long* right, long* surround,
+diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
+index 72edc9d..dc33cdc 100644
+--- a/src/melee/cm/camera.c
++++ b/src/melee/cm/camera.c
+@@ -52,6 +52,10 @@
+ 
+ /* 452C68 */ static Camera cm_80452C68;
+ /* 453004 */ CameraDebugMode cm_80453004;
++#if defined(MELEE_WEB_GAMEPLAY)
++/* Host lifetime owner snapshots the actual source camera between matches. */
++void* melee_web_camera_state(void) { return &cm_80452C68; }
++#endif
+ 
+ /* 3BCB18 */ static CameraModeCallbacks cm_803BCB18 = {
+     Camera_8002B3D4,
+diff --git a/src/melee/ef/efalt.c b/src/melee/ef/efalt.c
+index 4602bcd..3140ec8 100644
+--- a/src/melee/ef/efalt.c
++++ b/src/melee/ef/efalt.c
+@@ -9,7 +9,11 @@
+ #include <sysdolphin/baselib/gobj.h>
+ #include <sysdolphin/baselib/jobj.h>
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++#define EFALT_VA_ARG(t) va_arg(vlist, t)
++#else
+ #define EFALT_VA_ARG(t) (*((t*) __va_arg(vlist_arg, _var_arg_typeof(t))))
++#endif
+ 
+ extern volatile u32 efLib_LoadKind;
+ extern volatile s32 efLib_AnimCount;
+diff --git a/src/melee/ft/fighter.c b/src/melee/ft/fighter.c
+index 8299c5c..98a0f24 100644
+--- a/src/melee/ft/fighter.c
++++ b/src/melee/ft/fighter.c
+@@ -1,4 +1,7 @@
+ #include "fighter.h"
++#if defined(MELEE_WEB_GAMEPLAY)
++#include "gameplay_fighter_assets.h"
++#endif
+ 
+ #include <math.h>
+ #include <placeholder.h>
+@@ -179,7 +182,12 @@ void Fighter_FirstInitialize_80067A84(void)
+ void Fighter_LoadCommonData(void)
+ {
+     void** pData;
++#if defined(MELEE_WEB_GAMEPLAY)
++    extern void** melee_web_common_context_source_roots(void);
++    pData = melee_web_common_context_source_roots();
++#else
+     lbArchive_LoadSymbols("PlCo.dat", (void**) &pData, "ftLoadCommonData", 0);
++#endif
+ 
+     // copy 23 4-byte chunks from pData to p_ftCommonData in reverse order,
+     // equivalent to this: for(i=0; i<23; i++)
+@@ -3112,8 +3120,12 @@ void Fighter_Unload_8006DABC(void* user_data)
+     HSD_LObjRemoveAll(fp->x588);
+     Player_80031FB0(fp->player_id, fp->x221F_b4);
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_fighter_assets_unbind_destroying(fp);
++#else
+     HSD_ObjFree(&fighter_x59C_alloc_data, fp->x59C);
+     HSD_ObjFree(&fighter_x59C_alloc_data, fp->x5A0);
++#endif
+     HSD_ObjFree(&fighter_parts_alloc_data, fp->parts);
+     HSD_ObjFree(&fighter_dobj_list_alloc_data, fp->dobj_list.data);
+     HSD_ObjFree(&fighter_x2040_alloc_data, fp->x203C.data);
+diff --git a/src/melee/ft/ftaction.c b/src/melee/ft/ftaction.c
+index b32aa2a..7eaf8b3 100644
+--- a/src/melee/ft/ftaction.c
++++ b/src/melee/ft/ftaction.c
+@@ -1,3 +1,6 @@
++#if defined(MELEE_WEB_GAMEPLAY)
++#include "gameplay_action_store.h"
++#endif
+ #include "ftaction.h"
+ 
+ #include <Runtime/platform.h>
+@@ -290,14 +293,21 @@ void ftAction_8007121C(Fighter_GObj* gobj, CommandInfo* cmd)
+     HitCapsule* hitbox;
+     u32 hit_group;
+     u32 idx;
++#if !defined(MELEE_WEB_GAMEPLAY) || __BYTE_ORDER__ != __ORDER_LITTLE_ENDIAN__
+     struct spawn_hitbox_skip* skip;
++#endif
+     PAD_STACK(8);
+ 
+     fp = GET_FIGHTER(gobj);
+     /// @todo this matches but isnt pretty. maybe an inline/macro as
+     // we dont have enough stack in general?
++#if defined(MELEE_WEB_GAMEPLAY) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++    if (cmd->u[3].create_hitbox_3.ignore_thrown_fighters &&
++        fp->x1064_thrownHitbox.owner == NULL) {
++#else
+     skip = (struct spawn_hitbox_skip*) cmd->u;
+     if ((skip->xF_b4) && (fp->x1064_thrownHitbox.owner == NULL)) {
++#endif
+         ftAction_800715EC(gobj, cmd);
+     } else {
+         hit_group = cmd->u->create_hitbox_0.hit_group;
+@@ -350,7 +360,13 @@ void ftAction_8007121C(Fighter_GObj* gobj, CommandInfo* cmd)
+         hitbox->x42_b0 = 0;
+         hitbox->x42_b4 = 0;
+         hitbox->x41_b7 = 0;
++#if defined(MELEE_WEB_GAMEPLAY) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++        /* The original DOL reads byte1 bit3 of the following command here. */
++        hitbox->hit_grabbed_victim_only =
++            (melee_web_command_original_word(cmd->u) >> 19) & 1;
++#else
+         hitbox->hit_grabbed_victim_only = cmd->u->create_hitbox_5.x1_b4;
++#endif
+         hitbox->x42_b1 = 1;
+         hitbox->x42_b2 = 0;
+         hitbox->x43_b2 = 0;
+@@ -1208,7 +1224,11 @@ void ftAction_80072E4C(Fighter_GObj* gobj, CommandInfo* cmd)
+     fp = gobj->user_data;
+     sp60 = 1;
+     gfx_id = -1;
++#if defined(MELEE_WEB_GAMEPLAY) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++    cmd_flag = cmd->u->sound_effect_0.unknown >> 16;
++#else
+     cmd_flag = cmd->u->unk_fx_0.x1_b0_7;
++#endif
+     cmd_flag &= 1;
+     if ((ft_80084C38(gobj, &sp64, &sp60, &gfx_id) != false) &&
+         (cmd_flag == 0) && (sp64 != -1))
+@@ -1221,7 +1241,11 @@ void ftAction_80072E4C(Fighter_GObj* gobj, CommandInfo* cmd)
+     }
+ 
+     if (gfx_id == -1) {
++#if defined(MELEE_WEB_GAMEPLAY) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++        gfx_id = cmd->u->sound_effect_0.unknown & 0xffff;
++#else
+         gfx_id = ((u16*) cmd->u)[1];
++#endif
+     }
+     offset.z = 0.0f;
+     range.z = 0.0f;
+@@ -1339,6 +1363,9 @@ void ftAction_80073240(Fighter_GObj* fighter_gobj)
+             }
+             eventCode =
+                 gmScriptEventCast(ftCommand->u, gmScriptEventDefault)->opcode;
++#if defined(MELEE_WEB_GAMEPLAY)
++            melee_web_command_require_supported(eventCode);
++#endif
+             if (Command_Execute(ftCommand, eventCode) == false) {
+                 eventCode -= 0xA;
+                 ftAction_803C06E8[eventCode](fighter_gobj, ftCommand);
+@@ -1375,6 +1402,9 @@ void ftAction_80073354(Fighter_GObj* gobj)
+                 float timer = cmd->timer;
+                 eventCode =
+                     gmScriptEventCast(cmd->u, gmScriptEventDefault)->opcode;
++#if defined(MELEE_WEB_GAMEPLAY)
++            melee_web_command_require_supported(eventCode);
++#endif
+                 if (Command_Execute(cmd, eventCode) == false) {
+                     eventCode -= 0xA;
+                     ftAction_803C07AC[eventCode](gobj, cmd);
+@@ -1413,6 +1443,9 @@ void ftAction_8007349C(Fighter_GObj* gobj)
+         }
+         {
+             u32 id = cmd->u->Command_09.id;
++#if defined(MELEE_WEB_GAMEPLAY)
++            melee_web_command_require_supported(id);
++#endif
+             if (!Command_Execute(cmd, id)) {
+                 cmd->u += ftAction_803C0870[id - 10];
+             }
+diff --git a/src/melee/ft/ftcolanim.c b/src/melee/ft/ftcolanim.c
+index 3ed33e4..217e86f 100644
+--- a/src/melee/ft/ftcolanim.c
++++ b/src/melee/ft/ftcolanim.c
+@@ -95,14 +95,24 @@ static void ftCo_800BFF14(Fighter_GObj* gobj, CommandInfo* cmd)
+ 
+ static void ft_800BFF34(Fighter_GObj* gobj, CommandInfo* cmd, int arg2)
+ {
++#ifdef TARGET_PC
++    extern void melee_web_color_fighter_command(Fighter_GObj*,CommandInfo*,int,int);
++    melee_web_color_fighter_command(gobj,cmd,arg2,0);
++#else
+     int i = arg2 - 0x15;
+     ftCo_803C6AD0[i](gobj, cmd);
++#endif
+ }
+ 
+ static void ft_800BFF70(Fighter_GObj* gobj, CommandInfo* cmd, int arg0)
+ {
++#ifdef TARGET_PC
++    extern void melee_web_color_fighter_command(Fighter_GObj*,CommandInfo*,int,int);
++    melee_web_color_fighter_command(gobj,cmd,arg0,1);
++#else
+     int i = arg0 - 21;
+     ftCo_803C6ADC[i](gobj, cmd);
++#endif
+ }
+ 
+ void ftCo_800BFFAC(Fighter* fp)
+diff --git a/src/melee/ft/ftdata.c b/src/melee/ft/ftdata.c
+index 4592a59..b7a6a19 100644
+--- a/src/melee/ft/ftdata.c
++++ b/src/melee/ft/ftdata.c
+@@ -1,3 +1,6 @@
++#if defined(MELEE_WEB_GAMEPLAY)
++#include "gameplay_action_store.h"
++#endif
+ #include "ftdata.h"
+ 
+ #include <Runtime/platform.h>
+@@ -8,6 +11,9 @@
+ 
+ #include "fighter.h"
+ #include "forward.h"
++#if defined(MELEE_WEB_GAMEPLAY)
++#include "gameplay_fighter_assets.h"
++#endif
+ #include "ft_0877.h"
+ #include "inlines.h"
+ #include "kinds/ftCaptain/ftcaptain.h"
+@@ -168,19 +174,32 @@ void ft_8008521C(HSD_GObj* gobj)
+ 
+ static inline void ft_800852B0_Reset_ft_8045993C(ftData** list, int i)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    /* Wasm globals have no console linker adjacency contract. */
++    (void) list;
++    ft_8045993C[i].pad_x0 = 0;
++    ft_8045993C[i].x6_b0 = 0;
++    ft_8045993C[i].x6_b1_b2 = 0;
++#else
+     /// @todo Bitfields seem off
+     ((ft_8045993C_t*) &list[FTKIND_MAX])[i].pad_x0 = 0;
+     ((ft_8045993C_t*) &list[FTKIND_MAX])[i].x6_b0 = 0;
+     ((ft_8045993C_t*) &list[FTKIND_MAX])[i].x6_b1_b2 = 0;
++#endif
+ }
+ 
+ void ft_800852B0(void)
+ {
+     ftData** list;
++#if defined(MELEE_WEB_GAMEPLAY)
++    ftData_UnkCountStruct* unk0 = ftData_Table_Unk0;
++    ftData_UnkCountStruct* pairs = ftData_UnkIntPairs;
++#else
+     ftData_UnkCountStruct* unk0 =
+         (ftData_UnkCountStruct*) &CostumeListsForeachCharacter[FTKIND_MAX];
+     ftData_UnkCountStruct* pairs =
+         (ftData_UnkCountStruct*) ((u8*) CostumeListsForeachCharacter + 5940);
++#endif
+     int i;
+     int new_var = 0;
+ 
+@@ -1565,6 +1584,9 @@ void ftData_800855C8(FighterKind kind, u8 color)
+ 
+ void ftData_8008572C(FighterKind kind)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_fighter_assets_require_kind(kind);
++#endif
+     if (gFtDataList[kind] == NULL) {
+         lbArchive_80017040(NULL, ftData_803C1F40[kind].a, &gFtDataList[kind],
+                            ftData_803C1F40[kind].b, 0);
+@@ -1591,6 +1613,9 @@ void ftData_800857E0(FighterKind kind)
+ 
+ void ftData_80085820(FighterKind kind, int costume_id)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_fighter_assets_require_costume(kind, costume_id);
++#endif
+     UnkCostumeStruct* temp_r5 =
+         &CostumeListsForeachCharacter[kind].costume_list[costume_id];
+     if (temp_r5->joint == NULL) {
+@@ -1653,6 +1678,9 @@ void ftData_800859A8(Fighter* fp)
+ 
+ void ftData_80085A14(FighterKind kind)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_fighter_assets_require_kind(kind);
++#else
+     void* sp18;
+     void* a_head;
+     ftData* temp_r27 = gFtDataList[kind];
+@@ -1680,10 +1708,14 @@ void ftData_80085A14(FighterKind kind)
+         }
+         ftData_Table_Unk0[kind].data = a_head;
+     }
++#endif
+ }
+ 
+ void ftData_80085B10(Fighter* fp)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_fighter_assets_bind_created(fp);
++#else
+     FighterKind kind = fp->kind;
+     fp->x59C = HSD_ObjAlloc(&fighter_x59C_alloc_data);
+     fp->x5A0 = HSD_ObjAlloc(&fighter_x59C_alloc_data);
+@@ -1691,6 +1723,7 @@ void ftData_80085B10(Fighter* fp)
+     fp->x5A8 = NULL;
+     fp->x58C = ftData_Table_Unk0[kind].count;
+     ftData_80085A14(kind);
++#endif
+ }
+ 
+ void ftData_80085B98(Fighter* fp, int arg1, int arg2)
+@@ -1728,6 +1761,9 @@ void ftData_80085B98(Fighter* fp, int arg1, int arg2)
+ 
+ void ftData_80085CD8(Fighter* fp, Fighter* arg1, int msid)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_action_load(fp, arg1, msid, 0);
++#else
+     HSD_Archive sp14;
+     Fighter* temp_r3_3;
+     s32 temp_ret;
+@@ -1777,10 +1813,15 @@ void ftData_80085CD8(Fighter* fp, Fighter* arg1, int msid)
+             fp->x5A4 = (void*) temp_r3->x14;
+         }
+     }
++#endif
+ }
+ 
+ FigaTree* ftData_80085E50(Fighter* arg0, int msid)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_action_load(arg0, arg0, msid, 1);
++    return arg0->x598;
++#else
+     HSD_Archive sp10;
+     Fighter* temp_r3_3;
+     int temp_ret;
+@@ -1832,6 +1873,7 @@ FigaTree* ftData_80085E50(Fighter* arg0, int msid)
+         return arg0->x598;
+     }
+     return NULL;
++#endif
+ }
+ 
+ struct ftData_80085FD4_ret* ftData_80085FD4(Fighter* fp, int msid)
+diff --git a/src/melee/ft/ftlib.c b/src/melee/ft/ftlib.c
+index 5205313..90a73ef 100644
+--- a/src/melee/ft/ftlib.c
++++ b/src/melee/ft/ftlib.c
+@@ -971,9 +971,9 @@ void ftLib_80087610(u8 arg0)
+     }
+ }
+ 
+-void ftLib_800876B4(HSD_GObj* gobj)
++s32 ftLib_800876B4(HSD_GObj* gobj)
+ {
+-    ftAnim_IsFramesRemaining(gobj);
++    return ftAnim_IsFramesRemaining(gobj);
+ }
+ 
+ bool ftLib_800876D4(HSD_GObj* gobj)
+diff --git a/src/melee/ft/ftlib.h b/src/melee/ft/ftlib.h
+index c0226e2..e37ff58 100644
+--- a/src/melee/ft/ftlib.h
++++ b/src/melee/ft/ftlib.h
+@@ -97,7 +97,7 @@
+ /* 087574 */ void ftLib_80087574(s8);
+ /// /* 087574 */ void ftLib_80087574(FighterKind);
+ /* 087610 */ void ftLib_80087610(u8);
+-/* 0876B4 */ void ftLib_800876B4(HSD_GObj*);
++/* 0876B4 */ s32 ftLib_800876B4(HSD_GObj*);
+ /* 0876D4 */ bool ftLib_800876D4(HSD_GObj*);
+ /* 0876F4 */ s32 ftLib_800876F4(HSD_GObj*);
+ /* 087700 */ s32 ftLib_80087700(HSD_GObj*);
+diff --git a/src/melee/ft/ftmaterial.c b/src/melee/ft/ftmaterial.c
+index d9b1150..7275dcb 100644
+--- a/src/melee/ft/ftmaterial.c
++++ b/src/melee/ft/ftmaterial.c
+@@ -26,6 +26,8 @@ struct ft_MObjInfo {
+     HSD_TECnst texp_tmpl;
+ };
+ 
++/* Original PPC places these templates immediately after ftMObj. Native
++ * builds address their own objects instead of reading beyond HSD_MObjInfo. */
+ static HSD_TevDesc ftMaterial_803C69D0 = {
+     NULL,
+     TEVCONF_MODE,
+@@ -47,12 +49,25 @@ static HSD_TECnst ftMaterial_803C6A44 = {
+     HSD_TE_CNST, NULL, NULL, HSD_TE_RGB, HSD_TE_U8, 0xFF, 0xFF, 0, 0,
+ };
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++/* HSD invokes material setup with two arguments. The source's third parameter
++ * is unused; an explicit adapter preserves its body and Wasm callback type. */
++static void melee_web_fighter_material_setup(HSD_MObj* mobj, u32 mode)
++{
++    ftMaterial_800BF2B8(mobj, mode, 0);
++}
++#endif
++
+ void ftMaterial_800BF260(void)
+ {
+     hsdInitClassInfo(&ftMObj.parent, &hsdMObj.parent,
+                      "sysdolphin_base_library", "ft_mobj",
+                      sizeof(HSD_MObjInfo), sizeof(HSD_MObj));
++#if defined(MELEE_WEB_GAMEPLAY)
++    ftMObj.setup = melee_web_fighter_material_setup;
++#else
+     ftMObj.setup = (HSD_MObjSetupFunc) (Event) ftMaterial_800BF2B8;
++#endif
+ }
+ 
+ void ftMaterial_800BF2B8(HSD_MObj* mobj, u32 rendermode, u32 unused)
+@@ -159,12 +174,18 @@ HSD_TExp* ftMaterial_800BF534(Fighter* fp, HSD_MObj* mobj, HSD_TExp* texp,
+     HSD_TevDesc sp_tevdesc;
+     s32 reg;
+     bool chk;
++#if !defined(TARGET_PC)
+     struct ft_MObjInfo* info = (struct ft_MObjInfo*) &ftMObj;
++#endif
+     ColorOverlay* overlay = ftCo_800C0658(fp);
+ 
+     if (overlay->x7C_flag2 && overlay->x7C_light_enable) {
+         if (!(rendermode & RENDER_XLU) && !fp->x2223_b2) {
++#if defined(TARGET_PC)
++            texp->cnst = ftMaterial_803C6A44;
++#else
+             texp->cnst = info->texp_tmpl;
++#endif
+             chk = lbGetFreeColorRegister(0, mobj, NULL);
+             reg = chk;
+             if (reg == -1) {
+@@ -173,8 +194,13 @@ HSD_TExp* ftMaterial_800BF534(Fighter* fp, HSD_MObj* mobj, HSD_TExp* texp,
+             texp->cnst.reg = (u8) reg;
+             texp->cnst.val = &overlay->x50_light_color;
+             HSD_TExpSetReg(texp);
++#if defined(TARGET_PC)
++
++            sp_tevdesc = ftMaterial_803C69D0;
++#else
+ 
+             sp_tevdesc = info->tevdesc_tmpl;
++#endif
+             sp_tevdesc.stage = HSD_StateAssignTev();
+             sp_tevdesc.color = 2;
+             sp_tevdesc.u.tevconf.clr_a = GX_CC_ZERO;
+@@ -213,7 +239,9 @@ void ftMaterial_800BF6BC(Fighter* fp, HSD_MObj* mobj, HSD_TExp* texp)
+     s32 var_r3;
+     ColorOverlay* overlay;
+     s32 var_r5;
++#if !defined(TARGET_PC)
+     struct ft_MObjInfo* info = (struct ft_MObjInfo*) &ftMObj;
++#endif
+ 
+     if (!fp->x2223_b3) {
+         overlay = ftCo_800C0658(fp);
+@@ -284,7 +312,11 @@ void ftMaterial_800BF6BC(Fighter* fp, HSD_MObj* mobj, HSD_TExp* texp)
+             sp168 = overlay->x2C_hex;
+         }
+         if (chk1 != 0) {
++#if defined(TARGET_PC)
++            sp_cnst1 = ftMaterial_803C6A44;
++#else
+             sp_cnst1 = info->texp_tmpl;
++#endif
+             reg1 = lbGetFreeColorRegister(0, mobj, texp);
+             if (reg1 == -1) {
+                 HSD_ASSERTREPORT(352, 0, "can't find free color register!\n");
+@@ -309,7 +341,11 @@ void ftMaterial_800BF6BC(Fighter* fp, HSD_MObj* mobj, HSD_TExp* texp)
+                                  "can't find free color ratio register!\n");
+             }
+             if (fp->x61D != 0xFF) {
++#if defined(TARGET_PC)
++                sp_cnst2 = ftMaterial_803C6A44;
++#else
+                 sp_cnst2 = info->texp_tmpl;
++#endif
+                 sp_cnst2.reg = (u8) reg2;
+                 sp_cnst2.comp = 5;
+                 sp_cnst2.idx = 3;
+@@ -321,7 +357,12 @@ void ftMaterial_800BF6BC(Fighter* fp, HSD_MObj* mobj, HSD_TExp* texp)
+             sp_cnst1.reg = (u8) reg2;
+             {
+                 // @todo Fix this stack pointer arithmetic
++#if defined(TARGET_PC)
++                GXColor* color = &unused;
++                color->a = 0; /* The RGB constant consumer replaces this channel. */
++#else
+                 GXColor* color = (GXColor*) ((u8*) &sp_tevdesc - 4);
++#endif
+                 u8 alpha = sp168.a;
+ 
+                 color->r = alpha;
+@@ -330,7 +371,11 @@ void ftMaterial_800BF6BC(Fighter* fp, HSD_MObj* mobj, HSD_TExp* texp)
+                 sp_cnst1.val = color;
+             }
+             HSD_TExpSetReg((HSD_TExp*) &sp_cnst1);
++#if defined(TARGET_PC)
++            sp_tevdesc = ftMaterial_803C69D0;
++#else
+             sp_tevdesc = info->tevdesc_tmpl;
++#endif
+             sp_tevdesc.stage = HSD_StateAssignTev();
+             sp_tevdesc.u.tevconf.clr_b = lb_8000CC8C(reg1);
+             sp_tevdesc.u.tevconf.clr_c = lb_8000CC8C(reg2);
 diff --git a/src/melee/ft/types.h b/src/melee/ft/types.h
+index ab267c4..571a070 100644
 --- a/src/melee/ft/types.h
 +++ b/src/melee/ft/types.h
-@@ -1197,6 +1197,35 @@
+@@ -858,6 +858,22 @@ struct MotionState {
+     union {
+         /// @todo Try to match without this being a @c union.
+         u32 _;
++#if defined(MELEE_WEB_GAMEPLAY) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++        /* Source tables initialize the numeric word; retain PPC aliases. */
++        struct {
++            u32 xB : 8;
++            u32 xA : 8;
++            u32 x9_b7 : 1;
++            u32 x9_b6 : 1;
++            u32 x9_b5 : 1;
++            u32 x9_b4 : 1;
++            u32 x9_b3 : 1;
++            u32 x9_b2 : 1;
++            u32 x9_b1 : 1;
++            u32 x9_b0 : 1;
++            u32 move_id : 8;
++        };
++#else
+         struct {
+             u8 move_id : 8;
+             struct {
+@@ -873,6 +889,7 @@ struct MotionState {
+             u8 xA;
+             u8 xB;
+         };
++#endif
+     };
+ 
+     HSD_GObjEvent anim_cb;
+@@ -1197,6 +1214,35 @@ struct Fighter {
      /*  fp+58C */ u32 x58C;
      /*  fp+590 */ FigaTree* x590;
      /*  fp+594 */ union {
@@ -37,7 +999,7 @@ diff --git a/src/melee/ft/types.h b/src/melee/ft/types.h
          struct {
              /* fp+594:0 */ u8 x594_b0 : 1;
              /* fp+594:1 */ u8 x594_b1_loop : 1;
-@@ -1217,6 +1246,7 @@
+@@ -1217,6 +1263,7 @@ struct Fighter {
              u32 x594_pad2 : 3;
              u32 x597_bits : 6; // FighterKind of this fighter's x590 FigaTree
          };
@@ -45,7 +1007,283 @@ diff --git a/src/melee/ft/types.h b/src/melee/ft/types.h
          /* fp+594 */ s32 x594_s32;
      };
      /*  fp+598 */ FigaTree* x598;
+@@ -1830,8 +1877,14 @@ struct ftData_80085FD4_ret {
+     /* +4 */ UNK_T x4;
+     /* +8 */ size_t x8;
+     /* +C */ UNK_T xC;
++#if defined(MELEE_WEB_GAMEPLAY) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++    u32 x10_padding : 30;
++    u32 x10_b1 : 1;
++    u32 x10_b0 : 1;
++#else
+     /* +10:0 */ u8 x10_b0 : 1;
+     /* +10:1 */ u8 x10_b1 : 1;
++#endif
+     /* +14 */ u32 x14;
+ };
+ 
+diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
+index cd7e31a..234aa92 100644
+--- a/src/melee/gm/gm_16AE.c
++++ b/src/melee/gm/gm_16AE.c
+@@ -355,6 +355,13 @@ static float get_unk_float(void)
+     }
+ }
+ 
++#ifdef MELEE_WEB_GAMEPLAY
++void melee_web_match_source_refresh_ratio(void)
++{
++    lbl_8046B6A0.unk_34 = get_unk_float();
++}
++#endif
++
+ bool gm_IsCurrently1PMode(void)
+ {
+     return gm_Is1PMode(gm_GetCurrentGameMode());
+diff --git a/src/melee/gm/types.h b/src/melee/gm/types.h
+index 2014b73..10d3df0 100644
+--- a/src/melee/gm/types.h
++++ b/src/melee/gm/types.h
+@@ -22,6 +22,16 @@
+ typedef union UnkFlagStruct {
+     u8 u8;
+     struct {
++#if defined(TARGET_PC) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++        u8 b7 : 1;
++        u8 b6 : 1;
++        u8 b5 : 1;
++        u8 b4 : 1;
++        u8 b3 : 1;
++        u8 b2 : 1;
++        u8 b1 : 1;
++        u8 b0 : 1;
++#else
+         u8 b0 : 1;
+         u8 b1 : 1;
+         u8 b2 : 1;
+@@ -30,6 +40,7 @@ typedef union UnkFlagStruct {
+         u8 b5 : 1;
+         u8 b6 : 1;
+         u8 b7 : 1;
++#endif
+     };
+ } UnkFlagStruct;
+ 
+diff --git a/src/melee/gr/granime.c b/src/melee/gr/granime.c
+index a0401b6..2e9f1d1 100644
+--- a/src/melee/gr/granime.c
++++ b/src/melee/gr/granime.c
+@@ -47,12 +47,20 @@
+                                           u32 type, void* param, int arg5);
+ ///* 1C7B24 */ static void grAnime_801C7B24(HSD_GObj* gobj, int arg1, u32 arg2,
+ ///                                          f32 arg8);
++#if defined(MELEE_WEB_GAMEPLAY)
++static void fn_801C82E8(HSD_AObj* arg0, void* arg1);
++#else
+ /* 1C82E8 */ static void fn_801C82E8(int arg0, int* arg1);
++#endif
+ /* 4D6958 */ static float grAnime_804D6958;
+ /* 4D695C */ static float grAnime_804D695C;
+ 
+ struct padded_jmp_buf {
++#if defined(MELEE_WEB_GAMEPLAY)
++    jmp_buf buf;
++#else
+     __jmp_buf buf;
++#endif
+     u8 pad[0x118 - 0xF8];
+ };
+ 
+@@ -508,6 +516,26 @@ typedef void (*Callback3)(HSD_AObj* aobj, HSD_TObj* obj, int param);
+ void grAnime_801C6F50(HSD_AObj* aobj, void* obj, u32 flags, void* func,
+                       u32 type, void* param)
+ {
++#if defined(TARGET_PC)
++    callbackArg* arg = param;
++    /* Same typed dispatch as original aobj.c callbackForeachFunc. PPC allows
++     * the decomp's extra integer arguments; Wasm requires the exact signature. */
++    switch (type) {
++    case AOBJ_ARG_A: ((void (*)(HSD_AObj*)) func)(aobj); break;
++    case AOBJ_ARG_AF: ((void (*)(HSD_AObj*, f32)) func)(aobj, arg->f); break;
++    case AOBJ_ARG_AV: ((void (*)(HSD_AObj*, void*)) func)(aobj, arg->v); break;
++    case AOBJ_ARG_AU: ((void (*)(HSD_AObj*, u32)) func)(aobj, arg->d); break;
++    case AOBJ_ARG_AO: ((void (*)(HSD_AObj*, void*)) func)(aobj, obj); break;
++    case AOBJ_ARG_AOF: ((void (*)(HSD_AObj*, void*, f32)) func)(aobj, obj, arg->f); break;
++    case AOBJ_ARG_AOV: ((void (*)(HSD_AObj*, void*, void*)) func)(aobj, obj, arg->v); break;
++    case AOBJ_ARG_AOU: ((void (*)(HSD_AObj*, void*, u32)) func)(aobj, obj, arg->d); break;
++    case AOBJ_ARG_AOT: ((void (*)(HSD_AObj*, void*, HSD_Type)) func)(aobj, obj, flags); break;
++    case AOBJ_ARG_AOTF: ((void (*)(HSD_AObj*, void*, HSD_Type, f32)) func)(aobj, obj, flags, arg->f); break;
++    case AOBJ_ARG_AOTV: ((void (*)(HSD_AObj*, void*, HSD_Type, void*)) func)(aobj, obj, flags, arg->v); break;
++    case AOBJ_ARG_AOTU: ((void (*)(HSD_AObj*, void*, HSD_Type, u32)) func)(aobj, obj, flags, arg->d); break;
++    default: HSD_ASSERTREPORT(0x36F, 0, "unexpected argument format.\n"); break;
++    }
++#else
+     switch (type) {
+     case 0:
+         ((Event) func)();
+@@ -546,6 +574,7 @@ void grAnime_801C6F50(HSD_AObj* aobj, void* obj, u32 flags, void* func,
+         ((Callback4) func)(aobj, obj, flags, *(int*) param);
+         break;
+     }
++#endif
+ }
+ 
+ void grAnime_801C706C(HSD_TObj* tobj, s32 flags, void* func, u32 type,
+@@ -1047,17 +1076,30 @@ void grAnime_801C8138(HSD_GObj* gobj, enum_t arg1, bool arg2)
+     HSD_JObjAnimAll(jobj);
+ }
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++void fn_801C82E8(HSD_AObj* arg0, void* arg1)
++{
++    *(HSD_AObj* volatile*) arg1 = arg0;
++    longjmp(grAnime_8049EE40.buf, 1);
++}
++#else
+ void fn_801C82E8(int arg0, int* arg1)
+ {
+     *arg1 = arg0;
+     longjmp(&grAnime_8049EE40.buf, 1);
+ }
++#endif
+ 
+ HSD_AObj* grAnime_801C8318(HSD_GObj* gobj, int arg1, u32 arg2)
+ {
+     HSD_JObj* jobj;
+     enum _HSD_TypeMask var_r30 = 0;
++#if defined(MELEE_WEB_GAMEPLAY)
++    /* The callback changes this local between setjmp and longjmp. */
++    HSD_AObj* volatile sp14 = NULL;
++#else
+     HSD_AObj* sp14 = NULL;
++#endif
+     jobj = Ground_801C3FA4(gobj, arg1);
+     if (jobj == NULL) {
+         return 0;
+@@ -1071,7 +1113,11 @@ HSD_AObj* grAnime_801C8318(HSD_GObj* gobj, int arg1, u32 arg2)
+     if (arg2 & 4) {
+         var_r30 |= 0x100;
+     }
++#if defined(MELEE_WEB_GAMEPLAY)
++    if (setjmp(grAnime_8049EE40.buf) == 0) {
++#else
+     if (__setjmp(&grAnime_8049EE40.buf) == 0) {
++#endif
+         HSD_ForeachAnim(jobj, JOBJ_TYPE, var_r30, fn_801C82E8, AOBJ_ARG_AV,
+                         &sp14);
+     }
+diff --git a/src/melee/gr/grbigblue.c b/src/melee/gr/grbigblue.c
+index c693003..c7d490f 100644
+--- a/src/melee/gr/grbigblue.c
++++ b/src/melee/gr/grbigblue.c
+@@ -214,7 +214,7 @@ const grBb_LineIds grBb_803B8134 = { {
+     50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65,
+ } };
+ 
+-void grBigBlue_801E57BC(bool arg) {}
++void grBigBlue_801E57BC(int arg) {}
+ 
+ void grBigBlue_801E57C0(void)
+ {
+diff --git a/src/melee/gr/grbigblue.h b/src/melee/gr/grbigblue.h
+index e9450d6..056f06a 100644
+--- a/src/melee/gr/grbigblue.h
++++ b/src/melee/gr/grbigblue.h
+@@ -7,7 +7,7 @@
+ 
+ #include <dolphin/mtx.h>
+ 
+-/* 1E57BC */ void grBigBlue_801E57BC(bool);
++/* 1E57BC */ void grBigBlue_801E57BC(int);
+ /* 1E57C0 */ void grBigBlue_801E57C0(void);
+ /* 1E59C8 */ void grBigBlue_801E59C8(void);
+ /* 1E59CC */ void grBigBlue_801E59CC(void);
+diff --git a/src/melee/gr/grbigblueroute.c b/src/melee/gr/grbigblueroute.c
+index 2c3ce57..f2f7eaa 100644
+--- a/src/melee/gr/grbigblueroute.c
++++ b/src/melee/gr/grbigblueroute.c
+@@ -153,7 +153,7 @@ static void order_data(void)
+ }
+ #endif
+ 
+-void grBigBlueRoute_8020B864(bool arg)
++void grBigBlueRoute_8020B864(int arg)
+ {
+     HSD_GObj* gobj;
+     gobj = Ground_GetMapGObj(0x1F);
+diff --git a/src/melee/gr/grbigblueroute.h b/src/melee/gr/grbigblueroute.h
+index 7dc0a0d..a5eef64 100644
+--- a/src/melee/gr/grbigblueroute.h
++++ b/src/melee/gr/grbigblueroute.h
+@@ -9,7 +9,7 @@
+ 
+ #include <dolphin/mtx.h>
+ 
+-/* 20B864 */ void grBigBlueRoute_8020B864(bool);
++/* 20B864 */ void grBigBlueRoute_8020B864(int);
+ /* 20B89C */ void grBigBlueRoute_8020B89C(void);
+ /* 20B920 */ void grBigBlueRoute_8020B920(void);
+ /* 20B95C */ void grBigBlueRoute_8020B95C(void);
+diff --git a/src/melee/gr/grcastle.c b/src/melee/gr/grcastle.c
+index be36986..81ff568 100644
+--- a/src/melee/gr/grcastle.c
++++ b/src/melee/gr/grcastle.c
+@@ -214,7 +214,7 @@ typedef struct grCastle_YOffsets {
+     f32 v[6];
+ } grCastle_YOffsets;
+ 
+-void grCastle_801CD338(bool arg0)
++void grCastle_801CD338(int arg0)
+ {
+     HSD_GObj* gobj;
+     HSD_JObj* jobj;
+diff --git a/src/melee/gr/grcastle.h b/src/melee/gr/grcastle.h
+index af393e2..409c872 100644
+--- a/src/melee/gr/grcastle.h
++++ b/src/melee/gr/grcastle.h
+@@ -10,7 +10,7 @@
+ 
+ #include <dolphin/mtx.h>
+ 
+-/* 1CD338 */ void grCastle_801CD338(bool);
++/* 1CD338 */ void grCastle_801CD338(int);
+ /* 1CD37C */ void grCastle_801CD37C(void);
+ /* 1CD4A0 */ void grCastle_801CD4A0(void);
+ /* 1CD4A4 */ void grCastle_801CD4A4(void);
+diff --git a/src/melee/gr/grdatfiles.c b/src/melee/gr/grdatfiles.c
+index ff1989d..6973b66 100644
+--- a/src/melee/gr/grdatfiles.c
++++ b/src/melee/gr/grdatfiles.c
+@@ -1,4 +1,7 @@
+ #include "grdatfiles.h"
++#ifdef TARGET_PC
++#include "gameplay_stage_map.h"
++#endif
+ 
+ #include "ground.h"
+ #include "types.h"
+@@ -129,11 +132,19 @@ UnkArchiveStruct* grDatFiles_801C62B4(void)
+ 
+ UnkArchiveStruct* grDatFiles_GetArchive(void)
+ {
++#ifdef TARGET_PC
++    UnkArchiveStruct* native = melee_web_stage_map_archives();
++    if (native != NULL) return native;
++#endif
+     return grDatFiles_8049EE10;
+ }
+ 
+ UnkArchiveStruct* grDatFiles_801C6330(s32 arg0)
+ {
++#ifdef TARGET_PC
++    if (melee_web_stage_map_archives() != NULL)
++        return melee_web_stage_map_lookup(arg0);
++#endif
+     if (arg0 >= 0) {
+         s32 i;
+         for (i = 0; i < 4; i++) {
 diff --git a/src/melee/gr/grlast.c b/src/melee/gr/grlast.c
+index 2506c76..b40e2be 100644
 --- a/src/melee/gr/grlast.c
 +++ b/src/melee/gr/grlast.c
 @@ -70,7 +70,7 @@
@@ -57,10 +1295,148 @@ diff --git a/src/melee/gr/grlast.c b/src/melee/gr/grlast.c
  /* 21B920 */ static void grLast_8021B920(Ground_GObj*, int);
  /* 21C40C */ static void grLast_8021C40C(Ground_GObj*, GXColor, float);
  /* 21C500 */ static void grLast_8021C500(Ground_GObj*);
+@@ -92,6 +92,15 @@ Vec3 const grLast_803B8498 = { 0.0f, 0.0f, 1.0f };
+ 
+ /// @todo yakumono struct
+ static int* yakumono_param;
++#ifdef TARGET_PC
++void* melee_web_grlast_exchange_yakumono(void* value)
++{
++    void* previous = yakumono_param;
++    yakumono_param = value;
++    return previous;
++}
++#endif
++
+ 
+ static void grLast_OnDemoInit(enum_t arg0)
+ {
+diff --git a/src/melee/gr/grmutecity.c b/src/melee/gr/grmutecity.c
+index 64c921e..2011582 100644
+--- a/src/melee/gr/grmutecity.c
++++ b/src/melee/gr/grmutecity.c
+@@ -1902,6 +1902,11 @@ void grMuteCity_801F290C(Ground_GObj* gobj)
+ 
+ s32 grMuteCity_801F2AB0(s32 arg0, HSD_JObj* arg1)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    /* Source leaves its return register implicit; require a verified adapter. */
++    HSD_Panic(__FILE__, __LINE__, "Mute City particle result ABI is not ported");
++    return 0;
++#else
+     HSD_Generator* gen;
+     HSD_psAppSRT* appsrt;
+ 
+@@ -1920,6 +1925,7 @@ s32 grMuteCity_801F2AB0(s32 arg0, HSD_JObj* arg1)
+         gen->type |= PSAPPSRT_UNK_B11;
+         appsrt->gp = gen;
+     }
++#endif
+ }
+ 
+ /// @copydoc mpLib_JointCollisionCallback
+diff --git a/src/melee/gr/ground.c b/src/melee/gr/ground.c
+index 6c26c02..70f263b 100644
+--- a/src/melee/gr/ground.c
++++ b/src/melee/gr/ground.c
+@@ -284,6 +284,24 @@ void Ground_801C0378(int arg0)
+     zeroBuffer();
+ }
+ 
++#ifdef TARGET_PC
++int melee_web_ground_map_storage_begin(void)
++{
++    if (Ground_804D6950 != NULL) return 0;
++    Ground_801C0378(0);
++    return Ground_804D6950 != NULL;
++}
++int melee_web_ground_map_storage_end(void)
++{
++    int i;
++    for (i = 0; i < ARRAY_SIZE(stage_info.map_gobjs); i++)
++        if (stage_info.map_gobjs[i] != NULL) return 0;
++    if (Ground_804D6950 != NULL) HSD_Free(Ground_804D6950);
++    Ground_804D6950 = NULL;
++    return 1;
++}
++#endif
++
+ void mem_free(void* ptr)
+ {
+     HSD_Free(ptr);
+@@ -694,8 +712,13 @@ void Ground_801C0FB8(StageIdPair* pair)
+ {
+     struct {
+         void* unk0;
++#if defined(TARGET_PC)
++        HSD_GObj* unk4;
++        HSD_GObjEvent unk8;
++#else
+         s32 unk4;
+         void (*unk8)(s32);
++#endif
+     }* cur;
+     void* next;
+     stage_datas[pair->grkind]->on_start();
+@@ -1187,6 +1210,19 @@ static inline bool find_light_override(UnkArchiveStruct* archive,
+                                        HSD_LightDesc* desc, bool* b6, bool* b7,
+                                        bool* b5)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    extern int melee_web_stage_lights_lookup_override(void*, int*, unsigned char*);
++    extern int melee_web_stage_map_lookup_override(void*, int*, unsigned char*);
++    int found;
++    unsigned char flags;
++    if (melee_web_stage_lights_lookup_override(desc, &found, &flags) ||
++        melee_web_stage_map_lookup_override(desc, &found, &flags)) {
++        *b6 = (flags & 0x40) != 0;
++        *b7 = (flags & 0x80) != 0;
++        *b5 = (flags & 0x20) != 0;
++        return found;
++    }
++#endif
+     UnkStageDat* dat = archive->unk4;
+     s32 count = dat->unk1C;
+     s32 i;
+@@ -1210,6 +1246,19 @@ static inline bool find_light_override_in_dat(UnkStageDat* dat,
+                                               HSD_LightDesc* desc, bool* b6,
+                                               bool* b7, bool* b5)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    extern int melee_web_stage_lights_lookup_override(void*, int*, unsigned char*);
++    extern int melee_web_stage_map_lookup_override(void*, int*, unsigned char*);
++    int found;
++    unsigned char flags;
++    if (melee_web_stage_lights_lookup_override(desc, &found, &flags) ||
++        melee_web_stage_map_lookup_override(desc, &found, &flags)) {
++        *b6 = (flags & 0x40) != 0;
++        *b7 = (flags & 0x80) != 0;
++        *b5 = (flags & 0x20) != 0;
++        return found;
++    }
++#endif
+     s32 count = dat->unk1C;
+     s32 i;
+ 
+@@ -1523,6 +1572,13 @@ void Ground_801C28CC(s32* arg0, StKind stkind)
+     panicMissingStageParam(stkind, count);
+ }
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++void melee_web_ground_stage_parameters(int kind)
++{
++    Ground_801C28CC(&stage_info.xA0, kind);
++}
++#endif
++
+ s32* Ground_801C2AD8(void)
+ {
+     return &stage_info.xA0;
 diff --git a/src/melee/gr/types.h b/src/melee/gr/types.h
+index 4a0b8b7..b9f18e2 100644
 --- a/src/melee/gr/types.h
 +++ b/src/melee/gr/types.h
-@@ -135,6 +135,20 @@
+@@ -135,6 +135,20 @@ typedef struct StageCallbacks {
      /*  +C */ void (*callback3)(Ground_GObj*);
      /* +10 */ union {
          /* +10 */ u32 flags;
@@ -81,7 +1457,7 @@ diff --git a/src/melee/gr/types.h b/src/melee/gr/types.h
          struct {
              /* +10:0 */ u8 flags_b0 : 1;
              /* +10:1 */ u8 flags_b1 : 1;
-@@ -145,6 +159,7 @@
+@@ -145,6 +159,7 @@ typedef struct StageCallbacks {
              /* +10:6 */ u8 flags_b6 : 1;
              /* +10:7 */ u8 flags_b7 : 1;
          };
@@ -89,179 +1465,8 @@ diff --git a/src/melee/gr/types.h b/src/melee/gr/types.h
      };
  } StageCallbacks;
  
-diff --git a/src/melee/ft/ftdata.c b/src/melee/ft/ftdata.c
---- a/src/melee/ft/ftdata.c
-+++ b/src/melee/ft/ftdata.c
-@@ -168,19 +168,32 @@
- 
- static inline void ft_800852B0_Reset_ft_8045993C(ftData** list, int i)
- {
-+#if defined(MELEE_WEB_GAMEPLAY)
-+    /* Wasm globals have no console linker adjacency contract. */
-+    (void) list;
-+    ft_8045993C[i].pad_x0 = 0;
-+    ft_8045993C[i].x6_b0 = 0;
-+    ft_8045993C[i].x6_b1_b2 = 0;
-+#else
-     /// @todo Bitfields seem off
-     ((ft_8045993C_t*) &list[FTKIND_MAX])[i].pad_x0 = 0;
-     ((ft_8045993C_t*) &list[FTKIND_MAX])[i].x6_b0 = 0;
-     ((ft_8045993C_t*) &list[FTKIND_MAX])[i].x6_b1_b2 = 0;
-+#endif
- }
- 
- void ft_800852B0(void)
- {
-     ftData** list;
-+#if defined(MELEE_WEB_GAMEPLAY)
-+    ftData_UnkCountStruct* unk0 = ftData_Table_Unk0;
-+    ftData_UnkCountStruct* pairs = ftData_UnkIntPairs;
-+#else
-     ftData_UnkCountStruct* unk0 =
-         (ftData_UnkCountStruct*) &CostumeListsForeachCharacter[FTKIND_MAX];
-     ftData_UnkCountStruct* pairs =
-         (ftData_UnkCountStruct*) ((u8*) CostumeListsForeachCharacter + 5940);
-+#endif
-     int i;
-     int new_var = 0;
- 
-diff --git a/src/melee/ft/types.h b/src/melee/ft/types.h
---- a/src/melee/ft/types.h
-+++ b/src/melee/ft/types.h
-@@ -858,6 +858,22 @@
-     union {
-         /// @todo Try to match without this being a @c union.
-         u32 _;
-+#if defined(MELEE_WEB_GAMEPLAY) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-+        /* Source tables initialize the numeric word; retain PPC aliases. */
-+        struct {
-+            u32 xB : 8;
-+            u32 xA : 8;
-+            u32 x9_b7 : 1;
-+            u32 x9_b6 : 1;
-+            u32 x9_b5 : 1;
-+            u32 x9_b4 : 1;
-+            u32 x9_b3 : 1;
-+            u32 x9_b2 : 1;
-+            u32 x9_b1 : 1;
-+            u32 x9_b0 : 1;
-+            u32 move_id : 8;
-+        };
-+#else
-         struct {
-             u8 move_id : 8;
-             struct {
-@@ -873,6 +889,7 @@
-             u8 xA;
-             u8 xB;
-         };
-+#endif
-     };
- 
-     HSD_GObjEvent anim_cb;
-diff --git a/src/melee/ft/ftdata.c b/src/melee/ft/ftdata.c
---- a/src/melee/ft/ftdata.c
-+++ b/src/melee/ft/ftdata.c
-@@ -1,3 +1,6 @@
-+#if defined(MELEE_WEB_GAMEPLAY)
-+#include "gameplay_action_store.h"
-+#endif
- #include "ftdata.h"
- 
- #include <Runtime/platform.h>
-@@ -1728,6 +1731,9 @@
- 
- void ftData_80085CD8(Fighter* fp, Fighter* arg1, int msid)
- {
-+#if defined(MELEE_WEB_GAMEPLAY)
-+    melee_web_action_load(fp, arg1, msid, 0);
-+#else
-     HSD_Archive sp14;
-     Fighter* temp_r3_3;
-     s32 temp_ret;
-@@ -1777,10 +1783,15 @@
-             fp->x5A4 = (void*) temp_r3->x14;
-         }
-     }
-+#endif
- }
- 
- FigaTree* ftData_80085E50(Fighter* arg0, int msid)
- {
-+#if defined(MELEE_WEB_GAMEPLAY)
-+    melee_web_action_load(arg0, arg0, msid, 1);
-+    return arg0->x598;
-+#else
-     HSD_Archive sp10;
-     Fighter* temp_r3_3;
-     int temp_ret;
-@@ -1832,6 +1843,7 @@
-         return arg0->x598;
-     }
-     return NULL;
-+#endif
- }
- 
- struct ftData_80085FD4_ret* ftData_80085FD4(Fighter* fp, int msid)
-diff --git a/src/melee/ft/ftaction.c b/src/melee/ft/ftaction.c
---- a/src/melee/ft/ftaction.c
-+++ b/src/melee/ft/ftaction.c
-@@ -1,3 +1,6 @@
-+#if defined(MELEE_WEB_GAMEPLAY)
-+#include "gameplay_action_store.h"
-+#endif
- #include "ftaction.h"
- 
- #include <Runtime/platform.h>
-@@ -1339,6 +1342,9 @@
-             }
-             eventCode =
-                 gmScriptEventCast(ftCommand->u, gmScriptEventDefault)->opcode;
-+#if defined(MELEE_WEB_GAMEPLAY)
-+            melee_web_command_require_supported(eventCode);
-+#endif
-             if (Command_Execute(ftCommand, eventCode) == false) {
-                 eventCode -= 0xA;
-                 ftAction_803C06E8[eventCode](fighter_gobj, ftCommand);
-@@ -1375,6 +1381,9 @@
-                 float timer = cmd->timer;
-                 eventCode =
-                     gmScriptEventCast(cmd->u, gmScriptEventDefault)->opcode;
-+#if defined(MELEE_WEB_GAMEPLAY)
-+            melee_web_command_require_supported(eventCode);
-+#endif
-                 if (Command_Execute(cmd, eventCode) == false) {
-                     eventCode -= 0xA;
-                     ftAction_803C07AC[eventCode](gobj, cmd);
-@@ -1413,6 +1422,9 @@
-         }
-         {
-             u32 id = cmd->u->Command_09.id;
-+#if defined(MELEE_WEB_GAMEPLAY)
-+            melee_web_command_require_supported(id);
-+#endif
-             if (!Command_Execute(cmd, id)) {
-                 cmd->u += ftAction_803C0870[id - 10];
-             }
-diff --git a/src/melee/ft/types.h b/src/melee/ft/types.h
---- a/src/melee/ft/types.h
-+++ b/src/melee/ft/types.h
-@@ -1830,8 +1830,14 @@
-     /* +4 */ UNK_T x4;
-     /* +8 */ size_t x8;
-     /* +C */ UNK_T xC;
-+#if defined(MELEE_WEB_GAMEPLAY) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-+    u32 x10_padding : 30;
-+    u32 x10_b1 : 1;
-+    u32 x10_b0 : 1;
-+#else
-     /* +10:0 */ u8 x10_b0 : 1;
-     /* +10:1 */ u8 x10_b1 : 1;
-+#endif
-     /* +14 */ u32 x14;
- };
- 
 diff --git a/src/melee/if/textlib.c b/src/melee/if/textlib.c
+index bd8d18b..534268f 100644
 --- a/src/melee/if/textlib.c
 +++ b/src/melee/if/textlib.c
 @@ -2,7 +2,9 @@
@@ -274,169 +1479,8 @@ diff --git a/src/melee/if/textlib.c b/src/melee/if/textlib.c
  #include <stdarg.h>
  #include <stdio.h>
  #include <string.h>
-diff --git a/src/melee/ft/fighter.c b/src/melee/ft/fighter.c
---- a/src/melee/ft/fighter.c
-+++ b/src/melee/ft/fighter.c
-@@ -179,7 +179,12 @@
- void Fighter_LoadCommonData(void)
- {
-     void** pData;
-+#if defined(MELEE_WEB_GAMEPLAY)
-+    extern void** melee_web_common_context_source_roots(void);
-+    pData = melee_web_common_context_source_roots();
-+#else
-     lbArchive_LoadSymbols("PlCo.dat", (void**) &pData, "ftLoadCommonData", 0);
-+#endif
- 
-     // copy 23 4-byte chunks from pData to p_ftCommonData in reverse order,
-     // equivalent to this: for(i=0; i<23; i++)
-diff --git a/src/melee/ef/efalt.c b/src/melee/ef/efalt.c
---- a/src/melee/ef/efalt.c
-+++ b/src/melee/ef/efalt.c
-@@ -9,7 +9,11 @@
- #include <sysdolphin/baselib/gobj.h>
- #include <sysdolphin/baselib/jobj.h>
- 
-+#if defined(MELEE_WEB_GAMEPLAY)
-+#define EFALT_VA_ARG(t) va_arg(vlist, t)
-+#else
- #define EFALT_VA_ARG(t) (*((t*) __va_arg(vlist_arg, _var_arg_typeof(t))))
-+#endif
- 
- extern volatile u32 efLib_LoadKind;
- extern volatile s32 efLib_AnimCount;
-diff --git a/src/melee/it/item.c b/src/melee/it/item.c
---- a/src/melee/it/item.c
-+++ b/src/melee/it/item.c
-@@ -1,3 +1,6 @@
-+#if defined(MELEE_WEB_GAMEPLAY)
-+#include "gameplay_article_data.h"
-+#endif
- #include "item.h"
- 
- #include <melee/lb/forward.h>
-@@ -557,6 +560,9 @@
-                 686, 0, "not found zako model data! check ground dat file!\n");
-         }
-     }
-+#if defined(MELEE_WEB_GAMEPLAY)
-+    melee_web_article_require_ready(item_data->xC4_article_data);
-+#endif
-     item_data->xBC_itemStateContainer = item_data->xB8_itemLogicTable->states;
- }
- 
-diff --git a/src/melee/gr/grbigblue.c b/src/melee/gr/grbigblue.c
---- a/src/melee/gr/grbigblue.c
-+++ b/src/melee/gr/grbigblue.c
-@@ -214,7 +214,7 @@
-     50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65,
- } };
- 
--void grBigBlue_801E57BC(bool arg) {}
-+void grBigBlue_801E57BC(int arg) {}
- 
- void grBigBlue_801E57C0(void)
- {
-diff --git a/src/melee/gr/grbigblue.h b/src/melee/gr/grbigblue.h
---- a/src/melee/gr/grbigblue.h
-+++ b/src/melee/gr/grbigblue.h
-@@ -7,7 +7,7 @@
- 
- #include <dolphin/mtx.h>
- 
--/* 1E57BC */ void grBigBlue_801E57BC(bool);
-+/* 1E57BC */ void grBigBlue_801E57BC(int);
- /* 1E57C0 */ void grBigBlue_801E57C0(void);
- /* 1E59C8 */ void grBigBlue_801E59C8(void);
- /* 1E59CC */ void grBigBlue_801E59CC(void);
-diff --git a/src/melee/gr/grbigblueroute.c b/src/melee/gr/grbigblueroute.c
---- a/src/melee/gr/grbigblueroute.c
-+++ b/src/melee/gr/grbigblueroute.c
-@@ -153,7 +153,7 @@
- }
- #endif
- 
--void grBigBlueRoute_8020B864(bool arg)
-+void grBigBlueRoute_8020B864(int arg)
- {
-     HSD_GObj* gobj;
-     gobj = Ground_GetMapGObj(0x1F);
-diff --git a/src/melee/gr/grbigblueroute.h b/src/melee/gr/grbigblueroute.h
---- a/src/melee/gr/grbigblueroute.h
-+++ b/src/melee/gr/grbigblueroute.h
-@@ -9,7 +9,7 @@
- 
- #include <dolphin/mtx.h>
- 
--/* 20B864 */ void grBigBlueRoute_8020B864(bool);
-+/* 20B864 */ void grBigBlueRoute_8020B864(int);
- /* 20B89C */ void grBigBlueRoute_8020B89C(void);
- /* 20B920 */ void grBigBlueRoute_8020B920(void);
- /* 20B95C */ void grBigBlueRoute_8020B95C(void);
-diff --git a/src/melee/gr/grcastle.c b/src/melee/gr/grcastle.c
---- a/src/melee/gr/grcastle.c
-+++ b/src/melee/gr/grcastle.c
-@@ -214,7 +214,7 @@
-     f32 v[6];
- } grCastle_YOffsets;
- 
--void grCastle_801CD338(bool arg0)
-+void grCastle_801CD338(int arg0)
- {
-     HSD_GObj* gobj;
-     HSD_JObj* jobj;
-diff --git a/src/melee/gr/grcastle.h b/src/melee/gr/grcastle.h
---- a/src/melee/gr/grcastle.h
-+++ b/src/melee/gr/grcastle.h
-@@ -10,7 +10,7 @@
- 
- #include <dolphin/mtx.h>
- 
--/* 1CD338 */ void grCastle_801CD338(bool);
-+/* 1CD338 */ void grCastle_801CD338(int);
- /* 1CD37C */ void grCastle_801CD37C(void);
- /* 1CD4A0 */ void grCastle_801CD4A0(void);
- /* 1CD4A4 */ void grCastle_801CD4A4(void);
-diff --git a/src/melee/gr/granime.c b/src/melee/gr/granime.c
---- a/src/melee/gr/granime.c
-+++ b/src/melee/gr/granime.c
-@@ -52,7 +52,11 @@
- /* 4D695C */ static float grAnime_804D695C;
- 
- struct padded_jmp_buf {
-+#if defined(MELEE_WEB_GAMEPLAY)
-+    jmp_buf buf;
-+#else
-     __jmp_buf buf;
-+#endif
-     u8 pad[0x118 - 0xF8];
- };
- 
-@@ -1050,7 +1054,11 @@
- void fn_801C82E8(int arg0, int* arg1)
- {
-     *arg1 = arg0;
-+#if defined(MELEE_WEB_GAMEPLAY)
-+    longjmp(grAnime_8049EE40.buf, 1);
-+#else
-     longjmp(&grAnime_8049EE40.buf, 1);
-+#endif
- }
- 
- HSD_AObj* grAnime_801C8318(HSD_GObj* gobj, int arg1, u32 arg2)
-@@ -1071,7 +1079,11 @@
-     if (arg2 & 4) {
-         var_r30 |= 0x100;
-     }
-+#if defined(MELEE_WEB_GAMEPLAY)
-+    if (setjmp(grAnime_8049EE40.buf) == 0) {
-+#else
-     if (__setjmp(&grAnime_8049EE40.buf) == 0) {
-+#endif
-         HSD_ForeachAnim(jobj, JOBJ_TYPE, var_r30, fn_801C82E8, AOBJ_ARG_AV,
-                         &sp14);
-     }
 diff --git a/src/melee/if/textlib_1.c b/src/melee/if/textlib_1.c
+index 17cd48e..f1b4e1c 100644
 --- a/src/melee/if/textlib_1.c
 +++ b/src/melee/if/textlib_1.c
 @@ -1,6 +1,8 @@
@@ -448,22 +1492,170 @@ diff --git a/src/melee/if/textlib_1.c b/src/melee/if/textlib_1.c
  
  #include "textdraw.h"
  #include "textlib.h"
-diff --git a/src/sysdolphin/baselib/sislib.c b/src/sysdolphin/baselib/sislib.c
---- a/src/sysdolphin/baselib/sislib.c
-+++ b/src/sysdolphin/baselib/sislib.c
-@@ -1,6 +1,8 @@
- #include "sislib.h"
- 
-+#if !defined(MELEE_WEB_GAMEPLAY)
- #include <printf.h> // IWYU pragma: keep
+diff --git a/src/melee/it/item.c b/src/melee/it/item.c
+index 8d2df85..c2bb666 100644
+--- a/src/melee/it/item.c
++++ b/src/melee/it/item.c
+@@ -1,3 +1,6 @@
++#if defined(MELEE_WEB_GAMEPLAY)
++#include "gameplay_article_data.h"
 +#endif
- #include <stdio.h>
+ #include "item.h"
  
- #include "cobj.h"
+ #include <melee/lb/forward.h>
+@@ -557,6 +560,9 @@ void Item_80267978(HSD_GObj* gobj)
+                 686, 0, "not found zako model data! check ground dat file!\n");
+         }
+     }
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_article_require_ready(item_data->xC4_article_data);
++#endif
+     item_data->xBC_itemStateContainer = item_data->xB8_itemLogicTable->states;
+ }
+ 
+diff --git a/src/melee/it/itmaterial.c b/src/melee/it/itmaterial.c
+index 16f2c0e..a15958a 100644
+--- a/src/melee/it/itmaterial.c
++++ b/src/melee/it/itmaterial.c
+@@ -49,6 +49,14 @@ struct it_MObjInfo it_mobj = {
+     { HSD_TE_CNST, NULL, NULL, HSD_TE_RGB, HSD_TE_U8, 0xFF, 0xFF },
+ };
+ 
++#if defined(TARGET_PC)
++/* HSD material setup has two arguments; the original third is unused. */
++static void melee_web_item_material_setup(HSD_MObj* mobj, u32 mode)
++{
++    fn_80277D8C(mobj, mode, 0);
++}
++#endif
++
+ void it_80277D08(void)
+ {
+     hsdInitClassInfo(HSD_CLASS_INFO(&it_mobj), HSD_CLASS_INFO(&hsdMObj),
+@@ -56,7 +64,11 @@ void it_80277D08(void)
+                      sizeof(HSD_MObjInfo), sizeof(HSD_MObj));
+     it_mobj.parent.release = hsdMObj.parent.release;
+     it_mobj.parent.amnesia = hsdMObj.parent.amnesia;
++#if defined(TARGET_PC)
++    it_mobj.setup = melee_web_item_material_setup;
++#else
+     it_mobj.setup = (it_MObjSetupFunc) fn_80277D8C;
++#endif
+     it_mobj.load = hsdMObj.load;
+     it_mobj.make_texp = hsdMObj.make_texp;
+ }
+diff --git a/src/melee/it/itmaterial.h b/src/melee/it/itmaterial.h
+index 0eed414..6c59223 100644
+--- a/src/melee/it/itmaterial.h
++++ b/src/melee/it/itmaterial.h
+@@ -17,6 +17,10 @@ struct it_MObjInfo;
+ /* 278574 */ void it_80278574(HSD_GObj*, GXColor*);
+ /* 3F1F90 */ extern struct it_MObjInfo it_mobj;
+ 
++#if defined(TARGET_PC)
++typedef void (*it_MObjSetupFunc)(HSD_MObj* mobj, u32 rendermode);
++#else
+ typedef void (*it_MObjSetupFunc)(HSD_MObj* mobj, u32 rendermode, u32 unused);
++#endif
+ 
+ #endif
+diff --git a/src/melee/it/kinds/itcoin.c b/src/melee/it/kinds/itcoin.c
+index 066959e..3f313a9 100644
+--- a/src/melee/it/kinds/itcoin.c
++++ b/src/melee/it/kinds/itcoin.c
+@@ -141,7 +141,7 @@ bool itCoin_UnkMotion0_Coll(Item_GObj* gobj)
+     return false;
+ }
+ 
+-void inline itCoin_ResetRotation(Item_GObj* gobj)
++static inline void itCoin_ResetRotation(Item_GObj* gobj)
+ {
+     HSD_JObj* jobj;
+     jobj = GET_JOBJ(gobj);
+diff --git a/src/melee/lb/lb_013B.c b/src/melee/lb/lb_013B.c
+index 75dfb9c..3275ae3 100644
+--- a/src/melee/lb/lb_013B.c
++++ b/src/melee/lb/lb_013B.c
+@@ -169,7 +169,12 @@ bool lb_80014258(Fighter_GObj* gobj, void* arg1, FtCmd2 cmd)
+ 
+     while (co->x8_ptr1 != NULL && co->x0_timer == 0) {
+         u32 opcode = co->x8_ptr1->unk.unk;
++#ifdef TARGET_PC
++        extern int melee_web_color_command_execute(CommandInfo*,u32);
++        if (!melee_web_color_command_execute((CommandInfo*)co,opcode)) {
++#else
+         if (!Command_Execute((CommandInfo*) co, opcode)) {
++#endif
+             if (opcode < 0x15U) {
+                 u32 idx = opcode - 0xA;
+                 if (lb_803BA248[idx](co)) {
+diff --git a/src/melee/lb/lbarchive.c b/src/melee/lb/lbarchive.c
+index fb0385b..7c30812 100644
+--- a/src/melee/lb/lbarchive.c
++++ b/src/melee/lb/lbarchive.c
+@@ -181,6 +181,14 @@ bool lbArchive_80016F80(HSD_Archive** archive, const char* filename)
+ bool lbArchive_80017040(HSD_Archive** dst, const char* filename, void* symbols,
+                         ...)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    extern void melee_web_archive_sections_load(void*, const char*, void*, va_list);
++    va_list native_args;
++    va_start(native_args, symbols);
++    melee_web_archive_sections_load(dst, filename, symbols, native_args);
++    va_end(native_args);
++    return true;
++#else
+     void* tmp;
+     HSD_Archive* archive2;
+     HSD_Archive* archive;
+@@ -217,6 +225,7 @@ bool lbArchive_80017040(HSD_Archive** dst, const char* filename, void* symbols,
+         *dst = archive;
+     }
+     return preloaded;
++#endif
+ }
+ 
+ bool lbArchive_800171CC(HSD_Archive** dst, const char* filename, void* symbols,
+diff --git a/src/melee/lb/lbaudio_ax.c b/src/melee/lb/lbaudio_ax.c
+index 0e12ba9..4d4a4d2 100644
+--- a/src/melee/lb/lbaudio_ax.c
++++ b/src/melee/lb/lbaudio_ax.c
+@@ -2274,3 +2274,30 @@ void lbAudioAx_80028B90(void)
+ {
+     lbl_804D38CC = 0x7F;
+ }
++
++#if defined(MELEE_WEB_GAMEPLAY)
++static struct {
++    __typeof__(cur_hps_file) cur_hps_file;
++    __typeof__(cur_hps_stem) cur_hps_stem;
++    __typeof__(hps_stem_pos) hps_stem_pos;
++    __typeof__(lbl_804D6418) lbl_804D6418;
++} melee_audio_lb_stream_saved;
++void melee_web_audio_stream_lb_begin(void)
++{
++    memcpy(&melee_audio_lb_stream_saved.cur_hps_file, &cur_hps_file, sizeof(cur_hps_file));
++    memcpy(&melee_audio_lb_stream_saved.cur_hps_stem, &cur_hps_stem, sizeof(cur_hps_stem));
++    memcpy(&melee_audio_lb_stream_saved.hps_stem_pos, &hps_stem_pos, sizeof(hps_stem_pos));
++    memcpy(&melee_audio_lb_stream_saved.lbl_804D6418, &lbl_804D6418, sizeof(lbl_804D6418));
++    strcpy(cur_hps_file, str_audio);
++    hps_stem_pos = 7;
++    cur_hps_stem[0] = '\0';
++    lbl_804D6418 = 0;
++}
++void melee_web_audio_stream_lb_end(void)
++{
++    memcpy(&cur_hps_file, &melee_audio_lb_stream_saved.cur_hps_file, sizeof(cur_hps_file));
++    memcpy(&cur_hps_stem, &melee_audio_lb_stream_saved.cur_hps_stem, sizeof(cur_hps_stem));
++    memcpy(&hps_stem_pos, &melee_audio_lb_stream_saved.hps_stem_pos, sizeof(hps_stem_pos));
++    memcpy(&lbl_804D6418, &melee_audio_lb_stream_saved.lbl_804D6418, sizeof(lbl_804D6418));
++}
++#endif
 diff --git a/src/melee/lb/lbcollision.c b/src/melee/lb/lbcollision.c
+index 0e13b1a..bf76903 100644
 --- a/src/melee/lb/lbcollision.c
 +++ b/src/melee/lb/lbcollision.c
-@@ -2130,8 +2130,16 @@
+@@ -2130,8 +2130,16 @@ void lbColl_80008FC8(Vec3 arg0, Vec3 arg1, GXColor* arg2, GXColor* arg3,
      PSMTXConcat(sp44, sp74, sp74);
      GXSetCullMode(GX_CULL_BACK);
      GXClearVtxDesc();
@@ -480,7 +1672,7 @@ diff --git a/src/melee/lb/lbcollision.c b/src/melee/lb/lbcollision.c
      GXSetVtxDesc(GX_VA_POS, GX_INDEX8);
      GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_TEX_ST, GX_RGBA4, 0xE);
      GXSetVtxDesc(GX_VA_NRM, GX_INDEX8);
-@@ -2143,8 +2151,16 @@
+@@ -2143,8 +2151,16 @@ void lbColl_80008FC8(Vec3 arg0, Vec3 arg1, GXColor* arg2, GXColor* arg3,
      GXLoadNrmMtxImm(spD4, 0);
      GXCallDisplayList(lbColl_SphereDisplayList, 0x120);
      GXClearVtxDesc();
@@ -497,7 +1689,7 @@ diff --git a/src/melee/lb/lbcollision.c b/src/melee/lb/lbcollision.c
      GXSetVtxDesc(GX_VA_POS, GX_INDEX8);
      GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_TEX_ST, GX_RGBA4, 0xE);
      GXSetVtxDesc(GX_VA_NRM, GX_INDEX8);
-@@ -2157,8 +2173,16 @@
+@@ -2157,8 +2173,16 @@ void lbColl_80008FC8(Vec3 arg0, Vec3 arg1, GXColor* arg2, GXColor* arg3,
      GXCallDisplayList(lbColl_SphereDisplayList, 0x120);
      if (!isSmall(var_f31)) {
          GXClearVtxDesc();
@@ -514,7 +1706,7 @@ diff --git a/src/melee/lb/lbcollision.c b/src/melee/lb/lbcollision.c
          GXSetVtxDesc(GX_VA_POS, GX_INDEX8);
          GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_TEX_ST, GX_RGBA4, 0xE);
          GXSetVtxDesc(GX_VA_NRM, GX_INDEX8);
-@@ -2259,8 +2283,16 @@
+@@ -2259,8 +2283,16 @@ void lbColl_800096B4(MtxPtr arg0, Vec3 arg1, Vec3 arg2, GXColor* arg3,
      PSMTXConcat(arg0, sp78, sp78);
      GXSetCullMode(GX_CULL_BACK);
      GXClearVtxDesc();
@@ -531,7 +1723,7 @@ diff --git a/src/melee/lb/lbcollision.c b/src/melee/lb/lbcollision.c
      GXSetVtxDesc(GX_VA_POS, GX_INDEX8);
      GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_TEX_ST, GX_RGBA4, 0xE);
      GXSetVtxDesc(GX_VA_NRM, GX_INDEX8);
-@@ -2272,8 +2304,16 @@
+@@ -2272,8 +2304,16 @@ void lbColl_800096B4(MtxPtr arg0, Vec3 arg1, Vec3 arg2, GXColor* arg3,
      GXLoadNrmMtxImm(spD8, 0);
      GXCallDisplayList(lbColl_SphereDisplayList, 0x120);
      GXClearVtxDesc();
@@ -548,7 +1740,7 @@ diff --git a/src/melee/lb/lbcollision.c b/src/melee/lb/lbcollision.c
      GXSetVtxDesc(GX_VA_POS, GX_INDEX8);
      GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_TEX_ST, GX_RGBA4, 0xE);
      GXSetVtxDesc(GX_VA_NRM, GX_INDEX8);
-@@ -2286,8 +2326,16 @@
+@@ -2286,8 +2326,16 @@ void lbColl_800096B4(MtxPtr arg0, Vec3 arg1, Vec3 arg2, GXColor* arg3,
      GXCallDisplayList(lbColl_SphereDisplayList, 0x120);
      if (!isSmall(var_f31)) {
          GXClearVtxDesc();
@@ -565,197 +1757,400 @@ diff --git a/src/melee/lb/lbcollision.c b/src/melee/lb/lbcollision.c
          GXSetVtxDesc(GX_VA_POS, GX_INDEX8);
          GXSetVtxAttrFmt(GX_VTXFMT0, GX_VA_POS, GX_TEX_ST, GX_RGBA4, 0xE);
          GXSetVtxDesc(GX_VA_NRM, GX_INDEX8);
-diff --git a/src/melee/gr/grmutecity.c b/src/melee/gr/grmutecity.c
---- a/src/melee/gr/grmutecity.c
-+++ b/src/melee/gr/grmutecity.c
-@@ -1902,6 +1902,11 @@
+diff --git a/src/melee/lb/lbcommand.c b/src/melee/lb/lbcommand.c
+index 5ea9c63..b943ec8 100644
+--- a/src/melee/lb/lbcommand.c
++++ b/src/melee/lb/lbcommand.c
+@@ -31,12 +31,24 @@ void Command_02(CommandInfo* info)
+ }
  
- s32 grMuteCity_801F2AB0(s32 arg0, HSD_JObj* arg1)
+ /// SetLoop
++#ifdef TARGET_PC
++void melee_web_command_set_loop(CommandInfo* info,u32 count)
++{
++    info->event_return[info->loop_count++] = info->u + 1;
++    info->event_return[info->loop_count++] = (union CmdUnion*) count;
++    NEXT_CMD(info);
++}
++#endif
+ void Command_03(CommandInfo* info)
  {
-+#if defined(MELEE_WEB_GAMEPLAY)
-+    /* Source leaves its return register implicit; require a verified adapter. */
-+    HSD_Panic(__FILE__, __LINE__, "Mute City particle result ABI is not ported");
-+    return 0;
++#ifdef TARGET_PC
++    melee_web_command_set_loop(info,info->u->Command_03.value);
 +#else
-     HSD_Generator* gen;
-     HSD_psAppSRT* appsrt;
+     info->event_return[info->loop_count++] = info->u + 1;
+     info->event_return[info->loop_count++] =
+         (union CmdUnion*) info->u->Command_03.value;
+     NEXT_CMD(info);
++#endif
+ }
  
-@@ -1920,6 +1925,7 @@
-         gen->type |= PSAPPSRT_UNK_B11;
-         appsrt->gp = gen;
+ /// Execute Loop
+diff --git a/src/melee/lb/types.h b/src/melee/lb/types.h
+index 5917d53..eab242f 100644
+--- a/src/melee/lb/types.h
++++ b/src/melee/lb/types.h
+@@ -326,6 +326,24 @@ struct ColorOverlay_UnkInner {
+ 
+ union ColorOverlay_x8_t {
+     GXColor light_color;
++#if defined(TARGET_PC) && defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
++    /* Numeric command words retain PPC bit positions; GXColor operands retain
++     * their four serialized component bytes. */
++    struct { s32 yz : 13; s32 x : 13; s32 unk : 6; } light_rot1;
++    struct {
++        s32 yz : 12;
++        s32 x : 12;
++        u32 x0_7 : 1;
++        u32 light_enable : 1;
++        u32 x0_5 : 1;
++        u32 x0_4 : 1;
++        u32 x0_3 : 1;
++        u32 x0_2 : 1;
++        u32 x0_1 : 1;
++        u32 x0_0 : 1;
++    } light_rot2;
++    struct { u32 timer : 26; u32 unk : 6; } unk;
++#else
+     struct {
+         s32 unk : 6;
+         s32 x : 13;
+@@ -347,6 +365,7 @@ union ColorOverlay_x8_t {
+         u32 unk : 6;
+         u32 timer : 26;
+     } unk;
++#endif
+ };
+ ASSERT_SIZE(union ColorOverlay_x8_t, 0x4);
+ 
+diff --git a/src/melee/mn/mnhyaku.c b/src/melee/mn/mnhyaku.c
+index 8c07746..3cf975d 100644
+--- a/src/melee/mn/mnhyaku.c
++++ b/src/melee/mn/mnhyaku.c
+@@ -16,7 +16,7 @@
+ 
+ static HSD_GObj* mnHyaku_804D6C58;
+ 
+-void gm_801677E8(void);
++void gm_801677E8(s8 port);
+ 
+ static AnimLoopSettings mnHyaku_803EF668 = { 0.0f, 19.0f, -0.1f };
+ static AnimLoopSettings mnHyaku_803EF674 = { 20.0f, 29.0f, -0.1f };
+@@ -69,8 +69,7 @@ void mnHyaku_8024C68C(HSD_GObj* arg0)
      }
-+#endif
+     if (events & MenuInput_Confirm) {
+         sfxForward();
+-        mn_802295AC();
+-        gm_801677E8();
++        gm_801677E8(mn_802295AC());
+         // load the different multi-man melee modes
+         switch (menu->cursor) {
+         case 0:
+diff --git a/src/melee/mn/mnmainrule.c b/src/melee/mn/mnmainrule.c
+index 67c664b..196869c 100644
+--- a/src/melee/mn/mnmainrule.c
++++ b/src/melee/mn/mnmainrule.c
+@@ -152,7 +152,7 @@ HSD_GObj* mn_804D6BD0;
+ void mnItemSw_802358C0(void);
+ void mn_802339FC(void);
+ void mnCharSel_80264070(void);
+-void mnCharSel_802640A0(void);
++s32 mnCharSel_802640A0(void);
+ 
+ static inline u8 mn_8022F538_GetHoveredSelection(void)
+ {
+diff --git a/src/melee/mp/mplib.c b/src/melee/mp/mplib.c
+index ddc3979..a689544 100644
+--- a/src/melee/mp/mplib.c
++++ b/src/melee/mp/mplib.c
+@@ -5967,7 +5967,7 @@ void mpLib_800587FC(HSD_GObj* gobj)
+     grDynamicAttr_801CA224();
  }
  
- /// @copydoc mpLib_JointCollisionCallback
-diff --git a/src/melee/gr/ground.c b/src/melee/gr/ground.c
---- a/src/melee/gr/ground.c
-+++ b/src/melee/gr/ground.c
-@@ -1187,6 +1187,17 @@
-                                        HSD_LightDesc* desc, bool* b6, bool* b7,
-                                        bool* b5)
+-void mpLib_80058820(void)
++static HSD_GObj* mpLib_80058820_owned(void)
  {
-+#if defined(MELEE_WEB_GAMEPLAY)
-+    extern int melee_web_stage_lights_lookup_override(void*, int*, unsigned char*);
-+    int found;
-+    unsigned char flags;
-+    if (melee_web_stage_lights_lookup_override(desc, &found, &flags)) {
-+        *b6 = (flags & 0x40) != 0;
-+        *b7 = (flags & 0x80) != 0;
-+        *b5 = (flags & 0x20) != 0;
-+        return found;
-+    }
-+#endif
-     UnkStageDat* dat = archive->unk4;
-     s32 count = dat->unk1C;
-     s32 i;
-@@ -1210,6 +1221,17 @@
-                                               HSD_LightDesc* desc, bool* b6,
-                                               bool* b7, bool* b5)
- {
-+#if defined(MELEE_WEB_GAMEPLAY)
-+    extern int melee_web_stage_lights_lookup_override(void*, int*, unsigned char*);
-+    int found;
-+    unsigned char flags;
-+    if (melee_web_stage_lights_lookup_override(desc, &found, &flags)) {
-+        *b6 = (flags & 0x40) != 0;
-+        *b7 = (flags & 0x80) != 0;
-+        *b5 = (flags & 0x20) != 0;
-+        return found;
-+    }
-+#endif
-     s32 count = dat->unk1C;
-     s32 i;
+     mpCollisionBox* box = mpLib_80458868;
+     HSD_GObj* gobj = GObj_Create(1, 6, 0);
+@@ -5978,6 +5978,12 @@ void mpLib_80058820(void)
+     box[0].left = -10000.0F;
+     box[0].bottom = -10000.0F;
+     box[1] = box[0];
++    return gobj;
++}
++
++void mpLib_80058820(void)
++{
++    mpLib_80058820_owned();
+ }
  
-diff --git a/src/melee/ft/ftdata.c b/src/melee/ft/ftdata.c
---- a/src/melee/ft/ftdata.c
-+++ b/src/melee/ft/ftdata.c
-@@ -8,6 +8,9 @@
+ bool mpCheckedBounding(void)
+diff --git a/src/placeholder.h b/src/placeholder.h
+index 948c401..0ea5027 100644
+--- a/src/placeholder.h
++++ b/src/placeholder.h
+@@ -10,7 +10,14 @@ typedef void (*jmp_t)(void);
+ typedef jmp_t jtbl_t[];
  
- #include "fighter.h"
- #include "forward.h"
-+#if defined(MELEE_WEB_GAMEPLAY)
-+#include "gameplay_fighter_assets.h"
-+#endif
- #include "ft_0877.h"
- #include "inlines.h"
- #include "kinds/ftCaptain/ftcaptain.h"
-@@ -1565,6 +1568,9 @@
- 
- void ftData_8008572C(FighterKind kind)
- {
-+#if defined(MELEE_WEB_GAMEPLAY)
-+    melee_web_fighter_assets_require_kind(kind);
-+#endif
-     if (gFtDataList[kind] == NULL) {
-         lbArchive_80017040(NULL, ftData_803C1F40[kind].a, &gFtDataList[kind],
-                            ftData_803C1F40[kind].b, 0);
-@@ -1591,6 +1597,9 @@
- 
- void ftData_80085820(FighterKind kind, int costume_id)
- {
-+#if defined(MELEE_WEB_GAMEPLAY)
-+    melee_web_fighter_assets_require_costume(kind, costume_id);
-+#endif
-     UnkCostumeStruct* temp_r5 =
-         &CostumeListsForeachCharacter[kind].costume_list[costume_id];
-     if (temp_r5->joint == NULL) {
-@@ -1653,6 +1662,9 @@
- 
- void ftData_80085A14(FighterKind kind)
- {
-+#if defined(MELEE_WEB_GAMEPLAY)
-+    melee_web_fighter_assets_require_kind(kind);
+ #ifndef MWERKS_GEKKO
++#if defined(TARGET_PC)
++/* Executable ports need the reciprocal-square-root estimate, not the
++ * decompilation placeholder: original Newton refinement depends on it. */
++#include <dolphin/ppc_math.h>
++#define __frsqrte(x) frsqrte(x)
 +#else
-     void* sp18;
-     void* a_head;
-     ftData* temp_r27 = gFtDataList[kind];
-@@ -1680,10 +1692,14 @@
-         }
-         ftData_Table_Unk0[kind].data = a_head;
-     }
+ #define __frsqrte(x) sqrt(x)
 +#endif
- }
- 
- void ftData_80085B10(Fighter* fp)
- {
-+#if defined(MELEE_WEB_GAMEPLAY)
-+    melee_web_fighter_assets_bind_created(fp);
-+#else
-     FighterKind kind = fp->kind;
-     fp->x59C = HSD_ObjAlloc(&fighter_x59C_alloc_data);
-     fp->x5A0 = HSD_ObjAlloc(&fighter_x59C_alloc_data);
-@@ -1691,6 +1707,7 @@
-     fp->x5A8 = NULL;
-     fp->x58C = ftData_Table_Unk0[kind].count;
-     ftData_80085A14(kind);
-+#endif
- }
- 
- void ftData_80085B98(Fighter* fp, int arg1, int arg2)
-diff --git a/src/melee/ft/fighter.c b/src/melee/ft/fighter.c
---- a/src/melee/ft/fighter.c
-+++ b/src/melee/ft/fighter.c
-@@ -1,4 +1,7 @@
- #include "fighter.h"
-+#if defined(MELEE_WEB_GAMEPLAY)
-+#include "gameplay_fighter_assets.h"
-+#endif
+ #define sqrtf__Ff(x) sqrtf(x)
+ #define sqrtf_accurate(x) sqrtf(x)
+ #define __fabs(f) fabsf(f)
+diff --git a/src/sysdolphin/baselib/axdriver.c b/src/sysdolphin/baselib/axdriver.c
+index 72776f8..7177d58 100644
+--- a/src/sysdolphin/baselib/axdriver.c
++++ b/src/sysdolphin/baselib/axdriver.c
+@@ -1,4 +1,5 @@
+ #include "axdriver.h"
++#include <string.h>
  
  #include <math.h>
- #include <placeholder.h>
-@@ -3112,8 +3115,12 @@
-     HSD_LObjRemoveAll(fp->x588);
-     Player_80031FB0(fp->player_id, fp->x221F_b4);
+ #include <string.h>
+@@ -318,6 +319,10 @@ void AXDriver_8038C6C0(HSD_SM* v)
+     PAD_STACK(8);
  
+     while (v->x30 == (s32) AXDriver_804D778C) {
 +#if defined(MELEE_WEB_GAMEPLAY)
-+    melee_web_fighter_assets_unbind_destroying(fp);
-+#else
-     HSD_ObjFree(&fighter_x59C_alloc_data, fp->x59C);
-     HSD_ObjFree(&fighter_x59C_alloc_data, fp->x5A0);
++        extern void melee_web_audio_program_check(const u32*);
++        melee_web_audio_program_check(v->cmd_stream);
 +#endif
-     HSD_ObjFree(&fighter_parts_alloc_data, fp->parts);
-     HSD_ObjFree(&fighter_dobj_list_alloc_data, fp->dobj_list.data);
-     HSD_ObjFree(&fighter_x2040_alloc_data, fp->x203C.data);
-diff --git a/src/melee/it/kinds/itcoin.c b/src/melee/it/kinds/itcoin.c
---- a/src/melee/it/kinds/itcoin.c
-+++ b/src/melee/it/kinds/itcoin.c
-@@ -141,7 +141,7 @@
-     return false;
- }
+         cmd_word = *v->cmd_stream;
+         cmd_type = cmd_word >> 0x18U;
  
--void inline itCoin_ResetRotation(Item_GObj* gobj)
-+static inline void itCoin_ResetRotation(Item_GObj* gobj)
- {
-     HSD_JObj* jobj;
-     jobj = GET_JOBJ(gobj);
-diff --git a/src/melee/lb/lbarchive.c b/src/melee/lb/lbarchive.c
---- a/src/melee/lb/lbarchive.c
-+++ b/src/melee/lb/lbarchive.c
-@@ -181,6 +181,14 @@
- bool lbArchive_80017040(HSD_Archive** dst, const char* filename, void* symbols,
-                         ...)
- {
-+#if defined(MELEE_WEB_GAMEPLAY)
-+    extern void melee_web_archive_sections_load(void*, const char*, void*, va_list);
-+    va_list native_args;
-+    va_start(native_args, symbols);
-+    melee_web_archive_sections_load(dst, filename, symbols, native_args);
-+    va_end(native_args);
-+    return true;
-+#else
-     void* tmp;
-     HSD_Archive* archive2;
-     HSD_Archive* archive;
-@@ -217,6 +225,7 @@
-         *dst = archive;
+@@ -437,7 +442,7 @@ void AXDriver_8038C6C0(HSD_SM* v)
      }
-     return preloaded;
-+#endif
  }
  
- bool lbArchive_800171CC(HSD_Archive** dst, const char* filename, void* symbols,
+-static void fn_8038CC1C(void)
++static void fn_8038CC1C(int clock)
+ {
+     HSD_SM* v;
+     HSD_SM* next;
+@@ -1144,16 +1149,21 @@ bool AXDriver_8038E37C(AXDriverAuxType type, void* param)
+     return true;
+ }
+ 
+-void AXDriver_8038E498(int voices, int priority, int sample_rate,
+-                       int aram_size)
++static void AXDriverInitVoiceControls(void)
+ {
+     int i;
+-
+     for (i = 0; i < 0x60; i++) {
+         AXDriver_804C45A0[i].flags &= ~SMSTATE_MASK;
+         unk_inline(&AXDriver_804C45A0[i], &AXDriver_804D7790);
+     }
+ 
++}
++
++void AXDriver_8038E498(int voices, int priority, int sample_rate,
++                       int aram_size)
++{
++    AXDriverInitVoiceControls();
++
+     HSD_SynthInit(voices, priority, sample_rate, aram_size);
+     HSD_SynthSFXSetDriverMasterClockCallback(fn_8038CC1C);
+     HSD_SynthSFXSetDriverInactivatedCallback(fn_8038CEA4);
+@@ -1319,3 +1329,160 @@ bool AXDriver_8038EA18(void)
+     }
+     return true;
+ }
++
++#if defined(MELEE_WEB_GAMEPLAY)
++static struct {
++    __typeof__(AXDriver_804C45A0) AXDriver_804C45A0;
++    __typeof__(AXDriver_804C5920) AXDriver_804C5920;
++    __typeof__(AXDriver_804C5A20) AXDriver_804C5A20;
++    __typeof__(AXDriver_804D6038) AXDriver_804D6038;
++    __typeof__(AXDriver_804D603C) AXDriver_804D603C;
++    __typeof__(vidhigh) vidhigh;
++    __typeof__(AXDriver_804D778C) AXDriver_804D778C;
++    __typeof__(AXDriver_804D7790) AXDriver_804D7790;
++    __typeof__(AXDriver_804D7794) AXDriver_804D7794;
++    __typeof__(AXDriver_804D77B0) AXDriver_804D77B0;
++    __typeof__(AXDriver_804D77B4) AXDriver_804D77B4;
++    __typeof__(AXDriver_804D77B8) AXDriver_804D77B8;
++    __typeof__(AXDriver_804D77BC) AXDriver_804D77BC;
++    __typeof__(AXDriver_804D77C8) AXDriver_804D77C8;
++    __typeof__(AXDriver_804D77CC) AXDriver_804D77CC;
++    __typeof__(AXDriver_804D77D0) AXDriver_804D77D0;
++    __typeof__(AXDriver_804D77E0) AXDriver_804D77E0;
++    __typeof__(AXDriver_804D77E4) AXDriver_804D77E4;
++    __typeof__(AXDriver_804D77E8) AXDriver_804D77E8;
++} melee_audio_driver_saved;
++static int melee_audio_driver_active;
++void melee_web_audio_driver_begin(int bank_count,u32* starts,int program_count,u32** programs)
++{
++    HSD_ASSERT(1, !melee_audio_driver_active);
++    memcpy(&melee_audio_driver_saved.AXDriver_804C45A0, &AXDriver_804C45A0, sizeof(AXDriver_804C45A0));
++    memcpy(&melee_audio_driver_saved.AXDriver_804C5920, &AXDriver_804C5920, sizeof(AXDriver_804C5920));
++    memcpy(&melee_audio_driver_saved.AXDriver_804C5A20, &AXDriver_804C5A20, sizeof(AXDriver_804C5A20));
++    memcpy(&melee_audio_driver_saved.AXDriver_804D6038, &AXDriver_804D6038, sizeof(AXDriver_804D6038));
++    memcpy(&melee_audio_driver_saved.AXDriver_804D603C, &AXDriver_804D603C, sizeof(AXDriver_804D603C));
++    memcpy(&melee_audio_driver_saved.vidhigh, &vidhigh, sizeof(vidhigh));
++    memcpy(&melee_audio_driver_saved.AXDriver_804D778C, &AXDriver_804D778C, sizeof(AXDriver_804D778C));
++    memcpy(&melee_audio_driver_saved.AXDriver_804D7790, &AXDriver_804D7790, sizeof(AXDriver_804D7790));
++    memcpy(&melee_audio_driver_saved.AXDriver_804D7794, &AXDriver_804D7794, sizeof(AXDriver_804D7794));
++    memcpy(&melee_audio_driver_saved.AXDriver_804D77B0, &AXDriver_804D77B0, sizeof(AXDriver_804D77B0));
++    memcpy(&melee_audio_driver_saved.AXDriver_804D77B4, &AXDriver_804D77B4, sizeof(AXDriver_804D77B4));
++    memcpy(&melee_audio_driver_saved.AXDriver_804D77B8, &AXDriver_804D77B8, sizeof(AXDriver_804D77B8));
++    memcpy(&melee_audio_driver_saved.AXDriver_804D77BC, &AXDriver_804D77BC, sizeof(AXDriver_804D77BC));
++    memcpy(&melee_audio_driver_saved.AXDriver_804D77C8, &AXDriver_804D77C8, sizeof(AXDriver_804D77C8));
++    memcpy(&melee_audio_driver_saved.AXDriver_804D77CC, &AXDriver_804D77CC, sizeof(AXDriver_804D77CC));
++    memcpy(&melee_audio_driver_saved.AXDriver_804D77D0, &AXDriver_804D77D0, sizeof(AXDriver_804D77D0));
++    memcpy(&melee_audio_driver_saved.AXDriver_804D77E0, &AXDriver_804D77E0, sizeof(AXDriver_804D77E0));
++    memcpy(&melee_audio_driver_saved.AXDriver_804D77E4, &AXDriver_804D77E4, sizeof(AXDriver_804D77E4));
++    memset(&AXDriver_804C45A0, 0, sizeof(AXDriver_804C45A0));
++    memset(&AXDriver_804C5920, 0, sizeof(AXDriver_804C5920));
++    memset(&AXDriver_804C5A20, 0, sizeof(AXDriver_804C5A20));
++    memset(&AXDriver_804D6038, 0, sizeof(AXDriver_804D6038));
++    memset(&AXDriver_804D603C, 0, sizeof(AXDriver_804D603C));
++    memset(&vidhigh, 0, sizeof(vidhigh));
++    memset(&AXDriver_804D778C, 0, sizeof(AXDriver_804D778C));
++    memset(&AXDriver_804D7790, 0, sizeof(AXDriver_804D7790));
++    memset(&AXDriver_804D7794, 0, sizeof(AXDriver_804D7794));
++    memset(&AXDriver_804D77B0, 0, sizeof(AXDriver_804D77B0));
++    memset(&AXDriver_804D77B4, 0, sizeof(AXDriver_804D77B4));
++    memset(&AXDriver_804D77B8, 0, sizeof(AXDriver_804D77B8));
++    memset(&AXDriver_804D77BC, 0, sizeof(AXDriver_804D77BC));
++    memset(&AXDriver_804D77C8, 0, sizeof(AXDriver_804D77C8));
++    memset(&AXDriver_804D77CC, 0, sizeof(AXDriver_804D77CC));
++    memset(&AXDriver_804D77D0, 0, sizeof(AXDriver_804D77D0));
++    memset(&AXDriver_804D77E0, 0, sizeof(AXDriver_804D77E0));
++    memset(&AXDriver_804D77E4, 0, sizeof(AXDriver_804D77E4));
++    melee_audio_driver_active=1;
++    memcpy(&melee_audio_driver_saved.AXDriver_804D77E8, &AXDriver_804D77E8, sizeof(AXDriver_804D77E8));
++    AXDriver_804D77E8=0;
++    AXDriver_804D6038=-1;
++    AXDriver_804D603C=2;
++    AXDriver_804D77B0=bank_count;AXDriver_804D77B4=starts;
++    AXDriver_804D77B8=program_count;AXDriver_804D77BC=programs;
++    AXDriverInitVoiceControls();
++    HSD_SynthSFXSetDriverMasterClockCallback(fn_8038CC1C);
++    HSD_SynthSFXSetDriverInactivatedCallback(fn_8038CEA4);
++    HSD_SynthSFXSetDriverPauseCallback(fn_8038CF48);
++
++}
++void melee_web_audio_driver_end(void)
++{
++    HSD_ASSERT(1, melee_audio_driver_active);
++    memcpy(&AXDriver_804C45A0, &melee_audio_driver_saved.AXDriver_804C45A0, sizeof(AXDriver_804C45A0));
++    memcpy(&AXDriver_804C5920, &melee_audio_driver_saved.AXDriver_804C5920, sizeof(AXDriver_804C5920));
++    memcpy(&AXDriver_804C5A20, &melee_audio_driver_saved.AXDriver_804C5A20, sizeof(AXDriver_804C5A20));
++    memcpy(&AXDriver_804D6038, &melee_audio_driver_saved.AXDriver_804D6038, sizeof(AXDriver_804D6038));
++    memcpy(&AXDriver_804D603C, &melee_audio_driver_saved.AXDriver_804D603C, sizeof(AXDriver_804D603C));
++    memcpy(&vidhigh, &melee_audio_driver_saved.vidhigh, sizeof(vidhigh));
++    memcpy(&AXDriver_804D778C, &melee_audio_driver_saved.AXDriver_804D778C, sizeof(AXDriver_804D778C));
++    memcpy(&AXDriver_804D7790, &melee_audio_driver_saved.AXDriver_804D7790, sizeof(AXDriver_804D7790));
++    memcpy(&AXDriver_804D7794, &melee_audio_driver_saved.AXDriver_804D7794, sizeof(AXDriver_804D7794));
++    memcpy(&AXDriver_804D77B0, &melee_audio_driver_saved.AXDriver_804D77B0, sizeof(AXDriver_804D77B0));
++    memcpy(&AXDriver_804D77B4, &melee_audio_driver_saved.AXDriver_804D77B4, sizeof(AXDriver_804D77B4));
++    memcpy(&AXDriver_804D77B8, &melee_audio_driver_saved.AXDriver_804D77B8, sizeof(AXDriver_804D77B8));
++    memcpy(&AXDriver_804D77BC, &melee_audio_driver_saved.AXDriver_804D77BC, sizeof(AXDriver_804D77BC));
++    memcpy(&AXDriver_804D77C8, &melee_audio_driver_saved.AXDriver_804D77C8, sizeof(AXDriver_804D77C8));
++    memcpy(&AXDriver_804D77CC, &melee_audio_driver_saved.AXDriver_804D77CC, sizeof(AXDriver_804D77CC));
++    memcpy(&AXDriver_804D77D0, &melee_audio_driver_saved.AXDriver_804D77D0, sizeof(AXDriver_804D77D0));
++    memcpy(&AXDriver_804D77E0, &melee_audio_driver_saved.AXDriver_804D77E0, sizeof(AXDriver_804D77E0));
++    memcpy(&AXDriver_804D77E4, &melee_audio_driver_saved.AXDriver_804D77E4, sizeof(AXDriver_804D77E4));
++    memcpy(&AXDriver_804D77E8, &melee_audio_driver_saved.AXDriver_804D77E8, sizeof(AXDriver_804D77E8));
++    melee_audio_driver_active=0;
++}
++#endif
++
++#if defined(MELEE_WEB_GAMEPLAY)
++static struct {
++    __typeof__(AXDriver_804C5A40) AXDriver_804C5A40;
++    __typeof__(AXDriver_804C5E00) AXDriver_804C5E00;
++    __typeof__(AXDriver_804C60A8) AXDriver_804C60A8;
++    __typeof__(AXDriver_804C61E0) AXDriver_804C61E0;
++    __typeof__(AXDriver_804D77D4) AXDriver_804D77D4;
++    __typeof__(axfxallocsize) axfxallocsize;
++    __typeof__(axfxmaxsize) axfxmaxsize;
++    __typeof__(AXDriver_804D603C) AXDriver_804D603C;
++    __typeof__(__AXFXAlloc) __AXFXAlloc;
++    __typeof__(__AXFXFree) __AXFXFree;
++} melee_fx_saved;
++static int melee_fx_active;
++void melee_web_audio_effects_setup(void* reverb_heap,void* delay_heap)
++{
++    struct AXFX_REVERBSTD reverb;
++    struct AXFX_DELAY delay;
++    HSD_ASSERT(1,!melee_fx_active);
++    memcpy(&melee_fx_saved.AXDriver_804C5A40,&AXDriver_804C5A40,sizeof(AXDriver_804C5A40));
++    memcpy(&melee_fx_saved.AXDriver_804C5E00,&AXDriver_804C5E00,sizeof(AXDriver_804C5E00));
++    memcpy(&melee_fx_saved.AXDriver_804C60A8,&AXDriver_804C60A8,sizeof(AXDriver_804C60A8));
++    memcpy(&melee_fx_saved.AXDriver_804C61E0,&AXDriver_804C61E0,sizeof(AXDriver_804C61E0));
++    memcpy(&melee_fx_saved.AXDriver_804D77D4,&AXDriver_804D77D4,sizeof(AXDriver_804D77D4));
++    memcpy(&melee_fx_saved.axfxallocsize,&axfxallocsize,sizeof(axfxallocsize));
++    memcpy(&melee_fx_saved.axfxmaxsize,&axfxmaxsize,sizeof(axfxmaxsize));
++    memcpy(&melee_fx_saved.AXDriver_804D603C,&AXDriver_804D603C,sizeof(AXDriver_804D603C));
++    memcpy(&melee_fx_saved.__AXFXAlloc,&__AXFXAlloc,sizeof(__AXFXAlloc));
++    memcpy(&melee_fx_saved.__AXFXFree,&__AXFXFree,sizeof(__AXFXFree));
++    melee_fx_active=1;
++    AXFXSetHooks(AXDriverAlloc,AXDriverFree);
++    AXDriver_8038E37C(AXDRIVER_AUX_REVERB_STD,&reverb);
++    reverb.time=1.88F; /* Original lbAudioAx_8002838C setting. */
++    if(!AXDriver_8038E30C(0,AXDRIVER_AUX_REVERB_STD,&reverb,reverb_heap,53*1024))HSD_ASSERT(1,0);
++    AXDriver_8038E37C(AXDRIVER_AUX_DELAY,&delay);
++    if(!AXDriver_8038E30C(1,AXDRIVER_AUX_DELAY,&delay,delay_heap,71*1024))HSD_ASSERT(1,0);
++}
++void melee_web_audio_effects_release(void)
++{
++    HSD_ASSERT(1,melee_fx_active);
++    AXDriverSetupAux(0,AXDRIVER_AUX_OFF,NULL);
++    AXDriverSetupAux(1,AXDRIVER_AUX_OFF,NULL);
++    memcpy(&AXDriver_804C5A40,&melee_fx_saved.AXDriver_804C5A40,sizeof(AXDriver_804C5A40));
++    memcpy(&AXDriver_804C5E00,&melee_fx_saved.AXDriver_804C5E00,sizeof(AXDriver_804C5E00));
++    memcpy(&AXDriver_804C60A8,&melee_fx_saved.AXDriver_804C60A8,sizeof(AXDriver_804C60A8));
++    memcpy(&AXDriver_804C61E0,&melee_fx_saved.AXDriver_804C61E0,sizeof(AXDriver_804C61E0));
++    memcpy(&AXDriver_804D77D4,&melee_fx_saved.AXDriver_804D77D4,sizeof(AXDriver_804D77D4));
++    memcpy(&axfxallocsize,&melee_fx_saved.axfxallocsize,sizeof(axfxallocsize));
++    memcpy(&axfxmaxsize,&melee_fx_saved.axfxmaxsize,sizeof(axfxmaxsize));
++    memcpy(&AXDriver_804D603C,&melee_fx_saved.AXDriver_804D603C,sizeof(AXDriver_804D603C));
++    memcpy(&__AXFXAlloc,&melee_fx_saved.__AXFXAlloc,sizeof(__AXFXAlloc));
++    memcpy(&__AXFXFree,&melee_fx_saved.__AXFXFree,sizeof(__AXFXFree));
++    melee_fx_active=0;
++}
++#endif
+diff --git a/src/sysdolphin/baselib/fobj.c b/src/sysdolphin/baselib/fobj.c
+index fb87d01..9fcff88 100644
+--- a/src/sysdolphin/baselib/fobj.c
++++ b/src/sysdolphin/baselib/fobj.c
+@@ -1,6 +1,9 @@
+ #include "fobj.h"
+ 
+ #include <string.h>
++#ifdef TARGET_PC
++#include <stdio.h>
++#endif
+ 
+ #include "debug.h"
+ #include "spline.h"
+@@ -341,6 +344,14 @@ void FObjUpdateAnim(HSD_FObj* fobj, void* obj, HSD_ObjUpdateFunc obj_update)
+     if (obj_update == NULL) {
+         return;
+     }
++#ifdef TARGET_PC
++    if (fobj->op_intrp < HSD_A_OP_CON || fobj->op_intrp > HSD_A_OP_KEY) {
++        fprintf(stderr,"Native FObj: type=%u interpolation=%u op=%u state=%u length=%u offset=%u start=%d time=%g term=%u p0=%g p1=%g\n",
++                fobj->obj_type,fobj->op_intrp,fobj->op,HSD_FObjGetState(fobj),fobj->length,
++                (unsigned)(fobj->ad-fobj->ad_head),fobj->startframe,fobj->time,fobj->fterm,fobj->p0,fobj->p1);
++        HSD_Panic(__FILE__, __LINE__, "Native FObj reached undefined interpolation output");
++    }
++#endif
+     switch (fobj->op_intrp) {
+     case HSD_A_OP_KEY:
+         if (fobj->flags & 0x80) {
 diff --git a/src/sysdolphin/baselib/hsd_3A64.c b/src/sysdolphin/baselib/hsd_3A64.c
+index 1dc2c66..e83012d 100644
 --- a/src/sysdolphin/baselib/hsd_3A64.c
 +++ b/src/sysdolphin/baselib/hsd_3A64.c
 @@ -1,4 +1,6 @@
@@ -767,6 +2162,7 @@ diff --git a/src/sysdolphin/baselib/hsd_3A64.c b/src/sysdolphin/baselib/hsd_3A64
  #include <stdio.h>
  
 diff --git a/src/sysdolphin/baselib/hsd_3A76.c b/src/sysdolphin/baselib/hsd_3A76.c
+index 869fe23..2fe19e4 100644
 --- a/src/sysdolphin/baselib/hsd_3A76.c
 +++ b/src/sysdolphin/baselib/hsd_3A76.c
 @@ -1,5 +1,7 @@
@@ -778,9 +2174,389 @@ diff --git a/src/sysdolphin/baselib/hsd_3A76.c b/src/sysdolphin/baselib/hsd_3A76
  
  #include "cobj.h"
  #include "gobj.h"
+diff --git a/src/sysdolphin/baselib/mobj.c b/src/sysdolphin/baselib/mobj.c
+index 3ecfd29..bb73f48 100644
+--- a/src/sysdolphin/baselib/mobj.c
++++ b/src/sysdolphin/baselib/mobj.c
+@@ -91,6 +91,14 @@ static void MObjUpdateFunc(void* obj, enum_t type, HSD_ObjData* val)
+         return;
+     }
+ 
++#ifdef TARGET_PC
++    if ((type >= HSD_A_M_AMBIENT_R && type <= HSD_A_M_SPECULAR_B) ||
++        (mobj->pe && type >= HSD_A_M_PE_REF0 && type <= HSD_A_M_PE_DSTALPHA)) {
++        double converted = 255.0 * val->fv;
++        if (!(converted > -1.0 && converted < 256.0))
++            HSD_Panic(__FILE__, __LINE__, "Native material color exceeds original u8 conversion range");
++    }
++#endif
+     switch (type) {
+     case HSD_A_M_AMBIENT_R:
+         mobj->mat->ambient.r = (u8) (255.0 * val->fv);
+diff --git a/src/sysdolphin/baselib/particle.c b/src/sysdolphin/baselib/particle.c
+index 2b90525..061d987 100644
+--- a/src/sysdolphin/baselib/particle.c
++++ b/src/sysdolphin/baselib/particle.c
+@@ -671,6 +671,59 @@ static inline HSD_Particle* psSpawnChild(HSD_Particle** head, int linkNo,
+     return child;
+ }
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++/* The same original removal path serves particle expiry and owned-world
++ * teardown. Teardown never advances bytecode or invents simulation frames. */
++static HSD_Particle* melee_web_particle_remove(HSD_Particle* pp, HSD_Particle* prev)
++{
++        /* Call hookDelete if available */
++        if (pp->gen != NULL && pp->gen->userfunc != NULL &&
++            pp->gen->userfunc->hookDelete != NULL)
++        {
++            pp->gen->userfunc->hookDelete(pp);
++        }
++
++        /* Unlink from list */
++        if (prev == NULL) {
++            hsd_804D0908[pp->linkNo] = pp->next;
++        } else {
++            prev->next = pp->next;
++        }
++
++        /* Decrement generator child count */
++        {
++            HSD_Particle* next_pp = pp->next;
++            if (pp->gen != NULL) {
++                pp->gen->numChild--;
++            }
++
++            /* Free appsrt */
++            if (pp->appsrt != NULL) {
++                if (psRemoveParticleAppSRT(pp) == 0 && prev == NULL) {
++                    HSD_Particle* head = hsd_804D0908[pp->linkNo];
++                    if (head != next_pp) {
++                        next_pp = head;
++                    }
++                }
++            }
++
++            /* Free particle */
++            hsd_8039D048(pp);
++            HSD_ObjFree(&hsd_804D0F60.alloc_data, pp);
++            hsd_804D78E2--;
++            return next_pp;
++        }
++}
++void melee_web_particle_clear_all(void)
++{
++    int link;
++    for (link = 0; link < 16; ++link) {
++        while (hsd_804D0908[link] != NULL)
++            melee_web_particle_remove(hsd_804D0908[link], NULL);
++    }
++}
++#endif
++
+ void* hsd_8039930C(HSD_Particle* pp, HSD_Particle* prev)
+ {
+     int bank;
+@@ -2829,6 +2882,9 @@ do_life:
+     /* Life countdown */
+     if (--pp->life == 0) {
+     delete_particle:
++#if defined(MELEE_WEB_GAMEPLAY)
++        return melee_web_particle_remove(pp, prev);
++#else
+         /* Call hookDelete if available */
+         if (pp->gen != NULL && pp->gen->userfunc != NULL &&
+             pp->gen->userfunc->hookDelete != NULL)
+@@ -2866,6 +2922,7 @@ do_life:
+             hsd_804D78E2--;
+             return next_pp;
+         }
++#endif
+     }
+ 
+     /* --- Physics update --- */
+@@ -3051,7 +3108,7 @@ void hsd_8039D0A0(HSD_Generator* gen)
+ 
+     prev = NULL;
+     idnum = gen->idnum;
+-    head = &data->particle[gen->linkNo];
++    head = &hsd_804D0908[gen->linkNo];
+     prt = *head;
+ 
+     while (prt != NULL) {
+@@ -3079,13 +3136,13 @@ void hsd_8039D0A0(HSD_Generator* gen)
+ 
+             if (prt->kind & 0x8000) {
+                 s32 jidx = (prt->kind >> 12) & 7;
+-                if (data->jobj[jidx] != NULL) {
+-                    HSD_JObjUnref(data->jobj[jidx]);
+-                    data->jobj[jidx] = NULL;
++                if (hsd_804D08E8[jidx] != NULL) {
++                    HSD_JObjUnref(hsd_804D08E8[jidx]);
++                    hsd_804D08E8[jidx] = NULL;
+                 }
+             }
+ 
+-            HSD_ObjFree(&data->alloc_data, prt);
++            HSD_ObjFree(&hsd_804D0F60.alloc_data, prt);
+             hsd_804D78E2--;
+         } else {
+             prev = prt;
+diff --git a/src/sysdolphin/baselib/psdisp.c b/src/sysdolphin/baselib/psdisp.c
+index 8eaaead..7468f68 100644
+--- a/src/sysdolphin/baselib/psdisp.c
++++ b/src/sysdolphin/baselib/psdisp.c
+@@ -823,7 +823,11 @@ static inline void psDispSubMakePolygon(HSD_Particle* pp, u8* texform, f32 x,
+             if (pp->kind & DispTexture) {
+                 u8 tex_base = (pp->kind >> 16) & 0xC;
+ 
++#if defined(TARGET_PC)
++                GXTexCoord1x8(tex_base);
++#else
+                 GXWGFifo.u8 = tex_base;
++#endif
+             }
+             GXPosition3f32(x - up.x, y - up.y, z - up_z);
+             {
+@@ -834,7 +838,11 @@ static inline void psDispSubMakePolygon(HSD_Particle* pp, u8* texform, f32 x,
+                 GXColor4u8(r, g, b, a);
+             }
+             if (pp->kind & DispTexture) {
++#if defined(TARGET_PC)
++                GXTexCoord1x8(((pp->kind >> 16) & 0xC) + 1);
++#else
+                 GXWGFifo.u8 = ((pp->kind >> 16) & 0xC) + 1;
++#endif
+             }
+             GXPosition3f32(x + right.x, y + right.y, z + right_z);
+             {
+@@ -845,7 +853,11 @@ static inline void psDispSubMakePolygon(HSD_Particle* pp, u8* texform, f32 x,
+                 GXColor4u8(r, g, b, a);
+             }
+             if (pp->kind & DispTexture) {
++#if defined(TARGET_PC)
++                GXTexCoord1x8(((pp->kind >> 16) & 0xC) + 2);
++#else
+                 GXWGFifo.u8 = ((pp->kind >> 16) & 0xC) + 2;
++#endif
+             }
+             GXPosition3f32((*prev_x) + up.x, (*prev_y) + up.y,
+                            (*prev_z) + up_z);
+@@ -858,7 +870,11 @@ static inline void psDispSubMakePolygon(HSD_Particle* pp, u8* texform, f32 x,
+                 GXColor4u8(r, g, b, (u8) alpha);
+             }
+             if (pp->kind & DispTexture) {
++#if defined(TARGET_PC)
++                GXTexCoord1x8(((pp->kind >> 16) & 0xC) + 3);
++#else
+                 GXWGFifo.u8 = ((pp->kind >> 16) & 0xC) + 3;
++#endif
+             }
+         } else {
+             f32 trail_alpha = 255.0f * (1.0f - pp->trail);
+@@ -917,13 +933,21 @@ static inline void psDispSubMakePolygon(HSD_Particle* pp, u8* texform, f32 x,
+                         if (pp->kind & TexFlipT) {
+                             t = 1.0f - t;
+                         }
++#if defined(TARGET_PC)
++                        GXPosition3f32(up.x * tx + (right.x * sx + x), up.y * tx + (right.y * sx + y), up_z * tx + (right_z * sx + z));
++#else
+                         GXWGFifo.f32 = up.x * tx + (right.x * sx + x);
+                         GXWGFifo.f32 = up.y * tx + (right.y * sx + y);
+                         GXWGFifo.f32 = up_z * tx + (right_z * sx + z);
++#endif
+                         GXColor4u8(color->r, color->g, color->b, alpha);
+                         if (pp->kind & DispTexture) {
++#if defined(TARGET_PC)
++                            GXTexCoord2f32(s, t);
++#else
+                             GXWGFifo.f32 = s;
+                             GXWGFifo.f32 = t;
++#endif
+                         }
+                     }
+                 }
+@@ -939,19 +963,35 @@ static inline void psDispSubMakePolygon(HSD_Particle* pp, u8* texform, f32 x,
+         }
+         GXPosition3f32((cx = x - right.x), y - right.y, z - right_z);
+         if (pp->kind & DispTexture) {
++#if defined(TARGET_PC)
++            GXTexCoord1x8((pp->kind >> 16) & 0xC);
++#else
+             GXWGFifo.u8 = (pp->kind >> 16) & 0xC;
++#endif
+         }
+         GXPosition3f32((cx = x - up.x), y - up.y, z - up_z);
+         if (pp->kind & DispTexture) {
++#if defined(TARGET_PC)
++            GXTexCoord1x8(((pp->kind >> 16) & 0xC) + 1);
++#else
+             GXWGFifo.u8 = ((pp->kind >> 16) & 0xC) + 1;
++#endif
+         }
+         GXPosition3f32((cx = x + right.x), y + right.y, z + right_z);
+         if (pp->kind & DispTexture) {
++#if defined(TARGET_PC)
++            GXTexCoord1x8(((pp->kind >> 16) & 0xC) + 2);
++#else
+             GXWGFifo.u8 = ((pp->kind >> 16) & 0xC) + 2;
++#endif
+         }
+         GXPosition3f32(x + up.x, y + up.y, z + up_z);
+         if (pp->kind & DispTexture) {
++#if defined(TARGET_PC)
++            GXTexCoord1x8(((pp->kind >> 16) & 0xC) + 3);
++#else
+             GXWGFifo.u8 = ((pp->kind >> 16) & 0xC) + 3;
++#endif
+         }
+     } else {
+         u32 primitive_count = *(u32*) it;
+@@ -988,8 +1028,12 @@ static inline void psDispSubMakePolygon(HSD_Particle* pp, u8* texform, f32 x,
+                                y + right.y * sx + up.y * tx,
+                                z + right_z * sx + up_z * tx);
+                 if (pp->kind & DispTexture) {
++#if defined(TARGET_PC)
++                    GXTexCoord2f32(s, t);
++#else
+                     GXWGFifo.f32 = s;
+                     GXWGFifo.f32 = t;
++#endif
+                 }
+             }
+         }
+@@ -1717,8 +1761,12 @@ static inline void psDispSubAppSRT(HSD_Particle* pp, u8* texform)
+                         GXColor4u8(draw_color.r, draw_color.g, draw_color.b,
+                                    (u8) alpha);
+                         if (pp->kind & DispTexture) {
++#if defined(TARGET_PC)
++                            GXTexCoord2f32(s, t);
++#else
+                             GXWGFifo.f32 = s;
+                             GXWGFifo.f32 = t;
++#endif
+                         }
+                     }
+                 }
+@@ -1732,29 +1780,61 @@ static inline void psDispSubAppSRT(HSD_Particle* pp, u8* texform)
+             setVtxDesc(1);
+             GXBegin(GX_QUADS, GX_VTXFMT1, 4U);
+         }
++#if defined(TARGET_PC)
++        GXPosition3f32(-ax + cur_x, -ay + cur_y, cur_z);
++#else
+         GXWGFifo.f32 = -ax + cur_x;
+         GXWGFifo.f32 = -ay + cur_y;
+         GXWGFifo.f32 = cur_z;
++#endif
+         if (pp->kind & DispTexture) {
++#if defined(TARGET_PC)
++            GXTexCoord1x8((pp->kind >> 16) & 0xC);
++#else
+             GXWGFifo.u8 = (pp->kind >> 16) & 0xC;
++#endif
+         }
++#if defined(TARGET_PC)
++        GXPosition3f32(-bx + cur_x, -by + cur_y, cur_z);
++#else
+         GXWGFifo.f32 = -bx + cur_x;
+         GXWGFifo.f32 = -by + cur_y;
+         GXWGFifo.f32 = cur_z;
++#endif
+         if (pp->kind & DispTexture) {
++#if defined(TARGET_PC)
++            GXTexCoord1x8(((pp->kind >> 16) & 0xC) + 1);
++#else
+             GXWGFifo.u8 = ((pp->kind >> 16) & 0xC) + 1;
++#endif
+         }
++#if defined(TARGET_PC)
++        GXPosition3f32(ax + cur_x, ay + cur_y, cur_z);
++#else
+         GXWGFifo.f32 = ax + cur_x;
+         GXWGFifo.f32 = ay + cur_y;
+         GXWGFifo.f32 = cur_z;
++#endif
+         if (pp->kind & DispTexture) {
++#if defined(TARGET_PC)
++            GXTexCoord1x8(((pp->kind >> 16) & 0xC) + 2);
++#else
+             GXWGFifo.u8 = ((pp->kind >> 16) & 0xC) + 2;
++#endif
+         }
++#if defined(TARGET_PC)
++        GXPosition3f32(bx + cur_x, by + cur_y, cur_z);
++#else
+         GXWGFifo.f32 = bx + cur_x;
+         GXWGFifo.f32 = by + cur_y;
+         GXWGFifo.f32 = cur_z;
++#endif
+         if (pp->kind & DispTexture) {
++#if defined(TARGET_PC)
++            GXTexCoord1x8(((pp->kind >> 16) & 0xC) + 3);
++#else
+             GXWGFifo.u8 = ((pp->kind >> 16) & 0xC) + 3;
++#endif
+         }
+     } else {
+         u32 primitive_count = *(u32*) it;
+@@ -1790,8 +1870,12 @@ static inline void psDispSubAppSRT(HSD_Particle* pp, u8* texform)
+                 GXPosition3f32(cur_x + ax * sx + bx * tx,
+                                cur_y + ay * sx + by * tx, cur_z);
+                 if (pp->kind & DispTexture) {
++#if defined(TARGET_PC)
++                    GXTexCoord2f32(s, t);
++#else
+                     GXWGFifo.f32 = s;
+                     GXWGFifo.f32 = t;
++#endif
+                 }
+             }
+         }
+@@ -1980,7 +2064,12 @@ void psDispParticles(u32 target_link, u32 sw)
+                         psSetCurrentMtx(GX_PNMTX0);
+                         GXEnableTexOffsets(GX_TEXCOORD0, GX_TRUE, GX_TRUE);
+                         GXSetCullMode(GX_CULL_BACK);
++#if defined(AURORA)
++                        GXSetArray(GX_VA_TEX0, HSD_PSDisp_8040C340,
++                                   sizeof(HSD_PSDisp_8040C340), 2U, false);
++#else
+                         GXSetArray(GX_VA_TEX0, HSD_PSDisp_8040C340, 2U);
++#endif
+                         psSetupVtxFormat(GX_VTXFMT0, false, true, GX_RGB565);
+                         psSetupVtxFormat(GX_VTXFMT1, false, false, GX_RGB565);
+                         psSetupVtxFormat(GX_VTXFMT2, true, true, GX_RGB565);
+diff --git a/src/sysdolphin/baselib/sislib.c b/src/sysdolphin/baselib/sislib.c
+index bc3a912..a71424e 100644
+--- a/src/sysdolphin/baselib/sislib.c
++++ b/src/sysdolphin/baselib/sislib.c
+@@ -1,6 +1,8 @@
+ #include "sislib.h"
+ 
++#if !defined(MELEE_WEB_GAMEPLAY)
+ #include <printf.h> // IWYU pragma: keep
++#endif
+ #include <stdio.h>
+ 
+ #include "cobj.h"
+diff --git a/src/sysdolphin/baselib/sislib_font.c b/src/sysdolphin/baselib/sislib_font.c
+index 60f0b17..27ee6bb 100644
+--- a/src/sysdolphin/baselib/sislib_font.c
++++ b/src/sysdolphin/baselib/sislib_font.c
+@@ -1,5 +1,8 @@
+ #include "sislib_font.h"
+ 
++#if !defined(MELEE_WEB_GAMEPLAY)
+ TextGlyphTexture HSD_SisLib_FontAtlas[] ATTRIBUTE_ALIGN(32) = {
+ #include <sysdolphin/baselib/sislib_font.inc>
+ };
++
++#endif
+diff --git a/src/sysdolphin/baselib/sislib_font.h b/src/sysdolphin/baselib/sislib_font.h
+index a0eea92..3012e68 100644
 --- a/src/sysdolphin/baselib/sislib_font.h
 +++ b/src/sysdolphin/baselib/sislib_font.h
-@@ -7,6 +7,14 @@
+@@ -7,6 +7,14 @@ typedef struct TextGlyphTexture {
      /*0x00*/ u8 data[512];
  } TextGlyphTexture;
  
@@ -795,127 +2571,340 @@ diff --git a/src/sysdolphin/baselib/hsd_3A76.c b/src/sysdolphin/baselib/hsd_3A76
 +#endif
  
  #endif
---- a/src/sysdolphin/baselib/sislib_font.c
-+++ b/src/sysdolphin/baselib/sislib_font.c
-@@ -1,5 +1,8 @@
- #include "sislib_font.h"
- 
-+#if !defined(MELEE_WEB_GAMEPLAY)
- TextGlyphTexture HSD_SisLib_FontAtlas[] ATTRIBUTE_ALIGN(32) = {
- #include <sysdolphin/baselib/sislib_font.inc>
- };
-+
-+#endif
---- a/src/melee/cm/camera.c
-+++ b/src/melee/cm/camera.c
-@@ -52,6 +52,10 @@
- 
- /* 452C68 */ static Camera cm_80452C68;
- /* 453004 */ CameraDebugMode cm_80453004;
-+#if defined(MELEE_WEB_GAMEPLAY)
-+/* Host lifetime owner snapshots the actual source camera between matches. */
-+void* melee_web_camera_state(void) { return &cm_80452C68; }
-+#endif
- 
- /* 3BCB18 */ static CameraModeCallbacks cm_803BCB18 = {
-     Camera_8002B3D4,
-diff --git a/src/melee/gr/ground.c b/src/melee/gr/ground.c
---- a/src/melee/gr/ground.c
-+++ b/src/melee/gr/ground.c
-@@ -1523,6 +1523,13 @@
-     panicMissingStageParam(stkind, count);
+diff --git a/src/sysdolphin/baselib/synth.c b/src/sysdolphin/baselib/synth.c
+index 4af6a81..c383304 100644
+--- a/src/sysdolphin/baselib/synth.c
++++ b/src/sysdolphin/baselib/synth.c
+@@ -614,9 +614,12 @@ int HSD_Synth_80389334(int sfx_id, u8 vol, u8 vol2, u8 pan, int priority,
+             while (voice_idx < sfx_entry->unk8) {
+                 AXSetVoicePriority(voices[voice_idx], priority);
+                 AXSetVoiceVe(voices[voice_idx], &ve);
+-                *(u32*) &HSD_Synth_80407FD8.ratioHi =
+-                    (65536.0F *
+-                     (sfx_node->x18[1] * (sfx_node->x14 * sfx_node->x18[0])));
++                {
++                    u32 ratio = (65536.0F *
++                        (sfx_node->x18[1] * (sfx_node->x14 * sfx_node->x18[0])));
++                    HSD_Synth_80407FD8.ratioHi = ratio >> 16;
++                    HSD_Synth_80407FD8.ratioLo = ratio;
++                }
+                 AXSetVoiceSrc(voices[voice_idx], &HSD_Synth_80407FD8);
+                 AXSetVoiceAddr(voices[voice_idx], &SFX_VOICE(voice_idx)->x10);
+                 AXSetVoiceAdpcm(voices[voice_idx], &SFX_VOICE(voice_idx)->x20);
+@@ -1184,6 +1187,24 @@ void HSD_SynthCallback(void)
+     OSRestoreInterrupts(enabled);
  }
  
-+#if defined(MELEE_WEB_GAMEPLAY)
-+void melee_web_ground_stage_parameters(int kind)
++/* Typed DevCom callbacks: the original casts discard two arguments on PPC,
++ * but are incompatible indirect calls in Wasm. Keep the original consumers. */
++static void melee_audio_stream_data_callback(int request, int args, void* buffer, bool cancelled)
 +{
-+    Ground_801C28CC(&stage_info.xA0, kind);
++    HSD_ASSERT(1, !cancelled);
++    HSD_Synth_8038B120();
++}
++static void melee_audio_stream_first_callback(int request, int args, void* buffer, bool cancelled)
++{
++    HSD_ASSERT(1, !cancelled);
++    HSD_SynthPStreamFirstHakoHeaderCallback();
++}
++static void melee_audio_stream_next_callback(int request, int args, void* buffer, bool cancelled)
++{
++    HSD_ASSERT(1, !cancelled);
++    HSD_Synth_8038AD74(request, (uintptr_t) (u32) args);
++}
++
+ void HSD_SynthResetStreamCounters(int result, int length, void* buf, bool b)
+ {
+     HSD_Synth_804D776C = HSD_Synth_804D7768;
+@@ -1221,7 +1242,7 @@ static inline void HSD_Synth_8038ADD0_inline(u32 pos)
+                 HSD_DevComRequest(
+                     HSD_Synth_804D7764, src,
+                     (uintptr_t) &lbl_804C4540[HSD_Synth_804D7768], 0x20, 0x21,
+-                    0, (HSD_DevComCallback) (Event) HSD_Synth_8038AD74,
++                    0, melee_audio_stream_next_callback,
+                     (struct HSD_SynthStreamHeader*) (src + 0x20));
+             }
+         }
+@@ -1241,8 +1262,8 @@ void HSD_Synth_8038ADD0(void)
+     if (node->flags & 8) {
+         return;
+     }
+-    pos = (*(u32*) ((u8*) node->voice[0] + 0x1B2) - HSD_Synth_804D7780 * 2) >>
+-          0x11;
++    pos = ((((u32) node->voice[0]->pb.addr.currentAddressHi << 16) |
++             node->voice[0]->pb.addr.currentAddressLo) - HSD_Synth_804D7780 * 2) >> 0x11;
+     if (pos != HSD_Synth_804D7774) {
+         HSD_Synth_804D7774 = pos;
+         for (i = 0; i < node->voice_count; i++) {
+@@ -1303,11 +1324,11 @@ void HSD_Synth_8038B120(void)
+         for (i = 0; i < node->voice_count; i++) {
+             AXSetVoiceVe(node->voice[i], &ve);
+             if (node->flags & 4) {
+-                *(u32*) &HSD_Synth_80407FD8.ratioHi = 0;
++                HSD_Synth_80407FD8.ratioHi = HSD_Synth_80407FD8.ratioLo = 0;
+             } else {
+-                *(u32*) &HSD_Synth_80407FD8.ratioHi =
+-                    (u32) (65536.0F *
+-                           (node->x14 * node->x18[0] * node->x18[1]));
++                u32 ratio = (u32) (65536.0F * (node->x14 * node->x18[0] * node->x18[1]));
++                HSD_Synth_80407FD8.ratioHi = ratio >> 16;
++                HSD_Synth_80407FD8.ratioLo = ratio;
+             }
+             AXSetVoiceSrc(node->voice[i], &HSD_Synth_80407FD8);
+             AXSetVoiceCurrentAddr(
+@@ -1345,7 +1366,7 @@ void HSD_SynthPStreamFirstHakoHeaderCallback(void)
+     HSD_DevComRequest(HSD_Synth_804D7764, 0xA0,
+                       HSD_Synth_804D7780 + (HSD_Synth_804D7768 << 16),
+                       lbl_804C4540[HSD_Synth_804D7768].x0, 0x23, 0,
+-                      (HSD_DevComCallback) HSD_Synth_8038B120, 0);
++                      melee_audio_stream_data_callback, 0);
+ }
+ 
+ void HSD_SynthPStreamHeaderCallback(int arg0, int arg1, void* arg2,
+@@ -1364,7 +1385,9 @@ void HSD_SynthPStreamHeaderCallback(int arg0, int arg1, void* arg2,
+         }
+         node->x14 = 0.00003125f * (f32) entry[2];
+         for (i = 0; i < node->voice_count; i++) {
+-            *(u32*) &HSD_Synth_80407FD8.ratioHi = (u32) (65536.0f * node->x14);
++            u32 ratio = (u32) (65536.0f * node->x14);
++            HSD_Synth_80407FD8.ratioHi = ratio >> 16;
++            HSD_Synth_80407FD8.ratioLo = ratio;
+             AXSetVoiceAddr(node->voice[i], (AXPBADDR*) &entry[i * 14 + 4]);
+             AXSetVoiceAdpcm(node->voice[i], (AXPBADPCM*) &entry[i * 14 + 8]);
+         }
+@@ -1374,7 +1397,7 @@ void HSD_SynthPStreamHeaderCallback(int arg0, int arg1, void* arg2,
+         HSD_DevComRequest(
+             HSD_Synth_804D7764, 0x80,
+             (uintptr_t) &lbl_804C4540[HSD_Synth_804D7768], 0x20, 0x21, 0,
+-            (HSD_DevComCallback) HSD_SynthPStreamFirstHakoHeaderCallback,
++            melee_audio_stream_first_callback,
+             NULL);
+     } else {
+         HSD_Synth_804D7778 = 0;
+@@ -1468,20 +1491,8 @@ void HSD_SynthStreamSetVolume(f32 volume)
+     updateAllVolume(0xFFFF);
+ }
+ 
+-void HSD_SynthInit(int dsp_size, int voices, int stream_size, int bank_size)
++static void HSD_SynthInitChannelControls(void)
+ {
+-    AXInit();
+-    AISetDSPSampleRate(0);
+-    HSD_Synth_804D7784 = ARAlloc(0x500);
+-    HSD_DevComRequest(0, 0, HSD_Synth_804D7784, 0x500, 3, 0, 0, 0);
+-    HSD_Synth_804D7784 *= 2;
+-    hsd_SynthSFXBankHead[0] = ARAlloc(bank_size);
+-    AXRegisterCallback(HSD_SynthCallback);
+-    HSD_Synth_804D777C = 0xFF;
+-    AISetStreamVolLeft(HSD_Synth_804D6030 * (f32) HSD_Synth_804D777C);
+-    AISetStreamVolRight(HSD_Synth_804D6030 * (f32) HSD_Synth_804D777C);
+-    /// Loop unrolled to match original binary (loop version adds 8 bytes
+-    /// to stack frame due to compiler allocating space for the counter)
+     HSD_Synth_804C28E0_1784[0].x1784 = 1.0F;
+     HSD_Synth_804C28E0_1784[0].x1788 = 1.0F;
+     HSD_Synth_804C28E0_1784[0].x178C = 0;
+@@ -1530,6 +1541,23 @@ void HSD_SynthInit(int dsp_size, int voices, int stream_size, int bank_size)
+     HSD_Synth_804C28E0_1784[15].x1784 = 1.0F;
+     HSD_Synth_804C28E0_1784[15].x1788 = 1.0F;
+     HSD_Synth_804C28E0_1784[15].x178C = 0;
++}
++
++void HSD_SynthInit(int dsp_size, int voices, int stream_size, int bank_size)
++{
++    AXInit();
++    AISetDSPSampleRate(0);
++    HSD_Synth_804D7784 = ARAlloc(0x500);
++    HSD_DevComRequest(0, 0, HSD_Synth_804D7784, 0x500, 3, 0, 0, 0);
++    HSD_Synth_804D7784 *= 2;
++    hsd_SynthSFXBankHead[0] = ARAlloc(bank_size);
++    AXRegisterCallback(HSD_SynthCallback);
++    HSD_Synth_804D777C = 0xFF;
++    AISetStreamVolLeft(HSD_Synth_804D6030 * (f32) HSD_Synth_804D777C);
++    AISetStreamVolRight(HSD_Synth_804D6030 * (f32) HSD_Synth_804D777C);
++    /// Loop unrolled to match original binary (loop version adds 8 bytes
++    /// to stack frame due to compiler allocating space for the counter)
++    HSD_SynthInitChannelControls();
+     hsd_SynthSFXBankAREnd = hsd_SynthSFXBankHead[0] + bank_size;
+     HSD_Synth_804D7780 = ARAlloc(0x30000);
+     HSD_Synth_804D7754 = OSGetSoundMode();
+@@ -1538,3 +1566,162 @@ void HSD_SynthInit(int dsp_size, int voices, int stream_size, int bank_size)
+ /// @remarks Nothing in the DOL references this; it is recovered from the tail
+ /// of this TU's `.data`.
+ static u8 HSD_Synth_804080FC[0x44] = { 0 };
++
++#if defined(MELEE_WEB_GAMEPLAY)
++static struct {
++    __typeof__(HSD_Synth_804C28E0) HSD_Synth_804C28E0;
++    __typeof__(HSD_Synth_804C29E0) HSD_Synth_804C29E0;
++    __typeof__(hsd_SynthSFXNodes) hsd_SynthSFXNodes;
++    __typeof__(HSD_Synth_804C28E0_1784) HSD_Synth_804C28E0_1784;
++    __typeof__(HSD_Synth_804C28E0_1844) HSD_Synth_804C28E0_1844;
++    __typeof__(HSD_Synth_804D7720) HSD_Synth_804D7720;
++    __typeof__(driverInactivatedCallback) driverInactivatedCallback;
++    __typeof__(driverMasterClockCallback) driverMasterClockCallback;
++    __typeof__(driverPauseCallback) driverPauseCallback;
++    __typeof__(HSD_Synth_804D774C) HSD_Synth_804D774C;
++    __typeof__(HSD_Synth_804D7750) HSD_Synth_804D7750;
++    __typeof__(HSD_Synth_804D7754) HSD_Synth_804D7754;
++    __typeof__(HSD_Synth_804D7758) HSD_Synth_804D7758;
++    __typeof__(HSD_Synth_804D775C) HSD_Synth_804D775C;
++    __typeof__(HSD_Synth_804D7760) HSD_Synth_804D7760;
++    __typeof__(lbl_804C4540) lbl_804C4540;
++    __typeof__(HSD_Synth_804D7764) HSD_Synth_804D7764;
++    __typeof__(HSD_Synth_804D7768) HSD_Synth_804D7768;
++    __typeof__(HSD_Synth_804D776C) HSD_Synth_804D776C;
++    __typeof__(HSD_Synth_804D7770) HSD_Synth_804D7770;
++    __typeof__(HSD_Synth_804D7774) HSD_Synth_804D7774;
++    __typeof__(HSD_Synth_804D7778) HSD_Synth_804D7778;
++    __typeof__(HSD_Synth_804D777C) HSD_Synth_804D777C;
++    __typeof__(HSD_Synth_804D7780) HSD_Synth_804D7780;
++    __typeof__(HSD_Synth_804D7784) HSD_Synth_804D7784;
++
++    __typeof__(HSD_Synth_804D6030) HSD_Synth_804D6030;
++    __typeof__(lbl_80407FB4) lbl_80407FB4;
++    __typeof__(HSD_Synth_80407FD8) HSD_Synth_80407FD8;
++} melee_audio_synth_saved;
++static int melee_audio_synth_active;
++void melee_web_audio_synth_begin(void** buckets)
++{
++    HSD_ASSERT(1, !melee_audio_synth_active);
++    memcpy(&melee_audio_synth_saved.HSD_Synth_804C28E0, &HSD_Synth_804C28E0, sizeof(HSD_Synth_804C28E0));
++    memcpy(&melee_audio_synth_saved.HSD_Synth_804C29E0, &HSD_Synth_804C29E0, sizeof(HSD_Synth_804C29E0));
++    memcpy(&melee_audio_synth_saved.hsd_SynthSFXNodes, &hsd_SynthSFXNodes, sizeof(hsd_SynthSFXNodes));
++    memcpy(&melee_audio_synth_saved.HSD_Synth_804C28E0_1784, &HSD_Synth_804C28E0_1784, sizeof(HSD_Synth_804C28E0_1784));
++    memcpy(&melee_audio_synth_saved.HSD_Synth_804C28E0_1844, &HSD_Synth_804C28E0_1844, sizeof(HSD_Synth_804C28E0_1844));
++    memcpy(&melee_audio_synth_saved.HSD_Synth_804D7720, &HSD_Synth_804D7720, sizeof(HSD_Synth_804D7720));
++    memcpy(&melee_audio_synth_saved.driverInactivatedCallback, &driverInactivatedCallback, sizeof(driverInactivatedCallback));
++    memcpy(&melee_audio_synth_saved.driverMasterClockCallback, &driverMasterClockCallback, sizeof(driverMasterClockCallback));
++    memcpy(&melee_audio_synth_saved.driverPauseCallback, &driverPauseCallback, sizeof(driverPauseCallback));
++    memcpy(&melee_audio_synth_saved.HSD_Synth_804D774C, &HSD_Synth_804D774C, sizeof(HSD_Synth_804D774C));
++    memcpy(&melee_audio_synth_saved.HSD_Synth_804D7750, &HSD_Synth_804D7750, sizeof(HSD_Synth_804D7750));
++    memcpy(&melee_audio_synth_saved.HSD_Synth_804D7754, &HSD_Synth_804D7754, sizeof(HSD_Synth_804D7754));
++    memcpy(&melee_audio_synth_saved.HSD_Synth_804D7758, &HSD_Synth_804D7758, sizeof(HSD_Synth_804D7758));
++    memcpy(&melee_audio_synth_saved.HSD_Synth_804D775C, &HSD_Synth_804D775C, sizeof(HSD_Synth_804D775C));
++    memcpy(&melee_audio_synth_saved.HSD_Synth_804D7760, &HSD_Synth_804D7760, sizeof(HSD_Synth_804D7760));
++    memcpy(&melee_audio_synth_saved.HSD_Synth_804D6030, &HSD_Synth_804D6030, sizeof(HSD_Synth_804D6030));
++    memcpy(&melee_audio_synth_saved.lbl_80407FB4, &lbl_80407FB4, sizeof(lbl_80407FB4));
++    memcpy(&melee_audio_synth_saved.HSD_Synth_80407FD8, &HSD_Synth_80407FD8, sizeof(HSD_Synth_80407FD8));
++    memset(&HSD_Synth_804C28E0, 0, sizeof(HSD_Synth_804C28E0));
++    memset(&HSD_Synth_804C29E0, 0, sizeof(HSD_Synth_804C29E0));
++    memset(&hsd_SynthSFXNodes, 0, sizeof(hsd_SynthSFXNodes));
++    memset(&HSD_Synth_804C28E0_1784, 0, sizeof(HSD_Synth_804C28E0_1784));
++    memset(&HSD_Synth_804C28E0_1844, 0, sizeof(HSD_Synth_804C28E0_1844));
++    memset(&HSD_Synth_804D7720, 0, sizeof(HSD_Synth_804D7720));
++    memset(&driverInactivatedCallback, 0, sizeof(driverInactivatedCallback));
++    memset(&driverMasterClockCallback, 0, sizeof(driverMasterClockCallback));
++    memset(&driverPauseCallback, 0, sizeof(driverPauseCallback));
++    memset(&HSD_Synth_804D774C, 0, sizeof(HSD_Synth_804D774C));
++    memset(&HSD_Synth_804D7750, 0, sizeof(HSD_Synth_804D7750));
++    memset(&HSD_Synth_804D7754, 0, sizeof(HSD_Synth_804D7754));
++    memset(&HSD_Synth_804D7758, 0, sizeof(HSD_Synth_804D7758));
++    memset(&HSD_Synth_804D775C, 0, sizeof(HSD_Synth_804D775C));
++    memset(&HSD_Synth_804D7760, 0, sizeof(HSD_Synth_804D7760));
++    memset(&HSD_Synth_804D6030, 0, sizeof(HSD_Synth_804D6030));
++    memset(&lbl_80407FB4, 0, sizeof(lbl_80407FB4));
++    memset(&HSD_Synth_80407FD8, 0, sizeof(HSD_Synth_80407FD8));
++    memcpy((void*)&melee_audio_synth_saved.lbl_804C4540, (const void*)&lbl_804C4540, sizeof(lbl_804C4540));
++    memset((void*)&lbl_804C4540, 0, sizeof(lbl_804C4540));
++    memcpy((void*)&melee_audio_synth_saved.HSD_Synth_804D7764, (const void*)&HSD_Synth_804D7764, sizeof(HSD_Synth_804D7764));
++    memset((void*)&HSD_Synth_804D7764, 0, sizeof(HSD_Synth_804D7764));
++    memcpy((void*)&melee_audio_synth_saved.HSD_Synth_804D7768, (const void*)&HSD_Synth_804D7768, sizeof(HSD_Synth_804D7768));
++    memset((void*)&HSD_Synth_804D7768, 0, sizeof(HSD_Synth_804D7768));
++    memcpy((void*)&melee_audio_synth_saved.HSD_Synth_804D776C, (const void*)&HSD_Synth_804D776C, sizeof(HSD_Synth_804D776C));
++    memset((void*)&HSD_Synth_804D776C, 0, sizeof(HSD_Synth_804D776C));
++    memcpy((void*)&melee_audio_synth_saved.HSD_Synth_804D7770, (const void*)&HSD_Synth_804D7770, sizeof(HSD_Synth_804D7770));
++    memset((void*)&HSD_Synth_804D7770, 0, sizeof(HSD_Synth_804D7770));
++    memcpy((void*)&melee_audio_synth_saved.HSD_Synth_804D7774, (const void*)&HSD_Synth_804D7774, sizeof(HSD_Synth_804D7774));
++    memset((void*)&HSD_Synth_804D7774, 0, sizeof(HSD_Synth_804D7774));
++    memcpy((void*)&melee_audio_synth_saved.HSD_Synth_804D7778, (const void*)&HSD_Synth_804D7778, sizeof(HSD_Synth_804D7778));
++    memset((void*)&HSD_Synth_804D7778, 0, sizeof(HSD_Synth_804D7778));
++    memcpy((void*)&melee_audio_synth_saved.HSD_Synth_804D777C, (const void*)&HSD_Synth_804D777C, sizeof(HSD_Synth_804D777C));
++    memset((void*)&HSD_Synth_804D777C, 0, sizeof(HSD_Synth_804D777C));
++    memcpy((void*)&melee_audio_synth_saved.HSD_Synth_804D7780, (const void*)&HSD_Synth_804D7780, sizeof(HSD_Synth_804D7780));
++    memset((void*)&HSD_Synth_804D7780, 0, sizeof(HSD_Synth_804D7780));
++    memcpy((void*)&melee_audio_synth_saved.HSD_Synth_804D7784, (const void*)&HSD_Synth_804D7784, sizeof(HSD_Synth_804D7784));
++    memset((void*)&HSD_Synth_804D7784, 0, sizeof(HSD_Synth_804D7784));
++    melee_audio_synth_active=1;
++    memcpy(HSD_Synth_804C29E0,buckets,sizeof(HSD_Synth_804C29E0));
++    HSD_Synth_804D6030=1.0F;
++    HSD_Synth_804D7754=1; /* This native provider is configured for stereo. */
++    HSD_SynthInitChannelControls();
++
++}
++void melee_web_audio_synth_end(void)
++{
++    HSD_ASSERT(1, melee_audio_synth_active);
++    memcpy(&HSD_Synth_804C28E0, &melee_audio_synth_saved.HSD_Synth_804C28E0, sizeof(HSD_Synth_804C28E0));
++    memcpy(&HSD_Synth_804C29E0, &melee_audio_synth_saved.HSD_Synth_804C29E0, sizeof(HSD_Synth_804C29E0));
++    memcpy(&hsd_SynthSFXNodes, &melee_audio_synth_saved.hsd_SynthSFXNodes, sizeof(hsd_SynthSFXNodes));
++    memcpy(&HSD_Synth_804C28E0_1784, &melee_audio_synth_saved.HSD_Synth_804C28E0_1784, sizeof(HSD_Synth_804C28E0_1784));
++    memcpy(&HSD_Synth_804C28E0_1844, &melee_audio_synth_saved.HSD_Synth_804C28E0_1844, sizeof(HSD_Synth_804C28E0_1844));
++    memcpy(&HSD_Synth_804D7720, &melee_audio_synth_saved.HSD_Synth_804D7720, sizeof(HSD_Synth_804D7720));
++    memcpy(&driverInactivatedCallback, &melee_audio_synth_saved.driverInactivatedCallback, sizeof(driverInactivatedCallback));
++    memcpy(&driverMasterClockCallback, &melee_audio_synth_saved.driverMasterClockCallback, sizeof(driverMasterClockCallback));
++    memcpy(&driverPauseCallback, &melee_audio_synth_saved.driverPauseCallback, sizeof(driverPauseCallback));
++    memcpy(&HSD_Synth_804D774C, &melee_audio_synth_saved.HSD_Synth_804D774C, sizeof(HSD_Synth_804D774C));
++    memcpy(&HSD_Synth_804D7750, &melee_audio_synth_saved.HSD_Synth_804D7750, sizeof(HSD_Synth_804D7750));
++    memcpy(&HSD_Synth_804D7754, &melee_audio_synth_saved.HSD_Synth_804D7754, sizeof(HSD_Synth_804D7754));
++    memcpy(&HSD_Synth_804D7758, &melee_audio_synth_saved.HSD_Synth_804D7758, sizeof(HSD_Synth_804D7758));
++    memcpy(&HSD_Synth_804D775C, &melee_audio_synth_saved.HSD_Synth_804D775C, sizeof(HSD_Synth_804D775C));
++    memcpy(&HSD_Synth_804D7760, &melee_audio_synth_saved.HSD_Synth_804D7760, sizeof(HSD_Synth_804D7760));
++    memcpy(&HSD_Synth_804D6030, &melee_audio_synth_saved.HSD_Synth_804D6030, sizeof(HSD_Synth_804D6030));
++    memcpy(&lbl_80407FB4, &melee_audio_synth_saved.lbl_80407FB4, sizeof(lbl_80407FB4));
++    memcpy(&HSD_Synth_80407FD8, &melee_audio_synth_saved.HSD_Synth_80407FD8, sizeof(HSD_Synth_80407FD8));
++    memcpy((void*)&lbl_804C4540, (const void*)&melee_audio_synth_saved.lbl_804C4540, sizeof(lbl_804C4540));
++    memcpy((void*)&HSD_Synth_804D7764, (const void*)&melee_audio_synth_saved.HSD_Synth_804D7764, sizeof(HSD_Synth_804D7764));
++    memcpy((void*)&HSD_Synth_804D7768, (const void*)&melee_audio_synth_saved.HSD_Synth_804D7768, sizeof(HSD_Synth_804D7768));
++    memcpy((void*)&HSD_Synth_804D776C, (const void*)&melee_audio_synth_saved.HSD_Synth_804D776C, sizeof(HSD_Synth_804D776C));
++    memcpy((void*)&HSD_Synth_804D7770, (const void*)&melee_audio_synth_saved.HSD_Synth_804D7770, sizeof(HSD_Synth_804D7770));
++    memcpy((void*)&HSD_Synth_804D7774, (const void*)&melee_audio_synth_saved.HSD_Synth_804D7774, sizeof(HSD_Synth_804D7774));
++    memcpy((void*)&HSD_Synth_804D7778, (const void*)&melee_audio_synth_saved.HSD_Synth_804D7778, sizeof(HSD_Synth_804D7778));
++    memcpy((void*)&HSD_Synth_804D777C, (const void*)&melee_audio_synth_saved.HSD_Synth_804D777C, sizeof(HSD_Synth_804D777C));
++    memcpy((void*)&HSD_Synth_804D7780, (const void*)&melee_audio_synth_saved.HSD_Synth_804D7780, sizeof(HSD_Synth_804D7780));
++    memcpy((void*)&HSD_Synth_804D7784, (const void*)&melee_audio_synth_saved.HSD_Synth_804D7784, sizeof(HSD_Synth_804D7784));
++    melee_audio_synth_active=0;
 +}
 +#endif
 +
- s32* Ground_801C2AD8(void)
- {
-     return &stage_info.xA0;
-diff --git a/src/melee/mp/mplib.c b/src/melee/mp/mplib.c
---- a/src/melee/mp/mplib.c
-+++ b/src/melee/mp/mplib.c
-@@ -5967,7 +5967,7 @@
-     grDynamicAttr_801CA224();
- }
- 
--void mpLib_80058820(void)
-+static HSD_GObj* mpLib_80058820_owned(void)
- {
-     mpCollisionBox* box = mpLib_80458868;
-     HSD_GObj* gobj = GObj_Create(1, 6, 0);
-@@ -5978,6 +5978,12 @@
-     box[0].left = -10000.0F;
-     box[0].bottom = -10000.0F;
-     box[1] = box[0];
-+    return gobj;
++#if defined(MELEE_WEB_GAMEPLAY)
++void melee_web_audio_stream_source_bind(u32 base, u32 silence, void** headers)
++{
++    int i;
++    HSD_ASSERT(1, melee_audio_synth_active && !HSD_Synth_804D7778);
++    HSD_Synth_804D7780 = base;
++    HSD_Synth_804D7784 = silence;
++    for (i=0; i<3; i++) headers[i] = &lbl_804C4540[i];
 +}
-+
-+void mpLib_80058820(void)
++void melee_web_audio_stream_source_stop(void)
 +{
-+    mpLib_80058820_owned();
- }
- 
- bool mpCheckedBounding(void)
---- a/src/melee/mn/mnmainrule.c
-+++ b/src/melee/mn/mnmainrule.c
-@@ -152,7 +152,7 @@
- void mnItemSw_802358C0(void);
- void mn_802339FC(void);
- void mnCharSel_80264070(void);
--void mnCharSel_802640A0(void);
-+s32 mnCharSel_802640A0(void);
- 
- static inline u8 mn_8022F538_GetHoveredSelection(void)
- {
---- a/src/melee/mn/mnhyaku.c
-+++ b/src/melee/mn/mnhyaku.c
-@@ -16,7 +16,7 @@
- 
- static HSD_GObj* mnHyaku_804D6C58;
- 
--void gm_801677E8(void);
-+void gm_801677E8(s8 port);
- 
- static AnimLoopSettings mnHyaku_803EF668 = { 0.0f, 19.0f, -0.1f };
- static AnimLoopSettings mnHyaku_803EF674 = { 20.0f, 29.0f, -0.1f };
-@@ -69,8 +69,7 @@
-     }
-     if (events & MenuInput_Confirm) {
-         sfxForward();
--        mn_802295AC();
--        gm_801677E8();
-+        gm_801677E8(mn_802295AC());
-         // load the different multi-man melee modes
-         switch (menu->cursor) {
-         case 0:
---- a/src/melee/ft/ftlib.c
-+++ b/src/melee/ft/ftlib.c
-@@ -971,9 +971,9 @@
-     }
- }
- 
--void ftLib_800876B4(HSD_GObj* gobj)
--{
--    ftAnim_IsFramesRemaining(gobj);
-+s32 ftLib_800876B4(HSD_GObj* gobj)
++    int i;
++    HSD_ASSERT(1, !HSD_Synth_804D7778);
++    for (i=0; i<64; i++) {
++        struct HSD_SynthSFXNode* node = &hsd_SynthSFXNodes[i];
++        if (node->x0 > 0 && node->x27 == 2) HSD_SynthSFXStopNode(node);
++    }
++    HSD_Synth_804D7760 = 0;
++}
++int melee_web_audio_stream_source_loading(void)
 +{
-+    return ftAnim_IsFramesRemaining(gobj);
- }
++    return HSD_Synth_804D7778;
++}
++#endif
+diff --git a/src/sysdolphin/baselib/tobj.c b/src/sysdolphin/baselib/tobj.c
+index a9f2c8b..76fdc92 100644
+--- a/src/sysdolphin/baselib/tobj.c
++++ b/src/sysdolphin/baselib/tobj.c
+@@ -140,6 +140,13 @@ static void TObjUpdateFunc(void* obj, enum_t type, HSD_ObjData* val)
+         return;
+     }
  
- bool ftLib_800876D4(HSD_GObj* gobj)
---- a/src/melee/ft/ftlib.h
-+++ b/src/melee/ft/ftlib.h
-@@ -97,7 +97,7 @@
- /* 087574 */ void ftLib_80087574(s8);
- /// /* 087574 */ void ftLib_80087574(FighterKind);
- /* 087610 */ void ftLib_80087610(u8);
--/* 0876B4 */ void ftLib_800876B4(HSD_GObj*);
-+/* 0876B4 */ s32 ftLib_800876B4(HSD_GObj*);
- /* 0876D4 */ bool ftLib_800876D4(HSD_GObj*);
- /* 0876F4 */ s32 ftLib_800876F4(HSD_GObj*);
- /* 087700 */ s32 ftLib_80087700(HSD_GObj*);
++#ifdef TARGET_PC
++    if (type >= HSD_A_T_KONST_R && type <= HSD_A_T_TEV1_A) {
++        double converted = 255.0 * val->fv;
++        if (!(converted > -1.0 && converted < 256.0))
++            HSD_Panic(__FILE__, __LINE__, "Native texture color exceeds original u8 conversion range");
++    }
++#endif
+     switch (type) {
+     case HSD_A_T_TIMG: {
+         int n;

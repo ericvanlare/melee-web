@@ -1,5 +1,13 @@
+#include "gameplay_compat.h"
 #include "gameplay_fighter_assets.hpp"
 #include "gameplay_fighter_data.h"
+#include "dat_item_article.hpp"
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wwrite-strings"
+extern "C" {
+#include <melee/it/forward.h>
+}
+#pragma GCC diagnostic pop
 #include <array>
 #include <cstdio>
 #include <cstdlib>
@@ -16,11 +24,14 @@ struct GameplayFighterAssets::Storage {
     std::vector<uint8_t> animation;
     GameplayActionStore prototype;
     NativeDatArena arena;
+    std::array<std::unique_ptr<DatItemArticle>,4> articles;
     DatNativeJoint model;
     DatMaterialAnimation material;
     std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> native;
     std::unique_ptr<DatNativeJoint> metal_model;
     std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> metal_native;
+    std::unique_ptr<DatNativeJoint> guard_model;
+    std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> guard_native{nullptr,destroy_joint};
     std::array<std::unique_ptr<GameplayActionStore>,6> bindings;
     std::array<Fighter*,6> fighters{};
     uint32_t unresolved=0;
@@ -36,8 +47,19 @@ struct GameplayFighterAssets::Storage {
         if(!native)throw DatError(error);
         uint32_t costume_count=0;
         for(const auto& value:fighter_costumes())if(value.fighter_kind==id.fighter_kind)++costume_count;
-        void* data=melee_web_fighter_data_decode(arena.reader(),root(*fighter,id.fighter_symbol),id.fighter_kind,
+        const uint32_t fighter_root=root(*fighter,id.fighter_symbol);
+        void* data=melee_web_fighter_data_decode(arena.reader(),fighter_root,id.fighter_kind,
             costume_count,prototype.action_rows(),prototype.blend_rows(),prototype.wait_choices(),&unresolved);
+        const auto item_table=fighter->pointer(fighter_root+0x48,16);
+        if(!item_table)throw DatError("Mario item Article table is missing");
+        struct ItemIdentity { uint32_t index,kind; };
+        for(const auto item : {ItemIdentity{0,It_Kind_Mario_Fire},ItemIdentity{2,It_Kind_Mario_Cape}}) {
+            const auto article_root=fighter->pointer(*item_table+item.index*4,24);
+            if(!article_root)throw DatError("Mario item Article root is missing");
+            auto* registered=melee_web_fighter_data_article(data,item.index);
+            if(!registered)throw DatError("Mario item Article registration identity is missing");
+            articles[item.index]=std::make_unique<DatItemArticle>(fighter,*article_root,item.kind,registered);
+        }
         const auto metal_root=fighter->pointer(root(*fighter,id.fighter_symbol)+0x5c,64);
         if(!metal_root)throw DatError("Mario constructor requires its original metal graph");
         metal_model=std::make_unique<DatNativeJoint>(fighter,*metal_root);
@@ -58,9 +80,23 @@ struct GameplayFighterAssets::Storage {
         if(!melee_web_fighter_data_set_metal(data,
             melee_web_native_joint_descriptor(metal_native.get(),error,sizeof(error)),
             costume_count,metal_dobjs,&unresolved,error,sizeof(error)))throw DatError(error);
-        // Neutral Wait may not enter demo clips, Guard or part animation.
+        const auto guard_data=fighter->pointer(root(*fighter,id.fighter_symbol)+0x20,4);
+        if(!guard_data)throw DatError("Mario requires its original guard pose");
+        const auto guard_root=fighter->pointer(*guard_data,64);
+        if(!guard_root)throw DatError("Mario guard pose descriptor is missing");
+        guard_model=std::make_unique<DatNativeJoint>(fighter,*guard_root);
+        const auto& guard=guard_model->graph();
+        if(guard.joint_count!=costume_graph.joint_count)throw DatError("Guard pose does not match costume joint count");
+        for(uint32_t j=0;j<guard.joint_count;j++)
+            if(guard.joints[j].child!=costume_graph.joints[j].child||guard.joints[j].next!=costume_graph.joints[j].next)
+                throw DatError("Guard pose does not match costume joint topology");
+        guard_native.reset(melee_web_native_joint_hydrate(&guard,error,sizeof(error)));
+        if(!guard_native)throw DatError(error);
+        melee_web_fighter_data_set_guard(arena.reader(),root(*fighter,id.fighter_symbol),data,
+            melee_web_native_joint_descriptor(guard_native.get(),error,sizeof(error)),&unresolved);
+        // Demo clips and part animation remain explicitly unavailable.
         // All other ftData roots are required; Article spawning has its own gate.
-        constexpr uint32_t neutral_unreached=(1U<<5)|(1U<<6)|(1U<<7)|(1U<<8);
+        constexpr uint32_t neutral_unreached=(1U<<5)|(1U<<6)|(1U<<7);
         if(!data || (unresolved&~neutral_unreached))throw DatError("Creation-reachable fighter data is not hydrated");
         scope=melee_web_fighter_assets_begin(id.fighter_kind,id.costume_index,data,
             melee_web_native_joint_descriptor(native.get(),error,sizeof(error)),material.descriptor(),

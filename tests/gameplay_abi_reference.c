@@ -59,3 +59,22 @@ uint32_t motion_wait_move(void) { return motion_wait.move_id; }
 uint32_t motion_wait_default(void) { return FtMoveId_Default; }
 uint32_t motion_wait_b0(void) { return motion_wait.x9_b0; }
 uint32_t motion_wait_b1(void) { return motion_wait.x9_b1; }
+
+#define BYTE_REFERENCE(bit) \
+uint32_t byte_flag_##bit(void) { UnkFlagStruct v={0};v.b##bit=1;return v.u8; } \
+uint32_t byte_clear_##bit(void) { UnkFlagStruct v;v.u8=255;v.b##bit=0;return v.u8; }
+BYTE_REFERENCE(0) BYTE_REFERENCE(1) BYTE_REFERENCE(2) BYTE_REFERENCE(3)
+BYTE_REFERENCE(4) BYTE_REFERENCE(5) BYTE_REFERENCE(6) BYTE_REFERENCE(7)
+uint32_t byte_flag_size(void) { return sizeof(UnkFlagStruct); }
+uint32_t fighter_visible_on(void) { Fighter fp={0};fp.x21FC_flag.u8=1;return fp.x21FC_flag.b7; }
+uint32_t fighter_visible_off(void) { Fighter fp={0};fp.x21FC_flag.u8=0x80;return fp.x21FC_flag.b7; }
+
+#define COLOR_REFERENCE(name,field,value) \
+uint32_t name(void) { union { union ColorOverlay_x8_t c; uint32_t word; } v={0}; v.c.field=value; return v.word; }
+COLOR_REFERENCE(color_opcode,unk.unk,63)
+COLOR_REFERENCE(color_timer,unk.timer,0x3ffffff)
+COLOR_REFERENCE(color_rot1_x,light_rot1.x,-1)
+COLOR_REFERENCE(color_rot1_yz,light_rot1.yz,-1)
+COLOR_REFERENCE(color_rot2_x,light_rot2.x,-1)
+COLOR_REFERENCE(color_rot2_yz,light_rot2.yz,-1)
+COLOR_REFERENCE(color_enable,light_rot2.light_enable,1)

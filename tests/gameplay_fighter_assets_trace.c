@@ -1,6 +1,8 @@
 #include "gameplay_fighter_assets.h"
 #include <melee/ft/ftdata.h>
 #include <melee/ft/types.h>
+#include <melee/it/it_26B1.h>
+#include <melee/it/it_3F14.h>
 #include <sysdolphin/baselib/jobj.h>
 #include <sysdolphin/baselib/mobj.h>
 #include <stdlib.h>
@@ -8,12 +10,26 @@
 static ftData test_data;
 static HSD_Joint test_joint;
 static HSD_MatAnimJoint test_material;
+static Article fixture_fire;
+static Article fixture_cape;
+static void* fixture_items[3] = {&fixture_fire, NULL, &fixture_cape};
 static ftData* previous_data;
 static UnkCostumeStruct previous_costume;
+/* This fixture deliberately supplies the exact 26B3F8 source ABI used by
+ * Fighter_OnLoad. The full item runtime is outside this focused lifetime
+ * lane, so keep a source-shaped table here and assert the two Mario writes. */
+static Article* fixture_item_rows[118];
+Article** it_804D6D38 = fixture_item_rows;
+void it_8026B3F8(Article* article, s32 kind)
+{
+    if (kind < It_Kind_Kuriboh || kind >= It_Kind_Kuriboh + 118) abort();
+    fixture_item_rows[kind - It_Kind_Kuriboh] = article;
+}
 MeleeWebFighterAssetScope* assets_test_begin(void* rows,void* blends,void* waits,void* context,
     MeleeWebFighterAssetBind bind,MeleeWebFighterAssetUnbind unbind)
 {
     test_data=(ftData){0};test_data.xC=rows;test_data.x10=blends;test_data.x24=waits;
+    test_data.x48_items=fixture_items;
     previous_data=gFtDataList[0];previous_costume=CostumeListsForeachCharacter[0].costume_list[0];
     if(melee_web_fighter_assets_begin(0,0,&test_data,&test_joint,&test_material,303,context,bind,unbind,NULL,0))abort();
     if(gFtDataList[0]!=previous_data)abort();
@@ -21,13 +37,18 @@ MeleeWebFighterAssetScope* assets_test_begin(void* rows,void* blends,void* waits
     return melee_web_fighter_assets_begin(0,0,&test_data,&test_joint,&test_material,303,context,bind,unbind,NULL,0);
 }
 int assets_test_restored(void)
-{return gFtDataList[0]==previous_data && memcmp(&CostumeListsForeachCharacter[0].costume_list[0],&previous_costume,sizeof(previous_costume))==0;}
+{
+    return gFtDataList[0]==previous_data &&
+        memcmp(&CostumeListsForeachCharacter[0].costume_list[0],&previous_costume,sizeof(previous_costume))==0;
+}
 Fighter* assets_test_construct_storage(void)
 {
     Fighter* fp=calloc(1,sizeof(*fp));if(!fp)abort();
     fp->kind=0;fp->ft_data=gFtDataList[0];fp->x619_costume_id=0;
     fp->x24=fp->ft_data->xC;fp->x28=fp->ft_data->x10;
     ftData_80085B10(fp);
+    if (fixture_item_rows[It_Kind_Mario_Fire-It_Kind_Kuriboh] != &fixture_fire ||
+        fixture_item_rows[It_Kind_Mario_Cape-It_Kind_Kuriboh] != &fixture_cape) abort();
     if(fp->x58C!=303 || fp->x59C || fp->x5A0)abort();
     return fp;
 }

@@ -92,6 +92,12 @@ int melee_web_stage_lights_stats(MeleeWebStageLights* h,uint32_t* count,uint16_t
     }
     return ok(e,n);
 }
+int melee_web_stage_lights_select_current(char* e,size_t n){
+    MeleeWebStageLights* h=published;
+    if(!h||!h->owner||h->generation!=melee_web_gameplay_stats().generation||stage_info.map_plit!=h->list)
+        return fail(e,n,"Rendering requires published live stage lights");
+    HSD_LObjSetCurrentAll(h->owner->hsd_obj);return ok(e,n);
+}
 int melee_web_stage_lights_attach(MeleeWebStageLights* h,char* e,size_t n){
     if(!h||h->attached||published)return fail(e,n,"Stage light publication already owned or context missing");
     h->saved=stage_info.map_plit;stage_info.map_plit=h->list;h->attached=1;published=h;return ok(e,n);

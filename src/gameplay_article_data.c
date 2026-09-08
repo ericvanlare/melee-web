@@ -75,3 +75,21 @@ void melee_web_article_require_ready(const void* article)
     uint32_t mask=melee_web_article_unresolved(article);
     if(mask) { fprintf(stderr,"Item creation requires hydrated Article graph (unresolved mask 0x%x)\n",mask); abort(); }
 }
+
+int melee_web_article_publish(const MeleeWebNativeDat* r,void* article,void* special,
+    const MeleeWebItemStateDesc* states,uint32_t count,void* joint,uint32_t bones,int32_t attach,uint8_t flags,char* error,size_t size)
+{
+    NativeArticle* a=article;
+    if(!r||!a||a->magic!=ARTICLE_MAGIC||!special||!states||!count||count>8||!joint||
+       bones>140||(a->unresolved&~((1U<<1)|(1U<<3)|(1U<<4)))){
+        if(error&&size)snprintf(error,size,"Item graph publication requires checked registration root and complete fields");return 0;
+    }
+    ItemStateArray* native_states=NEW(ItemStateArray,1);
+    ItemModelDesc* model=NEW(ItemModelDesc,1);
+    for(uint32_t i=0;i<count;i++){
+        native_states->x0_itemStateDesc[i]=(struct ItemStateDesc){states[i].animation,states[i].material,states[i].shape,states[i].commands};
+    }
+    model->x0_joint=joint;model->x4_bone_count=bones;model->x8_bone_attach_id=attach;model->xC_bit_field=flags;
+    a->article.x4_specialAttributes=special;a->article.xC_itemStates=native_states;a->article.x10_modelDesc=model;
+    a->unresolved=0;if(error&&size)*error=0;return 1;
+}

@@ -79,7 +79,7 @@ class GameplayAbiTests(unittest.TestCase):
             value = re.search(r"ret i32 (-?\d+)", body)
             self.assertIsNotNone(value, "Expected a compiler constant for " + name)
             values[name] = int(value.group(1)) & 0xffffffff
-        self.assertEqual(len(values), 50)
+        self.assertEqual(len(values), 76)
         return values
 
     def test_original_powerpc_and_patched_wasm_agree_with_explicit_negative_control(self):
@@ -103,6 +103,19 @@ class GameplayAbiTests(unittest.TestCase):
                         motion_wait_move=ppc["motion_wait_default"],
                         motion_wait_word=(ppc["motion_wait_default"] << 24) | (1 << 22) | (1 << 23))
         expected.update({f"motion_b{bit}": 1 << (23-bit) for bit in range(8)})
+        expected.update({f"byte_flag_{bit}": 1 << (7-bit) for bit in range(8)})
+        expected.update({f"byte_clear_{bit}": 255 ^ (1 << (7-bit)) for bit in range(8)})
+        expected.update(color_opcode=0xfc000000,color_timer=0x03ffffff,
+                        color_rot1_x=0x03ffe000,color_rot1_yz=0x1fff,
+                        color_rot2_x=0x00fff000,color_rot2_yz=0xfff,color_enable=0x02000000)
+        for name in ("color_opcode","color_timer","color_rot1_x","color_rot2_x","color_enable"):
+            self.assertNotEqual(broken[name],ppc[name])
+        expected.update(byte_flag_size=1,fighter_visible_on=1,fighter_visible_off=0)
+        for bit in range(8):
+            self.assertNotEqual(broken[f"byte_flag_{bit}"],ppc[f"byte_flag_{bit}"])
+            self.assertNotEqual(broken[f"byte_clear_{bit}"],ppc[f"byte_clear_{bit}"])
+        self.assertNotEqual(broken["fighter_visible_on"],ppc["fighter_visible_on"])
+        self.assertNotEqual(broken["fighter_visible_off"],ppc["fighter_visible_off"])
         for key, value in expected.items():
             with self.subTest(field=key):
                 self.assertEqual(ppc[key], value)

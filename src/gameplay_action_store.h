@@ -22,6 +22,8 @@ void melee_web_action_load(struct Fighter* destination, struct Fighter* source, 
  * target is the native word index of a checked branch; UINT32_MAX otherwise. */
 typedef struct MeleeWebCommandWord { uint32_t word, target; } MeleeWebCommandWord;
 void* melee_web_commands_create(const MeleeWebCommandWord*, size_t count);
+uint32_t melee_web_command_original_word(const void* command);
+int melee_web_command_original_word_checked(const void* command, uint32_t* word);
 void melee_web_commands_destroy(void*);
 void* melee_web_commands_at(void*, size_t index);
 void* melee_web_commands_unsupported(void);

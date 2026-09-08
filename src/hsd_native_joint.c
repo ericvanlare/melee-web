@@ -1,4 +1,5 @@
 #include "hsd_native_joint.h"
+#include "hsd_native_arrays.h"
 #include "gameplay_bootstrap.h"
 #include <sysdolphin/baselib/class.h>
 #include <sysdolphin/baselib/aobj.h>
@@ -15,13 +16,15 @@
 #include <sysdolphin/baselib/list.h>
 #include <sysdolphin/baselib/pobj.h>
 #include <sysdolphin/baselib/tobj.h>
+#include <sysdolphin/baselib/spline.h>
+#include <sysdolphin/baselib/robj.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct NativeJ { HSD_Joint desc; Mtx inverse; uint32_t source_offset; } NativeJ;
-typedef struct NativeP { HSD_PObjDesc desc; HSD_VtxDescList* attributes; u8* display;
+typedef struct NativeJ { HSD_Joint desc; HSD_Spline spline; Mtx inverse; uint32_t source_offset; } NativeJ;
+typedef struct NativeP { HSD_PObjDesc desc; HSD_VtxDescList* attributes; u8* display; MeleeWebNativeArrays* arrays;
     HSD_EnvelopeDesc** envelopes; uint32_t envelope_count; } NativeP;
 typedef struct NativeT { HSD_TObjDesc desc; HSD_ImageDesc image;
     HSD_TlutDesc palette; HSD_TexLODDesc lod; HSD_TObjTevDesc tev; } NativeT;
@@ -70,6 +73,7 @@ static void free_descriptors(MeleeWebNativeJoint* handle)
     if (!handle) return;
     if (handle->pobjs) for (uint32_t i = 0; i < handle->pobj_count; ++i) {
         NativeP* p = &handle->pobjs[i];
+        melee_web_native_arrays_remove(p->arrays);
         free(p->attributes); free(p->display);
         if (p->envelopes) for (uint32_t j = 0; j < p->envelope_count; ++j) free(p->envelopes[j]);
         free(p->envelopes);
@@ -112,8 +116,21 @@ static int validate(const MeleeWebNativeGraph* g, char* error, size_t size)
         return fail(error, size, "Native HSD joints must form one complete acyclic unshared graph");
     for (uint32_t i = 0; i < g->joint_count; ++i) {
         const MeleeWebNativeJointDesc* j = &g->joints[i];
-        if ((j->flags & (JOBJ_INSTANCE | JOBJ_PTCL | JOBJ_SPLINE)) || !valid_index(j->dobj, g->dobj_count))
+        if ((j->flags & (JOBJ_INSTANCE | JOBJ_PTCL)) || !valid_index(j->dobj, g->dobj_count))
             return fail(error, size, "Native HSD joint union or DObj index is unsupported");
+        if(!!(j->flags&JOBJ_SPLINE)!=!!j->spline||(j->spline&&j->dobj!=UINT32_MAX))
+            return fail(error,size,"Native spline union does not match its joint flags");
+        if(j->spline){
+            const MeleeWebNativeSplineDesc* p=j->spline;
+            if(p->type>3||p->control_count<2||p->control_count>4096||!p->points||!p->segment_lengths||!isfinite(p->tension)||!isfinite(p->total_length)||p->total_length<=0)
+                return fail(error,size,"Native spline shape or buffers are invalid");
+            uint32_t points=p->type==1?3*(p->control_count-1)+1:p->type>=2?p->control_count+2:p->control_count;
+            if(p->point_count!=points||(p->type&&!p->segment_polynomials))return fail(error,size,"Native spline buffer counts invalid");
+            for(uint32_t k=0;k<points*3;k++)if(!isfinite(p->points[k]))return fail(error,size,"Native spline point is nonfinite");
+            for(uint32_t k=0;k<p->control_count;k++)if(!isfinite(p->segment_lengths[k])||p->segment_lengths[k]<0||p->segment_lengths[k]>1||(k&&p->segment_lengths[k]<=p->segment_lengths[k-1]))return fail(error,size,"Native spline arc ordering invalid");
+            if(p->segment_lengths[0]!=0||p->segment_lengths[p->control_count-1]!=1)return fail(error,size,"Native spline arc endpoints invalid");
+            if(p->segment_polynomials)for(uint32_t k=0;k<(p->control_count-1)*5;k++)if(!isfinite(p->segment_polynomials[k]))return fail(error,size,"Native spline polynomial is nonfinite");
+        }
         for (unsigned c = 0; c < 3; ++c)
             if (!isfinite(j->rotation[c]) || !isfinite(j->scale[c]) || !isfinite(j->translation[c]))
                 return fail(error, size, "Native HSD joint SRT must be finite");
@@ -228,6 +245,11 @@ static MeleeWebNativeJoint* create_joint(const MeleeWebNativeGraph* g, const uin
         d->child = s->child == UINT32_MAX ? NULL : &h->joints[s->child].desc;
         d->next = s->next == UINT32_MAX ? NULL : &h->joints[s->next].desc;
         d->u.dobjdesc = s->dobj == UINT32_MAX ? NULL : &h->dobjs[s->dobj];
+        if(s->spline){
+            const MeleeWebNativeSplineDesc* input=s->spline;HSD_Spline* p=&h->joints[i].spline;
+            p->type=input->type;p->numcv=input->control_count;p->tension=input->tension;p->totalLength=input->total_length;
+            p->cv=(Vec3*)input->points;p->segLength=(float*)input->segment_lengths;p->segPoly=(float(*)[5])input->segment_polynomials;d->u.spline=p;
+        }
         memcpy(&d->rotation, s->rotation, sizeof(Vec3)); memcpy(&d->scale, s->scale, sizeof(Vec3));
         memcpy(&d->position, s->translation, sizeof(Vec3));
         if (s->has_inverse_bind) { memcpy(h->joints[i].inverse, s->inverse_bind, sizeof(Mtx)); d->mtx = h->joints[i].inverse; }
@@ -252,6 +274,8 @@ static MeleeWebNativeJoint* create_joint(const MeleeWebNativeGraph* g, const uin
         p->attributes = calloc(s->geometry.attribute_count + 1, sizeof(HSD_VtxDescList));
         if (!p->attributes) goto oom;
         p->desc.verts = p->attributes;
+        p->arrays = melee_web_native_arrays_register(s->geometry.attributes,s->geometry.attribute_count,error,size);
+        if (!p->arrays) goto oom;
         for (uint32_t j = 0; j < s->geometry.attribute_count; ++j) {
             const MeleeWebPObjAttribute* a = &s->geometry.attributes[j];
             p->attributes[j] = (HSD_VtxDescList) {a->attr, a->attr_type, a->comp_cnt, a->comp_type, a->frac, a->stride, (void*) a->data};
@@ -349,6 +373,7 @@ int melee_web_native_joint_stats(const MeleeWebNativeJoint* h, MeleeWebNativeJoi
         if (!j || j->id != (u32) &h->joints[i].desc)
             return fail(error, size, "Original HSD joint descriptor identity is missing");
         ++result.joints;
+        if(j->flags&JOBJ_SPLINE)continue;
         for (HSD_DObj* d = j->u.dobj; d; d = d->next) {
             ++result.dobjs;
             if (d->mobj) {
@@ -384,7 +409,7 @@ int melee_web_native_world_enable(char* error, size_t size)
     if (native_generation != world.generation) {
         HSD_IDInitAllocData(); HSD_IDSetup();
         HSD_ListInitAllocData(); HSD_MtxInitAllocData(); HSD_VecInitAllocData();
-        HSD_AObjInitAllocData(); HSD_FObjInitAllocData();
+        HSD_AObjInitAllocData(); HSD_FObjInitAllocData(); HSD_RObjInitAllocData();
         native_generation = world.generation;
     }
     if (error && size) error[0] = 0;
@@ -401,6 +426,18 @@ void* melee_web_native_joint_descriptor(MeleeWebNativeJoint* h, char* error, siz
     }
     if (error && size) error[0] = 0;
     return &h->joints[h->root].desc;
+}
+void* melee_web_native_joint_descriptor_at(MeleeWebNativeJoint* h,uint32_t index,uint32_t expected,char* error,size_t size)
+{
+    if(!melee_web_native_joint_descriptor(h,error,size))return NULL;
+    if(index>=h->joint_count||h->joints[index].source_offset!=expected){fail(error,size,"Native joint index/source identity differs from owned graph");return NULL;}
+    return &h->joints[index].desc;
+}
+void* melee_web_native_joint_material_descriptor(MeleeWebNativeJoint* h,uint32_t index,char* error,size_t size)
+{
+    if(!melee_web_native_joint_descriptor(h,error,size))return NULL;
+    if(index>=h->material_count){fail(error,size,"Native material index exceeds owned descriptor graph");return NULL;}
+    return &h->materials[index].desc;
 }
 void* melee_web_native_joint_object(MeleeWebNativeJoint* h, char* error, size_t size)
 {

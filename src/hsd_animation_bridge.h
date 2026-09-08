@@ -27,6 +27,11 @@ typedef struct MeleeWebAnimation MeleeWebAnimation;
 int melee_web_animation_validate_track(const MeleeWebAnimationTrack* track,
                                       char* error, size_t error_size);
 
+/* Native original FObj evaluation has a source runtime guard for undefined
+ * interpolation state. Allows dormant single-value streams while checking all
+ * packet bounds; must only feed that guarded original evaluator. */
+int melee_web_animation_validate_native_track(const MeleeWebAnimationTrack*,char*,size_t);
+
 /* Each node count is its consecutive track count. The caller must establish
  * the animation-node to skeleton mapping; this seam uses matching preorder.
  * Copies all input data. Untracked SRT/flags retain bind values. Animated nodes

@@ -20,6 +20,10 @@ namespace melee_web {
 namespace {
 void require(bool condition, const char* reason) { if (!condition) throw DatError(reason); }
 struct NativeTrack { HSD_FObjDesc descriptor{}; std::vector<uint8_t> bytes; };
+struct NativeMaterialAnimation {
+    HSD_AObjDesc descriptor{};
+    std::vector<std::unique_ptr<NativeTrack>> tracks;
+};
 struct NativeTextureAnimation {
     HSD_TexAnim descriptor{};
     HSD_AObjDesc animation{};
@@ -32,7 +36,7 @@ struct NativeTextureAnimation {
 // Original TObjUpdateFunc directly indexes its tables. Restrict index channels
 // to constant/key opcodes and validate every decoded value before HSD sees it;
 // no interpolated curve can overshoot a checked table bound.
-void validate_indices(const NativeTrack& track, uint32_t count)
+void validate_indices(const NativeTrack& track, uint32_t count, bool normalized_color=false)
 {
     require(count > 0, "Texture animation index has no table");
     const auto format = track.descriptor.frac_value;
@@ -68,7 +72,8 @@ void validate_indices(const NativeTrack& track, uint32_t count)
                     (format >> 5) == 3 ? int8_t(bits) : int32_t(bits);
                 value = double(integer) / double(uint32_t(1) << (format & 31));
             }
-            require(std::isfinite(value) && value >= 0 && value < count && std::floor(value) == value,
+            require(std::isfinite(value) && value >= 0 &&
+                    (normalized_color ? value <= 1 : value < count && std::floor(value) == value),
                     "Texture animation index is outside its table");
             ++values;
             if (cursor < track.bytes.size()) { const auto first = byte(); (void)varint(first & 127, 7, first); }
@@ -82,8 +87,11 @@ struct DatMaterialAnimation::Storage {
     std::shared_ptr<const DatArchive> archive;
     std::vector<std::unique_ptr<HSD_MatAnimJoint>> joints;
     std::vector<std::unique_ptr<HSD_MatAnim>> materials;
+    std::vector<std::unique_ptr<NativeMaterialAnimation>> material_animations;
     std::vector<std::unique_ptr<NativeTextureAnimation>> textures;
     HSD_MatAnimJoint* root = nullptr;
+    std::vector<HSD_MatAnimJoint> indexed;
+    bool indexable=false;
     uint32_t images = 0;
 };
 DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> archive, uint32_t root,
@@ -110,8 +118,8 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
         const uint32_t id = a.be32(*offset+4);
         require(!material.material.texture_count || material.textures,
                 "Material animation model textures are absent");
-        bool found = false;
-        for (uint32_t i=0;i<material.material.texture_count;++i) found |= material.textures[i].source_id == id;
+        bool found = false;const MeleeWebNativeTextureDesc* native_texture=nullptr;
+        for (uint32_t i=0;i<material.material.texture_count;++i) if(material.textures[i].source_id==id){found=true;native_texture=&material.textures[i];}
         require(found, "Texture animation ID is absent from the matching model material");
         t.descriptor.id = static_cast<GXTexMapID>(id);
         const uint16_t ni = a.be16(*offset+20), np = a.be16(*offset+22);
@@ -153,28 +161,30 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
         t.animation.flags = flags; t.animation.end_frame = end;
         auto fo = a.pointer(ao+8,20); unsigned channels = 0;
         while (fo) {
-            require(t.tracks.size()<3 && track_seen.insert(*fo).second, "Texture animation track cycle or count limit"); record(*fo,20);
+            require(t.tracks.size()<24 && track_seen.insert(*fo).second, "Texture animation track cycle or count limit"); record(*fo,20);
             auto track = std::make_unique<NativeTrack>(); auto& f = track->descriptor;
             f.length = a.be32(*fo+4); f.startframe = a.f32(*fo+8);
             const auto fields = a.range(*fo+12,4); f.type=fields[0]; f.frac_value=fields[1]; f.frac_slope=fields[2];
-            require((f.type==1 || f.type==9 || f.type==10) && !(channels & (1U<<f.type)), "Unsupported or duplicate material animation channel");
+            require((f.type>=1 && f.type<=24) && !(channels & (1U<<f.type)), "Unsupported or duplicate material animation channel");
             channels |= 1U << f.type;
-            require(std::isfinite(f.startframe) && f.startframe>=0 && f.startframe<=32767 && std::floor(f.startframe)==f.startframe,
+            require(std::isfinite(f.startframe) && f.startframe>=-32768 && f.startframe<=32767 && std::floor(f.startframe)==f.startframe,
                     "Texture animation start frame exceeds original signed frame storage");
             require(f.length && f.length<=65535 && (stream_bytes += f.length)<=4*1024*1024, "Texture animation stream exceeds limit");
             const auto bytes = required(*fo+16,f.length); const auto span = a.range(bytes,f.length);
             require(f.length<=a.next_target_offset(bytes)-bytes, "Texture animation stream crosses a referenced region");
             track->bytes.assign(span.begin(),span.end()); f.ad=track->bytes.data();
-            if(f.type==9) {
+            require(f.type!=11||native_texture->has_lod,"Texture LOD animation requires native LOD storage");
+            require(f.type<12||f.type>23||native_texture->has_tev,"Texture TEV animation requires native TEV storage");
+            if(f.type!=1 && f.type!=10) {
                 const MeleeWebAnimationTrack view{track->bytes.data(),track->bytes.size(),0,1,f.frac_value,f.frac_slope};
                 char error[256];
-                require(melee_web_animation_validate_track(&view,error,sizeof(error)),error);
+                require(melee_web_animation_validate_native_track(&view,error,sizeof(error)),error);
             } else validate_indices(*track,f.type==1?ni:np);
             if (!t.tracks.empty()) t.tracks.back()->descriptor.next = &f;
             else t.animation.fobjdesc = &f;
             t.tracks.push_back(std::move(track)); fo=a.pointer(*fo,20);
         }
-        require(!t.tracks.empty(), "Texture animation has no index channels");
+        require(!t.tracks.empty(), "Texture animation has no supported channels");
         t.descriptor.aobjdesc=&t.animation; t.descriptor.imagetbl=ni?t.image_table.data():nullptr;
         t.descriptor.tluttbl=np?t.palette_table.data():nullptr; t.descriptor.n_imagetbl=ni; t.descriptor.n_tluttbl=np;
         auto* result=&t.descriptor; s.images+=ni; s.textures.push_back(std::move(owner));
@@ -185,19 +195,51 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
         if (!offset) { require(dobj==UINT32_MAX,"Material animation DObj topology is incomplete"); return nullptr; }
         require(dobj<model.dobj_count && s.materials.size()<4096 && material_seen.insert(*offset).second,
                 "Material animation DObj topology/cycle/count is invalid"); record(*offset,16);
-        require(!a.pointer(*offset+4) && !a.pointer(*offset+12), "Active material or render animation is unsupported");
+        require(!a.pointer(*offset+12), "Active render animation is unsupported");
         auto m=std::make_unique<HSD_MatAnim>(); auto* result=m.get(); s.materials.push_back(std::move(m));
+        if (const auto ao=a.pointer(*offset+4,16)) {
+            record(*ao,16); auto owner=std::make_unique<NativeMaterialAnimation>(); auto& n=*owner;
+            n.descriptor.flags=a.be32(*ao); n.descriptor.end_frame=a.f32(*ao+4);
+            require(!(n.descriptor.flags&~0x30000000U)&&std::isfinite(n.descriptor.end_frame)&&
+                    n.descriptor.end_frame>=0&&n.descriptor.end_frame<=65535,
+                    "Material alpha animation flags or end frame are invalid");
+            require(!a.pointer(*ao+12),"Material alpha animation object reference is unsupported");
+            auto fo=a.pointer(*ao+8,20);unsigned material_channels=0;
+            while(fo) {
+                require(n.tracks.size()<10&&track_seen.insert(*fo).second,"Material alpha animation duplicate track or cycle");
+                record(*fo,20); auto track=std::make_unique<NativeTrack>(); auto& f=track->descriptor;
+                f.length=a.be32(*fo+4);f.startframe=a.f32(*fo+8);
+                const auto fields=a.range(*fo+12,4);f.type=fields[0];f.frac_value=fields[1];f.frac_slope=fields[2];
+                require(f.type>=1&&f.type<=HSD_A_M_ALPHA&&!(material_channels&(1u<<f.type)),"Unsupported or duplicate material animation channel");
+                material_channels|=1u<<f.type;
+                require(std::isfinite(f.startframe)&&f.startframe>=-32768&&f.startframe<=32767&&std::floor(f.startframe)==f.startframe,
+                        "Material alpha animation start frame exceeds source signed storage");
+                require(f.length&&f.length<=65535&&(stream_bytes+=f.length)<=4U*1024U*1024U,
+                        "Material alpha animation stream budget exceeded");
+                const auto bytes=required(*fo+16,f.length);
+                require(f.length<=a.next_target_offset(bytes)-bytes,"Material alpha stream crosses referenced region");
+                const auto span=a.range(bytes,f.length);track->bytes.assign(span.begin(),span.end());f.ad=track->bytes.data();
+                const MeleeWebAnimationTrack view{f.ad,f.length,0,1,f.frac_value,f.frac_slope};char error[256];
+                require(melee_web_animation_validate_native_track(&view,error,sizeof(error)),error);
+                // Original guarded color update checks the interpolated conversion range.
+                if(n.tracks.empty())n.descriptor.fobjdesc=&f;else n.tracks.back()->descriptor.next=&f;
+                n.tracks.push_back(std::move(track));fo=a.pointer(*fo,20);
+            }
+            result->aobjdesc=&n.descriptor;s.material_animations.push_back(std::move(owner));
+        }
         require(model.dobjs[dobj].material < model.material_count,
                 "Material animation model material index is invalid");
         result->texanim=texture_chain(a.pointer(*offset+8,24),model.materials[model.dobjs[dobj].material]);
         result->next=material_chain(a.pointer(*offset,16),model.dobjs[dobj].next); return result;
     };
+    std::map<HSD_MatAnimJoint*,uint32_t> indices;
+    bool contiguous=model.root==0;
     std::function<HSD_MatAnimJoint*(std::optional<uint32_t>,uint32_t)> joint_tree;
     joint_tree = [&](std::optional<uint32_t> offset,uint32_t joint) -> HSD_MatAnimJoint* {
         if (!offset) { require(joint==UINT32_MAX,"Material animation joint topology is incomplete"); return nullptr; }
         require(joint<model.joint_count && s.joints.size()<140 && joint_seen.insert(*offset).second,
                 "Material animation joint topology/cycle/count is invalid"); record(*offset,12);
-        auto j=std::make_unique<HSD_MatAnimJoint>(); auto* result=j.get(); s.joints.push_back(std::move(j));
+        auto j=std::make_unique<HSD_MatAnimJoint>(); auto* result=j.get();indices[result]=joint;contiguous=contiguous&&*offset==root+joint*12;s.joints.push_back(std::move(j));
         result->matanim=material_chain(a.pointer(*offset+8,16),model.joints[joint].dobj);
         result->child=joint_tree(a.pointer(*offset,12),model.joints[joint].child);
         result->next=joint_tree(a.pointer(*offset+4,12),model.joints[joint].next); return result;
@@ -205,10 +247,19 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
     require(model.joints && model.root<model.joint_count &&
             (!model.dobj_count || model.dobjs) && (!model.material_count || model.materials),
             "Material animation requires a checked model graph");
-    s.root=joint_tree(root,model.root);
+    auto* tree=joint_tree(root,model.root);s.indexed.resize(model.joint_count);
+    for(const auto& [old,index]:indices){
+        auto& out=s.indexed[index];out=*old;
+        out.child=old->child?&s.indexed.at(indices.at(old->child)):nullptr;
+        out.next=old->next?&s.indexed.at(indices.at(old->next)):nullptr;
+    }
+    s.root=tree?&s.indexed.at(indices.at(tree)):nullptr;s.indexable=contiguous&&indices.size()==model.joint_count;
 }
 DatMaterialAnimation::~DatMaterialAnimation()=default;
 void* DatMaterialAnimation::descriptor() const noexcept { return storage_->root; }
+void* DatMaterialAnimation::indexed_descriptor()const{
+    require(storage_->indexable,"Native material animation source is not a complete contiguous bone-indexed array");return storage_->root;
+}
 uint32_t DatMaterialAnimation::texture_animation_count() const noexcept { return uint32_t(storage_->textures.size()); }
 uint32_t DatMaterialAnimation::image_count() const noexcept { return storage_->images; }
 }

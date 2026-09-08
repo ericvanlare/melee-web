@@ -6,7 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-struct MeleeWebPlayerContext { uint32_t slot; StaticPlayer saved; };
+struct MeleeWebPlayerContext { uint32_t slot,controller; StaticPlayer saved; };
 static MeleeWebPlayerContext* owners[Gm_Player_NumMax];
 static int fail(char* e,size_t n,const char* message){if(e&&n)snprintf(e,n,"%s",message);return 0;}
 static int ok(char* e,size_t n){if(e&&n)*e=0;return 1;}
@@ -26,12 +26,15 @@ MeleeWebPlayerContext* melee_web_player_context_begin(const MeleeWebPlayerSettin
     if(p->transformed[0]>1||p->transformed[1]>1){fail(e,n,"Previous source player transformation indices are invalid");return NULL;}
     MeleeWebPlayerContext* h=malloc(sizeof(*h));
     if(!h){fail(e,n,"Cannot allocate saved source player context");return NULL;}
-    h->slot=s->slot;memcpy(&h->saved,p,sizeof(*p));
+    h->slot=s->slot;h->controller=s->controller;memcpy(&h->saved,p,sizeof(*p));
     Player_InitOrResetPlayer(s->slot);
     plStale_ResetStaleMoveTableForPlayer(s->slot);
     Player_SetPlayerCharacter(s->slot,CKIND_MARIO);
     Player_SetSlottype(s->slot,Gm_PKind_Human);
-    Player_SetControllerIndex(s->slot,s->controller);
+    /* gm_16AE fn_8016D8AC supplies PlayerInitData.sub_color here. Despite
+     * its decompiled name this field tints the costume, not the input port.
+     * The match owner routes the configured controller into this slot's PAD. */
+    Player_SetControllerIndex(s->slot,0);
     Player_SetPlayerId(s->slot,s->slot);
     Player_SetCostumeId(s->slot,0);
     Player_SetTeam(s->slot,0);
@@ -48,7 +51,7 @@ int melee_web_player_context_stats(const MeleeWebPlayerContext* h,MeleeWebPlayer
     if(p->transformed[0]>1||p->transformed[1]>1)return fail(e,n,"Source player transformation indices are invalid");
     memset(out,0,sizeof(*out));
     out->slot_type=Player_GetPlayerSlotType(s);out->character=Player_GetPlayerCharacter(s);
-    out->controller=Player_GetControllerIndex(s);out->player_id=Player_GetPlayerId(s);
+    out->controller=h->controller;out->player_id=Player_GetPlayerId(s);
     out->costume=Player_GetCostumeId(s);out->stocks=Player_GetStocks(s);
     out->cpu_type=Player_GetCpuType(s);out->cpu_level=Player_GetCpuLevel(s);
     out->state=Player_GetPlayerState(s);out->damage=Player_GetDamage(s);

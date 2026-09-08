@@ -10,10 +10,18 @@ extern "C" {
 /* UINT32_MAX is a null descriptor index. Source offsets are immutable archive
  * identities, never emulated addresses. The checked CPU importer owns every
  * input array and byte span until the native handle is destroyed. */
+typedef struct MeleeWebNativeSplineDesc {
+    uint32_t source_offset, type, control_count, point_count;
+    float tension, total_length;
+    const float* points; /* point_count tightly packed XYZ triples */
+    const float* segment_lengths; /* control_count normalized arc boundaries */
+    const float* segment_polynomials; /* optional (control_count-1)*5 floats */
+} MeleeWebNativeSplineDesc;
 typedef struct MeleeWebNativeJointDesc {
     uint32_t source_offset, flags, child, next, dobj;
     float rotation[3], scale[3], translation[3], inverse_bind[3][4];
     uint8_t has_inverse_bind;
+    const MeleeWebNativeSplineDesc* spline;
 } MeleeWebNativeJointDesc;
 typedef struct MeleeWebNativeDObjDesc {
     uint32_t source_offset, next, material, pobj;
@@ -57,6 +65,10 @@ typedef struct MeleeWebNativeJointStats {
 int melee_web_native_world_enable(char* error, size_t error_size);
 MeleeWebNativeJoint* melee_web_native_joint_hydrate(const MeleeWebNativeGraph*, char*, size_t);
 void* melee_web_native_joint_descriptor(MeleeWebNativeJoint*, char*, size_t);
+void* melee_web_native_joint_descriptor_at(MeleeWebNativeJoint*,uint32_t index,uint32_t expected_source_offset,char*,size_t);
+/* Same owner lifetime as the root. Index is the checked graph material index;
+ * permits original pre-load storage flag initialization such as map shadows. */
+void* melee_web_native_joint_material_descriptor(MeleeWebNativeJoint*,uint32_t,char*,size_t);
 void* melee_web_native_joint_object(MeleeWebNativeJoint*, char*, size_t);
 /* Material descriptors must come from DatMaterialAnimation and remain alive
  * through runtime removal. These calls execute original HSD animation code. */

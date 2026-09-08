@@ -13,10 +13,10 @@ now passes original `Fighter_Create` → source Fall/Wait settling → 120 neutr
 Wait ticks → unload → restart, four times across two complete SDK worlds.
 See [the runtime gate](FIGHTER_RUNTIME.md) and [STATUS.md](../STATUS.md).
 
-Next: connect this same source runtime to browser presentation and fixed-tick
-controller input, and establish original-game state comparisons before expanding
-movement and combat. Rendered inspection animation is still separate from the
-validated fighter process loop.
+In progress: this same source runtime is connected to browser presentation and
+fixed-tick controller input. Rendering defects, complete stage/audio services,
+combat and original-game state comparisons remain. This checkpoint does not
+satisfy milestone 1.
 
 ## 1 — Playable local stock match
 
@@ -31,7 +31,9 @@ positions, actions, damage, stocks, RNG and outcome. Preserve original 60 Hz
 simulation independent of presentation. Missing services fail explicitly; do not
 substitute handwritten movement or successful runtime stubs.
 
-Select desktop reference hardware/browser versions before claiming 60 fps.
+Reference hardware selected from the development machine: Apple M4, Mac16,12,
+32 GiB RAM, macOS 26.6.2 (25G83). Record the exact browser build with the release
+benchmark; no complete-match performance result exists yet.
 Measure release-build frame intervals, CPU/GPU work where available, input
 latency, audio underruns, loading stalls and memory high-water. The frame budget
 is approximately 16.7 ms with headroom; average viewer FPS is not acceptance.

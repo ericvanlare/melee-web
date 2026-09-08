@@ -2,8 +2,10 @@
 #include "dat_native_joint.hpp"
 #include "dat_native_animation.hpp"
 #include "dat_material_animation.hpp"
+#include "dat_shape_animation.hpp"
 #include "gameplay_compat.h"
 #include "gameplay_archive_sections.h"
+#include "gameplay_effect_runtime.h"
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wwrite-strings"
 extern "C" {
@@ -25,6 +27,7 @@ struct Entry {
     std::unique_ptr<DatNativeJoint> model;
     std::unique_ptr<DatNativeAnimation> animation;
     std::unique_ptr<DatMaterialAnimation> material_animation;
+    std::unique_ptr<DatShapeAnimation> shape_animation;
     MeleeWebNativeJoint* native=nullptr;
     ~Entry(){if(native&&!melee_web_native_joint_destroy(native,nullptr,0))std::terminate();}
 };
@@ -38,10 +41,10 @@ struct DatEffectEntries::Storage {
     std::string symbol;
     MeleeWebArchiveSections* registration=nullptr;
     void* previous_data=nullptr;
-    bool ready=false;
+    bool ready=false,needs_particles=false;
     ~Storage(){std::free(table);}
 };
-DatEffectEntries::DatEffectEntries(std::shared_ptr<const DatArchive> archive,std::string_view symbol,uint32_t bank,uint32_t count)
+DatEffectEntries::DatEffectEntries(std::shared_ptr<const DatArchive> archive,std::string_view symbol,uint32_t bank,uint32_t count,bool particles)
     :storage_(std::make_unique<Storage>())
 {
     static_assert(sizeof(void*)==4&&sizeof(EF_EffectDesc)==20&&sizeof(Table)==8,"Original EF table layout");
@@ -58,28 +61,44 @@ DatEffectEntries::DatEffectEntries(std::shared_ptr<const DatArchive> archive,std
     s.table->commands=melee_web_effect_bank_commands(s.bank->bank());
     s.table->textures=melee_web_effect_bank_textures(s.bank->bank());
     for(uint32_t i=0;i<count;++i){
+      try {
         auto owner=std::make_unique<Entry>();auto& e=*owner;const uint32_t at=*root+8+20*i;
         const float lifetime=a.f32(at);
         if(!std::isfinite(lifetime)||lifetime<0||lifetime>65535)throw DatError("Effect lifetime exceeds native source range");
         const auto model=a.pointer(at+4,64),animation=a.pointer(at+8,20),material=a.pointer(at+12,12);
         if(!model)throw DatError("Effect static model has no joint descriptor");
-        if(a.pointer(at+16))throw DatError("Effect shape animation is not hydrated");
+        const auto shape=a.pointer(at+16,12);
         e.model=std::make_unique<DatNativeJoint>(s.archive,*model);char error[256];
         e.native=melee_web_native_joint_hydrate(&e.model->graph(),error,sizeof(error));
         if(!e.native)throw DatError(error);
-        if(animation)e.animation=std::make_unique<DatNativeAnimation>(s.archive,*animation,e.model->graph());
+        if(animation){
+            std::vector<void*> descriptors;
+            for(uint32_t j=0;j<e.model->graph().joint_count;j++){
+                void* descriptor=melee_web_native_joint_descriptor_at(e.native,j,e.model->graph().joints[j].source_offset,error,sizeof(error));
+                if(!descriptor)throw DatError(error);
+                descriptors.push_back(descriptor);
+            }
+            e.animation=std::make_unique<DatNativeAnimation>(s.archive,*animation,e.model->graph(),
+                particles?DatNativeAnimationPolicy::ParticleDescriptors:DatNativeAnimationPolicy::Transforms,descriptors);
+            s.needs_particles|=!e.animation->particle_events().empty();
+        }
         if(material)e.material_animation=std::make_unique<DatMaterialAnimation>(s.archive,*material,e.model->graph());
+        if(shape)e.shape_animation=std::make_unique<DatShapeAnimation>(s.archive,*shape,e.model->graph());
         auto& out=reinterpret_cast<EF_EffectDesc*>(s.table+1)[i];out.lifetime=lifetime;
         out.model_desc.joint=static_cast<HSD_Joint*>(melee_web_native_joint_descriptor(e.native,error,sizeof(error)));
         out.model_desc.animjoint=e.animation?static_cast<HSD_AnimJoint*>(e.animation->descriptor()):nullptr;
         out.model_desc.matanim_joint=e.material_animation?static_cast<HSD_MatAnimJoint*>(e.material_animation->descriptor()):nullptr;
-        out.model_desc.shapeanim_joint=nullptr;
+        out.model_desc.shapeanim_joint=e.shape_animation?e.shape_animation->descriptor():nullptr;
         s.entries.push_back(std::move(owner));
+      } catch(const DatError& error) {
+        throw DatError("Effect bank "+std::to_string(bank)+" entry "+std::to_string(i)+": "+error.what());
+      }
     }
 }
 DatEffectEntries::~DatEffectEntries(){if(!detach(nullptr,0))std::terminate();}
 bool DatEffectEntries::load(char* error,size_t size){
     auto& s=*storage_;
+    if(s.needs_particles&&!melee_web_effect_runtime_active())return fail(error,size,"Effect particle descriptors require the original callback runtime");
     if(s.registration)return fail(error,size,"Effect entries are already published");
     if(efLib_EffectCount)return fail(error,size,"Live source effects prevent descriptor replacement");
     if(s.bank_index>=50)return fail(error,size,"Effect source bank index is invalid");

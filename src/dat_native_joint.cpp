@@ -1,10 +1,34 @@
 #include "dat_native_joint.hpp"
 #include <algorithm>
 #include <map>
+#include <cmath>
 
 namespace melee_web {
+namespace {
+struct NativeSpline {
+    MeleeWebNativeSplineDesc descriptor{};
+    std::vector<float> points,lengths,polynomials;
+    NativeSpline(const DatArchive& a,uint32_t offset){
+        auto require=[](bool c,const char* e){if(!c)throw DatError(e);};
+        auto record=[&](uint32_t p,size_t n){require(!(p&3),"Native spline record is unaligned");(void)a.range(p,n);require(n<=a.next_target_offset(p)-p,"Native spline record crosses referenced region");};
+        auto pointer=[&](uint32_t slot,size_t n){auto p=a.pointer(slot,n);require(p.has_value(),"Native spline required payload missing");record(*p,n);return *p;};
+        auto scalar=[&](uint32_t p){float f=a.f32(p);require(std::isfinite(f),"Native spline scalar is nonfinite");return f;};
+        record(offset,24);auto& d=descriptor;d.source_offset=offset;d.type=a.range(offset,1)[0];d.control_count=a.be16(offset+2);
+        require(d.type<=3&&d.control_count>=2&&d.control_count<=4096,"Native spline type/control count invalid");
+        d.point_count=d.type==1?3*(d.control_count-1)+1:d.type>=2?d.control_count+2:d.control_count;
+        d.tension=scalar(offset+4);d.total_length=scalar(offset+12);require(d.total_length>0,"Native spline length is not positive");
+        uint32_t p=pointer(offset+8,d.point_count*12);points.resize(d.point_count*3);for(size_t i=0;i<points.size();i++)points[i]=scalar(p+4*i);
+        p=pointer(offset+16,d.control_count*4);lengths.resize(d.control_count);for(size_t i=0;i<lengths.size();i++){lengths[i]=scalar(p+4*i);require(lengths[i]>=0&&lengths[i]<=1&&(!i||lengths[i]>lengths[i-1]),"Native spline arc boundaries are not strictly ordered");}
+        require(lengths.front()==0&&lengths.back()==1,"Native spline arc endpoints invalid");
+        if(auto poly=a.pointer(offset+20,(d.control_count-1)*20)){record(*poly,(d.control_count-1)*20);polynomials.resize((d.control_count-1)*5);for(size_t i=0;i<polynomials.size();i++)polynomials[i]=scalar(*poly+4*i);}
+        else require(d.type==0,"Native nonlinear spline requires arc polynomials");
+        d.points=points.data();d.segment_lengths=lengths.data();d.segment_polynomials=polynomials.empty()?nullptr:polynomials.data();
+    }
+};
+}
 struct DatNativeJoint::Storage {
     RigidModel model;
+    std::map<uint32_t,std::unique_ptr<NativeSpline>> splines;
     MeleeWebNativeGraph graph{};
     std::vector<MeleeWebNativeJointDesc> joints;
     std::vector<MeleeWebNativeDObjDesc> dobjs;
@@ -26,6 +50,7 @@ DatNativeJoint::DatNativeJoint(std::shared_ptr<const DatArchive> archive, uint32
     // Shared DObj/PObj descriptors remain shared descriptor identities; original
     // loading still allocates their separate runtime occurrences as usual.
     for (const auto& j : s.model.joints) {
+        if(j.flags&0x4000U)continue;
         for (auto d = a.pointer(j.descriptor_offset + 16, 16); d; d = a.pointer(*d + 4, 16))
             if (!dobj_ids.contains(*d)) dobj_ids.emplace(*d, uint32_t(dobj_ids.size()));
     }
@@ -56,7 +81,12 @@ DatNativeJoint::DatNativeJoint(std::shared_ptr<const DatArchive> archive, uint32
         out.source_offset = j.descriptor_offset; out.flags = j.flags;
         out.child = index(joint_ids, j.descriptor_offset + 8);
         out.next = index(joint_ids, j.descriptor_offset + 12);
-        out.dobj = index(dobj_ids, j.descriptor_offset + 16);
+        out.dobj = UINT32_MAX;
+        if(j.flags&0x4000U){
+            auto p=a.pointer(j.descriptor_offset+16,24);if(!p)throw DatError("Native spline joint payload missing");
+            if(!s.splines.contains(*p))s.splines[*p]=std::make_unique<NativeSpline>(a,*p);
+            out.spline=&s.splines.at(*p)->descriptor;
+        }else out.dobj = index(dobj_ids, j.descriptor_offset + 16);
         std::copy(j.rotation.begin(), j.rotation.end(), out.rotation);
         std::copy(j.scale.begin(), j.scale.end(), out.scale);
         std::copy(j.translation.begin(), j.translation.end(), out.translation);

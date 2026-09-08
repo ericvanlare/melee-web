@@ -8,6 +8,8 @@
 extern "C" {
 #include <sysdolphin/baselib/particle.h>
 #include <sysdolphin/baselib/jobj.h>
+#include <sysdolphin/baselib/aobj.h>
+#include <sysdolphin/baselib/spline.h>
 #include <sysdolphin/baselib/mobj.h>
 #include <sysdolphin/baselib/tobj.h>
 #include <melee/ef/types.h>
@@ -24,6 +26,8 @@ extern HSD_Particle* hsd_804D0908[16];
 #include <iterator>
 #include <stdexcept>
 #include <cstring>
+#include <cmath>
+#include <functional>
 using Bytes=std::vector<uint8_t>;
 static char error[256];
 static void check(bool ok,const char* why){if(!ok)throw std::runtime_error(std::string(why)+": "+error);}
@@ -92,6 +96,38 @@ static void effect_entries(std::shared_ptr<const melee_web::DatArchive> archive)
     }
     std::cout<<"Local Mario effects: two native models and animation graphs; original LoadSync/evaluation/restart passed\n";
 }
+static void common_entries(std::shared_ptr<const melee_web::DatArchive> archive){
+    melee_web::DatEffectEntries owner(archive,"effCommonDataTable",0,47,true);archive.reset();
+    check(owner.entry_count()==47,"all common source effect descriptors hydrated");
+    auto* entries=reinterpret_cast<EF_EffectDesc*>(static_cast<char*>(owner.table())+8);
+    for(unsigned pass=0;pass<2;pass++){
+        check(melee_web_gameplay_startup(8U*1024U*1024U,error,sizeof(error)),"common path world startup");
+        check(melee_web_native_world_enable(error,sizeof(error)),"common path descriptor ID context");
+        auto& d=entries[36].model_desc;
+        HSD_JObj* joint=HSD_JObjLoadJoint(d.joint);check(joint,"load original spline effect model");
+        HSD_JObjAddAnimAll(joint,d.animjoint,nullptr,nullptr);
+        HSD_JObj* path=nullptr;HSD_JObj* spline=nullptr;
+        std::function<void(HSD_JObj*)> visit=[&](HSD_JObj* j){for(;j;j=j->next){
+            if(j->flags&JOBJ_SPLINE)spline=j;
+            if(j->aobj&&j->aobj->hsd_obj)path=j;
+            visit(j->child);
+        }};visit(joint);
+        check(path&&spline&&path->aobj->hsd_obj==reinterpret_cast<HSD_Obj*>(spline),"original AObj resolves exact loaded spline identity");
+        const auto* curve=spline->u.spline;check(curve&&curve->numcv>1,"original runtime retains checked control points");
+        float positions[2][3];
+        for(unsigned endpoint=0;endpoint<2;endpoint++){
+            HSD_ObjData value{};value.fv=float(endpoint);JObjUpdateFunc(path,4,&value);
+            positions[endpoint][0]=HSD_JObjGetTranslationX(path);
+            positions[endpoint][1]=HSD_JObjGetTranslationY(path);
+            positions[endpoint][2]=HSD_JObjGetTranslationZ(path);
+            for(float x:positions[endpoint])check(std::isfinite(x),"original PATH output finite");
+        }
+        check(std::memcmp(positions[0],positions[1],sizeof(positions[0]))!=0,"original PATH moves along actual spline");
+        HSD_JObjRemoveAll(joint);
+        check(melee_web_gameplay_shutdown(error,sizeof(error)),"common path world teardown");
+    }
+    std::cout<<"Common47 descriptors and original PATH reference/evaluation/restart passed\n";
+}
 int main(int argc,char** argv){
     try{
         registration(std::make_shared<melee_web::DatArchive>(fixture()),"r",false);
@@ -109,7 +145,11 @@ int main(int argc,char** argv){
             catch(const melee_web::DatError&){rejected=true;}
             check(rejected,"malformed particle bank rejected before publication");
         }
-        if(argc==2){
+        if(argc==3&&std::strcmp(argv[1],"--common")==0){
+            std::ifstream file(argv[2],std::ios::binary);check(bool(file),"open owned common effect archive");
+            Bytes bytes((std::istreambuf_iterator<char>(file)),{});
+            common_entries(std::make_shared<melee_web::DatArchive>(bytes));
+        }else if(argc==2){
             std::ifstream file(argv[1],std::ios::binary);check(bool(file),"open optional effect archive");
             Bytes bytes((std::istreambuf_iterator<char>(file)),{});
             registration(std::make_shared<melee_web::DatArchive>(bytes),"effMarioDataTable",true);

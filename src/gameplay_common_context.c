@@ -1,6 +1,7 @@
 #include "gameplay_common_context.h"
 #include "gameplay_bootstrap.h"
 #include <melee/ft/fighter.h>
+#include <melee/lb/types.h>
 #include <melee/ft/ft_0C8C.h>
 #include <melee/ft/ftCo_800C7CA0.h>
 #include <melee/gr/types.h>
@@ -112,6 +113,31 @@ MeleeWebCommonContext* melee_web_common_context_create(const MeleeWebCommonScala
     success(error,size);return h;
 oom:
     fail(error,size,"Cannot copy common root20 payload storage");release(h);return NULL;
+}
+int melee_web_common_context_set_color_tables(MeleeWebCommonContext* h,const MeleeWebColorRow* common,const MeleeWebColorRow* extra,char* error,size_t size)
+{
+    if(!h||h->attached||h->initialized||!common||!extra)return fail(error,size,"Color tables require an unpublished common owner");
+    struct Fighter_804D653C_t rows[123];
+    const MeleeWebColorRow* inputs[2]={common,extra};
+    for(unsigned table=0;table<2;table++){
+        unsigned count=table?6:123;
+        memset(rows,0,sizeof(rows));
+        for(unsigned i=0;i<count;i++){
+            rows[i].unk=inputs[table][i].program;rows[i].unk4=inputs[table][i].priority;rows[i].unk5=inputs[table][i].layer;
+        }
+        h->roots[6+table]=copy_payload(h,rows,count*sizeof(rows[0]));
+        if(!h->roots[6+table])return fail(error,size,"Cannot own native common color rows");
+    }
+    h->ready_mask|=(1u<<6)|(1u<<7);
+    return success(error,size);
+}
+int melee_web_common_context_set_respawn(MeleeWebCommonContext* h,void* joint,void* animation,char* error,size_t size)
+{
+    if(!h||h->attached||h->initialized||!joint||!animation)return fail(error,size,"Respawn descriptors require an unpublished common owner");
+    void* entries[2]={joint,animation};
+    h->roots[8]=copy_payload(h,entries,sizeof(entries));
+    if(!h->roots[8])return fail(error,size,"Cannot own respawn descriptor table");
+    h->ready_mask|=1u<<8;return success(error,size);
 }
 static void removed(void* data) { ((CommonObject*)data)->owner=NULL; }
 static void captured(void* data,void* root)

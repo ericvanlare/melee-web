@@ -104,3 +104,5 @@ int melee_web_stage_numeric_end(MeleeWebStageNumeric* h,char* e,size_t n){
     if(!h)return 1;if(active!=h)return fail(e,n,"Stage numeric scope is not active");
     stage_info=h->saved;active=NULL;if(h->owner)HSD_GObjPLink_80390228(h->owner);free(h);if(e&&n)*e=0;return 1;
 }
+
+void* melee_web_stage_markers_descriptor(MeleeWebStageMarkers* m){return m?m->root:NULL;}

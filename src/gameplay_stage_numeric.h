@@ -9,6 +9,8 @@ typedef struct MeleeWebStageNumeric MeleeWebStageNumeric;
 /* Strict Final Destination marker-only tree. The reader arena must outlive the
  * context and its original HSD objects. No rendering/stage on_init is invoked. */
 MeleeWebStageMarkers* melee_web_stage_markers_decode(const MeleeWebNativeDat*,uint32_t map_head);
+/* Borrowed original HSD_Joint descriptor for a complete native map owner. */
+void* melee_web_stage_markers_descriptor(MeleeWebStageMarkers*);
 /* Requires the decoded GroundParam already published. Retains a full StageInfo
  * snapshot: close before removing any pre-existing stage resource owners. */
 MeleeWebStageNumeric* melee_web_stage_numeric_begin(MeleeWebStageMarkers*,char*,size_t);

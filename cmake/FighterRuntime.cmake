@@ -17,7 +17,15 @@ foreach(path IN LISTS native_paths)
   list(APPEND fighter_paths "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/${relative}")
 endforeach()
 add_library(fighter_source_runtime STATIC EXCLUDE_FROM_ALL ${fighter_paths}
-  src/gameplay_sdk.c src/gameplay_action_store.c src/gameplay_bonus_data.c
+  src/gameplay_item_runtime.c src/dat_item_commands.c src/gameplay_render.c src/gameplay_color_commands.c src/gameplay_match_rules.c src/gameplay_stage_visual.c src/gameplay_stage_map.c src/gameplay_stage_last.c src/gameplay_effect_runtime.c
+  src/gameplay_audio.c src/gameplay_audio_stream.c src/gameplay_io.cpp src/gameplay_audio_resample.c src/gameplay_audio_itd.c src/gameplay_audio_fx.c src/gameplay_audio_reverb.c
+  "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/axfx/axfx.c"
+  "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/axfx/reverb_std.c"
+  "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/axfx/delay.c"
+  "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/ax/AXAlloc.c"
+  "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/ax/AXVPB.c"
+  "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/ax/AXCL.c"
+  "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/ax/AXAux.c" src/gameplay_sdk.c src/gameplay_action_store.c src/gameplay_bonus_data.c
   src/gameplay_player_context.c src/gameplay_fighter_assets.c src/gameplay_effect_banks.c src/gameplay_ground_data.c src/gameplay_archive_sections.c src/gameplay_platform.c src/gameplay_match_context.c src/gameplay_font_atlas.c src/gameplay_stage_numeric.c src/dat_item_registry.c
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/particle.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/generator.c"
@@ -41,22 +49,35 @@ add_library(fighter_source_runtime STATIC EXCLUDE_FROM_ALL ${fighter_paths}
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/hsd_393C.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/psappsrt.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/psdisptev.c"
+  "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/psdisp.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/MSL/float.c")
 target_include_directories(fighter_source_runtime PUBLIC src "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}"
   PRIVATE .deps/aurora/include .deps/melee/extern/dolphin/include)
 target_compile_definitions(fighter_source_runtime PUBLIC TARGET_PC)
+set_source_files_properties(src/gameplay_platform.c PROPERTIES COMPILE_DEFINITIONS "MELEE_WEB_AUDIO;MELEE_WEB_AUDIO_STREAM")
+set_source_files_properties(src/gameplay_audio.c PROPERTIES COMPILE_DEFINITIONS "MELEE_WEB_AUDIO_FX;MELEE_WEB_AUDIO_STREAM")
+set_source_files_properties(
+  "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/axfx/axfx.c"
+  "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/axfx/reverb_std.c"
+  "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/axfx/delay.c"
+  PROPERTIES COMPILE_OPTIONS "-include;string.h;-include;math.h")
+set_source_files_properties("${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/ax/AXCL.c" PROPERTIES COMPILE_OPTIONS "-include;string.h")
 target_compile_options(fighter_source_runtime PRIVATE -ffunction-sections -fdata-sections -ffp-contract=off
   -include "${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h")
 target_link_libraries(fighter_source_runtime PUBLIC hsd_native_runtime aurora::pad)
-add_executable(fighter_runtime_probe EXCLUDE_FROM_ALL tests/fighter_runtime_probe.c tests/fighter_runtime_probe.cpp tests/gameplay_match_context_trace.c
-  src/dat_archive.cpp src/dat_common.cpp src/dat_native_joint.cpp src/rigid_model.cpp
+add_library(fighter_asset_runtime STATIC EXCLUDE_FROM_ALL
+  src/gameplay_audio_bank.cpp src/gameplay_audio_stream_asset.cpp src/dat_audio_stream.cpp src/dat_audio.cpp src/dat_audio_programs.cpp
+  src/dat_item_article.cpp src/gameplay_world.cpp src/dat_color_animation.cpp src/dat_native_stage.cpp src/dat_archive.cpp src/dat_common.cpp src/dat_native_joint.cpp src/rigid_model.cpp
   src/dat_texture.cpp src/dat_material.cpp src/dat_material_animation.cpp
   src/native_dat.cpp src/gameplay_fighter_assets.cpp src/gameplay_action_store.cpp
   src/dat_commands.cpp src/dat_fighter_runtime.cpp src/dat_fighter.cpp
   src/dat_animation.cpp src/fighter_binding.cpp src/dat_lights.cpp src/dat_collision.cpp src/dat_stage.cpp
   src/dat_item_registry.cpp src/dat_item_registry_native.cpp
   src/dat_effect_banks.cpp src/dat_effect_entries.cpp src/dat_native_animation.cpp)
-target_link_libraries(fighter_runtime_probe PRIVATE fighter_source_runtime)
+target_link_libraries(fighter_asset_runtime PUBLIC fighter_source_runtime)
+target_compile_options(fighter_asset_runtime PRIVATE -ffp-contract=off)
+add_executable(fighter_runtime_probe EXCLUDE_FROM_ALL tests/fighter_runtime_probe.c tests/fighter_runtime_probe.cpp tests/gameplay_match_context_trace.c tests/gameplay_action_trace.c)
+target_link_libraries(fighter_runtime_probe PRIVATE fighter_asset_runtime)
 target_compile_options(fighter_runtime_probe PRIVATE
   "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
 target_link_options(fighter_runtime_probe PRIVATE -sENVIRONMENT=node -sNODERAWFS=1 -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2
@@ -81,3 +102,105 @@ foreach(trace bonus_data stage_numeric)
     -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
   set_target_properties(gameplay_${trace}_trace PROPERTIES SUFFIX ".js")
 endforeach()
+
+add_executable(gameplay_browser EXCLUDE_FROM_ALL src/gameplay_browser.cpp src/browser_input.cpp)
+target_link_libraries(gameplay_browser PRIVATE fighter_asset_runtime aurora::main)
+target_compile_options(gameplay_browser PRIVATE -ffp-contract=off)
+target_link_options(gameplay_browser PRIVATE -sENVIRONMENT=web -sALLOW_MEMORY_GROWTH=1
+  -sINITIAL_MEMORY=134217728 -sSTACK_SIZE=8388608 -sEXIT_RUNTIME=0
+  -sEXPORTED_RUNTIME_METHODS=HEAPU8,UTF8ToString
+  -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_melee_web_game_file,_melee_web_game_launch,_melee_web_game_unload,_melee_web_game_pause,_melee_web_game_message,_melee_web_game_stats,_melee_web_game_running,_melee_web_game_combat_check,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_message)
+set_target_properties(gameplay_browser PROPERTIES SUFFIX ".js")
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+  target_link_options(gameplay_browser PRIVATE -sASSERTIONS=0 -sSAFE_HEAP=0)
+  set(MELEE_WEB_BUILD_LABEL "Release")
+else()
+  target_link_options(gameplay_browser PRIVATE -sASSERTIONS=2 -sSAFE_HEAP=1)
+  set(MELEE_WEB_BUILD_LABEL "checked RelWithDebInfo")
+endif()
+configure_file(web/runtime.html runtime.html @ONLY)
+configure_file(web/audio-ring.mjs audio-ring.mjs COPYONLY)
+configure_file(web/audio-worklet.js audio-worklet.js COPYONLY)
+
+add_executable(gameplay_audio_trace EXCLUDE_FROM_ALL tests/gameplay_audio_trace.cpp)
+target_link_libraries(gameplay_audio_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_audio_trace PRIVATE -UNDEBUG)
+target_link_options(gameplay_audio_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_audio_trace PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_audio_fx_trace EXCLUDE_FROM_ALL tests/gameplay_audio_fx_trace.cpp)
+target_link_libraries(gameplay_audio_fx_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_audio_fx_trace PRIVATE -UNDEBUG)
+target_link_options(gameplay_audio_fx_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_audio_fx_trace PROPERTIES SUFFIX ".js")
+
+add_executable(dat_native_stage_map_trace EXCLUDE_FROM_ALL
+  tests/dat_native_stage_map_trace.cpp tests/dat_native_stage_map_trace.c)
+target_link_libraries(dat_native_stage_map_trace PRIVATE fighter_asset_runtime)
+target_compile_options(dat_native_stage_map_trace PRIVATE -UNDEBUG)
+target_link_options(dat_native_stage_map_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+set_target_properties(dat_native_stage_map_trace PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_audio_stream_trace EXCLUDE_FROM_ALL tests/gameplay_audio_stream_trace.cpp)
+target_link_libraries(gameplay_audio_stream_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_audio_stream_trace PRIVATE -UNDEBUG)
+target_link_options(gameplay_audio_stream_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_audio_stream_trace PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_stage_last_trace EXCLUDE_FROM_ALL tests/gameplay_stage_last_trace.cpp tests/gameplay_stage_last_trace.c)
+target_link_libraries(gameplay_stage_last_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_stage_last_trace PRIVATE -UNDEBUG)
+target_link_options(gameplay_stage_last_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_stage_last_trace PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_stock_trace EXCLUDE_FROM_ALL tests/gameplay_stock_trace.cpp)
+target_link_libraries(gameplay_stock_trace PRIVATE fighter_asset_runtime)
+target_link_options(gameplay_stock_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_stock_trace PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_edge_trace EXCLUDE_FROM_ALL tests/gameplay_edge_trace.cpp tests/gameplay_edge_state.c)
+target_link_libraries(gameplay_edge_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_edge_trace PRIVATE
+  "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
+target_link_options(gameplay_edge_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_edge_trace PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_article_trace EXCLUDE_FROM_ALL
+  tests/gameplay_article_trace.cpp tests/gameplay_article_item_state.c)
+target_link_libraries(gameplay_article_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_article_trace PRIVATE
+  "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
+target_link_options(gameplay_article_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_article_trace PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_specials_trace EXCLUDE_FROM_ALL
+  tests/gameplay_specials_trace.cpp tests/gameplay_article_item_state.c)
+target_link_libraries(gameplay_specials_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_specials_trace PRIVATE
+  "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
+target_link_options(gameplay_specials_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_specials_trace PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_player_context_trace EXCLUDE_FROM_ALL tests/gameplay_player_context_trace.c)
+target_link_libraries(gameplay_player_context_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_player_context_trace PRIVATE -include "${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h")
+target_link_options(gameplay_player_context_trace PRIVATE -sENVIRONMENT=node -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_player_context_trace PROPERTIES SUFFIX ".js")
+
+# Emits original source state for comparison with read-only retail traces.
+add_executable(gameplay_trajectory_trace EXCLUDE_FROM_ALL tests/gameplay_trajectory_trace.cpp tests/gameplay_trajectory_trace.c)
+target_link_libraries(gameplay_trajectory_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_trajectory_trace PRIVATE
+  "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
+target_link_options(gameplay_trajectory_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_trajectory_trace PROPERTIES SUFFIX ".js")

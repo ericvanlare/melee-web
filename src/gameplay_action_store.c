@@ -66,6 +66,32 @@ void melee_web_action_load(Fighter* destination, Fighter* source, int motion, un
     }
     fprintf(stderr, "Owned action load failed: %s\n", error); abort();
 }
+struct NativeCommandAllocation {
+    union CmdUnion* native;
+    uint32_t* canonical;
+    size_t count;
+    struct NativeCommandAllocation* next;
+};
+static struct NativeCommandAllocation* command_allocations;
+int melee_web_command_original_word_checked(const void* command,uint32_t* word)
+{
+    if(!command||!word)return 0;
+    const uintptr_t address=(uintptr_t)command;
+    for(struct NativeCommandAllocation* p=command_allocations;p;p=p->next){
+        const uintptr_t begin=(uintptr_t)p->native;
+        if(address>=begin&&address-begin<p->count*sizeof(*p->native)&&
+           (address-begin)%sizeof(*p->native)==0){
+            *word=p->canonical[(address-begin)/sizeof(*p->native)];return 1;
+        }
+    }
+    return 0;
+}
+uint32_t melee_web_command_original_word(const void* command)
+{
+    uint32_t word;
+    if(melee_web_command_original_word_checked(command,&word))return word;
+    fprintf(stderr,"Original command word lookup is outside a live native command allocation\n");abort();
+}
 static int signed_bits(uint32_t v, unsigned bits)
 { const uint32_t sign = 1U << (bits - 1); return (int)(v ^ sign) - (int)sign; }
 void* melee_web_commands_create(const MeleeWebCommandWord* words, size_t count)
@@ -76,12 +102,78 @@ void* melee_web_commands_create(const MeleeWebCommandWord* words, size_t count)
     for (size_t i = 0; i < count; ++i) {
         uint32_t word = words[i].word, op = word >> 26;
         switch (op) {
-        case 0: case 1: case 2: case 6: case 8:
+        case 0: case 1: case 2: case 3: case 4: case 6: case 8:
             result[i].Command_00.code = op; result[i].Command_00.value = word & 0x3ffffff; break;
         case 5: case 7:
             if (i + 1 >= count || words[i].target >= count) goto fail;
             result[i].Command_00.code = op;
             result[i + 1].Command_05.ptr = &result[words[i].target]; ++i; break;
+        case 20:
+            result[i].set_throw_flags = (struct set_throw_flags){op,word & 0x3ffffff}; break;
+        case 25: case 26: case 27:
+            result[i].set_airborne_state = (struct set_airborne_state){op,word & 0x3ffffff}; break;
+        case 28:
+            result[i].set_hurt_state = (struct set_hurt_state){op,(word >> 18) & 255,word & 0x3ffff}; break;
+        case 34:
+            if(i+2>=count || ((word >> 23) & 7)>=2)goto fail;
+            result[i].set_throw_hitbox_0 = (struct set_throw_hitbox_0){op,(word >> 23) & 7,word & 0x7fffff};
+            uint32_t throw1=words[i+1].word,throw2=words[i+2].word;
+            result[i+1].set_throw_hitbox_1 = (struct set_throw_hitbox_1){throw1 >> 23,(throw1 >> 14) & 511,(throw1 >> 5) & 511};
+            result[i+2].set_throw_hitbox_2 = (struct set_throw_hitbox_2){throw2 >> 23,(throw2 >> 19) & 15,(throw2 >> 16) & 7,(throw2 >> 12) & 15};
+            i+=2;break;
+        case 35:
+            result[i].unk27 = (struct unk27){op,word & 0x3ffffff};break;
+        case 56:
+            if(i+1>=count)goto fail;
+            result[i].smash_charge_0 = (struct smash_charge_0){op,(word >> 16) & 1023,word & 65535};
+            result[i+1].smash_charge_1 = (struct smash_charge_1){words[i+1].word >> 24,words[i+1].word & 0xffffff};
+            ++i;break;
+        case 11:
+            if (i + 5 >= count || ((word >> 23) & 7) >= 4) goto fail;
+            result[i].create_hitbox_0 = (struct spawn_hitbox_0){op, (word >> 23) & 7,
+                (word >> 20) & 7, (word >> 19) & 1, (word >> 11) & 255,
+                (word >> 10) & 1, word & 1023};
+            result[i+1].create_hitbox_1 = (struct spawn_hitbox_1){words[i+1].word >> 16, signed_bits(words[i+1].word & 65535,16)};
+            result[i+2].create_hitbox_2 = (struct spawn_hitbox_2){signed_bits(words[i+2].word >> 16,16), signed_bits(words[i+2].word & 65535,16)};
+            uint32_t hit3=words[i+3].word,hit4=words[i+4].word;
+            result[i+3].create_hitbox_3 = (struct spawn_hitbox_3){hit3 >> 23,
+                (hit3 >> 14) & 511, (hit3 >> 5) & 511, (hit3 >> 4) & 1,
+                (hit3 >> 3) & 1, (hit3 >> 2) & 1, (hit3 >> 1) & 1, hit3 & 1};
+            result[i+4].create_hitbox_4 = (struct spawn_hitbox_4){hit4 >> 23,
+                (hit4 >> 18) & 31, signed_bits((hit4 >> 10) & 255,8),
+                (hit4 >> 7) & 7, (hit4 >> 2) & 31, (hit4 >> 1) & 1, hit4 & 1};
+            i += 4; break;
+        case 13:
+            if (((word >> 23) & 7) >= 4) goto fail;
+            result[i].set_hitbox_scale = (struct set_hitbox_scale){op, (word >> 23) & 7, word & 0x7fffff}; break;
+        case 16: case 18: case 23: case 24:
+            result[i].Command_00 = (struct Command_00){op,word & 0x3ffffff}; break;
+        case 29:
+            result[i].set_jab_combo = (struct set_jab_combo){op,word & 0x3ffffff}; break;
+        case 10:
+            if (i + 4 >= count) goto fail;
+            result[i].spawn_gfx_0 = (struct spawn_gfx_0){op, (word >> 18) & 255,
+                (word >> 17) & 1, (word >> 16) & 1, (word >> 15) & 1, word & 32767};
+            result[i+1].spawn_gfx_1 = (struct spawn_gfx_1){words[i+1].word >> 16, words[i+1].word & 65535};
+            result[i+2].spawn_gfx_2 = (struct spawn_gfx_2){signed_bits(words[i+2].word >> 16,16), signed_bits(words[i+2].word & 65535,16)};
+            result[i+3].spawn_gfx_3 = (struct spawn_gfx_3){signed_bits(words[i+3].word >> 16,16), words[i+3].word & 65535};
+            result[i+4].spawn_gfx_4 = (struct spawn_gfx_4){words[i+4].word >> 16, words[i+4].word & 65535};
+            i += 4; break;
+        case 17: case 54: case 55:
+            if (i + 2 >= count) goto fail;
+            if (op == 54) result[i].footstep_fx_0 = (struct footstep_fx_0){op,
+                (word >> 18) & 255, (word >> 17) & 1, (word >> 16) & 1, (word >> 8) & 255, word & 255};
+            else result[i].sound_effect_0 = (struct sound_effect_0){op, (word >> 18) & 255, word & 0x3ffff};
+            result[i+1].sound_effect_1.sfx_id = words[i+1].word;
+            result[i+2].sound_effect_2 = (struct sound_effect_2){words[i+2].word >> 16,
+                (words[i+2].word >> 8) & 255, words[i+2].word & 255};
+            i += 2; break;
+        case 19:
+            result[i].set_cmd_var = (struct set_cmd_var){op, (word >> 24) & 3, word & 0xffffff}; break;
+        case 43:
+            result[i].unk10 = (struct unk10){op, (word >> 25) & 1, (word >> 13) & 4095, word & 8191}; break;
+        case 46:
+            result[i].unk13 = (struct unk13){op, (word >> 18) & 255, word & 0x3ffff}; break;
         case 40:
             result[i].set_tex_anim.opcode = op;
             result[i].set_tex_anim.b = (word >> 25) & 1;
@@ -93,10 +185,25 @@ void* melee_web_commands_create(const MeleeWebCommandWord* words, size_t count)
         default: goto fail;
         }
     }
+    struct NativeCommandAllocation* allocation=calloc(1,sizeof(*allocation));
+    if(!allocation)goto fail;
+    allocation->canonical=malloc(count*sizeof(*allocation->canonical));
+    if(!allocation->canonical){free(allocation);goto fail;}
+    for(size_t i=0;i<count;i++)allocation->canonical[i]=words[i].word;
+    allocation->native=result;allocation->count=count;allocation->next=command_allocations;
+    command_allocations=allocation;
     return result;
 fail: free(result); return NULL;
 }
-void melee_web_commands_destroy(void* p) { free(p); }
+void melee_web_commands_destroy(void* native)
+{
+    if(!native)return;
+    struct NativeCommandAllocation** link=&command_allocations;
+    while(*link&&(*link)->native!=native)link=&(*link)->next;
+    if(!*link){fprintf(stderr,"Native command allocation is not owned\n");abort();}
+    struct NativeCommandAllocation* p=*link;*link=p->next;
+    free(p->canonical);free(p->native);free(p);
+}
 void* melee_web_commands_at(void* p, size_t i) { return &((union CmdUnion*)p)[i]; }
 void* melee_web_commands_unsupported(void)
 { static union CmdUnion unsupported; unsupported.Command_00.code = 63; return &unsupported; }
@@ -132,7 +239,7 @@ void* melee_web_action_waits(MeleeWebNativeActionRows* p) { return p->waits; }
 void melee_web_command_require_supported(uint32_t opcode)
 {
     switch (opcode) {
-    case 0: case 1: case 2: case 5: case 6: case 7: case 8: case 40: case 52: return;
+    case 0: case 1: case 2: case 3: case 4: case 5: case 6: case 7: case 8: case 10: case 11: case 13: case 16: case 17: case 18: case 19: case 20: case 23: case 24: case 25: case 26: case 27: case 28: case 29: case 34: case 35: case 40: case 43: case 46: case 52: case 54: case 55: case 56: return;
     default: fprintf(stderr, "Unsupported native fighter command opcode %u\n", opcode); abort();
     }
 }

@@ -53,7 +53,13 @@ MeleeWebEffectBank* melee_web_effect_bank_decode(const MeleeWebNativeDat* d,uint
 {
     REQUIRE(bank<65,"Particle bank index exceeds original capacity");
     const uint32_t cb=d->pointer(d->context,table,8),tb=d->pointer(d->context,table+4,4);
-    REQUIRE(cb!=UINT32_MAX&&tb!=UINT32_MAX,"Particle banks are absent from effect table");
+    return melee_web_effect_bank_decode_roots(d,cb,tb,command_bytes,texture_bytes,bank);
+}
+MeleeWebEffectBank* melee_web_effect_bank_decode_roots(const MeleeWebNativeDat* d,uint32_t cb,uint32_t tb,
+    uint32_t command_bytes,uint32_t texture_bytes,uint32_t bank)
+{
+    REQUIRE(bank<65,"Particle bank index exceeds original capacity");
+    REQUIRE(cb!=UINT32_MAX&&tb!=UINT32_MAX,"Particle banks are absent");
     REQUIRE(command_bytes>=8&&texture_bytes>=4&&command_bytes<=8U*1024U*1024U&&texture_bytes<=16U*1024U*1024U,
             "Particle bank byte bounds are invalid");
     d->region(d->context,cb,command_bytes);d->region(d->context,tb,texture_bytes);

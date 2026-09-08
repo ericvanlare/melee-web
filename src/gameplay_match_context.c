@@ -1,4 +1,5 @@
 #include "gameplay_match_context.h"
+#include "gameplay_match_rules.h"
 #include "gameplay_bootstrap.h"
 #include <melee/cm/camera.h>
 #include <melee/cm/types.h>
@@ -7,6 +8,7 @@
 #include <sysdolphin/baselib/mobj.h>
 #include <sysdolphin/baselib/aobj.h>
 #include <melee/pl/player.h>
+#include <melee/it/item.h>
 #include <melee/mp/mpcoll.h>
 #include <melee/pl/plattack.h>
 #include <melee/pl/plstale.h>
@@ -16,6 +18,7 @@
 #include <sysdolphin/baselib/memory.h>
 #include <sysdolphin/baselib/random.h>
 #include <sysdolphin/baselib/shadow.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -24,16 +27,21 @@ extern void* melee_web_camera_state(void);
 extern CmSubject *cm_804D6458, *cm_804D645C, *cm_804D6460;
 extern HSD_CObj* cm_804D6464;
 extern u16 staleAttackInstance, unk_804D6480;
+extern PadLibData default_libinfo_data;
+extern HSD_PadStatus default_status_data;
 struct MeleeWebMatchContext {
-    MeleeWebPlayerContext* player;
+    MeleeWebPlayerContext* players[MELEE_WEB_MATCH_MAX_PLAYERS];
+    uint32_t player_count, slots[MELEE_WEB_MATCH_MAX_PLAYERS], controllers[MELEE_WEB_MATCH_MAX_PLAYERS];
     MeleeWebCollision* collision;
     uint64_t generation, ticks;
-    uint32_t slot, camera_count, seed;
+    uint32_t camera_count, seed;
     u32* saved_seed;
     u16 saved_stale, saved_attack;
     Camera saved_camera;
     CameraDebugMode saved_debug;
-    HSD_PadStatus saved_pads[4];
+    HSD_PadStatus saved_pads[4], saved_master[4], saved_copy[4];
+    PadLibData saved_pad_library;
+    HSD_PadData input_queue;
     CmSubject* pool;
 };
 static MeleeWebMatchContext* owner;
@@ -52,10 +60,22 @@ static int live(MeleeWebMatchContext* h,char* e,size_t n)
 MeleeWebMatchContext* melee_web_match_begin(const MeleeWebMatchSettings* s,
     MeleeWebCollision* collision,char* e,size_t n)
 {
+    if(!s){fail(e,n,"Match settings are required");return NULL;}
+    return melee_web_match_begin_players(&s->player,1,s->camera_subjects,s->random_seed,collision,e,n);
+}
+MeleeWebMatchContext* melee_web_match_begin_players(const MeleeWebPlayerSettings* players,
+    uint32_t count,uint32_t camera_subjects,uint32_t seed,MeleeWebCollision* collision,char* e,size_t n)
+{
     uint64_t generation=melee_web_gameplay_stats().generation;
     MeleeWebCollisionReadiness r;
-    if(!s||!generation||owner||s->camera_subjects<1||s->camera_subjects>70||s->player.slot>=4){
+    if(!players||!generation||owner||count<1||count>MELEE_WEB_MATCH_MAX_PLAYERS||camera_subjects<count||camera_subjects>70){
         fail(e,n,"Match needs an unowned world, player slot 0..3 and 1..70 camera subjects");return NULL;
+    }
+    for(uint32_t i=0;i<count;i++){
+        if(players[i].slot>=4||players[i].controller>=4){fail(e,n,"Match player slot/controller must be 0..3");return NULL;}
+        for(uint32_t j=0;j<i;j++)if(players[i].slot==players[j].slot||players[i].controller==players[j].controller){
+            fail(e,n,"Match players require distinct slots and controller ports");return NULL;
+        }
     }
     if(!melee_web_collision_readiness(collision,&r,e,n))return NULL;
     if(!r.storage_owned||!r.original_indices_initialized){fail(e,n,"Match requires original collision indices");return NULL;}
@@ -70,14 +90,37 @@ MeleeWebMatchContext* melee_web_match_begin(const MeleeWebMatchSettings* s,
        HSD_ShadowGetAllocData()->used){fail(e,n,"Source camera or shadow objects are already active");return NULL;}
     MeleeWebMatchContext* h=calloc(1,sizeof(*h));
     if(!h){fail(e,n,"Cannot allocate match context");return NULL;}
-    h->player=melee_web_player_context_begin(&s->player,e,n);
-    if(!h->player){free(h);return NULL;}
-    h->generation=generation;h->collision=collision;h->slot=s->player.slot;
-    h->camera_count=s->camera_subjects;h->seed=s->random_seed;
+    for(uint32_t i=0;i<count;i++){
+        h->players[i]=melee_web_player_context_begin(&players[i],e,n);
+        if(!h->players[i]){
+            while(i)melee_web_player_context_end(h->players[--i],NULL,0);
+            free(h);return NULL;
+        }
+        h->slots[i]=players[i].slot;h->controllers[i]=players[i].controller;
+    }
+    h->player_count=count;h->generation=generation;h->collision=collision;
+    h->camera_count=camera_subjects;h->seed=seed;
     h->saved_camera=*camera;h->saved_debug=cm_80453004;
     h->saved_seed=seed_ptr;h->saved_stale=staleAttackInstance;h->saved_attack=unk_804D6480;
     memcpy(h->saved_pads,HSD_PadGameStatus,sizeof(h->saved_pads));
-    memset(HSD_PadGameStatus,0,sizeof(h->saved_pads));
+    memcpy(h->saved_master,HSD_PadMasterStatus,sizeof(h->saved_master));
+    memcpy(h->saved_copy,HSD_PadCopyStatus,sizeof(h->saved_copy));
+    h->saved_pad_library=HSD_PadLibData;
+    /* Exact processing configuration from source gmMain_8015FD24. Hardware
+     * PADInit/sampling/rumble remain separate browser/provider responsibilities;
+     * only the source queue and status-processing histories are owned here. */
+    HSD_PadLibData=default_libinfo_data;
+    HSD_PadLibData.rumble_info=h->saved_pad_library.rumble_info;
+    HSD_PadLibData.qnum=1;HSD_PadLibData.queue=&h->input_queue;
+    HSD_PadLibData.clamp_stickType=0;HSD_PadLibData.clamp_stickShift=1;
+    HSD_PadLibData.clamp_stickMax=80;HSD_PadLibData.clamp_stickMin=0;
+    HSD_PadLibData.scale_stick=80;
+    HSD_PadLibData.clamp_analogLRShift=1;HSD_PadLibData.clamp_analogLRMax=140;
+    HSD_PadLibData.clamp_analogLRMin=0;HSD_PadLibData.scale_analogLR=140;
+    for(unsigned i=0;i<4;i++){
+        HSD_PadMasterStatus[i]=default_status_data;HSD_PadCopyStatus[i]=default_status_data;
+        HSD_PadGameStatus[i]=default_status_data;
+    }
     seed_ptr=&h->seed;
     plStale_InitAttackInstance();plAttack_80037590();
     /* Source match reset; these are per-query collision callbacks and an unused
@@ -86,28 +129,82 @@ MeleeWebMatchContext* melee_web_match_begin(const MeleeWebMatchSettings* s,
     /* Keep the original allocator registered until bootstrap destroys its heap.
      * Reinitializing within a world would discard the retained free pool. */
     if(shadow_generation!=generation){HSD_ShadowInitAllocData();shadow_generation=generation;}
-    Camera_80028B9C(s->camera_subjects);h->pool=cm_804D645C;
+    Camera_80028B9C(camera_subjects);h->pool=cm_804D645C;
     owner=h;ok(e,n);return h;
 }
 int melee_web_match_create_fighter(MeleeWebMatchContext* h,char* e,size_t n)
 {
+    return melee_web_match_create_fighters(h,e,n);
+}
+int melee_web_match_create_fighters(MeleeWebMatchContext* h,char* e,size_t n)
+{
     if(!live(h,e,n))return 0;
-    StaticPlayer* p=Player_GetPtrForSlot(h->slot);
-    if(p->player_entity[0]||p->player_entity[1])return fail(e,n,"Match player already has a fighter");
-    Player_80031AD0(h->slot);
-    if(!p->player_entity[0])return fail(e,n,"Original player constructor produced no fighter");
+    for(uint32_t i=0;i<h->player_count;i++){
+        StaticPlayer* p=Player_GetPtrForSlot(h->slots[i]);
+        if(p->player_entity[0]||p->player_entity[1])return fail(e,n,"Match player already has a fighter");
+    }
+    for(uint32_t i=0;i<h->player_count;i++){
+        Player_80031AD0(h->slots[i]);
+        if(!Player_GetPtrForSlot(h->slots[i])->player_entity[0])return fail(e,n,"Original player constructor produced no fighter");
+        /* Fighter_Create disables input through ftLib_800867E8. Match spawn
+         * completion in gm_16AE calls this original player activation routine. */
+        Player_80031848(h->slots[i]);
+    }
+    melee_web_match_rules_refresh();
     return ok(e,n);
+}
+static int sample_valid(const MeleeWebControllerSample* s)
+{
+    return isfinite(s->stick_x)&&fabsf(s->stick_x)<=1&&isfinite(s->stick_y)&&fabsf(s->stick_y)<=1&&
+        isfinite(s->cstick_x)&&fabsf(s->cstick_x)<=1&&isfinite(s->cstick_y)&&fabsf(s->cstick_y)<=1&&
+        isfinite(s->trigger_l)&&s->trigger_l>=0&&s->trigger_l<=1&&
+        isfinite(s->trigger_r)&&s->trigger_r>=0&&s->trigger_r<=1;
+}
+int melee_web_match_step_raw(MeleeWebMatchContext* h,const PADStatus raw[4],char* e,size_t n)
+{
+    if(!live(h,e,n))return 0;
+    if(!raw)return fail(e,n,"Four raw controller samples are required");
+    if(HSD_PadLibData.queue!=&h->input_queue||HSD_PadLibData.qnum!=1||HSD_PadLibData.qcount)
+        return fail(e,n,"Owned source PAD queue changed or has an unconsumed sample");
+    for(uint32_t i=0;i<h->player_count;i++)if(!Player_GetPtrForSlot(h->slots[i])->player_entity[0])
+        return fail(e,n,"Create all source fighters before raw input stepping");
+    memset(&h->input_queue,0,sizeof(h->input_queue));
+    for(unsigned i=0;i<4;i++)h->input_queue.stat[i].err=-1;
+    for(uint32_t i=0;i<h->player_count;i++)h->input_queue.stat[h->slots[i]]=raw[h->controllers[i]];
+    HSD_PadLibData.qread=HSD_PadLibData.qwrite=0;HSD_PadLibData.qcount=1;
+    HSD_PadRenewMasterStatus();HSD_PadRenewCopyStatus();HSD_PadRenewGameStatus();
+    if(HSD_PadLibData.qcount)return fail(e,n,"Original controller processing did not consume raw sample");
+    if(!melee_web_gameplay_step(e,n))return 0;
+    h->ticks++;return ok(e,n);
+}
+int melee_web_match_step_inputs(MeleeWebMatchContext* h,const MeleeWebControllerSample samples[4],char* e,size_t n)
+{
+    if(!live(h,e,n))return 0;
+    if(!samples)return fail(e,n,"Four controller samples are required");
+    for(unsigned i=0;i<4;i++)if(!sample_valid(&samples[i]))return fail(e,n,"Controller axes/triggers must be finite and within normalized ranges");
+    for(uint32_t i=0;i<h->player_count;i++)if(!Player_GetPtrForSlot(h->slots[i])->player_entity[0])
+        return fail(e,n,"Create all source fighters before stepping");
+    for(uint32_t i=0;i<h->player_count;i++){
+        HSD_PadStatus* pad=&HSD_PadGameStatus[h->slots[i]];
+        const MeleeWebControllerSample* sample=&samples[h->controllers[i]];
+        u32 previous=pad->button;
+        memset(pad,0,sizeof(*pad));pad->button=sample->buttons;pad->last_button=previous;
+        pad->trigger=sample->buttons&~previous;pad->release=previous&~sample->buttons;
+        pad->nml_stickX=sample->stick_x;pad->nml_stickY=sample->stick_y;
+        pad->nml_subStickX=sample->cstick_x;pad->nml_subStickY=sample->cstick_y;
+        pad->nml_analogL=sample->trigger_l;pad->nml_analogR=sample->trigger_r;
+        /* Source Fighter consumers use normalized values; raw fields remain
+         * zero because this is an explicit post-normalization input boundary. */
+    }
+    if(!melee_web_gameplay_step(e,n))return 0;
+    h->ticks++;return ok(e,n);
 }
 int melee_web_match_step(MeleeWebMatchContext* h,uint32_t ticks,char* e,size_t n)
 {
     if(!live(h,e,n))return 0;
     if(ticks>36000)return fail(e,n,"Neutral scheduler request exceeds bounded 36000 ticks");
-    if(!Player_GetPtrForSlot(h->slot)->player_entity[0])return fail(e,n,"Create the source fighter before stepping");
-    for(uint32_t i=0;i<ticks;i++){
-        memset(HSD_PadGameStatus,0,sizeof(h->saved_pads));
-        if(!melee_web_gameplay_step(e,n))return 0;
-        h->ticks++;
-    }
+    const MeleeWebControllerSample neutral[4]={{0}};
+    for(uint32_t i=0;i<ticks;i++)if(!melee_web_match_step_inputs(h,neutral,e,n))return 0;
     return ok(e,n);
 }
 /* HSD_TObjAddAnim borrows imagetbl from the retained TexAnim descriptor and
@@ -178,17 +275,26 @@ static int eye_stats(Fighter* fp,MeleeWebMatchStats* out,char* e,size_t n)
 }
 int melee_web_match_stats(MeleeWebMatchContext* h,MeleeWebMatchStats* out,char* e,size_t n)
 {
+    return melee_web_match_player_stats(h,0,out,e,n);
+}
+int melee_web_match_player_stats(MeleeWebMatchContext* h,uint32_t index,MeleeWebMatchStats* out,char* e,size_t n)
+{
     if(!live(h,e,n))return 0;
-    if(!out)return fail(e,n,"Match stats output is required");
+    if(!out||index>=h->player_count)return fail(e,n,"Match stats output and owned player index are required");
     memset(out,0,sizeof(*out));out->ticks=h->ticks;out->random_seed=h->seed;
-    StaticPlayer* p=Player_GetPtrForSlot(h->slot);
+    StaticPlayer* p=Player_GetPtrForSlot(h->slots[index]);
     out->live_fighters=(p->player_entity[0]!=NULL)+(p->player_entity[1]!=NULL);
-    out->motion_id=-1;out->ground_or_air=-1;
+    out->motion_id=-1;out->ground_or_air=-1;out->player_slot=h->slots[index];
+    out->stocks=Player_GetStocks(h->slots[index]);
     if(p->player_entity[0]){
         Fighter* fp=p->player_entity[0]->user_data;
         out->motion_id=fp->motion_id;out->ground_or_air=fp->ground_or_air;
         memcpy(out->position,&fp->cur_pos,sizeof(out->position));out->animation_frame=fp->cur_anim_frame;
         out->extra_model_objects=fp->x203C.count;
+        out->damage_percent=fp->dmg.x1830_percent;out->shield_health=fp->shield_health;
+        out->source_stick[0]=fp->input.lstick[0].x;out->source_stick[1]=fp->input.lstick[0].y;
+        out->source_triggers=fp->input.triggers[0];out->held_buttons=fp->input.held_buttons[0];
+        out->pressed_buttons=fp->input.pressed_buttons;out->released_buttons=fp->input.released_buttons;
         if(!eye_stats(fp,out,e,n))return 0;
     }
     for(CmSubject* subject=cm_804D6460;subject;subject=subject->next){
@@ -200,18 +306,28 @@ int melee_web_match_end(MeleeWebMatchContext* h,char* e,size_t n)
 {
     if(!h)return ok(e,n);
     if(!live(h,e,n))return 0;
+    /* Items may retain their fighter owner during source destruction. */
+    while(((HSD_GObj**)HSD_GObj_Entities)[9])Item_8026A8EC(((HSD_GObj**)HSD_GObj_Entities)[9]);
     /* Dispose the scoped source object through its registered destructor, as
      * bootstrap world disposal does. Player_80031EBC is an in-match despawn:
      * it first creates effect 0x43f and enters Sleep, leaving an effect object. */
-    StaticPlayer* p=Player_GetPtrForSlot(h->slot);
-    if(p->player_entity[0])HSD_GObjPLink_80390228(p->player_entity[0]);
-    if(p->player_entity[1])HSD_GObjPLink_80390228(p->player_entity[1]);
+    for(uint32_t i=0;i<h->player_count;i++){
+        StaticPlayer* p=Player_GetPtrForSlot(h->slots[i]);
+        if(p->player_entity[0])HSD_GObjPLink_80390228(p->player_entity[0]);
+        if(p->player_entity[1])HSD_GObjPLink_80390228(p->player_entity[1]);
+    }
     if(cm_804D6460||cm_804D6468||HSD_ShadowGetAllocData()->used)
         return fail(e,n,"Unload remaining camera subjects and shadows before match restore");
-    if(!melee_web_player_context_end(h->player,e,n))return 0;
+    for(uint32_t i=0;i<h->player_count;i++){
+        if(!melee_web_player_context_end(h->players[i],e,n))return 0;
+        h->players[i]=NULL;
+    }
     HSD_Free(h->pool);cm_804D6458=NULL;cm_804D645C=NULL;
     *(Camera*)melee_web_camera_state()=h->saved_camera;cm_80453004=h->saved_debug;
     seed_ptr=h->saved_seed;staleAttackInstance=h->saved_stale;unk_804D6480=h->saved_attack;
     memcpy(HSD_PadGameStatus,h->saved_pads,sizeof(h->saved_pads));
+    memcpy(HSD_PadMasterStatus,h->saved_master,sizeof(h->saved_master));
+    memcpy(HSD_PadCopyStatus,h->saved_copy,sizeof(h->saved_copy));
+    HSD_PadLibData=h->saved_pad_library;
     owner=NULL;free(h);return ok(e,n);
 }

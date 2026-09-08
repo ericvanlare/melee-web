@@ -12,7 +12,7 @@ from gameplay_sources import prepare_sources
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def build(jobs, root=ROOT, target="all"):
+def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo"):
     lock = read_lock(root)
     verify_sources(root, lock)
     # Registry strings/counts are generated from the pinned source, not game
@@ -42,14 +42,15 @@ def build(jobs, root=ROOT, target="all"):
     env["EM_CONFIG"] = str(sdk / ".emscripten")
     env["EM_CACHE"] = str(emscripten / "cache")
     env["EMSDK_PYTHON"] = sys.executable
-    build_dir = root / "build/browser"
+    build_dir = root / ("build/browser-release" if configuration == "Release" else "build/browser")
     if (root / "build").is_symlink() or build_dir.is_symlink():
         raise ValueError("Build output must be a local directory, not a symlink")
     subprocess.run([str(emcmake), str(cmake), "-S", str(root), "-B", str(build_dir),
-                    "-G", "Ninja", "-DCMAKE_BUILD_TYPE=RelWithDebInfo",
+                    "-G", "Ninja", f"-DCMAKE_BUILD_TYPE={configuration}",
                     f"-DMELEE_WEB_GAMEPLAY_SOURCE_DIR={gameplay_source}",
                     f"-DCMAKE_MAKE_PROGRAM={ninja}"], cwd=root, env=env, check=True)
     targets = {"graphics": ["gx_probe"], "gameplay": ["gameplay_checks"],
+               "runtime": ["gameplay_browser"],
                "fighter": ["fighter_runtime_probe", "gameplay_effect_banks_trace",
                            "gameplay_bonus_data_trace", "gameplay_stage_numeric_trace"],
                "all": ["gx_probe", "gameplay_checks"]}[target]
@@ -60,12 +61,13 @@ def build(jobs, root=ROOT, target="all"):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--jobs", type=int, default=min(os.cpu_count() or 2, 6))
-    parser.add_argument("--target", choices=("graphics", "gameplay", "fighter", "all"), default="all")
+    parser.add_argument("--target", choices=("graphics", "gameplay", "fighter", "runtime", "all"), default="all")
+    parser.add_argument("--configuration", choices=("RelWithDebInfo", "Release"), default="RelWithDebInfo")
     args = parser.parse_args()
     if args.jobs < 1:
         parser.error("--jobs must be positive")
     try:
-        build(args.jobs, target=args.target)
+        build(args.jobs, target=args.target, configuration=args.configuration)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         raise SystemExit(f"build: {error}") from error
 
