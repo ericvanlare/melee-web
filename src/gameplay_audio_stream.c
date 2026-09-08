@@ -1,3 +1,4 @@
+#include "gameplay_audio_bank_transport.h"
 #include "gameplay_audio_stream.h"
 #include "gameplay_io.h"
 #include <dolphin/ax.h>
@@ -58,13 +59,21 @@ MeleeWebAudioStream* melee_web_audio_stream_begin(MeleeWebAudio* audio,const Mel
  if(!s->io||!melee_web_io_add_file(s->io,in->path,in->bytes,in->size,&s->file,e,n)||!melee_web_io_add_buffer(s->io,MELEE_WEB_IO_AUXILIARY,0x30000,&s->aux,e,n)||!melee_web_io_add_buffer(s->io,MELEE_WEB_IO_MEMORY,128,&s->relay,e,n)){if(s->io)melee_web_io_destroy(s->io,NULL,0);free(s->visited);free(s);return NULL;}
  active=s;melee_web_audio_stream_lb_begin();melee_web_audio_stream_source_bind(STREAM_BASE,0,s->headers);if(e&&n)*e=0;return s;
 }
+/* Only the owned local audio registry implements disc requests here. Its
+ * pending queue determines busy/end; no hardware-cover state is fabricated. */
+s32 DVDGetDriveStatus(void){
+ if(!active&&!melee_web_audio_bank_transport_active())stop("Drive status requested without owned disc files");
+ return (active&&(active->requests||active->pumping))||melee_web_audio_bank_transport_busy()?DVD_STATE_BUSY:DVD_STATE_END;
+}
 s32 DVDConvertPathToEntrynum(const char* path){
+ int entry=melee_web_audio_bank_transport_path(path);if(entry>=0)return entry;
  if(!active)stop("DVD path requested without an owned file registry");
  if(!melee_web_audio_stream_pump_for(active->audio,NULL,0))stop("pending HPS transfer failed before file selection");
  uint64_t file;size_t length;
  return path&&melee_web_io_find_file(active->io,path,&file,&length,NULL,0)?1:-1;
 }
 int HSD_DevComRequest(int file,uintptr_t src,uintptr_t dest,size_t size,int type,int priority,HSD_DevComCallback callback,void* args){
+ if(melee_web_audio_bank_transport_file(file)||(type==0x1B&&melee_web_audio_bank_transport_active()))return melee_web_audio_bank_transport_request(file,src,dest,size,type,priority,callback,args);
  if(!active||file!=1||priority<0||priority>2||src%32||size%32||!size||!callback)stop("unsupported file/request alignment, priority, or callback");
  Request* r=calloc(1,sizeof(*r));if(!r)stop("request allocation failed");
  r->src=src;r->dest=dest;r->size=size;r->type=type;r->priority=priority;r->callback=callback;r->args=(uintptr_t)args;
@@ -76,10 +85,11 @@ int HSD_DevComRequest(int file,uintptr_t src,uintptr_t dest,size_t size,int type
   r->block=src>=32?block_at(src-32):NULL;if(!r->block||size!=r->block->size||dest<STREAM_BASE||(dest-STREAM_BASE)%65536||(dest-STREAM_BASE)/65536>=3)stop("payload request is not a validated HPS slot transfer");
   r->slot=(dest-STREAM_BASE)/65536;
  }else stop("unsupported DevCom request type");
- if(active->next_id>0x7ffffff8)stop("request ID exhausted");r->id=active->next_id+priority;active->next_id+=4;
+ if(active->next_id>0x1ffffff8)stop("request ID exhausted");r->id=active->next_id+priority;active->next_id+=4;
  Request** tail=&active->requests;while(*tail)tail=&(*tail)->next;*tail=r;return r->id;
 }
 int HSD_DevComCancelEx(int id,u32 flags,HSD_DevComCallback callback,void* args){
+ if(melee_web_audio_bank_transport_cancel(id,flags,callback,args))return 0;
  if(!active||flags&~3u)stop("unsupported DevCom cancellation");
  for(Request* r=active->requests;r;r=r->next)if(r->id==id){if(flags&1)r->callback=callback;if(flags&2)r->args=(uintptr_t)args;r->cancelled=1;break;}return 0;
 }

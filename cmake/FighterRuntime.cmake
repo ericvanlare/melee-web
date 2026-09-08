@@ -18,7 +18,7 @@ foreach(path IN LISTS native_paths)
 endforeach()
 add_library(fighter_source_runtime STATIC EXCLUDE_FROM_ALL ${fighter_paths}
   src/gameplay_menu.c src/gameplay_item_runtime.c src/dat_item_commands.c src/gameplay_crowd.c src/gameplay_render.c src/gameplay_color_commands.c src/gameplay_match_rules.c src/gameplay_stage_visual.c src/gameplay_stage_map.c src/gameplay_stage_last.c src/gameplay_effect_runtime.c
-  src/gameplay_audio.c src/gameplay_audio_stream.c src/gameplay_io.cpp src/gameplay_audio_resample.c src/gameplay_audio_itd.c src/gameplay_audio_fx.c src/gameplay_audio_reverb.c
+  src/gameplay_audio.c src/gameplay_audio_bank_transport.c src/gameplay_audio_residency.c src/gameplay_audio_stream.c src/gameplay_io.cpp src/gameplay_audio_resample.c src/gameplay_audio_itd.c src/gameplay_audio_fx.c src/gameplay_audio_reverb.c
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/axfx/axfx.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/axfx/reverb_std.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/axfx/delay.c"
@@ -53,7 +53,7 @@ add_library(fighter_source_runtime STATIC EXCLUDE_FROM_ALL ${fighter_paths}
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/MSL/float.c")
 target_include_directories(fighter_source_runtime PUBLIC src "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}"
   PRIVATE .deps/aurora/include .deps/melee/extern/dolphin/include)
-target_compile_definitions(fighter_source_runtime PUBLIC TARGET_PC)
+target_compile_definitions(fighter_source_runtime PUBLIC TARGET_PC PRIVATE MELEE_WEB_MENU_MARIO_FD)
 set_source_files_properties(src/gameplay_platform.c PROPERTIES COMPILE_DEFINITIONS "MELEE_WEB_AUDIO;MELEE_WEB_AUDIO_STREAM")
 set_source_files_properties(src/gameplay_audio.c PROPERTIES COMPILE_DEFINITIONS "MELEE_WEB_AUDIO_FX;MELEE_WEB_AUDIO_STREAM")
 set_source_files_properties(
@@ -240,3 +240,21 @@ target_link_libraries(dat_menu_support_trace PRIVATE fighter_asset_runtime)
 target_link_options(dat_menu_support_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
   -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSTACK_SIZE=8388608)
 set_target_properties(dat_menu_support_trace PROPERTIES SUFFIX ".js")
+
+# Local real CSS callback integration gate; no rendering/selection acceptance.
+add_executable(native_css_callbacks EXCLUDE_FROM_ALL tests/native_css_callbacks.cpp tests/native_css_callbacks.c)
+target_link_libraries(native_css_callbacks PRIVATE fighter_asset_runtime)
+target_link_options(native_css_callbacks PRIVATE --profiling-funcs -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSTACK_SIZE=8388608 -Wl,--error-limit=0)
+set_target_properties(native_css_callbacks PROPERTIES SUFFIX ".js")
+target_compile_options(native_css_callbacks PRIVATE
+  "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
+
+# Real source SSM load/cancel/switch/publication and repeated ownership.
+add_executable(native_audio_banks EXCLUDE_FROM_ALL tests/native_audio_banks.cpp tests/native_audio_banks.c)
+target_link_libraries(native_audio_banks PRIVATE fighter_asset_runtime)
+target_link_options(native_audio_banks PRIVATE --profiling-funcs -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSTACK_SIZE=8388608 -Wl,--error-limit=0)
+set_target_properties(native_audio_banks PROPERTIES SUFFIX ".js")
+target_compile_options(native_audio_banks PRIVATE
+  "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")

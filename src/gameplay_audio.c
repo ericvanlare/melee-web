@@ -1,3 +1,4 @@
+#include "gameplay_audio_bank_transport.h"
 #include "gameplay_audio.h"
 #include "gameplay_audio_resample.h"
 #include "gameplay_audio_itd.h"
@@ -29,7 +30,7 @@ _Static_assert(sizeof(VoiceParameters)==64&&offsetof(SampleEntry,voice)==16,"Ori
 _Static_assert(sizeof(AXVPB)==0x1f8&&sizeof(AXPB)==0xc0,"Original SDK voice/control ABI");
 typedef struct Binding {const MeleeWebAudioChannel* channel;uint32_t id,base;} Binding;
 typedef struct Playback {const Binding* binding;Binding stream_binding;size_t position;MeleeWebAudioResample resample;int loop,playing;int16_t history[64];unsigned history_at;} Playback;
-struct MeleeWebAudio {const MeleeWebAudioInput* input;SampleEntry* entries;Binding* bindings;uint32_t binding_count;u32** programs;u32* words;u32* starts;Playback playback[64];unsigned block_pos;
+struct MeleeWebAudio {const MeleeWebAudioInput* input;SampleEntry* entries;Binding* bindings;uint32_t binding_count;u32** programs;u32* words;u32* starts;Playback playback[64];unsigned block_pos;u32* source_sem;uint8_t ai_stream_volume[2];int source_closed;
 #if defined(MELEE_WEB_AUDIO_FX)
 MeleeWebAudioEffects* effects;
 #endif
@@ -38,7 +39,7 @@ static MeleeWebAudio* active;
 static uint32_t command_budget;
 void melee_web_audio_program_check(const u32* command){
  if(!active)return;
- uintptr_t at=(uintptr_t)command,begin=(uintptr_t)active->words,end=begin+active->input->word_count*4;
+ uintptr_t at=(uintptr_t)command,begin=(uintptr_t)(active->source_sem?active->source_sem:active->words),end=begin+active->input->word_count*4;
  if(at<begin||at>=end||(at-begin)%4||!command_budget){fprintf(stderr,"Native SEM command pointer or callback work budget invalid\n");abort();}
  --command_budget;
 }
@@ -82,7 +83,7 @@ MeleeWebAudio* melee_web_audio_begin(const MeleeWebAudioInput* in,char* e,size_t
  __AXAllocInit();__AXVPBInit();melee_web_audio_synth_begin(buckets);melee_web_audio_driver_begin(in->bank_count,a->starts,in->program_count,a->programs);active=a;if(e&&n)*e=0;return a;
 }
 int melee_web_audio_play(MeleeWebAudio* a,int id,uint8_t volume,uint8_t pan,int track,int channel,char* e,size_t n){
- if(!live(a)||id<0){fail(e,n,"Audio scope or sound ID is invalid");return -1;}
+ if(!live(a)||a->source_closed||id<0){fail(e,n,"Audio scope or sound ID is invalid");return -1;}
  int result=AXDriver_8038CFF4(id,volume,pan,track,channel);if(result<0)fail(e,n,"Original SEM driver rejected sound request");else if(e&&n)*e=0;return result;
 }
 int melee_web_audio_enable_effects(MeleeWebAudio* a,char* e,size_t n){
@@ -101,6 +102,14 @@ static size_t index_from_nibble(uint32_t at){return (size_t)(at/16)*14+at%16-2;}
 static uint32_t nibble_from_index(size_t index){return (uint32_t)(index/14*16+index%14+2);}
 static const Binding* find_binding(MeleeWebAudio* a,Playback* p,uint32_t at,uint32_t end){
  const Binding* found=binding(a,at,end);if(found)return found;
+ uint32_t id,channel,source_base;
+ if(melee_web_audio_bank_transport_resolve(a,at,end,&id,&channel,&source_base)){
+  for(uint32_t i=0;i<a->input->sample_count;i++)if(a->input->samples[i].id==id){
+   const MeleeWebAudioSample* sample=&a->input->samples[i];if(channel>=sample->channels)return NULL;
+   p->stream_binding=(Binding){&sample->channel[channel],id,source_base};return &p->stream_binding;
+  }
+  return NULL;
+ }
 #if defined(MELEE_WEB_AUDIO_STREAM)
  const MeleeWebAudioChannel* c;uint32_t base;
  if(melee_web_audio_stream_resolve(a,at,&c,&base)){p->stream_binding=(Binding){c,UINT32_MAX,base};return &p->stream_binding;}
@@ -124,10 +133,11 @@ static int16_t read_pcm(void* context){
  return (p->loop?c->loop_pcm:c->pcm)[p->position++];
 }
 int melee_web_audio_render(MeleeWebAudio* a,float* output,uint32_t frames,char* e,size_t n){
- if(!live(a)||!output||frames>32000)return fail(e,n,"Invalid audio output request");
+ if(!live(a)||a->source_closed||!output||frames>32000)return fail(e,n,"Invalid audio output request");
  memset(output,0,frames*2*sizeof(float));
  for(uint32_t frame=0;frame<frames;frame++){
   if(a->block_pos==0){
+   melee_web_audio_bank_transport_pump();
 #if defined(MELEE_WEB_AUDIO_STREAM)
    if(!melee_web_audio_stream_pump_for(a,e,n))return 0;
 #endif
@@ -193,6 +203,7 @@ int melee_web_audio_active_samples(MeleeWebAudio* a,uint32_t* ids,uint32_t capac
 }
 int melee_web_audio_end(MeleeWebAudio* a,char* e,size_t n){
  if(!live(a))return fail(e,n,"Audio scope is not active");
+ if(melee_web_audio_bank_transport_active())return fail(e,n,"Release owned source SSM transport before enclosing audio scope");
 #if defined(MELEE_WEB_AUDIO_STREAM)
  if(melee_web_audio_stream_owned(a))return fail(e,n,"Release owned HPS stream before enclosing audio scope");
 #endif
@@ -204,3 +215,25 @@ int melee_web_audio_end(MeleeWebAudio* a,char* e,size_t n){
 #endif
  melee_web_audio_driver_end();melee_web_audio_synth_end();__AXAllocQuit();active=NULL;free_owner(a);if(e&&n)*e=0;return 1;
 }
+
+uint32_t melee_web_audio_source_sem_size(MeleeWebAudio* a){
+ if(!live(a))abort();return a->input->word_count*4;
+}
+void melee_web_audio_source_sem_read(MeleeWebAudio* a,void* output,uint32_t size){
+ if(!live(a)||!output||size!=a->input->word_count*4)abort();
+ memcpy(output,a->words,size);a->source_sem=output;
+}
+
+/* This provider is configured for stereo, independently of console SRAM. */
+u32 OSGetSoundMode(void){if(!active)abort();return 1;}
+
+void melee_web_audio_source_finish(MeleeWebAudio* a){
+ if(!live(a))abort();a->source_sem=NULL;a->source_closed=1;
+}
+/* AI disc-stream volume registers are separate from the AX/HPS voice mixer.
+ * There is no active AI disc stream in this provider; preserve its controls
+ * without applying them a second time to the original AX gain calculation. */
+void AISetStreamVolLeft(u8 volume){if(!active)abort();active->ai_stream_volume[0]=volume;}
+void AISetStreamVolRight(u8 volume){if(!active)abort();active->ai_stream_volume[1]=volume;}
+u8 AIGetStreamVolLeft(void){if(!active)abort();return active->ai_stream_volume[0];}
+u8 AIGetStreamVolRight(void){if(!active)abort();return active->ai_stream_volume[1];}

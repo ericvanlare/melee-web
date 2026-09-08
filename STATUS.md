@@ -28,8 +28,16 @@ remain required acceptance work under [the accuracy contract](docs/ACCURACY_CONT
   Original card archive loading and camera/model/animation consumers also pass
   across two worlds with checked scene-heap ownership. The full regression suite
   passed 243 tests; subsequent focused lifetime/card checks and the Release build
-  pass. CSS callbacks, browser menu rendering, availability guards and match handoff
-  are still open. The HTML selector remains disposable scaffolding.
+  pass. Original CSS entry, 120 neutral raw-PAD/scheduler/audio ticks and exit
+  now pass across two worlds as well. Its cursor code accesses declared source
+  globals directly, removing a cross-global GameCube layout assumption. Original
+  SSM bank startup, cancellation, menu-to-Mario-to-menu switches and actual PCM
+  publication pass twice with all seven exact local bank paths. Source loading
+  still owns queues, accounting and sample publication; host bridges provide
+  checked bytes, native descriptor fields and scoped auxiliary storage. The full
+  regression suite passed 245 tests before the new focused bank/CSS checks.
+  Browser menu rendering, real selection, scene preloading, availability guards
+  and match handoff are still open. The HTML selector remains disposable scaffolding.
   Shared typed archive handles and a checked CSS/SSS lifecycle boundary are
   integrated. Texture indices are checked before original table access; unused
   authored values are preserved. The accuracy contract records catch-up

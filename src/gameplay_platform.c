@@ -64,14 +64,16 @@ STOP(s32,CARDProbeEx,(s32 chan U,s32* memory U,s32* sector U))
 STOP(s32,CARDRenameAsync,(s32 chan U,const char* old_name U,const char* new_name U,CARDCallback cb U))
 STOP(s32,CARDUnmount,(s32 chan U))
 STOP(DVDDiskID*,DVDGetCurrentDiskID,(void))
-STOP(s32,DVDGetDriveStatus,(void))
 #if !defined(MELEE_WEB_AUDIO_STREAM)
+STOP(s32,DVDGetDriveStatus,(void))
 STOP(s32,DVDConvertPathToEntrynum,(const char* path U))
 #endif
 STOP(BOOL,DVDFastOpen,(s32 entry U,DVDFileInfo* file U))
 STOP(BOOL,DVDClose,(DVDFileInfo* file U))
+#if !defined(MELEE_WEB_AUDIO)
 STOP(void,AISetStreamVolLeft,(u8 volume U))
 STOP(void,AISetStreamVolRight,(u8 volume U))
+#endif
 #if !defined(MELEE_WEB_AUDIO)
 typedef void (*VoiceCallback)(void*);
 STOP(AXVPB*,AXAcquireVoice,(u32 priority U,VoiceCallback callback U,u32 context U))
