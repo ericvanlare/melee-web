@@ -30,9 +30,11 @@ jobs:
         run: |
           python3 scripts/build.py --jobs 2
           python3 scripts/build.py --target fighter --jobs 2
+          python3 scripts/build.py --target runtime --jobs 2
       - name: Run original gameplay runtime and ABI checks
         run: |
           python3 -m unittest discover -s tests -p 'test_gameplay_*.py' -v
+          python3 -m unittest discover -s tests -p 'test_audio_transport.py' -v
           python3 -m unittest discover -s tests -p 'test_common_tables.py' -v
           python3 -m unittest discover -s tests -p 'test_hsd_native*.py' -v
           python3 scripts/check_gameplay.py
