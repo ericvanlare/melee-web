@@ -98,11 +98,25 @@ the reference machine. The smaller gates below are checkpoints, not completion.
   unlocked Stadium side platform; the port uses FD, so this is a scoped vertical
   movement comparison, not full match equivalence. A second retail capture repeats
   all 102 frames, and the updated intrinsic build still matches the comparison.
-- Local suite: 224 tests passed without skips after refreshing the affected
+- A bounded four-stock Final Destination trace from the original GALE01 rev2
+  collector uses four stocks, items NONE, Mario yellow at -60 and Mario red at
+  +60. Across 541 samples (original game frames 12..552; port after 120 neutral
+  settle ticks), the reusable comparison reports exact position, velocity,
+  motion, ground/air, stock and damage bits for both fighters, including one
+  loss and one grounded respawn. Animation idle phase and RNG are excluded from
+  this bounded comparison; it is not a full-match equivalence claim. An extended
+  754-sample recipe also matches all compared fields through a P1 jab and P2
+  3% damage, including the exact action-entry and impact ticks.
+- Local suite: 234 tests passed without skips after refreshing the affected
   source trace binaries. The strengthened projectile regression passes actual P2 impact,
   expiry and teardown in two worlds. All six ground/air side/up/down specials
   also pass source action entry, finite state and two-world teardown checks.
-  Browser rendering remains a separate gate for those additional specials.
+  The browser now also completes ground/air Cape, Super Jump Punch and Tornado
+  action checks. First-use Cape and Tornado presentation intervals reach about
+  55–58 ms; a saved-cache Cape run has no interval above 33.3 ms or audio
+  underrun. Isolated warm Jump Punch, Tornado and fireball restarts each stay below
+  19 ms worst interval and add no audio underruns; fireballs still deal 6% to P2.
+  Visual effect fidelity and other-special opponent impacts remain separate checks.
 
 ## Latest runtime evidence
 
@@ -124,7 +138,7 @@ or full-game performance. See [reproduction and scope](docs/FIGHTER_RUNTIME.md).
 
 Historical checkpoint: **192 tests passed with no skips**, the browser/gameplay
 and full fighter targets built, and both gameplay and owned-asset fighter runners
-passed. The current suite is the 224-test result above. Full-source linking has
+passed. The current suite is the 234-test result above. Full-source linking has
 no remaining function-signature mismatch warnings.
 
 ## Runtime foundation

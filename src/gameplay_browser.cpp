@@ -42,7 +42,8 @@ SDL_Window* runtime_window=nullptr;
 int render_scale=1;
 bool finished=false;
 int winner=-1;
-int combat_check=-1;
+int combat_check=-1,combat_kind=0;
+unsigned combat_seen=0;
 int stock_check_tick=-1,stock_check_total_ticks=0,stock_check_stocks=4,stock_check_respawns=0,stock_check_result=-1;
 bool stock_check_lost=false,stock_check_jump=false;
 alignas(32) unsigned char fifo_buffer[64*1024];
@@ -95,8 +96,14 @@ void tick(){
                 // Diagnostic fixture only. Original PAD processing, actions,
                 // item simulation and drawing remain the production path.
                 if(combat_check>=30&&combat_check<33)scripted[0].button=PAD_BUTTON_B;
-                if(combat_check>=105&&combat_check<113)scripted[0].button=PAD_BUTTON_X;
-                if(combat_check>=115&&combat_check<118)scripted[0].button=PAD_BUTTON_B;
+                const int jump_tick=combat_kind?210:105,air_tick=combat_kind?220:115;
+                if(combat_check>=jump_tick&&combat_check<jump_tick+8)scripted[0].button=PAD_BUTTON_X;
+                if(combat_check>=air_tick&&combat_check<air_tick+3)scripted[0].button=PAD_BUTTON_B;
+                if(scripted[0].button==PAD_BUTTON_B){
+                    if(combat_kind==1)scripted[0].stickX=80;
+                    if(combat_kind==2)scripted[0].stickY=80;
+                    if(combat_kind==3)scripted[0].stickY=-80;
+                }
                 sample=scripted;
             }
             require(melee_web_match_step_raw(match,sample,error,sizeof(error)),error);
@@ -111,10 +118,18 @@ void tick(){
                 ++stock_check_tick;
                 stock_check_total_ticks=stock_check_tick;
             }
-            if(combat_check>=0&&++combat_check==240){
+            if(combat_check>=0&&combat_kind){
+                MeleeWebMatchStats actor{};
+                require(melee_web_match_player_stats(match,0,&actor,error,sizeof(error)),error);
+                const int ground_motion=343+2*combat_kind,air_motion=ground_motion+1;
+                if(combat_check<210&&actor.motion_id==ground_motion)combat_seen|=1;
+                if(combat_check>=220&&actor.motion_id==air_motion)combat_seen|=2;
+            }
+            if(combat_check>=0&&++combat_check==(combat_kind?480:240)){
                 MeleeWebMatchStats opponent{};
                 require(melee_web_match_player_stats(match,1,&opponent,error,sizeof(error)),error);
-                message="Combat check complete: opponent damage "+std::to_string(opponent.damage_percent)+"%. Drawing and impact still require verification.";
+                if(combat_kind)require(combat_seen==3,"Special check did not observe both ground and air source actions");
+                message="Combat check complete: opponent damage "+std::to_string(opponent.damage_percent)+"%. "+(combat_kind?"Ground and air source actions observed. ":"")+"Drawing and impact still require verification.";
                 combat_check=-1;
             }
             audio_phase+=32000;const unsigned samples=audio_phase/60;audio_phase%=60;
@@ -188,9 +203,9 @@ void tick(){
 }
 }
 extern "C" {
-int melee_web_game_combat_check(){
-    if(!match||!running||finished||stock_check_tick>=0)return 0;
-    combat_check=0;message="Combat check: scripted ground and air B inputs (controllers temporarily overridden).";return 1;
+int melee_web_game_combat_check(int kind){
+    if(!match||!running||finished||stock_check_tick>=0||kind<0||kind>3)return 0;
+    combat_check=0;combat_kind=kind;combat_seen=0;message="Combat check: scripted ground and air special inputs (controllers temporarily overridden).";return 1;
 }
 int melee_web_game_stock_check(){
     if(!match||!running||finished||stock_check_tick>=0||combat_check>=0)return 0;

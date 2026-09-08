@@ -31,7 +31,7 @@ Direct launch is sufficient; full menus are a later gate.
 The normal browser launch now uses the authored Final Destination player markers
 `(-60, 10, 0)` and `(60, 10, 0)` through the original Ground API. Close-range
 `+/-20` coordinates remain diagnostic fixtures. The latest local suite reports
-224 tests passed without skips; the historical 192-test checkpoint is retained
+234 tests passed without skips; the historical 192-test checkpoint is retained
 only as an earlier validation point.
 
 Compare recorded original-game and port state at fixed simulation boundaries:
@@ -57,6 +57,14 @@ assets on the next page startup. Game assets are not persisted. The first cold
 visit still has unresolved rendering stalls. Browser audio uses a 1536-sample
 prefill and per-frame transport gating; the saved-cache runs had no underruns.
 The selectable 2× SDL render scale remains available for scale-specific checks.
+Future non-FD stages still need the original scene-level `fn_8016758C` reservation
+counter tick; FD uses direct player-index respawns and is covered by this trace.
+
+First-use preparation should use bounded, versioned renderer-state recipes
+through the normal GX path, independent of match simulation and imported game
+assets. Aurora currently exposes CPU pipeline-queue drainage but no browser GPU
+completion boundary; a future preparation gate must account for that distinction.
+The local persisted cache is useful evidence, not a universal first-visit fix.
 
 ## 2 — Complete versus loop
 

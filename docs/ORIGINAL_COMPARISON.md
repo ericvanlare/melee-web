@@ -122,6 +122,33 @@ The regression now checks continuous run-off and the first stock loss at this
 initial position, plus a separate post-respawn running scenario. These checks
 establish the observed behavior, not bitwise equality of every fighter field.
 
+## Four-stock movement and first respawn
+
+The local read-only capture in `work/reference-stock/stock-plain.jsonl` is from
+GALE01 revision 2 on Final Destination with four stocks, items set to NONE,
+Mario yellow on port 1 at -60 and Mario red on port 2 at +60. The original
+collector starts at game frame 12, holds port 2 right for 100 frames, then sends
+440 neutral frames. The capture contains one stock loss and one grounded
+respawn; its provenance is recorded in the adjacent `provenance.json`. Original
+assets and reference data remain outside the repository.
+
+The port's `gameplay_trajectory_trace --stock` settles both source fighters for
+120 neutral ticks, emits the initial sample, then uses the same 100 right and
+440 neutral raw input frames. `tools/compare_stock_trace.py` aligns all 541
+samples and reports exact equality for motion, ground/air state, stock count,
+position bits, velocity bits and damage bits for both fighters. P1 receives neutral input throughout. The port uses the neutral red costume
+for both fighters; the original uses yellow for P1 and red for P2. Startup
+animation age differs from the original capture, which begins at game frame 12. Animation frame/idle phase and RNG are
+explicitly excluded because their startup states are not synchronized. This is
+a bounded movement, death and first-respawn comparison, not a full-match
+equivalence claim.
+
+The extended `--stock-jab` recipe adds 120 neutral ticks, three P1 A ticks and
+90 neutral ticks. Against original game frames 12..765, the comparator with
+`--recipe stock-jab` reports 754/754 matching samples for the same state fields.
+P1 enters jab motion 44 at relative tick 661; P2 enters damage motion 79 with
+3% damage at tick 662. Idle phase and RNG retain the exclusions above.
+
 ## Current browser runtime evidence
 
 The latest saved-cache renderer run, captured in Chrome 152's IAB at DPR1,
