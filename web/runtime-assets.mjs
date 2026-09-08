@@ -1,0 +1,52 @@
+import {openDiscImage,fontFileRange} from './disc-image.mjs';
+import {replacementDspCoefficients,DSP_COEFFICIENT_SHA256} from './dsp-coefficients.mjs';
+
+// Exact revision/language paths: audio/ also contains Japanese alternatives.
+export const RUNTIME_DISC_FILES=Object.freeze({
+  'PlCo.dat':'PlCo.dat','PlMr.dat':'PlMr.dat','PlMrNr.dat':'PlMrNr.dat',
+  'PlMrAJ.dat':'PlMrAJ.dat','GrNLa.dat':'GrNLa.dat','ItCo.usd':'ItCo.usd',
+  'EfMrData.dat':'EfMrData.dat','EfCoData.dat':'EfCoData.dat','PdPm.dat':'PdPm.dat',
+  'smash2.sem':'audio/us/smash2.sem','main.ssm':'audio/us/main.ssm',
+  'mario.ssm':'audio/us/mario.ssm','sp_end.hps':'audio/sp_end.hps',
+});
+export const ORIGINAL_DOL_SHA1='08e0bf20134dfcb260699671004527b2d6bb1a45';
+const MAX_FILE=64*1024*1024,MAX_BUNDLE=128*1024*1024;
+async function digest(kind,bytes){return Array.from(new Uint8Array(await crypto.subtle.digest(kind,bytes)),x=>x.toString(16).padStart(2,'0')).join('');}
+
+/** Read only the current match's data; no upload or persistent storage. */
+export async function loadRuntimeDisc(file,report=()=>{}) {
+  if(/\.rvz$/i.test(file.name??''))throw Error('RVZ is not supported yet. Choose an ISO, GCM, or CISO image.');
+  report({phase:'validate',complete:0,total:15});
+  const disc=await openDiscImage(file);
+  const pointer=await disc.read(0x420,4),dolOffset=new DataView(pointer.buffer,pointer.byteOffset,4).getUint32(0);
+  if(dolOffset<0x440)throw Error('Invalid game executable location.');
+  const header=await disc.read(dolOffset,0x100),view=new DataView(header.buffer,header.byteOffset,header.byteLength);
+  let dolSize=0x100;
+  for(let i=0;i<18;i++){
+    const offset=view.getUint32(i*4),size=view.getUint32(0x90+i*4);
+    if(size){if(offset<0x100||offset+size>MAX_FILE)throw Error('Invalid game executable section.');dolSize=Math.max(dolSize,offset+size);}
+  }
+  const dol=await disc.read(dolOffset,dolSize);
+  if(await digest('SHA-1',dol)!==ORIGINAL_DOL_SHA1)throw Error('This build requires the unmodified USA revision 1.02 executable. This disc does not match.');
+  const entries=await disc.files();let totalBytes=0;
+  for(const path of Object.values(RUNTIME_DISC_FILES)){
+    const entry=entries.get(path);
+    if(!entry)throw Error('Required game data is missing: '+path);
+    if(!entry.size||entry.size>MAX_FILE)throw Error('Invalid game file size: '+path);
+    totalBytes+=entry.size;
+  }
+  if(totalBytes>MAX_BUNDLE)throw Error('Required game data exceeds the current import budget.');
+  const result=new Map();
+  for(const [name,path] of Object.entries(RUNTIME_DISC_FILES)){
+    report({phase:'read',file:name,complete:result.size,total:15});
+    result.set(name,await disc.readFile(path));
+  }
+  const font=fontFileRange(header);
+  if(font.offset+font.size>dol.byteLength)throw Error('Font data is outside the validated executable.');
+  result.set('sislib_font.bin',dol.slice(font.offset,font.offset+font.size));
+  const coefficients=replacementDspCoefficients();
+  if(await digest('SHA-256',coefficients)!==DSP_COEFFICIENT_SHA256)throw Error('Generated audio coefficients failed their integrity check.');
+  result.set('dsp_coef.bin',coefficients);
+  report({phase:'complete',complete:15,total:15});
+  return result;
+}

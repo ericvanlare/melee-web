@@ -16,3 +16,15 @@ actual dependency graph before a public release. No public release is made here.
 
 No Nintendo disc images, extracted assets, audio, textures or game executables
 are tracked. This repository does not grant rights to upstream code or game data.
+
+## Free DSP coefficient generator
+
+`web/dsp-coefficients.mjs` adapts Dolphin’s free replacement coefficient
+generator at revision `a2efdf1197be8132674b90fe9cf4761df39752ed`:
+https://github.com/dolphin-emu/dolphin/blob/a2efdf1197be8132674b90fe9cf4761df39752ed/docs/DSP/free_dsp_rom/generate_coefs.py
+
+Retain GPL-2.0-or-later attribution and upstream notices. The generated 4096-byte
+replacement is checked against SHA-256
+`d7741279c2e8ec5c5fb318f8fbdd6de6bf583520d288e836a5383233a4238179`.
+It is not a Nintendo hardware ROM dump and is only approximately equivalent.
+The source generator is included; no generated coefficient binary is tracked.

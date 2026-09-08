@@ -22,6 +22,14 @@ full-match equivalence. See [current evidence](STATUS.md),
 [the runtime gate](docs/FIGHTER_RUNTIME.md) and
 [original-game comparison](docs/ORIGINAL_COMPARISON.md).
 
+## Play the current match
+
+Open `runtime.html` on the local build server and choose your own unmodified
+USA revision 1.02 Melee ISO, GCM, or CISO. Select **Launch / restart** after import.
+The browser reads only the required disc ranges; game data stays in the tab and
+is neither uploaded nor persisted. RVZ is not supported. Extracted-folder loading
+remains available under Runtime diagnostics for development.
+
 ## Build and inspect
 
 Initial reference environment: Apple Silicon macOS, Python 3, Git, and desktop

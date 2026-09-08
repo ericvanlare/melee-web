@@ -14,6 +14,20 @@ the reference machine. The smaller gates below are checkpoints, not completion.
 
 ## Active integration
 
+- Direct browser ISO/GCM/CISO import validates GALE01 revision 2 and the original
+  executable, selects the English audio paths, extracts the font from that
+  executable, and generates Dolphin's free replacement DSP coefficients.
+  All fifteen inputs from the owned CISO match the existing local bundle byte for
+  byte (13,068,490 bytes). No disc or extracted data is uploaded or persisted.
+  Synthetic tests cover sparse blocks, malformed filesystem tables and bounded
+  reads. Extracted-folder import is now a developer diagnostic. The real browser
+  completed the 1,985-tick stock diagnostic (three respawns, P2 winner) after
+  direct CISO loading: saved-cache worst interval 18.43 ms, no intervals above
+  33.3 ms and no audio underruns. A rejected image disabled launch; reimporting
+  the valid image restored launch and the ground/air fireball check dealt 6%.
+  This validates import/restart, not cold-rendering acceptance. The complete
+  regression suite passes 237 tests with no skips; the Release browser build passes.
+
 - Normal keyboard play exposed an overly strict timing policy: more than eight
   elapsed source ticks forced a manual pause. Gameplay now retains bounded timing
   debt and runs at most eight original 60 Hz ticks per browser callback, catching

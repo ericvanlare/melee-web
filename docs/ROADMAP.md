@@ -68,6 +68,12 @@ The local persisted cache is useful evidence, not a universal first-visit fix.
 
 ## 2 — Complete versus loop
 
+The next scoped menu gate after core-loop stabilization is Mario-only character
+selection → Final Destination-only stage selection → stock match → return.
+Keep the initial rules to stocks; the full options menu can follow. Build through
+shared original menu and roster interfaces so Falco, the first planned expansion,
+does not require a separate flow.
+
 Local disc import → menus → character/stage selection → controlled matches →
 results → menus. Expand fighters, stages, items and four-player scenarios through
 the same source runtime, preserving accuracy and performance regressions.

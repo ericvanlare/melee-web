@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {loadRuntimeDisc,RUNTIME_DISC_FILES} from '../web/runtime-assets.mjs';
+assert.equal(Object.keys(RUNTIME_DISC_FILES).length,13);
+for(const name of ['main.ssm','mario.ssm','smash2.sem'])assert.equal(RUNTIME_DISC_FILES[name],'audio/us/'+name);
+await assert.rejects(loadRuntimeDisc({name:'game.rvz'}),/RVZ is not supported/);
+const bytes=new Uint8Array(0x2000),view=new DataView(bytes.buffer);
+bytes.set(new TextEncoder().encode('GALE01'));bytes[7]=2;
+view.setUint32(0x1c,0xc2339f3d);view.setUint32(0x420,0x600);
+await assert.rejects(loadRuntimeDisc(new Blob([bytes])),/unmodified USA revision/);
+view.setUint32(0x600,0x100);view.setUint32(0x690,0x10000000);
+await assert.rejects(loadRuntimeDisc(new Blob([bytes])),/Invalid game executable section/);
+console.log('Runtime disc language paths and executable rejection checks passed');

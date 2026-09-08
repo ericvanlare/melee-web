@@ -1,43 +1,33 @@
-# From a live fighter to a playable stock match
+# Core gameplay loop and the first menus
 
-The constructor/neutral/restart gate is complete. The next concrete gate is one
-controllable Mario on Final Destination in the browser, using the same original
-fighter process loop, with original-game movement comparisons.
+The browser now runs a two-player Mario stock match on Final Destination.
+The immediate cycle is direct disc import, first-use rendering preparation,
+and complete match/restart verification. The full acceptance milestone remains
+open until the checks in [ROADMAP.md](ROADMAP.md) pass, including physical
+controllers, audible output, and cold and warm performance.
 
-## Parallel work with bounded interfaces
+## Independent work boundaries
 
-1. **Browser runtime integration.** Share the owned runtime and asset bundle with
-   a browser entry point. Present the actual fighter GObj and source stage through
-   HSD/Aurora. Keep simulation at 60 Hz, independent of rendering; preserve pause,
-   focus loss, explicit errors, teardown and restart. Avoid copying gameplay into
-   the existing inspection animation player.
-2. **Input and movement.** Feed the original controller path from the existing
-   Aurora PAD boundary. Enable checked action scripts and services for Wait,
-   walk/run, jump, fall and landing. Landing's effect/audio command needs real
-   operands and providers before it is enabled. Extend through shared schema and
-   service boundaries rather than fighter-specific successful substitutes.
-3. **Reference traces.** Capture the original game's per-tick actions, position,
-   velocity, collision state and RNG for identical initial conditions and input.
-   Compare the Wasm runtime before claiming movement accuracy. Review floating
-   point primitives where the PowerPC source and host math differ.
+1. **Disc import.** The bounded Blob reader handles ISO/GCM/CISO and checked FST
+   lookup independently of the runtime's match-specific asset manifest. Validate
+   the original executable, keep data local, and retain malformed-input tests.
+2. **First-use rendering.** Measure death, respawn, and specials with the existing
+   frame, upload, pipeline, and audio diagnostics. Prepare required graphics before
+   play through shared HSD/GX paths. CPU pipeline drainage does not prove GPU
+   completion. Do not advance a hidden match or change the 60 Hz source clock.
+3. **Acceptance.** Exercise stock loss, respawn, outcome and restart with both
+   keyboard and physical controllers. Preserve original-game trace comparisons;
+   successful rendering or average FPS does not establish gameplay equivalence.
 
-The lead integrates one runnable browser slice across these lanes and keeps the
-constructor/restart regression passing. Full menus, AI, other characters and
-content coverage are downstream of a local Mario-versus-Mario stock match.
-
-## Acceptance for the next gate
-
-Import local owned data, launch a visible Mario on Final Destination, control
-movement and jump/landing through source callbacks, pause/resume safely, unload,
-and restart without a reload. Require original state comparisons for the named
-movement cases. Measure release-build frame intervals and memory on identified
-browser/hardware; debug Wasm or viewer FPS cannot establish match performance.
+After this cycle, build Mario-only character selection → FD-only stage selection
+→ stock match → return, initially without the full rules menu. Use shared original
+menu and roster interfaces. Falco is the first planned roster expansion after
+that flow and the core loop are stable.
 
 ## Foundation to reuse
 
-- [Fighter runtime](FIGHTER_RUNTIME.md): owned common/fighter/costume/metal graphs,
-  action identity, native commands, stage lights/bounds/collision, player data,
-  item registration, effect banks and full GObj process/destructor execution.
+- [Fighter runtime](FIGHTER_RUNTIME.md): common/fighter/costume graphs, native action
+  commands, stage collision, items, effects and source process/destructor lifetime.
 - Checked archive extern preservation and typed named-section publication.
   Unsupported references and services still fail explicitly.
 - Immutable original archive bytes, mutable owned native display lists and
@@ -45,5 +35,5 @@ browser/hardware; debug Wasm or viewer FPS cannot establish match performance.
 - [Testing](TESTING.md): source ABI comparisons, focused native tests, real-data
   probes, browser rendering checks and fixed dependency pins.
 
-Broaden behavior only when it unlocks this gate or catches a demonstrated bug.
-Keep workers on independent files and use GPT-6 Astra medium as configured.
+Keep worker assignments independent and bounded. Use GPT-5.6 Luna xhigh unless
+Eric changes that preference; the lead reviews and integrates their work.
