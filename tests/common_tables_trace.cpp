@@ -41,13 +41,15 @@ int main(int argc,char** argv)
     input->metal_modifiers[8]=5.5f;input->gravity_weight[1]=6.5f;
     input->primary_colors[4]={12,34,56,78};input->secondary_colors[4]={90,87,65,43};
     input->crowd.angle_min=-2.5f;input->crowd.x1C=-3;input->crowd.blastzone_y_offset=125.25f;
-    for(auto& map:input->parts) {
+    auto initialize_map=[](MeleeWebCommonParts& map) {
         map.part_count=3;
         std::fill_n(map.joint_to_part,MELEE_WEB_COMMON_MAX_PARTS,255);
         std::fill_n(map.part_to_joint,MELEE_WEB_COMMON_PART_NAMES,255);
         map.joint_to_part[0]=2;map.joint_to_part[2]=53;
         map.part_to_joint[2]=0;map.part_to_joint[53]=2;
-    }
+    };
+    for(auto& map:input->parts) initialize_map(map);
+    initialize_map(input->none_parts);
     input->alternates[4].has_descriptor=1;input->alternates[4].count=1;
     input->alternates[4].entries[0]={2,0,3,255};
     auto first=create(*input);
@@ -59,6 +61,8 @@ int main(int argc,char** argv)
     check(lookup(first.get(),32,53)==2&&lookup(second.get(),1,53)==1,"independent graphs own copied named maps");
     check(remap(first.get(),32,0,2)==2&&remap(second.get(),1,0,2)==1,
           "original remap follows names across owned fighter maps");
+    check(remap(first.get(),32,MELEE_WEB_COMMON_FIGHTERS,2)==2,
+          "original typed remap accepts the source-only FTKIND_NONE part table");
     check(remap(first.get(),32,0,1)==255&&remap(first.get(),32,0,3)==255&&
           remap(first.get(),32,0,0xffffffff)==255,"original unnamed and out-of-skeleton remaps retain invalid sentinel");
     check(ftPartsTable==nullptr,"native graph construction and reads leave no published global");
@@ -100,6 +104,8 @@ int main(int argc,char** argv)
               "actual Mario and Fox named maps reach original lookup");
         check(remap(native.get(),1,0,47)==5&&remap(native.get(),1,0,21)==255,
               "actual Mario-to-Fox remap reaches original source function");
+        check(remap(native.get(),0,MELEE_WEB_COMMON_FIGHTERS,0)<MELEE_WEB_COMMON_MAX_PARTS,
+              "actual FTKIND_NONE row reaches the original typed remap function");
         for(unsigned i=0;i<23;++i)
             check(bool(melee_web_common_tables_root(native.get(),i))==bool(MELEE_WEB_COMMON_STATIC_ROOT_MASK&(1U<<i)),
                   "native local root publication is limited to decoded static graph ownership");

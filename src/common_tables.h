@@ -11,6 +11,9 @@ extern "C" {
  * ftParts_80074E58's explicit named index 0x35. Padding after the 54 names is
  * not another named part. Native bridge assertions verify these constants. */
 #define MELEE_WEB_COMMON_FIGHTERS 33u
+/* ftPartsTable has one source-only FTKIND_NONE row after the 33 FighterKind
+ * rows. Keep that table capacity separate from the Fighter roster domain. */
+#define MELEE_WEB_COMMON_PART_TABLES (MELEE_WEB_COMMON_FIGHTERS + 1u)
 #define MELEE_WEB_COMMON_MAX_PARTS 140u
 #define MELEE_WEB_COMMON_PART_NAMES 54u
 #define MELEE_WEB_COMMON_MAX_ALTERNATES 32u
@@ -60,6 +63,7 @@ typedef struct MeleeWebCommonTables {
     MeleeWebCommonThrow item_throw[26];
     float swing[6][5], stale[9];
     MeleeWebCommonParts parts[MELEE_WEB_COMMON_FIGHTERS];
+    MeleeWebCommonParts none_parts;
     MeleeWebCommonAlternates alternates[MELEE_WEB_COMMON_FIGHTERS];
     MeleeWebCommonShake damage_shake[3], grab_shake, smash_shake;
     float scale_modifiers[39], bunny_modifiers[15], metal_modifiers[9], gravity_weight[2];

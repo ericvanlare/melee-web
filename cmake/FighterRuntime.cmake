@@ -190,6 +190,13 @@ target_link_options(gameplay_specials_trace PRIVATE -sENVIRONMENT=node -sNODERAW
   -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
 set_target_properties(gameplay_specials_trace PROPERTIES SUFFIX ".js")
 
+add_executable(gameplay_combat_trace EXCLUDE_FROM_ALL tests/gameplay_combat_trace.cpp)
+target_link_libraries(gameplay_combat_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_combat_trace PRIVATE -ffp-contract=off)
+target_link_options(gameplay_combat_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_combat_trace PROPERTIES SUFFIX ".js")
+
 add_executable(gameplay_player_context_trace EXCLUDE_FROM_ALL tests/gameplay_player_context_trace.c)
 target_link_libraries(gameplay_player_context_trace PRIVATE fighter_asset_runtime)
 target_compile_options(gameplay_player_context_trace PRIVATE -include "${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h")

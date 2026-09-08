@@ -30,7 +30,38 @@ int action_test_load(Fighter* fp, int motion, int slot)
     for (unsigned i = 0; i < tracks; ++i) if (!tree->tracks[i].ad_head || !tree->tracks[i].length) abort();
     return (int)nodes;
 }
+int action_test_load_from(Fighter* destination, Fighter* source, int motion)
+{
+    ftData_80085CD8(destination, source, motion);
+    FigaTree* tree = destination->x590;
+    if (!tree || !destination->x5A4) return 0;
+    unsigned nodes = 0;
+    while (tree->nodes[nodes] != -1) { if (++nodes > 140) abort(); }
+    return (int)nodes;
+}
 int action_test_alias(Fighter* fp) { return fp->x590 == fp->x598 && fp->x5A4 == fp->x5A8; }
+void* action_test_identity(Fighter* fp) { return fp->x5A4; }
+const char* action_test_identity_symbol(Fighter* fp)
+{ return fp->x5A4 ? ((struct Fighter_WaitAnimData*)fp->x5A4)->x0 : NULL; }
+int action_test_identity_command_live(Fighter* fp)
+{
+    if (!fp->x5A4) return 0;
+    void* command = ((struct Fighter_WaitAnimData*)fp->x5A4)->xC;
+    uint32_t word = 0;
+    return command && melee_web_command_original_word_checked(command, &word);
+}
+int action_test_identity_command_executes(Fighter* fp)
+{
+    if (!fp->x5A4) return 0;
+    const void* command = ((struct Fighter_WaitAnimData*)fp->x5A4)->xC;
+    if (!command) return 0;
+    Fighter local = {0}; HSD_GObj gobj = {0}; gobj.user_data = &local;
+    local.x3E4_fighterCmdScript.u = (void*)command; local.frame_speed_mul = 1;
+    for (unsigned frame = 0; frame < 40 && local.x3E4_fighterCmdScript.u; ++frame) {
+        local.cur_anim_frame = (float)frame; ftAction_80073240(&gobj);
+    }
+    return !local.x3E4_fighterCmdScript.u && !local.x3E4_fighterCmdScript.loop_count;
+}
 float action_test_frames(Fighter* fp) { return lbAnim_8001E8F8(fp->x590); }
 int action_test_cleared(Fighter* fp) { return !fp->x590 && !fp->x598 && !fp->x5A4 && !fp->x5A8; }
 int action_test_commands(void* rows, unsigned motion, int actual)

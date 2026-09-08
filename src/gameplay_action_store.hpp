@@ -25,11 +25,15 @@ public:
 private:
     struct Clip;
     static int select(void*, int, unsigned, FigaTree**, void**, char*, size_t);
+    static int transfer(void*, void*, Fighter*, Fighter*, int, unsigned,
+                        FigaTree**, void**, char*, size_t);
+    int select_from(GameplayActionStore& source, int motion, unsigned slot,
+                    FigaTree**, void**, char*, size_t);
     std::shared_ptr<const DatFighterRuntime> runtime_;
     DatFighterAnimationStore store_;
-    std::unique_ptr<DatCommands> commands_;
+    std::shared_ptr<DatCommands> commands_;
     std::set<uint32_t> command_motions_;
-    std::unique_ptr<MeleeWebNativeActionRows, decltype(&melee_web_action_rows_destroy)> rows_;
+    std::shared_ptr<MeleeWebNativeActionRows> rows_;
     std::array<std::shared_ptr<Clip>, 2> active_;
     std::array<uint32_t, 2> motions_{UINT32_MAX, UINT32_MAX};
     Fighter* fighter_ = nullptr;

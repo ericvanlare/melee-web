@@ -5,6 +5,12 @@ namespace melee_web {
 namespace { void require(bool v, const char* m) { if (!v) throw DatError(m); } }
 struct GameplayActionStore::Clip {
     DatSelectedAction selected;
+    /* The original x5A4/x5A8 identity points into the source row table. Keep
+     * that allocation alive when a victim outlives the thrower. */
+    std::shared_ptr<MeleeWebNativeActionRows> identity_rows;
+    /* The selected row's xC command pointer is also borrowed from the source
+     * command graph and is installed in the destination fighter state. */
+    std::shared_ptr<DatCommands> command_owner;
     std::unique_ptr<MeleeWebNativeClip, decltype(&melee_web_native_clip_destroy)> native;
     explicit Clip(DatSelectedAction value) : selected(std::move(value)), native(nullptr, melee_web_native_clip_destroy)
     {
@@ -39,7 +45,7 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     group(295,302);                              // Mario special scripts; Article creation remains a service gate
     for (auto choice : runtime_->wait_choices()) command_motions_.insert(choice.motion_id);
     for (auto id : command_motions_) if (auto offset = runtime_->action(id).command_offset) roots.push_back(*offset);
-    if (!roots.empty()) commands_ = std::make_unique<DatCommands>(archive, roots);
+    if (!roots.empty()) commands_ = std::make_shared<DatCommands>(archive, roots);
     std::vector<MeleeWebActionRow> rows;
     std::vector<MeleeWebWaitChoice> waits;
     for (const auto& a : runtime_->actions()) {
@@ -49,14 +55,15 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
                        {a.blend_dynamics[0], a.blend_dynamics[1]}});
     }
     for (auto w : runtime_->wait_choices()) waits.push_back({w.motion_id, w.weight});
-    rows_.reset(melee_web_action_rows_create(rows.data(), rows.size(), waits.data(), waits.size()));
+    rows_.reset(melee_web_action_rows_create(rows.data(), rows.size(), waits.data(), waits.size()),
+                melee_web_action_rows_destroy);
     require(bool(rows_), "Native action rows allocation failed");
 }
 GameplayActionStore::~GameplayActionStore() { unbind(); }
 void GameplayActionStore::bind(Fighter* fighter)
 {
     require(!fighter_, "Action store is already bound");
-    require(melee_web_action_bind(fighter, this, select), "Fighter action binding is unavailable"); fighter_ = fighter;
+    require(melee_web_action_bind(fighter, this, select, transfer), "Fighter action binding is unavailable"); fighter_ = fighter;
 }
 void GameplayActionStore::unbind()
 { if (fighter_) { melee_web_action_unbind(fighter_); fighter_ = nullptr; active_ = {}; motions_.fill(UINT32_MAX); } }
@@ -69,21 +76,49 @@ int GameplayActionStore::select(void* context, int motion, unsigned slot, FigaTr
 {
     try {
         auto& self = *static_cast<GameplayActionStore*>(context);
-        require(motion >= 0 && slot < 2, "Action selection is out of range");
-        const auto& row = self.runtime_->action(uint32_t(motion));
-        auto selected = self.store_.select(uint32_t(motion));
-        std::shared_ptr<Clip> clip;
-        for (const auto& active : self.active_) if (active &&
-            active->selected.action.container_offset == row.container_offset &&
-            active->selected.action.archive_bytes == row.archive_bytes && active->selected.action.symbol == row.symbol) clip = active;
-        if (!clip) clip = std::make_shared<Clip>(std::move(selected));
-        self.active_[slot] = clip; self.motions_[slot] = uint32_t(motion);
-        *tree = melee_web_native_clip_tree(clip->native.get());
-        *identity = melee_web_action_identity(self.rows_.get(), uint32_t(motion));
-        if (error && error_size) error[0] = 0;
-        return 1;
+        return self.select_from(self, motion, slot, tree, identity, error, error_size);
     } catch (const std::exception& e) {
         if (error && error_size) std::snprintf(error, error_size, "%s", e.what()); return 0;
     }
+}
+int GameplayActionStore::transfer(void* destination_context, void* source_context,
+    Fighter* destination, Fighter* source, int motion, unsigned slot, FigaTree** tree,
+    void** identity, char* error, size_t error_size)
+{
+    try {
+        auto& target = *static_cast<GameplayActionStore*>(destination_context);
+        auto& origin = *static_cast<GameplayActionStore*>(source_context);
+        require(target.fighter_ == destination, "Destination action store binding is stale");
+        require(origin.fighter_ == source, "Source action store binding is stale");
+        require(destination != source, "Cross-fighter transfer received identical fighters");
+        return target.select_from(origin, motion, slot, tree, identity, error, error_size);
+    } catch (const std::exception& e) {
+        if (error && error_size) std::snprintf(error, error_size, "%s", e.what()); return 0;
+    }
+}
+int GameplayActionStore::select_from(GameplayActionStore& source, int motion, unsigned slot,
+    FigaTree** tree, void** identity, char* error, size_t error_size)
+{
+    require(motion >= 0 && slot < 2, "Action selection is out of range");
+    require(fighter_, "Destination action store is unbound");
+    require(bool(source.rows_), "Source action rows are unavailable");
+    const auto& row = source.runtime_->action(uint32_t(motion));
+    auto selected = source.store_.select(uint32_t(motion));
+    std::shared_ptr<Clip> clip;
+    for (const auto& active : active_) if (active &&
+        active->identity_rows.get() == source.rows_.get() &&
+        active->selected.action.container_offset == row.container_offset &&
+        active->selected.action.archive_bytes == row.archive_bytes && active->selected.action.symbol == row.symbol) clip = active;
+    if (!clip) {
+        clip = std::make_shared<Clip>(std::move(selected));
+        clip->identity_rows = source.rows_;
+        clip->command_owner = source.commands_;
+    }
+    active_[slot] = clip; motions_[slot] = uint32_t(motion);
+    *tree = melee_web_native_clip_tree(clip->native.get());
+    /* x5A4/x5A8 are source-row identities in ftData_80085CD8. */
+    *identity = melee_web_action_identity(source.rows_.get(), uint32_t(motion));
+    if (error && error_size) error[0] = 0;
+    return 1;
 }
 }

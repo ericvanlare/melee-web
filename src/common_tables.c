@@ -29,8 +29,8 @@ _Static_assert(sizeof(struct ftCo_ItemThrowAttrs)==12 &&
 struct MeleeWebCommonNative {
     MeleeWebCommonTables values;
     struct ftCo_ItemThrowAttrs throws[26];
-    FighterPartsTable part_desc[MELEE_WEB_COMMON_FIGHTERS];
-    FighterPartsTable* parts[MELEE_WEB_COMMON_FIGHTERS];
+    FighterPartsTable part_desc[MELEE_WEB_COMMON_PART_TABLES];
+    FighterPartsTable* parts[MELEE_WEB_COMMON_PART_TABLES];
     struct Fighter_804D6540_t alternate_desc[MELEE_WEB_COMMON_FIGHTERS];
     struct Fighter_804D6540_t* alternates[MELEE_WEB_COMMON_FIGHTERS];
     struct Fighter_804D6540_x0_t entries[MELEE_WEB_COMMON_FIGHTERS][MELEE_WEB_COMMON_MAX_ALTERNATES];
@@ -58,6 +58,15 @@ static int shake_valid(const MeleeWebCommonShake* value)
         if(!isfinite(value->samples[i].x)||!isfinite(value->samples[i].y))return 0;
     return 1;
 }
+static int parts_valid(const MeleeWebCommonParts* p)
+{
+    if(!p->part_count || p->part_count>MELEE_WEB_COMMON_MAX_PARTS)return 0;
+    for(unsigned j=0;j<p->part_count;++j)
+        if(p->joint_to_part[j]!=255&&p->joint_to_part[j]>=MELEE_WEB_COMMON_PART_NAMES)return 0;
+    for(unsigned j=0;j<MELEE_WEB_COMMON_PART_NAMES;++j)
+        if(p->part_to_joint[j]!=255&&p->part_to_joint[j]>=p->part_count)return 0;
+    return 1;
+}
 static int validate(const MeleeWebCommonTables* t)
 {
     if(!t || (t->ready_mask&~MELEE_WEB_COMMON_STATIC_ROOT_MASK))return 0;
@@ -66,11 +75,10 @@ static int validate(const MeleeWebCommonTables* t)
         if(!isfinite(t->item_throw[i].velocity_mul)||!isfinite(t->item_throw[i].angle)||!isfinite(t->item_throw[i].heavy_mul))return 0;
     if(READY(2))for(unsigned i=0;i<6;++i)if(!finite_values(t->swing[i],5))return 0;
     if(READY(3)&&!finite_values(t->stale,9))return 0;
-    if(READY(4))for(unsigned i=0;i<MELEE_WEB_COMMON_FIGHTERS;++i) {
-        const MeleeWebCommonParts* p=&t->parts[i];
-        if(!p->part_count || p->part_count>MELEE_WEB_COMMON_MAX_PARTS)return 0;
-        for(unsigned j=0;j<p->part_count;++j)if(p->joint_to_part[j]!=255&&p->joint_to_part[j]>=MELEE_WEB_COMMON_PART_NAMES)return 0;
-        for(unsigned j=0;j<MELEE_WEB_COMMON_PART_NAMES;++j)if(p->part_to_joint[j]!=255&&p->part_to_joint[j]>=p->part_count)return 0;
+    if(READY(4)) {
+        for(unsigned i=0;i<MELEE_WEB_COMMON_FIGHTERS;++i)
+            if(!parts_valid(&t->parts[i]))return 0;
+        if(!parts_valid(&t->none_parts))return 0;
     }
     if(READY(5)) {
         if(!READY(4))return 0;
@@ -115,9 +123,11 @@ MeleeWebCommonNative* melee_web_common_tables_create(const MeleeWebCommonTables*
     for(unsigned i=0;i<26;++i)owner->throws[i]=(struct ftCo_ItemThrowAttrs){
         t->item_throw[i].velocity_mul,t->item_throw[i].angle,t->item_throw[i].heavy_mul};
     owner->roots[1]=owner->throws;owner->roots[2]=t->swing;owner->roots[3]=t->stale;
-    for(unsigned i=0;i<MELEE_WEB_COMMON_FIGHTERS;++i) {
-        owner->part_desc[i]=(FighterPartsTable){t->parts[i].joint_to_part,t->parts[i].part_to_joint,t->parts[i].part_count};
+    for(unsigned i=0;i<MELEE_WEB_COMMON_PART_TABLES;++i) {
+        MeleeWebCommonParts* source=i<MELEE_WEB_COMMON_FIGHTERS?&t->parts[i]:&t->none_parts;
+        owner->part_desc[i]=(FighterPartsTable){source->joint_to_part,source->part_to_joint,source->part_count};
         owner->parts[i]=&owner->part_desc[i];
+        if(i==MELEE_WEB_COMMON_FIGHTERS)continue;
         if((t->ready_mask&(1U<<5))&&t->alternates[i].has_descriptor) {
             owner->alternate_desc[i].x0=owner->entries[i];owner->alternate_desc[i].x4=(int)t->alternates[i].count;
             owner->alternates[i]=&owner->alternate_desc[i];
@@ -170,8 +180,8 @@ int melee_web_common_parts_lookup(MeleeWebCommonNative* owner,uint32_t kind,uint
 }
 int melee_web_common_parts_remap(MeleeWebCommonNative* owner,uint32_t to,uint32_t from,uint32_t joint,uint32_t* mapped,char* error,size_t size)
 {
-    if(!melee_web_common_tables_root(owner,4)||!mapped||to>=MELEE_WEB_COMMON_FIGHTERS||from>=MELEE_WEB_COMMON_FIGHTERS)
-        return fail(error,size,"Common part remap requires a ready graph and bounded source fighter kinds");
+    if(!melee_web_common_tables_root(owner,4)||!mapped||to>=MELEE_WEB_COMMON_FIGHTERS||from>=MELEE_WEB_COMMON_PART_TABLES)
+        return fail(error,size,"Common part remap requires a ready graph and bounded source part tables");
     FighterPartsTable** saved=ftPartsTable;ftPartsTable=owner->parts;
     *mapped=(uint32_t)ftPartsRemap(to,from,joint);
     ftPartsTable=saved;return success(error,size);

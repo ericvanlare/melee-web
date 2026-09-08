@@ -39,9 +39,9 @@ struct TablesFixture : Fixture {
             for(unsigned i=0;i<count;++i)putf(data,values+i*4,float(index*100+i));
             if(index==12)scale=values;
         }
-        maps=allocate(33*4);part_desc=allocate(12);joints=allocate(3);names=allocate(54);
+        maps=allocate(MELEE_WEB_COMMON_PART_TABLES*4);part_desc=allocate(12);joints=allocate(3);names=allocate(54);
         link(root+4*4,maps);link(part_desc,joints);link(part_desc+4,names);put32(data,part_desc+8,3);
-        for(unsigned kind=0;kind<33;++kind)link(maps+kind*4,part_desc);
+        for(unsigned kind=0;kind<MELEE_WEB_COMMON_PART_TABLES;++kind)link(maps+kind*4,part_desc);
         data[joints]=2;data[joints+1]=255;data[joints+2]=53;
         std::fill_n(data.begin()+names,54,255);data[names+2]=0;data[names+53]=2;
         alternates=allocate(33*4);alternate_desc=allocate(8);entries=allocate(4);
@@ -71,6 +71,8 @@ void static_graphs_and_ownership() {
           common.tables.gravity_weight[1]==1501,"source table boundaries retain values");
     check(common.tables.parts[32].part_count==3&&common.tables.parts[32].part_to_joint[53]==2&&
           common.tables.parts[32].joint_to_part[1]==255,"all 33 fighter slots include the final named mapping and sentinel");
+    check(common.tables.none_parts.part_count==3&&common.tables.none_parts.part_to_joint[53]==2&&
+          common.tables.none_parts.joint_to_part[1]==255,"the source-only FTKIND_NONE slot retains its part map");
     check(!common.tables.alternates[0].has_descriptor&&common.tables.alternates[4].count==1&&
           common.tables.alternates[4].entries[0].insertion==3&&common.tables.alternates[4].entries[0].source_joint==255,
           "nullable alternate table and typed insertion record");

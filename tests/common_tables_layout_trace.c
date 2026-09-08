@@ -36,6 +36,10 @@ unsigned common_tables_check_native_layout(const MeleeWebCommonNative* owner,con
             if(e->x0!=v->slot||e->x1!=v->parent||e->x2!=v->insertion||e->x3!=v->source_joint)return 5;
         }
     }
+    const MeleeWebCommonParts* none=&values->none_parts;
+    if(!parts[MELEE_WEB_COMMON_FIGHTERS]||parts[MELEE_WEB_COMMON_FIGHTERS]->parts_num!=none->part_count||
+       memcmp(parts[MELEE_WEB_COMMON_FIGHTERS]->part_to_joint,none->part_to_joint,MELEE_WEB_COMMON_PART_NAMES)||
+       memcmp(parts[MELEE_WEB_COMMON_FIGHTERS]->joint_to_part,none->joint_to_part,none->part_count))return 4;
     Vec2* const* damage=melee_web_common_tables_root(owner,9);
     if(!damage)return 9;
     for(unsigned i=0;i<3;++i) {

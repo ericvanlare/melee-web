@@ -1,5 +1,6 @@
 #include "gameplay_action_store.hpp"
 #include "fighter_runtime_fixture.hpp"
+#include <string>
 #include <fstream>
 #include <iostream>
 using namespace fighter_runtime_test;
@@ -7,6 +8,11 @@ extern "C" {
 Fighter* action_test_fighter(void);
 void action_test_destroy(Fighter*);
 int action_test_load(Fighter*, int, int);
+int action_test_load_from(Fighter*, Fighter*, int);
+void* action_test_identity(Fighter*);
+const char* action_test_identity_symbol(Fighter*);
+int action_test_identity_command_live(Fighter*);
+int action_test_identity_command_executes(Fighter*);
 int action_test_alias(Fighter*);
 float action_test_frames(Fighter*);
 int action_test_cleared(Fighter*);
@@ -49,6 +55,25 @@ void verify(std::shared_ptr<const DatArchive> archive, const Bytes& container, b
     }
     store.unbind(); check(action_test_cleared(fp), "Unbind clears borrowed fighter pointers"); action_test_destroy(fp);
 }
+void verify_cross_fighter_identity_lease(std::shared_ptr<const DatArchive> archive, const Bytes& container)
+{
+    auto source = std::make_unique<GameplayActionStore>(archive, mario(), container);
+    GameplayActionStore destination(archive, mario(), container);
+    Fighter* thrower = action_test_fighter(); Fighter* victim = action_test_fighter();
+    check(thrower && victim, "Cross-fighter test allocation"); source->bind(thrower); destination.bind(victim);
+    check(action_test_load_from(victim, thrower, 2) > 0, "Cross-fighter source action load");
+    const auto frames = action_test_frames(victim); const auto identity = action_test_identity(victim);
+    const std::string symbol = action_test_identity_symbol(victim);
+    check(frames > 0 && identity && !symbol.empty() && action_test_identity_command_live(victim),
+          "Cross-fighter destination owns action identity and source command lease");
+    source.reset();
+    check(action_test_frames(victim) == frames && action_test_identity(victim) == identity &&
+          action_test_identity_symbol(victim) && symbol == action_test_identity_symbol(victim) &&
+          action_test_identity_command_live(victim) && action_test_identity_command_executes(victim),
+          "Destination clip, source-row identity, symbol and command survive source teardown");
+    destination.unbind(); check(action_test_cleared(victim), "Cross-fighter destination unbind clears pointers");
+    action_test_destroy(thrower); action_test_destroy(victim);
+}
 }
 int main(int argc, char** argv)
 {
@@ -60,6 +85,7 @@ int main(int argc, char** argv)
         put32(fixture.data, fixture.command_a, 0xd0000003); fixture.unlink(fixture.command_a + 4);
         put32(fixture.data, fixture.command_b, 0);
         verify(std::make_shared<const DatArchive>(fixture.file()),fixture.container,false);
+        verify_cross_fighter_identity_lease(std::make_shared<const DatArchive>(fixture.file()), fixture.container);
         // Fail before publication on unsupported opcodes, missing branch relocations,
         // return underflow and branch cycles; original stack has only three slots.
         for (uint32_t word : {0xfc000000U,0x14000000U,0x18000000U}) {

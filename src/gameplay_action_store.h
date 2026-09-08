@@ -15,7 +15,14 @@ struct FigaTree* melee_web_native_clip_tree(MeleeWebNativeClip*);
  * original void loader; failure never masquerades as an empty source clip. */
 typedef int (*MeleeWebActionSelect)(void* context, int motion, unsigned slot,
     struct FigaTree** tree, void** identity, char* error, size_t error_size);
-int melee_web_action_bind(struct Fighter*, void* context, MeleeWebActionSelect);
+/* A cross-fighter load uses the source store's archive row and the
+ * destination store's native lease.  The Fighter arguments let the callback
+ * reject a stale context after either fighter has been torn down. */
+typedef int (*MeleeWebActionTransfer)(void* destination_context, void* source_context,
+    struct Fighter* destination, struct Fighter* source, int motion, unsigned slot,
+    struct FigaTree** tree, void** identity, char* error, size_t error_size);
+int melee_web_action_bind(struct Fighter*, void* context, MeleeWebActionSelect,
+    MeleeWebActionTransfer);
 void melee_web_action_unbind(struct Fighter*);
 void melee_web_action_load(struct Fighter* destination, struct Fighter* source, int motion, unsigned slot);
 /* Canonical instruction words are decoded into original native named fields.

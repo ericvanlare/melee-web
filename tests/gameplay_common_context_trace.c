@@ -26,6 +26,7 @@ int main(void)
         scalars.x7D8=(MeleeWebCommonColor){7,11,13,17};
         MeleeWebCommonTables tables={0};tables.ready_mask=1u<<4;
         for(unsigned i=0;i<MELEE_WEB_COMMON_FIGHTERS;++i)tables.parts[i].part_count=1;
+        tables.none_parts.part_count=1;
         MeleeWebNativeJointDesc joint={0};joint.child=joint.next=UINT32_MAX;
         joint.scale[0]=joint.scale[1]=joint.scale[2]=1;
         MeleeWebNativeDObjDesc dobj={0};dobj.next=dobj.pobj=UINT32_MAX;

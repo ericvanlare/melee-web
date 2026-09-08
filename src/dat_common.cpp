@@ -81,11 +81,11 @@ void static_tables(const DatArchive& archive, DatCommon& common)
             break;
         case 3: floats(archive,offset,t.stale,9); break;
         case 4:
-            region(archive,offset,MELEE_WEB_COMMON_FIGHTERS*4);
-            for(std::uint32_t kind=0;kind<MELEE_WEB_COMMON_FIGHTERS;++kind) {
+            region(archive,offset,MELEE_WEB_COMMON_PART_TABLES*4);
+            for(std::uint32_t kind=0;kind<MELEE_WEB_COMMON_PART_TABLES;++kind) {
                 const auto desc=required(archive,offset+kind*4,12);
                 region(archive,desc,12);
-                auto& parts=t.parts[kind];
+                auto& parts=kind<MELEE_WEB_COMMON_FIGHTERS?t.parts[kind]:t.none_parts;
                 parts.part_count=count_word(archive,desc+8);
                 if (!parts.part_count || parts.part_count>MELEE_WEB_COMMON_MAX_PARTS)
                     throw DatError("Common part count exceeds original Fighter storage");
