@@ -20,6 +20,7 @@ int main(int argc,char** argv){try{
   check(melee_web_match_create_fighters(match,error,sizeof(error)),error);
   MeleeWebRenderSettings settings{640,480,{0,25,180},{0,15,0},30,1,1000,(UINT64_C(1)<<3)|(UINT64_C(1)<<5)};
   auto* camera=melee_web_render_begin_match(&settings,error,sizeof(error));check(camera!=nullptr,error);
+  world.enable_full_stage();
   bool lost=false,returned=false,finished=false;int previous=-1,stock=4,respawns=0;bool jump=false;
   for(unsigned tick=0;tick<4000;tick++){
    PADStatus pads[4]={{0}};
@@ -40,6 +41,7 @@ int main(int argc,char** argv){try{
 
   }
   check(returned&&respawns==3&&finished,"Original four-stock elimination and three grounded respawns did not complete");
+  world.end_stage();
   check(melee_web_render_end(camera,error,sizeof(error)),error);check(melee_web_match_end(match,error,sizeof(error)),error);world.close();
  }
  std::cout<<"Original input four-stock elimination, three respawns and winner passed in two worlds\n";

@@ -14,13 +14,17 @@
 <p id="score" aria-live="off"></p>
 <p id="metrics">No match loaded.</p>
 <p id="audio-metrics">Audio output is not initialized.</p>
-<details><summary>Runtime diagnostics</summary><button id="combat-check" disabled>Restart + combat check</button><p>Diagnostic only: restarts this match, then supplies ground and air B inputs for four seconds.</p><pre id="state"></pre><pre id="input-state"></pre><pre id="log"></pre></details>
+<details><summary>Runtime diagnostics</summary><button id="combat-check" disabled>Restart + combat check</button><p>Diagnostic only: restarts this match, then supplies ground and air B inputs for four seconds.</p><button id="stock-check" disabled>Restart + stock check</button><p>Diagnostic only: uses movement and jump inputs to test four stock losses and three respawns, then the original match outcome.</p><pre id="environment"></pre><pre id="timing-events"></pre><pre id="state"></pre><pre id="input-state"></pre><pre id="log"></pre></details>
 <script>
 const $=id=>document.getElementById(id),required=['PlCo.dat','PlMr.dat','PlMrNr.dat','PlMrAJ.dat','GrNLa.dat','ItCo.usd','EfMrData.dat','EfCoData.dat','PdPm.dat','sislib_font.bin','smash2.sem','main.ssm','mario.ssm','dsp_coef.bin','sp_end.hps'];
-let ready=false,importing=false,fatal=false,last=0,intervals=[],costs=[],wasRunning=false,activeFrames=0,worstInterval=0,longFrames=0;
+let ready=false,importing=false,fatal=false,last=0,intervals=[],costs=[],wasRunning=false,activeFrames=0,worstInterval=0,longFrames=0,previousCost=0,timingEvents=[],renderTiming=null,previousRenderTiming=null,longTasks=[];
 let audioContext=null,audioNode=null,audioEnabled=false;
 const pendingCommands=[];
 let inputDirty=true;
+window.runtimeRenderTiming=timing=>{renderTiming=timing;};
+if(typeof PerformanceObserver!=='undefined'&&PerformanceObserver.supportedEntryTypes?.includes('longtask')){
+  new PerformanceObserver(list=>{for(const entry of list.getEntries())longTasks.push({start_ms:+entry.startTime.toFixed(3),duration_ms:+entry.duration.toFixed(3)});if(longTasks.length>50)longTasks.splice(0,longTasks.length-50);}).observe({type:'longtask'});
+}
 function atBoundary(run){return new Promise((resolve,reject)=>{if(fatal)return reject(Error('Runtime stopped'));pendingCommands.push({run,resolve,reject});});}
 window.runtimeServiceCommands=()=>{
   if(fatal)return;
@@ -43,29 +47,39 @@ async function prepareAudio(){
 }
 function syncAudio(enabled){if(audioEnabled===enabled)return;audioEnabled=enabled;audioNode?.port.postMessage({type:'state',enabled});}
 window.runtimeAudio=pcm=>{if(audioNode&&audioEnabled)audioNode.port.postMessage({type:'pcm',pcm},[pcm.buffer]);};
-function stopRuntime(reason){fatal=true;for(const command of pendingCommands.splice(0))command.reject(Error(reason));syncAudio(false);$('status').textContent='Runtime stopped: '+reason;for(const id of ['launch','pause','unload','files','combat-check'])$(id).disabled=true;log(reason);}
+function stopRuntime(reason){fatal=true;for(const command of pendingCommands.splice(0))command.reject(Error(reason));syncAudio(false);$('status').textContent='Runtime stopped: '+reason;for(const id of ['launch','pause','unload','files','combat-check','stock-check'])$(id).disabled=true;log(reason);}
 window.addEventListener('error',e=>stopRuntime(e.error?.stack||e.message));
 window.addEventListener('unhandledrejection',e=>stopRuntime(e.reason?.stack||String(e.reason)));
 setInterval(()=>{$('state').dataset.boundary=window.runtimeBoundary||'startup';$('state').title='Runtime boundary: '+(window.runtimeBoundary||'startup');},1000);
 const log=text=>{$('log').textContent=($('log').textContent+'\n'+text).slice(-24000);};
 function update(){if(!ready||fatal)return;syncAudio(!!Module._melee_web_game_running()&&!document.hidden);$('status').textContent=Module.UTF8ToString(Module._melee_web_game_message());const state=Module.UTF8ToString(Module._melee_web_game_stats());$('state').textContent=state;$('input-state').textContent=Module.UTF8ToString(Module._melee_web_input_message());const data=JSON.parse(state);$('score').textContent=data.players?data.players.map((p,i)=>`P${i+1} Mario · ${Math.floor(p.percent)}% · ${p.stocks} stocks`).join('     |     '):'';$('pause').disabled=!data.loaded||!!data.finished;$('pause').textContent=Module._melee_web_game_running()?'Pause':'Resume';}
 function activity(){inputDirty=true;}
-function resetMetrics(){last=0;intervals=[];costs=[];wasRunning=false;activeFrames=0;worstInterval=0;longFrames=0;}
+function resetMetrics(){last=0;intervals=[];costs=[];wasRunning=false;activeFrames=0;worstInterval=0;longFrames=0;previousCost=0;timingEvents=[];renderTiming=null;previousRenderTiming=null;longTasks=[];$('timing-events').textContent='No active-frame intervals above 33.3 ms.';
+  $('environment').textContent=`${navigator.userAgent}\nCanvas ${$('canvas').width}×${$('canvas').height}; device pixel ratio ${window.devicePixelRatio}`;
+}
 window.runtimeFrame=(frames,now,cost)=>{
   if(wasRunning&&last&&now>=last){
     const interval=now-last;intervals.push(interval);costs.push(cost);++activeFrames;
-    worstInterval=Math.max(worstInterval,interval);if(interval>1000/30)++longFrames;
+    worstInterval=Math.max(worstInterval,interval);
+    if(interval>1000/30){
+      ++longFrames;
+      const snapshot=JSON.parse(Module.UTF8ToString(Module._melee_web_game_stats()));
+      timingEvents.push({tick:snapshot.ticks,interval_ms:+interval.toFixed(3),previous_frame_work_ms:+previousCost.toFixed(3),current_frame_work_ms:+cost.toFixed(3),previous_render:previousRenderTiming,current_render:renderTiming,recent_long_tasks:longTasks.filter(task=>task.start_ms+task.duration_ms>=last-100),visible:!document.hidden,focused:document.hasFocus()});
+      if(timingEvents.length>50)timingEvents.shift();
+      $('timing-events').textContent=timingEvents.map(event=>JSON.stringify(event)).join('\n');
+    }
     if(intervals.length>600){intervals.shift();costs.shift();}
   }
-  last=now;wasRunning=ready&&!fatal&&!!Module._melee_web_game_running()&&!document.hidden;
+  previousRenderTiming=renderTiming;previousCost=cost;last=now;wasRunning=ready&&!fatal&&!!Module._melee_web_game_running()&&!document.hidden;
   if(frames%15===0){update();const p95=a=>a.length?[...a].sort((a,b)=>a-b)[Math.floor((a.length-1)*.95)].toFixed(2):'—';
     $('metrics').textContent=`Active frames ${activeFrames} · recent interval p95 ${p95(intervals)} ms · worst since launch ${worstInterval.toFixed(2)} ms · >33.3 ms ${longFrames} · recent CPU p95 ${p95(costs)} ms · @MELEE_WEB_BUILD_LABEL@`;
   }
 };
 async function put(name,data){return atBoundary(()=>{const nameBytes=new TextEncoder().encode(name+'\0');let n=0,p=0;try{n=Module._malloc(nameBytes.length);p=Module._malloc(data.length);if(!n||!p)throw Error('Out of memory during import');Module.HEAPU8.set(nameBytes,n);Module.HEAPU8.set(data,p);if(!Module._melee_web_game_file(n,p,data.length))throw Error(Module.UTF8ToString(Module._melee_web_game_message()));}finally{if(n)Module._free(n);if(p)Module._free(p);}});}
-$('files').addEventListener('change',async()=>{if(!ready||fatal||importing)return;importing=true;$('launch').disabled=true;try{if(!await atBoundary(()=>Module._melee_web_game_unload()))throw Error(Module.UTF8ToString(Module._melee_web_game_message()));const selected=new Map();for(const file of $('files').files){if(!required.includes(file.name))continue;if(selected.has(file.name))throw Error('Ambiguous duplicate file: '+file.name);if(!file.size||file.size>64*1024*1024)throw Error('Invalid file size: '+file.name);selected.set(file.name,file);}const missing=required.filter(name=>!selected.has(name));if(missing.length)throw Error('Missing: '+missing.join(', '));for(const name of required){$('status').textContent='Importing '+name;await put(name,new Uint8Array(await selected.get(name).arrayBuffer()));}$('launch').disabled=$('combat-check').disabled=false;update();}catch(e){$('status').textContent=e.message;}finally{importing=false;}});
+$('files').addEventListener('change',async()=>{if(!ready||fatal||importing)return;importing=true;$('launch').disabled=true;try{if(!await atBoundary(()=>Module._melee_web_game_unload()))throw Error(Module.UTF8ToString(Module._melee_web_game_message()));const selected=new Map();for(const file of $('files').files){if(!required.includes(file.name))continue;if(selected.has(file.name))throw Error('Ambiguous duplicate file: '+file.name);if(!file.size||file.size>64*1024*1024)throw Error('Invalid file size: '+file.name);selected.set(file.name,file);}const missing=required.filter(name=>!selected.has(name));if(missing.length)throw Error('Missing: '+missing.join(', '));for(const name of required){$('status').textContent='Importing '+name;await put(name,new Uint8Array(await selected.get(name).arrayBuffer()));}$('launch').disabled=$('combat-check').disabled=$('stock-check').disabled=false;update();}catch(e){$('status').textContent=e.message;}finally{importing=false;}});
 $('launch').onclick=async()=>{$('launch').disabled=true;try{await prepareAudio();if(!await atBoundary(()=>Module._melee_web_game_launch())){update();return;}resetMetrics();$('pause').disabled=$('unload').disabled=false;$('canvas').focus();activity();update();}catch(error){$('status').textContent=error.message;}finally{$('launch').disabled=false;}};
 $('combat-check').onclick=async()=>{await $('launch').onclick();await atBoundary(()=>{if(Module._melee_web_game_running())Module._melee_web_game_combat_check();});update();};
+$('stock-check').onclick=async()=>{await $('launch').onclick();await atBoundary(()=>{if(Module._melee_web_game_running())Module._melee_web_game_stock_check();});update();};
 $('pause').onclick=async()=>{await atBoundary(()=>Module._melee_web_game_pause(Module._melee_web_game_running()?1:0));if(Module._melee_web_game_running())$('canvas').focus();activity();update();};
 $('unload').onclick=async()=>{const unloaded=await atBoundary(()=>Module._melee_web_game_unload());if(unloaded)$('pause').disabled=$('unload').disabled=true;update();};
 $('keyboard').onchange=activity;

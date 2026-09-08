@@ -1,6 +1,7 @@
 #include "gameplay_match_context.h"
 #include "gameplay_match_rules.h"
 #include "gameplay_bootstrap.h"
+#include "gameplay_crowd.h"
 #include <melee/cm/camera.h>
 #include <melee/cm/types.h>
 #include <melee/ft/types.h>
@@ -43,6 +44,7 @@ struct MeleeWebMatchContext {
     PadLibData saved_pad_library;
     HSD_PadData input_queue;
     CmSubject* pool;
+    int crowd_started;
 };
 static MeleeWebMatchContext* owner;
 static uint64_t shadow_generation;
@@ -151,6 +153,8 @@ int melee_web_match_create_fighters(MeleeWebMatchContext* h,char* e,size_t n)
         Player_80031848(h->slots[i]);
     }
     melee_web_match_rules_refresh();
+    if(!melee_web_crowd_begin(e,n))return 0;
+    h->crowd_started=1;
     return ok(e,n);
 }
 static int sample_valid(const MeleeWebControllerSample* s)
@@ -308,6 +312,10 @@ int melee_web_match_end(MeleeWebMatchContext* h,char* e,size_t n)
     if(!live(h,e,n))return 0;
     /* Items may retain their fighter owner during source destruction. */
     while(((HSD_GObj**)HSD_GObj_Entities)[9])Item_8026A8EC(((HSD_GObj**)HSD_GObj_Entities)[9]);
+    if(h->crowd_started){
+        if(!melee_web_crowd_end(e,n))return 0;
+        h->crowd_started=0;
+    }
     /* Dispose the scoped source object through its registered destructor, as
      * bootstrap world disposal does. Player_80031EBC is an in-match despawn:
      * it first creates effect 0x43f and enters Sleep, leaving an effect object. */

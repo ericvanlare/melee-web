@@ -1,5 +1,6 @@
 #include "gameplay_compat.h"
 #include "gameplay_match_context.h"
+#include "gameplay_render.h"
 #include "gameplay_world.hpp"
 #include "dat_archive.hpp"
 
@@ -82,7 +83,7 @@ void settle(MeleeWebMatchContext* match, char* error)
     throw std::runtime_error("Two source fighters did not settle into grounded Wait");
 }
 
-MeleeWebMatchContext* begin_match(GameplayWorld& world, char* error)
+MeleeWebMatchContext* begin_match(GameplayWorld& world, MeleeWebRender*& camera, char* error)
 {
     const float left_floor = world.floor_height(-5.0f);
     const float right_floor = world.floor_height(5.0f);
@@ -95,10 +96,17 @@ MeleeWebMatchContext* begin_match(GameplayWorld& world, char* error)
     check(match != nullptr, error);
     try {
         check(melee_web_match_create_fighters(match, error, 256), error);
+        MeleeWebRenderSettings rendering{640,480,{0,35,190},{0,5,0},45,1,2000,
+            (UINT64_C(1)<<3)|(UINT64_C(1)<<5)};
+        camera=melee_web_render_begin_match(&rendering,error,256);
+        check(camera!=nullptr,error);
+        world.enable_full_stage();
         settle(match, error);
         return match;
     } catch (...) {
         char cleanup_error[256];
+        world.end_stage();
+        if(camera){melee_web_render_end(camera,cleanup_error,sizeof(cleanup_error));camera=nullptr;}
         if (!melee_web_match_end(match, cleanup_error, sizeof(cleanup_error))) {
             std::cerr << "Combat trace setup cleanup failed: " << cleanup_error << '\n';
         }
@@ -106,18 +114,21 @@ MeleeWebMatchContext* begin_match(GameplayWorld& world, char* error)
     }
 }
 
-void end_match(MeleeWebMatchContext*& match, char* error)
+void end_match(GameplayWorld& world, MeleeWebMatchContext*& match, MeleeWebRender*& camera, char* error)
 {
     if (match == nullptr) {
         return;
     }
+    world.end_stage();
+    if(camera){check(melee_web_render_end(camera,error,256),error);camera=nullptr;}
     check(melee_web_match_end(match, error, 256), error);
     match = nullptr;
 }
 
 void jab_trace(GameplayWorld& world, char* error)
 {
-    MeleeWebMatchContext* match = begin_match(world, error);
+    MeleeWebRender* camera=nullptr;
+    MeleeWebMatchContext* match = begin_match(world, camera, error);
     try {
         const PADStatus neutral = {0};
         PADStatus jab = {0};
@@ -150,10 +161,12 @@ void jab_trace(GameplayWorld& world, char* error)
         check(saw_damage_motion, "P2 did not enter a source damage motion after the jab");
         std::cerr << "jab: P2 damage " << initial.damage_percent << " -> "
                   << stats(match, 1, error).damage_percent << '\n';
-        end_match(match, error);
+        end_match(world, match, camera, error);
     } catch (...) {
         if (match != nullptr) {
             char cleanup_error[256];
+            world.end_stage();
+            if(camera){melee_web_render_end(camera,cleanup_error,sizeof(cleanup_error));camera=nullptr;}
             if (!melee_web_match_end(match, cleanup_error, sizeof(cleanup_error))) {
                 std::cerr << "Jab trace cleanup failed: " << cleanup_error << '\n';
             }
@@ -165,7 +178,8 @@ void jab_trace(GameplayWorld& world, char* error)
 
 void shield_trace(GameplayWorld& world, char* error)
 {
-    MeleeWebMatchContext* match = begin_match(world, error);
+    MeleeWebRender* camera=nullptr;
+    MeleeWebMatchContext* match = begin_match(world, camera, error);
     try {
         const PADStatus neutral = {0};
         PADStatus jab = {0};
@@ -209,10 +223,12 @@ void shield_trace(GameplayWorld& world, char* error)
         std::cerr << "shield: P2 shield " << initial.shield_health << " -> "
                   << minimum_shield << ", damage " << initial.damage_percent << " -> "
                   << maximum_damage << '\n';
-        end_match(match, error);
+        end_match(world, match, camera, error);
     } catch (...) {
         if (match != nullptr) {
             char cleanup_error[256];
+            world.end_stage();
+            if(camera){melee_web_render_end(camera,cleanup_error,sizeof(cleanup_error));camera=nullptr;}
             if (!melee_web_match_end(match, cleanup_error, sizeof(cleanup_error))) {
                 std::cerr << "Shield trace cleanup failed: " << cleanup_error << '\n';
             }
@@ -232,7 +248,8 @@ struct ThrowCase {
 
 void throw_trace(GameplayWorld& world, const ThrowCase& test, char* error)
 {
-    MeleeWebMatchContext* match = begin_match(world, error);
+    MeleeWebRender* camera=nullptr;
+    MeleeWebMatchContext* match = begin_match(world, camera, error);
     try {
         const PADStatus neutral = {0};
         PADStatus grab = {0};
@@ -300,10 +317,12 @@ void throw_trace(GameplayWorld& world, const ThrowCase& test, char* error)
         }
         std::cerr << test.name << " entered source throw " << test.throw_motion
                   << " / victim " << test.thrown_motion << '\n';
-        end_match(match, error);
+        end_match(world, match, camera, error);
     } catch (...) {
         if (match != nullptr) {
             char cleanup_error[256];
+            world.end_stage();
+            if(camera){melee_web_render_end(camera,cleanup_error,sizeof(cleanup_error));camera=nullptr;}
             if (!melee_web_match_end(match, cleanup_error, sizeof(cleanup_error))) {
             std::cerr << test.name << " cleanup failed: " << cleanup_error << '\n';
             }
@@ -313,7 +332,7 @@ void throw_trace(GameplayWorld& world, const ThrowCase& test, char* error)
     }
 }
 
-void grab_throw_trace(GameplayWorld& world, char* error)
+void grab_throw_trace(RuntimeFiles& files, char* error)
 {
     const ThrowCase cases[] = {
         {"forward", 80, 0, ftCo_MS_ThrowF, ftCo_MS_ThrownF},
@@ -321,17 +340,83 @@ void grab_throw_trace(GameplayWorld& world, char* error)
         {"up", 0, 80, ftCo_MS_ThrowHi, ftCo_MS_ThrownHi},
         {"down", 0, -80, ftCo_MS_ThrowLw, ftCo_MS_ThrownLw},
     };
-    for (const auto& test : cases) throw_trace(world, test, error);
+    for (const auto& test : cases) {GameplayWorld world(files);throw_trace(world, test, error);world.close();}
+}
+
+enum class MovePreparation { None, Air, Dash, Shield };
+struct MoveCase {
+    const char* name;
+    MovePreparation preparation;
+    int motion;
+    unsigned buttons;
+    int stick_x, stick_y, cstick_x, cstick_y;
+};
+
+void move_trace(RuntimeFiles& files, char* error)
+{
+    using P=MovePreparation;
+    const MoveCase cases[]={
+        {"forward tilt",P::None,ftCo_MS_AttackS3S,PAD_BUTTON_A,40,0,0,0},
+        {"up tilt",P::None,ftCo_MS_AttackHi3,PAD_BUTTON_A,0,40,0,0},
+        {"down tilt",P::None,ftCo_MS_AttackLw3,PAD_BUTTON_A,0,-40,0,0},
+        {"forward smash",P::None,ftCo_MS_AttackS4S,0,0,0,80,0},
+        {"up smash",P::None,ftCo_MS_AttackHi4,0,0,0,0,80},
+        {"down smash",P::None,ftCo_MS_AttackLw4,0,0,0,0,-80},
+        {"dash attack",P::Dash,ftCo_MS_AttackDash,PAD_BUTTON_A,80,0,0,0},
+        {"neutral aerial",P::Air,ftCo_MS_AttackAirN,PAD_BUTTON_A,0,0,0,0},
+        {"forward aerial",P::Air,ftCo_MS_AttackAirF,0,0,0,80,0},
+        {"back aerial",P::Air,ftCo_MS_AttackAirB,0,0,0,-80,0},
+        {"up aerial",P::Air,ftCo_MS_AttackAirHi,0,0,0,0,80},
+        {"down aerial",P::Air,ftCo_MS_AttackAirLw,0,0,0,0,-80},
+        {"air dodge",P::Air,ftCo_MS_EscapeAir,PAD_TRIGGER_L,0,0,0,0},
+        {"forward roll",P::Shield,ftCo_MS_EscapeF,PAD_TRIGGER_L,80,0,0,0},
+        {"back roll",P::Shield,ftCo_MS_EscapeB,PAD_TRIGGER_L,-80,0,0,0},
+        {"spot dodge",P::Shield,ftCo_MS_EscapeN,PAD_TRIGGER_L,0,-80,0,0},
+    };
+    const PADStatus neutral={0};
+    for(const auto& test:cases){
+        GameplayWorld world(files);
+        MeleeWebRender* camera=nullptr;
+        auto* match=begin_match(world,camera,error);
+        try {
+            PADStatus preparation={0};
+            if(test.preparation==P::Air)preparation.button=PAD_BUTTON_X;
+            if(test.preparation==P::Dash)preparation.stickX=80;
+            if(test.preparation==P::Shield){preparation.button=PAD_TRIGGER_L;preparation.triggerLeft=255;}
+            if(test.preparation!=P::None)
+                for(unsigned tick=0;tick<12;++tick)step(match,preparation,neutral,error);
+            PADStatus input={0};input.button=test.buttons;
+            input.stickX=test.stick_x;input.stickY=test.stick_y;
+            input.substickX=test.cstick_x;input.substickY=test.cstick_y;
+            if(input.button&PAD_TRIGGER_L)input.triggerLeft=255;
+            bool entered=false;
+            for(unsigned tick=0;tick<240;++tick){
+                step(match,tick<2?input:neutral,neutral,error);
+                auto p1=stats(match,0,error);auto p2=stats(match,1,error);
+                check_finite(p1,test.name);check_finite(p2,test.name);
+                entered|=p1.motion_id==test.motion;
+            }
+            auto final=stats(match,0,error);
+            check(entered,std::string(test.name)+" did not enter expected source motion "+std::to_string(test.motion));
+            check(final.motion_id==ftCo_MS_Wait&&final.ground_or_air==GA_Ground,
+                  std::string(test.name)+" did not complete and return to grounded Wait");
+            std::cerr<<test.name<<" source motion "<<test.motion<<" completed\n";
+            end_match(world,match,camera,error);
+            world.close();
+        }catch(...){
+            if(match){char cleanup[256];world.end_stage();if(camera)melee_web_render_end(camera,cleanup,sizeof(cleanup));if(!melee_web_match_end(match,cleanup,sizeof(cleanup)))std::cerr<<cleanup<<'\n';}
+            throw;
+        }
+    }
 }
 
 void run_cycle(RuntimeFiles& files, unsigned cycle)
 {
-    GameplayWorld world(files);
     char error[256];
-    jab_trace(world, error);
-    shield_trace(world, error);
-    grab_throw_trace(world, error);
-    world.close();
+    {GameplayWorld world(files);jab_trace(world,error);world.close();}
+    {GameplayWorld world(files);shield_trace(world,error);world.close();}
+    grab_throw_trace(files, error);
+    move_trace(files, error);
     std::cout << "combat cycle " << cycle << " passed\n";
 }
 
@@ -349,7 +434,7 @@ int main(int argc, char** argv)
         }
         run_cycle(files, 0);
         run_cycle(files, 1);
-        std::cout << "Original Mario close-range jab, shield, grab and directional throw paths passed in two worlds\n";
+        std::cout << "Original Mario close-range jab, shield, grab and directional throw and move paths passed in two complete passes\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

@@ -24,6 +24,7 @@
 #include "gameplay_font_atlas.h"
 #include "gameplay_ground_data.h"
 #include "gameplay_common_context.h"
+#include "gameplay_crowd.h"
 #include "gameplay_stage_context.h"
 #include "gameplay_bootstrap.h"
 #include "gameplay_fighter_assets.hpp"
@@ -226,6 +227,7 @@ struct GameplayWorld::Storage {
     void close(){
         if(fighter&&fighter->live_fighters())throw DatError("Close all fighter/render contexts before the runtime world");
         end_stage();
+        check(melee_web_crowd_end(error,sizeof(error)),error);
         if(item_runtime){check(melee_web_item_runtime_end(item_runtime,error,sizeof(error)),error);item_runtime=nullptr;}
         item_colors.reset();item_arena.reset();
         if(effect_started){check(melee_web_effect_runtime_end(error,sizeof(error)),error);effect_started=false;}

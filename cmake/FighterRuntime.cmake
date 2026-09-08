@@ -17,7 +17,7 @@ foreach(path IN LISTS native_paths)
   list(APPEND fighter_paths "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/${relative}")
 endforeach()
 add_library(fighter_source_runtime STATIC EXCLUDE_FROM_ALL ${fighter_paths}
-  src/gameplay_item_runtime.c src/dat_item_commands.c src/gameplay_render.c src/gameplay_color_commands.c src/gameplay_match_rules.c src/gameplay_stage_visual.c src/gameplay_stage_map.c src/gameplay_stage_last.c src/gameplay_effect_runtime.c
+  src/gameplay_item_runtime.c src/dat_item_commands.c src/gameplay_crowd.c src/gameplay_render.c src/gameplay_color_commands.c src/gameplay_match_rules.c src/gameplay_stage_visual.c src/gameplay_stage_map.c src/gameplay_stage_last.c src/gameplay_effect_runtime.c
   src/gameplay_audio.c src/gameplay_audio_stream.c src/gameplay_io.cpp src/gameplay_audio_resample.c src/gameplay_audio_itd.c src/gameplay_audio_fx.c src/gameplay_audio_reverb.c
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/axfx/axfx.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/axfx/reverb_std.c"
@@ -109,7 +109,7 @@ target_compile_options(gameplay_browser PRIVATE -ffp-contract=off)
 target_link_options(gameplay_browser PRIVATE -sENVIRONMENT=web -sALLOW_MEMORY_GROWTH=1
   -sINITIAL_MEMORY=134217728 -sSTACK_SIZE=8388608 -sEXIT_RUNTIME=0
   -sEXPORTED_RUNTIME_METHODS=HEAPU8,UTF8ToString
-  -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_melee_web_game_file,_melee_web_game_launch,_melee_web_game_unload,_melee_web_game_pause,_melee_web_game_message,_melee_web_game_stats,_melee_web_game_running,_melee_web_game_combat_check,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_message)
+  -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_melee_web_game_file,_melee_web_game_launch,_melee_web_game_unload,_melee_web_game_pause,_melee_web_game_message,_melee_web_game_stats,_melee_web_game_running,_melee_web_game_combat_check,_melee_web_game_stock_check,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_message)
 set_target_properties(gameplay_browser PROPERTIES SUFFIX ".js")
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
   target_link_options(gameplay_browser PRIVATE -sASSERTIONS=0 -sSAFE_HEAP=0)

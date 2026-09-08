@@ -94,3 +94,20 @@ unknown-instruction error. Its partial movement trace is diagnostic only and is
 not accepted as an edge-equivalence result. Further movement captures use the
 plain interpreter; the earlier rare visibility breakpoint capture did not use
 that repeated stepping workflow.
+
+## Full-stage FD edge regression
+
+A new plain-interpreter FD capture starts P2 grounded at x=59.153053283691406,
+facing left, then holds right for75 frames. The original enters Fall at
+x=86.153053283691406 and remains airborne on the next frame at
+x=87.01305389404297. This is a two-minute Time match; the port regression uses
+stock rules. The comparison is scoped to the run-off behavior before stock loss.
+
+The old isolated port probe omitted full stage initialization. Consequently
+`mpColl_804D64AC` never advanced, and the fighter selected `mpCheckFloor` instead
+of the generation-dependent `mpCheckFloorRemap` path. Full stage updates already
+ran in the browser. Adding those same stage and camera lifetimes to the probe
+removes the artificial floor regrab without changing gameplay collision code.
+The regression now checks continuous run-off and the first stock loss at this
+initial position, plus a separate post-respawn running scenario. These checks
+establish the observed behavior, not bitwise equality of every fighter field.

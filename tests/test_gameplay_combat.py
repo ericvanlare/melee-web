@@ -21,11 +21,11 @@ class GameplayCombatTests(unittest.TestCase):
             self.skipTest("Optional built combat trace and owned runtime assets required")
         result = subprocess.run(
             [str(node_runtime()), str(binary), str(assets)],
-            cwd=ROOT, capture_output=True, text=True, timeout=90,
+            cwd=ROOT, capture_output=True, text=True, timeout=180,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn(
-            "Original Mario close-range jab, shield, grab and directional throw paths passed in two worlds",
+            "Original Mario close-range jab, shield, grab and directional throw and move paths passed in two complete passes",
             result.stdout,
         )
         output = result.stdout + result.stderr

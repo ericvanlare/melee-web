@@ -3,7 +3,7 @@
 The browser runs two original Mario instances on Final Destination through
 compiled WebAssembly. The complete acceptance milestone below is still open:
 the reported projectile and post-respawn crashes have fixes, while broader
-combat, edge collision and long stage-animation validation remain open. No emulator
+rendered combat coverage, full stage presentation and sustained frame timing remain open. No emulator
 is shipped; Dolphin is used only as a separate original-game reference.
 
 The current stopping milestone is the **complete local Mario-versus-Mario stock
@@ -27,6 +27,9 @@ the reference machine. The smaller gates below are checkpoints, not completion.
   compatibility rule removes an original uninitialized visibility output while
   preserving the observed hidden result. Two worlds each pass 36,000 frames,
   every background state, cycle restart, archive immutability and teardown.
+  The release browser continued past 16,400 ticks after resuming a 150 ms
+  interval pause at tick13,017. The initial 788×592 run had no interval above
+  33.3 ms through tick11,940; the pause prevents stable-60-fps acceptance.
   Full rendered-cycle fidelity still needs browser/original comparison.
 - Original SEM/synth/AX source produces SFX PCM with original SDK reverb/delay.
   The integrated HPS stream runs the original three-slot scheduler through the
@@ -38,10 +41,12 @@ the reference machine. The smaller gates below are checkpoints, not completion.
   Original jab, jump/landing, shield and damage traces pass across two worlds. Actual damage,
   stocks and shield values are exposed directly for observation.
 - Original run-off, stock loss, respawn platform and grounded return pass in two
-  worlds after hydrating common root8. Certain run-off positions expose an
-  edge collision oscillation. An independent four-stock run with jumps passes
-  three respawns and the original elimination outcome in two worlds; it does
-  not resolve the plain-running collision defect.
+  worlds after hydrating common root8. The isolated edge probe omitted stage
+  updates, leaving the collision generation counter unchanged and selecting the
+  wrong source floor-check path. With full stage/camera startup, the precise
+  run-off phase captured from the original falls continuously without regrabbing
+  the floor. Regular post-respawn running also passes. The full-stage stock probe
+  passes three respawns and the original elimination outcome in two worlds.
 - B-button failures reached missing Mario article publication and original item
   common-data/allocator startup. Ground/air B simulation now passes in two
   worlds. A subsequent browser-only particle crash exposed raw GameCube FIFO
@@ -58,6 +63,16 @@ the reference machine. The smaller gates below are checkpoints, not completion.
   worlds. Cross-fighter animation streams, row identities and commands remain
   owned after the source fighter store is destroyed. Importing the shared
   FTKIND_NONE part-remap row fixes the grab/throw crash without changing roster size.
+- Sixteen additional raw-input move cases cover tilts, smashes, dash attack,
+  all aerials, air dodge, rolls and spot dodge in two complete passes with a fresh
+  full-stage world per case. Air dodge exposed missing original crowd-manager
+  startup; match creation now owns that manager through match teardown.
+- The release browser stock diagnostic uses raw movement/jump input and completes
+  four stock losses, three respawns and the normal P2 winner message at tick1985.
+  A cold run pauses during the first death/respawn rendering. Restarting with
+  the same renderer resources completes the identical1985 ticks with no pauses,
+  no intervals above33.3 ms and a worst interval of21.26 ms at640×480.
+  First-use rendering preparation remains open; warm timing is not cold acceptance.
 - Workers use GPT-5.6 Luna xhigh; the lead handles integration and difficult blockers.
 - The integrated runtime is checkpointed on the private remote. A clean Ubuntu
   GitHub Actions run builds the browser runtime and passes the source/ABI checks.
@@ -67,7 +82,7 @@ the reference machine. The smaller gates below are checkpoints, not completion.
   unlocked Stadium side platform; the port uses FD, so this is a scoped vertical
   movement comparison, not full match equivalence. A second retail capture repeats
   all 102 frames, and the updated intrinsic build still matches the comparison.
-- Local suite: 221 tests passed without skips after refreshing the affected
+- Local suite: 223 tests passed without skips after refreshing the affected
   source trace binaries. The strengthened projectile regression passes actual P2 impact,
   expiry and teardown in two worlds. All six ground/air side/up/down specials
   also pass source action entry, finite state and two-world teardown checks.
@@ -133,8 +148,8 @@ fighter now uses this browser input/presentation path; visual correctness remain
 
 ## Next
 
-Finish the long FD stage cycle and broader raw-input combat regressions, resolve
-the phase-dependent edge collision against an FD original-game trace, then run
-a sustained release-browser match and measure active-frame timing. Verify audible
+Complete rendered combat and a full FD presentation cycle, then measure sustained
+release-browser active-frame timing. Current browser runs have encountered long
+frames near stage transitions; CPU percentile alone does not establish stable 60 fps. Verify audible
 output and two physical controllers before closing the playable-match milestone.
 See [the acceptance roadmap](docs/ROADMAP.md).

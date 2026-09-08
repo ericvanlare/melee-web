@@ -21,6 +21,24 @@ class MatchCompletion(unittest.TestCase):
     def test_ground_and_air_fireball(self):
         self.run_trace('gameplay_article_trace','ground and air PAD_BUTTON_B Article paths passed in two worlds')
 
+    def run_edge_trace(self, *arguments):
+        assets=ROOT/'assets-local/next-gate'
+        binary=ROOT/'build/browser'/'gameplay_edge_trace.js'
+        names=('PlCo.dat','PlMr.dat','PlMrNr.dat','PlMrAJ.dat','GrNLa.dat','ItCo.usd','EfMrData.dat','EfCoData.dat','PdPm.dat','sislib_font.bin')
+        if not binary.is_file() or not all((assets/name).is_file() for name in names):
+            self.skipTest('Optional built full-stage edge trace and owned runtime assets required')
+        result=subprocess.run([str(node_runtime()),str(binary),str(assets),*arguments],cwd=ROOT,capture_output=True,text=True,timeout=90)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        return result
+
+    def test_full_stage_edge_phase_at_plain_reference_position(self):
+        result=self.run_edge_trace('phase','59.153053283691406')
+        self.assertIn('Original initial-spawn raw-stick phase trace captured',result.stdout)
+
+    def test_full_stage_edge_post_respawn_stock_trace(self):
+        result=self.run_edge_trace()
+        self.assertIn('Original post-respawn raw-stick edge trace captured',result.stdout)
+
     def test_controller_port_does_not_change_costume_color(self):
         binary=ROOT/'build/browser/gameplay_player_context_trace.js'
         if not binary.is_file():self.skipTest('Built original player context trace required')

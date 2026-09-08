@@ -11,7 +11,7 @@ remains the goal; menus, other matchups and modes follow this initial match gate
 runs two original Mario instances on Final Destination, with source controller
 processing, camera, stage rendering, stock/respawn logic and audio transport.
 Rendered ground/air fireballs now survive impact, restart and unload. This is an
-integration build: longer stage animation, broader combat, edge collision,
+integration build: full rendered stage cycles, broader rendered combat, sustained frame timing,
 audible output and physical controllers still need acceptance checks.
 
 A scoped 102-frame original-game jump comparison passes; this does not establish

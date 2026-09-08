@@ -9,6 +9,7 @@ extern "C" int lbAudioAx_80023F28(int);
 #include "animation_clock.hpp"
 #include <aurora/aurora.h>
 #include <aurora/event.h>
+#include <aurora/gfx.h>
 #include <aurora/main.h>
 #include <dolphin/gx.h>
 #include <emscripten.h>
@@ -38,11 +39,13 @@ unsigned frames=0;
 bool finished=false;
 int winner=-1;
 int combat_check=-1;
+int stock_check_tick=-1,stock_check_total_ticks=0,stock_check_stocks=4,stock_check_respawns=0,stock_check_result=-1;
+bool stock_check_lost=false,stock_check_jump=false;
 alignas(32) unsigned char fifo_buffer[64*1024];
 constexpr std::array<std::string_view,15> required={"PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","sislib_font.bin","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sp_end.hps"};
 void require(int value,const char* error){if(!value)throw std::runtime_error(error);}
 void close_game(){
-    running=false;finished=false;winner=-1;combat_check=-1;simulation_clock.reset();char error[256];
+    running=false;finished=false;winner=-1;combat_check=-1;stock_check_tick=-1;stock_check_total_ticks=0;stock_check_stocks=4;stock_check_respawns=0;stock_check_result=-1;stock_check_lost=false;stock_check_jump=false;simulation_clock.reset();char error[256];
     if(world)world->end_stage();
     if(render){require(melee_web_render_end(render,error,sizeof(error)),error);render=nullptr;}
     if(match){require(melee_web_match_end(match,error,sizeof(error)),error);match=nullptr;}
@@ -58,10 +61,16 @@ void tick(){
     EM_ASM({if(window.runtimeServiceCommands)window.runtimeServiceCommands();});
     EM_ASM({window.runtimeBoundary="update";});
     const double started=emscripten_get_now();
+    AuroraStats stats_before{};
+    if(const AuroraStats* stats=aurora_get_stats())stats_before=*stats;
+    double input_done=started,simulation_done=started,
+           begin_done=started,draw_done=started,end_done=started;
+    int began=0,drawn=1,timing_valid=1;
     for(const AuroraEvent* event=aurora_update();event&&event->type!=AURORA_NONE;++event)
         if(event->type==AURORA_EXIT)exiting=true;
     EM_ASM({window.runtimeBoundary="input";});
     const auto* input=melee_web_input_poll();
+    input_done=emscripten_get_now();
     if(exiting){close_game();melee_web_input_shutdown();aurora_shutdown();emscripten_cancel_main_loop();return;}
     try{
         EM_ASM({window.runtimeBoundary="simulation";});
@@ -71,7 +80,14 @@ void tick(){
         for(unsigned step=0;step<elapsed.steps;++step){
             PADStatus scripted[4]{};
             const PADStatus* sample=input->raw;
-            if(combat_check>=0){
+            if(stock_check_tick>=0){
+                // Diagnostic fixture only. This is the validated stock-trace
+                // recipe: raw sustained right input, then one source X press
+                // after each grounded respawn near the edge.
+                if(stock_check_tick>=20&&!stock_check_lost)scripted[0].stickX=80;
+                if(stock_check_jump)scripted[0].button=PAD_BUTTON_X;
+                sample=scripted;
+            }else if(combat_check>=0){
                 // Diagnostic fixture only. Original PAD processing, actions,
                 // item simulation and drawing remain the production path.
                 if(combat_check>=30&&combat_check<33)scripted[0].button=PAD_BUTTON_B;
@@ -80,6 +96,17 @@ void tick(){
                 sample=scripted;
             }
             require(melee_web_match_step_raw(match,sample,error,sizeof(error)),error);
+            if(stock_check_tick>=0){
+                MeleeWebMatchStats players[2]{};
+                require(melee_web_match_player_stats(match,0,&players[0],error,sizeof(error)),error);
+                require(melee_web_match_player_stats(match,1,&players[1],error,sizeof(error)),error);
+                if(players[1].stocks!=4)throw std::runtime_error("Stock check failed: stationary opponent lost a stock");
+                stock_check_jump=!stock_check_lost&&stock_check_stocks<4&&players[0].ground_or_air==0&&players[0].position[0]>65;
+                if(players[0].stocks<stock_check_stocks){stock_check_lost=true;stock_check_stocks=players[0].stocks;}
+                if(stock_check_lost&&players[0].motion_id==14&&players[0].ground_or_air==0){stock_check_lost=false;++stock_check_respawns;}
+                ++stock_check_tick;
+                stock_check_total_ticks=stock_check_tick;
+            }
             if(combat_check>=0&&++combat_check==240){
                 MeleeWebMatchStats opponent{};
                 require(melee_web_match_player_stats(match,1,&opponent,error,sizeof(error)),error);
@@ -92,29 +119,79 @@ void tick(){
             if(melee_web_match_rules_outcome(&winner)){
                 finished=true;running=false;simulation_clock.reset();
                 message=winner>=0?"Game! Player "+std::to_string(winner+1)+" wins. Restart to play again.":"Game! Restart to play again.";
+                if(stock_check_tick>=0){
+                    const bool passed=winner==1&&stock_check_stocks==0&&stock_check_respawns==3;
+                    stock_check_result=passed?1:2;
+                    message+=(passed?" Stock check passed: original four-stock elimination and three respawns completed.":" Stock check failed: original stock outcome or respawn count was incorrect.");
+                    stock_check_tick=-1;
+                }else message=winner>=0?"Game! Player "+std::to_string(winner+1)+" wins. Restart to play again.":"Game! Restart to play again.";
+                break;
+            }
+            if(stock_check_tick>=4000){
+                stock_check_result=2;stock_check_tick=-1;finished=true;running=false;simulation_clock.reset();
+                message="Stock check failed: no source elimination outcome after 4000 simulation ticks (respawns "+std::to_string(stock_check_respawns)+").";
                 break;
             }
         }
+        simulation_done=emscripten_get_now();
         EM_ASM({window.runtimeBoundary="begin frame";});
-        if(aurora_begin_frame()){
+        const int frame_began=aurora_begin_frame();
+        begin_done=emscripten_get_now();
+        if(frame_began){
+            began=1;
             EM_ASM({window.runtimeBoundary="draw";});
             GXSetCopyClear(GXColor{16,20,30,255},GX_MAX_Z24);
             // Aurora may yield through Asyncify while submitting. Never carry
             // a C++ exception across that suspension boundary.
-            int drawn=1;
             if(render)drawn=melee_web_render_draw(render,error,sizeof(error));
+            draw_done=emscripten_get_now();
             EM_ASM({window.runtimeBoundary="end frame";});
-            aurora_end_frame();++frames;
+            aurora_end_frame();end_done=emscripten_get_now();++frames;
             require(drawn,error);
+        }else{
+            draw_done=begin_done;end_done=begin_done;
         }
-    }catch(const std::exception& e){running=false;simulation_clock.reset();message=e.what();}
-    EM_ASM({if(window.runtimeFrame)window.runtimeFrame($0,$1,$2);},frames,started,emscripten_get_now()-started);
+    }catch(const std::exception& e){
+        running=false;simulation_clock.reset();message=e.what();timing_valid=0;
+        if(stock_check_tick>=0){stock_check_result=2;stock_check_tick=-1;}
+        const double failed_at=emscripten_get_now();
+        if(simulation_done<input_done)simulation_done=failed_at;
+        if(begin_done<simulation_done)begin_done=simulation_done;
+        if(draw_done<begin_done)draw_done=begin_done;
+        if(end_done<draw_done)end_done=draw_done;
+    }
+    const double finished_at=emscripten_get_now();
+    AuroraStats stats_after{};
+    if(const AuroraStats* stats=aurora_get_stats())stats_after=*stats;
+    const int queued_delta=int32_t(stats_after.queuedPipelines)-int32_t(stats_before.queuedPipelines);
+    const int created_delta=int32_t(stats_after.createdPipelines)-int32_t(stats_before.createdPipelines);
+    // Optional diagnostics only: no-op unless the page installs this callback.
+    // Keep this after all native work so the callback observes the complete
+    // synchronous WebGPU/pipeline-cache cost of this browser tick.
+    EM_ASM({
+        if(window.runtimeRenderTiming)window.runtimeRenderTiming({
+            frame:$0,started:$1,valid:$2,update_input_ms:$3,simulation_audio_ms:$4,
+            begin_ms:$5,draw_ms:$6,end_ms:$7,total_ms:$8,began:$9,drawn:$10,
+            queued_delta:$11,created_delta:$12,draw_calls:$13,
+            texture_upload_bytes:$14
+        });
+    },frames,started,timing_valid,input_done-started,simulation_done-input_done,
+       begin_done-simulation_done,draw_done-begin_done,end_done-draw_done,
+       finished_at-started,began,drawn,queued_delta,created_delta,
+       stats_after.drawCallCount,
+       stats_after.lastTextureUploadSize);
+    EM_ASM({if(window.runtimeFrame)window.runtimeFrame($0,$1,$2);},frames,started,finished_at-started);
 }
 }
 extern "C" {
 int melee_web_game_combat_check(){
-    if(!match||!running||finished)return 0;
+    if(!match||!running||finished||stock_check_tick>=0)return 0;
     combat_check=0;message="Combat check: scripted ground and air B inputs (controllers temporarily overridden).";return 1;
+}
+int melee_web_game_stock_check(){
+    if(!match||!running||finished||stock_check_tick>=0||combat_check>=0)return 0;
+    stock_check_tick=0;stock_check_total_ticks=0;stock_check_stocks=4;stock_check_respawns=0;stock_check_result=0;stock_check_lost=false;stock_check_jump=false;
+    message="Stock check: raw sustained right input with source respawns (diagnostic only).";return 1;
 }
 int melee_web_game_file(const char* name,const uint8_t* data,uint32_t size){
     try{
@@ -155,8 +232,9 @@ const char* melee_web_game_stats(){
     static char output[1024];MeleeWebMatchStats players[2]{};char error[256];
     if(!match)return "{\"loaded\":false}";
     for(unsigned i=0;i<2;++i)if(!melee_web_match_player_stats(match,i,&players[i],error,sizeof(error))){message=error;return "{\"loaded\":true,\"error\":true}";}
-    std::snprintf(output,sizeof(output),"{\"loaded\":true,\"ticks\":%llu,\"finished\":%s,\"winner\":%d,\"players\":[{\"action\":%d,\"x\":%.9g,\"y\":%.9g,\"percent\":%.9g,\"stocks\":%d,\"shield\":%.9g},{\"action\":%d,\"x\":%.9g,\"y\":%.9g,\"percent\":%.9g,\"stocks\":%d,\"shield\":%.9g}]}",
+    std::snprintf(output,sizeof(output),"{\"loaded\":true,\"ticks\":%llu,\"finished\":%s,\"winner\":%d,\"stock_check_active\":%s,\"stock_check_result\":%d,\"stock_check_ticks\":%d,\"stock_check_stocks\":%d,\"stock_check_respawns\":%d,\"players\":[{\"action\":%d,\"x\":%.9g,\"y\":%.9g,\"percent\":%.9g,\"stocks\":%d,\"shield\":%.9g},{\"action\":%d,\"x\":%.9g,\"y\":%.9g,\"percent\":%.9g,\"stocks\":%d,\"shield\":%.9g}]}",
         (unsigned long long)players[0].ticks,finished?"true":"false",winner,
+        stock_check_tick>=0?"true":"false",stock_check_result,stock_check_total_ticks,stock_check_stocks,stock_check_respawns,
         players[0].motion_id,players[0].position[0],players[0].position[1],players[0].damage_percent,players[0].stocks,players[0].shield_health,
         players[1].motion_id,players[1].position[0],players[1].position[1],players[1].damage_percent,players[1].stocks,players[1].shield_health);return output;
 }

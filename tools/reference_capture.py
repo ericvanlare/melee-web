@@ -18,7 +18,7 @@ def sample(fp):
  head=memory(fp,0x100);anim=memory(fp+0x894,16);input_data=memory(fp+0x620,0x6c);collision=memory(fp+0x794,0xfc)
  def u(o):return struct.unpack_from('>I',head,o)[0]
  def v(o):return [float_value(head[o+i:o+i+4]) for i in (0,4,8)]
- return {'kind':u(4),'spawn':u(8),'slot':head[12],'motion':u(16),'animation':u(20),'facing':float_value(head[44:48]),'position':v(0xb0),'previous':v(0xbc),'velocity':v(0x80),'knockback_velocity':v(0x8c),'ground_air':u(0xe0),'ground_velocity':float_value(head[0xec:0xf0]),'frame':float_value(anim[:4]),'frame_speed':float_value(anim[8:12]),'input_hex':input_data.hex(),'collision_hex':collision.hex(),'damage':float_value(memory(fp+0x1830,4)),'callbacks':[word(fp+o) for o in (0x21a0,0x21a4,0x21a8)]}
+ return {'kind':u(4),'spawn':u(8),'slot':head[12],'motion':u(16),'animation':u(20),'facing':float_value(head[44:48]),'position':v(0xb0),'previous':v(0xbc),'velocity':v(0x80),'knockback_velocity':v(0x8c),'ground_air':u(0xe0),'ground_velocity':float_value(head[0xec:0xf0]),'frame':float_value(anim[:4]),'frame_speed':float_value(anim[8:12]),'input_hex':input_data.hex(),'collision_hex':collision.hex(),'collision_prefix_hex':memory(fp+0x6f0,0xa4).hex(),'fighter_flags_hex':memory(fp+0x2218,0x10).hex(),'collision_generation':word(0x804d64ac),'damage':float_value(memory(fp+0x1830,4)),'callbacks':[word(fp+o) for o in (0x21a0,0x21a4,0x21a8)]}
 class Created(gdb.Breakpoint):
  def __init__(self):super().__init__('*0x800693a8',gdb.BP_HARDWARE_BREAKPOINT,internal=True);self.silent=True
  def stop(self):
