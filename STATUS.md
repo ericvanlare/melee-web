@@ -14,6 +14,15 @@ the reference machine. The smaller gates below are checkpoints, not completion.
 
 ## Active integration
 
+- Normal keyboard play exposed an overly strict timing policy: more than eight
+  elapsed source ticks forced a manual pause. Gameplay now retains bounded timing
+  debt and runs at most eight original 60 Hz ticks per browser callback, catching
+  up across callbacks. More than one second of debt still pauses explicitly.
+  Browser audio re-primes during catch-up instead of accumulating late PCM; the
+  source audio engine still processes every simulation tick. Repeated injected
+  200 ms and 800 ms delays recover without manual resume or audio overflow.
+  These are recovery checks, not evidence that rendering hitches are fixed.
+
 - One shared asset/world owner now serves the browser and Node regression harness.
 - Two original fighters run together. Raw PAD input uses the original HSD queue,
   clamp/scale processing, player activation and fighter processes. A 60-frame

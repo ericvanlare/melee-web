@@ -34,10 +34,11 @@ unsigned audio_phase=0;
 std::array<float,1068> audio_pcm;
 MeleeWebMatchContext* match=nullptr;
 MeleeWebRender* render=nullptr;
-FixedTickClock simulation_clock;
+FixedTickClock simulation_clock{FixedTickClock::OverrunPolicy::CatchUp};
 std::string message="Import local runtime assets to launch.";
 bool running=false,ready=false,exiting=false;
 unsigned frames=0;
+unsigned catchup_frames=0,max_backlog_ticks=0;
 SDL_Window* runtime_window=nullptr;
 int render_scale=1;
 bool finished=false;
@@ -50,7 +51,7 @@ alignas(32) unsigned char fifo_buffer[64*1024];
 constexpr std::array<std::string_view,15> required={"PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","sislib_font.bin","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sp_end.hps"};
 void require(int value,const char* error){if(!value)throw std::runtime_error(error);}
 void close_game(){
-    running=false;finished=false;winner=-1;combat_check=-1;stock_check_tick=-1;stock_check_total_ticks=0;stock_check_stocks=4;stock_check_respawns=0;stock_check_result=-1;stock_check_lost=false;stock_check_jump=false;simulation_clock.reset();char error[256];
+    running=false;finished=false;winner=-1;catchup_frames=0;max_backlog_ticks=0;combat_check=-1;stock_check_tick=-1;stock_check_total_ticks=0;stock_check_stocks=4;stock_check_respawns=0;stock_check_result=-1;stock_check_lost=false;stock_check_jump=false;simulation_clock.reset();char error[256];
     if(world)world->end_stage();
     if(render){require(melee_web_render_end(render,error,sizeof(error)),error);render=nullptr;}
     if(match){require(melee_web_match_end(match,error,sizeof(error)),error);match=nullptr;}
@@ -80,7 +81,11 @@ void tick(){
     try{
         EM_ASM({window.runtimeBoundary="simulation";});
         const auto elapsed=simulation_clock.tick(started,running&&match&&input->visible);
-        if(elapsed.stalled){running=false;message="Paused after a long frame. Resume to continue without skipping simulation ticks.";}
+        // Keep source audio ticking, but re-prime browser output after catch-up
+        // instead of queuing an entire stalled interval of late sound.
+        EM_ASM({if(window.runtimeAudioCatchup)window.runtimeAudioCatchup($0);},elapsed.pending_steps!=0);
+        if(elapsed.pending_steps){++catchup_frames;max_backlog_ticks=std::max(max_backlog_ticks,elapsed.pending_steps);}
+        if(elapsed.stalled){running=false;message="Paused after prolonged timing disruption (over one second of simulation debt or invalid clock). Resume to continue.";}
         char error[256];
         for(unsigned step=0;step<elapsed.steps;++step){
             PADStatus scripted[4]{};
@@ -268,8 +273,8 @@ const char* melee_web_game_stats(){
     static char output[1024];MeleeWebMatchStats players[2]{};char error[256];
     if(!match)return "{\"loaded\":false}";
     for(unsigned i=0;i<2;++i)if(!melee_web_match_player_stats(match,i,&players[i],error,sizeof(error))){message=error;return "{\"loaded\":true,\"error\":true}";}
-    std::snprintf(output,sizeof(output),"{\"loaded\":true,\"ticks\":%llu,\"finished\":%s,\"winner\":%d,\"stock_check_active\":%s,\"stock_check_result\":%d,\"stock_check_ticks\":%d,\"stock_check_stocks\":%d,\"stock_check_respawns\":%d,\"players\":[{\"action\":%d,\"x\":%.9g,\"y\":%.9g,\"percent\":%.9g,\"stocks\":%d,\"shield\":%.9g},{\"action\":%d,\"x\":%.9g,\"y\":%.9g,\"percent\":%.9g,\"stocks\":%d,\"shield\":%.9g}]}",
-        (unsigned long long)players[0].ticks,finished?"true":"false",winner,
+    std::snprintf(output,sizeof(output),"{\"loaded\":true,\"ticks\":%llu,\"catchup_frames\":%u,\"max_backlog_ticks\":%u,\"finished\":%s,\"winner\":%d,\"stock_check_active\":%s,\"stock_check_result\":%d,\"stock_check_ticks\":%d,\"stock_check_stocks\":%d,\"stock_check_respawns\":%d,\"players\":[{\"action\":%d,\"x\":%.9g,\"y\":%.9g,\"percent\":%.9g,\"stocks\":%d,\"shield\":%.9g},{\"action\":%d,\"x\":%.9g,\"y\":%.9g,\"percent\":%.9g,\"stocks\":%d,\"shield\":%.9g}]}",
+        (unsigned long long)players[0].ticks,catchup_frames,max_backlog_ticks,finished?"true":"false",winner,
         stock_check_tick>=0?"true":"false",stock_check_result,stock_check_total_ticks,stock_check_stocks,stock_check_respawns,
         players[0].motion_id,players[0].position[0],players[0].position[1],players[0].damage_percent,players[0].stocks,players[0].shield_health,
         players[1].motion_id,players[1].position[0],players[1].position[1],players[1].damage_percent,players[1].stocks,players[1].shield_health);return output;

@@ -14,12 +14,12 @@
 <p id="score" aria-live="off"></p>
 <p id="metrics">No match loaded.</p>
 <p id="audio-metrics">Audio output is not initialized.</p>
-<details><summary>Runtime diagnostics</summary><label>Special move <select id="combat-kind"><option value="0">Fireball</option><option value="1">Cape</option><option value="2">Super Jump Punch</option><option value="3">Mario Tornado</option></select></label><button id="combat-check" disabled>Restart + combat check</button><p>Diagnostic only: restarts this match, then supplies ground and air special inputs for four to eight seconds.</p><button id="stock-check" disabled>Restart + stock check</button><p>Diagnostic only: uses movement and jump inputs to test four stock losses and three respawns, then the original match outcome.</p><pre id="render-state"></pre><pre id="cache-status">Render cache is initializing.</pre><pre id="environment"></pre><pre id="timing-events"></pre><pre id="state"></pre><pre id="input-state"></pre><pre id="log"></pre></details>
+<details><summary>Runtime diagnostics</summary><label>Special move <select id="combat-kind"><option value="0">Fireball</option><option value="1">Cape</option><option value="2">Super Jump Punch</option><option value="3">Mario Tornado</option></select></label><button id="combat-check" disabled>Restart + combat check</button><p>Diagnostic only: restarts this match, then supplies ground and air special inputs for four to eight seconds.</p><button id="stock-check" disabled>Restart + stock check</button><p>Diagnostic only: uses movement and jump inputs to test four stock losses and three respawns, then the original match outcome.</p><label>Test delay <select id="delay-ms"><option value="200">200 ms</option><option value="800">800 ms</option></select></label><button id="delay-check">Inject frame delay</button><p>Diagnostic only: blocks one browser callback to check bounded recovery. The delay remains counted in timing and audio diagnostics.</p><pre id="render-state"></pre><pre id="cache-status">Render cache is initializing.</pre><pre id="environment"></pre><pre id="timing-events"></pre><pre id="state"></pre><pre id="input-state"></pre><pre id="log"></pre></details>
 <script src="runtime-cache.js"></script>
 <script>
 const $=id=>document.getElementById(id),required=['PlCo.dat','PlMr.dat','PlMrNr.dat','PlMrAJ.dat','GrNLa.dat','ItCo.usd','EfMrData.dat','EfCoData.dat','PdPm.dat','sislib_font.bin','smash2.sem','main.ssm','mario.ssm','dsp_coef.bin','sp_end.hps'];
 let ready=false,importing=false,fatal=false,last=0,intervals=[],costs=[],wasRunning=false,activeFrames=0,worstInterval=0,longFrames=0,previousCost=0,timingEvents=[],renderTiming=null,previousRenderTiming=null,longTasks=[];
-let audioContext=null,audioNode=null,audioEnabled=false;
+let audioContext=null,audioNode=null,audioEnabled=false,audioCatchingUp=false;
 const pendingCommands=[];
 let inputDirty=true,createdPipelineCount=0;
 window.runtimeRenderTiming=timing=>{renderTiming=timing;createdPipelineCount+=timing.created_delta;};
@@ -46,7 +46,8 @@ async function prepareAudio(){
   }
   await audioContext.resume();
 }
-function syncAudio(enabled){if(audioEnabled===enabled)return;audioEnabled=enabled;audioNode?.port.postMessage({type:'state',enabled});}
+function syncAudio(enabled){enabled=enabled&&!audioCatchingUp;if(audioEnabled===enabled)return;audioEnabled=enabled;audioNode?.port.postMessage({type:'state',enabled});}
+window.runtimeAudioCatchup=active=>{audioCatchingUp=!!active;syncAudio(ready&&!fatal&&!!Module._melee_web_game_running()&&!document.hidden);};
 window.runtimeAudio=pcm=>{if(audioNode&&audioEnabled)audioNode.port.postMessage({type:'pcm',pcm},[pcm.buffer]);};
 function stopRuntime(reason){fatal=true;for(const command of pendingCommands.splice(0))command.reject(Error(reason));syncAudio(false);$('status').textContent='Runtime stopped: '+reason;for(const id of ['launch','pause','unload','files','combat-check','stock-check'])$(id).disabled=true;log(reason);}
 window.addEventListener('error',e=>stopRuntime(e.error?.stack||e.message));
@@ -95,6 +96,7 @@ $('combat-check').onclick=async()=>{await launchMatch(true);await atBoundary(()=
 $('stock-check').onclick=async()=>{await launchMatch(true);await atBoundary(()=>{if(Module._melee_web_game_running())Module._melee_web_game_stock_check();});update();};
 $('pause').onclick=async()=>{await atBoundary(()=>{Module._melee_web_game_pause(Module._melee_web_game_running()?1:0);last=0;wasRunning=false;});if(Module._melee_web_game_running())$('canvas').focus();activity();update();};
 $('unload').onclick=async()=>{for(const id of ['launch','files','combat-check','stock-check','unload'])$(id).disabled=true;try{if(await unloadAndSave())$('pause').disabled=true;update();}catch(error){$('status').textContent=error.message;}finally{if(!fatal)for(const id of ['launch','files','combat-check','stock-check'])$(id).disabled=false;}};
+$('delay-check').onclick=()=>{if(!ready||fatal||!Module._melee_web_game_running())return;atBoundary(()=>{const ms=Number($('delay-ms').value);if(ms!==200&&ms!==800)throw Error('Unsupported test delay');const end=performance.now()+ms;while(performance.now()<end){};}).catch(error=>log(error.message));};
 $('keyboard').onchange=activity;
 $('canvas').addEventListener('pointerdown',()=>{$('canvas').focus();activity();});
 for(const event of ['focus','blur']){window.addEventListener(event,activity);$('canvas').addEventListener(event,activity);}document.addEventListener('visibilitychange',()=>{activity();last=0;wasRunning=false;update();if(document.hidden)audioContext?.suspend();else if(audioEnabled)audioContext?.resume().catch(error=>log(error.message));});
