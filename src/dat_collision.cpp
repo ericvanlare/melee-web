@@ -75,7 +75,11 @@ DatCollision::DatCollision(const DatArchive& archive, const std::string& name) :
     const auto found = std::find_if(symbols.begin(), symbols.end(), [&](const auto& s) { return s.name == name; });
     require(found != symbols.end(), "Collision public coll_data descriptor is missing");
     root_offset = found->data_offset;
-    region(archive, root_offset, 48);
+    /* MapCollData's source consumers stop at the joint count at +0x28. Some
+     * archives carry an additional word at +0x2c, while GrSt.dat ends exactly
+     * at the next public root. Keep that optional word when its own referenced
+     * region contains it; never borrow bytes from the following symbol. */
+    region(archive, root_offset, 44);
     const auto vertex_count = archive.be32(root_offset + 4);
     const auto line_count = archive.be32(root_offset + 12);
     const auto joint_count = archive.be32(root_offset + 40);
@@ -87,7 +91,8 @@ DatCollision::DatCollision(const DatArchive& archive, const std::string& name) :
     vertex_offset = array(archive, root_offset, vertex_count, 8);
     line_offset = array(archive, root_offset + 8, line_count, 16);
     joint_offset = array(archive, root_offset + 36, joint_count, 40);
-    source_reserved_2c = archive.be32(root_offset + 44);
+    if (archive.next_target_offset(root_offset) - root_offset >= 48)
+        source_reserved_2c = archive.be32(root_offset + 44);
     line_ranges = ranges(archive, root_offset + 16, line_count);
     for (std::uint32_t i = 0; i < vertex_count; ++i)
         vertices.push_back({finite(archive, vertex_offset + i * 8), finite(archive, vertex_offset + i * 8 + 4)});

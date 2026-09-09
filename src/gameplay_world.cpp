@@ -16,12 +16,14 @@
 #include "dat_lights.hpp"
 #include "dat_collision.hpp"
 #include "dat_item_registry_native.hpp"
+#include "dat_stage_items.hpp"
 #include "dat_effect_entries.hpp"
 #include "gameplay_stage_numeric.h"
 #include "gameplay_bonus_data.h"
 #include "gameplay_match_context.h"
 #include "gameplay_match_rules.h"
 #include "gameplay_item_runtime.h"
+#include "gameplay_stage_items.h"
 #include "gameplay_font_atlas.h"
 #include "gameplay_ground_data.h"
 #include "gameplay_common_context.h"
@@ -83,6 +85,8 @@ struct GameplayWorld::Storage {
     std::map<std::string,std::vector<uint8_t>,std::less<>> snapshots;
     std::unique_ptr<NativeDatArena> stage_arena,bonus_arena,item_arena;
     std::unique_ptr<DatItemRegistryNative> items;
+    std::unique_ptr<DatStageItems> stage_items;
+    MeleeWebStageItems* stage_item_scope=nullptr;
     std::map<unsigned,std::unique_ptr<GameplayFighterAssets>> fighters;
     const MeleeWebStageContent* stage=nullptr;
     std::vector<std::unique_ptr<DatEffectEntries>> effects;
@@ -124,8 +128,9 @@ struct GameplayWorld::Storage {
         if(!stage)throw DatError("No runtime owner for selected source ground kind");
         auto load=[&](std::string_view name){
             if(archives.contains(name))return;
-            auto value=std::make_shared<const DatArchive>(file(files,name),
-                name=="ItCo.usd"?DatExternalPolicy::PreserveUnresolved:DatExternalPolicy::Reject);
+            const auto policy=name=="ItCo.usd"?DatExternalPolicy::PreserveUnresolved:
+                name==stage->archive?DatExternalPolicy::ResolveNull:DatExternalPolicy::Reject;
+            auto value=std::make_shared<const DatArchive>(file(files,name),policy);
             snapshots[std::string(name)]={value->data().begin(),value->data().end()};
             archives.emplace(name,std::move(value));
         };
@@ -224,6 +229,12 @@ struct GameplayWorld::Storage {
         void* common_item=melee_web_item_common_decode(item_arena->reader(),*common_root);
         void* bounce=melee_web_item_bounce_decode(item_arena->reader(),*bounce_root);
         item_runtime=melee_web_item_runtime_begin(common_item,bounce,item_colors->table(),color_bytes/8,error,sizeof(error));check(item_runtime!=nullptr,error);
+        stage_items=std::make_unique<DatStageItems>(archive(stage->archive));
+        const auto stage_item_rows=stage_items->items();
+        if(!stage_item_rows.empty()){
+            stage_item_scope=melee_web_stage_items_begin(stage_item_rows.data(),stage_item_rows.size(),error,sizeof(error));
+            check(stage_item_scope!=nullptr,error);
+        }
         check(melee_web_bonus_data_begin(bonus,error,sizeof(error)),error);bonus_published=true;
     }
     void enable_stage_visual(){
@@ -277,6 +288,8 @@ struct GameplayWorld::Storage {
         end_stage();
         check(melee_web_crowd_end(error,sizeof(error)),error);
         if(item_runtime){check(melee_web_item_runtime_end(item_runtime,error,sizeof(error)),error);item_runtime=nullptr;}
+        if(stage_item_scope){check(melee_web_stage_items_end(stage_item_scope,error,sizeof(error)),error);stage_item_scope=nullptr;}
+        stage_items.reset();
         item_colors.reset();item_arena.reset();
         if(effect_started){check(melee_web_effect_runtime_end(error,sizeof(error)),error);effect_started=false;}
         if(stage_map){check(melee_web_stage_map_close(stage_map,error,sizeof(error)),error);stage_map=nullptr;}

@@ -12,7 +12,7 @@ function loadInstaller() {
   return context.installRuntimeCache;
 }
 
-function fakeModule({populateError = null} = {}) {
+function fakeModule({populateError = null, files = {"pipeline_cache.db": 4096}} = {}) {
   const calls = [];
   const mountPaths = [];
   const saveCallbacks = [];
@@ -26,6 +26,18 @@ function fakeModule({populateError = null} = {}) {
         calls.push(['syncfs', populate]);
         if (populate) queueMicrotask(() => callback(populateError));
         else saveCallbacks.push(callback);
+      },
+      readdir() { return ['.', '..', ...Object.keys(files)]; },
+      stat(path) {
+        const name = path.split('/').at(-1);
+        if (!(name in files)) throw new Error(`missing ${name}`);
+        return {mode: 0, size: files[name]};
+      },
+      isDir() { return false; },
+      unlink(path) {
+        const name = path.split('/').at(-1);
+        calls.push(['unlink', path]);
+        delete files[name];
       },
     },
     IDBFS: {},
@@ -46,6 +58,7 @@ async function main() {
   await waitTurn();
   assert.equal(state.state, 'ready');
   assert.equal(state.populated, true);
+  assert.equal(state.fileBytes, 4096);
   assert.equal(successful.dependencies, 0);
   assert.deepEqual(successful.mountPaths, ['/melee-render-cache']);
   assert.deepEqual(successful.calls.slice(0, 5), [
@@ -67,6 +80,7 @@ async function main() {
   successful.saveCallbacks.shift()(null);
   assert.equal(await second, true);
   assert.equal(state.saves, 2);
+  assert.equal(state.fileBytes, 4096);
 
   const failedSave = successful.module.saveRuntimeCache();
   await waitTurn();
@@ -92,7 +106,26 @@ async function main() {
   assert.equal(staleState.state, 'unavailable');
   assert.match(staleReports.at(-1).message, /unavailable/);
   assert.equal(await staleModule.saveRuntimeCache(), false);
-  console.log('Runtime cache mount, populate, dependency, serialization and failure checks passed');
+
+  const cleared = fakeModule({files: {"pipeline_cache.db": 8192, "pipeline_cache.db-journal": 512}});
+  const clearReports = [];
+  const clearState = installRuntimeCache(cleared.module, report => clearReports.push(report), {clearOnLoad: true});
+  cleared.module.preRun.at(-1)();
+  await waitTurn();
+  assert.deepEqual(cleared.calls.filter(call => Array.isArray(call) && call[0] === 'unlink'), [
+    ['unlink', '/melee-render-cache/pipeline_cache.db'],
+    ['unlink', '/melee-render-cache/pipeline_cache.db-journal'],
+  ]);
+  assert.equal(cleared.saveCallbacks.length, 1, 'cleared IDBFS contents must be persisted before startup');
+  assert.equal(cleared.dependencies, 1, 'renderer startup stays blocked until the reset is persisted');
+  cleared.saveCallbacks.shift()(null);
+  await waitTurn();
+  assert.equal(clearState.state, 'cleared');
+  assert.equal(clearState.clears, 1);
+  assert.equal(clearState.fileBytes, 0);
+  assert.equal(cleared.dependencies, 0);
+  assert.match(clearReports.at(-1).message, /driver cache unchanged/);
+  console.log('Runtime cache mount, populate, reset-before-startup, dependency, serialization and failure checks passed');
 }
 
 main().catch(error => {

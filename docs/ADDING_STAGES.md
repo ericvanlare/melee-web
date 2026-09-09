@@ -90,6 +90,23 @@ ownership. This evidence covers the Battlefield source boundary exercised by
 the trace; it does not claim full stage coverage or a full-reference-equivalence
 result for every stage service.
 
+Yoshi's Story adds several reusable cases. Its `map_head` has two joint-reference
+rows, so the marker owner must select and validate the first marker tree without
+requiring the entire table count to be one. Marker joints use
+`JOBJ_CLASSICAL_SCALE`. The stage archive's two references to
+`GrdStoryHeiho_TopN_shapeanim_joint` have no public provider; the original DAT
+loader validates the external chain and resolves those slots to null. Preserve
+that behavior rather than guessing a `TyHeiho.dat` dependency. Its map models
+also require native packed RGB direct colors and an animation PATH reference to
+the exact hydrated spline-joint descriptor.
+
+Stage-owned Articles use the archive's null-terminated `itemdata` table. Publish
+those decoded Articles through `stage_info.itemdata` and `it_804A0F60` before
+the source `on_init`, keep them alive through item teardown, then restore both
+globals. The Yoshi's Story content trace checks that this produces actual
+`It_Kind_Heiho` objects after the source 120-frame timer. Its exact archive
+contract is in [YOSHIS_STORY_PORT_NOTES.md](YOSHIS_STORY_PORT_NOTES.md).
+
 Run the focused native/data probes and ask the lead to run the browser and
 central CMake/Ninja targets. Browser SSS selection must use raw PAD input and
 observe the resulting source selection payload. A direct write to selection

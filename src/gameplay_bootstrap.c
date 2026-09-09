@@ -1,5 +1,6 @@
 #include "gameplay_bootstrap.h"
 #include "gameplay_heap.h"
+#include <melee/lb/lb_00F9.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/gobjplink.h>
 #include <sysdolphin/baselib/gobjproc.h>
@@ -70,6 +71,10 @@ int melee_web_gameplay_startup(size_t bytes, char* error, size_t error_size)
     OSSetCurrentHeap(heap);
     HSD_SetHeap(heap);
     HSD_ObjSetHeap((u32) bytes, NULL);
+    /* Fighter_Create initializes authored bone chains through this original
+     * dynamics pool. The pool belongs to the scoped SDK heap, so rebuild it
+     * for every fresh gameplay world before any Fighter can be constructed. */
+    lb_8000FCDC();
 
     /* The table ownership mirrors gobjinit.c. Registering its default graphics
      * destructors would pull in uninitialized HSD render-object lifetimes. This

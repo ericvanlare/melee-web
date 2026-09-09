@@ -23,6 +23,10 @@ python3 scripts/extract_disc_file.py "$DISC" audio/us/falco.ssm --output "$OUT/f
 python3 scripts/generate_fighter_registry.py --melee-root .deps/melee --check
 ```
 
+Fox follows the same extraction shape with `PlFx.dat`, `PlFxAJ.dat`,
+`PlFxNr/Or/La/Gr.dat`, `EfFxData.dat` and `audio/us/fox.ssm`. Its exact source
+contract and hashes are recorded in [FOX_PORT_NOTES.md](FOX_PORT_NOTES.md).
+
 Confirm each costume against its exact source model symbol. Falco's four model
 symbols are `PlyFalco5K_Share_joint`, `PlyFalco5KRe_Share_joint`,
 `PlyFalco5KBu_Share_joint` and `PlyFalco5KGr_Share_joint`; the costume DATs are
@@ -77,6 +81,13 @@ Falco and Fox share the `ftFox_DatAttrs` 0xd4-byte extension and the original
 fighter kind, while the article kinds remain the source values in the DAT.
 The shared effect table is loaded once per effect bank and is not duplicated
 under a Falco-specific symbol.
+
+Fox exposed two runtime requirements that a metadata-only check cannot find.
+Its nonempty `ftDynamics` needs the original dynamics pool initialized inside
+each scoped SDK heap before `Fighter_Create`, and its Illusion Article uses item
+script opcodes 12 and 14. Decode the authored chain parameter rows into their
+original `DynamicsDesc` view and test the live constructor; a scalar dump alone
+does not prove the per-Fighter linked chain can be built.
 
 ## Shared integration boundary
 

@@ -10,9 +10,11 @@
 #include <cmath>
 
 extern "C" int melee_web_test_content_player(unsigned,int,unsigned);
+extern "C" int melee_web_test_item_count(int);
+extern "C" int melee_web_story_state(uint32_t*,unsigned*,int*,int*,int*,int*);
 static void check(bool value,const char* message){if(!value)throw std::runtime_error(message);}
 int main(int argc,char** argv){try{
-    if(argc<3||argc>4)throw std::runtime_error("Expected owned menu/game directories and optional StKind");
+    if(argc<3||argc>6)throw std::runtime_error("Expected owned menu/game directories and optional StKind/P1 CKind/P2 CKind");
     melee_web::RuntimeFiles files;
     for(const auto* root:{argv[1],argv[2]})for(const auto& entry:std::filesystem::directory_iterator(root)){
         if(!entry.is_regular_file())continue;
@@ -31,9 +33,15 @@ int main(int argc,char** argv){try{
     selection.start=melee_web_menu_css(menu)->vs.start;
     check(melee_web_menu_session_destroy(menu,error,sizeof(error)),error);
     selection.hud_layout=2;selection.start.rules.x0_3=2;selection.random_seed=0x13579bdf;
-    selection.start.rules.stkind=argc==4?std::stoi(argv[3]):St_Kind_Last;
-    selection.start.players[0].ckind=CKIND_FALCO;
-    selection.start.players[1].ckind=CKIND_MARIO;
+    selection.start.rules.stkind=argc>=4?std::stoi(argv[3]):St_Kind_Last;
+    const int fighter_ckind=argc>=5?std::stoi(argv[4]):CKIND_FALCO;
+    const auto* fighter_content=melee_web_fighter_content(fighter_ckind);
+    check(fighter_content,"Selected fighter has no admitted source content");
+    const int opponent_ckind=argc==6?std::stoi(argv[5]):CKIND_MARIO;
+    const auto* opponent_content=melee_web_fighter_content(opponent_ckind);
+    check(opponent_content,"Selected opponent has no admitted source content");
+    selection.start.players[0].ckind=fighter_ckind;
+    selection.start.players[1].ckind=opponent_ckind;
     for(unsigned cycle=0;cycle<4;cycle++){
         selection.start.players[0].color=cycle;
         selection.start.players[1].color=cycle;
@@ -48,8 +56,21 @@ int main(int argc,char** argv){try{
                 check(std::isfinite(state.position[0])&&std::isfinite(state.position[1]),"Nonfinite fighter state");}};
         for(unsigned n=0;!match.ready()&&n<600;n++)tick();
         check(match.ready(),"Original Ready did not finish");
-        check(melee_web_test_content_player(0,FTKIND_FALCO,cycle),"Original Falco identity/costume/icon differs");
-        check(melee_web_test_content_player(1,FTKIND_MARIO,cycle),"Original Mario identity/costume/icon differs");
+        check(melee_web_test_content_player(0,fighter_content->fighter_kind,cycle),"Original selected-fighter identity/costume/icon differs");
+        check(melee_web_test_content_player(1,opponent_content->fighter_kind,cycle),"Original opponent identity/costume/icon differs");
+        if(selection.start.rules.stkind==St_Kind_Story){
+            uint32_t map_mask=0;unsigned map_count=0;int randall_timer=0,shy_timer=0,shy_count=0,shy_pattern=0;
+            check(melee_web_story_state(&map_mask,&map_count,&randall_timer,&shy_timer,&shy_count,&shy_pattern),
+                  "Yoshi's Story original map lifecycle is incomplete");
+            check(map_mask==0xf&&map_count==4&&randall_timer>=-1&&randall_timer<=29&&
+                      shy_timer>=0&&shy_timer<=120&&shy_count>=0&&shy_count<=5,
+                  "Yoshi's Story Randall/Shy Guy source state is outside its authored bounds");
+            bool shy_live=melee_web_test_item_count(0xd2)>0;
+            for(unsigned n=0;n<180&&!shy_live;n++){tick();shy_live=melee_web_test_item_count(0xd2)>0;}
+            check(shy_live,"Yoshi's Story did not create an original Shy Guy item after its 120-frame timer");
+            std::cout<<"Yoshi's Story maps="<<map_count<<" Randall timer="<<randall_timer
+                     <<" Shy timer="<<shy_timer<<" pattern="<<shy_pattern<<std::endl;
+        }else{
         // Battlefield's authored versus spawns put P2 on the top platform.
         // Drop that source Fighter through its pass-through platforms before
         // checking a horizontal projectile on the main floor.
@@ -68,31 +89,31 @@ int main(int argc,char** argv){try{
         }
         raw[0].stickX=0;
         check(std::abs(match.player_stats(1).position[0]-match.player_stats(0).position[0])<35.0f,
-              "Raw input did not bring Falco within laser range");
-        check(match.player_stats(0).ground_or_air==0,"Falco left the ground before the laser check");
+              "Raw input did not bring the selected fighter within laser range");
+        check(match.player_stats(0).ground_or_air==0,"Selected fighter left the ground before the laser check");
         const auto damage=match.player_stats(1).damage_percent;
         for(unsigned n=0;n<240&&match.player_stats(1).damage_percent==damage;n++){
             raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
         }
         raw[0].button=0;
-        check(match.player_stats(1).damage_percent>damage,"Falco ground laser did not damage the opponent");
-        std::cout<<"Falco laser damage="<<match.player_stats(1).damage_percent<<std::endl;
+        check(match.player_stats(1).damage_percent>damage,"Selected fighter ground laser did not damage the opponent");
+        std::cout<<fighter_content->name<<" laser damage="<<match.player_stats(1).damage_percent<<std::endl;
         for(unsigned n=0;n<120&&match.player_stats(0).ground_or_air==0;n++){
             raw[0].button=n%8==0?PAD_BUTTON_X:0;tick();
         }
         raw[0].button=0;
-        check(match.player_stats(0).ground_or_air==1,"Falco did not jump");
+        check(match.player_stats(0).ground_or_air==1,"Selected fighter did not jump");
         for(unsigned n=0;n<100;n++){raw[0].button=n<20?PAD_BUTTON_B:0;tick();}
         if(cycle==0){
             for(unsigned n=0;n<300&&match.player_stats(0).ground_or_air!=0;n++)tick();
-            check(match.player_stats(0).ground_or_air==0,"Falco did not land after the air laser");
+            check(match.player_stats(0).ground_or_air==0,"Selected fighter did not land after the air laser");
             bool reflector=false;
             for(unsigned n=0;n<180&&!reflector;n++){
                 raw[0].stickY=-80;raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
                 const auto motion=match.player_stats(0).motion_id;
                 reflector=motion>=360&&motion<=369;
             }
-            check(reflector,"Falco reflector did not enter its original special state");
+            check(reflector,"Reflector did not enter its original special state");
             raw[0].stickY=0;raw[0].button=0;
             for(unsigned n=0;n<300;n++){
                 const auto state=match.player_stats(0);
@@ -105,7 +126,7 @@ int main(int argc,char** argv){try{
                 const auto motion=match.player_stats(0).motion_id;
                 phantasm=motion>=347&&motion<=352;
             }
-            check(phantasm,"Falco Phantasm did not enter its original special state");
+            check(phantasm,"Side special did not enter its original source state");
             raw[0].stickX=0;raw[0].button=0;
             for(unsigned n=0;n<300;n++){
                 const auto motion=match.player_stats(0).motion_id;
@@ -118,8 +139,9 @@ int main(int argc,char** argv){try{
                 const auto motion=match.player_stats(0).motion_id;
                 fire_bird=motion>=353&&motion<=359;
             }
-            check(fire_bird,"Falco Fire Bird did not enter its original special state");
+            check(fire_bird,"Up special did not enter its original source state");
             raw[0].stickY=0;raw[0].button=0;
+        }
         }
         raw[0].button=PAD_BUTTON_START;tick();raw[0].button=0;
         for(unsigned n=0;n<30&&!match.paused();n++)tick();
@@ -130,5 +152,5 @@ int main(int argc,char** argv){try{
         check(match.complete(),"Original No Contest did not end the mixed match");
         match.close();match.close();
     }
-    std::cout<<"Mixed Falco/Mario source intro, four costumes, lasers, specials, pause and repeat teardown passed\n";
+    std::cout<<"Mixed source content intro, costumes, stage lifecycle, combat, pause and repeat teardown passed\n";
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

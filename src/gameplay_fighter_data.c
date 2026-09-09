@@ -123,7 +123,56 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     d->x8->x13=BYTE(at+19); d->x8->x14=BYTE(at+20);
     d->xC=actions; d->x10=blends; d->x24=choices;
     at=required(r,root+0x2c,20); d->x2C=NEW(ftDynamics,1);
-    REQUIRE(WORD(at)==0 && WORD(at+8)==0,"Native nonempty fighter dynamics are not hydrated");
+    d->x2C->dynamicsNum=READ_I32(at);
+    const unsigned dynamics_capacity=sizeof(((struct ArticleDynamicBones*)0)->array)/
+                                     sizeof(((struct ArticleDynamicBones*)0)->array[0]);
+    REQUIRE(d->x2C->dynamicsNum>=0 && (unsigned)d->x2C->dynamicsNum<dynamics_capacity,
+            "Native fighter dynamics count exceeds source Fighter storage");
+    if(d->x2C->dynamicsNum) {
+        const uint32_t bones=required(r,at+4,(size_t)d->x2C->dynamicsNum*sizeof(BoneDynamicsDesc));
+        d->x2C->ftDynamicBones=NEW(struct ArticleDynamicBones,1);
+        for(int i=0;i<d->x2C->dynamicsNum;++i) {
+            const uint32_t row=bones+(uint32_t)i*sizeof(BoneDynamicsDesc);
+            BoneDynamicsDesc* out=&d->x2C->ftDynamicBones->array[i];
+            out->bone_id=(enum_t)READ_I32(row);
+            REQUIRE(out->bone_id>=0 && out->bone_id<140,
+                    "Native fighter dynamics bone exceeds source part storage");
+            out->dyn_desc.count=READ_U32(row+8);
+            REQUIRE(out->dyn_desc.count>0 && out->dyn_desc.count<=140,
+                    "Native fighter dynamics chain exceeds source part storage");
+            const uint32_t values=required(r,row+4,
+                (size_t)out->dyn_desc.count*sizeof(struct lb_00F9_UnkDesc1Inner));
+            struct lb_00F9_UnkDesc1Inner* parameters=
+                NEW(struct lb_00F9_UnkDesc1Inner,out->dyn_desc.count);
+            for(unsigned j=0;j<out->dyn_desc.count;++j)for(unsigned k=0;k<15;++k) {
+                const uint32_t field=values+j*sizeof(*parameters)+k*4;
+                const float checked=floating(r,field);
+                memcpy((uint8_t*)&parameters[j]+k*4,&checked,4);
+            }
+            /* lb_80011710 treats the serialized parameter array as the
+             * lb_unk1 view of DynamicsData. Runtime linked DynamicsData is
+             * allocated separately by lb_8000FD48 for each Fighter. */
+            out->dyn_desc.data=(struct DynamicsData*)parameters;
+            out->dyn_desc.pos=(Vec3){floating(r,row+12),floating(r,row+16),floating(r,row+20)};
+        }
+    } else REQUIRE(PTR(at+4,1)==UINT32_MAX,
+                   "Empty native fighter dynamics has a nonnull bone table");
+    d->x2C->x4=READ_I32(at+8);
+    REQUIRE(d->x2C->x4>=0 && d->x2C->x4<=11,
+            "Native fighter dynamics auxiliary count exceeds source capacity");
+    if(d->x2C->x4) {
+        const uint32_t rows=required(r,at+12,(size_t)d->x2C->x4*sizeof(struct ftData_x38));
+        d->x2C->x8=NEW(struct ftData_x38,d->x2C->x4);
+        for(int i=0;i<d->x2C->x4;++i) {
+            const uint32_t row=rows+(uint32_t)i*sizeof(struct ftData_x38);
+            d->x2C->x8[i].x0=READ_I32(row);
+            REQUIRE(d->x2C->x8[i].x0>=0 && d->x2C->x8[i].x0<140,
+                    "Native fighter dynamics auxiliary bone exceeds source part storage");
+            d->x2C->x8[i].x4=(Vec3){floating(r,row+4),floating(r,row+8),floating(r,row+12)};
+            d->x2C->x8[i].x10=floating(r,row+16);
+        }
+    } else REQUIRE(PTR(at+12,1)==UINT32_MAX,
+                   "Empty native fighter dynamics has a nonnull auxiliary table");
     REQUIRE(PTR(at+16,1)==UINT32_MAX,"Native dynamics animation table is not hydrated");
     at=required(r,root+0x30,8); d->x30=NEW(struct ftData_x30,1); d->x30->count=(int)WORD(at);
     REQUIRE(d->x30->count>=0 && d->x30->count<=15,"Native hurtbox count exceeds source capacity");

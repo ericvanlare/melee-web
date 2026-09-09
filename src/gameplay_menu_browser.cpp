@@ -12,6 +12,7 @@
 #include <dolphin/gx.h>
 #include <dolphin/vi.h>
 #include <emscripten.h>
+#include <emscripten/heap.h>
 #include <SDL3/SDL_hints.h>
 #include <array>
 #include <algorithm>
@@ -41,7 +42,7 @@ PADStatus diagnostic_pad{};
 unsigned diagnostic_pad_port=0,diagnostic_pad_remaining=0;
 std::array<float,1068> pcm;
 alignas(32) unsigned char fifo[64*1024];
-constexpr std::array<std::string_view,45> keys={"GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","EfFxData.dat","falco.ssm","GrNBa.dat","sp_zako.hps","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sislib_font.bin"};
+constexpr std::array<std::string_view,54> keys={"GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","EfFxData.dat","falco.ssm","GrNBa.dat","sp_zako.hps","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","fox.ssm","GrSt.dat","ystory.hps","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sislib_font.bin"};
 constexpr unsigned kDiagnosticPadButtons=PAD_BUTTON_LEFT|PAD_BUTTON_RIGHT|PAD_BUTTON_DOWN|PAD_BUTTON_UP|
  PAD_TRIGGER_Z|PAD_TRIGGER_R|PAD_TRIGGER_L|PAD_BUTTON_A|PAD_BUTTON_B|PAD_BUTTON_X|PAD_BUTTON_Y|PAD_BUTTON_START;
 void check(int value,const char* error){if(!value)throw std::runtime_error(error);}
@@ -56,11 +57,13 @@ void report_construction(const char* kind,double started,double constructed,doub
                          const AuroraStats& before,const AuroraStats& after){
  EM_ASM({if(window.menuConstructionTiming)window.menuConstructionTiming({
    kind:UTF8ToString($0),total_ms:$1,construct_ms:$2,entry_ms:$3,
-   queued_delta:$4,created_delta:$5,draw_calls:$6,texture_upload_bytes:$7
+   queued_delta:$4,created_delta:$5,draw_calls:$6,texture_upload_bytes:$7,
+   queued_total:$8,created_total:$9,wasm_heap_bytes:$10
  });},kind,entered-started,constructed-started,entered-constructed,
         stat_delta(after.queuedPipelines,before.queuedPipelines),
         stat_delta(after.createdPipelines,before.createdPipelines),
-        after.drawCallCount,after.lastTextureUploadSize);
+        after.drawCallCount,after.lastTextureUploadSize,after.queuedPipelines,
+        after.createdPipelines,emscripten_get_heap_size());
 }
 void begin_preparation(){
  if(!preparation.request())return;
@@ -251,14 +254,17 @@ void tick(){
   "\"input_ms\":%.3f,\"simulation_audio_ms\":%.3f,\"preparation_ms\":%.3f,"
   "\"begin_ms\":%.3f,\"draw_ms\":%.3f,\"end_ms\":%.3f,\"total_ms\":%.3f,"
   "\"began\":%d,\"drawn\":%d,\"queued_delta\":%d,\"created_delta\":%d,"
-  "\"draw_calls\":%u,\"texture_upload_bytes\":%u,\"draw_suppressed\":%d}",
+  "\"queued_total\":%u,\"created_total\":%u,\"draw_calls\":%u,"
+  "\"texture_upload_bytes\":%u,\"wasm_heap_bytes\":%zu,\"draw_suppressed\":%d}",
   ++render_frame,started,timing_valid,first_use,input_done-started,
   std::max(0.0,simulation_done-input_done-preparation_ms),preparation_ms,
   begin_done-simulation_done,draw_done-begin_done,end_done-draw_done,
   finished-started,began,drawn,
   stat_delta(stats_after.queuedPipelines,stats_before.queuedPipelines),
   stat_delta(stats_after.createdPipelines,stats_before.createdPipelines),
-  stats_after.drawCallCount,stats_after.lastTextureUploadSize,suppress_draw);
+  stats_after.queuedPipelines,stats_after.createdPipelines,
+  stats_after.drawCallCount,stats_after.lastTextureUploadSize,
+  emscripten_get_heap_size(),suppress_draw);
  EM_ASM({if(window.menuRuntimeTiming)window.menuRuntimeTiming(JSON.parse(UTF8ToString($0)));},timing);
  EM_ASM({window.menuFrame?.();});
 }
@@ -266,7 +272,8 @@ void tick(){
 extern "C" {
 int melee_web_native_menu_file(const char* name,const uint8_t* data,unsigned size){try{
  if(world||match||!name||!data||!size||size>64*1024*1024)throw std::runtime_error("Unload before importing valid local files");
- bool known=false;for(auto key:keys)known|=key==name;if(!known)throw std::runtime_error("Unknown native menu file");
+ bool known=false;for(auto key:keys)known|=key==name;
+ if(!known)throw std::runtime_error("Unknown native menu file: "+std::string(name));
  files[name]={data,data+size};return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
 int melee_web_native_menu_prepare(){try{

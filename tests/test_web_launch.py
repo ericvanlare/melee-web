@@ -14,6 +14,9 @@ class WebLaunchTests(unittest.TestCase):
         self.assertIn("perf-metrics", runtime)
         self.assertIn("audio-metrics", runtime)
         self.assertIn("runtime-cache.js", runtime)
+        self.assertIn("Scene entry profile", runtime)
+        self.assertIn("Clear render cache + reload", runtime)
+        self.assertIn("clearOnLoad:clearRenderCacheOnLoad", runtime)
         self.assertNotIn("match-menu", runtime)
         self.assertNotIn("gameplay_browser.js", runtime)
 

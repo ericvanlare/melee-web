@@ -52,7 +52,10 @@ int main(void){
     CHECK(stats.character==CKIND_FALCO&&stats.costume==3);
     CHECK(melee_web_player_context_end(falco,error,sizeof(error)));
     settings.fighter_kind=FTKIND_FOX;settings.costume=0;
-    CHECK(!melee_web_player_context_begin(&settings,error,sizeof(error)));
+    MeleeWebPlayerContext* fox=melee_web_player_context_begin(&settings,error,sizeof(error));CHECK(fox);
+    CHECK(melee_web_player_context_stats(fox,&stats,error,sizeof(error)));
+    CHECK(stats.character==CKIND_FOX&&stats.costume==0);
+    CHECK(melee_web_player_context_end(fox,error,sizeof(error)));
     memcpy(p,&original,sizeof(original));
     puts("Original Player fighter identity mapping, settings, getters, stale reset, scoped restore and restart passed");return 0;
 }

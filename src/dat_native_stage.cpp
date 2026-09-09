@@ -143,6 +143,12 @@ DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive, int st
   else{
    auto graph=std::make_unique<DatNativeJoint>(archive,*e.joint_offset);char error[256];auto* native=melee_web_native_joint_hydrate(&graph->graph(),error,sizeof(error));require(native,error);s.native.push_back(native);
    out.unk0=static_cast<HSD_Joint*>(melee_web_native_joint_descriptor(native,error,sizeof(error)));require(out.unk0,error);s.joints[*e.joint_offset]=out.unk0;
+   std::vector<void*> native_joint_descriptors(graph->graph().joint_count);
+   for(uint32_t i=0;i<graph->graph().joint_count;i++){
+    native_joint_descriptors[i]=melee_web_native_joint_descriptor_at(
+        native,i,graph->graph().joints[i].source_offset,error,sizeof(error));
+    require(native_joint_descriptors[i],error);
+   }
    for(uint32_t i=0;i<graph->graph().material_count;i++){auto* material=static_cast<HSD_MObjDesc*>(melee_web_native_joint_material_descriptor(native,i,error,sizeof(error)));require(material,error);s.material_descriptors[graph->graph().materials[i].source_offset].push_back(material);}
    // Source callbacks select animation slots per entry. These are consumer
    // counts, not inferred DAT extents; the complete map descriptor table above
@@ -152,7 +158,7 @@ DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive, int st
    out.unk4=s.make<HSD_AnimJoint*>(count+1);out.unk8=s.make<HSD_MatAnimJoint*>(count+1);
    for(unsigned i=0;i<count;i++){
     if(e.joint_animation_table){s.record(*e.joint_animation_table,count*4);if(auto p=a.pointer(*e.joint_animation_table+4*i,20)){
-     auto anim=std::make_unique<DatNativeAnimation>(archive,*p,graph->graph(),DatNativeAnimationPolicy::ParticleDescriptors);out.unk4[i]=static_cast<HSD_AnimJoint*>(anim->indexed_descriptor());s.events.insert(s.events.end(),anim->particle_events().begin(),anim->particle_events().end());s.animations.push_back(std::move(anim));}}
+     auto anim=std::make_unique<DatNativeAnimation>(archive,*p,graph->graph(),DatNativeAnimationPolicy::ParticleDescriptors,native_joint_descriptors);out.unk4[i]=static_cast<HSD_AnimJoint*>(anim->indexed_descriptor());s.events.insert(s.events.end(),anim->particle_events().begin(),anim->particle_events().end());s.animations.push_back(std::move(anim));}}
     if(e.material_animation_table){s.record(*e.material_animation_table,count*4);if(auto p=a.pointer(*e.material_animation_table+4*i,12)){
      auto anim=std::make_unique<DatMaterialAnimation>(archive,*p,graph->graph());out.unk8[i]=static_cast<HSD_MatAnimJoint*>(anim->indexed_descriptor());s.materials.push_back(std::move(anim));}}
    }
@@ -186,6 +192,7 @@ DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive, int st
  // Ground light queries use the explicit bounded identity resolver below.
  s.map.unk1C=meta.light_override_table.count;s.map.unk18=nullptr;
  for(const auto& symbol:a.public_symbols())if(symbol.name=="yakumono_param"){
+  if(profile->decode_yakumono){s.yaku=profile->decode_yakumono(s.arena.reader(),symbol.data_offset);require(s.yaku,"Native stage yakumono decoder returned null");continue;}
  // Original grLast uses four pointers to material command programs. Typed
   // command hydration is required before exposing its native pointer table.
   // The word count is part of the source stage ABI: Battlefield has two

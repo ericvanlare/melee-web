@@ -5430,3 +5430,24 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
 +    return 1;
 +}
 +#endif
+diff --git a/src/melee/gr/grstory.c b/src/melee/gr/grstory.c
+--- a/src/melee/gr/grstory.c
++++ b/src/melee/gr/grstory.c
+@@ -322,6 +322,17 @@ bool grStory_801E36D8(Vec3* a, int _, HSD_JObj* jobj)
+     }
+ }
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++/* The browser owner restores the previous borrowed scalar block after every
++ * Yoshi's Story lifetime. */
++void* melee_web_grstory_exchange_yakumono(void* value)
++{
++    void* previous = yakumono_param;
++    yakumono_param = value;
++    return previous;
++}
++#endif
++
+ #ifdef MUST_MATCH
+ static u32 _[] = {
+     0xC3920000, 0x42D20000, 0xC3920000, 0x42960000, 0xC3920000, 0x42480000,

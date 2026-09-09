@@ -36,16 +36,16 @@ namespace {
 
 constexpr std::size_t kWorldHeapBytes = 32U * 1024U * 1024U;
 
-constexpr std::array<std::string_view, 18> kRequiredFiles = {
+constexpr std::array<std::string_view, 19> kRequiredFiles = {
     "MnSlChr.usd", "MnSlMap.usd", "SdSlChr.usd", "MnExtAll.usd",
     "LbMcGame.usd", "NtMemAc.usd", "sislib_font.bin", "smash2.sem",
-    "dsp_coef.bin", "menu01.hps", "main.ssm", "mario.ssm", "falco.ssm",
+    "dsp_coef.bin", "menu01.hps", "main.ssm", "mario.ssm", "fox.ssm", "falco.ssm",
     "nr_select.ssm", "nr_title.ssm", "nr_name.ssm", "pokemon.ssm",
     "end.ssm",
 };
 
-constexpr std::array<std::string_view, 8> kBankFiles = {
-    "main.ssm", "mario.ssm", "falco.ssm", "nr_select.ssm", "nr_title.ssm",
+constexpr std::array<std::string_view, 9> kBankFiles = {
+    "main.ssm", "mario.ssm", "fox.ssm", "falco.ssm", "nr_select.ssm", "nr_title.ssm",
     "nr_name.ssm", "pokemon.ssm", "end.ssm",
 };
 

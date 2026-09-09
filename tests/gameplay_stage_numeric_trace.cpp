@@ -13,7 +13,7 @@ int main(int argc,char** argv){
  if(argc!=2){std::cerr<<"Usage: gameplay_stage_numeric_trace.js PATH_TO_GrNLa.dat\n";return 64;}
  std::ifstream f(argv[1],std::ios::binary);if(!f){std::cerr<<"Cannot read stage asset\n";return 65;}std::vector<uint8_t> b((std::istreambuf_iterator<char>(f)),{});auto a=std::make_shared<DatArchive>(b);uint32_t h=0;for(auto s:a->public_symbols())if(s.name=="map_head")h=s.data_offset;auto table=*a->pointer(h),root=*a->pointer(table),pairs=*a->pointer(table+4);NativeDatArena arena(a);if(!melee_web_stage_markers_decode(arena.reader(),h))return 1;
 
- int rejected=0;for(auto [o,v]:std::vector<std::pair<uint32_t,uint32_t>>{{h+4,2},{table+8,262},{root+4,1},{root+20,0x7f800000},{root+32,0},{pairs,0xffff0094},{pairs,0x00010105},{pairs+4,0x00020094}}){auto bad=b;put(bad,o,v);try{NativeDatArena ar(std::make_shared<DatArchive>(bad));melee_web_stage_markers_decode(ar.reader(),h);}catch(const DatError&){rejected++;}}
+ int rejected=0;for(auto [o,v]:std::vector<std::pair<uint32_t,uint32_t>>{{h+4,65},{table+8,262},{root+4,1},{root+20,0x7f800000},{root+32,0},{pairs,0xffff0094},{pairs,0x00010105},{pairs+4,0x00020094}}){auto bad=b;put(bad,o,v);try{NativeDatArena ar(std::make_shared<DatArchive>(bad));melee_web_stage_markers_decode(ar.reader(),h);}catch(const DatError&){rejected++;}}
 
  if(rejected!=8)return 6;
  uint32_t ground=0;for(auto symbol:a->public_symbols())if(symbol.name=="grGroundParam")ground=symbol.data_offset;

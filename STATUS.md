@@ -1,8 +1,9 @@
 # Current status
 
 The browser runs original fighters and stages through compiled WebAssembly. The
-accepted first slice is two Marios on Final Destination; a narrower raw-PAD run
-also selected and rendered Falco versus Mario on Battlefield. The complete
+accepted first slice is two Marios on Final Destination; narrower raw-PAD runs
+also selected and rendered Falco versus Mario on Battlefield and Fox versus
+Mario on Yoshi's Story. The complete
 acceptance milestone below is still open:
 source stage and item rendering, stock/respawn/outcome flow, and the optional
 renderer cache are integrated, while clean cold-cache/full-match first-use
@@ -10,16 +11,25 @@ stalls, audible and physical controller verification, and full original-game
 equivalence remain open. No
 emulator is shipped; Dolphin is used only as a separate original-game reference.
 
-The typed content path now carries Falco and Battlefield source IDs, runtime
-manifests and focused development traces, including Falco costume/effect/audio
-metadata and Battlefield geometry/background data. Source stock icon IDs are
+The typed content path now carries Falco, Fox, Battlefield and Yoshi's Story
+source IDs, runtime manifests and focused development traces. Source stock icon IDs are
 selected from the typed character/fighter identity rows. In a fresh Release
 browser route, raw PAD input selected P1 Falco and P2 Mario in the original CSS,
 selected Battlefield in the original SSS, and entered a four-stock match. The
 rendered frame showed Falco, Mario, Battlefield geometry and the correct four
 Falco and four Mario stock icons. A complete ordinary-input loop, uninterrupted
 audio and retail-reference comparison have not passed, so the accepted
-first-deliverable claim remains Mario on Final Destination.
+first-deliverable claim remains Mario on Final Destination. The integrated
+source match trace completes Fox on Final Destination and Battlefield,
+including all four costumes, laser, Reflector, Illusion and Fire Fox. A combined
+Fox/Falco run proves shared effect-bank ownership. Yoshi's Story completes
+repeated source lifetimes with four map objects, Randall state, moving collision
+and real Shy Guy creation after the original 120-frame scheduler. A Release
+browser route selected Fox in the original CSS, selected the upper Yoshi's Story
+tile in the original SSS, and rendered the source Ready countdown with Fox stock
+icons and Yoshi's Story geometry. The lower adjacent tile is Yoshi's Island and
+remains unavailable. Uninterrupted audio and retail comparison for these
+additions remain open.
 
 The active first deliverable is **original in-game CSS → original in-game SSS
 → a playable four-stock Mario-versus-Mario match on Final Destination → original
@@ -32,8 +42,8 @@ remain required acceptance work under [the accuracy contract](docs/ACCURACY_CONT
 
 The canonical `runtime.html` player uses original CSS/SSS assets, callbacks and
 transitions. `native-menu.html` redirects to it; the asset inspector remains at
-`viewer.html`. The runtime availability gate now includes Mario and Falco, all
-of their source costumes, and Final Destination and Battlefield under the
+`viewer.html`. The runtime availability gate now includes Mario, Fox and Falco,
+all of their source costumes, and Final Destination, Battlefield and Yoshi's Story under the
 four-stock, no-items, no-timer rules. Menu selection carries the complete typed
 `StartMeleeData`, including source RNG and costume/tint settings, into the match.
 The original menu preloader is not supplied by this resident-asset integration.
@@ -59,9 +69,10 @@ not original-game equivalence evidence.
 
 The expanded native menu trace selects Mario/Falco through raw PAD, enters SSS,
 and completes a four-stock match back to CSS twice on both Final Destination and
-Battlefield. The content trace repeats both stages with every Mario and Falco
-costume, exercises Falco's laser, Reflector, Phantasm and Fire Bird action
-families, pause and No Contest, and verifies teardown before the next cycle.
+Battlefield. The content trace repeats all three stages with every Falco and Fox
+costume, exercises their laser, Reflector, side-special and up-special action
+families, pause and No Contest, checks Yoshi's Story's Randall/Shy Guy lifecycle,
+and verifies teardown before the next cycle.
 These native traces establish the checked source lifecycle; they do not replace
 browser input, audio or retail-reference evidence.
 
@@ -79,6 +90,17 @@ cold-cache or full-match acceptance. The subsequent MarioReady operation-55
 representation defect is fixed, and the fresh native whole-match routes above
 pass on both admitted stages.
 
+A correlated Battlefield cold-entry probe measured fresh application
+construction at 182.380 ms, the preparation boundary at 200.095 ms and first
+draw at 10.025 ms, with 399,360 texture-upload bytes and eight queued/five
+created pipelines. A source-world reload in the same page measured
+157.685/175.265/3.880 ms with no new uploads or pipelines; a full page reload
+measured 160.485/178.040/4.870 ms and repeated the texture upload while retaining
+the browser/driver pipeline cache. Diagnostics now distinguish application-state
+reload from clearing the persisted renderer cache. Neither clears browser or
+GPU-driver caches, so this explains the first-load shape without claiming a
+clean machine/browser cold-cache pass.
+
 The current Release browser separately passes original pause/resume and two
 four-stock loops, each at **2,125 diagnostic input ticks**, with three respawns
 and automatic return to CSS. Source pause was explicitly observed changing
@@ -95,8 +117,8 @@ accessory has a world-owned descriptor that outlives its original fighter/effect
 consumers. Eye telemetry distinguishes an authored base image from an animated
 table entry; this changes observation only, not the game's texture commands.
 
-The current local regression suite passes **262 tests without skips** (219.703
-seconds), recorded in `work/final-full-suite.log`. Default and Release browser, native-menu,
+The current local regression suite passes **266 tests without skips** (700.484
+seconds), recorded in `work/full-suite-2026-09-09.log`. Default and Release browser, native-menu,
 content-match, Battlefield, player-context and fighter-runtime targets build.
 The focused browser run used the Release build. The integrated change also
 received a primary review of ownership, input handoff, construction, callback

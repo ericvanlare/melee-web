@@ -20,7 +20,7 @@ class RuntimeCacheTests(unittest.TestCase):
             timeout=15,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("Runtime cache mount, populate, dependency, serialization and failure checks passed", result.stdout)
+        self.assertIn("Runtime cache mount, populate, reset-before-startup, dependency, serialization and failure checks passed", result.stdout)
 
 
 if __name__ == "__main__":

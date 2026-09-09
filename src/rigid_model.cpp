@@ -152,17 +152,22 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
             continue;
         }
         if (color) {
-            // HSD's native direct color path also retains the packed RGBA4
-            // format. It consumes a two-byte GXColor1u16 packet; this is a
-            // display-list value, so no host array is fabricated. Viewer
-            // imports keep the narrower RGBA8 contract below.
-            const bool rgba4 = type == 3 && policy == DatMaterialPolicy::NativeDescriptors;
-            const bool rgba6 = type == 4 && policy == DatMaterialPolicy::NativeDescriptors;
-            if (mode != direct || count != 1 || (type != 5 && !rgba4 && !rgba6) || frac != 0 ||
-                (stride != 0 && stride != 4))
+            // The original native PObj path consumes all six GX packed direct
+            // color encodings. RGB565/RGB8/RGBX8 carry GX_CLR_RGB while
+            // RGBA4/RGBA6/RGBA8 carry GX_CLR_RGBA. These bytes live in the
+            // display list, so no host vertex array is fabricated. Viewer
+            // imports retain the narrower direct RGBA8 contract.
+            static constexpr uint32_t packed_widths[] = {2, 3, 4, 2, 3, 4};
+            const bool native_packed = policy == DatMaterialPolicy::NativeDescriptors &&
+                type < std::size(packed_widths) && count == (type >= 3 ? 1u : 0u);
+            const bool viewer_rgba8 = type == 5 && count == 1;
+            const uint32_t packed_width = type < std::size(packed_widths)
+                ? packed_widths[type] : 0;
+            if (mode != direct || (!native_packed && !viewer_rgba8) || frac != 0 ||
+                (stride != 0 && stride != packed_width && stride != 4))
                 reject("Only supported direct vertex color formats are accepted");
             absent(a, d + 20, "Direct vertex colors cannot reference a vertex array");
-            widths[i] = rgba4 ? 2 : rgba6 ? 3 : 4;
+            widths[i] = packed_width;
             mesh.attributes.push_back({attr, mode, count, type, frac, stride, nullptr, 0});
             continue;
         }

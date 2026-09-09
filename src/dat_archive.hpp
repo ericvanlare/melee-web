@@ -16,7 +16,7 @@ public:
     using std::runtime_error::runtime_error;
 };
 
-enum class DatExternalPolicy { Reject, PreserveUnresolved };
+enum class DatExternalPolicy { Reject, PreserveUnresolved, ResolveNull };
 
 struct DatExternalSymbol {
     std::string name;
@@ -39,8 +39,10 @@ public:
     static constexpr std::size_t max_symbol_name_bytes = 4096U;
 
     // Limits also bound total copied symbol-name bytes to max_archive_bytes.
-    // External links default to rejection. The explicit PreserveUnresolved policy
-// keeps validated named slot chains without binding or emulating their values.
+    // External links default to rejection. PreserveUnresolved keeps validated
+    // named slot chains without binding their values. ResolveNull mirrors
+    // lbArchive_InitializeDAT: validate every chain, then replace its slots with
+    // null pointers while retaining the external symbol metadata.
     explicit DatArchive(std::span<const std::uint8_t> input,
                         DatExternalPolicy external_policy = DatExternalPolicy::Reject);
 

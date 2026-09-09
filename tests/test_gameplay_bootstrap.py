@@ -46,6 +46,7 @@ class GameplayBootstrapTests(unittest.TestCase):
         c_sources = [ROOT / "src/gameplay_bootstrap.c", ROOT / "src/hsd_host_support.c",
                      ROOT / ("tests/gameplay_bootstrap_trace.c" if kind == "bootstrap"
                              else "src/gameplay_fighter_probe.c")]
+        c_sources.append(source / "melee/lb/lb_00F9.c")
         cpp_sources = []
         if kind == "fighter":
             c_sources += [source / "melee/ft/fighter.c", source / "melee/ft/ftwalkcommon.c"]

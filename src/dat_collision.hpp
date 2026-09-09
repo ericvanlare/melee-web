@@ -47,7 +47,7 @@ public:
     explicit DatCollision(const DatArchive&, const std::string& symbol = "coll_data");
     std::string symbol;
     std::uint32_t root_offset = 0, vertex_offset = 0, line_offset = 0, joint_offset = 0;
-    std::uint32_t source_reserved_2c = 0; // Pinned MapCollData field is inferred; retained, not interpreted.
+    std::uint32_t source_reserved_2c = 0; // Optional trailing source word; retained, not interpreted.
     std::vector<DatCollisionVertex> vertices;
     std::vector<DatCollisionLine> lines;
     DatCollisionRanges line_ranges;

@@ -299,6 +299,21 @@ void preserved_external_links()
     auto empty=external_specimen();put32(empty,76,UINT32_MAX);
     check(DatArchive(empty,DatExternalPolicy::PreserveUnresolved).external_symbols()[0].slots.empty(),"Original empty external chain sentinel");
 }
+
+void null_resolved_external_links()
+{
+    using melee_web::DatExternalPolicy;
+    auto b=external_specimen();DatArchive a(b,DatExternalPolicy::ResolveNull);
+    check(a.external_symbols().size()==1&&a.external_symbols()[0].name=="ext"&&
+          a.external_symbols()[0].slots==std::vector<uint32_t>{0,8},
+          "Null-resolved external metadata retains the validated source chains");
+    check(!a.has_relocation(0)&&!a.has_relocation(8),
+          "Source null resolution removes external pointer-slot identity");
+    check(!a.pointer(0)&&!a.pointer(8)&&a.be32(0)==0&&a.be32(8)==0,
+          "Source null resolution replaces every external chain slot with null");
+    check(a.pointer(16)==24&&a.f32(24)==1,
+          "Null resolution leaves unrelated immutable data bytes intact");
+}
 void malformed_external_links()
 {
     using melee_web::DatExternalPolicy;
@@ -369,6 +384,7 @@ int main(int argc, char** argv)
         {"relocation_slots", relocation_slots}, {"relocation_targets", relocation_targets},
         {"public_targets", public_targets}, {"public_names", public_names},
         {"external_links", external_links}, {"preserved_external_links", preserved_external_links},
+        {"null_resolved_external_links", null_resolved_external_links},
         {"malformed_external_links", malformed_external_links}, {"resource_limits", resource_limits},
         {"referenced_region_boundaries", referenced_region_boundaries},
     };

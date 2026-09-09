@@ -43,7 +43,8 @@ class GameplayCollisionTests(unittest.TestCase):
             "gobj", "gobjproc", "gobjplink", "gobjgxlink", "gobjobject", "gobjuserdata",
             "objalloc", "memory", "initialize")]
         c_sources += [source / "melee" / path for path in (
-            "mp/mpisland.c", "gr/grdynamicattr.c", "gr/ground.c", "lb/lb_00B0.c")]
+            "mp/mpisland.c", "gr/grdynamicattr.c", "gr/ground.c", "lb/lb_00B0.c",
+            "lb/lb_00F9.c")]
         c_sources += [ROOT / ".deps/aurora/lib/dolphin/mtx/vec.c"]
         with tempfile.TemporaryDirectory(prefix="melee gameplay collision ") as directory:
             directory = Path(directory)

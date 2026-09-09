@@ -30,6 +30,7 @@ ArticleSchema schema(uint32_t kind)
     case It_Kind_Falco_Blaster:return {40,9};
     case It_Kind_Fox_Illusion:
     case It_Kind_Falco_Phantasm:return {8,3};
+    case It_Kind_Heiho:return {24,3};
     default:throw DatError("Item kind has no checked native article schema");
     }
 }
@@ -58,8 +59,20 @@ DatItemArticle::DatItemArticle(std::shared_ptr<const DatArchive> archive,uint32_
     record(root,24);const uint32_t special_size=article_schema.special_bytes;
     uint32_t at=pointer(root+4,special_size);const auto* reader=s.arena.reader();
     void* special=reader->allocate(reader->context,special_size/4,4);
-    for(uint32_t i=0;i<special_size;i+=4){
-        uint32_t value=a.be32(at+i);require(!a.has_relocation(at+i),"Item special scalar is relocated");
+    uint32_t first_special_word=0;
+    if(kind==It_Kind_Heiho){
+        require(sizeof(void*)==4,"Heiho Article hydration requires the 32-bit gameplay target");
+        const uint32_t scalar_at=pointer(at,4);
+        require(!a.has_relocation(scalar_at),"Heiho threshold scalar is relocated");
+        auto* scalar=static_cast<int32_t*>(reader->allocate(reader->context,1,sizeof(int32_t)));
+        const uint32_t value=a.be32(scalar_at);std::memcpy(scalar,&value,4);
+        require(*scalar>=0&&*scalar<=10000,"Heiho threshold scalar is outside source bounds");
+        std::memcpy(special,&scalar,sizeof(scalar));
+        first_special_word=4;
+    }
+    for(uint32_t i=first_special_word;i<special_size;i+=4){
+        require(!a.has_relocation(at+i),"Item special scalar is relocated");
+        uint32_t value=a.be32(at+i);
         require(std::isfinite(a.f32(at+i)),"Item special scalar is nonfinite");
         std::memcpy(static_cast<uint8_t*>(special)+i,&value,4);
     }

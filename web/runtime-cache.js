@@ -8,16 +8,19 @@
   const path = "/melee-render-cache";
   const dependency = "melee-render-cache-populate";
 
-  function installRuntimeCache(module, report) {
+  function installRuntimeCache(module, report, options = {}) {
     if (!module || typeof module !== "object") {
       throw new TypeError("installRuntimeCache requires the Emscripten Module object");
     }
     const notify = typeof report === "function" ? report : function () {};
+    const clearOnLoad = options.clearOnLoad === true;
     const state = {
       state: "initializing",
       mounted: false,
       populated: false,
       saves: 0,
+      clears: 0,
+      fileBytes: 0,
       message: "Preparing optional render cache storage.",
     };
     let saveQueue = Promise.resolve(false);
@@ -37,12 +40,39 @@
         mounted: state.mounted,
         populated: state.populated,
         saves: state.saves,
+        clears: state.clears,
+        fileBytes: state.fileBytes,
       };
       try {
         notify(payload);
       } catch (error) {
         console.warn(`[Melee render cache] Status reporter failed: ${describe(error)}`);
       }
+    }
+
+    function refreshFileBytes(fs) {
+      state.fileBytes = 0;
+      try {
+        for (const name of fs.readdir(path)) {
+          if (name === "." || name === "..") continue;
+          const entry = `${path}/${name}`;
+          const stat = fs.stat(entry);
+          if (!fs.isDir(stat.mode)) state.fileBytes += Number(stat.size) || 0;
+        }
+      } catch (_) {
+        // Size is diagnostic only; mounting and cache use may continue.
+      }
+    }
+
+    function clearMountedFiles(fs) {
+      for (const name of fs.readdir(path)) {
+        if (name === "." || name === "..") continue;
+        const entry = `${path}/${name}`;
+        const stat = fs.stat(entry);
+        if (fs.isDir(stat.mode)) throw new Error(`Unexpected render-cache directory: ${name}`);
+        fs.unlink(entry);
+      }
+      state.fileBytes = 0;
     }
 
     function unavailable(message, error) {
@@ -76,6 +106,7 @@
               return;
             }
             ++state.saves;
+            refreshFileBytes(fs);
             setState("saved", "Optional render cache persisted.");
             resolve(true);
           });
@@ -112,18 +143,40 @@
         addDependency(dependency);
         dependencyAdded = true;
         fs.syncfs(true, (error) => {
-          try {
-            if (error) {
-              unavailable("Render cache storage could not be populated", error);
-            } else {
-              state.populated = true;
-              setState("ready", "Optional render cache storage is ready.");
-            }
-          } finally {
+          const finish = () => {
             if (dependencyAdded) {
               dependencyAdded = false;
               removeDependency(dependency);
             }
+          };
+          if (error) {
+            unavailable("Render cache storage could not be populated", error);
+            finish();
+            return;
+          }
+          state.populated = true;
+          if (!clearOnLoad) {
+            refreshFileBytes(fs);
+            setState("ready", "Optional render cache storage is ready.");
+            finish();
+            return;
+          }
+          // This happens while the run dependency still prevents Aurora from
+          // opening its SQLite cache. Removing an open database later would
+          // race its writer and would not evict in-memory pipelines.
+          try {
+            clearMountedFiles(fs);
+            fs.syncfs(false, (clearError) => {
+              if (clearError) unavailable("Render cache reset failed", clearError);
+              else {
+                ++state.clears;
+                setState("cleared", "Optional render cache cleared before renderer startup; browser driver cache unchanged.");
+              }
+              finish();
+            });
+          } catch (clearError) {
+            unavailable("Render cache reset failed", clearError);
+            finish();
           }
         });
       } catch (error) {
@@ -147,6 +200,8 @@
         mounted: state.mounted,
         populated: state.populated,
         saves: state.saves,
+        clears: state.clears,
+        fileBytes: state.fileBytes,
       });
     } catch (error) {
       console.warn(`[Melee render cache] Status reporter failed: ${describe(error)}`);

@@ -162,10 +162,14 @@ DatArchive::DatArchive(std::span<const std::uint8_t> input, DatExternalPolicy ex
             if (!used_external_slots.insert(slot).second)
                 throw DatError("DAT external linked slots contain a cycle or overlapping chains");
             symbol.slots.push_back(slot);
-            external_slots_.emplace_back(slot, i);
+            if (external_policy == DatExternalPolicy::PreserveUnresolved)
+                external_slots_.emplace_back(slot, i);
             // Deliberately bypass typed be32: this reads the archive's linked
             // list encoding, not an unresolved pointer or scalar field.
-            slot = read_be32(data(), slot);
+            const auto next = read_be32(data(), slot);
+            if (external_policy == DatExternalPolicy::ResolveNull)
+                std::fill_n(bytes_.begin() + header_size + slot, 4, std::uint8_t{0});
+            slot = next;
         }
         external_symbols_.push_back(std::move(symbol));
     }

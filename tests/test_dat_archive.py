@@ -68,6 +68,9 @@ class DatArchiveTests(unittest.TestCase):
     def test_opt_in_external_slots_remain_named_owned_and_unreadable(self):
         self.run_case("preserved_external_links")
 
+    def test_source_loader_null_resolution_validates_and_clears_external_chains(self):
+        self.run_case("null_resolved_external_links")
+
     def test_external_chains_validate_bounds_cycles_alignment_overlap_and_names(self):
         self.run_case("malformed_external_links")
 

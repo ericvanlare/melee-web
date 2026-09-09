@@ -24,9 +24,10 @@ static HSD_Joint* joint(const MeleeWebNativeDat* r,MeleeWebStageMarkers* m,uint3
     for(unsigned i=0;i<m->joint_count;i++)REQUIRE(m->offsets[i]!=at,"Marker joint cycle or shared subtree");
     m->offsets[m->joint_count++]=at;r->region(r->context,at,64);
     REQUIRE(r->pointer(r->context,at,1)==UINT32_MAX,"Custom marker joint class");
-    REQUIRE(r->word(r->context,at+4)==0,"Unsupported marker joint flags");
+    const uint32_t flags=r->word(r->context,at+4);
+    REQUIRE(!(flags&~JOBJ_CLASSICAL_SCALE),"Unsupported marker joint flags");
     REQUIRE(r->pointer(r->context,at+16,1)==UINT32_MAX&&r->pointer(r->context,at+56,1)==UINT32_MAX&&r->pointer(r->context,at+60,1)==UINT32_MAX,"Marker joint has unsupported payload");
-    HSD_Joint* j=r->allocate(r->context,1,sizeof(*j));
+    HSD_Joint* j=r->allocate(r->context,1,sizeof(*j));j->flags=flags;
     float values[9];for(unsigned i=0;i<9;i++){uint32_t bits=r->word(r->context,at+20+4*i);memcpy(&values[i],&bits,4);REQUIRE(isfinite(values[i]),"Nonfinite marker transform");}
     for(unsigned i=3;i<6;i++)REQUIRE(values[i]!=0,"Singular marker scale");
     memcpy(&j->rotation,values,12);memcpy(&j->scale,values+3,12);memcpy(&j->position,values+6,12);
@@ -37,7 +38,9 @@ static HSD_Joint* joint(const MeleeWebNativeDat* r,MeleeWebStageMarkers* m,uint3
 }
 MeleeWebStageMarkers* melee_web_stage_markers_decode(const MeleeWebNativeDat* r,uint32_t head){
     if(!r)return NULL;r->region(r->context,head,48);
-    REQUIRE(r->word(r->context,head+4)==1,"Source marker context requires one marker tree");
+    const uint32_t reference_count=r->word(r->context,head+4);
+    REQUIRE(reference_count>0&&reference_count<=64,
+            "Source marker context has an invalid joint-reference count");
     uint32_t entry=r->pointer(r->context,head,12);REQUIRE(entry!=UINT32_MAX,"Missing marker table");r->region(r->context,entry,12);
     uint32_t root=r->pointer(r->context,entry,64),pairs=r->pointer(r->context,entry+4,4),count=r->word(r->context,entry+8);
     REQUIRE(root!=UINT32_MAX&&pairs!=UINT32_MAX&&count>0&&count<=261,"Invalid marker tree or pair count");

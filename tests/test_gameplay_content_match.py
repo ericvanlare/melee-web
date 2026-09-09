@@ -22,14 +22,20 @@ class ContentMatchTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, (result.stdout + result.stderr)[-6000:])
         self.assertIn(expected, result.stdout)
 
-    def test_mixed_falco_mario_costumes_on_both_stages(self):
+    def test_falco_fox_and_yoshis_story_source_lifecycles(self):
         menu, game = ROOT / "assets-local/native-menus", ROOT / "assets-local/next-gate"
-        if not (menu / "MnSlChr.usd").is_file() or not (game / "PlFc.dat").is_file():
-            self.skipTest("Owned menu and fighter fixtures are required")
-        for stage in (32, 31):
-            with self.subTest(stage=stage):
-                self.run_trace("gameplay_content_match_trace", [menu, game, stage],
-                               "Mixed Falco/Mario source intro")
+        required = (menu / "MnSlChr.usd", game / "PlFc.dat", game / "PlFx.dat",
+                    game / "PlFxAJ.dat", game / "GrNLa.dat", game / "GrNBa.dat",
+                    game / "GrSt.dat")
+        if not all(path.is_file() for path in required):
+            self.skipTest("Owned menu, Fox/Falco and stage fixtures are required")
+        cases = ((32, 20, 8), (31, 20, 8), (32, 2, 8), (31, 2, 8),
+                 (8, 20, 8), (8, 2, 8), (32, 2, 20))
+        for stage, fighter, opponent in cases:
+            with self.subTest(stage=stage, fighter=fighter, opponent=opponent):
+                self.run_trace("gameplay_content_match_trace",
+                               [menu, game, stage, fighter, opponent],
+                               "Mixed source content intro")
 
     def test_battlefield_scaled_geometry_and_background_lifetimes(self):
         game = ROOT / "assets-local/next-gate"
