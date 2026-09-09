@@ -24,6 +24,7 @@
       message: "Preparing optional render cache storage.",
     };
     let saveQueue = Promise.resolve(false);
+    let scheduledSave = null;
     let dependencyAdded = false;
 
     function describe(error) {
@@ -123,6 +124,27 @@
     module.saveRuntimeCache = function () {
       saveQueue = saveQueue.catch(() => false).then(saveOnce);
       return saveQueue;
+    };
+
+    // Scene preparation calls this only after Aurora has drained its pipeline
+    // queue through two quiet frames.  Coalesce adjacent scene notifications
+    // and let the browser schedule the IDBFS transaction outside the render
+    // callback.  This preserves newly discovered pipelines even if gameplay
+    // later aborts before the user reaches the explicit unload boundary.
+    module.scheduleRuntimeCacheSave = function () {
+      if (scheduledSave) return scheduledSave;
+      scheduledSave = new Promise((resolve) => {
+        const run = () => {
+          module.saveRuntimeCache().then(resolve, () => resolve(false)).finally(() => {
+            scheduledSave = null;
+          });
+        };
+        if (typeof requestIdleCallback === "function")
+          requestIdleCallback(run, {timeout: 1000});
+        else
+          setTimeout(run, 0);
+      });
+      return scheduledSave;
     };
 
     function populate() {

@@ -82,6 +82,16 @@ async function main() {
   assert.equal(state.saves, 2);
   assert.equal(state.fileBytes, 4096);
 
+  const scheduledFirst = successful.module.scheduleRuntimeCacheSave();
+  const scheduledSecond = successful.module.scheduleRuntimeCacheSave();
+  assert.equal(scheduledSecond, scheduledFirst, 'settled-scene saves must coalesce');
+  await waitTurn();
+  await waitTurn();
+  assert.equal(successful.saveCallbacks.length, 1, 'scheduled save runs outside the render callback');
+  successful.saveCallbacks.shift()(null);
+  assert.equal(await scheduledFirst, true);
+  assert.equal(state.saves, 3);
+
   const failedSave = successful.module.saveRuntimeCache();
   await waitTurn();
   successful.saveCallbacks.shift()(new Error('quota exceeded'));

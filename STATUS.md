@@ -73,6 +73,9 @@ Battlefield. The content trace repeats all three stages with every Falco and Fox
 costume, exercises their laser, Reflector, side-special, up-special and complete
 jab/rapid-jab action families, pause and No Contest, checks Yoshi's Story's Randall/Shy Guy lifecycle,
 and verifies teardown before the next cycle.
+Fox's Fire Fox launch now admits source command 38 through its recovered
+seven-byte skip handler, and the trace requires the full charge, launch and exit
+sequence rather than stopping at up-special entry.
 These native traces establish the checked source lifecycle; they do not replace
 browser input, audio or retail-reference evidence.
 
@@ -93,6 +96,19 @@ audio underruns. This is scoped application/driver-cache evidence rather than
 cold-cache or full-match acceptance. The subsequent MarioReady operation-55
 representation defect is fixed, and the fresh native whole-match routes above
 pass on both admitted stages.
+
+The Release browser now bundles a verified Aurora seed from the original CSS,
+SSS and Yoshi's Story route: one shader record and 121 pipeline descriptors.
+The seed contains no disc assets. Aurora merges all 122 rows into the optional
+origin cache, and each settled scene schedules a coalesced cache save outside
+the render callback so a later gameplay abort does not discard expensive
+pipeline discovery. On a cleared-origin run, first CSS entry changed from the
+earlier 357.48 ms pipeline-settle sample to 22.31 ms preparation with zero
+queued or created pipelines on first draw. With the expanded seed, CSS/SSS
+again created no pipelines; Yoshi's Story match preparation measured 808.41 ms
+(194.81 ms construction and 613.60 ms priming/scheduling), while the slowest
+active callback was 16.89 ms and none exceeded 33.3 ms. The cold preparation
+delay remains open. See [browser performance work](docs/PERFORMANCE.md).
 
 A correlated Battlefield cold-entry probe measured fresh application
 construction at 182.380 ms, the preparation boundary at 200.095 ms and first
@@ -121,9 +137,9 @@ accessory has a world-owned descriptor that outlives its original fighter/effect
 consumers. Eye telemetry distinguishes an authored base image from an animated
 table entry; this changes observation only, not the game's texture commands.
 
-The current local regression suite passes **266 tests without skips** (219.162
-seconds), recorded in `work/full-suite-2026-09-09-jab-perf.log`. Default and Release browser, native-menu,
-content-match, Battlefield, player-context and fighter-runtime targets build.
+The current local regression suite passes **267 tests without skips** (420.390
+seconds). Default and Release browser, native-menu, content-match, Battlefield,
+player-context and fighter-runtime targets build.
 The focused browser run used the Release build. The integrated change also
 received a primary review of ownership, input handoff, construction, callback
 timing and teardown paths.

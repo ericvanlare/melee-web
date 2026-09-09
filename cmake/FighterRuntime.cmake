@@ -290,12 +290,24 @@ set_target_properties(native_menu_host_trace PROPERTIES SUFFIX ".js")
 
 # Real original-menu browser integration; replaces temporary HTML selectors
 # once the source CSS/SSS/match handoff passes acceptance.
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+set(initial_pipeline_cache "${CMAKE_CURRENT_BINARY_DIR}/initial_pipeline_cache.db")
+add_custom_command(
+  OUTPUT "${initial_pipeline_cache}"
+  COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/materialize_pipeline_cache.py"
+    "${CMAKE_CURRENT_SOURCE_DIR}/web/initial_pipeline_cache.db.gz.b64" "${initial_pipeline_cache}"
+  DEPENDS scripts/materialize_pipeline_cache.py web/initial_pipeline_cache.db.gz.b64
+  VERBATIM)
+add_custom_target(gameplay_menu_pipeline_seed DEPENDS "${initial_pipeline_cache}")
 add_executable(gameplay_menu_browser EXCLUDE_FROM_ALL src/gameplay_menu_browser.cpp src/browser_input.cpp tests/native_menu_alarm_unavailable.c)
+add_dependencies(gameplay_menu_browser gameplay_menu_pipeline_seed)
+set_property(TARGET gameplay_menu_browser APPEND PROPERTY LINK_DEPENDS "${initial_pipeline_cache}")
 target_link_libraries(gameplay_menu_browser PRIVATE fighter_asset_runtime aurora::main)
 target_compile_options(gameplay_menu_browser PRIVATE -ffp-contract=off)
 target_link_options(gameplay_menu_browser PRIVATE --profiling-funcs -sENVIRONMENT=web
   -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=134217728 -sSTACK_SIZE=8388608 -sEXIT_RUNTIME=0 -sASSERTIONS=2
-  -sEXPORTED_RUNTIME_METHODS=FS,IDBFS,addRunDependency,removeRunDependency,HEAPU8,UTF8ToString
+  --preload-file "${initial_pipeline_cache}@/initial_pipeline_cache.db"
+  -sEXPORTED_RUNTIME_METHODS=FS,IDBFS,addRunDependency,removeRunDependency,HEAPU8,HEAP32,HEAPF32,UTF8ToString
   -lidbfs.js
   -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_melee_web_native_menu_file,_melee_web_native_menu_prepare,_melee_web_native_menu_launch,_melee_web_native_menu_unload,_melee_web_native_menu_pause,_melee_web_native_menu_message,_melee_web_native_menu_running,_melee_web_native_menu_cache_idle,_melee_web_native_menu_phase,_melee_web_native_menu_confirm_check,_melee_web_native_menu_pad_sample,_melee_web_native_menu_stock_check,_melee_web_native_menu_stock_check_ready,_melee_web_native_menu_diagnostics,_melee_web_css_observe,_melee_web_sss_observe,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_set_keyboard_port,_melee_web_input_message)
 set_target_properties(gameplay_menu_browser PROPERTIES SUFFIX ".js")

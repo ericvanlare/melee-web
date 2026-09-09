@@ -255,6 +255,7 @@ void tick(){
   stat_delta(stats_after.createdPipelines,stats_before.createdPipelines)!=0||
   stats_after.lastTextureUploadSize!=0;
  if(preparation.observe_render(actual_source_draw,stats_after.queuedPipelines,render_preparation_activity)){
+  EM_ASM({window.menuRenderCacheSettled?.();});
   if(render_only_preparation)render_only_preparation=false;
   else EM_ASM({window.menuPreparationDone?.();});
  }

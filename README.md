@@ -176,7 +176,8 @@ their versions are controlled by the pinned Aurora tree and our patch. See
 - User-supplied disc content stays local and outside Git.
 
 See [current evidence and limitations](STATUS.md),
-[milestones](docs/ROADMAP.md), and [architecture decisions](docs/ARCHITECTURE.md).
+[milestones](docs/ROADMAP.md), [browser performance work](docs/PERFORMANCE.md),
+and [architecture decisions](docs/ARCHITECTURE.md).
 
 This project is independent of Nintendo, doldecomp and Aurora. Dependency licenses
 remain attached to their upstream sources; see [third-party notices](THIRD_PARTY.md).

@@ -156,6 +156,18 @@ int main(int argc,char** argv){try{
             }
             check(fire_bird,"Up special did not enter its original source state");
             raw[0].stickY=0;raw[0].button=0;
+            bool fire_bird_launch=false,fire_bird_finished=false;
+            for(unsigned n=0;n<360&&!fire_bird_finished;n++){
+                tick();
+                const auto state=match.player_stats(0);
+                fire_bird_launch|=state.motion_id==356||state.motion_id==357;
+                fire_bird_finished=fire_bird_launch&&
+                    (state.motion_id<353||state.motion_id>359);
+            }
+            check(fire_bird_launch,
+                  "Up special did not reach its original Fire Fox launch motion");
+            check(fire_bird_finished,
+                  "Up special did not finish its original Fire Fox launch sequence");
         }
         }
         raw[0].button=PAD_BUTTON_START;tick();raw[0].button=0;

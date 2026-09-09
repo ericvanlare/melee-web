@@ -34,8 +34,12 @@ class WebLaunchTests(unittest.TestCase):
 
     def test_runtime_builds_native_browser_target(self):
         build = (ROOT / "scripts" / "build.py").read_text(encoding="utf-8")
+        cmake = (ROOT / "cmake" / "FighterRuntime.cmake").read_text(encoding="utf-8")
         self.assertIn('"runtime": ["gameplay_menu_browser"]', build)
         self.assertIn('"all": ["gx_probe", "gameplay_checks", "gameplay_menu_browser"]', build)
+        self.assertIn("HEAPU8,HEAP32,HEAPF32,UTF8ToString", cmake)
+        self.assertIn("initial_pipeline_cache.db", cmake)
+        self.assertIn("LINK_DEPENDS", cmake)
 
 
 if __name__ == "__main__":
