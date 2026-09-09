@@ -6,6 +6,8 @@
 #include <melee/cm/types.h>
 #include <melee/ft/types.h>
 #include <melee/ft/ftdata.h>
+#include <sysdolphin/baselib/jobj.h>
+#include <sysdolphin/baselib/dobj.h>
 #include <sysdolphin/baselib/mobj.h>
 #include <sysdolphin/baselib/aobj.h>
 #include <melee/pl/player.h>
@@ -252,11 +254,61 @@ static HSD_TexAnim* find_texture(HSD_MatAnimJoint* joint,HSD_TObj* tobj,unsigned
     }
     return NULL;
 }
+typedef struct BaseTextureSearch {
+    HSD_TObj* runtime;
+    HSD_TObjDesc* exact;
+} BaseTextureSearch;
+/* HSD_TObjAddAnim borrows the animation table but leaves imagedesc/tlut at
+ * the descriptor loaded by HSD_TObjLoadDesc until TIMG/TCLT selects a table
+ * entry. Walk the retained fighter joint graph to prove that default state is
+ * owned, while retaining a bounded traversal for malformed/cyclic graphs. */
+static int find_base_texture(HSD_Joint* joint,BaseTextureSearch* search,unsigned* budget)
+{
+    for(;joint;joint=joint->next){
+        if(!*budget)return 0;
+        --*budget;
+        if(!(joint->flags&(JOBJ_PTCL|JOBJ_SPLINE))){
+            HSD_DObjDesc* dobj=joint->u.dobjdesc;
+            for(;dobj;dobj=dobj->next){
+                if(!*budget)return 0;
+                --*budget;
+                HSD_MObjDesc* mobj=dobj->mobjdesc;
+                if(mobj){
+                    for(HSD_TObjDesc* tex=mobj->texdesc;tex;tex=tex->next){
+                        if(!*budget)return 0;
+                        --*budget;
+                        if(tex->id==search->runtime->id&&
+                           tex->imagedesc==search->runtime->imagedesc)
+                            search->exact=tex;
+                    }
+                }
+            }
+        }
+        if(!find_base_texture(joint->child,search,budget))return 0;
+    }
+    return 1;
+}
+static int base_tlut_matches(const HSD_Tlut* actual,const HSD_TlutDesc* owned)
+{
+    /* GX may assign tlut_name while preparing a draw; source ownership is
+     * the authored LUT storage/format/entry count, which remain stable. */
+    return actual&&owned&&actual->lut==owned->lut&&actual->fmt==owned->fmt&&
+        actual->n_entries==owned->n_entries;
+}
+static HSD_TObjDesc* owned_base_texture(HSD_Joint* root,HSD_TObj* runtime)
+{
+    BaseTextureSearch search={runtime,NULL};
+    unsigned budget=16384;
+    if(!find_base_texture(root,&search,&budget))return NULL;
+    return search.exact;
+}
 static int eye_stats(Fighter* fp,MeleeWebMatchStats* out,char* e,size_t n)
 {
     if(fp->tobj_list.n_costume_tobjs!=2)
         return fail(e,n,"Mario Wait requires exactly two original costume eye TObjs");
     HSD_MatAnimJoint* desc=CostumeListsForeachCharacter[fp->kind].costume_list[fp->x619_costume_id].x4;
+    HSD_Joint* owned_joint=CostumeListsForeachCharacter[fp->kind].costume_list[fp->x619_costume_id].joint;
+    if(!owned_joint)return fail(e,n,"Original eye telemetry has no owned costume descriptor graph");
     out->eye_count=2;
     for(unsigned eye=0;eye<2;eye++){
         HSD_TObj* tobj=fp->tobj_list.costume_tobjs[eye];
@@ -264,19 +316,28 @@ static int eye_stats(Fighter* fp,MeleeWebMatchStats* out,char* e,size_t n)
             return fail(e,n,"Original eye TObj has no attached native animation/image table");
         unsigned budget=4096;
         HSD_TexAnim* tex=find_texture(desc,tobj,&budget);
-        if(!tex||!tex->n_imagetbl||!tex->aobjdesc)
+        if(!tex||!tex->n_imagetbl||!tex->imagetbl||!tex->aobjdesc)
             return fail(e,n,"Original eye TObj does not borrow an owned costume texture table");
         MeleeWebMatchEyeStats* result=&out->eyes[eye];
         result->image_count=tex->n_imagetbl;result->palette_count=tex->n_tluttbl;
         result->image_index=UINT32_MAX;
         for(unsigned i=0;i<tex->n_imagetbl;i++)
             if(tex->imagetbl[i]==tobj->imagedesc){result->image_index=i;break;}
-        if(result->image_index==UINT32_MAX||!tobj->imagedesc||!tobj->imagedesc->image_ptr)
-            return fail(e,n,"Original Wait eye selected an image outside its owned native table");
+        HSD_TObjDesc* base=NULL;
+        if(result->image_index==UINT32_MAX){
+            base=owned_base_texture(owned_joint,tobj);
+            if(!base||!base->imagedesc||!base->imagedesc->image_ptr)
+                return fail(e,n,"Original eye base TObj is outside its owned costume descriptor graph");
+            result->image_is_base=1;
+        }else{
+            result->image_is_base=0;
+        }
+        if(!tobj->imagedesc||!tobj->imagedesc->image_ptr)
+            return fail(e,n,"Original eye selected a malformed image descriptor");
         result->palette_index=UINT32_MAX;
         if(tex->n_tluttbl){
-            if(!tex->tluttbl||!tobj->tluttbl||tobj->tlut_no>=tex->n_tluttbl)
-                return fail(e,n,"Original Wait eye selected a palette outside its owned table");
+            if(!tex->tluttbl||!tobj->tluttbl)
+                return fail(e,n,"Original eye has no owned runtime palette table");
             /* Validate every source-created palette, including inactive ones. */
             for(unsigned i=0;i<tex->n_tluttbl;i++){
                 HSD_Tlut* native=tobj->tluttbl[i];HSD_TlutDesc* owned=tex->tluttbl[i];
@@ -285,7 +346,24 @@ static int eye_stats(Fighter* fp,MeleeWebMatchStats* out,char* e,size_t n)
             }
             if(tobj->tluttbl[tex->n_tluttbl]!=NULL)
                 return fail(e,n,"Original eye runtime palette table has no bounded terminator");
-            result->palette_index=tobj->tlut_no;
+            if(tobj->tlut_no<tex->n_tluttbl){
+                result->palette_index=tobj->tlut_no;
+                result->palette_is_base=0;
+            }else{
+                if(!base)base=owned_base_texture(owned_joint,tobj);
+                if(!base)return fail(e,n,"Original eye base palette has no owned costume descriptor");
+                if((base->tlutdesc&&!base_tlut_matches(tobj->tlut,base->tlutdesc))||
+                   (!base->tlutdesc&&tobj->tlut))
+                    return fail(e,n,"Original eye base palette is outside its owned costume descriptor");
+                result->palette_is_base=1;
+            }
+        }else{
+            if(tobj->tlut){
+                if(!base)base=owned_base_texture(owned_joint,tobj);
+                if(!base||!base->tlutdesc||!base_tlut_matches(tobj->tlut,base->tlutdesc))
+                    return fail(e,n,"Original eye base palette is outside its owned costume descriptor");
+            }
+            result->palette_is_base=1;
         }
         result->animation_frame=tobj->aobj->curr_frame;
         result->animation_rate=tobj->aobj->framerate;

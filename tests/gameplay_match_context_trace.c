@@ -11,7 +11,10 @@ extern u16 staleAttackInstance, unk_804D6480;
 static int check_wait(const MeleeWebMatchStats* stats,char* error,size_t size)
 {
     if(stats->motion_id!=14||stats->ground_or_air!=0||stats->live_fighters!=1||
-       stats->camera_subjects!=1||stats->extra_model_objects!=8||stats->eye_count!=2){
+       stats->camera_subjects!=1||stats->extra_model_objects!=8||stats->eye_count!=2||
+       stats->eyes[0].image_is_base||stats->eyes[1].image_is_base||
+       stats->eyes[0].image_index>=stats->eyes[0].image_count||
+       stats->eyes[1].image_index>=stats->eyes[1].image_count){
         snprintf(error,size,"Expected original grounded Wait14, one fighter/subject, eight extra DObjs and two eyes; got motion%d ground%d fighters%u subjects%u DObjs%u eyes%u",
             stats->motion_id,stats->ground_or_air,stats->live_fighters,stats->camera_subjects,
             stats->extra_model_objects,stats->eye_count);return 0;

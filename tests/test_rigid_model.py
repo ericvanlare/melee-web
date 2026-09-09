@@ -91,6 +91,9 @@ class RigidModelTests(unittest.TestCase):
     def test_direct_rgba8_packet_layout_and_original_vertex_material_requirements(self):
         self.run_case("direct_rgba8_geometry")
 
+    def test_native_interleaved_nbt_and_cull_flags_preserve_source_metadata(self):
+        self.run_case("native_nbt_geometry_and_cull")
+
     def test_explicit_opaque_pass_counts_source_identity_and_unused_billboard_pruning(self):
         self.run_case("explicit_opaque_pass")
 

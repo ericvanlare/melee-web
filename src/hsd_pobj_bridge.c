@@ -141,10 +141,18 @@ static int valid_format(const MeleeWebPObjAttribute* a)
         return 0;
     }
     if (a->attr == GX_VA_NRM) {
-        /* NBT and NBT3 require a distinct index/component interpretation. */
+        /* NRM is the ordinary three-component normal stream. */
         return a->comp_cnt == GX_NRM_XYZ &&
                (a->comp_type == GX_S8 || a->comp_type == GX_S16 ||
                 a->comp_type == GX_F32);
+    }
+    if (a->attr == GX_VA_NBT) {
+        /* The original NBT stream is one index to nine interleaved scalar
+         * components. NBT3 has three independent indices and is intentionally
+         * outside this bridge's checked descriptor contract. */
+        return a->comp_cnt == GX_NRM_NBT && a->attr_type != GX_DIRECT &&
+               (a->comp_type != GX_F32 || a->frac == 0) &&
+               (a->comp_type == GX_S16 || a->comp_type == GX_F32);
     }
     return a->comp_cnt <= 1;
 }
@@ -157,7 +165,8 @@ static uint32_t component_bytes(const MeleeWebPObjAttribute* a)
     }
     const uint32_t scalar = a->comp_type <= GX_S8 ? 1 : a->comp_type <= GX_S16 ? 2 : 4;
     const uint32_t count = a->attr == GX_VA_POS ? a->comp_cnt + 2 :
-                           a->attr == GX_VA_NRM ? 3 : a->comp_cnt + 1;
+                           a->attr == GX_VA_NRM ? 3 :
+                           a->attr == GX_VA_NBT ? 9 : a->comp_cnt + 1;
     return scalar * count;
 }
 
@@ -189,8 +198,12 @@ static int draw_pobj(const MeleeWebPObjView* view, const MeleeWebPObjPalette* pa
     for (uint32_t i = 0; i < view->attribute_count; ++i) {
         const MeleeWebPObjAttribute* a = &view->attributes[i];
         const int matrix_index = a->attr <= GX_VA_TEX7MTXIDX;
-        if ((!palette && a->attr < GX_VA_POS) || a->attr > GX_VA_TEX7 ||
-            (i != 0 && a->attr <= view->attributes[i - 1].attr)) {
+        const uint32_t order = a->attr == GX_VA_NBT ? GX_VA_NRM : a->attr;
+        const uint32_t previous_order = i == 0 ? 0 :
+            (view->attributes[i - 1].attr == GX_VA_NBT ? GX_VA_NRM : view->attributes[i - 1].attr);
+        if ((!palette && a->attr < GX_VA_POS) ||
+            (a->attr > GX_VA_TEX7 && a->attr != GX_VA_NBT) ||
+            (i != 0 && order <= previous_order)) {
             return reject(error, error_size, "Unsupported or unordered PObj attribute");
         }
         if (a->attr_type < GX_DIRECT || a->attr_type > GX_INDEX16 ||

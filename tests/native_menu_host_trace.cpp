@@ -1,6 +1,7 @@
 #include "gameplay_menu_world.hpp"
 #include "gameplay_menu_host.h"
 #include "gameplay_match_session.hpp"
+#include <melee/gm/forward.h>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -9,7 +10,7 @@ static void check(int value,const char* error){if(!value){std::cerr<<"Check fail
 int main(int argc,char** argv){try{
  if(argc!=3)throw std::runtime_error("Expected local menu and audio directories");
  melee_web::RuntimeFiles files;
- for(const char* key:{"IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sislib_font.bin"}){
+ for(const char* key:{"GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sislib_font.bin"}){
   const auto root=std::filesystem::exists(std::filesystem::path(argv[1])/key)?argv[1]:argv[2];
   std::ifstream input(std::filesystem::path(root)/key,std::ios::binary);if(!input)throw std::runtime_error("Missing owned menu host fixture");
   files[key]={(std::istreambuf_iterator<char>(input)),{}};
@@ -62,9 +63,52 @@ int main(int argc,char** argv){try{
    }
    interrupted.close();interrupted.close();
   }
+  if(cycle==0){
+   // Exercise the source-owned pause/no-contest path from the same committed
+   // menu payload before the ordinary stock run.  Every source tick still
+   // drains the resident audio stream.
+   melee_web::GameplayMatchSession no_contest(files,selection);unsigned phase=0;
+   for(unsigned t=0;t<600&&!no_contest.ready();++t){
+    PADStatus pads[4]{};pads[2].err=pads[3].err=-1;no_contest.tick(pads);
+    phase+=32000;unsigned count=phase/60;phase%=60;
+    check(melee_web_audio_render(no_contest.audio(),pcm,count,error,sizeof(error)),error);
+   }
+   check(no_contest.ready(),"Original Ready/Go did not complete for No Contest test");
+   PADStatus pause[4]{};pause[2].err=pause[3].err=-1;pause[0].button=PAD_BUTTON_START;
+   no_contest.tick(pause);phase+=32000;unsigned count=phase/60;phase%=60;
+   check(melee_web_audio_render(no_contest.audio(),pcm,count,error,sizeof(error)),error);
+   pause[0].button=0;
+   for(unsigned t=0;t<20&&!no_contest.paused();++t){
+    no_contest.tick(pause);phase+=32000;count=phase/60;phase%=60;
+    check(melee_web_audio_render(no_contest.audio(),pcm,count,error,sizeof(error)),error);
+   }
+   check(no_contest.paused(),"Original P1 Start did not pause the match");
+   for(unsigned t=0;t<12;t++){
+    no_contest.tick(pause);phase+=32000;count=phase/60;phase%=60;
+    check(melee_web_audio_render(no_contest.audio(),pcm,count,error,sizeof(error)),error);
+   }
+   pause[0].button=PAD_TRIGGER_L|PAD_TRIGGER_R|PAD_BUTTON_A|PAD_BUTTON_START;
+   no_contest.tick(pause);phase+=32000;count=phase/60;phase%=60;
+   check(melee_web_audio_render(no_contest.audio(),pcm,count,error,sizeof(error)),error);
+   pause[0].button=0;
+   for(unsigned t=0;t<500&&!no_contest.complete();++t){
+    no_contest.tick(pause);phase+=32000;count=phase/60;phase%=60;
+    check(melee_web_audio_render(no_contest.audio(),pcm,count,error,sizeof(error)),error);
+   }
+   int no_contest_winner=-1;
+   check(no_contest.complete(),"Original No Contest did not complete its source ending");
+   check(no_contest.outcome(no_contest_winner)==OUTCOME_NO_CONTEST&&no_contest_winner==-1,
+         "Original No Contest outcome or winner was incorrect");
+   no_contest.close();
+  }
   {
    melee_web::GameplayMatchSession match(files,selection);audio_phase=0;
    check(!match.ready(),"Original match intro was bypassed");
+   const auto entry_stats=match.player_stats(0);
+   for(unsigned eye=0;eye<2;eye++)check(entry_stats.eyes[eye].image_is_base&&
+      entry_stats.eyes[eye].image_index==UINT32_MAX&&entry_stats.eyes[eye].palette_is_base&&
+      entry_stats.eyes[eye].palette_index==UINT32_MAX,
+      "Original Entry eye telemetry did not retain owned base image/palette");
    const float ready_start_x=match.player_stats(0).position[0];
    unsigned intro_ticks=0;
    for(;intro_ticks<600&&!match.ready();++intro_ticks){
@@ -76,6 +120,71 @@ int main(int argc,char** argv){try{
                            "Fighter accepted movement before original Ready completion");
    }
    check(match.ready(),"Original Ready/Go did not reach gameplay");
+   check(!match.paused(),"Original match entered gameplay already paused");
+   const auto active_frame=match.source_frames();
+   for(unsigned t=0;t<3;t++){
+    PADStatus pads[4]{};pads[2].err=pads[3].err=-1;match.tick(pads);
+    audio_phase+=32000;unsigned count=audio_phase/60;audio_phase%=60;
+    check(melee_web_audio_render(match.audio(),pcm,count,error,sizeof(error)),error);
+   }
+   check(match.source_frames()>active_frame,"Original active source frame did not advance");
+   const auto wait_stats=match.player_stats(0);
+   for(unsigned eye=0;eye<2;eye++){
+    check(wait_stats.eyes[eye].image_count>0,
+          "Original Wait eye telemetry lost its owned animation bounds");
+    check((wait_stats.eyes[eye].image_is_base&&wait_stats.eyes[eye].image_index==UINT32_MAX)||
+          (!wait_stats.eyes[eye].image_is_base&&wait_stats.eyes[eye].image_index<wait_stats.eyes[eye].image_count),
+          "Original Wait eye image state is outside its owned base/table representation");
+    check((wait_stats.eyes[eye].palette_is_base&&wait_stats.eyes[eye].palette_index==UINT32_MAX)||
+          (!wait_stats.eyes[eye].palette_is_base&&wait_stats.eyes[eye].palette_index<wait_stats.eyes[eye].palette_count),
+          "Original Wait eye palette state is outside its owned base/table representation");
+   }
+
+   // Start pauses through the original pauser path.  The source scheduler and
+   // audio continue to tick, but fighter actions/animation/positions and the
+   // match frame must remain held while the pause is debounced.
+   PADStatus pause[4]{};pause[2].err=pause[3].err=-1;pause[0].button=PAD_BUTTON_START;
+   match.tick(pause);audio_phase+=32000;unsigned count=audio_phase/60;audio_phase%=60;
+   check(melee_web_audio_render(match.audio(),pcm,count,error,sizeof(error)),error);
+   pause[0].button=0;
+   for(unsigned t=0;t<20&&!match.paused();++t){
+    match.tick(pause);audio_phase+=32000;count=audio_phase/60;audio_phase%=60;
+    check(melee_web_audio_render(match.audio(),pcm,count,error,sizeof(error)),error);
+   }
+   check(match.paused(),"Original P1 Start did not enter pause");
+   const auto paused_frame=match.source_frames();
+   const auto paused_player0=match.player_stats(0);
+   const auto paused_player1=match.player_stats(1);
+   for(unsigned t=0;t<20;t++){
+    pause[1].button=t==15?PAD_BUTTON_START:0;
+    match.tick(pause);audio_phase+=32000;count=audio_phase/60;audio_phase%=60;
+    check(melee_web_audio_render(match.audio(),pcm,count,error,sizeof(error)),error);
+    pause[1].button=0;
+    const auto held0=match.player_stats(0);
+    const auto held1=match.player_stats(1);
+    check(match.paused()&&match.source_frames()==paused_frame&&
+          held0.motion_id==paused_player0.motion_id&&
+          held0.animation_frame==paused_player0.animation_frame&&
+          held0.position[0]==paused_player0.position[0]&&
+          held0.position[1]==paused_player0.position[1]&&held0.stocks==paused_player0.stocks&&
+          held1.motion_id==paused_player1.motion_id&&
+          held1.animation_frame==paused_player1.animation_frame&&
+          held1.position[0]==paused_player1.position[0]&&
+          held1.position[1]==paused_player1.position[1]&&held1.stocks==paused_player1.stocks,
+          "Wrong-port Start or paused source tick changed the match");
+   }
+   pause[0].button=PAD_BUTTON_START;
+   match.tick(pause);audio_phase+=32000;count=audio_phase/60;audio_phase%=60;
+   check(melee_web_audio_render(match.audio(),pcm,count,error,sizeof(error)),error);
+   pause[0].button=0;
+   auto resumed_frame=match.source_frames();
+   for(unsigned t=0;t<30&&match.paused();++t){
+    match.tick(pause);audio_phase+=32000;count=audio_phase/60;audio_phase%=60;
+    check(melee_web_audio_render(match.audio(),pcm,count,error,sizeof(error)),error);
+    resumed_frame=match.source_frames();
+   }
+   check(!match.paused()&&resumed_frame>paused_frame,
+         "Original P1 Start did not resume after pause debounce");
    std::cout<<"Original Ready/Go completed at "<<intro_ticks<<" ticks\n";
    check(match.hud_damage(0)==0&&match.hud_damage(1)==0,"Original player damage HUD did not initialize");
    // Approach with source input so the opponent lies inside the projectile's

@@ -22,11 +22,23 @@ do not disguise absent implementation as unlock progression. No additional rules
 or name-entry menus are required yet; unsupported exits must not enter incomplete
 code. This restricted slice is not the final full vanilla product.
 
-The temporary HTML selection UI is disposable. Remove it from the player flow
-when the native chain passes; retain only useful developer diagnostics. The
-complete loop needs normal input testing, original selection/configuration
-handoff, KO/respawn/outcome, and a second match after returning. A link probe or
-automatically scripted match is only partial evidence.
+The native CSS/SSS chain is the canonical player path. The temporary HTML
+selection UI is removed from the player flow; useful developer diagnostics and
+the legacy native-menu URL redirect remain. The complete loop needs normal input
+testing, original selection/configuration handoff, KO/respawn/outcome, and a
+second match after returning. A link probe or automatically scripted match is
+only partial evidence.
+
+The current validated checkpoint carries the full source `StartMeleeData`
+through `fn_8016DCC0`, runs the original supported VS `OnFrame`, and passes
+Entry/Ready, source pause/resume, No Contest, and match-ending checks in two
+Node cycles. The evidence is recorded in
+`work/native-active-telemetry-run.log`. The Release browser also passes original pause/resume and two four-stock
+diagnostic loops with three respawns and return to CSS. These use raw-PAD
+diagnostics, not physical input; cold runs have shown timing pauses. This validates the
+supported Mario/Final Destination slice only. It does not establish full
+`gm_Scene_Vs_OnEnter` or retail scene-manager equivalence, and it is not
+tournament acceptance.
 
 ## Optimization policy
 
@@ -53,17 +65,17 @@ automatically scripted match is only partial evidence.
 
 | Gap | Current evidence / consequence | Required closure |
 | --- | --- | --- |
-| HTML CSS/SSS | Original CSS/SSS now render in a separate preview; source and rendered diagnostic repeat loops pass, while ordinary-input acceptance remains open | Execute and compare original menus and transitions; remove HTML player selection |
-| Catch-up sampling | `gameplay_browser.cpp` polls once per browser callback and reuses that sample for multiple source steps | Specify and verify per-tick input acquisition and phase/order under actual browser constraints; never claim missing historical samples were recovered |
+| Native menu acceptance | Original CSS/SSS is the canonical player flow; source and browser diagnostic repeat loops pass, including original pause/resume | Complete ordinary browser input and original menu/transition comparisons; keep the HTML selectors out of the player flow |
+| Catch-up sampling | `gameplay_browser.cpp` and `gameplay_menu_browser.cpp` poll once per browser callback and may reuse that sample for multiple source steps | Specify and verify per-tick input acquisition and phase/order under actual browser constraints; never claim missing historical samples were recovered |
 | Catch-up output | Source audio processes each tick, but late output is gated and re-primed | Explicit overload behavior plus measured input/audio timing; catch-up runs cannot count as uninterrupted performance acceptance |
 | Fixed 60.0 clock | Host clock and sample production currently use exactly 60 | Establish selected retail VI mode/cadence and input scheduling from reference evidence, including long-run drift; do not assume the nominal label proves exact cadence |
 | DSP coefficients | Generated replacement DROM is approximately equivalent, not identical to hardware | Validate the audio path against an independent reference and obtain exact coefficient/input support if needed; identical approximations on both sides are not an independent oracle |
 | Native numerics | Bounded original jump, jab and stock traces exist; no complete match equivalence | Broaden bit-preserving semantic traces under identical initial conditions and input sequences; locate first divergence |
-| Match initialization | Native menu handoff carries ports, costumes/tints, four stocks and RNG; remaining original match-init fields and startup behavior are not yet generally ported | Compare exact supported original start configuration and extend the source initializer before broadening modes or claiming start-state equivalence |
+| Match initialization | The supported native handoff carries full `StartMeleeData` through `fn_8016DCC0`, including ports, costumes/tints, four stocks and RNG; broader modes and configurations remain outside the validated slice | Compare exact supported original start configuration and extend the source initializer before broadening modes or claiming general start-state equivalence |
 | Original HUD | Original Ready/Go, damage/stocks and markers now execute and render; source damage/intro/repeat-lifetime checks and two browser diagnostic loops pass | Compare authored interface rendering, timing and audio against the original; broaden beyond Mario/FD |
-| Match ending | Original ordinary-VS ending callback, GAME!/Game Set interface/audio request, source process mask and exit request are integrated; two source loops verify 114 frozen ticks | Verify rendered/audio/reference behavior. The active match still uses a scoped end-only OnFrame adapter; full source bookkeeping and pause remain open. Only Results routing is skipped after the original exit |
-| Rendering | Native HSD/GX path renders current match; no complete pixel equivalence | Reference camera, transforms, materials, blending, depth, effects, viewport and output timing on a declared baseline |
-| Device/latency acceptance | Keyboard play and short warm timing runs; physical controllers and end-to-end latency remain unaccepted | Real-device routing, disconnect/reconnect, simultaneous players, analog thresholds and independently measured latency; cold/warm long-match tests |
+| Match ending | Original supported VS ending callback, GAME!/Game Set interface/audio request, source process mask, pause/resume, No Contest and exit request are integrated; two Node cycles pass the source ending checks | Verify rendered/audio/reference behavior and broader source modes. Results routing remains skipped after the original exit; this does not claim full `gm_Scene_Vs_OnEnter` or retail scene-manager equivalence |
+| Rendering | Native HSD/GX path renders the current match and browser original pause artwork/camera; no complete pixel equivalence | Reference camera, transforms, materials, blending, depth, effects, viewport and output timing on a declared baseline |
+| Device/latency acceptance | Earlier keyboard play and short warm timing runs; current native-menu ordinary input, physical controllers and end-to-end latency remain unaccepted; cold timing pauses are observed | Real-device routing, disconnect/reconnect, simultaneous players, analog thresholds and independently measured latency; cold/warm long-match tests |
 
 Moving input/simulation to a dedicated worker is a candidate architecture, not
 an approved accuracy fix by itself. Browser gamepad sampling availability, thread

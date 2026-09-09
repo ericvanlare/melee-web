@@ -131,6 +131,16 @@ int melee_web_common_context_set_color_tables(MeleeWebCommonContext* h,const Mel
     h->ready_mask|=(1u<<6)|(1u<<7);
     return success(error,size);
 }
+int melee_web_common_context_set_root16(MeleeWebCommonContext* h,void* joint,char* error,size_t size)
+{
+    if(!h||h->attached||h->initialized||h->roots[16]||!joint)
+        return fail(error,size,"Common root16 requires an unpublished nonnull descriptor");
+    if(((uintptr_t)joint&3U)!=0)
+        return fail(error,size,"Common root16 descriptor is not four-byte aligned");
+    h->roots[16]=joint;
+    h->ready_mask|=1u<<16;
+    return success(error,size);
+}
 int melee_web_common_context_set_respawn(MeleeWebCommonContext* h,void* joint,void* animation,char* error,size_t size)
 {
     if(!h||h->attached||h->initialized||!joint||!animation)return fail(error,size,"Respawn descriptors require an unpublished common owner");

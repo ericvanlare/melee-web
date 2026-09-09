@@ -1,14 +1,21 @@
 #ifndef MELEE_WEB_GAMEPLAY_MENU_HOST_H
 #define MELEE_WEB_GAMEPLAY_MENU_HOST_H
+#include "gameplay_compat.h"
 #include <stddef.h>
 #include <stdint.h>
 #include <dolphin/pad.h>
+#include <melee/mn/types.h>
 #include "gameplay_audio.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
 typedef struct MeleeWebMenuHost MeleeWebMenuHost;
 typedef struct MeleeWebMenuMatchSelection {
+    /* Complete source payload copied while the menu-owned VsModeData is still
+     * live.  Match handoff consumes this typed value synchronously. */
+    StartMeleeData start;
+    /* Compatibility view used by the existing match session; these values
+     * are copied from start.players by the host selection boundary. */
     struct {uint32_t controller,stocks,costume,sub_color;} players[2];
     uint32_t random_seed, hud_layout;
 } MeleeWebMenuMatchSelection;

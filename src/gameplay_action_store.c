@@ -280,6 +280,11 @@ void melee_web_command_require_supported(uint32_t opcode)
 {
     switch (opcode) {
     case 0: case 1: case 2: case 3: case 4: case 5: case 6: case 7: case 8: case 10: case 11: case 13: case 16: case 17: case 18: case 19: case 20: case 23: case 24: case 25: case 26: case 27: case 28: case 29: case 34: case 35: case 40: case 43: case 46: case 52: case 54: case 55: case 56: return;
-    default: fprintf(stderr, "Unsupported native fighter command opcode %u\n", opcode); abort();
+    default:
+        fprintf(stderr, "Unsupported native fighter command opcode %u\n", opcode);
+        for (unsigned i = 0; i < 6; ++i) if (bindings[i].fighter)
+            fprintf(stderr, "Bound fighter %u: motion %d, animation %d\n", i,
+                    bindings[i].fighter->motion_id, bindings[i].fighter->anim_id);
+        abort();
     }
 }

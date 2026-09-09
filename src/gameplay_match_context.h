@@ -26,6 +26,11 @@ typedef struct MeleeWebControllerSample {
 typedef struct MeleeWebMatchEyeStats {
     uint32_t image_count, palette_count, image_index, palette_index;
     float animation_frame, animation_rate;
+    /* HSD_TObjAddAnim starts from the retained costume descriptor image and
+     * palette. Keep that state separate from a command-selected table entry;
+     * UINT32_MAX is reserved for the base state. */
+    uint8_t image_is_base, palette_is_base;
+    uint16_t reserved;
 } MeleeWebMatchEyeStats;
 typedef struct MeleeWebMatchStats {
     uint64_t ticks;

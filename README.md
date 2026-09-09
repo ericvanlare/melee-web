@@ -29,8 +29,8 @@ full-match equivalence. See [current evidence](STATUS.md),
 Open `runtime.html` on the local build server and choose your own unmodified
 USA revision 1.02 Melee ISO, GCM, or CISO. **Open character select** enters the
 original in-game CSS. The current slice supports two Marios, four stocks and
-Final Destination, through original CSS/SSS transitions, Ready/Go, gameplay HUD
-and GAME! ending. It returns directly to original CSS after the source exit
+Final Destination, through original CSS/SSS transitions, fighter entrances,
+Ready/Go, gameplay HUD, pause/resume and GAME! ending. It returns directly to original CSS after the source exit
 request; Results is deliberately skipped. Other fighters/stages remain outside
 the supported slice. All roster unlocks are enabled separately from availability.
 

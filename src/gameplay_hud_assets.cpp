@@ -23,7 +23,7 @@ struct GameplayHudAssets::Storage {
 
     void start(const RuntimeFiles& files)
     {
-        for (const char* name : {"IfAll.usd", "IfCoGet.dat", "SdIntro.dat"}) {
+        for (const char* name : {"IfAll.usd", "IfCoGet.dat", "SdIntro.dat", "GmPause.usd"}) {
             const auto found = files.find(name);
             if (found == files.end() || found->second.empty())
                 throw DatError("Missing original HUD archive: " + std::string(name));
@@ -52,6 +52,7 @@ struct GameplayHudAssets::Storage {
             add_scene("IfAll.usd", symbol, DatSceneRootKind::DynamicModelTable);
         }
         add_scene("IfCoGet.dat", "ScInfCgt_scene_data", DatSceneRootKind::SceneDesc);
+        add_scene("GmPause.usd", "ScGamPause_scene_data", DatSceneRootKind::SceneDesc);
         intro = std::make_unique<DatSis>(archives.at("SdIntro.dat"), "SIS_IntroData");
         symbols.push_back({"SdIntro.dat", "SIS_IntroData", intro->descriptor()});
         char error[256]{};

@@ -227,9 +227,21 @@ DatTexture read_texture(const DatArchive& archive, std::uint32_t offset, bool na
     result.repeat_t = archive.range(offset + 61, 1)[0];
     if (!result.repeat_s || !result.repeat_t) reject("Texture repeat values must be nonzero");
     result.source_flags = archive.be32(offset + 64);
-    constexpr std::uint32_t allowed_flags = 0x80000000U | 0x00ff0000U | 0xf0U | 0xfU;
+    // TEX_BUMP is consumed by the original TObj setup (including its second
+    // BUMP texgen and volatile emboss TEV stages).  Keep it behind the native
+    // descriptor policy: the viewer material path has no equivalent setup.
+    constexpr std::uint32_t tex_bump = 1U << 24;
+    const std::uint32_t allowed_flags = 0x80000000U | 0x00ff0000U | 0xf0U | 0xfU |
+        (native_descriptors ? tex_bump : 0U);
     const auto coordinates = result.source_flags & 15U;
-    if ((result.source_flags & ~allowed_flags) || !(result.source_flags & 0xf0U) || coordinates > 1)
+    // The PlCo EntryStart accessory uses a native bump-only TObj. HSD accepts
+    // this descriptor without the ordinary color/alpha operation nibble; keep
+    // that authored flag set intact while retaining the operation requirement
+    // for every non-bump texture.
+    const bool native_bump_only = native_descriptors &&
+        (result.source_flags & tex_bump) && !(result.source_flags & 0xf0U);
+    if ((result.source_flags & ~allowed_flags) ||
+        (!(result.source_flags & 0xf0U) && !native_bump_only) || coordinates > 1)
         reject("Unsupported texture coordinate, lightmap or behavior flags");
     if (coordinates == 0 && (result.source < 4 || result.source > 11))
         reject("UV texture requires a TEX0 through TEX7 vertex source");

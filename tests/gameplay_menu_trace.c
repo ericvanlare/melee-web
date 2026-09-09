@@ -70,6 +70,12 @@ static void setup(CSSData* css)
     memset(css, 0, sizeof(*css));
     css->match_type = VS_MELEE;
     css->vs.start.rules.match_kind = MatchKind_Stock;
+    css->vs.start.rules.is_stock = 1;
+    css->vs.start.rules.is_vs = 1;
+    css->vs.start.rules.xB = -1;
+    css->vs.start.rules.x20 = 0;
+    css->vs.start.rules.timer_enabled = 0;
+    css->vs.start.rules.game_speed = 1.0f;
     css->vs.start.rules.stkind = MELEE_WEB_MENU_FD_ST_KIND;
     for (int i = 0; i < GM_MAX_PLAYERS; ++i)
         css->vs.start.players[i].slot_type = Gm_PKind_NA;

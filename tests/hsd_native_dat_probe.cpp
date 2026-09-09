@@ -46,8 +46,10 @@ int main(int argc, char** argv) {
             throw std::runtime_error("Usage: hsd_native_dat_probe PlCo.dat [costume.dat exact_public_joint_symbol]");
         auto archive = read_archive(argv[1]);
         const melee_web::DatCommon common(*archive);
+        if (!common.roots[16].data_offset) throw std::runtime_error("Common root16 accessory is absent");
         if (!common.roots[20].data_offset) throw std::runtime_error("Common root20 is absent");
         melee_web::DatNativeJoint graph(archive, *common.roots[20].data_offset);
+        melee_web::DatNativeJoint root16_graph(archive, *common.roots[16].data_offset);
         std::unique_ptr<melee_web::DatNativeJoint> costume;
         std::unique_ptr<melee_web::DatMaterialAnimation> material_animation;
         if (argc == 4) {
@@ -116,13 +118,17 @@ int main(int argc, char** argv) {
             }
             auto* common_context = melee_web_common_context_create(&common.scalars, &common.tables,
                 &graph.graph(), error, sizeof(error));
-            if (!common_context || !melee_web_common_context_attach(common_context,error,sizeof(error)) ||
+            auto* root16 = melee_web_native_joint_hydrate(&root16_graph.graph(), error, sizeof(error));
+            if (!root16) throw std::runtime_error(error);
+            if (!common_context || !melee_web_common_context_set_root16(common_context,
+                    melee_web_native_joint_descriptor(root16,error,sizeof(error)),error,sizeof(error)) ||
+                !melee_web_common_context_attach(common_context,error,sizeof(error)) ||
                 !melee_web_common_context_require(common_context,MELEE_WEB_COMMON_RUNTIME_MASK,error,sizeof(error)) ||
                 !melee_web_common_context_initialize_materials(common_context,error,sizeof(error)))
                 throw std::runtime_error(error);
             if (melee_web_common_context_require(common_context,(1u<<23)-1,error,sizeof(error)))
                 throw std::runtime_error("Unsupported common roots were marked ready");
-            std::cout << "Local common context: 17 copied roots, original8064/8F6C material owners passed\n";
+            std::cout << "Local common context: 18 copied roots, original8064/8F6C material owners passed\n";
             // Source world owns the real runtime. A surviving host descriptor
             // handle must reject access after shutdown and remain safe to free.
             if (!melee_web_gameplay_shutdown(error, sizeof(error))) throw std::runtime_error(error);
@@ -130,6 +136,9 @@ int main(int argc, char** argv) {
             if (melee_web_native_joint_stats(native, &stats, error, sizeof(error)))
                 throw std::runtime_error("Stale native handle was accepted");
             if (!melee_web_native_joint_destroy(native, error, sizeof(error))) throw std::runtime_error(error);
+            if (melee_web_native_joint_stats(root16, &stats, error, sizeof(error)))
+                throw std::runtime_error("Stale common root16 handle was accepted");
+            if (!melee_web_native_joint_destroy(root16, error, sizeof(error))) throw std::runtime_error(error);
             if (native_costume) {
                 if (melee_web_native_joint_stats(native_costume, &stats, error, sizeof(error)))
                     throw std::runtime_error("Stale costume handle was accepted");

@@ -993,6 +993,49 @@ void direct_rgba4_geometry()
     rejects([&] { (void) fixture.model(); });
 }
 
+void native_nbt_geometry_and_cull()
+{
+    Fixture fixture;
+    // GX_VA_NBT is numerically after TEX7, but its packet position is the
+    // normal slot. Keep the source attr identity and use one 9-scalar S16
+    // array, as the original native GmPause descriptor does.
+    put16(fixture.data, Fixture::pobj + 12, 0x8000);
+    fixture.attribute(Fixture::descriptors + 24, 25, 2, 1, 3, 0, 18, 32);
+    fixture.attribute(Fixture::descriptors + 48, 11, 1, 1, 4, 0, 4, 0);
+    fixture.unlink(Fixture::descriptors + 68); // Direct RGBA6 has no array.
+    put32(fixture.data, Fixture::descriptors + 72, 255);
+    for (std::size_t i = 0; i < 9; ++i)
+        put16(fixture.data, 32 + i * 2, static_cast<std::uint16_t>(0x100 + i));
+    for (std::uint8_t i = 0; i < 3; ++i) {
+        const auto cursor = Fixture::display + 3 + i * 5;
+        fixture.data[cursor] = i;
+        fixture.data[cursor + 1] = 0;
+        fixture.data[cursor + 2] = 0x10 + i;
+        fixture.data[cursor + 3] = 0x20 + i;
+        fixture.data[cursor + 4] = 0x30 + i;
+    }
+    const auto model = RigidModel(fixture.archive(), Fixture::joint, "native-nbt",
+                                  melee_web::ModelRenderPass::All,
+                                  melee_web::DatMaterialPolicy::NativeDescriptors);
+    const auto& mesh = model.meshes[0];
+    check(mesh.flags == 0x8000 && mesh.attributes.size() == 3 &&
+          mesh.attributes[1].attr == 25 && mesh.attributes[1].comp_type == 3 &&
+          mesh.attributes[1].comp_cnt == 1 && mesh.attributes[1].byte_size == 18 &&
+          mesh.attributes[2].attr == 11 && mesh.attributes[2].comp_type == 4,
+          "native GmPause cull and interleaved NBT metadata remain source typed");
+    auto invalid = fixture;
+    put32(invalid.data, Fixture::descriptors + 32, 2); // NBT3 is not one shared index.
+    rejects([&] { (void) RigidModel(invalid.archive(), Fixture::joint, "nbt3",
+                                    melee_web::ModelRenderPass::All,
+                                    melee_web::DatMaterialPolicy::NativeDescriptors); });
+    invalid = fixture;
+    put16(invalid.data, Fixture::descriptors + 42, 17);
+    rejects([&] { (void) RigidModel(invalid.archive(), Fixture::joint, "short-nbt",
+                                    melee_web::ModelRenderPass::All,
+                                    melee_web::DatMaterialPolicy::NativeDescriptors); });
+    rejects([&] { (void) fixture.model(); });
+}
+
 void explicit_opaque_pass()
 {
     using melee_web::ModelRenderPass;
@@ -1091,6 +1134,7 @@ int main(int argc, char** argv)
         {"missing_model_content", missing_model_content},
         {"direct_rgba8_geometry", direct_rgba8_geometry},
         {"direct_rgba4_geometry", direct_rgba4_geometry},
+        {"native_nbt_geometry_and_cull", native_nbt_geometry_and_cull},
         {"explicit_opaque_pass", explicit_opaque_pass},
         {"opaque_envelope_dependency_closure", opaque_envelope_dependency_closure},
         {"skin_metadata_and_bounds", skin_metadata_and_bounds},

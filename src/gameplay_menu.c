@@ -138,7 +138,10 @@ int melee_web_menu_css_selection_valid(const CSSData* css)
 
     if (css == NULL || css->match_type != VS_MELEE ||
         css->vs.start.rules.match_kind != MatchKind_Stock ||
+        !css->vs.start.rules.is_stock || !css->vs.start.rules.is_vs ||
         css->vs.start.rules.is_teams ||
+        css->vs.start.rules.timer_enabled || css->vs.start.rules.xB != -1 ||
+        css->vs.start.rules.x20 != 0 ||
         css->vs.start.rules.stkind != MELEE_WEB_MENU_FD_ST_KIND)
     {
         return 0;
@@ -245,6 +248,13 @@ MeleeWebMenuSession* melee_web_menu_session_create(
     session->css.vs.start.rules.match_kind = MatchKind_Stock;
     session->css.vs.start.rules.is_stock = true;
     session->css.vs.start.rules.is_vs = true;
+    /* The browser slice exposes the original stock menu while deliberately
+     * carrying a fixed no-items/timer-disabled policy into the source match.
+     * Keep this in StartMeleeData so handoff validates the actual payload
+     * instead of replacing it later. */
+    session->css.vs.start.rules.xB = -1;
+    session->css.vs.start.rules.x20 = 0;
+    session->css.vs.start.rules.timer_enabled = false;
     session->css.vs.start.rules.stkind = MELEE_WEB_MENU_FD_ST_KIND;
     for (i = 0; i < 2; i++) {
         PlayerInitData* player = &session->css.vs.start.players[i];

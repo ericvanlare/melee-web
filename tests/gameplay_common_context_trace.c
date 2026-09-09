@@ -40,15 +40,23 @@ int main(void)
         MeleeWebNativeGraph graph={&joint,&dobj,NULL,&material,1,1,0,1,0};
         MeleeWebCommonContext* context=melee_web_common_context_create(&scalars,&tables,&graph,error,sizeof(error));
         CHECK(context);memset(pixels,0,sizeof(pixels));scalars.walk_stick_threshold=0;
+        MeleeWebNativeJoint* root16=melee_web_native_joint_hydrate(&graph,error,sizeof(error));
+        CHECK(root16);
+        void* root16_descriptor=melee_web_native_joint_descriptor(root16,error,sizeof(error));
+        CHECK(root16_descriptor);
+        CHECK(melee_web_common_context_set_root16(context,root16_descriptor,error,sizeof(error)));
+        CHECK(!melee_web_common_context_set_root16(context,
+            melee_web_native_joint_descriptor(root16,error,sizeof(error)),error,sizeof(error)));
         CHECK(melee_web_gameplay_startup(4U*1024U*1024U,error,sizeof(error)));
         CHECK(melee_web_common_context_attach(context,error,sizeof(error)));
         CHECK(!melee_web_common_context_attach(context,error,sizeof(error)));
-        CHECK(melee_web_common_context_require(context,1u|(1u<<4)|(1u<<20),error,sizeof(error)));
+        CHECK(melee_web_common_context_require(context,1u|(1u<<4)|(1u<<16)|(1u<<20),error,sizeof(error)));
         CHECK(!melee_web_common_context_require(context,1u<<6,error,sizeof(error)));
         CHECK(strstr(error,"missing0x000040"));
         void** roots=melee_web_common_context_source_roots();
         CHECK(p_ftCommonData->walk_stick_threshold==0.18f&&ftPartsTable[0]->parts_num==1);
-        for(unsigned i=0;i<23;++i)CHECK((roots[i]!=NULL)==(i==0||i==4||i==20));
+        for(unsigned i=0;i<23;++i)CHECK((roots[i]!=NULL)==(i==0||i==4||i==16||i==20));
+        CHECK(roots[16]==root16_descriptor);
         HSD_Joint* copied=roots[20];
         CHECK(copied->u.dobjdesc->mobjdesc->texdesc->imagedesc->image_ptr!=pixels);
         CHECK(((uint8_t*)copied->u.dobjdesc->mobjdesc->texdesc->imagedesc->image_ptr)[0]==0x73);
@@ -62,6 +70,7 @@ int main(void)
         HSD_GObjPLink_80390228(fighter);
         if(pass)CHECK(melee_web_gameplay_shutdown(error,sizeof(error)));
         CHECK(melee_web_common_context_destroy(context,error,sizeof(error)));
+        CHECK(melee_web_native_joint_destroy(root16,error,sizeof(error)));
 #define RESTORED(index,name) CHECK((void*)name==saved[index]);
         MELEE_WEB_COMMON_ROOTS(RESTORED)
 #undef RESTORED

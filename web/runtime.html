@@ -39,7 +39,7 @@ window.menuFrame=()=>{
  }
  if(!importing&&!uiMessage)$('status').textContent=Module.UTF8ToString(Module._melee_web_native_menu_message());
  $('status').dataset.phase=Module._melee_web_native_menu_phase();
- $('stock-check').disabled=Module._melee_web_native_menu_phase()!==7;
+ $('stock-check').disabled=!Module._melee_web_native_menu_stock_check_ready();
  $('scene-check').textContent=Module.UTF8ToString(Module._melee_web_native_menu_diagnostics());
  if($('input').closest('details').open)$('input').textContent=Module.UTF8ToString(Module._melee_web_input_message());
  syncAudio();

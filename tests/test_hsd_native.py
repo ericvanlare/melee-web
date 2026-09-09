@@ -74,7 +74,7 @@ class NativeJointRuntimeTests(unittest.TestCase):
         self.assertEqual(result.stdout.count("costume native original loader: 61 joints"), 2)
         self.assertRegex(result.stdout, r"[1-9][0-9]* resolved influences")
         self.assertEqual(result.stdout.count("Mario original material animation: two eye textures"), 2)
-        self.assertEqual(result.stdout.count("Local common context: 17 copied roots"), 2)
+        self.assertEqual(result.stdout.count("Local common context: 18 copied roots"), 2)
         self.assertIn("Original common root20 initialization/destruction/restart passed", result.stdout)
 
     def test_local_costume_requires_exact_public_symbol(self):

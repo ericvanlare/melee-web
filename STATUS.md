@@ -10,79 +10,70 @@ emulator is shipped; Dolphin is used only as a separate original-game reference.
 The active first deliverable is **original in-game CSS → original in-game SSS
 → a playable four-stock Mario-versus-Mario match on Final Destination → original
 CSS**, without a results screen. Real menu assets, original scene/input behavior,
-transitions and repeat-match lifetime are required. The HTML selector is temporary
-scaffolding. Full accuracy, physical controllers, sound and stable performance
+transitions and repeat-match lifetime are required. The former HTML selector is
+removed from the player flow. Full accuracy, physical controllers, sound and stable performance
 remain required acceptance work under [the accuracy contract](docs/ACCURACY_CONTRACT.md).
 
 ## Active integration
 
-The `native-menu.html` integration preview now renders the original CSS and SSS
-and enters the actual Mario/FD match with menu-selected costumes. The first
-browser route used an explicitly labeled raw-PAD Start diagnostic; automated
-key taps are not accepted as physical-input evidence. The configured keyboard
-ports now stay connected with neutral input on focus loss, so inspecting controls
-does not cause original CSS disconnect logic to turn humans into CPUs.
+The canonical `runtime.html` player uses original CSS/SSS assets, callbacks and
+transitions. `native-menu.html` redirects to it; the asset inspector remains at
+`viewer.html`. Two human Mario slots, four stocks, no items, no timer and Final
+Destination are the supported slice. All five Mario costumes are hydrated with
+separate owned models, and menu selection carries the complete typed
+`StartMeleeData`, including source RNG and costume/tint settings, into the match.
+The original menu preloader is not supplied by this resident-asset integration.
 
-The shared production owners also pass **two original CSS → SSS → four-stock
-match → CSS cycles under Node/Wasm**, including three respawns, stock elimination,
-winner, audio rendering, source RNG handoff and full scene teardown. This is a
-source lifecycle check, not an original-equivalence claim. The test also
-passes original SSS B cancellation, CSS re-entry and stage confirmation.
-The real browser separately completed two four-stock diagnostic cycles through
-these original scenes, each with three respawns and automatic return to CSS
-at 2,011 input ticks. These runs use labeled raw-PAD diagnostics; manual
-keyboard/controller and cold-performance acceptance are still open. The full
-regression suite passed 251 tests without skips; the added cancellation check
-and Release browser build also pass.
-All five Mario costume assets are supported with shared fighter data and distinct
-owned models; the local costume regression runs stock/respawn/teardown twice.
+The match now calls original `fn_8016DCC0` for the supported start configuration
+and the original VS `OnFrame`, replacing the prior end-only adapter. Original
+stage markers are initialized before fighter creation. Original Entry, Ready/Go,
+damage/stock/player-marker/magnifier interface, pause screen and pause camera,
+No Contest, and the GAME!/Game Set ending run through scoped source owners.
+The host returns to CSS only after the original exit request, skipping Results.
+This does not establish full `gm_Scene_Vs_OnEnter` or retail scene-manager
+equivalence across all modes.
 
-The native preview now also runs original Ready/Go and the original damage,
-stock, player-marker and magnifier interface. Shared typed SceneDesc/model
-owners hydrate IfAll/IfCoGet; the text-only SdIntro atlas and direct packed
-RGBA4 geometry retain their authored representation. Original Ready completion
-owns stage start and fighter activation. Source checks pass Ready/Go at 124
-ticks, blocked movement during the first 60 intro ticks, an actual in-range
-Mario fireball with matching source/HUD damage, and two four-stock return loops.
-Early unload at 0, 60 and 100 intro ticks also passes before rebuilding the world.
-Typed callback adapters fix original magnifier signatures for Wasm; full camera
-traversal preserves and restores the owned HUD cameras.
+The current source lifecycle trace passes two complete original CSS → SSS →
+four-stock match → CSS cycles. It checks Ready/Go at **124 ticks**, blocked early
+movement, original entry accessory lifetime, an in-range fireball whose damage
+matches the HUD, three respawns and the winner, and **114 frozen ending ticks**.
+It also passes source pause with frozen fighter state, wrong-player Start
+rejection, same-player resume, original L+R+A+Start No Contest, SSS B cancellation
+and re-entry, and unload at 0, 60 and 100 intro ticks. The source trace is
+`work/native-active-telemetry-run.log`; these are shared-source lifecycle checks,
+not original-game equivalence evidence.
 
-The browser separately completed two further four-stock loops with this HUD,
-each at 2,011 diagnostic input ticks with three respawns and return to CSS.
-The first run needed a timing-pause resume; these are functional lifecycle checks,
-not uninterrupted performance or physical-input acceptance. The full regression
-suite passed **252 tests with no skips**; rebuilt player, full-stage and all-five-
-Mario-costume stock regressions also pass. The native page now reuses the optional
-IDBFS renderer cache and its bounded save at explicit unload; assets remain local
-and outside persistent storage.
+The current Release browser separately passes original pause/resume and two
+four-stock loops, each at **2,125 diagnostic input ticks**, with three respawns
+and automatic return to CSS. Source pause was explicitly observed changing
+from 0 to 1 and back to 0 before the first stock run. An earlier overlapping
+Start/stock diagnostic attempt stayed source-paused and failed its tick bound;
+it is not counted as a pass. Stock diagnostics now reject host/source pause,
+Ready/ending transitions and queued Start input, preventing that overlap.
+These browser runs use labeled raw-PAD diagnostics, not physical input.
 
-The canonical `runtime.html` player now uses the original CSS/SSS scenes; the
-temporary HTML selectors are removed from the player flow. `native-menu.html`
-redirects to it, and the asset inspector is preserved at `viewer.html`. Both the
-default build and `--target runtime` now build the native player.
+Native descriptor support now retains original interleaved NBT geometry and
+bump texture flags for the pause screen and common entry accessory. It uses the
+original HSD/GX path, with unsupported forms still rejected. The common root16
+accessory has a world-owned descriptor that outlives its original fighter/effect
+consumers. Eye telemetry distinguishes an authored base image from an animated
+table entry; this changes observation only, not the game's texture commands.
 
-The original ordinary-VS match ending is integrated: its end callback requests
-the GAME!/Game Set interface/audio, installs the source process mask, waits via
-the original end-state routine, and raises the original scene exit request.
-Only then does the host route back to CSS, skipping Results. Two complete source
-loops pass with **114 frozen ending ticks**, checking both fighters' actions,
-animation frames, positions and stocks while original interface/audio processing
-continues. Ready/Go, fireball damage/HUD, SSS B cancellation and intro unload
-checks also pass with the owned source clock/cadence and VS mode restored between
-worlds. Two rendered browser loops with this ending passed at 2,125 diagnostic
-input ticks each, with three respawns and automatic CSS return. These use raw-PAD
-diagnostics; they do not establish physical input, audio fidelity or performance.
-The full regression suite passed **256 tests without skips** (373.297 seconds),
-and rebuilt player, full-stage and five-costume stock checks pass.
+The complete local regression suite passes **258 tests without skips**
+(255.164 seconds), recorded in `work/native-active-full-suite-final.log`.
+The Release native player and source-loop target build, and rebuilt default
+player, full-stage, five-costume stock, article, edge and combat checks pass.
+The rebuilt legacy fighter constructor/eye-animation/restart runner also passes.
+A bounded Luna review found no actionable ownership/order regression in the
+match initialization, source clock, pause and teardown path.
 
 Ordinary keyboard/controller acceptance, original-game visual/audio comparison
 and cold first-use preparation remain open. First-use graphics can cause explicit
 timing pauses. The native player retains the strict pause policy and nominal
-60 Hz clock; neither establishes original timing equivalence. Active gameplay
-still uses a scoped end-only source OnFrame adapter, so full match bookkeeping,
-source pause and initialization need further integration/reference checks. The
-original menu preloader is not supplied by this resident-asset integration.
+60 Hz clock; neither establishes original timing equivalence. Catch-up input
+sampling and replacement DSP coefficients also remain open accuracy gaps under
+[the accuracy contract](docs/ACCURACY_CONTRACT.md). The optional IDBFS cache saves
+renderer resources after unload; disc assets remain local and unpersisted.
 
 The bullets below include earlier checkpoints; their narrower evidence must not
 be mistaken for newer browser or full-loop acceptance.
@@ -282,7 +273,7 @@ be mistaken for newer browser or full-loop acceptance.
   19 ms worst interval and add no audio underruns; fireballs still deal 6% to P2.
   Visual effect fidelity and other-special opponent impacts remain separate checks.
 
-## Latest runtime evidence
+## Earlier runtime foundation evidence
 
 The real-data gate passes **four fighter lifecycles across two complete worlds**:
 
@@ -302,8 +293,8 @@ or full-game performance. See [reproduction and scope](docs/FIGHTER_RUNTIME.md).
 
 Historical checkpoint: **192 tests passed with no skips**, the browser/gameplay
 and full fighter targets built, and both gameplay and owned-asset fighter runners
-passed. The current suite is the 234-test result above. Full-source linking has
-no remaining function-signature mismatch warnings.
+passed. That suite count belongs to the earlier checkpoint. Current verification is
+recorded in Active integration above.
 
 ## Runtime foundation
 
@@ -345,10 +336,9 @@ fighter now uses this browser input/presentation path; visual correctness remain
 
 ## Next
 
-Complete rendered combat and cold first-use preparation, then verify audible
-output and two physical controllers. The latest saved-cache full-stage cycle at
-1280×960 has a 30.50 ms worst interval, zero intervals above 33.3 ms and zero
-audio underruns across 14,452 ticks; the separate saved-cache stock run has the
-same zero-over-budget result across 1,985 ticks. These warm runs do not close the
-full playable-match milestone, and full original-game equivalence remains open.
-See [the acceptance roadmap](docs/ROADMAP.md).
+Complete ordinary input acceptance of the native menu/match loop, then compare
+its actual menu-derived start, source frames and ending against the original.
+Measure cold/warm full-match performance and input/audio latency on a named
+reference configuration. Existing short warm timing runs do not close those
+gates. Broaden the roster only after the reusable lifecycle and accuracy
+boundaries are verified. See [the acceptance roadmap](docs/ROADMAP.md).

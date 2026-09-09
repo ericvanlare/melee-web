@@ -53,10 +53,13 @@ struct DatTexture {
 // palette words. Returned byte spans require the archive to remain alive.
 // Supports up to eight ordinary UV/reflection TObjs with full finite SRT,
 // repeat/wrap modes, standard HSD color/alpha operations and diffuse, specular,
-// ambient or extension lightmaps. Raw flags/blend values are preserved for the
-// original HSD expression compiler; no effective-operation approximation is made.
-// Custom classes/active TEV, toon, bump, shadow and highlight coordinate modes remain
-// unsupported. Referenced-region bounds are conservative, not allocation sizes.
+// ambient or extension lightmaps. Native descriptor reads also preserve the
+// original TEX_BUMP flag for the HSD bump texgen/emboss path; the viewer policy
+// continues to reject that source behavior. Raw flags/blend values are preserved
+// for the original HSD expression compiler; no effective-operation approximation
+// is made. Custom classes/active TEV, toon, shadow and highlight coordinate modes
+// remain unsupported. Referenced-region bounds are conservative, not allocation
+// sizes.
 // Source IDs are preserved, but HSD assigns actual texture resources at runtime.
 [[nodiscard]] DatTextureImage read_dat_texture_image(const DatArchive&, std::uint32_t);
 [[nodiscard]] DatTexturePalette read_dat_texture_palette(const DatArchive&, std::uint32_t,

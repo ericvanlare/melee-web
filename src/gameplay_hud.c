@@ -12,10 +12,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+extern int melee_web_pause_screen_begin(void);
+extern int melee_web_pause_screen_end(void);
 struct MeleeWebHud {
     uint64_t generation;
     HSD_Archive* previous_archive;
-    int previous_language, previous_saved_language;
+    int previous_language, previous_saved_language, pause_owned;
 };
 static MeleeWebHud* owner;
 static int fail(char* error, size_t size, const char* message)
@@ -55,6 +57,12 @@ MeleeWebHud* melee_web_hud_begin(unsigned layout, char* error, size_t size)
     ifStatus_802F6EA4(3, -1, -1, 0, (Event) fn_8016B7B4,
                     (Event) intro_finished);
     ifTime_CreateTimers();
+    if (!melee_web_pause_screen_begin()) {
+        fail(error, size, "Original pause-screen ownership is unavailable");
+        melee_web_hud_end(hud, NULL, 0);
+        return NULL;
+    }
+    hud->pause_owned = 1;
     /* x0_3 is the original HUD layout choice. It is not inferred from the
      * number of active players; ordinary VS defaults to the four-slot layout. */
     ifStatus_802F665C(layout);
@@ -79,6 +87,9 @@ int melee_web_hud_end(MeleeWebHud* hud, char* error, size_t size)
     if (!hud) return 1;
     if (owner != hud || hud->generation != melee_web_gameplay_stats().generation)
         return fail(error, size, "Original HUD ownership changed");
+    if (hud->pause_owned && !melee_web_pause_screen_end())
+        return fail(error, size, "Original pause-screen ownership changed");
+    hud->pause_owned = 0;
     ifAll_802F3A64();
     HSD_SisLib_803A5FBC();
     *ifAll_GetArchive() = hud->previous_archive;

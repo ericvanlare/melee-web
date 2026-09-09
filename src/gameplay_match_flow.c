@@ -2,10 +2,14 @@
 #include "gameplay_match_clock.h"
 #include "gameplay_bootstrap.h"
 #include <melee/lb/lbaudio_ax.h>
+#include <melee/gm/gm_1A45.h>
+#include <melee/gm/forward.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-extern int melee_web_match_end_frame(void);
+extern int melee_web_match_source_frame(void);
+extern int melee_web_match_source_result(void);
+extern uint32_t melee_web_match_source_frames(void);
 extern int melee_web_match_end_state(void);
 struct MeleeWebMatchFlow {
     uint64_t generation;
@@ -24,7 +28,7 @@ static int live(const MeleeWebMatchFlow* flow)
 }
 static void source_frame(void)
 {
-    owner->source_valid = melee_web_match_end_frame();
+    owner->source_valid = melee_web_match_source_frame();
 }
 MeleeWebMatchFlow* melee_web_match_flow_begin(char* error, size_t size)
 {
@@ -66,7 +70,7 @@ int melee_web_match_flow_pre(void* context, char* error, size_t size)
         return fail(error, size, "Original match flow is not active");
     flow->source_valid = 0;
     if (!melee_web_source_clock_pre(source_frame) || !flow->source_valid)
-        return fail(error, size, "Unsupported original match ending or clock state");
+        return fail(error, size, "Unsupported original match scene or clock state");
     /* Retail order: source OnFrame, process mask, audio update, GObj scheduler.
      * PCM transport remains owned by the caller after the source frame. */
     lbAudioAx_80027DF8();
@@ -80,7 +84,9 @@ int melee_web_match_flow_post(void* context, char* error, size_t size)
         !melee_web_source_clock_request(&request))
         return fail(error, size, "Original match clock lost its frame ownership");
     if (request != 0) {
-        if (request != 1 || melee_web_match_end_state() != 3)
+        if (request != 1 || (melee_web_match_end_state() != 3 &&
+            !(melee_web_match_end_state() == 0 &&
+              melee_web_match_source_result() == OUTCOME_NO_CONTEST)))
             return fail(error, size, "Unexpected original match transition request");
         flow->complete = 1;
     }
@@ -110,4 +116,17 @@ int melee_web_match_flow_end(MeleeWebMatchFlow* flow, char* error, size_t size)
     owner = NULL;
     free(flow);
     return 1;
+}
+
+int melee_web_match_flow_paused(const MeleeWebMatchFlow* flow)
+{
+    return live(flow) && gm_801A45E8(1);
+}
+uint32_t melee_web_match_flow_frames(const MeleeWebMatchFlow* flow)
+{
+    return live(flow) ? melee_web_match_source_frames() : 0;
+}
+int melee_web_match_flow_result(const MeleeWebMatchFlow* flow)
+{
+    return live(flow) ? melee_web_match_source_result() : OUTCOME_NONE;
 }

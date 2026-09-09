@@ -53,6 +53,9 @@ class DatTextureTests(unittest.TestCase):
     def test_supported_operations_and_rejection_of_unknown_semantics(self):
         self.run_case("operations_and_modes")
 
+    def test_native_bump_flags_require_and_preserve_native_policy(self):
+        self.run_case("native_bump_descriptor")
+
     def test_custom_tev_invalid_coordinates_and_transform_rejections(self):
         self.run_case("unsupported_graphs_and_transforms")
 

@@ -48,10 +48,12 @@ struct GameplayMatchSession::Storage {
                         selected.costume,selected.sub_color};
         }
         match=melee_web_match_begin_players(players,2,70,selection.random_seed,world->collision(),error,sizeof(error));check(match!=nullptr,error);
+        world->enable_full_stage(true);
+        world->initialize_match(selection.start);
         check(melee_web_match_create_fighters_intro(match,error,sizeof(error)),error);
         MeleeWebRenderSettings settings{640,480,{0,25,180},{0,15,0},30,1,1000,(uint64_t(1)<<5)|(uint64_t(1)<<3)};
         render=melee_web_render_begin_match(&settings,error,sizeof(error));check(render!=nullptr,error);
-        world->enable_full_stage(true);check(melee_web_render_use_match_passes(render,error,sizeof(error)),error);
+        check(melee_web_render_use_match_passes(render,error,sizeof(error)),error);
         hud=melee_web_hud_begin(selection.hud_layout,error,sizeof(error));check(hud!=nullptr,error);
         check(melee_web_render_use_scene_cameras(render,error,sizeof(error)),error);
         flow=melee_web_match_flow_begin(error,sizeof(error));check(flow!=nullptr,error);
@@ -85,10 +87,15 @@ void GameplayMatchSession::draw(){
 }
 bool GameplayMatchSession::ending()const{return storage_&&melee_web_match_flow_ending(storage_->flow);}
 bool GameplayMatchSession::complete()const{return storage_&&melee_web_match_flow_complete(storage_->flow);}
+bool GameplayMatchSession::paused()const{return storage_&&melee_web_match_flow_paused(storage_->flow);}
+uint32_t GameplayMatchSession::source_frames()const{return storage_?melee_web_match_flow_frames(storage_->flow):0;}
 int GameplayMatchSession::hud_damage(unsigned player)const{return storage_?melee_web_hud_damage(storage_->hud,player):-1;}
 bool GameplayMatchSession::ready()const{return storage_&&melee_web_hud_ready(storage_->hud);}
 int GameplayMatchSession::outcome(int& winner)const{
-    check(storage_&&storage_->match,"Match session is closed");return melee_web_match_rules_outcome(&winner);
+    check(storage_&&storage_->match,"Match session is closed");
+    const int result=melee_web_match_flow_result(storage_->flow);
+    if(result==OUTCOME_NO_CONTEST){winner=-1;return result;}
+    return melee_web_match_rules_outcome(&winner);
 }
 uint32_t GameplayMatchSession::random_seed()const{
     check(storage_&&storage_->match,"Match session is closed");char error[256]{};MeleeWebMatchStats stats{};

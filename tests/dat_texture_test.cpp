@@ -126,10 +126,10 @@ struct Fixture {
 
     // Keep the owner together with the returned view so tests cannot accidentally
     // rely on data from a destroyed archive.
-    std::pair<std::shared_ptr<const DatArchive>, DatTexture> read() const
+    std::pair<std::shared_ptr<const DatArchive>, DatTexture> read(bool native = false) const
     {
         auto owner = archive();
-        auto textures = melee_web::read_dat_texture_chain(*owner, tobj);
+        auto textures = melee_web::read_dat_texture_chain(*owner, tobj, native);
         check(textures.size() == 1, "single-texture fixture must retain one descriptor");
         auto texture = std::move(textures.front());
         return {std::move(owner), std::move(texture)};
@@ -302,6 +302,33 @@ void operations_and_modes()
     }
 }
 
+void native_bump_descriptor()
+{
+    Fixture fixture;
+    constexpr std::uint32_t bump = 0x01040010; // TEX_BUMP, diffuse lightmap, UV/TEX0.
+    put32(fixture.data, Fixture::tobj + 64, bump);
+    const auto [owner, texture] = fixture.read(true);
+    check(texture.source_flags == bump,
+          "native texture hydration preserves the original TEX_BUMP source flags");
+    rejects([&] { (void) fixture.read(); });
+    fixture = Fixture();
+    constexpr std::uint32_t bump_only = 0x01000000; // PlCo EntryStart accessory.
+    put32(fixture.data, Fixture::tobj + 64, bump_only);
+    const auto [bump_owner, bump_texture] = fixture.read(true);
+    check(bump_texture.source_flags == bump_only,
+          "native hydration preserves a bump-only TObj without inventing color operations");
+    rejects([&] { (void) fixture.read(); });
+    fixture = Fixture();
+    put32(fixture.data, Fixture::tobj + 64, 0x00000000); // Non-bump flags lack required operations.
+    rejects([&] { (void) fixture.read(true); });
+    (void) bump_owner;
+    for (const auto unsupported : {0x02040010U, 0x01040110U}) {
+        put32(fixture.data, Fixture::tobj + 64, unsupported);
+        rejects([&] { (void) fixture.read(true); });
+    }
+    (void) owner;
+}
+
 void unsupported_graphs_and_transforms()
 {
     for (const auto offset : {0U, 4U, 88U}) {
@@ -464,6 +491,7 @@ int main(int argc, char** argv)
         {"mip_chains", mip_chains}, {"palette_formats_and_counts", palette_formats_and_counts},
         {"palette_indices", palette_indices}, {"lod_sampler", lod_sampler},
         {"operations_and_modes", operations_and_modes},
+        {"native_bump_descriptor", native_bump_descriptor},
         {"reflection_srt_and_chains", reflection_srt_and_chains},
         {"inactive_tev_descriptors", inactive_tev_descriptors},
         {"unsupported_graphs_and_transforms", unsupported_graphs_and_transforms},

@@ -31,7 +31,7 @@ unsigned stock_tick=0,completed_matches=0;
 bool stock_lost=false,stock_jump=false;
 std::array<float,1068> pcm;
 alignas(32) unsigned char fifo[64*1024];
-constexpr std::array<std::string_view,34> keys={"IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sislib_font.bin"};
+constexpr std::array<std::string_view,35> keys={"GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sislib_font.bin"};
 void check(int value,const char* error){if(!value)throw std::runtime_error(error);}
 void close(){
  char error[256]{};running=false;pending=false;menu_clock.reset();
@@ -139,16 +139,26 @@ void melee_web_native_menu_pause(int paused){
  running=(world||match)&&!paused;menu_clock.reset();
  message=running?(match?"Original four-stock Mario match on Final Destination":melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select"):"Paused.";
 }
-void melee_web_native_menu_confirm_check(){if(host_entered&&!faulted)diagnostic_start_ticks=3;}
+void melee_web_native_menu_confirm_check(){
+ if((host_entered||match)&&!faulted&&stock_check!=-1)diagnostic_start_ticks=3;
+}
+int melee_web_native_menu_stock_check_ready(){
+ return match&&!faulted&&running&&match->ready()&&!match->paused()&&
+        !match->ending()&&stock_check!=-1&&diagnostic_start_ticks==0;
+}
 int melee_web_native_menu_stock_check(){
- if(!match||faulted||match->player_stats(0).stocks!=4||match->player_stats(1).stocks!=4)return 0;
+ if(!melee_web_native_menu_stock_check_ready()||
+    match->player_stats(0).stocks!=4||match->player_stats(1).stocks!=4)return 0;
  stock_check=-1;stock_count=4;stock_respawns=0;stock_tick=0;stock_lost=stock_jump=false;
  running=true;menu_clock.reset();return 1;
 }
 const char* melee_web_native_menu_diagnostics(){
  static char text[512];
  std::snprintf(text,sizeof(text),"Completed matches: %u · stock check: %d · ticks: %u · stocks: %d · respawns: %d",
-  completed_matches,stock_check,stock_tick,stock_count,stock_respawns);return text;
+  completed_matches,stock_check,stock_tick,stock_count,stock_respawns);
+ if(match){const auto length=std::char_traits<char>::length(text);
+  std::snprintf(text+length,sizeof(text)-length," · source pause: %d · ready: %d",match->paused(),match->ready());}
+ return text;
 }
 const char* melee_web_native_menu_message(){return message.c_str();}
 int melee_web_native_menu_running(){return running;}

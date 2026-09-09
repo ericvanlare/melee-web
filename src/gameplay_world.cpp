@@ -89,6 +89,11 @@ struct GameplayWorld::Storage {
     std::unique_ptr<DatNativeAnimation> stage_animation;
     std::unique_ptr<DatMaterialAnimation> stage_material_animation;
     MeleeWebNativeJoint* stage_native=nullptr;
+    // Descriptor-only owner for Fighter_804D6514, the original EntryStart
+    // accessory. The common context borrows its HSD_Joint descriptor; this
+    // handle therefore outlives publication and is released after common
+    // globals have been restored.
+    MeleeWebNativeJoint* root16_native=nullptr;
     MeleeWebNativeJoint* respawn_native=nullptr;
     std::unique_ptr<DatNativeAnimation> respawn_animation;
     MeleeWebStageVisual* stage_visual=nullptr;
@@ -140,6 +145,12 @@ struct GameplayWorld::Storage {
         rules=melee_web_match_rules_begin(error,sizeof(error));check(rules!=nullptr,error);
         common=melee_web_common_context_create(&common_data.scalars,&common_data.tables,&common_joint.graph(),error,sizeof(error));
         check(common!=nullptr,error);
+        if(!common_data.roots[16].data_offset)throw DatError("Missing common root16 accessory");
+        DatNativeJoint root16_model(archive("PlCo.dat"),*common_data.roots[16].data_offset);
+        root16_native=melee_web_native_joint_hydrate(&root16_model.graph(),error,sizeof(error));
+        check(root16_native!=nullptr,error);
+        check(melee_web_common_context_set_root16(common,
+            melee_web_native_joint_descriptor(root16_native,error,sizeof(error)),error,sizeof(error)),error);
         if(!common_data.roots[6].data_offset||!common_data.roots[7].data_offset)throw DatError("Common color animation tables absent");
         common_colors=std::make_unique<DatColorAnimation>(archive("PlCo.dat"),*common_data.roots[6].data_offset,123);
         extra_colors=std::make_unique<DatColorAnimation>(archive("PlCo.dat"),*common_data.roots[7].data_offset,6);
@@ -250,6 +261,7 @@ struct GameplayWorld::Storage {
         if(collision){check(melee_web_collision_destroy(collision,error,sizeof(error)),error);collision=nullptr;}
         if(numeric){check(melee_web_stage_numeric_end(numeric,error,sizeof(error)),error);numeric=nullptr;}
         if(common){check(melee_web_common_context_destroy(common,error,sizeof(error)),error);common=nullptr;}
+        if(root16_native){check(melee_web_native_joint_destroy(root16_native,error,sizeof(error)),error);root16_native=nullptr;}
         if(respawn_native){check(melee_web_native_joint_destroy(respawn_native,error,sizeof(error)),error);respawn_native=nullptr;}
         respawn_animation.reset();extra_colors.reset();common_colors.reset();
         if(rules){check(melee_web_match_rules_end(rules,error,sizeof(error)),error);rules=nullptr;}
@@ -281,4 +293,9 @@ std::array<float, 3> GameplayWorld::player_spawn(unsigned slot)const{
 }
 uint32_t GameplayWorld::unresolved_fighter_fields()const{return storage_->fighter?storage_->fighter->unresolved_fields():0;}
 void GameplayWorld::verify_immutable_archives()const{storage_->verify();}
+void GameplayWorld::initialize_match(const StartMeleeData& start) {
+    check(storage_!=nullptr,"Gameplay world is closed");char error[256]{};
+    check(melee_web_match_rules_init_from_menu(storage_->rules,&start,error,sizeof(error)),error);
+}
+
 }

@@ -9,14 +9,15 @@
 #include <stdio.h>
 #include <string.h>
 extern void melee_web_match_source_refresh_ratio(void);
-struct MeleeWebMatchRules {lbl_8046B6A0_t saved;StaticPlayer players[6];uint64_t generation;};
+extern int melee_web_match_init_source(StartMeleeData*);
+struct MeleeWebMatchRules {lbl_8046B6A0_t saved;StaticPlayer players[6];StartMeleeData start;uint64_t generation;int initialized;};
 static MeleeWebMatchRules* active;
 static int fail(char* e,size_t n,const char* message){if(e&&n)snprintf(e,n,"%s",message);return 0;}
 MeleeWebMatchRules* melee_web_match_rules_begin(char* e,size_t n){
     if(active||!melee_web_gameplay_stats().generation){fail(e,n,"Match rules require an unowned live source world");return NULL;}
     for(int i=0;i<6;i++)if(Player_GetEntity(i)){fail(e,n,"Initialize rules before source fighters");return NULL;}
     MeleeWebMatchRules* h=malloc(sizeof(*h));if(!h){fail(e,n,"Cannot allocate original rules scope");return NULL;}
-    lbl_8046B6A0_t* data=gm_16AE_GetUnkData_0();h->saved=*data;h->generation=melee_web_gameplay_stats().generation;
+    lbl_8046B6A0_t* data=gm_16AE_GetUnkData_0();h->saved=*data;h->generation=melee_web_gameplay_stats().generation;h->initialized=0;
     for(int i=0;i<6;i++){
         h->players[i]=*Player_GetPtrForSlot(i);
         Player_InitOrResetPlayer(i);
@@ -27,6 +28,31 @@ MeleeWebMatchRules* melee_web_match_rules_begin(char* e,size_t n){
     data->x24C8.xB=-1;data->x24C8.x20=0;data->x24C8.timer_enabled=0;
     data->x24C.x5=MatchKind_Stock;data->x24C.is_teams=0;
     active=h;melee_web_match_source_refresh_ratio();if(e&&n)*e=0;return h;
+}
+int melee_web_match_rules_init_from_menu(MeleeWebMatchRules* h,
+                                         const StartMeleeData* menu,
+                                         char* e,size_t n)
+{
+    if(!h||h!=active||h->generation!=melee_web_gameplay_stats().generation)
+        return fail(e,n,"Original match rules scope is not active");
+    if(h->initialized)return fail(e,n,"Original match data is already initialized");
+    if(!menu)return fail(e,n,"A complete original menu payload is required");
+    for(int i=0;i<6;i++)if(Player_GetEntity(i))
+        return fail(e,n,"Initialize original match data before source fighters");
+    StartMeleeData candidate=*menu;
+    if(candidate.rules.match_kind!=MatchKind_Stock||!candidate.rules.is_stock||
+       !candidate.rules.is_vs||candidate.rules.is_teams||
+       candidate.rules.timer_enabled||candidate.rules.xB!=-1||
+       candidate.rules.x20!=0||candidate.rules.stkind!=St_Kind_Last)
+        return fail(e,n,"Menu payload does not match the fixed stock/FD rules");
+    h->start=candidate;
+    if(!melee_web_match_init_source(&h->start)){
+        memset(&h->start,0,sizeof(h->start));
+        return fail(e,n,"Original per-match initialization rejected menu payload");
+    }
+    h->initialized=1;
+    melee_web_match_source_refresh_ratio();
+    if(e&&n)*e=0;return 1;
 }
 void melee_web_match_rules_refresh(void){
     if(active&&active->generation==melee_web_gameplay_stats().generation)melee_web_match_source_refresh_ratio();

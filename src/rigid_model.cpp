@@ -8,11 +8,19 @@
 namespace melee_web {
 namespace {
 constexpr uint32_t va_pos = 9, va_nrm = 10, va_clr0 = 11, va_clr1 = 12,
-                   va_tex0 = 13, va_tex7 = 20, va_null = 255;
+                   va_tex0 = 13, va_tex7 = 20, va_nbt = 25, va_null = 255;
 constexpr uint32_t direct = 1, index8 = 2, index16 = 3, type_s16 = 3, type_f32 = 4;
 constexpr size_t max_joints = MELEE_WEB_SKIN_MAX_JOINTS, max_meshes = 4096, max_packets = 65536, max_vertices = 1000000;
 
 [[noreturn]] void reject(const char* reason) { throw DatError(reason); }
+
+// GX_VA_NBT is an alias descriptor after TEX7 in the enum, but the original
+// PObj packet order treats its normal payload at the NRM position. Preserve
+// attr=GX_VA_NBT in the published descriptor while using this order key only
+// for validation and packet layout checks.
+constexpr uint32_t attribute_order(uint32_t attr) noexcept {
+    return attr == va_nbt ? va_nrm : attr;
+}
 
 uint32_t required(const DatArchive& a, uint32_t slot, size_t length) {
     auto value = a.pointer(slot, length);
@@ -126,10 +134,13 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
         const bool matrix = attr <= 8;
         const bool color = attr == va_clr0 || attr == va_clr1;
         const bool uv = attr >= va_tex0 && attr <= va_tex7;
+        const bool nbt = attr == va_nbt;
+        if (nbt && policy != DatMaterialPolicy::NativeDescriptors)
+            reject("GX_VA_NBT requires the original native PObj path");
         if (i == MELEE_WEB_POBJ_MAX_ATTRIBUTES ||
-            (!matrix && attr != va_pos && attr != va_nrm && !color && !uv) ||
-            (i && attr <= mesh.attributes.back().attr))
-            reject("Only ordered matrix indices, POS, NRM, CLR and TEX0 through TEX7 descriptors are supported");
+            (!matrix && attr != va_pos && attr != va_nrm && !nbt && !color && !uv) ||
+            (i && attribute_order(attr) <= attribute_order(mesh.attributes.back().attr)))
+            reject("Only ordered matrix indices, POS, NRM/NBT, CLR and TEX0 through TEX7 descriptors are supported");
         const auto mode = a.be32(d + 4), count = a.be32(d + 8), type = a.be32(d + 12);
         const auto frac = a.range(d + 16, 1)[0];
         const auto stride = a.be16(d + 18);
@@ -159,8 +170,10 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
         if (count != (attr == va_nrm ? 0u : 1u)) reject("Only XYZ position/normal and ST texture coordinates are supported");
         if (type > type_f32 || (!uv && type != type_s16 && type != type_f32 && type != 1))
             reject("Unsupported vertex component format");
+        if (nbt && (count != 1 || (type != type_s16 && type != type_f32)))
+            reject("Only interleaved GX_VA_NBT count-one S16/F32 arrays are supported");
         if (frac > 31 || (type == type_f32 && frac != 0)) reject("Unsupported vertex fractional scale");
-        components[i] = uv ? 2 : 3;
+        components[i] = uv ? 2 : nbt ? 9 : 3;
         const uint32_t component_size = type < 2 ? 1 : type < 4 ? 2 : 4;
         const uint32_t width = components[i] * component_size;
         widths[i] = width;
@@ -179,6 +192,7 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
                            [&](const auto& descriptor) { return descriptor.attr == attr; });
     };
     if (!has_attribute(va_pos)) reject("Position attribute is missing");
+    const bool has_normal = has_attribute(va_nrm) || has_attribute(va_nbt);
     if ((mesh.material->render_mode & 2U) && !has_attribute(va_clr0))
         reject("Vertex-color material requires CLR0 geometry");
     if (!mesh.envelopes.empty() && !has_attribute(0))
@@ -272,7 +286,7 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
     }
     const bool lit = ((mesh.material->render_mode & 7U) == 4U) ||
                      (mesh.material->render_mode & 8U);
-    if (lit && !has_attribute(va_nrm))
+    if (lit && !has_normal)
         reject("Diffuse or specular lighting requires normal coordinates");
     // Original SetupEnvelopeModelMtx uploads normal matrices only when the
     // owning JObj has LIGHTING. A lit material without it would consume stale
@@ -280,8 +294,10 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
     if (lit && !mesh.envelopes.empty() && !(model.joints[mesh.joint_index].flags & 0x80U))
         reject("Lit envelope geometry requires its owning joint lighting flag");
     for (const auto& texture : mesh.material->textures) {
+        if ((texture.source_flags & (1U << 24)) && !has_attribute(va_nbt))
+            reject("Bump texture requires an interleaved GX_VA_NBT stream");
         if ((texture.source_flags & 15U) == 1) {
-            if (!has_attribute(va_nrm)) reject("Reflection texture requires normal coordinates");
+            if (!has_normal) reject("Reflection texture requires normal coordinates");
         } else if (!has_attribute(va_tex0 + texture.source - 4)) {
             reject("Texture requires a missing UV vertex source");
         }

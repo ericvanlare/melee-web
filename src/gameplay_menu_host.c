@@ -115,7 +115,7 @@ int melee_web_menu_host_enter(MeleeWebMenuHost* h,MeleeWebAudio* audio,char* e,s
     HSD_PadLibData.clamp_analogLRShift=1;HSD_PadLibData.clamp_analogLRMax=140;
     HSD_PadLibData.clamp_analogLRMin=0;HSD_PadLibData.scale_analogLR=140;
     for(unsigned i=0;i<4;i++)HSD_PadGameStatus[i]=HSD_PadMasterStatus[i]=HSD_PadCopyStatus[i]=default_status_data;
-    gm_801A3E88();lbAudioAx_8002835C();lbAudioAx_8002838C();lbAudioAx_80028690();
+    lbAudioAx_8002835C();lbAudioAx_8002838C();lbAudioAx_80028690();
     HSD_ZListInitAllocData();
     HSD_SisLib_803A6048(phase==MELEE_WEB_MENU_SSS_READY?0x4800:0x2400);
     int accepted=phase==MELEE_WEB_MENU_SSS_READY?melee_web_menu_enter_sss(h->session,e,n):
@@ -166,6 +166,7 @@ int melee_web_menu_host_selection(const MeleeWebMenuHost* h,MeleeWebMenuMatchSel
     const VsModeData* vs=melee_web_menu_ready_vs(h->session);
     if(!vs||!melee_web_menu_sss_selection_valid(melee_web_menu_sss(h->session)))
         return fail(e,n,"Original menus have not committed a supported selection");
+    out->start=vs->start;
     for(unsigned i=0;i<2;i++){
         const PlayerInitData* p=&vs->start.players[i];
         const unsigned port=p->slot?p->slot-1:i;

@@ -5,7 +5,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#define MELEE_WEB_COMMON_RUNTIME_MASK (MELEE_WEB_COMMON_STATIC_ROOT_MASK | 1u | (1u << 20))
+#define MELEE_WEB_COMMON_RUNTIME_MASK (MELEE_WEB_COMMON_STATIC_ROOT_MASK | 1u | (1u << 16) | (1u << 20))
 typedef struct MeleeWebCommonContext MeleeWebCommonContext;
 /* Copies all supported scalars/tables and root20 descriptors plus raw payloads.
  * The resulting owner is independent of the input archive and model lifetime. */
@@ -15,6 +15,10 @@ MeleeWebCommonContext* melee_web_common_context_create(const MeleeWebCommonScala
  * Call before attach; common counts are source123 and6. */
 typedef struct MeleeWebColorRow {void* program; uint8_t priority,layer;} MeleeWebColorRow;
 int melee_web_common_context_set_color_tables(MeleeWebCommonContext*,const MeleeWebColorRow*,const MeleeWebColorRow*,char*,size_t);
+/* Publishes a checked native HSD_Joint descriptor for Fighter_804D6514.
+ * The context borrows the descriptor until destroy; the caller owns the
+ * MeleeWebNativeJoint handle and must keep it alive through source teardown. */
+int melee_web_common_context_set_root16(MeleeWebCommonContext*,void* joint,char*,size_t);
 /* Borrows checked respawn platform descriptors until context destruction. */
 int melee_web_common_context_set_respawn(MeleeWebCommonContext*,void* joint,void* animation,char*,size_t);
 int melee_web_common_context_attach(MeleeWebCommonContext*, char*, size_t);

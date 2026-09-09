@@ -18,6 +18,8 @@ public:
     bool ready() const;
     bool ending() const;
     bool complete() const;
+    bool paused() const;
+    uint32_t source_frames() const;
     int hud_damage(unsigned player) const;
     uint32_t random_seed() const;
     MeleeWebMatchStats player_stats(unsigned index) const;

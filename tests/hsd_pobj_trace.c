@@ -189,6 +189,25 @@ int main(void) {
     const unsigned old_arrays = arrays, old_formats = formats, old_descriptors = descriptors;
     assert(melee_web_pobj_draw(&view, error, sizeof error));
     assert(arrays == old_arrays + 1 && formats == old_formats + 2 && descriptors == old_descriptors + 2);
+
+    // GX_VA_NBT is an alias descriptor after TEX7, but HSD uses one indexed
+    // packet value for the nine interleaved normal/binormal/tangent scalars.
+    unsigned char nbt_data[18] = {0};
+    MeleeWebPObjAttribute nbt_attributes[] = {
+        {GX_VA_POS, GX_INDEX8, GX_POS_XYZ, GX_S16, 10, 6, replacement, sizeof replacement},
+        {GX_VA_NBT, GX_INDEX8, GX_NRM_NBT, GX_S16, 0, 18, nbt_data, sizeof nbt_data},
+    };
+    MeleeWebPObjView nbt_view = {nbt_attributes, 2, display, sizeof display, 0x8000};
+    expected = &nbt_view;
+    assert(melee_web_pobj_draw(&nbt_view, error, sizeof error));
+    nbt_attributes[1].byte_size = 17;
+    assert(!melee_web_pobj_draw(&nbt_view, error, sizeof error) && strstr(error, "span"));
+    nbt_attributes[1].byte_size = sizeof nbt_data;
+    nbt_attributes[1].comp_cnt = GX_NRM_NBT3;
+    assert(!melee_web_pobj_draw(&nbt_view, error, sizeof error) && strstr(error, "format"));
+    nbt_attributes[1].comp_cnt = GX_NRM_NBT;
+    nbt_attributes[1].attr_type = GX_DIRECT;
+    assert(!melee_web_pobj_draw(&nbt_view, error, sizeof error) && strstr(error, "format"));
     puts("HSD original PObj bridge trace: passed");
     return 0;
 }

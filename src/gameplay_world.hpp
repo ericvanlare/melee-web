@@ -7,6 +7,7 @@
 #include <vector>
 #include <cstdint>
 
+struct StartMeleeData;
 namespace melee_web {
 using RuntimeFiles = std::map<std::string, std::vector<uint8_t>, std::less<>>;
 // Shared by the browser and source regression harness. Owns one original SDK
@@ -21,6 +22,7 @@ public:
     void enable_stage_visual();
     void enable_full_stage(bool defer_start = false);
     void end_stage();
+    void initialize_match(const StartMeleeData&);
     MeleeWebCollision* collision() const;
     float floor_height(float x) const;
     std::array<float, 3> player_spawn(unsigned slot) const;

@@ -429,20 +429,70 @@ index f8a271e..ccc61db 100644
  
  static void ReverbSTDCallback(long* left, long* right, long* surround,
 diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
-index 72edc9d..dc33cdc 100644
 --- a/src/melee/cm/camera.c
 +++ b/src/melee/cm/camera.c
-@@ -52,6 +52,10 @@
+@@ -52,6 +52,24 @@
  
  /* 452C68 */ static Camera cm_80452C68;
  /* 453004 */ CameraDebugMode cm_80453004;
 +#if defined(MELEE_WEB_GAMEPLAY)
 +/* Host lifetime owner snapshots the actual source camera between matches. */
 +void* melee_web_camera_state(void) { return &cm_80452C68; }
++/* Retail callbacks ignore these routines' integer results. Wasm requires
++ * the registered function type to match the void(Camera_x2D0*) call site. */
++static void melee_camera_bounds_callback(Camera_x2D0* params)
++{
++    (void) Camera_SetBounds((Vec4*) params);
++}
++static void melee_camera_f908_callback(Camera_x2D0* params)
++{
++    (void) fn_8002F908((HSD_RectF32*) params);
++}
++static void melee_camera_fba0_callback(Camera_x2D0* params)
++{
++    (void) fn_8002FBA0((HSD_RectF32*) params);
++}
 +#endif
  
  /* 3BCB18 */ static CameraModeCallbacks cm_803BCB18 = {
      Camera_8002B3D4,
+@@ -3524,8 +3542,12 @@
+     cm_80452C68.x2D0.angle_left = Stage_GetCamAngleRadiansLeft();
+     cm_80452C68.x2D0.unk28 = Stage_GetPauseCamZPosMin();
+     cm_80452C68.x2D0.unk2C = Stage_GetPauseCamZPosMax();
++#if defined(MELEE_WEB_GAMEPLAY)
++    cm_80452C68.x2D0.callback = melee_camera_bounds_callback;
++#else
+     cm_80452C68.x2D0.callback =
+         (void (*)(Camera_x2D0*))(Event) Camera_SetBounds;
++#endif
+ 
+     switch (arg2) {
+     case 0:
+@@ -3707,7 +3729,11 @@
+     scale = cm_80452C68.x32C * cm_803BCCA0.x8C + cm_803BCCA0.x90;
+     cm_80452C68.x2D0.unk28 = scale * cm_803BCCA0.x94;
+     cm_80452C68.x2D0.unk2C = scale * cm_803BCCA0.x98;
++#if defined(MELEE_WEB_GAMEPLAY)
++    cm_80452C68.x2D0.callback = melee_camera_f908_callback;
++#else
+     cm_80452C68.x2D0.callback = (void (*)(Camera_x2D0*))(Event) fn_8002F908;
++#endif
+ 
+     {
+         s8 slot = cm_80452C68.x304;
+@@ -3789,7 +3815,11 @@
+     temp_f2 = (cm_80452C68.x32C * (*new_var).x8C) + (*new_var).x90;
+     cm_80452C68.x2D0.unk28 = temp_f2 * (*new_var).x94;
+     cm_80452C68.x2D0.unk2C = temp_f2 * (*new_var).x98;
++#if defined(MELEE_WEB_GAMEPLAY)
++    cm_80452C68.x2D0.callback = melee_camera_fba0_callback;
++#else
+     cm_80452C68.x2D0.callback = (void (*)(Camera_x2D0*))(Event) fn_8002FBA0;
++#endif
+     x304_ptr = &cm_80452C68.x304;
+     x304_check = *x304_ptr;
+     cm_80452C68.x314.z = 0.0f;
 diff --git a/src/melee/ef/efalt.c b/src/melee/ef/efalt.c
 index 4602bcd..3140ec8 100644
 --- a/src/melee/ef/efalt.c
@@ -1025,7 +1075,13 @@ index ab267c4..571a070 100644
 diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
 --- a/src/melee/gm/gm_16AE.c
 +++ b/src/melee/gm/gm_16AE.c
-@@ -355,6 +355,13 @@
+@@ -1,4 +1,5 @@
+ #include "gm_16AE.h"
++#include <stddef.h>
+ 
+ #include <string.h>
+ 
+@@ -355,6 +356,13 @@
      }
  }
  
@@ -1039,7 +1095,7 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
  bool gm_IsCurrently1PMode(void)
  {
      return gm_Is1PMode(gm_GetCurrentGameMode());
-@@ -473,6 +480,20 @@
+@@ -473,6 +481,20 @@
      grStadium_801D4150();
  }
  
@@ -1060,7 +1116,7 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
  void fn_8016B7B4(int arg0)
  {
      Ground_801C1154();
-@@ -493,9 +514,9 @@
+@@ -493,9 +515,9 @@
      Stage_802252E4(tmp->x24C8.stkind, NULL);
      grStadium_801D4040();
      if (!tmp->x24C8.x1_3) {
@@ -1073,7 +1129,7 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
      }
      un_802FD428();
  }
-@@ -1325,6 +1346,17 @@
+@@ -1325,6 +1347,17 @@
      }
  }
  
@@ -1091,7 +1147,7 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
  void fn_8016CFE0(void)
  {
      lbl_8046B6A0_t* tmp = &lbl_8046B6A0;
-@@ -1387,11 +1419,7 @@
+@@ -1387,11 +1420,7 @@
      }
      if (tmp->match_result != OUTCOME_NONE) {
      block_51:
@@ -1104,7 +1160,81 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
      } else {
          fn_8016CD98(tmp);
      }
-@@ -2036,9 +2064,9 @@
+@@ -1661,7 +1690,11 @@
+     lbl_8046B6A0_t* tmp = &lbl_8046B6A0;
+     int i;
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++    memzero(&lbl_8046B6A0, offsetof(lbl_8046B6A0_t, x24C8));
++#else
+     memzero(&lbl_8046B6A0, 0x24C8);
++#endif
+     lbl_8046B6A0.unk_D = 6;
+     lbl_8046B6A0.unk_1C = (void*) &lbl_803D5630;
+     lbl_8046B6A0.unk_20 = (void*) &lbl_803D5620;
+@@ -1871,6 +1904,33 @@
+     }
+ }
+ 
++/* Shared original ordinary-VS position/tint setup, before fighter creation. */
++static void gm_prepare_player_start_position(int i)
++{
++    Vec3 sp18;
++    float var_f1_2;
++    bool is_teams;
++    getSpawnPoint(i, &sp18);
++    if (Player_GetFacingDirection(i) == 0.0F) {
++        if (Stage_80224DC8(lbl_8046B6A0.x24C8.stkind) != 0) {
++            Player_SetFacingDirection(i, 1.0F);
++        } else {
++            if (sp18.x >= 0.0F) {
++                var_f1_2 = -1.0F;
++            } else {
++                var_f1_2 = +1.0F;
++            }
++            Player_SetFacingDirection(i, var_f1_2);
++        }
++    }
++    Player_80032768(i, &sp18);
++    is_teams = lbl_8046B6A0.x24C8.is_teams == true;
++    Player_SetUnk45(
++        i, fn_80160840(gm_80160854(Player_GetPlayerId(i),
++                                   Player_GetTeam(i), is_teams,
++                                   Player_GetPlayerSlotType(i))));
++}
++
+ /// @todo The loop's SFX flag load uses a different equivalent address form.
+ void fn_8016E2BC(void)
+ {
+@@ -1915,26 +1975,8 @@
+         fn_8016DEEC();
+         for (i = 0; i < 6; i++) {
+             if (Player_GetPlayerSlotType(i) != Gm_PKind_NA) {
+-                getSpawnPoint(i, &sp18);
++                gm_prepare_player_start_position(i);
+                 tmp = &lbl_8046B6A0;
+-                if (Player_GetFacingDirection(i) == 0.0F) {
+-                    if (Stage_80224DC8(lbl_8046B6A0.x24C8.stkind) != 0) {
+-                        Player_SetFacingDirection(i, 1.0F);
+-                    } else {
+-                        if (sp18.x >= 0.0F) {
+-                            var_f1_2 = -1.0F;
+-                        } else {
+-                            var_f1_2 = +1.0F;
+-                        }
+-                        Player_SetFacingDirection(i, var_f1_2);
+-                    }
+-                }
+-                Player_80032768(i, &sp18);
+-                is_teams = lbl_8046B6A0.x24C8.is_teams == true;
+-                Player_SetUnk45(
+-                    i, fn_80160840(gm_80160854(Player_GetPlayerId(i),
+-                                               Player_GetTeam(i), is_teams,
+-                                               Player_GetPlayerSlotType(i))));
+                 Player_80031AD0(i);
+                 if (tmp->FighterMatchInfo[i].x4_b4) {
+                     lbAudioAx_800237A8(0x41F4E, 0x7F, 0x40);
+@@ -2036,9 +2078,9 @@
      StartMeleeData* tmp = arg0;
      fn_8016E730(tmp);
      if (tmp->rules.x1_2) {
@@ -1117,7 +1247,7 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
      }
      ifTime_CreateTimers();
      ifStatus_802F665C(tmp->rules.x0_3);
-@@ -2119,7 +2147,7 @@
+@@ -2119,7 +2161,7 @@
      StartMeleeData* data = user_data;
      data->rules.x6 = true;
      fn_8016E730(data);
@@ -1126,7 +1256,7 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
      ifTime_CreateTimers();
      ifStatus_802F665C(data->rules.x0_3);
  }
-@@ -2138,9 +2166,9 @@
+@@ -2138,9 +2180,9 @@
      Stage_802252E4(tmp2->x24C8.stkind, NULL);
      grStadium_801D4040();
      if (!lbl_8046B6A0.x24C8.x1_3) {
@@ -1139,44 +1269,108 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
      }
      un_802FD428();
      ifStatus_802F665C(data->rules.x0_3);
-@@ -2277,3 +2305,38 @@
+@@ -2277,3 +2319,102 @@
  {
      return pl_80039418(arg0, arg1);
  }
 +
 +#if defined(MELEE_WEB_GAMEPLAY)
-+/* The resident Mario/FD slice owns startup separately. Execute the original
-+ * ending branch and its authored delay without running unsupported VS pause,
-+ * results, or full-match bookkeeping against a partial scene initializer. */
-+int melee_web_match_end_frame(void)
++/* Run the original active/pause/ending scene callback only after the resident
++ * owner has initialized its complete supported StartMeleeData. */
++int melee_web_match_source_frame(void)
 +{
 +    lbl_8046B6A0_t* data = &lbl_8046B6A0;
 +    if (gm_GetCurrentGameMode() != GM_VS || !data->x24C8.is_vs ||
 +        data->x24C8.match_kind != MatchKind_Stock || data->x24C8.is_teams ||
 +        data->x24C8.x4_4 || data->is_singleplayer ||
-+        data->x24C8.on_frame_start || data->x24C8.on_frame_end) return 0;
-+    switch (data->unk_0) {
-+    case 0:
-+        data->match_result = gm_GetMatchOutcome();
-+        if (data->match_result != OUTCOME_NONE) {
-+            if (data->match_result != OUTCOME_ELIMINATION) return 0;
-+            melee_web_start_match_ending();
-+        }
-+        return 1;
-+    case 1:
-+        fn_8016D634();
-+        return 1;
-+    case 3:
-+        gm_801A4B60();
-+        return 1;
-+    default:
-+        return 0;
-+    }
++        data->x24C8.on_frame_start || data->x24C8.on_frame_end ||
++        data->x24C8.x3_2 || gm_1601_GetUnkData()->unk_10_b1 ||
++        (data->unk_0 != 0 && data->unk_0 != 1 && data->unk_0 != 3)) return 0;
++    gm_Scene_Vs_OnFrame();
++    return data->match_result == OUTCOME_NONE ||
++           data->match_result == OUTCOME_ELIMINATION ||
++           data->match_result == OUTCOME_NO_CONTEST;
++}
++int melee_web_match_source_result(void)
++{
++    return lbl_8046B6A0.match_result;
++}
++u32 melee_web_match_source_frames(void)
++{
++    return lbl_8046B6A0.frame_count;
 +}
 +int melee_web_match_end_state(void)
 +{
 +    return lbl_8046B6A0.unk_0;
 +}
++#endif
++
++#if defined(MELEE_WEB_GAMEPLAY)
++int melee_web_match_init_source(StartMeleeData* start)
++{
++    const StartMeleeRules* rules;
++    int i;
++
++    if (start == NULL) {
++        return 0;
++    }
++    rules = &start->rules;
++
++    /* These are the exact host rules currently supported by the match/HUD
++     * consumers.  In particular, do not silently turn a timer, item mask,
++     * team match, callback, or non-FD stage into another configuration. */
++    if (rules->match_kind != MatchKind_Stock || !rules->is_stock ||
++        !rules->is_vs || rules->is_teams || rules->timer_enabled ||
++        rules->stkind != St_Kind_Last || rules->x20 != 0 || rules->xB != -1 ||
++        rules->game_speed != 1.0F || rules->x54 != NULL ||
++        rules->on_match_start != NULL || rules->on_frame_start != NULL ||
++        rules->on_frame_end != NULL || rules->on_match_end != NULL) {
++        return 0;
++    }
++
++    /* Source fn_8016DCC0 always resets all six player slots.  Refuse a live
++     * fighter rather than destroying an unrelated owner while doing so. */
++    for (i = 0; i < 6; ++i) {
++        if (Player_GetEntity(i) != NULL) {
++            return 0;
++        }
++    }
++
++    /* The menu slice is exactly two human Mario players.  Source slot==0
++     * means "use this player index"; a nonzero slot is port+1.  Requiring the
++     * resulting source player id to equal the player index preserves the
++     * current one-human-per-port mapping without rewriting it here. */
++    for (i = 0; i < 2; ++i) {
++        const PlayerInitData* player = &start->players[i];
++        const int player_id = player->slot == 0 ? i : (int) player->slot - 1;
++        if (player->ckind != CKIND_MARIO ||
++            player->slot_type != Gm_PKind_Human || player->stocks != 4 ||
++            player->color >= 5 || player->sub_color > 4 || player->team != 0 ||
++            player->slot > 4 || player_id != i) {
++            return 0;
++        }
++    }
++    for (; i < 6; ++i) {
++        if (start->players[i].slot_type != Gm_PKind_NA) {
++            return 0;
++        }
++    }
++
++    /* This is the original initialization boundary.  It sets
++     * lbl_8046B6A0.{rules,FighterMatchInfo,state}, calls Camera_80030E34, and
++     * invokes fn_8016D8AC for all six slots.  Do not replace it with the
++     * existing per-player setters or with fn_8016E730: the latter also starts
++     * stage/items/audio and is outside this host's initialization boundary. */
++    fn_8016DCC0(start);
++    /* The same ordinary-VS preparation used by fn_8016E2BC. Its fighter
++     * creation remains with the checked resident match owner immediately
++     * after this call. Mario has no Kirby costume publication work. */
++    /* GameplayWorld already owns Fighter_FirstInitialize_80067A84. */
++    fn_8016DEEC();
++    for (i = 0; i < 2; ++i) gm_prepare_player_start_position(i);
++    return 1;
++}
++
 +#endif
 diff --git a/src/melee/gm/types.h b/src/melee/gm/types.h
 index 2014b73..10d3df0 100644
@@ -4537,7 +4731,7 @@ diff --git a/src/melee/gm/gm_1A45.c b/src/melee/gm/gm_1A45.c
  #include <sysdolphin/baselib/gobjproc.h>
  #include <sysdolphin/baselib/hsd_3924.h>
  #include <sysdolphin/baselib/hsd_392C.h>
-@@ -376,3 +377,214 @@
+@@ -376,3 +377,220 @@
      }
      HSD_VIWaitXFBFlush();
  }
@@ -4552,6 +4746,8 @@ diff --git a/src/melee/gm/gm_1A45.c b/src/melee/gm/gm_1A45.c
 +    MELEE_WEB_SOURCE_CLOCK_MENU = 1,
 +    MELEE_WEB_SOURCE_CLOCK_MATCH = 2,
 +};
++extern int melee_web_controller_map_begin(void);
++extern int melee_web_controller_map_end(void);
 +static struct gm_80479D58_t melee_source_clock_saved;
 +static int melee_source_clock_owner;
 +static int melee_source_clock_prepared;
@@ -4572,12 +4768,12 @@ diff --git a/src/melee/gm/gm_1A45.c b/src/melee/gm/gm_1A45.c
 +           owner == MELEE_WEB_SOURCE_CLOCK_MATCH;
 +}
 +
-+/* Bit 4 is the ordinary match-end hold set by gm_8016CFE0. Other source
++/* Bit 1 is ordinary pause and bit 4 is the match-end hold. Other source
 + * pause/debug bits, pending pause requests, and private callbacks are outside
 + * this browser boundary and must fail explicitly. */
 +static int melee_source_clock_state_supported(void)
 +{
-+    if (gm_80479D58.unk_10.x0 & (u8) ~(1U << 4)) return 0;
++    if (gm_80479D58.unk_10.x0 & (u8) ~((1U << 1) | (1U << 4))) return 0;
 +    if (gm_80479D58.unk_10.x2 != 0 || gm_80479D58.unk_10.unk_30 != NULL)
 +        return 0;
 +    if (gm_80479D58.unk_10.unk_34 < 0 ||
@@ -4593,6 +4789,7 @@ diff --git a/src/melee/gm/gm_1A45.c b/src/melee/gm/gm_1A45.c
 +        HSD_GObjLibInitData.unk_2 == &melee_source_clock_process_mask)
 +        return 0;
 +
++    if (!melee_web_controller_map_begin()) return 0;
 +    melee_source_clock_saved = gm_80479D58;
 +    melee_source_clock_saved_mask_ptr = HSD_GObjLibInitData.unk_2;
 +    melee_source_clock_saved_mask =
@@ -4633,6 +4830,8 @@ diff --git a/src/melee/gm/gm_1A45.c b/src/melee/gm/gm_1A45.c
 +    gm_80479D58.unk_10.unk_38_0 =
 +        gm_801A46B8(0) || !gm_801A45E8(0);
 +    if (!gm_80479D58.unk_10.unk_38_0) return 0;
++    if (melee_source_clock_owner == MELEE_WEB_SOURCE_CLOCK_MATCH)
++        gm_EvaluateAllControllerInputs();
 +    if (on_frame != NULL) {
 +        melee_source_clock_in_callback = 1;
 +        on_frame();
@@ -4712,6 +4911,7 @@ diff --git a/src/melee/gm/gm_1A45.c b/src/melee/gm/gm_1A45.c
 +    if (melee_source_clock_saved_mask_ptr != NULL &&
 +        *melee_source_clock_saved_mask_ptr != melee_source_clock_saved_mask)
 +        return 0;
++    if (!melee_web_controller_map_end()) return 0;
 +    HSD_GObjLibInitData.unk_2 = melee_source_clock_saved_mask_ptr;
 +    gm_80479D58 = melee_source_clock_saved;
 +    melee_source_clock_saved_mask_ptr = NULL;
@@ -5003,6 +5203,79 @@ diff --git a/src/melee/gm/gm_1A3F.c b/src/melee/gm/gm_1A3F.c
 +    if (!melee_web_vs_mode_owned) return 0;
 +    state_machine = melee_web_saved_vs_mode;
 +    melee_web_vs_mode_owned = false;
++    return 1;
++}
++#endif
+
+diff --git a/src/melee/gm/gm_1A36.c b/src/melee/gm/gm_1A36.c
+--- a/src/melee/gm/gm_1A36.c
++++ b/src/melee/gm/gm_1A36.c
+@@ -170,3 +170,24 @@
+         }
+     }
+ }
++
++#if defined(MELEE_WEB_GAMEPLAY)
++static struct controller_map melee_controller_map_saved;
++static int melee_controller_map_active;
++int melee_web_controller_map_begin(void)
++{
++    if (melee_controller_map_active) return 0;
++    melee_controller_map_saved = controller_map;
++    gm_801A3E88();
++    melee_controller_map_active = 1;
++    return 1;
++}
++int melee_web_controller_map_end(void)
++{
++    if (!melee_controller_map_active || controller_map.xF0 != fn_801A396C)
++        return 0;
++    controller_map = melee_controller_map_saved;
++    melee_controller_map_active = 0;
++    return 1;
++}
++#endif
+
+diff --git a/src/melee/gm/gmpause.c b/src/melee/gm/gmpause.c
+--- a/src/melee/gm/gmpause.c
++++ b/src/melee/gm/gmpause.c
+@@ -9,6 +9,7 @@
+ #include <sysdolphin/baselib/gobjgxlink.h>
+ #include <sysdolphin/baselib/gobjobject.h>
+ #include <sysdolphin/baselib/gobjproc.h>
++#include <sysdolphin/baselib/gobjplink.h>
+ #include <sysdolphin/baselib/jobj.h>
+ 
+ struct PauseData {
+@@ -99,3 +100,31 @@
+     HSD_GObj_SetupProc(gobj, fn_801A0E34, 0U);
+     lbl_80479B10.slot = 99;
+ }
++
++#if defined(MELEE_WEB_GAMEPLAY)
++static struct PauseData melee_pause_saved;
++static HSD_Archive* melee_pause_saved_archive;
++static HSD_GObj* melee_pause_owner;
++int melee_web_pause_screen_begin(void)
++{
++    if (melee_pause_owner || lbl_804D6704 || HSD_GObj_804D781C ||
++        HSD_GObj_804D7814) return 0;
++    melee_pause_saved = lbl_80479B10;
++    melee_pause_saved_archive = lbl_804D6700;
++    fn_801A1134();
++    melee_pause_owner = lbl_804D6704;
++    return melee_pause_owner != NULL;
++}
++int melee_web_pause_screen_end(void)
++{
++    if (!melee_pause_owner || lbl_804D6704 != melee_pause_owner ||
++        HSD_GObj_804D781C || HSD_GObj_804D7814) return 0;
++    HSD_GObjPLink_80390228(melee_pause_owner);
++    lbl_804D6704 = NULL;
++    lbl_804D6700 = melee_pause_saved_archive;
++    lbl_80479B10 = melee_pause_saved;
++    melee_pause_owner = NULL;
++    melee_pause_saved_archive = NULL;
 +    return 1;
 +}
 +#endif

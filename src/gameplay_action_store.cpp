@@ -40,6 +40,7 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     for(auto absent:{54U,56U,61U,63U,65U})command_motions_.erase(absent);
     group(165,181);group(183,204);                // damage, knockdown and techs
     command_motions_.insert(205);group(209,217);group(219,228);                // ledge actions
+    command_motions_.insert(238);                // original EntryStart; Mario script is END
     group(242,258);group(262,265);                // grab, pummel, throws and Mario capture reactions
     group(286,291);                              // shield-break knockdown
     group(295,302);                              // Mario special scripts; Article creation remains a service gate
