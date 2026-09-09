@@ -20,18 +20,25 @@ The runtime reports these costs independently:
 Do not retain an entered `GameplayMenuWorld` across CSS/SSS transitions.
 Recovered menu descriptors contain mutable cursor and animation state. A reuse
 experiment changed the second source entry and failed the owned lifecycle
-trace. The safe construction optimization is to cache immutable decoded
-archive/templates, then instantiate fresh mutable source-owned objects for
-every entry. Immutable archive verification and the repeated CSS/SSS lifecycle
-test remain gates for that work.
+trace. The browser instead caches each decoded archive by name and external
+resolution policy for the lifetime of one disc import. Menu and match entry
+still instantiate fresh mutable source-owned objects. Cache hits verify the
+original backing bytes and teardown verifies every shared archive against its
+immutable baseline.
+
+Aurora reports texture-upload bytes after the upload has completed. Live scenes
+therefore do not pause in response to that statistic; such a pause delayed the
+next source tick without hiding any work. New scenes still prime unchanged and
+wait for uploads plus pipeline creation to settle. A live scene pauses only
+while an asynchronous pipeline is actually queued.
 
 ## Pipeline seed and persistence
 
 `web/initial_pipeline_cache.db.gz.b64` is a reviewed Aurora cache seed captured
-from the Release browser runtime after the original CSS, SSS, and a Mario versus
-Mario Yoshi's Story match had rendered. It contains one shader record and 121
-pipeline descriptors. It contains no textures, models, audio, or other disc
-bytes. `scripts/materialize_pipeline_cache.py` verifies its SHA-256 digest and
+from the Release browser runtime after the original CSS, SSS, Yoshi's Story,
+Battlefield, and stock-loss/respawn paths had rendered. It contains one shader
+record and 206 pipeline descriptors. It contains no textures, models, audio,
+or other disc bytes. `scripts/materialize_pipeline_cache.py` verifies its SHA-256 digest and
 materializes it for Emscripten's `/initial_pipeline_cache.db` preload.
 
 Aurora merges that seed into the origin's optional IDBFS cache. Each completed
@@ -49,8 +56,8 @@ and descriptor payload size.
 On the project Chrome profile with the Release build, clearing the origin cache
 and loading the first 30-row seed changed first CSS entry from 357.48 ms of
 pipeline settling to 22.31 ms total preparation, with 1.69 ms construction and
-zero queued or newly created pipelines on the first draw. The expanded 121-row
-seed was then captured from the CSS/SSS/Yoshi's Story route.
+zero queued or newly created pipelines on the first draw. The then-current
+121-row seed was captured from the CSS/SSS/Yoshi's Story route.
 
 The seed-capture Yoshi's Story run exposed a separate cost: match preparation
 took 933.09 ms, including 545.17 ms of source-owner construction, and a later
@@ -58,13 +65,23 @@ active frame spent 146.47 ms in draw across 251 draw calls. That frame created
 no new pipeline and uploaded no texture. The expanded seed includes the 26
 descriptors discovered after the first visible frame.
 
-On the next cleared-origin run, Aurora merged all 122 seed rows. CSS and SSS
+On that seed's next cleared-origin run, Aurora merged all 122 seed rows. CSS and SSS
 reported no new pipeline work. Yoshi's Story preparation took 808.41 ms:
 194.81 ms of construction and 613.60 ms of priming/scheduling, with all 122
 pipelines already created and no queued pipeline at construction. The slowest
 active callback was 16.89 ms and the 146.47 ms draw spike did not recur. The
 remaining cold delay is therefore in source-owner construction and unchanged
 scene priming, not missing pipeline descriptors in that measured run.
+
+The archive-cache and 207-row seed run used a cleared origin and the Release
+build. CSS, SSS, and Battlefield each reported zero queued and zero created
+pipelines. Battlefield preparation took 322.78 ms: 263.75 ms of construction
+and 59.02 ms of scheduling and priming. Its first draw took 5.70 ms. The full
+four-stock diagnostic completed 1,916 source ticks, all three respawns, and the
+return to CSS. No native active callback exceeded 33.3 ms; the worst was 25.97
+ms. Computer-control waits did starve seven browser callbacks and caused one
+timing pause, so those browser callback intervals are not runtime acceptance
+evidence.
 
 For every admitted character/stage pair, record both a cleared-origin run and a
 second application load on named browser/hardware. The acceptance run must

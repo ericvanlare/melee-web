@@ -1,5 +1,6 @@
 #include "gameplay_compat.h"
 #include "gameplay_menu_world.hpp"
+#include "runtime_archive_cache.hpp"
 
 #include "dat_archive.hpp"
 #include "dat_menu_support.hpp"
@@ -75,6 +76,7 @@ const std::vector<std::uint8_t>& require_file(const RuntimeFiles& files,
 struct GameplayMenuWorld::Storage {
     std::map<std::string, std::shared_ptr<const DatArchive>, std::less<>> archives;
     std::map<std::string, std::vector<std::uint8_t>, std::less<>> snapshots;
+    RuntimeArchiveCache* archive_cache = nullptr;
 
     std::unique_ptr<DatNativeMenu> css;
     std::unique_ptr<DatNativeMenu> sss;
@@ -82,10 +84,10 @@ struct GameplayMenuWorld::Storage {
     std::unique_ptr<DatMenuSupport> card_icons;
     std::unique_ptr<DatMenuSupport> card_scene;
 
-    std::vector<std::uint8_t> sem;
-    std::vector<std::uint8_t> coefficients;
-    std::vector<std::uint8_t> hps;
-    std::array<std::vector<std::uint8_t>, kBankFiles.size()> bank_bytes;
+    std::span<const std::uint8_t> sem;
+    std::span<const std::uint8_t> coefficients;
+    std::span<const std::uint8_t> hps;
+    std::array<std::span<const std::uint8_t>, kBankFiles.size()> bank_bytes;
 
     std::unique_ptr<GameplayAudioBank> audio_bank;
     std::unique_ptr<GameplayAudioStream> music;
@@ -119,24 +121,27 @@ struct GameplayMenuWorld::Storage {
                 continue;
             }
             const auto& bytes = require_file(files, name);
-            auto value = std::make_shared<const DatArchive>(bytes);
-            snapshots.emplace(std::string(name),
-                              std::vector<std::uint8_t>(value->data().begin(),
-                                                        value->data().end()));
+            auto value = archive_cache ? archive_cache->archive(name) :
+                                         std::make_shared<const DatArchive>(bytes);
+            if (!archive_cache)
+                snapshots.emplace(std::string(name),
+                                  std::vector<std::uint8_t>(value->data().begin(),
+                                                            value->data().end()));
             archives.emplace(std::string(name), std::move(value));
         }
     }
 
-    void start(const RuntimeFiles& files)
+    void start(const RuntimeFiles& files, RuntimeArchiveCache* cache)
     {
+        archive_cache = cache;
         load_archives(files);
 
         const auto& font_bytes = require_file(files, "sislib_font.bin");
-        sem = require_file(files, "smash2.sem");
-        coefficients = require_file(files, "dsp_coef.bin");
-        hps = require_file(files, "menu01.hps");
+        sem = std::span<const std::uint8_t>{require_file(files, "smash2.sem")};
+        coefficients = std::span<const std::uint8_t>{require_file(files, "dsp_coef.bin")};
+        hps = std::span<const std::uint8_t>{require_file(files, "menu01.hps")};
         for (std::size_t i = 0; i < kBankFiles.size(); ++i)
-            bank_bytes[i] = require_file(files, kBankFiles[i]);
+            bank_bytes[i] = std::span<const std::uint8_t>{require_file(files, kBankFiles[i])};
 
         check(melee_web_gameplay_startup(kWorldHeapBytes, error, sizeof(error)),
               error, "Native menu SDK world startup failed");
@@ -216,6 +221,10 @@ struct GameplayMenuWorld::Storage {
     void verify() const
     {
         for (const auto& [name, source] : archives) {
+            if (archive_cache) {
+                archive_cache->verify(source);
+                continue;
+            }
             const auto expected = snapshots.find(name);
             if (expected == snapshots.end()) continue;
             const auto actual = source->data();
@@ -323,7 +332,14 @@ struct GameplayMenuWorld::Storage {
 GameplayMenuWorld::GameplayMenuWorld(const RuntimeFiles& files)
     : storage_(std::make_unique<Storage>())
 {
-    storage_->start(files);
+    storage_->start(files, nullptr);
+}
+
+GameplayMenuWorld::GameplayMenuWorld(const RuntimeFiles& files,
+                                     RuntimeArchiveCache& cache)
+    : storage_(std::make_unique<Storage>())
+{
+    storage_->start(files, &cache);
 }
 
 GameplayMenuWorld::~GameplayMenuWorld() = default;

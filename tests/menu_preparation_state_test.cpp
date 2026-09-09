@@ -12,6 +12,8 @@ int main()
     assert(!state.busy());
     assert(!state.suppress_source_draw());
     assert(!state.arm());
+    assert(!MenuPreparationState::needs_live_render_settle(0));
+    assert(MenuPreparationState::needs_live_render_settle(1));
 
     assert(state.request());
     assert(state.phase() == Phase::WaitingForAudio);

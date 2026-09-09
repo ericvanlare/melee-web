@@ -9,6 +9,8 @@ namespace melee_web {
 class GameplayMatchSession {
 public:
     GameplayMatchSession(const RuntimeFiles&,const MeleeWebMenuMatchSelection&);
+    GameplayMatchSession(const RuntimeFiles&,const MeleeWebMenuMatchSelection&,
+                         RuntimeArchiveCache&);
     ~GameplayMatchSession();
     GameplayMatchSession(const GameplayMatchSession&)=delete;
     GameplayMatchSession& operator=(const GameplayMatchSession&)=delete;

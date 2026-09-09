@@ -1,6 +1,7 @@
 #include "gameplay_menu_world.hpp"
 #include "gameplay_menu_host.h"
 #include "gameplay_match_session.hpp"
+#include "runtime_archive_cache.hpp"
 #include "gameplay_content.h"
 #include "menu_preparation_state.hpp"
 #include "browser_input.h"
@@ -24,6 +25,7 @@
 #include <string_view>
 namespace {
 melee_web::RuntimeFiles files;
+std::unique_ptr<melee_web::RuntimeArchiveCache> archive_cache;
 std::unique_ptr<melee_web::GameplayMenuWorld> world;
 std::unique_ptr<melee_web::GameplayMatchSession> match;
 MeleeWebMenuHost* host=nullptr;
@@ -39,6 +41,49 @@ bool stock_lost=false,stock_jump=false;
 bool first_use_draw_pending=false;
 bool render_only_preparation=false;
 unsigned render_frame=0;
+int32_t stat_delta(uint64_t after,uint64_t before);
+struct PreparationProfile {
+ double requested_at=0,audio_ready_at=0,constructed_at=0;
+ double render_cpu_ms=0,max_callback_ms=0,max_draw_ms=0,max_end_ms=0;
+ uint64_t texture_upload_bytes=0;
+ unsigned callbacks=0,source_draws=0,max_draw_calls=0,max_queued=0;
+ int32_t queued_delta=0,created_delta=0;
+ bool source_transition=false;
+ void begin(bool transition,double now) noexcept {
+  *this={};requested_at=now;source_transition=transition;
+ }
+ void construction_started(double now) noexcept {audio_ready_at=now;}
+ void construction_finished(double now) noexcept {constructed_at=now;}
+ void observe(double callback_ms,double draw_ms,double end_ms,bool source_draw,
+              const AuroraStats& before,const AuroraStats& after) noexcept {
+  ++callbacks;source_draws+=source_draw?1U:0U;
+  render_cpu_ms+=callback_ms;max_callback_ms=std::max(max_callback_ms,callback_ms);
+  max_draw_ms=std::max(max_draw_ms,draw_ms);max_end_ms=std::max(max_end_ms,end_ms);
+  texture_upload_bytes+=after.lastTextureUploadSize;
+  max_draw_calls=std::max(max_draw_calls,after.drawCallCount);
+  max_queued=std::max(max_queued,after.queuedPipelines);
+  queued_delta+=stat_delta(after.queuedPipelines,before.queuedPipelines);
+  created_delta+=stat_delta(after.createdPipelines,before.createdPipelines);
+ }
+ void report(double settled_at) const {
+  const double audio_wait=audio_ready_at?audio_ready_at-requested_at:0;
+  const double construction=constructed_at?constructed_at-audio_ready_at:0;
+  const double render_wait=constructed_at?settled_at-constructed_at:settled_at-requested_at;
+  char profile[1024];
+  std::snprintf(profile,sizeof(profile),
+   "{\"source_transition\":%s,\"total_ms\":%.3f,\"audio_wait_ms\":%.3f,"
+   "\"construction_ms\":%.3f,\"render_wait_ms\":%.3f,\"render_cpu_ms\":%.3f,"
+   "\"callbacks\":%u,\"source_draws\":%u,\"max_callback_ms\":%.3f,"
+   "\"max_draw_ms\":%.3f,\"max_end_ms\":%.3f,\"texture_upload_bytes\":%llu,"
+   "\"max_draw_calls\":%u,\"max_queued\":%u,\"queued_delta\":%d,\"created_delta\":%d}",
+   source_transition?"true":"false",settled_at-requested_at,audio_wait,construction,
+   render_wait,render_cpu_ms,callbacks,source_draws,max_callback_ms,max_draw_ms,max_end_ms,
+   static_cast<unsigned long long>(texture_upload_bytes),max_draw_calls,max_queued,
+   queued_delta,created_delta);
+  EM_ASM({window.menuPreparationProfile?.(JSON.parse(UTF8ToString($0)));},profile);
+ }
+};
+PreparationProfile preparation_profile;
 PADStatus diagnostic_pad{};
 unsigned diagnostic_pad_port=0,diagnostic_pad_remaining=0;
 std::array<float,1068> pcm;
@@ -68,6 +113,7 @@ void report_construction(const char* kind,double started,double constructed,doub
 }
 void begin_preparation(){
  if(!preparation.request())return;
+ preparation_profile.begin(true,emscripten_get_now());
  clear_diagnostic_pad();pending=false;running=false;menu_clock.reset();
  message=match?"Preparing original character select...":"Preparing original next scene...";
  EM_ASM({if(window.menuPreparation)window.menuPreparation(UTF8ToString($0));},message.c_str());
@@ -107,7 +153,7 @@ void close(){
 void enter_world(){
  const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
  char error[256]{};const bool prepared=world!=nullptr;
- if(!prepared)world=std::make_unique<melee_web::GameplayMenuWorld>(files);
+ if(!prepared)world=std::make_unique<melee_web::GameplayMenuWorld>(files,*archive_cache);
  const double constructed=emscripten_get_now();
  check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);host_entered=true;
  const double entered=emscripten_get_now();
@@ -130,7 +176,7 @@ void advance(){
   MeleeWebMenuMatchSelection selection{};check(melee_web_menu_host_selection(host,&selection,error,sizeof(error)),error);
   match_message=selected_match_message(selection);
   const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
-  match=std::make_unique<melee_web::GameplayMatchSession>(files,selection);
+  match=std::make_unique<melee_web::GameplayMatchSession>(files,selection,*archive_cache);
   const double constructed=emscripten_get_now();
   report_construction("match-enter",started,constructed,constructed,before,aurora_stats_snapshot());
   first_use_draw_pending=true;
@@ -163,8 +209,11 @@ void tick(){
   input_done=emscripten_get_now();
   if(preparation.waiting_for_audio()){
    if(preparation.begin_construction(audio_ready_for_preparation())){
-    preparation_started=emscripten_get_now();advance();
+    preparation_started=emscripten_get_now();
+    preparation_profile.construction_started(preparation_started);
+    advance();
     preparation_ms=emscripten_get_now()-preparation_started;preparation_started=0;
+    preparation_profile.construction_finished(emscripten_get_now());
     preparation.finish_construction(running);
     if(running)running=false;
     if(!preparation.busy())EM_ASM({window.menuPreparationDone?.();});
@@ -254,14 +303,23 @@ void tick(){
   stat_delta(stats_after.queuedPipelines,stats_before.queuedPipelines)!=0||
   stat_delta(stats_after.createdPipelines,stats_before.createdPipelines)!=0||
   stats_after.lastTextureUploadSize!=0;
+ const bool was_warming=preparation.warming();
+ if(was_warming)preparation_profile.observe(finished-started,draw_done-begin_done,end_done-draw_done,
+                                             actual_source_draw,stats_before,stats_after);
  if(preparation.observe_render(actual_source_draw,stats_after.queuedPipelines,render_preparation_activity)){
+  preparation_profile.report(finished);
   EM_ASM({window.menuRenderCacheSettled?.();});
   if(render_only_preparation)render_only_preparation=false;
   else EM_ASM({window.menuPreparationDone?.();});
  }
+ // A texture upload is complete by the time it is reported here, so pausing
+ // source simulation afterward cannot hide its cost. Newly constructed scenes
+ // still settle both uploads and pipelines above. During live play, only an
+ // outstanding asynchronous pipeline compilation justifies stopping the clock.
  if(preparation.phase()==melee_web::MenuPreparationState::Phase::Idle&&running&&actual_source_draw&&
-    (stats_after.queuedPipelines!=0||render_preparation_activity)){
+    melee_web::MenuPreparationState::needs_live_render_settle(stats_after.queuedPipelines)){
   if(preparation.request_render_settle()){
+   preparation_profile.begin(false,finished);
    render_only_preparation=true;
    running=false;menu_clock.reset();message="Preparing first-use rendering...";
   }
@@ -292,6 +350,7 @@ int melee_web_native_menu_file(const char* name,const uint8_t* data,unsigned siz
  if(world||match||!name||!data||!size||size>64*1024*1024)throw std::runtime_error("Unload before importing valid local files");
  bool known=false;for(auto key:keys)known|=key==name;
  if(!known)throw std::runtime_error("Unknown native menu file: "+std::string(name));
+ archive_cache.reset();
  files[name]={data,data+size};return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
 int melee_web_native_menu_prepare(){try{
@@ -302,8 +361,9 @@ int melee_web_native_menu_prepare(){try{
  // Preserve the source ownership order used by launch: the menu host claims
  // RNG/session ownership before the SDK world is started. No source scene or
  // simulation callback runs during this preparation phase.
+ if(!archive_cache)archive_cache=std::make_unique<melee_web::RuntimeArchiveCache>(files);
  host=melee_web_menu_host_create(error,sizeof(error));check(host!=nullptr,error);
- world=std::make_unique<melee_web::GameplayMenuWorld>(files);
+ world=std::make_unique<melee_web::GameplayMenuWorld>(files,*archive_cache);
  const double constructed=emscripten_get_now();
  report_construction("scene-prepare",started,constructed,constructed,before,aurora_stats_snapshot());
  message="Native menu resources prepared.";return 1;
@@ -317,6 +377,7 @@ int melee_web_native_menu_launch(){try{
  if(preparation.busy()||pending)
   throw std::runtime_error("Native menu transition is still preparing");
  if(match||host_entered||(host&&!world))close();
+ if(!archive_cache)archive_cache=std::make_unique<melee_web::RuntimeArchiveCache>(files);
  char error[256]{};if(!host){host=melee_web_menu_host_create(error,sizeof(error));check(host!=nullptr,error);}
  VISetFrameBufferScale(1);enter_world();return 1;
 }catch(const std::exception& e){message=e.what();running=false;return 0;}}

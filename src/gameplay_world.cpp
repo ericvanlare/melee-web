@@ -1,4 +1,5 @@
 #include "gameplay_world.hpp"
+#include "runtime_archive_cache.hpp"
 #include "gameplay_content.h"
 #include <cstdio>
 #include <cstdlib>
@@ -83,6 +84,7 @@ namespace melee_web {
 struct GameplayWorld::Storage {
     std::map<std::string,std::shared_ptr<const DatArchive>,std::less<>> archives;
     std::map<std::string,std::vector<uint8_t>,std::less<>> snapshots;
+    RuntimeArchiveCache* archive_cache=nullptr;
     std::unique_ptr<NativeDatArena> stage_arena,bonus_arena,item_arena;
     std::unique_ptr<DatItemRegistryNative> items;
     std::unique_ptr<DatStageItems> stage_items;
@@ -123,15 +125,19 @@ struct GameplayWorld::Storage {
     int floor_start=0;
     char error[256]{};
     std::shared_ptr<const DatArchive> archive(std::string_view name)const{return archives.at(std::string(name));}
-    void start(const RuntimeFiles& files,const GameplayWorldSelection& selection){
+    void start(const RuntimeFiles& files,const GameplayWorldSelection& selection,
+               RuntimeArchiveCache* cache){
+        archive_cache=cache;
         stage=melee_web_stage_content_by_ground(selection.ground_kind);
         if(!stage)throw DatError("No runtime owner for selected source ground kind");
         auto load=[&](std::string_view name){
             if(archives.contains(name))return;
             const auto policy=name=="ItCo.usd"?DatExternalPolicy::PreserveUnresolved:
                 name==stage->archive?DatExternalPolicy::ResolveNull:DatExternalPolicy::Reject;
-            auto value=std::make_shared<const DatArchive>(file(files,name),policy);
-            snapshots[std::string(name)]={value->data().begin(),value->data().end()};
+            auto value=archive_cache?archive_cache->archive(name,policy):
+                std::make_shared<const DatArchive>(file(files,name),policy);
+            if(!archive_cache)
+                snapshots[std::string(name)]={value->data().begin(),value->data().end()};
             archives.emplace(name,std::move(value));
         };
         for(const char* name:{"PlCo.dat","ItCo.usd","EfCoData.dat","PdPm.dat"})load(name);
@@ -277,6 +283,7 @@ struct GameplayWorld::Storage {
     }
     void verify()const{
         for(const auto& [name,source]:archives){
+            if(archive_cache){archive_cache->verify(source);continue;}
             const auto& expected=snapshots.at(name);auto actual=source->data();
             if(!std::equal(actual.begin(),actual.end(),expected.begin(),expected.end()))
                 throw DatError("Original source mutated immutable archive: "+name);
@@ -320,7 +327,10 @@ struct GameplayWorld::Storage {
 };
 GameplayWorld::GameplayWorld(const RuntimeFiles& files):GameplayWorld(files,GameplayWorldSelection{}){}
 GameplayWorld::GameplayWorld(const RuntimeFiles& files,const GameplayWorldSelection& selection)
-    :storage_(std::make_unique<Storage>()){storage_->start(files,selection);}
+    :storage_(std::make_unique<Storage>()){storage_->start(files,selection,nullptr);}
+GameplayWorld::GameplayWorld(const RuntimeFiles& files,const GameplayWorldSelection& selection,
+                             RuntimeArchiveCache& cache)
+    :storage_(std::make_unique<Storage>()){storage_->start(files,selection,&cache);}
 GameplayWorld::~GameplayWorld()=default;
 void GameplayWorld::enable_stage_visual(){storage_->enable_stage_visual();}
 void GameplayWorld::enable_full_stage(bool defer_start){storage_->enable_full_stage(defer_start);}

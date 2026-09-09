@@ -1,4 +1,5 @@
 #include "gameplay_match_session.hpp"
+#include "runtime_archive_cache.hpp"
 #include "gameplay_content.h"
 #include "gameplay_audio_bank.hpp"
 #include "gameplay_audio_stream_asset.hpp"
@@ -29,7 +30,8 @@ struct GameplayMatchSession::Storage {
     MeleeWebMatchFlow* flow=nullptr;
     bool mode_owned=false;
     ~Storage(){try{close();}catch(const std::exception& e){std::fprintf(stderr,"Match session teardown: %s\n",e.what());std::abort();}}
-    void start(const RuntimeFiles& files,const MeleeWebMenuMatchSelection& selection){
+    void start(const RuntimeFiles& files,const MeleeWebMenuMatchSelection& selection,
+               RuntimeArchiveCache* archive_cache){
         const auto* stage=melee_web_stage_content(selection.start.rules.stkind);
         check(stage!=nullptr,"Match stage has no source runtime owner");
         GameplayWorldSelection content{};content.ground_kind=stage->ground_kind;
@@ -41,8 +43,11 @@ struct GameplayMatchSession::Storage {
             content.fighter_kinds[i]=fighter->fighter_kind;
         }
         check(melee_web_vs_mode_begin(),"Original VS mode is already owned");mode_owned=true;
-        world=std::make_unique<GameplayWorld>(files,content);char error[256]{};
-        hud_assets=std::make_unique<GameplayHudAssets>(files);
+        world=archive_cache?std::make_unique<GameplayWorld>(files,content,*archive_cache):
+                            std::make_unique<GameplayWorld>(files,content);
+        char error[256]{};
+        hud_assets=archive_cache?std::make_unique<GameplayHudAssets>(files,*archive_cache):
+                                 std::make_unique<GameplayHudAssets>(files);
         std::vector<std::span<const uint8_t>> banks;
         for(const char* name:{"main.ssm","nr_select.ssm","nr_title.ssm",
                               "nr_name.ssm","pokemon.ssm","end.ssm"})banks.emplace_back(files.at(name));
@@ -88,7 +93,11 @@ struct GameplayMatchSession::Storage {
     }
 };
 GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,const MeleeWebMenuMatchSelection& selection)
-    :storage_(std::make_unique<Storage>()){storage_->start(files,selection);}
+    :storage_(std::make_unique<Storage>()){storage_->start(files,selection,nullptr);}
+GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,
+                                           const MeleeWebMenuMatchSelection& selection,
+                                           RuntimeArchiveCache& archive_cache)
+    :storage_(std::make_unique<Storage>()){storage_->start(files,selection,&archive_cache);}
 GameplayMatchSession::~GameplayMatchSession()=default;
 void GameplayMatchSession::close(){if(storage_){storage_->close();storage_.reset();}}
 void GameplayMatchSession::tick(const PADStatus raw[4]){

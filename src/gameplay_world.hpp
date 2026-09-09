@@ -10,6 +10,7 @@
 struct StartMeleeData;
 namespace melee_web {
 using RuntimeFiles = std::map<std::string, std::vector<uint8_t>, std::less<>>;
+class RuntimeArchiveCache;
 // Original FTKind and GrKind values, never CSS/SSS grid indices. Defaults keep
 // existing Mario/FD probes scoped to their original fixture.
 struct GameplayWorldSelection {
@@ -22,6 +23,8 @@ class GameplayWorld {
 public:
     explicit GameplayWorld(const RuntimeFiles&);
     GameplayWorld(const RuntimeFiles&, const GameplayWorldSelection&);
+    GameplayWorld(const RuntimeFiles&, const GameplayWorldSelection&,
+                  RuntimeArchiveCache&);
     ~GameplayWorld();
     GameplayWorld(const GameplayWorld&) = delete;
     GameplayWorld& operator=(const GameplayWorld&) = delete;

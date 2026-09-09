@@ -12,6 +12,7 @@ namespace melee_web {
 class GameplayMenuWorld {
 public:
     explicit GameplayMenuWorld(const RuntimeFiles&);
+    GameplayMenuWorld(const RuntimeFiles&, RuntimeArchiveCache&);
     ~GameplayMenuWorld();
 
     GameplayMenuWorld(const GameplayMenuWorld&) = delete;

@@ -29,6 +29,14 @@ public:
         return true;
     }
 
+    // Upload statistics describe work that has already completed. Only a
+    // pipeline still queued on the asynchronous renderer can benefit from
+    // stopping an otherwise live source scene.
+    static bool needs_live_render_settle(unsigned queued_pipelines) noexcept
+    {
+        return queued_pipelines != 0;
+    }
+
     bool waiting_for_audio() const noexcept
     {
         return phase_ == Phase::WaitingForAudio;

@@ -1,4 +1,5 @@
 #include "gameplay_hud_assets.hpp"
+#include "runtime_archive_cache.hpp"
 #include "dat_archive.hpp"
 #include "dat_scene.hpp"
 #include "dat_sis.hpp"
@@ -17,22 +18,26 @@ namespace melee_web {
 struct GameplayHudAssets::Storage {
     std::map<std::string, std::shared_ptr<const DatArchive>, std::less<>> archives;
     std::map<std::string, std::vector<uint8_t>, std::less<>> snapshots;
+    RuntimeArchiveCache* archive_cache = nullptr;
     std::vector<std::unique_ptr<DatScene>> scenes;
     std::unique_ptr<DatSis> intro;
     MeleeWebArchiveSections* scope = nullptr;
 
-    void start(const RuntimeFiles& files)
+    void start(const RuntimeFiles& files, RuntimeArchiveCache* cache)
     {
+        archive_cache = cache;
         for (const char* name : {"IfAll.usd", "IfCoGet.dat", "SdIntro.dat", "GmPause.usd"}) {
             const auto found = files.find(name);
             if (found == files.end() || found->second.empty())
                 throw DatError("Missing original HUD archive: " + std::string(name));
             std::shared_ptr<const DatArchive> archive;
-            try { archive = std::make_shared<const DatArchive>(found->second); }
+            try { archive = archive_cache ? archive_cache->archive(name) :
+                                           std::make_shared<const DatArchive>(found->second); }
             catch (const DatError& error) {
                 throw DatError(std::string("HUD archive ") + name + ": " + error.what());
             }
-            snapshots[name] = {archive->data().begin(), archive->data().end()};
+            if (!archive_cache)
+                snapshots[name] = {archive->data().begin(), archive->data().end()};
             archives.emplace(name, std::move(archive));
         }
         std::vector<MeleeWebArchiveSymbol> symbols;
@@ -62,6 +67,10 @@ struct GameplayHudAssets::Storage {
     void verify() const
     {
         for (const auto& [name, archive] : archives) {
+            if (archive_cache) {
+                archive_cache->verify(archive);
+                continue;
+            }
             const auto bytes = archive->data();
             const auto& expected = snapshots.at(name);
             if (!std::equal(bytes.begin(), bytes.end(), expected.begin(), expected.end()))
@@ -90,7 +99,10 @@ struct GameplayHudAssets::Storage {
     }
 };
 GameplayHudAssets::GameplayHudAssets(const RuntimeFiles& files)
-    : storage_(std::make_unique<Storage>()) { storage_->start(files); }
+    : storage_(std::make_unique<Storage>()) { storage_->start(files, nullptr); }
+GameplayHudAssets::GameplayHudAssets(const RuntimeFiles& files,
+                                     RuntimeArchiveCache& cache)
+    : storage_(std::make_unique<Storage>()) { storage_->start(files, &cache); }
 GameplayHudAssets::~GameplayHudAssets() = default;
 void GameplayHudAssets::verify() const { storage_->verify(); }
 void GameplayHudAssets::close() { storage_->close(); }

@@ -8,6 +8,7 @@ namespace melee_web {
 class GameplayHudAssets {
 public:
     explicit GameplayHudAssets(const RuntimeFiles&);
+    GameplayHudAssets(const RuntimeFiles&, RuntimeArchiveCache&);
     ~GameplayHudAssets();
     GameplayHudAssets(const GameplayHudAssets&) = delete;
     GameplayHudAssets& operator=(const GameplayHudAssets&) = delete;

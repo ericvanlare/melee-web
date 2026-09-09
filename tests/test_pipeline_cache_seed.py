@@ -19,12 +19,12 @@ class PipelineCacheSeedTests(unittest.TestCase):
             output = Path(directory) / "initial_pipeline_cache.db"
             materialize(SEED, output)
 
-            self.assertEqual(504 * 1024, output.stat().st_size)
+            self.assertEqual(844 * 1024, output.stat().st_size)
             self.assertEqual(EXPECTED_SHA256, hashlib.sha256(output.read_bytes()).hexdigest())
             with sqlite3.connect(output) as database:
                 self.assertEqual([(1,)], database.execute("SELECT value FROM aurora_schema").fetchall())
                 self.assertEqual(
-                    [(0, 1, 64), (1, 121, 335412)],
+                    [(0, 1, 64), (1, 206, 571032)],
                     database.execute(
                         "SELECT type, COUNT(*), SUM(length(config)) FROM pipeline_cache GROUP BY type"
                     ).fetchall(),
