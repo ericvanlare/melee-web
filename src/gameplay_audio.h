@@ -32,6 +32,10 @@ int melee_web_audio_play(MeleeWebAudio*,int sound_id,uint8_t volume,uint8_t pan,
 int melee_web_audio_enable_effects(MeleeWebAudio*,char*,size_t);
 int melee_web_audio_render(MeleeWebAudio*,float* interleaved_stereo,uint32_t frames,char*,size_t);
 int melee_web_audio_active_samples(MeleeWebAudio*,uint32_t* ids,uint32_t capacity);
+/* Monotonic identity for one owned provider lifetime. This lets source hosts
+ * distinguish a retained audio engine from a new allocation at the same host
+ * address without exposing or interpreting that address. */
+uint64_t melee_web_audio_generation(MeleeWebAudio*);
 int melee_web_audio_end(MeleeWebAudio*,char*,size_t);
 #ifdef __cplusplus
 }

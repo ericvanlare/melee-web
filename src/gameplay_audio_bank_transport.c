@@ -33,6 +33,17 @@ static struct {
 } state;
 static int fail(char* e,size_t n,const char* s){if(e&&n)snprintf(e,n,"%s",s);return 0;}
 static void check(int condition,const char* why){if(!condition)melee_web_platform_unavailable(why);}
+/* Retail gives the synth a dedicated audio heap whose lifetime spans scene
+ * heaps. Keep the same ownership split in the source port so CSS/SSS can
+ * replace their HSD world without invalidating resident SSM descriptors. */
+void* melee_web_audio_heap_alloc(size_t size){
+ check(state.audio&&size&&size<=32u*1024u*1024u,"Invalid source audio heap allocation");
+ void* result=aligned_alloc(32,(size+31u)&~31u);
+ check(result!=NULL,"Source audio heap allocation failed");return result;
+}
+void melee_web_audio_heap_free(void* pointer){
+ check(state.audio&&pointer,"Invalid source audio heap release");free(pointer);
+}
 static uint32_t be32(const unsigned char* p){return (uint32_t)p[0]<<24|(uint32_t)p[1]<<16|(uint32_t)p[2]<<8|p[3];}
 static uint16_t be16(const unsigned char* p){return (uint16_t)p[0]<<8|p[1];}
 static MeleeWebAudioResidencyInfo info(int file){

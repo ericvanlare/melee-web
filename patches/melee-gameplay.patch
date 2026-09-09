@@ -3465,6 +3465,36 @@ diff --git a/src/sysdolphin/baselib/synth.c b/src/sysdolphin/baselib/synth.c
  #include "synth.h"
  
  #include <math.h> // IWYU pragma: keep
+@@ -17,16 +21,29 @@
+                                            float mix_main, float mix_auxA,
+                                            float mix_auxB);
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++extern void* melee_web_audio_heap_alloc(size_t size);
++extern void melee_web_audio_heap_free(void* ptr);
++#endif
++
+ void* HSD_AudioMalloc(size_t size)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    return melee_web_audio_heap_alloc(size);
++#else
+     void* p = OSAllocFromHeap(HSD_Synth_804D6018, size);
+     HSD_ASSERTREPORT(0x29U, p, "audio heap overflow.\n");
+     return p;
++#endif
+ }
+ 
+ void HSD_AudioFree(void* ptr)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_audio_heap_free(ptr);
++#else
+     OSFreeToHeap(HSD_Synth_804D6018, ptr);
++#endif
+ }
+ 
+ static int HSD_Synth_804D6028[2] = { 0 };
 @@ -107,6 +111,18 @@
              memcpy((u8*) HSD_Synth_804D7730 + 8, HSD_Synth_804D7734, nbytes);
              for (k = 0; k < n; k++) {

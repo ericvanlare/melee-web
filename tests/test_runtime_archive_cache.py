@@ -22,6 +22,7 @@ class RuntimeArchiveCacheTests(unittest.TestCase):
                     "tests/runtime_archive_cache_test.cpp",
                     "src/runtime_archive_cache.cpp",
                     "src/dat_archive.cpp",
+                    "src/dat_audio.cpp",
                     "-o",
                     str(binary),
                 ],

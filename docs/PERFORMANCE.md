@@ -17,14 +17,28 @@ The runtime reports these costs independently:
    Browser callback interval is reported separately because it is not CPU/GPU
    execution time.
 
-Do not retain an entered `GameplayMenuWorld` across CSS/SSS transitions.
-Recovered menu descriptors contain mutable cursor and animation state. A reuse
-experiment changed the second source entry and failed the owned lifecycle
-trace. The browser instead caches each decoded archive by name and external
-resolution policy for the lifetime of one disc import. Menu and match entry
-still instantiate fresh mutable source-owned objects. Cache hits verify the
-original backing bytes and teardown verifies every shared archive against its
-immutable baseline.
+Do not retain mutable CSS/SSS scene descriptors across transitions. Recovered
+menu descriptors contain cursor and animation state; a reuse experiment changed
+the second source entry and failed the owned lifecycle trace. The browser keeps
+the menu service owner and original audio engine alive, runs the source OnExit,
+destroys the old HSD world and descriptors, and hydrates a fresh next scene.
+Decoded archives and SSM banks are cached for one disc import. Cache hits verify
+the original backing bytes and teardown verifies every shared archive against
+its immutable baseline.
+
+HPS files are validated and indexed when their owner is created, while each of
+the source stream's three transfer slots decodes its own ADPCM payload only when
+the original loader requests that slot. This removed full-track PCM decoding
+from match construction without changing the decoded samples. Match construction
+is divided at ownership boundaries: world core, each fighter kind, effects,
+items, HUD/audio, match/stage setup, fighter intro, and render/HUD/flow. Source
+simulation and rendering remain stopped until every phase completes.
+
+Menu audio uses one continuous 60 Hz producer clock across CSS and SSS. It keeps
+the same audio generation, HPS progress, fractional clock phase, and AudioWorklet
+queue while the visual scene is rebuilt. Visual teardown and hydration run in
+separate callbacks. A match transition still acknowledges a paused worklet and
+starts a new stage-audio owner.
 
 Aurora reports texture-upload bytes after the upload has completed. Live scenes
 therefore do not pause in response to that statistic; such a pause delayed the
@@ -82,6 +96,17 @@ return to CSS. No native active callback exceeded 33.3 ms; the worst was 25.97
 ms. Computer-control waits did starve seven browser callbacks and caused one
 timing pause, so those browser callback intervals are not runtime acceptance
 evidence.
+
+The retained-audio/staged-construction run used the 207-row seed and a live
+32 kHz AudioWorklet. CSS-to-SSS and SSS-to-CSS both completed with the same HPS
+owner and zero audio underruns. The reverse menu preparation took 65.7 ms wall
+time; its mutable teardown and hydration were 0.9 ms and 17.4 ms, and no active
+browser or native callback exceeded 33.3 ms. A following Mario-versus-Mario
+Battlefield entry took 206.5 ms wall time and 104.7 ms summed construction CPU
+across eight callbacks, down from 263.8 ms in the earlier archive-cache run.
+Eight seconds of gameplay reported a 22.8 ms worst browser interval, 15.1 ms
+worst active native callback, no interval over 33.3 ms, zero audio underruns,
+and no automatic timing pause.
 
 For every admitted character/stage pair, record both a cleared-origin run and a
 second application load on named browser/hardware. The acceptance run must

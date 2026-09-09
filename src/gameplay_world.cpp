@@ -122,11 +122,18 @@ struct GameplayWorld::Storage {
     void* previous_ground=nullptr;
     bool effect_started=false;
     bool started=false,ground_published=false,bonus_published=false;
+    const RuntimeFiles* runtime_files=nullptr;
+    std::map<unsigned,const FighterCostume*> identities;
+    std::map<unsigned,std::set<unsigned>> selected_costumes;
+    std::vector<unsigned> identity_order;
+    size_t fighter_at=0;
+    unsigned construction_phase=0;
     int floor_start=0;
     char error[256]{};
     std::shared_ptr<const DatArchive> archive(std::string_view name)const{return archives.at(std::string(name));}
     void start(const RuntimeFiles& files,const GameplayWorldSelection& selection,
-               RuntimeArchiveCache* cache){
+               RuntimeArchiveCache* cache,bool defer=false){
+        runtime_files=&files;
         archive_cache=cache;
         stage=melee_web_stage_content_by_ground(selection.ground_kind);
         if(!stage)throw DatError("No runtime owner for selected source ground kind");
@@ -142,17 +149,23 @@ struct GameplayWorld::Storage {
         };
         for(const char* name:{"PlCo.dat","ItCo.usd","EfCoData.dat","PdPm.dat"})load(name);
         load(stage->archive);
-        std::map<unsigned,const FighterCostume*> identities;
+        for(unsigned slot=0;slot<selection.fighter_kinds.size();++slot)
+            selected_costumes[selection.fighter_kinds[slot]].insert(selection.costume_indices[slot]);
         for(const auto kind:selection.fighter_kinds){
             if(!melee_web_fighter_content_by_kind(kind))throw DatError("No runtime owner for selected source fighter kind");
             for(const auto& costume:fighter_costumes())if(costume.fighter_kind==kind){
                 if(costume.costume_index==0){identities[kind]=&costume;load(costume.fighter_filename);load(costume.model_filename);}
-                else if(files.contains(costume.model_filename))load(costume.model_filename);
+                else if(selected_costumes[kind].contains(costume.costume_index)){
+                    if(!files.contains(costume.model_filename))
+                        throw DatError("Selected fighter costume model is missing");
+                    load(costume.model_filename);
+                }
             }
             if(!identities.contains(kind))throw DatError("Pinned fighter identity missing");
         }
         // Fighter effect dependencies are selected below from source identities.
         for(const auto& [kind,identity]:identities)load(melee_web_fighter_content_by_kind(kind)->effect_archive);
+        for(const auto& [kind,identity]:identities)identity_order.push_back(kind);
         // Decode before acquiring the source world whenever possible.
         DatCommon common_data(*archive("PlCo.dat"));
         if(!common_data.roots[20].data_offset)throw DatError("Missing common root20");
@@ -201,47 +214,66 @@ struct GameplayWorld::Storage {
         collision=load_collision(collision_data,stage->ground_kind,read_dat_stage_scale(*archive(stage->archive)));
         floor_start=collision_data.line_ranges[0].start;
         check(melee_web_common_context_initialize_fighters(common,error,sizeof(error)),error);
-        for(const auto& [kind,identity]:identities){
+        construction_phase=1;
+        if(!defer)while(!advance_construction()){}
+    }
+    bool advance_construction(){
+        if(construction_phase==0)return false;
+        if(construction_phase==1){
+            if(fighter_at<identity_order.size()){
+                const unsigned kind=identity_order[fighter_at++];
+                const auto* identity=identities.at(kind);
             auto owner=std::make_unique<GameplayFighterAssets>(archive(identity->fighter_filename),
-                archive(identity->model_filename),file(files,identity->animation_filename),*identity);
+                archive(identity->model_filename),file(*runtime_files,identity->animation_filename),*identity);
             for(const auto& costume:fighter_costumes())
-                if(costume.fighter_kind==kind&&costume.costume_index!=0&&archives.contains(costume.model_filename))
+                if(costume.fighter_kind==kind&&costume.costume_index!=0&&
+                   selected_costumes[kind].contains(costume.costume_index)&&
+                   archives.contains(costume.model_filename))
                     owner->add_costume(archive(costume.model_filename),costume);
             fighters.emplace(kind,std::move(owner));
+                return false;
+            }
+            construction_phase=2;
         }
-        check(melee_web_effect_runtime_begin(error,sizeof(error)),error);effect_started=true;
-        common_effects=std::make_unique<DatEffectEntries>(archive("EfCoData.dat"),"effCommonDataTable",0,47,true);
-        check(common_effects->load(error,sizeof(error)),error);
-        std::set<unsigned> effect_banks;
-        for(const auto& [kind,identity]:identities){
-            const auto* dependency=melee_web_fighter_content_by_kind(kind);
-            if(!effect_banks.insert(dependency->effect_bank).second)continue;
-            /* Fighter effect tables may carry the original packed particle
-             * callback channel (Falco bank 3 entry 1 does). Decode it under
-             * the checked particle policy; publication still requires the
-             * source effect runtime whenever such events are present. */
-            auto effect=std::make_unique<DatEffectEntries>(archive(dependency->effect_archive),
-                dependency->effect_symbol,dependency->effect_bank,dependency->effect_count,true);
-            check(effect->load(error,sizeof(error)),error);effects.push_back(std::move(effect));
+        if(construction_phase==2){
+            check(melee_web_effect_runtime_begin(error,sizeof(error)),error);effect_started=true;
+            common_effects=std::make_unique<DatEffectEntries>(archive("EfCoData.dat"),"effCommonDataTable",0,47,true);
+            check(common_effects->load(error,sizeof(error)),error);
+            std::set<unsigned> effect_banks;
+            for(const auto& [kind,identity]:identities){
+                const auto* dependency=melee_web_fighter_content_by_kind(kind);
+                if(!effect_banks.insert(dependency->effect_bank).second)continue;
+                /* Fighter effect tables may carry the original packed particle
+                 * callback channel (Falco bank 3 entry 1 does). */
+                auto effect=std::make_unique<DatEffectEntries>(archive(dependency->effect_archive),
+                    dependency->effect_symbol,dependency->effect_bank,dependency->effect_count,true);
+                check(effect->load(error,sizeof(error)),error);effects.push_back(std::move(effect));
+            }
+            construction_phase=3;
+            return false;
         }
-        registry=melee_web_item_registry_begin(items->articles(),MELEE_WEB_ITEM_REGISTRY_COUNT,error,sizeof(error));check(registry!=nullptr,error);
-        item_arena=std::make_unique<NativeDatArena>(archive("ItCo.usd"));
-        const auto& it=*archive("ItCo.usd");const auto item_root=symbol(it,"itPublicData");
-        auto common_root=it.pointer(item_root,0x160),bounce_root=it.pointer(item_root+16,0x1c),color_root=it.pointer(item_root+20,8);
-        if(!common_root||!bounce_root||!color_root)throw DatError("Incomplete original item service data");
-        const size_t color_bytes=it.next_target_offset(*color_root)-*color_root;
-        if(color_bytes%8||color_bytes/8>256)throw DatError("Invalid item color table extent");
-        item_colors=std::make_unique<DatColorAnimation>(archive("ItCo.usd"),*color_root,color_bytes/8);
-        void* common_item=melee_web_item_common_decode(item_arena->reader(),*common_root);
-        void* bounce=melee_web_item_bounce_decode(item_arena->reader(),*bounce_root);
-        item_runtime=melee_web_item_runtime_begin(common_item,bounce,item_colors->table(),color_bytes/8,error,sizeof(error));check(item_runtime!=nullptr,error);
-        stage_items=std::make_unique<DatStageItems>(archive(stage->archive));
-        const auto stage_item_rows=stage_items->items();
-        if(!stage_item_rows.empty()){
-            stage_item_scope=melee_web_stage_items_begin(stage_item_rows.data(),stage_item_rows.size(),error,sizeof(error));
-            check(stage_item_scope!=nullptr,error);
+        if(construction_phase==3){
+            registry=melee_web_item_registry_begin(items->articles(),MELEE_WEB_ITEM_REGISTRY_COUNT,error,sizeof(error));check(registry!=nullptr,error);
+            item_arena=std::make_unique<NativeDatArena>(archive("ItCo.usd"));
+            const auto& it=*archive("ItCo.usd");const auto item_root=symbol(it,"itPublicData");
+            auto common_root=it.pointer(item_root,0x160),bounce_root=it.pointer(item_root+16,0x1c),color_root=it.pointer(item_root+20,8);
+            if(!common_root||!bounce_root||!color_root)throw DatError("Incomplete original item service data");
+            const size_t color_bytes=it.next_target_offset(*color_root)-*color_root;
+            if(color_bytes%8||color_bytes/8>256)throw DatError("Invalid item color table extent");
+            item_colors=std::make_unique<DatColorAnimation>(archive("ItCo.usd"),*color_root,color_bytes/8);
+            void* common_item=melee_web_item_common_decode(item_arena->reader(),*common_root);
+            void* bounce=melee_web_item_bounce_decode(item_arena->reader(),*bounce_root);
+            item_runtime=melee_web_item_runtime_begin(common_item,bounce,item_colors->table(),color_bytes/8,error,sizeof(error));check(item_runtime!=nullptr,error);
+            stage_items=std::make_unique<DatStageItems>(archive(stage->archive));
+            const auto stage_item_rows=stage_items->items();
+            if(!stage_item_rows.empty()){
+                stage_item_scope=melee_web_stage_items_begin(stage_item_rows.data(),stage_item_rows.size(),error,sizeof(error));
+                check(stage_item_scope!=nullptr,error);
+            }
+            check(melee_web_bonus_data_begin(bonus,error,sizeof(error)),error);bonus_published=true;
+            construction_phase=4;
         }
-        check(melee_web_bonus_data_begin(bonus,error,sizeof(error)),error);bonus_published=true;
+        return construction_phase==4;
     }
     void enable_stage_visual(){
         if(stage_visual)return;
@@ -327,10 +359,15 @@ struct GameplayWorld::Storage {
 };
 GameplayWorld::GameplayWorld(const RuntimeFiles& files):GameplayWorld(files,GameplayWorldSelection{}){}
 GameplayWorld::GameplayWorld(const RuntimeFiles& files,const GameplayWorldSelection& selection)
-    :storage_(std::make_unique<Storage>()){storage_->start(files,selection,nullptr);}
+    :storage_(std::make_unique<Storage>()){storage_->start(files,selection,nullptr,false);}
 GameplayWorld::GameplayWorld(const RuntimeFiles& files,const GameplayWorldSelection& selection,
                              RuntimeArchiveCache& cache)
-    :storage_(std::make_unique<Storage>()){storage_->start(files,selection,&cache);}
+    :storage_(std::make_unique<Storage>()){storage_->start(files,selection,&cache,false);}
+GameplayWorld::GameplayWorld(const RuntimeFiles& files,const GameplayWorldSelection& selection,
+                             RuntimeArchiveCache& cache,GameplayWorldConstruction construction)
+    :storage_(std::make_unique<Storage>()){
+    storage_->start(files,selection,&cache,construction==GameplayWorldConstruction::Deferred);
+}
 GameplayWorld::~GameplayWorld()=default;
 void GameplayWorld::enable_stage_visual(){storage_->enable_stage_visual();}
 void GameplayWorld::enable_full_stage(bool defer_start){storage_->enable_full_stage(defer_start);}
@@ -352,6 +389,8 @@ uint32_t GameplayWorld::unresolved_fighter_fields()const{
     uint32_t result=0;for(const auto& [kind,fighter]:storage_->fighters)result|=fighter->unresolved_fields();return result;
 }
 void GameplayWorld::verify_immutable_archives()const{storage_->verify();}
+bool GameplayWorld::advance_construction(){return storage_->advance_construction();}
+bool GameplayWorld::construction_complete()const{return storage_->construction_phase==4;}
 void GameplayWorld::initialize_match(const StartMeleeData& start) {
     check(storage_!=nullptr,"Gameplay world is closed");char error[256]{};
     check(melee_web_match_rules_init_from_menu(storage_->rules,&start,error,sizeof(error)),error);

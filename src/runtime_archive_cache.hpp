@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dat_archive.hpp"
+#include "dat_audio.hpp"
 #include "gameplay_world.hpp"
 
 #include <map>
@@ -21,6 +22,8 @@ public:
     [[nodiscard]] std::shared_ptr<const DatArchive>
     archive(std::string_view name,
             DatExternalPolicy policy = DatExternalPolicy::Reject);
+    [[nodiscard]] std::shared_ptr<const DatAudioBank>
+    audio_bank(std::string_view name);
     void verify(const std::shared_ptr<const DatArchive>& archive) const;
 
 private:
@@ -39,9 +42,15 @@ private:
         const std::uint8_t* source_data = nullptr;
         std::size_t source_size = 0;
     };
+    struct AudioEntry {
+        std::shared_ptr<const DatAudioBank> bank;
+        const std::uint8_t* source_data = nullptr;
+        std::size_t source_size = 0;
+    };
 
     const RuntimeFiles& files_;
     std::map<Key, Entry> entries_;
+    std::map<std::string, AudioEntry, std::less<>> audio_entries_;
 };
 
 } // namespace melee_web

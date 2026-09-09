@@ -3,9 +3,15 @@
 #include <cstdlib>
 namespace melee_web {
 GameplayAudioBank::GameplayAudioBank(std::span<const uint8_t> sem,const std::vector<std::span<const uint8_t>>& banks,std::span<const uint8_t> coefficients):programs_(sem){
+ for(auto bytes:banks)banks_.push_back(std::make_shared<const DatAudioBank>(bytes));
+ start(coefficients);
+}
+GameplayAudioBank::GameplayAudioBank(std::span<const uint8_t> sem,
+ std::vector<std::shared_ptr<const DatAudioBank>> banks,std::span<const uint8_t> coefficients)
+ :programs_(sem),banks_(std::move(banks)){start(coefficients);}
+void GameplayAudioBank::start(std::span<const uint8_t> coefficients){
  if(coefficients.size()!=4096)throw DatError("DSP coefficient file must contain2048 big-endian halfwords");
  for(size_t i=0;i<coefficients.size();i+=2)coefficients_.push_back(int16_t(uint16_t(coefficients[i])<<8|coefficients[i+1]));
- for(auto bytes:banks)banks_.push_back(std::make_unique<DatAudioBank>(bytes));
  for(auto& bank:banks_)for(auto& sample:bank->samples){
   MeleeWebAudioSample out{};out.id=sample.id;out.rate=sample.sample_rate;out.channels=sample.channels.size();
   for(unsigned i=0;i<out.channels;i++){

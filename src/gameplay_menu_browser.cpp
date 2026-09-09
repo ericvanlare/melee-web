@@ -1,6 +1,7 @@
 #include "gameplay_menu_world.hpp"
 #include "gameplay_menu_host.h"
 #include "gameplay_match_session.hpp"
+#include "gameplay_audio_stream.h"
 #include "runtime_archive_cache.hpp"
 #include "gameplay_content.h"
 #include "menu_preparation_state.hpp"
@@ -30,9 +31,10 @@ std::unique_ptr<melee_web::GameplayMenuWorld> world;
 std::unique_ptr<melee_web::GameplayMatchSession> match;
 MeleeWebMenuHost* host=nullptr;
 melee_web::FixedTickClock menu_clock;
+melee_web::FixedTickClock audio_clock{melee_web::FixedTickClock::OverrunPolicy::CatchUp};
 std::string message="Choose your local Melee disc image.";
 std::string match_message="Original four-stock source match";
-bool running=false,pending=false,host_entered=false,faulted=false;
+bool running=false,pending=false,host_entered=false,world_exposed=false,faulted=false;
 melee_web::MenuPreparationState preparation;
 unsigned audio_phase=0,diagnostic_start_ticks=0;
 int stock_check=0,stock_count=4,stock_respawns=0;
@@ -40,8 +42,12 @@ unsigned stock_tick=0,completed_matches=0;
 bool stock_lost=false,stock_jump=false;
 bool first_use_draw_pending=false;
 bool render_only_preparation=false;
+bool transition_audio_continues=false;
+bool menu_scene_rebuild_pending=false;
+melee_web::GameplayMenuScene pending_menu_scene=melee_web::GameplayMenuScene::Characters;
 unsigned render_frame=0;
 int32_t stat_delta(uint64_t after,uint64_t before);
+void render_audio_tick(MeleeWebAudio* audio,char* error,size_t error_size);
 struct PreparationProfile {
  double requested_at=0,audio_ready_at=0,constructed_at=0;
  double render_cpu_ms=0,max_callback_ms=0,max_draw_ms=0,max_end_ms=0;
@@ -115,8 +121,18 @@ void begin_preparation(){
  if(!preparation.request())return;
  preparation_profile.begin(true,emscripten_get_now());
  clear_diagnostic_pad();pending=false;running=false;menu_clock.reset();
+ bool preserve_audio=false;
+ if(!match&&host_entered){
+  char error[256]{};
+  check(melee_web_menu_host_leave(host,0,error,sizeof(error)),error);host_entered=false;
+  const int phase=melee_web_menu_host_phase(host);
+  preserve_audio=phase!=5&&phase!=6;
+ }
+ transition_audio_continues=preserve_audio;
+ if(!preserve_audio)audio_clock.reset();
  message=match?"Preparing original character select...":"Preparing original next scene...";
- EM_ASM({if(window.menuPreparation)window.menuPreparation(UTF8ToString($0));},message.c_str());
+ EM_ASM({if(window.menuPreparation)window.menuPreparation(UTF8ToString($0),!!$1);},
+        message.c_str(),preserve_audio?1:0);
 }
 bool audio_ready_for_preparation(){
  return EM_ASM_INT({return window.menuAudioReadyForPreparation?
@@ -140,9 +156,13 @@ void close(){
  const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
  char error[256]{};running=false;pending=false;preparation.reset();menu_clock.reset();
  if(match){match->close();match.reset();}
- if(world){if(host_entered){check(melee_web_menu_host_leave(host,1,error,sizeof(error)),error);host_entered=false;world->close();}else world->close_prepared();world.reset();}
+ if(world){
+  if(host_entered){check(melee_web_menu_host_leave(host,1,error,sizeof(error)),error);host_entered=false;}
+  if(world_exposed)world->close();else world->close_prepared();
+  world.reset();world_exposed=false;
+ }
  if(host){check(melee_web_menu_host_destroy(host,error,sizeof(error)),error);host=nullptr;}
- audio_phase=0;faulted=false;diagnostic_start_ticks=0;stock_check=0;stock_tick=0;render_frame=0;first_use_draw_pending=false;render_only_preparation=false;clear_diagnostic_pad();
+ audio_phase=0;faulted=false;diagnostic_start_ticks=0;stock_check=0;stock_tick=0;render_frame=0;first_use_draw_pending=false;render_only_preparation=false;transition_audio_continues=false;menu_scene_rebuild_pending=false;audio_clock.reset();clear_diagnostic_pad();
  match_message="Original four-stock source match";
  if(had_lifetime){
   const double finished=emscripten_get_now();
@@ -155,11 +175,11 @@ void enter_world(){
  char error[256]{};const bool prepared=world!=nullptr;
  if(!prepared)world=std::make_unique<melee_web::GameplayMenuWorld>(files,*archive_cache);
  const double constructed=emscripten_get_now();
- check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);host_entered=true;
+ check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);host_entered=true;world_exposed=true;
  const double entered=emscripten_get_now();
  report_construction("scene-enter",started,constructed,entered,before,aurora_stats_snapshot());
  first_use_draw_pending=true;
- menu_clock.reset();audio_phase=0;running=true;
+ menu_clock.reset();audio_phase=0;audio_clock.reset();running=true;
  message=melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select";
 }
 void advance(){
@@ -169,26 +189,82 @@ void advance(){
   check(melee_web_menu_host_match_finished(host,seed,error,sizeof(error)),error);
   pending=false;enter_world();return;
  }
- check(melee_web_menu_host_leave(host,0,error,sizeof(error)),error);host_entered=false;
- world->close();world.reset();pending=false;menu_clock.reset();audio_phase=0;
+ if(host_entered){check(melee_web_menu_host_leave(host,0,error,sizeof(error)),error);host_entered=false;}
  const int phase=melee_web_menu_host_phase(host);
+ if(phase!=5&&phase!=6){
+  pending=false;menu_clock.reset();
+  pending_menu_scene=phase==2?melee_web::GameplayMenuScene::Stages:
+                              melee_web::GameplayMenuScene::Characters;
+  const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
+  world->begin_scene_rebuild();
+  const double finished=emscripten_get_now();
+  report_construction("scene-rebuild-step",started,finished,finished,before,
+                      aurora_stats_snapshot());
+  menu_scene_rebuild_pending=true;running=false;return;
+ }
+ world->close();world.reset();world_exposed=false;pending=false;menu_clock.reset();audio_phase=0;
  if(phase==5){
   MeleeWebMenuMatchSelection selection{};check(melee_web_menu_host_selection(host,&selection,error,sizeof(error)),error);
   match_message=selected_match_message(selection);
   const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
-  match=std::make_unique<melee_web::GameplayMatchSession>(files,selection,*archive_cache);
+  match=std::make_unique<melee_web::GameplayMatchSession>(
+      files,selection,*archive_cache,melee_web::GameplayMatchConstruction::Deferred);
   const double constructed=emscripten_get_now();
-  report_construction("match-enter",started,constructed,constructed,before,aurora_stats_snapshot());
-  first_use_draw_pending=true;
-  running=true;message=match_message;return;
+  report_construction("match-enter-step",started,constructed,constructed,before,aurora_stats_snapshot());
+  running=false;message="Preparing original match...";return;
  }
  if(phase==6){running=false;message="Original menu closed.";return;}
- enter_world();
+}
+
+bool advance_match_construction(){
+ const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
+ const bool complete=match->advance_construction();const double finished=emscripten_get_now();
+ report_construction(complete?"match-enter":"match-enter-step",started,finished,finished,
+                     before,aurora_stats_snapshot());
+ if(complete){first_use_draw_pending=true;running=true;message=match_message;}
+ return complete;
+}
+
+void finish_menu_scene_rebuild(){
+ const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
+ char error[256]{};
+ world->finish_scene_rebuild(pending_menu_scene);
+ const double constructed=emscripten_get_now();
+ check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);
+ host_entered=true;world_exposed=true;
+ const double entered=emscripten_get_now();
+ report_construction("scene-rebuild",started,constructed,entered,before,
+                     aurora_stats_snapshot());
+ menu_scene_rebuild_pending=false;first_use_draw_pending=true;
+ menu_clock.reset();running=true;
+ message=melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select";
+}
+
+void begin_transition_construction(double& preparation_ms,int& suppress_draw){
+ if(!preparation.waiting_for_audio()||
+    !preparation.begin_construction(audio_ready_for_preparation()))return;
+ const double started=emscripten_get_now();
+ preparation_profile.construction_started(started);
+ advance();
+ preparation_ms+=emscripten_get_now()-started;
+ const bool construction_complete=!menu_scene_rebuild_pending&&
+                                  (!match||match->construction_complete());
+ if(!construction_complete)return;
+ preparation_profile.construction_finished(emscripten_get_now());
+ preparation.finish_construction(running);
+ if(running)running=false;
+ suppress_draw=preparation.suppress_source_draw();
+ if(!preparation.busy())EM_ASM({window.menuPreparationDone?.();});
 }
 
 void log_message(AuroraLogLevel level,const char* module,const char* text,unsigned length){
  std::fprintf(level>=LOG_ERROR?stderr:stdout,"[%s] %.*s\n",module,int(length),text);
  if(level==LOG_FATAL)std::abort();
+}
+void render_audio_tick(MeleeWebAudio* audio,char* error,size_t error_size){
+ audio_phase+=32000;const unsigned count=audio_phase/60;audio_phase%=60;
+ check(melee_web_audio_render(audio,pcm.data(),count,error,error_size),error);
+ EM_ASM({window.menuAudio?.(HEAPF32.slice($0>>2,($0>>2)+$1*2));},pcm.data(),count);
 }
 void tick(){
  EM_ASM({window.menuServiceCommands?.();});
@@ -207,24 +283,42 @@ void tick(){
   }
   const auto* input=melee_web_input_poll();
   input_done=emscripten_get_now();
+  const double clock_now=emscripten_get_now();
+  char error[256]{};
+  const bool audio_before_construction=transition_audio_continues&&
+                                       (!running||preparation.busy());
+  MeleeWebAudio* const audio_owner=match?match->audio():world?world->audio():nullptr;
+  const auto audio_elapsed=audio_clock.tick(
+      clock_now,audio_owner&&input->visible&&(running||transition_audio_continues));
+  if(audio_elapsed.stalled){
+   running=false;message="Paused after an audio timing disruption. Resume to continue.";
+  }else if(audio_before_construction){
+   for(unsigned step=0;step<audio_elapsed.steps;step++)
+    render_audio_tick(audio_owner,error,sizeof(error));
+  }
   if(preparation.waiting_for_audio()){
-   if(preparation.begin_construction(audio_ready_for_preparation())){
-    preparation_started=emscripten_get_now();
-    preparation_profile.construction_started(preparation_started);
-    advance();
-    preparation_ms=emscripten_get_now()-preparation_started;preparation_started=0;
+   begin_transition_construction(preparation_ms,suppress_draw);
+  }else if(preparation.phase()==melee_web::MenuPreparationState::Phase::Constructing){
+   preparation_started=emscripten_get_now();
+   const bool construction_complete=menu_scene_rebuild_pending?
+       (finish_menu_scene_rebuild(),true):advance_match_construction();
+   if(construction_complete){
     preparation_profile.construction_finished(emscripten_get_now());
-    preparation.finish_construction(running);
-    if(running)running=false;
-    if(!preparation.busy())EM_ASM({window.menuPreparationDone?.();});
+    preparation.finish_construction(true);running=false;
    }
+   preparation_ms=emscripten_get_now()-preparation_started;preparation_started=0;
+   suppress_draw=preparation.suppress_source_draw();
   }else if(preparation.arming()){
    preparation.arm();running=true;menu_clock.reset();suppress_draw=0;
    message=match?match_message:melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select";
-  }else if(pending)begin_preparation();
-  const auto elapsed=menu_clock.tick(emscripten_get_now(),running&&(world||match)&&input->visible);
+  }else if(pending){
+   begin_preparation();
+  }
+  const auto elapsed=menu_clock.tick(clock_now,running&&(world||match)&&input->visible);
   if(elapsed.stalled){running=false;message="Paused after a timing disruption. Resume to continue.";}
-  char error[256]{};
+  if(elapsed.steps&&transition_audio_continues){
+   transition_audio_continues=false;
+  }
   for(unsigned step=0;step<elapsed.steps;step++){
    PADStatus checked_input[4];const PADStatus* sample=input->raw;bool copied_input=false;
    bool diagnostic_start_pulse=false;
@@ -265,11 +359,11 @@ void tick(){
     if(match->complete()){check(outcome,"Original match transitioned without an outcome");pending=true;result=3;}
    }
    else{result=melee_web_menu_host_tick(host,sample,error,sizeof(error));check(result==1||result==3,error);}
-   audio_phase+=32000;const unsigned count=audio_phase/60;audio_phase%=60;
-   check(melee_web_audio_render(match?match->audio():world->audio(),pcm.data(),count,error,sizeof(error)),error);
-   EM_ASM({window.menuAudio?.(HEAPF32.slice($0>>2,($0>>2)+$1*2));},pcm.data(),count);
    if(result==3){pending=true;clear_diagnostic_pad();break;}
   }
+  if(!audio_before_construction&&!audio_elapsed.stalled)
+   for(unsigned step=0;step<audio_elapsed.steps;step++)
+    render_audio_tick(audio_owner,error,sizeof(error));
   simulation_done=emscripten_get_now();
   begin_done=simulation_done;
   if(aurora_begin_frame()){
@@ -423,6 +517,14 @@ const char* melee_web_native_menu_diagnostics(){
   std::snprintf(text+length,sizeof(text)-length," · raw PAD: none");
  if(match){const auto length=std::char_traits<char>::length(text);
   std::snprintf(text+length,sizeof(text)-length," · source pause: %d · ready: %d",match->paused(),match->ready());}
+ else if(world){
+  uint32_t completed=0,revisited=0;
+  if(melee_web_audio_stream_progress(world->audio(),&completed,&revisited)){
+   const auto length=std::char_traits<char>::length(text);
+   std::snprintf(text+length,sizeof(text)-length," · menu audio blocks: %u · revisits: %u",
+                 completed,revisited);
+  }
+ }
  return text;
 }
 const char* melee_web_native_menu_message(){return message.c_str();}

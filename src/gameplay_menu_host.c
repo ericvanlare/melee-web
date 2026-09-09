@@ -31,7 +31,7 @@ extern int melee_web_menu_clock_end(void);
 struct MeleeWebMenuHost {
     MeleeWebMenuSession* session;
     MeleeWebAudio* audio;
-    uint64_t generation;
+    uint64_t generation,audio_generation;
     u32 seed,*saved_seed;
     HSD_PadData queue;
     PadLibData saved_library;
@@ -89,8 +89,9 @@ static void restore_context(MeleeWebMenuHost* h){
     h->audio=NULL;h->generation=0;
 }
 int melee_web_menu_host_enter(MeleeWebMenuHost* h,MeleeWebAudio* audio,char* e,size_t n){
+    const uint64_t audio_generation=melee_web_audio_generation(audio);
     if(!h||h!=owner||h->entered||h->audio||seed_ptr!=&h->seed||!melee_web_audio_is_active(audio)||
-       !melee_web_audio_bank_transport_active()||!melee_web_gameplay_stats().generation)
+       !audio_generation||!melee_web_audio_bank_transport_active()||!melee_web_gameplay_stats().generation)
         return fail(e,n,"Native menu enter requires a fresh owned world and source audio");
     const MeleeWebMenuPhase phase=melee_web_menu_phase(h->session);
     if(phase!=MELEE_WEB_MENU_CREATED&&phase!=MELEE_WEB_MENU_CSS_READY&&phase!=MELEE_WEB_MENU_SSS_READY&&phase!=MELEE_WEB_MENU_READY)
@@ -116,7 +117,16 @@ int melee_web_menu_host_enter(MeleeWebMenuHost* h,MeleeWebAudio* audio,char* e,s
     HSD_PadLibData.clamp_analogLRShift=1;HSD_PadLibData.clamp_analogLRMax=140;
     HSD_PadLibData.clamp_analogLRMin=0;HSD_PadLibData.scale_analogLR=140;
     for(unsigned i=0;i<4;i++)HSD_PadGameStatus[i]=HSD_PadMasterStatus[i]=HSD_PadCopyStatus[i]=default_status_data;
-    lbAudioAx_8002835C();lbAudioAx_8002838C();lbAudioAx_80028690();
+    /* The retail bootstrap initializes the AX driver and language banks once,
+     * outside ordinary CSS/SSS scene changes. The per-world audio GObj
+     * allocator must still be rebound because its storage uses the fresh HSD
+     * heap. A newly owned provider gets the full initialization; a retained
+     * menu provider keeps its HPS voice and source stream position. */
+    lbAudioAx_8002835C();
+    if(h->audio_generation!=audio_generation){
+        lbAudioAx_8002838C();lbAudioAx_80028690();
+        h->audio_generation=audio_generation;
+    }
     HSD_ZListInitAllocData();
     HSD_SisLib_803A6048(phase==MELEE_WEB_MENU_SSS_READY?0x4800:0x2400);
     int accepted=phase==MELEE_WEB_MENU_SSS_READY?melee_web_menu_enter_sss(h->session,e,n):

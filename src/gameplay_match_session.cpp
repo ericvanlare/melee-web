@@ -30,53 +30,102 @@ struct GameplayMatchSession::Storage {
     MeleeWebMatchFlow* flow=nullptr;
     bool mode_owned=false;
     ~Storage(){try{close();}catch(const std::exception& e){std::fprintf(stderr,"Match session teardown: %s\n",e.what());std::abort();}}
-    void start(const RuntimeFiles& files,const MeleeWebMenuMatchSelection& selection,
+    const RuntimeFiles* runtime_files=nullptr;
+    RuntimeArchiveCache* runtime_cache=nullptr;
+    MeleeWebMenuMatchSelection selected{};
+    GameplayWorldSelection content{};
+    const MeleeWebStageContent* stage=nullptr;
+    unsigned construction_phase=0;
+    void begin(const RuntimeFiles& files,const MeleeWebMenuMatchSelection& selection,
                RuntimeArchiveCache* archive_cache){
-        const auto* stage=melee_web_stage_content(selection.start.rules.stkind);
+        runtime_files=&files;runtime_cache=archive_cache;selected=selection;
+        stage=melee_web_stage_content(selection.start.rules.stkind);
         check(stage!=nullptr,"Match stage has no source runtime owner");
-        GameplayWorldSelection content{};content.ground_kind=stage->ground_kind;
+        content.ground_kind=stage->ground_kind;
         for(unsigned i=0;i<2;i++){
             const auto* fighter=melee_web_fighter_content(selection.start.players[i].ckind);
             check(fighter&&selection.players[i].controller==i&&selection.players[i].stocks==4&&
                   selection.players[i].costume<fighter->costumes&&selection.players[i].sub_color<=4,
                   "Match requires the supported original four-stock menu selection");
             content.fighter_kinds[i]=fighter->fighter_kind;
+            content.costume_indices[i]=selection.players[i].costume;
         }
         check(melee_web_vs_mode_begin(),"Original VS mode is already owned");mode_owned=true;
-        world=archive_cache?std::make_unique<GameplayWorld>(files,content,*archive_cache):
-                            std::make_unique<GameplayWorld>(files,content);
+        if(archive_cache)
+            world=std::make_unique<GameplayWorld>(files,content,*archive_cache,
+                                                  GameplayWorldConstruction::Deferred);
+        else
+            world=std::make_unique<GameplayWorld>(files,content);
+    }
+    bool advance_construction(){
         char error[256]{};
-        hud_assets=archive_cache?std::make_unique<GameplayHudAssets>(files,*archive_cache):
-                                 std::make_unique<GameplayHudAssets>(files);
-        std::vector<std::span<const uint8_t>> banks;
-        for(const char* name:{"main.ssm","nr_select.ssm","nr_title.ssm",
-                              "nr_name.ssm","pokemon.ssm","end.ssm"})banks.emplace_back(files.at(name));
-        std::set<std::string_view> fighter_banks;
-        for(const auto kind:content.fighter_kinds){
-            const auto* dependency=melee_web_fighter_content_by_kind(kind);
-            if(fighter_banks.insert(dependency->audio_bank).second)banks.emplace_back(files.at(dependency->audio_bank));
+        if(construction_phase==0){
+            if(runtime_cache&&!world->advance_construction())return false;
+            construction_phase=1;
+            return false;
         }
-        bank=std::make_unique<GameplayAudioBank>(files.at("smash2.sem"),banks,files.at("dsp_coef.bin"));
-        check(melee_web_audio_enable_effects(bank->get(),error,sizeof(error)),error);
-        music_path="/audio/"+std::string(stage->music);
-        music=std::make_unique<GameplayAudioStream>(bank->get(),music_path.c_str(),files.at(stage->music));
-        check(lbAudioAx_80023F28(stage->music_id)==0,"Original selected stage music did not start");
-        MeleeWebPlayerSettings players[2]{};
-        for(unsigned i=0;i<2;i++){
-            const auto spawn=world->player_spawn(i);const auto& selected=selection.players[i];
-            players[i]={i,selected.controller,selected.stocks,{spawn[0],spawn[1],spawn[2]},spawn[0]<0?1.0f:-1.0f,
-                        selected.costume,selected.sub_color,content.fighter_kinds[i]};
+        if(construction_phase==1){
+            hud_assets=runtime_cache?std::make_unique<GameplayHudAssets>(*runtime_files,*runtime_cache):
+                                     std::make_unique<GameplayHudAssets>(*runtime_files);
+            std::vector<std::string_view> bank_names={"main.ssm","nr_select.ssm","nr_title.ssm",
+                                                      "nr_name.ssm","pokemon.ssm","end.ssm"};
+            std::set<std::string_view> fighter_banks;
+            for(const auto kind:content.fighter_kinds){
+                const auto* dependency=melee_web_fighter_content_by_kind(kind);
+                if(fighter_banks.insert(dependency->audio_bank).second)
+                    bank_names.emplace_back(dependency->audio_bank);
+            }
+            if(runtime_cache){
+                std::vector<std::shared_ptr<const DatAudioBank>> decoded;
+                decoded.reserve(bank_names.size());
+                for(const auto name:bank_names)decoded.push_back(runtime_cache->audio_bank(name));
+                bank=std::make_unique<GameplayAudioBank>(runtime_files->at("smash2.sem"),std::move(decoded),runtime_files->at("dsp_coef.bin"));
+            }else{
+                std::vector<std::span<const uint8_t>> banks;
+                banks.reserve(bank_names.size());
+                for(const auto name:bank_names)banks.emplace_back(runtime_files->at(std::string(name)));
+                bank=std::make_unique<GameplayAudioBank>(runtime_files->at("smash2.sem"),banks,runtime_files->at("dsp_coef.bin"));
+            }
+            check(melee_web_audio_enable_effects(bank->get(),error,sizeof(error)),error);
+            music_path="/audio/"+std::string(stage->music);
+            music=std::make_unique<GameplayAudioStream>(bank->get(),music_path.c_str(),runtime_files->at(stage->music));
+            check(lbAudioAx_80023F28(stage->music_id)==0,"Original selected stage music did not start");
+            construction_phase=2;
+            return false;
         }
-        match=melee_web_match_begin_players(players,2,70,selection.random_seed,world->collision(),error,sizeof(error));check(match!=nullptr,error);
-        world->enable_full_stage(true);
-        world->initialize_match(selection.start);
-        check(melee_web_match_create_fighters_intro(match,error,sizeof(error)),error);
-        MeleeWebRenderSettings settings{640,480,{0,25,180},{0,15,0},30,1,1000,(uint64_t(1)<<5)|(uint64_t(1)<<3)};
-        render=melee_web_render_begin_match(&settings,error,sizeof(error));check(render!=nullptr,error);
-        check(melee_web_render_use_match_passes(render,error,sizeof(error)),error);
-        hud=melee_web_hud_begin(selection.hud_layout,error,sizeof(error));check(hud!=nullptr,error);
-        check(melee_web_render_use_scene_cameras(render,error,sizeof(error)),error);
-        flow=melee_web_match_flow_begin(error,sizeof(error));check(flow!=nullptr,error);
+        if(construction_phase==2){
+            MeleeWebPlayerSettings players[2]{};
+            for(unsigned i=0;i<2;i++){
+                const auto spawn=world->player_spawn(i);const auto& player=selected.players[i];
+                players[i]={i,player.controller,player.stocks,{spawn[0],spawn[1],spawn[2]},spawn[0]<0?1.0f:-1.0f,
+                            player.costume,player.sub_color,content.fighter_kinds[i]};
+            }
+            match=melee_web_match_begin_players(players,2,70,selected.random_seed,world->collision(),error,sizeof(error));check(match!=nullptr,error);
+            world->enable_full_stage(true);
+            world->initialize_match(selected.start);
+            construction_phase=3;
+            return false;
+        }
+        if(construction_phase==3){
+            check(melee_web_match_create_fighters_intro(match,error,sizeof(error)),error);
+            construction_phase=4;
+            return false;
+        }
+        if(construction_phase==4){
+            MeleeWebRenderSettings settings{640,480,{0,25,180},{0,15,0},30,1,1000,(uint64_t(1)<<5)|(uint64_t(1)<<3)};
+            render=melee_web_render_begin_match(&settings,error,sizeof(error));check(render!=nullptr,error);
+            check(melee_web_render_use_match_passes(render,error,sizeof(error)),error);
+            hud=melee_web_hud_begin(selected.hud_layout,error,sizeof(error));check(hud!=nullptr,error);
+            check(melee_web_render_use_scene_cameras(render,error,sizeof(error)),error);
+            flow=melee_web_match_flow_begin(error,sizeof(error));check(flow!=nullptr,error);
+            construction_phase=5;
+        }
+        return true;
+    }
+    void start(const RuntimeFiles& files,const MeleeWebMenuMatchSelection& selection,
+               RuntimeArchiveCache* archive_cache){
+        begin(files,selection,archive_cache);
+        while(!advance_construction()){}
     }
     void close(){
         char error[256]{};
@@ -98,6 +147,16 @@ GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,
                                            const MeleeWebMenuMatchSelection& selection,
                                            RuntimeArchiveCache& archive_cache)
     :storage_(std::make_unique<Storage>()){storage_->start(files,selection,&archive_cache);}
+GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,
+                                           const MeleeWebMenuMatchSelection& selection,
+                                           RuntimeArchiveCache& archive_cache,
+                                           GameplayMatchConstruction construction)
+    :storage_(std::make_unique<Storage>()){
+    if(construction==GameplayMatchConstruction::Deferred)
+        storage_->begin(files,selection,&archive_cache);
+    else
+        storage_->start(files,selection,&archive_cache);
+}
 GameplayMatchSession::~GameplayMatchSession()=default;
 void GameplayMatchSession::close(){if(storage_){storage_->close();storage_.reset();}}
 void GameplayMatchSession::tick(const PADStatus raw[4]){
@@ -130,4 +189,6 @@ MeleeWebMatchStats GameplayMatchSession::player_stats(unsigned index)const{
     check(melee_web_match_player_stats(storage_->match,index,&stats,error,sizeof(error)),error);return stats;
 }
 MeleeWebAudio* GameplayMatchSession::audio()const{return storage_&&storage_->bank?storage_->bank->get():nullptr;}
+bool GameplayMatchSession::advance_construction(){return storage_&&storage_->advance_construction();}
+bool GameplayMatchSession::construction_complete()const{return storage_&&storage_->construction_phase==5;}
 }

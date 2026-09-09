@@ -30,13 +30,14 @@ _Static_assert(sizeof(VoiceParameters)==64&&offsetof(SampleEntry,voice)==16,"Ori
 _Static_assert(sizeof(AXVPB)==0x1f8&&sizeof(AXPB)==0xc0,"Original SDK voice/control ABI");
 typedef struct Binding {const MeleeWebAudioChannel* channel;uint32_t id,base;} Binding;
 typedef struct Playback {const Binding* binding;Binding stream_binding;size_t position;MeleeWebAudioResample resample;int loop,playing;int16_t history[64];unsigned history_at;} Playback;
-struct MeleeWebAudio {const MeleeWebAudioInput* input;SampleEntry* entries;Binding* bindings;uint32_t binding_count;u32** programs;u32* words;u32* starts;Playback playback[64];unsigned block_pos;u32* source_sem;uint8_t ai_stream_volume[2];int source_closed;
+struct MeleeWebAudio {const MeleeWebAudioInput* input;SampleEntry* entries;Binding* bindings;uint32_t binding_count;u32** programs;u32* words;u32* starts;Playback playback[64];unsigned block_pos;u32* source_sem;uint64_t generation;uint8_t ai_stream_volume[2];int source_closed;
 #if defined(MELEE_WEB_AUDIO_FX)
 MeleeWebAudioEffects* effects;
 #endif
 };
 static MeleeWebAudio* active;
 static uint32_t command_budget;
+static uint64_t next_generation;
 void melee_web_audio_program_check(const u32* command){
  if(!active)return;
  uintptr_t at=(uintptr_t)command,begin=(uintptr_t)(active->source_sem?active->source_sem:active->words),end=begin+active->input->word_count*4;
@@ -68,7 +69,10 @@ MeleeWebAudio* melee_web_audio_begin(const MeleeWebAudioInput* in,char* e,size_t
  MeleeWebAudio* a=calloc(1,sizeof(*a));if(!a){fail(e,n,"Audio scope allocation failed");return NULL;}
  a->entries=calloc(in->sample_count,sizeof(*a->entries));a->bindings=calloc(binding_count,sizeof(*a->bindings));a->programs=calloc(in->program_count,sizeof(*a->programs));a->words=malloc(in->word_count*4);a->starts=malloc(in->bank_count*4);
  if(!a->entries||!a->bindings||!a->programs||!a->words||!a->starts){free_owner(a);fail(e,n,"Audio descriptor allocation failed");return NULL;}
- a->input=in;a->binding_count=binding_count;memcpy(a->words,in->words,in->word_count*4);memcpy(a->starts,in->bank_starts,in->bank_count*4);
+ a->input=in;a->binding_count=binding_count;
+ if(next_generation==UINT64_MAX){free_owner(a);fail(e,n,"Audio lifetime identity exhausted");return NULL;}
+ a->generation=++next_generation;
+ memcpy(a->words,in->words,in->word_count*4);memcpy(a->starts,in->bank_starts,in->bank_count*4);
  for(uint32_t i=0;i<in->program_count;i++)a->programs[i]=a->words+in->program_offsets[i]/4;
  void* buckets[32]={0};uint32_t bound=0;uint64_t base=0x10000;
  for(uint32_t i=0;i<in->sample_count;i++){
@@ -204,6 +208,7 @@ int melee_web_audio_render(MeleeWebAudio* a,float* output,uint32_t frames,char* 
 int melee_web_audio_active_samples(MeleeWebAudio* a,uint32_t* ids,uint32_t capacity){
  if(!live(a)||!ids)return -1;uint32_t count=0;for(unsigned i=0;i<64;i++)if(a->playback[i].playing){if(count>=capacity)return -1;ids[count++]=a->playback[i].binding->id;}return count;
 }
+uint64_t melee_web_audio_generation(MeleeWebAudio* a){return live(a)?a->generation:0;}
 int melee_web_audio_end(MeleeWebAudio* a,char* e,size_t n){
  if(!live(a))return fail(e,n,"Audio scope is not active");
  if(melee_web_audio_bank_transport_active())return fail(e,n,"Release owned source SSM transport before enclosing audio scope");

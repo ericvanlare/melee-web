@@ -6,6 +6,7 @@ extern "C" {
 #endif
 typedef struct MeleeWebAudioStreamBlock {
  uint32_t offset,size,end,next;
+ const uint8_t* payload[2];uint32_t channel_bytes;
  MeleeWebAudioChannel channel[2];
 } MeleeWebAudioStreamBlock;
 typedef struct MeleeWebAudioStreamInput {

@@ -23,6 +23,7 @@ typedef struct Request {
 struct MeleeWebAudioStream {
  MeleeWebAudio* audio;const MeleeWebAudioStreamInput* input;MeleeWebIo* io;
  uint64_t file,aux,relay;void* headers[3];const MeleeWebAudioStreamBlock* slots[3];
+ MeleeWebAudioChannel slot_channels[3][2];int16_t* slot_pcm[3][2];
  Request* requests;uint32_t next_id,completed,revisited;uint8_t* visited;int pumping;
 };
 static MeleeWebAudioStream* active;
@@ -51,6 +52,37 @@ static void block_native(void* out,const MeleeWebAudioStreamBlock* b){
  h.size=b->size;h.end=b->end;h.next=b->next;
  for(unsigned i=0;i<active->input->channels;i++){h.history[i].dsp.loop_pred_scale=b->channel[i].predictor_scale;h.history[i].dsp.loop_yn1=b->channel[i].history1;h.history[i].dsp.loop_yn2=b->channel[i].history2;}
  memcpy(out,&h,sizeof(h));
+}
+static size_t sample_index(uint32_t address){return (size_t)(address/16)*14+address%16-2;}
+static int decode_slot(unsigned slot,const MeleeWebAudioStreamBlock* block,char* e,size_t n){
+ for(unsigned side=0;side<active->input->channels;side++){
+  const MeleeWebAudioChannel* source=&block->channel[side];
+  const size_t frames=sample_index(source->end_nibble)-sample_index(source->current_nibble)+1;
+  int16_t* pcm=malloc(frames*sizeof(*pcm));
+  if(!pcm)return fail(e,n,"HPS slot PCM allocation failed");
+  uint16_t predictor_scale=source->predictor_scale;
+  int16_t history1=source->history1,history2=source->history2;
+  size_t output=0;
+  for(uint32_t at=source->current_nibble;at<=source->end_nibble;){
+   if(at%16==0){predictor_scale=block->payload[side][at/2];if(predictor_scale&0x80){free(pcm);return fail(e,n,"Invalid HPS DSP frame predictor");}at+=2;}
+   if(at>source->end_nibble)break;
+   const unsigned raw=(at&1)?block->payload[side][at/2]&15:block->payload[side][at/2]>>4;
+   const int nibble=raw<8?(int)raw:(int)raw-16;
+   int64_t rounded=(int64_t)source->coefficients[(predictor_scale>>4)*2]*history1+
+                   (int64_t)source->coefficients[(predictor_scale>>4)*2+1]*history2+
+                   (int64_t)nibble*((int64_t)1<<(predictor_scale&15))*2048;
+   rounded=rounded*32+0x8000;
+   if(rounded<INT32_MIN)rounded=INT32_MIN;else if(rounded>INT32_MAX)rounded=INT32_MAX;
+   const int16_t value=(int16_t)(rounded>=0?rounded/65536:-((-rounded+65535)/65536));
+   pcm[output++]=value;history2=history1;history1=value;++at;
+  }
+  if(output!=frames){free(pcm);return fail(e,n,"HPS slot PCM extent mismatch");}
+  free(active->slot_pcm[slot][side]);active->slot_pcm[slot][side]=pcm;
+  active->slot_channels[slot][side]=*source;
+  active->slot_channels[slot][side].pcm=pcm;
+  active->slot_channels[slot][side].frames=frames;
+ }
+ return 1;
 }
 MeleeWebAudioStream* melee_web_audio_stream_begin(MeleeWebAudio* audio,const MeleeWebAudioStreamInput* in,char* e,size_t n){
  if(active||!melee_web_audio_is_active(audio)||!in||!in->path||!in->bytes||in->size<128||!in->blocks||!in->count||in->count>16384||in->channels<1||in->channels>2||!in->rate||in->rate>192000){fail(e,n,"Invalid or already-owned HPS scope");return NULL;}
@@ -111,7 +143,7 @@ int melee_web_audio_stream_pump_for(MeleeWebAudio* audio,char* e,size_t n){
    if(!melee_web_io_submit(active->io,from,to,r->size,NULL,NULL,&request,e,n)||!melee_web_io_pump(active->io,1,&completed,e,n)||completed!=1)stop("owned byte transfer failed");
    if(r->type==0x22){if(!melee_web_io_buffer(active->io,active->relay,&relay,&length,e,n))stop("relay missing");header_native(relay);}
    if(r->type==0x21)block_native((void*)r->dest,r->block);
-   if(r->type==0x23){active->slots[r->slot]=r->block;active->completed++;size_t index=r->block-active->input->blocks;if(active->visited[index])active->revisited++;active->visited[index]=1;}
+   if(r->type==0x23){if(!decode_slot(r->slot,r->block,e,n)){free(r);active->pumping=0;return 0;}active->slots[r->slot]=r->block;active->completed++;size_t index=r->block-active->input->blocks;if(active->visited[index])active->revisited++;active->visited[index]=1;}
   }
   if(r->callback)r->callback(r->id,(int)r->args,relay,r->cancelled);free(r);
  }
@@ -124,7 +156,7 @@ int melee_web_audio_stream_resolve(MeleeWebAudio* audio,uint32_t address,const M
  const MeleeWebAudioStreamBlock* b=active->slots[slot];
  for(unsigned i=0;i<active->input->channels;i++){
   uint32_t start=STREAM_BASE*2u+slot*0x20000+i*(b->size*2/active->input->channels);
-  if(address>=start+2&&address<=start+b->end){*channel=&b->channel[i];*base=start;return 1;}
+  if(address>=start+2&&address<=start+b->end){*channel=&active->slot_channels[slot][i];*base=start;return 1;}
  }
  return 0;
 }
@@ -137,5 +169,5 @@ int melee_web_audio_stream_end(MeleeWebAudioStream* s,char* e,size_t n){
   if(melee_web_audio_stream_source_loading())return fail(e,n,"Original HPS source remains loading");
   melee_web_audio_stream_source_stop();
  }
- if(!melee_web_io_destroy(s->io,e,n))return 0;melee_web_audio_stream_lb_end();active=NULL;free(s->visited);free(s);return 1;
+ if(!melee_web_io_destroy(s->io,e,n))return 0;melee_web_audio_stream_lb_end();active=NULL;for(unsigned slot=0;slot<3;slot++)for(unsigned side=0;side<2;side++)free(s->slot_pcm[slot][side]);free(s->visited);free(s);return 1;
 }

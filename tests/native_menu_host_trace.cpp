@@ -1,6 +1,7 @@
 #include "gameplay_menu_world.hpp"
 #include "gameplay_menu_host.h"
 #include "gameplay_match_session.hpp"
+#include "gameplay_audio_stream.h"
 #include "native_menu_fighter_input.h"
 #include "native_menu_stage_input.h"
 #include <melee/ft/forward.h>
@@ -39,9 +40,31 @@ int main(int argc,char** argv){try{
    for(unsigned wait=0;result!=3&&wait<120;wait++)result=tick();
    check(result==3,"Original menu input did not complete its transition");
    check(melee_web_menu_host_leave(host,0,error,sizeof(error)),error);
-   world->verify_immutable_archives();world->close();world.reset();
+   world->verify_immutable_archives();
+  };
+  auto rebuild_menu_scene=[&](){
+   MeleeWebAudio* retained=world->audio();
+   const uint64_t generation=melee_web_audio_generation(retained);
+   uint32_t completed=0,revisited=0,after_completed=0,after_revisited=0;
+   check(generation!=0,"Original menu audio lifetime is unavailable");
+   check(melee_web_audio_stream_progress(retained,&completed,&revisited),
+         "Original menu HPS progress is unavailable before scene rebuild");
+   const auto scene=melee_web_menu_host_phase(host)==2?
+       melee_web::GameplayMenuScene::Stages:melee_web::GameplayMenuScene::Characters;
+   world->rebuild_scene(scene);
+   check(world->audio()==retained&&melee_web_audio_generation(world->audio())==generation,
+         "CSS/SSS scene rebuild replaced the original menu audio lifetime");
+   check(melee_web_audio_stream_progress(world->audio(),&after_completed,&after_revisited)&&
+         after_completed==completed&&after_revisited==revisited,
+         "CSS/SSS scene rebuild reset or advanced menu music outside an audio tick");
+   check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);
   };
   for(unsigned t=0;t<120;t++)check(tick()==1,"Unexpected CSS transition");
+  uint32_t initial_music_completed=0,initial_music_revisited=0;
+  check(melee_web_audio_stream_progress(world->audio(),&initial_music_completed,
+                                         &initial_music_revisited)&&
+        initial_music_completed>0,
+        "Original CSS music did not load an HPS payload");
   if(cycle==1){
    bool falco_selected=false;
    for(unsigned t=0;t<180;t++){
@@ -70,18 +93,15 @@ int main(int argc,char** argv){try{
     check(tick()==1,"CSS transitioned during Falco confirmation settle");
   }
   transition();check(melee_web_menu_host_phase(host)==2,"CSS did not choose original SSS");
-  world=std::make_unique<melee_web::GameplayMenuWorld>(files);audio_phase=0;
-  check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);
+  rebuild_menu_scene();
   for(unsigned t=0;t<120;t++)check(tick()==1,"Unexpected SSS transition");
   // Exercise the real B cancellation before committing the match, with new
   // owned worlds for both directions and no direct source selection writes.
   transition(PAD_BUTTON_B);check(melee_web_menu_host_phase(host)==4,"Original SSS B did not return toward CSS");
-  world=std::make_unique<melee_web::GameplayMenuWorld>(files);audio_phase=0;
-  check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);
+  rebuild_menu_scene();
   for(unsigned t=0;t<120;t++)check(tick()==1,"Unexpected cancelled CSS transition");
   transition();check(melee_web_menu_host_phase(host)==2,"Returned CSS did not choose SSS");
-  world=std::make_unique<melee_web::GameplayMenuWorld>(files);audio_phase=0;
-  check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);
+  rebuild_menu_scene();
   for(unsigned t=0;t<120;t++)check(tick()==1,"Unexpected second SSS transition");
   // Move the original SSS cursor with raw PAD input. Random is deliberately
   // not used: adding an available stage must not change the FD regression.
@@ -98,11 +118,17 @@ int main(int argc,char** argv){try{
    check(tick()==1,"SSS cursor input unexpectedly transitioned");
   }
   check(at_target,"Original SSS cursor did not reach requested stage");
+  uint32_t continued_music_completed=0,continued_music_revisited=0;
+  check(melee_web_audio_stream_progress(world->audio(),&continued_music_completed,
+                                         &continued_music_revisited)&&
+        continued_music_completed>initial_music_completed,
+        "Original menu music did not continue loading across CSS/SSS scenes");
   transition();check(melee_web_menu_host_phase(host)==5,"SSS did not complete original selection");
   MeleeWebMenuMatchSelection selection{};check(melee_web_menu_host_selection(host,&selection,error,sizeof(error)),error);
   check(selection.start.rules.stkind==stage_kind,"Source SSS committed another stage");
   check(selection.start.players[0].ckind==(cycle==1?CKIND_FALCO:CKIND_MARIO),
         "Source CSS committed another P1 character");
+  world->close();world.reset();audio_phase=0;
   if(cycle==0)for(unsigned stop:{0u,60u,100u}){
    // Unload both before and after Ready's stage-start callback, then rebuild
    // the full SDK world from the same immutable native selection.

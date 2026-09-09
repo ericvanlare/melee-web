@@ -12,7 +12,7 @@ struct Reader {
     uint32_t word(size_t o)const{return uint32_t(half(o))<<16|half(o+2);}
 };
 }
-DatAudioStream::DatAudioStream(std::span<const uint8_t> bytes){
+DatAudioStream::DatAudioStream(std::span<const uint8_t> bytes,bool decode_payloads){
     Reader r{bytes};r.range(0,128);
     require(bytes.size()<=64U*1024U*1024U,"HPS input exceeds stream budget");
     require(std::memcmp(bytes.data()," HALPST\0",8)==0,"Invalid HPS magic");
@@ -48,8 +48,16 @@ DatAudioStream::DatAudioStream(std::span<const uint8_t> bytes){
             if(blocks.empty())require(c.predictor_scale==channel_headers[i].predictor_scale&&c.history1==channel_headers[i].history1&&c.history2==channel_headers[i].history2,"HPS initial header and first block histories disagree");
             c.current_nibble=2;c.end_nibble=b.end_nibble;c.looping=false;
             const auto payload=bytes.subspan(size_t(cursor)+32+i*channel_bytes,channel_bytes);
+            b.payloads[i]=payload;
             require(payload[0]==c.predictor_scale,"HPS block header/frame predictor mismatch");
-            decode_audio_adpcm(payload,c,2,c.predictor_scale,c.history1,c.history2,c.pcm,budget);
+            if(decode_payloads)
+                decode_audio_adpcm(payload,c,2,c.predictor_scale,c.history1,c.history2,c.pcm,budget);
+            else {
+                const size_t frames=size_t(c.end_nibble/16)*14+c.end_nibble%16-2;
+                require(budget<=64U*1024U*1024U&&frames+1<=(64U*1024U*1024U-budget)/2,
+                        "HPS decoded PCM exceeds stream budget");
+                budget+=(frames+1)*2;
+            }
             b.channels.push_back(std::move(c));
         }
         visited.emplace(cursor,blocks.size());blocks.push_back(std::move(b));cursor=blocks.back().next_offset;

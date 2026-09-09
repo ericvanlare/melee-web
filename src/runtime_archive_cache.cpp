@@ -31,6 +31,30 @@ RuntimeArchiveCache::archive(std::string_view name, DatExternalPolicy policy)
     return parsed;
 }
 
+std::shared_ptr<const DatAudioBank>
+RuntimeArchiveCache::audio_bank(std::string_view name)
+{
+    const auto file = files_.find(name);
+    if (file == files_.end() || file->second.empty() ||
+        file->second.size() > DatArchive::max_archive_bytes) {
+        throw DatError("Missing or invalid runtime audio bank: " +
+                       std::string(name));
+    }
+    if (const auto cached = audio_entries_.find(name);
+        cached != audio_entries_.end()) {
+        if (cached->second.source_data != file->second.data() ||
+            cached->second.source_size != file->second.size()) {
+            throw DatError("Runtime audio bank bytes changed while cached: " +
+                           std::string(name));
+        }
+        return cached->second.bank;
+    }
+    auto parsed = std::make_shared<const DatAudioBank>(file->second);
+    audio_entries_.emplace(std::string(name), AudioEntry{
+        parsed, file->second.data(), file->second.size()});
+    return parsed;
+}
+
 void RuntimeArchiveCache::verify(
     const std::shared_ptr<const DatArchive>& archive) const
 {

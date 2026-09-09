@@ -87,6 +87,7 @@ struct GameplayMenuWorld::Storage {
     std::span<const std::uint8_t> sem;
     std::span<const std::uint8_t> coefficients;
     std::span<const std::uint8_t> hps;
+    std::span<const std::uint8_t> font_bytes;
     std::array<std::span<const std::uint8_t>, kBankFiles.size()> bank_bytes;
 
     std::unique_ptr<GameplayAudioBank> audio_bank;
@@ -99,6 +100,7 @@ struct GameplayMenuWorld::Storage {
     bool world_started = false;
     bool transport_started = false;
     bool fully_constructed = false;
+    bool scene_rebuild_started = false;
     bool closed = false;
 
     std::shared_ptr<const DatArchive> archive(std::string_view name) const
@@ -131,18 +133,8 @@ struct GameplayMenuWorld::Storage {
         }
     }
 
-    void start(const RuntimeFiles& files, RuntimeArchiveCache* cache)
+    void start_scene(GameplayMenuScene scene)
     {
-        archive_cache = cache;
-        load_archives(files);
-
-        const auto& font_bytes = require_file(files, "sislib_font.bin");
-        sem = std::span<const std::uint8_t>{require_file(files, "smash2.sem")};
-        coefficients = std::span<const std::uint8_t>{require_file(files, "dsp_coef.bin")};
-        hps = std::span<const std::uint8_t>{require_file(files, "menu01.hps")};
-        for (std::size_t i = 0; i < kBankFiles.size(); ++i)
-            bank_bytes[i] = std::span<const std::uint8_t>{require_file(files, kBankFiles[i])};
-
         check(melee_web_gameplay_startup(kWorldHeapBytes, error, sizeof(error)),
               error, "Native menu SDK world startup failed");
         world_started = true;
@@ -151,27 +143,31 @@ struct GameplayMenuWorld::Storage {
 
         // These owners hydrate the exact source roots before publication. The
         // source files still own scene state, object creation, and animation.
-        css = std::make_unique<DatNativeMenu>(archive("MnSlChr.usd"),
-                                              NativeMenuKind::Characters);
-        sss = std::make_unique<DatNativeMenu>(archive("MnSlMap.usd"),
-                                              NativeMenuKind::Stages);
-        sis = std::make_unique<DatSis>(archive("SdSlChr.usd"),
-                                       "SIS_SelCharData");
-        card_icons = std::make_unique<DatMenuSupport>(
-            archive("LbMcGame.usd"), DatMenuSupportKind::CardIcons);
-        card_scene = std::make_unique<DatMenuSupport>(
-            archive("NtMemAc.usd"), DatMenuSupportKind::CardScene);
-
-        std::vector<MeleeWebArchiveSymbol> symbols = {
-            {"MnSlChr.usd", "MnSelectChrDataTable", css->descriptor()},
-            {"MnSlMap.usd", "MnSelectStageDataTable", sss->descriptor()},
-            {"SdSlChr.usd", "SIS_SelCharData", sis->descriptor()},
-            {"LbMcGame.usd", "MemCardIconData", card_icons->descriptor()},
-            {"NtMemAc.usd", "ScNtcCommon_scene_data", card_scene->descriptor()},
-        };
-        const auto extra = archive("MnExtAll.usd");
-        for (const auto& symbol : extra->public_symbols())
-            symbols.push_back({"MnExtAll.usd", symbol.name.c_str(), nullptr});
+        std::vector<MeleeWebArchiveSymbol> symbols;
+        if (scene == GameplayMenuScene::Stages) {
+            sss = std::make_unique<DatNativeMenu>(archive("MnSlMap.usd"),
+                                                  NativeMenuKind::Stages);
+            symbols.push_back(
+                {"MnSlMap.usd", "MnSelectStageDataTable", sss->descriptor()});
+        } else {
+            css = std::make_unique<DatNativeMenu>(archive("MnSlChr.usd"),
+                                                  NativeMenuKind::Characters);
+            sis = std::make_unique<DatSis>(archive("SdSlChr.usd"),
+                                           "SIS_SelCharData");
+            card_icons = std::make_unique<DatMenuSupport>(
+                archive("LbMcGame.usd"), DatMenuSupportKind::CardIcons);
+            card_scene = std::make_unique<DatMenuSupport>(
+                archive("NtMemAc.usd"), DatMenuSupportKind::CardScene);
+            symbols = {
+                {"MnSlChr.usd", "MnSelectChrDataTable", css->descriptor()},
+                {"SdSlChr.usd", "SIS_SelCharData", sis->descriptor()},
+                {"LbMcGame.usd", "MemCardIconData", card_icons->descriptor()},
+                {"NtMemAc.usd", "ScNtcCommon_scene_data", card_scene->descriptor()},
+            };
+            const auto extra = archive("MnExtAll.usd");
+            for (const auto& symbol : extra->public_symbols())
+                symbols.push_back({"MnExtAll.usd", symbol.name.c_str(), nullptr});
+        }
         archive_scope = melee_web_archive_sections_register_heap(
             symbols.data(), symbols.size(), error, sizeof(error));
         check(archive_scope != nullptr, error,
@@ -180,12 +176,24 @@ struct GameplayMenuWorld::Storage {
         font = melee_web_font_atlas_register(font_bytes.data(), font_bytes.size(),
                                              error, sizeof(error));
         check(font != nullptr, error, "Native menu font registration failed");
+    }
 
-        std::vector<std::span<const std::uint8_t>> bank_views;
-        bank_views.reserve(bank_bytes.size());
-        for (const auto& bytes : bank_bytes) bank_views.emplace_back(bytes);
-        audio_bank = std::make_unique<GameplayAudioBank>(sem, bank_views,
-                                                          coefficients);
+    void start_audio()
+    {
+        if (archive_cache) {
+            std::vector<std::shared_ptr<const DatAudioBank>> decoded;
+            decoded.reserve(kBankFiles.size());
+            for (const auto name : kBankFiles)
+                decoded.push_back(archive_cache->audio_bank(name));
+            audio_bank = std::make_unique<GameplayAudioBank>(
+                sem, std::move(decoded), coefficients);
+        } else {
+            std::vector<std::span<const std::uint8_t>> bank_views;
+            bank_views.reserve(bank_bytes.size());
+            for (const auto& bytes : bank_bytes) bank_views.emplace_back(bytes);
+            audio_bank = std::make_unique<GameplayAudioBank>(sem, bank_views,
+                                                              coefficients);
+        }
 
         residency = melee_web_audio_residency_create(error, sizeof(error));
         check(residency != nullptr, error,
@@ -214,7 +222,22 @@ struct GameplayMenuWorld::Storage {
               error, "Native menu source audio effects setup failed");
         music = std::make_unique<GameplayAudioStream>(
             audio_bank->get(), "/audio/menu01.hps", hps);
+    }
 
+    void start(const RuntimeFiles& files, RuntimeArchiveCache* cache)
+    {
+        archive_cache = cache;
+        load_archives(files);
+
+        font_bytes = std::span<const std::uint8_t>{require_file(files, "sislib_font.bin")};
+        sem = std::span<const std::uint8_t>{require_file(files, "smash2.sem")};
+        coefficients = std::span<const std::uint8_t>{require_file(files, "dsp_coef.bin")};
+        hps = std::span<const std::uint8_t>{require_file(files, "menu01.hps")};
+        for (std::size_t i = 0; i < kBankFiles.size(); ++i)
+            bank_bytes[i] = std::span<const std::uint8_t>{require_file(files, kBankFiles[i])};
+
+        start_scene(GameplayMenuScene::Characters);
+        start_audio();
         fully_constructed = true;
     }
 
@@ -253,32 +276,8 @@ struct GameplayMenuWorld::Storage {
             throw DatError("Native menu source audio transport did not drain");
     }
 
-    void close_impl(bool discard_card_globals)
+    void close_scene(bool discard_card_globals)
     {
-        if (closed) return;
-
-        // On normal use the caller has already run source OnExit. Calling the
-        // original stop path again is deliberate: it closes the source's
-        // bank/voice transition before the host stream and transport owners.
-        // A constructor rollback cannot have run source audio startup, so it
-        // must only release the host transport. Normal close is explicitly
-        // after the caller's OnExit and runs the original stop transition.
-        if (discard_card_globals) drain_source_audio();
-        music.reset();
-
-        if (transport_started) {
-            check(melee_web_audio_bank_transport_end(error, sizeof(error)),
-                  error, "Native menu source audio transport close failed");
-            transport_started = false;
-        }
-        if (residency) {
-            check(melee_web_audio_residency_destroy(residency, error,
-                                                    sizeof(error)),
-                  error, "Native menu audio residency close failed");
-            residency = nullptr;
-        }
-        audio_bank.reset();
-
         if (world_started) {
             check(melee_web_gameplay_shutdown(error, sizeof(error)), error,
                   "Native menu SDK world shutdown failed");
@@ -312,6 +311,62 @@ struct GameplayMenuWorld::Storage {
         sis.reset();
         sss.reset();
         css.reset();
+    }
+
+    void begin_scene_rebuild()
+    {
+        if (closed || !fully_constructed || !audio_bank || !transport_started ||
+            !music || scene_rebuild_started) {
+            fail("Native menu scene rebuild requires a live complete audio scope");
+        }
+        verify();
+        close_scene(true);
+        scene_rebuild_started = true;
+    }
+
+    void finish_scene_rebuild(GameplayMenuScene scene)
+    {
+        if (closed || !scene_rebuild_started || world_started || archive_scope ||
+            font) {
+            fail("Native menu scene rebuild finish requires completed teardown");
+        }
+        start_scene(scene);
+        scene_rebuild_started = false;
+    }
+
+    void rebuild_scene(GameplayMenuScene scene)
+    {
+        begin_scene_rebuild();
+        finish_scene_rebuild(scene);
+    }
+
+    void close_impl(bool discard_card_globals)
+    {
+        if (closed) return;
+
+        // On normal use the caller has already run source OnExit. Calling the
+        // original stop path again is deliberate: it closes the source's
+        // bank/voice transition before the host stream and transport owners.
+        // A constructor rollback cannot have run source audio startup, so it
+        // must only release the host transport. Normal close is explicitly
+        // after the caller's OnExit and runs the original stop transition.
+        if (discard_card_globals) drain_source_audio();
+        music.reset();
+
+        if (transport_started) {
+            check(melee_web_audio_bank_transport_end(error, sizeof(error)),
+                  error, "Native menu source audio transport close failed");
+            transport_started = false;
+        }
+        if (residency) {
+            check(melee_web_audio_residency_destroy(residency, error,
+                                                    sizeof(error)),
+                  error, "Native menu audio residency close failed");
+            residency = nullptr;
+        }
+        audio_bank.reset();
+
+        close_scene(discard_card_globals);
         closed = true;
     }
 
@@ -352,6 +407,21 @@ void GameplayMenuWorld::close()
 void GameplayMenuWorld::close_prepared()
 {
     storage_->close_impl(false);
+}
+
+void GameplayMenuWorld::rebuild_scene(GameplayMenuScene scene)
+{
+    storage_->rebuild_scene(scene);
+}
+
+void GameplayMenuWorld::begin_scene_rebuild()
+{
+    storage_->begin_scene_rebuild();
+}
+
+void GameplayMenuWorld::finish_scene_rebuild(GameplayMenuScene scene)
+{
+    storage_->finish_scene_rebuild(scene);
 }
 
 MeleeWebAudio* GameplayMenuWorld::audio() const noexcept

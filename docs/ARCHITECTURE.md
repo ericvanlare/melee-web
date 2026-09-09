@@ -216,3 +216,31 @@ pointers fail that test. Port storage identity and completion explicitly, reusin
 checked decoded clips without pretending raw BE archive relocation is valid.
 Acceptance is real creation, neutral source ticks, unload and restart before
 movement/combat and the local stock-match gate.
+
+## 015 — Immutable decode caches and staged mutable ownership
+
+One disc import owns a `RuntimeArchiveCache` for immutable DAT and SSM decodes.
+Every cache entry records the original byte storage identity and size; reuse
+rejects if either changes. Mutable HSD graphs, source globals, fighters, scenes,
+and audio voices are never cached. Match worlds hydrate only the costumes in the
+confirmed menu selection, while costume zero remains the source base topology.
+
+Large source-owner constructors expose ordered continuation points without
+reordering source calls inside a phase. World core, fighter kinds, effects,
+items, HUD/audio, match/stage initialization, fighter intro, and render flow are
+advanced on separate browser callbacks. CSS/SSS also separate old-scene teardown
+from new-scene hydration. Rollback and close accept every partial phase.
+
+The menu audio engine follows the retail lifetime split: synth allocations use
+a dedicated audio heap, and CSS/SSS scene heaps can be replaced without freeing
+resident banks or `menu01.hps`. A monotonic generation identifies the owner even
+if an allocator reuses an address. One audio clock continues across both menu
+scenes and renders before visual construction callbacks, preserving fractional
+phase and the AudioWorklet queue. Entering a match closes that owner and starts
+the selected stage stream normally.
+
+HPS construction validates headers, block links, channel metadata, payload
+bounds, and total decoded budget, but leaves compressed payloads in immutable
+disc storage. The original three-slot stream transport decodes a block with the
+same DSP rounding and saturation when its source transfer completes. This keeps
+full-track decoding out of scene entry while preserving exact PCM evidence.

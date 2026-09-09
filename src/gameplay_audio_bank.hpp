@@ -10,6 +10,9 @@ namespace melee_web {
 class GameplayAudioBank {
 public:
  GameplayAudioBank(std::span<const uint8_t> sem, const std::vector<std::span<const uint8_t>>& banks, std::span<const uint8_t> coefficients);
+ GameplayAudioBank(std::span<const uint8_t> sem,
+                   std::vector<std::shared_ptr<const DatAudioBank>> banks,
+                   std::span<const uint8_t> coefficients);
  ~GameplayAudioBank();
  GameplayAudioBank(const GameplayAudioBank&)=delete;
  GameplayAudioBank& operator=(const GameplayAudioBank&)=delete;
@@ -17,9 +20,10 @@ public:
 private:
  DatAudioPrograms programs_;
  std::vector<int16_t> coefficients_;
- std::vector<std::unique_ptr<DatAudioBank>> banks_;
+ std::vector<std::shared_ptr<const DatAudioBank>> banks_;
  std::vector<MeleeWebAudioSample> samples_;
  MeleeWebAudioInput input_{};
  MeleeWebAudio* audio_=nullptr;
+ void start(std::span<const uint8_t> coefficients);
 };
 }
