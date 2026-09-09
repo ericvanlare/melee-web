@@ -44,17 +44,22 @@ DatSis::DatSis(std::shared_ptr<const DatArchive> archive, std::string_view symbo
     };
     // These field names are reversed in the recovered SIS declaration:
     // field 0 is I4 glyph pixels, field 1 is two-byte kerning pairs.
-    const auto pixels = a.pointer(*root);
+    const auto pixels = a.pointer(*root, 0);
     const auto kerning = a.pointer(*root + 4);
     require(pixels.has_value() == kerning.has_value(), "Incomplete SIS font data");
     size_t custom_glyphs = 0;
     if (pixels) {
-        auto image_bytes = region(*pixels), kern_bytes = region(*kerning);
+        auto image_bytes = *pixels == a.data().size() ? a.range(*pixels, 0) : region(*pixels);
+        auto kern_bytes = region(*kerning);
         require(!(*pixels & 31) && image_bytes.size() % 512 == 0 && kern_bytes.size() >= 2,
                 "Invalid SIS I4 glyph atlas");
         custom_glyphs = std::min(image_bytes.size() / 512, kern_bytes.size() / 2);
-        s.table[0] = s.copy(image_bytes);
         s.table[1] = s.copy(kern_bytes);
+        // Text-only SIS archives can point their zero-length custom atlas at
+        // end-of-data. Preserve a non-null one-past pointer into owned storage;
+        // the zero glyph count below rejects every attempted custom glyph read.
+        s.table[0] = image_bytes.empty() ?
+            static_cast<uint8_t*>(s.table[1]) + kern_bytes.size() : s.copy(image_bytes);
     }
     std::map<uint32_t, void*> strings;
     size_t total_bytes = 0;

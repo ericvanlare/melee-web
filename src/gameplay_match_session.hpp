@@ -15,6 +15,8 @@ public:
     void tick(const PADStatus[4]);
     void draw();
     int outcome(int& winner) const;
+    bool ready() const;
+    int hud_damage(unsigned player) const;
     uint32_t random_seed() const;
     MeleeWebMatchStats player_stats(unsigned index) const;
     MeleeWebAudio* audio() const;

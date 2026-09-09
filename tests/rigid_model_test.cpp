@@ -965,6 +965,34 @@ void direct_rgba8_geometry()
     rejects([&] { (void) fixture.model(); }); // DIRECT has no external array even at relocated zero.
 }
 
+void direct_rgba4_geometry()
+{
+    Fixture fixture;
+    put32(fixture.data, Fixture::mobj + 4, 2);
+    fixture.attribute(Fixture::descriptors + 24, 11, 1, 1, 3, 0, 4, 0);
+    fixture.unlink(Fixture::descriptors + 44);
+    put32(fixture.data, Fixture::descriptors + 48, 255);
+    for (uint8_t i = 0; i < 3; ++i) {
+        const auto cursor = Fixture::display + 3 + i * 3;
+        fixture.data[cursor] = i;
+        fixture.data[cursor + 1] = uint8_t(0x10 + i);
+        fixture.data[cursor + 2] = uint8_t(0x20 + i);
+    }
+    const auto model = RigidModel(fixture.archive(), Fixture::joint, "rgba4",
+                                  melee_web::ModelRenderPass::All,
+                                  melee_web::DatMaterialPolicy::NativeDescriptors);
+    const auto& mesh = model.meshes[0];
+    check(mesh.attributes.size() == 2 && mesh.attributes[1].attr == 11 &&
+          mesh.attributes[1].attr_type == 1 && mesh.attributes[1].comp_type == 3 &&
+          mesh.attributes[1].data == nullptr && mesh.attributes[1].byte_size == 0 &&
+          model.submitted_vertices == 3,
+          "native direct RGBA4 remains a two-byte display-list color");
+    for (uint8_t i = 0; i < 3; ++i)
+        check(static_cast<const uint8_t*>(mesh.display)[3 + i * 3 + 2] == uint8_t(0x20 + i),
+              "packed RGBA4 bytes survive in the original display list");
+    rejects([&] { (void) fixture.model(); });
+}
+
 void explicit_opaque_pass()
 {
     using melee_web::ModelRenderPass;
@@ -1062,6 +1090,7 @@ int main(int argc, char** argv)
         {"descriptor_formats", descriptor_formats}, {"finite_geometry", finite_geometry},
         {"missing_model_content", missing_model_content},
         {"direct_rgba8_geometry", direct_rgba8_geometry},
+        {"direct_rgba4_geometry", direct_rgba4_geometry},
         {"explicit_opaque_pass", explicit_opaque_pass},
         {"opaque_envelope_dependency_closure", opaque_envelope_dependency_closure},
         {"skin_metadata_and_bounds", skin_metadata_and_bounds},

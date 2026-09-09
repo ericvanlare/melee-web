@@ -4,6 +4,8 @@
 #include "gameplay_match_context.h"
 #include "gameplay_match_rules.h"
 #include "gameplay_render.h"
+#include "gameplay_hud.h"
+#include "gameplay_hud_assets.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <stdexcept>
@@ -16,6 +18,8 @@ struct GameplayMatchSession::Storage {
     std::unique_ptr<GameplayAudioStream> music;
     MeleeWebMatchContext* match=nullptr;
     MeleeWebRender* render=nullptr;
+    std::unique_ptr<GameplayHudAssets> hud_assets;
+    MeleeWebHud* hud=nullptr;
     ~Storage(){try{close();}catch(const std::exception& e){std::fprintf(stderr,"Match session teardown: %s\n",e.what());std::abort();}}
     void start(const RuntimeFiles& files,const MeleeWebMenuMatchSelection& selection){
         for(unsigned i=0;i<2;i++)
@@ -23,8 +27,11 @@ struct GameplayMatchSession::Storage {
                   selection.players[i].costume<5&&selection.players[i].sub_color<=4,
                   "Match requires the supported original four-stock menu selection");
         world=std::make_unique<GameplayWorld>(files);char error[256]{};
-        bank=std::make_unique<GameplayAudioBank>(files.at("smash2.sem"),
-            std::vector<std::span<const uint8_t>>{files.at("main.ssm"),files.at("mario.ssm")},files.at("dsp_coef.bin"));
+        hud_assets=std::make_unique<GameplayHudAssets>(files);
+        std::vector<std::span<const uint8_t>> banks;
+        for(const char* name:{"main.ssm","mario.ssm","nr_select.ssm","nr_title.ssm",
+                              "nr_name.ssm","pokemon.ssm","end.ssm"})banks.emplace_back(files.at(name));
+        bank=std::make_unique<GameplayAudioBank>(files.at("smash2.sem"),banks,files.at("dsp_coef.bin"));
         check(melee_web_audio_enable_effects(bank->get(),error,sizeof(error)),error);
         music=std::make_unique<GameplayAudioStream>(bank->get(),"/audio/sp_end.hps",files.at("sp_end.hps"));
         check(lbAudioAx_80023F28(78)==0,"Original Final Destination music did not start");
@@ -35,18 +42,22 @@ struct GameplayMatchSession::Storage {
                         selected.costume,selected.sub_color};
         }
         match=melee_web_match_begin_players(players,2,70,selection.random_seed,world->collision(),error,sizeof(error));check(match!=nullptr,error);
-        check(melee_web_match_create_fighters(match,error,sizeof(error)),error);
+        check(melee_web_match_create_fighters_intro(match,error,sizeof(error)),error);
         MeleeWebRenderSettings settings{640,480,{0,25,180},{0,15,0},30,1,1000,(uint64_t(1)<<5)|(uint64_t(1)<<3)};
         render=melee_web_render_begin_match(&settings,error,sizeof(error));check(render!=nullptr,error);
-        world->enable_full_stage();check(melee_web_render_use_match_passes(render,error,sizeof(error)),error);
+        world->enable_full_stage(true);check(melee_web_render_use_match_passes(render,error,sizeof(error)),error);
+        hud=melee_web_hud_begin(selection.hud_layout,error,sizeof(error));check(hud!=nullptr,error);
+        check(melee_web_render_use_scene_cameras(render,error,sizeof(error)),error);
     }
     void close(){
         char error[256]{};
+        if(hud){check(melee_web_hud_end(hud,error,sizeof(error)),error);hud=nullptr;}
         if(world)world->end_stage();
         if(render){check(melee_web_render_end(render,error,sizeof(error)),error);render=nullptr;}
         if(match){check(melee_web_match_end(match,error,sizeof(error)),error);match=nullptr;}
         music.reset();
         if(world){world->verify_immutable_archives();world->close();world.reset();}
+        if(hud_assets){hud_assets->close();hud_assets.reset();}
         bank.reset();
     }
 };
@@ -62,6 +73,8 @@ void GameplayMatchSession::draw(){
     check(storage_&&storage_->render,"Match render session is closed");char error[256]{};
     check(melee_web_render_draw(storage_->render,error,sizeof(error)),error);
 }
+int GameplayMatchSession::hud_damage(unsigned player)const{return storage_?melee_web_hud_damage(storage_->hud,player):-1;}
+bool GameplayMatchSession::ready()const{return storage_&&melee_web_hud_ready(storage_->hud);}
 int GameplayMatchSession::outcome(int& winner)const{
     check(storage_&&storage_->match,"Match session is closed");return melee_web_match_rules_outcome(&winner);
 }

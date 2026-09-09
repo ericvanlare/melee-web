@@ -174,6 +174,9 @@ int melee_web_menu_host_selection(const MeleeWebMenuHost* h,MeleeWebMenuMatchSel
         out->players[i].controller=port;out->players[i].stocks=p->stocks;
         out->players[i].costume=p->color;out->players[i].sub_color=p->sub_color;
     }
+    if(vs->start.rules.x0_3<1||vs->start.rules.x0_3>6)
+        return fail(e,n,"Original HUD layout is unsupported");
+    out->hud_layout=vs->start.rules.x0_3;
     out->random_seed=h->seed;return ok(e,n);
 }
 int melee_web_menu_host_match_finished(MeleeWebMenuHost* h,uint32_t seed,char* e,size_t n){

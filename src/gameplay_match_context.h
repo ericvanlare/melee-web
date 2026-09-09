@@ -46,6 +46,8 @@ MeleeWebMatchContext* melee_web_match_begin(const MeleeWebMatchSettings*,
 MeleeWebMatchContext* melee_web_match_begin_players(const MeleeWebPlayerSettings*,
     uint32_t count,uint32_t camera_subjects,uint32_t seed,MeleeWebCollision*,char*,size_t);
 int melee_web_match_create_fighters(MeleeWebMatchContext*,char*,size_t);
+/* Preserve Fighter_Create's disabled input until original Ready completes. */
+int melee_web_match_create_fighters_intro(MeleeWebMatchContext*,char*,size_t);
 /* Browser entry: consume Snapshot.raw, never Snapshot.clamped. Uses original
  * HSD queue consumption, radial clamp, AD conversion, scale, and edge/repeat
  * history with source Melee calibration; exactly one original scheduler tick. */

@@ -1026,7 +1026,7 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
 index cd7e31a..234aa92 100644
 --- a/src/melee/gm/gm_16AE.c
 +++ b/src/melee/gm/gm_16AE.c
-@@ -355,6 +355,13 @@ static float get_unk_float(void)
+@@ -355,6 +355,13 @@
      }
  }
  
@@ -1040,6 +1040,75 @@ index cd7e31a..234aa92 100644
  bool gm_IsCurrently1PMode(void)
  {
      return gm_Is1PMode(gm_GetCurrentGameMode());
+@@ -473,6 +480,20 @@
+     grStadium_801D4150();
+ }
+ 
++/* The HUD calls IfStatusCb with an int. PPC permitted the original no-arg
++ * targets; Wasm requires the actual indirect-call signature to agree. */
++static void melee_web_hud_enable(int unused)
++{
++    (void) unused;
++    fn_8016B784();
++}
++
++static void melee_web_hud_intro_finished(int unused)
++{
++    (void) unused;
++    fn_8016B7F8();
++}
++
+ void fn_8016B7B4(int arg0)
+ {
+     Ground_801C1154();
+@@ -493,9 +514,9 @@
+     Stage_802252E4(tmp->x24C8.stkind, NULL);
+     grStadium_801D4040();
+     if (!tmp->x24C8.x1_3) {
+-        ifStatus_802F6EA4(4, -1, -1, 0, NULL, fn_8016B784);
+-    } else {
+-        ifStatus_802F6EA4(8, -1, -1, 0, NULL, fn_8016B784);
++        ifStatus_802F6EA4(4, -1, -1, 0, NULL, (Event) melee_web_hud_enable);
++    } else {
++        ifStatus_802F6EA4(8, -1, -1, 0, NULL, (Event) melee_web_hud_enable);
+     }
+     un_802FD428();
+ }
+@@ -2036,9 +2057,9 @@
+     StartMeleeData* tmp = arg0;
+     fn_8016E730(tmp);
+     if (tmp->rules.x1_2) {
+-        ifStatus_802F6EA4(8, -1, -1, 0, (void*) fn_8016B7B4, fn_8016B7F8);
+-    } else {
+-        ifStatus_802F6EA4(3, -1, -1, 0, (void*) fn_8016B7B4, fn_8016B7F8);
++        ifStatus_802F6EA4(8, -1, -1, 0, (void*) fn_8016B7B4, (Event) melee_web_hud_intro_finished);
++    } else {
++        ifStatus_802F6EA4(3, -1, -1, 0, (void*) fn_8016B7B4, (Event) melee_web_hud_intro_finished);
+     }
+     ifTime_CreateTimers();
+     ifStatus_802F665C(tmp->rules.x0_3);
+@@ -2119,7 +2140,7 @@
+     StartMeleeData* data = user_data;
+     data->rules.x6 = true;
+     fn_8016E730(data);
+-    ifStatus_802F6EA4(1, -1, -1, 0, (void*) fn_8016B7B4, fn_8016B7F8);
++    ifStatus_802F6EA4(1, -1, -1, 0, (void*) fn_8016B7B4, (Event) melee_web_hud_intro_finished);
+     ifTime_CreateTimers();
+     ifStatus_802F665C(data->rules.x0_3);
+ }
+@@ -2138,9 +2159,9 @@
+     Stage_802252E4(tmp2->x24C8.stkind, NULL);
+     grStadium_801D4040();
+     if (!lbl_8046B6A0.x24C8.x1_3) {
+-        ifStatus_802F6EA4(4, -1, -1, 0, 0, fn_8016B784);
+-    } else {
+-        ifStatus_802F6EA4(8, -1, -1, 0, 0, fn_8016B784);
++        ifStatus_802F6EA4(4, -1, -1, 0, 0, (Event) melee_web_hud_enable);
++    } else {
++        ifStatus_802F6EA4(8, -1, -1, 0, 0, (Event) melee_web_hud_enable);
+     }
+     un_802FD428();
+     ifStatus_802F665C(data->rules.x0_3);
 diff --git a/src/melee/gm/types.h b/src/melee/gm/types.h
 index 2014b73..10d3df0 100644
 --- a/src/melee/gm/types.h
@@ -1637,7 +1706,7 @@ diff --git a/src/melee/lb/lbarchive.c b/src/melee/lb/lbarchive.c
      lbArchive_vLoadSections(archive, symbols, sections);
  
      va_end(sections);
-@@ -146,10 +161,15 @@
+@@ -146,14 +161,27 @@
  
  void lbArchive_80016EFC(HSD_Archive* archive)
  {
@@ -1653,7 +1722,25 @@ diff --git a/src/melee/lb/lbarchive.c b/src/melee/lb/lbarchive.c
  }
  
  bool lbArchive_80016F80(HSD_Archive** archive, const char* filename)
-@@ -181,6 +201,14 @@
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    /* Each resident typed open has a fresh source handle. It was not returned
++     * from the retail preload cache, so preserve the non-preloaded result. */
++    extern void* melee_web_archive_sections_open(const char*);
++    HSD_Archive* opened = melee_web_archive_sections_open(lbFileGetFullName(filename));
++    if (archive != NULL) *archive = opened;
++    return false;
++#else
+     void* data;
+     size_t length;
+     HSD_Archive* var_r3;
+@@ -176,11 +204,20 @@
+         *archive = var_r3;
+     }
+     return result;
++#endif
+ }
+ 
  bool lbArchive_80017040(HSD_Archive** dst, const char* filename, void* symbols,
                          ...)
  {
@@ -1668,7 +1755,7 @@ diff --git a/src/melee/lb/lbarchive.c b/src/melee/lb/lbarchive.c
      void* tmp;
      HSD_Archive* archive2;
      HSD_Archive* archive;
-@@ -217,6 +245,7 @@
+@@ -217,6 +254,7 @@
          *dst = archive;
      }
      return preloaded;
@@ -4480,3 +4567,114 @@ diff --git a/src/melee/mn/mnstagesel.c b/src/melee/mn/mnstagesel.c
  }
  
  int mnStageSel_8025BC08(int idx)
+
+--- a/src/melee/gr/stage.c
++++ b/src/melee/gr/stage.c
+@@ -483,22 +483,44 @@
+     { Gr_Kind_Shrine, 0, 0 },       { Gr_Kind_Battle, 0, 0 },
+ };
+ 
+-GrKind Stage_8022519C(StKind stkind)
+-{
+-    return stage_id_map[stkind].grkind;
+-}
+-
+-void Stage_802251B4(StKind stkind)
+-{
+-    Ground_801C06B8(stage_id_map[stkind].grkind);
+-}
+-
+-void Stage_802251E8(StKind stkind, s32* _)
+-{
+-    StageIdPair local_data;
+-
++/* Scope the actual selected-stage storage while resident host services own
++ * stage preparation. Original Ready completion still calls Stage_802252E4. */
++static struct StageSelection melee_web_saved_stage_selection;
++static bool melee_web_stage_selection_owned;
++int melee_web_stage_selection_begin(int stkind)
++{
++    if (melee_web_stage_selection_owned || stkind < 0 ||
++        stkind >= sizeof(stage_id_map) / sizeof(stage_id_map[0])) return 0;
++    melee_web_saved_stage_selection = selected_stage;
+     selected_stage.stkind = stkind;
+     selected_stage.entry = &stage_id_map[stkind];
++    melee_web_stage_selection_owned = true;
++    return 1;
++}
++int melee_web_stage_selection_end(void)
++{
++    if (!melee_web_stage_selection_owned) return 0;
++    selected_stage = melee_web_saved_stage_selection;
++    melee_web_stage_selection_owned = false;
++    return 1;
++}
++
++GrKind Stage_8022519C(StKind stkind)
++{
++    return stage_id_map[stkind].grkind;
++}
++
++void Stage_802251B4(StKind stkind)
++{
++    Ground_801C06B8(stage_id_map[stkind].grkind);
++}
++
++void Stage_802251E8(StKind stkind, s32* _)
++{
++    StageIdPair local_data;
++
++    selected_stage.stkind = stkind;
++    selected_stage.entry = &stage_id_map[stkind];
+ 
+     local_data = default_stage_pair;
+ 
+
+--- a/src/melee/if/ifmagnify.c
++++ b/src/melee/if/ifmagnify.c
+@@ -449,6 +449,21 @@
+ 
+ void ifMagnify_802FC3BC(void) {}
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++/* Wasm checks callback signatures; the source callbacks ignore the extra
++ * argument, but must still be called through their actual C function types. */
++static void melee_web_magnify_remove(void* unused)
++{
++    (void) unused;
++    ifMagnify_802FC3BC();
++}
++static void melee_web_magnify_camera(HSD_GObj* gobj, int pass)
++{
++    (void) pass;
++    ifMagnify_802FBBDC(gobj);
++}
++#endif
++
+ void ifMagnify_802FC3C0(s32 slot)
+ {
+     ifMagnifyPlayer* player;
+@@ -463,7 +478,11 @@
+     }
+ 
+     gobj = GObj_Create(HSD_GOBJ_CLASS_UI, 15, 0);
++#if defined(MELEE_WEB_GAMEPLAY)
++    GObj_InitUserData(gobj, 0xE, melee_web_magnify_remove, player);
++#else
+     GObj_InitUserData(gobj, 0xE, (void (*)(void*)) ifMagnify_802FC3BC, player);
++#endif
+ 
+     jobj = HSD_JObjLoadJoint(
+         (*(DynamicModelDesc**) ifMagnify_804A1DE0.model_desc)->joint);
+@@ -525,7 +544,11 @@
+     gobj = GObj_Create(HSD_GOBJ_CLASS_UI, 15, 0);
+     cobj = lb_80013B14((HSD_CameraDescPerspective*) &ifMagnify_803F97E8);
+     HSD_GObjObject_80390A70(gobj, HSD_GObj_CameraKind, cobj);
++#if defined(MELEE_WEB_GAMEPLAY)
++    GObj_SetupGXLinkMax(gobj, melee_web_magnify_camera, 0);
++#else
+     GObj_SetupGXLinkMax(gobj, (GObj_RenderFunc) (Event) ifMagnify_802FBBDC, 0);
++#endif
+     gobj->gxlink_prios = 0x10;
+ 
+     idesc = player0->idesc;

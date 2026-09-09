@@ -37,12 +37,34 @@ and Release browser build also pass.
 All five Mario costume assets are supported with shared fighter data and distinct
 owned models; the local costume regression runs stock/respawn/teardown twice.
 
-Original HUD startup and ordinary input acceptance are still being worked
-on. First-use CSS/SSS/game graphics cause explicit timing pauses. The native
-preview retains the strict pause policy and nominal 60 Hz clock; neither that
-policy nor the existing catch-up path establishes original timing equivalence.
-The original menu preloader is not supplied by this resident-asset integration.
-The temporary HTML player flow remains until native acceptance is complete.
+The native preview now also runs original Ready/Go and the original damage,
+stock, player-marker and magnifier interface. Shared typed SceneDesc/model
+owners hydrate IfAll/IfCoGet; the text-only SdIntro atlas and direct packed
+RGBA4 geometry retain their authored representation. Original Ready completion
+owns stage start and fighter activation. Source checks pass Ready/Go at 124
+ticks, blocked movement during the first 60 intro ticks, an actual in-range
+Mario fireball with matching source/HUD damage, and two four-stock return loops.
+Early unload at 0, 60 and 100 intro ticks also passes before rebuilding the world.
+Typed callback adapters fix original magnifier signatures for Wasm; full camera
+traversal preserves and restores the owned HUD cameras.
+
+The browser separately completed two further four-stock loops with this HUD,
+each at 2,011 diagnostic input ticks with three respawns and return to CSS.
+The first run needed a timing-pause resume; these are functional lifecycle checks,
+not uninterrupted performance or physical-input acceptance. The full regression
+suite passed **252 tests with no skips**; rebuilt player, full-stage and all-five-
+Mario-costume stock regressions also pass. The native page now reuses the optional
+IDBFS renderer cache and its bounded save at explicit unload; assets remain local
+and outside persistent storage.
+
+The original match-ending GAME!/Game Set sequence remains to be integrated:
+the current host returns to CSS immediately after the source elimination outcome.
+Ordinary keyboard/controller acceptance, original-game visual/audio comparison
+and cold first-use preparation remain open. First-use graphics can cause explicit
+timing pauses. The native preview retains the strict pause policy and nominal
+60 Hz clock; neither establishes original timing equivalence. The original menu
+preloader is not supplied by this resident-asset integration. The temporary HTML
+player flow remains until native acceptance is complete.
 
 The bullets below include earlier checkpoints; their narrower evidence must not
 be mistaken for newer browser or full-loop acceptance.

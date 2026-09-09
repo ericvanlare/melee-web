@@ -4,11 +4,11 @@
 <p>Native menu integration preview · Original screens and callbacks. Four-stock Mario/FD loop under validation.</p>
 <label>Melee disc image <input id="disc" type="file" accept=".iso,.gcm,.ciso" disabled></label>
 <div><button id="launch" disabled>Open character select</button><button id="pause" disabled>Pause / resume</button><button id="unload" disabled>Unload</button><label><input id="keyboard" type="checkbox" checked> P1 keyboard</label><label><input id="keyboard2" type="checkbox" checked> P2 keyboard</label></div>
-<p id="status">Starting WebGPU…</p>
+<p id="status">Starting WebGPU…</p><p id="cache-status">Render cache is initializing.</p>
 <canvas id="canvas" width="640" height="480" tabindex="0"></canvas>
 <p>Click the game for input. Move: WASD · A: J · B: K · Start: Enter. P2: arrows · A/B: right Shift/Ctrl · Start: End · Jump: Delete. Controller ports use the original PAD path.</p>
 <details><summary>Diagnostics</summary><button id="confirm-check">Start input (diagnostic)</button><button id="stock-check" disabled>Four-stock input check</button><p id="scene-check"></p><p>Injects three raw PAD Start samples for scene testing; this does not validate keyboard or controller hardware.</p><pre id="input"></pre><pre id="log"></pre></details>
-<script>
+<script src="runtime-cache.js"></script><script>
 const $=id=>document.getElementById(id);let ready=false,fatal=false,bundle=false,inputDirty=true,importing=false,uiMessage="";
 const commands=[];
 const boundary=run=>fatal?Promise.reject(Error("Reload after the runtime fault.")):new Promise((resolve,reject)=>commands.push({run,resolve,reject}));
@@ -34,15 +34,26 @@ $('confirm-check').onclick=()=>boundary(()=>Module._melee_web_native_menu_confir
 $('keyboard').onchange=$('keyboard2').onchange=()=>inputDirty=true;
 function status(){return Module.UTF8ToString(Module._melee_web_native_menu_message());}
 function check(result){if(!result)throw Error(status());}
+async function unloadAndSave(){
+ const unloaded=await boundary(()=>{syncAudio();return Module._melee_web_native_menu_unload();});
+ if(!unloaded)return false;
+ const deadline=performance.now()+30000;
+ while(!await boundary(()=>Module._melee_web_native_menu_cache_idle())){
+  if(performance.now()>deadline){$('cache-status').textContent='Render cache was not saved: pending pipeline work did not drain.';return true;}
+ }
+ await Module.saveRuntimeCache();
+ return true;
+}
 async function put(name,bytes){await boundary(()=>{const encoded=new TextEncoder().encode(name+'\0');const np=Module._malloc(encoded.length),bp=Module._malloc(bytes.length);try{if(!np||!bp)throw Error('Allocation failed');Module.HEAPU8.set(encoded,np);Module.HEAPU8.set(bytes,bp);check(Module._melee_web_native_menu_file(np,bp,bytes.length));}finally{Module._free(np);Module._free(bp);}});}
 $('disc').onchange=async()=>{try{
  const file=$('disc').files[0];if(!file)return;bundle=false;importing=true;uiMessage='';$('launch').disabled=true;$('disc').disabled=true;
- await boundary(()=>check(Module._melee_web_native_menu_unload()));
+ if(!await unloadAndSave())throw Error(status());
  const {loadNativeGameDisc}=await import('./runtime-assets.mjs');const files=await loadNativeGameDisc(file,p=>$('status').textContent=`Reading local data ${p.complete}/${p.total}`);
  for(const [name,bytes] of files)await put(name,bytes);bundle=true;uiMessage='Local menu data loaded.';$('status').textContent=uiMessage;
 }catch(e){uiMessage=e.message;log(e.message);$('status').textContent=e.message;}finally{importing=false;$('disc').disabled=fatal;$('launch').disabled=fatal||!bundle;}};
 $('launch').onclick=async()=>{try{uiMessage='';await prepareAudio();await boundary(()=>check(Module._melee_web_native_menu_launch()));$('pause').disabled=$('unload').disabled=false;$('canvas').focus();inputDirty=true;syncAudio();}catch(e){log(e.message);$('status').textContent=e.message;}};
 $('pause').onclick=()=>boundary(()=>Module._melee_web_native_menu_pause(Module._melee_web_native_menu_running())).then(()=>{$('canvas').focus();inputDirty=true;});
-$('unload').onclick=()=>{uiMessage='';return boundary(()=>check(Module._melee_web_native_menu_unload()));};
+$('unload').onclick=async()=>{try{uiMessage='';if(!await unloadAndSave())throw Error(status());$('pause').disabled=$('unload').disabled=true;syncAudio();}catch(e){uiMessage=e.message;log(e.message);$('status').textContent=e.message;}};
 var Module={canvas:$('canvas'),print:log,printErr:log,onAbort:stop,onRuntimeInitialized(){ready=true;$('disc').disabled=false;}};
+installRuntimeCache(Module,report=>{$('cache-status').textContent=report.message;});
 </script><script src="gameplay_menu_browser.js"></script></html>

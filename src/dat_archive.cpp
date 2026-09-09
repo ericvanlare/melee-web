@@ -79,7 +79,9 @@ DatArchive::DatArchive(std::span<const std::uint8_t> input, DatExternalPolicy ex
             throw DatError("DAT relocation slot is not four-byte aligned");
         }
         const auto target = be32(slot);
-        (void) range(target, 1);
+        // Relocation may name an empty region at the end of the data section.
+        // Typed pointer reads still require their requested number of bytes.
+        (void) range(target, 0);
         referenced_targets_.push_back(target);
         relocation_slots_.push_back(slot);
     }

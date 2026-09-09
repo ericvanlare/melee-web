@@ -23,6 +23,7 @@ export const NATIVE_MENU_DISC_FILES=Object.freeze({
 });
 export const NATIVE_GAME_DISC_FILES=Object.freeze({
   ...NATIVE_MENU_DISC_FILES,...RUNTIME_DISC_FILES,
+  'IfAll.usd':'IfAll.usd','IfCoGet.dat':'IfCoGet.dat','SdIntro.dat':'SdIntro.dat',
   'PlMrYe.dat':'PlMrYe.dat','PlMrBk.dat':'PlMrBk.dat',
   'PlMrBu.dat':'PlMrBu.dat','PlMrGr.dat':'PlMrGr.dat',
 });

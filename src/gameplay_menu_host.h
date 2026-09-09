@@ -10,7 +10,7 @@ extern "C" {
 typedef struct MeleeWebMenuHost MeleeWebMenuHost;
 typedef struct MeleeWebMenuMatchSelection {
     struct {uint32_t controller,stocks,costume,sub_color;} players[2];
-    uint32_t random_seed;
+    uint32_t random_seed, hud_layout;
 } MeleeWebMenuMatchSelection;
 /* Owns source selection across separate CSS, SSS and match SDK worlds.
  * Enter only after GameplayMenuWorld has published its native assets. */

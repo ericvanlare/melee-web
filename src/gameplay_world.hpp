@@ -19,7 +19,7 @@ public:
     GameplayWorld& operator=(const GameplayWorld&) = delete;
     void close();
     void enable_stage_visual();
-    void enable_full_stage();
+    void enable_full_stage(bool defer_start = false);
     void end_stage();
     MeleeWebCollision* collision() const;
     float floor_height(float x) const;

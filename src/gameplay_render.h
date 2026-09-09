@@ -20,6 +20,9 @@ MeleeWebRender* melee_web_render_begin(const MeleeWebRenderSettings*,char*,size_
 MeleeWebRender* melee_web_render_begin_match(const MeleeWebRenderSettings*,char*,size_t);
 /* Enable the camera's original complete draw callback after full stage setup. */
 int melee_web_render_use_match_passes(MeleeWebRender*,char*,size_t);
+/* Use original top-level camera ordering, including the match HUD, magnifiers
+ * and nametags. Call only after those original scene owners have started. */
+int melee_web_render_use_scene_cameras(MeleeWebRender*,char*,size_t);
 int melee_web_render_update(MeleeWebRender*,const MeleeWebRenderSettings*,char*,size_t);
 int melee_web_render_draw(MeleeWebRender*,char*,size_t);
 /* Call after Aurora submits the last frame, before match/world teardown. */

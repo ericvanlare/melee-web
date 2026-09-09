@@ -29,6 +29,11 @@ int main() { try {
     auto rejects=[](const Bytes& b){bool caught=false;try {
         melee_web::DatSis bad(std::make_shared<melee_web::DatArchive>(b),"s");
     }catch(const melee_web::DatError&){caught=true;}check(caught);};
+    auto text_only=fixture();word(text_only,32,576);text_only[53]=0x20;
+    melee_web::DatSis text(std::make_shared<melee_web::DatArchive>(text_only),"s");
+    auto** text_table=static_cast<uint8_t**>(text.descriptor());
+    check(text_table[0]==text_table[1]+544 && text_table[2][5]==0x20);
+    text_only[53]=0x40;rejects(text_only); // no custom glyphs in an empty atlas
     auto bad=fixture();bad[54]=1;rejects(bad); // custom glyph 1, atlas contains only 0
     bad=fixture();bad[48]=8;rejects(bad); // unsupported branch relocation
     bad=fixture();std::fill(bad.begin()+48,bad.begin()+64,1);rejects(bad); // no terminator

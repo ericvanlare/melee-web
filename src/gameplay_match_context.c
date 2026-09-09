@@ -138,7 +138,7 @@ int melee_web_match_create_fighter(MeleeWebMatchContext* h,char* e,size_t n)
 {
     return melee_web_match_create_fighters(h,e,n);
 }
-int melee_web_match_create_fighters(MeleeWebMatchContext* h,char* e,size_t n)
+static int create_fighters(MeleeWebMatchContext* h,int activate,char* e,size_t n)
 {
     if(!live(h,e,n))return 0;
     for(uint32_t i=0;i<h->player_count;i++){
@@ -150,12 +150,20 @@ int melee_web_match_create_fighters(MeleeWebMatchContext* h,char* e,size_t n)
         if(!Player_GetPtrForSlot(h->slots[i])->player_entity[0])return fail(e,n,"Original player constructor produced no fighter");
         /* Fighter_Create disables input through ftLib_800867E8. Match spawn
          * completion in gm_16AE calls this original player activation routine. */
-        Player_80031848(h->slots[i]);
+        if(activate)Player_80031848(h->slots[i]);
     }
     melee_web_match_rules_refresh();
     if(!melee_web_crowd_begin(e,n))return 0;
     h->crowd_started=1;
     return ok(e,n);
+}
+int melee_web_match_create_fighters(MeleeWebMatchContext* h,char* e,size_t n)
+{
+    return create_fighters(h,1,e,n);
+}
+int melee_web_match_create_fighters_intro(MeleeWebMatchContext* h,char* e,size_t n)
+{
+    return create_fighters(h,0,e,n);
 }
 static int sample_valid(const MeleeWebControllerSample* s)
 {

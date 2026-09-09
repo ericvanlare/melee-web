@@ -6,6 +6,7 @@
 #include <aurora/aurora.h>
 #include <aurora/event.h>
 #include <aurora/main.h>
+#include <aurora/gfx.h>
 #include <dolphin/gx.h>
 #include <dolphin/vi.h>
 #include <emscripten.h>
@@ -30,7 +31,7 @@ unsigned stock_tick=0,completed_matches=0;
 bool stock_lost=false,stock_jump=false;
 std::array<float,1068> pcm;
 alignas(32) unsigned char fifo[64*1024];
-constexpr std::array<std::string_view,31> keys={"PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sislib_font.bin"};
+constexpr std::array<std::string_view,34> keys={"IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sislib_font.bin"};
 void check(int value,const char* error){if(!value)throw std::runtime_error(error);}
 void close(){
  char error[256]{};running=false;pending=false;menu_clock.reset();
@@ -151,10 +152,15 @@ const char* melee_web_native_menu_diagnostics(){
 }
 const char* melee_web_native_menu_message(){return message.c_str();}
 int melee_web_native_menu_running(){return running;}
+int melee_web_native_menu_cache_idle(){
+ const AuroraStats* stats=aurora_get_stats();
+ return !world&&!match&&stats&&stats->queuedPipelines==0;
+}
 int melee_web_native_menu_phase(){return match?7:host?melee_web_menu_host_phase(host):0;}
 }
 int main(int argc,char** argv){
  AuroraConfig config{};config.appName="Melee native menus";config.desiredBackend=BACKEND_WEBGPU;
+ config.cachePath="/melee-render-cache";
  config.windowWidth=640;config.windowHeight=480;config.msaa=1;config.vsync=true;
  config.logCallback=log_message;config.logLevel=LOG_INFO;
  if(!SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT,"#canvas"))return 1;

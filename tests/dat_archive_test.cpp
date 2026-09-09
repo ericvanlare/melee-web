@@ -220,7 +220,13 @@ void relocation_slots()
 
 void relocation_targets()
 {
-    for (const auto target : {32U, 33U, 0xffffffffU}) {
+    auto boundary = specimen();
+    put32(boundary, 0x20, 32);
+    const DatArchive empty_target(boundary);
+    check(empty_target.pointer(0, 0) == 32, "one-past relocation names an empty region");
+    rejects([&] { (void) empty_target.pointer(0); });
+    rejects([&] { (void) empty_target.range(32, 1); });
+    for (const auto target : {33U, 0xffffffffU}) {
         auto bytes = specimen();
         put32(bytes, 0x20, target);
         rejects([&] { (void) DatArchive(bytes); });

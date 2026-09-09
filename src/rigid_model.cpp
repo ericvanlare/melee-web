@@ -141,12 +141,17 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
             continue;
         }
         if (color) {
+            // HSD's native direct color path also retains the packed RGBA4
+            // format. It consumes a two-byte GXColor1u16 packet; this is a
+            // display-list value, so no host array is fabricated. Viewer
+            // imports keep the narrower RGBA8 contract below.
+            const bool rgba4 = type == 3 && policy == DatMaterialPolicy::NativeDescriptors;
             const bool rgba6 = type == 4 && policy == DatMaterialPolicy::NativeDescriptors;
-            if (mode != direct || count != 1 || (type != 5 && !rgba6) || frac != 0 ||
+            if (mode != direct || count != 1 || (type != 5 && !rgba4 && !rgba6) || frac != 0 ||
                 (stride != 0 && stride != 4))
-                reject("Only direct RGBA8 vertex colors are supported");
+                reject("Only supported direct vertex color formats are accepted");
             absent(a, d + 20, "Direct vertex colors cannot reference a vertex array");
-            widths[i] = rgba6 ? 3 : 4;
+            widths[i] = rgba4 ? 2 : rgba6 ? 3 : 4;
             mesh.attributes.push_back({attr, mode, count, type, frac, stride, nullptr, 0});
             continue;
         }
@@ -324,7 +329,7 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
             for (size_t i = 0; i < mesh.attributes.size(); ++i) {
                 const auto& attr = mesh.attributes[i];
                 if (attr.attr_type == direct && attr.attr >= va_pos) {
-                    if (bytes.size() - cursor < widths[i]) reject("Truncated direct RGBA8 vertex packet");
+                    if (bytes.size() - cursor < widths[i]) reject("Truncated direct color vertex packet");
                     cursor += widths[i];
                     continue;
                 }

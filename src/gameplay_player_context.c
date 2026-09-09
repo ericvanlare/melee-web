@@ -39,6 +39,9 @@ MeleeWebPlayerContext* melee_web_player_context_begin(const MeleeWebPlayerSettin
     Player_SetControllerIndex(s->slot,s->sub_color);
     Player_SetPlayerId(s->slot,s->slot);
     Player_SetTeam(s->slot,0);
+    /* The current no-name profile comes from the original CSS nametag 0x78
+     * selection. Player reset alone leaves zero, which selects a saved name. */
+    Player_SetNametagSlotID(s->slot,0x78);
     Player_SetStocks(s->slot,s->stocks);
     Player_SetFacingDirection(s->slot,s->facing);
     Vec3 pos={s->position[0],s->position[1],s->position[2]};

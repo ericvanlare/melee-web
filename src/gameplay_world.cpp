@@ -207,7 +207,7 @@ struct GameplayWorld::Storage {
         stage_native=melee_web_native_joint_create(&stage_model->graph(),error,sizeof(error));check(stage_native!=nullptr,error);
         stage_visual=melee_web_stage_visual_begin(stage_native,stage_animation?stage_animation->descriptor():nullptr,stage_material_animation?stage_material_animation->descriptor():nullptr,3,1,error,sizeof(error));check(stage_visual!=nullptr,error);
     }
-    void enable_full_stage(){
+    void enable_full_stage(bool defer_start){
         if(stage_last)return;
         if(stage_visual)throw DatError("Close selected stage visual before full initialization");
         check(melee_web_stage_lights_load(lights,error,sizeof(error)),error);
@@ -218,7 +218,7 @@ struct GameplayWorld::Storage {
         stage_map=melee_web_stage_map_publish(full_stage->map_head(),error,sizeof(error));check(stage_map!=nullptr,error);
         const auto& overrides=full_stage->light_overrides();
         check(melee_web_stage_map_set_overrides(stage_map,overrides.data(),overrides.size(),error,sizeof(error)),error);
-        stage_last=melee_web_stage_last_begin(full_stage->yakumono(),stage_effects->bank(),error,sizeof(error));check(stage_last!=nullptr,error);
+        stage_last=(defer_start?melee_web_stage_last_begin_intro:melee_web_stage_last_begin)(full_stage->yakumono(),stage_effects->bank(),error,sizeof(error));check(stage_last!=nullptr,error);
     }
     void end_stage(){
         if(stage_last){check(melee_web_stage_last_end(stage_last,error,sizeof(error)),error);stage_last=nullptr;}
@@ -264,7 +264,7 @@ struct GameplayWorld::Storage {
 GameplayWorld::GameplayWorld(const RuntimeFiles& files):storage_(std::make_unique<Storage>()){storage_->start(files);}
 GameplayWorld::~GameplayWorld()=default;
 void GameplayWorld::enable_stage_visual(){storage_->enable_stage_visual();}
-void GameplayWorld::enable_full_stage(){storage_->enable_full_stage();}
+void GameplayWorld::enable_full_stage(bool defer_start){storage_->enable_full_stage(defer_start);}
 void GameplayWorld::end_stage(){storage_->end_stage();}
 void GameplayWorld::close(){storage_->close();}
 MeleeWebCollision* GameplayWorld::collision()const{return storage_->collision;}

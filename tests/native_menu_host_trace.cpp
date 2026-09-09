@@ -5,11 +5,11 @@
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
-static void check(int value,const char* error){if(!value)throw std::runtime_error(error);}
+static void check(int value,const char* error){if(!value){std::cerr<<"Check failed before teardown: "<<error<<"\n";throw std::runtime_error(error);}}
 int main(int argc,char** argv){try{
  if(argc!=3)throw std::runtime_error("Expected local menu and audio directories");
  melee_web::RuntimeFiles files;
- for(const char* key:{"PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sislib_font.bin"}){
+ for(const char* key:{"IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sislib_font.bin"}){
   const auto root=std::filesystem::exists(std::filesystem::path(argv[1])/key)?argv[1]:argv[2];
   std::ifstream input(std::filesystem::path(root)/key,std::ios::binary);if(!input)throw std::runtime_error("Missing owned menu host fixture");
   files[key]={(std::istreambuf_iterator<char>(input)),{}};
@@ -51,8 +51,51 @@ int main(int argc,char** argv){try{
   for(unsigned t=0;t<120;t++)check(tick()==1,"Unexpected second SSS transition");
   transition();check(melee_web_menu_host_phase(host)==5,"SSS did not complete original selection");
   MeleeWebMenuMatchSelection selection{};check(melee_web_menu_host_selection(host,&selection,error,sizeof(error)),error);
+  if(cycle==0)for(unsigned stop:{0u,60u,100u}){
+   // Unload both before and after Ready's stage-start callback, then rebuild
+   // the full SDK world from the same immutable native selection.
+   melee_web::GameplayMatchSession interrupted(files,selection);unsigned phase=0;
+   for(unsigned t=0;t<stop;++t){
+    PADStatus pads[4]{};pads[2].err=pads[3].err=-1;interrupted.tick(pads);
+    phase+=32000;unsigned count=phase/60;phase%=60;
+    check(melee_web_audio_render(interrupted.audio(),pcm,count,error,sizeof(error)),error);
+   }
+   interrupted.close();interrupted.close();
+  }
   {
    melee_web::GameplayMatchSession match(files,selection);audio_phase=0;
+   check(!match.ready(),"Original match intro was bypassed");
+   const float ready_start_x=match.player_stats(0).position[0];
+   unsigned intro_ticks=0;
+   for(;intro_ticks<600&&!match.ready();++intro_ticks){
+    PADStatus pads[4]{};pads[2].err=pads[3].err=-1;
+    if(intro_ticks<60)pads[0].stickX=80;
+    match.tick(pads);audio_phase+=32000;unsigned count=audio_phase/60;audio_phase%=60;
+    check(melee_web_audio_render(match.audio(),pcm,count,error,sizeof(error)),error);
+    if(intro_ticks<60)check(match.player_stats(0).position[0]==ready_start_x,
+                           "Fighter accepted movement before original Ready completion");
+   }
+   check(match.ready(),"Original Ready/Go did not reach gameplay");
+   std::cout<<"Original Ready/Go completed at "<<intro_ticks<<" ticks\n";
+   check(match.hud_damage(0)==0&&match.hud_damage(1)==0,"Original player damage HUD did not initialize");
+   // Approach with source input so the opponent lies inside the projectile's
+   // actual lifetime/range; retain ordinary FD spawn positions and physics.
+   for(unsigned t=0;t<100&&match.player_stats(0).position[0]<0;++t){
+    PADStatus pads[4]{};pads[2].err=pads[3].err=-1;pads[0].stickX=80;
+    match.tick(pads);audio_phase+=32000;unsigned count=audio_phase/60;audio_phase%=60;
+    check(melee_web_audio_render(match.audio(),pcm,count,error,sizeof(error)),error);
+   }
+   check(match.player_stats(0).position[0]>=0,"Original movement did not reach projectile test range");
+   // Let the actual Mario projectile hit the opponent, then observe the
+   // original HUD consumer catching up to source player damage.
+   for(unsigned t=0;t<150;++t){
+    PADStatus pads[4]{};pads[2].err=pads[3].err=-1;
+    if(t==0)pads[0].button=PAD_BUTTON_B;
+    match.tick(pads);audio_phase+=32000;unsigned count=audio_phase/60;audio_phase%=60;
+    check(melee_web_audio_render(match.audio(),pcm,count,error,sizeof(error)),error);
+   }
+   check(match.player_stats(1).damage_percent>0&&match.hud_damage(1)==int(match.player_stats(1).damage_percent),
+         "Original HUD did not display actual fireball damage");
    bool lost=false,jump=false;int stocks=4,respawns=0,winner=-1;unsigned t=0;
    for(;t<4000;t++){
     PADStatus pads[4]{};pads[2].err=pads[3].err=-1;

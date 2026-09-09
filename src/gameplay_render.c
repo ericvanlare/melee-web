@@ -35,6 +35,7 @@ struct MeleeWebRender {
     HSD_CObj* view_camera;
     int original_controller;
     int match_passes;
+    int scene_cameras;
     MeleeWebRenderSettings settings;
     int drawing;
 };
@@ -125,6 +126,13 @@ int melee_web_render_use_match_passes(MeleeWebRender* h,char* e,size_t n)
         return fail(e,n,"Complete draw passes require the idle original match camera");
     h->match_passes=1;return ok(e,n);
 }
+int melee_web_render_use_scene_cameras(MeleeWebRender* h,char* e,size_t n)
+{
+    if(!live(h,e,n))return 0;
+    if(h->drawing||!h->match_passes)
+        return fail(e,n,"Scene camera traversal requires original match passes");
+    h->scene_cameras=1;return ok(e,n);
+}
 int melee_web_render_draw(MeleeWebRender* h,char* e,size_t n)
 {
     BOUNDARY("render ownership");
@@ -152,7 +160,11 @@ int melee_web_render_draw(MeleeWebRender* h,char* e,size_t n)
     if(h->original_controller&&!h->match_passes)Camera_8002A4AC(h->gobj);
     BOUNDARY("set camera");
     int accepted;
-    if(h->match_passes){
+    if(h->scene_cameras){
+        BOUNDARY("original scene camera traversal");
+        HSD_GObj_80390FC0();
+        accepted=1;
+    }else if(h->match_passes){
         BOUNDARY("original match render callback");
         h->gobj->render_cb(h->gobj,0);
         accepted=1;
@@ -181,7 +193,19 @@ int melee_web_render_draw(MeleeWebRender* h,char* e,size_t n)
     /* Original shadow drawing leaves its fighter in the current-render slot.
      * Our outer camera callback scope must restore the caller for teardown. */
     HSD_GObj_804D7814=previous_render_gobj;
-    int restored=melee_web_native_camera_restore_current(h->camera,previous);
+    /* Full scene traversal legitimately ends on a HUD camera. Verify that
+     * camera belongs to this SDK world's registered camera list before
+     * restoring the caller; CObjEndCurrent intentionally retains it. */
+    HSD_CObj* final_camera=HSD_CObjGetCurrent();
+    int camera_owned=final_camera==h->camera;
+    if(h->scene_cameras){
+        for(HSD_GObj* camera=HSD_GObjGXLinkHead[HSD_GObjLibInitData.gx_link_max+1];
+            camera;camera=camera->next_gx){
+            if(camera->obj_kind==HSD_GObj_CameraKind&&camera->hsd_obj==final_camera)
+                camera_owned=1;
+        }
+    }
+    int restored=camera_owned&&melee_web_native_camera_restore_current(final_camera,previous);
     *HSD_VIGetRenderMode()=old_mode;HSD_StartRender(pass);
     h->drawing=0;
     if(!accepted)return fail(e,n,"Original HSD camera rejected the render target");

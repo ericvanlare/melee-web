@@ -53,14 +53,15 @@ automatically scripted match is only partial evidence.
 
 | Gap | Current evidence / consequence | Required closure |
 | --- | --- | --- |
-| HTML CSS/SSS | Original CSS/SSS now render in a separate preview; two source menu/match/return loops pass, while rendered repeat-match acceptance remains open | Execute and compare original menus and transitions; remove HTML player selection |
+| HTML CSS/SSS | Original CSS/SSS now render in a separate preview; source and rendered diagnostic repeat loops pass, while ordinary-input acceptance remains open | Execute and compare original menus and transitions; remove HTML player selection |
 | Catch-up sampling | `gameplay_browser.cpp` polls once per browser callback and reuses that sample for multiple source steps | Specify and verify per-tick input acquisition and phase/order under actual browser constraints; never claim missing historical samples were recovered |
 | Catch-up output | Source audio processes each tick, but late output is gated and re-primed | Explicit overload behavior plus measured input/audio timing; catch-up runs cannot count as uninterrupted performance acceptance |
 | Fixed 60.0 clock | Host clock and sample production currently use exactly 60 | Establish selected retail VI mode/cadence and input scheduling from reference evidence, including long-run drift; do not assume the nominal label proves exact cadence |
 | DSP coefficients | Generated replacement DROM is approximately equivalent, not identical to hardware | Validate the audio path against an independent reference and obtain exact coefficient/input support if needed; identical approximations on both sides are not an independent oracle |
 | Native numerics | Bounded original jump, jab and stock traces exist; no complete match equivalence | Broaden bit-preserving semantic traces under identical initial conditions and input sequences; locate first divergence |
 | Match initialization | Native menu handoff carries ports, costumes/tints, four stocks and RNG; remaining original match-init fields and startup behavior are not yet generally ported | Compare exact supported original start configuration and extend the source initializer before broadening modes or claiming start-state equivalence |
-| Original HUD | Existing gameplay owner does not yet create original damage/stock HUD | Instantiate and validate original interface assets, callbacks and stock/damage updates; no HTML substitution |
+| Original HUD | Original Ready/Go, damage/stocks and markers now execute and render; source damage/intro/repeat-lifetime checks and two browser diagnostic loops pass | Compare authored interface rendering, timing and audio against the original; broaden beyond Mario/FD |
+| Match ending | Current host returns immediately on original stock elimination | Run the original GAME!/Game Set audio, animation, freeze and source transition request before returning to CSS; skip only Results |
 | Rendering | Native HSD/GX path renders current match; no complete pixel equivalence | Reference camera, transforms, materials, blending, depth, effects, viewport and output timing on a declared baseline |
 | Device/latency acceptance | Keyboard play and short warm timing runs; physical controllers and end-to-end latency remain unaccepted | Real-device routing, disconnect/reconnect, simultaneous players, analog thresholds and independently measured latency; cold/warm long-match tests |
 

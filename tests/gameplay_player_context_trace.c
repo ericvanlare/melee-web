@@ -20,6 +20,7 @@ int main(void){
         CHECK(stats.cpu_type==4&&stats.cpu_level==0&&stats.model_scale==1&&stats.attack_ratio==1&&stats.defense_ratio==1);
         CHECK(stats.position[0]==12&&stats.position[1]==3&&stats.position[2]==0&&stats.facing==1);
         CHECK(Player_GetControllerIndex(0)==3); /* tint is independent of the input port */
+        CHECK(Player_GetNametagSlotID(0)==0x78);
         CHECK(p->transformed[0]==0&&p->transformed[1]==1);
         for(int i=0;i<10;i++)CHECK(!p->stale_moves.StaleMoves[i].move_id&&!p->stale_moves.StaleMoves[i].attack_instance);
         CHECK(melee_web_player_context_end(h,error,sizeof(error)));
