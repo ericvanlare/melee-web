@@ -174,6 +174,12 @@ static int sample_valid(const MeleeWebControllerSample* s)
 }
 int melee_web_match_step_raw(MeleeWebMatchContext* h,const PADStatus raw[4],char* e,size_t n)
 {
+    return melee_web_match_step_raw_phased(h,raw,NULL,NULL,NULL,NULL,e,n);
+}
+int melee_web_match_step_raw_phased(MeleeWebMatchContext* h,const PADStatus raw[4],
+    MeleeWebMatchTickPhase renew,MeleeWebMatchTickPhase before,
+    MeleeWebMatchTickPhase after,void* context,char* e,size_t n)
+{
     if(!live(h,e,n))return 0;
     if(!raw)return fail(e,n,"Four raw controller samples are required");
     if(HSD_PadLibData.queue!=&h->input_queue||HSD_PadLibData.qnum!=1||HSD_PadLibData.qcount)
@@ -184,10 +190,15 @@ int melee_web_match_step_raw(MeleeWebMatchContext* h,const PADStatus raw[4],char
     for(unsigned i=0;i<4;i++)h->input_queue.stat[i].err=-1;
     for(uint32_t i=0;i<h->player_count;i++)h->input_queue.stat[h->slots[i]]=raw[h->controllers[i]];
     HSD_PadLibData.qread=HSD_PadLibData.qwrite=0;HSD_PadLibData.qcount=1;
-    HSD_PadRenewMasterStatus();HSD_PadRenewCopyStatus();HSD_PadRenewGameStatus();
+    HSD_PadRenewMasterStatus();
+    if(renew){if(!renew(context,e,n))return 0;}
+    else{HSD_PadRenewCopyStatus();HSD_PadRenewGameStatus();}
     if(HSD_PadLibData.qcount)return fail(e,n,"Original controller processing did not consume raw sample");
+    if(before&&!before(context,e,n))return 0;
     if(!melee_web_gameplay_step(e,n))return 0;
-    h->ticks++;return ok(e,n);
+    h->ticks++;
+    if(after&&!after(context,e,n))return 0;
+    return ok(e,n);
 }
 int melee_web_match_step_inputs(MeleeWebMatchContext* h,const MeleeWebControllerSample samples[4],char* e,size_t n)
 {

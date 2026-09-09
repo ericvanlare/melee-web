@@ -102,10 +102,10 @@ void tick(){
      if(player.stocks<stock_count){stock_lost=true;stock_count=player.stocks;}
      if(stock_lost&&player.motion_id==14&&player.ground_or_air==0){stock_lost=false;++stock_respawns;}
      ++stock_tick;
-     if(outcome){check(winner==1&&stock_count==0&&stock_respawns==3,"Stock diagnostic: unexpected source outcome");stock_check=1;}
-     else check(stock_tick<4000,"Stock diagnostic: no outcome after 4000 ticks");
+     if(outcome){check(winner==1&&stock_count==0&&stock_respawns==3,"Stock diagnostic: unexpected source outcome");if(match->complete())stock_check=1;}
+     if(!match->complete())check(stock_tick<4000,"Stock diagnostic: no source exit after 4000 ticks");
     }
-    if(outcome){pending=true;result=3;}
+    if(match->complete()){check(outcome,"Original match transitioned without an outcome");pending=true;result=3;}
    }
    else{result=melee_web_menu_host_tick(host,sample,error,sizeof(error));check(result==1||result==3,error);}
    audio_phase+=32000;const unsigned count=audio_phase/60;audio_phase%=60;

@@ -5,11 +5,14 @@
 #include "gameplay_match_rules.h"
 #include "gameplay_render.h"
 #include "gameplay_hud.h"
+#include "gameplay_match_flow.h"
 #include "gameplay_hud_assets.hpp"
 #include <cstdio>
 #include <cstdlib>
 #include <stdexcept>
 extern "C" int lbAudioAx_80023F28(int);
+extern "C" int melee_web_vs_mode_begin(void);
+extern "C" int melee_web_vs_mode_end(void);
 namespace melee_web {
 namespace {void check(int value,const char* error){if(!value)throw std::runtime_error(error);}}
 struct GameplayMatchSession::Storage {
@@ -20,12 +23,15 @@ struct GameplayMatchSession::Storage {
     MeleeWebRender* render=nullptr;
     std::unique_ptr<GameplayHudAssets> hud_assets;
     MeleeWebHud* hud=nullptr;
+    MeleeWebMatchFlow* flow=nullptr;
+    bool mode_owned=false;
     ~Storage(){try{close();}catch(const std::exception& e){std::fprintf(stderr,"Match session teardown: %s\n",e.what());std::abort();}}
     void start(const RuntimeFiles& files,const MeleeWebMenuMatchSelection& selection){
         for(unsigned i=0;i<2;i++)
             check(selection.players[i].controller==i&&selection.players[i].stocks==4&&
                   selection.players[i].costume<5&&selection.players[i].sub_color<=4,
                   "Match requires the supported original four-stock menu selection");
+        check(melee_web_vs_mode_begin(),"Original VS mode is already owned");mode_owned=true;
         world=std::make_unique<GameplayWorld>(files);char error[256]{};
         hud_assets=std::make_unique<GameplayHudAssets>(files);
         std::vector<std::span<const uint8_t>> banks;
@@ -48,9 +54,11 @@ struct GameplayMatchSession::Storage {
         world->enable_full_stage(true);check(melee_web_render_use_match_passes(render,error,sizeof(error)),error);
         hud=melee_web_hud_begin(selection.hud_layout,error,sizeof(error));check(hud!=nullptr,error);
         check(melee_web_render_use_scene_cameras(render,error,sizeof(error)),error);
+        flow=melee_web_match_flow_begin(error,sizeof(error));check(flow!=nullptr,error);
     }
     void close(){
         char error[256]{};
+        if(flow){check(melee_web_match_flow_end(flow,error,sizeof(error)),error);flow=nullptr;}
         if(hud){check(melee_web_hud_end(hud,error,sizeof(error)),error);hud=nullptr;}
         if(world)world->end_stage();
         if(render){check(melee_web_render_end(render,error,sizeof(error)),error);render=nullptr;}
@@ -59,6 +67,7 @@ struct GameplayMatchSession::Storage {
         if(world){world->verify_immutable_archives();world->close();world.reset();}
         if(hud_assets){hud_assets->close();hud_assets.reset();}
         bank.reset();
+        if(mode_owned){check(melee_web_vs_mode_end(),"Original VS mode lost ownership");mode_owned=false;}
     }
 };
 GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,const MeleeWebMenuMatchSelection& selection)
@@ -67,12 +76,15 @@ GameplayMatchSession::~GameplayMatchSession()=default;
 void GameplayMatchSession::close(){if(storage_){storage_->close();storage_.reset();}}
 void GameplayMatchSession::tick(const PADStatus raw[4]){
     check(storage_&&storage_->match,"Match session is closed");char error[256]{};
-    check(melee_web_match_step_raw(storage_->match,raw,error,sizeof(error)),error);
+    check(melee_web_match_step_raw_phased(storage_->match,raw,melee_web_match_flow_renew,melee_web_match_flow_pre,melee_web_match_flow_post,storage_->flow,error,sizeof(error)),error);
 }
 void GameplayMatchSession::draw(){
     check(storage_&&storage_->render,"Match render session is closed");char error[256]{};
     check(melee_web_render_draw(storage_->render,error,sizeof(error)),error);
+    check(melee_web_match_flow_present(storage_->flow,error,sizeof(error)),error);
 }
+bool GameplayMatchSession::ending()const{return storage_&&melee_web_match_flow_ending(storage_->flow);}
+bool GameplayMatchSession::complete()const{return storage_&&melee_web_match_flow_complete(storage_->flow);}
 int GameplayMatchSession::hud_damage(unsigned player)const{return storage_?melee_web_hud_damage(storage_->hud,player):-1;}
 bool GameplayMatchSession::ready()const{return storage_&&melee_web_hud_ready(storage_->hud);}
 int GameplayMatchSession::outcome(int& winner)const{

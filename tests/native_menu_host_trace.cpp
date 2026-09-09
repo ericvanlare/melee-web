@@ -97,6 +97,7 @@ int main(int argc,char** argv){try{
    check(match.player_stats(1).damage_percent>0&&match.hud_damage(1)==int(match.player_stats(1).damage_percent),
          "Original HUD did not display actual fireball damage");
    bool lost=false,jump=false;int stocks=4,respawns=0,winner=-1;unsigned t=0;
+   unsigned ending_ticks=0;MeleeWebMatchStats held_players[2]{};
    for(;t<4000;t++){
     PADStatus pads[4]{};pads[2].err=pads[3].err=-1;
     if(t>=20&&!lost)pads[0].stickX=80;if(jump)pads[0].button=PAD_BUTTON_X;
@@ -106,9 +107,26 @@ int main(int argc,char** argv){try{
     jump=!lost&&stocks<4&&player.ground_or_air==0&&player.position[0]>65;
     if(player.stocks<stocks){lost=true;stocks=player.stocks;}
     if(lost&&player.motion_id==14&&player.ground_or_air==0){lost=false;++respawns;}
-    if(match.outcome(winner))break;
+    const int outcome=match.outcome(winner);
+    if(match.ending()){
+     check(outcome!=0,"Original ending started before the source outcome");
+     for(unsigned slot=0;slot<2;++slot){
+      const auto current=match.player_stats(slot);
+      if(ending_ticks){
+       check(current.motion_id==held_players[slot].motion_id&&
+             current.animation_frame==held_players[slot].animation_frame&&
+             current.position[0]==held_players[slot].position[0]&&
+             current.position[1]==held_players[slot].position[1]&&
+             current.stocks==held_players[slot].stocks,
+             "Fighter processes advanced during original GAME freeze");
+      }else held_players[slot]=current;
+     }
+     ++ending_ticks;
+    }
+    if(match.complete()){check(outcome!=0&&ending_ticks>0,"Source exit skipped the original ending");break;}
    }
    check(t<4000&&stocks==0&&respawns==3&&winner==1,"Native menu match did not complete original four-stock outcome");
+   std::cout<<"Original GAME ending and source transition completed across "<<ending_ticks<<" frozen ticks\n";
    const uint32_t seed=match.random_seed();match.close();
    check(melee_web_menu_host_match_finished(host,seed,error,sizeof(error)),error);
   }

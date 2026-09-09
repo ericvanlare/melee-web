@@ -27,19 +27,24 @@ full-match equivalence. See [current evidence](STATUS.md),
 ## Play the current match
 
 Open `runtime.html` on the local build server and choose your own unmodified
-USA revision 1.02 Melee ISO, GCM, or CISO. Choose fighters and stocks, select
-**Choose stage**, then **Final Destination** to start. A finished match returns
-directly to character select; **Character select** also leaves a match early.
-Selections survive each return. These browser menus are temporary, disposable
-test scaffolding around the original match. They will be removed when the original in-game CSS and SSS
-scenes, assets, and behavior are ported; they do not fulfill menu accuracy.
-All roster entries are unlocked, with availability tracked separately: Mario
-and Final Destination are currently playable. Stocks range from 1 to 99.
-Render resolution controls the internal framebuffer: 1× is 640×480 and 2× is
-1280×960, independently of the display's pixel density.
-The browser reads only the required disc ranges; game data stays in the tab and
-is neither uploaded nor persisted. RVZ is not supported. Extracted-folder loading
-remains available under Runtime diagnostics for development.
+USA revision 1.02 Melee ISO, GCM, or CISO. **Open character select** enters the
+original in-game CSS. The current slice supports two Marios, four stocks and
+Final Destination, through original CSS/SSS transitions, Ready/Go, gameplay HUD
+and GAME! ending. It returns directly to original CSS after the source exit
+request; Results is deliberately skipped. Other fighters/stages remain outside
+the supported slice. All roster unlocks are enabled separately from availability.
+
+Click the canvas for keyboard input; the page lists P1/P2 bindings. Physical
+controllers use the original PAD processing path and still need acceptance checks.
+The browser reads only required disc ranges; game data stays in the tab and is
+neither uploaded nor persisted. RVZ is not supported. **Unload** releases the
+source world and saves the optional renderer cache. `native-menu.html` redirects
+to this player. The former HTML fighter/stage selectors are no longer in the
+player flow. Asset inspection remains at `viewer.html`.
+
+The current framebuffer is 640×480 at 1×. Cold timing stalls, physical input,
+audio/reference comparison and full original-game equivalence remain open;
+the diagnostic input buttons do not establish those forms of acceptance.
 
 ## Build and inspect
 
@@ -68,10 +73,10 @@ The data arguments are optional and stay local. `--stage-kind 37` is the origina
 Final Destination `GrKind`, distinct from viewer map entry 3. The runner reports
 common-root readiness and source-consumer results; successful checks do not mean
 a fighter or stage is fully initialized. `--target graphics` builds only the
-browser viewer; the default build includes both targets.
+browser viewer; the default build also includes the original-game player.
 
 Open http://127.0.0.1:8787. Keep the tab visible for timing measurements. The
-server binds to loopback and supplies cross-origin isolation headers. The probe
+server binds to loopback and supplies cross-origin isolation headers. The `viewer.html` probe
 starts with a synthetic triangle and contains no extracted game assets.
 
 To inspect the first validated model, extract it from your own GALE01 revision 2

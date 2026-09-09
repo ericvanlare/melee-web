@@ -7,6 +7,12 @@
 extern "C" {
 #endif
 typedef struct MeleeWebMatchContext MeleeWebMatchContext;
+/* Source scene phases run after PAD renewal and around the original scheduler. */
+typedef int (*MeleeWebMatchTickPhase)(void*, char*, size_t);
+int melee_web_match_step_raw_phased(MeleeWebMatchContext*, const PADStatus[4],
+    MeleeWebMatchTickPhase renew, MeleeWebMatchTickPhase before,
+    MeleeWebMatchTickPhase after, void*, char*, size_t);
+
 typedef struct MeleeWebMatchSettings {
     MeleeWebPlayerSettings player; /* slot 0..3: source input indexes four PAD records. */
     uint32_t camera_subjects; /* Main source match uses 70. Explicit, nonzero. */

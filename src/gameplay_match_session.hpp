@@ -16,6 +16,8 @@ public:
     void draw();
     int outcome(int& winner) const;
     bool ready() const;
+    bool ending() const;
+    bool complete() const;
     int hud_damage(unsigned player) const;
     uint32_t random_seed() const;
     MeleeWebMatchStats player_stats(unsigned index) const;

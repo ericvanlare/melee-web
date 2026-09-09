@@ -57,14 +57,32 @@ Mario-costume stock regressions also pass. The native page now reuses the option
 IDBFS renderer cache and its bounded save at explicit unload; assets remain local
 and outside persistent storage.
 
-The original match-ending GAME!/Game Set sequence remains to be integrated:
-the current host returns to CSS immediately after the source elimination outcome.
+The canonical `runtime.html` player now uses the original CSS/SSS scenes; the
+temporary HTML selectors are removed from the player flow. `native-menu.html`
+redirects to it, and the asset inspector is preserved at `viewer.html`. Both the
+default build and `--target runtime` now build the native player.
+
+The original ordinary-VS match ending is integrated: its end callback requests
+the GAME!/Game Set interface/audio, installs the source process mask, waits via
+the original end-state routine, and raises the original scene exit request.
+Only then does the host route back to CSS, skipping Results. Two complete source
+loops pass with **114 frozen ending ticks**, checking both fighters' actions,
+animation frames, positions and stocks while original interface/audio processing
+continues. Ready/Go, fireball damage/HUD, SSS B cancellation and intro unload
+checks also pass with the owned source clock/cadence and VS mode restored between
+worlds. Two rendered browser loops with this ending passed at 2,125 diagnostic
+input ticks each, with three respawns and automatic CSS return. These use raw-PAD
+diagnostics; they do not establish physical input, audio fidelity or performance.
+The full regression suite passed **256 tests without skips** (373.297 seconds),
+and rebuilt player, full-stage and five-costume stock checks pass.
+
 Ordinary keyboard/controller acceptance, original-game visual/audio comparison
 and cold first-use preparation remain open. First-use graphics can cause explicit
-timing pauses. The native preview retains the strict pause policy and nominal
-60 Hz clock; neither establishes original timing equivalence. The original menu
-preloader is not supplied by this resident-asset integration. The temporary HTML
-player flow remains until native acceptance is complete.
+timing pauses. The native player retains the strict pause policy and nominal
+60 Hz clock; neither establishes original timing equivalence. Active gameplay
+still uses a scoped end-only source OnFrame adapter, so full match bookkeeping,
+source pause and initialization need further integration/reference checks. The
+original menu preloader is not supplied by this resident-asset integration.
 
 The bullets below include earlier checkpoints; their narrower evidence must not
 be mistaken for newer browser or full-loop acceptance.
