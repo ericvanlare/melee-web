@@ -70,8 +70,8 @@ not original-game equivalence evidence.
 The expanded native menu trace selects Mario/Falco through raw PAD, enters SSS,
 and completes a four-stock match back to CSS twice on both Final Destination and
 Battlefield. The content trace repeats all three stages with every Falco and Fox
-costume, exercises their laser, Reflector, side-special and up-special action
-families, pause and No Contest, checks Yoshi's Story's Randall/Shy Guy lifecycle,
+costume, exercises their laser, Reflector, side-special, up-special and complete
+jab/rapid-jab action families, pause and No Contest, checks Yoshi's Story's Randall/Shy Guy lifecycle,
 and verifies teardown before the next cycle.
 These native traces establish the checked source lifecycle; they do not replace
 browser input, audio or retail-reference evidence.
@@ -80,8 +80,12 @@ Scene transitions now use an explicit preparation boundary for CSS, SSS and
 match entry. The browser shows the phase and waits for the audio worklet's
 disabled-state acknowledgement before owner/session construction; no source
 simulation ticks or source draws run during the wait or construction phase.
-Preparation time is reported separately, and the live clock arms on a later
-callback. The scoped [scene-entry profile](work/scene-entry-profile.md) measured
+The constructed scene is then drawn without source ticks until texture uploads
+and Aurora's pipeline queue remain quiet for two callbacks. The live clock arms
+on a later callback. Pipelines or uploads first encountered during a match enter
+the same frozen render-preparation gate and resume automatically; unrelated clock
+overruns retain the explicit hitch pause. Preparation time is reported separately,
+and the scoped [scene-entry profile](work/scene-entry-profile.md) measured
 106.555 ms for initial resource preparation, 83.140 ms for isolated SSS owner
 construction and 160.100 ms for isolated match construction. Its 7,604 active
 callbacks had a 24.200 ms worst callback, no callback above 33.3 ms and zero
@@ -117,8 +121,8 @@ accessory has a world-owned descriptor that outlives its original fighter/effect
 consumers. Eye telemetry distinguishes an authored base image from an animated
 table entry; this changes observation only, not the game's texture commands.
 
-The current local regression suite passes **266 tests without skips** (700.484
-seconds), recorded in `work/full-suite-2026-09-09.log`. Default and Release browser, native-menu,
+The current local regression suite passes **266 tests without skips** (219.162
+seconds), recorded in `work/full-suite-2026-09-09-jab-perf.log`. Default and Release browser, native-menu,
 content-match, Battlefield, player-context and fighter-runtime targets build.
 The focused browser run used the Release build. The integrated change also
 received a primary review of ownership, input handoff, construction, callback
@@ -130,9 +134,10 @@ visual/audio comparison and clean cold-cache/full-match timing acceptance remain
 open. The inspected Falco/Battlefield match reported an active callback below
 10 ms and none above 33.3 ms, with preparation reported separately; automation
 disrupted that run and produced audio underruns, so it is not uninterrupted
-performance or audio evidence. First-use
-graphics can cause explicit timing pauses. The native player retains the strict
-pause policy and nominal 60 Hz clock; neither establishes original timing
+performance or audio evidence. First-use graphics previously caused explicit
+timing pauses. The render-preparation gate still needs a clean browser cold-entry
+and death/respawn timing pass. The native player retains the strict pause policy
+and nominal 60 Hz clock; neither establishes original timing
 equivalence. Catch-up input
 sampling and replacement DSP coefficients also remain open accuracy gaps under
 [the accuracy contract](docs/ACCURACY_CONTRACT.md). The optional IDBFS cache saves

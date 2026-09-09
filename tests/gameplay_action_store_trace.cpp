@@ -44,14 +44,13 @@ void verify(std::shared_ptr<const DatArchive> archive, const Bytes& container, b
     for (auto id : {2U,6U}) check(action_test_commands(store.action_rows(),id,actual), "Original Wait command executor trace");
     if (actual) {
         for(auto id : {7U,8U,9U,12U,13U,16U,18U,20U,35U,36U}) check(store.command_ready(id),"Explicit movement command readiness");
-        for(auto id:{46U,47U,48U}) check(store.command_ready(id),"Explicit jab command readiness");
+        for(auto id:{46U,47U,48U,49U,50U,51U}) check(store.command_ready(id),"Explicit jab/dash/tilt command readiness");
         for(auto id:{37U,41U,52U,60U,66U,72U,77U,177U,199U,221U,242U,247U,250U,253U}) check(store.command_ready(id),"Explicit normal action group readiness");
         for(auto id:{295U,296U,297U,298U,299U,300U,301U,302U}) check(store.command_ready(id),"Mario special script operands ready independently of Article services");
         check(store.command_ready(238), "Original EntryStart command graph is ready");
         check(action_test_load(fp,238,1)>0, "Original EntryStart clip loads");
         check(action_test_commands(store.action_rows(),238,false), "Original Mario EntryStart END executes");
         check(!store.command_ready(138),"Unchecked item shoot script remains gated");
-        check(!store.command_ready(49),"Unchecked rapid jab script remains gated");
         check(action_test_load(fp,20,0)>0, "Source Fall20 clip loads through original loader");
         check(action_test_commands(store.action_rows(),20,false), "Source Fall20 END command executes");
         check(action_test_commands(store.action_rows(),3,true), "Weighted alternate Wait source script");

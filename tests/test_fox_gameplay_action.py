@@ -76,7 +76,7 @@ class FoxGameplayActionTests(unittest.TestCase):
                 [str(node), str(output), str(fighter), str(animation)], cwd=directory, env=env,
                 capture_output=True, text=True, timeout=60)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("Article slots and all 32 source special command rows: passed", result.stdout)
+            self.assertIn("Article slots, common attacks and all 32 source special command rows: passed", result.stdout)
 
 
 if __name__ == "__main__":

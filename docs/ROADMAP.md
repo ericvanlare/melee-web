@@ -65,8 +65,11 @@ marker/collision paths. Additional non-FD stages still need their own callback,
 reservation, data and lifecycle evidence; FD uses direct player-index respawns.
 
 Scene entry now uses an explicit preparation boundary through the normal GX path,
-independent of match simulation. Aurora still exposes CPU pipeline-queue drainage
-but no browser GPU completion boundary; acceptance must account for that distinction.
+independent of match simulation. Unchanged source frames discover texture uploads
+and pipelines while the clock is stopped, and the runtime requires two quiet
+callbacks before arming. First-use render work discovered during a match enters
+the same automatic gate. Aurora still exposes CPU pipeline-queue drainage but no
+browser GPU completion boundary; acceptance must account for that distinction.
 The local persisted cache is useful evidence, not a universal first-visit fix.
 Runtime diagnostics can sample queue-completion callback latency at most once per
 60 submitted frames, with only one sample outstanding. Sampling is off by default,

@@ -27,10 +27,18 @@ int main()
     assert(state.suppress_source_draw());
     assert(!state.begin_construction(true));
     state.finish_construction(true);
-    assert(state.phase() == Phase::Arming);
+    assert(state.phase() == Phase::Priming);
     assert(state.busy());
-    // The arm callback is the first point where a source draw is permitted.
     assert(!state.suppress_source_draw());
+    assert(!state.observe_render(false, 0, false));
+    assert(state.phase() == Phase::Priming);
+    assert(!state.observe_render(true, 3, true));
+    assert(state.phase() == Phase::Settling);
+    assert(!state.observe_render(true, 0, true));
+    assert(!state.observe_render(true, 0, false));
+    assert(state.phase() == Phase::Settling);
+    assert(state.observe_render(true, 0, false));
+    assert(state.phase() == Phase::Arming);
     assert(state.arm());
     assert(state.phase() == Phase::Idle);
     assert(!state.busy());
@@ -40,6 +48,15 @@ int main()
     state.finish_construction(false);
     assert(state.phase() == Phase::Idle);
     assert(!state.suppress_source_draw());
+
+    assert(state.request_render_settle());
+    assert(state.phase() == Phase::Settling);
+    assert(!state.suppress_source_draw());
+    assert(!state.request_render_settle());
+    assert(!state.observe_render(true, 1, true));
+    assert(!state.observe_render(true, 0, false));
+    assert(state.observe_render(true, 0, false));
+    assert(state.arm());
 
     state.request();
     state.reset();

@@ -37,6 +37,7 @@ int stock_check=0,stock_count=4,stock_respawns=0;
 unsigned stock_tick=0,completed_matches=0;
 bool stock_lost=false,stock_jump=false;
 bool first_use_draw_pending=false;
+bool render_only_preparation=false;
 unsigned render_frame=0;
 PADStatus diagnostic_pad{};
 unsigned diagnostic_pad_port=0,diagnostic_pad_remaining=0;
@@ -95,7 +96,7 @@ void close(){
  if(match){match->close();match.reset();}
  if(world){if(host_entered){check(melee_web_menu_host_leave(host,1,error,sizeof(error)),error);host_entered=false;world->close();}else world->close_prepared();world.reset();}
  if(host){check(melee_web_menu_host_destroy(host,error,sizeof(error)),error);host=nullptr;}
- audio_phase=0;faulted=false;diagnostic_start_ticks=0;stock_check=0;stock_tick=0;render_frame=0;first_use_draw_pending=false;clear_diagnostic_pad();
+ audio_phase=0;faulted=false;diagnostic_start_ticks=0;stock_check=0;stock_tick=0;render_frame=0;first_use_draw_pending=false;render_only_preparation=false;clear_diagnostic_pad();
  match_message="Original four-stock source match";
  if(had_lifetime){
   const double finished=emscripten_get_now();
@@ -164,12 +165,13 @@ void tick(){
    if(preparation.begin_construction(audio_ready_for_preparation())){
     preparation_started=emscripten_get_now();advance();
     preparation_ms=emscripten_get_now()-preparation_started;preparation_started=0;
-    EM_ASM({window.menuPreparationDone?.();});
     preparation.finish_construction(running);
     if(running)running=false;
+    if(!preparation.busy())EM_ASM({window.menuPreparationDone?.();});
    }
   }else if(preparation.arming()){
    preparation.arm();running=true;menu_clock.reset();suppress_draw=0;
+   message=match?match_message:melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select";
   }else if(pending)begin_preparation();
   const auto elapsed=menu_clock.tick(emscripten_get_now(),running&&(world||match)&&input->visible);
   if(elapsed.stalled){running=false;message="Paused after a timing disruption. Resume to continue.";}
@@ -232,13 +234,13 @@ void tick(){
    }
    draw_done=emscripten_get_now();
    aurora_end_frame();end_done=emscripten_get_now();check(drawn,error);
-   if(actual_source_draw){
+   if(actual_source_draw&&running){
     first_use=first_use_draw_pending?1:0;
     first_use_draw_pending=false;
    }
   }
   else{draw_done=begin_done;end_done=begin_done;}
- }catch(const std::exception& e){running=false;faulted=true;preparation.reset();pending=false;clear_diagnostic_pad();menu_clock.reset();message=e.what();if(preparation_started)preparation_ms=emscripten_get_now()-preparation_started;preparation_failed(e.what());timing_valid=0;std::fprintf(stderr,"Native menu: %s\n",e.what());
+ }catch(const std::exception& e){running=false;faulted=true;preparation.reset();render_only_preparation=false;pending=false;clear_diagnostic_pad();menu_clock.reset();message=e.what();if(preparation_started)preparation_ms=emscripten_get_now()-preparation_started;preparation_failed(e.what());timing_valid=0;std::fprintf(stderr,"Native menu: %s\n",e.what());
   const double failed=emscripten_get_now();
   if(input_done<started)input_done=failed;
   if(simulation_done<input_done)simulation_done=failed;
@@ -248,6 +250,21 @@ void tick(){
  }
  const double finished=emscripten_get_now();
  const AuroraStats stats_after=aurora_stats_snapshot();
+ const bool render_preparation_activity=
+  stat_delta(stats_after.queuedPipelines,stats_before.queuedPipelines)!=0||
+  stat_delta(stats_after.createdPipelines,stats_before.createdPipelines)!=0||
+  stats_after.lastTextureUploadSize!=0;
+ if(preparation.observe_render(actual_source_draw,stats_after.queuedPipelines,render_preparation_activity)){
+  if(render_only_preparation)render_only_preparation=false;
+  else EM_ASM({window.menuPreparationDone?.();});
+ }
+ if(preparation.phase()==melee_web::MenuPreparationState::Phase::Idle&&running&&actual_source_draw&&
+    (stats_after.queuedPipelines!=0||render_preparation_activity)){
+  if(preparation.request_render_settle()){
+   render_only_preparation=true;
+   running=false;menu_clock.reset();message="Preparing first-use rendering...";
+  }
+ }
  char timing[1024];
  std::snprintf(timing,sizeof(timing),
   "{\"frame\":%u,\"started\":%.3f,\"valid\":%d,\"first_use\":%d,"

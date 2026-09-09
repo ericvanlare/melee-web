@@ -73,6 +73,17 @@ two missing one-word item commands: opcode 12 changes an enabled hitbox's damage
 and opcode 14 clears one hitbox. Both now use the original checked bitfield
 layouts.
 
+Fox's common jab audit exposed two reusable omissions. The admitted common
+range ended at `Attack100Loop` (motion 48), so `Attack100End` (49), dash attack
+(50), and the first forward-tilt angle (51) published the unsupported-row
+sentinel. The common attack range now covers motions 34 through 77 while retaining
+the five source-absent rows. Fox's `Attack12` then reached opcode 30, whose decoded
+`set_jab_rapid` operand and original `ftAction_80071B28` handler were already
+present but missing from the runtime execution gate. The integrated trace now
+drives `Attack11`, `Attack12`, and `Attack100` start/loop/end for both Fox and
+Falco, instead of treating successful command-graph construction as execution
+evidence.
+
 The integrated source match trace now executes laser, reflector, Illusion and
 Fire Fox with source item/effect/audio services live across all four costumes,
 and repeats teardown. A Fox-versus-Falco case keeps both fighters resident and

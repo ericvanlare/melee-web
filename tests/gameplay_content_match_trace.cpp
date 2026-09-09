@@ -98,6 +98,21 @@ int main(int argc,char** argv){try{
         raw[0].button=0;
         check(match.player_stats(1).damage_percent>damage,"Selected fighter ground laser did not damage the opponent");
         std::cout<<fighter_content->name<<" laser damage="<<match.player_stats(1).damage_percent<<std::endl;
+        if(cycle==0){
+            bool jab1=false,jab2=false,rapid=false,rapid_end=false;
+            for(unsigned n=0;n<180&&!rapid;n++){
+                raw[0].button=n%2==0?PAD_BUTTON_A:0;tick();
+                const auto motion=match.player_stats(0).motion_id;
+                jab1|=motion==44;jab2|=motion==45;
+                rapid|=motion==47||motion==48;
+            }
+            raw[0].button=0;
+            for(unsigned n=0;n<180&&!rapid_end;n++){
+                tick();rapid_end=match.player_stats(0).motion_id==49;
+            }
+            check(jab1&&jab2&&rapid&&rapid_end,
+                  "Fox-family jab input did not complete source Attack11/12/100 start-loop-end motions");
+        }
         for(unsigned n=0;n<120&&match.player_stats(0).ground_or_air==0;n++){
             raw[0].button=n%8==0?PAD_BUTTON_X:0;tick();
         }

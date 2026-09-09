@@ -40,6 +40,12 @@ int main(int argc, char** argv)
         GameplayActionStore store(archive, fox_costume(), animation);
         if (store.runtime().actions().size() != 327 || !store.runtime().fox_attributes())
             throw std::runtime_error("Fox runtime identity or extension is incomplete");
+        for (std::uint32_t motion = 44; motion <= 77; ++motion) {
+            if (motion == 54 || motion == 56 || motion == 61 || motion == 63 || motion == 65)
+                continue;
+            if (!store.command_ready(motion))
+                throw std::runtime_error("Fox common attack command graph is not admitted: " + std::to_string(motion));
+        }
         for (std::uint32_t motion = 295; motion <= 326; ++motion)
             if (!store.command_ready(motion))
                 throw std::runtime_error("Fox special command graph is not admitted: " + std::to_string(motion));
@@ -60,7 +66,7 @@ int main(int argc, char** argv)
             throw std::runtime_error("Fox native ftData did not retain part-animation and metal ownership gates");
         if (!fox_test_native_fighter_data(data))
             throw std::runtime_error("Fox native dynamics differ from the source");
-        std::cout << "Fox checked ftData, Article slots and all 32 source special command rows: passed\n";
+        std::cout << "Fox checked ftData, Article slots, common attacks and all 32 source special command rows: passed\n";
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;

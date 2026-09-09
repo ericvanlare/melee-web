@@ -37,8 +37,7 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     // graphs only, not readiness of every original world service they invoke.
     command_motions_ = {0,1,2,3,6};
     auto group=[&](uint32_t first,uint32_t last){for(uint32_t id=first;id<=last;++id)command_motions_.insert(id);};
-    group(7,31);group(34,48);                     // locomotion, crouch, shield, dodge, jab
-    group(52,77);                                // grounded/aerial attacks and their landings
+    group(7,31);group(34,77);                     // locomotion through grounded/aerial attacks and landings
     for(auto absent:{54U,56U,61U,63U,65U})command_motions_.erase(absent);
     group(165,181);group(183,204);                // damage, knockdown and techs
     command_motions_.insert(205);group(209,217);group(219,228);                // ledge actions
