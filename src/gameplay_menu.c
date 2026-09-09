@@ -1,4 +1,5 @@
 #include "gameplay_menu.h"
+#include "gameplay_content.h"
 
 #include <melee/gm/gm_1601.h>
 #include <melee/mn/mncharsel.h>
@@ -122,14 +123,14 @@ static int observe_transition(MeleeWebMenuSession* session,
 int melee_web_menu_character_available(int ckind)
 {
     /* Availability is intentionally narrower than the retail unlock table.
-     * All CSS entries may be unlocked by the host, while only Mario is
-     * admitted to the current playable source boundary. */
-    return ckind == CKIND_MARIO;
+     * All CSS entries may be unlocked by the host; only implemented source
+     * owners are admitted to this development boundary. */
+    return melee_web_fighter_content(ckind) != NULL;
 }
 
 int melee_web_menu_stage_available(int stkind)
 {
-    return stkind == MELEE_WEB_MENU_FD_ST_KIND;
+    return melee_web_stage_content(stkind) != NULL;
 }
 
 int melee_web_menu_css_selection_valid(const CSSData* css)
@@ -142,7 +143,7 @@ int melee_web_menu_css_selection_valid(const CSSData* css)
         css->vs.start.rules.is_teams ||
         css->vs.start.rules.timer_enabled || css->vs.start.rules.xB != -1 ||
         css->vs.start.rules.x20 != 0 ||
-        css->vs.start.rules.stkind != MELEE_WEB_MENU_FD_ST_KIND)
+        !melee_web_menu_stage_available(css->vs.start.rules.stkind))
     {
         return 0;
     }
@@ -162,7 +163,9 @@ int melee_web_menu_css_selection_valid(const CSSData* css)
     }
     for (i = 0; i < 2; i++) {
         const PlayerInitData* player=&css->vs.start.players[i];
-        if((player->slot?player->slot-1:i)!=i || player->color>=5 || player->sub_color>4) return 0;
+        const MeleeWebFighterContent* content=melee_web_fighter_content(player->ckind);
+        if(!content || (player->slot?player->slot-1:i)!=i ||
+           player->color>=content->costumes || player->sub_color>4) return 0;
     }
     for (i = 2; i < GM_MAX_PLAYERS; i++) {
         if (css->vs.start.players[i].slot_type != Gm_PKind_NA) {

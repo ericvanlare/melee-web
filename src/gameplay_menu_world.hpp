@@ -20,6 +20,10 @@ public:
     // Call after the source scene's OnExit. The operation is idempotent.
     void close();
 
+    // Release a prepared owner that has never entered a source CSS/SSS scene.
+    // This deliberately skips source scene card/audio stop callbacks.
+    void close_prepared();
+
     [[nodiscard]] MeleeWebAudio* audio() const noexcept;
     void verify_immutable_archives() const;
 

@@ -1,16 +1,22 @@
 #include "gameplay_menu_world.hpp"
 #include "gameplay_menu_host.h"
 #include "gameplay_match_session.hpp"
+#include "native_menu_fighter_input.h"
+#include "native_menu_stage_input.h"
+#include <melee/ft/forward.h>
 #include <melee/gm/forward.h>
+#include <melee/gr/forward.h>
+#include <cmath>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
 static void check(int value,const char* error){if(!value){std::cerr<<"Check failed before teardown: "<<error<<"\n";throw std::runtime_error(error);}}
 int main(int argc,char** argv){try{
- if(argc!=3)throw std::runtime_error("Expected local menu and audio directories");
+ if(argc<3||argc>4)throw std::runtime_error("Expected local menu and audio directories and optional stage kind");
+ const int stage_kind=argc==4?std::stoi(argv[3]):St_Kind_Last;
  melee_web::RuntimeFiles files;
- for(const char* key:{"GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sislib_font.bin"}){
+ for(const char* key:{"GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","GrNLa.dat","GrNBa.dat","sp_zako.hps","ItCo.usd","EfMrData.dat","EfFxData.dat","EfCoData.dat","PdPm.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","falco.ssm","dsp_coef.bin","sislib_font.bin"}){
   const auto root=std::filesystem::exists(std::filesystem::path(argv[1])/key)?argv[1]:argv[2];
   std::ifstream input(std::filesystem::path(root)/key,std::ios::binary);if(!input)throw std::runtime_error("Missing owned menu host fixture");
   files[key]={(std::istreambuf_iterator<char>(input)),{}};
@@ -36,6 +42,33 @@ int main(int argc,char** argv){try{
    world->verify_immutable_archives();world->close();world.reset();
   };
   for(unsigned t=0;t<120;t++)check(tick()==1,"Unexpected CSS transition");
+  if(cycle==1){
+   bool falco_selected=false;
+   for(unsigned t=0;t<180;t++){
+    MeleeWebFighterInputObservation observed{};
+    check(melee_web_fighter_input_observe(CKIND_FALCO,&observed),
+          "Original CSS fighter observation unavailable");
+    const int state=melee_web_fighter_input_drive(raw,&observed,CKIND_FALCO);
+    check(state!=MELEE_WEB_FIGHTER_INPUT_INVALID,
+          "Original CSS Falco target is invalid");
+    if(state==MELEE_WEB_FIGHTER_INPUT_ALREADY_SELECTED){
+     falco_selected=true;break;
+    }
+    if(state==MELEE_WEB_FIGHTER_INPUT_PICKUP_READY||
+       state==MELEE_WEB_FIGHTER_INPUT_TARGET_READY)
+      melee_web_fighter_input_button(raw,PAD_BUTTON_A);
+    check(tick()==1,"CSS cursor input unexpectedly transitioned");
+    melee_web_fighter_input_neutral(raw);
+    check(tick()==1,"CSS button release unexpectedly transitioned");
+   }
+   check(falco_selected,"Original CSS did not commit Falco through raw PAD input");
+   // The source keeps the door/model confirmation animation active briefly
+   // after the drop.  Give that original process time to reach its ordinary
+   // Start-accepting state before requesting the scene transition.
+   melee_web_fighter_input_neutral(raw);
+   for(unsigned settle=0;settle<30;++settle)
+    check(tick()==1,"CSS transitioned during Falco confirmation settle");
+  }
   transition();check(melee_web_menu_host_phase(host)==2,"CSS did not choose original SSS");
   world=std::make_unique<melee_web::GameplayMenuWorld>(files);audio_phase=0;
   check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);
@@ -50,8 +83,26 @@ int main(int argc,char** argv){try{
   world=std::make_unique<melee_web::GameplayMenuWorld>(files);audio_phase=0;
   check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);
   for(unsigned t=0;t<120;t++)check(tick()==1,"Unexpected second SSS transition");
+  // Move the original SSS cursor with raw PAD input. Random is deliberately
+  // not used: adding an available stage must not change the FD regression.
+  bool at_target=false;
+  for(unsigned t=0;t<120;t++){
+   MeleeWebStageInputObservation observed{};
+   check(melee_web_stage_input_observe(stage_kind,&observed),"Original SSS cursor observation unavailable");
+   const int state=melee_web_stage_input_drive(raw,&observed,stage_kind);
+   check(state!=MELEE_WEB_STAGE_INPUT_INVALID,"Original SSS target is invalid");
+   if(state==MELEE_WEB_STAGE_INPUT_AT_TARGET){
+    check(observed.selected_stage_kind==stage_kind,"Cursor target and source selected tile differ");
+    at_target=true;break;
+   }
+   check(tick()==1,"SSS cursor input unexpectedly transitioned");
+  }
+  check(at_target,"Original SSS cursor did not reach requested stage");
   transition();check(melee_web_menu_host_phase(host)==5,"SSS did not complete original selection");
   MeleeWebMenuMatchSelection selection{};check(melee_web_menu_host_selection(host,&selection,error,sizeof(error)),error);
+  check(selection.start.rules.stkind==stage_kind,"Source SSS committed another stage");
+  check(selection.start.players[0].ckind==(cycle==1?CKIND_FALCO:CKIND_MARIO),
+        "Source CSS committed another P1 character");
   if(cycle==0)for(unsigned stop:{0u,60u,100u}){
    // Unload both before and after Ready's stage-start callback, then rebuild
    // the full SDK world from the same immutable native selection.
@@ -187,24 +238,51 @@ int main(int argc,char** argv){try{
          "Original P1 Start did not resume after pause debounce");
    std::cout<<"Original Ready/Go completed at "<<intro_ticks<<" ticks\n";
    check(match.hud_damage(0)==0&&match.hud_damage(1)==0,"Original player damage HUD did not initialize");
+   // Battlefield's authored spawn puts P2 on the upper platform. Use source
+   // input to reach the main floor before testing a horizontal projectile.
+   for(unsigned t=0;t<180&&
+       std::abs(match.player_stats(1).position[1]-
+                match.player_stats(0).position[1])>=5.0f;++t){
+    PADStatus pads[4]{};pads[2].err=pads[3].err=-1;pads[1].stickY=-80;
+    match.tick(pads);audio_phase+=32000;unsigned count=audio_phase/60;audio_phase%=60;
+    check(melee_web_audio_render(match.audio(),pcm,count,error,sizeof(error)),error);
+   }
+   check(std::abs(match.player_stats(1).position[1]-
+                  match.player_stats(0).position[1])<5.0f,
+         "Original input did not bring both fighters to the same stage level");
    // Approach with source input so the opponent lies inside the projectile's
-   // actual lifetime/range; retain ordinary FD spawn positions and physics.
-   for(unsigned t=0;t<100&&match.player_stats(0).position[0]<0;++t){
-    PADStatus pads[4]{};pads[2].err=pads[3].err=-1;pads[0].stickX=80;
-    match.tick(pads);audio_phase+=32000;unsigned count=audio_phase/60;audio_phase%=60;
-    check(melee_web_audio_render(match.audio(),pcm,count,error,sizeof(error)),error);
-   }
-   check(match.player_stats(0).position[0]>=0,"Original movement did not reach projectile test range");
-   // Let the actual Mario projectile hit the opponent, then observe the
-   // original HUD consumer catching up to source player damage.
-   for(unsigned t=0;t<150;++t){
+   // actual lifetime and range.
+   for(unsigned t=0;t<120&&
+       std::abs(match.player_stats(1).position[0]-
+                match.player_stats(0).position[0])>=35.0f;++t){
     PADStatus pads[4]{};pads[2].err=pads[3].err=-1;
-    if(t==0)pads[0].button=PAD_BUTTON_B;
+    pads[0].stickX=match.player_stats(1).position[0]>
+                           match.player_stats(0).position[0]?80:-80;
     match.tick(pads);audio_phase+=32000;unsigned count=audio_phase/60;audio_phase%=60;
     check(melee_web_audio_render(match.audio(),pcm,count,error,sizeof(error)),error);
    }
-   check(match.player_stats(1).damage_percent>0&&match.hud_damage(1)==int(match.player_stats(1).damage_percent),
-         "Original HUD did not display actual fireball damage");
+   check(std::abs(match.player_stats(1).position[0]-
+                  match.player_stats(0).position[0])<35.0f,
+         "Original movement did not reach projectile test range");
+   // Let the actual selected fighter projectile hit the opponent, then
+   // observe the original HUD consumer catching up to source player damage.
+   const float projectile_start_damage=match.player_stats(1).damage_percent;
+   for(unsigned t=0;t<240&&
+       match.player_stats(1).damage_percent==projectile_start_damage;++t){
+    PADStatus pads[4]{};pads[2].err=pads[3].err=-1;
+    if(t%8==0)pads[0].button=PAD_BUTTON_B;
+    match.tick(pads);audio_phase+=32000;unsigned count=audio_phase/60;audio_phase%=60;
+    check(melee_web_audio_render(match.audio(),pcm,count,error,sizeof(error)),error);
+   }
+   for(unsigned t=0;t<30&&
+       match.hud_damage(1)!=int(match.player_stats(1).damage_percent);++t){
+    PADStatus pads[4]{};pads[2].err=pads[3].err=-1;
+    match.tick(pads);audio_phase+=32000;unsigned count=audio_phase/60;audio_phase%=60;
+    check(melee_web_audio_render(match.audio(),pcm,count,error,sizeof(error)),error);
+   }
+   check(match.player_stats(1).damage_percent>projectile_start_damage&&
+         match.hud_damage(1)==int(match.player_stats(1).damage_percent),
+         "Original HUD did not display actual projectile damage");
    bool lost=false,jump=false;int stocks=4,respawns=0,winner=-1;unsigned t=0;
    unsigned ending_ticks=0;MeleeWebMatchStats held_players[2]{};
    for(;t<4000;t++){
@@ -246,5 +324,5 @@ int main(int argc,char** argv){try{
   world->verify_immutable_archives();world->close();world->close();world.reset();
   check(melee_web_menu_host_destroy(host,error,sizeof(error)),error);
  }
- std::cout<<"Native original CSS to SSS to four-stock match to CSS passed twice; no browser or equivalence claim\n";
+ std::cout<<"Native original CSS Mario/Falco to SSS to four-stock match to CSS passed twice; no browser or equivalence claim\n";
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

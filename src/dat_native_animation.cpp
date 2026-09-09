@@ -66,9 +66,15 @@ DatNativeAnimation::DatNativeAnimation(std::shared_ptr<const DatArchive> archive
                 auto track=std::make_unique<Track>();auto& f=track->descriptor;
                 f.length=a.be32(*fo+4);f.startframe=a.f32(*fo+8);
                 const auto fields=a.range(*fo+12,4);f.type=fields[0];f.frac_value=fields[1];f.frac_slope=fields[2];
-                require(((f.type>=1&&f.type<=3)||(f.type>=5&&f.type<=12)||(f.type==4&&reference.has_value())||
-                         (f.type==40&&policy==DatNativeAnimationPolicy::ParticleDescriptors))&&!(channels&(UINT64_C(1)<<f.type)),
-                        "Native animation channel requires ordinary SRT or visibility");channels|=UINT64_C(1)<<f.type;
+                if (!(((f.type>=1&&f.type<=3)||(f.type>=5&&f.type<=12)||
+                       (f.type==4&&reference.has_value())||
+                       (f.type==40&&policy==DatNativeAnimationPolicy::ParticleDescriptors))&&
+                      !(channels&(UINT64_C(1)<<f.type))))
+                    throw DatError("Native animation channel " +
+                                   std::to_string(f.type) +
+                                   " requires an enabled checked policy at track " +
+                                   std::to_string(*fo));
+                channels|=UINT64_C(1)<<f.type;
                 require(std::isfinite(f.startframe)&&f.startframe>=-32768&&f.startframe<=32767&&std::floor(f.startframe)==f.startframe,
                         "Native animation start frame exceeds source signed storage");
                 require(f.length&&f.length<=65535&&(stream_bytes+=f.length)<=4U*1024U*1024U,"Native animation stream budget exceeded");

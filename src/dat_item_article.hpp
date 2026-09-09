@@ -3,8 +3,9 @@
 #include <memory>
 namespace melee_web {
 // Owns source item model/state/command graphs, published into an existing
-// registration identity only after complete validation. Supports the source
-// Mario Fire/Cape schemas; all other item kinds remain explicitly unavailable.
+// registration identity only after complete validation. The current native
+// article schemas cover Mario Fire/Cape and the shared Fox/Falco laser,
+// blaster and illusion/phantasm family.
 class DatItemArticle {
 public:
     DatItemArticle(std::shared_ptr<const DatArchive>,uint32_t root,uint32_t kind,void* registered_article);

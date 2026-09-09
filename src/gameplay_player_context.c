@@ -1,4 +1,5 @@
 #include "gameplay_player_context.h"
+#include "gameplay_content.h"
 #include <melee/pl/player.h>
 #include <melee/ft/ftdata.h>
 #include <melee/pl/plstale.h>
@@ -13,9 +14,11 @@ static int fail(char* e,size_t n,const char* message){if(e&&n)snprintf(e,n,"%s",
 static int ok(char* e,size_t n){if(e&&n)*e=0;return 1;}
 MeleeWebPlayerContext* melee_web_player_context_begin(const MeleeWebPlayerSettings* s,char* e,size_t n)
 {
-    if(!s||s->slot>=Gm_Player_NumMax||s->controller>=4||s->stocks<1||s->stocks>99||
-       (s->facing!=1&&s->facing!=-1)||s->costume>=CostumeListsForeachCharacter[FTKIND_MARIO].numCostumes||s->sub_color>4){
-        fail(e,n,"Player settings require a valid slot/controller, 1..99 stocks, an original Mario costume/tint and facing +/-1");return NULL;
+    const MeleeWebFighterContent* content=s?melee_web_fighter_content_by_kind(s->fighter_kind):NULL;
+    if(!s||!content||s->slot>=Gm_Player_NumMax||s->controller>=4||s->stocks<1||s->stocks>99||
+       (s->facing!=1&&s->facing!=-1)||s->fighter_kind>=FTKIND_NONE||
+       s->costume>=CostumeListsForeachCharacter[s->fighter_kind].numCostumes||s->sub_color>4){
+        fail(e,n,"Player settings require a supported FighterKind, valid slot/controller, 1..99 stocks, original costume/tint and facing +/-1");return NULL;
     }
     for(int i=0;i<3;i++)if(!isfinite(s->position[i])){fail(e,n,"Player position must be finite");return NULL;}
     StaticPlayer* p=Player_GetPtrForSlot(s->slot);
@@ -30,7 +33,10 @@ MeleeWebPlayerContext* melee_web_player_context_begin(const MeleeWebPlayerSettin
     h->slot=s->slot;h->controller=s->controller;memcpy(&h->saved,p,sizeof(*p));
     Player_InitOrResetPlayer(s->slot);
     plStale_ResetStaleMoveTableForPlayer(s->slot);
-    Player_SetPlayerCharacter(s->slot,CKIND_MARIO);
+    /* FighterKind is the source ftData index; Player_SetPlayerCharacter
+     * consumes CharacterKind. The typed registry preserves this mapping for
+     * admitted fighters, including Falco's nonmatching numeric identities. */
+    Player_SetPlayerCharacter(s->slot,(CharacterKind)content->character_kind);
     Player_SetSlottype(s->slot,Gm_PKind_Human);
     Player_SetCostumeId(s->slot,s->costume);
     /* gm_16AE fn_8016D8AC supplies PlayerInitData.sub_color here. Despite

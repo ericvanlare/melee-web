@@ -1269,7 +1269,7 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
      }
      un_802FD428();
      ifStatus_802F665C(data->rules.x0_3);
-@@ -2277,3 +2319,102 @@
+@@ -2277,3 +2319,104 @@
  {
      return pl_80039418(arg0, arg1);
  }
@@ -1306,6 +1306,7 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
 +#endif
 +
 +#if defined(MELEE_WEB_GAMEPLAY)
++#include "gameplay_content.h"
 +int melee_web_match_init_source(StartMeleeData* start)
 +{
 +    const StartMeleeRules* rules;
@@ -1318,10 +1319,10 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
 +
 +    /* These are the exact host rules currently supported by the match/HUD
 +     * consumers.  In particular, do not silently turn a timer, item mask,
-+     * team match, callback, or non-FD stage into another configuration. */
++     * team match, callback, or unsupported stage into another configuration. */
 +    if (rules->match_kind != MatchKind_Stock || !rules->is_stock ||
 +        !rules->is_vs || rules->is_teams || rules->timer_enabled ||
-+        rules->stkind != St_Kind_Last || rules->x20 != 0 || rules->xB != -1 ||
++        !melee_web_stage_content(rules->stkind) || rules->x20 != 0 || rules->xB != -1 ||
 +        rules->game_speed != 1.0F || rules->x54 != NULL ||
 +        rules->on_match_start != NULL || rules->on_frame_start != NULL ||
 +        rules->on_frame_end != NULL || rules->on_match_end != NULL) {
@@ -1336,16 +1337,17 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
 +        }
 +    }
 +
-+    /* The menu slice is exactly two human Mario players.  Source slot==0
++    /* The menu slice is exactly two supported human players. Source slot==0
 +     * means "use this player index"; a nonzero slot is port+1.  Requiring the
 +     * resulting source player id to equal the player index preserves the
 +     * current one-human-per-port mapping without rewriting it here. */
 +    for (i = 0; i < 2; ++i) {
 +        const PlayerInitData* player = &start->players[i];
 +        const int player_id = player->slot == 0 ? i : (int) player->slot - 1;
-+        if (player->ckind != CKIND_MARIO ||
++        const MeleeWebFighterContent* content = melee_web_fighter_content(player->ckind);
++        if (content == NULL ||
 +            player->slot_type != Gm_PKind_Human || player->stocks != 4 ||
-+            player->color >= 5 || player->sub_color > 4 || player->team != 0 ||
++            player->color >= content->costumes || player->sub_color > 4 || player->team != 0 ||
 +            player->slot > 4 || player_id != i) {
 +            return 0;
 +        }
@@ -1364,7 +1366,7 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
 +    fn_8016DCC0(start);
 +    /* The same ordinary-VS preparation used by fn_8016E2BC. Its fighter
 +     * creation remains with the checked resident match owner immediately
-+     * after this call. Mario has no Kirby costume publication work. */
++     * after this call. These fighters have no Kirby costume publication. */
 +    /* GameplayWorld already owns Fighter_FirstInitialize_80067A84. */
 +    fn_8016DEEC();
 +    for (i = 0; i < 2; ++i) gm_prepare_player_start_position(i);
@@ -5276,6 +5278,155 @@ diff --git a/src/melee/gm/gmpause.c b/src/melee/gm/gmpause.c
 +    lbl_80479B10 = melee_pause_saved;
 +    melee_pause_owner = NULL;
 +    melee_pause_saved_archive = NULL;
++    return 1;
++}
++#endif
+diff --git a/src/melee/gm/gm_1601.c b/src/melee/gm/gm_1601.c
+--- a/src/melee/gm/gm_1601.c
++++ b/src/melee/gm/gm_1601.c
+@@ -3901,7 +3901,8 @@
+ 
+ f32 gm_80168B34(CharacterKind ckind, int arg1, int arg2)
+ {
+-    int base;
++    /* Retail keeps ckind in r3 on the ordinary-character path. */
++    int base = ckind;
+     if (ckind == CKIND_GKOOPS) {
+         return 58.0F;
+     }
+@@ -3934,7 +3935,8 @@
+ {
+     CharacterKind ckind = Player_GetPlayerCharacter(arg0);
+     u32 costume = Player_GetCostumeId(arg0);
+-    gm_80168B34(ckind, Player_80036394(arg0), costume);
++    /* Retail returns this helper's f1 unchanged. */
++    return gm_80168B34(ckind, Player_80036394(arg0), costume);
+ }
+ 
+ void gm_80168C5C(u32 arg0)
+diff --git a/src/melee/gr/grbattle.c b/src/melee/gr/grbattle.c
+--- a/src/melee/gr/grbattle.c
++++ b/src/melee/gr/grbattle.c
+@@ -434,3 +434,14 @@
+ {
+     return true;
+ }
++
++#if defined(MELEE_WEB_GAMEPLAY)
++/* The host restores the previous borrowed descriptor after all stage objects
++ * have gone away, just as its existing Final Destination owner does. */
++void* melee_web_grbattle_exchange_yakumono(void* value)
++{
++    void* previous = yakumono_param;
++    yakumono_param = value;
++    return previous;
++}
++#endif
+diff --git a/src/melee/mn/mnstagesel.c b/src/melee/mn/mnstagesel.c
+--- a/src/melee/mn/mnstagesel.c
++++ b/src/melee/mn/mnstagesel.c
+@@ -857,4 +857,45 @@
+ int mnStageSel_8025BC08(int idx)
+ {
+     return mnStageSel_803F06D0[idx].xB;
+ }
++
++#if defined(MELEE_WEB_GAMEPLAY)
++/* Observation only: identify the live original SSS cursor by its process.
++ * Tests feed PAD samples back through the host; this never selects a tile. */
++int melee_web_sss_observe(int stkind, int ids[4], float geometry[6])
++{
++    HSD_GObj* cursor = NULL;
++    HSD_GObj* g;
++    int target = -1;
++    int i;
++    Vec3 position, tile;
++    if (!ids || !geometry || !HSD_GObj_Entities || mnStageSel_804D6CAF)
++        return 0;
++    for (g = HSD_GObj_Entities->x14; g; g = g->next) {
++        HSD_GObjProc* proc;
++        for (proc = g->proc; proc; proc = proc->child) {
++            if (proc->on_invoke == fn_8025A310) {
++                if (cursor) return 0;
++                cursor = g;
++            }
++        }
++    }
++    for (i = 0; i < 30; ++i) {
++        if (mnStageSel_803F06D0[i].xB == stkind &&
++            mnStageSel_803F06D0[i].x8 >= 2) target = i;
++    }
++    if (!cursor || !cursor->hsd_obj || target < 0 ||
++        !mnStageSel_803F06D0[target].x0) return 0;
++    lb_8000B1CC(cursor->hsd_obj, NULL, &position);
++    HSD_JObjSetupMatrix(mnStageSel_803F06D0[target].x0);
++    lb_8000B1CC(mnStageSel_803F06D0[target].x0, NULL, &tile);
++    ids[0] = mnStageSel_804D6CAE;
++    ids[1] = ids[0] < 30 ? mnStageSel_803F06D0[ids[0]].xB : -1;
++    ids[2] = target; ids[3] = mnStageSel_803F06D0[target].xB;
++    geometry[0] = position.x; geometry[1] = position.y;
++    geometry[2] = tile.x; geometry[3] = tile.y;
++    geometry[4] = mnStageSel_803F06D0[target].xC;
++    geometry[5] = mnStageSel_803F06D0[target].x10;
++    return 1;
++}
++#endif
+diff --git a/src/melee/it/types.h b/src/melee/it/types.h
+--- a/src/melee/it/types.h
++++ b/src/melee/it/types.h
+@@ -155,3 +155,11 @@
+ struct ItemStateArray {
++#if defined(MELEE_WEB_GAMEPLAY)
++    /* DAT state tables are variable length: Fox/Falco blaster has nine
++     * serialized rows, including state 8 selected by itfoxblaster.c.
++     * The host allocates the checked descriptor count.  Use Clang's trailing
++     * array extension so original consumers retain their pointer ABI. */
++    struct ItemStateDesc x0_itemStateDesc[0];
++#else
+     struct ItemStateDesc x0_itemStateDesc[8];
++#endif
+ };
+diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
+--- a/src/melee/mn/mncharsel.c
++++ b/src/melee/mn/mncharsel.c
+@@ -5528,3 +5528,40 @@
+     lbAudioAx_8002702C(4, tmp);
+     lbAudioAx_80027168();
+ }
++
++#if defined(MELEE_WEB_GAMEPLAY)
++/* Observation only: expose the live P1 cursor/model geometry and the exact
++ * source icon bounds. Tests feed resulting PAD samples through the host. */
++int melee_web_css_observe(int ckind, int ids[4], float geometry[8])
++{
++    struct CSSCursorData* cursor;
++    struct CSSCharModel* model;
++    int target = -1;
++    int selected = -1;
++    int i;
++    if (!ids || !geometry || !mnCharSel_804A0BC0[0] ||
++        !mnCharSel_804A0BD0[0]) return 0;
++    for (i = 0; i < 25; ++i) {
++        if (icons[i].char_kind == ckind && icons[i].state >= 1) {
++            target = i;
++            break;
++        }
++    }
++    if (target < 0) return 0;
++    cursor = mnCharSel_804A0BC0[0];
++    model = mnCharSel_804A0BD0[0];
++    if (mnCharSel_803F0DFC.doors[0].sel_icon < 25)
++        selected = icons[mnCharSel_803F0DFC.doors[0].sel_icon].char_kind;
++    ids[0] = cursor->x4;
++    ids[1] = cursor->x5 == 1 && cursor->x6 < 4 ? cursor->x6 : -1;
++    ids[2] = selected;
++    ids[3] = target;
++    geometry[0] = cursor->xC; geometry[1] = cursor->x10;
++    geometry[2] = model->x8; geometry[3] = model->xC;
++    geometry[4] = icons[target].bound_l;
++    geometry[5] = icons[target].bound_r;
++    geometry[6] = icons[target].bound_u;
++    geometry[7] = icons[target].bound_d;
 +    return 1;
 +}
 +#endif

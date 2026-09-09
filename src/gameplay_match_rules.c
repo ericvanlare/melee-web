@@ -1,4 +1,5 @@
 #include "gameplay_match_rules.h"
+#include "gameplay_content.h"
 #include "gameplay_bootstrap.h"
 #include <melee/gm/gm_1601.h>
 #include <melee/gm/gm_16AE.h>
@@ -43,8 +44,8 @@ int melee_web_match_rules_init_from_menu(MeleeWebMatchRules* h,
     if(candidate.rules.match_kind!=MatchKind_Stock||!candidate.rules.is_stock||
        !candidate.rules.is_vs||candidate.rules.is_teams||
        candidate.rules.timer_enabled||candidate.rules.xB!=-1||
-       candidate.rules.x20!=0||candidate.rules.stkind!=St_Kind_Last)
-        return fail(e,n,"Menu payload does not match the fixed stock/FD rules");
+       candidate.rules.x20!=0||!melee_web_stage_content(candidate.rules.stkind))
+        return fail(e,n,"Menu payload does not match the supported stock/stage rules");
     h->start=candidate;
     if(!melee_web_match_init_source(&h->start)){
         memset(&h->start,0,sizeof(h->start));

@@ -202,3 +202,41 @@ int action_test_common_operands(void)
     valid=valid&&!info.u&&info.loop_count==0&&waits==3&&steps==8;
     melee_web_commands_destroy(p);return valid;
 }
+
+int action_test_falco_operands(void)
+{
+    const uint32_t pseudo = (38U << 26) | (0x55U << 18) | (0xaaU << 10) | (5U << 6) | 6U;
+    const MeleeWebCommandWord words[] = {
+        {(12U << 26) | (3U << 23) | 0x123456U, UINT32_MAX},
+        {(30U << 26) | 0x1abcdeU, UINT32_MAX},
+        {(37U << 26) | 0x123U, UINT32_MAX},
+        {pseudo, UINT32_MAX},
+        {0x11111111U, UINT32_MAX}, {0x22222222U, UINT32_MAX}, {0x33333333U, UINT32_MAX},
+        {0x44444444U, UINT32_MAX}, {0x55555555U, UINT32_MAX}, {0x66666666U, UINT32_MAX},
+        {(41U << 26) | (126U << 19) | (3U << 12) | 0xabcu, UINT32_MAX},
+        {(42U << 26) | (0x1aaau << 13) | 0x123U, UINT32_MAX},
+        {(49U << 26) | (1U << 25) | 0x1234567U, UINT32_MAX},
+        {(55U << 26) | (2U << 24) | (0x81U << 16) | (0x72U << 8) | 0x43U, UINT32_MAX},
+        {0x77777777U, UINT32_MAX}, {0x88889999U, UINT32_MAX},
+    };
+    union CmdUnion* p = melee_web_commands_create(words, sizeof(words) / sizeof(*words));
+    if (!p) return 0;
+    uint32_t original = 0;
+    int valid = p[0].set_hitbox_damage.idx == 3 && p[0].set_hitbox_damage.value == 0x123456 &&
+        p[1].set_jab_rapid.state == 0x1abcde && p[2].set_fighter_vis.value == 0x123 &&
+        p[3].pseudo_random_sfx_0.volume == 0x55 && p[3].pseudo_random_sfx_0.panning == 0xaa &&
+        p[3].pseudo_random_sfx_0.behavior == 5 && p[3].pseudo_random_sfx_0.random_range == 6 &&
+        p[4].pseudo_random_sfx_1.sfx_id == 0x11111111U && p[9].pseudo_random_sfx_1.sfx_id == 0x66666666U &&
+        p[10].part_anim.unk1 == -2 && p[10].part_anim.unk2 == 3 && p[10].part_anim.unk3 == 0xabcu &&
+        p[11].unk9.unk1 == 0x1aaa && p[11].unk9.unk2 == 0x123 &&
+        p[12].unk16.unk3 == -1 && p[12].unk16.unk4 == 0x1234567 - 0x2000000 &&
+        /* Actual little-endian source adapter reads the flag and gfx id
+         * through unknown before passing the word to the sound consumer. */
+        ((p[13].sound_effect_0.unknown >> 16) & 1) == 1 &&
+        (p[13].sound_effect_0.unknown & 0xffff) == 0x7243 &&
+        p[13].sound_effect_0.behavior == ((words[13].word >> 18) & 255) &&
+        p[14].sound_effect_1.sfx_id == 0x77777777U &&
+        melee_web_command_original_word_checked(&p[13], &original) && original == words[13].word;
+    melee_web_commands_destroy(p);
+    return valid;
+}

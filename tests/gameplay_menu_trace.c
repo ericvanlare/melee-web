@@ -1,4 +1,5 @@
 #include "gameplay_menu.h"
+#include "gameplay_content.h"
 
 #include <melee/ft/forward.h>
 #include <melee/pl/forward.h>
@@ -19,9 +20,11 @@ static CSSData* active_css;
 static SSSData* active_sss;
 static int transition_request;
 static int invalid_exit;
+static int source_order_enabled;
+static int source_order;
 
 void mnCharSel_Scene_OnEnter(void* data) { active_css = data; }
-void mnCharSel_Scene_OnFrame(void) {}
+void mnCharSel_Scene_OnFrame(void) { if (source_order_enabled) source_order = 1; }
 void mnCharSel_Scene_OnExit(void* data)
 {
     (void) data;
@@ -30,7 +33,7 @@ void mnCharSel_Scene_OnExit(void* data)
     active_css = NULL;
 }
 void mnStageSel_Scene_OnEnter(void* data) { active_sss = data; }
-void mnStageSel_Scene_OnFrame(void) {}
+void mnStageSel_Scene_OnFrame(void) { if (source_order_enabled) source_order = 1; }
 void mnStageSel_Scene_OnExit(void* data)
 {
     (void) data;
@@ -50,6 +53,7 @@ static int check(void* user, MeleeWebMenuScene scene, char* error, size_t n)
 static int scheduler(void* user, char* error, size_t n)
 {
     (void) user;
+    if (source_order_enabled && source_order == 1) source_order = 2;
     if (error != NULL && n != 0) error[0] = '\0';
     return 1;
 }
@@ -59,6 +63,8 @@ static int transition(void* user, MeleeWebMenuScene scene, int* requested,
 {
     (void) user;
     (void) scene;
+    if (source_order_enabled && transition_request != 0 && source_order == 2)
+        source_order = 3;
     *requested = transition_request;
     transition_request = 0;
     if (error != NULL && n != 0) error[0] = '\0';
@@ -99,6 +105,17 @@ int main(void)
         return 1;
     css.vs.start.players[1].ckind = CKIND_FOX;
     if (melee_web_menu_css_selection_valid(&css)) return 2;
+    css.vs.start.players[1].ckind = CKIND_FALCO;
+    css.vs.start.players[1].color = 3;
+    css.vs.start.rules.stkind = St_Kind_Battle;
+    if (!melee_web_menu_css_selection_valid(&css) ||
+        !melee_web_menu_character_available(CKIND_FALCO) ||
+        !melee_web_menu_stage_available(St_Kind_Battle) ||
+        melee_web_fighter_content(CKIND_FALCO)->fighter_kind != FTKIND_FALCO ||
+        melee_web_stage_content(St_Kind_Battle)->ground_kind != Gr_Kind_Battle)
+        return 48;
+    css.vs.start.players[1].color = 4;
+    if (melee_web_menu_css_selection_valid(&css)) return 49;
     setup(&css);
     memset(&sss, 0, sizeof(sss));
     sss.force_stage_id = -1;
@@ -107,6 +124,9 @@ int main(void)
     if (!melee_web_menu_sss_selection_valid(&sss)) return 3;
     sss.vs.start.rules.stkind = 25;
     if (melee_web_menu_sss_selection_valid(&sss)) return 4;
+    sss.vs.start.rules.stkind = St_Kind_Battle;
+    sss.vs.start.players[0].ckind = CKIND_FALCO;
+    if (!melee_web_menu_sss_selection_valid(&sss)) return 50;
 
     {
         MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition};
@@ -136,10 +156,17 @@ int main(void)
         if (session == NULL || !melee_web_menu_enter_css(session, error,
                                                           sizeof(error)))
             return 9;
+        /* gm_801A4D34 observes OnFrame, runs the scheduler, then publishes the
+         * transition request. Keep this order visible to the host boundary so
+         * a preparation gate cannot move the request before source teardown. */
+        source_order_enabled = 1;
+        source_order = 0;
         transition_request = 1;
         if (melee_web_menu_tick(session, error, sizeof(error)) !=
             MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED)
             return 10;
+        source_order_enabled = 0;
+        if (source_order != 3) return 51;
         if (!melee_web_menu_leave_css(session, error, sizeof(error)) ||
             melee_web_menu_phase(session) != MELEE_WEB_MENU_SSS_READY ||
             !melee_web_menu_session_destroy(session, error, sizeof(error)))

@@ -17,7 +17,10 @@ public:
             if((at&3)||at>=limit||a.has_relocation(at))throw DatError("Item command instruction bounds or relocation invalid");
             uint32_t w=a.be32(at),op=w>>26;unsigned count=1;
             if(op==11)count=6;
-            else if(op!=0&&op!=1&&op!=2&&op!=17&&op!=18&&op!=19)throw DatError("Item command opcode is outside checked capabilities");
+            else if(op!=0&&op!=1&&op!=2&&op!=15&&op!=17&&op!=18&&op!=19)
+                throw DatError("Item command opcode " + std::to_string(op) +
+                               " is outside checked capabilities at source offset " +
+                               std::to_string(at));
             if(count*4>limit-at)throw DatError("Item command operands cross referenced region");
             for(unsigned k=0;k<count;k++){
                 if(a.has_relocation(at+4*k))throw DatError("Item numeric command operand is relocated");

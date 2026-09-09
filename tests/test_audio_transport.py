@@ -9,5 +9,6 @@ class AudioTransportTests(unittest.TestCase):
     def test_browser_pcm_queue(self):
         if not (ROOT/'.deps/emsdk/.emscripten').is_file():
             self.skipTest('Pinned Node runtime unavailable before SDK bootstrap')
-        result=subprocess.run([str(node_runtime()),str(ROOT/'tests/audio_ring_test.mjs')],capture_output=True,text=True,timeout=15)
-        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        for test in ('audio_ring_test.mjs', 'audio_worklet_test.mjs'):
+            result=subprocess.run([str(node_runtime()),str(ROOT/'tests'/test)],capture_output=True,text=True,timeout=15)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)

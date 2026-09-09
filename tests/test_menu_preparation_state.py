@@ -1,0 +1,29 @@
+"""Check the native preparation gate's source and clock safety invariants."""
+from pathlib import Path
+import shutil
+import subprocess
+import tempfile
+import unittest
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+class MenuPreparationStateTests(unittest.TestCase):
+    def test_transition_gate_invariants(self):
+        compiler = shutil.which("clang++") or shutil.which("c++")
+        self.assertIsNotNone(compiler, "A C++20 compiler is required")
+        with tempfile.TemporaryDirectory(prefix="melee preparation state ") as directory:
+            binary = Path(directory) / "preparation-state"
+            built = subprocess.run(
+                [compiler, "-std=c++20", "-Wall", "-Wextra", "-Werror", "-O1",
+                 "-I", str(ROOT / "src"),
+                 str(ROOT / "tests/menu_preparation_state_test.cpp"),
+                 "-o", str(binary)], capture_output=True, text=True, timeout=30,
+            )
+            self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
+            ran = subprocess.run([str(binary)], capture_output=True, text=True, timeout=10)
+            self.assertEqual(ran.returncode, 0, ran.stdout + ran.stderr)
+
+
+if __name__ == "__main__":
+    unittest.main()

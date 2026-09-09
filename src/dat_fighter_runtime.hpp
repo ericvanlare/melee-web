@@ -70,6 +70,10 @@ public:
     [[nodiscard]] std::uint32_t root_offset() const noexcept { return root_; }
     [[nodiscard]] const MeleeWebFighterBaseAttributes& base_attributes() const noexcept { return base_; }
     [[nodiscard]] const std::optional<MeleeWebMarioAttributes>& mario_attributes() const noexcept { return mario_; }
+    // Fox and Falco use the shared original ftFox_DatAttrs layout.  The
+    // optional is keyed by source kind; it is absent for Mario and for kinds
+    // whose extension schema has not been hydrated.
+    [[nodiscard]] const std::optional<MeleeWebFoxAttributes>& fox_attributes() const noexcept { return fox_; }
     [[nodiscard]] std::uint32_t extension_offset() const noexcept { return extension_; }
     [[nodiscard]] const std::vector<DatRuntimeAction>& actions() const noexcept { return actions_; }
     [[nodiscard]] const DatRuntimeAction& action(std::uint32_t motion_id) const;
@@ -88,6 +92,7 @@ private:
     std::uint32_t root_, extension_;
     MeleeWebFighterBaseAttributes base_{};
     std::optional<MeleeWebMarioAttributes> mario_;
+    std::optional<MeleeWebFoxAttributes> fox_;
     std::vector<DatRuntimeAction> actions_;
     std::vector<DatWaitChoice> wait_choices_;
     std::vector<DatFighterHurtbox> hurtboxes_;

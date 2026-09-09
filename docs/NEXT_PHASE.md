@@ -3,10 +3,15 @@
 The browser now runs a two-player Mario stock match on Final Destination.
 The active deliverable is original in-game CSS → original SSS → a playable
 four-stock Mario/FD match → original CSS, while preserving the
-[accuracy contract](ACCURACY_CONTRACT.md). Direct disc import is integrated.
-Native menu archives, scene lifetime and transitions are the immediate work. The full acceptance milestone remains
-open until the checks in [ROADMAP.md](ROADMAP.md) pass, including physical
-controllers, audible output, and cold and warm performance.
+[accuracy contract](ACCURACY_CONTRACT.md). Direct disc import, native menu
+archives, scene lifetime and transitions are integrated. The runtime also has
+narrower Falco/Battlefield source-loop and browser-rendering evidence. The full
+acceptance milestone remains open until the checks in [ROADMAP.md](ROADMAP.md)
+pass, including complete ordinary input, physical controllers, audible output,
+reference comparison, and cold and warm performance.
+
+The implementation notes below preserve the sequence used to reach the current
+native-menu path. [STATUS.md](../STATUS.md) is the authority for current coverage.
 
 ## Independent work boundaries
 
@@ -22,19 +27,19 @@ controllers, audible output, and cold and warm performance.
    successful rendering or average FPS does not establish gameplay equivalence.
 
 The first browser character selection → stage selection → stock match → character
-selection loop is implemented alongside performance work. It deliberately uses
+selection loop was implemented alongside performance work. It deliberately used
 HTML presentation around the original native match, without a results screen or
-full rules menu. This is disposable scaffolding, not the menu deliverable. Replace it with the
-original HSD CSS/SSS scenes, assets, and input behavior; remove the HTML selection
-UI after that transition. Do not invest in expanding its presentation.
+full rules menu. That scaffold has been removed from the canonical player and
+replaced by the original HSD CSS/SSS scenes, assets, and input behavior.
 `web/match-flow.mjs` owns immutable selections, phase guards, original selection
-IDs, and separate unlock/availability flags. All characters are unlocked; only
-Mario and FD are available. `web/match-menu.mjs` owns presentation and delegates
+IDs, and separate unlock/availability flags. All characters were unlocked while
+only Mario and FD were available in that historical scaffold. `web/match-menu.mjs`
+owns presentation and delegates
 launch/unload through the native command boundary. Stocks range from 1 to 99.
 Selections survive return, and controller navigation reuses the gameplay PAD
 mapping with release required across screen transitions. Physical controller
-acceptance remains pending. Falco is the first planned roster expansion after
-this flow and the core loop are stable.
+acceptance remains pending. Falco is now the first expanded runtime fighter, with
+the scoped evidence recorded in [STATUS.md](../STATUS.md).
 
 ## Native menu work now implemented
 

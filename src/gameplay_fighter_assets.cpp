@@ -2,6 +2,7 @@
 #include "gameplay_fighter_assets.hpp"
 #include "gameplay_fighter_data.h"
 #include "dat_item_article.hpp"
+#include "dat_native_animation.hpp"
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wwrite-strings"
 extern "C" {
@@ -30,6 +31,19 @@ bool canonical_costume(const FighterCostume& candidate) noexcept
 }
 void destroy_joint(MeleeWebNativeJoint* joint)
 {char error[128];if(!melee_web_native_joint_destroy(joint,error,sizeof(error))){std::fprintf(stderr,"%s\n",error);std::abort();}}
+struct NativePartAnimationGroup {
+    uint16_t start_part=0;
+    uint16_t part_count=0;
+    uint8_t* parts=nullptr;
+    void** animations=nullptr;
+};
+static_assert(sizeof(NativePartAnimationGroup)==12);
+struct OwnedPartAnimationGroup {
+    NativePartAnimationGroup native;
+    std::vector<uint8_t> parts;
+    std::vector<std::unique_ptr<DatNativeAnimation>> owners;
+    std::vector<void*> animations;
+};
 }
 struct OwnedAdditionalCostume {
     FighterCostume identity;
@@ -64,6 +78,8 @@ struct GameplayFighterAssets::Storage {
     std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> metal_native;
     std::unique_ptr<DatNativeJoint> guard_model;
     std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> guard_native{nullptr,destroy_joint};
+    std::vector<std::unique_ptr<OwnedPartAnimationGroup>> part_groups;
+    std::vector<void*> part_group_table;
     std::array<std::unique_ptr<OwnedAdditionalCostume>,16> additional;
     std::array<std::unique_ptr<GameplayActionStore>,6> bindings;
     std::array<Fighter*,6> fighters{};
@@ -84,17 +100,33 @@ struct GameplayFighterAssets::Storage {
         void* data=melee_web_fighter_data_decode(arena.reader(),fighter_root,id.fighter_kind,
             costume_count,prototype.action_rows(),prototype.blend_rows(),prototype.wait_choices(),&unresolved);
         const auto item_table=fighter->pointer(fighter_root+0x48,16);
-        if(!item_table)throw DatError("Mario item Article table is missing");
+        if(!item_table)throw DatError("Fighter item Article table is missing");
         struct ItemIdentity { uint32_t index,kind; };
-        for(const auto item : {ItemIdentity{0,It_Kind_Mario_Fire},ItemIdentity{2,It_Kind_Mario_Cape}}) {
+        std::array<ItemIdentity,3> item_identities{};
+        size_t item_count=0;
+        if(id.fighter_kind==0) {
+            item_identities[item_count++]={0,static_cast<uint32_t>(It_Kind_Mario_Fire)};
+            item_identities[item_count++]={2,static_cast<uint32_t>(It_Kind_Mario_Cape)};
+        } else if(id.fighter_kind==1 || id.fighter_kind==22) {
+            const auto& attributes=prototype.runtime().fox_attributes();
+            if(!attributes)throw DatError("Fox family ftData extension is not hydrated");
+            item_identities[item_count++]={0,attributes->blaster_shot_item_kind};
+            item_identities[item_count++]={1,attributes->blaster_gun_item_kind};
+            item_identities[item_count++]={id.fighter_kind==1?2U:3U,
+                static_cast<uint32_t>(id.fighter_kind==1?It_Kind_Fox_Illusion:It_Kind_Falco_Phantasm)};
+        } else {
+            throw DatError("Fighter item Article schema is unavailable");
+        }
+        for(size_t n=0;n<item_count;++n) {
+            const auto item=item_identities[n];
             const auto article_root=fighter->pointer(*item_table+item.index*4,24);
-            if(!article_root)throw DatError("Mario item Article root is missing");
+            if(!article_root)throw DatError("Fighter item Article root is missing");
             auto* registered=melee_web_fighter_data_article(data,item.index);
-            if(!registered)throw DatError("Mario item Article registration identity is missing");
+            if(!registered)throw DatError("Fighter item Article registration identity is missing");
             articles[item.index]=std::make_unique<DatItemArticle>(fighter,*article_root,item.kind,registered);
         }
         const auto metal_root=fighter->pointer(root(*fighter,id.fighter_symbol)+0x5c,64);
-        if(!metal_root)throw DatError("Mario constructor requires its original metal graph");
+        if(!metal_root)throw DatError("Fighter constructor requires its original metal graph");
         metal_model=std::make_unique<DatNativeJoint>(fighter,*metal_root);
         const auto& metal=metal_model->graph();
         // The original consumer assigns metal descriptors to the costume's
@@ -114,9 +146,9 @@ struct GameplayFighterAssets::Storage {
             melee_web_native_joint_descriptor(metal_native.get(),error,sizeof(error)),
             costume_count,metal_dobjs,&unresolved,error,sizeof(error)))throw DatError(error);
         const auto guard_data=fighter->pointer(root(*fighter,id.fighter_symbol)+0x20,4);
-        if(!guard_data)throw DatError("Mario requires its original guard pose");
+        if(!guard_data)throw DatError("Fighter requires its original guard pose");
         const auto guard_root=fighter->pointer(*guard_data,64);
-        if(!guard_root)throw DatError("Mario guard pose descriptor is missing");
+        if(!guard_root)throw DatError("Fighter guard pose descriptor is missing");
         guard_model=std::make_unique<DatNativeJoint>(fighter,*guard_root);
         const auto& guard=guard_model->graph();
         if(guard.joint_count!=costume_graph.joint_count)throw DatError("Guard pose does not match costume joint count");
@@ -127,9 +159,55 @@ struct GameplayFighterAssets::Storage {
         if(!guard_native)throw DatError(error);
         melee_web_fighter_data_set_guard(arena.reader(),root(*fighter,id.fighter_symbol),data,
             melee_web_native_joint_descriptor(guard_native.get(),error,sizeof(error)),&unresolved);
-        // Demo clips and part animation remain explicitly unavailable.
+        const auto part_table=fighter->pointer(fighter_root+0x1c,4);
+        if(!part_table)throw DatError("Fighter part animation table is missing");
+        const auto part_table_end=fighter->next_target_offset(*part_table);
+        if(part_table_end<=*part_table||(part_table_end-*part_table)%4)
+            throw DatError("Fighter part animation table extent is invalid");
+        const auto part_group_count=(part_table_end-*part_table)/4;
+        if(!part_group_count||part_group_count>5)
+            throw DatError("Fighter part animation group count exceeds source capacity");
+        part_groups.reserve(part_group_count);part_group_table.reserve(part_group_count);
+        for(uint32_t group_index=0;group_index<part_group_count;++group_index) {
+            const auto descriptor=fighter->pointer(*part_table+group_index*4,12);
+            if(!descriptor)throw DatError("Fighter part animation descriptor is missing");
+            auto group=std::make_unique<OwnedPartAnimationGroup>();
+            group->native.start_part=fighter->be16(*descriptor);
+            group->native.part_count=fighter->be16(*descriptor+2);
+            if(group->native.start_part>=model.graph().joint_count||!group->native.part_count||
+               group->native.part_count>model.graph().joint_count)
+                throw DatError("Fighter part animation range exceeds the model graph");
+            const auto part_indices=fighter->pointer(*descriptor+4,group->native.part_count);
+            if(!part_indices)throw DatError("Fighter part animation index list is missing");
+            const auto part_bytes=fighter->range(*part_indices,group->native.part_count);
+            for(const auto part:part_bytes)if(part>=model.graph().joint_count)
+                throw DatError("Fighter part animation index exceeds the model graph");
+            group->parts.assign(part_bytes.begin(),part_bytes.end());
+            const auto animation_table=fighter->pointer(*descriptor+8,4);
+            if(!animation_table)throw DatError("Fighter part animation root table is missing");
+            const auto animation_end=fighter->next_target_offset(*animation_table);
+            if(animation_end<=*animation_table||(animation_end-*animation_table)%4)
+                throw DatError("Fighter part animation root table extent is invalid");
+            const auto animation_count=(animation_end-*animation_table)/4;
+            if(!animation_count||animation_count>32)
+                throw DatError("Fighter part animation variant count exceeds source capacity");
+            group->owners.reserve(animation_count);group->animations.reserve(animation_count);
+            auto partial_graph=model.graph();partial_graph.root=group->native.start_part;
+            for(uint32_t animation_index=0;animation_index<animation_count;++animation_index) {
+                const auto animation_root=fighter->pointer(*animation_table+animation_index*4,20);
+                if(!animation_root)throw DatError("Fighter part animation root is missing");
+                auto animation=std::make_unique<DatNativeAnimation>(fighter,*animation_root,partial_graph);
+                group->animations.push_back(animation->descriptor());
+                group->owners.push_back(std::move(animation));
+            }
+            group->native.parts=group->parts.data();group->native.animations=group->animations.data();
+            part_group_table.push_back(&group->native);part_groups.push_back(std::move(group));
+        }
+        if(!melee_web_fighter_data_set_part_animations(data,part_group_table.data(),part_group_count,
+            &unresolved,error,sizeof(error)))throw DatError(error);
+        // Demo clips remain explicitly unavailable.
         // All other ftData roots are required; Article spawning has its own gate.
-        constexpr uint32_t neutral_unreached=(1U<<5)|(1U<<6)|(1U<<7);
+        constexpr uint32_t neutral_unreached=(1U<<5)|(1U<<6);
         if(!data || (unresolved&~neutral_unreached))throw DatError("Creation-reachable fighter data is not hydrated");
         scope=melee_web_fighter_assets_begin(id.fighter_kind,id.costume_index,data,
             melee_web_native_joint_descriptor(native.get(),error,sizeof(error)),material.descriptor(),

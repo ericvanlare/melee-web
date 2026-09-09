@@ -29,8 +29,10 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     : runtime_(std::make_shared<const DatFighterRuntime>(archive, costume)), store_(runtime_, container),
       rows_(nullptr, melee_web_action_rows_destroy)
 {
-    require(costume.fighter_kind == 0, "Native action store currently requires Mario common-action command semantics");
-    std::vector<uint32_t> roots;
+    const bool mario = costume.fighter_kind == 0;
+    const bool fox_family = costume.fighter_kind == 1 || costume.fighter_kind == 22;
+    require(mario || fox_family, "Native action store has no checked fighter command schema for this kind");
+    std::vector<DatCommandRoot> roots;
     // Explicit source ftCo submotion groups. This certifies command operand
     // graphs only, not readiness of every original world service they invoke.
     command_motions_ = {0,1,2,3,6};
@@ -43,9 +45,17 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     command_motions_.insert(238);                // original EntryStart; Mario script is END
     group(242,258);group(262,265);                // grab, pummel, throws and Mario capture reactions
     group(286,291);                              // shield-break knockdown
-    group(295,302);                              // Mario special scripts; Article creation remains a service gate
+    if (mario) group(295,302);                   // Mario special scripts; Article creation remains a service gate
+    else group(295,326);                         // Fox/Falco specials, including laser, illusion and recovery
     for (auto choice : runtime_->wait_choices()) command_motions_.insert(choice.motion_id);
-    for (auto id : command_motions_) if (auto offset = runtime_->action(id).command_offset) roots.push_back(*offset);
+    for (auto id : command_motions_) {
+        const auto& action = runtime_->action(id);
+        if (!action.command_offset) continue;
+        const auto selected = store_.select(id);
+        const float end_frame = selected.animation ? selected.animation->end_frame : 0.0f;
+        roots.push_back({*action.command_offset, end_frame,
+                         static_cast<uint8_t>((action.motion_flags & (1U << 30)) != 0)});
+    }
     if (!roots.empty()) commands_ = std::make_shared<DatCommands>(archive, roots);
     std::vector<MeleeWebActionRow> rows;
     std::vector<MeleeWebWaitChoice> waits;

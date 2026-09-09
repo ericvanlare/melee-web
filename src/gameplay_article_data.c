@@ -10,7 +10,14 @@
 #define NEW(t,n) ((t*)r->allocate(r->context,(n),sizeof(t)))
 #define REQUIRE(c,m) do { if (!(c)) r->reject(r->context,m); } while(0)
 #define ARTICLE_MAGIC UINT32_C(0x41525443)
-typedef struct NativeArticle { Article article; uint32_t magic, unresolved; } NativeArticle;
+typedef struct NativeArticle {
+    Article article;
+    uint32_t magic, unresolved;
+    /* The source ItemStateArray is a variable-length descriptor tail in the
+     * gameplay build. Keep the count beside the pointer so any source bridge
+     * that indexes the tail can check its bound. */
+    uint32_t state_count;
+} NativeArticle;
 _Static_assert(sizeof(Article)==24 && sizeof(ItemAttr)==0x84, "Article source ABI");
 static float floating(const MeleeWebNativeDat* r,uint32_t at)
 { uint32_t w=WORD(at); float f; memcpy(&f,&w,4); REQUIRE(isfinite(f),"Article scalar is nonfinite"); return f; }
@@ -80,16 +87,22 @@ int melee_web_article_publish(const MeleeWebNativeDat* r,void* article,void* spe
     const MeleeWebItemStateDesc* states,uint32_t count,void* joint,uint32_t bones,int32_t attach,uint8_t flags,char* error,size_t size)
 {
     NativeArticle* a=article;
-    if(!r||!a||a->magic!=ARTICLE_MAGIC||!special||!states||!count||count>8||!joint||
+    if(!r||!a||a->magic!=ARTICLE_MAGIC||!special||!states||!count||count>64||!joint||
        bones>140||(a->unresolved&~((1U<<1)|(1U<<3)|(1U<<4)))){
         if(error&&size)snprintf(error,size,"Item graph publication requires checked registration root and complete fields");return 0;
     }
-    ItemStateArray* native_states=NEW(ItemStateArray,1);
+    /* ItemStateArray historically declared eight inline entries, but the
+     * original Fox/Falco blaster roots carry a ninth, null descriptor. The
+     * gameplay source patch makes this field a flexible tail; allocate the
+     * exact number of source rows rather than indexing a fixed C array. */
+    struct ItemStateDesc* native_states=(struct ItemStateDesc*)r->allocate(
+        r->context,count,sizeof(struct ItemStateDesc));
     ItemModelDesc* model=NEW(ItemModelDesc,1);
     for(uint32_t i=0;i<count;i++){
-        native_states->x0_itemStateDesc[i]=(struct ItemStateDesc){states[i].animation,states[i].material,states[i].shape,states[i].commands};
+        native_states[i]=(struct ItemStateDesc){states[i].animation,states[i].material,states[i].shape,states[i].commands};
     }
     model->x0_joint=joint;model->x4_bone_count=bones;model->x8_bone_attach_id=attach;model->xC_bit_field=flags;
-    a->article.x4_specialAttributes=special;a->article.xC_itemStates=native_states;a->article.x10_modelDesc=model;
+    a->article.x4_specialAttributes=special;a->article.xC_itemStates=(ItemStateArray*)native_states;a->article.x10_modelDesc=model;
+    a->state_count=count;
     a->unresolved=0;if(error&&size)*error=0;return 1;
 }

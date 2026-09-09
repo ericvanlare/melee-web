@@ -19,6 +19,22 @@ persisting game assets. Cold first-use stalls, broader
 rendered combat, audible output, physical controllers and full original-game
 equivalence still need acceptance checks.
 
+CSS, SSS and match transitions now expose an explicit resource-preparation
+phase. It waits for the audio worklet's disabled-state acknowledgement, keeps
+source simulation and drawing out of owner construction, and reports
+preparation separately from live callbacks. The scoped
+[scene-entry profile](work/scene-entry-profile.md) records the measured phases;
+it is not cold-cache or full-match performance acceptance.
+
+Typed source-content rows and runtime manifests now include Falco and
+Battlefield, with focused development traces for their source identity,
+costumes, effects and stage data. A raw-PAD browser run selected P1 Falco and P2
+Mario on Battlefield through the original CSS/SSS and visibly rendered both
+fighters, the stage and their distinct four-stock icons. The native loop also
+completed this route on both Battlefield and Final Destination. Full ordinary
+input, uninterrupted audio, complete browser-loop and retail-reference checks
+remain open, so this does not widen the accepted first-deliverable claim.
+
 A scoped 102-frame original-game jump comparison passes; this does not establish
 full-match equivalence. See [current evidence](STATUS.md),
 [the runtime gate](docs/FIGHTER_RUNTIME.md) and
@@ -28,21 +44,25 @@ full-match equivalence. See [current evidence](STATUS.md),
 
 Open `runtime.html` on the local build server and choose your own unmodified
 USA revision 1.02 Melee ISO, GCM, or CISO. **Open character select** enters the
-original in-game CSS. The current slice supports two Marios, four stocks and
-Final Destination, through original CSS/SSS transitions, fighter entrances,
-Ready/Go, gameplay HUD, pause/resume and GAME! ending. It returns directly to original CSS after the source exit
-request; Results is deliberately skipped. Other fighters/stages remain outside
-the supported slice. All roster unlocks are enabled separately from availability.
+original in-game CSS. The accepted first-deliverable slice supports two Marios,
+four stocks and Final Destination through original CSS/SSS transitions, fighter
+entrances, Ready/Go, gameplay HUD, pause/resume and GAME! ending. It returns
+directly to original CSS after the source exit request; Results is deliberately
+skipped. The runtime now also admits Falco and Battlefield, with the narrower
+raw-PAD/rendering and native-loop evidence described above. All roster unlocks
+are enabled separately from availability.
 
-Click the canvas for keyboard input; the page lists P1/P2 bindings. Physical
-controllers use the original PAD processing path and still need acceptance checks.
+Click the canvas for keyboard input; the page lists P1/P2 bindings. Ordinary
+keyboard Start and SSS cancellation have been checked in the browser, while a
+complete ordinary-input Falco/Battlefield loop remains open. Physical controllers
+use the original PAD processing path and still need acceptance checks.
 The browser reads only required disc ranges; game data stays in the tab and is
 neither uploaded nor persisted. RVZ is not supported. **Unload** releases the
 source world and saves the optional renderer cache. `native-menu.html` redirects
 to this player. The former HTML fighter/stage selectors are no longer in the
 player flow. Asset inspection remains at `viewer.html`.
 
-The current framebuffer is 640×480 at 1×. Cold timing stalls, physical input,
+The current framebuffer is 640×480 at 1×. Cold-cache timing, physical input,
 audio/reference comparison and full original-game equivalence remain open;
 the diagnostic input buttons do not establish those forms of acceptance.
 

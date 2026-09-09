@@ -147,6 +147,66 @@
     X(0x07c, F32, cape_reflection_x1C_speed_mul, cape_reflection.x1C_speed_mul) \
     X(0x080, U8, cape_reflection_x20_behavior, cape_reflection.x20_behavior)
 
+/* Fox and Falco share the original ftFox_DatAttrs layout.  Their special
+ * moves are implemented by the same source routines, while PlFx.dat and
+ * PlFc.dat provide different scalar values and Article identities.  Keep the
+ * serialized offsets explicit so the two kinds can share the decoder without
+ * treating one character's attributes as the other character's data. */
+#define MELEE_WEB_FOX_ATTRIBUTE_FIELDS(X) \
+    X(0x000, F32, blaster_x0, x0_FOX_BLASTER_UNK1) \
+    X(0x004, F32, blaster_x4, x4_FOX_BLASTER_UNK2) \
+    X(0x008, F32, blaster_x8, x8_FOX_BLASTER_UNK3) \
+    X(0x00c, F32, blaster_xC, xC_FOX_BLASTER_UNK4) \
+    X(0x010, F32, blaster_angle, x10_FOX_BLASTER_ANGLE) \
+    X(0x014, F32, blaster_velocity, x14_FOX_BLASTER_VEL) \
+    X(0x018, F32, blaster_landing_lag, x18_FOX_BLASTER_LANDING_LAG) \
+    X(0x01c, U32, blaster_shot_item_kind, x1C_FOX_BLASTER_SHOT_ITKIND) \
+    X(0x020, U32, blaster_gun_item_kind, x20_FOX_BLASTER_GUN_ITKIND) \
+    X(0x024, F32, illusion_gravity_delay, x24_FOX_ILLUSION_GRAVITY_DELAY) \
+    X(0x028, F32, illusion_ground_velocity, x28_FOX_ILLUSION_GROUND_VEL_X) \
+    X(0x02c, F32, illusion_x2C, x2C_FOX_ILLUSION_UNK1) \
+    X(0x030, F32, illusion_x30, x30_FOX_ILLUSION_UNK2) \
+    X(0x034, F32, illusion_ground_end_velocity, x34_FOX_ILLUSION_GROUND_END_VEL_X) \
+    X(0x038, F32, illusion_ground_friction, x38_FOX_ILLUSION_GROUND_FRICTION) \
+    X(0x03c, F32, illusion_air_end_velocity, x3C_FOX_ILLUSION_AIR_END_VEL_X) \
+    X(0x040, F32, illusion_air_multiplier, x40_FOX_ILLUSION_AIR_MUL_X) \
+    X(0x044, F32, illusion_fall_accel, x44_FOX_ILLUSION_FALL_ACCEL) \
+    X(0x048, F32, illusion_terminal_velocity, x48_FOX_ILLUSION_TERMINAL_VELOCITY) \
+    X(0x04c, F32, illusion_freefall_mobility, x4C_FOX_ILLUSION_FREEFALL_MOBILITY) \
+    X(0x050, F32, illusion_landing_lag, x50_FOX_ILLUSION_LANDING_LAG) \
+    X(0x054, F32, firefox_gravity_delay, x54_FOX_FIREFOX_GRAVITY_DELAY) \
+    X(0x058, F32, firefox_velocity_x, x58_FOX_FIREFOX_VEL_X) \
+    X(0x05c, F32, firefox_air_momentum_x, x5C_FOX_FIREFOX_AIR_MOMENTUM_PRESERVE_X) \
+    X(0x060, F32, firefox_fall_accel, x60_FOX_FIREFOX_FALL_ACCEL) \
+    X(0x064, F32, firefox_direction_stick_range, x64_FOX_FIREFOX_DIRECTION_STICK_RANGE_MIN) \
+    X(0x068, F32, firefox_duration, x68_FOX_FIREFOX_DURATION) \
+    X(0x06c, I32, firefox_bounce_var, x6C_FOX_FIREFOX_BOUNCE_VAR) \
+    X(0x070, F32, firefox_duration_end, x70_FOX_FIREFOX_DURATION_END) \
+    X(0x074, F32, firefox_speed, x74_FOX_FIREFOX_SPEED) \
+    X(0x078, F32, firefox_reverse_accel, x78_FOX_FIREFOX_REVERSE_ACCEL) \
+    X(0x07c, F32, firefox_ground_momentum_end, x7C_FOX_FIREFOX_GROUND_MOMENTUM_END) \
+    X(0x080, F32, firefox_x80, x80_FOX_FIREFOX_UNK2) \
+    X(0x084, F32, firefox_bound_velocity_x, x84_FOX_FIREFOX_BOUND_VEL_X) \
+    X(0x088, F32, firefox_facing_stick_range, x88_FOX_FIREFOX_FACING_STICK_RANGE_MIN) \
+    X(0x08c, F32, firefox_freefall_mobility, x8C_FOX_FIREFOX_FREEFALL_MOBILITY) \
+    X(0x090, F32, firefox_landing_lag, x90_FOX_FIREFOX_LANDING_LAG) \
+    X(0x094, F32, firefox_bound_angle, x94_FOX_FIREFOX_BOUND_ANGLE) \
+    X(0x098, F32, reflector_release_lag, x98_FOX_REFLECTOR_RELEASE_LAG) \
+    X(0x09c, F32, reflector_turn_frames, x9C_FOX_REFLECTOR_TURN_FRAMES) \
+    X(0x0a0, F32, reflector_xA0, xA0_FOX_REFLECTOR_UNK1) \
+    X(0x0a4, I32, reflector_gravity_delay, xA4_FOX_REFLECTOR_GRAVITY_DELAY) \
+    X(0x0a8, F32, reflector_momentum_x, xA8_FOX_REFLECTOR_MOMENTUM_PRESERVE_X) \
+    X(0x0ac, F32, reflector_fall_accel, xAC_FOX_REFLECTOR_FALL_ACCEL) \
+    X(0x0b0, U32, reflector_bone_id, xB0_FOX_REFLECTOR_REFLECTION.x0_bone_id) \
+    X(0x0b4, I32, reflector_max_damage, xB0_FOX_REFLECTOR_REFLECTION.x4_max_damage) \
+    X(0x0b8, F32, reflector_offset_x, xB0_FOX_REFLECTOR_REFLECTION.x8_offset.x) \
+    X(0x0bc, F32, reflector_offset_y, xB0_FOX_REFLECTOR_REFLECTION.x8_offset.y) \
+    X(0x0c0, F32, reflector_offset_z, xB0_FOX_REFLECTOR_REFLECTION.x8_offset.z) \
+    X(0x0c4, F32, reflector_size, xB0_FOX_REFLECTOR_REFLECTION.x14_size) \
+    X(0x0c8, F32, reflector_damage_multiplier, xB0_FOX_REFLECTOR_REFLECTION.x18_damage_mul) \
+    X(0x0cc, F32, reflector_speed_multiplier, xB0_FOX_REFLECTOR_REFLECTION.x1C_speed_mul) \
+    X(0x0d0, U8, reflector_behavior, xB0_FOX_REFLECTOR_REFLECTION.x20_behavior)
+
 #define MELEE_WEB_PICKUP_ATTRIBUTE_FIELDS(X) \
     X(0x000, F32, gr_light_offset_x, gr_light_offset.x) \
     X(0x004, F32, gr_light_offset_y, gr_light_offset.y) \
@@ -169,6 +229,10 @@ typedef struct MeleeWebCoAttributes {
 typedef struct MeleeWebMarioAttributes {
     MELEE_WEB_MARIO_ATTRIBUTE_FIELDS(MELEE_WEB_DECLARE_ATTRIBUTE)
 } MeleeWebMarioAttributes;
+typedef struct MeleeWebFoxAttributes {
+    MELEE_WEB_FOX_ATTRIBUTE_FIELDS(MELEE_WEB_DECLARE_ATTRIBUTE)
+    uint8_t reserved[3];
+} MeleeWebFoxAttributes;
 typedef struct MeleeWebItemPickup {
     MELEE_WEB_PICKUP_ATTRIBUTE_FIELDS(MELEE_WEB_DECLARE_ATTRIBUTE)
 } MeleeWebItemPickup;

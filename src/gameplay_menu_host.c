@@ -1,5 +1,6 @@
 #include "gameplay_menu_host.h"
 #include "gameplay_menu.h"
+#include "gameplay_content.h"
 #include "gameplay_bootstrap.h"
 #include "gameplay_audio_bank_transport.h"
 #include <melee/gm/gm_1A36.h>
@@ -170,7 +171,8 @@ int melee_web_menu_host_selection(const MeleeWebMenuHost* h,MeleeWebMenuMatchSel
     for(unsigned i=0;i<2;i++){
         const PlayerInitData* p=&vs->start.players[i];
         const unsigned port=p->slot?p->slot-1:i;
-        if(port!=i||p->color>=5||p->sub_color>4)
+        const MeleeWebFighterContent* content=melee_web_fighter_content(p->ckind);
+        if(!content||port!=i||p->color>=content->costumes||p->sub_color>4)
             return fail(e,n,"Unsupported original menu port, costume or tint");
         out->players[i].controller=port;out->players[i].stocks=p->stocks;
         out->players[i].costume=p->color;out->players[i].sub_color=p->sub_color;

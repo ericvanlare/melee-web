@@ -17,7 +17,7 @@ foreach(path IN LISTS native_paths)
   list(APPEND fighter_paths "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/${relative}")
 endforeach()
 add_library(fighter_source_runtime STATIC EXCLUDE_FROM_ALL ${fighter_paths}
-  src/gameplay_match_flow.c src/gameplay_hud.c src/gameplay_menu.c src/gameplay_menu_host.c src/gameplay_item_runtime.c src/dat_item_commands.c src/gameplay_crowd.c src/gameplay_render.c src/gameplay_color_commands.c src/gameplay_match_rules.c src/gameplay_stage_visual.c src/gameplay_stage_map.c src/gameplay_stage_last.c src/gameplay_effect_runtime.c
+  src/gameplay_match_flow.c src/gameplay_hud.c src/gameplay_menu.c src/gameplay_menu_host.c src/gameplay_item_runtime.c src/dat_item_commands.c src/gameplay_crowd.c src/gameplay_render.c src/gameplay_color_commands.c src/gameplay_match_rules.c src/gameplay_stage_visual.c src/gameplay_stage_map.c src/gameplay_stage_last.c src/gameplay_stage_profile.c src/gameplay_effect_runtime.c
   src/gameplay_audio.c src/gameplay_audio_bank_transport.c src/gameplay_audio_residency.c src/gameplay_audio_stream.c src/gameplay_io.cpp src/gameplay_audio_resample.c src/gameplay_audio_itd.c src/gameplay_audio_fx.c src/gameplay_audio_reverb.c
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/axfx/axfx.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/axfx/reverb_std.c"
@@ -163,6 +163,26 @@ target_link_options(gameplay_stage_last_trace PRIVATE -sENVIRONMENT=node -sNODER
   -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
 set_target_properties(gameplay_stage_last_trace PROPERTIES SUFFIX ".js")
 
+add_executable(gameplay_stage_battlefield_trace EXCLUDE_FROM_ALL
+  tests/gameplay_stage_battlefield_trace.cpp tests/gameplay_stage_battlefield_trace.c)
+target_link_libraries(gameplay_stage_battlefield_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_stage_battlefield_trace PRIVATE -UNDEBUG
+  "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
+target_link_options(gameplay_stage_battlefield_trace PRIVATE --profiling-funcs
+  -sENVIRONMENT=node -sNODERAWFS=1 -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1
+  -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_stage_battlefield_trace PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_content_match_trace EXCLUDE_FROM_ALL
+  tests/gameplay_content_match_trace.cpp tests/gameplay_content_match_state.c)
+target_link_libraries(gameplay_content_match_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_content_match_trace PRIVATE -UNDEBUG
+  "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
+target_link_options(gameplay_content_match_trace PRIVATE --profiling-funcs
+  -sENVIRONMENT=node -sNODERAWFS=1 -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1
+  -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_content_match_trace PROPERTIES SUFFIX ".js")
+
 add_executable(gameplay_stock_trace EXCLUDE_FROM_ALL tests/gameplay_stock_trace.cpp)
 target_link_libraries(gameplay_stock_trace PRIVATE fighter_asset_runtime)
 target_link_options(gameplay_stock_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
@@ -259,7 +279,10 @@ set_target_properties(native_audio_banks PROPERTIES SUFFIX ".js")
 target_compile_options(native_audio_banks PRIVATE
   "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
 
-add_executable(native_menu_host_trace EXCLUDE_FROM_ALL tests/native_menu_host_trace.cpp tests/native_menu_alarm_unavailable.c)
+add_executable(native_menu_host_trace EXCLUDE_FROM_ALL tests/native_menu_host_trace.cpp
+  tests/native_menu_fighter_input.c tests/native_menu_stage_input.c tests/native_menu_alarm_unavailable.c)
+target_compile_options(native_menu_host_trace PRIVATE
+  "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
 target_link_libraries(native_menu_host_trace PRIVATE fighter_asset_runtime)
 target_link_options(native_menu_host_trace PRIVATE --profiling-funcs -sENVIRONMENT=node -sNODERAWFS=1
   -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSTACK_SIZE=8388608)
@@ -274,7 +297,7 @@ target_link_options(gameplay_menu_browser PRIVATE --profiling-funcs -sENVIRONMEN
   -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=134217728 -sSTACK_SIZE=8388608 -sEXIT_RUNTIME=0 -sASSERTIONS=2
   -sEXPORTED_RUNTIME_METHODS=FS,IDBFS,addRunDependency,removeRunDependency,HEAPU8,UTF8ToString
   -lidbfs.js
-  -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_melee_web_native_menu_file,_melee_web_native_menu_launch,_melee_web_native_menu_unload,_melee_web_native_menu_pause,_melee_web_native_menu_message,_melee_web_native_menu_running,_melee_web_native_menu_cache_idle,_melee_web_native_menu_phase,_melee_web_native_menu_confirm_check,_melee_web_native_menu_stock_check,_melee_web_native_menu_stock_check_ready,_melee_web_native_menu_diagnostics,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_set_keyboard_port,_melee_web_input_message)
+  -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_melee_web_native_menu_file,_melee_web_native_menu_prepare,_melee_web_native_menu_launch,_melee_web_native_menu_unload,_melee_web_native_menu_pause,_melee_web_native_menu_message,_melee_web_native_menu_running,_melee_web_native_menu_cache_idle,_melee_web_native_menu_phase,_melee_web_native_menu_confirm_check,_melee_web_native_menu_pad_sample,_melee_web_native_menu_stock_check,_melee_web_native_menu_stock_check_ready,_melee_web_native_menu_diagnostics,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_set_keyboard_port,_melee_web_input_message)
 set_target_properties(gameplay_menu_browser PROPERTIES SUFFIX ".js")
 configure_file(web/native-menu.html native-menu.html @ONLY)
 

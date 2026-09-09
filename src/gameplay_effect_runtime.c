@@ -36,8 +36,18 @@ int melee_web_effect_runtime_end(char* e,size_t n){
     hsd_8039EE24(UINT32_MAX);
     melee_web_particle_clear_all();
     while(hsd_804D78FC){
-        HSD_Generator* previous=hsd_804D78FC;hsd_8039D4DC(previous);
-        if(hsd_804D78FC==previous)return fail(e,n,"Original generator retains external SRT references");
+        /* Generators may share an AppSRT.  The owning generator cannot be
+         * removed until every later borrower has released its reference, so
+         * make a full source-list pass instead of retrying only the head. */
+        const u16 before=hsd_804D78E0;
+        HSD_Generator* generator=hsd_804D78FC;
+        while(generator){
+            HSD_Generator* next=generator->next;
+            hsd_8039D4DC(generator);
+            generator=next;
+        }
+        if(hsd_804D78E0>=before)
+            return fail(e,n,"Original generators retain external SRT references");
     }
     if(efLib_EffectCount||hsd_804D78E0)return fail(e,n,"Original effects remain alive after teardown");
     HSD_JObjSetSPtclCallback(NULL);HSD_JObjSetDPtclCallback(NULL);hsd_804D7900=NULL;psCamera=NULL;

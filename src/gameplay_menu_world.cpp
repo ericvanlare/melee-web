@@ -36,16 +36,16 @@ namespace {
 
 constexpr std::size_t kWorldHeapBytes = 32U * 1024U * 1024U;
 
-constexpr std::array<std::string_view, 17> kRequiredFiles = {
+constexpr std::array<std::string_view, 18> kRequiredFiles = {
     "MnSlChr.usd", "MnSlMap.usd", "SdSlChr.usd", "MnExtAll.usd",
     "LbMcGame.usd", "NtMemAc.usd", "sislib_font.bin", "smash2.sem",
-    "dsp_coef.bin", "menu01.hps", "main.ssm", "mario.ssm",
+    "dsp_coef.bin", "menu01.hps", "main.ssm", "mario.ssm", "falco.ssm",
     "nr_select.ssm", "nr_title.ssm", "nr_name.ssm", "pokemon.ssm",
     "end.ssm",
 };
 
-constexpr std::array<std::string_view, 7> kBankFiles = {
-    "main.ssm", "mario.ssm", "nr_select.ssm", "nr_title.ssm",
+constexpr std::array<std::string_view, 8> kBankFiles = {
+    "main.ssm", "mario.ssm", "falco.ssm", "nr_select.ssm", "nr_title.ssm",
     "nr_name.ssm", "pokemon.ssm", "end.ssm",
 };
 
@@ -331,6 +331,11 @@ GameplayMenuWorld::~GameplayMenuWorld() = default;
 void GameplayMenuWorld::close()
 {
     storage_->close_impl(true);
+}
+
+void GameplayMenuWorld::close_prepared()
+{
+    storage_->close_impl(false);
 }
 
 MeleeWebAudio* GameplayMenuWorld::audio() const noexcept

@@ -9,7 +9,9 @@ struct Fighter;
 typedef struct MeleeWebFighterAssetScope MeleeWebFighterAssetScope;
 typedef int (*MeleeWebFighterAssetBind)(void*,struct Fighter*,void** actions,void** blends,char*,size_t);
 typedef void (*MeleeWebFighterAssetUnbind)(void*,struct Fighter*);
-/* Publish one decoded Mario costume and ftData after common initialization.
+/* Publish one decoded source fighter costume and ftData after common
+ * initialization. Mario, Fox and Falco currently have complete native
+ * extension/article schemas; other kinds are rejected by their decoders.
  * Source globals are restored only after every bound Fighter has unloaded. */
 MeleeWebFighterAssetScope* melee_web_fighter_assets_begin(uint32_t kind,uint32_t costume,
     void* data,void* joint,void* material_animation,uint32_t motion_count,void* context,

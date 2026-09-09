@@ -1,4 +1,5 @@
 #include "gameplay_world.hpp"
+#include "gameplay_content.h"
 #include <cstdio>
 #include <cstdlib>
 #include "dat_archive.hpp"
@@ -30,6 +31,7 @@
 #include "gameplay_fighter_assets.hpp"
 #include <iostream>
 #include <algorithm>
+#include <set>
 using namespace melee_web;
 namespace {
 void check(int ok,const char* error){if(!ok)throw DatError(error);}
@@ -81,8 +83,10 @@ struct GameplayWorld::Storage {
     std::map<std::string,std::vector<uint8_t>,std::less<>> snapshots;
     std::unique_ptr<NativeDatArena> stage_arena,bonus_arena,item_arena;
     std::unique_ptr<DatItemRegistryNative> items;
-    std::unique_ptr<GameplayFighterAssets> fighter;
-    std::unique_ptr<DatEffectEntries> effects,common_effects;
+    std::map<unsigned,std::unique_ptr<GameplayFighterAssets>> fighters;
+    const MeleeWebStageContent* stage=nullptr;
+    std::vector<std::unique_ptr<DatEffectEntries>> effects;
+    std::unique_ptr<DatEffectEntries> common_effects;
     std::unique_ptr<DatColorAnimation> common_colors,extra_colors,item_colors;
     MeleeWebItemRuntime* item_runtime=nullptr;
     std::unique_ptr<DatNativeJoint> stage_model;
@@ -115,31 +119,42 @@ struct GameplayWorld::Storage {
     int floor_start=0;
     char error[256]{};
     std::shared_ptr<const DatArchive> archive(std::string_view name)const{return archives.at(std::string(name));}
-    void start(const RuntimeFiles& files){
-        for(const char* name:{"PlCo.dat","PlMr.dat","PlMrNr.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat"}){
+    void start(const RuntimeFiles& files,const GameplayWorldSelection& selection){
+        stage=melee_web_stage_content_by_ground(selection.ground_kind);
+        if(!stage)throw DatError("No runtime owner for selected source ground kind");
+        auto load=[&](std::string_view name){
+            if(archives.contains(name))return;
             auto value=std::make_shared<const DatArchive>(file(files,name),
-                std::string_view(name)=="ItCo.usd"?DatExternalPolicy::PreserveUnresolved:DatExternalPolicy::Reject);
-            snapshots[name]={value->data().begin(),value->data().end()};archives.emplace(name,std::move(value));
+                name=="ItCo.usd"?DatExternalPolicy::PreserveUnresolved:DatExternalPolicy::Reject);
+            snapshots[std::string(name)]={value->data().begin(),value->data().end()};
+            archives.emplace(name,std::move(value));
+        };
+        for(const char* name:{"PlCo.dat","ItCo.usd","EfCoData.dat","PdPm.dat"})load(name);
+        load(stage->archive);
+        std::map<unsigned,const FighterCostume*> identities;
+        for(const auto kind:selection.fighter_kinds){
+            if(!melee_web_fighter_content_by_kind(kind))throw DatError("No runtime owner for selected source fighter kind");
+            for(const auto& costume:fighter_costumes())if(costume.fighter_kind==kind){
+                if(costume.costume_index==0){identities[kind]=&costume;load(costume.fighter_filename);load(costume.model_filename);}
+                else if(files.contains(costume.model_filename))load(costume.model_filename);
+            }
+            if(!identities.contains(kind))throw DatError("Pinned fighter identity missing");
         }
-        for(const auto& costume:fighter_costumes())if(costume.fighter_kind==0&&costume.costume_index!=0&&files.contains(costume.model_filename)) {
-            auto value=std::make_shared<const DatArchive>(file(files,costume.model_filename));
-            snapshots[std::string(costume.model_filename)]={value->data().begin(),value->data().end()};
-            archives.emplace(costume.model_filename,std::move(value));
-        }
+        // Fighter effect dependencies are selected below from source identities.
+        for(const auto& [kind,identity]:identities)load(melee_web_fighter_content_by_kind(kind)->effect_archive);
         // Decode before acquiring the source world whenever possible.
         DatCommon common_data(*archive("PlCo.dat"));
         if(!common_data.roots[20].data_offset)throw DatError("Missing common root20");
         DatNativeJoint common_joint(archive("PlCo.dat"),*common_data.roots[20].data_offset);
-        DatCollision collision_data(*archive("GrNLa.dat"));
-        DatLights light_data(*archive("GrNLa.dat"));
+        DatCollision collision_data(*archive(stage->archive));
+        DatLights light_data(*archive(stage->archive));
         items=std::make_unique<DatItemRegistryNative>(archive("ItCo.usd"));
-        stage_arena=std::make_unique<NativeDatArena>(archive("GrNLa.dat"));
+        stage_arena=std::make_unique<NativeDatArena>(archive(stage->archive));
         bonus_arena=std::make_unique<NativeDatArena>(archive("PdPm.dat"));
-        auto* ground=melee_web_ground_data_decode(stage_arena->reader(),symbol(*archive("GrNLa.dat"),"grGroundParam"));
-        auto* markers=melee_web_stage_markers_decode(stage_arena->reader(),symbol(*archive("GrNLa.dat"),"map_head"));
+        auto* ground=melee_web_ground_data_decode(stage_arena->reader(),symbol(*archive(stage->archive),"grGroundParam"));
+        auto* markers=melee_web_stage_markers_decode(stage_arena->reader(),symbol(*archive(stage->archive),"map_head"));
         bonus=melee_web_bonus_data_decode(bonus_arena->reader(),symbol(*archive("PdPm.dat"),"plLoadCommonData"));
         const auto& font_bytes=file(files,"sislib_font.bin");
-        const auto& animations=file(files,"PlMrAJ.dat");
         font=melee_web_font_atlas_register(font_bytes.data(),font_bytes.size(),error,sizeof(error));check(font!=nullptr,error);
         check(melee_web_gameplay_startup(32*1024*1024,error,sizeof(error)),error);started=true;
         rules=melee_web_match_rules_begin(error,sizeof(error));check(rules!=nullptr,error);
@@ -166,26 +181,38 @@ struct GameplayWorld::Storage {
         check(melee_web_common_context_attach(common,error,sizeof(error)),error);
         lights=melee_web_stage_lights_create(light_data.lights.data(),light_data.lights.size(),error,sizeof(error));check(lights!=nullptr,error);
         for(uint32_t i=0;i<light_data.lights.size();i++){
-            auto flags=read_dat_light_override(*archive("GrNLa.dat"),light_data.lights[i].source_offset);
+            auto flags=read_dat_light_override(*archive(stage->archive),light_data.lights[i].source_offset);
             check(melee_web_stage_lights_set_override(lights,i,flags.has_value(),flags.value_or(0),error,sizeof(error)),error);
         }
         check(melee_web_stage_lights_attach(lights,error,sizeof(error)),error);
         previous_ground=melee_web_ground_data_publish(ground);ground_published=true;
-        numeric=melee_web_stage_numeric_begin(markers,error,sizeof(error));check(numeric!=nullptr,error);
-        collision=load_collision(collision_data,37,read_dat_stage_scale(*archive("GrNLa.dat")));
+        numeric=melee_web_stage_numeric_begin_kind(markers,stage->stage_kind,error,sizeof(error));check(numeric!=nullptr,error);
+        collision=load_collision(collision_data,stage->ground_kind,read_dat_stage_scale(*archive(stage->archive)));
         floor_start=collision_data.line_ranges[0].start;
         check(melee_web_common_context_initialize_fighters(common,error,sizeof(error)),error);
-        const FighterCostume* mario=nullptr;
-        for(const auto& costume:fighter_costumes())if(costume.fighter_kind==0&&costume.costume_index==0)mario=&costume;
-        if(!mario)throw DatError("Pinned Mario identity missing");
-        fighter=std::make_unique<GameplayFighterAssets>(archive("PlMr.dat"),archive("PlMrNr.dat"),animations,*mario);
-        for(const auto& costume:fighter_costumes())if(costume.fighter_kind==0&&costume.costume_index!=0&&archives.contains(costume.model_filename))
-            fighter->add_costume(archive(costume.model_filename),costume);
+        for(const auto& [kind,identity]:identities){
+            auto owner=std::make_unique<GameplayFighterAssets>(archive(identity->fighter_filename),
+                archive(identity->model_filename),file(files,identity->animation_filename),*identity);
+            for(const auto& costume:fighter_costumes())
+                if(costume.fighter_kind==kind&&costume.costume_index!=0&&archives.contains(costume.model_filename))
+                    owner->add_costume(archive(costume.model_filename),costume);
+            fighters.emplace(kind,std::move(owner));
+        }
         check(melee_web_effect_runtime_begin(error,sizeof(error)),error);effect_started=true;
         common_effects=std::make_unique<DatEffectEntries>(archive("EfCoData.dat"),"effCommonDataTable",0,47,true);
         check(common_effects->load(error,sizeof(error)),error);
-        effects=std::make_unique<DatEffectEntries>(archive("EfMrData.dat"),"effMarioDataTable",1,2);
-        check(effects->load(error,sizeof(error)),error);
+        std::set<unsigned> effect_banks;
+        for(const auto& [kind,identity]:identities){
+            const auto* dependency=melee_web_fighter_content_by_kind(kind);
+            if(!effect_banks.insert(dependency->effect_bank).second)continue;
+            /* Fighter effect tables may carry the original packed particle
+             * callback channel (Falco bank 3 entry 1 does). Decode it under
+             * the checked particle policy; publication still requires the
+             * source effect runtime whenever such events are present. */
+            auto effect=std::make_unique<DatEffectEntries>(archive(dependency->effect_archive),
+                dependency->effect_symbol,dependency->effect_bank,dependency->effect_count,true);
+            check(effect->load(error,sizeof(error)),error);effects.push_back(std::move(effect));
+        }
         registry=melee_web_item_registry_begin(items->articles(),MELEE_WEB_ITEM_REGISTRY_COUNT,error,sizeof(error));check(registry!=nullptr,error);
         item_arena=std::make_unique<NativeDatArena>(archive("ItCo.usd"));
         const auto& it=*archive("ItCo.usd");const auto item_root=symbol(it,"itPublicData");
@@ -201,8 +228,10 @@ struct GameplayWorld::Storage {
     }
     void enable_stage_visual(){
         if(stage_visual)return;
+        if(stage->stage_kind!=St_Kind_Last)
+            throw DatError("The partial stage visual probe only owns Final Destination entry3; use full source stage initialization");
         check(melee_web_stage_lights_load(lights,error,sizeof(error)),error);
-        auto source=archive("GrNLa.dat");
+        auto source=archive(stage->archive);
         DatStage metadata(*source);
         const auto& entry=metadata.entries.at(3);
         if(!entry.joint_offset)throw DatError("Final Destination map entry3 has no model");
@@ -222,14 +251,14 @@ struct GameplayWorld::Storage {
         if(stage_last)return;
         if(stage_visual)throw DatError("Close selected stage visual before full initialization");
         check(melee_web_stage_lights_load(lights,error,sizeof(error)),error);
-        auto source=archive("GrNLa.dat");
-        full_stage=std::make_unique<DatNativeStage>(source);
+        auto source=archive(stage->archive);
+        full_stage=std::make_unique<DatNativeStage>(source,stage->stage_kind);
         stage_effects=std::make_unique<DatEffectBanks>(source,"map_ptcl","map_texg",64);
         check(melee_web_effect_bank_attach(stage_effects->bank(),error,sizeof(error)),error);
         stage_map=melee_web_stage_map_publish(full_stage->map_head(),error,sizeof(error));check(stage_map!=nullptr,error);
         const auto& overrides=full_stage->light_overrides();
         check(melee_web_stage_map_set_overrides(stage_map,overrides.data(),overrides.size(),error,sizeof(error)),error);
-        stage_last=(defer_start?melee_web_stage_last_begin_intro:melee_web_stage_last_begin)(full_stage->yakumono(),stage_effects->bank(),error,sizeof(error));check(stage_last!=nullptr,error);
+        stage_last=melee_web_stage_begin_kind(stage->stage_kind,full_stage->yakumono(),stage_effects->bank(),defer_start,error,sizeof(error));check(stage_last!=nullptr,error);
     }
     void end_stage(){
         if(stage_last){check(melee_web_stage_last_end(stage_last,error,sizeof(error)),error);stage_last=nullptr;}
@@ -243,7 +272,8 @@ struct GameplayWorld::Storage {
         }
     }
     void close(){
-        if(fighter&&fighter->live_fighters())throw DatError("Close all fighter/render contexts before the runtime world");
+        for(const auto& [kind,fighter]:fighters)
+            if(fighter->live_fighters())throw DatError("Close all fighter/render contexts before the runtime world");
         end_stage();
         check(melee_web_crowd_end(error,sizeof(error)),error);
         if(item_runtime){check(melee_web_item_runtime_end(item_runtime,error,sizeof(error)),error);item_runtime=nullptr;}
@@ -255,9 +285,11 @@ struct GameplayWorld::Storage {
         stage_material_animation.reset();stage_animation.reset();stage_model.reset();
         if(bonus_published){check(melee_web_bonus_data_end(bonus,error,sizeof(error)),error);bonus_published=false;}
         if(registry){check(melee_web_item_registry_end(registry,error,sizeof(error)),error);registry=nullptr;}
-        if(effects){check(effects->detach(error,sizeof(error)),error);effects.reset();}
+        for(auto i=effects.rbegin();i!=effects.rend();++i)check((*i)->detach(error,sizeof(error)),error);
+        effects.clear();
         if(common_effects){check(common_effects->detach(error,sizeof(error)),error);common_effects.reset();}
-        if(fighter){fighter->close();fighter.reset();}
+        for(auto i=fighters.rbegin();i!=fighters.rend();++i)i->second->close();
+        fighters.clear();
         if(collision){check(melee_web_collision_destroy(collision,error,sizeof(error)),error);collision=nullptr;}
         if(numeric){check(melee_web_stage_numeric_end(numeric,error,sizeof(error)),error);numeric=nullptr;}
         if(common){check(melee_web_common_context_destroy(common,error,sizeof(error)),error);common=nullptr;}
@@ -273,7 +305,9 @@ struct GameplayWorld::Storage {
     }
     ~Storage(){try{close();}catch(const std::exception& e){std::fprintf(stderr,"Runtime teardown: %s\n",e.what());std::abort();}}
 };
-GameplayWorld::GameplayWorld(const RuntimeFiles& files):storage_(std::make_unique<Storage>()){storage_->start(files);}
+GameplayWorld::GameplayWorld(const RuntimeFiles& files):GameplayWorld(files,GameplayWorldSelection{}){}
+GameplayWorld::GameplayWorld(const RuntimeFiles& files,const GameplayWorldSelection& selection)
+    :storage_(std::make_unique<Storage>()){storage_->start(files,selection);}
 GameplayWorld::~GameplayWorld()=default;
 void GameplayWorld::enable_stage_visual(){storage_->enable_stage_visual();}
 void GameplayWorld::enable_full_stage(bool defer_start){storage_->enable_full_stage(defer_start);}
@@ -291,7 +325,9 @@ std::array<float, 3> GameplayWorld::player_spawn(unsigned slot)const{
     check(melee_web_stage_numeric_spawn(storage_->numeric,slot,position,error,sizeof(error)),error);
     return {position[0],position[1],position[2]};
 }
-uint32_t GameplayWorld::unresolved_fighter_fields()const{return storage_->fighter?storage_->fighter->unresolved_fields():0;}
+uint32_t GameplayWorld::unresolved_fighter_fields()const{
+    uint32_t result=0;for(const auto& [kind,fighter]:storage_->fighters)result|=fighter->unresolved_fields();return result;
+}
 void GameplayWorld::verify_immutable_archives()const{storage_->verify();}
 void GameplayWorld::initialize_match(const StartMeleeData& start) {
     check(storage_!=nullptr,"Gameplay world is closed");char error[256]{};

@@ -33,8 +33,8 @@ without a results screen. See [the accuracy contract](ACCURACY_CONTRACT.md).
 The normal browser launch now uses the authored Final Destination player markers
 `(-60, 10, 0)` and `(60, 10, 0)` through the original Ground API. Close-range
 `+/-20` coordinates remain diagnostic fixtures. The latest local suite reports
-234 tests passed without skips; the historical 192-test checkpoint is retained
-only as an earlier validation point.
+262 tests passed without skips in 219.703 seconds; the historical 192-test
+checkpoint is retained only as an earlier validation point.
 
 Compare recorded original-game and port state at fixed simulation boundaries:
 positions, actions, damage, stocks, RNG and outcome. Preserve original 60 Hz
@@ -60,13 +60,13 @@ visit still has unresolved rendering stalls. Browser audio uses a 1536-sample
 prefill and per-frame transport gating; the saved-cache runs had no underruns.
 Internal framebuffer scale is explicitly 640×480 at 1× and 1280×960 at 2×;
 presentation density does not define the internal resolution.
-Future non-FD stages still need the original scene-level `fn_8016758C` reservation
-counter tick; FD uses direct player-index respawns and is covered by this trace.
+Battlefield now runs its original scene-level stage lifecycle and checked scaled
+marker/collision paths. Additional non-FD stages still need their own callback,
+reservation, data and lifecycle evidence; FD uses direct player-index respawns.
 
-First-use preparation should use bounded, versioned renderer-state recipes
-through the normal GX path, independent of match simulation and imported game
-assets. Aurora currently exposes CPU pipeline-queue drainage but no browser GPU
-completion boundary; a future preparation gate must account for that distinction.
+Scene entry now uses an explicit preparation boundary through the normal GX path,
+independent of match simulation. Aurora still exposes CPU pipeline-queue drainage
+but no browser GPU completion boundary; acceptance must account for that distinction.
 The local persisted cache is useful evidence, not a universal first-visit fix.
 Runtime diagnostics can sample queue-completion callback latency at most once per
 60 submitted frames, with only one sample outstanding. Sampling is off by default,

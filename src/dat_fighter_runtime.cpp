@@ -107,12 +107,29 @@ DatFighterRuntime::DatFighterRuntime(std::shared_ptr<const DatArchive> archive, 
     extension_ = pointer(data, root_ + 4, 1);
     // Kind-specific schema, not a filename exception. Other kinds retain only
     // the checked extension identity; they are not native-extension-ready.
-    if (costume_->kind_name == "FTKIND_MARIO") {
+    if (costume_->fighter_kind == 0) {
         region(data, extension_, 0x84);
         mario_.emplace();
 #define READ_MARIO(at, type, name, original) mario_->name = read_##type(data, extension_ + at);
         MELEE_WEB_MARIO_ATTRIBUTE_FIELDS(READ_MARIO)
 #undef READ_MARIO
+    } else if (costume_->fighter_kind == 1 || costume_->fighter_kind == 22) {
+        /* Fox and Falco intentionally share ftFox_DatAttrs and all of the
+         * original ftFx special-state consumers.  Their PlFx/PlFc values and
+         * Article kinds remain distinct in the decoded fields. */
+        /* Keep the portable foreign-kind fixture contract: old synthetic Fox
+         * fixtures used a Mario-sized extension solely to exercise the common
+         * fields.  A real Fox archive has the full 0xd4-byte schema, while
+         * Falco is always strict because its playable path depends on it. */
+        const auto extension_bytes = data.next_target_offset(extension_) - extension_;
+        if (costume_->fighter_kind != 1 || extension_bytes >= 0xD4) {
+            region(data, extension_, 0xD4);
+            fox_.emplace();
+#define READ_FOX(at, type, name, original) fox_->name = read_##type(data, extension_ + at);
+            MELEE_WEB_FOX_ATTRIBUTE_FIELDS(READ_FOX)
+#undef READ_FOX
+            require(fox_->reflector_bone_id < 140, "Fighter reflector bone exceeds checked part bounds");
+        }
     }
     // ftColl_8007B320 enforces 15 hurt capsules and 11 dynamics spheres;
     // ftCo_8009CF84 enforces strictly fewer than 10 dynamics sets.
@@ -232,6 +249,7 @@ void DatFighterRuntime::validate_part_indices(std::size_t count) const
     for (const auto& bone : dynamics_.bones) require(bone.bone_index < count, "Fighter dynamics bone is outside the bound skeleton");
     for (const auto& sphere : dynamics_.spheres) require(sphere.bone_index < count, "Fighter sphere bone is outside the bound skeleton");
     if (mario_) require(mario_->cape_reflection_x0_bone_id < count, "Fighter reflector bone is outside the bound skeleton");
+    if (fox_) require(fox_->reflector_bone_id < count, "Fighter reflector bone is outside the bound skeleton");
 }
 std::optional<DatPackedCommands> DatFighterRuntime::commands(std::uint32_t id) const
 {

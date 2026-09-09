@@ -9,7 +9,9 @@ void* melee_web_item_commands_create(const uint32_t* words,size_t count){
     for(size_t i=0;i<count;i++){
         uint32_t w=words[i],op=w>>26;
         switch(op){
-        case 0:case 1:case 2:
+        /* Opcode 15 dispatches to it_802796C4, which consumes only the
+         * six-bit opcode and advances one word after clearing hitboxes. */
+        case 0:case 1:case 2:case 15:
             out[i].Command_00.code=op;out[i].Command_00.value=w&0x3ffffff;break;
         case 17:case 18:case 19:
             out[i].set_throw_flags=(struct set_throw_flags){op,w&0x3ffffff};break;

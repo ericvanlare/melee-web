@@ -1,4 +1,5 @@
 #include "gameplay_match_session.hpp"
+#include "gameplay_content.h"
 #include "gameplay_audio_bank.hpp"
 #include "gameplay_audio_stream_asset.hpp"
 #include "gameplay_match_context.h"
@@ -10,6 +11,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <stdexcept>
+#include <set>
 extern "C" int lbAudioAx_80023F28(int);
 extern "C" int melee_web_vs_mode_begin(void);
 extern "C" int melee_web_vs_mode_end(void);
@@ -19,6 +21,7 @@ struct GameplayMatchSession::Storage {
     std::unique_ptr<GameplayWorld> world;
     std::unique_ptr<GameplayAudioBank> bank;
     std::unique_ptr<GameplayAudioStream> music;
+    std::string music_path;
     MeleeWebMatchContext* match=nullptr;
     MeleeWebRender* render=nullptr;
     std::unique_ptr<GameplayHudAssets> hud_assets;
@@ -27,25 +30,37 @@ struct GameplayMatchSession::Storage {
     bool mode_owned=false;
     ~Storage(){try{close();}catch(const std::exception& e){std::fprintf(stderr,"Match session teardown: %s\n",e.what());std::abort();}}
     void start(const RuntimeFiles& files,const MeleeWebMenuMatchSelection& selection){
-        for(unsigned i=0;i<2;i++)
-            check(selection.players[i].controller==i&&selection.players[i].stocks==4&&
-                  selection.players[i].costume<5&&selection.players[i].sub_color<=4,
+        const auto* stage=melee_web_stage_content(selection.start.rules.stkind);
+        check(stage!=nullptr,"Match stage has no source runtime owner");
+        GameplayWorldSelection content{};content.ground_kind=stage->ground_kind;
+        for(unsigned i=0;i<2;i++){
+            const auto* fighter=melee_web_fighter_content(selection.start.players[i].ckind);
+            check(fighter&&selection.players[i].controller==i&&selection.players[i].stocks==4&&
+                  selection.players[i].costume<fighter->costumes&&selection.players[i].sub_color<=4,
                   "Match requires the supported original four-stock menu selection");
+            content.fighter_kinds[i]=fighter->fighter_kind;
+        }
         check(melee_web_vs_mode_begin(),"Original VS mode is already owned");mode_owned=true;
-        world=std::make_unique<GameplayWorld>(files);char error[256]{};
+        world=std::make_unique<GameplayWorld>(files,content);char error[256]{};
         hud_assets=std::make_unique<GameplayHudAssets>(files);
         std::vector<std::span<const uint8_t>> banks;
-        for(const char* name:{"main.ssm","mario.ssm","nr_select.ssm","nr_title.ssm",
+        for(const char* name:{"main.ssm","nr_select.ssm","nr_title.ssm",
                               "nr_name.ssm","pokemon.ssm","end.ssm"})banks.emplace_back(files.at(name));
+        std::set<std::string_view> fighter_banks;
+        for(const auto kind:content.fighter_kinds){
+            const auto* dependency=melee_web_fighter_content_by_kind(kind);
+            if(fighter_banks.insert(dependency->audio_bank).second)banks.emplace_back(files.at(dependency->audio_bank));
+        }
         bank=std::make_unique<GameplayAudioBank>(files.at("smash2.sem"),banks,files.at("dsp_coef.bin"));
         check(melee_web_audio_enable_effects(bank->get(),error,sizeof(error)),error);
-        music=std::make_unique<GameplayAudioStream>(bank->get(),"/audio/sp_end.hps",files.at("sp_end.hps"));
-        check(lbAudioAx_80023F28(78)==0,"Original Final Destination music did not start");
+        music_path="/audio/"+std::string(stage->music);
+        music=std::make_unique<GameplayAudioStream>(bank->get(),music_path.c_str(),files.at(stage->music));
+        check(lbAudioAx_80023F28(stage->music_id)==0,"Original selected stage music did not start");
         MeleeWebPlayerSettings players[2]{};
         for(unsigned i=0;i<2;i++){
             const auto spawn=world->player_spawn(i);const auto& selected=selection.players[i];
             players[i]={i,selected.controller,selected.stocks,{spawn[0],spawn[1],spawn[2]},spawn[0]<0?1.0f:-1.0f,
-                        selected.costume,selected.sub_color};
+                        selected.costume,selected.sub_color,content.fighter_kinds[i]};
         }
         match=melee_web_match_begin_players(players,2,70,selection.random_seed,world->collision(),error,sizeof(error));check(match!=nullptr,error);
         world->enable_full_stage(true);

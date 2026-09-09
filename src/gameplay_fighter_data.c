@@ -3,6 +3,7 @@
 #include "gameplay_article_data.h"
 #include <melee/ft/types.h>
 #include <melee/ft/kinds/ftMario/types.h>
+#include <melee/ft/kinds/ftFox/types.h>
 #include <sysdolphin/baselib/jobj.h>
 #include <stddef.h>
 #include <math.h>
@@ -69,7 +70,8 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     uint32_t kind,uint32_t costumes,void* actions,void* blends,void* choices,uint32_t* unresolved)
 {
     if (!r || !unresolved) return NULL;
-    REQUIRE(kind==FTKIND_MARIO,"Native fighter extension schema unavailable");
+    REQUIRE(kind==FTKIND_MARIO || kind==FTKIND_FOX || kind==FTKIND_FALCO,
+        "Native fighter extension schema unavailable");
     REQUIRE(costumes>0 && costumes<=16,"Native costume count exceeds checked bound");
     REGION(root,0x60); ftData* d=NEW(ftData,1); *unresolved=0;
     /* Every source pointer starts explicitly unresolved until decoded below. */
@@ -83,10 +85,24 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
 #define CO(o,t,n,orig) d->x0->orig=READ_##t(at+o);
     MELEE_WEB_CO_ATTRIBUTE_FIELDS(CO)
 #undef CO
-    at=required(r,root+4,0x84); ftMario_DatAttrs* mario=NEW(ftMario_DatAttrs,1); d->ext_attr=mario;
+    if(kind==FTKIND_MARIO) {
+        at=required(r,root+4,0x84); ftMario_DatAttrs* mario=NEW(ftMario_DatAttrs,1); d->ext_attr=mario;
 #define MARIO(o,t,n,orig) mario->orig=READ_##t(at+o);
-    MELEE_WEB_MARIO_ATTRIBUTE_FIELDS(MARIO)
+        MELEE_WEB_MARIO_ATTRIBUTE_FIELDS(MARIO)
 #undef MARIO
+    } else if(kind==FTKIND_FOX || kind==FTKIND_FALCO) {
+        /* Fox and Falco use one original extension ABI.  The source keeps
+         * separate DAT values and Article identities, so decode the complete
+         * ftFox_DatAttrs record for either kind rather than borrowing Fox's
+         * values or reducing the extension to a common subset. */
+        at=required(r,root+4,0xD4); ftFox_DatAttrs* fox=NEW(ftFox_DatAttrs,1); d->ext_attr=fox;
+#define FOX(o,t,n,orig) fox->orig=READ_##t(at+o);
+        MELEE_WEB_FOX_ATTRIBUTE_FIELDS(FOX)
+#undef FOX
+        REQUIRE(fox->xB0_FOX_REFLECTOR_REFLECTION.x0_bone_id<140,"Native reflector bone index invalid");
+    } else {
+        REQUIRE(0,"Native fighter extension schema unavailable");
+    }
     at=required(r,root+8,0x18); d->x8=NEW(struct ftData_x8,1);
     d->x8->x0.model_num=WORD(at); REQUIRE(d->x8->x0.model_num<=11,"Fighter model count exceeds source capacity");
     uint32_t table=required(r,at+4,costumes*16);
@@ -166,7 +182,14 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
         uint32_t p=PTR(at+i*4,24), article_unresolved;
         if(p!=UINT32_MAX) d->x48_items[i]=melee_web_article_decode(r,p,&article_unresolved);
     }
-    REQUIRE(d->x48_items[0] && d->x48_items[2],"Mario OnLoad requires fireball and cape Articles");
+    if(kind==FTKIND_MARIO)
+        REQUIRE(d->x48_items[0] && d->x48_items[2],"Mario OnLoad requires fireball and cape Articles");
+    else if(kind==FTKIND_FOX)
+        REQUIRE(d->x48_items[0] && d->x48_items[1] && d->x48_items[2],
+            "Fox OnLoad requires laser, blaster and illusion Articles");
+    else
+        REQUIRE(kind==FTKIND_FALCO && d->x48_items[0] && d->x48_items[1] && d->x48_items[3],
+            "Falco OnLoad requires laser, blaster and Phantasm Articles");
     const unsigned ready[]={0,1,2,11,12,13,14,15,16,17,18,19,20,21,22};
     for(unsigned i=0;i<sizeof(ready)/sizeof(ready[0]);++i) *unresolved &= ~(1U<<ready[i]);
     if(actions) *unresolved &= ~(1U<<3);
@@ -222,4 +245,21 @@ void melee_web_fighter_data_set_guard(const MeleeWebNativeDat* r,uint32_t root,
     struct ftData_x20* guard=NEW(struct ftData_x20,1);
     guard->x0=(HSD_Joint**)pose;
     d->x20=guard; *unresolved&=~(1U<<8);
+}
+
+int melee_web_fighter_data_set_part_animations(void* data,void* groups,
+    uint32_t group_count,uint32_t* unresolved,char* error,size_t size)
+{
+    ftData* d=data;
+#define PART_REQUIRE(c,m) do { if(!(c)){if(error&&size)snprintf(error,size,"%s",m);return 0;} } while(0)
+    PART_REQUIRE(d&&groups&&unresolved&&(*unresolved&(1U<<7))&&!d->x1C,
+                 "Part animations require an unresolved nonnull source table");
+    PART_REQUIRE(group_count>0&&group_count<=5,
+                 "Part animation group count exceeds source Fighter storage");
+    struct ftData_x1C** table=groups;
+    for(uint32_t i=0;i<group_count;++i)
+        PART_REQUIRE(table[i]&&table[i]->x2&&table[i]->x4&&table[i]->x8,
+                     "Part animation group is incomplete");
+    d->x1C=table;*unresolved&=~(1U<<7);if(error&&size)*error=0;return 1;
+#undef PART_REQUIRE
 }

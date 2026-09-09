@@ -22,6 +22,16 @@ do not disguise absent implementation as unlock progression. No additional rules
 or name-entry menus are required yet; unsupported exits must not enter incomplete
 code. This restricted slice is not the final full vanilla product.
 
+Falco and Battlefield now have typed source-content rows, runtime asset
+manifests and focused development traces. Raw PAD input in a Release browser has
+selected Falco/Mario and Battlefield through the original CSS/SSS and rendered
+the fighters, stage and their distinct four-stock icons. Native menu loops also
+complete this route on both admitted stages. Falco/Battlefield remain outside
+this first-deliverable claim until complete ordinary input, uninterrupted audio,
+browser-loop and reference checks establish their behavior. Stock icon identity
+must continue to come from the source character/fighter mapping; an icon index or
+linked asset alone is not acceptance evidence.
+
 The native CSS/SSS chain is the canonical player path. The temporary HTML
 selection UI is removed from the player flow; useful developer diagnostics and
 the legacy native-menu URL redirect remain. The complete loop needs normal input
@@ -29,16 +39,32 @@ testing, original selection/configuration handoff, KO/respawn/outcome, and a
 second match after returning. A link probe or automatically scripted match is
 only partial evidence.
 
+Each requested CSS, SSS or match transition may enter an explicit preparation
+phase. The phase must be visible, wait for the audio transport's disabled-state
+acknowledgement, keep source simulation and source drawing out of construction,
+and report its duration separately from live callbacks. It must preserve source
+ownership, RNG and input order and arm the live clock without hidden ticks.
+
 The current validated checkpoint carries the full source `StartMeleeData`
 through `fn_8016DCC0`, runs the original supported VS `OnFrame`, and passes
 Entry/Ready, source pause/resume, No Contest, and match-ending checks in two
-Node cycles. The evidence is recorded in
+Node cycles. Expanded native routes also complete Mario/Falco matches on Final
+Destination and Battlefield and exercise Falco's laser and special-action
+families across every hydrated costume. The evidence is recorded in
 `work/native-active-telemetry-run.log`. The Release browser also passes original pause/resume and two four-stock
 diagnostic loops with three respawns and return to CSS. These use raw-PAD
 diagnostics, not physical input; cold runs have shown timing pauses. This validates the
-supported Mario/Final Destination slice only. It does not establish full
+accepted Mario/Final Destination slice and narrower Falco/Battlefield source and
+rendering scopes. It does not establish full
 `gm_Scene_Vs_OnEnter` or retail scene-manager equivalence, and it is not
 tournament acceptance.
+
+The scoped [scene-entry profile](../work/scene-entry-profile.md) records the
+measured preparation and first-use phases. It is application/driver-cache
+evidence from an isolated run, not a clean cold-cache, uninterrupted full-match
+or retail-reference result. The later MarioReady operation-55 representation
+defect is fixed, and fresh native whole-match routes pass on both admitted
+stages.
 
 ## Optimization policy
 
@@ -65,17 +91,18 @@ tournament acceptance.
 
 | Gap | Current evidence / consequence | Required closure |
 | --- | --- | --- |
-| Native menu acceptance | Original CSS/SSS is the canonical player flow; source and browser diagnostic repeat loops pass, including original pause/resume | Complete ordinary browser input and original menu/transition comparisons; keep the HTML selectors out of the player flow |
+| Native menu acceptance | Original CSS/SSS is the canonical player flow; source and browser diagnostic repeat loops pass, including original pause/resume, and raw PAD selects and renders Falco/Mario on Battlefield | Complete ordinary browser input and original menu/transition comparisons; keep the HTML selectors out of the player flow |
+| Scene-entry preparation | CSS, SSS and match owner construction now runs in a visible preparation phase with audio acknowledgement and separate timing evidence; the scoped profile still excludes clean cold-cache and whole-match acceptance | Repeat on clean application/driver caches, verify the request-tick render and first live draw for each transition, and include full-match tails and audio underruns |
 | Catch-up sampling | `gameplay_browser.cpp` and `gameplay_menu_browser.cpp` poll once per browser callback and may reuse that sample for multiple source steps | Specify and verify per-tick input acquisition and phase/order under actual browser constraints; never claim missing historical samples were recovered |
 | Catch-up output | Source audio processes each tick, but late output is gated and re-primed | Explicit overload behavior plus measured input/audio timing; catch-up runs cannot count as uninterrupted performance acceptance |
 | Fixed 60.0 clock | Host clock and sample production currently use exactly 60 | Establish selected retail VI mode/cadence and input scheduling from reference evidence, including long-run drift; do not assume the nominal label proves exact cadence |
 | DSP coefficients | Generated replacement DROM is approximately equivalent, not identical to hardware | Validate the audio path against an independent reference and obtain exact coefficient/input support if needed; identical approximations on both sides are not an independent oracle |
 | Native numerics | Bounded original jump, jab and stock traces exist; no complete match equivalence | Broaden bit-preserving semantic traces under identical initial conditions and input sequences; locate first divergence |
 | Match initialization | The supported native handoff carries full `StartMeleeData` through `fn_8016DCC0`, including ports, costumes/tints, four stocks and RNG; broader modes and configurations remain outside the validated slice | Compare exact supported original start configuration and extend the source initializer before broadening modes or claiming general start-state equivalence |
-| Original HUD | Original Ready/Go, damage/stocks and markers now execute and render; source damage/intro/repeat-lifetime checks and two browser diagnostic loops pass | Compare authored interface rendering, timing and audio against the original; broaden beyond Mario/FD |
+| Original HUD | Original Ready/Go, damage/stocks and markers execute and render; source damage/intro/repeat-lifetime checks and two browser diagnostic loops pass, and Falco/Mario stock identities render on Battlefield | Compare authored interface rendering, timing and audio against the original; complete ordinary-input and reference checks beyond Mario/FD |
 | Match ending | Original supported VS ending callback, GAME!/Game Set interface/audio request, source process mask, pause/resume, No Contest and exit request are integrated; two Node cycles pass the source ending checks | Verify rendered/audio/reference behavior and broader source modes. Results routing remains skipped after the original exit; this does not claim full `gm_Scene_Vs_OnEnter` or retail scene-manager equivalence |
 | Rendering | Native HSD/GX path renders the current match and browser original pause artwork/camera; no complete pixel equivalence | Reference camera, transforms, materials, blending, depth, effects, viewport and output timing on a declared baseline |
-| Device/latency acceptance | Earlier keyboard play and short warm timing runs; current native-menu ordinary input, physical controllers and end-to-end latency remain unaccepted; cold timing pauses are observed | Real-device routing, disconnect/reconnect, simultaneous players, analog thresholds and independently measured latency; cold/warm long-match tests |
+| Device/latency acceptance | Keyboard Start and SSS cancellation pass; complete ordinary native-menu play, physical controllers and end-to-end latency remain unaccepted; cold timing pauses are observed | Real-device routing, disconnect/reconnect, simultaneous players, analog thresholds and independently measured latency; cold/warm long-match tests |
 
 Moving input/simulation to a dedicated worker is a candidate architecture, not
 an approved accuracy fix by itself. Browser gamepad sampling availability, thread

@@ -3,6 +3,8 @@
 #include "dat_stage.hpp"
 #include "dat_lights.hpp"
 #include "gameplay_stage_numeric.h"
+#include "gameplay_stage_profile.h"
+#include "gameplay_content.h"
 #include "gameplay_compat.h"
 #include "hsd_animation_bridge.h"
 #pragma GCC diagnostic push
@@ -22,6 +24,8 @@
 #include <cstring>
 #include <map>
 #include <set>
+#include <sstream>
+#include <utility>
 namespace melee_web {
 namespace {void require(bool c,const char* m){if(!c)throw DatError(m);}}
 struct DatNativeStage::Storage {
@@ -47,7 +51,16 @@ struct DatNativeStage::Storage {
     explicit Storage(std::shared_ptr<const DatArchive> a):archive(a),arena(a),metadata(*a){}
     ~Storage(){for(auto* h:native)if(!melee_web_native_joint_destroy(h,nullptr,0))std::terminate();}
     template<class T>T* make(size_t count=1){require(count<=65536,"Native stage allocation count exceeds budget");auto p=std::shared_ptr<T[]>(new T[count]{});auto* out=p.get();memory.emplace_back(p,out);return out;}
-    void record(uint32_t o,size_t n){require(!(o&3),"Native stage record is unaligned");(void)archive->range(o,n);require(n<=archive->next_target_offset(o)-o,"Native stage record crosses referenced allocation");}
+    void record(uint32_t o,size_t n){
+        require(!(o&3),"Native stage record is unaligned");
+        (void)archive->range(o,n);
+        const uint32_t end=archive->next_target_offset(o);
+        if(n<=end-o)return;
+        std::ostringstream message;
+        message<<"Native stage record crosses referenced allocation (offset=0x"
+               <<std::hex<<o<<", bytes=0x"<<n<<", allocation_end=0x"<<end<<")";
+        throw DatError(message.str());
+    }
     uint32_t pointer(uint32_t slot,size_t n){auto p=archive->pointer(slot,n);require(bool(p),"Native stage required pointer is null");return *p;}
     float number(uint32_t o){float f=archive->f32(o);require(std::isfinite(f),"Nonfinite native stage scalar");return f;}
     Vec3* vector(uint32_t o){record(o,12);auto* v=make<Vec3>();v->x=number(o);v->y=number(o+4);v->z=number(o+8);return v;}
@@ -112,9 +125,17 @@ struct DatNativeStage::Storage {
         uint32_t lengths=pointer(o+16,d->numcv*4);record(lengths,d->numcv*4);d->segLength=make<float>(d->numcv);for(int i=0;i<d->numcv;i++){d->segLength[i]=number(lengths+4*i);require(d->segLength[i]>=0&&d->segLength[i]<=1&&(!i||d->segLength[i]>d->segLength[i-1]),"Stage spline arc table is not strictly ordered");}require(d->segLength[0]==0&&d->segLength[d->numcv-1]==1,"Stage spline arc table endpoints invalid");
         if(auto p=archive->pointer(o+20,(d->numcv-1)*20)){record(*p,(d->numcv-1)*20);auto* values=make<float>((d->numcv-1)*5);d->segPoly=reinterpret_cast<float(*)[5]>(values);for(int i=0;i<(d->numcv-1)*5;i++)values[i]=number(*p+4*i);}else require(d->type==0,"Nonlinear stage spline requires arc polynomial");splines[o]=d;return d;}
 };
-DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive):storage_(std::make_unique<Storage>(archive)){
+DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive)
+    : DatNativeStage(std::move(archive), St_Kind_Last) {}
+
+DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive, int stage_kind)
+    : storage_(std::make_unique<Storage>(archive)){
  auto& s=*storage_;const auto& a=*archive;const auto& meta=s.metadata;
- require(meta.entries.size()==10,"Native stage profile requires Final Destination's ten entries");
+ const auto* profile=melee_web_stage_profile(stage_kind);
+ require(profile,"Native stage has no complete source callback profile");
+ require(meta.entries.size()==profile->entry_count,"Native stage map entry count differs from source profile");
+ require(profile->animation_count_count==profile->entry_count&&profile->animation_counts,
+         "Native stage profile lacks animation consumer counts");
  auto* markers=melee_web_stage_markers_decode(s.arena.reader(),meta.root_offset);
  s.map.unkC=meta.entries.size();s.map.unk8=s.make<MeleeWebMapEntryInput>(s.map.unkC);
  for(const auto& e:meta.entries){auto& out=s.map.unk8[e.index];require(bool(e.joint_offset),"Native stage model missing");
@@ -123,9 +144,11 @@ DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive):storag
    auto graph=std::make_unique<DatNativeJoint>(archive,*e.joint_offset);char error[256];auto* native=melee_web_native_joint_hydrate(&graph->graph(),error,sizeof(error));require(native,error);s.native.push_back(native);
    out.unk0=static_cast<HSD_Joint*>(melee_web_native_joint_descriptor(native,error,sizeof(error)));require(out.unk0,error);s.joints[*e.joint_offset]=out.unk0;
    for(uint32_t i=0;i<graph->graph().material_count;i++){auto* material=static_cast<HSD_MObjDesc*>(melee_web_native_joint_material_descriptor(native,i,error,sizeof(error)));require(material,error);s.material_descriptors[graph->graph().materials[i].source_offset].push_back(material);}
-   // Source grLast selects indices0..10 for five background holders and index0
-   // for the other objects. These are consumer counts, not inferred DAT extents.
-   const unsigned count=e.index>=4&&e.index<=8?11:1;
+   // Source callbacks select animation slots per entry. These are consumer
+   // counts, not inferred DAT extents; the complete map descriptor table above
+   // is still hydrated for every archive entry.
+   const unsigned count=profile->animation_counts[e.index];
+   require(count>0&&count<=64,"Native stage profile has an invalid animation consumer count");
    out.unk4=s.make<HSD_AnimJoint*>(count+1);out.unk8=s.make<HSD_MatAnimJoint*>(count+1);
    for(unsigned i=0;i<count;i++){
     if(e.joint_animation_table){s.record(*e.joint_animation_table,count*4);if(auto p=a.pointer(*e.joint_animation_table+4*i,20)){
@@ -163,10 +186,16 @@ DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive):storag
  // Ground light queries use the explicit bounded identity resolver below.
  s.map.unk1C=meta.light_override_table.count;s.map.unk18=nullptr;
  for(const auto& symbol:a.public_symbols())if(symbol.name=="yakumono_param"){
-  // Original grLast uses four pointers to material command programs. Typed
+ // Original grLast uses four pointers to material command programs. Typed
   // command hydration is required before exposing its native pointer table.
-  s.record(symbol.data_offset,16);auto** programs=s.make<uint32_t*>(4);
-  for(unsigned program=0;program<4;program++){
+  // The word count is part of the source stage ABI: Battlefield has two
+  // overlay words and Final Destination has four. Do not infer it from the
+  // next DAT allocation, since that boundary can be smaller than a generic
+  // four-word read.
+  const size_t program_count=profile->yakumono_program_count;
+  require(program_count>0&&program_count<=4,"Native stage profile has an invalid yakumono program count");
+  s.record(symbol.data_offset,program_count*4);auto** programs=s.make<uint32_t*>(program_count);
+  for(size_t program=0;program<program_count;program++){
    const auto start=s.pointer(symbol.data_offset+4*program,4);const auto end=a.next_target_offset(start);
    std::vector<uint32_t> words;bool ended=false;
    for(uint32_t cursor=start;cursor<end;){

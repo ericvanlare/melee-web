@@ -18,6 +18,21 @@ namespace melee_web {
 namespace {
 void require(bool c,const char* message){if(!c)throw DatError(message);}
 void destroy(MeleeWebNativeJoint* p){if(p&&!melee_web_native_joint_destroy(p,nullptr,0))std::terminate();}
+struct ArticleSchema { uint32_t special_bytes, state_count; };
+ArticleSchema schema(uint32_t kind)
+{
+    switch(kind) {
+    case It_Kind_Mario_Fire:return {20,1};
+    case It_Kind_Mario_Cape:return {4,2};
+    case It_Kind_Fox_Laser:
+    case It_Kind_Falco_Laser:return {40,2};
+    case It_Kind_Fox_Blaster:
+    case It_Kind_Falco_Blaster:return {40,9};
+    case It_Kind_Fox_Illusion:
+    case It_Kind_Falco_Phantasm:return {8,3};
+    default:throw DatError("Item kind has no checked native article schema");
+    }
+}
 }
 struct DatItemArticle::Storage {
     std::shared_ptr<const DatArchive> archive;
@@ -28,7 +43,7 @@ struct DatItemArticle::Storage {
     std::vector<std::unique_ptr<DatMaterialAnimation>> materials;
     std::vector<std::unique_ptr<DatShapeAnimation>> shapes;
     DatItemCommands commands;
-    MeleeWebItemStateDesc states[8]{};
+    std::unique_ptr<MeleeWebItemStateDesc[]> states;
     uint32_t count=0;
     explicit Storage(std::shared_ptr<const DatArchive> a):archive(a),arena(std::move(a)){}
 };
@@ -36,16 +51,16 @@ DatItemArticle::DatItemArticle(std::shared_ptr<const DatArchive> archive,uint32_
     :storage_(std::make_unique<Storage>(archive))
 {
     require(bool(archive)&&article,"Item article requires owned source and registered identity");
-    require(kind==It_Kind_Mario_Fire||kind==It_Kind_Mario_Cape,"Item kind has no checked native article schema");
+    const auto article_schema=schema(kind);
     auto& s=*storage_;const auto& a=*archive;char error[256];
     auto record=[&](uint32_t at,size_t size){require(!(at&3)&&size<=a.next_target_offset(at)-at,"Item descriptor crosses source region");(void)a.range(at,size);};
     auto pointer=[&](uint32_t at,size_t size){auto p=a.pointer(at,size);require(bool(p),"Required item descriptor missing");record(*p,size);return *p;};
-    record(root,24);const uint32_t special_size=kind==It_Kind_Mario_Fire?20:4;
+    record(root,24);const uint32_t special_size=article_schema.special_bytes;
     uint32_t at=pointer(root+4,special_size);const auto* reader=s.arena.reader();
     void* special=reader->allocate(reader->context,special_size/4,4);
     for(uint32_t i=0;i<special_size;i+=4){
         uint32_t value=a.be32(at+i);require(!a.has_relocation(at+i),"Item special scalar is relocated");
-        if(kind==It_Kind_Mario_Fire)require(std::isfinite(a.f32(at+i)),"Item special scalar is nonfinite");
+        require(std::isfinite(a.f32(at+i)),"Item special scalar is nonfinite");
         std::memcpy(static_cast<uint8_t*>(special)+i,&value,4);
     }
     at=pointer(root+16,16);const uint32_t model_root=pointer(at,64);
@@ -62,7 +77,8 @@ DatItemArticle::DatItemArticle(std::shared_ptr<const DatArchive> archive,uint32_
     for(uint32_t j=0;j<graph.joint_count;j++){
         void* d=melee_web_native_joint_descriptor_at(s.native.get(),j,graph.joints[j].source_offset,error,sizeof(error));require(d,error);descriptors.push_back(d);
     }
-    s.count=kind==It_Kind_Mario_Fire?1:2;at=pointer(root+12,s.count*16);
+    s.count=article_schema.state_count;at=pointer(root+12,s.count*16);
+    s.states=std::make_unique<MeleeWebItemStateDesc[]>(s.count);
     for(uint32_t i=0;i<s.count;i++){
         const uint32_t row=at+16*i;auto& state=s.states[i];
         if(auto p=a.pointer(row,20)){
@@ -83,7 +99,7 @@ DatItemArticle::DatItemArticle(std::shared_ptr<const DatArchive> archive,uint32_
         }
         if(auto p=a.pointer(row+12,4))state.commands=s.commands.decode(a,*p);
     }
-    require(melee_web_article_publish(reader,article,special,s.states,s.count,joint,bones,attach,flags,error,sizeof(error)),error);
+    require(melee_web_article_publish(reader,article,special,s.states.get(),s.count,joint,bones,attach,flags,error,sizeof(error)),error);
 }
 DatItemArticle::~DatItemArticle()=default;
 uint32_t DatItemArticle::state_count()const noexcept{return storage_->count;}

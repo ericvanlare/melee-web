@@ -146,17 +146,17 @@ validated before gameplay. Successful host compilation cannot establish numeric
 equivalence; avoid fast-math and validate floating-point behavior against original
 game traces.
 
-## Next runtime gate
+## Current runtime gate
 
-The first playable target is original Mario versus Mario on Final Destination.
-Next hydrate named common part maps and required common roots, Mario ftData and
-costume material animation, then integrate actual HSD constructors/destructors
-and player/stage services. Common root20 is loaded unconditionally by the original
-fighter initializer; model inspection alone does not satisfy that lifetime.
-Full fighter creation, action commands, physics, audio and match outcomes remain
-unvalidated. See [NEXT_PHASE.md](NEXT_PHASE.md) for parallel work boundaries,
-[ROADMAP.md](ROADMAP.md) for acceptance criteria and [STATUS.md](../STATUS.md)
-for observed results.
+The first playable target remains original Mario versus Mario on Final
+Destination. Named common roots, Mario and Falco fighter data/costumes/actions,
+Final Destination and Battlefield stage owners, source constructors/destructors,
+player services, audio transport and match outcomes are integrated for the scopes
+recorded in [STATUS.md](../STATUS.md). Common root20 remains loaded
+unconditionally by the original fighter initializer; model inspection alone does
+not satisfy that lifetime. Complete ordinary input, physical controllers,
+audible/reference comparison and full-match timing remain open under
+[ROADMAP.md](ROADMAP.md) and [the accuracy contract](ACCURACY_CONTRACT.md).
 
 The executable stage animation lookup uses a volatile local pointer across
 `setjmp`/`longjmp` and a pointer-typed traversal callback. Without volatility,

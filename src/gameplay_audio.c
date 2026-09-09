@@ -167,7 +167,10 @@ int melee_web_audio_render(MeleeWebAudio* a,float* output,uint32_t frames,char* 
    if(voice->sync&AX_SYNC_FLAG_COPYITD)memset(p->history,0,sizeof(p->history));
    if(p->binding->id!=UINT32_MAX&&pb->addr.loopFlag&&(!c->looping||addr(pb->addr.loopAddressHi,pb->addr.loopAddressLo)!=p->binding->base+c->loop_nibble))return fail(e,n,"Original AX loop differs from decoded SSM loop");
    if(pb->srcSelect>2||pb->coefSelect>2)return fail(e,n,"Unknown original AX resampler selector");
-   uint32_t ratio=addr(pb->src.ratioHi,pb->src.ratioLo);if(!ratio||ratio>0x40000)return fail(e,n,"Original AX sample ratio is unsupported");
+   uint32_t ratio=addr(pb->src.ratioHi,pb->src.ratioLo);if(ratio>0x40000){
+    if(e&&n)snprintf(e,n,"Original AX sample ratio %u is unsupported for voice %u state %u sync %u",ratio,voice->index,pb->state,voice->sync);
+    return 0;
+   }
    SampleRead read={p,pb,a,0};int16_t value=melee_web_audio_resample(&p->resample,ratio,pb->srcSelect,a->input->resample_coefficients+pb->coefSelect*512,read_pcm,&read);
    if(read.failed)return fail(e,n,"Original HPS loop points to an unloaded auxiliary slot");
    c=p->binding->channel;

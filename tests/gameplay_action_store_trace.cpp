@@ -21,6 +21,7 @@ int action_test_rows(void*, void*, void*);
 int action_test_movement_operands(void);
 int action_test_jab_operands(void);
 int action_test_common_operands(void);
+int action_test_falco_operands(void);
 }
 namespace {
 Bytes read_file(const char* path)
@@ -84,6 +85,7 @@ int main(int argc, char** argv)
         check(action_test_movement_operands(), "Native movement operand ABI and truncation rejection");
         check(action_test_jab_operands(),"Native hitbox fields and canonical alias bounds/lifetime");
         check(action_test_common_operands(),"Common attack operands and original finite-loop execution");
+        check(action_test_falco_operands(),"Falco special opcode schemas retain source fields and canonical words");
         FighterFixture fixture;
         put32(fixture.data, fixture.command_a, 0xd0000003); fixture.unlink(fixture.command_a + 4);
         put32(fixture.data, fixture.command_b, 0);
@@ -106,6 +108,27 @@ int main(int argc, char** argv)
         check(timed_commands.word_count()==3,"Animation-yielding source loop preserves relocated goto");
         put32(timed.data,timed.command_a,0x08000001); // absolute wait alone becomes non-yielding
         rejects([&]{DatCommands bad(std::make_shared<const DatArchive>(timed.file()),std::span(&timed_root,1));});
+        // Command_02 is a source-frame timer rather than a scheduler wait.
+        // A loop that stops at frame 3 of a 20-frame clip is therefore not
+        // bounded: after the animation advances past frame 3 it spins in one
+        // source tick.  The Falco Run graph reaches frame 20 before jumping
+        // back, and its source motion is explicitly marked looping.
+        auto async=fixture;
+        const uint32_t async_root=async.data.size(); async.data.resize(async_root+12);
+        put32(async.data,async_root,0x08000003); // Command_02, absolute frame 3
+        put32(async.data,async_root+4,0x1c000000); // Command_07, relocated goto
+        async.link(async_root+8,async_root);
+        const DatCommandRoot bounded_low{async_root,20.0f,1};
+        rejects([&]{DatCommands bad(std::make_shared<const DatArchive>(async.file()),
+                                     std::span(&bounded_low,1));});
+        put32(async.data,async_root,0x08000014); // same graph reaches source frame 20
+        const DatCommandRoot bounded_ok{async_root,20.0f,1};
+        DatCommands bounded_commands(std::make_shared<const DatArchive>(async.file()),
+                                     std::span(&bounded_ok,1));
+        check(bounded_commands.word_count()==3,"Looping source timer reaches animation boundary");
+        const DatCommandRoot non_looping{async_root,20.0f,0};
+        rejects([&]{DatCommands bad(std::make_shared<const DatArchive>(async.file()),
+                                     std::span(&non_looping,1));});
         auto finite=fixture;
         const uint32_t finite_root=finite.data.size();finite.data.resize(finite_root+32);
         put32(finite.data,finite_root,0x0c000003);put32(finite.data,finite_root+4,0x04000001);

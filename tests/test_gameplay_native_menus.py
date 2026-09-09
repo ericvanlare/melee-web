@@ -36,10 +36,17 @@ class NativeMenuSourceTests(unittest.TestCase):
         if not targets or not (menu / "MnSlChr.usd").is_file() or not (game / "PlMr.dat").is_file():
             self.skipTest("Build the native menu host and supply owned menu/game fixtures")
         target = max(targets, key=lambda path: path.stat().st_mtime)
-        run = subprocess.run([str(node_runtime()), str(target), str(menu), str(game)],
-                             cwd=ROOT, capture_output=True, text=True, timeout=90)
-        self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-4000:])
-        self.assertIn("Native original CSS to SSS to four-stock match to CSS passed twice", run.stdout)
+        for stage_kind in (32, 31):
+            with self.subTest(stage_kind=stage_kind):
+                run = subprocess.run(
+                    [str(node_runtime()), str(target), str(menu), str(game),
+                     str(stage_kind)], cwd=ROOT, capture_output=True, text=True,
+                    timeout=120)
+                self.assertEqual(run.returncode, 0,
+                                 (run.stdout + run.stderr)[-4000:])
+                self.assertIn(
+                    "Native original CSS Mario/Falco to SSS to four-stock match to CSS passed twice",
+                    run.stdout)
 
     def test_original_sis_layout_and_style_stack(self):
         candidates = [ROOT / "build" / directory / "native_menu_scene_trace.js"

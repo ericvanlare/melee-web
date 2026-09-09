@@ -134,8 +134,18 @@ void* melee_web_commands_create(const MeleeWebCommandWord* words, size_t count)
             if (i + 1 >= count || words[i].target >= count) goto fail;
             result[i].Command_00.code = op;
             result[i + 1].Command_05.ptr = &result[words[i].target]; ++i; break;
+        case 12:
+            if (((word >> 23) & 7) >= 4) goto fail;
+            result[i].set_hitbox_damage = (struct set_hitbox_damage){op, (word >> 23) & 7, word & 0x7fffff}; break;
+        case 14:
+            result[i].set_hitbox_x42_b57 = (struct set_hitbox_x42_b57){op,
+                (word >> 2) & 0xffffff, (word >> 1) & 1, word & 1}; break;
+        case 15:
+            result[i].set_throw_flags = (struct set_throw_flags){op,word & 0x3ffffff}; break;
         case 20:
             result[i].set_throw_flags = (struct set_throw_flags){op,word & 0x3ffffff}; break;
+        case 21: case 22: case 23: case 24:
+            result[i].Command_00 = (struct Command_00){op,word & 0x3ffffff}; break;
         case 25: case 26: case 27:
             result[i].set_airborne_state = (struct set_airborne_state){op,word & 0x3ffffff}; break;
         case 28:
@@ -149,6 +159,27 @@ void* melee_web_commands_create(const MeleeWebCommandWord* words, size_t count)
             i+=2;break;
         case 35:
             result[i].unk27 = (struct unk27){op,word & 0x3ffffff};break;
+        case 30:
+            result[i].set_jab_rapid = (struct set_jab_rapid){op,word & 0x3ffffff}; break;
+        case 31:
+            result[i].set_dobj_flags = (struct set_dobj_flags){op,
+                signed_bits((word >> 19) & 127, 7), signed_bits(word & 0x7ffff, 19)}; break;
+        case 36:
+            result[i].set_article_vis = (struct set_article_vis){op,word & 0x3ffffff}; break;
+        case 37:
+            result[i].set_fighter_vis = (struct set_fighter_vis){op,word & 0x3ffffff}; break;
+        case 38:
+            if (i + 6 >= count) goto fail;
+            result[i].pseudo_random_sfx_0 = (struct pseudo_random_sfx_0){op,
+                (word >> 18) & 255, (word >> 10) & 255, (word >> 6) & 15, word & 63};
+            for (size_t j = 1; j <= 6; ++j)
+                result[i + j].pseudo_random_sfx_1.sfx_id = words[i + j].word;
+            i += 6; break;
+        case 41:
+            result[i].part_anim = (struct part_anim){op,
+                signed_bits((word >> 19) & 127, 7), signed_bits((word >> 12) & 127, 7), word & 4095}; break;
+        case 42:
+            result[i].unk9 = (struct unk9){op,(word >> 13) & 8191,word & 8191}; break;
         case 56:
             if(i+1>=count)goto fail;
             result[i].smash_charge_0 = (struct smash_charge_0){op,(word >> 16) & 1023,word & 65535};
@@ -172,7 +203,7 @@ void* melee_web_commands_create(const MeleeWebCommandWord* words, size_t count)
         case 13:
             if (((word >> 23) & 7) >= 4) goto fail;
             result[i].set_hitbox_scale = (struct set_hitbox_scale){op, (word >> 23) & 7, word & 0x7fffff}; break;
-        case 16: case 18: case 23: case 24:
+        case 16: case 18:
             result[i].Command_00 = (struct Command_00){op,word & 0x3ffffff}; break;
         case 29:
             result[i].set_jab_combo = (struct set_jab_combo){op,word & 0x3ffffff}; break;
@@ -185,11 +216,9 @@ void* melee_web_commands_create(const MeleeWebCommandWord* words, size_t count)
             result[i+3].spawn_gfx_3 = (struct spawn_gfx_3){signed_bits(words[i+3].word >> 16,16), words[i+3].word & 65535};
             result[i+4].spawn_gfx_4 = (struct spawn_gfx_4){words[i+4].word >> 16, words[i+4].word & 65535};
             i += 4; break;
-        case 17: case 54: case 55:
+        case 17:
             if (i + 2 >= count) goto fail;
-            if (op == 54) result[i].footstep_fx_0 = (struct footstep_fx_0){op,
-                (word >> 18) & 255, (word >> 17) & 1, (word >> 16) & 1, (word >> 8) & 255, word & 255};
-            else result[i].sound_effect_0 = (struct sound_effect_0){op, (word >> 18) & 255, word & 0x3ffff};
+            result[i].sound_effect_0 = (struct sound_effect_0){op, (word >> 18) & 255, word & 0x3ffff};
             result[i+1].sound_effect_1.sfx_id = words[i+1].word;
             result[i+2].sound_effect_2 = (struct sound_effect_2){words[i+2].word >> 16,
                 (words[i+2].word >> 8) & 255, words[i+2].word & 255};
@@ -208,6 +237,60 @@ void* melee_web_commands_create(const MeleeWebCommandWord* words, size_t count)
             result[i].set_tex_anim.frame = signed_bits(word & 2047, 11); break;
         case 52:
             result[i].unk19.unk0 = op; result[i].unk19.unk1 = word & 0x3ffffff; break;
+        case 49:
+            result[i].unk16 = (struct unk16){op,
+                signed_bits((word >> 25) & 1, 1), signed_bits(word & 0x1ffffff, 25)}; break;
+        case 32: case 33: case 44: case 45: case 47: case 48:
+            result[i].Command_00 = (struct Command_00){op,word & 0x3ffffff}; break;
+        case 50:
+            result[i].unk17 = (struct unk17){op,signed_bits(word & 0x3ffffff, 26)}; break;
+        case 51:
+            result[i].unk18 = (struct unk18){op,signed_bits(word & 0x3ffffff, 26)}; break;
+        case 53:
+            result[i].unk20 = (struct unk20){op,word & 0x3ffffff}; break;
+        case 57:
+            result[i].unk21 = (struct unk21){op,(word >> 25) & 1,(word >> 17) & 255}; break;
+        case 39:
+            if (i + 3 >= count) goto fail;
+            result[i].stage_sfx_0 = (struct stage_sfx_0){op,(word >> 16) & 1023,
+                (word >> 8) & 255,word & 255};
+            result[i + 1].stage_sfx_1.sfx_id = words[i + 1].word;
+            result[i + 2].stage_sfx_2 = (struct stage_sfx_2){words[i + 2].word >> 16, words[i + 2].word & 0xffff};
+            result[i + 3].stage_sfx_3 = (struct stage_sfx_3){words[i + 3].word >> 16,
+                (words[i + 3].word >> 8) & 255, words[i + 3].word & 255};
+            i += 3; break;
+        case 54:
+            if (i + 2 >= count) goto fail;
+            result[i].footstep_fx_0 = (struct footstep_fx_0){op,
+                (word >> 18) & 255, (word >> 17) & 1, (word >> 16) & 1,
+                (word >> 8) & 255, word & 255};
+            result[i + 1].sound_effect_1.sfx_id = words[i + 1].word;
+            result[i + 2].sound_effect_2 = (struct sound_effect_2){words[i + 2].word >> 16,
+                (words[i + 2].word >> 8) & 255, words[i + 2].word & 255};
+            i += 2; break;
+        case 58:
+            if (i + 3 >= count) goto fail;
+            result[i].wind_fx_0 = (struct wind_fx_0){op,(word >> 8) & 0x3ffff,word & 255};
+            result[i + 1].wind_fx_1 = (struct wind_fx_1){
+                signed_bits(words[i + 1].word >> 16, 16), signed_bits(words[i + 1].word & 0xffff, 16)};
+            result[i + 2].wind_fx_2 = (struct wind_fx_2){
+                signed_bits(words[i + 2].word >> 16, 16), signed_bits(words[i + 2].word & 0xffff, 16)};
+            result[i + 3].wind_fx_3 = (struct wind_fx_3){
+                signed_bits(words[i + 3].word >> 16, 16), signed_bits(words[i + 3].word & 0xffff, 16)};
+            i += 3; break;
+        case 55:
+            if (i + 2 >= count) goto fail;
+            /* The checked little-endian ftAction_80072E4C adapter reads
+             * flag/gfx bits from unknown, then reuses this word through the
+             * original sound consumer ftAction_80071B50. Keep its shared
+             * native sound representation; unk_fx's native bitfield layout
+             * is different despite sharing the same retail command word. */
+            result[i].sound_effect_0 = (struct sound_effect_0){op,
+                (word >> 18) & 255, word & 0x3ffff};
+            result[i + 1].sound_effect_1.sfx_id = words[i + 1].word;
+            result[i + 2].sound_effect_2 = (struct sound_effect_2){words[i + 2].word >> 16,
+                (words[i + 2].word >> 8) & 255, words[i + 2].word & 255};
+            i += 2; break;
         default: goto fail;
         }
     }
@@ -279,7 +362,7 @@ void* melee_web_action_waits(MeleeWebNativeActionRows* p) { return p->waits; }
 void melee_web_command_require_supported(uint32_t opcode)
 {
     switch (opcode) {
-    case 0: case 1: case 2: case 3: case 4: case 5: case 6: case 7: case 8: case 10: case 11: case 13: case 16: case 17: case 18: case 19: case 20: case 23: case 24: case 25: case 26: case 27: case 28: case 29: case 34: case 35: case 40: case 43: case 46: case 52: case 54: case 55: case 56: return;
+    case 0: case 1: case 2: case 3: case 4: case 5: case 6: case 7: case 8: case 10: case 11: case 13: case 16: case 17: case 18: case 19: case 20: case 23: case 24: case 25: case 26: case 27: case 28: case 29: case 34: case 35: case 37: case 40: case 41: case 43: case 46: case 52: case 54: case 55: case 56: return;
     default:
         fprintf(stderr, "Unsupported native fighter command opcode %u\n", opcode);
         for (unsigned i = 0; i < 6; ++i) if (bindings[i].fighter)

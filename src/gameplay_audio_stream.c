@@ -70,11 +70,18 @@ s32 DVDConvertPathToEntrynum(const char* path){
  if(!active)stop("DVD path requested without an owned file registry");
  if(!melee_web_audio_stream_pump_for(active->audio,NULL,0))stop("pending HPS transfer failed before file selection");
  uint64_t file;size_t length;
- return path&&melee_web_io_find_file(active->io,path,&file,&length,NULL,0)?1:-1;
+ if(path&&melee_web_io_find_file(active->io,path,&file,&length,NULL,0))return 1;
+ fprintf(stderr,"Original HPS path is not owned: %s\n",path?path:"(null)");
+ return -1;
 }
 int HSD_DevComRequest(int file,uintptr_t src,uintptr_t dest,size_t size,int type,int priority,HSD_DevComCallback callback,void* args){
  if(melee_web_audio_bank_transport_file(file)||(type==0x1B&&melee_web_audio_bank_transport_active()))return melee_web_audio_bank_transport_request(file,src,dest,size,type,priority,callback,args);
- if(!active||file!=1||priority<0||priority>2||src%32||size%32||!size||!callback)stop("unsupported file/request alignment, priority, or callback");
+ if(!active||file!=1||priority<0||priority>2||src%32||size%32||!size||!callback){
+  fprintf(stderr,"DevCom file=%d src=%lu dest=%lu size=%lu type=%d priority=%d callback=%p stream=%p bank=%d\n",
+      file,(unsigned long)src,(unsigned long)dest,(unsigned long)size,type,priority,(void*)callback,(void*)active,
+      melee_web_audio_bank_transport_active());
+  stop("unsupported file/request alignment, priority, or callback");
+ }
  Request* r=calloc(1,sizeof(*r));if(!r)stop("request allocation failed");
  r->src=src;r->dest=dest;r->size=size;r->type=type;r->priority=priority;r->callback=callback;r->args=(uintptr_t)args;
  if(type==0x22){if(src||dest||size!=128)stop("unsupported relay request");}

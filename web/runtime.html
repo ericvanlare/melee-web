@@ -1,25 +1,36 @@
 <!doctype html>
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Melee Web · Original CSS/SSS player</title>
 <style>:root{color-scheme:dark;font:15px system-ui;background:#10141e;color:#e7ebf4}body{max-width:900px;margin:24px auto;padding:0 18px}canvas{width:100%;aspect-ratio:4/3;background:black;outline:none}button,input{font:inherit}button{margin:12px 8px 12px 0;padding:8px 14px}pre{white-space:pre-wrap;font-size:12px;max-height:140px;overflow:auto}</style>
-<p>Original CSS/SSS player · Original screens, callbacks, and Mario/Final Destination match.</p>
+<p>Original CSS/SSS player · Original screens, callbacks, and source match.</p>
 <label>Melee disc image <input id="disc" type="file" accept=".iso,.gcm,.ciso" disabled></label>
 <div><button id="launch" disabled>Open character select</button><button id="pause" disabled>Pause / resume</button><button id="unload" disabled>Unload</button><label><input id="keyboard" type="checkbox" checked> P1 keyboard</label><label><input id="keyboard2" type="checkbox" checked> P2 keyboard</label></div>
-<p id="status">Starting WebGPU…</p><p id="cache-status">Render cache is initializing.</p><p id="perf-metrics">Browser frame diagnostics are waiting for the native player.</p><p id="audio-metrics">Audio output is not initialized.</p>
+<p id="status">Starting WebGPU…</p><p id="cache-status">Render cache is initializing.</p><p id="perf-metrics">Browser frame diagnostics are waiting for the native player.</p><p id="render-metrics">Native timing diagnostics are waiting for the native player.</p><p id="construction-metrics">Scene construction diagnostics are waiting for the native player.</p><p id="audio-metrics">Audio output is not initialized.</p>
 <canvas id="canvas" width="640" height="480" tabindex="0"></canvas>
 <p>Click the game for input. P1: WASD · A/B: J/K · Jump: U/I · Shield: Q/E · Grab: O · C-stick: TGFH · Start: Enter. P2: arrows · A/B: right Shift/Ctrl · Start: End · Jump: Delete. Controller ports use the original PAD path.</p>
-<details><summary>Diagnostics</summary><button id="confirm-check">Start input (diagnostic)</button><button id="stock-check" disabled>Four-stock input check</button><p id="scene-check"></p><p>Injects three raw PAD Start samples for scene testing; this does not validate keyboard or controller hardware.</p><pre id="input"></pre><pre id="log"></pre></details>
+<details><summary>Diagnostics</summary><button id="confirm-check">Start input (diagnostic)</button><button id="stock-check" disabled>Four-stock input check</button><fieldset><legend>Raw PAD sample</legend><label>Port <select id="pad-port"><option value="0">P1</option><option value="1">P2</option></select></label> <label>Buttons <input id="pad-buttons" value="0x100" size="8" inputmode="numeric"></label> <label>Stick X <input id="pad-stick-x" type="number" min="-80" max="80" value="0" size="4"></label> <label>Stick Y <input id="pad-stick-y" type="number" min="-80" max="80" value="0" size="4"></label> <label>Duration (source ticks) <input id="pad-duration" type="number" min="1" max="120" value="1" size="4"></label> <button id="pad-send" disabled>Send PAD sample</button><span id="pad-status"></span></fieldset><p id="scene-check"></p><p>Raw PAD samples are applied at the next strict source tick for the selected port. Buttons accept the original GameCube bitmask (for example A 0x100, B 0x200, X 0x400, Start 0x1000); axes are limited to -80…80. Samples are disabled during preparation and the stock diagnostic.</p><pre id="input"></pre><pre id="log"></pre></details>
 <script src="runtime-cache.js"></script><script>
-const $=id=>document.getElementById(id);let ready=false,fatal=false,bundle=false,inputDirty=true,importing=false,uiMessage="";let frameLast=0,perfLastReport=0,activeFrames=0,worstFrame=0,longFrames=0;
+const $=id=>document.getElementById(id);let ready=false,fatal=false,bundle=false,inputDirty=true,importing=false,uiMessage="";let frameLast=0,perfLastReport=0,activeFrames=0,worstFrame=0,longFrames=0;let nativeTimingFrames=0,nativeTimingWorst=0,nativeLongFrames=0,nativeFirstUse=0,nativeFirstUseWorst=0,nativeLastTiming=null;let constructionCounts={},constructionWorst=0,constructionFirstUseWorst=0,preparationCount=0,preparationWorst=0;let preparationSince=0,preparationLabel="";let audioStateAcknowledged=true,audioAckWaiters=[],stockCheckActive=false;
 const commands=[];
 const boundary=run=>fatal?Promise.reject(Error("Reload after the runtime fault.")):new Promise((resolve,reject)=>commands.push({run,resolve,reject}));
 const log=text=>$('log').textContent=($('log').textContent+'\n'+text).slice(-16000);
 let audioContext=null,audioNode=null,audioEnabled=false;
+function resetTiming(clearConstruction=true){frameLast=0;perfLastReport=0;activeFrames=0;worstFrame=0;longFrames=0;nativeTimingFrames=0;nativeTimingWorst=0;nativeLongFrames=0;nativeFirstUse=0;nativeFirstUseWorst=0;nativeLastTiming=null;if(clearConstruction){constructionCounts={};constructionWorst=0;constructionFirstUseWorst=0;preparationCount=0;preparationWorst=0;preparationSince=0;preparationLabel='';}$('render-metrics').textContent='Native timing diagnostics are waiting for the native player.';if(clearConstruction)$('construction-metrics').textContent='Scene construction diagnostics are waiting for the native player.';}
+function renderConstructionMetrics(){const construction=Object.entries(constructionCounts).map(([name,count])=>`${name} ${count}`).join(' · ')||'none';$('construction-metrics').textContent=`Construction ${construction} · worst ${constructionWorst.toFixed(2)} ms · construct ${constructionFirstUseWorst.toFixed(2)} ms · preparations ${preparationCount} (worst ${preparationWorst.toFixed(2)} ms; source entry/teardown separate)`;}
+window.menuConstructionTiming=data=>{const kind=data.kind||'unknown';constructionCounts[kind]=(constructionCounts[kind]||0)+1;constructionWorst=Math.max(constructionWorst,data.total_ms||0);constructionFirstUseWorst=Math.max(constructionFirstUseWorst,data.construct_ms||0);log(`Native construction ${JSON.stringify(data)}`);renderConstructionMetrics();};
+window.menuRuntimeTiming=data=>{if(!data.valid)return;const total=data.total_ms||0,preparation=data.preparation_ms||0,active=Math.max(0,total-preparation);nativeLastTiming=data;nativeTimingFrames++;nativeTimingWorst=Math.max(nativeTimingWorst,active);if(active>1000/30)nativeLongFrames++;if(data.first_use){nativeFirstUse++;nativeFirstUseWorst=Math.max(nativeFirstUseWorst,active);}if(data.first_use||active>1000/30||preparation)log(`Native callback ${JSON.stringify(data)}`);};
+window.menuPreparation=label=>{preparationLabel=label||'Preparing original scene';preparationSince=performance.now();uiMessage='';$('status').textContent=`${preparationLabel} · audio paused`;};
+window.menuPreparationDone=()=>{if(preparationSince){const duration=performance.now()-preparationSince;preparationCount++;preparationWorst=Math.max(preparationWorst,duration);log(`Native preparation boundary {"label":${JSON.stringify(preparationLabel)},"duration_ms":${duration.toFixed(3)}}`);renderConstructionMetrics();}preparationSince=0;preparationLabel='';uiMessage='';};
+window.menuPreparationCanceled=()=>{preparationSince=0;preparationLabel='';uiMessage='';};
+window.menuPreparationFailed=error=>{preparationSince=0;preparationLabel='';uiMessage=error||'Native preparation failed';$('status').textContent=uiMessage;};
 async function prepareAudio(){
- if(!audioContext){audioContext=new AudioContext({sampleRate:32000,latencyHint:'interactive'});if(audioContext.sampleRate!==32000)throw Error('Expected 32000 Hz audio context');await audioContext.audioWorklet.addModule('audio-worklet.js');audioNode=new AudioWorkletNode(audioContext,'melee-audio-output',{numberOfInputs:0,numberOfOutputs:1,outputChannelCount:[2]});audioNode.port.onmessage=({data})=>{if(data.error){log(data.error);return;}$('audio-metrics').textContent=`Audio queue ${data.queued} frames · underrun ${data.underruns} frames · stereo with original reverb/delay · replacement DSP coefficients`;};audioNode.connect(audioContext.destination);}
+ if(!audioContext){audioContext=new AudioContext({sampleRate:32000,latencyHint:'interactive'});if(audioContext.sampleRate!==32000)throw Error('Expected 32000 Hz audio context');await audioContext.audioWorklet.addModule('audio-worklet.js');audioNode=new AudioWorkletNode(audioContext,'melee-audio-output',{numberOfInputs:0,numberOfOutputs:1,outputChannelCount:[2]});audioStateAcknowledged=false;audioNode.port.onmessage=({data})=>{if(data.type==='state-ack'){if(data.enabled===audioEnabled){audioStateAcknowledged=true;for(const resolve of audioAckWaiters.splice(0))resolve();}return;}if(data.error){log(data.error);return;}$('audio-metrics').textContent=`Audio queue ${data.queued} frames · underrun ${data.underruns} frames · stereo with original reverb/delay · replacement DSP coefficients`;};audioNode.port.postMessage({type:'state',enabled:false});audioNode.connect(audioContext.destination);}
  await audioContext.resume();
 }
-function syncAudio(){const value=ready&&!fatal&&!!Module._melee_web_native_menu_running()&&!document.hidden;if(value!==audioEnabled){audioEnabled=value;audioNode?.port.postMessage({type:'state',enabled:value});}}
+function waitForAudioAck(){return audioStateAcknowledged?Promise.resolve():new Promise(resolve=>audioAckWaiters.push(resolve));}
+async function pauseAudioForPreparation(){if(audioEnabled){audioEnabled=false;audioStateAcknowledged=!audioNode;audioNode?.port.postMessage({type:'state',enabled:false});}await waitForAudioAck();}
+function syncAudio(){const value=ready&&!fatal&&!!Module._melee_web_native_menu_running()&&!document.hidden;if(value!==audioEnabled){audioEnabled=value;audioStateAcknowledged=!audioNode;audioNode?.port.postMessage({type:'state',enabled:value});}}
 window.menuAudio=pcm=>{if(audioEnabled)audioNode?.port.postMessage({type:'pcm',pcm},[pcm.buffer]);};
+window.menuAudioReadyForPreparation=()=>!audioNode||(!audioEnabled&&audioStateAcknowledged);
 window.menuServiceCommands=()=>{
  if(fatal)return;
  for(const c of commands.splice(0)){try{c.resolve(c.run());}catch(e){c.reject(e);}}
@@ -35,26 +46,37 @@ window.menuFrame=()=>{
  }else frameLast=0;
  if(now-perfLastReport>=250){
   $('perf-metrics').textContent=`Active browser callbacks ${activeFrames} · worst callback interval ${worstFrame.toFixed(2)} ms · >33.3 ms ${longFrames} (callback interval only; not CPU/GPU timing or acceptance evidence)`;
+  const last=nativeLastTiming;const phase=last?`last phases p${Number(last.preparation_ms||0).toFixed(2)} i${Number(last.input_ms||0).toFixed(2)} s${Number(last.simulation_audio_ms||0).toFixed(2)} b${Number(last.begin_ms||0).toFixed(2)} d${Number(last.draw_ms||0).toFixed(2)} e${Number(last.end_ms||0).toFixed(2)} ms`:'last phases —';
+  $('render-metrics').textContent=`Native callbacks ${nativeTimingFrames} · worst active callback ${nativeTimingWorst.toFixed(2)} ms · >33.3 ms ${nativeLongFrames} · first-use draws ${nativeFirstUse} (worst ${nativeFirstUseWorst.toFixed(2)} ms) · ${phase} (preparation excluded here and reported separately; full first-use/long callbacks in log)`;
   perfLastReport=now;
  }
- if(!importing&&!uiMessage)$('status').textContent=Module.UTF8ToString(Module._melee_web_native_menu_message());
+ if(preparationSince)$('status').textContent=`${preparationLabel} · ${Math.round(now-preparationSince)} ms · audio paused`;else if(!importing&&!uiMessage)$('status').textContent=Module.UTF8ToString(Module._melee_web_native_menu_message());
  $('status').dataset.phase=Module._melee_web_native_menu_phase();
+ const nativePhase=Module._melee_web_native_menu_phase();if(nativePhase!==7)stockCheckActive=false;
  $('stock-check').disabled=!Module._melee_web_native_menu_stock_check_ready();
+ $('pad-send').disabled=importing||!!preparationSince||fatal||!Module._melee_web_native_menu_running()||stockCheckActive;
  $('scene-check').textContent=Module.UTF8ToString(Module._melee_web_native_menu_diagnostics());
  if($('input').closest('details').open)$('input').textContent=Module.UTF8ToString(Module._melee_web_input_message());
  syncAudio();
 };
-function stop(error){fatal=true;for(const id of ['disc','launch','pause','unload','keyboard','keyboard2','confirm-check','stock-check'])$(id).disabled=true;log(error);$('status').textContent='Stopped: '+error;syncAudio();for(const c of commands.splice(0))c.reject(Error(error));}
+function stop(error){fatal=true;window.menuPreparationFailed?.(error);for(const id of ['disc','launch','pause','unload','keyboard','keyboard2','confirm-check','stock-check','pad-send'])$(id).disabled=true;log(error);$('status').textContent='Stopped: '+error;syncAudio();for(const c of commands.splice(0))c.reject(Error(error));}
 window.addEventListener('error',e=>stop(e.error?.stack||e.message));window.addEventListener('unhandledrejection',e=>stop(e.reason?.stack||String(e.reason)));
 for(const type of ['focus','blur','visibilitychange','focusin','focusout'])window.addEventListener(type,()=>inputDirty=true,true);
-$('stock-check').onclick=()=>boundary(()=>check(Module._melee_web_native_menu_stock_check())).then(()=>{$('canvas').focus();inputDirty=true;});
+$('stock-check').onclick=()=>boundary(()=>check(Module._melee_web_native_menu_stock_check())).then(()=>{stockCheckActive=true;$('canvas').focus();inputDirty=true;});
 $('confirm-check').onclick=()=>boundary(()=>Module._melee_web_native_menu_confirm_check()).then(()=>{$('canvas').focus();inputDirty=true;});
+function padNumber(id){const raw=$(id).value.trim();if(!raw)throw Error(`${id} must be numeric`);const value=Number(raw);if(!Number.isInteger(value))throw Error(`${id} must be an integer`);return value;}
+function padError(error){$('pad-status').textContent=error.message||String(error);log($('pad-status').textContent);}
+$('pad-send').onclick=()=>{try{
+ const port=padNumber('pad-port'),buttons=padNumber('pad-buttons'),stickX=padNumber('pad-stick-x'),stickY=padNumber('pad-stick-y'),duration=padNumber('pad-duration');
+ boundary(()=>check(Module._melee_web_native_menu_pad_sample(port,buttons,stickX,stickY,duration))).then(()=>{$('pad-status').textContent=`Queued P${port+1} PAD sample for ${duration} source tick${duration===1?'':'s'}.`;inputDirty=true;}).catch(padError);
+}catch(error){padError(error);}};
 $('keyboard').onchange=$('keyboard2').onchange=()=>inputDirty=true;
 function status(){return Module.UTF8ToString(Module._melee_web_native_menu_message());}
 function check(result){if(!result)throw Error(status());}
 async function unloadAndSave(){
  const unloaded=await boundary(()=>{syncAudio();return Module._melee_web_native_menu_unload();});
  if(!unloaded)return false;
+ window.menuPreparationCanceled?.();await pauseAudioForPreparation();
  const deadline=performance.now()+30000;
  while(!await boundary(()=>Module._melee_web_native_menu_cache_idle())){
   if(performance.now()>deadline){$('cache-status').textContent='Render cache was not saved: pending pipeline work did not drain.';return true;}
@@ -63,15 +85,24 @@ async function unloadAndSave(){
  return true;
 }
 async function put(name,bytes){await boundary(()=>{const encoded=new TextEncoder().encode(name+'\0');const np=Module._malloc(encoded.length),bp=Module._malloc(bytes.length);try{if(!np||!bp)throw Error('Allocation failed');Module.HEAPU8.set(encoded,np);Module.HEAPU8.set(bytes,bp);check(Module._melee_web_native_menu_file(np,bp,bytes.length));}finally{Module._free(np);Module._free(bp);}});}
+async function prepareNativeResources(){
+ window.menuPreparation('Preparing native menu resources');
+ await pauseAudioForPreparation();
+ // Give the browser one turn to paint the phase and deliver the disabled
+ // state before the native owner allocates its source heaps.
+ await new Promise(resolve=>setTimeout(resolve,0));
+ await boundary(()=>check(Module._melee_web_native_menu_prepare()));
+ window.menuPreparationDone();
+}
 $('disc').onchange=async()=>{try{
- const file=$('disc').files[0];if(!file)return;bundle=false;importing=true;uiMessage='';$('launch').disabled=true;$('disc').disabled=true;
+ const file=$('disc').files[0];if(!file)return;bundle=false;stockCheckActive=false;importing=true;uiMessage='';resetTiming();$('launch').disabled=true;$('disc').disabled=true;
  if(!await unloadAndSave())throw Error(status());
  const {loadNativeGameDisc}=await import('./runtime-assets.mjs');const files=await loadNativeGameDisc(file,p=>$('status').textContent=`Reading local data ${p.complete}/${p.total}`);
- for(const [name,bytes] of files)await put(name,bytes);bundle=true;uiMessage='Local menu data loaded.';$('status').textContent=uiMessage;
-}catch(e){uiMessage=e.message;log(e.message);$('status').textContent=e.message;}finally{importing=false;$('disc').disabled=fatal;$('launch').disabled=fatal||!bundle;}};
-$('launch').onclick=async()=>{try{uiMessage='';frameLast=0;perfLastReport=0;activeFrames=0;worstFrame=0;longFrames=0;await prepareAudio();await boundary(()=>check(Module._melee_web_native_menu_launch()));$('pause').disabled=$('unload').disabled=false;$('canvas').focus();inputDirty=true;syncAudio();}catch(e){log(e.message);$('status').textContent=e.message;}};
+ for(const [name,bytes] of files)await put(name,bytes);await prepareNativeResources();bundle=true;uiMessage='Local menu data loaded.';$('status').textContent=uiMessage;
+}catch(e){window.menuPreparationFailed?.(e.message);uiMessage=e.message;log(e.message);$('status').textContent=e.message;}finally{importing=false;$('disc').disabled=fatal;$('launch').disabled=fatal||!bundle;}};
+ $('launch').onclick=async()=>{if($('launch').disabled)return;$('launch').disabled=true;try{uiMessage='';resetTiming(false);await prepareNativeResources();await prepareAudio();await boundary(()=>check(Module._melee_web_native_menu_launch()));$('pause').disabled=$('unload').disabled=false;$('canvas').focus();inputDirty=true;syncAudio();}catch(e){window.menuPreparationFailed?.(e.message);log(e.message);$('status').textContent=e.message;if(!fatal&&!Module._melee_web_native_menu_running())$('launch').disabled=!bundle;}};
 $('pause').onclick=()=>boundary(()=>Module._melee_web_native_menu_pause(Module._melee_web_native_menu_running())).then(()=>{$('canvas').focus();inputDirty=true;});
-$('unload').onclick=async()=>{try{uiMessage='';if(!await unloadAndSave())throw Error(status());$('pause').disabled=$('unload').disabled=true;syncAudio();}catch(e){uiMessage=e.message;log(e.message);$('status').textContent=e.message;}};
+ $('unload').onclick=async()=>{try{uiMessage='';if(!await unloadAndSave())throw Error(status());stockCheckActive=false;$('pause').disabled=$('unload').disabled=true;$('launch').disabled=fatal||!bundle;syncAudio();}catch(e){uiMessage=e.message;log(e.message);$('status').textContent=e.message;}};
 var Module={canvas:$('canvas'),print:log,printErr:log,onAbort:stop,onRuntimeInitialized(){ready=true;$('disc').disabled=false;}};
 installRuntimeCache(Module,report=>{$('cache-status').textContent=report.message;});
 </script><script src="gameplay_menu_browser.js"></script></html>

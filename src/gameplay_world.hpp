@@ -10,11 +10,18 @@
 struct StartMeleeData;
 namespace melee_web {
 using RuntimeFiles = std::map<std::string, std::vector<uint8_t>, std::less<>>;
+// Original FTKind and GrKind values, never CSS/SSS grid indices. Defaults keep
+// existing Mario/FD probes scoped to their original fixture.
+struct GameplayWorldSelection {
+    std::array<unsigned,2> fighter_kinds{0,0};
+    int ground_kind=37;
+};
 // Shared by the browser and source regression harness. Owns one original SDK
 // world and its assets. Match/render contexts must close before this owner.
 class GameplayWorld {
 public:
     explicit GameplayWorld(const RuntimeFiles&);
+    GameplayWorld(const RuntimeFiles&, const GameplayWorldSelection&);
     ~GameplayWorld();
     GameplayWorld(const GameplayWorld&) = delete;
     GameplayWorld& operator=(const GameplayWorld&) = delete;

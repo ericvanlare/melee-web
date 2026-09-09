@@ -12,13 +12,18 @@ await assert.rejects(loadRuntimeDisc(new Blob([bytes])),/Invalid game executable
 console.log('Runtime disc language paths and executable rejection checks passed');
 
 assert.equal(Object.keys(NATIVE_MENU_DISC_FILES).length,15);
-assert.equal(Object.keys(NATIVE_GAME_DISC_FILES).length,33);
+assert.equal(Object.keys(NATIVE_GAME_DISC_FILES).length,43);
 for(const name of ['nr_select','nr_title','nr_name','pokemon','end']) {
   assert.equal(NATIVE_MENU_DISC_FILES[name+'.ssm'],'audio/us/'+name+'.ssm');
   assert.equal(NATIVE_GAME_DISC_FILES[name+'.ssm'],'audio/us/'+name+'.ssm');
 }
-for(const name of ['GmPause.usd','IfAll.usd','IfCoGet.dat','SdIntro.dat','PlMrNr.dat','PlMrYe.dat','PlMrBk.dat','PlMrBu.dat','PlMrGr.dat'])
+for(const name of ['GmPause.usd','IfAll.usd','IfCoGet.dat','SdIntro.dat',
+  'PlMrNr.dat','PlMrYe.dat','PlMrBk.dat','PlMrBu.dat','PlMrGr.dat',
+  'PlFc.dat','PlFcAJ.dat','PlFcNr.dat','PlFcRe.dat','PlFcBu.dat','PlFcGr.dat',
+  'EfFxData.dat','GrNBa.dat'])
   assert.equal(NATIVE_GAME_DISC_FILES[name],name);
+assert.equal(NATIVE_GAME_DISC_FILES['falco.ssm'],'audio/us/falco.ssm');
+assert.equal(NATIVE_GAME_DISC_FILES['sp_zako.hps'],'audio/sp_zako.hps');
 for(const loader of [loadNativeMenuDisc,loadNativeGameDisc]) {
   await assert.rejects(loader({name:'game.rvz'}),/RVZ is not supported/);
   await assert.rejects(loader(new Blob([bytes])),/Invalid game executable section/);

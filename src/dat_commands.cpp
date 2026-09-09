@@ -1,10 +1,20 @@
 #include "dat_commands.hpp"
+#include <algorithm>
 #include <cstdlib>
 #include <cstring>
+#include <cmath>
 #include <set>
+#include <utility>
 namespace melee_web {
 namespace {
 void require(bool v, const char* message) { if (!v) throw DatError(message); }
+std::vector<DatCommandRoot> unbounded_roots(std::span<const uint32_t> roots)
+{
+    std::vector<DatCommandRoot> result;
+    result.reserve(roots.size());
+    for (const auto root : roots) result.push_back({root, 0.0f, 0});
+    return result;
+}
 void* color_commands(const std::vector<MeleeWebCommandWord>& words){
     require(sizeof(void*)==4,"Original color command pointers require a 32-bit target");
     auto* out=static_cast<uint32_t*>(std::calloc(words.size(),4));
@@ -15,14 +25,22 @@ void* color_commands(const std::vector<MeleeWebCommandWord>& words){
     return out;
 }
 }
-DatCommands::DatCommands(std::shared_ptr<const DatArchive> archive, std::span<const uint32_t> roots, DatCommandKind kind):kind_(kind)
+DatCommands::DatCommands(std::shared_ptr<const DatArchive> archive, std::span<const uint32_t> roots, DatCommandKind kind)
+    : DatCommands(std::move(archive), unbounded_roots(roots), kind) {}
+
+DatCommands::DatCommands(std::shared_ptr<const DatArchive> archive, std::span<const DatCommandRoot> roots, DatCommandKind kind):kind_(kind)
 {
     require(bool(archive), "Command archive is null");
     std::map<uint32_t, uint32_t> words;
     std::map<uint32_t, uint32_t> branches;
     std::set<uint32_t> operands;
     const size_t stack_capacity=kind==DatCommandKind::ColorOverlay?6:3;
-    for (uint32_t root : roots) {
+    for (const DatCommandRoot root_info : roots) {
+        const uint32_t root = root_info.offset;
+        if (kind == DatCommandKind::Fighter && root_info.animation_end_frame != 0.0f)
+            require(std::isfinite(root_info.animation_end_frame) && root_info.animation_end_frame > 0.0f &&
+                    root_info.animation_end_frame <= 65535.0f,
+                    "Fighter command animation end frame is outside the source range");
         struct StackEntry { bool loop; uint32_t address; uint32_t remaining; };
         std::vector<StackEntry> returns;
         auto stack_slots = [&] { size_t n=0;for(auto e:returns)n+=e.loop?2:1;return n; };
@@ -40,12 +58,31 @@ DatCommands::DatCommands(std::shared_ptr<const DatArchive> archive, std::span<co
             state.push_back(at);
             if (auto seen = visited.find(state); seen != visited.end()) {
                 bool relative = false, animation_wait = false;
+                uint32_t maximum_async_timer = 0;
                 for (size_t j = seen->second; j < history.size(); ++j) {
                     const auto v = history[j];
                     relative |= (v >> 26) == (kind==DatCommandKind::ColorOverlay?11:1) && (v & 0x3ffffff) != 0;
                     animation_wait |= (v >> 26) == 8;
+                    if (kind == DatCommandKind::Fighter && (v >> 26) == 2)
+                        maximum_async_timer = std::max(maximum_async_timer, v & 0x3ffffff);
                 }
-                require(relative || animation_wait, "Command graph has a non-yielding cycle");
+                /* Command_02 is asynchronous only when it is the sole
+                 * scheduler yield in a cycle. Relative waits and the source
+                 * animation wait already prove that the cycle yields, so do
+                 * not impose a frame witness on those original loops. */
+                if (!relative && !animation_wait) {
+                    if (kind == DatCommandKind::Fighter && maximum_async_timer != 0) {
+                        require(root_info.animation_end_frame > 0.0f &&
+                                root_info.animation_loops != 0,
+                                "Asynchronous timer cycle lacks a looping source animation witness");
+                        require(static_cast<float>(maximum_async_timer) <= root_info.animation_end_frame &&
+                                static_cast<float>(maximum_async_timer) >= root_info.animation_end_frame,
+                                "Asynchronous timer cycle does not reach the source animation boundary");
+                    } else {
+                        throw DatError("Command graph has a non-yielding cycle (root " +
+                                       std::to_string(root) + ", instruction " + std::to_string(at) + ")");
+                    }
+                }
                 terminated = true; break;
             }
             visited.emplace(std::move(state), history.size()); history.push_back(word);
@@ -87,10 +124,18 @@ DatCommands::DatCommands(std::shared_ptr<const DatArchive> archive, std::span<co
                 }
                 if(op==15||op==19)require((word&0x3ffffff)!=0,"Color blend duration is zero");
             }else switch (op) {
-            case 1: case 2: case 8: case 13: case 16: case 18: case 19: case 20: case 23: case 24: case 25: case 26: case 27: case 28: case 29: case 35: case 40: case 43: case 46: case 52: break;
+            case 1: case 2: case 8: case 12: case 13: case 14: case 15:
+            case 16: case 18: case 19: case 20: case 21: case 22: case 23:
+            case 24: case 25: case 26: case 27: case 28: case 29: case 30:
+            case 31: case 32: case 33: case 35: case 36: case 37: case 40:
+            case 41: case 42: case 43: case 44: case 45: case 46: case 47:
+            case 48: case 49: case 50: case 51: case 52: case 53: case 57: break;
             case 10: case 11: length = 5; break;
             case 17: case 34: case 54: case 55: length = 3; break;
+            case 38: length = 7; break;
             case 56: length = 2; break;
+            case 39: length = 4; break;
+            case 58: length = 4; break;
             default: throw DatError("Command opcode is outside the checked action execution subset");
             }
             for (unsigned i = 1; i < length; ++i) {

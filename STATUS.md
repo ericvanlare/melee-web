@@ -1,11 +1,25 @@
 # Current status
 
-The browser runs two original Mario instances on Final Destination through
-compiled WebAssembly. The complete acceptance milestone below is still open:
+The browser runs original fighters and stages through compiled WebAssembly. The
+accepted first slice is two Marios on Final Destination; a narrower raw-PAD run
+also selected and rendered Falco versus Mario on Battlefield. The complete
+acceptance milestone below is still open:
 source stage and item rendering, stock/respawn/outcome flow, and the optional
-renderer cache are integrated, while cold first-use stalls, audible and physical
-controller verification, and full original-game equivalence remain open. No
+renderer cache are integrated, while clean cold-cache/full-match first-use
+stalls, audible and physical controller verification, and full original-game
+equivalence remain open. No
 emulator is shipped; Dolphin is used only as a separate original-game reference.
+
+The typed content path now carries Falco and Battlefield source IDs, runtime
+manifests and focused development traces, including Falco costume/effect/audio
+metadata and Battlefield geometry/background data. Source stock icon IDs are
+selected from the typed character/fighter identity rows. In a fresh Release
+browser route, raw PAD input selected P1 Falco and P2 Mario in the original CSS,
+selected Battlefield in the original SSS, and entered a four-stock match. The
+rendered frame showed Falco, Mario, Battlefield geometry and the correct four
+Falco and four Mario stock icons. A complete ordinary-input loop, uninterrupted
+audio and retail-reference comparison have not passed, so the accepted
+first-deliverable claim remains Mario on Final Destination.
 
 The active first deliverable is **original in-game CSS → original in-game SSS
 → a playable four-stock Mario-versus-Mario match on Final Destination → original
@@ -18,9 +32,9 @@ remain required acceptance work under [the accuracy contract](docs/ACCURACY_CONT
 
 The canonical `runtime.html` player uses original CSS/SSS assets, callbacks and
 transitions. `native-menu.html` redirects to it; the asset inspector remains at
-`viewer.html`. Two human Mario slots, four stocks, no items, no timer and Final
-Destination are the supported slice. All five Mario costumes are hydrated with
-separate owned models, and menu selection carries the complete typed
+`viewer.html`. The runtime availability gate now includes Mario and Falco, all
+of their source costumes, and Final Destination and Battlefield under the
+four-stock, no-items, no-timer rules. Menu selection carries the complete typed
 `StartMeleeData`, including source RNG and costume/tint settings, into the match.
 The original menu preloader is not supplied by this resident-asset integration.
 
@@ -43,6 +57,28 @@ and re-entry, and unload at 0, 60 and 100 intro ticks. The source trace is
 `work/native-active-telemetry-run.log`; these are shared-source lifecycle checks,
 not original-game equivalence evidence.
 
+The expanded native menu trace selects Mario/Falco through raw PAD, enters SSS,
+and completes a four-stock match back to CSS twice on both Final Destination and
+Battlefield. The content trace repeats both stages with every Mario and Falco
+costume, exercises Falco's laser, Reflector, Phantasm and Fire Bird action
+families, pause and No Contest, and verifies teardown before the next cycle.
+These native traces establish the checked source lifecycle; they do not replace
+browser input, audio or retail-reference evidence.
+
+Scene transitions now use an explicit preparation boundary for CSS, SSS and
+match entry. The browser shows the phase and waits for the audio worklet's
+disabled-state acknowledgement before owner/session construction; no source
+simulation ticks or source draws run during the wait or construction phase.
+Preparation time is reported separately, and the live clock arms on a later
+callback. The scoped [scene-entry profile](work/scene-entry-profile.md) measured
+106.555 ms for initial resource preparation, 83.140 ms for isolated SSS owner
+construction and 160.100 ms for isolated match construction. Its 7,604 active
+callbacks had a 24.200 ms worst callback, no callback above 33.3 ms and zero
+audio underruns. This is scoped application/driver-cache evidence rather than
+cold-cache or full-match acceptance. The subsequent MarioReady operation-55
+representation defect is fixed, and the fresh native whole-match routes above
+pass on both admitted stages.
+
 The current Release browser separately passes original pause/resume and two
 four-stock loops, each at **2,125 diagnostic input ticks**, with three respawns
 and automatic return to CSS. Source pause was explicitly observed changing
@@ -59,18 +95,23 @@ accessory has a world-owned descriptor that outlives its original fighter/effect
 consumers. Eye telemetry distinguishes an authored base image from an animated
 table entry; this changes observation only, not the game's texture commands.
 
-The complete local regression suite passes **258 tests without skips**
-(255.164 seconds), recorded in `work/native-active-full-suite-final.log`.
-The Release native player and source-loop target build, and rebuilt default
-player, full-stage, five-costume stock, article, edge and combat checks pass.
-The rebuilt legacy fighter constructor/eye-animation/restart runner also passes.
-A bounded Luna review found no actionable ownership/order regression in the
-match initialization, source clock, pause and teardown path.
+The current local regression suite passes **262 tests without skips** (219.703
+seconds), recorded in `work/final-full-suite.log`. Default and Release browser, native-menu,
+content-match, Battlefield, player-context and fighter-runtime targets build.
+The focused browser run used the Release build. The integrated change also
+received a primary review of ownership, input handoff, construction, callback
+timing and teardown paths.
 
-Ordinary keyboard/controller acceptance, original-game visual/audio comparison
-and cold first-use preparation remain open. First-use graphics can cause explicit
-timing pauses. The native player retains the strict pause policy and nominal
-60 Hz clock; neither establishes original timing equivalence. Catch-up input
+Ordinary keyboard Start and SSS B cancellation work in the browser. Complete
+ordinary keyboard play, physical-controller acceptance, original-game
+visual/audio comparison and clean cold-cache/full-match timing acceptance remain
+open. The inspected Falco/Battlefield match reported an active callback below
+10 ms and none above 33.3 ms, with preparation reported separately; automation
+disrupted that run and produced audio underruns, so it is not uninterrupted
+performance or audio evidence. First-use
+graphics can cause explicit timing pauses. The native player retains the strict
+pause policy and nominal 60 Hz clock; neither establishes original timing
+equivalence. Catch-up input
 sampling and replacement DSP coefficients also remain open accuracy gaps under
 [the accuracy contract](docs/ACCURACY_CONTRACT.md). The optional IDBFS cache saves
 renderer resources after unload; disc assets remain local and unpersisted.
@@ -244,7 +285,8 @@ be mistaken for newer browser or full-loop acceptance.
 - Current saved-cache timing was captured in Chrome 152's IAB at DPR1 on the
   reference machine at 1280×960. The selectable 2× SDL render scale remains
   available for scale-specific checks.
-- Workers use GPT-5.6 Luna xhigh; the lead handles integration and difficult blockers.
+- Earlier parallel checkpoints used GPT-5.6 Luna xhigh; the lead retained
+  integration and difficult blockers.
 - The integrated runtime is checkpointed on the private remote. A clean Ubuntu
   GitHub Actions run builds the browser runtime and passes the source/ABI checks.
 - A 102-frame retail comparison of a full jump/landing matches source motion IDs,

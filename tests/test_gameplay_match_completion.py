@@ -56,3 +56,4 @@ class MatchCompletion(unittest.TestCase):
         if not binary.is_file():self.skipTest('Built original player context trace required')
         result=subprocess.run([str(node_runtime()),str(binary)],cwd=ROOT,capture_output=True,text=True,timeout=30)
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertIn('fighter identity mapping',result.stdout)

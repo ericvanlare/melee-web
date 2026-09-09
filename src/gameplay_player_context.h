@@ -10,6 +10,12 @@ typedef struct MeleeWebPlayerSettings {
     uint32_t slot, controller, stocks;
     float position[3], facing;
     uint32_t costume,sub_color; /* Original selected costume and duplicate tint. */
+    /* Original FighterKind.  This field is appended for ABI compatibility:
+     * existing aggregate initializers retain Mario (zero).  The source
+     * Player record stores CharacterKind, so the context maps this identity at
+     * the original boundary instead of treating FighterKind and CharacterKind
+     * as interchangeable (Fox/Falco are deliberately non-contiguous). */
+    uint32_t fighter_kind;
 } MeleeWebPlayerSettings;
 typedef struct MeleeWebPlayerStats {
     int32_t slot_type, character, controller, player_id, costume, stocks;
@@ -17,7 +23,7 @@ typedef struct MeleeWebPlayerStats {
     float position[3], facing, model_scale, attack_ratio, defense_ratio;
     uint32_t stale_index, live_entities;
 } MeleeWebPlayerStats;
-/* Scoped source StaticPlayer initialization for human Mario with an explicit costume.
+/* Scoped source StaticPlayer initialization for a supported human fighter with an explicit costume.
  * Uses original reset/setters/getters and stale-table reset. Owns no Fighter;
  * original Player_80031AD0(slot) can subsequently create and publish one.
  * Existing entity/state or overlapping context ownership rejects. */

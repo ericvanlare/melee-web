@@ -3,11 +3,15 @@
 #include "native_dat.hpp"
 #include "gameplay_stage_map.h"
 namespace melee_web {
-// Owns native Final Destination map descriptors and every source-selected
+// Owns native source-stage map descriptors and every source-selected
 // animation. Does not publish them or imply particle execution is initialized.
 class DatNativeStage {
 public:
+    /* Retain the one-argument form for stage inspection tools; it selects the
+     * existing Final Destination profile. Match startup should pass its
+     * selected StKind to the profile-aware overload. */
     explicit DatNativeStage(std::shared_ptr<const DatArchive>);
+    DatNativeStage(std::shared_ptr<const DatArchive>, int stage_kind);
     ~DatNativeStage();
     DatNativeStage(const DatNativeStage&)=delete;
     DatNativeStage& operator=(const DatNativeStage&)=delete;

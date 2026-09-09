@@ -20,6 +20,8 @@ void* melee_web_fighter_data_article(void* data, uint32_t index);
  * The descriptor owner must outlive source fighters, like the costume owner. */
 void melee_web_fighter_data_set_guard(const MeleeWebNativeDat*,uint32_t root,
     void* data,void* joint,uint32_t* unresolved);
+int melee_web_fighter_data_set_part_animations(void* data,void* groups,
+    uint32_t group_count,uint32_t* unresolved,char* error,size_t error_size);
 /* Borrow the checked native metal descriptor until every source Fighter is
  * destroyed. Validates category2 visibility indices against the real DObj
  * occurrence count before marking the constructor-reachable x5C field ready. */

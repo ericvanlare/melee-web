@@ -1,4 +1,5 @@
 #include "gameplay_stage_numeric.h"
+#include "gameplay_stage_profile.h"
 #include "hsd_native_joint.h"
 #include <melee/gr/ground.h>
 #include <melee/gr/grlast.h>
@@ -36,7 +37,7 @@ static HSD_Joint* joint(const MeleeWebNativeDat* r,MeleeWebStageMarkers* m,uint3
 }
 MeleeWebStageMarkers* melee_web_stage_markers_decode(const MeleeWebNativeDat* r,uint32_t head){
     if(!r)return NULL;r->region(r->context,head,48);
-    REQUIRE(r->word(r->context,head+4)==1,"FD marker context requires one marker tree");
+    REQUIRE(r->word(r->context,head+4)==1,"Source marker context requires one marker tree");
     uint32_t entry=r->pointer(r->context,head,12);REQUIRE(entry!=UINT32_MAX,"Missing marker table");r->region(r->context,entry,12);
     uint32_t root=r->pointer(r->context,entry,64),pairs=r->pointer(r->context,entry+4,4),count=r->word(r->context,entry+8);
     REQUIRE(root!=UINT32_MAX&&pairs!=UINT32_MAX&&count>0&&count<=261,"Invalid marker tree or pair count");
@@ -49,33 +50,43 @@ MeleeWebStageMarkers* melee_web_stage_markers_decode(const MeleeWebNativeDat* r,
         REQUIRE(index<m->joint_count&&id<261&&!seen[id],"Invalid or duplicate marker binding");
         seen[id]=1;m->pairs[i][0]=index;m->pairs[i][1]=id;
     }
-    for(unsigned i=0;i<8;i++)REQUIRE(seen[i],"Missing FD player marker");
-    for(unsigned i=148;i<=152;i++)REQUIRE(seen[i],"Missing FD camera or blast marker");
+    for(unsigned i=0;i<8;i++)REQUIRE(seen[i],"Missing source player marker");
+    for(unsigned i=148;i<=152;i++)REQUIRE(seen[i],"Missing source camera or blast marker");
     return m;
 }
 static int fail(char* e,size_t n,const char* s){if(e&&n)snprintf(e,n,"%s",s);return 0;}
 static void removed(void* p){((MeleeWebStageNumeric*)p)->owner=NULL;}
 static void collect(HSD_JObj* j,HSD_JObj** list,unsigned* count){for(;j;j=j->next){if(*count>=261)abort();list[(*count)++]=j;if(j->child)collect(j->child,list,count);}}
-MeleeWebStageNumeric* melee_web_stage_numeric_begin(MeleeWebStageMarkers* m,char* e,size_t n){
-    if(!m||active||!stage_info.param){fail(e,n,"Missing marker/ground data or active stage scope");return NULL;}
-    /* This scope covers the actual FD scale-one tree. Other stages need the
-     * original map-object scaling path before they can use this publication. */
-    if(stage_info.param->y!=1){fail(e,n,"FD marker context requires source scale one");return NULL;}
+MeleeWebStageNumeric* melee_web_stage_numeric_begin_kind(MeleeWebStageMarkers* m,int stage_kind,char* e,size_t n){
+    const MeleeWebStageProfile* profile=melee_web_stage_profile(stage_kind);
+    if(!profile||!m||active||!stage_info.param){fail(e,n,"Missing supported stage marker/ground data or active stage scope");return NULL;}
+    if(!isfinite(stage_info.param->y)||stage_info.param->y<=0){fail(e,n,"Stage marker context requires a finite positive source scale");return NULL;}
     int has_row=0;
-    for(int i=0;i<stage_info.param->stage_param_count;i++)if(stage_info.param->stage_params[i].stkind==St_Kind_Last)has_row=1;
-    if(!has_row){fail(e,n,"Ground parameters have no Final Destination row");return NULL;}
+    for(int i=0;i<stage_info.param->stage_param_count;i++)if(stage_info.param->stage_params[i].stkind==profile->stage_kind)has_row=1;
+    if(!has_row){fail(e,n,"Ground parameters have no selected stage row");return NULL;}
     if(!melee_web_native_world_enable(e,n))return NULL;
     MeleeWebStageNumeric* h=calloc(1,sizeof(*h));if(!h){fail(e,n,"Cannot allocate stage numeric scope");return NULL;}
     h->saved=stage_info;h->owner=GObj_Create(3,3,0);if(!h->owner){free(h);fail(e,n,"Cannot allocate marker owner");return NULL;}
     HSD_JObj* root=HSD_JObjLoadJoint(m->root);if(!root){HSD_GObjPLink_80390228(h->owner);free(h);fail(e,n,"Original marker joint load failed");return NULL;}
-    HSD_GObjObject_80390A70(h->owner,HSD_GObj_JObjKind,root);GObj_InitUserData(h->owner,0,removed,h);
+    /* Ground_GetStageGObj loads every map root below a synthetic source
+     * joint whose uniform scale is GroundParam::y. Keep that wrapper in the
+     * numeric owner too: Ground_801C2D24 reads world transforms, so omitting
+     * it would leave Battlefield's 0.8 marker/camera coordinates unscaled. */
+    HSD_Joint scale_desc={0};
+    scale_desc.scale.x=stage_info.param->y;
+    scale_desc.scale.y=stage_info.param->y;
+    scale_desc.scale.z=stage_info.param->y;
+    HSD_JObj* scaled=HSD_JObjLoadJoint(&scale_desc);
+    if(!scaled){HSD_GObjObject_80390A70(h->owner,HSD_GObj_JObjKind,root);HSD_GObjPLink_80390228(h->owner);free(h);fail(e,n,"Original marker scale joint load failed");return NULL;}
+    HSD_JObjAddNext(root,scaled);
+    HSD_GObjObject_80390A70(h->owner,HSD_GObj_JObjKind,scaled);GObj_InitUserData(h->owner,0,removed,h);
     HSD_JObj* joints[261];unsigned count=0;collect(root,joints,&count);
     if(count!=m->joint_count){HSD_GObjPLink_80390228(h->owner);free(h);fail(e,n,"Original marker tree count differs");return NULL;}
     memset(stage_info.x280,0,sizeof(stage_info.x280));
     for(unsigned i=0;i<m->pair_count;i++)Ground_801C2D0C(m->pairs[i][1],joints[m->pairs[i][0]]);
-    stage_info.grkind=Gr_Kind_Last;stage_info.on_touch_line=grNLa_StageData.on_touch_line;stage_info.on_check_shadow_render=grNLa_StageData.on_check_shadow_render;
+    stage_info.grkind=profile->ground_kind;stage_info.on_touch_line=profile->source->on_touch_line;stage_info.on_check_shadow_render=profile->source->on_check_shadow_render;
     stage_info.unk8C.b4=1;stage_info.unk8C.b5=1;
-    melee_web_ground_stage_parameters(St_Kind_Last);
+    melee_web_ground_stage_parameters(profile->stage_kind);
     GroundParam* p=stage_info.param;
     Ground_801C38D0(p->x8,p->x14,p->x1C,p->x18);Ground_801C38EC(p->x10,p->xC);Ground_801C3970(p->x28);
     Ground_801C3900(p->x2E,p->x30,p->x34,p->x38,p->x3C,p->x40,p->x44,p->x48);
@@ -95,6 +106,9 @@ MeleeWebStageNumeric* melee_web_stage_numeric_begin(MeleeWebStageMarkers* m,char
         melee_web_stage_numeric_end(h,NULL,0);fail(e,n,"Invalid source camera or blast range");return NULL;
     }
     if(e&&n)*e=0;return h;
+}
+MeleeWebStageNumeric* melee_web_stage_numeric_begin(MeleeWebStageMarkers* m,char* e,size_t n){
+    return melee_web_stage_numeric_begin_kind(m,St_Kind_Last,e,n);
 }
 int melee_web_stage_numeric_bounds(MeleeWebStageNumeric* h,float camera[4],float blast[4],float offset[2],char* e,size_t n){
     if(!h||active!=h||!h->owner||!camera||!blast||!offset)return fail(e,n,"Stage numeric context is not live");

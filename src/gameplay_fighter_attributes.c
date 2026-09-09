@@ -2,6 +2,7 @@
 #include <melee/ft/ftchangeparam.h>
 #include <melee/ft/types.h>
 #include <melee/ft/kinds/ftMario/types.h>
+#include <melee/ft/kinds/ftFox/types.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <math.h>
 #include <stddef.h>
@@ -11,6 +12,7 @@
 _Static_assert(sizeof(void*) == 4, "Fighter hydration requires the checked Wasm32 ABI");
 _Static_assert(sizeof(ftCo_DatAttrs) == 0x184, "Original co attribute size");
 _Static_assert(sizeof(ftMario_DatAttrs) == 0x84, "Original Mario attribute size");
+_Static_assert(sizeof(ftFox_DatAttrs) == 0xD4, "Original Fox/Falco attribute size");
 _Static_assert(sizeof(itPickup) == 0x30, "Original item pickup size");
 _Static_assert(sizeof(ftData) == 0x60, "Original fighter data size");
 _Static_assert(sizeof(ftHurtboxInit) == 40 && offsetof(ftHurtboxInit, scale) == 36 &&
@@ -37,10 +39,13 @@ _Static_assert(offsetof(Fighter, co_attrs) == 0x110 && offsetof(Fighter, x294_it
 MELEE_WEB_CO_ATTRIBUTE_FIELDS(CHECK_CO)
 #define CHECK_MARIO(at, type, name, original) CHECK_FIELD(ftMario_DatAttrs, MeleeWebMarioAttributes, at, type, name, original)
 MELEE_WEB_MARIO_ATTRIBUTE_FIELDS(CHECK_MARIO)
+#define CHECK_FOX(at, type, name, original) CHECK_FIELD(ftFox_DatAttrs, MeleeWebFoxAttributes, at, type, name, original)
+MELEE_WEB_FOX_ATTRIBUTE_FIELDS(CHECK_FOX)
 #define CHECK_PICKUP(at, type, name, original) CHECK_FIELD(itPickup, MeleeWebItemPickup, at, type, name, original)
 MELEE_WEB_PICKUP_ATTRIBUTE_FIELDS(CHECK_PICKUP)
 #undef CHECK_CO
 #undef CHECK_MARIO
+#undef CHECK_FOX
 #undef CHECK_PICKUP
 #undef CHECK_FIELD
 
