@@ -2,8 +2,8 @@
 
 The browser runs original fighters and stages through compiled WebAssembly. The
 accepted first slice is two Marios on Final Destination; narrower raw-PAD runs
-also selected and rendered Falco versus Mario on Battlefield and Fox versus
-Mario on Yoshi's Story. The complete
+also selected and rendered Falco versus Mario on Battlefield, Fox versus Mario
+on Yoshi's Story, and Marth versus Mario on Dream Land. The complete
 acceptance milestone below is still open:
 source stage and item rendering, stock/respawn/outcome flow, and the optional
 renderer cache are integrated, while clean cold-cache/full-match first-use
@@ -14,7 +14,7 @@ The combined [performance and accuracy playbook](docs/PERFORMANCE_AND_ACCURACY.m
 defines the evidence levels, content admission workflow and failure-response
 process used from this point forward.
 
-The typed content path now carries Falco, Fox, Battlefield and Yoshi's Story
+The typed content path now carries Falco, Fox, Marth, Battlefield, Yoshi's Story and Dream Land
 source IDs, runtime manifests and focused development traces. Source stock icon IDs are
 selected from the typed character/fighter identity rows. In a fresh Release
 browser route, raw PAD input selected P1 Falco and P2 Mario in the original CSS,
@@ -34,6 +34,17 @@ icons and Yoshi's Story geometry. The lower adjacent tile is Yoshi's Island and
 remains unavailable. Uninterrupted audio and retail comparison for these
 additions remain open.
 
+Marth's exact 0x98-byte extension, five costumes, 327 actions, three authored
+dynamic-bone chains, null Article table, two-entry effect table and source audio
+bank are pinned by owned-asset tests. The integrated trace executes jab, Shield
+Breaker, Dancing Blade, Dolphin Slash, Counter and an aerial across all admitted
+stages and repeats teardown. Dream Land pins eight source map objects, its joint
+and material animation consumers, collision, lights, shadows, flagged objects,
+and exact bird/tree/wind/blink parameters. The Release browser selected this
+pair through the original CSS/SSS and exercised those actions plus five
+wavedashes. See [Marth's notes](docs/MARTH_PORT_NOTES.md) and
+[Dream Land's notes](docs/DREAM_LAND_PORT_NOTES.md).
+
 The active first deliverable is **original in-game CSS → original in-game SSS
 → a playable four-stock Mario-versus-Mario match on Final Destination → original
 CSS**, without a results screen. Real menu assets, original scene/input behavior,
@@ -45,8 +56,9 @@ remain required acceptance work under [the accuracy contract](docs/ACCURACY_CONT
 
 The canonical `runtime.html` player uses original CSS/SSS assets, callbacks and
 transitions. `native-menu.html` redirects to it; the asset inspector remains at
-`viewer.html`. The runtime availability gate now includes Mario, Fox and Falco,
-all of their source costumes, and Final Destination, Battlefield and Yoshi's Story under the
+`viewer.html`. The runtime availability gate now includes Mario, Fox, Falco and
+Marth, all of their source costumes, and Final Destination, Battlefield,
+Yoshi's Story and Dream Land under the
 four-stock, no-items, no-timer rules. Menu selection carries the complete typed
 `StartMeleeData`, including source RNG and costume/tint settings, into the match.
 The original menu preloader is not supplied by this resident-asset integration.
@@ -72,10 +84,11 @@ not original-game equivalence evidence.
 
 The expanded native menu trace selects Mario/Falco through raw PAD, enters SSS,
 and completes a four-stock match back to CSS twice on both Final Destination and
-Battlefield. The content trace repeats all three stages with every Falco and Fox
-costume, exercises their laser, Reflector, side-special, up-special and complete
-jab/rapid-jab action families, pause and No Contest, checks Yoshi's Story's Randall/Shy Guy lifecycle,
-and verifies teardown before the next cycle.
+Battlefield. The content trace repeats all four stages with every Falco, Fox and
+Marth costume. It exercises the Fox-family laser, Reflector, side-special,
+up-special and complete jab/rapid-jab action families plus Marth's representative
+action set, pause and No Contest. It also checks Yoshi's Story's Randall/Shy Guy
+lifecycle, Dream Land's eight-map lifecycle, and teardown before the next cycle.
 Fox's Fire Fox launch now admits source command 38 through its recovered
 seven-byte skip handler, and the trace requires the full charge, launch and exit
 sequence rather than stopping at up-special entry.
@@ -117,8 +130,9 @@ representation defect is fixed, and the fresh native whole-match routes above
 pass on both admitted stages.
 
 The Release browser now bundles a verified Aurora seed from the original CSS,
-SSS, Battlefield, Yoshi's Story, stock/respawn and Fox first-use routes: one
-shader record and 283 pipeline descriptors. The seed contains no disc assets.
+SSS, Battlefield, Yoshi's Story, Dream Land, stock/respawn, Fox and Marth
+first-use routes: one shader record and 330 pipeline descriptors. The seed
+contains no disc assets.
 Aurora merges it into the optional origin cache. Newly discovered pipelines
 remain dirty until native teardown, when **Unload** or application reload
 persists the database; IDBFS serialization no longer runs during gameplay.
@@ -129,6 +143,13 @@ again created no pipelines; Yoshi's Story match preparation measured 808.41 ms
 (194.81 ms construction and 613.60 ms priming/scheduling), while the slowest
 active callback was 16.89 ms and none exceeded 33.3 ms. The cold preparation
 delay remains open. See [browser performance work](docs/PERFORMANCE.md).
+
+With the expanded cache already present, Marth/Dream Land match preparation
+measured 187.25 ms, including 98.28 ms of source-owner construction; first draw
+was 4.04 ms with no new pipelines. Representative combat and movement stayed
+below the 33.3 ms native callback budget. Computer-control operations produced
+browser callback gaps and audio underruns, so that run is graphics/source timing
+evidence rather than uninterrupted browser/audio acceptance.
 
 A correlated Battlefield cold-entry probe measured fresh application
 construction at 182.380 ms, the preparation boundary at 200.095 ms and first
@@ -157,7 +178,7 @@ accessory has a world-owned descriptor that outlives its original fighter/effect
 consumers. Eye telemetry distinguishes an authored base image from an animated
 table entry; this changes observation only, not the game's texture commands.
 
-The current local regression suite passes **276 tests without skips** (211.762
+The current local regression suite passes **278 tests without skips** (265.418
 seconds). Default and Release browser, native-menu, content-match, Battlefield,
 player-context and fighter-runtime targets build.
 The focused browser run used the Release build. The integrated change also

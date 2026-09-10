@@ -53,10 +53,12 @@ int main(int argc,char** argv){try{
     check(opponent_content,"Selected opponent has no admitted source content");
     selection.start.players[0].ckind=fighter_ckind;
     selection.start.players[1].ckind=opponent_ckind;
-    for(unsigned cycle=0;cycle<4;cycle++){
+    for(unsigned cycle=0;cycle<fighter_content->costumes;cycle++){
         selection.start.players[0].color=cycle;
-        selection.start.players[1].color=cycle;
-        for(unsigned i=0;i<2;i++)selection.players[i]={i,4,cycle,0};
+        const unsigned opponent_color=cycle%opponent_content->costumes;
+        selection.start.players[1].color=opponent_color;
+        selection.players[0]={0,4,cycle,0};
+        selection.players[1]={1,4,opponent_color,0};
         std::cout<<"Construct mixed content stage="<<selection.start.rules.stkind<<" costume="<<cycle<<std::endl;
         melee_web::GameplayMatchSession match(files,selection);
         PADStatus raw[4]{};raw[2].err=raw[3].err=PAD_ERR_NO_CONTROLLER;
@@ -68,7 +70,7 @@ int main(int argc,char** argv){try{
         for(unsigned n=0;!match.ready()&&n<600;n++)tick();
         check(match.ready(),"Original Ready did not finish");
         check(melee_web_test_content_player(0,fighter_content->fighter_kind,cycle),"Original selected-fighter identity/costume/icon differs");
-        check(melee_web_test_content_player(1,opponent_content->fighter_kind,cycle),"Original opponent identity/costume/icon differs");
+        check(melee_web_test_content_player(1,opponent_content->fighter_kind,opponent_color),"Original opponent identity/costume/icon differs");
         if(selection.start.rules.stkind==St_Kind_Story){
             uint32_t map_mask=0;unsigned map_count=0;int randall_timer=0,shy_timer=0,shy_count=0,shy_pattern=0;
             check(melee_web_story_state(&map_mask,&map_count,&randall_timer,&shy_timer,&shy_count,&shy_pattern),
@@ -82,9 +84,10 @@ int main(int argc,char** argv){try{
             std::cout<<"Yoshi's Story maps="<<map_count<<" Randall timer="<<randall_timer
                      <<" Shy timer="<<shy_timer<<" pattern="<<shy_pattern<<std::endl;
         }else{
-        // Battlefield's authored versus spawns put P2 on the top platform.
-        // Drop that source Fighter through its pass-through platforms before
-        // checking a horizontal projectile on the main floor.
+        const bool fox_family=fighter_content->fighter_kind==FTKIND_FOX||
+            fighter_content->fighter_kind==FTKIND_FALCO;
+        // Authored versus spawns may put P2 on a platform. Drop that source
+        // Fighter to P1's level before checking their real attack paths.
         for(unsigned n=0;n<180;n++){
             const auto p1=match.player_stats(0),p2=match.player_stats(1);
             if(std::abs(p2.position[1]-p1.position[1])<5.0f)break;
@@ -108,8 +111,9 @@ int main(int argc,char** argv){try{
         }
         raw[0].button=0;
         check(match.player_stats(1).damage_percent>damage,"Selected fighter ground laser did not damage the opponent");
-        std::cout<<fighter_content->name<<" laser damage="<<match.player_stats(1).damage_percent<<std::endl;
-        if(cycle==0){
+        std::cout<<fighter_content->name<<(fox_family?" laser damage=":" neutral-special damage=")
+                 <<match.player_stats(1).damage_percent<<std::endl;
+        if(cycle==0&&fox_family){
             bool jab1=false,jab2=false,rapid=false,rapid_end=false;
             for(unsigned n=0;n<180&&!rapid;n++){
                 raw[0].button=n%2==0?PAD_BUTTON_A:0;tick();
@@ -123,6 +127,20 @@ int main(int argc,char** argv){try{
             }
             check(jab1&&jab2&&rapid&&rapid_end,
                   "Fox-family jab input did not complete source Attack11/12/100 start-loop-end motions");
+        }else if(cycle==0){
+            for(unsigned n=0;n<300;n++){
+                const auto motion=match.player_stats(0).motion_id;
+                if(motion<341||motion>348)break;
+                tick();
+            }
+            bool jab=false;
+            for(unsigned n=0;n<120&&!jab;n++){
+                raw[0].button=n%8==0?PAD_BUTTON_A:0;tick();
+                jab=match.player_stats(0).motion_id==44;
+            }
+            raw[0].button=0;
+            check(jab,"Marth jab did not enter and execute its original Attack11 script");
+            for(unsigned n=0;n<120&&match.player_stats(0).motion_id==44;n++)tick();
         }
         for(unsigned n=0;n<120&&match.player_stats(0).ground_or_air==0;n++){
             raw[0].button=n%8==0?PAD_BUTTON_X:0;tick();
@@ -130,7 +148,7 @@ int main(int argc,char** argv){try{
         raw[0].button=0;
         check(match.player_stats(0).ground_or_air==1,"Selected fighter did not jump");
         for(unsigned n=0;n<100;n++){raw[0].button=n<20?PAD_BUTTON_B:0;tick();}
-        if(cycle==0){
+        if(cycle==0&&fox_family){
             for(unsigned n=0;n<300&&match.player_stats(0).ground_or_air!=0;n++)tick();
             check(match.player_stats(0).ground_or_air==0,"Selected fighter did not land after the air laser");
             bool reflector=false;
@@ -179,6 +197,51 @@ int main(int argc,char** argv){try{
                   "Up special did not reach its original Fire Fox launch motion");
             check(fire_bird_finished,
                   "Up special did not finish its original Fire Fox launch sequence");
+        }else if(cycle==0){
+            raw[0].button=0;raw[0].stickX=raw[0].stickY=0;
+            for(unsigned n=0;n<420;n++){
+                const auto state=match.player_stats(0);
+                if(state.ground_or_air==0&&(state.motion_id<341||state.motion_id>372))break;
+                tick();
+            }
+            check(match.player_stats(0).ground_or_air==0,
+                  "Marth did not land after the aerial neutral special");
+            bool dancing_blade=false,dancing_blade_chain=false;
+            for(unsigned n=0;n<180&&!dancing_blade_chain;n++){
+                raw[0].stickX=80;raw[0].button=n%7==0?PAD_BUTTON_B:0;tick();
+                const auto motion=match.player_stats(0).motion_id;
+                dancing_blade|=motion==349;
+                dancing_blade_chain|=motion>=350&&motion<=357;
+            }
+            raw[0].stickX=0;raw[0].button=0;
+            check(dancing_blade&&dancing_blade_chain,
+                  "Marth Dancing Blade did not enter and chain its original source states");
+            for(unsigned n=0;n<300;n++){
+                const auto motion=match.player_stats(0).motion_id;
+                if(motion<349||motion>366)break;
+                tick();
+            }
+            bool dolphin_slash=false;
+            for(unsigned n=0;n<120&&!dolphin_slash;n++){
+                raw[0].stickY=80;raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
+                const auto motion=match.player_stats(0).motion_id;
+                dolphin_slash=motion==367||motion==368;
+            }
+            raw[0].stickY=0;raw[0].button=0;
+            check(dolphin_slash,"Marth Dolphin Slash did not enter its original source state");
+            for(unsigned n=0;n<420;n++){
+                const auto state=match.player_stats(0);
+                if(state.ground_or_air==0&&(state.motion_id<341||state.motion_id>372))break;
+                tick();
+            }
+            check(match.player_stats(0).ground_or_air==0,"Marth did not land after Dolphin Slash");
+            bool counter=false;
+            for(unsigned n=0;n<120&&!counter;n++){
+                raw[0].stickY=-80;raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
+                counter=match.player_stats(0).motion_id==369;
+            }
+            raw[0].stickY=0;raw[0].button=0;
+            check(counter,"Marth Counter did not enter its original source state");
         }
         }
         raw[0].button=PAD_BUTTON_START;tick();raw[0].button=0;

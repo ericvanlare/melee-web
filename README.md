@@ -29,13 +29,14 @@ preparation separately from live callbacks. The scoped
 [scene-entry profile](work/scene-entry-profile.md) records the measured phases;
 it is not cold-cache or full-match performance acceptance.
 
-Typed source-content rows and runtime manifests now include Falco, Fox,
-Battlefield and Yoshi's Story, with focused development traces for their source
-identity, costumes, effects and stage data. Fox and Yoshi's Story pass the
-integrated source match lifecycle, including Fox's specials and dynamics plus
-Randall and Shy Guy creation. A Release browser run selected Fox through the
-original CSS, selected Yoshi's Story through the original SSS and rendered the
-source match; uninterrupted audio inspection remains open.
+Typed source-content rows and runtime manifests now include Falco, Fox, Marth,
+Battlefield, Yoshi's Story and Dream Land, with focused development traces for
+their source identity, costumes, effects and stage data. Their integrated source
+match lifecycles cover every admitted costume and stage, representative special
+and common actions, dynamic stage objects, and repeated teardown. Release browser
+runs selected Fox on Yoshi's Story and Marth on Dream Land through the original
+CSS/SSS and rendered the source matches; uninterrupted audio inspection remains
+open.
 A raw-PAD browser run selected P1 Falco and P2
 Mario on Battlefield through the original CSS/SSS and visibly rendered both
 fighters, the stage and their distinct four-stock icons. The native loop also
@@ -59,7 +60,8 @@ original in-game CSS. The accepted first-deliverable slice supports two Marios,
 four stocks and Final Destination through original CSS/SSS transitions, fighter
 entrances, Ready/Go, gameplay HUD, pause/resume and GAME! ending. It returns
 directly to original CSS after the source exit request; Results is deliberately
-skipped. The runtime now also admits Falco, Fox, Battlefield and Yoshi's Story,
+skipped. The runtime now also admits Falco, Fox, Marth, Battlefield, Yoshi's
+Story and Dream Land,
 with the narrower browser/native-loop evidence described above. All roster unlocks
 are enabled separately from availability.
 

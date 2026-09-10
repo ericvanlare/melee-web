@@ -112,6 +112,9 @@ DatNativeJoint::DatNativeJoint(std::shared_ptr<const DatArchive> archive, uint32
             s.envelopes.at(id).push_back({e.influences.data(), uint32_t(e.influences.size())});
         out.envelopes = s.envelopes.at(id).data();
         out.envelope_count = uint32_t(s.envelopes.at(id).size());
+        out.has_shared_joint = mesh.shared_joint_offset.has_value();
+        if (out.has_shared_joint)
+            out.shared_joint = joint_ids.at(*mesh.shared_joint_offset);
         if (mesh.shape) {
             s.shape_vertex_lists.push_back(mesh.shape->vertex_index_lists);
             s.shape_normal_lists.push_back(mesh.shape->normal_index_lists);

@@ -93,14 +93,21 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
     mesh.descriptor_offset = offset;
     mesh.flags = a.be16(offset + 12);
     const bool shape_animation = (mesh.flags & 0x3000U) == 0x1000U;
-    // Bit zero is retained source metadata; HSD's primitive and setup paths
-    // ignore it. The type field selects rigid skin (0), shape animation
+    // Bits zero and two are retained source metadata; HSD's primitive and
+    // setup paths ignore them. Dream Land uses bit two on back-face-culled
+    // foliage. The type field selects rigid skin (0), shape animation
     // (0x1000), or envelope (0x2000).
-    if (mesh.flags & ~uint16_t(0xF001)) reject("Unsupported polygon flags or shape animation");
+    if (mesh.flags & ~uint16_t(0xF005)) reject("Unsupported polygon flags or shape animation");
     if ((mesh.flags & 0x3000) == 0x2000)
         envelopes(a, required(a, offset + 20, 4), mesh);
-    else if (!shape_animation)
-        absent(a, offset + 20, "Shared-joint skinning is unsupported");
+    else if (!shape_animation) {
+        const auto shared = a.pointer(offset + 20, 64);
+        if (shared) {
+            if (policy != DatMaterialPolicy::NativeDescriptors)
+                reject("Shared-joint skinning requires the native HSD path");
+            mesh.shared_joint_offset = *shared;
+        }
+    }
     const auto shape_set_offset = shape_animation ? required(a, offset + 20, 28) : 0;
     const auto units = a.be16(offset + 14);
     if (!units) reject("Polygon display list is empty");
@@ -145,8 +152,8 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
         const auto frac = a.range(d + 16, 1)[0];
         const auto stride = a.be16(d + 18);
         if (matrix) {
-            if (mesh.envelopes.empty() || mode != direct || stride != 0)
-                reject("Direct matrix indices require an envelope palette and zero array stride");
+            if ((mesh.envelopes.empty() && !mesh.shared_joint_offset) || mode != direct || stride != 0)
+                reject("Direct matrix indices require an envelope/shared-joint source and zero array stride");
             absent(a, d + 20, "Direct matrix indices cannot reference a vertex array");
             mesh.attributes.push_back({attr, mode, count, type, frac, stride, nullptr, 0});
             continue;
@@ -367,8 +374,11 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
                     reject("Shape display normal index exceeds its blended buffer");
                 if (attr.attr <= 8) {
                     const auto base = attr.attr == 0 ? 0U : 30U;
-                    if (index < base || (index - base) % 3 ||
-                        (index - base) / 3 >= mesh.envelopes.size())
+                    if (mesh.shared_joint_offset) {
+                        if (index != base && index != base + 3U)
+                            reject("Shared-joint vertex matrix index is outside PNMTX0/1");
+                    } else if (index < base || (index - base) % 3 ||
+                               (index - base) / 3 >= mesh.envelopes.size())
                         reject("Vertex matrix index is outside its loaded palette");
                     if (attr.attr == 0) palette_slot = index / 3;
                     continue;
@@ -562,8 +572,11 @@ RigidModel::RigidModel(std::shared_ptr<const DatArchive> source, uint32_t joint_
         // is safe only when neither a selected mesh nor an envelope needs it.
         // Native HSD computes ordinary, vertical, horizontal and rotation billboards.
         // The inspection renderer still rejects that camera-dependent behavior.
+        /* Native displayfunc.c implements perspective billboards as well as
+         * the ordinary/axis/rotation variants. Keep the inspection path
+         * strict because it does not have that camera-dependent transform. */
         const uint32_t allowed = 0x701D01DFu |
-            (materials == DatMaterialPolicy::NativeDescriptors ? 0x4e00u : 0u);
+            (materials == DatMaterialPolicy::NativeDescriptors ? 0x6e00u : 0u);
         if ((node.flags & ~allowed) || (node.flags & 0xe00u)>0x800u) reject("Joint flags require unsupported HSD behavior");
         absent(a, node.descriptor_offset + 60, "Joint references are unsupported");
     }

@@ -99,7 +99,17 @@ struct DatNativeStage::Storage {
     }
     HSD_LightDesc* light(uint32_t o){
         if(lights.contains(o))return lights.at(o);require(lights.size()+active.size()<256,"Native stage light count exceeds budget");record(o,28);require(active.insert(o).second,"Native light descriptor cycle");require(!archive->pointer(o),"Custom native light class unsupported");auto* d=make<HSD_LightDesc>();d->flags=archive->be16(o+8);d->attnflags=archive->be16(o+10);
-        require((d->flags&3)<=1,"Stage point/spot descriptor not implemented");std::memcpy(&d->color,archive->range(o+12,4).data(),4);d->position=world(archive->pointer(o+16,20));d->interest=world(archive->pointer(o+20,20));if(auto p=archive->pointer(o+24,4)){d->u.shininess=make<float>();*d->u.shininess=number(*p);}
+        const unsigned type=d->flags&3;
+        std::memcpy(&d->color,archive->range(o+12,4).data(),4);d->position=world(archive->pointer(o+16,20));d->interest=world(archive->pointer(o+20,20));
+        auto payload=archive->pointer(o+24,4);
+        if(type==1){require(d->position&&payload,"Infinite native stage light lacks position or shininess");d->u.shininess=make<float>();*d->u.shininess=number(*payload);}
+        else if(type==2){require(d->position&&payload,"Point native stage light lacks position or attenuation");
+            if(d->attnflags&1){record(*payload,24);auto* v=make<HSD_LightAttn>();v->a0=number(*payload);v->a1=number(*payload+4);v->a2=number(*payload+8);v->k0=number(*payload+12);v->k1=number(*payload+16);v->k2=number(*payload+20);d->u.attn=v;}
+            else{record(*payload,12);auto* v=make<HSD_LightPointDesc>();v->ref_br=number(*payload);v->ref_dist=number(*payload+4);v->dist_func=archive->be32(*payload+8);require(v->ref_br>=0&&v->ref_dist>=0&&v->dist_func<=3,"Point native stage light attenuation invalid");d->u.point=v;}}
+        else if(type==3){require(d->position&&d->interest&&payload,"Spot native stage light lacks position, interest or attenuation");
+            if(d->attnflags){record(*payload,24);auto* v=make<HSD_LightAttn>();v->a0=number(*payload);v->a1=number(*payload+4);v->a2=number(*payload+8);v->k0=number(*payload+12);v->k1=number(*payload+16);v->k2=number(*payload+20);d->u.attn=v;}
+            else{record(*payload,20);auto* v=make<HSD_LightSpotDesc>();v->cutoff=number(*payload);v->spot_func=archive->be32(*payload+4);v->ref_br=number(*payload+8);v->ref_dist=number(*payload+12);v->dist_func=archive->be32(*payload+16);require(v->cutoff>=0&&v->cutoff<=180&&v->spot_func<=3&&v->ref_br>=0&&v->ref_dist>=0&&v->dist_func<=3,"Spot native stage light attenuation invalid");d->u.spot=v;}}
+        else require(!payload,"Ambient native stage light has an unexpected payload");
         if(auto p=archive->pointer(o+4,28))d->next=light(*p);active.erase(o);lights[o]=d;return d;
     }
     HSD_LightAnim* light_anim(uint32_t o){
@@ -141,7 +151,10 @@ DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive, int st
  for(const auto& e:meta.entries){auto& out=s.map.unk8[e.index];require(bool(e.joint_offset),"Native stage model missing");
   if(e.index==0){out.unk0=static_cast<HSD_Joint*>(melee_web_stage_markers_descriptor(markers));s.joints[*e.joint_offset]=out.unk0;}
   else{
-   auto graph=std::make_unique<DatNativeJoint>(archive,*e.joint_offset);char error[256];auto* native=melee_web_native_joint_hydrate(&graph->graph(),error,sizeof(error));require(native,error);s.native.push_back(native);
+   std::unique_ptr<DatNativeJoint> graph;
+   try { graph=std::make_unique<DatNativeJoint>(archive,*e.joint_offset); }
+   catch(const DatError& error) { throw DatError("Stage map entry "+std::to_string(e.index)+": "+error.what()); }
+   char error[256];auto* native=melee_web_native_joint_hydrate(&graph->graph(),error,sizeof(error));require(native,error);s.native.push_back(native);
    out.unk0=static_cast<HSD_Joint*>(melee_web_native_joint_descriptor(native,error,sizeof(error)));require(out.unk0,error);s.joints[*e.joint_offset]=out.unk0;
    std::vector<void*> native_joint_descriptors(graph->graph().joint_count);
    for(uint32_t i=0;i<graph->graph().joint_count;i++){

@@ -22,15 +22,17 @@ class ContentMatchTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, (result.stdout + result.stderr)[-6000:])
         self.assertIn(expected, result.stdout)
 
-    def test_falco_fox_and_yoshis_story_source_lifecycles(self):
+    def test_admitted_fighter_and_stage_source_lifecycles(self):
         menu, game = ROOT / "assets-local/native-menus", ROOT / "assets-local/next-gate"
         required = (menu / "MnSlChr.usd", game / "PlFc.dat", game / "PlFx.dat",
                     game / "PlFxAJ.dat", game / "GrNLa.dat", game / "GrNBa.dat",
-                    game / "GrSt.dat")
+                    game / "GrSt.dat", game / "PlMs.dat", game / "PlMsAJ.dat",
+                    game / "GrOp.dat")
         if not all(path.is_file() for path in required):
             self.skipTest("Owned menu, Fox/Falco and stage fixtures are required")
         cases = ((32, 20, 8), (31, 20, 8), (32, 2, 8), (31, 2, 8),
-                 (8, 20, 8), (8, 2, 8), (32, 2, 20))
+                 (8, 20, 8), (8, 2, 8), (32, 2, 20),
+                 (28, 20, 8), (28, 9, 8))
         for stage, fighter, opponent in cases:
             with self.subTest(stage=stage, fighter=fighter, opponent=opponent):
                 self.run_trace("gameplay_content_match_trace",

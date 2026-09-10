@@ -5523,3 +5523,24 @@ diff --git a/src/melee/gm/gmvsmelee.c b/src/melee/gm/gmvsmelee.c
  void gmVsMelee_ExitVs(GameModeState* state, u8 id0, u8 id1)
  {
      MatchExitInfo* exit = gm_GetGameModeStateExitData(state);
+diff --git a/src/melee/gr/groldpupupu.c b/src/melee/gr/groldpupupu.c
+--- a/src/melee/gr/groldpupupu.c
++++ b/src/melee/gr/groldpupupu.c
+@@ -42,6 +42,17 @@ struct grOldpupupu_YakumonoParam {
+ 
+ static struct grOldpupupu_YakumonoParam* yakumono_param;
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++/* The browser owns this decoded stage-specific scalar block and restores the
++ * previous source pointer after all Dream Land map objects are destroyed. */
++void* melee_web_groldpupupu_exchange_yakumono(void* value)
++{
++    void* previous = yakumono_param;
++    yakumono_param = value;
++    return previous;
++}
++#endif
++
+ static void* grOp_804D6A9C;
+ 
+ static int grOp_804D48A0[1][2] = { { 4, 0 } };

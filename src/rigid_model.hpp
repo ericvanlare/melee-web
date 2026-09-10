@@ -44,6 +44,9 @@ struct RigidMesh {
     uint32_t display_bytes = 0;
     uint16_t flags = 0;
     std::optional<RigidShape> shape;
+    /* POBJ_SKIN source joint identity; resolved by the native descriptor
+     * owner after the complete joint preorder is known. */
+    std::optional<uint32_t> shared_joint_offset;
     std::vector<RigidEnvelope> envelopes; // Original ordered GX matrix palette.
     uint16_t palette_used_mask = 0;
     // Local submitted-position bounds for each referenced PN matrix slot.
@@ -54,7 +57,7 @@ struct RigidMesh {
 // CPU-only decoded static graph. Archive-backed geometry/texture spans remain
 // immutable; GPU resources and source HSD transform state belong to the renderer.
 // Envelope weights and inverse binds stay unchanged for original HSD skinning.
-// Shape animation, shared-joint skinning and unsupported material modes reject.
+// Shape animation and unsupported material modes reject.
 class RigidModel {
 public:
     RigidModel(std::shared_ptr<const DatArchive> archive, const std::string& symbol);

@@ -207,6 +207,54 @@
     X(0x0cc, F32, reflector_speed_multiplier, xB0_FOX_REFLECTOR_REFLECTION.x1C_speed_mul) \
     X(0x0d0, U8, reflector_behavior, xB0_FOX_REFLECTOR_REFLECTION.x20_behavior)
 
+/* Exact MarsAttributes layout from ftMars/types.h. Marth and Roy share this
+ * source ABI, while their DAT values and source callbacks remain distinct. */
+#define MELEE_WEB_MARS_ATTRIBUTE_FIELDS(X) \
+    X(0x000, I32, x0, x0) \
+    X(0x004, I32, x4, x4) \
+    X(0x008, I32, x8, x8) \
+    X(0x00c, F32, specialn_friction, specialn_friction) \
+    X(0x010, F32, specialn_start_friction, specialn_start_friction) \
+    X(0x014, F32, x14, x14) \
+    X(0x018, F32, x18, x18) \
+    X(0x01c, F32, x1C, x1C) \
+    X(0x020, F32, x20, x20) \
+    X(0x024, F32, x24, x24) \
+    X(0x028, F32, x28, x28) \
+    X(0x02c, F32, x2C, x2C) \
+    X(0x030, F32, x30, x30) \
+    X(0x034, F32, x34, x34) \
+    X(0x038, F32, x38, x38) \
+    X(0x03c, F32, x3C, x3C) \
+    X(0x040, F32, x40, x40) \
+    X(0x044, F32, x44, x44) \
+    X(0x048, F32, x48, x48) \
+    X(0x04c, F32, x4C, x4C) \
+    X(0x050, F32, x50, x50) \
+    X(0x054, F32, x54, x54) \
+    X(0x058, F32, x58, x58) \
+    X(0x05c, F32, x5C, x5C) \
+    X(0x060, F32, x60, x60) \
+    X(0x064, I32, absorb_bone, x64.x0_bone_id) \
+    X(0x068, F32, absorb_offset_x, x64.x4_offset.x) \
+    X(0x06c, F32, absorb_offset_y, x64.x4_offset.y) \
+    X(0x070, F32, absorb_offset_z, x64.x4_offset.z) \
+    X(0x074, F32, absorb_size, x64.x10_size) \
+    X(0x078, F32, sword_x0, x78.x0) \
+    X(0x07c, F32, sword_x4, x78.x4) \
+    X(0x080, U8, sword_x8, x78.x8) \
+    X(0x081, U8, sword_x9, x78.x9) \
+    X(0x082, U8, sword_xA, x78.xA) \
+    X(0x083, U8, sword_xB, x78.xB) \
+    X(0x084, U8, sword_xC, x78.xC) \
+    X(0x085, U8, sword_xD, x78.xD) \
+    X(0x086, U8, sword_xE, x78.xE) \
+    X(0x087, U8, sword_xF, x78.xF) \
+    X(0x088, U8, sword_x10, x78.x10) \
+    X(0x08c, I32, sword_x14, x78.x14) \
+    X(0x090, F32, sword_x18, x78.x18) \
+    X(0x094, F32, sword_x1C, x78.x1C)
+
 #define MELEE_WEB_PICKUP_ATTRIBUTE_FIELDS(X) \
     X(0x000, F32, gr_light_offset_x, gr_light_offset.x) \
     X(0x004, F32, gr_light_offset_y, gr_light_offset.y) \
@@ -233,6 +281,9 @@ typedef struct MeleeWebFoxAttributes {
     MELEE_WEB_FOX_ATTRIBUTE_FIELDS(MELEE_WEB_DECLARE_ATTRIBUTE)
     uint8_t reserved[3];
 } MeleeWebFoxAttributes;
+typedef struct MeleeWebMarsAttributes {
+    MELEE_WEB_MARS_ATTRIBUTE_FIELDS(MELEE_WEB_DECLARE_ATTRIBUTE)
+} MeleeWebMarsAttributes;
 typedef struct MeleeWebItemPickup {
     MELEE_WEB_PICKUP_ATTRIBUTE_FIELDS(MELEE_WEB_DECLARE_ATTRIBUTE)
 } MeleeWebItemPickup;

@@ -31,7 +31,8 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
 {
     const bool mario = costume.fighter_kind == 0;
     const bool fox_family = costume.fighter_kind == 1 || costume.fighter_kind == 22;
-    require(mario || fox_family, "Native action store has no checked fighter command schema for this kind");
+    const bool mars = costume.fighter_kind == 18;
+    require(mario || fox_family || mars, "Native action store has no checked fighter command schema for this kind");
     std::vector<DatCommandRoot> roots;
     // Explicit source ftCo submotion groups. This certifies command operand
     // graphs only, not readiness of every original world service they invoke.
@@ -45,7 +46,7 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     group(242,258);group(262,265);                // grab, pummel, throws and Mario capture reactions
     group(286,291);                              // shield-break knockdown
     if (mario) group(295,302);                   // Mario special scripts; Article creation remains a service gate
-    else group(295,326);                         // Fox/Falco specials, including laser, illusion and recovery
+    else group(295,326);                         // Fox/Falco/Marth source special command rows
     for (auto choice : runtime_->wait_choices()) command_motions_.insert(choice.motion_id);
     for (auto id : command_motions_) {
         const auto& action = runtime_->action(id);

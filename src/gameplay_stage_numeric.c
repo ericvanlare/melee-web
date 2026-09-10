@@ -53,7 +53,10 @@ MeleeWebStageMarkers* melee_web_stage_markers_decode(const MeleeWebNativeDat* r,
         REQUIRE(index<m->joint_count&&id<261&&!seen[id],"Invalid or duplicate marker binding");
         seen[id]=1;m->pairs[i][0]=index;m->pairs[i][1]=id;
     }
-    for(unsigned i=0;i<8;i++)REQUIRE(seen[i],"Missing source player marker");
+    /* All versus stages require four authored player starts. Additional marker
+     * IDs are stage-specific; Dream Land ends at ID 4 while modern stages may
+     * carry alternate/team starts through ID 7. */
+    for(unsigned i=0;i<4;i++)REQUIRE(seen[i],"Missing source player marker");
     for(unsigned i=148;i<=152;i++)REQUIRE(seen[i],"Missing source camera or blast marker");
     return m;
 }

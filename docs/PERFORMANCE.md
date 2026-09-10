@@ -50,8 +50,8 @@ while an asynchronous pipeline is actually queued.
 
 `web/initial_pipeline_cache.db.gz.b64` is a reviewed Aurora cache seed captured
 from the Release browser runtime after the original CSS, SSS, Yoshi's Story,
-Battlefield, stock-loss/respawn, and Fox first-use paths had rendered. It
-contains one shader record and 283 pipeline descriptors. It contains no
+Battlefield, Dream Land, stock-loss/respawn, Fox first-use, and Marth first-use
+paths had rendered. It contains one shader record and 330 pipeline descriptors. It contains no
 textures, models, audio, or other disc bytes.
 `scripts/materialize_pipeline_cache.py` verifies its SHA-256 digest and
 materializes it for Emscripten's `/initial_pipeline_cache.db` preload.
@@ -117,6 +117,15 @@ Fox/Yoshi's Story entry, intro rendering, stock paths and a complete vertical
 Fire Fox. The source database contained one shader and 283 unique pipeline
 descriptors. This broadens first-use coverage; it does not prove that all Fox
 motions, effects, costumes, opponents or stages are covered.
+
+The 330-pipeline seed adds the descriptors discovered by Marth-versus-Mario on
+Dream Land, including the unchanged intro, jab, special, aerial, and movement
+draw paths. On the
+expanded origin cache, the repeated match preparation took 237.06 ms, including
+125.88 ms of source-owner construction, and its first draw took 3.93 ms with no
+new pipeline creation. A later Marth draw exposed the retail no-op
+`GXSetTevClampMode`; the browser bridge now matches GALE01's four-byte return
+instead of applying the assertion found in the SDK source drop.
 
 Browser interval accounting now records the callback that detects a timing
 stall using the running state at callback entry. Previously that callback set

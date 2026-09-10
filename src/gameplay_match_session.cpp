@@ -75,6 +75,7 @@ struct GameplayMatchSession::Storage {
                 if(fighter_banks.insert(dependency->audio_bank).second)
                     bank_names.emplace_back(dependency->audio_bank);
             }
+            if(stage->audio_bank)bank_names.emplace_back(stage->audio_bank);
             if(runtime_cache){
                 std::vector<std::shared_ptr<const DatAudioBank>> decoded;
                 decoded.reserve(bank_names.size());

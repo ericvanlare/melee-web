@@ -32,6 +32,8 @@ typedef struct MeleeWebNativePObjDesc {
     const MeleeWebSkinEnvelope* envelopes;
     uint32_t envelope_count;
     const MeleeWebNativeShapeDesc* shape;
+    uint32_t shared_joint;
+    uint8_t has_shared_joint;
 } MeleeWebNativePObjDesc;
 typedef struct MeleeWebNativeTextureDesc {
     MeleeWebHsdTextureDesc texture;

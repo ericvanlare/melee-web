@@ -37,8 +37,8 @@ struct DatFighterDynamics {
     std::uint32_t descriptor_offset;
     std::vector<DatFighterDynamicsBone> bones;
     std::vector<DatFighterDynamicsSphere> spheres;
-    // The source's FigaTree*** annotation is not a proven serialized pointer
-    // graph (the consumer also casts its entries to counts). Not hydrated.
+    // Mars uses this target as five rows of three pointer-width integer chain
+    // cutoffs. Other fighter-specific table schemas remain unadmitted.
     std::optional<std::uint32_t> animation_table_offset;
 };
 
@@ -74,6 +74,7 @@ public:
     // optional is keyed by source kind; it is absent for Mario and for kinds
     // whose extension schema has not been hydrated.
     [[nodiscard]] const std::optional<MeleeWebFoxAttributes>& fox_attributes() const noexcept { return fox_; }
+    [[nodiscard]] const std::optional<MeleeWebMarsAttributes>& mars_attributes() const noexcept { return mars_; }
     [[nodiscard]] std::uint32_t extension_offset() const noexcept { return extension_; }
     [[nodiscard]] const std::vector<DatRuntimeAction>& actions() const noexcept { return actions_; }
     [[nodiscard]] const DatRuntimeAction& action(std::uint32_t motion_id) const;
@@ -93,6 +94,7 @@ private:
     MeleeWebFighterBaseAttributes base_{};
     std::optional<MeleeWebMarioAttributes> mario_;
     std::optional<MeleeWebFoxAttributes> fox_;
+    std::optional<MeleeWebMarsAttributes> mars_;
     std::vector<DatRuntimeAction> actions_;
     std::vector<DatWaitChoice> wait_choices_;
     std::vector<DatFighterHurtbox> hurtboxes_;

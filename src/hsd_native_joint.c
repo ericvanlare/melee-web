@@ -199,8 +199,10 @@ static int validate(const MeleeWebNativeGraph* g, char* error, size_t size)
         if (!valid_index(p->next, g->pobj_count) || !v->attributes || !v->attribute_count ||
             v->attribute_count > 21 || !v->display || !v->display_byte_size ||
             v->display_byte_size % 32 || v->display_byte_size / 32 > UINT16_MAX ||
-            (v->flags & ~0xf001U) || (v->flags & 0x3000U) == 0x3000U || p->envelope_count > 10 ||
+            (v->flags & ~0xf005U) || (v->flags & 0x3000U) == 0x3000U || p->envelope_count > 10 ||
             ((v->flags & 0x3000U) == 0x2000U) != (p->envelope_count != 0) ||
+            (p->has_shared_joint && p->shared_joint >= g->joint_count) ||
+            (p->has_shared_joint && (v->flags & 0x3000U) != POBJ_SKIN) ||
             (p->envelope_count && !p->envelopes))
             return fail(error, size, "Native PObj requires checked rigid/envelope/shape geometry");
         const uint32_t type = v->flags & 0x3000U;
@@ -403,6 +405,8 @@ static MeleeWebNativeJoint* create_joint(const MeleeWebNativeGraph* g, const uin
                     p->envelopes[e][j] = (HSD_EnvelopeDesc) {&h->joints[in->influences[j].joint].desc, in->influences[j].weight};
             }
         }
+        if (s->has_shared_joint)
+            p->desc.u.joint = &h->joints[s->shared_joint].desc;
     }
     for (uint32_t i = 0; i < g->material_count; ++i) {
         const MeleeWebNativeMaterialDesc* s = &g->materials[i]; NativeM* m = &h->materials[i];

@@ -1,7 +1,7 @@
-#include <sysdolphin/baselib/debug.h>
-/* Original SDK GXTev.c unconditionally asserts for this hardware operation. */
+/* GALE01's GXSetTevClampMode is a four-byte return instruction.  The SDK
+ * source assertion is not present in the retail executable, so preserve the
+ * retail no-op instead of introducing a browser-only draw failure. */
 void GXSetTevClampMode(int stage,int mode)
 {
     (void)stage; (void)mode;
-    HSD_Panic(__FILE__,__LINE__,"GXSetTevClampMode: not available on this hardware");
 }

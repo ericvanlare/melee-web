@@ -4,6 +4,7 @@
 #include <melee/ft/types.h>
 #include <melee/ft/kinds/ftMario/types.h>
 #include <melee/ft/kinds/ftFox/types.h>
+#include <melee/ft/kinds/ftMars/types.h>
 #include <sysdolphin/baselib/jobj.h>
 #include <stddef.h>
 #include <math.h>
@@ -70,7 +71,7 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     uint32_t kind,uint32_t costumes,void* actions,void* blends,void* choices,uint32_t* unresolved)
 {
     if (!r || !unresolved) return NULL;
-    REQUIRE(kind==FTKIND_MARIO || kind==FTKIND_FOX || kind==FTKIND_FALCO,
+    REQUIRE(kind==FTKIND_MARIO || kind==FTKIND_FOX || kind==FTKIND_FALCO || kind==FTKIND_MARS,
         "Native fighter extension schema unavailable");
     REQUIRE(costumes>0 && costumes<=16,"Native costume count exceeds checked bound");
     REGION(root,0x60); ftData* d=NEW(ftData,1); *unresolved=0;
@@ -100,6 +101,13 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
         MELEE_WEB_FOX_ATTRIBUTE_FIELDS(FOX)
 #undef FOX
         REQUIRE(fox->xB0_FOX_REFLECTOR_REFLECTION.x0_bone_id<140,"Native reflector bone index invalid");
+    } else if(kind==FTKIND_MARS) {
+        at=required(r,root+4,0x98); MarsAttributes* mars=NEW(MarsAttributes,1); d->ext_attr=mars;
+#define MARS(o,t,n,orig) mars->orig=READ_##t(at+o);
+        MELEE_WEB_MARS_ATTRIBUTE_FIELDS(MARS)
+#undef MARS
+        REQUIRE(mars->x64.x0_bone_id>=0 && mars->x64.x0_bone_id<140 && mars->x64.x10_size>0,
+                "Native Marth counter descriptor invalid");
     } else {
         REQUIRE(0,"Native fighter extension schema unavailable");
     }
@@ -173,7 +181,28 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
         }
     } else REQUIRE(PTR(at+12,1)==UINT32_MAX,
                    "Empty native fighter dynamics has a nonnull auxiliary table");
-    REQUIRE(PTR(at+16,1)==UINT32_MAX,"Native dynamics animation table is not hydrated");
+    uint32_t dynamics_table=PTR(at+16,1);
+    if(dynamics_table!=UINT32_MAX) {
+        /* Marth's five authored dynamics modes each carry one integer chain
+         * cutoff per sword/cape bone. The original field is typed FigaTree***
+         * but ftdynamics.c intentionally compares these pointer-width values
+         * as small integers; preserve that exact ABI without fabricating clips. */
+        REQUIRE(kind==FTKIND_MARS&&d->x2C->dynamicsNum==3,
+                "Native fighter dynamics mode schema unavailable");
+        REGION(dynamics_table,5*4);
+        d->x2C->x10=NEW(FigaTree**,5);
+        for(unsigned mode=0;mode<5;++mode) {
+            uint32_t row=required(r,dynamics_table+mode*4,
+                                  d->x2C->dynamicsNum*4);
+            d->x2C->x10[mode]=NEW(FigaTree*,d->x2C->dynamicsNum);
+            for(int bone=0;bone<d->x2C->dynamicsNum;++bone) {
+                uint32_t cutoff=WORD(row+bone*4);
+                REQUIRE(cutoff<=d->x2C->ftDynamicBones->array[bone].dyn_desc.count,
+                        "Marth dynamics cutoff exceeds its source chain");
+                d->x2C->x10[mode][bone]=(FigaTree*)(uintptr_t)cutoff;
+            }
+        }
+    } else d->x2C->x10=NULL;
     at=required(r,root+0x30,8); d->x30=NEW(struct ftData_x30,1); d->x30->count=(int)WORD(at);
     REQUIRE(d->x30->count>=0 && d->x30->count<=15,"Native hurtbox count exceeds source capacity");
     uint32_t rows=PTR(at+4,d->x30->count?d->x30->count*40:1);
@@ -226,19 +255,26 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     d->x58->x10=BYTE(at+16); d->x58->x11=BYTE(at+17); d->x58->x18=floating(r,at+24);
     REQUIRE(d->x58->x0<140 && d->x58->x1<140 && d->x58->x8<140 && d->x58->x9<140 &&
         d->x58->x10<140 && d->x58->x11<140,"Native IK bone index invalid");
-    at=required(r,root+0x48,16); d->x48_items=NEW(void*,4);
-    for(unsigned i=0;i<4;++i) {
-        uint32_t p=PTR(at+i*4,24), article_unresolved;
-        if(p!=UINT32_MAX) d->x48_items[i]=melee_web_article_decode(r,p,&article_unresolved);
+    d->x48_items=NEW(void*,4);
+    at=PTR(root+0x48,16);
+    if(at!=UINT32_MAX) {
+        REGION(at,16);
+        for(unsigned i=0;i<4;++i) {
+            uint32_t p=PTR(at+i*4,24), article_unresolved;
+            if(p!=UINT32_MAX) d->x48_items[i]=melee_web_article_decode(r,p,&article_unresolved);
+        }
     }
     if(kind==FTKIND_MARIO)
         REQUIRE(d->x48_items[0] && d->x48_items[2],"Mario OnLoad requires fireball and cape Articles");
     else if(kind==FTKIND_FOX)
         REQUIRE(d->x48_items[0] && d->x48_items[1] && d->x48_items[2],
             "Fox OnLoad requires laser, blaster and illusion Articles");
-    else
+    else if(kind==FTKIND_FALCO)
         REQUIRE(kind==FTKIND_FALCO && d->x48_items[0] && d->x48_items[1] && d->x48_items[3],
             "Falco OnLoad requires laser, blaster and Phantasm Articles");
+    else
+        REQUIRE(kind==FTKIND_MARS && at==UINT32_MAX,
+                "Marth source ftData must not invent an Article table");
     const unsigned ready[]={0,1,2,11,12,13,14,15,16,17,18,19,20,21,22};
     for(unsigned i=0;i<sizeof(ready)/sizeof(ready[0]);++i) *unresolved &= ~(1U<<ready[i]);
     if(actions) *unresolved &= ~(1U<<3);
