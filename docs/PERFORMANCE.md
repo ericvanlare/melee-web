@@ -51,7 +51,7 @@ while an asynchronous pipeline is actually queued.
 `web/initial_pipeline_cache.db.gz.b64` is a reviewed Aurora cache seed captured
 from the Release browser runtime after the original CSS, SSS, Yoshi's Story,
 Battlefield, Dream Land, stock-loss/respawn, Fox first-use, and Marth first-use
-paths had rendered. It contains one shader record and 330 pipeline descriptors. It contains no
+paths had rendered. It contains one shader record and 333 pipeline descriptors. It contains no
 textures, models, audio, or other disc bytes.
 `scripts/materialize_pipeline_cache.py` verifies its SHA-256 digest and
 materializes it for Emscripten's `/initial_pipeline_cache.db` preload.
@@ -118,7 +118,7 @@ Fire Fox. The source database contained one shader and 283 unique pipeline
 descriptors. This broadens first-use coverage; it does not prove that all Fox
 motions, effects, costumes, opponents or stages are covered.
 
-The 330-pipeline seed adds the descriptors discovered by Marth-versus-Mario on
+The 333-pipeline seed adds the descriptors discovered by Marth-versus-Mario on
 Dream Land, including the unchanged intro, jab, special, aerial, and movement
 draw paths. On the
 expanded origin cache, the repeated match preparation took 237.06 ms, including
@@ -126,6 +126,18 @@ expanded origin cache, the repeated match preparation took 237.06 ms, including
 new pipeline creation. A later Marth draw exposed the retail no-op
 `GXSetTevClampMode`; the browser bridge now matches GALE01's four-byte return
 instead of applying the assertion found in the SDK source drop.
+
+A later retry selected Marth and Dream Land through the original CSS/SSS. Match
+entry had no queued or newly created pipelines and a 3.85 ms first draw. While
+the canvas was visible but unfocused, the browser missed one 192.16 ms callback;
+the native callback itself took 9.09 ms, and the missed scheduling interval
+caused 86 audio-underrun frames and an automatic pause. After resume and canvas
+focus, a continuous 30-second window advanced 1,842 browser callbacks and 1,851
+source frames with no additional interval above 33.3 ms, no additional audio
+underrun, and no native callback above budget. Record focused state alongside
+visibility for future browser admission runs.
+Three descriptors first seen during that broader action sequence were captured
+after unload and added to the seed.
 
 Browser interval accounting now records the callback that detects a timing
 stall using the running state at callback entry. Previously that callback set

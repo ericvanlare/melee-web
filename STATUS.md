@@ -131,7 +131,7 @@ pass on both admitted stages.
 
 The Release browser now bundles a verified Aurora seed from the original CSS,
 SSS, Battlefield, Yoshi's Story, Dream Land, stock/respawn, Fox and Marth
-first-use routes: one shader record and 330 pipeline descriptors. The seed
+first-use routes: one shader record and 333 pipeline descriptors. The seed
 contains no disc assets.
 Aurora merges it into the optional origin cache. Newly discovered pipelines
 remain dirty until native teardown, when **Unload** or application reload
@@ -150,6 +150,18 @@ was 4.04 ms with no new pipelines. Representative combat and movement stayed
 below the 33.3 ms native callback budget. Computer-control operations produced
 browser callback gaps and audio underruns, so that run is graphics/source timing
 evidence rather than uninterrupted browser/audio acceptance.
+
+A focused follow-up run repeated the original CSS/SSS route and entered Marth
+versus Mario on Dream Land with zero queued or created pipelines at match entry
+and a 3.85 ms first draw. An unfocused interval first recorded one 192.16 ms
+browser scheduling gap while the corresponding native callback took 9.09 ms;
+that gap caused 86 audio-underrun frames and the expected automatic pause. After
+resume and canvas focus, a continuous 30-second window advanced 1,842 browser
+callbacks and 1,851 source frames without increasing either the hitch count or
+the underrun count. This is a focused-window pass; longer audible play and the
+replacement DSP-coefficient gap remain outside audio-equivalence acceptance.
+The representative action sequence added three late pipeline descriptors; they
+are included in the 333-descriptor seed rather than deferred to live play.
 
 A correlated Battlefield cold-entry probe measured fresh application
 construction at 182.380 ms, the preparation boundary at 200.095 ms and first
