@@ -168,6 +168,12 @@ class LockTests(unittest.TestCase):
         lock = copy.deepcopy(self.lock)
         lock["python_build_packages"] = ["cmake>=3"]
         invalid.append(lock)
+        lock = copy.deepcopy(self.lock)
+        lock["reference_tools"]["slippi-js"]["commit"] = "main"
+        invalid.append(lock)
+        lock = copy.deepcopy(self.lock)
+        lock["reference_tools"]["slippi-js"]["version"] = "latest"
+        invalid.append(lock)
         for lock in invalid:
             with self.subTest(lock=lock), self.assertRaises(ValueError):
                 self.read(lock)

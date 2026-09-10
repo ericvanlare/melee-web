@@ -116,6 +116,28 @@ retail comparisons in
 [PERFORMANCE_AND_ACCURACY.md](PERFORMANCE_AND_ACCURACY.md) before admitting a
 fighter/stage pair or a shared runtime optimization.
 
+## Slippi corpus ingestion
+
+Index replay inputs before using them as gameplay or performance evidence:
+
+```sh
+python3 scripts/index_slippi.py /path/to/replays \
+  --output work/slippi/manifest.json
+```
+
+The indexer reads the versioned Game Start event, hashes and deduplicates files,
+retains the original Game Info Block and RNG, and reports controller fixes, PAL,
+Frozen Stadium, scene kind and physical-input field availability. It does not
+copy paths, player names, connect codes or replay bytes into the manifest.
+Malformed and incomplete files remain explicit errors and make the command fail.
+
+`vanilla_profile_candidate` is only a format-level intake decision. It does not
+establish retail equivalence, content support or replay success. Older files
+marked `processed_only` can supply scoped post-input and browser-performance
+evidence, but cannot receive raw-controller credit. Follow
+[SLIPPI_REPLAY_VALIDATION.md](SLIPPI_REPLAY_VALIDATION.md) and the measured
+[corpus audit](SLIPPI_CORPUS_AUDIT.md) for the downstream gates.
+
 This currently has no automated GPU screenshot comparison. The CI workflow
 checks tests and compilation, while the smoke test exercises the real browser.
 Add a reference-image test when the first real asset scene is stable; future

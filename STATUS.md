@@ -14,6 +14,21 @@ The combined [performance and accuracy playbook](docs/PERFORMANCE_AND_ACCURACY.m
 defines the evidence levels, content admission workflow and failure-response
 process used from this point forward.
 
+Slippi replay validation is now the planned scalable gameplay workload. The
+first ingestion slice adds a streaming, version-aware Game Start decoder and a
+privacy-minimized local corpus indexer. It hashes and deduplicates replays,
+preserves the exact Game Info Block and initial RNG, and classifies UCF, PAL,
+Frozen Stadium, online scene and raw-controller-field availability without
+copying player names or paths. Synthetic negative/deduplication tests pass, and
+the decoder was checked against an official UCF-off 1.7.1 fixture plus a real
+UCF 2.0.1 tournament file. This is intake evidence only; normalized per-frame
+input/state replay and source-match comparison are the next slice. The public
+tournament corpus audit found 6,813 supported cross-character/stage games but
+zero UCF-off files in a 952-file sample, so it is accepted for performance and
+scoped post-input coverage rather than vanilla equivalence. See the
+[replay architecture](docs/SLIPPI_REPLAY_VALIDATION.md) and
+[corpus audit](docs/SLIPPI_CORPUS_AUDIT.md).
+
 The typed content path now carries Falco, Fox, Marth, Battlefield, Yoshi's Story and Dream Land
 source IDs, runtime manifests and focused development traces. Source stock icon IDs are
 selected from the typed character/fighter identity rows. In a fresh Release

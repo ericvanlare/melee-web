@@ -43,6 +43,20 @@ def read_lock(root=ROOT):
         for package in packages
     ):
         raise ValueError("Python build packages must use exact name==version pins")
+    reference_tools = lock.get("reference_tools", {})
+    if not isinstance(reference_tools, dict):
+        raise ValueError("Reference tools must be an object")
+    for name, spec in reference_tools.items():
+        if not re.fullmatch(r"[a-z][a-z0-9_-]*", name):
+            raise ValueError(f"Invalid reference tool name: {name}")
+        if not isinstance(spec, dict) or not isinstance(spec.get("url"), str):
+            raise ValueError(f"{name}: missing reference tool URL")
+        if not re.fullmatch(r"[0-9a-f]{40}", str(spec.get("commit", ""))):
+            raise ValueError(f"{name}: reference tool commit must be a full lowercase Git SHA-1")
+        if not isinstance(spec.get("package"), str) or not spec["package"]:
+            raise ValueError(f"{name}: missing reference package name")
+        if not re.fullmatch(r"\d+\.\d+\.\d+", str(spec.get("version", ""))):
+            raise ValueError(f"{name}: reference package must use an exact version")
     return lock
 
 
