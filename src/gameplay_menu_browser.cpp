@@ -1,6 +1,8 @@
 #include "gameplay_menu_world.hpp"
 #include "gameplay_menu_host.h"
 #include "gameplay_match_session.hpp"
+#include "../tests/native_menu_fighter_input.h"
+#include "../tests/native_menu_stage_input.h"
 #include "gameplay_audio_stream.h"
 #include "runtime_archive_cache.hpp"
 #include "gameplay_content.h"
@@ -218,8 +220,18 @@ void advance(){
 
 bool advance_match_construction(){
  const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
- const bool complete=match->advance_construction();const double finished=emscripten_get_now();
- report_construction(complete?"match-enter":"match-enter-step",started,finished,finished,
+ const bool complete=match->advance_construction();
+ if(complete){
+  // Emscripten grows linear memory by replacing the ArrayBuffer, which can
+  // suspend the browser long enough to trip the source timing guard. Force
+  // action/effect allocation headroom while the source clock is stopped.
+  constexpr std::size_t kLiveMatchHeadroom=192U*1024U*1024U;
+  auto* reserve=static_cast<volatile unsigned char*>(std::malloc(kLiveMatchHeadroom));
+  if(!reserve)throw std::runtime_error("Unable to reserve live-match WebAssembly heap headroom");
+  reserve[0]=0;reserve[kLiveMatchHeadroom-1]=0;std::free(const_cast<unsigned char*>(reserve));
+ }
+ const double reserved=emscripten_get_now();
+ report_construction(complete?"match-enter":"match-enter-step",started,reserved,reserved,
                      before,aurora_stats_snapshot());
  if(complete){first_use_draw_pending=true;running=true;message=match_message;}
  return complete;
@@ -491,15 +503,56 @@ void melee_web_native_menu_confirm_check(){
  if((host_entered||match)&&!faulted&&!preparation.busy()&&!pending&&stock_check!=-1&&diagnostic_pad_remaining==0)
   diagnostic_start_ticks=3;
 }
-int melee_web_native_menu_pad_sample(unsigned port,unsigned buttons,int stick_x,int stick_y,unsigned duration){try{
+int melee_web_native_menu_pad_sample_full(unsigned port,unsigned buttons,int stick_x,int stick_y,
+                                          int cstick_x,int cstick_y,unsigned trigger_l,
+                                          unsigned trigger_r,unsigned duration){try{
  if(faulted||preparation.busy()||pending||stock_check==-1||diagnostic_start_ticks!=0||!running||(!host_entered&&!match))
   throw std::runtime_error("Raw PAD samples require an active, non-diagnostic scene");
- if(port>1||buttons>0xffffU||(buttons&~kDiagnosticPadButtons)||stick_x<-80||stick_x>80||stick_y<-80||stick_y>80||duration<1||duration>120)
+ if(port>1||buttons>0xffffU||(buttons&~kDiagnosticPadButtons)||stick_x<-80||stick_x>80||stick_y<-80||stick_y>80||
+    cstick_x<-80||cstick_x>80||cstick_y<-80||cstick_y>80||trigger_l>255||trigger_r>255||duration<1||duration>120)
   throw std::runtime_error("Raw PAD sample is outside the supported port, button, axis or duration bounds");
  if(diagnostic_pad_remaining)throw std::runtime_error("A raw PAD sample is already queued");
  diagnostic_pad={};diagnostic_pad.err=PAD_ERR_NONE;diagnostic_pad.button=static_cast<u16>(buttons);
  diagnostic_pad.stickX=static_cast<s8>(stick_x);diagnostic_pad.stickY=static_cast<s8>(stick_y);
+ diagnostic_pad.substickX=static_cast<s8>(cstick_x);diagnostic_pad.substickY=static_cast<s8>(cstick_y);
+ diagnostic_pad.triggerLeft=static_cast<u8>(trigger_l);diagnostic_pad.triggerRight=static_cast<u8>(trigger_r);
  diagnostic_pad_port=port;diagnostic_pad_remaining=duration;message="Raw PAD sample queued at the next source tick.";return 1;
+}catch(const std::exception& e){message=e.what();return 0;}}
+int melee_web_native_menu_pad_sample(unsigned port,unsigned buttons,int stick_x,int stick_y,unsigned duration){
+ return melee_web_native_menu_pad_sample_full(port,buttons,stick_x,stick_y,0,0,0,0,duration);
+}
+int melee_web_native_menu_player_state(unsigned player,int* fighter_kind,int* motion_id,
+                                       int* ground_or_air,unsigned* source_frame,
+                                       float* position_x,float* position_y){try{
+ if(!fighter_kind||!motion_id||!ground_or_air||!source_frame||!position_x||!position_y||
+    player>1||!match||!match->ready())
+  throw std::runtime_error("Player state requires a ready source match and valid output storage");
+ const auto stats=match->player_stats(player);*fighter_kind=match->fighter_kind(player);
+ *motion_id=stats.motion_id;*ground_or_air=stats.ground_or_air;*source_frame=match->source_frames();
+ *position_x=stats.position[0];*position_y=stats.position[1];return 1;
+}catch(const std::exception& e){message=e.what();return 0;}}
+int melee_web_native_menu_drive_fighter(int character_kind){try{
+ if(!host||melee_web_menu_host_phase(host)!=1)throw std::runtime_error("Fighter selection drive requires the original CSS");
+ MeleeWebFighterInputObservation observed{};check(melee_web_fighter_input_observe(character_kind,&observed),"CSS target observation is unavailable");
+ PADStatus raw[PAD_MAX_CONTROLLERS]{};const int state=melee_web_fighter_input_drive(raw,&observed,character_kind);
+ check(state!=MELEE_WEB_FIGHTER_INPUT_INVALID,"CSS target observation is invalid");
+ if(state==MELEE_WEB_FIGHTER_INPUT_ALREADY_SELECTED)return 2;
+ if(state==MELEE_WEB_FIGHTER_INPUT_PICKUP_READY||state==MELEE_WEB_FIGHTER_INPUT_TARGET_READY)
+  check(melee_web_fighter_input_button(raw,PAD_BUTTON_A),"CSS target button sample failed");
+ check(melee_web_native_menu_pad_sample_full(observed.cursor_port,raw[observed.cursor_port].button,
+       raw[observed.cursor_port].stickX,raw[observed.cursor_port].stickY,
+       raw[observed.cursor_port].substickX,raw[observed.cursor_port].substickY,
+       raw[observed.cursor_port].triggerLeft,raw[observed.cursor_port].triggerRight,1),message.c_str());
+ return 1;
+}catch(const std::exception& e){message=e.what();return 0;}}
+int melee_web_native_menu_drive_stage(int stage_kind){try{
+ if(!host||melee_web_menu_host_phase(host)!=3)throw std::runtime_error("Stage selection drive requires the original SSS");
+ MeleeWebStageInputObservation observed{};check(melee_web_stage_input_observe(stage_kind,&observed),"SSS target observation is unavailable");
+ PADStatus raw[PAD_MAX_CONTROLLERS]{};const int state=melee_web_stage_input_drive(raw,&observed,stage_kind);
+ check(state!=MELEE_WEB_STAGE_INPUT_INVALID,"SSS target observation is invalid");if(state==MELEE_WEB_STAGE_INPUT_AT_TARGET)return 2;
+ check(melee_web_native_menu_pad_sample_full(0,raw[0].button,raw[0].stickX,raw[0].stickY,
+       raw[0].substickX,raw[0].substickY,raw[0].triggerLeft,raw[0].triggerRight,1),message.c_str());
+ return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
 int melee_web_native_menu_stock_check_ready(){
  return match&&!faulted&&running&&match->ready()&&!match->paused()&&

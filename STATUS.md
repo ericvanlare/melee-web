@@ -40,9 +40,10 @@ bank are pinned by owned-asset tests. The integrated trace executes jab, Shield
 Breaker, Dancing Blade, Dolphin Slash, Counter and an aerial across all admitted
 stages and repeats teardown. Dream Land pins eight source map objects, its joint
 and material animation consumers, collision, lights, shadows, flagged objects,
-and exact bird/tree/wind/blink parameters. The Release browser selected this
-pair through the original CSS/SSS and exercised those actions plus five
-wavedashes. See [Marth's notes](docs/MARTH_PORT_NOTES.md) and
+and exact bird/tree/wind/blink parameters. The Release browser selects this pair
+through the original CSS/SSS and runs a versioned 46-case inventory covering
+grounded normals, shield/roll/dodge/grab, aerials, twenty wavedashes and all four
+Marth special families. See [Marth's notes](docs/MARTH_PORT_NOTES.md) and
 [Dream Land's notes](docs/DREAM_LAND_PORT_NOTES.md).
 
 The active first deliverable is **original in-game CSS → original in-game SSS
@@ -86,8 +87,8 @@ The expanded native menu trace selects Mario/Falco through raw PAD, enters SSS,
 and completes a four-stock match back to CSS twice on both Final Destination and
 Battlefield. The content trace repeats all four stages with every Falco, Fox and
 Marth costume. It exercises the Fox-family laser, Reflector, side-special,
-up-special and complete jab/rapid-jab action families plus Marth's representative
-action set, pause and No Contest. It also checks Yoshi's Story's Randall/Shy Guy
+up-special and complete jab/rapid-jab action families plus Marth's admitted
+special/action set, pause and No Contest. It also checks Yoshi's Story's Randall/Shy Guy
 lifecycle, Dream Land's eight-map lifecycle, and teardown before the next cycle.
 Fox's Fire Fox launch now admits source command 38 through its recovered
 seven-byte skip handler, and the trace requires the full charge, launch and exit
@@ -131,7 +132,7 @@ pass on both admitted stages.
 
 The Release browser now bundles a verified Aurora seed from the original CSS,
 SSS, Battlefield, Yoshi's Story, Dream Land, stock/respawn, Fox and Marth
-first-use routes: one shader record and 333 pipeline descriptors. The seed
+first-use routes: one shader record and 344 pipeline descriptors. The seed
 contains no disc assets.
 Aurora merges it into the optional origin cache. Newly discovered pipelines
 remain dirty until native teardown, when **Unload** or application reload
@@ -144,24 +145,37 @@ again created no pipelines; Yoshi's Story match preparation measured 808.41 ms
 active callback was 16.89 ms and none exceeded 33.3 ms. The cold preparation
 delay remains open. See [browser performance work](docs/PERFORMANCE.md).
 
-With the expanded cache already present, Marth/Dream Land match preparation
-measured 187.25 ms, including 98.28 ms of source-owner construction; first draw
-was 4.04 ms with no new pipelines. Representative combat and movement stayed
-below the 33.3 ms native callback budget. Computer-control operations produced
-browser callback gaps and audio underruns, so that run is graphics/source timing
-evidence rather than uninterrupted browser/audio acceptance.
+The earlier representative Marth/Dream Land samples did not establish browser
+admission. The new in-page `marth-visible-actions-v1` gate uses the strict raw-PAD
+queue and expected source motion IDs for 46 cases: every normal and defense
+option, all aerials, air dodge, ten wavedashes in both directions, all four Marth
+special families, and a Dream Land scheduler window of at least 4,200 frames.
+It exposed and fixed roll's checked source command opcode 31, recenters movement
+through ordinary source input, and reserves 192 MiB of Wasm allocation headroom
+while the source clock is stopped at match preparation so live play cannot pay
+`memory.grow`.
 
-A focused follow-up run repeated the original CSS/SSS route and entered Marth
-versus Mario on Dream Land with zero queued or created pipelines at match entry
-and a 3.85 ms first draw. An unfocused interval first recorded one 192.16 ms
-browser scheduling gap while the corresponding native callback took 9.09 ms;
-that gap caused 86 audio-underrun frames and the expected automatic pause. After
-resume and canvas focus, a continuous 30-second window advanced 1,842 browser
-callbacks and 1,851 source frames without increasing either the hitch count or
-the underrun count. This is a focused-window pass; longer audible play and the
-replacement DSP-coefficient gap remain outside audio-equivalence acceptance.
-The representative action sequence added three late pipeline descriptors; they
-are included in the 333-descriptor seed rather than deferred to live play.
+The first cleared-origin Chrome capture failed with seven browser callback gaps
+(worst 284.295 ms), 404 audio-underrun frames, live pipeline creation and timing
+pauses while native callbacks remained below 17.64 ms. Eleven descriptors were
+persisted only after visible source play and native teardown, increasing the
+reviewed seed from 333 to 344 pipelines. After rebuilding and clearing the origin
+cache, the exact 46-case run passed 6,070 source frames: worst browser interval
+22.785 ms, worst native callback 19.38 ms, and zero callback gaps, long tasks,
+native callbacks over 33.3 ms, audio underruns, live pipeline creation, automatic
+pauses or focus loss. Wasm heap growth remains an explicit report field for
+correlation with any timing failure. After teardown and a complete application
+reload, the warm run passed the same 46 cases across 6,109 source frames with a
+21.06 ms worst browser interval and 15.325 ms worst native callback; every hard
+gate remained zero. This is browser performance evidence for
+Marth versus Mario on Dream Land on the measured Chrome/macOS configuration;
+retail equivalence remains limited to the separately named comparisons.
+
+The final runner excludes recovery/recentering motions from the following
+case's expected-motion check. A stricter supplemental warm run passed all 46
+cases across 6,289 source frames with a 26.3 ms worst browser interval, 22.7 ms
+worst native callback and every hard gate at zero. It recorded 113,508,352 bytes
+of Wasm heap growth without a correlated callback, long-task or audio failure.
 
 A correlated Battlefield cold-entry probe measured fresh application
 construction at 182.380 ms, the preparation boundary at 200.095 ms and first

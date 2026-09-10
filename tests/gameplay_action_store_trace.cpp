@@ -20,6 +20,7 @@ int action_test_commands(void*, unsigned, int);
 int action_test_rows(void*, void*, void*);
 int action_test_movement_operands(void);
 int action_test_jab_operands(void);
+int action_test_dobj_operands(void);
 int action_test_common_operands(void);
 int action_test_falco_operands(void);
 }
@@ -83,6 +84,7 @@ int main(int argc, char** argv)
     try {
         check(action_test_movement_operands(), "Native movement operand ABI and truncation rejection");
         check(action_test_jab_operands(),"Native hitbox fields and canonical alias bounds/lifetime");
+        check(action_test_dobj_operands(),"Native DObj visibility command operands and admission");
         check(action_test_common_operands(),"Common attack operands and original finite-loop execution");
         check(action_test_falco_operands(),"Falco special opcode schemas retain source fields and canonical words");
         FighterFixture fixture;

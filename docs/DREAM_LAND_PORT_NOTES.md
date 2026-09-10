@@ -44,11 +44,19 @@ by this archive is retained as source metadata rather than rejected as geometry.
 `tests/dream_land_stage_data_trace.cpp` pins the archive topology, animation
 services, collision, lights, table counts, and full yakumono payload. The
 integrated source-match trace repeats Dream Land with every admitted fighter and
-costume, checks stage construction and teardown, and exercises Marth's complete
-representative move set. A Release browser run selected the Past Stages Dream
-Land tile and rendered Marth versus Mario with zero newly created pipelines on
-match entry from the expanded cache. Match preparation took 187.25 ms, with
-98.28 ms of source-owner construction, and the first draw took 4.04 ms.
+costume and checks stage construction and teardown. The Release browser gate
+selects the Past Stages Dream Land tile through source SSS input and runs the
+46-case Marth inventory plus at least 4,200 source frames, which crosses the
+stage's deterministic bird, tree, wind and blink scheduler intervals. With the
+344-pipeline seed and a cleared origin, the run passed 6,070 source frames with a
+22.785 ms worst browser interval, 19.38 ms worst native callback, and zero timing
+gaps, long tasks, audio underruns, live pipeline creation, automatic pauses or
+focus loss. Wasm heap growth is recorded separately for timing correlation. The
+second-application warm run also passed all 46 cases across 6,109 source frames,
+with a 21.06 ms worst browser interval, 15.325 ms worst native callback and every
+hard gate at zero. Match preparation took 314.77 ms in the cleared-origin run
+and occurred with the source clock stopped; the first draw took 7.11 ms with no
+queued or newly created pipelines.
 
 ```sh
 python3 -m unittest -v tests.test_dream_land_stage_data tests.test_gameplay_content_match

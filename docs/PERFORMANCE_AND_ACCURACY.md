@@ -125,8 +125,8 @@ The port currently has these reusable controls:
 - staged match construction, per-owner archive reuse, on-demand HPS slot decode
   and continuous CSS/SSS audio production;
 - unchanged-scene renderer preparation and a reviewed initial Aurora cache with
-  one shader record and 283 pipeline descriptors covering the current menus,
-  stages, stock paths and observed Fox first use;
+  one shader record and 344 pipeline descriptors covering the current menus,
+  stages, stock paths and the complete versioned Marth/Dream Land sweep;
 - teardown-only IDBFS persistence, so SQLite serialization cannot interrupt live
   gameplay; and
 - telemetry for preparation phases, active native phases, browser callback gaps,
@@ -150,15 +150,18 @@ open gate; later evidence cannot erase it.
    services with explicit lifetimes. Run construction, action/stage behavior,
    teardown and a second construction while verifying input bytes remain
    unchanged.
-3. **Exercise the native action inventory.** Cover every common action and each
+3. **Create and exercise the complete action inventory.** Add the fighter to
+   `web/action-sweep.mjs` before admission. Cover every common action and each
    fighter/stage-specific action, Article, effect, scheduler and dynamic
-   collision family. An action row that has not passed remains unavailable.
+   collision family with expected source motion IDs. An action row that has not
+   passed remains unavailable. “Representative moves” is not a passing scope.
 4. **Compare retail semantics.** Add or extend a pinned read-only retail capture
    for new behavior. Compare identical source ticks and report the first differing
    field. Re-run existing transition and gameplay comparisons after shared
    runtime changes.
-5. **Run the visible Release browser matrix.** Use original CSS and SSS, then
-   cover intro, ordinary movement, at least ten wavedashes in each direction,
+5. **Run the visible Release browser matrix.** Use the in-page source CSS/SSS
+   drivers and **Run visible action/performance sweep**, then cover intro,
+   ordinary movement, at least ten wavedashes in each direction,
    defense, ledge/recovery, every attack/special/article/effect variant, hits and
    shield contact, KO/respawn, pause/resume, match exit, return to CSS and a
    second match. Add stage-specific scheduled and dynamic behavior.
@@ -166,9 +169,12 @@ open gate; later evidence cannot erase it.
    once after a complete unload/application reload. Record the machine, browser,
    OS, resolution, display/power state, build commit and scenario inventory.
 7. **Close first-use work.** Any pipeline discovered by visible gameplay is added
-   to the reviewed seed, then both runs are repeated. Any live texture upload,
-   allocation/heap growth or long callback is classified and removed or kept as
-   an explicit failed gate.
+   to the reviewed seed after teardown, then both runs are repeated. Live texture
+   uploads are recorded and classified because source-authored animation can
+   upload by design. Pipeline creation, long callbacks and audio underruns during
+   the sweep fail the gate. Heap growth is recorded independently; growth outside
+   the source clock must be explained, and growth correlated with a timing failure
+   fails the gate.
 8. **Record the result.** Store raw local evidence under ignored `work/` and add
    the exact passed scope and remaining gaps to `STATUS.md`. Only then update the
    admitted content claim.
@@ -206,9 +212,9 @@ and warm browser matrix.
 
 The foundation must expand with the port:
 
-- turn the versioned browser action inventory into a repeatable in-page Release
-  runner that uses the same visible raw-PAD boundary and emits a machine-readable
-  report without hidden simulation;
+- add a complete versioned inventory to the in-page Release runner for every
+  fighter as the roster expands, including articles, hits, throws, ledges and
+  stage interactions beyond the current Marth/Dream Land inventory;
 - cover every fighter action/effect/article, costume/opponent combination and
   stage-specific renderer state, then keep the reviewed pipeline seed synchronized;
 - move remaining first-use immutable decode/upload work into measured scene

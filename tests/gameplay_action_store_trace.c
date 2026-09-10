@@ -154,6 +154,21 @@ int action_test_jab_operands(void)
     return valid;
 }
 
+int action_test_dobj_operands(void)
+{
+    const MeleeWebCommandWord words[] = {
+        {(31U << 26) | (126U << 19) | 0x7fffdU, UINT32_MAX},
+        {0, UINT32_MAX},
+    };
+    union CmdUnion* p = melee_web_commands_create(words, sizeof(words) / sizeof(*words));
+    if (!p) return 0;
+    const int valid = p[0].set_dobj_flags.idx == -2 &&
+        p[0].set_dobj_flags.value == -3;
+    melee_web_command_require_supported(31);
+    melee_web_commands_destroy(p);
+    return valid;
+}
+
 void ftAction_80073008(HSD_GObj*,CommandInfo*);
 void ftAction_80071974(HSD_GObj*,CommandInfo*);
 int action_test_common_operands(void)

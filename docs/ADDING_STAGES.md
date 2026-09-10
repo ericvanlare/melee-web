@@ -112,15 +112,20 @@ central CMake/Ninja targets. Browser SSS selection must use raw PAD input and
 observe the resulting source selection payload. A direct write to selection
 globals, a menu tile index, or a parsed archive row is not a lifecycle check.
 
-Before admission, run the Release browser matrix in
-[PERFORMANCE.md](PERFORMANCE.md#browser-admission-matrix) with every admitted
-fighter on the stage, from both a cleared origin cache and a second application
-load. Exercise ordinary movement and defense, every admitted attack/special
-family, stage articles and scheduled effects, KO/respawn, match exit, and a
-second match. Require zero automatic timing pauses, zero active callback
-intervals over 33.3 ms, zero browser `longtask` entries, zero audio underruns,
-and no live pipeline creation. Capture new pipeline descriptors only
-from visible source gameplay and update the reviewed seed before admitting the
+Before admission, run every admitted fighter's versioned
+`web/action-sweep.mjs` inventory on the stage through the in-page source CSS/SSS
+drivers, from both a cleared origin cache and a second application load. Set the
+minimum source-frame window high enough to cross every deterministic stage
+scheduler boundary and add explicit cases for stage Articles, moving collision,
+background transitions and effects. Preserve the machine-readable JSON reports;
+a representative move sample is not a pass. Extend the matrix with KO/respawn,
+pause, match exit and a second match when those paths are not encoded by the
+runner. Require zero automatic timing pauses, zero active callback intervals
+over 33.3 ms, zero browser `longtask` entries, zero audio underruns, no Wasm heap
+growth correlated with a timing failure, and no live pipeline creation. Record
+all Wasm heap growth even when it occurs outside the source clock. Capture new
+descriptors only from visible source gameplay, persist them after native
+teardown, update the reviewed seed, then repeat both runs before admitting the
 stage.
 
 ## Unsupported behavior

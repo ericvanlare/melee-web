@@ -36,12 +36,44 @@ special, Dancing Blade entry and continuation, Dolphin Slash, Counter, an
 aerial, pause, match exit, and repeated teardown. Jab exposed command opcode 49;
 the linked original `ftAction_80072B3C` is now the checked handler.
 
-The Release browser run selected Marth through the original CSS, selected Dream
-Land through the original SSS, and exercised the same representative moves plus
-five wavedashes. It exposed `GXSetTevClampMode` in Marth's live draw path. The
-GALE01 symbol is four bytes and returns immediately, so the browser bridge now
-matches that retail no-op instead of calling the assertion present in the SDK
-source drop.
+The Release browser gate selects Marth through the original CSS and Dream Land
+through the original SSS, then runs the versioned 46-case
+`marth-visible-actions-v1` inventory. It covers every grounded normal,
+shield/roll/dodge/grab, all five aerials, air dodge, ten wavedashes in each
+direction, Shield
+Breaker charge/release, Dancing Blade, Dolphin Slash, Counter, and 4,200 or more
+Dream Land source frames. The runner recenters Marth through ordinary source
+PAD input so movement cases cannot silently fall offstage, and it checks the
+expected source motion IDs for every case.
+
+The exhaustive run found source command opcode 31 in roll motion 234. The native
+command decoder already preserved its signed DObj visibility operands and the
+linked original handler was present; the strict admission list now allows that
+checked handler, with an operand regression test. An earlier representative run
+had not exercised roll and therefore missed it. The same broader run exposed
+`GXSetTevClampMode` in Marth's live draw path. The GALE01 symbol is four bytes
+and returns immediately, so the browser bridge matches that retail no-op instead
+of calling the assertion present in the SDK source drop.
+
+The first cleared-origin 46-case capture failed as intended: seven callback gaps
+(worst 284.295 ms), 404 audio-underrun frames, live pipeline creation and timing
+pauses, while native callbacks stayed below 17.64 ms. Eleven descriptors were
+captured after visible play and teardown. With the resulting 344-pipeline seed,
+the cleared-origin rerun passed 6,070 source frames with a 22.785 ms worst browser
+interval and 19.38 ms worst native callback, and zero gaps, long tasks, audio
+underruns, live pipeline creation, automatic pauses or focus loss. Wasm heap
+growth is recorded separately in every report so a future growth event can be
+correlated with a timing failure instead of being mistaken for CPU time.
+After teardown and a complete application reload, the warm run passed all 46
+cases across 6,109 source frames with a 21.06 ms worst browser interval and
+15.325 ms worst native callback; every hard gate remained zero.
+
+A final stricter rerun excluded recovery/recentering motions from each following
+case's expected-motion observation. It passed all 46 cases across 6,289 source
+frames with a 26.3 ms worst browser interval, 22.7 ms worst native callback, and
+every hard timing/audio/pipeline/focus gate at zero. The report recorded
+113,508,352 bytes of live Wasm heap growth without a correlated timing or audio
+failure.
 
 ## Owned asset hashes
 
@@ -63,8 +95,8 @@ Run the portable identity check and complete source-match matrix with:
 python3 -m unittest -v tests.test_marth_real_assets tests.test_gameplay_content_match
 ```
 
-For the next character, start with the same five gates: exact asset identity,
-typed extension and dynamics decoding, checked action construction, integrated
-source execution across every costume and admitted stage, then one Release
-browser path that exercises first-use rendering before updating the pipeline
-seed.
+For the next character, start with the same gates: exact asset identity, typed
+extension and dynamics decoding, checked action construction, integrated source
+execution across every costume and admitted stage, then a complete versioned
+Release action inventory from cleared and warm origins. Capture first-use
+pipelines after teardown, update the seed, and repeat both runs before admission.

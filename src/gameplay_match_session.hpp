@@ -27,6 +27,7 @@ public:
     uint32_t source_frames() const;
     int hud_damage(unsigned player) const;
     uint32_t random_seed() const;
+    int fighter_kind(unsigned index) const;
     MeleeWebMatchStats player_stats(unsigned index) const;
     MeleeWebAudio* audio() const;
     bool advance_construction();

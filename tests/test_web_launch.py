@@ -1,5 +1,6 @@
 """The canonical browser entry points must use the original menu player."""
 from pathlib import Path
+import subprocess
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,6 +21,10 @@ class WebLaunchTests(unittest.TestCase):
         self.assertIn("markRuntimeCacheDirty", runtime)
         self.assertIn("Browser long task", runtime)
         self.assertIn("Render cache save", runtime)
+        self.assertIn("Run visible action/performance sweep", runtime)
+        self.assertIn("_melee_web_native_menu_pad_sample_full", runtime)
+        self.assertIn("_melee_web_native_menu_player_state", runtime)
+        self.assertIn("Action performance report", runtime)
         self.assertNotIn("match-menu", runtime)
         self.assertNotIn("gameplay_browser.js", runtime)
 
@@ -43,6 +48,25 @@ class WebLaunchTests(unittest.TestCase):
         self.assertIn("HEAPU8,HEAP32,HEAPF32,UTF8ToString", cmake)
         self.assertIn("initial_pipeline_cache.db", cmake)
         self.assertIn("LINK_DEPENDS", cmake)
+        self.assertIn("_melee_web_native_menu_pad_sample_full", cmake)
+        self.assertIn("_melee_web_native_menu_player_state", cmake)
+
+    def test_marth_visible_action_inventory_is_versioned_and_broad(self):
+        script = """
+import {actionInventory} from './web/action-sweep.mjs';
+const inventory=actionInventory(18);
+if(!inventory || inventory.id!=='marth-visible-actions-v1' || inventory.fighter!=='Marth')process.exit(1);
+const names=new Set(inventory.cases.map(item=>item.name));
+for(const name of ['jab','forward smash','down aerial','air dodge',
+                   'wavedash left 10/10','wavedash right 10/10',
+                   'Shield Breaker charge/release','Dancing Blade chain',
+                   'Dolphin Slash','Counter'])if(!names.has(name))process.exit(2);
+if(inventory.cases.length<40 || inventory.minimumStageFrames<4200)process.exit(3);
+"""
+        subprocess.run(
+            ["node", "--input-type=module", "-e", script],
+            cwd=ROOT, check=True,
+        )
 
 
 if __name__ == "__main__":

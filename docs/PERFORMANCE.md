@@ -51,7 +51,7 @@ while an asynchronous pipeline is actually queued.
 `web/initial_pipeline_cache.db.gz.b64` is a reviewed Aurora cache seed captured
 from the Release browser runtime after the original CSS, SSS, Yoshi's Story,
 Battlefield, Dream Land, stock-loss/respawn, Fox first-use, and Marth first-use
-paths had rendered. It contains one shader record and 333 pipeline descriptors. It contains no
+paths had rendered. It contains one shader record and 344 pipeline descriptors. It contains no
 textures, models, audio, or other disc bytes.
 `scripts/materialize_pipeline_cache.py` verifies its SHA-256 digest and
 materializes it for Emscripten's `/initial_pipeline_cache.db` preload.
@@ -139,6 +139,31 @@ visibility for future browser admission runs.
 Three descriptors first seen during that broader action sequence were captured
 after unload and added to the seed.
 
+The Marth/Dream Land exhaustive gate replaced the earlier representative run.
+The in-page `marth-visible-actions-v1` inventory drives 46 cases through the
+strict raw-PAD queue: grounded normals, shield/roll/dodge/grab, five aerials, air dodge, twenty
+wavedashes, and all four Marth special families, followed by at least 4,200
+Dream Land source frames. The first cleared-origin run exposed seven browser
+gaps (worst 284.295 ms), 404 audio-underrun frames, live pipeline creation and
+automatic timing pauses while native callbacks stayed below 17.64 ms. Eleven
+new pipeline descriptors were captured only after visible source play and
+native teardown. The reviewed seed now contains one shader and 344 pipelines.
+With that seed and the origin cache cleared, the same 46-case run passed 6,070
+source frames: worst browser interval 22.785 ms, worst native callback 19.38 ms,
+and zero callback gaps, browser long tasks, native callbacks over 33.3 ms, audio
+underruns, live pipeline creation, automatic pauses or focus loss. The report
+also records Wasm heap growth independently so memory growth can be correlated
+with timing evidence. After teardown and a complete application reload, the warm
+run passed all 46 cases across 6,109 source frames with a 21.06 ms worst browser
+interval and 15.325 ms worst native callback; every hard gate remained zero.
+
+The final runner also isolates case observations from its source-input recovery
+steps, so a previous action cannot satisfy the next case. That stricter warm run
+passed 6,289 source frames with a 26.3 ms worst browser interval, 22.7 ms worst
+native callback, and every hard gate at zero. It recorded 113,508,352 bytes of
+live Wasm heap growth with no callback, long-task or audio failure; the growth
+remains visible in the report for future correlation.
+
 Browser interval accounting now records the callback that detects a timing
 stall using the running state at callback entry. Previously that callback set
 the native player to paused before the page sampled the interval, so the actual
@@ -151,7 +176,11 @@ Every admitted character/stage pair needs a cleared-origin run and a second
 application load on a named machine, browser/version, OS, resolution and power
 configuration. Run the Release build through the original CSS and SSS; a direct
 fixture entry does not cover player transitions. Preserve raw PAD inputs and
-the source frame/motion at every reported hitch.
+the source frame/motion at every reported hitch. Add the fighter's versioned
+inventory to `web/action-sweep.mjs` before browser admission and run it with the
+in-page **Run visible action/performance sweep** control. The emitted JSON report
+is the acceptance artifact. A hand-played or representative subset cannot
+replace this run.
 
 The versioned action inventory for each fighter is:
 

@@ -142,13 +142,16 @@ action.
   one action trace that selects a normal action and each new special family.
 - Exercise construction, one source action tick, unbind, close, and a second
   construction. Check that input archive bytes are unchanged.
-- Run the Release browser acceptance matrix in
-  [PERFORMANCE.md](PERFORMANCE.md#browser-admission-matrix) on every admitted
-  stage, from both a cleared origin cache and a second application load. Cover
-  repeated movement/defense, every normal attack and special family, their
-  articles and effects, taking a hit, KO/respawn, match exit, and a second
-  match. A single action trace or successful scene entry is not browser
-  performance coverage.
+- Before browser admission, add a versioned fighter inventory to
+  `web/action-sweep.mjs` with expected source motion IDs for every common action,
+  defense option, normal, aerial, throw, recovery and special variant. Run it
+  through the in-page source CSS/SSS drivers on every admitted stage, from both a
+  cleared origin cache and a second application load. Preserve the emitted JSON
+  reports. A hand-played or “representative” subset, a single action trace, or a
+  successful scene entry is not browser performance coverage.
+- Extend the same Release matrix with articles/effects, taking and shielding a
+  hit, ledges, KO/respawn, pause, match exit and a second match when those paths
+  are not yet encoded by the inventory runner.
 - Require zero automatic timing pauses, zero active callback intervals over
   33.3 ms, zero browser `longtask` entries, zero audio underruns, and no live
   pipeline creation in that matrix. Add newly observed pipeline
