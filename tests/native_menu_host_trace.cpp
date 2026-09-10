@@ -7,6 +7,7 @@
 #include <melee/ft/forward.h>
 #include <melee/gm/forward.h>
 #include <melee/gr/forward.h>
+#include <sysdolphin/baselib/random.h>
 #include <bit>
 #include <cmath>
 #include <filesystem>
@@ -71,14 +72,17 @@ class TransitionTrace {
   if(found!=epochs.end())return found->second;const unsigned result=epochs.size();epochs[generation]=result;return result;
  }
 public:
- explicit TransitionTrace(const char* path,const char* source_revision){
+ explicit TransitionTrace(const char* path,const char* source_revision,
+                          const char* input_recipe){
   if(!path)return;const std::string revision=source_revision?source_revision:"";
   if(revision.size()!=40||revision.find_first_not_of("0123456789abcdef")!=std::string::npos)
    throw std::runtime_error("Transition trace requires a full lowercase source revision");
   output.open(path,std::ios::trunc);if(!output)throw std::runtime_error("Cannot open transition trace output");
   output<<"{\"record\":\"header\",\"schema\":\"melee-web-transition-trace\",\"version\":1,"
           "\"producer\":\"port\",\"game_revision\":\"GALE01r2\",\"source_revision\":\""
-        <<revision<<"\",\"build_configuration\":\"browser-release\"}\n";
+        <<revision<<"\",\"build_configuration\":\"browser-release\"";
+  if(input_recipe)output<<",\"input_recipe\":\""<<input_recipe<<"\"";
+  output<<"}\n";
  }
  void begin_run(unsigned run){run_=run;index_=0;epochs.clear();}
  void event(const char* name,MeleeWebAudio* audio,const char* route=nullptr,
@@ -89,8 +93,10 @@ public:
         <<(!stream.empty()?"true":"false")<<",\"owner_epoch\":"<<epoch(audio)
         <<",\"stream\":\""<<stream<<"\"}";
   if(route)output<<",\"route\":\""<<route<<"\"";
+  const uint32_t* event_rng=rng?rng:seed_ptr;
+  if(event_rng)output<<",\"rng\":"<<*event_rng;
   if(selection){
-   output<<",\"rng\":"<<(rng?*rng:selection->random_seed)<<",\"selection\":";
+   output<<",\"selection\":";
    write_selection(output,*selection);
   }
   output<<"}\n";output.flush();
@@ -98,11 +104,15 @@ public:
 };
 }
 int main(int argc,char** argv){try{
- if(argc<3||argc>6)throw std::runtime_error("Expected menu/audio directories, optional stage kind, transition trace path and source revision");
+ if(argc<3||argc>7)throw std::runtime_error("Expected menu/audio directories, optional stage kind, transition trace path, source revision and input recipe");
  const int stage_kind=argc>=4?std::stoi(argv[3]):St_Kind_Last;
  const char* trace_path=argc>=5?argv[4]:nullptr;
- const char* source_revision=argc==6?argv[5]:nullptr;
- TransitionTrace trace(trace_path,source_revision);
+ const char* source_revision=argc>=6?argv[5]:nullptr;
+ const char* input_recipe=argc==7?argv[6]:nullptr;
+ const bool retail_fd_recipe=input_recipe&&std::string(input_recipe)=="retail-stock-fd-v1";
+ if(input_recipe&&!retail_fd_recipe)throw std::runtime_error("Unknown transition input recipe");
+ if(retail_fd_recipe&&stage_kind!=St_Kind_Last)throw std::runtime_error("Retail FD recipe requires Final Destination");
+ TransitionTrace trace(trace_path,source_revision,input_recipe);
  melee_web::RuntimeFiles files;
  for(const char* key:{"GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","GrNLa.dat","GrNBa.dat","GrSt.dat","sp_zako.hps","ystory.hps","ItCo.usd","EfMrData.dat","EfFxData.dat","EfCoData.dat","PdPm.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","fox.ssm","falco.ssm","dsp_coef.bin","sislib_font.bin"}){
   const auto root=std::filesystem::exists(std::filesystem::path(argv[1])/key)?argv[1]:argv[2];
@@ -111,6 +121,7 @@ int main(int argc,char** argv){try{
  }
  for(unsigned cycle=0;cycle<2;cycle++){
   trace.begin_run(cycle);
+  if(retail_fd_recipe&&cycle==0)*seed_ptr=1840631306u;
   char error[256]{};auto* host=melee_web_menu_host_create(error,sizeof(error));check(host!=nullptr,error);
   auto world=std::make_unique<melee_web::GameplayMenuWorld>(files);
   check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);
@@ -148,7 +159,8 @@ int main(int argc,char** argv){try{
          "CSS/SSS scene rebuild reset or advanced menu music outside an audio tick");
    check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);
   };
-  for(unsigned t=0;t<120;t++)check(tick()==1,"Unexpected CSS transition");
+  const unsigned first_css_neutral=retail_fd_recipe&&cycle==0?187:120;
+  for(unsigned t=0;t<first_css_neutral;t++)check(tick()==1,"Unexpected CSS transition");
   uint32_t initial_music_completed=0,initial_music_revisited=0;
   check(melee_web_audio_stream_progress(world->audio(),&initial_music_completed,
                                          &initial_music_revisited)&&
@@ -192,7 +204,8 @@ int main(int argc,char** argv){try{
   trace.event("sss_exit_complete",world->audio(),"css");
   rebuild_menu_scene();
   trace.event("css_enter_complete",world->audio());
-  for(unsigned t=0;t<120;t++)check(tick()==1,"Unexpected cancelled CSS transition");
+  const unsigned second_css_neutral=retail_fd_recipe&&cycle==0?138:120;
+  for(unsigned t=0;t<second_css_neutral;t++)check(tick()==1,"Unexpected cancelled CSS transition");
   transition();check(melee_web_menu_host_phase(host)==2,"Returned CSS did not choose SSS");
   trace.event("css_exit_complete",world->audio());
   rebuild_menu_scene();
@@ -219,12 +232,16 @@ int main(int argc,char** argv){try{
         continued_music_completed>initial_music_completed,
         "Original menu music did not continue loading across CSS/SSS scenes");
   transition();check(melee_web_menu_host_phase(host)==5,"SSS did not complete original selection");
+  StartMeleeData raw_start{};
+  check(melee_web_menu_host_raw_selection(host,&raw_start,error,sizeof(error)),error);
   MeleeWebMenuMatchSelection selection{};check(melee_web_menu_host_selection(host,&selection,error,sizeof(error)),error);
   check(selection.start.rules.stkind==stage_kind,"Source SSS committed another stage");
   check(selection.start.players[0].ckind==(cycle==1?CKIND_FALCO:CKIND_MARIO),
         "Source CSS committed another P1 character");
   const uint32_t selection_rng=selection.random_seed;
-  trace.event("sss_exit_complete",world->audio(),"match",&selection,&selection_rng);
+  MeleeWebMenuMatchSelection raw_selection{};raw_selection.start=raw_start;
+  raw_selection.random_seed=selection_rng;
+  trace.event("sss_exit_complete",world->audio(),"match",&raw_selection,&selection_rng);
   world->close();world.reset();audio_phase=0;
   bool match_entry_recorded=false;
   if(cycle==0)for(unsigned stop:{0u,60u,100u}){

@@ -16,23 +16,26 @@ SPEC.loader.exec_module(COMPARE)
 from tools.transition_trace_format import decode_start_melee_data
 
 
-def selection(stage=32):
+def selection(stage=32, match_entry=False):
     player = {
-        "ckind": 0, "slot_type": 0, "stocks": 4, "color": 0, "slot": 0,
-        "spawn": 0, "spawn_direction": 0, "sub_color": 0, "handicap": 9,
-        "team": 0, "nametag": 120, "flags_c": 0, "flags_d": 0,
-        "cpu_kind": 0, "cpu_level": 0, "damage_10": 0, "damage_12": 0,
+        "ckind": 0, "slot_type": 0, "stocks": 4 if match_entry else 0,
+        "color": 0, "slot": 0, "spawn": -1, "spawn_direction": 0,
+        "sub_color": 0, "handicap": 9, "team": 0, "nametag": 120,
+        "flags_c": 192 if match_entry else 64, "flags_d": 0,
+        "cpu_kind": 4, "cpu_level": 1, "damage_10": 0, "damage_12": 0,
         "hp": 0, "attack_ratio_bits": "3f800000",
         "defense_ratio_bits": "3f800000", "model_scale_bits": "3f800000",
     }
     return {
         "rules": {
-            "match_kind": 0, "hud_layout": 1, "timer_enabled": False,
+            "match_kind": 1 if match_entry else 0, "hud_layout": 4,
+            "timer_enabled": False,
             "timer_counts_up": False, "friendly_fire": False,
-            "is_stock": True, "single_button": False,
-            "disable_pausing": False, "is_vs": True, "is_teams": 0,
-            "item_frequency": -1, "stage_kind": stage, "time_limit": 0,
-            "item_mask": "0000000000000000", "damage_ratio_bits": "3f800000",
+            "is_stock": match_entry, "single_button": False,
+            "disable_pausing": False, "is_vs": match_entry, "is_teams": 0,
+            "item_frequency": -1 if match_entry else 2,
+            "stage_kind": stage, "time_limit": 0,
+            "item_mask": "ffffffffffffffff", "damage_ratio_bits": "3f800000",
             "game_speed_bits": "3f800000",
         },
         "players": [dict(player) for _ in range(4)],
@@ -57,10 +60,10 @@ def rows(producer):
         header.update({
             "source_revision": "0123456789abcdef0123456789abcdef01234567",
             "build_configuration": "browser-release",
+            "input_recipe": "fixture-v1",
         })
     result = [header]
     routes = {3: "css", 7: "match"}
-    selected = selection()
     for index, name in enumerate(COMPARE.EXPECTED_EVENTS):
         event = {
             "record": "event", "run": 0, "index": index, "event": name,
@@ -69,12 +72,12 @@ def rows(producer):
                 "owner_epoch": 1 if index == 8 else 0,
                 "stream": "sp_end.hps" if index == 8 else "menu01.hps",
             },
+            "rng": 1234 + index,
         }
         if index in routes:
             event["route"] = routes[index]
         if index in (7, 8):
-            event["selection"] = selected
-            event["rng"] = 1234 if index == 7 else 5678
+            event["selection"] = selection(match_entry=index == 8)
         if producer == "retail":
             event["retail_audio_diagnostics"] = {
                 "stream_starts": 1 if index == 8 else 0,
@@ -124,10 +127,18 @@ class TransitionTraceComparisonTests(unittest.TestCase):
         port[-1]["selection"]["rules"]["stage_kind"] = 31
         result = COMPARE.compare(rows("retail"), port, 0)
         self.assertFalse(result["equivalent"])
-        self.assertEqual(result["first_divergence"]["index"], 7)
+        self.assertEqual(result["first_divergence"]["index"], 8)
         self.assertEqual(result["first_divergence"]["field"],
                          "$.selection.rules.stage_kind")
         self.assertEqual(result["checks"]["semantic_state"], "fail")
+
+    def test_compares_rng_at_every_boundary(self):
+        port = rows("port")
+        port[3]["rng"] += 1
+        result = COMPARE.compare(rows("retail"), port, 0)
+        self.assertFalse(result["equivalent"])
+        self.assertEqual(result["first_divergence"]["index"], 2)
+        self.assertEqual(result["first_divergence"]["field"], "$.rng")
 
     def test_rejects_retail_menu_audio_restart(self):
         retail = rows("retail")

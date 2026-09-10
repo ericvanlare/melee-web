@@ -29,8 +29,12 @@ int melee_web_menu_host_tick(MeleeWebMenuHost*,const PADStatus[4],char*,size_t);
 int melee_web_menu_host_draw(MeleeWebMenuHost*,char*,size_t);
 /* Call after the final Aurora frame has submitted, before closing its world. */
 int melee_web_menu_host_leave(MeleeWebMenuHost*,int abort_scene,char*,size_t);
-/* Reads the configuration published by original CSS/SSS OnExit. */
+/* Reads the separate configuration produced by the original VS-entry rules
+ * and player preparation after CSS/SSS OnExit. */
 int melee_web_menu_host_selection(const MeleeWebMenuHost*,MeleeWebMenuMatchSelection*,char*,size_t);
+/* Reads the raw SSS-owned payload after OnExit and before VS-entry
+ * normalization. This is a read-only retail-equivalence observation. */
+int melee_web_menu_host_raw_selection(const MeleeWebMenuHost*,StartMeleeData*,char*,size_t);
 /* Called after source match teardown restores RNG ownership. */
 int melee_web_menu_host_match_finished(MeleeWebMenuHost*,uint32_t random_seed,char*,size_t);
 int melee_web_menu_host_destroy(MeleeWebMenuHost*,char*,size_t);

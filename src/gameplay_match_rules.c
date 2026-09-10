@@ -26,7 +26,7 @@ MeleeWebMatchRules* melee_web_match_rules_begin(char* e,size_t n){
     memset(data,0,sizeof(*data));gm_SetupRulesDefaults(&data->x24C8);
     data->x24C8.match_kind=MatchKind_Stock;data->x24C8.is_stock=1;data->x24C8.is_vs=1;
     data->x24C8.is_teams=0;data->x24C8.stkind=St_Kind_Last;
-    data->x24C8.xB=-1;data->x24C8.x20=0;data->x24C8.timer_enabled=0;
+    data->x24C8.xB=-1;data->x24C8.x20=UINT64_MAX;data->x24C8.timer_enabled=0;
     data->x24C.x5=MatchKind_Stock;data->x24C.is_teams=0;
     active=h;melee_web_match_source_refresh_ratio();if(e&&n)*e=0;return h;
 }
@@ -44,7 +44,7 @@ int melee_web_match_rules_init_from_menu(MeleeWebMatchRules* h,
     if(candidate.rules.match_kind!=MatchKind_Stock||!candidate.rules.is_stock||
        !candidate.rules.is_vs||candidate.rules.is_teams||
        candidate.rules.timer_enabled||candidate.rules.xB!=-1||
-       candidate.rules.x20!=0||!melee_web_stage_content(candidate.rules.stkind))
+       candidate.rules.x20!=UINT64_MAX||!melee_web_stage_content(candidate.rules.stkind))
         return fail(e,n,"Menu payload does not match the supported stock/stage rules");
     h->start=candidate;
     if(!melee_web_match_init_source(&h->start)){

@@ -14,6 +14,7 @@ struct MeleeWebMenuSession {
     MeleeWebMenuRuntime runtime;
     CSSData css;
     SSSData sss;
+    VsModeData match_vs;
     u8 css_ko_counts[GM_MAX_PLAYERS];
     uint64_t ticks;
     MeleeWebMenuPhase phase;
@@ -25,6 +26,9 @@ struct MeleeWebMenuSession {
 };
 
 static MeleeWebMenuSession* owner;
+
+extern int melee_web_vs_prepare_start_source(StartMeleeData*,
+                                              const VsModeData*);
 
 static int fail(char* error, size_t error_size, const char* message)
 {
@@ -138,18 +142,18 @@ int melee_web_menu_css_selection_valid(const CSSData* css)
     int i;
 
     if (css == NULL || css->match_type != VS_MELEE ||
-        css->vs.start.rules.match_kind != MatchKind_Stock ||
-        !css->vs.start.rules.is_stock || !css->vs.start.rules.is_vs ||
+        css->vs.start.rules.match_kind != MatchKind_Time ||
+        css->vs.start.rules.is_stock || css->vs.start.rules.is_vs ||
         css->vs.start.rules.is_teams ||
-        css->vs.start.rules.timer_enabled || css->vs.start.rules.xB != -1 ||
-        css->vs.start.rules.x20 != 0 ||
+        css->vs.start.rules.timer_enabled || css->vs.start.rules.xB != 2 ||
+        css->vs.start.rules.x20 != UINT64_MAX ||
         !melee_web_menu_stage_available(css->vs.start.rules.stkind))
     {
         return 0;
     }
     if (css->vs.start.players[0].slot_type != Gm_PKind_Human ||
         css->vs.start.players[1].slot_type != Gm_PKind_Human ||
-        css->vs.start.players[0].stocks != 4 ||
+        css->vs.start.players[0].stocks != 0 ||
         css->vs.start.players[1].stocks != css->vs.start.players[0].stocks)
     {
         return 0;
@@ -169,6 +173,41 @@ int melee_web_menu_css_selection_valid(const CSSData* css)
     }
     for (i = 2; i < GM_MAX_PLAYERS; i++) {
         if (css->vs.start.players[i].slot_type != Gm_PKind_NA) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
+static int match_selection_valid(const StartMeleeData* start)
+{
+    int i;
+
+    if (start == NULL || start->rules.match_kind != MatchKind_Stock ||
+        !start->rules.is_stock || !start->rules.is_vs ||
+        start->rules.is_teams || start->rules.timer_enabled ||
+        start->rules.xB != -1 || start->rules.x20 != UINT64_MAX ||
+        !melee_web_menu_stage_available(start->rules.stkind))
+    {
+        return 0;
+    }
+    for (i = 0; i < 2; ++i) {
+        const PlayerInitData* player = &start->players[i];
+        const MeleeWebFighterContent* content =
+            melee_web_fighter_content(player->ckind);
+        if (player->slot_type != Gm_PKind_Human || player->stocks != 4 ||
+            !player->rumble_enabled || content == NULL ||
+            (player->slot ? player->slot - 1 : i) != i ||
+            player->color >= content->costumes || player->sub_color > 4)
+        {
+            return 0;
+        }
+    }
+    for (; i < GM_MAX_PLAYERS; ++i) {
+        if (start->players[i].slot_type != Gm_PKind_NA ||
+            start->players[i].stocks != 4 ||
+            start->players[i].rumble_enabled)
+        {
             return 0;
         }
     }
@@ -248,22 +287,13 @@ MeleeWebMenuSession* melee_web_menu_session_create(
     session->css.match_type = VS_MELEE;
     session->css.pending_scene_change = 0;
     session->css.ko_counts = session->css_ko_counts;
-    session->css.vs.start.rules.match_kind = MatchKind_Stock;
-    session->css.vs.start.rules.is_stock = true;
-    session->css.vs.start.rules.is_vs = true;
-    /* The browser slice exposes the original stock menu while deliberately
-     * carrying a fixed no-items/timer-disabled policy into the source match.
-     * Keep this in StartMeleeData so handoff validates the actual payload
-     * instead of replacing it later. */
-    session->css.vs.start.rules.xB = -1;
-    session->css.vs.start.rules.x20 = 0;
-    session->css.vs.start.rules.timer_enabled = false;
+    /* Retail keeps gm_InitVsMode's raw menu payload through SSS OnExit. The
+     * stock/no-item policy is applied later by the original VS-entry path. */
     session->css.vs.start.rules.stkind = MELEE_WEB_MENU_FD_ST_KIND;
     for (i = 0; i < 2; i++) {
         PlayerInitData* player = &session->css.vs.start.players[i];
         player->ckind = CKIND_MARIO;
         player->slot_type = Gm_PKind_Human;
-        player->stocks = (s8) selected->stocks;
         player->color = i == 0 ? selected->player0_color : selected->player1_color;
         /* Original slot 0 means use this player index; nonzero is port + 1. */
         player->slot = 0;
@@ -534,6 +564,15 @@ int melee_web_menu_leave_sss(MeleeWebMenuSession* session, char* error,
     }
     if (session->sss.start_game) {
         session->css.vs = session->sss.vs;
+        session->match_vs = session->sss.vs;
+        if (!melee_web_vs_prepare_start_source(&session->match_vs.start,
+                                                &session->sss.vs) ||
+            !match_selection_valid(&session->match_vs.start))
+        {
+            session->phase = MELEE_WEB_MENU_CLOSED;
+            return fail(error, error_size,
+                        "Original VS entry produced an unsupported match payload");
+        }
         session->phase = MELEE_WEB_MENU_READY;
     } else {
         session->css.vs = session->sss.vs;
@@ -589,5 +628,5 @@ const VsModeData* melee_web_menu_ready_vs(const MeleeWebMenuSession* session)
     {
         return NULL;
     }
-    return &session->sss.vs;
+    return &session->match_vs;
 }

@@ -1322,7 +1322,7 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
 +     * team match, callback, or unsupported stage into another configuration. */
 +    if (rules->match_kind != MatchKind_Stock || !rules->is_stock ||
 +        !rules->is_vs || rules->is_teams || rules->timer_enabled ||
-+        !melee_web_stage_content(rules->stkind) || rules->x20 != 0 || rules->xB != -1 ||
++        !melee_web_stage_content(rules->stkind) || rules->x20 != (u64) -1 || rules->xB != -1 ||
 +        rules->game_speed != 1.0F || rules->x54 != NULL ||
 +        rules->on_match_start != NULL || rules->on_frame_start != NULL ||
 +        rules->on_frame_end != NULL || rules->on_match_end != NULL) {
@@ -5481,3 +5481,45 @@ diff --git a/src/melee/gr/grstory.c b/src/melee/gr/grstory.c
  #ifdef MUST_MATCH
  static u32 _[] = {
      0xC3920000, 0x42D20000, 0xC3920000, 0x42960000, 0xC3920000, 0x42480000,
+diff --git a/src/melee/gm/gmvsmelee.c b/src/melee/gm/gmvsmelee.c
+--- a/src/melee/gm/gmvsmelee.c
++++ b/src/melee/gm/gmvsmelee.c
+@@ -204,8 +204,38 @@ void gmVsMelee_EnterVs(GameModeState* state, VsModeData* vs,
+     gm_LoadAnnouncer();
+ }
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++/* Build the same StartMeleeData published by ordinary VS OnEnter without
++ * starting the announcer preload. The browser owns that audio dependency in
++ * its checked match construction phase. Keep the menu-owned VsModeData raw:
++ * retail does not apply persistent rules until after SSS has exited. */
++int melee_web_vs_prepare_start_source(StartMeleeData* start,
++                                      const VsModeData* menu)
++{
++    VsModeData vs;
++    ssize_t i;
++
++    if (start == NULL || menu == NULL) {
++        return 0;
++    }
++    vs = *menu;
++    gm_80167BC8(&vs);
++    start->rules = vs.start.rules;
++    if (start->rules.match_kind == MatchKind_Stock) {
++        start->rules.is_stock = true;
++    }
++    start->rules.is_vs = true;
++    for (i = 0; i < GM_MAX_PLAYERS; ++i) {
++        start->players[i] = vs.start.players[i];
++    }
++    gm_SetupSubColors(start);
++    gm_LoadRumbleEnabled(start);
++    return 1;
++}
++#endif
++
+ /// @param id0 Next state id if one or zero winners
+ /// @param id1 Next state id if multiple winners
+ void gmVsMelee_ExitVs(GameModeState* state, u8 id0, u8 id1)
+ {
+     MatchExitInfo* exit = gm_GetGameModeStateExitData(state);

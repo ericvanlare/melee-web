@@ -166,9 +166,12 @@ def validate_selection(selection, event):
 
 
 def comparable_event(event):
+    if not isinstance(event.get("rng"), int):
+        raise TraceError(f"{event['event']}: source RNG is missing")
     result = {
         "event": event["event"],
         "route": event.get("route"),
+        "rng": event["rng"],
         "audio": {
             "active": event["audio"]["active"],
             "owner_epoch": event["audio"]["owner_epoch"],
@@ -180,23 +183,19 @@ def comparable_event(event):
             raise TraceError(f"{event['event']}: match route is missing selection")
         validate_selection(event["selection"], event["event"])
         result["selection"] = event["selection"]
-        if not isinstance(event.get("rng"), int):
-            raise TraceError(f"{event['event']}: source RNG is missing")
-        result["rng"] = event["rng"]
     elif event["event"] == "match_enter_complete":
         if "selection" not in event:
             raise TraceError("match_enter_complete: selection is missing")
         validate_selection(event["selection"], event["event"])
         result["selection"] = event["selection"]
-        if not isinstance(event.get("rng"), int):
-            raise TraceError("match_enter_complete: source RNG is missing")
-        result["rng"] = event["rng"]
     return result
 
 
 def compare(reference_rows, port_rows, run):
     reference_header, reference = select_run(reference_rows, "retail", run)
     port_header, port = select_run(port_rows, "port", run)
+    if not isinstance(port_header.get("input_recipe"), str) or not port_header["input_recipe"]:
+        raise TraceError("port: comparison requires a named deterministic input recipe")
     if reference_header.get("game_revision") != port_header.get("game_revision"):
         raise TraceError("retail and port game revisions differ")
     validate_continuity("retail", reference)

@@ -99,7 +99,7 @@ int melee_web_menu_session_destroy(MeleeWebMenuSession*, char* error,
 int melee_web_menu_enter_css(MeleeWebMenuSession*, char* error,
                              size_t error_size);
 /* Re-enter CSS after the host has torn down the match world.  This preserves
- * the validated Mario/4-stock selection and requires the same runtime check
+ * the validated character selection and requires the same runtime check
  * used for the initial native scene. */
 int melee_web_menu_return_to_css(MeleeWebMenuSession*, char* error,
                                  size_t error_size);
@@ -115,6 +115,8 @@ int melee_web_menu_abort(MeleeWebMenuSession*, char* error, size_t error_size);
 MeleeWebMenuPhase melee_web_menu_phase(const MeleeWebMenuSession*);
 const CSSData* melee_web_menu_css(const MeleeWebMenuSession*);
 const SSSData* melee_web_menu_sss(const MeleeWebMenuSession*);
+/* Returns the separate VS-entry payload after the original source adapter has
+ * applied persistent rules, stocks, item settings and rumble. */
 const VsModeData* melee_web_menu_ready_vs(const MeleeWebMenuSession*);
 
 /* Pure boundary checks used by the lifecycle and by the host before launch.

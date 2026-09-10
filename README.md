@@ -45,8 +45,8 @@ full-match equivalence. See [current evidence](STATUS.md),
 [the runtime gate](docs/FIGHTER_RUNTIME.md) and
 [original-game comparison](docs/ORIGINAL_COMPARISON.md). The reusable
 [CSS/SSS and match-entry transition gate](docs/TRANSITION_EQUIVALENCE.md) is
-implemented. A pinned retail run matches lifecycle order and uninterrupted menu
-audio, while the full semantic gate remains red at match-data normalization.
+implemented. Its pinned Mario/Mario Final Destination replay matches retail at
+all nine lifecycle, audio, match-data and RNG boundaries.
 
 ## Play the current match
 

@@ -174,6 +174,7 @@ Mario/Mario Final Destination capture now completes all nine boundaries. Retail
 keeps `menu01.hps` active under one owner with zero stream start/stop, AX driver
 initialization or language-bank initialization calls through both CSS/SSS trips,
 then performs one stop/start into `sp_end.hps` at match entry. The port matches
-that lifecycle and audio result. The strict semantic comparison remains red: its
-first divergence is the SSS-exit `match_kind`, where retail still exposes the
-pre-`gm_16AE` payload and the port already exposes normalized stock rules.
+that lifecycle and audio result. The port now retains the same raw menu payload
+through SSS exit, then applies persistent stock/item/rumble settings through the
+source VS-entry adapter. A deterministic replay matches the retail rules, all
+four player records and RNG at every captured boundary.

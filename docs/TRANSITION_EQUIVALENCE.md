@@ -18,9 +18,9 @@ The comparator requires the exact event order and routes. Every menu event must
 retain active `menu01.hps` under owner epoch zero. Match entry must establish one
 new active owner and the retail capture must observe no stream start, stream stop,
 AX driver initialization or language-bank initialization during the preceding
-CSS/SSS transitions. The committed rules, all four `PlayerInitData` records and
-source RNG are compared at SSS exit and completed match entry. Addresses and
-callback pointers are deliberately absent.
+CSS/SSS transitions. The committed rules and all four `PlayerInitData` records
+are compared at SSS exit and completed match entry. Source RNG is compared at
+every boundary. Addresses and callback pointers are deliberately absent.
 
 ## Port capture
 
@@ -32,7 +32,8 @@ only local, owned assets and writes ignored evidence under `work/`:
 .deps/emsdk/node/24.19.0_64bit/bin/node \
   build/browser-release/native_menu_host_trace.js \
   assets-local/native-menus assets-local/next-gate 32 \
-  work/port-transition-fd.jsonl "$(git rev-parse HEAD)"
+  work/port-transition-fd.jsonl "$(git rev-parse HEAD)" \
+  retail-stock-fd-v1
 ```
 
 Run zero carries Mario/Mario and run one carries Falco/Mario. The trace itself is
@@ -93,12 +94,16 @@ PCM output, latency or performance evidence.
 
 The ignored local `work/reference-transition-stock-fd.jsonl` capture uses four
 stocks, P1 yellow Mario, P2 red Mario and Final Destination. It completes all
-nine events. Lifecycle order and audio continuity pass: retail records no menu
-stream stop/start or AX reinitialization and changes once from `menu01.hps` to
-`sp_end.hps` at match entry. The full semantic report remains red. Its first
-divergence is `sss_exit_complete.selection.rules.match_kind`: retail still has
-the pre-`gm_16AE` payload at that return boundary, while the port has already
-normalized the stock payload. At completed match entry, item-mask, rumble flag,
-inactive-slot stock and RNG fields also differ. RNG equality requires a saved
-starting state and frame-counted input recipe; wall-clock-driven menu input is
-valid for lifecycle/audio evidence but cannot establish exact RNG equivalence.
+nine events. Retail records no menu stream stop/start or AX reinitialization and
+changes once from `menu01.hps` to `sp_end.hps` at match entry. The port keeps the
+same pre-normalization data through SSS exit, including the default item mask and
+zero menu stocks, then uses the original VS-entry operations to apply stock mode,
+four stocks in all six slots, item frequency, and active-player rumble.
+
+The `retail-stock-fd-v1` replay pins the observed capture-begin RNG and supplies
+187 and 138 neutral CSS ticks before the two transitions. Those fixed dwell
+lengths reproduce the retail capture's 15,120 and 11,200 source RNG steps; match
+construction consumes the same final eight steps. The strict report passes all
+nine lifecycle, audio, semantic-state and RNG comparisons. This is scoped
+Mario/Mario FD transition evidence, not a claim for other configurations or
+later gameplay.

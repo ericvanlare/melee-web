@@ -30,7 +30,18 @@ int main(int argc,char** argv){try{
         [](void*,MeleeWebMenuScene,int*,char*,size_t){return 1;}};
     auto* menu=melee_web_menu_session_create(&services,nullptr,error,sizeof(error));check(menu,error);
     MeleeWebMenuMatchSelection selection{};
-    selection.start=melee_web_menu_css(menu)->vs.start;
+    const VsModeData raw=melee_web_menu_css(menu)->vs;
+    selection.start=raw.start;
+    selection.start.rules.match_kind=MatchKind_Stock;
+    selection.start.rules.is_stock=true;
+    selection.start.rules.is_vs=true;
+    selection.start.rules.xB=-1;
+    for(unsigned i=0;i<GM_MAX_PLAYERS;i++){
+        selection.start.players[i].stocks=4;
+        /* This explicit headless fixture has no PAD-rumble transport. The
+         * native menu/match gate separately exercises retail rumble flags. */
+        selection.start.players[i].rumble_enabled=false;
+    }
     check(melee_web_menu_session_destroy(menu,error,sizeof(error)),error);
     selection.hud_layout=2;selection.start.rules.x0_3=2;selection.random_seed=0x13579bdf;
     selection.start.rules.stkind=argc>=4?std::stoi(argv[3]):St_Kind_Last;

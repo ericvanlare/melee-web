@@ -12,8 +12,39 @@
 void gm_InitVsMode(VsModeData* vs)
 {
     memset(vs, 0, sizeof(*vs));
-    for (int i = 0; i < GM_MAX_PLAYERS; ++i)
+    vs->start.rules.x0_3 = 4;
+    vs->start.rules.match_kind = MatchKind_Time;
+    vs->start.rules.xB = 2;
+    vs->start.rules.x20 = UINT64_MAX;
+    vs->start.rules.x30 = 1.0f;
+    vs->start.rules.game_speed = 1.0f;
+    for (int i = 0; i < GM_MAX_PLAYERS; ++i) {
+        vs->start.players[i].ckind = CHKIND_NONE;
         vs->start.players[i].slot_type = Gm_PKind_NA;
+        vs->start.players[i].x5 = -1;
+        vs->start.players[i].handicap = 9;
+        vs->start.players[i].nametag = 120;
+        vs->start.players[i].xC_b1 = true;
+        vs->start.players[i].cpu_kind = 4;
+        vs->start.players[i].attack_ratio = 1.0f;
+        vs->start.players[i].defense_ratio = 1.0f;
+        vs->start.players[i].model_scale = 1.0f;
+    }
+}
+
+int melee_web_vs_prepare_start_source(StartMeleeData* start,
+                                      const VsModeData* menu)
+{
+    *start = menu->start;
+    start->rules.match_kind = MatchKind_Stock;
+    start->rules.is_stock = true;
+    start->rules.is_vs = true;
+    start->rules.xB = -1;
+    for (int i = 0; i < GM_MAX_PLAYERS; ++i) {
+        start->players[i].stocks = 4;
+        start->players[i].rumble_enabled = i < 2;
+    }
+    return 1;
 }
 
 static CSSData* active_css;
@@ -74,21 +105,12 @@ static int transition(void* user, MeleeWebMenuScene scene, int* requested,
 static void setup(CSSData* css)
 {
     memset(css, 0, sizeof(*css));
+    gm_InitVsMode(&css->vs);
     css->match_type = VS_MELEE;
-    css->vs.start.rules.match_kind = MatchKind_Stock;
-    css->vs.start.rules.is_stock = 1;
-    css->vs.start.rules.is_vs = 1;
-    css->vs.start.rules.xB = -1;
-    css->vs.start.rules.x20 = 0;
-    css->vs.start.rules.timer_enabled = 0;
-    css->vs.start.rules.game_speed = 1.0f;
     css->vs.start.rules.stkind = MELEE_WEB_MENU_FD_ST_KIND;
-    for (int i = 0; i < GM_MAX_PLAYERS; ++i)
-        css->vs.start.players[i].slot_type = Gm_PKind_NA;
     for (int i = 0; i < 2; ++i) {
         css->vs.start.players[i].slot_type = Gm_PKind_Human;
         css->vs.start.players[i].ckind = CKIND_MARIO;
-        css->vs.start.players[i].stocks = 4;
     }
 }
 
@@ -190,6 +212,7 @@ int main(void)
         MeleeWebMenuSession* session =
             melee_web_menu_session_create(&runtime, NULL, error, sizeof(error));
         const CSSData* result;
+        const VsModeData* ready;
         if (session == NULL || !melee_web_menu_enter_css(session, error,
                                                           sizeof(error)))
             return 12;
@@ -206,9 +229,18 @@ int main(void)
             melee_web_menu_phase(session) != MELEE_WEB_MENU_READY)
             return 14;
         result = melee_web_menu_css(session);
-        if (result == NULL || result->vs.start.players[0].ckind != CKIND_MARIO ||
-            result->vs.start.players[0].stocks != 4 ||
-            result->vs.start.players[1].stocks != 4)
+        ready = melee_web_menu_ready_vs(session);
+        if (result == NULL || ready == NULL ||
+            result->vs.start.players[0].ckind != CKIND_MARIO ||
+            result->vs.start.players[0].stocks != 0 ||
+            result->vs.start.players[1].stocks != 0 ||
+            ready->start.rules.match_kind != MatchKind_Stock ||
+            !ready->start.rules.is_stock || !ready->start.rules.is_vs ||
+            ready->start.rules.xB != -1 ||
+            ready->start.rules.x20 != UINT64_MAX ||
+            ready->start.players[0].stocks != 4 ||
+            ready->start.players[1].stocks != 4 ||
+            ready->start.players[2].stocks != 4)
             return 15;
         if (!melee_web_menu_return_to_css(session, error, sizeof(error)))
             return 16;

@@ -37,6 +37,7 @@ struct MeleeWebMenuHost {
     PadLibData saved_library;
     HSD_PadStatus saved_game[4],saved_master[4],saved_copy[4];
     GameRules saved_rules;
+    struct gmm_x1CB0 saved_preferences;
     int saved_language,saved_saved_language;
     u16 saved_characters,saved_stages;
     int entered,drawing,transition;
@@ -82,6 +83,7 @@ static void restore_context(MeleeWebMenuHost* h){
     memcpy(HSD_PadMasterStatus,h->saved_master,sizeof(h->saved_master));
     memcpy(HSD_PadCopyStatus,h->saved_copy,sizeof(h->saved_copy));
     *gmMainLib_GetGameRules()=h->saved_rules;
+    *gmMainLib_8015CC58()=h->saved_preferences;
     *gmMainLib_GetUnlockedCharactersBitmaskPtr()=h->saved_characters;
     *gmMainLib_8015EDA4()=h->saved_stages;
     lbLang_SetLanguageSetting(h->saved_language);lbLang_SetSavedLanguage(h->saved_saved_language);
@@ -99,6 +101,7 @@ int melee_web_menu_host_enter(MeleeWebMenuHost* h,MeleeWebAudio* audio,char* e,s
     if(!melee_web_menu_clock_begin())return fail(e,n,"Original scene clock is already owned");
     h->audio=audio;h->generation=melee_web_gameplay_stats().generation;h->transition=0;
     h->saved_rules=*gmMainLib_GetGameRules();
+    h->saved_preferences=*gmMainLib_8015CC58();
     h->saved_characters=*gmMainLib_GetUnlockedCharactersBitmaskPtr();h->saved_stages=*gmMainLib_8015EDA4();
     h->saved_language=lbLang_GetLanguageSetting();h->saved_saved_language=lbLang_GetSavedLanguage();
     h->saved_library=HSD_PadLibData;
@@ -108,6 +111,10 @@ int melee_web_menu_host_enter(MeleeWebMenuHost* h,MeleeWebAudio* audio,char* e,s
     lbLang_SetLanguageSetting(LANG_US);lbLang_SetSavedLanguage(LANG_US);
     *gmMainLib_GetGameRules()=gmMainLib_803D4A48;
     gmMainLib_GetGameRules()->mode=1;gmMainLib_GetGameRules()->stock_count=4;
+    gmMainLib_8015CC58()->item_freq=(u8)-1;
+    gmMainLib_8015CC58()->item_mask=UINT64_MAX;
+    gmMainLib_8015CC58()->rumble_enabled[0]=true;
+    gmMainLib_8015CC58()->rumble_enabled[1]=true;
     *gmMainLib_GetUnlockedCharactersBitmaskPtr()=0xffff;*gmMainLib_8015EDA4()=0xffff;
     HSD_PadLibData=default_libinfo_data;
     HSD_PadLibData.rumble_info=h->saved_library.rumble_info;
@@ -191,6 +198,15 @@ int melee_web_menu_host_selection(const MeleeWebMenuHost* h,MeleeWebMenuMatchSel
         return fail(e,n,"Original HUD layout is unsupported");
     out->hud_layout=vs->start.rules.x0_3;
     out->random_seed=h->seed;return ok(e,n);
+}
+int melee_web_menu_host_raw_selection(const MeleeWebMenuHost* h,StartMeleeData* out,char* e,size_t n){
+    if(!h||h!=owner||h->entered||h->audio||!out||seed_ptr!=&h->seed||
+       melee_web_menu_phase(h->session)!=MELEE_WEB_MENU_READY)
+        return fail(e,n,"Raw selection requires a completed closed SSS scene");
+    const SSSData* sss=melee_web_menu_sss(h->session);
+    if(!sss||!sss->start_game||!melee_web_menu_sss_selection_valid(sss))
+        return fail(e,n,"Original SSS has not committed a supported raw selection");
+    *out=sss->vs.start;return ok(e,n);
 }
 int melee_web_menu_host_match_finished(MeleeWebMenuHost* h,uint32_t seed,char* e,size_t n){
     if(!h||h!=owner||h->entered||h->audio||seed_ptr!=&h->seed||melee_web_menu_phase(h->session)!=MELEE_WEB_MENU_READY)
