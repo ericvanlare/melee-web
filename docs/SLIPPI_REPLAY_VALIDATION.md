@@ -89,6 +89,15 @@ no emulator enters the browser runtime. Preserve ordinary retail setup and
 capture the complete `StartMeleeData` at VS entry. Decode native source fields
 explicitly; never transplant PPC pointers or C bitfield layouts.
 
+The calibration recipe v2 carries the complete semantic PAD configuration and
+Master/Copy/Game histories into source initialization. Compare those histories
+as well as fighter fields on every tick; fresh-zero PAD state is not equivalent
+to entering from an ordinary menu. The native queue and rumble pointers stay
+owned by the port. See [the wire and phase contract](RETAIL_REPLAY_CAPTURE.md).
+The optional retail draw audit binds every camera traversal to its source tick
+and reports any declared-state mutation. Its passing neutral sequence does not
+replace an active, visibly rendered replay or prove pixel agreement.
+
 Capture PAD samples at actual source consumption, not at every hardware poll:
 raw polls can continue during scene loading. Observe state after the original
 GObj scheduler. The game match counter can remain zero during Ready, while the
@@ -183,9 +192,10 @@ an expected-state comparison. The independent retail/port calibration passes
 240 neutral Mario/Mario Final Destination ticks and exposed shared particle-bank
 and rumble gaps. See [the reproducible capture procedure](RETAIL_REPLAY_CAPTURE.md)
 for exact provenance, field/phase limits and retained negative evidence.
-No Slippi fixture is gold-admitted yet. Before broader admission, restore the
-complete typed initial PAD history and settle source draw-phase coverage, then
-run the modern input donor against the reference and in the visible browser.
+No Slippi fixture is gold-admitted yet. The typed initial PAD contract and its
+240-tick comparison pass. The neutral retail draw audit also passes for declared
+fields; active source draw-phase coverage remains open. Next run the modern
+input donor against the reference and in the visible browser.
 
 ## Immediate implementation order
 
@@ -193,9 +203,9 @@ The parser/indexer, rollback normalization, input-only runner, independent
 retail capture and scoped port comparison are working. Keep their negative
 controls and the retained pre-fix RNG divergence as calibration evidence.
 
-1. Extend the recipe to typed master/copy/game PAD histories and processing
-   configuration. Establish the source tick/draw lifecycle contract with the
-   existing small retail fixture before claiming general input equivalence.
+1. Retain the passing typed master/copy/game PAD history/configuration and
+   neutral source draw-audit controls. Extend the draw lifecycle evidence to
+   active replay before claiming general input equivalence.
 2. Feed the existing modern Fox/Falco Battlefield recording through the same
    reference process without arbitrary opponent replacement. Capture a new
    vanilla trajectory and compare it; the original UCF state stays excluded.

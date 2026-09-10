@@ -50,7 +50,7 @@ struct MeleeWebMatchContext {
     HSD_RumbleData saved_rumble[4];
     HSD_PadRumbleListData rumble_lists[12];
     CmSubject* pool;
-    int crowd_started;
+    int crowd_started,input_restored;
 };
 static MeleeWebMatchContext* owner;
 static uint64_t shadow_generation;
@@ -144,6 +144,17 @@ MeleeWebMatchContext* melee_web_match_begin_players(const MeleeWebPlayerSettings
 int melee_web_match_create_fighter(MeleeWebMatchContext* h,char* e,size_t n)
 {
     return melee_web_match_create_fighters(h,e,n);
+}
+int melee_web_match_restore_input(MeleeWebMatchContext* h,const MeleeWebPadState* state,char* e,size_t n)
+{
+    if(!live(h,e,n))return 0;
+    if(!state||h->ticks||h->input_restored||HSD_PadLibData.qcount)
+        return fail(e,n,"Input history may be restored once before match initialization");
+    for(uint32_t i=0;i<h->player_count;i++)
+        if(Player_GetPtrForSlot(h->slots[i])->player_entity[0])
+            return fail(e,n,"Input history cannot be restored after fighter creation");
+    melee_web_pad_state_apply(state);h->input_restored=1;
+    return ok(e,n);
 }
 static int create_fighters(MeleeWebMatchContext* h,int activate,char* e,size_t n)
 {

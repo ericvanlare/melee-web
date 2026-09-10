@@ -29,6 +29,7 @@ from pathlib import Path
 import re
 import struct
 from typing import Any, Iterable
+from pad_state import PAD_STATE_BYTES, decode_pad_state
 
 
 SCHEMA = "melee-web-retail-replay-candidate"
@@ -226,6 +227,12 @@ def _validate_provenance(value: Any, context: str) -> dict[str, Any]:
     return value
 
 
+def _pad_state(value, context):
+    _hex(value, PAD_STATE_BYTES, context)
+    try: return decode_pad_state(value)
+    except ValueError as error: raise CaptureError(context+": "+str(error)) from error
+
+
 def _validate_fighter(value: Any, slot: int, context: str) -> None:
     if not isinstance(value, dict):
         raise CaptureError(f"{context}: fighter must be an object")
@@ -247,10 +254,11 @@ def _validate_fighter(value: Any, slot: int, context: str) -> None:
     _hex(value["input_hex"], 0x6C, f"{context}.input_hex")
 
 
-def _validate_state(value: Any, context: str) -> None:
+def _validate_state(value: Any, context: str, version: int = 1) -> None:
     if not isinstance(value, dict):
         raise CaptureError(f"{context}: state must be an object")
-    _require_keys(value, STATE_KEYS, context)
+    _require_keys(value, STATE_KEYS | ({"pad_state_hex"} if version == 2 else set()), context)
+    if version == 2: _pad_state(value["pad_state_hex"], context+".pad_state_hex")
     _u32(value["rng"], f"{context}.rng")
     _u32(value["scene_frame"], f"{context}.scene_frame")
     _u32(value["match_frame"], f"{context}.match_frame")
@@ -338,7 +346,7 @@ def _validate_capture(rows: Iterable[dict[str, Any]], context: str,
         raise CaptureError(f"{context}: first record must be header")
     _require_keys(header, HEADER_KEYS, f"{context}.header")
     if (header["schema"] != SCHEMA or type(header["version"]) is not int
-            or header["version"] != VERSION):
+            or header["version"] not in (1, 2)):
         raise CaptureError(f"{context}.header: unsupported schema or version")
     if header["phase"] != PHASE:
         raise CaptureError(f"{context}.header: unsupported phase")
@@ -348,6 +356,8 @@ def _validate_capture(rows: Iterable[dict[str, Any]], context: str,
         raise CaptureError(f"{context}.header: unsupported initial phase")
     if header["game_revision"] != GAME_REVISION:
         raise CaptureError(f"{context}.header: unsupported game revision")
+    version = header["version"]
+    state_keys = STATE_KEYS | ({"pad_state_hex"} if version == 2 else set())
     requested = _int(header["frames_requested"], f"{context}.header.frames_requested",
                      minimum=1, maximum=MAX_FRAMES)
     _validate_provenance(header["provenance"], f"{context}.header.provenance")
@@ -368,23 +378,27 @@ def _validate_capture(rows: Iterable[dict[str, Any]], context: str,
     match_enter = rows_tuple[1]
     if match_enter.get("record") != "match_enter":
         raise CaptureError(f"{context}: record 1 must be match_enter")
-    _require_keys(match_enter, MATCH_ENTER_KEYS, f"{context}.match_enter")
+    _require_keys(match_enter, MATCH_ENTER_KEYS if version == 1 else
+                  {"record", "rng", "start_melee_hex", "pad_state_hex"}, f"{context}.match_enter")
     _u32(match_enter["rng"], f"{context}.match_enter.rng")
     _hex(match_enter["start_melee_hex"], 0x138,
          f"{context}.match_enter.start_melee_hex")
-    _hex(match_enter["pad_lib_hex"], 0x20, f"{context}.match_enter.pad_lib_hex")
-    _hex(match_enter["pad_master_hex"], 0x110,
-         f"{context}.match_enter.pad_master_hex")
-    _hex(match_enter["pad_game_hex"], 0x110,
-         f"{context}.match_enter.pad_game_hex")
+    if version == 2:
+        _pad_state(match_enter["pad_state_hex"], f"{context}.match_enter.pad_state_hex")
+    else:
+        _hex(match_enter["pad_lib_hex"], 0x20, f"{context}.match_enter.pad_lib_hex")
+        _hex(match_enter["pad_master_hex"], 0x110,
+             f"{context}.match_enter.pad_master_hex")
+        _hex(match_enter["pad_game_hex"], 0x110,
+             f"{context}.match_enter.pad_game_hex")
 
     initial = rows_tuple[2]
     if initial.get("record") != "match_enter_complete":
         raise CaptureError(f"{context}: record 2 must be match_enter_complete")
-    _require_keys(initial, {"record", *STATE_KEYS},
+    _require_keys(initial, {"record", *state_keys},
                   f"{context}.match_enter_complete")
-    initial_state = {key: initial.get(key) for key in STATE_KEYS}
-    _validate_state(initial_state, f"{context}.match_enter_complete")
+    initial_state = {key: initial.get(key) for key in state_keys}
+    _validate_state(initial_state, f"{context}.match_enter_complete", version)
 
     frames: list[dict[str, Any]] = []
     for expected_index, row in enumerate(rows_tuple[3:-1]):
@@ -393,12 +407,12 @@ def _validate_capture(rows: Iterable[dict[str, Any]], context: str,
             raise CaptureError(
                 f"{context}: record {expected_index + 3} must be frame "
                 f"(got {row.get('record')!r})")
-        _require_keys(row, FRAME_KEYS, context_row)
+        _require_keys(row, FRAME_KEYS | ({"pad_state_hex"} if version == 2 else set()), context_row)
         if _int(row["index"], f"{context_row}.index", minimum=0) != expected_index:
             raise CaptureError(
                 f"{context_row}.index: expected {expected_index}, got {row['index']!r}")
         _validate_inputs(row["consumed_inputs"], f"{context_row}.consumed_inputs")
-        _validate_state({key: row.get(key) for key in STATE_KEYS}, context_row)
+        _validate_state({key: row.get(key) for key in state_keys}, context_row, version)
         frames.append(row)
     _validate_scene_continuity(frames, context)
 
@@ -512,6 +526,7 @@ def _initial_semantics(capture: _Capture) -> dict[str, Any]:
         "match_frame": capture.initial["match_frame"],
         "fighters": capture.initial["fighters"],
     }
+    if capture.header["version"] == 2: initial["pad_state_hex"] = capture.initial["pad_state_hex"]
     return _lower_hex_strings(initial)
 
 
@@ -542,7 +557,7 @@ def _base_report(first: _Capture | None, second: _Capture | None,
         "equivalent": True,
         "scope": SCOPE,
         "schema": SCHEMA,
-        "version": VERSION,
+        "version": first.header["version"] if first else VERSION,
         "schema_note": SCHEMA_NOTE,
         "independence_note": INDEPENDENCE_NOTE,
         "captures": {"a": first_meta, "b": second_meta},
@@ -570,10 +585,12 @@ def _compare_validated(first_capture: _Capture, second_capture: _Capture) -> dic
     # count and collector identity still belong to this candidate schema and
     # are useful first divergences when otherwise-valid files differ.
     header_left = {
+        "version": first_capture.header["version"],
         "frames_requested": first_capture.header["frames_requested"],
         "collector_sha256": first_capture.header["collector_sha256"],
     }
     header_right = {
+        "version": second_capture.header["version"],
         "frames_requested": second_capture.header["frames_requested"],
         "collector_sha256": second_capture.header["collector_sha256"],
     }

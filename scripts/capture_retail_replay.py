@@ -40,6 +40,7 @@ sys.path.insert(0, str(TOOLS_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from retail_replay_validation import EXPECTED_PROVENANCE, MAX_FRAMES, load_capture
+from retail_draw_audit import load_draw_audit
 from extract_disc_file import DiscImage, DiscFormatError
 
 
@@ -535,7 +536,7 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
                    template_user: str | Path, snapshot: str | Path,
                    checkpoint_gc: str | Path, provenance: str | Path,
                    output: str | Path, frames: int = DEFAULT_FRAMES,
-                   timeout: float = DEFAULT_TIMEOUT) -> dict:
+                   timeout: float = DEFAULT_TIMEOUT, draw_audit: bool = False) -> dict:
     """Run the bounded capture and return preserved run metadata."""
 
     if isinstance(frames, bool) or not isinstance(frames, int) or not 1 <= frames <= MAX_FRAMES:
@@ -543,6 +544,8 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
     if (isinstance(timeout, bool) or not isinstance(timeout, (int, float))
             or not math.isfinite(timeout) or timeout <= 0):
         raise CaptureRunnerError("timeout must be positive")
+    if not isinstance(draw_audit, bool):
+        raise CaptureRunnerError("draw_audit must be boolean")
     disc_path = _regular_file(Path(disc), "disc image")
     snapshot_path = _regular_file(Path(snapshot), "snapshot")
     started = time.monotonic()
@@ -598,6 +601,7 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
         "run_root": str(run_root),
         "output": str(paths["output"]),
         "frames_requested": frames,
+        "source_draw_audit": draw_audit,
         "timeout_seconds": timeout,
         "identity": paths["identity"],
         "source": {
@@ -648,6 +652,7 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
         environment = os.environ.copy()
         environment["MELEE_REPLAY_REFERENCE_WORK"] = str(paths["evidence"])
         environment["MELEE_REPLAY_COLLECTOR"] = str(paths["collector"])
+        environment["MELEE_REPLAY_DRAW_AUDIT"] = "1" if draw_audit else "0"
         dolphin_log = (run_root / "dolphin.log").open("w", encoding="utf-8")
         dolphin_process = subprocess.Popen(
             command, stdout=dolphin_log, stderr=subprocess.STDOUT, env=environment,
@@ -675,6 +680,12 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
                 f"collector did not produce requested output: {paths['output']}")
         try:
             loaded = load_capture(paths["output"])
+            if len(loaded.frames) != frames:
+                raise ValueError("captured frame count differs from requested bound")
+            if draw_audit:
+                audit_path = paths["evidence"] / "draw-audit.jsonl"
+                metadata["draw_audit"] = load_draw_audit(loaded, audit_path)
+                metadata["draw_audit"]["path"] = str(audit_path)
         except ValueError as error:
             raise CaptureRunnerError(f"captured JSONL failed strict validation: {error}") from error
         metadata.update({
@@ -715,6 +726,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--provenance", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--frames", type=int, default=DEFAULT_FRAMES)
+    parser.add_argument("--draw-audit", action="store_true", help="Observe one source camera traversal after each captured tick")
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT)
     args = parser.parse_args(argv)
     try:
@@ -722,7 +734,7 @@ def main(argv: list[str] | None = None) -> int:
             dolphin=args.dolphin, disc=args.disc, dol=args.dol,
             template_user=args.template_user, snapshot=args.snapshot,
             checkpoint_gc=args.checkpoint_gc, provenance=args.provenance,
-            output=args.output, frames=args.frames, timeout=args.timeout)
+            output=args.output, frames=args.frames, timeout=args.timeout, draw_audit=args.draw_audit)
     except CaptureRunnerError as error:
         parser.exit(2, f"retail capture failed: {error}\n")
     print(json.dumps({

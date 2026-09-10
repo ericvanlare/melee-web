@@ -31,6 +31,9 @@ frame_index = 0
 fighters = {}
 pending_inputs = []
 breakpoints = []
+DRAW_AUDIT = os.environ.get("MELEE_REPLAY_DRAW_AUDIT") == "1"
+draw_before = None
+draw_count = 0
 
 
 def memory(address, size):
@@ -82,8 +85,18 @@ def fighter_state(slot, address):
     }
 
 
+def pad_state():
+    config = memory(0x804C1F84, 0x20)
+    # Skip the two alignment bytes before adc_angle and each status tail.
+    result = config[:10] + config[12:]
+    for base in (0x804C1FAC, 0x804C20BC, 0x804C21CC):
+        raw = memory(base, 0x110)
+        result += b"".join(raw[i:i + 66] for i in range(0, 0x110, 68))
+    return result.hex()
+
+
 def state():
-    return {"rng": rng(), "scene_frame": word(0x80479D58),
+    return {"pad_state_hex": pad_state(), "rng": rng(), "scene_frame": word(0x80479D58),
             "match_frame": word(0x8046B6C4),
             "fighters": [fighter_state(slot, pointer)
                          for slot, pointer in sorted(fighters.items())]}
@@ -152,12 +165,48 @@ def scheduler_return():
           "consumed_inputs": list(pending_inputs), **sample})
     pending_inputs.clear()
     frame_index += 1
+    if frame_index == LIMIT and not DRAW_AUDIT:
+        return finish()
+    return False
+
+
+def finish():
+    global active
+    emit({"record": "end", "frames": frame_index, "status": "captured"})
+    active = False
+    print("Identical debugger trap repeats:", observations.duplicates)
+    print("Reference candidate captured:", OUTPUT)
+    return True
+
+
+def draw_enter():
+    global draw_before
+    if not active or not ready: return False
+    sample = state()
+    if not observations.accept("draw_enter", sample["scene_frame"], (machine_context(), sample)):
+        return False
+    if draw_before is not None: raise RuntimeError("Nested source camera traversal")
+    if sample["scene_frame"] != frame_index or frame_index != draw_count + 1:
+        raise RuntimeError("Draw audit requires one camera traversal per source tick")
+    draw_before = sample
+    return False
+
+
+def draw_return():
+    global draw_before, draw_count
+    if not active or not ready: return False
+    sample = state()
+    if not observations.accept("draw_return", sample["scene_frame"], (machine_context(), sample)):
+        return False
+    if draw_before is None: raise RuntimeError("Source draw return without entry")
+    with (ROOT / "draw-audit.jsonl").open("a") as stream:
+        stream.write(json.dumps({"record":"draw", "index":draw_count,
+                                "before":draw_before, "after":sample}, sort_keys=True)+"\n")
+    draw_before = None
+    draw_count += 1
     if frame_index == LIMIT:
-        emit({"record": "end", "frames": frame_index, "status": "captured"})
-        active = False
-        print("Identical debugger trap repeats:", observations.duplicates)
-        print("Reference candidate captured:", OUTPUT)
-        return True
+        if draw_count != LIMIT: raise RuntimeError("Incomplete draw lifecycle")
+        return finish()
     return False
 
 
@@ -180,9 +229,7 @@ def enter():
     pointer = int(gdb.parse_and_eval("$r3"))
     sample = {"record": "match_enter", "rng": rng(),
               "start_melee_hex": memory(pointer, 0x138).hex(),
-              "pad_lib_hex": memory(0x804C1F78 + 0xC, 0x20).hex(),
-              "pad_master_hex": memory(0x804C1FAC, 0x110).hex(),
-              "pad_game_hex": memory(0x804C21CC, 0x110).hex()}
+              "pad_state_hex": pad_state()}
     if not observations.accept("entry", 0, (machine_context(), sample)):
         if ready:
             raise RuntimeError("Match entry repeated after initialization")
@@ -223,7 +270,7 @@ class Arm(gdb.Command):
         fighters.clear()
         pending_inputs.clear()
         emit({"record": "header", "schema": "melee-web-retail-replay-candidate",
-              "version": 1, "capture_id": uuid.uuid4().hex, "phase": "HSD_GObj_80390CFC_return",
+              "version": 2, "capture_id": uuid.uuid4().hex, "phase": "HSD_GObj_80390CFC_return",
               "input_phase": "HSD_PadRenewMasterStatus_entry_queue",
               "initial_phase": "gm_Scene_Vs_OnEnter_entry",
               "game_revision": "GALE01r2", "frames_requested": LIMIT,
@@ -239,6 +286,13 @@ class Arm(gdb.Command):
         Observer(0x8016E9C4, entered)
         Observer(0x8037750C, pad_consume)
         Observer(0x80390EB4, scheduler_return)
+        if DRAW_AUDIT:
+            if word(0x80391040) != 0x4E800020:
+                raise gdb.GdbError("Pinned camera-traversal return instruction does not match")
+            if (ROOT / "draw-audit.jsonl").exists():
+                raise gdb.GdbError("Draw audit output already exists")
+            Observer(0x80390FC0, draw_enter)
+            Observer(0x80391040, draw_return)
         print("Read-only reference collector armed:", OUTPUT)
 
 

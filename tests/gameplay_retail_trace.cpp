@@ -9,6 +9,8 @@
 #include <iostream>
 #include <stdexcept>
 #include <vector>
+#include <memory>
+#include "gameplay_pad_state.h"
 
 extern "C" int melee_web_retail_setup(const uint8_t*,uint32_t,
     MeleeWebMenuMatchSelection*,char*,size_t);
@@ -21,7 +23,7 @@ struct Reader {
     size_t cursor=0;
     explicit Reader(const char* path){
         const auto size=std::filesystem::file_size(path);
-        check(size>=16+0x138&&size<=16+0x138+36000*44,
+        check(size>=16+0x138&&size<=16+0x138+36000*44+MELEE_WEB_PAD_STATE_BYTES,
               "Reference input size is outside its bounds");
         std::ifstream f(path,std::ios::binary);bytes.assign(std::istreambuf_iterator<char>(f),{});
         check(bytes.size()==size,"Reference input read was incomplete");
@@ -39,9 +41,10 @@ void hex(const uint8_t* data,size_t count){
 int main(int argc,char** argv){try{
     check(argc==4,"Expected owned menu/game directories and MWRC reference input");
     Reader input(argv[3]);
-    check(input.u32()==0x4d575243&&input.u32()==1,"Unsupported reference input format");
+    check(input.u32()==0x4d575243,"Unsupported reference input format");
+    const auto version=input.u32();check(version==1||version==2,"Unsupported reference input version");
     const auto seed=input.u32();const auto frames=input.u32();
-    check(frames&&frames<=36000&&input.bytes.size()==16+0x138+size_t(frames)*44,
+    check(frames&&frames<=36000&&input.bytes.size()==16+0x138+(version==2?MELEE_WEB_PAD_STATE_BYTES:0)+size_t(frames)*44,
           "Reference input frame count disagrees with its size");
     std::array<uint8_t,0x138> setup{};for(auto& byte:setup)byte=input.u8();
     char error[256]{};MeleeWebMenuMatchSelection selection{};
@@ -54,11 +57,25 @@ int main(int argc,char** argv){try{
             files[entry.path().filename().string()]={std::istreambuf_iterator<char>(stream),{}};
         }
     }
-    melee_web::GameplayMatchSession match(files,selection);
-    std::cout<<"{\"record\":\"header\",\"schema\":\"melee-web-port-replay-candidate\",\"version\":1,\"frames_requested\":"<<frames
+    std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> pad_bytes{};
+    std::unique_ptr<MeleeWebPadState,decltype(&melee_web_pad_state_free)> initial_input(nullptr,melee_web_pad_state_free);
+    if(version==2){
+        for(auto& byte:pad_bytes)byte=input.u8();
+        initial_input.reset(melee_web_pad_state_decode(pad_bytes.data(),pad_bytes.size(),error,sizeof(error)));
+        check(bool(initial_input),error);
+    }
+    auto owned_match=initial_input?std::make_unique<melee_web::GameplayMatchSession>(files,selection,*initial_input):
+                                  std::make_unique<melee_web::GameplayMatchSession>(files,selection);
+    auto& match=*owned_match;
+    auto history=[&](){if(version==2){
+        std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> data{};melee_web_pad_state_capture(data.data());
+        std::cout<<",\"pad_state_hex\":\"";hex(data.data(),data.size());std::cout<<"\"";
+    }};
+    std::cout<<"{\"record\":\"header\",\"schema\":\"melee-web-port-replay-candidate\",\"version\":"<<version<<",\"frames_requested\":"<<frames
         <<",\"phase\":\"after_source_tick_before_audio_transport\",\"rendering\":\"excluded\",\"comparison\":\"not_run\"}\n";
-    std::cout<<"{\"record\":\"match_enter\",\"rng\":"<<seed<<",\"start_melee_hex\":\"";hex(setup.data(),setup.size());std::cout<<"\"}\n";
-    std::cout<<"{\"record\":\"match_enter_complete\",";melee_web_retail_state();std::cout<<"}\n";
+    std::cout<<"{\"record\":\"match_enter\",\"rng\":"<<seed<<",\"start_melee_hex\":\"";hex(setup.data(),setup.size());std::cout<<"\"";
+    if(version==2){std::cout<<",\"pad_state_hex\":\"";hex(pad_bytes.data(),pad_bytes.size());std::cout<<"\"";}std::cout<<"}\n";
+    std::cout<<"{\"record\":\"match_enter_complete\",";melee_web_retail_state();history();std::cout<<"}\n";
     unsigned audio_phase=0;float pcm[1068];
     for(uint32_t index=0;index<frames;index++){
         check(!match.paused()&&!match.complete(),"Reference workload reached an unsupported pause/exit");
@@ -71,7 +88,7 @@ int main(int argc,char** argv){try{
         match.tick(pads);
         std::cout<<"{\"record\":\"frame\",\"index\":"<<index<<",\"supplied_inputs\":[";
         for(unsigned port=0;port<4;port++){if(port)std::cout<<",";std::cout<<"\"";hex(input.bytes.data()+offset+port*11,11);std::cout<<"\"";}
-        std::cout<<"],";melee_web_retail_state();std::cout<<"}\n";
+        std::cout<<"],";melee_web_retail_state();history();std::cout<<"}\n";
         audio_phase+=32000;const auto samples=audio_phase/60;audio_phase%=60;
         check(melee_web_audio_render(match.audio(),pcm,samples,error,sizeof(error)),error);
     }

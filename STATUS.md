@@ -25,7 +25,11 @@ runner. That is workload evidence, not browser performance or equivalence.
 The first retail replay calibration now passes: two independent automated
 Mario/Mario Final Destination captures repeat exactly for 240 neutral source
 ticks, and the port matches their entry data, input vectors, declared fighter
-fields, RNG and match clock. This found and fixed missing stage particle bank30
+fields, RNG and match clock. The v2 fixture additionally restores and compares
+the semantic PAD configuration and all Master/Copy/Game histories on every tick.
+A separate 240-tick retail camera-traversal audit finds no changes to these
+declared fields during drawing for this neutral sequence. The calibration found
+and fixed missing stage particle bank30
 publication and the absent owned rumble data/interpreter boundary. Stage banks
 30/64 share decoded assets; authored particle dependencies are checked before
 entry. See the [capture procedure and evidence](docs/RETAIL_REPLAY_CAPTURE.md).
@@ -33,8 +37,8 @@ After these fixes, the visible Release Marth/Dream Land warm action inventory
 completed all 46 cases and 6,168 source frames with zero hard-gate failures
 (worst native callback 12.19 ms); an earlier incomplete sweep exposed a test
 driver recovery gap at the original platform-edge teeter state, now corrected.
-This is still **zero admitted gold Slippi fixtures**: initial global PAD-history
-restoration, the reference/port draw lifecycle, the real Fox/Falco input-derived
+This is still **zero admitted gold Slippi fixtures**: the active reference/port
+draw lifecycle, the real Fox/Falco input-derived
 reference and visible Release cold/warm replay validation remain open.
 
 The public tournament corpus audit found 6,813 supported cross-character/stage

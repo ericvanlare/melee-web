@@ -12,6 +12,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
 SPEC = importlib.util.spec_from_file_location(
     "retail_replay_validation", ROOT / "tools" / "retail_replay_validation.py")
 VALIDATION = importlib.util.module_from_spec(SPEC)

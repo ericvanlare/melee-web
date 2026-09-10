@@ -26,7 +26,7 @@ add_library(fighter_source_runtime STATIC EXCLUDE_FROM_ALL ${fighter_paths}
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/ax/AXVPB.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/ax/AXCL.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/ax/AXAux.c" src/gameplay_sdk.c src/gameplay_action_store.c src/gameplay_bonus_data.c src/gameplay_rumble.c
-  src/gameplay_player_context.c src/gameplay_fighter_assets.c src/gameplay_effect_banks.c src/gameplay_ground_data.c src/gameplay_archive_sections.c src/gameplay_platform.c src/gameplay_match_context.c src/gameplay_font_atlas.c src/gameplay_stage_numeric.c src/dat_item_registry.c
+  src/gameplay_player_context.c src/gameplay_fighter_assets.c src/gameplay_effect_banks.c src/gameplay_ground_data.c src/gameplay_archive_sections.c src/gameplay_platform.c src/gameplay_match_context.c src/gameplay_pad_state.c src/gameplay_font_atlas.c src/gameplay_stage_numeric.c src/dat_item_registry.c
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/particle.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/generator.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/hsd_3A64.c"
@@ -202,6 +202,14 @@ target_link_options(gameplay_retail_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS
   -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1
   -sSTACK_SIZE=8388608)
 set_target_properties(gameplay_retail_trace PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_pad_state_trace EXCLUDE_FROM_ALL tests/gameplay_pad_state_trace.c)
+target_link_libraries(gameplay_pad_state_trace PRIVATE fighter_source_runtime)
+target_compile_options(gameplay_pad_state_trace PRIVATE -UNDEBUG
+  -include "${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h")
+target_link_options(gameplay_pad_state_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+  -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_pad_state_trace PROPERTIES SUFFIX ".js")
 
 add_executable(gameplay_rumble_trace EXCLUDE_FROM_ALL
   tests/gameplay_rumble_trace.cpp tests/gameplay_rumble_state.c)

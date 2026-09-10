@@ -13,7 +13,9 @@ match-clock values. The input is neutral on two human ports; red/yellow costumes
 and the complete 0x138-byte StartMeleeData come from ordinary retail menus.
 The port then completes the same input recipe and teardown. Entry data, all
 supplied inputs, both fighters' declared fields, RNG and match clock compare
-exactly against that repeated reference.
+exactly against that repeated reference. Schema/recipe v2 also restores and
+compares the semantic PAD processing configuration and all four ports of the
+Master, Copy and Game history banks, at initialization and on every tick.
 
 This exposed two shared runtime gaps, subsequently fixed:
 
@@ -36,13 +38,25 @@ This exposed two shared runtime gaps, subsequently fixed:
 The machine report deliberately says `declared_state_match`,
 `gold_admitted: false` and `performance: not_evaluated`. This is a calibration
 fixture, not a Slippi-derived gold replay, full-match acceptance or visual/audio
-agreement. The recipe currently excludes initial global PAD histories; the
-collector records master/game histories and configuration but still needs copy
-history and a typed restoration contract before general input admission. The
-probe excludes source drawing and records state after the source tick, before
-PCM transport. Those phase and lifecycle limits must be resolved or explicitly
-proven irrelevant for a future admitted fixture; matching this neutral prefix
-cannot waive them.
+agreement. The headless probe excludes source drawing and records state after
+the source tick, before PCM transport. A separate retail audit now observes
+entry/return of the original camera traversal on all 240 ticks: none changes
+the declared fighter fields, PAD configuration/history, RNG or clocks during
+drawing. This is a neutral-fixture result, not a claim about all render state or
+active gameplay. A visible source draw/replay comparison remains necessary;
+matching this prefix cannot waive it.
+
+The v2 initial PAD contract is 822 big-endian semantic bytes: 30 configuration
+bytes, then Master/Copy/Game banks with four 66-byte statuses each. C padding,
+queue storage and rumble pointers are excluded. Native code decodes each scalar
+and float bit pattern, validates the configuration, and applies it once to an
+owned unticked match before fighter/world initialization. Each history keeps
+its own buttons, trigger/release/repeat state, repeat counter, raw and normalized
+axes, cross-direction and error status. This preserves held-button history
+instead of synthesizing a fresh press. The live queue and rumble allocations
+remain native-owned. Existing v1 evidence remains readable with its narrower
+scope; it cannot silently acquire v2 coverage. This explicit recipe constructor
+does not change ordinary browser CSS/SSS controller-history ownership.
 
 ## Reproduce with local owned inputs
 
@@ -100,10 +114,20 @@ then capture the requested match ticks. It is not a general menu driver or a
 Slippi input injector. Do not feed another checkpoint and assume equivalent
 initial conditions merely because the command exits successfully.
 
+Add `--draw-audit` to observe `HSD_GObj_80390FC0` entry and its verified return.
+The owned evidence directory receives `draw-audit.jsonl`; run metadata binds
+its hash to the capture and records the comparison. Missing, reordered or extra
+draws, invalid state, or a draw entry that does not match the immediately
+preceding scheduler state fail validation. The expected source scene-counter
+increment between scheduler and draw is checked explicitly. Changes during
+drawing remain visible as `declared_state_changed`, never waived. This audit
+requires one draw per source tick; it does not cover retail's queued multi-tick
+cadence, pixels, GPU results or timing.
+
 ## Capture contract and failure rules
 
 - Entry is `gm_Scene_Vs_OnEnter` entry. The full StartMeleeData and RNG are read;
-  the capture also records source PAD configuration and master/game histories.
+  v2 also records semantic source PAD configuration and master/copy/game histories.
 - Initial state is the verified return instruction of VS entry. First input
   consumption and frame observations are forbidden before that boundary.
 - Inputs are read at `HSD_PadRenewMasterStatus` entry from the queue slot actually
@@ -112,6 +136,8 @@ initial conditions merely because the command exits successfully.
 - State is read at `HSD_GObj_80390CFC` return: both fighters' motion/animation,
   position, velocities, facing, grounded state, damage, shield, stocks and input
   bytes, plus RNG and clocks. Floats retain exact IEEE bits.
+- V2 compares the complete semantic PAD snapshot at entry, initial state and
+  each scheduler observation. A PAD divergence names its bank, port and member.
 - Scene ticks must be contiguous from zero. Match time can remain zero during
   Ready; using it as the input-step clock would collapse real simulation ticks.
 - Repeated debugger traps were observed at identical boundaries. A repeat is
@@ -164,3 +190,19 @@ Logs are `verified-unittest.log`, `verified-replay-tests.log`,
 `browser-sweep-pass.json`. The browser records are compact transcriptions of the
 visible DOM reports, not reference-state traces; the passing record pins the
 tested Release artifact hashes and records unload/cleanup.
+
+The follow-up ignored `work/reference-input-v2/` evidence contains independent
+`retail-a.jsonl` / `retail-b.jsonl`, repeated-reference export `retail-input.mwrc`,
+`port-final.jsonl` and `comparison-final.json`. All 240 ticks match, including
+the complete PAD snapshot. The respective capture SHA-256 values are
+`ce5561fc4e52b887006a2d90ddca764586b749c05ea5c2328ada97a80a1d69d3`,
+`616a5849655cc732446b0b50cb35e2663f4633fc64c3659b1157e2b5e9c509c5`
+and `6e6ebea3ae091c25bb9892c09b45b564012501922583e946bd98cf0627576b75`.
+`retail-draw.jsonl` is a further independent capture with drawing observation;
+`draw-audit-comparison.json` records 240 traversals and zero measured changes.
+Native boundary tests cover exact signed/float bytes, distinct held/released
+edges, invalid snapshots and retention of queue/rumble ownership. Schema
+negative controls reject omitted histories and broken draw lifecycles.
+The follow-up full suite passes all 354 tests, and both Debug and Release
+`gameplay_menu_browser` builds pass. These builds are integration checks, not
+new visible-browser replay performance evidence.

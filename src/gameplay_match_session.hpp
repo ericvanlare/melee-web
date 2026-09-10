@@ -11,6 +11,8 @@ class GameplayMatchSession {
 public:
     GameplayMatchSession(const RuntimeFiles&,const MeleeWebMenuMatchSelection&);
     GameplayMatchSession(const RuntimeFiles&,const MeleeWebMenuMatchSelection&,
+                         const MeleeWebPadState&);
+    GameplayMatchSession(const RuntimeFiles&,const MeleeWebMenuMatchSelection&,
                          RuntimeArchiveCache&);
     GameplayMatchSession(const RuntimeFiles&,const MeleeWebMenuMatchSelection&,
                          RuntimeArchiveCache&,GameplayMatchConstruction);

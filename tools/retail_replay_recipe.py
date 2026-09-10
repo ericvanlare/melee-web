@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Export two repeatable retail candidates to the MWRC v1 input recipe.
+"""Export two repeatable retail candidates to the versioned MWRC input recipe.
 
 The existing ``gameplay_retail_trace`` executable consumes this fixed-width
 binary format::
 
     magic ``MWRC`` | version u32 | entry RNG u32 | frame count u32
     StartMeleeData[0x138]
+    version 2 only: semantic initial PAD configuration/history[822]
     for each frame: four semantic PAD vectors, 11 bytes per port
 
 The exporter uses the first candidate's setup and consumed inputs only after
@@ -24,7 +25,7 @@ import struct
 from typing import Any
 
 from retail_replay_validation import (CaptureError, MAX_FRAMES,
-                                      compare_validated, load_capture)
+                                      compare_validated, load_capture, PAD_STATE_BYTES)
 
 
 MAGIC = b"MWRC"
@@ -33,7 +34,7 @@ GAME_INFO_SIZE = 0x138
 PAD_SEMANTIC_SIZE = 11
 PORT_COUNT = 4
 FRAME_INPUT_SIZE = PORT_COUNT * PAD_SEMANTIC_SIZE
-MAX_TRANSPORT_SIZE = 16 + GAME_INFO_SIZE + MAX_FRAMES * FRAME_INPUT_SIZE
+MAX_TRANSPORT_SIZE = 16 + GAME_INFO_SIZE + PAD_STATE_BYTES + MAX_FRAMES * FRAME_INPUT_SIZE
 
 HEADER = struct.Struct(">4sIII")
 SCOPE = (
@@ -122,10 +123,13 @@ def encode_mwrc(capture) -> tuple[bytes, str]:
             input_bytes += _hex_bytes(raw, PAD_SEMANTIC_SIZE,
                                       f"frame {index} consumed_inputs port {port}")
 
-    payload = bytearray(HEADER.pack(MAGIC, VERSION, seed, frame_count))
+    version = capture.header["version"]
+    payload = bytearray(HEADER.pack(MAGIC, version, seed, frame_count))
     payload += setup
+    if version == 2:
+        payload += _hex_bytes(capture.match_enter["pad_state_hex"], PAD_STATE_BYTES, "entry PAD history")
     payload += input_bytes
-    expected_size = 16 + GAME_INFO_SIZE + frame_count * FRAME_INPUT_SIZE
+    expected_size = 16 + GAME_INFO_SIZE + (PAD_STATE_BYTES if version == 2 else 0) + frame_count * FRAME_INPUT_SIZE
     if len(payload) != expected_size or len(payload) > MAX_TRANSPORT_SIZE:
         raise RecipeError("generated MWRC size does not match its frame count")
     return bytes(payload), hashlib.sha256(bytes(input_bytes)).hexdigest()
@@ -176,11 +180,12 @@ def export_pair(first_path: str | Path, second_path: str | Path,
         "independence_note": INDEPENDENCE_NOTE,
         "transport": {
             "magic": MAGIC.decode("ascii"),
-            "version": VERSION,
+            "version": first_capture.header["version"],
             "frames": len(first_capture.frames),
             "bytes": len(payload),
             "entry_rng": first_capture.match_enter["rng"],
             "start_melee_bytes": GAME_INFO_SIZE,
+            "initial_pad_bytes": PAD_STATE_BYTES if first_capture.header["version"] == 2 else 0,
             "pad_bytes_per_port": PAD_SEMANTIC_SIZE,
             "ports": PORT_COUNT,
         },
