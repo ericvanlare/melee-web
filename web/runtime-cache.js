@@ -20,11 +20,12 @@
       populated: false,
       saves: 0,
       clears: 0,
+      dirty: false,
+      lastSaveMs: null,
       fileBytes: 0,
       message: "Preparing optional render cache storage.",
     };
     let saveQueue = Promise.resolve(false);
-    let scheduledSave = null;
     let dependencyAdded = false;
 
     function describe(error) {
@@ -42,6 +43,8 @@
         populated: state.populated,
         saves: state.saves,
         clears: state.clears,
+        dirty: state.dirty,
+        lastSaveMs: state.lastSaveMs,
         fileBytes: state.fileBytes,
       };
       try {
@@ -92,6 +95,7 @@
           resolve(false);
           return;
         }
+        const startedAt = Date.now();
         setState("saving", "Persisting optional render cache storage.");
         try {
           const fs = module.FS || (typeof FS !== "undefined" ? FS : null);
@@ -107,6 +111,8 @@
               return;
             }
             ++state.saves;
+            state.dirty = false;
+            state.lastSaveMs = Date.now() - startedAt;
             refreshFileBytes(fs);
             setState("saved", "Optional render cache persisted.");
             resolve(true);
@@ -126,25 +132,16 @@
       return saveQueue;
     };
 
-    // Scene preparation calls this only after Aurora has drained its pipeline
-    // queue through two quiet frames.  Coalesce adjacent scene notifications
-    // and let the browser schedule the IDBFS transaction outside the render
-    // callback.  This preserves newly discovered pipelines even if gameplay
-    // later aborts before the user reaches the explicit unload boundary.
-    module.scheduleRuntimeCacheSave = function () {
-      if (scheduledSave) return scheduledSave;
-      scheduledSave = new Promise((resolve) => {
-        const run = () => {
-          module.saveRuntimeCache().then(resolve, () => resolve(false)).finally(() => {
-            scheduledSave = null;
-          });
-        };
-        if (typeof requestIdleCallback === "function")
-          requestIdleCallback(run, {timeout: 1000});
-        else
-          setTimeout(run, 0);
-      });
-      return scheduledSave;
+    // Pipeline discovery happens during scene preparation and live first use.
+    // IDBFS sync serializes the SQLite database on the browser thread, so even
+    // an idle callback with a timeout can interrupt a later gameplay frame.
+    // Record the dirty state here and flush only after native scene ownership
+    // has been torn down by unloadAndSave().
+    module.markRuntimeCacheDirty = function () {
+      if (!state.mounted || !state.populated) return false;
+      state.dirty = true;
+      setState("dirty", "Optional render cache has pending changes; it will persist at unload.");
+      return true;
     };
 
     function populate() {
@@ -223,6 +220,8 @@
         populated: state.populated,
         saves: state.saves,
         clears: state.clears,
+        dirty: state.dirty,
+        lastSaveMs: state.lastSaveMs,
         fileBytes: state.fileBytes,
       });
     } catch (error) {

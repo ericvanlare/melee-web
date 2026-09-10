@@ -50,16 +50,20 @@ while an asynchronous pipeline is actually queued.
 
 `web/initial_pipeline_cache.db.gz.b64` is a reviewed Aurora cache seed captured
 from the Release browser runtime after the original CSS, SSS, Yoshi's Story,
-Battlefield, and stock-loss/respawn paths had rendered. It contains one shader
-record and 206 pipeline descriptors. It contains no textures, models, audio,
-or other disc bytes. `scripts/materialize_pipeline_cache.py` verifies its SHA-256 digest and
+Battlefield, stock-loss/respawn, and Fox first-use paths had rendered. It
+contains one shader record and 283 pipeline descriptors. It contains no
+textures, models, audio, or other disc bytes.
+`scripts/materialize_pipeline_cache.py` verifies its SHA-256 digest and
 materializes it for Emscripten's `/initial_pipeline_cache.db` preload.
 
-Aurora merges that seed into the origin's optional IDBFS cache. Each completed
-scene preparation schedules a coalesced IDBFS save outside the render callback.
-This preserves newly discovered pipelines even when later gameplay aborts, so
-a crash after a cold stage load does not force the same compilation work on the
-next run.
+Aurora merges that seed into the origin's optional IDBFS cache. Pipeline
+discovery marks the database dirty. The browser flushes it only after native
+scene ownership has been torn down by **Unload** or application reload. An
+earlier implementation scheduled `FS.syncfs` with a one-second idle timeout
+after every settled scene. A captured Fox/Yoshi's Story entry showed the prior
+SSS save still active at the match's first draw, and later first-use paths
+scheduled more saves during gameplay. IDBFS serialization shares the browser
+thread with input and frame submission, so it is excluded from live play.
 
 The seed must be regenerated when Aurora's cache schema or pipeline descriptor
 version changes. Its test checks the schema, digest, byte size, row inventory,
@@ -108,11 +112,59 @@ Eight seconds of gameplay reported a 22.8 ms worst browser interval, 15.1 ms
 worst active native callback, no interval over 33.3 ms, zero audio underruns,
 and no automatic timing pause.
 
-For every admitted character/stage pair, record both a cleared-origin run and a
-second application load on named browser/hardware. The acceptance run must
-include CSS, SSS, match entry, ordinary gameplay, a stock loss/respawn, and
-return to CSS. Record preparations, active callbacks over 33.3 ms, audio
-underruns, pipeline creation, uploads, and any automatic timing pause.
+The 283-pipeline seed was captured from the same Release browser profile after
+Fox/Yoshi's Story entry, intro rendering, stock paths and a complete vertical
+Fire Fox. The source database contained one shader and 283 unique pipeline
+descriptors. This broadens first-use coverage; it does not prove that all Fox
+motions, effects, costumes, opponents or stages are covered.
+
+Browser interval accounting now records the callback that detects a timing
+stall using the running state at callback entry. Previously that callback set
+the native player to paused before the page sampled the interval, so the actual
+stall could disappear from the displayed maximum. The page also records browser
+long tasks separately from native simulation and render callback phases.
+
+## Browser admission matrix
+
+Every admitted character/stage pair needs a cleared-origin run and a second
+application load on a named machine, browser/version, OS, resolution and power
+configuration. Run the Release build through the original CSS and SSS; a direct
+fixture entry does not cover player transitions. Preserve raw PAD inputs and
+the source frame/motion at every reported hitch.
+
+The versioned action inventory for each fighter is:
+
+1. match intro and the first controllable frame;
+2. walk, dash, crouch, jump, double jump, fast fall and at least ten repeated
+   wavedash inputs in both directions;
+3. shield, roll, spot dodge, air dodge, ledge interaction and recovery;
+4. every jab/tilt/smash/aerial/grab/throw and every grounded and aerial special
+   family, including charged/held and directional variants that select distinct
+   source actions;
+5. every fighter article and effect, hitting and being hit, shield contact,
+   KO/stock loss, respawn and invincibility;
+6. pause/resume, match exit, return to CSS and a second match without reloading.
+
+Add stage-specific articles, effects, animated or moving collision, background
+state transitions and alternate source paths to the same inventory. Record the
+exact unexercised rows; content cannot be admitted on metadata, scene-entry or
+one-action evidence.
+
+The current browser gate is zero automatic timing pauses, zero active callback
+intervals over 33.3 ms, zero browser long tasks over 33.3 ms, zero audio
+underruns, and zero pipelines queued or created during live actions. Record
+preparation wall time, native phase timings, first-use draws, texture uploads,
+heap growth and the first failing source frame/motion. These numbers establish
+performance only for the recorded configuration; retail state/render/audio
+equivalence remains a separate gate under [ACCURACY_CONTRACT.md](ACCURACY_CONTRACT.md).
+
+No optional persistence, archive decode, resource destruction, cache/database
+serialization or pipeline compilation may run on the interactive callback
+path. New immutable renderer resources can be prepared while the source clock
+is visibly stopped at a scene boundary. Do not run hidden simulation, consume
+RNG, synthesize input or skip a source effect to warm a cache. Add pipeline
+descriptors discovered by the visible matrix to the reviewed seed, then repeat
+the cleared-origin and warm runs before admitting the content.
 
 The deterministic retail-versus-Wasm state comparison described in
 [issue 1](https://github.com/ericvanlare/melee-web/issues/1) is the accuracy

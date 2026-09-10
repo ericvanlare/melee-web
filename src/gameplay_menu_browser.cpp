@@ -269,6 +269,7 @@ void render_audio_tick(MeleeWebAudio* audio,char* error,size_t error_size){
 void tick(){
  EM_ASM({window.menuServiceCommands?.();});
  const double started=emscripten_get_now();
+ const bool running_at_callback_start=running;
  const AuroraStats stats_before=aurora_stats_snapshot();
  double input_done=started,simulation_done=started,begin_done=started,draw_done=started,end_done=started;
  double preparation_ms=0,preparation_started=0;
@@ -436,7 +437,7 @@ void tick(){
   stats_after.drawCallCount,stats_after.lastTextureUploadSize,
   emscripten_get_heap_size(),suppress_draw);
  EM_ASM({if(window.menuRuntimeTiming)window.menuRuntimeTiming(JSON.parse(UTF8ToString($0)));},timing);
- EM_ASM({window.menuFrame?.();});
+ EM_ASM({window.menuFrame?.(!!$0);},running_at_callback_start?1:0);
 }
 }
 extern "C" {
@@ -506,7 +507,7 @@ int melee_web_native_menu_stock_check(){
  running=true;menu_clock.reset();return 1;
 }
 const char* melee_web_native_menu_diagnostics(){
- static char text[512];
+ static char text[640];
  std::snprintf(text,sizeof(text),"Completed matches: %u · stock check: %d · ticks: %u · stocks: %d · respawns: %d",
   completed_matches,stock_check,stock_tick,stock_count,stock_respawns);
  const auto length=std::char_traits<char>::length(text);
@@ -515,8 +516,14 @@ const char* melee_web_native_menu_diagnostics(){
                 diagnostic_pad_port,static_cast<unsigned>(diagnostic_pad.button),diagnostic_pad.stickX,diagnostic_pad.stickY,diagnostic_pad_remaining);
  else
   std::snprintf(text+length,sizeof(text)-length," · raw PAD: none");
- if(match){const auto length=std::char_traits<char>::length(text);
-  std::snprintf(text+length,sizeof(text)-length," · source pause: %d · ready: %d",match->paused(),match->ready());}
+ if(match){
+  const auto player=match->player_stats(0);
+  const auto length=std::char_traits<char>::length(text);
+  std::snprintf(text+length,sizeof(text)-length,
+   " · source frame: %u · P1 motion: %d · anim: %.3f · ground/air: %d · position: [%.3f,%.3f] · source pause: %d · ready: %d",
+   match->source_frames(),player.motion_id,player.animation_frame,player.ground_or_air,
+   player.position[0],player.position[1],match->paused(),match->ready());
+ }
  else if(world){
   uint32_t completed=0,revisited=0;
   if(melee_web_audio_stream_progress(world->audio(),&completed,&revisited)){

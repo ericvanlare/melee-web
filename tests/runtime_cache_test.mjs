@@ -82,15 +82,21 @@ async function main() {
   assert.equal(state.saves, 2);
   assert.equal(state.fileBytes, 4096);
 
-  const scheduledFirst = successful.module.scheduleRuntimeCacheSave();
-  const scheduledSecond = successful.module.scheduleRuntimeCacheSave();
-  assert.equal(scheduledSecond, scheduledFirst, 'settled-scene saves must coalesce');
+  assert.equal(successful.module.markRuntimeCacheDirty(), true);
+  assert.equal(successful.module.markRuntimeCacheDirty(), true);
+  assert.equal(state.dirty, true);
   await waitTurn();
   await waitTurn();
-  assert.equal(successful.saveCallbacks.length, 1, 'scheduled save runs outside the render callback');
+  assert.equal(successful.saveCallbacks.length, 0, 'pipeline discovery must not persist during gameplay');
+  const deferredSave = successful.module.saveRuntimeCache();
+  await waitTurn();
+  assert.equal(successful.saveCallbacks.length, 1, 'explicit lifecycle teardown starts the cache save');
   successful.saveCallbacks.shift()(null);
-  assert.equal(await scheduledFirst, true);
+  assert.equal(await deferredSave, true);
   assert.equal(state.saves, 3);
+  assert.equal(state.dirty, false);
+  assert.equal(typeof state.lastSaveMs, 'number');
+  assert.equal(successful.module.scheduleRuntimeCacheSave, undefined);
 
   const failedSave = successful.module.saveRuntimeCache();
   await waitTurn();

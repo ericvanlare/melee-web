@@ -17,6 +17,9 @@ class WebLaunchTests(unittest.TestCase):
         self.assertIn("Scene entry profile", runtime)
         self.assertIn("Clear render cache + reload", runtime)
         self.assertIn("clearOnLoad:clearRenderCacheOnLoad", runtime)
+        self.assertIn("markRuntimeCacheDirty", runtime)
+        self.assertIn("Browser long task", runtime)
+        self.assertIn("Render cache save", runtime)
         self.assertNotIn("match-menu", runtime)
         self.assertNotIn("gameplay_browser.js", runtime)
 

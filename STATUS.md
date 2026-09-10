@@ -114,11 +114,12 @@ representation defect is fixed, and the fresh native whole-match routes above
 pass on both admitted stages.
 
 The Release browser now bundles a verified Aurora seed from the original CSS,
-SSS and Yoshi's Story route: one shader record and 121 pipeline descriptors.
-The seed contains no disc assets. Aurora merges all 122 rows into the optional
-origin cache, and each settled scene schedules a coalesced cache save outside
-the render callback so a later gameplay abort does not discard expensive
-pipeline discovery. On a cleared-origin run, first CSS entry changed from the
+SSS, Battlefield, Yoshi's Story, stock/respawn and Fox first-use routes: one
+shader record and 283 pipeline descriptors. The seed contains no disc assets.
+Aurora merges it into the optional origin cache. Newly discovered pipelines
+remain dirty until native teardown, when **Unload** or application reload
+persists the database; IDBFS serialization no longer runs during gameplay.
+On a cleared-origin run, first CSS entry changed from the
 earlier 357.48 ms pipeline-settle sample to 22.31 ms preparation with zero
 queued or created pipelines on first draw. With the expanded seed, CSS/SSS
 again created no pipelines; Yoshi's Story match preparation measured 808.41 ms

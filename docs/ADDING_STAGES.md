@@ -112,6 +112,17 @@ central CMake/Ninja targets. Browser SSS selection must use raw PAD input and
 observe the resulting source selection payload. A direct write to selection
 globals, a menu tile index, or a parsed archive row is not a lifecycle check.
 
+Before admission, run the Release browser matrix in
+[PERFORMANCE.md](PERFORMANCE.md#browser-admission-matrix) with every admitted
+fighter on the stage, from both a cleared origin cache and a second application
+load. Exercise ordinary movement and defense, every admitted attack/special
+family, stage articles and scheduled effects, KO/respawn, match exit, and a
+second match. Require zero automatic timing pauses, zero active callback
+intervals over 33.3 ms, zero browser long tasks over 33.3 ms, zero audio
+underruns, and no live pipeline creation. Capture new pipeline descriptors only
+from visible source gameplay and update the reviewed seed before admitting the
+stage.
+
 ## Unsupported behavior
 
 Until all dependencies and validations above pass, leave the stage out of the

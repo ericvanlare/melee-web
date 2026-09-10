@@ -142,5 +142,17 @@ action.
   one action trace that selects a normal action and each new special family.
 - Exercise construction, one source action tick, unbind, close, and a second
   construction. Check that input archive bytes are unchanged.
+- Run the Release browser acceptance matrix in
+  [PERFORMANCE.md](PERFORMANCE.md#browser-admission-matrix) on every admitted
+  stage, from both a cleared origin cache and a second application load. Cover
+  repeated movement/defense, every normal attack and special family, their
+  articles and effects, taking a hit, KO/respawn, match exit, and a second
+  match. A single action trace or successful scene entry is not browser
+  performance coverage.
+- Require zero automatic timing pauses, zero active callback intervals over
+  33.3 ms, zero browser long tasks over 33.3 ms, zero audio underruns, and no
+  live pipeline creation in that matrix. Add newly observed pipeline
+  descriptors to the reviewed seed only after the source action is exercised
+  in visible gameplay; never advance a hidden match to warm it.
 - State the exact remaining gap when a source service is not hydrated; do not
   enable the character only because its row appears in the registry.
