@@ -10,6 +10,9 @@ renderer cache are integrated, while clean cold-cache/full-match first-use
 stalls, audible and physical controller verification, and full original-game
 equivalence remain open. No
 emulator is shipped; Dolphin is used only as a separate original-game reference.
+The combined [performance and accuracy playbook](docs/PERFORMANCE_AND_ACCURACY.md)
+defines the evidence levels, content admission workflow and failure-response
+process used from this point forward.
 
 The typed content path now carries Falco, Fox, Battlefield and Yoshi's Story
 source IDs, runtime manifests and focused development traces. Source stock icon IDs are

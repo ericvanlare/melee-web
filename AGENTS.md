@@ -3,7 +3,8 @@
 Goal: full vanilla Melee running accurately and performantly in a desktop browser
 through compiled source, without a PowerPC CPU interpreter or JIT.
 
-- Read README.md and STATUS.md before work. Keep status backed by observed evidence.
+- Read README.md, STATUS.md and docs/PERFORMANCE_AND_ACCURACY.md before work. Keep
+  status backed by observed evidence and use the playbook's scoped evidence labels.
 - Follow docs/ACCURACY_CONTRACT.md. The next deliverable is original in-game CSS
   → original SSS → four-stock Mario/FD gameplay → original CSS. Temporary HTML
   menus do not satisfy it. Preserve accuracy; record and resolve existing deviations.

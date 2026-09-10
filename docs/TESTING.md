@@ -110,6 +110,12 @@ evaluates that local clip. Its expected structure is 61 nodes, 111 tracks and a
 These steps define acceptance checks, not a record that they have all passed.
 Record actual results and remaining gaps in STATUS.md.
 
+The gameplay player has a broader required matrix than this asset-viewer smoke
+test. Run the cold and warm action inventory, hard hitch/audio/pipeline gates and
+retail comparisons in
+[PERFORMANCE_AND_ACCURACY.md](PERFORMANCE_AND_ACCURACY.md) before admitting a
+fighter/stage pair or a shared runtime optimization.
+
 This currently has no automated GPU screenshot comparison. The CI workflow
 checks tests and compilation, while the smoke test exercises the real browser.
 Add a reference-image test when the first real asset scene is stable; future

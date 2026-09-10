@@ -8,6 +8,9 @@ Final Destination at 60 fps**, using original gameplay code. Full vanilla Melee
 remains the goal. The active first deliverable includes the original in-game
 CSS → original SSS → four-stock Mario/FD match → original CSS. See the
 [accuracy contract](docs/ACCURACY_CONTRACT.md).
+The combined [performance and accuracy playbook](docs/PERFORMANCE_AND_ACCURACY.md)
+defines the evidence levels and admission process used for every new fighter,
+stage and shared runtime change.
 
 **The complete playable-match milestone is still open.** The browser currently
 runs two original Mario instances on Final Destination, with source controller
@@ -180,7 +183,8 @@ their versions are controlled by the pinned Aurora tree and our patch. See
 
 See [current evidence and limitations](STATUS.md),
 [milestones](docs/ROADMAP.md), [browser performance work](docs/PERFORMANCE.md),
-and [architecture decisions](docs/ARCHITECTURE.md).
+[the performance and accuracy playbook](docs/PERFORMANCE_AND_ACCURACY.md), and
+[architecture decisions](docs/ARCHITECTURE.md).
 
 This project is independent of Nintendo, doldecomp and Aurora. Dependency licenses
 remain attached to their upstream sources; see [third-party notices](THIRD_PARTY.md).

@@ -150,8 +150,8 @@ action.
   match. A single action trace or successful scene entry is not browser
   performance coverage.
 - Require zero automatic timing pauses, zero active callback intervals over
-  33.3 ms, zero browser long tasks over 33.3 ms, zero audio underruns, and no
-  live pipeline creation in that matrix. Add newly observed pipeline
+  33.3 ms, zero browser `longtask` entries, zero audio underruns, and no live
+  pipeline creation in that matrix. Add newly observed pipeline
   descriptors to the reviewed seed only after the source action is exercised
   in visible gameplay; never advance a hidden match to warm it.
 - State the exact remaining gap when a source service is not hydrated; do not

@@ -118,8 +118,8 @@ fighter on the stage, from both a cleared origin cache and a second application
 load. Exercise ordinary movement and defense, every admitted attack/special
 family, stage articles and scheduled effects, KO/respawn, match exit, and a
 second match. Require zero automatic timing pauses, zero active callback
-intervals over 33.3 ms, zero browser long tasks over 33.3 ms, zero audio
-underruns, and no live pipeline creation. Capture new pipeline descriptors only
+intervals over 33.3 ms, zero browser `longtask` entries, zero audio underruns,
+and no live pipeline creation. Capture new pipeline descriptors only
 from visible source gameplay and update the reviewed seed before admitting the
 stage.
 

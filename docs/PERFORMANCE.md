@@ -151,8 +151,9 @@ exact unexercised rows; content cannot be admitted on metadata, scene-entry or
 one-action evidence.
 
 The current browser gate is zero automatic timing pauses, zero active callback
-intervals over 33.3 ms, zero browser long tasks over 33.3 ms, zero audio
-underruns, and zero pipelines queued or created during live actions. Record
+intervals over 33.3 ms, zero browser `longtask` entries (the API reports tasks
+at approximately 50 ms and above), zero audio underruns, and zero pipelines
+queued or created during live actions. Record
 preparation wall time, native phase timings, first-use draws, texture uploads,
 heap growth and the first failing source frame/motion. These numbers establish
 performance only for the recorded configuration; retail state/render/audio
