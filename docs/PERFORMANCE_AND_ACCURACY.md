@@ -11,7 +11,9 @@ contracts and capture procedures remain in
 [ACCURACY_CONTRACT.md](ACCURACY_CONTRACT.md),
 [PERFORMANCE.md](PERFORMANCE.md),
 [ORIGINAL_COMPARISON.md](ORIGINAL_COMPARISON.md), and
-[TRANSITION_EQUIVALENCE.md](TRANSITION_EQUIVALENCE.md).
+[TRANSITION_EQUIVALENCE.md](TRANSITION_EQUIVALENCE.md). Scalable gameplay
+coverage and replay admission are defined in
+[SLIPPI_REPLAY_VALIDATION.md](SLIPPI_REPLAY_VALIDATION.md).
 
 ## What each claim means
 
@@ -150,21 +152,22 @@ open gate; later evidence cannot erase it.
    services with explicit lifetimes. Run construction, action/stage behavior,
    teardown and a second construction while verifying input bytes remain
    unchanged.
-3. **Create and exercise the complete action inventory.** Add the fighter to
-   `web/action-sweep.mjs` before admission. Cover every common action and each
-   fighter/stage-specific action, Article, effect, scheduler and dynamic
-   collision family with expected source motion IDs. An action row that has not
-   passed remains unavailable. “Representative moves” is not a passing scope.
-4. **Compare retail semantics.** Add or extend a pinned read-only retail capture
-   for new behavior. Compare identical source ticks and report the first differing
-   field. Re-run existing transition and gameplay comparisons after shared
-   runtime changes.
-5. **Run the visible Release browser matrix.** Use the in-page source CSS/SSS
-   drivers and **Run visible action/performance sweep**, then cover intro,
-   ordinary movement, at least ten wavedashes in each direction,
-   defense, ledge/recovery, every attack/special/article/effect variant, hits and
-   shield contact, KO/respawn, pause/resume, match exit, return to CSS and a
-   second match. Add stage-specific scheduled and dynamic behavior.
+3. **Exercise the replay corpus.** Import every eligible Slippi replay for the
+   content through the normalized replay timeline. Require exact inputs, normal
+   source match construction and first-divergence post-frame comparison. Use the
+   coverage-maximizing canary set for iteration and the full eligible corpus for
+   admission. Keep `web/action-sweep.mjs` as a short smoke and focused-reproducer
+   inventory; it is not whole-fighter proof.
+4. **Compare retail semantics.** Treat Slippi post-frame state and RNG as the
+   broad gameplay oracle, never as state to inject. Add the pinned read-only
+   Dolphin captures where Slippi lacks setup or internal fields. Compare
+   identical source ticks and report the first differing field. Re-run existing
+   transition and gameplay comparisons after shared runtime changes.
+5. **Run the visible Release browser matrix.** Play the same admitted replay
+   canaries at real time through ordinary rendering and audio, then run the
+   existing CSS/SSS, pause/resume, match-exit, return-to-CSS and second-match
+   lifecycle checks which Slippi cannot cover. Add stage-specific scheduled and
+   dynamic behavior to the corpus coverage requirements.
 6. **Run cold and warm.** Start once with the origin render cache cleared and
    once after a complete unload/application reload. Record the machine, browser,
    OS, resolution, display/power state, build commit and scenario inventory.
@@ -212,9 +215,9 @@ and warm browser matrix.
 
 The foundation must expand with the port:
 
-- add a complete versioned inventory to the in-page Release runner for every
-  fighter as the roster expands, including articles, hits, throws, ledges and
-  stage interactions beyond the current Marth/Dream Land inventory;
+- implement the normalized Slippi replay timeline, exact source-input runner,
+  first-divergence comparator and coverage-maximizing local corpus described in
+  `SLIPPI_REPLAY_VALIDATION.md`;
 - cover every fighter action/effect/article, costume/opponent combination and
   stage-specific renderer state, then keep the reviewed pipeline seed synchronized;
 - move remaining first-use immutable decode/upload work into measured scene
