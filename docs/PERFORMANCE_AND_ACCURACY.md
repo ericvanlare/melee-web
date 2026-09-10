@@ -152,16 +152,16 @@ open gate; later evidence cannot erase it.
    services with explicit lifetimes. Run construction, action/stage behavior,
    teardown and a second construction while verifying input bytes remain
    unchanged.
-3. **Exercise the replay corpus.** Import every eligible Slippi replay for the
-   content through the normalized replay timeline. Require exact inputs, normal
-   source match construction and first-divergence post-frame comparison. Use the
-   coverage-maximizing canary set for iteration and the full eligible corpus for
-   admission. Keep `web/action-sweep.mjs` as a short smoke and focused-reproducer
-   inventory; it is not whole-fighter proof.
-4. **Compare retail semantics.** Treat Slippi post-frame state and RNG as the
-   broad gameplay oracle, never as state to inject. Add the pinned read-only
-   Dolphin captures where Slippi lacks setup or internal fields. Compare
-   identical source ticks and report the first differing field. Re-run existing
+3. **Exercise the replay corpus.** Normalize supported recordings with explicit
+   exact/derived input and setup provenance. Workload completion is separate
+   from accuracy comparison. Use measured execution coverage to select canaries
+   and a held-out admission set; process the broader corpus on scheduled runs.
+   Keep `web/action-sweep.mjs` for smoke tests and focused reproducers.
+4. **Compare retail semantics.** Require repeatability of the independent pinned
+   vanilla reference before interpreting a port mismatch. Use complete declared
+   initialization, actual consumed inputs and matching source phases. UCF `.slp`
+   state is never the vanilla oracle, and state/RNG observations are never
+   injected to repair drift. Report the first differing field. Re-run existing
    transition and gameplay comparisons after shared runtime changes.
 5. **Run the visible Release browser matrix.** Play the same admitted replay
    canaries at real time through ordinary rendering and audio, then run the
@@ -215,8 +215,9 @@ and warm browser matrix.
 
 The foundation must expand with the port:
 
-- implement the normalized Slippi replay timeline, exact source-input runner,
-  first-divergence comparator and coverage-maximizing local corpus described in
+- extend the passing neutral retail calibration to complete initialization and
+  drawing contracts, then connect normalized Slippi input to a vanilla reference,
+  visible browser playback and measured coverage as described in
   `SLIPPI_REPLAY_VALIDATION.md`;
 - cover every fighter action/effect/article, costume/opponent combination and
   stage-specific renderer state, then keep the reviewed pipeline seed synchronized;
@@ -256,3 +257,39 @@ Before merging a shared runtime, performance or content change:
 - [ ] Raw evidence names its machine, browser, configuration, commit and scope.
 - [ ] `STATUS.md`, the content notes and pipeline-seed inventory describe the
       measured result and every remaining gap.
+
+## Replay calibration lessons
+
+The [retail replay calibration](RETAIL_REPLAY_CAPTURE.md) found two shared gaps
+that hand-authored move sweeps had missed: an unregistered stage particle bank
+and a headless rumble exclusion. Visual effects consume the shared gameplay RNG;
+never omit them from a simulation oracle or remove them to improve performance.
+Stage entry now verifies authored particle bank/command dependencies and shares
+one decoded asset owner across both original bank slots. Native workload tests
+exercise the original rumble interpreter; physical output remains a separate
+acceptance check. New source systems need their real service/data owners in the
+common runtime, with explicit hardware boundaries.
+
+A repeated reference plus a complete exact-field port comparison is a useful
+calibration milestone. It does not waive missing global input history, drawing,
+PCM, hardware, browser timing or held-out coverage. Retain first-divergence
+records from before a fix and run the relevant common-system checks afterward.
+Reference generation is offline; validate a faster exporter against the small
+GDB oracle before expanding the corpus. Reuse immutable expected traces for
+routine checks so correctness does not make content iteration prohibitively slow.
+
+Test drivers also need explicit failure evidence. The Release Marth/Dream Land
+sweep stopped before Counter when neutral input could not leave the original
+OttottoWait platform-edge state within the recovery bound. Recovery now uses
+ordinary inward PAD input from Wait/Ottotto/OttottoWait, while still requiring
+grounded Wait near center before the next case. No source state or timing gate
+was changed. The subsequent warm 46-case run completed 6,168 source frames with
+zero hard-gate failures, worst browser callback 22.115 ms and worst native
+callback 12.190 ms. It queued/created no live pipelines, had no audio underruns,
+preparation pauses or heap growth, and uploaded 727,040 texture bytes. This was
+a visible Release IAB run on Apple M4 / 32 GiB / macOS 26.6.2 with normal audio;
+the embedded browser version was not captured. It is not
+cold-cache, full-match, hardware-input or Slippi replay acceptance. Both the
+incomplete run and passing rerun are recorded under the local calibration
+evidence directory. Source unload, render-cache persistence and owned browser /
+server / reference-process cleanup completed afterward.

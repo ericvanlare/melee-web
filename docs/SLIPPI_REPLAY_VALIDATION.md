@@ -1,8 +1,9 @@
 # Slippi replay validation architecture
 
-Slippi replays are the primary scalable gameplay workload for this port. A
-single normalized replay drives both deterministic source-state comparison and
-visible Release-browser performance. Hand-authored action traces remain short
+Slippi replays are the primary scalable gameplay workload for this port. The intended
+pipeline uses canonical input workloads for independently captured vanilla
+state comparison and visible Release-browser performance. These are separate
+gates, and workload completion alone passes neither. Hand-authored action traces remain short
 smoke tests and first-divergence reproducers; they are not the admission proof
 for an entire fighter or stage.
 
@@ -40,45 +41,71 @@ timeline containing:
 
 - immutable match setup and provenance;
 - one finalized input record per source frame and controller port;
-- expected state fields with presence masks and original float bits;
+- original observed state fields with presence masks and original float bits;
 - RNG observations, item/stage observations and match-end data; and
 - a content hash for cache and evidence identity.
 
-The original gameplay runtime consumes that timeline through the same
-`PADStatus` boundary as a physical controller. Slippi parsing must not become a
+The original gameplay runtime consumes only its validated input/setup product
+through the same `PADStatus` boundary as a physical controller. Original
+recording observations remain outside the executable input transport. Slippi parsing must not become a
 dependency of fighter, stage or HSD source code.
 
-### 2. Simulate; do not resynchronize
+### 2. Separate workloads from trusted reference fixtures
 
-Construct the match from the recorded Game Info Block, source settings and
-game-start seed. Then supply finalized controller samples one source tick at a
-time. Never write recorded positions, action states, damage, stocks or per-frame
-RNG into the running port. Doing so would conceal the divergence being measured.
+A gold fixture is a versioned contract containing canonical input bytes, complete
+initial conditions, the observation phase, independent vanilla expected state,
+and provenance. A `.slp` file alone is not that contract. Its observed state
+belongs to its original executable, modifications, setup and input boundary.
 
-At the matching original post-frame boundary, compare every available declared
-field and stop on the first mismatch. Report replay hash, frame, port, field,
-expected and actual bit patterns, nearby inputs, RNG and relevant source state.
-Per-frame RNG is an assertion. It is not a repair mechanism.
+Use two explicit routes:
 
-Modern files expose raw axes and physical buttons progressively by format
-version. Exact-input admission initially requires a version new enough to carry
-all controller fields needed to reconstruct `PADStatus`. Older recordings may
-be used as stress workloads but cannot silently receive exact-input credit.
+- **Derived workload:** extract the available inputs, declare every conversion
+  and setup change, then execute ordinary source match construction. Completion
+  provides workload evidence only. The v2 `MWRP` transport carries source
+  identity and the original Game Info Block for provenance, but deliberately
+  contains no expected state and cannot enable an accuracy comparison.
+- **Reference fixture candidate:** run a declared input sequence through pinned,
+  cheats-disabled vanilla retail. Capture initialization, actual consumed PAD
+  samples and state at a named source phase. First require two independent
+  executions to agree. Only then compare the port at the corresponding phase.
 
-### 3. Treat modifications as named profiles
+Prefer modern raw-rich recordings. Missing raw fields in older recordings may
+be converted into explicitly derived canonical PAD workloads later; those bytes
+are not recovered original hardware input. Even modern physical trigger floats
+can admit more than one original byte, so record the canonicalization policy.
+Do not inject processed stick floats into a raw controller boundary.
 
-The first accuracy profile is GALE01 revision 2, NTSC, singles, vanilla rules,
-supported fighters/stages and no gameplay-modifying codes. A file with UCF,
-PAL, Frozen Stadium or another modification is rejected from that profile.
+Construct the match once from the declared fixture initialization, then supply
+one input vector per source tick. Never write recorded positions, action states,
+damage, stocks or per-frame RNG into the running game. RNG after initialization
+is an observation/assertion, not a repair mechanism. Compare exact bits first;
+any numerical tolerance needs a documented field-specific rationale.
 
-Additional profiles may be added when their code and settings are explicitly
-supported. A tournament Slippi workload is useful performance evidence even
-when it is ineligible for a vanilla-retail accuracy claim. The report always
-names the profile and the reason each replay was accepted or rejected.
+### 3. Establish reference trust before interpreting a red
 
-For rollback recordings, consume only the finalized frame sequence indicated by
-frame bookends. Superseded speculative frames can separately stress rollback
-infrastructure later; they are not ordinary match simulation inputs.
+Pin the retail executable, Dolphin build, source revision, CPU mode, settings,
+save/setup recipe and collector. Dolphin remains an external validation tool;
+no emulator enters the browser runtime. Preserve ordinary retail setup and
+capture the complete `StartMeleeData` at VS entry. Decode native source fields
+explicitly; never transplant PPC pointers or C bitfield layouts.
+
+Capture PAD samples at actual source consumption, not at every hardware poll:
+raw polls can continue during scene loading. Observe state after the original
+GObj scheduler. The game match counter can remain zero during Ready, while the
+source scheduler still advances. Incomplete, reordered or ambiguous captures
+are invalid evidence, not gameplay divergences.
+
+The initial profile is GALE01 revision 2, NTSC, singles, supported content and
+vanilla rules. UCF, PAL, Frozen Stadium and online initialization cannot silently
+inherit that profile. Modern UCF recordings remain useful input donors: their
+independently captured vanilla trajectory supplies the expected state. Measure
+coverage on that new trajectory because removed modifications can change the
+interaction or end the match earlier.
+
+For rollback recordings, assemble complete frame attempts and apply the pinned
+format's finalization rules. Never mix a pre-frame from one speculative attempt
+with a post-frame from another, or treat the largest observed watermark as proof
+that every intervening frame is present. Reject unsupported/incomplete histories.
 
 ### 4. Run the same timeline visibly
 
@@ -123,8 +150,10 @@ Coverage is measured from execution, not filenames. For every replay collect:
 
 Select a small canary set that maximizes unique coverage, then deduplicate
 longer corpora by marginal coverage. Pull requests run the canary set; fighter
-or stage admission runs every eligible replay for that content plus repeated
-cold/warm visible samples; scheduled runs process the full local corpus. This
+or stage admission runs a coverage-selected acceptance set plus held-out
+recordings and repeated cold/warm visible samples; scheduled runs process the
+broader local corpus. Use measured marginal coverage to grow the set, rather
+than making every pull request replay thousands of redundant matches. This
 keeps routine iteration quick without replacing breadth with a few scripted
 moves.
 
@@ -146,26 +175,42 @@ The report feeds the evidence inventory in issue 3. A smaller model can add
 content, but it cannot mark the content admitted or suppress an unsupported row;
 the gates and evidence generator make that decision.
 
-## First implementation slice
+## Implemented calibration boundary
 
-1. Pin `slippi-js` and import its public fixtures as external test inputs.
-2. Build the corpus indexer and normalized timeline schema with parser negative
-   tests and explicit version/profile rejection reasons.
-3. Add a headless `GameplayReplaySession` that constructs an ordinary source VS
-   match, supplies exact `PADStatus` frames and reports the first post-frame
-   divergence without resynchronizing.
-4. Automate replay of modern physical-input histories through the pinned
-   cheats-disabled retail reference to generate coverage-selected vanilla gold
-   traces; never reuse the UCF recording's state as the vanilla expectation.
-5. Pass one short supported Fox/Falco/Marth replay on Final Destination,
-   Battlefield, Yoshi's Story or Dream Land, then expand across every eligible
-   official fixture and local replay.
-6. Add file loading and real-time playback to the browser and emit the existing
-   performance evidence schema.
-7. Generate the coverage-maximizing canary manifest and make it the default
-   character/stage admission gate.
+Normalization and the input-only v2 workload runner are implemented. A 686-frame
+Fox/Falco Battlefield recording completes source playback and teardown without
+an expected-state comparison. The independent retail/port calibration passes
+240 neutral Mario/Mario Final Destination ticks and exposed shared particle-bank
+and rumble gaps. See [the reproducible capture procedure](RETAIL_REPLAY_CAPTURE.md)
+for exact provenance, field/phase limits and retained negative evidence.
+No Slippi fixture is gold-admitted yet. Before broader admission, restore the
+complete typed initial PAD history and settle source draw-phase coverage, then
+run the modern input donor against the reference and in the visible browser.
 
-The first slice deliberately starts with completed replay files, singles and
-the currently supported content. Live spectating, seeking, rollback display,
-doubles, items-on rules and unsupported modifications can reuse the timeline
-later without complicating the validation foundation.
+## Immediate implementation order
+
+The parser/indexer, rollback normalization, input-only runner, independent
+retail capture and scoped port comparison are working. Keep their negative
+controls and the retained pre-fix RNG divergence as calibration evidence.
+
+1. Extend the recipe to typed master/copy/game PAD histories and processing
+   configuration. Establish the source tick/draw lifecycle contract with the
+   existing small retail fixture before claiming general input equivalence.
+2. Feed the existing modern Fox/Falco Battlefield recording through the same
+   reference process without arbitrary opponent replacement. Capture a new
+   vanilla trajectory and compare it; the original UCF state stays excluded.
+   Require independent repeatability, actual consumed-input agreement and a
+   complete port comparison before admitting the fixture.
+3. Run that workload visibly in Release, cold and warm, with normal source audio,
+   rendering, hard hitch gates and complete teardown. Headless runtime timings
+   are never browser acceptance evidence.
+4. Validate a faster offline reference exporter against the small GDB oracle;
+   reuse immutable expected traces during routine content iteration.
+5. Add execution coverage, select canaries and a held-out set, then broaden
+   supported matchups/stages and make evidence generation the admission gate.
+
+Completed-file singles playback comes first. Seeking, live spectating, rollback
+presentation, doubles, items-on rules, netplay and a coverage dashboard follow
+once this end-to-end validation path is dependable. Machine-readable evidence
+and useful first-divergence reports are needed now; the dashboard is not a
+prerequisite.

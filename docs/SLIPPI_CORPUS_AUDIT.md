@@ -13,8 +13,8 @@ controller field.
 Use the public corpus in two ways:
 
 1. play coverage-selected games visibly at real time as performance workloads;
-2. compare source state downstream of an explicitly declared processed-input
-   boundary where the recorded format permits it.
+2. supply input donors for independently captured vanilla fixture candidates,
+   preserving exact/derived input and setup provenance.
 
 Build the vanilla gold corpus separately by replaying physical input histories
 through the pinned, cheats-disabled GALE01 revision-2 reference and capturing
@@ -70,7 +70,7 @@ model; it does not prove that the complete corpus contains no UCF-off file.
 
 The uniform subset contained 540 version-2.0.1 files and 60 version-3.9.0
 files. Those versions predate some later physical-axis fields. They can still
-provide extensive visible performance and declared post-input evidence, but
+provide extensive derived workload coverage, but
 they cannot silently receive full raw-`PADStatus` equivalence credit.
 
 ## Resulting corpus plan
@@ -78,11 +78,11 @@ they cannot silently receive full raw-`PADStatus` equivalence credit.
 Maintain three machine-readable evidence classes:
 
 - **Vanilla gold:** exact or independently captured vanilla initialization,
-  physical inputs and reference state. This is eligible for the GALE01
+  canonical inputs and independent vanilla reference state. This is eligible for the GALE01
   revision-2 accuracy gate.
-- **Processed-input comparison:** legacy or UCF recordings supplied at a named
-  post-processing boundary. This tests the original fighter/stage engine after
-  that boundary and lists controller preprocessing as excluded evidence.
+- **Derived input candidate:** legacy or modern recordings converted by a named
+  policy into canonical PAD bytes. They can acquire vanilla expected state by
+  independent retail execution; the original recording is not the oracle.
 - **Performance workload:** any supported recording whose match assets and
   runtime behavior are admissible, played through normal Release rendering and
   audio without using its state as a vanilla oracle.
@@ -92,15 +92,18 @@ physical controller fields. Extract only their physical input histories and
 match inventory. Run those inputs from ordinary match construction in the
 existing pinned retail reference with UCF and other gameplay modifications
 disabled. Capture the vanilla outcome at the same source boundary used by the
-port comparator. Human inputs remain useful after the resulting match diverges
+port comparator. Human inputs may remain useful after the resulting match diverges
 from the UCF recording; the new retail capture defines the expected trajectory.
+Measure actual vanilla execution coverage: later attacks can miss, movement
+can change and matches can end early, so source-recording coverage is not enough.
 
 Select reference runs by marginal execution coverage rather than raw replay
 count. Keep adding candidates until action states, animation commands, Articles,
 effects, attacks, collisions, ledges, deaths, respawns and stage schedulers stop
 gaining coverage, then add focused generated inputs only for the remaining
-rows. This should require hundreds of gold traces rather than storing and
-running thousands of redundant full matches for every change.
+rows. The required number of gold traces is an outcome of measured coverage, not a
+promised corpus size. Keep a small canary set, a distinct held-out acceptance
+set and broader scheduled runs.
 
 ## Remaining acquisition work
 

@@ -193,6 +193,16 @@ target_link_options(gameplay_replay_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS
   -sSTACK_SIZE=8388608)
 set_target_properties(gameplay_replay_trace PROPERTIES SUFFIX ".js")
 
+add_executable(gameplay_retail_trace EXCLUDE_FROM_ALL
+  tests/gameplay_retail_trace.cpp tests/gameplay_retail_setup.c tests/gameplay_retail_state.c)
+target_link_libraries(gameplay_retail_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_retail_trace PRIVATE
+  "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
+target_link_options(gameplay_retail_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1
+  -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_retail_trace PROPERTIES SUFFIX ".js")
+
 add_executable(gameplay_rumble_trace EXCLUDE_FROM_ALL
   tests/gameplay_rumble_trace.cpp tests/gameplay_rumble_state.c)
 target_link_libraries(gameplay_rumble_trace PRIVATE fighter_asset_runtime)

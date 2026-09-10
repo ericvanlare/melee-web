@@ -47,7 +47,10 @@ remain open, so this does not widen the accepted first-deliverable claim.
 A scoped 102-frame original-game jump comparison passes; this does not establish
 full-match equivalence. See [current evidence](STATUS.md),
 [the runtime gate](docs/FIGHTER_RUNTIME.md) and
-[original-game comparison](docs/ORIGINAL_COMPARISON.md). The reusable
+[original-game comparison](docs/ORIGINAL_COMPARISON.md). A separate [retail replay calibration](docs/RETAIL_REPLAY_CAPTURE.md) now matches
+240 neutral Mario/Mario Final Destination ticks across two independent retail
+captures and the port's declared state fields, RNG and input recipe. Slippi-derived
+gold fixtures and visible replay performance admission remain open. The reusable
 [CSS/SSS and match-entry transition gate](docs/TRANSITION_EQUIVALENCE.md) is
 implemented. Its pinned Mario/Mario Final Destination replay matches retail at
 all nine lifecycle, audio, match-data and RNG boundaries.

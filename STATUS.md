@@ -14,18 +14,33 @@ The combined [performance and accuracy playbook](docs/PERFORMANCE_AND_ACCURACY.m
 defines the evidence levels, content admission workflow and failure-response
 process used from this point forward.
 
-Slippi replay validation is now the planned scalable gameplay workload. The
-first ingestion slice adds a streaming, version-aware Game Start decoder and a
-privacy-minimized local corpus indexer. It hashes and deduplicates replays,
-preserves the exact Game Info Block and initial RNG, and classifies UCF, PAL,
-Frozen Stadium, online scene and raw-controller-field availability without
-copying player names or paths. Synthetic negative/deduplication tests pass, and
-the decoder was checked against an official UCF-off 1.7.1 fixture plus a real
-UCF 2.0.1 tournament file. This is intake evidence only; normalized per-frame
-input/state replay and source-match comparison are the next slice. The public
-tournament corpus audit found 6,813 supported cross-character/stage games but
-zero UCF-off files in a 952-file sample, so it is accepted for performance and
-scoped post-input coverage rather than vanilla equivalence. See the
+Slippi ingestion now normalizes finalized per-frame input/state records, handles
+rollback history without mixing revisions, preserves exact field bits and
+rejects incomplete timelines. The v2 input-only workload transport retains
+source identity and records derived rules explicitly; it never treats UCF
+post-frame observations as a vanilla oracle. The existing modern Fox/Falco
+Battlefield fixture completes all 686 input frames and teardown in the source
+runner. That is workload evidence, not browser performance or equivalence.
+
+The first retail replay calibration now passes: two independent automated
+Mario/Mario Final Destination captures repeat exactly for 240 neutral source
+ticks, and the port matches their entry data, input vectors, declared fighter
+fields, RNG and match clock. This found and fixed missing stage particle bank30
+publication and the absent owned rumble data/interpreter boundary. Stage banks
+30/64 share decoded assets; authored particle dependencies are checked before
+entry. See the [capture procedure and evidence](docs/RETAIL_REPLAY_CAPTURE.md).
+After these fixes, the visible Release Marth/Dream Land warm action inventory
+completed all 46 cases and 6,168 source frames with zero hard-gate failures
+(worst native callback 12.19 ms); an earlier incomplete sweep exposed a test
+driver recovery gap at the original platform-edge teeter state, now corrected.
+This is still **zero admitted gold Slippi fixtures**: initial global PAD-history
+restoration, the reference/port draw lifecycle, the real Fox/Falco input-derived
+reference and visible Release cold/warm replay validation remain open.
+
+The public tournament corpus audit found 6,813 supported cross-character/stage
+games but zero UCF-off files in a 952-file sample. These are useful workload/input
+donors; new vanilla reference trajectories must define expected state, and
+coverage must be measured from those new trajectories. See the
 [replay architecture](docs/SLIPPI_REPLAY_VALIDATION.md) and
 [corpus audit](docs/SLIPPI_CORPUS_AUDIT.md).
 
