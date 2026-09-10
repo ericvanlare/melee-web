@@ -1,12 +1,16 @@
 """Original SIS bytecode behavior; runs without proprietary menu assets."""
 from pathlib import Path
+import json
 import subprocess
 import sys
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 from check_gameplay import node_runtime
+sys.path.insert(0, str(ROOT / "tools"))
+import compare_transition_trace as transition_compare
 
 class NativeMenuSourceTests(unittest.TestCase):
     def test_owned_css_scene_lifecycle(self):
@@ -36,14 +40,22 @@ class NativeMenuSourceTests(unittest.TestCase):
         if not targets or not (menu / "MnSlChr.usd").is_file() or not (game / "PlMr.dat").is_file():
             self.skipTest("Build the native menu host and supply owned menu/game fixtures")
         target = max(targets, key=lambda path: path.stat().st_mtime)
+        source_revision = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
         for stage_kind in (32, 31):
             with self.subTest(stage_kind=stage_kind):
-                run = subprocess.run(
-                    [str(node_runtime()), str(target), str(menu), str(game),
-                     str(stage_kind)], cwd=ROOT, capture_output=True, text=True,
-                    timeout=120)
-                self.assertEqual(run.returncode, 0,
-                                 (run.stdout + run.stderr)[-4000:])
+                with tempfile.TemporaryDirectory(prefix="menu transition trace ") as directory:
+                    trace = Path(directory) / "port.jsonl"
+                    run = subprocess.run(
+                        [str(node_runtime()), str(target), str(menu), str(game),
+                         str(stage_kind), str(trace), source_revision], cwd=ROOT,
+                        capture_output=True, text=True, timeout=120)
+                    self.assertEqual(run.returncode, 0,
+                                     (run.stdout + run.stderr)[-4000:])
+                    rows = [json.loads(line) for line in trace.read_text().splitlines()]
+                    for trace_run in (0, 1):
+                        _, events = transition_compare.select_run(rows, "port", trace_run)
+                        transition_compare.validate_continuity("port", events)
                 self.assertIn(
                     "Native original CSS Mario/Falco to SSS to four-stock match to CSS passed twice",
                     run.stdout)

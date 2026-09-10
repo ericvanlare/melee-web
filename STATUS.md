@@ -79,6 +79,23 @@ sequence rather than stopping at up-special entry.
 These native traces establish the checked source lifecycle; they do not replace
 browser input, audio or retail-reference evidence.
 
+A versioned transition-equivalence harness now emits the same semantic JSONL
+boundary records from the port and a read-only GALE01 revision-2 Dolphin
+collector. It requires CSS → SSS, SSS B cancellation → CSS, a second CSS → SSS,
+and match entry in exact order; compares all committed rules, four player records
+and source RNG; and rejects any retail HPS stop/start, AX driver initialization or
+language-bank initialization before match entry. The port emitter passes its
+audio-owner continuity invariants in two cycles on Final Destination and
+Battlefield. A pinned four-stock Mario/Mario Final Destination retail capture
+now passes the exact lifecycle and audio-continuity checks: both CSS/SSS trips
+retain `menu01.hps` with zero audio restart/reinitialization calls, followed by
+one owner change to `sp_end.hps` at match entry. Full semantic equivalence remains
+open. The strict report first diverges at SSS-exit `match_kind` because retail has
+not yet run its match-entry normalization while the port payload is already
+normalized. Match entry also exposes item-mask, rumble/inactive-slot and
+unsynchronized-RNG differences that require aligned fixture work. See
+[the transition gate](docs/TRANSITION_EQUIVALENCE.md).
+
 Scene transitions now use an explicit preparation boundary for CSS, SSS and
 match entry. The browser shows the phase and waits for the audio worklet's
 disabled-state acknowledgement before owner/session construction; no source
@@ -137,7 +154,7 @@ accessory has a world-owned descriptor that outlives its original fighter/effect
 consumers. Eye telemetry distinguishes an authored base image from an animated
 table entry; this changes observation only, not the game's texture commands.
 
-The current local regression suite passes **267 tests without skips** (420.390
+The current local regression suite passes **274 tests without skips** (226.631
 seconds). Default and Release browser, native-menu, content-match, Battlefield,
 player-context and fighter-runtime targets build.
 The focused browser run used the Release build. The integrated change also

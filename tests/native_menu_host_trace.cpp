@@ -7,15 +7,102 @@
 #include <melee/ft/forward.h>
 #include <melee/gm/forward.h>
 #include <melee/gr/forward.h>
+#include <bit>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
+#include <iomanip>
 #include <iostream>
+#include <map>
+#include <sstream>
 #include <stdexcept>
 static void check(int value,const char* error){if(!value){std::cerr<<"Check failed before teardown: "<<error<<"\n";throw std::runtime_error(error);}}
+
+namespace {
+std::string hex32(uint32_t value){std::ostringstream out;out<<std::hex<<std::setfill('0')<<std::setw(8)<<value;return out.str();}
+std::string hex64(uint64_t value){std::ostringstream out;out<<std::hex<<std::setfill('0')<<std::setw(16)<<value;return out.str();}
+std::string stream_name(MeleeWebAudio* audio){
+ const char* path=melee_web_audio_stream_path(audio);if(!path)return {};
+ std::string result(path);const auto slash=result.find_last_of("/\\");return slash==std::string::npos?result:result.substr(slash+1);
+}
+void write_player(std::ostream& out,const PlayerInitData& player){
+ const unsigned flags_c=(unsigned(player.rumble_enabled)<<7)|(unsigned(player.xC_b1)<<6)|
+  (unsigned(player.xC_b2)<<5)|(unsigned(player.xC_b3)<<4)|(unsigned(player.vs_invisible)<<3)|
+  (unsigned(player.xC_b5)<<2)|(unsigned(player.xC_b6)<<1)|unsigned(player.xC_b7);
+ const unsigned flags_d=(unsigned(player.xD_b0)<<7)|(unsigned(player.xD_b1)<<6)|
+  (unsigned(player.xD_b2)<<5)|(unsigned(player.xD_b3)<<4)|(unsigned(player.xD_b4)<<3)|
+  (unsigned(player.xD_b5)<<2)|(unsigned(player.xD_b6)<<1)|unsigned(player.xD_b7);
+ out<<"{\"ckind\":"<<int(player.ckind)<<",\"slot_type\":"<<unsigned(player.slot_type)
+    <<",\"stocks\":"<<int(player.stocks)<<",\"color\":"<<unsigned(player.color)
+    <<",\"slot\":"<<unsigned(player.slot)<<",\"spawn\":"<<int(player.x5)
+    <<",\"spawn_direction\":"<<int(player.spawn_dir)<<",\"sub_color\":"<<unsigned(player.sub_color)
+    <<",\"handicap\":"<<int(player.handicap)<<",\"team\":"<<unsigned(player.team)
+    <<",\"nametag\":"<<unsigned(player.nametag)<<",\"flags_c\":"<<flags_c
+    <<",\"flags_d\":"<<flags_d<<",\"cpu_kind\":"<<unsigned(player.cpu_kind)
+    <<",\"cpu_level\":"<<unsigned(player.cpu_level)<<",\"damage_10\":"<<player.x10
+    <<",\"damage_12\":"<<player.x12<<",\"hp\":"<<player.hp
+    <<",\"attack_ratio_bits\":\""<<hex32(std::bit_cast<uint32_t>(player.attack_ratio))
+    <<"\",\"defense_ratio_bits\":\""<<hex32(std::bit_cast<uint32_t>(player.defense_ratio))
+    <<"\",\"model_scale_bits\":\""<<hex32(std::bit_cast<uint32_t>(player.model_scale))<<"\"}";
+}
+void write_selection(std::ostream& out,const MeleeWebMenuMatchSelection& selection){
+ const auto& rules=selection.start.rules;
+ out<<"{\"rules\":{\"match_kind\":"<<unsigned(rules.match_kind)
+    <<",\"hud_layout\":"<<unsigned(rules.x0_3)
+    <<",\"timer_enabled\":"<<(rules.timer_enabled?"true":"false")
+    <<",\"timer_counts_up\":"<<(rules.timer_counts_up?"true":"false")
+    <<",\"friendly_fire\":"<<(rules.friendly_fire?"true":"false")
+    <<",\"is_stock\":"<<(rules.is_stock?"true":"false")
+    <<",\"single_button\":"<<(rules.single_button?"true":"false")
+    <<",\"disable_pausing\":"<<(rules.disable_pausing?"true":"false")
+    <<",\"is_vs\":"<<(rules.is_vs?"true":"false")
+    <<",\"is_teams\":"<<unsigned(rules.is_teams)<<",\"item_frequency\":"<<int(rules.xB)
+    <<",\"stage_kind\":"<<rules.stkind<<",\"time_limit\":"<<rules.time_limit
+    <<",\"item_mask\":\""<<hex64(rules.x20)<<"\",\"damage_ratio_bits\":\""
+    <<hex32(std::bit_cast<uint32_t>(rules.x30))<<"\",\"game_speed_bits\":\""
+    <<hex32(std::bit_cast<uint32_t>(rules.game_speed))<<"\"},\"players\":[";
+ for(unsigned i=0;i<4;++i){if(i)out<<',';write_player(out,selection.start.players[i]);}
+ out<<"]}";
+}
+class TransitionTrace {
+ std::ofstream output;unsigned run_=0,index_=0;std::map<uint64_t,unsigned> epochs;
+ unsigned epoch(MeleeWebAudio* audio){
+  const uint64_t generation=melee_web_audio_generation(audio);auto found=epochs.find(generation);
+  if(found!=epochs.end())return found->second;const unsigned result=epochs.size();epochs[generation]=result;return result;
+ }
+public:
+ explicit TransitionTrace(const char* path,const char* source_revision){
+  if(!path)return;const std::string revision=source_revision?source_revision:"";
+  if(revision.size()!=40||revision.find_first_not_of("0123456789abcdef")!=std::string::npos)
+   throw std::runtime_error("Transition trace requires a full lowercase source revision");
+  output.open(path,std::ios::trunc);if(!output)throw std::runtime_error("Cannot open transition trace output");
+  output<<"{\"record\":\"header\",\"schema\":\"melee-web-transition-trace\",\"version\":1,"
+          "\"producer\":\"port\",\"game_revision\":\"GALE01r2\",\"source_revision\":\""
+        <<revision<<"\",\"build_configuration\":\"browser-release\"}\n";
+ }
+ void begin_run(unsigned run){run_=run;index_=0;epochs.clear();}
+ void event(const char* name,MeleeWebAudio* audio,const char* route=nullptr,
+            const MeleeWebMenuMatchSelection* selection=nullptr,const uint32_t* rng=nullptr){
+  if(!output)return;const auto stream=stream_name(audio);
+  output<<"{\"record\":\"event\",\"run\":"<<run_<<",\"index\":"<<index_++
+        <<",\"event\":\""<<name<<"\",\"audio\":{\"active\":"
+        <<(!stream.empty()?"true":"false")<<",\"owner_epoch\":"<<epoch(audio)
+        <<",\"stream\":\""<<stream<<"\"}";
+  if(route)output<<",\"route\":\""<<route<<"\"";
+  if(selection){
+   output<<",\"rng\":"<<(rng?*rng:selection->random_seed)<<",\"selection\":";
+   write_selection(output,*selection);
+  }
+  output<<"}\n";output.flush();
+ }
+};
+}
 int main(int argc,char** argv){try{
- if(argc<3||argc>4)throw std::runtime_error("Expected local menu and audio directories and optional stage kind");
- const int stage_kind=argc==4?std::stoi(argv[3]):St_Kind_Last;
+ if(argc<3||argc>6)throw std::runtime_error("Expected menu/audio directories, optional stage kind, transition trace path and source revision");
+ const int stage_kind=argc>=4?std::stoi(argv[3]):St_Kind_Last;
+ const char* trace_path=argc>=5?argv[4]:nullptr;
+ const char* source_revision=argc==6?argv[5]:nullptr;
+ TransitionTrace trace(trace_path,source_revision);
  melee_web::RuntimeFiles files;
  for(const char* key:{"GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","GrNLa.dat","GrNBa.dat","GrSt.dat","sp_zako.hps","ystory.hps","ItCo.usd","EfMrData.dat","EfFxData.dat","EfCoData.dat","PdPm.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","fox.ssm","falco.ssm","dsp_coef.bin","sislib_font.bin"}){
   const auto root=std::filesystem::exists(std::filesystem::path(argv[1])/key)?argv[1]:argv[2];
@@ -23,9 +110,11 @@ int main(int argc,char** argv){try{
   files[key]={(std::istreambuf_iterator<char>(input)),{}};
  }
  for(unsigned cycle=0;cycle<2;cycle++){
+  trace.begin_run(cycle);
   char error[256]{};auto* host=melee_web_menu_host_create(error,sizeof(error));check(host!=nullptr,error);
   auto world=std::make_unique<melee_web::GameplayMenuWorld>(files);
   check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);
+  trace.event("capture_begin",world->audio());
   PADStatus raw[4]{};raw[2].err=raw[3].err=-1;float pcm[1068];unsigned audio_phase=0;
   auto tick=[&](){
    int result=melee_web_menu_host_tick(host,raw,error,sizeof(error));
@@ -93,15 +182,21 @@ int main(int argc,char** argv){try{
     check(tick()==1,"CSS transitioned during Falco confirmation settle");
   }
   transition();check(melee_web_menu_host_phase(host)==2,"CSS did not choose original SSS");
+  trace.event("css_exit_complete",world->audio());
   rebuild_menu_scene();
+  trace.event("sss_enter_complete",world->audio());
   for(unsigned t=0;t<120;t++)check(tick()==1,"Unexpected SSS transition");
   // Exercise the real B cancellation before committing the match, with new
   // owned worlds for both directions and no direct source selection writes.
   transition(PAD_BUTTON_B);check(melee_web_menu_host_phase(host)==4,"Original SSS B did not return toward CSS");
+  trace.event("sss_exit_complete",world->audio(),"css");
   rebuild_menu_scene();
+  trace.event("css_enter_complete",world->audio());
   for(unsigned t=0;t<120;t++)check(tick()==1,"Unexpected cancelled CSS transition");
   transition();check(melee_web_menu_host_phase(host)==2,"Returned CSS did not choose SSS");
+  trace.event("css_exit_complete",world->audio());
   rebuild_menu_scene();
+  trace.event("sss_enter_complete",world->audio());
   for(unsigned t=0;t<120;t++)check(tick()==1,"Unexpected second SSS transition");
   // Move the original SSS cursor with raw PAD input. Random is deliberately
   // not used: adding an available stage must not change the FD regression.
@@ -128,11 +223,15 @@ int main(int argc,char** argv){try{
   check(selection.start.rules.stkind==stage_kind,"Source SSS committed another stage");
   check(selection.start.players[0].ckind==(cycle==1?CKIND_FALCO:CKIND_MARIO),
         "Source CSS committed another P1 character");
+  const uint32_t selection_rng=selection.random_seed;
+  trace.event("sss_exit_complete",world->audio(),"match",&selection,&selection_rng);
   world->close();world.reset();audio_phase=0;
+  bool match_entry_recorded=false;
   if(cycle==0)for(unsigned stop:{0u,60u,100u}){
    // Unload both before and after Ready's stage-start callback, then rebuild
    // the full SDK world from the same immutable native selection.
    melee_web::GameplayMatchSession interrupted(files,selection);unsigned phase=0;
+   if(!match_entry_recorded){const uint32_t rng=interrupted.random_seed();trace.event("match_enter_complete",interrupted.audio(),nullptr,&selection,&rng);match_entry_recorded=true;}
    for(unsigned t=0;t<stop;++t){
     PADStatus pads[4]{};pads[2].err=pads[3].err=-1;interrupted.tick(pads);
     phase+=32000;unsigned count=phase/60;phase%=60;
@@ -180,6 +279,7 @@ int main(int argc,char** argv){try{
   }
   {
    melee_web::GameplayMatchSession match(files,selection);audio_phase=0;
+   if(!match_entry_recorded){const uint32_t rng=match.random_seed();trace.event("match_enter_complete",match.audio(),nullptr,&selection,&rng);match_entry_recorded=true;}
    check(!match.ready(),"Original match intro was bypassed");
    const auto entry_stats=match.player_stats(0);
    for(unsigned eye=0;eye<2;eye++)check(entry_stats.eyes[eye].image_is_base&&

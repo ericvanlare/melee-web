@@ -164,3 +164,16 @@ first-use stalls remain unresolved, and these warm browser runs do not establish
 full original-game equivalence, audible output or physical two-controller
 behavior. The selectable 2× SDL render scale remains available for
 scale-specific checks.
+
+## CSS/SSS and match-entry lifecycle gate
+
+The versioned transition schema, read-only retail collector, port emitter and
+strict first-divergence comparator are documented in
+[`TRANSITION_EQUIVALENCE.md`](TRANSITION_EQUIVALENCE.md). A pinned four-stock
+Mario/Mario Final Destination capture now completes all nine boundaries. Retail
+keeps `menu01.hps` active under one owner with zero stream start/stop, AX driver
+initialization or language-bank initialization calls through both CSS/SSS trips,
+then performs one stop/start into `sp_end.hps` at match entry. The port matches
+that lifecycle and audio result. The strict semantic comparison remains red: its
+first divergence is the SSS-exit `match_kind`, where retail still exposes the
+pre-`gm_16AE` payload and the port already exposes normalized stock rules.

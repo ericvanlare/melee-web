@@ -161,6 +161,7 @@ int melee_web_audio_stream_resolve(MeleeWebAudio* audio,uint32_t address,const M
  return 0;
 }
 int melee_web_audio_stream_progress(MeleeWebAudio* a,uint32_t* completed,uint32_t* revisited){if(!active||active->audio!=a||!completed||!revisited)return 0;*completed=active->completed;*revisited=active->revisited;return 1;}
+const char* melee_web_audio_stream_path(MeleeWebAudio* a){return active&&active->audio==a?active->input->path:NULL;}
 int melee_web_audio_stream_owned(MeleeWebAudio* a){return active&&active->audio==a;}
 int melee_web_audio_stream_end(MeleeWebAudioStream* s,char* e,size_t n){
  if(!s||active!=s||s->pumping)return fail(e,n,"HPS scope is not active or is pumping");
