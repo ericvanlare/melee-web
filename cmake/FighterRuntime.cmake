@@ -25,7 +25,7 @@ add_library(fighter_source_runtime STATIC EXCLUDE_FROM_ALL ${fighter_paths}
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/ax/AXAlloc.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/ax/AXVPB.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/ax/AXCL.c"
-  "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/ax/AXAux.c" src/gameplay_sdk.c src/gameplay_action_store.c src/gameplay_bonus_data.c
+  "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/ax/AXAux.c" src/gameplay_sdk.c src/gameplay_action_store.c src/gameplay_bonus_data.c src/gameplay_rumble.c
   src/gameplay_player_context.c src/gameplay_fighter_assets.c src/gameplay_effect_banks.c src/gameplay_ground_data.c src/gameplay_archive_sections.c src/gameplay_platform.c src/gameplay_match_context.c src/gameplay_font_atlas.c src/gameplay_stage_numeric.c src/dat_item_registry.c
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/particle.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/generator.c"
@@ -89,7 +89,7 @@ add_executable(gameplay_effect_banks_trace EXCLUDE_FROM_ALL tests/gameplay_effec
   src/dat_effect_banks.cpp src/native_dat.cpp src/dat_archive.cpp
   src/dat_effect_entries.cpp src/dat_native_animation.cpp src/dat_native_joint.cpp
   src/rigid_model.cpp src/dat_material.cpp src/dat_texture.cpp
-  src/dat_material_animation.cpp src/dat_animation.cpp)
+  src/dat_material_animation.cpp src/dat_animation.cpp src/dat_shape_animation.cpp)
 target_link_libraries(gameplay_effect_banks_trace PRIVATE fighter_source_runtime)
 target_link_options(gameplay_effect_banks_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1 -sEXIT_RUNTIME=1
   -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
@@ -183,6 +183,16 @@ target_link_options(gameplay_content_match_trace PRIVATE --profiling-funcs
   -sENVIRONMENT=node -sNODERAWFS=1 -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1
   -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
 set_target_properties(gameplay_content_match_trace PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_rumble_trace EXCLUDE_FROM_ALL
+  tests/gameplay_rumble_trace.cpp tests/gameplay_rumble_state.c)
+target_link_libraries(gameplay_rumble_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_rumble_trace PRIVATE
+  "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
+target_link_options(gameplay_rumble_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1
+  -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_rumble_trace PROPERTIES SUFFIX ".js")
 
 add_executable(gameplay_stock_trace EXCLUDE_FROM_ALL tests/gameplay_stock_trace.cpp)
 target_link_libraries(gameplay_stock_trace PRIVATE fighter_asset_runtime)

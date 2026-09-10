@@ -38,9 +38,7 @@ int main(int argc,char** argv){try{
     selection.start.rules.xB=-1;
     for(unsigned i=0;i<GM_MAX_PLAYERS;i++){
         selection.start.players[i].stocks=4;
-        /* This explicit headless fixture has no PAD-rumble transport. The
-         * native menu/match gate separately exercises retail rumble flags. */
-        selection.start.players[i].rumble_enabled=false;
+        selection.start.players[i].rumble_enabled=i<2;
     }
     check(melee_web_menu_session_destroy(menu,error,sizeof(error)),error);
     selection.hud_layout=2;selection.start.rules.x0_3=2;selection.random_seed=0x13579bdf;

@@ -22,6 +22,24 @@ struct MeleeWebEffectBank {
     unsigned attached;
 };
 static MeleeWebEffectBank* published[65];
+int melee_web_effect_bank_has_command(uint32_t bank,uint32_t command)
+{
+    if(bank>=65||!published[bank])return 0;
+    const MeleeWebEffectBank* h=published[bank];
+    return command>=h->stats.first_command&&
+        command-h->stats.first_command<h->stats.command_count&&
+        ptclref_804D0E5C[bank]&&ptclref_804D0E5C[bank][command];
+}
+MeleeWebEffectBank* melee_web_effect_bank_alias(const MeleeWebNativeDat* d,
+    const MeleeWebEffectBank* source,uint32_t bank)
+{
+    if(!source||bank>=65||bank==source->stats.bank)
+        d->reject(d->context,"Invalid particle bank alias");
+    MeleeWebEffectBank* h=d->allocate(d->context,1,sizeof(*h));
+    h->commands=source->commands;h->textures=source->textures;
+    h->stats=source->stats;h->stats.bank=bank;h->stats.particle_bank_ready=0;
+    return h;
+}
 static int fail(char* e,size_t n,const char* why){if(e&&n)snprintf(e,n,"%s",why);return 0;}
 static int success(char* e,size_t n){if(e&&n)e[0]=0;return 1;}
 #define REQUIRE(c,m) do{if(!(c))d->reject(d->context,m);}while(0)

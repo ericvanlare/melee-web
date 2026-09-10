@@ -30,7 +30,16 @@ DatEffectBanks::~DatEffectBanks()
 {
     // Continuing would release native pointers still published to original
     // particle consumers. Explicit detach returns a diagnostic to the caller.
+    for(auto [id,alias]:aliases_)
+        if(!melee_web_effect_bank_detach(alias,nullptr,0))std::terminate();
     if(bank_&&!melee_web_effect_bank_detach(bank_,nullptr,0))std::terminate();
 }
 MeleeWebEffectBank* DatEffectBanks::bank()const noexcept{return bank_;}
+MeleeWebEffectBank* DatEffectBanks::alias(uint32_t bank)
+{
+    for(auto [id,alias]:aliases_)if(id==bank)return alias;
+    auto* alias=melee_web_effect_bank_alias(arena_.reader(),bank_,bank);
+    aliases_.emplace_back(bank,alias);
+    return alias;
+}
 }

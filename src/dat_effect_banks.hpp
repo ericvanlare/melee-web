@@ -15,8 +15,10 @@ public:
     DatEffectBanks(const DatEffectBanks&)=delete;
     DatEffectBanks& operator=(const DatEffectBanks&)=delete;
     MeleeWebEffectBank* bank() const noexcept;
+    MeleeWebEffectBank* alias(uint32_t bank);
 private:
     NativeDatArena arena_;
     MeleeWebEffectBank* bank_=nullptr;
+    std::vector<std::pair<uint32_t,MeleeWebEffectBank*>> aliases_;
 };
 }

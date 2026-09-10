@@ -50,7 +50,7 @@ unsigned combat_seen=0;
 int stock_check_tick=-1,stock_check_total_ticks=0,stock_check_stocks=4,stock_check_respawns=0,stock_check_result=-1;
 bool stock_check_lost=false,stock_check_jump=false;
 alignas(32) unsigned char fifo_buffer[64*1024];
-constexpr std::array<std::string_view,15> required={"PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","sislib_font.bin","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sp_end.hps"};
+constexpr std::array<std::string_view,16> required={"PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sislib_font.bin","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sp_end.hps"};
 void require(int value,const char* error){if(!value)throw std::runtime_error(error);}
 void close_game(){
     running=false;finished=false;winner=-1;catchup_frames=0;max_backlog_ticks=0;combat_check=-1;stock_check_tick=-1;stock_check_total_ticks=0;stock_check_stocks=4;stock_check_respawns=0;stock_check_result=-1;stock_check_lost=false;stock_check_jump=false;simulation_clock.reset();char error[256];

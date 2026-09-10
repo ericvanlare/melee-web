@@ -27,7 +27,7 @@ class ContentMatchTests(unittest.TestCase):
         required = (menu / "MnSlChr.usd", game / "PlFc.dat", game / "PlFx.dat",
                     game / "PlFxAJ.dat", game / "GrNLa.dat", game / "GrNBa.dat",
                     game / "GrSt.dat", game / "PlMs.dat", game / "PlMsAJ.dat",
-                    game / "GrOp.dat")
+                    game / "GrOp.dat", game / "LbRb.dat")
         if not all(path.is_file() for path in required):
             self.skipTest("Owned menu, Fox/Falco and stage fixtures are required")
         cases = ((32, 20, 8), (31, 20, 8), (32, 2, 8), (31, 2, 8),

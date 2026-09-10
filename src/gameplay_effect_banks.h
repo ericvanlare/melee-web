@@ -19,9 +19,14 @@ MeleeWebEffectBank* melee_web_effect_bank_decode_roots(const MeleeWebNativeDat*,
     uint32_t command_bytes,uint32_t texture_bytes,uint32_t bank);
 void* melee_web_effect_bank_commands(MeleeWebEffectBank*);
 void* melee_web_effect_bank_textures(MeleeWebEffectBank*);
+/* Alias shares decoded command/image ownership; its arena must not outlive the
+ * source arena. Each original bank slot still has independent publication. */
+MeleeWebEffectBank* melee_web_effect_bank_alias(const MeleeWebNativeDat*,
+                                              const MeleeWebEffectBank*,uint32_t bank);
 int melee_web_effect_bank_attach(MeleeWebEffectBank*, char*, size_t);
 int melee_web_effect_bank_detach(MeleeWebEffectBank*, char*, size_t);
 int melee_web_effect_bank_stats(const MeleeWebEffectBank*, MeleeWebEffectBankStats*, char*, size_t);
+int melee_web_effect_bank_has_command(uint32_t bank,uint32_t command);
 #ifdef __cplusplus
 }
 #endif

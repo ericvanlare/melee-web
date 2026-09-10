@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {loadRuntimeDisc,RUNTIME_DISC_FILES,loadNativeMenuDisc,NATIVE_MENU_DISC_FILES,loadNativeGameDisc,NATIVE_GAME_DISC_FILES} from '../web/runtime-assets.mjs';
-assert.equal(Object.keys(RUNTIME_DISC_FILES).length,13);
+assert.equal(Object.keys(RUNTIME_DISC_FILES).length,14);
+assert.equal(RUNTIME_DISC_FILES['LbRb.dat'],'LbRb.dat');
 for(const name of ['main.ssm','mario.ssm','smash2.sem'])assert.equal(RUNTIME_DISC_FILES[name],'audio/us/'+name);
 await assert.rejects(loadRuntimeDisc({name:'game.rvz'}),/RVZ is not supported/);
 const bytes=new Uint8Array(0x2000),view=new DataView(bytes.buffer);
@@ -12,12 +13,12 @@ await assert.rejects(loadRuntimeDisc(new Blob([bytes])),/Invalid game executable
 console.log('Runtime disc language paths and executable rejection checks passed');
 
 assert.equal(Object.keys(NATIVE_MENU_DISC_FILES).length,15);
-assert.equal(Object.keys(NATIVE_GAME_DISC_FILES).length,64);
+assert.equal(Object.keys(NATIVE_GAME_DISC_FILES).length,65);
 for(const name of ['nr_select','nr_title','nr_name','pokemon','end']) {
   assert.equal(NATIVE_MENU_DISC_FILES[name+'.ssm'],'audio/us/'+name+'.ssm');
   assert.equal(NATIVE_GAME_DISC_FILES[name+'.ssm'],'audio/us/'+name+'.ssm');
 }
-for(const name of ['GmPause.usd','IfAll.usd','IfCoGet.dat','SdIntro.dat',
+for(const name of ['LbRb.dat','GmPause.usd','IfAll.usd','IfCoGet.dat','SdIntro.dat',
   'PlMrNr.dat','PlMrYe.dat','PlMrBk.dat','PlMrBu.dat','PlMrGr.dat',
   'PlFc.dat','PlFcAJ.dat','PlFcNr.dat','PlFcRe.dat','PlFcBu.dat','PlFcGr.dat',
   'PlFx.dat','PlFxAJ.dat','PlFxNr.dat','PlFxOr.dat','PlFxLa.dat','PlFxGr.dat',

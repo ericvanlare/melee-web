@@ -51,9 +51,19 @@ static void registration(std::shared_ptr<const melee_web::DatArchive> archive,co
     const auto saved_ref=hsd_804D0948[1];const auto saved_tex=psTexGroupArray[1];const auto saved_form=psNumCmdList[1];
     const auto saved_cmd=ptclref_804D0E5C[1];const int saved_count=psCmdListArray[1];
     HSD_PSFormGroup** saved_groups=psFormGroupArray[1];
+    const auto saved_alias=ptclref_804D0E5C[30];
+    const auto saved_alias_tex=psTexGroupArray[30];
     for(unsigned pass=0;pass<2;++pass){
         check(melee_web_gameplay_startup(4U*1024U*1024U,error,sizeof(error)),"source world startup");
         check(melee_web_effect_bank_attach(owner.bank(),error,sizeof(error)),"original psInitDataBankLoad");
+        auto* alias=owner.alias(30);
+        check(!melee_web_effect_bank_has_command(30,1000),"unpublished authored dependency rejected");
+        check(melee_web_effect_bank_attach(alias,error,sizeof(error)),"second source bank registration");
+        check(melee_web_effect_bank_has_command(30,1000)&&
+              !melee_web_effect_bank_has_command(30,999)&&
+              !melee_web_effect_bank_has_command(30,1000+stats.command_count),"authored dependency range checked");
+        check(ptclref_804D0E5C[30]==ptclref_804D0E5C[1]&&psTexGroupArray[30]==psTexGroupArray[1],
+              "bank alias shares exact command and texture pointers");
         check(!melee_web_effect_bank_attach(owner.bank(),error,sizeof(error)),"duplicate bank owner rejected");
         check(psCmdListArray[1]==int(1000+stats.command_count)&&ptclref_804D0E5C[1][1000]->life==16,"original biased command lookup");
         check((ptclref_804D0E5C[1][1000]->kind&0x0e000000)==0x08000000,"original Locate kind fixup retained");
@@ -65,6 +75,9 @@ static void registration(std::shared_ptr<const melee_web::DatArchive> archive,co
         check(!melee_web_effect_bank_detach(owner.bank(),error,sizeof(error)),"live particle prevents bank release");hsd_804D0908[0]=nullptr;
         hsd_804D78E0=1;check(!melee_web_effect_bank_detach(owner.bank(),error,sizeof(error)),"live generator prevents bank release");hsd_804D78E0=0;
         check(melee_web_effect_bank_detach(owner.bank(),error,sizeof(error)),"bank detach");
+        check(ptclref_804D0E5C[30]!=saved_alias,"alias remains registered independently");
+        check(melee_web_effect_bank_detach(alias,error,sizeof(error)),"alias detach");
+        check(ptclref_804D0E5C[30]==saved_alias&&psTexGroupArray[30]==saved_alias_tex,"alias restored");
         check(hsd_804D0948[1]==saved_ref&&psTexGroupArray[1]==saved_tex&&psNumCmdList[1]==saved_form&&
               ptclref_804D0E5C[1]==saved_cmd&&psCmdListArray[1]==saved_count&&psFormGroupArray[1]==saved_groups,"all original bank globals restored");
         check(melee_web_gameplay_shutdown(error,sizeof(error)),"source world shutdown");

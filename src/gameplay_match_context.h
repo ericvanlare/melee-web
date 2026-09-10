@@ -38,7 +38,7 @@ typedef struct MeleeWebMatchStats {
     int32_t motion_id, ground_or_air;
     uint32_t extra_model_objects, eye_count;
     MeleeWebMatchEyeStats eyes[2];
-    float position[3], animation_frame;
+    float position[3], facing_direction, animation_frame;
     float source_stick[2], source_triggers;
     uint32_t held_buttons, pressed_buttons, released_buttons;
     uint32_t player_slot;

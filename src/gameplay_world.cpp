@@ -21,6 +21,7 @@
 #include "dat_effect_entries.hpp"
 #include "gameplay_stage_numeric.h"
 #include "gameplay_bonus_data.h"
+#include "gameplay_rumble.h"
 #include "gameplay_match_context.h"
 #include "gameplay_match_rules.h"
 #include "gameplay_item_runtime.h"
@@ -85,7 +86,7 @@ struct GameplayWorld::Storage {
     std::map<std::string,std::shared_ptr<const DatArchive>,std::less<>> archives;
     std::map<std::string,std::vector<uint8_t>,std::less<>> snapshots;
     RuntimeArchiveCache* archive_cache=nullptr;
-    std::unique_ptr<NativeDatArena> stage_arena,bonus_arena,item_arena;
+    std::unique_ptr<NativeDatArena> stage_arena,bonus_arena,item_arena,rumble_arena;
     std::unique_ptr<DatItemRegistryNative> items;
     std::unique_ptr<DatStageItems> stage_items;
     MeleeWebStageItems* stage_item_scope=nullptr;
@@ -119,9 +120,11 @@ struct GameplayWorld::Storage {
     MeleeWebCollision* collision=nullptr;
     MeleeWebItemRegistry* registry=nullptr;
     MeleeWebBonusData* bonus=nullptr;
+    MeleeWebRumble* rumble=nullptr;
     void* previous_ground=nullptr;
     bool effect_started=false;
     bool started=false,ground_published=false,bonus_published=false;
+    bool rumble_published=false;
     const RuntimeFiles* runtime_files=nullptr;
     std::map<unsigned,const FighterCostume*> identities;
     std::map<unsigned,std::set<unsigned>> selected_costumes;
@@ -147,7 +150,7 @@ struct GameplayWorld::Storage {
                 snapshots[std::string(name)]={value->data().begin(),value->data().end()};
             archives.emplace(name,std::move(value));
         };
-        for(const char* name:{"PlCo.dat","ItCo.usd","EfCoData.dat","PdPm.dat"})load(name);
+        for(const char* name:{"PlCo.dat","ItCo.usd","EfCoData.dat","PdPm.dat","LbRb.dat"})load(name);
         load(stage->archive);
         for(unsigned slot=0;slot<selection.fighter_kinds.size();++slot)
             selected_costumes[selection.fighter_kinds[slot]].insert(selection.costume_indices[slot]);
@@ -178,9 +181,15 @@ struct GameplayWorld::Storage {
         auto* ground=melee_web_ground_data_decode(stage_arena->reader(),symbol(*archive(stage->archive),"grGroundParam"));
         auto* markers=melee_web_stage_markers_decode(stage_arena->reader(),symbol(*archive(stage->archive),"map_head"));
         bonus=melee_web_bonus_data_decode(bonus_arena->reader(),symbol(*archive("PdPm.dat"),"plLoadCommonData"));
+        rumble_arena=std::make_unique<NativeDatArena>(archive("LbRb.dat"));
+        const auto rumble_root=symbol(*archive("LbRb.dat"),"lbRumbleData");
+        const auto rumble_bytes=archive("LbRb.dat")->next_target_offset(rumble_root)-rumble_root;
+        if(rumble_bytes!=40*8)throw DatError("GALE01r2 rumble table must contain 40 source rows");
+        rumble=melee_web_rumble_decode(rumble_arena->reader(),rumble_root,40);
         const auto& font_bytes=file(files,"sislib_font.bin");
         font=melee_web_font_atlas_register(font_bytes.data(),font_bytes.size(),error,sizeof(error));check(font!=nullptr,error);
         check(melee_web_gameplay_startup(32*1024*1024,error,sizeof(error)),error);started=true;
+        check(melee_web_rumble_begin(rumble,error,sizeof(error)),error);rumble_published=true;
         rules=melee_web_match_rules_begin(error,sizeof(error));check(rules!=nullptr,error);
         common=melee_web_common_context_create(&common_data.scalars,&common_data.tables,&common_joint.graph(),error,sizeof(error));
         check(common!=nullptr,error);
@@ -304,6 +313,13 @@ struct GameplayWorld::Storage {
         full_stage=std::make_unique<DatNativeStage>(source,stage->stage_kind);
         stage_effects=std::make_unique<DatEffectBanks>(source,"map_ptcl","map_texg",64);
         check(melee_web_effect_bank_attach(stage_effects->bank(),error,sizeof(error)),error);
+        // grDatFiles publishes bank64 for stage loading; Ground initialization
+        // publishes the same map data at bank30 for authored joint events.
+        check(melee_web_effect_bank_attach(stage_effects->alias(30),error,sizeof(error)),error);
+        for(const auto& event:full_stage->particle_events())
+            if(!melee_web_effect_bank_has_command(event.bank,event.command))
+                throw DatError("Stage animation requires unpublished particle bank/command "+
+                    std::to_string(event.bank)+"/"+std::to_string(event.command));
         stage_map=melee_web_stage_map_publish(full_stage->map_head(),error,sizeof(error));check(stage_map!=nullptr,error);
         const auto& overrides=full_stage->light_overrides();
         check(melee_web_stage_map_set_overrides(stage_map,overrides.data(),overrides.size(),error,sizeof(error)),error);
@@ -336,6 +352,7 @@ struct GameplayWorld::Storage {
         if(stage_native){check(melee_web_native_joint_destroy(stage_native,error,sizeof(error)),error);stage_native=nullptr;}
         stage_material_animation.reset();stage_animation.reset();stage_model.reset();
         if(bonus_published){check(melee_web_bonus_data_end(bonus,error,sizeof(error)),error);bonus_published=false;}
+        if(rumble_published){check(melee_web_rumble_end(rumble,error,sizeof(error)),error);rumble_published=false;}
         if(registry){check(melee_web_item_registry_end(registry,error,sizeof(error)),error);registry=nullptr;}
         for(auto i=effects.rbegin();i!=effects.rend();++i)check((*i)->detach(error,sizeof(error)),error);
         effects.clear();

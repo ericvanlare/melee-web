@@ -6,6 +6,7 @@ export const RUNTIME_DISC_FILES=Object.freeze({
   'PlCo.dat':'PlCo.dat','PlMr.dat':'PlMr.dat','PlMrNr.dat':'PlMrNr.dat',
   'PlMrAJ.dat':'PlMrAJ.dat','GrNLa.dat':'GrNLa.dat','ItCo.usd':'ItCo.usd',
   'EfMrData.dat':'EfMrData.dat','EfCoData.dat':'EfCoData.dat','PdPm.dat':'PdPm.dat',
+  'LbRb.dat':'LbRb.dat',
   'smash2.sem':'audio/us/smash2.sem','main.ssm':'audio/us/main.ssm',
   'mario.ssm':'audio/us/mario.ssm','sp_end.hps':'audio/sp_end.hps',
 });

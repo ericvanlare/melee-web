@@ -1923,6 +1923,22 @@ index 75dfb9c..3275ae3 100644
              if (opcode < 0x15U) {
                  u32 idx = opcode - 0xA;
                  if (lb_803BA248[idx](co)) {
+@@ -247,6 +247,15 @@
+                      lb_804D63C0[arg2].unk);
+ }
+ 
++#ifdef TARGET_PC
++struct Fighter_804D653C_t* melee_web_rumble_exchange(struct Fighter_804D653C_t* data)
++{
++    struct Fighter_804D653C_t* previous = lb_804D63C0;
++    lb_804D63C0 = data;
++    return previous;
++}
++#endif
++
+ void lb_800145C0(u8 slot)
+ {
+     HSD_PadRumbleRemove(slot);
 diff --git a/src/melee/lb/lbarchive.c b/src/melee/lb/lbarchive.c
 --- a/src/melee/lb/lbarchive.c
 +++ b/src/melee/lb/lbarchive.c
@@ -5544,3 +5560,15 @@ diff --git a/src/melee/gr/groldpupupu.c b/src/melee/gr/groldpupupu.c
  static void* grOp_804D6A9C;
  
  static int grOp_804D48A0[1][2] = { { 4, 0 } };
+diff --git a/src/sysdolphin/baselib/rumble.c b/src/sysdolphin/baselib/rumble.c
+--- a/src/sysdolphin/baselib/rumble.c
++++ b/src/sysdolphin/baselib/rumble.c
+@@ -168,7 +168,7 @@
+         return 0;
+     }
+     while (a->wait == 0) {
+-        switch ((*(u8*) a->listp >> 5) & 7) {
++        switch ((*a->listp >> 13) & 7) {
+         case 0:
+             if (a->frame == -2) {
+                 return 1;
