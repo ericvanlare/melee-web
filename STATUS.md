@@ -14,6 +14,17 @@ The combined [performance and accuracy playbook](docs/PERFORMANCE_AND_ACCURACY.m
 defines the evidence levels, content admission workflow and failure-response
 process used from this point forward.
 
+Browser staging now uses bounded persistent CPU storage and transfers only used
+ranges, preserving original GPU copy/draw ordering and completion backpressure.
+Three complete 3,719-tick matches in one application keep Wasm capacity at
+334,102,528 bytes with zero gameplay growth and stable teardown allocations;
+the old mapping path reached 1,047,986,176 bytes on its third repetition.
+The visible trace still matches both retail references exactly, and independent
+Release cold/warm gates pass (native maxima 10.000/7.430 ms), with no live
+pipeline creation, timing resumes or audio-queue failures. This closes the
+measured repeated-workload allocation issue; broader memory and content
+coverage remain open. See the [evidence ledger](docs/REPLAY_CORPUS.md#bounded-browser-staging).
+
 The [first measured replay cohort](docs/REPLAY_CORPUS.md) now contains three
 development workloads and one independently held-out workload, totaling 11,122
 source ticks. Two new development reference pairs and the held-out pair repeat

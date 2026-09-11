@@ -225,6 +225,39 @@ automated regression. Re-run the retail comparison when execution order, input,
 RNG, numerics or source-visible lifetime could have changed, then repeat the cold
 and warm browser matrix.
 
+## Repeated-session memory checks
+
+For renderer or lifetime changes, run a retained complete workload at least
+three times in the same application, with no reload or cache reset between
+matches. Save each report before the next run. This complements the independent
+cold/warm application runs; it does not replace them. Preserve timing failures
+and do not resume a performance run into a passing result.
+
+Use the replay report's lifecycle memory snapshots to separate Wasm capacity
+from allocated bytes. Compare `before_preparation`, `prepared`,
+`before_teardown` and `after_teardown`. The current pinned dlmalloc allocator
+reports live, free and top-free bytes; sample these outside the source clock.
+Its free-list walk does not belong in per-tick telemetry. Record any allocator
+change along with the build profile.
+
+Stable post-teardown live bytes with growing capacity indicate a high-water or
+fragmentation investigation. Growing live bytes require ownership attribution
+to the source world, imported archives, audio or renderer caches. Retained
+immutable caches are expected, but their bounds and retirement must be explicit.
+Neither raising the stopped-clock reserve nor forcing a page reload demonstrates
+a lifetime fix. Follow the retained workload through real teardown and reuse;
+measure additional characters/stages as the corpus expands.
+
+Browser staging now has explicit bounded ownership: two frame packets each own
+63 MiB of CPU shadow storage, and two GPU staging buffers remain leased until
+submitted work completes. Upload only the used prefixes, clear the previous
+dirty prefixes before reuse, and preserve the original command-buffer copy/draw
+order. Queue completion failure is fatal; callbacks from a retired renderer
+generation cannot release new leases. The native mapping path is unchanged.
+`liveStagingUsedBytes` and `peakStagingUsedBytes` report logical per-frame used
+ranges, not GPU allocation, driver memory, or separately allocated overflow
+texture uploads. Measure those distinctions before adjusting capacities.
+
 ## Work still required
 
 The foundation must expand with the port:

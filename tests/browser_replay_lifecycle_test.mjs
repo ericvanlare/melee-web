@@ -7,6 +7,17 @@ const start=page.slice(page.indexOf("$('retail-replay-start').onclick="),page.in
 const pause=page.split('\n').find(line=>line.startsWith("$('pause').onclick="));
 const completion=page.slice(page.indexOf('window.menuReplayCompleted='),page.indexOf('\nwindow.menuReplayPoll='));
 assert(start&&pause&&completion);
+{
+ const memory=page.slice(page.indexOf('const replayMemorySnapshot='),page.indexOf('\nfunction replayMetrics('));
+ let nativeCalls=0;
+ const scope={fatal:true,Module:{_melee_web_native_menu_memory(){nativeCalls++;throw Error('unavailable');}}};
+ vm.createContext(scope);vm.runInContext(memory,scope);
+ assert.equal(vm.runInContext('replayMemorySnapshot().available',scope),false);
+ assert.equal(nativeCalls,0,'A native abort must not trigger an allocator walk');
+ scope.fatal=false;
+ assert.equal(vm.runInContext('replayMemorySnapshot().reason',scope),'unavailable');
+ assert.equal(nativeCalls,1,'Optional diagnostics failure must not prevent replay evidence');
+}
 function harness(unload=true){
  let resolveBytes;
  const pending=new Promise(resolve=>resolveBytes=resolve);
@@ -18,6 +29,7 @@ function harness(unload=true){
   replayEvidence:[],uiMessage:'',inputDirty:false,clearRenderCacheOnLoad:false,
   window:{},setTimeout:fn=>fn(),
   TextEncoder,Uint8Array,URL,performance,replayHash:async()=> 'a'.repeat(64),
+  replayMemorySnapshot:()=>({wasm_heap_bytes:2048}),
   status:()=> 'teardown failed',unloadAndSave:async()=>{calls.unload++;return unload;},
   prepareAudio:async()=>{calls.audio++;},pauseAudioForPreparation:async()=>{},
   boundary:async fn=>fn(),check:value=>assert.equal(value,1),syncAudio(){},

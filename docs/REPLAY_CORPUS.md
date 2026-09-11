@@ -253,3 +253,91 @@ setup bundle is preparation only; its copied base savestate is not a completed
 Marth checkpoint or evidence. Preserve this cohort as regressions, profile the
 observed heap growth, and reserve fresh source hashes before subsequent held-out
 evaluations that follow runtime changes informed by evaluation data.
+
+## Second expansion: frozen inputs and memory baseline
+
+Before runtime tuning or new original-game execution, a bounded screen of 12
+complete sources at the same pinned dataset revision reserved two fresh
+held-out donors:
+
+| Public source | Complete donor SHA-256 |
+| --- | --- |
+| `FOX/batch_01/19_32_48 Fox + Falco (FD).slp` | `0376f27fe92a224a1c6a972493292562f0b07391a7265dea480bc13806b6b433` |
+| `MARTH/batch_00/19_11_16 Marth + Falco (YS).slp` | `0e073460262b77369111e20098644531b9e718fbc6a21608097cb2d9bcabe0e9` |
+
+Screening used headers, complete input availability and pre-frame controller
+intent, including early B+up-like inputs. It did not score donor post-frame
+combat. The initial development executions are Fox/Falco FD `16_38_42`
+(`18e6ef1e426c5b4a3040c121d6e5aa3aeaed50e9028bd5b9deac09131f2ae9d8`),
+Fox/Falco FD `21_06_57 [NELL]`
+(`03075ddd0e7b927a3aa0905205874e75ce16ab2764b5ac8cc8a69b25fdf63012`),
+Marth/Falco YS `15_07_17`
+(`12f970373838985577ed187bb2a6a0446f31cce82c6c398636de68112d4f195b`),
+and Marth/Falco YS `20_39_26`
+(`0323db5f3de35c79b8b91aba6dbc9ffb7f22d19b702879abe04d4449227dbdba`).
+Selection is a workload hypothesis; only the new vanilla trajectories establish
+observed combat or recovery coverage. The ignored source manifest and full
+input plans are under `work/replay-expansion/`.
+
+Replay reports now sample Wasm capacity and the pinned dlmalloc allocator's
+live/free/top-free bytes before preparation, after preparation, before teardown
+and after teardown. These lifecycle samples stay outside the live source clock;
+`mallinfo` walks allocator metadata and must not run every tick. The existing
+`wasmHeapGrowthBytes` metric still measures capacity during live execution, not
+live allocations. Post-teardown intentionally includes imported files and
+decoded archive/audio/renderer caches retained by the application.
+
+Three complete 3,719-tick development replays in one visible application, without
+reload, cache clear or disc reimport between matches, returned post-teardown live
+allocations of 106,765,288 / 106,765,144 / 106,765,136 bytes. Wasm capacity ended
+at 922,157,056 / 922,157,056 / 1,047,986,176 bytes. All three passed the existing
+timing gates, but the third still grew capacity by 120 MiB. This is evidence of
+stable live ownership for the repeated workload, with unresolved transient
+allocation or fragmentation costs; it is not a general bounded-memory claim.
+These are repeated-session diagnostics, not cold/warm acceptance runs.
+The raw reports and artifact identities are retained in
+`work/replay-expansion/memory-browser/session-before-fix.json`.
+
+### Bounded browser staging
+
+The pinned browser WebGPU bridge implemented `GetMappedRange` by allocating
+Wasm memory for mapped ranges and copying them back on unmap. Aurora mapped five
+ranges totaling 63 MiB per frame, regardless of their used lengths. Repeated
+mapping allocations explain the capacity/fragmentation problem without a
+growing retained live allocation in this workload.
+
+The browser path now owns two persistent 63 MiB CPU shadows and uploads their
+used prefixes with `Queue.WriteBuffer`. Original command-buffer copies and draw
+order remain intact. Two GPU staging leases enforce completion backpressure;
+retired-generation callbacks cannot release new leases, and completion failure
+fails explicitly. Ordinary per-frame mapping and the temporary 192 MiB match
+reserve are removed. Native rendering and original Melee source are unchanged.
+
+On the same visible Release configuration, three further complete 3,719-tick
+replays in one application passed every hard timing gate. Wasm capacity stayed
+at **334,102,528 bytes** after preparation and through all three teardowns, with
+zero live-gameplay growth. Post-teardown live bytes were
+238,886,088 / 238,885,968 / 238,885,984, including the explicit 126 MiB CPU shadow
+owner. Worst native callbacks were 10.000 / 7.320 / 7.160 ms; browser intervals
+24.930 / 21.020 / 20.080 ms. Average logical staging use was approximately
+1.3 MiB per callback, with first-run peak 3,115,276 bytes. This measures Wasm
+allocation and submitted data, not total browser/driver/GPU memory.
+
+The complete before/after reports and build hashes are retained in
+`work/replay-expansion/memory-browser/session-after-fix.json`. These repeated
+matches establish bounded reuse for this retained workload; new stage/fighter
+combinations still require their own state and performance checks.
+
+The separate visible state run matches both original-game references through
+all 3,719 ticks and retains the exact prior visible trace hash
+`74bfc62ecff76fbfd29e5aef223dad0540f8eb824f58f343065e660197338b17`.
+The first cleared-cache run above and a fresh application with persisted cache
+pass the strict joined state/completion/cold/warm gates. Warm native maximum is
+7.430 ms, browser interval 20.780 ms, preparation 216.490 ms, and live heap
+growth zero. Cold preparation is 250.540 ms. Both inspect empty browser error
+logs; driver cache remains uncontrolled. The joined receipt
+`staging-dev12-browser-final.json` is SHA-256
+`a0170e7d4435a824ff95d7ef9b64995c39f615fe9d11dbdf2c511e018bd273d2`;
+Wasm is `74c7c1256ae3e458f0d4e57b03666f9e18cbf694a8891fb50b770a57e5ade25c`.
+This is exact declared-state and scoped timing evidence, with no pixel, PCM,
+hardware-input or broad content admission claim.

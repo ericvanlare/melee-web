@@ -18,6 +18,7 @@
 #include <dolphin/vi.h>
 #include <emscripten.h>
 #include <emscripten/heap.h>
+#include <malloc.h>
 #include <SDL3/SDL_hints.h>
 #include <array>
 #include <algorithm>
@@ -238,17 +239,8 @@ void advance(){
 bool advance_match_construction(){
  const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
  const bool complete=match->advance_construction();
- if(complete){
-  // Emscripten grows linear memory by replacing the ArrayBuffer, which can
-  // suspend the browser long enough to trip the source timing guard. Force
-  // action/effect allocation headroom while the source clock is stopped.
-  constexpr std::size_t kLiveMatchHeadroom=192U*1024U*1024U;
-  auto* reserve=static_cast<volatile unsigned char*>(std::malloc(kLiveMatchHeadroom));
-  if(!reserve)throw std::runtime_error("Unable to reserve live-match WebAssembly heap headroom");
-  reserve[0]=0;reserve[kLiveMatchHeadroom-1]=0;std::free(const_cast<unsigned char*>(reserve));
- }
- const double reserved=emscripten_get_now();
- report_construction(complete?"match-enter":"match-enter-step",started,reserved,reserved,
+ const double constructed=emscripten_get_now();
+ report_construction(complete?"match-enter":"match-enter-step",started,constructed,constructed,
                      before,aurora_stats_snapshot());
  if(complete){
   if(replay&&replay_trace)melee_web::retail_replay_initial(*replay,true);
@@ -483,13 +475,17 @@ void tick(){
   }
  }
  char timing[1024];
+ const uint32_t staging_used_bytes=began?
+  stats_after.lastVertSize+stats_after.lastUniformSize+stats_after.lastIndexSize+
+  stats_after.lastStorageSize+stats_after.lastTextureUploadSize:0;
  std::snprintf(timing,sizeof(timing),
   "{\"frame\":%u,\"started\":%.3f,\"valid\":%d,\"first_use\":%d,"
   "\"input_ms\":%.3f,\"simulation_audio_ms\":%.3f,\"preparation_ms\":%.3f,"
   "\"begin_ms\":%.3f,\"draw_ms\":%.3f,\"end_ms\":%.3f,\"total_ms\":%.3f,"
   "\"began\":%d,\"drawn\":%d,\"queued_delta\":%d,\"created_delta\":%d,"
   "\"queued_total\":%u,\"created_total\":%u,\"draw_calls\":%u,"
-  "\"texture_upload_bytes\":%u,\"wasm_heap_bytes\":%zu,\"draw_suppressed\":%d}",
+  "\"texture_upload_bytes\":%u,\"staging_used_bytes\":%u,"
+  "\"wasm_heap_bytes\":%zu,\"draw_suppressed\":%d}",
   ++render_frame,started,timing_valid,first_use,input_done-started,
   std::max(0.0,simulation_done-input_done-preparation_ms),preparation_ms,
   begin_done-simulation_done,draw_done-begin_done,end_done-draw_done,
@@ -497,7 +493,7 @@ void tick(){
   stat_delta(stats_after.queuedPipelines,stats_before.queuedPipelines),
   stat_delta(stats_after.createdPipelines,stats_before.createdPipelines),
   stats_after.queuedPipelines,stats_after.createdPipelines,
-  stats_after.drawCallCount,stats_after.lastTextureUploadSize,
+  stats_after.drawCallCount,stats_after.lastTextureUploadSize,staging_used_bytes,
   emscripten_get_heap_size(),suppress_draw);
  EM_ASM({if(window.menuRuntimeTiming)window.menuRuntimeTiming(JSON.parse(UTF8ToString($0)));},timing);
  EM_ASM({window.menuFrame?.(!!$0);},running_at_callback_start?1:0);
@@ -629,6 +625,20 @@ int melee_web_native_menu_stock_check(){
     match->player_stats(0).stocks!=4||match->player_stats(1).stocks!=4)return 0;
  stock_check=-1;stock_count=4;stock_respawns=0;stock_tick=0;stock_lost=stock_jump=false;
  running=true;menu_clock.reset();return 1;
+}
+const char* melee_web_native_menu_memory(){
+ // Lifecycle diagnostics only: mallinfo walks the allocator's free lists.
+ // Reserved linear memory is not the same as live allocations and cannot shrink.
+ const auto info=mallinfo();
+ static char text[512];
+ std::snprintf(text,sizeof(text),
+  "{\"wasm_heap_bytes\":%zu,\"allocator_arena_bytes\":%zu,"
+  "\"allocator_live_bytes\":%zu,\"allocator_free_bytes\":%zu,"
+  "\"allocator_top_free_bytes\":%zu,"
+  "\"match_present\":%s,\"menu_present\":%s}",
+  emscripten_get_heap_size(),info.arena,info.uordblks,info.fordblks,info.keepcost,
+  match?"true":"false",world?"true":"false");
+ return text;
 }
 const char* melee_web_native_menu_diagnostics(){
  static char text[640];
