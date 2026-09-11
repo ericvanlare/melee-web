@@ -95,19 +95,28 @@ class CaptureRunnerTests(unittest.TestCase):
         command = CAPTURE.dolphin_command(
             Path("/Dolphin"), Path("/owned/user"), Path("/owned/snapshot.sav"),
             Path("/readonly/game.iso"))
-        self.assertEqual(command[0:8], [
-            "/Dolphin", "-u", "/owned/user", "-d", "-s",
+        self.assertEqual(command[0:9], [
+            "/Dolphin", "-u", "/owned/user", "-b", "-d", "-s",
             "/owned/snapshot.sav", "-e", "/readonly/game.iso",
         ])
         for setting in (
             "Dolphin.Input.BackgroundInput=True",
             "Dolphin.Core.CPUCore=0",
+            "Dolphin.DSP.Backend=No Audio Output",
             "Dolphin.Core.CPUThread=False",
             "Dolphin.Core.EnableCheats=False",
             "Dolphin.Core.EnableCustomRTC=True",
             f"Dolphin.Core.CustomRTCValue={CAPTURE.RTC}",
         ):
             self.assertIn(setting, command)
+
+    def test_jit_profile_is_explicit_and_unknown_cores_are_rejected(self):
+        args = (Path('/Dolphin'), Path('/user'), Path('/snapshot'), Path('/disc'))
+        command = CAPTURE.dolphin_command(*args, cpu='JITARM64')
+        self.assertIn('Dolphin.Core.CPUCore=4', command)
+        self.assertNotIn('Dolphin.Core.CPUCore=0', command)
+        with self.assertRaises(CAPTURE.CaptureRunnerError):
+            CAPTURE.dolphin_command(*args, cpu='auto')
 
     def test_generated_gdb_control_counts_source_ticks_and_bounds_traps(self):
         with tempfile.TemporaryDirectory() as directory:

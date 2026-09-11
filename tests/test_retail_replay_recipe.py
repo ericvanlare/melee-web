@@ -96,6 +96,22 @@ def write_candidate(path, rows):
 
 
 class RetailReplayRecipeTests(unittest.TestCase):
+    def test_jit_export_requires_explicit_cpu_and_retains_provenance(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first, second = root / 'a.jsonl', root / 'b.jsonl'
+            for path in (first, second):
+                rows = candidate()
+                rows[0]['provenance']['cpu'] = 'JITARM64'
+                write_candidate(path, rows)
+            output = root / 'input.mwrc'
+            with self.assertRaises(RECIPE.RecipeError):
+                RECIPE.export_pair(first, second, output)
+            self.assertFalse(output.exists())
+            result = RECIPE.export_pair(first, second, output, cpu='JITARM64')
+            self.assertEqual(result['captures']['a']['provenance']['cpu'], 'JITARM64')
+            self.assertEqual(result['claims']['gold_admission'], 'not_claimed')
+
     def test_mwrc_header_setup_and_exact_input_payload(self):
         first = candidate(3)
         second = candidate(3)

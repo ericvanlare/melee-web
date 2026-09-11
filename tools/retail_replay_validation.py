@@ -36,9 +36,11 @@ SCHEMA = "melee-web-retail-replay-candidate"
 VERSION = 1
 PHASE = "HSD_GObj_80390CFC_return"
 INPUT_PHASE = "HSD_PadRenewMasterStatus_entry_queue"
+DEQUEUED_INPUT_PHASE = "HSD_PadRenewMasterStatus_dequeued_slot"
 INITIAL_PHASE = "gm_Scene_Vs_OnEnter_entry"
 GAME_REVISION = "GALE01r2"
 MAX_FRAMES = 36000
+CPU_PROFILES = {"Interpreter64": 0, "JITARM64": 4}
 
 # These values are copied from the pinned provenance used by the collector.
 # A candidate with a different executable, Dolphin build, source revision,
@@ -208,10 +210,12 @@ def _finite_float_bits(value: Any, context: str) -> str:
     return bits
 
 
-def _validate_provenance(value: Any, context: str) -> dict[str, Any]:
+def _validate_provenance(value: Any, context: str, *, cpu: str = "Interpreter64") -> dict[str, Any]:
+    if cpu not in CPU_PROFILES:
+        raise CaptureError("Unsupported reference CPU profile")
     if not isinstance(value, dict):
         raise CaptureError(f"{context}: provenance must be an object")
-    for key, expected in EXPECTED_PROVENANCE.items():
+    for key, expected in dict(EXPECTED_PROVENANCE, cpu=cpu).items():
         if key not in value:
             raise CaptureError(f"{context}: missing pinned field {key}")
         # ``0 == False`` in Python, but these provenance values describe
@@ -327,7 +331,7 @@ class _Capture:
 
 def _validate_capture(rows: Iterable[dict[str, Any]], context: str,
                       sha256: str | None = None,
-                      raw: bytes | None = None) -> _Capture:
+                      raw: bytes | None = None, *, cpu: str = "Interpreter64") -> _Capture:
     if not isinstance(rows, (list, tuple)):
         raise CaptureError(f"{context}: capture rows must be a list")
     rows_tuple = tuple(rows)
@@ -350,7 +354,7 @@ def _validate_capture(rows: Iterable[dict[str, Any]], context: str,
         raise CaptureError(f"{context}.header: unsupported schema or version")
     if header["phase"] != PHASE:
         raise CaptureError(f"{context}.header: unsupported phase")
-    if header["input_phase"] != INPUT_PHASE:
+    if header["input_phase"] not in (INPUT_PHASE, DEQUEUED_INPUT_PHASE):
         raise CaptureError(f"{context}.header: unsupported input phase")
     if header["initial_phase"] != INITIAL_PHASE:
         raise CaptureError(f"{context}.header: unsupported initial phase")
@@ -360,7 +364,7 @@ def _validate_capture(rows: Iterable[dict[str, Any]], context: str,
     state_keys = STATE_KEYS | ({"pad_state_hex"} if version == 2 else set())
     requested = _int(header["frames_requested"], f"{context}.header.frames_requested",
                      minimum=1, maximum=MAX_FRAMES)
-    _validate_provenance(header["provenance"], f"{context}.header.provenance")
+    _validate_provenance(header["provenance"], f"{context}.header.provenance", cpu=cpu)
     _hex(header["collector_sha256"], 32, f"{context}.header.collector_sha256")
     capture_id = header["capture_id"]
     _hex(capture_id, 16, f"{context}.header.capture_id")
@@ -430,19 +434,19 @@ def _validate_capture(rows: Iterable[dict[str, Any]], context: str,
 
 
 def validate_capture(rows: list[dict[str, Any]] | tuple[dict[str, Any], ...],
-                     context: str = "capture") -> list[dict[str, Any]] | tuple[dict[str, Any], ...]:
+                     context: str = "capture", *, cpu: str = "Interpreter64") -> list[dict[str, Any]] | tuple[dict[str, Any], ...]:
     """Validate already-decoded rows and return them unchanged.
 
     The returned rows are intentionally the caller's objects; validation never
     repairs or normalizes captured state or raw PAD bytes.
     """
 
-    _validate_capture(rows, context)
+    _validate_capture(rows, context, cpu=cpu)
     return rows
 
 
 def _load(value: str | Path | list[dict[str, Any]] | tuple[dict[str, Any], ...],
-          context: str) -> _Capture:
+          context: str, *, cpu: str = "Interpreter64") -> _Capture:
     if isinstance(value, (str, Path)):
         path = Path(value)
         try:
@@ -469,14 +473,14 @@ def _load(value: str | Path | list[dict[str, Any]] | tuple[dict[str, Any], ...],
             if not isinstance(row, dict):
                 raise CaptureError(f"{context}: line {line_number} is not an object")
             rows.append(row)
-        return _validate_capture(rows, context, digest, raw)
-    return _validate_capture(value, context)
+        return _validate_capture(rows, context, digest, raw, cpu=cpu)
+    return _validate_capture(value, context, cpu=cpu)
 
 
-def load_capture(path: str | Path) -> _Capture:
+def load_capture(path: str | Path, *, cpu: str = "Interpreter64") -> _Capture:
     """Load, hash, and validate one candidate file."""
 
-    return _load(path, "capture")
+    return _load(path, "capture", cpu=cpu)
 
 
 def _lower_hex_strings(value: Any) -> Any:
@@ -585,12 +589,18 @@ def _compare_validated(first_capture: _Capture, second_capture: _Capture) -> dic
     # count and collector identity still belong to this candidate schema and
     # are useful first divergences when otherwise-valid files differ.
     header_left = {
+        "input_phase": first_capture.header["input_phase"],
+        "cpu": first_capture.header["provenance"]["cpu"],
+        "dolphin_binary_sha256": first_capture.header["provenance"].get("dolphin_binary_sha256"),
         "version": first_capture.header["version"],
         "frames_requested": first_capture.header["frames_requested"],
         "collector_sha256": first_capture.header["collector_sha256"],
         "input_plan_sha256": first_capture.header['provenance'].get('input_plan_sha256'),
     }
     header_right = {
+        "input_phase": second_capture.header["input_phase"],
+        "cpu": second_capture.header["provenance"]["cpu"],
+        "dolphin_binary_sha256": second_capture.header["provenance"].get("dolphin_binary_sha256"),
         "version": second_capture.header["version"],
         "frames_requested": second_capture.header["frames_requested"],
         "collector_sha256": second_capture.header["collector_sha256"],
@@ -648,7 +658,8 @@ def _compare_validated(first_capture: _Capture, second_capture: _Capture) -> dic
 
 
 def compare(first: str | Path | list[dict[str, Any]] | tuple[dict[str, Any], ...],
-            second: str | Path | list[dict[str, Any]] | tuple[dict[str, Any], ...]) -> dict[str, Any]:
+            second: str | Path | list[dict[str, Any]] | tuple[dict[str, Any], ...],
+            *, cpu: str = "Interpreter64") -> dict[str, Any]:
     """Return a repeatability report for two independent candidate captures.
 
     Invalid inputs are reported with ``status == "invalid_capture"``.  A
@@ -660,7 +671,7 @@ def compare(first: str | Path | list[dict[str, Any]] | tuple[dict[str, Any], ...
     first_capture: _Capture | None = None
     second_capture: _Capture | None = None
     try:
-        first_capture = _load(first, "capture_a")
+        first_capture = _load(first, "capture_a", cpu=cpu)
     except CaptureError as error:
         report = _base_report(None, None)
         report.update({
@@ -669,7 +680,7 @@ def compare(first: str | Path | list[dict[str, Any]] | tuple[dict[str, Any], ...
         })
         return report
     try:
-        second_capture = _load(second, "capture_b")
+        second_capture = _load(second, "capture_b", cpu=cpu)
     except CaptureError as error:
         report = _base_report(first_capture, None)
         report.update({
@@ -701,8 +712,9 @@ def cli_main(argv: list[str] | None = None) -> int:
     parser.add_argument("capture_b", type=Path)
     parser.add_argument("--output", type=Path,
                         help="optional path for the machine-readable JSON report")
+    parser.add_argument("--cpu", choices=CPU_PROFILES, default="Interpreter64")
     args = parser.parse_args(argv)
-    report = compare(args.capture_a, args.capture_b)
+    report = compare(args.capture_a, args.capture_b, cpu=args.cpu)
     encoded = json.dumps(report, indent=2, sort_keys=True) + "\n"
     if args.output:
         try:

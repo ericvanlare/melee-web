@@ -1,18 +1,30 @@
 """Input-only plans for the pinned Dolphin pipe boundary; no expected state.
 
-Stick calibration must be empty, with zero dead zone and virtual notches. The
-emulator then maps signed axes / 127 to the requested raw bytes. Digital L/R
-force analog 255; A/B pressure follows the corresponding digital button. These
-are explicit workload derivations, not recovered original hardware pressure.
+The default ``dolphin-pipe-raw-v2`` policy uses the four raw stick bytes
+recorded by modern Slippi files.  ``dolphin-pipe-processed-v2`` is an explicit
+legacy fallback: it derives each raw axis as ``round_half_away_from_zero(80
+* processed_axis)`` after requiring a finite processed value in ``[-1, 1]``.
+The scale 80 is the pinned HSD normalization scale.  This is a derived
+workload, never recovered hardware input and never a UCF or vanilla expected-
+state equivalence.  Both policies require physical buttons and exact,
+invertible physical trigger floats.  Digital L/R force analog 255; A/B
+pressure is zero at Melee's serial-interface mode-3 PAD boundary. The old
+raw-v1 movement canary remains readable only where no A/B pressure was assumed.
 """
 import hashlib
 import json
+import math
+from dataclasses import replace
 from pathlib import Path
 import re
 import struct
 
 SCHEMA = 'melee-web-retail-input-plan'
-POLICY = 'dolphin-pipe-raw-v1'
+POLICY = 'dolphin-pipe-raw-v2'
+PROCESSED_POLICY = 'dolphin-pipe-processed-v2'
+LEGACY_RAW_POLICY = 'dolphin-pipe-raw-v1'
+POLICIES = (LEGACY_RAW_POLICY, POLICY, PROCESSED_POLICY)
+EXPORT_POLICIES = (POLICY, PROCESSED_POLICY)
 MAX_FRAMES = 36000
 PAD = struct.Struct('>HbbbbBBBBb')
 DISCONNECTED_PAD = '00' * 10 + 'ff'
@@ -32,13 +44,33 @@ def _integer(value, low, high):
         raise ValueError('Input plan integer is outside its bounds')
 
 
+def _require_policy(policy):
+    if policy not in POLICIES:
+        raise ValueError('Unsupported input plan controller policy')
+
+
+def _processed_axis(bits):
+    """Convert one finite processed float bit pattern to a signed raw byte."""
+    if type(bits) is not int or not 0 <= bits <= 0xffffffff:
+        raise ValueError('Processed axis does not contain a valid float bit pattern')
+    value = struct.unpack('>f', struct.pack('>I', bits))[0]
+    if not math.isfinite(value):
+        raise ValueError('Processed axis must be finite')
+    if not -1.0 <= value <= 1.0:
+        raise ValueError('Processed axis is outside [-1,1]')
+    scaled = value * 80
+    # Python round uses ties-to-even. The pipe workload pins ties away from
+    # zero so +0.5 -> +1 and -0.5 -> -1.
+    return math.floor(scaled + 0.5) if scaled >= 0 else math.ceil(scaled - 0.5)
+
+
 def _pad(value):
     if not isinstance(value, str) or re.fullmatch('[0-9a-f]{22}', value) is None:
         raise ValueError('Input plan requires 11 canonical hexadecimal PAD bytes')
     fields = PAD.unpack(bytes.fromhex(value))
     buttons, x, y, cx, cy, left, right, a, b, err = fields
     if (buttons & ~BUTTON_MASK or min(x,y,cx,cy) < -127 or err != 0 or
-            a != (255 if buttons & 256 else 0) or b != (255 if buttons & 512 else 0) or
+            a != 0 or b != 0 or
             (buttons & 64 and left != 255) or (buttons & 32 and right != 255)):
         raise ValueError('PAD sample is not representable by the declared pipe policy')
     return fields
@@ -47,7 +79,8 @@ def _pad(value):
 def validate_plan(value):
     _keys(value, ('schema','version','policy','source_sha256','first_frame',
                   'source_stage','source_characters','frames'))
-    if value['schema'] != SCHEMA or type(value['version']) is not int or value['version'] != 1 or value['policy'] != POLICY:
+    if (value['schema'] != SCHEMA or type(value['version']) is not int or
+            value['version'] != 1 or value['policy'] not in POLICIES):
         raise ValueError('Unsupported input plan schema or controller policy')
     digest = value['source_sha256']
     if not isinstance(digest, str) or re.fullmatch('[0-9a-f]{64}', digest) is None or digest == '0'*64:
@@ -67,7 +100,13 @@ def validate_plan(value):
         if not isinstance(frame, list) or len(frame) != 2:
             raise ValueError('Each input plan tick requires both human ports')
         for pad in frame:
-            _pad(pad)
+            decoded = _pad(pad)
+            if (value['policy'] == PROCESSED_POLICY and
+                    max(abs(axis) for axis in decoded[1:5]) > 80):
+                raise ValueError(
+                    'Processed-v2 PAD axes must remain within the derived [-80,80] range')
+            if value["policy"] == LEGACY_RAW_POLICY and decoded[0] & (256 | 512):
+                raise ValueError("Raw-v1 A/B pressure assumption is unsupported; re-export with raw-v2")
     return value
 
 
@@ -90,7 +129,51 @@ def load_plan(path):
     return validate_plan(json.loads(raw, object_pairs_hook=_unique)), hashlib.sha256(raw).hexdigest()
 
 
-def plan_from_timeline(timeline, source_sha256):
+def prefix_timeline(timeline, frame_count):
+    """Select an initial source prefix while retaining the full source identity."""
+    if type(frame_count) is not int or frame_count <= 0:
+        raise ValueError('Input plan frame prefix must be a positive integer')
+    if not timeline.frames or timeline.frames[0].number != -123:
+        raise ValueError('Input plan frame prefix requires source frame -123')
+    if frame_count > len(timeline.frames):
+        raise ValueError('Input plan frame prefix exceeds the complete source timeline')
+    return replace(timeline, frames=timeline.frames[:frame_count])
+
+
+def _pack_pad(value, policy):
+    if policy in (POLICY, LEGACY_RAW_POLICY):
+        pad = value.reconstructed_pad()
+        buttons = pad['buttons']
+        stick = pad['stick']
+        cstick = pad['cstick']
+        raw_triggers = pad['triggers']
+    else:
+        physical = value.record()['physical']
+        buttons = physical['buttons']
+        if buttons is None:
+            raise ValueError(
+                f'frame {value.frame} port {value.port} requires physical buttons')
+        if type(buttons) is not int or buttons & ~BUTTON_MASK:
+            raise ValueError(
+                f'frame {value.frame} port {value.port} has invalid physical buttons')
+        raw_triggers = physical['trigger_bytes']
+        if (not isinstance(raw_triggers, list) or len(raw_triggers) != 2 or
+                any(type(raw) is not int or not 0 <= raw <= 140
+                    for raw in raw_triggers)):
+            raise ValueError(
+                f'frame {value.frame} port {value.port} requires exact invertible physical triggers')
+        axes = (*value.processed_stick_bits, *value.processed_cstick_bits)
+        derived = tuple(_processed_axis(bits) for bits in axes)
+        stick, cstick = derived[:2], derived[2:]
+    triggers = [255 if buttons & mask else raw
+                for raw, mask in zip(raw_triggers, (64,32))]
+    return PAD.pack(buttons, *stick, *cstick, *triggers, 0, 0, 0).hex()
+
+
+def plan_from_timeline(timeline, source_sha256, policy=POLICY):
+    _require_policy(policy)
+    if getattr(timeline, 'game_end_method', None) is None:
+        raise ValueError('Input plan requires a complete Slippi source with Game End')
     header = timeline.header.record()
     if (header['is_teams'] or tuple(p['port'] for p in header['players']) != (1,2)
             or any(p['player_type'] != 0 for p in header['players'])):
@@ -108,14 +191,9 @@ def plan_from_timeline(timeline, source_sha256):
             raise ValueError('Input plan requires both human ports each tick')
         pads = []
         for port in (1,2):
-            value = ports[port].reconstructed_pad()
-            buttons = value['buttons']
-            triggers = [255 if buttons & mask else raw
-                        for raw, mask in zip(value['triggers'], (64,32))]
-            pads.append(PAD.pack(buttons, *value['stick'], *value['cstick'],
-                *triggers, 255 if buttons & 256 else 0, 255 if buttons & 512 else 0, 0).hex())
+            pads.append(_pack_pad(ports[port], policy))
         frames.append(pads)
-    return validate_plan({'schema':SCHEMA, 'version':1, 'policy':POLICY,
+    return validate_plan({'schema':SCHEMA, 'version':1, 'policy':policy,
         'source_sha256':source_sha256, 'first_frame':timeline.frames[0].number if frames else -123,
         'source_stage':header['stage_id'],
         'source_characters':[p['character_id'] for p in header['players']], 'frames':frames})

@@ -10,6 +10,16 @@
 #include "hsd_probe_compat.h"
 #include <dolphin/gx.h>
 #include <dolphin/card.h>
+#include "gameplay_ps_math.h"
+
+/* Retail uses the paired-single SDK path. Aurora's portable C matrix
+ * fallback has different arithmetic rounding; keep the original PS operation
+ * order in gameplay and HSD joint evaluation. Explicit C_MTXConcat callers
+ * retain their separate C SDK contract. */
+#undef MTXConcat
+#define MTXConcat melee_web_ps_mtx_concat
+#undef PSMTXConcat
+#define PSMTXConcat melee_web_ps_mtx_concat
 
 typedef struct { f32 x, y; } Vec2;
 typedef struct { int x, y; } IntVec2;

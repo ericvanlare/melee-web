@@ -109,6 +109,38 @@ def candidate(frame_count=3, capture_id=None):
 
 
 class RetailReplayValidationTests(unittest.TestCase):
+    def test_protected_dequeue_phase_is_explicit_and_cannot_mix_in_pair(self):
+        left, right = candidate(), candidate()
+        right[0]['input_phase'] = VALIDATION.DEQUEUED_INPUT_PHASE
+        result = VALIDATION.compare(left, right)
+        self.assertEqual(result['status'], 'diverged')
+        self.assertEqual(result['first_divergence']['field'], 'header.input_phase')
+        left[0]['input_phase'] = VALIDATION.DEQUEUED_INPUT_PHASE
+        self.assertEqual(VALIDATION.compare(left, right)['status'], 'repeatable')
+        right[0]['input_phase'] = 'unrecognized boundary'
+        self.assertEqual(VALIDATION.compare(left, right)['status'], 'invalid_capture')
+
+    def test_alternate_cpu_requires_explicit_profile_and_matching_pair(self):
+        left, right = candidate(), candidate()
+        for rows in (left, right):
+            rows[0]['provenance']['cpu'] = 'JITARM64'
+        self.assertEqual(VALIDATION.compare(left, right)['status'], 'invalid_capture')
+        self.assertEqual(VALIDATION.compare(left, right, cpu='JITARM64')['status'], 'repeatable')
+        self.assertEqual(VALIDATION.compare(left, right, cpu='auto')['status'], 'invalid_capture')
+        right[0]['provenance']['cpu'] = 'Interpreter64'
+        self.assertEqual(VALIDATION.compare(left, right, cpu='JITARM64')['status'], 'invalid_capture')
+        first = VALIDATION._validate_capture(left, 'first', cpu='JITARM64')
+        second = VALIDATION._validate_capture(right, 'second')
+        self.assertEqual(VALIDATION.compare_validated(first, second)['first_divergence']['field'],
+                         'header.cpu')
+
+    def test_repeatability_rejects_different_reference_binary(self):
+        left, right = candidate(), candidate()
+        right[0]['provenance']['dolphin_binary_sha256'] = 'ef' * 32
+        result = VALIDATION.compare(left, right)
+        self.assertEqual(result['status'], 'diverged')
+        self.assertEqual(result['first_divergence']['field'], 'header.dolphin_binary_sha256')
+
     def test_schema_types_and_match_entry_origin_are_not_inferred(self):
         for version in (True, 1.0):
             rows = candidate()

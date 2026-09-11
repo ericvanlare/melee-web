@@ -23,6 +23,7 @@ import hashlib
 import json
 import math
 import os
+import platform
 from pathlib import Path
 import shutil
 import signal
@@ -40,8 +41,9 @@ TOOLS_ROOT = REPO_ROOT / "tools"
 sys.path.insert(0, str(TOOLS_ROOT))
 sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
-from retail_replay_validation import EXPECTED_PROVENANCE, MAX_FRAMES, load_capture
+from retail_replay_validation import EXPECTED_PROVENANCE, CPU_PROFILES, MAX_FRAMES, load_capture
 from retail_draw_audit import load_draw_audit
+from retail_match_completion import load_match_completion
 from retail_input_plan import load_plan, verify_capture
 from extract_disc_file import DiscImage, DiscFormatError
 
@@ -127,10 +129,10 @@ def dolphin_executable(path: str | Path) -> Path:
     return _regular_file(candidate, "Dolphin executable")
 
 
-def _strict_provenance(provenance: dict, dol: Path, dolphin: Path) -> dict:
+def _strict_provenance(provenance: dict, dol: Path, dolphin: Path, *, cpu: str = "Interpreter64") -> dict:
     if not isinstance(provenance, dict):
         raise CaptureRunnerError("provenance must be a JSON object")
-    for key, expected in EXPECTED_PROVENANCE.items():
+    for key, expected in dict(EXPECTED_PROVENANCE, cpu=cpu).items():
         actual = provenance.get(key)
         if type(actual) is not type(expected) or actual != expected:
             raise CaptureRunnerError(f"pinned provenance mismatch for {key}")
@@ -166,13 +168,13 @@ def _strict_provenance(provenance: dict, dol: Path, dolphin: Path) -> dict:
 
 
 def _load_provenance_source(source: Path, dol: Path,
-                            dolphin: Path) -> tuple[dict, dict, bytes]:
+                            dolphin: Path, *, cpu: str = "Interpreter64") -> tuple[dict, dict, bytes]:
     try:
         raw = source.read_bytes()
         provenance = json.loads(raw.decode("utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
         raise CaptureRunnerError(f"cannot read provenance {source}: {error}") from error
-    return provenance, _strict_provenance(provenance, dol, dolphin), raw
+    return provenance, _strict_provenance(provenance, dol, dolphin, cpu=cpu), raw
 
 
 def load_provenance(path: str | Path, dol: Path, dolphin: Path) -> tuple[dict, dict]:
@@ -300,7 +302,7 @@ def _make_fifo(path: Path) -> None:
 
 def prepare_run(template_user: str | Path, checkpoint_gc: str | Path,
                 provenance_path: str | Path, dol: str | Path,
-                dolphin: str | Path, output: str | Path) -> dict:
+                dolphin: str | Path, output: str | Path, *, cpu: str = "Interpreter64") -> dict:
     """Prepare an owned run directory and return its paths/metadata."""
 
     template = _directory(Path(template_user), "template user")
@@ -313,7 +315,7 @@ def prepare_run(template_user: str | Path, checkpoint_gc: str | Path,
     output_path.parent.mkdir(parents=True, exist_ok=True)
     provenance_source = _regular_file(Path(provenance_path), "provenance")
     provenance, identity, provenance_bytes = _load_provenance_source(
-        provenance_source, dol_path, dolphin_path)
+        provenance_source, dol_path, dolphin_path, cpu=cpu)
 
     try:
         run_root = Path(tempfile.mkdtemp(prefix=".retail-replay-run-",
@@ -493,12 +495,16 @@ def write_gdb_script(path: Path, socket: Path, helper: Path, collector: Path,
         raise CaptureRunnerError(f"cannot write GDB command script: {error}") from error
 
 
-def dolphin_command(dolphin: Path, user: Path, snapshot: Path, disc: Path) -> list[str]:
+def dolphin_command(dolphin: Path, user: Path, snapshot: Path, disc: Path,
+                    *, cpu: str = "Interpreter64") -> list[str]:
+    if cpu not in CPU_PROFILES:
+        raise CaptureRunnerError("Unsupported reference CPU profile")
     return [
-        str(dolphin), "-u", str(user), "-d", "-s", str(snapshot), "-e", str(disc),
+        str(dolphin), "-u", str(user), "-b", "-d", "-s", str(snapshot), "-e", str(disc),
         "-C", "Dolphin.Input.BackgroundInput=True",
         "-C", "Dolphin.Display.Fullscreen=False",
-        "-C", "Dolphin.Core.CPUCore=0",
+        "-C", "Dolphin.DSP.Backend=No Audio Output",
+        "-C", f"Dolphin.Core.CPUCore={CPU_PROFILES[cpu]}",
         "-C", "Dolphin.Core.CPUThread=False",
         "-C", "Dolphin.Core.EnableCheats=False",
         "-C", "Dolphin.Core.EnableCustomRTC=True",
@@ -565,7 +571,8 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
                    checkpoint_gc: str | Path, provenance: str | Path,
                    output: str | Path, frames: int = DEFAULT_FRAMES,
                    timeout: float = DEFAULT_TIMEOUT, draw_audit: bool = False,
-                   input_plan: str | Path | None = None) -> dict:
+                   input_plan: str | Path | None = None, cpu: str = "Interpreter64",
+                   require_match_complete: bool = False) -> dict:
     """Run the bounded capture and return preserved run metadata."""
 
     if isinstance(frames, bool) or not isinstance(frames, int) or not 1 <= frames <= MAX_FRAMES:
@@ -575,6 +582,14 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
         raise CaptureRunnerError("timeout must be positive")
     if not isinstance(draw_audit, bool):
         raise CaptureRunnerError("draw_audit must be boolean")
+    if not isinstance(require_match_complete, bool):
+        raise CaptureRunnerError("require_match_complete must be boolean")
+    if require_match_complete and not draw_audit:
+        raise CaptureRunnerError("Complete-match capture requires --draw-audit")
+    if cpu not in CPU_PROFILES:
+        raise CaptureRunnerError("Unsupported reference CPU profile")
+    if cpu == "JITARM64" and platform.machine() not in ("arm64", "aarch64"):
+        raise CaptureRunnerError("JITARM64 capture requires an ARM64 host")
     plan = None
     if input_plan is not None:
         try:
@@ -586,7 +601,7 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
     disc_path = _regular_file(Path(disc), "disc image")
     snapshot_path = _regular_file(Path(snapshot), "snapshot")
     started = time.monotonic()
-    paths = prepare_run(template_user, checkpoint_gc, provenance, dol, dolphin, output)
+    paths = prepare_run(template_user, checkpoint_gc, provenance, dol, dolphin, output, cpu=cpu)
     run_root = paths["run_root"]
     paths["identity"]["disc_dol_sha1"] = verify_disc_dol(disc_path, paths["source_dol"])
     # Copy the snapshot into the owned run evidence area. Dolphin only reads
@@ -616,7 +631,7 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
     write_gdb_script(gdb_commands, paths["socket"], helper, paths["collector"],
                      paths["output"], frames)
     command = dolphin_command(paths["source_dolphin"], paths["user"],
-                              paths["snapshot"], disc_path)
+                              paths["snapshot"], disc_path, cpu=cpu)
     gdb_command = ["gdb", "--quiet", "--nx", "--batch", "-x", str(gdb_commands)]
     metadata_path = run_root / "run-metadata.json"
     input_procedure = {
@@ -645,6 +660,7 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
         "output": str(paths["output"]),
         "frames_requested": frames,
         "source_draw_audit": draw_audit,
+        "require_match_complete": require_match_complete,
         "timeout_seconds": timeout,
         "identity": paths["identity"],
         "source": {
@@ -674,7 +690,9 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
             "architecture": GDB_ARCHITECTURE,
             "endian": "big",
             "background_input_cli": "Dolphin.Input.BackgroundInput=True",
-            "cpu_core_cli": "Dolphin.Core.CPUCore=0 (Interpreter64)",
+            "cpu_core_cli": f"Dolphin.Core.CPUCore={CPU_PROFILES[cpu]} ({cpu})",
+            "debugger_ui": "hidden by batch mode; hardware observers retained",
+            "host_audio_sink": "No Audio Output; DSP/game audio execution retained",
             "cpu_thread_cli": "Dolphin.Core.CPUThread=False",
             "cheats_cli": "Dolphin.Core.EnableCheats=False",
             "rtc_cli": f"Dolphin.Core.EnableCustomRTC=True, Dolphin.Core.CustomRTCValue={RTC}",
@@ -731,7 +749,7 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
             raise CaptureRunnerError(
                 f"collector did not produce requested output: {paths['output']}")
         try:
-            loaded = load_capture(paths["output"])
+            loaded = load_capture(paths["output"], cpu=cpu)
             if loaded.header['collector_sha256'] != paths['collector_sha256']:
                 raise ValueError('Captured collector hash differs from owned source files')
             if len(loaded.frames) != frames:
@@ -745,6 +763,10 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
                 audit_path = paths["evidence"] / "draw-audit.jsonl"
                 metadata["draw_audit"] = load_draw_audit(loaded, audit_path)
                 metadata["draw_audit"]["path"] = str(audit_path)
+            completion_path = paths["evidence"] / "match-completion.json"
+            if completion_path.exists() or require_match_complete:
+                metadata["match_completion"] = load_match_completion(
+                    loaded, completion_path, require_complete=require_match_complete)
         except ValueError as error:
             raise CaptureRunnerError(f"captured JSONL failed strict validation: {error}") from error
         metadata.update({
@@ -752,6 +774,7 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
             "output_sha256": loaded.sha256,
             "frames_actual": len(loaded.frames),
             "capture_id": loaded.header["capture_id"],
+            "capture_wall_seconds": time.monotonic() - started,
         })
         _write_json(metadata_path, metadata)
         return metadata
@@ -785,9 +808,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--provenance", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--frames", type=int, default=DEFAULT_FRAMES)
-    parser.add_argument('--input-plan', type=Path, help='Complete input-only donor plan; requires the raw pipe configuration')
-    parser.add_argument("--draw-audit", action="store_true", help="Observe one source camera traversal after each captured tick")
+    parser.add_argument('--input-plan', type=Path, help='Input-only donor plan; every declared tick must be consumed')
+    parser.add_argument("--draw-audit", action="store_true", help="Observe every source camera traversal and its scheduler-tick index")
+    parser.add_argument("--require-match-complete", action="store_true",
+                        help="Require the original elimination exit request and final source draw")
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT)
+    parser.add_argument("--cpu", choices=CPU_PROFILES, default="Interpreter64",
+                        help="Explicit reference backend; JIT needs interpreter calibration")
     args = parser.parse_args(argv)
     try:
         metadata = capture_replay(
@@ -795,7 +822,8 @@ def main(argv: list[str] | None = None) -> int:
             template_user=args.template_user, snapshot=args.snapshot,
             checkpoint_gc=args.checkpoint_gc, provenance=args.provenance,
             output=args.output, frames=args.frames, timeout=args.timeout,
-            draw_audit=args.draw_audit, input_plan=args.input_plan)
+            draw_audit=args.draw_audit, input_plan=args.input_plan, cpu=args.cpu,
+            require_match_complete=args.require_match_complete)
     except CaptureRunnerError as error:
         parser.exit(2, f"retail capture failed: {error}\n")
     print(json.dumps({

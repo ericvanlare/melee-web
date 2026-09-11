@@ -429,7 +429,7 @@ int main(int argc, char** argv)
         RuntimeFiles files;
         for (const char* name : {"PlCo.dat", "PlMr.dat", "PlMrNr.dat", "PlMrAJ.dat",
                                  "GrNLa.dat", "ItCo.usd", "EfMrData.dat", "EfCoData.dat",
-                                 "PdPm.dat", "sislib_font.bin"}) {
+                                 "PdPm.dat", "LbRb.dat", "sislib_font.bin"}) {
             files[name] = bytes(std::filesystem::path(argv[1]) / name);
         }
         run_cycle(files, 0);

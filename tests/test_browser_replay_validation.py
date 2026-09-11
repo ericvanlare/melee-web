@@ -4,7 +4,7 @@ from pathlib import Path
 import sys
 import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
-from browser_replay_validation import validate_report, ZERO_GATES
+from browser_replay_validation import check_evidence, validate_report, ZERO_GATES
 
 
 def report():
@@ -73,3 +73,33 @@ class BrowserReplayValidationTests(unittest.TestCase):
             with self.subTest(key=key):
                 value = copy.deepcopy(report()); value[group][key] = replacement
                 with self.assertRaises(ValueError): self.check(value)
+
+    def test_source_match_completion_is_required_only_for_full_match_evidence(self):
+        value = report()
+        self.assertIs(self.check(value), value)
+        value['source_match'] = {'complete': True, 'outcome': 2, 'winner': 1}
+        self.assertIs(validate_report(value, 'a' * 64, 686, 'performance', True,
+                                      expected_winner=1), value)
+        for replacement in (
+                None,
+                {'complete': False, 'outcome': 2, 'winner': 1},
+                {'complete': True, 'outcome': 1, 'winner': 1},
+                {'complete': True, 'outcome': 2, 'winner': 0},
+                {'complete': True, 'outcome': 2, 'winner': True},
+        ):
+            with self.subTest(source_match=replacement):
+                candidate = report()
+                if replacement is not None:
+                    candidate['source_match'] = replacement
+                with self.assertRaises(ValueError):
+                    validate_report(candidate, 'a' * 64, 686, 'performance', True,
+                                    expected_winner=1)
+
+    def test_completion_paths_must_be_paired(self):
+        values = dict(reference_a=None, reference_b=None, recipe=None, port=None,
+                      state=None, cold=None, warm=None, profile=None,
+                      browser_errors=None, build_directory=None)
+        with self.assertRaisesRegex(ValueError, 'supplied together'):
+            check_evidence(**values, completion_a='completion-a.json')
+        with self.assertRaisesRegex(ValueError, 'supplied together'):
+            check_evidence(**values, completion_b='completion-b.json')

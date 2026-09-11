@@ -6,6 +6,7 @@ from pathlib import Path
 
 from port_replay_validation import compare_paths
 from retail_replay_recipe import encode_mwrc
+from retail_match_completion import load_match_completion
 from retail_replay_validation import load_capture
 
 ZERO_GATES = ('browserCallbackGaps', 'browserLongTasks', 'nativeCallbacksOver33ms',
@@ -22,7 +23,7 @@ def finite(value):
     return type(value) in (int, float) and math.isfinite(value) and value >= 0
 
 
-def validate_report(report, recipe_hash, frames, mode, cold=None):
+def validate_report(report, recipe_hash, frames, mode, cold=None, *, expected_winner=None):
     require(isinstance(report, dict), 'Browser report must be an object')
     for key, expected in {'schema': 'melee-web-browser-retail-replay', 'version': 1,
                           'recipe_sha256': recipe_hash, 'frames': frames,
@@ -43,6 +44,15 @@ def validate_report(report, recipe_hash, frames, mode, cold=None):
             and report['device_pixel_ratio'] > 0, 'Missing rendering configuration')
     preparation = report.get('preparation')
     require(isinstance(preparation, dict) and finite(preparation.get('total_ms')), 'Missing preparation timing')
+    if expected_winner is not None:
+        source_match = report.get('source_match')
+        require(isinstance(source_match, dict), 'Missing source match completion observation')
+        require(type(source_match.get('complete')) is bool and source_match['complete'] is True,
+                'Browser source match did not complete')
+        require(type(source_match.get('outcome')) is int and source_match['outcome'] == 2,
+                'Browser source match did not report elimination outcome')
+        require(type(source_match.get('winner')) is int and source_match['winner'] == expected_winner,
+                'Browser source match winner disagrees with reference final stocks')
     if mode == 'performance':
         require(type(report.get('instrumented_timing_resumes')) is int and report['instrumented_timing_resumes'] == 0,
                 'Timing run resumed')
@@ -78,20 +88,50 @@ def _json(path, limit=65536):
     return json.loads(raw, object_pairs_hook=unique), hashlib.sha256(raw).hexdigest()
 
 
-def check_evidence(reference_a, reference_b, recipe, port, state, cold, warm, profile, browser_errors, build_directory):
-    comparison = compare_paths(reference_a, reference_b, port)
+def _reference_winner(capture, context):
+    try:
+        fighters = capture.frames[-1]['fighters']
+        stocks = [fighter['stocks'] for fighter in fighters]
+    except (AttributeError, IndexError, KeyError, TypeError) as error:
+        raise ValueError(f'{context}: missing final fighter stocks') from error
+    require(len(stocks) == 2 and all(type(stock) is int for stock in stocks),
+            f'{context}: invalid final fighter stocks')
+    require(stocks.count(0) == 1 and any(stock > 0 for stock in stocks),
+            f'{context}: final stocks do not identify one winner')
+    return 1 if stocks[0] == 0 else 0
+
+
+def check_evidence(reference_a, reference_b, recipe, port, state, cold, warm, profile,
+                   browser_errors, build_directory, *, cpu="Interpreter64",
+                   completion_a=None, completion_b=None):
+    require((completion_a is None) == (completion_b is None),
+            'completion-a and completion-b must be supplied together')
+    comparison = compare_paths(reference_a, reference_b, port, cpu=cpu)
     require(comparison['status'] == 'declared_state_match' and comparison['source_drawing'] == 'source_draws',
             'Rendered source comparison failed: ' + json.dumps(comparison))
-    expected, _ = encode_mwrc(load_capture(reference_a))
+    expected, _ = encode_mwrc(load_capture(reference_a, cpu=cpu))
     actual = Path(recipe).read_bytes()
     require(actual == expected, 'Browser recipe differs from paired retail input/setup')
     recipe_hash = hashlib.sha256(actual).hexdigest()
     frames = comparison['frames_compared']
+    completion_reports = None
+    expected_winner = None
+    if completion_a is not None:
+        capture_a = load_capture(reference_a, cpu=cpu)
+        capture_b = load_capture(reference_b, cpu=cpu)
+        completion_reports = {
+            'a': load_match_completion(capture_a, completion_a, require_complete=True),
+            'b': load_match_completion(capture_b, completion_b, require_complete=True),
+        }
+        expected_winner = _reference_winner(capture_a, 'reference-a')
+        require(_reference_winner(capture_b, 'reference-b') == expected_winner,
+                'Reference final stocks identify different winners')
     reports, hashes = {}, {}
     for name, path in (('state', state), ('cold', cold), ('warm', warm)):
         reports[name], hashes[name] = _json(path)
         validate_report(reports[name], recipe_hash, frames,
-                        'state_capture' if name == 'state' else 'performance', name == 'cold')
+                        'state_capture' if name == 'state' else 'performance', name == 'cold',
+                        expected_winner=expected_winner)
     require(reports['state'].get('trace_sha256') == comparison['capture_hashes']['port'], 'State report names a different trace')
     for key in ('user_agent', 'resolution', 'device_pixel_ratio'):
         require(reports['state'][key] == reports['cold'][key] == reports['warm'][key], 'Browser configurations differ')
@@ -107,7 +147,7 @@ def check_evidence(reference_a, reference_b, recipe, port, state, cold, warm, pr
                 'Build artifact changed: ' + name)
     errors, hashes['browser_errors'] = _json(browser_errors)
     require(errors == [], 'Browser error log must be an inspected empty error list')
-    return {'schema': 'melee-web-scoped-replay-evidence', 'version': 1,
+    result = {'schema': 'melee-web-scoped-replay-evidence', 'version': 1,
             'status': 'scoped_replay_gates_passed', 'gold_admitted': False,
             'content_admitted': False, 'frames': frames, 'recipe_sha256': recipe_hash,
             'evidence_hashes': {**comparison['capture_hashes'], **hashes},
@@ -116,3 +156,12 @@ def check_evidence(reference_a, reference_b, recipe, port, state, cold, warm, pr
             'scope': 'This bounded input donor and the declared state fields on the named visible Release configuration only. '
                      'The profile/error inspection is an operator attestation, not browser build attestation. '
                      'No full-match/content admission, driver-cold, pixel/audio-reference or hardware-input claim.'}
+    if completion_reports is not None:
+        result['evidence_hashes'].update({
+            'completion_a': completion_reports['a']['completion_sha256'],
+            'completion_b': completion_reports['b']['completion_sha256'],
+        })
+        result['match_completion'] = completion_reports
+        result['completion_a'] = completion_reports['a']
+        result['completion_b'] = completion_reports['b']
+    return result

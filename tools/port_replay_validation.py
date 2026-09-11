@@ -113,10 +113,10 @@ def compare_rows(reference, rows):
     return report
 
 
-def compare_paths(first, second, port):
+def compare_paths(first, second, port, *, cpu="Interpreter64"):
     report={'status':'invalid_capture','gold_admitted':False,'performance':'not_evaluated'}
     try:
-        _,_,a_hash,b_hash,reference,_,_= _pair(first,second)
+        _,_,a_hash,b_hash,reference,_,_= _pair(first,second,cpu=cpu)
         path=Path(port)
         if path.stat().st_size>128*1024*1024: raise CaptureError('port capture exceeds byte limit')
         raw=path.read_bytes()
@@ -127,6 +127,7 @@ def compare_paths(first, second, port):
         report['capture_hashes']={'reference_a':a_hash,'reference_b':b_hash,
                                   'port':hashlib.sha256(raw).hexdigest()}
         report['reference_repeatability']='pass'
+        report['reference_cpu']=cpu
     except (CaptureError,RecipeError,_DuplicateKey,OSError,UnicodeError,json.JSONDecodeError) as error:
         report['error']=str(error)
     return report

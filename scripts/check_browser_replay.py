@@ -13,9 +13,12 @@ def main():
     for name in ('reference-a', 'reference-b', 'recipe', 'port', 'state', 'cold', 'warm',
                  'profile', 'browser-errors', 'build-directory', 'output'):
         parser.add_argument('--' + name, required=True, type=Path)
+    for name in ('completion-a', 'completion-b'):
+        parser.add_argument('--' + name, type=Path)
+    parser.add_argument("--cpu", choices=("Interpreter64", "JITARM64"), default="Interpreter64")
     args = vars(parser.parse_args())
     output = args.pop('output')
-    if output.resolve() in {p.resolve() for p in args.values()}:
+    if output.resolve() in {p.resolve() for p in args.values() if isinstance(p, Path)}:
         parser.error('Output cannot overwrite input evidence')
     try:
         result = check_evidence(**args)

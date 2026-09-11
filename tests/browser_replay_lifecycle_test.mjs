@@ -5,7 +5,8 @@ import vm from 'node:vm';
 const page=fs.readFileSync(new URL('../web/runtime.html',import.meta.url),'utf8');
 const start=page.slice(page.indexOf("$('retail-replay-start').onclick="),page.indexOf('\nvar Module='));
 const pause=page.split('\n').find(line=>line.startsWith("$('pause').onclick="));
-assert(start&&pause);
+const completion=page.slice(page.indexOf('window.menuReplayCompleted='),page.indexOf('\nwindow.menuReplayPoll='));
+assert(start&&pause&&completion);
 function harness(unload=true){
  let resolveBytes;
  const pending=new Promise(resolve=>resolveBytes=resolve);
@@ -15,17 +16,36 @@ function harness(unload=true){
  const calls={native:0,unload:0,audio:0,paused:0,failed:[]};
  const scope={$,retailRun:null,replayLoading:false,ready:true,fatal:false,bundle:true,importing:false,
   replayEvidence:[],uiMessage:'',inputDirty:false,clearRenderCacheOnLoad:false,
+  window:{},setTimeout:fn=>fn(),
   TextEncoder,Uint8Array,URL,performance,replayHash:async()=> 'a'.repeat(64),
   status:()=> 'teardown failed',unloadAndSave:async()=>{calls.unload++;return unload;},
   prepareAudio:async()=>{calls.audio++;},pauseAudioForPreparation:async()=>{},
   boundary:async fn=>fn(),check:value=>assert.equal(value,1),syncAudio(){},
-  finishRetailReplay:async reason=>{calls.failed.push(reason);scope.retailRun=null;},
+  finishRetailReplay:async reason=>{calls.failed.push(reason);calls.completedRun=scope.retailRun;scope.retailRun=null;},
   Module:{HEAPU8:new Uint8Array(2048),_malloc:()=>1,_free(){},
    _melee_web_native_menu_replay:()=>{calls.native++;return 1;},
    _melee_web_native_menu_running:()=>1,
    _melee_web_native_menu_pause:()=>{calls.paused++;}}};
  vm.createContext(scope);vm.runInContext(start+'\n'+pause,scope);
  return {$,scope,calls,resolveBytes,play:()=>$('retail-replay-start').onclick()};
+}
+{
+ const h=harness();
+ vm.runInContext(completion,h.scope);
+ h.scope.retailRun={};
+ h.scope.window.menuReplayCompleted(686,1,2,1);
+ assert.equal(h.calls.completedRun.sourceMatch.complete,true);
+ assert.equal(h.calls.completedRun.sourceMatch.outcome,2);
+ assert.equal(h.calls.completedRun.sourceMatch.winner,1);
+}
+{
+ const h=harness();
+ vm.runInContext(completion,h.scope);
+ h.scope.retailRun={};
+ h.scope.window.menuReplayCompleted(686);
+ assert.equal(h.calls.completedRun.sourceMatch.complete,false);
+ assert.equal(h.calls.completedRun.sourceMatch.outcome,null);
+ assert.equal(h.calls.completedRun.sourceMatch.winner,null);
 }
 {
  const h=harness();const first=h.play();const duplicate=h.play();

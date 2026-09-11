@@ -69,11 +69,21 @@ Use two explicit routes:
   samples and state at a named source phase. First require two independent
   executions to agree. Only then compare the port at the corresponding phase.
 
-Prefer modern raw-rich recordings. Missing raw fields in older recordings may
-be converted into explicitly derived canonical PAD workloads later; those bytes
-are not recovered original hardware input. Even modern physical trigger floats
-can admit more than one original byte, so record the canonicalization policy.
-Do not inject processed stick floats into a raw controller boundary.
+Prefer modern raw-rich recordings. The current `dolphin-pipe-raw-v2` plan is
+the default. Older recordings with missing raw axes may use the explicit
+`dolphin-pipe-processed-v2` fallback: finite processed axes in `[-1,1]` are
+converted with the pinned scale 80 and nearest half-away-from-zero rounding.
+These are derived workload bytes, never recovered hardware input or UCF
+expected state. Physical buttons and invertible trigger floats remain required;
+mode-3 serial PAD A/B pressure is zero, while digital L/R maps to analog 255.
+The historical raw-v1 plan is readable only for neutral A/B samples. Never
+inject processed floats directly at the raw controller boundary.
+
+An exporter prefix is initial-only: `--frames N` requires a positive `N`, keeps
+source frame `-123`, and rejects values beyond the complete parsed timeline.
+The exporter parses and hashes the complete `.slp` before slicing, so a prefix
+plan retains the full source-byte provenance. The retail runner also checks the
+actual consumed four-port PAD vector on every scheduler tick.
 
 Construct the match once from the declared fixture initialization, then supply
 one input vector per source tick. Never write recorded positions, action states,
@@ -84,10 +94,37 @@ any numerical tolerance needs a documented field-specific rationale.
 ### 3. Establish reference trust before interpreting a red
 
 Pin the retail executable, Dolphin build, source revision, CPU mode, settings,
-save/setup recipe and collector. Dolphin remains an external validation tool;
-no emulator enters the browser runtime. Preserve ordinary retail setup and
-capture the complete `StartMeleeData` at VS entry. Decode native source fields
-explicitly; never transplant PPC pointers or C bitfield layouts.
+save/setup recipe and collector. `Interpreter64` is the strict default;
+`JITARM64` is an explicit ARM64 opt-in. Dolphin remains an external validation
+tool; no emulator enters the browser runtime. Preserve ordinary retail setup
+and capture the complete `StartMeleeData` at VS entry. Decode native source
+fields explicitly; never transplant PPC pointers or C bitfield layouts.
+
+The collector runs GDB in hidden batch mode and uses Dolphin's
+`Dolphin.DSP.Backend=No Audio Output`. The older `Null` sink is invalid and
+falls back to Cubeb; `No Audio Output` removes the host sink while preserving
+DSP and source audio execution. Calibrate a changed collector or JIT backend
+against two immutable Interpreter64 captures on the same bounded control
+trajectory before using it for corpus capture:
+
+```sh
+python3 scripts/calibrate_retail_collector.py \
+  --reference-a work/reference/complete-a.jsonl \
+  --reference-b work/reference/complete-b.jsonl \
+  --candidate work/reference/complete-jit.jsonl \
+  --candidate-cpu JITARM64 \
+  --output work/reference/jit-calibration.json
+```
+
+That report compares entry, actual inputs, state and end records while allowing
+the explicitly selected candidate backend/collector identity to differ. Its
+scope is the selected trajectory only; it is not broad equivalence,
+performance acceptance or gold admission. Expanded workloads still require
+independent repeat captures with the same collector/profile. Cross-check a
+representative complete workload in the interpreter when extending the
+calibrated execution coverage; compare it to the repeated JIT pair using
+explicit `--reference-cpu JITARM64 --candidate-cpu Interpreter64`. A failed
+cross-check remains red even if the JIT pair repeats.
 
 The calibration recipe v2 carries the complete semantic PAD configuration and
 Master/Copy/Game histories into source initialization. Compare those histories
@@ -99,10 +136,22 @@ and reports any declared-state mutation. Its passing neutral sequence does not
 replace an active, visibly rendered replay or prove pixel agreement.
 
 Capture PAD samples at actual source consumption, not at every hardware poll:
-raw polls can continue during scene loading. Observe state after the original
-GObj scheduler. The game match counter can remain zero during Ready, while the
-source scheduler still advances. Incomplete, reordered or ambiguous captures
-are invalid evidence, not gameplay divergences.
+raw polls can continue during scene loading. The collector publishes the first
+input at VS entry, bootstraps one input of lookahead at the first protected
+HSD dequeue, then observes PADRead before interrupt restoration to publish the
+next vector. It reads the consumed slot after the queue decrement while
+interrupts remain disabled, and checks all four actual PAD ports at scheduler
+return. Observe state after the original GObj scheduler. The game match counter
+can remain zero during Ready, while the source scheduler still advances.
+Duplicate debugger observations are accepted only when their boundary identity
+and complete payload agree; incomplete, reordered or ambiguous captures are
+invalid evidence, not gameplay divergences.
+
+Draw audits record observed source indices and validate sparse ordered camera
+traversals; they do not synthesize one draw for every source tick. The optional
+`--require-match-complete` bound requires the collector exit callback, JSONL end
+record and `match-completion.json` sidecar, including its capture hash, final
+draw index and match-end observations.
 
 The initial profile is GALE01 revision 2, NTSC, singles, supported content and
 vanilla rules. UCF, PAL, Frozen Stadium and online initialization cannot silently
@@ -186,21 +235,25 @@ the gates and evidence generator make that decision.
 
 ## Implemented calibration boundary
 
-Normalization and the input-only v2 workload runner are implemented. A 686-frame
-Fox/Falco Battlefield recording completes source playback and teardown without
-an expected-state comparison. The independent retail/port calibration passes
-240 neutral Mario/Mario Final Destination ticks and exposed shared particle-bank
-and rumble gaps. See [the reproducible capture procedure](RETAIL_REPLAY_CAPTURE.md)
-for exact provenance, field/phase limits and retained negative evidence.
-No Slippi fixture is gold-admitted yet. The typed initial PAD contract and its
-240-tick comparison pass. The modern donor now supplies a repeatable vanilla
-686-tick reference, exact consumed inputs, two passing retail draw audits and
-a passing complete port state comparison. Its six air dodges exposed host-libm
-differences; the original MSL trigonometric routines now supply their shared
-numeric boundary. The same 686 inputs now pass visible browser state comparison
-and cleared-origin/warm Release timing gates. The shared MWRC v2 decoder and
-observer are used by both native and browser playback; expected state never
-enters the runtime. See the [browser procedure and evidence](RETAIL_REPLAY_CAPTURE.md#visible-browser-replay).
+Normalization, the input-only v2 workload runner and the full-source prefix
+export are implemented. The Fox/Falco Battlefield donor is a processed-v2
+derived workload; its complete-match prefix is 3,122 ticks beginning at -123,
+while its source file and provenance remain the full 9,898-frame donor.
+Independent JITARM64 captures A and B repeat exactly through the original
+elimination exit and final draw. The port now matches all declared fields in
+headless and visible Release execution and tears down cleanly. Final visible
+Release cold/warm timing gates pass with zero failures. The final protected-
+dequeue collector also passes the entire Interpreter64 cross-check against the
+repeated reference pair. No broad gold or content admission follows from this
+trajectory. The
+[complete-game evidence ledger](COMPLETE_REPLAY_CALIBRATION.md) records hashes,
+shared arithmetic/memory fixes and the measured coverage gaps.
+
+The 686-frame movement donor and the 240-tick neutral pair remain scoped
+calibration evidence for parser, PAD-history, queue and draw controls. They do
+not establish combat equivalence, complete-match teardown, audio-output
+agreement or browser acceptance. See [the reproducible capture procedure](RETAIL_REPLAY_CAPTURE.md)
+for exact provenance, CPU selection and retained negative evidence.
 
 ## Immediate implementation order
 
@@ -208,24 +261,18 @@ The parser/indexer, rollback normalization, input-only runner, independent
 retail capture and scoped port comparison are working. Keep their negative
 controls and the retained pre-fix RNG divergence as calibration evidence.
 
-1. Retain the passing typed master/copy/game PAD history/configuration and
-   neutral source draw-audit controls. Extend the draw lifecycle evidence to
-   further active replays before claiming general input equivalence. The first
-   686-tick donor passes both retail draw audits and visible port comparison.
-2. Retain the passing Fox/Falco Battlefield donor, its independent vanilla
-   repeatability, exact actual-input checks and full 686-tick port comparison.
-   Preserve the numerical reds and host-libm negative control. Apply the same
-   gates to future donors without replacing their opponents or importing UCF
-   expected state.
-3. Retain the passing visible Release state capture and cleared-origin/warm
-   performance runs for that donor. Reuse `check_browser_replay.py` to join the
-   reports and reject missing gates or mismatched recipes. Broader workloads
-   still need normal audio/rendering and complete teardown; headless timings
-   never establish browser acceptance.
-4. Validate a faster offline reference exporter against the small GDB oracle;
-   reuse immutable expected traces during routine content iteration.
-5. Add execution coverage, select canaries and a held-out set, then broaden
-   supported matchups/stages and make evidence generation the admission gate.
+1. Freeze the passing full-game interpreter/JIT calibration and visible Release
+   cold/warm evidence as regression controls. Keep ambiguous controller
+   observations and timing failures red; require exact state, original ending,
+   final draw and teardown.
+2. Select a small representative set and an untouched held-out set from observed
+   vanilla trajectories. Prioritize dense combat, up-special, ledge, grab/throw
+   and stage-specific gaps; donor post-frame coverage is not vanilla coverage.
+3. Reuse immutable reference traces during routine port iteration. Capture a
+   new independent pair when its input, source setup or reference profile changes.
+4. Make the joined state/lifecycle/performance evidence the admission gate, then
+   resume broader fighter/stage integration. Further exporter optimization is
+   justified by measured capture cost; a dashboard is not a prerequisite.
 
 Completed-file singles playback comes first. Seeking, live spectating, rollback
 presentation, doubles, items-on rules, netplay and a coverage dashboard follow

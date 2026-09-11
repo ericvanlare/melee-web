@@ -8,6 +8,7 @@
 #include "gameplay_render.h"
 #include "gameplay_hud.h"
 #include "gameplay_match_flow.h"
+#include "gameplay_fighter_assets.h"
 #include "gameplay_hud_assets.hpp"
 #include <cstdio>
 #include <cstdlib>
@@ -17,7 +18,14 @@ extern "C" int lbAudioAx_80023F28(int);
 extern "C" int melee_web_vs_mode_begin(void);
 extern "C" int melee_web_vs_mode_end(void);
 namespace melee_web {
-namespace {void check(int value,const char* error){if(!value)throw std::runtime_error(error);}}
+namespace {
+void check(int value,const char* error){if(!value)throw std::runtime_error(error);}
+void check_fighter_asset_ownership(const char* phase){
+    char error[256]{};
+    if(!melee_web_fighter_assets_check_owned(phase,error,sizeof(error)))
+        throw std::runtime_error(error);
+}
+}
 struct GameplayMatchSession::Storage {
     std::unique_ptr<GameplayWorld> world;
     std::unique_ptr<GameplayAudioBank> bank;
@@ -136,9 +144,16 @@ struct GameplayMatchSession::Storage {
         if(hud){check(melee_web_hud_end(hud,error,sizeof(error)),error);hud=nullptr;}
         if(world)world->end_stage();
         if(render){check(melee_web_render_end(render,error,sizeof(error)),error);render=nullptr;}
-        if(match){check(melee_web_match_end(match,error,sizeof(error)),error);match=nullptr;}
+        if(match){
+            check_fighter_asset_ownership("before-match-end");
+            check(melee_web_match_end(match,error,sizeof(error)),error);match=nullptr;
+            check_fighter_asset_ownership("after-match-end");
+        }
         music.reset();
-        if(world){world->verify_immutable_archives();world->close();world.reset();}
+        if(world){
+            check_fighter_asset_ownership("before-world-close");
+            world->verify_immutable_archives();world->close();world.reset();
+        }
         if(hud_assets){hud_assets->close();hud_assets.reset();}
         bank.reset();
         if(mode_owned){check(melee_web_vs_mode_end(),"Original VS mode lost ownership");mode_owned=false;}

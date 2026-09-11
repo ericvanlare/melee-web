@@ -14,6 +14,21 @@ The combined [performance and accuracy playbook](docs/PERFORMANCE_AND_ACCURACY.m
 defines the evidence levels, content admission workflow and failure-response
 process used from this point forward.
 
+The [complete-game replay calibration](docs/COMPLETE_REPLAY_CALIBRATION.md)
+now covers a derived 3,122-tick Fox/Falco Battlefield elimination match. Two
+independent JITARM64 references repeat exactly; Release/headless and visibly
+drawn port traces match every declared field through the original ending and
+successful teardown. Shared Hermite, DI, joint-matrix and knockback rounding
+boundaries now follow the pinned retail instructions. Effect-parameter setters
+address their real table, fixing a shield-triggered overwrite caused by an
+original link-layout assumption. The reviewed startup seed contains 427
+pipelines. Final visible Release cold/warm runs pass all 3,122 ticks with zero
+hard-gate failures (worst native callbacks 11.330/12.485 ms; browser intervals
+21.365/22.010 ms). The final collector also matches the full repeated reference
+trajectory in Interpreter64; its protected dequeue observation resolves the
+retained controller-capture race. All 435 tests pass. This trajectory includes seven stock losses and six respawns but only
+five damage increases and no up-special; broad corpus admission remains open.
+
 Slippi ingestion now normalizes finalized per-frame input/state records, handles
 rollback history without mixing revisions, preserves exact field bits and
 rejects incomplete timelines. The v2 input-only workload transport retains

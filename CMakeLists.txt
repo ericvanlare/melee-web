@@ -41,6 +41,7 @@ if(EMSCRIPTEN)
     message(FATAL_ERROR "Generated gameplay source missing; use scripts/build.py")
   endif()
   add_library(gameplay_runtime STATIC src/gameplay_bootstrap.c src/gameplay_abi.c
+    src/gameplay_ps_math.c
     src/gameplay_heap.cpp src/gameplay_fighter_probe.c src/gameplay_collision.c src/hsd_debug.c
     src/common_tables.c src/gameplay_fighter_attributes.c src/gameplay_fighter_data.c
     src/gameplay_article_data.c

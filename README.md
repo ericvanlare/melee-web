@@ -52,8 +52,11 @@ full-match equivalence. See [current evidence](STATUS.md),
 captures and the port's declared state fields, RNG and input recipe. The first
 Fox/Falco Battlefield Slippi input donor also matches all 686 ticks against two
 independent vanilla captures. The same donor also passes visible Release state comparison and cleared-origin/warm
-performance checks. This is one bounded canary; broad gold-corpus and content
-admission remain open. The reusable
+performance checks. A second derived donor now matches all 3,122 ticks of an
+original elimination match, including the final drawn state and teardown. See
+[the complete-game calibration](docs/COMPLETE_REPLAY_CALIBRATION.md) for its
+reference cross-check, timing status and coverage limits. Broad gold-corpus and
+content admission remain open. The reusable
 [CSS/SSS and match-entry transition gate](docs/TRANSITION_EQUIVALENCE.md) is
 implemented. Its pinned Mario/Mario Final Destination replay matches retail at
 all nine lifecycle, audio, match-data and RNG boundaries.

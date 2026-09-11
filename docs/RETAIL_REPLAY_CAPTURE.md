@@ -7,15 +7,19 @@ port. Dolphin is a development reference; no emulator enters the browser port.
 
 ## Current result
 
-Two independent automated captures of a four-stock Mario/Mario Final Destination
-match repeat exactly for 240 source ticks, including Ready and the first 117
-match-clock values. The input is neutral on two human ports; red/yellow costumes
-and the complete 0x138-byte StartMeleeData come from ordinary retail menus.
-The port then completes the same input recipe and teardown. Entry data, all
-supplied inputs, both fighters' declared fields, RNG and match clock compare
-exactly against that repeated reference. Schema/recipe v2 also restores and
-compares the semantic PAD processing configuration and all four ports of the
-Master, Copy and Game history banks, at initialization and on every tick.
+The 240-tick Mario/Mario Final Destination pair remains the small Interpreter64
+calibration trajectory. It repeats exactly through Ready and the first 117
+match-clock values, including the complete semantic PAD configuration/history
+contract. That result is scoped calibration evidence.
+
+A processed-v2 Fox/Falco Battlefield donor now supplies a 3,122-tick complete
+vanilla match. Two independent JITARM64 captures repeat exactly through the
+original elimination exit and final draw. Release/headless and visibly drawn
+port traces match all declared fields and finish teardown. Final visible Release
+cold/warm timing gates pass with zero failures, and the final collector passes
+the full Interpreter64 cross-check against the repeated references. See the
+[complete-game evidence ledger](COMPLETE_REPLAY_CALIBRATION.md) for hashes,
+shared fixes, retained reds and observed coverage.
 
 This exposed two shared runtime gaps, subsequently fixed:
 
@@ -35,16 +39,11 @@ This exposed two shared runtime gaps, subsequently fixed:
   responsibility. A focused test executes the original motor-command sequence,
   restart and malformed-program rejection. Hardware rumble is not validated.
 
-The machine report deliberately says `declared_state_match`,
-`gold_admitted: false` and `performance: not_evaluated`. This is a calibration
-fixture, not a Slippi-derived gold replay, full-match acceptance or visual/audio
-agreement. The headless probe excludes source drawing and records state after
-the source tick, before PCM transport. A separate retail audit now observes
-entry/return of the original camera traversal on all 240 ticks: none changes
-the declared fighter fields, PAD configuration/history, RNG or clocks during
-drawing. This is a neutral-fixture result, not a claim about all render state or
-active gameplay. A visible source draw/replay comparison remains necessary;
-matching this prefix cannot waive it.
+Machine reports deliberately retain `gold_admitted: false` and
+`performance: not_evaluated`. A capture is a calibration candidate until the
+independent pair, actual-input checks, complete callback/end/draw evidence and
+port comparison all pass. The headless probe records state after the source
+tick and before host audio transport; it is not visual or audio agreement.
 
 The v2 initial PAD contract is 822 big-endian semantic bytes: 30 configuration
 bytes, then Master/Copy/Game banks with four 66-byte statuses each. C padding,
@@ -70,6 +69,25 @@ The template controller configuration uses `Pipe/0/pad1` and `Pipe/0/pad2`.
 The snapshot must be an ordinary SSS checkpoint paired with its external GC
 state, after any memory-card prompts have been resolved. A savestate alone does
 not identify the whole input state.
+
+`Interpreter64` is the strict default and the backend used for the immutable
+reference pair. `JITARM64` is an explicit ARM64 opt-in; it is not silently
+substituted for the interpreter. Calibrate a changed collector against the
+immutable Interpreter64 pair on the same scoped trajectory before using it:
+
+```sh
+python3 scripts/calibrate_retail_collector.py \
+  --reference-a work/reference/complete-a.jsonl \
+  --reference-b work/reference/complete-b.jsonl \
+  --candidate work/reference/complete-jit.jsonl \
+  --candidate-cpu JITARM64 \
+  --output work/reference/jit-calibration.json
+```
+
+The calibration report permits the candidate collector identity and explicitly
+selected CPU backend to differ, but compares the declared entry, PAD input,
+state and end trajectory. Its scope is that trajectory only: it is not broad
+equivalence, performance acceptance or gold admission.
 
 ```sh
 python3 scripts/capture_retail_replay.py \
@@ -102,6 +120,11 @@ validates completion and terminates only its own GDB/Dolphin process groups on
 success or failure. Its hidden `.retail-replay-run-*` directory preserves
 configuration, commands, hashes and logs. Captures and extracted assets remain
 local and ignored. The runtime now also requires the owned `LbRb.dat` file.
+GDB runs in hidden batch mode while retaining hardware observers. Dolphin is
+launched with `Dolphin.DSP.Backend=No Audio Output`; the old `Null` value is
+invalid and falls back to Cubeb. `No Audio Output` removes the host sink while
+retaining DSP and source audio execution, so the capture does not become a
+different source workload.
 Before launching, the runner also reads the executable from the supplied disc
 and requires its hash to match the independently pinned DOL. Supplying a correct
 standalone DOL beside a different game image is insufficient. The local CISO's
@@ -122,38 +145,59 @@ All four consumed PAD vectors are checked at every tick. Seeking and arbitrary
 mid-recording slices require a separate explicit initialization contract.
 
 `export_retail_input_plan.py` derives a bounded, input-only plan from a completed,
-finalized modern `.slp` file. It requires both human ports 1/2, complete raw axes
-and trigger fields, and no follower or doubles inputs. The strict plan schema
-rejects state-bearing or unknown fields, duplicate keys and incomplete vectors.
-It retains the source hash, frame origin, character IDs and stage ID; the retail
-menu checkpoint must select those same characters and stage. Costumes, rules,
-starting RNG and all initial PAD histories come from the independently observed
-retail initialization, not the recording's online/UCF post-state.
+finalized `.slp` file. It requires both human ports 1/2 and no follower or
+doubles inputs. The strict plan schema rejects state-bearing or unknown fields,
+duplicate keys and incomplete vectors. It retains the full source hash, frame
+origin, character IDs and stage ID; the retail menu checkpoint must select those
+same characters and stage. Costumes, rules, starting RNG and all initial PAD
+histories come from the independently observed retail initialization, not the
+recording's online/UCF post-state.
 
 ```sh
 python3 scripts/export_retail_input_plan.py /path/to/donor.slp \
-  --output work/reference/donor-plan.json
-# Add both options to each independent capture command above:
-#   --input-plan work/reference/donor-plan.json --frames 686
-# The frame count must equal the entire supplied plan; add --draw-audit.
+  --output work/reference/donor-plan.json \
+  --policy dolphin-pipe-raw-v2
+# An initial complete-match prefix keeps frame -123 and parses/hashes the full
+# .slp before slicing its plan:
+python3 scripts/export_retail_input_plan.py /path/to/donor.slp \
+  --output work/reference/complete-plan.json --policy dolphin-pipe-processed-v2 \
+  --frames 3122
+# The capture count must equal the entire supplied plan:
+#   --input-plan work/reference/complete-plan.json --frames 3122
+# Add --draw-audit and, for a completion claim, --require-match-complete.
 ```
 
-The versioned `dolphin-pipe-raw-v1` policy clears stick calibration, center and
-modifier bindings, and requires zero dead zone and virtual notches. With this
-configuration the pipe backend maps each signed axis through `axis / 127` to
-the requested byte. Digital L/R force the corresponding analog pressure to
-255 in Dolphin; digital A/B similarly determine their unrecorded pressure.
-These pressure choices are declared derivations, not recovered hardware input.
-Ordinary source PAD processing still applies its original clamp and histories.
-The runner checks the copied controller configuration, pins the plan and all
-collector helpers, then requires **every actual consumed vector** to agree with
-the intended input. A configuration check alone is insufficient evidence.
+The current `dolphin-pipe-raw-v2` policy is the default. It clears stick
+calibration, center and modifier bindings, and requires zero dead zone and
+virtual notches. `dolphin-pipe-processed-v2` is an explicit legacy conversion:
+finite processed axes in `[-1,1]` become raw bytes with scale 80 and nearest
+rounding, with half ties away from zero. Those bytes are a derived workload,
+never recovered hardware or UCF expected state. The serial-interface mode-3
+PAD boundary keeps A/B pressure at zero; digital L/R still forces analog 255.
+The historical `dolphin-pipe-raw-v1` policy is readable only for neutral A/B
+samples and cannot be used to imply the v2 pressure contract.
 
-The plan is queued at the verified VS-entry return and after each source tick.
-It cannot supply another vector after the last tick. When drawing is audited,
-completion waits for that tick's final camera traversal. A collector regression
-test covers this final-tick/final-draw ordering; an earlier failed local capture
-that requested input 687 from a 686-tick plan remains invalid evidence.
+`--frames N` accepts only a positive initial prefix beginning at frame `-123`
+and no larger than the complete parsed timeline. The exporter parses the whole
+`.slp` and hashes all source bytes before selecting the prefix, so the plan's
+provenance remains the donor's full SHA-256. The runner pins the plan and all
+collector helpers, then requires **every actual consumed four-port PAD vector**
+to agree with the intended input. A configuration check alone is insufficient.
+
+The collector publishes the first input at VS entry and bootstraps one input
+of lookahead at the first HSD queue consumption. Later input publication observes
+all four statuses inside PADRead, before OSRestoreInterrupts can allow the next
+VI sample. The consumed slot is observed at `80377584`, after HSD has decremented the queue
+count and while interrupts are still disabled; `r25` retains the consumed slot
+and `r6` its original read index. The collector verifies that pointer against
+the queue allocation. Its header names `HSD_PadRenewMasterStatus_dequeued_slot`;
+legacy entry-queue captures remain readable but cannot be mixed into a repeat
+pair. The actual four-port vector is independently checked at every scheduler
+return. Duplicate debugger observations must have identical
+boundary identity and complete payload; ambiguous observations invalidate the
+capture. It refuses an extra source tick before the final requested draw.
+Draw audits retain sparse ordered source indices, and complete-match evidence
+requires the final draw plus the original elimination exit observation.
 
 The first donor is the official Slippi JS 9.1.3 `wavedash-1.slp` fixture, SHA-256
 `173e24ef8c7d600fbe12b09a2e4e3217669f0b19c306912ff80c3bf224ddd2e5`:
@@ -165,7 +209,7 @@ then an arctangent difference at tick 252 after the sine boundary was corrected.
 Neither red is waived with a tolerance. This short movement workload does not
 cover combat, a complete stock match, all numerical functions or browser timing.
 
-The final port run matches all 686 ticks after compiling the original MSL
+For the separate movement canary only, the final port run matches all 686 ticks after compiling the original MSL
 `trigf.c` and enabling the recovered `lbtrigf.c` arctangent. The downstream patch
 preserves the retail polynomial tables and each `fmadds`/`fnmsubs` rounding
 boundary with explicit `fmaf` calls. It also preserves the original initialized
@@ -213,14 +257,21 @@ pipes. Do not conflate this documented setup with capture purity, or reuse an
 unrelated save directory just because the savestate loads.
 
 Add `--draw-audit` to observe `HSD_GObj_80390FC0` entry and its verified return.
-The owned evidence directory receives `draw-audit.jsonl`; run metadata binds
-its hash to the capture and records the comparison. Missing, reordered or extra
-draws, invalid state, or a draw entry that does not match the immediately
-preceding scheduler state fail validation. The expected source scene-counter
-increment between scheduler and draw is checked explicitly. Changes during
-drawing remain visible as `declared_state_changed`, never waived. This audit
-requires one draw per source tick; it does not cover retail's queued multi-tick
-cadence, pixels, GPU results or timing.
+The owned evidence directory receives `draw-audit.jsonl`; each row records the
+source index and run metadata binds its hash to the capture. Missing, reordered
+or conflicting observations, invalid state, or a draw entry that does not match
+the immediately preceding scheduler state fail validation. Sparse draw indices
+remain explicit evidence rather than being filled in as one-draw-per-tick.
+For `--require-match-complete`, the final draw must cover the final source tick;
+pixels, GPU results and timing remain outside this audit.
+
+`--require-match-complete` is an explicit stronger bound. It requires
+`--draw-audit`, the collector's exit callback observation, the JSONL `end`
+record, and `match-completion.json`. That sidecar records the capture hash,
+frame count, original exit request, match-end bytes and final draw source index;
+the runner validates it against the capture and requires the final draw after
+the final scheduler tick. A normal bounded prefix capture may stop at its
+requested tick without making any full-match or teardown claim.
 
 ## Capture contract and failure rules
 
@@ -278,11 +329,15 @@ The ignored `work/reference-replay-proof/` directory contains:
   are diagnosis records, not additional admitted reference fixtures.
 
 Integration verification also retained the 686-frame input-only workload result,
-Release build and warm Marth/Dream Land action-sweep reports. The full automated
+Release build and warm Marth/Dream Land action-sweep reports. Those are separate
+movement/integration evidence; they do not accept the 3,122-tick combat
+trajectory. The full automated
 suite exercised 350 tests: 344 passed, while six recipe tests rejected an outdated
 synthetic fixture that began at scene tick 100. After correcting that fixture to
 tick zero, all 41 replay tests passed in a focused rerun. The actual retail
-captures already began at zero and the final port comparison still passes.
+captures already began at zero. Those are historical calibration logs; the
+newer complete-game ledger records resolved combat numerical/teardown reds and
+the final full-suite result.
 Logs are `verified-unittest.log`, `verified-replay-tests.log`,
 `final-slippi-workload.jsonl`, `browser-sweep-teeter-failure.json` and
 `browser-sweep-pass.json`. The browser records are compact transcriptions of the
@@ -425,11 +480,12 @@ inspection remain operator attestations; the checker cannot prove which browser
 binary rendered a self-reported artifact. It emits scoped evidence, never
 fighter/stage admission or an unqualified gold-corpus claim.
 
-### First donor browser evidence
+### First donor browser evidence (movement canary)
 
 The ignored `work/reference-input-v2/` receipt
-`scoped-replay-evidence.json` passes the implemented gates for the complete
-686-input donor, with all six air dodges retained. The rendered trace SHA-256 is
+`scoped-replay-evidence.json` passes the implemented movement-canary gates for
+the complete 686-input donor, with all six air dodges retained. The rendered
+trace SHA-256 is
 `fe695b74c56e2945fd17082eae306abe39c5e8fb2e2e9552865d2f8e3d2da65c`.
 It is identical across repeated browser state runs, including a discovery run
 whose instrumented scheduler batched some ticks. Every declared entry/fighter,

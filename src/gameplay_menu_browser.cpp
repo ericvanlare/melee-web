@@ -35,6 +35,8 @@ std::unique_ptr<melee_web::GameplayMatchSession> match;
 std::unique_ptr<melee_web::RetailReplayRecipe> replay;
 size_t replay_cursor=0;
 bool replay_trace=false,replay_pending=false,replay_started=false,replay_final_draw=false;
+bool replay_match_complete=false;
+int replay_outcome=0,replay_winner=-1;
 MeleeWebMenuHost* host=nullptr;
 melee_web::FixedTickClock menu_clock;
 melee_web::FixedTickClock audio_clock{melee_web::FixedTickClock::OverrunPolicy::CatchUp};
@@ -171,6 +173,7 @@ void close(){
  if(replay&&replay_trace&&replay_final_draw&&!faulted)
   melee_web::retail_replay_end(replay->frames.size());
  replay.reset();replay_cursor=0;replay_trace=replay_pending=replay_started=replay_final_draw=false;
+ replay_match_complete=false;replay_outcome=0;replay_winner=-1;
  audio_phase=0;faulted=false;diagnostic_start_ticks=0;stock_check=0;stock_tick=0;render_frame=0;first_use_draw_pending=false;render_only_preparation=false;transition_audio_continues=false;menu_scene_rebuild_pending=false;audio_clock.reset();clear_diagnostic_pad();
  match_message="Original four-stock source match";
  if(had_lifetime){
@@ -393,6 +396,7 @@ void tick(){
     }
     match->tick(sample);int winner=-1;const int outcome=match->outcome(winner);
     if(replay){
+     replay_match_complete=match->complete();replay_outcome=outcome;replay_winner=winner;
      if(replay_trace)melee_web::retail_replay_frame(*replay,replay_cursor);
      ++replay_cursor;
      ++replay_steps;
@@ -497,7 +501,9 @@ void tick(){
   emscripten_get_heap_size(),suppress_draw);
  EM_ASM({if(window.menuRuntimeTiming)window.menuRuntimeTiming(JSON.parse(UTF8ToString($0)));},timing);
  EM_ASM({window.menuFrame?.(!!$0);},running_at_callback_start?1:0);
- if(replay_completed_now)EM_ASM({window.menuReplayCompleted?.($0);},replay_cursor);
+ if(replay_completed_now)EM_ASM({window.menuReplayCompleted?.($0,!!$1,$2,$3);},
+                                replay_cursor,replay_match_complete?1:0,
+                                replay_outcome,replay_winner);
 }
 }
 extern "C" {

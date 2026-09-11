@@ -510,7 +510,7 @@ index 4602bcd..3140ec8 100644
  extern volatile u32 efLib_LoadKind;
  extern volatile s32 efLib_AnimCount;
 diff --git a/src/melee/ft/fighter.c b/src/melee/ft/fighter.c
-index 8299c5c..98a0f24 100644
+index 8299c5c..df8bb28 100644
 --- a/src/melee/ft/fighter.c
 +++ b/src/melee/ft/fighter.c
 @@ -1,4 +1,7 @@
@@ -534,7 +534,35 @@ index 8299c5c..98a0f24 100644
  
      // copy 23 4-byte chunks from pData to p_ftCommonData in reverse order,
      // equivalent to this: for(i=0; i<23; i++)
-@@ -3112,8 +3120,12 @@ void Fighter_Unload_8006DABC(void* user_data)
+@@ -2192,17 +2200,20 @@ void Fighter_procUpdate(Fighter_GObj* gobj)
+                 } else {
+                     float kb_angle = atan2f(kb_vel_y, kb_vel_x);
+ 
+-                    if (sqrtf(kb_vel_x * kb_vel_x + kb_vel_y * kb_vel_y) <
++                    /* GALE01r2 8006B938/8006B9C8/8006B9E4: retain
++                     * scalar single-precision fused-operation rounding. */
++
++                    if (sqrtf(fmaf(kb_vel_x, kb_vel_x, kb_vel_y * kb_vel_y)) <
+                         p_ftCommonData->x204_knockbackFrameDecay)
+                     {
+                         p_kb_vel->x = p_kb_vel->y = 0;
+                     } else {
+-                        p_kb_vel->x -=
+-                            p_ftCommonData->x204_knockbackFrameDecay *
+-                            cosf(kb_angle);
+-                        p_kb_vel->y -=
+-                            p_ftCommonData->x204_knockbackFrameDecay *
+-                            sinf(kb_angle);
++                        p_kb_vel->x =
++                            fmaf(-p_ftCommonData->x204_knockbackFrameDecay,
++                                 cosf(kb_angle), p_kb_vel->x);
++                        p_kb_vel->y =
++                            fmaf(-p_ftCommonData->x204_knockbackFrameDecay,
++                                 sinf(kb_angle), p_kb_vel->y);
+                     }
+                 }
+ 
+@@ -3112,8 +3123,12 @@ void Fighter_Unload_8006DABC(void* user_data)
      HSD_LObjRemoveAll(fp->x588);
      Player_80031FB0(fp->player_id, fp->x221F_b4);
  
@@ -2871,12 +2899,13 @@ diff --git a/src/sysdolphin/baselib/axdriver.c b/src/sysdolphin/baselib/axdriver
 +}
 +#endif
 diff --git a/src/sysdolphin/baselib/fobj.c b/src/sysdolphin/baselib/fobj.c
-index fb87d01..ba1ad1e 100644
+index fb87d01..991e6d7 100644
 --- a/src/sysdolphin/baselib/fobj.c
 +++ b/src/sysdolphin/baselib/fobj.c
-@@ -1,6 +1,9 @@
+@@ -1,6 +1,10 @@
  #include "fobj.h"
  
++#include <math.h>
  #include <string.h>
 +#ifdef TARGET_PC
 +#include <stdio.h>
@@ -2884,7 +2913,7 @@ index fb87d01..ba1ad1e 100644
  
  #include "debug.h"
  #include "spline.h"
-@@ -341,6 +344,25 @@ void FObjUpdateAnim(HSD_FObj* fobj, void* obj, HSD_ObjUpdateFunc obj_update)
+@@ -341,6 +345,25 @@ void FObjUpdateAnim(HSD_FObj* fobj, void* obj, HSD_ObjUpdateFunc obj_update)
      if (obj_update == NULL) {
          return;
      }
@@ -2910,6 +2939,16 @@ index fb87d01..ba1ad1e 100644
      switch (fobj->op_intrp) {
      case HSD_A_OP_KEY:
          if (fobj->flags & 0x80) {
+@@ -368,7 +391,8 @@ void FObjUpdateAnim(HSD_FObj* fobj, void* obj, HSD_ObjUpdateFunc obj_update)
+                 fobj->p0 = fobj->p1;
+             }
+         }
+-        fobjdata.fv = fobj->d0 * fobj->time + fobj->p0;
++        /* GALE01r2 8036AF98 is fmadds, as in the Hermite path. */
++        fobjdata.fv = fmaf(fobj->d0, fobj->time, fobj->p0);
+         break;
+     case HSD_A_OP_SPL0:
+     case HSD_A_OP_SPL:
 diff --git a/src/sysdolphin/baselib/hsd_3A64.c b/src/sysdolphin/baselib/hsd_3A64.c
 index 1dc2c66..e83012d 100644
 --- a/src/sysdolphin/baselib/hsd_3A64.c
@@ -5816,3 +5855,115 @@ diff --git a/src/melee/lb/lbtrigf.c b/src/melee/lb/lbtrigf.c
      return result;
  }
  #endif
+diff --git a/src/melee/ft/kinds/ftCommon/ftCo_Damage.c b/src/melee/ft/kinds/ftCommon/ftCo_Damage.c
+index 363b9d8..9f66b14 100644
+--- a/src/melee/ft/kinds/ftCommon/ftCo_Damage.c
++++ b/src/melee/ft/kinds/ftCommon/ftCo_Damage.c
+@@ -594,10 +594,11 @@ void ftCo_8008E5A4(Fighter* fp)
+         float kb_x = fp->x8c_kb_vel.x;
+         float kb_y = fp->x8c_kb_vel.y;
+         float kb_vel_x_neg = -kb_x;
+-        float kb_mag = kb_vel_x_neg * kb_vel_x_neg + kb_y * kb_y;
++        /* Pinned 8008E5FC/8008E624 use single-rounding fmadds. */
++        float kb_mag = fmaf(kb_vel_x_neg, kb_vel_x_neg, kb_y * kb_y);
+         if (!(kb_mag < 0.00001f)) {
+-            float f3 = kb_y * fp->input.lstick[0].x +
+-                       kb_vel_x_neg * fp->input.lstick[0].y;
++            float f3 = fmaf(kb_y, fp->input.lstick[0].x,
++                            kb_vel_x_neg * fp->input.lstick[0].y);
+             float f30 = f3 * f3 / kb_mag;
+             Vec3 lstick_vec3, kb_vel_cross_lstick;
+             lstick_vec3.x = fp->input.lstick[0].x;
+@@ -611,9 +612,9 @@ void ftCo_8008E5A4(Fighter* fp)
+             {
+                 float angle = atan2f(kb_y, kb_x);
+                 float scale;
+-                kb_mag = sqrtf(kb_x * kb_x + kb_y * kb_y);
++                kb_mag = sqrtf(fmaf(kb_x, kb_x, kb_y * kb_y));
+                 scale = MTXDegToRad(p_ftCommonData->x1A8);
+-                angle += scale * f30;
++                angle = fmaf(scale, f30, angle); /* 8008E6CC */
+                 fp->x8c_kb_vel.x = kb_mag * cosf(angle);
+                 fp->x8c_kb_vel.y = kb_mag * sinf(angle);
+             }
+@@ -658,7 +659,7 @@ void ftCo_Damage_OnExitHitlag(Fighter_GObj* gobj)
+         if (kb_x || kb_y) {
+             float kb_angle = atan2f(kb_y, kb_x);
+             float scaled_kb_mag =
+-                sqrtf(kb_x * kb_x + kb_y * kb_y) * p_ftCommonData->x1AC;
++                sqrtf(fmaf(kb_x, kb_x, kb_y * kb_y)) * p_ftCommonData->x1AC;
+             fp->x8c_kb_vel.x = scaled_kb_mag * cosf(kb_angle);
+             fp->x8c_kb_vel.y = scaled_kb_mag * sinf(kb_angle);
+         }
+diff --git a/src/sysdolphin/baselib/spline.c b/src/sysdolphin/baselib/spline.c
+index 6a4569f..626d628 100644
+--- a/src/sysdolphin/baselib/spline.c
++++ b/src/sysdolphin/baselib/spline.c
+@@ -22,9 +22,13 @@ f32 splGetHelmite(f32 fterm, f32 time, f32 p0, f32 p1, f32 d0, f32 d1)
+     _2t3_T3 = 2.0f * t3_T2 * fterm;
+     _3t2_T2 = 3.0f * _1_T2 * t2;
+ 
+-    return (d1 * (t3_T2 - t2_T)) + ((d0 * (time + ((t3_T2 - t2_T) - t2_T))) +
+-                                    ((p0 * (1.0f + (_2t3_T3 - _3t2_T2))) +
+-                                     (p1 * (-_2t3_T3 + _3t2_T2))));
++    /* GALE01r2 80378A80..80378A8C: one fmuls followed by three
++     * fmadds. Preserve those single-rounding boundaries; separate multiply
++     * and add changes authored root-motion deltas as well as visual curves. */
++    return fmaf(d1, t3_T2 - t2_T,
++                fmaf(d0, time + ((t3_T2 - t2_T) - t2_T),
++                     fmaf(p0, 1.0f + (_2t3_T3 - _3t2_T2),
++                          p1 * (-_2t3_T3 + _3t2_T2))));
+ }
+ 
+ static inline void splGetCardinalPoint(Vec3* p, Vec3* cp, f32 tension, f32 u)
+diff --git a/src/melee/ef/eflib.c b/src/melee/ef/eflib.c
+index 6b937b3..9733f2b 100644
+--- a/src/melee/ef/eflib.c
++++ b/src/melee/ef/eflib.c
+@@ -1412,8 +1412,9 @@ void efLib_SetParamAlpha(HSD_GObj* gobj, u8 alpha)
+ {
+     s32 idx;
+ 
+-    // WHY
+-    EF_ParamEntry* base = efLib_AnimQueue + 0x10;
++    // The retail link places ParamTable immediately after AnimQueue.
++    // Address the actual object when native link layout differs.
++    EF_ParamEntry* base = efLib_ParamTable;
+ 
+     for (idx = 0; idx < 8; idx++) {
+         if (base[idx].gobj == gobj) {
+@@ -1428,17 +1429,17 @@ void efLib_SetParamAlpha(HSD_GObj* gobj, u8 alpha)
+     return;
+ 
+ found:
+-    // WHY
+-    efLib_AnimQueue[idx + 0x10].gobj = gobj;
+-    efLib_AnimQueue[idx + 0x10].alpha = alpha;
++    efLib_ParamTable[idx].gobj = gobj;
++    efLib_ParamTable[idx].alpha = alpha;
+ }
+ 
+ void efLib_SetParamGfxId(HSD_GObj* gobj, s32 gfx_id)
+ {
+     s32 idx;
+ 
+-    // WHY
+-    EF_ParamEntry* base = efLib_AnimQueue + 0x10;
++    // The retail link places ParamTable immediately after AnimQueue.
++    // Address the actual object when native link layout differs.
++    EF_ParamEntry* base = efLib_ParamTable;
+ 
+     for (idx = 0; idx < 8; idx++) {
+         if (base[idx].gobj == gobj) {
+@@ -1453,9 +1454,8 @@ void efLib_SetParamGfxId(HSD_GObj* gobj, s32 gfx_id)
+     return;
+ 
+ found:
+-    // WHY
+-    efLib_AnimQueue[idx + 0x10].gobj = gobj;
+-    efLib_AnimQueue[idx + 0x10].gfx_id = gfx_id;
++    efLib_ParamTable[idx].gobj = gobj;
++    efLib_ParamTable[idx].gfx_id = gfx_id;
+ }
+ 
+ void efLib_Cb_ApplyStoredAlpha(EF_Effect* effect)

@@ -14,7 +14,7 @@ class GameplayCombatTests(unittest.TestCase):
         assets = ROOT / "assets-local/next-gate"
         names = (
             "PlCo.dat", "PlMr.dat", "PlMrNr.dat", "PlMrAJ.dat", "GrNLa.dat",
-            "ItCo.usd", "EfMrData.dat", "EfCoData.dat", "PdPm.dat", "sislib_font.bin",
+            "ItCo.usd", "EfMrData.dat", "EfCoData.dat", "PdPm.dat", "LbRb.dat", "sislib_font.bin",
         )
         binary = ROOT / "build/browser/gameplay_combat_trace.js"
         if not binary.is_file() or not all((assets / name).is_file() for name in names):

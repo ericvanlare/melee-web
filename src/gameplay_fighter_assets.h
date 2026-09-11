@@ -25,6 +25,8 @@ uint32_t melee_web_fighter_assets_live(const MeleeWebFighterAssetScope*);
 /* Storage hooks for the original constructor/loader/unload call sites. */
 void melee_web_fighter_assets_require_kind(uint32_t kind);
 void melee_web_fighter_assets_require_costume(uint32_t kind,int costume);
+/* Read-only ownership check for bounded replay diagnostics. */
+int melee_web_fighter_assets_check_owned(const char* phase,char*,size_t);
 void melee_web_fighter_assets_bind_created(struct Fighter*);
 void melee_web_fighter_assets_unbind_destroying(struct Fighter*);
 #ifdef __cplusplus

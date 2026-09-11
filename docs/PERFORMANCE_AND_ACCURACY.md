@@ -254,7 +254,10 @@ Before merging a shared runtime, performance or content change:
       without matching retail evidence.
 - [ ] Focused native lifecycle/action tests pass twice through teardown.
 - [ ] Relevant retail transition and gameplay comparisons pass.
-- [ ] Release WebAssembly builds and the complete automated suite passes.
+- [ ] Release WebAssembly builds and the complete automated suite passes. Rebuild
+  every trace cited for a changed shared runtime boundary before running it;
+  tests that select an existing executable can otherwise pass against stale
+  code. Keep fixture manifests aligned with the current owned dependencies.
 - [ ] The visible cold and warm browser inventory passes with the hard timing,
       audio, pipeline and error gates.
 - [ ] First-use resources are covered without hidden source simulation.
@@ -298,23 +301,52 @@ incomplete run and passing rerun are recorded under the local calibration
 evidence directory. Source unload, render-cache persistence and owned browser /
 server / reference-process cleanup completed afterward.
 
+## Complete combat calibration lessons
+
+A complete source match is a lifecycle claim, not an input-length claim. Require
+the original exit observation, the successful JSONL end record and the final
+source draw as separate completion evidence. Keep exact consumed PAD vectors and
+all four-port checks as hard gates; a UCF recording supplies an input workload,
+never a vanilla expected-state oracle.
+
+Measure coverage on the new vanilla trajectory after rules or removed
+modifications change its path. Preserve first-divergent ticks and verify
+compiler-fused math and recovered library routines against the original DOL at
+their rounding boundaries. Replace linker or global-adjacency assumptions with
+actual object references: the effect-parameter-table failure showed that fields
+can look correct while an adjacent global has already been corrupted.
+
+Run constructor, teardown and per-tick ownership diagnostics alongside semantic
+state comparisons. They can expose memory corruption before a state field
+diverges and keep fixes focused on the original owner and lifetime.
+
+The current Fox/Falco Battlefield calibration reaches 3,122 ticks with exact
+independent reference repeatability, the expected elimination outcome, the
+original exit and final draw, and an exact visible source-draw state comparison.
+The final protected-dequeue collector also matches the repeated trajectory in
+Interpreter64, preserving exact actual-input checks across the former capture
+race.
+The discovery pass found 38 new pipelines and expanded the reviewed seed from
+389 to 427 descriptors. Final visible Release cold/warm runs pass all 3,122 ticks
+with zero hard-gate failures: worst native callbacks 11.330/12.485 ms and worst
+browser intervals 21.365/22.010 ms. This is scoped performance evidence; broad
+content admission remains open. The [complete-game ledger](COMPLETE_REPLAY_CALIBRATION.md)
+records reference cross-calibration, observed coverage, preparation, memory and
+upload measurements alongside the joined receipt.
+
 ## First visible replay canary
 
-The first Fox/Falco Battlefield input donor now passes the full implemented
-reference-to-browser path: two independent vanilla captures, exact declared
-state/PAD comparison in both native and visibly drawn playback, then separate
-Release performance runs with an origin reset and a full warm application
-reload. `scripts/check_browser_replay.py` rechecks the raw reference/port files,
-requires the exact paired input recipe, binds the state report to the trace,
-validates every timing counter and records the build/configuration evidence.
-It rejects an instrumented run, missing counters, nonfinite timings, a different
-recipe, incomplete playback or a falsely labelled cache profile. An operator
-still attests to the visible machine profile and console inspection; the report
-does not pretend to be cryptographic browser/build attestation.
+The original 686-tick Fox/Falco Battlefield donor remains a movement canary. It
+covers six air dodges but no combat or stock loss, so it cannot admit Fox, Falco
+or Battlefield as complete content. The complete combat calibration above uses
+a separate derived workload and retains the same exact-input and declared-state
+boundaries. `scripts/check_browser_replay.py` rechecks the raw reference/port
+files, requires the exact paired input recipe, binds the state report to the
+trace, validates timing counters when performance evidence is available, and
+records the build/configuration evidence. An operator still attests to the
+visible machine profile and console inspection; the report does not pretend to
+be cryptographic browser/build attestation.
 
-The receipt remains scoped to 686 ticks and the compared fields. This donor has
-six air dodges but no combat or stock loss; it cannot admit Fox, Falco or
-Battlefield as complete content. The initial discovery pass was not a timing
-pass. Its 45 new descriptors were reviewed and added before repeating both
-performance runs. Keep memory growth and uploads in the report even when they
-do not cause a hitch. See [the exact evidence and procedure](RETAIL_REPLAY_CAPTURE.md#visible-browser-replay).
+The receipt remains scoped to the selected ticks and compared fields. Keep
+memory growth and uploads in the report even when they do not cause a hitch. See
+[the exact evidence and procedure](RETAIL_REPLAY_CAPTURE.md#visible-browser-replay).

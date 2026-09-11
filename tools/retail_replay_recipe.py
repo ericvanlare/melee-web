@@ -64,15 +64,15 @@ def _hex_bytes(value: Any, byte_count: int, context: str) -> bytes:
     return result
 
 
-def _pair(first_path: str | Path, second_path: str | Path):
+def _pair(first_path: str | Path, second_path: str | Path, *, cpu: str = "Interpreter64"):
     first = Path(first_path).expanduser().resolve()
     second = Path(second_path).expanduser().resolve()
     if first == second:
         raise RecipeError(
             "capture A and capture B resolve to the same path; two executions are required")
     try:
-        first_capture = load_capture(first)
-        second_capture = load_capture(second)
+        first_capture = load_capture(first, cpu=cpu)
+        second_capture = load_capture(second, cpu=cpu)
     except CaptureError as error:
         raise RecipeError(f"retail candidate validation failed: {error}") from error
     first_hash = first_capture.sha256
@@ -153,7 +153,8 @@ def _write_json(path: Path, value: dict[str, Any]) -> None:
 
 
 def export_pair(first_path: str | Path, second_path: str | Path,
-                output_path: str | Path, sidecar_path: str | Path | None = None) -> dict[str, Any]:
+                output_path: str | Path, sidecar_path: str | Path | None = None,
+                *, cpu: str = "Interpreter64") -> dict[str, Any]:
     """Validate two independent candidates and write a versioned MWRC recipe.
 
     Capture A supplies the output setup/input bytes after A and B have matched
@@ -166,7 +167,7 @@ def export_pair(first_path: str | Path, second_path: str | Path,
     if output == sidecar:
         raise RecipeError("MWRC output and sidecar must be different paths")
     first, second, first_hash, second_hash, first_capture, second_capture, report = _pair(
-        first_path, second_path)
+        first_path, second_path, cpu=cpu)
     if output in (first, second) or sidecar in (first, second):
         raise RecipeError(
             "MWRC output and sidecar must not overwrite either reference capture")
@@ -233,9 +234,10 @@ def main() -> int:
                         help="MWRC binary output path")
     parser.add_argument("--sidecar", type=Path,
                         help="optional sidecar path (default: OUTPUT.json)")
+    parser.add_argument("--cpu", choices=("Interpreter64", "JITARM64"), default="Interpreter64")
     args = parser.parse_args()
     try:
-        sidecar = export_pair(args.capture_a, args.capture_b, args.output, args.sidecar)
+        sidecar = export_pair(args.capture_a, args.capture_b, args.output, args.sidecar, cpu=args.cpu)
     except RecipeError as error:
         parser.exit(2, f"retail replay export failed: {error}\n")
     print(json.dumps({
