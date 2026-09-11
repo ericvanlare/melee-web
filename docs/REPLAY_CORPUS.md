@@ -469,7 +469,8 @@ preparation ranges from 184.520–238.970 ms; warm preparation is
 All eight consecutive instrumented state runs keep Wasm capacity at 334,102,528
 bytes through teardown; all 16 isolated timing runs have zero live heap growth.
 The named machine is Apple M4 / Mac16,12, 32 GiB, macOS 26.6.2, visible Chromium
-152, 640×480 with DPR 2, battery power and Low Power Mode off. Timing runs exclude
+152, 640×480 with DPR 2. The recorded development profile starts on battery
+power with Low Power Mode off; it is not continuous power telemetry. Timing runs exclude
 concurrent builds, tests and Dolphin captures. These are declared-state and
 scoped performance gates; pixels, PCM, physical input, hardware timing and broad
 gold/content admission remain open.
@@ -493,7 +494,8 @@ build identity, source ending and inspected browser error logs.
 | dev-11_36_13 | 7.670 / 13.085 | `2a96e56b083ad3cc4f083f303910f78d14b7c9e1dc899396a9325f4cb7abac2d` |
 | heldout-19_03_39 | 10.855 / 7.885 | `a0fa6186c6ecdbfeed467f38561c31bf6e1c51a5136387257cd0ed78d8ba9e5d` |
 
-The two previously reserved donor identities remain unexecuted at this milestone:
+At the development freeze, the two previously reserved donor identities were still
+unexecuted:
 `0376f27fe92a224a1c6a972493292562f0b07391a7265dea480bc13806b6b433`
 (Fox/Falco FD) and
 `0e073460262b77369111e20098644531b9e718fbc6a21608097cb2d9bcabe0e9`
@@ -501,6 +503,49 @@ The two previously reserved donor identities remain unexecuted at this milestone
 `heldout-execution-plan.json`. Reference and port execution require an explicit
 runtime freeze after the eight joined development gates pass; any tuning after
 an evaluation failure moves that donor into development.
+
+## Two untouched evaluations on the frozen expansion
+
+Commit `01fd0f3ca421d15e5aeb375ec8e6ebd7e854fd2c` freezes the shared runtime and
+469-pipeline seed after the eight development gates. The ignored freeze record
+`work/replay-expansion/heldout-runtime-freeze.json` has SHA-256
+`386360e3027ec31d0c4db8201ea753317be1f0132d8f6b96f3eb76a7df58aec1` and binds
+the source tree, all 13 browser artifacts, selected donor/input-plan hashes and
+the eight joined development receipts. Those artifacts are unchanged after
+both evaluations; neither held-out game required runtime or seed tuning.
+
+Source-driven ending discovery is followed by two fresh, fixed-length complete
+retail captures for each reserved donor. Both pairs independently repeat exactly.
+The visible browser state matches all 6,219 ticks, with full source drawing,
+original endings and teardown. Four separate isolated cold/warm runs pass every
+hard timing/resource/audio-queue gate, with zero resumes, live pipeline creation
+or live heap growth. Original-reference processes are stopped before timing.
+
+| Held-out game | Complete ticks | Native cold / warm (ms) | Preparation cold / warm (ms) | Joined receipt SHA-256 |
+| --- | ---: | ---: | ---: | --- |
+| Fox/Falco FD `19_32_48` | 4,608 | 10.120 / 10.360 | 186.540 / 184.200 | `c7ffaf3c5176fbbc7a64526994c954c0fdcbcec584c147dfcea07c79e61337f9` |
+| Marth/Falco YS `19_11_16` | 1,611 | 12.435 / 12.965 | 187.140 / 185.810 | `a900799b3f906b7a6c7b7d31cac8244b676f73ca71161b35315bdce97b16463f` |
+
+| Game | Retail A SHA-256 | Retail B SHA-256 | MWRC SHA-256 | Source-drawn port SHA-256 |
+| --- | --- | --- | --- | --- |
+| FD `19_32_48` | `690efc3374b3ac8a19b93eb98da55803b4c8106b8f22d07352eb8f6fcabb0787` | `19630f14d5c02cf35eeb17e82048728fd80c5fd829b7941984814cc19732fe24` | `44dc466ea44dd61c70a2347209014ed4d8e53c0cf96a2cf36274673ff1b70b42` | `6e6fc534ddaccbd929030907285f8b00c206dc75a91a3f3095000757d01b3b4f` |
+| YS `19_11_16` | `822b434f750fe6229e344ddd0d52a638eee7f99f7f3bd507853c9d75929fe971` | `c487797fe2a09daf123d7a23af67cbb836a0787d9ccdef7d1fa7a2a361ea9987` | `83a889c7e9b03a0ba785fcea56a81b1efaf92a06261ce7cc0ca20f5be86b08af` | `1c8f8ee44c06cadab4d32dfba0426dd63245621638fd405c97c6ad68bd69fece` |
+
+The local `heldout-browser-runs.json` ledger preserves all six state/timing
+reports; `heldout-result.json` joins their final status. The profile
+`browser-profile-heldout-final.json` records the same Apple M4 / Chromium 152
+configuration, now on AC power; the separate state profile allows reference
+capture concurrency without claiming timing acceptance. Driver caches are
+uncontrolled. All inspected browser error logs are empty. The owned browser
+tab, test server and reference processes are closed after evaluation.
+
+Together the frozen build passes ten complete games, 31,042 source-drawn
+comparison ticks and 20 cold/warm performance runs totaling 62,084 ticks. These
+are input-donor-derived vanilla reference trajectories and declared-field
+checks, not admitted gold Slippi reproduction, full pixel/PCM equivalence,
+hardware input/latency, or complete fighter/stage admission. The next cohort is
+the separately reserved UCF-off development/held-out split below; it has not
+been executed or used to tune this build.
 
 ## Independently verified UCF-off candidate split
 

@@ -37,7 +37,11 @@ ticks with source drawing. The reviewed startup seed now has 469 pipelines.
 All eight complete regression games now match both original captures through
 24,823 source-drawn ticks. Their 16 isolated cold/warm performance runs pass
 with zero hard-gate failures, live pipeline creation or heap growth; the worst
-native callback is 15.855 ms. Two reserved inputs await frozen-build evaluation.
+native callback is 15.855 ms. Both reserved games then pass the frozen build
+without runtime or seed changes: 6,219 additional exact source-drawn ticks and
+four further cold/warm runs with zero hard-gate failures. This brings the
+current build to ten complete games and 20 performance runs; broader gold,
+pixel/PCM, physical-input and content admission remain open.
 All 473 tests pass;
 rebuilt fighter/stage lifecycle checks also pass after correcting a missing
 rumble archive in the standalone Battlefield test bundle. See the [expanded evidence ledger](docs/REPLAY_CORPUS.md#expanded-development-corpus--eight-game-regression-gate).
