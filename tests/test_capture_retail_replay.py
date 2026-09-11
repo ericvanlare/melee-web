@@ -178,7 +178,8 @@ class CaptureRunnerTests(unittest.TestCase):
             self.assertNotIn("/tmp/stale-gdb.sock", dolphin_ini)
             boundary = paths["collector_boundary"]
             expected_hash = hashlib.sha256(
-                paths["collector"].read_bytes() + b"\0" + boundary.read_bytes()).hexdigest()
+                paths["collector"].read_bytes() + b"\0" + boundary.read_bytes() + b"\0" +
+                paths["collector"].with_name('retail_input_plan.py').read_bytes()).hexdigest()
             self.assertEqual(paths["collector_sha256"], expected_hash)
 
     def test_provenance_configuration_types_are_exact(self):

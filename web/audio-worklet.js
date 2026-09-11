@@ -3,7 +3,7 @@ class MeleeAudioOutput extends AudioWorkletProcessor {
   constructor() {
     super(); this.queue = new AudioRing(); this.enabled = false; this.blocks = 0;
     this.port.onmessage = ({ data }) => {
-      if (data.type === 'state') { this.enabled = data.enabled; this.queue.reset(); this.port.postMessage({type: 'state-ack', enabled: this.enabled}); }
+      if (data.type === 'state') { this.enabled = data.enabled; this.queue.reset(); this.port.postMessage({type: 'state-ack', enabled: this.enabled, queued: this.queue.available, underruns: this.queue.underruns, overflows: this.queue.overflows}); }
       if (data.type === 'pcm' && this.enabled) {
         try { if (!this.queue.push(data.pcm)) this.port.postMessage({ error: 'Audio output queue overflow' }); }
         catch (error) { this.port.postMessage({ error: error.message }); }

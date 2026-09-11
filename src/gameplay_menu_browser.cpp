@@ -1,6 +1,7 @@
 #include "gameplay_menu_world.hpp"
 #include "gameplay_menu_host.h"
 #include "gameplay_match_session.hpp"
+#include "gameplay_retail_recipe.hpp"
 #include "../tests/native_menu_fighter_input.h"
 #include "../tests/native_menu_stage_input.h"
 #include "gameplay_audio_stream.h"
@@ -31,6 +32,9 @@ melee_web::RuntimeFiles files;
 std::unique_ptr<melee_web::RuntimeArchiveCache> archive_cache;
 std::unique_ptr<melee_web::GameplayMenuWorld> world;
 std::unique_ptr<melee_web::GameplayMatchSession> match;
+std::unique_ptr<melee_web::RetailReplayRecipe> replay;
+size_t replay_cursor=0;
+bool replay_trace=false,replay_pending=false,replay_started=false,replay_final_draw=false;
 MeleeWebMenuHost* host=nullptr;
 melee_web::FixedTickClock menu_clock;
 melee_web::FixedTickClock audio_clock{melee_web::FixedTickClock::OverrunPolicy::CatchUp};
@@ -164,6 +168,9 @@ void close(){
   world.reset();world_exposed=false;
  }
  if(host){check(melee_web_menu_host_destroy(host,error,sizeof(error)),error);host=nullptr;}
+ if(replay&&replay_trace&&replay_final_draw&&!faulted)
+  melee_web::retail_replay_end(replay->frames.size());
+ replay.reset();replay_cursor=0;replay_trace=replay_pending=replay_started=replay_final_draw=false;
  audio_phase=0;faulted=false;diagnostic_start_ticks=0;stock_check=0;stock_tick=0;render_frame=0;first_use_draw_pending=false;render_only_preparation=false;transition_audio_continues=false;menu_scene_rebuild_pending=false;audio_clock.reset();clear_diagnostic_pad();
  match_message="Original four-stock source match";
  if(had_lifetime){
@@ -186,6 +193,13 @@ void enter_world(){
 }
 void advance(){
  char error[256]{};
+ if(replay_pending){
+  check(replay&&replay->initial_input,"Replay initialization is unavailable");
+  replay_pending=false;
+  match=std::make_unique<melee_web::GameplayMatchSession>(files,replay->selection,*archive_cache,
+      melee_web::GameplayMatchConstruction::Deferred,*replay->initial_input);
+  running=false;message="Preparing reference replay...";return;
+ }
  if(match){
   const uint32_t seed=match->random_seed();match->close();match.reset();++completed_matches;
   check(melee_web_menu_host_match_finished(host,seed,error,sizeof(error)),error);
@@ -233,7 +247,10 @@ bool advance_match_construction(){
  const double reserved=emscripten_get_now();
  report_construction(complete?"match-enter":"match-enter-step",started,reserved,reserved,
                      before,aurora_stats_snapshot());
- if(complete){first_use_draw_pending=true;running=true;message=match_message;}
+ if(complete){
+  if(replay&&replay_trace)melee_web::retail_replay_initial(*replay,true);
+  first_use_draw_pending=true;running=true;message=match_message;
+ }
  return complete;
 }
 
@@ -288,8 +305,10 @@ void tick(){
  int began=0,drawn=1,timing_valid=1,first_use=0;
  // A transition request owns the whole callback in which it is observed.
  // Keep the source presenter out of both the request and audio-ack waits.
- int suppress_draw=preparation.suppress_source_draw()||pending;
+ int suppress_draw=preparation.suppress_source_draw()||pending||replay_final_draw;
  bool actual_source_draw=false;
+ bool replay_completed_now=false;
+ unsigned replay_steps=0;
  try{
   for(const AuroraEvent* event=aurora_update();event&&event->type!=AURORA_NONE;++event){
    if(event->type==AURORA_EXIT){close();melee_web_input_shutdown();aurora_shutdown();emscripten_cancel_main_loop();return;}
@@ -338,6 +357,7 @@ void tick(){
    transition_audio_continues=false;
   }
   for(unsigned step=0;step<elapsed.steps;step++){
+   if(replay&&replay_cursor==replay->frames.size())break;
    PADStatus checked_input[4];const PADStatus* sample=input->raw;bool copied_input=false;
    bool diagnostic_start_pulse=false;
    if(diagnostic_start_ticks){
@@ -363,7 +383,21 @@ void tick(){
    }
    int result=1;
    if(match){
+    if(replay){
+     check(!match->paused()&&!match->complete(),"Replay reached an unsupported source pause/exit");
+     if(!replay_started){
+      replay_started=true;
+      EM_ASM({window.menuReplayStarted?.($0,!!$1);},replay->frames.size(),replay_trace);
+     }
+     sample=replay->frames[replay_cursor].pads.data();
+    }
     match->tick(sample);int winner=-1;const int outcome=match->outcome(winner);
+    if(replay){
+     if(replay_trace)melee_web::retail_replay_frame(*replay,replay_cursor);
+     ++replay_cursor;
+     ++replay_steps;
+     check(!match->complete()||replay_cursor==replay->frames.size(),"Replay source match exited before all input was consumed");
+    }
     if(stock_check==-1){
      const auto player=match->player_stats(0);
      check(match->player_stats(1).stocks==4,"Stock diagnostic: stationary opponent lost a stock");
@@ -374,7 +408,7 @@ void tick(){
      if(outcome){check(winner==1&&stock_count==0&&stock_respawns==3,"Stock diagnostic: unexpected source outcome");if(match->complete())stock_check=1;}
      if(!match->complete())check(stock_tick<4000,"Stock diagnostic: no source exit after 4000 ticks");
     }
-    if(match->complete()){check(outcome,"Original match transitioned without an outcome");pending=true;result=3;}
+    if(match->complete()&&!replay){check(outcome,"Original match transitioned without an outcome");pending=true;result=3;}
    }
    else{result=melee_web_menu_host_tick(host,sample,error,sizeof(error));check(result==1||result==3,error);}
    if(result==3){pending=true;clear_diagnostic_pad();break;}
@@ -395,12 +429,20 @@ void tick(){
    }
    draw_done=emscripten_get_now();
    aurora_end_frame();end_done=emscripten_get_now();check(drawn,error);
+   if(replay&&!replay_final_draw&&replay_cursor==replay->frames.size()&&actual_source_draw){
+    replay_final_draw=true;replay_completed_now=true;running=false;menu_clock.reset();
+    message="Reference replay complete; all input consumed and final frame drawn.";
+   }
    if(actual_source_draw&&running){
     first_use=first_use_draw_pending?1:0;
     first_use_draw_pending=false;
    }
   }
   else{draw_done=begin_done;end_done=begin_done;}
+  // Normal scheduling can group source ticks, but a callback that consumed
+  // replay input must execute its source draw. A missed surface frame cannot
+  // later produce a successful rendered trace by drawing only the final tick.
+  check(!replay_steps||actual_source_draw,"Reference replay could not draw after consuming source input");
  }catch(const std::exception& e){running=false;faulted=true;preparation.reset();render_only_preparation=false;pending=false;clear_diagnostic_pad();menu_clock.reset();message=e.what();if(preparation_started)preparation_ms=emscripten_get_now()-preparation_started;preparation_failed(e.what());timing_valid=0;std::fprintf(stderr,"Native menu: %s\n",e.what());
   const double failed=emscripten_get_now();
   if(input_done<started)input_done=failed;
@@ -455,6 +497,7 @@ void tick(){
   emscripten_get_heap_size(),suppress_draw);
  EM_ASM({if(window.menuRuntimeTiming)window.menuRuntimeTiming(JSON.parse(UTF8ToString($0)));},timing);
  EM_ASM({window.menuFrame?.(!!$0);},running_at_callback_start?1:0);
+ if(replay_completed_now)EM_ASM({window.menuReplayCompleted?.($0);},replay_cursor);
 }
 }
 extern "C" {
@@ -494,19 +537,36 @@ int melee_web_native_menu_launch(){try{
  VISetFrameBufferScale(1);enter_world();return 1;
 }catch(const std::exception& e){message=e.what();running=false;return 0;}}
 int melee_web_native_menu_unload(){try{close();message="Native menus unloaded.";return 1;}catch(const std::exception& e){message=e.what();return 0;}}
+int melee_web_native_menu_replay(const uint8_t* data,unsigned size,int observe){try{
+ check(data&&size<=melee_web::kRetailReplayMaxBytes,"Invalid reference replay bytes");
+ check(observe==0||observe==1,"Invalid replay observation mode");
+ auto candidate=std::make_unique<melee_web::RetailReplayRecipe>(melee_web::read_retail_replay({data,size}));
+ check(candidate->version==2&&candidate->initial_input,"Browser reference playback requires a v2 PAD history recipe");
+ close();
+ if(!archive_cache)archive_cache=std::make_unique<melee_web::RuntimeArchiveCache>(files);
+ replay=std::move(candidate);replay_trace=observe;replay_pending=true;
+ match_message="Reference replay: "+selected_match_message(replay->selection);
+ check(preparation.request(),"Replay preparation is already active");
+ preparation_profile.begin(true,emscripten_get_now());
+ VISetFrameBufferScale(1);
+ message="Preparing reference replay...";
+ EM_ASM({window.menuPreparation?.(UTF8ToString($0));},message.c_str());
+ return 1;
+}catch(const std::exception& e){message=e.what();running=false;return 0;}}
+unsigned melee_web_native_menu_replay_cursor(){return static_cast<unsigned>(replay_cursor);}
 void melee_web_native_menu_pause(int paused){
- if(faulted||preparation.busy()||pending||(!host_entered&&!match))return;
+ if(faulted||replay_final_draw||preparation.busy()||pending||(!host_entered&&!match))return;
  running=(world||match)&&!paused;menu_clock.reset();
  message=running?(match?match_message:melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select"):"Paused.";
 }
 void melee_web_native_menu_confirm_check(){
- if((host_entered||match)&&!faulted&&!preparation.busy()&&!pending&&stock_check!=-1&&diagnostic_pad_remaining==0)
+ if(!replay&&(host_entered||match)&&!faulted&&!preparation.busy()&&!pending&&stock_check!=-1&&diagnostic_pad_remaining==0)
   diagnostic_start_ticks=3;
 }
 int melee_web_native_menu_pad_sample_full(unsigned port,unsigned buttons,int stick_x,int stick_y,
                                           int cstick_x,int cstick_y,unsigned trigger_l,
                                           unsigned trigger_r,unsigned duration){try{
- if(faulted||preparation.busy()||pending||stock_check==-1||diagnostic_start_ticks!=0||!running||(!host_entered&&!match))
+ if(replay||faulted||preparation.busy()||pending||stock_check==-1||diagnostic_start_ticks!=0||!running||(!host_entered&&!match))
   throw std::runtime_error("Raw PAD samples require an active, non-diagnostic scene");
  if(port>1||buttons>0xffffU||(buttons&~kDiagnosticPadButtons)||stick_x<-80||stick_x>80||stick_y<-80||stick_y>80||
     cstick_x<-80||cstick_x>80||cstick_y<-80||cstick_y>80||trigger_l>255||trigger_r>255||duration<1||duration>120)
@@ -555,7 +615,7 @@ int melee_web_native_menu_drive_stage(int stage_kind){try{
  return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
 int melee_web_native_menu_stock_check_ready(){
- return match&&!faulted&&running&&match->ready()&&!match->paused()&&
+ return !replay&&match&&!faulted&&running&&match->ready()&&!match->paused()&&
         !match->ending()&&stock_check!=-1&&diagnostic_start_ticks==0&&diagnostic_pad_remaining==0;
 }
 int melee_web_native_menu_stock_check(){

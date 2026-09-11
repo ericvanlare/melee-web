@@ -10,45 +10,22 @@
 #include <stdexcept>
 #include <vector>
 #include <memory>
-#include "gameplay_pad_state.h"
+#include "gameplay_retail_recipe.hpp"
 
-extern "C" int melee_web_retail_setup(const uint8_t*,uint32_t,
-    MeleeWebMenuMatchSelection*,char*,size_t);
-extern "C" void melee_web_retail_state(void);
 
 namespace {
 void check(bool value,const char* message){if(!value)throw std::runtime_error(message);}
-struct Reader {
-    std::vector<uint8_t> bytes;
-    size_t cursor=0;
-    explicit Reader(const char* path){
-        const auto size=std::filesystem::file_size(path);
-        check(size>=16+0x138&&size<=16+0x138+36000*44+MELEE_WEB_PAD_STATE_BYTES,
-              "Reference input size is outside its bounds");
-        std::ifstream f(path,std::ios::binary);bytes.assign(std::istreambuf_iterator<char>(f),{});
-        check(bytes.size()==size,"Reference input read was incomplete");
-    }
-    uint8_t u8(){check(cursor<bytes.size(),"Reference input is truncated");return bytes[cursor++];}
-    uint16_t u16(){const auto hi=u8();const auto lo=u8();return uint16_t(hi)<<8|lo;}
-    uint32_t u32(){const auto hi=u16();const auto lo=u16();return uint32_t(hi)<<16|lo;}
-};
-void hex(const uint8_t* data,size_t count){
-    static constexpr char digits[]="0123456789abcdef";
-    for(size_t i=0;i<count;i++)std::cout<<digits[data[i]>>4]<<digits[data[i]&15];
-}
+
 }
 
 int main(int argc,char** argv){try{
     check(argc==4,"Expected owned menu/game directories and MWRC reference input");
-    Reader input(argv[3]);
-    check(input.u32()==0x4d575243,"Unsupported reference input format");
-    const auto version=input.u32();check(version==1||version==2,"Unsupported reference input version");
-    const auto seed=input.u32();const auto frames=input.u32();
-    check(frames&&frames<=36000&&input.bytes.size()==16+0x138+(version==2?MELEE_WEB_PAD_STATE_BYTES:0)+size_t(frames)*44,
-          "Reference input frame count disagrees with its size");
-    std::array<uint8_t,0x138> setup{};for(auto& byte:setup)byte=input.u8();
-    char error[256]{};MeleeWebMenuMatchSelection selection{};
-    check(melee_web_retail_setup(setup.data(),seed,&selection,error,sizeof(error)),error);
+    const auto size=std::filesystem::file_size(argv[3]);
+    check(size<=melee_web::kRetailReplayMaxBytes,"Reference input exceeds size limit");
+    std::ifstream stream(argv[3],std::ios::binary);
+    std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(stream),{}};
+    check(bytes.size()==size,"Reference input read was incomplete");
+    auto recipe=melee_web::read_retail_replay(bytes);
     melee_web::RuntimeFiles files;
     for(const auto* root:{argv[1],argv[2]}){
         for(const auto& entry:std::filesystem::directory_iterator(root)){
@@ -57,42 +34,20 @@ int main(int argc,char** argv){try{
             files[entry.path().filename().string()]={std::istreambuf_iterator<char>(stream),{}};
         }
     }
-    std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> pad_bytes{};
-    std::unique_ptr<MeleeWebPadState,decltype(&melee_web_pad_state_free)> initial_input(nullptr,melee_web_pad_state_free);
-    if(version==2){
-        for(auto& byte:pad_bytes)byte=input.u8();
-        initial_input.reset(melee_web_pad_state_decode(pad_bytes.data(),pad_bytes.size(),error,sizeof(error)));
-        check(bool(initial_input),error);
-    }
-    auto owned_match=initial_input?std::make_unique<melee_web::GameplayMatchSession>(files,selection,*initial_input):
-                                  std::make_unique<melee_web::GameplayMatchSession>(files,selection);
+    auto owned_match=recipe.initial_input?
+        std::make_unique<melee_web::GameplayMatchSession>(files,recipe.selection,*recipe.initial_input):
+        std::make_unique<melee_web::GameplayMatchSession>(files,recipe.selection);
     auto& match=*owned_match;
-    auto history=[&](){if(version==2){
-        std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> data{};melee_web_pad_state_capture(data.data());
-        std::cout<<",\"pad_state_hex\":\"";hex(data.data(),data.size());std::cout<<"\"";
-    }};
-    std::cout<<"{\"record\":\"header\",\"schema\":\"melee-web-port-replay-candidate\",\"version\":"<<version<<",\"frames_requested\":"<<frames
-        <<",\"phase\":\"after_source_tick_before_audio_transport\",\"rendering\":\"excluded\",\"comparison\":\"not_run\"}\n";
-    std::cout<<"{\"record\":\"match_enter\",\"rng\":"<<seed<<",\"start_melee_hex\":\"";hex(setup.data(),setup.size());std::cout<<"\"";
-    if(version==2){std::cout<<",\"pad_state_hex\":\"";hex(pad_bytes.data(),pad_bytes.size());std::cout<<"\"";}std::cout<<"}\n";
-    std::cout<<"{\"record\":\"match_enter_complete\",";melee_web_retail_state();history();std::cout<<"}\n";
-    unsigned audio_phase=0;float pcm[1068];
-    for(uint32_t index=0;index<frames;index++){
+    melee_web::retail_replay_initial(recipe,false);
+    unsigned audio_phase=0;float pcm[1068];char error[256]{};
+    for(uint32_t index=0;index<recipe.frames.size();index++){
         check(!match.paused()&&!match.complete(),"Reference workload reached an unsupported pause/exit");
-        const auto offset=input.cursor;PADStatus pads[4]{};
-        for(auto& pad:pads){
-            pad.button=input.u16();pad.stickX=std::bit_cast<int8_t>(input.u8());pad.stickY=std::bit_cast<int8_t>(input.u8());
-            pad.substickX=std::bit_cast<int8_t>(input.u8());pad.substickY=std::bit_cast<int8_t>(input.u8());
-            pad.triggerLeft=input.u8();pad.triggerRight=input.u8();pad.analogA=input.u8();pad.analogB=input.u8();pad.err=std::bit_cast<int8_t>(input.u8());
-        }
-        match.tick(pads);
-        std::cout<<"{\"record\":\"frame\",\"index\":"<<index<<",\"supplied_inputs\":[";
-        for(unsigned port=0;port<4;port++){if(port)std::cout<<",";std::cout<<"\"";hex(input.bytes.data()+offset+port*11,11);std::cout<<"\"";}
-        std::cout<<"],";melee_web_retail_state();history();std::cout<<"}\n";
+        match.tick(recipe.frames[index].pads.data());
+        melee_web::retail_replay_frame(recipe,index);
         audio_phase+=32000;const auto samples=audio_phase/60;audio_phase%=60;
         check(melee_web_audio_render(match.audio(),pcm,samples,error,sizeof(error)),error);
     }
     match.close();
-    std::cout<<"{\"record\":\"end\",\"frames\":"<<frames<<",\"status\":\"captured\"}\n";
+    melee_web::retail_replay_end(recipe.frames.size());
     return 0;
 }catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 2;}}

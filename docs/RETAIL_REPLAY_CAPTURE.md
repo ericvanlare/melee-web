@@ -108,11 +108,109 @@ standalone DOL beside a different game image is insufficient. The local CISO's
 executable passes this check. Snapshot creation remains a trusted, documented
 retail procedure; hashing a snapshot alone cannot prove how it was produced.
 
-The procedure currently handles this specific SSS checkpoint: advance 12 neutral
+The procedure handles the documented SSS checkpoints: advance 12 neutral
 source ticks, arm observers, press A for eight source ticks, release for eight,
-then capture the requested match ticks. It is not a general menu driver or a
-Slippi input injector. Do not feed another checkpoint and assume equivalent
+then capture the requested match ticks. It is not a general menu driver.
+Do not feed another checkpoint and assume equivalent
 initial conditions merely because the command exits successfully.
+
+## Input donors through vanilla retail
+
+The initial profile requires a timeline beginning at Slippi frame -123, with
+two human players on ports 1/2 and neutral disconnected samples on ports 3/4.
+All four consumed PAD vectors are checked at every tick. Seeking and arbitrary
+mid-recording slices require a separate explicit initialization contract.
+
+`export_retail_input_plan.py` derives a bounded, input-only plan from a completed,
+finalized modern `.slp` file. It requires both human ports 1/2, complete raw axes
+and trigger fields, and no follower or doubles inputs. The strict plan schema
+rejects state-bearing or unknown fields, duplicate keys and incomplete vectors.
+It retains the source hash, frame origin, character IDs and stage ID; the retail
+menu checkpoint must select those same characters and stage. Costumes, rules,
+starting RNG and all initial PAD histories come from the independently observed
+retail initialization, not the recording's online/UCF post-state.
+
+```sh
+python3 scripts/export_retail_input_plan.py /path/to/donor.slp \
+  --output work/reference/donor-plan.json
+# Add both options to each independent capture command above:
+#   --input-plan work/reference/donor-plan.json --frames 686
+# The frame count must equal the entire supplied plan; add --draw-audit.
+```
+
+The versioned `dolphin-pipe-raw-v1` policy clears stick calibration, center and
+modifier bindings, and requires zero dead zone and virtual notches. With this
+configuration the pipe backend maps each signed axis through `axis / 127` to
+the requested byte. Digital L/R force the corresponding analog pressure to
+255 in Dolphin; digital A/B similarly determine their unrecorded pressure.
+These pressure choices are declared derivations, not recovered hardware input.
+Ordinary source PAD processing still applies its original clamp and histories.
+The runner checks the copied controller configuration, pins the plan and all
+collector helpers, then requires **every actual consumed vector** to agree with
+the intended input. A configuration check alone is insufficient evidence.
+
+The plan is queued at the verified VS-entry return and after each source tick.
+It cannot supply another vector after the last tick. When drawing is audited,
+completion waits for that tick's final camera traversal. A collector regression
+test covers this final-tick/final-draw ordering; an earlier failed local capture
+that requested input 687 from a 686-tick plan remains invalid evidence.
+
+The first donor is the official Slippi JS 9.1.3 `wavedash-1.slp` fixture, SHA-256
+`173e24ef8c7d600fbe12b09a2e4e3217669f0b19c306912ff80c3bf224ddd2e5`:
+Fox/Falco on Battlefield, 686 source frames from -123 through 562. Its UCF/online
+state is excluded. Two independent vanilla executions repeat exactly for all
+686 ticks, and both 686-draw audits find no changes to the declared state.
+The first port comparison exposed a real one-bit sine difference at tick 155,
+then an arctangent difference at tick 252 after the sine boundary was corrected.
+Neither red is waived with a tolerance. This short movement workload does not
+cover combat, a complete stock match, all numerical functions or browser timing.
+
+The final port run matches all 686 ticks after compiling the original MSL
+`trigf.c` and enabling the recovered `lbtrigf.c` arctangent. The downstream patch
+preserves the retail polynomial tables and each `fmadds`/`fnmsubs` rounding
+boundary with explicit `fmaf` calls. It also preserves the original initialized
+range-reduction constants, sign bits and integer conversion/shift behavior
+without undefined C casts, aliasing or out-of-bounds pointer formation.
+The range-conversion helper retains positive-overflow saturation to `INT32_MAX`
+and negative-overflow saturation to `INT32_MIN`, matching [IBM’s fctiwz
+instruction definition](https://www.ibm.com/docs/en/aix/7.1.0?topic=is-fctiwz-fcirz-floating-convert-integer-word-round-zero-instruction).
+Compiler builtins are disabled for these gameplay functions; general fast-math
+and implicit contraction remain disabled. This is a shared math-boundary fix,
+not an air-dodge special case or a position correction.
+
+Read-only call-site probes independently captured these function results:
+
+| Source tick | Stick X/Y bits | Angle bits | Sine bits | Cosine bits |
+| --- | --- | --- | --- | --- |
+| 155 | `bf466666` / `bf200000` | `c01da0a6` | `bf20b463` | `bf474614` |
+| 252 | `3f500000` / `bf100000` | `bf1b04f7` | `bf11b7bd` | `3f527b31` |
+
+The automated Wasm test executes the actual patched source functions against
+these observations, with host libm as a required failing negative control.
+All six air-dodge entries in the new vanilla trajectory (155, 252, 318, 396,
+465, 598) are included in the passing full-state comparison. This remains
+declared-state evidence; unmeasured math paths need their own comparisons.
+
+### Preparing the Fox/Falco checkpoint
+
+The local `work/reference-input-v2/fox-falco-checkpoint/` manifest records the
+setup recipe separately from the read-only capture. An isolated copy of the
+persistent availability state enabled Falco (character-unlock bit 5) and
+Battlefield (stage-unlock bit 6), using verified revision-2 tables. That setup
+step writes availability data; it does not write executable code, RNG, fighters
+or active-match state. Ordinary source cursor input then selects Fox/Falco,
+waits for the CSS ready condition before Start, resolves the original memory-card
+overwrite/continue-without-saving prompts, and hovers Battlefield in SSS.
+
+Save from Dolphin's main-window Emulation → Save State menu into an unused
+slot, then copy that snapshot, external GC files and controller configuration
+together. A hotkey sent only to the render window did not save this checkpoint.
+Pin all copied hashes and the setup description before capturing. The local
+SSS snapshot SHA-256 is
+`55dfef2413480ed37531f584296ffc0850551b9d64612278bcf6792a2ee0c30c`.
+Every subsequent collector process is read-only and uses ordinary controller
+pipes. Do not conflate this documented setup with capture purity, or reuse an
+unrelated save directory just because the savestate loads.
 
 Add `--draw-audit` to observe `HSD_GObj_80390FC0` entry and its verified return.
 The owned evidence directory receives `draw-audit.jsonl`; run metadata binds
@@ -206,3 +304,166 @@ negative controls reject omitted histories and broken draw lifecycles.
 The follow-up full suite passes all 354 tests, and both Debug and Release
 `gameplay_menu_browser` builds pass. These builds are integration checks, not
 new visible-browser replay performance evidence.
+
+The input-donor follow-up in `work/reference-input-v2/` contains:
+
+- `donor-b.jsonl`, SHA-256
+  `27af52b3e12385b0d67a3b5741ca0bda06b33952fe4fcf4c1d825829c9e80216`;
+- independent `donor-c.jsonl`, SHA-256
+  `6f33592b670151e1e40627001d3cf2f05cb1c563c5b550aa482a2e81480aeee4`;
+- `donor-paired.mwrc` and its sidecar, exported only after complete repeatability;
+- `donor-first-red.json` (tick 155) and `donor-msl-comparison.json` (tick 252),
+  retained without filtering or tolerance changes;
+- `donor-port-trig.jsonl`, SHA-256
+  `ce999008f9544fd4225c0b9fab86be64f36d2d3641145cfd3fbc884cf5f0fb0d`,
+  and `donor-trig-comparison.json`, the passing 686-tick declared-state comparison;
+- owned run metadata binding both 686-draw audit files to their captures;
+- `trig-diagnostic-prefix.jsonl` / `trig-diagnostic-prefix-253.jsonl`, separate
+  read-only call-site diagnostics whose owned evidence contains the scalar
+  observations above; and
+- `retail-trig-disassembly.txt`, instruction inspection of the owned pinned DOL.
+
+The original 240-tick neutral calibration also remains exact after the sine
+boundary change. No visible browser replay or performance gate is implied by
+these native traces, and the number of admitted gold Slippi fixtures remains zero.
+
+## Visible browser replay
+
+The ordinary Release player now accepts the paired **MWRC v2** input recipe in
+Diagnostics → Reference replay. Native and browser playback share the bounded
+recipe decoder, typed original setup, PAD initialization and diagnostic observer.
+The browser constructs a fresh source match through its existing deferred owner,
+waits for ordinary audio acknowledgement/resource preparation, and feeds one
+recipe sample to each source tick in the normal render/audio loop. It requires
+a successful source draw in every callback that consumes replay input, plus the
+final input, final draw and successful teardown before completion. Normal
+scheduling can group ticks in a callback; this is not a one-draw-per-tick claim.
+Startup is locked before asynchronous work, and failed teardown rejects entry.
+Diagnostic raw input cannot override the timeline. Source pause/early exit beyond
+this bounded profile fails explicitly; seeking and replaying the original Slippi
+post-state are not implemented.
+
+Two modes deliberately collect different evidence:
+
+- **State capture (instrumented)** emits the same initial/per-tick semantic trace
+  as the native probe, before audio transport and source drawing. It can resume
+  an instrumentation-induced timing pause and records those resumes. This mode
+  never provides performance evidence.
+- **Performance** does not serialize state. It uses ordinary production timing,
+  resource and audio counters; a timing pause ends the run as a failure. No
+  automatic/manual resume can turn that run into a passing timing report. The
+  real-browser manual-pause negative control stopped at input 301 with an
+  explicit failure and incomplete timeline; the automated handler test also
+  rejects overlapping startup and failed teardown.
+
+The completed state run offers `retail-port.jsonl` and both modes offer
+`retail-browser-report.json`. Reports include the recipe SHA-256, consumed count,
+preparation, callback tails, memory/resource activity, audio counters, visibility,
+cache state and browser configuration. The disabled audio acknowledgement carries
+final counters so an underrun in the last reporting interval is not lost.
+Downloads and serialization happen after teardown.
+
+When browser download support is unavailable, start the existing loopback server
+with an explicit evidence directory outside the served build:
+
+```sh
+python3 scripts/serve.py --directory build/browser-release --port 8791 \
+  --evidence-directory work/replay-evidence
+```
+
+**Save replay to local evidence server** saves only the generated trace/report.
+The opt-in endpoint requires its loopback origin and known diagnostic names,
+limits upload sizes, and saves files under SHA-256 names without overwriting
+existing evidence. It returns the local paths and hashes in the page. Ordinary
+server operation remains read-only. The disc/file loader does not use this
+endpoint; game archives stay in the tab.
+
+For pipeline discovery, complete/unload the visible replay, then use **Export
+render cache** followed by **Save cache to local evidence server** after pending
+pipelines drain. This saves only `pipeline_cache.db` and its nonempty SQLite WAL,
+not the driver-specific Dawn cache. Copy both exports to a temporary directory
+as `pipeline_cache.db` and `pipeline_cache.db-wal`, respectively, before opening
+SQLite and checkpointing. The main database alone may contain only its header;
+a WAL cannot be omitted. Do not modify the immutable captured files in place.
+Review the schema, descriptor version/size and added rows against the previous
+seed; preserve all prior descriptor payloads. Materialize only those portable
+rows into the reviewed seed, update its digest/inventory test, rebuild Release,
+and repeat the cold/warm runs. Discovery is never a timing pass.
+
+For the timing pair, use **Clear render cache + reload**, reload the local disc,
+choose the same recipe and run **Performance** with the tab visible and no build,
+full-suite, emulator or other agent CPU work in flight. Save that report. Then
+use **Reload application state**, reload the disc/recipe, run Performance again
+and save its report. This discards the entire runtime/asset/audio heap between
+runs. It does not clear browser or GPU-driver caches. Capture the Release
+artifact hashes, machine, browser, power and display profile before running and
+inspect the browser error log. Source-frame instrumentation stays off throughout
+both live timing runs.
+
+Join the raw evidence using:
+
+```sh
+python3 scripts/check_browser_replay.py \
+  --reference-a work/retail-a.jsonl --reference-b work/retail-b.jsonl \
+  --recipe work/paired.mwrc --port work/retail-port.jsonl \
+  --state work/state-browser-report.json \
+  --cold work/cold-browser-report.json --warm work/warm-browser-report.json \
+  --profile work/browser-profile.json --browser-errors work/browser-errors.json \
+  --build-directory build/browser-release --output work/scoped-replay-evidence.json
+```
+
+The profile pins `build: "Release"`, machine `hardware`, `power` and `display`,
+and an `artifacts` mapping of SHA-256 hashes for `gameplay_menu_browser.js`,
+`gameplay_menu_browser.wasm`, `gameplay_menu_browser.data`, `runtime.html`,
+`runtime-cache.js` and `audio-worklet.js`. Preserve OS, input, power settings,
+driver-cache scope and instrumentation notes alongside those required fields.
+The inspected browser-errors file is a JSON list. The checker revalidates the
+paired references and actual rendered port trace, compares the exact recipe,
+checks report hashes and every hard counter, rejects wrong cache profiles, and
+verifies the named build artifacts have not changed. The profile and console
+inspection remain operator attestations; the checker cannot prove which browser
+binary rendered a self-reported artifact. It emits scoped evidence, never
+fighter/stage admission or an unqualified gold-corpus claim.
+
+### First donor browser evidence
+
+The ignored `work/reference-input-v2/` receipt
+`scoped-replay-evidence.json` passes the implemented gates for the complete
+686-input donor, with all six air dodges retained. The rendered trace SHA-256 is
+`fe695b74c56e2945fd17082eae306abe39c5e8fb2e2e9552865d2f8e3d2da65c`.
+It is identical across repeated browser state runs, including a discovery run
+whose instrumented scheduler batched some ticks. Every declared entry/fighter,
+RNG, match-clock, raw input and full PAD-history field matches both retail
+captures. This does not establish pixel, audio-output or retail VI-cadence
+agreement.
+
+The final-build reports under `browser-evidence/` are SHA-256 named:
+
+- state: `2e7609e253c00224696f1cb5b43ee025b8481d186be654512215ca0d0236d791`;
+- cleared origin: `74e6bdc1c7c3dfdc9f35085fbfecef7981d3e017458b7dfc691a2ad1339d26a9`;
+- full warm reload: `88c56280fdb7f49959bd249c5b501bad1faadacf05b08d40a2eaaa1b6a18e83f`.
+
+The reviewed seed gained 45 portable GX descriptors, preserving all 344 earlier
+payloads. Its 389 pipelines use config version 65549 with 2,772 bytes per
+pipeline, plus the existing 64-byte clear record. Seed SHA-256 is
+`49bf551d057cd9d597e9c145132be763fb99b92289876934a5f21b8bd7c0f047`.
+The Release Wasm SHA-256 is
+`d5e9639aa22ad0af62450690aa80ca7692c1e252953e54a315d76751520f2f67`.
+
+Both timing runs complete 686 source ticks with zero timing gaps, long tasks,
+audio underruns/overflows, live pipeline creation, visibility loss or resume.
+Worst native callbacks are 12.735/7.42 ms, intervals 26.11/19.615 ms, and match
+preparation 186.745/200.905 ms. Both upload 3,811,328 texture bytes during play
+and have no live heap growth. An earlier warm run grew the Wasm heap by
+86,441,984 bytes without a timing failure; that report remains retained.
+These are explicit resource measurements, not a zero-allocation guarantee. The named machine is Apple M4,
+32 GiB, macOS 26.6.2 (25G83), AC power with low-power mode off, built-in
+2560×1664 display, visible in-app Chromium 152.0.0.0, 640×480 framebuffer,
+DPR 2. Driver caches are uncontrolled. The next corpus work is a faster validated
+reference exporter and coverage-selected combat/stock-loss donors; this movement
+canary does not substitute for those trajectories.
+
+Final verification: all 372 automated tests pass, including actual JavaScript
+startup/pause handlers, malformed evidence and raw-input rejection controls;
+Debug native/browser and Release browser builds pass. The neutral 240-tick and
+donor 686-tick native comparisons remain exact after integration.

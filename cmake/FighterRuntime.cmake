@@ -17,6 +17,7 @@ foreach(path IN LISTS native_paths)
   list(APPEND fighter_paths "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/${relative}")
 endforeach()
 add_library(fighter_source_runtime STATIC EXCLUDE_FROM_ALL ${fighter_paths}
+  src/gameplay_retail_setup.c src/gameplay_retail_state.c
   src/gameplay_match_flow.c src/gameplay_hud.c src/gameplay_menu.c src/gameplay_menu_host.c src/gameplay_item_runtime.c src/gameplay_stage_items.c src/dat_item_commands.c src/gameplay_crowd.c src/gameplay_render.c src/gameplay_color_commands.c src/gameplay_match_rules.c src/gameplay_stage_visual.c src/gameplay_stage_map.c src/gameplay_stage_last.c src/gameplay_stage_profile.c src/gameplay_stage_story.c src/gameplay_effect_runtime.c
   src/gameplay_stage_dream_land.c src/gameplay_audio.c src/gameplay_audio_bank_transport.c src/gameplay_audio_residency.c src/gameplay_audio_stream.c src/gameplay_io.cpp src/gameplay_audio_resample.c src/gameplay_audio_itd.c src/gameplay_audio_fx.c src/gameplay_audio_reverb.c
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/axfx/axfx.c"
@@ -50,7 +51,9 @@ add_library(fighter_source_runtime STATIC EXCLUDE_FROM_ALL ${fighter_paths}
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/psappsrt.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/psdisptev.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/psdisp.c"
-  "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/MSL/float.c")
+  "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/MSL/float.c"
+  "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/MSL/trigf.c"
+  "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/MSL/math_data.c")
 target_include_directories(fighter_source_runtime PUBLIC src "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}"
   PRIVATE .deps/aurora/include .deps/melee/extern/dolphin/include)
 target_compile_definitions(fighter_source_runtime PUBLIC TARGET_PC PRIVATE MELEE_WEB_MENU_MARIO_FD)
@@ -63,9 +66,12 @@ set_source_files_properties(
   PROPERTIES COMPILE_OPTIONS "-include;string.h;-include;math.h")
 set_source_files_properties("${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/ax/AXCL.c" PROPERTIES COMPILE_OPTIONS "-include;string.h")
 target_compile_options(fighter_source_runtime PRIVATE -ffunction-sections -fdata-sections -ffp-contract=off
+  -fno-builtin-sinf -fno-builtin-cosf -fno-builtin-tanf
+  -fno-builtin-atanf -fno-builtin-atan2f
   -include "${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h")
 target_link_libraries(fighter_source_runtime PUBLIC hsd_native_runtime aurora::pad)
 add_library(fighter_asset_runtime STATIC EXCLUDE_FROM_ALL
+  src/gameplay_retail_recipe.cpp
   src/gameplay_replay_transport.cpp src/gameplay_replay_session.cpp
   src/runtime_archive_cache.cpp
   src/gameplay_audio_bank.cpp src/gameplay_audio_stream_asset.cpp src/dat_audio_stream.cpp src/dat_audio.cpp src/dat_audio_programs.cpp
@@ -194,7 +200,7 @@ target_link_options(gameplay_replay_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS
 set_target_properties(gameplay_replay_trace PROPERTIES SUFFIX ".js")
 
 add_executable(gameplay_retail_trace EXCLUDE_FROM_ALL
-  tests/gameplay_retail_trace.cpp tests/gameplay_retail_setup.c tests/gameplay_retail_state.c)
+  tests/gameplay_retail_trace.cpp)
 target_link_libraries(gameplay_retail_trace PRIVATE fighter_asset_runtime)
 target_compile_options(gameplay_retail_trace PRIVATE
   "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
@@ -348,7 +354,7 @@ target_link_options(gameplay_menu_browser PRIVATE --profiling-funcs -sENVIRONMEN
   --preload-file "${initial_pipeline_cache}@/initial_pipeline_cache.db"
   -sEXPORTED_RUNTIME_METHODS=FS,IDBFS,addRunDependency,removeRunDependency,HEAPU8,HEAP32,HEAPF32,UTF8ToString
   -lidbfs.js
-  -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_melee_web_native_menu_file,_melee_web_native_menu_prepare,_melee_web_native_menu_launch,_melee_web_native_menu_unload,_melee_web_native_menu_pause,_melee_web_native_menu_message,_melee_web_native_menu_running,_melee_web_native_menu_cache_idle,_melee_web_native_menu_phase,_melee_web_native_menu_confirm_check,_melee_web_native_menu_pad_sample,_melee_web_native_menu_pad_sample_full,_melee_web_native_menu_player_state,_melee_web_native_menu_drive_fighter,_melee_web_native_menu_drive_stage,_melee_web_native_menu_stock_check,_melee_web_native_menu_stock_check_ready,_melee_web_native_menu_diagnostics,_melee_web_css_observe,_melee_web_sss_observe,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_set_keyboard_port,_melee_web_input_message)
+  -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_melee_web_native_menu_file,_melee_web_native_menu_prepare,_melee_web_native_menu_launch,_melee_web_native_menu_replay,_melee_web_native_menu_replay_cursor,_melee_web_native_menu_unload,_melee_web_native_menu_pause,_melee_web_native_menu_message,_melee_web_native_menu_running,_melee_web_native_menu_cache_idle,_melee_web_native_menu_phase,_melee_web_native_menu_confirm_check,_melee_web_native_menu_pad_sample,_melee_web_native_menu_pad_sample_full,_melee_web_native_menu_player_state,_melee_web_native_menu_drive_fighter,_melee_web_native_menu_drive_stage,_melee_web_native_menu_stock_check,_melee_web_native_menu_stock_check_ready,_melee_web_native_menu_diagnostics,_melee_web_css_observe,_melee_web_sss_observe,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_set_keyboard_port,_melee_web_input_message)
 set_target_properties(gameplay_menu_browser PROPERTIES SUFFIX ".js")
 configure_file(web/native-menu.html native-menu.html @ONLY)
 

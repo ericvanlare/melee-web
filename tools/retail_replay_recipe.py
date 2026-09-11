@@ -154,7 +154,7 @@ def _write_json(path: Path, value: dict[str, Any]) -> None:
 
 def export_pair(first_path: str | Path, second_path: str | Path,
                 output_path: str | Path, sidecar_path: str | Path | None = None) -> dict[str, Any]:
-    """Validate two independent candidates and write an MWRC v1 recipe.
+    """Validate two independent candidates and write a versioned MWRC recipe.
 
     Capture A supplies the output setup/input bytes after A and B have matched
     exactly.  The pair's hashes and provenance are retained in the sidecar.
@@ -226,11 +226,11 @@ def main() -> int:
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Export two repeatable retail candidates to MWRC v1")
+        description="Export two repeatable retail candidates to versioned MWRC")
     parser.add_argument("capture_a", type=Path)
     parser.add_argument("capture_b", type=Path)
     parser.add_argument("--output", required=True, type=Path,
-                        help="MWRC v1 binary output path")
+                        help="MWRC binary output path")
     parser.add_argument("--sidecar", type=Path,
                         help="optional sidecar path (default: OUTPUT.json)")
     args = parser.parse_args()

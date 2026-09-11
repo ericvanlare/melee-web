@@ -5572,3 +5572,247 @@ diff --git a/src/sysdolphin/baselib/rumble.c b/src/sysdolphin/baselib/rumble.c
          case 0:
              if (a->frame == -2) {
                  return 1;
+diff --git a/src/MSL/trigf.c b/src/MSL/trigf.c
+--- a/src/MSL/trigf.c
++++ b/src/MSL/trigf.c
+@@ -1,15 +1,17 @@
+-#include "math.h"
++#include "gameplay_trig.h"
+ 
+ #define __epsilon 3.45266983e-4f
+ 
+-#define __HI(x) (((s32*) &x)[0])
++#define __HI(x) melee_web_trig_bits(x)
+ 
+ extern f32 __sincos_on_quadrant[];
+ extern f32 __sincos_poly[];
+ 
+ const f32 tmp_float[] = { 0.25f, 0.0232393741608f, 1.70555722434e-7f,
+                           1.86736494323e-11f };
+-f32 __four_over_pi_m1[] = { 0.0f, 0.0f, 0.0f, 0.0f };
++/* Original constructor values are immutable after retail startup. */
++f32 __four_over_pi_m1[] = { 0.25f, 0.0232393741608f, 1.70555722434e-7f,
++                           1.86736494323e-11f };
+ 
+ void __sinit_trigf_c(void)
+ {
+@@ -29,38 +31,38 @@
+     f32 z;
+ 
+     z = (2.0f / (f32) M_PI) * x;
+-    n = (__HI(x) & 0x80000000) ? (int) (z - 0.5f) : (int) (z + 0.5f);
++    n = melee_web_trig_integer((__HI(x) & 0x80000000) ? z - 0.5f : z + 0.5f);
+ 
+-    y = x - n * 2 + __four_over_pi_m1[0] * x + __four_over_pi_m1[1] * x +
+-        __four_over_pi_m1[2] * x + __four_over_pi_m1[3] * x;
++    /* GALE01r2: four fmadds following the separately rounded subtraction. */
++    y = x - melee_web_trig_twice(n);
++    y = fmaf(__four_over_pi_m1[0], x, y);
++    y = fmaf(__four_over_pi_m1[1], x, y);
++    y = fmaf(__four_over_pi_m1[2], x, y);
++    y = fmaf(__four_over_pi_m1[3], x, y);
+     n &= 3;
+ 
+-    if (fabsf__Ff(y) < __epsilon) {
++    if (fabsf(y) < __epsilon) {
+         n <<= 1;
+-        return __sincos_on_quadrant[n] +
+-               (__sincos_on_quadrant[n + 1] * y * __sincos_poly[9]);
++        return fmaf(__sincos_poly[9], __sincos_on_quadrant[n + 1] * y,
++                    __sincos_on_quadrant[n]);
+     }
+ 
+     ysq = y * y;
+     if (n & 1) {
+         n <<= 1;
+-        z = (((__sincos_poly[0] * ysq + __sincos_poly[2]) * ysq +
+-              __sincos_poly[4]) *
+-                 ysq +
+-             __sincos_poly[6]) *
+-                ysq +
+-            __sincos_poly[8];
++        z = fmaf(__sincos_poly[0], ysq, __sincos_poly[2]);
++        z = fmaf(ysq, z, __sincos_poly[4]);
++        z = fmaf(ysq, z, __sincos_poly[6]);
++        z = fmaf(ysq, z, __sincos_poly[8]);
+ 
+         return z * __sincos_on_quadrant[n];
+     } else {
+         n <<= 1;
+-        z = ((((__sincos_poly[1] * ysq + __sincos_poly[3]) * ysq +
+-               __sincos_poly[5]) *
+-                  ysq +
+-              __sincos_poly[7]) *
+-                 ysq +
+-             __sincos_poly[9]) *
+-            y;
++        z = fmaf(__sincos_poly[1], ysq, __sincos_poly[3]);
++        z = fmaf(ysq, z, __sincos_poly[5]);
++        z = fmaf(ysq, z, __sincos_poly[7]);
++        z = fmaf(ysq, z, __sincos_poly[9]);
++        z *= y;
+         return z * __sincos_on_quadrant[n + 1];
+     }
+ }
+@@ -73,35 +75,35 @@
+     f32 z;
+ 
+     z = (2.0f / (f32) M_PI) * x;
+-    n = (__HI(x) & 0x80000000) ? (int) (z - 0.5f) : (int) (z + 0.5f);
++    n = melee_web_trig_integer((__HI(x) & 0x80000000) ? z - 0.5f : z + 0.5f);
+ 
+-    y = x - n * 2 + __four_over_pi_m1[0] * x + __four_over_pi_m1[1] * x +
+-        __four_over_pi_m1[2] * x + __four_over_pi_m1[3] * x;
++    /* GALE01r2: four fmadds following the separately rounded subtraction. */
++    y = x - melee_web_trig_twice(n);
++    y = fmaf(__four_over_pi_m1[0], x, y);
++    y = fmaf(__four_over_pi_m1[1], x, y);
++    y = fmaf(__four_over_pi_m1[2], x, y);
++    y = fmaf(__four_over_pi_m1[3], x, y);
+     n &= 3;
+-    if (fabsf__Ff(y) < __epsilon) {
++    if (fabsf(y) < __epsilon) {
+         n <<= 1;
+-        return __sincos_on_quadrant[n + 1] - y * __sincos_on_quadrant[n];
++        return -fmaf(y, __sincos_on_quadrant[n], -__sincos_on_quadrant[n + 1]);
+     }
+ 
+     ysq = y * y;
+     if (n & 1) {
+         n <<= 1;
+-        z = -((((__sincos_poly[1] * ysq + __sincos_poly[3]) * ysq +
+-                __sincos_poly[5]) *
+-                   ysq +
+-               __sincos_poly[7]) *
+-                  ysq +
+-              __sincos_poly[9]) *
+-            y;
++        z = fmaf(__sincos_poly[1], ysq, __sincos_poly[3]);
++        z = fmaf(ysq, z, __sincos_poly[5]);
++        z = fmaf(ysq, z, __sincos_poly[7]);
++        z = -fmaf(ysq, z, __sincos_poly[9]);
++        z *= y;
+         return z * __sincos_on_quadrant[n];
+     } else {
+         n <<= 1;
+-        z = (((__sincos_poly[0] * ysq + __sincos_poly[2]) * ysq +
+-              __sincos_poly[4]) *
+-                 ysq +
+-             __sincos_poly[6]) *
+-                ysq +
+-            __sincos_poly[8];
++        z = fmaf(__sincos_poly[0], ysq, __sincos_poly[2]);
++        z = fmaf(ysq, z, __sincos_poly[4]);
++        z = fmaf(ysq, z, __sincos_poly[6]);
++        z = fmaf(ysq, z, __sincos_poly[8]);
+         return z * __sincos_on_quadrant[n + 1];
+     }
+ }
+diff --git a/src/melee/lb/lbtrigf.c b/src/melee/lb/lbtrigf.c
+--- a/src/melee/lb/lbtrigf.c
++++ b/src/melee/lb/lbtrigf.c
+@@ -1,4 +1,5 @@
+ #include "lbtrigf.h"
++#include "gameplay_trig.h"
+ 
+ #include <Runtime/platform.h>
+ 
+@@ -9,8 +10,8 @@
+ /* 400770 */ extern float MSL_TrigF_80400770[];
+ /* 400774 */ extern float MSL_TrigF_80400774[];
+ 
+-#define SIGN_BIT (1 << 31)
+-#define BITWISE(f) (*(u32*) &f)
++#define SIGN_BIT (1U << 31)
++#define BITWISE(f) melee_web_trig_bits(f)
+ #define SIGNED_BITWISE(f) ((s32) BITWISE(f))
+ #define GET_SIGN_BIT(f) (SIGNED_BITWISE(f) & SIGN_BIT)
+ #define BITWISE_PI_2 0x3FC90FDB
+@@ -37,7 +38,7 @@
+         return atanf(y / x);
+     }
+ 
+-    *(u32*) &y = GET_SIGN_BIT(y) + BITWISE_PI_2;
++    y = melee_web_trig_from_bits(GET_SIGN_BIT(y) + BITWISE_PI_2);
+ 
+     return y;
+ }
+@@ -144,7 +145,7 @@
+     0.0,
+ };
+ 
+-#ifdef __MWERKS__
++#if defined(__MWERKS__) || defined(MELEE_WEB_GAMEPLAY)
+ float atanf(float x)
+ {
+     float const silver_ratio = 2.4142136573791504f;
+@@ -156,7 +157,7 @@
+     bool x_ge_ratio = false;
+     s32 sign_bit_x = BITWISE(x) & SIGN_BIT;
+ 
+-    BITWISE(x) &= ~SIGN_BIT;
++    x = melee_web_trig_from_bits(BITWISE(x) & ~SIGN_BIT);
+ 
+     if (x >= silver_ratio) {
+         x_ge_ratio = true;
+@@ -200,8 +201,8 @@
+             offset_33 = lookup_ptr[33];
+ 
+             result = 1.0f / (offset_33 + (x + offset_39));
+-            result = __fnmsubs(result, lookup_ptr[7], offset_33) +
+-                     __fnmsubs(result, lookup_ptr[13], offset_39);
++            result = -fmaf(result, lookup_ptr[7], -offset_33) +
++                     -fmaf(result, lookup_ptr[13], -offset_39);
+         }
+     } else {
+         result = x;
+@@ -209,27 +210,19 @@
+ 
+     {
+         float result_squared = result * result;
+-        lookup_ptr = &atanf_lookup[lookup_index];
+-
+-        // clang-format off
+-        result = result *
+-            result_squared * (
+-                result_squared * (
+-                    result_squared * (
+-                        result_squared * (
+-                            result_squared * (
+-                                result_squared * (
+-                                    atanf_lookup[6]
+-                                ) + atanf_lookup[5]
+-                            ) + atanf_lookup[4]
+-                        ) + atanf_lookup[3]
+-                    ) + atanf_lookup[2]
+-                ) + atanf_lookup[1]
+-            ) + result;
+-        // clang-format on
+-
+-        result += lookup_ptr[27];
+-        result += lookup_ptr[20];
++        /* Index -1 is the no-reduction case. Index the actual table members
++         * below without forming a pointer before its first element. */
++
++        /* GALE01r2 0x80022FC8..0x80022FEC: retain each fmadds boundary. */
++        float poly = fmaf(result_squared, atanf_lookup[6], atanf_lookup[5]);
++        poly = fmaf(result_squared, poly, atanf_lookup[4]);
++        poly = fmaf(result_squared, poly, atanf_lookup[3]);
++        poly = fmaf(result_squared, poly, atanf_lookup[2]);
++        poly = fmaf(result_squared, poly, atanf_lookup[1]);
++        result = fmaf(result * result_squared, poly, result);
++
++        result += atanf_lookup[lookup_index + 27];
++        result += atanf_lookup[lookup_index + 20];
+     }
+ 
+     if (x_ge_ratio) {
+@@ -237,7 +230,7 @@
+         return sign_bit_x ? result : -result;
+     }
+ 
+-    BITWISE(result) |= sign_bit_x;
++    result = melee_web_trig_from_bits(BITWISE(result) | sign_bit_x);
+     return result;
+ }
+ #endif

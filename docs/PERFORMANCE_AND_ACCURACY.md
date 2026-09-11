@@ -49,6 +49,11 @@ semantics, animation commands, scene callbacks and audio requests.
   sample. Do not invent historical samples after a host stall.
 - Preserve float bits unless a field-specific difference has independent retail
   evidence and a documented reason. Do not enable fast-math or relaxed precision.
+- Verify math-library boundaries as well as gameplay formulas. Host libm can
+  differ from the original MSL approximation. The first repeated Slippi-derived
+  vanilla trajectory caught both sine and arctangent differences during air
+  dodges. Reuse the recovered routines, preserve their explicit fused-operation
+  rounding, and keep a failing host-libm control alongside retail scalar evidence.
 - Preserve source teardown and reconstruction. Mutable fighters, stages and menu
   scenes are not reusable caches.
 - Preserve menu and audio ownership. CSS to SSS retains the original menu audio
@@ -215,10 +220,9 @@ and warm browser matrix.
 
 The foundation must expand with the port:
 
-- extend the passing neutral retail calibration to complete initialization and
-  drawing contracts, then connect normalized Slippi input to a vanilla reference,
-  visible browser playback and measured coverage as described in
-  `SLIPPI_REPLAY_VALIDATION.md`;
+- expand the first passing Slippi-input → independent vanilla reference →
+  visible state/performance canary into execution coverage and held-out inputs,
+  as described in `SLIPPI_REPLAY_VALIDATION.md`;
 - cover every fighter action/effect/article, costume/opponent combination and
   stage-specific renderer state, then keep the reviewed pipeline seed synchronized;
 - move remaining first-use immutable decode/upload work into measured scene
@@ -293,3 +297,24 @@ cold-cache, full-match, hardware-input or Slippi replay acceptance. Both the
 incomplete run and passing rerun are recorded under the local calibration
 evidence directory. Source unload, render-cache persistence and owned browser /
 server / reference-process cleanup completed afterward.
+
+## First visible replay canary
+
+The first Fox/Falco Battlefield input donor now passes the full implemented
+reference-to-browser path: two independent vanilla captures, exact declared
+state/PAD comparison in both native and visibly drawn playback, then separate
+Release performance runs with an origin reset and a full warm application
+reload. `scripts/check_browser_replay.py` rechecks the raw reference/port files,
+requires the exact paired input recipe, binds the state report to the trace,
+validates every timing counter and records the build/configuration evidence.
+It rejects an instrumented run, missing counters, nonfinite timings, a different
+recipe, incomplete playback or a falsely labelled cache profile. An operator
+still attests to the visible machine profile and console inspection; the report
+does not pretend to be cryptographic browser/build attestation.
+
+The receipt remains scoped to 686 ticks and the compared fields. This donor has
+six air dodges but no combat or stock loss; it cannot admit Fox, Falco or
+Battlefield as complete content. The initial discovery pass was not a timing
+pass. Its 45 new descriptors were reviewed and added before repeating both
+performance runs. Keep memory growth and uploads in the report even when they
+do not cause a hitch. See [the exact evidence and procedure](RETAIL_REPLAY_CAPTURE.md#visible-browser-replay).

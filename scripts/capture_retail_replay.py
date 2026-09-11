@@ -18,6 +18,7 @@ by ``retail_replay_validation`` before success is reported.
 from __future__ import annotations
 
 import argparse
+import configparser
 import hashlib
 import json
 import math
@@ -41,6 +42,7 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from retail_replay_validation import EXPECTED_PROVENANCE, MAX_FRAMES, load_capture
 from retail_draw_audit import load_draw_audit
+from retail_input_plan import load_plan, verify_capture
 from extract_disc_file import DiscImage, DiscFormatError
 
 
@@ -267,6 +269,28 @@ def _require_pipe_config(config: Path) -> None:
                 f"copied GCPadNew.ini does not configure Pipe/0/pad{port}")
 
 
+def require_raw_pipe_config(path: Path) -> None:
+    config = configparser.ConfigParser(interpolation=None)
+    config.optionxform = str
+    try:
+        config.read_string(path.read_text())
+        for port in (1, 2):
+            section = config[f'GCPad{port}']
+            if section.get('Device') != f'Pipe/0/pad{port}':
+                raise ValueError('unexpected controller device')
+            for stick in ('Main Stick', 'C-Stick'):
+                for key in ('Calibration', 'Center', 'Modifier'):
+                    if section.get(stick + '/' + key, '').strip():
+                        raise ValueError('stick calibration/center/modifier must be empty')
+                for key in ('Dead Zone', 'Virtual Notches'):
+                    if float(section.get(stick + '/' + key, '0')) != 0:
+                        raise ValueError('stick dead zone/notches must be zero')
+            if float(section.get('Triggers/Dead Zone', '0')) != 0 or not 0 < float(section.get('Triggers/Threshold', '90')) <= 100:
+                raise ValueError('unsupported trigger processing configuration')
+    except (OSError, ValueError, KeyError, configparser.Error) as error:
+        raise CaptureRunnerError(f'raw pipe input configuration: {error}') from error
+
+
 def _make_fifo(path: Path) -> None:
     try:
         os.mkfifo(path, 0o600)
@@ -309,9 +333,12 @@ def prepare_run(template_user: str | Path, checkpoint_gc: str | Path,
     collector_boundary = _regular_file(
         collector.with_name("reference_replay_boundary.py"),
         "retail collector boundary helper")
+    collector_input = _regular_file(collector.with_name('retail_input_plan.py'),
+                                    'retail input plan helper')
     try:
         collector_sha256 = _sha256_bytes(
-            collector.read_bytes(), b"\0", collector_boundary.read_bytes())
+            collector.read_bytes(), b"\0", collector_boundary.read_bytes(),
+            b"\0", collector_input.read_bytes())
     except OSError as error:
         raise CaptureRunnerError(
             f"cannot hash retail collector sources: {error}") from error
@@ -320,6 +347,7 @@ def prepare_run(template_user: str | Path, checkpoint_gc: str | Path,
         pinned_collector.mkdir()
         shutil.copy2(collector, pinned_collector / "reference_replay_capture.py")
         shutil.copy2(collector_boundary, pinned_collector / "reference_replay_boundary.py")
+        shutil.copy2(collector_input, pinned_collector / 'retail_input_plan.py')
         collector = pinned_collector / "reference_replay_capture.py"
         collector_boundary = pinned_collector / "reference_replay_boundary.py"
         _copy_tree(template, user, skip={"Pipes"})
@@ -536,7 +564,8 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
                    template_user: str | Path, snapshot: str | Path,
                    checkpoint_gc: str | Path, provenance: str | Path,
                    output: str | Path, frames: int = DEFAULT_FRAMES,
-                   timeout: float = DEFAULT_TIMEOUT, draw_audit: bool = False) -> dict:
+                   timeout: float = DEFAULT_TIMEOUT, draw_audit: bool = False,
+                   input_plan: str | Path | None = None) -> dict:
     """Run the bounded capture and return preserved run metadata."""
 
     if isinstance(frames, bool) or not isinstance(frames, int) or not 1 <= frames <= MAX_FRAMES:
@@ -546,6 +575,14 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
         raise CaptureRunnerError("timeout must be positive")
     if not isinstance(draw_audit, bool):
         raise CaptureRunnerError("draw_audit must be boolean")
+    plan = None
+    if input_plan is not None:
+        try:
+            plan, plan_hash = load_plan(input_plan)
+            if frames != len(plan['frames']):
+                raise ValueError('Capture must consume the entire declared input plan')
+        except (OSError, ValueError) as error:
+            raise CaptureRunnerError(str(error)) from error
     disc_path = _regular_file(Path(disc), "disc image")
     snapshot_path = _regular_file(Path(snapshot), "snapshot")
     started = time.monotonic()
@@ -568,6 +605,12 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
     if actual_gc != paths["provenance"].get("external_save_hashes"):
         raise CaptureRunnerError("owned external GC state does not match pinned provenance")
     helper = run_root / "gdb-control.py"
+    if plan is not None:
+        require_raw_pipe_config(paths['pad_config'])
+        plan_copy = paths['evidence'] / 'input-plan.json'
+        shutil.copy2(input_plan, plan_copy)
+        if _sha256(plan_copy) != plan_hash:
+            raise CaptureRunnerError('Input plan changed during preparation')
     gdb_commands = run_root / "gdb-commands.txt"
     write_control_helper(helper, paths["user"] / "Pipes", paths["output"])
     write_gdb_script(gdb_commands, paths["socket"], helper, paths["collector"],
@@ -644,6 +687,12 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
         },
     }
     _write_json(metadata_path, metadata)
+    if plan is not None:
+        metadata['input_plan'] = {'path': str(plan_copy), 'sha256': plan_hash,
+            'source_sha256': plan['source_sha256'], 'policy': plan['policy'],
+            'source_first_frame': plan['first_frame'], 'frames': len(plan['frames']),
+            'consumption': 'not_yet_verified'}
+        _write_json(metadata_path, metadata)
     dolphin_process: subprocess.Popen | None = None
     gdb_process: subprocess.Popen | None = None
     dolphin_log = None
@@ -653,6 +702,9 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
         environment["MELEE_REPLAY_REFERENCE_WORK"] = str(paths["evidence"])
         environment["MELEE_REPLAY_COLLECTOR"] = str(paths["collector"])
         environment["MELEE_REPLAY_DRAW_AUDIT"] = "1" if draw_audit else "0"
+        environment.pop('MELEE_REPLAY_INPUT_PLAN', None)
+        if plan is not None:
+            environment['MELEE_REPLAY_INPUT_PLAN'] = str(plan_copy)
         dolphin_log = (run_root / "dolphin.log").open("w", encoding="utf-8")
         dolphin_process = subprocess.Popen(
             command, stdout=dolphin_log, stderr=subprocess.STDOUT, env=environment,
@@ -680,8 +732,15 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
                 f"collector did not produce requested output: {paths['output']}")
         try:
             loaded = load_capture(paths["output"])
+            if loaded.header['collector_sha256'] != paths['collector_sha256']:
+                raise ValueError('Captured collector hash differs from owned source files')
             if len(loaded.frames) != frames:
                 raise ValueError("captured frame count differs from requested bound")
+            if plan is not None:
+                if loaded.header['provenance'].get('input_plan_sha256') != plan_hash:
+                    raise ValueError('Captured input plan hash differs from owned plan')
+                verify_capture(plan, loaded)
+                metadata['input_plan']['consumption'] = 'verified_all_ticks'
             if draw_audit:
                 audit_path = paths["evidence"] / "draw-audit.jsonl"
                 metadata["draw_audit"] = load_draw_audit(loaded, audit_path)
@@ -726,6 +785,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--provenance", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--frames", type=int, default=DEFAULT_FRAMES)
+    parser.add_argument('--input-plan', type=Path, help='Complete input-only donor plan; requires the raw pipe configuration')
     parser.add_argument("--draw-audit", action="store_true", help="Observe one source camera traversal after each captured tick")
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT)
     args = parser.parse_args(argv)
@@ -734,7 +794,8 @@ def main(argv: list[str] | None = None) -> int:
             dolphin=args.dolphin, disc=args.disc, dol=args.dol,
             template_user=args.template_user, snapshot=args.snapshot,
             checkpoint_gc=args.checkpoint_gc, provenance=args.provenance,
-            output=args.output, frames=args.frames, timeout=args.timeout, draw_audit=args.draw_audit)
+            output=args.output, frames=args.frames, timeout=args.timeout,
+            draw_audit=args.draw_audit, input_plan=args.input_plan)
     except CaptureRunnerError as error:
         parser.exit(2, f"retail capture failed: {error}\n")
     print(json.dumps({

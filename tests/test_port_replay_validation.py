@@ -32,6 +32,18 @@ class PortReplayTests(unittest.TestCase):
         self.assertFalse(result['gold_admitted'])
         self.assertEqual(result['performance'],'not_evaluated')
 
+    def test_rendered_state_evidence_does_not_claim_pixel_or_performance_agreement(self):
+        ref, port = fixture()
+        port[0]['rendering'] = 'source_draws'
+        result = compare_rows(ref, port)
+        self.assertEqual(result['status'], 'declared_state_match')
+        self.assertEqual(result['source_drawing'], 'source_draws')
+        self.assertIn('pixel agreement', result['scope'])
+        self.assertFalse(result['gold_admitted'])
+        self.assertEqual(result['performance'], 'not_evaluated')
+        port[0]['rendering'] = 'unknown'
+        with self.assertRaises(CaptureError): validate_port(port)
+
     def test_first_rng_difference_is_not_hidden_by_matching_fighters(self):
         ref,port=fixture();port[3]['rng']+=1
         result=compare_rows(ref,port)

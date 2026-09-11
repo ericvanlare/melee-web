@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Export two repeatable retail replay candidates as an MWRC v1 recipe."""
+"""Export two repeatable retail replay candidates as a versioned MWRC recipe."""
 
 from pathlib import Path
 import sys

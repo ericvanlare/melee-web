@@ -166,6 +166,18 @@ GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,
         storage_->start(files,selection,&archive_cache);
 }
 GameplayMatchSession::~GameplayMatchSession()=default;
+GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,
+                                           const MeleeWebMenuMatchSelection& selection,
+                                           RuntimeArchiveCache& archive_cache,
+                                           GameplayMatchConstruction construction,
+                                           const MeleeWebPadState& initial_input)
+    :storage_(std::make_unique<Storage>()){
+    storage_->initial_input=&initial_input;
+    if(construction==GameplayMatchConstruction::Deferred)
+        storage_->begin(files,selection,&archive_cache);
+    else
+        storage_->start(files,selection,&archive_cache);
+}
 void GameplayMatchSession::close(){if(storage_){storage_->close();storage_.reset();}}
 void GameplayMatchSession::tick(const PADStatus raw[4]){
     check(storage_&&storage_->match,"Match session is closed");char error[256]{};

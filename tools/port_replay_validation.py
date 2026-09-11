@@ -37,10 +37,12 @@ def validate_port(rows):
     version=_int(head["version"], "port.version", minimum=1, maximum=2)
     state_keys=STATE|({"pad_state_hex"} if version == 2 else set())
     fixed={'record':'header', 'schema':'melee-web-port-replay-candidate',
-           'phase':'after_source_tick_before_audio_transport', 'rendering':'excluded', 'comparison':'not_run'}
+           'phase':'after_source_tick_before_audio_transport', 'comparison':'not_run'}
     for key, value in fixed.items():
         if type(head[key]) is not type(value) or head[key] != value:
             raise CaptureError('port.header: unsupported '+key)
+    if head['rendering'] not in ('excluded', 'source_draws'):
+        raise CaptureError('port.header: unsupported rendering mode')
     count=_int(head['frames_requested'], 'port.frames_requested', minimum=1, maximum=MAX_FRAMES)
     if len(rows)!=count+4:
         raise CaptureError('port: incomplete or extra records; completion requires teardown')
@@ -75,11 +77,14 @@ def compare_rows(reference, rows):
     version=rows[0]["version"]
     groups=("rng","match_frame","fighters")+(("pad_state_hex",) if version == 2 else ())
     report={'status':'declared_state_match', 'gold_admitted':False, 'performance':'not_evaluated',
+            'source_drawing':rows[0]['rendering'],
             'scope':'declared entry data, supplied inputs, fighter fields, RNG and match clock'+
                     (', PAD configuration and all three history banks' if version == 2 else '')+' only; '+
                     ('rendering, hardware and audio output are excluded' if version == 2 else
-                     'rendering, global PAD history, hardware and audio output are excluded'),
+                    'rendering, global PAD history, hardware and audio output are excluded'),
             'frames_compared':0, 'first_divergence':None, 'checks':{}}
+    if rows[0]['rendering'] == 'source_draws':
+        report['scope'] = report['scope'].replace('rendering, ', 'pixel agreement, ')
     first={}
     def check(group, expected, actual, record, frame=None):
         if group == 'pad_state_hex':

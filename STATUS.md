@@ -37,9 +37,23 @@ After these fixes, the visible Release Marth/Dream Land warm action inventory
 completed all 46 cases and 6,168 source frames with zero hard-gate failures
 (worst native callback 12.19 ms); an earlier incomplete sweep exposed a test
 driver recovery gap at the original platform-edge teeter state, now corrected.
-This is still **zero admitted gold Slippi fixtures**: the active reference/port
-draw lifecycle, the real Fox/Falco input-derived
-reference and visible Release cold/warm replay validation remain open.
+The modern Fox/Falco Battlefield donor now also has two independently repeatable
+vanilla captures: all 686 source ticks consume the intended PAD vectors, and
+both 686-draw audits leave the declared state unchanged. The port matches every
+declared field after restoring the original MSL sine/cosine and arctangent
+routines with their explicit fused-operation rounding. Two retained numerical
+reds at air-dodge entry led to these shared fixes; no tolerance or per-frame
+state correction was added. This is still **zero admitted gold Slippi fixtures**:
+broad corpus/coverage and content admission remain open. The first donor now
+also passes visible source-draw state comparison and Release cleared-origin/warm
+performance checks, with zero hitches, audio underruns or live pipeline creation
+over all 686 ticks. Worst native callbacks were 12.735/7.42 ms and match preparation
+186.745/200.905 ms on an Apple M4, macOS 26.6.2, visible Chromium 152, 640×480
+framebuffer. Driver caches were not controlled. The final pair had no live heap growth. An earlier warm run grew the Wasm heap
+by 86,441,984 bytes without a timing failure; this remains measured memory work,
+not a zero-allocation claim. The reviewed seed now includes 389 pipelines.
+`check_browser_replay.py` independently joins recipe, state, timing and build
+evidence while refusing a broader admission claim.
 
 The public tournament corpus audit found 6,813 supported cross-character/stage
 games but zero UCF-off files in a 952-file sample. These are useful workload/input

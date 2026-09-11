@@ -193,9 +193,14 @@ an expected-state comparison. The independent retail/port calibration passes
 and rumble gaps. See [the reproducible capture procedure](RETAIL_REPLAY_CAPTURE.md)
 for exact provenance, field/phase limits and retained negative evidence.
 No Slippi fixture is gold-admitted yet. The typed initial PAD contract and its
-240-tick comparison pass. The neutral retail draw audit also passes for declared
-fields; active source draw-phase coverage remains open. Next run the modern
-input donor against the reference and in the visible browser.
+240-tick comparison pass. The modern donor now supplies a repeatable vanilla
+686-tick reference, exact consumed inputs, two passing retail draw audits and
+a passing complete port state comparison. Its six air dodges exposed host-libm
+differences; the original MSL trigonometric routines now supply their shared
+numeric boundary. The same 686 inputs now pass visible browser state comparison
+and cleared-origin/warm Release timing gates. The shared MWRC v2 decoder and
+observer are used by both native and browser playback; expected state never
+enters the runtime. See the [browser procedure and evidence](RETAIL_REPLAY_CAPTURE.md#visible-browser-replay).
 
 ## Immediate implementation order
 
@@ -205,15 +210,18 @@ controls and the retained pre-fix RNG divergence as calibration evidence.
 
 1. Retain the passing typed master/copy/game PAD history/configuration and
    neutral source draw-audit controls. Extend the draw lifecycle evidence to
-   active replay before claiming general input equivalence.
-2. Feed the existing modern Fox/Falco Battlefield recording through the same
-   reference process without arbitrary opponent replacement. Capture a new
-   vanilla trajectory and compare it; the original UCF state stays excluded.
-   Require independent repeatability, actual consumed-input agreement and a
-   complete port comparison before admitting the fixture.
-3. Run that workload visibly in Release, cold and warm, with normal source audio,
-   rendering, hard hitch gates and complete teardown. Headless runtime timings
-   are never browser acceptance evidence.
+   further active replays before claiming general input equivalence. The first
+   686-tick donor passes both retail draw audits and visible port comparison.
+2. Retain the passing Fox/Falco Battlefield donor, its independent vanilla
+   repeatability, exact actual-input checks and full 686-tick port comparison.
+   Preserve the numerical reds and host-libm negative control. Apply the same
+   gates to future donors without replacing their opponents or importing UCF
+   expected state.
+3. Retain the passing visible Release state capture and cleared-origin/warm
+   performance runs for that donor. Reuse `check_browser_replay.py` to join the
+   reports and reject missing gates or mismatched recipes. Broader workloads
+   still need normal audio/rendering and complete teardown; headless timings
+   never establish browser acceptance.
 4. Validate a faster offline reference exporter against the small GDB oracle;
    reuse immutable expected traces during routine content iteration.
 5. Add execution coverage, select canaries and a held-out set, then broaden

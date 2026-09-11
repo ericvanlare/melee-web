@@ -21,6 +21,10 @@ ROOT = Path(os.environ.get("MELEE_REPLAY_REFERENCE_WORK",
 COLLECTOR = Path(os.environ.get("MELEE_REPLAY_COLLECTOR", "tools/reference_replay_capture.py")).resolve()
 sys.path.insert(0, str(COLLECTOR.parent))
 from reference_replay_boundary import BoundaryObservations
+from retail_input_plan import load_plan, pipe_commands, verify_entry, verify_tick
+
+INPUT_PLAN_PATH = os.environ.get("MELEE_REPLAY_INPUT_PLAN")
+input_plan, input_plan_sha256 = load_plan(INPUT_PLAN_PATH) if INPUT_PLAN_PATH else (None, None)
 
 observations = BoundaryObservations()
 OUTPUT = ROOT / "capture.jsonl"
@@ -53,6 +57,19 @@ def rng():
 def emit(row):
     with OUTPUT.open("a") as stream:
         stream.write(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n")
+
+
+def supply_input(index):
+    if input_plan is None: return
+    for port, pad in enumerate(input_plan['frames'][index]):
+        path = ROOT.parent / 'user' / 'Pipes' / ('pad%d' % (port + 1))
+        fd = os.open(path, os.O_WRONLY | os.O_NONBLOCK)
+        try:
+            command = pipe_commands(pad)
+            if os.write(fd, command) != len(command):
+                raise RuntimeError('Incomplete owned controller pipe write')
+        finally:
+            os.close(fd)
 
 
 def machine_context():
@@ -161,10 +178,13 @@ def scheduler_return():
         raise RuntimeError("Source scene counter is not contiguous from match entry")
     if len(pending_inputs) != 1:
         raise RuntimeError("Source tick did not consume exactly one PAD vector")
+    if input_plan is not None:
+        verify_tick(input_plan, frame_index, pending_inputs[0])
     emit({"record": "frame", "index": frame_index,
           "consumed_inputs": list(pending_inputs), **sample})
     pending_inputs.clear()
     frame_index += 1
+    if frame_index < LIMIT: supply_input(frame_index)
     if frame_index == LIMIT and not DRAW_AUDIT:
         return finish()
     return False
@@ -222,6 +242,7 @@ def entered():
     pending_inputs.clear()
     emit({"record": "match_enter_complete", **sample})
     ready = True
+    supply_input(0)
 
 
 def enter():
@@ -237,6 +258,8 @@ def enter():
     if active:
         raise RuntimeError("A second match entered before reference capture finished")
     active = True
+    if input_plan is not None:
+        verify_entry(input_plan, sample['start_melee_hex'])
     emit(sample)
 
 
@@ -256,8 +279,12 @@ class Arm(gdb.Command):
         LIMIT = int(values[1])
         if not 1 <= LIMIT <= 36000 or OUTPUT.exists():
             raise gdb.GdbError("Require a fresh output path and 1..36000 frames")
+        if input_plan is not None and LIMIT != len(input_plan['frames']):
+            raise gdb.GdbError('Capture must consume the entire declared input plan')
         OUTPUT.parent.mkdir(parents=True, exist_ok=True)
         provenance = json.loads((ROOT / "provenance.json").read_text())
+        if input_plan is not None:
+            provenance['input_plan_sha256'] = input_plan_sha256
         if (provenance.get("dol_sha1") != "08e0bf20134dfcb260699671004527b2d6bb1a45"
                 or provenance.get("dolphin_commit") != "c77bbaa0f372c3f72281602a8b087206706542cb"
                 or provenance.get("cpu") != "Interpreter64"
@@ -275,7 +302,9 @@ class Arm(gdb.Command):
               "initial_phase": "gm_Scene_Vs_OnEnter_entry",
               "game_revision": "GALE01r2", "frames_requested": LIMIT,
               "provenance": provenance,
-              "collector_sha256": hashlib.sha256(COLLECTOR.read_bytes() + b"\0" + COLLECTOR.with_name("reference_replay_boundary.py").read_bytes()).hexdigest(),
+              "collector_sha256": hashlib.sha256(COLLECTOR.read_bytes() + b"\0" +
+                  COLLECTOR.with_name("reference_replay_boundary.py").read_bytes() + b"\0" +
+                  COLLECTOR.with_name("retail_input_plan.py").read_bytes()).hexdigest(),
               "writes_game_state": False})
         Observer(0x800693A8, created)
         # Install all observers before execution. Mutating GDB breakpoints

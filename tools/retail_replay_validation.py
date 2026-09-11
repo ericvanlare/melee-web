@@ -220,7 +220,7 @@ def _validate_provenance(value: Any, context: str) -> dict[str, Any]:
             raise CaptureError(f"{context}: pinned provenance mismatch for {key}")
     # Hashes are optional extensions to the version-one provenance object, but
     # if present they must be complete hashes rather than unchecked paths.
-    for key in ("dolphin_binary_sha256", "Dolphin.ini_sha256", "GCPadNew.ini_sha256"):
+    for key in ("dolphin_binary_sha256", "Dolphin.ini_sha256", "GCPadNew.ini_sha256", "input_plan_sha256"):
         if key in value and (not isinstance(value[key], str)
                              or re.fullmatch(r"[0-9a-fA-F]{64}", value[key]) is None):
             raise CaptureError(f"{context}: invalid {key}")
@@ -588,11 +588,13 @@ def _compare_validated(first_capture: _Capture, second_capture: _Capture) -> dic
         "version": first_capture.header["version"],
         "frames_requested": first_capture.header["frames_requested"],
         "collector_sha256": first_capture.header["collector_sha256"],
+        "input_plan_sha256": first_capture.header['provenance'].get('input_plan_sha256'),
     }
     header_right = {
         "version": second_capture.header["version"],
         "frames_requested": second_capture.header["frames_requested"],
         "collector_sha256": second_capture.header["collector_sha256"],
+        "input_plan_sha256": second_capture.header['provenance'].get('input_plan_sha256'),
     }
     checks = {
         "schema": "pass", "version": "pass", "phase": "pass",

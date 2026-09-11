@@ -3,6 +3,8 @@
 import argparse
 import http.client
 import importlib.util
+import hashlib
+import json
 from pathlib import Path
 import subprocess
 import sys
@@ -38,10 +40,10 @@ class ServerTests(unittest.TestCase):
         self.thread.join(timeout=5)
         self.assertFalse(self.thread.is_alive(), "HTTP server did not stop")
 
-    def request(self, path, method="GET"):
+    def request(self, path, method="GET", body=None, headers=None):
         connection = http.client.HTTPConnection(*self.server.server_address, timeout=5)
         try:
-            connection.request(method, path)
+            connection.request(method, path, body=body, headers=headers or {})
             response = connection.getresponse()
             return response.status, dict(response.getheaders()), response.read()
         finally:
@@ -111,8 +113,40 @@ class ServerTests(unittest.TestCase):
                 self.assertEqual(status, 400)
                 self.assert_isolated(headers)
 
+    def test_evidence_is_opt_in_and_same_origin_bounded(self):
+        path = "/__melee_evidence/retail-browser-report.json"
+        data = b'{"complete":true}'
+        origin = f"http://127.0.0.1:{self.server.server_port}"
+        headers = {"Origin": origin, "Content-Type": "application/octet-stream"}
+        self.assertEqual(self.request(path, "POST", data, headers)[0], 404)
+        output = Path(self.temp.name) / "evidence"
+        output.mkdir()
+        self.server.evidence_directory = output
+        for changes, expected in (({"Origin": "https://example.com"}, 403),
+                                  ({"Host": "example.com"}, 403),
+                                  ({"Content-Type": "text/plain"}, 415),
+                                  ({"Content-Length": "65537"}, 413)):
+            with self.subTest(changes=changes):
+                self.assertEqual(self.request(path, "POST", data, {**headers, **changes})[0], expected)
+        self.assertEqual(self.request("/__melee_evidence/../private.txt", "POST", data, headers)[0], 404)
+        self.assertEqual(list(output.iterdir()), [])
+        for _ in range(2):
+            status, response_headers, body = self.request(path, "POST", data, headers)
+            self.assertEqual(status, 201)
+            self.assert_isolated(response_headers)
+            result = json.loads(body)
+            self.assertEqual(result["sha256"], hashlib.sha256(data).hexdigest())
+            self.assertEqual(Path(result["path"]).read_bytes(), data)
+        self.assertEqual(len(list(output.iterdir())), 1)
+        self.assertEqual(self.request("/" + Path(result["path"]).name)[0], 404)
+
 
 class ConfigurationTests(unittest.TestCase):
+    def test_evidence_directory_cannot_be_served(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            with self.assertRaisesRegex(ValueError, "outside"):
+                serve.create_server(temporary, port=0, evidence_directory=Path(temporary) / "evidence")
+
     def test_requires_existing_directory(self):
         with tempfile.TemporaryDirectory() as temporary:
             with self.assertRaises(FileNotFoundError):
