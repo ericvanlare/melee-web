@@ -36,6 +36,7 @@ fighters = {}
 pending_inputs = []
 breakpoints = []
 DRAW_AUDIT = os.environ.get("MELEE_REPLAY_DRAW_AUDIT") == "1"
+UNTIL_MATCH_END = os.environ.get("MELEE_REPLAY_UNTIL_MATCH_END") == "1"
 draw_before = None
 draw_count = 0
 draw_source_index = None
@@ -44,6 +45,32 @@ published_inputs = 0
 pad_bootstrapped = False
 pad_sample_index = None
 exit_observation = None
+
+
+def discovery_end_ready():
+    """Return true only after the source exit and final camera draw agree.
+
+    ``exit_requested`` records the scheduler frame count at the callback.  The
+    callback can run immediately before the final scheduler return (count is
+    the final source index) or after the final draw (count is one past it), so
+    the raw count is retained and both orderings are accepted only when the
+    final draw supplies the same source index.
+    """
+    if not UNTIL_MATCH_END or exit_observation is None or last_drawn_source_index < 0:
+        return False
+    if last_drawn_source_index != frame_index - 1:
+        return False
+    if exit_observation.get("frame_index") not in (
+            last_drawn_source_index, last_drawn_source_index + 1):
+        return False
+    # The callback can be observed before the final scheduler return.  Its
+    # raw callback count then points at the next source tick, but the source
+    # scene counter still identifies the eventual final tick.  Do not infer
+    # completion from counts alone: the exact source counter must agree with
+    # the final draw that was observed later.
+    if exit_observation.get("source_scene_frame") != last_drawn_source_index:
+        return False
+    return word(0x80479D64) == 1
 
 
 def memory(address, size):
@@ -271,7 +298,7 @@ def scheduler_return():
           "consumed_inputs": list(pending_inputs), **sample})
     pending_inputs.clear()
     frame_index += 1
-    if frame_index == LIMIT and not DRAW_AUDIT:
+    if frame_index == LIMIT and not DRAW_AUDIT and not UNTIL_MATCH_END:
         return finish()
     return False
 
@@ -301,18 +328,56 @@ def finish():
     return True
 
 
+def finish_discovery(stop_reason):
+    """Finish a source-length discovery without producing a candidate.
+
+    The discovery JSONL has its own schema and is never accepted by the fixed
+    replay validator.  A cap hit remains an explicit incomplete observation;
+    it is retained for diagnostics but the runner rejects it as success.
+    """
+    global active
+    if stop_reason == "match_end":
+        if not discovery_end_ready():
+            raise RuntimeError("Match-end discovery lacks the original exit/final-draw boundary")
+        status = "complete"
+    elif stop_reason == "frame_cap":
+        if frame_index != LIMIT or last_drawn_source_index != LIMIT - 1:
+            raise RuntimeError("Frame-cap discovery lacks the final source draw")
+        status = "cap_exhausted"
+    else:
+        raise RuntimeError("Unknown match discovery stop reason")
+    emit({"record": "end", "frames": frame_index,
+          "stop_reason": stop_reason, "status": status,
+          "scene_request": word(0x80479D64),
+          "match_end_state": memory(0x8046B6A0, 1)[0],
+          "match_result": memory(0x8046B6A8, 1)[0],
+          "final_draw_source_index": last_drawn_source_index,
+          "exit_observation": exit_observation})
+    active = False
+    print("Retail match-length discovery finished:", stop_reason, OUTPUT)
+    return True
+
+
 def exit_requested():
     global exit_observation
     if not active or not ready:
         return False
-    sample = {"phase": "gm_801A4B60_return", "index": frame_index,
-              "caller": int(gdb.parse_and_eval("$lr")),
-              "scene_request": word(0x80479D64)}
+    if UNTIL_MATCH_END:
+        sample = {"phase": "gm_801A4B60_return", "frame_index": frame_index,
+                  "source_scene_frame": word(0x80479D58),
+                  "caller": int(gdb.parse_and_eval("$lr")),
+                  "scene_request": word(0x80479D64)}
+    else:
+        sample = {"phase": "gm_801A4B60_return", "index": frame_index,
+                  "caller": int(gdb.parse_and_eval("$lr")),
+                  "scene_request": word(0x80479D64)}
     if not observations.accept("exit", frame_index, (machine_context(), sample)):
         return False
     if exit_observation is not None:
         raise RuntimeError("A second scene exit was requested within one captured match")
     exit_observation = sample
+    if UNTIL_MATCH_END and discovery_end_ready():
+        return finish_discovery("match_end")
     return False
 
 
@@ -346,7 +411,12 @@ def draw_return():
     last_drawn_source_index = draw_source_index
     draw_before = None
     draw_count += 1
-    if frame_index == LIMIT:
+    if UNTIL_MATCH_END:
+        if discovery_end_ready():
+            return finish_discovery("match_end")
+        if frame_index == LIMIT:
+            return finish_discovery("frame_cap")
+    elif frame_index == LIMIT:
         if last_drawn_source_index != LIMIT - 1: raise RuntimeError("Incomplete draw lifecycle")
         return finish()
     return False
@@ -405,7 +475,14 @@ class Arm(gdb.Command):
         LIMIT = int(values[1])
         if not 1 <= LIMIT <= 36000 or OUTPUT.exists():
             raise gdb.GdbError("Require a fresh output path and 1..36000 frames")
-        if input_plan is not None and LIMIT != len(input_plan['frames']):
+        if UNTIL_MATCH_END:
+            if input_plan is None:
+                raise gdb.GdbError('Match-length discovery requires a complete input plan')
+            if LIMIT > len(input_plan['frames']):
+                raise gdb.GdbError('Discovery cap exceeds the declared input plan')
+            if not DRAW_AUDIT:
+                raise gdb.GdbError('Match-length discovery requires the source draw observer')
+        elif input_plan is not None and LIMIT != len(input_plan['frames']):
             raise gdb.GdbError('Capture must consume the entire declared input plan')
         OUTPUT.parent.mkdir(parents=True, exist_ok=True)
         provenance = json.loads((ROOT / "provenance.json").read_text())
@@ -425,16 +502,31 @@ class Arm(gdb.Command):
         ready = False
         fighters.clear()
         pending_inputs.clear()
-        emit({"record": "header", "schema": "melee-web-retail-replay-candidate",
-              "version": 2, "capture_id": uuid.uuid4().hex, "phase": "HSD_GObj_80390CFC_return",
-              "input_phase": "HSD_PadRenewMasterStatus_dequeued_slot",
-              "initial_phase": "gm_Scene_Vs_OnEnter_entry",
-              "game_revision": "GALE01r2", "frames_requested": LIMIT,
-              "provenance": provenance,
-              "collector_sha256": hashlib.sha256(COLLECTOR.read_bytes() + b"\0" +
-                  COLLECTOR.with_name("reference_replay_boundary.py").read_bytes() + b"\0" +
-                  COLLECTOR.with_name("retail_input_plan.py").read_bytes()).hexdigest(),
-              "writes_game_state": False})
+        collector_sha256 = hashlib.sha256(
+            COLLECTOR.read_bytes() + b"\0" +
+            COLLECTOR.with_name("reference_replay_boundary.py").read_bytes() + b"\0" +
+            COLLECTOR.with_name("retail_input_plan.py").read_bytes()).hexdigest()
+        if UNTIL_MATCH_END:
+            emit({"record": "header", "schema": "melee-web-retail-match-discovery",
+                  "version": 1, "capture_id": uuid.uuid4().hex,
+                  "phase": "HSD_GObj_80390CFC_return",
+                  "input_phase": "HSD_PadRenewMasterStatus_dequeued_slot",
+                  "initial_phase": "gm_Scene_Vs_OnEnter_entry",
+                  "game_revision": "GALE01r2", "frames_cap": LIMIT,
+                  "input_plan_frames": len(input_plan['frames']),
+                  "input_plan_sha256": input_plan_sha256,
+                  "provenance": provenance,
+                  "collector_sha256": collector_sha256,
+                  "writes_game_state": False})
+        else:
+            emit({"record": "header", "schema": "melee-web-retail-replay-candidate",
+                  "version": 2, "capture_id": uuid.uuid4().hex, "phase": "HSD_GObj_80390CFC_return",
+                  "input_phase": "HSD_PadRenewMasterStatus_dequeued_slot",
+                  "initial_phase": "gm_Scene_Vs_OnEnter_entry",
+                  "game_revision": "GALE01r2", "frames_requested": LIMIT,
+                  "provenance": provenance,
+                  "collector_sha256": collector_sha256,
+                  "writes_game_state": False})
         Observer(0x800693A8, created)
         # Install all observers before execution. Mutating GDB breakpoints
         # inside stop callbacks can retrigger the current remote stop.

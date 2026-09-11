@@ -13,7 +13,8 @@ contracts and capture procedures remain in
 [ORIGINAL_COMPARISON.md](ORIGINAL_COMPARISON.md), and
 [TRANSITION_EQUIVALENCE.md](TRANSITION_EQUIVALENCE.md). Scalable gameplay
 coverage and replay admission are defined in
-[SLIPPI_REPLAY_VALIDATION.md](SLIPPI_REPLAY_VALIDATION.md).
+[SLIPPI_REPLAY_VALIDATION.md](SLIPPI_REPLAY_VALIDATION.md) and the measured
+[vanilla replay corpus](REPLAY_CORPUS.md).
 
 ## What each claim means
 
@@ -66,6 +67,14 @@ identity and native lifecycle tests come first. Deterministic retail comparisons
 then use the same rules, players, costumes, stage, RNG, inputs and source tick.
 The comparator must report the first divergent tick and field rather than widen
 a tolerance or remove a field.
+
+Require source-drawn comparison before admitting a replay workload. Headless
+traces omit camera callbacks that can affect later gameplay: the original
+magnifier sets an offscreen flag used by fighter damage. A draw audit that
+preserves the currently declared fields does not prove independence from all
+hidden render state. Keep a headless red visible, identify the source dependency
+and validate it in the real drawn path; do not fake the missing flag or waive
+the affected damage/RNG fields. See the [corpus example](REPLAY_CORPUS.md).
 
 Rendering, emitted PCM, physical input and end-to-end latency need independent
 reference evidence. Matching gameplay state alone does not close those gates.

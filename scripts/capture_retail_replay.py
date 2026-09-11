@@ -8,11 +8,14 @@ provenance root, and preserves launch/config/input metadata plus process logs.
 It never edits the supplied disc, DOL, snapshot, template user, checkpoint, or
 provenance inputs.
 
-The procedure is intentionally narrow: stop on the first scheduler return,
-advance 12 neutral ticks, arm the collector, issue eight ``PRESS A`` and eight
-``RELEASE A`` ticks, disable the temporary scheduler breakpoint, then let the
-collector stop at the requested frame count.  A completed output is validated
-by ``retail_replay_validation`` before success is reported.
+The fixed procedure is intentionally narrow: stop on the first scheduler
+return, advance 12 neutral ticks, arm the collector, issue eight ``PRESS A``
+and eight ``RELEASE A`` ticks, disable the temporary scheduler breakpoint, then
+let the collector stop at the requested frame count.  With
+``--until-match-end``, the same setup uses a full input plan and a hard frame
+cap, writing a distinct source-match discovery artifact that stops only after
+the original exit and final source draw.  Fixed output is validated by
+``retail_replay_validation`` before success is reported.
 """
 
 from __future__ import annotations
@@ -45,6 +48,7 @@ from retail_replay_validation import EXPECTED_PROVENANCE, CPU_PROFILES, MAX_FRAM
 from retail_draw_audit import load_draw_audit
 from retail_match_completion import load_match_completion
 from retail_input_plan import load_plan, verify_capture
+from retail_match_discovery import load_discovery
 from extract_disc_file import DiscImage, DiscFormatError
 
 
@@ -572,7 +576,8 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
                    output: str | Path, frames: int = DEFAULT_FRAMES,
                    timeout: float = DEFAULT_TIMEOUT, draw_audit: bool = False,
                    input_plan: str | Path | None = None, cpu: str = "Interpreter64",
-                   require_match_complete: bool = False) -> dict:
+                   require_match_complete: bool = False,
+                   until_match_end: bool = False) -> dict:
     """Run the bounded capture and return preserved run metadata."""
 
     if isinstance(frames, bool) or not isinstance(frames, int) or not 1 <= frames <= MAX_FRAMES:
@@ -584,8 +589,12 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
         raise CaptureRunnerError("draw_audit must be boolean")
     if not isinstance(require_match_complete, bool):
         raise CaptureRunnerError("require_match_complete must be boolean")
+    if not isinstance(until_match_end, bool):
+        raise CaptureRunnerError("until_match_end must be boolean")
     if require_match_complete and not draw_audit:
         raise CaptureRunnerError("Complete-match capture requires --draw-audit")
+    if until_match_end and require_match_complete:
+        raise CaptureRunnerError("Match-length discovery cannot be a fixed candidate completion")
     if cpu not in CPU_PROFILES:
         raise CaptureRunnerError("Unsupported reference CPU profile")
     if cpu == "JITARM64" and platform.machine() not in ("arm64", "aarch64"):
@@ -594,10 +603,14 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
     if input_plan is not None:
         try:
             plan, plan_hash = load_plan(input_plan)
-            if frames != len(plan['frames']):
+            if (until_match_end and frames > len(plan['frames'])):
+                raise ValueError('Discovery cap exceeds the declared input plan')
+            if not until_match_end and frames != len(plan['frames']):
                 raise ValueError('Capture must consume the entire declared input plan')
         except (OSError, ValueError) as error:
             raise CaptureRunnerError(str(error)) from error
+    elif until_match_end:
+        raise CaptureRunnerError("Match-length discovery requires --input-plan")
     disc_path = _regular_file(Path(disc), "disc image")
     snapshot_path = _regular_file(Path(snapshot), "snapshot")
     started = time.monotonic()
@@ -645,12 +658,16 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
         "duplicate_trap_budget": "8 * requested_ticks + 64",
         "tick_transition": "exactly previous scene_frame + 1 modulo u32",
         "collector_phase": "HSD_GObj_80390CFC_return",
-        "input_phase": "HSD_PadRenewMasterStatus_entry_queue",
+        "input_phase": "HSD_PadRenewMasterStatus_dequeued_slot",
     }
     metadata = {
         "status": "prepared",
         "evidence_status": "provisional",
         "scope": (
+            "source retail match-length discovery only; exact input prefix and "
+            "original exit/final-draw evidence; no reference, port equivalence, "
+            "performance, or gold admission claim"
+            if until_match_end else
             "bounded retail candidate capture procedure only; repeatability must "
             "be established by the separate comparator; no port equivalence, "
             "performance acceptance, or gold admission claim"
@@ -659,8 +676,9 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
         "run_root": str(run_root),
         "output": str(paths["output"]),
         "frames_requested": frames,
-        "source_draw_audit": draw_audit,
+        "source_draw_audit": draw_audit or until_match_end,
         "require_match_complete": require_match_complete,
+        "until_match_end": until_match_end,
         "timeout_seconds": timeout,
         "identity": paths["identity"],
         "source": {
@@ -719,7 +737,8 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
         environment = os.environ.copy()
         environment["MELEE_REPLAY_REFERENCE_WORK"] = str(paths["evidence"])
         environment["MELEE_REPLAY_COLLECTOR"] = str(paths["collector"])
-        environment["MELEE_REPLAY_DRAW_AUDIT"] = "1" if draw_audit else "0"
+        environment["MELEE_REPLAY_DRAW_AUDIT"] = "1" if (draw_audit or until_match_end) else "0"
+        environment["MELEE_REPLAY_UNTIL_MATCH_END"] = "1" if until_match_end else "0"
         environment.pop('MELEE_REPLAY_INPUT_PLAN', None)
         if plan is not None:
             environment['MELEE_REPLAY_INPUT_PLAN'] = str(plan_copy)
@@ -749,28 +768,41 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
             raise CaptureRunnerError(
                 f"collector did not produce requested output: {paths['output']}")
         try:
-            loaded = load_capture(paths["output"], cpu=cpu)
-            if loaded.header['collector_sha256'] != paths['collector_sha256']:
-                raise ValueError('Captured collector hash differs from owned source files')
-            if len(loaded.frames) != frames:
-                raise ValueError("captured frame count differs from requested bound")
-            if plan is not None:
-                if loaded.header['provenance'].get('input_plan_sha256') != plan_hash:
-                    raise ValueError('Captured input plan hash differs from owned plan')
-                verify_capture(plan, loaded)
-                metadata['input_plan']['consumption'] = 'verified_all_ticks'
-            if draw_audit:
-                audit_path = paths["evidence"] / "draw-audit.jsonl"
-                metadata["draw_audit"] = load_draw_audit(loaded, audit_path)
-                metadata["draw_audit"]["path"] = str(audit_path)
-            completion_path = paths["evidence"] / "match-completion.json"
-            if completion_path.exists() or require_match_complete:
-                metadata["match_completion"] = load_match_completion(
-                    loaded, completion_path, require_complete=require_match_complete)
+            if until_match_end:
+                discovery = load_discovery(paths["output"], cpu=cpu, plan=plan,
+                                           plan_sha256=plan_hash)
+                if discovery.header['collector_sha256'] != paths['collector_sha256']:
+                    raise ValueError('Discovery collector hash differs from owned source files')
+                metadata['discovery'] = dict(discovery.report)
+                metadata['discovery']['path'] = str(paths['output'])
+                metadata['input_plan']['consumption'] = 'verified_prefix'
+                if not discovery.complete:
+                    raise ValueError(
+                        'original match did not end before the discovery frame cap')
+                loaded = discovery
+            else:
+                loaded = load_capture(paths["output"], cpu=cpu)
+                if loaded.header['collector_sha256'] != paths['collector_sha256']:
+                    raise ValueError('Captured collector hash differs from owned source files')
+                if len(loaded.frames) != frames:
+                    raise ValueError("captured frame count differs from requested bound")
+                if plan is not None:
+                    if loaded.header['provenance'].get('input_plan_sha256') != plan_hash:
+                        raise ValueError('Captured input plan hash differs from owned plan')
+                    verify_capture(plan, loaded)
+                    metadata['input_plan']['consumption'] = 'verified_all_ticks'
+                if draw_audit:
+                    audit_path = paths["evidence"] / "draw-audit.jsonl"
+                    metadata["draw_audit"] = load_draw_audit(loaded, audit_path)
+                    metadata["draw_audit"]["path"] = str(audit_path)
+                completion_path = paths["evidence"] / "match-completion.json"
+                if completion_path.exists() or require_match_complete:
+                    metadata["match_completion"] = load_match_completion(
+                        loaded, completion_path, require_complete=require_match_complete)
         except ValueError as error:
             raise CaptureRunnerError(f"captured JSONL failed strict validation: {error}") from error
         metadata.update({
-            "status": "captured",
+            "status": "discovered" if until_match_end else "captured",
             "output_sha256": loaded.sha256,
             "frames_actual": len(loaded.frames),
             "capture_id": loaded.header["capture_id"],
@@ -812,6 +844,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--draw-audit", action="store_true", help="Observe every source camera traversal and its scheduler-tick index")
     parser.add_argument("--require-match-complete", action="store_true",
                         help="Require the original elimination exit request and final source draw")
+    parser.add_argument("--until-match-end", action="store_true",
+                        help="Discover the original match length under --frames using a full input plan")
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT)
     parser.add_argument("--cpu", choices=CPU_PROFILES, default="Interpreter64",
                         help="Explicit reference backend; JIT needs interpreter calibration")
@@ -823,7 +857,8 @@ def main(argv: list[str] | None = None) -> int:
             checkpoint_gc=args.checkpoint_gc, provenance=args.provenance,
             output=args.output, frames=args.frames, timeout=args.timeout,
             draw_audit=args.draw_audit, input_plan=args.input_plan, cpu=args.cpu,
-            require_match_complete=args.require_match_complete)
+            require_match_complete=args.require_match_complete,
+            until_match_end=args.until_match_end)
     except CaptureRunnerError as error:
         parser.exit(2, f"retail capture failed: {error}\n")
     print(json.dumps({

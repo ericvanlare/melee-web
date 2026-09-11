@@ -10,15 +10,6 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def patch_block(patch_text: str, path: str) -> str:
-    marker = f"diff --git a/{path} b/{path}"
-    start = patch_text.find(marker)
-    if start < 0:
-        raise AssertionError(f"reviewed patch has no hunk for {path}")
-    end = patch_text.find("\ndiff --git ", start + len(marker))
-    return patch_text[start:] if end < 0 else patch_text[start:end]
-
-
 def extract_function(source: str, name: str) -> str:
     start = source.index(f"void {name}(")
     opening = source.index("{", start)
@@ -50,11 +41,10 @@ class EfLibParamTableTests(unittest.TestCase):
             source_path = directory / "src/melee/ef/eflib.c"
             source_path.parent.mkdir(parents=True)
             source_path.write_text(original.read_text())
-            diff = patch_block(patch.read_text(), "src/melee/ef/eflib.c")
             diff_path = directory / "eflib.patch"
-            diff_path.write_text(diff)
+            diff_path.write_text(patch.read_text())
             applied = subprocess.run(
-                ["git", "apply", "--unsafe-paths", str(diff_path)],
+                ["git", "apply", "--include=src/melee/ef/eflib.c", str(diff_path)],
                 cwd=directory,
                 capture_output=True,
                 text=True,

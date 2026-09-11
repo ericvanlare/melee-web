@@ -21,6 +21,13 @@ the full Interpreter64 cross-check against the repeated references. See the
 [complete-game evidence ledger](COMPLETE_REPLAY_CALIBRATION.md) for hashes,
 shared fixes, retained reds and observed coverage.
 
+The [corpus expansion](REPLAY_CORPUS.md) adds source-driven match-length
+discovery and coverage selection with source-hash separation of held-out inputs.
+It also records why source-drawn comparison is mandatory: magnifier rendering
+sets an offscreen flag that can change damage and RNG on a later source tick.
+A headless trace or a draw audit of the currently declared fields cannot prove
+independence from that hidden state.
+
 This exposed two shared runtime gaps, subsequently fixed:
 
 - Ground initialization registers stage particle data at bank 30 as well as

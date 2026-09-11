@@ -14,6 +14,21 @@ The combined [performance and accuracy playbook](docs/PERFORMANCE_AND_ACCURACY.m
 defines the evidence levels, content admission workflow and failure-response
 process used from this point forward.
 
+The [first measured replay cohort](docs/REPLAY_CORPUS.md) now contains three
+development workloads and one independently held-out workload, totaling 11,122
+source ticks. Two new development reference pairs and the held-out pair repeat
+exactly; all three match the visible source-drawn port through original endings
+and teardown. Their six final Release cold/warm runs have zero hard-gate
+failures (worst native callback 12.020 ms). The held-out game passed the frozen
+runtime and seed without changes. This expansion fixed shared knockback FMA
+rounding, added source-driven match-length discovery and measured coverage
+selection, and brought the reviewed startup seed to 432 pipelines. A retained
+headless red exposed original magnifier drawing's effect on later offscreen
+damage; visible comparison is now mandatory. The full 453-test suite and the
+updated 12-test coverage suite pass. All four workloads remain Fox/Falco on
+Battlefield with sparse combat and no up-special; broader gold/content
+admission and the observed live Wasm heap growth remain open.
+
 The [complete-game replay calibration](docs/COMPLETE_REPLAY_CALIBRATION.md)
 now covers a derived 3,122-tick Fox/Falco Battlefield elimination match. Two
 independent JITARM64 references repeat exactly; Release/headless and visibly
@@ -21,7 +36,7 @@ drawn port traces match every declared field through the original ending and
 successful teardown. Shared Hermite, DI, joint-matrix and knockback rounding
 boundaries now follow the pinned retail instructions. Effect-parameter setters
 address their real table, fixing a shield-triggered overwrite caused by an
-original link-layout assumption. The reviewed startup seed contains 427
+original link-layout assumption. That calibration's startup seed contained 427
 pipelines. Final visible Release cold/warm runs pass all 3,122 ticks with zero
 hard-gate failures (worst native callbacks 11.330/12.485 ms; browser intervals
 21.365/22.010 ms). The final collector also matches the full repeated reference
@@ -66,7 +81,7 @@ over all 686 ticks. Worst native callbacks were 12.735/7.42 ms and match prepara
 186.745/200.905 ms on an Apple M4, macOS 26.6.2, visible Chromium 152, 640×480
 framebuffer. Driver caches were not controlled. The final pair had no live heap growth. An earlier warm run grew the Wasm heap
 by 86,441,984 bytes without a timing failure; this remains measured memory work,
-not a zero-allocation claim. The reviewed seed now includes 389 pipelines.
+not a zero-allocation claim. That earlier calibration's seed contained 389 pipelines.
 `check_browser_replay.py` independently joins recipe, state, timing and build
 evidence while refusing a broader admission claim.
 
