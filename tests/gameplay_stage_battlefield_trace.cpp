@@ -96,7 +96,7 @@ int main(int argc, char** argv)
         RuntimeFiles files;
         for (const char* name : {"PlCo.dat", "PlMr.dat", "PlMrNr.dat", "PlMrAJ.dat",
                                  "GrNBa.dat", "ItCo.usd", "EfMrData.dat", "EfCoData.dat",
-                                 "PdPm.dat", "sislib_font.bin"})
+                                 "PdPm.dat", "LbRb.dat", "sislib_font.bin"})
             files.emplace(name, read_file(root / name));
 
         GameplayWorldSelection selection{};

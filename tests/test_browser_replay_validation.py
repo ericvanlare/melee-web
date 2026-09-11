@@ -1,10 +1,13 @@
 """A reported pass cannot hide missing counters, wrong inputs or instrumentation."""
 import copy
+import hashlib
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
-from browser_replay_validation import check_evidence, validate_report, ZERO_GATES
+from browser_replay_validation import (check_evidence, validate_report, ZERO_GATES,
+                                       BUILD_ARTIFACTS, validate_build_artifacts)
 
 
 def report():
@@ -24,6 +27,26 @@ def report():
 
 
 class BrowserReplayValidationTests(unittest.TestCase):
+    def test_imported_runtime_and_audio_modules_are_bound_to_the_frozen_build(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            artifacts = {}
+            for name in BUILD_ARTIFACTS:
+                payload = name.encode()
+                (root / name).write_bytes(payload)
+                artifacts[name] = hashlib.sha256(payload).hexdigest()
+            validate_build_artifacts(artifacts, root)
+            incomplete = dict(artifacts)
+            del incomplete['runtime-assets.mjs']
+            with self.assertRaisesRegex(ValueError, 'inventory'):
+                validate_build_artifacts(incomplete, root)
+            for name in ('runtime-assets.mjs', 'disc-image.mjs', 'audio-ring.mjs'):
+                with self.subTest(module=name):
+                    (root / name).write_bytes(b'changed after freeze')
+                    with self.assertRaisesRegex(ValueError, 'Build artifact changed'):
+                        validate_build_artifacts(artifacts, root)
+                    (root / name).write_bytes(name.encode())
+
     def check(self, value):
         return validate_report(value, 'a' * 64, 686, 'performance', True)
 

@@ -3,6 +3,7 @@
 #include "dat_archive.hpp"
 #include "dat_scene.hpp"
 #include "dat_sis.hpp"
+#include "dat_color_animation.hpp"
 #include "gameplay_archive_sections.h"
 #include <algorithm>
 #include <array>
@@ -21,12 +22,13 @@ struct GameplayHudAssets::Storage {
     RuntimeArchiveCache* archive_cache = nullptr;
     std::vector<std::unique_ptr<DatScene>> scenes;
     std::unique_ptr<DatSis> intro;
+    std::unique_ptr<DatColorAnimation> screen_flashes;
     MeleeWebArchiveSections* scope = nullptr;
 
     void start(const RuntimeFiles& files, RuntimeArchiveCache* cache)
     {
         archive_cache = cache;
-        for (const char* name : {"IfAll.usd", "IfCoGet.dat", "SdIntro.dat", "GmPause.usd"}) {
+        for (const char* name : {"IfAll.usd", "IfCoGet.dat", "SdIntro.dat", "GmPause.usd", "LbBf.dat"}) {
             const auto found = files.find(name);
             if (found == files.end() || found->second.empty())
                 throw DatError("Missing original HUD archive: " + std::string(name));
@@ -60,6 +62,17 @@ struct GameplayHudAssets::Storage {
         add_scene("GmPause.usd", "ScGamPause_scene_data", DatSceneRootKind::SceneDesc);
         intro = std::make_unique<DatSis>(archives.at("SdIntro.dat"), "SIS_IntroData");
         symbols.push_back({"SdIntro.dat", "SIS_IntroData", intro->descriptor()});
+        const auto flash = archives.at("LbBf.dat");
+        const auto& exports = flash->public_symbols();
+        const auto table = std::find_if(exports.begin(), exports.end(), [](const auto& entry) {
+            return entry.name == "lbBgFlashColAnimData";
+        });
+        if (table == exports.end()) throw DatError("Original screen-flash table is absent");
+        const auto bytes = flash->next_target_offset(table->data_offset) - table->data_offset;
+        if (!bytes || bytes % 8) throw DatError("Invalid original screen-flash table extent");
+        screen_flashes = std::make_unique<DatColorAnimation>(flash, table->data_offset, bytes / 8);
+        symbols.push_back({"LbBf.dat", "lbBgFlashColAnimData",
+                           const_cast<MeleeWebColorRow*>(screen_flashes->table())});
         char error[256]{};
         scope = melee_web_archive_sections_register_heap(symbols.data(), symbols.size(), error, sizeof(error));
         if (!scope) throw DatError(error);
@@ -86,6 +99,7 @@ struct GameplayHudAssets::Storage {
             scope = nullptr;
         }
         verify();
+        screen_flashes.reset();
         intro.reset();
         scenes.clear();
     }

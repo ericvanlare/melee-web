@@ -25,6 +25,23 @@ pipeline creation, timing resumes or audio-queue failures. This closes the
 measured repeated-workload allocation issue; broader memory and content
 coverage remain open. See the [evidence ledger](docs/REPLAY_CORPUS.md#bounded-browser-staging).
 
+Four additional complete retail reference pairs now add 13,701 source ticks on
+Final Destination and Yoshi's Story with Fox, Falco and Marth. They include 43
+damage increases and actual up-special execution. Shared screen-flash ownership,
+shield/up-special rounding, projection-buffer storage and original ground
+initialization are corrected in development. All four new visible gameplay
+traces now match both original captures. The final one-ULP Marth position red
+required shared pose and SDK quaternion-matrix rounding corrections, verified
+first against captured scalar operands and outputs, then through all 2,901
+ticks with source drawing. The reviewed startup seed now has 469 pipelines.
+All eight complete regression games now match both original captures through
+24,823 source-drawn ticks. Their 16 isolated cold/warm performance runs pass
+with zero hard-gate failures, live pipeline creation or heap growth; the worst
+native callback is 15.855 ms. Two reserved inputs await frozen-build evaluation.
+All 473 tests pass;
+rebuilt fighter/stage lifecycle checks also pass after correcting a missing
+rumble archive in the standalone Battlefield test bundle. See the [expanded evidence ledger](docs/REPLAY_CORPUS.md#expanded-development-corpus--eight-game-regression-gate).
+
 The [first measured replay cohort](docs/REPLAY_CORPUS.md) now contains three
 development workloads and one independently held-out workload, totaling 11,122
 source ticks. Two new development reference pairs and the held-out pair repeat
@@ -38,7 +55,8 @@ headless red exposed original magnifier drawing's effect on later offscreen
 damage; visible comparison is now mandatory. The full 453-test suite and the
 updated 12-test coverage suite pass. All four workloads remain Fox/Falco on
 Battlefield with sparse combat and no up-special; broader gold/content
-admission and the observed live Wasm heap growth remain open.
+admission remain open; the subsequently measured staging fix above closes that
+cohort's observed live heap growth.
 
 The [complete-game replay calibration](docs/COMPLETE_REPLAY_CALIBRATION.md)
 now covers a derived 3,122-tick Fox/Falco Battlefield elimination match. Two
@@ -96,12 +114,14 @@ not a zero-allocation claim. That earlier calibration's seed contained 389 pipel
 `check_browser_replay.py` independently joins recipe, state, timing and build
 evidence while refusing a broader admission claim.
 
-The public tournament corpus audit found 6,813 supported cross-character/stage
-games but zero UCF-off files in a 952-file sample. These are useful workload/input
-donors; new vanilla reference trajectories must define expected state, and
-coverage must be measured from those new trajectories. See the
-[replay architecture](docs/SLIPPI_REPLAY_VALIDATION.md) and
-[corpus audit](docs/SLIPPI_CORPUS_AUDIT.md).
+A successor public corpus audit supplies 1,005 UCF-off candidates on the current
+fighter/stage surface. Independent full parsing verifies 76 complete source
+identities, including 16 exact human P1/P2 games compatible with processed-v2
+input export. Eight development games and two fresh whole-game holdouts are
+reserved before runtime execution. These legacy recordings lack complete raw
+controller samples; original vanilla captures must still establish expected
+state. The earlier 952-file zero-UCF-off sample no longer constrains candidate
+selection. See the [verified split and limitations](docs/REPLAY_CORPUS.md#independently-verified-ucf-off-candidate-split).
 
 The typed content path now carries Falco, Fox, Marth, Battlefield, Yoshi's Story and Dream Land
 source IDs, runtime manifests and focused development traces. Source stock icon IDs are

@@ -256,6 +256,23 @@ overwrite/continue-without-saving prompts, and hovers Battlefield in SSS.
 Save from Dolphin's main-window Emulation → Save State menu into an unused
 slot, then copy that snapshot, external GC files and controller configuration
 together. A hotkey sent only to the render window did not save this checkpoint.
+
+Use a non-batch Dolphin launch (omit `-b`) for checkpoint preparation so the
+main window and its Save State menu remain available. Fixed reference capture
+can retain its existing batch launch. Keep the preparation debugger connected;
+this pinned Dolphin reports that remote detach is unsupported and can leave a
+stopped target with no reconnectable debugger. Disable the preparation breakpoint
+and continue before the ordinary UI save, then verify the new state file before
+terminating the owned processes.
+
+When a menu transition does not reach SSS, observe the original major/minor scene
+and scene kind before waiting or steering. In particular, the persistent
+memory-card mode override can intercept an accepted CSS Start. Advance neutral
+source ticks until its actual prompt has rendered and handle it through ordinary
+controller input in the copied save environment. Do not write the boot override,
+RNG or match state to bypass it. Verify the resulting fighter selection, stage
+highlight and snapshot identity; a setup-only copied snapshot is not the final
+checkpoint.
 Pin all copied hashes and the setup description before capturing. The local
 SSS snapshot SHA-256 is
 `55dfef2413480ed37531f584296ffc0850551b9d64612278bcf6792a2ee0c30c`.
@@ -530,3 +547,41 @@ Final verification: all 372 automated tests pass, including actual JavaScript
 startup/pause handlers, malformed evidence and raw-input rejection controls;
 Debug native/browser and Release browser builds pass. The neutral 240-tick and
 donor 686-tick native comparisons remain exact after integration.
+
+
+## Shared pose and quaternion-matrix scalar oracles
+
+The expanded Yoshi's Story workload first diverged by one position ULP at tick
+1,146. Read-only original function captures separated collision, local pose,
+and matrix conversion. Wall arithmetic was not causal. The scalar pose sidecar
+contains 675 `lb_8000C490`, 567 `EulerToQuat`, and 243 quaternion-interpolation
+calls (SHA-256 `05daadd514da0d37b5750bb77df4416ff757e8f9a5f8c3b3836418659ad6fcb2`).
+The corrected original-source expressions match all 1,485 input/output records;
+the prior arithmetic differs on 833. This retains the original trig kernels,
+reciprocal-square-root estimate, fused-operation order and final negations.
+Both gameplay and HSD callers disable host trig builtin substitution.
+
+With those changes, every captured local rotation, scale and translation in
+the six ECB joint parent chains matches across ticks 1,144–1,146. Only matrices
+still differ. A separate read-only sidecar contains 135 `PSMTXQuat` and 108
+`HSD_MtxSRTQuat` calls (SHA-256
+`ee1367ac89ba49e16da73baa69a239d33d226302635448ae5245ffaa2de287e5`).
+The scalar expansion of the original `PSMTXQuat` at `80342690..80342730`
+matches all 135 rotation matrices; Aurora's C fallback differs on 111.
+The complete 2,901-tick headless comparison then matches both references.
+Visible state and timing acceptance remain separate checks.
+
+The expansion preserves the original reciprocal estimate plus Newton step,
+paired-single sums, fused endpoints and signed-zero matrix lanes. Its binary32
+reciprocal helper follows Andrew Church's public-domain
+[750CL hardware tests](https://achurch.org/cpu-tests/ppc750cl.s), rather than
+substituting exact division. `fnmsubs` negates the rounded subtraction result;
+see the [IBM instruction definition](https://www.ibm.com/docs/en/aix/7.3.0?topic=set-fnmsub-fnms-floating-negative-multiply-subtract-instruction).
+The captured quaternion norms are finite and positive; the scalar evidence is
+not an FPSCR, exceptional-value or general CPU-equivalence claim.
+
+Permanent tests retain a small set of numeric input/output words for pose
+blending, quaternion matrices, signed zeros and reciprocal boundary cases.
+Full ignored captures, baseline controls and discarded diagnostic patches live
+under `work/replay-expansion/`; no capture observer, injected expected state or
+per-workload exception enters the runtime.

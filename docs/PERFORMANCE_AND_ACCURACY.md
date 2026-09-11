@@ -76,6 +76,24 @@ hidden render state. Keep a headless red visible, identify the source dependency
 and validate it in the real drawn path; do not fake the missing flag or waive
 the affected damage/RNG fields. See the [corpus example](REPLAY_CORPUS.md).
 
+When a replay exposes hidden state, compare the original owner construction and
+its first consumers as well as the visible formula. The expanded corpus found
+missing screen-flash ownership and a missing ground reset whose floor sentinel
+changed camera culling and later damage. Restore the original shared routine at
+its source lifetime boundary, verify teardown and repeated construction, and
+retain the complete failing replay. A locally plausible numerical change is
+not a fix unless the actual failing operands reach it and the reference
+comparison changes as predicted.
+
+For a numerical red, compare operand bits before changing the consumer. Capture
+the original producer's input/output boundary, keep the unfused or prior path
+as a negative control, and verify a shared primitive before replaying the full
+game. Local pose agreement isolated the expanded Yoshi's Story failure to the
+SDK quaternion-matrix conversion. Its paired-single sums and reciprocal estimate
+must retain the original order; algebraically equivalent C expressions can
+change rounding and signed zeros. Keep a few observed scalar cases in fast
+tests, with the complete original captures in the evidence ledger.
+
 Rendering, emitted PCM, physical input and end-to-end latency need independent
 reference evidence. Matching gameplay state alone does not close those gates.
 

@@ -1,5 +1,10 @@
 # Slippi corpus audit
 
+> Update, 2026-09-11: the UCF-off candidate conclusion below is superseded by
+> the [independently verified successor split](REPLAY_CORPUS.md#independently-verified-ucf-off-candidate-split).
+> The old sampling result is retained as historical evidence; it must not be
+> extrapolated to the full corpus.
+
 Audit date: 2026-09-10
 
 ## Decision

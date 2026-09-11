@@ -73,6 +73,8 @@ if(EMSCRIPTEN)
   target_include_directories(hsd_native_runtime PUBLIC src "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}")
   target_compile_definitions(hsd_native_runtime PUBLIC TARGET_PC)
   target_compile_options(hsd_native_runtime PRIVATE -ffunction-sections -fdata-sections -ffp-contract=off
+    -fno-builtin-sinf -fno-builtin-cosf -fno-builtin-tanf
+    -fno-builtin-atanf -fno-builtin-atan2f -fno-builtin-acosf
     -include "${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h")
   target_link_libraries(hsd_native_runtime PUBLIC gameplay_runtime aurora::core aurora::gx aurora::mtx aurora::vi)
   add_executable(gameplay_common_context_trace tests/gameplay_common_context_trace.c)

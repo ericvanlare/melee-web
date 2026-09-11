@@ -1,0 +1,92 @@
+{
+  "schema": "melee-web-gameplay-pose-scalar-fixture",
+  "version": 1,
+  "scope": "pure numeric input/output words; no capture identity, player data, or live state",
+  "provenance": {
+    "source_sidecar_sha256": "05daadd514da0d37b5750bb77df4416ff757e8f9a5f8c3b3836418659ad6fcb2",
+    "quatlib_sha256": "56eb636d14997cf0a8a334783a87b25ec4d6d54d086ece2d3c36b977f85d6adf",
+    "lbtrigf_sha256": "83617cf5f6932c4d7edbebc7ada9b8d90eac4f60c1fe55250f1016ed7980114c",
+    "lb00b0_sha256": "993e10c15ae86fd37b44e50178fb4345923c151e779d1594ae0a0999cea2d65d",
+    "game_revision": "GALE01r2",
+    "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+    "source_commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5"
+  },
+  "cases": [
+    {
+      "name": "euler-small-negative",
+      "kind": "EulerToQuat",
+      "input_bits": "3e8286d13cf59a13be121da1",
+      "expected_bits": "3e02e9bb3bbd0d7fbd94af093f7d36c0"
+    },
+    {
+      "name": "euler-wide-negative",
+      "kind": "EulerToQuat",
+      "input_bits": "3eca8ff1bf3c4d7abd9dda78",
+      "expected_bits": "3e2dbcfcbeb7fad83d10d1c83f6abece"
+    },
+    {
+      "name": "slerp-small",
+      "kind": "HSD_QuatLib_8037EF28",
+      "p_bits": "3e02e9bb3bbd0d7fbd94af093f7d36c0",
+      "q_bits": "3ca372d53c297cd6bd8fd1c63f7f4d9d",
+      "t_bits": "3e9b3508",
+      "expected_bits": "3dc30c9b3bead0dabd9364283f7e29b2"
+    },
+    {
+      "name": "slerp-late-axis",
+      "kind": "HSD_QuatLib_8037EF28",
+      "p_bits": "3e88ed1d00000000000000003f76acee",
+      "q_bits": "3e84eb4600000000000000003f77390c",
+      "t_bits": "3e1a7134",
+      "expected_bits": "3e88528b00000000000000003f76c255"
+    },
+    {
+      "name": "jobj-blend-quaternion",
+      "kind": "lb_8000C490",
+      "arg8_bits": "3f32657c",
+      "arg9_bits": "3e9b3508",
+      "input1": {
+        "flags": 268435529,
+        "rotate_bits": "3e8286d13cf59a13be121da13ee894bc",
+        "scale_bits": "3f8000003f8000003f800000",
+        "translate_bits": "bee80000bf959800bee80000"
+      },
+      "input2": {
+        "flags": 268435529,
+        "rotate_bits": "3d1d225f3cc00000be0f838e3f7e6606",
+        "scale_bits": "3f8000003f8000003f800000",
+        "translate_bits": "bee80000bf959800bee80000"
+      },
+      "expected": {
+        "flags": 268566601,
+        "rotate_bits": "3dc30c9b3bead0dabd9364283f7e29b2",
+        "scale_bits": "3f8000003f8000003f800000",
+        "translate_bits": "bee80000bf959800bee80000"
+      }
+    },
+    {
+      "name": "jobj-blend-fused-translation",
+      "kind": "lb_8000C490",
+      "arg8_bits": "3f32657c",
+      "arg9_bits": "3e9b3508",
+      "input1": {
+        "flags": 72,
+        "rotate_bits": "8000000080000000bfc90fd800000000",
+        "scale_bits": "3f8000003f8000003f800000",
+        "translate_bits": "407a9f41bd9d61f63bb228dd"
+      },
+      "input2": {
+        "flags": 72,
+        "rotate_bits": "8000000080000000bfc90fd800000000",
+        "scale_bits": "3f8000003f8000003f800000",
+        "translate_bits": "407a9f41bd9d61f63bb228dd"
+      },
+      "expected": {
+        "flags": 72,
+        "rotate_bits": "8000000080000000bfc90fd800000000",
+        "scale_bits": "3f8000003f8000003f800000",
+        "translate_bits": "407a9f41bd9d61f63bb228dd"
+      }
+    }
+  ]
+}

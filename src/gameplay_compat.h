@@ -20,6 +20,10 @@
 #define MTXConcat melee_web_ps_mtx_concat
 #undef PSMTXConcat
 #define PSMTXConcat melee_web_ps_mtx_concat
+#undef MTXQuat
+#define MTXQuat melee_web_ps_mtx_quat
+#undef PSMTXQuat
+#define PSMTXQuat melee_web_ps_mtx_quat
 
 typedef struct { f32 x, y; } Vec2;
 typedef struct { int x, y; } IntVec2;

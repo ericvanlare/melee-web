@@ -48,6 +48,7 @@ add_library(fighter_source_runtime STATIC EXCLUDE_FROM_ALL ${fighter_paths}
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/synth.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/sislib.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/hsd_393C.c"
+  "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/hsd_3915.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/psappsrt.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/psdisptev.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/psdisp.c"
@@ -67,7 +68,7 @@ set_source_files_properties(
 set_source_files_properties("${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/ax/AXCL.c" PROPERTIES COMPILE_OPTIONS "-include;string.h")
 target_compile_options(fighter_source_runtime PRIVATE -ffunction-sections -fdata-sections -ffp-contract=off
   -fno-builtin-sinf -fno-builtin-cosf -fno-builtin-tanf
-  -fno-builtin-atanf -fno-builtin-atan2f
+  -fno-builtin-atanf -fno-builtin-atan2f -fno-builtin-acosf
   -include "${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h")
 target_link_libraries(fighter_source_runtime PUBLIC hsd_native_runtime aurora::pad)
 add_library(fighter_asset_runtime STATIC EXCLUDE_FROM_ALL
@@ -204,7 +205,7 @@ add_executable(gameplay_retail_trace EXCLUDE_FROM_ALL
 target_link_libraries(gameplay_retail_trace PRIVATE fighter_asset_runtime)
 target_compile_options(gameplay_retail_trace PRIVATE
   "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
-target_link_options(gameplay_retail_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+target_link_options(gameplay_retail_trace PRIVATE --profiling-funcs -sENVIRONMENT=node -sNODERAWFS=1
   -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1
   -sSTACK_SIZE=8388608)
 set_target_properties(gameplay_retail_trace PROPERTIES SUFFIX ".js")

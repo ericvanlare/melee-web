@@ -2,7 +2,7 @@
 #include "dat_commands.hpp"
 #include "gameplay_common_context.h"
 namespace melee_web {
-// Owns the exact common fighter ColorOverlay table and its validated programs.
+// Owns original ColorOverlay row tables and their validated command programs.
 class DatColorAnimation {
 public:
     DatColorAnimation(std::shared_ptr<const DatArchive>,uint32_t root,size_t count);

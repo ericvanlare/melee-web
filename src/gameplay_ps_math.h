@@ -3,9 +3,9 @@
 
 #include <dolphin/mtx.h>
 
-/* The original PSMTXConcat arithmetic is a PowerPC paired-single sequence,
- * rather than an ordinary C matrix multiply. Keep this helper isolated until
- * the gameplay SDK compatibility boundary wires it into a source alias. */
+/* Scalar expansions of the original paired-single SDK routines, with their
+ * rounding boundaries preserved. Wired through the gameplay SDK aliases. */
 void melee_web_ps_mtx_concat(const Mtx a, const Mtx b, Mtx out);
+void melee_web_ps_mtx_quat(Mtx out, const Quaternion* q);
 
 #endif

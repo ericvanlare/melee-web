@@ -13,10 +13,28 @@ ZERO_GATES = ('browserCallbackGaps', 'browserLongTasks', 'nativeCallbacksOver33m
               'livePipelinesQueued', 'livePipelinesCreated', 'preparationPauses',
               'audioUnderrunFrames', 'audioOverflowFrames')
 
+# Include the separately imported asset loader, disc/PAD utilities and audio
+# transport modules; freezing only the Wasm and HTML leaves executable inputs
+# outside the development/held-out build identity.
+BUILD_ARTIFACTS = (
+    'gameplay_menu_browser.js', 'gameplay_menu_browser.wasm', 'gameplay_menu_browser.data',
+    'runtime.html', 'runtime-cache.js', 'audio-worklet.js', 'audio-ring.mjs',
+    'disc-image.mjs', 'dsp-coefficients.mjs', 'runtime-assets.mjs',
+    'match-flow.mjs', 'match-menu.mjs', 'action-sweep.mjs',
+)
+
 
 def require(condition, message):
     if not condition:
         raise ValueError(message)
+
+
+def validate_build_artifacts(artifacts, build_directory):
+    require(isinstance(artifacts, dict) and set(artifacts) == set(BUILD_ARTIFACTS),
+            'Build artifact inventory is incomplete')
+    for name in BUILD_ARTIFACTS:
+        require(hashlib.sha256((Path(build_directory) / name).read_bytes()).hexdigest() == artifacts[name],
+                'Build artifact changed: ' + name)
 
 
 def finite(value):
@@ -139,12 +157,7 @@ def check_evidence(reference_a, reference_b, recipe, port, state, cold, warm, pr
     require(config.get('build') == 'Release' and config.get('hardware') and config.get('power') and config.get('display'),
             'A named Release machine/power/display profile is required')
     artifacts = config.get('artifacts', {})
-    required = ('gameplay_menu_browser.js', 'gameplay_menu_browser.wasm', 'gameplay_menu_browser.data',
-                'runtime.html', 'runtime-cache.js', 'audio-worklet.js')
-    require(set(artifacts) == set(required), 'Build artifact inventory is incomplete')
-    for name in required:
-        require(hashlib.sha256((Path(build_directory) / name).read_bytes()).hexdigest() == artifacts[name],
-                'Build artifact changed: ' + name)
+    validate_build_artifacts(artifacts, build_directory)
     errors, hashes['browser_errors'] = _json(browser_errors)
     require(errors == [], 'Browser error log must be an inspected empty error list')
     result = {'schema': 'melee-web-scoped-replay-evidence', 'version': 1,

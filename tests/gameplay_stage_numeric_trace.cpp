@@ -8,6 +8,7 @@
 #include <cmath>
 #include <string>
 using namespace melee_web;
+extern "C" void Ground_801C4368(float*, float*);
 static void put(std::vector<uint8_t>& b,uint32_t o,uint32_t v){for(int i=0;i<4;i++)b[32+o+i]=v>>(24-8*i);}
 int main(int argc,char** argv){
  if(argc!=2){std::cerr<<"Usage: gameplay_stage_numeric_trace.js PATH_TO_GrNLa.dat\n";return 64;}
@@ -21,7 +22,12 @@ int main(int argc,char** argv){
  for(int pass=0;pass<2;pass++){
   if(!melee_web_gameplay_startup(32*1024*1024,error,sizeof(error)))throw std::runtime_error(error);
   void* previous=melee_web_ground_data_publish(param);
+  float previous_floor,previous_delta;Ground_801C4368(&previous_floor,&previous_delta);
   auto* context=melee_web_stage_numeric_begin(markers,error,sizeof(error));if(!context)throw std::runtime_error(error);
+  float floor,delta;Ground_801C4368(&floor,&delta);
+  // Original Ground_801BFFB0 sentinel: zero incorrectly clamps the camera
+  // above offstage recoveries. Verify the source getter and scope restoration.
+  if(floor!=-10000.0f)return 12;
   float cam[4],blast[4],offset[2];if(!melee_web_stage_numeric_bounds(context,cam,blast,offset,error,sizeof(error)))return 2;
   std::cout<<"Original FD camera "<<cam[0]<<","<<cam[1]<<","<<cam[2]<<","<<cam[3]<<" blast "<<blast[0]<<","<<blast[1]<<","<<blast[2]<<","<<blast[3]<<" offset "<<offset[0]<<","<<offset[1]<<"\n";
   // Regression values from GALE01 1.02 GrNLa marker positions, with original
@@ -38,6 +44,8 @@ int main(int argc,char** argv){
   if(melee_web_stage_numeric_spawn(context,4,spawns[0],error,sizeof(error)))return 10;
   if(std::string(error).find("0..3")==std::string::npos)return 11;
   if(!melee_web_stage_numeric_end(context,error,sizeof(error)))throw std::runtime_error(error);
+  Ground_801C4368(&floor,&delta);
+  if(floor!=previous_floor||delta!=previous_delta)return 13;
   if(melee_web_ground_data_publish(previous)!=param)return 4;
   if(melee_web_gameplay_stats().objects!=0)return 5;
   if(!melee_web_gameplay_shutdown(error,sizeof(error)))throw std::runtime_error(error);

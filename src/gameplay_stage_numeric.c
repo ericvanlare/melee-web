@@ -1,5 +1,6 @@
 #include "gameplay_stage_numeric.h"
 #include "gameplay_stage_profile.h"
+#include "gameplay_stage_map.h"
 #include "hsd_native_joint.h"
 #include <melee/gr/ground.h>
 #include <melee/gr/grlast.h>
@@ -66,6 +67,9 @@ static void collect(HSD_JObj* j,HSD_JObj** list,unsigned* count){for(;j;j=j->nex
 MeleeWebStageNumeric* melee_web_stage_numeric_begin_kind(MeleeWebStageMarkers* m,int stage_kind,char* e,size_t n){
     const MeleeWebStageProfile* profile=melee_web_stage_profile(stage_kind);
     if(!profile||!m||active||!stage_info.param){fail(e,n,"Missing supported stage marker/ground data or active stage scope");return NULL;}
+    if(melee_web_stage_map_archives()){fail(e,n,"Initialize source ground state before publishing map archives");return NULL;}
+    for(unsigned i=0;i<sizeof(stage_info.map_gobjs)/sizeof(stage_info.map_gobjs[0]);i++)
+        if(stage_info.map_gobjs[i]){fail(e,n,"Initialize source ground state before creating stage objects");return NULL;}
     if(!isfinite(stage_info.param->y)||stage_info.param->y<=0){fail(e,n,"Stage marker context requires a finite positive source scale");return NULL;}
     int has_row=0;
     for(int i=0;i<stage_info.param->stage_param_count;i++)if(stage_info.param->stage_params[i].stkind==profile->stage_kind)has_row=1;
@@ -88,7 +92,11 @@ MeleeWebStageNumeric* melee_web_stage_numeric_begin_kind(MeleeWebStageMarkers* m
     HSD_GObjObject_80390A70(h->owner,HSD_GObj_JObjKind,scaled);GObj_InitUserData(h->owner,0,removed,h);
     HSD_JObj* joints[261];unsigned count=0;collect(root,joints,&count);
     if(count!=m->joint_count){HSD_GObjPLink_80390228(h->owner);free(h);fail(e,n,"Original marker tree count differs");return NULL;}
-    memset(stage_info.x280,0,sizeof(stage_info.x280));
+    /* Ground_801C0754 resets mutable ground state before publishing markers
+     * and stage data. In particular its -10000 floor sentinel permits the
+     * original camera to follow fighters below the stage. Archive publication
+     * and stage objects are absent here; saved StageInfo owns the full restore. */
+    Ground_801BFFB0();
     for(unsigned i=0;i<m->pair_count;i++)Ground_801C2D0C(m->pairs[i][1],joints[m->pairs[i][0]]);
     stage_info.grkind=profile->ground_kind;stage_info.on_touch_line=profile->source->on_touch_line;stage_info.on_check_shadow_render=profile->source->on_check_shadow_render;
     stage_info.unk8C.b4=1;stage_info.unk8C.b5=1;

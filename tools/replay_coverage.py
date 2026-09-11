@@ -20,7 +20,11 @@ from retail_replay_validation import CaptureError, load_capture
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SOURCE_ROOT = ROOT / ".deps" / "melee" / "src"
 SCHEMA = "melee-web-replay-coverage"
-VERSION = 1
+# Version 2 changes special-family labels from posture-plus-direction to
+# direction only. Existing version-1 reports remain historical ledgers; their
+# labels are not rewritten. Physical posture is reported by ground_air fields
+# and transitions instead.
+VERSION = 2
 CPUS = ("Interpreter64", "JITARM64")
 
 _FIGHTER_KIND_RE = re.compile(r"^FTKIND_[A-Z0-9_]+$")
@@ -329,12 +333,12 @@ def load_source_mapping(source_root: Path = DEFAULT_SOURCE_ROOT) -> dict:
 
 def _family(name: str, *, special: bool) -> str | None:
     if special:
-        match = re.search(r"_MS_(Special)(Air)?(N|S|Hi|Lw)", name)
+        match = re.search(r"_MS_Special(?:Air)?(N|S|Hi|Lw)", name)
         if not match:
             return None
-        air, direction = match.group(2), match.group(3)
+        direction = match.group(1)
         labels = {"N": "neutral", "S": "side", "Hi": "up", "Lw": "down"}
-        return f"special:{'air-' if air else 'ground-'}{labels[direction]}"
+        return f"special:{labels[direction]}"
     suffix = name.split("_MS_", 1)[-1]
     # These labels are deliberately sourced from exact pinned enum names; no
     # numeric motion ranges are used.
@@ -547,7 +551,9 @@ def analyze_capture(
         "scope": (
             "Observed execution coverage from a validated bounded vanilla retail "
             "capture; donor post-frame state, port equivalence, pixels, PCM, "
-            "physical input and content admission are outside scope."
+            "physical input and content admission are outside scope. Special "
+            "family labels carry direction only; physical posture comes from "
+            "ground_air fields and transitions."
         ),
     }
     return capture
@@ -675,6 +681,8 @@ def build_report(
         "selection_limit": select_limit,
         "scope": (
             "Measured fields from the supplied vanilla retail trajectory only; "
-            "selection never uses held-out coverage."
+            "selection never uses held-out coverage. Special family labels carry "
+            "direction only; physical posture comes from ground_air fields and "
+            "transitions."
         ),
     }

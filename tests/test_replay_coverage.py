@@ -16,6 +16,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 
 from replay_coverage import (  # noqa: E402
     CoverageError,
+    VERSION as COVERAGE_VERSION,
     _parse_enum,
     analyze_capture,
     build_report,
@@ -228,6 +229,29 @@ class ReplayCoverageTests(unittest.TestCase):
                       if item["id"] == 370)
         self.assertEqual(appeal["scope"], "fighter_specific")
         self.assertIsNone(appeal["family"])
+
+    def test_special_family_uses_direction_only_from_pinned_enum(self):
+        with tempfile.TemporaryDirectory() as directory:
+            # These are pinned Fox/Falco shared enum states. HoldAir and Fall
+            # contain posture words, but family labels must not infer posture
+            # from them; ground_air is measured separately from each frame.
+            capture, plan = _write_fixture(
+                directory, frame_count=4,
+                motions0=[354, 358, 354, 356],
+                motions1=[354, 358, 354, 356],
+            )
+            report = build_report([capture], input_plans=[plan], cpu="Interpreter64")
+            result = report["candidate_captures"][0]
+        self.assertEqual(report["version"], COVERAGE_VERSION)
+        self.assertEqual(COVERAGE_VERSION, 2)
+        for player in result["players"]:
+            families = {
+                motion["family"] for motion in player["motions"]
+                if motion["id"] in {354, 356, 358}
+            }
+            self.assertEqual(families, {"special:up"})
+            self.assertTrue(all("ground" not in family and "air" not in family
+                                for family in families))
 
     def test_mapping_hash_covers_scanned_dependency_inventory(self):
         dependency = "melee/ft/kinds/ftCommon/ftCo_Damage.c"

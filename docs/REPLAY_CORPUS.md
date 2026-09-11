@@ -75,6 +75,21 @@ portable pipeline descriptors before adding them to the startup seed. A
 discovery run or passing average frame time is not a performance pass. Preserve
 raw failures alongside final results.
 
+For a crash before the required end/teardown record, use
+`scripts/diagnose_port_replay.py REFERENCE_A REFERENCE_B PORT --cpu JITARM64`.
+It verifies the complete reference pair and validates the actual contiguous port
+prefix, then reports its first input, PAD, fighter, RNG or clock mismatch.
+Its `incomplete_capture_diagnostic` result never establishes completion or
+equivalence. Preserve the raw crash and do not append a synthetic end record.
+Complete captures still go through `scripts/compare_port_replay.py` and the
+visible browser acceptance checks.
+
+The frozen build inventory is `BUILD_ARTIFACTS` in
+`tools/browser_replay_validation.py`. Include the imported `.mjs` asset, disc,
+input and audio modules as well as the Wasm, loader, HTML and pipeline seed.
+Changing any of these invalidates the current build identity. Older six-artifact
+ledgers retain their historical scope; new evidence uses the complete inventory.
+
 Coverage reports describe observed motions, transitions and events, with source
 enum identities. They do not prove branch coverage, correct outcomes outside
 the compared fields, pixels, emitted PCM, GPU timing or physical input latency.
@@ -139,6 +154,24 @@ python3 scripts/analyze_replay_coverage.py --cpu JITARM64 \
   --capture work/development-b.jsonl --input-plan work/development-b-plan.json \
   --select 2 --output work/development-coverage.json
 ```
+
+Review portable pipeline discoveries from a fresh-origin cache export only
+after preserving its database, adjacent WAL and provenance manifest:
+
+```sh
+python3 scripts/review_pipeline_cache.py \
+  --base web/initial_pipeline_cache.db.gz.b64 \
+  --candidate work/replay-corpus/pipeline-review/candidate-fresh-origin.db \
+  --provenance work/replay-corpus/pipeline-review/candidate-fresh-origin.provenance.json \
+  --report work/replay-corpus/pipeline-review/review.json \
+  --output work/replay-corpus/pipeline-review/reviewed-seed.db \
+  --expected-base-pipelines 440
+```
+
+The reviewer copies the DB and live WAL before opening SQLite, binds both
+SHA-256 values to the manifest, rejects unknown or unreviewed descriptor
+types, and appends only new reviewed type-1 rows to an immutable seed. Dawn
+driver-cache data is excluded by provenance and is never merged.
 
 The report verifies each capture with the strict reference loader, binds the
 plan by its byte hash, checks every actual four-port input and retains the full
@@ -341,3 +374,171 @@ logs; driver cache remains uncontrolled. The joined receipt
 Wasm is `74c7c1256ae3e458f0d4e57b03666f9e18cbf694a8891fb50b770a57e5ade25c`.
 This is exact declared-state and scoped timing evidence, with no pixel, PCM,
 hardware-input or broad content admission claim.
+
+## Expanded development corpus — eight-game regression gate
+
+The v2 coverage report
+`work/replay-expansion/development-coverage-v2.json` (SHA-256
+`f891c3cbc6d9b2569c96c5ebbf397b8d15e5babb55cde8f311eabc0f29fb9bc9`) analyzes
+the four new retail-A trajectories as development candidates and compares them
+with the prior four-game cohort as historical comparison data. The coverage
+file names that side `held_out`; all four are now development regressions,
+not untouched evaluation games. It uses pinned
+source mapping SHA-256
+`7d912a27ec94d8ad34cac9b793e3bfc24b3f71b65c80f878cb38a2f400b07cbd`, retains
+the complete donor identity, and reports `gold_admitted: false`.
+
+| Workload | Complete donor SHA-256 | Stage / fighters | Ticks | Stock losses | Damage increases | Respawns | Up-special states observed |
+| --- | --- | --- | ---: | ---: | ---: | ---: | --- |
+| New FD `16_38_42` | `18e6ef1e426c5b4a3040c121d6e5aa3aeaed50e9028bd5b9deac09131f2ae9d8` | FD / Fox-Falco | 3,765 | 6 | 19 | 5 | none |
+| New FD `21_06_57` | `03075ddd0e7b927a3aa0905205874e75ce16ab2764b5ac8cc8a69b25fdf63012` | FD / Fox-Falco | 3,535 | 7 | 14 | 6 | Falco: 3 |
+| New YS `15_07_17` | `12f970373838985577ed187bb2a6a0446f31cce82c6c398636de68112d4f195b` | Yoshi's Story / Marth-Falco | 2,901 | 6 | 3 | 5 | Falco: 4 |
+| New YS `20_39_26` | `0323db5f3de35c79b8b91aba6dbc9ffb7f22d19b702879abe04d4449227dbdba` | Yoshi's Story / Marth-Falco | 3,500 | 6 | 7 | 5 | none |
+| Prior BF `19_06_05` | `bd3112441fdbf4c11d8e0332a64236c4022c7f930d51c1226f8e3e30def057af` | Battlefield / Fox-Falco | 3,122 | 7 | 5 | 6 | none |
+| Prior BF `11_36_13` | `1747654c47bbafd72b7644822d2bed686cbfc2cfe16d43a050f4fb7011f4103f` | Battlefield / Fox-Falco | 1,829 | 4 | 1 | 3 | none |
+| Prior BF `12_37_37` | `302be92c000e4b09109648592be4578ec82bd42be88ff6fda609b279c45c488b` | Battlefield / Fox-Falco | 3,719 | 7 | 4 | 6 | none |
+| Prior BF `19_03_39` | `43697ca60cf380e1d76251216923b7946de5c39f369497d10c164371937b0ff1` | Battlefield / Fox-Falco | 2,452 | 6 | 0 | 5 | none |
+
+The new trajectories total 13,701 ticks, 25 stock losses, 43 damage
+increases and 21 respawns. The prior four-game comparison totals 11,122 ticks,
+24 stock losses, ten damage increases and 20 respawns. Up-special coverage is
+present in two new trajectories, both Falco observations; the counts above are
+distinct pinned motion states in the observed `special:up` family. The v2
+report supersedes v1's `special:ground-*` and `special:air-*` labels with
+direction-only special families; ground or air posture remains in the observed
+`ground_air` fields and transitions. Existing v1 reports remain unchanged.
+
+The immutable reference artifact hashes are:
+
+| Workload | Retail A SHA-256 | Retail B SHA-256 | MWRC recipe SHA-256 |
+| --- | --- | --- | --- |
+| New FD `16_38_42` | `8a0da77abe54cea68a961629a4f4a096853d11762749a34b2ce229488be6d5ea` | `995c98828a694b609934b9f1cc73c6214a6e18eb287e181dc9b2db962a4958e2` | `7b7617817588047aec256aebfd701894e61e794fc0ef80edf65746108f7a489c` |
+| New FD `21_06_57` | `c4e71b0b80b161ade524105c806f66cfcc592b253499fff14892a6312543b0a6` | `637b0c881bb74ebf2ee4da236a0d97c30b47c10c341fb15e62fc1db3774431f8` | `48d1a08eb5eaa7d653860d450d4e89cccb03b1e1b15a7bf4aea64a5d38bf9a6f` |
+| New YS `15_07_17` | `276bafbcf067b4fa5099f7aadc43ca21064efe36083f0fa6a4c2ce7c002b6411` | `c4b530f5279ca550a2f5f761d368a5194c04a1df8aff333ce77a81ca7c5414fc` | `3aedd1b90444bd7465a80d0671474708197e21005eb4c9080d268b212deb5d9f` |
+| New YS `20_39_26` | `aba8d5f49deeacaa118f4caccebbd9cfb01deb839d7a8eb4425eb1031a7fca6b` | `174d9c27f44b740f51ee8055f8e3f3764d8cc824eb7c6b029464e7f5d66f2e14` | `38ba2ab7a95161f3fa2292f884a7ace661448030bb7a684b031c71e62bea278f` |
+| Prior BF `19_06_05` | `15146ce4b3b542ee1ddf82d5345395dec551612c4f7ad82152e0d58ca061ff0d` | `56e90c852bfe0305b42e93dc3a9d71ec2a2206b9f2fde3a80483631fd6c84511` | `fa4e646ffa56aa0ad34938a4f427fa9e5600ad18a6308a165566f33e5f36e54a` |
+| Prior BF `11_36_13` | `5ce2679daea4b5f44251b0f0d26ea4653d87820c0d4b8b5b05ffd23d9a8a1306` | `f57f1c67f3fe785958a31cc4d5b86e6021c9aa391f7c00412c857acb40558080` | `4f6d37f9df0638f56e33a76962734bb2863b06106d1d00f84802a04e59460541` |
+| Prior BF `12_37_37` | `d268186b50ece52788b052633a43ee30c154ffaf4de45f4d722c693db01439ff` | `93c1f9f65115c25260a65ba88a0a98b10b5ab3c40f344887c12b6577dbec4e7f` | `d8e8f7d1e0ec8171642d651176ba72135a46e25462926b614e5806e2c9f50e26` |
+| Prior BF `19_03_39` | `cc1abee7031563ece3327f8935da1fe8e8688b80d101071d7bbe6a40a3bb0187` | `ee9f5996f181c7935535dd5c2ad6249794e13c7690158a429f2c56673d8a7147` | `7e28fba9b221fa99d6681e315bd0b129144f899ba167beb35d9d1a37a8207f09` |
+
+### Reference repeatability and port status
+
+All four new A/B reference pairs independently repeat with complete input,
+frame-order, provenance and semantic-state checks. This reference result is
+separate from port validation. All eight visible declared-state comparisons
+now pass through original endings and teardown on the final shared build.
+The FD `16_38_42` damage/RNG red at tick 2,396 exposed missing original
+`Ground_801BFFB0` initialization: a zero floor constrained the main camera,
+causing earlier magnifier damage. Restoring the source reset before map archive
+publication fixes the full 3,765-tick visible declared-state comparison against
+both retail references (trace SHA-256
+`c7d676a238528f7118057652ff666c9d80e8967fc840c26f8ce7322fbcac4a2f`).
+The original 60-tick damage threshold is unchanged. A separate `Mtx44`
+projection-buffer correction removes a 16-byte overwrite; its isolated full-game
+control preserved the failing trace and did not explain the camera red.
+Selected camera coordinates still differ from retail, so this gameplay result
+is not pixel or camera equivalence.
+
+Yoshi's Story `15_07_17` now matches both references through all 2,901 ticks,
+including visible source drawing (trace SHA-256
+`b17481b1cf3a3a7ed7993d450c6de2e9592caa38bf0e1aca185ebff6ded4c86a`).
+Its tick-1,146 position red required shared pose and SDK quaternion-matrix
+rounding corrections. Identical retail scalar inputs establish 1,485 exact
+pose-call outputs and 135 exact quaternion matrices before the full replay.
+The prior implementations differed on 833 and 111 calls respectively.
+Noncausal wall-interpolation edits were removed; no tolerance, expected-state
+injection or special-case replay correction was added. See the
+[scalar capture procedure](RETAIL_REPLAY_CAPTURE.md#shared-pose-and-quaternion-matrix-scalar-oracles).
+
+The updated development seed preserves all 446 prior pipelines and appends 23
+validated type-1 keys from a cleared-origin YS `15_07_17` discovery run (19
+preparation and four live creations). It contains 469 pipelines plus the same
+shader row, SHA-256
+`30a502f41112c06663b9fa8655a380e9cbeae065f4f2475e81172f5929a1003f`.
+The review retains original row metadata, verifies payload version/size and
+records DB/WAL provenance in `pipeline-review/ys15-review-final.json`.
+The final Release build passes all eight complete visible state comparisons
+(24,823 ticks), followed by 16 isolated application-cold/warm performance runs
+(49,646 ticks). All hard counters are zero: callback gaps over 33.3 ms, native
+callbacks over 33.3 ms, browser long tasks, timing pauses, live pipeline queue/
+creation, and audio underruns/overflows. No run resumed a hitch. Worst native
+callback is 15.855 ms and worst browser interval is 26.560 ms. Application-cold
+preparation ranges from 184.520–238.970 ms; warm preparation is
+182.910–218.160 ms. Driver caches remain uncontrolled.
+
+All eight consecutive instrumented state runs keep Wasm capacity at 334,102,528
+bytes through teardown; all 16 isolated timing runs have zero live heap growth.
+The named machine is Apple M4 / Mac16,12, 32 GiB, macOS 26.6.2, visible Chromium
+152, 640×480 with DPR 2, battery power and Low Power Mode off. Timing runs exclude
+concurrent builds, tests and Dolphin captures. These are declared-state and
+scoped performance gates; pixels, PCM, physical input, hardware timing and broad
+gold/content admission remain open.
+
+`work/replay-expansion/browser-profile-psquat-final.json` freezes all 13 runtime
+artifacts, including Wasm SHA-256
+`9eae28251d27fea6f87e0d1246083546c0355e0a9d9fcf6fac8d848747c6ade0` and the seed
+above. The instrumented state ledger is `psquat-visible-state-runs.json`; the
+isolated timing ledger is `psquat-performance-runs.json`. Each joined receipt
+checks both complete originals, recipe, source-drawn state, cold/warm reports,
+build identity, source ending and inspected browser error logs.
+
+| Workload | Worst native cold / warm (ms) | Joined receipt SHA-256 |
+| --- | ---: | --- |
+| dev-ys-15_07_17 | 12.400 / 13.000 | `ab1b561a2791f28a6a44684114c6f7dcd93f097ab5e2c428b61b0a78c51dce3c` |
+| dev-ys-20_39_26 | 13.270 / 15.855 | `abc4817a0be22a56b0c494626249e66a528b3e7117424ef71c21652357f12140` |
+| dev-fd-16_38_42 | 10.255 / 11.820 | `9b3468598745eb5dad5ed72131ecb132140b919b3c2211953b1b365338f4801b` |
+| dev-fd-21_06_57 | 10.535 / 12.320 | `f254fe00767a5502e23bffd2353a76ab2a03bebdc3c029ed793d21a7761c967f` |
+| dev-12_37_37 | 9.645 / 9.790 | `c036783ef83eb5e47a63c4fa2e97982e3b3b8a05430141553a57691974a14885` |
+| baseline | 9.155 / 11.175 | `2401cd937972a77276fa39945e78177f874752b0d55e001614412fde08d9ee9a` |
+| dev-11_36_13 | 7.670 / 13.085 | `2a96e56b083ad3cc4f083f303910f78d14b7c9e1dc899396a9325f4cb7abac2d` |
+| heldout-19_03_39 | 10.855 / 7.885 | `a0fa6186c6ecdbfeed467f38561c31bf6e1c51a5136387257cd0ed78d8ba9e5d` |
+
+The two previously reserved donor identities remain unexecuted at this milestone:
+`0376f27fe92a224a1c6a972493292562f0b07391a7265dea480bc13806b6b433`
+(Fox/Falco FD) and
+`0e073460262b77369111e20098644531b9e718fbc6a21608097cb2d9bcabe0e9`
+(Marth/Falco Yoshi's Story). Their input-only plans and identities are in
+`heldout-execution-plan.json`. Reference and port execution require an explicit
+runtime freeze after the eight joined development gates pass; any tuning after
+an evaluation failure moves that donor into development.
+
+## Independently verified UCF-off candidate split
+
+The earlier 952-file sample and its approximately 0.50% one-sided UCF-off bound
+describe that sample only. They are superseded for corpus-wide candidate
+selection: the older sample's source identities and the pre-filter inventory
+needed to explain the difference are unavailable, so the cause of the changed
+observed rate remains unresolved. Do not treat the earlier zero-observation
+result as a full-corpus constraint.
+
+At pinned dataset revision
+`c82be5f6e43f3388555cfe0cf8652580601f396d`, the ignored manifest
+`work/replay-expansion/vanilla-candidate-split-2026-09-11/manifest.json`
+(SHA-256 `db441dfb6069672a3946dc0026f0da02bdbcb1e9340b0075d72103611905748f`)
+records 76 complete source identities. The pinned decoder and installed
+`@slippi/slippi-js` 9.1.3 agreed on all 76 headers and Game End records; the
+16 exact human P1/P2 sources passed complete parsing and explicit
+`dolphin-pipe-processed-v2` export. Selection used headers, stage/matchup,
+ports, normal Game End and pre-frame intent only. No runtime or reference
+execution has occurred, and `gold_admitted` remains false.
+
+| Role | Complete donor SHA-256 | Stage / matchup |
+| --- | --- | --- |
+| Development | `323d7ff17991fd5c47f7584531b5e50128132e0543e659d13ca0696ef5986f23` | Battlefield / Falco-Fox |
+| Development | `4683290e23b85b189f6157871b46690a67d5456f304e75b4dca2cd0cf0a0d5c8` | Yoshi's Story / Marth-Marth |
+| Development | `59cee05bb6d0f37e4cafd7100b0ffb73ea3c2886412328ded5b661aa3fd8afba` | Final Destination / Fox-Fox |
+| Development | `7e5a8d15187dabb5e9a658fe025e2cb301c968a2c1f6a7bcad440675e8dc4002` | Yoshi's Story / Falco-Mario |
+| Development | `8075c5d52d965088e0ebe36b5974e29ad399206099e770178dd344e936b316cc` | Dream Land / Falco-Marth |
+| Development | `a822bb8d76fad6ec60fa034eef8b1e560edb07bad5cb90ac49ac8ce82c973f9a` | Dream Land / Fox-Marth |
+| Development | `dca20df0227367841f09e6a53b4557d3ffcbd6c3028c00d1e7b7a5b5300f5d1d` | Yoshi's Story / Falco-Marth |
+| Development | `e2a3baac277f9ef20b59efad37bf90b5fd456fa0e595e99f2a8a5ecfd542819c` | Dream Land / Falco-Falco |
+| Held-out, reserved | `277c7e0e2f42ceb42435b16e639fb97b554fbf9a1574059e809967179aec594a` | Battlefield / Marth-Marth |
+| Held-out, reserved | `feeb4d6d52ccc2f25fd0eabf75794c5aebd28ee2b1bfc17e2d74f316784924cd` | Final Destination / Falco-Falco |
+
+These legacy recordings do not provide complete modern raw PAD fields. Their
+plans therefore use the explicit processed-v2 policy, which derives axis bytes
+from bounded processed axes and preserves physical buttons and invertible
+trigger bytes. This is a derived input workload, not recovered hardware input
+or UCF-state equivalence. The plans retain donor identity and inputs but do not
+transplant donor fighter positions; initial retail spawn setup remains a
+separate validation boundary.

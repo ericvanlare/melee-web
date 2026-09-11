@@ -510,7 +510,6 @@ index 4602bcd..3140ec8 100644
  extern volatile u32 efLib_LoadKind;
  extern volatile s32 efLib_AnimCount;
 diff --git a/src/melee/ft/fighter.c b/src/melee/ft/fighter.c
-index 8299c5c..df8bb28 100644
 --- a/src/melee/ft/fighter.c
 +++ b/src/melee/ft/fighter.c
 @@ -1,4 +1,7 @@
@@ -540,8 +539,8 @@ index 8299c5c..df8bb28 100644
  
 -                    if (sqrtf(kb_vel_x * kb_vel_x + kb_vel_y * kb_vel_y) <
 +                    /* GALE01r2 8006B938/8006B9C8/8006B9E4: retain
-+                     * scalar single-precision fused-operation rounding. */
-+
++                     * scalar single-precision fused-operation rounding.
++                     * fnmsubs negates the rounded result, including zero. */
 +                    if (sqrtf(fmaf(kb_vel_x, kb_vel_x, kb_vel_y * kb_vel_y)) <
                          p_ftCommonData->x204_knockbackFrameDecay)
                      {
@@ -554,15 +553,45 @@ index 8299c5c..df8bb28 100644
 -                            p_ftCommonData->x204_knockbackFrameDecay *
 -                            sinf(kb_angle);
 +                        p_kb_vel->x =
-+                            fmaf(-p_ftCommonData->x204_knockbackFrameDecay,
-+                                 cosf(kb_angle), p_kb_vel->x);
++                            -fmaf(p_ftCommonData->x204_knockbackFrameDecay,
++                                  cosf(kb_angle), -p_kb_vel->x);
 +                        p_kb_vel->y =
-+                            fmaf(-p_ftCommonData->x204_knockbackFrameDecay,
-+                                 sinf(kb_angle), p_kb_vel->y);
++                            -fmaf(p_ftCommonData->x204_knockbackFrameDecay,
++                                  sinf(kb_angle), -p_kb_vel->y);
                      }
                  }
  
-@@ -3112,8 +3123,12 @@ void Fighter_Unload_8006DABC(void* user_data)
+@@ -2238,7 +2249,9 @@ void Fighter_procUpdate(Fighter_GObj* gobj)
+                 float kb_y = pAtkShieldKB->y;
+                 float atkShieldKBAngle = atan2f(kb_y, kb_x);
+ 
+-                if (sqrtf(kb_x * kb_x + kb_y * kb_y) <
++                /* GALE01r2 8006BAA8/8006BB34/8006BB50 use the same
++                 * fmadds/fnmsubs boundaries for shield knockback. */
++                if (sqrtf(fmaf(kb_x, kb_x, kb_y * kb_y)) <
+                     p_ftCommonData->x3E8_shieldKnockbackFrameDecay)
+                 {
+                     /// @bug IN THE MELEE CODE THAT CAUSES THE INVISIBLE
+@@ -2251,12 +2264,12 @@ void Fighter_procUpdate(Fighter_GObj* gobj)
+                     // p_stc_ftcommon->x3e8_shield_kb_frameDecay)/atkShieldKB_len
+                     // float atkShieldKBAngle = atan2_80022C30(pAtkShieldKB->y,
+                     // pAtkShieldKB->x);
+-                    pAtkShieldKB->x -=
+-                        p_ftCommonData->x3E8_shieldKnockbackFrameDecay *
+-                        cosf(atkShieldKBAngle);
+-                    pAtkShieldKB->y -=
+-                        p_ftCommonData->x3E8_shieldKnockbackFrameDecay *
+-                        sinf(atkShieldKBAngle);
++                    pAtkShieldKB->x =
++                        -fmaf(p_ftCommonData->x3E8_shieldKnockbackFrameDecay,
++                              cosf(atkShieldKBAngle), -pAtkShieldKB->x);
++                    pAtkShieldKB->y =
++                        -fmaf(p_ftCommonData->x3E8_shieldKnockbackFrameDecay,
++                              sinf(atkShieldKBAngle), -pAtkShieldKB->y);
+                 }
+                 fp->xF4_ground_attacker_shield_kb_vel = 0;
+             } else {
+@@ -3112,8 +3125,12 @@ void Fighter_Unload_8006DABC(void* user_data)
      HSD_LObjRemoveAll(fp->x588);
      Player_80031FB0(fp->player_id, fp->x221F_b4);
  
@@ -5767,7 +5796,7 @@ diff --git a/src/melee/lb/lbtrigf.c b/src/melee/lb/lbtrigf.c
  #define SIGNED_BITWISE(f) ((s32) BITWISE(f))
  #define GET_SIGN_BIT(f) (SIGNED_BITWISE(f) & SIGN_BIT)
  #define BITWISE_PI_2 0x3FC90FDB
-@@ -37,7 +38,7 @@
+@@ -37,20 +38,22 @@
          return atanf(y / x);
      }
  
@@ -5776,7 +5805,26 @@ diff --git a/src/melee/lb/lbtrigf.c b/src/melee/lb/lbtrigf.c
  
      return y;
  }
-@@ -144,7 +145,7 @@
+ 
+ float acosf(float x)
+ {
+-    float result = 1.0F - x * x;
++    /* GALE01r2 80022D30/54/64/74: preserve fnmsubs rounding, including
++     * its final negation. The original frsqrte estimate remains unchanged. */
++    float result = -fmaf(x, x, -1.0F);
+     if (result > 0) {
+         float guess;
+         guess = __frsqrte(result);
+-        guess = 0.5f * guess * (3.0f - guess * guess * result);
+-        guess = 0.5f * guess * (3.0f - guess * guess * result);
+-        guess = 0.5f * guess * (3.0f - guess * guess * result);
++        guess = (0.5f * guess) * -fmaf(result, guess * guess, -3.0f);
++        guess = (0.5f * guess) * -fmaf(result, guess * guess, -3.0f);
++        guess = (0.5f * guess) * -fmaf(result, guess * guess, -3.0f);
+         result = guess;
+     } else if (result) {
+         result = NAN;
+@@ -144,7 +147,7 @@
      0.0,
  };
  
@@ -5785,8 +5833,12 @@ diff --git a/src/melee/lb/lbtrigf.c b/src/melee/lb/lbtrigf.c
  float atanf(float x)
  {
      float const silver_ratio = 2.4142136573791504f;
-@@ -156,7 +157,7 @@
-     bool x_ge_ratio = false;
+@@ -153,10 +156,10 @@
+     float result;
+     const float* lookup_ptr;
+     s32 lookup_index = -1;
+-    bool x_ge_ratio = false;
++    melee_source_bool x_ge_ratio = false;
      s32 sign_bit_x = BITWISE(x) & SIGN_BIT;
  
 -    BITWISE(x) &= ~SIGN_BIT;
@@ -5794,7 +5846,7 @@ diff --git a/src/melee/lb/lbtrigf.c b/src/melee/lb/lbtrigf.c
  
      if (x >= silver_ratio) {
          x_ge_ratio = true;
-@@ -200,8 +201,8 @@
+@@ -200,8 +203,8 @@
              offset_33 = lookup_ptr[33];
  
              result = 1.0f / (offset_33 + (x + offset_39));
@@ -5805,7 +5857,7 @@ diff --git a/src/melee/lb/lbtrigf.c b/src/melee/lb/lbtrigf.c
          }
      } else {
          result = x;
-@@ -209,27 +210,19 @@
+@@ -209,27 +212,19 @@
  
      {
          float result_squared = result * result;
@@ -5846,7 +5898,7 @@ diff --git a/src/melee/lb/lbtrigf.c b/src/melee/lb/lbtrigf.c
      }
  
      if (x_ge_ratio) {
-@@ -237,7 +230,7 @@
+@@ -237,7 +232,7 @@
          return sign_bit_x ? result : -result;
      }
  
@@ -6332,3 +6384,495 @@ index 6b937b3..9733f2b 100644
              break;
          }
          default:
+
+diff --git a/src/melee/lb/lb_0219.c b/src/melee/lb/lb_0219.c
+--- a/src/melee/lb/lb_0219.c
++++ b/src/melee/lb/lb_0219.c
+@@ -68,6 +68,171 @@
+     }
+ }
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++/*
++ * The native flash helpers leave their objects in global registries. The
++ * browser owns this short-lived instance, so keep exact identities and only
++ * tear it down after all callbacks have quiesced.
++ */
++extern HSD_GObj* melee_web_bg_flash_overlay_owner(void);
++extern HSD_GObj* melee_web_bg_flash_camera_owner(void);
++extern int melee_web_bg_flash_destroy(HSD_GObj* overlay, HSD_GObj* camera);
++extern void melee_web_bg_flash_save_state(void);
++extern void melee_web_bg_flash_restore_state(void);
++
++static HSD_GObj* melee_web_bg_flash_animation_owner;
++static HSD_GObj* melee_web_bg_flash_saved_overlay;
++static HSD_GObj* melee_web_bg_flash_saved_camera;
++static void* melee_web_bg_flash_saved_user_data;
++static BgFlashGlobal* melee_web_bg_flash_saved_animation;
++static struct Fighter_804D653C_t* melee_web_bg_flash_saved_col_anim;
++static f32 melee_web_bg_flash_saved_scale;
++static int melee_web_bg_flash_saved_valid;
++
++static int melee_web_bg_flash_callback_active(void)
++{
++    return HSD_GObj_804D781C != NULL || HSD_GObj_804D7814 != NULL || HSD_GObj_804D7818 != NULL;
++}
++
++static void melee_web_bg_flash_restore_private_state(void)
++{
++    if (melee_web_bg_flash_saved_valid) {
++        lbl_804D63E0 = melee_web_bg_flash_saved_animation;
++        lbl_804D63DC = melee_web_bg_flash_saved_col_anim;
++        lbl_804D63D8 = melee_web_bg_flash_saved_scale;
++        melee_web_bg_flash_saved_valid = 0;
++    }
++}
++
++static void melee_web_bg_flash_clear_created_owners(void)
++{
++    melee_web_bg_flash_saved_overlay = NULL;
++    melee_web_bg_flash_saved_camera = NULL;
++    melee_web_bg_flash_saved_user_data = NULL;
++}
++
++static int melee_web_bg_flash_release_animation(HSD_GObj* owner)
++{
++    if (owner == NULL || lbl_804D63E0 != (BgFlashGlobal*) owner ||
++        melee_web_bg_flash_callback_active() ||
++        HSD_ObjAllocGetUsing(&lbl_804336A0) != 1)
++    {
++        return 0;
++    }
++
++    HSD_GObjPLink_80390228(owner);
++    lbl_804D63E0 = NULL;
++    return HSD_ObjAllocGetUsing(&lbl_804336A0) == 0;
++}
++
++int melee_web_bg_flash_begin(void)
++{
++    HSD_GObj* animation;
++    HSD_GObj* overlay;
++    HSD_GObj* camera;
++    int cleanup_ok;
++
++    if (melee_web_bg_flash_animation_owner != NULL ||
++        melee_web_bg_flash_saved_valid || lbl_804D63E0 != NULL ||
++        melee_web_bg_flash_overlay_owner() != NULL ||
++        melee_web_bg_flash_camera_owner() != NULL ||
++        melee_web_bg_flash_callback_active() ||
++        HSD_ObjAllocGetUsing(&lbl_804336A0) != 0)
++    {
++        return 0;
++    }
++
++    melee_web_bg_flash_saved_animation = lbl_804D63E0;
++    melee_web_bg_flash_saved_col_anim = lbl_804D63DC;
++    melee_web_bg_flash_saved_scale = lbl_804D63D8;
++    melee_web_bg_flash_saved_valid = 1;
++    melee_web_bg_flash_save_state();
++
++    /* This is the original constructor, including the 0xFF alpha source. */
++    lbBgFlash_80021A18(0xFF);
++
++    animation = (HSD_GObj*) lbl_804D63E0;
++    overlay = melee_web_bg_flash_overlay_owner();
++    camera = melee_web_bg_flash_camera_owner();
++    if (animation != NULL && overlay != NULL && camera != NULL &&
++        lbl_804D63DC != NULL && animation->user_data != NULL &&
++        animation->user_data_remove_func == fn_800219E4 &&
++        HSD_ObjAllocGetUsing(&lbl_804336A0) == 1)
++    {
++        melee_web_bg_flash_animation_owner = animation;
++        melee_web_bg_flash_saved_overlay = overlay;
++        melee_web_bg_flash_saved_camera = camera;
++        melee_web_bg_flash_saved_user_data = animation->user_data;
++        return 1;
++    }
++
++    /* A partial constructor is still rolled back through the real destructors. */
++    cleanup_ok = 1;
++    if (animation != NULL) {
++        cleanup_ok = melee_web_bg_flash_release_animation(animation);
++    }
++    if (cleanup_ok) {
++        overlay = melee_web_bg_flash_overlay_owner();
++        camera = melee_web_bg_flash_camera_owner();
++        cleanup_ok = melee_web_bg_flash_destroy(overlay, camera);
++    }
++    if (cleanup_ok && HSD_ObjAllocGetUsing(&lbl_804336A0) == 0) {
++        HSD_ObjAllocInit(&lbl_804336A0, 0x84, 4);
++        melee_web_bg_flash_restore_private_state();
++        melee_web_bg_flash_restore_state();
++        melee_web_bg_flash_clear_created_owners();
++    }
++    return 0;
++}
++
++int melee_web_bg_flash_end(void)
++{
++    HSD_GObj* overlay;
++    HSD_GObj* camera;
++
++    if (melee_web_bg_flash_animation_owner == NULL ||
++        !melee_web_bg_flash_saved_valid ||
++        lbl_804D63E0 != (BgFlashGlobal*) melee_web_bg_flash_animation_owner ||
++        melee_web_bg_flash_callback_active() ||
++        HSD_ObjAllocGetUsing(&lbl_804336A0) != 1)
++    {
++        return 0;
++    }
++
++    if (melee_web_bg_flash_overlay_owner() !=
++            melee_web_bg_flash_saved_overlay ||
++        melee_web_bg_flash_camera_owner() != melee_web_bg_flash_saved_camera ||
++        melee_web_bg_flash_animation_owner->user_data !=
++            melee_web_bg_flash_saved_user_data ||
++        melee_web_bg_flash_animation_owner->user_data_remove_func !=
++            fn_800219E4)
++    {
++        return 0;
++    }
++    overlay = melee_web_bg_flash_saved_overlay;
++    camera = melee_web_bg_flash_saved_camera;
++
++    if (!melee_web_bg_flash_release_animation(
++            melee_web_bg_flash_animation_owner))
++    {
++        return 0;
++    }
++    if (!melee_web_bg_flash_destroy(overlay, camera) ||
++        HSD_ObjAllocGetUsing(&lbl_804336A0) != 0)
++    {
++        return 0;
++    }
++
++    /* Re-register a clean allocator; never restore its live-list `next`. */
++    HSD_ObjAllocInit(&lbl_804336A0, 0x84, 4);
++    melee_web_bg_flash_animation_owner = NULL;
++    melee_web_bg_flash_restore_private_state();
++    melee_web_bg_flash_restore_state();
++    melee_web_bg_flash_clear_created_owners();
++    return 1;
++}
++#endif
++
+ typedef struct BgFlashUserData {
+     u8 x0;
+     u8 pad_01[3];
+
+diff --git a/src/melee/lb/lbbgflash.c b/src/melee/lb/lbbgflash.c
+--- a/src/melee/lb/lbbgflash.c
++++ b/src/melee/lb/lbbgflash.c
+@@ -44,6 +44,7 @@
+ #include <sysdolphin/baselib/gobj.h>
+ #include <sysdolphin/baselib/gobjgxlink.h>
+ #include <sysdolphin/baselib/gobjobject.h>
++#include <sysdolphin/baselib/gobjplink.h>
+ #include <sysdolphin/baselib/gobjproc.h>
+ #include <sysdolphin/baselib/hsd_3915.h>
+ 
+@@ -367,6 +368,61 @@
+     }
+ }
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++static BgFlashData melee_web_bg_flash_saved_state;
++static int melee_web_bg_flash_saved_state_valid;
++
++void melee_web_bg_flash_save_state(void)
++{
++    melee_web_bg_flash_saved_state = lbl_80433658;
++    melee_web_bg_flash_saved_state_valid = 1;
++}
++
++void melee_web_bg_flash_restore_state(void)
++{
++    if (melee_web_bg_flash_saved_state_valid) {
++        lbl_80433658 = melee_web_bg_flash_saved_state;
++        melee_web_bg_flash_saved_state_valid = 0;
++    }
++}
++
++HSD_GObj* melee_web_bg_flash_overlay_owner(void)
++{
++    return lbl_80433658.x40;
++}
++
++HSD_GObj* melee_web_bg_flash_camera_owner(void)
++{
++    return lbl_80433658.x44;
++}
++
++int melee_web_bg_flash_destroy(HSD_GObj* overlay, HSD_GObj* camera)
++{
++    if (HSD_GObj_804D781C != NULL || HSD_GObj_804D7814 != NULL || HSD_GObj_804D7818 != NULL ||
++        lbl_80433658.x40 != overlay || lbl_80433658.x44 != camera)
++    {
++        return 0;
++    }
++
++    /* Clear private owners before unlinking so callbacks cannot observe them. */
++    lbl_80433658.x40 = NULL;
++    lbl_80433658.x44 = NULL;
++    if (overlay != NULL) {
++        HSD_GObjPLink_80390228(overlay);
++    }
++    if (camera != NULL) {
++        HSD_GObjPLink_80390228(camera);
++    }
++    return 1;
++}
++
++static void fn_800204C8_event(HSD_GObj* gobj)
++{
++    (void) gobj;
++    fn_800204C8();
++}
++#endif
++
+ /// @brief Trigger background flash.
+ /// @param duration Flash duration in frames (minimum 1).
+ void lbBgFlash_800205F0(s32 duration)
+@@ -467,7 +523,11 @@
+     gobj2_slot = &flash->x40;
+     GObj_SetupGXLink(*gobj2_slot, (GObj_RenderFunc) fn_8001FEC4, 0x10,
+                      (u8) arg0);
++#if defined(MELEE_WEB_GAMEPLAY)
++    HSD_GObj_SetupProc(*gobj2_slot, fn_800204C8_event, 0);
++#else
+     HSD_GObj_SetupProc(*gobj2_slot, (HSD_GObjEvent) fn_800204C8, 0);
++#endif
+ 
+     lbl_80433658.state.active = 1;
+     lbl_80433658.state.mode = 0;
+@@ -498,7 +558,11 @@
+     gobj2_slot = &flash->x40;
+     GObj_SetupGXLink(*gobj2_slot, (GObj_RenderFunc) fn_8001FEC4, 0x10, 0xa);
+     temp = *gobj2_slot;
++#if defined(MELEE_WEB_GAMEPLAY)
++    HSD_GObj_SetupProc(temp, fn_800204C8_event, 0);
++#else
+     HSD_GObj_SetupProc(temp, (HSD_GObjEvent) fn_800204C8, 0);
++#endif
+     lbl_80433658.state.active = 1;
+     lbl_80433658.state.mode = 0;
+ }
+
+diff --git a/src/sysdolphin/baselib/hsd_3915.c b/src/sysdolphin/baselib/hsd_3915.c
+--- a/src/sysdolphin/baselib/hsd_3915.c
++++ b/src/sysdolphin/baselib/hsd_3915.c
+@@ -416,9 +416,14 @@
+     { 0xB3808000, hsd_80392194 },
+ };
+ 
++#if !defined(MELEE_WEB_GAMEPLAY)
+ DebugFontGlyph HSD_DebugFontAtlas[] = {
+ #include <sysdolphin/baselib/debug_font.inc>
+ };
++#endif
++/* The browser links the original screen-overlay GX setup from this unit.
++ * Debug-console text is outside its closure. Keep the atlas declaration
++ * unresolved so a future console consumer requires an owned-data provider. */
+ 
+ void hsd_803921B8(void* bitmap, s32 x, s32 y, s32 dst, s32 w, s32 h,
+                   s32 stride, void* tbl)
+
+diff --git a/src/melee/ft/kinds/ftCommon/ftCo_Guard.c b/src/melee/ft/kinds/ftCommon/ftCo_Guard.c
+--- a/src/melee/ft/kinds/ftCommon/ftCo_Guard.c
++++ b/src/melee/ft/kinds/ftCommon/ftCo_Guard.c
+@@ -676,12 +676,14 @@
+         fp->x2219_b0 = true;
+     }
+     {
+-        float f = (p_ftCommonData->x28C *
+-                   (fp->x19A4 *
+-                    (1.0f - ((fp->lightshield_amount *
+-                              (p_ftCommonData->x2E8 - p_ftCommonData->x2E4)) +
+-                             p_ftCommonData->x2E4)))) +
+-                  p_ftCommonData->x290;
++        float shield_scale =
++            fmaf(fp->lightshield_amount,
++                 p_ftCommonData->x2E8 - p_ftCommonData->x2E4,
++                 p_ftCommonData->x2E4);
++        float f =
++            fmaf(p_ftCommonData->x28C,
++                 (float) fp->x19A4 * (1.0f - shield_scale),
++                 p_ftCommonData->x290);
+         ftAnim_SetAnimRate(gobj,
+                            (0.1f + lbGetJObjEndFrame(GET_JOBJ(gobj))) / f);
+         if (!arg1) {
+diff --git a/src/melee/ft/kinds/ftFox/ftfoxspecialhi.c b/src/melee/ft/kinds/ftFox/ftfoxspecialhi.c
+--- a/src/melee/ft/kinds/ftFox/ftfoxspecialhi.c
++++ b/src/melee/ft/kinds/ftFox/ftfoxspecialhi.c
+@@ -278,13 +278,16 @@
+     fp->mv.fx.SpecialHi.unk++;
+ 
+     if (fp->mv.fx.SpecialHi.unk >= da->x70_FOX_FIREFOX_DURATION_END) {
++        /* GALE01r2: X rounds accel*cos at 800E77C0 before 800E77C8
++         * fnmsubs; Y directly fuses accel*sin - old at 800E77E0. */
++        float reverse_accel = da->x78_FOX_FIREFOX_REVERSE_ACCEL;
+         fp->self_vel.x =
+-            -((fp->facing_dir * (da->x78_FOX_FIREFOX_REVERSE_ACCEL *
+-                                 cosf(fp->mv.fx.SpecialHi.rotateModel))) -
+-              fp->self_vel.x);
+-        fp->self_vel.y = -((da->x78_FOX_FIREFOX_REVERSE_ACCEL *
+-                            sinf(fp->mv.fx.SpecialHi.rotateModel)) -
+-                           fp->self_vel.y);
++            -fmaf(fp->facing_dir,
++                  reverse_accel * cosf(fp->mv.fx.SpecialHi.rotateModel),
++                  -fp->self_vel.x);
++        fp->self_vel.y =
++            -fmaf(reverse_accel, sinf(fp->mv.fx.SpecialHi.rotateModel),
++                  -fp->self_vel.y);
+     }
+ }
+ 
+
+--- a/src/melee/lb/lbvector.c
++++ b/src/melee/lb/lbvector.c
+@@ -368,7 +368,8 @@
+ {
+     u8 _[16];
+ 
+-    Mtx projMtx;
++    /* MTXPerspective/MTXOrtho write a full 4x4 projection matrix. */
++    Mtx44 projMtx;
+     float projection[7]; // projection params
+     float viewport[6];   // viewport params
+     Mtx m;
+diff --git a/src/sysdolphin/baselib/quatlib.c b/src/sysdolphin/baselib/quatlib.c
+--- a/src/sysdolphin/baselib/quatlib.c
++++ b/src/sysdolphin/baselib/quatlib.c
+@@ -137,10 +137,11 @@
+ 
+     ss = sy * sz;
+     cc = cy * cz;
+-    q->w = cx * cc + sx * ss;
+-    q->x = sx * cc - cx * ss;
+-    q->y = cz * (cx * sy) + sz * (sx * cy);
+-    q->z = sz * (cx * cy) - cz * (sx * sy);
++    /* GALE01r2 8037EED0..8037EEF0: single-precision fused endpoints. */
++    q->w = fmaf(cx, cc, sx * ss);
++    q->x = fmaf(sx, cc, -(cx * ss));
++    q->y = fmaf(cz, cx * sy, sz * (sx * cy));
++    q->z = fmaf(sz, cx * cy, -(cz * (sx * sy)));
+ 
+     return 0;
+ }
+@@ -154,7 +155,10 @@
+     f32 sp;
+     f32 sq;
+ 
+-    cosom = p->x * q->x + p->y * q->y + p->z * q->z + p->w * q->w;
++    /* 8037EF6C..8037EF94: y product first, then x/z/w fmadds. */
++    cosom = fmaf(p->x, q->x, p->y * q->y);
++    cosom = fmaf(p->z, q->z, cosom);
++    cosom = fmaf(p->w, q->w, cosom);
+ 
+     if ((1.0F + cosom) > 1e-10F) {
+         if ((1.0F - cosom) > 1e-10F) {
+@@ -166,10 +170,10 @@
+             sq = t;
+             sp = (f32) (1.0 - (f64) t);
+         }
+-        out->x = sp * p->x + sq * q->x;
+-        out->y = sp * p->y + sq * q->y;
+-        out->z = sp * p->z + sq * q->z;
+-        out->w = sp * p->w + sq * q->w;
++        out->x = fmaf(sp, p->x, sq * q->x);
++        out->y = fmaf(sp, p->y, sq * q->y);
++        out->z = fmaf(sp, p->z, sq * q->z);
++        out->w = fmaf(sp, p->w, sq * q->w);
+     } else {
+         out->x = -p->y;
+         out->y = p->x;
+@@ -179,21 +183,21 @@
+         if (t < 0.5F) {
+             sp = sinf((f32) (M_PI_2 * (1.0F - (2.0F * t))));
+             sq = sinf((f32) (M_PI_2 * (2.0F * t)));
+-            out->x = sp * p->x + sq * q->x;
+-            out->y = sp * p->y + sq * q->y;
+-            out->z = sp * p->z + sq * q->z;
+-            out->w = sp * p->w + sq * q->w;
++            out->x = fmaf(sp, p->x, sq * q->x);
++            out->y = fmaf(sp, p->y, sq * q->y);
++            out->z = fmaf(sp, p->z, sq * q->z);
++            out->w = fmaf(sp, p->w, sq * q->w);
+         } else {
+             t -= 0.5F;
+             t2 = 2.0F * t;
+             sp = sinf((f32) (M_PI_2 * (1.0F - t2)));
+             sq = sinf((f32) (M_PI_2 * t2));
+-            out->x = sp * p->x + sq * q->x;
+-            out->y = sp * p->y + sq * q->y;
+-            out->z = sp * p->z + sq * q->z;
+-            out->w = sp * p->w + sq * q->w;
+-        }
+-    }
+-
+-    return 0;
+-}
++            out->x = fmaf(sp, p->x, sq * q->x);
++            out->y = fmaf(sp, p->y, sq * q->y);
++            out->z = fmaf(sp, p->z, sq * q->z);
++            out->w = fmaf(sp, p->w, sq * q->w);
++        }
++    }
++
++    return 0;
++}
+diff --git a/src/melee/lb/lb_00B0.c b/src/melee/lb/lb_00B0.c
+--- a/src/melee/lb/lb_00B0.c
++++ b/src/melee/lb/lb_00B0.c
+@@ -1,6 +1,7 @@
+ #include "lb_00B0.h"
+ 
+ #include <dolphin/mtx.h>
++#include <math.h>
+ #include <melee/sc/types.h> // IWYU pragma: keep
+ #include <sysdolphin/baselib/aobj.h>
+ #include <sysdolphin/baselib/dobj.h> // IWYU pragma: keep
+@@ -489,15 +490,16 @@
+     float sum_square_diffs;
+     float sum_square_sums;
+ 
++    /* GALE01r2 8000C4BC..8000C528: round source2 first, then fmadds. */
+     arg2->translate.x =
+-        (jobj1->translate.x * arg8) + (jobj2->translate.x * arg9);
++        fmaf(jobj1->translate.x, arg8, jobj2->translate.x * arg9);
+     arg2->translate.y =
+-        (jobj1->translate.y * arg8) + (jobj2->translate.y * arg9);
++        fmaf(jobj1->translate.y, arg8, jobj2->translate.y * arg9);
+     arg2->translate.z =
+-        (jobj1->translate.z * arg8) + (jobj2->translate.z * arg9);
+-    arg2->scale.x = (jobj1->scale.x * arg8) + (jobj2->scale.x * arg9);
+-    arg2->scale.y = (jobj1->scale.y * arg8) + (jobj2->scale.y * arg9);
+-    arg2->scale.z = (jobj1->scale.z * arg8) + (jobj2->scale.z * arg9);
++        fmaf(jobj1->translate.z, arg8, jobj2->translate.z * arg9);
++    arg2->scale.x = fmaf(jobj1->scale.x, arg8, jobj2->scale.x * arg9);
++    arg2->scale.y = fmaf(jobj1->scale.y, arg8, jobj2->scale.y * arg9);
++    arg2->scale.z = fmaf(jobj1->scale.z, arg8, jobj2->scale.z * arg9);
+     is_quat_1 = HSD_JObjGetFlags(jobj1) & 0x20000;
+     is_quat_2 = HSD_JObjGetFlags(jobj2) & 0x20000;
+     if (!is_quat_1 && !is_quat_2) {
+@@ -593,12 +595,13 @@
+     float phi_f1_2;
+     float phi_f1_3;
+ 
+-    arg2->translate.x = (arg0->position.x * arg8) + (arg1->translate.x * arg9);
+-    arg2->translate.y = (arg0->position.y * arg8) + (arg1->translate.y * arg9);
+-    arg2->translate.z = (arg0->position.z * arg8) + (arg1->translate.z * arg9);
+-    arg2->scale.x = (arg0->scale.x * arg8) + (arg1->scale.x * arg9);
+-    arg2->scale.y = (arg0->scale.y * arg8) + (arg1->scale.y * arg9);
+-    arg2->scale.z = (arg0->scale.z * arg8) + (arg1->scale.z * arg9);
++    /* The descriptor-to-joint blend uses the same source2-first boundary. */
++    arg2->translate.x = fmaf(arg0->position.x, arg8, arg1->translate.x * arg9);
++    arg2->translate.y = fmaf(arg0->position.y, arg8, arg1->translate.y * arg9);
++    arg2->translate.z = fmaf(arg0->position.z, arg8, arg1->translate.z * arg9);
++    arg2->scale.x = fmaf(arg0->scale.x, arg8, arg1->scale.x * arg9);
++    arg2->scale.y = fmaf(arg0->scale.y, arg8, arg1->scale.y * arg9);
++    arg2->scale.z = fmaf(arg0->scale.z, arg8, arg1->scale.z * arg9);
+     temp_r31 = HSD_JObjGetFlags(arg1) & 0x20000;
+     if (temp_r31 == 0) {
+         temp_f5 = arg0->rotation.x - arg1->rotate.x;
