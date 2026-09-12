@@ -1013,6 +1013,14 @@ def _validate_browser_report(report: Any, plan: Mapping[str, Any],
         return {"valid": False, "errors": ["report is not a JSON object"],
                 "validator": "browser_replay_validation.validate_report"}
     target_id = slot["target_id"]
+    if "page_paint" in slot:
+        paint = report.get("diagnostic_page_paint")
+        if (slot["page_paint"] not in ("normal", "hidden")
+                or not isinstance(paint, Mapping)
+                or paint.get("mode") != slot["page_paint"]):
+            errors.append("report page-paint condition does not match the frozen slot")
+        if slot["page_paint"] == "hidden":
+            errors.append("hidden page-paint slot is diagnostic only, not normal-page acceptance")
     expected_recipe = plan["identities"]["development_recipes"][target_id]["sha256"]
     if report.get("recipe_sha256") != expected_recipe:
         errors.append("report recipe_sha256 does not match the frozen development recipe")

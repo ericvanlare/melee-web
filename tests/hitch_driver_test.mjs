@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {verifyServedArtifacts,stopTrace,remainingTimeout,TRACE,traceSettings,
-  frozenTraceSettings,scheduleTraceEnd,finalizeTrace} from '../scripts/run_hitch_matrix.mjs';
+  frozenTraceSettings,scheduleTraceEnd,finalizeTrace,pagePaintCondition,verifyPagePaintReport} from '../scripts/run_hitch_matrix.mjs';
 
 assert.deepEqual(frozenTraceSettings({trace:TRACE}),traceSettings());
 const gpu=traceSettings('gpu-startup');
@@ -18,6 +18,22 @@ assert.throws(()=>traceSettings('unknown'),/Unknown trace detail/);
 assert.throws(()=>frozenTraceSettings(profile,'standard'),/differs from frozen/);
 assert.throws(()=>frozenTraceSettings({...profile,trace_window_ms:20000}),/configuration changed/);
 assert.throws(()=>frozenTraceSettings({...profile,trace:TRACE}),/configuration changed/);
+assert.equal(pagePaintCondition({mode:'profiler'}),'normal');
+assert.throws(()=>pagePaintCondition({mode:'unprofiled',page_paint:'hidden'}),/diagnostic only/);
+assert.throws(()=>pagePaintCondition({mode:'profiler',page_paint:'unknown'}),/Unknown/);
+verifyPagePaintReport({}, {mode:'profiler'}); // Old normal-page report.
+const geometry={x:12,y:-200,width:900,height:675,buffer_width:1280,buffer_height:960,dpr:2};
+const paintReport={diagnostic_page_paint:{mode:'hidden',diagnostic_only:true,restored:true,
+  started_ms:100,ended_ms:200,geometry_before:geometry,geometry_after:{...geometry}}};
+const paintSlot={mode:'profiler',page_paint:'hidden'};
+verifyPagePaintReport(paintReport,paintSlot);
+assert.throws(()=>verifyPagePaintReport({},paintSlot),/disagrees/);
+assert.throws(()=>verifyPagePaintReport(paintReport,{mode:'profiler',page_paint:'normal'}),/disagrees/);
+for(const patch of [{restored:false},{ended_ms:90},{geometry_after:{...geometry,width:800}},
+  {geometry_before:{},geometry_after:{}},
+  {geometry_before:{...geometry,buffer_width:640,buffer_height:480},geometry_after:{...geometry,buffer_width:640,buffer_height:480}}]){
+  assert.throws(()=>verifyPagePaintReport({diagnostic_page_paint:{...paintReport.diagnostic_page_paint,...patch}},paintSlot));
+}
 
 const bytes=Buffer.from('frozen executable');
 const digest=crypto.createHash('sha256').update(bytes).digest('hex');

@@ -348,6 +348,21 @@ The detailed fighter and stage checklists are in
 [ADDING_CHARACTERS.md](ADDING_CHARACTERS.md) and
 [ADDING_STAGES.md](ADDING_STAGES.md).
 
+Diagnostic controls must carry their condition in the frozen plan and raw
+report. A hidden-output control cannot establish normal-page acceptance. Keep
+logical render dimensions, high DPI backing pixels and CSS geometry distinct;
+verify runtime-dependent assumptions in the actual initialized WebGPU page,
+not only in a static HTML fixture. Preserve failed attempts when correcting a
+harness check, and never retroactively relabel their ledger status.
+
+For native/browser profiling, verify exported event coverage around each failed
+interval. A successful recorder exit, requested duration or large trace file
+does not establish retained duration: templates can use rolling windows. Test
+retention beyond the template default on an owned non-game process, correlate
+clock anchors and target PIDs/TIDs, and keep missing coverage explicit. Finish
+source execution before draining or analyzing trace data. See the [page-paint
+and native-capture findings](HITCH_CAPTURE.md#diagnostic-page-painting-and-native-gpu-capture--2026-09-12).
+
 ## When a hitch or mismatch appears
 
 Preserve the first failure before changing code. Record the source frame/motion,

@@ -224,6 +224,18 @@ tool now supports a frozen ten-second GPU startup preset with deferred stream
 reading. No gameplay or renderer implementation changed; the red remains
 unresolved and both holdouts remain unopened. See the [results and next discrimination](docs/HITCH_CAPTURE.md#cold-begin-wait-and-gpu-startup-diagnosis--2026-09-12).
 
+A subsequent fixed four-slot diagnostic-output painting experiment completes
+15,568 source ticks/draws but does not reproduce the long GPU worker. It retains
+43 native deadline misses, zero native hard failures, 28 browser hard gaps and
+three focus-loss failures. Startup CPU traces implicate application work in
+some smaller misses; they do not explain the old wait. A separate native GPU
+profiled replay adds two deadline misses and one browser gap, with no focus
+loss. The native recording's exported retention does not cover those failures,
+despite successful attachment and file creation. The new canvas verifier's
+logical/backing-size mistake is corrected; all original failed attempts remain
+preserved. No performance fix or external-scheduling classification is claimed.
+Both holdouts remain unopened. See the [experiment and coverage limits](docs/HITCH_CAPTURE.md#diagnostic-page-painting-and-native-gpu-capture--2026-09-12).
+
 The typed content path now carries Falco, Fox, Marth, Battlefield, Yoshi's Story and Dream Land
 source IDs, runtime manifests and focused development traces. Source stock icon IDs are
 selected from the typed character/fighter identity rows. In a fresh Release

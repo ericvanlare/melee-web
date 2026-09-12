@@ -563,3 +563,101 @@ All other served artifact hashes match. This newly rebuilt binary is not
 assigned the six earlier measurements: those retain the frozen
 `66a37092…` Wasm. `post-build-identity.json` and the section comparison preserve
 the distinction; the next runtime experiment must bind its actual executable.
+
+## Diagnostic page painting and native GPU capture — 2026-09-12
+
+The next experiment consumed exactly four fresh-browser, cold-origin `a822`
+slots in normal/hidden/hidden/normal order. All ran the same 3,892 source ticks
+and draws on one immutable build: Wasm `c2917642…`, seed `cdf157ee…`.
+`work/hitch-page-paint-2026-09-12/experiment.json` freezes the order, inputs,
+profiles, source snapshots and bounds; its SHA-256 is
+`21aeea9ae776531cd82675926d5f54f5d854f6ee242874b83e70375f6fc73f79`.
+The new Wasm includes a different embedded repository revision; earlier timing
+results retain their own executable identities.
+
+`hitch-ui-paint=hidden` is a diagnostic control requiring hitch capture. It uses
+`visibility:hidden` on the named diagnostic text outputs, from before source
+preparation until teardown. DOM updates, layout, counters, logs, controls,
+audio, canvas, source ticks and draws continue. It does not freeze the layout
+or suppress all page painting. Both conditions audit canvas geometry before
+native entry; only hidden mode changes visibility. Unknown modes fail explicitly,
+and both page-report validation and the frozen-slot ledger reject hidden output
+as normal-page acceptance evidence, even if someone strips its report label.
+
+| Slot | Output painting | Callbacks | Native >16.67 ms | Native >33.3 ms | Browser >33.3 ms | Native max ms | Browser max ms | Other failure |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 1 | Normal | 3,904 | 1 | 0 | 0 | 17.575 | 30.955 | Focus loss |
+| 2 | Hidden | 3,897 | 5 | 0 | 2 | 24.055 | 34.700 | Focus loss |
+| 3 | Hidden | 3,906 | 10 | 0 | 4 | 22.625 | 36.355 | — |
+| 4 | Normal | 3,921 | 27 | 0 | 22 | 24.675 | 41.900 | Focus loss |
+
+All four source replays completed, and raw reports/traces were saved before a
+new harness check incorrectly rejected their canvas backing size. SDL uses a
+640×480 logical window with a 1280×960 backing store at DPR 2. The check now
+uses logical size times DPR. Its regression test rejects the stale assumption;
+a separate actual initialized WebGPU runtime confirms the backing dimensions.
+The earlier no-Wasm HTML fixture could not check this invariant. The original
+four aborted ledger entries remain unchanged, alongside the post-hoc geometry
+check; there are no replacement runs. Before/after geometry equality proves
+only that the visibility toggle preserved geometry at entry. The subsequent
+ordinary canvas focus can scroll the page; post-focus viewport position was
+not measured by this experiment.
+
+Each ten-second Chrome trace is complete for its window (244,196 / 235,239 /
+228,534 / 230,529 events). All contain the same five Skia-labelled asynchronous
+pipeline initializations, with worker maxima 1.445 / 2.390 / 1.604 / 2.272 ms.
+The additional Graphite category was requested but emitted no events; absence
+of that category does not establish absence of Graphite work. The old long
+GPU worker was not reproduced, and aggregate A/B differences do not identify
+a fix. Layout and residual painting remain in both conditions.
+
+Thirteen native misses align inside the startup traces. Their staging wait is
+zero and their enclosing renderer tasks have thread CPU close to wall duration.
+Two first-source-tick simulation/audio phases take 20.605 and 17.090 ms; sampled
+stacks contain application Wasm, audio and gameplay work without sampled
+compile/GC frames. Other misses include two source draws in one callback.
+Sampling gaps and profiler perturbation prevent assigning every millisecond
+or calling these unprofiled costs. Slot 1's late 17.575 ms callback contains
+10.750 ms across eight staging waits, outside the startup trace. All other
+uncovered failures remain failures. Analysis and sampled stacks are retained
+under the experiment directory.
+
+After that fixed bound, a separate one-slot experiment attached Xcode System
+Trace to the owned Chrome GPU PID, using a recording-ready notification before
+replay. It consumed one normal-page `a822` replay, with no retry: 3,892 source
+ticks/draws, 3,930 callbacks, two native deadline misses (max 19.070 ms), zero
+native hard failures, and one browser hard gap (37.575 ms). Focus remained
+valid; there were no audio-queue failures, live pipeline creations, preparation
+pauses or heap growth. Both native misses had zero staging wait. The ten-second
+Chrome trace has 229,703 events and is complete only for startup.
+
+The native recorder ran across the game and exited successfully, but its
+export retained only 0–10 seconds under the template's default rolling-window
+configuration. The three failure markers map to about 23.904–23.986 seconds
+and have no enclosing native or Chrome trace coverage. Successful attachment,
+file creation and process exit are insufficient coverage checks. Raw recordings,
+thread-state exports, exact owned process IDs, bounds and failures remain under
+`work/hitch-native-gpu-2026-09-12/`; the frozen experiment SHA-256 is
+`750ef5612d08a7e04c1ea792bc7f0d827ee0d7846d72efb2fdb2260c33f3007b`.
+System Trace may include other processes in its kernel scheduling tables even
+when attached to one PID; filter to the owned target before attribution.
+
+The capture helper was then corrected to request `--window 90s` explicitly.
+A separate owned blank-browser probe, with no source gameplay, retains target
+thread states from 0.935 through 13.166 seconds and reports the requested
+90-second window. This passes the missing retention preflight; it does not
+retroactively supply coverage for the failed gameplay capture. The corrected
+helper and exported-range check are preserved as `native_capture_v2.mjs` and
+`retention-preflight/validation.json` in the native experiment directory.
+Any next capture must still verify its own exported coverage and clock anchors.
+
+No performance fix or external-scheduling classification follows from these
+experiments. Both holdouts stay unopened, followed by the separate retained-heap
+sequence gate. Do not repeat either completed matrix. The explicit-retention
+preflight is now complete. The next experiment must use that setting and capture
+the operation inside an actual failed interval, including the owned GPU thread
+states; do not spend more runs on the already inconclusive output-paint split. The diagnostic page control remains optional, and
+normal UI behavior is unchanged. The implementation passed the 556-test suite,
+40 focused checks covering the later ledger guard, the corrected driver check,
+and the Release build. No native gameplay, renderer, numerical or input code
+changed in this pass; no new retail-equivalence claim is made.

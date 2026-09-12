@@ -137,6 +137,24 @@ def validate_hitch_capture(capture, metrics):
 
 def validate_report(report, recipe_hash, frames, mode, cold=None, *, expected_winner=None):
     require(isinstance(report, dict), 'Browser report must be an object')
+    paint = report.get('diagnostic_page_paint')
+    require(paint is None or (isinstance(paint, dict) and paint.get('mode') == 'normal'
+                             and paint.get('diagnostic_only') is False
+                             and paint.get('restored') is True),
+            'Diagnostic page-paint control is not normal-page acceptance evidence')
+    if paint is not None:
+        require(finite(paint.get('started_ms')) and finite(paint.get('ended_ms'))
+                and paint['ended_ms'] >= paint['started_ms'], 'Invalid page-paint interval')
+        geometry = paint.get('geometry_after')
+        require(isinstance(geometry, dict) and paint.get('geometry_before') == geometry,
+                'Page-paint geometry changed or is missing')
+        require(all(type(geometry.get(k)) in (int, float) and math.isfinite(geometry[k])
+                    for k in ('x', 'y', 'width', 'height', 'buffer_width', 'buffer_height', 'dpr'))
+                and geometry['width'] > 0 and geometry['height'] > 0 and geometry['dpr'] > 0
+                and geometry['dpr'] == report.get('device_pixel_ratio')
+                and geometry['buffer_width'] == 640 * geometry['dpr']
+                and geometry['buffer_height'] == 480 * geometry['dpr'],
+                'Invalid page-paint canvas geometry')
     for key, expected in {'schema': 'melee-web-browser-retail-replay', 'version': 1,
                           'recipe_sha256': recipe_hash, 'frames': frames,
                           'mode': mode, 'complete': True, 'pass': True,

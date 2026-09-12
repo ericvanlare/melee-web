@@ -153,6 +153,7 @@ function harness(unload=true){
   replayMemorySnapshot:()=>({wasm_heap_bytes:2048}),
   status:()=> 'teardown failed',unloadAndSave:async()=>{calls.unload++;return unload;},
   resetTiming:()=>{calls.timingResets++;},prepareAudio:async()=>{calls.audio++;},pauseAudioForPreparation:async()=>{},
+  beginReplayPaintControl:()=>({evidence:{mode:'normal'},restore(){}}),
   boundary:async fn=>fn(),check:value=>assert.equal(value,1),syncAudio(){},
   finishRetailReplay:async reason=>{calls.failed.push(reason);calls.completedRun=scope.retailRun;scope.retailRun=null;},
   Module:{HEAPU8:new Uint8Array(2048),_malloc:()=>1,_free(){},

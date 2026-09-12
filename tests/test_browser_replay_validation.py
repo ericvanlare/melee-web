@@ -28,6 +28,34 @@ def report():
 
 
 class BrowserReplayValidationTests(unittest.TestCase):
+    def test_hidden_diagnostic_paint_cannot_be_accepted_as_normal_page_performance(self):
+        value = report()
+        geometry = dict(x=62, y=-563.5, width=900, height=675,
+                        buffer_width=1280, buffer_height=960, dpr=2)
+        value['diagnostic_page_paint'] = dict(mode='normal', diagnostic_only=False, restored=True,
+                                            started_ms=100, ended_ms=200,
+                                            geometry_before=geometry, geometry_after=dict(geometry))
+        self.assertIs(self.check(value), value)
+        for mode in ('hidden', 'unknown'):
+            value['diagnostic_page_paint']['mode'] = mode
+            with self.assertRaisesRegex(ValueError, 'not normal-page acceptance'):
+                self.check(value)
+
+    def test_manual_normal_paint_report_requires_complete_geometry_and_interval(self):
+        value = report()
+        geometry = dict(x=62, y=-563.5, width=900, height=675,
+                        buffer_width=1280, buffer_height=960, dpr=2)
+        paint = dict(mode='normal', diagnostic_only=False, restored=True,
+                     started_ms=100, ended_ms=200,
+                     geometry_before=geometry, geometry_after=dict(geometry))
+        for patch in ({'ended_ms': None}, {'ended_ms': 99}, {'geometry_before': {}},
+                      {'geometry_before': {'dpr': 2}, 'geometry_after': {'dpr': 2}},
+                      {'geometry_before': {**geometry, 'buffer_width': 640},
+                       'geometry_after': {**geometry, 'buffer_width': 640}}):
+            value['diagnostic_page_paint'] = {**paint, **patch}
+            with self.assertRaisesRegex(ValueError, 'page-paint|Page-paint'):
+                self.check(value)
+
     def test_imported_runtime_and_audio_modules_are_bound_to_the_frozen_build(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

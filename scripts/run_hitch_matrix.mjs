@@ -63,7 +63,8 @@ export function traceSettings(detail='standard') {
   if(!['standard','gpu-startup'].includes(detail))throw Error('Unknown trace detail: '+detail);
   const trace=structuredClone(TRACE);
   if(detail==='gpu-startup')trace.traceConfig.includedCategories.push(
-    'gpu','gpu.dawn','disabled-by-default-gpu.dawn','disabled-by-default-gpu.service');
+    'gpu','gpu.dawn','disabled-by-default-gpu.dawn','disabled-by-default-gpu.service',
+    'disabled-by-default-gpu.graphite.dawn');
   return {detail,trace,windowMs:detail==='gpu-startup'?10000:null};
 }
 
@@ -73,6 +74,29 @@ export function frozenTraceSettings(machine, requestedDetail) {
   if(JSON.stringify(machine.trace)!==JSON.stringify(settings.trace)||
      (machine.trace_window_ms??null)!==settings.windowMs)throw Error('Trace configuration changed');
   return settings;
+}
+
+export function pagePaintCondition(slot) {
+  const mode=slot.page_paint??'normal';
+  if(!['normal','hidden'].includes(mode))throw Error('Unknown page-paint condition');
+  if(mode==='hidden'&&slot.mode!=='profiler')throw Error('Hidden page painting is diagnostic only');
+  return mode;
+}
+
+export function verifyPagePaintReport(report,slot) {
+  const mode=pagePaintCondition(slot),paint=report.diagnostic_page_paint;
+  if(slot.page_paint===undefined&&paint==null)return; // Earlier normal-page builds.
+  if(!paint||paint.mode!==mode||paint.diagnostic_only!==(mode==='hidden')||
+     paint.restored!==true||!Number.isFinite(paint.started_ms)||
+     !Number.isFinite(paint.ended_ms)||paint.ended_ms<paint.started_ms||
+     !paint.geometry_before||!paint.geometry_after||
+     JSON.stringify(paint.geometry_before)!==JSON.stringify(paint.geometry_after))
+    throw Error('Page-paint condition or restoration disagrees with frozen slot');
+  const g=paint.geometry_after;
+  // SDL uses a high-density backing store; report.resolution is logical size.
+  if(g.dpr!==LAUNCH.deviceScaleFactor||g.buffer_width!==640*g.dpr||g.buffer_height!==480*g.dpr||
+     !['x','y','width','height'].every(k=>Number.isFinite(g[k]))||g.width<=0||g.height<=0)
+    throw Error('Missing or changed diagnostic canvas geometry');
 }
 
 async function playwright(modulePath) {
@@ -234,6 +258,7 @@ async function publicReport(page, deadline) {
 async function run(options,pw) {
   const planPath=path.resolve(options.plan),plan=await read(planPath);
   const machine=await read(plan.identities.profile.path);
+  for(const slot of plan.slots)pagePaintCondition(slot);
   const settings=frozenTraceSettings(machine,options['trace-detail']);
   if(options.build&&path.resolve(options.build)!==machine.build_directory)throw Error('--build differs from the frozen profile');
   if(machine.runner_sha256!==sha(await fs.readFile(fileURLToPath(import.meta.url))))throw Error('Runner changed after profile freeze');
@@ -270,6 +295,7 @@ async function run(options,pw) {
         const url=new URL(machine.url);url.searchParams.set('hitch-capture','1');
         url.searchParams.set('hitch-marks',slot.mode==='profiler'?'1':'0');
         url.searchParams.set('hitch-causal',slot.mode==='profiler'?'1':'0');
+        url.searchParams.set('hitch-ui-paint',pagePaintCondition(slot));
         if(slot.cache==='cold')url.searchParams.set('render-cache','clear');
         await page.goto(url.href,{waitUntil:'load',timeout:remainingTimeout(deadline,60000)});
         await page.bringToFront();
@@ -291,6 +317,7 @@ async function run(options,pw) {
         replayStarted=true;
         const report=await publicReport(page,deadline);
         reportPath=path.join(directory,'browser-report.json');await save(reportPath,report);
+        verifyPagePaintReport(report,slot);
         if(!report.diagnostic_capture?.enabled)throw Error('Requested hitch capture was not enabled');
         const syncProbe=report.diagnostic_capture.capabilities?.cache_sync;
         if(slot.mode==='profiler'&&!(syncProbe?.requested&&syncProbe.enabled&&syncProbe.installed))
