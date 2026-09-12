@@ -297,8 +297,31 @@ void render_audio_tick(MeleeWebAudio* audio,char* error,size_t error_size){
  check(melee_web_audio_render(audio,pcm.data(),count,error,error_size),error);
  EM_ASM({window.menuAudio?.(HEAPF32.slice($0>>2,($0>>2)+$1*2));},pcm.data(),count);
 }
+bool render_cache_can_flush(){
+ const AuroraStats* stats=aurora_get_stats();
+ return !world&&!match&&!host&&!running&&!pending&&!preparation.busy()&&
+        stats&&stats->queuedPipelines==0;
+}
+void service_render_cache_writes(){
+ // SQLite fsync may Asyncify-yield. Run at the top-level main-loop boundary,
+ // after source ownership is gone, never from a nested JS command/export or
+ // between source scenes. Persistence time is separate from live callbacks.
+ static bool failure_reported=false;
+ if(!render_cache_can_flush())return;
+ const auto state=aurora_pipeline_cache_status();
+ if(state==AURORA_PIPELINE_CACHE_READY)return;
+ if(state==AURORA_PIPELINE_CACHE_ERROR&&failure_reported)return;
+ const bool flushed=state==AURORA_PIPELINE_CACHE_PENDING;
+ const double started=emscripten_get_now();
+ const bool ok=flushed&&aurora_flush_pipeline_cache();
+ const double duration=emscripten_get_now()-started;
+ if(!ok)failure_reported=true;
+ EM_ASM({window.menuCacheWritesFlushed?.({ok:!!$0,flushed:!!$1,duration_ms:$2});},
+        ok,flushed,duration);
+}
 void tick(){
  EM_ASM({window.menuServiceCommands?.();});
+ service_render_cache_writes();
  const double started=emscripten_get_now();
  const bool running_at_callback_start=running;
  const AuroraStats stats_before=aurora_stats_snapshot();
@@ -827,8 +850,9 @@ const char* melee_web_native_menu_diagnostics(){
 const char* melee_web_native_menu_message(){return message.c_str();}
 int melee_web_native_menu_running(){return running;}
 int melee_web_native_menu_cache_idle(){
- const AuroraStats* stats=aurora_get_stats();
- return !world&&!match&&stats&&stats->queuedPipelines==0;
+ if(!render_cache_can_flush())return 0;
+ const auto state=aurora_pipeline_cache_status();
+ return state==AURORA_PIPELINE_CACHE_READY?1:state==AURORA_PIPELINE_CACHE_ERROR?-1:0;
 }
 int melee_web_native_menu_phase(){return match?7:host?melee_web_menu_host_phase(host):0;}
 }
@@ -838,7 +862,9 @@ int main(int argc,char** argv){
  config.windowWidth=640;config.windowHeight=480;config.msaa=1;config.vsync=true;
  config.logCallback=log_message;config.logLevel=LOG_INFO;
  if(!SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT,"#canvas"))return 1;
- aurora_initialize(argc,argv,&config);GXInit(fifo,sizeof(fifo));
+ aurora_initialize(argc,argv,&config);
+ aurora_set_deferred_pipeline_cache_writes(true);
+ GXInit(fifo,sizeof(fifo));
  if(!melee_web_input_startup())return 1;
  emscripten_set_main_loop(tick,0,1);return 0;
 }

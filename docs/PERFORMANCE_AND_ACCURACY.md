@@ -180,6 +180,14 @@ that path.
 - Prepare pipelines from unchanged visible scene draws. The reviewed seed may
   contain renderer descriptors, never disc assets. Persist newly discovered
   descriptors only after native teardown.
+  This includes SQLite COMMIT and automatic WAL checkpoints, not just explicit
+  JavaScript IDBFS saves. Keep a bounded queue coalesced by descriptor key;
+  queue overflow or transaction failure invalidates optional persistence, never
+  triggers a live flush or changes pipeline availability. At unload, drain from
+  the top-level native loop after all source owners and pipeline compilation
+  are gone, then publish files only after successful native flush and storage
+  save. Test this boundary with real exported DB/WAL reloads and exact source
+  comparisons; UI save timing alone misses implicit native filesystem work.
 - Retain auto-pause on timing disruption. It exposes lost scheduling time and
   prevents a stalled host callback from silently changing input/simulation order.
 - Treat browser callback interval, browser long tasks, native CPU phases, GPU
@@ -274,7 +282,9 @@ The port currently has these reusable controls:
 - unchanged-scene renderer preparation and a reviewed initial Aurora cache with
   one shader record and 344 pipeline descriptors covering the current menus,
   stages, stock paths and the complete versioned Marth/Dream Land sweep;
-- teardown-only IDBFS persistence, so SQLite serialization cannot interrupt live
+- teardown-only IDBFS persistence, including deferral of SQLite transactions
+  themselves, whose automatic WAL checkpoints can call `fsync` inside a draw,
+  so serialization cannot interrupt live
   gameplay; and
 - telemetry for preparation phases, active native phases, browser callback gaps,
   browser long tasks, audio underruns, pipelines, uploads and heap size. Hitch

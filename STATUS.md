@@ -196,8 +196,20 @@ none is acceptance evidence. The earlier 91.795 ms cold begin-frame stall remain
 unresolved. The new instrumentation passes 552 tests and the Release build;
 its frozen build, all failures and causal evidence are recorded in
 [the hitch-capture notes](docs/HITCH_CAPTURE.md#causal-capture-results--2026-09-12).
-The fix and its separate original-reference/unprofiled verification are next.
-Both fresh holdouts and the subsequent retained-heap gate remain closed.
+The optional-cache fix is now implemented and verified on these two development
+workloads: SQLite transactions remain queued during source ownership and drain
+only after native teardown, with bounded coalescing and explicit save failures.
+Both original A/B comparisons pass for 9,480 source ticks, including declared
+state/RNG/PAD, timers, source draws and match completion. Both real exported
+DB/WAL pairs pass integrity checks and reload. Four separate unprofiled cold/warm
+runs pass across 18,960 source ticks / 18,961 callbacks: zero native 16.67 ms
+misses, zero native 33.3 ms failures and zero browser 33.3 ms gaps. Worst native
+callback is 12.845 ms; worst browser interval is 30.555 ms. A separate complete
+profiled run records zero live cache syncs and a successful post-teardown flush.
+All 554 tests and the Release build pass. See the [fix evidence](docs/HITCH_CAPTURE.md#deferred-cache-fix-and-verification--2026-09-12).
+The earlier cold begin-frame red remains independently unresolved; these clean
+runs do not classify it as external scheduling. Both fresh holdouts and the
+subsequent retained-heap gate remain closed.
 
 The typed content path now carries Falco, Fox, Marth, Battlefield, Yoshi's Story and Dream Land
 source IDs, runtime manifests and focused development traces. Source stock icon IDs are

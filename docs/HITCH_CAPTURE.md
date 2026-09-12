@@ -351,8 +351,84 @@ individual task CPU fields, raw sampled stacks and their interpretation.
 
 The supported fix boundary is optional cache transactions/persistence outside
 live source callbacks, preserving pipeline creation/use order and source math.
-It still requires implementation, original-reference state/RNG/timer/completion
-comparison and separate bounded unprofiled verification. The earlier cold a822
+The following experiment implements and verifies that boundary. The earlier cold a822
 91.795 ms begin-frame stall did not recur and remains unresolved; this cache
 cause does not explain it. Both holdouts remain unopened. No public 4×4 or
 retained-source-heap acceptance is claimed.
+
+## Deferred cache fix and verification — 2026-09-12
+
+The native-menu browser now opts into deferred Aurora pipeline-cache writes.
+Pipeline creation/use and source tick/draw order stay unchanged. Pending writes
+coalesce by SQLite key (shader type/hash), retain earliest first use and newest
+payload/version, and preserve original enqueue order. The queue is capped at
+16,384 unique rows / 64 MiB of config bytes. Exceeding either bound or failing a
+transaction invalidates optional persistence; it never forces a gameplay flush
+or evicts a required pipeline.
+
+Flush only after all source owners, pending preparation and pipeline compilation
+are gone. The Asyncify-capable SQLite call runs at the top-level native loop,
+not inside a nested JavaScript command/export or between CSS and SSS. Its time
+is reported separately. Public unload/save and export require native readiness;
+a failed COMMIT is propagated instead of reporting a stale successful save.
+Other browser targets retain Aurora's default immediate-writer policy. Native
+threaded flush releases its wait mutex before querying status. Focus reporting
+now retains one first-loss record without changing the visibility failure gate.
+
+The reviewed Release build and all **554 tests** passed, including real SQLite
+COMMIT rejection/rollback, queue coalescing/bounds and public save/export failure
+paths. Evidence is in `work/hitch-cache-fix-2026-09-12/`, with source/build
+snapshots, original-reference bindings, every attempt, exported DB/WAL files and
+the complete profiled trace. Frozen Wasm:
+`66a3709265d7c5c465700946b1125f91458bba7688992bd8fb454f848d7e94b2`.
+The 507-pipeline data seed is unchanged. The profile records headed Chrome
+153.0.8010.36 / Apple M4 / macOS 26.6.2, battery power with low-power mode off,
+640×480 framebuffer and DPR 2. The preceding causal profile also records battery
+power; the first twelve-attempt matrix recorded AC power. These are distinct
+recorded conditions, not a power-normalized comparison.
+
+Two state captures match the existing independent original A/B references:
+3,892 Fox/Marth Dream Land ticks and 5,588 Marth/Falco Yoshi's Story ticks. The
+existing strict evidence join passes for declared state, RNG, all-port input,
+timers, source draws and original elimination/winner/completion. This is exact
+agreement for the captured fields, not pixel/PCM/hardware equivalence. Each
+actual exported DB/WAL pair passes SQLite integrity and config-size checks,
+contains 508 cache rows, and reloads through ordinary public page controls.
+The separately reported native flushes take 2.240 and 2.580 ms in those state
+captures; those instrumented durations are not gameplay timing evidence.
+
+Frozen timing plan
+`d95b451d533a0ba9eadc97c99146ec8a5fcba743e8cdc7965c37234b0365d1e0`
+consumes exactly four unprofiled slots and one profiled slot, with zero retries
+or timing resumes. It binds seven prior red reports and the prior causal plan.
+
+| Attempt | Native callbacks | Native >16.67 ms | Native >33.3 ms | Browser >33.3 ms | Native max ms | Browser max ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| a822 cold, unprofiled | 3,893 | 0 | 0 | 0 | 11.285 | 26.800 |
+| a822 warm, unprofiled | 3,892 | 0 | 0 | 0 | 10.325 | 26.140 |
+| dca cold, unprofiled | 5,589 | 0 | 0 | 0 | 12.845 | 27.850 |
+| dca warm, unprofiled | 5,587 | 0 | 0 | 0 | 11.970 | 30.555 |
+| a822 warm, profiled diagnostic | 3,893 | 0 | 0 | 0 | 7.930 | 25.405 |
+
+Browser callback denominators equal the native counts in these rows. The four
+unprofiled rows complete 18,960 source ticks/draws across 18,961 callbacks; all
+strict timing gates pass, with no focus loss, browser errors, audio faults,
+live pipeline creation or preparation pauses. The lower profiled maximum is
+not a speedup claim or acceptance evidence.
+
+The diagnostic report
+`d2aad54087f2ab827340c0989206b5e5a7715beba46930ea8fdb54ff299e084b`
+has an enabled, installed, valid cache-sync probe with **zero live calls**. Its
+581,433-event trace passes loss/truncation and bounded-parser checks. A successful
+native cache flush (1.005 ms) and storage save (10 ms) occur after source
+teardown. Together with the directly traced failing cache transaction and the
+reviewed ownership guard, this verifies removal of that optional persistence
+path from gameplay. All failed baseline reports remain preserved.
+
+The earlier 91.795 ms cold begin-frame stall remains unresolved. These clean
+repetitions neither explain it nor establish unrelated OS scheduling, and do
+not retrospectively attribute every prior spike to cache I/O. Both holdouts
+remain unopened; the separate retained-source-heap sequence track still follows
+holdouts. The public 4×4 loop is not declared ready. Next work should target the
+remaining begin-frame wait, using a separately explained bounded experiment
+that preserves this matrix and the original failure.

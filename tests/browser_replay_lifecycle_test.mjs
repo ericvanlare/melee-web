@@ -8,6 +8,38 @@ const pause=page.split('\n').find(line=>line.startsWith("$('pause').onclick="));
 const completion=page.slice(page.indexOf('window.menuReplayCompleted='),page.indexOf('\nwindow.menuReplayPoll='));
 assert(start&&pause&&completion);
 {
+ const unload=page.slice(page.indexOf('async function unloadAndSave(){'),page.indexOf('\nasync function reloadApplication('));
+ const flush=page.slice(page.indexOf('window.menuCacheWritesFlushed='),page.indexOf('\n};',page.indexOf('window.menuCacheWritesFlushed='))+3);
+ for(const finalState of [1,-1]){
+  const events=[],display={};let idleCalls=0;
+  const scope={window:{menuPreparationCanceled:()=>events.push('cancel')},performance,
+   $:()=>display,log:text=>events.push(text),syncAudio:()=>events.push('sync-audio'),
+   pauseAudioForPreparation:async()=>events.push('audio-stopped'),boundary:async run=>run(),
+   Module:{runtimeCacheState:{dirty:false},
+    _melee_web_native_menu_unload:()=>{events.push('unload');return 1;},
+    _melee_web_native_menu_cache_idle:()=>{events.push('idle-check');return idleCalls++?finalState:0;},
+    markRuntimeCacheDirty(){this.runtimeCacheState.dirty=true;events.push('dirty');},
+    saveRuntimeCache:async()=>{events.push('save');return true;}}};
+  vm.createContext(scope);vm.runInContext(unload+'\n'+flush,scope);
+  scope.window.menuCacheWritesFlushed({ok:finalState===1,flushed:true});
+  assert.equal(await scope.unloadAndSave(),true,'Optional cache failure cannot undo successful source teardown');
+  assert.deepEqual(events.filter(x=>['unload','audio-stopped','idle-check','save'].includes(x)),
+   finalState===1?['unload','audio-stopped','idle-check','idle-check','save']:['unload','audio-stopped','idle-check','idle-check']);
+  if(finalState===-1){assert.equal(scope.Module.runtimeCacheState.dirty,false);assert.match(display.textContent,/native cache writes failed/);}
+ }
+ const exportHandler=page.split('\n').find(line=>line.startsWith("$('export-render-cache').onclick="));
+ for(const cacheState of [0,-1,1]){
+  const button={},errors=[];let reads=0,saves=0;
+  const scope={$:()=>button,log:text=>errors.push(text),boundary:async run=>run(),Module:{
+   _melee_web_native_menu_cache_idle:()=>cacheState,
+   saveRuntimeCache:async()=>{saves++;return false;},
+   FS:{readdir:()=>{reads++;return [];}}}};
+  vm.createContext(scope);vm.runInContext(exportHandler,scope);await button.onclick();
+  assert.equal(reads,0,'Export must not publish stale files before native flush and persistence both succeed');
+  assert.equal(saves,cacheState===1?1:0);assert.equal(errors.length,1);
+ }
+}
+{
  const handler=page.split('\n').find(line=>line.startsWith('window.menuRuntimeTimingError='));
  const failed=[];
  const scope={window:{},diagnosticCaptureInvalid:false,stop:error=>failed.push(error)};
