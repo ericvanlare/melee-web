@@ -43,6 +43,65 @@ try {
     assert(await page.locator('#controls-dialog').isHidden());
     await page.frames()[1].waitForFunction(()=>document.activeElement.id==='canvas');
   });
+  await check('B0XX layout, modifiers, key release, persistence and split-layout restore', async()=>{
+    const input = () => page.frames()[1];
+    const waitPad = async expected => input().waitForFunction(expected => {
+      const state = JSON.parse(Module.UTF8ToString(Module._melee_web_input_message()));
+      return Object.entries(expected).every(([key,value]) => JSON.stringify(state.pads[0][key]) === JSON.stringify(value));
+    }, expected);
+    const chooseLayout = async layout => {
+      await page.locator('#controls-open').click();
+      await page.locator('#keyboard-layout').selectOption(layout);
+      assert.equal(await page.locator('#keyboard-two-option').isHidden(), layout === 'boxx');
+      await page.locator('#controls-close').click();
+      await input().waitForFunction(()=>document.activeElement.id==='canvas');
+    };
+    await chooseLayout('boxx');
+    await input().waitForFunction(()=>JSON.parse(Module.UTF8ToString(Module._melee_web_input_message())).keyboard_active_mask===1);
+    const cases = [
+      ['m',{buttons:0x100}], ['o',{buttons:0x200}], ['p',{buttons:0x400}], ['0',{buttons:0x800}],
+      ['[',{buttons:0x10}], ['7',{buttons:0x1000}], ['q',{buttons:0x40}], ['9',{buttons:0x20}],
+      ['2',{stick:[-80,0]}], ['3',{stick:[0,-80]}], ['4',{stick:[80,0]}], [']',{stick:[0,80]}],
+      ['n',{cstick:[-80,0]}], [' ',{cstick:[0,-80]}], [',',{cstick:[80,0]}], ['k',{cstick:[0,80]}],
+      ['-',{triggers:[0,49]}], ['=',{triggers:[0,94]}],
+      ['ArrowLeft',{buttons:1}], ['ArrowRight',{buttons:2}], ['ArrowDown',{buttons:4}], ['ArrowUp',{buttons:8}],
+    ];
+    for (const [key,expected] of cases) {
+      await page.keyboard.down(key); await waitPad(expected); await page.keyboard.up(key);
+      await waitPad({buttons:0,stick:[0,0],cstick:[0,0],triggers:[0,0]});
+    }
+    await page.keyboard.down('4'); await page.keyboard.down('v'); await waitPad({stick:[53,0]});
+    await page.keyboard.up('v'); await page.keyboard.down('b'); await waitPad({stick:[27,0]});
+    await page.keyboard.up('b'); await page.keyboard.down('3'); await waitPad({stick:[56,-56]});
+    await page.keyboard.down('v'); await waitPad({stick:[59,-25]});
+    await page.keyboard.down('q'); await waitPad({stick:[51,-30]});
+    for (const key of ['q','v','3','4']) await page.keyboard.up(key);
+    await waitPad({buttons:0,stick:[0,0]});
+    await page.keyboard.down('2'); await page.keyboard.down('4'); await waitPad({stick:[80,0]});
+    await page.keyboard.up('4'); await waitPad({stick:[0,0]}); await page.keyboard.up('2');
+    await page.keyboard.down('v'); await page.keyboard.down('b'); await page.keyboard.down('k');
+    await waitPad({buttons:8,cstick:[0,0]});
+    for (const key of ['k','b','v']) await page.keyboard.up(key);
+    await waitPad({buttons:0,stick:[0,0]});
+    // Modal focus loss clears a held action; release/repeat cannot leak it back.
+    await page.keyboard.down('m'); await waitPad({buttons:0x100});
+    await page.locator('#controls-open').click(); await waitPad({buttons:0});
+    await screenshot('boxx-controls');
+    await page.keyboard.up('m'); await page.locator('#controls-close').click();
+    await input().waitForFunction(()=>document.activeElement.id==='canvas'); await waitPad({buttons:0});
+    await page.reload(); await page.locator('#choose-disc:not([disabled])').waitFor({timeout:60000});
+    assert.equal(await page.locator('#keyboard-layout').inputValue(),'boxx');
+    await input().locator('#canvas').click();
+    await input().waitForFunction(()=>JSON.parse(Module.UTF8ToString(Module._melee_web_input_message())).keyboard_active_mask===1);
+    await page.keyboard.down('m'); await waitPad({buttons:0x100}); await page.keyboard.up('m');
+    await chooseLayout('two');
+    await input().waitForFunction(()=>JSON.parse(Module.UTF8ToString(Module._melee_web_input_message())).keyboard_active_mask===3);
+    await page.keyboard.down('m'); await waitPad({buttons:0}); await page.keyboard.up('m');
+    await page.keyboard.down('j'); await waitPad({buttons:0x100}); await page.keyboard.up('j');
+    await page.keyboard.down('ShiftRight');
+    await input().waitForFunction(()=>JSON.parse(Module.UTF8ToString(Module._melee_web_input_message())).pads[1].buttons===0x100);
+    await page.keyboard.up('ShiftRight');
+  });
   await check('unsupported disc rejection and selectable retry',async()=>{
     await page.locator('#disc-file').setInputFiles({name:'unsupported.rvz',mimeType:'application/octet-stream',buffer:Buffer.from('invalid')});
     await page.locator('#error-dialog[open]').waitFor({timeout:60000});
@@ -119,12 +178,33 @@ try {
       await page.frameLocator('iframe').locator('#status[data-phase=\"3\"]').waitFor({state:'attached',timeout:15000});
       await screenshot('original-sss');
     });
+    await check('B0XX menu cancel and Start input; existing CPU admission remains blocked',async()=>{
+      await page.locator('#controls-open').click();
+      await page.locator('#keyboard-layout').selectOption('boxx');
+      await page.locator('#controls-close').click();
+      await page.frames()[1].waitForFunction(()=>document.activeElement.id==='canvas');
+      await page.keyboard.down('o'); await page.waitForTimeout(120); await page.keyboard.up('o');
+      await page.frameLocator('iframe').locator('#status[data-phase="1"]').waitFor({state:'attached',timeout:15000});
+      // Original CSS initializes a 30-source-tick Start lockout on entry.
+      // Read existing diagnostics; do not modify source state or inject PAD.
+      const entrySteps = await page.frames()[1].evaluate(()=>nativeSourceSteps);
+      await page.frames()[1].waitForFunction(steps=>nativeSourceSteps>=steps+31,entrySteps);
+      await page.keyboard.down('7');
+      await page.frames()[1].waitForFunction(()=>JSON.parse(Module.UTF8ToString(Module._melee_web_input_message())).pads[0].buttons===0x1000);
+      await page.waitForTimeout(120); await page.keyboard.up('7');
+      await page.frames()[1].waitForFunction(steps=>nativeSourceSteps>=steps+45,entrySteps);
+      // Without a P2 controller the original CSS converts P2 to CPU. Current
+      // admission requires two humans, so this must not silently bypass it.
+      assert.equal(await page.frameLocator('iframe').locator('#status').getAttribute('data-phase'),'1');
+    });
     await check('session teardown releases frame and imported data',async()=>{
       const old = page.frames()[1];
       await page.locator('#end-session').click();
       await page.locator('#choose-disc:not([disabled])').waitFor({timeout:60000});
       assert(old.isDetached());
       assert(await page.locator('#start-game').isDisabled());
+      assert.equal(await page.locator('#keyboard-layout').inputValue(),'boxx');
+      await page.frames()[1].waitForFunction(()=>JSON.parse(Module.UTF8ToString(Module._melee_web_input_message())).keyboard_layout===1);
     });
   }
   assert.deepEqual(errors,[]); assert.deepEqual(posts,[]);

@@ -63,6 +63,7 @@ It returns a frozen handle:
   openCharacterSelect(): Promise<void>,
   pauseOrResume(): Promise<void>,
   setKeyboard(slot, enabled): void,
+  setKeyboardLayout('two' | 'boxx'): void,
   focus(): void,
   dispose(): Promise<void>,
 }
@@ -96,8 +97,10 @@ controls, status/progress/error and on-demand dialogs.
 
 Disc import reuses the child's inline handler, which loads `runtime-assets.mjs`,
 calls `loadNativeGameDisc`, transfers bytes through `put`, runs
-`prepareNativeResources` and handles failure. The adapter does not call `Module`,
-`_melee_web_*`, `loadDiscBundle`, `prepareAudio` or cache methods. Its 250 ms timer
+`prepareNativeResources` and handles failure. The adapter's one native configuration
+call is `_melee_web_input_set_keyboard_layout`; it does not call gameplay,
+replay, `loadDiscBundle`, audio or cache methods. The [keyboard follow-up](KEYBOARD_LAYOUTS.md)
+documents that input-settings boundary. Its 250 ms timer
 reports display state only; it never drives source ticks. Launch verifies the
 child enabled its live controls. Pause uses a status observer to wait for the
 existing handler’s acknowledgement before accepting another command. A watchdog marks a
@@ -263,29 +266,33 @@ or generated binaries.
 
 ## Input issue #5
 
-Controller assignment, ordering and remapping remain deferred. The shell can show
-browser gamepad detection and toggle existing keyboard layouts, while the current
-player keeps its existing port routing. Detection is not physical-controller
+Controller assignment, ordering and arbitrary remapping remain deferred. Controls
+now switches between the existing split keyboard and a one-player B0XX-style
+preset with modifiers; see [keyboard layouts](KEYBOARD_LAYOUTS.md). Preferences
+are stored locally, and the current player keeps its existing physical port routing. Detection is not physical-controller
 acceptance. The future input boundary needs `setInputBindings(bindings)` with
 explicit slot/port ownership, release/focus behavior and validation.
 
 ## Integration inventory
 
-The current work is new-files-only: prototype HTML/CSS/modules,
-`prepare_prototype.py`, prototype-specific tests and this document. There are no tracked-file conflicts with
-runtime or performance work. `runtime.html` DOM/status changes are semantic
-conflicts because the temporary adapter relies on exact IDs, phase values and
+The initial shell was new-files-only. The keyboard follow-up also changes
+`src/browser_input.cpp`, `src/browser_input.h`, their existing tests and
+`THIRD_PARTY.md`, and adds `src/boxx_input.h` with its tests/license. These input
+files need coordination if another branch changes them. `runtime.html`, native
+gameplay, renderer/cache instrumentation, patches, and build configuration remain
+untouched. `runtime.html` DOM/status changes are semantic conflicts because the temporary adapter relies on exact IDs, phase values and
 handlers. Future `runtime.html`, CMake/build target, runtime tests,
 `runtime-assets.mjs` manifest or native content-table changes must be coordinated
 with the mount boundary, staging hashes and content bridge.
 
-## Validation — 2026-09-12
+## Initial shell validation — 2026-09-12
 
 The prototype target was assembled from the matching `d69a7fb` Release runtime
 snapshot. Its Wasm SHA-256 is
 `09717d148a0231262afbe9868c58828f4c7aea098f9b602e290396be587f229f`.
-No native target, source timing, performance instrumentation or build
-configuration changed. `prototype-build.json` records the complete served
+At this initial checkpoint, no native target, source timing, performance
+instrumentation or build configuration changed. The later keyboard follow-up
+rebuilds the runtime with the input mapping described in KEYBOARD_LAYOUTS.md. `prototype-build.json` records the complete served
 runtime and shell hashes; generated files remain ignored.
 
 `python3 -m unittest discover -s tests -v` completed successfully: 528 tests,
@@ -318,3 +325,56 @@ node tests/prototype_browser_test.mjs \
 Omit `--disc` for the startup/error/layout checks. These are interface checks,
 not a complete match, audio/physical-input acceptance, a performance run, or
 fresh-holdout/consecutive-match evidence. The public 4×4 gate remains open.
+
+
+## Keyboard follow-up validation — 2026-09-12
+
+Controls now offers the original two-player keyboard and a one-player B0XX-style
+preset. The exact bindings, MIT source, native input API and limitations are in
+[KEYBOARD_LAYOUTS.md](KEYBOARD_LAYOUTS.md). This follow-up modifies only the
+browser input provider and prototype files/tests/docs; the contested runtime,
+renderer/cache instrumentation, native gameplay, patches and build configuration
+are untouched.
+
+A fresh local `Release` runtime build completed with
+`python3 scripts/build.py --target runtime --configuration Release --jobs 4`.
+The final preview's Wasm SHA-256 is
+`5b873d798c9efe826068d48f35e6cf63640646a439ab885193e5abe4f99deb1a`.
+`build/prototype-keyboard-final/prototype-build.json` records the served hashes.
+No disc data or generated binary is tracked.
+
+Full `python3 -m unittest discover -s tests -v` discovery completed successfully:
+542 tests, 46 skipped, 247.253 seconds. Skips are unavailable native trace targets,
+optional local fixtures and tests requiring the separate default browser build;
+the changed input tests use this worktree's Release SDL headers and ran. The log
+is retained at `work/prototype-keyboard-unittest-final.log`.
+
+The 13 native input adapter tests and the standalone B0XX vector test pass.
+They cover raw mapping, modifiers, event order, focus/layout resets, preserving
+held P1 input when P2 connects/disconnects, physical priority and failure cleanup.
+
+Headed Chrome 153.0.8010.36 passed all 14 recorded HTTP browser checks at
+640×480 native framebuffer resolution. `work/prototype-keyboard-browser-final/report.json`
+records zero page/console/HTTP errors and zero upload requests. The check sends
+ordinary keyboard events and reads existing PAD diagnostics: all documented
+B0XX buttons and axes, Mod X/Y, shield diagonals, SOCD release, D-pad layer,
+focus loss, persistence after reload, split-profile restoration and Eject pass.
+The original two-keyboard CSS→SSS route still passes. B0XX cancellation returns
+to CSS, and its Start key reaches the native PAD boundary.
+
+**B0XX Start was not admitted from the tested one-keyboard CSS state.** With P2
+keyboard disabled and no P2 controller, original CSS converted P2 to CPU. The
+existing `gameplay_menu.c` gate requires two humans, so it rejected that state.
+The final browser check explicitly preserves this restriction; it does not count
+CPU or solo-match support as a pass. Controls surfaces the limitation.
+
+Earlier browser attempts remain in ignored `work/`: the first pressed a key
+before the existing focus policy acknowledged activation after reload; another
+expected the unsupported CPU selection to enter SSS. The final test waits for
+input activation and the source CSS's entry lockout, verifies the actual Start
+sample, and checks that the two-human gate remains intact. Native gameplay and
+admission checks were not loosened to make the UI test pass.
+
+This is keyboard/input-boundary evidence only. Complete matches, physical
+controllers, keyboard rollover, input latency, firmware/tournament equivalence,
+audio and performance admission remain unverified by these checks.

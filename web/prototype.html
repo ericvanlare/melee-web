@@ -27,22 +27,15 @@
   </main>
   <dialog id="controls-dialog" aria-label="Controls">
     <div class="keyboard-options">
-      <label><input id="keyboard-one" type="checkbox" checked> P1 keyboard</label>
-      <label><input id="keyboard-two" type="checkbox" checked> P2 keyboard</label>
+      <select id="keyboard-layout" aria-label="Keyboard layout" disabled>
+        <option value="two">2 players</option>
+        <option value="boxx">1 player · B0XX</option>
+      </select>
+      <label><input id="keyboard-one" type="checkbox" checked> <span id="keyboard-one-label">P1 keyboard</span></label>
+      <label id="keyboard-two-option"><input id="keyboard-two" type="checkbox" checked> P2 keyboard</label>
     </div>
-    <table>
-      <thead><tr><th></th><th>P1</th><th>P2</th></tr></thead>
-      <tbody>
-        <tr><th>Move</th><td>W A S D</td><td>Arrows</td></tr>
-        <tr><th>Attack</th><td>J</td><td>Right Shift</td></tr>
-        <tr><th>Special</th><td>K</td><td>Right Ctrl</td></tr>
-        <tr><th>Jump</th><td>U / I</td><td>Delete</td></tr>
-        <tr><th>Shield</th><td>Q / E</td><td>—</td></tr>
-        <tr><th>Grab</th><td>O</td><td>—</td></tr>
-        <tr><th>C-stick</th><td>T G F H</td><td>—</td></tr>
-        <tr><th>Start</th><td>Enter</td><td>End</td></tr>
-      </tbody>
-    </table>
+    <table id="keyboard-bindings" aria-label="Keyboard bindings"></table>
+    <p id="keyboard-note" hidden>CPU matches unavailable.</p>
     <ul id="controllers" aria-label="Detected controllers"></ul>
     <div class="dialog-actions"><button id="controls-close" type="button">Close</button></div>
   </dialog>

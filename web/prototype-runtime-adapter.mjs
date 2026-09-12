@@ -1,7 +1,8 @@
 /**
  * TEMPORARY same-origin DOM adapter. See docs/PROTOTYPE.md for its removal gate.
- * Only this module knows runtime.html's DOM. It never calls Module/native APIs,
- * replaces host callbacks, samples input, or implements a second game loop.
+ * Only this module knows runtime.html's DOM. Its one native configuration call
+ * selects a keyboard layout. It never replaces host callbacks, samples input,
+ * injects PAD samples, or implements a second game loop.
  */
 export function mountPrototypePlayer({root, onStatus = () => {}, onSceneChange = () => {}}) {
   const frame = document.createElement('iframe');
@@ -9,7 +10,7 @@ export function mountPrototypePlayer({root, onStatus = () => {}, onSceneChange =
   frame.allow = 'autoplay; fullscreen; gamepad';
   frame.src = new URL('./runtime.html', import.meta.url).href;
   let doc, timer, watchdog, disposed = false, busy = false, started = false;
-  let lastKey = '', lastScene = '', fault = '', operation = '';
+  let lastKey = '', lastScene = '', fault = '', operation = '', keyboardLayout = 'two';
   const $ = id => doc?.getElementById(id);
   const emit = state => {
     const key = JSON.stringify(state);
@@ -113,10 +114,21 @@ export function mountPrototypePlayer({root, onStatus = () => {}, onSceneChange =
         }));
       } finally { observer?.disconnect(); }
     },
+    setKeyboardLayout(layout) {
+      if (!['two', 'boxx'].includes(layout)) throw Error('Unknown keyboard layout.');
+      if (!started || disposed) throw Error('Wait for the player before changing controls.');
+      // Configuration only, on the same main thread as the existing input owner.
+      // No frame scheduling or diagnostic PAD injection is involved.
+      const setLayout = frame.contentWindow?.Module?._melee_web_input_set_keyboard_layout;
+      if (!setLayout) {
+        if (layout !== 'two') throw Error('Rebuild the game runtime to enable B0XX controls.');
+      } else if (setLayout(layout === 'boxx' ? 1 : 0) !== 1) throw Error('Keyboard layout could not be applied.');
+      keyboardLayout = layout;
+    },
     setKeyboard(slot, enabled) {
       const input = $(slot === 0 ? 'keyboard' : 'keyboard2');
       if (!input || disposed) return;
-      input.checked = !!enabled; input.dispatchEvent(new Event('change'));
+      input.checked = !!enabled && (slot === 0 || keyboardLayout !== 'boxx'); input.dispatchEvent(new Event('change'));
     },
     focus,
     async dispose() {

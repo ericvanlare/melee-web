@@ -18,7 +18,7 @@ from browser_replay_validation import BUILD_ARTIFACTS  # noqa: E402
 
 PROTOTYPE_FILES = (
     'prototype.html', 'prototype.css', 'prototype-shell.mjs',
-    'prototype-runtime-adapter.mjs', 'prototype-content.mjs',
+    'prototype-runtime-adapter.mjs', 'prototype-content.mjs', 'prototype-keyboard-layouts.mjs',
 )
 
 
@@ -75,6 +75,8 @@ def prepare(runtime_build, output, environment='staging'):
         raise ValueError('The runtime build changed during copying. Keep this failed snapshot local and retry in a new directory.')
     for name in PROTOTYPE_FILES:
         shutil.copyfile(ROOT / 'web' / name, output / name)
+    # Retain the notice for the keyboard mapping compiled into the runtime.
+    shutil.copyfile(ROOT / 'licenses/b0xx-ahk.txt', output / 'b0xx-ahk-LICENSE.txt')
     page = (output / 'prototype.html').read_text().replace(
         'data-environment="staging"', f'data-environment="{environment}"')
     (output / 'prototype.html').write_text(page)
@@ -84,7 +86,7 @@ def prepare(runtime_build, output, environment='staging'):
         'public_release': False, 'adapter': 'temporary-same-origin-iframe',
         'runtime_sha256': before,
         'native_content_sha256': digest(ROOT / 'src/gameplay_content.h'),
-        'prototype_sha256': {name: digest(output / name) for name in (*PROTOTYPE_FILES, 'prototype-content.json')},
+        'prototype_sha256': {name: digest(output / name) for name in (*PROTOTYPE_FILES, 'prototype-content.json', 'b0xx-ahk-LICENSE.txt')},
     }
     (output / 'prototype-build.json').write_text(json.dumps(identity, indent=2) + '\n')
     return output
