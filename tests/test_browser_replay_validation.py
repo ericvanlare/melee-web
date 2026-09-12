@@ -41,7 +41,7 @@ class BrowserReplayValidationTests(unittest.TestCase):
             del incomplete['runtime-assets.mjs']
             with self.assertRaisesRegex(ValueError, 'inventory'):
                 validate_build_artifacts(incomplete, root)
-            for name in ('runtime-assets.mjs', 'disc-image.mjs', 'audio-ring.mjs'):
+            for name in ('runtime-assets.mjs', 'disc-image.mjs', 'audio-ring.mjs', 'hitch-capture.mjs'):
                 with self.subTest(module=name):
                     (root / name).write_bytes(b'changed after freeze')
                     with self.assertRaisesRegex(ValueError, 'Build artifact changed'):
@@ -50,6 +50,30 @@ class BrowserReplayValidationTests(unittest.TestCase):
 
     def check(self, value):
         return validate_report(value, 'a' * 64, 686, 'performance', True)
+
+    def test_hitch_deadline_evidence_is_separate_and_cannot_hide_missing_events(self):
+        value = report()
+        value['metrics']['nativeCallbacksOverBudget'] = 2
+        value['metrics']['worstNativeCallbackMs'] = 22
+        value['diagnostic_capture'] = {
+            'schema': 'melee-web-diagnostic-hitch-capture', 'version': 1,
+            'enabled': True, 'valid': True, 'invalid': False, 'overflowed': False,
+            'overflow_count': 0, 'cap': 128, 'event_count': 2, 'observer_count': 0,
+            'events': [{'id': 'a', 'kind': 'native_deadline', 'duration_ms': 17},
+                       {'id': 'b', 'kind': 'native_deadline', 'duration_ms': 22}],
+            'observers': [],
+        }
+        self.assertIs(self.check(value), value)  # Deadline misses don't widen/change the hard gate.
+        for key, replacement in [('overflow_count', 1), ('valid', False), ('events', []),
+                                 ('event_count', 0)]:
+            candidate = copy.deepcopy(value)
+            candidate['diagnostic_capture'][key] = replacement
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                self.check(candidate)
+        candidate = copy.deepcopy(value)
+        candidate['metrics']['nativeCallbacksOverBudget'] = 0
+        with self.assertRaisesRegex(ValueError, 'counter'):
+            self.check(candidate)
 
     def test_scoped_timing_report_retains_memory_growth_measurement(self):
         value = report()

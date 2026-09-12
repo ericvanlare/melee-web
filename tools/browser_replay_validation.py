@@ -21,7 +21,7 @@ BUILD_ARTIFACTS = (
     'gameplay_menu_browser.js', 'gameplay_menu_browser.wasm', 'gameplay_menu_browser.data',
     'runtime.html', 'runtime-cache.js', 'audio-worklet.js', 'audio-ring.mjs',
     'disc-image.mjs', 'dsp-coefficients.mjs', 'runtime-assets.mjs',
-    'match-flow.mjs', 'match-menu.mjs', 'action-sweep.mjs',
+    'match-flow.mjs', 'match-menu.mjs', 'action-sweep.mjs', 'hitch-capture.mjs',
 )
 
 
@@ -42,6 +42,50 @@ def finite(value):
     return type(value) in (int, float) and math.isfinite(value) and value >= 0
 
 
+def validate_hitch_capture(capture, metrics):
+    """Optional diagnostic evidence must agree with the independent counters."""
+    require(isinstance(capture, dict), 'Malformed hitch capture')
+    require(capture.get('schema') == 'melee-web-diagnostic-hitch-capture'
+            and type(capture.get('version')) is int and capture['version'] == 1,
+            'Unsupported hitch capture schema')
+    require(type(capture.get('enabled')) is bool, 'Missing hitch capture enablement')
+    if not capture['enabled']:
+        return
+    require(capture.get('valid') is True and capture.get('invalid') is False
+            and capture.get('overflowed') is False
+            and type(capture.get('overflow_count')) is int and capture['overflow_count'] == 0,
+            'Incomplete or overflowed hitch capture')
+    events, observers = capture.get('events'), capture.get('observers')
+    require(isinstance(events, list) and isinstance(observers, list), 'Missing hitch events')
+    require(type(capture.get('cap')) is int and 0 < capture['cap'] <= 1024
+            and len(events) + len(observers) <= capture['cap'], 'Invalid hitch event bound')
+    require(capture.get('event_count') == len(events)
+            and capture.get('observer_count') == len(observers), 'Hitch event count mismatch')
+    counts = {'nativeCallbacksOverBudget': 0, 'nativeCallbacksOver33ms': 0, 'browserCallbackGaps': 0}
+    ids = set()
+    for event in events:
+        require(isinstance(event, dict) and isinstance(event.get('id'), str), 'Invalid hitch event')
+        require(event['id'] not in ids, 'Duplicate hitch event id')
+        ids.add(event['id'])
+        require(finite(event.get('duration_ms')), 'Missing hitch event duration')
+        duration = event['duration_ms']
+        if event.get('kind') == 'native_deadline':
+            require(duration > 1000 / 60, 'Native hitch does not miss its deadline')
+            require(finite(metrics.get('worstNativeCallbackMs')) and duration <= metrics['worstNativeCallbackMs'],
+                    'Native hitch exceeds reported maximum')
+            counts['nativeCallbacksOverBudget'] += 1
+            counts['nativeCallbacksOver33ms'] += int(duration > 1000 / 30)
+        else:
+            require(event.get('kind') == 'browser_gap' and duration > 1000 / 30,
+                    'Invalid browser hitch')
+            require(finite(metrics.get('worstBrowserCallbackMs')) and duration <= metrics['worstBrowserCallbackMs'],
+                    'Browser hitch exceeds reported maximum')
+            counts['browserCallbackGaps'] += 1
+    for key, count in counts.items():
+        require(type(metrics.get(key)) is int and metrics[key] == count,
+                'Hitch events disagree with counter: ' + key)
+
+
 def validate_report(report, recipe_hash, frames, mode, cold=None, *, expected_winner=None):
     require(isinstance(report, dict), 'Browser report must be an object')
     for key, expected in {'schema': 'melee-web-browser-retail-replay', 'version': 1,
@@ -54,6 +98,8 @@ def validate_report(report, recipe_hash, frames, mode, cold=None, *, expected_wi
                 'Browser report disagrees at ' + key)
     metrics = report.get('metrics', {})
     require(isinstance(metrics, dict), 'Browser metrics must be an object')
+    if report.get('diagnostic_capture') is not None:
+        validate_hitch_capture(report['diagnostic_capture'], metrics)
     require(type(metrics.get('sourceFrames')) is int and metrics['sourceFrames'] == frames,
             'Browser input timeline is incomplete')
     # Earlier v1 evidence predates per-tick traversal accounting. New reports
@@ -100,7 +146,7 @@ def validate_report(report, recipe_hash, frames, mode, cold=None, *, expected_wi
     return report
 
 
-def _json(path, limit=65536):
+def _json(path, limit=8 * 1024 * 1024):
     with Path(path).open('rb') as stream:
         raw = stream.read(limit + 1)
     require(len(raw) <= limit, 'Evidence JSON exceeds byte limit')

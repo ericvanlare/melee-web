@@ -166,6 +166,25 @@ resumes or audio faults. Those measurements do not clear the earlier unexplained
 reds. The reviewed seed contains 507 pipelines. See the [remaining-five evidence](docs/REPLAY_CORPUS.md#remaining-five-ucf-off-development-donors).
 The candidate is not frozen; broader gold/content admission remains open.
 
+The reusable [bounded hitch-capture loop](docs/HITCH_CAPTURE.md) now preserves
+every abnormal callback, previous timing context and optional browser trace in
+an immutable attempt ledger. Its first fixed twelve-attempt matrix is complete:
+eight unprofiled attempts measured six native 16.67 ms deadline misses, including
+one native 33.3 ms hard failure, and three separate browser hard gaps across
+37,915 callbacks. Maxima are 94.115 ms native / 106.645 ms browser. Four profiled
+attempts had no hitches and cannot close these failures. The cold red is in
+begin-frame work; warm recording spikes repeat the earlier Dream Land source
+frame 1746 and Yoshi source frame 279. SQLite/IDBFS sync during frame finalization is a concrete
+code-path suspect, still awaiting event-level causal confirmation. All raw
+reports and the unrelated favicon 404s that marked these attempts aborted are
+retained. No source gameplay code or numerical behavior was changed for this
+capture work. Both fresh holdouts stay unopened, followed by a separate required
+whole-sequence reference/performance track for consecutive matches with retained
+source heap state before any public 4×4 readiness claim.
+All 550 regression tests and the affected Release build pass. Harness recovery,
+trace loss, overflow and served-build checks are covered; this is validation of
+the diagnostic loop, not resolution of the measured gameplay red.
+
 The typed content path now carries Falco, Fox, Marth, Battlefield, Yoshi's Story and Dream Land
 source IDs, runtime manifests and focused development traces. Source stock icon IDs are
 selected from the typed character/fighter identity rows. In a fresh Release

@@ -5,6 +5,20 @@ The first playable milestone is a local **Mario-versus-Mario stock match on
 Final Destination at 60 fps**. Progress is measured by original runtime behavior,
 not the number of supported inspection assets.
 
+The immediate validation order is fixed: run the bounded development
+[hitch-capture matrix](HITCH_CAPTURE.md), resolve the retained performance red
+causally or classify external scheduling with correlated evidence, freeze the
+candidate, and then execute the two untouched holdouts. Native 16.67 ms target
+misses remain visible separately from browser callback gaps; the 33.3 ms hard
+failure threshold stays unchanged.
+
+After those holdouts, the public four-character/four-stage loop still requires
+the separate [consecutive-match validation track](HITCH_CAPTURE.md#consecutive-match-track-after-holdouts).
+Use whole-sequence original references and retain source heap history through
+CSS/SSS and successive completed matches. A fresh-process replay pass cannot
+substitute for this gate, or for the separate controller, visual, PCM and latency
+checks.
+
 ## 0 — Rendering and runtime foundation
 
 Established: pinned tools/source, original HSD model/material/skin/animation

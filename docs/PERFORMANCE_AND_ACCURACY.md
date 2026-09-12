@@ -199,7 +199,13 @@ The current hard browser gate for a declared gameplay scenario is:
 The optimization target is a worst active native callback at or below the
 16.67 ms source-frame budget on the named reference machine. A 16.67–33.3 ms
 callback is recorded and investigated even when it does not fail the current
-hitch gate. Replay reports retain the count above this target and one worst
+hitch gate. Report native deadline misses separately from browser callback gaps;
+missing deadline counters in older reports are unknown, not zero. The
+[bounded hitch-capture loop](HITCH_CAPTURE.md) preserves all attempts in a frozen
+matrix and adds opt-in event retention and trace correlation. Both fresh
+holdouts remain closed until the outstanding red is causally resolved or
+convincingly classified as external scheduling with evidence. Replay reports
+retain the count above this target and one worst
 native callback with its phase durations; a new over-budget maximum also records
 the source diagnostics. This bounded record survives later fast frames without
 collecting a per-frame state trace during performance runs. Scene preparation
@@ -364,6 +370,13 @@ three times in the same application, with no reload or cache reset between
 matches. Save each report before the next run. This complements the independent
 cold/warm application runs; it does not replace them. Preserve timing failures
 and do not resume a performance run into a passing result.
+
+The current v2 paired reference recipe requires a fresh process; it cannot be
+used to claim this retained-history check. After the frozen holdouts, execute
+the separate [consecutive-match track](HITCH_CAPTURE.md#consecutive-match-track-after-holdouts)
+with whole-sequence original references and original CSS/SSS transitions before
+declaring the public four-character/four-stage loop ready. Preserve prior source
+heap state, including source bytes not initialized by a later stage constructor.
 
 Use the replay report's lifecycle memory snapshots to separate Wasm capacity
 from allocated bytes. Compare `before_preparation`, `prepared`,

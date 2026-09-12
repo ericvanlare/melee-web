@@ -14,7 +14,8 @@ class BuildRequestHandler(SimpleHTTPRequestHandler):
     evidence_limits = {
         "retail-port.jsonl": 256 * 1024 * 1024,
         "retail-timer.jsonl": 8 * 1024 * 1024,
-        "retail-browser-report.json": 64 * 1024,
+        # Optional bounded hitch events include full nested phase/context data.
+        "retail-browser-report.json": 8 * 1024 * 1024,
         "render-cache.db": 16 * 1024 * 1024,
         "render-cache.db-wal": 16 * 1024 * 1024,
     }

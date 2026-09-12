@@ -11,6 +11,9 @@ CSS → original SSS → four-stock Mario/FD match → original CSS. See the
 The combined [performance and accuracy playbook](docs/PERFORMANCE_AND_ACCURACY.md)
 defines the evidence levels and admission process used for every new fighter,
 stage and shared runtime change.
+The [bounded hitch-capture loop](docs/HITCH_CAPTURE.md) records every failure
+with separate native deadline and browser-gap metrics, a frozen repetition
+matrix and optional correlated traces.
 
 **The complete playable-match milestone is still open.** The browser currently
 runs two original Mario instances on Final Destination, with source controller

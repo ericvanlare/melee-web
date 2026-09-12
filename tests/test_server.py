@@ -125,7 +125,7 @@ class ServerTests(unittest.TestCase):
         for changes, expected in (({"Origin": "https://example.com"}, 403),
                                   ({"Host": "example.com"}, 403),
                                   ({"Content-Type": "text/plain"}, 415),
-                                  ({"Content-Length": "65537"}, 413)):
+                                  ({"Content-Length": str(8 * 1024 * 1024 + 1)}, 413)):
             with self.subTest(changes=changes):
                 self.assertEqual(self.request(path, "POST", data, {**headers, **changes})[0], expected)
         self.assertEqual(self.request("/__melee_evidence/../private.txt", "POST", data, headers)[0], 404)
@@ -147,6 +147,22 @@ class ServerTests(unittest.TestCase):
         timer = json.loads(body)
         self.assertEqual(Path(timer["path"]).read_bytes(), data)
         self.assertEqual(timer["sha256"], hashlib.sha256(data).hexdigest())
+
+    def test_bounded_hitch_report_above_old_limit_is_preserved_exactly(self):
+        output = Path(self.temp.name) / "hitch-evidence"
+        output.mkdir()
+        self.server.evidence_directory = output
+        data = json.dumps({"diagnostic_capture": {"events": [
+            {"id": i, "context": "x" * 2048} for i in range(64)]}}).encode()
+        self.assertGreater(len(data), 65536)
+        headers = {"Origin": f"http://127.0.0.1:{self.server.server_port}",
+                   "Content-Type": "application/octet-stream"}
+        status, _, body = self.request("/__melee_evidence/retail-browser-report.json",
+                                       "POST", data, headers)
+        self.assertEqual(status, 201)
+        saved = json.loads(body)
+        self.assertEqual(Path(saved['path']).read_bytes(), data)
+        self.assertEqual(saved['sha256'], hashlib.sha256(data).hexdigest())
 
 
 class ConfigurationTests(unittest.TestCase):
