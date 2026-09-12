@@ -8,6 +8,16 @@ const pause=page.split('\n').find(line=>line.startsWith("$('pause').onclick="));
 const completion=page.slice(page.indexOf('window.menuReplayCompleted='),page.indexOf('\nwindow.menuReplayPoll='));
 assert(start&&pause&&completion);
 {
+ const handler=page.split('\n').find(line=>line.startsWith('window.menuRuntimeTimingError='));
+ const failed=[];
+ const scope={window:{},diagnosticCaptureInvalid:false,stop:error=>failed.push(error)};
+ vm.createContext(scope);vm.runInContext(handler,scope);
+ scope.window.menuRuntimeTimingError('Native menu timing JSON exceeded 4096 bytes');
+ assert.equal(scope.diagnosticCaptureInvalid,true);
+ assert.deepEqual(failed,['Native menu timing JSON exceeded 4096 bytes'],
+  'Missing native timing must stop the replay instead of being ignored as an inactive callback');
+}
+{
  const save=page.split('\n').find(line=>line.startsWith('async function saveEvidence('));
  let nativeCalls=0;const posted=[];const display={};
  const scope={fatal:true,retailRun:null,$:()=>display,

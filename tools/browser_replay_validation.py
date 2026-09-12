@@ -42,6 +42,54 @@ def finite(value):
     return type(value) in (int, float) and math.isfinite(value) and value >= 0
 
 
+def validate_cache_sync_capture(capture):
+    """Auxiliary I/O records cannot replace native/browser failure evidence."""
+    capabilities = capture.get('capabilities', {})
+    require(isinstance(capabilities, dict), 'Malformed hitch capabilities')
+    capability = capabilities.get('cache_sync', {})
+    require(isinstance(capability, dict), 'Malformed cache sync capability')
+    fields = ('cache_syncs', 'cache_sync_cap', 'cache_sync_count', 'cache_sync_overflow_count')
+    if not any(key in capture for key in fields) and capability.get('requested') is not True:
+        return  # Earlier reports predate the optional mount instrumentation.
+    rows = capture.get('cache_syncs')
+    require(isinstance(rows, list), 'Missing cache sync records')
+    require(type(capture.get('cache_sync_cap')) is int and 0 < capture['cache_sync_cap'] <= 1024
+            and len(rows) <= capture['cache_sync_cap'], 'Invalid cache sync bound')
+    require(type(capture.get('cache_sync_count')) is int and capture['cache_sync_count'] == len(rows),
+            'Cache sync count mismatch')
+    require(type(capture.get('cache_sync_overflow_count')) is int
+            and capture['cache_sync_overflow_count'] == 0, 'Overflowed cache sync capture')
+    require(type(capability.get('requested')) is bool, 'Missing cache sync request state')
+    if capability['requested']:
+        require(capability.get('installed') is True and capability.get('enabled') is True,
+                'Requested cache sync hook unavailable')
+    else:
+        require(not rows, 'Unexpected cache sync records without opt-in')
+    ids = set()
+    counts = {'calls': len(rows), 'pending': 0, 'errors': 0}
+    for row in rows:
+        require(isinstance(row, dict) and isinstance(row.get('id'), str) and row['id']
+                and row['id'] not in ids, 'Invalid or duplicate cache sync record')
+        ids.add(row['id'])
+        require(row.get('clock') == 'performance.now' and finite(row.get('started')),
+                'Missing cache sync clock')
+        require(row.get('status') in ('pending', 'completed', 'error'), 'Invalid cache sync status')
+        if row['status'] == 'pending':
+            counts['pending'] += 1
+            require(row.get('ended') is None and row.get('duration_ms') is None,
+                    'Pending cache sync has a completion')
+        else:
+            require(finite(row.get('ended')) and row['ended'] >= row['started']
+                    and finite(row.get('duration_ms'))
+                    and math.isclose(row['duration_ms'], row['ended'] - row['started'], abs_tol=0.01),
+                    'Invalid cache sync completion interval')
+            counts['errors'] += int(row['status'] == 'error')
+    for key, count in counts.items():
+        require(type(capability.get(key)) is int and capability[key] == count,
+                'Cache sync records disagree with counter: ' + key)
+    require(counts['pending'] == 0 and counts['errors'] == 0, 'Incomplete or failed cache sync evidence')
+
+
 def validate_hitch_capture(capture, metrics):
     """Optional diagnostic evidence must agree with the independent counters."""
     require(isinstance(capture, dict), 'Malformed hitch capture')
@@ -84,6 +132,7 @@ def validate_hitch_capture(capture, metrics):
     for key, count in counts.items():
         require(type(metrics.get(key)) is int and metrics[key] == count,
                 'Hitch events disagree with counter: ' + key)
+    validate_cache_sync_capture(capture)
 
 
 def validate_report(report, recipe_hash, frames, mode, cold=None, *, expected_winner=None):

@@ -73,8 +73,8 @@ recorded configuration must be extended explicitly for another host platform.
    ordinary scheduling settings, machine/power/display, renderer dimensions,
    artifact hashes and runner identity. This opens and closes an owned blank
    browser; it does not execute a replay.
-3. Create a local spec with only verified development recipes and the frozen
-   twelve slots; use `python scripts/hitch_capture.py plan --spec SPEC --output
+3. Create a local spec with only verified development recipes and the experiment's
+   predeclared slots; use `python scripts/hitch_capture.py plan --spec SPEC --output
    PLAN`. Review the generated plan before execution.
 4. Run `node scripts/run_hitch_matrix.mjs run --plan PLAN --disc DISC`. The driver
    uses the ordinary file picker, replay selector and start button. It creates
@@ -236,3 +236,123 @@ immutable snapshots, bounded markers/history, unknown trace clocks, trace loss,
 atomic interrupted-record recovery, evidence-size limits, fixed plan thresholds
 and real HTTP served-build identity. No source gameplay change or accuracy
 relaxation is included in this diagnostic implementation.
+
+## Causal experiment protocol — four slots
+
+The next diagnostic extension observes the actual render-cache mount sync
+boundary and partitions begin-frame acquisition. It changes no scheduling,
+cache writes, frame-slot policy, source input or source draw ordering. There is
+no performance fix or causal conclusion yet.
+
+Freeze a new build/profile and a new plan after this extension passes its
+checks. Do not reuse the twelve-attempt plan or overwrite its evidence. Execute
+only these four full development replays, sequentially, once each:
+
+| Order | Existing development input | Cache | Mode |
+| --- | --- | --- | --- |
+| 1 | `a822`, Fox/Marth Dream Land, 3,892 ticks | Cold | Profiled causal diagnosis |
+| 2 | `a822`, same input | Warm | Profiled causal diagnosis |
+| 3 | `dca`, Marth/Falco Yoshi's Story, 5,588 ticks | Cold | Profiled causal diagnosis |
+| 4 | `dca`, same input | Warm | Profiled causal diagnosis |
+
+Use the existing verified recipes, development-role proof and original
+reference results. Bind the new profile, runner, harness and every served
+artifact; retain the old plan digest, its final status and every earlier red
+as evidence. Keep the 300-second per-slot bound, fresh document/Wasm per
+attempt, one retained browser context, ordinary audio and scheduling, no
+hidden warmup, no timing resumes and no replacement slots. All four rows are
+diagnostic; none can count as unprofiled acceptance.
+
+The runner enables `hitch-causal=1` only for profiled rows. Cache diagnostics
+must show that the render-cache mount hook was installed. Record sync starts,
+completions, errors, pending operations and call stacks on the page's monotonic
+clock. Distinguish explicit populate/clear/save requests from the native
+`fd_sync` route by the recorded stack; unlabelled calls remain `unknown` until
+that evidence is inspected. Stack text is bounded to 4,096 characters and may
+be truncated. Auxiliary sync records have their own finite bound and never
+increment native deadline or browser gap counters. Overflow, an uncompleted
+sync or a missing hook remains visible; absence of records alone cannot prove
+that the suspected path was absent.
+
+Begin-frame timing must include both frame-slot and staging acquisition,
+actual progress-wait counts, and the surrounding setup. Preserve failures and
+the outer API residual, including work before/after the graphics function.
+For callbacks with multiple source draws, report sums and counts as sums;
+do not present them as contiguous per-draw trace slices. `begin_phases.start_ms`
+and `end_ms` bound the last begin invocation; the maximum wait interval is the
+largest individual wait across all begin invocations in that callback.
+
+The reduced Chrome categories retain top-level tasks, the normal DevTools
+timeline, User Timing, V8 CPU samples and renderer scheduling. Broad GPU,
+compositor and detailed timeline categories are omitted to reduce trace loss.
+The existing 128 MiB recording, 256 MiB stream and 512 MiB decompressed-reader
+bounds remain in force. A smaller category list is not proof of completeness:
+check the stream sidecar and actual failed interval. Missing GPU/thread CPU or
+scheduling evidence remains unknown.
+
+Correlate the same failed callback's begin/end partition, sync overlap and
+trace. Overlap supports investigation but does not by itself prove causality.
+If the four slots do not reproduce or explain the red, preserve that outcome
+and propose a different discriminating experiment; do not keep repeating until
+green. A demonstrated fix then needs the existing original-reference state,
+RNG/timer/completion comparison and a separately frozen unprofiled timing
+matrix. Continue reporting >16.67 ms native misses separately from >33.3 ms
+native failures and browser callback gaps. Both holdouts remain closed, and
+the retained-source-heap sequence track still follows holdout validation.
+
+## Causal capture results — 2026-09-12
+
+Plan `3154a2c5740809fe2a36b68e0a3e75fc6a82410e514ddc0919e18b8dcbf2300d`
+consumed exactly those four profiled slots, with no retries or timing resumes.
+All 18,960 input ticks and source draws completed. All four traces pass the
+existing loss and bounded-parser checks; the smaller category inventory retained
+the full long-workload traces this time. The build is Chrome 153.0.8010.36 on the
+same recorded machine, Wasm
+`959a715d3ae878f213e88f4e854a74e138ca31047eabf10c8e11a87974f512a2`,
+with the unchanged 507-pipeline data seed. Source/build bytes, served-response
+hashes, prior-plan/role proof, six prior red reports and all raw attempt evidence
+are preserved under `work/hitch-causal-2026-09-12/`.
+
+| Attempt | Native >16.67 ms | Native >33.3 ms | Browser >33.3 ms | Native max ms | Browser max ms | Live cache syncs |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| a822 cold | 0 | 0 | 0 | 10.585 | 25.875 | 0 |
+| a822 warm | 1 | 0 | 1 | 20.580 | 37.610 | 4 |
+| dca cold | 0 | 0 | 0 | 10.860 | 28.290 | 0 |
+| dca warm | 0 | 0 | 0 | 10.790 | 28.015 | 0 |
+
+The a822 rows each contain 3,892 callbacks; each dca row contains 5,589.
+The three rows without timing breaches record `focusLost` and remain failed
+runs. Warm a822 has the browser-gap failure and no focus loss. The original
+ledger's pass-only acceptance validator rejects all four reports with
+`Browser report disagrees at pass`, as expected for their recorded failures;
+this does not mean the diagnostic event records are malformed. Neither a
+complete trace nor well-formed failed evidence
+turns a failing attempt into a passing measurement.
+
+Warm a822 repeats native callback 1,883/source frame 1,746. Its 20.580 ms callback
+spends 16.555 ms in recording. The actual mounted-cache probe records three
+sequential, completed `fsync` waits wholly inside it: 10.525, 0.440 and 3.315 ms
+(14.280 ms total wall time). The fourth sync occurs later in the replay.
+All eight cache boundary marks match the failed callback's renderer thread and
+page/trace clock alignment. There are zero begin-frame progress waits, new
+pipelines, texture uploads or Wasm growth in the failed callback.
+
+The correlated CPU samples show `pipeline_cache_writer` → transaction commit →
+SQLite's automatic WAL checkpoint → `unixSync`/`fsync` → Emscripten `fd_sync` →
+Asyncify → IDBFS. They also show checkpoint file reads/writes and buffer
+expansion between the waits. This is direct evidence of optional cache
+persistence blocking the source callback, not a classification as unrelated
+OS scheduling. Samples establish call-path presence, not precise CPU duration;
+the 14.280 ms comes from independent, nonoverlapping page-clock intervals.
+The raw report is
+`a2cec931b2b86be573c3faf00b66fa3b5b495ebbfb6922e2985ec2d1682f2235`;
+`trace-analysis.json` and `failed-interval-inspection.json` retain the alignment,
+individual task CPU fields, raw sampled stacks and their interpretation.
+
+The supported fix boundary is optional cache transactions/persistence outside
+live source callbacks, preserving pipeline creation/use order and source math.
+It still requires implementation, original-reference state/RNG/timer/completion
+comparison and separate bounded unprofiled verification. The earlier cold a822
+91.795 ms begin-frame stall did not recur and remains unresolved; this cache
+cause does not explain it. Both holdouts remain unopened. No public 4×4 or
+retained-source-heap acceptance is claimed.

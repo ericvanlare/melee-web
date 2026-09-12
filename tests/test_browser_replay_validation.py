@@ -81,6 +81,48 @@ class BrowserReplayValidationTests(unittest.TestCase):
         self.assertIs(self.check(value), value)
         self.assertFalse(value['gold_admitted'])
 
+    def test_cache_sync_auxiliary_evidence_requires_complete_installed_probe(self):
+        value = report()
+        value['metrics']['nativeCallbacksOverBudget'] = 0
+        value['diagnostic_capture'] = {
+            'schema': 'melee-web-diagnostic-hitch-capture', 'version': 1,
+            'enabled': True, 'valid': True, 'invalid': False, 'overflowed': False,
+            'overflow_count': 0, 'cap': 128, 'event_count': 0, 'observer_count': 0,
+            'events': [], 'observers': [], 'cache_sync_cap': 128, 'cache_sync_count': 1,
+            'cache_sync_overflow_count': 0,
+            'capabilities': {'cache_sync': {'requested': True, 'installed': True,
+                                           'enabled': True, 'calls': 1, 'pending': 0, 'errors': 0}},
+            'cache_syncs': [{'id': 'cache-1', 'clock': 'performance.now', 'started': 100,
+                            'ended': 120, 'duration_ms': 20, 'status': 'completed'}],
+        }
+        # A 20ms sync is auxiliary wall time, never an invented native miss.
+        self.assertIs(self.check(value), value)
+        for key, replacement in [('installed', False), ('calls', 0), ('pending', 1),
+                                 ('requested', False), ('enabled', False)]:
+            candidate = copy.deepcopy(value)
+            candidate['diagnostic_capture']['capabilities']['cache_sync'][key] = replacement
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                self.check(candidate)
+        for key, replacement in [('cache_sync_count', 0), ('cache_sync_overflow_count', 1),
+                                 ('cache_sync_cap', 0), ('cache_sync_count', True)]:
+            candidate = copy.deepcopy(value)
+            candidate['diagnostic_capture'][key] = replacement
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                self.check(candidate)
+        for status in ('pending', 'error'):
+            candidate = copy.deepcopy(value)
+            cap = candidate['diagnostic_capture']
+            cap['cache_syncs'][0]['status'] = status
+            cap['capabilities']['cache_sync']['pending' if status == 'pending' else 'errors'] = 1
+            if status == 'pending':
+                cap['cache_syncs'][0].update(ended=None, duration_ms=None)
+            with self.subTest(status=status), self.assertRaisesRegex(ValueError, 'Incomplete'):
+                self.check(candidate)
+        candidate = copy.deepcopy(value)
+        candidate['diagnostic_capture']['cache_syncs'][0]['duration_ms'] = 0
+        with self.assertRaisesRegex(ValueError, 'interval'):
+            self.check(candidate)
+
     def test_source_tick_draw_counts_must_agree_when_reported(self):
         value = report()
         value['metrics'].update(sourceSteps=686, sourceDraws=686)

@@ -185,6 +185,20 @@ All 550 regression tests and the affected Release build pass. Harness recovery,
 trace loss, overflow and served-build checks are covered; this is validation of
 the diagnostic loop, not resolution of the measured gameplay red.
 
+The subsequent four-slot causal capture completed 18,960 development input ticks
+with four complete traces and no retries. Warm Fox/Marth on Dream Land reproduced
+callback 1,883/source frame 1,746: 20.580 ms native and a 37.610 ms browser gap.
+Three actual cache `fsync` waits account for 14.280 ms within that callback;
+correlated stacks show the renderer's SQLite transaction triggering an automatic
+WAL checkpoint through Asyncify/IDBFS. This identifies an optional persistence
+path to remove from live gameplay. The other three runs record focus loss;
+none is acceptance evidence. The earlier 91.795 ms cold begin-frame stall remains
+unresolved. The new instrumentation passes 552 tests and the Release build;
+its frozen build, all failures and causal evidence are recorded in
+[the hitch-capture notes](docs/HITCH_CAPTURE.md#causal-capture-results--2026-09-12).
+The fix and its separate original-reference/unprofiled verification are next.
+Both fresh holdouts and the subsequent retained-heap gate remain closed.
+
 The typed content path now carries Falco, Fox, Marth, Battlefield, Yoshi's Story and Dream Land
 source IDs, runtime manifests and focused development traces. Source stock icon IDs are
 selected from the typed character/fighter identity rows. In a fresh Release

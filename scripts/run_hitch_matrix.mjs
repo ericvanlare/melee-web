@@ -52,9 +52,11 @@ export const TRACE = {
   transferMode:'ReturnAsStream', streamFormat:'json', streamCompression:'gzip',
   traceConfig:{recordMode:'recordUntilFull', traceBufferSizeInKb:131072,
     enableSampling:true,
-    includedCategories:['toplevel','devtools.timeline','disabled-by-default-devtools.timeline',
-      'blink.user_timing','v8','disabled-by-default-v8.cpu_profiler','renderer.scheduler',
-      'sequence_manager','gpu','cc','viz']},
+    // The first matrix lost both long-workload traces with broad GPU/compositor
+    // categories. Retain CPU stacks, scheduling and explicit boundary marks;
+    // completeness still requires the loss/size checks, never this smaller list.
+    includedCategories:['toplevel','devtools.timeline','blink.user_timing',
+      'v8','disabled-by-default-v8.cpu_profiler','renderer.scheduler']},
 };
 
 async function playwright(modulePath) {
@@ -199,6 +201,7 @@ async function run(options,pw) {
         const servedPath=path.join(directory,'served-build.json');await save(servedPath,served);attachments.push(servedPath);
         const url=new URL(machine.url);url.searchParams.set('hitch-capture','1');
         url.searchParams.set('hitch-marks',slot.mode==='profiler'?'1':'0');
+        url.searchParams.set('hitch-causal',slot.mode==='profiler'?'1':'0');
         if(slot.cache==='cold')url.searchParams.set('render-cache','clear');
         await page.goto(url.href,{waitUntil:'load',timeout:remainingTimeout(deadline,60000)});
         await page.bringToFront();
@@ -218,6 +221,11 @@ async function run(options,pw) {
         const report=await publicReport(page,deadline);
         reportPath=path.join(directory,'browser-report.json');await save(reportPath,report);
         if(!report.diagnostic_capture?.enabled)throw Error('Requested hitch capture was not enabled');
+        const syncProbe=report.diagnostic_capture.capabilities?.cache_sync;
+        if(slot.mode==='profiler'&&!(syncProbe?.requested&&syncProbe.enabled&&syncProbe.installed))
+          throw Error('Requested causal cache sync hook was not installed and enabled');
+        if(slot.mode==='unprofiled'&&syncProbe?.requested)
+          throw Error('Unprofiled slot unexpectedly enabled causal sync diagnostics');
       } catch(error) {
         reason=String(error.stack||error);
         // Stop a timed-out/failed replay through its public control and retain

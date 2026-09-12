@@ -14,6 +14,11 @@
     }
     const notify = typeof report === "function" ? report : function () {};
     const clearOnLoad = options.clearOnLoad === true;
+    const syncClock = typeof options.now === "function"
+      ? options.now
+      : () => (typeof performance !== "undefined" && typeof performance.now === "function"
+        ? performance.now() : null);
+    const syncEventReport = typeof options.onSync === "function" ? options.onSync : null;
     const state = {
       state: "initializing",
       mounted: false,
@@ -24,9 +29,194 @@
       lastSaveMs: null,
       fileBytes: 0,
       message: "Preparing optional render cache storage.",
+      syncDiagnostics: {
+        enabled: options.syncDiagnostics === true,
+        installed: false,
+        calls: 0,
+        pending: 0,
+        errors: 0,
+      },
     };
     let saveQueue = Promise.resolve(false);
     let dependencyAdded = false;
+    let syncIntent = null;
+    let syncMountType = null;
+    let syncTargetMount = null;
+    let syncOriginalType = null;
+    let syncOriginal = null;
+    let syncWrapped = null;
+    let nextSyncId = 1;
+
+    function syncNow() {
+      try {
+        const raw = syncClock();
+        const value = raw === null || raw === undefined ? NaN : Number(raw);
+        return Number.isFinite(value) ? value : null;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function reportSync(event) {
+      if (!syncEventReport) return;
+      try {
+        syncEventReport(event);
+      } catch (error) {
+        // Diagnostic reporting must never change the cache call's behavior.
+        console.warn(`[Melee render cache] Sync diagnostic reporter failed: ${describe(error)}`);
+      }
+    }
+
+    function describeSyncError(error) {
+      if (!error) return null;
+      const value = {
+        name: error && error.name ? String(error.name) : null,
+        message: describe(error),
+      };
+      return value;
+    }
+
+    function finishSync(event, error) {
+      if (!event || event.finished) return;
+      event.finished = true;
+      const ended = syncNow();
+      const failed = !!error;
+      state.syncDiagnostics.pending = Math.max(0, state.syncDiagnostics.pending - 1);
+      if (failed) ++state.syncDiagnostics.errors;
+      reportSync({
+        id: event.id,
+        phase: "completion",
+        status: failed ? "error" : "completed",
+        source: event.source,
+        operation: event.operation,
+        started: event.started,
+        ended,
+        duration_ms: event.started !== null && ended !== null ? Math.max(0, ended - event.started) : null,
+        error: describeSyncError(error),
+        clock: "performance.now",
+        native_context: "unknown",
+        stack: event.stack,
+      });
+    }
+
+    function resolveSyncType(fs, mounted) {
+      const mount = mounted?.mount || (mounted?.type ? mounted
+        : (typeof fs?.lookupPath === "function" ? fs.lookupPath(path)?.node?.mount : null));
+      const type = mounted && typeof mounted.syncfs === "function" ? mounted : (mount?.type || null);
+      return type && typeof type.syncfs === "function" ? {type, mount} : null;
+    }
+
+    function unwrapSyncInstrumentation() {
+      if (syncTargetMount && syncTargetMount.type === syncMountType) {
+        try { syncTargetMount.type = syncOriginalType; } catch (_) { /* optional diagnostics */ }
+      }
+      syncMountType = null;
+      syncTargetMount = null;
+      syncOriginalType = null;
+      syncOriginal = null;
+      syncWrapped = null;
+      state.syncDiagnostics.installed = false;
+    }
+
+    function installSyncInstrumentation(fs, mounted) {
+      if (!state.syncDiagnostics.enabled || state.syncDiagnostics.installed) return false;
+      const resolved = resolveSyncType(fs, mounted);
+      if (!resolved?.mount || resolved.mount.type !== resolved.type) return false;
+      const {type, mount} = resolved;
+      const original = type.syncfs;
+      if (original.__meleeRenderCacheSyncInstrumentation) return false;
+      const wrapped = function (...args) {
+        // Keep the disabled path as the original call, including its receiver,
+        // argument list, return value, and synchronous errors.
+        // Only this mount receives an adapter. Preserve the receiver the
+        // original type would have received; custom call receivers pass through.
+        const receiver = this === syncMountType ? type : this;
+        if (!state.syncDiagnostics.enabled || args[0] !== syncTargetMount) {
+          return Reflect.apply(original, receiver, args);
+        }
+        const operation = syncIntent;
+        const event = {
+          id: `cache-sync-${nextSyncId++}`,
+          source: operation ? "explicit" : "unknown",
+          operation: operation || "unknown",
+          started: syncNow(),
+          stack: (() => {
+            try {
+              const value = new Error().stack;
+              return value ? String(value).slice(0, 4096) : null;
+            } catch (_) {
+              return null;
+            }
+          })(),
+          finished: false,
+        };
+        ++state.syncDiagnostics.calls;
+        ++state.syncDiagnostics.pending;
+        reportSync({
+          id: event.id,
+          phase: "start",
+          status: "pending",
+          source: event.source,
+          operation: event.operation,
+          started: event.started,
+          ended: null,
+          duration_ms: null,
+          error: null,
+          clock: "performance.now",
+          native_context: "unknown",
+          stack: event.stack,
+        });
+
+        const callbackIndex = args.length - 1;
+        const callback = callbackIndex >= 0 && typeof args[callbackIndex] === "function"
+          ? args[callbackIndex] : null;
+        const forwarded = callback ? args.slice() : args;
+        if (callback) {
+          forwarded[callbackIndex] = function (...callbackArgs) {
+            // Finish before forwarding so callback observers see a completed
+            // record, while callback receiver/arguments/errors stay intact.
+            try { finishSync(event, callbackArgs[0]); } catch (_) { /* diagnostics only */ }
+            return Reflect.apply(callback, this, callbackArgs);
+          };
+        }
+        try {
+          const result = Reflect.apply(original, receiver, forwarded);
+          // A syncfs implementation without a callback is still a completed
+          // call from the instrumenter's perspective.
+          if (!callback) finishSync(event, null);
+          return result;
+        } catch (error) {
+          try { finishSync(event, error); } catch (_) { /* diagnostics only */ }
+          throw error;
+        }
+      };
+      try {
+        Object.defineProperty(wrapped, "__meleeRenderCacheSyncInstrumentation", {value: true});
+        const adapter = Object.create(type);
+        Object.defineProperty(adapter, "syncfs", {value: wrapped, configurable: true});
+        mount.type = adapter;
+        if (mount.type !== adapter) return false;
+        syncMountType = adapter;
+      } catch (_) {
+        return false;
+      }
+      syncTargetMount = mount;
+      syncOriginalType = type;
+      syncOriginal = original;
+      syncWrapped = wrapped;
+      state.syncDiagnostics.installed = true;
+      return true;
+    }
+
+    function withSyncIntent(operation, invoke) {
+      const previous = syncIntent;
+      syncIntent = operation;
+      try {
+        return invoke();
+      } finally {
+        syncIntent = previous;
+      }
+    }
 
     function describe(error) {
       if (error instanceof Error && error.message) return error.message;
@@ -46,6 +236,7 @@
         dirty: state.dirty,
         lastSaveMs: state.lastSaveMs,
         fileBytes: state.fileBytes,
+        sync_diagnostics: {...state.syncDiagnostics},
       };
       try {
         notify(payload);
@@ -82,6 +273,7 @@
     function unavailable(message, error) {
       state.mounted = false;
       state.populated = false;
+      unwrapSyncInstrumentation();
       const detail = error ? `${message} (${describe(error)})` : message;
       // Cache persistence is optional.  Keep the runtime usable when storage
       // is blocked by privacy mode, quota, or an older browser.
@@ -104,7 +296,7 @@
             resolve(false);
             return;
           }
-          fs.syncfs(false, (error) => {
+          withSyncIntent("save", () => fs.syncfs(false, (error) => {
             if (error) {
               unavailable("Render cache save failed", error);
               resolve(false);
@@ -116,7 +308,7 @@
             refreshFileBytes(fs);
             setState("saved", "Optional render cache persisted.");
             resolve(true);
-          });
+          }));
         } catch (error) {
           unavailable("Render cache save failed", error);
           resolve(false);
@@ -130,6 +322,18 @@
     module.saveRuntimeCache = function () {
       saveQueue = saveQueue.catch(() => false).then(saveOnce);
       return saveQueue;
+    };
+
+    module.setRuntimeCacheSyncDiagnostics = function (enabled) {
+      state.syncDiagnostics.enabled = enabled === true;
+      if (!state.syncDiagnostics.enabled) {
+        unwrapSyncInstrumentation();
+      } else if (state.mounted) {
+        const fs = module.FS || (typeof FS !== "undefined" ? FS : null);
+        installSyncInstrumentation(fs, null);
+      }
+      setState(state.state, state.message);
+      return state.syncDiagnostics.enabled;
     };
 
     // Pipeline discovery happens during scene preparation and live first use.
@@ -157,11 +361,12 @@
       }
       try {
         fs.mkdirTree(path);
-        fs.mount(idbfs, {}, path);
+        const mounted = fs.mount(idbfs, {}, path);
         state.mounted = true;
+        installSyncInstrumentation(fs, mounted);
         addDependency(dependency);
         dependencyAdded = true;
-        fs.syncfs(true, (error) => {
+        withSyncIntent("populate", () => fs.syncfs(true, (error) => {
           const finish = () => {
             if (dependencyAdded) {
               dependencyAdded = false;
@@ -185,19 +390,19 @@
           // race its writer and would not evict in-memory pipelines.
           try {
             clearMountedFiles(fs);
-            fs.syncfs(false, (clearError) => {
+            withSyncIntent("clear", () => fs.syncfs(false, (clearError) => {
               if (clearError) unavailable("Render cache reset failed", clearError);
               else {
                 ++state.clears;
                 setState("cleared", "Optional render cache cleared before renderer startup; browser driver cache unchanged.");
               }
               finish();
-            });
+            }));
           } catch (clearError) {
             unavailable("Render cache reset failed", clearError);
             finish();
           }
-        });
+        }));
       } catch (error) {
         unavailable("Render cache storage could not be mounted", error);
         if (dependencyAdded) {
@@ -223,6 +428,7 @@
         dirty: state.dirty,
         lastSaveMs: state.lastSaveMs,
         fileBytes: state.fileBytes,
+        sync_diagnostics: {...state.syncDiagnostics},
       });
     } catch (error) {
       console.warn(`[Melee render cache] Status reporter failed: ${describe(error)}`);

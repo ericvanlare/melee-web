@@ -120,13 +120,38 @@ index e1feaca..5051b3e 100644
      target_link_libraries(imgui_backends PRIVATE imgui ${AURORA_SDL3_TARGET} dawn::webgpu_dawn)
      target_link_libraries(imgui PUBLIC imgui_backends)
 diff --git a/include/aurora/gfx.h b/include/aurora/gfx.h
-index 94504b1..a36e7c3 100644
+index 94504b1..18300fb 100644
 --- a/include/aurora/gfx.h
 +++ b/include/aurora/gfx.h
-@@ -26,6 +26,26 @@ typedef struct {
+@@ -26,6 +26,51 @@ typedef struct {
    uint32_t lastIndexSize;
    uint32_t lastStorageSize;
    uint32_t lastTextureUploadSize;
++  uint64_t lastBeginFrameId;
++  double lastBeginFrameFrameSlotMs;
++  double lastBeginFrameFrameSlotWaitMs;
++  uint32_t lastBeginFrameFrameSlotWaitCount;
++  double lastBeginFrameStagingSlotMs;
++  double lastBeginFrameStagingSlotWaitMs;
++  uint32_t lastBeginFrameStagingSlotWaitCount;
++  double lastBeginFramePacketMs;
++  double lastBeginFrameRecordMs;
++  double lastBeginFramePipelineMs;
++  double lastBeginFrameWorkerMs;
++  double lastBeginFrameEncoderMs;
++  double lastBeginFrameTotalMs;
++  double lastBeginFrameResidualMs;
++  double lastBeginFrameStartMs;
++  double lastBeginFrameEndMs;
++  double lastBeginFrameMaxWaitMs;
++  double lastBeginFrameMaxWaitStartMs;
++  double lastBeginFrameMaxWaitEndMs;
++  uint32_t lastBeginFrameMaxWaitKind;
++  double lastBeginFrameOuterSurfaceMs;
++  double lastBeginFrameOuterImguiMs;
++  double lastBeginFrameOuterFifoMs;
++  double lastBeginFrameOuterTotalMs;
++  double lastBeginFrameOuterResidualMs;
 +  uint64_t lastEndFrameId;
 +  double lastEndFrameFifoTextureMs;
 +  double lastEndFrameGfxFinishMs;
@@ -151,7 +176,7 @@ index 94504b1..a36e7c3 100644
  
  const AuroraStats* aurora_get_stats();
 diff --git a/lib/aurora.cpp b/lib/aurora.cpp
-index 9430842..445cfa1 100644
+index 9430842..2927f11 100644
 --- a/lib/aurora.cpp
 +++ b/lib/aurora.cpp
 @@ -1,6 +1,10 @@
@@ -223,7 +248,55 @@ index 9430842..445cfa1 100644
  uint32_t clamp_scissor_coord(double value, uint32_t maximum) noexcept {
    if (!std::isfinite(value)) {
      return 0;
-@@ -264,10 +313,19 @@ bool begin_frame() noexcept {
+@@ -236,27 +285,47 @@ const AuroraEvent* update() noexcept {
+ bool begin_frame() noexcept {
+   ZoneScoped;
+ #ifdef AURORA_ENABLE_GX
++  const double beginStarted = phase_now_ms();
++  const double surfaceStarted = phase_now_ms();
++  double surfaceMs = 0.0;
+   {
+     if (!window::is_presentable()) {
+       webgpu::release_surface();
++      const double end = phase_now_ms();
++      gfx::record_begin_frame_failure(0.0, 0.0);
++      gfx::record_begin_frame_outer(beginStarted, end, end - surfaceStarted, 0.0, 0.0);
+       return false;
+     }
+     if (window::is_paused()) {
++      const double end = phase_now_ms();
++      gfx::record_begin_frame_failure(0.0, 0.0);
++      gfx::record_begin_frame_outer(beginStarted, end, end - surfaceStarted, 0.0, 0.0);
+       return false;
+     }
+     if (!g_surface) {
+       webgpu::refresh_surface(true);
+       if (!g_surface) {
++        const double end = phase_now_ms();
++        gfx::record_begin_frame_failure(0.0, 0.0);
++        gfx::record_begin_frame_outer(beginStarted, end, end - surfaceStarted, 0.0, 0.0);
+         return false;
+       }
+     }
+   }
++  surfaceMs = phase_now_ms() - surfaceStarted;
+ 
++  const double imguiStarted = phase_now_ms();
+   imgui::new_frame(window::get_window_size());
++  const double imguiMs = phase_now_ms() - imguiStarted;
+   if (!gfx::begin_frame()) {
++    const double end = phase_now_ms();
++    gfx::record_begin_frame_outer(beginStarted, end, surfaceMs, imguiMs, 0.0);
+     return false;
+   }
++  const double fifoStarted = phase_now_ms();
+   gx::fifo::begin_frame();
++  const double fifoMs = phase_now_ms() - fifoStarted;
++  gfx::record_begin_frame_outer(beginStarted, phase_now_ms(), surfaceMs, imguiMs, fifoMs);
+ #endif
+   return true;
+ }
+@@ -264,10 +333,19 @@ bool begin_frame() noexcept {
  void end_frame() noexcept {
    ZoneScoped;
  #ifdef AURORA_ENABLE_GX
@@ -243,7 +316,7 @@ index 9430842..445cfa1 100644
    auto imguiDrawData = imgui::freeze();
  
    const auto& presentSource = webgpu::present_source();
-@@ -284,10 +342,13 @@ void end_frame() noexcept {
+@@ -284,10 +362,13 @@ void end_frame() noexcept {
      rmlOverlay = rmlFrame.overlay;
    }
  #endif
@@ -259,7 +332,7 @@ index 9430842..445cfa1 100644
      wgpu::Texture currentTexture;
      wgpu::TextureView currentView;
      auto surfaceStatus = wgpu::SurfaceGetCurrentTextureStatus::Error;
-@@ -367,12 +428,21 @@ void end_frame() noexcept {
+@@ -367,12 +448,21 @@ void end_frame() noexcept {
        Log.info("Skipping present; window not presentable");
      }
      webgpu::gpu_prof::frame_end(encoder);
@@ -281,7 +354,7 @@ index 9430842..445cfa1 100644
      webgpu::gpu_prof::after_submit();
      if (canPresent && g_surface) {
        ZoneScopedN("Present");
-@@ -380,7 +450,12 @@ void end_frame() noexcept {
+@@ -380,7 +470,12 @@ void end_frame() noexcept {
        {
          window::SurfaceLock surfaceLock;
          if (window::is_presentable()) {
@@ -294,7 +367,7 @@ index 9430842..445cfa1 100644
          }
        }
        if (status) {
-@@ -429,7 +504,7 @@ void end_frame() noexcept {
+@@ -429,7 +524,7 @@ void end_frame() noexcept {
      TracyPlotConfig("aurora: lastStorageSize", tracy::PlotFormatType::Memory, false, true, 0);
      TracyPlotConfig("aurora: lastTextureUploadSize", tracy::PlotFormatType::Memory, false, true, 0);
  
@@ -303,7 +376,7 @@ index 9430842..445cfa1 100644
      TracyPlot("aurora: queuedPipelines", static_cast<int64_t>(stats.queuedPipelines));
      TracyPlot("aurora: createdPipelines", static_cast<int64_t>(stats.createdPipelines));
      TracyPlot("aurora: drawCallCount", static_cast<int64_t>(stats.drawCallCount));
-@@ -439,8 +514,25 @@ void end_frame() noexcept {
+@@ -439,8 +534,25 @@ void end_frame() noexcept {
      TracyPlot("aurora: lastIndexSize", static_cast<int64_t>(stats.lastIndexSize));
      TracyPlot("aurora: lastStorageSize", static_cast<int64_t>(stats.lastStorageSize));
      TracyPlot("aurora: lastTextureUploadSize", static_cast<int64_t>(stats.lastTextureUploadSize));
@@ -345,7 +418,7 @@ index 447ead8..8514c86 100644
    std::shared_ptr<wgpu::SurfaceSourceWindowsHWND> desc = std::make_shared<wgpu::SurfaceSourceWindowsHWND>();
    desc->hwnd = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr);
 diff --git a/lib/gfx/frame.cpp b/lib/gfx/frame.cpp
-index 9fd83ef..f877846 100644
+index 9fd83ef..4db47d9 100644
 --- a/lib/gfx/frame.cpp
 +++ b/lib/gfx/frame.cpp
 @@ -16,9 +16,12 @@
@@ -433,7 +506,107 @@ index 9fd83ef..f877846 100644
  uint32_t g_frameIndex = UINT32_MAX;
  
  std::array<FramePacket, FrameSlotCount> g_framePackets;
-@@ -179,7 +233,12 @@ void wait_for_gpu_progress(std::chrono::nanoseconds sleepDuration) {
+@@ -56,6 +110,99 @@ uint64_t g_nextFrameId = 1;
+ render_worker::FrameSlotPool g_frameSlots{FrameSlotCount};
+ render_worker::FrameSlotPool g_stagingSlots{StagingBufferCount};
+ 
++struct BeginFrameTiming {
++  uint64_t frameId = 0;
++  double frameSlotMs = 0.0;
++  double frameSlotWaitMs = 0.0;
++  uint32_t frameSlotWaitCount = 0;
++  double stagingSlotMs = 0.0;
++  double stagingSlotWaitMs = 0.0;
++  uint32_t stagingSlotWaitCount = 0;
++  double packetMs = 0.0;
++  double recordMs = 0.0;
++  double pipelineMs = 0.0;
++  double workerMs = 0.0;
++  double encoderMs = 0.0;
++  double totalMs = 0.0;
++  double startMs = 0.0;
++  double endMs = 0.0;
++  double maxWaitMs = 0.0;
++  double maxWaitStartMs = 0.0;
++  double maxWaitEndMs = 0.0;
++  uint32_t maxWaitKind = 0;
++};
++
++void observe_begin_wait(BeginFrameTiming& timing, uint32_t kind, double startMs, double endMs) noexcept {
++  const double waitMs = endMs - startMs;
++  if (waitMs > timing.maxWaitMs) {
++    timing.maxWaitMs = waitMs;
++    timing.maxWaitStartMs = startMs;
++    timing.maxWaitEndMs = endMs;
++    timing.maxWaitKind = kind;
++  }
++}
++
++void clear_begin_frame_stats() noexcept {
++#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  auto& stats = g_resources.stats;
++  stats.lastBeginFrameId = 0;
++  stats.lastBeginFrameFrameSlotMs = 0.0;
++  stats.lastBeginFrameFrameSlotWaitMs = 0.0;
++  stats.lastBeginFrameFrameSlotWaitCount = 0;
++  stats.lastBeginFrameStagingSlotMs = 0.0;
++  stats.lastBeginFrameStagingSlotWaitMs = 0.0;
++  stats.lastBeginFrameStagingSlotWaitCount = 0;
++  stats.lastBeginFramePacketMs = 0.0;
++  stats.lastBeginFrameRecordMs = 0.0;
++  stats.lastBeginFramePipelineMs = 0.0;
++  stats.lastBeginFrameWorkerMs = 0.0;
++  stats.lastBeginFrameEncoderMs = 0.0;
++  stats.lastBeginFrameTotalMs = 0.0;
++  stats.lastBeginFrameResidualMs = 0.0;
++  stats.lastBeginFrameStartMs = 0.0;
++  stats.lastBeginFrameEndMs = 0.0;
++  stats.lastBeginFrameMaxWaitMs = 0.0;
++  stats.lastBeginFrameMaxWaitStartMs = 0.0;
++  stats.lastBeginFrameMaxWaitEndMs = 0.0;
++  stats.lastBeginFrameMaxWaitKind = 0;
++  stats.lastBeginFrameOuterSurfaceMs = 0.0;
++  stats.lastBeginFrameOuterImguiMs = 0.0;
++  stats.lastBeginFrameOuterFifoMs = 0.0;
++  stats.lastBeginFrameOuterTotalMs = 0.0;
++  stats.lastBeginFrameOuterResidualMs = 0.0;
++#endif
++}
++
++void publish_begin_frame_stats(const BeginFrameTiming& timing) noexcept {
++#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  auto& stats = g_resources.stats;
++  stats.lastBeginFrameId = timing.frameId;
++  stats.lastBeginFrameFrameSlotMs = timing.frameSlotMs;
++  stats.lastBeginFrameFrameSlotWaitMs = timing.frameSlotWaitMs;
++  stats.lastBeginFrameFrameSlotWaitCount = timing.frameSlotWaitCount;
++  stats.lastBeginFrameStagingSlotMs = timing.stagingSlotMs;
++  stats.lastBeginFrameStagingSlotWaitMs = timing.stagingSlotWaitMs;
++  stats.lastBeginFrameStagingSlotWaitCount = timing.stagingSlotWaitCount;
++  stats.lastBeginFramePacketMs = timing.packetMs;
++  stats.lastBeginFrameRecordMs = timing.recordMs;
++  stats.lastBeginFramePipelineMs = timing.pipelineMs;
++  stats.lastBeginFrameWorkerMs = timing.workerMs;
++  stats.lastBeginFrameEncoderMs = timing.encoderMs;
++  stats.lastBeginFrameTotalMs = timing.totalMs;
++  stats.lastBeginFrameResidualMs =
++      timing.totalMs - (timing.frameSlotMs + timing.stagingSlotMs + timing.packetMs +
++                        timing.recordMs + timing.pipelineMs + timing.workerMs);
++  stats.lastBeginFrameStartMs = timing.startMs;
++  stats.lastBeginFrameEndMs = timing.endMs;
++  stats.lastBeginFrameMaxWaitMs = timing.maxWaitMs;
++  stats.lastBeginFrameMaxWaitStartMs = timing.maxWaitStartMs;
++  stats.lastBeginFrameMaxWaitEndMs = timing.maxWaitEndMs;
++  stats.lastBeginFrameMaxWaitKind = timing.maxWaitKind;
++#else
++  (void)timing;
++#endif
++}
++
+ struct RuntimeDrawType {
+   std::string label;
+   DrawCallback draw = nullptr;
+@@ -179,7 +326,12 @@ void wait_for_gpu_progress(std::chrono::nanoseconds sleepDuration) {
    if (render_worker::is_idle()) {
      enqueue_process_events();
    }
@@ -446,7 +619,7 @@ index 9fd83ef..f877846 100644
  }
  
  void pace_frame_start() {
-@@ -239,6 +298,53 @@ void map_staging_buffer(size_t slot, bool releaseSlotOnCompletion = false) {
+@@ -239,6 +391,53 @@ void map_staging_buffer(size_t slot, bool releaseSlotOnCompletion = false) {
          }
        });
  }
@@ -500,7 +673,7 @@ index 9fd83ef..f877846 100644
  } // namespace
  
  namespace detail {
-@@ -385,6 +491,18 @@ void initialize() {
+@@ -385,6 +584,18 @@ void initialize() {
      g_presentTimes.clear();
    }
    render_worker::initialize();
@@ -519,7 +692,7 @@ index 9fd83ef..f877846 100644
    // This appears to take a while and blocks the render thread for periods of time
    // render_worker::set_event_pump([] {
    //   if (g_instance) {
-@@ -420,15 +538,22 @@ void initialize() {
+@@ -420,15 +631,22 @@ void initialize() {
                 "Shared Storage Buffer");
    for (size_t i = 0; i < g_stagingBuffers.size(); ++i) {
      const auto label = fmt::format("Staging Buffer {}", i);
@@ -542,7 +715,7 @@ index 9fd83ef..f877846 100644
  
    {
      constexpr std::array layoutEntries{
-@@ -519,6 +644,10 @@ void initialize() {
+@@ -519,6 +737,10 @@ void initialize() {
  }
  
  void shutdown() {
@@ -553,7 +726,7 @@ index 9fd83ef..f877846 100644
    render_worker::synchronize();
    render_worker::shutdown();
    g_processEventsQueued.store(false, std::memory_order_release);
-@@ -556,6 +685,20 @@ void shutdown() {
+@@ -556,6 +778,20 @@ void shutdown() {
    for (auto& packet : g_framePackets) {
      packet = {};
    }
@@ -574,30 +747,95 @@ index 9fd83ef..f877846 100644
    shutdown_recording();
    g_resources.staticBindGroup = {};
    g_resources.staticBindGroupLayout = {};
-@@ -600,6 +743,14 @@ size_t acquire_frame_slot() {
+@@ -584,49 +820,112 @@ bool wait_for_staging_buffer(size_t slot) {
+   }
+ }
  
- std::optional<size_t> acquire_mapped_staging_buffer() {
+-size_t acquire_frame_slot() {
++size_t acquire_frame_slot(BeginFrameTiming& timing) {
+   ZoneScopedN("Acquire frame slot");
++  const double acquireStarted = phase_now_ms();
+   const auto waitStart = PresentClock::now();
+   while (true) {
+     if (const auto slot = g_frameSlots.try_acquire()) {
+       const auto waitDuration = PresentClock::now() - waitStart;
+       const double waitMs = std::chrono::duration<double, std::milli>{waitDuration}.count();
+       TracyPlot("aurora: frameSlotWaitMs", waitMs);
++      timing.frameSlotMs = phase_now_ms() - acquireStarted;
+       return *slot;
+     }
++    ++timing.frameSlotWaitCount;
++    const double waitStarted = phase_now_ms();
+     wait_for_gpu_progress(std::chrono::microseconds{100});
++    const double waitEnded = phase_now_ms();
++    timing.frameSlotWaitMs += waitEnded - waitStarted;
++    observe_begin_wait(timing, 1, waitStarted, waitEnded);
+   }
+ }
+ 
+-std::optional<size_t> acquire_mapped_staging_buffer() {
++std::optional<size_t> acquire_mapped_staging_buffer(BeginFrameTiming& timing) {
    ZoneScopedN("Acquire mapped staging buffer");
++  const double acquireStarted = phase_now_ms();
 +#ifdef __EMSCRIPTEN__
-+  while (true) {
-+    if (auto slot = g_stagingSlots.try_acquire()) {
-+      return slot;
-+    }
-+    wait_for_gpu_progress(std::chrono::microseconds{100});
-+  }
-+#else
    while (true) {
      if (auto slot = g_stagingSlots.try_acquire()) {
++      timing.stagingSlotMs = phase_now_ms() - acquireStarted;
++      return slot;
++    }
++    ++timing.stagingSlotWaitCount;
++    const double waitStarted = phase_now_ms();
++    wait_for_gpu_progress(std::chrono::microseconds{100});
++    const double waitEnded = phase_now_ms();
++    timing.stagingSlotWaitMs += waitEnded - waitStarted;
++    observe_begin_wait(timing, 2, waitStarted, waitEnded);
++  }
++#else
++  while (true) {
++    if (auto slot = g_stagingSlots.try_acquire()) {
++      const double mapStarted = phase_now_ms();
        if (wait_for_staging_buffer(*slot)) {
-@@ -610,6 +761,7 @@ std::optional<size_t> acquire_mapped_staging_buffer() {
++        timing.stagingSlotWaitMs += phase_now_ms() - mapStarted;
++        timing.stagingSlotMs = phase_now_ms() - acquireStarted;
+         return *slot;
+       }
++      timing.stagingSlotWaitMs += phase_now_ms() - mapStarted;
+       g_stagingSlots.release(*slot);
++      timing.stagingSlotMs = phase_now_ms() - acquireStarted;
+       return std::nullopt;
      }
++    ++timing.stagingSlotWaitCount;
++    const double waitStarted = phase_now_ms();
      wait_for_gpu_progress(std::chrono::microseconds{100});
++    const double waitEnded = phase_now_ms();
++    timing.stagingSlotWaitMs += waitEnded - waitStarted;
++    observe_begin_wait(timing, 2, waitStarted, waitEnded);
    }
 +#endif
  }
  
  bool begin_frame() {
-@@ -627,6 +779,28 @@ bool begin_frame() {
+   ZoneScoped;
+   // pace_frame_start();
+-  const size_t frameSlot = acquire_frame_slot();
+-  const auto stagingSlot = acquire_mapped_staging_buffer();
++  BeginFrameTiming timing;
++  const double beginStarted = phase_now_ms();
++  timing.startMs = beginStarted;
++  clear_begin_frame_stats();
++  const size_t frameSlot = acquire_frame_slot(timing);
++  const auto stagingSlot = acquire_mapped_staging_buffer(timing);
+   if (!stagingSlot) {
+     g_frameSlots.release(frameSlot);
++    timing.endMs = phase_now_ms();
++    timing.totalMs = timing.endMs - beginStarted;
++    publish_begin_frame_stats(timing);
+     return false;
+   }
+ 
++  const double packetStarted = phase_now_ms();
+   auto& frame = g_framePackets[frameSlot];
+   frame = {};
    frame.frameId = g_nextFrameId++;
    frame.frameIndex = g_frameIndex;
    frame.stagingBuffer = *stagingSlot;
@@ -626,16 +864,70 @@ index 9fd83ef..f877846 100644
    size_t bufferOffset = 0;
    const auto& stagingBuf = g_stagingBuffers[*stagingSlot];
    const auto mapBuffer = [&](ByteBuffer& buf, uint64_t size) {
-@@ -643,6 +817,7 @@ bool begin_frame() {
+@@ -643,20 +942,71 @@ bool begin_frame() {
    if constexpr (UseTextureBuffer) {
      mapBuffer(frame.textureUpload, TextureUploadSize);
    }
 +#endif
++  timing.packetMs = phase_now_ms() - packetStarted;
  
++  const double recordStarted = phase_now_ms();
    begin_recording(frame, frameSlot);
++  timing.recordMs = phase_now_ms() - recordStarted;
++  const double pipelineStarted = phase_now_ms();
    begin_pipeline_frame();
-@@ -657,6 +832,9 @@ bool begin_frame() {
++  timing.pipelineMs = phase_now_ms() - pipelineStarted;
++  const double workerStarted = phase_now_ms();
+   render_worker::enqueue_begin_frame(frame.frameId, [frameSlot] {
++#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    const double encoderStarted = phase_now_ms();
++#endif
+     constexpr wgpu::CommandEncoderDescriptor EncoderDescriptor{.label = "Redraw encoder"};
+     g_framePackets[frameSlot].encoder = g_device.CreateCommandEncoder(&EncoderDescriptor);
+     webgpu::gpu_prof::frame_begin(g_framePackets[frameSlot].encoder);
++#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++    g_resources.stats.lastBeginFrameEncoderMs = phase_now_ms() - encoderStarted;
++#endif
+   });
++  timing.workerMs = phase_now_ms() - workerStarted;
++  timing.encoderMs = g_resources.stats.lastBeginFrameEncoderMs;
++  timing.frameId = frame.frameId;
++  timing.endMs = phase_now_ms();
++  timing.totalMs = timing.endMs - beginStarted;
++  publish_begin_frame_stats(timing);
+   g_cpuFrameStart = PresentClock::now();
+   return true;
+ }
  
++void record_begin_frame_failure(double startMs, double endMs) noexcept {
++  BeginFrameTiming timing;
++  clear_begin_frame_stats();
++  timing.startMs = startMs;
++  timing.endMs = endMs;
++  timing.totalMs = endMs - startMs;
++  publish_begin_frame_stats(timing);
++}
++
++void record_begin_frame_outer(double startMs, double endMs, double surfaceMs, double imguiMs, double fifoMs) noexcept {
++#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  auto& stats = g_resources.stats;
++  stats.lastBeginFrameOuterSurfaceMs = surfaceMs;
++  stats.lastBeginFrameOuterImguiMs = imguiMs;
++  stats.lastBeginFrameOuterFifoMs = fifoMs;
++  stats.lastBeginFrameStartMs = startMs;
++  stats.lastBeginFrameEndMs = endMs;
++  stats.lastBeginFrameOuterTotalMs = endMs - startMs;
++  stats.lastBeginFrameOuterResidualMs =
++      (endMs - startMs) - (surfaceMs + imguiMs + fifoMs + stats.lastBeginFrameTotalMs);
++#else
++  (void)startMs;
++  (void)endMs;
++  (void)surfaceMs;
++  (void)imguiMs;
++  (void)fifoMs;
++#endif
++}
++
  void end_frame(EndFrameCallback callback) {
    ZoneScoped;
 +#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
@@ -644,7 +936,7 @@ index 9fd83ef..f877846 100644
    if (g_cpuFrameStart.time_since_epoch().count() != 0) {
      const auto cpuFrameTime = PresentClock::now() - g_cpuFrameStart;
      update_ema(g_cpuFrameTimeNs, duration_ns(cpuFrameTime));
-@@ -669,14 +847,37 @@ void end_frame(EndFrameCallback callback) {
+@@ -669,14 +1019,37 @@ void end_frame(EndFrameCallback callback) {
    const uint64_t frameId = frame.frameId;
    end_pipeline_frame();
    ++g_frameIndex;
@@ -684,7 +976,7 @@ index 9fd83ef..f877846 100644
      auto afterSubmitCallbacks = std::move(packet.afterSubmitCallbacks);
      packet = {};
      g_resources.stats.drawCallCount = stats.drawCallCount;
-@@ -686,14 +887,74 @@ void end_frame(EndFrameCallback callback) {
+@@ -686,14 +1059,74 @@ void end_frame(EndFrameCallback callback) {
      g_resources.stats.lastIndexSize = stats.lastIndexSize;
      g_resources.stats.lastStorageSize = stats.lastStorageSize;
      g_resources.stats.lastTextureUploadSize = stats.lastTextureUploadSize;
@@ -761,7 +1053,7 @@ index 9fd83ef..f877846 100644
  
  uint32_t current_frame() noexcept { return g_frameIndex; }
 diff --git a/lib/gfx/frame.hpp b/lib/gfx/frame.hpp
-index 0b86ffe..2edb10f 100644
+index 0b86ffe..8bcfe54 100644
 --- a/lib/gfx/frame.hpp
 +++ b/lib/gfx/frame.hpp
 @@ -8,7 +8,14 @@
@@ -779,6 +1071,15 @@ index 0b86ffe..2edb10f 100644
  inline constexpr uint64_t StagingBufferSize = UniformBufferSize + VertexBufferSize + IndexBufferSize +
                                                StorageBufferSize + (UseTextureBuffer ? TextureUploadSize : 0);
  
+@@ -34,6 +41,8 @@ namespace aurora::gfx {
+ void initialize();
+ void shutdown();
+ bool begin_frame();
++void record_begin_frame_failure(double startMs, double endMs) noexcept;
++void record_begin_frame_outer(double startMs, double endMs, double surfaceMs, double imguiMs, double fifoMs) noexcept;
+ void end_frame(EndFrameCallback callback);
+ uint32_t current_frame() noexcept;
+ void after_submit() noexcept;
 diff --git a/lib/gfx/pipeline_cache.cpp b/lib/gfx/pipeline_cache.cpp
 index bff9b47..8b55cd4 100644
 --- a/lib/gfx/pipeline_cache.cpp

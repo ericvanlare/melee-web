@@ -306,6 +306,7 @@ void tick(){
  double preparation_ms=0,preparation_started=0;
  double render_begin_ms=0,render_draw_ms=0,render_end_ms=0,render_total_ms=0,simulation_cpu_ms=0;
  uint32_t callback_draw_calls=0,callback_texture_upload=0,callback_staging_used=0;
+ AuroraStats callback_begin_stats{};
  AuroraStats callback_end_stats{};
  melee_web::SourceFrameSequence source_frames;
  int began=0,drawn=1,timing_valid=1,first_use=0;
@@ -352,8 +353,35 @@ void tick(){
   render_draw_ms+=draw_done-begin_done;
   render_end_ms+=end_done-draw_done;
   render_total_ms+=end_done-render_started;
+  const auto rendered=aurora_stats_snapshot();
+  callback_begin_stats.lastBeginFrameId=rendered.lastBeginFrameId;
+  callback_begin_stats.lastBeginFrameFrameSlotMs+=rendered.lastBeginFrameFrameSlotMs;
+  callback_begin_stats.lastBeginFrameFrameSlotWaitMs+=rendered.lastBeginFrameFrameSlotWaitMs;
+  callback_begin_stats.lastBeginFrameFrameSlotWaitCount+=rendered.lastBeginFrameFrameSlotWaitCount;
+  callback_begin_stats.lastBeginFrameStagingSlotMs+=rendered.lastBeginFrameStagingSlotMs;
+  callback_begin_stats.lastBeginFrameStagingSlotWaitMs+=rendered.lastBeginFrameStagingSlotWaitMs;
+  callback_begin_stats.lastBeginFrameStagingSlotWaitCount+=rendered.lastBeginFrameStagingSlotWaitCount;
+  callback_begin_stats.lastBeginFramePacketMs+=rendered.lastBeginFramePacketMs;
+  callback_begin_stats.lastBeginFrameRecordMs+=rendered.lastBeginFrameRecordMs;
+  callback_begin_stats.lastBeginFramePipelineMs+=rendered.lastBeginFramePipelineMs;
+  callback_begin_stats.lastBeginFrameWorkerMs+=rendered.lastBeginFrameWorkerMs;
+  callback_begin_stats.lastBeginFrameEncoderMs+=rendered.lastBeginFrameEncoderMs;
+  callback_begin_stats.lastBeginFrameTotalMs+=rendered.lastBeginFrameTotalMs;
+  callback_begin_stats.lastBeginFrameResidualMs+=rendered.lastBeginFrameResidualMs;
+  callback_begin_stats.lastBeginFrameStartMs=rendered.lastBeginFrameStartMs;
+  callback_begin_stats.lastBeginFrameEndMs=rendered.lastBeginFrameEndMs;
+  if(rendered.lastBeginFrameMaxWaitMs>callback_begin_stats.lastBeginFrameMaxWaitMs){
+   callback_begin_stats.lastBeginFrameMaxWaitMs=rendered.lastBeginFrameMaxWaitMs;
+   callback_begin_stats.lastBeginFrameMaxWaitStartMs=rendered.lastBeginFrameMaxWaitStartMs;
+   callback_begin_stats.lastBeginFrameMaxWaitEndMs=rendered.lastBeginFrameMaxWaitEndMs;
+   callback_begin_stats.lastBeginFrameMaxWaitKind=rendered.lastBeginFrameMaxWaitKind;
+  }
+  callback_begin_stats.lastBeginFrameOuterSurfaceMs+=rendered.lastBeginFrameOuterSurfaceMs;
+  callback_begin_stats.lastBeginFrameOuterImguiMs+=rendered.lastBeginFrameOuterImguiMs;
+  callback_begin_stats.lastBeginFrameOuterFifoMs+=rendered.lastBeginFrameOuterFifoMs;
+  callback_begin_stats.lastBeginFrameOuterTotalMs+=rendered.lastBeginFrameOuterTotalMs;
+  callback_begin_stats.lastBeginFrameOuterResidualMs+=rendered.lastBeginFrameOuterResidualMs;
   if(began_this_frame){
-   const auto rendered=aurora_stats_snapshot();
    callback_draw_calls+=rendered.drawCallCount;
    callback_texture_upload+=rendered.lastTextureUploadSize;
    callback_staging_used+=rendered.lastVertSize+rendered.lastUniformSize+
@@ -530,9 +558,20 @@ void tick(){
  }
  char timing[4096];
  const uint32_t staging_used_bytes=callback_staging_used;
- std::snprintf(timing,sizeof(timing),
+ const int timing_written=std::snprintf(timing,sizeof(timing),
   "{\"frame\":%u,\"started\":%.3f,\"valid\":%d,\"first_use\":%d,"
   "\"input_ms\":%.3f,\"simulation_audio_ms\":%.3f,\"preparation_ms\":%.3f,"
+  "\"begin_phases\":{\"frame_slot_ms\":%.3f,\"frame_slot_wait_ms\":%.3f,"
+  "\"frame_slot_wait_count\":%u,\"staging_slot_ms\":%.3f,"
+  "\"staging_slot_wait_ms\":%.3f,\"staging_slot_wait_count\":%u,"
+  "\"packet_ms\":%.3f,\"record_ms\":%.3f,\"pipeline_ms\":%.3f,"
+  "\"worker_ms\":%.3f,\"encoder_ms\":%.3f,\"total_ms\":%.3f,"
+  "\"residual_ms\":%.3f,\"outer_surface_ms\":%.3f,"
+  "\"outer_imgui_ms\":%.3f,\"outer_fifo_ms\":%.3f,"
+  "\"outer_total_ms\":%.3f,\"outer_residual_ms\":%.3f,"
+  "\"start_ms\":%.3f,\"end_ms\":%.3f,\"max_wait_ms\":%.3f,"
+  "\"max_wait_start_ms\":%.3f,\"max_wait_end_ms\":%.3f,\"max_wait_kind\":%u,"
+  "\"last_frame_id\":%llu},"
   "\"begin_ms\":%.3f,\"draw_ms\":%.3f,\"end_ms\":%.3f,\"total_ms\":%.3f,"
   "\"end_phases\":{\"last_frame\":%llu,\"fifo_texture_ms\":%.3f,\"gfx_finish_ms\":%.3f,"
   "\"staging_writes_ms\":%.3f,\"surface_encode_ms\":%.3f,\"encoder_finish_ms\":%.3f,"
@@ -555,6 +594,20 @@ void tick(){
   "\"wasm_heap_bytes\":%zu,\"draw_suppressed\":%d,\"source_steps\":%zu,\"source_draws\":%zu}",
   ++render_frame,started,timing_valid,first_use,input_done-started,
   simulation_cpu_ms,preparation_ms,
+  callback_begin_stats.lastBeginFrameFrameSlotMs,callback_begin_stats.lastBeginFrameFrameSlotWaitMs,
+  callback_begin_stats.lastBeginFrameFrameSlotWaitCount,
+  callback_begin_stats.lastBeginFrameStagingSlotMs,callback_begin_stats.lastBeginFrameStagingSlotWaitMs,
+  callback_begin_stats.lastBeginFrameStagingSlotWaitCount,
+  callback_begin_stats.lastBeginFramePacketMs,callback_begin_stats.lastBeginFrameRecordMs,
+  callback_begin_stats.lastBeginFramePipelineMs,callback_begin_stats.lastBeginFrameWorkerMs,
+  callback_begin_stats.lastBeginFrameEncoderMs,callback_begin_stats.lastBeginFrameTotalMs,
+  callback_begin_stats.lastBeginFrameResidualMs,callback_begin_stats.lastBeginFrameOuterSurfaceMs,
+  callback_begin_stats.lastBeginFrameOuterImguiMs,callback_begin_stats.lastBeginFrameOuterFifoMs,
+  callback_begin_stats.lastBeginFrameOuterTotalMs,callback_begin_stats.lastBeginFrameOuterResidualMs,
+  callback_begin_stats.lastBeginFrameStartMs,callback_begin_stats.lastBeginFrameEndMs,
+  callback_begin_stats.lastBeginFrameMaxWaitMs,callback_begin_stats.lastBeginFrameMaxWaitStartMs,
+  callback_begin_stats.lastBeginFrameMaxWaitEndMs,callback_begin_stats.lastBeginFrameMaxWaitKind,
+  static_cast<unsigned long long>(callback_begin_stats.lastBeginFrameId),
   render_begin_ms,render_draw_ms,render_end_ms,
   finished-started,static_cast<unsigned long long>(callback_end_stats.lastEndFrameId),
   callback_end_stats.lastEndFrameFifoTextureMs,callback_end_stats.lastEndFrameGfxFinishMs,
@@ -579,6 +632,15 @@ void tick(){
   stats_after.queuedPipelines,stats_after.createdPipelines,
   callback_draw_calls,callback_texture_upload,staging_used_bytes,
   emscripten_get_heap_size(),suppress_draw,source_frames.steps(),source_frames.draws());
+ if(timing_written<0||static_cast<size_t>(timing_written)>=sizeof(timing)){
+  timing_valid=0;
+  std::snprintf(timing,sizeof(timing),"{\"frame\":%u,\"valid\":0,\"timing_truncated\":true}",render_frame);
+  EM_ASM({
+   const text=UTF8ToString($0);
+   if(window.menuRuntimeTimingError)window.menuRuntimeTimingError(text);
+   else console.error(text);
+  },timing_written<0?"Native menu timing JSON formatting failed":"Native menu timing JSON exceeded 4096 bytes");
+ }
  EM_ASM({if(window.menuRuntimeTiming)window.menuRuntimeTiming(JSON.parse(UTF8ToString($0)));},timing);
  EM_ASM({window.menuFrame?.(!!$0);},running_at_callback_start?1:0);
  if(replay_completed_now)EM_ASM({window.menuReplayCompleted?.($0,!!$1,$2,$3);},
