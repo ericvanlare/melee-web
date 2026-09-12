@@ -211,6 +211,19 @@ The earlier cold begin-frame red remains independently unresolved; these clean
 runs do not classify it as external scheduling. Both fresh holdouts and the
 subsequent retained-heap gate remain closed.
 
+A four-slot fresh/reloaded-browser experiment now reproduces the remaining
+cold failure: a 90.745 ms native callback includes 85.945 ms across 27 waits for
+a staging buffer's GPU completion. There are zero CPU frame-slot waits or live
+cache syncs. A 115.722 ms GPU-process task overlaps it, including a Dawn worker
+with only 1.057 ms of thread CPU across 114.404 ms wall time. This localizes the
+wait but does not identify the underlying GPU operation or establish external
+scheduling. Two subsequent, separately bounded startup GPU traces do not
+reproduce the stall; both experiments preserve a focus-loss failure as well.
+All six diagnostic traces are complete for their declared windows. The capture
+tool now supports a frozen ten-second GPU startup preset with deferred stream
+reading. No gameplay or renderer implementation changed; the red remains
+unresolved and both holdouts remain unopened. See the [results and next discrimination](docs/HITCH_CAPTURE.md#cold-begin-wait-and-gpu-startup-diagnosis--2026-09-12).
+
 The typed content path now carries Falco, Fox, Marth, Battlefield, Yoshi's Story and Dream Land
 source IDs, runtime manifests and focused development traces. Source stock icon IDs are
 selected from the typed character/fighter identity rows. In a fresh Release

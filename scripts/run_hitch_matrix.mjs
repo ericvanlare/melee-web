@@ -59,6 +59,22 @@ export const TRACE = {
       'v8','disabled-by-default-v8.cpu_profiler','renderer.scheduler']},
 };
 
+export function traceSettings(detail='standard') {
+  if(!['standard','gpu-startup'].includes(detail))throw Error('Unknown trace detail: '+detail);
+  const trace=structuredClone(TRACE);
+  if(detail==='gpu-startup')trace.traceConfig.includedCategories.push(
+    'gpu','gpu.dawn','disabled-by-default-gpu.dawn','disabled-by-default-gpu.service');
+  return {detail,trace,windowMs:detail==='gpu-startup'?10000:null};
+}
+
+export function frozenTraceSettings(machine, requestedDetail) {
+  const settings=traceSettings(machine.trace_detail||'standard');
+  if(requestedDetail&&requestedDetail!==settings.detail)throw Error('Trace detail differs from frozen profile');
+  if(JSON.stringify(machine.trace)!==JSON.stringify(settings.trace)||
+     (machine.trace_window_ms??null)!==settings.windowMs)throw Error('Trace configuration changed');
+  return settings;
+}
+
 async function playwright(modulePath) {
   return modulePath ? import(pathToFileURL(path.join(path.resolve(modulePath),'index.mjs')).href) : import('playwright');
 }
@@ -82,6 +98,7 @@ async function startBrowser(pw, directory) {
 }
 
 async function profile(options, pw) {
+  const settings=traceSettings(options['trace-detail']);
   const browser = await startBrowser(pw, path.resolve(options['browser-profile']));
   try {
     const python = options.python || path.join(ROOT,'.venv/bin/python');
@@ -97,7 +114,8 @@ async function profile(options, pw) {
       harness_artifacts:Object.fromEntries(await Promise.all(
         ['scripts/hitch_capture.py','tools/hitch_capture.py','tools/browser_replay_validation.py'].map(async file=>
           [file,sha(await fs.readFile(path.join(ROOT,file)))]))),
-      browser:browser.version,command_line:browser.commandLine,launch:LAUNCH,trace:TRACE,node:process.version,
+      browser:browser.version,command_line:browser.commandLine,launch:LAUNCH,trace:settings.trace,
+      trace_detail:settings.detail,trace_window_ms:settings.windowMs,node:process.version,
       gpu:browser.systemInfo.gpu,
       focus_emulation:false,artifacts,build_directory:path.resolve(options.build),
       application_reset:'Fresh document and Wasm heap per attempt; one browser context/process and its driver caches retained across the matrix.',
@@ -116,15 +134,39 @@ async function profile(options, pw) {
   } finally {await browser.context.close();}
 }
 
-export async function stopTrace(cdp, directory, maxBytes=256*1024*1024) {
-  const complete = new Promise(resolve => cdp.once('Tracing.tracingComplete',resolve));
-  await cdp.send('Tracing.end');
-  let timer,info;
+export async function requestTraceEnd(cdp) {
+  let onComplete;
+  const complete = new Promise(resolve => {onComplete=resolve;cdp.once('Tracing.tracingComplete',onComplete);});
+  let timer;
   try {
-    info=await Promise.race([complete,new Promise((_,reject)=>{
+    return await Promise.race([(async()=>{await cdp.send('Tracing.end');return complete;})(),new Promise((_,reject)=>{
       timer=setTimeout(()=>reject(Error('Trace finalization timeout')),30000);
     })]);
-  } finally {clearTimeout(timer);}
+  } finally {clearTimeout(timer);cdp.off('Tracing.tracingComplete',onComplete);}
+}
+
+// End the trace on a Node-side timer, without reading its stream or writing
+// artifacts during the remaining replay. Errors are values until teardown so
+// a rejected CDP promise cannot discard the public report or crash the driver.
+export function scheduleTraceEnd(cdp, windowMs, schedule=setTimeout, cancel=clearTimeout) {
+  const window={start_utc_ms:Date.now(),requested_window_ms:windowMs,
+    scope:'Startup window only. Later replay failures remain failures without enclosing trace coverage. Stream read deferred until replay stops.'};
+  let timer,ending;
+  const end=reason=>{
+    if(ending)return ending;
+    cancel(timer);
+    window.end_requested_utc_ms=Date.now();window.end_reason=reason;
+    ending=requestTraceEnd(cdp).then(info=>{
+      window.finalized_utc_ms=Date.now();return {info,window};
+    },error=>({error:String(error.stack||error),window}));
+    return ending;
+  };
+  timer=schedule(()=>{void end('window-deadline');},windowMs);
+  return {finish:()=>end('replay-stopped')};
+}
+
+export async function stopTrace(cdp, directory, maxBytes=256*1024*1024, options={}) {
+  const info=options.info||await requestTraceEnd(cdp);
   const tracePath = path.join(directory,'chrome-trace.json.gz');
   const output = await fs.open(tracePath,'wx');
   let bytes=0, bytesRead=0, truncated=false,readError=null;
@@ -147,9 +189,34 @@ export async function stopTrace(cdp, directory, maxBytes=256*1024*1024) {
   }
   const metadata = path.join(directory,'trace-metadata.json');
   const valid=!!info.stream&&!truncated&&!readError&&info.dataLossOccurred===false;
-  await save(metadata,{...info,bytes,bytes_read:bytesRead,truncated,read_error:readError,configuration:TRACE,
+  await save(metadata,{...info,bytes,bytes_read:bytesRead,truncated,read_error:readError,
+    configuration:options.configuration||TRACE,window:options.window||null,
     diagnostic_only:true,complete:valid});
   return {paths:[tracePath,metadata],complete:valid};
+}
+
+export async function finalizeTrace(cdp,directory,settings,traceWindow=null) {
+  const paths=[];let ended;
+  try {
+    ended=traceWindow?await traceWindow.finish():null;
+    if(ended){
+      const windowPath=path.join(directory,'trace-window.json');
+      await save(windowPath,ended.window);paths.push(windowPath);
+      if(ended.error)throw Error(ended.error);
+    }
+    const trace=await stopTrace(cdp,directory,256*1024*1024,
+      {info:ended?.info,window:ended?.window,configuration:settings.trace});
+    return {...trace,paths:[...paths,...trace.paths],reusable:true,
+      error:trace.complete?null:'Trace incomplete; retained with loss metadata'};
+  }catch(error){
+    const reason=String(error.stack||error);
+    const failurePath=path.join(directory,'trace-finalization-failure.json');
+    await save(failurePath,{complete:false,diagnostic_only:true,error:reason,
+      window:ended?.window||null,configuration:settings.trace,
+      trace_state_unknown:true,scope:'No usable trace is claimed. Close this browser before any further slot.'});
+    paths.push(failurePath);
+    return {paths,complete:false,reusable:false,error:reason};
+  }
 }
 
 async function publicReport(page, deadline) {
@@ -167,11 +234,12 @@ async function publicReport(page, deadline) {
 async function run(options,pw) {
   const planPath=path.resolve(options.plan),plan=await read(planPath);
   const machine=await read(plan.identities.profile.path);
+  const settings=frozenTraceSettings(machine,options['trace-detail']);
   if(options.build&&path.resolve(options.build)!==machine.build_directory)throw Error('--build differs from the frozen profile');
   if(machine.runner_sha256!==sha(await fs.readFile(fileURLToPath(import.meta.url))))throw Error('Runner changed after profile freeze');
   for(const [file,digest] of Object.entries(machine.harness_artifacts||{}))
     if(sha(await fs.readFile(path.join(ROOT,file)))!==digest)throw Error('Harness changed after freeze: '+file);
-  if(JSON.stringify(machine.launch)!==JSON.stringify(LAUNCH)||JSON.stringify(machine.trace)!==JSON.stringify(TRACE))throw Error('Browser configuration changed');
+  if(JSON.stringify(machine.launch)!==JSON.stringify(LAUNCH))throw Error('Browser configuration changed');
   const python=options.python||path.join(ROOT,'.venv/bin/python');
   const ledger=(verb,args=[])=>JSON.parse(cmd(python,[path.join(ROOT,'scripts/hitch_capture.py'),verb,'--plan',planPath,...args]));
   // Validation happens before touching the browser, and again before every slot.
@@ -189,7 +257,7 @@ async function run(options,pw) {
       const started=ledger('start',['--slot',slot.slot_id]);
       const directory=started.attempt_dir;
       const deadline=Date.now()+plan.timeout_ms;
-      const errors=[],attachments=[];let tracing=false,reportPath=null,reason=null,replayStarted=false;
+      const errors=[],attachments=[];let tracing=false,reportPath=null,reason=null,replayStarted=false,traceWindow=null,traceReusable=true;
       const pageError=e=>errors.push({type:'pageerror',message:String(e),at:new Date().toISOString()});
       const consoleError=m=>{if(m.type()==='error')errors.push({type:'console',message:m.text(),location:m.location(),at:new Date().toISOString()});};
       page.on('pageerror',pageError);page.on('console',consoleError);
@@ -215,7 +283,10 @@ async function run(options,pw) {
         const recipe=plan.identities.development_recipes[slot.target_id];
         await page.locator('#retail-replay-file').setInputFiles(recipe.path,{timeout:remainingTimeout(deadline)});
         await page.locator('#retail-replay-mode').selectOption('performance',{timeout:remainingTimeout(deadline)});
-        if(slot.mode==='profiler'){await cdp.send('Tracing.start',TRACE);tracing=true;}
+        if(slot.mode==='profiler'){
+          await cdp.send('Tracing.start',settings.trace);tracing=true;
+          if(settings.windowMs)traceWindow=scheduleTraceEnd(cdp,settings.windowMs);
+        }
         await page.locator('#retail-replay-start').click({timeout:remainingTimeout(deadline)});
         replayStarted=true;
         const report=await publicReport(page,deadline);
@@ -238,9 +309,10 @@ async function run(options,pw) {
       }
       finally {
         if(tracing)try{
-          const trace=await stopTrace(cdp,directory);attachments.push(...trace.paths);
-          if(!trace.complete)reason=(reason||'')+'\nTrace incomplete; retained with loss metadata';
-        }catch(error){reason=(reason||'')+'\nTrace capture: '+String(error);}
+          const trace=await finalizeTrace(cdp,directory,settings,traceWindow);
+          attachments.push(...trace.paths);traceReusable=trace.reusable;
+          if(trace.error)reason=(reason||'')+'\nTrace capture: '+trace.error;
+        }catch(error){traceReusable=false;reason=(reason||'')+'\nTrace capture: '+String(error);}
         // Public DOM only, collected after the source clock stops or an attempt fails.
         const dom={};
         for(const id of ['status','cache-status','render-metrics','perf-metrics','audio-metrics','log','retail-replay-report']) {
@@ -258,6 +330,9 @@ async function run(options,pw) {
         const finished=ledger('finish',args);
         console.log(JSON.stringify({event:'finished',slot:slot.slot_id,status:finished.status,
           validation:finished.validation,summary:finished.performance_summary}));
+        // A failed end could deliver a late completion for the wrong slot.
+        // Preserve this attempt, then close the context without starting another.
+        if(!traceReusable)throw Error('Trace state unresolved; browser closed. Remaining slots are unconsumed.');
       }
     }
     const summary=ledger('status');
@@ -268,7 +343,7 @@ async function run(options,pw) {
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
   const {values,positionals}=parseArgs({allowPositionals:true,options:Object.fromEntries(
-    ['plan','disc','python','playwright','out','build','browser-profile','url'].map(k=>[k,{type:'string'}]))});
+    ['plan','disc','python','playwright','out','build','browser-profile','url','trace-detail'].map(k=>[k,{type:'string'}]))});
   try {
     const required=positionals[0]==='profile'?['out','build','browser-profile']:['plan','disc'];
     for(const key of required)if(!values[key])throw Error('Missing required --'+key+'; see docs/HITCH_CAPTURE.md');

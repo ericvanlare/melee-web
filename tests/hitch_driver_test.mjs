@@ -5,7 +5,19 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import {verifyServedArtifacts,stopTrace,remainingTimeout} from '../scripts/run_hitch_matrix.mjs';
+import {verifyServedArtifacts,stopTrace,remainingTimeout,TRACE,traceSettings,
+  frozenTraceSettings,scheduleTraceEnd,finalizeTrace} from '../scripts/run_hitch_matrix.mjs';
+
+assert.deepEqual(frozenTraceSettings({trace:TRACE}),traceSettings());
+const gpu=traceSettings('gpu-startup');
+const profile={trace:gpu.trace,trace_detail:gpu.detail,trace_window_ms:gpu.windowMs};
+assert.equal(frozenTraceSettings(profile).windowMs,10000);
+assert(gpu.trace.traceConfig.includedCategories.includes('disabled-by-default-gpu.dawn'));
+assert(!TRACE.traceConfig.includedCategories.includes('disabled-by-default-gpu.dawn'));
+assert.throws(()=>traceSettings('unknown'),/Unknown trace detail/);
+assert.throws(()=>frozenTraceSettings(profile,'standard'),/differs from frozen/);
+assert.throws(()=>frozenTraceSettings({...profile,trace_window_ms:20000}),/configuration changed/);
+assert.throws(()=>frozenTraceSettings({...profile,trace:TRACE}),/configuration changed/);
 
 const bytes=Buffer.from('frozen executable');
 const digest=crypto.createHash('sha256').update(bytes).digest('hex');
@@ -27,8 +39,9 @@ try {
 } finally {await new Promise(resolve=>server.close(resolve));}
 
 class TraceSession extends EventEmitter {
-  constructor(chunks,loss=false,error=false){super();this.chunks=chunks;this.loss=loss;this.error=error;this.closed=false;}
+  constructor(chunks,loss=false,error=false){super();this.chunks=chunks;this.loss=loss;this.error=error;this.closed=false;this.calls=[];}
   async send(method){
+    this.calls.push(method);
     if(method==='Tracing.end') {queueMicrotask(()=>this.emit('Tracing.tracingComplete',{stream:'1',dataLossOccurred:this.loss}));return {};}
     if(method==='IO.close'){this.closed=true;return {};}
     if(method==='IO.read'){
@@ -40,6 +53,43 @@ class TraceSession extends EventEmitter {
 }
 const root=await fs.mkdtemp(path.join(os.tmpdir(),'melee-hitch-driver-'));
 try {
+  // Deadline and early source stop both end once; neither consumes the stream
+  // until the completed replay's teardown explicitly writes the artifact.
+  for(const early of [false,true]) {
+    const session=new TraceSession(['{}'],!early);
+    let fire,cancelled=false;
+    const window=scheduleTraceEnd(session,10000,callback=>{fire=callback;return 42;},id=>{
+      assert.equal(id,42);cancelled=true;
+    });
+    if(!early)fire();
+    const ended=await window.finish();
+    fire(); // A late timer callback must reuse the in-progress/completed end.
+    await window.finish();
+    assert(cancelled);
+    assert.deepEqual(session.calls,['Tracing.end']);
+    assert.equal(ended.window.end_reason,early?'replay-stopped':'window-deadline');
+    const directory=path.join(root,early?'early-window':'deadline-window');await fs.mkdir(directory);
+    const result=await stopTrace(session,directory,1024,{...ended,configuration:gpu.trace});
+    assert.equal(session.calls.filter(x=>x==='Tracing.end').length,1);
+    assert.equal(result.complete,early); // Loss still fails a short-window trace.
+    const metadata=JSON.parse(await fs.readFile(result.paths[1],'utf8'));
+    assert.deepEqual(metadata.window,ended.window);
+    assert.deepEqual(metadata.configuration,gpu.trace);
+  }
+  const failure=new TraceSession([]);
+  failure.send=async()=>{throw Error('GPU process disconnected');};
+  const failedWindow=scheduleTraceEnd(failure,10000,()=>42,()=>{});
+  assert.match((await failedWindow.finish()).error,/GPU process disconnected/);
+  assert.equal(failure.listenerCount('Tracing.tracingComplete'),0);
+  const failedDirectory=path.join(root,'end-failure');await fs.mkdir(failedDirectory);
+  const failed=await finalizeTrace(failure,failedDirectory,gpu,failedWindow);
+  assert.equal(failed.complete,false);
+  assert.equal(failed.reusable,false);
+  assert.match(failed.error,/GPU process disconnected/);
+  assert.equal(failed.paths.length,2);
+  const failureRecord=JSON.parse(await fs.readFile(failed.paths[1],'utf8'));
+  assert.equal(failureRecord.complete,false);
+  assert.equal(failureRecord.trace_state_unknown,true);
   for(const [name,session,limit,expectedBytes,complete] of [
     ['complete',new TraceSession(['abc','def']),8,6,true],
     ['capped',new TraceSession(['abc','def']),4,3,false],

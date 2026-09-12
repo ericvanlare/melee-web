@@ -95,6 +95,29 @@ Record the exact browser profile. In particular, clean installed-Chrome runs
 do not close earlier in-app Chromium failures. A browser change is a different
 configuration, not a proven fix.
 
+For a startup GPU investigation, add `--trace-detail gpu-startup` to **profile**,
+then freeze a new plan with that profile. `run` derives the preset from the
+frozen profile and rejects an override or changed configuration. This adds
+GPU/Dawn/service events to the existing CPU and User Timing categories and
+ends tracing on a ten-second timer scheduled immediately before the public
+replay click, after CDP acknowledges trace start. A replay that ends earlier
+also ends its trace. The source input
+continues unchanged; trace stream reads and artifact writes wait until replay
+completion or failure teardown. The ordinary `standard` preset retains its
+full-replay trace. Neither preset supplies acceptance timing evidence.
+
+The sidecar's `window` and `trace-window.json` record the requested window and
+end reason. A complete short trace is complete **only for that window**;
+later report failures remain failures without an enclosing GPU trace. Keep
+all loss, truncation, focus and timeout failures. The shorter window does not
+authorize additional repetitions. Browser-internal pipeline labels must be
+distinguished from the port's pipelines before changing runtime preparation.
+If trace finalization rejects or times out, retain the public report and
+`trace-finalization-failure.json`; no usable trace is claimed. Remove its
+completion listener and close that browser after sealing the failed attempt,
+leaving later slots unconsumed. A late completion must never be attached to a
+later slot. No automatic relaunch or replacement is performed.
+
 ## Causal diagnosis and holdout lock
 
 Correlate an actual failed interval to its trace using the page clock and User
@@ -432,3 +455,111 @@ remain unopened; the separate retained-source-heap sequence track still follows
 holdouts. The public 4×4 loop is not declared ready. Next work should target the
 remaining begin-frame wait, using a separately explained bounded experiment
 that preserves this matrix and the original failure.
+
+## Cold begin wait and GPU startup diagnosis — 2026-09-12
+
+The next frozen experiment
+`642b06310d438139106a5f5bd792fbc43f37decc40a6fbd5bb8ba1ac7cc163c6`
+consumed exactly four profiled a822 slots: two fresh Chrome sessions, each
+followed by a fresh document/Wasm replay in the same browser process. Every
+slot cleared the application's optional cache. Browser and GPU PIDs in the
+saved traces confirm the intended process contrast; driver caches remained
+uncontrolled. This used the unchanged `a709b6d` runtime, seed and browser
+configuration from the cache fix, on battery with low-power mode off. All
+3,892 source ticks/draws completed in every slot, with no retries or resumes.
+
+| Slot | Native callbacks | Native >16.67 ms | Native >33.3 ms | Browser >33.3 ms | Native max ms | Browser max ms | Other failure |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| fresh process 1 | 3,887 | 2 | 1 | 2 | 90.745 | 108.910 | 107 audio-underrun frames |
+| reload process 1 | 3,893 | 0 | 0 | 0 | 8.975 | 25.435 | none |
+| fresh process 2 | 3,892 | 0 | 0 | 0 | 11.880 | 24.600 | focus loss |
+| reload process 2 | 3,892 | 0 | 0 | 0 | 14.055 | 29.095 | none |
+
+Browser callback denominators equal native counts. All four traces pass loss,
+truncation and bounded-parser checks. The third slot's retained first blur is
+at page time 46,823.910 ms, with the source active and document not hidden;
+it remains a failed attempt. These diagnostic runs are not acceptance evidence.
+
+The first slot's callback 22 takes 90.745 ms, with 86.145 ms in outer begin
+work. It performs **two source ticks/draws**. Aggregated begin counters measure
+27 staging-slot progress waits totaling 85.945 ms, zero CPU frame-slot waits,
+no live cache sync, no pipeline creation and no texture uploads. Its largest
+individual wait is 4.160 ms. The begin start/end timestamps refer only to the
+last draw; they must not be used to place the whole aggregated 86 ms interval.
+The next callback takes 26.520 ms for six catch-up ticks/draws.
+
+The complete trace aligns the failed native interval to one renderer thread.
+A 115.722 ms GPU-main scheduler task overlaps it, as does a 114.404 ms Dawn
+worker task (1.057 ms thread CPU). The native staging wait yields through
+Asyncify until a GPU-completion callback releases a slot. This establishes the
+blocking boundary. The original trace has only generic GPU task names, so it
+does **not** establish its pipeline identity or which inner operation blocked
+it. The separately described source audit narrows the worker entry path.
+Nested task durations are not added;
+small thread CPU is not proof of unrelated OS scheduling. The earlier 94.115 ms
+unprofiled failure also names callback 22, but predates the subphase counters
+and cannot be retroactively assigned their measurements.
+
+All reports, full traces, process proof, source/build snapshots and analysis
+are under `work/hitch-begin-2026-09-12/`. The new failed report hash is
+`e206b04c9a984ca54f63177911185bfd3e0a8829c30a2520a19df92ee59135e2`.
+
+A separate two-slot experiment
+`6447443b163c9df5eaf70eb94b5a95c6e856c8715830557e63a4eb4e3cdb417e`
+then collected detailed GPU/Dawn events during each fresh browser's first ten
+seconds, while completing the same full input. This changes the diagnostic
+categories/window, not the runtime. It uses a frozen local driver derived from
+the existing runner; its exact diff/hash and checks are retained. The reusable
+`gpu-startup` preset above was integrated **after** these runs and is not
+retroactively assigned to their harness identity.
+
+| Slot | Native callbacks | Native >16.67 ms | Native >33.3 ms | Browser >33.3 ms | Native max ms | Browser max ms | Other failure |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| GPU startup 1 | 3,892 | 0 | 0 | 0 | 10.970 | 28.725 | none |
+| GPU startup 2 | 3,892 | 0 | 0 | 0 | 10.685 | 23.110 | focus loss |
+
+Both short traces are complete for their windows (226,088 and 245,489 events).
+The second slot's first blur at page time 61,677.520 ms is retained; it occurs
+with the source active and document not hidden. No trace coverage is claimed
+for later failures. Neither run reproduces the timing red. Each startup window
+contains four async pipeline-initialization tasks with Skia/Graphite labels
+such as `CoverBoundsRenderStep` and `TessellateWedgesRenderStep`; their worker
+maxima are 1.074 and 1.004 ms. These are a browser-presentation lead, not proof
+that the earlier 114 ms worker performed the same operation. The raw evidence,
+window endpoints, process identities and inspection are in
+`work/hitch-gpu-startup-2026-09-12/`.
+
+The exact Chrome tag pins Dawn to
+`225a7ba1bcb997d26de3e894e04fb341638e8c5a`. A source audit finds async pipeline
+initialization as the direct submitter to that worker pool; synchronous pipeline
+creation and queue-completion futures follow other paths. This narrows the
+likely operation, but the failed trace lacks its pipeline label and nested
+shader-library/Metal intervals. Do not assign the clean Skia labels or an
+inner blocking cause to it. Useful discriminators include pipeline
+initialization/shader-library events, queue submission/progress and wire return
+events. Consult the pinned [async pipeline worker](https://dawn.googlesource.com/dawn/+/225a7ba1bcb997d26de3e894e04fb341638e8c5a/src/dawn/native/CreatePipelineAsyncEvent.cpp),
+[Dawn Metal pipeline code](https://dawn.googlesource.com/dawn/+/225a7ba1bcb997d26de3e894e04fb341638e8c5a/src/dawn/native/metal/RenderPipelineMTL.mm)
+and [Chromium Dawn platform](https://chromium.googlesource.com/chromium/src/+/refs/tags/153.0.8010.36/gpu/command_buffer/service/dawn_platform.cc),
+and verify which categories the actual Chrome build emits. A missing category
+or named Metal interval cannot be interpreted as absent GPU work.
+
+The remaining red stays open and both holdouts stay closed. Do not remove
+completion backpressure or add unbounded staging buffers merely to improve CPU
+callback numbers: that can leave presentation stalled while the CPU runs ahead.
+The next diagnostic must identify the operation inside an actual long GPU task,
+including browser/Graphite work, and correlate queue completion/presentation.
+A separate explained bound is required before further replays. Choose a fix
+from that evidence, then verify declared source/draw equivalence and independent
+unprofiled timing before opening holdouts. The retained-source-heap sequence
+track still follows holdouts; the public 4×4 loop is not ready.
+
+The integrated harness passes the 554-test suite, focused timer/finalization
+failure checks, a real Chrome blank-page trace-window check, and the Release
+target build. No further gameplay repetition was used to validate the harness.
+The rebuild updates SDL's embedded repository-revision string from `8e2d2d6`
+to `a709b6d`, changing Wasm data addresses and its hash to
+`aa90ec3f48bf10351315e09f5635e42036a6e4de8cd854afed4a12264fff228a`.
+All other served artifact hashes match. This newly rebuilt binary is not
+assigned the six earlier measurements: those retain the frozen
+`66a37092…` Wasm. `post-build-identity.json` and the section comparison preserve
+the distinction; the next runtime experiment must bind its actual executable.
