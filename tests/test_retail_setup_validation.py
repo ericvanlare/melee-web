@@ -96,6 +96,37 @@ def write_inputs(root: Path):
 
 
 class RetailSetupValidationTests(unittest.TestCase):
+    def test_decode_accepts_ordinary_vs_cpu_and_keeps_human_shape(self):
+        raw = setup_bytes()
+        raw[0x85] = 1
+        raw[0x92] = 4
+        raw[0x93] = 9
+        actual = VALIDATION._decode_setup(raw.hex())
+        self.assertEqual(actual["players"][0], expected_setup()["players"][0])
+        self.assertEqual(actual["players"][1], {
+            "port": 2, "character_kind": 20, "costume": 2, "stocks": 4,
+            "player_type": 1, "rumble_enabled": False,
+            "cpu_kind": 4, "cpu_level": 9,
+        })
+
+        expected = expected_setup()
+        expected["players"][1].update({"player_type": 1, "cpu_kind": 4, "cpu_level": 9})
+        self.assertEqual(VALIDATION._validate_expected_setup(expected)["players"][1],
+                         actual["players"][1])
+
+    def test_decode_rejects_non_ordinary_cpu_kind_or_level(self):
+        for offset, value, message in ((0x92, 0, "ordinary-VS CPU"),
+                                        (0x93, 10, "ordinary-VS CPU"),
+                                        (0x90, 0x80, "CPU rumble disabled")):
+            with self.subTest(offset=hex(offset)):
+                raw = setup_bytes()
+                raw[0x85] = 1
+                raw[0x92] = 4
+                raw[0x93] = 9
+                raw[offset] = value
+                with self.assertRaisesRegex(VALIDATION.SetupValidationError, message):
+                    VALIDATION._decode_setup(raw.hex())
+
     def test_unsupported_source_profile_fields_are_rejected(self):
         mutations = (
             ("is_vs", lambda raw: raw.__setitem__(4, raw[4] & ~0x40),

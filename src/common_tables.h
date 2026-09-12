@@ -7,6 +7,29 @@
 extern "C" {
 #endif
 
+/* Root22 is a source-layout graph owned by DatCommon's PlCo decoder.  The
+ * context retains this opaque handle while Fighter_804D64FC is published;
+ * no unrelocated archive pointers are exposed to original C code. */
+typedef struct MeleeWebCommonCpuData {
+    void* root;
+    void* storage;
+    uint32_t refs;
+    void (*destroy)(struct MeleeWebCommonCpuData*);
+} MeleeWebCommonCpuData;
+static inline int melee_web_common_cpu_retain(MeleeWebCommonCpuData* data)
+{
+    if (!data || !data->root || !data->storage || !data->destroy ||
+        data->refs == UINT32_MAX)
+        return 0;
+    ++data->refs;
+    return 1;
+}
+static inline void melee_web_common_cpu_release(MeleeWebCommonCpuData* data)
+{
+    if (!data || !data->refs) return;
+    if (--data->refs == 0) data->destroy(data);
+}
+
 /* Source domains: FTKIND_MAX; MAX_FT_PARTS; named enum TopN..TransN2 plus
  * ftParts_80074E58's explicit named index 0x35. Padding after the 54 names is
  * not another named part. Native bridge assertions verify these constants. */
@@ -70,6 +93,9 @@ typedef struct MeleeWebCommonTables {
     /* Player_GetUnk45 selects player colors 0..3 or the non-human color 4. */
     MeleeWebCommonColor primary_colors[5], secondary_colors[5];
     MeleeWebCommonCrowd crowd;
+    /* Optional decoded PlCo root22.  This is not part of static_tables' value
+     * readiness mask; the common context owns a retained graph separately. */
+    MeleeWebCommonCpuData* cpu_data;
 } MeleeWebCommonTables;
 
 typedef struct MeleeWebCommonNative MeleeWebCommonNative;

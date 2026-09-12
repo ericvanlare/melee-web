@@ -1,6 +1,7 @@
 #include "gameplay_menu.h"
 #include "gameplay_content.h"
 #include "gameplay_match_rules.h"
+#include "gameplay_player_selection.h"
 
 #include <melee/gm/gm_1601.h>
 #include <melee/mn/mncharsel.h>
@@ -152,8 +153,8 @@ int melee_web_menu_css_selection_valid(const CSSData* css)
     {
         return 0;
     }
-    if (css->vs.start.players[0].slot_type != Gm_PKind_Human ||
-        css->vs.start.players[1].slot_type != Gm_PKind_Human ||
+    if (!melee_web_player_selection_supported(&css->vs.start.players[0]) ||
+        !melee_web_player_selection_supported(&css->vs.start.players[1]) ||
         css->vs.start.players[0].stocks != 0 ||
         css->vs.start.players[1].stocks != css->vs.start.players[0].stocks)
     {
@@ -196,8 +197,9 @@ static int match_selection_valid(const StartMeleeData* start)
         const PlayerInitData* player = &start->players[i];
         const MeleeWebFighterContent* content =
             melee_web_fighter_content(player->ckind);
-        if (player->slot_type != Gm_PKind_Human || player->stocks != 4 ||
-            !player->rumble_enabled || content == NULL ||
+        if (!melee_web_player_selection_supported(player) || player->stocks != 4 ||
+            player->rumble_enabled != (player->slot_type == Gm_PKind_Human) ||
+            content == NULL ||
             (player->slot ? player->slot - 1 : i) != i ||
             player->color >= content->costumes || player->sub_color > 4)
         {
@@ -223,7 +225,7 @@ static int css_progress_valid(const CSSData* css)
     for (unsigned i=0; i<2; i++) {
         PlayerInitData* p=&view.vs.start.players[i];
         if (p->ckind==CHKIND_NONE) p->ckind=CKIND_MARIO;
-        if (p->slot_type==Gm_PKind_NA || p->slot_type==Gm_PKind_Cpu)
+        if (p->slot_type==Gm_PKind_NA)
             p->slot_type=Gm_PKind_Human;
     }
     return melee_web_menu_css_selection_valid(&view);

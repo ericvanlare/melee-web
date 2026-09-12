@@ -6,13 +6,13 @@ or disc data is uploaded. If browser storage is blocked, controls still work for
 the current session. Switching the layout, disabling keyboard input, changing
 P1's physical source, losing focus, and restarting clear held keyboard input.
 
-One-player mode uses P1 only; a physical P2 controller can still be used. It does
-not override the native menus' behavior for a disconnected player slot. The
-current native gate admits two human slots only. Without a P2 controller,
-disabling its keyboard can make the native CSS convert P2 to CPU, and Start
-then remains blocked by that existing gate. **This adds a one-player keyboard
-preset, not solo CPU-match support.** Controls shows “CPU matches unavailable”
-for this reason. Port assignment is still the existing runtime behavior.
+One-player mode uses P1 only; a physical P2 controller can still be used. With
+P2's keyboard disabled and no controller connected, the original CSS converts
+that slot to CPU. The shared native match boundary accepts ordinary VS CPUs
+at levels 1–9. Select the CPU character and difficulty through the original
+CSS, then use Start to enter SSS. See [CPU opponents](CPU_OPPONENTS.md) for the
+shared source/data ownership and validation scope. Port assignment is still
+the existing runtime behavior.
 Physical controllers retain the existing priority on their assigned ports.
 Controller assignment and hardware validation in issue #5 remain open.
 
@@ -65,8 +65,8 @@ priority over both. No timed macros or automatic gameplay actions are added.
 
 `browser_input.cpp` watches the existing SDL key-event stream to retain press
 order, then samples the mapping once at the existing `melee_web_input_poll()`
-boundary. The source scheduler, replay path, native game code, and renderer are
-unchanged. The raw sample and separate diagnostic clamp retain their previous
+boundary. The keyboard provider does not change the source scheduler, replay
+path or renderer. The raw sample and separate diagnostic clamp retain their previous
 roles. The two-player path retains its existing Aurora bindings.
 
 The temporary iframe adapter now has one native configuration dependency:

@@ -1,6 +1,7 @@
 // Decode the declared retail initialization boundary into native source types.
 // Pointer-bearing fields are rejected; PPC addresses are never transplanted.
 #include "gameplay_menu_host.h"
+#include "gameplay_player_selection.h"
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -88,8 +89,8 @@ int melee_web_retail_setup(const uint8_t raw[0x138],uint32_t seed,MeleeWebMenuMa
             snprintf(error,size,"Retail setup contains nonfinite player ratios");return 0;
         }
         if(i<2){
-            if(v->slot_type!=0||(v->slot!=0&&v->slot!=i+1)||v->stocks!=4){
-                snprintf(error,size,"Retail setup requires human ports 1/2 and four stocks");return 0;
+            if(!melee_web_match_player_supported(v)||(v->slot!=0&&v->slot!=i+1)||v->stocks!=4){
+                snprintf(error,size,"Retail setup requires supported human/CPU slots 1/2 and four stocks");return 0;
             }
             out->players[i].controller=v->slot?v->slot-1:i;out->players[i].stocks=v->stocks;out->players[i].costume=v->color;out->players[i].sub_color=v->sub_color;
         }else if(v->slot_type!=3){

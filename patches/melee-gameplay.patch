@@ -1359,7 +1359,7 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
      }
      un_802FD428();
      ifStatus_802F665C(data->rules.x0_3);
-@@ -2277,3 +2319,106 @@
+@@ -2277,3 +2319,107 @@
  {
      return pl_80039418(arg0, arg1);
  }
@@ -1399,6 +1399,7 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
 +#if defined(MELEE_WEB_GAMEPLAY)
 +#include "gameplay_content.h"
 +#include "gameplay_match_rules.h"
++#include "gameplay_player_selection.h"
 +int melee_web_match_init_source(StartMeleeData* start)
 +{
 +    const StartMeleeRules* rules;
@@ -1429,16 +1430,16 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
 +        }
 +    }
 +
-+    /* The menu slice is exactly two supported human players. Source slot==0
++    /* The menu slice is exactly two supported players. Source slot==0
 +     * means "use this player index"; a nonzero slot is port+1.  Requiring the
 +     * resulting source player id to equal the player index preserves the
-+     * current one-human-per-port mapping without rewriting it here. */
++     * current slot-to-port mapping without rewriting it here. */
 +    for (i = 0; i < 2; ++i) {
 +        const PlayerInitData* player = &start->players[i];
 +        const int player_id = player->slot == 0 ? i : (int) player->slot - 1;
 +        const MeleeWebFighterContent* content = melee_web_fighter_content(player->ckind);
 +        if (content == NULL ||
-+            player->slot_type != Gm_PKind_Human || player->stocks != 4 ||
++            !melee_web_match_player_supported(player) || player->stocks != 4 ||
 +            player->color >= content->costumes || player->sub_color > 4 || player->team != 0 ||
 +            player->slot > 4 || player_id != i) {
 +            return 0;

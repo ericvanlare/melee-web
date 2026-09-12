@@ -17,6 +17,11 @@ binaries stay local and untracked.
 
 ## Current capability and evidence
 
+Ordinary VS CPUs at levels 1–9 now use the shared compiled source and locally
+decoded CPU data. One-player B0XX mode can enter SSS with a CPU opponent. See
+[CPU opponents](CPU_OPPONENTS.md) for the current implementation and evidence;
+the keyboard-only checkpoint below predates this addition.
+
 The user selects a USA 1.02 ISO, GCM or CISO locally. The existing runtime reads
 `NATIVE_GAME_DISC_FILES`, opens original CSS and SSS, and runs the current native
 four-by-four gate: Mario, Fox, Falco and Marth; Final Destination, Battlefield,
@@ -329,6 +334,10 @@ fresh-holdout/consecutive-match evidence. The public 4×4 gate remains open.
 
 ## Keyboard follow-up validation — 2026-09-12
 
+This section records commit `3f0705f` before CPU integration. Its two-human
+restriction is superseded by [the shared CPU work](CPU_OPPONENTS.md); the earlier
+checks and failed attempts remain recorded here with their original scope.
+
 Controls now offers the original two-player keyboard and a one-player B0XX-style
 preset. The exact bindings, MIT source, native input API and limitations are in
 [KEYBOARD_LAYOUTS.md](KEYBOARD_LAYOUTS.md). This follow-up modifies only the
@@ -378,3 +387,20 @@ admission checks were not loosened to make the UI test pass.
 This is keyboard/input-boundary evidence only. Complete matches, physical
 controllers, keyboard rollover, input latency, firmware/tournament equivalence,
 audio and performance admission remain unverified by these checks.
+
+## Shared CPU follow-up — 2026-09-12
+
+CPU work adds no adapter API and changes no inline host code. Both pages use
+the original CSS difficulty slider and the same `GameplayMatchSession`,
+source CPU routines and retained PlCo root22 owner. The final HTTP UI test
+passes CPU gameplay and teardown on both pages, plus prototype No Contest
+back to CSS. The old Controls warning about unavailable CPU matches is removed.
+
+The CPU follow-up changes `gameplay_menu.c/.h`, the retail setup decoder,
+`dat_common.cpp/.hpp`, common tables/context, reference tools and their tests.
+It also adds the shared player-selection header and a small admission change
+in `patches/melee-gameplay.patch`. That shared patch is the main additional
+integration conflict risk. Coordinate edits to those native owners when
+integrating; no `runtime.html`, renderer/cache timing, CMake or hitch-capture
+files are changed. Future runtime extraction carries the existing compiled
+runtime dependency, including CPUs, without a separate prototype AI path.

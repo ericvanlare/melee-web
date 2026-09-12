@@ -136,7 +136,6 @@ try {
 function renderKeyboard() {
   const boxx = $('keyboard-layout').value === 'boxx';
   $('keyboard-two-option').hidden = boxx;
-  $('keyboard-note').hidden = !boxx;
   $('keyboard-one-label').textContent = boxx ? 'Keyboard' : 'P1 keyboard';
   const header = document.createElement('thead');
   const body = document.createElement('tbody');

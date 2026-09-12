@@ -1,12 +1,290 @@
 #include "dat_common.hpp"
 
 #include <algorithm>
+#include <array>
 #include <bit>
 #include <cmath>
+#include <memory>
+#include <string>
+#include <utility>
 
 namespace melee_web {
 namespace {
 MELEE_WEB_COMMON_ASSERT_LAYOUT(MeleeWebCommonScalars)
+
+/* PlCo's CPU arrays cover the 32 indexed fighter kinds used by the CPU
+ * routines.  The common roster's 33-row capacity includes the source-only
+ * Sandbag/None tail, which is absent from this root22 graph. */
+constexpr std::uint32_t cpu_table_count = 32;
+constexpr std::uint32_t cpu_script_count = 62;
+constexpr std::uint32_t cpu_table_fields = 7;
+constexpr std::uint8_t cpu_cmd_done = 0x7f;
+/* CpuCmd_Count in the pinned source.  The command enum has a deliberate gap
+ * between the zero-argument and one-argument ranges, so keep the value
+ * explicit in this host-portable archive decoder. */
+constexpr std::uint8_t cpu_cmd_count = 0xc3;
+constexpr std::size_t cpu_attack_entry_bytes = 9 * sizeof(std::uint32_t);
+constexpr std::size_t cpu_attack_entry_limit = 31;
+constexpr std::size_t cpu_script_limit = 0x100;
+
+/* Private source type used by ftcpuattack.c; this is the serialized
+ * nine-word layout, not a new gameplay representation. */
+struct CpuAttackEntry {
+    std::int32_t cmd;
+    std::int32_t x04;
+    float x08;
+    float x0C;
+    float x10;
+    float x14;
+    float weight;
+    std::int32_t x1C;
+    std::int32_t x20;
+};
+static_assert(sizeof(CpuAttackEntry) == cpu_attack_entry_bytes);
+
+/* Source-compatible root22 layout.  This bridge deliberately avoids pulling
+ * the target's headers into host-only DAT parser tests; under Wasm32 these
+ * pointer fields have the same offsets and element types as Fighter's root. */
+struct CpuRoot {
+    std::uint8_t** cmdscripts;
+    void** x4;
+    void** x8;
+    void** xC;
+    void** x10;
+    void** x14;
+    void** x18;
+    void** x1C;
+    float* x20;
+    void* x24;
+};
+static_assert(sizeof(CpuRoot) == 10 * sizeof(void*));
+static_assert(offsetof(CpuRoot, x24) == 9 * sizeof(void*));
+
+struct CpuStorage {
+    CpuRoot root{};
+    std::array<std::uint8_t*, cpu_script_count> scripts{};
+    std::array<std::vector<std::uint8_t>, cpu_script_count> script_bytes{};
+    std::array<std::array<void*, cpu_table_count>, cpu_table_fields> tables{};
+    std::array<std::array<std::vector<CpuAttackEntry>, cpu_table_count>, cpu_table_fields>
+        attack_entries{};
+    std::array<float, cpu_table_count> distances{};
+    std::array<float, 6> reach{};
+};
+
+void destroy_cpu_data(MeleeWebCommonCpuData* data)
+{
+    if (!data) return;
+    delete static_cast<CpuStorage*>(data->storage);
+    delete data;
+}
+
+void require_plain_words(const DatArchive& archive, std::uint32_t offset,
+                         std::size_t bytes, const char* description)
+{
+    if (offset % 4 || bytes % 4)
+        throw DatError(std::string("CPU ") + description + " is unaligned");
+    (void) archive.range(offset, bytes);
+    if (bytes > archive.next_target_offset(offset) - offset)
+        throw DatError(std::string("CPU ") + description + " crosses a referenced region");
+    for (std::size_t at = offset; at < std::size_t{offset} + bytes; at += 4)
+        if (archive.has_relocation(static_cast<std::uint32_t>(at)))
+            throw DatError(std::string("CPU ") + description + " contains a pointer relocation");
+}
+
+void bounded_region(const DatArchive& archive, std::uint32_t offset,
+                    std::size_t bytes, const char* description)
+{
+    if (offset % 4 || bytes % 4)
+        throw DatError(std::string("CPU ") + description + " is unaligned");
+    (void) archive.range(offset, bytes);
+    if (bytes > archive.next_target_offset(offset) - offset)
+        throw DatError(std::string("CPU ") + description + " crosses a referenced region");
+}
+
+std::uint32_t required_pointer(const DatArchive& archive, std::uint32_t slot,
+                               std::size_t bytes, const char* description)
+{
+    const auto target = archive.pointer(slot, bytes);
+    if (!target)
+        throw DatError(std::string("CPU ") + description + " is null");
+    return *target;
+}
+
+std::size_t target_extent(const DatArchive& archive, std::uint32_t target,
+                          const char* description)
+{
+    const auto end = archive.next_target_offset(target);
+    if (end <= target)
+        throw DatError(std::string("CPU ") + description + " has an empty extent");
+    return end - target;
+}
+
+bool valid_cpu_command(std::uint8_t command)
+{
+    return (command >= 1 && command <= 25) || command == cpu_cmd_done ||
+           (command >= 0x80 && command <= 0x95) ||
+           (command >= 0xc0 && command <= 0xc2);
+}
+
+void reject_script_relocations(const DatArchive& archive, std::uint32_t target,
+                               std::size_t extent)
+{
+    const auto end = std::size_t{target} + extent;
+    for (auto slot = target & ~std::uint32_t{3}; std::size_t{slot} < end; slot += 4)
+        if (std::size_t{slot} + 4 > target && archive.has_relocation(slot))
+            throw DatError("CPU command script contains a pointer relocation");
+}
+
+void decode_script(const DatArchive& archive, std::uint32_t target,
+                   std::vector<std::uint8_t>& output)
+{
+    const auto extent = target_extent(archive, target, "command script");
+    if (!extent || extent > cpu_script_limit)
+        throw DatError("CPU command script exceeds the source 0x100-byte buffer");
+    reject_script_relocations(archive, target, extent);
+    const auto bytes = archive.range(target, extent);
+    std::size_t at = 0;
+    bool done = false;
+    while (at < bytes.size()) {
+        const auto command = bytes[at++];
+        if (command >= cpu_cmd_count || !valid_cpu_command(command))
+            throw DatError("CPU command script contains an unknown opcode");
+        if (command == cpu_cmd_done) {
+            done = true;
+            break;
+        }
+        const std::size_t argument_count = command > 0xBF ? 2 : command > 0x7F ? 1 : 0;
+        if (argument_count > bytes.size() - at)
+            throw DatError("CPU command script has truncated operands");
+        at += argument_count;
+    }
+    if (!done)
+        throw DatError("CPU command script has no Done terminator");
+    for (; at < bytes.size(); ++at)
+        if (bytes[at] != 0)
+            throw DatError("CPU command script has nonzero bytes after Done");
+    output.assign(bytes.begin(), bytes.end());
+}
+
+void decode_attack_list(const DatArchive& archive, std::uint32_t target,
+                        std::vector<CpuAttackEntry>& output)
+{
+    const auto extent = target_extent(archive, target, "attack table");
+    if (extent < cpu_attack_entry_bytes)
+        throw DatError("CPU attack table is shorter than its terminator");
+    const auto rows = extent / cpu_attack_entry_bytes;
+    if (rows > cpu_attack_entry_limit + 1)
+        throw DatError("CPU attack table exceeds the original 32-entry selection buffer");
+
+    std::size_t count = 0;
+    bool done = false;
+    for (; count < rows; ++count) {
+        const auto row = target + static_cast<std::uint32_t>(count * cpu_attack_entry_bytes);
+        require_plain_words(archive, row, cpu_attack_entry_bytes, "attack entry");
+        const auto command = static_cast<std::int32_t>(archive.be32(row));
+        if (command == 0) {
+            done = true;
+            break;
+        }
+        if (command < 1 || command >= static_cast<std::int32_t>(cpu_script_count))
+            throw DatError("CPU attack table references an invalid command script");
+        if (std::bit_cast<std::int32_t>(archive.be32(row + 0x1C)) <= 0)
+            throw DatError("CPU attack table has a nonpositive selection divisor");
+        for (unsigned field = 2; field <= 6; ++field)
+            if (!std::isfinite(archive.f32(row + field * 4)))
+                throw DatError("CPU attack table has a nonfinite floating field");
+    }
+    if (!done)
+        throw DatError("CPU attack table has no terminator");
+    const auto consumed = (count + 1) * cpu_attack_entry_bytes;
+    for (std::size_t at = consumed; at < extent; ++at)
+        if (archive.data()[target + at] != 0)
+            throw DatError("CPU attack table has nonzero trailing padding");
+
+    output.resize(count + 1);
+    for (std::size_t i = 0; i <= count; ++i) {
+        const auto row = target + static_cast<std::uint32_t>(i * cpu_attack_entry_bytes);
+        auto& entry = output[i];
+        entry.cmd = static_cast<std::int32_t>(archive.be32(row));
+        entry.x04 = static_cast<std::int32_t>(archive.be32(row + 4));
+        entry.x08 = archive.f32(row + 8);
+        entry.x0C = archive.f32(row + 0xC);
+        entry.x10 = archive.f32(row + 0x10);
+        entry.x14 = archive.f32(row + 0x14);
+        entry.weight = archive.f32(row + 0x18);
+        entry.x1C = static_cast<std::int32_t>(archive.be32(row + 0x1C));
+        entry.x20 = static_cast<std::int32_t>(archive.be32(row + 0x20));
+    }
+}
+
+MeleeWebCommonCpuData* decode_cpu_data(const DatArchive& archive,
+                                       std::uint32_t root_offset)
+{
+    auto storage = std::make_unique<CpuStorage>();
+    bounded_region(archive, root_offset, 10 * 4, "root22 descriptor");
+
+    const auto command_table = required_pointer(archive, root_offset, cpu_script_count * 4,
+                                                "command script table");
+    bounded_region(archive, command_table, cpu_script_count * 4, "command script pointers");
+    if (archive.pointer(command_table, 1))
+        throw DatError("CPU command script table row zero must be null");
+    for (std::uint32_t i = 1; i < cpu_script_count; ++i) {
+        const auto target = required_pointer(archive, command_table + i * 4, 1,
+                                             "command script");
+        decode_script(archive, target, storage->script_bytes[i]);
+        storage->scripts[i] = storage->script_bytes[i].data();
+    }
+
+    for (std::uint32_t field = 1; field <= 7; ++field) {
+        const auto table = required_pointer(archive, root_offset + field * 4,
+                                            cpu_table_count * 4, "attack table pointer array");
+        bounded_region(archive, table, cpu_table_count * 4, "attack table pointers");
+        for (std::uint32_t kind = 0; kind < cpu_table_count; ++kind) {
+            const auto target = archive.pointer(table + kind * 4);
+            if (!target) continue;
+            auto& entries = storage->attack_entries[field - 1][kind];
+            decode_attack_list(archive, *target, entries);
+            storage->tables[field - 1][kind] = entries.data();
+        }
+    }
+
+    const auto distance_table = required_pointer(archive, root_offset + 8 * 4,
+                                                  cpu_table_count * 4, "distance table");
+    require_plain_words(archive, distance_table, cpu_table_count * 4, "distance values");
+    for (std::uint32_t kind = 0; kind < cpu_table_count; ++kind) {
+        storage->distances[kind] = archive.f32(distance_table + kind * 4);
+        if (!std::isfinite(storage->distances[kind]))
+            throw DatError("CPU distance table contains a nonfinite value");
+    }
+
+    const auto reach_table = required_pointer(archive, root_offset + 9 * 4, 6 * 4,
+                                              "reach table");
+    require_plain_words(archive, reach_table, 6 * 4, "reach values");
+    for (std::uint32_t i = 0; i < 6; ++i) {
+        storage->reach[i] = archive.f32(reach_table + i * 4);
+        if (!std::isfinite(storage->reach[i]))
+            throw DatError("CPU reach table contains a nonfinite value");
+    }
+
+    storage->root.cmdscripts = storage->scripts.data();
+    storage->root.x4 = storage->tables[0].data();
+    storage->root.x8 = storage->tables[1].data();
+    storage->root.xC = storage->tables[2].data();
+    storage->root.x10 = storage->tables[3].data();
+    storage->root.x14 = storage->tables[4].data();
+    storage->root.x18 = storage->tables[5].data();
+    storage->root.x1C = storage->tables[6].data();
+    storage->root.x20 = storage->distances.data();
+    storage->root.x24 = storage->reach.data();
+
+    auto data = std::make_unique<MeleeWebCommonCpuData>();
+    data->root = &storage->root;
+    data->storage = storage.release();
+    data->refs = 1;
+    data->destroy = &destroy_cpu_data;
+    return data.release();
+}
+
 void region(const DatArchive& archive, std::uint32_t offset, std::size_t size)
 {
     if (offset % 4) throw DatError("Common-data descriptor is unaligned");
@@ -196,5 +474,72 @@ DatCommon::DatCommon(const DatArchive& archive)
 #undef LOAD_F32
     roots[0].readiness = DatCommonReadiness::ScalarsDecoded;
     static_tables(archive,*this);
+    if (roots[22].data_offset) {
+        /* decode_cpu_data starts with one owner reference.  Transfer it only
+         * after the complete graph has validated, so malformed DAT input
+         * cannot leak a partially constructed source graph. */
+        std::unique_ptr<MeleeWebCommonCpuData, void (*)(MeleeWebCommonCpuData*)> data(
+            decode_cpu_data(archive, *roots[22].data_offset), melee_web_common_cpu_release);
+        cpu_data_ = data.release();
+        tables.cpu_data = cpu_data_;
+        roots[22].readiness = DatCommonReadiness::CpuDataDecoded;
+    }
+}
+
+DatCommon::DatCommon(const DatCommon& other)
+    : descriptor_offset(other.descriptor_offset), scalar_offset(other.scalar_offset),
+      roots(other.roots), scalars(other.scalars), tables(other.tables),
+      cpu_data_(other.cpu_data_)
+{
+    if (cpu_data_ && !melee_web_common_cpu_retain(cpu_data_))
+        throw DatError("Cannot retain decoded CPU common data");
+    tables.cpu_data = cpu_data_;
+}
+
+DatCommon& DatCommon::operator=(const DatCommon& other)
+{
+    if (this == &other) return *this;
+    if (other.cpu_data_ && !melee_web_common_cpu_retain(other.cpu_data_))
+        throw DatError("Cannot retain decoded CPU common data");
+    melee_web_common_cpu_release(cpu_data_);
+    descriptor_offset = other.descriptor_offset;
+    scalar_offset = other.scalar_offset;
+    roots = other.roots;
+    scalars = other.scalars;
+    tables = other.tables;
+    cpu_data_ = other.cpu_data_;
+    tables.cpu_data = cpu_data_;
+    return *this;
+}
+
+DatCommon::DatCommon(DatCommon&& other) noexcept
+    : descriptor_offset(other.descriptor_offset), scalar_offset(other.scalar_offset),
+      roots(std::move(other.roots)), scalars(other.scalars), tables(other.tables),
+      cpu_data_(other.cpu_data_)
+{
+    tables.cpu_data = cpu_data_;
+    other.cpu_data_ = nullptr;
+    other.tables.cpu_data = nullptr;
+}
+
+DatCommon& DatCommon::operator=(DatCommon&& other) noexcept
+{
+    if (this == &other) return *this;
+    melee_web_common_cpu_release(cpu_data_);
+    descriptor_offset = other.descriptor_offset;
+    scalar_offset = other.scalar_offset;
+    roots = std::move(other.roots);
+    scalars = other.scalars;
+    tables = other.tables;
+    cpu_data_ = other.cpu_data_;
+    tables.cpu_data = cpu_data_;
+    other.cpu_data_ = nullptr;
+    other.tables.cpu_data = nullptr;
+    return *this;
+}
+
+DatCommon::~DatCommon()
+{
+    melee_web_common_cpu_release(cpu_data_);
 }
 } // namespace melee_web

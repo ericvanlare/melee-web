@@ -190,8 +190,19 @@ def supply_input(index):
     if index != published_inputs:
         raise RuntimeError('Controller publication skipped or reordered a planned input: '
                            'requested %d, next %d' % (index, published_inputs))
-    for port, pad in enumerate(input_plan['frames'][index]):
-        path = ROOT.parent / 'user' / 'Pipes' / ('pad%d' % (port + 1))
+    controlled_ports = set(input_plan.get('controlled_ports', (1, 2)))
+    cpu_pad_modes = input_plan.get('source_cpu_pad_modes', ())
+    for port, pad in enumerate(input_plan['frames'][index], 1):
+        # CPU slots are driven inside the retail engine. A declared
+        # disconnected sample remains in the verified four-port vector but
+        # must never be sent through a physical controller pipe. A declared
+        # neutral sample is an immutable connected neutral status; publish it
+        # as transport setup, without treating that port as human-controlled.
+        neutral_cpu_pad = (port <= len(cpu_pad_modes) and
+                           cpu_pad_modes[port - 1] == 'neutral')
+        if port not in controlled_ports and not neutral_cpu_pad:
+            continue
+        path = ROOT.parent / 'user' / 'Pipes' / ('pad%d' % port)
         fd = os.open(path, os.O_WRONLY | os.O_NONBLOCK)
         try:
             command = pipe_commands(pad)

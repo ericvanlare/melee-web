@@ -11,6 +11,8 @@ const {chromium} = values.playwright ? await import(pathToFileURL(path.join(path
 await fs.mkdir(values.out,{recursive:true});
 const browser = await chromium.launch({channel:'chrome',headless:false,chromiumSandbox:true});
 const failures=[], errors=[], posts=[], checks=[];
+let failureState = null;
+let timingResumes = 0;
 const page = await browser.newPage({viewport:{width:1440,height:1050},deviceScaleFactor:1});
 page.on('pageerror', error=>errors.push(error.message));
 page.on('console', message=>{if(message.type()==='error')errors.push(message.text())});
@@ -178,7 +180,7 @@ try {
       await page.frameLocator('iframe').locator('#status[data-phase=\"3\"]').waitFor({state:'attached',timeout:15000});
       await screenshot('original-sss');
     });
-    await check('B0XX menu cancel and Start input; existing CPU admission remains blocked',async()=>{
+    await check('B0XX Start enters SSS with a CPU opponent',async()=>{
       await page.locator('#controls-open').click();
       await page.locator('#keyboard-layout').selectOption('boxx');
       await page.locator('#controls-close').click();
@@ -192,10 +194,57 @@ try {
       await page.keyboard.down('7');
       await page.frames()[1].waitForFunction(()=>JSON.parse(Module.UTF8ToString(Module._melee_web_input_message())).pads[0].buttons===0x1000);
       await page.waitForTimeout(120); await page.keyboard.up('7');
-      await page.frames()[1].waitForFunction(steps=>nativeSourceSteps>=steps+45,entrySteps);
-      // Without a P2 controller the original CSS converts P2 to CPU. Current
-      // admission requires two humans, so this must not silently bypass it.
-      assert.equal(await page.frameLocator('iframe').locator('#status').getAttribute('data-phase'),'1');
+      await page.frameLocator('iframe').locator('#status[data-phase="3"]').waitFor({state:'attached',timeout:15000});
+    });
+    await check('ordinary keyboard stage selection and autonomous CPU movement',async()=>{
+      const frame = page.frames()[1];
+      await frame.waitForFunction(()=>!!window.menuObserveStage(32));
+      // Read the source cursor, then steer with ordinary keyboard events.
+      // No native selection writes or diagnostic PAD injection.
+      for (let attempt=0; attempt<240; attempt++) {
+        const {ids,geometry:[x,y,tx,ty]} = await frame.evaluate(()=>window.menuObserveStage(32));
+        if (ids[1]===32) break;
+        const keys=[];
+        if (Math.abs(tx-x)>1.2) keys.push(tx>x?'4':'2');
+        if (Math.abs(ty-y)>1.2) keys.push(ty>y?']':'3');
+        if (!keys.length) keys.push(tx>=x?'4':'2');
+        for (const key of keys) await page.keyboard.down(key);
+        await page.waitForTimeout(20);
+        for (const key of keys) await page.keyboard.up(key);
+        await page.waitForTimeout(20);
+      }
+      assert.equal((await frame.evaluate(()=>window.menuObserveStage(32))).ids[1],32);
+      await page.keyboard.down('m'); await page.waitForTimeout(120); await page.keyboard.up('m');
+      await frame.locator('#status[data-phase="7"]').waitFor({state:'attached',timeout:120000});
+      await frame.waitForFunction(()=>window.menuObservePlayer(1)?.frame>=180,null,{timeout:60000});
+      const cpuStart=await frame.evaluate(()=>window.menuObservePlayer(1));
+      await frame.waitForFunction(start=>{
+        const cpu=window.menuObservePlayer(1);
+        return cpu && cpu.frame>start.frame+60 && cpu.motion!==14 &&
+          (Math.abs(cpu.x-start.x)>2 || cpu.motion!==start.motion);
+      },cpuStart,{timeout:60000});
+      assert.equal(await frame.evaluate(()=>JSON.parse(Module.UTF8ToString(Module._melee_web_input_message())).pads[1].err),-1);
+      await screenshot('cpu-match');
+    });
+    await check('CPU match No Contest returns to CSS through ordinary keyboard input',async()=>{
+      const frame = page.frames()[1];
+      // Screenshot/automation stalls can trigger the host's timing guard.
+      // Resume through the visible utility and report it; this is UI evidence,
+      // never an uninterrupted gameplay or performance pass.
+      await page.waitForTimeout(200);
+      if ((await frame.locator('#status').textContent()).includes('timing disruption')) {
+        await page.locator('#pause-game').click();
+        timingResumes++;
+        await frame.waitForFunction(()=>Module._melee_web_native_menu_running());
+      }
+      await page.keyboard.down('7'); await page.waitForTimeout(100); await page.keyboard.up('7');
+      await frame.waitForFunction(()=>Module.UTF8ToString(Module._melee_web_native_menu_diagnostics()).includes('source pause: 1'));
+      await page.waitForTimeout(700);
+      for (const key of ['q','9','m','7']) await page.keyboard.down(key);
+      await page.waitForTimeout(120);
+      for (const key of ['7','m','9','q']) await page.keyboard.up(key);
+      await page.frames()[1].locator('#status[data-phase="1"]').waitFor({state:'attached',timeout:30000});
+      await screenshot('cpu-return-css');
     });
     await check('session teardown releases frame and imported data',async()=>{
       const old = page.frames()[1];
@@ -206,14 +255,76 @@ try {
       assert.equal(await page.locator('#keyboard-layout').inputValue(),'boxx');
       await page.frames()[1].waitForFunction(()=>JSON.parse(Module.UTF8ToString(Module._melee_web_input_message())).keyboard_layout===1);
     });
+    await check('development runtime launches the same CPU match with one keyboard',async()=>{
+      const runtime = await browser.newPage({viewport:{width:1280,height:960}});
+      runtime.on('pageerror',error=>errors.push(error.message));
+      runtime.on('console',message=>{if(message.type()==='error')errors.push(message.text())});
+      try {
+        await runtime.goto(new URL('runtime.html',values.url).href);
+        await runtime.locator('#disc:not([disabled])').waitFor({timeout:60000});
+        await runtime.locator('#keyboard2').uncheck();
+        await runtime.locator('#disc').setInputFiles(values.disc);
+        await runtime.locator('#launch:not([disabled])').waitFor({timeout:60000});
+        await runtime.locator('#launch').click();
+        await runtime.locator('#status[data-phase="1"]').waitFor({state:'attached',timeout:60000});
+        await runtime.locator('#canvas').click();
+        const entered=await runtime.evaluate(()=>nativeSourceSteps);
+        await runtime.waitForFunction(steps=>nativeSourceSteps>=steps+31,entered);
+        for (const key of ['j','Enter']) {
+          await runtime.keyboard.down(key); await runtime.waitForTimeout(120);
+          await runtime.keyboard.up(key); await runtime.waitForTimeout(150);
+        }
+        await runtime.locator('#status[data-phase="3"]').waitFor({state:'attached',timeout:15000});
+        await runtime.waitForFunction(()=>!!window.menuObserveStage(32));
+        for (let attempt=0;attempt<240;attempt++) {
+          const {ids,geometry:[x,y,tx,ty]}=await runtime.evaluate(()=>window.menuObserveStage(32));
+          if (ids[1]===32) break;
+          const keys=[];
+          if (Math.abs(tx-x)>1.2) keys.push(tx>x?'d':'a');
+          if (Math.abs(ty-y)>1.2) keys.push(ty>y?'w':'s');
+          if (!keys.length) keys.push(tx>=x?'d':'a');
+          for (const key of keys) await runtime.keyboard.down(key);
+          await runtime.waitForTimeout(20);
+          for (const key of keys) await runtime.keyboard.up(key);
+          await runtime.waitForTimeout(20);
+        }
+        assert.equal((await runtime.evaluate(()=>window.menuObserveStage(32))).ids[1],32);
+        await runtime.keyboard.down('j'); await runtime.waitForTimeout(120); await runtime.keyboard.up('j');
+        await runtime.locator('#status[data-phase="7"]').waitFor({state:'attached',timeout:120000});
+        await runtime.waitForFunction(()=>window.menuObservePlayer(1)?.frame>=180,null,{timeout:60000});
+        const initial=await runtime.evaluate(()=>window.menuObservePlayer(1));
+        await runtime.waitForFunction(start=>{
+          const cpu=window.menuObservePlayer(1);
+          return cpu && cpu.frame>start.frame+60 && cpu.motion!==14 &&
+            (Math.abs(cpu.x-start.x)>2 || cpu.motion!==start.motion);
+        },initial,{timeout:60000});
+        assert.equal(await runtime.evaluate(()=>JSON.parse(Module.UTF8ToString(Module._melee_web_input_message())).pads[1].err),-1);
+        await runtime.screenshot({path:path.join(values.out,'development-cpu-match.png'),fullPage:true});
+        await runtime.locator('#unload').click();
+        await runtime.waitForFunction(()=>document.querySelector('#status').textContent==='Native menus unloaded.');
+      } catch(error) {
+        await runtime.screenshot({path:path.join(values.out,'development-failure.png'),fullPage:true});
+        error.message += `\nDevelopment status: ${await runtime.locator('#status').textContent()}`;
+        throw error;
+      } finally { await runtime.close(); }
+    });
   }
   assert.deepEqual(errors,[]); assert.deepEqual(posts,[]);
   checks.push('no page/HTTP errors and no data uploads');
 } catch(error) {
   failures.push(error.stack || String(error));
+  failureState = await Promise.all(page.frames().map(frame => frame.evaluate(()=>{
+    const m=globalThis.Module;
+    return {
+      status:document.querySelector('#status')?.textContent,
+      phase:document.querySelector('#status')?.dataset.phase,
+      native:m?._melee_web_native_menu_diagnostics ? m.UTF8ToString(m._melee_web_native_menu_diagnostics()) : null,
+      input:m?._melee_web_input_message ? m.UTF8ToString(m._melee_web_input_message()) : null,
+    };
+  }).catch(()=>null)));
   await screenshot('failure');
 } finally {
-  await fs.writeFile(path.join(values.out,'report.json'),JSON.stringify({schema:'melee-web-prototype-ui-check-v1',browser:browser.version(),checks,failures,errors,posts,owned_disc_used:!!values.disc,gameplay_admission:false,performance_admission:false},null,2)+'\n');
+  await fs.writeFile(path.join(values.out,'report.json'),JSON.stringify({schema:'melee-web-prototype-ui-check-v1',browser:browser.version(),checks,failures,errors,posts,failureState,timing_resumes:timingResumes,owned_disc_used:!!values.disc,gameplay_admission:false,performance_admission:false},null,2)+'\n');
   await browser.close();
 }
 if (failures.length) { console.error(failures.join('\n')); process.exitCode=1; }

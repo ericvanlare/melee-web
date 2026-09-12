@@ -31,6 +31,7 @@ PLAYER_KEYS = {
     "port", "character_kind", "costume", "stocks", "player_type",
     "rumble_enabled",
 }
+CPU_PLAYER_KEYS = {"cpu_kind", "cpu_level"}
 
 SCOPE = (
     "exact declared donor settings plus supported ordinary-VS profile checks; "
@@ -125,7 +126,10 @@ def _validate_expected_setup(value: Any) -> dict[str, Any]:
     normalized_players = []
     for index, player in enumerate(players):
         context = f"expected_setup.players[{index}]"
-        _require(isinstance(player, dict) and set(player) == PLAYER_KEYS,
+        _require(isinstance(player, dict), f"{context} must be an object")
+        player_type = _integer(player.get("player_type"), f"{context}.player_type", 0, 1)
+        expected_keys = PLAYER_KEYS | (CPU_PLAYER_KEYS if player_type == 1 else set())
+        _require(set(player) == expected_keys,
                  f"{context} has missing or unrecognized fields")
         port = _integer(player["port"], f"{context}.port", 1, 2)
         _require(port not in seen_ports, f"{context}.port is duplicated")
@@ -135,9 +139,16 @@ def _validate_expected_setup(value: Any) -> dict[str, Any]:
             "character_kind": _integer(player["character_kind"], f"{context}.character_kind", -128, 127),
             "costume": _integer(player["costume"], f"{context}.costume", 0, 255),
             "stocks": _integer(player["stocks"], f"{context}.stocks", -128, 127),
-            "player_type": _integer(player["player_type"], f"{context}.player_type", 0, 255),
+            "player_type": player_type,
             "rumble_enabled": _boolean(player["rumble_enabled"], f"{context}.rumble_enabled"),
         })
+        if player_type == 1:
+            _require(not normalized_players[-1]["rumble_enabled"],
+                     f"{context}.rumble_enabled must be false for a CPU")
+            normalized_players[-1].update({
+                "cpu_kind": _integer(player["cpu_kind"], f"{context}.cpu_kind", 4, 4),
+                "cpu_level": _integer(player["cpu_level"], f"{context}.cpu_level", 1, 9),
+            })
     _require(seen_ports == {1, 2}, "expected_setup.players must name ports 1 and 2")
     normalized = {
         "players": normalized_players,
@@ -220,24 +231,31 @@ def _decode_setup(start_melee_hex: Any) -> dict[str, Any]:
         base = 0x60 + index * 0x24
         slot = raw[base + 4]
         port = index + 1
-        if index < 2 and raw[base + 1] == 0:
+        if index < 2 and raw[base + 1] in (0, 1):
             _require(slot in (0, port),
                      f"capture setup has an invalid slot byte at player index {index}")
-            actual["players"].append({
+            player = {
                 "port": port,
                 "character_kind": _s8(raw[base]),
                 "costume": raw[base + 3],
                 "stocks": _s8(raw[base + 2]),
                 "player_type": raw[base + 1],
                 "rumble_enabled": bool((raw[base + 12] >> 7) & 1),
-            })
+            }
+            if raw[base + 1] == 1:
+                _require(not player["rumble_enabled"],
+                         f"capture setup requires CPU rumble disabled at player index {index}")
+                _require(raw[base + 14] == 4 and 1 <= raw[base + 15] <= 9,
+                         f"capture setup has an unsupported ordinary-VS CPU at player index {index}")
+                player.update({"cpu_kind": raw[base + 14], "cpu_level": raw[base + 15]})
+            actual["players"].append(player)
         elif index >= 2:
             _require(raw[base + 1] == 3,
                      f"capture setup has an unsupported active player record at index {index}")
     actual["players"].sort(key=lambda player: player["port"])
     _require(len(actual["players"]) == 2 and
              [player["port"] for player in actual["players"]] == [1, 2],
-             "capture setup does not contain exactly human ports 1 and 2")
+             "capture setup does not contain exactly supported ports 1 and 2")
     return actual
 
 

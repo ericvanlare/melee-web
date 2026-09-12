@@ -70,7 +70,7 @@ typedef struct MeleeWebMenuRuntime {
 } MeleeWebMenuRuntime;
 
 typedef struct MeleeWebMenuConfig {
-    /* Only the first two local human slots are in scope for this gate. */
+    /* Two local slots: human or the original ordinary-VS CPU (levels 1..9). */
     uint8_t stocks; /* must be 4 for the current native launch contract */
     uint8_t player0_color;
     uint8_t player1_color;
