@@ -11,7 +11,7 @@ int main()
     assert(state.phase() == Phase::Idle);
     assert(!state.busy());
     assert(!state.suppress_source_draw());
-    assert(!state.arm());
+    assert(!state.arm(true));
     assert(!MenuPreparationState::needs_live_render_settle(0));
     assert(MenuPreparationState::needs_live_render_settle(1));
 
@@ -41,7 +41,17 @@ int main()
     assert(state.phase() == Phase::Settling);
     assert(state.observe_render(true, 0, false));
     assert(state.phase() == Phase::Arming);
-    assert(state.arm());
+    // Quiet submission counters cannot release the source clock. A delayed
+    // completion callback must hold the same state without additional draws.
+    for (unsigned poll = 0; poll < 8; ++poll) {
+        assert(!state.arm(false));
+        assert(state.busy());
+        assert(!state.warming());
+        assert(state.suppress_source_draw());
+        assert(!state.observe_render(false, 0, false));
+        assert(state.phase() == Phase::Arming);
+    }
+    assert(state.arm(true));
     assert(state.phase() == Phase::Idle);
     assert(!state.busy());
 
@@ -58,7 +68,10 @@ int main()
     assert(!state.observe_render(true, 1, true));
     assert(!state.observe_render(true, 0, false));
     assert(state.observe_render(true, 0, false));
-    assert(state.arm());
+    assert(!state.arm(false));
+    state.reset(); // Unload/failure cancels readiness without arming a dead owner.
+    assert(!state.arm(true));
+    assert(!state.busy());
 
     state.request();
     state.reset();

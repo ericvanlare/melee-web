@@ -236,6 +236,20 @@ logical/backing-size mistake is corrected; all original failed attempts remain
 preserved. No performance fix or external-scheduling classification is claimed.
 Both holdouts remain unopened. See the [experiment and coverage limits](docs/HITCH_CAPTURE.md#diagnostic-page-painting-and-native-gpu-capture--2026-09-12).
 
+Scene preparation now waits nonblockingly for submitted GPU work to complete
+before arming the source clock, preserving source ticks/draws and menu audio
+ownership. A controlled delayed-completion test proves the old build started
+source execution prematurely and the new build waits without extra draws.
+Both full development replays still match both original references across
+9,480 ticks, and all nine original menu/entry comparisons pass. All 558 tests
+and the Release build pass. Four independent cold runs complete 18,960 ticks
+with zero native 16.67 ms misses, native 33.3 ms failures or browser 33.3 ms
+gaps; native maximum is 10.710 ms. Three pass fully; the fourth retains a
+focus-loss failure. All four are already GPU-ready at their first arming poll,
+so this protocol fix does not establish the cause of the old 115 ms GPU task.
+That red stays unresolved and both holdouts stay unopened. See the
+[readiness fix and bounded verification](docs/HITCH_CAPTURE.md#submitted-work-readiness--2026-09-12).
+
 The typed content path now carries Falco, Fox, Marth, Battlefield, Yoshi's Story and Dream Land
 source IDs, runtime manifests and focused development traces. Source stock icon IDs are
 selected from the typed character/fighter identity rows. In a fresh Release

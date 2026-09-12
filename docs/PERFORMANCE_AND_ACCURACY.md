@@ -221,6 +221,19 @@ has a separate cold/warm distribution; report its
 wall time and per-phase maximum and reject regressions rather than hiding it in
 the active-frame average.
 
+Scene readiness requires completed submissions as well as quiet pipeline/upload
+counters. After the final preparation draw, poll the existing renderer's frame
+packets, staging leases and worker status without blocking. Keep simulation and
+source drawing stopped until all submitted work completes, retain the last
+image, then reset the source clock. Do not add draws, extra source ticks, new
+buffers or a fixed sleep to manufacture readiness. Preserve retained menu audio
+ownership. A completion timeout is an explicit preparation failure.
+`gpu_completion_wait_ms` includes callback scheduling between the final quiet
+draw and successful arming; it is loading wall time, not GPU execution time.
+Keep it inside total preparation time. A controlled delayed-completion test can
+verify this protocol, but cannot identify an unrelated later GPU stall or close
+an old performance red. See the [startup readiness evidence](HITCH_CAPTURE.md#submitted-work-readiness--2026-09-12).
+
 Keep browser-gap evidence independently of native CPU maxima: the slowest native
 callback need not be the one with the largest browser interval. Retain bounded
 phase snapshots in the saved report, because a scrolling log can wrap during a

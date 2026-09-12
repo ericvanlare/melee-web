@@ -66,6 +66,9 @@ void render_audio_tick(MeleeWebAudio* audio,char* error,size_t error_size);
 struct PreparationProfile {
  double requested_at=0,audio_ready_at=0,constructed_at=0;
  double render_cpu_ms=0,max_callback_ms=0,max_draw_ms=0,max_end_ms=0;
+ double submission_wait_started=0,submission_ready_at=0;
+ unsigned submission_wait_callbacks=0,pending_staging_at_settle=0,pending_staging_at_first_arm=0;
+ bool submission_polled=false;
  uint64_t texture_upload_bytes=0;
  unsigned callbacks=0,source_draws=0,max_draw_calls=0,max_queued=0;
  int32_t queued_delta=0,created_delta=0;
@@ -90,17 +93,23 @@ struct PreparationProfile {
   const double audio_wait=audio_ready_at?audio_ready_at-requested_at:0;
   const double construction=constructed_at?constructed_at-audio_ready_at:0;
   const double render_wait=constructed_at?settled_at-constructed_at:settled_at-requested_at;
-  char profile[1024];
+  char profile[1280];
   std::snprintf(profile,sizeof(profile),
    "{\"source_transition\":%s,\"total_ms\":%.3f,\"audio_wait_ms\":%.3f,"
    "\"construction_ms\":%.3f,\"render_wait_ms\":%.3f,\"render_cpu_ms\":%.3f,"
    "\"callbacks\":%u,\"source_draws\":%u,\"max_callback_ms\":%.3f,"
    "\"max_draw_ms\":%.3f,\"max_end_ms\":%.3f,\"texture_upload_bytes\":%llu,"
-   "\"max_draw_calls\":%u,\"max_queued\":%u,\"queued_delta\":%d,\"created_delta\":%d}",
+   "\"max_draw_calls\":%u,\"max_queued\":%u,\"queued_delta\":%d,\"created_delta\":%d,"
+   "\"gpu_completion_wait_ms\":%.3f,\"gpu_completion_wait_callbacks\":%u,"
+   "\"pending_staging_at_settle\":%u,\"pending_staging_at_first_arm\":%u,"
+   "\"gpu_completion_ready\":%s}",
    source_transition?"true":"false",settled_at-requested_at,audio_wait,construction,
    render_wait,render_cpu_ms,callbacks,source_draws,max_callback_ms,max_draw_ms,max_end_ms,
    static_cast<unsigned long long>(texture_upload_bytes),max_draw_calls,max_queued,
-   queued_delta,created_delta);
+   queued_delta,created_delta,
+   submission_wait_started?submission_ready_at-submission_wait_started:0,
+   submission_wait_callbacks,pending_staging_at_settle,pending_staging_at_first_arm,
+   submission_ready_at?"true":"false");
   EM_ASM({window.menuPreparationProfile?.(JSON.parse(UTF8ToString($0)));},profile);
  }
 };
@@ -457,8 +466,30 @@ void tick(){
    preparation_ms=emscripten_get_now()-preparation_started;preparation_started=0;
    suppress_draw=preparation.suppress_source_draw();
   }else if(preparation.arming()){
-   preparation.arm();running=true;menu_clock.reset();suppress_draw=0;
-   message=match?match_message:melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select";
+   // The final preparation draw is already submitted. Keep its image and let
+   // the browser deliver completion callbacks; never redraw or advance source
+   // state just to wait for a staging buffer to become reusable.
+   const auto submitted=aurora_browser_submission_status();
+   if(!preparation_profile.submission_polled){
+    preparation_profile.pending_staging_at_first_arm=submitted.pendingStagingBuffers;
+    preparation_profile.submission_polled=true;
+   }
+   const bool complete=submitted.pendingFramePackets==0&&submitted.pendingStagingBuffers==0&&
+                       submitted.workerBusy==0;
+   if(preparation.arm(complete)){
+    const double ready_at=emscripten_get_now();
+    preparation_profile.submission_ready_at=ready_at;
+    preparation_profile.report(ready_at);
+    EM_ASM({window.menuRenderCacheSettled?.();});
+    if(render_only_preparation)render_only_preparation=false;
+    else EM_ASM({window.menuPreparationDone?.();});
+    running=true;menu_clock.reset();suppress_draw=0;
+    message=match?match_message:melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select";
+   }else{
+    ++preparation_profile.submission_wait_callbacks;
+    check(emscripten_get_now()-preparation_profile.submission_wait_started<10000,
+          "GPU completion timed out during scene preparation");
+   }
   }else if(pending){
    begin_preparation();
   }
@@ -562,10 +593,9 @@ void tick(){
  if(was_warming)preparation_profile.observe(finished-started,render_draw_ms,render_end_ms,
                                              actual_source_draw,stats_before,stats_after);
  if(preparation.observe_render(actual_source_draw,stats_after.queuedPipelines,render_preparation_activity)){
-  preparation_profile.report(finished);
-  EM_ASM({window.menuRenderCacheSettled?.();});
-  if(render_only_preparation)render_only_preparation=false;
-  else EM_ASM({window.menuPreparationDone?.();});
+  preparation_profile.submission_wait_started=finished;
+  preparation_profile.pending_staging_at_settle=
+      aurora_browser_submission_status().pendingStagingBuffers;
  }
  // A texture upload is complete by the time it is reported here, so pausing
  // source simulation afterward cannot hide its cost. Newly constructed scenes

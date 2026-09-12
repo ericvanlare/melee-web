@@ -149,10 +149,10 @@ index 56c7aae..4a1c018 100644
  void aurora_set_log_level(AuroraLogLevel level);
  void aurora_set_pause_on_focus_lost(bool value);
 diff --git a/include/aurora/gfx.h b/include/aurora/gfx.h
-index 94504b1..18300fb 100644
+index 94504b1..ae5908f 100644
 --- a/include/aurora/gfx.h
 +++ b/include/aurora/gfx.h
-@@ -26,6 +26,51 @@ typedef struct {
+@@ -26,8 +26,64 @@ typedef struct {
    uint32_t lastIndexSize;
    uint32_t lastStorageSize;
    uint32_t lastTextureUploadSize;
@@ -203,7 +203,20 @@ index 94504b1..18300fb 100644
 +  double lastEndFrameResidualMs;
  } AuroraStats;
  
++#ifdef __EMSCRIPTEN__
++/** Browser-only completion snapshot. Polls callbacks without waiting or submitting
++ * another draw. Staging slots stay owned until OnSubmittedWorkDone succeeds. */
++typedef struct {
++  uint32_t pendingFramePackets;
++  uint32_t pendingStagingBuffers;
++  uint32_t workerBusy;
++} AuroraBrowserSubmissionStatus;
++AuroraBrowserSubmissionStatus aurora_browser_submission_status();
++#endif
++
  const AuroraStats* aurora_get_stats();
+ float aurora_get_fps();
+ 
 diff --git a/lib/aurora.cpp b/lib/aurora.cpp
 index 9430842..f93262b 100644
 --- a/lib/aurora.cpp
@@ -481,7 +494,7 @@ index 447ead8..8514c86 100644
    std::shared_ptr<wgpu::SurfaceSourceWindowsHWND> desc = std::make_shared<wgpu::SurfaceSourceWindowsHWND>();
    desc->hwnd = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr);
 diff --git a/lib/gfx/frame.cpp b/lib/gfx/frame.cpp
-index 9fd83ef..4db47d9 100644
+index 9fd83ef..6d17d1b 100644
 --- a/lib/gfx/frame.cpp
 +++ b/lib/gfx/frame.cpp
 @@ -16,9 +16,12 @@
@@ -841,8 +854,8 @@ index 9fd83ef..4db47d9 100644
    ZoneScopedN("Acquire mapped staging buffer");
 +  const double acquireStarted = phase_now_ms();
 +#ifdef __EMSCRIPTEN__
-   while (true) {
-     if (auto slot = g_stagingSlots.try_acquire()) {
++  while (true) {
++    if (auto slot = g_stagingSlots.try_acquire()) {
 +      timing.stagingSlotMs = phase_now_ms() - acquireStarted;
 +      return slot;
 +    }
@@ -854,8 +867,8 @@ index 9fd83ef..4db47d9 100644
 +    observe_begin_wait(timing, 2, waitStarted, waitEnded);
 +  }
 +#else
-+  while (true) {
-+    if (auto slot = g_stagingSlots.try_acquire()) {
+   while (true) {
+     if (auto slot = g_stagingSlots.try_acquire()) {
 +      const double mapStarted = phase_now_ms();
        if (wait_for_staging_buffer(*slot)) {
 +        timing.stagingSlotWaitMs += phase_now_ms() - mapStarted;
@@ -1039,19 +1052,19 @@ index 9fd83ef..4db47d9 100644
      auto afterSubmitCallbacks = std::move(packet.afterSubmitCallbacks);
      packet = {};
      g_resources.stats.drawCallCount = stats.drawCallCount;
-@@ -686,14 +1059,74 @@ void end_frame(EndFrameCallback callback) {
+@@ -686,15 +1059,86 @@ void end_frame(EndFrameCallback callback) {
      g_resources.stats.lastIndexSize = stats.lastIndexSize;
      g_resources.stats.lastStorageSize = stats.lastStorageSize;
      g_resources.stats.lastTextureUploadSize = stats.lastTextureUploadSize;
 +    stats.lastEndFramePacketMs = phase_now_ms() - packetStarted;
 +    const double callbackStarted = phase_now_ms();
-+    if (callback) {
-+      callback(encoder, std::move(afterSubmitCallbacks), stats);
-+    }
-+    stats.lastEndFrameCallbackMs = phase_now_ms() - callbackStarted;
-+#ifdef __EMSCRIPTEN__
      if (callback) {
 -      callback(encoder, std::move(afterSubmitCallbacks));
++      callback(encoder, std::move(afterSubmitCallbacks), stats);
+     }
++    stats.lastEndFrameCallbackMs = phase_now_ms() - callbackStarted;
++#ifdef __EMSCRIPTEN__
++    if (callback) {
 +      // The caller's callback finishes and submits the command buffer before
 +      // this completion observer is registered. Guard the slot pool against
 +      // a later Aurora shutdown/reinitialization resetting its ownership.
@@ -1071,7 +1084,7 @@ index 9fd83ef..4db47d9 100644
 +      stats.lastEndFrameObserverMs = phase_now_ms() - observerStarted;
 +    } else {
 +      g_stagingSlots.release(stagingSlot);
-     }
++    }
 +#endif
 +    stats.lastEndFrameCallbackResidualMs =
 +        stats.lastEndFrameCallbackMs -
@@ -1112,9 +1125,33 @@ index 9fd83ef..4db47d9 100644
 +                  g_resources.stats.lastEndFrameCallbackMs + g_resources.stats.lastEndFrameObserverMs +
 +                  g_resources.stats.lastEndFrameTailMs);
 +#endif
++}
++
++#ifdef __EMSCRIPTEN__
++AuroraBrowserSubmissionStatus browser_submission_status() {
++  enqueue_process_events();
++  return {
++      static_cast<uint32_t>(FrameSlotCount - g_frameSlots.free_count()),
++      static_cast<uint32_t>(StagingBufferCount - g_stagingSlots.free_count()),
++      render_worker::is_idle() ? 0U : 1U,
++  };
  }
++#endif
  
  uint32_t current_frame() noexcept { return g_frameIndex; }
+ 
+@@ -734,5 +1178,11 @@ float calculate_fps() noexcept {
+ }
+ } // namespace aurora::gfx
+ 
++#ifdef __EMSCRIPTEN__
++AuroraBrowserSubmissionStatus aurora_browser_submission_status() {
++  return aurora::gfx::browser_submission_status();
++}
++#endif
++
+ const AuroraStats* aurora_get_stats() { return &aurora::gfx::detail::resources().stats; }
+ float aurora_get_fps() { return aurora::gfx::calculate_fps(); }
 diff --git a/lib/gfx/frame.hpp b/lib/gfx/frame.hpp
 index 0b86ffe..8bcfe54 100644
 --- a/lib/gfx/frame.hpp

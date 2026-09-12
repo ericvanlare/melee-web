@@ -661,3 +661,91 @@ normal UI behavior is unchanged. The implementation passed the 556-test suite,
 40 focused checks covering the later ledger guard, the corrected driver check,
 and the Release build. No native gameplay, renderer, numerical or input code
 changed in this pass; no new retail-equivalence claim is made.
+
+## Submitted-work readiness — 2026-09-12
+
+The preparation state previously armed the source clock after two quiet
+pipeline/upload draws without checking completion of submitted GPU work. The
+browser now polls Aurora's existing frame packets, staging leases and render
+worker in `Arming`. Source ticks and draws remain stopped, the last image stays
+visible, and existing menu audio ownership continues. Once all three are clear,
+the preparation report is finalized and the source clock resets. No source math,
+PAD input, GPU command ordering, buffer capacity or completion backpressure
+changes. Ten seconds without completion fails preparation explicitly.
+
+`gpu_completion_wait_ms` measures from the final quiet draw to successful arming,
+including callback scheduling. It remains inside total preparation time and is
+not GPU execution time. The report also records unsuccessful polls and pending
+staging leases at settle/first arm. These lease snapshots are taken after polling
+completion events, so they need not observe a short-lived pending lease.
+
+The bounded scope in `work/startup-readiness-2026-09-12/scope.json` has SHA-256
+`3f65913f52a7b086f958485b0a32f04577b25e931ea4a6e536e6dc79c0d5c725`.
+It permits two controlled 180-tick startup checks, two full development state
+captures, and four separate unprofiled fresh-browser/cold-origin runs in
+a822/dca/dca/a822 order, with no retries. Driver caches are not controlled.
+The frozen candidate Wasm SHA-256 is
+`5f825b0662cee334a32ba31c2ce09ee0ab8ef2f95a3ea86a19447bfd97ed338f`;
+the seed remains
+`cdf157ee0f1850884f07a71165fd2192177acb23c2c777313b719e70ea67546f`.
+
+The controlled check delays delivery of the third preparation submission's real
+`GPUQueue.onSubmittedWorkDone` promise by 120 ms, after its actual GPU completion.
+The baseline starts source execution 59.10 ms before delivery. The candidate
+starts 41.515 ms after delivery and reports a 131.750 ms preparation wait with
+three unsuccessful polls. Both retain exactly three preparation draws followed
+by 180 source ticks/draws. This verifies the readiness protocol without adding a
+source warmup. Raw reports, event times and browser errors are preserved under
+`control-attempts/`; `control-verification.json` records the assertions.
+
+These injected-delay runs are diagnostic only. Both have zero native 16.67 ms
+misses and zero native 33.3 ms failures, but each retains 43 browser gaps above
+33.3 ms; maxima are 41.025/42.465 ms. They ran on critically low battery, and no
+cause is assigned to those gaps. Neither is a performance pass or a reproduction
+of the old 115 ms GPU task. In the older trace that task began after source
+execution was already underway; a startup completion gate alone cannot establish
+its cause or close that historical red.
+
+Both full candidate state captures match both independent retail references:
+3,892 a822 ticks and 5,588 dca ticks, including declared state/RNG/PAD, source
+drawing, timers, original winner/end and completed teardown. These state captures
+are not timing evidence. The existing Mario/Mario FD reference also matches all
+nine CSS/SSS/cancel/match-entry boundaries, including retained menu music ownership
+and source RNG. This native transition check does not exercise browser GPU waits
+or establish pixel/PCM equivalence. All 558 tests, the focused Arming-reset test,
+Release build and Aurora patch application check pass; a bounded final review
+found no blocking issue.
+
+After AC power was connected, all four unprofiled attempts completed in separate
+owned browser profiles/processes, each clearing the application render cache.
+No build, test, reference collector or profiler ran alongside live timing.
+
+| Slot | Source ticks/draws | Native >16.67 ms | Native >33.3 ms | Browser >33.3 ms | Native max ms | Browser max ms | Other failure |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| a822 cold 1 | 3,892 | 0 | 0 | 0 | 9.985 | 27.380 | none |
+| dca cold 1 | 5,588 | 0 | 0 | 0 | 9.745 | 22.785 | none |
+| dca cold 2 | 5,588 | 0 | 0 | 0 | 8.675 | 22.935 | none |
+| a822 cold 2 | 3,892 | 0 | 0 | 0 | 10.710 | 26.690 | focus loss |
+
+These are 18,960 source ticks/draws and callbacks, with zero live pipeline
+creation, heap growth, preparation pauses or audio under/overflow in the reports.
+Three runs pass the full report validator. The fourth reports `focusLost` and
+`pass:false`; its ledger rejects the report with `Browser report disagrees at
+pass`. It remains a failed slot, with no replacement. Preserve its measured
+timings without promoting it to a complete performance pass.
+
+Preparation totals are 199.185/215.535/215.470/215.765 ms. Completion wait wall
+times are 13.860/14.245/14.410/14.845 ms, all ready at the first arming poll with
+zero unsuccessful polls. Thus the natural runs show no outstanding submission
+at the old arming boundary. The gate corrects a demonstrated protocol gap, but
+these runs do not show that gap causing the historical startup stall. Raw
+reports, frozen per-process plans, validation ledgers and `attempt-index.json`
+preserve this distinction; no attempt is repeated or discarded.
+
+The historical GPU red remains unresolved. Both holdouts remain unopened and the
+subsequent retained-source-heap track remains required. Do not add a fixed startup
+delay or run another clean-start matrix to claim closure. The remaining causal
+question is the operation inside the later overlapping GPU worker: capture an
+actual failing interval with the corrected native retention and owned-thread
+clock alignment described above. The new readiness evidence removes an
+unproven startup-boundary assumption; it does not justify a renderer rewrite.
