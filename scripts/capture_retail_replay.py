@@ -48,6 +48,9 @@ from retail_replay_validation import EXPECTED_PROVENANCE, CPU_PROFILES, MAX_FRAM
 from retail_draw_audit import load_draw_audit
 from retail_match_completion import load_match_completion
 from retail_input_plan import load_plan, verify_capture
+from retail_input_bootstrap import (BootstrapCalibrationError, load_calibration,
+                                     load_runtime_binding, runtime_binding_record,
+                                     write_runtime_binding)
 from retail_match_discovery import load_discovery
 from extract_disc_file import DiscImage, DiscFormatError
 
@@ -57,6 +60,7 @@ DEFAULT_TIMEOUT = 120.0
 SCHEDULER_RETURN = "0x80390eb4"
 GDB_ARCHITECTURE = "powerpc:common"
 RTC = EXPECTED_PROVENANCE["fixed_rtc"]
+CANONICAL_GDB_SOCKET = "<owned-gdb-socket>"
 
 
 class CaptureRunnerError(RuntimeError):
@@ -90,6 +94,41 @@ def _sha256_bytes(*parts: bytes) -> str:
     for part in parts:
         digest.update(part)
     return digest.hexdigest()
+
+
+def _canonical_dolphin_ini_sha256(path: Path, owned_socket: Path) -> str:
+    """Hash Dolphin.ini with only its verified per-run GDB socket normalized."""
+
+    try:
+        raw = path.read_bytes()
+        text = raw.decode("utf-8")
+    except (OSError, UnicodeDecodeError) as error:
+        raise CaptureRunnerError(f"cannot read Dolphin.ini for canonical hash: {error}") from error
+    expected_socket = str(owned_socket)
+    lines: list[str] = []
+    in_general = False
+    socket_count = 0
+    for line in text.splitlines(keepends=True):
+        body = line.rstrip("\r\n")
+        stripped = body.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            in_general = stripped[1:-1].strip().lower() == "general"
+        if in_general:
+            key, separator, value = body.partition("=")
+            if separator and key.strip().lower() == "gdbsocket":
+                socket_count += 1
+                if value.strip() != expected_socket:
+                    raise CaptureRunnerError(
+                        "Dolphin.ini General/GDBSocket is not the owned runtime socket")
+                leading = value[:len(value) - len(value.lstrip())]
+                trailing = value[len(value.rstrip()):]
+                line = (key + separator + leading + CANONICAL_GDB_SOCKET + trailing
+                        + line[len(body):])
+        lines.append(line)
+    if socket_count != 1:
+        raise CaptureRunnerError(
+            "Dolphin.ini must contain exactly one General/GDBSocket for canonical binding")
+    return hashlib.sha256("".join(lines).encode("utf-8")).hexdigest()
 
 
 def verify_disc_dol(disc: Path, dol: Path) -> str:
@@ -341,10 +380,13 @@ def prepare_run(template_user: str | Path, checkpoint_gc: str | Path,
         "retail collector boundary helper")
     collector_input = _regular_file(collector.with_name('retail_input_plan.py'),
                                     'retail input plan helper')
+    collector_bootstrap = _regular_file(
+        collector.with_name('retail_input_bootstrap.py'),
+        'retail input bootstrap helper')
     try:
         collector_sha256 = _sha256_bytes(
             collector.read_bytes(), b"\0", collector_boundary.read_bytes(),
-            b"\0", collector_input.read_bytes())
+            b"\0", collector_input.read_bytes(), b"\0", collector_bootstrap.read_bytes())
     except OSError as error:
         raise CaptureRunnerError(
             f"cannot hash retail collector sources: {error}") from error
@@ -354,6 +396,7 @@ def prepare_run(template_user: str | Path, checkpoint_gc: str | Path,
         shutil.copy2(collector, pinned_collector / "reference_replay_capture.py")
         shutil.copy2(collector_boundary, pinned_collector / "reference_replay_boundary.py")
         shutil.copy2(collector_input, pinned_collector / 'retail_input_plan.py')
+        shutil.copy2(collector_bootstrap, pinned_collector / 'retail_input_bootstrap.py')
         collector = pinned_collector / "reference_replay_capture.py"
         collector_boundary = pinned_collector / "reference_replay_boundary.py"
         _copy_tree(template, user, skip={"Pipes"})
@@ -468,7 +511,10 @@ RetailStep()
 
 def write_gdb_script(path: Path, socket: Path, helper: Path, collector: Path,
                      output: Path, frames: int) -> None:
-    content = "\n".join([
+    # Calibration uses the same neutral/press/release and scheduler-disable
+    # sequence as ordinary captures. Its collector stops at VS entry during
+    # the final continue, after which this script's quit command runs.
+    lines = [
         "set architecture powerpc:common",
         "set endian big",
         "set pagination off",
@@ -491,8 +537,9 @@ def write_gdb_script(path: Path, socket: Path, helper: Path, collector: Path,
         "disable 1",
         "continue",
         "quit",
-        "",
-    ])
+    ]
+    lines.append("")
+    content = "\n".join(lines)
     try:
         path.write_text(content, encoding="utf-8")
     except OSError as error:
@@ -577,7 +624,9 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
                    timeout: float = DEFAULT_TIMEOUT, draw_audit: bool = False,
                    input_plan: str | Path | None = None, cpu: str = "Interpreter64",
                    require_match_complete: bool = False,
-                   until_match_end: bool = False) -> dict:
+                   until_match_end: bool = False,
+                   input_bootstrap: str | Path | None = None,
+                   input_bootstrap_calibrate: bool = False) -> dict:
     """Run the bounded capture and return preserved run metadata."""
 
     if isinstance(frames, bool) or not isinstance(frames, int) or not 1 <= frames <= MAX_FRAMES:
@@ -591,6 +640,12 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
         raise CaptureRunnerError("require_match_complete must be boolean")
     if not isinstance(until_match_end, bool):
         raise CaptureRunnerError("until_match_end must be boolean")
+    if not isinstance(input_bootstrap_calibrate, bool):
+        raise CaptureRunnerError("input_bootstrap_calibrate must be boolean")
+    if input_bootstrap is not None and input_bootstrap_calibrate:
+        raise CaptureRunnerError("Choose input bootstrap apply or calibration, not both")
+    if input_bootstrap_calibrate and (until_match_end or require_match_complete or draw_audit):
+        raise CaptureRunnerError("Bootstrap calibration cannot request capture completion or draw evidence")
     if require_match_complete and not draw_audit:
         raise CaptureRunnerError("Complete-match capture requires --draw-audit")
     if until_match_end and require_match_complete:
@@ -611,6 +666,10 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
             raise CaptureRunnerError(str(error)) from error
     elif until_match_end:
         raise CaptureRunnerError("Match-length discovery requires --input-plan")
+    if input_bootstrap_calibrate and plan is None:
+        raise CaptureRunnerError("Bootstrap calibration requires --input-plan")
+    if input_bootstrap is not None and plan is None:
+        raise CaptureRunnerError("Calibrated input requires --input-plan")
     disc_path = _regular_file(Path(disc), "disc image")
     snapshot_path = _regular_file(Path(snapshot), "snapshot")
     started = time.monotonic()
@@ -632,6 +691,23 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
                  for p in gc.rglob("*") if p.is_file()}
     if actual_gc != paths["provenance"].get("external_save_hashes"):
         raise CaptureRunnerError("owned external GC state does not match pinned provenance")
+    bootstrap_runtime = None
+    bootstrap_runtime_path = None
+    bootstrap_runtime_hash = None
+    if input_bootstrap is not None or input_bootstrap_calibrate:
+        bootstrap_runtime = runtime_binding_record(
+            dolphin_ini_canonical_sha256=_canonical_dolphin_ini_sha256(
+                paths["config"], paths["socket"]),
+            gcpad_ini_sha256=_sha256(paths["pad_config"]),
+            external_save_hashes=actual_gc)
+        bootstrap_runtime_path = paths["evidence"] / "input-bootstrap-runtime.json"
+        try:
+            write_runtime_binding(bootstrap_runtime_path, bootstrap_runtime)
+            bootstrap_runtime_hash = _sha256(bootstrap_runtime_path)
+        except (OSError, BootstrapCalibrationError) as error:
+            raise CaptureRunnerError(str(error)) from error
+    bootstrap_runtime_for_run = dict(paths["provenance"])
+    bootstrap_runtime_for_run.update(bootstrap_runtime or {})
     helper = run_root / "gdb-control.py"
     if plan is not None:
         require_raw_pipe_config(paths['pad_config'])
@@ -639,10 +715,25 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
         shutil.copy2(input_plan, plan_copy)
         if _sha256(plan_copy) != plan_hash:
             raise CaptureRunnerError('Input plan changed during preparation')
+    bootstrap_copy = None
+    bootstrap_hash = None
+    if input_bootstrap is not None:
+        bootstrap_source = _regular_file(Path(input_bootstrap), "input bootstrap calibration")
+        bootstrap_copy = paths["evidence"] / "input-bootstrap.json"
+        shutil.copy2(bootstrap_source, bootstrap_copy)
+        bootstrap_hash = _sha256(bootstrap_copy)
+        try:
+            load_calibration(bootstrap_copy, plan=plan, plan_sha256=plan_hash,
+                             runtime=bootstrap_runtime_for_run,
+                             collector_sha256=paths["collector_sha256"])
+        except (OSError, BootstrapCalibrationError) as error:
+            raise CaptureRunnerError(str(error)) from error
     gdb_commands = run_root / "gdb-commands.txt"
-    write_control_helper(helper, paths["user"] / "Pipes", paths["output"])
+    collector_output = (paths["evidence"] / "bootstrap-capture.jsonl"
+                        if input_bootstrap_calibrate else paths["output"])
+    write_control_helper(helper, paths["user"] / "Pipes", collector_output)
     write_gdb_script(gdb_commands, paths["socket"], helper, paths["collector"],
-                     paths["output"], frames)
+                     collector_output, frames)
     command = dolphin_command(paths["source_dolphin"], paths["user"],
                               paths["snapshot"], disc_path, cpu=cpu)
     gdb_command = ["gdb", "--quiet", "--nx", "--batch", "-x", str(gdb_commands)]
@@ -659,6 +750,9 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
         "tick_transition": "exactly previous scene_frame + 1 modulo u32",
         "collector_phase": "HSD_GObj_80390CFC_return",
         "input_phase": "HSD_PadRenewMasterStatus_dequeued_slot",
+        "bootstrap_mode": (
+            "calibrate" if input_bootstrap_calibrate else
+            "apply" if input_bootstrap is not None else "default"),
     }
     metadata = {
         "status": "prepared",
@@ -679,6 +773,7 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
         "source_draw_audit": draw_audit or until_match_end,
         "require_match_complete": require_match_complete,
         "until_match_end": until_match_end,
+        "input_bootstrap_calibrate": input_bootstrap_calibrate,
         "timeout_seconds": timeout,
         "identity": paths["identity"],
         "source": {
@@ -699,7 +794,13 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
             "collector_boundary": str(paths["collector_boundary"]),
             "collector_boundary_sha256": _sha256(paths["collector_boundary"]),
             "dolphin_ini_sha256": _sha256(paths["config"]),
+            "dolphin_ini_canonical_sha256": (
+                bootstrap_runtime["dolphin_ini_canonical_sha256"]
+                if bootstrap_runtime is not None else None),
             "gcpad_ini_sha256": _sha256(paths["pad_config"]),
+            "input_bootstrap_runtime": (
+                str(bootstrap_runtime_path) if bootstrap_runtime_path is not None else None),
+            "input_bootstrap_runtime_sha256": bootstrap_runtime_hash,
             "snapshot_sha256": _sha256(paths["snapshot"]),
             "provenance_sha256": _sha256(paths["evidence"] / "provenance.json"),
         },
@@ -729,6 +830,14 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
             'source_first_frame': plan['first_frame'], 'frames': len(plan['frames']),
             'consumption': 'not_yet_verified'}
         _write_json(metadata_path, metadata)
+    if bootstrap_copy is not None:
+        metadata["input_bootstrap"] = {
+            "path": str(bootstrap_copy), "sha256": bootstrap_hash,
+            "source": str(Path(input_bootstrap).expanduser().resolve()),
+            "runtime_path": str(bootstrap_runtime_path),
+            "runtime_sha256": bootstrap_runtime_hash,
+        }
+        _write_json(metadata_path, metadata)
     dolphin_process: subprocess.Popen | None = None
     gdb_process: subprocess.Popen | None = None
     dolphin_log = None
@@ -739,6 +848,19 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
         environment["MELEE_REPLAY_COLLECTOR"] = str(paths["collector"])
         environment["MELEE_REPLAY_DRAW_AUDIT"] = "1" if (draw_audit or until_match_end) else "0"
         environment["MELEE_REPLAY_UNTIL_MATCH_END"] = "1" if until_match_end else "0"
+        environment["MELEE_REPLAY_INPUT_BOOTSTRAP_MODE"] = (
+            "calibrate" if input_bootstrap_calibrate else
+            "apply" if input_bootstrap is not None else "default")
+        environment.pop("MELEE_REPLAY_INPUT_BOOTSTRAP_CALIBRATION", None)
+        environment.pop("MELEE_REPLAY_INPUT_BOOTSTRAP_RUNTIME", None)
+        environment.pop("MELEE_REPLAY_INPUT_BOOTSTRAP_OUTPUT", None)
+        if bootstrap_copy is not None:
+            environment["MELEE_REPLAY_INPUT_BOOTSTRAP_CALIBRATION"] = str(bootstrap_copy)
+        if bootstrap_runtime_path is not None:
+            environment["MELEE_REPLAY_INPUT_BOOTSTRAP_RUNTIME"] = str(bootstrap_runtime_path)
+        if input_bootstrap_calibrate:
+            environment["MELEE_REPLAY_INPUT_BOOTSTRAP_OUTPUT"] = str(
+                paths["evidence"] / "bootstrap-calibration.json")
         environment.pop('MELEE_REPLAY_INPUT_PLAN', None)
         if plan is not None:
             environment['MELEE_REPLAY_INPUT_PLAN'] = str(plan_copy)
@@ -764,6 +886,33 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
         if gdb_process.returncode != 0:
             raise CaptureRunnerError(
                 f"GDB capture failed with status {gdb_process.returncode}; see {run_root / 'gdb.log'}")
+        if input_bootstrap_calibrate:
+            calibration_path = paths["evidence"] / "bootstrap-calibration.json"
+            if not calibration_path.exists():
+                raise CaptureRunnerError(
+                    f"collector did not produce bootstrap calibration: {calibration_path}")
+            try:
+                calibration, calibration_hash = load_calibration(
+                    calibration_path, plan=plan, plan_sha256=plan_hash,
+                    runtime=bootstrap_runtime_for_run, collector_sha256=paths["collector_sha256"])
+                shutil.copy2(calibration_path, paths["output"])
+            except (OSError, BootstrapCalibrationError) as error:
+                raise CaptureRunnerError(str(error)) from error
+            metadata["input_bootstrap"] = {
+                "path": str(paths["output"]), "sha256": _sha256(paths["output"]),
+                "construction_pad_reads": calibration["construction_pad_reads"],
+                "calibration_sha256": calibration_hash,
+                "runtime_path": str(bootstrap_runtime_path),
+                "runtime_sha256": bootstrap_runtime_hash,
+            }
+            metadata.update({
+                "status": "bootstrap_calibrated",
+                "output_sha256": _sha256(paths["output"]),
+                "frames_actual": 0,
+                "capture_wall_seconds": time.monotonic() - started,
+            })
+            _write_json(metadata_path, metadata)
+            return metadata
         if not paths["output"].exists():
             raise CaptureRunnerError(
                 f"collector did not produce requested output: {paths['output']}")
@@ -846,6 +995,13 @@ def main(argv: list[str] | None = None) -> int:
                         help="Require the original elimination exit request and final source draw")
     parser.add_argument("--until-match-end", action="store_true",
                         help="Discover the original match length under --frames using a full input plan")
+    bootstrap = parser.add_mutually_exclusive_group()
+    bootstrap.add_argument(
+        "--input-bootstrap", type=Path,
+        help="Apply a previously calibrated construction PADRead bootstrap sidecar")
+    bootstrap.add_argument(
+        "--input-bootstrap-calibrate", action="store_true",
+        help="Record a construction PADRead bootstrap sidecar at --output")
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT)
     parser.add_argument("--cpu", choices=CPU_PROFILES, default="Interpreter64",
                         help="Explicit reference backend; JIT needs interpreter calibration")
@@ -858,7 +1014,9 @@ def main(argv: list[str] | None = None) -> int:
             output=args.output, frames=args.frames, timeout=args.timeout,
             draw_audit=args.draw_audit, input_plan=args.input_plan, cpu=args.cpu,
             require_match_complete=args.require_match_complete,
-            until_match_end=args.until_match_end)
+            until_match_end=args.until_match_end,
+            input_bootstrap=args.input_bootstrap,
+            input_bootstrap_calibrate=args.input_bootstrap_calibrate)
     except CaptureRunnerError as error:
         parser.exit(2, f"retail capture failed: {error}\n")
     print(json.dumps({

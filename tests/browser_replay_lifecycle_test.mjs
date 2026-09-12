@@ -8,6 +8,28 @@ const pause=page.split('\n').find(line=>line.startsWith("$('pause').onclick="));
 const completion=page.slice(page.indexOf('window.menuReplayCompleted='),page.indexOf('\nwindow.menuReplayPoll='));
 assert(start&&pause&&completion);
 {
+ const moduleLine=page.slice(page.indexOf('var Module='),page.indexOf('\ninstallRuntimeCache'));
+ const logged=[];
+ const scope={$:()=>({}),retailRun:{observe:true,rows:[],timerRows:[]},
+  log:text=>logged.push(text),stop(){}};
+ vm.createContext(scope);vm.runInContext(moduleLine,scope);
+ const state='{"record":"frame","index":0}';
+ const timer='{"record":"frame","index":0,"seconds":480}';
+ scope.Module.print(state);
+ scope.Module.printErr('TIMER_AUDIT '+timer);
+ assert.deepEqual(scope.retailRun.rows,[state]);
+ assert.deepEqual(scope.retailRun.timerRows,[timer]);
+ assert.equal(logged.length,0,'Timer sidecars must not flood browser logging');
+ scope.Module.printErr('real native error');
+ assert.deepEqual(logged,['real native error']);
+ scope.retailRun.observe=false;
+ scope.Module.printErr('TIMER_AUDIT '+timer);
+ assert.equal(scope.retailRun.timerRows.length,1,'Performance runs do not collect state');
+ scope.retailRun.observe=true;
+ scope.retailRun.timerRows.length=36003;
+ assert.throws(()=>scope.Module.printErr('TIMER_AUDIT '+timer),/record bound/);
+}
+{
  const memory=page.slice(page.indexOf('const replayMemorySnapshot='),page.indexOf('\nfunction replayMetrics('));
  let nativeCalls=0;
  const scope={fatal:true,Module:{_melee_web_native_menu_memory(){nativeCalls++;throw Error('unavailable');}}};

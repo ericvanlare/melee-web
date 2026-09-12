@@ -127,6 +127,28 @@ controller samples; original vanilla captures must still establish expected
 state. The earlier 952-file zero-UCF-off sample no longer constrains candidate
 selection. See the [verified split and limitations](docs/REPLAY_CORPUS.md#independently-verified-ucf-off-candidate-split).
 
+The UCF-off cohort now has three executed development donors, with five still
+pending and both fresh holdouts unexecuted. The port supports their original
+eight-minute stock countdown through the source timer and timeout paths; exact
+donor settings and separate timer sidecars are mandatory gates. Reusable
+construction-input calibration passes the production collector and original
+reference controls. The first Fox/Falco Battlefield donor matches all 5,772
+recorded ticks, ending on the last KO before the source ending; it remains a
+bounded recording. Marth/Marth on Yoshi’s Story and Fox/Fox on Final Destination
+match both original captures through complete endings of 6,525 and 7,481 ticks.
+
+Those workloads found shared matrix/vector lane-order, Dolphin Slash rotation
+and linear-spline rounding differences. Fixes follow original scalar evidence
+and pinned instructions, with no tolerance or input changes. All ten earlier
+source-drawn games still pass (31,042 ticks), giving this candidate 50,820 exact
+visible ticks across twelve complete games and one bounded recording. All 510
+tests pass. The three timed workloads also pass six isolated cold/warm Release
+runs (39,556 ticks), with zero callbacks over 33.3 ms, live pipeline creation,
+heap growth, timing resumes or audio-queue faults. Worst native/browser callbacks
+are 23.755 / 27.205 ms on the named M4/Chromium configuration. The reviewed seed
+contains 473 pipelines. See the [timed cohort evidence](docs/REPLAY_CORPUS.md#final-timed-cohort-candidate-performance-gate).
+The candidate is not frozen; broader gold/content admission remains open.
+
 The typed content path now carries Falco, Fox, Marth, Battlefield, Yoshi's Story and Dream Land
 source IDs, runtime manifests and focused development traces. Source stock icon IDs are
 selected from the typed character/fighter identity rows. In a fresh Release

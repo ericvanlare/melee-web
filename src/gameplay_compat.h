@@ -24,6 +24,10 @@
 #define MTXQuat melee_web_ps_mtx_quat
 #undef PSMTXQuat
 #define PSMTXQuat melee_web_ps_mtx_quat
+#undef MTXMultVec
+#define MTXMultVec melee_web_ps_mtx_mult_vec
+#undef PSMTXMultVec
+#define PSMTXMultVec melee_web_ps_mtx_mult_vec
 
 typedef struct { f32 x, y; } Vec2;
 typedef struct { int x, y; } IntVec2;

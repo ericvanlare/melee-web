@@ -96,6 +96,59 @@ selected CPU backend to differ, but compares the declared entry, PAD input,
 state and end trajectory. Its scope is that trajectory only: it is not broad
 equivalence, performance acceptance or gold admission.
 
+The reusable construction-PAD bootstrap is a separate two-pass calibration. It
+binds the exact full input plan, source hash, setup snapshot and external GC
+state, Dolphin/runtime configuration, and collector hash before the run starts.
+The strict `input-bootstrap-runtime.json` sidecar keeps these runtime-file
+bindings separate from immutable capture-header provenance. Its Dolphin.ini
+digest normalizes only the verified owned `General/GDBSocket` value; every
+other byte remains bound. The controller configuration remains byte-exact, and
+run metadata retains the unnormalized configuration and runtime-sidecar hashes.
+First record the final construction `PADRead` with the normal pinned capture
+arguments and full plan:
+
+```sh
+python3 scripts/capture_retail_replay.py \
+  --dolphin /path/to/pinned/Dolphin.app \
+  --disc /path/to/owned/game.ciso --dol /path/to/owned/main.dol \
+  --template-user /path/to/template-user \
+  --snapshot /path/to/sss.sav --checkpoint-gc /path/to/checkpoint-gc \
+  --provenance /path/to/provenance.json \
+  --input-plan work/reference/complete-plan.json --frames N \
+  --input-bootstrap-calibrate \
+  --output work/reference/input-bootstrap.json
+```
+
+Then apply that sidecar to a normal fixed-count capture with the same pinned
+setup, plan and `N`:
+
+```sh
+python3 scripts/capture_retail_replay.py \
+  --dolphin /path/to/pinned/Dolphin.app \
+  --disc /path/to/owned/game.ciso --dol /path/to/owned/main.dol \
+  --template-user /path/to/template-user \
+  --snapshot /path/to/sss.sav --checkpoint-gc /path/to/checkpoint-gc \
+  --provenance /path/to/provenance.json \
+  --input-plan work/reference/complete-plan.json --frames N \
+  --input-bootstrap work/reference/input-bootstrap.json \
+  --draw-audit --output work/reference/run-bootstrap.jsonl
+```
+
+Bootstrap calibration is input-timing evidence only; it cannot establish
+gameplay equivalence or source completion. The resulting fixed capture must
+still go through the v2 semantic PAD comparison, which checks the configuration and all
+Master/Copy/Game history members at entry, initial state and every scheduler
+observation. The first donor's final production two-pass capture passes the exact
+setup, plan, runtime and semantic PAD checks and matches both original captures
+through all 5,772 ticks. The bootstrap sidecar alone remains input-timing evidence;
+the separately compared applied capture supplies this gameplay evidence. The
+final collector also passes the existing 240-tick neutral and 686-tick movement
+Interpreter64 controls. Evidence is retained in
+`work/ucf-off-cohort/collector-*-calibration.json` and
+`work/ucf-off-cohort/ucf-dev-323d7ff1/production-collector-calibration.json`.
+The checkpoints independently measured 20 construction reads for Fox/Falco on
+Battlefield and 31 for Marth/Marth on Yoshi's Story; neither count is hardcoded.
+
 ```sh
 python3 scripts/capture_retail_replay.py \
   --dolphin /path/to/pinned/Dolphin.app \
@@ -216,6 +269,28 @@ then an arctangent difference at tick 252 after the sine boundary was corrected.
 Neither red is waived with a tolerance. This short movement workload does not
 cover combat, a complete stock match, all numerical functions or browser timing.
 
+### First bounded UCF-off donor
+
+The development donor
+`323d7ff17991fd5c47f7584531b5e50128132e0543e659d13ca0696ef5986f23`
+was executed for its complete 5,772-tick input plan. The prototype fixed
+captures and comparison artifacts are retained under
+`work/ucf-off-cohort/ucf-dev-323d7ff1/`: `prototype-fixed-a.jsonl`,
+`prototype-fixed-b.jsonl`, `prototype-browser-comparison.json` and
+`prototype-timer-comparison.json`. They report exact declared state/PAD/RNG/
+match-clock and timer agreement for all 5,772 ticks; this is bounded development
+evidence only.
+
+The donor's final row is its last KO (P1 stocks 0, P2 stocks 3), but the original
+source ending was not observed. Discovery therefore remains
+`cap_exhausted`/`complete_match: false`, with no exit or match-end observation
+and no full-match or gold claim. The current protocol does not append neutral
+PAD vectors to a frozen donor plan or synthesize the missing ending. The
+initial preflight used 20 construction reads. Final production application is
+verified by `production-collector-calibration.json` and
+`production-setup-gate.json`; it preserves the same bounded trajectory and timer
+fields. It does not establish the missing source ending.
+
 For the separate movement canary only, the final port run matches all 686 ticks after compiling the original MSL
 `trigf.c` and enabling the recovered `lbtrigf.c` arctangent. The downstream patch
 preserves the retail polynomial tables and each `fmadds`/`fnmsubs` rounding
@@ -279,6 +354,26 @@ SSS snapshot SHA-256 is
 Every subsequent collector process is read-only and uses ordinary controller
 pipes. Do not conflate this documented setup with capture purity, or reuse an
 unrelated save directory just because the savestate loads.
+
+For donor-specific rules, use the original menus and verify the final match-entry
+payload against the frozen setup inventory. In More Rules, Up/Down selects a
+row; Left/Right changes its value. The edited value is
+`MenuFlow.confirmed_selection` until the original save callback persists it.
+Start from More Rules in `GM_MENU` proceeds directly to VS. Do not assume it
+returns to the VS submenu. Verify actual scene/menu readiness before steering.
+The current major mode can change while a memory-card scene still owns input;
+read the active scene kind as well. `MenuFlow.entering_menu` selects the forward
+or backward transition animation and is not a readiness flag. Wait for the
+actual menu and its source input cooldown, handling original card prompts when
+they are active.
+
+Derive observer addresses from the pinned getter instructions and struct nesting,
+not a field's historical name or absolute-offset comment. For example, retail
+`gmMainLib_8015CC58` returns the main save owner plus `0x1CB0`: item frequency,
+item mask and port rumble flags are at owner offsets `0x1CB0`, `0x1CB8` and
+`0x1CC0`. The `0x448` preference offset is relative to the nested save block,
+not the main owner. These reads verify setup; they do not authorize writing
+preferences or active game state through the debugger.
 
 Add `--draw-audit` to observe `HSD_GObj_80390FC0` entry and its verified return.
 The owned evidence directory receives `draw-audit.jsonl`; each row records the
@@ -441,6 +536,36 @@ preparation, callback tails, memory/resource activity, audio counters, visibilit
 cache state and browser configuration. The disabled audio acknowledgement carries
 final counters so an underrun in the last reporting interval is not lost.
 Downloads and serialization happen after teardown.
+
+Timed stock recipes additionally emit `retail-timer.jsonl` in state mode. This
+separate version-1 sidecar records the initial state and every consumed tick's
+match frame, countdown seconds, subframe, source outcome and ending state. Its
+header binds the exact 0x138-byte retail setup and the existing observation
+phase. It does not change the fighter-state schema. Performance mode executes
+neither observer.
+
+The original samples at scheduler return (`80390EB4`); the port samples after
+the matching source tick and its clock post step, before audio transport.
+That post step increments only the scene counters, not any of the six timer
+fields. The sidecar phase names this shared timer boundary; it does not claim
+that the two observers stop at the same instruction or expose identical scene
+counter values. The ordinary whole-minute countdown profile is checked before
+comparison (60–5,940 seconds, no hours display, no nonzero `x14`).
+
+The original collector writes `timer-audit.jsonl` in its owned evidence directory
+for fixed-length timed captures. Length discovery with `--until-match-end`
+deliberately omits this sidecar; first discover the source completion boundary,
+then collect the independently repeated fixed-length runs and their timer traces.
+
+Compare independently captured retail timer sidecars A/B before the port, using
+`scripts/compare_retail_timers.py A B PORT --reference-capture RETAIL_A --cpu
+JITARM64`. The validator requires exact fields, setup, frame count and match-frame
+alignment with the named retail capture; it rejects incomplete or oversized
+files. Supply `--timer-a`, `--timer-b` and `--timer-port` to
+`check_browser_replay.py` for a timed recipe. The joined checker requires these
+sidecars and binds the browser report's `timer_trace_sha256` to the compared port
+file. A timer comparison establishes only the observed timer fields for that
+workload; timeout, pause and other paths still need their own exercised evidence.
 
 When browser download support is unavailable, start the existing loopback server
 with an explicit evidence directory outside the served build:

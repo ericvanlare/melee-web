@@ -4,6 +4,22 @@
 #include <math.h>
 #include <string.h>
 
+void melee_web_ps_mtx_mult_vec(const Mtx m, const Vec* src, Vec* dst)
+{
+    const float x = src->x, y = src->y, z = src->z;
+    float result[3];
+    for (int row = 0; row < 3; ++row) {
+        /* GALE01r2 80342AA8: ps_mul rounds x/y lanes separately,
+         * ps_madd adds z/translation, then ps_sum0 adds the lanes. */
+        float even = fmaf(m[row][2], z, m[row][0] * x);
+        float odd = fmaf(m[row][3], 1.0f, m[row][1] * y);
+        result[row] = even + odd;
+    }
+    dst->x = result[0];
+    dst->y = result[1];
+    dst->z = result[2];
+}
+
 void melee_web_ps_mtx_concat(const Mtx a, const Mtx b, Mtx out)
 {
     Mtx tempMtx;

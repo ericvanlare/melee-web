@@ -8,6 +8,7 @@ from port_replay_validation import compare_paths
 from retail_replay_recipe import encode_mwrc
 from retail_match_completion import load_match_completion
 from retail_replay_validation import load_capture
+from retail_timer_validation import compare_paths as compare_timer_paths
 
 ZERO_GATES = ('browserCallbackGaps', 'browserLongTasks', 'nativeCallbacksOver33ms',
               'livePipelinesQueued', 'livePipelinesCreated', 'preparationPauses',
@@ -121,13 +122,27 @@ def _reference_winner(capture, context):
 
 def check_evidence(reference_a, reference_b, recipe, port, state, cold, warm, profile,
                    browser_errors, build_directory, *, cpu="Interpreter64",
-                   completion_a=None, completion_b=None):
+                   completion_a=None, completion_b=None,
+                   timer_a=None, timer_b=None, timer_port=None):
     require((completion_a is None) == (completion_b is None),
             'completion-a and completion-b must be supplied together')
+    timer_paths = (timer_a, timer_b, timer_port)
+    timer_supplied = tuple(path is not None for path in timer_paths)
+    require(len(set(timer_supplied)) == 1,
+            'timer-a, timer-b, and timer-port must be supplied together')
     comparison = compare_paths(reference_a, reference_b, port, cpu=cpu)
     require(comparison['status'] == 'declared_state_match' and comparison['source_drawing'] == 'source_draws',
             'Rendered source comparison failed: ' + json.dumps(comparison))
-    expected, _ = encode_mwrc(load_capture(reference_a, cpu=cpu))
+    reference_capture = load_capture(reference_a, cpu=cpu)
+    expected, _ = encode_mwrc(reference_capture)
+    setup = bytes.fromhex(reference_capture.match_enter['start_melee_hex'])
+    timer_enabled = bool(setup[0] & 2)
+    if timer_enabled:
+        require(all(timer_supplied),
+                'timer-a, timer-b, and timer-port are required for a timed reference setup')
+    else:
+        require(not any(timer_supplied),
+                'timer sidecars are not valid for an untimed reference setup')
     actual = Path(recipe).read_bytes()
     require(actual == expected, 'Browser recipe differs from paired retail input/setup')
     recipe_hash = hashlib.sha256(actual).hexdigest()
@@ -151,6 +166,17 @@ def check_evidence(reference_a, reference_b, recipe, port, state, cold, warm, pr
                         'state_capture' if name == 'state' else 'performance', name == 'cold',
                         expected_winner=expected_winner)
     require(reports['state'].get('trace_sha256') == comparison['capture_hashes']['port'], 'State report names a different trace')
+    timer_comparison = None
+    if timer_enabled:
+        timer_comparison = compare_timer_paths(
+            timer_a, timer_b, timer_port, reference_capture=reference_a, cpu=cpu)
+        require(timer_comparison.get('status') == 'pass',
+                'Timer comparison failed: ' + json.dumps(timer_comparison, sort_keys=True))
+        timer_port_sha256 = timer_comparison['captures']['port'].get('sha256')
+        require(isinstance(timer_port_sha256, str) and len(timer_port_sha256) == 64,
+                'Timer comparison omitted the port sidecar hash')
+        require(reports['state'].get('timer_trace_sha256') == timer_port_sha256,
+                'State report names a different timer trace')
     for key in ('user_agent', 'resolution', 'device_pixel_ratio'):
         require(reports['state'][key] == reports['cold'][key] == reports['warm'][key], 'Browser configurations differ')
     config, hashes['profile'] = _json(profile)
@@ -169,6 +195,13 @@ def check_evidence(reference_a, reference_b, recipe, port, state, cold, warm, pr
             'scope': 'This bounded input donor and the declared state fields on the named visible Release configuration only. '
                      'The profile/error inspection is an operator attestation, not browser build attestation. '
                      'No full-match/content admission, driver-cold, pixel/audio-reference or hardware-input claim.'}
+    if timer_comparison is not None:
+        result['timer_comparison'] = timer_comparison
+        result['evidence_hashes'].update({
+            'timer_a': timer_comparison['captures']['a']['sha256'],
+            'timer_b': timer_comparison['captures']['b']['sha256'],
+            'timer_port': timer_comparison['captures']['port']['sha256'],
+        })
     if completion_reports is not None:
         result['evidence_hashes'].update({
             'completion_a': completion_reports['a']['completion_sha256'],

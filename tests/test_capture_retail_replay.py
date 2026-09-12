@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import socket
 from pathlib import Path
 import stat
 import tempfile
@@ -22,6 +23,9 @@ SPEC = importlib.util.spec_from_file_location(
 CAPTURE = importlib.util.module_from_spec(SPEC)
 assert SPEC.loader is not None
 SPEC.loader.exec_module(CAPTURE)
+from retail_input_plan import load_plan
+from retail_input_bootstrap import (calibration_record, load_runtime_binding,
+                                     write_calibration)
 
 
 def _setup_files(root: Path) -> dict[str, Path | dict]:
@@ -167,6 +171,21 @@ class CaptureRunnerTests(unittest.TestCase):
             self.assertIn('target remote %s' % (root / "gdb.sock"), lines)
             self.assertIn("hbreak *0x80390eb4", lines)
 
+    def test_bootstrap_calibration_script_preserves_normal_probe_sequence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "gdb-commands.txt"
+            CAPTURE.write_gdb_script(
+                path, root / "gdb.sock", root / "gdb-control.py",
+                root / "reference_replay_capture.py", root / "bootstrap.json", 240)
+            lines = path.read_text(encoding="utf-8").splitlines()
+            self.assertEqual(lines[-1], "quit")
+            self.assertLess(lines.index("retail-step 8 1 PRESS A"),
+                            lines.index("retail-step 8 1 RELEASE A"))
+            self.assertLess(lines.index("retail-step 8 1 RELEASE A"),
+                            lines.index("disable 1"))
+            self.assertLess(lines.index("disable 1"), lines.index("continue", lines.index("disable 1")))
+
     def test_prepare_run_copies_bytes_and_creates_fresh_owned_inputs(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -188,8 +207,166 @@ class CaptureRunnerTests(unittest.TestCase):
             boundary = paths["collector_boundary"]
             expected_hash = hashlib.sha256(
                 paths["collector"].read_bytes() + b"\0" + boundary.read_bytes() + b"\0" +
-                paths["collector"].with_name('retail_input_plan.py').read_bytes()).hexdigest()
+                paths["collector"].with_name('retail_input_plan.py').read_bytes() + b"\0" +
+                paths["collector"].with_name('retail_input_bootstrap.py').read_bytes()).hexdigest()
             self.assertEqual(paths["collector_sha256"], expected_hash)
+
+    def test_canonical_dolphin_ini_hash_only_normalizes_owned_socket(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "Dolphin.ini"
+            socket_a = Path("/tmp/mwr-owned-a.sock")
+            socket_b = Path("/tmp/mwr-owned-b.sock")
+            path.write_text(
+                "[General]\nGDBSocket = /tmp/mwr-owned-a.sock\n\n"
+                "[Core]\nCPUThread = False\n", encoding="utf-8")
+            first = CAPTURE._canonical_dolphin_ini_sha256(path, socket_a)
+            path.write_text(
+                "[General]\nGDBSocket = /tmp/mwr-owned-b.sock\n\n"
+                "[Core]\nCPUThread = False\n", encoding="utf-8")
+            self.assertEqual(first, CAPTURE._canonical_dolphin_ini_sha256(path, socket_b))
+            path.write_text(
+                "[General]\nGDBSocket = /tmp/mwr-owned-b.sock\n\n"
+                "[Core]\nCPUThread = True\n", encoding="utf-8")
+            self.assertNotEqual(first, CAPTURE._canonical_dolphin_ini_sha256(path, socket_b))
+            with self.assertRaisesRegex(CAPTURE.CaptureRunnerError, "owned runtime socket"):
+                CAPTURE._canonical_dolphin_ini_sha256(path, socket_a)
+
+    def test_calibration_return_keeps_immutable_provenance_and_runtime_sidecar(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            files = _setup_files(root)
+            files["dol"].write_bytes(files["dol"].read_bytes().ljust(0x100, b"\0"))
+            files["expected"]["dol_sha1"] = hashlib.sha1(
+                files["dol"].read_bytes()).hexdigest()
+            files["expected"]["setup_snapshot_sha256"] = hashlib.sha256(
+                files["dol"].read_bytes()).hexdigest()
+            files["expected"]["external_save_hashes"] = {
+                str(path.relative_to(files["checkpoint"])): hashlib.sha256(
+                    path.read_bytes()).hexdigest()
+                for path in files["checkpoint"].rglob("*") if path.is_file()
+            }
+            files["provenance"].write_text(
+                json.dumps(files["expected"], sort_keys=True) + "\n", encoding="utf-8")
+            original_provenance = files["provenance"].read_bytes()
+            config = files["template"] / "Config" / "GCPadNew.ini"
+            sections = []
+            for port in (1, 2):
+                sections.append(
+                    f"[GCPad{port}]\nDevice = Pipe/0/pad{port}\n"
+                    "Main Stick/Calibration =\nMain Stick/Center =\n"
+                    "Main Stick/Modifier =\nMain Stick/Dead Zone = 0\n"
+                    "Main Stick/Virtual Notches = 0\nC-Stick/Calibration =\n"
+                    "C-Stick/Center =\nC-Stick/Modifier =\nC-Stick/Dead Zone = 0\n"
+                    "C-Stick/Virtual Notches = 0\nTriggers/Dead Zone = 0\n"
+                    "Triggers/Threshold = 90\n")
+            config.write_text("\n".join(sections), encoding="utf-8")
+
+            disc = root / "game.iso"
+            image = bytearray(0x1000)
+            image[:8] = b"GALE01\x00\x02"
+            image[0x1C:0x20] = bytes.fromhex("c2339f3d")
+            image[0x420:0x424] = (0x800).to_bytes(4, "big")
+            image[0x800:0x800 + files["dol"].stat().st_size] = files["dol"].read_bytes()
+            disc.write_bytes(image)
+
+            plan_path = root / "input-plan.json"
+            plan_value = {
+                "schema": "melee-web-retail-input-plan", "version": 1,
+                "policy": "dolphin-pipe-raw-v2", "source_sha256": "a" * 64,
+                "first_frame": -123, "source_stage": 32,
+                "source_characters": [8, 8],
+                "frames": [["00" * 11, "00" * 11], ["00" * 11, "00" * 11]],
+            }
+            plan_path.write_text(json.dumps(plan_value, sort_keys=True) + "\n",
+                                 encoding="utf-8")
+            output = root / "capture.json"
+            dolphin_process = None
+
+            class FakeProcess:
+                def __init__(self, command, *, env=None):
+                    self.command = command
+                    self.returncode = None
+                    self.pid = 99999999
+                    self.listener = None
+                    if Path(command[0]).name != "gdb":
+                        user = Path(command[2])
+                        ini = (user / "Config" / "Dolphin.ini").read_text()
+                        socket_path = Path(next(
+                            line.split("=", 1)[1].strip()
+                            for line in ini.splitlines()
+                            if line.strip().lower().startswith("gdbsocket")))
+                        self.listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                        self.listener.bind(str(socket_path))
+                        self.listener.listen(1)
+                        self.socket_path = socket_path
+                        nonlocal dolphin_process
+                        dolphin_process = self
+                    else:
+                        self._write_calibration(env)
+                        dolphin_process.returncode = 0
+                        dolphin_process.listener.close()
+                        dolphin_process.socket_path.unlink(missing_ok=True)
+                        dolphin_process.listener = None
+
+                def _write_calibration(self, env):
+                    evidence = Path(env["MELEE_REPLAY_REFERENCE_WORK"])
+                    loaded_plan, plan_hash = load_plan(evidence / "input-plan.json")
+                    runtime, _ = load_runtime_binding(
+                        env["MELEE_REPLAY_INPUT_BOOTSTRAP_RUNTIME"])
+                    provenance = json.loads((evidence / "provenance.json").read_text())
+                    provenance.update(runtime)
+                    collector = Path(env["MELEE_REPLAY_COLLECTOR"])
+                    collector_hash = hashlib.sha256(
+                        collector.read_bytes() + b"\0" +
+                        collector.with_name("reference_replay_boundary.py").read_bytes() + b"\0" +
+                        collector.with_name("retail_input_plan.py").read_bytes() + b"\0" +
+                        collector.with_name("retail_input_bootstrap.py").read_bytes()).hexdigest()
+                    raw = b"".join(bytes.fromhex(pad) + bytes([fill])
+                                   for pad, fill in zip(
+                                       loaded_plan["frames"][0] + ["00" * 10 + "ff"] * 2,
+                                       (0x9C, 0xD8, 0x38, 0x30)))
+                    record = calibration_record(
+                        plan=loaded_plan, plan_sha256=plan_hash,
+                        provenance=provenance, collector_sha256=collector_hash,
+                        construction_pad_reads=1,
+                        last_construction_pad_read={
+                            "ordinal": 0, "scene_frame": 221,
+                            "retrace_count": 500, "source_vi_count": 499,
+                            "caller": 0x80376A28, "stack": 0x80002000,
+                            "queue_hex": "00" * 12, "raw_hex": raw.hex(),
+                        })
+                    write_calibration(evidence / "bootstrap-calibration.json", record)
+
+                def poll(self):
+                    return self.returncode
+
+                def wait(self, timeout=None):
+                    self.returncode = 0
+                    return 0
+
+                def terminate(self):
+                    self.returncode = 0
+
+            def popen(command, **kwargs):
+                return FakeProcess(command, env=kwargs["env"])
+
+            with mock.patch.object(CAPTURE, "EXPECTED_PROVENANCE", files["expected"]), \
+                    mock.patch.object(CAPTURE.subprocess, "Popen", side_effect=popen):
+                metadata = CAPTURE.capture_replay(
+                    dolphin=files["dolphin"], disc=disc, dol=files["dol"],
+                    template_user=files["template"], snapshot=files["dol"],
+                    checkpoint_gc=files["checkpoint"], provenance=files["provenance"],
+                    output=output, frames=2, input_plan=plan_path,
+                    input_bootstrap_calibrate=True)
+
+            self.assertEqual(metadata["status"], "bootstrap_calibrated")
+            run_root = Path(metadata["run_root"])
+            self.assertEqual((run_root / "evidence" / "provenance.json").read_bytes(),
+                             original_provenance)
+            runtime_path = run_root / "evidence" / "input-bootstrap-runtime.json"
+            self.assertEqual(metadata["owned"]["input_bootstrap_runtime_sha256"],
+                             hashlib.sha256(runtime_path.read_bytes()).hexdigest())
+            self.assertTrue(output.exists())
 
     def test_provenance_configuration_types_are_exact(self):
         with tempfile.TemporaryDirectory() as directory:

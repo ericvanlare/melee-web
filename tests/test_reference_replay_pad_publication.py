@@ -11,6 +11,7 @@ from types import SimpleNamespace
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from retail_input_plan import DISCONNECTED_PAD, SCHEMA, POLICY
+from retail_input_bootstrap import calibration_record
 
 
 def plan(count=4):
@@ -190,6 +191,43 @@ class PadPublicationTests(unittest.TestCase):
         }[expression]
         with self.assertRaisesRegex(RuntimeError, "does not retain the consumed slot"):
             collector.pad_consume()
+
+    def test_calibrated_bootstrap_publishes_only_at_final_construction_read(self):
+        collector = self.setup_collector("pad_calibrated_bootstrap")
+        collector.ready = False
+        collector.BOOTSTRAP_MODE = "calibrate"
+        collector.construction_pad_reads = 0
+        collector.last_construction_pad_read = None
+        collector.supply_input.reset_mock()
+        raw = self.vector(collector.input_plan["frames"][0])
+        self.configure_pad_read(collector, raw, scene=17)
+        self.assertFalse(collector.pad_read_before_interrupt_restore())
+        self.assertEqual(collector.construction_pad_reads, 1)
+        self.assertEqual(collector.supply_input.call_count, 0)
+
+        runtime = {
+            "dol_sha1": "b" * 40, "dolphin_binary_sha256": "c" * 64,
+            "source_revision": "revision", "cpu": "JITARM64",
+            "cpu_thread": False, "cheats": False, "background_input": True,
+            "fixed_rtc": 1704067200, "setup_snapshot_sha256": "d" * 64,
+            "dolphin_ini_canonical_sha256": "e" * 64, "gcpad_ini_sha256": "f" * 64,
+            "external_save_hashes": {"SRAM.raw": "a" * 64},
+        }
+        calibration = calibration_record(
+            plan=collector.input_plan, plan_sha256="a" * 64, provenance=runtime,
+            collector_sha256="e" * 64,
+            construction_pad_reads=collector.construction_pad_reads,
+            last_construction_pad_read=collector.last_construction_pad_read)
+        collector.BOOTSTRAP_MODE = "apply"
+        collector.bootstrap_calibration = calibration
+        collector.construction_pad_reads = 0
+        collector.bootstrap_applied = False
+        collector.observations = type(collector.observations)()
+        collector.supply_input.reset_mock()
+        self.configure_pad_read(collector, raw, scene=17)
+        self.assertFalse(collector.pad_read_before_interrupt_restore())
+        collector.supply_input.assert_called_once_with(1)
+        self.assertTrue(collector.bootstrap_applied)
 
 
 if __name__ == "__main__":

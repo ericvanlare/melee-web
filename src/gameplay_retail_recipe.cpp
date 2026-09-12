@@ -3,10 +3,16 @@
 #include <bit>
 #include <iostream>
 #include <stdexcept>
+#include <string_view>
 
 extern "C" int melee_web_retail_setup(const uint8_t*, uint32_t,
     MeleeWebMenuMatchSelection*, char*, size_t);
 extern "C" void melee_web_retail_state(void);
+extern "C" uint32_t gm_GetFrameCount(void);
+extern "C" uint32_t gm_8016AEEC(void);
+extern "C" uint16_t gm_8016AEFC(void);
+extern "C" int melee_web_match_source_result(void);
+extern "C" int melee_web_match_end_state(void);
 
 namespace melee_web {
 namespace {
@@ -23,9 +29,22 @@ struct Reader {
     uint16_t u16() { const auto hi = u8(); const auto lo = u8(); return uint16_t(hi) << 8 | lo; }
     uint32_t u32() { const auto hi = u16(); const auto lo = u16(); return uint32_t(hi) << 16 | lo; }
 };
-void hex(std::span<const uint8_t> bytes) {
+void hex(std::span<const uint8_t> bytes, std::ostream& out = std::cout) {
     static constexpr char digits[] = "0123456789abcdef";
-    for (auto byte : bytes) std::cout << digits[byte >> 4] << digits[byte & 15];
+    for (auto byte : bytes) out << digits[byte >> 4] << digits[byte & 15];
+}
+bool timer_audit_active = false;
+void timer_state(const char* record, size_t index = 0) {
+    if (!timer_audit_active) return;
+    // Separate diagnostic stream: never add fields to an older state schema,
+    // and never execute this observer in a performance replay.
+    std::cerr << "TIMER_AUDIT {\"record\":\"" << record << "\"";
+    if (std::string_view(record) == "frame") std::cerr << ",\"index\":" << index;
+    std::cerr << ",\"match_frame\":" << gm_GetFrameCount()
+        << ",\"seconds\":" << gm_8016AEEC()
+        << ",\"subframe\":" << gm_8016AEFC()
+        << ",\"outcome\":" << melee_web_match_source_result()
+        << ",\"end_state\":" << melee_web_match_end_state() << "}\n";
 }
 void history(const RetailReplayRecipe& recipe) {
     if (recipe.version != 2) return;
@@ -77,6 +96,7 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
 }
 
 void retail_replay_initial(const RetailReplayRecipe& recipe, bool source_drawing) {
+    timer_audit_active = recipe.selection.start.rules.timer_enabled;
     std::cout << "{\"record\":\"header\",\"schema\":\"melee-web-port-replay-candidate\",\"version\":"
         << recipe.version << ",\"frames_requested\":" << recipe.frames.size()
         << ",\"phase\":\"after_source_tick_before_audio_transport\",\"rendering\":\""
@@ -86,6 +106,13 @@ void retail_replay_initial(const RetailReplayRecipe& recipe, bool source_drawing
     if (recipe.version == 2) { std::cout << ",\"pad_state_hex\":\""; hex(recipe.pad_bytes); std::cout << "\""; }
     std::cout << "}\n{\"record\":\"match_enter_complete\",";
     melee_web_retail_state(); history(recipe); std::cout << "}\n";
+    if (timer_audit_active) {
+        std::cerr << "TIMER_AUDIT {\"record\":\"header\",\"schema\":\"melee-web-match-timer-audit\",\"version\":1,\"frames_requested\":"
+            << recipe.frames.size() << ",\"setup_hex\":\"";
+        hex(recipe.setup, std::cerr);
+        std::cerr << "\",\"phase\":\"after_source_tick_before_audio_transport\"}\n";
+        timer_state("initial");
+    }
 }
 
 void retail_replay_frame(const RetailReplayRecipe& recipe, size_t index) {
@@ -97,8 +124,13 @@ void retail_replay_frame(const RetailReplayRecipe& recipe, size_t index) {
         std::cout << "\""; hex(std::span(frame.bytes).subspan(port * 11, 11)); std::cout << "\"";
     }
     std::cout << "],"; melee_web_retail_state(); history(recipe); std::cout << "}\n";
+    timer_state("frame", index);
 }
 void retail_replay_end(size_t frames) {
     std::cout << "{\"record\":\"end\",\"frames\":" << frames << ",\"status\":\"captured\"}\n";
+    if (timer_audit_active) {
+        std::cerr << "TIMER_AUDIT {\"record\":\"end\",\"frames\":" << frames << ",\"status\":\"captured\"}\n";
+        timer_audit_active = false;
+    }
 }
 } // namespace melee_web

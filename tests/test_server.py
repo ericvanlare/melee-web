@@ -139,6 +139,14 @@ class ServerTests(unittest.TestCase):
             self.assertEqual(Path(result["path"]).read_bytes(), data)
         self.assertEqual(len(list(output.iterdir())), 1)
         self.assertEqual(self.request("/" + Path(result["path"]).name)[0], 404)
+        timer_path = "/__melee_evidence/retail-timer.jsonl"
+        self.assertEqual(self.request(timer_path, "POST", data,
+                         {**headers, "Content-Length": str(8 * 1024 * 1024 + 1)})[0], 413)
+        status, _, body = self.request(timer_path, "POST", data, headers)
+        self.assertEqual(status, 201)
+        timer = json.loads(body)
+        self.assertEqual(Path(timer["path"]).read_bytes(), data)
+        self.assertEqual(timer["sha256"], hashlib.sha256(data).hexdigest())
 
 
 class ConfigurationTests(unittest.TestCase):

@@ -18,6 +18,18 @@ class MatchCompletion(unittest.TestCase):
         self.assertIn(expected,result.stdout)
     def test_four_stock_elimination_respawn_and_winner(self):
         self.run_trace('gameplay_stock_trace','four-stock elimination, three respawns and winner passed in two worlds')
+    def test_stock_timer_countdown_pause_timeout_and_repeat_lifetime(self):
+        menu_assets=ROOT/'assets-local/native-menus'
+        game_assets=ROOT/'assets-local/next-gate'
+        binaries=(ROOT/'build/browser-release/gameplay_timer_trace.js',
+                  ROOT/'build/browser/gameplay_timer_trace.js')
+        binary=next((path for path in binaries if path.is_file()),None)
+        if binary is None or not menu_assets.is_dir() or not game_assets.is_dir():
+            self.skipTest('Optional built timer trace and owned runtime assets required')
+        result=subprocess.run([str(node_runtime()),str(binary),str(menu_assets),str(game_assets)],cwd=ROOT,
+                              capture_output=True,text=True,timeout=180)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertIn('stock timer countdown, pause/resume, timeout and repeated lifetime passed',result.stdout)
 
     def test_all_mario_costumes_repeat_source_lifecycle(self):
         assets=ROOT/'assets-local/next-gate'

@@ -22,6 +22,9 @@ COLLECTOR = Path(os.environ.get("MELEE_REPLAY_COLLECTOR", "tools/reference_repla
 sys.path.insert(0, str(COLLECTOR.parent))
 from reference_replay_boundary import BoundaryObservations
 from retail_input_plan import load_plan, pipe_commands, verify_entry, verify_tick
+from retail_input_bootstrap import (BootstrapCalibrationError, calibration_record,
+                                     load_calibration, load_runtime_binding,
+                                     write_calibration, MAX_CONSTRUCTION_PAD_READS)
 
 INPUT_PLAN_PATH = os.environ.get("MELEE_REPLAY_INPUT_PLAN")
 input_plan, input_plan_sha256 = load_plan(INPUT_PLAN_PATH) if INPUT_PLAN_PATH else (None, None)
@@ -45,6 +48,25 @@ published_inputs = 0
 pad_bootstrapped = False
 pad_sample_index = None
 exit_observation = None
+BOOTSTRAP_MODE = os.environ.get("MELEE_REPLAY_INPUT_BOOTSTRAP_MODE", "default")
+BOOTSTRAP_CALIBRATION_PATH = os.environ.get("MELEE_REPLAY_INPUT_BOOTSTRAP_CALIBRATION")
+BOOTSTRAP_RUNTIME_PATH = os.environ.get("MELEE_REPLAY_INPUT_BOOTSTRAP_RUNTIME")
+BOOTSTRAP_OUTPUT_PATH = os.environ.get("MELEE_REPLAY_INPUT_BOOTSTRAP_OUTPUT")
+# Pinned GALE01r2 game SDK symbols: ``retraceCount`` is read by
+# VIGetRetraceCount, while ``InputBufferVcount[0]`` is the SI transfer's
+# source vertical-count stamp. Both are read-only identity keys for repeated
+# debugger stops; neither is used to advance game state.
+RETRACE_COUNT = 0x804D7420
+INPUT_BUFFER_VCOUNT = 0x804A7F98
+VI_GET_RETRACE_COUNT = 0x8035017C
+VI_GET_RETRACE_COUNT_WORDS = (0x806DBD80, 0x4E800020)
+construction_pad_reads = 0
+last_construction_pad_read = None
+bootstrap_applied = False
+bootstrap_calibration = None
+bootstrap_calibration_sha256 = None
+collector_sha256 = None
+run_provenance = {}
 
 
 def discovery_end_ready():
@@ -83,13 +105,81 @@ def word(address):
     return struct.unpack(">I", memory(address, 4))[0]
 
 
+def pad_read_identity(stack, caller, queue, raw):
+    return {
+        "ordinal": construction_pad_reads,
+        "scene_frame": word(0x80479D58),
+        "retrace_count": word(RETRACE_COUNT),
+        "source_vi_count": word(INPUT_BUFFER_VCOUNT),
+        "caller": caller,
+        "stack": stack,
+        "queue_hex": queue.hex(),
+        "raw_hex": raw.hex(),
+    }
+
+
+def bootstrap_calibration_runtime():
+    return {
+        "dol_sha1": run_provenance.get("dol_sha1"),
+        "dolphin_binary_sha256": run_provenance.get("dolphin_binary_sha256"),
+        "source_revision": run_provenance.get("source_revision"),
+        "cpu": run_provenance.get("cpu"),
+        "cpu_thread": run_provenance.get("cpu_thread"),
+        "cheats": run_provenance.get("cheats"),
+        "background_input": run_provenance.get("background_input"),
+        "fixed_rtc": run_provenance.get("fixed_rtc"),
+        "setup_snapshot_sha256": run_provenance.get("setup_snapshot_sha256"),
+        "dolphin_ini_canonical_sha256": run_provenance.get("dolphin_ini_canonical_sha256"),
+        "gcpad_ini_sha256": run_provenance.get("gcpad_ini_sha256"),
+        "external_save_hashes": run_provenance.get("external_save_hashes"),
+    }
+
+
 def rng():
     return word(word(0x804D5F94))
+
+
+def timer_audit(row):
+    # Read-only sidecar for fixed timed captures. No new breakpoints, inputs,
+    # source state writes, or changes to the existing fighter-state schema.
+    if UNTIL_MATCH_END:
+        return
+    kind = row.get("record")
+    path = ROOT / "timer-audit.jsonl"
+    if kind == "match_enter":
+        raw = bytes.fromhex(row["start_melee_hex"])
+        if not (raw[0] & 2):
+            return
+        value = {"record": "header", "schema": "melee-web-match-timer-audit",
+                 "version": 1, "frames_requested": LIMIT,
+                 "setup_hex": row["start_melee_hex"],
+                 "phase": "after_source_tick_before_audio_transport"}
+        with path.open("x") as stream:
+            stream.write(json.dumps(value, sort_keys=True) + "\n")
+        return
+    if not path.exists():
+        return
+    if kind in ("match_enter_complete", "frame"):
+        value = {"record": "initial" if kind == "match_enter_complete" else "frame",
+                 "match_frame": word(0x8046B6C4),
+                 "seconds": word(0x8046B6C8),
+                 "subframe": struct.unpack(">H", memory(0x8046B6CC, 2))[0],
+                 "outcome": memory(0x8046B6A8, 1)[0],
+                 "end_state": memory(0x8046B6A0, 1)[0]}
+        if kind == "frame":
+            value["index"] = row["index"]
+    elif kind == "end" and row.get("status") == "captured":
+        value = {"record": "end", "frames": row["frames"], "status": "captured"}
+    else:
+        return
+    with path.open("a") as stream:
+        stream.write(json.dumps(value, sort_keys=True) + "\n")
 
 
 def emit(row):
     with OUTPUT.open("a") as stream:
         stream.write(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n")
+    timer_audit(row)
 
 
 def supply_input(index):
@@ -225,7 +315,10 @@ def pad_consume():
         if input_plan is not None and not pad_bootstrapped:
             pad_bootstrapped = True
             pad_sample_index = 0
-            if 1 < LIMIT:
+            if BOOTSTRAP_MODE == "apply":
+                if not bootstrap_applied:
+                    raise RuntimeError('Calibrated input bootstrap was not applied before source consume')
+            elif 1 < LIMIT:
                 supply_input(1)
 
 
@@ -241,8 +334,18 @@ def pad_read_before_interrupt_restore():
     had arrived. This boundary is inside PADRead and is accepted only for
     HSD_PadRenewRawStatus's saved caller.
     """
-    global pad_sample_index
-    if not active or not ready or input_plan is None or not pad_bootstrapped:
+    global pad_sample_index, construction_pad_reads, last_construction_pad_read
+    global bootstrap_applied
+    if not active or input_plan is None:
+        return False
+    # Preserve the legacy collector's pre-entry behavior: its PADRead
+    # observer was inactive until VS entry completed. Only the explicit
+    # two-pass modes inspect construction polling.
+    if not ready and BOOTSTRAP_MODE == "default":
+        return False
+    # Preserve the old collector's harmless pre-bootstrap window: a PADRead
+    # between VS entry and the first source queue consume was ignored.
+    if ready and not pad_bootstrapped:
         return False
 
     stack = int(gdb.parse_and_eval('$r1'))
@@ -253,10 +356,52 @@ def pad_read_before_interrupt_restore():
     raw = memory(status_end - 0x30, 0x30)
     queue = memory(0x804C1F78, 0xC)
     scene = word(0x80479D58)
-    key = (stack, scene, queue.hex(), raw.hex())
-    observation = (machine_context(), queue.hex(), raw.hex())
+    retrace_count = word(RETRACE_COUNT)
+    source_vi_count = word(INPUT_BUFFER_VCOUNT)
+    key = (stack, scene, retrace_count, source_vi_count, queue.hex(), raw.hex())
+    observation = (machine_context(), retrace_count, source_vi_count,
+                   queue.hex(), raw.hex())
     if not observations.accept('pad_read', key, observation):
         return False
+
+    # During VS construction the SI response is already latched before the
+    # first source queue consume.  A calibrated run publishes the successor
+    # at the final accepted construction PADRead, which gives Dolphin's
+    # source SI poll one complete interval to parse the Pipe command.
+    if not ready:
+        if construction_pad_reads >= MAX_CONSTRUCTION_PAD_READS:
+            raise RuntimeError('Construction PADRead count exceeds calibration bound')
+        identity = pad_read_identity(stack, PAD_READ_HSD_CALLER, queue, raw)
+        if BOOTSTRAP_MODE == "calibrate":
+            construction_pad_reads += 1
+            identity["ordinal"] = construction_pad_reads - 1
+            last_construction_pad_read = identity
+            return False
+        if BOOTSTRAP_MODE == "apply":
+            if bootstrap_calibration is None:
+                raise RuntimeError('Input bootstrap calibration was not loaded')
+            expected_count = bootstrap_calibration["construction_pad_reads"]
+            if construction_pad_reads >= expected_count:
+                raise RuntimeError('Construction PADRead count exceeded calibrated count')
+            if construction_pad_reads == expected_count - 1:
+                if identity != bootstrap_calibration["last_construction_pad_read"]:
+                    raise RuntimeError('Final construction PADRead differs from calibration')
+                expected_semantic = (bootstrap_calibration["first_input"] +
+                                     ["00" * 10 + "ff", "00" * 10 + "ff"])
+                actual_semantic = [raw[offset:offset + 11].hex()
+                                   for offset in range(0, 48, 12)]
+                if actual_semantic != expected_semantic:
+                    raise RuntimeError('Calibrated construction PADRead does not contain plan tick 0')
+                supply_input(1)
+                bootstrap_applied = True
+            construction_pad_reads += 1
+            return False
+        construction_pad_reads += 1
+        last_construction_pad_read = identity
+        return False
+
+    if not pad_bootstrapped:
+        raise RuntimeError('PADRead observed before source PAD bootstrap')
 
     if pad_sample_index is None:
         raise RuntimeError('PADRead observed before source PAD bootstrap')
@@ -423,7 +568,7 @@ def draw_return():
 
 
 def entered():
-    global ready
+    global ready, active
     if not active:
         return False
     sample = state()
@@ -433,6 +578,25 @@ def entered():
         return False
     pending_inputs.clear()
     emit({"record": "match_enter_complete", **sample})
+    if BOOTSTRAP_MODE == "calibrate":
+        if (BOOTSTRAP_OUTPUT_PATH is None or construction_pad_reads <= 0 or
+                last_construction_pad_read is None):
+            raise RuntimeError('Construction PADRead calibration did not observe a final read')
+        try:
+            record = calibration_record(
+                plan=input_plan, plan_sha256=input_plan_sha256,
+                provenance=run_provenance, collector_sha256=collector_sha256,
+                construction_pad_reads=construction_pad_reads,
+                last_construction_pad_read=last_construction_pad_read)
+            write_calibration(BOOTSTRAP_OUTPUT_PATH, record)
+        except BootstrapCalibrationError as error:
+            raise RuntimeError(str(error)) from error
+        active = False
+        print('Input bootstrap calibration captured:', BOOTSTRAP_OUTPUT_PATH)
+        # The normal GDB script's final ``continue`` stops here. Its next
+        # command is ``quit``, so calibration retains the exact normal
+        # neutral/press/release setup without running an unbounded session.
+        return True
     ready = True
 
 
@@ -465,12 +629,23 @@ class Arm(gdb.Command):
 
     def invoke(self, args, from_tty):
         global OUTPUT, LIMIT, frame_index, active, ready, published_inputs
-        global pad_bootstrapped, pad_sample_index
+        global pad_bootstrapped, pad_sample_index, construction_pad_reads
+        global last_construction_pad_read, bootstrap_applied
+        global bootstrap_calibration, bootstrap_calibration_sha256
+        global collector_sha256, run_provenance
         values = gdb.string_to_argv(args)
         if len(values) != 2:
             raise gdb.GdbError("retail-replay-arm OUTPUT_PATH FRAME_COUNT")
         if any(bp.is_valid() for bp in breakpoints):
             raise gdb.GdbError("Collector already armed; use a new GDB session")
+        if BOOTSTRAP_MODE not in ("default", "calibrate", "apply"):
+            raise gdb.GdbError("Unsupported input bootstrap mode")
+        if BOOTSTRAP_MODE == "calibrate" and (input_plan is None or
+                                                BOOTSTRAP_OUTPUT_PATH is None):
+            raise gdb.GdbError("Calibration requires an input plan and output path")
+        if BOOTSTRAP_MODE == "apply" and (input_plan is None or
+                                             BOOTSTRAP_CALIBRATION_PATH is None):
+            raise gdb.GdbError("Calibrated input requires an input plan and calibration path")
         OUTPUT = Path(values[0]).resolve()
         LIMIT = int(values[1])
         if not 1 <= LIMIT <= 36000 or OUTPUT.exists():
@@ -486,8 +661,10 @@ class Arm(gdb.Command):
             raise gdb.GdbError('Capture must consume the entire declared input plan')
         OUTPUT.parent.mkdir(parents=True, exist_ok=True)
         provenance = json.loads((ROOT / "provenance.json").read_text())
+        run_provenance = dict(provenance)
         if input_plan is not None:
             provenance['input_plan_sha256'] = input_plan_sha256
+            run_provenance['input_plan_sha256'] = input_plan_sha256
         if (provenance.get("dol_sha1") != "08e0bf20134dfcb260699671004527b2d6bb1a45"
                 or provenance.get("dolphin_commit") != "c77bbaa0f372c3f72281602a8b087206706542cb"
                 or provenance.get("cpu") not in ("Interpreter64", "JITARM64")
@@ -498,6 +675,9 @@ class Arm(gdb.Command):
         published_inputs = 0
         pad_bootstrapped = False
         pad_sample_index = None
+        construction_pad_reads = 0
+        last_construction_pad_read = None
+        bootstrap_applied = False
         active = False
         ready = False
         fighters.clear()
@@ -505,7 +685,27 @@ class Arm(gdb.Command):
         collector_sha256 = hashlib.sha256(
             COLLECTOR.read_bytes() + b"\0" +
             COLLECTOR.with_name("reference_replay_boundary.py").read_bytes() + b"\0" +
-            COLLECTOR.with_name("retail_input_plan.py").read_bytes()).hexdigest()
+            COLLECTOR.with_name("retail_input_plan.py").read_bytes() + b"\0" +
+            COLLECTOR.with_name("retail_input_bootstrap.py").read_bytes()).hexdigest()
+        bootstrap_calibration = None
+        bootstrap_calibration_sha256 = None
+        if BOOTSTRAP_MODE in ("calibrate", "apply"):
+            if BOOTSTRAP_RUNTIME_PATH is None:
+                raise gdb.GdbError("Two-pass input bootstrap requires a runtime binding sidecar")
+            try:
+                runtime_binding, _ = load_runtime_binding(BOOTSTRAP_RUNTIME_PATH)
+            except (OSError, BootstrapCalibrationError) as error:
+                raise gdb.GdbError(str(error)) from error
+            run_provenance.update(runtime_binding)
+        if BOOTSTRAP_MODE == "apply":
+            try:
+                bootstrap_calibration, bootstrap_calibration_sha256 = load_calibration(
+                    BOOTSTRAP_CALIBRATION_PATH, plan=input_plan,
+                    plan_sha256=input_plan_sha256,
+                    runtime=bootstrap_calibration_runtime(),
+                    collector_sha256=collector_sha256)
+            except (OSError, BootstrapCalibrationError) as error:
+                raise gdb.GdbError(str(error)) from error
         if UNTIL_MATCH_END:
             emit({"record": "header", "schema": "melee-web-retail-match-discovery",
                   "version": 1, "capture_id": uuid.uuid4().hex,
@@ -548,6 +748,9 @@ class Arm(gdb.Command):
         if (word(0x8034DD8C) != 0x7EC3B378 or
                 word(0x8034DD90) != 0x4BFF95FD):
             raise gdb.GdbError("Pinned PADRead pre-restore instructions do not match")
+        if (word(VI_GET_RETRACE_COUNT) != VI_GET_RETRACE_COUNT_WORDS[0] or
+                word(VI_GET_RETRACE_COUNT + 4) != VI_GET_RETRACE_COUNT_WORDS[1]):
+            raise gdb.GdbError("Pinned VIGetRetraceCount instructions do not match")
         Observer(0x8034DD8C, pad_read_before_interrupt_restore)
         Observer(0x80390EB4, scheduler_return)
         if word(0x801A4B70) != 0x4E800020:

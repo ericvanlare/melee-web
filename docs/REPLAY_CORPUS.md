@@ -146,6 +146,17 @@ normal captures with `--draw-audit --require-match-complete`. A cap-exhausted
 run returns failure and retains its diagnostic artifact. Fixed v2 captures and
 MWRC remain unchanged, and their loaders reject discovery artifacts.
 
+For construction-PAD timing, use the runner's two-pass bootstrap CLI: run a
+full-plan capture with `--input-bootstrap-calibrate`, then run the same fixed
+plan and pinned setup with `--input-bootstrap PATH`. The sidecar binds the
+source/plan hashes, setup snapshot and external GC state, runtime configuration
+and collector identity; the resulting capture must still pass the v2 semantic PAD
+configuration/history comparison at entry, initial state and every scheduler
+observation. This is reusable input/bootstrap calibration evidence, separate
+from gameplay equivalence or source-completion evidence. A preflight may report
+the construction `PADRead` count, but that does not validate a production
+bootstrap until both passes and their bindings have been checked.
+
 Measure the resulting reference captures with their exact prefix plans:
 
 ```sh
@@ -565,7 +576,7 @@ records 76 complete source identities. The pinned decoder and installed
 16 exact human P1/P2 sources passed complete parsing and explicit
 `dolphin-pipe-processed-v2` export. Selection used headers, stage/matchup,
 ports, normal Game End and pre-frame intent only. No runtime or reference
-execution has occurred, and `gold_admitted` remains false.
+execution had occurred at reservation, and `gold_admitted` remains false.
 
 | Role | Complete donor SHA-256 | Stage / matchup |
 | --- | --- | --- |
@@ -587,3 +598,204 @@ trigger bytes. This is a derived input workload, not recovered hardware input
 or UCF-state equivalence. The plans retain donor identity and inputs but do not
 transplant donor fighter positions; initial retail spawn setup remains a
 separate validation boundary.
+
+### Timed-cohort preparation in progress
+
+The frozen development execution plan is
+`work/ucf-off-cohort/development-execution-plan-v3.json`, SHA-256
+`4d6d25ea2f57bcf2c1625dc7602306fd26a140b2c43165750a9eb6dc5b6407e2`.
+It binds the existing source/input hashes and each exact stage, character,
+costume, stock count, timer, pause, item and rumble setting. All eight development
+headers have an eight-minute countdown; the original menu defaults cannot be
+substituted. The independently checked setup inventory is
+`work/ucf-off-cohort/development-setup-audit.json`, SHA-256
+`f277c36c7079849a4c70e5893fc99ec4b2f229f042fa83204a15d71e479a9d75`.
+The historical reservation manifest remains unchanged and both holdouts remain
+unexecuted.
+
+The timer candidate's first untimed regression matches all declared fields
+through 3,122 ticks with visible source drawing. Its local comparison is
+`work/ucf-off-cohort/baseline-bf-browser-comparison.json`; rendered trace SHA-256
+is `af184be8e15b061cf60930a8176373f36af5b091a2f68a17150df608edb16414`.
+The native timer lifecycle also passes countdown, pause/resume, timeout and a
+second construction. The first timed comparison and isolated cold/warm result
+are recorded below; the remaining development cohort is still pending.
+
+Before executing a named development workload, bind its complete retail
+capture to the frozen setup and exact input-prefix identity:
+
+```sh
+python3 scripts/check_retail_setup.py \
+  --plan work/ucf-off-cohort/development-execution-plan-v3.json \
+  --name ucf-dev-323d7ff1 --capture /path/to/complete-retail-capture.jsonl \
+  --repo-root . --cpu JITARM64
+```
+
+The gate checks the full donor source/input-plan hashes, the exact consumed
+prefix and its capture hash, and the declared donor `StartMeleeData` fields
+before any runtime result is considered. It also rejects unsupported ordinary-VS
+profile flags, camera scale and callback pointers; this is not a claim that the
+manifest freezes every opaque setup byte.
+
+### First bounded UCF-off development donor
+
+The first executed development donor is
+`323d7ff17991fd5c47f7584531b5e50128132e0543e659d13ca0696ef5986f23`
+(`Battlefield / Fox-Falco`). Its frozen plan consumed exactly 5,772 ticks. The
+raw fixed captures and prototype joins are retained in
+`work/ucf-off-cohort/ucf-dev-323d7ff1/`: `prototype-fixed-a.jsonl`,
+`prototype-fixed-b.jsonl`, `prototype-browser-comparison.json` and
+`prototype-timer-comparison.json`. The prototype joins report exact declared
+state/PAD/RNG/match-clock and timer agreement for all 5,772 ticks. The
+production two-pass bootstrap is now separately validated: `production-a.jsonl`
+(SHA-256 `0a5c222379d1bbe577bd512fb4d5f0ce20b126a260e429805675dd898cc5e05a`)
+matches that entire repeated trajectory, its exact setup gate passes, and its
+timer sidecar is byte-identical to both references. `bootstrap-v4.json` binds the
+20 construction PAD reads, complete input plan and canonical runtime profile;
+only the verified run-owned debugger socket token is excluded from that profile.
+`production-collector-calibration.json` and `production-setup-gate.json` retain
+these separate checks.
+
+The donor ends at its last KO (P1 stocks 0, P2 stocks 3), while the original
+source ending was not observed before the available plan ended. Its discovery
+record is therefore `cap_exhausted` with `complete_match: false`, no exit or
+match-end observation, and no full-match or gold admission. The preflight
+construction count was 20. The current protocol does not extend a frozen donor
+with neutral PAD vectors, rewrite its end record, or synthesize source ending
+evidence; the bounded result remains a workload observation.
+
+The initial timed-stock candidate passes the independent state/timer/cold/warm join in
+`work/ucf-off-cohort/ucf-dev-323d7ff1/browser-seed473-final.json`. The final
+source-drawn state and timer traces are byte-identical to the pre-seed traces.
+Both 5,772-tick performance runs have zero callbacks over 33.3 ms, live pipeline
+creation, timing resumes, browser long tasks, heap growth and audio queue faults.
+The source-derived coverage report (`coverage.json` beside the captures) records
+81 damage increases, five stock losses, four respawns, and execution of all four
+special families. Its 589 observed feature labels are total coverage for this
+workload, not a claim of 589 additions to the previous corpus.
+
+| Profile | Worst native callback | Worst browser interval | Match preparation |
+| --- | ---: | ---: | ---: |
+| Cleared application origin | 15.920 ms | 25.885 ms | 201.800 ms |
+| Full application warm reload | 11.870 ms | 26.150 ms | 201.330 ms |
+
+Configuration: Apple M4, macOS 26.6.2, visible Chromium 152, 640×480 framebuffer,
+DPR 2, battery power with low-power mode off. Driver caches were uncontrolled.
+There were no concurrent tests, builds or Dolphin captures during timing runs.
+That build profile is `work/ucf-off-cohort/browser-profile-timer-seed473.json`;
+Wasm SHA-256 is
+`a1c1e7c8e8dab852914c32bb423ab381cfe8678088a71aa83386f9795cb60693`.
+
+The workload discovered three live pipeline descriptors and one preparation
+descriptor. The append-only review in `work/ucf-off-cohort/timed-pipeline-merge.json`
+preserves every prior row and adds four portable descriptors, bringing the seed
+to 473 pipelines plus its existing shader record. Database SHA-256:
+`197d7d9eb58d60e3eaba40f4b1742bd730eda1956c8bcc43a2c119a4871fbb39`.
+The renderer seed changed; the game simulation did not. This remains a
+development candidate and is not the reserved holdout build freeze.
+
+
+### Timed Marth/Yoshi’s and Fox/Final Destination development
+
+The next two reserved development donors preserve their exact eight-minute
+stock setup, costumes, pause and rumble policy. Their input plans are unchanged
+prefixes of the frozen donors, ending when the original source ends the match:
+Marth/Marth on Yoshi’s Story consumes 6,525 of 11,209 available ticks, and Fox/Fox
+on Final Destination consumes 7,481 of 10,965. Each has independently repeated
+original captures, the original ending/final draw, and a passing exact setup gate.
+These are original vanilla trajectories driven by derived SLP input, not a claim
+that processed SLP samples recover the original raw controller stream.
+
+The Marth trajectory exposed three shared numerical boundaries: paired-single
+matrix/vector lane order at tick 644, Dolphin Slash velocity rotation at tick
+1,971, and linear spline interpolation feeding Randall at tick 5,918. Read-only
+original scalar probes and the pinned DOL instruction order identified the
+rounding differences. The port now preserves those fused-operation boundaries.
+Original moving-platform vertex/bounds and segment-remap fused operations were
+also restored after instruction verification; those changes alone did not close
+the observed reds. No state field or tolerance was changed. The final headless and source-drawn
+Marth traces match both original captures through all 6,525 ticks. The Fox
+source-drawn trace also matches all 7,481 ticks; its retained headless damage/RNG
+red at tick 6,245 is absent with original drawing, consistent with the existing
+magnifier dependency. Both timer sidecars match exactly. Performance results
+for the final candidate are recorded separately below.
+
+Evidence is under `work/ucf-off-cohort/ucf-dev-4683290e/` (`retail-a.jsonl`,
+`retail-b.jsonl`, `paired.mwrc`, `headless-spline-comparison.json`) and
+`work/ucf-off-cohort/ucf-dev-59cee05b/` (`canonical-retail-a.jsonl`,
+`canonical-retail-b.jsonl`, `canonical-repeatability.json`,
+`canonical-setup-gate.json`, `paired-canonical.mwrc`). The initial Fox pair used
+noncanonical JSON whitespace for its prefix and was rejected by the setup hash
+gate. It remains diagnostic evidence; the canonical pair was independently
+recaptured. Serialize a prefix with sorted keys, compact separators and one final
+newline, and validate that exact identity before launching a capture.
+
+The remaining five development donors and both fresh holdouts are unexecuted.
+The candidate is not frozen, and there is no new gold or content admission.
+
+
+The final candidate's 510-test suite passes (`full-suite-final-math.log`,
+SHA-256 `23cd2f2d59c42fc8f42c838df1bd5ab9c506d37873b642397abfbd4471227c66`).
+The rebuilt timer and admitted-content lifecycle targets are exercised by that
+suite. Shared matrix/vector tests use nine original scalar vectors, verify both
+SDK aliases and in-place operation, and retain the old-order failing control.
+The spline test reads the owned ignored `GrSt.dat`, verifies its hash and actual
+descriptor, then checks nine original samples through the compiled source; the
+unfused control fails. No extracted stage asset table is stored in the tests.
+
+
+The current numerical candidate also passes all ten previously executed games
+with original source drawing: 31,042 exact ticks, including the known
+magnifier-dependent case. `work/ucf-off-cohort/final-prior-visible-regression.json`
+(SHA-256 `3ddf74a4111f6cc86625f1411e4d9cee333ebd04064903e76cfd81b1c4e41c3b`)
+binds every trace/report. All ten consecutive teardowns retained Wasm capacity
+334,102,528 bytes. This regression is state evidence; its instrumented timing
+must not be substituted for isolated performance runs. The two new reserved
+holdouts remain unexecuted.
+
+
+### Final timed-cohort candidate performance gate
+
+The same final build passes the independent state/timer and cold/warm joins for
+all three executed donors. The two complete original endings are also joined for
+Marth/Yoshi’s and Fox/Final Destination; Battlefield remains the explicitly bounded
+5,772-tick recording. All six isolated performance runs pass with zero callbacks
+over 33.3 ms, browser long tasks, timing resumes, live pipeline creation, live
+heap growth, preparation pauses and audio queue faults. No tests, builds,
+Dolphin captures or state observers ran during timing measurement.
+
+| Donor / stage | Ticks per run | Worst native cold / warm | Worst browser cold / warm | Preparation cold / warm |
+| --- | ---: | ---: | ---: | ---: |
+| Fox/Falco / Battlefield | 5,772 | 13.495 / 15.535 ms | 23.820 / 23.580 ms | 202.575 / 201.155 ms |
+| Marth/Marth / Yoshi’s Story | 6,525 | 16.710 / 23.755 ms | 25.560 / 27.205 ms | 186.120 / 188.030 ms |
+| Fox/Fox / Final Destination | 7,481 | 10.130 / 12.815 ms | 21.470 / 23.920 ms | 167.885 / 166.245 ms |
+
+This adds 19,778 exact visible timed ticks and 39,556 performance ticks on the
+named configuration. With the prior visible regression, this candidate has
+50,820 exact source-drawn ticks across twelve complete games and one bounded
+recording. It does not retroactively revalidate the prior build’s twenty timing
+runs. The current six timing runs use the same Apple M4 / macOS 26.6.2 / visible
+Chromium 152 / 640×480 / DPR 2 configuration, battery power and low-power mode
+off. Each cold run clears the application origin’s render cache; each warm run
+recreates the entire application heap. Driver caches remain uncontrolled.
+
+The final profile is `work/ucf-off-cohort/browser-profile-timed-math-final.json`.
+Wasm SHA-256: `f24f54078a03e9ace694d77ac2c1c9e3f6b7c03d2d7dfb095858cb9d54e25aab`.
+The reviewed 473-pipeline seed is unchanged by the numerical corrections.
+The complete machine-readable ledger is
+`work/ucf-off-cohort/final-validation-ledger.json`, SHA-256
+`279fa2df556939062b0258777945437d1a7ff8f229003c230e89f316b7e9df0e`. Individual joins are in
+`work/ucf-off-cohort/final-browser/`:
+
+| Join | SHA-256 |
+| --- | --- |
+| `bf-joined.json` | `47350f70bedb6c7d166c55e75bd0c27c00c3fb036e2d631ad35adcf83c1c7af3` |
+| `marth-joined.json` | `0fd0b7a9c47eeaaa01d7abab8c4b0226472fc4d1ece50415ea63dfae6d80ca83` |
+| `fox-joined.json` | `89b0a40cc152248fbecf185a5a4357fe2812343fdf003f6b33202487d9e4193b` |
+
+All original capture processes exited, and the owned test browser tab and port
+8791 evidence server were closed after validation. Other existing servers were
+left alone. Next: execute the remaining five reserved development donors,
+resolve their observed gaps, then freeze the candidate before opening the two
+fresh holdouts. Broad gold, pixel/PCM, physical-input and content admission
+remain open.

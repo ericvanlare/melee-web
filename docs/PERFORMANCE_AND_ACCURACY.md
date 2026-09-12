@@ -68,6 +68,26 @@ then use the same rules, players, costumes, stage, RNG, inputs and source tick.
 The comparator must report the first divergent tick and field rather than widen
 a tolerance or remove a field.
 
+Preserve each donor's supported setup as well as its inputs: timer, pause policy,
+costumes, controller ports and rumble flags can change the source execution.
+Reject an unsupported setup instead of silently substituting the current menu
+defaults. Timed stock workloads require the separate exact timer-sidecar gate
+alongside fighter-state comparison. Reserve source hashes before execution and
+keep holdouts untouched while implementing newly exposed shared behavior.
+
+The setup gate compares the donor-declared fields and separately rejects
+unsupported ordinary-VS profile values: missing VS mode, timer hours or a custom
+initial subframe, nonstandard camera scale, friendly fire and callback pointers.
+It does not claim to have frozen every opaque `StartMeleeData` byte. Keep the raw
+setup in paired reference/port comparison, and validate the exact canonical
+input-prefix bytes before starting a long capture.
+
+Treat a recording's end separately from the source match ending. A legacy SLP
+can stop on the final KO before the original manager starts its ending; retain
+the bounded state/performance result and missing completion evidence explicitly.
+Do not pad a frozen donor plan to make its completion gate pass. Any separate
+ending-continuation experiment needs its own named policy and evidence.
+
 Require source-drawn comparison before admitting a replay workload. Headless
 traces omit camera callbacks that can affect later gameplay: the original
 magnifier sets an offscreen flag used by fighter damage. A draw audit that
@@ -93,6 +113,15 @@ SDK quaternion-matrix conversion. Its paired-single sums and reciprocal estimate
 must retain the original order; algebraically equivalent C expressions can
 change rounding and signed zeros. Keep a few observed scalar cases in fast
 tests, with the complete original captures in the evidence ledger.
+
+Audit SDK aliases at the shared boundary as coverage grows. The timed Marth
+donor exposed a different addition order in the portable `MTXMultVec` fallback:
+Randall's local animation was exact, but its final joint translation and floor
+vertices were not. The gameplay alias now uses the original paired-single
+operation order, with nine captured scalar cases and the old C order as a
+failing control. An SDK function with the same signature is not automatically
+numerically equivalent. Preserve explicit C callers, verify the actual retail
+call target, and rerun the full affected trajectories after a shared correction.
 
 Rendering, emitted PCM, physical input and end-to-end latency need independent
 reference evidence. Matching gameplay state alone does not close those gates.
