@@ -77,6 +77,15 @@ The snapshot must be an ordinary SSS checkpoint paired with its external GC
 state, after any memory-card prompts have been resolved. A savestate alone does
 not identify the whole input state.
 
+Prepare new checkpoints through the original rules, rumble, CSS and SSS menus,
+then validate the actual match-entry bytes against the frozen donor setup.
+Availability is a separate prerequisite: check each stage's unlock mapping in
+the pinned source and executable before steering SSS. Dream Land uses unlock
+bit 8 (`lbl_803B790C` row 8: `08 1c 13`); the Battlefield/Final Destination
+unlock bits do not unlock it. Retain a failed setup attempt, correct only the
+verified availability step, and save a fresh checkpoint with its external GC
+state. Preliminary CSS stock/rumble bytes are not the match-entry setup gate.
+
 `Interpreter64` is the strict default and the backend used for the immutable
 reference pair. `JITARM64` is an explicit ARM64 opt-in; it is not silently
 substituted for the interpreter. Calibrate a changed collector against the
@@ -509,9 +518,10 @@ recipe decoder, typed original setup, PAD initialization and diagnostic observer
 The browser constructs a fresh source match through its existing deferred owner,
 waits for ordinary audio acknowledgement/resource preparation, and feeds one
 recipe sample to each source tick in the normal render/audio loop. It requires
-a successful source draw in every callback that consumes replay input, plus the
-final input, final draw and successful teardown before completion. Normal
-scheduling can group ticks in a callback; this is not a one-draw-per-tick claim.
+a successful source draw after each consumed tick and before the next tick,
+plus the final input, final draw and successful teardown before completion.
+Normal scheduling can group ticks in a callback; every grouped tick retains
+its original source traversal. Zero-tick callbacks retain the previous image.
 Startup is locked before asynchronous work, and failed teardown rejects entry.
 Diagnostic raw input cannot override the timeline. Source pause/early exit beyond
 this bounded profile fails explicitly; seeking and replaying the original Slippi
@@ -593,6 +603,19 @@ Review the schema, descriptor version/size and added rows against the previous
 seed; preserve all prior descriptor payloads. Materialize only those portable
 rows into the reviewed seed, update its digest/inventory test, rebuild Release,
 and repeat the cold/warm runs. Discovery is never a timing pass.
+
+Every v2 fixed-reference run, including state capture, requires a fresh application
+instance and one disc import before entering menus. That import performs the
+normal, single unentered menu-resource preparation; it is part of the validated
+startup path, not a claim that no allocator has run. Use **Reload application state**
+between recipes. The native replay entry rejects reuse after a replay, menu entry,
+or repeated menu preparation; ordinary gameplay remains available. V2 stores
+setup, PAD history and RNG, but not prior heap contents. Yoshi's Story's original
+Shy Guy callback reads an uncleared previous-pattern byte, so a source-faithful
+consecutive game can legitimately consume a different RNG sequence from a
+fresh-process reference. Do not normalize that byte or treat arbitrary heap
+histories as identical initial conditions. A future replay schema needs explicit,
+independently captured initial stage context before widening that claim.
 
 For the timing pair, use **Clear render cache + reload**, reload the local disc,
 choose the same recipe and run **Performance** with the tab visible and no build,

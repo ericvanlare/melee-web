@@ -23,6 +23,7 @@ int action_test_jab_operands(void);
 int action_test_dobj_operands(void);
 int action_test_common_operands(void);
 int action_test_falco_operands(void);
+int action_test_wind_operands(void);
 }
 namespace {
 Bytes read_file(const char* path)
@@ -87,6 +88,7 @@ int main(int argc, char** argv)
         check(action_test_dobj_operands(),"Native DObj visibility command operands and admission");
         check(action_test_common_operands(),"Common attack operands and original finite-loop execution");
         check(action_test_falco_operands(),"Falco special opcode schemas retain source fields and canonical words");
+        check(action_test_wind_operands(),"Marth wind command decodes source fields and reaches ftCo_8009E714");
         FighterFixture fixture;
         put32(fixture.data, fixture.command_a, 0xd0000003); fixture.unlink(fixture.command_a + 4);
         put32(fixture.data, fixture.command_b, 0);

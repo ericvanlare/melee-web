@@ -11,6 +11,7 @@
 #include "dat_material_animation.hpp"
 #include "dat_stage.hpp"
 #include "dat_native_stage.hpp"
+#include "dat_scene.hpp"
 #include "gameplay_stage_last.h"
 #include "gameplay_stage_visual.h"
 #include "gameplay_effect_runtime.h"
@@ -109,6 +110,7 @@ struct GameplayWorld::Storage {
     std::unique_ptr<DatNativeAnimation> respawn_animation;
     MeleeWebStageVisual* stage_visual=nullptr;
     std::unique_ptr<DatNativeStage> full_stage;
+    std::unique_ptr<DatScene> quake_model;
     std::unique_ptr<DatEffectBanks> stage_effects;
     MeleeWebStageMap* stage_map=nullptr;
     MeleeWebStageLast* stage_last=nullptr;
@@ -220,6 +222,20 @@ struct GameplayWorld::Storage {
         check(melee_web_stage_lights_attach(lights,error,sizeof(error)),error);
         previous_ground=melee_web_ground_data_publish(ground);ground_published=true;
         numeric=melee_web_stage_numeric_begin_kind(markers,stage->stage_kind,error,sizeof(error));check(numeric!=nullptr,error);
+        // grDatFiles_801C6038 publishes this shared stage dependency before any
+        // hit can request grLib_801C9CEC. Reuse checked native scene animation
+        // descriptors; the original quake GObj owns animation and camera input.
+        const auto& stage_archive=*archive(stage->archive);
+        const auto quake_root=symbol(stage_archive,"quake_model_set");
+        const auto quake_anims=stage_archive.pointer(quake_root+4,20);
+        if(!quake_anims)throw DatError("Stage quake animation table is missing");
+        for(unsigned i=0;i<4;i++)
+            if(!stage_archive.pointer(*quake_anims+i*4,20))
+                throw DatError("Stage quake requires four authored animations");
+        if(stage_archive.pointer(*quake_anims+16,4))
+            throw DatError("Stage quake animation table exceeds its source variants");
+        quake_model=std::make_unique<DatScene>(archive(stage->archive),"quake_model_set",DatSceneRootKind::DynamicModel);
+        check(melee_web_stage_numeric_set_quake(numeric,quake_model->single_model(),error,sizeof(error)),error);
         collision=load_collision(collision_data,stage->ground_kind,read_dat_stage_scale(*archive(stage->archive)));
         floor_start=collision_data.line_ranges[0].start;
         check(melee_web_common_context_initialize_fighters(common,error,sizeof(error)),error);
@@ -326,6 +342,7 @@ struct GameplayWorld::Storage {
         stage_last=melee_web_stage_begin_kind(stage->stage_kind,full_stage->yakumono(),stage_effects->bank(),defer_start,error,sizeof(error));check(stage_last!=nullptr,error);
     }
     void end_stage(){
+        if(numeric)check(melee_web_stage_numeric_clear_quakes(numeric,error,sizeof(error)),error);
         if(stage_last){check(melee_web_stage_last_end(stage_last,error,sizeof(error)),error);stage_last=nullptr;}
         if(stage_visual){check(melee_web_stage_visual_end(stage_visual,error,sizeof(error)),error);stage_visual=nullptr;}
     }
@@ -361,6 +378,7 @@ struct GameplayWorld::Storage {
         fighters.clear();
         if(collision){check(melee_web_collision_destroy(collision,error,sizeof(error)),error);collision=nullptr;}
         if(numeric){check(melee_web_stage_numeric_end(numeric,error,sizeof(error)),error);numeric=nullptr;}
+        quake_model.reset();
         if(common){check(melee_web_common_context_destroy(common,error,sizeof(error)),error);common=nullptr;}
         if(root16_native){check(melee_web_native_joint_destroy(root16_native,error,sizeof(error)),error);root16_native=nullptr;}
         if(respawn_native){check(melee_web_native_joint_destroy(respawn_native,error,sizeof(error)),error);respawn_native=nullptr;}

@@ -88,6 +88,16 @@ the bounded state/performance result and missing completion evidence explicitly.
 Do not pad a frozen donor plan to make its completion gate pass. Any separate
 ending-continuation experiment needs its own named policy and evidence.
 
+Match initial hidden state as well as the declared setup. Original code sometimes
+reads uncleared heap bytes: Yoshi's Story's previous Shy Guy pattern changes a
+rejection-sampling branch. A fresh-process reference cannot establish equivalence
+for an arbitrary preceding match history. Keep v2 fixed-reference runs on fresh
+application heaps, preserve the counterexample, and expand the captured initial
+context before claiming repeat-history equivalence. Never zero an original field
+or skip RNG calls merely to align a replay. An incomplete capture remains invalid;
+a structurally validated prefix may report the first divergence only as diagnostic
+evidence, without shortening the reference or admitting the run.
+
 Require source-drawn comparison before admitting a replay workload. Headless
 traces omit camera callbacks that can affect later gameplay: the original
 magnifier sets an offscreen flag used by fighter damage. A draw audit that
@@ -95,6 +105,19 @@ preserves the currently declared fields does not prove independence from all
 hidden render state. Keep a headless red visible, identify the source dependency
 and validate it in the real drawn path; do not fake the missing flag or waive
 the affected damage/RNG fields. See the [corpus example](REPLAY_CORPUS.md).
+
+Preserve that dependency within browser scheduling too. A callback can contain
+zero or multiple source ticks; an equal total of callbacks and ticks does not
+prove their ordering. The older Battlefield regression exposed an intermittent
+offscreen-damage red when a critical tick had no intervening source draw. The
+native frame sequence now flushes each consumed tick's source traversal before
+the next tick, and flushes the final tick before completion. Zero-tick callbacks
+retain the previous image; explicit resource preparation is the separate frozen
+draw path. Replay reports reject unequal input, source-step and source-draw
+counts. Test grouped and zero-tick schedules as well as complete real replays,
+and aggregate all GPU phases and transfers in a callback instead of reporting
+only its final draw. This does not recover missing historical controller samples
+or close the separate input/cadence and PCM acceptance gates.
 
 When a replay exposes hidden state, compare the original owner construction and
 its first consumers as well as the visible formula. The expanded corpus found
@@ -104,6 +127,18 @@ its source lifetime boundary, verify teardown and repeated construction, and
 retain the complete failing replay. A locally plausible numerical change is
 not a fix unless the actual failing operands reach it and the reference
 comparison changes as predicted.
+
+Audit any recovered code that treats separate globals as one aggregate. The
+Marth/Falco Yoshi's Story investigation found camera translation reading past a
+callback table to reach an assumed adjacent camera descriptor. It also found
+the stage quake model was never published, so the original shake routines
+had no authored animation to consume. Both dependencies must be restored. Those addresses
+are adjacent in the retail DOL, but independent C globals have no such portable
+layout guarantee. Use the actual named object, preserve the original arithmetic,
+and test it with independently stored tables. Compare the final source consumer
+as well: a camera translation error delayed offscreen damage and RNG consumption
+without initially changing fighter positions. Do not tune the projection or
+damage threshold to compensate for a bad data address.
 
 For a numerical red, compare operand bits before changing the consumer. Capture
 the original producer's input/output boundary, keep the unfused or prior path
@@ -164,9 +199,52 @@ The current hard browser gate for a declared gameplay scenario is:
 The optimization target is a worst active native callback at or below the
 16.67 ms source-frame budget on the named reference machine. A 16.67–33.3 ms
 callback is recorded and investigated even when it does not fail the current
-hitch gate. Scene preparation has a separate cold/warm distribution; report its
+hitch gate. Replay reports retain the count above this target and one worst
+native callback with its phase durations; a new over-budget maximum also records
+the source diagnostics. This bounded record survives later fast frames without
+collecting a per-frame state trace during performance runs. Scene preparation
+has a separate cold/warm distribution; report its
 wall time and per-phase maximum and reject regressions rather than hiding it in
 the active-frame average.
+
+Keep browser-gap evidence independently of native CPU maxima: the slowest native
+callback need not be the one with the largest browser interval. Retain bounded
+phase snapshots in the saved report, because a scrolling log can wrap during a
+complete game. Diagnostic text is a display, not an input or simulation clock;
+refresh it at the existing 250 ms UI cadence while measuring every callback.
+Open diagnostics must not format and lay out full controller/state strings at
+60 Hz. A UI optimization does not establish the cause of an earlier gap unless
+the retained evidence supports that attribution; rerun the failed workload and
+keep its original red report.
+
+When frame finalization spikes, retain its upload, FIFO/texture, graphics finish,
+surface encoding, command finish, queue submission, completion observer and
+cleanup timings. Include outer preparation, packet bookkeeping, callback and
+worker totals plus their residuals, so object destruction and unmeasured work
+cannot disappear between named phases. These are nested CPU wall-time intervals;
+do not add parent totals to their children or describe them as GPU execution
+time. Measurements outside the inline browser worker must not publish into
+native threaded-worker statistics. An instrumented passing retry is evidence
+about that run, not a fix for an unexplained intermittent red.
+
+Profile persistent CPU costs as well as first-use stalls. The reserved-five
+replay batch exposed a vertex-array bounds adapter that scanned every registered
+mesh for each polygon, plus generation checks that unnecessarily traversed the
+entire SDK heap. These costs grow with content even when shaders and assets are
+already resident. Keep validated array metadata in an index keyed by attribute,
+address and stride, with exact live-owner alias bounds and removal semantics.
+Keep cheap ownership queries separate from explicit heap audits. Neither change
+permits unregistered arrays, stale owners, skipped draws or altered source math.
+Use a profiler only for diagnosis, then close it before isolated acceptance runs.
+Retain the original failing replay and verify the changed metadata/lifetime
+boundary before comparing its complete visible replay again.
+
+Use the production Emscripten profile for Release timing and retain a separate
+checked build. The menu player and gameplay probe use `ASSERTIONS=0, SAFE_HEAP=0`
+in Release and `ASSERTIONS=2, SAFE_HEAP=1` in checked builds. Explicit runtime
+admission checks and unsupported-service failures remain enabled in both. A
+build-profile change alone is not a performance fix; the repeated replay hitch
+persisted after this correction and required the CPU investigation above.
 
 ## Foundation already in place
 
@@ -218,6 +296,13 @@ open gate; later evidence cannot erase it.
    from accuracy comparison. Use measured execution coverage to select canaries
    and a held-out admission set; process the broader corpus on scheduled runs.
    Keep `web/action-sweep.mjs` for smoke tests and focused reproducers.
+   Include interaction-triggered branches: entering Marth's Counter stance does
+   not exercise its retaliation. The UCF-off corpus reached the retaliation's
+   wind command (58), whose decoder and original services were present but whose
+   runtime admission was missing. Inventory reachable command roots, including
+   call/jump targets, against runtime capabilities; decoding a command alone
+   does not establish support. Verify its original consumer and dependencies,
+   then rerun the complete interaction in the drawn port.
 4. **Compare retail semantics.** Require repeatability of the independent pinned
    vanilla reference before interpreting a port mismatch. Use complete declared
    initialization, actual consumed inputs and matching source phases. UCF `.slp`

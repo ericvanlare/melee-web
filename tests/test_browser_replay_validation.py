@@ -57,6 +57,21 @@ class BrowserReplayValidationTests(unittest.TestCase):
         self.assertIs(self.check(value), value)
         self.assertFalse(value['gold_admitted'])
 
+    def test_source_tick_draw_counts_must_agree_when_reported(self):
+        value = report()
+        value['metrics'].update(sourceSteps=686, sourceDraws=686)
+        self.assertIs(self.check(value), value)
+        for key in ('sourceSteps', 'sourceDraws'):
+            for replacement in (None, 685, 687, True):
+                with self.subTest(key=key, replacement=replacement):
+                    candidate = copy.deepcopy(value)
+                    if replacement is None:
+                        del candidate['metrics'][key]
+                    else:
+                        candidate['metrics'][key] = replacement
+                    with self.assertRaisesRegex(ValueError, 'Source tick/draw'):
+                        self.check(candidate)
+
     def test_every_missing_or_nonzero_hard_counter_rejects_even_with_pass_true(self):
         for key in ZERO_GATES:
             for replacement in (None, 1, False):

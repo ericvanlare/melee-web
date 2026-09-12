@@ -119,24 +119,80 @@ index e1feaca..5051b3e 100644
      target_compile_definitions(imgui_backends PRIVATE IMGUI_IMPL_WEBGPU_BACKEND_DAWN)
      target_link_libraries(imgui_backends PRIVATE imgui ${AURORA_SDL3_TARGET} dawn::webgpu_dawn)
      target_link_libraries(imgui PUBLIC imgui_backends)
+diff --git a/include/aurora/gfx.h b/include/aurora/gfx.h
+index 94504b1..a36e7c3 100644
+--- a/include/aurora/gfx.h
++++ b/include/aurora/gfx.h
+@@ -26,6 +26,26 @@ typedef struct {
+   uint32_t lastIndexSize;
+   uint32_t lastStorageSize;
+   uint32_t lastTextureUploadSize;
++  uint64_t lastEndFrameId;
++  double lastEndFrameFifoTextureMs;
++  double lastEndFrameGfxFinishMs;
++  double lastEndFrameStagingWritesMs;
++  double lastEndFrameSurfaceEncodeMs;
++  double lastEndFrameEncoderFinishMs;
++  double lastEndFrameQueueSubmitMs;
++  double lastEndFrameCleanupMs;
++  double lastEndFrameOuterPrepMs;
++  double lastEndFrameRecordMs;
++  double lastEndFramePacketMs;
++  double lastEndFrameCallbackMs;
++  double lastEndFrameCallbackPostSubmitMs;
++  double lastEndFrameObserverMs;
++  double lastEndFrameCallbackResidualMs;
++  double lastEndFrameTailMs;
++  double lastEndFrameWorkerMs;
++  double lastEndFrameWorkerResidualMs;
++  double lastEndFrameTotalMs;
++  double lastEndFrameResidualMs;
+ } AuroraStats;
+ 
+ const AuroraStats* aurora_get_stats();
 diff --git a/lib/aurora.cpp b/lib/aurora.cpp
+index 9430842..445cfa1 100644
 --- a/lib/aurora.cpp
 +++ b/lib/aurora.cpp
-@@ -1,5 +1,9 @@
+@@ -1,6 +1,10 @@
  #include <aurora/aurora.h>
  #include <aurora/time.hpp>
-+
+ 
 +#ifdef __EMSCRIPTEN__
 +#include <emscripten.h>
 +#endif
- 
++
  #ifdef AURORA_ENABLE_GX
  #include "gfx/resources.hpp"
-@@ -44,6 +48,33 @@
+ #include "gfx/frame.hpp"
+@@ -39,12 +43,57 @@ char g_gameName[4];
+ namespace {
+ constexpr Module Log{"aurora"};
+ 
++struct EndFrameCpuTiming {
++  double fifoTextureMs = 0.0;
++  double gfxFinishMs = 0.0;
++  double outerPrepMs = 0.0;
++  double surfaceEncodeMs = 0.0;
++  double encoderFinishMs = 0.0;
++  double queueSubmitMs = 0.0;
++  double callbackPostSubmitMs = 0.0;
++};
++
++static double phase_now_ms() noexcept {
++#ifdef __EMSCRIPTEN__
++  return emscripten_get_now();
++#else
++  return 0.0;
++#endif
++}
++
+ #ifdef AURORA_ENABLE_GX
+ // GPU
  using webgpu::g_device;
  using webgpu::g_queue;
  using webgpu::g_surface;
-+
+ 
 +#ifdef __EMSCRIPTEN__
 +// Opt-in observation only: never wait for the queue or retain gameplay objects.
 +// Latency includes GPU work and browser callback scheduling, not GPU time alone.
@@ -163,10 +219,56 @@ diff --git a/lib/aurora.cpp b/lib/aurora.cpp
 +      });
 +}
 +#endif
- 
++
  uint32_t clamp_scissor_coord(double value, uint32_t maximum) noexcept {
    if (!std::isfinite(value)) {
-@@ -372,6 +403,9 @@
+     return 0;
+@@ -264,10 +313,19 @@ bool begin_frame() noexcept {
+ void end_frame() noexcept {
+   ZoneScoped;
+ #ifdef AURORA_ENABLE_GX
++#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  const double endFrameStarted = phase_now_ms();
++#endif
++  EndFrameCpuTiming timing;
++  double phaseStarted = phase_now_ms();
+   gx::fifo::drain();
+   gx::fifo::end_frame();
+   gx::texture::end_frame();
++  timing.fifoTextureMs = phase_now_ms() - phaseStarted;
++  phaseStarted = phase_now_ms();
+   gfx::finish();
++  timing.gfxFinishMs = phase_now_ms() - phaseStarted;
++  phaseStarted = phase_now_ms();
+   auto imguiDrawData = imgui::freeze();
+ 
+   const auto& presentSource = webgpu::present_source();
+@@ -284,10 +342,13 @@ void end_frame() noexcept {
+     rmlOverlay = rmlFrame.overlay;
+   }
+ #endif
++  timing.outerPrepMs = phase_now_ms() - phaseStarted;
+ 
+   gfx::end_frame([rmlBindGroup = std::move(rmlBindGroup), rmlOverlay, viewport,
+-                  imguiDrawData = std::move(imguiDrawData)](
+-                     wgpu::CommandEncoder& encoder, std::vector<gfx::AfterSubmitCallback> afterSubmitCallbacks) {
++                  imguiDrawData = std::move(imguiDrawData), timing](
++                     wgpu::CommandEncoder& encoder, std::vector<gfx::AfterSubmitCallback> afterSubmitCallbacks,
++                     AuroraStats& frameStats) mutable {
++    double phaseStarted = phase_now_ms();
+     wgpu::Texture currentTexture;
+     wgpu::TextureView currentView;
+     auto surfaceStatus = wgpu::SurfaceGetCurrentTextureStatus::Error;
+@@ -367,12 +428,21 @@ void end_frame() noexcept {
+       Log.info("Skipping present; window not presentable");
+     }
+     webgpu::gpu_prof::frame_end(encoder);
++    timing.surfaceEncodeMs = phase_now_ms() - phaseStarted;
+     const wgpu::CommandBufferDescriptor cmdBufDescriptor{.label = "Redraw command buffer"};
++    phaseStarted = phase_now_ms();
+     const auto buffer = encoder.Finish(&cmdBufDescriptor);
++    timing.encoderFinishMs = phase_now_ms() - phaseStarted;
++    phaseStarted = phase_now_ms();
      {
        ZoneScopedN("Queue Submit");
        g_queue.Submit(1, &buffer);
@@ -174,9 +276,12 @@ diff --git a/lib/aurora.cpp b/lib/aurora.cpp
 +      sample_browser_queue();
 +#endif
      }
++    timing.queueSubmitMs = phase_now_ms() - phaseStarted;
++    phaseStarted = phase_now_ms();
      webgpu::gpu_prof::after_submit();
      if (canPresent && g_surface) {
-@@ -380,7 +414,12 @@
+       ZoneScopedN("Present");
+@@ -380,7 +450,12 @@ void end_frame() noexcept {
        {
          window::SurfaceLock surfaceLock;
          if (window::is_presentable()) {
@@ -189,6 +294,41 @@ diff --git a/lib/aurora.cpp b/lib/aurora.cpp
          }
        }
        if (status) {
+@@ -429,7 +504,7 @@ void end_frame() noexcept {
+     TracyPlotConfig("aurora: lastStorageSize", tracy::PlotFormatType::Memory, false, true, 0);
+     TracyPlotConfig("aurora: lastTextureUploadSize", tracy::PlotFormatType::Memory, false, true, 0);
+ 
+-    const auto& stats = gfx::detail::resources().stats;
++    auto& stats = gfx::detail::resources().stats;
+     TracyPlot("aurora: queuedPipelines", static_cast<int64_t>(stats.queuedPipelines));
+     TracyPlot("aurora: createdPipelines", static_cast<int64_t>(stats.createdPipelines));
+     TracyPlot("aurora: drawCallCount", static_cast<int64_t>(stats.drawCallCount));
+@@ -439,8 +514,25 @@ void end_frame() noexcept {
+     TracyPlot("aurora: lastIndexSize", static_cast<int64_t>(stats.lastIndexSize));
+     TracyPlot("aurora: lastStorageSize", static_cast<int64_t>(stats.lastStorageSize));
+     TracyPlot("aurora: lastTextureUploadSize", static_cast<int64_t>(stats.lastTextureUploadSize));
++    frameStats.lastEndFrameFifoTextureMs = timing.fifoTextureMs;
++    frameStats.lastEndFrameGfxFinishMs = timing.gfxFinishMs;
++    frameStats.lastEndFrameSurfaceEncodeMs = timing.surfaceEncodeMs;
++    frameStats.lastEndFrameEncoderFinishMs = timing.encoderFinishMs;
++    frameStats.lastEndFrameQueueSubmitMs = timing.queueSubmitMs;
++    timing.callbackPostSubmitMs = phase_now_ms() - phaseStarted;
++    frameStats.lastEndFrameCallbackPostSubmitMs = timing.callbackPostSubmitMs;
+   });
+ 
++#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  const double endFrameTotalMs = phase_now_ms() - endFrameStarted;
++  auto& stats = gfx::detail::resources().stats;
++  stats.lastEndFrameOuterPrepMs = timing.outerPrepMs;
++  stats.lastEndFrameTotalMs = endFrameTotalMs;
++  stats.lastEndFrameResidualMs =
++      endFrameTotalMs - (stats.lastEndFrameFifoTextureMs + stats.lastEndFrameGfxFinishMs +
++                         stats.lastEndFrameOuterPrepMs + stats.lastEndFrameRecordMs + stats.lastEndFrameWorkerMs);
++#endif
++
+ #endif
+ }
+ } // namespace
 diff --git a/lib/dawn/BackendBinding.cpp b/lib/dawn/BackendBinding.cpp
 index 447ead8..8514c86 100644
 --- a/lib/dawn/BackendBinding.cpp
@@ -205,7 +345,7 @@ index 447ead8..8514c86 100644
    std::shared_ptr<wgpu::SurfaceSourceWindowsHWND> desc = std::make_shared<wgpu::SurfaceSourceWindowsHWND>();
    desc->hwnd = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr);
 diff --git a/lib/gfx/frame.cpp b/lib/gfx/frame.cpp
-index 9fd83ef..a2aea17 100644
+index 9fd83ef..f877846 100644
 --- a/lib/gfx/frame.cpp
 +++ b/lib/gfx/frame.cpp
 @@ -16,9 +16,12 @@
@@ -231,7 +371,22 @@ index 9fd83ef..a2aea17 100644
  #include <tracy/Tracy.hpp>
  #include <magic_enum.hpp>
  
-@@ -49,6 +55,46 @@ enum class BufferMapState {
+@@ -36,6 +42,14 @@ using webgpu::g_device;
+ using webgpu::g_instance;
+ using webgpu::g_queue;
+ 
++static double phase_now_ms() noexcept {
++#ifdef __EMSCRIPTEN__
++  return emscripten_get_now();
++#else
++  return 0.0;
++#endif
++}
++
+ namespace {
+ constexpr Module Log{"aurora::gfx"};
+ 
+@@ -49,6 +63,46 @@ enum class BufferMapState {
  
  std::array<wgpu::Buffer, StagingBufferCount> g_stagingBuffers;
  std::array<std::atomic<BufferMapState>, StagingBufferCount> g_mappingStates;
@@ -278,7 +433,7 @@ index 9fd83ef..a2aea17 100644
  uint32_t g_frameIndex = UINT32_MAX;
  
  std::array<FramePacket, FrameSlotCount> g_framePackets;
-@@ -179,7 +225,12 @@ void wait_for_gpu_progress(std::chrono::nanoseconds sleepDuration) {
+@@ -179,7 +233,12 @@ void wait_for_gpu_progress(std::chrono::nanoseconds sleepDuration) {
    if (render_worker::is_idle()) {
      enqueue_process_events();
    }
@@ -291,7 +446,7 @@ index 9fd83ef..a2aea17 100644
  }
  
  void pace_frame_start() {
-@@ -239,6 +290,53 @@ void map_staging_buffer(size_t slot, bool releaseSlotOnCompletion = false) {
+@@ -239,6 +298,53 @@ void map_staging_buffer(size_t slot, bool releaseSlotOnCompletion = false) {
          }
        });
  }
@@ -345,7 +500,7 @@ index 9fd83ef..a2aea17 100644
  } // namespace
  
  namespace detail {
-@@ -385,6 +483,18 @@ void initialize() {
+@@ -385,6 +491,18 @@ void initialize() {
      g_presentTimes.clear();
    }
    render_worker::initialize();
@@ -364,7 +519,7 @@ index 9fd83ef..a2aea17 100644
    // This appears to take a while and blocks the render thread for periods of time
    // render_worker::set_event_pump([] {
    //   if (g_instance) {
-@@ -420,15 +530,22 @@ void initialize() {
+@@ -420,15 +538,22 @@ void initialize() {
                 "Shared Storage Buffer");
    for (size_t i = 0; i < g_stagingBuffers.size(); ++i) {
      const auto label = fmt::format("Staging Buffer {}", i);
@@ -387,7 +542,7 @@ index 9fd83ef..a2aea17 100644
  
    {
      constexpr std::array layoutEntries{
-@@ -519,6 +636,10 @@ void initialize() {
+@@ -519,6 +644,10 @@ void initialize() {
  }
  
  void shutdown() {
@@ -398,7 +553,7 @@ index 9fd83ef..a2aea17 100644
    render_worker::synchronize();
    render_worker::shutdown();
    g_processEventsQueued.store(false, std::memory_order_release);
-@@ -556,6 +677,20 @@ void shutdown() {
+@@ -556,6 +685,20 @@ void shutdown() {
    for (auto& packet : g_framePackets) {
      packet = {};
    }
@@ -419,7 +574,7 @@ index 9fd83ef..a2aea17 100644
    shutdown_recording();
    g_resources.staticBindGroup = {};
    g_resources.staticBindGroupLayout = {};
-@@ -600,6 +735,14 @@ size_t acquire_frame_slot() {
+@@ -600,6 +743,14 @@ size_t acquire_frame_slot() {
  
  std::optional<size_t> acquire_mapped_staging_buffer() {
    ZoneScopedN("Acquire mapped staging buffer");
@@ -434,7 +589,7 @@ index 9fd83ef..a2aea17 100644
    while (true) {
      if (auto slot = g_stagingSlots.try_acquire()) {
        if (wait_for_staging_buffer(*slot)) {
-@@ -610,6 +753,7 @@ std::optional<size_t> acquire_mapped_staging_buffer() {
+@@ -610,6 +761,7 @@ std::optional<size_t> acquire_mapped_staging_buffer() {
      }
      wait_for_gpu_progress(std::chrono::microseconds{100});
    }
@@ -442,7 +597,7 @@ index 9fd83ef..a2aea17 100644
  }
  
  bool begin_frame() {
-@@ -627,6 +771,28 @@ bool begin_frame() {
+@@ -627,6 +779,28 @@ bool begin_frame() {
    frame.frameId = g_nextFrameId++;
    frame.frameIndex = g_frameIndex;
    frame.stagingBuffer = *stagingSlot;
@@ -471,7 +626,7 @@ index 9fd83ef..a2aea17 100644
    size_t bufferOffset = 0;
    const auto& stagingBuf = g_stagingBuffers[*stagingSlot];
    const auto mapBuffer = [&](ByteBuffer& buf, uint64_t size) {
-@@ -643,6 +809,7 @@ bool begin_frame() {
+@@ -643,6 +817,7 @@ bool begin_frame() {
    if constexpr (UseTextureBuffer) {
      mapBuffer(frame.textureUpload, TextureUploadSize);
    }
@@ -479,32 +634,73 @@ index 9fd83ef..a2aea17 100644
  
    begin_recording(frame, frameSlot);
    begin_pipeline_frame();
-@@ -673,8 +840,17 @@ void end_frame(EndFrameCallback callback) {
+@@ -657,6 +832,9 @@ bool begin_frame() {
+ 
+ void end_frame(EndFrameCallback callback) {
+   ZoneScoped;
++#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  const double recordStarted = phase_now_ms();
++#endif
+   if (g_cpuFrameStart.time_since_epoch().count() != 0) {
+     const auto cpuFrameTime = PresentClock::now() - g_cpuFrameStart;
+     update_ema(g_cpuFrameTimeNs, duration_ns(cpuFrameTime));
+@@ -669,14 +847,37 @@ void end_frame(EndFrameCallback callback) {
+   const uint64_t frameId = frame.frameId;
+   end_pipeline_frame();
+   ++g_frameIndex;
++#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  const double recordMs = phase_now_ms() - recordStarted;
++  g_resources.stats.lastEndFrameRecordMs = recordMs;
++#endif
+ 
    const size_t stagingSlot = frame.stagingBuffer;
-   render_worker::enqueue_end_frame(frameId, [frameSlot, stagingSlot, callback = std::move(callback)]() mutable {
+-  render_worker::enqueue_end_frame(frameId, [frameSlot, stagingSlot, callback = std::move(callback)]() mutable {
++#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  const double workerStarted = phase_now_ms();
++#endif
++  render_worker::enqueue_end_frame(frameId, [frameId, frameSlot, stagingSlot, callback = std::move(callback)]() mutable {
      auto& packet = g_framePackets[frameSlot];
 +#ifdef __EMSCRIPTEN__
 +    // Queue writes are ordered before the command buffer submitted by the
 +    // caller below. The packet's staging ranges are append-only, so final
 +    // used prefixes preserve every recorded high-water copy without mapping
 +    // the full 63 MiB buffer into Wasm on each frame.
++    const double stagingStarted = phase_now_ms();
 +    write_browser_staging_ranges(stagingSlot, packet);
 +    observe_browser_staging(frameSlot, packet);
++    const double stagingWritesMs = phase_now_ms() - stagingStarted;
 +#else
      g_stagingBuffers[stagingSlot].Unmap();
      g_mappingStates[stagingSlot].store(BufferMapState::Unmapped, std::memory_order_release);
 +#endif
++    const double packetStarted = phase_now_ms();
      auto encoder = std::move(packet.encoder);
-     const auto stats = packet.stats;
-     auto afterSubmitCallbacks = std::move(packet.afterSubmitCallbacks);
-@@ -688,10 +864,33 @@ void end_frame(EndFrameCallback callback) {
-     g_resources.stats.lastTextureUploadSize = stats.lastTextureUploadSize;
-     if (callback) {
-       callback(encoder, std::move(afterSubmitCallbacks));
+-    const auto stats = packet.stats;
++    auto stats = packet.stats;
++    stats.lastEndFrameId = frameId;
 +#ifdef __EMSCRIPTEN__
++    stats.lastEndFrameStagingWritesMs = stagingWritesMs;
++#endif
+     auto afterSubmitCallbacks = std::move(packet.afterSubmitCallbacks);
+     packet = {};
+     g_resources.stats.drawCallCount = stats.drawCallCount;
+@@ -686,14 +887,74 @@ void end_frame(EndFrameCallback callback) {
+     g_resources.stats.lastIndexSize = stats.lastIndexSize;
+     g_resources.stats.lastStorageSize = stats.lastStorageSize;
+     g_resources.stats.lastTextureUploadSize = stats.lastTextureUploadSize;
++    stats.lastEndFramePacketMs = phase_now_ms() - packetStarted;
++    const double callbackStarted = phase_now_ms();
++    if (callback) {
++      callback(encoder, std::move(afterSubmitCallbacks), stats);
++    }
++    stats.lastEndFrameCallbackMs = phase_now_ms() - callbackStarted;
++#ifdef __EMSCRIPTEN__
+     if (callback) {
+-      callback(encoder, std::move(afterSubmitCallbacks));
 +      // The caller's callback finishes and submits the command buffer before
 +      // this completion observer is registered. Guard the slot pool against
 +      // a later Aurora shutdown/reinitialization resetting its ownership.
++      const double observerStarted = phase_now_ms();
 +      const auto generation = g_browserStagingGeneration.load(std::memory_order_acquire);
 +      g_queue.OnSubmittedWorkDone(
 +          wgpu::CallbackMode::AllowSpontaneous,
@@ -517,20 +713,72 @@ index 9fd83ef..a2aea17 100644
 +            }
 +            g_stagingSlots.release(stagingSlot);
 +          });
-+#endif
-+#ifdef __EMSCRIPTEN__
++      stats.lastEndFrameObserverMs = phase_now_ms() - observerStarted;
 +    } else {
 +      g_stagingSlots.release(stagingSlot);
-+#endif
      }
++#endif
++    stats.lastEndFrameCallbackResidualMs =
++        stats.lastEndFrameCallbackMs -
++        (stats.lastEndFrameSurfaceEncodeMs + stats.lastEndFrameEncoderFinishMs +
++         stats.lastEndFrameQueueSubmitMs + stats.lastEndFrameCallbackPostSubmitMs);
++    const double tailStarted = phase_now_ms();
++    const double cleanupStarted = phase_now_ms();
      g_frameSlots.release(frameSlot);
      expire_cached_bind_groups();
 +#ifndef __EMSCRIPTEN__
      map_staging_buffer(stagingSlot, true);
 +#endif
      process_events();
++#ifdef __EMSCRIPTEN__
++    stats.lastEndFrameCleanupMs = phase_now_ms() - cleanupStarted;
++#endif
++    stats.lastEndFrameTailMs = phase_now_ms() - tailStarted;
++    g_resources.stats.lastEndFrameId = stats.lastEndFrameId;
++    g_resources.stats.lastEndFrameFifoTextureMs = stats.lastEndFrameFifoTextureMs;
++    g_resources.stats.lastEndFrameGfxFinishMs = stats.lastEndFrameGfxFinishMs;
++    g_resources.stats.lastEndFrameStagingWritesMs = stats.lastEndFrameStagingWritesMs;
++    g_resources.stats.lastEndFrameSurfaceEncodeMs = stats.lastEndFrameSurfaceEncodeMs;
++    g_resources.stats.lastEndFrameEncoderFinishMs = stats.lastEndFrameEncoderFinishMs;
++    g_resources.stats.lastEndFrameQueueSubmitMs = stats.lastEndFrameQueueSubmitMs;
++    g_resources.stats.lastEndFrameCleanupMs = stats.lastEndFrameCleanupMs;
++    g_resources.stats.lastEndFramePacketMs = stats.lastEndFramePacketMs;
++    g_resources.stats.lastEndFrameCallbackMs = stats.lastEndFrameCallbackMs;
++    g_resources.stats.lastEndFrameCallbackPostSubmitMs = stats.lastEndFrameCallbackPostSubmitMs;
++    g_resources.stats.lastEndFrameObserverMs = stats.lastEndFrameObserverMs;
++    g_resources.stats.lastEndFrameCallbackResidualMs = stats.lastEndFrameCallbackResidualMs;
++    g_resources.stats.lastEndFrameTailMs = stats.lastEndFrameTailMs;
    });
++#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
++  const double workerMs = phase_now_ms() - workerStarted;
++  g_resources.stats.lastEndFrameWorkerMs = workerMs;
++  g_resources.stats.lastEndFrameWorkerResidualMs =
++      workerMs - (g_resources.stats.lastEndFrameStagingWritesMs + g_resources.stats.lastEndFramePacketMs +
++                  g_resources.stats.lastEndFrameCallbackMs + g_resources.stats.lastEndFrameObserverMs +
++                  g_resources.stats.lastEndFrameTailMs);
++#endif
  }
+ 
+ uint32_t current_frame() noexcept { return g_frameIndex; }
+diff --git a/lib/gfx/frame.hpp b/lib/gfx/frame.hpp
+index 0b86ffe..2edb10f 100644
+--- a/lib/gfx/frame.hpp
++++ b/lib/gfx/frame.hpp
+@@ -8,7 +8,14 @@
+ namespace aurora::gfx::detail {
+ 
+ inline constexpr size_t FrameSlotCount = 2;
++#ifdef __EMSCRIPTEN__
++// Queue.WriteBuffer does not need the native map-ahead ring. Keep one GPU
++// staging buffer per frame packet so a submitted frame cannot overwrite data
++// still consumed by the queue.
++inline constexpr size_t StagingBufferCount = FrameSlotCount;
++#else
+ inline constexpr size_t StagingBufferCount = FrameSlotCount + 3;
++#endif
+ inline constexpr uint64_t StagingBufferSize = UniformBufferSize + VertexBufferSize + IndexBufferSize +
+                                               StorageBufferSize + (UseTextureBuffer ? TextureUploadSize : 0);
+ 
 diff --git a/lib/gfx/pipeline_cache.cpp b/lib/gfx/pipeline_cache.cpp
 index bff9b47..8b55cd4 100644
 --- a/lib/gfx/pipeline_cache.cpp
@@ -576,6 +824,89 @@ index bff9b47..8b55cd4 100644
  }
  
  bool get_pipeline(PipelineRef ref, wgpu::RenderPipeline& pipeline) {
+diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
+index d04db0f..f61b5e2 100644
+--- a/lib/gfx/recording.cpp
++++ b/lib/gfx/recording.cpp
+@@ -19,6 +19,7 @@
+ #include "../window.hpp"
+ 
+ #include <array>
++#include <cstdlib>
+ #include <cstring>
+ #include <new>
+ #include <optional>
+@@ -33,6 +34,7 @@
+ #include <tracy/Tracy.hpp>
+ 
+ namespace aurora::gfx {
++using webgpu::g_queue;
+ using namespace detail;
+ 
+ namespace {
+@@ -634,7 +636,8 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
+                                wgpu::TexelCopyTextureInfo tex, wgpu::Extent3D size) {
+   const auto copyBytesPerRow = AURORA_ALIGN(bytesPerRow, 256);
+   auto& frame = current_frame_packet();
+-  if (frame.textureUpload.size() + copyBytesPerRow * rowsPerImage <= TextureUploadSize) {
++  const uint64_t uploadSize = static_cast<uint64_t>(copyBytesPerRow) * rowsPerImage;
++  if (static_cast<uint64_t>(frame.textureUpload.size()) + uploadSize <= TextureUploadSize) {
+     const auto range = push_texture_data(data, bytesPerRow, rowsPerImage);
+     const wgpu::TexelCopyBufferLayout layout{
+         .offset = range.offset,
+@@ -645,14 +648,43 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
+     return;
+   }
+ 
+-  const uint64_t uploadSize = copyBytesPerRow * rowsPerImage;
+   const wgpu::BufferDescriptor descriptor{
+       .label = "Overflow Texture Upload Buffer",
++#ifdef __EMSCRIPTEN__
++      .usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::CopySrc,
++#else
+       .usage = wgpu::BufferUsage::MapWrite | wgpu::BufferUsage::CopySrc,
++#endif
+       .size = uploadSize,
++#ifndef __EMSCRIPTEN__
+       .mappedAtCreation = true,
++#endif
+   };
+   auto buffer = webgpu::g_device.CreateBuffer(&descriptor);
++#ifdef __EMSCRIPTEN__
++  // Queue.WriteBuffer takes one contiguous source range. This call-local
++  // zero-initialized buffer preserves the row padding without issuing one JS
++  // write per row for a large overflow upload.
++  const size_t uploadBytes = static_cast<size_t>(uploadSize);
++  const bool representable = static_cast<uint64_t>(uploadBytes) == uploadSize;
++  AURORA_ASSERT(representable, "Overflow texture upload is too large ({} bytes)", uploadSize);
++  if (!representable) {
++    std::abort();
++  }
++  ByteBuffer padded{uploadBytes};
++  const bool allocated = padded.data() != nullptr && padded.size() == uploadBytes;
++  AURORA_ASSERT(allocated, "Overflow texture upload allocation failed ({} bytes)", uploadSize);
++  if (!allocated) {
++    std::abort();
++  }
++  auto* dst = padded.data();
++  for (uint32_t row = 0; row < rowsPerImage; ++row) {
++    memcpy(dst, data, bytesPerRow);
++    data += bytesPerRow;
++    dst += copyBytesPerRow;
++  }
++  g_queue.WriteBuffer(buffer, 0, padded.data(), uploadBytes);
++#else
+   auto* dst = static_cast<uint8_t*>(buffer.GetMappedRange(0, uploadSize));
+   for (uint32_t row = 0; row < rowsPerImage; ++row) {
+     memcpy(dst, data, bytesPerRow);
+@@ -660,6 +692,7 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
+     dst += copyBytesPerRow;
+   }
+   buffer.Unmap();
++#endif
+ 
+   const wgpu::TexelCopyBufferLayout layout{
+       .offset = 0,
 diff --git a/lib/gfx/render_worker.cpp b/lib/gfx/render_worker.cpp
 index 85783b6..2698e96 100644
 --- a/lib/gfx/render_worker.cpp
@@ -667,6 +998,17 @@ index 03dda46..c810993 100644
    uint8_t* const dst = blob.data();
    uint64_t o = 0;
    const auto append = [&](const ByteBuffer& d) noexcept -> bool {
+diff --git a/lib/gfx/types.hpp b/lib/gfx/types.hpp
+index 940d599..4b30013 100644
+--- a/lib/gfx/types.hpp
++++ b/lib/gfx/types.hpp
+@@ -37,5 +37,5 @@ using webgpu::Viewport;
+ struct TextureRef;
+ using TextureHandle = std::shared_ptr<TextureRef>;
+ using AfterSubmitCallback = std::function<void()>;
+-using EndFrameCallback = std::function<void(wgpu::CommandEncoder&, std::vector<AfterSubmitCallback>)>;
++using EndFrameCallback = std::function<void(wgpu::CommandEncoder&, std::vector<AfterSubmitCallback>, AuroraStats&)>;
+ } // namespace aurora::gfx
 diff --git a/lib/gx/command_processor.cpp b/lib/gx/command_processor.cpp
 index b0dce17..ae03ada 100644
 --- a/lib/gx/command_processor.cpp
@@ -915,103 +1257,3 @@ index 2a4aadf..540854e 100644
  #include "time_internal.hpp"
  #include "dolphin/vi/vi_internal.hpp"
  
-diff --git a/lib/gfx/frame.hpp b/lib/gfx/frame.hpp
---- a/lib/gfx/frame.hpp
-+++ b/lib/gfx/frame.hpp
-@@ -8,7 +8,14 @@
- namespace aurora::gfx::detail {
- 
- inline constexpr size_t FrameSlotCount = 2;
-+#ifdef __EMSCRIPTEN__
-+// Queue.WriteBuffer does not need the native map-ahead ring. Keep one GPU
-+// staging buffer per frame packet so a submitted frame cannot overwrite data
-+// still consumed by the queue.
-+inline constexpr size_t StagingBufferCount = FrameSlotCount;
-+#else
- inline constexpr size_t StagingBufferCount = FrameSlotCount + 3;
-+#endif
- inline constexpr uint64_t StagingBufferSize = UniformBufferSize + VertexBufferSize + IndexBufferSize +
-                                               StorageBufferSize + (UseTextureBuffer ? TextureUploadSize : 0);
- 
-diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
---- a/lib/gfx/recording.cpp
-+++ b/lib/gfx/recording.cpp
-@@ -19,6 +19,7 @@
- #include "../window.hpp"
- 
- #include <array>
-+#include <cstdlib>
- #include <cstring>
- #include <new>
- #include <optional>
-@@ -33,6 +34,7 @@
- #include <tracy/Tracy.hpp>
- 
- namespace aurora::gfx {
-+using webgpu::g_queue;
- using namespace detail;
- 
- namespace {
-@@ -634,7 +636,8 @@
-                                wgpu::TexelCopyTextureInfo tex, wgpu::Extent3D size) {
-   const auto copyBytesPerRow = AURORA_ALIGN(bytesPerRow, 256);
-   auto& frame = current_frame_packet();
--  if (frame.textureUpload.size() + copyBytesPerRow * rowsPerImage <= TextureUploadSize) {
-+  const uint64_t uploadSize = static_cast<uint64_t>(copyBytesPerRow) * rowsPerImage;
-+  if (static_cast<uint64_t>(frame.textureUpload.size()) + uploadSize <= TextureUploadSize) {
-     const auto range = push_texture_data(data, bytesPerRow, rowsPerImage);
-     const wgpu::TexelCopyBufferLayout layout{
-         .offset = range.offset,
-@@ -645,14 +648,43 @@
-     return;
-   }
- 
--  const uint64_t uploadSize = copyBytesPerRow * rowsPerImage;
-   const wgpu::BufferDescriptor descriptor{
-       .label = "Overflow Texture Upload Buffer",
-+#ifdef __EMSCRIPTEN__
-+      .usage = wgpu::BufferUsage::CopyDst | wgpu::BufferUsage::CopySrc,
-+#else
-       .usage = wgpu::BufferUsage::MapWrite | wgpu::BufferUsage::CopySrc,
-+#endif
-       .size = uploadSize,
-+#ifndef __EMSCRIPTEN__
-       .mappedAtCreation = true,
-+#endif
-   };
-   auto buffer = webgpu::g_device.CreateBuffer(&descriptor);
-+#ifdef __EMSCRIPTEN__
-+  // Queue.WriteBuffer takes one contiguous source range. This call-local
-+  // zero-initialized buffer preserves the row padding without issuing one JS
-+  // write per row for a large overflow upload.
-+  const size_t uploadBytes = static_cast<size_t>(uploadSize);
-+  const bool representable = static_cast<uint64_t>(uploadBytes) == uploadSize;
-+  AURORA_ASSERT(representable, "Overflow texture upload is too large ({} bytes)", uploadSize);
-+  if (!representable) {
-+    std::abort();
-+  }
-+  ByteBuffer padded{uploadBytes};
-+  const bool allocated = padded.data() != nullptr && padded.size() == uploadBytes;
-+  AURORA_ASSERT(allocated, "Overflow texture upload allocation failed ({} bytes)", uploadSize);
-+  if (!allocated) {
-+    std::abort();
-+  }
-+  auto* dst = padded.data();
-+  for (uint32_t row = 0; row < rowsPerImage; ++row) {
-+    memcpy(dst, data, bytesPerRow);
-+    data += bytesPerRow;
-+    dst += copyBytesPerRow;
-+  }
-+  g_queue.WriteBuffer(buffer, 0, padded.data(), uploadBytes);
-+#else
-   auto* dst = static_cast<uint8_t*>(buffer.GetMappedRange(0, uploadSize));
-   for (uint32_t row = 0; row < rowsPerImage; ++row) {
-     memcpy(dst, data, bytesPerRow);
-@@ -660,6 +692,7 @@
-     dst += copyBytesPerRow;
-   }
-   buffer.Unmap();
-+#endif
- 
-   const wgpu::TexelCopyBufferLayout layout{
-       .offset = 0,

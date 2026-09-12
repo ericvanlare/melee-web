@@ -18,6 +18,9 @@ class GameplayBootstrapTests(unittest.TestCase):
     def test_original_fighter_input_consumer_and_lifetime(self):
         self.run_trace("fighter")
 
+    def test_generation_accessor_rejects_replaced_heap(self):
+        self.run_trace("bootstrap_replaced")
+
     def run_trace(self, kind):
         sdk = ROOT / ".deps/emsdk"
         compiler = sdk / "upstream/emscripten"
@@ -44,7 +47,7 @@ class GameplayBootstrapTests(unittest.TestCase):
             source = prepare_sources(ROOT)
         original = source / "sysdolphin/baselib"
         c_sources = [ROOT / "src/gameplay_bootstrap.c", ROOT / "src/hsd_host_support.c",
-                     ROOT / ("tests/gameplay_bootstrap_trace.c" if kind == "bootstrap"
+                     ROOT / ("tests/gameplay_bootstrap_trace.c" if kind.startswith("bootstrap")
                              else "src/gameplay_fighter_probe.c")]
         c_sources.append(source / "melee/lb/lb_00F9.c")
         cpp_sources = []
@@ -83,13 +86,16 @@ class GameplayBootstrapTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             asset = ROOT / "assets-local/next-gate/PlCo.dat"
             arguments = [str(asset)] if kind == "fighter" and asset.is_file() else []
+            if kind == "bootstrap_replaced":
+                arguments = ["replaced_heap"]
             result = subprocess.run([str(node), str(output), *arguments], cwd=directory, env=env,
                                     capture_output=True, text=True, timeout=30)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            expected = "Original HSD gameplay-bootstrap scheduler trace: passed" if kind == "bootstrap" else \
-                       "Original Fighter input consumer and lifetime trace: passed"
+            expected = ("Gameplay generation accessor replacement guard: passed" if kind == "bootstrap_replaced"
+                        else "Original HSD gameplay-bootstrap scheduler trace: passed" if kind == "bootstrap" else
+                        "Original Fighter input consumer and lifetime trace: passed")
             self.assertIn(expected, result.stdout)
-            if arguments:
+            if kind == "fighter" and asset.is_file():
                 self.assertIn("Local PlCo typed root0 consumed by original walk predicate: passed", result.stdout)
 
 

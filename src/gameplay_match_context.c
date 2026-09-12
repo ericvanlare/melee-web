@@ -58,7 +58,7 @@ static int fail(char* e,size_t n,const char* m){if(e&&n)snprintf(e,n,"%s",m);ret
 static int ok(char* e,size_t n){if(e&&n)*e=0;return 1;}
 static int live(MeleeWebMatchContext* h,char* e,size_t n)
 {
-    if(!h||h!=owner||h->generation!=melee_web_gameplay_stats().generation)
+    if(!h||h!=owner||h->generation!=melee_web_gameplay_generation())
         return fail(e,n,"Match context requires its live owned source world");
     if(seed_ptr!=&h->seed||cm_804D645C!=h->pool)
         return fail(e,n,"Match source RNG or camera ownership changed");
@@ -74,7 +74,7 @@ MeleeWebMatchContext* melee_web_match_begin(const MeleeWebMatchSettings* s,
 MeleeWebMatchContext* melee_web_match_begin_players(const MeleeWebPlayerSettings* players,
     uint32_t count,uint32_t camera_subjects,uint32_t seed,MeleeWebCollision* collision,char* e,size_t n)
 {
-    uint64_t generation=melee_web_gameplay_stats().generation;
+    uint64_t generation=melee_web_gameplay_generation();
     MeleeWebCollisionReadiness r;
     if(!players||!generation||owner||count<1||count>MELEE_WEB_MATCH_MAX_PLAYERS||camera_subjects<count||camera_subjects>70){
         fail(e,n,"Match needs an unowned world, player slot 0..3 and 1..70 camera subjects");return NULL;

@@ -5,6 +5,7 @@
 #include <melee/gr/ground.h>
 #include <melee/gr/grlast.h>
 #include <melee/gr/types.h>
+#include <melee/sc/types.h>
 #include <sysdolphin/baselib/jobj.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/gobjobject.h>
@@ -15,7 +16,8 @@
 #include <stdlib.h>
 #include <string.h>
 struct MeleeWebStageMarkers {HSD_Joint* root;uint32_t offsets[261],joint_count,pair_count;uint16_t pairs[261][2];};
-struct MeleeWebStageNumeric {StageInfo saved;HSD_GObj* owner;};
+struct MeleeWebStageNumeric {StageInfo saved;HSD_GObj* owner;DynamicModelDesc* quake;};
+extern void melee_web_ground_quakes_clear(void);
 static MeleeWebStageNumeric* active;
 /* Original numeric stage-row consumer, private in ground.h. */
 extern void melee_web_ground_stage_parameters(int);
@@ -138,8 +140,25 @@ int melee_web_stage_numeric_spawn(MeleeWebStageNumeric* h,uint32_t slot,float po
     position[0]=source.x;position[1]=source.y;position[2]=source.z;
     if(e&&n)*e=0;return 1;
 }
+int melee_web_stage_numeric_set_quake(MeleeWebStageNumeric* h,void* descriptor,char* e,size_t n){
+    DynamicModelDesc* quake=descriptor;
+    if(!h||active!=h||h->quake||!quake||!quake->joint||!quake->anims)
+        return fail(e,n,"Stage quake publication requires an owned checked descriptor");
+    /* The archive owner validates the four-entry source table before this call. */
+    for(unsigned i=0;i<4;i++)if(!quake->anims[i])return fail(e,n,"Stage quake animation is missing");
+    h->quake=quake;stage_info.quake_model_set=quake;if(e&&n)*e=0;return 1;
+}
+int melee_web_stage_numeric_clear_quakes(MeleeWebStageNumeric* h,char* e,size_t n){
+    if(!h||active!=h)return fail(e,n,"Stage numeric scope is not active");
+    if(h->quake){
+        if(stage_info.quake_model_set!=h->quake)return fail(e,n,"Stage quake publication changed owner");
+        melee_web_ground_quakes_clear();
+    }
+    if(e&&n)*e=0;return 1;
+}
 int melee_web_stage_numeric_end(MeleeWebStageNumeric* h,char* e,size_t n){
     if(!h)return 1;if(active!=h)return fail(e,n,"Stage numeric scope is not active");
+    if(!melee_web_stage_numeric_clear_quakes(h,e,n))return 0;
     stage_info=h->saved;active=NULL;if(h->owner)HSD_GObjPLink_80390228(h->owner);free(h);if(e&&n)*e=0;return 1;
 }
 

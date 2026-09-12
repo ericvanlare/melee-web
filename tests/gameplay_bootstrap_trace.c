@@ -5,6 +5,7 @@
 #include <sysdolphin/baselib/gobjproc.h>
 #include <sysdolphin/baselib/gobjuserdata.h>
 #include <sysdolphin/baselib/objalloc.h>
+#include <dolphin/os/OSAlloc.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -68,9 +69,34 @@ static void expect(const unsigned* expected, unsigned size)
 #define EXPECT(...) do { const unsigned values[] = {__VA_ARGS__}; expect(values, sizeof(values) / sizeof(values[0])); } while (0)
 static void step(void) { check(melee_web_gameplay_step(error, sizeof(error)), "original runtime tick"); }
 
-int main(void)
+static int replaced_heap_case(void)
 {
+    static _Alignas(32) unsigned char replacement[65536];
+    check(melee_web_gameplay_startup(1024 * 1024, error, sizeof(error)),
+          "runtime startup for replacement check");
+    const uint64_t generation = melee_web_gameplay_generation();
+    check(generation != 0 && generation == melee_web_gameplay_stats().generation,
+          "generation accessor agrees with live statistics");
+    void* start = OSInitAlloc(replacement, replacement + sizeof(replacement), 1);
+    check(start != NULL, "replacement SDK allocator initialization");
+    check(melee_web_gameplay_generation() == 0,
+          "generation accessor rejects replaced SDK ownership");
+    check(melee_web_gameplay_stats().generation == 0,
+          "full statistics retain replacement-ownership rejection");
+    check(!melee_web_gameplay_shutdown(error, sizeof(error)),
+          "shutdown rejects replaced SDK ownership");
+    check(OSCreateHeap(start, replacement + sizeof(replacement)) == 0 && OSCheckHeap(0) > 0,
+          "replacement SDK heap remains valid after rejected shutdown");
+    puts("Gameplay generation accessor replacement guard: passed");
+    return 0;
+}
+
+int main(int argc, char** argv)
+{
+    if (argc == 2 && !strcmp(argv[1], "replaced_heap")) return replaced_heap_case();
+    check(argc == 1, "unexpected bootstrap trace arguments");
     check(!melee_web_gameplay_step(error, sizeof(error)), "uninitialized ticks reject");
+    check(melee_web_gameplay_generation() == 0, "uninitialized generation rejects");
     check(!melee_web_gameplay_startup(1024, error, sizeof(error)), "undersized heap rejects");
     check(melee_web_gameplay_startup(1024 * 1024, error, sizeof(error)), "runtime startup");
     check(!melee_web_gameplay_startup(1024 * 1024, error, sizeof(error)), "duplicate startup rejects");
@@ -82,6 +108,9 @@ int main(void)
     process(gc, 6); process(gc, 4); process(gc, 0);
     process(gb, 4); process(gb, 0); process(gb, 6); process(ga, 4);
     MeleeWebGameplayStats stats = melee_web_gameplay_stats();
+    const uint64_t initial_generation = melee_web_gameplay_generation();
+    check(initial_generation != 0 && stats.generation == initial_generation,
+          "live generation matches full bootstrap statistics");
     check(stats.objects == 3 && stats.processes == 7 && stats.heap_free_bytes > 0,
           "original pool counts and real SDK heap validation");
     step(); EXPECT(200, 300, 104, 204, 304, 206, 306);
@@ -125,11 +154,15 @@ int main(void)
     check(HSD_GObjObject_80390ADC(gd) == &d, "explicit source detach restores the supported lifecycle");
 
     check(melee_web_gameplay_shutdown(error, sizeof(error)), "runtime shutdown");
+    check(melee_web_gameplay_generation() == 0, "shutdown clears live generation");
     check(removals == 4 && melee_web_gameplay_stats().objects == 0,
           "shutdown calls remaining original user-data destructors and clears state");
     check(melee_web_gameplay_shutdown(error, sizeof(error)), "shutdown is idempotent");
     check(melee_web_gameplay_startup(1024 * 1024, error, sizeof(error)), "runtime restart");
-    check(melee_web_gameplay_stats().ticks == 0 && melee_web_gameplay_stats().objects == 0,
+    check(melee_web_gameplay_generation() != 0 &&
+          melee_web_gameplay_generation() != initial_generation &&
+          melee_web_gameplay_stats().generation == melee_web_gameplay_generation() &&
+          melee_web_gameplay_stats().ticks == 0 && melee_web_gameplay_stats().objects == 0,
           "restart does not inherit old pool counters or process lists");
     step(); check(trace_size == 0, "empty restarted world has no stale callbacks");
     check(melee_web_gameplay_shutdown(error, sizeof(error)), "restarted shutdown");

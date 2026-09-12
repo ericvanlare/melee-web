@@ -56,6 +56,12 @@ def validate_report(report, recipe_hash, frames, mode, cold=None, *, expected_wi
     require(isinstance(metrics, dict), 'Browser metrics must be an object')
     require(type(metrics.get('sourceFrames')) is int and metrics['sourceFrames'] == frames,
             'Browser input timeline is incomplete')
+    # Earlier v1 evidence predates per-tick traversal accounting. New reports
+    # carry both counters; never accept a partial or mismatched pair.
+    if 'sourceSteps' in metrics or 'sourceDraws' in metrics:
+        for key in ('sourceSteps', 'sourceDraws'):
+            require(type(metrics.get(key)) is int and metrics[key] == frames,
+                    'Source tick/draw count mismatch: ' + key)
     for key in ('browserCallbacks', 'nativeCallbacks'):
         require(type(metrics.get(key)) is int and metrics[key] > 0, 'Missing active callbacks')
     require(isinstance(report.get('user_agent'), str) and report['user_agent'], 'Missing browser identity')

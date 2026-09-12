@@ -11,8 +11,16 @@ class NativeArraysTests(unittest.TestCase):
         self.assertIsNotNone(compiler)
         with tempfile.TemporaryDirectory() as directory:
             binary=Path(directory)/"arrays"
+            registry=Path(directory)/"hsd_native_arrays.o"
+            harness=Path(directory)/"hsd_native_arrays_test.o"
             result=subprocess.run([compiler,"-std=c11","-Wall","-Wextra","-Werror","-I",str(ROOT/"src"),
-                str(ROOT/"src/hsd_native_arrays.c"),str(ROOT/"tests/hsd_native_arrays_test.c"),"-o",str(binary)],capture_output=True,text=True)
+                "-Dmalloc=test_malloc","-Dcalloc=test_calloc","-Dfree=test_free","-c",
+                str(ROOT/"src/hsd_native_arrays.c"),"-o",str(registry)],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            result=subprocess.run([compiler,"-std=c11","-Wall","-Wextra","-Werror","-I",str(ROOT/"src"),
+                "-c",str(ROOT/"tests/hsd_native_arrays_test.c"),"-o",str(harness)],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+            result=subprocess.run([compiler,str(registry),str(harness),"-o",str(binary)],capture_output=True,text=True)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)
             result=subprocess.run([str(binary)],capture_output=True,text=True)
             self.assertEqual(result.returncode,0,result.stdout+result.stderr)

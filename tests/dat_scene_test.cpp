@@ -81,6 +81,16 @@ void test_missing_symbol()
     }, "missing SceneDesc public symbol is rejected");
 }
 
+void test_invalid_root_kind()
+{
+    auto archive = std::make_shared<melee_web::DatArchive>(empty_archive());
+    rejects([&] {
+        melee_web::DatScene scene(
+            archive, "MissingScene",
+            static_cast<melee_web::DatSceneRootKind>(0xff));
+    }, "invalid Scene root kind is rejected");
+}
+
 void test_malformed_root_pointer()
 {
     auto archive = std::make_shared<melee_web::DatArchive>(malformed_scene_archive());
@@ -190,18 +200,67 @@ void test_local(const char* ifall_path, const char* ifcoget_path)
     test_local_once(ifall_path, ifcoget_path);
 }
 
+void test_stage_once(const char* stage_path)
+{
+    auto archive = std::make_shared<melee_web::DatArchive>(
+        read_file(stage_path), melee_web::DatExternalPolicy::ResolveNull);
+    melee_web::DatScene quake(
+        archive, "quake_model_set", melee_web::DatSceneRootKind::DynamicModel);
+    check(quake.descriptor() == nullptr && quake.model_table() == nullptr &&
+              quake.single_model() && quake.model_count() == 1,
+          "stage quake_model_set publishes one typed DynamicModelDesc root");
+    auto* model = quake.single_model();
+    check(model->joint && model->anims,
+          "stage quake_model_set publishes a joint and animation table");
+    for (unsigned index = 0; index < 4; ++index)
+        check(model->anims[index],
+              "stage quake_model_set has four grLib_801C9CEC animations");
+    check(model->anims[4] == nullptr,
+          "stage quake_model_set animation table is terminated after four entries");
+}
+
+void test_stage(const char* stage_path)
+{
+    // Rehydrate each stage root twice so native animation/joint ownership is
+    // released before the next source archive lifetime begins.
+    test_stage_once(stage_path);
+    test_stage_once(stage_path);
+}
+
 } // namespace
 
 int main(int argc, char** argv)
 {
     try {
-        check(argc == 1 || (argc == 4 && std::string_view(argv[1]) == "--assets"),
-              "usage: [--assets IfAll.usd IfCoGet.dat]");
+        const char* ifall_path = nullptr;
+        const char* ifcoget_path = nullptr;
+        std::vector<const char*> stage_paths;
+        for (int index = 1; index < argc;) {
+            const std::string_view option = argv[index++];
+            if (option == "--assets") {
+                check(!ifall_path && index + 1 < argc,
+                      "usage: [--assets IfAll.usd IfCoGet.dat] [--stage GrNLa.dat ...]");
+                ifall_path = argv[index++];
+                ifcoget_path = argv[index++];
+            } else if (option == "--stage") {
+                check(index < argc,
+                      "usage: [--assets IfAll.usd IfCoGet.dat] [--stage GrNLa.dat ...]");
+                stage_paths.push_back(argv[index++]);
+            } else {
+                check(false,
+                      "usage: [--assets IfAll.usd IfCoGet.dat] [--stage GrNLa.dat ...]");
+            }
+        }
+        check((ifall_path == nullptr) == (ifcoget_path == nullptr),
+              "--assets requires both IfAll.usd and IfCoGet.dat");
         test_missing_symbol();
+        test_invalid_root_kind();
         test_malformed_root_pointer();
-        if (argc == 4) test_local(argv[2], argv[3]);
-        std::cout << (argc == 1 ? "SceneDesc missing-symbol rejection passed\n" :
-                     "Typed SceneDesc hydration and missing-symbol bounds passed\n");
+        if (ifall_path) test_local(ifall_path, ifcoget_path);
+        for (const auto* stage_path : stage_paths) test_stage(stage_path);
+        std::cout << (ifall_path || !stage_paths.empty() ?
+                          "Typed SceneDesc and DynamicModel hydration passed\n" :
+                          "SceneDesc missing-symbol rejection passed\n");
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
         return 1;

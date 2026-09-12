@@ -730,8 +730,9 @@ gate. It remains diagnostic evidence; the canonical pair was independently
 recaptured. Serialize a prefix with sorted keys, compact separators and one final
 newline, and validate that exact identity before launching a capture.
 
-The remaining five development donors and both fresh holdouts are unexecuted.
-The candidate is not frozen, and there is no new gold or content admission.
+At this checkpoint the remaining five development donors and both fresh
+holdouts were unexecuted. The five are continued below; neither fresh holdout
+has been opened. There is no new gold or content admission.
 
 
 The final candidate's 510-test suite passes (`full-suite-final-math.log`,
@@ -799,3 +800,174 @@ left alone. Next: execute the remaining five reserved development donors,
 resolve their observed gaps, then freeze the candidate before opening the two
 fresh holdouts. Broad gold, pixel/PCM, physical-input and content admission
 remain open.
+
+### Remaining five UCF-off development donors
+
+The five reserved development donors now have independent original A/B captures,
+passing exact setup gates and repeated source endings. The frozen donor inputs,
+costumes, eight-minute stock timer, pause policy and per-port rumble flags are
+preserved. Each paired recipe is the exact input prefix consumed before the
+original match ended; none extends a recording with invented neutral inputs.
+
+| Donor | Source setup | Available / consumed ticks |
+| --- | --- | ---: |
+| `7e5a8d15` | Mario / Falco, Yoshi's Story | 9,735 / 4,324 |
+| `8075c5d5` | Falco / Marth, Dream Land | 18,517 / 4,317 |
+| `a822bb8d` | Fox / Marth, Dream Land | 8,541 / 3,892 |
+| `dca20df0` | Marth / Falco, Yoshi's Story | 8,133 / 5,588 |
+| `e2a3baac` | Falco / Falco, Dream Land | 13,408 / 2,794 |
+
+This adds 20,915 complete original source ticks, 102 damage increases, 32 stock
+losses and 27 respawns. The union exercises all four special families. Its 1,500
+unique coverage labels include 799 additions relative to the preceding **three
+UCF-off donors**, not relative to every earlier replay. These are coverage
+labels, not newly admitted moves or characters. Per-donor identities and hashes
+are in `work/ucf-off-cohort/remaining-browser/five-coverage-summary.json`.
+
+The batch exposed three shared runtime boundaries:
+
+- Marth's actual Counter retaliation reached wind command 58. The native operand
+  decoder and original consumer already existed, but runtime admission rejected
+  the command. Admission now reaches the original consumer; focused tests cover
+  all four words, signed operands, bone, timer, cursor advance and the original
+  `0.003906f` scalar. Counter stance alone had not exercised this path.
+- The stage owner never published `quake_model_set`, leaving the original camera
+  shake routines without their authored animation. A checked single-model scene
+  root now owns the joint and four animations, publishes them before gameplay,
+  and retains them until every original quake GObj is destroyed. Lifecycle tests
+  leave all four variants live during unload and reconstruct across costumes.
+  `Camera_8002A0C0` also now addresses its actual camera descriptor instead of
+  relying on unrelated globals being adjacent as in the retail DOL. Fixing that
+  address alone did not close the red: both source dependencies were required.
+- The older Battlefield regression then exposed intermittent source draw order.
+  A browser callback could consume two ticks and draw only the second, or draw
+  twice around a tick when another callback consumed zero. The magnifier's hidden
+  offscreen state could therefore change later damage/RNG. The frame sequence
+  now draws each consumed tick before the next tick and draws the final tick
+  before completion. Zero-tick callbacks retain the previous image; explicit
+  preparation draws remain separately measured. Reports count source steps and
+  draws, reject disagreement, and aggregate every draw's cost and transfers.
+
+The retained Marth red first diverged at tick 2,599; original camera and magnifier
+probes showed missing translation delayed its offscreen damage. Its corrected
+source-drawn trace matches all 5,588 ticks and the exact timer through the real
+ending. The Battlefield red at tick 2,372 was separate: read-only original and
+port probes showed the counter reaching 60 only with the expected intervening
+source draws. The scheduling fix reproduces the earlier exact 3,719-tick trace.
+No compared field, tolerance, source input, RNG result or damage threshold was
+changed. Diagnostic records and failed candidates remain in
+`work/ucf-off-cohort/remaining-browser/`, including `stage-quake-diagnosis.json`
+and `source-draw-order-diagnosis.json`.
+
+The portable pipeline seed adds 33 descriptors discovered by these development
+trajectories, preserving every prior record and payload. It contains 506 pipeline
+records plus the existing shader record; database SHA-256 is
+`dc7e2e7c8d99ab71b03827d56e55c121b0546759435f5bc57f6689dbb95938e5`.
+The origin was cleared before discovery; no fresh holdout or synthetic warm-up
+was used. Failed development runs remain named in the append-only review's
+provenance. Driver cache contents are not included. See
+`remaining-discovery-pipeline-review.json` and its provenance alongside it.
+
+The mixed-history diagnostic found a separate replay-context limitation. A fresh
+Mario/Falco Yoshi's run matches all 4,324 ticks; following the complete Marth/Falco
+Yoshi's game in the same application instead diverges in RNG at tick 120 and
+exits after 3,598 ticks. Both full red repetitions are retained. Read-only probes
+find the original fresh match's previous Shy Guy pattern is 0, the port's
+canonical fresh import path also has 0, and the later port match inherits 5.
+The original code leaves this allocation byte uncleared. Its rejection of the
+first randomly selected pattern accounts for six extra RNG calls and five Shy
+Guys instead of one; changing the byte would change original behavior.
+
+V2 recipes contain no prior heap context. Their browser entry now requires a
+fresh application, one normal disc import/preparation and no earlier source
+menu/replay execution. Unload does not reset that eligibility. Ordinary gameplay
+is unchanged. The corrected precondition matches the frozen reference workflow;
+it does not establish equivalence across arbitrary preceding match histories.
+That future claim requires independently captured initial stage context in an
+expanded recipe schema. `story-heap-history-diagnosis.json` binds the direct
+observations, LCG branch analysis and retained traces. An early-exit comparator
+now exposes a structurally validated prefix's first divergence while retaining
+`invalid_capture`; it never shortens a reference or converts a prefix into an
+accepted match.
+
+A subsequent reviewed export adds one further descriptor from the retained
+mixed-history development path: type 1, hash `3159515267`, 2,772-byte config
+version 65,549. All 507 prior rows, including metadata, remain byte-identical.
+The final seed has 507 pipelines plus the shader record; its database SHA-256 is
+`cdf157ee0f1850884f07a71165fd2192177acb23c2c777313b719e70ea67546f`. This appends a portable
+renderer resource without accepting the failed replay's initial context.
+The export/provenance chain and append-only review are in
+`work/ucf-off-cohort/remaining-browser/pipeline-review/`.
+
+
+The first isolated cold/warm sweep after indexing the native array registry
+completed all five games but passed eight of ten timing runs. Fox/Marth Dream
+Land and Marth/Falco Yoshi's Story each had one warm browser interval over the
+33.3 ms gate (43.815 and 45.105 ms). Their native frame-finalization phases took
+28.370 and 28.750 ms despite zero live pipeline creation, heap growth or audio
+faults. These remain performance reds.
+
+The preceding CPU profile identified two separate persistent costs: each native
+vertex-array lookup scanned all owners, and generation-only ownership checks
+walked the SDK heap. An exact `(attribute, address, stride)` index now retains
+live aliases and their original maximum byte bound. Registration and removal
+preserve ownership and rollback on allocation failure. Generation-only queries
+retain the existing live-world/allocator checks without collecting heap stats.
+The source tick/draw order and numerical behavior are unchanged. Release also
+uses the same production Emscripten settings as the gameplay probe; explicit
+runtime admission checks remain active.
+
+The first expanded finalization diagnostic reproduced a 34.715 ms browser gap
+and 20.155 ms end-frame phase, of which only 1.610 ms was attributable to the
+initial subphases. A second instrumentation build covers the remaining outer
+preparation, bookkeeping, completion-observer registration, callback and worker
+lifetimes with explicit residuals. Two complete warm repetitions of each
+previously affected workload then passed. This does not establish a cause or
+close the intermittent red. All failed and passing diagnostic records are bound
+in `work/ucf-off-cohort/remaining-browser/intermittent-end-frame-diagnosis.json`;
+the earlier profile and persistent-cost diagnosis are in
+`performance-lookup-diagnosis.json`. No threshold was relaxed, source draw
+skipped, expected state changed, or fresh holdout executed.
+
+
+The final Release build separately revalidated all five new source-drawn state
+captures (20,915 ticks) and three earlier controls: Battlefield draw order,
+timed Marth/Marth Yoshi's Story and timed Fox/Fox Final Destination (17,725 ticks).
+Every declared field, input vector, RNG value, enabled timer and complete ending
+matches both originals. This is 38,640 final-build ticks; the earlier complete
+13-game regression retains its source-fix build identity. The unique corpus
+still totals 71,735 ticks across 17 complete games and one bounded recording.
+All 518 tests pass without skips.
+
+The ten final-build cold/warm measurements pass their scoped gates, with one
+source draw per consumed tick, no timing resumes and zero callbacks over
+33.3 ms, live pipeline creation, live Wasm heap growth, browser long tasks or
+audio-queue faults. The first full-partition warm reports for `a822` and `dca`
+are reused by their preselected hashes, not counted as new executions. The
+remaining eight runs followed `final-build-validation-plan.json`; diagnostic
+repeats remain separate. No build, tests, reference collector or state observer
+ran during these timing measurements.
+
+| Donor | Cold native / browser / preparation ms | Warm native / browser / preparation ms |
+| --- | ---: | ---: |
+| `7e5a8d15` | 10.050 / 25.915 / 169.505 | 10.045 / 24.705 / 167.815 |
+| `8075c5d5` | 10.835 / 23.360 / 167.255 | 10.645 / 23.685 / 167.775 |
+| `a822bb8d` | 9.405 / 25.095 / 183.990 | 9.995 / 27.485 / 167.290 |
+| `dca20df0` | 10.440 / 27.000 / 184.800 | 12.830 / 29.420 / 201.460 |
+| `e2a3baac` | 10.230 / 25.625 / 150.640 | 9.625 / 26.485 / 150.595 |
+
+These are visible Chromium 152 measurements on the named AC-powered Apple M4,
+640×480 at DPR2, with driver cache uncontrolled. They do **not** close the three
+retained intermittent finalization reds or admit gold/content. The candidate
+remains unfrozen and both fresh holdouts remain unexecuted.
+
+The final bound record is
+`work/ucf-off-cohort/remaining-browser/final-validation-ledger.json`, SHA-256
+`9ba744bc8a05f101159262ba5f11279f20fd9a5f178b263e017b70fc009d029c`.
+It binds original A/B, source/settings/recipe identities, state and timer traces,
+endings, exact browser reports, the 13 executable artifacts, reviewed diagnostics
+and test logs. Final browser Wasm SHA-256 is
+`e14d69f678e26e136eaf1962cfce129f8b42d51e0e11537d14808f5a837e3790`.
+No browser errors were present at final inspection. Owned Dolphin/GDB instances,
+profiling windows, replay tabs and the temporary evidence server were closed;
+pre-existing user tabs and servers were retained.

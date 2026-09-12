@@ -113,6 +113,59 @@ def compare_rows(reference, rows):
     return report
 
 
+def _read_port_rows(raw, path):
+    """Decode one port JSONL byte string without repairing or dropping rows."""
+
+    try:
+        text = raw.decode('utf-8')
+    except UnicodeDecodeError as error:
+        raise CaptureError(f'{path}: port capture is not UTF-8: {error}') from error
+    if not text:
+        raise CaptureError(f'{path}: port capture is empty')
+    rows = []
+    for line_number, line in enumerate(text.splitlines(), 1):
+        if not line.strip():
+            raise CaptureError(f'{path}:{line_number}: blank JSONL line')
+        try:
+            row = json.loads(line, object_pairs_hook=_reject_duplicate_keys)
+        except (_DuplicateKey, json.JSONDecodeError) as error:
+            raise CaptureError(f'{path}:{line_number}: invalid JSON: {error}') from error
+        if not isinstance(row, dict):
+            raise CaptureError(f'{path}:{line_number}: each record must be an object')
+        rows.append(row)
+    if not rows:
+        raise CaptureError(f'{path}: port capture is empty')
+    return rows
+
+
+def _validated_prefix_report(reference, rows, *, reference_a_hash, reference_b_hash,
+                             port_hash):
+    """Return a non-accepting prefix report, or None when the prefix is invalid.
+
+    The dedicated diagnostic module owns the prefix schema checks and comparison.
+    Import it only after strict comparison fails so the normal validator remains
+    independent of diagnostic-only code during ordinary complete comparisons.
+    """
+
+    from port_replay_diagnostics import diagnose_rows
+
+    try:
+        diagnostic = diagnose_rows(
+            reference, rows, reference_a_sha256=reference_a_hash,
+            reference_b_sha256=reference_b_hash, port_sha256=port_hash)
+    except CaptureError:
+        return None
+    diagnostic['status'] = 'invalid_capture'
+    diagnostic['gold_admitted'] = False
+    diagnostic['performance'] = 'not_evaluated'
+    diagnostic['diagnostic_status'] = 'validated_prefix'
+    diagnostic['error'] = (
+        'port capture is incomplete; validated prefix only, with no successful '
+        'teardown/end record'
+    )
+    return diagnostic
+
+
 def compare_paths(first, second, port, *, cpu="Interpreter64"):
     report={'status':'invalid_capture','gold_admitted':False,'performance':'not_evaluated'}
     try:
@@ -121,11 +174,19 @@ def compare_paths(first, second, port, *, cpu="Interpreter64"):
         if path.stat().st_size>128*1024*1024: raise CaptureError('port capture exceeds byte limit')
         raw=path.read_bytes()
         if len(raw)>128*1024*1024: raise CaptureError('port capture exceeds byte limit')
-        rows=[json.loads(line, object_pairs_hook=_reject_duplicate_keys)
-              for line in raw.decode('utf-8').splitlines()]
-        report=compare_rows(reference,rows)
+        rows=_read_port_rows(raw,path)
+        port_hash=hashlib.sha256(raw).hexdigest()
+        try:
+            report=compare_rows(reference,rows)
+        except CaptureError as error:
+            prefix_report=_validated_prefix_report(
+                reference, rows, reference_a_hash=a_hash,
+                reference_b_hash=b_hash, port_hash=port_hash)
+            if prefix_report is None:
+                raise error
+            report=prefix_report
         report['capture_hashes']={'reference_a':a_hash,'reference_b':b_hash,
-                                  'port':hashlib.sha256(raw).hexdigest()}
+                                  'port':port_hash}
         report['reference_repeatability']='pass'
         report['reference_cpu']=cpu
     except (CaptureError,RecipeError,_DuplicateKey,OSError,UnicodeError,json.JSONDecodeError) as error:

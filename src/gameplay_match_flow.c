@@ -24,7 +24,7 @@ static int fail(char* error, size_t size, const char* message)
 static int live(const MeleeWebMatchFlow* flow)
 {
     return flow && flow == owner &&
-        flow->generation == melee_web_gameplay_stats().generation;
+        flow->generation == melee_web_gameplay_generation();
 }
 static void source_frame(void)
 {
@@ -32,7 +32,7 @@ static void source_frame(void)
 }
 MeleeWebMatchFlow* melee_web_match_flow_begin(char* error, size_t size)
 {
-    const uint64_t generation = melee_web_gameplay_stats().generation;
+    const uint64_t generation = melee_web_gameplay_generation();
     if (owner || !generation) {
         fail(error, size, "Original match flow requires an unowned source world");
         return NULL;

@@ -1,10 +1,12 @@
 """The diagnostic may find agreement, but never admit incomplete/gold evidence."""
 from copy import deepcopy
+import json
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
-from port_replay_validation import compare_rows, validate_port
+from port_replay_validation import compare_paths, compare_rows, validate_port
 from retail_replay_validation import CaptureError, _validate_capture
 from test_retail_replay_validation import candidate
 
@@ -22,6 +24,23 @@ def fixture():
                      'supplied_inputs':row['consumed_inputs'][0]})
     port.append(deepcopy(rows[-1]))
     return reference,deepcopy(port)
+
+
+def _write(path, rows):
+    path.write_text(''.join(json.dumps(row, separators=(',', ':')) + '\n'
+                         for row in rows), encoding='utf-8')
+
+
+def _paths(port_rows):
+    directory = tempfile.TemporaryDirectory(prefix='port-validation-')
+    root = Path(directory.name)
+    reference_a = candidate()
+    reference_b = candidate()
+    paths = (root / 'reference-a.jsonl', root / 'reference-b.jsonl', root / 'port.jsonl')
+    _write(paths[0], reference_a)
+    _write(paths[1], reference_b)
+    _write(paths[2], port_rows)
+    return directory, paths
 
 
 class PortReplayTests(unittest.TestCase):
@@ -72,5 +91,74 @@ class PortReplayTests(unittest.TestCase):
         for mutate in mutations:
             port=deepcopy(good);mutate(port)
             with self.assertRaises(CaptureError): validate_port(port)
+
+    def test_incomplete_early_exit_keeps_first_divergence_diagnostic(self):
+        _, port = fixture()
+        prefix = deepcopy(port[:-1])
+        prefix[4]['supplied_inputs'][0] = '01' + '00' * 10
+        directory, paths = _paths(prefix)
+        try:
+            result = compare_paths(*paths)
+        finally:
+            directory.cleanup()
+        self.assertEqual(result['status'], 'invalid_capture')
+        self.assertEqual(result['diagnostic_status'], 'validated_prefix')
+        self.assertEqual(result['first_divergence']['record'], 'frame')
+        self.assertEqual(result['first_divergence']['frame'], 1)
+        self.assertEqual(result['first_divergence']['field'], '[0]')
+        self.assertEqual(result['checks']['inputs'], 'diverged')
+        self.assertFalse(result['gold_admitted'])
+        self.assertEqual(result['performance'], 'not_evaluated')
+
+    def test_matching_prefix_stays_invalid_and_reports_missing_teardown(self):
+        _, port = fixture()
+        directory, paths = _paths(port[:-1])
+        try:
+            result = compare_paths(*paths)
+        finally:
+            directory.cleanup()
+        self.assertEqual(result['status'], 'invalid_capture')
+        self.assertEqual(result['diagnostic_status'], 'validated_prefix')
+        self.assertIsNone(result['first_divergence'])
+        self.assertEqual(result['observed_frames'], 3)
+        self.assertEqual(result['frames_compared'], 3)
+        self.assertFalse(result['gold_admitted'])
+        self.assertEqual(result['performance'], 'not_evaluated')
+        self.assertIn('teardown/end', result['error'])
+
+    def test_malformed_prefix_has_no_misleading_comparison(self):
+        _, port = fixture()
+        prefix = deepcopy(port[:-1])
+        prefix[4]['index'] = 0
+        directory, paths = _paths(prefix)
+        try:
+            result = compare_paths(*paths)
+        finally:
+            directory.cleanup()
+        self.assertEqual(result['status'], 'invalid_capture')
+        self.assertNotIn('diagnostic_status', result)
+        self.assertIsNone(result.get('first_divergence'))
+        self.assertNotIn('frames_compared', result)
+        self.assertIn('incomplete or extra records', result['error'])
+
+    def test_duplicate_json_key_is_rejected_without_prefix_diagnostic(self):
+        _, port = fixture()
+        directory = tempfile.TemporaryDirectory(prefix='port-validation-duplicate-')
+        try:
+            root = Path(directory.name)
+            paths = (root / 'reference-a.jsonl', root / 'reference-b.jsonl', root / 'port.jsonl')
+            _write(paths[0], candidate())
+            _write(paths[1], candidate())
+            paths[2].write_text(
+                json.dumps(port[0], separators=(',', ':')) + '\n' +
+                '{"record":"header","record":"header"}\n',
+                encoding='utf-8')
+            result = compare_paths(*paths)
+        finally:
+            directory.cleanup()
+        self.assertEqual(result['status'], 'invalid_capture')
+        self.assertNotIn('diagnostic_status', result)
+        self.assertIsNone(result.get('first_divergence'))
+        self.assertIn('duplicate JSON key', result['error'])
 
 if __name__=='__main__': unittest.main()

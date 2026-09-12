@@ -98,7 +98,7 @@ static void free_descriptors(MeleeWebNativeJoint* handle)
 int melee_web_native_joint_destroy(MeleeWebNativeJoint* handle, char* error, size_t size)
 {
     if (handle && handle->owner) {
-        if (handle->generation != melee_web_gameplay_stats().generation)
+        if (handle->generation != melee_web_gameplay_generation())
             return fail(error, size, "Native HSD teardown requires its original owned world");
         if (handle->owner == HSD_GObj_804D781C)
             return fail(error, size, "Cannot destroy a native HSD owner inside its current callback");
@@ -478,7 +478,7 @@ MeleeWebNativeJoint* melee_web_native_common_joint_create(const MeleeWebNativeGr
 
 int melee_web_native_joint_stats(const MeleeWebNativeJoint* h, MeleeWebNativeJointStats* out, char* error, size_t size)
 {
-    if (!h || !out || !h->owner || h->generation != melee_web_gameplay_stats().generation)
+    if (!h || !out || !h->owner || h->generation != melee_web_gameplay_generation())
         return fail(error, size, "Native HSD handle is no longer in a live owned world");
     MeleeWebNativeJointStats result = {0}; result.generation = h->generation;
     for (uint32_t i = 0; i < h->joint_count; ++i) {
@@ -534,7 +534,7 @@ MeleeWebNativeJoint* melee_web_native_joint_hydrate(const MeleeWebNativeGraph* g
 }
 void* melee_web_native_joint_descriptor(MeleeWebNativeJoint* h, char* error, size_t size)
 {
-    if (!h || (h->generation && (!h->owner || h->generation != melee_web_gameplay_stats().generation))) {
+    if (!h || (h->generation && (!h->owner || h->generation != melee_web_gameplay_generation()))) {
         fail(error, size, "Native joint descriptor requires a live owner"); return NULL;
     }
     if (error && size) error[0] = 0;
@@ -554,7 +554,7 @@ void* melee_web_native_joint_material_descriptor(MeleeWebNativeJoint* h,uint32_t
 }
 void* melee_web_native_joint_object(MeleeWebNativeJoint* h, char* error, size_t size)
 {
-    if (!h || !h->owner || h->generation != melee_web_gameplay_stats().generation) {
+    if (!h || !h->owner || h->generation != melee_web_gameplay_generation()) {
         fail(error, size, "Native joint object requires its original live world"); return NULL;
     }
     if (error && size) error[0] = 0;

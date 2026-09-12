@@ -10,6 +10,7 @@
 #include "menu_preparation_state.hpp"
 #include "browser_input.h"
 #include "animation_clock.hpp"
+#include "source_frame_sequence.hpp"
 #include <aurora/aurora.h>
 #include <aurora/event.h>
 #include <aurora/main.h>
@@ -36,6 +37,11 @@ std::unique_ptr<melee_web::GameplayMatchSession> match;
 std::unique_ptr<melee_web::RetailReplayRecipe> replay;
 size_t replay_cursor=0;
 bool replay_trace=false,replay_pending=false,replay_started=false,replay_final_draw=false;
+// V2 recipes come from fresh original processes and do not carry heap history.
+// Original stage callbacks can read uncleared allocation bytes (Shy Guy pattern).
+// Do not reset this eligibility on unload or normalize those gameplay bytes.
+bool reference_heap_used=false;
+unsigned reference_menu_preparations=0;
 bool replay_match_complete=false;
 int replay_outcome=0,replay_winner=-1;
 MeleeWebMenuHost* host=nullptr;
@@ -184,6 +190,7 @@ void close(){
  }
 }
 void enter_world(){
+ reference_heap_used=true;
  const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
  char error[256]{};const bool prepared=world!=nullptr;
  if(!prepared)world=std::make_unique<melee_web::GameplayMenuWorld>(files,*archive_cache);
@@ -297,6 +304,10 @@ void tick(){
  const AuroraStats stats_before=aurora_stats_snapshot();
  double input_done=started,simulation_done=started,begin_done=started,draw_done=started,end_done=started;
  double preparation_ms=0,preparation_started=0;
+ double render_begin_ms=0,render_draw_ms=0,render_end_ms=0,render_total_ms=0,simulation_cpu_ms=0;
+ uint32_t callback_draw_calls=0,callback_texture_upload=0,callback_staging_used=0;
+ AuroraStats callback_end_stats{};
+ melee_web::SourceFrameSequence source_frames;
  int began=0,drawn=1,timing_valid=1,first_use=0;
  // A transition request owns the whole callback in which it is observed.
  // Keep the source presenter out of both the request and audio-ack waits.
@@ -312,6 +323,65 @@ void tick(){
   input_done=emscripten_get_now();
   const double clock_now=emscripten_get_now();
   char error[256]{};
+  const auto present_source=[&](){
+  bool drew_source=false;
+  bool began_this_frame=false;
+  const double render_started=emscripten_get_now();
+  if(aurora_begin_frame()){
+   began=1;began_this_frame=true;begin_done=emscripten_get_now();
+   GXSetCopyClear(GXColor{0,0,0,255},GX_MAX_Z24);
+   if(!suppress_draw){
+    if(!faulted){
+     if(match){match->draw();actual_source_draw=true;drew_source=true;}
+     else if(world&&host_entered){drawn=melee_web_menu_host_draw(host,error,sizeof(error));actual_source_draw=drawn!=0;drew_source=drawn!=0;}
+    }
+   }
+   draw_done=emscripten_get_now();
+   aurora_end_frame();end_done=emscripten_get_now();check(drawn,error);
+   if(replay&&!replay_final_draw&&replay_cursor==replay->frames.size()&&drew_source){
+    replay_final_draw=true;replay_completed_now=true;running=false;menu_clock.reset();
+    message="Reference replay complete; all input consumed and final frame drawn.";
+   }
+   if(drew_source&&running){
+    if(first_use_draw_pending){first_use=1;first_use_draw_pending=false;}
+   }
+  }
+  else{begin_done=draw_done=end_done=emscripten_get_now();}
+
+  render_begin_ms+=begin_done-render_started;
+  render_draw_ms+=draw_done-begin_done;
+  render_end_ms+=end_done-draw_done;
+  render_total_ms+=end_done-render_started;
+  if(began_this_frame){
+   const auto rendered=aurora_stats_snapshot();
+   callback_draw_calls+=rendered.drawCallCount;
+   callback_texture_upload+=rendered.lastTextureUploadSize;
+   callback_staging_used+=rendered.lastVertSize+rendered.lastUniformSize+
+                         rendered.lastIndexSize+rendered.lastStorageSize+
+                         rendered.lastTextureUploadSize;
+   callback_end_stats.lastEndFrameId=rendered.lastEndFrameId;
+   callback_end_stats.lastEndFrameFifoTextureMs+=rendered.lastEndFrameFifoTextureMs;
+   callback_end_stats.lastEndFrameGfxFinishMs+=rendered.lastEndFrameGfxFinishMs;
+   callback_end_stats.lastEndFrameStagingWritesMs+=rendered.lastEndFrameStagingWritesMs;
+   callback_end_stats.lastEndFrameSurfaceEncodeMs+=rendered.lastEndFrameSurfaceEncodeMs;
+   callback_end_stats.lastEndFrameEncoderFinishMs+=rendered.lastEndFrameEncoderFinishMs;
+   callback_end_stats.lastEndFrameQueueSubmitMs+=rendered.lastEndFrameQueueSubmitMs;
+   callback_end_stats.lastEndFrameCleanupMs+=rendered.lastEndFrameCleanupMs;
+   callback_end_stats.lastEndFrameOuterPrepMs+=rendered.lastEndFrameOuterPrepMs;
+   callback_end_stats.lastEndFrameRecordMs+=rendered.lastEndFrameRecordMs;
+   callback_end_stats.lastEndFramePacketMs+=rendered.lastEndFramePacketMs;
+   callback_end_stats.lastEndFrameCallbackMs+=rendered.lastEndFrameCallbackMs;
+   callback_end_stats.lastEndFrameCallbackPostSubmitMs+=rendered.lastEndFrameCallbackPostSubmitMs;
+   callback_end_stats.lastEndFrameObserverMs+=rendered.lastEndFrameObserverMs;
+   callback_end_stats.lastEndFrameCallbackResidualMs+=rendered.lastEndFrameCallbackResidualMs;
+   callback_end_stats.lastEndFrameTailMs+=rendered.lastEndFrameTailMs;
+   callback_end_stats.lastEndFrameWorkerMs+=rendered.lastEndFrameWorkerMs;
+   callback_end_stats.lastEndFrameWorkerResidualMs+=rendered.lastEndFrameWorkerResidualMs;
+   callback_end_stats.lastEndFrameTotalMs+=rendered.lastEndFrameTotalMs;
+   callback_end_stats.lastEndFrameResidualMs+=rendered.lastEndFrameResidualMs;
+  }
+  return drew_source;
+  };
   const bool audio_before_construction=transition_audio_continues&&
                                        (!running||preparation.busy());
   MeleeWebAudio* const audio_owner=match?match->audio():world?world->audio():nullptr;
@@ -353,6 +423,7 @@ void tick(){
   }
   for(unsigned step=0;step<elapsed.steps;step++){
    if(replay&&replay_cursor==replay->frames.size())break;
+   source_frames.before_step(present_source);
    PADStatus checked_input[4];const PADStatus* sample=input->raw;bool copied_input=false;
    bool diagnostic_start_pulse=false;
    if(diagnostic_start_ticks){
@@ -386,7 +457,8 @@ void tick(){
      }
      sample=replay->frames[replay_cursor].pads.data();
     }
-    match->tick(sample);int winner=-1;const int outcome=match->outcome(winner);
+    match->tick(sample);source_frames.did_step();
+    int winner=-1;const int outcome=match->outcome(winner);
     if(replay){
      replay_match_complete=match->complete();replay_outcome=outcome;replay_winner=winner;
      if(replay_trace)melee_web::retail_replay_frame(*replay,replay_cursor);
@@ -406,39 +478,21 @@ void tick(){
     }
     if(match->complete()&&!replay){check(outcome,"Original match transitioned without an outcome");pending=true;result=3;}
    }
-   else{result=melee_web_menu_host_tick(host,sample,error,sizeof(error));check(result==1||result==3,error);}
+   else{result=melee_web_menu_host_tick(host,sample,error,sizeof(error));check(result==1||result==3,error);source_frames.did_step();}
    if(result==3){pending=true;clear_diagnostic_pad();break;}
   }
   if(!audio_before_construction&&!audio_elapsed.stalled)
    for(unsigned step=0;step<audio_elapsed.steps;step++)
     render_audio_tick(audio_owner,error,sizeof(error));
   simulation_done=emscripten_get_now();
-  begin_done=simulation_done;
-  if(aurora_begin_frame()){
-   began=1;begin_done=emscripten_get_now();
-   GXSetCopyClear(GXColor{0,0,0,255},GX_MAX_Z24);
-   if(!suppress_draw){
-    if(!faulted){
-     if(match){match->draw();actual_source_draw=true;}
-     else if(world&&host_entered){drawn=melee_web_menu_host_draw(host,error,sizeof(error));actual_source_draw=drawn!=0;}
-    }
-   }
-   draw_done=emscripten_get_now();
-   aurora_end_frame();end_done=emscripten_get_now();check(drawn,error);
-   if(replay&&!replay_final_draw&&replay_cursor==replay->frames.size()&&actual_source_draw){
-    replay_final_draw=true;replay_completed_now=true;running=false;menu_clock.reset();
-    message="Reference replay complete; all input consumed and final frame drawn.";
-   }
-   if(actual_source_draw&&running){
-    first_use=first_use_draw_pending?1:0;
-    first_use_draw_pending=false;
-   }
-  }
-  else{draw_done=begin_done;end_done=begin_done;}
-  // Normal scheduling can group source ticks, but a callback that consumed
-  // replay input must execute its source draw. A missed surface frame cannot
-  // later produce a successful rendered trace by drawing only the final tick.
-  check(!replay_steps||actual_source_draw,"Reference replay could not draw after consuming source input");
+  simulation_cpu_ms=std::max(0.0,simulation_done-input_done-preparation_ms-render_total_ms);
+  source_frames.finish(present_source);
+  // Camera callbacks mutate source state (including magnifier damage flags).
+  // A callback without a source tick must retain the last image; preparation
+  // alone may redraw a frozen scene to settle its explicitly measured resources.
+  if(source_frames.steps()==0&&(preparation.warming()||(!world&&!match)))present_source();
+  check(!replay_steps||source_frames.draws()==replay_steps,
+        "Reference replay did not draw every consumed source tick");
  }catch(const std::exception& e){running=false;faulted=true;preparation.reset();render_only_preparation=false;pending=false;clear_diagnostic_pad();menu_clock.reset();message=e.what();if(preparation_started)preparation_ms=emscripten_get_now()-preparation_started;preparation_failed(e.what());timing_valid=0;std::fprintf(stderr,"Native menu: %s\n",e.what());
   const double failed=emscripten_get_now();
   if(input_done<started)input_done=failed;
@@ -454,7 +508,7 @@ void tick(){
   stat_delta(stats_after.createdPipelines,stats_before.createdPipelines)!=0||
   stats_after.lastTextureUploadSize!=0;
  const bool was_warming=preparation.warming();
- if(was_warming)preparation_profile.observe(finished-started,draw_done-begin_done,end_done-draw_done,
+ if(was_warming)preparation_profile.observe(finished-started,render_draw_ms,render_end_ms,
                                              actual_source_draw,stats_before,stats_after);
  if(preparation.observe_render(actual_source_draw,stats_after.queuedPipelines,render_preparation_activity)){
   preparation_profile.report(finished);
@@ -474,27 +528,57 @@ void tick(){
    running=false;menu_clock.reset();message="Preparing first-use rendering...";
   }
  }
- char timing[1024];
- const uint32_t staging_used_bytes=began?
-  stats_after.lastVertSize+stats_after.lastUniformSize+stats_after.lastIndexSize+
-  stats_after.lastStorageSize+stats_after.lastTextureUploadSize:0;
+ char timing[4096];
+ const uint32_t staging_used_bytes=callback_staging_used;
  std::snprintf(timing,sizeof(timing),
   "{\"frame\":%u,\"started\":%.3f,\"valid\":%d,\"first_use\":%d,"
   "\"input_ms\":%.3f,\"simulation_audio_ms\":%.3f,\"preparation_ms\":%.3f,"
   "\"begin_ms\":%.3f,\"draw_ms\":%.3f,\"end_ms\":%.3f,\"total_ms\":%.3f,"
+  "\"end_phases\":{\"last_frame\":%llu,\"fifo_texture_ms\":%.3f,\"gfx_finish_ms\":%.3f,"
+  "\"staging_writes_ms\":%.3f,\"surface_encode_ms\":%.3f,\"encoder_finish_ms\":%.3f,"
+  "\"queue_submit_ms\":%.3f,\"cleanup_ms\":%.3f,"
+  "\"outer_prep_ms\":%.3f,"
+  "\"record_ms\":%.3f,"
+  "\"packet_ms\":%.3f,"
+  "\"callback_ms\":%.3f,"
+  "\"callback_post_submit_ms\":%.3f,"
+  "\"observer_ms\":%.3f,"
+  "\"callback_residual_ms\":%.3f,"
+  "\"tail_ms\":%.3f,"
+  "\"worker_ms\":%.3f,"
+  "\"worker_residual_ms\":%.3f,"
+  "\"total_ms\":%.3f,"
+  "\"residual_ms\":%.3f},"
   "\"began\":%d,\"drawn\":%d,\"queued_delta\":%d,\"created_delta\":%d,"
   "\"queued_total\":%u,\"created_total\":%u,\"draw_calls\":%u,"
   "\"texture_upload_bytes\":%u,\"staging_used_bytes\":%u,"
-  "\"wasm_heap_bytes\":%zu,\"draw_suppressed\":%d}",
+  "\"wasm_heap_bytes\":%zu,\"draw_suppressed\":%d,\"source_steps\":%zu,\"source_draws\":%zu}",
   ++render_frame,started,timing_valid,first_use,input_done-started,
-  std::max(0.0,simulation_done-input_done-preparation_ms),preparation_ms,
-  begin_done-simulation_done,draw_done-begin_done,end_done-draw_done,
-  finished-started,began,drawn,
+  simulation_cpu_ms,preparation_ms,
+  render_begin_ms,render_draw_ms,render_end_ms,
+  finished-started,static_cast<unsigned long long>(callback_end_stats.lastEndFrameId),
+  callback_end_stats.lastEndFrameFifoTextureMs,callback_end_stats.lastEndFrameGfxFinishMs,
+  callback_end_stats.lastEndFrameStagingWritesMs,callback_end_stats.lastEndFrameSurfaceEncodeMs,
+  callback_end_stats.lastEndFrameEncoderFinishMs,callback_end_stats.lastEndFrameQueueSubmitMs,
+  callback_end_stats.lastEndFrameCleanupMs,
+  callback_end_stats.lastEndFrameOuterPrepMs,
+  callback_end_stats.lastEndFrameRecordMs,
+  callback_end_stats.lastEndFramePacketMs,
+  callback_end_stats.lastEndFrameCallbackMs,
+  callback_end_stats.lastEndFrameCallbackPostSubmitMs,
+  callback_end_stats.lastEndFrameObserverMs,
+  callback_end_stats.lastEndFrameCallbackResidualMs,
+  callback_end_stats.lastEndFrameTailMs,
+  callback_end_stats.lastEndFrameWorkerMs,
+  callback_end_stats.lastEndFrameWorkerResidualMs,
+  callback_end_stats.lastEndFrameTotalMs,
+  callback_end_stats.lastEndFrameResidualMs,
+  began,drawn,
   stat_delta(stats_after.queuedPipelines,stats_before.queuedPipelines),
   stat_delta(stats_after.createdPipelines,stats_before.createdPipelines),
   stats_after.queuedPipelines,stats_after.createdPipelines,
-  stats_after.drawCallCount,stats_after.lastTextureUploadSize,staging_used_bytes,
-  emscripten_get_heap_size(),suppress_draw);
+  callback_draw_calls,callback_texture_upload,staging_used_bytes,
+  emscripten_get_heap_size(),suppress_draw,source_frames.steps(),source_frames.draws());
  EM_ASM({if(window.menuRuntimeTiming)window.menuRuntimeTiming(JSON.parse(UTF8ToString($0)));},timing);
  EM_ASM({window.menuFrame?.(!!$0);},running_at_callback_start?1:0);
  if(replay_completed_now)EM_ASM({window.menuReplayCompleted?.($0,!!$1,$2,$3);},
@@ -520,6 +604,9 @@ int melee_web_native_menu_prepare(){try{
  // simulation callback runs during this preparation phase.
  if(!archive_cache)archive_cache=std::make_unique<melee_web::RuntimeArchiveCache>(files);
  host=melee_web_menu_host_create(error,sizeof(error));check(host!=nullptr,error);
+ // One unentered menu preparation belongs to the canonical fresh import.
+ // Repeating it changes allocation history even without entering a source scene.
+ if(reference_menu_preparations++)reference_heap_used=true;
  world=std::make_unique<melee_web::GameplayMenuWorld>(files,*archive_cache);
  const double constructed=emscripten_get_now();
  report_construction("scene-prepare",started,constructed,constructed,before,aurora_stats_snapshot());
@@ -544,6 +631,8 @@ int melee_web_native_menu_replay(const uint8_t* data,unsigned size,int observe){
  check(observe==0||observe==1,"Invalid replay observation mode");
  auto candidate=std::make_unique<melee_web::RetailReplayRecipe>(melee_web::read_retail_replay({data,size}));
  check(candidate->version==2&&candidate->initial_input,"Browser reference playback requires a v2 PAD history recipe");
+ check(!reference_heap_used,"Reference replay requires a fresh application. Use Reload application state, import the disc, then play the recipe before entering menus.");
+ reference_heap_used=true;
  close();
  if(!archive_cache)archive_cache=std::make_unique<melee_web::RuntimeArchiveCache>(files);
  replay=std::move(candidate);replay_trace=observe;replay_pending=true;
@@ -650,7 +739,8 @@ const char* melee_web_native_menu_diagnostics(){
                 diagnostic_pad_port,static_cast<unsigned>(diagnostic_pad.button),diagnostic_pad.stickX,diagnostic_pad.stickY,diagnostic_pad_remaining);
  else
   std::snprintf(text+length,sizeof(text)-length," · raw PAD: none");
- if(match&&match->ready()){
+ // Ready/Go is already source gameplay, even before the HUD allows controls.
+ if(match&&match->construction_complete()){
   const auto player=match->player_stats(0);
   const auto length=std::char_traits<char>::length(text);
   std::snprintf(text+length,sizeof(text)-length,
