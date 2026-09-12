@@ -65,8 +65,8 @@ the complete CPU data audit; it is retained as UI evidence only.
 The native menu contract checks levels 1–9, rejects out-of-range levels and
 non-VS CPU types, and preserves a level-9 selection through CSS, SSS, four-stock
 preparation and return to CSS. The real-HTTP browser check exercises ordinary
-keyboard input in both pages. Original-game reference evidence is recorded
-separately below as it becomes available.
+keyboard input in both pages. The original-game comparisons below validate two
+bounded Mario/Final Destination workloads, not every admitted CPU selection.
 
 This work does not establish audio, controller hardware, latency, performance,
 or public release admission for the 4×4 slice. Existing evidence and holdout
@@ -87,6 +87,69 @@ CPU-generated fighter input is an output of original simulation, not an input
 copied from the reference into the port. Difficulty and player-type metadata
 must agree with the independently observed original setup before comparison.
 
+## CPU original-game comparisons — 2026-09-12
+
+Mario human P1 versus Mario CPU P2 on Final Destination matches independent
+original-game captures at both ends of the difficulty range. Each workload
+supplies 480 neutral P1 ticks and leaves P2's connected PAD neutral; the CPU
+generates its own fighter input. Both setups use four stocks, no timer,
+ordinary VS CPU kind 4, and source-selected levels 1 or 9. Observed entry data
+has human rumble enabled and CPU rumble disabled.
+
+| Difficulty | Independent original executions | Compiled trace target | Drawn browser runtime |
+| --- | --- | --- | --- |
+| 1 | Exact agreement, 480 ticks | Exact declared state, 480 ticks | Exact declared state, 480 steps and 480 draws |
+| 9 | Exact agreement, 480 ticks | Exact declared state, 480 ticks | Exact declared state, 480 steps and 480 draws |
+
+The existing strict comparators check entry, consumed input, declared fighter
+fields including CPU-generated input, RNG, match clock, PAD configuration and
+all three PAD history banks. No comparison field, tolerance or acceptance gate
+was relaxed. Each original draw audit observes all 480 camera traversals with
+no change to those declared state fields. The browser reports pass their
+`state_capture` validation with zero timing resumes. Drawing was executed;
+pixels were not compared. Neither 480-tick workload completes a match.
+
+Each original run starts a fresh pinned Dolphin Interpreter64 process for
+GALE01r2, using the owned baseline SSS snapshot and save data. A hashed input
+driver repeats the original CSS/SSS menu selection before arming the observer:
+it changes P2 to CPU, selects the difficulty through the original slider and
+starts the match. It writes no source memory, registers, RNG or fighter state.
+The baseline must already contain the recorded unlock state; the driver rejects
+otherwise. This is baseline plus repeated original menu preparation, not a
+saved CPU checkpoint. Run metadata retains the preparation script, local
+snapshot/save/config hashes, input plan and observer identity.
+
+The reference uses Dolphin commit `c77bbaa0f372c3f72281602a8b087206706542cb`,
+source revision `b43912cc78606f96c9569f5d6229bc9d7e265ea5`, and verified original
+DOL SHA-1 `08e0bf20134dfcb260699671004527b2d6bb1a45`. Raw-v2 pipe configuration
+has no stick calibration or deadzone; the game retains its original PAD
+processing. Every consumed four-port vector and original CPU setup is checked
+against the input-only plan. CPU decisions are never copied into port input.
+
+Paired recipe SHA-256 values:
+
+- Level 1: `fe5dfa245d47f0207991d6666b109ecc8a5877e1230d19d23903f32a188d7d99`.
+- Level 9: `ebffb1b403cffda1d09c97b9202bb434d9d70c1f17875f7c7ba4c2cdd137e0fe`.
+
+Level 1's diagnostic recipe ran before its second original capture finished;
+after pairing, the official exported recipe was verified byte-identical to
+the executed recipe. Its final comparison uses both independent captures.
+Level 9 executed the paired export directly.
+
+The ignored evidence folders are `work/cpu-reference/inline-level1/` and
+`work/cpu-reference/inline-level9-v2/`. They retain source traces, plans,
+independent run metadata, draw audits, exported recipes, native/browser traces
+and comparison reports. `work/prototype-cpu-validation.json` binds those hashes,
+decoded setups and the frozen build identity; its SHA-256 is
+`384e6e91d54c2444a86f9cf1c614929925eacd98bd3bf911bc4615364ac88864`.
+
+Failed checkpoint saves, raw-pipe preflight attempts and the initial level-9
+slider preparation remain diagnostic records in `work/cpu-reference/`; they
+are not passing captures. Levels 2–8 have menu contract coverage but no original
+trace comparison here. Other fighters/stages, full and consecutive matches,
+audio, physical controls and performance still require their own evidence.
+No reserved holdout was used and no gold/public admission is claimed.
+
 ## Human regression control
 
 The existing Mario/Mario Final Destination development pair (`retail-a4` and
@@ -106,6 +169,10 @@ The final Release runtime and retail-trace targets build. Full unittest
 discovery reports 550 tests, no failures and 46 skips for optional fixtures and
 separate trace targets not present in this worktree. The new CPU data, input
 plan and menu tests run.
+
+The CI workflow now installs pinned dependencies before full unittest discovery;
+the former order ran dependency-backed tests before their tools and patched
+sources existed. Native build configuration is unchanged.
 
 Headed Chrome 153 over real HTTP passes all 17 prototype checks. Ordinary
 keyboard input selects B0XX mode, sends Start with P2 disconnected, selects

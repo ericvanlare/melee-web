@@ -283,9 +283,11 @@ explicit slot/port ownership, release/focus behavior and validation.
 The initial shell was new-files-only. The keyboard follow-up also changes
 `src/browser_input.cpp`, `src/browser_input.h`, their existing tests and
 `THIRD_PARTY.md`, and adds `src/boxx_input.h` with its tests/license. These input
-files need coordination if another branch changes them. `runtime.html`, native
-gameplay, renderer/cache instrumentation, patches, and build configuration remain
-untouched. `runtime.html` DOM/status changes are semantic conflicts because the temporary adapter relies on exact IDs, phase values and
+files need coordination if another branch changes them. The CPU follow-up also
+changes the native owners and shared patch listed below. `runtime.html`,
+renderer/cache instrumentation and native build configuration remain untouched.
+CI now installs dependencies before running dependency-backed tests.
+`runtime.html` DOM/status changes are semantic conflicts because the temporary adapter relies on exact IDs, phase values and
 handlers. Future `runtime.html`, CMake/build target, runtime tests,
 `runtime-assets.mjs` manifest or native content-table changes must be coordinated
 with the mount boundary, staging hashes and content bridge.
@@ -396,6 +398,15 @@ source CPU routines and retained PlCo root22 owner. The final HTTP UI test
 passes CPU gameplay and teardown on both pages, plus prototype No Contest
 back to CSS. The old Controls warning about unavailable CPU matches is removed.
 
+Two independent original-game runs per difficulty agree exactly with the port
+for 480 ticks each at CPU levels 1 and 9 (Mario versus Mario on Final
+Destination). Both the compiled trace target and the drawn browser runtime
+match the declared fighter, input, RNG, clock and PAD-history fields. The browser
+executes 480 source steps and 480 draws per workload. These bounded checks do not
+complete matches or establish pixel, audio, hardware or performance acceptance;
+[CPU opponents](CPU_OPPONENTS.md) records the procedure, artifact identities and
+remaining scope.
+
 The CPU follow-up changes `gameplay_menu.c/.h`, the retail setup decoder,
 `dat_common.cpp/.hpp`, common tables/context, reference tools and their tests.
 It also adds the shared player-selection header and a small admission change
@@ -404,3 +415,5 @@ integration conflict risk. Coordinate edits to those native owners when
 integrating; no `runtime.html`, renderer/cache timing, CMake or hitch-capture
 files are changed. Future runtime extraction carries the existing compiled
 runtime dependency, including CPUs, without a separate prototype AI path.
+The only workflow change reorders pinned dependency installation ahead of tests
+in `.github/workflows/verify.yml`.
