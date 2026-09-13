@@ -84,16 +84,21 @@ class GameplayActionStoreTests(unittest.TestCase):
                                      "-sNODERAWFS=1", "-sALLOW_MEMORY_GROWTH=1", "-o", str(output)],
                                     cwd=directory, env=env, capture_output=True, text=True, timeout=120)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            asset = ROOT / "assets-local/next-gate/PlMr.dat"
-            container = ROOT / "assets-local/next-gate/PlMrAJ.dat"
-            args = [str(asset)] if asset.is_file() else []
-            if args and container.is_file():
-                args.append(str(container))
+            owned_pairs = [
+                (ROOT / "assets-local/next-gate/PlMr.dat", ROOT / "assets-local/next-gate/PlMrAJ.dat"),
+                (ROOT / "assets-local/next-gate/PlFx.dat", ROOT / "assets-local/next-gate/PlFxAJ.dat"),
+                (ROOT / "assets-local/next-gate/PlFc.dat", ROOT / "assets-local/next-gate/PlFcAJ.dat"),
+                (ROOT / "assets-local/next-gate/PlMs.dat", ROOT / "assets-local/next-gate/PlMsAJ.dat"),
+            ]
+            available_pairs = [pair for pair in owned_pairs if all(path.is_file() for path in pair)]
+            args = [str(path) for pair in available_pairs for path in pair]
             result = subprocess.run([str(node), str(output), *args], cwd=directory, env=env,
                                     capture_output=True, text=True, timeout=30)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("Original owned action loaders and checked Wait command execution: passed", result.stdout)
-            if len(args) > 1:
+            if len(available_pairs) == len(owned_pairs):
+                self.assertIn("Owned common appeal action rows 239/240 for Mario, Fox, Falco and Marth: passed", result.stdout)
+            if owned_pairs[0] in available_pairs:
                 self.assertIn("Local Mario Wait2/3/6 source command traces and startup clips: passed", result.stdout)
             print(result.stdout, end="")
 

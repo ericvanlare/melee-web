@@ -50,6 +50,11 @@ void melee_web_input_set_keyboard(int enabled);
  * profile is enabled, P1's D-pad moves to Z/X/C/V to avoid arrow overlap;
  * disabling it restores the existing P1 arrow-D-pad mapping. */
 int melee_web_input_set_keyboard_port(unsigned port, int enabled);
+/* Layout 0 preserves the existing per-port profiles. Layout 1 maps the whole
+ * keyboard to B0XX-style port 0 and suppresses port 1 keyboard fallback (physical
+ * ports retain priority). Requested keyboard flags survive switching back.
+ * Clears held input on change; rejects unknown values. No simulation mutation. */
+int melee_web_input_set_keyboard_layout(int layout);
 /* Small JSON diagnostic. No physical-device or gameplay validation is implied. */
 const char* melee_web_input_message(void);
 /* Menu buttons from physical ports 0/1 using the same mapped PAD snapshot. */

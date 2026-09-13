@@ -16,6 +16,8 @@ class BrowserInputTests(unittest.TestCase):
     def setUpClass(cls):
         aurora = ROOT / ".deps/aurora/include"
         sdl = ROOT / "build/browser/_deps/sdl-src/include"
+        if not (sdl / "SDL3/SDL_keyboard.h").is_file():
+            sdl = ROOT / "build/browser-release/_deps/sdl-src/include"
         if not (aurora / "dolphin/pad.h").is_file() or not (sdl / "SDL3/SDL_keyboard.h").is_file():
             raise unittest.SkipTest("Bootstrap and configure the browser build to obtain pinned PAD/SDL headers")
         compiler = shutil.which("clang++") or shutil.which("c++")
@@ -40,6 +42,15 @@ class BrowserInputTests(unittest.TestCase):
         self.assertEqual(len(diagnostic["pads"]), 4)
         self.assertIn(diagnostic["active"], (0, 1))
         return diagnostic
+
+    def test_boxx_mapping_and_layout_switch_clear_held_keys(self):
+        self.run_case("boxx_layout")
+
+    def test_boxx_focus_physical_priority_and_keyboard_disable(self):
+        self.run_case("boxx_focus_and_sources")
+
+    def test_boxx_event_watch_startup_failure_is_explicit(self):
+        self.run_case("boxx_startup_failure")
 
     def test_documented_keyboard_button_and_axis_mapping(self):
         result = self.run_case("binding_mapping")

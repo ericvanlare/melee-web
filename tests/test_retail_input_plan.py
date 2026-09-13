@@ -18,7 +18,7 @@ sys.path.insert(0, str(ROOT/'scripts'))
 from retail_input_plan import (
     PAD, SCHEMA, POLICY, PROCESSED_POLICY, LEGACY_RAW_POLICY, DISCONNECTED_PAD, validate_plan, load_plan,
     plan_from_timeline, prefix_timeline,
-    pipe_commands, verify_capture,
+    pipe_commands, verify_capture, verify_entry,
 )
 from capture_retail_replay import require_raw_pipe_config, CaptureRunnerError
 from retail_replay_validation import _validate_capture
@@ -31,6 +31,20 @@ def plan():
     return {'schema':SCHEMA, 'version':1, 'policy':POLICY, 'source_sha256':'a'*64,
             'first_frame':-123, 'source_stage':32, 'source_characters':[8,8],
             'frames':[['00'*11, '00'*11] for _ in range(3)]}
+
+
+def cpu_plan():
+    value = plan()
+    value.update({
+        'version': 2,
+        'source_player_types': [0, 1],
+        'source_cpu_kinds': [None, 4],
+        'source_cpu_levels': [None, 9],
+        'source_cpu_pad_modes': [None, 'disconnected'],
+        'controlled_ports': [1],
+    })
+    value['frames'] = [[frame[0], DISCONNECTED_PAD] for frame in value['frames']]
+    return value
 
 
 def float_bits(value):
@@ -142,6 +156,37 @@ class RetailInputPlanTests(unittest.TestCase):
         gap = replace(timeline, frames=(timeline.frames[0], timeline.frames[2]))
         with self.assertRaisesRegex(ValueError, 'contiguous'):
             plan_from_timeline(gap, 'a'*64)
+
+    def test_cpu_plan_binds_ordinary_vs_setup_and_disconnects_cpu_pad(self):
+        value = cpu_plan()
+        self.assertIs(validate_plan(value), value)
+        setup = bytearray(0x138)
+        setup[14:16] = (32).to_bytes(2, 'big')
+        setup[0x60], setup[0x84] = 8, 8
+        setup[0x61], setup[0x85] = 0, 1
+        setup[0x6e], setup[0x92] = 0, 4
+        setup[0x6f], setup[0x93] = 0, 9
+        verify_entry(value, setup.hex())
+
+        changed = bytearray(setup)
+        changed[0x93] = 1
+        with self.assertRaisesRegex(ValueError, 'CPU level'):
+            verify_entry(value, changed.hex())
+
+        changed = bytearray(setup)
+        changed[0x92] = 0
+        with self.assertRaisesRegex(ValueError, 'CPU kind'):
+            verify_entry(value, changed.hex())
+
+        changed_plan = deepcopy(value)
+        changed_plan['frames'][0][1] = '00' * 11
+        with self.assertRaisesRegex(ValueError, 'disconnected PAD'):
+            validate_plan(changed_plan)
+
+        neutral = cpu_plan()
+        neutral['source_cpu_pad_modes'][1] = 'neutral'
+        neutral['frames'] = [[frame[0], '00' * 11] for frame in neutral['frames']]
+        self.assertIs(validate_plan(neutral), neutral)
 
     def test_plan_export_requires_a_complete_source_game_end(self):
         timeline = decode_timeline(timeline_fixture())
@@ -320,6 +365,50 @@ class RetailInputPlanTests(unittest.TestCase):
         collector.enter()
         self.assertTrue(collector.active)
         collector.supply_input.assert_called_once_with(0)
+
+    def test_cpu_collector_writes_only_declared_human_pipe(self):
+        class Command:
+            def __init__(self, *args, **kwargs): pass
+        fake = SimpleNamespace(Command=Command, Breakpoint=Command, COMMAND_USER=0)
+        spec = importlib.util.spec_from_file_location(
+            'collector_cpu_publication', ROOT/'tools/reference_replay_capture.py')
+        collector = importlib.util.module_from_spec(spec)
+        with mock.patch.dict(sys.modules, {'gdb': fake}):
+            spec.loader.exec_module(collector)
+        collector.input_plan = cpu_plan()
+        collector.published_inputs = 0
+        with mock.patch.object(collector.os, 'open', return_value=17) as opened, \
+                mock.patch.object(collector.os, 'write', side_effect=lambda fd, data: len(data)) as written, \
+                mock.patch.object(collector.os, 'close') as closed:
+            collector.supply_input(0)
+        self.assertEqual(collector.published_inputs, 1)
+        self.assertEqual(opened.call_count, 1)
+        self.assertIn('/pad1', str(opened.call_args.args[0]))
+        self.assertNotIn('/pad2', str(opened.call_args.args[0]))
+        self.assertTrue(written.call_args.args[1].endswith(b'\n'))
+        closed.assert_called_once_with(17)
+
+    def test_cpu_collector_publishes_declared_neutral_cpu_status(self):
+        class Command:
+            def __init__(self, *args, **kwargs): pass
+        fake = SimpleNamespace(Command=Command, Breakpoint=Command, COMMAND_USER=0)
+        spec = importlib.util.spec_from_file_location(
+            'collector_cpu_neutral_publication', ROOT/'tools/reference_replay_capture.py')
+        collector = importlib.util.module_from_spec(spec)
+        with mock.patch.dict(sys.modules, {'gdb': fake}):
+            spec.loader.exec_module(collector)
+        value = cpu_plan()
+        value['source_cpu_pad_modes'][1] = 'neutral'
+        value['frames'] = [[frame[0], '00' * 11] for frame in value['frames']]
+        collector.input_plan = value
+        collector.published_inputs = 0
+        with mock.patch.object(collector.os, 'open', return_value=17) as opened, \
+                mock.patch.object(collector.os, 'write', side_effect=lambda fd, data: len(data)), \
+                mock.patch.object(collector.os, 'close'):
+            collector.supply_input(0)
+        self.assertEqual(collector.published_inputs, 1)
+        self.assertEqual({str(call.args[0]).rsplit('/', 1)[-1] for call in opened.call_args_list},
+                         {'pad1', 'pad2'})
 
     def test_collector_pad_read_before_restore_publishes_next_vector(self):
         class Command:

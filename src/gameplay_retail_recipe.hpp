@@ -33,6 +33,8 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t>);
 // end is emitted only after the complete input timeline and successful teardown.
 void retail_replay_initial(const RetailReplayRecipe&, bool source_drawing);
 void retail_replay_frame(const RetailReplayRecipe&, size_t index);
+void retail_replay_draw(const RetailReplayRecipe&, size_t index);
+void retail_replay_preparation_draw(const RetailReplayRecipe&);
 void retail_replay_end(size_t frames);
 
 } // namespace melee_web

@@ -29,3 +29,12 @@ replacement is checked against SHA-256
 `d7741279c2e8ec5c5fb318f8fbdd6de6bf583520d288e836a5383233a4238179`.
 It is not a Nintendo hardware ROM dump and is only approximately equivalent.
 The source generator is included; no generated coefficient binary is tracked.
+
+## B0XX-style keyboard mapping
+
+`src/boxx_input.h` adapts the coordinate tables and directional state rules from
+[agirardeau/b0xx-ahk](https://github.com/agirardeau/b0xx-ahk/tree/7c070f8e0f135c8108cfb0af9a37dc6809070b15)
+at commit `7c070f8e0f135c8108cfb0af9a37dc6809070b15`.
+The MIT notice is retained in [licenses/b0xx-ahk.txt](licenses/b0xx-ahk.txt).
+The default key positions come from the same project's `hotkeys.ini`.
+See [keyboard behavior and scope](docs/KEYBOARD_LAYOUTS.md).

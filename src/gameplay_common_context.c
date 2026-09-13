@@ -27,6 +27,7 @@ typedef struct CommonObject { struct MeleeWebCommonContext* context; HSD_GObj* o
 struct MeleeWebCommonContext {
     ftCommonData scalars;
     MeleeWebCommonNative* tables;
+    MeleeWebCommonCpuData* cpu_data;
     MeleeWebNativeJoint* joint;
     Payload* payloads;
     size_t payload_bytes;
@@ -55,6 +56,7 @@ static void release(MeleeWebCommonContext* h)
     if(!h)return;
     if(h->joint)melee_web_native_joint_destroy(h->joint,NULL,0);
     melee_web_common_tables_destroy(h->tables);
+    melee_web_common_cpu_release(h->cpu_data);
     while(h->payloads){Payload* p=h->payloads;h->payloads=p->next;free(p->bytes);free(p);}
     free(h);
 }
@@ -75,6 +77,13 @@ MeleeWebCommonContext* melee_web_common_context_create(const MeleeWebCommonScala
     memcpy((char*)&h->scalars+offset,(const char*)input+offset,sizeof(input->name));
     MELEE_WEB_COMMON_FIELDS(COPY_FIELD)
 #undef COPY_FIELD
+    /* DatCommon owns the decoded PlCo graph.  The context takes a reference
+     * before publishing Fighter_804D64FC, so the archive owner may be
+     * destroyed while original fighters still use the graph. */
+    if(tables->cpu_data&&!melee_web_common_cpu_retain(tables->cpu_data)){
+        fail(error,size,"Common CPU data handle cannot be retained");release(h);return NULL;
+    }
+    h->cpu_data=tables->cpu_data;
     h->tables=melee_web_common_tables_create(tables,error,size);if(!h->tables){release(h);return NULL;}
     // Validate the complete graph before copying bounded borrowed byte spans.
     MeleeWebNativeJoint* checked=melee_web_native_joint_hydrate(graph,error,size);
@@ -107,8 +116,10 @@ MeleeWebCommonContext* melee_web_common_context_create(const MeleeWebCommonScala
     }
     h->joint=melee_web_native_joint_hydrate(&owned,error,size);if(!h->joint){release(h);return NULL;}
     h->ready_mask=tables->ready_mask|1u|(1u<<20);
+    if(h->cpu_data)h->ready_mask|=1u<<22;
     h->roots[0]=&h->scalars;
     for(uint32_t r=1;r<23;++r)h->roots[r]=(void*)melee_web_common_tables_root(h->tables,r);
+    h->roots[22]=h->cpu_data?h->cpu_data->root:NULL;
     h->roots[20]=melee_web_native_joint_descriptor(h->joint,error,size);
     success(error,size);return h;
 oom:

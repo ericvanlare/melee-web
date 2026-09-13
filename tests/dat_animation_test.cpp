@@ -59,6 +59,37 @@ void unsupported_channels_and_formats()
     }
 }
 
+void native_action_channel_policy()
+{
+    Bytes node_stream = segment(2, 0, 10, 10);
+    MeleeWebAnimationTrack node{node_stream.data(), node_stream.size(), 0, 11, 0, 0};
+    char error[256];
+    check(!melee_web_animation_validate_track(&node, error, sizeof(error)) && error[0],
+          "generic inspection validation rejects source node visibility channels");
+    check(!melee_web_animation_validate_native_track(&node, error, sizeof(error)) && error[0],
+          "generic native pose validation rejects source node visibility channels");
+    check(melee_web_animation_validate_native_action_track(&node, error, sizeof(error)) && !error[0],
+          "native fighter action validation admits source node visibility channels");
+
+    Fixture fixture(node_stream, 11);
+    rejects([&] { (void) fixture.animation(); });
+    const auto action = melee_web::DatAnimation(
+        fixture.archive(), Fixture::root, melee_web::DatAnimationPolicy::NativeFighterAction);
+    check(action.tracks.size() == 1 && action.tracks[0].type == 11,
+          "native fighter action policy retains the checked node track");
+
+    for (auto type : {12, 20, 255}) {
+        MeleeWebAnimationTrack unsupported{node_stream.data(), node_stream.size(), 0,
+                                           std::uint8_t(type), 0, 0};
+        check(!melee_web_animation_validate_native_action_track(&unsupported, error, sizeof(error)) && error[0],
+              "native fighter action validation rejects unrelated channels");
+    }
+    const Bytes malformed{1, 0};
+    MeleeWebAnimationTrack truncated{malformed.data(), malformed.size(), 0, 11, 0, 0};
+    check(!melee_web_animation_validate_native_action_track(&truncated, error, sizeof(error)) && error[0],
+          "native fighter action validation still rejects malformed node streams");
+}
+
 void malformed_operands()
 {
     const std::vector<Bytes> invalid{
@@ -127,6 +158,7 @@ int main(int argc, char** argv)
     const std::map<std::string, void (*)()> cases{
         {"preserves_channels", preserves_channels}, {"tree_bounds", tree_bounds},
         {"unsupported_channels_and_formats", unsupported_channels_and_formats},
+        {"native_action_channel_policy", native_action_channel_policy},
         {"malformed_operands", malformed_operands}, {"encoding_and_integer_edges", encoding_and_integer_edges},
         {"native_single_value_guard", native_single_value_guard},
     };

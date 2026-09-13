@@ -2,9 +2,9 @@
 
 The completion sidecar is deliberately separate from the JSONL replay
 candidate.  A valid sidecar can establish that the observed retail source
-execution reached the narrow elimination boundary described here; it says
-nothing about port equivalence, rendering, performance, audio, or content
-admission.
+execution reached the narrow elimination or timer-timeout boundary described
+here; it says nothing about port equivalence, rendering, performance, audio,
+or content admission.
 """
 
 from __future__ import annotations
@@ -46,7 +46,8 @@ EXIT_KEYS = {"phase", "index", "caller", "scene_request"}
 
 SCOPE = (
     "source retail match completion only: the validated capture's final fighter "
-    "stock observation, scene request/end-state/result bytes, callback-return "
+    "stock observation, elimination or timer-timeout result, scene "
+    "request/end-state/result bytes, callback-return "
     "observation, and final source-draw marker; no port equivalence, rendering, "
     "performance, audio, or gold/content admission"
 )
@@ -88,7 +89,7 @@ def _optional_source_index(value: Any, frame_count: int, context: str) -> int | 
     return _int(value, context, minimum=0, maximum=frame_count - 1)
 
 
-def _validate_exit(value: Any, frame_count: int) -> dict[str, Any] | None:
+def _validate_exit(value: Any, frame_count: int, *, allow_one_past: bool = False) -> dict[str, Any] | None:
     if value is None:
         return None
     context = "completion.exit_observation"
@@ -97,7 +98,11 @@ def _validate_exit(value: Any, frame_count: int) -> dict[str, Any] | None:
     _require_keys(value, EXIT_KEYS, context)
     if value["phase"] != EXIT_PHASE or type(value["phase"]) is not str:
         raise CaptureError(f"{context}.phase: expected {EXIT_PHASE!r}")
-    _int(value["index"], f"{context}.index", minimum=0, maximum=frame_count - 1)
+    # The fixed collector retains the raw scheduler count.  When the exit
+    # callback is observed after the final source draw, that count is one past
+    # the final frame index; the draw marker still identifies frame_count - 1.
+    maximum = frame_count if allow_one_past else frame_count - 1
+    _int(value["index"], f"{context}.index", minimum=0, maximum=maximum)
     _u32(value["caller"], f"{context}.caller")
     _u32(value["scene_request"], f"{context}.scene_request")
     return dict(value)
@@ -136,7 +141,9 @@ def _validate_sidecar(value: dict[str, Any], capture: Any) -> dict[str, Any]:
     final_draw = _optional_source_index(
         value["final_draw_source_index"], frame_count,
         "completion.final_draw_source_index")
-    exit_observation = _validate_exit(value["exit_observation"], frame_count)
+    exit_observation = _validate_exit(
+        value["exit_observation"], frame_count,
+        allow_one_past=value["phase"] == "after_final_source_draw")
     return {
         "schema": SCHEMA,
         "version": VERSION,
@@ -152,33 +159,82 @@ def _validate_sidecar(value: dict[str, Any], capture: Any) -> dict[str, Any]:
 
 
 def _stocks_show_elimination(capture: Any) -> bool:
-    """Return whether the validated final frame has one dead fighter."""
+    """Return whether the final frame leaves one active fighter."""
 
     try:
         fighters = capture.frames[-1]["fighters"]
         stocks = [fighter["stocks"] for fighter in fighters]
     except (AttributeError, IndexError, KeyError, TypeError):
         return False
-    if len(stocks) != 2 or any(type(stock) is not int for stock in stocks):
+    active_player_count = getattr(capture, "active_player_count", len(stocks))
+    if (not 2 <= active_player_count <= 4 or
+            len(stocks) != active_player_count or
+            any(type(stock) is not int for stock in stocks)):
         return False
-    return stocks.count(0) == 1 and any(stock > 0 for stock in stocks)
+    return (stocks.count(0) == active_player_count - 1 and
+            len([stock for stock in stocks if stock > 0]) == 1 and
+            all(stock >= 0 for stock in stocks))
+
+
+def _timer_setup_is_enabled(capture: Any) -> bool:
+    try:
+        setup = bytes.fromhex(capture.match_enter["start_melee_hex"])
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return False
+    return (len(setup) == 0x138 and bool(setup[0] & 0x02) and
+            int.from_bytes(setup[0x10:0x14], "big") > 0)
+
+
+def _stocks_show_timeout(capture: Any) -> bool:
+    """Return whether a source timeout left a valid active-player stock set."""
+
+    try:
+        fighters = capture.frames[-1]["fighters"]
+        stocks = [fighter["stocks"] for fighter in fighters]
+    except (AttributeError, IndexError, KeyError, TypeError):
+        return False
+    active_player_count = getattr(capture, "active_player_count", len(stocks))
+    return (_timer_setup_is_enabled(capture) and
+            2 <= active_player_count <= 4 and
+            len(stocks) == active_player_count and
+            all(type(stock) is int and stock >= 0 for stock in stocks))
+
+
+def _ending(sidecar: dict[str, Any], capture: Any) -> dict[str, Any] | None:
+    if sidecar["match_result"] == 2 and _stocks_show_elimination(capture):
+        fighters = capture.frames[-1]["fighters"]
+        return {"mode": "elimination",
+                "winner_slots": [fighter["slot"] for fighter in fighters
+                                  if fighter["stocks"] > 0],
+                "stock_tie": False}
+    if sidecar["match_result"] == 1 and _stocks_show_timeout(capture):
+        # MatchEnd's winner/tie standings are outside this historical sidecar;
+        # expose only the stock ranking.  A tied-stock timeout is not reduced
+        # to an invented source winner.
+        fighters = capture.frames[-1]["fighters"]
+        highest = max(fighter["stocks"] for fighter in fighters)
+        stock_winners = [fighter["slot"] for fighter in fighters
+                         if fighter["stocks"] == highest]
+        return {"mode": "timeout", "stock_winner_slots": stock_winners,
+                "stock_tie": len(stock_winners) != 1}
+    return None
 
 
 def _is_complete(sidecar: dict[str, Any], capture: Any) -> bool:
     final_index = len(capture.frames) - 1
     exit_observation = sidecar["exit_observation"]
+    ending = _ending(sidecar, capture)
     return (
         sidecar["phase"] == "after_final_source_draw"
         and sidecar["scene_request"] == 1
         and sidecar["match_end_state"] == 3
-        and sidecar["match_result"] == 2
+        and ending is not None
         and sidecar["final_draw_source_index"] == final_index
         and exit_observation is not None
         and exit_observation["phase"] == EXIT_PHASE
-        and exit_observation["index"] == final_index
+        and exit_observation["index"] in (final_index, final_index + 1)
         and exit_observation["caller"] == FINAL_EXIT_CALLER
         and exit_observation["scene_request"] == 1
-        and _stocks_show_elimination(capture)
     )
 
 
@@ -188,7 +244,7 @@ def load_match_completion(capture: Any, path: str | Path,
 
     A valid sidecar that only describes a prefix is reported as
     ``bounded_prefix``.  ``require_complete`` turns that bounded result into a
-    hard ``CaptureError`` for callers that require the full elimination gate.
+    hard ``CaptureError`` for callers that require the full source ending gate.
     """
 
     if type(require_complete) is not bool:
@@ -199,7 +255,7 @@ def load_match_completion(capture: Any, path: str | Path,
     complete = _is_complete(sidecar, capture)
     status = "source_match_complete" if complete else "bounded_prefix"
     if require_complete and not complete:
-        raise CaptureError(f"{sidecar_path}: completion sidecar does not prove full elimination")
+        raise CaptureError(f"{sidecar_path}: completion sidecar does not prove full source ending")
     report = dict(sidecar)
     report.update({
         "status": status,
@@ -209,6 +265,7 @@ def load_match_completion(capture: Any, path: str | Path,
         "content_admitted": False,
         "port_equivalence": "not_evaluated",
         "performance": "not_evaluated",
+        "ending": _ending(sidecar, capture),
         "scope": SCOPE,
     })
     return report

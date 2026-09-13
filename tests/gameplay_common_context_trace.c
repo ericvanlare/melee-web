@@ -13,6 +13,12 @@
 #include <stdlib.h>
 #include <string.h>
 #define CHECK(c) do {if(!(c)){fprintf(stderr,"common context check line%d: %s (%s)\n",__LINE__,#c,error);abort();}}while(0)
+static unsigned cpu_destroyed;
+static void cpu_destroy(MeleeWebCommonCpuData* data)
+{
+    (void)data;
+    ++cpu_destroyed;
+}
 int main(void)
 {
     char error[256];
@@ -25,6 +31,9 @@ int main(void)
         MeleeWebCommonScalars scalars={0};scalars.walk_stick_threshold=0.18f;
         scalars.x7D8=(MeleeWebCommonColor){7,11,13,17};
         MeleeWebCommonTables tables={0};tables.ready_mask=1u<<4;
+        unsigned cpu_storage=0xC0DEC0DE;
+        MeleeWebCommonCpuData cpu_data={&cpu_storage,&cpu_storage,1,cpu_destroy};
+        tables.cpu_data=&cpu_data;
         for(unsigned i=0;i<MELEE_WEB_COMMON_FIGHTERS;++i)tables.parts[i].part_count=1;
         tables.none_parts.part_count=1;
         MeleeWebNativeJointDesc joint={0};joint.child=joint.next=UINT32_MAX;
@@ -51,12 +60,14 @@ int main(void)
         CHECK(melee_web_common_context_attach(context,error,sizeof(error)));
         CHECK(!melee_web_common_context_attach(context,error,sizeof(error)));
         CHECK(melee_web_common_context_require(context,1u|(1u<<4)|(1u<<16)|(1u<<20),error,sizeof(error)));
+        CHECK(melee_web_common_context_require(context,1u<<22,error,sizeof(error)));
         CHECK(!melee_web_common_context_require(context,1u<<6,error,sizeof(error)));
         CHECK(strstr(error,"missing0x000040"));
         void** roots=melee_web_common_context_source_roots();
         CHECK(p_ftCommonData->walk_stick_threshold==0.18f&&ftPartsTable[0]->parts_num==1);
-        for(unsigned i=0;i<23;++i)CHECK((roots[i]!=NULL)==(i==0||i==4||i==16||i==20));
+        for(unsigned i=0;i<23;++i)CHECK((roots[i]!=NULL)==(i==0||i==4||i==16||i==20||i==22));
         CHECK(roots[16]==root16_descriptor);
+        CHECK((void*)Fighter_804D64FC==&cpu_storage);
         HSD_Joint* copied=roots[20];
         CHECK(copied->u.dobjdesc->mobjdesc->texdesc->imagedesc->image_ptr!=pixels);
         CHECK(((uint8_t*)copied->u.dobjdesc->mobjdesc->texdesc->imagedesc->image_ptr)[0]==0x73);
@@ -75,6 +86,9 @@ int main(void)
         MELEE_WEB_COMMON_ROOTS(RESTORED)
 #undef RESTORED
         CHECK(ft_804D6580==old_materials[0]&&ft_804D6588==old_materials[1]);
+        CHECK(cpu_data.refs==1);
+        melee_web_common_cpu_release(&cpu_data);
+        CHECK(cpu_data.refs==0&&cpu_destroyed==pass+1);
         if(!pass)CHECK(melee_web_gameplay_shutdown(error,sizeof(error)));
     }
     puts("Original common8064/8F6C persistent ownership/publication/restoration/restart passed");

@@ -1,5 +1,6 @@
 #include "gameplay_action_store.hpp"
 #include "fighter_runtime_fixture.hpp"
+#include <algorithm>
 #include <string>
 #include <fstream>
 #include <iostream>
@@ -24,6 +25,7 @@ int action_test_dobj_operands(void);
 int action_test_common_operands(void);
 int action_test_falco_operands(void);
 int action_test_wind_operands(void);
+int action_test_common_appeals(void*, unsigned);
 }
 namespace {
 Bytes read_file(const char* path)
@@ -78,6 +80,49 @@ void verify_cross_fighter_identity_lease(std::shared_ptr<const DatArchive> archi
           "Destination clip, source-row identity, symbol and command survive source teardown");
     destination.unbind(); check(action_test_cleared(victim), "Cross-fighter destination unbind clears pointers");
     action_test_destroy(thrower); action_test_destroy(victim);
+}
+
+const FighterCostume& costume_for_archive(const DatArchive& archive)
+{
+    for (const auto& symbol : archive.public_symbols()) {
+        for (const auto& costume : fighter_costumes()) {
+            if (costume.costume_index == 0 && costume.fighter_symbol == symbol.name)
+                return costume;
+        }
+    }
+    throw std::runtime_error("Owned fighter archive has no canonical source costume");
+}
+
+void verify_common_appeals(std::shared_ptr<const DatArchive> archive, const Bytes& container,
+                           const FighterCostume& costume)
+{
+    if (costume.fighter_kind == 1) {
+        // Fox's source appeal row 239 contains HSD_A_J_NODE visibility tracks.
+        // Selecting it through the native-action policy must succeed, while a
+        // subsequent generic selection must parse independently and reject it.
+        auto runtime = std::make_shared<const DatFighterRuntime>(archive, costume);
+        DatFighterAnimationStore policy_store(runtime, container);
+        const auto selected = policy_store.select_native_action(239);
+        check(selected.animation && std::any_of(selected.animation->tracks.begin(), selected.animation->tracks.end(),
+                                                [](const auto& track) { return track.type == 11; }),
+              "Fox common appeal row 239 did not retain its source node channel");
+        bool generic_rejected = false;
+        try { (void) policy_store.select(239); }
+        catch (const melee_web::DatError&) { generic_rejected = true; }
+        check(generic_rejected, "generic and native-action animation cache policies were conflated");
+    }
+    GameplayActionStore store(std::move(archive), costume, container);
+    unsigned expected_command_mask = 0;
+    for (unsigned index = 0; index < 2; ++index) {
+        const unsigned motion = 239 + index;
+        const bool source_has_command = store.runtime().action(motion).command_offset.has_value();
+        if (source_has_command) expected_command_mask |= 1U << index;
+        check(store.command_ready(motion), "Common appeal action row is not admitted");
+        check(store.runtime().commands(motion).has_value() == source_has_command,
+              "Common appeal source command presence changed");
+    }
+    check(action_test_common_appeals(store.action_rows(), expected_command_mask),
+          "Common appeal rows did not retain checked command storage or were given the sentinel");
 }
 }
 int main(int argc, char** argv)
@@ -164,7 +209,24 @@ int main(int argc, char** argv)
         auto operand = fixture; put32(operand.data,operand.command_a,0x1c000000); operand.link(operand.command_a+4,operand.command_a+4);
         rejects([&] { GameplayActionStore store(std::make_shared<const DatArchive>(operand.file()),mario(),operand.container); });
         std::cout << "Original owned action loaders and checked Wait command execution: passed\n";
-        if (argc == 3) { verify(std::make_shared<const DatArchive>(read_file(argv[1])),read_file(argv[2]),true);
-            std::cout << "Local Mario Wait2/3/6 source command traces and startup clips: passed\n"; }
+        if (argc > 1) {
+            check(argc >= 3 && ((argc - 1) % 2) == 0, "Owned action archive arguments must be archive/container pairs");
+            std::set<unsigned> kinds;
+            for (int arg = 1; arg < argc; arg += 2) {
+                auto archive = std::make_shared<const DatArchive>(read_file(argv[arg]));
+                const auto container = read_file(argv[arg + 1]);
+                const auto& costume = costume_for_archive(*archive);
+                kinds.insert(costume.fighter_kind);
+                verify_common_appeals(archive, container, costume);
+                if (costume.fighter_kind == 0)
+                    verify(archive, container, true);
+            }
+            if (kinds == std::set<unsigned>{0, 1, 18, 22})
+                std::cout << "Owned common appeal action rows 239/240 for Mario, Fox, Falco and Marth: passed\n";
+            else
+                std::cout << "Owned common appeal action rows 239/240: passed\n";
+            if (kinds.contains(0))
+                std::cout << "Local Mario Wait2/3/6 source command traces and startup clips: passed\n";
+        }
     } catch (const std::exception& e) { std::cerr << e.what() << '\n'; return 1; }
 }

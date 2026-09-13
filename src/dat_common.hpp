@@ -8,7 +8,13 @@
 #include <string_view>
 
 namespace melee_web {
-enum class DatCommonReadiness { Missing, Unresolved, ScalarsDecoded, StaticTablesDecoded };
+enum class DatCommonReadiness {
+    Missing,
+    Unresolved,
+    ScalarsDecoded,
+    StaticTablesDecoded,
+    CpuDataDecoded,
+};
 struct DatCommonRoot {
     std::uint32_t index;
     std::string_view source_global; // Generated original Fighter_LoadCommonData assignment identity.
@@ -27,10 +33,18 @@ struct DatCommonRoot {
 class DatCommon {
 public:
     explicit DatCommon(const DatArchive&);
+    DatCommon(const DatCommon&);
+    DatCommon& operator=(const DatCommon&);
+    DatCommon(DatCommon&&) noexcept;
+    DatCommon& operator=(DatCommon&&) noexcept;
+    ~DatCommon();
     std::uint32_t descriptor_offset = 0, scalar_offset = 0;
     std::array<DatCommonRoot, MELEE_WEB_COMMON_ROOT_COUNT> roots{};
     MeleeWebCommonScalars scalars{};
     MeleeWebCommonTables tables{};
+
+private:
+    MeleeWebCommonCpuData* cpu_data_ = nullptr;
 };
 
 } // namespace melee_web

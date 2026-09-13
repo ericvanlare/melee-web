@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en" data-environment="staging">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <title>Melee · Staging prototype</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="prototype.css">
+  <script type="module" src="prototype-shell.mjs"></script>
+</head>
+<body>
+  <main id="player" aria-label="Melee staging prototype">
+    <div id="runtime-host" aria-label="Game"></div>
+    <div id="toolbar" role="toolbar" aria-label="Game controls">
+      <button id="choose-disc" type="button" disabled>Disc</button>
+      <input id="disc-file" type="file" accept=".iso,.gcm,.ciso" aria-label="USA 1.02 disc image" hidden>
+      <button id="start-game" type="button" disabled>Play</button>
+      <button id="pause-game" type="button" disabled>Pause</button>
+      <button id="controls-open" type="button">Controls</button>
+      <button id="fullscreen" type="button">Fullscreen</button>
+      <button id="end-session" type="button" disabled>Eject</button>
+      <button id="development-link" type="button" hidden>Dev</button>
+      <button id="status" type="button" disabled aria-live="polite">Loading…</button>
+      <progress id="progress" aria-label="Preparing local data" hidden></progress>
+    </div>
+  </main>
+  <dialog id="controls-dialog" aria-label="Controls">
+    <div class="keyboard-options">
+      <select id="keyboard-layout" aria-label="Keyboard layout" disabled>
+        <option value="two">2 players</option>
+        <option value="boxx">1 player · B0XX</option>
+      </select>
+      <label><input id="keyboard-one" type="checkbox" checked> <span id="keyboard-one-label">P1 keyboard</span></label>
+      <label id="keyboard-two-option"><input id="keyboard-two" type="checkbox" checked> P2 keyboard</label>
+    </div>
+    <table id="keyboard-bindings" aria-label="Keyboard bindings"></table>
+    <ul id="controllers" aria-label="Detected controllers"></ul>
+    <div class="dialog-actions"><button id="controls-close" type="button">Close</button></div>
+  </dialog>
+  <dialog id="error-dialog" aria-label="Player error">
+    <p id="error" role="alert"></p>
+    <div class="dialog-actions"><button id="retry" type="button">Restart</button><button id="error-close" type="button">Close</button></div>
+  </dialog>
+  <noscript><button type="button" disabled>JavaScript required</button></noscript>
+</body>
+</html>

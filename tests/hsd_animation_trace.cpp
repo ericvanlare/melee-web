@@ -145,6 +145,20 @@ void rejected_construction_and_failed_evaluation()
     rejects([&] { animation.advance(); });
 }
 
+void native_node_channel_stays_out_of_pose_bridge()
+{
+    const Bytes stream = segment(2, 0, 10, 10);
+    const MeleeWebAnimationTrack node{stream.data(), stream.size(), 0, 11, 0, 0};
+    const std::uint8_t nodes[] = {1};
+    const AnimationPose bind[] = {{{0, 0, 0}, {0, 0, 0}, {1, 1, 1}, 0}};
+    char error[256];
+    const auto animation = melee_web_animation_create(1, 0, 10, nodes, 1, &node, 1,
+                                                       bind, 1, error, sizeof(error));
+    check(!animation && error[0],
+          "generic pose bridge rejects native fighter node visibility channels");
+    melee_web_animation_destroy(animation);
+}
+
 void local_clip(const char* path)
 {
     std::ifstream file(path, std::ios::binary);
@@ -183,6 +197,7 @@ int main(int argc, char** argv)
         inspection_loop_boundary();
         signed_stream_and_startframe();
         rejected_construction_and_failed_evaluation();
+        native_node_channel_stays_out_of_pose_bridge();
         for (int i = 1; i < argc; ++i) local_clip(argv[i]);
         std::cout << "Original HSD animation trace: passed\n";
     } catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }

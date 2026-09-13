@@ -16,7 +16,7 @@ void putf(Bytes& b, std::size_t p, float n) { put32(b,p,std::bit_cast<std::uint3
 struct Fixture {
     static constexpr std::uint32_t root=0x900, other=0x960;
     Bytes data=Bytes(0xa00); std::vector<std::uint32_t> slots;
-    Fixture() { link(root,0);for(auto i:{6U,7U,8U,16U,17U,20U,22U})link(root+i*4,other+i*4); }
+    Fixture() { link(root,0);for(auto i:{6U,7U,8U,16U,17U,20U})link(root+i*4,other+i*4); }
     void link(std::uint32_t p,std::uint32_t n) { put32(data,p,n); if(std::find(slots.begin(),slots.end(),p)==slots.end())slots.push_back(p); }
     void unlink(std::uint32_t p) { put32(data,p,0);std::erase(slots,p); }
     std::uint32_t allocate(std::uint32_t bytes) {
@@ -137,8 +137,8 @@ void root_identity_and_readiness() {
     check(c.descriptor_offset==Fixture::root&&c.roots.size()==23&&c.roots[0].data_offset==0&&
           c.roots[0].source_global=="p_ftCommonData"&&c.roots[0].readiness==DatCommonReadiness::ScalarsDecoded,
           "relocated root zero is the typed scalar block");
-    const std::array<std::pair<unsigned,std::string_view>,4> checks={{{6,"Fighter_804D653C"},{8,"Fighter_804D6534"},
-        {16,"Fighter_804D6514"},{22,"Fighter_804D64FC"}}};
+    const std::array<std::pair<unsigned,std::string_view>,3> checks={{{6,"Fighter_804D653C"},{8,"Fighter_804D6534"},
+        {16,"Fighter_804D6514"}}};
     for(const auto& [i,name]:checks)check(c.roots[i].index==i&&c.roots[i].source_global==name&&
         c.roots[i].data_offset==Fixture::other+i*4&&c.roots[i].readiness==DatCommonReadiness::Unresolved,
         "known global identities stay unresolved offsets, not guessed native objects");

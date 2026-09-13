@@ -16,7 +16,7 @@ MeleeWebNativeClip* melee_web_native_clip_create(uint32_t type, uint32_t flags, 
     for (size_t i = 0; i < node_count; ++i) { if (nodes[i] > 9) return NULL; sum += nodes[i]; }
     if (sum != track_count) return NULL;
     for (size_t i = 0; i < track_count; ++i)
-        if (tracks[i].length > UINT16_MAX || !melee_web_animation_validate_track(&tracks[i], NULL, 0)) return NULL;
+        if (tracks[i].length > UINT16_MAX || !melee_web_animation_validate_native_action_track(&tracks[i], NULL, 0)) return NULL;
     MeleeWebNativeClip* clip = calloc(1, sizeof(*clip));
     if (!clip) return NULL;
     clip->tree = (FigaTree){type, flags, frames, malloc(node_count + 1), calloc(track_count, sizeof(FigaTrack))};

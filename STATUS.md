@@ -1,5 +1,19 @@
 # Current status
 
+Ordinary VS CPU levels 1–9 run in the shared compiled runtime used by both
+entry pages. The [CPU match development corpus](docs/CPU_MATCH_CORPUS.md) now
+has repeatable two-, three- and four-player retail reference pairs totaling
+9,383 source ticks. Native and browser match all 1,199 core ticks of the
+two-player match; the browser also matches all 4,346 core ticks and CPU
+observations of the three-player match. The four-player browser completes
+3,838 ticks but first differs in CPU-generated input at 2495, where the source
+reads uninitialized stick values. Shared repairs cover the earlier hitlag
+caller carry, clank/entry-scale rounding and common taunt loading. Headless
+draw-dependent behavior and expanded camera/draw-phase comparisons remain
+failing. The 480/480/240-tick CPU/human port regressions remain exact; 604 tests
+pass with 35 optional-fixture skips. These are development results, without
+CPU holdout, multiplayer, pixel, audio, physical-input or performance admission.
+
 The browser runs original fighters and stages through compiled WebAssembly. The
 accepted first slice is two Marios on Final Destination; narrower raw-PAD runs
 also selected and rendered Falco versus Mario on Battlefield, Fox versus Mario

@@ -95,6 +95,19 @@ def _write_capture(directory: Path, *, final_stocks=(0, 2), frame_count=3):
     return path, load_capture(path)
 
 
+def _write_timeout_capture(directory: Path, *, final_stocks=(2, 2)):
+    rows = _capture_rows(frame_count=3, final_stocks=final_stocks)
+    setup = bytearray.fromhex(rows[1]["start_melee_hex"])
+    setup[0] = 0x22  # stock match with a one-minute countdown timer
+    setup[0x10:0x14] = (60).to_bytes(4, "big")
+    rows[1]["start_melee_hex"] = setup.hex()
+    path = directory / "timeout-capture.jsonl"
+    with path.open("w", encoding="utf-8", newline="") as stream:
+        for row in rows:
+            stream.write(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n")
+    return path, load_capture(path)
+
+
 def _sidecar(capture, **overrides) -> dict:
     value = {
         "schema": "melee-web-retail-match-completion",
@@ -151,6 +164,60 @@ class RetailMatchCompletionTests(unittest.TestCase):
             with self.assertRaises(CaptureError):
                 load_match_completion(capture, path, require_complete=True)
 
+    def test_exit_after_final_draw_retains_one_past_scheduler_index(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            _, capture = _write_capture(directory)
+            exit_observation = {
+                "phase": EXIT_PHASE,
+                "index": len(capture.frames),
+                "caller": FINAL_EXIT_CALLER,
+                "scene_request": 1,
+            }
+            path = _write_sidecar(directory / "completion.json",
+                                  _sidecar(capture, exit_observation=exit_observation))
+            report = load_match_completion(capture, path, require_complete=True)
+            self.assertEqual(report["status"], "source_match_complete")
+            self.assertEqual(report["exit_observation"]["index"], len(capture.frames))
+
+    def test_one_past_exit_index_is_only_valid_after_a_final_draw(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            _, capture = _write_capture(directory)
+            value = _sidecar(
+                capture,
+                phase="after_final_scheduler",
+                final_draw_source_index=None,
+                exit_observation={
+                    "phase": EXIT_PHASE,
+                    "index": len(capture.frames),
+                    "caller": FINAL_EXIT_CALLER,
+                    "scene_request": 1,
+                },
+            )
+            path = _write_sidecar(directory / "completion.json", value)
+            with self.assertRaises(CaptureError):
+                load_match_completion(capture, path)
+
+    def test_source_timeout_is_complete_even_when_stocks_are_tied(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            _, capture = _write_timeout_capture(directory)
+            value = _sidecar(capture, match_result=1)
+            path = _write_sidecar(directory / "completion.json", value)
+            report = load_match_completion(capture, path, require_complete=True)
+            self.assertEqual(report["status"], "source_match_complete")
+            self.assertEqual(report["ending"]["mode"], "timeout")
+
+    def test_timeout_result_without_source_timer_is_not_complete(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            _, capture = _write_capture(directory, final_stocks=(2, 2))
+            path = _write_sidecar(directory / "completion.json",
+                                  _sidecar(capture, match_result=1))
+            report = load_match_completion(capture, path)
+            self.assertEqual(report["status"], "bounded_prefix")
+
     def test_capture_hash_and_frame_count_bind_the_sidecar(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
@@ -177,7 +244,7 @@ class RetailMatchCompletionTests(unittest.TestCase):
                 (dict(base, match_end_state=256), "end-state byte"),
                 (dict(base, final_draw_source_index=len(capture.frames)), "draw index"),
                 (dict(base, exit_observation={**base["exit_observation"],
-                                               "index": len(capture.frames)}), "exit index"),
+                                               "index": len(capture.frames) + 1}), "exit index"),
             ]
             for index, (value, _label) in enumerate(malformed):
                 path = _write_sidecar(directory / "completion.json", value, suffix=f"-{index}")

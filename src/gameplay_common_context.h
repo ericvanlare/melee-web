@@ -5,7 +5,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-#define MELEE_WEB_COMMON_RUNTIME_MASK (MELEE_WEB_COMMON_STATIC_ROOT_MASK | 1u | (1u << 16) | (1u << 20))
+#define MELEE_WEB_COMMON_RUNTIME_MASK (MELEE_WEB_COMMON_STATIC_ROOT_MASK | 1u | (1u << 16) | (1u << 20) | (1u << 22))
 typedef struct MeleeWebCommonContext MeleeWebCommonContext;
 /* Copies all supported scalars/tables and root20 descriptors plus raw payloads.
  * The resulting owner is independent of the input archive and model lifetime. */

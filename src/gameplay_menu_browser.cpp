@@ -1,6 +1,7 @@
 #include "gameplay_menu_world.hpp"
 #include "gameplay_menu_host.h"
 #include "gameplay_match_session.hpp"
+#include "gameplay_match_rules.h"
 #include "gameplay_retail_recipe.hpp"
 #include "../tests/native_menu_fighter_input.h"
 #include "../tests/native_menu_stage_input.h"
@@ -48,7 +49,7 @@ MeleeWebMenuHost* host=nullptr;
 melee_web::FixedTickClock menu_clock;
 melee_web::FixedTickClock audio_clock{melee_web::FixedTickClock::OverrunPolicy::CatchUp};
 std::string message="Choose your local Melee disc image.";
-std::string match_message="Original four-stock source match";
+std::string match_message="Original source match";
 bool running=false,pending=false,host_entered=false,world_exposed=false,faulted=false;
 melee_web::MenuPreparationState preparation;
 unsigned audio_phase=0,diagnostic_start_ticks=0;
@@ -166,12 +167,13 @@ void preparation_failed(const char* error){
  EM_ASM({window.menuPreparationFailed?.(UTF8ToString($0));},error?error:"Native preparation failed");
 }
 std::string selected_match_message(const MeleeWebMenuMatchSelection& selection){
- const auto* first=melee_web_fighter_content(selection.start.players[0].ckind);
- const auto* second=melee_web_fighter_content(selection.start.players[1].ckind);
  const auto* stage=melee_web_stage_content(selection.start.rules.stkind);
- std::string result="Original four-stock ";
- if(first&&second){result+=first->name;result+=" vs ";result+=second->name;}
- else result+="source fighters";
+ std::string result="Original ";
+ for(unsigned i=0;i<selection.player_count;++i){
+  const auto* fighter=melee_web_fighter_content(selection.start.players[i].ckind);
+  if(i)result+=" vs ";
+  result+=fighter?fighter->name:"source fighter";
+ }
  result+=" match on ";result+=stage?stage->name:"source stage";
  return result;
 }
@@ -191,7 +193,7 @@ void close(){
  replay.reset();replay_cursor=0;replay_trace=replay_pending=replay_started=replay_final_draw=false;
  replay_match_complete=false;replay_outcome=0;replay_winner=-1;
  audio_phase=0;faulted=false;diagnostic_start_ticks=0;stock_check=0;stock_tick=0;render_frame=0;first_use_draw_pending=false;render_only_preparation=false;transition_audio_continues=false;menu_scene_rebuild_pending=false;audio_clock.reset();clear_diagnostic_pad();
- match_message="Original four-stock source match";
+ match_message="Original source match";
  if(had_lifetime){
   const double finished=emscripten_get_now();
   report_construction("lifecycle-close",started,finished,finished,before,
@@ -221,7 +223,18 @@ void advance(){
   running=false;message="Preparing reference replay...";return;
  }
  if(match){
-  const uint32_t seed=match->random_seed();match->close();match.reset();++completed_matches;
+  const bool checking_stock=stock_check==-1;
+  const uint32_t seed=match->random_seed();match->close();match.reset();
+  if(checking_stock){
+   int terminal_outcome=OUTCOME_NONE,terminal_count=0,terminal_winners[6]{};
+   check(melee_web_match_rules_terminal_result(&terminal_outcome,&terminal_count,terminal_winners),
+         "Stock diagnostic did not retain the source MatchEnd");
+   check(terminal_outcome==OUTCOME_ELIMINATION&&terminal_count==1&&terminal_winners[0]==1&&
+         stock_count==0&&stock_respawns==3,
+         "Stock diagnostic: source MatchEnd winner or stock accounting was incorrect");
+   stock_check=1;
+  }
+  ++completed_matches;
   check(melee_web_menu_host_match_finished(host,seed,error,sizeof(error)),error);
   pending=false;enter_world();return;
  }
@@ -365,13 +378,23 @@ void tick(){
    GXSetCopyClear(GXColor{0,0,0,255},GX_MAX_Z24);
    if(!suppress_draw){
     if(!faulted){
-     if(match){match->draw();actual_source_draw=true;drew_source=true;}
+     if(match){
+      match->draw();actual_source_draw=true;drew_source=true;
+      if(replay&&replay_trace&&!replay_final_draw){
+       if(replay_cursor)melee_web::retail_replay_draw(*replay,replay_cursor-1);
+       else melee_web::retail_replay_preparation_draw(*replay);
+      }
+     }
      else if(world&&host_entered){drawn=melee_web_menu_host_draw(host,error,sizeof(error));actual_source_draw=drawn!=0;drew_source=drawn!=0;}
     }
    }
    draw_done=emscripten_get_now();
    aurora_end_frame();end_done=emscripten_get_now();check(drawn,error);
    if(replay&&!replay_final_draw&&replay_cursor==replay->frames.size()&&drew_source){
+    /* The final source frame is drawn before this close-boundary publication;
+     * report the canonical MatchEnd winner after its source ranking exists. */
+    (void)melee_web_match_rules_publish_result();
+    replay_outcome=melee_web_match_rules_outcome(&replay_winner);
     replay_final_draw=true;replay_completed_now=true;running=false;menu_clock.reset();
     message="Reference replay complete; all input consumed and final frame drawn.";
    }
@@ -448,7 +471,10 @@ void tick(){
   const auto audio_elapsed=audio_clock.tick(
       clock_now,audio_owner&&input->visible&&(running||transition_audio_continues));
   if(audio_elapsed.stalled){
-   running=false;message="Paused after an audio timing disruption. Resume to continue.";
+   // Keep the shared timing-pause prefix understood by the development host.
+   // Its state capture may resume and records every resume; performance capture
+   // still fails on the pause. The audio guard and clock policy are unchanged.
+   running=false;message="Paused after a timing disruption in the audio clock. Resume to continue.";
   }else if(audio_before_construction){
    for(unsigned step=0;step<audio_elapsed.steps;step++)
     render_audio_tick(audio_owner,error,sizeof(error));
@@ -555,7 +581,7 @@ void tick(){
      if(player.stocks<stock_count){stock_lost=true;stock_count=player.stocks;}
      if(stock_lost&&player.motion_id==14&&player.ground_or_air==0){stock_lost=false;++stock_respawns;}
      ++stock_tick;
-     if(outcome){check(winner==1&&stock_count==0&&stock_respawns==3,"Stock diagnostic: unexpected source outcome");if(match->complete())stock_check=1;}
+     if(outcome)check(outcome==OUTCOME_ELIMINATION&&stock_count==0&&stock_respawns==3,"Stock diagnostic: unexpected source outcome");
      if(!match->complete())check(stock_tick<4000,"Stock diagnostic: no source exit after 4000 ticks");
     }
     if(match->complete()&&!replay){check(outcome,"Original match transitioned without an outcome");pending=true;result=3;}
@@ -745,7 +771,7 @@ int melee_web_native_menu_replay(const uint8_t* data,unsigned size,int observe){
  check(data&&size<=melee_web::kRetailReplayMaxBytes,"Invalid reference replay bytes");
  check(observe==0||observe==1,"Invalid replay observation mode");
  auto candidate=std::make_unique<melee_web::RetailReplayRecipe>(melee_web::read_retail_replay({data,size}));
- check(candidate->version==2&&candidate->initial_input,"Browser reference playback requires a v2 PAD history recipe");
+ check(candidate->version>=2&&candidate->initial_input,"Browser reference playback requires a PAD history recipe (v2 or v3)");
  check(!reference_heap_used,"Reference replay requires a fresh application. Use Reload application state, import the disc, then play the recipe before entering menus.");
  reference_heap_used=true;
  close();

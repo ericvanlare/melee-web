@@ -2,6 +2,7 @@
  * the provider's clamp algorithm are verified separately in the browser. */
 #include "browser_input.h"
 #include <SDL3/SDL_keyboard.h>
+#include <SDL3/SDL_events.h>
 
 #include <array>
 #include <cstring>
@@ -20,6 +21,18 @@ std::array<std::vector<PADKeyAxisBinding>, 4> axes;
 bool init_ok = true, bindings_ok = true, blocked = false;
 int reads = 0, clamps = 0, key_resets = 0;
 PADStatus* read_destination = nullptr;
+SDL_EventFilter event_watch = nullptr;
+void* event_userdata = nullptr;
+bool watch_ok = true;
+
+void key(SDL_Scancode code, bool down = true, bool repeat = false)
+{
+    SDL_Event event{};
+    event.type = down ? SDL_EVENT_KEY_DOWN : SDL_EVENT_KEY_UP;
+    event.key.scancode = code;
+    event.key.repeat = repeat;
+    if (event_watch) event_watch(event_userdata, &event);
+}
 
 void check(bool value, const char* message)
 {
@@ -52,6 +65,77 @@ void keyboard_preference()
     melee_web_input_set_activity(1, 1);
     check(melee_web_input_snapshot()->keyboard_requested && keyboard[0],
           "a frontend choice before runtime startup is preserved");
+}
+
+void boxx_layout()
+{
+    startup();
+    melee_web_input_set_keyboard_port(1, 1);
+    check(melee_web_input_set_keyboard_layout(1) == 1, "B0XX layout accepted");
+    check(!melee_web_input_set_keyboard_layout(2), "unknown layout rejected");
+    check(keyboard[0] && !keyboard[1], "B0XX only activates P1 keyboard");
+    key(SDL_SCANCODE_4); key(SDL_SCANCODE_V); key(SDL_SCANCODE_M);
+    auto snapshot = melee_web_input_poll();
+    check(snapshot->raw[0].stickX == 53 && snapshot->raw[0].button == PAD_BUTTON_A,
+          "B0XX movement/modifier/attack reach raw PAD together");
+    check(snapshot->clamped[0].stickX == 41, "diagnostic clamp remains separate");
+    check(snapshot->raw[1].err == PAD_ERR_NO_CONTROLLER, "second keyboard disconnected in one-player mode");
+    key(SDL_SCANCODE_M, false); key(SDL_SCANCODE_V, false);
+    snapshot = melee_web_input_poll();
+    check(snapshot->raw[0].stickX == 80 && !snapshot->raw[0].button, "key release updates held state");
+    melee_web_input_set_keyboard_layout(0);
+    neutral(melee_web_input_snapshot()->raw[0]);
+    check(keyboard[0] && keyboard[1], "split keyboard preference restored");
+    melee_web_input_set_keyboard_layout(1);
+    neutral(melee_web_input_poll()->raw[0]);
+    key(SDL_SCANCODE_4, true, true);
+    neutral(melee_web_input_poll()->raw[0]);
+    check(!melee_web_input_snapshot()->raw[0].stickX, "repeats do not resurrect cleared held inputs");
+}
+
+void boxx_focus_and_sources()
+{
+    startup(); melee_web_input_set_keyboard_port(1, 1);
+    melee_web_input_set_keyboard_layout(1);
+    key(SDL_SCANCODE_M);
+    check(melee_web_input_poll()->raw[0].button == PAD_BUTTON_A, "B0XX initial attack");
+    melee_web_input_set_activity(0, 1);
+    neutral(melee_web_input_snapshot()->raw[0]);
+    key(SDL_SCANCODE_M);
+    melee_web_input_set_activity(1, 1);
+    neutral(melee_web_input_poll()->raw[0]);
+    connected[0] = 0; supplied[0].button = PAD_BUTTON_B;
+    check(melee_web_input_poll()->raw[0].button == PAD_BUTTON_B, "physical P1 takes priority");
+    key(SDL_SCANCODE_M);
+    check(melee_web_input_poll()->raw[0].button == PAD_BUTTON_B, "keyboard cannot mix into physical P1");
+    connected[0] = -1; supplied[0] = {};
+    neutral(melee_web_input_poll()->raw[0]);
+    key(SDL_SCANCODE_M);
+    connected[1] = 1; supplied[1].button = PAD_BUTTON_X;
+    auto snapshot = melee_web_input_poll();
+    check(snapshot->raw[0].button == PAD_BUTTON_A, "P2 connection preserves held B0XX P1 input");
+    check(snapshot->raw[1].button == PAD_BUTTON_X && snapshot->physical_mask == 2,
+          "physical P2 remains usable with B0XX P1");
+    key(SDL_SCANCODE_M);
+    check(melee_web_input_poll()->raw[0].button == PAD_BUTTON_A, "keyboard P1 and physical P2 coexist");
+    connected[1] = -1; supplied[1] = {};
+    check(melee_web_input_poll()->raw[0].button == PAD_BUTTON_A, "P2 disconnect preserves held B0XX P1 input");
+    key(SDL_SCANCODE_M, false); neutral(melee_web_input_poll()->raw[0]);
+    melee_web_input_set_keyboard(0); neutral(melee_web_input_snapshot()->raw[0]);
+    melee_web_input_set_keyboard(1); neutral(melee_web_input_poll()->raw[0]);
+    melee_web_input_shutdown();
+    check(!event_watch, "event watch detached on shutdown");
+    startup(); neutral(melee_web_input_poll()->raw[0]);
+}
+
+void boxx_startup_failure()
+{
+    watch_ok = false;
+    check(!melee_web_input_startup(), "failed event watch must fail startup");
+    check(!melee_web_input_snapshot()->ready && blocked, "startup failure leaves input unavailable");
+    watch_ok = true;
+    startup();
+    check(event_watch != nullptr, "event watch can be retried");
 }
 
 void binding_mapping()
@@ -354,11 +438,24 @@ extern "C" void PADClamp(PADStatus* output)
     }
 }
 extern "C" void SDL_ResetKeyboard(void) { ++key_resets; }
+extern "C" bool SDL_AddEventWatch(SDL_EventFilter filter, void* userdata)
+{
+    if (!watch_ok) return false;
+    event_watch = filter; event_userdata = userdata; return true;
+}
+extern "C" void SDL_RemoveEventWatch(SDL_EventFilter filter, void* userdata)
+{
+    check(event_watch == filter && event_userdata == userdata, "same event watch removed");
+    event_watch = nullptr; event_userdata = nullptr;
+}
 
 int main(int argc, char** argv)
 {
     const std::map<std::string, void (*)()> cases{
         {"binding_mapping", binding_mapping},
+        {"boxx_layout", boxx_layout},
+        {"boxx_focus_and_sources", boxx_focus_and_sources},
+        {"boxx_startup_failure", boxx_startup_failure},
         {"keyboard_port_two_profile", keyboard_port_two_profile},
         {"per_port_physical_priority", per_port_physical_priority},
         {"raw_and_clamped", raw_and_clamped},

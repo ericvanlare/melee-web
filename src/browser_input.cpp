@@ -1,4 +1,12 @@
 #include "browser_input.h"
+#include "boxx_input.h"
+
+#include <SDL3/SDL_events.h>
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+#else
+#define EMSCRIPTEN_KEEPALIVE
+#endif
 
 #include <SDL3/SDL_keyboard.h>
 #include <cstddef>
@@ -9,6 +17,49 @@ namespace {
 MeleeWebInputSnapshot state{};
 const char* initialization_error = "";
 const char* configuration_error = "";
+int keyboard_layout = 0; // 0: existing split keyboard, 1: one-player B0XX.
+BoxxInput boxx;
+
+uint32_t requested_keyboards()
+{
+    return state.keyboard_requested_mask & (keyboard_layout == 1 ? 1U : 3U);
+}
+
+void reset_keyboard()
+{
+    boxx.reset();
+    SDL_ResetKeyboard();
+}
+
+bool SDLCALL boxx_event(void*, SDL_Event* event)
+{
+    if (keyboard_layout != 1 || !(state.keyboard_active_mask & 1U) ||
+        (event->type != SDL_EVENT_KEY_DOWN && event->type != SDL_EVENT_KEY_UP) || event->key.repeat)
+        return true;
+    // Physical positions from the upstream b0xx-ahk default layout. Event order
+    // is retained for SOCD; sampling still happens at the existing PAD boundary.
+    static const struct { SDL_Scancode code; BoxxKey key; } bindings[] = {
+        {SDL_SCANCODE_RIGHTBRACKET, BoxxKey::Up}, {SDL_SCANCODE_3, BoxxKey::Down},
+        {SDL_SCANCODE_2, BoxxKey::Left}, {SDL_SCANCODE_4, BoxxKey::Right},
+        {SDL_SCANCODE_V, BoxxKey::ModX}, {SDL_SCANCODE_B, BoxxKey::ModY},
+        {SDL_SCANCODE_M, BoxxKey::A}, {SDL_SCANCODE_O, BoxxKey::B},
+        {SDL_SCANCODE_Q, BoxxKey::L}, {SDL_SCANCODE_9, BoxxKey::R},
+        {SDL_SCANCODE_P, BoxxKey::X}, {SDL_SCANCODE_0, BoxxKey::Y},
+        {SDL_SCANCODE_LEFTBRACKET, BoxxKey::Z},
+        {SDL_SCANCODE_K, BoxxKey::CUp}, {SDL_SCANCODE_SPACE, BoxxKey::CDown},
+        {SDL_SCANCODE_N, BoxxKey::CLeft}, {SDL_SCANCODE_COMMA, BoxxKey::CRight},
+        {SDL_SCANCODE_MINUS, BoxxKey::LightShield}, {SDL_SCANCODE_EQUALS, BoxxKey::MidShield},
+        {SDL_SCANCODE_7, BoxxKey::Start},
+        {SDL_SCANCODE_UP, BoxxKey::DUp}, {SDL_SCANCODE_DOWN, BoxxKey::DDown},
+        {SDL_SCANCODE_LEFT, BoxxKey::DLeft}, {SDL_SCANCODE_RIGHT, BoxxKey::DRight},
+    };
+    for (const auto& binding : bindings)
+        if (event->key.scancode == binding.code) {
+            boxx.key(binding.key, event->type == SDL_EVENT_KEY_DOWN);
+            break;
+        }
+    return true; // Watch the existing SDL stream without filtering it.
+}
 
 void neutral(PADStatus& pad, int error)
 {
@@ -26,7 +77,7 @@ void neutral_snapshot()
 {
     for (unsigned port = 0; port < PAD_MAX_CONTROLLERS; ++port) {
         const bool source = (state.physical_mask & (1U << port)) ||
-                            (state.keyboard_requested_mask & (1U << port));
+                            (requested_keyboards() & (1U << port));
         neutral(state.raw[port], !state.ready ? PAD_ERR_NOT_READY
                                               : source ? PAD_ERR_NONE
                                                        : PAD_ERR_NO_CONTROLLER);
@@ -39,7 +90,7 @@ void apply_policy()
     state.active = state.ready && state.focused && state.visible;
     state.keyboard_requested = (state.keyboard_requested_mask & 1U) != 0;
     state.keyboard_active_mask = state.active
-                                     ? state.keyboard_requested_mask & ~state.physical_mask
+                                     ? requested_keyboards() & ~state.physical_mask
                                      : 0;
     state.keyboard_active = (state.keyboard_active_mask & 1U) != 0;
     if (!state.ready) return;
@@ -145,6 +196,14 @@ extern "C" int melee_web_input_startup(void)
         neutral_snapshot();
         return 0;
     }
+    if (!SDL_AddEventWatch(boxx_event, nullptr)) {
+        initialization_error = "SDL keyboard event watch failed";
+        for (unsigned port = 0; port < PAD_MAX_CONTROLLERS; ++port)
+            PADSetKeyboardActive(port, false);
+        PADBlockInput(true);
+        neutral_snapshot();
+        return 0;
+    }
     state.ready = 1;
     apply_policy();
     neutral_snapshot();
@@ -158,15 +217,30 @@ extern "C" const MeleeWebInputSnapshot* melee_web_input_poll(void)
     for (unsigned port = 0; port < PAD_MAX_CONTROLLERS; ++port)
         if (PADGetIndexForPort(port) >= 0) physical |= 1U << port;
     // A new source must not inherit keys held during a previous source's use.
-    if (physical != state.physical_mask) SDL_ResetKeyboard();
+    // B0XX has only one keyboard port: another gamepad's connection must not
+    // interrupt P1 or discard its eventual key-up events by resetting SDL.
+    const auto changed_sources = physical ^ state.physical_mask;
+    if (changed_sources && (keyboard_layout == 0 || (changed_sources & 1U))) reset_keyboard();
     state.physical_mask = physical;
     apply_policy();
     (void) PADRead(state.raw); // Return value is rumble support, not connectivity.
+    if (keyboard_layout == 1 && (state.keyboard_active_mask & 1U)) {
+        const auto sample = boxx.sample();
+        auto& pad = state.raw[0];
+        neutral(pad, PAD_ERR_NONE);
+        pad.button = static_cast<u16>(sample.buttons);
+        pad.stickX = static_cast<s8>(sample.stickX);
+        pad.stickY = static_cast<s8>(sample.stickY);
+        pad.substickX = static_cast<s8>(sample.cstickX);
+        pad.substickY = static_cast<s8>(sample.cstickY);
+        pad.triggerLeft = static_cast<u8>(sample.triggerL);
+        pad.triggerRight = static_cast<u8>(sample.triggerR);
+    }
     for (unsigned port = 0; port < PAD_MAX_CONTROLLERS; ++port) {
         const bool source = (physical & (1U << port)) ||
-                            (state.keyboard_requested_mask & (1U << port));
+                            (requested_keyboards() & (1U << port));
         if (!source) neutral(state.raw[port], PAD_ERR_NO_CONTROLLER);
-        else if (!state.active && (state.keyboard_requested_mask & ~physical & (1U << port)))
+        else if (!state.active && (requested_keyboards() & ~physical & (1U << port)))
             // A configured virtual keyboard stays connected while its input is
             // blocked; losing focus is not a source controller disconnect.
             neutral(state.raw[port], PAD_ERR_NONE);
@@ -192,7 +266,7 @@ extern "C" void melee_web_input_set_activity(int focused, int visible)
     const bool changed = state.focused != bool(focused) || state.visible != bool(visible);
     state.focused = focused != 0;
     state.visible = visible != 0;
-    if (changed && state.ready) SDL_ResetKeyboard();
+    if (changed && state.ready) reset_keyboard();
     apply_policy();
     if (!state.active) neutral_snapshot(); // Do not wait for a suspended browser tick.
 }
@@ -211,9 +285,21 @@ extern "C" int melee_web_input_set_keyboard_port(unsigned port, int enabled)
         configuration_error = "Aurora rejected a keyboard profile binding";
         return 0;
     }
-    if (state.ready) SDL_ResetKeyboard();
+    if (state.ready) reset_keyboard();
     state.keyboard_requested_mask = next;
     configuration_error = "";
+    apply_policy();
+    neutral_snapshot();
+    return 1;
+}
+
+extern "C" EMSCRIPTEN_KEEPALIVE int melee_web_input_set_keyboard_layout(int layout)
+{
+    if (layout != 0 && layout != 1) return 0;
+    if (keyboard_layout == layout) return 1;
+    keyboard_layout = layout;
+    if (state.ready) reset_keyboard();
+    else boxx.reset();
     apply_policy();
     neutral_snapshot();
     return 1;
@@ -231,11 +317,11 @@ extern "C" const char* melee_web_input_message(void)
         "{\"ready\":%d,\"focused\":%d,\"visible\":%d,\"active\":%d,"
         "\"keyboard_requested\":%d,\"keyboard_active\":%d,"
         "\"keyboard_requested_mask\":%u,\"keyboard_active_mask\":%u,"
-        "\"physical_mask\":%u,"
+        "\"physical_mask\":%u,\"keyboard_layout\":%d,"
         "\"samples\":%llu,\"error\":\"%s\",\"pads\":[",
         state.ready, state.focused, state.visible, state.active,
         state.keyboard_requested, state.keyboard_active, state.keyboard_requested_mask,
-        state.keyboard_active_mask, state.physical_mask,
+        state.keyboard_active_mask, state.physical_mask, keyboard_layout,
         static_cast<unsigned long long>(state.samples),
         initialization_error[0] ? initialization_error : configuration_error);
     for (unsigned port = 0; port < PAD_MAX_CONTROLLERS; ++port) {
@@ -246,7 +332,7 @@ extern "C" const char* melee_web_input_message(void)
             "\"cstick\":[%d,%d],\"triggers\":[%u,%u],\"analog\":[%u,%u],"
             "\"clamped\":{\"stick\":[%d,%d],\"cstick\":[%d,%d],\"triggers\":[%u,%u]}}",
             port ? "," : "", state.physical_mask & (1U << port) ? "gamepad" :
-                state.keyboard_requested_mask & (1U << port) ? "keyboard" : "none",
+                requested_keyboards() & (1U << port) ? "keyboard" : "none",
             raw.err, raw.button, raw.stickX, raw.stickY, raw.substickX, raw.substickY,
             raw.triggerLeft, raw.triggerRight, raw.analogA, raw.analogB,
             clamped.stickX, clamped.stickY, clamped.substickX, clamped.substickY,
@@ -276,8 +362,11 @@ extern "C" void melee_web_input_shutdown(void)
         PADBlockInput(true);
         for (unsigned port = 0; port < PAD_MAX_CONTROLLERS; ++port)
             PADSetKeyboardActive(port, false);
-        SDL_ResetKeyboard();
+        SDL_RemoveEventWatch(boxx_event, nullptr);
+        reset_keyboard();
     }
+    keyboard_layout = 0;
+    boxx.reset();
     state = {};
     initialization_error = "";
     configuration_error = "";

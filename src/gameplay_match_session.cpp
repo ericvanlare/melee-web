@@ -5,6 +5,7 @@
 #include "gameplay_audio_stream_asset.hpp"
 #include "gameplay_match_context.h"
 #include "gameplay_match_rules.h"
+#include "gameplay_menu.h"
 #include "gameplay_render.h"
 #include "gameplay_hud.h"
 #include "gameplay_match_flow.h"
@@ -47,15 +48,34 @@ struct GameplayMatchSession::Storage {
     const MeleeWebPadState* initial_input=nullptr;
     void begin(const RuntimeFiles& files,const MeleeWebMenuMatchSelection& selection,
                RuntimeArchiveCache* archive_cache){
+        unsigned player_count = selection.player_count != 0
+                                    ? selection.player_count
+                                    : melee_web_menu_active_player_count(&selection.start);
+        check(player_count >= MELEE_WEB_MENU_MIN_PLAYERS &&
+              player_count <= MELEE_WEB_MENU_MAX_PLAYERS,
+              "Match requires two through four active source players");
+        check(melee_web_menu_active_player_count(&selection.start) ==
+              static_cast<int>(player_count),
+              "Match player count does not match contiguous source slots");
+        check(selection.hud_layout == selection.start.rules.x0_3,
+              "Match compatibility settings differ from source payload");
         runtime_files=&files;runtime_cache=archive_cache;selected=selection;
         stage=melee_web_stage_content(selection.start.rules.stkind);
         check(stage!=nullptr,"Match stage has no source runtime owner");
         content.ground_kind=stage->ground_kind;
-        for(unsigned i=0;i<2;i++){
+        content.player_count=player_count;
+        for(unsigned i=0;i<player_count;i++){
+            const auto& source = selection.start.players[i];
+            const auto& settings = selection.players[i];
+            check(settings.controller == (source.slot ? source.slot - 1u : i) &&
+                  settings.stocks == source.stocks && settings.costume == source.color &&
+                  settings.sub_color == source.sub_color,
+                  "Match compatibility settings differ from source payload");
             const auto* fighter=melee_web_fighter_content(selection.start.players[i].ckind);
-            check(fighter&&selection.players[i].controller==i&&selection.players[i].stocks==4&&
+            check(fighter&&selection.players[i].controller==i&&
+                  selection.players[i].stocks>=1&&selection.players[i].stocks<=5&&
                   selection.players[i].costume<fighter->costumes&&selection.players[i].sub_color<=4,
-                  "Match requires the supported original four-stock menu selection");
+                  "Match requires supported source player stock/costume selections");
             content.fighter_kinds[i]=fighter->fighter_kind;
             content.costume_indices[i]=selection.players[i].costume;
         }
@@ -79,7 +99,8 @@ struct GameplayMatchSession::Storage {
             std::vector<std::string_view> bank_names={"main.ssm","nr_select.ssm","nr_title.ssm",
                                                       "nr_name.ssm","pokemon.ssm","end.ssm"};
             std::set<std::string_view> fighter_banks;
-            for(const auto kind:content.fighter_kinds){
+            for(unsigned i=0;i<content.player_count;++i){
+                const auto kind=content.fighter_kinds[i];
                 const auto* dependency=melee_web_fighter_content_by_kind(kind);
                 if(fighter_banks.insert(dependency->audio_bank).second)
                     bank_names.emplace_back(dependency->audio_bank);
@@ -104,13 +125,13 @@ struct GameplayMatchSession::Storage {
             return false;
         }
         if(construction_phase==2){
-            MeleeWebPlayerSettings players[2]{};
-            for(unsigned i=0;i<2;i++){
+            MeleeWebPlayerSettings players[MELEE_WEB_MENU_MAX_PLAYERS]{};
+            for(unsigned i=0;i<content.player_count;i++){
                 const auto spawn=world->player_spawn(i);const auto& player=selected.players[i];
                 players[i]={i,player.controller,player.stocks,{spawn[0],spawn[1],spawn[2]},spawn[0]<0?1.0f:-1.0f,
                             player.costume,player.sub_color,content.fighter_kinds[i]};
             }
-            match=melee_web_match_begin_players(players,2,70,selected.random_seed,world->collision(),error,sizeof(error));check(match!=nullptr,error);
+            match=melee_web_match_begin_players(players,content.player_count,70,selected.random_seed,world->collision(),error,sizeof(error));check(match!=nullptr,error);
             if(initial_input){check(melee_web_match_restore_input(match,initial_input,error,sizeof(error)),error);initial_input=nullptr;}
             world->enable_full_stage(true);
             world->initialize_match(selected.start);
@@ -141,6 +162,11 @@ struct GameplayMatchSession::Storage {
     void close(){
         char error[256]{};
         if(flow){check(melee_web_match_flow_end(flow,error,sizeof(error)),error);flow=nullptr;}
+        /* The browser's final source draw has completed before close(). Keep
+         * the original fighter state resident while publishing MatchEnd, then
+         * let melee_web_match_end tear down the source objects. The rules
+         * module retains a bounded terminal snapshot for post-close reports. */
+        if(match)(void)melee_web_match_rules_publish_result();
         if(hud){check(melee_web_hud_end(hud,error,sizeof(error)),error);hud=nullptr;}
         if(world)world->end_stage();
         if(render){check(melee_web_render_end(render,error,sizeof(error)),error);render=nullptr;}
@@ -220,7 +246,7 @@ uint32_t GameplayMatchSession::random_seed()const{
     check(melee_web_match_stats(storage_->match,&stats,error,sizeof(error)),error);return stats.random_seed;
 }
 int GameplayMatchSession::fighter_kind(unsigned index)const{
-    check(storage_&&storage_->match&&index<2,"Match player index is outside the active source match");
+    check(storage_&&storage_->match&&index<storage_->content.player_count,"Match player index is outside the active source match");
     return storage_->content.fighter_kinds[index];
 }
 MeleeWebMatchStats GameplayMatchSession::player_stats(unsigned index)const{

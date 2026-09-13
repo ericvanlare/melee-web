@@ -25,9 +25,13 @@ PROCESSED_POLICY = 'dolphin-pipe-processed-v2'
 LEGACY_RAW_POLICY = 'dolphin-pipe-raw-v1'
 POLICIES = (LEGACY_RAW_POLICY, POLICY, PROCESSED_POLICY)
 EXPORT_POLICIES = (POLICY, PROCESSED_POLICY)
+CPU_PLAN_VERSION = 2
+MULTIPLAYER_CPU_PLAN_VERSION = 3
+MAX_ACTIVE_PLAYERS = 4
 MAX_FRAMES = 36000
 PAD = struct.Struct('>HbbbbBBBBb')
 DISCONNECTED_PAD = '00' * 10 + 'ff'
+NEUTRAL_PAD = '00' * 11
 BUTTONS = ((1,'D_LEFT'), (2,'D_RIGHT'), (4,'D_DOWN'), (8,'D_UP'),
            (16,'Z'), (32,'R'), (64,'L'), (256,'A'), (512,'B'),
            (1024,'X'), (2048,'Y'), (4096,'START'))
@@ -77,10 +81,20 @@ def _pad(value):
 
 
 def validate_plan(value):
-    _keys(value, ('schema','version','policy','source_sha256','first_frame',
-                  'source_stage','source_characters','frames'))
+    version = value.get('version') if isinstance(value, dict) else None
+    common = ('schema','version','policy','source_sha256','first_frame',
+              'source_stage','source_characters','frames')
+    cpu_fields = ('source_player_types','source_cpu_kinds','source_cpu_levels',
+                  'source_cpu_pad_modes','controlled_ports')
+    if version == MULTIPLAYER_CPU_PLAN_VERSION:
+        expected = common + ('active_player_count',) + cpu_fields
+    else:
+        expected = common if version != CPU_PLAN_VERSION else common + cpu_fields
+    _keys(value, expected)
     if (value['schema'] != SCHEMA or type(value['version']) is not int or
-            value['version'] != 1 or value['policy'] not in POLICIES):
+            value['version'] not in (1, CPU_PLAN_VERSION,
+                                     MULTIPLAYER_CPU_PLAN_VERSION) or
+            value['policy'] not in POLICIES):
         raise ValueError('Unsupported input plan schema or controller policy')
     digest = value['source_sha256']
     if not isinstance(digest, str) or re.fullmatch('[0-9a-f]{64}', digest) is None or digest == '0'*64:
@@ -89,17 +103,80 @@ def validate_plan(value):
     # pretending a mid-recording slice contains the original initial history.
     _integer(value['first_frame'], -123, -123)
     _integer(value['source_stage'], 0, 0xffff)
-    if not isinstance(value['source_characters'], list) or len(value['source_characters']) != 2:
-        raise ValueError('Input plan requires two source characters')
+    active_count = 2
+    if version == MULTIPLAYER_CPU_PLAN_VERSION:
+        _integer(value['active_player_count'], 2, MAX_ACTIVE_PLAYERS)
+        active_count = value['active_player_count']
+    if (not isinstance(value['source_characters'], list) or
+            len(value['source_characters']) != active_count):
+        raise ValueError(f'Input plan requires {active_count} source characters')
     for character in value['source_characters']:
         _integer(character, 0, 255)
+    if value['version'] in (CPU_PLAN_VERSION, MULTIPLAYER_CPU_PLAN_VERSION):
+        player_types = value['source_player_types']
+        kinds = value['source_cpu_kinds']
+        levels = value['source_cpu_levels']
+        pad_modes = value['source_cpu_pad_modes']
+        controlled = value['controlled_ports']
+        if (not isinstance(player_types, list) or len(player_types) != active_count or
+                any(type(player_type) is not int or player_type not in (0, 1)
+                    for player_type in player_types)):
+            raise ValueError(f'CPU input plan requires {active_count} human/CPU player types')
+        if (value['version'] == MULTIPLAYER_CPU_PLAN_VERSION and
+                (player_types[0] != 0 or any(player_type != 1 for player_type in player_types[1:]))):
+            raise ValueError('Multiplayer CPU input plan requires human P1 and CPU players on P2..P4')
+        if (not isinstance(kinds, list) or len(kinds) != active_count or
+                any(kind is not None and
+                    (type(kind) is not int or kind != 4)
+                    for kind in kinds) or
+                any((player_type == 0) != (kind is None)
+                    for player_type, kind in zip(player_types, kinds))):
+            raise ValueError('CPU input plan requires ordinary-VS CPU kind 4 only')
+        if (not isinstance(levels, list) or len(levels) != active_count or
+                any(level is not None and
+                    (type(level) is not int or not 1 <= level <= 9)
+                    for level in levels) or
+                any((player_type == 0) != (level is None)
+                    for player_type, level in zip(player_types, levels))):
+            raise ValueError('CPU input plan requires level 1..9 only for CPU players')
+        if (not isinstance(pad_modes, list) or len(pad_modes) != active_count or
+                any(mode is not None and mode not in ('disconnected', 'neutral')
+                    for mode in pad_modes) or
+                any((player_type == 0) != (mode is None)
+                    for player_type, mode in zip(player_types, pad_modes))):
+            raise ValueError('CPU input plan requires an immutable CPU PAD mode')
+        if (not isinstance(controlled, list) or not controlled or
+                any(type(port) is not int or port not in range(1, active_count + 1)
+                    for port in controlled) or
+                len(set(controlled)) != len(controlled) or
+                controlled != sorted(controlled) or
+                controlled != [1] or
+                controlled != [port for port in range(1, active_count + 1)
+                               if player_types[port - 1] == 0]):
+            raise ValueError('CPU input plan must control human P1 only in this capture runner')
     frames = value['frames']
     if not isinstance(frames, list) or not 1 <= len(frames) <= MAX_FRAMES:
         raise ValueError('Input plan requires a bounded nonempty timeline')
     for frame in frames:
-        if not isinstance(frame, list) or len(frame) != 2:
-            raise ValueError('Each input plan tick requires both human ports')
-        for pad in frame:
+        frame_width = 4 if value['version'] == MULTIPLAYER_CPU_PLAN_VERSION else 2
+        if not isinstance(frame, list) or len(frame) != frame_width:
+            raise ValueError('Each input plan tick requires all four source ports'
+                             if value['version'] == MULTIPLAYER_CPU_PLAN_VERSION
+                             else 'Each input plan tick requires both source ports')
+        for port, pad in enumerate(frame, 1):
+            if (value['version'] in (CPU_PLAN_VERSION, MULTIPLAYER_CPU_PLAN_VERSION) and
+                    port <= active_count and
+                    value['source_player_types'][port - 1] == 1):
+                mode = value['source_cpu_pad_modes'][port - 1]
+                expected = DISCONNECTED_PAD if mode == 'disconnected' else NEUTRAL_PAD
+                if pad != expected:
+                    raise ValueError('CPU input plan %s PAD sample does not match its declared CPU mode'
+                                     % mode)
+                continue
+            if (value['version'] == MULTIPLAYER_CPU_PLAN_VERSION and port > active_count):
+                if pad != DISCONNECTED_PAD:
+                    raise ValueError('Inactive multiplayer input plan ports must be disconnected')
+                continue
             decoded = _pad(pad)
             if (value['policy'] == PROCESSED_POLICY and
                     max(abs(axis) for axis in decoded[1:5]) > 80):
@@ -211,13 +288,30 @@ def pipe_commands(pad):
 
 def verify_entry(plan, start_hex):
     raw = bytes.fromhex(start_hex)
+    active_count = (plan.get('active_player_count', 2)
+                    if plan.get('version') == MULTIPLAYER_CPU_PLAN_VERSION else 2)
+    character_offsets = [0x60 + index * 0x24 for index in range(active_count)]
     if (len(raw) != 0x138 or int.from_bytes(raw[14:16], 'big') != plan['source_stage'] or
-            [raw[0x60], raw[0x84]] != plan['source_characters']):
+            [raw[offset] for offset in character_offsets] != plan['source_characters']):
         raise ValueError('Retail menu selection differs from the donor characters/stage')
+    if plan.get('version') in (CPU_PLAN_VERSION, MULTIPLAYER_CPU_PLAN_VERSION):
+        player_offsets = [0x60 + index * 0x24 for index in range(active_count)]
+        actual_types = [raw[offset + 1] for offset in player_offsets]
+        actual_kinds = [raw[offset + 0x0e] for offset in player_offsets]
+        actual_levels = [raw[offset + 0x0f] for offset in player_offsets]
+        if actual_types != plan['source_player_types']:
+            raise ValueError('Retail menu selection differs from the declared human/CPU players')
+        for index, (actual_kind, expected_kind, actual_level, expected_level) in enumerate(
+                zip(actual_kinds, plan['source_cpu_kinds'], actual_levels, plan['source_cpu_levels'])):
+            if expected_kind is not None and actual_kind != expected_kind:
+                raise ValueError('Retail menu selection differs from CPU kind at player %d' % (index + 1))
+            if expected_level is not None and actual_level != expected_level:
+                raise ValueError('Retail menu selection differs from CPU level at player %d' % (index + 1))
 
 
 def verify_tick(plan, index, inputs):
-    expected = plan['frames'][index] + [DISCONNECTED_PAD, DISCONNECTED_PAD]
+    expected = (plan['frames'][index] if plan.get('version') == MULTIPLAYER_CPU_PLAN_VERSION
+                else plan['frames'][index] + [DISCONNECTED_PAD, DISCONNECTED_PAD])
     if inputs != expected:
         raise ValueError('Input intent mismatch at tick %d: expected %s, consumed %s' %
                          (index, expected, inputs))
