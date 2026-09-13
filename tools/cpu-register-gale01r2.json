@@ -1,0 +1,208 @@
+{
+  "schema": "melee-web-retail-cpu-register-diagnostic",
+  "version": 1,
+  "probes": [
+    {
+      "label": "after_kind_dispatch",
+      "address": "0x800b3924",
+      "expected_word": "0x7fe3fb78"
+    },
+    {
+      "label": "state_dispatch_entry",
+      "address": "0x800b2790",
+      "expected_word": "0x7c0802a6"
+    },
+    {
+      "label": "before_hitlag_sticks",
+      "address": "0x800b2aa8",
+      "expected_word": "0x4bff9af9"
+    },
+    {
+      "label": "after_hitlag_sticks",
+      "address": "0x800b2aac",
+      "expected_word": "0x48000028"
+    },
+    {
+      "label": "hitlag_sticks_entry",
+      "address": "0x800ac5a0",
+      "expected_word": "0x7c0802a6"
+    },
+    {
+      "label": "near_zero_predicate",
+      "address": "0x800ac6cc",
+      "expected_word": "0x2c000000"
+    },
+    {
+      "label": "near_zero_branch",
+      "address": "0x800ac6d0",
+      "expected_word": "0x40820074"
+    },
+    {
+      "label": "stick_setup",
+      "address": "0x800ac744",
+      "expected_word": "0x387d0000"
+    },
+    {
+      "label": "write_stick_x",
+      "address": "0x800ac74c",
+      "expected_word": "0x48007f6d"
+    },
+    {
+      "label": "after_stick_x",
+      "address": "0x800ac750",
+      "expected_word": "0x387d0000"
+    },
+    {
+      "label": "write_stick_y",
+      "address": "0x800ac75c",
+      "expected_word": "0x48007f5d"
+    },
+    {
+      "label": "after_stick_y",
+      "address": "0x800ac760",
+      "expected_word": "0x48000024"
+    },
+    {
+      "label": "hitlag_sticks_exit",
+      "address": "0x800ac7b8",
+      "expected_word": "0x80010034"
+    },
+    {
+      "label": "kind4_command_carry",
+      "address": "0x800b24e4",
+      "expected_word": "0x7c651b79"
+    },
+    {
+      "label": "target_common_call",
+      "address": "0x800b25dc",
+      "expected_word": "0x4bffb86d"
+    },
+    {
+      "label": "target_common_return",
+      "address": "0x800b25e0",
+      "expected_word": "0x48000190"
+    },
+    {
+      "label": "no_target_common_call",
+      "address": "0x800b276c",
+      "expected_word": "0x4bffb6dd"
+    },
+    {
+      "label": "no_target_common_return",
+      "address": "0x800b2770",
+      "expected_word": "0x8001004c"
+    },
+    {
+      "label": "common_entry",
+      "address": "0x800ade48",
+      "expected_word": "0x7c0802a6"
+    },
+    {
+      "label": "after_floor_output_setup",
+      "address": "0x800ade74",
+      "expected_word": "0xdbc10080"
+    },
+    {
+      "label": "floor_call",
+      "address": "0x800adebc",
+      "expected_word": "0x4bfa114d"
+    },
+    {
+      "label": "floor_return",
+      "address": "0x800adec0",
+      "expected_word": "0x7c7c1b79"
+    },
+    {
+      "label": "floor_exit",
+      "address": "0x8004f3c4",
+      "expected_word": "0x7f63db78"
+    },
+    {
+      "label": "state18_test",
+      "address": "0x800ae1b8",
+      "expected_word": "0x801e0018"
+    },
+    {
+      "label": "state18_return",
+      "address": "0x800ae290",
+      "expected_word": "0x38600001"
+    },
+    {
+      "label": "command_writer",
+      "address": "0x800b46b8",
+      "expected_word": "0x7c0802a6"
+    },
+    {
+      "label": "reset_cpu_commands_entry",
+      "address": "0x800b4a78",
+      "expected_word": "0x38831a88"
+    },
+    {
+      "label": "after_behavior_change",
+      "address": "0x800ae280",
+      "expected_word": "0x38000012"
+    },
+    {
+      "label": "reset_cpu_commands_return",
+      "address": "0x800b4aac",
+      "expected_word": "0x4e800020"
+    },
+    {
+      "label": "hitlag_random_call",
+      "address": "0x800ae21c",
+      "expected_word": "0x482d230d"
+    },
+    {
+      "label": "hitlag_random_return",
+      "address": "0x800ae220",
+      "expected_word": "0x807b0010"
+    },
+    {
+      "label": "randf_return",
+      "address": "0x8038057c",
+      "expected_word": "0x4e800020"
+    }
+  ],
+  "extra_memory": [
+    {
+      "label": "fighter_alloc_data",
+      "address": "0x80458fd0",
+      "size": 44
+    },
+    {
+      "label": "lbHeap",
+      "address": "0x80431fa0",
+      "size": 176
+    },
+    {
+      "label": "obj_heap",
+      "address": "0x80406e48",
+      "size": 16
+    },
+    {
+      "label": "OS_heap_globals",
+      "address": "0x804d7360",
+      "size": 16
+    },
+    {
+      "label": "current_heap",
+      "address": "0x804d5e00",
+      "size": 4
+    },
+    {
+      "label": "hsd_heap_arena",
+      "address": "0x804d76b8",
+      "size": 8
+    },
+    {
+      "label": "DefaultThread",
+      "address": "0x804a83c8",
+      "size": 784
+    },
+    {
+      "label": "random_seed_and_pointer",
+      "address": "0x804d5f90",
+      "size": 8
+    }
+  ]
+}

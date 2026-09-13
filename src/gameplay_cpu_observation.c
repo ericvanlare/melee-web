@@ -312,6 +312,21 @@ void melee_web_cpu_observation_begin(const uint8_t setup[0x138], size_t frames, 
     for (unsigned i = 0; i < 0x138; ++i) put("%02x", setup[i]);
     put("\"}"); emit();
     put("{\"record\":\"initial\","); snapshot(); put("}"); emit();
+    if (hitlag_audit) {
+        /* Native allocation identities are diagnostic data, never a retail
+         * pointer model or part of the semantic CPU comparison. */
+        put("{\"schema\":\"melee-web-native-cpu-address-diagnostic\",\"version\":1,"
+            "\"phase\":\"initial\",\"players\":[");
+        for (unsigned slot = 0; slot < count; ++slot) {
+            const Fighter* fp = fighter(slot);
+            if (!fp) abort();
+            put("%s{\"slot\":%u,\"fighter_pointer\":%u,\"cpu_pointer\":%u}",
+                slot ? "," : "", slot, (uint32_t)(uintptr_t)fp,
+                (uint32_t)(uintptr_t)&fp->cpu);
+        }
+        put("]}");
+        fprintf(stderr, "CPU_ADDRESS_AUDIT %s\n", line); used = 0;
+    }
 }
 void melee_web_cpu_observation_enable_hitlag_audit(void)
 {

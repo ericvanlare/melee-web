@@ -1,0 +1,952 @@
+{
+  "base_commit": "6b8bdda2b02a6a5e753e857891e964b5059f817f",
+  "browser_baselines": [
+    {
+      "artifacts_unchanged": true,
+      "complete": true,
+      "core_comparison": {
+        "capture_hashes": {
+          "port": "75baf980adafb575936933c08359a26c172192cad4f5f2f58124aaad189e2fc9",
+          "reference_a": "ff6b7fbe5436a6e021270779669a3cf2c619323d5e5617f567dea0b28e97ae4d",
+          "reference_b": "f560226e86fb590472fa8165dc9f2bccfd40591013bdb50a886ee8d562830487"
+        },
+        "checks": {
+          "active_player_count": "pass",
+          "entry": "pass",
+          "fighters": "pass",
+          "frame_count": "pass",
+          "inputs": "pass",
+          "match_frame": "pass",
+          "pad_state_hex": "pass",
+          "rng": "pass"
+        },
+        "first_divergence": null,
+        "first_divergence_by_group": {},
+        "frames_compared": 1199,
+        "gold_admitted": false,
+        "performance": "not_evaluated",
+        "reference_cpu": "Interpreter64",
+        "reference_repeatability": "pass",
+        "scope": "declared entry data, supplied inputs, fighter fields, RNG and match clock, PAD configuration and all three history banks only; pixel agreement, hardware and audio output are excluded",
+        "source_drawing": "source_draws",
+        "status": "declared_state_match"
+      },
+      "cpu_and_presentation_comparison": {
+        "first_divergence": {
+          "actual": "46ea6000",
+          "expected": "46800000",
+          "field": "camera.far_bits",
+          "phase": "frame",
+          "tick": 0
+        },
+        "first_divergences_by_domain": {
+          "camera": {
+            "actual": "46ea6000",
+            "expected": "46800000",
+            "field": "camera.far_bits",
+            "phase": "frame",
+            "tick": 0
+          },
+          "cpu": null,
+          "draw_alignment": {
+            "actual_count": 1199,
+            "expected_count": 1199,
+            "extra_in_actual": [],
+            "extra_in_actual_count": 0,
+            "matched_count": 1199,
+            "missing_from_actual": [],
+            "missing_from_actual_count": 0,
+            "scope": "source_draws_by_source_index",
+            "status": "aligned"
+          },
+          "hud": null,
+          "magnifier": null,
+          "match": null,
+          "subject": {
+            "actual": "bf147cea",
+            "expected": "bf147ce9",
+            "field": "players[1].subject.bone_bits[2]",
+            "phase": "frame",
+            "tick": 82
+          }
+        },
+        "frames": 1199,
+        "gold_admitted": false,
+        "hashes": {
+          "port": "ccf6f4573022e80d82e55e4a2de057f5d9ddf414707c1549638894f2c3561e54",
+          "reference_a": "e8a51fec6512068924076bcd35b2bbc4157d7bba5c0f8ba411a52387de5fc09b",
+          "reference_b": "e8a51fec6512068924076bcd35b2bbc4157d7bba5c0f8ba411a52387de5fc09b"
+        },
+        "performance": "not_evaluated",
+        "pixels": "not_compared",
+        "port_draws": 1199,
+        "reference_draws": 1199,
+        "reference_repeatability": "pass",
+        "schema": "melee-web-cpu-observation-comparison",
+        "source_drawing": true,
+        "status": "declared_state_divergence",
+        "version": 1
+      },
+      "http": true,
+      "mode": "state_capture",
+      "receipts": {
+        "browser-errors.json": {
+          "path": "work/cpu-register/browser-two-player-baseline-v1/browser-errors.json",
+          "sha256": "ae58cdb3e6ee5292c44c477c5666d651ee5e2e1551c872822b249317fbdf514a"
+        },
+        "core-comparison.json": {
+          "path": "work/cpu-register/browser-two-player-baseline-v1/core-comparison.json",
+          "sha256": "ea187801cfd03d700ac87f0c7c44f7af8090a04727a42f7acae14c3190ae4aca"
+        },
+        "cpu-comparison.json": {
+          "path": "work/cpu-register/browser-two-player-baseline-v1/cpu-comparison.json",
+          "sha256": "b67a889aa259e54689e0f94da859dc07e5512efec522706c105e7737b1d01aba"
+        },
+        "retail-browser-report.json": {
+          "path": "work/cpu-register/browser-two-player-baseline-v1/retail-browser-report.json",
+          "sha256": "9fd0b30cf45409c40baf63f9f916052ff98aa531c627947abb1534f76426929b"
+        },
+        "served-artifacts-after.json": {
+          "path": "work/cpu-register/browser-two-player-baseline-v1/served-artifacts-after.json",
+          "sha256": "5dd6fc933393d3e55542489577fdf42e089ebfd75d5dff1a9e1cb1eddf182f46"
+        },
+        "served-artifacts.json": {
+          "path": "work/cpu-register/browser-two-player-baseline-v1/served-artifacts.json",
+          "sha256": "5dd6fc933393d3e55542489577fdf42e089ebfd75d5dff1a9e1cb1eddf182f46"
+        }
+      },
+      "scenario_id": "mario-human-vs-fox-cpu1-final-destination",
+      "served_artifacts_sha256": {
+        "action-sweep.mjs": "e4de82aaa8b990b5ac2d887a6bcd12a8ac402bc99e9556393833f2e0a80f9219",
+        "audio-ring.mjs": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf",
+        "audio-worklet.js": "ef4374ac08f5bab821efa05cf5d252ca8e4b50647710d434e192beac3d7d7b4f",
+        "disc-image.mjs": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a",
+        "dsp-coefficients.mjs": "5176d1cf4400228f31dff428bcc8cd60d07694c0ceea1628a79ac19f3e112b4a",
+        "gameplay_menu_browser.data": "cdf157ee0f1850884f07a71165fd2192177acb23c2c777313b719e70ea67546f",
+        "gameplay_menu_browser.js": "2067bcb40872bbf770181961acdb5882914ebf668582edc6e94378843828c03b",
+        "gameplay_menu_browser.wasm": "4473d658834c86cf4ac7cd91bef711d626e1620dfaa70aa784b1df65cf951680",
+        "hitch-capture.mjs": "f6d5441aa7289bccc185426300942fa9b0b879e478dd17af9ea43fe9e51127d3",
+        "match-flow.mjs": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f",
+        "match-menu.mjs": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba",
+        "runtime-assets.mjs": "1e0971f848191e5a1a6fd5c1fc260bc31417acdb0080e05b0ee2d86f2e3a06e6",
+        "runtime-cache.js": "49e02cdab92e66943528ae9aed4306c4076b42e1f7f9a2356f414ac5e41e5561",
+        "runtime.html": "a7e44eefa2ee250934c278839f81cccf1099ac42570441721ad74be228b1a67e"
+      },
+      "source_match": {
+        "complete": true,
+        "outcome": 2,
+        "winner": 1
+      },
+      "timing_observation": {
+        "browserCallbackGaps": 1,
+        "nativeCallbacksOver33ms": 0,
+        "nativeCallbacksOverBudget": 0,
+        "note": "native callback budget misses and browser gaps are distinct counters; no cold/warm admission",
+        "performance_admitted": false,
+        "shared_machine_with_debuggers": true,
+        "worstBrowserCallbackMs": 54.935000002384186,
+        "worstNativeCallbackMs": 8.855
+      },
+      "visible": true
+    },
+    {
+      "artifacts_unchanged": true,
+      "complete": true,
+      "core_comparison": {
+        "capture_hashes": {
+          "port": "0050077815b44d5259777dd98e61c924040d9f47b2d579b622881435f7f665da",
+          "reference_a": "ee119869a4c32e55d024e53bfe3af9520c661289b2669107e97be3da84f851dc",
+          "reference_b": "8b597c59f1139d0658016b487c5e03201574d0a5217adec5a500d6f320f8e592"
+        },
+        "checks": {
+          "active_player_count": "pass",
+          "entry": "pass",
+          "fighters": "pass",
+          "frame_count": "pass",
+          "inputs": "pass",
+          "match_frame": "pass",
+          "pad_state_hex": "pass",
+          "rng": "pass"
+        },
+        "first_divergence": null,
+        "first_divergence_by_group": {},
+        "frames_compared": 4346,
+        "gold_admitted": false,
+        "performance": "not_evaluated",
+        "reference_cpu": "Interpreter64",
+        "reference_repeatability": "pass",
+        "scope": "declared entry data, supplied inputs, fighter fields, RNG and match clock, PAD configuration and all three history banks only; pixel agreement, hardware and audio output are excluded",
+        "source_drawing": "source_draws",
+        "status": "declared_state_match"
+      },
+      "cpu_and_presentation_comparison": {
+        "first_divergence": {
+          "actual": "41a00000",
+          "expected": "41f00000",
+          "field": "camera.fov_bits",
+          "phase": "frame",
+          "tick": 0
+        },
+        "first_divergences_by_domain": {
+          "camera": {
+            "actual": "41a00000",
+            "expected": "41f00000",
+            "field": "camera.fov_bits",
+            "phase": "frame",
+            "tick": 0
+          },
+          "cpu": null,
+          "draw_alignment": {
+            "actual_count": 4346,
+            "expected_count": 4343,
+            "extra_in_actual": [
+              {
+                "ordinal": 1598,
+                "source_index": 1598
+              },
+              {
+                "ordinal": 2599,
+                "source_index": 2599
+              },
+              {
+                "ordinal": 3600,
+                "source_index": 3600
+              }
+            ],
+            "extra_in_actual_count": 3,
+            "matched_count": 4343,
+            "missing_from_actual": [],
+            "missing_from_actual_count": 0,
+            "scope": "source_draws_by_source_index",
+            "status": "misaligned"
+          },
+          "hud": null,
+          "magnifier": null,
+          "match": null,
+          "subject": {
+            "actual": "bd59cc73",
+            "expected": "bd59cc74",
+            "field": "players[0].subject.bone_bits[2]",
+            "phase": "frame",
+            "tick": 67
+          }
+        },
+        "frames": 4346,
+        "gold_admitted": false,
+        "hashes": {
+          "port": "d49c7b03de2dc48967e3f94adea29a3a20fe42c971d84d3ae4b6d65080391cb9",
+          "reference_a": "a4713aaed8d3a66662e7cd7f090b8677b9932c4a82f1463f10df98eba44869fb",
+          "reference_b": "a4713aaed8d3a66662e7cd7f090b8677b9932c4a82f1463f10df98eba44869fb"
+        },
+        "performance": "not_evaluated",
+        "pixels": "not_compared",
+        "port_draws": 4346,
+        "reference_draws": 4343,
+        "reference_repeatability": "pass",
+        "schema": "melee-web-cpu-observation-comparison",
+        "source_drawing": true,
+        "status": "declared_state_divergence",
+        "version": 1
+      },
+      "http": true,
+      "mode": "state_capture",
+      "receipts": {
+        "browser-errors.json": {
+          "path": "work/cpu-register/browser-three-player-baseline-v1/browser-errors.json",
+          "sha256": "ae58cdb3e6ee5292c44c477c5666d651ee5e2e1551c872822b249317fbdf514a"
+        },
+        "core-comparison.json": {
+          "path": "work/cpu-register/browser-three-player-baseline-v1/core-comparison.json",
+          "sha256": "f8323e1f50d40938def29b7027d0723dab2aa3c0ca497e20e1c905ec29a53665"
+        },
+        "cpu-comparison.json": {
+          "path": "work/cpu-register/browser-three-player-baseline-v1/cpu-comparison.json",
+          "sha256": "60af79721a988d01d88a2044211c7b97d63a889abafd11c2e38168ee58ddfc4d"
+        },
+        "retail-browser-report.json": {
+          "path": "work/cpu-register/browser-three-player-baseline-v1/retail-browser-report.json",
+          "sha256": "8716611585b18b4444c042f18a4f0d6037d04fb56911a7eeed844d4188b72b29"
+        },
+        "served-artifacts-after.json": {
+          "path": "work/cpu-register/browser-three-player-baseline-v1/served-artifacts-after.json",
+          "sha256": "5dd6fc933393d3e55542489577fdf42e089ebfd75d5dff1a9e1cb1eddf182f46"
+        },
+        "served-artifacts.json": {
+          "path": "work/cpu-register/browser-three-player-baseline-v1/served-artifacts.json",
+          "sha256": "5dd6fc933393d3e55542489577fdf42e089ebfd75d5dff1a9e1cb1eddf182f46"
+        }
+      },
+      "scenario_id": "marth-human-vs-falco5-mario9-yoshis-story-120s",
+      "served_artifacts_sha256": {
+        "action-sweep.mjs": "e4de82aaa8b990b5ac2d887a6bcd12a8ac402bc99e9556393833f2e0a80f9219",
+        "audio-ring.mjs": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf",
+        "audio-worklet.js": "ef4374ac08f5bab821efa05cf5d252ca8e4b50647710d434e192beac3d7d7b4f",
+        "disc-image.mjs": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a",
+        "dsp-coefficients.mjs": "5176d1cf4400228f31dff428bcc8cd60d07694c0ceea1628a79ac19f3e112b4a",
+        "gameplay_menu_browser.data": "cdf157ee0f1850884f07a71165fd2192177acb23c2c777313b719e70ea67546f",
+        "gameplay_menu_browser.js": "2067bcb40872bbf770181961acdb5882914ebf668582edc6e94378843828c03b",
+        "gameplay_menu_browser.wasm": "4473d658834c86cf4ac7cd91bef711d626e1620dfaa70aa784b1df65cf951680",
+        "hitch-capture.mjs": "f6d5441aa7289bccc185426300942fa9b0b879e478dd17af9ea43fe9e51127d3",
+        "match-flow.mjs": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f",
+        "match-menu.mjs": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba",
+        "runtime-assets.mjs": "1e0971f848191e5a1a6fd5c1fc260bc31417acdb0080e05b0ee2d86f2e3a06e6",
+        "runtime-cache.js": "49e02cdab92e66943528ae9aed4306c4076b42e1f7f9a2356f414ac5e41e5561",
+        "runtime.html": "a7e44eefa2ee250934c278839f81cccf1099ac42570441721ad74be228b1a67e"
+      },
+      "source_match": {
+        "complete": true,
+        "outcome": 2,
+        "winner": 2
+      },
+      "timing_observation": {
+        "browserCallbackGaps": 99,
+        "nativeCallbacksOver33ms": 0,
+        "nativeCallbacksOverBudget": 17,
+        "note": "native callback budget misses and browser gaps are distinct counters; no cold/warm admission",
+        "performance_admitted": false,
+        "shared_machine_with_debuggers": true,
+        "worstBrowserCallbackMs": 161.01500000059605,
+        "worstNativeCallbackMs": 19.075
+      },
+      "visible": true
+    },
+    {
+      "artifacts_unchanged": true,
+      "complete": true,
+      "core_comparison": {
+        "capture_hashes": {
+          "port": "910221e2709ba3b60c422b71a85a38b588ce13e4b06519f5fe6f19d29d9c3b8b",
+          "reference_a": "418e88c14947ecabfbdfc5511d42247f4b0ab190df156987ff0a81cf59787460",
+          "reference_b": "eef5b617b8683cacc41d1396b2920ca937537b4733794eac07c7e0672cc1237a"
+        },
+        "checks": {
+          "active_player_count": "pass",
+          "entry": "pass",
+          "fighters": "diverged",
+          "frame_count": "pass",
+          "inputs": "pass",
+          "match_frame": "pass",
+          "pad_state_hex": "pass",
+          "rng": "pass"
+        },
+        "first_divergence": {
+          "actual": "000000000000000000000000000000003f800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fefefefefefe1d5c5cfefefe21ffff5a5affff0900ffffffffff0001",
+          "expected": "bf6000003f01020400000000000000003f8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fe0000fe00005c0000fe21ffff5a5affff0900ffffffffff0001",
+          "field": "fighters[1].input_hex",
+          "frame": 2495,
+          "record": "frame"
+        },
+        "first_divergence_by_group": {
+          "fighters": {
+            "actual": "000000000000000000000000000000003f800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fefefefefefe1d5c5cfefefe21ffff5a5affff0900ffffffffff0001",
+            "expected": "bf6000003f01020400000000000000003f8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fe0000fe00005c0000fe21ffff5a5affff0900ffffffffff0001",
+            "field": "fighters[1].input_hex",
+            "frame": 2495,
+            "record": "frame"
+          }
+        },
+        "frames_compared": 3838,
+        "gold_admitted": false,
+        "performance": "not_evaluated",
+        "reference_cpu": "Interpreter64",
+        "reference_repeatability": "pass",
+        "scope": "declared entry data, supplied inputs, fighter fields, RNG and match clock, PAD configuration and all three history banks only; pixel agreement, hardware and audio output are excluded",
+        "source_drawing": "source_draws",
+        "status": "diverged"
+      },
+      "cpu_and_presentation_comparison": {
+        "first_divergence": {
+          "actual": "3f123976",
+          "expected": "3f123975",
+          "field": "players[0].subject.bone_bits[2]",
+          "phase": "frame",
+          "tick": 74
+        },
+        "first_divergences_by_domain": {
+          "camera": {
+            "actual": "4103c711",
+            "expected": "4103c712",
+            "field": "camera.interest_bits[1]",
+            "phase": "frame",
+            "tick": 184
+          },
+          "cpu": {
+            "actual": "800081008e017f7f",
+            "expected": "809081408e017f7f",
+            "field": "players[1].cpu.command_bytes",
+            "phase": "frame",
+            "tick": 2495
+          },
+          "draw_alignment": {
+            "actual_count": 3838,
+            "expected_count": 3836,
+            "extra_in_actual": [
+              {
+                "ordinal": 2268,
+                "source_index": 2268
+              },
+              {
+                "ordinal": 3269,
+                "source_index": 3269
+              }
+            ],
+            "extra_in_actual_count": 2,
+            "matched_count": 3836,
+            "missing_from_actual": [],
+            "missing_from_actual_count": 0,
+            "scope": "source_draws_by_source_index",
+            "status": "misaligned"
+          },
+          "hud": null,
+          "magnifier": null,
+          "match": null,
+          "subject": {
+            "actual": "3f123976",
+            "expected": "3f123975",
+            "field": "players[0].subject.bone_bits[2]",
+            "phase": "frame",
+            "tick": 74
+          }
+        },
+        "frames": 3838,
+        "gold_admitted": false,
+        "hashes": {
+          "port": "ce92ed1dc751188c481dd130332289031dc1e6ff30c252cd6d726ee80c0fd6b0",
+          "reference_a": "357781495153a89a5564cdc9cb021ac11f93550d67816b444b24e26cad733d85",
+          "reference_b": "357781495153a89a5564cdc9cb021ac11f93550d67816b444b24e26cad733d85"
+        },
+        "performance": "not_evaluated",
+        "pixels": "not_compared",
+        "port_draws": 3838,
+        "reference_draws": 3836,
+        "reference_repeatability": "pass",
+        "schema": "melee-web-cpu-observation-comparison",
+        "source_drawing": true,
+        "status": "declared_state_divergence",
+        "version": 1
+      },
+      "http": true,
+      "mode": "state_capture",
+      "receipts": {
+        "browser-errors.json": {
+          "path": "work/cpu-register/browser-four-player-baseline-v1/browser-errors.json",
+          "sha256": "ae58cdb3e6ee5292c44c477c5666d651ee5e2e1551c872822b249317fbdf514a"
+        },
+        "core-comparison.json": {
+          "path": "work/cpu-register/browser-four-player-baseline-v1/core-comparison.json",
+          "sha256": "0aa242bcf11bc158d3401655ab4db9e0c9142aa294078ec4b0d56f61baec34cb"
+        },
+        "cpu-comparison.json": {
+          "path": "work/cpu-register/browser-four-player-baseline-v1/cpu-comparison.json",
+          "sha256": "bdd512d819e636df2c29997fd4d3839a64dfd994190365f3c0aef68370bd46d3"
+        },
+        "retail-browser-report.json": {
+          "path": "work/cpu-register/browser-four-player-baseline-v1/retail-browser-report.json",
+          "sha256": "5b3e288640b07d38d4c901dcdb24aef0780a558f05d3600c04d4fb42a72a652d"
+        },
+        "served-artifacts-after.json": {
+          "path": "work/cpu-register/browser-four-player-baseline-v1/served-artifacts-after.json",
+          "sha256": "5dd6fc933393d3e55542489577fdf42e089ebfd75d5dff1a9e1cb1eddf182f46"
+        },
+        "served-artifacts.json": {
+          "path": "work/cpu-register/browser-four-player-baseline-v1/served-artifacts.json",
+          "sha256": "5dd6fc933393d3e55542489577fdf42e089ebfd75d5dff1a9e1cb1eddf182f46"
+        }
+      },
+      "scenario_id": "fox-human-vs-mario3-marth6-falco8-dream-land",
+      "served_artifacts_sha256": {
+        "action-sweep.mjs": "e4de82aaa8b990b5ac2d887a6bcd12a8ac402bc99e9556393833f2e0a80f9219",
+        "audio-ring.mjs": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf",
+        "audio-worklet.js": "ef4374ac08f5bab821efa05cf5d252ca8e4b50647710d434e192beac3d7d7b4f",
+        "disc-image.mjs": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a",
+        "dsp-coefficients.mjs": "5176d1cf4400228f31dff428bcc8cd60d07694c0ceea1628a79ac19f3e112b4a",
+        "gameplay_menu_browser.data": "cdf157ee0f1850884f07a71165fd2192177acb23c2c777313b719e70ea67546f",
+        "gameplay_menu_browser.js": "2067bcb40872bbf770181961acdb5882914ebf668582edc6e94378843828c03b",
+        "gameplay_menu_browser.wasm": "4473d658834c86cf4ac7cd91bef711d626e1620dfaa70aa784b1df65cf951680",
+        "hitch-capture.mjs": "f6d5441aa7289bccc185426300942fa9b0b879e478dd17af9ea43fe9e51127d3",
+        "match-flow.mjs": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f",
+        "match-menu.mjs": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba",
+        "runtime-assets.mjs": "1e0971f848191e5a1a6fd5c1fc260bc31417acdb0080e05b0ee2d86f2e3a06e6",
+        "runtime-cache.js": "49e02cdab92e66943528ae9aed4306c4076b42e1f7f9a2356f414ac5e41e5561",
+        "runtime.html": "a7e44eefa2ee250934c278839f81cccf1099ac42570441721ad74be228b1a67e"
+      },
+      "source_match": {
+        "complete": true,
+        "outcome": 1,
+        "winner": 3
+      },
+      "timing_observation": {
+        "browserCallbackGaps": 12,
+        "nativeCallbacksOver33ms": 1,
+        "nativeCallbacksOverBudget": 5,
+        "note": "native callback budget misses and browser gaps are distinct counters; no cold/warm admission",
+        "performance_admitted": false,
+        "shared_machine_with_debuggers": true,
+        "worstBrowserCallbackMs": 153.4350000023842,
+        "worstNativeCallbackMs": 136.08
+      },
+      "visible": true
+    }
+  ],
+  "builds": [
+    {
+      "receipt": {
+        "path": "work/cpu-register/browser-address-build.log",
+        "sha256": "aacfcf6948ebabfeeb0deb5d026dba4b5470de785ea2b01fc2abc45de54ba471"
+      },
+      "result": "passed",
+      "target": "gameplay_menu_browser Release"
+    },
+    {
+      "receipt": {
+        "path": "work/cpu-register/native-address-build.log",
+        "sha256": "d2e27d1ca9fcfcff80805c085edf70a0f6bb4b833f986914a890ecf91207194a"
+      },
+      "result": "passed",
+      "target": "gameplay_retail_trace Release"
+    }
+  ],
+  "checkpoint_ci": {
+    "conclusion": "success",
+    "pull_request": 34733044472,
+    "push": 34733043195,
+    "repair_required": false
+  },
+  "diagnostics": [
+    {
+      "candidate_admission": "forbidden",
+      "embedded_helper_sha256": "7e64637bedfb9efaa7c3072ccd58288827947f7901d06c858059071887988c21",
+      "executed_prefix_sha256": "1190f538a92576bbe115930bc22b5c8fbee8564b805acdf586c8b3247c56e97e",
+      "full_input_plan_sha256": "3f9067a0edf388fd9a579b853e44eeca51e769853281ac301b2a4631e234d925",
+      "identity": {
+        "background_input": true,
+        "cheats": false,
+        "cpu": "Interpreter64",
+        "cpu_thread": false,
+        "disc_dol_sha1": "08e0bf20134dfcb260699671004527b2d6bb1a45",
+        "disc_image_bytes": 1449165376,
+        "disc_image_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+        "dol_sha1": "08e0bf20134dfcb260699671004527b2d6bb1a45",
+        "dolphin_binary_sha256": "dc3e63c85a2c7f96d3c055a48ecf78d31216eac4642ba1c4733c873dda803264",
+        "dolphin_version": "2606a",
+        "fixed_rtc": 1704067200,
+        "source_revision": "b43912cc78606f96c9569f5d6229bc9d7e265ea5"
+      },
+      "input_collector_source_sha256": "ce8e0cc6192efd6b84e4b46f98e6b261ff66804fcbbbdf83b7b15d233076bd89",
+      "instrumented_collector_bundle_sha256": "88f02722a519f4af2b247e584f9e4baa3267ff4552ca63e76146bc3957206f2e",
+      "prefix_comparison": {
+        "path": "work/cpu-register/actual-prefix-check-2p.json",
+        "sha256": "ceaac47abd190939392d723e191d5a38aea5620ebc0a4722a6210d3b83cda0ef"
+      },
+      "prefix_ticks": 868,
+      "prefix_trace_sha256": "5ed96232a3aeeb4c20b784a111babfed29ca4fad81a6ab74287376192ae0a8e8",
+      "probes_sha256": "e5fcf7920432677eaf93de953ecc2ac8e68bb69a5447bfa3ea71578f26348647",
+      "records": 346,
+      "run_metadata": {
+        "path": "work/cpu-register/two-player-v2/.retail-replay-run-lv1_a1u1/run-metadata.json",
+        "sha256": "c5948665b56efe9a645e95b1ff39b4b8084257559ea79efd0ede197fa86cd1a8"
+      },
+      "scenario_id": "mario-human-vs-fox-cpu1-final-destination",
+      "sidecar": {
+        "path": "work/cpu-register/two-player-v2/registers.jsonl",
+        "sha256": "9af899a87d79768cde51509096491104a90dec4f4f0b5abcf27d6b75727cb3e1"
+      },
+      "source_comparisons": [
+        {
+          "first_divergence": null,
+          "frames_compared": 868,
+          "gold": "a",
+          "status": "exact"
+        },
+        {
+          "first_divergence": null,
+          "frames_compared": 868,
+          "gold": "b",
+          "status": "exact"
+        }
+      ],
+      "status": "diagnostic_only",
+      "window": {
+        "end_tick": 867,
+        "start_tick": 864
+      }
+    },
+    {
+      "candidate_admission": "forbidden",
+      "embedded_helper_sha256": "7e64637bedfb9efaa7c3072ccd58288827947f7901d06c858059071887988c21",
+      "executed_prefix_sha256": "f4beb578a3d78eb743a4f0cf7157986f5b43504a0177fd3165b4e0eee715263f",
+      "full_input_plan_sha256": "24a91bde840a6ccbe294320d6c6dd83437f6ecbc88dd107ada881d3008cf4ea6",
+      "identity": {
+        "background_input": true,
+        "cheats": false,
+        "cpu": "Interpreter64",
+        "cpu_thread": false,
+        "disc_dol_sha1": "08e0bf20134dfcb260699671004527b2d6bb1a45",
+        "disc_image_bytes": 1449165376,
+        "disc_image_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+        "dol_sha1": "08e0bf20134dfcb260699671004527b2d6bb1a45",
+        "dolphin_binary_sha256": "dc3e63c85a2c7f96d3c055a48ecf78d31216eac4642ba1c4733c873dda803264",
+        "dolphin_version": "2606a",
+        "fixed_rtc": 1704067200,
+        "source_revision": "b43912cc78606f96c9569f5d6229bc9d7e265ea5"
+      },
+      "input_collector_source_sha256": "fe8d66febf6436b6f6f691b3ad539e49d6e725b0f31f7b5b991aff7334310875",
+      "instrumented_collector_bundle_sha256": "f1b931560116c8d8ece328e0cc962712f7b9ed6d71627b5c9bf18ee16adf13c7",
+      "prefix_comparison": {
+        "path": "work/cpu-register/actual-prefix-check-3p.json",
+        "sha256": "d8e58eb755bf39f8cf0334b62d74962191e1d5c8ae588b19ec287eae94330728"
+      },
+      "prefix_ticks": 282,
+      "prefix_trace_sha256": "e92ccf3e21772c905103367ec9bdc310c569ed0c54dd2401bba3934665943c66",
+      "probes_sha256": "e5fcf7920432677eaf93de953ecc2ac8e68bb69a5447bfa3ea71578f26348647",
+      "records": 237,
+      "run_metadata": {
+        "path": "work/cpu-register/three-player-v2/.retail-replay-run-a0l5yqva/run-metadata.json",
+        "sha256": "71e9bec2e9586f8237578fbe7344adfaad9c48d835591340efa7e12e13429c80"
+      },
+      "scenario_id": "marth-human-vs-falco5-mario9-yoshis-story-120s",
+      "sidecar": {
+        "path": "work/cpu-register/three-player-v2/registers.jsonl",
+        "sha256": "0af297a4f0d86242a85b161d94a3b06ad62dd96354a55ce4048c0c8b2d02756f"
+      },
+      "source_comparisons": [
+        {
+          "first_divergence": null,
+          "frames_compared": 282,
+          "gold": "a",
+          "status": "exact"
+        },
+        {
+          "first_divergence": null,
+          "frames_compared": 282,
+          "gold": "b",
+          "status": "exact"
+        }
+      ],
+      "status": "diagnostic_only",
+      "window": {
+        "end_tick": 281,
+        "start_tick": 278
+      }
+    },
+    {
+      "candidate_admission": "forbidden",
+      "embedded_helper_sha256": "7e64637bedfb9efaa7c3072ccd58288827947f7901d06c858059071887988c21",
+      "executed_prefix_sha256": "17ee30a0c4649c06a7464056e57a76522ab90d33c3e110966c89ea0d1c72ddcd",
+      "full_input_plan_sha256": "63bbc8185098a41751148218fa0ce81188c21ad0787f77f81ccccf5190cc10f0",
+      "identity": {
+        "background_input": true,
+        "cheats": false,
+        "cpu": "Interpreter64",
+        "cpu_thread": false,
+        "disc_dol_sha1": "08e0bf20134dfcb260699671004527b2d6bb1a45",
+        "disc_image_bytes": 1449165376,
+        "disc_image_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+        "dol_sha1": "08e0bf20134dfcb260699671004527b2d6bb1a45",
+        "dolphin_binary_sha256": "dc3e63c85a2c7f96d3c055a48ecf78d31216eac4642ba1c4733c873dda803264",
+        "dolphin_version": "2606a",
+        "fixed_rtc": 1704067200,
+        "source_revision": "b43912cc78606f96c9569f5d6229bc9d7e265ea5"
+      },
+      "input_collector_source_sha256": "340038435f6af650db391ec5c0c944e24b7dca569e28fe68ff16581846a39588",
+      "instrumented_collector_bundle_sha256": "92d129d8c09244e7946e98b6d1795f5389d2613db846bdbe0a2737969b9eb29f",
+      "prefix_comparison": {
+        "path": "work/cpu-register/actual-prefix-check-4p.json",
+        "sha256": "5fc75c9a7a4dc95d072b2f7a55e5683613ae60db38964a4c611ba4642b472d75"
+      },
+      "prefix_ticks": 2497,
+      "prefix_trace_sha256": "47a87c5b6cb07cd5f95ae1d15297380f32c97c689b2c94739c5fe0214501a67b",
+      "probes_sha256": "e5fcf7920432677eaf93de953ecc2ac8e68bb69a5447bfa3ea71578f26348647",
+      "records": 235,
+      "run_metadata": {
+        "path": "work/cpu-register/four-player-v3/.retail-replay-run-u54jf95m/run-metadata.json",
+        "sha256": "f716dafdc0803db5dd2a50a1238615f08fbd52c30504380d4664a2ddcd08898a"
+      },
+      "scenario_id": "fox-human-vs-mario3-marth6-falco8-dream-land",
+      "sidecar": {
+        "path": "work/cpu-register/four-player-v3/registers.jsonl",
+        "sha256": "492b0d1073923d05d8cedc1923c6bacb91d0617e27ea0e6a2f8a810141730747"
+      },
+      "source_comparisons": [
+        {
+          "first_divergence": null,
+          "frames_compared": 2497,
+          "gold": "a",
+          "status": "exact"
+        },
+        {
+          "first_divergence": null,
+          "frames_compared": 2497,
+          "gold": "b",
+          "status": "exact"
+        }
+      ],
+      "status": "diagnostic_only",
+      "window": {
+        "end_tick": 2496,
+        "start_tick": 2494
+      }
+    }
+  ],
+  "exclusions": [
+    "performance admission",
+    "pixels",
+    "audio output",
+    "reserved holdouts",
+    "additional scenarios",
+    "native gameplay-relevant drawing repair",
+    "camera precision repair",
+    "preparation-draw repair"
+  ],
+  "failed_diagnostics": [
+    {
+      "conclusion": {
+        "evidence_admission": "forbidden",
+        "reason": "diagnostic retained 133 probe/state errors; see sidecar",
+        "source_state": "exact_through_prefix",
+        "status": "diagnostic_failed"
+      },
+      "metadata": {
+        "path": "work/cpu-register/two-player-v1/.retail-replay-run-c5027znh/run-metadata.json",
+        "sha256": "1f607c88d8f7a0c471ca0b9c8a1c3556293fc8cb7c1b57d2e44d6e3f7682db31"
+      },
+      "prefix_comparison": {
+        "path": "work/cpu-register/two-player-v1/prefix-comparison-failed.json",
+        "sha256": "946ae20fa6165df43cbb51a3c53ef008baf1dd4436b94e26b5b24f290e66d44d"
+      },
+      "reason": "diagnostic retained 133 probe/state errors; see sidecar",
+      "run": "two-player-v1",
+      "sidecar": {
+        "path": "work/cpu-register/two-player-v1/registers.jsonl",
+        "sha256": "b14f071f2a07caef8dcd0e6775855a3207f738e68cf251d99f14b56b83e5088e"
+      },
+      "status": "diagnostic_failed"
+    },
+    {
+      "conclusion": {
+        "evidence_admission": "forbidden",
+        "reason": "diagnostic retained 407 probe/state errors; see sidecar",
+        "source_state": "exact_through_prefix",
+        "status": "diagnostic_failed"
+      },
+      "metadata": {
+        "path": "work/cpu-register/three-player-v1/.retail-replay-run-nbliga2k/run-metadata.json",
+        "sha256": "e3e45e438898bb48b65d89af37f982ed888c0d9ccf7c088eef739ba60c4059a1"
+      },
+      "prefix_comparison": {
+        "path": "work/cpu-register/three-player-v1/prefix-comparison-failed.json",
+        "sha256": "08c88d4d2f318b72460c0bace69fec4372a58aff4ef058e5c0ca6ccfd5fbc245"
+      },
+      "reason": "diagnostic retained 407 probe/state errors; see sidecar",
+      "run": "three-player-v1",
+      "sidecar": {
+        "path": "work/cpu-register/three-player-v1/registers.jsonl",
+        "sha256": "600041895357887a3b4b90a97c950e446a8c563eb564a751aec0c4a0e45e704f"
+      },
+      "status": "diagnostic_failed"
+    },
+    {
+      "conclusion": {
+        "evidence_admission": "forbidden",
+        "reason": "diagnostic retained 276 probe/state errors; see sidecar",
+        "source_state": "exact_through_prefix",
+        "status": "diagnostic_failed"
+      },
+      "metadata": {
+        "path": "work/cpu-register/four-player-v2/.retail-replay-run-2yxgr9xb/run-metadata.json",
+        "sha256": "365e38a7ec5939bae77c6082f4c6b94b64181b0253e035ad46e951fbd475876a"
+      },
+      "prefix_comparison": {
+        "path": "work/cpu-register/four-player-v2/prefix-comparison-failed.json",
+        "sha256": "01d6125f1c8ec44d813386a489f6422a309e58da28d4c277e3c22075120e8f2d"
+      },
+      "reason": "diagnostic retained 276 probe/state errors; see sidecar",
+      "run": "four-player-v2",
+      "sidecar": {
+        "path": "work/cpu-register/four-player-v2/registers.jsonl",
+        "sha256": "f1d2f07b27997079d94d623f2419432ceda132ccdebb3532c4ea35a68c2d9ef7"
+      },
+      "status": "diagnostic_failed"
+    },
+    {
+      "reason": "owned wrapper interrupted before probe window to correct probe gating and validation",
+      "receipt": {
+        "path": "work/cpu-register/four-player-v1/diagnostic-aborted.json",
+        "sha256": "e3d535011bb24449f7ce1d47c6f94df785be36da0c66b57dbbcfd3979f434e6c"
+      },
+      "run": "four-player-v1",
+      "status": "aborted"
+    }
+  ],
+  "final_focused_tests": {
+    "command": "python -m unittest discover -s tests -p test_cpu_register_prefix.py -v",
+    "receipt": {
+      "path": "work/cpu-register/prefix-tests-final.log",
+      "sha256": "deced9c00b6bf835191fe57341e5a9d4c40d7290f4014a22fd1cc751d2af8b05"
+    },
+    "result": "passed",
+    "tests": 9
+  },
+  "four_player_divergence_resolved": false,
+  "frozen_inputs": [
+    {
+      "files_sha256": {
+        "capture-a.jsonl": "ff6b7fbe5436a6e021270779669a3cf2c619323d5e5617f567dea0b28e97ae4d",
+        "capture-b.jsonl": "f560226e86fb590472fa8165dc9f2bccfd40591013bdb50a886ee8d562830487",
+        "input-plan.json": "3f9067a0edf388fd9a579b853e44eeca51e769853281ac301b2a4631e234d925",
+        "paired.mwrc": "c26f1379ca34a2ea8d28cb0d3e903800d49eccbf677acc7e6f002f91e0e82687",
+        "scenario.json": "47eea34486f2b42ace1c7fa006e5632ba4ab50cc5f25b34e33a323c586c2f7f8"
+      },
+      "scenario_id": "mario-human-vs-fox-cpu1-final-destination",
+      "unchanged": true
+    },
+    {
+      "files_sha256": {
+        "capture-a.jsonl": "ee119869a4c32e55d024e53bfe3af9520c661289b2669107e97be3da84f851dc",
+        "capture-b.jsonl": "8b597c59f1139d0658016b487c5e03201574d0a5217adec5a500d6f320f8e592",
+        "input-plan.json": "24a91bde840a6ccbe294320d6c6dd83437f6ecbc88dd107ada881d3008cf4ea6",
+        "paired.mwrc": "b67336a975f0c353a3c98a850f2b2f74dd789e35937fe315cf7dbda7af833858",
+        "scenario.json": "ef6fc8b4dae4a7e25e1356313768eb1e9953b1acb7a90db9b93c8cc3fd76f471"
+      },
+      "scenario_id": "marth-human-vs-falco5-mario9-yoshis-story-120s",
+      "unchanged": true
+    },
+    {
+      "files_sha256": {
+        "capture-a.jsonl": "418e88c14947ecabfbdfc5511d42247f4b0ab190df156987ff0a81cf59787460",
+        "capture-b.jsonl": "eef5b617b8683cacc41d1396b2920ca937537b4733794eac07c7e0672cc1237a",
+        "input-plan.json": "63bbc8185098a41751148218fa0ce81188c21ad0787f77f81ccccf5190cc10f0",
+        "paired.mwrc": "2e521b9b06792ee13fbf9b38dbf342b6c0aa8921f10c7a090b000f8d94850f55",
+        "scenario.json": "ce662f38032aebc6c4d72ea7d7e020b1907b354cd5e25840e0d1aaede5452f6f"
+      },
+      "scenario_id": "fox-human-vs-mario3-marth6-falco8-dream-land",
+      "unchanged": true
+    }
+  ],
+  "gameplay_fix_implemented": false,
+  "inherited_regressions": {
+    "commit": "6b8bdda2b02a6a5e753e857891e964b5059f817f",
+    "human_ticks": 240,
+    "level1_ticks": 480,
+    "level9_ticks": 480,
+    "rerun_on_this_branch": false,
+    "status": "exact at base; rerun required after gameplay fix"
+  },
+  "native_headless_baseline": {
+    "artifacts_after": {
+      "gameplay_retail_trace.js": "7526327596d8fca379c513fef72ecda1e0eb4f6a8563ce824db5729c9cc8833b",
+      "gameplay_retail_trace.wasm": "d78b040bcef9fad3ade1b137b94474085e1e73b02f641fa57c0ee9b2913ea31b"
+    },
+    "artifacts_before": {
+      "gameplay_retail_trace.js": "7526327596d8fca379c513fef72ecda1e0eb4f6a8563ce824db5729c9cc8833b",
+      "gameplay_retail_trace.wasm": "d78b040bcef9fad3ade1b137b94474085e1e73b02f641fa57c0ee9b2913ea31b"
+    },
+    "capture_receipt": {
+      "path": "work/cpu-register/native-address-v1/capture-result.json",
+      "sha256": "c6a424d82833d8c86bb048f226bc965bb05653142205efec6a0ea45d7ae40942"
+    },
+    "complete": true,
+    "core_comparison": {
+      "capture_hashes": {
+        "port": "2df750f90f4a597d7f254e86d075697bd106ffb8b5382fce8ae86462cff34e26",
+        "reference_a": "418e88c14947ecabfbdfc5511d42247f4b0ab190df156987ff0a81cf59787460",
+        "reference_b": "eef5b617b8683cacc41d1396b2920ca937537b4733794eac07c7e0672cc1237a"
+      },
+      "checks": {
+        "active_player_count": "pass",
+        "entry": "pass",
+        "fighters": "diverged",
+        "frame_count": "pass",
+        "inputs": "pass",
+        "match_frame": "pass",
+        "pad_state_hex": "pass",
+        "rng": "diverged"
+      },
+      "first_divergence": {
+        "actual": 298633274,
+        "expected": 2503578946,
+        "field": "rng",
+        "frame": 1871,
+        "record": "frame"
+      },
+      "first_divergence_by_group": {
+        "fighters": {
+          "actual": "42edbd71",
+          "expected": "42efbd71",
+          "field": "fighters[1].damage_bits",
+          "frame": 1871,
+          "record": "frame"
+        },
+        "rng": {
+          "actual": 298633274,
+          "expected": 2503578946,
+          "field": "rng",
+          "frame": 1871,
+          "record": "frame"
+        }
+      },
+      "frames_compared": 3838,
+      "gold_admitted": false,
+      "performance": "not_evaluated",
+      "reference_cpu": "Interpreter64",
+      "reference_repeatability": "pass",
+      "scope": "declared entry data, supplied inputs, fighter fields, RNG and match clock, PAD configuration and all three history banks only; rendering, hardware and audio output are excluded",
+      "source_drawing": "excluded",
+      "status": "diverged"
+    },
+    "full_match_accuracy_pass": false,
+    "limitation": "gameplay-relevant source drawing/magnifier execution omitted",
+    "outputs_sha256": {
+      "cpu-observation.jsonl": "ab6eafb537b324703ef00a558f5377a1e806bd3006bd39206d41a9ddeea14389",
+      "hitlag-audit.log": "2f78158f042fd01489d2be9fd343d78680bc9afaff5753d149c70022b9bee14e",
+      "matrix-audit.jsonl": "0dc9dfe5d1a112a3542b1e33f9c3bae366d5352732827b2395ecac8c303de55f",
+      "stderr.log": "a18cc02cec3e91a2564a3ce7b8c9fd0a79a35e57a9549a79bd0d5c521d25556a",
+      "trace.jsonl": "2df750f90f4a597d7f254e86d075697bd106ffb8b5382fce8ae86462cff34e26"
+    }
+  },
+  "schema": "melee-web-cpu-register-investigation",
+  "scope": "development diagnostics and unchanged-behavior baselines; no compatibility model or CPU admission",
+  "test_suite": {
+    "command": "python -m unittest discover -s tests -v",
+    "note": "46 optional target/asset checks unavailable in this isolated worktree; no failures. Final CLI overwrite guard added afterward and covered by focused rerun.",
+    "receipt": {
+      "path": "work/cpu-register/full-tests.log",
+      "sha256": "d3156aa349f16812d003219cbebbf10dd3e81ab032f66a13b59c2d62b788efa4"
+    },
+    "result": "passed",
+    "seconds": 172.281,
+    "skip_reasons": {
+      "Bootstrap Aurora and a C++20 compiler for independent DSP comparison": 2,
+      "Build dat_scene_trace before the typed scene check": 1,
+      "Build fighter targets before running the focused bonus_data trace": 1,
+      "Build fighter targets before running the focused stage_numeric trace": 1,
+      "Build fighter targets before the original SIS consumer check": 1,
+      "Build fighter targets before the typed support check": 1,
+      "Build fighter/audio stream target and supply optional owned HPS/SSM/SEM/coefficient inputs": 1,
+      "Build gameplay_audio_trace and provide local SSM/SEM/DSP coefficient fixtures": 2,
+      "Build gameplay_pad_state_trace": 1,
+      "Build gameplay_retail_trace to test the shared decoder": 1,
+      "Build gameplay_rumble_trace and provide owned LbRb.dat": 1,
+      "Build the native menu host and supply owned menu/game fixtures": 1,
+      "Build the native_audio_banks fighter target first": 1,
+      "Build the source content trace targets": 10,
+      "Built original player context trace required": 1,
+      "Built stock trace and owned Mario costume archives required": 1,
+      "Common context trace unavailable; build gameplay first": 1,
+      "Effect trace unavailable; build gameplay_effect_banks_trace first": 1,
+      "Native HSD targets unavailable; run scripts/build.py --target gameplay": 1,
+      "Optional built combat trace and owned runtime assets required": 1,
+      "Optional built full-stage edge trace and owned runtime assets required": 2,
+      "Optional built source trace and owned runtime assets required": 2,
+      "Optional built timer trace and owned runtime assets required": 1,
+      "Original CSS target and owned local fixtures are required": 1,
+      "Original stage trace target unavailable": 2,
+      "Project SDK and Aurora build dependencies unavailable; run bootstrap/build": 4,
+      "Project SDK/Aurora build dependencies unavailable; run bootstrap/build": 1,
+      "pinned slippi-js fixtures are not checked out": 2
+    },
+    "skipped": 46,
+    "tests": 619
+  },
+  "version": 1
+}

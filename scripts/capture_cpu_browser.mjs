@@ -9,6 +9,7 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
 import {createHash} from 'node:crypto';
+import {installCpuBrowserModuleCapture} from './cpu_browser_module_capture.mjs';
 const {values: options} = parseArgs({options: {
   ...Object.fromEntries(['url','disc','recipe','out','playwright'].map(name => [name, {type:'string'}])),
   timeout: {type:'string', default:'900000'},
@@ -36,6 +37,9 @@ const {chromium} = options.playwright
   ? await import(pathToFileURL(path.join(path.resolve(options.playwright), 'index.mjs')).href)
   : await import('playwright');
 const browser = await chromium.launch({channel:'chrome', headless:false, chromiumSandbox:true});
+await fs.writeFile(path.join(options.out, 'browser-identity.json'), JSON.stringify({
+  browser: 'chrome', version: await browser.version(), visible_browser: true,
+}, null, 2) + '\n');
 const page = await browser.newPage({viewport:{width:1280,height:960}, deviceScaleFactor:1});
 const errors = [], requests = [];
 const servedArtifacts = {}, servedArtifactsAfter = {};
@@ -67,6 +71,10 @@ async function readArtifacts(expected, output) {
   }
 }
 try {
+  // Install before runtime.html loads. melee-runtime.mjs publishes Module just
+  // before appending the generated Emscripten loader, so this observes the
+  // callbacks at the boundary where the loader captures them.
+  await page.addInitScript(installCpuBrowserModuleCapture);
   await page.addInitScript(() => {
     window.cpuObservationRows = [];
     window.cpuPreparationRows = [];
@@ -100,9 +108,24 @@ try {
   await page.locator('#retail-replay-mode').selectOption('state');
   await page.locator('#retail-replay-file').setInputFiles(options.recipe);
   await page.locator('#retail-replay-start:not([disabled])').click();
+  // Clicking diagnostics scrolls below the canvas. Keep source presentation
+  // visible; full-page screenshots can resize the live WebGPU surface.
+  await page.locator('#canvas').scrollIntoViewIfNeeded();
   await page.waitForFunction(() => window.cpuObservationRows.length >= 360 ||
     document.querySelector('#retail-replay-downloads a'), null, {timeout});
-  await page.screenshot({path:path.join(options.out, 'playing.png'), fullPage:true});
+  const presentation = await page.locator('#canvas').evaluate(canvas => {
+    const rect = canvas.getBoundingClientRect();
+    return {x:rect.x, y:rect.y, width:rect.width, height:rect.height,
+      buffer_width:canvas.width, buffer_height:canvas.height,
+      viewport_width:innerWidth, viewport_height:innerHeight, document_hidden:document.hidden};
+  });
+  await write('playing-presentation.json', JSON.stringify(presentation, null, 2) + '\n');
+  if (presentation.document_hidden || presentation.x < 0 || presentation.y < 0 ||
+      presentation.x + presentation.width > presentation.viewport_width ||
+      presentation.y + presentation.height > presentation.viewport_height ||
+      !presentation.buffer_width || !presentation.buffer_height)
+    throw Error('The source canvas must remain visible with a nonempty framebuffer');
+  await page.screenshot({path:path.join(options.out, 'playing.png'), fullPage:false});
   await write('playing-observation.json', await page.evaluate(() =>
     window.cpuObservationRows.at(-1) || 'null'));
   await page.waitForFunction(() => document.querySelector('#retail-replay-downloads a'), null, {timeout});
@@ -111,7 +134,7 @@ try {
   for (const exported of exports) await write(path.basename(exported.name), exported.text);
   const report = JSON.parse(await page.locator('#retail-replay-report').textContent());
   await write('ui-report.json', JSON.stringify(report, null, 2) + '\n');
-  await page.screenshot({path:path.join(options.out, 'completed.png'), fullPage:true});
+  await page.screenshot({path:path.join(options.out, 'completed.png'), fullPage:false});
   if (!report.complete || !report.pass || !report.source_match?.complete)
     throw Error('The full browser match did not complete successfully');
   await readArtifacts(inventory.runtime_sha256, servedArtifactsAfter);
@@ -122,21 +145,39 @@ try {
   await write('failure.txt', (error.stack || String(error)) + '\n');
   if (!page.isClosed()) {
     await write('page.txt', await page.locator('body').innerText().catch(() => 'Page unavailable'));
-    await page.screenshot({path:path.join(options.out, 'failure.png'), fullPage:true}).catch(() => {});
+    await page.screenshot({path:path.join(options.out, 'failure.png'), fullPage:false}).catch(() => {});
   }
 } finally {
   if (!page.isClosed()) {
     const evidence = await page.evaluate(() => ({
       cpu: window.cpuObservationRows || [],
       preparation: window.cpuPreparationRows || [],
-      core: typeof retailRun !== 'undefined' ? retailRun?.rows || [] : [],
-      timer: typeof retailRun !== 'undefined' ? retailRun?.timerRows || [] : [],
-    })).catch(() => ({cpu:[],preparation:[],core:[],timer:[]}));
+      module: window.__meleeCpuModuleOutputCapture ? {
+        version: window.__meleeCpuModuleOutputCapture.version,
+        core_limit: window.__meleeCpuModuleOutputCapture.core_limit,
+        timer_limit: window.__meleeCpuModuleOutputCapture.timer_limit,
+        core_overflow: window.__meleeCpuModuleOutputCapture.core_overflow,
+        timer_overflow: window.__meleeCpuModuleOutputCapture.timer_overflow,
+        capture_errors: window.__meleeCpuModuleOutputCapture.capture_errors,
+        wrapped_modules: window.__meleeCpuModuleOutputCapture.wrapped_modules,
+        core: window.__meleeCpuModuleOutputCapture.core,
+        timer: window.__meleeCpuModuleOutputCapture.timer,
+      } : null,
+    })).catch(() => ({cpu:[],preparation:[],module:null}));
     await write('cpu-observation.jsonl', evidence.cpu.join('\n') + (evidence.cpu.length ? '\n' : ''));
     await write('preparation-observation.jsonl', evidence.preparation.join('\n') + (evidence.preparation.length ? '\n' : ''));
+    await write('module-output-capture.json', JSON.stringify(evidence.module, null, 2) + '\n');
+    if (!evidence.module?.wrapped_modules || evidence.module.core_overflow ||
+        evidence.module.timer_overflow || evidence.module.capture_errors) {
+      complete = false;
+      process.exitCode = 1;
+      await write('module-output-failure.txt', 'Module output observation was unavailable or lost rows; this capture is not accepted.\n');
+    }
     if (!complete) {
-      await write('partial-port.jsonl', evidence.core.join('\n') + (evidence.core.length ? '\n' : ''));
-      await write('partial-timer.jsonl', evidence.timer.join('\n') + (evidence.timer.length ? '\n' : ''));
+      const core = evidence.module?.core || [];
+      const timer = evidence.module?.timer || [];
+      await write('partial-port.jsonl', core.join('\n') + (core.length ? '\n' : ''));
+      await write('partial-timer.jsonl', timer.join('\n') + (timer.length ? '\n' : ''));
     }
   }
   await write('served-artifacts.json', JSON.stringify(servedArtifacts, null, 2) + '\n');

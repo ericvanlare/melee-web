@@ -1,0 +1,1194 @@
+{
+  "browser_comparisons": [
+    {
+      "artifacts_unchanged": true,
+      "browser_identity": {
+        "browser": "chrome",
+        "version": "153.0.8010.36",
+        "visible_browser": true
+      },
+      "capture_exit_code": 0,
+      "capture_script_sha256": "1fb7a83c8f8a84a5f63950bb80702522cbc2d9a8e47adc39c1f4f825afe32f33",
+      "complete": true,
+      "core_comparison": {
+        "capture_hashes": {
+          "port": "75baf980adafb575936933c08359a26c172192cad4f5f2f58124aaad189e2fc9",
+          "reference_a": "ff6b7fbe5436a6e021270779669a3cf2c619323d5e5617f567dea0b28e97ae4d",
+          "reference_b": "f560226e86fb590472fa8165dc9f2bccfd40591013bdb50a886ee8d562830487"
+        },
+        "checks": {
+          "active_player_count": "pass",
+          "entry": "pass",
+          "fighters": "pass",
+          "frame_count": "pass",
+          "inputs": "pass",
+          "match_frame": "pass",
+          "pad_state_hex": "pass",
+          "rng": "pass"
+        },
+        "first_divergence": null,
+        "first_divergence_by_group": {},
+        "frames_compared": 1199,
+        "gold_admitted": false,
+        "performance": "not_evaluated",
+        "reference_cpu": "Interpreter64",
+        "reference_repeatability": "pass",
+        "scope": "declared entry data, supplied inputs, fighter fields, RNG and match clock, PAD configuration and all three history banks only; pixel agreement, hardware and audio output are excluded",
+        "source_drawing": "source_draws",
+        "status": "declared_state_match"
+      },
+      "cpu_and_presentation_comparison": {
+        "first_divergence": {
+          "actual": "46ea6000",
+          "expected": "46800000",
+          "field": "camera.far_bits",
+          "phase": "frame",
+          "tick": 0
+        },
+        "first_divergences_by_domain": {
+          "camera": {
+            "actual": "46ea6000",
+            "expected": "46800000",
+            "field": "camera.far_bits",
+            "phase": "frame",
+            "tick": 0
+          },
+          "cpu": null,
+          "draw_alignment": {
+            "actual_count": 1199,
+            "expected_count": 1199,
+            "extra_in_actual": [],
+            "extra_in_actual_count": 0,
+            "matched_count": 1199,
+            "missing_from_actual": [],
+            "missing_from_actual_count": 0,
+            "scope": "source_draws_by_source_index",
+            "status": "aligned"
+          },
+          "hud": null,
+          "magnifier": null,
+          "match": null,
+          "subject": {
+            "actual": "bf147cea",
+            "expected": "bf147ce9",
+            "field": "players[1].subject.bone_bits[2]",
+            "phase": "frame",
+            "tick": 82
+          }
+        },
+        "frames": 1199,
+        "gold_admitted": false,
+        "hashes": {
+          "port": "ccf6f4573022e80d82e55e4a2de057f5d9ddf414707c1549638894f2c3561e54",
+          "reference_a": "e8a51fec6512068924076bcd35b2bbc4157d7bba5c0f8ba411a52387de5fc09b",
+          "reference_b": "e8a51fec6512068924076bcd35b2bbc4157d7bba5c0f8ba411a52387de5fc09b"
+        },
+        "performance": "not_evaluated",
+        "pixels": "not_compared",
+        "port_draws": 1199,
+        "reference_draws": 1199,
+        "reference_repeatability": "pass",
+        "schema": "melee-web-cpu-observation-comparison",
+        "source_drawing": true,
+        "status": "declared_state_divergence",
+        "version": 1
+      },
+      "frozen_files_unchanged": true,
+      "http": true,
+      "mode": "state_capture",
+      "module_output_matches_runtime_exports": true,
+      "module_output_row_counts": {
+        "core": 1203,
+        "timer": 1202
+      },
+      "receipts": {
+        "browser-errors.json": {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v2/browser-errors.json",
+          "sha256": "ae58cdb3e6ee5292c44c477c5666d651ee5e2e1551c872822b249317fbdf514a"
+        },
+        "browser-identity.json": {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v2/browser-identity.json",
+          "sha256": "df65499f0a007fc256650bf7fbdac4cda6d950eb1a5984d7e779e63b540f5fdf"
+        },
+        "capture-config.json": {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v2/capture-config.json",
+          "sha256": "d5b9bcb49733b1fbfe3356dd9c299d700bc0464b6b441b43ed39886e5e559ff1"
+        },
+        "completed.png": {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v2/completed.png",
+          "sha256": "626ea0293a66bcd62a5b67b6fd69a710553c55cae685219f8b615bf88882ca29"
+        },
+        "core-comparison.json": {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v2/core-comparison.json",
+          "sha256": "ea187801cfd03d700ac87f0c7c44f7af8090a04727a42f7acae14c3190ae4aca"
+        },
+        "cpu-comparison.json": {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v2/cpu-comparison.json",
+          "sha256": "b67a889aa259e54689e0f94da859dc07e5512efec522706c105e7737b1d01aba"
+        },
+        "cpu-observation.jsonl": {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v2/cpu-observation.jsonl",
+          "sha256": "ccf6f4573022e80d82e55e4a2de057f5d9ddf414707c1549638894f2c3561e54"
+        },
+        "driver-receipt.json": {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v2/driver-receipt.json",
+          "sha256": "7a235b79ca0609649982edb2f6f13872af2a929bf0d9019181897668582923d2"
+        },
+        "module-output-capture.json": {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v2/module-output-capture.json",
+          "sha256": "f6fee7e4f3eb1626e73a746601943f9f976d674f84fc2e24ea98517ae2a15459"
+        },
+        "playing-observation.json": {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v2/playing-observation.json",
+          "sha256": "5116541e505a240f01a7f2876604aca4df4d9c5e5c81999d71df063c0e4b7e5e"
+        },
+        "playing-presentation.json": {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v2/playing-presentation.json",
+          "sha256": "ff6af29ac4e98e040197f7ef7926816660c6321cce0fca623062d097b926aebc"
+        },
+        "playing.png": {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v2/playing.png",
+          "sha256": "d8d5975f3785205d3223cbf0c5504848b69518dcf46be3d357ba677ff05427f9"
+        },
+        "preparation-observation.jsonl": {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v2/preparation-observation.jsonl",
+          "sha256": "ca23b559ee9af88c85e014cbda3fab1898850e133491288c2254b3b79d03d73e"
+        },
+        "retail-browser-report.json": {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v2/retail-browser-report.json",
+          "sha256": "9547cb7d51edeeecdffd9c757d54b63d3daf35f24a76c99dba010af847f601ed"
+        },
+        "retail-port.jsonl": {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v2/retail-port.jsonl",
+          "sha256": "75baf980adafb575936933c08359a26c172192cad4f5f2f58124aaad189e2fc9"
+        },
+        "retail-timer.jsonl": {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v2/retail-timer.jsonl",
+          "sha256": "b5c43c5d86f5ee8c62d38c4f0cdff3a4d5efc836dc1173fa17bf0bc2a0d2a336"
+        },
+        "served-artifacts-after.json": {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v2/served-artifacts-after.json",
+          "sha256": "9f801b54c710d17f66757a60169ddcd1c604cf7db407409b15cee4e9dee7f8c4"
+        },
+        "served-artifacts.json": {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v2/served-artifacts.json",
+          "sha256": "9f801b54c710d17f66757a60169ddcd1c604cf7db407409b15cee4e9dee7f8c4"
+        },
+        "ui-report.json": {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v2/ui-report.json",
+          "sha256": "88fe31e15a747e52c697f63dfe787676252cd0aab62e71c5fe9318cff26dbc23"
+        }
+      },
+      "scenario_id": "mario-human-vs-fox-cpu1-final-destination",
+      "served_artifacts_sha256": {
+        "action-sweep.mjs": "e4de82aaa8b990b5ac2d887a6bcd12a8ac402bc99e9556393833f2e0a80f9219",
+        "audio-ring.mjs": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf",
+        "audio-worklet.js": "ef4374ac08f5bab821efa05cf5d252ca8e4b50647710d434e192beac3d7d7b4f",
+        "disc-image.mjs": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a",
+        "dsp-coefficients.mjs": "5176d1cf4400228f31dff428bcc8cd60d07694c0ceea1628a79ac19f3e112b4a",
+        "gameplay_menu_browser.data": "cdf157ee0f1850884f07a71165fd2192177acb23c2c777313b719e70ea67546f",
+        "gameplay_menu_browser.js": "1b5f27a1ea02734a8378d5c48ca3e04c2af3e303c83d5ac3f2d6f18957fd727e",
+        "gameplay_menu_browser.wasm": "686c04cb34fa5cf6c407beff470be5f807e40d8f0c7c5c0f65a250900c53d605",
+        "hitch-capture.mjs": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3",
+        "match-flow.mjs": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f",
+        "match-menu.mjs": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba",
+        "melee-runtime.mjs": "141610454c63d7434c1c5dd408fa6ee17a62f7657d25b2238c7fd9d6a9bf2322",
+        "runtime-assets.mjs": "422f220df5ae8edbba2a2793e67e295359ea08c3cdf22e676f933c23882db2ce",
+        "runtime-audio-assets.mjs": "b9bfd3f841d73e4ee4987fc5ac7351832c4ae8eca48ba5cf9c95578a238c7dbc",
+        "runtime-audio.mjs": "d968d2b2f9b58d2ab5dc1a4720d2ad2114cfbcac44a888694da7850100546545",
+        "runtime-cache.js": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26",
+        "runtime-development.mjs": "138e1471207444e61615f6f7fc31ec3d6e36eae7efb158d539ce92fd7e58a0f5",
+        "runtime.html": "afd340c25023f842b241e893d5634f6019c73f922d8ddf0b67348e38227c608e"
+      },
+      "source_match": {
+        "complete": true,
+        "outcome": 2,
+        "winner": 1
+      },
+      "timing_observation": {
+        "browserCallbackGaps": 0,
+        "instrumented_timing_resumes": 0,
+        "isolation_not_controlled": true,
+        "nativeCallbacksOver33ms": 0,
+        "nativeCallbacksOverBudget": 0,
+        "performance_admitted": false,
+        "worstBrowserCallbackMs": 22.82999999821186,
+        "worstNativeCallbackMs": 8.435
+      },
+      "visible": true
+    },
+    {
+      "artifacts_unchanged": true,
+      "browser_identity": {
+        "browser": "chrome",
+        "version": "153.0.8010.36",
+        "visible_browser": true
+      },
+      "capture_exit_code": 0,
+      "capture_script_sha256": "1fb7a83c8f8a84a5f63950bb80702522cbc2d9a8e47adc39c1f4f825afe32f33",
+      "complete": true,
+      "core_comparison": {
+        "capture_hashes": {
+          "port": "0050077815b44d5259777dd98e61c924040d9f47b2d579b622881435f7f665da",
+          "reference_a": "ee119869a4c32e55d024e53bfe3af9520c661289b2669107e97be3da84f851dc",
+          "reference_b": "8b597c59f1139d0658016b487c5e03201574d0a5217adec5a500d6f320f8e592"
+        },
+        "checks": {
+          "active_player_count": "pass",
+          "entry": "pass",
+          "fighters": "pass",
+          "frame_count": "pass",
+          "inputs": "pass",
+          "match_frame": "pass",
+          "pad_state_hex": "pass",
+          "rng": "pass"
+        },
+        "first_divergence": null,
+        "first_divergence_by_group": {},
+        "frames_compared": 4346,
+        "gold_admitted": false,
+        "performance": "not_evaluated",
+        "reference_cpu": "Interpreter64",
+        "reference_repeatability": "pass",
+        "scope": "declared entry data, supplied inputs, fighter fields, RNG and match clock, PAD configuration and all three history banks only; pixel agreement, hardware and audio output are excluded",
+        "source_drawing": "source_draws",
+        "status": "declared_state_match"
+      },
+      "cpu_and_presentation_comparison": {
+        "first_divergence": {
+          "actual": "41a00000",
+          "expected": "41f00000",
+          "field": "camera.fov_bits",
+          "phase": "frame",
+          "tick": 0
+        },
+        "first_divergences_by_domain": {
+          "camera": {
+            "actual": "41a00000",
+            "expected": "41f00000",
+            "field": "camera.fov_bits",
+            "phase": "frame",
+            "tick": 0
+          },
+          "cpu": null,
+          "draw_alignment": {
+            "actual_count": 4346,
+            "expected_count": 4343,
+            "extra_in_actual": [
+              {
+                "ordinal": 1598,
+                "source_index": 1598
+              },
+              {
+                "ordinal": 2599,
+                "source_index": 2599
+              },
+              {
+                "ordinal": 3600,
+                "source_index": 3600
+              }
+            ],
+            "extra_in_actual_count": 3,
+            "matched_count": 4343,
+            "missing_from_actual": [],
+            "missing_from_actual_count": 0,
+            "scope": "source_draws_by_source_index",
+            "status": "misaligned"
+          },
+          "hud": null,
+          "magnifier": null,
+          "match": null,
+          "subject": {
+            "actual": "bd59cc73",
+            "expected": "bd59cc74",
+            "field": "players[0].subject.bone_bits[2]",
+            "phase": "frame",
+            "tick": 67
+          }
+        },
+        "frames": 4346,
+        "gold_admitted": false,
+        "hashes": {
+          "port": "d49c7b03de2dc48967e3f94adea29a3a20fe42c971d84d3ae4b6d65080391cb9",
+          "reference_a": "a4713aaed8d3a66662e7cd7f090b8677b9932c4a82f1463f10df98eba44869fb",
+          "reference_b": "a4713aaed8d3a66662e7cd7f090b8677b9932c4a82f1463f10df98eba44869fb"
+        },
+        "performance": "not_evaluated",
+        "pixels": "not_compared",
+        "port_draws": 4346,
+        "reference_draws": 4343,
+        "reference_repeatability": "pass",
+        "schema": "melee-web-cpu-observation-comparison",
+        "source_drawing": true,
+        "status": "declared_state_divergence",
+        "version": 1
+      },
+      "frozen_files_unchanged": true,
+      "http": true,
+      "mode": "state_capture",
+      "module_output_matches_runtime_exports": true,
+      "module_output_row_counts": {
+        "core": 4350,
+        "timer": 4349
+      },
+      "receipts": {
+        "browser-errors.json": {
+          "path": "work/cpu-register-allocation/browser-three-player-reconciled-v2/browser-errors.json",
+          "sha256": "ae58cdb3e6ee5292c44c477c5666d651ee5e2e1551c872822b249317fbdf514a"
+        },
+        "browser-identity.json": {
+          "path": "work/cpu-register-allocation/browser-three-player-reconciled-v2/browser-identity.json",
+          "sha256": "df65499f0a007fc256650bf7fbdac4cda6d950eb1a5984d7e779e63b540f5fdf"
+        },
+        "capture-config.json": {
+          "path": "work/cpu-register-allocation/browser-three-player-reconciled-v2/capture-config.json",
+          "sha256": "595caedc880e2e8145ab9287beaeed0b161de8aa882974a6ac59055b7499507f"
+        },
+        "completed.png": {
+          "path": "work/cpu-register-allocation/browser-three-player-reconciled-v2/completed.png",
+          "sha256": "626ea0293a66bcd62a5b67b6fd69a710553c55cae685219f8b615bf88882ca29"
+        },
+        "core-comparison.json": {
+          "path": "work/cpu-register-allocation/browser-three-player-reconciled-v2/core-comparison.json",
+          "sha256": "f8323e1f50d40938def29b7027d0723dab2aa3c0ca497e20e1c905ec29a53665"
+        },
+        "cpu-comparison.json": {
+          "path": "work/cpu-register-allocation/browser-three-player-reconciled-v2/cpu-comparison.json",
+          "sha256": "60af79721a988d01d88a2044211c7b97d63a889abafd11c2e38168ee58ddfc4d"
+        },
+        "cpu-observation.jsonl": {
+          "path": "work/cpu-register-allocation/browser-three-player-reconciled-v2/cpu-observation.jsonl",
+          "sha256": "d49c7b03de2dc48967e3f94adea29a3a20fe42c971d84d3ae4b6d65080391cb9"
+        },
+        "driver-receipt.json": {
+          "path": "work/cpu-register-allocation/browser-three-player-reconciled-v2/driver-receipt.json",
+          "sha256": "8e026405d559e7074950c5b71ac1fc2599f136fcbbdc53c844653c6987fe5ca5"
+        },
+        "module-output-capture.json": {
+          "path": "work/cpu-register-allocation/browser-three-player-reconciled-v2/module-output-capture.json",
+          "sha256": "25da051a897825cabe01dcf885f8d49abb16e0ab76121c4bd5c7de7a763bbc59"
+        },
+        "playing-observation.json": {
+          "path": "work/cpu-register-allocation/browser-three-player-reconciled-v2/playing-observation.json",
+          "sha256": "cc164c2fd3ae15a6821653693604a24892c19949d2a636123333529c5b914f06"
+        },
+        "playing-presentation.json": {
+          "path": "work/cpu-register-allocation/browser-three-player-reconciled-v2/playing-presentation.json",
+          "sha256": "ff6af29ac4e98e040197f7ef7926816660c6321cce0fca623062d097b926aebc"
+        },
+        "playing.png": {
+          "path": "work/cpu-register-allocation/browser-three-player-reconciled-v2/playing.png",
+          "sha256": "0cf6c7c80b60a73d6e16b9a48161167b41e58cc2e56fc2dabb44ef32e7d4b51e"
+        },
+        "preparation-observation.jsonl": {
+          "path": "work/cpu-register-allocation/browser-three-player-reconciled-v2/preparation-observation.jsonl",
+          "sha256": "9d02810b996f0ce271f0a5c4199093e5e74788ae9e7c4a6e01463acabec20818"
+        },
+        "retail-browser-report.json": {
+          "path": "work/cpu-register-allocation/browser-three-player-reconciled-v2/retail-browser-report.json",
+          "sha256": "411cba050b894fa40fdf100eda4b0fdcf431de8cfad2610421bb150a85c08ba3"
+        },
+        "retail-port.jsonl": {
+          "path": "work/cpu-register-allocation/browser-three-player-reconciled-v2/retail-port.jsonl",
+          "sha256": "0050077815b44d5259777dd98e61c924040d9f47b2d579b622881435f7f665da"
+        },
+        "retail-timer.jsonl": {
+          "path": "work/cpu-register-allocation/browser-three-player-reconciled-v2/retail-timer.jsonl",
+          "sha256": "57d843067feb49b2fabb34cd55d236d2ee01ce2a9cd410f9640f9f347b84dde8"
+        },
+        "served-artifacts-after.json": {
+          "path": "work/cpu-register-allocation/browser-three-player-reconciled-v2/served-artifacts-after.json",
+          "sha256": "9f801b54c710d17f66757a60169ddcd1c604cf7db407409b15cee4e9dee7f8c4"
+        },
+        "served-artifacts.json": {
+          "path": "work/cpu-register-allocation/browser-three-player-reconciled-v2/served-artifacts.json",
+          "sha256": "9f801b54c710d17f66757a60169ddcd1c604cf7db407409b15cee4e9dee7f8c4"
+        },
+        "ui-report.json": {
+          "path": "work/cpu-register-allocation/browser-three-player-reconciled-v2/ui-report.json",
+          "sha256": "fbc7ce66b8ff10704455a285941a1ff75add328d39d0e442eb09a83616263f91"
+        }
+      },
+      "scenario_id": "marth-human-vs-falco5-mario9-yoshis-story-120s",
+      "served_artifacts_sha256": {
+        "action-sweep.mjs": "e4de82aaa8b990b5ac2d887a6bcd12a8ac402bc99e9556393833f2e0a80f9219",
+        "audio-ring.mjs": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf",
+        "audio-worklet.js": "ef4374ac08f5bab821efa05cf5d252ca8e4b50647710d434e192beac3d7d7b4f",
+        "disc-image.mjs": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a",
+        "dsp-coefficients.mjs": "5176d1cf4400228f31dff428bcc8cd60d07694c0ceea1628a79ac19f3e112b4a",
+        "gameplay_menu_browser.data": "cdf157ee0f1850884f07a71165fd2192177acb23c2c777313b719e70ea67546f",
+        "gameplay_menu_browser.js": "1b5f27a1ea02734a8378d5c48ca3e04c2af3e303c83d5ac3f2d6f18957fd727e",
+        "gameplay_menu_browser.wasm": "686c04cb34fa5cf6c407beff470be5f807e40d8f0c7c5c0f65a250900c53d605",
+        "hitch-capture.mjs": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3",
+        "match-flow.mjs": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f",
+        "match-menu.mjs": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba",
+        "melee-runtime.mjs": "141610454c63d7434c1c5dd408fa6ee17a62f7657d25b2238c7fd9d6a9bf2322",
+        "runtime-assets.mjs": "422f220df5ae8edbba2a2793e67e295359ea08c3cdf22e676f933c23882db2ce",
+        "runtime-audio-assets.mjs": "b9bfd3f841d73e4ee4987fc5ac7351832c4ae8eca48ba5cf9c95578a238c7dbc",
+        "runtime-audio.mjs": "d968d2b2f9b58d2ab5dc1a4720d2ad2114cfbcac44a888694da7850100546545",
+        "runtime-cache.js": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26",
+        "runtime-development.mjs": "138e1471207444e61615f6f7fc31ec3d6e36eae7efb158d539ce92fd7e58a0f5",
+        "runtime.html": "afd340c25023f842b241e893d5634f6019c73f922d8ddf0b67348e38227c608e"
+      },
+      "source_match": {
+        "complete": true,
+        "outcome": 2,
+        "winner": 2
+      },
+      "timing_observation": {
+        "browserCallbackGaps": 1,
+        "instrumented_timing_resumes": 1,
+        "isolation_not_controlled": true,
+        "nativeCallbacksOver33ms": 1,
+        "nativeCallbacksOverBudget": 1,
+        "performance_admitted": false,
+        "worstBrowserCallbackMs": 150.85999999940395,
+        "worstNativeCallbackMs": 138.4
+      },
+      "visible": true
+    },
+    {
+      "artifacts_unchanged": true,
+      "browser_identity": {
+        "browser": "chrome",
+        "version": "153.0.8010.36",
+        "visible_browser": true
+      },
+      "capture_exit_code": 0,
+      "capture_script_sha256": "1fb7a83c8f8a84a5f63950bb80702522cbc2d9a8e47adc39c1f4f825afe32f33",
+      "complete": true,
+      "core_comparison": {
+        "capture_hashes": {
+          "port": "910221e2709ba3b60c422b71a85a38b588ce13e4b06519f5fe6f19d29d9c3b8b",
+          "reference_a": "418e88c14947ecabfbdfc5511d42247f4b0ab190df156987ff0a81cf59787460",
+          "reference_b": "eef5b617b8683cacc41d1396b2920ca937537b4733794eac07c7e0672cc1237a"
+        },
+        "checks": {
+          "active_player_count": "pass",
+          "entry": "pass",
+          "fighters": "diverged",
+          "frame_count": "pass",
+          "inputs": "pass",
+          "match_frame": "pass",
+          "pad_state_hex": "pass",
+          "rng": "pass"
+        },
+        "first_divergence": {
+          "actual": "000000000000000000000000000000003f800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fefefefefefe1d5c5cfefefe21ffff5a5affff0900ffffffffff0001",
+          "expected": "bf6000003f01020400000000000000003f8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fe0000fe00005c0000fe21ffff5a5affff0900ffffffffff0001",
+          "field": "fighters[1].input_hex",
+          "frame": 2495,
+          "record": "frame"
+        },
+        "first_divergence_by_group": {
+          "fighters": {
+            "actual": "000000000000000000000000000000003f800000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fefefefefefe1d5c5cfefefe21ffff5a5affff0900ffffffffff0001",
+            "expected": "bf6000003f01020400000000000000003f8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000fe0000fe00005c0000fe21ffff5a5affff0900ffffffffff0001",
+            "field": "fighters[1].input_hex",
+            "frame": 2495,
+            "record": "frame"
+          }
+        },
+        "frames_compared": 3838,
+        "gold_admitted": false,
+        "performance": "not_evaluated",
+        "reference_cpu": "Interpreter64",
+        "reference_repeatability": "pass",
+        "scope": "declared entry data, supplied inputs, fighter fields, RNG and match clock, PAD configuration and all three history banks only; pixel agreement, hardware and audio output are excluded",
+        "source_drawing": "source_draws",
+        "status": "diverged"
+      },
+      "cpu_and_presentation_comparison": {
+        "first_divergence": {
+          "actual": "3f123976",
+          "expected": "3f123975",
+          "field": "players[0].subject.bone_bits[2]",
+          "phase": "frame",
+          "tick": 74
+        },
+        "first_divergences_by_domain": {
+          "camera": {
+            "actual": "4103c711",
+            "expected": "4103c712",
+            "field": "camera.interest_bits[1]",
+            "phase": "frame",
+            "tick": 184
+          },
+          "cpu": {
+            "actual": "800081008e017f7f",
+            "expected": "809081408e017f7f",
+            "field": "players[1].cpu.command_bytes",
+            "phase": "frame",
+            "tick": 2495
+          },
+          "draw_alignment": {
+            "actual_count": 3838,
+            "expected_count": 3836,
+            "extra_in_actual": [
+              {
+                "ordinal": 2268,
+                "source_index": 2268
+              },
+              {
+                "ordinal": 3269,
+                "source_index": 3269
+              }
+            ],
+            "extra_in_actual_count": 2,
+            "matched_count": 3836,
+            "missing_from_actual": [],
+            "missing_from_actual_count": 0,
+            "scope": "source_draws_by_source_index",
+            "status": "misaligned"
+          },
+          "hud": null,
+          "magnifier": null,
+          "match": null,
+          "subject": {
+            "actual": "3f123976",
+            "expected": "3f123975",
+            "field": "players[0].subject.bone_bits[2]",
+            "phase": "frame",
+            "tick": 74
+          }
+        },
+        "frames": 3838,
+        "gold_admitted": false,
+        "hashes": {
+          "port": "ce92ed1dc751188c481dd130332289031dc1e6ff30c252cd6d726ee80c0fd6b0",
+          "reference_a": "357781495153a89a5564cdc9cb021ac11f93550d67816b444b24e26cad733d85",
+          "reference_b": "357781495153a89a5564cdc9cb021ac11f93550d67816b444b24e26cad733d85"
+        },
+        "performance": "not_evaluated",
+        "pixels": "not_compared",
+        "port_draws": 3838,
+        "reference_draws": 3836,
+        "reference_repeatability": "pass",
+        "schema": "melee-web-cpu-observation-comparison",
+        "source_drawing": true,
+        "status": "declared_state_divergence",
+        "version": 1
+      },
+      "frozen_files_unchanged": true,
+      "http": true,
+      "mode": "state_capture",
+      "module_output_matches_runtime_exports": true,
+      "module_output_row_counts": {
+        "core": 3842,
+        "timer": 3841
+      },
+      "receipts": {
+        "browser-errors.json": {
+          "path": "work/cpu-register-allocation/browser-four-player-reconciled-v2/browser-errors.json",
+          "sha256": "ae58cdb3e6ee5292c44c477c5666d651ee5e2e1551c872822b249317fbdf514a"
+        },
+        "browser-identity.json": {
+          "path": "work/cpu-register-allocation/browser-four-player-reconciled-v2/browser-identity.json",
+          "sha256": "df65499f0a007fc256650bf7fbdac4cda6d950eb1a5984d7e779e63b540f5fdf"
+        },
+        "capture-config.json": {
+          "path": "work/cpu-register-allocation/browser-four-player-reconciled-v2/capture-config.json",
+          "sha256": "c6530b4b83f674de1778f700e1636c8dd33a7ea27c81af13fc046d115381c60f"
+        },
+        "completed.png": {
+          "path": "work/cpu-register-allocation/browser-four-player-reconciled-v2/completed.png",
+          "sha256": "626ea0293a66bcd62a5b67b6fd69a710553c55cae685219f8b615bf88882ca29"
+        },
+        "core-comparison.json": {
+          "path": "work/cpu-register-allocation/browser-four-player-reconciled-v2/core-comparison.json",
+          "sha256": "0aa242bcf11bc158d3401655ab4db9e0c9142aa294078ec4b0d56f61baec34cb"
+        },
+        "cpu-comparison.json": {
+          "path": "work/cpu-register-allocation/browser-four-player-reconciled-v2/cpu-comparison.json",
+          "sha256": "bdd512d819e636df2c29997fd4d3839a64dfd994190365f3c0aef68370bd46d3"
+        },
+        "cpu-observation.jsonl": {
+          "path": "work/cpu-register-allocation/browser-four-player-reconciled-v2/cpu-observation.jsonl",
+          "sha256": "ce92ed1dc751188c481dd130332289031dc1e6ff30c252cd6d726ee80c0fd6b0"
+        },
+        "driver-receipt.json": {
+          "path": "work/cpu-register-allocation/browser-four-player-reconciled-v2/driver-receipt.json",
+          "sha256": "318b298d3ef310006af0cf7316e48194c509652a2bd865ebdfd8f7ad13cf3b7b"
+        },
+        "module-output-capture.json": {
+          "path": "work/cpu-register-allocation/browser-four-player-reconciled-v2/module-output-capture.json",
+          "sha256": "4ae4d4d95b3bfcdab9fe801cbc3edaa0d10b3ad59fc2792acbfd5b90cb5cd0c0"
+        },
+        "playing-observation.json": {
+          "path": "work/cpu-register-allocation/browser-four-player-reconciled-v2/playing-observation.json",
+          "sha256": "a60e6a45338c69fbec4d2c95ad400434714ae7430e40c034dae8305df23429ad"
+        },
+        "playing-presentation.json": {
+          "path": "work/cpu-register-allocation/browser-four-player-reconciled-v2/playing-presentation.json",
+          "sha256": "ff6af29ac4e98e040197f7ef7926816660c6321cce0fca623062d097b926aebc"
+        },
+        "playing.png": {
+          "path": "work/cpu-register-allocation/browser-four-player-reconciled-v2/playing.png",
+          "sha256": "2778d00a016075508a14e773101fed39c2f8c322f0fcb3369936a771a59c445a"
+        },
+        "preparation-observation.jsonl": {
+          "path": "work/cpu-register-allocation/browser-four-player-reconciled-v2/preparation-observation.jsonl",
+          "sha256": "b1bebbd5c7c4458fc2645838fe90ebbe82eb57c9ac4333ba510ac298568c36b7"
+        },
+        "retail-browser-report.json": {
+          "path": "work/cpu-register-allocation/browser-four-player-reconciled-v2/retail-browser-report.json",
+          "sha256": "5bcefbb1a32402c2a7c2f770167cfae485b4307a289f59a36ef7f0e9f559a911"
+        },
+        "retail-port.jsonl": {
+          "path": "work/cpu-register-allocation/browser-four-player-reconciled-v2/retail-port.jsonl",
+          "sha256": "910221e2709ba3b60c422b71a85a38b588ce13e4b06519f5fe6f19d29d9c3b8b"
+        },
+        "retail-timer.jsonl": {
+          "path": "work/cpu-register-allocation/browser-four-player-reconciled-v2/retail-timer.jsonl",
+          "sha256": "5fe103d308f423241ddd1e9c88189956a4ea8ffab0e1ffde4d4eb349d40822a3"
+        },
+        "served-artifacts-after.json": {
+          "path": "work/cpu-register-allocation/browser-four-player-reconciled-v2/served-artifacts-after.json",
+          "sha256": "9f801b54c710d17f66757a60169ddcd1c604cf7db407409b15cee4e9dee7f8c4"
+        },
+        "served-artifacts.json": {
+          "path": "work/cpu-register-allocation/browser-four-player-reconciled-v2/served-artifacts.json",
+          "sha256": "9f801b54c710d17f66757a60169ddcd1c604cf7db407409b15cee4e9dee7f8c4"
+        },
+        "ui-report.json": {
+          "path": "work/cpu-register-allocation/browser-four-player-reconciled-v2/ui-report.json",
+          "sha256": "76a08e603b3198d5466af03bc13aa6fd2f586085e730a1a720d03a0f627adef8"
+        }
+      },
+      "scenario_id": "fox-human-vs-mario3-marth6-falco8-dream-land",
+      "served_artifacts_sha256": {
+        "action-sweep.mjs": "e4de82aaa8b990b5ac2d887a6bcd12a8ac402bc99e9556393833f2e0a80f9219",
+        "audio-ring.mjs": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf",
+        "audio-worklet.js": "ef4374ac08f5bab821efa05cf5d252ca8e4b50647710d434e192beac3d7d7b4f",
+        "disc-image.mjs": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a",
+        "dsp-coefficients.mjs": "5176d1cf4400228f31dff428bcc8cd60d07694c0ceea1628a79ac19f3e112b4a",
+        "gameplay_menu_browser.data": "cdf157ee0f1850884f07a71165fd2192177acb23c2c777313b719e70ea67546f",
+        "gameplay_menu_browser.js": "1b5f27a1ea02734a8378d5c48ca3e04c2af3e303c83d5ac3f2d6f18957fd727e",
+        "gameplay_menu_browser.wasm": "686c04cb34fa5cf6c407beff470be5f807e40d8f0c7c5c0f65a250900c53d605",
+        "hitch-capture.mjs": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3",
+        "match-flow.mjs": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f",
+        "match-menu.mjs": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba",
+        "melee-runtime.mjs": "141610454c63d7434c1c5dd408fa6ee17a62f7657d25b2238c7fd9d6a9bf2322",
+        "runtime-assets.mjs": "422f220df5ae8edbba2a2793e67e295359ea08c3cdf22e676f933c23882db2ce",
+        "runtime-audio-assets.mjs": "b9bfd3f841d73e4ee4987fc5ac7351832c4ae8eca48ba5cf9c95578a238c7dbc",
+        "runtime-audio.mjs": "d968d2b2f9b58d2ab5dc1a4720d2ad2114cfbcac44a888694da7850100546545",
+        "runtime-cache.js": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26",
+        "runtime-development.mjs": "138e1471207444e61615f6f7fc31ec3d6e36eae7efb158d539ce92fd7e58a0f5",
+        "runtime.html": "afd340c25023f842b241e893d5634f6019c73f922d8ddf0b67348e38227c608e"
+      },
+      "source_match": {
+        "complete": true,
+        "outcome": 1,
+        "winner": 3
+      },
+      "timing_observation": {
+        "browserCallbackGaps": 1,
+        "instrumented_timing_resumes": 0,
+        "isolation_not_controlled": true,
+        "nativeCallbacksOver33ms": 0,
+        "nativeCallbacksOverBudget": 0,
+        "performance_admitted": false,
+        "worstBrowserCallbackMs": 36.83499999344349,
+        "worstNativeCallbackMs": 10.43
+      },
+      "visible": true
+    }
+  ],
+  "browser_harness_commit": "8a58edef3b86de4338de990a6c055a4f90bb9725",
+  "browser_harness_sha256": {
+    "scripts/capture_cpu_browser.mjs": "1fb7a83c8f8a84a5f63950bb80702522cbc2d9a8e47adc39c1f4f825afe32f33",
+    "scripts/cpu_browser_module_capture.mjs": "364fecf0db9275f485a30c9510368b7c7d1a5dbc2819eec7190cc7c5df7a9e8c",
+    "tests/cpu_browser_module_capture_test.mjs": "b87b99f2d92eafc712c8afa8e2d139d1647ece0b4c2011f95070239797f38670",
+    "tests/test_cpu_browser_module_capture.py": "5741d1fabde8f500c0fe304fea800c35b64f85bbf70b0d3bac6639c4df24172a"
+  },
+  "browser_harness_tests": {
+    "errors": 0,
+    "failures": 0,
+    "log": {
+      "path": "work/cpu-register-allocation/browser-module-tests-v2.log",
+      "sha256": "a822674bc7454351b083263b1a17c5b1d68540803706dadc276d1f80a59d6a01"
+    },
+    "run": 1,
+    "scope": "Loader callback forwarding, receiver/exception preservation, deduplicated hooks, core/timer bounds; full visible runs separately exercise the actual Emscripten loader.",
+    "skips": 0
+  },
+  "build": {
+    "artifacts": {
+      "gameplay_menu_browser.data": "cdf157ee0f1850884f07a71165fd2192177acb23c2c777313b719e70ea67546f",
+      "gameplay_menu_browser.js": "1b5f27a1ea02734a8378d5c48ca3e04c2af3e303c83d5ac3f2d6f18957fd727e",
+      "gameplay_menu_browser.wasm": "686c04cb34fa5cf6c407beff470be5f807e40d8f0c7c5c0f65a250900c53d605",
+      "gameplay_retail_trace.js": "545df88c01cf44c1609abc58bb999a8ecca15d862888b1d39660db03d6ba223f",
+      "gameplay_retail_trace.wasm": "d88fe8799a2387d33457b8e4e3f6314238aa6f43e02d73ad06455d4e848713c2"
+    },
+    "configuration": "Release",
+    "git_commit": "224758c723a924ce76cf3c2d3f36c453caf3f96a",
+    "logs": [
+      {
+        "path": "work/cpu-register-allocation/runtime-release-v2.log",
+        "sha256": "23a21db819c1156d8f9820a7cd9e1e8a68b2b35612ac344f78a73bd24cfdab4a"
+      },
+      {
+        "path": "work/cpu-register-allocation/retail-trace-release-v1.log",
+        "sha256": "0920114cc67b6c0b3fbf46f9ceb1a350ec68e1c270b84d0018e5d19ddc67d5e6"
+      }
+    ],
+    "source_address_context_linked_to_runtime": false
+  },
+  "component_review": "Independent GPT-5.6 Luna xhigh review found no actionable defects within the documented supported boundary; lead inspected and verified the integration.",
+  "component_tests": {
+    "comparisons": [
+      {
+        "path": "work/cpu-register-allocation/differential-v4/test_fragmented_source_histories_at_multiple_source_bases-1baa4c8abe69/comparison.json",
+        "sha256": "158a43857dc9d8048bf58bd68f7215329f13153c50bcbaedc2742e2378aabe5a"
+      },
+      {
+        "path": "work/cpu-register-allocation/differential-v4/test_fragmented_source_histories_at_multiple_source_bases-378f2d1cb01c/comparison.json",
+        "sha256": "1c6152045362cc2c63093b8c8eaaca017b9d7305afd331d49d5338d1ff6e2642"
+      },
+      {
+        "path": "work/cpu-register-allocation/differential-v4/test_fragmented_source_histories_at_multiple_source_bases-ec7560f7bc49/comparison.json",
+        "sha256": "87a3a6cbffa3db0a0773c1ad63b6d5e7b585030c6d7d3f5a7adb76e214ae635e"
+      },
+      {
+        "path": "work/cpu-register-allocation/differential-v4/test_original_hsd_refill_lifo_and_interleaved_os_ownership-84ad1909dd0c/comparison.json",
+        "sha256": "5d85860f4d21fda3e2a88ba46d8f2ccbb78e38461177094f01a114768f4e1d16"
+      },
+      {
+        "path": "work/cpu-register-allocation/differential-v4/test_source_first_fit_split_threshold_exhaustion_and_coalescing-af72c173cfe7/comparison.json",
+        "sha256": "a0785c32333bf5c269b0a29abba1850b3d087badf37cf427d695e7b4d852d9e7"
+      }
+    ],
+    "errors": 0,
+    "events_per_base_and_target": 3268,
+    "failures": 0,
+    "log": {
+      "path": "work/cpu-register-allocation/source-address-tests-v4.log",
+      "sha256": "1283b276748b2cf34c5c54abda9d0961c145beddf0339ec44d01c5871c5da9c7"
+    },
+    "native": "C++17, AddressSanitizer and UndefinedBehaviorSanitizer",
+    "run": 5,
+    "skips": 0,
+    "source_bases": [
+      1056768,
+      878055968,
+      1164378560
+    ],
+    "targets": [
+      "native",
+      "wasm"
+    ],
+    "wasm": "Emscripten 6.0.9, assertions and SAFE_HEAP, repository-local Node"
+  },
+  "cpu_behavior_changed_by_prerequisite": false,
+  "evidence_scope": [
+    "synthetic_component_only",
+    "compiled",
+    "native_traced",
+    "browser_exercised",
+    "retail_compared_declared_fields"
+  ],
+  "first_remaining_cpu_divergence_resolved": false,
+  "frozen_inputs": {
+    "exact": true,
+    "files": [
+      {
+        "actual": "ff6b7fbe5436a6e021270779669a3cf2c619323d5e5617f567dea0b28e97ae4d",
+        "exact": true,
+        "expected": "ff6b7fbe5436a6e021270779669a3cf2c619323d5e5617f567dea0b28e97ae4d",
+        "file": "capture-a.jsonl",
+        "scenario_id": "mario-human-vs-fox-cpu1-final-destination"
+      },
+      {
+        "actual": "f560226e86fb590472fa8165dc9f2bccfd40591013bdb50a886ee8d562830487",
+        "exact": true,
+        "expected": "f560226e86fb590472fa8165dc9f2bccfd40591013bdb50a886ee8d562830487",
+        "file": "capture-b.jsonl",
+        "scenario_id": "mario-human-vs-fox-cpu1-final-destination"
+      },
+      {
+        "actual": "c26f1379ca34a2ea8d28cb0d3e903800d49eccbf677acc7e6f002f91e0e82687",
+        "exact": true,
+        "expected": "c26f1379ca34a2ea8d28cb0d3e903800d49eccbf677acc7e6f002f91e0e82687",
+        "file": "paired.mwrc",
+        "scenario_id": "mario-human-vs-fox-cpu1-final-destination"
+      },
+      {
+        "actual": "47eea34486f2b42ace1c7fa006e5632ba4ab50cc5f25b34e33a323c586c2f7f8",
+        "exact": true,
+        "expected": "47eea34486f2b42ace1c7fa006e5632ba4ab50cc5f25b34e33a323c586c2f7f8",
+        "file": "scenario.json",
+        "scenario_id": "mario-human-vs-fox-cpu1-final-destination"
+      },
+      {
+        "actual": "3f9067a0edf388fd9a579b853e44eeca51e769853281ac301b2a4631e234d925",
+        "exact": true,
+        "expected": "3f9067a0edf388fd9a579b853e44eeca51e769853281ac301b2a4631e234d925",
+        "file": "input-plan.json",
+        "scenario_id": "mario-human-vs-fox-cpu1-final-destination"
+      },
+      {
+        "actual": "ee119869a4c32e55d024e53bfe3af9520c661289b2669107e97be3da84f851dc",
+        "exact": true,
+        "expected": "ee119869a4c32e55d024e53bfe3af9520c661289b2669107e97be3da84f851dc",
+        "file": "capture-a.jsonl",
+        "scenario_id": "marth-human-vs-falco5-mario9-yoshis-story-120s"
+      },
+      {
+        "actual": "8b597c59f1139d0658016b487c5e03201574d0a5217adec5a500d6f320f8e592",
+        "exact": true,
+        "expected": "8b597c59f1139d0658016b487c5e03201574d0a5217adec5a500d6f320f8e592",
+        "file": "capture-b.jsonl",
+        "scenario_id": "marth-human-vs-falco5-mario9-yoshis-story-120s"
+      },
+      {
+        "actual": "b67336a975f0c353a3c98a850f2b2f74dd789e35937fe315cf7dbda7af833858",
+        "exact": true,
+        "expected": "b67336a975f0c353a3c98a850f2b2f74dd789e35937fe315cf7dbda7af833858",
+        "file": "paired.mwrc",
+        "scenario_id": "marth-human-vs-falco5-mario9-yoshis-story-120s"
+      },
+      {
+        "actual": "ef6fc8b4dae4a7e25e1356313768eb1e9953b1acb7a90db9b93c8cc3fd76f471",
+        "exact": true,
+        "expected": "ef6fc8b4dae4a7e25e1356313768eb1e9953b1acb7a90db9b93c8cc3fd76f471",
+        "file": "scenario.json",
+        "scenario_id": "marth-human-vs-falco5-mario9-yoshis-story-120s"
+      },
+      {
+        "actual": "24a91bde840a6ccbe294320d6c6dd83437f6ecbc88dd107ada881d3008cf4ea6",
+        "exact": true,
+        "expected": "24a91bde840a6ccbe294320d6c6dd83437f6ecbc88dd107ada881d3008cf4ea6",
+        "file": "input-plan.json",
+        "scenario_id": "marth-human-vs-falco5-mario9-yoshis-story-120s"
+      },
+      {
+        "actual": "418e88c14947ecabfbdfc5511d42247f4b0ab190df156987ff0a81cf59787460",
+        "exact": true,
+        "expected": "418e88c14947ecabfbdfc5511d42247f4b0ab190df156987ff0a81cf59787460",
+        "file": "capture-a.jsonl",
+        "scenario_id": "fox-human-vs-mario3-marth6-falco8-dream-land"
+      },
+      {
+        "actual": "eef5b617b8683cacc41d1396b2920ca937537b4733794eac07c7e0672cc1237a",
+        "exact": true,
+        "expected": "eef5b617b8683cacc41d1396b2920ca937537b4733794eac07c7e0672cc1237a",
+        "file": "capture-b.jsonl",
+        "scenario_id": "fox-human-vs-mario3-marth6-falco8-dream-land"
+      },
+      {
+        "actual": "2e521b9b06792ee13fbf9b38dbf342b6c0aa8921f10c7a090b000f8d94850f55",
+        "exact": true,
+        "expected": "2e521b9b06792ee13fbf9b38dbf342b6c0aa8921f10c7a090b000f8d94850f55",
+        "file": "paired.mwrc",
+        "scenario_id": "fox-human-vs-mario3-marth6-falco8-dream-land"
+      },
+      {
+        "actual": "ce662f38032aebc6c4d72ea7d7e020b1907b354cd5e25840e0d1aaede5452f6f",
+        "exact": true,
+        "expected": "ce662f38032aebc6c4d72ea7d7e020b1907b354cd5e25840e0d1aaede5452f6f",
+        "file": "scenario.json",
+        "scenario_id": "fox-human-vs-mario3-marth6-falco8-dream-land"
+      },
+      {
+        "actual": "63bbc8185098a41751148218fa0ce81188c21ad0787f77f81ccccf5190cc10f0",
+        "exact": true,
+        "expected": "63bbc8185098a41751148218fa0ce81188c21ad0787f77f81ccccf5190cc10f0",
+        "file": "input-plan.json",
+        "scenario_id": "fox-human-vs-mario3-marth6-falco8-dream-land"
+      }
+    ]
+  },
+  "full_suite": {
+    "errors": 0,
+    "failures": 0,
+    "green": true,
+    "log": {
+      "path": "work/cpu-register-allocation/full-suite-v2.log",
+      "sha256": "12521e94a2f32a5e2df7939e053a345223dd3dd2c8626a49c800e59ab8786f9f"
+    },
+    "run": 673,
+    "seconds": 197.715,
+    "skip_lines": [
+      "setUpClass (test_dat_audio.DatAudioTests) ... skipped 'Bootstrap Aurora and a C++20 compiler for independent DSP comparison'",
+      "setUpClass (test_dat_audio_stream.DatAudioStreamTests) ... skipped 'Bootstrap Aurora and a C++20 compiler for independent DSP comparison'",
+      "test_support_roots_and_optional_local_assets (test_dat_menu_support.DatMenuSupportTests.test_support_roots_and_optional_local_assets) ... skipped 'Build fighter targets before the typed support check'",
+      "test_original_map_objects_scene_animation_and_restart (test_dat_native_stage.NativeStageOriginalRuntime.test_original_map_objects_scene_animation_and_restart) ... skipped 'Original stage trace target unavailable'",
+      "test_original_oninit_scheduler_and_teardown (test_dat_native_stage.NativeStageOriginalRuntime.test_original_oninit_scheduler_and_teardown) ... skipped 'Original stage trace target unavailable'",
+      "test_synthetic_and_optional_owned_scene_roots (test_dat_scene.DatSceneTests.test_synthetic_and_optional_owned_scene_roots) ... skipped 'Build dat_scene_trace before the typed scene check'",
+      "test_original_effect_callbacks_and_transport (test_gameplay_audio.GameplayAudioTests.test_original_effect_callbacks_and_transport) ... skipped 'Build gameplay_audio_trace and provide local SSM/SEM/DSP coefficient fixtures'",
+      "test_original_voice_pcm (test_gameplay_audio.GameplayAudioTests.test_original_voice_pcm) ... skipped 'Build gameplay_audio_trace and provide local SSM/SEM/DSP coefficient fixtures'",
+      "test_original_music_id_stream_loop_and_restart (test_gameplay_audio_stream.GameplayAudioStreamTests.test_original_music_id_stream_loop_and_restart) ... skipped 'Build fighter/audio stream target and supply optional owned HPS/SSM/SEM/coefficient inputs'",
+      "test_actual_threshold_words_and_scoped_publication (test_gameplay_bonus_data.GameplayBonusDataTests.test_actual_threshold_words_and_scoped_publication) ... skipped 'Build fighter targets before running the focused bonus_data trace'",
+      "test_generation_accessor_rejects_replaced_heap (test_gameplay_bootstrap.GameplayBootstrapTests.test_generation_accessor_rejects_replaced_heap) ... skipped 'Project SDK and Aurora build dependencies unavailable; run bootstrap/build'",
+      "test_original_fighter_input_consumer_and_lifetime (test_gameplay_bootstrap.GameplayBootstrapTests.test_original_fighter_input_consumer_and_lifetime) ... skipped 'Project SDK and Aurora build dependencies unavailable; run bootstrap/build'",
+      "test_original_object_world_and_process_order (test_gameplay_bootstrap.GameplayBootstrapTests.test_original_object_world_and_process_order) ... skipped 'Project SDK and Aurora build dependencies unavailable; run bootstrap/build'",
+      "test_original_static_collision_load_queries_and_lifetime (test_gameplay_collision.GameplayCollisionTests.test_original_static_collision_load_queries_and_lifetime) ... skipped 'Project SDK and Aurora build dependencies unavailable; run bootstrap/build'",
+      "test_two_world_jab_shield_grab_and_directional_throws (test_gameplay_combat.GameplayCombatTests.test_two_world_jab_shield_grab_and_directional_throws) ... skipped 'Optional built combat trace and owned runtime assets required'",
+      "test_original_material_owners_restore_all_common_globals (test_gameplay_common_context.CommonContextTests.test_original_material_owners_restore_all_common_globals) ... skipped 'Common context trace unavailable; build gameplay first'",
+      "  test_admitted_fighter_and_stage_source_lifecycles (test_gameplay_content_match.ContentMatchTests.test_admitted_fighter_and_stage_source_lifecycles) (stage=32, fighter=20, opponent=8) ... skipped 'Build the source content trace targets'",
+      "  test_admitted_fighter_and_stage_source_lifecycles (test_gameplay_content_match.ContentMatchTests.test_admitted_fighter_and_stage_source_lifecycles) (stage=31, fighter=20, opponent=8) ... skipped 'Build the source content trace targets'",
+      "  test_admitted_fighter_and_stage_source_lifecycles (test_gameplay_content_match.ContentMatchTests.test_admitted_fighter_and_stage_source_lifecycles) (stage=32, fighter=2, opponent=8) ... skipped 'Build the source content trace targets'",
+      "  test_admitted_fighter_and_stage_source_lifecycles (test_gameplay_content_match.ContentMatchTests.test_admitted_fighter_and_stage_source_lifecycles) (stage=31, fighter=2, opponent=8) ... skipped 'Build the source content trace targets'",
+      "  test_admitted_fighter_and_stage_source_lifecycles (test_gameplay_content_match.ContentMatchTests.test_admitted_fighter_and_stage_source_lifecycles) (stage=8, fighter=20, opponent=8) ... skipped 'Build the source content trace targets'",
+      "  test_admitted_fighter_and_stage_source_lifecycles (test_gameplay_content_match.ContentMatchTests.test_admitted_fighter_and_stage_source_lifecycles) (stage=8, fighter=2, opponent=8) ... skipped 'Build the source content trace targets'",
+      "  test_admitted_fighter_and_stage_source_lifecycles (test_gameplay_content_match.ContentMatchTests.test_admitted_fighter_and_stage_source_lifecycles) (stage=32, fighter=2, opponent=20) ... skipped 'Build the source content trace targets'",
+      "  test_admitted_fighter_and_stage_source_lifecycles (test_gameplay_content_match.ContentMatchTests.test_admitted_fighter_and_stage_source_lifecycles) (stage=28, fighter=20, opponent=8) ... skipped 'Build the source content trace targets'",
+      "  test_admitted_fighter_and_stage_source_lifecycles (test_gameplay_content_match.ContentMatchTests.test_admitted_fighter_and_stage_source_lifecycles) (stage=28, fighter=9, opponent=8) ... skipped 'Build the source content trace targets'",
+      "test_battlefield_scaled_geometry_and_background_lifetimes (test_gameplay_content_match.ContentMatchTests.test_battlefield_scaled_geometry_and_background_lifetimes) ... skipped 'Build the source content trace targets'",
+      "setUpClass (test_gameplay_effects.EffectContextTests) ... skipped 'Effect trace unavailable; build gameplay_effect_banks_trace first'",
+      "setUpClass (test_gameplay_heap.GameplayHeapTests) ... skipped 'Project SDK/Aurora build dependencies unavailable; run bootstrap/build'",
+      "test_all_mario_costumes_repeat_source_lifecycle (test_gameplay_match_completion.MatchCompletion.test_all_mario_costumes_repeat_source_lifecycle) ... skipped 'Built stock trace and owned Mario costume archives required'",
+      "test_controller_port_and_costume_are_distinct (test_gameplay_match_completion.MatchCompletion.test_controller_port_and_costume_are_distinct) ... skipped 'Built original player context trace required'",
+      "test_four_stock_elimination_respawn_and_winner (test_gameplay_match_completion.MatchCompletion.test_four_stock_elimination_respawn_and_winner) ... skipped 'Optional built source trace and owned runtime assets required'",
+      "test_full_stage_edge_phase_at_plain_reference_position (test_gameplay_match_completion.MatchCompletion.test_full_stage_edge_phase_at_plain_reference_position) ... skipped 'Optional built full-stage edge trace and owned runtime assets required'",
+      "test_full_stage_edge_post_respawn_stock_trace (test_gameplay_match_completion.MatchCompletion.test_full_stage_edge_post_respawn_stock_trace) ... skipped 'Optional built full-stage edge trace and owned runtime assets required'",
+      "test_ground_and_air_fireball (test_gameplay_match_completion.MatchCompletion.test_ground_and_air_fireball) ... skipped 'Optional built source trace and owned runtime assets required'",
+      "test_stock_timer_countdown_pause_timeout_and_repeat_lifetime (test_gameplay_match_completion.MatchCompletion.test_stock_timer_countdown_pause_timeout_and_repeat_lifetime) ... skipped 'Optional built timer trace and owned runtime assets required'",
+      "test_original_sis_layout_and_style_stack (test_gameplay_native_menus.NativeMenuSourceTests.test_original_sis_layout_and_style_stack) ... skipped 'Build fighter targets before the original SIS consumer check'",
+      "test_owned_css_scene_lifecycle (test_gameplay_native_menus.NativeMenuSourceTests.test_owned_css_scene_lifecycle) ... skipped 'Original CSS target and owned local fixtures are required'",
+      "test_owned_original_menu_match_loop (test_gameplay_native_menus.NativeMenuSourceTests.test_owned_original_menu_match_loop) ... skipped 'Build the native menu host and supply owned menu/game fixtures'",
+      "test_owned_programs_and_source_interpreter (test_gameplay_rumble.RumbleTests.test_owned_programs_and_source_interpreter) ... skipped 'Build gameplay_rumble_trace and provide owned LbRb.dat'",
+      "test_original_marker_bounds_and_scoped_lifetime (test_gameplay_stage_numeric.GameplayStageNumericTests.test_original_marker_bounds_and_scoped_lifetime) ... skipped 'Build fighter targets before running the focused stage_numeric trace'",
+      "setUpClass (test_hsd_native.NativeJointRuntimeTests) ... skipped 'Native HSD targets unavailable; run scripts/build.py --target gameplay'",
+      "test_original_bank_lifecycle_two_worlds (test_native_audio_banks.NativeAudioBankTests.test_original_bank_lifecycle_two_worlds) ... skipped 'Build the native_audio_banks fighter target first'",
+      "test_native_codec_and_source_input_edges (test_pad_state.PadSnapshotTests.test_native_codec_and_source_input_edges) ... skipped 'Build gameplay_pad_state_trace'",
+      "test_native_decoder_rejects_before_asset_or_match_construction (test_retail_recipe_runtime.RetailRecipeRuntimeTests.test_native_decoder_rejects_before_asset_or_match_construction) ... skipped 'Build gameplay_retail_trace to test the shared decoder'",
+      "test_official_finalized_fixture (test_slippi_timeline.SlippiTimelineTests.test_official_finalized_fixture) ... skipped 'pinned slippi-js fixtures are not checked out'",
+      "test_official_rollback_fixture_includes_game_end_frame (test_slippi_timeline.SlippiTimelineTests.test_official_rollback_fixture_includes_game_end_frame) ... skipped 'pinned slippi-js fixtures are not checked out'"
+    ],
+    "skips": 46
+  },
+  "historical_evidence_unchanged": [
+    "docs/evidence/cpu-register-diagnostics-v1.json",
+    "docs/evidence/source-address-prerequisite-v1.json"
+  ],
+  "implementation_sha256": {
+    "src/source_address_context.cpp": "a5c871348789b9a95acddb3f88f904c7a66b69a3dee1a9a8aca891ae3a818069",
+    "src/source_address_context.hpp": "535d2d115b6c29ab2c50525aece76aace9c36fa8b0108589c8e3960d03763c60",
+    "tests/source_address_context_test.cpp": "185602c8b1d213a5cebd55333ff06f807953008af588bbcd1c6f7a995a397203",
+    "tests/source_address_model_trace.cpp": "d35be63b554ef22bc50e2cd03bfbec521aade15044a5d4750b4577cbde76b0ec",
+    "tests/source_address_oracle.c": "68903423335bd78fc4ce7093d9a062ebe0615458a7251205859efea5641463fa",
+    "tests/source_address_oracle_include/Runtime/platform.h": "53f2e32e85c1157daa3e3ff0f4878a09330c792f3925642365055248b60bb80a",
+    "tests/source_address_oracle_include/dolphin.h": "e093fe383ebfa9b6faab1f9d998413134cdb2f1726081009f4932a8baab0c692",
+    "tests/source_address_oracle_include/dolphin/os.h": "1c04f7307c6e85923251c7d1c36fa610d1d2b14df3ed8dfe27dfd25d91340a52",
+    "tests/source_address_oracle_include/dolphin/os/OSAlloc.h": "e8c383ac70c45d7433b6be3e0fb054f6535edc0446e33054787586d18f14d842",
+    "tests/test_source_address_context.py": "5f8534494145e99ed4db02191fa9dfd10618e897b2a8d9947fb85f1cae99fa0b"
+  },
+  "integration": {
+    "conflicts": [],
+    "historical_blockers": "The prior task GitHub, Git-write and socket denials remain in the original prerequisite receipt; access worked in this task.",
+    "main_automatic_verify": {
+      "conclusion": "success",
+      "event": "push",
+      "run": 34747201211
+    },
+    "main_commit": "e24e296fdcdb3f67a0d371e94732870acefcef96",
+    "merge_commit": "224758c723a924ce76cf3c2d3f36c453caf3f96a",
+    "merge_parents": [
+      "0e74ff29bf8d3128058a01a4dedb5e96bbff3d3f",
+      "e24e296fdcdb3f67a0d371e94732870acefcef96"
+    ],
+    "preserved_diagnostic_commit": "d2c5db3c274635ab5b81e777a3641f5061d5d147",
+    "preserved_prerequisite_commit": "0e74ff29bf8d3128058a01a4dedb5e96bbff3d3f",
+    "strategy": "normal merge, no rebase or force push"
+  },
+  "machine": {
+    "architecture": "arm64",
+    "hardware": "Apple M4",
+    "os": "macOS-26.6.2-arm64-arm-64bit-Mach-O"
+  },
+  "native_headless": {
+    "artifact_change": false,
+    "artifacts_after": {
+      "gameplay_retail_trace.js": "545df88c01cf44c1609abc58bb999a8ecca15d862888b1d39660db03d6ba223f",
+      "gameplay_retail_trace.wasm": "d88fe8799a2387d33457b8e4e3f6314238aa6f43e02d73ad06455d4e848713c2"
+    },
+    "artifacts_before": {
+      "gameplay_retail_trace.js": "545df88c01cf44c1609abc58bb999a8ecca15d862888b1d39660db03d6ba223f",
+      "gameplay_retail_trace.wasm": "d88fe8799a2387d33457b8e4e3f6314238aa6f43e02d73ad06455d4e848713c2"
+    },
+    "capture_receipt": {
+      "path": "work/cpu-register-allocation/native-four-player-reconciled-v1/capture-result.json",
+      "sha256": "c2d4c7d20bcb2ed73792591d8de047e62eedeb03f0a6774035e5337d8d4923fb"
+    },
+    "complete": true,
+    "core_comparison": {
+      "capture_hashes": {
+        "port": "2df750f90f4a597d7f254e86d075697bd106ffb8b5382fce8ae86462cff34e26",
+        "reference_a": "418e88c14947ecabfbdfc5511d42247f4b0ab190df156987ff0a81cf59787460",
+        "reference_b": "eef5b617b8683cacc41d1396b2920ca937537b4733794eac07c7e0672cc1237a"
+      },
+      "checks": {
+        "active_player_count": "pass",
+        "entry": "pass",
+        "fighters": "diverged",
+        "frame_count": "pass",
+        "inputs": "pass",
+        "match_frame": "pass",
+        "pad_state_hex": "pass",
+        "rng": "diverged"
+      },
+      "first_divergence": {
+        "actual": 298633274,
+        "expected": 2503578946,
+        "field": "rng",
+        "frame": 1871,
+        "record": "frame"
+      },
+      "first_divergence_by_group": {
+        "fighters": {
+          "actual": "42edbd71",
+          "expected": "42efbd71",
+          "field": "fighters[1].damage_bits",
+          "frame": 1871,
+          "record": "frame"
+        },
+        "rng": {
+          "actual": 298633274,
+          "expected": 2503578946,
+          "field": "rng",
+          "frame": 1871,
+          "record": "frame"
+        }
+      },
+      "frames_compared": 3838,
+      "gold_admitted": false,
+      "performance": "not_evaluated",
+      "reference_cpu": "Interpreter64",
+      "reference_repeatability": "pass",
+      "scope": "declared entry data, supplied inputs, fighter fields, RNG and match clock, PAD configuration and all three history banks only; rendering, hardware and audio output are excluded",
+      "source_drawing": "excluded",
+      "status": "diverged"
+    },
+    "limitation": "Gameplay-relevant source drawing/magnifier execution omitted; no full-match accuracy pass."
+  },
+  "new_scenarios_or_reserved_holdouts_run": false,
+  "performance_admitted": false,
+  "public_site_modified_or_deployed": false,
+  "remaining_dependency": "Complete original application allocation/heap/pool history (or independently authenticated complete context), host bindings, global/SDA and stack identities, and caller-specific reaching definitions/clobbers before integrating only the skipped-conversion path.",
+  "retained_failed_attempts": [
+    {
+      "log": {
+        "path": "work/cpu-register-allocation/runtime-release-v1.log",
+        "sha256": "db10e65daca2ae3b90a0b256f88cf7d8fb559a127c2c58e8273460bfa1aa6a06"
+      },
+      "reason": "Integrated Aurora patch differed from the exactly verified pre-merge patch. Applied the reviewed patch transition and rebuilt successfully; no dependency version change or unexplained edit overwritten."
+    },
+    {
+      "log": {
+        "path": "work/cpu-register-allocation/browser-server-v1.log",
+        "sha256": "2200de334b88162241bcbba5f6bf3a2c661ecf24580291292f7618be65d74972"
+      },
+      "reason": "Selected port already in use. Left its owner untouched and used a fresh OS-assigned loopback port."
+    },
+    {
+      "completed_ticks": 363,
+      "partial_module_output_matches_runtime_export": true,
+      "reason": "WebGPU zero-sized swapchain errors at the full-page screenshot boundary. Retained the failed attempt; changed only harness scrolling and viewport screenshots before fresh runs.",
+      "receipts": [
+        {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v1/browser-errors.json",
+          "sha256": "3618864f01c07feac2eaa02a25bf51f18c04f2daafe1242fe76137157637ea35"
+        },
+        {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v1/browser-identity.json",
+          "sha256": "df65499f0a007fc256650bf7fbdac4cda6d950eb1a5984d7e779e63b540f5fdf"
+        },
+        {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v1/capture-config.json",
+          "sha256": "d5b9bcb49733b1fbfe3356dd9c299d700bc0464b6b441b43ed39886e5e559ff1"
+        },
+        {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v1/completed.png",
+          "sha256": "733478e73073fc9f7f19e588e859a56fbd2b9414cd2d8f5c62e92e977e607124"
+        },
+        {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v1/core-comparison.json",
+          "sha256": "bf91877fa0e6485f111557022d28d724c93a7eb351e8d214aeec6dbfc427bbd7"
+        },
+        {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v1/cpu-comparison.json",
+          "sha256": "7c2fe4eee3c7a1d955cdb4924a419da250dd9520e624d14129c6c72ffb8fc49c"
+        },
+        {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v1/cpu-observation.jsonl",
+          "sha256": "6736796b3a372384eaf1c4745a13f6789a969a67f633cf046d05ef251efd6745"
+        },
+        {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v1/driver-receipt.json",
+          "sha256": "16a359592702ab60d7b991601da272dda7bd51d534271f151ef6af841910c0a9"
+        },
+        {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v1/failure.png",
+          "sha256": "46b8854675edc1aff82b340834094567a1c107704ee856f46994120d853440d9"
+        },
+        {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v1/failure.txt",
+          "sha256": "86cf21af36e41a7397fb610dfebb4ddeefe9b325d98be235889586dab0503a5f"
+        },
+        {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v1/module-output-capture.json",
+          "sha256": "0ec6f1111dc21d7f617543219014b743c04a48522ea8c59b3c98b6bed4fd504b"
+        },
+        {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v1/page.txt",
+          "sha256": "edebb8146e19a4c761ff697ab73660ee8c491175e9786cd320473c9c5bfa235b"
+        },
+        {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v1/partial-port.jsonl",
+          "sha256": "e4ba47d3e9b0eaf8b204266ba95a3a0d68c83df2ae6fedfbb77033f1b0c7b640"
+        },
+        {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v1/partial-timer.jsonl",
+          "sha256": "3477f623f398931a17ebfc8e0b6c3aa5e8f8c1a417651dc07012deebc186a4cd"
+        },
+        {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v1/playing-observation.json",
+          "sha256": "ced1685974a4a8da360d8c1bc502fe33ad26797abadee3d60df8cbf996f7320d"
+        },
+        {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v1/playing.png",
+          "sha256": "a0af303725604fc281902272698478b12a01888f85937f63ece13ac31635ee66"
+        },
+        {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v1/preparation-observation.jsonl",
+          "sha256": "ca23b559ee9af88c85e014cbda3fab1898850e133491288c2254b3b79d03d73e"
+        },
+        {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v1/retail-browser-report.json",
+          "sha256": "ddf21bc31055e4a2af64ba0568cc82947e2d665608b9910c44f47d04eeabcf47"
+        },
+        {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v1/retail-port.jsonl",
+          "sha256": "e4ba47d3e9b0eaf8b204266ba95a3a0d68c83df2ae6fedfbb77033f1b0c7b640"
+        },
+        {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v1/retail-timer.jsonl",
+          "sha256": "3477f623f398931a17ebfc8e0b6c3aa5e8f8c1a417651dc07012deebc186a4cd"
+        },
+        {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v1/served-artifacts-after.json",
+          "sha256": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356"
+        },
+        {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v1/served-artifacts.json",
+          "sha256": "9f801b54c710d17f66757a60169ddcd1c604cf7db407409b15cee4e9dee7f8c4"
+        },
+        {
+          "path": "work/cpu-register-allocation/browser-two-player-reconciled-v1/ui-report.json",
+          "sha256": "67929db26ddfc1c312d5c575b826e7893470b5472fe9e5ee5ff6615031372961"
+        }
+      ],
+      "run": "browser-two-player-reconciled-v1"
+    }
+  ],
+  "schema": "melee-cpu-register-reconciled-evidence",
+  "source_context_provider_implemented": false,
+  "source_hashes": {
+    ".deps/melee/extern/dolphin/src/dolphin/os/OSAlloc.c": "5868c5806827534297e0b8f3dca1eff89d70b8caa1ed6f8b18914023aaba1df8",
+    ".deps/melee/src/sysdolphin/baselib/memory.c": "ac09d32fc260614e7e65ba38013fe5ac95f64ba1686baa16c81c9b11a25fdb0a",
+    ".deps/melee/src/sysdolphin/baselib/objalloc.c": "b986ad5ea00a6b9d73de000641b46cb0aa3513208e6097c4bc21ab986b04357f"
+  },
+  "source_revision": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+  "version": 1
+}
