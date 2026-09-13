@@ -15,18 +15,20 @@ the accepted alpha risk posture and the remaining artifact/contact gates.
 
 ## Current launch state
 
-The `webmelee` Direct Upload Pages project and a free `webmelee.gg` zone have
-been created. The operator has specified **NaiadAI, LLC** and
-**legal@webmelee.gg** as the public contact. This supplies the public facts; it
-does not prove mail delivery. The audited candidate is deployed only to staging:
-[8e2cdf90.webmelee.pages.dev](https://8e2cdf90.webmelee.pages.dev). Hosted byte,
-header and 404 checks and all 10 public browser checks pass. No custom domain
-is active yet. Cloudflare's DNS
-scan preserved the five existing MX records and SPF TXT record; its imported A
-and www CNAME still point to Namecheap parking and must be replaced for Pages.
-The assigned nameservers are `alan.ns.cloudflare.com` and
-`hadlee.ns.cloudflare.com`. Namecheap still uses its original nameservers.
-Recheck this state immediately before resuming; assignment alone is not cutover.
+The operator is **NaiadAI, LLC**; the public contact is **legal@webmelee.gg**.
+Actual Google Workspace alias delivery was verified before the nameserver
+change. The exact audited candidate is deployed to staging at
+[8e2cdf90.webmelee.pages.dev](https://8e2cdf90.webmelee.pages.dev) and to the
+production Pages environment at
+[928714aa.webmelee.pages.dev](https://928714aa.webmelee.pages.dev).
+
+Namecheap saved `alan.ns.cloudflare.com` and `hadlee.ns.cloudflare.com` as the
+custom nameservers after the mail and artifact gates passed. Cloudflare serves
+the Google MX/SPF/verification records and proxied apex/www CNAME records to
+`webmelee.pages.dev`. The registry delegation is still propagating; Cloudflare
+will not attach the apex until the zone is active. The two-entry
+`webmelee_canonical_hosts` redirect list is saved but inactive. Recheck these
+states before continuing; a saved registrar setting alone is not propagation.
 
 ## Build, audit and preview
 
@@ -168,18 +170,17 @@ Do not activate the public website until the exact artifact audit passes and
 inbox. DNS MX records or a verified destination alone are not end-to-end proof.
 Obtain the intended forwarding destination from the operator; do not infer it
 from account or Git metadata. Keep that private destination out of public files.
-The registrar session expired during the alpha preparation check and needs
-reauthentication before its current aliases can be inspected or changed.
+The initial expired-login and missing-destination blockers were resolved by the
+separate email setup task. It configured an explicit Workspace alias on an
+existing user, with no new paid user or catch-all. An external test addressed
+only to legal@webmelee.gg arrived at the intended inbox on September 12, 2026
+at 22:02 Pacific; receipt, recipient details and TLS were checked. The private
+inbox stays out of public documentation.
 
-[Namecheap free forwarding](https://www.namecheap.com/support/knowledgebase/article.aspx/308/2214/how-to-set-up-free-email-forwarding/)
-requires its BasicDNS, PremiumDNS or FreeDNS service. Merely copying its MX
-records into Cloudflare does not establish a working route after cutover.
-[Cloudflare routing](https://developers.cloudflare.com/email-service/get-started/route-emails/)
-requires Cloudflare DNS and a verified destination. Prepare the intended route
-and retain current DNS/mail records before any approved DNS migration. Keep the
-website detached while mail setup and final testing are incomplete. If the
-operator's domain-activation gate prevents a required DNS-only mail setup step,
-explain that exact dependency before changing nameservers.
+The final mail provider is **Google Workspace**, independent of Namecheap DNS.
+Preserve its records during migration; do not enable Cloudflare Email Routing
+or restore the old Namecheap forwarding MX/SPF records. No send-as identity,
+DKIM or DMARC record was added by the incoming-alias setup task.
 
 Send a uniquely identifiable test message from a separate sender account to
 `legal@webmelee.gg`; verify receipt in the destination inbox, including recipient,
@@ -203,6 +204,19 @@ The pre-change inventory on September 12–13, 2026 was:
 | @ TXT | v=spf1 include:spf.efwd.registrar-servers.com ~all | Preserve with the matching mail setup |
 | Email forwarding | No recipients or catch-all defined | Not a verified contact mailbox |
 | DNSSEC / Dynamic DNS | Off / off | No DS-removal requirement observed |
+
+The mail setup task superseded the old forwarding inventory before cutover.
+The final records were re-read in Namecheap and copied to Cloudflare, and both
+assigned Cloudflare nameservers answered with these values before the
+nameserver change:
+
+| Type / name | Current value | Other settings |
+| --- | --- | --- |
+| MX @ | `smtp.google.com` | Priority 1; DNS only; Auto TTL |
+| TXT @ | `v=spf1 include:_spf.google.com ~all` | DNS only; Auto TTL |
+| TXT @ | `google-site-verification=wiOtbQAdsn4dG7EIcoR62vP7HCLJahI5FJWCmUIp0ts` | DNS only; Auto TTL |
+| CNAME @ | `webmelee.pages.dev` | Proxied; Auto TTL; replaces parking A |
+| CNAME www | `webmelee.pages.dev` | Proxied; Auto TTL; canonical redirect after apex verification |
 
 Read the full current Namecheap Advanced DNS page again at cutover; another
 operator may have changed it. Save any additional A/AAAA/CNAME/MX/TXT/SRV/CAA,

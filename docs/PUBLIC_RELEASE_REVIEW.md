@@ -48,7 +48,8 @@ resolve the rights in the executable.
 
 The legal templates retain build placeholders. Production packaging substitutes
 NaiadAI, LLC and legal@webmelee.gg, as expressly supplied by the operator. The
-mail route still requires end-to-end verification before domain activation.
+mail route passed an actual receipt test before the nameserver change; receipt
+must be rechecked after DNS migration.
 
 ## Artifact and seed facts
 
@@ -225,7 +226,8 @@ WebMelee clearance or completeness.
 
 ## Unclosed release issues
 
-1. Operator identity and contact spelling are supplied. Test forwarding and
+1. Operator identity and contact spelling are supplied. Incoming delivery was
+   tested before cutover; recheck after DNS migration and
    retain its private delivery receipt; address, consumer, privacy or jurisdiction
    questions remain review topics, not invented operator facts.
 2. Generate and independently review the exact public artifact manifest and

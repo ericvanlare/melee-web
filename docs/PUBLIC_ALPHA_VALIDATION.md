@@ -135,8 +135,15 @@ contains only same-origin static GET requests; no browser audio contexts,
 page/CSP errors or application uploads were observed. The hosted runtime hash
 matches the locally tested silent CPU-match artifact exactly.
 
-No nameserver cutover or public custom domain was activated. The forwarding
-destination still needs to be supplied, the expired Namecheap sign-in restored,
-and actual receipt at that inbox verified. A published address, copied MX
-records or dashboard status alone is not an end-to-end mail test. The final
-artifact gate passes; the mail gate remains open.
+The email setup task verified actual delivery to the intended Workspace inbox
+before cutover (September 12, 2026, 22:02 Pacific). The original mail gate is
+closed. The verified MX/SPF/Google domain TXT were copied into Cloudflare and
+queried successfully at both assigned nameservers. Namecheap then saved the
+Cloudflare delegation. The same exact files were deployed to the production
+Pages environment at [928714aa.webmelee.pages.dev](https://928714aa.webmelee.pages.dev);
+its default production hostname also passes all 18-file/five-alias/32-404 HTTP
+checks.
+
+Registry propagation, apex/www attachment, HTTPS, redirects and a post-migration
+receipt test remain in progress. The registrar's saved values alone are not
+proof of propagated DNS or a finished public launch.
