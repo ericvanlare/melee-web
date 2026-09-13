@@ -180,6 +180,14 @@ that path.
 - Prepare pipelines from unchanged visible scene draws. The reviewed seed may
   contain renderer descriptors, never disc assets. Persist newly discovered
   descriptors only after native teardown.
+  This includes SQLite COMMIT and automatic WAL checkpoints, not just explicit
+  JavaScript IDBFS saves. Keep a bounded queue coalesced by descriptor key;
+  queue overflow or transaction failure invalidates optional persistence, never
+  triggers a live flush or changes pipeline availability. At unload, drain from
+  the top-level native loop after all source owners and pipeline compilation
+  are gone, then publish files only after successful native flush and storage
+  save. Test this boundary with real exported DB/WAL reloads and exact source
+  comparisons; UI save timing alone misses implicit native filesystem work.
 - Retain auto-pause on timing disruption. It exposes lost scheduling time and
   prevents a stalled host callback from silently changing input/simulation order.
 - Treat browser callback interval, browser long tasks, native CPU phases, GPU
@@ -212,6 +220,19 @@ collecting a per-frame state trace during performance runs. Scene preparation
 has a separate cold/warm distribution; report its
 wall time and per-phase maximum and reject regressions rather than hiding it in
 the active-frame average.
+
+Scene readiness requires completed submissions as well as quiet pipeline/upload
+counters. After the final preparation draw, poll the existing renderer's frame
+packets, staging leases and worker status without blocking. Keep simulation and
+source drawing stopped until all submitted work completes, retain the last
+image, then reset the source clock. Do not add draws, extra source ticks, new
+buffers or a fixed sleep to manufacture readiness. Preserve retained menu audio
+ownership. A completion timeout is an explicit preparation failure.
+`gpu_completion_wait_ms` includes callback scheduling between the final quiet
+draw and successful arming; it is loading wall time, not GPU execution time.
+Keep it inside total preparation time. A controlled delayed-completion test can
+verify this protocol, but cannot identify an unrelated later GPU stall or close
+an old performance red. See the [startup readiness evidence](HITCH_CAPTURE.md#submitted-work-readiness--2026-09-12).
 
 Keep browser-gap evidence independently of native CPU maxima: the slowest native
 callback need not be the one with the largest browser interval. Retain bounded
@@ -274,7 +295,9 @@ The port currently has these reusable controls:
 - unchanged-scene renderer preparation and a reviewed initial Aurora cache with
   one shader record and 344 pipeline descriptors covering the current menus,
   stages, stock paths and the complete versioned Marth/Dream Land sweep;
-- teardown-only IDBFS persistence, so SQLite serialization cannot interrupt live
+- teardown-only IDBFS persistence, including deferral of SQLite transactions
+  themselves, whose automatic WAL checkpoints can call `fsync` inside a draw,
+  so serialization cannot interrupt live
   gameplay; and
 - telemetry for preparation phases, active native phases, browser callback gaps,
   browser long tasks, audio underruns, pipelines, uploads and heap size. Hitch
@@ -337,6 +360,21 @@ open gate; later evidence cannot erase it.
 The detailed fighter and stage checklists are in
 [ADDING_CHARACTERS.md](ADDING_CHARACTERS.md) and
 [ADDING_STAGES.md](ADDING_STAGES.md).
+
+Diagnostic controls must carry their condition in the frozen plan and raw
+report. A hidden-output control cannot establish normal-page acceptance. Keep
+logical render dimensions, high DPI backing pixels and CSS geometry distinct;
+verify runtime-dependent assumptions in the actual initialized WebGPU page,
+not only in a static HTML fixture. Preserve failed attempts when correcting a
+harness check, and never retroactively relabel their ledger status.
+
+For native/browser profiling, verify exported event coverage around each failed
+interval. A successful recorder exit, requested duration or large trace file
+does not establish retained duration: templates can use rolling windows. Test
+retention beyond the template default on an owned non-game process, correlate
+clock anchors and target PIDs/TIDs, and keep missing coverage explicit. Finish
+source execution before draining or analyzing trace data. See the [page-paint
+and native-capture findings](HITCH_CAPTURE.md#diagnostic-page-painting-and-native-gpu-capture--2026-09-12).
 
 ## When a hitch or mismatch appears
 

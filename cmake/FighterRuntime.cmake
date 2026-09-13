@@ -86,6 +86,32 @@ add_library(fighter_asset_runtime STATIC EXCLUDE_FROM_ALL
   src/dat_effect_banks.cpp src/dat_effect_entries.cpp src/dat_native_animation.cpp)
 target_link_libraries(fighter_asset_runtime PUBLIC fighter_source_runtime)
 target_compile_options(fighter_asset_runtime PRIVATE -ffp-contract=off)
+
+# The public alpha has an explicitly silent audio policy.  Keep its source
+# graph separate from the development graph so the GPL-derived resampler is
+# absent from both the compile commands and the final link closure.  The
+# normal fighter_source_runtime/fighter_asset_runtime targets remain exactly
+# as before for development, replay, and audio trace builds.
+if(CMAKE_BUILD_TYPE STREQUAL "Release" AND MELEE_WEB_PUBLIC_RUNTIME)
+  get_target_property(_public_source_files fighter_source_runtime SOURCES)
+  list(FILTER _public_source_files EXCLUDE REGEX "(^|/)gameplay_audio_resample\\.c$")
+  add_library(fighter_source_runtime_public STATIC EXCLUDE_FROM_ALL ${_public_source_files})
+  target_include_directories(fighter_source_runtime_public PUBLIC src "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}"
+    PRIVATE .deps/aurora/include .deps/melee/extern/dolphin/include)
+  target_compile_definitions(fighter_source_runtime_public PUBLIC TARGET_PC
+    PRIVATE MELEE_WEB_MENU_MARIO_FD MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+  target_compile_options(fighter_source_runtime_public PRIVATE -ffunction-sections -fdata-sections -ffp-contract=off
+    -fno-builtin-sinf -fno-builtin-cosf -fno-builtin-tanf
+    -fno-builtin-atanf -fno-builtin-atan2f -fno-builtin-acosf
+    -include "${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h")
+  target_link_libraries(fighter_source_runtime_public PUBLIC hsd_native_runtime aurora::pad)
+
+  get_target_property(_public_asset_files fighter_asset_runtime SOURCES)
+  add_library(fighter_asset_runtime_public STATIC EXCLUDE_FROM_ALL ${_public_asset_files})
+  target_compile_definitions(fighter_asset_runtime_public PRIVATE MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+  target_compile_options(fighter_asset_runtime_public PRIVATE -ffp-contract=off)
+  target_link_libraries(fighter_asset_runtime_public PUBLIC fighter_source_runtime_public)
+endif()
 add_executable(fighter_runtime_probe EXCLUDE_FROM_ALL tests/fighter_runtime_probe.c tests/fighter_runtime_probe.cpp tests/gameplay_match_context_trace.c tests/gameplay_action_trace.c)
 target_link_libraries(fighter_runtime_probe PRIVATE fighter_asset_runtime)
 target_compile_options(fighter_runtime_probe PRIVATE
@@ -131,7 +157,7 @@ else()
 endif()
 configure_file(web/runtime.html runtime.html @ONLY)
 configure_file(web/runtime-cache.js runtime-cache.js COPYONLY)
-foreach(module disc-image dsp-coefficients runtime-assets match-flow match-menu action-sweep hitch-capture)
+foreach(module disc-image dsp-coefficients runtime-assets runtime-audio runtime-audio-assets match-flow match-menu action-sweep hitch-capture melee-runtime runtime-development)
   configure_file(web/${module}.mjs ${module}.mjs COPYONLY)
 endforeach()
 configure_file(web/audio-ring.mjs audio-ring.mjs COPYONLY)
@@ -379,6 +405,35 @@ else()
   target_link_options(gameplay_menu_browser PRIVATE -sASSERTIONS=2 -sSAFE_HEAP=1)
 endif()
 configure_file(web/native-menu.html native-menu.html @ONLY)
+
+# The public player is a Release-only export surface with an explicit silent
+# audio closure.  It retains the source owner's SEM/AX clock and finite voice
+# lifetime handling, but the public source/archive pair excludes the GPL DSP
+# resampler and its coefficient input, and the browser receives zero PCM.
+# Keep the development target above intact so replay and source-observation
+# checks retain their full instrumentation.
+if(CMAKE_BUILD_TYPE STREQUAL "Release" AND MELEE_WEB_PUBLIC_RUNTIME)
+  add_executable(gameplay_public EXCLUDE_FROM_ALL src/gameplay_menu_browser.cpp src/browser_input.cpp
+    tests/native_menu_alarm_unavailable.c tests/native_menu_fighter_input.c tests/native_menu_stage_input.c)
+  add_dependencies(gameplay_public gameplay_menu_pipeline_seed)
+  set_property(TARGET gameplay_public APPEND PROPERTY LINK_DEPENDS "${initial_pipeline_cache}")
+  target_compile_definitions(gameplay_public PRIVATE MELEE_WEB_PUBLIC_RUNTIME)
+  target_compile_definitions(gameplay_public PRIVATE MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+  target_link_libraries(gameplay_public PRIVATE fighter_asset_runtime_public aurora::main)
+  target_include_directories(gameplay_public SYSTEM PRIVATE "${EMSCRIPTEN_SYSROOT}/include/compat")
+  target_compile_options(gameplay_public PRIVATE -ffp-contract=off)
+  # Keep profiling disabled here.  The explicit roots below are the
+  # production API; Emscripten's linker DCE removes the replay, stock, raw-PAD,
+  # player-state, source-observation, memory and diagnostic surfaces.
+  target_link_options(gameplay_public PRIVATE -sENVIRONMENT=web -sDYNAMIC_EXECUTION=0
+    -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=134217728 -sSTACK_SIZE=8388608 -sEXIT_RUNTIME=0
+    --preload-file "${initial_pipeline_cache}@/initial_pipeline_cache.db"
+    -sEXPORTED_RUNTIME_METHODS=FS,IDBFS,addRunDependency,removeRunDependency,HEAPU8,UTF8ToString
+    -lidbfs.js
+    -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_melee_web_native_menu_file,_melee_web_native_menu_prepare,_melee_web_native_menu_launch,_melee_web_native_menu_unload,_melee_web_native_menu_pause,_melee_web_native_menu_message,_melee_web_native_menu_running,_melee_web_native_menu_phase,_melee_web_native_menu_cache_idle,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_set_keyboard_port,_melee_web_input_set_keyboard_layout)
+  set_target_properties(gameplay_public PROPERTIES SUFFIX ".js")
+  add_custom_target(runtime-public DEPENDS gameplay_public)
+endif()
 
 # Shared typed scene/model tables consumed by the original match interface.
 add_executable(dat_scene_trace EXCLUDE_FROM_ALL tests/dat_scene_test.cpp)

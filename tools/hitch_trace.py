@@ -430,6 +430,50 @@ def _event_mark_name(event: Mapping[str, Any]) -> str:
     return f"melee-hitch-{identifier}" if identifier is not None else ""
 
 
+def _cache_sync_overlap(capture: Mapping[str, Any], start_ms: float | None,
+                        end_ms: float | None) -> dict[str, Any]:
+    """Join page-clock intervals offline; overlap is never causal attribution."""
+    result: dict[str, Any] = {
+        "status": "unavailable", "items": [],
+        "interpretation": "Page-clock overlap only; not CPU time or proof that a sync caused the hitch.",
+    }
+    rows = capture.get("cache_syncs")
+    if rows is None:
+        return result
+    if not isinstance(rows, list) or len(rows) > 1024:
+        raise HitchTraceError("cache_syncs must be a bounded array")
+    if (start_ms is None or end_ms is None or end_ms < start_ms
+            or _nested(capture, "clock", "source") != "performance.now"):
+        result["reason"] = "shared page clock or failed interval unavailable"
+        return result
+    capability = _nested(capture, "capabilities", "cache_sync")
+    if (not isinstance(capability, Mapping) or capability.get("installed") is not True
+            or capability.get("requested") is not True or capability.get("enabled") is not True):
+        result["reason"] = "cache sync hook installation not established"
+        return result
+    result["status"] = "incomplete" if capture.get("cache_sync_overflow_count", 0) else "available"
+    for raw in rows:
+        row = _as_object(raw, "cache_syncs row")
+        started, ended = _finite(row.get("started")), _finite(row.get("ended"))
+        if row.get("clock") != "performance.now" or started is None:
+            result["status"] = "incomplete"
+            continue
+        if row.get("status") == "pending":
+            result["status"] = "incomplete"
+            if started < end_ms:
+                result["items"].append({"sync": dict(row), "overlap_ms": None,
+                                         "overlap_status": "possible_pending"})
+            continue
+        if ended is None or ended < started:
+            result["status"] = "incomplete"
+            continue
+        overlap = min(end_ms, ended) - max(start_ms, started)
+        if overlap > 0:
+            result["items"].append({"sync": dict(row), "overlap_ms": overlap,
+                                     "overlap_status": "measured"})
+    return result
+
+
 def analyze_capture(report: Mapping[str, Any], trace: Any, metadata: Any = None,
                     *, top_n: int = DEFAULT_TOP_N,
                     max_decompressed_bytes: int = DEFAULT_MAX_DECOMPRESSED_BYTES) -> dict[str, Any]:
@@ -552,6 +596,8 @@ def analyze_capture(report: Mapping[str, Any], trace: Any, metadata: Any = None,
             "known_phase_context": {"items": [], "returned_count": 0, "available_count": 0,
                                     "limit": top_n, "truncated": False, "omitted_count": 0},
             "native_phases": [],
+            "native_begin_partition": None,
+            "cache_sync_overlap": _cache_sync_overlap(capture, start_ms, end_ms),
             "thread_cpu": {"status": "unknown", "reason": "trace thread-clock duration (tdur) is absent"},
             "status": "unknown",
         }
@@ -561,14 +607,20 @@ def analyze_capture(report: Mapping[str, Any], trace: Any, metadata: Any = None,
         if not isinstance(current, Mapping):
             current = event.get("native") if isinstance(event.get("native"), Mapping) else None
         if isinstance(current, Mapping):
-            phase_cursor = 0.0
+            if isinstance(current.get("begin_phases"), Mapping):
+                event_result["native_begin_partition"] = {
+                    "values": dict(current["begin_phases"]), "source": "report",
+                    "interpretation": "Nested wall timings summed across begin calls; not contiguous slices or CPU time.",
+                }
             for key in ("input_ms", "simulation_audio_ms", "preparation_ms", "begin_ms", "draw_ms", "end_ms"):
                 duration = _finite(current.get(key))
                 if duration is None or duration < 0:
                     continue
-                event_result["native_phases"].append({"name": key, "start_ms": phase_cursor,
-                                                        "duration_ms": duration, "source": "report"})
-                phase_cursor += duration
+                # A catch-up callback interleaves several draws and steps.
+                # Aggregates cannot establish contiguous phase start offsets.
+                event_result["native_phases"].append({"name": key, "start_ms": None,
+                                                        "duration_ms": duration, "source": "report",
+                                                        "aggregation": "callback_sum"})
         if selected is None or start_ms is None or end_ms is None:
             if marker_result["status"] == "matched" and (start_ms is None or end_ms is None):
                 event_result["status"] = "unknown_interval"

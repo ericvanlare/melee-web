@@ -8,6 +8,17 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(BUILD_SHARED_LIBS OFF CACHE BOOL "Static dependencies" FORCE)
 
+# Public artifacts must not carry a developer checkout path through __FILE__
+# panic strings or compiler metadata. This is opt-in for the public Release
+# configure, leaving debug/replay builds byte-for-byte on their existing path
+# policy while covering the native sources and pinned dependencies compiled in
+# this directory.
+option(MELEE_WEB_PUBLIC_RUNTIME "Redact local paths from public artifacts" OFF)
+if(EMSCRIPTEN AND MELEE_WEB_PUBLIC_RUNTIME)
+  add_compile_options("-ffile-prefix-map=${CMAKE_SOURCE_DIR}=.")
+  add_compile_options("-fdebug-prefix-map=${CMAKE_SOURCE_DIR}=.")
+endif()
+
 # Keep this probe narrow. These services remain required for the game port.
 set(AURORA_ENABLE_DVD OFF CACHE BOOL "" FORCE)
 set(AURORA_ENABLE_CARD OFF CACHE BOOL "" FORCE)

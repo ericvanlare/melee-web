@@ -121,6 +121,21 @@ class HitchCaptureTests(unittest.TestCase):
                                 "development_recipes": {}, "legacy_red_reports": []},
             })}, root / "bad.json")
 
+    def test_hidden_slot_cannot_accept_a_report_with_its_control_field_removed(self):
+        root, _, plan, files = self.fixture()
+        controlled_path = root / "paint-plan.json"
+        controlled = create_plan({
+            **plan, "plan_id": "paint-control-test", "attempts_dir": "paint-attempts",
+            "slots": [{**plan["slots"][0], "mode": "profiler", "page_paint": "hidden"}],
+        }, controlled_path)
+        slot = controlled["slots"][0]["slot_id"]
+        begin_attempt(controlled_path, slot)
+        report = self.valid_browser_report(root, controlled, files)
+        result = finish_attempt(controlled_path, slot, report_path=report)
+        self.assertFalse(result["validation"]["valid"])
+        self.assertTrue(any("page-paint" in error for error in result["validation"]["errors"]))
+        self.assertTrue(status(controlled_path)["attempts"][0]["consumed"])
+
     def test_attempt_is_exclusive_and_failed_completion_consumes_slot(self):
         root, plan_path, plan, files = self.fixture()
         started = begin_attempt(plan_path, plan["slots"][0]["slot_id"])

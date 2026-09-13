@@ -67,6 +67,9 @@ void render_audio_tick(MeleeWebAudio* audio,char* error,size_t error_size);
 struct PreparationProfile {
  double requested_at=0,audio_ready_at=0,constructed_at=0;
  double render_cpu_ms=0,max_callback_ms=0,max_draw_ms=0,max_end_ms=0;
+ double submission_wait_started=0,submission_ready_at=0;
+ unsigned submission_wait_callbacks=0,pending_staging_at_settle=0,pending_staging_at_first_arm=0;
+ bool submission_polled=false;
  uint64_t texture_upload_bytes=0;
  unsigned callbacks=0,source_draws=0,max_draw_calls=0,max_queued=0;
  int32_t queued_delta=0,created_delta=0;
@@ -91,17 +94,23 @@ struct PreparationProfile {
   const double audio_wait=audio_ready_at?audio_ready_at-requested_at:0;
   const double construction=constructed_at?constructed_at-audio_ready_at:0;
   const double render_wait=constructed_at?settled_at-constructed_at:settled_at-requested_at;
-  char profile[1024];
+  char profile[1280];
   std::snprintf(profile,sizeof(profile),
    "{\"source_transition\":%s,\"total_ms\":%.3f,\"audio_wait_ms\":%.3f,"
    "\"construction_ms\":%.3f,\"render_wait_ms\":%.3f,\"render_cpu_ms\":%.3f,"
    "\"callbacks\":%u,\"source_draws\":%u,\"max_callback_ms\":%.3f,"
    "\"max_draw_ms\":%.3f,\"max_end_ms\":%.3f,\"texture_upload_bytes\":%llu,"
-   "\"max_draw_calls\":%u,\"max_queued\":%u,\"queued_delta\":%d,\"created_delta\":%d}",
+   "\"max_draw_calls\":%u,\"max_queued\":%u,\"queued_delta\":%d,\"created_delta\":%d,"
+   "\"gpu_completion_wait_ms\":%.3f,\"gpu_completion_wait_callbacks\":%u,"
+   "\"pending_staging_at_settle\":%u,\"pending_staging_at_first_arm\":%u,"
+   "\"gpu_completion_ready\":%s}",
    source_transition?"true":"false",settled_at-requested_at,audio_wait,construction,
    render_wait,render_cpu_ms,callbacks,source_draws,max_callback_ms,max_draw_ms,max_end_ms,
    static_cast<unsigned long long>(texture_upload_bytes),max_draw_calls,max_queued,
-   queued_delta,created_delta);
+   queued_delta,created_delta,
+   submission_wait_started?submission_ready_at-submission_wait_started:0,
+   submission_wait_callbacks,pending_staging_at_settle,pending_staging_at_first_arm,
+   submission_ready_at?"true":"false");
   EM_ASM({window.menuPreparationProfile?.(JSON.parse(UTF8ToString($0)));},profile);
  }
 };
@@ -308,10 +317,35 @@ void log_message(AuroraLogLevel level,const char* module,const char* text,unsign
 void render_audio_tick(MeleeWebAudio* audio,char* error,size_t error_size){
  audio_phase+=32000;const unsigned count=audio_phase/60;audio_phase%=60;
  check(melee_web_audio_render(audio,pcm.data(),count,error,error_size),error);
+#if !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
  EM_ASM({window.menuAudio?.(HEAPF32.slice($0>>2,($0>>2)+$1*2));},pcm.data(),count);
+#endif
+}
+bool render_cache_can_flush(){
+ const AuroraStats* stats=aurora_get_stats();
+ return !world&&!match&&!host&&!running&&!pending&&!preparation.busy()&&
+        stats&&stats->queuedPipelines==0;
+}
+void service_render_cache_writes(){
+ // SQLite fsync may Asyncify-yield. Run at the top-level main-loop boundary,
+ // after source ownership is gone, never from a nested JS command/export or
+ // between source scenes. Persistence time is separate from live callbacks.
+ static bool failure_reported=false;
+ if(!render_cache_can_flush())return;
+ const auto state=aurora_pipeline_cache_status();
+ if(state==AURORA_PIPELINE_CACHE_READY)return;
+ if(state==AURORA_PIPELINE_CACHE_ERROR&&failure_reported)return;
+ const bool flushed=state==AURORA_PIPELINE_CACHE_PENDING;
+ const double started=emscripten_get_now();
+ const bool ok=flushed&&aurora_flush_pipeline_cache();
+ const double duration=emscripten_get_now()-started;
+ if(!ok)failure_reported=true;
+ EM_ASM({window.menuCacheWritesFlushed?.({ok:!!$0,flushed:!!$1,duration_ms:$2});},
+        ok,flushed,duration);
 }
 void tick(){
  EM_ASM({window.menuServiceCommands?.();});
+ service_render_cache_writes();
  const double started=emscripten_get_now();
  const bool running_at_callback_start=running;
  const AuroraStats stats_before=aurora_stats_snapshot();
@@ -319,6 +353,7 @@ void tick(){
  double preparation_ms=0,preparation_started=0;
  double render_begin_ms=0,render_draw_ms=0,render_end_ms=0,render_total_ms=0,simulation_cpu_ms=0;
  uint32_t callback_draw_calls=0,callback_texture_upload=0,callback_staging_used=0;
+ AuroraStats callback_begin_stats{};
  AuroraStats callback_end_stats{};
  melee_web::SourceFrameSequence source_frames;
  int began=0,drawn=1,timing_valid=1,first_use=0;
@@ -375,8 +410,35 @@ void tick(){
   render_draw_ms+=draw_done-begin_done;
   render_end_ms+=end_done-draw_done;
   render_total_ms+=end_done-render_started;
+  const auto rendered=aurora_stats_snapshot();
+  callback_begin_stats.lastBeginFrameId=rendered.lastBeginFrameId;
+  callback_begin_stats.lastBeginFrameFrameSlotMs+=rendered.lastBeginFrameFrameSlotMs;
+  callback_begin_stats.lastBeginFrameFrameSlotWaitMs+=rendered.lastBeginFrameFrameSlotWaitMs;
+  callback_begin_stats.lastBeginFrameFrameSlotWaitCount+=rendered.lastBeginFrameFrameSlotWaitCount;
+  callback_begin_stats.lastBeginFrameStagingSlotMs+=rendered.lastBeginFrameStagingSlotMs;
+  callback_begin_stats.lastBeginFrameStagingSlotWaitMs+=rendered.lastBeginFrameStagingSlotWaitMs;
+  callback_begin_stats.lastBeginFrameStagingSlotWaitCount+=rendered.lastBeginFrameStagingSlotWaitCount;
+  callback_begin_stats.lastBeginFramePacketMs+=rendered.lastBeginFramePacketMs;
+  callback_begin_stats.lastBeginFrameRecordMs+=rendered.lastBeginFrameRecordMs;
+  callback_begin_stats.lastBeginFramePipelineMs+=rendered.lastBeginFramePipelineMs;
+  callback_begin_stats.lastBeginFrameWorkerMs+=rendered.lastBeginFrameWorkerMs;
+  callback_begin_stats.lastBeginFrameEncoderMs+=rendered.lastBeginFrameEncoderMs;
+  callback_begin_stats.lastBeginFrameTotalMs+=rendered.lastBeginFrameTotalMs;
+  callback_begin_stats.lastBeginFrameResidualMs+=rendered.lastBeginFrameResidualMs;
+  callback_begin_stats.lastBeginFrameStartMs=rendered.lastBeginFrameStartMs;
+  callback_begin_stats.lastBeginFrameEndMs=rendered.lastBeginFrameEndMs;
+  if(rendered.lastBeginFrameMaxWaitMs>callback_begin_stats.lastBeginFrameMaxWaitMs){
+   callback_begin_stats.lastBeginFrameMaxWaitMs=rendered.lastBeginFrameMaxWaitMs;
+   callback_begin_stats.lastBeginFrameMaxWaitStartMs=rendered.lastBeginFrameMaxWaitStartMs;
+   callback_begin_stats.lastBeginFrameMaxWaitEndMs=rendered.lastBeginFrameMaxWaitEndMs;
+   callback_begin_stats.lastBeginFrameMaxWaitKind=rendered.lastBeginFrameMaxWaitKind;
+  }
+  callback_begin_stats.lastBeginFrameOuterSurfaceMs+=rendered.lastBeginFrameOuterSurfaceMs;
+  callback_begin_stats.lastBeginFrameOuterImguiMs+=rendered.lastBeginFrameOuterImguiMs;
+  callback_begin_stats.lastBeginFrameOuterFifoMs+=rendered.lastBeginFrameOuterFifoMs;
+  callback_begin_stats.lastBeginFrameOuterTotalMs+=rendered.lastBeginFrameOuterTotalMs;
+  callback_begin_stats.lastBeginFrameOuterResidualMs+=rendered.lastBeginFrameOuterResidualMs;
   if(began_this_frame){
-   const auto rendered=aurora_stats_snapshot();
    callback_draw_calls+=rendered.drawCallCount;
    callback_texture_upload+=rendered.lastTextureUploadSize;
    callback_staging_used+=rendered.lastVertSize+rendered.lastUniformSize+
@@ -432,8 +494,30 @@ void tick(){
    preparation_ms=emscripten_get_now()-preparation_started;preparation_started=0;
    suppress_draw=preparation.suppress_source_draw();
   }else if(preparation.arming()){
-   preparation.arm();running=true;menu_clock.reset();suppress_draw=0;
-   message=match?match_message:melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select";
+   // The final preparation draw is already submitted. Keep its image and let
+   // the browser deliver completion callbacks; never redraw or advance source
+   // state just to wait for a staging buffer to become reusable.
+   const auto submitted=aurora_browser_submission_status();
+   if(!preparation_profile.submission_polled){
+    preparation_profile.pending_staging_at_first_arm=submitted.pendingStagingBuffers;
+    preparation_profile.submission_polled=true;
+   }
+   const bool complete=submitted.pendingFramePackets==0&&submitted.pendingStagingBuffers==0&&
+                       submitted.workerBusy==0;
+   if(preparation.arm(complete)){
+    const double ready_at=emscripten_get_now();
+    preparation_profile.submission_ready_at=ready_at;
+    preparation_profile.report(ready_at);
+    EM_ASM({window.menuRenderCacheSettled?.();});
+    if(render_only_preparation)render_only_preparation=false;
+    else EM_ASM({window.menuPreparationDone?.();});
+    running=true;menu_clock.reset();suppress_draw=0;
+    message=match?match_message:melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select";
+   }else{
+    ++preparation_profile.submission_wait_callbacks;
+    check(emscripten_get_now()-preparation_profile.submission_wait_started<10000,
+          "GPU completion timed out during scene preparation");
+   }
   }else if(pending){
    begin_preparation();
   }
@@ -537,10 +621,9 @@ void tick(){
  if(was_warming)preparation_profile.observe(finished-started,render_draw_ms,render_end_ms,
                                              actual_source_draw,stats_before,stats_after);
  if(preparation.observe_render(actual_source_draw,stats_after.queuedPipelines,render_preparation_activity)){
-  preparation_profile.report(finished);
-  EM_ASM({window.menuRenderCacheSettled?.();});
-  if(render_only_preparation)render_only_preparation=false;
-  else EM_ASM({window.menuPreparationDone?.();});
+  preparation_profile.submission_wait_started=finished;
+  preparation_profile.pending_staging_at_settle=
+      aurora_browser_submission_status().pendingStagingBuffers;
  }
  // A texture upload is complete by the time it is reported here, so pausing
  // source simulation afterward cannot hide its cost. Newly constructed scenes
@@ -556,9 +639,20 @@ void tick(){
  }
  char timing[4096];
  const uint32_t staging_used_bytes=callback_staging_used;
- std::snprintf(timing,sizeof(timing),
+ const int timing_written=std::snprintf(timing,sizeof(timing),
   "{\"frame\":%u,\"started\":%.3f,\"valid\":%d,\"first_use\":%d,"
   "\"input_ms\":%.3f,\"simulation_audio_ms\":%.3f,\"preparation_ms\":%.3f,"
+  "\"begin_phases\":{\"frame_slot_ms\":%.3f,\"frame_slot_wait_ms\":%.3f,"
+  "\"frame_slot_wait_count\":%u,\"staging_slot_ms\":%.3f,"
+  "\"staging_slot_wait_ms\":%.3f,\"staging_slot_wait_count\":%u,"
+  "\"packet_ms\":%.3f,\"record_ms\":%.3f,\"pipeline_ms\":%.3f,"
+  "\"worker_ms\":%.3f,\"encoder_ms\":%.3f,\"total_ms\":%.3f,"
+  "\"residual_ms\":%.3f,\"outer_surface_ms\":%.3f,"
+  "\"outer_imgui_ms\":%.3f,\"outer_fifo_ms\":%.3f,"
+  "\"outer_total_ms\":%.3f,\"outer_residual_ms\":%.3f,"
+  "\"start_ms\":%.3f,\"end_ms\":%.3f,\"max_wait_ms\":%.3f,"
+  "\"max_wait_start_ms\":%.3f,\"max_wait_end_ms\":%.3f,\"max_wait_kind\":%u,"
+  "\"last_frame_id\":%llu},"
   "\"begin_ms\":%.3f,\"draw_ms\":%.3f,\"end_ms\":%.3f,\"total_ms\":%.3f,"
   "\"end_phases\":{\"last_frame\":%llu,\"fifo_texture_ms\":%.3f,\"gfx_finish_ms\":%.3f,"
   "\"staging_writes_ms\":%.3f,\"surface_encode_ms\":%.3f,\"encoder_finish_ms\":%.3f,"
@@ -581,6 +675,20 @@ void tick(){
   "\"wasm_heap_bytes\":%zu,\"draw_suppressed\":%d,\"source_steps\":%zu,\"source_draws\":%zu}",
   ++render_frame,started,timing_valid,first_use,input_done-started,
   simulation_cpu_ms,preparation_ms,
+  callback_begin_stats.lastBeginFrameFrameSlotMs,callback_begin_stats.lastBeginFrameFrameSlotWaitMs,
+  callback_begin_stats.lastBeginFrameFrameSlotWaitCount,
+  callback_begin_stats.lastBeginFrameStagingSlotMs,callback_begin_stats.lastBeginFrameStagingSlotWaitMs,
+  callback_begin_stats.lastBeginFrameStagingSlotWaitCount,
+  callback_begin_stats.lastBeginFramePacketMs,callback_begin_stats.lastBeginFrameRecordMs,
+  callback_begin_stats.lastBeginFramePipelineMs,callback_begin_stats.lastBeginFrameWorkerMs,
+  callback_begin_stats.lastBeginFrameEncoderMs,callback_begin_stats.lastBeginFrameTotalMs,
+  callback_begin_stats.lastBeginFrameResidualMs,callback_begin_stats.lastBeginFrameOuterSurfaceMs,
+  callback_begin_stats.lastBeginFrameOuterImguiMs,callback_begin_stats.lastBeginFrameOuterFifoMs,
+  callback_begin_stats.lastBeginFrameOuterTotalMs,callback_begin_stats.lastBeginFrameOuterResidualMs,
+  callback_begin_stats.lastBeginFrameStartMs,callback_begin_stats.lastBeginFrameEndMs,
+  callback_begin_stats.lastBeginFrameMaxWaitMs,callback_begin_stats.lastBeginFrameMaxWaitStartMs,
+  callback_begin_stats.lastBeginFrameMaxWaitEndMs,callback_begin_stats.lastBeginFrameMaxWaitKind,
+  static_cast<unsigned long long>(callback_begin_stats.lastBeginFrameId),
   render_begin_ms,render_draw_ms,render_end_ms,
   finished-started,static_cast<unsigned long long>(callback_end_stats.lastEndFrameId),
   callback_end_stats.lastEndFrameFifoTextureMs,callback_end_stats.lastEndFrameGfxFinishMs,
@@ -605,6 +713,15 @@ void tick(){
   stats_after.queuedPipelines,stats_after.createdPipelines,
   callback_draw_calls,callback_texture_upload,staging_used_bytes,
   emscripten_get_heap_size(),suppress_draw,source_frames.steps(),source_frames.draws());
+ if(timing_written<0||static_cast<size_t>(timing_written)>=sizeof(timing)){
+  timing_valid=0;
+  std::snprintf(timing,sizeof(timing),"{\"frame\":%u,\"valid\":0,\"timing_truncated\":true}",render_frame);
+  EM_ASM({
+   const text=UTF8ToString($0);
+   if(window.menuRuntimeTimingError)window.menuRuntimeTimingError(text);
+   else console.error(text);
+  },timing_written<0?"Native menu timing JSON formatting failed":"Native menu timing JSON exceeded 4096 bytes");
+ }
  EM_ASM({if(window.menuRuntimeTiming)window.menuRuntimeTiming(JSON.parse(UTF8ToString($0)));},timing);
  EM_ASM({window.menuFrame?.(!!$0);},running_at_callback_start?1:0);
  if(replay_completed_now)EM_ASM({window.menuReplayCompleted?.($0,!!$1,$2,$3);},
@@ -615,6 +732,9 @@ void tick(){
 extern "C" {
 int melee_web_native_menu_file(const char* name,const uint8_t* data,unsigned size){try{
  if(world||match||!name||!data||!size||size>64*1024*1024)throw std::runtime_error("Unload before importing valid local files");
+#if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+ if(std::string_view{name}=="dsp_coef.bin")throw std::runtime_error("Public audio-disabled runtime does not accept DSP coefficient input");
+#endif
  bool known=false;for(auto key:keys)known|=key==name;
  if(!known)throw std::runtime_error("Unknown native menu file: "+std::string(name));
  archive_cache.reset();
@@ -791,8 +911,9 @@ const char* melee_web_native_menu_diagnostics(){
 const char* melee_web_native_menu_message(){return message.c_str();}
 int melee_web_native_menu_running(){return running;}
 int melee_web_native_menu_cache_idle(){
- const AuroraStats* stats=aurora_get_stats();
- return !world&&!match&&stats&&stats->queuedPipelines==0;
+ if(!render_cache_can_flush())return 0;
+ const auto state=aurora_pipeline_cache_status();
+ return state==AURORA_PIPELINE_CACHE_READY?1:state==AURORA_PIPELINE_CACHE_ERROR?-1:0;
 }
 int melee_web_native_menu_phase(){return match?7:host?melee_web_menu_host_phase(host):0;}
 }
@@ -802,7 +923,9 @@ int main(int argc,char** argv){
  config.windowWidth=640;config.windowHeight=480;config.msaa=1;config.vsync=true;
  config.logCallback=log_message;config.logLevel=LOG_INFO;
  if(!SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT,"#canvas"))return 1;
- aurora_initialize(argc,argv,&config);GXInit(fifo,sizeof(fifo));
+ aurora_initialize(argc,argv,&config);
+ aurora_set_deferred_pipeline_cache_writes(true);
+ GXInit(fifo,sizeof(fifo));
  if(!melee_web_input_startup())return 1;
  emscripten_set_main_loop(tick,0,1);return 0;
 }

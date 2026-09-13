@@ -12,6 +12,7 @@ export const NATIVE_DEADLINE_MS = 1000 / 60;
 export const BROWSER_HARD_GAP_MS = 1000 / 30;
 export const DEFAULT_EVENT_CAP = 128;
 export const DEFAULT_CONTEXT_CAP = 8;
+export const DEFAULT_CACHE_SYNC_CAP = 128;
 
 const finite = value => value === null || value === undefined || !Number.isFinite(Number(value))
   ? null : Number(value);
@@ -69,6 +70,9 @@ export function createHitchCapture(options = {}) {
   const configuredContextCap = Number(options.contextCap ?? DEFAULT_CONTEXT_CAP);
   const contextCap = Number.isInteger(configuredContextCap) && configuredContextCap > 0
     ? configuredContextCap : DEFAULT_CONTEXT_CAP;
+  const configuredCacheSyncCap = Number(options.cacheSyncCap ?? DEFAULT_CACHE_SYNC_CAP);
+  const cacheSyncCap = Number.isInteger(configuredCacheSyncCap) && configuredCacheSyncCap > 0
+    ? configuredCacheSyncCap : DEFAULT_CACHE_SYNC_CAP;
   const useUserTiming = options.userTiming === true;
   const requestedObservers = options.observeObservers !== false;
   const timeOrigin = finite(options.timeOrigin ?? perf?.timeOrigin);
@@ -82,6 +86,16 @@ export function createHitchCapture(options = {}) {
     loaf: capability(Observer, supportedTypes.has('long-animation-frame'),
       Observer ? (supportedTypes.has('long-animation-frame') ? null : 'entry type unsupported') : 'PerformanceObserver unavailable'),
     user_timing: {requested: useUserTiming, supported: !!perf?.mark, observed: false, reason: perf?.mark ? null : 'performance.mark unavailable'},
+    cache_sync: {
+      requested: options.cacheSyncDiagnostics === true,
+      enabled: false,
+      installed: false,
+      observed: false,
+      calls: 0,
+      pending: 0,
+      errors: 0,
+      reason: null,
+    },
   };
 
   let enabled = options.enabled === true;
@@ -92,6 +106,8 @@ export function createHitchCapture(options = {}) {
   let nextId = 1;
   let events = [];
   let observers = [];
+  let cacheSyncs = [];
+  let cacheSyncById = new Map();
   let marks = [];
   let recentNative = [];
   let observerHandles = [];
@@ -100,6 +116,9 @@ export function createHitchCapture(options = {}) {
   let captureEnd = null;
   let preparationSince = null;
   let preparationWindows = [];
+  let cacheSyncOverflowCount = 0;
+
+  capabilities.cache_sync.enabled = enabled && capabilities.cache_sync.requested;
 
   const mark = (eventId, timestamp) => {
     if (!enabled || !useUserTiming || !perf?.mark || events.length + observers.length >= cap) return null;
@@ -109,6 +128,27 @@ export function createHitchCapture(options = {}) {
       // browser callback timestamps.  Browsers that reject it still get a
       // useful mark at the observation point.
       perf.mark(name, {startTime: finite(timestamp) ?? now()});
+      marks.push(name);
+      capabilities.user_timing.observed = true;
+      return {name, clock: 'performance.now', start_time: finite(timestamp) ?? null};
+    } catch {
+      try {
+        perf.mark(name);
+        marks.push(name);
+        capabilities.user_timing.observed = true;
+        return {name, clock: 'performance.now', start_time: null, requested_start_time: finite(timestamp) ?? null};
+      } catch {
+        return null;
+      }
+    }
+  };
+
+  const markCacheSync = (eventId, phase, timestamp) => {
+    if (!enabled || !useUserTiming || !perf?.mark) return null;
+    const name = `melee-cache-sync-${eventId}-${phase}`;
+    const at = finite(timestamp) ?? now();
+    try {
+      perf.mark(name, {startTime: at});
       marks.push(name);
       capabilities.user_timing.observed = true;
       return {name, clock: 'performance.now', start_time: finite(timestamp) ?? null};
@@ -217,6 +257,84 @@ export function createHitchCapture(options = {}) {
     event.user_timing = mark(id, currentStarted ?? observedAt);
     const recorded = append(events, event);
     return {recorded, overflowed, invalid, active_ms: active, id: recorded ? id : null};
+  }
+
+  function noteCacheSyncLoss(count = 1) {
+    if (!Number.isInteger(count) || count <= 0) return;
+    overflowed = invalid = true;
+    overflowCount += count;
+    cacheSyncOverflowCount += count;
+  }
+
+  function observeCacheSync({
+    id,
+    phase = 'start',
+    status = null,
+    source = 'unknown',
+    operation = 'unknown',
+    started,
+    ended,
+    duration_ms: durationMs,
+    error = null,
+    clock = 'performance.now',
+    native_context: nativeContext = 'unknown',
+    stack = null,
+  } = {}) {
+    if (!enabled || stopped || !capabilities.cache_sync.requested) {
+      return {recorded: false, overflowed, invalid};
+    }
+    capabilities.cache_sync.enabled = capabilities.cache_sync.requested;
+    capabilities.cache_sync.observed = true;
+    const normalizedPhase = phase === 'completion' || phase === 'complete' || phase === 'end'
+      ? 'completion' : 'start';
+    const key = id === undefined || id === null ? `cache-sync-${nextId++}` : String(id);
+    if (normalizedPhase === 'start') {
+      if (cacheSyncById.has(key)) {
+        noteCacheSyncLoss();
+        return {recorded: false, overflowed, invalid, id: key, ignored: 'duplicate_start'};
+      }
+      if (cacheSyncs.length >= cacheSyncCap) {
+        failOverflow();
+        ++cacheSyncOverflowCount;
+        return {recorded: false, overflowed, invalid, id: null};
+      }
+      const item = {
+        id: key,
+        phase: 'lifecycle',
+        status: 'pending',
+        source: source === 'explicit' ? 'explicit' : 'unknown',
+        operation: operation === 'populate' || operation === 'clear' || operation === 'save'
+          ? operation : 'unknown',
+        started: finite(started),
+        ended: null,
+        duration_ms: null,
+        error: null,
+        clock: clock || 'performance.now',
+        native_context: nativeContext || 'unknown',
+        stack: stack ? String(stack).slice(0, 4096) : null,
+        user_timing: {start: markCacheSync(key, 'start', started), end: null},
+      };
+      cacheSyncs.push(item);
+      cacheSyncById.set(key, item);
+      capabilities.cache_sync.calls++;
+      capabilities.cache_sync.pending++;
+      return {recorded: true, overflowed, invalid, id: key, status: item.status};
+    }
+
+    const item = cacheSyncById.get(key);
+    if (!item) return {recorded: false, overflowed, invalid, id: key, ignored: 'missing_start'};
+    if (item.status !== 'pending') return {recorded: false, overflowed, invalid, id: key, ignored: 'already_completed'};
+    const finalEnded = finite(ended);
+    item.ended = finalEnded;
+    item.duration_ms = finite(durationMs) ?? (item.started !== null && finalEnded !== null
+      ? Math.max(0, finalEnded - item.started) : null);
+    item.status = status === 'error' || error ? 'error' : 'completed';
+    item.error = error === null || error === undefined ? null : immutable(error);
+    item.native_context = nativeContext || item.native_context || 'unknown';
+    item.user_timing.end = markCacheSync(key, 'end', finalEnded);
+    capabilities.cache_sync.pending = Math.max(0, capabilities.cache_sync.pending - 1);
+    if (item.status === 'error') capabilities.cache_sync.errors++;
+    return {recorded: true, overflowed, invalid, id: key, status: item.status};
   }
 
   function observeBrowserGap({
@@ -364,17 +482,25 @@ export function createHitchCapture(options = {}) {
     clearMarks();
     events = [];
     observers = [];
+    cacheSyncs = [];
+    cacheSyncById = new Map();
     recentNative = [];
     invalid = false;
     overflowed = false;
     overflowCount = 0;
     nextId = 1;
+    cacheSyncOverflowCount = 0;
     stopped = false;
     captureStart = enabled ? now() : null;
     captureEnd = null;
     preparationSince = null;
     preparationWindows = [];
     if (enabled) installObservers();
+    capabilities.cache_sync.observed = false;
+    capabilities.cache_sync.calls = 0;
+    capabilities.cache_sync.pending = 0;
+    capabilities.cache_sync.errors = 0;
+    capabilities.cache_sync.enabled = enabled && capabilities.cache_sync.requested;
   }
 
   function setEnabled(value) {
@@ -382,6 +508,7 @@ export function createHitchCapture(options = {}) {
     stopped = false;
     captureStart = enabled ? now() : null;
     captureEnd = null;
+    capabilities.cache_sync.enabled = enabled && capabilities.cache_sync.requested;
     if (enabled) installObservers();
     else {
       for (const observer of observerHandles.splice(0)) {
@@ -415,6 +542,21 @@ export function createHitchCapture(options = {}) {
     }
   }
 
+  function setCacheSyncCapability(value = {}) {
+    if (!value || typeof value !== 'object') return capabilities.cache_sync;
+    const installed = value.installed === undefined
+      ? capabilities.cache_sync.installed : value.installed === true;
+    const reason = value.reason === undefined ? capabilities.cache_sync.reason : value.reason;
+    capabilities.cache_sync = {
+      ...capabilities.cache_sync,
+      installed,
+      reason,
+      requested: capabilities.cache_sync.requested,
+      enabled: enabled && capabilities.cache_sync.requested,
+    };
+    return capabilities.cache_sync;
+  }
+
   function report() {
     flushObservers();
     return immutable({
@@ -428,6 +570,10 @@ export function createHitchCapture(options = {}) {
       overflow_count: overflowCount,
       cap,
       context_cap: contextCap,
+      cache_sync_cap: cacheSyncCap,
+      cache_sync_count: cacheSyncs.length,
+      cache_sync_overflow_count: cacheSyncOverflowCount,
+      cache_syncs: cacheSyncs,
       event_count: events.length,
       observer_count: observers.length,
       events,
@@ -444,12 +590,15 @@ export function createHitchCapture(options = {}) {
     setEnabled,
     isEnabled: () => enabled && !stopped,
     setPreparation,
+    setCacheSyncCapability,
     reset,
     stop,
     report,
     isInvalid: () => invalid,
     isOverflowed: () => overflowed,
     observeNativeTiming,
+    observeCacheSync,
+    noteCacheSyncLoss,
     observeBrowserGap,
     captureObserverEntry,
     constants: Object.freeze({native_deadline_ms: NATIVE_DEADLINE_MS, browser_hard_gap_ms: BROWSER_HARD_GAP_MS}),

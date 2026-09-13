@@ -2,11 +2,56 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-const page=fs.readFileSync(new URL('../web/runtime.html',import.meta.url),'utf8');
-const start=page.slice(page.indexOf("$('retail-replay-start').onclick="),page.indexOf('\nvar Module='));
-const pause=page.split('\n').find(line=>line.startsWith("$('pause').onclick="));
+const page=fs.readFileSync(new URL('../web/runtime-development.mjs',import.meta.url),'utf8');
+const start=page.slice(page.indexOf("$('retail-replay-start').onclick="),page.indexOf("\n$('disc').onchange="));
+const pause=page.slice(page.indexOf("$('pause').onclick="),page.indexOf("\n$('unload').onclick="));
 const completion=page.slice(page.indexOf('window.menuReplayCompleted='),page.indexOf('\nwindow.menuReplayPoll='));
 assert(start&&pause&&completion);
+{
+ const shared=fs.readFileSync(new URL('../web/melee-runtime.mjs',import.meta.url),'utf8');
+ const unload=shared.slice(shared.indexOf('  async function unloadAndSave() {'),shared.indexOf('  async function put('));
+ assert(unload.includes('Module._melee_web_native_menu_cache_idle()'));
+ const flush=page.slice(page.indexOf('window.menuCacheWritesFlushed='),page.indexOf('\n};',page.indexOf('window.menuCacheWritesFlushed='))+3);
+ for(const finalState of [1,-1]){
+  const events=[],display={};let idleCalls=0;
+  const scope={window:{},prepared:true,callbacks:{menuPreparationCanceled:()=>events.push('cancel')},performance,
+   emit:(name,message)=>{assert.equal(name,'cacheWriteFailed');display.textContent=message;},
+   $:()=>display,log:text=>events.push(text),syncAudio:()=>events.push('sync-audio'),
+   pauseAudioForPreparation:async()=>events.push('audio-stopped'),boundary:async run=>run(),
+   Module:{runtimeCacheState:{dirty:false},
+    _melee_web_native_menu_unload:()=>{events.push('unload');return 1;},
+    _melee_web_native_menu_cache_idle:()=>{events.push('idle-check');return idleCalls++?finalState:0;},
+    markRuntimeCacheDirty(){this.runtimeCacheState.dirty=true;events.push('dirty');},
+    saveRuntimeCache:async()=>{events.push('save');return true;}}};
+  vm.createContext(scope);vm.runInContext(unload+'\n'+flush,scope);
+  scope.window.menuCacheWritesFlushed({ok:finalState===1,flushed:true});
+  assert.equal(await scope.unloadAndSave(),true,'Optional cache failure cannot undo successful source teardown');
+  assert.deepEqual(events.filter(x=>['unload','audio-stopped','idle-check','save'].includes(x)),
+   finalState===1?['unload','audio-stopped','idle-check','idle-check','save']:['unload','audio-stopped','idle-check','idle-check']);
+  if(finalState===-1){assert.equal(scope.Module.runtimeCacheState.dirty,false);assert.match(display.textContent,/native cache writes failed/);}
+ }
+ const exportHandler=page.split('\n').find(line=>line.startsWith("$('export-render-cache').onclick="));
+ for(const cacheState of [0,-1,1]){
+  const button={},errors=[];let reads=0,saves=0;
+  const scope={$:()=>button,log:text=>errors.push(text),boundary:async run=>run(),Module:{
+   _melee_web_native_menu_cache_idle:()=>cacheState,
+   saveRuntimeCache:async()=>{saves++;return false;},
+   FS:{readdir:()=>{reads++;return [];}}}};
+  vm.createContext(scope);vm.runInContext(exportHandler,scope);await button.onclick();
+  assert.equal(reads,0,'Export must not publish stale files before native flush and persistence both succeed');
+  assert.equal(saves,cacheState===1?1:0);assert.equal(errors.length,1);
+ }
+}
+{
+ const handler=page.split('\n').find(line=>line.startsWith('window.menuRuntimeTimingError='));
+ const failed=[];
+ const scope={window:{},diagnosticCaptureInvalid:false,stop:error=>failed.push(error)};
+ vm.createContext(scope);vm.runInContext(handler,scope);
+ scope.window.menuRuntimeTimingError('Native menu timing JSON exceeded 4096 bytes');
+ assert.equal(scope.diagnosticCaptureInvalid,true);
+ assert.deepEqual(failed,['Native menu timing JSON exceeded 4096 bytes'],
+  'Missing native timing must stop the replay instead of being ignored as an inactive callback');
+}
 {
  const save=page.split('\n').find(line=>line.startsWith('async function saveEvidence('));
  let nativeCalls=0;const posted=[];const display={};
@@ -65,7 +110,8 @@ assert(start&&pause&&completion);
  assert.equal(report.nativeCallbacksOverBudget,0,'A new replay starts its own bounded timing record');
 }
 {
- const moduleLine=page.slice(page.indexOf('var Module='),page.indexOf('\ninstallRuntimeCache'));
+ const logHook=page.slice(page.indexOf('    onLog(text,isError){'),page.indexOf('    onEvent(name,data){'));
+ const moduleLine='const hooks={'+logHook+'}; var Module={print:text=>hooks.onLog(text,false),printErr:text=>hooks.onLog(text,true)};';
  const logged=[];
  const scope={$:()=>({}),retailRun:{observe:true,rows:[],timerRows:[]},
   log:text=>logged.push(text),stop(){}};
@@ -111,6 +157,7 @@ function harness(unload=true){
   replayMemorySnapshot:()=>({wasm_heap_bytes:2048}),
   status:()=> 'teardown failed',unloadAndSave:async()=>{calls.unload++;return unload;},
   resetTiming:()=>{calls.timingResets++;},prepareAudio:async()=>{calls.audio++;},pauseAudioForPreparation:async()=>{},
+  beginReplayPaintControl:()=>({evidence:{mode:'normal'},restore(){}}),
   boundary:async fn=>fn(),check:value=>assert.equal(value,1),syncAudio(){},
   finishRetailReplay:async reason=>{calls.failed.push(reason);calls.completedRun=scope.retailRun;scope.retailRun=null;},
   Module:{HEAPU8:new Uint8Array(2048),_malloc:()=>1,_free(){},
@@ -165,7 +212,7 @@ function harness(unload=true){
 }
 {
  const reset=page.split('\n').find(line=>line.startsWith('function resetTiming('));
- const frame=page.slice(page.indexOf('window.menuFrame='),page.indexOf('\nfunction stop('));
+ const frame=page.slice(page.indexOf('developmentHooks.frame='),page.indexOf("\nfor(const type of ['focus'")).replace('developmentHooks.frame=', 'window.menuFrame=');
  const metrics=page.split('\n').find(line=>line.startsWith('function replayMetrics('));
  let clock=1000,polls=0;
  const elements=new Map();
@@ -193,7 +240,7 @@ function harness(unload=true){
 }
 {
  const reset=page.split('\n').find(line=>line.startsWith('function resetTiming('));
- const frame=page.slice(page.indexOf('window.menuFrame='),page.indexOf('\nfunction stop('));
+ const frame=page.slice(page.indexOf('developmentHooks.frame='),page.indexOf("\nfor(const type of ['focus'")).replace('developmentHooks.frame=', 'window.menuFrame=');
  let clock=1016,polls=0,sceneReads=0,inputReads=0;
  const elements=new Map();
  const $=id=>{if(!elements.has(id))elements.set(id,{disabled:false,textContent:'',dataset:{},closest:()=>({open:false})});return elements.get(id);};
@@ -204,7 +251,7 @@ function harness(unload=true){
   Module:{HEAPU8:new Uint8Array(2048),_melee_web_native_menu_phase:()=>7,_melee_web_native_menu_stock_check_ready:()=>1,
    _melee_web_native_menu_running:()=>1,_melee_web_native_menu_message:()=>0,_melee_web_native_menu_diagnostics:()=>0,
    _melee_web_input_message:()=>0,UTF8ToString:value=>value}};
- vm.createContext(scope);vm.runInContext(reset+'\n'+frame,scope);scope.resetTiming();scope.frameLast=1000;scope.perfLastReport=1000;
+ vm.createContext(scope);vm.runInContext(reset+'\n'+frame.replace('developmentHooks.frame=', 'window.menuFrame='),scope);scope.resetTiming();scope.frameLast=1000;scope.perfLastReport=1000;
  scope.window.menuFrame(true);assert.equal(sceneReads,0);assert.equal(inputReads,0);assert.equal(polls,1);
  clock=1260;scope.window.menuFrame(true);assert.equal(sceneReads,1);assert.equal(inputReads,1);
  assert.equal(polls,2,'Replay polling remains per callback while diagnostics refresh is throttled');assert.equal(scope.activeFrames,2);

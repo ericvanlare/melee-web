@@ -28,6 +28,34 @@ def report():
 
 
 class BrowserReplayValidationTests(unittest.TestCase):
+    def test_hidden_diagnostic_paint_cannot_be_accepted_as_normal_page_performance(self):
+        value = report()
+        geometry = dict(x=62, y=-563.5, width=900, height=675,
+                        buffer_width=1280, buffer_height=960, dpr=2)
+        value['diagnostic_page_paint'] = dict(mode='normal', diagnostic_only=False, restored=True,
+                                            started_ms=100, ended_ms=200,
+                                            geometry_before=geometry, geometry_after=dict(geometry))
+        self.assertIs(self.check(value), value)
+        for mode in ('hidden', 'unknown'):
+            value['diagnostic_page_paint']['mode'] = mode
+            with self.assertRaisesRegex(ValueError, 'not normal-page acceptance'):
+                self.check(value)
+
+    def test_manual_normal_paint_report_requires_complete_geometry_and_interval(self):
+        value = report()
+        geometry = dict(x=62, y=-563.5, width=900, height=675,
+                        buffer_width=1280, buffer_height=960, dpr=2)
+        paint = dict(mode='normal', diagnostic_only=False, restored=True,
+                     started_ms=100, ended_ms=200,
+                     geometry_before=geometry, geometry_after=dict(geometry))
+        for patch in ({'ended_ms': None}, {'ended_ms': 99}, {'geometry_before': {}},
+                      {'geometry_before': {'dpr': 2}, 'geometry_after': {'dpr': 2}},
+                      {'geometry_before': {**geometry, 'buffer_width': 640},
+                       'geometry_after': {**geometry, 'buffer_width': 640}}):
+            value['diagnostic_page_paint'] = {**paint, **patch}
+            with self.assertRaisesRegex(ValueError, 'page-paint|Page-paint'):
+                self.check(value)
+
     def test_imported_runtime_and_audio_modules_are_bound_to_the_frozen_build(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -80,6 +108,48 @@ class BrowserReplayValidationTests(unittest.TestCase):
         value['metrics']['wasmHeapGrowthBytes'] = 86441984
         self.assertIs(self.check(value), value)
         self.assertFalse(value['gold_admitted'])
+
+    def test_cache_sync_auxiliary_evidence_requires_complete_installed_probe(self):
+        value = report()
+        value['metrics']['nativeCallbacksOverBudget'] = 0
+        value['diagnostic_capture'] = {
+            'schema': 'melee-web-diagnostic-hitch-capture', 'version': 1,
+            'enabled': True, 'valid': True, 'invalid': False, 'overflowed': False,
+            'overflow_count': 0, 'cap': 128, 'event_count': 0, 'observer_count': 0,
+            'events': [], 'observers': [], 'cache_sync_cap': 128, 'cache_sync_count': 1,
+            'cache_sync_overflow_count': 0,
+            'capabilities': {'cache_sync': {'requested': True, 'installed': True,
+                                           'enabled': True, 'calls': 1, 'pending': 0, 'errors': 0}},
+            'cache_syncs': [{'id': 'cache-1', 'clock': 'performance.now', 'started': 100,
+                            'ended': 120, 'duration_ms': 20, 'status': 'completed'}],
+        }
+        # A 20ms sync is auxiliary wall time, never an invented native miss.
+        self.assertIs(self.check(value), value)
+        for key, replacement in [('installed', False), ('calls', 0), ('pending', 1),
+                                 ('requested', False), ('enabled', False)]:
+            candidate = copy.deepcopy(value)
+            candidate['diagnostic_capture']['capabilities']['cache_sync'][key] = replacement
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                self.check(candidate)
+        for key, replacement in [('cache_sync_count', 0), ('cache_sync_overflow_count', 1),
+                                 ('cache_sync_cap', 0), ('cache_sync_count', True)]:
+            candidate = copy.deepcopy(value)
+            candidate['diagnostic_capture'][key] = replacement
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                self.check(candidate)
+        for status in ('pending', 'error'):
+            candidate = copy.deepcopy(value)
+            cap = candidate['diagnostic_capture']
+            cap['cache_syncs'][0]['status'] = status
+            cap['capabilities']['cache_sync']['pending' if status == 'pending' else 'errors'] = 1
+            if status == 'pending':
+                cap['cache_syncs'][0].update(ended=None, duration_ms=None)
+            with self.subTest(status=status), self.assertRaisesRegex(ValueError, 'Incomplete'):
+                self.check(candidate)
+        candidate = copy.deepcopy(value)
+        candidate['diagnostic_capture']['cache_syncs'][0]['duration_ms'] = 0
+        with self.assertRaisesRegex(ValueError, 'interval'):
+            self.check(candidate)
 
     def test_source_tick_draw_counts_must_agree_when_reported(self):
         value = report()

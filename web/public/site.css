@@ -1,0 +1,118 @@
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+.game-page {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  background: #000;
+  color: #aaa;
+  font: 13px system-ui, sans-serif;
+}
+
+#player {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100dvh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right)
+    env(safe-area-inset-bottom) env(safe-area-inset-left);
+  background: #000;
+}
+
+#runtime-host {
+  flex: 1;
+  min-height: 0;
+}
+
+#toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+}
+
+button {
+  font: inherit;
+  padding: 4px 10px;
+  cursor: pointer;
+  color: #000;
+  background: #eee;
+  border: 1px solid #aaa;
+  border-radius: 2px;
+  touch-action: manipulation;
+}
+
+button:disabled {
+  color: #888;
+  background: #ddd;
+  cursor: default;
+}
+
+button:focus-visible, a:focus-visible {
+  outline: 2px solid #888;
+  outline-offset: 3px;
+}
+
+#toolbar a {
+  color: #aaa;
+  margin-left: 6px;
+}
+
+#status {
+  margin-left: 6px;
+}
+
+#fullscreen-status {
+  text-align: center;
+  margin: 0 8px 8px;
+}
+
+#fullscreen-status:empty {
+  display: none;
+}
+
+.document-page {
+  margin: 24px auto;
+  max-width: 760px;
+  padding: 0 16px;
+  color: #000;
+  background: #fff;
+  font: 16px/1.5 Georgia, "Times New Roman", serif;
+  overflow-wrap: anywhere;
+}
+
+.document-page nav a {
+  margin-right: 12px;
+}
+
+.document-page a {
+  color: #00e;
+  overflow-wrap: anywhere;
+}
+
+.document-page h1 {
+  font-size: 28px;
+}
+
+.document-page h2 {
+  font-size: 20px;
+  margin-top: 24px;
+}
+
+.document-page .updated {
+  font-size: 14px;
+}
+
+.document-page footer {
+  border-top: 1px solid #aaa;
+  margin-top: 32px;
+  padding-top: 12px;
+}
