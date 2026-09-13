@@ -86,6 +86,7 @@ button:focus-visible, a:focus-visible {
   color: #000;
   background: #fff;
   font: 16px/1.5 Georgia, "Times New Roman", serif;
+  overflow-wrap: anywhere;
 }
 
 .document-page nav a {

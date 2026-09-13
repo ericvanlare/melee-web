@@ -18,9 +18,25 @@ from build_public import (  # noqa: E402
     BuildError,
     DEFAULT_SOURCE,
     MAX_FILE_BYTES,
+    PLAYER_RUNTIME_FILES,
+    RUNTIME_REQUIRED_EXPORTS,
+    RUNTIME_FORBIDDEN_EXPORTS,
+    PLAYER_SOURCE,
+    _tree_hash,
+    RUNTIME_SOURCE_FILES,
     SOURCE_ALLOWLIST,
     build,
 )
+
+
+def _uleb(value: int) -> bytes:
+    result = bytearray()
+    while True:
+        byte = value & 0x7f
+        value >>= 7
+        result.append(byte | (0x80 if value else 0))
+        if not value:
+            return bytes(result)
 
 
 class PublicReleaseTests(unittest.TestCase):
@@ -40,6 +56,82 @@ class PublicReleaseTests(unittest.TestCase):
               "rights@example.test" if mode == "production" else None, manifest)
         return output, manifest
 
+    def runtime_fixture(self) -> Path:
+        container = self.root / f"runtime-input-{len(tuple(self.root.glob('runtime-input-*')))}"
+        runtime = container / "artifacts"
+        runtime.mkdir(parents=True)
+        source_map = {
+            "melee-runtime.mjs": ROOT / "web" / "melee-runtime.mjs",
+            "runtime-assets.mjs": ROOT / "web" / "runtime-assets.mjs",
+            "disc-image.mjs": ROOT / "web" / "disc-image.mjs",
+            "dsp-coefficients.mjs": ROOT / "web" / "dsp-coefficients.mjs",
+            "prototype-keyboard-layouts.mjs": ROOT / "web" / "prototype-keyboard-layouts.mjs",
+            "audio-worklet.js": ROOT / "web" / "audio-worklet.js",
+            "audio-ring.mjs": ROOT / "web" / "audio-ring.mjs",
+        }
+        for name, path in source_map.items():
+            shutil.copyfile(path, runtime / name)
+        (runtime / "gameplay_public.js").write_text(
+            'FS.mkdir("/home/web_user"); ENV["HOME"] = "/home/web_user"; // gameplay_public.wasm\n'
+        )
+        (runtime / "gameplay_public.data").write_bytes((ROOT / "build/browser-release/initial_pipeline_cache.db").read_bytes())
+        # Minimal version-1 Wasm module with one function export; the audit
+        # parses the export section rather than trusting the sidecar list.
+        export_names = tuple(RUNTIME_REQUIRED_EXPORTS)
+        exports = bytearray(_uleb(len(export_names)))
+        for index, export_name in enumerate(export_names):
+            encoded_name = export_name.encode("utf-8")
+            exports.extend(_uleb(len(encoded_name)) + encoded_name + b"\x00" + _uleb(index))
+        payload = bytes(exports)
+        (runtime / "gameplay_public.wasm").write_bytes(b"\x00asm\x01\x00\x00\x00\x07" + _uleb(len(payload)) + payload)
+        artifacts = []
+        for name in ("gameplay_public.js", "gameplay_public.wasm", "gameplay_public.data"):
+            data = (runtime / name).read_bytes()
+            artifacts.append({"path": name, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()})
+        source_hashes = {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in RUNTIME_SOURCE_FILES}
+        tool_paths = (".deps/emsdk/.emscripten", ".deps/emsdk/upstream/emscripten/emcc",
+                      ".deps/emsdk/upstream/emscripten/emscripten-version.txt", ".venv/bin/cmake", ".venv/bin/ninja")
+        tool_hashes = {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in tool_paths}
+        seed_source = ROOT / "web/initial_pipeline_cache.db.gz.b64"
+        seed_materialized = ROOT / "build/browser-release/initial_pipeline_cache.db"
+        all_exports = [{"name": name, "kind": 0, "index": index} for index, name in enumerate(export_names)]
+        identity = {
+            "schema": "melee-web-runtime-public-build-v1",
+            "target": "runtime-public",
+            "configuration": "Release",
+            "artifact_root": ".",
+            "pipeline_seed": {
+                "source": {"path": "web/initial_pipeline_cache.db.gz.b64", "bytes": seed_source.stat().st_size,
+                            "sha256": hashlib.sha256(seed_source.read_bytes()).hexdigest()},
+                "materialized": {"path": "build/browser-release/initial_pipeline_cache.db", "bytes": seed_materialized.stat().st_size,
+                                 "sha256": hashlib.sha256(seed_materialized.read_bytes()).hexdigest()},
+                "expected_sha256": hashlib.sha256(seed_materialized.read_bytes()).hexdigest(),
+                "sqlite_tables": [],
+            },
+            "source_inputs": {
+                "files_sha256": source_hashes,
+                "trees": {name: {"path": name, "files": _tree_hash(ROOT / name)[0], "sha256": _tree_hash(ROOT / name)[1]} for name in ("src", "cmake")},
+                "prepared_gameplay": {
+                    "path": "build/gameplay-source",
+                    "pinned_commit": __import__('subprocess').check_output(["git", "rev-parse", "HEAD"], cwd=ROOT / "build/gameplay-source", text=True).strip(),
+                    "composed_patch": {"path": "build/gameplay-source/.git/melee-web-composed.patch", "sha256": hashlib.sha256((ROOT / "build/gameplay-source/.git/melee-web-composed.patch").read_bytes()).hexdigest()},
+                    "reviewed_patch": {"path": "build/gameplay-source/.git/melee-web-gameplay.patch", "sha256": hashlib.sha256((ROOT / "build/gameplay-source/.git/melee-web-gameplay.patch").read_bytes()).hexdigest()},
+                    "working_tree_diff_sha256": hashlib.sha256(__import__('subprocess').check_output(["git", "diff", "--binary", "HEAD"], cwd=ROOT / "build/gameplay-source")).hexdigest(),
+                    "tree": {"path": "build/gameplay-source", "files": _tree_hash(ROOT / "build/gameplay-source")[0], "sha256": _tree_hash(ROOT / "build/gameplay-source")[1]},
+                },
+            },
+            "toolchain": {"emscripten": "fixture", "cmake": "fixture", "ninja": "fixture", "sha256": tool_hashes},
+            "upload_convention": {"group": "artifacts plus the reviewed public-shell files",
+                                   "identity_path": "build/runtime-public-identity.json",
+                                   "identity_is_outside_artifact_root": True},
+            "artifacts": artifacts,
+            "wasm_exports": {"required": list(RUNTIME_REQUIRED_EXPORTS), "functions": list(RUNTIME_REQUIRED_EXPORTS),
+                             "all": all_exports, "javascript_bindings": {name: name for name in RUNTIME_REQUIRED_EXPORTS},
+                             "forbidden_absent": sorted(RUNTIME_FORBIDDEN_EXPORTS)},
+        }
+        (container / "runtime-public-identity.json").write_text(json.dumps(identity, sort_keys=True) + "\n")
+        return runtime
+
     def test_preview_build_is_auditable_and_uses_hashed_assets(self):
         output, manifest = self.paths()
         result = audit(output, manifest)
@@ -48,6 +140,90 @@ class PublicReleaseTests(unittest.TestCase):
         self.assertIn('<title>[staging] WebMelee (WIP)</title>', (output / "index.html").read_text())
         self.assertEqual(len(list((output / "assets").iterdir())), 2)
         self.assertFalse((output / "_redirects").exists())
+
+    def test_player_requires_runtime_and_preserves_immutable_loader_graph(self):
+        with self.assertRaisesRegex(BuildError, "runtime-dir"):
+            build(output=self.root / "missing-player", profile="player")
+        runtime = self.runtime_fixture()
+        output = self.root / "player"
+        manifest = self.root / "player.manifest.json"
+        build(output=output, manifest=manifest, profile="player", runtime_dir=runtime)
+        result = audit(output, manifest)
+        self.assertEqual(result["profile"], "player")
+        runtime_hash = json.loads(manifest.read_text())["runtime"]["hash"]
+        self.assertTrue((output / "runtime" / runtime_hash / "player" / "player-shell.mjs").is_file())
+        self.assertEqual((output / "runtime" / runtime_hash / "melee-runtime.mjs").read_bytes(),
+                         (ROOT / "web" / "melee-runtime.mjs").read_bytes())
+        self.assertNotIn("gameplay_public.wasm", (output / "index.html").read_text())
+        player_css = f"/runtime/{runtime_hash}/player/player.css"
+        legal_css = f"/assets/site.{hashlib.sha256((DEFAULT_SOURCE / 'site.css').read_bytes()).hexdigest()[:16]}.css"
+        self.assertIn(player_css, (output / "index.html").read_text())
+        self.assertTrue((output / legal_css.lstrip("/")).is_file())
+        for name in ("terms.html", "privacy.html", "copyright.html", "notices.html", "404.html"):
+            page = (output / name).read_text()
+            self.assertIn(legal_css, page)
+            self.assertNotIn(player_css, page)
+
+    def test_player_runtime_hash_changes_when_entry_shell_changes(self):
+        runtime = self.runtime_fixture()
+        player_source = self.root / "player-source"
+        shutil.copytree(PLAYER_SOURCE, player_source)
+        first_manifest = self.root / "first-player.manifest.json"
+        build(source=player_source, output=self.root / "first-player", manifest=first_manifest,
+              profile="player", runtime_dir=runtime)
+        first_hash = json.loads(first_manifest.read_text())["runtime"]["hash"]
+        (player_source / "player-shell.mjs").write_text(
+            (player_source / "player-shell.mjs").read_text() + "\n// reviewed entry change\n"
+        )
+        second_manifest = self.root / "second-player.manifest.json"
+        build(source=player_source, output=self.root / "second-player", manifest=second_manifest,
+              profile="player", runtime_dir=runtime)
+        second_hash = json.loads(second_manifest.read_text())["runtime"]["hash"]
+        self.assertNotEqual(first_hash, second_hash)
+
+    def test_player_rejects_runtime_identity_drift_and_undeclared_files(self):
+        runtime = self.runtime_fixture()
+        identity_path = runtime.parent / "runtime-public-identity.json"
+        identity = json.loads(identity_path.read_text())
+        identity["artifacts"].append({"path": "evil.js", "bytes": 5, "sha256": "0" * 64})
+        identity_path.write_text(json.dumps(identity))
+        with self.assertRaisesRegex(BuildError, "unauthorized artifact"):
+            build(output=self.root / "extra-runtime", profile="player", runtime_dir=runtime)
+        runtime = self.runtime_fixture()
+        identity_path = runtime.parent / "runtime-public-identity.json"
+        identity = json.loads(identity_path.read_text())
+        next(item for item in identity["artifacts"] if item["path"] == "gameplay_public.wasm")["sha256"] = "0" * 64
+        identity_path.write_text(json.dumps(identity))
+        with self.assertRaisesRegex(BuildError, "identity mismatch"):
+            build(output=self.root / "drift-runtime", profile="player", runtime_dir=runtime)
+
+    def test_player_rejects_nonstandard_generated_private_home_path(self):
+        runtime = self.runtime_fixture()
+        gameplay = runtime / "gameplay_public.js"
+        gameplay.write_text('FS.mkdir("/home/web_user/private"); // gameplay_public.wasm\n')
+        identity_path = runtime.parent / "runtime-public-identity.json"
+        identity = json.loads(identity_path.read_text())
+        record = next(item for item in identity["artifacts"] if item["path"] == "gameplay_public.js")
+        data = gameplay.read_bytes()
+        record["bytes"] = len(data)
+        record["sha256"] = hashlib.sha256(data).hexdigest()
+        identity_path.write_text(json.dumps(identity))
+        with self.assertRaisesRegex(BuildError, "private path"):
+            build(output=self.root / "private-home-runtime", profile="player", runtime_dir=runtime)
+
+    def test_player_rejects_runtime_file_over_pages_per_file_limit(self):
+        runtime = self.runtime_fixture()
+        gameplay = runtime / "gameplay_public.js"
+        data = b"a" * (25 * 1024 * 1024 + 1) + b"\n// gameplay_public.wasm\n"
+        gameplay.write_bytes(data)
+        identity_path = runtime.parent / "runtime-public-identity.json"
+        identity = json.loads(identity_path.read_text())
+        record = next(item for item in identity["artifacts"] if item["path"] == "gameplay_public.js")
+        record["bytes"] = len(data)
+        record["sha256"] = hashlib.sha256(data).hexdigest()
+        identity_path.write_text(json.dumps(identity))
+        with self.assertRaisesRegex(BuildError, "25 MiB"):
+            build(output=self.root / "oversize-runtime", profile="player", runtime_dir=runtime)
 
     def test_production_requires_explicit_operator_and_contact(self):
         with self.assertRaisesRegex(BuildError, "requires explicit"):

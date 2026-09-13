@@ -9,24 +9,25 @@ ROOT = Path(__file__).resolve().parents[1]
 class WebLaunchTests(unittest.TestCase):
     def test_runtime_is_native_menu_player(self):
         runtime = (ROOT / "web" / "runtime.html").read_text(encoding="utf-8")
-        self.assertIn("gameplay_menu_browser.js", runtime)
-        self.assertIn("loadNativeGameDisc", runtime)
-        self.assertIn("_melee_web_native_menu_launch", runtime)
-        self.assertIn("perf-metrics", runtime)
-        self.assertIn("audio-metrics", runtime)
-        self.assertIn("runtime-cache.js", runtime)
-        self.assertIn("Scene entry profile", runtime)
-        self.assertIn("Clear render cache + reload", runtime)
-        self.assertIn("clearOnLoad:clearRenderCacheOnLoad", runtime)
-        self.assertIn("markRuntimeCacheDirty", runtime)
-        self.assertIn("Browser long task", runtime)
-        self.assertIn("Render cache save", runtime)
-        self.assertIn("Run visible action/performance sweep", runtime)
-        self.assertIn("_melee_web_native_menu_pad_sample_full", runtime)
-        self.assertIn("_melee_web_native_menu_player_state", runtime)
-        self.assertIn("Action performance report", runtime)
-        self.assertNotIn("match-menu", runtime)
-        self.assertNotIn("gameplay_browser.js", runtime)
+        development = (ROOT / "web" / "runtime-development.mjs").read_text(encoding="utf-8")
+        owner = (ROOT / "web" / "melee-runtime.mjs").read_text(encoding="utf-8")
+        self.assertIn('type="module" src="runtime-development.mjs"', runtime)
+        self.assertIn("mountMeleeRuntime", development)
+        self.assertIn("gameplay_menu_browser.js", development)
+        self.assertIn("loadNativeGameDisc", owner)
+        self.assertIn("_melee_web_native_menu_launch", owner)
+        for text in ("perf-metrics", "audio-metrics", "runtime-cache.js",
+                     "Clear render cache + reload", "Run visible action/performance sweep"):
+            self.assertIn(text, runtime)
+        for text in ("Scene entry profile", "clearOnLoad:clearRenderCacheOnLoad",
+                     "Browser long task", "Render cache save",
+                     "_melee_web_native_menu_pad_sample_full", "_melee_web_native_menu_player_state",
+                     "Action performance report"):
+            self.assertIn(text, development)
+        self.assertIn("markRuntimeCacheDirty", owner)
+        for source in (runtime, development, owner):
+            self.assertNotIn("match-menu", source)
+            self.assertNotIn("gameplay_browser.js", source)
 
     def test_legacy_native_menu_url_is_an_alias(self):
         alias = (ROOT / "web" / "native-menu.html").read_text(encoding="utf-8")

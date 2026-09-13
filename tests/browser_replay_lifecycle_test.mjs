@@ -2,9 +2,9 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-const page=fs.readFileSync(new URL('../web/runtime.html',import.meta.url),'utf8');
-const start=page.slice(page.indexOf("$('retail-replay-start').onclick="),page.indexOf('\nvar Module='));
-const pause=page.split('\n').find(line=>line.startsWith("$('pause').onclick="));
+const page=fs.readFileSync(new URL('../web/runtime-development.mjs',import.meta.url),'utf8');
+const start=page.slice(page.indexOf("$('retail-replay-start').onclick="),page.indexOf("\n$('disc').onchange="));
+const pause=page.slice(page.indexOf("$('pause').onclick="),page.indexOf("\n$('unload').onclick="));
 const completion=page.slice(page.indexOf('window.menuReplayCompleted='),page.indexOf('\nwindow.menuReplayPoll='));
 assert(start&&pause&&completion);
 {
@@ -65,7 +65,8 @@ assert(start&&pause&&completion);
  assert.equal(report.nativeCallbacksOverBudget,0,'A new replay starts its own bounded timing record');
 }
 {
- const moduleLine=page.slice(page.indexOf('var Module='),page.indexOf('\ninstallRuntimeCache'));
+ const logHook=page.slice(page.indexOf('    onLog(text,isError){'),page.indexOf('    onEvent(name,data){'));
+ const moduleLine='const hooks={'+logHook+'}; var Module={print:text=>hooks.onLog(text,false),printErr:text=>hooks.onLog(text,true)};';
  const logged=[];
  const scope={$:()=>({}),retailRun:{observe:true,rows:[],timerRows:[]},
   log:text=>logged.push(text),stop(){}};
@@ -165,7 +166,7 @@ function harness(unload=true){
 }
 {
  const reset=page.split('\n').find(line=>line.startsWith('function resetTiming('));
- const frame=page.slice(page.indexOf('window.menuFrame='),page.indexOf('\nfunction stop('));
+ const frame=page.slice(page.indexOf('developmentHooks.frame='),page.indexOf("\nfor(const type of ['focus'")).replace('developmentHooks.frame=', 'window.menuFrame=');
  const metrics=page.split('\n').find(line=>line.startsWith('function replayMetrics('));
  let clock=1000,polls=0;
  const elements=new Map();
@@ -193,7 +194,7 @@ function harness(unload=true){
 }
 {
  const reset=page.split('\n').find(line=>line.startsWith('function resetTiming('));
- const frame=page.slice(page.indexOf('window.menuFrame='),page.indexOf('\nfunction stop('));
+ const frame=page.slice(page.indexOf('developmentHooks.frame='),page.indexOf("\nfor(const type of ['focus'")).replace('developmentHooks.frame=', 'window.menuFrame=');
  let clock=1016,polls=0,sceneReads=0,inputReads=0;
  const elements=new Map();
  const $=id=>{if(!elements.has(id))elements.set(id,{disabled:false,textContent:'',dataset:{},closest:()=>({open:false})});return elements.get(id);};
@@ -204,7 +205,7 @@ function harness(unload=true){
   Module:{HEAPU8:new Uint8Array(2048),_melee_web_native_menu_phase:()=>7,_melee_web_native_menu_stock_check_ready:()=>1,
    _melee_web_native_menu_running:()=>1,_melee_web_native_menu_message:()=>0,_melee_web_native_menu_diagnostics:()=>0,
    _melee_web_input_message:()=>0,UTF8ToString:value=>value}};
- vm.createContext(scope);vm.runInContext(reset+'\n'+frame,scope);scope.resetTiming();scope.frameLast=1000;scope.perfLastReport=1000;
+ vm.createContext(scope);vm.runInContext(reset+'\n'+frame.replace('developmentHooks.frame=', 'window.menuFrame='),scope);scope.resetTiming();scope.frameLast=1000;scope.perfLastReport=1000;
  scope.window.menuFrame(true);assert.equal(sceneReads,0);assert.equal(inputReads,0);assert.equal(polls,1);
  clock=1260;scope.window.menuFrame(true);assert.equal(sceneReads,1);assert.equal(inputReads,1);
  assert.equal(polls,2,'Replay polling remains per callback while diagnostics refresh is throttled');assert.equal(scope.activeFrames,2);

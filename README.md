@@ -64,14 +64,22 @@ content admission remain open. The reusable
 implemented. Its pinned Mario/Mario Final Destination replay matches retail at
 all nine lifecycle, audio, match-data and RNG boundaries.
 
-## Public shell packaging
+## Public player packaging
 
-The independent public shell uses `scripts/build_public.py`, with a fixed text-only
-allowlist and a separate manifest audit. It contains no playable runtime, disc
-selector or game data. The local iframe prototype packager is not a public release
-builder. See [release review](docs/PUBLIC_RELEASE_REVIEW.md) and
-[Cloudflare deployment](docs/PUBLIC_DEPLOYMENT.md) for the distribution and
-integration gates. This work does not widen gameplay acceptance.
+The public entry in `web/player/` mounts `web/melee-runtime.mjs` directly and
+keeps the prototype's black canvas and small toolbar. The development entry
+attaches its tools separately to that same owner. `runtime-public` is a
+Release-only native target with an audited lifecycle/input export surface.
+
+Build it with `python3 scripts/build.py --target runtime-public --configuration Release`.
+Then run `scripts/build_public.py --profile player --runtime-dir build/browser-release`
+with an explicit output and environment. The packager checks the native build
+identity and copies a fixed source graph into a content-hashed runtime directory;
+`scripts/audit_public.py` independently regenerates and verifies its manifest.
+The optional `maintenance` profile has no runtime or disc selector.
+See [release review](docs/PUBLIC_RELEASE_REVIEW.md) and
+[Cloudflare deployment](docs/PUBLIC_DEPLOYMENT.md) for complete commands,
+publication requirements and rollback. This work does not widen gameplay acceptance.
 
 ## Play the current match
 

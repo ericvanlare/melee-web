@@ -1,18 +1,362 @@
 #!/usr/bin/env python3
 """Configure and build the browser integration probe using project-local tools."""
 import argparse
+import hashlib
+import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
+import sqlite3
 
 from bootstrap import read_lock, verify_sources
 from gameplay_sources import prepare_sources
 
 ROOT = Path(__file__).resolve().parents[1]
 
+PUBLIC_RUNTIME_TARGET = "runtime-public"
+PUBLIC_RUNTIME_CONFIGURATION = "Release"
+PUBLIC_RUNTIME_EXPORTS = (
+    "_main",
+    "_malloc",
+    "_free",
+    "_melee_web_native_menu_file",
+    "_melee_web_native_menu_prepare",
+    "_melee_web_native_menu_launch",
+    "_melee_web_native_menu_unload",
+    "_melee_web_native_menu_pause",
+    "_melee_web_native_menu_message",
+    "_melee_web_native_menu_running",
+    "_melee_web_native_menu_phase",
+    "_melee_web_native_menu_cache_idle",
+    "_melee_web_input_set_activity",
+    "_melee_web_input_set_keyboard",
+    "_melee_web_input_set_keyboard_port",
+    "_melee_web_input_set_keyboard_layout",
+)
+PUBLIC_RUNTIME_FORBIDDEN_EXPORTS = frozenset(
+    {
+        "_melee_web_native_menu_replay",
+        "_melee_web_native_menu_replay_cursor",
+        "_melee_web_native_menu_confirm_check",
+        "_melee_web_native_menu_pad_sample",
+        "_melee_web_native_menu_pad_sample_full",
+        "_melee_web_native_menu_player_state",
+        "_melee_web_native_menu_drive_fighter",
+        "_melee_web_native_menu_drive_stage",
+        "_melee_web_native_menu_stock_check",
+        "_melee_web_native_menu_stock_check_ready",
+        "_melee_web_native_menu_diagnostics",
+        "_melee_web_native_menu_memory",
+        "_melee_web_css_observe",
+        "_melee_web_sss_observe",
+        "_melee_web_input_message",
+    }
+)
+PUBLIC_RUNTIME_SOURCE_FILES = (
+    "CMakeLists.txt",
+    "cmake/FighterRuntime.cmake",
+    "patches/melee-gameplay.patch",
+    "src/gameplay_menu_browser.cpp",
+    "src/browser_input.cpp",
+    "src/browser_input.h",
+    "scripts/bootstrap.py",
+    "scripts/build.py",
+    "scripts/gameplay_bool.py",
+    "scripts/gameplay_sources.py",
+    "scripts/generate_common_schema.py",
+    "scripts/generate_fighter_registry.py",
+    "scripts/materialize_pipeline_cache.py",
+    "web/initial_pipeline_cache.db.gz.b64",
+    "patches/aurora-browser.patch",
+    "dependencies.lock.json",
+)
+
+
+def _sha256(path):
+    """Hash a regular local file without loading an asset into memory."""
+    if path.is_symlink() or not path.is_file():
+        raise ValueError(f"{path}: expected a regular file")
+    digest = hashlib.sha256()
+    with path.open("rb") as source:
+        for chunk in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _file_record(path, root):
+    return {
+        "path": path.relative_to(root).as_posix(),
+        "bytes": path.stat().st_size,
+        "sha256": _sha256(path),
+    }
+
+
+def _tree_record(path, root):
+    """Hash a deterministic path-and-bytes inventory for a source subtree."""
+    if path.is_symlink() or not path.is_dir():
+        raise ValueError(f"{path}: expected a regular source directory")
+    digest = hashlib.sha256()
+    files = 0
+    for child in sorted(path.rglob("*")):
+        if ".git" in child.relative_to(path).parts:
+            continue
+        if child.is_symlink():
+            raise ValueError(f"{child}: source inventory contains a symlink")
+        if not child.is_file():
+            continue
+        relative = child.relative_to(root).as_posix().encode("utf-8")
+        digest.update(relative)
+        digest.update(b"\0")
+        with child.open("rb") as source:
+            for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                digest.update(chunk)
+        files += 1
+    return {"path": path.relative_to(root).as_posix(), "files": files, "sha256": digest.hexdigest()}
+
+
+def _prepared_source_record(root, generated):
+    """Capture the pinned checkout and its exact reviewed working-tree patch."""
+    if generated.is_symlink() or not generated.is_dir():
+        raise ValueError(f"{generated}: prepared gameplay source must be a local directory")
+    try:
+        commit = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=generated, text=True
+        ).strip()
+        patch = generated / ".git/melee-web-composed.patch"
+        applied = generated / ".git/melee-web-gameplay.patch"
+        diff = subprocess.check_output(["git", "diff", "--binary", "HEAD"], cwd=generated)
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise ValueError(f"{generated}: cannot inspect prepared gameplay source: {error}") from error
+    if not patch.is_file() or not applied.is_file():
+        raise ValueError(f"{generated}: composed gameplay patch provenance is missing")
+    return {
+        "path": generated.relative_to(root).as_posix(),
+        "pinned_commit": commit,
+        "composed_patch": {"path": patch.relative_to(root).as_posix(), "sha256": _sha256(patch)},
+        "reviewed_patch": {"path": applied.relative_to(root).as_posix(), "sha256": _sha256(applied)},
+        "working_tree_diff_sha256": hashlib.sha256(diff).hexdigest(),
+        "tree": _tree_record(generated, root),
+    }
+
+
+def _uleb(data, offset):
+    value = 0
+    shift = 0
+    while offset < len(data):
+        byte = data[offset]
+        offset += 1
+        value |= (byte & 0x7F) << shift
+        if not byte & 0x80:
+            return value, offset
+        shift += 7
+        if shift > 63:
+            break
+    raise ValueError("malformed WebAssembly unsigned integer")
+
+
+def _wasm_exports(path):
+    """Return the actual WebAssembly export section, without external tools."""
+    data = path.read_bytes()
+    if data[:4] != b"\0asm" or data[4:8] != b"\1\0\0\0":
+        raise ValueError(f"{path}: not a WebAssembly binary")
+    offset = 8
+    exports = []
+    while offset < len(data):
+        section = data[offset]
+        offset += 1
+        size, offset = _uleb(data, offset)
+        end = offset + size
+        if end > len(data):
+            raise ValueError(f"{path}: truncated WebAssembly section")
+        if section == 7:  # export section
+            count, cursor = _uleb(data, offset)
+            for _ in range(count):
+                name_size, cursor = _uleb(data, cursor)
+                name_end = cursor + name_size
+                if name_end > end:
+                    raise ValueError(f"{path}: truncated WebAssembly export name")
+                name = data[cursor:name_end].decode("utf-8")
+                cursor = name_end
+                kind = data[cursor]
+                cursor += 1
+                index, cursor = _uleb(data, cursor)
+                exports.append({"name": name, "kind": kind, "index": index})
+            if cursor != end:
+                raise ValueError(f"{path}: malformed WebAssembly export section")
+        offset = end
+    return tuple(exports)
+
+
+def _pipeline_seed_record(root, build_dir):
+    source = root / "web/initial_pipeline_cache.db.gz.b64"
+    materialized = build_dir / "initial_pipeline_cache.db"
+    if source.is_symlink() or not source.is_file():
+        raise ValueError(f"{source}: reviewed pipeline seed is missing")
+    if materialized.is_symlink() or not materialized.is_file():
+        raise ValueError(f"{materialized}: materialized pipeline seed is missing")
+    # materialize_pipeline_cache.py verifies this digest before CMake can link,
+    # and repeat it here so the identity record states exactly what was built.
+    from materialize_pipeline_cache import EXPECTED_SHA256
+
+    materialized_hash = _sha256(materialized)
+    if materialized_hash != EXPECTED_SHA256:
+        raise ValueError(f"{materialized}: pipeline seed digest mismatch: {materialized_hash}")
+    tables = []
+    try:
+        connection = sqlite3.connect(f"file:{materialized}?mode=ro", uri=True)
+        try:
+            names = connection.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+            ).fetchall()
+            for (name,) in names:
+                if not name.startswith("sqlite_"):
+                    count = connection.execute(
+                        'SELECT COUNT(*) FROM "' + name.replace('"', '""') + '"'
+                    ).fetchone()[0]
+                    tables.append({"name": name, "rows": count})
+        finally:
+            connection.close()
+    except sqlite3.Error as error:
+        raise ValueError(f"{materialized}: pipeline seed SQLite inspection failed: {error}") from error
+    return {
+        "source": {
+            "path": source.relative_to(root).as_posix(),
+            "bytes": source.stat().st_size,
+            "sha256": _sha256(source),
+        },
+        "materialized": {
+            "path": materialized.relative_to(root).as_posix(),
+            "bytes": materialized.stat().st_size,
+            "sha256": materialized_hash,
+        },
+        "expected_sha256": EXPECTED_SHA256,
+        "sqlite_tables": tables,
+    }
+
+
+def _source_inputs_record(root, gameplay_source):
+    """Return the complete native-input fingerprint used by the producer."""
+    root_files = {
+        path: _sha256(root / path)
+        for path in PUBLIC_RUNTIME_SOURCE_FILES
+        if path not in {"CMakeLists.txt", "cmake/FighterRuntime.cmake"}
+    }
+    root_files["CMakeLists.txt"] = _sha256(root / "CMakeLists.txt")
+    root_files["cmake/FighterRuntime.cmake"] = _sha256(root / "cmake/FighterRuntime.cmake")
+    for path in (
+        "tests/native_menu_alarm_unavailable.c",
+        "tests/native_menu_fighter_input.c",
+        "tests/native_menu_stage_input.c",
+    ):
+        root_files[path] = _sha256(root / path)
+    return {
+        "files_sha256": dict(sorted(root_files.items())),
+        "trees": {
+            "src": _tree_record(root / "src", root),
+            "cmake": _tree_record(root / "cmake", root),
+        },
+        "prepared_gameplay": _prepared_source_record(root, gameplay_source.parent),
+    }
+
+
+def _verify_public_exports(wasm, javascript):
+    exports = _wasm_exports(wasm)
+    functions = tuple(item["name"] for item in exports if item["kind"] == 0)
+    function_set = set(functions)
+    # Release Emscripten minifies Wasm export names. Its generated JS contains
+    # the authoritative public-name -> Wasm-name assignments, which we verify
+    # against the binary rather than assuming the names survive minification.
+    source = javascript.read_text(encoding="utf-8")
+    bindings = {}
+    for name in PUBLIC_RUNTIME_EXPORTS:
+        escaped = re.escape(name)
+        match = re.search(
+            rf"{escaped}=Module\[\"{escaped}\"\]=wasmExports\[\"([^\"]+)\"\]",
+            source,
+        )
+        if match:
+            bindings[name] = match.group(1)
+    missing = [name for name in PUBLIC_RUNTIME_EXPORTS if name not in bindings]
+    absent_binary = sorted(name for name in bindings.values() if name not in function_set)
+    forbidden = sorted(
+        name for name in PUBLIC_RUNTIME_FORBIDDEN_EXPORTS
+        if re.search(rf"{re.escape(name)}=Module\[", source)
+    )
+    if missing:
+        raise ValueError(f"{javascript}: missing public runtime JS bindings: {', '.join(missing)}")
+    if absent_binary:
+        raise ValueError(f"{wasm}: JS bindings absent from Wasm export section: {', '.join(absent_binary)}")
+    if forbidden:
+        raise ValueError(f"{javascript}: forbidden public runtime bindings: {', '.join(forbidden)}")
+    return {
+        "required": list(PUBLIC_RUNTIME_EXPORTS),
+        "functions": list(functions),
+        "all": list(exports),
+        "javascript_bindings": bindings,
+        "forbidden_absent": sorted(PUBLIC_RUNTIME_FORBIDDEN_EXPORTS),
+    }
+
+
+def _write_public_identity(root, build_dir, version, cmake, ninja, gameplay_source,
+                           expected_source_inputs=None):
+    artifact_names = ("gameplay_public.js", "gameplay_public.wasm", "gameplay_public.data")
+    artifacts = []
+    for name in artifact_names:
+        path = build_dir / name
+        if path.is_symlink() or not path.is_file():
+            raise ValueError(f"{path}: public runtime artifact is missing or a symlink")
+        artifacts.append(_file_record(path, root))
+    wasm = build_dir / "gameplay_public.wasm"
+    exports = _verify_public_exports(wasm, build_dir / "gameplay_public.js")
+    source_inputs = _source_inputs_record(root, gameplay_source)
+    if expected_source_inputs is not None and source_inputs != expected_source_inputs:
+        raise ValueError("native source inputs changed during the public runtime build")
+    emscripten_version = root / ".deps/emsdk/upstream/emscripten/emscripten-version.txt"
+    emscripten_config = root / ".deps/emsdk/.emscripten"
+    emcc = root / ".deps/emsdk/upstream/emscripten/emcc"
+    tool_paths = (emscripten_version, emscripten_config, emcc, cmake, ninja)
+    tool_hashes = {
+        path.relative_to(root).as_posix(): _sha256(path)
+        for path in tool_paths
+    }
+    identity = {
+        "schema": "melee-web-runtime-public-build-v1",
+        "target": "runtime-public",
+        "configuration": "Release",
+        "artifact_root": build_dir.relative_to(root).as_posix(),
+        "artifacts": artifacts,
+        "wasm_exports": exports,
+        "source_inputs": source_inputs,
+        "toolchain": {
+            "emscripten": version,
+            "sha256": tool_hashes,
+            "cmake": subprocess.check_output([str(cmake), "--version"], text=True).splitlines()[0],
+            "ninja": subprocess.check_output([str(ninja), "--version"], text=True).strip(),
+        },
+        "pipeline_seed": _pipeline_seed_record(root, build_dir),
+        "upload_convention": {
+            "group": "artifacts plus the reviewed public-shell files",
+            "identity_path": "build/runtime-public-identity.json",
+            "identity_is_outside_artifact_root": True,
+        },
+    }
+    identity_path = root / "build/runtime-public-identity.json"
+    if identity_path.is_symlink():
+        raise ValueError(f"{identity_path}: identity sidecar must not be a symlink")
+    identity_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = identity_path.with_name(identity_path.name + ".tmp")
+    if temporary.is_symlink():
+        raise ValueError(f"{temporary}: refusing a symlink identity temporary")
+    temporary.write_text(json.dumps(identity, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    temporary.replace(identity_path)
+    return identity_path
+
 
 def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo"):
+    if target == PUBLIC_RUNTIME_TARGET and configuration != PUBLIC_RUNTIME_CONFIGURATION:
+        raise ValueError("runtime-public is Release-only; pass --configuration Release")
     lock = read_lock(root)
     verify_sources(root, lock)
     # Registry strings/counts are generated from the pinned source, not game
@@ -45,24 +389,41 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo"):
     build_dir = root / ("build/browser-release" if configuration == "Release" else "build/browser")
     if (root / "build").is_symlink() or build_dir.is_symlink():
         raise ValueError("Build output must be a local directory, not a symlink")
-    subprocess.run([str(emcmake), str(cmake), "-S", str(root), "-B", str(build_dir),
-                    "-G", "Ninja", f"-DCMAKE_BUILD_TYPE={configuration}",
-                    f"-DMELEE_WEB_GAMEPLAY_SOURCE_DIR={gameplay_source}",
-                    f"-DCMAKE_MAKE_PROGRAM={ninja}"], cwd=root, env=env, check=True)
+    source_inputs_before = (
+        _source_inputs_record(root, gameplay_source)
+        if target == PUBLIC_RUNTIME_TARGET else None
+    )
+    configure = [str(emcmake), str(cmake), "-S", str(root), "-B", str(build_dir),
+                 "-G", "Ninja", f"-DCMAKE_BUILD_TYPE={configuration}",
+                 f"-DMELEE_WEB_GAMEPLAY_SOURCE_DIR={gameplay_source}",
+                 f"-DCMAKE_MAKE_PROGRAM={ninja}"]
+    configure.append(
+        f"-DMELEE_WEB_PUBLIC_RUNTIME={'ON' if target == PUBLIC_RUNTIME_TARGET else 'OFF'}"
+    )
+    subprocess.run(configure, cwd=root, env=env, check=True)
     targets = {"graphics": ["gx_probe"], "gameplay": ["gameplay_checks"],
                "runtime": ["gameplay_menu_browser"],
+               PUBLIC_RUNTIME_TARGET: [PUBLIC_RUNTIME_TARGET],
                "fighter": ["fighter_runtime_probe", "gameplay_effect_banks_trace",
                            "gameplay_bonus_data_trace", "gameplay_stage_numeric_trace",
                            "native_menu_scene_trace", "dat_menu_support_trace"],
                "all": ["gx_probe", "gameplay_checks", "gameplay_menu_browser"]}[target]
     subprocess.run([str(cmake), "--build", str(build_dir), "--target", *targets, "-j", str(jobs)],
                    cwd=root, env=env, check=True)
+    if target == PUBLIC_RUNTIME_TARGET:
+        if _source_inputs_record(root, gameplay_source) != source_inputs_before:
+            raise ValueError("native source inputs changed during the public runtime build")
+        identity_path = _write_public_identity(
+            root, build_dir, version, cmake, ninja, gameplay_source,
+            expected_source_inputs=source_inputs_before,
+        )
+        print(f"Wrote {identity_path.relative_to(root)}")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--jobs", type=int, default=min(os.cpu_count() or 2, 6))
-    parser.add_argument("--target", choices=("graphics", "gameplay", "fighter", "runtime", "all"), default="all")
+    parser.add_argument("--target", choices=("graphics", "gameplay", "fighter", "runtime", PUBLIC_RUNTIME_TARGET, "all"), default="all")
     parser.add_argument("--configuration", choices=("RelWithDebInfo", "Release"), default="RelWithDebInfo")
     args = parser.parse_args()
     if args.jobs < 1:

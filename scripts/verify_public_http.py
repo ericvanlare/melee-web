@@ -13,6 +13,7 @@ BLOCKED_PATHS = (
     '/hitch-capture.mjs', '/tests/', '/docs/', '/work/', '/build/',
     '/.git/config', '/_worker.js', '/assets/', '/unrecognized-test-route',
     '/_headers', '/_redirects', '/disc-image.mjs', '/runtime-cache.js',
+    '/runtime/',
     '/gameplay_menu_browser.wasm', '/__melee_evidence/replay.json',
 )
 
@@ -43,7 +44,7 @@ def check_destination(origin, final_url, expected_paths):
         raise ValueError(f'unexpected canonical destination: {actual.path}')
 
 
-def check_resource(origin, route, record, require_noindex):
+def check_resource(origin, route, record, require_noindex, profile='maintenance'):
     status, headers, body, canonical = get(origin + route)
     name = record['path']
     canonical_path = '/' if name == 'index.html' else '/' + name.removesuffix('.html')
@@ -53,14 +54,37 @@ def check_resource(origin, route, record, require_noindex):
     if name.endswith('.css'):
         require(headers.get_content_type() == 'text/css', f'{route}: expected Content-Type text/css')
         require('immutable' in headers.get('Cache-Control', ''), f'{route}: expected immutable Cache-Control')
-    if name.endswith('.js'):
+    if name.endswith(('.js', '.mjs')):
         require(headers.get_content_type() in ('application/javascript', 'text/javascript'),
                 f'{route}: expected JavaScript Content-Type')
         require('immutable' in headers.get('Cache-Control', ''), f'{route}: expected immutable Cache-Control')
+    if name.endswith('.wasm'):
+        require(headers.get_content_type() == 'application/wasm', f'{route}: expected Content-Type application/wasm')
+        require('immutable' in headers.get('Cache-Control', ''), f'{route}: expected immutable Cache-Control')
+    if name.endswith('.data'):
+        require(headers.get_content_type() in ('application/octet-stream', 'application/x-sqlite3'),
+                f'{route}: expected binary runtime data Content-Type')
+        require('immutable' in headers.get('Cache-Control', ''), f'{route}: expected immutable Cache-Control')
+    if name == 'licenses/runtime-third-party.txt':
+        require(headers.get_content_type() == 'text/plain', f'{route}: expected Content-Type text/plain')
+        cache = headers.get('Cache-Control', '').lower()
+        revalidates = 'no-cache' in cache or ('max-age=0' in cache and 'must-revalidate' in cache)
+        require(revalidates and 'immutable' not in cache,
+                f'{route}: an unversioned notice must revalidate')
     if name.endswith('.html'):
         require(headers.get_content_type() == 'text/html', f'{route}: expected Content-Type text/html')
-    require("connect-src 'none'" in headers.get('Content-Security-Policy', ''),
-            f'{route}: missing CSP connect-src none')
+    expected_connect = "connect-src 'self'" if profile == 'player' else "connect-src 'none'"
+    require(expected_connect in headers.get('Content-Security-Policy', ''),
+            f'{route}: missing CSP {expected_connect}')
+    if profile == 'player':
+        require("worker-src 'self'" in headers.get('Content-Security-Policy', ''),
+                f'{route}: missing CSP worker-src self')
+        require(headers.get('Cross-Origin-Opener-Policy') == 'same-origin',
+                f'{route}: missing Cross-Origin-Opener-Policy same-origin')
+        require(headers.get('Cross-Origin-Embedder-Policy') == 'require-corp',
+                f'{route}: missing Cross-Origin-Embedder-Policy require-corp')
+        require(headers.get('Cross-Origin-Resource-Policy') == 'same-origin',
+                f'{route}: missing Cross-Origin-Resource-Policy same-origin')
     require(headers.get('X-Content-Type-Options') == 'nosniff',
             f'{route}: missing X-Content-Type-Options nosniff')
     require(headers.get('Referrer-Policy') == 'no-referrer',
@@ -81,16 +105,19 @@ def verify(url, manifest):
     loopback = origin.hostname in ('localhost', '127.0.0.1', '::1')
     origin = urllib.parse.urlunsplit((origin.scheme, origin.netloc, '', '', ''))
     records = json.loads(Path(manifest).read_text())
+    profile = records.get('profile', 'maintenance')
+    if profile not in ('maintenance', 'player'):
+        raise ValueError('manifest profile must be maintenance or player')
     result = {'origin': origin, 'resources': [], 'missing': [], 'result': 'pass'}
     require_noindex = not records['index_production'] or urllib.parse.urlsplit(origin).hostname.endswith('.pages.dev')
     for record in records['files']:
         name = record['path']
         if name.startswith('_'):
             continue  # Pages consumes configuration, verified by its effects below.
-        result['resources'].append(check_resource(origin, '/' + name, record, require_noindex))
+        result['resources'].append(check_resource(origin, '/' + name, record, require_noindex, profile))
     by_path = {record['path']: record for record in records['files']}
     # The actual user links must match the same complete HTML as the file URLs.
-    result['aliases'] = [check_resource(origin, route, by_path[name], require_noindex)
+    result['aliases'] = [check_resource(origin, route, by_path[name], require_noindex, profile)
                          for route, name in (('/', 'index.html'), ('/terms', 'terms.html'),
                                              ('/privacy', 'privacy.html'), ('/copyright', 'copyright.html'),
                                              ('/notices', 'notices.html'))]

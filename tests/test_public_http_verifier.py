@@ -23,13 +23,18 @@ from verify_public_http import verify  # noqa: E402
 class _StaticHTTP:
     """Small controllable HTTP origin used instead of a mocked urllib layer."""
 
-    def __init__(self, files: dict[str, bytes], *, canonical_redirects: bool = False,
+    def __init__(self, files: dict[str, bytes], *, profile: str = "maintenance", canonical_redirects: bool = False,
                  overrides: dict[str, tuple[int, bytes]] | None = None,
-                 missing_headers: set[str] | None = None):
+                 missing_headers: set[str] | None = None,
+                 missing_values: set[str] | None = None,
+                 missing_values_by_path: dict[str, set[str]] | None = None):
         self.files = files
+        self.profile = profile
         self.canonical_redirects = canonical_redirects
         self.overrides = overrides or {}
         self.missing_headers = missing_headers or set()
+        self.missing_values = missing_values or set()
+        self.missing_values_by_path = missing_values_by_path or {}
         owner = self
 
         class Handler(BaseHTTPRequestHandler):
@@ -75,29 +80,54 @@ class _StaticHTTP:
             if path.endswith(".css"):
                 request.send_header("Content-Type", "text/css")
                 request.send_header("Cache-Control", "public, max-age=31536000, immutable")
-            elif path.endswith(".js"):
+            elif path.endswith((".js", ".mjs")):
                 request.send_header("Content-Type", "application/javascript")
                 request.send_header("Cache-Control", "public, max-age=31536000, immutable")
+            elif path.endswith(".wasm"):
+                request.send_header("Content-Type", "application/wasm")
+                request.send_header("Cache-Control", "public, max-age=31536000, immutable")
+            elif path.endswith(".data"):
+                request.send_header("Content-Type", "application/octet-stream")
+                request.send_header("Cache-Control", "public, max-age=31536000, immutable")
+            elif path == "/licenses/runtime-third-party.txt":
+                request.send_header("Content-Type", "text/plain")
+                request.send_header("Cache-Control", "no-cache")
             elif path.endswith(".html") or path in {"/", "/terms", "/privacy", "/copyright", "/notices"}:
                 request.send_header("Content-Type", "text/html")
             if path not in self.missing_headers:
-                request.send_header("Content-Security-Policy", "default-src 'none'; connect-src 'none'")
-                request.send_header("X-Content-Type-Options", "nosniff")
-                request.send_header("Referrer-Policy", "no-referrer")
-                request.send_header("X-Frame-Options", "DENY")
-                request.send_header("Permissions-Policy", "fullscreen=(self)")
-                request.send_header("X-Robots-Tag", "noindex, nofollow, noarchive")
+                connect = "self" if self.profile == "player" else "none"
+                worker = "; worker-src 'self'" if self.profile == "player" else ""
+                headers = {
+                    "Content-Security-Policy": f"default-src 'none'; connect-src '{connect}'{worker}",
+                    "X-Content-Type-Options": "nosniff",
+                    "Referrer-Policy": "no-referrer",
+                    "X-Frame-Options": "DENY",
+                    "Permissions-Policy": "fullscreen=(self)",
+                    "X-Robots-Tag": "noindex, nofollow, noarchive",
+                }
+                missing_values = self.missing_values | self.missing_values_by_path.get(path, set())
+                for key, value in headers.items():
+                    if key not in missing_values:
+                        request.send_header(key, value)
+                if self.profile == "player":
+                    for key in ("Cross-Origin-Opener-Policy", "Cross-Origin-Embedder-Policy",
+                                "Cross-Origin-Resource-Policy"):
+                        if key not in missing_values:
+                            request.send_header(key, "same-origin" if key.endswith("Opener-Policy")
+                                                else "require-corp" if key.endswith("Embedder-Policy")
+                                                else "same-origin")
         request.end_headers()
         request.wfile.write(body)
 
 
-def _fixture() -> tuple[dict[str, bytes], dict[str, object]]:
+def _fixture(profile: str = "maintenance") -> tuple[dict[str, bytes], dict[str, object]]:
     files = {
         "/index.html": b"<html><body>Gameplay is not available</body></html>",
         "/terms.html": b"<html><h1>Terms of Use</h1></html>",
         "/privacy.html": b"<html><h1>Privacy Notice</h1></html>",
         "/copyright.html": b"<html><h1>Copyright & contact</h1></html>",
         "/notices.html": b"<html><h1>Third-party notices</h1></html>",
+        "/licenses/runtime-third-party.txt": b"Full runtime third-party notices.\n",
         "/robots.txt": b"User-agent: *\nDisallow: /\n",
     }
     css = b"body { color: black; }"
@@ -119,7 +149,40 @@ def _fixture() -> tuple[dict[str, bytes], dict[str, object]]:
         {"path": path.lstrip("/"), "size": len(body), "sha256": hashlib.sha256(body).hexdigest()}
         for path, body in sorted(files.items()) if path not in aliases
     ]
-    return files, {"files": records, "index_production": False}
+    return files, {"files": records, "index_production": False, "profile": profile}
+
+
+def _player_fixture() -> tuple[dict[str, bytes], dict[str, object]]:
+    files, manifest = _fixture("player")
+    for path in tuple(files):
+        if path.startswith("/assets/"):
+            del files[path]
+    runtime_root = "/runtime/0123456789abcdef"
+    runtime_files = {
+        "melee-runtime.mjs": b"export {};",
+        "runtime-assets.mjs": b"export {};",
+        "disc-image.mjs": b"export {};",
+        "dsp-coefficients.mjs": b"export {};",
+        "prototype-keyboard-layouts.mjs": b"export {};",
+        "audio-worklet.js": b"registerProcessor('x', class extends AudioWorkletProcessor {});",
+        "audio-ring.mjs": b"export {};",
+        "gameplay_public.js": b"// gameplay_public.wasm",
+        "gameplay_public.wasm": b"\x00asm\x01\x00\x00\x00",
+        "gameplay_public.data": b"SQLite format 3\x00seed",
+        "player/player.css": b"body { color: black; }",
+        "player/player-shell.mjs": b"import '../melee-runtime.mjs';",
+    }
+    for name, body in runtime_files.items():
+        files[f"{runtime_root}/{name}"] = body
+    aliases = {"/": "/index.html", "/terms": "/terms.html", "/privacy": "/privacy.html",
+               "/copyright": "/copyright.html", "/notices": "/notices.html"}
+    records = [
+        {"path": path.lstrip("/"), "size": len(body), "sha256": hashlib.sha256(body).hexdigest()}
+        for path, body in sorted(files.items()) if path not in aliases
+    ]
+    manifest["files"] = records
+    manifest["runtime"] = {"path": runtime_root.lstrip("/"), "hash": "0123456789abcdef"}
+    return files, manifest
 
 
 class PublicHTTPVerifierTests(unittest.TestCase):
@@ -135,8 +198,8 @@ class PublicHTTPVerifierTests(unittest.TestCase):
             server.close()
         self.temp.cleanup()
 
-    def server(self, **kwargs) -> _StaticHTTP:
-        server = _StaticHTTP(self.files, **kwargs)
+    def server(self, files: dict[str, bytes] | None = None, **kwargs) -> _StaticHTTP:
+        server = _StaticHTTP(self.files if files is None else files, **kwargs)
         self.servers.append(server)
         return server
 
@@ -210,6 +273,25 @@ class PublicHTTPVerifierTests(unittest.TestCase):
         )
         self.assertNotEqual(probe.returncode, 0, probe.stdout + probe.stderr)
         self.assertIn('/copyright: missing CSP', probe.stderr)
+
+    def test_player_runtime_mjs_wasm_data_and_isolation_pass(self):
+        files, manifest = _player_fixture()
+        self.manifest_path.write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+        origin = self.server(files=files, profile="player")
+        result = verify(origin.url, self.manifest_path)
+        runtime_paths = {item["path"] for item in result["resources"]}
+        self.assertIn("/runtime/0123456789abcdef/melee-runtime.mjs", runtime_paths)
+        self.assertIn("/runtime/0123456789abcdef/gameplay_public.wasm", runtime_paths)
+        self.assertIn("/runtime/0123456789abcdef/gameplay_public.data", runtime_paths)
+
+    def test_player_runtime_missing_isolation_headers_are_rejected(self):
+        files, manifest = _player_fixture()
+        self.manifest_path.write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+        origin = self.server(files=files, profile="player", missing_values_by_path={
+            "/runtime/0123456789abcdef/player/player-shell.mjs": {"Cross-Origin-Opener-Policy"},
+        })
+        with self.assertRaisesRegex(ValueError, r"player-shell.mjs: missing Cross-Origin-Opener-Policy"):
+            verify(origin.url, self.manifest_path)
 
 
 if __name__ == "__main__":

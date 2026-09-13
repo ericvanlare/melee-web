@@ -19,7 +19,7 @@ ZERO_GATES = ('browserCallbackGaps', 'browserLongTasks', 'nativeCallbacksOver33m
 # outside the development/held-out build identity.
 BUILD_ARTIFACTS = (
     'gameplay_menu_browser.js', 'gameplay_menu_browser.wasm', 'gameplay_menu_browser.data',
-    'runtime.html', 'runtime-cache.js', 'audio-worklet.js', 'audio-ring.mjs',
+    'runtime.html', 'runtime-development.mjs', 'melee-runtime.mjs', 'runtime-cache.js', 'audio-worklet.js', 'audio-ring.mjs',
     'disc-image.mjs', 'dsp-coefficients.mjs', 'runtime-assets.mjs',
     'match-flow.mjs', 'match-menu.mjs', 'action-sweep.mjs', 'hitch-capture.mjs',
 )

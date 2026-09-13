@@ -1,205 +1,223 @@
-# WebMelee shell release review
+# WebMelee public player release review
 
-Research date: September 12–13, 2026. Prepared for operator and qualified counsel
-review. This is a technical inventory and issue assessment, not a legal opinion,
-trademark clearance or assurance of legal protection.
+Research date: September 12, 2026. Prepared for operator and qualified counsel
+review. This is a technical inventory and issue assessment, not a legal
+opinion, trademark clearance or assurance of legal protection.
 
 ## Candidate and scope
 
-The deployment branch is stacked on PR #10, pushed commit `6d5ce786d4dfc3ad383c1e6b4002ff1b63afad22`.
-PR #10 targets `port/fighter-runtime`; PR #11 targets `main`. Neither is merged,
-rebased or rewritten by this launch. PR #11's newer runtime commits and the CPU
-track's uncommitted changes are not inputs. Their descriptions/checks report
-unresolved CI, source validation and public gameplay gates. The launch does not
-close issues #2, #4 or #5 or supersede the accuracy contract.
+This review covers the current `web/player` loader, `web/melee-runtime.mjs`, the
+Release `gameplay_public` target and the legal pages in `web/public/`. The final
+artifact identity, runtime hash and deployed URL must come from the packager's
+fresh manifest. A development runtime, diagnostics page and evidence server are
+outside the public player graph.
 
-**Only the public shell is a distribution candidate.** Its exact input inventory
-is six original HTML pages, one original stylesheet and one original fullscreen
-script under `web/public/`. It has no runtime dependency, iframe, native code,
-Wasm, disc parser, file input, account, upload, backend or game.
+The player profile serves the reviewed legal pages plus a compiled Emscripten
+JavaScript/Wasm/data runtime and the small JavaScript modules needed for local
+disc reads, input and audio. It does not serve a retail disc image, extracted
+game archive, standalone game asset or repository source checkout. The compiled
+program is nevertheless built from recovered Melee/HSD and original platform
+source, so excluding source files and retail assets from the upload does not
+resolve the rights in the executable.
 
-The source templates for Terms, Privacy, Copyright/contact and Notices are complete
-except operator identity and a working rights/privacy email. Those facts must be
-provided by the operator, not inferred from registrar details or Git metadata.
-Do not publish an invented `legal@webmelee.gg` address. No postal address, business
-entity or choice of jurisdiction has been invented. Counsel should determine
-whether additional identity/address disclosures are required for the operator's
-actual location, audience and service. Draft preview placeholders are not final
-operator contact details.
+The legal page templates still contain `{{OPERATOR_NAME}}` and
+`{{CONTACT_EMAIL}}`. Production packaging must substitute a real operator and
+working rights/privacy address. Do not infer either value from a registrar,
+Cloudflare account or Git metadata.
 
-## Artifact inventory and technical enforcement
+## Artifact and seed facts
 
-`scripts/build_public.py` reads an explicit source allowlist and generates a fresh
-output. It never copies `web/`, `build/`, test data, upstream sources or local work.
-CSS/JS filenames contain content hashes. `scripts/audit_public.py` binds the complete
-output to an external SHA-256/size/path manifest, rejects unknown files, unsafe
-paths/symlinks, prohibited formats and suspect content. The external manifest is
-intentionally outside the upload directory, so every uploaded byte can be hashed
-without a self-hash exception. Cloudflare consumes `_headers` and `_redirects` as
-configuration rather than serving them as assets.
+The Release target preloads `web/initial_pipeline_cache.db.gz.b64` as
+`/initial_pipeline_cache.db`. Decoding the checked-in source produces a
+2,113,536-byte SQLite database with SHA-256
+`cdf157ee0f1850884f07a71165fd2192177acb23c2c777313b719e70ea67546f`. Its
+schema has one `aurora_schema` row, one shader row and 507 pipeline rows. The
+seed was updated in commit
+`9c90e52569ef66409d5a4ca7431548095bc14b6b` after Aurora descriptors were
+observed while rendering development game routes.
 
-No game executable, recovered source, original SDK code, disc image, extracted
-archive, sound, font, icon, screenshot, recording, savestate, memory card, replay,
-trace, debugger artifact, test report, pipeline cache or compiled game binary is
-approved for this build. Binary formats including Wasm are rejected altogether.
-The complete output is inspectable UTF-8 text. Original CSS has no image/font URLs;
-HTML uses only an empty data favicon. System fonts are requested from the device,
-not redistributed. There are no shipped npm dependencies. Build/test/deployment
-tools remain outside the upload tree.
+The seed contains binary renderer configuration blobs and hashes rather than
+file names. Inspection found no raw texture, model, audio or disc bytes. That
+observation is a content fact, not a rights conclusion: the seed is generated
+metadata tied to the game renderer and must be included in the artifact
+manifest, SBOM and rights review. Do not describe it as unrelated to the game.
 
-A signature scanner cannot establish copyright ownership or detect every encoded
-payload. The defense is the small reviewed source inventory, exact regenerated
-bytes and manifest equality, plus format/content rejection and browser/network
-verification. A future allowlist expansion requires renewed rights and technical
-review; passing this shell's scan does not authorize a game executable.
+The public loader does not load `runtime-cache.js`, mount IDBFS or call a cache
+persistence hook. Aurora's `/melee-render-cache` path is page-local in this
+profile. The native code and linker still include cache support for renderer
+operation, and browsers or graphics drivers may maintain their own caches. A
+future change that mounts IDBFS or distributes cache files requires a new
+privacy and notice review.
 
-## Local processing and privacy claims
+## Local processing and network behavior
 
-| Surface | This public shell | Development player / future integration |
+| Surface | Current public player | Boundary or verification limit |
 | --- | --- | --- |
-| Disc selection | Unavailable; no file input or reader | `DiscImage` reads bounded `Blob.slice()` ranges |
-| Game data | None supplied, read or derived | Disc DOL/FST validation, archive extraction, original font extraction and native in-memory transfers |
-| Network | Initial public page/CSS/JS GETs; application connection APIs blocked by CSP | Development host includes explicit evidence POST controls; cannot be described as having no upload capability |
-| Filenames and hashes | No access to either | Disc/DOL validation and asset names exist locally; review error and evidence paths before publication |
-| localStorage | Unused | Prototype stores keyboard preferences |
-| IndexedDB | Unused | Optional IDBFS renderer cache; provenance of cached shader/pipeline content needs review |
-| Cache Storage / service worker | Unused | Reaudit actual integrated loader/module graph |
-| HTTP cache/history | Public shell resources/URLs may remain | Distinct from application storage |
-| Hosting | Cloudflare receives IP, URLs and request headers | Provider processing is separate from application telemetry |
+| Disc selection | Browser file input accepts `.iso`, `.gcm` and `.ciso`; the player asks for an unmodified USA 1.02 copy | RVZ is rejected; the implementation reads bounded `Blob.slice()` ranges and validates the GameCube image, FST and DOL SHA-1 `08e0bf20134dfcb260699671004527b2d6bb1a45`; this does not establish rights in the selected copy or prove every archive byte is original |
+| Selected data | The fixed required-file inventory is copied into native in-memory storage for preparation | No retail data is included by the site; exact memory retirement should be tested against the built artifact |
+| Filename and hash | The browser file name and local DOL hash are used for local validation/status | The reviewed source path has no code that sends those values to an application endpoint; retain request-trace evidence for the deployed build |
+| Application network | Same-origin requests load the player modules and compiled runtime; no application account, analytics or upload path is present in the reviewed graph | Cloudflare and browser networking remain outside application code; verify methods, URLs, bodies, WebSocket and beacon activity on the deployed artifact |
+| Preference storage | Keyboard layout and enablement choices use localStorage key `melee-prototype-keyboard-v1` | Storage may be unavailable; no preference should be described as server-side |
+| Renderer storage | Native Aurora cache files use the page's in-memory filesystem; public JS does not mount IDBFS | Browser HTTP cache, history and graphics-driver caches are uncontrolled and are separate from application memory |
+| Eject/reload | Eject unloads native state, closes audio, calls `player.destroy()` and reloads the document | The full reload retires the page/Wasm/native heap, imported archive bytes, decoded assets and audio graph; it does not clear keyboard preferences or browser/driver caches |
+| Diagnostics | Development `runtime.html`, evidence routes and cache export controls are not in the player graph | The public packager rejects diagnostic/evidence modules; verify the runtime identity and output manifest |
 
-The truthful current statement is: **this shell cannot select or read a disc and
-has no upload capability.** Do not advertise a verified public disc import when
-none exists. Disc-selection/preparation upload tests are unavailable for this
-build because the operation is deliberately absent. Browser checks instead verify
-that absence, the entire request inventory, no application storage and blocked
-network APIs. Future preparation must be checked against a genuine authorized
-local disc, capturing request URLs/methods/bodies plus WebSocket/beacon attempts
-across startup, import, preparation, failure, pause, eject and reload. Retain that
-sensitive evidence locally; publish only sanitized results. Test cache contents
-and reload/clear behavior separately. Avoid claiming that browser or host-level
-crash collection can never occur.
+The selected file and derived data are processed locally in the reviewed source
+path. This is not a promise about host-level crash collection, browser logging,
+extensions or provider processing. The public player has no user-content storage
+area and no account or online-match service.
 
 ## Copyright, source licensing and circumvention
 
 [17 USC 106](https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title17-section106&num=0&edition=prelim)
-reserves reproduction, adaptation, distribution and other rights. Keeping retail
-assets local reduces server distribution but does not resolve rights in recovered
-game code compiled into a delivered executable. An open GitHub repository is not
-a license. The pinned doldecomp Melee tree has no identified repository-wide
-license. Project patches and recovered declarations cannot be presumed original
-or independently licensable.
+reserves reproduction, adaptation, distribution and other rights. Keeping a
+retail copy on the visitor's device reduces server distribution of that copy,
+but does not resolve rights in recovered game code, original platform code,
+compiled adaptations or generated renderer metadata shipped by the operator.
+The pinned `doldecomp/melee` root has no identified repository-wide license.
+Public availability of a repository is not a license.
 
 [17 USC 107](https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title17-section107&num=0&edition=prelim)
-requires a fact-specific four-factor fair-use analysis. A noncommercial label or
-disclaimer does not decide it. [Section 117](https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title17-section117&num=0&edition=prelim)
-addresses limited essential-step/archival copying by owners of program copies;
-it is not general permission to distribute a game. The disc acknowledgement
-therefore asks for legal authority rather than treating physical ownership as
-universal authorization.
+requires a fact-specific fair-use analysis. A fan-project label, noncommercial
+intent or Nintendo non-affiliation statement does not decide that analysis.
+[Section 117](https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title17-section117&num=0&edition=prelim)
+addresses limited essential-step and archival copying by owners of program
+copies; it is not a general permission to distribute a game or compiled port.
 
 [17 USC 1201](https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title17-section1201&num=0&edition=prelim)
-raises a separate access-control/circumvention inquiry. Counsel must evaluate
-actual dumping/access instructions, access controls and any claimed exception.
-Conditional research/preservation exceptions are not a general browser-game
-release permission. This shell provides neither game files nor circumvention
-instructions.
+raises a separate access-control and circumvention inquiry. The player asks the
+visitor to select a copy, provides no disc image, and does not publish
+circumvention instructions. Counsel must evaluate the actual dumping/access
+workflow, local law and any claimed exception.
 
-The development runtime contains GPL-2.0-or-later Dolphin adaptations, including
-audio resampling and the free DSP-coefficient generator, as well as MIT Aurora
-and B0XX-derived components and the Emscripten/toolchain dependency graph. GPL
-source and distribution duties must be reviewed for the combined program;
-complying with GPL does not resolve Nintendo rights. The public shell excludes
-all of these. See `THIRD_PARTY.md` for the development/source boundary.
+The compiled runtime includes at least these rights boundaries:
+
+- Recovered Melee/HSD code at commit
+  `b43912cc78606f96c9569f5d6229bc9d7e265ea5` has no identified root license.
+- Original platform AX/AXFX units under Melee's `extern/dolphin` path have no
+  per-file license header identified. The directory name does not make them
+  Dolphin Emulator code or GPL code; their provenance and rights remain open.
+- `src/gameplay_audio_resample.c/.h` and the free DSP coefficient generator
+  retain GPL-2.0-or-later provenance from Dolphin revision
+  `a2efdf1197be8132674b90fe9cf4761df39752ed`. The full text is included in
+  [`docs/licenses/runtime-third-party.txt`](licenses/runtime-third-party.txt)
+  and retained in [`docs/licenses/dolphin-gpl-2.0-or-later.txt`](licenses/dolphin-gpl-2.0-or-later.txt).
+  GPL compliance does not resolve rights in recovered Melee or platform code.
+- Aurora at commit `749d6ee7a22bdfab78c8ece9047bca5d79aa72ca` is MIT. The
+  B0XX-derived keyboard mapping retains its MIT notice at
+  [`licenses/b0xx-ahk.txt`](../licenses/b0xx-ahk.txt); both are included in the
+  runtime aggregate.
+- The Emscripten 6.0.9 toolchain and `emdawnwebgpu` port carry MIT/NCSA and
+  package-specific notices. Aurora's active graph also includes SDL, Abseil,
+  fmt, xxHash, zlib-ng, libpng, FreeType, Dear ImGui, SQLite and Tracy. The
+  verbatim texts copied from the actual pinned dependency trees, their source
+  paths and the known local adaptations are collected in
+  [`docs/licenses/runtime-third-party.txt`](licenses/runtime-third-party.txt),
+  with the inventory and unresolved source correspondence recorded in
+  [`docs/licenses/PLAYABLE_RUNTIME_NOTICES.md`](licenses/PLAYABLE_RUNTIME_NOTICES.md).
+
+The aggregate is configured notice delivery and intentionally errs on inclusion;
+it is not an exact post-link SBOM. It does not establish that the combined
+executable may be distributed, provide corresponding source for GPL-covered
+adaptations, or resolve rights in recovered code or the generated pipeline seed.
+
+## GPL corresponding-source delivery
+
+The current worktree contains project source, the Dolphin-derived source
+identifiers and reproducibility scripts, but it does not configure a public
+corresponding-source route, a downloadable source bundle tied to a player
+release, or a written GPL offer. No such commitment should be implied by this
+review.
+
+Before distributing a player that contains GPL-covered code, the operator and
+counsel must choose and verify a compliant path. One possible path is a
+release-specific source bundle or source URL containing the GPL-covered source,
+the project changes, the build scripts and the exact dependency/source
+correspondence needed to modify the distributed work, together with the GPL
+text. Another possible path is a valid written offer under the applicable GPL
+version and distribution terms. The repository currently implements neither
+path as a public service. Publishing recovered Melee or original SDK source can
+raise separate rights issues, so a source bundle cannot be added by assumption.
 
 ## Naming and marks
 
-`WebMelee`, `webmelee.gg` and `Melee` may function as source identifiers for game
-software. Adding “Web” or `.gg` does not establish distinctiveness or eliminate
-confusion. Nintendo, GameCube and Super Smash Bros. Melee are descriptive
-references here, without logos or imitated branding. The independent-project
-notice is factual context, not permission or an infringement defense by itself.
+`WebMelee`, `webmelee.gg` and `Melee` may function as source identifiers for
+game software. Adding “Web” or `.gg` does not establish distinctiveness or
+eliminate confusion. Nintendo, GameCube and Super Smash Bros. Melee are
+references to their respective rights holders and the intended game/platform;
+the site uses no Nintendo logos or promotional assets in the reviewed public
+artifact.
 
 [USPTO likelihood-of-confusion guidance](https://www.uspto.gov/trademarks/search/likelihood-confusion)
-considers resemblance and related goods/services; the
+considers resemblance and related goods/services. The
 [USPTO trademark process](https://www.uspto.gov/trademarks/basics/trademark-process)
 explains that domain registration does not confer trademark rights. Counsel
-should conduct live federal/state/common-law, game/software marketplace and
-domain-dispute searches for all relevant names and variants. No comprehensive
-trademark clearance was performed. Search-index results or an absent exact-word
-hit are not a clearance conclusion. [15 USC 1125](https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title15-section1125&num=0&edition=prelim)
-also addresses false designation and, under subsection (d), bad-faith domain
-registration/use. No bad-faith or liability conclusion is drawn here.
+should conduct live federal, state, common-law, software-marketplace and
+domain-dispute searches for the names and variants. No comprehensive clearance
+was performed. [15 USC 1125](https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title15-section1125&num=0&edition=prelim)
+also addresses false designation and bad-faith domain registration/use. No
+bad-faith or liability conclusion is drawn here.
 
-## Copyright contact and DMCA agent
+## Copyright contact and DMCA distinction
 
-This build distributes the operator's static shell and accepts no user content.
-[17 USC 512(c)](https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title17-section512&num=0&edition=prelim)
-addresses storage at users' direction. There is no identified user-storage
-feature requiring a section 512(c) safe-harbor launch workflow here. That is a
-service-model observation, not an opinion that section 512 can never apply.
-A public copyright contact remains necessary for this launch. Merely listing an
-email does not register a designated agent or confer safe-harbor protection for
-the operator's own distributed materials.
+The player serves operator-selected static files and a compiled runtime. A
+visitor's locally selected disc is processed in the visitor's browser and is
+not stored on the site's server. The reviewed service has no hosted user-content
+area. [17 USC 512(c)](https://uscode.house.gov/view.xhtml?req=granuleid:USC-prelim-title17-section512&num=0&edition=prelim)
+addresses storage at a user's direction; whether any statutory safe harbor
+applies to a particular service or claim is not decided here.
 
-Before future hosting of replays, screenshots, custom fighters or other user
-content, counsel must reassess applicable safe harbors, public/registered agent
-information, compliant notices/counter-notices, repeat-infringer policy and
-operational response. The Copyright Office provides
-[service-provider guidance](https://www.copyright.gov/onlinesp/), the
+The public contact page is a general reporting channel. It does not represent
+that a designated agent has been registered with the Copyright Office, that
+safe-harbor eligibility exists, or that every statutory notice/counter-notice
+workflow applies. Before hosting replays, screenshots, custom fighters or any
+other user content, counsel must revisit agent registration, public agent
+information, compliant notices and counter-notices, repeat-infringer policy and
+operational response. See the [Copyright Office service-provider guidance](https://www.copyright.gov/onlinesp/),
 [agent FAQ](https://www.copyright.gov/dmca-directory/faq.html) and
 [37 CFR 201.38](https://www.copyright.gov/title37/201/37cfr201-38.html).
-No registration has been submitted and none is represented on the site.
 
-## Product references, inspected directly
+## Product references inspected directly
 
-The research checked the public HTTP sites and their delivered client code/routes.
-[smash.fun](https://smash.fun/) was reachable and described a fan browser project;
-its client contained ROM-validation and account/fighter API references. The obvious
-`/privacy`, `/terms`, `/dmca`, `/copyright` and `/legal` paths returned 404 at the
-check. This limited route inspection does not prove an absence of notices
-elsewhere and no claim about actual ROM upload was established.
+The public HTTP site [smash.fun](https://smash.fun/) was reachable during the
+research check and presented a fan browser project. Its delivered client and
+visible routes contained ROM-validation and account/fighter API references;
+obvious `/privacy`, `/terms`, `/dmca`, `/copyright` and `/legal` paths returned
+404 at that check. This limited route inspection does not establish its full
+service model and no wording was copied.
 
-[Slippi Terms](https://slippi.gg/tos) and [Privacy](https://slippi.gg/privacy) were
-public React routes with December 7, 2022 update dates. Their notices address an
-operator, account/service conduct, rights reporting, Nintendo non-affiliation
-and data processing. Its account/network service differs from this static shell.
-These were structural product references only. No wording was copied and their
-approach is not evidence of completeness or legal clearance for WebMelee.
+[Slippi Terms](https://slippi.gg/tos) and [Slippi Privacy](https://slippi.gg/privacy)
+were public React routes with December 7, 2022 update dates. They describe a
+different account/network service, operator, rights reporting and data
+processing model. They were structural references only and are not evidence of
+WebMelee clearance or completeness.
 
-## Questions reserved for counsel and operator
+## Unclosed release issues
 
-1. Who is the actual operator, what public contact receives mail, where does the
-   operator operate and which audiences/jurisdictions are intended? Are postal
-   address, statutory notices, consumer or privacy disclosures required?
-2. Is the name/domain acceptable after trademark clearance? Are the intended
-   references and presentation sufficiently clear about origin?
-3. What rights basis permits distribution of recovered Melee/source/SDK material,
-   patches and a combined compiled executable? Which components must remain
-   excluded regardless of local asset processing?
-4. What GPL/corresponding-source and transitive attribution obligations apply to
-   each future artifact? Is source publication possible under the actual rights?
-5. Do proposed disc-access instructions implicate access controls or local law?
-6. Are Terms assent, warranty wording and correspondence retention appropriate?
-7. Before UGC/network play, what changes to privacy, safety, notices, agent
-   registration and actual response procedures are needed?
+1. Substitute the actual operator identity and working rights/privacy contact;
+   decide whether address, consumer, privacy or jurisdiction disclosures apply.
+2. Generate and independently review the exact public artifact manifest and
+   runtime identity after the Release build. Confirm that development runtime,
+   evidence and diagnostic paths are excluded.
+3. Resolve the rights basis for distributing the compiled recovered Melee/HSD
+   and original SDK material. Do not infer permission from a DOL hash, local
+   disc processing or an open repository.
+4. Choose and implement a verified GPL corresponding-source path for the
+   Dolphin-derived code. No source URL or written offer is currently configured.
+5. Generate a binary-level SBOM and complete corresponding-source delivery for
+   Aurora, Emscripten/Dawn and active transitive dependencies. The checked-in
+   [`docs/licenses/runtime-third-party.txt`](licenses/runtime-third-party.txt)
+   provides the reviewed configured notice texts, but patched-source and exact
+   post-link correspondence remain open.
+6. Decide whether the preloaded 507-row Aurora seed can be distributed and
+   retain its exact provenance, hash and notice treatment.
+7. Have counsel review the disc-access workflow, access controls and applicable
+   Section 1201/local-law questions.
+8. Complete trademark/domain searches for WebMelee, webmelee.gg, Melee and
+   related references before treating the name as cleared.
+9. Verify the deployed privacy behavior, provider terms and operational
+   retention assumptions. Revisit this review before any account, online match,
+   analytics or hosted user-content feature.
 
-The shell can proceed only with truthful contact information, its exact artifact
-and behavior checks, and explicit limitations. Gameplay remains separately gated.
-
-## Additional source-audit detail
-
-The build also compiles recovered **original platform SDK** AX/AXFX sources under
-Melee's `extern/dolphin`; that name must not be confused with Dolphin Emulator.
-No per-file license header was identified. This is an additional unresolved
-rights boundary. `THIRD_PARTY.md` now records these files and the audited Aurora
-external versions/license sources. The future runtime still needs an actual
-linked-artifact SBOM and complete license texts, beyond this source inventory.
-
-Development disc validation verifies the DOL, not every selected archive's hash.
-Thus it is not proof that all assets match an unmodified retail disc. Native
-Unload tears down scene owners but retains the imported file map until a full
-page/iframe reset; prototype Eject removes the iframe. Disclosures must distinguish
-scene unload from data retirement. The renderer database schema stores config
-BLOBs and pipeline hashes; no filename/disc column was found, but that alone is
-not a legal assessment of the cached descriptors' provenance. The shell has none
-of these storage paths.
+No item above is represented as resolved by this document. The legal pages are
+drafts pending operator identity, artifact verification and counsel review.

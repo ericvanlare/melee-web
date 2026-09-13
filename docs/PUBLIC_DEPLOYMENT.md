@@ -1,14 +1,17 @@
-# Public shell deployment runbook
+# Public player deployment runbook
 
-This is a Cloudflare Pages **Direct Upload** shell release. It does not deploy a
-native runtime or change repository visibility. Never upload the repository,
-`web/`, a runtime build, an iframe staging package or a directory of accumulated
-work. See `PUBLIC_RELEASE_REVIEW.md` before changing the approved inventory.
+This is a Cloudflare Pages **Direct Upload** release. The player at `/` keeps
+the original prototype's black canvas and small bottom toolbar. Disc, Play,
+Pause, Controls, Fullscreen and Eject call the shared player owner directly.
+About and legal information lives on linked document pages. There is no landing
+page, iframe, developer host, account, analytics or upload endpoint.
 
-The page at `/` uses the original prototype's black player area and small bottom
-toolbar. Gameplay controls are disabled with a short WIP status. About and legal
-information lives on separate plain document pages. A preview is marked in its
-browser title; deployment labels do not add banners to the player.
+The `player` profile packages a Release native build with a fixed public export
+surface. The `maintenance` profile packages the small nonplayable fallback.
+Never upload the repository, `web/`, a native build directory, an iframe staging
+package or accumulated `work/` files. Do not change repository visibility.
+See `PUBLIC_RELEASE_REVIEW.md` for the executable/source rights assessment,
+source-delivery requirements and operator facts needed before publication.
 
 ## Current launch state
 
@@ -23,37 +26,56 @@ Recheck this state immediately before resuming; assignment alone is not cutover.
 
 ## Build, audit and preview
 
-Build using `python3 scripts/build_public.py --help`; use a fresh ignored output
-and keep its generated manifest outside that directory. Production requires
-operator-supplied contact facts. Review all generated legal pages with those
-values. Run `python3 scripts/audit_public.py --help` and audit the candidate
-against the sidecar manifest immediately before upload. Preserve the manifest,
-source commit, environment, tool versions and upload result together locally.
-The manifest inventories configuration files as well as public resources.
-
-For a local draft (the `build` parent must already exist):
+Freeze a reviewed pushed source checkpoint in an isolated checkout. Install its
+pinned dependencies independently with `scripts/bootstrap.py`; do not borrow
+another task's modified sources or build. Build and audit with the checked-in
+scripts, using a fresh ignored output directory for each candidate:
 
 ```sh
-mkdir -p build
-python3 scripts/build_public.py --output build/public-preview --mode preview
-python3 scripts/audit_public.py --output build/public-preview --manifest build/public-preview.manifest.json
+python3 scripts/build.py --target runtime-public --configuration Release
+python3 scripts/build_public.py --profile player --runtime-dir build/browser-release --output build/player-preview --mode preview
+python3 scripts/audit_public.py --output build/player-preview --manifest build/player-preview.manifest.json
 ```
 
-For publication, set `WEBMELEE_PUBLIC_OPERATOR` and `WEBMELEE_PUBLIC_CONTACT` to
-the operator's approved public values in the local shell, then run:
+`runtime-public` builds the shared native engine, input and renderer with a
+Release-only export list. It does not use a copied development executable.
+`build/runtime-public-identity.json` records native file bytes/hashes, actual
+Wasm exports and JS bindings, source trees, prepared pinned-source identity,
+toolchain and pipeline seed. The public builder verifies that record against
+this checkout and selects only the three named native files. It copies the
+reviewed JS/audio modules directly from source and hashes the complete runtime
+graph into `runtime/<hash>/`. Relative imports and the Wasm/data/worklet paths
+remain within that immutable directory.
+
+The sidecar release manifest inventories every output path, byte size and
+SHA-256, including hosting configuration and full third-party notices. It stays
+outside the upload. Audit regenerates expected output from reviewed sources and
+compares the complete inventory. A native or source mismatch fails; a manually
+rewritten manifest does not authorize extra files. The source commit and the
+local operator configuration must be retained beside the candidate.
+
+Preview mode has explicit draft legal placeholders and is for local review only
+until contact facts are supplied. Once the operator provides the approved public
+name and working email, set `WEBMELEE_PUBLIC_OPERATOR` and
+`WEBMELEE_PUBLIC_CONTACT` in the local shell and build the publishable candidate:
 
 ```sh
-python3 scripts/build_public.py --output build/public-production --mode production --operator "$WEBMELEE_PUBLIC_OPERATOR" --contact "$WEBMELEE_PUBLIC_CONTACT"
-python3 scripts/audit_public.py --output build/public-production --manifest build/public-production.manifest.json
+python3 scripts/build_public.py --profile player --runtime-dir build/browser-release --output build/player-candidate --mode production --operator "$WEBMELEE_PUBLIC_OPERATOR" --contact "$WEBMELEE_PUBLIC_CONTACT"
+python3 scripts/audit_public.py --output build/player-candidate --manifest build/player-candidate.manifest.json
 ```
 
-Use a fresh output name for each candidate. The sidecar is never uploaded.
-Production remains non-indexed unless `--index-production` is explicitly chosen.
+Complete the source-distribution and rights review documented in
+`PUBLIC_RELEASE_REVIEW.md` before uploading a compiled player. Production stays
+non-indexed unless `--index-production` is deliberately chosen. A preview is
+marked in its browser title; it does not add a banner to the player.
 
-Run the focused release tests and the repository's full unittest discovery.
-Native dependencies must be installed independently in this worktree using
-`scripts/bootstrap.py`; never borrow another track's modified sources or build.
-No native engine target is changed or part of this shell release.
+Build a maintenance fallback with `--profile maintenance` and the same operator
+facts. It has disabled gameplay and no native files. Retain its audited output
+alongside the first playable production candidate for incident response.
+
+Run the repository's full unittest discovery and the actual affected native
+target. Real-browser checks below are additional evidence, not substitutes for
+the separate accuracy, PCM, physical-controller or performance admission gates.
 
 The launch uses Wrangler 4.131.1 from the npm registry as a local development
 and deployment tool; `WRANGLER_SEND_METRICS=false` disables its optional metrics.
@@ -61,7 +83,7 @@ Install tools under ignored `work/`, not the public directory. Do not put tokens
 account IDs, private contact details or local paths into Git, published manifests,
 screenshots or PR text. Use normal authenticated Wrangler or dashboard sessions.
 
-Use `wrangler pages dev OUTPUT --port 18960 --inspector-port 19360` on unused
+Use `wrangler pages dev OUTPUT --port 18961 --inspector-port 19361` on unused
 local ports for Cloudflare's actual static routing
 and header behavior. A generic file server is insufficient to certify Pages
 extensionless routing, configuration headers or 404 responses. Browser checks
@@ -73,13 +95,12 @@ headers assume `webmelee.pages.dev`. Create and verify a staging
 branch deployment before attaching any custom domain. Upload only the audited
 output directory; the sidecar manifest is retained locally, not uploaded. Keep
 all preview hostnames non-indexed. `noindex` is a crawler instruction, not access
-control. If previews contain sensitive material, do not deploy them; this
-candidate is intended to contain only reviewed public shell content.
+control. If previews contain sensitive material, do not deploy them; the candidate must contain only the reviewed release inventory.
 
 With Wrangler authenticated, deploy the configured, audited candidate to staging:
 
 ```sh
-WRANGLER_SEND_METRICS=false wrangler pages deploy build/public-production --project-name webmelee --branch staging
+WRANGLER_SEND_METRICS=false wrangler pages deploy build/player-candidate --project-name webmelee --branch staging
 ```
 
 The existing signed-in Cloudflare dashboard also supports Direct Upload. A ZIP
@@ -92,8 +113,8 @@ publish a draft containing missing-operator placeholders.
 ## Hosting constraints and headers
 
 Cloudflare's current [Pages limits](https://developers.cloudflare.com/pages/platform/limits/)
-allow at most 25 MiB per asset. The audit enforces that upper bound; this shell is
-text-only and much smaller. Pages alone suffices. R2 is not created or needed.
+allow at most 25 MiB per asset. The audit enforces that upper bound. The compiled player fits in Pages without splitting its
+Wasm or data file. Pages alone suffices. R2 is not created or needed.
 Disc-derived/user-selected content must never be placed in R2.
 
 A root `404.html` disables [SPA fallback](https://developers.cloudflare.com/pages/configuration/serving-pages/).
@@ -103,11 +124,16 @@ Check that `/runtime.html`, `/prototype.html`, `/viewer.html`, `/native-menu.htm
 status 200 is a failure. Directory inventories must not be served.
 
 The generated [_headers](https://developers.cloudflare.com/pages/configuration/headers/)
-sets CSP, nosniff, no-referrer, DENY framing and feature permissions. This shell
-requires neither COOP nor COEP, Wasm nor binary MIME overrides. Introducing a
-runtime requires explicit Wasm/binary MIME checks, required isolation headers,
-worker/audio/fullscreen validation, and a new CSP review. Do not weaken CSP
-preemptively. Hashed CSS/JS use immutable caching; HTML revalidates. Check that
+sets CSP, nosniff, no-referrer, DENY framing and feature permissions. The player
+requires COOP `same-origin` and COEP `require-corp`. Its CSP permits same-origin
+module/loader/worklet and Wasm compilation via `wasm-unsafe-eval`; generated JS
+is built with dynamic JS execution disabled. Same-origin fetch is needed for
+Wasm/data loading. It is not an upload prevention rule: verify the actual
+application requests instead of claiming CSP blocks every same-origin POST.
+Wasm is served as `application/wasm`, data as `application/octet-stream`, and
+JS modules as JavaScript. Hashed runtime assets use immutable caching; HTML
+revalidates. Verify WebGPU, audio, local file selection and fullscreen against
+these exact headers. Check that
 Cloudflare has not injected Web Analytics, Zaraz or another script.
 
 Cloudflare [_redirects](https://developers.cloudflare.com/pages/configuration/redirects/)
@@ -172,8 +198,8 @@ Run these against each immutable deployment origin and the apex (substitute the
 actual returned origin for `CANDIDATE_ORIGIN`):
 
 ```sh
-python3 scripts/verify_public_http.py --url "$CANDIDATE_ORIGIN" --manifest build/public-production.manifest.json --report work/hosted-http.json
-node tests/public_shell_browser_test.mjs --url "$CANDIDATE_ORIGIN" --playwright ./work/deploy-tools/node_modules/playwright --out work/hosted-browser
+python3 scripts/verify_public_http.py --url "$CANDIDATE_ORIGIN" --manifest build/player-candidate.manifest.json --report work/hosted-http.json
+node tests/public_player_browser_test.mjs --url "$CANDIDATE_ORIGIN" --playwright ./work/deploy-tools/node_modules/playwright --out work/hosted-browser --disc "$WEBMELEE_LOCAL_DISC"
 ```
 
 HTTP verification checks full bytes and headers for each resource and each linked
@@ -184,17 +210,30 @@ or HTML with missing security headers is a failure. Wrangler 4.131.1 can return 
 reserved-configuration ENOTDIR/502 locally; this exception is recorded only for
 loopback and never accepted for a hosted URL.
 
-The no-upload result is scoped to this shell: it has no disc selection/preparation
-path. Do not write that a production disc import passed. Validate no file input,
-iframe/runtime loads, storage or unsolicited network connections. Fullscreen
-can be tested; Wasm, gameplay audio and disc behavior are unavailable and cannot
-be certified by this deployment.
+The player browser check runs the real public graph through startup, controls,
+invalid-disc retry, acknowledged owned-disc import, native preparation, original
+CSS/SSS navigation, pause/resume, audio context startup, Eject/reload and another
+import/launch. Inspect requests through the entire session: all application
+requests must be expected same-origin static GETs without bodies or queries;
+no disc bytes, derived assets, file names or local hashes may be transmitted.
+Check WebSocket/beacon activity, cookies, local/session storage, IndexedDB,
+Cache Storage and service workers. Only keyboard preferences should persist.
+Do not put the local disc path or game screenshots in public evidence.
+
+A real audio graph is not proof of acoustic output or PCM equivalence. A menu
+smoke is not a complete match/performance result. Record any timing-guard pause
+and manual resume in the scoped evidence. Broad game content, mobile play,
+physical controllers, retail equivalence and uninterrupted performance remain
+separate acceptance work.
 
 ## Reproduction, rollback and incident response
 
-Keep at least one verified production deployment and its full manifest. Rebuild
-from its source commit and operator config into a fresh directory, audit, compare
-manifest equality and upload. The output has no timestamp-dependent build fields.
+Keep at least one verified production deployment and its full manifest. Retain the
+exact source-bound native files, identity, public output and operator config.
+A rebuild must pass its own identity/audit and reproduce the public bytes from
+that frozen native input. Independent native rebuilds can differ with compiler
+or graphics-port tooling and require a new comparison and verification; do not
+assume bit-for-bit native determinism without measuring it. The output has no timestamp-dependent build fields.
 Do not use an undocumented mutable runtime artifact.
 
 Cloudflare [Pages rollbacks](https://developers.cloudflare.com/pages/configuration/rollbacks/)
@@ -216,20 +255,24 @@ its provider, and obtain legal advice for notices and response obligations.
 Do not publicly upload the report or copyrighted evidence. The operator handles
 rights correspondence; this task has not registered a DMCA agent.
 
-## Runtime integration boundary
+## Promotion and ongoing development
 
-The exact contract and extraction sequence are in `PROTOTYPE.md` under future
-`mountMeleeRuntime`. The missing production owner must provide `importDisc`,
-`prepare`, `start`, `focus`, `pause`, `resume`, `getState`, `unload`, `destroy`;
-keep audio acknowledgement and native command draining synchronous at their
-existing boundary, and retain source preparation/teardown ordering. Remove the
-iframe and DOM/status parsing. Keep diagnostic attachments, raw-PAD/replay/memory
-controls and evidence POST endpoints outside the production graph. No developer
-host can be renamed into a production asset.
+The source checkpoint and runtime graph hash identify a candidate; branch names
+alone do not. Build a production-mode candidate once, audit it, upload those
+exact bytes to a staging branch and verify the immutable deployment URL. Then
+upload that same unchanged directory to the production branch and compare the
+returned immutable URL and apex to the same manifest. Record both deployment
+IDs and the prior production ID. HTML links to its own runtime hash, so an old
+page cannot accidentally load a newer runtime module during a rollout.
 
-When that API is available, integrate only a clean pushed runtime checkpoint,
-resolve distribution rights and complete transitive notices/corresponding source,
-freeze the rebuilt runtime inventory, enforce MIME/isolation/size/network/storage
-gates, show a real disc acknowledgement, then perform the relevant existing
-accuracy/audio/input/performance admission. Fresh gameplay holdouts are not UI QA.
-This shell release does not authorize enabling gameplay by flipping a feature flag.
+There is no automatic release of changing runtime heads. Normal development
+continues in the shared native code and `melee-runtime.mjs`; diagnostics attach
+only through `runtime-development.mjs` and the development native profile.
+Promote a reviewed checkpoint through build → audit → real browser → staging
+HTTP/browser verification → production HTTP/browser verification. A failure
+keeps the previously verified production deployment serving.
+
+Future modularization may allow replacing a heap without page reload. Until
+then, one native owner per document and reload on Eject are explicit product
+behavior. Do not add runtime diagnostics to production for acceptance testing;
+run the separate development target when a diagnostic observer is required.

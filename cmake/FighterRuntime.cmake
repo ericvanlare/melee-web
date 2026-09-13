@@ -131,7 +131,7 @@ else()
 endif()
 configure_file(web/runtime.html runtime.html @ONLY)
 configure_file(web/runtime-cache.js runtime-cache.js COPYONLY)
-foreach(module disc-image dsp-coefficients runtime-assets match-flow match-menu action-sweep hitch-capture)
+foreach(module disc-image dsp-coefficients runtime-assets match-flow match-menu action-sweep hitch-capture melee-runtime runtime-development)
   configure_file(web/${module}.mjs ${module}.mjs COPYONLY)
 endforeach()
 configure_file(web/audio-ring.mjs audio-ring.mjs COPYONLY)
@@ -379,6 +379,33 @@ else()
   target_link_options(gameplay_menu_browser PRIVATE -sASSERTIONS=2 -sSAFE_HEAP=1)
 endif()
 configure_file(web/native-menu.html native-menu.html @ONLY)
+
+# The public player is a Release-only export surface.  It intentionally uses
+# the same source owner, renderer, audio path, input provider and reviewed
+# pipeline seed as gameplay_menu_browser; only its linker roots differ.  Keep
+# the development target above intact so replay and source-observation checks
+# retain their full instrumentation.
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+  add_executable(gameplay_public EXCLUDE_FROM_ALL src/gameplay_menu_browser.cpp src/browser_input.cpp
+    tests/native_menu_alarm_unavailable.c tests/native_menu_fighter_input.c tests/native_menu_stage_input.c)
+  add_dependencies(gameplay_public gameplay_menu_pipeline_seed)
+  set_property(TARGET gameplay_public APPEND PROPERTY LINK_DEPENDS "${initial_pipeline_cache}")
+  target_compile_definitions(gameplay_public PRIVATE MELEE_WEB_PUBLIC_RUNTIME)
+  target_link_libraries(gameplay_public PRIVATE fighter_asset_runtime aurora::main)
+  target_include_directories(gameplay_public SYSTEM PRIVATE "${EMSCRIPTEN_SYSROOT}/include/compat")
+  target_compile_options(gameplay_public PRIVATE -ffp-contract=off)
+  # Keep profiling disabled here.  The explicit roots below are the
+  # production API; Emscripten's linker DCE removes the replay, stock, raw-PAD,
+  # player-state, source-observation, memory and diagnostic surfaces.
+  target_link_options(gameplay_public PRIVATE -sENVIRONMENT=web -sDYNAMIC_EXECUTION=0
+    -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=134217728 -sSTACK_SIZE=8388608 -sEXIT_RUNTIME=0
+    --preload-file "${initial_pipeline_cache}@/initial_pipeline_cache.db"
+    -sEXPORTED_RUNTIME_METHODS=FS,IDBFS,addRunDependency,removeRunDependency,HEAPU8,UTF8ToString
+    -lidbfs.js
+    -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_melee_web_native_menu_file,_melee_web_native_menu_prepare,_melee_web_native_menu_launch,_melee_web_native_menu_unload,_melee_web_native_menu_pause,_melee_web_native_menu_message,_melee_web_native_menu_running,_melee_web_native_menu_phase,_melee_web_native_menu_cache_idle,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_set_keyboard_port,_melee_web_input_set_keyboard_layout)
+  set_target_properties(gameplay_public PROPERTIES SUFFIX ".js")
+  add_custom_target(runtime-public DEPENDS gameplay_public)
+endif()
 
 # Shared typed scene/model tables consumed by the original match interface.
 add_executable(dat_scene_trace EXCLUDE_FROM_ALL tests/dat_scene_test.cpp)

@@ -45,12 +45,11 @@ content admission remain open. `docs/REPLAY_CORPUS.md` records bounded workloads
 and repeated-session diagnostics without broad distribution or gold/content
 admission; its expanded report says `gold_admitted: false`.
 
-There is no hard production diagnostics exclusion yet. The existing runtime
-artifact contains observation, replay, raw-PAD and performance diagnostics. The
-prototype adapter does not expose them, which is an API decision rather than a
-binary/release guarantee. Production needs a build/CI exclusion check. The public
-mount must omit raw-PAD traces, replay cursors, action sweeps, source memory and
-native diagnostic readbacks; development tools attach separately.
+The local development artifact contains observation, replay, raw-PAD and
+performance diagnostics. The public `runtime-public` target has separate
+linker roots; its producer and release audit inspect the actual Wasm exports
+and generated JavaScript bindings. The public entry does not import the
+development attachment, cache persistence, replay or evidence modules.
 
 ## Temporary same-origin adapter
 
@@ -100,7 +99,7 @@ focuses `contentWindow`/canvas; and appends child CSS. These are temporary DOM
 dependencies, not a runtime API. The outer shell supplies its toolbar root,
 controls, status/progress/error and on-demand dialogs.
 
-Disc import reuses the child's inline handler, which loads `runtime-assets.mjs`,
+Disc import reuses the child's shared-owner handler, which loads `runtime-assets.mjs`,
 calls `loadNativeGameDisc`, transfers bytes through `put`, runs
 `prepareNativeResources` and handles failure. The adapter's one native configuration
 call is `_melee_web_input_set_keyboard_layout`; it does not call gameplay,
@@ -135,76 +134,68 @@ presentation boundary, `GameplayMatchSession::tick()` or
 no-step callback may redraw a frozen preparation scene but may not invent a source
 tick. Preserve this tick/draw order and catch-up distinction when extracting it.
 
-## Future `mountMeleeRuntime` API
+## Shared `mountMeleeRuntime` API
 
-The iframe should become an explicit versioned runtime mount:
+`web/melee-runtime.mjs` is the player owner used by both `web/player/` and the
+local development entry. The public entry mounts it directly into `#canvas`;
+it has no iframe and does not parse a developer page's DOM or status text.
+`prototype.html` retains its temporary adapter for local compatibility and is
+excluded from publication.
 
 ```js
-const runtime = await mountMeleeRuntime({
-  canvas, onState, onPreparation, onTiming, onAudio, onError, onComplete,
-});
-await runtime.importDisc(file);
-await runtime.prepare();
+const runtime = await mountMeleeRuntime({canvas, onState, onError});
+await runtime.importDisc(file); // validates local data and prepares resources
 await runtime.start();
 runtime.focus();
 await runtime.pause(); await runtime.resume();
 runtime.getState();
-await runtime.unload(); await runtime.destroy();
+await runtime.unload(); // retain imported files for another launch
+await runtime.destroy(); // unload, close audio; document reload is still required
 ```
 
-The lifecycle handle is `importDisc`, `prepare`, `start`, `focus`, `pause`,
-`resume`, `getState`, `unload` and `destroy`. `getState()` returns a versioned
-typed state such as `uninitialized`, `importing`, `prepared`, `css`, `sss`,
-`preparing`, `match`, `paused`, `ending` or `error`. Callbacks report lifecycle,
-preparation, timing, audio, errors and completion. The public API has no raw-PAD
-diagnostics, replay controls, source-memory access or native pointers. Dev tools
-attach through a separate development module/build.
+The frozen version-1 handle also exposes `prepare`, `setKeyboard` and
+`setKeyboardLayout`. State snapshots carry `state`, `scene`, `phase`, `running`,
+`paused`, `message`, `progress`, `ready`, `bundle`, `busy`, `requiresReload` and
+capability flags. States include booting, idle, importing, preparing, prepared,
+css, sss, match, paused, pausing, resuming, unloading, error and destroyed.
+Startup resolves after the generated runtime initializes; failed startup and
+unresponsive native operations require reload.
 
-Extract inline responsibilities without changing their owners:
+Only one mount is supported per document. The global Emscripten heap and native
+main loop are not independently destroyed. Public Eject completes native unload,
+waits for renderer work, closes audio, then reloads the document to retire that
+heap and imported bytes. It preserves keyboard preferences. It does not claim
+to clear browser or graphics-driver caches.
 
-- `prepareAudio`, `waitForAudioAck`, `pauseAudioForPreparation` and `syncAudio`
-  own the audio context/worklet. `menuAudio` supplies native PCM and
-  `menuAudioReadyForPreparation` supplies the acknowledgement gate.
-- `put` is the only JS-to-native file transfer: temporary `Module` buffers are
-  allocated, `_melee_web_native_menu_file` is called, and buffers are freed.
-- `prepareNativeResources` emits `menuPreparation`, pauses audio, yields one
-  browser turn, calls `_melee_web_native_menu_prepare` and emits completion.
-- `unloadAndSave` calls `_melee_web_native_menu_unload`, emits preparation
-  cancellation, waits for `_melee_web_native_menu_cache_idle`, and calls
-  `Module.saveRuntimeCache` only when dirty.
-- The current `Module` setup, fatal-stop handling and `boundary` command queue
-  move into the shared owner. `menuServiceCommands` must still drain commands
-  synchronously at the native boundary. `menuAudioReadyForPreparation` must still
-  return its synchronous acknowledgement; neither can become a fire-and-forget
-  status event. `menuFrame` retains lifecycle/input/audio bookkeeping, then emits
-  coalesced presentation status separately.
-- The required `window.menu*` callbacks initially remain narrow dispatchers into
-  that owner, because the compiled native code invokes those names. Move optional
-  timing sinks, raw-PAD diagnostics, stock/action sweeps, replay state/transport,
-  hitch collection and evidence downloads into a separate development attachment.
+`runtime-development.mjs` owns the original local controls, source observations,
+replay and hitch tools. Its explicit attachment gets access to native helpers
+before startup; `runtime.html` loads that module and the optional development
+cache installer. The public entry passes neither attachment nor installer.
+`Module` is absent from the public handle, though the classic generated loader
+still has a global `Module`; the compiled public profile removes the diagnostic
+exports instead of relying on hiding that variable.
 
-After the performance work lands, extract in this order:
+The shared owner preserves these boundaries:
 
-1. Move the inline host state and core functions into `melee-runtime.mjs` without
-   reordering preparation, commands, audio gates or source callbacks. Retain one
-   active owner per document. The current global Emscripten loader and `#canvas`
-   selector do not support arbitrary concurrent mounts.
-2. Make startup own the loader URL/asset resolution, pre-start cache installation,
-   `onRuntimeInitialized` and abort/error listeners. Resolve the mount only after
-   startup completes; reject explicit aborts. Keep `Module` off the public handle.
-   Repeated full mounts require a modularized loader/explicit shutdown; until
-   then, use document reload for complete heap reset rather than claiming disposal.
-3. Extract development controls and observers. The development entry imports
-   their attachment; the staging/production entry must not import those modules.
-   Keep core failure and timing-disruption reporting available to the player.
-4. Change `runtime.html` to mount the shared owner, attach its diagnostic tools,
-   and preserve its existing control semantics. Switch the prototype adapter to
-   mount that same owner and delete all iframe DOM/status parsing.
-5. Update the coordinated build copy rules, executable artifact identity inventory
-   and browser tests. Verify both pages' boot/import, CSS→SSS→match→CSS,
-   audio acknowledgement, focus/visibility, pause, teardown and second launch.
-   Re-run the relevant reference and uninstrumented performance gates before
-   claiming unchanged gameplay admission. Do not execute fresh holdouts for UI QA.
+- Audio context/worklet creation, disabled-state acknowledgement and native PCM
+  dispatch remain together. `menuAudioReadyForPreparation` returns synchronously.
+- `menuServiceCommands` drains the command queue synchronously before native
+  update, then updates keyboard enablement and separate focus/visibility inputs.
+  It does not create a JavaScript simulation loop.
+- `put` allocates temporary file buffers, transfers them to native storage, and
+  frees the temporary buffers. Preparation pauses audio, yields one browser turn,
+  calls native prepare, then reports completion.
+- Native unload precedes the cache-idle wait and optional development-only cache
+  save. Source scenes, RNG, ticking, drawing and audio ownership remain native.
+- `menuFrame` updates audio and reports changed lifecycle state. Timing, replay,
+  raw-PAD, memory, action-sweep and evidence hooks belong to the development module.
+
+The focused owner test exercises both native input-activity arguments, command
+order, failed-disc retry, acknowledgement gates, void pause API, repeat launch
+and reload-only destruction. Real-browser checks must use the actual public
+profile as well as the development entry. UI checks do not replace the separate
+retail-reference, physical input, PCM and performance gates; do not execute fresh
+holdouts just to test a shell.
 
 Ownership remains:
 
@@ -418,11 +409,13 @@ runtime dependency, including CPUs, without a separate prototype AI path.
 The only workflow change reorders pinned dependency installation ahead of tests
 in `.github/workflows/verify.yml`.
 
-## Public shell release boundary
+## Public release boundary
 
-`scripts/build_public.py` builds a separate original-text/CSS shell at `/`.
-It ships neither this temporary prototype nor `runtime.html`. Disc selection and
-gameplay remain visibly unavailable. `scripts/audit_public.py` enforces its exact
-inventory and byte identity; the source inputs live under `web/public/`.
-The future mount contract above remains the integration requirement. See
-[release review](PUBLIC_RELEASE_REVIEW.md) and [deployment](PUBLIC_DEPLOYMENT.md).
+`scripts/build_public.py --profile player` assembles the direct player at `/`,
+legal pages and full notices, plus the explicit source-bound runtime graph. It
+requires a Release `runtime-public` build identity and verifies source/dependency
+fingerprints and compiled exports. The hashed runtime directory preserves module
+relative paths. No directory copy or renamed development page is accepted.
+The separate `maintenance` profile has disabled gameplay and contains no runtime.
+See [release review](PUBLIC_RELEASE_REVIEW.md) and
+[deployment](PUBLIC_DEPLOYMENT.md) for artifact, legal and hosted verification.
