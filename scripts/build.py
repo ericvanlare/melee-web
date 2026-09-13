@@ -17,6 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 PUBLIC_RUNTIME_TARGET = "runtime-public"
 PUBLIC_RUNTIME_CONFIGURATION = "Release"
+PUBLIC_RUNTIME_BUILD_DIR = "build/browser-public-release"
 PUBLIC_RUNTIME_EXPORTS = (
     "_main",
     "_malloc",
@@ -59,6 +60,10 @@ PUBLIC_RUNTIME_SOURCE_FILES = (
     "cmake/FighterRuntime.cmake",
     "patches/melee-gameplay.patch",
     "src/gameplay_menu_browser.cpp",
+    "src/gameplay_menu_world.cpp",
+    "src/gameplay_match_session.cpp",
+    "src/gameplay_audio.c",
+    "src/gameplay_audio_bank.cpp",
     "src/browser_input.cpp",
     "src/browser_input.h",
     "scripts/bootstrap.py",
@@ -236,6 +241,130 @@ def _pipeline_seed_record(root, build_dir):
     }
 
 
+def _ninja_build_block(ninja_text, output):
+    """Return one exact Ninja build statement and its indented variables."""
+    lines = ninja_text.splitlines()
+    for index, line in enumerate(lines):
+        if not line.startswith("build ") or not line.startswith(f"build {output}:"):
+            continue
+        block = [line]
+        cursor = index + 1
+        while cursor < len(lines) and (lines[cursor].startswith("  ") or not lines[cursor]):
+            block.append(lines[cursor])
+            cursor += 1
+        return block
+    raise ValueError(f"build.ninja has no statement for {output}")
+
+
+def _public_audio_graph_proof(root, build_dir):
+    """Capture machine-checkable proof that the public target omits GPL DSP code."""
+    ninja_path = build_dir / "build.ninja"
+    if ninja_path.is_symlink() or not ninja_path.is_file():
+        raise ValueError(f"{ninja_path}: public build graph is missing")
+    ninja_text = ninja_path.read_text(encoding="utf-8")
+    target_block = _ninja_build_block(ninja_text, "gameplay_public.js")
+    source_archive_block = _ninja_build_block(ninja_text, "libfighter_source_runtime_public.a")
+    asset_archive_block = _ninja_build_block(ninja_text, "libfighter_asset_runtime_public.a")
+    all_graph = "\n".join(target_block + source_archive_block + asset_archive_block)
+    forbidden_c = "gameplay_audio_resample.c"
+    forbidden_h = "gameplay_audio_resample.h"
+    if forbidden_c in all_graph or forbidden_h in all_graph:
+        raise ValueError("public Ninja link/archive graph references the GPL resampler")
+
+    try:
+        compile_commands = json.loads((build_dir / "compile_commands.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"{build_dir}: public compile command database is unavailable") from error
+    public_audio_commands = [
+        entry for entry in compile_commands
+        if "fighter_source_runtime_public.dir" in entry.get("command", "")
+        and entry.get("file", "").endswith("/src/gameplay_audio.c")
+    ]
+    public_resampler_commands = [
+        entry for entry in compile_commands
+        if "fighter_source_runtime_public.dir" in entry.get("command", "")
+        and "gameplay_audio_resample.c" in entry.get("file", "")
+    ]
+    if len(public_audio_commands) != 1 or public_resampler_commands:
+        raise ValueError("public compile commands do not prove the intended silent audio unit")
+    audio_command = public_audio_commands[0]["command"]
+    if "MELEE_WEB_PUBLIC_AUDIO_DISABLED" not in audio_command:
+        raise ValueError("public gameplay_audio.c compile command lacks the silent policy definition")
+    depfile_rel = "CMakeFiles/fighter_source_runtime_public.dir/src/gameplay_audio.c.o.d"
+    depfile = build_dir / depfile_rel
+    depfile_text = ""
+    if depfile.is_file() and not depfile.is_symlink():
+        depfile_text = depfile.read_text(encoding="utf-8")
+        if forbidden_h in depfile_text:
+            raise ValueError("public gameplay_audio.c depfile references the GPL resampler header")
+    elif depfile.is_symlink():
+        raise ValueError(f"{depfile}: public gameplay_audio.c depfile is a symlink")
+
+    # Ninja consumes compiler depfiles and normally removes the .d sidecar
+    # after importing it into .ninja_deps.  Query that durable database instead
+    # of treating a missing transient .d file as a graph failure.
+    public_audio_object = "CMakeFiles/fighter_source_runtime_public.dir/src/gameplay_audio.c.o"
+    ninja = root / ".venv" / "bin" / "ninja"
+    if ninja.is_symlink() or not ninja.is_file():
+        raise ValueError(f"{ninja}: project Ninja is unavailable for dependency proof")
+    deps_result = subprocess.run(
+        [str(ninja), "-t", "deps", public_audio_object],
+        cwd=build_dir,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if deps_result.returncode != 0 or not deps_result.stdout.strip():
+        raise ValueError(
+            f"{public_audio_object}: Ninja dependency database is unavailable: "
+            f"{deps_result.stderr.strip()}"
+        )
+    ninja_deps_text = deps_result.stdout
+    if forbidden_h in ninja_deps_text:
+        raise ValueError("public gameplay_audio.c Ninja dependencies reference the GPL resampler header")
+
+    def tokens(block):
+        return [token for token in " ".join(block).split() if token.startswith("CMakeFiles/") or token.startswith("lib")]
+
+    return {
+        "schema": "melee-web-public-audio-graph-v2",
+        "target": "gameplay_public",
+        "excluded_inputs": ["src/gameplay_audio_resample.c", "src/gameplay_audio_resample.h"],
+        "ninja": {
+            "path": ninja_path.relative_to(root).as_posix(),
+            "target_statement_sha256": hashlib.sha256("\n".join(target_block).encode()).hexdigest(),
+            "source_archive_statement_sha256": hashlib.sha256("\n".join(source_archive_block).encode()).hexdigest(),
+            "asset_archive_statement_sha256": hashlib.sha256("\n".join(asset_archive_block).encode()).hexdigest(),
+            "target_inputs": tokens(target_block),
+            "source_archive_inputs": tokens(source_archive_block),
+            "asset_archive_inputs": tokens(asset_archive_block),
+        },
+        "compile_commands": {
+            "path": (build_dir / "compile_commands.json").relative_to(root).as_posix(),
+            "public_audio_command_sha256": hashlib.sha256(audio_command.encode()).hexdigest(),
+            "public_audio_object": public_audio_object,
+            "public_resampler_compile_commands": 0,
+        },
+        "depfile": {
+            "path": (build_dir / depfile_rel).relative_to(root).as_posix(),
+            "present": bool(depfile_text),
+            "resampler_header_referenced": forbidden_h in depfile_text,
+        },
+        "ninja_deps": {
+            "object": public_audio_object,
+            "sha256": hashlib.sha256(ninja_deps_text.encode()).hexdigest(),
+            "resampler_header_referenced": forbidden_h in ninja_deps_text,
+        },
+        "checks": {
+            "resampler_c_in_public_ninja_graph": forbidden_c in all_graph,
+            "resampler_h_in_public_ninja_graph": forbidden_h in all_graph,
+            "resampler_c_in_public_compile_commands": bool(public_resampler_commands),
+            "resampler_h_in_public_depfile": forbidden_h in depfile_text,
+            "resampler_h_in_public_ninja_deps": forbidden_h in ninja_deps_text,
+        },
+    }
+
+
 def _source_inputs_record(root, gameplay_source):
     """Return the complete native-input fingerprint used by the producer."""
     root_files = {
@@ -322,12 +451,19 @@ def _write_public_identity(root, build_dir, version, cmake, ninja, gameplay_sour
         for path in tool_paths
     }
     identity = {
-        "schema": "melee-web-runtime-public-build-v1",
+        "schema": "melee-web-runtime-public-build-v2",
         "target": "runtime-public",
         "configuration": "Release",
         "artifact_root": build_dir.relative_to(root).as_posix(),
         "artifacts": artifacts,
         "wasm_exports": exports,
+        "audio_policy": {
+            "mode": "disabled",
+            "pcm_output": False,
+            "dsp_resampler": False,
+            "dsp_coefficients_required": False,
+        },
+        "audio_graph": _public_audio_graph_proof(root, build_dir),
         "source_inputs": source_inputs,
         "toolchain": {
             "emscripten": version,
@@ -386,7 +522,8 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo"):
     env["EM_CONFIG"] = str(sdk / ".emscripten")
     env["EM_CACHE"] = str(emscripten / "cache")
     env["EMSDK_PYTHON"] = sys.executable
-    build_dir = root / ("build/browser-release" if configuration == "Release" else "build/browser")
+    build_dir = root / (PUBLIC_RUNTIME_BUILD_DIR if target == PUBLIC_RUNTIME_TARGET else
+                         ("build/browser-release" if configuration == "Release" else "build/browser"))
     if (root / "build").is_symlink() or build_dir.is_symlink():
         raise ValueError("Build output must be a local directory, not a symlink")
     source_inputs_before = (

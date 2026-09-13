@@ -54,6 +54,7 @@ try {
     assert.equal(await page.locator('iframe,h1,header,footer,article').count(), 0);
     assert(await page.locator('#start-game').isDisabled());
     assert(await page.locator('#end-session').isDisabled());
+    assert.match(await page.locator('#edition').innerText(), /no audio/);
     assert.equal(await page.evaluate(() => typeof Module._melee_web_native_menu_replay_begin), 'undefined');
     assert.equal(await page.evaluate(() => typeof Module._melee_web_native_menu_diagnostics), 'undefined');
     assert.equal(await page.evaluate(() => typeof window.menuObservePlayer), 'undefined');
@@ -118,7 +119,7 @@ try {
       await page.waitForTimeout(700);
       await press('o'); await phase(1);
     });
-    await check('Eject retires the document and audio; a second import can launch', async () => {
+    await check('Eject retires the document; a second silent import can launch', async () => {
       await page.evaluate(() => { window.releaseOldDocumentMarker = true; });
       await collectViolations(); await page.locator('#end-session').click(); await page.waitForFunction(() => !window.releaseOldDocumentMarker); await ready();
       assert(await page.locator('#start-game').isDisabled());
@@ -128,10 +129,8 @@ try {
       await page.locator('#end-session').click(); await ready();
       assert(await page.locator('#start-game').isDisabled());
     });
-    assert(audioEvents.some(row => row.event === 'contextCreated' && row.data.context.sampleRate === 32000));
-    assert(audioEvents.some(row => row.event === 'contextChanged' && row.data.context.contextState === 'running'));
-    assert(audioEvents.some(row => row.event === 'contextWillBeDestroyed'));
-    report.audio = 'Observed real 32000 Hz Web Audio context creation, running state and retirement. No PCM comparison or acoustic-output claim.';
+    assert.deepEqual(audioEvents, [], 'The audio-disabled public profile must never create a Web Audio context');
+    report.audio = 'Audio explicitly disabled. No Web Audio contexts were created during import, menus, pause/resume or second launch. No audio fidelity claim.';
   } else report.disc = 'Not supplied; native import, menus and audio not exercised.';
   await check('legal pages use their readable document stylesheet and serve full notices', async () => {
     await collectViolations();
@@ -147,7 +146,7 @@ try {
     assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
     await shot('legal-mobile');
     const notices = await page.request.get(origin + '/licenses/runtime-third-party.txt');
-    assert.equal(notices.status(), 200); assert.match(await notices.text(), /GNU GENERAL PUBLIC LICENSE/);
+    assert.equal(notices.status(), 200); assert.match(await notices.text(), /Permission is hereby granted/);
   });
   await check('only keyboard preferences persist; no application upload or background connections', async () => {
     const storage = await page.evaluate(async () => ({local: Object.keys(localStorage), session: Object.keys(sessionStorage),
@@ -160,6 +159,7 @@ try {
       const url = new URL(request.url);
       assert.equal(url.origin, origin); assert.equal(request.method, 'GET'); assert.equal(request.body, null);
       assert.equal(url.search, '');
+      assert.doesNotMatch(url.pathname, /dsp-coefficients|runtime-audio|audio-worklet|audio-ring/);
       assert(['/', '/terms', '/privacy', '/copyright', '/notices'].includes(url.pathname) ||
         /^\/runtime\/[a-f0-9]+\/[a-z0-9/_.-]+$/i.test(url.pathname) || /^\/assets\/site\.[a-f0-9]+\.css$/.test(url.pathname), url.pathname);
     }

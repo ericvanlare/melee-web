@@ -6,6 +6,7 @@ const SCENES = {1: 'css', 2: 'preparing', 3: 'sss', 4: 'preparing', 5: 'preparin
 
 export async function mountMeleeRuntime({canvas, onState = () => {}, onError = () => {},
   onEvent = () => {}, onLog = () => {}, onOwner, configureModule,
+  readDisc = loadNativeGameDisc, createAudio,
   loaderUrl = new URL('./gameplay_public.js', import.meta.url), startupTimeout = 60000} = {}) {
   if (!canvas || canvas.id !== 'canvas') throw Error('The player requires its own #canvas.');
   if (documentClaimed) throw Error('Reload the page to start a fresh player.');
@@ -18,8 +19,9 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   let busy = '', message = '', progress = null, inputDirty = true, lastState = '';
   let preparationLabel = '', preparationKeepsAudio = false;
   let keyboard = [true, true], layout = 'two';
-  let audioContext = null, audioNode = null, audioEnabled = false, audioStateAcknowledged = true;
-  const commands = [], audioAckWaiters = [], listeners = [];
+  const commands = [], listeners = [];
+  const audio = createAudio?.({assetBase, onEvent: data => emit('audio', data),
+    onError: error => { message = error.message; onError(error); publish(); }, onFatal: stop});
   const emit = (name, data) => onEvent(name, data);
   let resolveStartup, rejectStartup;
   const startup = new Promise((resolve, reject) => { resolveStartup = resolve; rejectStartup = reject; });
@@ -41,7 +43,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     const paused = active && !running && !preparationLabel && !busy;
     const state = destroyed ? 'destroyed' : fatal ? 'error' : !ready ? 'booting' : busy ||
       (preparationLabel ? 'preparing' : paused ? 'paused' : active ? scene : prepared ? 'prepared' : 'idle');
-    return Object.freeze({version: 1, state, scene, phase, running, paused,
+    return Object.freeze({version: 1, state, scene, phase, running, paused, audio: audio ? 'enabled' : 'disabled',
       message: message || preparationLabel || status(), progress,
       ready, bundle, busy: !!busy, requiresReload: destroyed || fatal,
       canImport: ready && !fatal && !destroyed && !busy && !preparationLabel,
@@ -61,7 +63,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     preparationLabel = ''; preparationKeepsAudio = false;
     syncAudio();
     for (const c of commands.splice(0)) c.reject(Error(message));
-    for (const waiter of audioAckWaiters.splice(0)) { clearTimeout(waiter.timer); waiter.reject(Error(message)); }
+    audio?.fail(Error(message));
     rejectStartup(Error(message)); publish(); onError(Error(message)); emit('fatal', message);
   }
   const boundary = run => fatal || destroyed ? Promise.reject(Error('Reload after the player stopped.')) :
@@ -78,49 +80,22 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     } catch (error) { callbacks.menuPreparationFailed(error.message || String(error)); throw error; }
     finally { clearTimeout(timeout); busy = ''; progress = null; publish(); }
   }
-  function waitForAudioAck() {
-    if (audioStateAcknowledged) return Promise.resolve();
-    return new Promise((resolve, reject) => {
-      const waiter = {resolve, reject, timer: setTimeout(() => stop(Error('Audio did not acknowledge preparation. Reload to recover.')), 10000)};
-      audioAckWaiters.push(waiter);
-    });
-  }
-  async function prepareAudio() {
-    if (!audioContext) {
-      audioContext = new AudioContext({sampleRate: 32000, latencyHint: 'interactive'});
-      if (audioContext.sampleRate !== 32000) throw Error('Expected 32000 Hz audio context.');
-      await audioContext.audioWorklet.addModule(new URL('audio-worklet.js', assetBase).href);
-      audioNode = new AudioWorkletNode(audioContext, 'melee-audio-output', {
-        numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [2],
-      });
-      audioStateAcknowledged = false;
-      audioNode.port.onmessage = ({data}) => {
-        if (data.type === 'state-ack' && data.enabled === audioEnabled) {
-          audioStateAcknowledged = true;
-          for (const waiter of audioAckWaiters.splice(0)) { clearTimeout(waiter.timer); waiter.resolve(); }
-        }
-        if (data.error) { message = data.error; onError(Error(data.error)); publish(); }
-        emit('audio', data);
-      };
-      audioNode.port.postMessage({type: 'state', enabled: false});
-      audioNode.connect(audioContext.destination);
-    }
-    await audioContext.resume();
-  }
-  async function pauseAudioForPreparation() {
-    if (audioEnabled) { audioEnabled = false; audioStateAcknowledged = !audioNode; audioNode?.port.postMessage({type: 'state', enabled: false}); }
-    await waitForAudioAck();
-  }
+  const waitForAudioAck = () => audio?.waitForAck() || Promise.resolve();
+  const prepareAudio = async () => { await audio?.prepare(); };
+  const pauseAudioForPreparation = async () => { await audio?.pause(); };
   function syncAudio() {
     const running = ready && !fatal && !destroyed && !!Module._melee_web_native_menu_running();
     const enabled = ready && !fatal && !destroyed && (running || preparationKeepsAudio) && !document.hidden;
     if (running) preparationKeepsAudio = false;
-    if (enabled !== audioEnabled) { audioEnabled = enabled; audioStateAcknowledged = !audioNode; audioNode?.port.postMessage({type: 'state', enabled}); }
+    audio?.setEnabled(enabled);
   }
   const callbacks = {
-    menuAudio(pcm) { if (audioEnabled) audioNode?.port.postMessage({type: 'pcm', pcm}, [pcm.buffer]); },
+    menuAudio(pcm) {
+      if (!audio) throw Error('Audio output is disabled in this public alpha.');
+      audio.write(pcm);
+    },
     // These two callbacks MUST remain synchronous at their native boundaries.
-    menuAudioReadyForPreparation() { return preparationKeepsAudio || !audioNode || (!audioEnabled && audioStateAcknowledged); },
+    menuAudioReadyForPreparation() { return preparationKeepsAudio || !audio || audio.readyForPreparation(); },
     menuServiceCommands() {
       if (fatal || destroyed) return;
       for (const c of commands.splice(0)) { try { c.resolve(c.run()); } catch (error) { c.reject(error); } }
@@ -181,7 +156,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       return operation('importing', async () => {
         bundle = false;
         if (!await unloadAndSave()) throw Error(status());
-        const files = await loadNativeGameDisc(file, p => {
+        const files = await readDisc(file, p => {
           progress = Object.freeze({complete: p.complete, total: p.total}); message = `Reading local data ${p.complete}/${p.total}`; publish();
         });
         for (const [name, bytes] of files) await put(name, bytes);
@@ -208,7 +183,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       if (destroyed) return Object.freeze({requiresReload: true});
       if (!fatal) await handle.unload();
       destroyed = true; syncAudio();
-      audioNode?.disconnect(); if (audioContext) await audioContext.close();
+      await audio?.destroy();
       for (const [type, listener] of listeners) window.removeEventListener(type, listener, true);
       publish();
       // The global Emscripten heap and main loop live until this document retires.

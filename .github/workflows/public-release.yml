@@ -40,7 +40,7 @@ jobs:
       - name: Package and audit the player graph
         run: |
           python3 scripts/build_public.py --profile player --mode preview \
-            --runtime-dir build/browser-release --output build/public-player \
+            --runtime-dir build/browser-public-release --output build/public-player \
             --manifest build/public-player.manifest.json
           python3 scripts/audit_public.py --profile player --output build/public-player \
             --manifest build/public-player.manifest.json

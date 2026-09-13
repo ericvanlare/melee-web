@@ -1,5 +1,7 @@
 /** Development tools attach to the shared player; this file is excluded from public builds. */
 import {mountMeleeRuntime} from './melee-runtime.mjs';
+import {createRuntimeAudio} from './runtime-audio.mjs';
+import {loadNativeGameDisc} from './runtime-audio-assets.mjs';
 const developmentHooks = {};
 let owner, Module, boundary, status, check, put, prepareAudio, pauseAudioForPreparation;
 let syncAudio, unloadAndSave, prepareNativeResources, waitForAudioAck;
@@ -197,7 +199,7 @@ $('pause').onclick=()=>{
 };
 $('unload').onclick=async()=>{try{await owner.handle.unload();stockCheckActive=false;}catch(error){log(error.message);}};
 try {
-  await mountMeleeRuntime({canvas:$('canvas'),loaderUrl:new URL('./gameplay_menu_browser.js',import.meta.url),
+  await mountMeleeRuntime({canvas:$('canvas'),createAudio:createRuntimeAudio,readDisc:loadNativeGameDisc,loaderUrl:new URL('./gameplay_menu_browser.js',import.meta.url),
     onOwner(context){owner=context;({Module,boundary,status,check,put,prepareAudio,pauseAudioForPreparation,
       syncAudio,unloadAndSave,prepareNativeResources,waitForAudioAck}=context);},
     configureModule(module){

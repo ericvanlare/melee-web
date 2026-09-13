@@ -155,7 +155,7 @@ await runtime.destroy(); // unload, close audio; document reload is still requir
 
 The frozen version-1 handle also exposes `prepare`, `setKeyboard` and
 `setKeyboardLayout`. State snapshots carry `state`, `scene`, `phase`, `running`,
-`paused`, `message`, `progress`, `ready`, `bundle`, `busy`, `requiresReload` and
+`paused`, `audio`, `message`, `progress`, `ready`, `bundle`, `busy`, `requiresReload` and
 capability flags. States include booting, idle, importing, preparing, prepared,
 css, sss, match, paused, pausing, resuming, unloading, error and destroyed.
 Startup resolves after the generated runtime initializes; failed startup and
@@ -163,22 +163,28 @@ unresponsive native operations require reload.
 
 Only one mount is supported per document. The global Emscripten heap and native
 main loop are not independently destroyed. Public Eject completes native unload,
-waits for renderer work, closes audio, then reloads the document to retire that
+waits for renderer work, then reloads the document to retire that
 heap and imported bytes. It preserves keyboard preferences. It does not claim
 to clear browser or graphics-driver caches.
 
 `runtime-development.mjs` owns the original local controls, source observations,
 replay and hitch tools. Its explicit attachment gets access to native helpers
 before startup; `runtime.html` loads that module and the optional development
-cache installer. The public entry passes neither attachment nor installer.
+cache installer. It injects `createRuntimeAudio` from `runtime-audio.mjs` and
+`loadNativeGameDisc` from `runtime-audio-assets.mjs` to retain the existing
+development audio path. Those modules, their coefficient generator and worklet
+are excluded from the public graph. The public entry passes none of these
+attachments; its state explicitly reports `audio: disabled`.
 `Module` is absent from the public handle, though the classic generated loader
 still has a global `Module`; the compiled public profile removes the diagnostic
 exports instead of relying on hiding that variable.
 
 The shared owner preserves these boundaries:
 
-- Audio context/worklet creation, disabled-state acknowledgement and native PCM
-  dispatch remain together. `menuAudioReadyForPreparation` returns synchronously.
+- Development audio context/worklet creation, disabled-state acknowledgement and
+  PCM dispatch remain together in `runtime-audio.mjs`. The shared preparation
+  callback remains synchronous. The public owner never creates an AudioContext
+  and treats an unexpected native PCM callback as an error.
 - `menuServiceCommands` drains the command queue synchronously before native
   update, then updates keyboard enablement and separate focus/visibility inputs.
   It does not create a JavaScript simulation loop.
@@ -226,7 +232,9 @@ insufficient.
    aggregate limit.
 4. Read manifest entries in insertion order and report progress.
 5. Extract `sislib_font.bin` from the DOL font range.
-6. Validate and append generated `dsp_coef.bin`.
+6. For development audio only, `runtime-audio-assets.mjs` validates and appends
+   generated `dsp_coef.bin`. The public `runtime-assets.mjs` never imports the
+   GPL generator or supplies coefficient bytes.
 7. Pass bytes through `_melee_web_native_menu_file`, then prepare natively.
 
 Imported disc data is never written to the renderer cache; that cache is

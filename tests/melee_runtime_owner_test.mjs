@@ -4,6 +4,8 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {createRuntimeAudio} from '../web/runtime-audio.mjs';
+const withAudio = !process.argv.includes('--silent');
 const original = await fs.readFile(new URL('../web/melee-runtime.mjs', import.meta.url), 'utf8');
 const source = original.replace("import {loadNativeGameDisc} from './runtime-assets.mjs';", 'const loadNativeGameDisc = globalThis.testDiscReader;');
 let phase = 0, running = false, nextPointer = 16, cacheWaits = 0, audioClosed = false;
@@ -44,7 +46,7 @@ await fs.writeFile(sourcePath, source);
 const {mountMeleeRuntime} = await import(pathToFileURL(sourcePath));
 await fs.rm(temporary, {recursive: true});
 let owner;
-const mounted = mountMeleeRuntime({canvas, loaderUrl: new URL('http://localhost/runtime/version/gameplay_public.js'),
+const mounted = mountMeleeRuntime({canvas, createAudio: withAudio ? createRuntimeAudio : undefined, loaderUrl: new URL('http://localhost/runtime/version/gameplay_public.js'),
   onState: state => states.push(state), onOwner: context => { owner = context; }});
 assert.equal(states.at(-1).state, 'booting');
 Object.assign(Module, {
@@ -114,7 +116,12 @@ await pump(player.importDisc({name: 'owned.iso'}));
 await pump(player.start());
 assert.equal(player.getState().scene, 'css');
 assert.equal(player.getState().canPause, true);
-assert.ok(calls.findIndex(row => row[0] === 'audioResume') < calls.findIndex(row => row[0] === 'launch'));
+if (withAudio) assert.ok(calls.findIndex(row => row[0] === 'audioResume') < calls.findIndex(row => row[0] === 'launch'));
+else {
+  assert.equal(calls.some(row => row[0] === 'audioResume'), false);
+  assert.equal(player.getState().audio, 'disabled');
+  assert.throws(() => window.menuAudio(new Float32Array(2)), /Audio output is disabled/);
+}
 await pump(player.pause()); assert.equal(player.getState().paused, true);
 await pump(player.resume()); assert.equal(player.getState().running, true);
 window.menuPreparation('Next source scene', true);
@@ -128,10 +135,10 @@ assert.equal(player.getState().canStart, true, 'Normal unload retains the prepar
 await pump(player.start());
 const destroyed = await pump(player.destroy());
 assert.equal(destroyed.requiresReload, true);
-assert.equal(audioClosed, true);
+assert.equal(audioClosed, withAudio);
 assert.equal(player.getState().state, 'destroyed');
 assert.equal(player.getState().canImport, false);
 await assert.rejects(player.start(), /valid local disc/);
 assert.equal(calls.filter(row => row[0] === 'loader').length, 1);
-assert.equal(calls.filter(row => row[0] === 'worklet').length, 1);
+assert.equal(calls.filter(row => row[0] === 'worklet').length, withAudio ? 1 : 0);
 console.log('Shared runtime owner: boot, command order, disc retry, audio gates, void pause API, repeat launch and reload-only destruction pass.');

@@ -11,13 +11,14 @@ surface. The `maintenance` profile packages the small nonplayable fallback.
 Never upload the repository, `web/`, a native build directory, an iframe staging
 package or accumulated `work/` files. Do not change repository visibility.
 See `PUBLIC_RELEASE_REVIEW.md` for the executable/source rights assessment,
-source-delivery requirements and operator facts needed before publication.
+the accepted alpha risk posture and the remaining artifact/contact gates.
 
 ## Current launch state
 
 The `webmelee` Direct Upload Pages project and a free `webmelee.gg` zone have
-been created. No deployment or custom domain is active. Publication is waiting
-for an operator-supplied public name and working contact email. Cloudflare's DNS
+been created. The operator has specified **NaiadAI, LLC** and
+**legal@webmelee.gg** as the public contact. This supplies the public facts; it
+does not prove mail delivery. No deployment or custom domain is active yet. Cloudflare's DNS
 scan preserved the five existing MX records and SPF TXT record; its imported A
 and www CNAME still point to Namecheap parking and must be replaced for Pages.
 The assigned nameservers are `alan.ns.cloudflare.com` and
@@ -33,18 +34,21 @@ scripts, using a fresh ignored output directory for each candidate:
 
 ```sh
 python3 scripts/build.py --target runtime-public --configuration Release
-python3 scripts/build_public.py --profile player --runtime-dir build/browser-release --output build/player-preview --mode preview
+python3 scripts/build_public.py --profile player --runtime-dir build/browser-public-release --output build/player-preview --mode preview
 python3 scripts/audit_public.py --output build/player-preview --manifest build/player-preview.manifest.json
 ```
 
 `runtime-public` builds the shared native engine, input and renderer with a
-Release-only export list. It does not use a copied development executable.
+Release-only export list and an explicitly audio-disabled public native closure.
+Its separate `build/browser-public-release` directory prevents the alpha flags
+from changing the normal development build in `build/browser-release`. It does
+not use a copied development executable.
 `build/runtime-public-identity.json` records native file bytes/hashes, actual
 Wasm exports and JS bindings, source trees, prepared pinned-source identity,
-toolchain and pipeline seed. The public builder verifies that record against
+toolchain, pipeline seed, disabled-audio policy and compile/link exclusion proof. The public builder verifies that record against
 this checkout and selects only the three named native files. It copies the
-reviewed JS/audio modules directly from source and hashes the complete runtime
-graph into `runtime/<hash>/`. Relative imports and the Wasm/data/worklet paths
+reviewed player, disc and input modules directly from source and hashes the complete runtime
+graph into `runtime/<hash>/`. Relative imports and the Wasm/data paths
 remain within that immutable directory.
 
 The sidecar release manifest inventories every output path, byte size and
@@ -54,18 +58,20 @@ compares the complete inventory. A native or source mismatch fails; a manually
 rewritten manifest does not authorize extra files. The source commit and the
 local operator configuration must be retained beside the candidate.
 
-Preview mode has explicit draft legal placeholders and is for local review only
-until contact facts are supplied. Once the operator provides the approved public
-name and working email, set `WEBMELEE_PUBLIC_OPERATOR` and
-`WEBMELEE_PUBLIC_CONTACT` in the local shell and build the publishable candidate:
+Preview mode has draft legal placeholders and is for local review only. Build
+the production candidate with the operator-approved facts below, then verify
+forwarding independently before activating the public domain:
 
 ```sh
-python3 scripts/build_public.py --profile player --runtime-dir build/browser-release --output build/player-candidate --mode production --operator "$WEBMELEE_PUBLIC_OPERATOR" --contact "$WEBMELEE_PUBLIC_CONTACT"
+python3 scripts/build_public.py --profile player --runtime-dir build/browser-public-release --output build/player-candidate --mode production --operator 'NaiadAI, LLC' --contact legal@webmelee.gg
 python3 scripts/audit_public.py --output build/player-candidate --manifest build/player-candidate.manifest.json
 ```
 
-Complete the source-distribution and rights review documented in
-`PUBLIC_RELEASE_REVIEW.md` before uploading a compiled player. Production stays
+The operator accepts the unresolved recovered-code risk for this alpha; that
+is recorded in `PUBLIC_RELEASE_REVIEW.md`, without a claim of legal clearance.
+The public artifact must exclude the GPL-derived audio implementations and pass
+its final audit. Legacy audio-enabled/v1 identities are rejected. The public
+page must retain both the audio-disabled disclosure and opcode-63 limitation. Production stays
 non-indexed unless `--index-production` is deliberately chosen. A preview is
 marked in its browser title; it does not add a banner to the player.
 
@@ -126,13 +132,13 @@ status 200 is a failure. Directory inventories must not be served.
 The generated [_headers](https://developers.cloudflare.com/pages/configuration/headers/)
 sets CSP, nosniff, no-referrer, DENY framing and feature permissions. The player
 requires COOP `same-origin` and COEP `require-corp`. Its CSP permits same-origin
-module/loader/worklet and Wasm compilation via `wasm-unsafe-eval`; generated JS
+module/loader and Wasm compilation via `wasm-unsafe-eval`; generated JS
 is built with dynamic JS execution disabled. Same-origin fetch is needed for
 Wasm/data loading. It is not an upload prevention rule: verify the actual
 application requests instead of claiming CSP blocks every same-origin POST.
 Wasm is served as `application/wasm`, data as `application/octet-stream`, and
 JS modules as JavaScript. Hashed runtime assets use immutable caching; HTML
-revalidates. Verify WebGPU, audio, local file selection and fullscreen against
+revalidates. Verify WebGPU, the absence of audio output, local file selection and fullscreen against
 these exact headers. Check that
 Cloudflare has not injected Web Analytics, Zaraz or another script.
 
@@ -151,6 +157,34 @@ Omitting the source scheme matches HTTP and HTTPS. These are URL/flag settings;
 Bulk Redirects do not use `_redirects` wildcard substitutions. Activate the list's
 rule only after the apex works, and confirm that immutable preview hosts remain
 separate.
+
+## Mail verification gate
+
+Do not activate the public website until the exact artifact audit passes and
+`legal@webmelee.gg` forwarding has been observed delivering mail to the intended
+inbox. DNS MX records or a verified destination alone are not end-to-end proof.
+Obtain the intended forwarding destination from the operator; do not infer it
+from account or Git metadata. Keep that private destination out of public files.
+The registrar session expired during the alpha preparation check and needs
+reauthentication before its current aliases can be inspected or changed.
+
+[Namecheap free forwarding](https://www.namecheap.com/support/knowledgebase/article.aspx/308/2214/how-to-set-up-free-email-forwarding/)
+requires its BasicDNS, PremiumDNS or FreeDNS service. Merely copying its MX
+records into Cloudflare does not establish a working route after cutover.
+[Cloudflare routing](https://developers.cloudflare.com/email-service/get-started/route-emails/)
+requires Cloudflare DNS and a verified destination. Prepare the intended route
+and retain current DNS/mail records before any approved DNS migration. Keep the
+website detached while mail setup and final testing are incomplete. If the
+operator's domain-activation gate prevents a required DNS-only mail setup step,
+explain that exact dependency before changing nameservers.
+
+Send a uniquely identifiable test message from a separate sender account to
+`legal@webmelee.gg`; verify receipt in the destination inbox, including recipient,
+subject/token and time. A provider verification link is a different check.
+Retain a private receipt without mailbox contents or credentials in Git. Retest
+after changing MX, nameservers or routing providers, before website activation.
+Record failed/bounced attempts honestly. Do not configure a catch-all unless
+requested.
 
 ## DNS inventory and cutover
 

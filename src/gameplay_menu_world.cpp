@@ -116,6 +116,12 @@ struct GameplayMenuWorld::Storage {
     void load_archives(const RuntimeFiles& files)
     {
         for (const auto name : kRequiredFiles) {
+#if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+            // The public alpha carries no GPL resampler or DROM coefficients.
+            // Keep the source file inventory explicit while letting the
+            // silent provider own SEM/AX setup without this optional input.
+            if (name == "dsp_coef.bin") continue;
+#endif
             if (name == "sislib_font.bin" || name == "smash2.sem" ||
                 name == "dsp_coef.bin" || name == "menu01.hps" ||
                 name.ends_with(".ssm")) {
@@ -231,7 +237,11 @@ struct GameplayMenuWorld::Storage {
 
         font_bytes = std::span<const std::uint8_t>{require_file(files, "sislib_font.bin")};
         sem = std::span<const std::uint8_t>{require_file(files, "smash2.sem")};
+#if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+        coefficients = {};
+#else
         coefficients = std::span<const std::uint8_t>{require_file(files, "dsp_coef.bin")};
+#endif
         hps = std::span<const std::uint8_t>{require_file(files, "menu01.hps")};
         for (std::size_t i = 0; i < kBankFiles.size(); ++i)
             bank_bytes[i] = std::span<const std::uint8_t>{require_file(files, kBankFiles[i])};

@@ -4,6 +4,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -14,7 +15,13 @@ BLOCKED_PATHS = (
     '/.git/config', '/_worker.js', '/assets/', '/unrecognized-test-route',
     '/_headers', '/_redirects', '/disc-image.mjs', '/runtime-cache.js',
     '/runtime/',
+    '/dsp-coefficients.mjs', '/runtime-audio-assets.mjs', '/runtime-audio.mjs',
+    '/audio-worklet.js', '/audio-ring.mjs', '/dsp_coef.bin',
     '/gameplay_menu_browser.wasm', '/__melee_evidence/replay.json',
+)
+FORBIDDEN_AUDIO_MODULES = (
+    'dsp-coefficients.mjs', 'runtime-audio-assets.mjs', 'runtime-audio.mjs',
+    'audio-worklet.js', 'audio-ring.mjs', 'dsp_coef.bin',
 )
 
 
@@ -108,6 +115,28 @@ def verify(url, manifest):
     profile = records.get('profile', 'maintenance')
     if profile not in ('maintenance', 'player'):
         raise ValueError('manifest profile must be maintenance or player')
+    if profile == 'player':
+        runtime_paths = [record.get('path', '') for record in records.get('files', [])
+                         if isinstance(record, dict) and isinstance(record.get('path'), str)
+                         and record['path'].startswith('runtime/')]
+        groups = {tuple(path.split('/', 2)[:2]) for path in runtime_paths
+                  if len(path.split('/', 2)) >= 2}
+        if len(groups) != 1 or not next(iter(groups))[0] == 'runtime' or not \
+                re.fullmatch(r'[0-9a-f]{16}', next(iter(groups))[1]):
+            raise ValueError('player manifest runtime path is invalid')
+        runtime_root = '/'.join(next(iter(groups)))
+        allowed = {
+            f'{runtime_root}/melee-runtime.mjs', f'{runtime_root}/runtime-assets.mjs',
+            f'{runtime_root}/disc-image.mjs', f'{runtime_root}/prototype-keyboard-layouts.mjs',
+            f'{runtime_root}/gameplay_public.js', f'{runtime_root}/gameplay_public.wasm',
+            f'{runtime_root}/gameplay_public.data', f'{runtime_root}/player/player.css',
+            f'{runtime_root}/player/player-shell.mjs',
+        }
+        if set(runtime_paths) != allowed:
+            raise ValueError('player manifest runtime graph contains unauthorized or audio modules')
+        blocked_paths = BLOCKED_PATHS + tuple(f'/{runtime_root}/{name}' for name in FORBIDDEN_AUDIO_MODULES)
+    else:
+        blocked_paths = BLOCKED_PATHS
     result = {'origin': origin, 'resources': [], 'missing': [], 'result': 'pass'}
     require_noindex = not records['index_production'] or urllib.parse.urlsplit(origin).hostname.endswith('.pages.dev')
     for record in records['files']:
@@ -121,7 +150,7 @@ def verify(url, manifest):
                          for route, name in (('/', 'index.html'), ('/terms', 'terms.html'),
                                              ('/privacy', 'privacy.html'), ('/copyright', 'copyright.html'),
                                              ('/notices', 'notices.html'))]
-    for route in BLOCKED_PATHS:
+    for route in blocked_paths:
         status, _, body, final_url = get(origin + route)
         check_destination(origin, final_url, {route})
         if loopback and route in ('/_headers', '/_redirects') and status == 502 and b'ENOTDIR' in body:

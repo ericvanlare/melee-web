@@ -10,8 +10,12 @@ GameplayAudioBank::GameplayAudioBank(std::span<const uint8_t> sem,
  std::vector<std::shared_ptr<const DatAudioBank>> banks,std::span<const uint8_t> coefficients)
  :programs_(sem),banks_(std::move(banks)){start(coefficients);}
 void GameplayAudioBank::start(std::span<const uint8_t> coefficients){
+#if !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
  if(coefficients.size()!=4096)throw DatError("DSP coefficient file must contain2048 big-endian halfwords");
  for(size_t i=0;i<coefficients.size();i+=2)coefficients_.push_back(int16_t(uint16_t(coefficients[i])<<8|coefficients[i+1]));
+#else
+ (void)coefficients;
+#endif
  for(auto& bank:banks_)for(auto& sample:bank->samples){
   MeleeWebAudioSample out{};out.id=sample.id;out.rate=sample.sample_rate;out.channels=sample.channels.size();
   for(unsigned i=0;i<out.channels;i++){
@@ -22,7 +26,13 @@ void GameplayAudioBank::start(std::span<const uint8_t> coefficients){
   }
   samples_.push_back(out);
  }
- input_={samples_.data(),uint32_t(samples_.size()),programs_.words.data(),uint32_t(programs_.words.size()),programs_.tables[2].data(),uint32_t(programs_.tables[2].size()),programs_.tables[3].data(),uint32_t(programs_.tables[3].size()),coefficients_.data(),uint32_t(coefficients_.size())};
+ input_={samples_.data(),uint32_t(samples_.size()),programs_.words.data(),uint32_t(programs_.words.size()),programs_.tables[2].data(),uint32_t(programs_.tables[2].size()),programs_.tables[3].data(),uint32_t(programs_.tables[3].size()),
+#if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+         nullptr,0
+#else
+         coefficients_.data(),uint32_t(coefficients_.size())
+#endif
+ };
  char error[256];audio_=melee_web_audio_begin(&input_,error,sizeof(error));if(!audio_)throw DatError(error);
 }
 GameplayAudioBank::~GameplayAudioBank(){if(audio_){char error[256];if(!melee_web_audio_end(audio_,error,sizeof(error)))std::abort();}}

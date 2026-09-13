@@ -41,8 +41,12 @@ class PublicRuntimeBuildTests(unittest.TestCase):
         public = cmake.split("# The public player", 1)[1].split(
             "# Shared typed scene/model tables", 1
         )[0]
-        self.assertIn("if(CMAKE_BUILD_TYPE STREQUAL \"Release\")", public)
+        self.assertIn("if(CMAKE_BUILD_TYPE STREQUAL \"Release\" AND MELEE_WEB_PUBLIC_RUNTIME)", public)
         self.assertIn("add_custom_target(runtime-public DEPENDS gameplay_public)", public)
+        self.assertIn("MELEE_WEB_PUBLIC_AUDIO_DISABLED", public)
+        self.assertIn("fighter_asset_runtime_public", public)
+        self.assertNotIn("gameplay_audio_resample.c", public)
+        self.assertEqual(public_build.PUBLIC_RUNTIME_BUILD_DIR, "build/browser-public-release")
         self.assertNotIn("--profiling-funcs", public)
         self.assertIn("_melee_web_native_menu_message", public)
         self.assertIn("_melee_web_input_set_keyboard_layout", public)

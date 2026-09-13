@@ -4,6 +4,31 @@ Research date: September 12, 2026. Prepared for operator and qualified counsel
 review. This is a technical inventory and issue assessment, not a legal
 opinion, trademark clearance or assurance of legal protection.
 
+## Operator-approved alpha posture
+
+The operator is **NaiadAI, LLC** and the approved public contact is
+**legal@webmelee.gg**. The operator explicitly accepts the unresolved
+recovered/decompiled-code risk for the initial alpha, using smash.fun as a
+rough product-risk reference. That acceptance is not a legal comparison,
+clearance or evidence of another service's rights. Do not re-open the accepted
+risk posture as an automatic deployment-approval gate.
+
+The operator prohibits distributing GPL-derived audio code without meeting its
+obligations. The immediate alpha therefore uses an explicitly audio-disabled
+public native build, excludes `gameplay_audio_resample.c/.h` and
+`dsp-coefficients.mjs`, and supplies no generated replacement DSP coefficient
+bytes. The normal development profile retains those sources and its tests;
+it must not be deployed. The exact production identity, compile/link closure,
+JS graph and final artifact audit must establish the exclusions. Full audio
+fidelity is on the roadmap. No source-distribution promise or repository
+visibility change is made by this release path.
+
+Forwarding to the intended inbox must be tested and the final candidate audit
+must pass before public-domain activation. The approved address alone does not
+establish receipt. The existing opcode-63 CPU-action abort remains an explicit
+known limitation; no wider stability or full-match claim follows from this
+release posture.
+
 ## Candidate and scope
 
 This review covers the current `web/player` loader, `web/melee-runtime.mjs`, the
@@ -14,16 +39,16 @@ outside the public player graph.
 
 The player profile serves the reviewed legal pages plus a compiled Emscripten
 JavaScript/Wasm/data runtime and the small JavaScript modules needed for local
-disc reads, input and audio. It does not serve a retail disc image, extracted
+disc reads and input. Public audio output is disabled; no Web Audio transport
+or DSP coefficient generator is included. It does not serve a retail disc image, extracted
 game archive, standalone game asset or repository source checkout. The compiled
 program is nevertheless built from recovered Melee/HSD and original platform
 source, so excluding source files and retail assets from the upload does not
 resolve the rights in the executable.
 
-The legal page templates still contain `{{OPERATOR_NAME}}` and
-`{{CONTACT_EMAIL}}`. Production packaging must substitute a real operator and
-working rights/privacy address. Do not infer either value from a registrar,
-Cloudflare account or Git metadata.
+The legal templates retain build placeholders. Production packaging substitutes
+NaiadAI, LLC and legal@webmelee.gg, as expressly supplied by the operator. The
+mail route still requires end-to-end verification before domain activation.
 
 ## Artifact and seed facts
 
@@ -59,7 +84,7 @@ privacy and notice review.
 | Application network | Same-origin requests load the player modules and compiled runtime; no application account, analytics or upload path is present in the reviewed graph | Cloudflare and browser networking remain outside application code; verify methods, URLs, bodies, WebSocket and beacon activity on the deployed artifact |
 | Preference storage | Keyboard layout and enablement choices use localStorage key `melee-prototype-keyboard-v1` | Storage may be unavailable; no preference should be described as server-side |
 | Renderer storage | Native Aurora cache files use the page's in-memory filesystem; public JS does not mount IDBFS | Browser HTTP cache, history and graphics-driver caches are uncontrolled and are separate from application memory |
-| Eject/reload | Eject unloads native state, closes audio, calls `player.destroy()` and reloads the document | The full reload retires the page/Wasm/native heap, imported archive bytes, decoded assets and audio graph; it does not clear keyboard preferences or browser/driver caches |
+| Eject/reload | Eject unloads native state, calls `player.destroy()` and reloads the document | The full reload retires the page/Wasm/native heap, imported archive bytes, decoded assets; it does not clear keyboard preferences or browser/driver caches |
 | Diagnostics | Development `runtime.html`, evidence routes and cache export controls are not in the player graph | The public packager rejects diagnostic/evidence modules; verify the runtime identity and output manifest |
 
 The selected file and derived data are processed locally in the reviewed source
@@ -90,7 +115,8 @@ visitor to select a copy, provides no disc image, and does not publish
 circumvention instructions. Counsel must evaluate the actual dumping/access
 workflow, local law and any claimed exception.
 
-The compiled runtime includes at least these rights boundaries:
+The compiled source/dependency inventory includes these rights boundaries; the
+GPL audio row describes the development implementation excluded from the alpha:
 
 - Recovered Melee/HSD code at commit
   `b43912cc78606f96c9569f5d6229bc9d7e265ea5` has no identified root license.
@@ -98,10 +124,10 @@ The compiled runtime includes at least these rights boundaries:
   per-file license header identified. The directory name does not make them
   Dolphin Emulator code or GPL code; their provenance and rights remain open.
 - `src/gameplay_audio_resample.c/.h` and the free DSP coefficient generator
-  retain GPL-2.0-or-later provenance from Dolphin revision
-  `a2efdf1197be8132674b90fe9cf4761df39752ed`. The full text is included in
-  [`docs/licenses/runtime-third-party.txt`](licenses/runtime-third-party.txt)
-  and retained in [`docs/licenses/dolphin-gpl-2.0-or-later.txt`](licenses/dolphin-gpl-2.0-or-later.txt).
+  retain GPL-2.0-or-later provenance in development only, from Dolphin revision
+  `a2efdf1197be8132674b90fe9cf4761df39752ed`. Their implementations and generated
+  coefficient bytes are excluded from the public alpha. The development license
+  text remains in [`docs/licenses/dolphin-gpl-2.0-or-later.txt`](licenses/dolphin-gpl-2.0-or-later.txt).
   GPL compliance does not resolve rights in recovered Melee or platform code.
 - Aurora at commit `749d6ee7a22bdfab78c8ece9047bca5d79aa72ca` is MIT. The
   B0XX-derived keyboard mapping retains its MIT notice at
@@ -121,7 +147,12 @@ it is not an exact post-link SBOM. It does not establish that the combined
 executable may be distributed, provide corresponding source for GPL-covered
 adaptations, or resolve rights in recovered code or the generated pipeline seed.
 
-## GPL corresponding-source delivery
+## GPL corresponding-source delivery for any future audio-enabled release
+
+This is a future audio-enabled release obligation, not a claim that the excluded
+audio sources are part of the silent alpha. Any failure to establish their
+exclusion blocks the alpha artifact.
+
 
 The current worktree contains project source, the Dolphin-derived source
 identifiers and reproducibility scripts, but it does not configure a public
@@ -194,21 +225,24 @@ WebMelee clearance or completeness.
 
 ## Unclosed release issues
 
-1. Substitute the actual operator identity and working rights/privacy contact;
-   decide whether address, consumer, privacy or jurisdiction disclosures apply.
+1. Operator identity and contact spelling are supplied. Test forwarding and
+   retain its private delivery receipt; address, consumer, privacy or jurisdiction
+   questions remain review topics, not invented operator facts.
 2. Generate and independently review the exact public artifact manifest and
    runtime identity after the Release build. Confirm that development runtime,
    evidence and diagnostic paths are excluded.
-3. Resolve the rights basis for distributing the compiled recovered Melee/HSD
-   and original SDK material. Do not infer permission from a DOL hash, local
-   disc processing or an open repository.
-4. Choose and implement a verified GPL corresponding-source path for the
-   Dolphin-derived code. No source URL or written offer is currently configured.
-5. Generate a binary-level SBOM and complete corresponding-source delivery for
-   Aurora, Emscripten/Dawn and active transitive dependencies. The checked-in
+3. The operator accepts unresolved recovered Melee/HSD and original SDK
+   distribution risk for the alpha. No permission is inferred from a DOL hash,
+   local disc processing or an open repository.
+4. Verify GPL audio implementation exclusion in the exact silent alpha. Before
+   restoring those implementations, fulfill their source obligations or replace
+   them with independently authored permissive implementations and validate them.
+5. Retain required notices and check the actual native input inventory against
+   the selected licenses for Aurora, Emscripten/Dawn and active dependencies.
    [`docs/licenses/runtime-third-party.txt`](licenses/runtime-third-party.txt)
-   provides the reviewed configured notice texts, but patched-source and exact
-   post-link correspondence remain open.
+   provides the configured notice texts. A complete post-link SBOM remains a
+   follow-up; permissive licenses are not described as requiring GPL-style
+   corresponding-source publication.
 6. Decide whether the preloaded 507-row Aurora seed can be distributed and
    retain its exact provenance, hash and notice treatment.
 7. Have counsel review the disc-access workflow, access controls and applicable
@@ -219,5 +253,7 @@ WebMelee clearance or completeness.
    retention assumptions. Revisit this review before any account, online match,
    analytics or hosted user-content feature.
 
-No item above is represented as resolved by this document. The legal pages are
-drafts pending operator identity, artifact verification and counsel review.
+The supplied operator facts and accepted alpha risk posture are recorded above.
+Artifact verification and tested mail forwarding remain concrete pre-activation
+gates. This assessment does not represent the remaining legal questions as
+resolved or require a new risk waiver already supplied by the operator.

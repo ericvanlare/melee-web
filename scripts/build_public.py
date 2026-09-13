@@ -44,10 +44,7 @@ PLAYER_RUNTIME_FILES = (
     "melee-runtime.mjs",
     "runtime-assets.mjs",
     "disc-image.mjs",
-    "dsp-coefficients.mjs",
     "prototype-keyboard-layouts.mjs",
-    "audio-worklet.js",
-    "audio-ring.mjs",
     "gameplay_public.js",
     "gameplay_public.wasm",
 )
@@ -56,18 +53,19 @@ PLAYER_SOURCE_RUNTIME_FILES = (
     "melee-runtime.mjs",
     "runtime-assets.mjs",
     "disc-image.mjs",
-    "dsp-coefficients.mjs",
     "prototype-keyboard-layouts.mjs",
-    "audio-worklet.js",
-    "audio-ring.mjs",
 )
-RUNTIME_IDENTITY_SCHEMA = "melee-web-runtime-public-build-v1"
+RUNTIME_IDENTITY_SCHEMA = "melee-web-runtime-public-build-v2"
 RUNTIME_IDENTITY_NAME = "runtime-public-identity.json"
 RUNTIME_SOURCE_FILES = (
     "CMakeLists.txt",
     "cmake/FighterRuntime.cmake",
     "patches/melee-gameplay.patch",
     "src/gameplay_menu_browser.cpp",
+    "src/gameplay_menu_world.cpp",
+    "src/gameplay_match_session.cpp",
+    "src/gameplay_audio.c",
+    "src/gameplay_audio_bank.cpp",
     "src/browser_input.cpp",
     "src/browser_input.h",
     "scripts/bootstrap.py",
@@ -116,7 +114,7 @@ RUNTIME_TOOLCHAIN_PATHS = frozenset({
 })
 PIPELINE_SEED_PATHS = {
     "source": "web/initial_pipeline_cache.db.gz.b64",
-    "materialized": "build/browser-release/initial_pipeline_cache.db",
+    "materialized": "build/browser-public-release/initial_pipeline_cache.db",
 }
 HTML_INPUTS = (
     "index.html",
@@ -461,7 +459,9 @@ def _identity_artifacts(value: object, artifact_root: str | None = None) -> dict
         if not isinstance(item, dict) or set(item) != {"path", "bytes", "sha256"}:
             raise BuildError("runtime identity artifact records must contain path, bytes and sha256")
         path = item["path"]
-        if not isinstance(path, str) or "\\" in path or path.startswith("/"):
+        if (not isinstance(path, str) or "\\" in path or path.startswith("/")
+                or Path(path).as_posix() != path
+                or any(part in ("", ".", "..") for part in Path(path).parts)):
             raise BuildError(f"runtime identity contains an unauthorized artifact path: {path!r}")
         try:
             local_path = Path(path).relative_to(root_path).as_posix()
@@ -551,11 +551,15 @@ def _read_runtime_identity(runtime_dir: Path) -> tuple[dict[str, object], dict[s
     required_identity = {
         "schema", "target", "configuration", "artifact_root", "artifacts", "wasm_exports",
         "source_inputs", "toolchain", "pipeline_seed", "upload_convention",
+        "audio_policy", "audio_graph",
     }
     if set(value) != required_identity:
         raise BuildError("runtime identity has unexpected or missing producer fields")
     if value.get("target") != "runtime-public" or value.get("configuration") != "Release":
         raise BuildError("runtime identity is not the Release runtime-public target")
+    if value.get("artifact_root") != "build/browser-public-release":
+        raise BuildError("runtime identity artifact_root is not the reviewed public Release output")
+    _validate_audio_policy(value)
     convention = value.get("upload_convention")
     if (not isinstance(convention, dict)
             or convention.get("identity_path") != "build/runtime-public-identity.json"
@@ -617,6 +621,180 @@ def _read_runtime_identity(runtime_dir: Path) -> tuple[dict[str, object], dict[s
     if not isinstance(runtime_hash, str) or not re.fullmatch(r"[0-9a-f]{16,64}", runtime_hash):
         raise BuildError("runtime identity runtime_hash must be 16-64 lowercase hexadecimal characters")
     return value, files, runtime_hash[:16], identity_bytes
+
+
+def _validate_audio_policy(identity: dict[str, object]) -> None:
+    """Require the producer's source-bound proof that the alpha has no audio."""
+    policy = identity.get("audio_policy")
+    expected_policy = {
+        "mode": "disabled",
+        "pcm_output": False,
+        "dsp_resampler": False,
+        "dsp_coefficients_required": False,
+    }
+    if policy != expected_policy:
+        raise BuildError("runtime identity audio_policy is not the reviewed disabled policy")
+    proof = identity.get("audio_graph")
+    if not isinstance(proof, dict):
+        raise BuildError("runtime identity audio_graph proof is missing")
+    if proof.get("schema") != "melee-web-public-audio-graph-v2":
+        raise BuildError("runtime identity audio_graph proof schema is unsupported")
+    if set(proof) != {"schema", "target", "excluded_inputs", "ninja", "compile_commands", "depfile", "ninja_deps", "checks"}:
+        raise BuildError("runtime identity audio_graph proof has unexpected or missing fields")
+    if proof.get("target") != "gameplay_public" or proof.get("excluded_inputs") != [
+        "src/gameplay_audio_resample.c", "src/gameplay_audio_resample.h"
+    ]:
+        raise BuildError("runtime identity audio_graph does not exclude the reviewed GPL resampler inputs")
+
+    def require_hash(value: object, label: str) -> str:
+        if not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value):
+            raise BuildError(f"runtime identity audio_graph {label} hash is invalid")
+        return value
+
+    ninja = proof.get("ninja")
+    if not isinstance(ninja, dict) or set(ninja) != {
+        "path", "target_statement_sha256", "source_archive_statement_sha256",
+        "asset_archive_statement_sha256", "target_inputs", "source_archive_inputs", "asset_archive_inputs",
+    } or ninja.get("path") != "build/browser-public-release/build.ninja":
+        raise BuildError("runtime identity audio_graph Ninja evidence is incomplete")
+    ninja_path = _identity_repo_path(ninja["path"], "audio graph Ninja")
+    if _is_symlink(ninja_path) or not ninja_path.is_file():
+        raise BuildError("runtime identity audio_graph Ninja file is missing")
+    try:
+        ninja_text = ninja_path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise BuildError("runtime identity audio_graph Ninja file is unreadable") from exc
+
+    def ninja_block(output: str) -> list[str]:
+        lines = ninja_text.splitlines()
+        for index, line in enumerate(lines):
+            if not line.startswith(f"build {output}:"):
+                continue
+            block = [line]
+            cursor = index + 1
+            while cursor < len(lines) and (lines[cursor].startswith("  ") or not lines[cursor]):
+                block.append(lines[cursor])
+                cursor += 1
+            return block
+        raise BuildError(f"runtime identity audio_graph Ninja statement is missing: {output}")
+
+    def statement_hash(output: str) -> tuple[str, list[str]]:
+        block = ninja_block(output)
+        tokens = [token for token in " ".join(block).split()
+                  if token.startswith("CMakeFiles/") or token.startswith("lib")]
+        return hashlib.sha256("\n".join(block).encode()).hexdigest(), tokens
+
+    nonpublic_archive = re.compile(r"(?:^|/)libfighter_(?:source|asset)_runtime\.a:?$")
+    for output, hash_key, inputs_key in (
+        ("gameplay_public.js", "target_statement_sha256", "target_inputs"),
+        ("libfighter_source_runtime_public.a", "source_archive_statement_sha256", "source_archive_inputs"),
+        ("libfighter_asset_runtime_public.a", "asset_archive_statement_sha256", "asset_archive_inputs"),
+    ):
+        actual_hash, actual_inputs = statement_hash(output)
+        if require_hash(ninja.get(hash_key), f"{hash_key}") != actual_hash or ninja.get(inputs_key) != actual_inputs:
+            raise BuildError(f"runtime identity audio_graph Ninja evidence is stale: {output}")
+        if any("gameplay_audio_resample." in item for item in actual_inputs):
+            raise BuildError("runtime identity audio_graph Ninja graph references the GPL resampler")
+        if any(nonpublic_archive.fullmatch(item) for item in actual_inputs):
+            raise BuildError("runtime identity audio_graph public target closure references a non-public fighter archive")
+
+    commands = proof.get("compile_commands")
+    if not isinstance(commands, dict) or set(commands) != {
+        "path", "public_audio_command_sha256", "public_audio_object", "public_resampler_compile_commands",
+    } or commands.get("path") != "build/browser-public-release/compile_commands.json":
+        raise BuildError("runtime identity audio_graph compile command evidence is incomplete")
+    compile_path = _identity_repo_path(commands["path"], "audio graph compile commands")
+    if _is_symlink(compile_path) or not compile_path.is_file():
+        raise BuildError("runtime identity audio_graph compile command database is missing")
+    try:
+        compile_entries = json.loads(compile_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise BuildError("runtime identity audio_graph compile command database is unreadable") from exc
+    if not isinstance(compile_entries, list):
+        raise BuildError("runtime identity audio_graph compile command database is invalid")
+    public_audio = [entry for entry in compile_entries if isinstance(entry, dict)
+                    and isinstance(entry.get("command"), str)
+                    and "fighter_source_runtime_public.dir" in entry["command"]
+                    and isinstance(entry.get("file"), str) and entry["file"].endswith("/src/gameplay_audio.c")]
+    public_resampler = [entry for entry in compile_entries if isinstance(entry, dict)
+                        and isinstance(entry.get("command"), str)
+                        and "fighter_source_runtime_public.dir" in entry["command"]
+                        and "gameplay_audio_resample.c" in str(entry.get("file", ""))]
+    if len(public_audio) != 1 or public_resampler or commands.get("public_resampler_compile_commands") != 0:
+        raise BuildError("runtime identity audio_graph compile commands do not prove the silent audio unit")
+    audio_command = public_audio[0].get("command")
+    if not isinstance(audio_command, str) or "MELEE_WEB_PUBLIC_AUDIO_DISABLED" not in audio_command:
+        raise BuildError("runtime identity audio_graph silent policy compile definition is missing")
+    if require_hash(commands.get("public_audio_command_sha256"), "public audio command") != hashlib.sha256(audio_command.encode()).hexdigest():
+        raise BuildError("runtime identity audio_graph public audio compile command evidence is stale")
+    if commands.get("public_audio_object") != "CMakeFiles/fighter_source_runtime_public.dir/src/gameplay_audio.c.o":
+        raise BuildError("runtime identity audio_graph public audio object is invalid")
+
+    depfile = proof.get("depfile")
+    if not isinstance(depfile, dict) or set(depfile) != {"path", "present", "resampler_header_referenced"}:
+        raise BuildError("runtime identity audio_graph depfile evidence is incomplete")
+    if depfile.get("path") != "build/browser-public-release/CMakeFiles/fighter_source_runtime_public.dir/src/gameplay_audio.c.o.d":
+        raise BuildError("runtime identity audio_graph depfile path is invalid")
+    depfile_path = _identity_repo_path(depfile["path"], "audio graph depfile")
+    if _is_symlink(depfile_path):
+        raise BuildError("runtime identity audio_graph depfile may not be a symlink")
+    depfile_text = ""
+    if depfile_path.is_file():
+        try:
+            depfile_text = depfile_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as exc:
+            raise BuildError("runtime identity audio_graph depfile is unreadable") from exc
+    elif depfile_path.exists():
+        raise BuildError("runtime identity audio_graph depfile is not a regular file")
+    if depfile.get("present") is not bool(depfile_text) or depfile.get("resampler_header_referenced") is not False:
+        raise BuildError("runtime identity audio_graph depfile evidence is stale")
+    if "gameplay_audio_resample.h" in depfile_text:
+        raise BuildError("runtime identity audio_graph depfile references the GPL resampler header")
+
+    ninja_deps = proof.get("ninja_deps")
+    if not isinstance(ninja_deps, dict) or set(ninja_deps) != {
+        "object", "sha256", "resampler_header_referenced",
+    } or ninja_deps.get("object") != "CMakeFiles/fighter_source_runtime_public.dir/src/gameplay_audio.c.o":
+        raise BuildError("runtime identity audio_graph Ninja dependency evidence is incomplete")
+    ninja_path = _identity_repo_path(".venv/bin/ninja", "project Ninja")
+    if _is_symlink(ninja_path) or not ninja_path.is_file():
+        raise BuildError("runtime identity audio_graph project Ninja is missing")
+    try:
+        deps_result = subprocess.run(
+            [str(ninja_path), "-C", "build/browser-public-release", "-t", "deps", ninja_deps["object"]],
+            cwd=ROOT, text=True, capture_output=True, check=False,
+        )
+    except OSError as exc:
+        raise BuildError("runtime identity audio_graph Ninja dependency query failed") from exc
+    deps_text = deps_result.stdout
+    object_header = re.compile(
+        rf"^{re.escape(ninja_deps['object'])}: #deps ([1-9][0-9]*), deps mtime [0-9]+ \(VALID\)$",
+        re.MULTILINE,
+    )
+    if deps_result.returncode != 0 or not deps_text.strip() or not object_header.search(deps_text):
+        raise BuildError("runtime identity audio_graph Ninja dependency database is unavailable")
+    if not isinstance(ninja_deps.get("sha256"), str) or not re.fullmatch(r"[0-9a-f]{64}", ninja_deps["sha256"]):
+        raise BuildError("runtime identity audio_graph Ninja dependency hash is invalid")
+    if hashlib.sha256(deps_text.encode()).hexdigest() != ninja_deps["sha256"]:
+        raise BuildError("runtime identity audio_graph Ninja dependency evidence is stale")
+    if ninja_deps.get("resampler_header_referenced") is not False or "gameplay_audio_resample.h" in deps_text:
+        raise BuildError("runtime identity audio_graph Ninja dependencies reference the GPL resampler header")
+    dependency_paths = deps_text.splitlines()[1:]
+    if not any(path.rstrip().endswith("/src/gameplay_audio.c") for path in dependency_paths):
+        raise BuildError("runtime identity audio_graph Ninja dependencies omit gameplay_audio.c")
+    if not any(path.rstrip().endswith("/src/gameplay_audio_silent_clock.h") for path in dependency_paths):
+        raise BuildError("runtime identity audio_graph Ninja dependencies omit the silent clock header")
+
+    checks = proof.get("checks")
+    expected_checks = {
+        "resampler_c_in_public_ninja_graph": False,
+        "resampler_h_in_public_ninja_graph": False,
+        "resampler_c_in_public_compile_commands": False,
+        "resampler_h_in_public_depfile": False,
+        "resampler_h_in_public_ninja_deps": False,
+    }
+    if checks != expected_checks:
+        raise BuildError("runtime identity audio_graph checks do not prove exclusion")
 
 
 def _validate_runtime_provenance(identity: dict[str, object]) -> None:
@@ -755,6 +933,12 @@ def _runtime_graph_hash(files: dict[str, bytes]) -> str:
 
 def _validate_runtime_graph(files: dict[str, bytes]) -> None:
     """Validate the small public loader graph and reject evidence/upload code."""
+    forbidden_modules = {
+        "dsp-coefficients.mjs", "audio-worklet.js", "audio-ring.mjs",
+        "runtime-audio-assets.mjs", "runtime-audio.mjs",
+    }
+    if forbidden_modules.intersection(files):
+        raise BuildError("public runtime graph contains a development audio module")
     for rel, data in files.items():
         if rel.endswith((".mjs", ".js")):
             try:
@@ -784,10 +968,11 @@ def _validate_runtime_graph(files: dict[str, bytes]) -> None:
                 raise BuildError(f"upload/evidence code rejected in runtime JavaScript: {rel}")
             if re.search(r"https?://|(?:from|import)\s*[\"'](?:https?:|//)", text, re.I):
                 raise BuildError(f"external runtime URL rejected in runtime JavaScript: {rel}")
+            if re.search(r"(?:dsp-coefficients|audio-worklet|audio-ring|runtime-audio)", text, re.I):
+                raise BuildError(f"development audio module reference rejected in runtime JavaScript: {rel}")
     required_imports = {
-        "melee-runtime.mjs": ("./runtime-assets.mjs", "./gameplay_public.js", "audio-worklet.js"),
-        "runtime-assets.mjs": ("./disc-image.mjs", "./dsp-coefficients.mjs"),
-        "audio-worklet.js": ("./audio-ring.mjs",),
+        "melee-runtime.mjs": ("./runtime-assets.mjs", "./gameplay_public.js"),
+        "runtime-assets.mjs": ("./disc-image.mjs",),
     }
     for rel, imports in required_imports.items():
         text = files[rel].decode("utf-8")
@@ -908,6 +1093,10 @@ def _headers(mode: str, index_production: bool = False, profile: str = "maintena
             )
         )
     lines.extend(("/assets/*", "  Cache-Control: public, max-age=31536000, immutable"))
+    # The legal notice is deliberately an unversioned, source-bound text
+    # asset.  Browsers must revalidate it so a corrected applicable notice is
+    # visible without waiting for an immutable cache entry to expire.
+    lines.extend(("/licenses/*", "  Cache-Control: public, max-age=0, must-revalidate"))
     if profile == "player":
         lines.extend(("/runtime/*", "  Cache-Control: public, max-age=31536000, immutable"))
     return "\n".join(lines) + "\n"
@@ -966,7 +1155,7 @@ def _file_records(output: Path, profile: str = "maintenance") -> list[dict[str, 
         if profile == "player":
             size = _validate_size(path, len(data))
             if size > RUNTIME_MAX_FILE_BYTES:
-                raise BuildError(f"runtime file exceeds 256 MiB limit: {rel} ({size} bytes)")
+                raise BuildError(f"runtime file exceeds 25 MiB limit: {rel} ({size} bytes)")
         else:
             size = _validate_size(path, len(data))
         total += size
@@ -1018,10 +1207,7 @@ def build(
             "melee-runtime.mjs": ROOT / "web" / "melee-runtime.mjs",
             "runtime-assets.mjs": ROOT / "web" / "runtime-assets.mjs",
             "disc-image.mjs": ROOT / "web" / "disc-image.mjs",
-            "dsp-coefficients.mjs": ROOT / "web" / "dsp-coefficients.mjs",
             "prototype-keyboard-layouts.mjs": ROOT / "web" / "prototype-keyboard-layouts.mjs",
-            "audio-worklet.js": ROOT / "web" / "audio-worklet.js",
-            "audio-ring.mjs": ROOT / "web" / "audio-ring.mjs",
         }
         for rel, path in source_runtime.items():
             if _is_symlink(path) or not path.is_file():

@@ -308,7 +308,9 @@ void log_message(AuroraLogLevel level,const char* module,const char* text,unsign
 void render_audio_tick(MeleeWebAudio* audio,char* error,size_t error_size){
  audio_phase+=32000;const unsigned count=audio_phase/60;audio_phase%=60;
  check(melee_web_audio_render(audio,pcm.data(),count,error,error_size),error);
+#if !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
  EM_ASM({window.menuAudio?.(HEAPF32.slice($0>>2,($0>>2)+$1*2));},pcm.data(),count);
+#endif
 }
 void tick(){
  EM_ASM({window.menuServiceCommands?.();});
@@ -615,6 +617,9 @@ void tick(){
 extern "C" {
 int melee_web_native_menu_file(const char* name,const uint8_t* data,unsigned size){try{
  if(world||match||!name||!data||!size||size>64*1024*1024)throw std::runtime_error("Unload before importing valid local files");
+#if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+ if(std::string_view{name}=="dsp_coef.bin")throw std::runtime_error("Public audio-disabled runtime does not accept DSP coefficient input");
+#endif
  bool known=false;for(auto key:keys)known|=key==name;
  if(!known)throw std::runtime_error("Unknown native menu file: "+std::string(name));
  archive_cache.reset();

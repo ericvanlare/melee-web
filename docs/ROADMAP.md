@@ -109,3 +109,16 @@ All original modes, movies, saves, controller routing, failure recovery and
 browser lifecycle behavior. Broaden browser support after the reference
 implementation is stable. Custom fighters, netplay and product extras are later
 projects. See [NEXT_PHASE.md](NEXT_PHASE.md) for the immediate work boundaries.
+
+## Initial public alpha audio follow-up
+
+The initial public alpha deliberately disables audio output to exclude the
+Dolphin-derived resampler and DSP coefficient generator. Development retains
+its current audio implementation and accuracy tests. Before restoring public
+audio, implement independently authored permissive replacements or fulfill the
+applicable source-license obligations; then validate voice/cursor timing,
+SSM/HPS loops and bank lifetimes, source transitions, repeated teardown, emitted
+PCM against an independent original reference, and visible cold/warm playback.
+Full audio fidelity remains open. Silent-alpha checks do not satisfy audio
+acceptance, and the existing opcode-63 CPU-action abort remains a separate
+known gameplay limitation.

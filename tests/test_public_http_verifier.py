@@ -91,7 +91,8 @@ class _StaticHTTP:
                 request.send_header("Cache-Control", "public, max-age=31536000, immutable")
             elif path == "/licenses/runtime-third-party.txt":
                 request.send_header("Content-Type", "text/plain")
-                request.send_header("Cache-Control", "no-cache")
+                if "Cache-Control" not in self.missing_values | self.missing_values_by_path.get(path, set()):
+                    request.send_header("Cache-Control", "public, max-age=0, must-revalidate")
             elif path.endswith(".html") or path in {"/", "/terms", "/privacy", "/copyright", "/notices"}:
                 request.send_header("Content-Type", "text/html")
             if path not in self.missing_headers:
@@ -162,10 +163,7 @@ def _player_fixture() -> tuple[dict[str, bytes], dict[str, object]]:
         "melee-runtime.mjs": b"export {};",
         "runtime-assets.mjs": b"export {};",
         "disc-image.mjs": b"export {};",
-        "dsp-coefficients.mjs": b"export {};",
         "prototype-keyboard-layouts.mjs": b"export {};",
-        "audio-worklet.js": b"registerProcessor('x', class extends AudioWorkletProcessor {});",
-        "audio-ring.mjs": b"export {};",
         "gameplay_public.js": b"// gameplay_public.wasm",
         "gameplay_public.wasm": b"\x00asm\x01\x00\x00\x00",
         "gameplay_public.data": b"SQLite format 3\x00seed",
@@ -291,6 +289,46 @@ class PublicHTTPVerifierTests(unittest.TestCase):
             "/runtime/0123456789abcdef/player/player-shell.mjs": {"Cross-Origin-Opener-Policy"},
         })
         with self.assertRaisesRegex(ValueError, r"player-shell.mjs: missing Cross-Origin-Opener-Policy"):
+            verify(origin.url, self.manifest_path)
+
+    def test_player_runtime_audio_module_is_rejected(self):
+        files, manifest = _player_fixture()
+        path = "/runtime/0123456789abcdef/dsp-coefficients.mjs"
+        files[path] = b"export {};"
+        manifest["files"].append({
+            "path": path.lstrip("/"), "size": len(files[path]),
+            "sha256": hashlib.sha256(files[path]).hexdigest(),
+        })
+        self.manifest_path.write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+        origin = self.server(files=files, profile="player")
+        with self.assertRaisesRegex(ValueError, r"unauthorized or audio modules"):
+            verify(origin.url, self.manifest_path)
+
+    def test_player_development_audio_routes_are_strict_404(self):
+        files, manifest = _player_fixture()
+        self.manifest_path.write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+        runtime_root = "/runtime/0123456789abcdef"
+        routes = (
+            "/dsp-coefficients.mjs", "/runtime-audio-assets.mjs", "/runtime-audio.mjs",
+            "/audio-worklet.js", "/audio-ring.mjs", "/dsp_coef.bin",
+            *(f"{runtime_root}/{name}" for name in (
+                "dsp-coefficients.mjs", "runtime-audio-assets.mjs", "runtime-audio.mjs",
+                "audio-worklet.js", "audio-ring.mjs", "dsp_coef.bin",
+            )),
+        )
+        for route in routes:
+            with self.subTest(route=route):
+                served = dict(files)
+                served[route] = b"development audio module"
+                origin = self.server(files=served, profile="player")
+                with self.assertRaisesRegex(ValueError, r"forbidden/unknown route must return 404"):
+                    verify(origin.url, self.manifest_path)
+
+    def test_unversioned_legal_notice_must_revalidate(self):
+        origin = self.server(missing_values_by_path={
+            "/licenses/runtime-third-party.txt": {"Cache-Control"},
+        })
+        with self.assertRaisesRegex(ValueError, r"runtime-third-party.txt: an unversioned notice must revalidate"):
             verify(origin.url, self.manifest_path)
 
 

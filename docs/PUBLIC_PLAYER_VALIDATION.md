@@ -1,4 +1,9 @@
-# Public player integration evidence
+# Earlier audio-enabled integration evidence
+
+This records the pre-alpha v1 candidate, which was never published. The initial
+public alpha uses a later, explicitly audio-disabled profile to exclude the
+GPL-derived audio implementations. See `PUBLIC_ALPHA_VALIDATION.md` for that
+candidate; do not treat the audio results below as silent-alpha evidence.
 
 Measured September 12, 2026 on macOS with headed Chrome 153.0.8010.36 and
 Playwright 1.58.2. This is interface, release-boundary and scoped browser evidence.
@@ -101,9 +106,13 @@ Raw local logs, manifests and game screenshots stay in ignored `work/` and
 `build/`. Only original shell screenshots are checked into documentation.
 No game imagery or user-selected bytes are included in the deployment bundle.
 
-## Publication status
+## Publication status at this earlier checkpoint
 
-No Pages deployment, custom domain or DNS cutover has been completed. The Pages
+The following status describes only the earlier v1 checkpoint. See
+[the alpha record](PUBLIC_ALPHA_VALIDATION.md) for the operator decision and
+current candidate.
+
+No Pages deployment, custom domain or DNS cutover had been completed. The Pages
 project and zone are prepared. Public operator/contact facts are still missing;
 GPL corresponding-source delivery and the recovered-code/seed distribution
 basis remain documented release decisions. Full third-party notice texts are

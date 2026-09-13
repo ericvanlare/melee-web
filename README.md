@@ -69,10 +69,14 @@ all nine lifecycle, audio, match-data and RNG boundaries.
 The public entry in `web/player/` mounts `web/melee-runtime.mjs` directly and
 keeps the prototype's black canvas and small toolbar. The development entry
 attaches its tools separately to that same owner. `runtime-public` is a
-Release-only native target with an audited lifecycle/input export surface.
+Release-only native target with an audited lifecycle/input export surface. The
+initial public alpha deliberately has no audio: its native graph excludes the
+GPL-derived resampler and its browser graph excludes the DSP coefficient
+generator and Web Audio transport. Development retains its existing audio and
+accuracy tests. Full public audio fidelity is on the roadmap.
 
 Build it with `python3 scripts/build.py --target runtime-public --configuration Release`.
-Then run `scripts/build_public.py --profile player --runtime-dir build/browser-release`
+Then run `scripts/build_public.py --profile player --runtime-dir build/browser-public-release`
 with an explicit output and environment. The packager checks the native build
 identity and copies a fixed source graph into a content-hashed runtime directory;
 `scripts/audit_public.py` independently regenerates and verifies its manifest.

@@ -66,6 +66,7 @@ try:
         _validate_runtime_graph,
         _identity_repo_path,
         _runtime_graph_hash,
+        _validate_audio_policy,
     )
 except ImportError as exc:  # pragma: no cover - only relevant to direct misuse
     raise SystemExit(f"audit_public must run with scripts/ on PYTHONPATH: {exc}") from exc
@@ -379,9 +380,16 @@ def _validate_player_runtime(output: Path, runtime: dict[str, Any], records: lis
     required_identity = {
         "schema", "target", "configuration", "artifact_root", "artifacts", "wasm_exports",
         "source_inputs", "toolchain", "pipeline_seed", "upload_convention",
+        "audio_policy", "audio_graph",
     }
     if set(identity) != required_identity or identity.get("target") != "runtime-public" or identity.get("configuration") != "Release":
         _fail("player runtime identity does not match the producer contract")
+    if identity.get("artifact_root") != "build/browser-public-release":
+        _fail("player runtime identity artifact_root is not the reviewed public Release output")
+    try:
+        _validate_audio_policy(identity)
+    except BuildError as exc:
+        _fail(str(exc))
     convention = identity.get("upload_convention")
     if (not isinstance(convention, dict)
             or convention.get("identity_path") != "build/runtime-public-identity.json"
@@ -396,6 +404,21 @@ def _validate_player_runtime(output: Path, runtime: dict[str, Any], records: lis
     identity_sha = runtime.get("identity_sha256")
     if not isinstance(identity_sha, str) or not re.fullmatch(r"[0-9a-f]{64}", identity_sha):
         _fail("player runtime identity hash is missing or invalid")
+    identity_path = ROOT / "build" / RUNTIME_IDENTITY_NAME
+    if _is_symlink(identity_path) or not identity_path.is_file():
+        _fail("player runtime producer identity sidecar is missing")
+    try:
+        sidecar_bytes = identity_path.read_bytes()
+    except OSError as exc:
+        _fail(f"cannot read player runtime producer identity sidecar: {exc}")
+    if hashlib.sha256(sidecar_bytes).hexdigest() != identity_sha:
+        _fail("player runtime producer identity sidecar hash differs from manifest")
+    try:
+        sidecar = json.loads(sidecar_bytes.decode("utf-8"), object_pairs_hook=_unique_object)
+    except (UnicodeDecodeError, json.JSONDecodeError, ValueError) as exc:
+        _fail(f"player runtime producer identity sidecar is invalid: {exc}")
+    if sidecar != identity:
+        _fail("player runtime identity differs from the producer sidecar")
     try:
         artifacts = _identity_artifacts(identity)
     except BuildError as exc:
@@ -414,10 +437,7 @@ def _validate_player_runtime(output: Path, runtime: dict[str, Any], records: lis
         "melee-runtime.mjs": ROOT / "web" / "melee-runtime.mjs",
         "runtime-assets.mjs": ROOT / "web" / "runtime-assets.mjs",
         "disc-image.mjs": ROOT / "web" / "disc-image.mjs",
-        "dsp-coefficients.mjs": ROOT / "web" / "dsp-coefficients.mjs",
         "prototype-keyboard-layouts.mjs": ROOT / "web" / "prototype-keyboard-layouts.mjs",
-        "audio-worklet.js": ROOT / "web" / "audio-worklet.js",
-        "audio-ring.mjs": ROOT / "web" / "audio-ring.mjs",
     }
     for rel in source_map:
         runtime_files[rel] = _read_output(output, f"{runtime_path}/{rel}", "player")

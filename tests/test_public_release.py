@@ -73,18 +73,36 @@ class PublicReleaseTests(unittest.TestCase):
             return self.fixture_repo
         repo = self.root / "producer-checkout"
         repo.mkdir()
-        for rel in set(RUNTIME_SOURCE_FILES) | {
-            f"web/{name}" for name in build_public.PLAYER_SOURCE_RUNTIME_FILES
-        }:
+        ninja_deps_text = (
+            f"CMakeFiles/fighter_source_runtime_public.dir/src/gameplay_audio.c.o: #deps 2, deps mtime 1 (VALID)\n"
+            f"    {repo / 'src/gameplay_audio.c'}\n"
+            f"    {repo / 'src/gameplay_audio_silent_clock.h'}\n"
+        )
+        for rel in (set(RUNTIME_SOURCE_FILES)
+                    | {"src/gameplay_audio_silent_clock.h"}
+                    | {f"web/{name}" for name in build_public.PLAYER_SOURCE_RUNTIME_FILES}):
             destination = repo / rel
             destination.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(ROOT / rel, destination)
         for rel in build_public.RUNTIME_TOOLCHAIN_PATHS:
             destination = repo / rel
             destination.parent.mkdir(parents=True, exist_ok=True)
-            destination.write_text(f"test tool fixture: {rel}\n")
+            if rel == ".venv/bin/ninja":
+                destination.write_text(
+                    "#!/bin/sh\n"
+                    "if [ \"$1\" = \"-C\" ] && [ \"$3\" = \"-t\" ] && [ \"$4\" = \"deps\" ]; then\n"
+                    "  cat <<'EOF'\n"
+                    f"{ninja_deps_text}"
+                    "EOF\n"
+                    "  exit 0\n"
+                    "fi\nexit 1\n",
+                    encoding="utf-8",
+                )
+                destination.chmod(0o755)
+            else:
+                destination.write_text(f"test tool fixture: {rel}\n")
         materialize(repo / "web/initial_pipeline_cache.db.gz.b64",
-                    repo / "build/browser-release/initial_pipeline_cache.db")
+                    repo / "build/browser-public-release/initial_pipeline_cache.db")
         prepared = repo / "build/gameplay-source"
         prepared.mkdir()
         (prepared / "fixture.c").write_text("int fixture(void) { return 0; }\n")
@@ -97,15 +115,30 @@ class PublicReleaseTests(unittest.TestCase):
                        cwd=prepared, check=True)
         for rel in build_public.PREPARED_GAMEPLAY_PATCHES.values():
             (repo / rel).write_text("test prepared patch fixture\n")
+        public_build = repo / "build/browser-public-release"
+        public_build.mkdir(parents=True, exist_ok=True)
+        (public_build / "build.ninja").write_text(
+            "build gameplay_public.js: link CMakeFiles/gameplay_public.dir/src/gameplay_menu_browser.cpp.o libfighter_asset_runtime_public.a\n"
+            "build libfighter_source_runtime_public.a: archive CMakeFiles/fighter_source_runtime_public.dir/src/gameplay_audio.c.o\n"
+            "build libfighter_asset_runtime_public.a: archive CMakeFiles/fighter_asset_runtime_public.dir/src/gameplay_audio_bank.cpp.o libfighter_source_runtime_public.a\n",
+            encoding="utf-8",
+        )
+        command = "emcc -DMELEE_WEB_PUBLIC_AUDIO_DISABLED -c CMakeFiles/fighter_source_runtime_public.dir/src/gameplay_audio.c"
+        (public_build / "compile_commands.json").write_text(json.dumps([
+            {"directory": str(public_build), "command": command,
+             "file": str(repo / "src/gameplay_audio.c")},
+        ]), encoding="utf-8")
         for module in (build_public, audit_public):
             root_patch = patch.object(module, "ROOT", repo)
             root_patch.start()
             self.addCleanup(root_patch.stop)
+        self.ninja_deps_text = ninja_deps_text
         self.fixture_repo = repo
         return repo
 
     def runtime_fixture(self) -> Path:
         fixture_root = self.runtime_source_fixture()
+        ninja_deps_text = self.ninja_deps_text
         container = self.root / f"runtime-input-{len(tuple(self.root.glob('runtime-input-*')))}"
         runtime = container / "artifacts"
         runtime.mkdir(parents=True)
@@ -113,17 +146,14 @@ class PublicReleaseTests(unittest.TestCase):
             "melee-runtime.mjs": fixture_root / "web" / "melee-runtime.mjs",
             "runtime-assets.mjs": fixture_root / "web" / "runtime-assets.mjs",
             "disc-image.mjs": fixture_root / "web" / "disc-image.mjs",
-            "dsp-coefficients.mjs": fixture_root / "web" / "dsp-coefficients.mjs",
             "prototype-keyboard-layouts.mjs": fixture_root / "web" / "prototype-keyboard-layouts.mjs",
-            "audio-worklet.js": fixture_root / "web" / "audio-worklet.js",
-            "audio-ring.mjs": fixture_root / "web" / "audio-ring.mjs",
         }
         for name, path in source_map.items():
             shutil.copyfile(path, runtime / name)
         (runtime / "gameplay_public.js").write_text(
             'FS.mkdir("/home/web_user"); ENV["HOME"] = "/home/web_user"; // gameplay_public.wasm\n'
         )
-        (runtime / "gameplay_public.data").write_bytes((fixture_root / "build/browser-release/initial_pipeline_cache.db").read_bytes())
+        (runtime / "gameplay_public.data").write_bytes((fixture_root / "build/browser-public-release/initial_pipeline_cache.db").read_bytes())
         # Minimal version-1 Wasm module with one function export; the audit
         # parses the export section rather than trusting the sidecar list.
         export_names = tuple(RUNTIME_REQUIRED_EXPORTS)
@@ -136,23 +166,24 @@ class PublicReleaseTests(unittest.TestCase):
         artifacts = []
         for name in ("gameplay_public.js", "gameplay_public.wasm", "gameplay_public.data"):
             data = (runtime / name).read_bytes()
-            artifacts.append({"path": name, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()})
+            artifacts.append({"path": f"build/browser-public-release/{name}", "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()})
+        command = "emcc -DMELEE_WEB_PUBLIC_AUDIO_DISABLED -c CMakeFiles/fighter_source_runtime_public.dir/src/gameplay_audio.c"
         source_hashes = {name: hashlib.sha256((fixture_root / name).read_bytes()).hexdigest() for name in RUNTIME_SOURCE_FILES}
         tool_paths = (".deps/emsdk/.emscripten", ".deps/emsdk/upstream/emscripten/emcc",
                       ".deps/emsdk/upstream/emscripten/emscripten-version.txt", ".venv/bin/cmake", ".venv/bin/ninja")
         tool_hashes = {name: hashlib.sha256((fixture_root / name).read_bytes()).hexdigest() for name in tool_paths}
         seed_source = fixture_root / "web/initial_pipeline_cache.db.gz.b64"
-        seed_materialized = fixture_root / "build/browser-release/initial_pipeline_cache.db"
+        seed_materialized = fixture_root / "build/browser-public-release/initial_pipeline_cache.db"
         all_exports = [{"name": name, "kind": 0, "index": index} for index, name in enumerate(export_names)]
         identity = {
-            "schema": "melee-web-runtime-public-build-v1",
+            "schema": "melee-web-runtime-public-build-v2",
             "target": "runtime-public",
             "configuration": "Release",
-            "artifact_root": ".",
+            "artifact_root": "build/browser-public-release",
             "pipeline_seed": {
                 "source": {"path": "web/initial_pipeline_cache.db.gz.b64", "bytes": seed_source.stat().st_size,
                             "sha256": hashlib.sha256(seed_source.read_bytes()).hexdigest()},
-                "materialized": {"path": "build/browser-release/initial_pipeline_cache.db", "bytes": seed_materialized.stat().st_size,
+                "materialized": {"path": "build/browser-public-release/initial_pipeline_cache.db", "bytes": seed_materialized.stat().st_size,
                                  "sha256": hashlib.sha256(seed_materialized.read_bytes()).hexdigest()},
                 "expected_sha256": hashlib.sha256(seed_materialized.read_bytes()).hexdigest(),
                 "sqlite_tables": [],
@@ -173,12 +204,63 @@ class PublicReleaseTests(unittest.TestCase):
             "upload_convention": {"group": "artifacts plus the reviewed public-shell files",
                                    "identity_path": "build/runtime-public-identity.json",
                                    "identity_is_outside_artifact_root": True},
+            "audio_policy": {
+                "mode": "disabled",
+                "pcm_output": False,
+                "dsp_resampler": False,
+                "dsp_coefficients_required": False,
+            },
+            "audio_graph": {
+                "schema": "melee-web-public-audio-graph-v2",
+                "target": "gameplay_public",
+                "excluded_inputs": ["src/gameplay_audio_resample.c", "src/gameplay_audio_resample.h"],
+                "ninja": {
+                    "path": "build/browser-public-release/build.ninja",
+                    "target_statement_sha256": hashlib.sha256(
+                        "build gameplay_public.js: link CMakeFiles/gameplay_public.dir/src/gameplay_menu_browser.cpp.o libfighter_asset_runtime_public.a".encode()
+                    ).hexdigest(),
+                    "source_archive_statement_sha256": hashlib.sha256(
+                        "build libfighter_source_runtime_public.a: archive CMakeFiles/fighter_source_runtime_public.dir/src/gameplay_audio.c.o".encode()
+                    ).hexdigest(),
+                    "asset_archive_statement_sha256": hashlib.sha256(
+                        "build libfighter_asset_runtime_public.a: archive CMakeFiles/fighter_asset_runtime_public.dir/src/gameplay_audio_bank.cpp.o libfighter_source_runtime_public.a".encode()
+                    ).hexdigest(),
+                    "target_inputs": ["CMakeFiles/gameplay_public.dir/src/gameplay_menu_browser.cpp.o", "libfighter_asset_runtime_public.a"],
+                    "source_archive_inputs": ["libfighter_source_runtime_public.a:", "CMakeFiles/fighter_source_runtime_public.dir/src/gameplay_audio.c.o"],
+                    "asset_archive_inputs": ["libfighter_asset_runtime_public.a:", "CMakeFiles/fighter_asset_runtime_public.dir/src/gameplay_audio_bank.cpp.o", "libfighter_source_runtime_public.a"],
+                },
+                "compile_commands": {
+                    "path": "build/browser-public-release/compile_commands.json",
+                    "public_audio_command_sha256": hashlib.sha256(command.encode()).hexdigest(),
+                    "public_audio_object": "CMakeFiles/fighter_source_runtime_public.dir/src/gameplay_audio.c.o",
+                    "public_resampler_compile_commands": 0,
+                },
+                "depfile": {
+                    "path": "build/browser-public-release/CMakeFiles/fighter_source_runtime_public.dir/src/gameplay_audio.c.o.d",
+                    "present": False,
+                    "resampler_header_referenced": False,
+                },
+                "ninja_deps": {
+                    "object": "CMakeFiles/fighter_source_runtime_public.dir/src/gameplay_audio.c.o",
+                    "sha256": hashlib.sha256(ninja_deps_text.encode()).hexdigest(),
+                    "resampler_header_referenced": False,
+                },
+                "checks": {
+                    "resampler_c_in_public_ninja_graph": False,
+                    "resampler_h_in_public_ninja_graph": False,
+                    "resampler_c_in_public_compile_commands": False,
+                    "resampler_h_in_public_depfile": False,
+                    "resampler_h_in_public_ninja_deps": False,
+                },
+            },
             "artifacts": artifacts,
             "wasm_exports": {"required": list(RUNTIME_REQUIRED_EXPORTS), "functions": list(RUNTIME_REQUIRED_EXPORTS),
                              "all": all_exports, "javascript_bindings": {name: name for name in RUNTIME_REQUIRED_EXPORTS},
                              "forbidden_absent": sorted(RUNTIME_FORBIDDEN_EXPORTS)},
         }
-        (container / "runtime-public-identity.json").write_text(json.dumps(identity, sort_keys=True) + "\n")
+        identity_bytes = (json.dumps(identity, sort_keys=True) + "\n").encode()
+        (container / "runtime-public-identity.json").write_bytes(identity_bytes)
+        (fixture_root / "build" / "runtime-public-identity.json").write_bytes(identity_bytes)
         return runtime
 
     def test_preview_build_is_auditable_and_uses_hashed_assets(self):
@@ -229,6 +311,13 @@ class PublicReleaseTests(unittest.TestCase):
               profile="player", runtime_dir=runtime)
         second_hash = json.loads(second_manifest.read_text())["runtime"]["hash"]
         self.assertNotEqual(first_hash, second_hash)
+        owner_source = self.fixture_repo / "web/melee-runtime.mjs"
+        owner_source.write_text(owner_source.read_text() + "\n// reviewed owner change\n")
+        third_manifest = self.root / "third-player.manifest.json"
+        build(source=player_source, output=self.root / "third-player", manifest=third_manifest,
+              profile="player", runtime_dir=runtime)
+        third_hash = json.loads(third_manifest.read_text())["runtime"]["hash"]
+        self.assertNotEqual(second_hash, third_hash)
 
     def test_player_rejects_runtime_identity_drift_and_undeclared_files(self):
         runtime = self.runtime_fixture()
@@ -236,15 +325,75 @@ class PublicReleaseTests(unittest.TestCase):
         identity = json.loads(identity_path.read_text())
         identity["artifacts"].append({"path": "evil.js", "bytes": 5, "sha256": "0" * 64})
         identity_path.write_text(json.dumps(identity))
-        with self.assertRaisesRegex(BuildError, "unauthorized artifact"):
+        with self.assertRaisesRegex(BuildError, "artifact path"):
             build(output=self.root / "extra-runtime", profile="player", runtime_dir=runtime)
         runtime = self.runtime_fixture()
         identity_path = runtime.parent / "runtime-public-identity.json"
         identity = json.loads(identity_path.read_text())
-        next(item for item in identity["artifacts"] if item["path"] == "gameplay_public.wasm")["sha256"] = "0" * 64
+        next(item for item in identity["artifacts"] if item["path"].endswith("/gameplay_public.wasm"))["sha256"] = "0" * 64
         identity_path.write_text(json.dumps(identity))
         with self.assertRaisesRegex(BuildError, "identity mismatch"):
             build(output=self.root / "drift-runtime", profile="player", runtime_dir=runtime)
+
+    def test_player_rejects_legacy_identity_and_audio_policy_drift(self):
+        runtime = self.runtime_fixture()
+        identity_path = runtime.parent / "runtime-public-identity.json"
+        identity = json.loads(identity_path.read_text())
+        identity["schema"] = "melee-web-runtime-public-build-v1"
+        identity_path.write_text(json.dumps(identity))
+        with self.assertRaisesRegex(BuildError, "unsupported runtime identity schema"):
+            build(output=self.root / "legacy-runtime", profile="player", runtime_dir=runtime)
+
+        identity["schema"] = "melee-web-runtime-public-build-v2"
+        identity["audio_policy"]["mode"] = "enabled"
+        identity_path.write_text(json.dumps(identity))
+        with self.assertRaisesRegex(BuildError, "audio_policy"):
+            build(output=self.root / "audio-runtime", profile="player", runtime_dir=runtime)
+
+        identity["audio_policy"]["mode"] = "disabled"
+        identity["audio_graph"]["excluded_inputs"] = []
+        identity_path.write_text(json.dumps(identity))
+        with self.assertRaisesRegex(BuildError, "audio_graph"):
+            build(output=self.root / "stale-audio-proof", profile="player", runtime_dir=runtime)
+
+    def test_player_rejects_nonpublic_fighter_archives_in_audio_graph(self):
+        runtime = self.runtime_fixture()
+        ninja_path = self.fixture_repo / "build/browser-public-release/build.ninja"
+        identity_path = runtime.parent / "runtime-public-identity.json"
+        original = ninja_path.read_text()
+        for archive in ("libfighter_source_runtime.a", "libfighter_asset_runtime.a"):
+            with self.subTest(archive=archive):
+                target = "build gameplay_public.js: link CMakeFiles/gameplay_public.dir/src/gameplay_menu_browser.cpp.o libfighter_asset_runtime_public.a"
+                replacement = target.replace("libfighter_asset_runtime_public.a", archive)
+                ninja_path.write_text(original.replace(target, replacement))
+                identity = json.loads(identity_path.read_text())
+                identity["audio_graph"]["ninja"]["target_statement_sha256"] = hashlib.sha256(
+                    replacement.encode()
+                ).hexdigest()
+                identity["audio_graph"]["ninja"]["target_inputs"] = [
+                    "CMakeFiles/gameplay_public.dir/src/gameplay_menu_browser.cpp.o", archive
+                ]
+                identity_path.write_text(json.dumps(identity))
+                with self.assertRaisesRegex(BuildError, "non-public fighter archive"):
+                    build(output=self.root / f"nonpublic-{archive}", profile="player", runtime_dir=runtime)
+                ninja_path.write_text(original)
+                identity_path.write_text(json.dumps(json.loads((self.fixture_repo / "build/runtime-public-identity.json").read_text())))
+
+    def test_player_rejects_invalid_ninja_dependency_status(self):
+        runtime = self.runtime_fixture()
+        ninja_path = self.fixture_repo / ".venv/bin/ninja"
+        identity_path = runtime.parent / "runtime-public-identity.json"
+        original_script = ninja_path.read_text()
+        invalid_text = self.ninja_deps_text.replace("#deps 2, deps mtime 1 (VALID)", "deps not found")
+        ninja_path.write_text(original_script.replace(self.ninja_deps_text, invalid_text))
+        identity = json.loads(identity_path.read_text())
+        identity["audio_graph"]["ninja_deps"]["sha256"] = hashlib.sha256(invalid_text.encode()).hexdigest()
+        identity_path.write_text(json.dumps(identity))
+        try:
+            with self.assertRaisesRegex(BuildError, "dependency database is unavailable"):
+                build(output=self.root / "invalid-ninja-deps", profile="player", runtime_dir=runtime)
+        finally:
+            ninja_path.write_text(original_script)
 
     def test_player_rejects_changed_producer_inputs_in_build_and_audit(self):
         runtime = self.runtime_fixture()
@@ -256,7 +405,7 @@ class PublicReleaseTests(unittest.TestCase):
             ".venv/bin/ninja",
             "build/gameplay-source/fixture.c",
             "build/gameplay-source/.git/melee-web-composed.patch",
-            "build/browser-release/initial_pipeline_cache.db",
+            "build/browser-public-release/initial_pipeline_cache.db",
         )
         for index, rel in enumerate(inputs):
             with self.subTest(input=rel):
@@ -278,7 +427,7 @@ class PublicReleaseTests(unittest.TestCase):
         gameplay.write_text('FS.mkdir("/home/web_user/private"); // gameplay_public.wasm\n')
         identity_path = runtime.parent / "runtime-public-identity.json"
         identity = json.loads(identity_path.read_text())
-        record = next(item for item in identity["artifacts"] if item["path"] == "gameplay_public.js")
+        record = next(item for item in identity["artifacts"] if item["path"].endswith("/gameplay_public.js"))
         data = gameplay.read_bytes()
         record["bytes"] = len(data)
         record["sha256"] = hashlib.sha256(data).hexdigest()
@@ -293,7 +442,7 @@ class PublicReleaseTests(unittest.TestCase):
         gameplay.write_bytes(data)
         identity_path = runtime.parent / "runtime-public-identity.json"
         identity = json.loads(identity_path.read_text())
-        record = next(item for item in identity["artifacts"] if item["path"] == "gameplay_public.js")
+        record = next(item for item in identity["artifacts"] if item["path"].endswith("/gameplay_public.js"))
         record["bytes"] = len(data)
         record["sha256"] = hashlib.sha256(data).hexdigest()
         identity_path.write_text(json.dumps(identity))

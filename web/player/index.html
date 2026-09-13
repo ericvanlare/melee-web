@@ -22,10 +22,11 @@
       <button id="end-session" type="button" disabled>Eject</button>
       <button id="status" type="button" disabled aria-live="polite">Loading…</button>
       <progress id="progress" aria-label="Preparing local data" hidden></progress>
-      <span id="edition">WIP</span> <a href="/notices">About / legal</a>
+      <span id="edition">alpha · no audio</span> <a href="/notices">About / legal</a>
     </div>
   </main>
   <dialog id="disc-dialog" aria-label="Select your game copy">
+    <p>Audio is disabled in this alpha. Some CPU actions can stop the player (opcode 63); restart may be required.</p>
     <p>Select an unmodified USA 1.02 ISO, GCM or CISO. The selected file and game data stay on this device.</p>
     <label><input id="disc-ack" type="checkbox"> I am selecting a copy of the game that I am legally authorized to use.</label>
     <div class="dialog-actions"><button id="disc-cancel" type="button">Cancel</button><button id="disc-continue" type="button" disabled>Choose file</button></div>

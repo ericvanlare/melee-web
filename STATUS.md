@@ -1,5 +1,15 @@
 # Current status
 
+The initial public alpha uses an explicitly **audio-disabled** release profile.
+The public compile/link and JavaScript graph excludes the identified GPL-derived
+resampler and coefficient generator; normal development audio remains separate.
+The candidate mounts the player directly with the original minimal prototype
+layout. It still reproduces the opcode-63 CPU-action abort, and the development
+No Contest path can exit with unsupported pending scene 0. These are retained
+failures. See [the alpha validation record](docs/PUBLIC_ALPHA_VALIDATION.md).
+Public-domain activation is gated on tested legal-contact forwarding and the
+exact artifact audit, not on an assertion of broader stability.
+
 Ordinary VS CPU levels 1–9 now run in the shared compiled runtime used by both
 entry pages. The [CPU match development corpus](docs/CPU_MATCH_CORPUS.md)
 extends the existing checkpoint evidence: two independent retail captures,

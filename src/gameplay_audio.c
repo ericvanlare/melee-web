@@ -1,6 +1,10 @@
 #include "gameplay_audio_bank_transport.h"
 #include "gameplay_audio.h"
+#if !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
 #include "gameplay_audio_resample.h"
+#else
+#include "gameplay_audio_silent_clock.h"
+#endif
 #include "gameplay_audio_itd.h"
 #if defined(MELEE_WEB_AUDIO_STREAM)
 #include "gameplay_audio_stream.h"
@@ -29,9 +33,22 @@ typedef struct SampleEntry {struct SampleEntry* next;int id,channels,rate;VoiceP
 _Static_assert(sizeof(VoiceParameters)==64&&offsetof(SampleEntry,voice)==16,"Original synth SSM entry ABI");
 _Static_assert(sizeof(AXVPB)==0x1f8&&sizeof(AXPB)==0xc0,"Original SDK voice/control ABI");
 typedef struct Binding {const MeleeWebAudioChannel* channel;uint32_t id,base;} Binding;
-typedef struct Playback {const Binding* binding;Binding stream_binding;size_t position;MeleeWebAudioResample resample;int loop,playing;int16_t history[64];unsigned history_at;} Playback;
+typedef struct Playback {const Binding* binding;Binding stream_binding;size_t position;
+#if !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+ MeleeWebAudioResample resample;
+#else
+ /* Public audio has no DSP state.  This is the original 16.16 source-clock
+  * accumulator only, used to retire source samples at the AX ratio while the
+  * output remains silent. */
+ uint32_t timing_fraction;
+#endif
+ int loop,playing;
+#if !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+ int16_t history[64];unsigned history_at;
+#endif
+} Playback;
 struct MeleeWebAudio {const MeleeWebAudioInput* input;SampleEntry* entries;Binding* bindings;uint32_t binding_count;u32** programs;u32* words;u32* starts;Playback playback[64];unsigned block_pos;u32* source_sem;uint64_t generation;uint8_t ai_stream_volume[2];int source_closed;
-#if defined(MELEE_WEB_AUDIO_FX)
+#if defined(MELEE_WEB_AUDIO_FX) && !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
 MeleeWebAudioEffects* effects;
 #endif
 };
@@ -51,7 +68,11 @@ static uint32_t addr(u16 hi,u16 lo){return (uint32_t)hi<<16|lo;}
 static void split(uint32_t v,u16* hi,u16* lo){*hi=v>>16;*lo=v;}
 static void free_owner(MeleeWebAudio* a){if(a){free(a->entries);free(a->bindings);free(a->programs);free(a->words);free(a->starts);free(a);}}
 MeleeWebAudio* melee_web_audio_begin(const MeleeWebAudioInput* in,char* e,size_t n){
+#if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+ if(active||!in||!in->samples||!in->sample_count||in->sample_count>4096||!in->words||!in->word_count||in->word_count>1048576||!in->bank_starts||!in->bank_count||in->bank_count>4096||!in->program_offsets||!in->program_count||in->program_count>65536){fail(e,n,"Invalid or already-owned audio inputs");return NULL;}
+#else
  if(active||!in||!in->resample_coefficients||in->resample_coefficient_count!=2048||!in->samples||!in->sample_count||in->sample_count>4096||!in->words||!in->word_count||in->word_count>1048576||!in->bank_starts||!in->bank_count||in->bank_count>4096||!in->program_offsets||!in->program_count||in->program_count>65536){fail(e,n,"Invalid or already-owned audio inputs");return NULL;}
+#endif
  for(unsigned priority=1;priority<32;priority++)if(__AXGetStackHead(priority)){fail(e,n,"Original AX voices are already owned");return NULL;}
  for(uint32_t i=0;i<in->bank_count;i++)if(in->bank_starts[i]>=in->program_count||(i&&in->bank_starts[i]<in->bank_starts[i-1])){fail(e,n,"Invalid SEM bank starts");return NULL;}
  for(uint32_t i=0;i<in->program_count;i++)if(in->program_offsets[i]%4||in->program_offsets[i]/4>=in->word_count){fail(e,n,"Invalid SEM program pointer");return NULL;}
@@ -92,7 +113,9 @@ int melee_web_audio_play(MeleeWebAudio* a,int id,uint8_t volume,uint8_t pan,int 
 }
 int melee_web_audio_enable_effects(MeleeWebAudio* a,char* e,size_t n){
  if(!live(a)||a->block_pos)return fail(e,n,"Effects require an active audio scope at a block boundary");
-#if defined(MELEE_WEB_AUDIO_FX)
+#if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+ if(e&&n)*e=0;return 1;
+#elif defined(MELEE_WEB_AUDIO_FX)
  if(a->effects)return 1;
  if(melee_web_audio_aux_enabled())return fail(e,n,"Original auxiliary effects are already owned");
  a->effects=melee_web_audio_fx_create(e,n);return a->effects!=NULL;
@@ -137,6 +160,54 @@ static int16_t read_pcm(void* context){
  return (p->loop?c->loop_pcm:c->pcm)[p->position++];
 }
 int melee_web_audio_render(MeleeWebAudio* a,float* output,uint32_t frames,char* e,size_t n){
+#if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+ if(!live(a)||a->source_closed||!output||frames>32000)return fail(e,n,"Invalid audio output request");
+ memset(output,0,frames*2*sizeof(float));
+ for(uint32_t frame=0;frame<frames;frame++){
+  if(a->block_pos==0){
+   melee_web_audio_bank_transport_pump();
+#if defined(MELEE_WEB_AUDIO_STREAM)
+   if(!melee_web_audio_stream_pump_for(a,e,n))return 0;
+#endif
+   /* Keep source SEM/AX callbacks and their 160-sample cadence alive.  The
+    * public alpha deliberately advances no samples into PCM output. */
+   command_budget=65536;HSD_SynthCallback();
+  }
+  for(unsigned priority=1;priority<32;priority++)for(AXVPB* voice=__AXGetStackHead(priority);voice;voice=voice->next){
+   AXPB* pb=&voice->pb;Playback* p=&a->playback[voice->index];
+   if(!pb->state){p->playing=0;continue;}
+   uint32_t at=addr(pb->addr.currentAddressHi,pb->addr.currentAddressLo),end=addr(pb->addr.endAddressHi,pb->addr.endAddressLo);
+   if(!p->playing||(voice->sync&(AX_SYNC_FLAG_COPYADDR|AX_SYNC_FLAG_COPYCURADDR))){
+    p->binding=find_binding(a,p,at,end);if(!p->binding)return fail(e,n,"Original AX voice address is not bound to decoded source audio");
+    if(at%16<2)return fail(e,n,"Original AX current address points to DSP header");
+    p->position=index_from_nibble(at-p->binding->base)-index_from_nibble(p->binding->channel->current_nibble);p->loop=0;p->playing=1;p->timing_fraction=pb->src.currentAddressFrac;
+   }
+   if(pb->srcSelect>2||pb->coefSelect>2)return fail(e,n,"Unknown original AX resampler selector");
+   uint32_t ratio=addr(pb->src.ratioHi,pb->src.ratioLo);if(ratio>0x40000){
+    if(e&&n)snprintf(e,n,"Original AX sample ratio %u is unsupported for voice %u state %u sync %u",ratio,voice->index,pb->state,voice->sync);
+    return 0;
+   }
+   /* Match the source-clock part of the original resampler.  Nearest (2)
+    * consumes one source frame per output frame; the two filtered selectors
+    * consume the integer part of a 16.16 phase accumulator.  Values are read
+    * only to exercise the existing finite voice, loop, and HPS handoff logic;
+    * no sample reaches the public output. */
+   const uint32_t source_frames=melee_web_audio_silent_clock_advance(&p->timing_fraction,ratio,pb->srcSelect);
+   SampleRead read={p,pb,a,0};
+   for(uint32_t source=0;source<source_frames&&pb->state;source++)(void)read_pcm(&read);
+   if(read.failed)return fail(e,n,"Original HPS loop points to an unloaded auxiliary slot");
+   if(!pb->state){p->playing=0;continue;}
+   const MeleeWebAudioChannel* c=p->binding->channel;const size_t count=p->loop?c->loop_frames:c->frames;
+   if(!count){pb->state=0;p->playing=0;continue;}
+   size_t next=p->position;if(next>=count)next=count-1;
+   const uint32_t start=p->loop?c->loop_nibble:c->current_nibble;
+   const uint32_t address=p->binding->base+nibble_from_index(index_from_nibble(start)+next);
+   split(address,&pb->addr.currentAddressHi,&pb->addr.currentAddressLo);pb->src.currentAddressFrac=(u16)p->timing_fraction;voice->sync=0;
+  }
+  a->block_pos=(a->block_pos+1)%160;
+ }
+ if(e&&n)*e=0;return 1;
+#else
  if(!live(a)||a->source_closed||!output||frames>32000)return fail(e,n,"Invalid audio output request");
  memset(output,0,frames*2*sizeof(float));
  for(uint32_t frame=0;frame<frames;frame++){
@@ -204,6 +275,7 @@ int melee_web_audio_render(MeleeWebAudio* a,float* output,uint32_t frames,char* 
   a->block_pos=(a->block_pos+1)%160;
  }
  if(e&&n)*e=0;return 1;
+#endif
 }
 int melee_web_audio_active_samples(MeleeWebAudio* a,uint32_t* ids,uint32_t capacity){
  if(!live(a)||!ids)return -1;uint32_t count=0;for(unsigned i=0;i<64;i++)if(a->playback[i].playing){if(count>=capacity)return -1;ids[count++]=a->playback[i].binding->id;}return count;
@@ -218,7 +290,7 @@ int melee_web_audio_end(MeleeWebAudio* a,char* e,size_t n){
  HSD_AudioSFXKeyOffAll();
  for(unsigned priority=1;priority<32;priority++)while(__AXGetStackHead(priority))AXFreeVoice(__AXGetStackHead(priority));
 
-#if defined(MELEE_WEB_AUDIO_FX)
+#if defined(MELEE_WEB_AUDIO_FX) && !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
  melee_web_audio_fx_destroy(a->effects);
 #endif
  melee_web_audio_driver_end();melee_web_audio_synth_end();__AXAllocQuit();active=NULL;free_owner(a);if(e&&n)*e=0;return 1;
