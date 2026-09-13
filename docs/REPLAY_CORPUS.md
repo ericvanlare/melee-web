@@ -6,6 +6,14 @@ named conversion policy. Newly executed vanilla Melee supplies expected state.
 The original recording's post-frame positions, damage, RNG and outcome are
 never substituted for that execution.
 
+The separate [CPU match development corpus](CPU_MATCH_CORPUS.md) extends these
+same input-plan, retail capture and MWRC contracts to ordinary VS CPUs and
+two through four players. Recorded CPU decisions remain comparison fields;
+the port generates its own decisions from compiled source. Its first complete
+two-player core comparison covers 1,199 exact ticks, while expanded camera
+and source-draw-phase checks remain failing. CPU holdouts and performance
+admission are still open; the human-only evidence below does not imply them.
+
 ## Selection and split
 
 Freeze development and held-out membership by the complete donor SHA-256 before

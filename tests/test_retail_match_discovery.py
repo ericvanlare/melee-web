@@ -22,7 +22,7 @@ from retail_match_discovery import (  # noqa: E402
     DiscoveryError,
     load_discovery,
 )
-from retail_input_plan import DISCONNECTED_PAD  # noqa: E402
+from retail_input_plan import DISCONNECTED_PAD, NEUTRAL_PAD  # noqa: E402
 
 
 def _pad_state() -> str:
@@ -61,6 +61,16 @@ def _state(scene_frame: int, stocks=(4, 4)) -> dict:
     }
 
 
+def _state_many(scene_frame: int, stocks: tuple[int, ...]) -> dict:
+    return {
+        "rng": 100 + scene_frame,
+        "scene_frame": scene_frame,
+        "match_frame": scene_frame,
+        "fighters": [_fighter(slot, stock) for slot, stock in enumerate(stocks)],
+        "pad_state_hex": _pad_state(),
+    }
+
+
 def _plan(frame_count: int) -> tuple[dict, str]:
     pads = [["00" * 11, "00" * 11] for _ in range(frame_count)]
     value = {
@@ -69,6 +79,25 @@ def _plan(frame_count: int) -> tuple[dict, str]:
         "frames": pads,
     }
     return value, "aa" * 32
+
+
+def _multiplayer_plan(frame_count: int, active_player_count: int) -> tuple[dict, str]:
+    frames = [["00" * 11] + [NEUTRAL_PAD] * (active_player_count - 1)
+              + [DISCONNECTED_PAD] * (4 - active_player_count)
+              for _ in range(frame_count)]
+    value = {
+        "version": 3,
+        "active_player_count": active_player_count,
+        "source_stage": 32,
+        "source_characters": [8] + [2] * (active_player_count - 1),
+        "source_player_types": [0] + [1] * (active_player_count - 1),
+        "source_cpu_kinds": [None] + [4] * (active_player_count - 1),
+        "source_cpu_levels": [None] + [1] * (active_player_count - 1),
+        "source_cpu_pad_modes": [None] + ["neutral"] * (active_player_count - 1),
+        "controlled_ports": [1],
+        "frames": frames,
+    }
+    return value, "cc" * 32
 
 
 def _rows(frame_count=2, cap=4, *, stop_reason="match_end", status="complete",
@@ -215,6 +244,99 @@ class RetailMatchDiscoveryTests(unittest.TestCase):
                     template_user=root / "template", snapshot=root / "snapshot",
                     checkpoint_gc=root / "checkpoint", provenance=root / "provenance",
                     output=output, frames=2, until_match_end=True)
+
+    def test_v3_discovery_accepts_four_port_three_player_elimination(self):
+        plan, plan_hash = _multiplayer_plan(2, 3)
+        start = bytearray(0x138)
+        start[0x0E:0x10] = (32).to_bytes(2, "big")
+        for index, character in enumerate(plan["source_characters"]):
+            base = 0x60 + index * 0x24
+            start[base] = character
+            start[base + 1] = 0 if index == 0 else 1
+            start[base + 0x0E] = 0 if index == 0 else 4
+            start[base + 0x0F] = 0 if index == 0 else 1
+        for index in range(3, 6):
+            start[0x60 + index * 0x24 + 1] = 3
+        provenance = dict(EXPECTED_PROVENANCE)
+        provenance["input_plan_sha256"] = plan_hash
+        rows = [{
+            "record": "header", "schema": SCHEMA, "version": 1,
+            "capture_id": "00000000000040008000000000000001",
+            "phase": "HSD_GObj_80390CFC_return",
+            "input_phase": "HSD_PadRenewMasterStatus_dequeued_slot",
+            "initial_phase": "gm_Scene_Vs_OnEnter_entry", "game_revision": "GALE01r2",
+            "frames_cap": 2, "input_plan_frames": 2,
+            "input_plan_sha256": plan_hash, "provenance": provenance,
+            "collector_sha256": "bb" * 32, "writes_game_state": False,
+            "active_player_count": 3,
+        }, {
+            "record": "match_enter", "rng": 7, "start_melee_hex": start.hex(),
+            "pad_state_hex": _pad_state(),
+        }, {"record": "match_enter_complete", **_state_many(999, (4, 4, 4))}]
+        for index, stocks in enumerate(((4, 4, 4), (0, 0, 2))):
+            rows.append({"record": "frame", "index": index,
+                         "consumed_inputs": [plan["frames"][index]],
+                         **_state_many(index, stocks)})
+        rows.append({
+            "record": "end", "frames": 2, "stop_reason": "match_end",
+            "status": "complete", "scene_request": 1, "match_end_state": 3,
+            "match_result": 2, "final_draw_source_index": 1,
+            "exit_observation": {"phase": EXIT_PHASE, "frame_index": 1,
+                                  "source_scene_frame": 1,
+                                  "caller": FINAL_EXIT_CALLER, "scene_request": 1},
+        })
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "discovery.jsonl"
+            _write(path, rows)
+            result = load_discovery(path, plan=plan, plan_sha256=plan_hash)
+        self.assertTrue(result.complete)
+        self.assertEqual(result.active_player_count, 3)
+        self.assertEqual(result.report["ending"]["mode"], "elimination")
+
+    def test_v3_discovery_accepts_source_timeout_with_tied_stocks(self):
+        plan, plan_hash = _multiplayer_plan(2, 2)
+        start = bytearray(0x138)
+        start[0] = 0x22  # stock match + one-minute countdown timer enabled
+        start[0x10:0x14] = (60).to_bytes(4, "big")
+        start[0x0E:0x10] = (32).to_bytes(2, "big")
+        start[0x60] = 8
+        start[0x61] = 0
+        start[0x84] = 2
+        start[0x85] = 1
+        start[0x92] = 4
+        start[0x93] = 1
+        for index in range(2, 6):
+            start[0x60 + index * 0x24 + 1] = 3
+        provenance = dict(EXPECTED_PROVENANCE)
+        provenance["input_plan_sha256"] = plan_hash
+        rows, _, _ = _rows(frame_count=2, cap=2)
+        header = rows[0]
+        header.update({"active_player_count": 2,
+                      "input_plan_sha256": plan_hash})
+        header["provenance"] = provenance
+        rows[1]["start_melee_hex"] = start.hex()
+        rows[1]["pad_state_hex"] = _pad_state()
+        rows[2] = {"record": "match_enter_complete", **_state_many(999, (4, 4))}
+        rows[3] = {"record": "frame", "index": 0,
+                   "consumed_inputs": [plan["frames"][0]],
+                   **_state_many(0, (4, 4))}
+        rows[4] = {"record": "frame", "index": 1,
+                   "consumed_inputs": [plan["frames"][1]],
+                   **_state_many(1, (2, 2))}
+        rows[5].update({"stop_reason": "match_end", "status": "complete",
+                        "scene_request": 1, "match_end_state": 3,
+                        "match_result": 1,
+                        "exit_observation": {"phase": EXIT_PHASE, "frame_index": 1,
+                                              "source_scene_frame": 1,
+                                              "caller": FINAL_EXIT_CALLER,
+                                              "scene_request": 1}})
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "timeout.jsonl"
+            _write(path, rows)
+            result = load_discovery(path, plan=plan, plan_sha256=plan_hash)
+        self.assertTrue(result.complete)
+        self.assertEqual(result.report["ending"]["mode"], "timeout")
+        self.assertTrue(result.report["ending"]["stock_tie"])
 
 
 class RetailMatchDiscoveryCollectorTests(unittest.TestCase):

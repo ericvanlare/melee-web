@@ -25,6 +25,9 @@ from retail_input_plan import load_plan, pipe_commands, verify_entry, verify_tic
 from retail_input_bootstrap import (BootstrapCalibrationError, calibration_record,
                                      load_calibration, load_runtime_binding,
                                      write_calibration, MAX_CONSTRUCTION_PAD_READS)
+CPU_OBSERVATION_PATH = os.environ.get("MELEE_CPU_OBSERVATION")
+if CPU_OBSERVATION_PATH:
+    from retail_cpu_observation import CpuObservation
 
 INPUT_PLAN_PATH = os.environ.get("MELEE_REPLAY_INPUT_PLAN")
 input_plan, input_plan_sha256 = load_plan(INPUT_PLAN_PATH) if INPUT_PLAN_PATH else (None, None)
@@ -36,6 +39,12 @@ active = False
 ready = False
 frame_index = 0
 fighters = {}
+active_player_count = 2
+candidate_version = 2
+match_setup_hex = None
+cpu_observation = None
+source_finished = False
+result_pointer = None
 pending_inputs = []
 breakpoints = []
 DRAW_AUDIT = os.environ.get("MELEE_REPLAY_DRAW_AUDIT") == "1"
@@ -160,12 +169,13 @@ def timer_audit(row):
     if not path.exists():
         return
     if kind in ("match_enter_complete", "frame"):
+        timer = memory(0x8046B6A0, 0x30)
         value = {"record": "initial" if kind == "match_enter_complete" else "frame",
-                 "match_frame": word(0x8046B6C4),
-                 "seconds": word(0x8046B6C8),
-                 "subframe": struct.unpack(">H", memory(0x8046B6CC, 2))[0],
-                 "outcome": memory(0x8046B6A8, 1)[0],
-                 "end_state": memory(0x8046B6A0, 1)[0]}
+                 "match_frame": struct.unpack_from(">I", timer, 0x24)[0],
+                 "seconds": struct.unpack_from(">I", timer, 0x28)[0],
+                 "subframe": struct.unpack_from(">H", timer, 0x2C)[0],
+                 "outcome": timer[8],
+                 "end_state": timer[0]}
         if kind == "frame":
             value["index"] = row["index"]
     elif kind == "end" and row.get("status") == "captured":
@@ -224,6 +234,8 @@ def float_bits(address):
 
 def fighter_state(slot, address):
     head = memory(address, 0x100)
+    input_anim = memory(address + 0x620, 0x280)
+    damage_shield = memory(address + 0x1830, 0x16C)
     def u(offset):
         return struct.unpack_from(">I", head, offset)[0]
     def vector(offset):
@@ -234,21 +246,24 @@ def fighter_state(slot, address):
         "animation": u(0x14), "facing_bits": head[0x2C:0x30].hex(),
         "position_bits": vector(0xB0), "velocity_bits": vector(0x80),
         "knockback_bits": vector(0x8C), "ground_air": u(0xE0),
-        "animation_frame_bits": float_bits(address + 0x894),
-        "animation_speed_bits": float_bits(address + 0x89C),
-        "damage_bits": float_bits(address + 0x1830),
-        "shield_bits": float_bits(address + 0x1998),
+        "animation_frame_bits": input_anim[0x894 - 0x620:0x898 - 0x620].hex(),
+        "animation_speed_bits": input_anim[0x89C - 0x620:0x8A0 - 0x620].hex(),
+        "damage_bits": damage_shield[0:4].hex(),
+        "shield_bits": damage_shield[0x1998 - 0x1830:0x199C - 0x1830].hex(),
         "stocks": struct.unpack("b", memory(0x80453080 + slot * 0xE90 + 0x8E, 1))[0],
-        "input_hex": memory(address + 0x620, 0x6C).hex(),
+        "input_hex": input_anim[:0x6C].hex(),
     }
 
 
 def pad_state():
-    config = memory(0x804C1F84, 0x20)
+    base_address = 0x804C1F84
+    combined = memory(base_address, 0x358)
+    config = combined[:0x20]
     # Skip the two alignment bytes before adc_angle and each status tail.
     result = config[:10] + config[12:]
     for base in (0x804C1FAC, 0x804C20BC, 0x804C21CC):
-        raw = memory(base, 0x110)
+        offset = base - base_address
+        raw = combined[offset:offset + 0x110]
         result += b"".join(raw[i:i + 66] for i in range(0, 0x110, 68))
     return result.hex()
 
@@ -279,12 +294,71 @@ class Observer(gdb.Breakpoint):
             return True
 
 
+def result_enter():
+    global result_pointer
+    if not active or cpu_observation is None or not source_finished:
+        return False
+    result_pointer = int(gdb.parse_and_eval("$r3")) & 0xFFFFFFFF
+    if result_pointer != 0x80479D98:
+        raise RuntimeError("Ordinary VS result destination differs from pinned source context")
+    return False
+
+
+def result_return():
+    if not active or cpu_observation is None or not source_finished:
+        return False
+    if result_pointer is None:
+        raise RuntimeError("VS result return without its source entry")
+    raw = memory(result_pointer + 0xC, 0x28)
+    count = raw[0xD]
+    if not 1 <= count <= active_player_count:
+        raise RuntimeError("Source result has an invalid winner count")
+    winners = list(raw[0x10:0x10 + count])
+    if len(set(winners)) != count or any(slot >= active_player_count for slot in winners):
+        raise RuntimeError("Source result has invalid winner slots")
+    cpu_observation.result = {"outcome": raw[4], "winners": winners}
+    return False
+
+
+def scene_objects_reset():
+    """Observe the next scene's original object-library reset, not destructors.
+
+    Retail reclaims scene storage and rebuilds empty GObj lists. It does not
+    run Fighter_Unload for each fighter at an ordinary scene transition.
+    Never dereference old fighter allocations after this reset.
+    """
+    global active
+    if not active or cpu_observation is None or not source_finished:
+        return False
+    if cpu_observation.result is None:
+        raise RuntimeError("Scene ownership reset preceded original result publication")
+    count = memory(0x804CE380, 1)[0] + 1
+    if not 1 <= count <= 64:
+        raise RuntimeError("Source GObj reset has an invalid entity-list count")
+    heads = memory(word(0x804D782C), count * 4)
+    if heads != bytes(len(heads)):
+        raise RuntimeError("Source GObj reset left nonempty entity lists")
+    with (ROOT / "scene-teardown.json").open("x") as stream:
+        json.dump({"schema": "melee-web-retail-scene-teardown", "version": 1,
+                   "phase": "HSD_GObj_80391304_return", "address": "8039157c",
+                   "source_ticks": frame_index, "source_draws": draw_count,
+                   "released_fighter_slots": sorted(fighters),
+                   "entity_list_count": count, "entity_heads_hex": heads.hex(),
+                   "routing_hex": memory(0x80479D30, 6).hex(),
+                   "result": cpu_observation.result}, stream, sort_keys=True)
+    fighters.clear()
+    cpu_observation.end(frame_index, [])
+    active = False
+    print("Original result publication and scene ownership reset captured:", OUTPUT)
+    return True
+
+
 def created():
-    if active:
+    if active and not source_finished:
         pointer = word(int(gdb.parse_and_eval("$r3")) + 0x2C)
         slot = memory(pointer + 0xC, 1)[0]
-        if slot not in (0, 1):
-            raise RuntimeError("Initial reference slice requires human slots 0 and 1")
+        if slot not in range(active_player_count):
+            raise RuntimeError("Initial reference slice found a fighter outside active slots")
         fighters[slot] = pointer
 
 
@@ -300,7 +374,7 @@ PAD_MASTER_CONSUME_WORD = 0x3B7E0028
 
 def pad_consume():
     global pad_bootstrapped, pad_sample_index
-    if active and ready:
+    if active and ready and not source_finished:
         if frame_index == LIMIT:
             raise RuntimeError('Next source tick reached before the final requested source draw')
         queue = memory(0x804C1F78, 0xC)
@@ -347,7 +421,7 @@ def pad_read_before_interrupt_restore():
     """
     global pad_sample_index, construction_pad_reads, last_construction_pad_read
     global bootstrap_applied
-    if not active or input_plan is None:
+    if not active or input_plan is None or source_finished:
         return False
     # Preserve the legacy collector's pre-entry behavior: its PADRead
     # observer was inactive until VS entry completed. Only the explicit
@@ -397,8 +471,11 @@ def pad_read_before_interrupt_restore():
             if construction_pad_reads == expected_count - 1:
                 if identity != bootstrap_calibration["last_construction_pad_read"]:
                     raise RuntimeError('Final construction PADRead differs from calibration')
-                expected_semantic = (bootstrap_calibration["first_input"] +
-                                     ["00" * 10 + "ff", "00" * 10 + "ff"])
+                if input_plan is not None and input_plan.get('version') == 3:
+                    expected_semantic = input_plan['frames'][0]
+                else:
+                    expected_semantic = bootstrap_calibration["first_input"] + [
+                        "00" * 10 + "ff", "00" * 10 + "ff"]
                 actual_semantic = [raw[offset:offset + 11].hex()
                                    for offset in range(0, 48, 12)]
                 if actual_semantic != expected_semantic:
@@ -436,8 +513,10 @@ def scheduler_return():
     global active, frame_index
     if not active or not ready:
         return False
-    if set(fighters) != {0, 1}:
-        raise RuntimeError("Scheduler reached without both retail fighters")
+    if source_finished:
+        return False
+    if set(fighters) != set(range(active_player_count)):
+        raise RuntimeError("Scheduler reached without all active retail fighters")
     sample = state()
     if not observations.accept("scheduler", sample["scene_frame"],
                                (machine_context(), sample)):
@@ -450,6 +529,8 @@ def scheduler_return():
         raise RuntimeError("Source tick did not consume exactly one PAD vector")
     if input_plan is not None:
         verify_tick(input_plan, frame_index, pending_inputs[0])
+    if cpu_observation is not None:
+        cpu_observation.tick(frame_index, fighters)
     emit({"record": "frame", "index": frame_index,
           "consumed_inputs": list(pending_inputs), **sample})
     pending_inputs.clear()
@@ -460,7 +541,9 @@ def scheduler_return():
 
 
 def finish():
-    global active
+    global active, source_finished
+    if cpu_observation is not None and not fixed_end_ready():
+        raise RuntimeError("CPU reference bound does not coincide with the natural source ending")
     emit({"record": "end", "frames": frame_index, "status": "captured"})
     # A bounded input prefix and a complete stock match are different evidence.
     # Observe the original exit request after the final scheduler/draw, before
@@ -478,6 +561,9 @@ def finish():
     }
     with (ROOT / "match-completion.json").open("x") as stream:
         json.dump(completion, stream, sort_keys=True)
+    if cpu_observation is not None:
+        source_finished = True
+        return False
     active = False
     print("Identical debugger trap repeats:", observations.duplicates)
     print("Reference candidate captured:", OUTPUT)
@@ -491,7 +577,9 @@ def finish_discovery(stop_reason):
     replay validator.  A cap hit remains an explicit incomplete observation;
     it is retained for diagnostics but the runner rejects it as success.
     """
-    global active
+    global active, source_finished
+    if source_finished:
+        return False
     if stop_reason == "match_end":
         if not discovery_end_ready():
             raise RuntimeError("Match-end discovery lacks the original exit/final-draw boundary")
@@ -509,14 +597,28 @@ def finish_discovery(stop_reason):
           "match_result": memory(0x8046B6A8, 1)[0],
           "final_draw_source_index": last_drawn_source_index,
           "exit_observation": exit_observation})
-    active = False
-    print("Retail match-length discovery finished:", stop_reason, OUTPUT)
-    return True
+    source_finished = True
+    # The main discovery trace ends at the final source draw.  CPU observation
+    # remains armed through result publication and the next source GObj reset.
+    # The final draw alone is not evidence of released scene ownership.
+    if cpu_observation is None or stop_reason == "frame_cap":
+        active = False
+        print("Retail match-length discovery finished:", stop_reason, OUTPUT)
+        return True
+    return False
+
+
+def fixed_end_ready():
+    return (exit_observation is not None and
+            exit_observation.get("index") in (frame_index - 1, frame_index) and
+            last_drawn_source_index == frame_index - 1 and
+            word(0x80479D64) == 1 and memory(0x8046B6A0, 1)[0] == 3 and
+            memory(0x8046B6A8, 1)[0] in (1, 2))
 
 
 def exit_requested():
     global exit_observation
-    if not active or not ready:
+    if not active or not ready or source_finished:
         return False
     if UNTIL_MATCH_END:
         sample = {"phase": "gm_801A4B60_return", "frame_index": frame_index,
@@ -539,7 +641,7 @@ def exit_requested():
 
 def draw_enter():
     global draw_before, draw_source_index
-    if not active or not ready: return False
+    if not active or not ready or source_finished: return False
     sample = state()
     if not observations.accept("draw_enter", sample["scene_frame"], (machine_context(), sample)):
         return False
@@ -553,7 +655,7 @@ def draw_enter():
 
 def draw_return():
     global draw_before, draw_count, last_drawn_source_index
-    if not active or not ready: return False
+    if not active or not ready or source_finished: return False
     sample = state()
     if not observations.accept("draw_return", sample["scene_frame"], (machine_context(), sample)):
         return False
@@ -564,6 +666,8 @@ def draw_return():
         stream.write(json.dumps({"record":"draw", "index":draw_count,
                                 "source_index":draw_source_index,
                                 "before":draw_before, "after":sample}, sort_keys=True)+"\n")
+    if cpu_observation is not None:
+        cpu_observation.draw(draw_source_index, fighters)
     last_drawn_source_index = draw_source_index
     draw_before = None
     draw_count += 1
@@ -572,6 +676,8 @@ def draw_return():
             return finish_discovery("match_end")
         if frame_index == LIMIT:
             return finish_discovery("frame_cap")
+    elif cpu_observation is not None and fixed_end_ready() and frame_index != LIMIT:
+        raise RuntimeError("Original CPU match ended before the declared exact reference bound")
     elif frame_index == LIMIT:
         if last_drawn_source_index != LIMIT - 1: raise RuntimeError("Incomplete draw lifecycle")
         return finish()
@@ -580,7 +686,7 @@ def draw_return():
 
 def entered():
     global ready, active
-    if not active:
+    if not active or source_finished:
         return False
     sample = state()
     if not observations.accept("initial", 0, (machine_context(), sample)):
@@ -589,6 +695,10 @@ def entered():
         return False
     pending_inputs.clear()
     emit({"record": "match_enter_complete", **sample})
+    if cpu_observation is not None:
+        if match_setup_hex is None:
+            raise RuntimeError("CPU observation entered without a source setup")
+        cpu_observation.begin(match_setup_hex, LIMIT, fighters)
     if BOOTSTRAP_MODE == "calibrate":
         if (BOOTSTRAP_OUTPUT_PATH is None or construction_pad_reads <= 0 or
                 last_construction_pad_read is None):
@@ -612,7 +722,9 @@ def entered():
 
 
 def enter():
-    global active
+    global active, match_setup_hex
+    if source_finished:
+        return False
     pointer = int(gdb.parse_and_eval("$r3"))
     sample = {"record": "match_enter", "rng": rng(),
               "start_melee_hex": memory(pointer, 0x138).hex(),
@@ -624,6 +736,7 @@ def enter():
     if active:
         raise RuntimeError("A second match entered before reference capture finished")
     active = True
+    match_setup_hex = sample['start_melee_hex']
     if input_plan is not None:
         verify_entry(input_plan, sample['start_melee_hex'])
     emit(sample)
@@ -643,7 +756,8 @@ class Arm(gdb.Command):
         global pad_bootstrapped, pad_sample_index, construction_pad_reads
         global last_construction_pad_read, bootstrap_applied
         global bootstrap_calibration, bootstrap_calibration_sha256
-        global collector_sha256, run_provenance
+        global collector_sha256, run_provenance, active_player_count, candidate_version
+        global match_setup_hex, cpu_observation, source_finished
         values = gdb.string_to_argv(args)
         if len(values) != 2:
             raise gdb.GdbError("retail-replay-arm OUTPUT_PATH FRAME_COUNT")
@@ -670,6 +784,17 @@ class Arm(gdb.Command):
                 raise gdb.GdbError('Match-length discovery requires the source draw observer')
         elif input_plan is not None and LIMIT != len(input_plan['frames']):
             raise gdb.GdbError('Capture must consume the entire declared input plan')
+        candidate_version = (3 if input_plan is not None and input_plan.get('version') == 3 else 2)
+        active_player_count = (input_plan.get('active_player_count', 2)
+                               if candidate_version == 3 else 2)
+        if CPU_OBSERVATION_PATH and candidate_version != 3:
+            raise gdb.GdbError('MELEE_CPU_OBSERVATION requires a version-3 CPU input plan')
+        cpu_observation = None
+        if CPU_OBSERVATION_PATH:
+            helper = COLLECTOR.with_name('retail_cpu_observation.py')
+            if not helper.is_file():
+                raise gdb.GdbError('MELEE_CPU_OBSERVATION requires retail_cpu_observation.py beside collector')
+            cpu_observation = CpuObservation(CPU_OBSERVATION_PATH, memory)
         OUTPUT.parent.mkdir(parents=True, exist_ok=True)
         provenance = json.loads((ROOT / "provenance.json").read_text())
         run_provenance = dict(provenance)
@@ -691,13 +816,23 @@ class Arm(gdb.Command):
         bootstrap_applied = False
         active = False
         ready = False
+        source_finished = False
+        match_setup_hex = None
         fighters.clear()
         pending_inputs.clear()
-        collector_sha256 = hashlib.sha256(
-            COLLECTOR.read_bytes() + b"\0" +
-            COLLECTOR.with_name("reference_replay_boundary.py").read_bytes() + b"\0" +
-            COLLECTOR.with_name("retail_input_plan.py").read_bytes() + b"\0" +
-            COLLECTOR.with_name("retail_input_bootstrap.py").read_bytes()).hexdigest()
+        collector_parts = [
+            COLLECTOR.read_bytes(),
+            COLLECTOR.with_name("reference_replay_boundary.py").read_bytes(),
+            COLLECTOR.with_name("retail_input_plan.py").read_bytes(),
+            COLLECTOR.with_name("retail_input_bootstrap.py").read_bytes(),
+        ]
+        collector_cpu = COLLECTOR.with_name("retail_cpu_observation.py")
+        # The runner binds the optional companion whenever it exists beside
+        # the collector, including historical v2 captures where the env opt-in
+        # is absent.  Keep this byte list identical to prepare_run's identity.
+        if collector_cpu.is_file():
+            collector_parts.append(collector_cpu.read_bytes())
+        collector_sha256 = hashlib.sha256(b"\0".join(collector_parts)).hexdigest()
         bootstrap_calibration = None
         bootstrap_calibration_sha256 = None
         if BOOTSTRAP_MODE in ("calibrate", "apply"):
@@ -718,26 +853,33 @@ class Arm(gdb.Command):
             except (OSError, BootstrapCalibrationError) as error:
                 raise gdb.GdbError(str(error)) from error
         if UNTIL_MATCH_END:
-            emit({"record": "header", "schema": "melee-web-retail-match-discovery",
-                  "version": 1, "capture_id": uuid.uuid4().hex,
-                  "phase": "HSD_GObj_80390CFC_return",
-                  "input_phase": "HSD_PadRenewMasterStatus_dequeued_slot",
-                  "initial_phase": "gm_Scene_Vs_OnEnter_entry",
-                  "game_revision": "GALE01r2", "frames_cap": LIMIT,
-                  "input_plan_frames": len(input_plan['frames']),
-                  "input_plan_sha256": input_plan_sha256,
-                  "provenance": provenance,
-                  "collector_sha256": collector_sha256,
-                  "writes_game_state": False})
+            discovery_header = {
+                "record": "header", "schema": "melee-web-retail-match-discovery",
+                "version": 1, "capture_id": uuid.uuid4().hex,
+                "phase": "HSD_GObj_80390CFC_return",
+                "input_phase": "HSD_PadRenewMasterStatus_dequeued_slot",
+                "initial_phase": "gm_Scene_Vs_OnEnter_entry",
+                "game_revision": "GALE01r2", "frames_cap": LIMIT,
+                "input_plan_frames": len(input_plan['frames']),
+                "input_plan_sha256": input_plan_sha256,
+                "provenance": provenance,
+                "collector_sha256": collector_sha256,
+                "writes_game_state": False}
+            if candidate_version == 3:
+                discovery_header["active_player_count"] = active_player_count
+            emit(discovery_header)
         else:
-            emit({"record": "header", "schema": "melee-web-retail-replay-candidate",
-                  "version": 2, "capture_id": uuid.uuid4().hex, "phase": "HSD_GObj_80390CFC_return",
+            header = {"record": "header", "schema": "melee-web-retail-replay-candidate",
+                  "version": candidate_version, "capture_id": uuid.uuid4().hex, "phase": "HSD_GObj_80390CFC_return",
                   "input_phase": "HSD_PadRenewMasterStatus_dequeued_slot",
                   "initial_phase": "gm_Scene_Vs_OnEnter_entry",
                   "game_revision": "GALE01r2", "frames_requested": LIMIT,
                   "provenance": provenance,
                   "collector_sha256": collector_sha256,
-                  "writes_game_state": False})
+                  "writes_game_state": False}
+            if candidate_version == 3:
+                header["active_player_count"] = active_player_count
+            emit(header)
         Observer(0x800693A8, created)
         # Install all observers before execution. Mutating GDB breakpoints
         # inside stop callbacks can retrigger the current remote stop.
@@ -774,6 +916,17 @@ class Arm(gdb.Command):
                 raise gdb.GdbError("Draw audit output already exists")
             Observer(0x80390FC0, draw_enter)
             Observer(0x80391040, draw_return)
+        if CPU_OBSERVATION_PATH:
+            # Pin both result publication and the next scene's actual reset.
+            # These are read-only observations after the final match draw.
+            for address, instruction in ((0x8016E9C8, 0x7C0802A6),
+                                         (0x8016EBBC, 0x4E800020),
+                                         (0x8039157C, 0x4E800020)):
+                if word(address) != instruction:
+                    raise gdb.GdbError("Pinned CPU terminal boundary does not match")
+            Observer(0x8016E9C8, result_enter)
+            Observer(0x8016EBBC, result_return)
+            Observer(0x8039157C, scene_objects_reset)
         print("Read-only reference collector armed:", OUTPUT)
 
 

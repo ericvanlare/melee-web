@@ -314,12 +314,12 @@ def _require_pipe_config(config: Path) -> None:
                 f"copied GCPadNew.ini does not configure Pipe/0/pad{port}")
 
 
-def require_raw_pipe_config(path: Path) -> None:
+def require_raw_pipe_config(path: Path, ports=(1, 2)) -> None:
     config = configparser.ConfigParser(interpolation=None)
     config.optionxform = str
     try:
         config.read_string(path.read_text())
-        for port in (1, 2):
+        for port in ports:
             section = config[f'GCPad{port}']
             if section.get('Device') != f'Pipe/0/pad{port}':
                 raise ValueError('unexpected controller device')
@@ -383,10 +383,16 @@ def prepare_run(template_user: str | Path, checkpoint_gc: str | Path,
     collector_bootstrap = _regular_file(
         collector.with_name('retail_input_bootstrap.py'),
         'retail input bootstrap helper')
+    # Historical/custom collectors can omit the v3 observer. A v3 plan below
+    # requires it; when present it is always copied and bound to collector identity.
+    collector_cpu = collector.with_name('retail_cpu_observation.py')
+    if not collector_cpu.is_file():
+        collector_cpu = None
     try:
         collector_sha256 = _sha256_bytes(
             collector.read_bytes(), b"\0", collector_boundary.read_bytes(),
-            b"\0", collector_input.read_bytes(), b"\0", collector_bootstrap.read_bytes())
+            b"\0", collector_input.read_bytes(), b"\0", collector_bootstrap.read_bytes(),
+            *( (b"\0", collector_cpu.read_bytes()) if collector_cpu else () ))
     except OSError as error:
         raise CaptureRunnerError(
             f"cannot hash retail collector sources: {error}") from error
@@ -397,6 +403,8 @@ def prepare_run(template_user: str | Path, checkpoint_gc: str | Path,
         shutil.copy2(collector_boundary, pinned_collector / "reference_replay_boundary.py")
         shutil.copy2(collector_input, pinned_collector / 'retail_input_plan.py')
         shutil.copy2(collector_bootstrap, pinned_collector / 'retail_input_bootstrap.py')
+        if collector_cpu:
+            shutil.copy2(collector_cpu, pinned_collector / 'retail_cpu_observation.py')
         collector = pinned_collector / "reference_replay_capture.py"
         collector_boundary = pinned_collector / "reference_replay_boundary.py"
         _copy_tree(template, user, skip={"Pipes"})
@@ -406,7 +414,7 @@ def prepare_run(template_user: str | Path, checkpoint_gc: str | Path,
         _require_pipe_config(pad_config)
         pipes = user / "Pipes"
         pipes.mkdir(parents=True, exist_ok=True)
-        for port in (1, 2):
+        for port in (1, 2, 3, 4):
             _make_fifo(pipes / f"pad{port}")
         gc = user / "GC"
         if gc.exists():
@@ -530,6 +538,9 @@ def write_gdb_script(path: Path, socket: Path, helper: Path, collector: Path,
         f"source {helper}",
         "retail-step 12 1 SET MAIN 0.5 0.5",
         f"source {collector}",
+        # Inline source-menu preparation may leave this owned breakpoint
+        # disabled. The bounded A press/release steps require it enabled.
+        "enable 1",
         f"retail-replay-arm {_gdb_quote(output)} {frames}",
         "retail-step 8 1 PRESS A",
         "retail-step 8 1 RELEASE A",
@@ -676,6 +687,9 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
     paths = prepare_run(template_user, checkpoint_gc, provenance, dol, dolphin, output, cpu=cpu)
     run_root = paths["run_root"]
     paths["identity"]["disc_dol_sha1"] = verify_disc_dol(disc_path, paths["source_dol"])
+    if plan is not None and plan['version'] == 3:
+        paths['identity']['disc_image_sha256'] = _sha256(disc_path)
+        paths['identity']['disc_image_bytes'] = disc_path.stat().st_size
     # Copy the snapshot into the owned run evidence area. Dolphin only reads
     # it, but this makes the launch wholly independent of a mutable source.
     try:
@@ -710,7 +724,8 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
     bootstrap_runtime_for_run.update(bootstrap_runtime or {})
     helper = run_root / "gdb-control.py"
     if plan is not None:
-        require_raw_pipe_config(paths['pad_config'])
+        active_ports = range(1, plan['active_player_count'] + 1) if plan.get('version') == 3 else (1, 2)
+        require_raw_pipe_config(paths['pad_config'], active_ports)
         plan_copy = paths['evidence'] / 'input-plan.json'
         shutil.copy2(input_plan, plan_copy)
         if _sha256(plan_copy) != plan_hash:
@@ -848,6 +863,11 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
         environment["MELEE_REPLAY_COLLECTOR"] = str(paths["collector"])
         environment["MELEE_REPLAY_DRAW_AUDIT"] = "1" if (draw_audit or until_match_end) else "0"
         environment["MELEE_REPLAY_UNTIL_MATCH_END"] = "1" if until_match_end else "0"
+        environment.pop("MELEE_CPU_OBSERVATION", None)
+        if plan is not None and plan.get('version') == 3 and not input_bootstrap_calibrate:
+            if not paths['collector'].with_name('retail_cpu_observation.py').is_file():
+                raise CaptureRunnerError('CPU v3 capture requires its pinned semantic observer')
+            environment["MELEE_CPU_OBSERVATION"] = str(paths["evidence"] / "cpu-observation.jsonl")
         environment["MELEE_REPLAY_INPUT_BOOTSTRAP_MODE"] = (
             "calibrate" if input_bootstrap_calibrate else
             "apply" if input_bootstrap is not None else "default")
@@ -948,6 +968,15 @@ def capture_replay(*, dolphin: str | Path, disc: str | Path, dol: str | Path,
                 if completion_path.exists() or require_match_complete:
                     metadata["match_completion"] = load_match_completion(
                         loaded, completion_path, require_complete=require_match_complete)
+                if plan is not None and plan['version'] == 3:
+                    from cpu_observation_validation import load_observation
+                    cpu_path = paths['evidence'] / 'cpu-observation.jsonl'
+                    observed = load_observation(cpu_path, loaded)
+                    metadata['cpu_observation'] = {
+                        'path': str(cpu_path), 'sha256': observed.sha256,
+                        'frames': len(observed.frames), 'draws': len(observed.draws),
+                        'remaining_fighter_slots': observed.end['remaining_fighter_slots'],
+                    }
         except ValueError as error:
             raise CaptureRunnerError(f"captured JSONL failed strict validation: {error}") from error
         metadata.update({

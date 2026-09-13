@@ -139,9 +139,32 @@ int melee_web_menu_stage_available(int stkind)
     return melee_web_stage_content(stkind) != NULL;
 }
 
+int melee_web_menu_active_player_count(const StartMeleeData* start)
+{
+    int count = 0;
+
+    if (start == NULL) {
+        return 0;
+    }
+    while (count < MELEE_WEB_MENU_MAX_PLAYERS &&
+           start->players[count].slot_type != Gm_PKind_NA) {
+        ++count;
+    }
+    if (count < MELEE_WEB_MENU_MIN_PLAYERS) {
+        return 0;
+    }
+    for (int i = count; i < GM_MAX_PLAYERS; ++i) {
+        if (start->players[i].slot_type != Gm_PKind_NA) {
+            return 0;
+        }
+    }
+    return count;
+}
+
 int melee_web_menu_css_selection_valid(const CSSData* css)
 {
     int i;
+    int count;
 
     if (css == NULL || css->match_type != VS_MELEE ||
         css->vs.start.rules.match_kind != MatchKind_Time ||
@@ -153,27 +176,21 @@ int melee_web_menu_css_selection_valid(const CSSData* css)
     {
         return 0;
     }
-    if (!melee_web_player_selection_supported(&css->vs.start.players[0]) ||
-        !melee_web_player_selection_supported(&css->vs.start.players[1]) ||
-        css->vs.start.players[0].stocks != 0 ||
-        css->vs.start.players[1].stocks != css->vs.start.players[0].stocks)
+    count = melee_web_menu_active_player_count(&css->vs.start);
+    if (count == 0)
     {
         return 0;
     }
-    if (!melee_web_menu_character_available(
-            css->vs.start.players[0].ckind) ||
-        !melee_web_menu_character_available(
-            css->vs.start.players[1].ckind))
-    {
-        return 0;
-    }
-    for (i = 0; i < 2; i++) {
+    for (i = 0; i < count; i++) {
         const PlayerInitData* player=&css->vs.start.players[i];
         const MeleeWebFighterContent* content=melee_web_fighter_content(player->ckind);
-        if(!content || (player->slot?player->slot-1:i)!=i ||
+        if(!melee_web_player_selection_supported(player) ||
+           !melee_web_menu_character_available(player->ckind) ||
+           player->stocks != 0 ||
+           !content || (player->slot?player->slot-1:i)!=i ||
            player->color>=content->costumes || player->sub_color>4) return 0;
     }
-    for (i = 2; i < GM_MAX_PLAYERS; i++) {
+    for (i = count; i < GM_MAX_PLAYERS; i++) {
         if (css->vs.start.players[i].slot_type != Gm_PKind_NA) {
             return 0;
         }
@@ -184,6 +201,7 @@ int melee_web_menu_css_selection_valid(const CSSData* css)
 static int match_selection_valid(const StartMeleeData* start)
 {
     int i;
+    int count;
 
     if (start == NULL || start->rules.match_kind != MatchKind_Stock ||
         !start->rules.is_stock || !start->rules.is_vs ||
@@ -193,11 +211,16 @@ static int match_selection_valid(const StartMeleeData* start)
     {
         return 0;
     }
-    for (i = 0; i < 2; ++i) {
+    count = melee_web_menu_active_player_count(start);
+    if (count == 0) {
+        return 0;
+    }
+    for (i = 0; i < count; ++i) {
         const PlayerInitData* player = &start->players[i];
         const MeleeWebFighterContent* content =
             melee_web_fighter_content(player->ckind);
-        if (!melee_web_player_selection_supported(player) || player->stocks != 4 ||
+        if (!melee_web_player_selection_supported(player) || player->stocks < 1 ||
+            player->stocks > 5 ||
             player->rumble_enabled != (player->slot_type == Gm_PKind_Human) ||
             content == NULL ||
             (player->slot ? player->slot - 1 : i) != i ||
@@ -208,7 +231,6 @@ static int match_selection_valid(const StartMeleeData* start)
     }
     for (; i < GM_MAX_PLAYERS; ++i) {
         if (start->players[i].slot_type != Gm_PKind_NA ||
-            start->players[i].stocks != 4 ||
             start->players[i].rumble_enabled)
         {
             return 0;
@@ -222,11 +244,19 @@ static int match_selection_valid(const StartMeleeData* start)
 static int css_progress_valid(const CSSData* css)
 {
     CSSData view = *css;
-    for (unsigned i=0; i<2; i++) {
-        PlayerInitData* p=&view.vs.start.players[i];
-        if (p->ckind==CHKIND_NONE) p->ckind=CKIND_MARIO;
-        if (p->slot_type==Gm_PKind_NA)
-            p->slot_type=Gm_PKind_Human;
+    for (unsigned i = 0; i < MELEE_WEB_MENU_MAX_PLAYERS; i++) {
+        PlayerInitData* p = &view.vs.start.players[i];
+        /* Preserve the existing unplugged-controller allowance for the two
+         * initial doors.  Inactive P3/P4 slots must remain dormant. */
+        if (i < MELEE_WEB_MENU_MIN_PLAYERS && p->slot_type == Gm_PKind_NA) {
+            p->slot_type = Gm_PKind_Human;
+        }
+        /* A newly joined door has a live slot before the original CSS has
+         * assigned its character icon.  Keep the transient source state
+         * valid for progress checks without waking dormant doors. */
+        if (p->slot_type != Gm_PKind_NA && p->ckind == CHKIND_NONE) {
+            p->ckind = CKIND_MARIO;
+        }
     }
     return melee_web_menu_css_selection_valid(&view);
 }
@@ -257,9 +287,12 @@ MeleeWebMenuSession* melee_web_menu_session_create(
     const MeleeWebMenuRuntime* runtime, const MeleeWebMenuConfig* config,
     char* error, size_t error_size)
 {
-    MeleeWebMenuConfig defaults = {4, 0, 0};
+    MeleeWebMenuConfig defaults = {4, 0, 0, 0, 0, 0};
     const MeleeWebMenuConfig* selected = config != NULL ? config : &defaults;
     MeleeWebMenuSession* session;
+    unsigned player_count = selected->player_count != 0
+                                ? selected->player_count
+                                : MELEE_WEB_MENU_MIN_PLAYERS;
     int i;
 
     if (owner != NULL) {
@@ -272,9 +305,15 @@ MeleeWebMenuSession* melee_web_menu_session_create(
              "Menu creation requires native service, scheduler and transition callbacks");
         return NULL;
     }
-    if (selected->stocks != 4) {
+    if (selected->stocks < 1 || selected->stocks > 5) {
         fail(error, error_size,
-             "Native menu currently supports exactly four stocks");
+             "Native menu supports source stock counts 1 through 5");
+        return NULL;
+    }
+    if (player_count < MELEE_WEB_MENU_MIN_PLAYERS ||
+        player_count > MELEE_WEB_MENU_MAX_PLAYERS) {
+        fail(error, error_size,
+             "Native menu supports two through four active players");
         return NULL;
     }
 
@@ -293,13 +332,21 @@ MeleeWebMenuSession* melee_web_menu_session_create(
     /* Retail keeps gm_InitVsMode's raw menu payload through SSS OnExit. The
      * stock/no-item policy is applied later by the original VS-entry path. */
     session->css.vs.start.rules.stkind = MELEE_WEB_MENU_FD_ST_KIND;
-    for (i = 0; i < 2; i++) {
+    for (i = 0; i < (int)player_count; i++) {
         PlayerInitData* player = &session->css.vs.start.players[i];
         player->ckind = CKIND_MARIO;
-        player->slot_type = Gm_PKind_Human;
-        player->color = i == 0 ? selected->player0_color : selected->player1_color;
+        player->slot_type = i < MELEE_WEB_MENU_MIN_PLAYERS
+                                ? Gm_PKind_Human
+                                : Gm_PKind_Cpu;
+        player->cpu_kind = CpuKind_4;
+        player->cpu_level = i < MELEE_WEB_MENU_MIN_PLAYERS ? 0 : 1;
+        player->color = i == 0 ? selected->player0_color
+                      : i == 1 ? selected->player1_color
+                      : i == 2 ? selected->player2_color
+                               : selected->player3_color;
         /* Original slot 0 means use this player index; nonzero is port + 1. */
         player->slot = 0;
+        player->rumble_enabled = player->slot_type == Gm_PKind_Human;
         player->nametag = 0x78;
     }
     session->sss.unk_stage = 0;

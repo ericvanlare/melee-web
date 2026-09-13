@@ -1,6 +1,7 @@
 // Semantic state at the same gameplay phase as reference_replay_capture.py.
 #include <melee/ft/types.h>
 #include <melee/pl/player.h>
+#include <melee/gm/forward.h>
 #include <sysdolphin/baselib/random.h>
 #include <stdio.h>
 #include <stdint.h>
@@ -13,7 +14,7 @@ static void vec(const Vec3* v){printf("[\"%08x\",\"%08x\",\"%08x\"]",bits(v->x),
 void melee_web_retail_state(void){
     if(!seed_ptr)abort();
     printf("\"rng\":%u,\"match_frame\":%u,\"fighters\":[",*seed_ptr,gm_GetFrameCount());
-    for(unsigned slot=0;slot<2;slot++){
+    for(unsigned slot=0;slot<4 && Player_GetPlayerSlotType(slot)!=Gm_PKind_NA;slot++){
         StaticPlayer* p=Player_GetPtrForSlot(slot);
         if(!p||!p->player_entity[0])abort();
         Fighter* fp=p->player_entity[0]->user_data;

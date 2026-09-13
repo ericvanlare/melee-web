@@ -11,13 +11,14 @@ foreach(path IN LISTS native_paths)
       OR relative STREQUAL "melee/ft/ftparts.c" OR relative STREQUAL "melee/ft/ftchangeparam.c"
       OR relative STREQUAL "melee/ft/ftwalkcommon.c" OR relative STREQUAL "melee/mp/mpisland.c" OR relative STREQUAL "melee/mp/mplib.c"
       OR relative STREQUAL "melee/gr/ground.c" OR relative STREQUAL "melee/gr/grdynamicattr.c"
-      OR relative STREQUAL "melee/lb/lb_00B0.c" OR relative STREQUAL "melee/lb/lbspdisplay.c")
+      OR relative STREQUAL "melee/lb/lb_00B0.c" OR relative STREQUAL "melee/lb/lb_00F9.c"
+      OR relative STREQUAL "melee/lb/lbspdisplay.c")
     continue()
   endif()
   list(APPEND fighter_paths "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/${relative}")
 endforeach()
 add_library(fighter_source_runtime STATIC EXCLUDE_FROM_ALL ${fighter_paths}
-  src/gameplay_retail_setup.c src/gameplay_retail_state.c
+  src/gameplay_retail_setup.c src/gameplay_retail_state.c src/gameplay_cpu_observation.c
   src/gameplay_match_flow.c src/gameplay_hud.c src/gameplay_menu.c src/gameplay_menu_host.c src/gameplay_item_runtime.c src/gameplay_stage_items.c src/dat_item_commands.c src/gameplay_crowd.c src/gameplay_render.c src/gameplay_color_commands.c src/gameplay_match_rules.c src/gameplay_stage_visual.c src/gameplay_stage_map.c src/gameplay_stage_last.c src/gameplay_stage_profile.c src/gameplay_stage_story.c src/gameplay_effect_runtime.c
   src/gameplay_stage_dream_land.c src/gameplay_audio.c src/gameplay_audio_bank_transport.c src/gameplay_audio_residency.c src/gameplay_audio_stream.c src/gameplay_io.cpp src/gameplay_audio_resample.c src/gameplay_audio_itd.c src/gameplay_audio_fx.c src/gameplay_audio_reverb.c
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/axfx/axfx.c"

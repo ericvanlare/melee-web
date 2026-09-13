@@ -18,6 +18,11 @@ bytes.
 The ``repeatable`` result means only that these two retail candidates agree.
 It is not port equivalence, performance acceptance, or gold/admission
 evidence.
+
+Candidate versions 1 and 2 remain unchanged. Version 3 adds an explicit
+active-player count (2--4) and uses the version-2 semantic PAD state; all four
+PAD ports remain present in every frame. Player roles and rules remain bound by
+StartMeleeData and the setup validator.
 """
 
 from __future__ import annotations
@@ -34,6 +39,7 @@ from pad_state import PAD_STATE_BYTES, decode_pad_state
 
 SCHEMA = "melee-web-retail-replay-candidate"
 VERSION = 1
+MULTIPLAYER_VERSION = 3
 PHASE = "HSD_GObj_80390CFC_return"
 INPUT_PHASE = "HSD_PadRenewMasterStatus_entry_queue"
 DEQUEUED_INPUT_PHASE = "HSD_PadRenewMasterStatus_dequeued_slot"
@@ -241,7 +247,7 @@ def _validate_fighter(value: Any, slot: int, context: str) -> None:
     if not isinstance(value, dict):
         raise CaptureError(f"{context}: fighter must be an object")
     _require_keys(value, FIGHTER_KEYS, context)
-    if _int(value["slot"], f"{context}.slot", minimum=0, maximum=1) != slot:
+    if _int(value["slot"], f"{context}.slot", minimum=0, maximum=3) != slot:
         raise CaptureError(f"{context}.slot: expected supported slot {slot}")
     for field in ("kind", "motion", "animation", "ground_air"):
         _u32(value[field], f"{context}.{field}")
@@ -258,17 +264,25 @@ def _validate_fighter(value: Any, slot: int, context: str) -> None:
     _hex(value["input_hex"], 0x6C, f"{context}.input_hex")
 
 
-def _validate_state(value: Any, context: str, version: int = 1) -> None:
+def _validate_state(value: Any, context: str, version: int = 1,
+                    active_player_count: int = 2) -> None:
     if not isinstance(value, dict):
         raise CaptureError(f"{context}: state must be an object")
-    _require_keys(value, STATE_KEYS | ({"pad_state_hex"} if version == 2 else set()), context)
-    if version == 2: _pad_state(value["pad_state_hex"], context+".pad_state_hex")
+    _require_keys(value, STATE_KEYS | ({"pad_state_hex"}
+                                       if version in (2, MULTIPLAYER_VERSION) else set()), context)
+    if version in (2, MULTIPLAYER_VERSION):
+        _pad_state(value["pad_state_hex"], context+".pad_state_hex")
     _u32(value["rng"], f"{context}.rng")
     _u32(value["scene_frame"], f"{context}.scene_frame")
     _u32(value["match_frame"], f"{context}.match_frame")
+    if version == MULTIPLAYER_VERSION:
+        _int(active_player_count, f"{context}.active_player_count", minimum=2, maximum=4)
+    else:
+        active_player_count = 2
     fighters = value["fighters"]
-    if not isinstance(fighters, list) or len(fighters) != 2:
-        raise CaptureError(f"{context}.fighters: exactly two fighter records are required")
+    if not isinstance(fighters, list) or len(fighters) != active_player_count:
+        raise CaptureError(
+            f"{context}.fighters: exactly {active_player_count} fighter records are required")
     for slot, fighter in enumerate(fighters):
         _validate_fighter(fighter, slot, f"{context}.fighters[{slot}]")
 
@@ -313,12 +327,13 @@ def _validate_scene_continuity(frames: list[dict[str, Any]], context: str) -> No
 
 class _Capture:
     __slots__ = ("rows", "header", "match_enter", "initial", "frames", "end",
-                 "sha256", "raw")
+                 "sha256", "raw", "active_player_count")
 
     def __init__(self, rows: tuple[dict[str, Any], ...], header: dict[str, Any],
                  match_enter: dict[str, Any], initial: dict[str, Any],
                  frames: tuple[dict[str, Any], ...], end: dict[str, Any],
-                 sha256: str | None, raw: bytes | None = None):
+                 sha256: str | None, raw: bytes | None = None,
+                 active_player_count: int = 2):
         self.rows = rows
         self.header = header
         self.match_enter = match_enter
@@ -327,6 +342,7 @@ class _Capture:
         self.end = end
         self.sha256 = sha256
         self.raw = raw
+        self.active_player_count = active_player_count
 
 
 def _validate_capture(rows: Iterable[dict[str, Any]], context: str,
@@ -348,9 +364,12 @@ def _validate_capture(rows: Iterable[dict[str, Any]], context: str,
     header = rows_tuple[0]
     if header.get("record") != "header":
         raise CaptureError(f"{context}: first record must be header")
-    _require_keys(header, HEADER_KEYS, f"{context}.header")
+    version = header.get("version")
+    header_keys = (HEADER_KEYS | {"active_player_count"}
+                   if version == MULTIPLAYER_VERSION else HEADER_KEYS)
+    _require_keys(header, header_keys, f"{context}.header")
     if (header["schema"] != SCHEMA or type(header["version"]) is not int
-            or header["version"] not in (1, 2)):
+            or header["version"] not in (1, 2, MULTIPLAYER_VERSION)):
         raise CaptureError(f"{context}.header: unsupported schema or version")
     if header["phase"] != PHASE:
         raise CaptureError(f"{context}.header: unsupported phase")
@@ -361,7 +380,12 @@ def _validate_capture(rows: Iterable[dict[str, Any]], context: str,
     if header["game_revision"] != GAME_REVISION:
         raise CaptureError(f"{context}.header: unsupported game revision")
     version = header["version"]
-    state_keys = STATE_KEYS | ({"pad_state_hex"} if version == 2 else set())
+    active_player_count = 2
+    if version == MULTIPLAYER_VERSION:
+        active_player_count = _int(header["active_player_count"],
+                                   f"{context}.header.active_player_count",
+                                   minimum=2, maximum=4)
+    state_keys = STATE_KEYS | ({"pad_state_hex"} if version in (2, MULTIPLAYER_VERSION) else set())
     requested = _int(header["frames_requested"], f"{context}.header.frames_requested",
                      minimum=1, maximum=MAX_FRAMES)
     _validate_provenance(header["provenance"], f"{context}.header.provenance", cpu=cpu)
@@ -387,7 +411,7 @@ def _validate_capture(rows: Iterable[dict[str, Any]], context: str,
     _u32(match_enter["rng"], f"{context}.match_enter.rng")
     _hex(match_enter["start_melee_hex"], 0x138,
          f"{context}.match_enter.start_melee_hex")
-    if version == 2:
+    if version in (2, MULTIPLAYER_VERSION):
         _pad_state(match_enter["pad_state_hex"], f"{context}.match_enter.pad_state_hex")
     else:
         _hex(match_enter["pad_lib_hex"], 0x20, f"{context}.match_enter.pad_lib_hex")
@@ -402,7 +426,8 @@ def _validate_capture(rows: Iterable[dict[str, Any]], context: str,
     _require_keys(initial, {"record", *state_keys},
                   f"{context}.match_enter_complete")
     initial_state = {key: initial.get(key) for key in state_keys}
-    _validate_state(initial_state, f"{context}.match_enter_complete", version)
+    _validate_state(initial_state, f"{context}.match_enter_complete", version,
+                    active_player_count)
 
     frames: list[dict[str, Any]] = []
     for expected_index, row in enumerate(rows_tuple[3:-1]):
@@ -411,12 +436,15 @@ def _validate_capture(rows: Iterable[dict[str, Any]], context: str,
             raise CaptureError(
                 f"{context}: record {expected_index + 3} must be frame "
                 f"(got {row.get('record')!r})")
-        _require_keys(row, FRAME_KEYS | ({"pad_state_hex"} if version == 2 else set()), context_row)
+        _require_keys(row, FRAME_KEYS | ({"pad_state_hex"}
+                                         if version in (2, MULTIPLAYER_VERSION)
+                                         else set()), context_row)
         if _int(row["index"], f"{context_row}.index", minimum=0) != expected_index:
             raise CaptureError(
                 f"{context_row}.index: expected {expected_index}, got {row['index']!r}")
         _validate_inputs(row["consumed_inputs"], f"{context_row}.consumed_inputs")
-        _validate_state({key: row.get(key) for key in state_keys}, context_row, version)
+        _validate_state({key: row.get(key) for key in state_keys}, context_row, version,
+                        active_player_count)
         frames.append(row)
     _validate_scene_continuity(frames, context)
 
@@ -430,7 +458,7 @@ def _validate_capture(rows: Iterable[dict[str, Any]], context: str,
     if end["status"] != "captured":
         raise CaptureError(f"{context}.end.status: expected captured")
     return _Capture(rows_tuple, header, match_enter, initial, tuple(frames), end,
-                    sha256, raw)
+                    sha256, raw, active_player_count)
 
 
 def validate_capture(rows: list[dict[str, Any]] | tuple[dict[str, Any], ...],
@@ -530,7 +558,8 @@ def _initial_semantics(capture: _Capture) -> dict[str, Any]:
         "match_frame": capture.initial["match_frame"],
         "fighters": capture.initial["fighters"],
     }
-    if capture.header["version"] == 2: initial["pad_state_hex"] = capture.initial["pad_state_hex"]
+    if capture.header["version"] in (2, MULTIPLAYER_VERSION):
+        initial["pad_state_hex"] = capture.initial["pad_state_hex"]
     return _lower_hex_strings(initial)
 
 
@@ -606,6 +635,10 @@ def _compare_validated(first_capture: _Capture, second_capture: _Capture) -> dic
         "collector_sha256": second_capture.header["collector_sha256"],
         "input_plan_sha256": second_capture.header['provenance'].get('input_plan_sha256'),
     }
+    if first_capture.header["version"] == MULTIPLAYER_VERSION:
+        header_left["active_player_count"] = first_capture.active_player_count
+    if second_capture.header["version"] == MULTIPLAYER_VERSION:
+        header_right["active_player_count"] = second_capture.active_player_count
     checks = {
         "schema": "pass", "version": "pass", "phase": "pass",
         "input_phase": "pass", "initial_phase": "pass", "provenance": "pass",

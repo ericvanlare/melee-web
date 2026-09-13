@@ -15,8 +15,9 @@ enum class GameplayWorldConstruction { Immediate, Deferred };
 // Original FTKind and GrKind values, never CSS/SSS grid indices. Defaults keep
 // existing Mario/FD probes scoped to their original fixture.
 struct GameplayWorldSelection {
-    std::array<unsigned,2> fighter_kinds{0,0};
-    std::array<unsigned,2> costume_indices{0,0};
+    unsigned player_count=2;
+    std::array<unsigned,4> fighter_kinds{0,0,0,0};
+    std::array<unsigned,4> costume_indices{0,0,0,0};
     int ground_kind=37;
 };
 // Shared by the browser and source regression harness. Owns one original SDK

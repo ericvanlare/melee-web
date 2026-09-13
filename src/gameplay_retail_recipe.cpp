@@ -1,4 +1,5 @@
 #include "gameplay_retail_recipe.hpp"
+#include "gameplay_cpu_observation.h"
 #include <algorithm>
 #include <bit>
 #include <iostream>
@@ -47,7 +48,7 @@ void timer_state(const char* record, size_t index = 0) {
         << ",\"end_state\":" << melee_web_match_end_state() << "}\n";
 }
 void history(const RetailReplayRecipe& recipe) {
-    if (recipe.version != 2) return;
+    if (recipe.version < 2) return;
     std::array<uint8_t, MELEE_WEB_PAD_STATE_BYTES> bytes{};
     melee_web_pad_state_capture(bytes.data());
     std::cout << ",\"pad_state_hex\":\""; hex(bytes); std::cout << "\"";
@@ -61,17 +62,19 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
     check(input.u32() == 0x4d575243, "Unsupported reference input format");
     RetailReplayRecipe result;
     result.version = input.u32();
-    check(result.version == 1 || result.version == 2, "Unsupported reference input version");
+    check(result.version >= 1 && result.version <= 3, "Unsupported reference input version");
     result.seed = input.u32();
     const auto count = input.u32();
     check(count && count <= 36000 && bytes.size() == 16 + 0x138 +
-          (result.version == 2 ? MELEE_WEB_PAD_STATE_BYTES : 0) + size_t(count) * 44,
+          (result.version >= 2 ? MELEE_WEB_PAD_STATE_BYTES : 0) + size_t(count) * 44,
           "Reference input frame count disagrees with its size");
     for (auto& byte : result.setup) byte = input.u8();
     char error[256]{};
     check(melee_web_retail_setup(result.setup.data(), result.seed, &result.selection,
                                 error, sizeof(error)), error);
-    if (result.version == 2) {
+    check(result.version == 3 || result.selection.player_count == 2,
+          "Multiplayer input requires reference version 3");
+    if (result.version >= 2) {
         for (auto& byte : result.pad_bytes) byte = input.u8();
         result.initial_input.reset(melee_web_pad_state_decode(result.pad_bytes.data(),
             result.pad_bytes.size(), error, sizeof(error)));
@@ -98,14 +101,17 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
 void retail_replay_initial(const RetailReplayRecipe& recipe, bool source_drawing) {
     timer_audit_active = recipe.selection.start.rules.timer_enabled;
     std::cout << "{\"record\":\"header\",\"schema\":\"melee-web-port-replay-candidate\",\"version\":"
-        << recipe.version << ",\"frames_requested\":" << recipe.frames.size()
-        << ",\"phase\":\"after_source_tick_before_audio_transport\",\"rendering\":\""
+        << recipe.version << ",\"frames_requested\":" << recipe.frames.size();
+    if (recipe.version == 3) std::cout << ",\"active_player_count\":" << recipe.selection.player_count;
+    std::cout << ",\"phase\":\"after_source_tick_before_audio_transport\",\"rendering\":\""
         << (source_drawing ? "source_draws" : "excluded") << "\",\"comparison\":\"not_run\"}\n";
     std::cout << "{\"record\":\"match_enter\",\"rng\":" << recipe.seed << ",\"start_melee_hex\":\"";
     hex(recipe.setup); std::cout << "\"";
-    if (recipe.version == 2) { std::cout << ",\"pad_state_hex\":\""; hex(recipe.pad_bytes); std::cout << "\""; }
+    if (recipe.version >= 2) { std::cout << ",\"pad_state_hex\":\""; hex(recipe.pad_bytes); std::cout << "\""; }
     std::cout << "}\n{\"record\":\"match_enter_complete\",";
     melee_web_retail_state(); history(recipe); std::cout << "}\n";
+    if (recipe.version == 3)
+        melee_web_cpu_observation_begin(recipe.setup.data(), recipe.frames.size(), source_drawing);
     if (timer_audit_active) {
         std::cerr << "TIMER_AUDIT {\"record\":\"header\",\"schema\":\"melee-web-match-timer-audit\",\"version\":1,\"frames_requested\":"
             << recipe.frames.size() << ",\"setup_hex\":\"";
@@ -125,8 +131,16 @@ void retail_replay_frame(const RetailReplayRecipe& recipe, size_t index) {
     }
     std::cout << "],"; melee_web_retail_state(); history(recipe); std::cout << "}\n";
     timer_state("frame", index);
+    if (recipe.version == 3) melee_web_cpu_observation_tick(index);
+}
+void retail_replay_draw(const RetailReplayRecipe& recipe, size_t index) {
+    if (recipe.version == 3) melee_web_cpu_observation_draw(index);
+}
+void retail_replay_preparation_draw(const RetailReplayRecipe& recipe) {
+    if (recipe.version == 3) melee_web_cpu_observation_preparation_draw();
 }
 void retail_replay_end(size_t frames) {
+    melee_web_cpu_observation_end(frames);
     std::cout << "{\"record\":\"end\",\"frames\":" << frames << ",\"status\":\"captured\"}\n";
     if (timer_audit_active) {
         std::cerr << "TIMER_AUDIT {\"record\":\"end\",\"frames\":" << frames << ",\"status\":\"captured\"}\n";

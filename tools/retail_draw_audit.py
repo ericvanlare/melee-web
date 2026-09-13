@@ -9,14 +9,15 @@ import hashlib
 from pathlib import Path
 
 from retail_replay_validation import (
-    CaptureError, STATE_KEYS, _require_keys, _int, _u32, _pad_state,
+    CaptureError, MULTIPLAYER_VERSION, STATE_KEYS, _require_keys, _int, _u32, _pad_state,
     _validate_fighter, _first_difference, read_jsonl,
 )
 
 
 def validate_draw_rows(capture, rows):
-    if capture.header['version'] != 2:
-        raise CaptureError('draw audit requires a v2 reference capture')
+    if capture.header['version'] not in (2, MULTIPLAYER_VERSION):
+        raise CaptureError('draw audit requires a v2 or v3 reference capture')
+    active_player_count = getattr(capture, 'active_player_count', 2)
     if not isinstance(rows, list) or not rows:
         raise CaptureError('draw audit requires at least one traversal')
 
@@ -63,8 +64,10 @@ def validate_draw_rows(capture, rows):
             for key in ('rng', 'scene_frame', 'match_frame'):
                 _u32(sample[key], context + '.' + phase + '.' + key)
             _pad_state(sample['pad_state_hex'], context + '.' + phase + '.pad_state_hex')
-            if not isinstance(sample['fighters'], list) or len(sample['fighters']) != 2:
-                raise CaptureError(context + ': expected two fighters')
+            if (not isinstance(sample['fighters'], list) or
+                    len(sample['fighters']) != active_player_count):
+                raise CaptureError(context +
+                                   f': expected {active_player_count} fighters')
             for slot, fighter in enumerate(sample['fighters']):
                 _validate_fighter(fighter, slot, context + '.' + phase + '.fighter')
             if sample['scene_frame'] != expected_scene_frame:

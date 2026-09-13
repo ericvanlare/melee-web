@@ -20,7 +20,15 @@ MeleeWebMatchRules* melee_web_match_rules_begin(char*,size_t);
 int melee_web_match_rules_init_from_menu(MeleeWebMatchRules*,
                                          const StartMeleeData*,char*,size_t);
 void melee_web_match_rules_refresh(void);
-/* Original match outcome enum; winner is source slot for elimination, or -1. */
+/* Publish the source MatchEnd ranking at close/exit while source fighters are
+ * resident. Must run before melee_web_match_end destroys them. */
+int melee_web_match_rules_publish_result(void);
+/* Read the close-boundary source snapshot after the source player/rules
+ * owner has been torn down. The cache is cleared at the next begin(). */
+int melee_web_match_rules_terminal_result(int* outcome,int* count,int winners[6]);
+/* Original match outcome enum; a unique source winner is returned for stock
+ * elimination or timeout, while source ties and unavailable rankings return
+ * winner=-1. */
 int melee_web_match_rules_outcome(int* winner);
 int melee_web_match_rules_end(MeleeWebMatchRules*,char*,size_t);
 #ifdef __cplusplus

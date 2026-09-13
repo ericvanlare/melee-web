@@ -185,7 +185,12 @@ int melee_web_menu_host_selection(const MeleeWebMenuHost* h,MeleeWebMenuMatchSel
     if(!vs||!melee_web_menu_sss_selection_valid(melee_web_menu_sss(h->session)))
         return fail(e,n,"Original menus have not committed a supported selection");
     out->start=vs->start;
-    for(unsigned i=0;i<2;i++){
+    const int count=melee_web_menu_active_player_count(&vs->start);
+    if(count<MELEE_WEB_MENU_MIN_PLAYERS||count>MELEE_WEB_MENU_MAX_PLAYERS)
+        return fail(e,n,"Original menu did not commit two through four active players");
+    memset(out->players,0,sizeof(out->players));
+    out->player_count=(uint32_t)count;
+    for(unsigned i=0;i<(unsigned)count;i++){
         const PlayerInitData* p=&vs->start.players[i];
         const unsigned port=p->slot?p->slot-1:i;
         const MeleeWebFighterContent* content=melee_web_fighter_content(p->ckind);

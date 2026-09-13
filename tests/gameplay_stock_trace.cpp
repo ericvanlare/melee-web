@@ -11,7 +11,7 @@ static void check(int ok,const char* why){if(!ok){std::cerr<<why<<'\n';throw Dat
 static std::vector<uint8_t> bytes(const std::filesystem::path& p){std::ifstream f(p,std::ios::binary);check(bool(f),"Open owned stock-test asset");return {std::istreambuf_iterator<char>(f),{}};}
 int main(int argc,char** argv){try{
  check(argc==2||argc==3,"Expected base asset directory and optional Mario costume directory");RuntimeFiles files;
- for(const char* name:{"PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","sislib_font.bin"})files[name]=bytes(std::filesystem::path(argv[1])/name);
+ for(const char* name:{"PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sislib_font.bin"})files[name]=bytes(std::filesystem::path(argv[1])/name);
  const bool extra_costumes=argc==3;
  if(extra_costumes)for(const char* name:{"PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat"})
    files[name]=bytes(std::filesystem::path(argv[2])/name);
@@ -19,7 +19,9 @@ int main(int argc,char** argv){try{
  for(unsigned cycle=0;cycle<2;cycle++){
   const unsigned costume_last=extra_costumes?5:1;
   for(unsigned selected=0;selected<costume_last;selected++){
-   GameplayWorld world(files);
+   GameplayWorldSelection world_selection;
+   world_selection.costume_indices[0]=selected;
+   GameplayWorld world(files,world_selection);
    MeleeWebPlayerSettings players[2]={{0,0,4,{-20,world.floor_height(-20)+1,0},1,selected,0},{1,1,4,{20,world.floor_height(20)+1,0},-1,0,0}};
   auto* match=melee_web_match_begin_players(players,2,70,1,world.collision(),error,sizeof(error));check(match!=nullptr,error);
   check(melee_web_match_create_fighters(match,error,sizeof(error)),error);
@@ -27,6 +29,7 @@ int main(int argc,char** argv){try{
   auto* camera=melee_web_render_begin_match(&settings,error,sizeof(error));check(camera!=nullptr,error);
   world.enable_full_stage();
   bool lost=false,returned=false,finished=false;int previous=-1,stock=4,respawns=0;bool jump=false;
+  int winner=-1,outcome=0;
   for(unsigned tick=0;tick<4000;tick++){
    PADStatus pads[4]={{0}};
    // Ordinary sustained right input leaves the platform. Release as soon as
@@ -39,13 +42,16 @@ int main(int argc,char** argv){try{
    check(stats[1].stocks==4,"Stationary opponent lost a stock");
    jump=!lost&&stock<4&&stats[0].ground_or_air==0&&stats[0].position[0]>65;
    if(stats[0].stocks<stock){lost=true;stock=stats[0].stocks;}
-   int winner=-1;int outcome=melee_web_match_rules_outcome(&winner);
-   if(stock==0){check(outcome==2&&winner==1,"Original elimination outcome or winner incorrect");finished=true;break;}
+   outcome=melee_web_match_rules_outcome(&winner);
+   if(stock==0){check(outcome==2,"Original elimination outcome was not reported");finished=true;break;}
    check(outcome==0,"Original match ended before final stock");
    if(lost&&stats[0].motion_id==14&&stats[0].ground_or_air==0){returned=true;lost=false;++respawns;}
 
   }
   check(returned&&respawns==3&&finished,"Original four-stock elimination and three grounded respawns did not complete");
+  check(melee_web_match_rules_publish_result(),"Source elimination result was not published at close");
+  outcome=melee_web_match_rules_outcome(&winner);
+  check(outcome==2&&winner==1,"Original elimination outcome or winner incorrect");
   world.end_stage();
   check(melee_web_render_end(camera,error,sizeof(error)),error);check(melee_web_match_end(match,error,sizeof(error)),error);world.close();
   }

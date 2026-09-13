@@ -1,6 +1,7 @@
 // Decode the declared retail initialization boundary into native source types.
 // Pointer-bearing fields are rejected; PPC addresses are never transplanted.
 #include "gameplay_menu_host.h"
+#include "gameplay_menu.h"
 #include "gameplay_player_selection.h"
 #include <math.h>
 #include <stdint.h>
@@ -10,6 +11,7 @@ static uint16_t be16(const uint8_t* p){return (uint16_t)p[0]<<8|p[1];}
 static uint32_t be32(const uint8_t* p){return (uint32_t)p[0]<<24|(uint32_t)p[1]<<16|(uint32_t)p[2]<<8|p[3];}
 static float bef(const uint8_t* p){uint32_t u=be32(p);float f;memcpy(&f,&u,4);return f;}
 int melee_web_retail_setup(const uint8_t raw[0x138],uint32_t seed,MeleeWebMenuMatchSelection* out,char* error,size_t size){
+    unsigned active_count=0;
     memset(out,0,sizeof(*out));
     for(unsigned i=0x38;i<0x5c;i++)if(raw[i]){
         snprintf(error,size,"Retail setup contains an unsupported callback/data pointer at 0x%x",i);return 0;
@@ -88,14 +90,27 @@ int melee_web_retail_setup(const uint8_t raw[0x138],uint32_t seed,MeleeWebMenuMa
         if(!isfinite(v->attack_ratio)||!isfinite(v->defense_ratio)||!isfinite(v->model_scale)){
             snprintf(error,size,"Retail setup contains nonfinite player ratios");return 0;
         }
-        if(i<2){
-            if(!melee_web_match_player_supported(v)||(v->slot!=0&&v->slot!=i+1)||v->stocks!=4){
-                snprintf(error,size,"Retail setup requires supported human/CPU slots 1/2 and four stocks");return 0;
-            }
-            out->players[i].controller=v->slot?v->slot-1:i;out->players[i].stocks=v->stocks;out->players[i].costume=v->color;out->players[i].sub_color=v->sub_color;
-        }else if(v->slot_type!=3){
-            snprintf(error,size,"Retail setup has an unsupported active player");return 0;
-        }
+        if(i<MELEE_WEB_MENU_MAX_PLAYERS && v->slot_type!=Gm_PKind_NA)
+            ++active_count;
     }
+    if(active_count<MELEE_WEB_MENU_MIN_PLAYERS){
+        snprintf(error,size,"Retail setup requires two through four contiguous active players");return 0;
+    }
+    for(unsigned i=active_count;i<GM_MAX_PLAYERS;i++)
+        if(out->start.players[i].slot_type!=Gm_PKind_NA){
+            snprintf(error,size,"Retail setup has an unsupported active player outside the bounded four-player slice");return 0;
+        }
+    for(unsigned i=0;i<active_count;i++){
+        PlayerInitData* v=&out->start.players[i];
+        if(!melee_web_match_player_supported(v)||(v->slot!=0&&v->slot!=i+1)||
+           v->stocks<1||v->stocks>5){
+            snprintf(error,size,"Retail setup requires supported human/CPU ports 1..4 and source stock counts 1..5");return 0;
+        }
+        out->players[i].controller=v->slot?v->slot-1:i;
+        out->players[i].stocks=v->stocks;
+        out->players[i].costume=v->color;
+        out->players[i].sub_color=v->sub_color;
+    }
+    out->player_count=active_count;
     out->hud_layout=r->x0_3;out->random_seed=seed;return 1;
 }

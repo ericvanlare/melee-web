@@ -6,7 +6,7 @@ binary format::
 
     magic ``MWRC`` | version u32 | entry RNG u32 | frame count u32
     StartMeleeData[0x138]
-    version 2 only: semantic initial PAD configuration/history[822]
+    version 2/3: semantic initial PAD configuration/history[822]
     for each frame: four semantic PAD vectors, 11 bytes per port
 
 The exporter uses the first candidate's setup and consumed inputs only after
@@ -25,7 +25,8 @@ import struct
 from typing import Any
 
 from retail_replay_validation import (CaptureError, MAX_FRAMES,
-                                      compare_validated, load_capture, PAD_STATE_BYTES)
+                                      MULTIPLAYER_VERSION, compare_validated,
+                                      load_capture, PAD_STATE_BYTES)
 
 
 MAGIC = b"MWRC"
@@ -126,10 +127,12 @@ def encode_mwrc(capture) -> tuple[bytes, str]:
     version = capture.header["version"]
     payload = bytearray(HEADER.pack(MAGIC, version, seed, frame_count))
     payload += setup
-    if version == 2:
+    if version in (2, MULTIPLAYER_VERSION):
         payload += _hex_bytes(capture.match_enter["pad_state_hex"], PAD_STATE_BYTES, "entry PAD history")
     payload += input_bytes
-    expected_size = 16 + GAME_INFO_SIZE + (PAD_STATE_BYTES if version == 2 else 0) + frame_count * FRAME_INPUT_SIZE
+    expected_size = (16 + GAME_INFO_SIZE +
+                     (PAD_STATE_BYTES if version in (2, MULTIPLAYER_VERSION) else 0) +
+                     frame_count * FRAME_INPUT_SIZE)
     if len(payload) != expected_size or len(payload) > MAX_TRANSPORT_SIZE:
         raise RecipeError("generated MWRC size does not match its frame count")
     return bytes(payload), hashlib.sha256(bytes(input_bytes)).hexdigest()
@@ -173,23 +176,28 @@ def export_pair(first_path: str | Path, second_path: str | Path,
             "MWRC output and sidecar must not overwrite either reference capture")
     payload, input_hash = encode_mwrc(first_capture)
     _write_bytes(output, payload)
+    transport = {
+        "magic": MAGIC.decode("ascii"),
+        "version": first_capture.header["version"],
+        "frames": len(first_capture.frames),
+        "bytes": len(payload),
+        "entry_rng": first_capture.match_enter["rng"],
+        "start_melee_bytes": GAME_INFO_SIZE,
+        "initial_pad_bytes": (PAD_STATE_BYTES if first_capture.header["version"] in
+                               (2, MULTIPLAYER_VERSION) else 0),
+        "pad_bytes_per_port": PAD_SEMANTIC_SIZE,
+        "ports": PORT_COUNT,
+    }
+    if first_capture.header["version"] == MULTIPLAYER_VERSION:
+        transport["observation_version"] = MULTIPLAYER_VERSION
+        transport["active_player_count"] = first_capture.active_player_count
     sidecar_data = {
         "schema": "melee-web-retail-replay-recipe",
         "version": 1,
         "status": "exported",
         "scope": SCOPE,
         "independence_note": INDEPENDENCE_NOTE,
-        "transport": {
-            "magic": MAGIC.decode("ascii"),
-            "version": first_capture.header["version"],
-            "frames": len(first_capture.frames),
-            "bytes": len(payload),
-            "entry_rng": first_capture.match_enter["rng"],
-            "start_melee_bytes": GAME_INFO_SIZE,
-            "initial_pad_bytes": PAD_STATE_BYTES if first_capture.header["version"] == 2 else 0,
-            "pad_bytes_per_port": PAD_SEMANTIC_SIZE,
-            "ports": PORT_COUNT,
-        },
+        "transport": transport,
         "input_sha256": input_hash,
         "output_sha256": hashlib.sha256(payload).hexdigest(),
         "captures": {
