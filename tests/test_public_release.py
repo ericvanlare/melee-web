@@ -6,12 +6,18 @@ import hashlib
 import json
 from pathlib import Path
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
+
+import audit_public  # noqa: E402
+import build_public  # noqa: E402
+from materialize_pipeline_cache import materialize  # noqa: E402
 
 from audit_public import AuditError, audit  # noqa: E402
 from build_public import (  # noqa: E402
@@ -56,25 +62,68 @@ class PublicReleaseTests(unittest.TestCase):
               "rights@example.test" if mode == "production" else None, manifest)
         return output, manifest
 
+    def runtime_source_fixture(self) -> Path:
+        """Create producer inputs without depending on any local native build.
+
+        Native tools and prepared gameplay are deliberately tiny fixtures. The
+        real provenance readers still hash files, trees, patches and Git state;
+        no validation function is mocked or skipped.
+        """
+        if hasattr(self, "fixture_repo"):
+            return self.fixture_repo
+        repo = self.root / "producer-checkout"
+        repo.mkdir()
+        for rel in set(RUNTIME_SOURCE_FILES) | {
+            f"web/{name}" for name in build_public.PLAYER_SOURCE_RUNTIME_FILES
+        }:
+            destination = repo / rel
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(ROOT / rel, destination)
+        for rel in build_public.RUNTIME_TOOLCHAIN_PATHS:
+            destination = repo / rel
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_text(f"test tool fixture: {rel}\n")
+        materialize(repo / "web/initial_pipeline_cache.db.gz.b64",
+                    repo / "build/browser-release/initial_pipeline_cache.db")
+        prepared = repo / "build/gameplay-source"
+        prepared.mkdir()
+        (prepared / "fixture.c").write_text("int fixture(void) { return 0; }\n")
+        subprocess.run(["git", "init", "-q", "--template=", "--initial-branch=fixture"],
+                       cwd=prepared, check=True)
+        subprocess.run(["git", "add", "fixture.c"], cwd=prepared, check=True)
+        subprocess.run(["git", "-c", "user.name=Release Test", "-c",
+                        "user.email=fixture@example.invalid", "-c", "commit.gpgsign=false",
+                        "-c", "core.hooksPath=/dev/null", "commit", "-qm", "Fixture"],
+                       cwd=prepared, check=True)
+        for rel in build_public.PREPARED_GAMEPLAY_PATCHES.values():
+            (repo / rel).write_text("test prepared patch fixture\n")
+        for module in (build_public, audit_public):
+            root_patch = patch.object(module, "ROOT", repo)
+            root_patch.start()
+            self.addCleanup(root_patch.stop)
+        self.fixture_repo = repo
+        return repo
+
     def runtime_fixture(self) -> Path:
+        fixture_root = self.runtime_source_fixture()
         container = self.root / f"runtime-input-{len(tuple(self.root.glob('runtime-input-*')))}"
         runtime = container / "artifacts"
         runtime.mkdir(parents=True)
         source_map = {
-            "melee-runtime.mjs": ROOT / "web" / "melee-runtime.mjs",
-            "runtime-assets.mjs": ROOT / "web" / "runtime-assets.mjs",
-            "disc-image.mjs": ROOT / "web" / "disc-image.mjs",
-            "dsp-coefficients.mjs": ROOT / "web" / "dsp-coefficients.mjs",
-            "prototype-keyboard-layouts.mjs": ROOT / "web" / "prototype-keyboard-layouts.mjs",
-            "audio-worklet.js": ROOT / "web" / "audio-worklet.js",
-            "audio-ring.mjs": ROOT / "web" / "audio-ring.mjs",
+            "melee-runtime.mjs": fixture_root / "web" / "melee-runtime.mjs",
+            "runtime-assets.mjs": fixture_root / "web" / "runtime-assets.mjs",
+            "disc-image.mjs": fixture_root / "web" / "disc-image.mjs",
+            "dsp-coefficients.mjs": fixture_root / "web" / "dsp-coefficients.mjs",
+            "prototype-keyboard-layouts.mjs": fixture_root / "web" / "prototype-keyboard-layouts.mjs",
+            "audio-worklet.js": fixture_root / "web" / "audio-worklet.js",
+            "audio-ring.mjs": fixture_root / "web" / "audio-ring.mjs",
         }
         for name, path in source_map.items():
             shutil.copyfile(path, runtime / name)
         (runtime / "gameplay_public.js").write_text(
             'FS.mkdir("/home/web_user"); ENV["HOME"] = "/home/web_user"; // gameplay_public.wasm\n'
         )
-        (runtime / "gameplay_public.data").write_bytes((ROOT / "build/browser-release/initial_pipeline_cache.db").read_bytes())
+        (runtime / "gameplay_public.data").write_bytes((fixture_root / "build/browser-release/initial_pipeline_cache.db").read_bytes())
         # Minimal version-1 Wasm module with one function export; the audit
         # parses the export section rather than trusting the sidecar list.
         export_names = tuple(RUNTIME_REQUIRED_EXPORTS)
@@ -88,12 +137,12 @@ class PublicReleaseTests(unittest.TestCase):
         for name in ("gameplay_public.js", "gameplay_public.wasm", "gameplay_public.data"):
             data = (runtime / name).read_bytes()
             artifacts.append({"path": name, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()})
-        source_hashes = {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in RUNTIME_SOURCE_FILES}
+        source_hashes = {name: hashlib.sha256((fixture_root / name).read_bytes()).hexdigest() for name in RUNTIME_SOURCE_FILES}
         tool_paths = (".deps/emsdk/.emscripten", ".deps/emsdk/upstream/emscripten/emcc",
                       ".deps/emsdk/upstream/emscripten/emscripten-version.txt", ".venv/bin/cmake", ".venv/bin/ninja")
-        tool_hashes = {name: hashlib.sha256((ROOT / name).read_bytes()).hexdigest() for name in tool_paths}
-        seed_source = ROOT / "web/initial_pipeline_cache.db.gz.b64"
-        seed_materialized = ROOT / "build/browser-release/initial_pipeline_cache.db"
+        tool_hashes = {name: hashlib.sha256((fixture_root / name).read_bytes()).hexdigest() for name in tool_paths}
+        seed_source = fixture_root / "web/initial_pipeline_cache.db.gz.b64"
+        seed_materialized = fixture_root / "build/browser-release/initial_pipeline_cache.db"
         all_exports = [{"name": name, "kind": 0, "index": index} for index, name in enumerate(export_names)]
         identity = {
             "schema": "melee-web-runtime-public-build-v1",
@@ -110,14 +159,14 @@ class PublicReleaseTests(unittest.TestCase):
             },
             "source_inputs": {
                 "files_sha256": source_hashes,
-                "trees": {name: {"path": name, "files": _tree_hash(ROOT / name)[0], "sha256": _tree_hash(ROOT / name)[1]} for name in ("src", "cmake")},
+                "trees": {name: {"path": name, "files": _tree_hash(fixture_root / name)[0], "sha256": _tree_hash(fixture_root / name)[1]} for name in ("src", "cmake")},
                 "prepared_gameplay": {
                     "path": "build/gameplay-source",
-                    "pinned_commit": __import__('subprocess').check_output(["git", "rev-parse", "HEAD"], cwd=ROOT / "build/gameplay-source", text=True).strip(),
-                    "composed_patch": {"path": "build/gameplay-source/.git/melee-web-composed.patch", "sha256": hashlib.sha256((ROOT / "build/gameplay-source/.git/melee-web-composed.patch").read_bytes()).hexdigest()},
-                    "reviewed_patch": {"path": "build/gameplay-source/.git/melee-web-gameplay.patch", "sha256": hashlib.sha256((ROOT / "build/gameplay-source/.git/melee-web-gameplay.patch").read_bytes()).hexdigest()},
-                    "working_tree_diff_sha256": hashlib.sha256(__import__('subprocess').check_output(["git", "diff", "--binary", "HEAD"], cwd=ROOT / "build/gameplay-source")).hexdigest(),
-                    "tree": {"path": "build/gameplay-source", "files": _tree_hash(ROOT / "build/gameplay-source")[0], "sha256": _tree_hash(ROOT / "build/gameplay-source")[1]},
+                    "pinned_commit": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=fixture_root / "build/gameplay-source", text=True).strip(),
+                    "composed_patch": {"path": "build/gameplay-source/.git/melee-web-composed.patch", "sha256": hashlib.sha256((fixture_root / "build/gameplay-source/.git/melee-web-composed.patch").read_bytes()).hexdigest()},
+                    "reviewed_patch": {"path": "build/gameplay-source/.git/melee-web-gameplay.patch", "sha256": hashlib.sha256((fixture_root / "build/gameplay-source/.git/melee-web-gameplay.patch").read_bytes()).hexdigest()},
+                    "working_tree_diff_sha256": hashlib.sha256(subprocess.check_output(["git", "diff", "--binary", "HEAD"], cwd=fixture_root / "build/gameplay-source")).hexdigest(),
+                    "tree": {"path": "build/gameplay-source", "files": _tree_hash(fixture_root / "build/gameplay-source")[0], "sha256": _tree_hash(fixture_root / "build/gameplay-source")[1]},
                 },
             },
             "toolchain": {"emscripten": "fixture", "cmake": "fixture", "ninja": "fixture", "sha256": tool_hashes},
@@ -196,6 +245,32 @@ class PublicReleaseTests(unittest.TestCase):
         identity_path.write_text(json.dumps(identity))
         with self.assertRaisesRegex(BuildError, "identity mismatch"):
             build(output=self.root / "drift-runtime", profile="player", runtime_dir=runtime)
+
+    def test_player_rejects_changed_producer_inputs_in_build_and_audit(self):
+        runtime = self.runtime_fixture()
+        output = self.root / "provenance-player"
+        manifest = self.root / "provenance-player.manifest.json"
+        build(output=output, manifest=manifest, profile="player", runtime_dir=runtime)
+        inputs = (
+            "src/browser_input.cpp",
+            ".venv/bin/ninja",
+            "build/gameplay-source/fixture.c",
+            "build/gameplay-source/.git/melee-web-composed.patch",
+            "build/browser-release/initial_pipeline_cache.db",
+        )
+        for index, rel in enumerate(inputs):
+            with self.subTest(input=rel):
+                source = self.fixture_repo / rel
+                original = source.read_bytes()
+                try:
+                    source.write_bytes(original + b"\nchanged producer input\n")
+                    with self.assertRaisesRegex(BuildError, "differ"):
+                        build(output=self.root / f"changed-producer-{index}",
+                              profile="player", runtime_dir=runtime)
+                    with self.assertRaisesRegex(AuditError, "differ"):
+                        audit(output, manifest)
+                finally:
+                    source.write_bytes(original)
 
     def test_player_rejects_nonstandard_generated_private_home_path(self):
         runtime = self.runtime_fixture()

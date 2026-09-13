@@ -27,7 +27,9 @@ use its generated manifest for current legal text and total byte size.
 
 - Full unittest discovery: **633 tests, 50 skipped**, no failures. Skips require
   optional owned assets, traces or tools not installed in this isolated worktree.
-  The final public release checks were rerun after release-audit tightening.
+  The final 30 public release checks pass in a fresh tracked-files checkout
+  without installed dependencies or existing native build outputs. They include
+  source/toolchain/prepared-patch/seed drift rejection in both build and audit.
 - Release `runtime-public` and development `gameplay_menu_browser` both compile.
   The public output has the 16 required lifecycle/input JS bindings, actual Wasm
   export verification, no public diagnostic/replay/raw-PAD/memory bindings, no
