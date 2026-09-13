@@ -6,7 +6,7 @@ import {
   createHitchCapture,
 } from '../web/hitch-capture.mjs';
 
-const runtime = fs.readFileSync(new URL('../web/runtime.html', import.meta.url), 'utf8');
+const runtime = fs.readFileSync(new URL('../web/runtime-development.mjs', import.meta.url), 'utf8');
 assert.match(runtime, /await window\.meleeHitchCaptureLoading/);
 assert.match(runtime, /diagnostic_capture:diagnosticCapture/);
 assert.match(runtime, /nativeCallbacksOverBudget/);

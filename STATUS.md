@@ -1,5 +1,17 @@
 # Current status
 
+The initial public alpha uses an explicitly **audio-disabled** release profile.
+The public compile/link and JavaScript graph excludes the identified GPL-derived
+resampler and coefficient generator; normal development audio remains separate.
+The candidate mounts the player directly with the original minimal prototype
+layout. It still reproduces the opcode-63 CPU-action abort, and the development
+No Contest path can exit with unsupported pending scene 0. These are retained
+failures. See [the alpha validation record](docs/PUBLIC_ALPHA_VALIDATION.md).
+The alpha is live at [webmelee.gg](https://webmelee.gg/) after tested legal-contact
+delivery before and after DNS migration and the exact artifact audit. Final apex
+HTTP/browser, HTTPS and canonical redirect checks pass. This does not assert
+broader gameplay stability.
+
 Ordinary VS CPU levels 1–9 run in the shared compiled runtime used by both
 entry pages. The [CPU match development corpus](docs/CPU_MATCH_CORPUS.md) now
 has repeatable two-, three- and four-player retail reference pairs totaling

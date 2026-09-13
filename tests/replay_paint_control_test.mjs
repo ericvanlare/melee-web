@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
-const html=fs.readFileSync(new URL('../web/runtime.html',import.meta.url),'utf8');
-const code=html.slice(html.indexOf('function beginReplayPaintControl(){'),html.indexOf('\nconst boundary='));
+const runtime=fs.readFileSync(new URL('../web/runtime-development.mjs',import.meta.url),'utf8');
+const code=runtime.slice(runtime.indexOf('function beginReplayPaintControl(){'),runtime.indexOf('\nconst log='));
+assert(code.startsWith('function beginReplayPaintControl(){'));
 function fixture(mode,enabled=true,drift=false){
   const classes=new Set();let reads=0,clock=10;
   const canvas={width:640,height:480,getBoundingClientRect(){

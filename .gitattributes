@@ -5,3 +5,6 @@
 *.cmake text eol=lf
 # Unified diffs require a single space on otherwise empty context lines.
 *.patch text eol=lf whitespace=-blank-at-eol,-blank-at-eof
+
+# Preserve upstream license texts byte-for-byte, including their whitespace.
+docs/licenses/*.txt -whitespace

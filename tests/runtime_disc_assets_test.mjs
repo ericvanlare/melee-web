@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {loadRuntimeDisc,RUNTIME_DISC_FILES,loadNativeMenuDisc,NATIVE_MENU_DISC_FILES,loadNativeGameDisc,NATIVE_GAME_DISC_FILES} from '../web/runtime-assets.mjs';
+import {loadRuntimeDisc,RUNTIME_DISC_FILES,loadNativeMenuDisc,NATIVE_MENU_DISC_FILES,loadNativeGameDisc,NATIVE_GAME_DISC_FILES} from '../web/runtime-audio-assets.mjs';
 assert.equal(Object.keys(RUNTIME_DISC_FILES).length,14);
 assert.equal(RUNTIME_DISC_FILES['LbRb.dat'],'LbRb.dat');
 for(const name of ['main.ssm','mario.ssm','smash2.sem'])assert.equal(RUNTIME_DISC_FILES[name],'audio/us/'+name);

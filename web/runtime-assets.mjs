@@ -1,5 +1,4 @@
 import {openDiscImage,fontFileRange} from './disc-image.mjs';
-import {replacementDspCoefficients,DSP_COEFFICIENT_SHA256} from './dsp-coefficients.mjs';
 
 // Exact revision/language paths: audio/ also contains Japanese alternatives.
 export const RUNTIME_DISC_FILES=Object.freeze({
@@ -55,7 +54,7 @@ export function loadNativeMenuDisc(file,report=()=>{}) {
   return loadDiscBundle(file,report,NATIVE_MENU_DISC_FILES);
 }
 async function loadDiscBundle(file,report,paths) {
-  const total=Object.keys(paths).length+2;
+  const total=Object.keys(paths).length+1;
   if(/\.rvz$/i.test(file.name??''))throw Error('RVZ is not supported yet. Choose an ISO, GCM, or CISO image.');
   report({phase:'validate',complete:0,total});
   const disc=await openDiscImage(file);
@@ -85,9 +84,6 @@ async function loadDiscBundle(file,report,paths) {
   const font=fontFileRange(header);
   if(font.offset+font.size>dol.byteLength)throw Error('Font data is outside the validated executable.');
   result.set('sislib_font.bin',dol.slice(font.offset,font.offset+font.size));
-  const coefficients=replacementDspCoefficients();
-  if(await digest('SHA-256',coefficients)!==DSP_COEFFICIENT_SHA256)throw Error('Generated audio coefficients failed their integrity check.');
-  result.set('dsp_coef.bin',coefficients);
   report({phase:'complete',complete:total,total});
   return result;
 }

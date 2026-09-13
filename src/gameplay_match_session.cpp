@@ -110,12 +110,20 @@ struct GameplayMatchSession::Storage {
                 std::vector<std::shared_ptr<const DatAudioBank>> decoded;
                 decoded.reserve(bank_names.size());
                 for(const auto name:bank_names)decoded.push_back(runtime_cache->audio_bank(name));
+#if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+                bank=std::make_unique<GameplayAudioBank>(runtime_files->at("smash2.sem"),std::move(decoded),std::span<const uint8_t>{});
+#else
                 bank=std::make_unique<GameplayAudioBank>(runtime_files->at("smash2.sem"),std::move(decoded),runtime_files->at("dsp_coef.bin"));
+#endif
             }else{
                 std::vector<std::span<const uint8_t>> banks;
                 banks.reserve(bank_names.size());
                 for(const auto name:bank_names)banks.emplace_back(runtime_files->at(std::string(name)));
+#if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+                bank=std::make_unique<GameplayAudioBank>(runtime_files->at("smash2.sem"),banks,std::span<const uint8_t>{});
+#else
                 bank=std::make_unique<GameplayAudioBank>(runtime_files->at("smash2.sem"),banks,runtime_files->at("dsp_coef.bin"));
+#endif
             }
             check(melee_web_audio_enable_effects(bank->get(),error,sizeof(error)),error);
             music_path="/audio/"+std::string(stage->music);
