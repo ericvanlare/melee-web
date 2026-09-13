@@ -1,5 +1,20 @@
 # Current status
 
+The [original allocation-history experiment](docs/ORIGINAL_ALLOCATION_HISTORY.md)
+collects read-only boot, allocator and heap-lifetime events. Two independent
+boots agree on all 276 recorded calls, and boot roots derive from the owned
+disc/apploader and original DOL without captured address inputs. Native and
+checked Wasm replay agree through 33 operations and 13 pointer aliases, then stop
+at call 55 (`lbHeap_80015900`), whose partition/replacement lifetime orchestration
+is not implemented. The frozen
+external save lacks the requested unlocks, so the six full cold-boot CPU
+captures require an owned unlocked persistent save. Fighter-address derivation
+and CPU register-carry integration remain open; no gameplay or public deployment
+change is included.
+The final local suite passes 709 tests (44 optional target/fixture skips), with
+29 focused collector/menu/boot/replay checks and runtime, graphics and fighter
+Release builds passing. Original source and frozen gold inputs remain unchanged.
+
 The [source-address prerequisite](docs/SOURCE_ADDRESS_CONTEXT.md) models ordinary
 original SDK/HSD allocation identity and defined register-byte consumption,
 without supplying missing original allocation history or changing gameplay.
