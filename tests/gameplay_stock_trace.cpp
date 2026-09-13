@@ -19,7 +19,9 @@ int main(int argc,char** argv){try{
  for(unsigned cycle=0;cycle<2;cycle++){
   const unsigned costume_last=extra_costumes?5:1;
   for(unsigned selected=0;selected<costume_last;selected++){
-   GameplayWorld world(files);
+   GameplayWorldSelection world_selection;
+   world_selection.costume_indices[0]=selected;
+   GameplayWorld world(files,world_selection);
    MeleeWebPlayerSettings players[2]={{0,0,4,{-20,world.floor_height(-20)+1,0},1,selected,0},{1,1,4,{20,world.floor_height(20)+1,0},-1,0,0}};
   auto* match=melee_web_match_begin_players(players,2,70,1,world.collision(),error,sizeof(error));check(match!=nullptr,error);
   check(melee_web_match_create_fighters(match,error,sizeof(error)),error);
