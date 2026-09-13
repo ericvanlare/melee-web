@@ -20,7 +20,7 @@ typedef struct MeleeWebMatchSettings {
     uint32_t camera_subjects; /* Main source match uses 70. Explicit, nonzero. */
     uint32_t random_seed;
 } MeleeWebMatchSettings;
-#define MELEE_WEB_MATCH_MAX_PLAYERS 2u
+#define MELEE_WEB_MATCH_MAX_PLAYERS 4u
 typedef struct MeleeWebControllerSample {
     uint32_t buttons;
     float stick_x, stick_y, cstick_x, cstick_y, trigger_l, trigger_r;
@@ -53,9 +53,10 @@ typedef struct MeleeWebMatchStats {
  * human player. Does not create a render camera or claim full stage readiness. */
 MeleeWebMatchContext* melee_web_match_begin(const MeleeWebMatchSettings*,
     MeleeWebCollision*, char*, size_t);
-/* Additive two-player boundary. Distinct slots and controller ports are
- * required. samples[controller] is routed to the configured player's original
- * PlayerId PAD record; source Fighter processing computes input transitions. */
+/* Bounded ordinary-VS boundary for two through four active players. Distinct
+ * slots and controller ports are required. samples[controller] is routed to
+ * the configured player's original PlayerId PAD record; source Fighter
+ * processing computes input transitions. */
 MeleeWebMatchContext* melee_web_match_begin_players(const MeleeWebPlayerSettings*,
     uint32_t count,uint32_t camera_subjects,uint32_t seed,MeleeWebCollision*,char*,size_t);
 int melee_web_match_create_fighters(MeleeWebMatchContext*,char*,size_t);

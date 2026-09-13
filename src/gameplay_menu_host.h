@@ -16,7 +16,8 @@ typedef struct MeleeWebMenuMatchSelection {
     StartMeleeData start;
     /* Compatibility view used by the existing match session; these values
      * are copied from start.players by the host selection boundary. */
-    struct {uint32_t controller,stocks,costume,sub_color;} players[2];
+    struct {uint32_t controller,stocks,costume,sub_color;} players[4];
+    uint32_t player_count;
     uint32_t random_seed, hud_layout;
 } MeleeWebMenuMatchSelection;
 /* Owns source selection across separate CSS, SSS and match SDK worlds.

@@ -9,8 +9,11 @@ simulation loop or prototype-only CPU setting.
 
 `gameplay_player_selection.h` declares the admitted player types: human or
 ordinary VS CPU (`cpu_kind == 4`, difficulty 1–9). Both the menu gates and the
-patched original match-entry boundary use it. The two-slot, four-stock, supported
-fighter/stage restrictions remain. Event and training AI modes are not admitted.
+patched original match-entry boundary use it. The shared owner accepts two
+through four contiguous players, 1–5 stocks, and the supported fighters/stages.
+Teams, event and training AI modes are not admitted. These implementation gates
+are broader than the current accuracy evidence; see the
+[complete-match development corpus](CPU_MATCH_CORPUS.md).
 CPU rumble stays disabled by the original `gm_LoadRumbleEnabled` routine.
 The prepared-match gate rejects CPU rumble; CSS selection does not inspect a
 rumble setting that original VS entry has not resolved yet.
@@ -165,14 +168,15 @@ The local report and build/reference identities are retained under
 
 ## Browser and build checks — 2026-09-12
 
-The final Release runtime and retail-trace targets build. Full unittest
+The checkpoint-era Release runtime and retail-trace targets build. Full unittest
 discovery reports 550 tests, no failures and 46 skips for optional fixtures and
 separate trace targets not present in this worktree. The new CPU data, input
 plan and menu tests run.
 
 The CI workflow now installs pinned dependencies before full unittest discovery;
 the former order ran dependency-backed tests before their tools and patched
-sources existed. Native build configuration is unchanged.
+sources existed. That checkpoint change left native build configuration unchanged;
+the later complete-match work adds shared result/observation dependencies.
 
 Headed Chrome 153 over real HTTP passes all 17 prototype checks. Ordinary
 keyboard input selects B0XX mode, sends Start with P2 disconnected, selects

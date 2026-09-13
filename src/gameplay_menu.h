@@ -19,6 +19,10 @@ enum {
     MELEE_WEB_MENU_FD_ENTRY = 25,
     MELEE_WEB_MENU_FD_ST_KIND = 0x20,
     MELEE_WEB_MENU_FD_GR_KIND = 0x25,
+    /* The source StartMeleeData has six slots.  This host deliberately keeps
+     * the ordinary VS slice bounded to the first four source ports. */
+    MELEE_WEB_MENU_MIN_PLAYERS = 2,
+    MELEE_WEB_MENU_MAX_PLAYERS = 4,
 };
 
 typedef enum MeleeWebMenuScene {
@@ -70,10 +74,16 @@ typedef struct MeleeWebMenuRuntime {
 } MeleeWebMenuRuntime;
 
 typedef struct MeleeWebMenuConfig {
-    /* Two local slots: human or the original ordinary-VS CPU (levels 1..9). */
-    uint8_t stocks; /* must be 4 for the current native launch contract */
+    /* Local slots: human or the original ordinary-VS CPU (levels 1..9).
+     * The first three fields preserve the original two-player initializer. */
+    uint8_t stocks; /* source menu range is 1..5; CSS starts at zero */
     uint8_t player0_color;
     uint8_t player1_color;
+    /* Zero preserves the original two-player default.  For 3/4-player
+     * preparation the added slots start as level-1 ordinary CPUs. */
+    uint8_t player_count;
+    uint8_t player2_color;
+    uint8_t player3_color;
 } MeleeWebMenuConfig;
 
 typedef struct MeleeWebMenuSession MeleeWebMenuSession;
@@ -118,6 +128,10 @@ const SSSData* melee_web_menu_sss(const MeleeWebMenuSession*);
 /* Returns the separate VS-entry payload after the original source adapter has
  * applied persistent rules, stocks, item settings and rumble. */
 const VsModeData* melee_web_menu_ready_vs(const MeleeWebMenuSession*);
+
+/* Return the contiguous active source-player count in [2,4], or zero for a
+ * malformed/non-match shape.  Slots after the returned count must be NA. */
+int melee_web_menu_active_player_count(const StartMeleeData*);
 
 /* Pure boundary checks used by the lifecycle and by the host before launch.
  * These check source IDs and rule shape; they do not consult browser state or

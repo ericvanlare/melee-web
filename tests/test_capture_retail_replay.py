@@ -155,6 +155,7 @@ class CaptureRunnerTests(unittest.TestCase):
                 "source %s" % (root / "gdb-control.py"),
                 "retail-step 12 1 SET MAIN 0.5 0.5",
                 "source %s" % (root / "reference_replay_capture.py"),
+                "enable 1",
                 "retail-replay-arm \"%s\" 240" % (root / "capture.jsonl"),
                 "retail-step 8 1 PRESS A",
                 "retail-step 8 1 RELEASE A",
@@ -208,7 +209,8 @@ class CaptureRunnerTests(unittest.TestCase):
             expected_hash = hashlib.sha256(
                 paths["collector"].read_bytes() + b"\0" + boundary.read_bytes() + b"\0" +
                 paths["collector"].with_name('retail_input_plan.py').read_bytes() + b"\0" +
-                paths["collector"].with_name('retail_input_bootstrap.py').read_bytes()).hexdigest()
+                paths["collector"].with_name('retail_input_bootstrap.py').read_bytes() + b"\0" +
+                paths["collector"].with_name('retail_cpu_observation.py').read_bytes()).hexdigest()
             self.assertEqual(paths["collector_sha256"], expected_hash)
 
     def test_canonical_dolphin_ini_hash_only_normalizes_owned_socket(self):
@@ -320,7 +322,8 @@ class CaptureRunnerTests(unittest.TestCase):
                         collector.read_bytes() + b"\0" +
                         collector.with_name("reference_replay_boundary.py").read_bytes() + b"\0" +
                         collector.with_name("retail_input_plan.py").read_bytes() + b"\0" +
-                        collector.with_name("retail_input_bootstrap.py").read_bytes()).hexdigest()
+                        collector.with_name("retail_input_bootstrap.py").read_bytes() + b"\0" +
+                        collector.with_name("retail_cpu_observation.py").read_bytes()).hexdigest()
                     raw = b"".join(bytes.fromhex(pad) + bytes([fill])
                                    for pad, fill in zip(
                                        loaded_plan["frames"][0] + ["00" * 10 + "ff"] * 2,

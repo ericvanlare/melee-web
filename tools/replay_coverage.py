@@ -559,6 +559,230 @@ def analyze_capture(
     return capture
 
 
+def analyze_cpu_capture(path, *, input_plan, observation, completion,
+                        cpu="Interpreter64", source_root=DEFAULT_SOURCE_ROOT):
+    """Extend the existing motion/event report with observed CPU match coverage.
+
+    CPU command-buffer inventory means queued commands, not an assertion that
+    every command ran. Decision-state samples, generated PAD, and fighter
+    motion entries provide separate execution evidence.
+    """
+    from cpu_observation_validation import load_observation
+    from retail_match_completion import load_match_completion
+    from retail_setup_validation import _decode_setup
+
+    report = analyze_capture(path, input_plan=input_plan, cpu=cpu, source_root=source_root)
+    capture = load_capture(path, cpu=cpu)
+    audit = load_observation(observation, capture)
+    ending = load_match_completion(capture, completion, require_complete=True)
+    setup = _decode_setup(capture.match_enter['start_melee_hex'])
+    raw_setup = bytes.fromhex(capture.match_enter['start_melee_hex'])
+    for slot, settings in enumerate(setup['players']):
+        settings['team'] = raw_setup[0x69 + slot * 0x24]
+        settings['sub_color'] = raw_setup[0x67 + slot * 0x24]
+        settings['source_slot'] = raw_setup[0x64 + slot * 0x24]
+    source = Path(source_root) / 'melee/ft/ftcmdscript.h'
+    text = re.sub(r'^\s*#.*$', '', source.read_text(), flags=re.M)
+    commands = _parse_enum(text, 'CPUCommand', source)
+    names = {value: name for name, value in commands.items()
+             if name not in ('CpuCmd_ZeroArgEnd', 'CpuCmd_OneArgEnd', 'CpuCmd_Count')}
+
+    def program(hex_bytes):
+        raw = bytes.fromhex(hex_bytes)
+        cursor, result = 0, set()
+        while cursor < len(raw):
+            opcode = raw[cursor]
+            if opcode not in names:
+                raise CoverageError(f'CPU buffer has an unmapped source command: {opcode:#x}')
+            width = 1 if opcode <= 0x7f else 2 if opcode <= 0xbf else 3
+            if cursor + width > len(raw):
+                raise CoverageError('CPU buffer ends inside a command')
+            result.add(opcode)
+            cursor += width
+        return result
+
+    drawing_available = bool(audit.header['source_drawing'])
+    for player, settings in zip(report['players'], setup['players']):
+        slot = player['slot']
+        player['configuration'] = settings
+        player['role'] = 'cpu' if settings['player_type'] == 1 else 'human'
+        player['attack_motion_entries'] = sum(motion['entries'] for motion in player['motions']
+            if 'Attack' in motion['name'] or 'Throw' in motion['name'])
+        samples = [row['players'][slot] for row in audit.frames]
+        target_changes, state_changes = [], []
+        state_ticks, commands_seen = {}, set()
+        target_ticks = {}
+        queue_values = {'attack': set(), 'defend': set()}
+        queue_ticks = {'attack': {}, 'defend': {}}
+        queue_transitions = {'attack': [], 'defend': []}
+        generated_active_ticks = 0
+        initial_target = None
+        previous_decision = None
+        for index, sample in enumerate(samples):
+            decision = sample['cpu']
+            if decision is None:
+                continue
+            if initial_target is None:
+                initial_target = decision['target_slot']
+            state = decision['state']
+            state_ticks[state] = state_ticks.get(state, 0) + 1
+            target = decision['target_slot']
+            target_ticks[target] = target_ticks.get(target, 0) + 1
+            commands_seen |= program(decision['command_bytes'])
+            generated_active_ticks += bool(decision['buttons'] or any(decision['sticks']) or any(decision['triggers']))
+            for queue_name, field in (('attack', 'attack_queue'),
+                                      ('defend', 'defend_queue')):
+                queue = tuple(decision.get(field, ()))
+                for value in set(queue):
+                    queue_values[queue_name].add(value)
+                    ticks = queue_ticks[queue_name]
+                    ticks[value] = ticks.get(value, 0) + 1
+                if previous_decision is not None:
+                    previous_queue = tuple(previous_decision.get(field, ()))
+                    if queue != previous_queue:
+                        queue_transitions[queue_name].append({
+                            'tick': index, 'from': list(previous_queue),
+                            'to': list(queue),
+                        })
+            if previous_decision is not None:
+                for key, events in [('target_slot', target_changes), ('state', state_changes)]:
+                    if decision[key] != previous_decision[key]:
+                        events.append({'tick': index, 'from': previous_decision[key],
+                                       'to': decision[key]})
+            previous_decision = decision
+        if player['role'] == 'cpu':
+            player['cpu'] = {
+                'difficulty': settings['cpu_level'],
+                'decision_state_ticks': {str(key): state_ticks[key] for key in sorted(state_ticks)},
+                'decision_state_changes': state_changes, 'target_changes': target_changes,
+                'initial_target_slot': initial_target,
+                'target_ticks': {str(key): target_ticks[key] for key in sorted(target_ticks)},
+                'generated_active_input_ticks': generated_active_ticks,
+                'queued_commands': [{'id': cmd, 'name': names[cmd]} for cmd in sorted(commands_seen)],
+                'attack_queue': {
+                    'observed_ids': sorted(queue_values['attack']),
+                    'tick_counts': {str(key): queue_ticks['attack'][key]
+                                    for key in sorted(queue_ticks['attack'])},
+                    'transitions': queue_transitions['attack'],
+                },
+                'defend_queue': {
+                    'observed_ids': sorted(queue_values['defend']),
+                    'tick_counts': {str(key): queue_ticks['defend'][key]
+                                    for key in sorted(queue_ticks['defend'])},
+                    'transitions': queue_transitions['defend'],
+                },
+                'decision_state_definition': 'source CpuFighter.x18; numeric states are retained without guessed labels',
+                'queue_observation_scope': 'active source queue values and transitions; no consumption or execution inference',
+                'source_motion_inventory': [
+                    {'id': motion['id'], 'name': motion['name'],
+                     'scope': motion['scope'], 'family': motion.get('family'),
+                     'ticks': motion['ticks'], 'entries': motion['entries']}
+                    for motion in player['motions']
+                ],
+            }
+        player['drawing_coverage'] = {
+            'available': drawing_available,
+            'phase': 'source_draws' if drawing_available else 'simulation_frames_only',
+            'source_draws': len(audit.draws),
+        }
+        player['magnifier_events'] = []
+        player['offscreen_draws'] = 0
+        player['camera_subject_events'] = []
+        if drawing_available:
+            last = audit.initial['players'][slot]
+            for row in audit.draws:
+                sample = row['players'][slot]
+                player['offscreen_draws'] += sample['magnifier']['offscreen']
+                if sample['magnifier'] != last['magnifier']:
+                    player['magnifier_events'].append({'tick': row['source_index'],
+                        'before': last['magnifier'], 'after': sample['magnifier']})
+                before = last['subject']
+                after = sample['subject']
+                if ((before is None) != (after is None) or
+                        (before is not None and after is not None and
+                         any(before[key] != after[key] for key in ('state', 'on_ledge', 'force_inactive', 'was_framed')))):
+                    player['camera_subject_events'].append({'tick': row['source_index'],
+                        'before': before, 'after': after})
+                last = sample
+        else:
+            # Frame snapshots retain simulation state, but no draw-phase
+            # camera or magnifier coverage exists in a headless sidecar.
+            player['magnifier_events'] = None
+            player['offscreen_draws'] = None
+            player['camera_subject_events'] = None
+    camera_transform_changes = None
+    if drawing_available:
+        camera_transform_changes = sum(left['camera'] != right['camera']
+            for left, right in zip((audit.initial, *audit.draws[:-1]), audit.draws))
+    report['cpu_match'] = {
+        'schema_version': 1, 'player_count': len(setup['players']),
+        'roles': [player['role'] for player in report['players']],
+        'rules_and_players': setup,
+        'cpu_difficulties': [p['cpu_level'] for p in setup['players'] if p['player_type'] == 1],
+        'source_ticks': len(audit.frames), 'source_draws': len(audit.draws),
+        'duration_nominal_seconds': len(audit.frames) / 60,
+        'duration_scope': 'nominal source ticks divided by 60; not measured wall time or a retail VI cadence claim',
+        'drawing': {
+            'available': drawing_available,
+            'phase': 'source_draws' if drawing_available else 'simulation_frames_only',
+            'source_draws': len(audit.draws),
+        },
+        'camera_transform_changes': camera_transform_changes,
+        'ending': ending, 'final_match_state': audit.frames[-1]['match'],
+        'result': audit.end['result'],
+        'teardown_remaining_slots': audit.end['remaining_fighter_slots'],
+        'observation_sha256': audit.sha256,
+        'cpu_command_mapping_sha256': hashlib.sha256(source.read_bytes()).hexdigest(),
+    }
+    features = set(report.get('features', ()))
+    features.add(f"player-count:{len(setup['players'])}")
+    for player in report['players']:
+        slot = player['slot']
+        features.add(f"role:{slot}:{player['role']}")
+        if player['role'] == 'cpu':
+            cpu_report = player['cpu']
+            features.add(f"cpu-level:{slot}:{cpu_report['difficulty']}")
+            for state in cpu_report['decision_state_ticks']:
+                features.add(f"cpu-state:{slot}:{state}")
+            for motion in cpu_report['source_motion_inventory']:
+                features.add(f"cpu-motion:{slot}:{motion['id']}")
+                if motion['family']:
+                    features.add(f"cpu-family:{slot}:{motion['family']}")
+            for target in cpu_report['target_ticks']:
+                features.add(f"cpu-target:{slot}:{target}")
+            for command in cpu_report['queued_commands']:
+                features.add(f"cpu-command:{slot}:{command['id']}")
+            for queue_name, field in (('attack', 'attack_queue'),
+                                      ('defend', 'defend_queue')):
+                for value in cpu_report[field]['observed_ids']:
+                    features.add(f"cpu-queue:{slot}:{queue_name}:{value}")
+            if cpu_report['generated_active_input_ticks']:
+                features.add(f"cpu-input-active:{slot}")
+    features.add('drawing:source' if drawing_available else 'drawing:headless')
+    if drawing_available:
+        if camera_transform_changes:
+            features.add('camera:transform-change')
+        if any(player['magnifier_events'] or player['offscreen_draws']
+               for player in report['players']):
+            features.add('magnifier:observed')
+    if isinstance(ending.get('ending'), dict):
+        mode = ending['ending'].get('mode')
+        if mode is not None:
+            features.add(f"ending:mode:{mode}")
+        winners = ending['ending'].get('winner_slots')
+        if isinstance(winners, list):
+            features.add(f"ending:winner-count:{len(winners)}")
+    if ending.get('match_result') is not None:
+        features.add(f"ending:result:{ending['match_result']}")
+    report['features'] = sorted(features)
+    report['scope'] += (' CPU, camera/HUD/magnifier and ending coverage is from the exact '
+                        'semantic sidecar. Queued command inventory is not command execution coverage; '
+                        'attack/defend queue values are observed snapshots without consumption inference; '
+                        'damage events identify receivers, not inferred attackers. Draw-phase fields are '
+                        'marked unavailable for headless sidecars.')
+    return report
+
+
 def select_coverage(captures: Sequence[Mapping], limit: int) -> list[dict]:
     """Select a deterministic marginal-coverage subset from candidate captures."""
     if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:

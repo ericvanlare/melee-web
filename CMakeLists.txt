@@ -52,7 +52,15 @@ if(EMSCRIPTEN)
     "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/mp/mpisland.c"
     "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/gr/ground.c"
     "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/gr/grdynamicattr.c"
-    "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/lb/lb_00B0.c")
+    "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/lb/lb_00B0.c"
+    # The common bootstrap initializes the original bone-dynamics pool before
+    # any fighter exists. Its provider is also required by narrow HSD checks.
+    "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/lb/lb_00F9.c")
+  # Preserve this unit's original fighter-library numerical compilation policy
+  # when moving its provider to the lower bootstrap dependency.
+  set_source_files_properties("${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/lb/lb_00F9.c"
+    PROPERTIES COMPILE_OPTIONS
+    "-fno-builtin-sinf;-fno-builtin-cosf;-fno-builtin-tanf;-fno-builtin-atanf;-fno-builtin-atan2f;-fno-builtin-acosf")
   foreach(unit gobj gobjproc gobjplink gobjgxlink gobjobject gobjuserdata objalloc memory initialize)
     target_sources(gameplay_runtime PRIVATE "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/${unit}.c")
   endforeach()

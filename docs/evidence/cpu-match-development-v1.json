@@ -1,0 +1,854 @@
+{
+  "checkpoint_regressions": [
+    {
+      "browser": {
+        "errors": [],
+        "hashes": {
+          "port": "3253da365cfa9447c8aa5d586b6ec920b66b24f8f947beaa1f35197ca4111ebf",
+          "reference_a": "f5350c1682d7843301cf79f91d721becc8c5ad90eb56ce2d5fdad0bb89ede504",
+          "reference_b": "515ada9471cec2635e9a4fca644daf872522d4f13ac83fdf30ee307ebf0a68b1"
+        },
+        "source_draws": 480,
+        "source_steps": 480,
+        "status": "declared_state_match",
+        "ticks": 480
+      },
+      "name": "level1",
+      "native": {
+        "hashes": {
+          "port": "7156b2d790e6cc94b26dcbad65ad77c7518f1d647ac20880db1f9a7793b6a213",
+          "reference_a": "f5350c1682d7843301cf79f91d721becc8c5ad90eb56ce2d5fdad0bb89ede504",
+          "reference_b": "515ada9471cec2635e9a4fca644daf872522d4f13ac83fdf30ee307ebf0a68b1"
+        },
+        "status": "declared_state_match",
+        "ticks": 480
+      }
+    },
+    {
+      "browser": {
+        "errors": [],
+        "hashes": {
+          "port": "dc9d97ca763e8615bba6ec337b4d128aa8198e2a46aa6e25606dc94b92abeb4d",
+          "reference_a": "8414f11899fb8bd121e15159af16e89b0c893ae367defa6c1506495de684c01a",
+          "reference_b": "aaa99ba4ee62ea0c2ab178fca44311b95023d61765252b4bea5365e7aa4f8f53"
+        },
+        "source_draws": 480,
+        "source_steps": 480,
+        "status": "declared_state_match",
+        "ticks": 480
+      },
+      "name": "level9",
+      "native": {
+        "hashes": {
+          "port": "3e1a7d7e917f793e27a1ae82f4473b312afe054c4454d2af85ea615c47266abd",
+          "reference_a": "8414f11899fb8bd121e15159af16e89b0c893ae367defa6c1506495de684c01a",
+          "reference_b": "aaa99ba4ee62ea0c2ab178fca44311b95023d61765252b4bea5365e7aa4f8f53"
+        },
+        "status": "declared_state_match",
+        "ticks": 480
+      }
+    },
+    {
+      "browser": {
+        "errors": [],
+        "hashes": {
+          "port": "943d74e40f3b47e12355dd6398992a463ce2c0b0c3f784d12874036569fac8da",
+          "reference_a": "ce5561fc4e52b887006a2d90ddca764586b749c05ea5c2328ada97a80a1d69d3",
+          "reference_b": "616a5849655cc732446b0b50cb35e2663f4633fc64c3659b1157e2b5e9c509c5"
+        },
+        "source_draws": 240,
+        "source_steps": 240,
+        "status": "declared_state_match",
+        "ticks": 240
+      },
+      "name": "human-v2",
+      "native": {
+        "hashes": {
+          "port": "6e6ebea3ae091c25bb9892c09b45b564012501922583e946bd98cf0627576b75",
+          "reference_a": "ce5561fc4e52b887006a2d90ddca764586b749c05ea5c2328ada97a80a1d69d3",
+          "reference_b": "616a5849655cc732446b0b50cb35e2663f4633fc64c3659b1157e2b5e9c509c5"
+        },
+        "status": "declared_state_match",
+        "ticks": 240
+      }
+    }
+  ],
+  "pending": [
+    {
+      "draws": 3835,
+      "local_evidence": "work/cpu-corpus/prepared-v6/marth-human-vs-falco5-mario9-yoshis-story",
+      "no_camera_traversal_ticks": [
+        1610,
+        2611,
+        3612
+      ],
+      "scenario": "three-player",
+      "status": "discovered_tie_requires_sudden_death",
+      "ticks": 3838,
+      "winners": [
+        1,
+        2
+      ]
+    },
+    {
+      "draws": 3836,
+      "local_evidence": "work/cpu-corpus/prepared-v6/fox-human-vs-mario3-marth6-falco8-dream-land",
+      "no_camera_traversal_ticks": [
+        2268,
+        3269
+      ],
+      "scenario": "four-player",
+      "status": "discovered_unique_timeout_independent_pair_pending",
+      "ticks": 3838,
+      "winners": [
+        3
+      ]
+    },
+    {
+      "authored_sample_bound": 7923,
+      "local_evidence": "work/cpu-corpus/prepared-v8/marth-human-vs-falco5-mario9-yoshis-story-120s",
+      "scenario": "three-player-120s",
+      "scenario_id": "marth-human-vs-falco5-mario9-yoshis-story-120s",
+      "scenario_sha256": "ef6fc8b4dae4a7e25e1356313768eb1e9953b1acb7a90db9b93c8cc3fd76f471",
+      "status": "separately_declared_discovery_in_progress",
+      "stock_timer_seconds": 120,
+      "stocks": 2
+    }
+  ],
+  "reference_identity": {
+    "background_input": true,
+    "cheats": false,
+    "cpu": "Interpreter64",
+    "cpu_thread": false,
+    "disc_dol_sha1": "08e0bf20134dfcb260699671004527b2d6bb1a45",
+    "disc_image_bytes": 1449165376,
+    "disc_image_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+    "dol_sha1": "08e0bf20134dfcb260699671004527b2d6bb1a45",
+    "dolphin_binary_sha256": "dc3e63c85a2c7f96d3c055a48ecf78d31216eac4642ba1c4733c873dda803264",
+    "dolphin_version": "2606a",
+    "fixed_rtc": 1704067200,
+    "source_revision": "b43912cc78606f96c9569f5d6229bc9d7e265ea5"
+  },
+  "retained_failures": [
+    {
+      "cause": "Uninitialized decompiled switch_cmd failed to preserve the retail caller r31 carry in ftCo_800ADE48. Explicit source-grounded caller arguments fix it.",
+      "first_core_divergence": {
+        "field": "rng",
+        "port": 1683125113,
+        "retail": 2839876495,
+        "tick": 865
+      },
+      "first_cpu_divergence": {
+        "field": "cpu.state",
+        "port": 1,
+        "retail": 18,
+        "tick": 864
+      },
+      "local_evidence": "work/cpu-corpus/case1-paired-v2/native-v1.jsonl and browser-v1/",
+      "scenario": "two-player"
+    },
+    {
+      "failure": "Full core state matched but capture failed retrieving an evicted CDP response body. This run remains failed; subsequent wrapper runs hash HTTP bodies in the browser before and after execution.",
+      "local_evidence": "work/cpu-corpus/case1-paired-v2/browser-v2/",
+      "scenario": "two-player"
+    },
+    {
+      "failure": "Debugger wall-time cap at 3725 ticks; incomplete.",
+      "local_evidence": "work/cpu-corpus/prepared-v5/",
+      "scenario": "three-player"
+    },
+    {
+      "failure": "Debugger wall-time cap at 3447 ticks; incomplete.",
+      "local_evidence": "work/cpu-corpus/prepared-v5/",
+      "scenario": "four-player"
+    }
+  ],
+  "scenarios": [
+    {
+      "browser_agrees": false,
+      "browser_artifacts": {
+        "action-sweep.mjs": "e4de82aaa8b990b5ac2d887a6bcd12a8ac402bc99e9556393833f2e0a80f9219",
+        "audio-ring.mjs": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf",
+        "audio-worklet.js": "ef4374ac08f5bab821efa05cf5d252ca8e4b50647710d434e192beac3d7d7b4f",
+        "disc-image.mjs": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a",
+        "dsp-coefficients.mjs": "5176d1cf4400228f31dff428bcc8cd60d07694c0ceea1628a79ac19f3e112b4a",
+        "gameplay_menu_browser.data": "cdf157ee0f1850884f07a71165fd2192177acb23c2c777313b719e70ea67546f",
+        "gameplay_menu_browser.js": "b04af57b1ad9750cbe12ad2bcd13c48c0df995220f38e199cb9c3daa52080b2f",
+        "gameplay_menu_browser.wasm": "21ff7c6ed586350c4cd5ee6667f0ba5c32f0e15d1eb0b95dbf442c9cf0753273",
+        "hitch-capture.mjs": "f6d5441aa7289bccc185426300942fa9b0b879e478dd17af9ea43fe9e51127d3",
+        "match-flow.mjs": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f",
+        "match-menu.mjs": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba",
+        "runtime-assets.mjs": "1e0971f848191e5a1a6fd5c1fc260bc31417acdb0080e05b0ee2d86f2e3a06e6",
+        "runtime-cache.js": "49e02cdab92e66943528ae9aed4306c4076b42e1f7f9a2356f414ac5e41e5561",
+        "runtime.html": "a7e44eefa2ee250934c278839f81cccf1099ac42570441721ad74be228b1a67e"
+      },
+      "comparison": {
+        "browser_cpu_observation": {
+          "first_divergence": {
+            "actual": "46ea6000",
+            "expected": "46800000",
+            "field": "camera.far_bits",
+            "phase": "frame",
+            "tick": 0
+          },
+          "first_divergences_by_domain": {
+            "camera": {
+              "actual": "46ea6000",
+              "expected": "46800000",
+              "field": "camera.far_bits",
+              "phase": "frame",
+              "tick": 0
+            },
+            "cpu": null,
+            "draw_alignment": {
+              "actual_count": 1199,
+              "detail_scope": "Counts here; complete per-source-tick alignment is retained in the hash-bound local join.",
+              "expected_count": 1199,
+              "extra_in_actual_count": 0,
+              "matched_count": 1199,
+              "missing_from_actual_count": 0,
+              "scope": "source_draws_by_source_index",
+              "status": "aligned"
+            },
+            "hud": null,
+            "magnifier": null,
+            "match": null,
+            "subject": {
+              "actual": "414f259e",
+              "expected": "414f25a0",
+              "field": "players[1].subject.bone_bits[1]",
+              "phase": "frame",
+              "tick": 18
+            }
+          },
+          "frames": 1199,
+          "gold_admitted": false,
+          "hashes": {
+            "port": "e2824b21b7bad24b27ba7476c787ca1aa38a5d703afec988aa43891fe692335d",
+            "reference_a": "e8a51fec6512068924076bcd35b2bbc4157d7bba5c0f8ba411a52387de5fc09b",
+            "reference_b": "e8a51fec6512068924076bcd35b2bbc4157d7bba5c0f8ba411a52387de5fc09b"
+          },
+          "performance": "not_evaluated",
+          "pixels": "not_compared",
+          "port_draws": 1199,
+          "reference_draws": 1199,
+          "reference_repeatability": "pass",
+          "schema": "melee-web-cpu-observation-comparison",
+          "source_drawing": true,
+          "status": "declared_state_divergence",
+          "version": 1
+        },
+        "browser_state": {
+          "capture_hashes": {
+            "port": "75baf980adafb575936933c08359a26c172192cad4f5f2f58124aaad189e2fc9",
+            "reference_a": "ff6b7fbe5436a6e021270779669a3cf2c619323d5e5617f567dea0b28e97ae4d",
+            "reference_b": "f560226e86fb590472fa8165dc9f2bccfd40591013bdb50a886ee8d562830487"
+          },
+          "checks": {
+            "active_player_count": "pass",
+            "entry": "pass",
+            "fighters": "pass",
+            "frame_count": "pass",
+            "inputs": "pass",
+            "match_frame": "pass",
+            "pad_state_hex": "pass",
+            "rng": "pass"
+          },
+          "first_divergence": null,
+          "first_divergence_by_group": {},
+          "frames_compared": 1199,
+          "gold_admitted": false,
+          "performance": "not_evaluated",
+          "reference_cpu": "Interpreter64",
+          "reference_repeatability": "pass",
+          "scope": "declared entry data, supplied inputs, fighter fields, RNG and match clock, PAD configuration and all three history banks only; pixel agreement, hardware and audio output are excluded",
+          "source_drawing": "source_draws",
+          "status": "declared_state_match"
+        },
+        "native_cpu_observation": {
+          "first_divergence": {
+            "actual": "46800000",
+            "expected": "46ea6000",
+            "field": "camera.far_bits",
+            "phase": "frame",
+            "tick": 1
+          },
+          "first_divergences_by_domain": {
+            "camera": {
+              "actual": "46800000",
+              "expected": "46ea6000",
+              "field": "camera.far_bits",
+              "phase": "frame",
+              "tick": 1
+            },
+            "cpu": null,
+            "draw_alignment": {
+              "actual_count": 0,
+              "detail_scope": "Counts here; complete per-source-tick alignment is retained in the hash-bound local join.",
+              "expected_count": 1199,
+              "extra_in_actual_count": 0,
+              "matched_count": 0,
+              "missing_from_actual_count": 1199,
+              "scope": "draws_not_compared_headless",
+              "status": "not_compared"
+            },
+            "hud": null,
+            "magnifier": {
+              "actual": 0,
+              "expected": 3,
+              "field": "players[0].magnifier.edge",
+              "phase": "frame",
+              "tick": 322
+            },
+            "match": null,
+            "subject": {
+              "actual": "414f259e",
+              "expected": "414f25a0",
+              "field": "players[1].subject.bone_bits[1]",
+              "phase": "frame",
+              "tick": 18
+            }
+          },
+          "frames": 1199,
+          "gold_admitted": false,
+          "hashes": {
+            "port": "3dae73db8d9435b5abd0410e14db1247ba27f48341ec51d513d56567a8f9bf80",
+            "reference_a": "e8a51fec6512068924076bcd35b2bbc4157d7bba5c0f8ba411a52387de5fc09b",
+            "reference_b": "e8a51fec6512068924076bcd35b2bbc4157d7bba5c0f8ba411a52387de5fc09b"
+          },
+          "performance": "not_evaluated",
+          "pixels": "not_compared",
+          "port_draws": 0,
+          "reference_draws": 1199,
+          "reference_repeatability": "pass",
+          "schema": "melee-web-cpu-observation-comparison",
+          "source_drawing": false,
+          "status": "declared_state_divergence",
+          "version": 1
+        },
+        "native_state": {
+          "capture_hashes": {
+            "port": "e16df47394d7b26333137fbef12b5f9ddfd2106efac0a0703e2cd30654f92285",
+            "reference_a": "ff6b7fbe5436a6e021270779669a3cf2c619323d5e5617f567dea0b28e97ae4d",
+            "reference_b": "f560226e86fb590472fa8165dc9f2bccfd40591013bdb50a886ee8d562830487"
+          },
+          "checks": {
+            "active_player_count": "pass",
+            "entry": "pass",
+            "fighters": "pass",
+            "frame_count": "pass",
+            "inputs": "pass",
+            "match_frame": "pass",
+            "pad_state_hex": "pass",
+            "rng": "pass"
+          },
+          "first_divergence": null,
+          "first_divergence_by_group": {},
+          "frames_compared": 1199,
+          "gold_admitted": false,
+          "performance": "not_evaluated",
+          "reference_cpu": "Interpreter64",
+          "reference_repeatability": "pass",
+          "scope": "declared entry data, supplied inputs, fighter fields, RNG and match clock, PAD configuration and all three history banks only; rendering, hardware and audio output are excluded",
+          "source_drawing": "excluded",
+          "status": "declared_state_match"
+        }
+      },
+      "coverage": {
+        "camera_transform_changes": 1199,
+        "cpu_command_mapping_sha256": "efc64f6c7a4eaa982e45eefba93c496e90f36f2e739d49f83df07bf12d20d3d8",
+        "cpu_difficulties": [
+          1
+        ],
+        "drawing": {
+          "available": true,
+          "phase": "source_draws",
+          "source_draws": 1199
+        },
+        "duration_nominal_seconds": 19.983333333333334,
+        "duration_scope": "nominal source ticks divided by 60; not measured wall time or a retail VI cadence claim",
+        "ending": {
+          "capture_sha256": "ff6b7fbe5436a6e021270779669a3cf2c619323d5e5617f567dea0b28e97ae4d",
+          "completion_sha256": "d19994516160d1e42370f31097245036ec64033b94f917bed820df8d661d0b84",
+          "content_admitted": false,
+          "ending": {
+            "mode": "elimination",
+            "stock_tie": false,
+            "winner_slots": [
+              1
+            ]
+          },
+          "exit_observation": {
+            "caller": 2148980868,
+            "index": 1198,
+            "phase": "gm_801A4B60_return",
+            "scene_request": 1
+          },
+          "final_draw_source_index": 1198,
+          "frames": 1199,
+          "gold_admitted": false,
+          "match_end_state": 3,
+          "match_result": 2,
+          "performance": "not_evaluated",
+          "phase": "after_final_source_draw",
+          "port_equivalence": "not_evaluated",
+          "scene_request": 1,
+          "schema": "melee-web-retail-match-completion",
+          "scope": "source retail match completion only: the validated capture's final fighter stock observation, elimination or timer-timeout result, scene request/end-state/result bytes, callback-return observation, and final source-draw marker; no port equivalence, rendering, performance, audio, or gold/content admission",
+          "status": "source_match_complete",
+          "version": 1
+        },
+        "final_match_state": {
+          "end_state": 3,
+          "frame": 961,
+          "outcome": 2,
+          "seconds": 43,
+          "subframe": 0
+        },
+        "observation_sha256": "e8a51fec6512068924076bcd35b2bbc4157d7bba5c0f8ba411a52387de5fc09b",
+        "player_count": 2,
+        "result": {
+          "outcome": 2,
+          "winners": [
+            1
+          ]
+        },
+        "roles": [
+          "human",
+          "cpu"
+        ],
+        "rules_and_players": {
+          "damage_ratio_bits": "3f800000",
+          "disable_pausing": false,
+          "game_speed_bits": "3f800000",
+          "is_stock": true,
+          "is_teams": false,
+          "item_frequency": -1,
+          "item_mask_hex": "ffffffffffffffff",
+          "match_kind": 1,
+          "players": [
+            {
+              "character_kind": 8,
+              "costume": 0,
+              "player_type": 0,
+              "port": 1,
+              "rumble_enabled": false,
+              "source_slot": 0,
+              "stocks": 2,
+              "sub_color": 0,
+              "team": 0
+            },
+            {
+              "character_kind": 2,
+              "costume": 1,
+              "cpu_kind": 4,
+              "cpu_level": 1,
+              "player_type": 1,
+              "port": 2,
+              "rumble_enabled": false,
+              "source_slot": 0,
+              "stocks": 2,
+              "sub_color": 0,
+              "team": 0
+            }
+          ],
+          "stage": 32,
+          "time_limit_seconds": 60,
+          "timer_counts_up": false,
+          "timer_enabled": true
+        },
+        "schema_version": 1,
+        "source_draws": 1199,
+        "source_ticks": 1199,
+        "teardown_remaining_slots": []
+      },
+      "coverage_scope": "Attack-motion entries and queue inventory are observations, not proof of connected attacks or command execution.",
+      "input_plan_sha256": "3f9067a0edf388fd9a579b853e44eeca51e769853281ac301b2a4631e234d925",
+      "instrumented_browser_timing": {
+        "browserCallbackGaps": 1,
+        "nativeCallbacksOver33ms": 0,
+        "nativeCallbacksOverBudget": 0,
+        "worstBrowserCallbackMs": 38.57000000029802,
+        "worstNativeCallbackMs": 10.06
+      },
+      "join_sha256": "22607ba75cf4290e6e7b22d7673241c2e48c5200c35d475e0a26195c6ea285c1",
+      "local_join": "work/cpu-corpus/case1-paired-v2/result-v7.json",
+      "native_agrees": false,
+      "native_artifacts": {
+        "gameplay_retail_trace.js": "b826dcec0adca375579de0b0303e013849a4d5bf0a670536b1ca2d22fb11888b",
+        "gameplay_retail_trace.wasm": "12c885ec91e56977fcc350e1d59a771a20b20598d47b6cb37cd625cbf56f6947"
+      },
+      "natural_match_complete": true,
+      "player_coverage": [
+        {
+          "attack_motion_entries": 7,
+          "camera_subject_events_count": 2,
+          "configuration": {
+            "character_kind": 8,
+            "costume": 0,
+            "player_type": 0,
+            "port": 1,
+            "rumble_enabled": false,
+            "source_slot": 0,
+            "stocks": 2,
+            "sub_color": 0,
+            "team": 0
+          },
+          "damage_increases": [
+            {
+              "after_bits": "40400000",
+              "before_bits": "00000000",
+              "delta": 3.0,
+              "tick": 960
+            },
+            {
+              "after_bits": "40b75c29",
+              "before_bits": "40400000",
+              "delta": 2.7300000190734863,
+              "tick": 970
+            }
+          ],
+          "kind_name": "FTKIND_MARIO",
+          "magnifier_events_count": 4,
+          "offscreen_draws": 58,
+          "respawns": [
+            {
+              "motion": 12,
+              "name": "ftCo_MS_Rebirth",
+              "tick": 410
+            }
+          ],
+          "role": "human",
+          "slot": 0,
+          "stock_losses": [
+            {
+              "after": 1,
+              "before": 2,
+              "tick": 350
+            },
+            {
+              "after": 0,
+              "before": 1,
+              "tick": 1084
+            }
+          ]
+        },
+        {
+          "attack_motion_entries": 2,
+          "camera_subject_events_count": 0,
+          "configuration": {
+            "character_kind": 2,
+            "costume": 1,
+            "cpu_kind": 4,
+            "cpu_level": 1,
+            "player_type": 1,
+            "port": 2,
+            "rumble_enabled": false,
+            "source_slot": 0,
+            "stocks": 2,
+            "sub_color": 0,
+            "team": 0
+          },
+          "cpu": {
+            "attack_queue": {
+              "observed_ids": [
+                27
+              ],
+              "tick_counts": {
+                "27": 225
+              },
+              "transitions_count": 10
+            },
+            "decision_state_ticks": {
+              "1": 556,
+              "10": 477,
+              "18": 4,
+              "2": 85,
+              "3": 50,
+              "5": 27
+            },
+            "defend_queue": {
+              "observed_ids": [
+                10,
+                14
+              ],
+              "tick_counts": {
+                "10": 40,
+                "14": 40
+              },
+              "transitions_count": 2
+            },
+            "difficulty": 1,
+            "generated_active_input_ticks": 510,
+            "initial_target_slot": -1,
+            "queue_observation_scope": "active source queue values and transitions; no consumption or execution inference",
+            "queued_commands": [
+              {
+                "id": 10,
+                "name": "CpuCmd_ReleaseR"
+              },
+              {
+                "id": 127,
+                "name": "CpuCmd_Done"
+              },
+              {
+                "id": 128,
+                "name": "CpuCmd_SetLstickX"
+              },
+              {
+                "id": 129,
+                "name": "CpuCmd_SetLstickY"
+              },
+              {
+                "id": 134,
+                "name": "CpuCmd_PressAFor"
+              },
+              {
+                "id": 135,
+                "name": "CpuCmd_ReleaseAFor"
+              },
+              {
+                "id": 136,
+                "name": "CpuCmd_PressBFor"
+              },
+              {
+                "id": 137,
+                "name": "CpuCmd_ReleaseBFor"
+              },
+              {
+                "id": 142,
+                "name": "CpuCmd_WaitFor"
+              },
+              {
+                "id": 144,
+                "name": "CpuCmd_LstickXTowardDestination"
+              },
+              {
+                "id": 145,
+                "name": "CpuCmd_LstickXForward"
+              },
+              {
+                "id": 193,
+                "name": "CpuCmd_LstickXTowardDestinationClamped"
+              }
+            ],
+            "source_motion_inventory": [
+              {
+                "entries": 11,
+                "family": "common:movement",
+                "id": 14,
+                "name": "ftCo_MS_Wait",
+                "scope": "common",
+                "ticks": 565
+              },
+              {
+                "entries": 7,
+                "family": "common:movement",
+                "id": 15,
+                "name": "ftCo_MS_WalkSlow",
+                "scope": "common",
+                "ticks": 94
+              },
+              {
+                "entries": 6,
+                "family": "common:movement",
+                "id": 16,
+                "name": "ftCo_MS_WalkMiddle",
+                "scope": "common",
+                "ticks": 230
+              },
+              {
+                "entries": 3,
+                "family": "common:movement",
+                "id": 18,
+                "name": "ftCo_MS_Turn",
+                "scope": "common",
+                "ticks": 33
+              },
+              {
+                "entries": 1,
+                "family": "common:movement",
+                "id": 29,
+                "name": "ftCo_MS_Fall",
+                "scope": "common",
+                "ticks": 10
+              },
+              {
+                "entries": 1,
+                "family": "common:movement",
+                "id": 42,
+                "name": "ftCo_MS_Landing",
+                "scope": "common",
+                "ticks": 5
+              },
+              {
+                "entries": 1,
+                "family": "common:attack",
+                "id": 60,
+                "name": "ftCo_MS_AttackS4S",
+                "scope": "common",
+                "ticks": 46
+              },
+              {
+                "entries": 1,
+                "family": "common:attack",
+                "id": 64,
+                "name": "ftCo_MS_AttackLw4",
+                "scope": "common",
+                "ticks": 20
+              },
+              {
+                "entries": 1,
+                "family": "common:damage",
+                "id": 87,
+                "name": "ftCo_MS_DamageFlyHi",
+                "scope": "common",
+                "ticks": 21
+              },
+              {
+                "entries": 1,
+                "family": "common:downed",
+                "id": 191,
+                "name": "ftCo_MS_DownBoundD",
+                "scope": "common",
+                "ticks": 26
+              },
+              {
+                "entries": 1,
+                "family": "common:downed",
+                "id": 194,
+                "name": "ftCo_MS_DownStandD",
+                "scope": "common",
+                "ticks": 30
+              },
+              {
+                "entries": 1,
+                "family": null,
+                "id": 322,
+                "name": "ftCo_MS_Entry",
+                "scope": "common",
+                "ticks": 10
+              },
+              {
+                "entries": 1,
+                "family": null,
+                "id": 323,
+                "name": "ftCo_MS_EntryStart",
+                "scope": "common",
+                "ticks": 29
+              },
+              {
+                "entries": 1,
+                "family": null,
+                "id": 324,
+                "name": "ftCo_MS_EntryEnd",
+                "scope": "common",
+                "ticks": 30
+              },
+              {
+                "entries": 1,
+                "family": "special:neutral",
+                "id": 341,
+                "name": "ftFx_MS_SpecialNStart",
+                "scope": "fighter_specific",
+                "ticks": 6
+              },
+              {
+                "entries": 1,
+                "family": "special:neutral",
+                "id": 342,
+                "name": "ftFx_MS_SpecialNLoop",
+                "scope": "fighter_specific",
+                "ticks": 20
+              },
+              {
+                "entries": 1,
+                "family": "special:neutral",
+                "id": 343,
+                "name": "ftFx_MS_SpecialNEnd",
+                "scope": "fighter_specific",
+                "ticks": 24
+              }
+            ],
+            "target_changes": 8,
+            "target_ticks": {
+              "-1": 345,
+              "0": 854
+            }
+          },
+          "damage_increases": [
+            {
+              "after_bits": "41000000",
+              "before_bits": "00000000",
+              "delta": 8.0,
+              "tick": 863
+            }
+          ],
+          "kind_name": "FTKIND_FOX",
+          "magnifier_events_count": 0,
+          "offscreen_draws": 0,
+          "respawns": [],
+          "role": "cpu",
+          "slot": 1,
+          "stock_losses": []
+        }
+      ],
+      "recipe_sha256": "c26f1379ca34a2ea8d28cb0d3e903800d49eccbf677acc7e6f002f91e0e82687",
+      "reference_accepted": true,
+      "retail_pair": [
+        {
+          "capture_id": "c26c14521ff34bbdadd1a8169f36b118",
+          "capture_sha256": "ff6b7fbe5436a6e021270779669a3cf2c619323d5e5617f567dea0b28e97ae4d",
+          "initial_rng": 1162236032,
+          "observation_sha256": "e8a51fec6512068924076bcd35b2bbc4157d7bba5c0f8ba411a52387de5fc09b",
+          "result": {
+            "outcome": 2,
+            "winners": [
+              1
+            ]
+          },
+          "run_metadata_sha256": "3165efea9e148b40d27e93e2c8397671fa4c591d2e24fea0232f1d439abeae39",
+          "scene_teardown_sha256": "2857d3b54ba0f66359a432860e3aa801cf8b4700b89729b1c952fff198c16db6",
+          "ticks": 1199
+        },
+        {
+          "capture_id": "801a74f0fa7b48a18d8a0952e004e68d",
+          "capture_sha256": "f560226e86fb590472fa8165dc9f2bccfd40591013bdb50a886ee8d562830487",
+          "initial_rng": 1162236032,
+          "observation_sha256": "e8a51fec6512068924076bcd35b2bbc4157d7bba5c0f8ba411a52387de5fc09b",
+          "result": {
+            "outcome": 2,
+            "winners": [
+              1
+            ]
+          },
+          "run_metadata_sha256": "afda4697fe17fdc68a0379097523ea2a3e1587f944b489f42eddd2583c3cf9fb",
+          "scene_teardown_sha256": "2857d3b54ba0f66359a432860e3aa801cf8b4700b89729b1c952fff198c16db6",
+          "ticks": 1199
+        }
+      ],
+      "scenario_id": "mario-human-vs-fox-cpu1-final-destination",
+      "scenario_sha256": "47eea34486f2b42ace1c7fa006e5632ba4ab50cc5f25b34e33a323c586c2f7f8",
+      "source_counts": {
+        "browser_live_draws": 1199,
+        "browser_preparation_draws": 3,
+        "native_draws": 0,
+        "retail_draws": 1199,
+        "ticks": 1199
+      },
+      "status": "divergence_or_incomplete",
+      "timing_scope": "Concurrent instrumented development capture; isolated cold/warm performance admission remains open."
+    }
+  ],
+  "schema": "melee-web-cpu-development-evidence",
+  "scope": "Development evidence only. No CPU holdout, multiplayer, pixel/PCM, physical-input or performance admission.",
+  "validation": {
+    "build": "Release gameplay_menu_browser, gameplay_retail_trace, gameplay_timer_trace",
+    "failures": 0,
+    "focused_draw_alignment_tests": 27,
+    "skipped": 35,
+    "timer_lifetime": "Original countdown, pause/resume, timeout and repeated teardown passed; inconsistent selection fields rejected before asset loading",
+    "unit_tests": 598
+  },
+  "version": 1
+}

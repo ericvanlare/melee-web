@@ -17,6 +17,7 @@ VERSION = 1
 EXECUTION_SCHEMA = "melee-web-ucf-off-development-execution"
 EXECUTION_VERSION = 1
 SETUP_BYTES = 0x138
+MAX_ACTIVE_PLAYERS = 4
 MAX_EXECUTION_PLAN_BYTES = 1024 * 1024
 HEX64 = re.compile(r"[0-9a-f]{64}\Z")
 HEX8 = re.compile(r"[0-9a-f]{8}\Z")
@@ -120,8 +121,8 @@ def _validate_expected_setup(value: Any) -> dict[str, Any]:
     _require(set(value) == EXPECTED_SETUP_KEYS,
              "expected_setup has missing or unrecognized fields")
     players = value["players"]
-    _require(isinstance(players, list) and len(players) == 2,
-             "expected_setup.players must contain exactly P1 and P2")
+    _require(isinstance(players, list) and 2 <= len(players) <= MAX_ACTIVE_PLAYERS,
+             "expected_setup.players must contain 2 to 4 active players")
     seen_ports: set[int] = set()
     normalized_players = []
     for index, player in enumerate(players):
@@ -131,7 +132,7 @@ def _validate_expected_setup(value: Any) -> dict[str, Any]:
         expected_keys = PLAYER_KEYS | (CPU_PLAYER_KEYS if player_type == 1 else set())
         _require(set(player) == expected_keys,
                  f"{context} has missing or unrecognized fields")
-        port = _integer(player["port"], f"{context}.port", 1, 2)
+        port = _integer(player["port"], f"{context}.port", 1, MAX_ACTIVE_PLAYERS)
         _require(port not in seen_ports, f"{context}.port is duplicated")
         seen_ports.add(port)
         normalized_players.append({
@@ -149,7 +150,8 @@ def _validate_expected_setup(value: Any) -> dict[str, Any]:
                 "cpu_kind": _integer(player["cpu_kind"], f"{context}.cpu_kind", 4, 4),
                 "cpu_level": _integer(player["cpu_level"], f"{context}.cpu_level", 1, 9),
             })
-    _require(seen_ports == {1, 2}, "expected_setup.players must name ports 1 and 2")
+    _require(seen_ports == set(range(1, len(players) + 1)),
+             "expected_setup.players must name contiguous ports starting at P1")
     normalized = {
         "players": normalized_players,
         "stage": _integer(value["stage"], "expected_setup.stage", 0, 0xffff),
@@ -231,7 +233,7 @@ def _decode_setup(start_melee_hex: Any) -> dict[str, Any]:
         base = 0x60 + index * 0x24
         slot = raw[base + 4]
         port = index + 1
-        if index < 2 and raw[base + 1] in (0, 1):
+        if index < MAX_ACTIVE_PLAYERS and raw[base + 1] in (0, 1):
             _require(slot in (0, port),
                      f"capture setup has an invalid slot byte at player index {index}")
             player = {
@@ -249,13 +251,15 @@ def _decode_setup(start_melee_hex: Any) -> dict[str, Any]:
                          f"capture setup has an unsupported ordinary-VS CPU at player index {index}")
                 player.update({"cpu_kind": raw[base + 14], "cpu_level": raw[base + 15]})
             actual["players"].append(player)
-        elif index >= 2:
+        elif index >= MAX_ACTIVE_PLAYERS:
             _require(raw[base + 1] == 3,
                      f"capture setup has an unsupported active player record at index {index}")
     actual["players"].sort(key=lambda player: player["port"])
-    _require(len(actual["players"]) == 2 and
-             [player["port"] for player in actual["players"]] == [1, 2],
-             "capture setup does not contain exactly supported ports 1 and 2")
+    active_count = len(actual["players"])
+    _require(2 <= active_count <= MAX_ACTIVE_PLAYERS and
+             [player["port"] for player in actual["players"]] ==
+             list(range(1, active_count + 1)),
+             "capture setup does not contain 2 to 4 contiguous active ports")
     return actual
 
 

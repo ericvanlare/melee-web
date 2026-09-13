@@ -13,6 +13,7 @@
 #include <memory>
 #include "gameplay_retail_recipe.hpp"
 #include "gameplay_fighter_assets.h"
+#include "gameplay_cpu_observation.h"
 
 
 namespace {
@@ -21,9 +22,17 @@ void check(bool value,const char* message){if(!value)throw std::runtime_error(me
 }
 
 int main(int argc,char** argv){try{
-    check(argc==4||(argc==5&&std::string(argv[4])=="--require-match-complete"),
-          "Expected owned menu/game directories, MWRC reference input, and optional --require-match-complete");
-    const bool require_match_complete=argc==5;
+    check(argc>=4&&argc<=6,
+          "Expected owned menu/game directories, MWRC reference input, and optional diagnostic flags");
+    bool require_match_complete=false;
+    bool cpu_hitlag_diagnostic=false;
+    for(int i=4;i<argc;i++){
+        const std::string option=argv[i];
+        if(option=="--require-match-complete") require_match_complete=true;
+        else if(option=="--cpu-hitlag-diagnostic") cpu_hitlag_diagnostic=true;
+        else throw std::runtime_error("Unknown gameplay_retail_trace option: "+option);
+    }
+    if(cpu_hitlag_diagnostic) melee_web_cpu_observation_enable_hitlag_audit();
     const auto size=std::filesystem::file_size(argv[3]);
     check(size<=melee_web::kRetailReplayMaxBytes,"Reference input exceeds size limit");
     std::ifstream stream(argv[3],std::ios::binary);
@@ -61,8 +70,11 @@ int main(int argc,char** argv){try{
     }
     if(require_match_complete){
         check(match.complete(),"Reference workload did not reach match completion");
-        check(outcome==2&&winner>=0&&winner<2,
-              "Reference workload did not reach a valid elimination outcome");
+        check(outcome==OUTCOME_ELIMINATION||outcome==OUTCOME_TIMEOUT,
+              "Reference workload did not reach a source stock or timeout outcome");
+        check(winner==-1||(winner>=0&&
+              winner<static_cast<int>(recipe.selection.player_count)),
+              "Reference workload exposed an invalid source winner slot");
     }
     check_ownership("before-match-close",recipe.frames.size());
     match.close();

@@ -25,6 +25,7 @@
 #include "gameplay_rumble.h"
 #include "gameplay_match_context.h"
 #include "gameplay_match_rules.h"
+#include "gameplay_menu.h"
 #include "gameplay_item_runtime.h"
 #include "gameplay_stage_items.h"
 #include "gameplay_font_atlas.h"
@@ -138,6 +139,9 @@ struct GameplayWorld::Storage {
     std::shared_ptr<const DatArchive> archive(std::string_view name)const{return archives.at(std::string(name));}
     void start(const RuntimeFiles& files,const GameplayWorldSelection& selection,
                RuntimeArchiveCache* cache,bool defer=false){
+        if(selection.player_count < MELEE_WEB_MENU_MIN_PLAYERS ||
+           selection.player_count > MELEE_WEB_MENU_MAX_PLAYERS)
+            throw DatError("Gameplay world requires two through four active fighters");
         runtime_files=&files;
         archive_cache=cache;
         stage=melee_web_stage_content_by_ground(selection.ground_kind);
@@ -154,9 +158,10 @@ struct GameplayWorld::Storage {
         };
         for(const char* name:{"PlCo.dat","ItCo.usd","EfCoData.dat","PdPm.dat","LbRb.dat"})load(name);
         load(stage->archive);
-        for(unsigned slot=0;slot<selection.fighter_kinds.size();++slot)
+        for(unsigned slot=0;slot<selection.player_count;++slot)
             selected_costumes[selection.fighter_kinds[slot]].insert(selection.costume_indices[slot]);
-        for(const auto kind:selection.fighter_kinds){
+        for(unsigned slot=0;slot<selection.player_count;++slot){
+            const auto kind=selection.fighter_kinds[slot];
             if(!melee_web_fighter_content_by_kind(kind))throw DatError("No runtime owner for selected source fighter kind");
             for(const auto& costume:fighter_costumes())if(costume.fighter_kind==kind){
                 if(costume.costume_index==0){identities[kind]=&costume;load(costume.fighter_filename);load(costume.model_filename);}

@@ -1,5 +1,15 @@
 # Current status
 
+Ordinary VS CPU levels 1–9 now run in the shared compiled runtime used by both
+entry pages. The [CPU match development corpus](docs/CPU_MATCH_CORPUS.md)
+extends the existing checkpoint evidence: two independent retail captures,
+the native trace and visible browser agree through all 1,199 ticks of one
+complete Mario/Fox match for gameplay, CPU decisions, RNG, PAD history, HUD
+and result state. This fixed the source CPU hitlag caller carry. Expanded
+camera and source-draw-phase comparisons remain red; three- and four-player
+reference work is still in progress. These results do not admit CPU holdouts,
+multiplayer, pixels, audio, physical input or performance.
+
 The browser runs original fighters and stages through compiled WebAssembly. The
 accepted first slice is two Marios on Final Destination; narrower raw-PAD runs
 also selected and rendered Falco versus Mario on Battlefield, Fox versus Mario

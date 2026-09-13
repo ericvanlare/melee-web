@@ -113,6 +113,28 @@ void validate_timer_shape()
     check(!melee_web_match_timer_supported(&rules), "custom initial subframe admitted");
 }
 
+void validate_selection_consistency()
+{
+    for (unsigned field = 0; field < 5; ++field) {
+        auto selection = timed_selection();
+        switch (field) {
+        case 0: selection.players[0].controller = 1; break;
+        case 1: selection.players[0].stocks = 3; break;
+        case 2: selection.players[0].costume = 1; break;
+        case 3: selection.players[0].sub_color = 1; break;
+        case 4: selection.hud_layout = 2; break;
+        }
+        bool rejected = false;
+        try {
+            GameplayMatchSession match(RuntimeFiles{}, selection);
+        } catch (const std::exception& error) {
+            rejected = std::string(error.what()) ==
+                       "Match compatibility settings differ from source payload";
+        }
+        check(rejected, "Inconsistent settings were not rejected before asset preparation");
+    }
+}
+
 void run_timer_lifecycle(const RuntimeFiles& files)
 {
     auto selection = timed_selection();
@@ -187,6 +209,19 @@ void run_timer_lifecycle(const RuntimeFiles& files)
         check(match->outcome(final_winner) == OUTCOME_TIMEOUT && final_winner == -1,
               "completed source match lost its timeout result");
         match->close();
+        int terminal_outcome = OUTCOME_NONE;
+        int terminal_count = 0;
+        int terminal_winners[6]{};
+        check(melee_web_match_rules_terminal_result(&terminal_outcome,
+                                                     &terminal_count,
+                                                     terminal_winners),
+              "completed source match did not retain its terminal MatchEnd");
+        check(terminal_outcome == OUTCOME_TIMEOUT && terminal_count >= 1 &&
+                  terminal_count <= 2,
+              "terminal source timeout ranking has an invalid winner count");
+        for (int i = 0; i < terminal_count; ++i)
+            check(terminal_winners[i] >= 0 && terminal_winners[i] < 2,
+                  "terminal source timeout ranking has an invalid slot");
     } catch (...) {
         try { match->close(); } catch (...) {}
         throw;
@@ -200,6 +235,7 @@ int main(int argc, char** argv)
     try {
         check(argc == 3, "Expected owned menu and game asset directories");
         validate_timer_shape();
+        validate_selection_consistency();
         RuntimeFiles files = load_files(argv[1], argv[2]);
         run_timer_lifecycle(files);
         run_timer_lifecycle(files); /* repeat ownership/lifetime teardown */
