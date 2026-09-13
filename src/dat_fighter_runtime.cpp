@@ -277,16 +277,28 @@ DatFighterAnimationStore::DatFighterAnimationStore(std::shared_ptr<const DatFigh
 }
 DatSelectedAction DatFighterAnimationStore::select(std::uint32_t id)
 {
+    return select_impl(id, DatAnimationPolicy::Inspection);
+}
+DatSelectedAction DatFighterAnimationStore::select_native_action(std::uint32_t id)
+{
+    return select_impl(id, DatAnimationPolicy::NativeFighterAction);
+}
+DatSelectedAction DatFighterAnimationStore::select_impl(std::uint32_t id, DatAnimationPolicy policy)
+{
     DatSelectedAction result{fighter_->action(id), {}, fighter_->commands(id)};
     if (!result.action.archive_bytes) return result;
+    const bool native_action = policy == DatAnimationPolicy::NativeFighterAction;
     for (const auto& entry : cache_) {
         if (entry.animation && entry.offset == result.action.container_offset && entry.size == result.action.archive_bytes &&
-            entry.symbol == result.action.symbol) { result.animation = entry.animation; return result; }
+            entry.symbol == result.action.symbol && entry.native_action == native_action) {
+            result.animation = entry.animation; return result;
+        }
     }
     const DatArchive archive(fighter_->archive_actions().slice(container_, id));
     const auto offset = root(archive, result.action.symbol);
-    result.animation = std::make_shared<const DatAnimation>(archive, offset);
-    cache_[next_] = {result.action.container_offset, result.action.archive_bytes, result.action.symbol, result.animation};
+    result.animation = std::make_shared<const DatAnimation>(archive, offset, policy);
+    cache_[next_] = {result.action.container_offset, result.action.archive_bytes, result.action.symbol,
+                     native_action, result.animation};
     next_ = (next_ + 1) % cache_.size();
     return result;
 }

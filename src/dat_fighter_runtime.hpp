@@ -115,12 +115,17 @@ class DatFighterAnimationStore {
 public:
     DatFighterAnimationStore(std::shared_ptr<const DatFighterRuntime>, std::span<const std::uint8_t> container);
     [[nodiscard]] DatSelectedAction select(std::uint32_t motion_id);
+    // Source fighter action hydration admits HSD_A_J_NODE visibility tracks;
+    // generic inspection selection remains ordinary-SRT-only.
+    [[nodiscard]] DatSelectedAction select_native_action(std::uint32_t motion_id);
 private:
     struct Entry {
         std::uint32_t offset = 0, size = 0;
         std::string symbol;
+        bool native_action = false;
         std::shared_ptr<const DatAnimation> animation;
     };
+    [[nodiscard]] DatSelectedAction select_impl(std::uint32_t motion_id, DatAnimationPolicy policy);
     std::shared_ptr<const DatFighterRuntime> fighter_;
     std::vector<std::uint8_t> container_;
     std::array<Entry, 2> cache_;

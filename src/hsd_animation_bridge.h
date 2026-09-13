@@ -32,6 +32,12 @@ int melee_web_animation_validate_track(const MeleeWebAnimationTrack* track,
  * packet bounds; must only feed that guarded original evaluator. */
 int melee_web_animation_validate_native_track(const MeleeWebAnimationTrack*,char*,size_t);
 
+/* Native fighter FigaTree hydration also retains HSD_A_J_NODE (type 11),
+ * which the original JObj callback consumes as a visibility flag.  This
+ * validator is for that source path only; melee_web_animation_create remains
+ * ordinary-SRT pose evaluation and rejects node channels. */
+int melee_web_animation_validate_native_action_track(const MeleeWebAnimationTrack*,char*,size_t);
+
 /* Each node count is its consecutive track count. The caller must establish
  * the animation-node to skeleton mapping; this seam uses matching preorder.
  * Copies all input data. Untracked SRT/flags retain bind values. Animated nodes

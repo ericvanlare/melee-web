@@ -38,6 +38,9 @@ class DatAnimationTests(unittest.TestCase):
     def test_unsupported_channels_and_scalar_encodings(self):
         self.run_case("unsupported_channels_and_formats")
 
+    def test_native_action_node_channel_policy_and_bounds(self):
+        self.run_case("native_action_channel_policy")
+
     def test_truncated_nonfinite_and_overflowing_packed_operands(self):
         self.run_case("malformed_operands")
 

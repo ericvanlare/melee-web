@@ -69,6 +69,13 @@ _Static_assert(offsetof(struct IfDamageState, frames_of_shake_remaining) == 0x0F
 _Static_assert(offsetof(struct IfDamageState, flags) == 0x10, "HUD flags drift");
 _Static_assert(offsetof(ifMagnifyPlayer, state) == 0x0C, "magnifier flags drift");
 _Static_assert(offsetof(struct HSD_GObj, hsd_obj) == 0x28, "camera gobj drift");
+_Static_assert(sizeof(struct HSD_JObj) == 0x88, "JObj size drift");
+_Static_assert(offsetof(struct HSD_JObj, parent) == 0x0C, "JObj parent drift");
+_Static_assert(offsetof(struct HSD_JObj, flags) == 0x14, "JObj flags drift");
+_Static_assert(offsetof(struct HSD_JObj, rotate) == 0x1C, "JObj rotation drift");
+_Static_assert(offsetof(struct HSD_JObj, scale) == 0x2C, "JObj scale drift");
+_Static_assert(offsetof(struct HSD_JObj, translate) == 0x38, "JObj translation drift");
+_Static_assert(offsetof(struct HSD_JObj, mtx) == 0x44, "JObj matrix drift");
 _Static_assert(offsetof(struct HSD_CObj, near) == 0x38, "camera near drift");
 _Static_assert(offsetof(struct HSD_CObj, far) == 0x3C, "camera far drift");
 _Static_assert(offsetof(struct HSD_CObj, projection_param.perspective.fov) == 0x40,
@@ -80,7 +87,10 @@ static int enabled, drawing;
 static int hitlag_audit_requested, hitlag_audit;
 static unsigned count, types[6];
 static size_t draws, preparation_draws, used;
-static char line[32768];
+/* One matrix record contains the normalized chain twice (bone->root and
+ * root->bone), including local SRT and 3x4 matrix values for every node. */
+static char line[65536];
+#define MELEE_WEB_MATRIX_AUDIT_MAX_ANCESTORS 64
 static void put(const char* format, ...)
 {
     va_list args; va_start(args, format);
@@ -92,6 +102,40 @@ static void put(const char* format, ...)
 static uint32_t bits(float f) { uint32_t u; memcpy(&u, &f, 4); return u; }
 static void vec(const Vec3* v)
 { put("[\"%08x\",\"%08x\",\"%08x\"]", bits(v->x), bits(v->y), bits(v->z)); }
+static void quat(const Quaternion* q)
+{ put("[\"%08x\",\"%08x\",\"%08x\",\"%08x\"]", bits(q->x), bits(q->y), bits(q->z), bits(q->w)); }
+static void matrix(const Mtx m)
+{
+    put("[");
+    for (unsigned row = 0; row < 3; ++row)
+        for (unsigned col = 0; col < 4; ++col)
+            put("%s\"%08x\"", row || col ? "," : "", bits(m[row][col]));
+    put("]");
+}
+static size_t matrix_chain(const HSD_JObj* target,
+                           const HSD_JObj* nodes[MELEE_WEB_MATRIX_AUDIT_MAX_ANCESTORS])
+{
+    size_t count = 0;
+    for (const HSD_JObj* node = target; node; node = node->parent) {
+        if (count >= MELEE_WEB_MATRIX_AUDIT_MAX_ANCESTORS) abort();
+        /* A malformed parent cycle would otherwise make the observer's
+         * bounded walk look like a valid, longer skeleton. */
+        for (size_t i = 0; i < count; ++i) if (nodes[i] == node) abort();
+        nodes[count++] = node;
+    }
+    return count;
+}
+static void matrix_node(const HSD_JObj* node, size_t index, size_t count, int first)
+{
+    const int parent_index = index + 1 < count ? (int)(index + 1) : -1;
+    put("%s{\"index\":%zu,\"parent_index\":%d,\"flags\":%u,\"rotate_bits\":",
+        first ? "" : ",", index, parent_index, node->flags);
+    quat(&node->rotate);
+    put(",\"scale_bits\":"); vec(&node->scale);
+    put(",\"translate_bits\":"); vec(&node->translate);
+    put(",\"matrix_bits\":"); matrix(node->mtx);
+    put("}");
+}
 static Fighter* fighter(unsigned slot)
 {
     StaticPlayer* player = Player_GetPtrForSlot(slot);
@@ -182,16 +226,28 @@ static void hitlag_audit_tick(size_t index)
         if (bone < 0 || bone >= MAX_FT_PARTS || !fp->parts) abort();
         const HSD_JObj* joint = fp->parts[bone].joint;
         if (!joint) abort();
+        const HSD_JObj* nodes[MELEE_WEB_MATRIX_AUDIT_MAX_ANCESTORS];
+        const size_t node_count = matrix_chain(joint, nodes);
         put("{\"tick\":%zu,\"slot\":%u,\"phase\":\"after_source_tick\","
-            "\"bone\":%d,\"joint_flags\":%u,\"parent_present\":%s,\"matrix_bits\":[",
-            index, slot, bone, joint->flags, joint->parent ? "true" : "false");
-        for (unsigned row = 0; row < 3; ++row)
-            for (unsigned col = 0; col < 4; ++col)
-                put("%s\"%08x\"", row || col ? "," : "", bits(joint->mtx[row][col]));
-        put("],\"offset_bits\":"); vec(&fp->co_attrs.x170);
+            "\"bone\":%d,\"fighter_bone_flags8\":%u,\"fighter_bone_flagsC\":%u,"
+            "\"joint_flags\":%u,\"parent_present\":%s,\"matrix_bits\":",
+            index, slot, bone, fp->parts[bone].flags8, fp->parts[bone].flagsC,
+            joint->flags, joint->parent ? "true" : "false");
+        matrix(joint->mtx);
+        put(",\"offset_bits\":"); vec(&fp->co_attrs.x170);
+        put(",\"camera_offset_bits\":"); vec(&fp->co_attrs.x170);
         put(",\"subject_bone_bits\":");
         if (fp->x890_cameraBox) vec(&fp->x890_cameraBox->bone_pos);
         else put("null");
+        put(",\"ancestor_count_including_bone\":%zu,\"nodes_bone_to_root_order\":[",
+            node_count);
+        for (size_t i = 0; i < node_count; ++i)
+            matrix_node(nodes[i], i, node_count, i == 0);
+        put("],\"nodes_root_to_bone_parent_order\":[");
+        for (size_t reverse = 0; reverse < node_count; ++reverse)
+            matrix_node(nodes[node_count - reverse - 1], node_count - reverse - 1,
+                        node_count, reverse == 0);
+        put("]");
         put("}"); fprintf(stderr, "MATRIX_AUDIT %s\n", line); used = 0;
     }
 }

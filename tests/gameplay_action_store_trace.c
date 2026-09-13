@@ -90,6 +90,27 @@ int action_test_rows(void* rows, void* blends, void* waits)
         w[0].motion == 2 && w[2].motion == UINT32_MAX;
 }
 
+/* Common appeal uses action-table rows 239/240 (ftCo_SM_AppealSR/SL).  The
+ * motion-state IDs 264/265 select those rows later; they are not action-row
+ * IDs.  Check the published native rows without executing a command graph:
+ * DatCommands has already admitted every word, and the checked lookup proves
+ * the pointer is owned decoder storage rather than the opcode-63 sentinel. */
+int action_test_common_appeals(void* rows, unsigned expected_command_mask)
+{
+    struct Fighter_WaitAnimData* table = rows;
+    for (unsigned index = 0; index < 2; ++index) {
+        const unsigned motion = 239 + index;
+        void* command = table[motion].xC;
+        if (!!command != !!(expected_command_mask & (1U << index))) return 0;
+        if (!command) continue;
+        if (command == melee_web_commands_unsupported()) return 0;
+        uint32_t word = 0;
+        if (!melee_web_command_original_word_checked(command, &word)) return 0;
+        melee_web_command_require_supported(word >> 26);
+    }
+    return 1;
+}
+
 /* These reads use the actual source operand types, including fields whose
  * native bit positions differ from the archive representation. */
 void ftAction_80071820(HSD_GObj*,CommandInfo*);
