@@ -157,23 +157,47 @@ The paired boots exercise 34 of the 45 configured functions. The receipt lists
 the count for each function; unhit boundaries, including fighter construction,
 are instrumentation coverage rather than observed original behavior.
 
-Both histories replay identically through 33 model operations and validate 13
-pointer aliases with the independently derived boot context. Native and checked
-Wasm outputs agree. The first unsupported event is call 55, sequence 111,
-`lbHeap_80015900`: the source game-heap planner applies transient/persistent
-partitions and replacement lifetimes. Its static descriptor table is already
-derived from the DOL; replay still needs the source-owned orchestration that
-destroys/recreates OS and handle heaps and updates HSD pool lifetimes. No earlier
-allocation mismatch is observed. The identical captures therefore identify a
-missing replay dependency, not an independent-run divergence.
+Both histories now replay all 276 captured calls through 211 model operations
+and validate 94 allocation identities each. Native and checked Wasm outputs
+agree, including the SDK heap descriptor heads, ordinary HSD pool descriptors,
+ARAM stack metadata and game-heap/handle words. The earlier call-55
+`lbHeap_80015900` boundary is covered by the new source game-heap planner.
 
-No fighter construction is reached in these boot captures. Zero requested full
-scenario captures are complete, and no fighter address has been derived. The
-first acceptance gate remains open. After supplying the unlocked persistent save,
-record two fresh controller-driven captures for each development scenario, then
-extend the planner against untouched source and validate every observed fighter
-and relevant global identity. Do not integrate CPU register carry before those
-requirements and the caller/global provenance requirements above are satisfied.
+The continuation also captured a fresh original menu prefix through Mario/Fox
+CSS and original SSS. Its first retained attempt contains 25,168 completed calls;
+all replay through 20,070 model operations and 12,189 allocation identities in
+native and checked Wasm. The capture itself failed at the SSS readiness check,
+so it has no complete scenario receipt. Its raw stream and the failed replay
+attempts are preserved. The observed pool reset/replacement/refill sequence at
+call 1,878 exposed a stale ownership check: after a descriptor reset the OS heap
+still owns orphaned backing cells, but the descriptor no longer references them.
+That distinction is now modeled and checked against the untouched HSD code.
+The SSS readiness failure was a separate controller-driver bug: the prior gate
+read the unrelated main-menu cooldown. The driver now checks the original SSS
+cursor process and its own cooldown; a fresh run has returned through original
+SSS to CSS and reached the original rules menu without a state write.
+That second attempt reached its declared 600-second wall limit in rules setup;
+all 47,974 captured calls replay through 39,489 model operations and 22,867
+allocation identities in native and checked Wasm. It includes 14 observed
+`lbMemFreeToHeap` releases, bound to model-derived owners and payload labels.
+Neither partial menu attempt has a complete scenario receipt.
+
+The two menu histories agree on the first 23,397 completed allocation calls,
+including arguments, results and allocator metadata. Their first differing
+allocation is call 23,397, after the corrected driver presses B at SSS frame 31;
+the older driver instead remains neutral in its failing readiness wait. This
+is an explained controller-context difference, not an unexplained allocator
+mismatch or a complete same-input scenario pair. No allocation mismatch remains
+inside either captured prefix.
+
+No fighter construction is reached in these boot/menu captures. Zero of six
+requested full scenario captures are complete, and no fighter address has been
+derived. The [bounded save search](OWNED_SAVE_PREREQUISITE.md) found no eligible
+owned unlocked persistent card. The first acceptance gate remains open: supply
+that ordinary save, record two fresh controller-driven captures for each
+workload, and validate every observed fighter and relevant global identity.
+CPU integration also requires source-to-host ownership and caller/global/stack
+provenance. The diagnostic prefix does not supply those bindings.
 
 Replay a retained raw stream with the owned inputs and pinned symbols:
 
@@ -192,8 +216,27 @@ always has `complete: false`; `--require-complete` fails for this bounded model.
 
 ## Model and test boundaries
 
-The merged OS heap/HSD pool implementation is unchanged. The separate address-only
-`source_aram` component models the observed aligned ARAM allocation stack and
+The OS heap/HSD pool component now supports explicit descriptor resets, registry
+forgetting, and separate backing-cell adoption and object pops. A reset clears
+the descriptor's chains while the OS heap retains orphaned backing cells. The
+replay adapter executes the raw child allocation before linking the pool refill;
+it never allocates the same request twice or passes an observed pointer to the
+model. All observed retail HSD refills select heap 1; selected-heap variants in
+tests are synthetic coverage, not a new observed retail mode. Dedicated heaps
+and number/heap limit modes remain explicitly unsupported.
+
+The separate `source_game_heap` component reproduces the source descriptor
+partitioning, ordered transient destruction, HSD main-heap replacement, current
+ARAM handle replacement, and persistent child recreation. Its step interface
+allows original HSD pool resets and registry forgetting to occur inside the
+main-heap replacement at their original boundaries. Invalid layout requests
+remain retryable. The native and checked Wasm models are compared with unchanged
+`lbheap.c` under a 32-bit oracle whose nested allocator services are explicit
+synthetic boundaries; original capture replay separately validates those nested
+services. Type-0 table descriptors are not admitted; the original sentinel is
+removed by the independent context adapter.
+
+The separate address-only `source_aram` component models the observed aligned ARAM allocation stack and
 LIFO release. The `source_handle` component models original `lbMemory` descriptor
 free lists, best-fit placement, the last-equal-gap rule, and descriptor recycling.
 Both receive explicit source context and reject missing or unsupported behavior.
@@ -210,18 +253,28 @@ Synthetic descriptor, heap and ARAM bases are relocated, with corresponding
 normalized outputs required to agree. No original assets or executable bodies
 are embedded in tests.
 
-Use `MELEE_SOURCE_ADDRESS_EVIDENCE_DIR`, `MELEE_SOURCE_HANDLE_EVIDENCE_DIR` and
-`MELEE_SOURCE_ARAM_EVIDENCE_DIR` to retain component operation streams, outputs
+Use `MELEE_SOURCE_ADDRESS_EVIDENCE_DIR`, `MELEE_SOURCE_HANDLE_EVIDENCE_DIR`,
+`MELEE_SOURCE_ARAM_EVIDENCE_DIR`, `MELEE_SOURCE_GAME_HEAP_EVIDENCE_DIR` and
+`MELEE_SOURCE_POOL_LIFETIME_EVIDENCE_DIR` to retain component operation streams, outputs
 and hash receipts in fresh ignored directories. The allocation runner likewise
 preserves every attempt, checks the owned plan copy, freezes generated execution
 inputs, and verifies that original inputs and owned collector files stay unchanged.
 
-The [portable evidence receipt](evidence/original-allocation-history-v1.json)
+The [version-1 evidence receipt](evidence/original-allocation-history-v1.json)
 records both final runs, all retained attempts, precise configured and observed
 function counts, input/output hashes, source identities, replay boundaries,
 component comparisons and validation totals. The receipt contains no raw streams
 or game payloads. Runtime, graphics and fighter Release builds pass. These are
 compile and bounded allocator results, without gameplay or performance admission.
-The final repository suite passes 709 tests with 44 optional fixture/target skips;
-the final focused collector, menu, boot and replay run passes 29 tests. All 2,651
+The version-1 repository suite passed 709 tests with 44 optional fixture/target
+skips; its focused collector, menu, boot and replay run passed 29 tests. All 2,651
 original source files and 15 frozen gold-corpus files match their reserved hashes.
+
+The continuation's [version-2 receipt](evidence/original-allocation-history-v2.json)
+records the heap and pool lifetime extensions, retained failures, fresh menu
+prefixes, relocated component comparisons, and the bounded save search. Its
+complete local suite passes 723 tests with 44 documented optional skips; all 54
+affected collector/context/native/Wasm/replay checks pass within that suite.
+Runtime, graphics, and fighter Release builds pass. Exact-head CI results are
+recorded on the draft PR after publication. No public deployment files or CPU
+integration path changed.

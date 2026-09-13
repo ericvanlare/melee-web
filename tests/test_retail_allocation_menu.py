@@ -65,9 +65,43 @@ class RetailAllocationMenuTests(unittest.TestCase):
         self.assertIn("SSS_CURSOR_PROC=0x8025A310", source)
         self.assertIn("_cold_boot_sss_cursor()", readiness)
         self.assertIn("u32(0x804D6CA4)", readiness)
-        self.assertIn("mem(0x804D6BC8,2)", readiness)
+        self.assertIn("cursor is not None and cooldown==0", readiness)
+        self.assertNotIn("mem(0x804D6BC8,2)", readiness)
         self.assertIn("SSS_ENTRY_TICK_LIMIT", readiness)
         self.assertIn("step(1)", readiness)
+
+    def test_sss_readiness_accepts_stale_main_menu_cooldown(self):
+        source = driver.render_cold_boot_driver()
+        readiness = source.split("def _cold_boot_wait_sss_ready():", 1)[1].split(
+            "def _cold_boot_check_character_availability():", 1)[0]
+        ticks = []
+        menu_reads = []
+        observed = {"cursor": 0x804D1234, "sss_cooldown": 0,
+                    "menu_cooldown": 5}
+
+        def fake_u32(address):
+            self.assertEqual(address, 0x804D6CA4)
+            return observed["sss_cooldown"]
+
+        def fake_mem(address, size):
+            menu_reads.append((address, size))
+            return observed["menu_cooldown"].to_bytes(size, "big")
+
+        namespace = {
+            "SCENE_SSS": driver.SCENE_SSS,
+            "SSS_ENTRY_TICK_LIMIT": 1,
+            "scene_kind": lambda: driver.SCENE_SSS,
+            "_cold_boot_scene_name": lambda kind: "GS_SSS",
+            "_cold_boot_sss_cursor": lambda: observed["cursor"],
+            "u32": fake_u32,
+            "mem": fake_mem,
+            "step": lambda count: ticks.append(count),
+        }
+        exec(compile("def _cold_boot_wait_sss_ready():" + readiness,
+                      "cold_boot_menu.py", "exec"), namespace)
+        namespace["_cold_boot_wait_sss_ready"]()
+        self.assertEqual(ticks, [])
+        self.assertEqual(menu_reads, [])
 
     def test_missing_character_is_bounded_source_availability_failure(self):
         source = driver.render_cold_boot_driver()

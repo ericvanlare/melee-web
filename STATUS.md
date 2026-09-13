@@ -1,19 +1,21 @@
 # Current status
 
 The [original allocation-history experiment](docs/ORIGINAL_ALLOCATION_HISTORY.md)
-collects read-only boot, allocator and heap-lifetime events. Two independent
-boots agree on all 276 recorded calls, and boot roots derive from the owned
-disc/apploader and original DOL without captured address inputs. Native and
-checked Wasm replay agree through 33 operations and 13 pointer aliases, then stop
-at call 55 (`lbHeap_80015900`), whose partition/replacement lifetime orchestration
-is not implemented. The frozen
-external save lacks the requested unlocks, so the six full cold-boot CPU
-captures require an owned unlocked persistent save. Fighter-address derivation
-and CPU register-carry integration remain open; no gameplay or public deployment
-change is included.
-The final local suite passes 709 tests (44 optional target/fixture skips), with
-29 focused collector/menu/boot/replay checks and runtime, graphics and fighter
-Release builds passing. Original source and frozen gold inputs remain unchanged.
+now replays the observed original heap and pool lifetimes. Two independent cold
+boots agree on all 276 calls, with 211 model operations and 94 derived allocation
+identities each. Two fresh partial menu runs replay 25,168 and 47,974 calls in
+native and checked Wasm; their first 23,397 calls agree before an explained
+controller-program difference. No allocator mismatch remains within those
+prefixes. The SSS readiness fix is verified through original SSS → CSS → rules.
+
+The bounded save search found no eligible owned unlocked persistent card.
+Zero of six requested full scenario captures are complete; no fighter address
+has been derived, and CPU register-carry integration remains blocked on that
+context and caller/global/stack provenance. The local suite passes 723 tests
+(44 documented optional skips), including all 54 affected checks; runtime,
+graphics and fighter Release builds pass. Original source, frozen gold inputs,
+CPU integration and public deployment files remain unchanged. See the
+[continuation receipt](docs/evidence/original-allocation-history-v2.json).
 
 The [source-address prerequisite](docs/SOURCE_ADDRESS_CONTEXT.md) models ordinary
 original SDK/HSD allocation identity and defined register-byte consumption,

@@ -91,12 +91,14 @@ static void pool_lifetime()
     check(pool.release(b.address) == Status::ok && pool.allocate().address == b.address,
           "rejected backing-cell free leaves pool reuse intact");
     check(pool.initialize(21, 4) == Status::invalid_context,
-          "unmodeled in-place HSD reset is rejected");
+          "ordinary pool initialize keeps the generation guard");
+    check(pool.reset(21, 4) == Status::ok && pool.state().used == 0 &&
+          pool.state().free.empty() && pool.state().live.empty(),
+          "in-place HSD reset discards descriptor chains but retains OS backing");
     const auto snapshot = heap.state();
     check(heap.restore(snapshot) == Status::ok, "explicit context replacement");
-    check(pool.allocate().status == Status::missing_context &&
-          pool.release(b.address) == Status::missing_context,
-          "old pool cannot borrow a replacement heap with reused numeric addresses");
+    check(pool.allocate().status == Status::ok,
+          "reset drops orphaned descriptor ownership before heap replacement");
     check(pool.initialize(16, 4) == Status::ok && pool.state().used == 0 &&
           pool.state().peak == 0 && pool.state().free.empty() && pool.state().live.empty(),
           "explicit initialization in a new heap generation discards stale pool state");

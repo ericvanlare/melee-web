@@ -130,12 +130,15 @@ def _cold_boot_wait_sss_ready():
     for _ in range(SSS_ENTRY_TICK_LIMIT):
         cursor=_cold_boot_sss_cursor()
         cooldown=u32(0x804D6CA4)
-        if cursor is not None and cooldown==0 and struct.unpack('>H',mem(0x804D6BC8,2))[0]==0:
+        # 0x804D6CA4 is mnStageSel's source-owned entry/input cooldown.  The
+        # 0x804D6BC8 word is mnmain's unrelated MenuInputState cooldown; it
+        # can retain the CSS/main-menu value (for example 5) after SSS entry.
+        if cursor is not None and cooldown==0:
             return
         step(1)
         if scene_kind()!=SCENE_SSS:
             raise RuntimeError(f'SSS construction left source scene: {{_cold_boot_scene_name(scene_kind())}}')
-    raise RuntimeError(f'original SSS did not expose cursor/cooldown readiness: cursor={{_cold_boot_sss_cursor()}} cooldown={{u32(0x804D6CA4)}} menu={{mem(0x804D6BC8,2).hex()}}')
+    raise RuntimeError(f'original SSS did not expose cursor/cooldown readiness: cursor={{_cold_boot_sss_cursor()}} cooldown={{u32(0x804D6CA4)}}')
 
 def _cold_boot_check_character_availability():
     # CSS itself is the source-owned availability oracle.  Check every

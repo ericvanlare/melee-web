@@ -1,0 +1,6 @@
+#ifndef MELEE_WEB_SOURCE_GAME_HEAP_ORACLE_MEMORY_H
+#define MELEE_WEB_SOURCE_GAME_HEAP_ORACLE_MEMORY_H
+
+#include <Runtime/platform.h>
+
+#endif

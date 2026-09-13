@@ -342,7 +342,8 @@ def parse_result(line: str) -> dict[str, Any]:
 
 class ModelDriver:
     def __init__(self, *, compiler: str | None = None, wasm: bool = False,
-                 node: str | None = None, emxx: str | None = None):
+                 node: str | None = None, emxx: str | None = None,
+                 source: Path = MODEL_SOURCE, extra_impls: Iterable[Path] = ()):
         self.temp = tempfile.TemporaryDirectory(prefix="allocation-history-model-")
         self.path = Path(self.temp.name) / ("model.js" if wasm else "model")
         self.wasm = wasm
@@ -359,7 +360,8 @@ class ModelDriver:
             command = [compiler]
             node_path = None
         command += ["-std=c++17", "-O1", "-Wall", "-Wextra", "-Werror", "-Isrc",
-                    str(MODEL_IMPL), str(HANDLE_IMPL), str(ARAM_IMPL), str(MODEL_SOURCE)]
+                    str(MODEL_IMPL), str(HANDLE_IMPL), str(ARAM_IMPL),
+                    *(str(path) for path in extra_impls), str(source)]
         if wasm:
             command += ["-sENVIRONMENT=node", "-sEXIT_RUNTIME=1", "-sASSERTIONS=2",
                         "-sSAFE_HEAP=1", "-o", str(self.path)]
@@ -497,6 +499,12 @@ def replay(trace: Path, profile_path: Path, context_path: Path | None,
                              ("audio_heap_size", "iparam_audio_heap_size")):
         if profile_key in profile_params and parse_u32(profile_params[profile_key], profile_key) != context[key]:
             raise ReplayProblem("provenance", f"context {key} differs from DOL-initial {profile_key}")
+
+    if retail:
+        from .allocation_lifetime_replay import replay_lifetimes
+        return replay_lifetimes(trace, profile_path, profile, header, rows, enters, returns,
+                                context, verified_context, checked_wasm=checked_wasm,
+                                require_complete=require_complete)
 
     expected_names = {item.get("name") for item in profile.get("functions", []) if isinstance(item, dict)}
     supported_names = expected_names | CONTEXT_ONLY | set(UNSUPPORTED_AT_ENTRY)
