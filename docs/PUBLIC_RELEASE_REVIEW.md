@@ -48,8 +48,10 @@ resolve the rights in the executable.
 
 The legal templates retain build placeholders. Production packaging substitutes
 NaiadAI, LLC and legal@webmelee.gg, as expressly supplied by the operator. The
-mail route passed an actual receipt test before the nameserver change; receipt
-must be rechecked after DNS migration.
+mail route passed actual receipt tests before the nameserver change and after
+DNS migration, before domain activation. The exact alpha is now live at
+[webmelee.gg](https://webmelee.gg/); its scoped artifact, browser, DNS, HTTPS and
+redirect evidence is recorded in [PUBLIC_ALPHA_VALIDATION.md](PUBLIC_ALPHA_VALIDATION.md).
 
 ## Artifact and seed facts
 
@@ -224,19 +226,19 @@ different account/network service, operator, rights reporting and data
 processing model. They were structural references only and are not evidence of
 WebMelee clearance or completeness.
 
-## Unclosed release issues
+## Release evidence and remaining legal questions
 
-1. Operator identity and contact spelling are supplied. Incoming delivery was
-   tested before cutover; recheck after DNS migration and
-   retain its private delivery receipt; address, consumer, privacy or jurisdiction
+1. Operator identity and contact spelling are supplied. Incoming delivery passed
+   before cutover and after DNS migration; retain the private receipts.
+   Address, consumer, privacy or jurisdiction
    questions remain review topics, not invented operator facts.
-2. Generate and independently review the exact public artifact manifest and
-   runtime identity after the Release build. Confirm that development runtime,
-   evidence and diagnostic paths are excluded.
+2. The exact public manifest, native identity and compile/link exclusions passed
+   audit. Final apex resources match the manifest; development runtime,
+   evidence and diagnostic paths return 404. Future candidates need new audits.
 3. The operator accepts unresolved recovered Melee/HSD and original SDK
    distribution risk for the alpha. No permission is inferred from a DOL hash,
    local disc processing or an open repository.
-4. Verify GPL audio implementation exclusion in the exact silent alpha. Before
+4. GPL audio implementation exclusion is verified in the exact silent alpha. Before
    restoring those implementations, fulfill their source obligations or replace
    them with independently authored permissive implementations and validate them.
 5. Retain required notices and check the actual native input inventory against
@@ -251,11 +253,14 @@ WebMelee clearance or completeness.
    Section 1201/local-law questions.
 8. Complete trademark/domain searches for WebMelee, webmelee.gg, Melee and
    related references before treating the name as cleared.
-9. Verify the deployed privacy behavior, provider terms and operational
-   retention assumptions. Revisit this review before any account, online match,
+9. The final apex browser/network checks passed after disabling RUM injection,
+   email rewriting and active NEL response policies. Hosting-provider terms and
+   operational retention assumptions remain distinct from application behavior.
+   Revisit this review before any account, online match,
    analytics or hosted user-content feature.
 
 The supplied operator facts and accepted alpha risk posture are recorded above.
-Artifact verification and tested mail forwarding remain concrete pre-activation
-gates. This assessment does not represent the remaining legal questions as
-resolved or require a new risk waiver already supplied by the operator.
+Artifact verification and tested mail forwarding passed before activation and
+remain requirements for future changes. This assessment does not represent
+the remaining legal questions as resolved or require a new risk waiver already
+supplied by the operator.

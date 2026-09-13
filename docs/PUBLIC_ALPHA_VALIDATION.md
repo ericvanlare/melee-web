@@ -3,7 +3,7 @@
 Measured September 12–13, 2026 with Chrome 153.0.8010.36 on macOS.
 NaiadAI, LLC is the operator; legal@webmelee.gg is the approved public address.
 The operator accepts the unresolved recovered-code distribution risk for this
-alpha. Mail forwarding must be tested before the public domain is activated.
+alpha. Mail receipt and the exact artifact audit passed before domain activation.
 This record is scoped release evidence, not accuracy or stability admission.
 
 ## Exact candidate
@@ -144,12 +144,53 @@ Pages environment at [928714aa.webmelee.pages.dev](https://928714aa.webmelee.pag
 its default production hostname also passes all 18-file/five-alias/32-404 HTTP
 checks.
 
-Registry propagation, apex/www attachment, HTTPS, redirects and a post-migration
-receipt test remain in progress. The registrar's saved values alone are not
-proof of propagated DNS or a finished public launch.
-
 A 15-minute external watch ended at September 13, 05:29 UTC with both queried
 `.gg` authorities and public resolvers still returning the old registrar
-nameservers. Public Google MX/SPF records were correct. GitHub's public-shell
-job passed; browser-build remained pending and public-player CI was skipped.
-Those CI states are separate from the measured local and hosted checks above.
+nameservers. The first authority changed by 06:23 UTC, and both changed by
+06:34 UTC. The post-migration message to only `legal@webmelee.gg` was then
+received in the intended Workspace inbox at **06:36 UTC / September 12, 23:36
+Pacific**, with token `WM-CF-0913-A7K9`; recipient, subject, authenticated sender
+domain and TLS were checked. Private mailbox identities stay out of this record.
+
+## Public domain verification
+
+The alpha is live at **[webmelee.gg](https://webmelee.gg/)**. Both apex and `www`
+are active Pages custom domains with SSL enabled. Namecheap's saved delegation,
+both queried `.gg` authorities, and public resolver checks establish the switch
+to Cloudflare. Google initially retained the old parking A/NS records; its
+public cache-flush utility returned success for the apex NS refresh, after
+which 8.8.8.8 returned Cloudflare NS and apex/www addresses. 1.1.1.1 also returns
+Cloudflare IPv4 addresses and the verified Google mail records. A later
+1.1.1.1 snapshot still contained old NS and a negative AAAA cache entry while
+its A response pointed to Cloudflare. This is measured resolver coverage, not
+a claim that every record cache worldwide has expired.
+
+The final apex HTTP repeat passes **18 exact served files, five HTML aliases
+and 32 absent routes** against the unchanged candidate manifest. The final
+headed Chrome repeat passes all **10 checks**, with **58 same-origin static GET
+requests**, no request bodies, WebSockets, audio contexts or page/CSP errors.
+Only the keyboard preference persists. These remain startup/menu/lifecycle and
+privacy checks; the retained opcode-63 failure above still prevents a full-match
+stability claim.
+
+Cloudflare initially injected a RUM analytics beacon and rewrote the public
+email address using another script. The exact-byte audit rejected both. RUM
+and Email Address Obfuscation are now disabled for this zone, and final HTML
+matches the manifest. The Network Error Logging switch was turned off, but
+operational reporting headers remained visible. A scoped response-header rule
+therefore sets `NEL: {"max_age":0}` and expires the `cf-nel` reporting group on
+the apex and `www`. Actual 200/legal/404 responses carry the cancelling policy.
+Cloudflare-managed preview hosts may retain provider NEL headers; the privacy
+notice distinguishes hosting-provider operations from application telemetry.
+
+The enabled canonical-host rule passes **12 redirect cases** across HTTP/HTTPS,
+`www`/the default production Pages hostname, and root/legal/missing paths.
+All use 301 to the HTTPS apex, preserve paths and queries, and missing paths
+finish with 404. Apex HTTP-to-HTTPS also passes. The two immutable deployment
+hosts and staging alias still serve the exact non-indexed index without the
+canonical-host redirect.
+
+GitHub checks at documentation checkpoint `2aab502` passed **browser-build** and
+**public-shell**; **public-player** CI was skipped. The exact deployed player
+was tested locally and on the apex as described above. Later documentation-only
+commits do not change the deployed bytes or widen gameplay acceptance.

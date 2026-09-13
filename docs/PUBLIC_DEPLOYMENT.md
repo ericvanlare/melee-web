@@ -11,13 +11,15 @@ surface. The `maintenance` profile packages the small nonplayable fallback.
 Never upload the repository, `web/`, a native build directory, an iframe staging
 package or accumulated `work/` files. Do not change repository visibility.
 See `PUBLIC_RELEASE_REVIEW.md` for the executable/source rights assessment,
-the accepted alpha risk posture and the remaining artifact/contact gates.
+the accepted alpha risk posture and the artifact/contact requirements.
 
 ## Current launch state
 
+The initial silent alpha is live at **[webmelee.gg](https://webmelee.gg/)**.
 The operator is **NaiadAI, LLC**; the public contact is **legal@webmelee.gg**.
 Actual Google Workspace alias delivery was verified before the nameserver
-change. The exact audited candidate is deployed to staging at
+change and again after migration, before custom-domain activation. The exact
+audited candidate is deployed to staging at
 [8e2cdf90.webmelee.pages.dev](https://8e2cdf90.webmelee.pages.dev) and to the
 production Pages environment at
 [928714aa.webmelee.pages.dev](https://928714aa.webmelee.pages.dev).
@@ -25,13 +27,14 @@ production Pages environment at
 Namecheap saved `alan.ns.cloudflare.com` and `hadlee.ns.cloudflare.com` as the
 custom nameservers after the mail and artifact gates passed. Cloudflare serves
 the Google MX/SPF/verification records and proxied apex/www CNAME records to
-`webmelee.pages.dev`. The registry delegation is still propagating; Cloudflare
-will not attach the apex until the zone is active. The two-entry
-`webmelee_canonical_hosts` list is attached to the saved **disabled** rule
-`WebMelee canonical hostnames`; no canonical-host redirect is enabled yet.
-Always Use HTTPS is enabled, SSL mode remains Full, and the pending zone has
-no edge certificate yet. Recheck these states before continuing; a saved
-registrar setting alone is not propagation.
+`webmelee.pages.dev`. Both queried `.gg` authorities now publish that delegation;
+1.1.1.1 and 8.8.8.8 resolve the apex to Cloudflare. Both Pages custom domains
+are active with SSL enabled. The two-entry `webmelee_canonical_hosts` list is
+attached to the **enabled** rule `WebMelee canonical hostnames`. The apex,
+redirects, missing routes and unchanged preview hosts passed external checks.
+Always Use HTTPS is enabled and SSL mode remains Full. See the
+[final alpha evidence](PUBLIC_ALPHA_VALIDATION.md) for the exact runtime,
+manifest, limitations and measured resolver coverage.
 
 ## Build, audit and preview
 
@@ -166,6 +169,32 @@ Bulk Redirects do not use `_redirects` wildcard substitutions. Activate the list
 rule only after the apex works, and confirm that immutable preview hosts remain
 separate.
 
+### Keep the edge from modifying the release
+
+The final custom-domain check found Cloudflare injecting RUM analytics and
+rewriting email addresses even though the uploaded files contained neither.
+Disable **Speed → Real user monitoring → Disable completely** and **Security
+→ Settings → Email Address Obfuscation**. Recheck full response bytes with the
+explicit audit client and a real browser; a successful upload alone does not
+prove that the edge serves unchanged HTML.
+
+The zone's **Network → Network Error Logging** switch is off. Because NEL
+headers remained visible after that setting change, the active response-header
+transform rule **Disable browser network reporting** matches
+`http.host in {"webmelee.gg" "www.webmelee.gg"}` and sets these static headers:
+
+| Header | Value |
+| --- | --- |
+| `NEL` | `{"max_age":0}` |
+| `Report-To` | `{"group":"cf-nel","max_age":0,"endpoints":[]}` |
+
+Verify the cancelling policy on actual apex main/legal/404 responses. A zero
+maximum age also expires a browser's prior reporting policy. Provider-managed
+Pages preview hosts can retain Cloudflare operational NEL headers; do not
+describe an application network smoke as proof that the hosting provider
+collects nothing. See Cloudflare's [NEL documentation](https://developers.cloudflare.com/network-error-logging/)
+and [response-header rules](https://developers.cloudflare.com/rules/transform/response-header-modification/).
+
 ## Mail verification gate
 
 Do not activate the public website until the exact artifact audit passes and
@@ -177,8 +206,10 @@ The initial expired-login and missing-destination blockers were resolved by the
 separate email setup task. It configured an explicit Workspace alias on an
 existing user, with no new paid user or catch-all. An external test addressed
 only to legal@webmelee.gg arrived at the intended inbox on September 12, 2026
-at 22:02 Pacific; receipt, recipient details and TLS were checked. The private
-inbox stays out of public documentation.
+at 22:02 Pacific; receipt, recipient details and TLS were checked. A separate
+post-migration message with token `WM-CF-0913-A7K9` arrived at 23:36 Pacific,
+before attaching the public domains. The private inbox stays out of public
+documentation.
 
 The final mail provider is **Google Workspace**, independent of Namecheap DNS.
 Preserve its records during migration; do not enable Cloudflare Email Routing
