@@ -317,13 +317,28 @@ def check_manifest(manifest_path):
         if config.get('recipe_sha256') != result['recipe_sha256']:
             raise ValueError('Browser invocation differs from accepted recipe')
         report = _read_json(browser / 'retail-browser-report.json')
-        validate_report(report, result['recipe_sha256'], captures[0]['ticks'], 'state_capture')
+        # The generic browser validator predates separate source traversal
+        # accounting and requires sourceSteps/sourceDraws to equal one frame
+        # count. Keep its report/schema gates, but bind the two counters below
+        # to their distinct evidence sources in this CPU corpus checker.
+        report_for_validation = dict(report)
+        report_for_validation['metrics'] = dict(report.get('metrics', {}))
+        report_for_validation['metrics'].pop('sourceSteps', None)
+        report_for_validation['metrics'].pop('sourceDraws', None)
+        validate_report(report_for_validation, result['recipe_sha256'],
+                        captures[0]['ticks'], 'state_capture')
         metrics = report.get('metrics')
         if not isinstance(metrics, dict):
             raise ValueError('Browser report metrics are missing')
-        for key in ('sourceFrames', 'sourceSteps', 'sourceDraws'):
-            if type(metrics.get(key)) is not int or metrics[key] != captures[0]['ticks']:
-                raise ValueError('Browser source timeline count mismatch: ' + key)
+        source_ticks = captures[0]['ticks']
+        if type(metrics.get('sourceFrames')) is not int or metrics['sourceFrames'] != source_ticks:
+            raise ValueError('Browser source timeline count mismatch: sourceFrames')
+        if type(metrics.get('sourceSteps')) is not int or metrics['sourceSteps'] != source_ticks:
+            raise ValueError('Browser source timeline count mismatch: sourceSteps')
+        browser_observation = load_observation(browser / 'cpu-observation.jsonl')
+        if (type(metrics.get('sourceDraws')) is not int or
+                metrics['sourceDraws'] != len(browser_observation.draws)):
+            raise ValueError('Browser source timeline count mismatch: sourceDraws')
         preparation_report = report.get('preparation')
         if (not isinstance(preparation_report, dict) or
                 type(preparation_report.get('source_draws')) is not int or
@@ -358,11 +373,14 @@ def check_manifest(manifest_path):
             raise ValueError('Browser completion must be validated before source-phase alignment')
         if browser_completion.get('preparation_source_draws') != len(preparation):
             raise ValueError('Browser preparation report disagrees with preparation observation rows')
+        live_draws = browser_completion.get('source_draws')
+        if type(live_draws) is not int:
+            raise ValueError('Browser live source-draw count is missing')
         return {'status': 'additional_source_draws' if preparation else 'aligned',
                 'preparation_sha256': sha(path),
                 'source_preparation_draws': len(preparation),
-                'source_replay_draws': captures[0]['ticks'],
-                'all_observed_source_draws': len(preparation) + captures[0]['ticks'],
+                'source_replay_draws': live_draws,
+                'all_observed_source_draws': len(preparation) + live_draws,
                 'first_unmatched_preparation_draw': preparation[0] if preparation else None}
     record('browser_source_phases', verify_browser_phases)
     coverage = record('coverage', lambda: analyze_cpu_capture(a, input_plan=plan_path,

@@ -14,7 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
 from port_replay_diagnostics import (MAX_CAPTURE_BYTES, _read_port,
-                                     diagnose_paths)  # noqa: E402
+                                     diagnose_paths, diagnose_rows)  # noqa: E402
+from retail_replay_validation import CaptureError  # noqa: E402
 from test_retail_replay_validation import candidate  # noqa: E402
 from test_port_replay_validation import fixture  # noqa: E402
 
@@ -25,6 +26,44 @@ def _write(path: Path, rows) -> None:
 
 
 class PortReplayDiagnosticTests(unittest.TestCase):
+    def test_multiplayer_prefix_retains_exact_player_and_pad_divergences(self):
+        for count in (3, 4):
+            with self.subTest(players=count):
+                reference, port = fixture()
+                reference = deepcopy(reference)
+                port = deepcopy(port[:-1])
+                pad = (bytes.fromhex(
+                    "0000002d00000008001e0000000000007f0000ff0000ff007fffff000000")
+                    + bytes(12 * 66)).hex()
+                for header in (reference.header, port[0]):
+                    header.update(version=3, active_player_count=count)
+                for entry in (reference.match_enter, port[1]):
+                    entry["pad_state_hex"] = pad
+                for row in (reference.initial, *reference.frames, *port[2:]):
+                    row["pad_state_hex"] = pad
+                    for slot in range(2, count):
+                        fighter = deepcopy(row["fighters"][1])
+                        fighter["slot"] = slot
+                        row["fighters"].append(fighter)
+                port[4]["fighters"][-1]["damage_bits"] = "3f800000"
+                raw = bytearray.fromhex(pad)
+                struct.pack_into(">i", raw, 30 + 4 * 66 + 20, 7)
+                port[5]["pad_state_hex"] = raw.hex()
+                report = diagnose_rows(reference, port)
+                self.assertEqual(report["status"], "incomplete_capture_diagnostic")
+                self.assertFalse(report["complete"])
+                self.assertFalse(report["gold_admitted"])
+                self.assertEqual(report["first_divergence"]["frame"], 1)
+                self.assertEqual(report["first_divergence"]["field"],
+                                 f"fighters[{count - 1}].damage_bits")
+                self.assertEqual(report["first_divergence_by_group"]["pad_state_hex"]["frame"], 2)
+
+                # A claimed player count cannot hide missing fighter records.
+                malformed = deepcopy(port)
+                malformed[3]["fighters"].pop()
+                with self.assertRaisesRegex(CaptureError, "fighters required"):
+                    diagnose_rows(reference, malformed)
+
     def test_oversized_capture_is_rejected_before_loading(self):
         with tempfile.TemporaryDirectory(prefix="port-diagnostic-size-") as directory:
             path = Path(directory) / "oversized.jsonl"

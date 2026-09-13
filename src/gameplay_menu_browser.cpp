@@ -411,7 +411,10 @@ void tick(){
   const auto audio_elapsed=audio_clock.tick(
       clock_now,audio_owner&&input->visible&&(running||transition_audio_continues));
   if(audio_elapsed.stalled){
-   running=false;message="Paused after an audio timing disruption. Resume to continue.";
+   // Keep the shared timing-pause prefix understood by the development host.
+   // Its state capture may resume and records every resume; performance capture
+   // still fails on the pause. The audio guard and clock policy are unchanged.
+   running=false;message="Paused after a timing disruption in the audio clock. Resume to continue.";
   }else if(audio_before_construction){
    for(unsigned step=0;step<audio_elapsed.steps;step++)
     render_audio_tick(audio_owner,error,sizeof(error));

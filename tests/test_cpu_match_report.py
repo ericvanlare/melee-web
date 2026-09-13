@@ -207,7 +207,7 @@ def _fake_captures(root: Path, plan_sha: str):
 
 @contextmanager
 def _checker_fakes(captures, *, winner_b=1, winners_b=None,
-                   native_status="declared_state_match"):
+                   native_status="declared_state_match", browser_draws=2):
     setup = _setup()
     published_winners_b = [winner_b] if winners_b is None else list(winners_b)
     observation = types.SimpleNamespace(
@@ -225,6 +225,13 @@ def _checker_fakes(captures, *, winner_b=1, winners_b=None,
         return value
 
     def load_observation(_path, _capture=None):
+        if "browser" in str(_path):
+            return types.SimpleNamespace(
+                sha256="p" * 64,
+                draws=[{} for _ in range(browser_draws)],
+                end={"result": {"outcome": 2, "winners": [1]},
+                     "remaining_fighter_slots": []},
+            )
         if published_winners_b == [1] or "run-b" not in str(_path):
             return observation
         return types.SimpleNamespace(
@@ -369,6 +376,32 @@ class CpuMatchReportTests(unittest.TestCase):
         self.assertFalse(result['browser_agrees'])
         self.assertIn('source timeline count',
                       result['checks']['browser_completion']['error'])
+
+    def test_browser_steps_use_ticks_but_draws_use_observation_rows(self):
+        for declared_draws, observed_draws in ((1, 1), (2, 1)):
+            with self.subTest(declared_draws=declared_draws,
+                              observed_draws=observed_draws), tempfile.TemporaryDirectory(
+                                  prefix="cpu-source-clock-draws-") as directory:
+                root = Path(directory)
+                manifest, plan_sha, _ = _write_manifest(root)
+                browser_report = root / 'browser' / 'retail-browser-report.json'
+                report = json.loads(browser_report.read_text())
+                report['metrics']['sourceDraws'] = declared_draws
+                browser_report.write_text(json.dumps(report) + '\n')
+                with _checker_fakes(_fake_captures(root, plan_sha),
+                                    browser_draws=observed_draws):
+                    result = CHECKER.check_manifest(manifest)
+            self.assertTrue(result['reference_accepted'])
+            if declared_draws == observed_draws:
+                self.assertTrue(result['browser_agrees'])
+                self.assertEqual(result['checks']['browser_completion']['source_steps'], 2)
+                self.assertEqual(result['checks']['browser_completion']['source_draws'], 1)
+                self.assertEqual(result['checks']['browser_source_phases']['source_replay_draws'], 1)
+                self.assertEqual(result['checks']['browser_source_phases']['all_observed_source_draws'], 1)
+            else:
+                self.assertFalse(result['browser_agrees'])
+                self.assertIn('source timeline count mismatch: sourceDraws',
+                              result['checks']['browser_completion']['error'])
 
     def test_extra_browser_http_artifact_prevents_agreement(self):
         with tempfile.TemporaryDirectory(prefix="cpu-browser-artifact-") as directory:

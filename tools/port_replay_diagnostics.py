@@ -28,7 +28,9 @@ from port_replay_validation import (
     _validate_inputs,
 )
 from retail_replay_recipe import RecipeError, _pair
-from retail_replay_validation import CaptureError, MAX_FRAMES, _lower_hex_strings
+from retail_replay_validation import (CaptureError, MAX_FRAMES,
+                                      MULTIPLAYER_VERSION, _lower_hex_strings,
+                                      _pad_state)
 
 
 MAX_CAPTURE_BYTES = 128 * 1024 * 1024
@@ -105,8 +107,13 @@ def _validate_prefix(rows: list[dict[str, Any]] | tuple[dict[str, Any], ...],
         raise CaptureError(f"{context}: every record must be an object")
 
     header = rows_tuple[0]
-    _require_keys(header, HEADER, f"{context}.header")
-    version = _int(header["version"], f"{context}.version", minimum=1, maximum=2)
+    version = _int(header.get("version"), f"{context}.version",
+                   minimum=1, maximum=MULTIPLAYER_VERSION)
+    _require_keys(header, HEADER | ({"active_player_count"}
+                  if version == MULTIPLAYER_VERSION else set()), f"{context}.header")
+    player_count = (_int(header["active_player_count"],
+                        f"{context}.active_player_count", minimum=2, maximum=4)
+                    if version == MULTIPLAYER_VERSION else 2)
     fixed = {
         "record": "header",
         "schema": "melee-web-port-replay-candidate",
@@ -133,24 +140,23 @@ def _validate_prefix(rows: list[dict[str, Any]] | tuple[dict[str, Any], ...],
             f"{context}: incomplete prefix requires header, match_enter, and "
             "match_enter_complete records")
 
-    state_keys = STATE | ({"pad_state_hex"} if version == 2 else set())
+    state_keys = STATE | ({"pad_state_hex"} if version >= 2 else set())
     match_keys = {"record", "rng", "start_melee_hex"}
-    if version == 2:
+    if version >= 2:
         match_keys.add("pad_state_hex")
     _require_keys(rows_tuple[1], match_keys, f"{context}.match_enter")
     if rows_tuple[1]["record"] != "match_enter":
         raise CaptureError(f"{context}: missing match entry")
     _u32(rows_tuple[1]["rng"], f"{context}.entry.rng")
     _hex(rows_tuple[1]["start_melee_hex"], 0x138, f"{context}.entry.setup")
-    if version == 2:
-        from retail_replay_validation import _pad_state
+    if version >= 2:
         _pad_state(rows_tuple[1]["pad_state_hex"], f"{context}.entry.pad_state_hex")
 
     initial = rows_tuple[2]
     _require_keys(initial, state_keys | {"record"}, f"{context}.initial")
     if initial["record"] != "match_enter_complete":
         raise CaptureError(f"{context}: missing initial state")
-    _state(initial, f"{context}.initial", version)
+    _state(initial, f"{context}.initial", version, player_count)
 
     if len(rows_tuple) - 3 > requested:
         raise CaptureError(
@@ -166,7 +172,7 @@ def _validate_prefix(rows: list[dict[str, Any]] | tuple[dict[str, Any], ...],
         if _int(row["index"], f"{row_context}.index", minimum=0) != index:
             raise CaptureError(f"{context}: noncontiguous frame sequence")
         _validate_inputs([row["supplied_inputs"]], f"{row_context}.supplied_inputs")
-        _state(row, row_context, version)
+        _state(row, row_context, version, player_count)
         if row["match_frame"] < previous_match:
             raise CaptureError(f"{row_context}: match clock moved backwards")
         previous_match = row["match_frame"]
@@ -183,7 +189,7 @@ def _diagnostic_report(reference, prefix: _PortPrefix,
         raise CaptureError("port and reference schema versions must agree")
     version = prefix.header["version"]
     groups = ("rng", "match_frame", "fighters")
-    if version == 2:
+    if version >= 2:
         groups += ("pad_state_hex",)
     report: dict[str, Any] = {
         "status": "incomplete_capture_diagnostic",
@@ -210,13 +216,16 @@ def _diagnostic_report(reference, prefix: _PortPrefix,
             "rng": "pass",
             "match_frame": "pass",
             "fighters": "pass",
-            **({"pad_state_hex": "pass"} if version == 2 else {}),
+            **({"pad_state_hex": "pass"} if version >= 2 else {}),
         },
     }
     first: dict[str, dict[str, Any]] = {}
 
     def check(group: str, expected: Any, actual: Any, record: str,
               frame: int | None = None) -> None:
+        if group == "pad_state_hex":
+            expected = {"pad_state": _pad_state(expected["pad_state_hex"], "reference")}
+            actual = {"pad_state": _pad_state(actual["pad_state_hex"], "port")}
         difference = _first_difference(
             _lower_hex_strings(expected), _lower_hex_strings(actual))
         if difference is None or group in first:
@@ -232,7 +241,10 @@ def _diagnostic_report(reference, prefix: _PortPrefix,
                       "frames_requested": len(reference.frames)},
           {"version": prefix.header["version"],
            "frames_requested": prefix.header["frames_requested"]}, "header")
-    entry_keys = ("rng", "start_melee_hex") + (("pad_state_hex",) if version == 2 else ())
+    if version == MULTIPLAYER_VERSION:
+        check("header", {"active_player_count": reference.header["active_player_count"]},
+              {"active_player_count": prefix.header["active_player_count"]}, "header")
+    entry_keys = ("rng", "start_melee_hex") + (("pad_state_hex",) if version >= 2 else ())
     check("entry", {key: reference.match_enter[key] for key in entry_keys},
           {key: prefix.match_enter[key] for key in entry_keys}, "match_enter")
     for group in groups:

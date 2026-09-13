@@ -6,8 +6,10 @@ extends the existing checkpoint evidence: two independent retail captures,
 the native trace and visible browser agree through all 1,199 ticks of one
 complete Mario/Fox match for gameplay, CPU decisions, RNG, PAD history, HUD
 and result state. This fixed the source CPU hitlag caller carry. Expanded
-camera and source-draw-phase comparisons remain red; three- and four-player
-reference work is still in progress. These results do not admit CPU holdouts,
+camera and source-draw-phase comparisons remain red. The four-player reference
+now repeats for 3,838 ticks in two original processes; port comparison exposes
+an animation-speed mismatch at 264 and a browser fighter-command fault at
+2,622. Three-player reference work remains in progress. These results do not admit CPU holdouts,
 multiplayer, pixels, audio, physical input or performance.
 
 The browser runs original fighters and stages through compiled WebAssembly. The

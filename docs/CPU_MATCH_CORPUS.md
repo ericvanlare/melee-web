@@ -95,6 +95,44 @@ For each declared workload:
    coverage report. Retain every comparison, including incomplete native or
    browser captures and their first divergences.
 
+Manifest paths resolve relative to the manifest file. For example, a manifest
+inside a prepared scenario directory has this shape; replace run directories,
+build paths and the Node executable with those used by that capture:
+
+```json
+{
+  "schema": "melee-web-cpu-match-run",
+  "version": 1,
+  "scenario_id": "mario-human-vs-fox-cpu1-final-destination",
+  "scenario": "scenario.json",
+  "input_plan": "input-plan.json",
+  "recipe": "paired.mwrc",
+  "reference_a": {
+    "trace": "capture-a.jsonl",
+    "run_directory": ".retail-replay-run-A"
+  },
+  "reference_b": {
+    "trace": "capture-b.jsonl",
+    "run_directory": ".retail-replay-run-B"
+  },
+  "native": {
+    "trace": "native-v1/trace.jsonl",
+    "observation": "native-v1/cpu-observation.jsonl",
+    "build_directory": "path/to/frozen-native-build",
+    "menu_assets": "path/to/owned/menu-assets",
+    "game_assets": "path/to/owned/game-assets",
+    "node_executable": "path/to/node"
+  },
+  "browser": "browser-v1",
+  "build_directory": "path/to/frozen-browser-build"
+}
+```
+
+The native capture directory must retain its config, receipt and every hashed
+output beside `trace.jsonl`. Export `paired.mwrc` with
+`scripts/export_retail_replay.py capture-a.jsonl capture-b.jsonl --output paired.mwrc`;
+do not hand-author or substitute CPU-generated decisions into it.
+
 The browser path has an explicit preparation interval before live source ticks
 and draws. Count and retain preparation source draws separately from live
 source draws, and record the boundary where live tick zero begins. Align each
@@ -199,7 +237,7 @@ and camera fixes without recapturing their retail references: native and visible
 still match 480 ticks each. The existing PAD-history human regression also
 matches 240 ticks in native and browser. Each browser checkpoint has the exact
 corresponding source step/draw count and zero recorded page errors.
-The Release browser, retail-trace and timer targets build; all 598 unit tests
+The Release browser, retail-trace and timer targets build; all 602 unit tests
 pass with 35 optional-fixture skips. The timer target also passes original
 countdown, pause/resume, timeout, repeated teardown and inconsistent-selection
 rejection checks against owned local assets.
@@ -210,7 +248,7 @@ The instrumented complete browser run recorded one callback gap over 33.3 ms
 separate observations identify a timing failure without establishing an
 isolated cold/warm performance result.
 
-The complete two-player join is `result-v7.json`; its manifest binds the frozen
+The complete two-player join is `result-v8.json`; its manifest binds the frozen
 native and browser builds, exact Node/assets, both independent reference runs,
 recipe, source teardown and before/after HTTP artifact inventories. An earlier
 browser rerun (`browser-v2/`) reached the ending and matched core state but
@@ -219,8 +257,8 @@ failed the capture harness's response-body retrieval; it remains a failed run.
 Three- and four-player discovery retries reached the original timeout after
 3,838 ticks. The three-player bout published two winners, Falco and Mario,
 and therefore requires Sudden Death before whole-match completion. The
-four-player bout published Falco as its sole winner; its independent fixed
-captures remain in progress. Discovery alone is not an accepted reference.
+four-player bout published Falco as its sole winner. Discovery alone is not an
+accepted reference.
 
 The original camera traversal counts were 3,835 and 3,836 respectively.
 Three-player source ticks 1610, 2611 and 3612 had no camera traversal;
@@ -240,6 +278,38 @@ It continues the same authored combat cycle. It must independently reach a
 natural ending and repeat in two fresh processes before becoming a reference;
 the longer timer itself proves neither completion nor agreement. This change
 does not modify the retained one-minute tie or the two-/four-player recipes.
+
+## Four-player complete reference and retained port failures
+
+The two independent fixed runs in
+`work/cpu-corpus/paired-v7/fox-human-vs-mario3-marth6-falco8-dream-land/`
+now repeat across all 3,838 ticks and 3,836 traversals, including CPU decisions,
+camera/HUD, result and original scene teardown. Falco is the sole timeout
+winner. The corpus checker accepts this reference pair. Coverage includes
+126 attack-motion entries, four stock losses, three respawns and 116 received
+damage increases across four players.
+
+The complete `native-v6/` trace first differs in Marth's animation speed at
+tick 264: original `4034c59d`, port `4034c59e`. Headless RNG first differs at
+1871, coinciding with Mario's damage being one point below the drawn original;
+the missing magnifier traversal is a separate diagnostic lead. These are
+retained failures, not an accepted native match.
+
+Browser attempts `browser-v6/` and `browser-v6b/` stopped after 22 and 18 ticks
+on audio timing guards (worst browser gaps 1518.89 and 1280.86 ms). The shared
+compiled host now gives both clock guards the timing-pause prefix understood
+by the existing development page. Explicitly instrumented state capture can
+therefore resume and count audio-clock pauses too. Live play still pauses,
+and performance capture still fails on a pause; no timing guard was removed.
+`runtime.html` is unchanged.
+
+`browser-v7/` rendered the four-player match and reached 2,622 ticks, with 40
+recorded diagnostic resumes, before aborting on unsupported fighter command
+63 in the original wait/taunt transition. Its retained incomplete prefix has
+the same first animation-speed difference at 264; RNG and PAD history agree
+through all observed ticks. The prefix checker now supports the existing
+three-/four-player format while requiring complete teardown for acceptance.
+The fault and animation calculation remain under investigation.
 
 A timed bout with multiple original winners may require Sudden Death. The
 report flags this as incomplete whole-match coverage even if the ordinary
