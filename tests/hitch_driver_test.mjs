@@ -5,7 +5,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import {verifyServedArtifacts,stopTrace,remainingTimeout,TRACE,traceSettings,
+import {BUILD_ARTIFACTS,verifyServedArtifacts,stopTrace,remainingTimeout,TRACE,traceSettings,
   frozenTraceSettings,scheduleTraceEnd,finalizeTrace,pagePaintCondition,verifyPagePaintReport} from '../scripts/run_hitch_matrix.mjs';
 
 assert.deepEqual(frozenTraceSettings({trace:TRACE}),traceSettings());
@@ -38,17 +38,21 @@ for(const patch of [{restored:false},{ended_ms:90},{geometry_after:{...geometry,
 const bytes=Buffer.from('frozen executable');
 const digest=crypto.createHash('sha256').update(bytes).digest('hex');
 let served=bytes;
+let missing=false;
 const server=http.createServer((req,res)=>{
-  if(req.url!='/runtime.wasm'){res.writeHead(404);res.end();return;}
+  if(missing||!BUILD_ARTIFACTS.some(name=>req.url==='/'+name)){res.writeHead(404);res.end();return;}
   res.writeHead(200);res.end(served);
 });
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 try {
-  const machine={url:`http://127.0.0.1:${server.address().port}/runtime.html`,artifacts:{'runtime.wasm':digest}};
-  assert.deepEqual(await verifyServedArtifacts(machine),{'runtime.wasm':{sha256:digest,bytes:bytes.length}});
+  const machine={url:`http://127.0.0.1:${server.address().port}/runtime.html`,
+    artifacts:Object.fromEntries(BUILD_ARTIFACTS.map(name=>[name,digest]))};
+  assert.deepEqual(await verifyServedArtifacts(machine),
+    Object.fromEntries(BUILD_ARTIFACTS.map(name=>[name,{sha256:digest,bytes:bytes.length}])));
   served=Buffer.from('different executable');
   await assert.rejects(verifyServedArtifacts(machine),/Served artifact changed/);
-  await assert.rejects(verifyServedArtifacts({...machine,artifacts:{'missing.wasm':digest}}),/HTTP 404/);
+  missing=true;
+  await assert.rejects(verifyServedArtifacts(machine),/HTTP 404/);
   await assert.rejects(verifyServedArtifacts(machine,Date.now()-1),/wall-time bound/);
   assert.throws(()=>remainingTimeout(Date.now()-1),/wall-time bound/);
   assert.equal(remainingTimeout(Date.now()+10000,500),500);

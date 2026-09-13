@@ -17,12 +17,9 @@ ZERO_GATES = ('browserCallbackGaps', 'browserLongTasks', 'nativeCallbacksOver33m
 # Include the separately imported asset loader, disc/PAD utilities and audio
 # transport modules; freezing only the Wasm and HTML leaves executable inputs
 # outside the development/held-out build identity.
-BUILD_ARTIFACTS = (
-    'gameplay_menu_browser.js', 'gameplay_menu_browser.wasm', 'gameplay_menu_browser.data',
-    'runtime.html', 'runtime-cache.js', 'audio-worklet.js', 'audio-ring.mjs',
-    'disc-image.mjs', 'dsp-coefficients.mjs', 'runtime-assets.mjs',
-    'match-flow.mjs', 'match-menu.mjs', 'action-sweep.mjs', 'hitch-capture.mjs',
-)
+BUILD_ARTIFACTS = tuple(json.loads(
+    Path(__file__).with_name('browser_build_artifacts.json').read_text(encoding='utf-8')
+))
 
 
 def require(condition, message):

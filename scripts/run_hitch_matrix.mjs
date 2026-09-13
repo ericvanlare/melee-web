@@ -17,12 +17,50 @@ const save = async (p, value) => fs.writeFile(p, JSON.stringify(value, null, 2)+
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 const cmd = (exe, args) => execFileSync(exe, args, {cwd:ROOT, encoding:'utf8', maxBuffer:8*1024*1024}).trim();
 const MAX_ARTIFACT_BYTES=256*1024*1024;
+// One required inventory is shared with the Python evidence validator.
+export const BUILD_ARTIFACTS=Object.freeze(await read(new URL('../tools/browser_build_artifacts.json',import.meta.url)));
+export const HARNESS_ARTIFACTS=Object.freeze([
+  'scripts/hitch_capture.py','tools/hitch_capture.py','tools/browser_replay_validation.py',
+  'tools/browser_build_artifacts.json',
+]);
+const validSha=value=>typeof value==='string'&&/^[0-9a-f]{64}$/.test(value);
+function validateHashInventory(inventory,required,label) {
+  if(!inventory||typeof inventory!=='object'||Array.isArray(inventory)||
+     Object.keys(inventory).length!==required.length||
+     !required.every(name=>Object.hasOwn(inventory,name)))
+    throw Error(`${label} inventory is incomplete or unexpected`);
+  for(const name of required)if(!validSha(inventory[name]))
+    throw Error(`${label} SHA-256 is invalid: ${name}`);
+}
+
+export function validateFrozenBuildProfile(machine,buildArtifacts) {
+  if(machine?.schema!=='melee-web-hitch-browser-profile'||machine.version!==1)
+    throw Error('Unsupported browser profile schema');
+  validateHashInventory(machine.artifacts,BUILD_ARTIFACTS,'Build artifact');
+  validateHashInventory(machine.harness_artifacts,HARNESS_ARTIFACTS,'Harness artifact');
+  if(!Array.isArray(buildArtifacts)||buildArtifacts.length!==BUILD_ARTIFACTS.length)
+    throw Error('Frozen build manifest inventory is incomplete or unexpected');
+  const names=new Set();
+  for(const identity of buildArtifacts) {
+    if(!identity||typeof identity.path!=='string'||!path.isAbsolute(identity.path)||
+       !validSha(identity.sha256))throw Error('Invalid frozen build manifest identity');
+    const name=path.basename(identity.path);
+    if(!BUILD_ARTIFACTS.includes(name)||names.has(name))
+      throw Error('Duplicate or unexpected frozen build artifact: '+name);
+    names.add(name);
+    if(machine.artifacts[name]!==identity.sha256)
+      throw Error('Browser profile disagrees with frozen build manifest: '+name);
+  }
+}
+
 export function remainingTimeout(deadline, maximum=30000) {
   const remaining=deadline-Date.now();
   if(remaining<=0)throw Error('Frozen slot wall-time bound exhausted');
   return Math.max(1,Math.min(maximum,remaining));
 }
 export async function verifyServedArtifacts(machine,deadline=Date.now()+300000) {
+  // Even standalone callers must bind every executable input before any HTTP.
+  validateHashInventory(machine?.artifacts,BUILD_ARTIFACTS,'Build artifact');
   const observed={};
   for(const [name,expected] of Object.entries(machine.artifacts)) {
     const url=new URL(name,machine.url);
@@ -125,18 +163,15 @@ async function profile(options, pw) {
   const settings=traceSettings(options['trace-detail']);
   const browser = await startBrowser(pw, path.resolve(options['browser-profile']));
   try {
-    const python = options.python || path.join(ROOT,'.venv/bin/python');
-    const files = JSON.parse(cmd(python,['-c',
-      "import json,sys;sys.path.insert(0,'tools');from browser_replay_validation import BUILD_ARTIFACTS;print(json.dumps(BUILD_ARTIFACTS))"]));
     const artifacts = {};
-    for(const file of files) artifacts[file] = sha(await fs.readFile(path.join(options.build,file)));
+    for(const file of BUILD_ARTIFACTS) artifacts[file] = sha(await fs.readFile(path.join(options.build,file)));
     const result = {
       schema:'melee-web-hitch-browser-profile',version:1,build:'Release',
       base_commit:cmd('git',['rev-parse','HEAD']),
       diff_sha256:sha(cmd('git',['diff','--binary'])),
       runner_sha256:sha(await fs.readFile(fileURLToPath(import.meta.url))),
       harness_artifacts:Object.fromEntries(await Promise.all(
-        ['scripts/hitch_capture.py','tools/hitch_capture.py','tools/browser_replay_validation.py'].map(async file=>
+        HARNESS_ARTIFACTS.map(async file=>
           [file,sha(await fs.readFile(path.join(ROOT,file)))]))),
       browser:browser.version,command_line:browser.commandLine,launch:LAUNCH,trace:settings.trace,
       trace_detail:settings.detail,trace_window_ms:settings.windowMs,node:process.version,
@@ -258,11 +293,12 @@ async function publicReport(page, deadline) {
 async function run(options,pw) {
   const planPath=path.resolve(options.plan),plan=await read(planPath);
   const machine=await read(plan.identities.profile.path);
+  validateFrozenBuildProfile(machine,plan.identities.build_artifacts);
   for(const slot of plan.slots)pagePaintCondition(slot);
   const settings=frozenTraceSettings(machine,options['trace-detail']);
   if(options.build&&path.resolve(options.build)!==machine.build_directory)throw Error('--build differs from the frozen profile');
   if(machine.runner_sha256!==sha(await fs.readFile(fileURLToPath(import.meta.url))))throw Error('Runner changed after profile freeze');
-  for(const [file,digest] of Object.entries(machine.harness_artifacts||{}))
+  for(const [file,digest] of Object.entries(machine.harness_artifacts))
     if(sha(await fs.readFile(path.join(ROOT,file)))!==digest)throw Error('Harness changed after freeze: '+file);
   if(JSON.stringify(machine.launch)!==JSON.stringify(LAUNCH))throw Error('Browser configuration changed');
   const python=options.python||path.join(ROOT,'.venv/bin/python');

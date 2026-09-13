@@ -56,6 +56,13 @@ Every saved report/trace/terminal snapshot has an independently rechecked digest
 The allowlist is declared from the development split; neither holdout is read
 or executed. A named target alone is insufficient evidence of its split role.
 
+New captures require a newly frozen browser profile with the complete shared
+inventory in `tools/browser_build_artifacts.json`, including that inventory's
+own harness hash. The runner rejects missing, extra or duplicate artifacts and
+profile/manifest hash disagreement before opening the browser, then hashes all
+served artifact bytes independently. Keep earlier sealed profiles and their
+evidence unchanged; they remain bound to their original runner.
+
 ## Running the loop
 
 Use Node 20+ with Playwright installed, the project Python environment, an
