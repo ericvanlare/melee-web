@@ -1,6 +1,7 @@
 #include "gameplay_menu_world.hpp"
 #include "gameplay_menu_host.h"
 #include "gameplay_match_session.hpp"
+#include "gameplay_match_rules.h"
 #include "gameplay_audio_stream.h"
 #include "native_menu_fighter_input.h"
 #include "native_menu_stage_input.h"
@@ -455,9 +456,13 @@ int main(int argc,char** argv){try{
     }
     if(match.complete()){check(outcome!=0&&ending_ticks>0,"Source exit skipped the original ending");break;}
    }
-   check(t<4000&&stocks==0&&respawns==3&&winner==1,"Native menu match did not complete original four-stock outcome");
+   check(t<4000&&stocks==0&&respawns==3,"Native menu match did not complete original four-stock outcome");
    std::cout<<"Original GAME ending and source transition completed across "<<ending_ticks<<" frozen ticks\n";
    const uint32_t seed=match.random_seed();match.close();
+   int terminal_outcome=0,winner_count=0,winners[6]{};
+   check(melee_web_match_rules_terminal_result(&terminal_outcome,&winner_count,winners)&&
+         terminal_outcome==OUTCOME_ELIMINATION&&winner_count==1&&winners[0]==1,
+         "Native menu match did not publish the original elimination winner at close");
    check(melee_web_menu_host_match_finished(host,seed,error,sizeof(error)),error);
   }
   world=std::make_unique<melee_web::GameplayMenuWorld>(files);audio_phase=0;
