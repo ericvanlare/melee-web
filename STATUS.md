@@ -199,6 +199,71 @@ All 550 regression tests and the affected Release build pass. Harness recovery,
 trace loss, overflow and served-build checks are covered; this is validation of
 the diagnostic loop, not resolution of the measured gameplay red.
 
+The subsequent four-slot causal capture completed 18,960 development input ticks
+with four complete traces and no retries. Warm Fox/Marth on Dream Land reproduced
+callback 1,883/source frame 1,746: 20.580 ms native and a 37.610 ms browser gap.
+Three actual cache `fsync` waits account for 14.280 ms within that callback;
+correlated stacks show the renderer's SQLite transaction triggering an automatic
+WAL checkpoint through Asyncify/IDBFS. This identifies an optional persistence
+path to remove from live gameplay. The other three runs record focus loss;
+none is acceptance evidence. The earlier 91.795 ms cold begin-frame stall remains
+unresolved. The new instrumentation passes 552 tests and the Release build;
+its frozen build, all failures and causal evidence are recorded in
+[the hitch-capture notes](docs/HITCH_CAPTURE.md#causal-capture-results--2026-09-12).
+The optional-cache fix is now implemented and verified on these two development
+workloads: SQLite transactions remain queued during source ownership and drain
+only after native teardown, with bounded coalescing and explicit save failures.
+Both original A/B comparisons pass for 9,480 source ticks, including declared
+state/RNG/PAD, timers, source draws and match completion. Both real exported
+DB/WAL pairs pass integrity checks and reload. Four separate unprofiled cold/warm
+runs pass across 18,960 source ticks / 18,961 callbacks: zero native 16.67 ms
+misses, zero native 33.3 ms failures and zero browser 33.3 ms gaps. Worst native
+callback is 12.845 ms; worst browser interval is 30.555 ms. A separate complete
+profiled run records zero live cache syncs and a successful post-teardown flush.
+All 554 tests and the Release build pass. See the [fix evidence](docs/HITCH_CAPTURE.md#deferred-cache-fix-and-verification--2026-09-12).
+The earlier cold begin-frame red remains independently unresolved; these clean
+runs do not classify it as external scheduling. Both fresh holdouts and the
+subsequent retained-heap gate remain closed.
+
+A four-slot fresh/reloaded-browser experiment now reproduces the remaining
+cold failure: a 90.745 ms native callback includes 85.945 ms across 27 waits for
+a staging buffer's GPU completion. There are zero CPU frame-slot waits or live
+cache syncs. A 115.722 ms GPU-process task overlaps it, including a Dawn worker
+with only 1.057 ms of thread CPU across 114.404 ms wall time. This localizes the
+wait but does not identify the underlying GPU operation or establish external
+scheduling. Two subsequent, separately bounded startup GPU traces do not
+reproduce the stall; both experiments preserve a focus-loss failure as well.
+All six diagnostic traces are complete for their declared windows. The capture
+tool now supports a frozen ten-second GPU startup preset with deferred stream
+reading. No gameplay or renderer implementation changed; the red remains
+unresolved and both holdouts remain unopened. See the [results and next discrimination](docs/HITCH_CAPTURE.md#cold-begin-wait-and-gpu-startup-diagnosis--2026-09-12).
+
+A subsequent fixed four-slot diagnostic-output painting experiment completes
+15,568 source ticks/draws but does not reproduce the long GPU worker. It retains
+43 native deadline misses, zero native hard failures, 28 browser hard gaps and
+three focus-loss failures. Startup CPU traces implicate application work in
+some smaller misses; they do not explain the old wait. A separate native GPU
+profiled replay adds two deadline misses and one browser gap, with no focus
+loss. The native recording's exported retention does not cover those failures,
+despite successful attachment and file creation. The new canvas verifier's
+logical/backing-size mistake is corrected; all original failed attempts remain
+preserved. No performance fix or external-scheduling classification is claimed.
+Both holdouts remain unopened. See the [experiment and coverage limits](docs/HITCH_CAPTURE.md#diagnostic-page-painting-and-native-gpu-capture--2026-09-12).
+
+Scene preparation now waits nonblockingly for submitted GPU work to complete
+before arming the source clock, preserving source ticks/draws and menu audio
+ownership. A controlled delayed-completion test proves the old build started
+source execution prematurely and the new build waits without extra draws.
+Both full development replays still match both original references across
+9,480 ticks, and all nine original menu/entry comparisons pass. All 558 tests
+and the Release build pass. Four independent cold runs complete 18,960 ticks
+with zero native 16.67 ms misses, native 33.3 ms failures or browser 33.3 ms
+gaps; native maximum is 10.710 ms. Three pass fully; the fourth retains a
+focus-loss failure. All four are already GPU-ready at their first arming poll,
+so this protocol fix does not establish the cause of the old 115 ms GPU task.
+That red stays unresolved and both holdouts stay unopened. See the
+[readiness fix and bounded verification](docs/HITCH_CAPTURE.md#submitted-work-readiness--2026-09-12).
+
 The typed content path now carries Falco, Fox, Marth, Battlefield, Yoshi's Story and Dream Land
 source IDs, runtime manifests and focused development traces. Source stock icon IDs are
 selected from the typed character/fighter identity rows. In a fresh Release
