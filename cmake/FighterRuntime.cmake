@@ -11,7 +11,8 @@ foreach(path IN LISTS native_paths)
       OR relative STREQUAL "melee/ft/ftparts.c" OR relative STREQUAL "melee/ft/ftchangeparam.c"
       OR relative STREQUAL "melee/ft/ftwalkcommon.c" OR relative STREQUAL "melee/mp/mpisland.c" OR relative STREQUAL "melee/mp/mplib.c"
       OR relative STREQUAL "melee/gr/ground.c" OR relative STREQUAL "melee/gr/grdynamicattr.c"
-      OR relative STREQUAL "melee/lb/lb_00B0.c" OR relative STREQUAL "melee/lb/lbspdisplay.c")
+      OR relative STREQUAL "melee/lb/lb_00B0.c" OR relative STREQUAL "melee/lb/lb_00F9.c"
+      OR relative STREQUAL "melee/lb/lbspdisplay.c")
     continue()
   endif()
   list(APPEND fighter_paths "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/${relative}")
