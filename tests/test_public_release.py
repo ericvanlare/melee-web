@@ -335,6 +335,36 @@ class PublicReleaseTests(unittest.TestCase):
         with self.assertRaisesRegex(BuildError, "identity mismatch"):
             build(output=self.root / "drift-runtime", profile="player", runtime_dir=runtime)
 
+    def test_player_rejects_unexported_cpu_address_diagnostics(self):
+        for index, marker in enumerate((b"CPU_ADDRESS_AUDIT", b"melee-web-native-cpu-address-diagnostic")):
+            with self.subTest(marker=marker):
+                runtime = self.runtime_fixture()
+                wasm = runtime / "gameplay_public.wasm"
+                # A custom section leaves the allowed export inventory intact.
+                # Re-sign the fixture identity so rejection cannot rely on drift.
+                name = b"diagnostic-fixture"
+                payload = _uleb(len(name)) + name + marker
+                wasm.write_bytes(wasm.read_bytes() + b"\x00" + _uleb(len(payload)) + payload)
+                identity_path = runtime.parent / "runtime-public-identity.json"
+                identity = json.loads(identity_path.read_text())
+                record = next(item for item in identity["artifacts"]
+                              if item["path"].endswith("/gameplay_public.wasm"))
+                record.update(bytes=wasm.stat().st_size, sha256=hashlib.sha256(wasm.read_bytes()).hexdigest())
+                encoded = json.dumps(identity).encode()
+                identity_path.write_bytes(encoded)
+                (self.fixture_repo / "build/runtime-public-identity.json").write_bytes(encoded)
+                with self.assertRaisesRegex(BuildError, "CPU address diagnostic"):
+                    build(output=self.root / f"rejected-address-{index}", profile="player", runtime_dir=runtime)
+
+                # Model an older packager accepting dormant native diagnostics;
+                # the current audit must reject that internally consistent bundle.
+                output = self.root / f"tainted-address-{index}"
+                manifest = self.root / f"tainted-address-{index}.manifest.json"
+                with patch.object(build_public, "_validate_runtime_graph", return_value=None):
+                    build(output=output, manifest=manifest, profile="player", runtime_dir=runtime)
+                with self.assertRaisesRegex(AuditError, "CPU address diagnostic"):
+                    audit(output, manifest)
+
     def test_player_rejects_legacy_identity_and_audio_policy_drift(self):
         runtime = self.runtime_fixture()
         identity_path = runtime.parent / "runtime-public-identity.json"

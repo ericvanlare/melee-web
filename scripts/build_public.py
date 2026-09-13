@@ -940,6 +940,12 @@ def _validate_runtime_graph(files: dict[str, bytes]) -> None:
     if forbidden_modules.intersection(files):
         raise BuildError("public runtime graph contains a development audio module")
     for rel, data in files.items():
+        # Export checks alone cannot detect dormant diagnostics retained by
+        # internal replay references in a shared native archive.
+        if any(marker in data for marker in (
+            b"CPU_ADDRESS_AUDIT", b"melee-web-native-cpu-address-diagnostic",
+        )):
+            raise BuildError(f"CPU address diagnostic rejected in public runtime: {rel}")
         if rel.endswith((".mjs", ".js")):
             try:
                 text = data.decode("utf-8")

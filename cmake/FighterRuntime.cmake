@@ -99,7 +99,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release" AND MELEE_WEB_PUBLIC_RUNTIME)
   target_include_directories(fighter_source_runtime_public PUBLIC src "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}"
     PRIVATE .deps/aurora/include .deps/melee/extern/dolphin/include)
   target_compile_definitions(fighter_source_runtime_public PUBLIC TARGET_PC
-    PRIVATE MELEE_WEB_MENU_MARIO_FD MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+    PRIVATE MELEE_WEB_MENU_MARIO_FD MELEE_WEB_PUBLIC_AUDIO_DISABLED MELEE_WEB_PUBLIC_RUNTIME)
   target_compile_options(fighter_source_runtime_public PRIVATE -ffunction-sections -fdata-sections -ffp-contract=off
     -fno-builtin-sinf -fno-builtin-cosf -fno-builtin-tanf
     -fno-builtin-atanf -fno-builtin-atan2f -fno-builtin-acosf
