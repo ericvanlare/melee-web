@@ -15,9 +15,11 @@ namespace melee_web {
 enum class DatSceneRootKind {
     SceneDesc,
     DynamicModelTable,
+    DynamicModel,
 };
 
-// Owns a source SceneDesc or DynamicModelDesc** table and every typed
+// Owns a source SceneDesc, DynamicModelDesc** table, or single
+// DynamicModelDesc and every typed
 // descriptor reachable from its public symbol. Model graphs and their
 // joint/material/shape animations reuse the
 // checked native owners. Camera/light/fog animation records are hydrated when
@@ -35,8 +37,11 @@ public:
     // DynamicModelDesc** roots such as ScInfCnt_scene_models, Stc_scemdls,
     // DmgNum_scene_models, ScInfTim_scene_models, tdsce, and lupe are
     // published separately from SceneDesc.
-    // Returns nullptr when this object was constructed for a SceneDesc root.
+    // Returns nullptr when this object was constructed for another root kind.
     [[nodiscard]] DynamicModelDesc** model_table() const noexcept;
+    // A single DynamicModelDesc root such as a stage's quake_model_set.
+    // Returns nullptr when this object was constructed for another root kind.
+    [[nodiscard]] DynamicModelDesc* single_model() const noexcept;
     [[nodiscard]] std::string_view symbol_name() const noexcept;
     [[nodiscard]] std::size_t model_count() const noexcept;
     [[nodiscard]] std::size_t camera_count() const noexcept;

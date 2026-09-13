@@ -11,6 +11,9 @@ CSS → original SSS → four-stock Mario/FD match → original CSS. See the
 The combined [performance and accuracy playbook](docs/PERFORMANCE_AND_ACCURACY.md)
 defines the evidence levels and admission process used for every new fighter,
 stage and shared runtime change.
+The [bounded hitch-capture loop](docs/HITCH_CAPTURE.md) records every failure
+with separate native deadline and browser-gap metrics, a frozen repetition
+matrix and optional correlated traces.
 
 **The complete playable-match milestone is still open.** The browser currently
 runs two original Mario instances on Final Destination, with source controller
@@ -47,7 +50,16 @@ remain open, so this does not widen the accepted first-deliverable claim.
 A scoped 102-frame original-game jump comparison passes; this does not establish
 full-match equivalence. See [current evidence](STATUS.md),
 [the runtime gate](docs/FIGHTER_RUNTIME.md) and
-[original-game comparison](docs/ORIGINAL_COMPARISON.md). The reusable
+[original-game comparison](docs/ORIGINAL_COMPARISON.md). A separate [retail replay calibration](docs/RETAIL_REPLAY_CAPTURE.md) now matches
+240 neutral Mario/Mario Final Destination ticks across two independent retail
+captures and the port's declared state fields, RNG and input recipe. The first
+Fox/Falco Battlefield Slippi input donor also matches all 686 ticks against two
+independent vanilla captures. The same donor also passes visible Release state comparison and cleared-origin/warm
+performance checks. A second derived donor now matches all 3,122 ticks of an
+original elimination match, including the final drawn state and teardown. See
+[the complete-game calibration](docs/COMPLETE_REPLAY_CALIBRATION.md) for its
+reference cross-check, timing status and coverage limits. Broad gold-corpus and
+content admission remain open. The reusable
 [CSS/SSS and match-entry transition gate](docs/TRANSITION_EQUIVALENCE.md) is
 implemented. Its pinned Mario/Mario Final Destination replay matches retail at
 all nine lifecycle, audio, match-data and RNG boundaries.

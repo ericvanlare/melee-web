@@ -60,7 +60,7 @@ static int valid(const MeleeWebRenderSettings* s,char* e,size_t n)
 }
 static int live(MeleeWebRender* h,char* e,size_t n)
 {
-    if(!h||h!=owner||h->generation!=melee_web_gameplay_stats().generation||
+    if(!h||h!=owner||h->generation!=melee_web_gameplay_generation()||
        cm_804D6464!=h->view_camera||((Camera*)melee_web_camera_state())->gobj!=h->gobj)
         return fail(e,n,"Native render camera ownership changed");
     return 1;
@@ -87,7 +87,7 @@ static MeleeWebRender* begin_render(const MeleeWebRenderSettings* s,int original
     Camera* source=melee_web_camera_state();
     if(owner||source->gobj||cm_804D6464){fail(e,n,"Original camera storage already has an owner");return NULL;}
     if(!melee_web_native_world_enable(e,n))return NULL;
-    uint64_t generation=melee_web_gameplay_stats().generation;
+    uint64_t generation=melee_web_gameplay_generation();
     if(zlist_generation!=generation){
         if(zlist_alloc_data.used){fail(e,n,"Native render cannot replace an existing Z-list pool");return NULL;}
         HSD_ZListInitAllocData();zlist_generation=generation;

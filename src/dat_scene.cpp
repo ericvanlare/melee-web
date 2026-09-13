@@ -86,6 +86,7 @@ struct DatScene::Storage {
     std::vector<SceneDesc::SceneFogDesc> fogs;
     SceneDesc scene{};
     DynamicModelDesc** published_model_table = nullptr;
+    DynamicModelDesc* published_single_model = nullptr;
 
     ~Storage()
     {
@@ -507,6 +508,12 @@ struct DatScene::Storage {
         decode_models(table);
     }
 
+    void decode_single_model_root(std::uint32_t root)
+    {
+        models.push_back(model(root));
+        published_single_model = models.back();
+    }
+
     void decode_cameras(std::uint32_t table)
     {
         const std::uint32_t end = archive->next_target_offset(table);
@@ -620,11 +627,22 @@ DatScene::DatScene(std::shared_ptr<const DatArchive> archive,
     storage_->archive = std::move(archive);
     storage_->symbol = public_symbol;
     storage_->root_kind = root_kind;
+    require(root_kind == DatSceneRootKind::SceneDesc ||
+                root_kind == DatSceneRootKind::DynamicModelTable ||
+                root_kind == DatSceneRootKind::DynamicModel,
+            "Scene root kind is invalid");
     const auto& symbol = find_symbol(*storage_->archive, public_symbol);
-    if (root_kind == DatSceneRootKind::SceneDesc)
+    switch (root_kind) {
+    case DatSceneRootKind::SceneDesc:
         storage_->decode(symbol.data_offset);
-    else
+        break;
+    case DatSceneRootKind::DynamicModelTable:
         storage_->decode_model_table_root(symbol.data_offset);
+        break;
+    case DatSceneRootKind::DynamicModel:
+        storage_->decode_single_model_root(symbol.data_offset);
+        break;
+    }
 }
 
 DatScene::~DatScene() = default;
@@ -640,6 +658,13 @@ DynamicModelDesc** DatScene::model_table() const noexcept
     if (storage_->root_kind != DatSceneRootKind::DynamicModelTable)
         return nullptr;
     return storage_->published_model_table;
+}
+
+DynamicModelDesc* DatScene::single_model() const noexcept
+{
+    if (storage_->root_kind != DatSceneRootKind::DynamicModel)
+        return nullptr;
+    return storage_->published_single_model;
 }
 
 std::string_view DatScene::symbol_name() const noexcept

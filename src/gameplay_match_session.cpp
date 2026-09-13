@@ -8,6 +8,7 @@
 #include "gameplay_render.h"
 #include "gameplay_hud.h"
 #include "gameplay_match_flow.h"
+#include "gameplay_fighter_assets.h"
 #include "gameplay_hud_assets.hpp"
 #include <cstdio>
 #include <cstdlib>
@@ -17,7 +18,14 @@ extern "C" int lbAudioAx_80023F28(int);
 extern "C" int melee_web_vs_mode_begin(void);
 extern "C" int melee_web_vs_mode_end(void);
 namespace melee_web {
-namespace {void check(int value,const char* error){if(!value)throw std::runtime_error(error);}}
+namespace {
+void check(int value,const char* error){if(!value)throw std::runtime_error(error);}
+void check_fighter_asset_ownership(const char* phase){
+    char error[256]{};
+    if(!melee_web_fighter_assets_check_owned(phase,error,sizeof(error)))
+        throw std::runtime_error(error);
+}
+}
 struct GameplayMatchSession::Storage {
     std::unique_ptr<GameplayWorld> world;
     std::unique_ptr<GameplayAudioBank> bank;
@@ -36,6 +44,7 @@ struct GameplayMatchSession::Storage {
     GameplayWorldSelection content{};
     const MeleeWebStageContent* stage=nullptr;
     unsigned construction_phase=0;
+    const MeleeWebPadState* initial_input=nullptr;
     void begin(const RuntimeFiles& files,const MeleeWebMenuMatchSelection& selection,
                RuntimeArchiveCache* archive_cache){
         runtime_files=&files;runtime_cache=archive_cache;selected=selection;
@@ -102,6 +111,7 @@ struct GameplayMatchSession::Storage {
                             player.costume,player.sub_color,content.fighter_kinds[i]};
             }
             match=melee_web_match_begin_players(players,2,70,selected.random_seed,world->collision(),error,sizeof(error));check(match!=nullptr,error);
+            if(initial_input){check(melee_web_match_restore_input(match,initial_input,error,sizeof(error)),error);initial_input=nullptr;}
             world->enable_full_stage(true);
             world->initialize_match(selected.start);
             construction_phase=3;
@@ -134,9 +144,16 @@ struct GameplayMatchSession::Storage {
         if(hud){check(melee_web_hud_end(hud,error,sizeof(error)),error);hud=nullptr;}
         if(world)world->end_stage();
         if(render){check(melee_web_render_end(render,error,sizeof(error)),error);render=nullptr;}
-        if(match){check(melee_web_match_end(match,error,sizeof(error)),error);match=nullptr;}
+        if(match){
+            check_fighter_asset_ownership("before-match-end");
+            check(melee_web_match_end(match,error,sizeof(error)),error);match=nullptr;
+            check_fighter_asset_ownership("after-match-end");
+        }
         music.reset();
-        if(world){world->verify_immutable_archives();world->close();world.reset();}
+        if(world){
+            check_fighter_asset_ownership("before-world-close");
+            world->verify_immutable_archives();world->close();world.reset();
+        }
         if(hud_assets){hud_assets->close();hud_assets.reset();}
         bank.reset();
         if(mode_owned){check(melee_web_vs_mode_end(),"Original VS mode lost ownership");mode_owned=false;}
@@ -144,6 +161,11 @@ struct GameplayMatchSession::Storage {
 };
 GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,const MeleeWebMenuMatchSelection& selection)
     :storage_(std::make_unique<Storage>()){storage_->start(files,selection,nullptr);}
+GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,const MeleeWebMenuMatchSelection& selection,
+                                           const MeleeWebPadState& initial_input)
+    :storage_(std::make_unique<Storage>()){
+    storage_->initial_input=&initial_input;storage_->start(files,selection,nullptr);
+}
 GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,
                                            const MeleeWebMenuMatchSelection& selection,
                                            RuntimeArchiveCache& archive_cache)
@@ -159,6 +181,18 @@ GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,
         storage_->start(files,selection,&archive_cache);
 }
 GameplayMatchSession::~GameplayMatchSession()=default;
+GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,
+                                           const MeleeWebMenuMatchSelection& selection,
+                                           RuntimeArchiveCache& archive_cache,
+                                           GameplayMatchConstruction construction,
+                                           const MeleeWebPadState& initial_input)
+    :storage_(std::make_unique<Storage>()){
+    storage_->initial_input=&initial_input;
+    if(construction==GameplayMatchConstruction::Deferred)
+        storage_->begin(files,selection,&archive_cache);
+    else
+        storage_->start(files,selection,&archive_cache);
+}
 void GameplayMatchSession::close(){if(storage_){storage_->close();storage_.reset();}}
 void GameplayMatchSession::tick(const PADStatus raw[4]){
     check(storage_&&storage_->match,"Match session is closed");char error[256]{};

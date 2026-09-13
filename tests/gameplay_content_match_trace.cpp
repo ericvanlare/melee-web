@@ -11,6 +11,8 @@
 
 extern "C" int melee_web_test_content_player(unsigned,int,unsigned);
 extern "C" int melee_web_test_item_count(int);
+extern "C" int melee_web_test_quake_start(int);
+extern "C" int melee_web_test_quake_translated(void);
 extern "C" int melee_web_story_state(uint32_t*,unsigned*,int*,int*,int*,int*);
 static void check(bool value,const char* message){if(!value)throw std::runtime_error(message);}
 int main(int argc,char** argv){try{
@@ -38,9 +40,7 @@ int main(int argc,char** argv){try{
     selection.start.rules.xB=-1;
     for(unsigned i=0;i<GM_MAX_PLAYERS;i++){
         selection.start.players[i].stocks=4;
-        /* This explicit headless fixture has no PAD-rumble transport. The
-         * native menu/match gate separately exercises retail rumble flags. */
-        selection.start.players[i].rumble_enabled=false;
+        selection.start.players[i].rumble_enabled=i<2;
     }
     check(melee_web_menu_session_destroy(menu,error,sizeof(error)),error);
     selection.hud_layout=2;selection.start.rules.x0_3=2;selection.random_seed=0x13579bdf;
@@ -244,6 +244,10 @@ int main(int argc,char** argv){try{
             check(counter,"Marth Counter did not enter its original source state");
         }
         }
+        check(melee_web_test_quake_start(2),"Original authored stage quake was not created");
+        bool translated=false;
+        for(unsigned n=0;n<8;n++){tick();translated|=melee_web_test_quake_translated()!=0;}
+        check(translated,"Authored quake animation did not translate the original camera");
         raw[0].button=PAD_BUTTON_START;tick();raw[0].button=0;
         for(unsigned n=0;n<30&&!match.paused();n++)tick();
         check(match.paused(),"Source pause did not engage");
@@ -251,6 +255,10 @@ int main(int argc,char** argv){try{
         raw[0].button=PAD_TRIGGER_L|PAD_TRIGGER_R|PAD_BUTTON_A|PAD_BUTTON_START;tick();raw[0].button=0;
         for(unsigned n=0;n<500&&!match.complete();n++)tick();
         check(match.complete(),"Original No Contest did not end the mixed match");
+        // Keep every original variant live across close, including the loop
+        // owned by Camera::xA0. The next costume reconstructs the same world.
+        for(int variant=1;variant<=4;variant++)
+            check(melee_web_test_quake_start(variant),"Stage quake variant is missing");
         match.close();match.close();
     }
     std::cout<<"Mixed source content intro, costumes, stage lifecycle, combat, pause and repeat teardown passed\n";

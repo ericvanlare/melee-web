@@ -16,6 +16,7 @@
 #include <melee/pl/plattack.h>
 #include <melee/pl/plstale.h>
 #include <sysdolphin/baselib/controller.h>
+#include <sysdolphin/baselib/rumble.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/gobjplink.h>
 #include <sysdolphin/baselib/memory.h>
@@ -32,6 +33,7 @@ extern HSD_CObj* cm_804D6464;
 extern u16 staleAttackInstance, unk_804D6480;
 extern PadLibData default_libinfo_data;
 extern HSD_PadStatus default_status_data;
+extern HSD_RumbleData HSD_Rumble_804C22E0[4];
 struct MeleeWebMatchContext {
     MeleeWebPlayerContext* players[MELEE_WEB_MATCH_MAX_PLAYERS];
     uint32_t player_count, slots[MELEE_WEB_MATCH_MAX_PLAYERS], controllers[MELEE_WEB_MATCH_MAX_PLAYERS];
@@ -45,8 +47,10 @@ struct MeleeWebMatchContext {
     HSD_PadStatus saved_pads[4], saved_master[4], saved_copy[4];
     PadLibData saved_pad_library;
     HSD_PadData input_queue;
+    HSD_RumbleData saved_rumble[4];
+    HSD_PadRumbleListData rumble_lists[12];
     CmSubject* pool;
-    int crowd_started;
+    int crowd_started,input_restored;
 };
 static MeleeWebMatchContext* owner;
 static uint64_t shadow_generation;
@@ -54,7 +58,7 @@ static int fail(char* e,size_t n,const char* m){if(e&&n)snprintf(e,n,"%s",m);ret
 static int ok(char* e,size_t n){if(e&&n)*e=0;return 1;}
 static int live(MeleeWebMatchContext* h,char* e,size_t n)
 {
-    if(!h||h!=owner||h->generation!=melee_web_gameplay_stats().generation)
+    if(!h||h!=owner||h->generation!=melee_web_gameplay_generation())
         return fail(e,n,"Match context requires its live owned source world");
     if(seed_ptr!=&h->seed||cm_804D645C!=h->pool)
         return fail(e,n,"Match source RNG or camera ownership changed");
@@ -70,7 +74,7 @@ MeleeWebMatchContext* melee_web_match_begin(const MeleeWebMatchSettings* s,
 MeleeWebMatchContext* melee_web_match_begin_players(const MeleeWebPlayerSettings* players,
     uint32_t count,uint32_t camera_subjects,uint32_t seed,MeleeWebCollision* collision,char* e,size_t n)
 {
-    uint64_t generation=melee_web_gameplay_stats().generation;
+    uint64_t generation=melee_web_gameplay_generation();
     MeleeWebCollisionReadiness r;
     if(!players||!generation||owner||count<1||count>MELEE_WEB_MATCH_MAX_PLAYERS||camera_subjects<count||camera_subjects>70){
         fail(e,n,"Match needs an unowned world, player slot 0..3 and 1..70 camera subjects");return NULL;
@@ -110,11 +114,12 @@ MeleeWebMatchContext* melee_web_match_begin_players(const MeleeWebPlayerSettings
     memcpy(h->saved_master,HSD_PadMasterStatus,sizeof(h->saved_master));
     memcpy(h->saved_copy,HSD_PadCopyStatus,sizeof(h->saved_copy));
     h->saved_pad_library=HSD_PadLibData;
+    memcpy(h->saved_rumble,HSD_Rumble_804C22E0,sizeof(h->saved_rumble));
     /* Exact processing configuration from source gmMain_8015FD24. Hardware
-     * PADInit/sampling/rumble remain separate browser/provider responsibilities;
-     * only the source queue and status-processing histories are owned here. */
+     * PAD sampling/output remains the provider boundary. The source rumble
+     * interpreter owns the same 12-list pool as gmMain_8015FD24. */
     HSD_PadLibData=default_libinfo_data;
-    HSD_PadLibData.rumble_info=h->saved_pad_library.rumble_info;
+    HSD_PadRumbleInit(12,h->rumble_lists);
     HSD_PadLibData.qnum=1;HSD_PadLibData.queue=&h->input_queue;
     HSD_PadLibData.clamp_stickType=0;HSD_PadLibData.clamp_stickShift=1;
     HSD_PadLibData.clamp_stickMax=80;HSD_PadLibData.clamp_stickMin=0;
@@ -139,6 +144,17 @@ MeleeWebMatchContext* melee_web_match_begin_players(const MeleeWebPlayerSettings
 int melee_web_match_create_fighter(MeleeWebMatchContext* h,char* e,size_t n)
 {
     return melee_web_match_create_fighters(h,e,n);
+}
+int melee_web_match_restore_input(MeleeWebMatchContext* h,const MeleeWebPadState* state,char* e,size_t n)
+{
+    if(!live(h,e,n))return 0;
+    if(!state||h->ticks||h->input_restored||HSD_PadLibData.qcount)
+        return fail(e,n,"Input history may be restored once before match initialization");
+    for(uint32_t i=0;i<h->player_count;i++)
+        if(Player_GetPtrForSlot(h->slots[i])->player_entity[0])
+            return fail(e,n,"Input history cannot be restored after fighter creation");
+    melee_web_pad_state_apply(state);h->input_restored=1;
+    return ok(e,n);
 }
 static int create_fighters(MeleeWebMatchContext* h,int activate,char* e,size_t n)
 {
@@ -192,6 +208,9 @@ int melee_web_match_step_raw_phased(MeleeWebMatchContext* h,const PADStatus raw[
     for(unsigned i=0;i<4;i++)h->input_queue.stat[i].err=-1;
     for(uint32_t i=0;i<h->player_count;i++)h->input_queue.stat[h->slots[i]]=raw[h->controllers[i]];
     HSD_PadLibData.qread=HSD_PadLibData.qwrite=0;HSD_PadLibData.qcount=1;
+    /* Raw replay samples replace PADRead, not the source rumble interpreter
+     * that precedes it in HSD_PadRenewRawStatus. One sample is supplied per tick. */
+    HSD_PadRumbleInterpret();
     HSD_PadRenewMasterStatus();
     if(renew){if(!renew(context,e,n))return 0;}
     else{HSD_PadRenewCopyStatus();HSD_PadRenewGameStatus();}
@@ -390,7 +409,8 @@ int melee_web_match_player_stats(MeleeWebMatchContext* h,uint32_t index,MeleeWeb
     if(p->player_entity[0]){
         Fighter* fp=p->player_entity[0]->user_data;
         out->motion_id=fp->motion_id;out->ground_or_air=fp->ground_or_air;
-        memcpy(out->position,&fp->cur_pos,sizeof(out->position));out->animation_frame=fp->cur_anim_frame;
+        memcpy(out->position,&fp->cur_pos,sizeof(out->position));out->facing_direction=fp->facing_dir;
+        out->animation_frame=fp->cur_anim_frame;
         out->extra_model_objects=fp->x203C.count;
         out->damage_percent=fp->dmg.x1830_percent;out->shield_health=fp->shield_health;
         out->source_stick[0]=fp->input.lstick[0].x;out->source_stick[1]=fp->input.lstick[0].y;
@@ -434,5 +454,7 @@ int melee_web_match_end(MeleeWebMatchContext* h,char* e,size_t n)
     memcpy(HSD_PadMasterStatus,h->saved_master,sizeof(h->saved_master));
     memcpy(HSD_PadCopyStatus,h->saved_copy,sizeof(h->saved_copy));
     HSD_PadLibData=h->saved_pad_library;
+    for(unsigned i=0;i<4;i++)PADControlMotor(i,PAD_MOTOR_STOP_HARD);
+    memcpy(HSD_Rumble_804C22E0,h->saved_rumble,sizeof(h->saved_rumble));
     owner=NULL;free(h);return ok(e,n);
 }

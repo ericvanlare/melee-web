@@ -2,11 +2,13 @@
 #define MELEE_WEB_GAMEPLAY_MATCH_CONTEXT_H
 #include "gameplay_player_context.h"
 #include "gameplay_collision.h"
+#include "gameplay_pad_state.h"
 #include <dolphin/pad.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
 typedef struct MeleeWebMatchContext MeleeWebMatchContext;
+int melee_web_match_restore_input(MeleeWebMatchContext*,const MeleeWebPadState*,char*,size_t);
 /* Source scene phases run after PAD renewal and around the original scheduler. */
 typedef int (*MeleeWebMatchTickPhase)(void*, char*, size_t);
 int melee_web_match_step_raw_phased(MeleeWebMatchContext*, const PADStatus[4],
@@ -38,7 +40,7 @@ typedef struct MeleeWebMatchStats {
     int32_t motion_id, ground_or_air;
     uint32_t extra_model_objects, eye_count;
     MeleeWebMatchEyeStats eyes[2];
-    float position[3], animation_frame;
+    float position[3], facing_direction, animation_frame;
     float source_stick[2], source_triggers;
     uint32_t held_buttons, pressed_buttons, released_buttons;
     uint32_t player_slot;

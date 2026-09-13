@@ -22,6 +22,12 @@ struct MeleeWebFighterAssetScope {
 static MeleeWebFighterAssetScope* owners[FTKIND_NONE];
 static int fail(char* error,size_t size,const char* text)
 { if(error && size)snprintf(error,size,"%s",text);return 0; }
+static int fail_data_change(char* error,size_t size,uint32_t kind,const void* expected,const void* actual)
+{
+    if(error&&size)snprintf(error,size,"Published fighter data changed unexpectedly for kind %u (expected %p, actual %p)",
+        kind,expected,actual);
+    return 0;
+}
 static void fatal(const char* text)
 { fprintf(stderr,"Owned fighter assets: %s\n",text);abort(); }
 MeleeWebFighterAssetScope* melee_web_fighter_assets_begin(uint32_t kind,uint32_t costume,
@@ -64,7 +70,7 @@ int melee_web_fighter_assets_end(MeleeWebFighterAssetScope* h,char* error,size_t
     if(!h)return 1;
     if(h->kind>=FTKIND_NONE || owners[h->kind]!=h || melee_web_fighter_assets_live(h))return fail(error,size,"Fighter assets still have live source Fighters");
     if(gFtDataList[h->kind]!=h->data)
-        return fail(error,size,"Published fighter data changed unexpectedly");
+        return fail_data_change(error,size,h->kind,h->data,gFtDataList[h->kind]);
     for(unsigned c=0;c<16;c++)if(h->costume_owned[c] &&
         (CostumeListsForeachCharacter[h->kind].costume_list[c].joint!=h->published_costume[c].joint ||
          CostumeListsForeachCharacter[h->kind].costume_list[c].x4!=h->published_costume[c].x4))
@@ -84,6 +90,27 @@ void melee_web_fighter_assets_require_costume(uint32_t kind,int costume)
     melee_web_fighter_assets_require_kind(kind);
     if(costume<0 || costume>=16 || !owners[kind]->costume_owned[costume])
         fatal("Requested costume is not hydrated in this asset scope");
+}
+int melee_web_fighter_assets_check_owned(const char* phase,char* error,size_t size)
+{
+    for(unsigned kind=0;kind<FTKIND_NONE;++kind) {
+        MeleeWebFighterAssetScope* h=owners[kind];
+        if(!h)continue;
+        if(gFtDataList[kind]!=h->data) {
+            if(error&&size)snprintf(error,size,"%s: kind %u ftData owner changed (expected %p, actual %p)",
+                phase?phase:"fighter-assets",kind,(void*)h->data,(void*)gFtDataList[kind]);
+            return 0;
+        }
+        for(unsigned c=0;c<16;++c)if(h->costume_owned[c] &&
+            (CostumeListsForeachCharacter[kind].costume_list[c].joint!=h->published_costume[c].joint ||
+             CostumeListsForeachCharacter[kind].costume_list[c].x4!=h->published_costume[c].x4)) {
+            if(error&&size)snprintf(error,size,"%s: kind %u costume %u owner changed",
+                phase?phase:"fighter-assets",kind,c);
+            return 0;
+        }
+    }
+    if(error&&size)error[0]=0;
+    return 1;
 }
 void melee_web_fighter_assets_bind_created(Fighter* fp)
 {

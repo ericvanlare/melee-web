@@ -14,10 +14,12 @@
 
 extern int melee_web_pause_screen_begin(void);
 extern int melee_web_pause_screen_end(void);
+extern int melee_web_bg_flash_begin(void);
+extern int melee_web_bg_flash_end(void);
 struct MeleeWebHud {
     uint64_t generation;
     HSD_Archive* previous_archive;
-    int previous_language, previous_saved_language, pause_owned;
+    int previous_language, previous_saved_language, pause_owned, flash_owned;
 };
 static MeleeWebHud* owner;
 static int fail(char* error, size_t size, const char* message)
@@ -54,6 +56,13 @@ MeleeWebHud* melee_web_hud_begin(unsigned layout, char* error, size_t size)
     /* gm_1A3F's original default gameplay scene preparation size. */
     HSD_SisLib_803A6048(0x4800);
     ifAll_802F390C();
+    /* fn_8016E730 creates the authored screen-flash system after ifAll. */
+    if (!melee_web_bg_flash_begin()) {
+        fail(error, size, "Original screen-flash ownership is unavailable");
+        melee_web_hud_end(hud, NULL, 0);
+        return NULL;
+    }
+    hud->flash_owned = 1;
     ifStatus_802F6EA4(3, -1, -1, 0, (Event) fn_8016B7B4,
                     (Event) intro_finished);
     ifTime_CreateTimers();
@@ -90,6 +99,9 @@ int melee_web_hud_end(MeleeWebHud* hud, char* error, size_t size)
     if (hud->pause_owned && !melee_web_pause_screen_end())
         return fail(error, size, "Original pause-screen ownership changed");
     hud->pause_owned = 0;
+    if (hud->flash_owned && !melee_web_bg_flash_end())
+        return fail(error, size, "Original screen-flash ownership changed");
+    hud->flash_owned = 0;
     ifAll_802F3A64();
     HSD_SisLib_803A5FBC();
     *ifAll_GetArchive() = hud->previous_archive;

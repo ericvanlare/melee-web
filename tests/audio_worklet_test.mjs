@@ -47,4 +47,10 @@ assert.equal(output.queue.available, 0, 'disabled worklet rejects source PCM');
 
 state(true);
 assert.equal(output.queue.available, 0, 're-enabling starts with an empty queue');
+output.queue.prefill = 0;
+output.process([], [[pcm(new Array(128).fill(0)), pcm(new Array(128).fill(0))]]);
+state(false);
+assert.equal(output.port.messages[0].underruns, 128,
+  'the final disable acknowledgement reports underruns before a periodic report');
+assert.equal(output.port.messages[0].overflows, 0);
 console.log('Audio worklet state acknowledgement and preparation queue reset passed');

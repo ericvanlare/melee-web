@@ -51,7 +51,9 @@ while an asynchronous pipeline is actually queued.
 `web/initial_pipeline_cache.db.gz.b64` is a reviewed Aurora cache seed captured
 from the Release browser runtime after the original CSS, SSS, Yoshi's Story,
 Battlefield, Dream Land, stock-loss/respawn, Fox first-use, and Marth first-use
-paths had rendered. It contains one shader record and 344 pipeline descriptors. It contains no
+paths had rendered. It contains one shader record and 389 pipeline descriptors. The latest 45
+were discovered by the visibly drawn Fox/Falco Battlefield replay canary; all
+344 existing descriptor payloads were retained unchanged. It contains no
 textures, models, audio, or other disc bytes.
 `scripts/materialize_pipeline_cache.py` verifies its SHA-256 digest and
 materializes it for Emscripten's `/initial_pipeline_cache.db` preload.
@@ -223,3 +225,32 @@ guard for deeper construction changes. The coverage and cold/warm acceptance
 split described in
 [issue 3](https://github.com/ericvanlare/melee-web/issues/3) should remain the
 reporting format as more stages and fighters are admitted.
+
+## Slippi-derived visible replay canary
+
+The 686-input Fox/Falco Battlefield canary independently matches vanilla state
+in the browser, then passes separate Release timing runs on Apple M4/32 GiB,
+macOS 26.6.2 (25G83), AC power with low-power mode off, visible in-app Chromium
+152, the built-in 2560×1664 display and a 640×480 source framebuffer (DPR 2).
+Browser/driver shader caches were uncontrolled; “cold” here means the origin's
+IDBFS renderer cache was cleared before a fresh Wasm/runtime instance.
+
+| Measurement | Cleared origin | Full warm reload |
+| --- | ---: | ---: |
+| Source inputs consumed | 686 | 686 |
+| Worst native callback | 12.735 ms | 7.42 ms |
+| Worst active callback interval | 26.11 ms | 19.615 ms |
+| Timing gaps / long tasks / audio underruns | 0 / 0 / 0 | 0 / 0 / 0 |
+| Live pipelines queued / created | 0 / 0 | 0 / 0 |
+| Match preparation | 186.745 ms | 200.905 ms |
+| Live texture upload bytes | 3,811,328 | 3,811,328 |
+| Live Wasm heap growth bytes | 0 | 0 |
+
+Both runs complete final drawing and teardown without a resume, and browser
+error inspection is empty. An earlier warm run had 86,441,984 bytes of live
+heap growth without a timing failure. That result is retained and should inform
+resource budgets as corpus coverage expands. Neither average FPS nor the absence
+of a timing failure proves zero allocation, GPU completion or full-match
+performance. The canary covers six air dodges and no combat/stock loss.
+Its receipt and reproducible UI/CLI steps are in
+[the retail replay notes](RETAIL_REPLAY_CAPTURE.md#visible-browser-replay).

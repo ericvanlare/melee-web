@@ -14,20 +14,241 @@ The combined [performance and accuracy playbook](docs/PERFORMANCE_AND_ACCURACY.m
 defines the evidence levels, content admission workflow and failure-response
 process used from this point forward.
 
-Slippi replay validation is now the planned scalable gameplay workload. The
-first ingestion slice adds a streaming, version-aware Game Start decoder and a
-privacy-minimized local corpus indexer. It hashes and deduplicates replays,
-preserves the exact Game Info Block and initial RNG, and classifies UCF, PAL,
-Frozen Stadium, online scene and raw-controller-field availability without
-copying player names or paths. Synthetic negative/deduplication tests pass, and
-the decoder was checked against an official UCF-off 1.7.1 fixture plus a real
-UCF 2.0.1 tournament file. This is intake evidence only; normalized per-frame
-input/state replay and source-match comparison are the next slice. The public
-tournament corpus audit found 6,813 supported cross-character/stage games but
-zero UCF-off files in a 952-file sample, so it is accepted for performance and
-scoped post-input coverage rather than vanilla equivalence. See the
-[replay architecture](docs/SLIPPI_REPLAY_VALIDATION.md) and
-[corpus audit](docs/SLIPPI_CORPUS_AUDIT.md).
+Browser staging now uses bounded persistent CPU storage and transfers only used
+ranges, preserving original GPU copy/draw ordering and completion backpressure.
+Three complete 3,719-tick matches in one application keep Wasm capacity at
+334,102,528 bytes with zero gameplay growth and stable teardown allocations;
+the old mapping path reached 1,047,986,176 bytes on its third repetition.
+The visible trace still matches both retail references exactly, and independent
+Release cold/warm gates pass (native maxima 10.000/7.430 ms), with no live
+pipeline creation, timing resumes or audio-queue failures. This closes the
+measured repeated-workload allocation issue; broader memory and content
+coverage remain open. See the [evidence ledger](docs/REPLAY_CORPUS.md#bounded-browser-staging).
+
+Four additional complete retail reference pairs now add 13,701 source ticks on
+Final Destination and Yoshi's Story with Fox, Falco and Marth. They include 43
+damage increases and actual up-special execution. Shared screen-flash ownership,
+shield/up-special rounding, projection-buffer storage and original ground
+initialization are corrected in development. All four new visible gameplay
+traces now match both original captures. The final one-ULP Marth position red
+required shared pose and SDK quaternion-matrix rounding corrections, verified
+first against captured scalar operands and outputs, then through all 2,901
+ticks with source drawing. The reviewed startup seed now has 469 pipelines.
+All eight complete regression games now match both original captures through
+24,823 source-drawn ticks. Their 16 isolated cold/warm performance runs pass
+with zero hard-gate failures, live pipeline creation or heap growth; the worst
+native callback is 15.855 ms. Both reserved games then pass the frozen build
+without runtime or seed changes: 6,219 additional exact source-drawn ticks and
+four further cold/warm runs with zero hard-gate failures. This brings the
+current build to ten complete games and 20 performance runs; broader gold,
+pixel/PCM, physical-input and content admission remain open.
+All 473 tests pass;
+rebuilt fighter/stage lifecycle checks also pass after correcting a missing
+rumble archive in the standalone Battlefield test bundle. See the [expanded evidence ledger](docs/REPLAY_CORPUS.md#expanded-development-corpus--eight-game-regression-gate).
+
+The [first measured replay cohort](docs/REPLAY_CORPUS.md) now contains three
+development workloads and one independently held-out workload, totaling 11,122
+source ticks. Two new development reference pairs and the held-out pair repeat
+exactly; all three match the visible source-drawn port through original endings
+and teardown. Their six final Release cold/warm runs have zero hard-gate
+failures (worst native callback 12.020 ms). The held-out game passed the frozen
+runtime and seed without changes. This expansion fixed shared knockback FMA
+rounding, added source-driven match-length discovery and measured coverage
+selection, and brought the reviewed startup seed to 432 pipelines. A retained
+headless red exposed original magnifier drawing's effect on later offscreen
+damage; visible comparison is now mandatory. The full 453-test suite and the
+updated 12-test coverage suite pass. All four workloads remain Fox/Falco on
+Battlefield with sparse combat and no up-special; broader gold/content
+admission remain open; the subsequently measured staging fix above closes that
+cohort's observed live heap growth.
+
+The [complete-game replay calibration](docs/COMPLETE_REPLAY_CALIBRATION.md)
+now covers a derived 3,122-tick Fox/Falco Battlefield elimination match. Two
+independent JITARM64 references repeat exactly; Release/headless and visibly
+drawn port traces match every declared field through the original ending and
+successful teardown. Shared Hermite, DI, joint-matrix and knockback rounding
+boundaries now follow the pinned retail instructions. Effect-parameter setters
+address their real table, fixing a shield-triggered overwrite caused by an
+original link-layout assumption. That calibration's startup seed contained 427
+pipelines. Final visible Release cold/warm runs pass all 3,122 ticks with zero
+hard-gate failures (worst native callbacks 11.330/12.485 ms; browser intervals
+21.365/22.010 ms). The final collector also matches the full repeated reference
+trajectory in Interpreter64; its protected dequeue observation resolves the
+retained controller-capture race. All 435 tests pass. This trajectory includes seven stock losses and six respawns but only
+five damage increases and no up-special; broad corpus admission remains open.
+
+Slippi ingestion now normalizes finalized per-frame input/state records, handles
+rollback history without mixing revisions, preserves exact field bits and
+rejects incomplete timelines. The v2 input-only workload transport retains
+source identity and records derived rules explicitly; it never treats UCF
+post-frame observations as a vanilla oracle. The existing modern Fox/Falco
+Battlefield fixture completes all 686 input frames and teardown in the source
+runner. That is workload evidence, not browser performance or equivalence.
+
+The first retail replay calibration now passes: two independent automated
+Mario/Mario Final Destination captures repeat exactly for 240 neutral source
+ticks, and the port matches their entry data, input vectors, declared fighter
+fields, RNG and match clock. The v2 fixture additionally restores and compares
+the semantic PAD configuration and all Master/Copy/Game histories on every tick.
+A separate 240-tick retail camera-traversal audit finds no changes to these
+declared fields during drawing for this neutral sequence. The calibration found
+and fixed missing stage particle bank30
+publication and the absent owned rumble data/interpreter boundary. Stage banks
+30/64 share decoded assets; authored particle dependencies are checked before
+entry. See the [capture procedure and evidence](docs/RETAIL_REPLAY_CAPTURE.md).
+After these fixes, the visible Release Marth/Dream Land warm action inventory
+completed all 46 cases and 6,168 source frames with zero hard-gate failures
+(worst native callback 12.19 ms); an earlier incomplete sweep exposed a test
+driver recovery gap at the original platform-edge teeter state, now corrected.
+The modern Fox/Falco Battlefield donor now also has two independently repeatable
+vanilla captures: all 686 source ticks consume the intended PAD vectors, and
+both 686-draw audits leave the declared state unchanged. The port matches every
+declared field after restoring the original MSL sine/cosine and arctangent
+routines with their explicit fused-operation rounding. Two retained numerical
+reds at air-dodge entry led to these shared fixes; no tolerance or per-frame
+state correction was added. This is still **zero admitted gold Slippi fixtures**:
+broad corpus/coverage and content admission remain open. The first donor now
+also passes visible source-draw state comparison and Release cleared-origin/warm
+performance checks, with zero hitches, audio underruns or live pipeline creation
+over all 686 ticks. Worst native callbacks were 12.735/7.42 ms and match preparation
+186.745/200.905 ms on an Apple M4, macOS 26.6.2, visible Chromium 152, 640×480
+framebuffer. Driver caches were not controlled. The final pair had no live heap growth. An earlier warm run grew the Wasm heap
+by 86,441,984 bytes without a timing failure; this remains measured memory work,
+not a zero-allocation claim. That earlier calibration's seed contained 389 pipelines.
+`check_browser_replay.py` independently joins recipe, state, timing and build
+evidence while refusing a broader admission claim.
+
+A successor public corpus audit supplies 1,005 UCF-off candidates on the current
+fighter/stage surface. Independent full parsing verifies 76 complete source
+identities, including 16 exact human P1/P2 games compatible with processed-v2
+input export. Eight development games and two fresh whole-game holdouts are
+reserved before runtime execution. These legacy recordings lack complete raw
+controller samples; original vanilla captures must still establish expected
+state. The earlier 952-file zero-UCF-off sample no longer constrains candidate
+selection. See the [verified split and limitations](docs/REPLAY_CORPUS.md#independently-verified-ucf-off-candidate-split).
+
+The UCF-off cohort now has all eight development donors executed; both fresh
+holdouts remain unexecuted. The port supports their original
+eight-minute stock countdown through the source timer and timeout paths; exact
+donor settings and separate timer sidecars are mandatory gates. Reusable
+construction-input calibration passes the production collector and original
+reference controls. The first Fox/Falco Battlefield donor matches all 5,772
+recorded ticks, ending on the last KO before the source ending; it remains a
+bounded recording. Marth/Marth on Yoshi’s Story and Fox/Fox on Final Destination
+match both original captures through complete endings of 6,525 and 7,481 ticks.
+
+The first three workloads found shared matrix/vector lane-order, Dolphin Slash
+rotation and linear-spline rounding differences. Their earlier ten-game source
+regression and six cold/warm runs passed on the previous candidate; those reports
+retain their original build identities. See the [timed cohort evidence](docs/REPLAY_CORPUS.md#final-timed-cohort-candidate-performance-gate).
+
+The remaining five donors independently repeat their original setup and endings
+and now match 20,915 exact visible source ticks on the final Release build. They
+exposed and cover Counter's wind command, stage quake animation ownership,
+camera descriptor addressing, and source tick/draw ordering. Fresh-reference
+replay entry also rejects unknown prior heap history, which v2 recipes do not
+encode. The earlier 13-game state regression still passes on the source-fix
+build, for 71,735 unique visible ticks across 17 complete games and one bounded
+recording. Together with three earlier controls, the final Release build matches 38,640
+exact current-build ticks. Old reports are not reassigned to a new executable.
+All 518 tests pass.
+
+Profiling found content-dependent vertex-array registry scans and unnecessary
+SDK heap walks during ownership checks. An exact live-owner array index and
+cheap generation accessor remove those costs without changing source math or
+draw order. The first five-game cold/warm sweep on that Release build passed
+eight of ten runs; two intermittent frame-finalization spikes remain under
+investigation. Expanded timing reproduced a third red, then four further
+full-partition repetitions passed. Those passing retries do not close the reds.
+The final ten cold/warm runs pass their scoped gates: worst native/browser
+callbacks are 12.830 / 29.420 ms, with zero live pipelines, heap growth, timing
+resumes or audio faults. Those measurements do not clear the earlier unexplained
+reds. The reviewed seed contains 507 pipelines. See the [remaining-five evidence](docs/REPLAY_CORPUS.md#remaining-five-ucf-off-development-donors).
+The candidate is not frozen; broader gold/content admission remains open.
+
+The reusable [bounded hitch-capture loop](docs/HITCH_CAPTURE.md) now preserves
+every abnormal callback, previous timing context and optional browser trace in
+an immutable attempt ledger. Its first fixed twelve-attempt matrix is complete:
+eight unprofiled attempts measured six native 16.67 ms deadline misses, including
+one native 33.3 ms hard failure, and three separate browser hard gaps across
+37,915 callbacks. Maxima are 94.115 ms native / 106.645 ms browser. Four profiled
+attempts had no hitches and cannot close these failures. The cold red is in
+begin-frame work; warm recording spikes repeat the earlier Dream Land source
+frame 1746 and Yoshi source frame 279. SQLite/IDBFS sync during frame finalization is a concrete
+code-path suspect, still awaiting event-level causal confirmation. All raw
+reports and the unrelated favicon 404s that marked these attempts aborted are
+retained. No source gameplay code or numerical behavior was changed for this
+capture work. Both fresh holdouts stay unopened, followed by a separate required
+whole-sequence reference/performance track for consecutive matches with retained
+source heap state before any public 4×4 readiness claim.
+All 550 regression tests and the affected Release build pass. Harness recovery,
+trace loss, overflow and served-build checks are covered; this is validation of
+the diagnostic loop, not resolution of the measured gameplay red.
+
+The subsequent four-slot causal capture completed 18,960 development input ticks
+with four complete traces and no retries. Warm Fox/Marth on Dream Land reproduced
+callback 1,883/source frame 1,746: 20.580 ms native and a 37.610 ms browser gap.
+Three actual cache `fsync` waits account for 14.280 ms within that callback;
+correlated stacks show the renderer's SQLite transaction triggering an automatic
+WAL checkpoint through Asyncify/IDBFS. This identifies an optional persistence
+path to remove from live gameplay. The other three runs record focus loss;
+none is acceptance evidence. The earlier 91.795 ms cold begin-frame stall remains
+unresolved. The new instrumentation passes 552 tests and the Release build;
+its frozen build, all failures and causal evidence are recorded in
+[the hitch-capture notes](docs/HITCH_CAPTURE.md#causal-capture-results--2026-09-12).
+The optional-cache fix is now implemented and verified on these two development
+workloads: SQLite transactions remain queued during source ownership and drain
+only after native teardown, with bounded coalescing and explicit save failures.
+Both original A/B comparisons pass for 9,480 source ticks, including declared
+state/RNG/PAD, timers, source draws and match completion. Both real exported
+DB/WAL pairs pass integrity checks and reload. Four separate unprofiled cold/warm
+runs pass across 18,960 source ticks / 18,961 callbacks: zero native 16.67 ms
+misses, zero native 33.3 ms failures and zero browser 33.3 ms gaps. Worst native
+callback is 12.845 ms; worst browser interval is 30.555 ms. A separate complete
+profiled run records zero live cache syncs and a successful post-teardown flush.
+All 554 tests and the Release build pass. See the [fix evidence](docs/HITCH_CAPTURE.md#deferred-cache-fix-and-verification--2026-09-12).
+The earlier cold begin-frame red remains independently unresolved; these clean
+runs do not classify it as external scheduling. Both fresh holdouts and the
+subsequent retained-heap gate remain closed.
+
+A four-slot fresh/reloaded-browser experiment now reproduces the remaining
+cold failure: a 90.745 ms native callback includes 85.945 ms across 27 waits for
+a staging buffer's GPU completion. There are zero CPU frame-slot waits or live
+cache syncs. A 115.722 ms GPU-process task overlaps it, including a Dawn worker
+with only 1.057 ms of thread CPU across 114.404 ms wall time. This localizes the
+wait but does not identify the underlying GPU operation or establish external
+scheduling. Two subsequent, separately bounded startup GPU traces do not
+reproduce the stall; both experiments preserve a focus-loss failure as well.
+All six diagnostic traces are complete for their declared windows. The capture
+tool now supports a frozen ten-second GPU startup preset with deferred stream
+reading. No gameplay or renderer implementation changed; the red remains
+unresolved and both holdouts remain unopened. See the [results and next discrimination](docs/HITCH_CAPTURE.md#cold-begin-wait-and-gpu-startup-diagnosis--2026-09-12).
+
+A subsequent fixed four-slot diagnostic-output painting experiment completes
+15,568 source ticks/draws but does not reproduce the long GPU worker. It retains
+43 native deadline misses, zero native hard failures, 28 browser hard gaps and
+three focus-loss failures. Startup CPU traces implicate application work in
+some smaller misses; they do not explain the old wait. A separate native GPU
+profiled replay adds two deadline misses and one browser gap, with no focus
+loss. The native recording's exported retention does not cover those failures,
+despite successful attachment and file creation. The new canvas verifier's
+logical/backing-size mistake is corrected; all original failed attempts remain
+preserved. No performance fix or external-scheduling classification is claimed.
+Both holdouts remain unopened. See the [experiment and coverage limits](docs/HITCH_CAPTURE.md#diagnostic-page-painting-and-native-gpu-capture--2026-09-12).
+
+Scene preparation now waits nonblockingly for submitted GPU work to complete
+before arming the source clock, preserving source ticks/draws and menu audio
+ownership. A controlled delayed-completion test proves the old build started
+source execution prematurely and the new build waits without extra draws.
+Both full development replays still match both original references across
+9,480 ticks, and all nine original menu/entry comparisons pass. All 558 tests
+and the Release build pass. Four independent cold runs complete 18,960 ticks
+with zero native 16.67 ms misses, native 33.3 ms failures or browser 33.3 ms
+gaps; native maximum is 10.710 ms. Three pass fully; the fourth retains a
+focus-loss failure. All four are already GPU-ready at their first arming poll,
+so this protocol fix does not establish the cause of the old 115 ms GPU task.
+That red stays unresolved and both holdouts stay unopened. See the
+[readiness fix and bounded verification](docs/HITCH_CAPTURE.md#submitted-work-readiness--2026-09-12).
 
 The typed content path now carries Falco, Fox, Marth, Battlefield, Yoshi's Story and Dream Land
 source IDs, runtime manifests and focused development traces. Source stock icon IDs are
@@ -503,9 +724,11 @@ fighter now uses this browser input/presentation path; visual correctness remain
 
 ## Next
 
-Complete ordinary input acceptance of the native menu/match loop, then compare
-its actual menu-derived start, source frames and ending against the original.
-Measure cold/warm full-match performance and input/audio latency on a named
-reference configuration. Existing short warm timing runs do not close those
-gates. Broaden the roster only after the reusable lifecycle and accuracy
-boundaries are verified. See [the acceptance roadmap](docs/ROADMAP.md).
+Close the retained intermittent frame-finalization reds using the complete
+submission timing now saved with replay evidence. Keep the eight development
+donors as regressions; freeze a candidate before executing either fresh holdout.
+Passing development repeats alone do not admit gold or clear an unexplained red.
+Ordinary controller/menu acceptance, visual and audio comparisons, input/audio
+latency, and arbitrary prior-match context remain separate work. Broaden the
+roster only after the reusable lifecycle and accuracy boundaries are verified.
+See [the acceptance roadmap](docs/ROADMAP.md).

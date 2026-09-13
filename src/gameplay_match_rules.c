@@ -14,6 +14,16 @@ extern int melee_web_match_init_source(StartMeleeData*);
 struct MeleeWebMatchRules {lbl_8046B6A0_t saved;StaticPlayer players[6];StartMeleeData start;uint64_t generation;int initialized;};
 static MeleeWebMatchRules* active;
 static int fail(char* e,size_t n,const char* message){if(e&&n)snprintf(e,n,"%s",message);return 0;}
+int melee_web_match_timer_supported(const struct StartMeleeRules* rules)
+{
+    if (!rules) return 0;
+    if (!rules->timer_enabled) return 1;
+    /* Retail Rule Plus stores minutes in an u8; the VS handoff converts each
+     * selected minute to 60 seconds before it reaches time_limit. */
+    return !rules->timer_counts_up && !rules->timer_shows_hours &&
+           rules->time_limit >= 60 && rules->time_limit <= 99 * 60 &&
+           rules->time_limit % 60 == 0 && rules->x14 == 0;
+}
 MeleeWebMatchRules* melee_web_match_rules_begin(char* e,size_t n){
     if(active||!melee_web_gameplay_stats().generation){fail(e,n,"Match rules require an unowned live source world");return NULL;}
     for(int i=0;i<6;i++)if(Player_GetEntity(i)){fail(e,n,"Initialize rules before source fighters");return NULL;}
@@ -43,7 +53,7 @@ int melee_web_match_rules_init_from_menu(MeleeWebMatchRules* h,
     StartMeleeData candidate=*menu;
     if(candidate.rules.match_kind!=MatchKind_Stock||!candidate.rules.is_stock||
        !candidate.rules.is_vs||candidate.rules.is_teams||
-       candidate.rules.timer_enabled||candidate.rules.xB!=-1||
+       !melee_web_match_timer_supported(&candidate.rules)||candidate.rules.xB!=-1||
        candidate.rules.x20!=UINT64_MAX||!melee_web_stage_content(candidate.rules.stkind))
         return fail(e,n,"Menu payload does not match the supported stock/stage rules");
     h->start=candidate;
@@ -62,7 +72,9 @@ int melee_web_match_rules_outcome(int* winner)
 {
     if(winner)*winner=-1;
     if(!active)return 0;
-    MatchOutcome result=gm_GetFFAOutcome();
+    /* gm_GetFFAOutcome only covers stock elimination.  The original match
+     * manager owns the timer branch and returns OUTCOME_TIMEOUT there. */
+    MatchOutcome result=gm_GetMatchOutcome();
     if(result==OUTCOME_ELIMINATION&&winner){
         for(int i=0;i<6;i++)if(Player_GetPlayerSlotType(i)!=Gm_PKind_NA&&Player_GetStocks(i)>0)*winner=i;
     }

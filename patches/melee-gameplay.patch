@@ -456,7 +456,40 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
  
  /* 3BCB18 */ static CameraModeCallbacks cm_803BCB18 = {
      Camera_8002B3D4,
-@@ -3524,8 +3542,12 @@
+@@ -916,12 +934,10 @@
+     f32 input_x;
+     f32 input_y;
+     f32 depth_ratio;
+-    struct CameraStaticData {
+-        CameraModeCallbacks callbacks;
+-        HSD_WObjDesc interest;
+-        HSD_WObjDesc eyepos;
+-        HSD_CameraDescPerspective desc;
+-    }* data = (struct CameraStaticData*) &cm_803BCB18;
++    /* The retail linker places this descriptor after the callback/WObj tables.
++     * C globals have independent storage in Wasm; address the actual descriptor
++     * instead of reading beyond the callback table's object. */
++    const HSD_CameraDescPerspective* desc = &cm_803BCB64;
+ 
+     input_x = cm_80452C68.xA4 * cm_80452C68.xAC;
+     input_y = cm_80452C68.xA8 * cm_80452C68.xAC;
+@@ -938,12 +954,12 @@
+     half_view_height =
+         bounds->z_pos * tanf(0.5f * (0.017453292f * state->fov));
+     viewport_x_scale =
+-        data->desc.aspect *
++        desc->aspect *
+         (half_view_height /
+-         (0.5f * (f32) (data->desc.viewport.xmax - data->desc.viewport.xmin)));
++         (0.5f * (f32) (desc->viewport.xmax - desc->viewport.xmin)));
+     viewport_y_scale =
+         half_view_height /
+-        (0.5f * (f32) (data->desc.viewport.ymax - data->desc.viewport.ymin));
++        (0.5f * (f32) (desc->viewport.ymax - desc->viewport.ymin));
+     depth_factor_y = Stage_GetCamZoomRate();
+     depth_factor_x = Stage_GetCamMaxDepth() - depth_factor_y;
+ 
+@@ -3524,8 +3540,12 @@
      cm_80452C68.x2D0.angle_left = Stage_GetCamAngleRadiansLeft();
      cm_80452C68.x2D0.unk28 = Stage_GetPauseCamZPosMin();
      cm_80452C68.x2D0.unk2C = Stage_GetPauseCamZPosMax();
@@ -469,7 +502,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
  
      switch (arg2) {
      case 0:
-@@ -3707,7 +3729,11 @@
+@@ -3707,7 +3727,11 @@
      scale = cm_80452C68.x32C * cm_803BCCA0.x8C + cm_803BCCA0.x90;
      cm_80452C68.x2D0.unk28 = scale * cm_803BCCA0.x94;
      cm_80452C68.x2D0.unk2C = scale * cm_803BCCA0.x98;
@@ -481,7 +514,7 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
  
      {
          s8 slot = cm_80452C68.x304;
-@@ -3789,7 +3815,11 @@
+@@ -3789,7 +3813,11 @@
      temp_f2 = (cm_80452C68.x32C * (*new_var).x8C) + (*new_var).x90;
      cm_80452C68.x2D0.unk28 = temp_f2 * (*new_var).x94;
      cm_80452C68.x2D0.unk2C = temp_f2 * (*new_var).x98;
@@ -510,7 +543,6 @@ index 4602bcd..3140ec8 100644
  extern volatile u32 efLib_LoadKind;
  extern volatile s32 efLib_AnimCount;
 diff --git a/src/melee/ft/fighter.c b/src/melee/ft/fighter.c
-index 8299c5c..98a0f24 100644
 --- a/src/melee/ft/fighter.c
 +++ b/src/melee/ft/fighter.c
 @@ -1,4 +1,7 @@
@@ -534,7 +566,65 @@ index 8299c5c..98a0f24 100644
  
      // copy 23 4-byte chunks from pData to p_ftCommonData in reverse order,
      // equivalent to this: for(i=0; i<23; i++)
-@@ -3112,8 +3120,12 @@ void Fighter_Unload_8006DABC(void* user_data)
+@@ -2192,17 +2200,20 @@ void Fighter_procUpdate(Fighter_GObj* gobj)
+                 } else {
+                     float kb_angle = atan2f(kb_vel_y, kb_vel_x);
+ 
+-                    if (sqrtf(kb_vel_x * kb_vel_x + kb_vel_y * kb_vel_y) <
++                    /* GALE01r2 8006B938/8006B9C8/8006B9E4: retain
++                     * scalar single-precision fused-operation rounding.
++                     * fnmsubs negates the rounded result, including zero. */
++                    if (sqrtf(fmaf(kb_vel_x, kb_vel_x, kb_vel_y * kb_vel_y)) <
+                         p_ftCommonData->x204_knockbackFrameDecay)
+                     {
+                         p_kb_vel->x = p_kb_vel->y = 0;
+                     } else {
+-                        p_kb_vel->x -=
+-                            p_ftCommonData->x204_knockbackFrameDecay *
+-                            cosf(kb_angle);
+-                        p_kb_vel->y -=
+-                            p_ftCommonData->x204_knockbackFrameDecay *
+-                            sinf(kb_angle);
++                        p_kb_vel->x =
++                            -fmaf(p_ftCommonData->x204_knockbackFrameDecay,
++                                  cosf(kb_angle), -p_kb_vel->x);
++                        p_kb_vel->y =
++                            -fmaf(p_ftCommonData->x204_knockbackFrameDecay,
++                                  sinf(kb_angle), -p_kb_vel->y);
+                     }
+                 }
+ 
+@@ -2238,7 +2249,9 @@ void Fighter_procUpdate(Fighter_GObj* gobj)
+                 float kb_y = pAtkShieldKB->y;
+                 float atkShieldKBAngle = atan2f(kb_y, kb_x);
+ 
+-                if (sqrtf(kb_x * kb_x + kb_y * kb_y) <
++                /* GALE01r2 8006BAA8/8006BB34/8006BB50 use the same
++                 * fmadds/fnmsubs boundaries for shield knockback. */
++                if (sqrtf(fmaf(kb_x, kb_x, kb_y * kb_y)) <
+                     p_ftCommonData->x3E8_shieldKnockbackFrameDecay)
+                 {
+                     /// @bug IN THE MELEE CODE THAT CAUSES THE INVISIBLE
+@@ -2251,12 +2264,12 @@ void Fighter_procUpdate(Fighter_GObj* gobj)
+                     // p_stc_ftcommon->x3e8_shield_kb_frameDecay)/atkShieldKB_len
+                     // float atkShieldKBAngle = atan2_80022C30(pAtkShieldKB->y,
+                     // pAtkShieldKB->x);
+-                    pAtkShieldKB->x -=
+-                        p_ftCommonData->x3E8_shieldKnockbackFrameDecay *
+-                        cosf(atkShieldKBAngle);
+-                    pAtkShieldKB->y -=
+-                        p_ftCommonData->x3E8_shieldKnockbackFrameDecay *
+-                        sinf(atkShieldKBAngle);
++                    pAtkShieldKB->x =
++                        -fmaf(p_ftCommonData->x3E8_shieldKnockbackFrameDecay,
++                              cosf(atkShieldKBAngle), -pAtkShieldKB->x);
++                    pAtkShieldKB->y =
++                        -fmaf(p_ftCommonData->x3E8_shieldKnockbackFrameDecay,
++                              sinf(atkShieldKBAngle), -pAtkShieldKB->y);
+                 }
+                 fp->xF4_ground_attacker_shield_kb_vel = 0;
+             } else {
+@@ -3112,8 +3125,12 @@ void Fighter_Unload_8006DABC(void* user_data)
      HSD_LObjRemoveAll(fp->x588);
      Player_80031FB0(fp->player_id, fp->x221F_b4);
  
@@ -1269,7 +1359,7 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
      }
      un_802FD428();
      ifStatus_802F665C(data->rules.x0_3);
-@@ -2277,3 +2319,104 @@
+@@ -2277,3 +2319,106 @@
  {
      return pl_80039418(arg0, arg1);
  }
@@ -1288,6 +1378,7 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
 +        (data->unk_0 != 0 && data->unk_0 != 1 && data->unk_0 != 3)) return 0;
 +    gm_Scene_Vs_OnFrame();
 +    return data->match_result == OUTCOME_NONE ||
++           data->match_result == OUTCOME_TIMEOUT ||
 +           data->match_result == OUTCOME_ELIMINATION ||
 +           data->match_result == OUTCOME_NO_CONTEST;
 +}
@@ -1307,6 +1398,7 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
 +
 +#if defined(MELEE_WEB_GAMEPLAY)
 +#include "gameplay_content.h"
++#include "gameplay_match_rules.h"
 +int melee_web_match_init_source(StartMeleeData* start)
 +{
 +    const StartMeleeRules* rules;
@@ -1321,7 +1413,7 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
 +     * consumers.  In particular, do not silently turn a timer, item mask,
 +     * team match, callback, or unsupported stage into another configuration. */
 +    if (rules->match_kind != MatchKind_Stock || !rules->is_stock ||
-+        !rules->is_vs || rules->is_teams || rules->timer_enabled ||
++        !rules->is_vs || rules->is_teams || !melee_web_match_timer_supported(rules) ||
 +        !melee_web_stage_content(rules->stkind) || rules->x20 != (u64) -1 || rules->xB != -1 ||
 +        rules->game_speed != 1.0F || rules->x54 != NULL ||
 +        rules->on_match_start != NULL || rules->on_frame_start != NULL ||
@@ -1923,6 +2015,22 @@ index 75dfb9c..3275ae3 100644
              if (opcode < 0x15U) {
                  u32 idx = opcode - 0xA;
                  if (lb_803BA248[idx](co)) {
+@@ -247,6 +247,15 @@
+                      lb_804D63C0[arg2].unk);
+ }
+ 
++#ifdef TARGET_PC
++struct Fighter_804D653C_t* melee_web_rumble_exchange(struct Fighter_804D653C_t* data)
++{
++    struct Fighter_804D653C_t* previous = lb_804D63C0;
++    lb_804D63C0 = data;
++    return previous;
++}
++#endif
++
+ void lb_800145C0(u8 slot)
+ {
+     HSD_PadRumbleRemove(slot);
 diff --git a/src/melee/lb/lbarchive.c b/src/melee/lb/lbarchive.c
 --- a/src/melee/lb/lbarchive.c
 +++ b/src/melee/lb/lbarchive.c
@@ -2855,12 +2963,13 @@ diff --git a/src/sysdolphin/baselib/axdriver.c b/src/sysdolphin/baselib/axdriver
 +}
 +#endif
 diff --git a/src/sysdolphin/baselib/fobj.c b/src/sysdolphin/baselib/fobj.c
-index fb87d01..ba1ad1e 100644
+index fb87d01..991e6d7 100644
 --- a/src/sysdolphin/baselib/fobj.c
 +++ b/src/sysdolphin/baselib/fobj.c
-@@ -1,6 +1,9 @@
+@@ -1,6 +1,10 @@
  #include "fobj.h"
  
++#include <math.h>
  #include <string.h>
 +#ifdef TARGET_PC
 +#include <stdio.h>
@@ -2868,7 +2977,7 @@ index fb87d01..ba1ad1e 100644
  
  #include "debug.h"
  #include "spline.h"
-@@ -341,6 +344,25 @@ void FObjUpdateAnim(HSD_FObj* fobj, void* obj, HSD_ObjUpdateFunc obj_update)
+@@ -341,6 +345,25 @@ void FObjUpdateAnim(HSD_FObj* fobj, void* obj, HSD_ObjUpdateFunc obj_update)
      if (obj_update == NULL) {
          return;
      }
@@ -2894,6 +3003,16 @@ index fb87d01..ba1ad1e 100644
      switch (fobj->op_intrp) {
      case HSD_A_OP_KEY:
          if (fobj->flags & 0x80) {
+@@ -368,7 +391,8 @@ void FObjUpdateAnim(HSD_FObj* fobj, void* obj, HSD_ObjUpdateFunc obj_update)
+                 fobj->p0 = fobj->p1;
+             }
+         }
+-        fobjdata.fv = fobj->d0 * fobj->time + fobj->p0;
++        /* GALE01r2 8036AF98 is fmadds, as in the Hermite path. */
++        fobjdata.fv = fmaf(fobj->d0, fobj->time, fobj->p0);
+         break;
+     case HSD_A_OP_SPL0:
+     case HSD_A_OP_SPL:
 diff --git a/src/sysdolphin/baselib/hsd_3A64.c b/src/sysdolphin/baselib/hsd_3A64.c
 index 1dc2c66..e83012d 100644
 --- a/src/sysdolphin/baselib/hsd_3A64.c
@@ -5544,3 +5663,1385 @@ diff --git a/src/melee/gr/groldpupupu.c b/src/melee/gr/groldpupupu.c
  static void* grOp_804D6A9C;
  
  static int grOp_804D48A0[1][2] = { { 4, 0 } };
+diff --git a/src/sysdolphin/baselib/rumble.c b/src/sysdolphin/baselib/rumble.c
+--- a/src/sysdolphin/baselib/rumble.c
++++ b/src/sysdolphin/baselib/rumble.c
+@@ -168,7 +168,7 @@
+         return 0;
+     }
+     while (a->wait == 0) {
+-        switch ((*(u8*) a->listp >> 5) & 7) {
++        switch ((*a->listp >> 13) & 7) {
+         case 0:
+             if (a->frame == -2) {
+                 return 1;
+diff --git a/src/MSL/trigf.c b/src/MSL/trigf.c
+--- a/src/MSL/trigf.c
++++ b/src/MSL/trigf.c
+@@ -1,15 +1,17 @@
+-#include "math.h"
++#include "gameplay_trig.h"
+ 
+ #define __epsilon 3.45266983e-4f
+ 
+-#define __HI(x) (((s32*) &x)[0])
++#define __HI(x) melee_web_trig_bits(x)
+ 
+ extern f32 __sincos_on_quadrant[];
+ extern f32 __sincos_poly[];
+ 
+ const f32 tmp_float[] = { 0.25f, 0.0232393741608f, 1.70555722434e-7f,
+                           1.86736494323e-11f };
+-f32 __four_over_pi_m1[] = { 0.0f, 0.0f, 0.0f, 0.0f };
++/* Original constructor values are immutable after retail startup. */
++f32 __four_over_pi_m1[] = { 0.25f, 0.0232393741608f, 1.70555722434e-7f,
++                           1.86736494323e-11f };
+ 
+ void __sinit_trigf_c(void)
+ {
+@@ -29,38 +31,38 @@
+     f32 z;
+ 
+     z = (2.0f / (f32) M_PI) * x;
+-    n = (__HI(x) & 0x80000000) ? (int) (z - 0.5f) : (int) (z + 0.5f);
++    n = melee_web_trig_integer((__HI(x) & 0x80000000) ? z - 0.5f : z + 0.5f);
+ 
+-    y = x - n * 2 + __four_over_pi_m1[0] * x + __four_over_pi_m1[1] * x +
+-        __four_over_pi_m1[2] * x + __four_over_pi_m1[3] * x;
++    /* GALE01r2: four fmadds following the separately rounded subtraction. */
++    y = x - melee_web_trig_twice(n);
++    y = fmaf(__four_over_pi_m1[0], x, y);
++    y = fmaf(__four_over_pi_m1[1], x, y);
++    y = fmaf(__four_over_pi_m1[2], x, y);
++    y = fmaf(__four_over_pi_m1[3], x, y);
+     n &= 3;
+ 
+-    if (fabsf__Ff(y) < __epsilon) {
++    if (fabsf(y) < __epsilon) {
+         n <<= 1;
+-        return __sincos_on_quadrant[n] +
+-               (__sincos_on_quadrant[n + 1] * y * __sincos_poly[9]);
++        return fmaf(__sincos_poly[9], __sincos_on_quadrant[n + 1] * y,
++                    __sincos_on_quadrant[n]);
+     }
+ 
+     ysq = y * y;
+     if (n & 1) {
+         n <<= 1;
+-        z = (((__sincos_poly[0] * ysq + __sincos_poly[2]) * ysq +
+-              __sincos_poly[4]) *
+-                 ysq +
+-             __sincos_poly[6]) *
+-                ysq +
+-            __sincos_poly[8];
++        z = fmaf(__sincos_poly[0], ysq, __sincos_poly[2]);
++        z = fmaf(ysq, z, __sincos_poly[4]);
++        z = fmaf(ysq, z, __sincos_poly[6]);
++        z = fmaf(ysq, z, __sincos_poly[8]);
+ 
+         return z * __sincos_on_quadrant[n];
+     } else {
+         n <<= 1;
+-        z = ((((__sincos_poly[1] * ysq + __sincos_poly[3]) * ysq +
+-               __sincos_poly[5]) *
+-                  ysq +
+-              __sincos_poly[7]) *
+-                 ysq +
+-             __sincos_poly[9]) *
+-            y;
++        z = fmaf(__sincos_poly[1], ysq, __sincos_poly[3]);
++        z = fmaf(ysq, z, __sincos_poly[5]);
++        z = fmaf(ysq, z, __sincos_poly[7]);
++        z = fmaf(ysq, z, __sincos_poly[9]);
++        z *= y;
+         return z * __sincos_on_quadrant[n + 1];
+     }
+ }
+@@ -73,35 +75,35 @@
+     f32 z;
+ 
+     z = (2.0f / (f32) M_PI) * x;
+-    n = (__HI(x) & 0x80000000) ? (int) (z - 0.5f) : (int) (z + 0.5f);
++    n = melee_web_trig_integer((__HI(x) & 0x80000000) ? z - 0.5f : z + 0.5f);
+ 
+-    y = x - n * 2 + __four_over_pi_m1[0] * x + __four_over_pi_m1[1] * x +
+-        __four_over_pi_m1[2] * x + __four_over_pi_m1[3] * x;
++    /* GALE01r2: four fmadds following the separately rounded subtraction. */
++    y = x - melee_web_trig_twice(n);
++    y = fmaf(__four_over_pi_m1[0], x, y);
++    y = fmaf(__four_over_pi_m1[1], x, y);
++    y = fmaf(__four_over_pi_m1[2], x, y);
++    y = fmaf(__four_over_pi_m1[3], x, y);
+     n &= 3;
+-    if (fabsf__Ff(y) < __epsilon) {
++    if (fabsf(y) < __epsilon) {
+         n <<= 1;
+-        return __sincos_on_quadrant[n + 1] - y * __sincos_on_quadrant[n];
++        return -fmaf(y, __sincos_on_quadrant[n], -__sincos_on_quadrant[n + 1]);
+     }
+ 
+     ysq = y * y;
+     if (n & 1) {
+         n <<= 1;
+-        z = -((((__sincos_poly[1] * ysq + __sincos_poly[3]) * ysq +
+-                __sincos_poly[5]) *
+-                   ysq +
+-               __sincos_poly[7]) *
+-                  ysq +
+-              __sincos_poly[9]) *
+-            y;
++        z = fmaf(__sincos_poly[1], ysq, __sincos_poly[3]);
++        z = fmaf(ysq, z, __sincos_poly[5]);
++        z = fmaf(ysq, z, __sincos_poly[7]);
++        z = -fmaf(ysq, z, __sincos_poly[9]);
++        z *= y;
+         return z * __sincos_on_quadrant[n];
+     } else {
+         n <<= 1;
+-        z = (((__sincos_poly[0] * ysq + __sincos_poly[2]) * ysq +
+-              __sincos_poly[4]) *
+-                 ysq +
+-             __sincos_poly[6]) *
+-                ysq +
+-            __sincos_poly[8];
++        z = fmaf(__sincos_poly[0], ysq, __sincos_poly[2]);
++        z = fmaf(ysq, z, __sincos_poly[4]);
++        z = fmaf(ysq, z, __sincos_poly[6]);
++        z = fmaf(ysq, z, __sincos_poly[8]);
+         return z * __sincos_on_quadrant[n + 1];
+     }
+ }
+diff --git a/src/melee/lb/lbtrigf.c b/src/melee/lb/lbtrigf.c
+--- a/src/melee/lb/lbtrigf.c
++++ b/src/melee/lb/lbtrigf.c
+@@ -1,4 +1,5 @@
+ #include "lbtrigf.h"
++#include "gameplay_trig.h"
+ 
+ #include <Runtime/platform.h>
+ 
+@@ -9,8 +10,8 @@
+ /* 400770 */ extern float MSL_TrigF_80400770[];
+ /* 400774 */ extern float MSL_TrigF_80400774[];
+ 
+-#define SIGN_BIT (1 << 31)
+-#define BITWISE(f) (*(u32*) &f)
++#define SIGN_BIT (1U << 31)
++#define BITWISE(f) melee_web_trig_bits(f)
+ #define SIGNED_BITWISE(f) ((s32) BITWISE(f))
+ #define GET_SIGN_BIT(f) (SIGNED_BITWISE(f) & SIGN_BIT)
+ #define BITWISE_PI_2 0x3FC90FDB
+@@ -37,20 +38,22 @@
+         return atanf(y / x);
+     }
+ 
+-    *(u32*) &y = GET_SIGN_BIT(y) + BITWISE_PI_2;
++    y = melee_web_trig_from_bits(GET_SIGN_BIT(y) + BITWISE_PI_2);
+ 
+     return y;
+ }
+ 
+ float acosf(float x)
+ {
+-    float result = 1.0F - x * x;
++    /* GALE01r2 80022D30/54/64/74: preserve fnmsubs rounding, including
++     * its final negation. The original frsqrte estimate remains unchanged. */
++    float result = -fmaf(x, x, -1.0F);
+     if (result > 0) {
+         float guess;
+         guess = __frsqrte(result);
+-        guess = 0.5f * guess * (3.0f - guess * guess * result);
+-        guess = 0.5f * guess * (3.0f - guess * guess * result);
+-        guess = 0.5f * guess * (3.0f - guess * guess * result);
++        guess = (0.5f * guess) * -fmaf(result, guess * guess, -3.0f);
++        guess = (0.5f * guess) * -fmaf(result, guess * guess, -3.0f);
++        guess = (0.5f * guess) * -fmaf(result, guess * guess, -3.0f);
+         result = guess;
+     } else if (result) {
+         result = NAN;
+@@ -144,7 +147,7 @@
+     0.0,
+ };
+ 
+-#ifdef __MWERKS__
++#if defined(__MWERKS__) || defined(MELEE_WEB_GAMEPLAY)
+ float atanf(float x)
+ {
+     float const silver_ratio = 2.4142136573791504f;
+@@ -153,10 +156,10 @@
+     float result;
+     const float* lookup_ptr;
+     s32 lookup_index = -1;
+-    bool x_ge_ratio = false;
++    melee_source_bool x_ge_ratio = false;
+     s32 sign_bit_x = BITWISE(x) & SIGN_BIT;
+ 
+-    BITWISE(x) &= ~SIGN_BIT;
++    x = melee_web_trig_from_bits(BITWISE(x) & ~SIGN_BIT);
+ 
+     if (x >= silver_ratio) {
+         x_ge_ratio = true;
+@@ -200,8 +203,8 @@
+             offset_33 = lookup_ptr[33];
+ 
+             result = 1.0f / (offset_33 + (x + offset_39));
+-            result = __fnmsubs(result, lookup_ptr[7], offset_33) +
+-                     __fnmsubs(result, lookup_ptr[13], offset_39);
++            result = -fmaf(result, lookup_ptr[7], -offset_33) +
++                     -fmaf(result, lookup_ptr[13], -offset_39);
+         }
+     } else {
+         result = x;
+@@ -209,27 +212,19 @@
+ 
+     {
+         float result_squared = result * result;
+-        lookup_ptr = &atanf_lookup[lookup_index];
+-
+-        // clang-format off
+-        result = result *
+-            result_squared * (
+-                result_squared * (
+-                    result_squared * (
+-                        result_squared * (
+-                            result_squared * (
+-                                result_squared * (
+-                                    atanf_lookup[6]
+-                                ) + atanf_lookup[5]
+-                            ) + atanf_lookup[4]
+-                        ) + atanf_lookup[3]
+-                    ) + atanf_lookup[2]
+-                ) + atanf_lookup[1]
+-            ) + result;
+-        // clang-format on
+-
+-        result += lookup_ptr[27];
+-        result += lookup_ptr[20];
++        /* Index -1 is the no-reduction case. Index the actual table members
++         * below without forming a pointer before its first element. */
++
++        /* GALE01r2 0x80022FC8..0x80022FEC: retain each fmadds boundary. */
++        float poly = fmaf(result_squared, atanf_lookup[6], atanf_lookup[5]);
++        poly = fmaf(result_squared, poly, atanf_lookup[4]);
++        poly = fmaf(result_squared, poly, atanf_lookup[3]);
++        poly = fmaf(result_squared, poly, atanf_lookup[2]);
++        poly = fmaf(result_squared, poly, atanf_lookup[1]);
++        result = fmaf(result * result_squared, poly, result);
++
++        result += atanf_lookup[lookup_index + 27];
++        result += atanf_lookup[lookup_index + 20];
+     }
+ 
+     if (x_ge_ratio) {
+@@ -237,7 +232,7 @@
+         return sign_bit_x ? result : -result;
+     }
+ 
+-    BITWISE(result) |= sign_bit_x;
++    result = melee_web_trig_from_bits(BITWISE(result) | sign_bit_x);
+     return result;
+ }
+ #endif
+diff --git a/src/melee/ft/kinds/ftCommon/ftCo_Damage.c b/src/melee/ft/kinds/ftCommon/ftCo_Damage.c
+index 363b9d8..9f66b14 100644
+--- a/src/melee/ft/kinds/ftCommon/ftCo_Damage.c
++++ b/src/melee/ft/kinds/ftCommon/ftCo_Damage.c
+@@ -594,10 +594,11 @@ void ftCo_8008E5A4(Fighter* fp)
+         float kb_x = fp->x8c_kb_vel.x;
+         float kb_y = fp->x8c_kb_vel.y;
+         float kb_vel_x_neg = -kb_x;
+-        float kb_mag = kb_vel_x_neg * kb_vel_x_neg + kb_y * kb_y;
++        /* Pinned 8008E5FC/8008E624 use single-rounding fmadds. */
++        float kb_mag = fmaf(kb_vel_x_neg, kb_vel_x_neg, kb_y * kb_y);
+         if (!(kb_mag < 0.00001f)) {
+-            float f3 = kb_y * fp->input.lstick[0].x +
+-                       kb_vel_x_neg * fp->input.lstick[0].y;
++            float f3 = fmaf(kb_y, fp->input.lstick[0].x,
++                            kb_vel_x_neg * fp->input.lstick[0].y);
+             float f30 = f3 * f3 / kb_mag;
+             Vec3 lstick_vec3, kb_vel_cross_lstick;
+             lstick_vec3.x = fp->input.lstick[0].x;
+@@ -611,9 +612,9 @@ void ftCo_8008E5A4(Fighter* fp)
+             {
+                 float angle = atan2f(kb_y, kb_x);
+                 float scale;
+-                kb_mag = sqrtf(kb_x * kb_x + kb_y * kb_y);
++                kb_mag = sqrtf(fmaf(kb_x, kb_x, kb_y * kb_y));
+                 scale = MTXDegToRad(p_ftCommonData->x1A8);
+-                angle += scale * f30;
++                angle = fmaf(scale, f30, angle); /* 8008E6CC */
+                 fp->x8c_kb_vel.x = kb_mag * cosf(angle);
+                 fp->x8c_kb_vel.y = kb_mag * sinf(angle);
+             }
+@@ -658,7 +659,7 @@ void ftCo_Damage_OnExitHitlag(Fighter_GObj* gobj)
+         if (kb_x || kb_y) {
+             float kb_angle = atan2f(kb_y, kb_x);
+             float scaled_kb_mag =
+-                sqrtf(kb_x * kb_x + kb_y * kb_y) * p_ftCommonData->x1AC;
++                sqrtf(fmaf(kb_x, kb_x, kb_y * kb_y)) * p_ftCommonData->x1AC;
+             fp->x8c_kb_vel.x = scaled_kb_mag * cosf(kb_angle);
+             fp->x8c_kb_vel.y = scaled_kb_mag * sinf(kb_angle);
+         }
+diff --git a/src/sysdolphin/baselib/spline.c b/src/sysdolphin/baselib/spline.c
+index 6a4569f..626d628 100644
+--- a/src/sysdolphin/baselib/spline.c
++++ b/src/sysdolphin/baselib/spline.c
+@@ -22,9 +22,13 @@ f32 splGetHelmite(f32 fterm, f32 time, f32 p0, f32 p1, f32 d0, f32 d1)
+     _2t3_T3 = 2.0f * t3_T2 * fterm;
+     _3t2_T2 = 3.0f * _1_T2 * t2;
+ 
+-    return (d1 * (t3_T2 - t2_T)) + ((d0 * (time + ((t3_T2 - t2_T) - t2_T))) +
+-                                    ((p0 * (1.0f + (_2t3_T3 - _3t2_T2))) +
+-                                     (p1 * (-_2t3_T3 + _3t2_T2))));
++    /* GALE01r2 80378A80..80378A8C: one fmuls followed by three
++     * fmadds. Preserve those single-rounding boundaries; separate multiply
++     * and add changes authored root-motion deltas as well as visual curves. */
++    return fmaf(d1, t3_T2 - t2_T,
++                fmaf(d0, time + ((t3_T2 - t2_T) - t2_T),
++                     fmaf(p0, 1.0f + (_2t3_T3 - _3t2_T2),
++                          p1 * (-_2t3_T3 + _3t2_T2))));
+ }
+ 
+ static inline void splGetCardinalPoint(Vec3* p, Vec3* cp, f32 tension, f32 u)
+diff --git a/src/melee/ef/eflib.c b/src/melee/ef/eflib.c
+index 6b937b3..9733f2b 100644
+--- a/src/melee/ef/eflib.c
++++ b/src/melee/ef/eflib.c
+@@ -1412,8 +1412,9 @@ void efLib_SetParamAlpha(HSD_GObj* gobj, u8 alpha)
+ {
+     s32 idx;
+ 
+-    // WHY
+-    EF_ParamEntry* base = efLib_AnimQueue + 0x10;
++    // The retail link places ParamTable immediately after AnimQueue.
++    // Address the actual object when native link layout differs.
++    EF_ParamEntry* base = efLib_ParamTable;
+ 
+     for (idx = 0; idx < 8; idx++) {
+         if (base[idx].gobj == gobj) {
+@@ -1428,17 +1429,17 @@ void efLib_SetParamAlpha(HSD_GObj* gobj, u8 alpha)
+     return;
+ 
+ found:
+-    // WHY
+-    efLib_AnimQueue[idx + 0x10].gobj = gobj;
+-    efLib_AnimQueue[idx + 0x10].alpha = alpha;
++    efLib_ParamTable[idx].gobj = gobj;
++    efLib_ParamTable[idx].alpha = alpha;
+ }
+ 
+ void efLib_SetParamGfxId(HSD_GObj* gobj, s32 gfx_id)
+ {
+     s32 idx;
+ 
+-    // WHY
+-    EF_ParamEntry* base = efLib_AnimQueue + 0x10;
++    // The retail link places ParamTable immediately after AnimQueue.
++    // Address the actual object when native link layout differs.
++    EF_ParamEntry* base = efLib_ParamTable;
+ 
+     for (idx = 0; idx < 8; idx++) {
+         if (base[idx].gobj == gobj) {
+@@ -1453,9 +1454,8 @@ void efLib_SetParamGfxId(HSD_GObj* gobj, s32 gfx_id)
+     return;
+ 
+ found:
+-    // WHY
+-    efLib_AnimQueue[idx + 0x10].gobj = gobj;
+-    efLib_AnimQueue[idx + 0x10].gfx_id = gfx_id;
++    efLib_ParamTable[idx].gobj = gobj;
++    efLib_ParamTable[idx].gfx_id = gfx_id;
+ }
+ 
+ void efLib_Cb_ApplyStoredAlpha(EF_Effect* effect)
+--- a/src/melee/ft/ftcoll.c
++++ b/src/melee/ft/ftcoll.c
+@@ -2371,52 +2371,46 @@
+     return (s32) fp->dmg.x1830_percent;
+ }
+ 
+-/// Shared knockback formula shell. @p inner is the per-branch scaling term.
+-/// @remarks Must stay one nested expression; step assignments change the
+-/// float register webs (see ftColl_80079C70).
+-#define KNOCKBACK(defense, attack, arg3, one, ftd, hit, w, inner)             \
+-    ((defense) *                                                              \
+-     ((attack) *                                                              \
+-      ((arg3) * ((0.01F * (hit)->x24 *                                        \
+-                  ((ftd)->x11C *                                              \
+-                       (((ftd)->xF8 - (((w) * (ftd)->xF8) / ((one) + (w)))) * \
+-                        (inner)) +                                            \
+-                   (ftd)->x120)) +                                            \
+-                 (hit)->x2C))))
++/// Preserve the scalar fmadds boundaries shared by the retail fighter,
++/// item and environmental knockback paths (80079B48..8007A040 and the
++/// inlined copies in 8007A06C). The original compiler contracts three
++/// multiply/add pairs and multiplies weight_term * inner before x11C.
++/// Keep the remaining operations separately rounded; global contraction
++/// remains disabled for the source port.
++static float ftColl_CalcKnockback(Fighter* fp, HitCapsule* hit, u32 damage,
++                                  float stage, float attack, float defense,
++                                  float weight)
++{
++    ftCommonData* ftd = p_ftCommonData;
++    float w = weight * ftd->xF4;
++    float weight_term = ftd->xF8 - (w * ftd->xF8) / (1.0F + w);
++    float inner;
++    float scaled;
++    float result;
++
++    if (hit->x28 != 0) {
++        float set = ftd->x118;
++        inner = fmaf(set, ftd->x110,
++                     ftd->x114 * (set * (float) hit->x28));
++    } else {
++        float total = (float) ftColl_GetDamageCount(fp, ftd) +
++                      fp->dmg.x1838_percentTemp;
++        inner = fmaf(ftd->x110, total,
++                     ftd->x114 * ((float) damage * total));
++    }
++    scaled = fmaf(ftd->x11C, weight_term * inner, ftd->x120);
++    result = fmaf(0.01F * (float) hit->x24, scaled, (float) hit->x2C);
++    result = defense * (attack * (stage * result));
++    if (result >= ftd->x108) {
++        result = ftd->x108;
++    }
++    return result;
++}
+ 
+ float ftColl_80079AB0(Fighter* fp, HitCapsule* hit, u32 unk_count, float arg3,
+                       float attack, float defense, float weight)
+ {
+-    ftCommonData* ftd = p_ftCommonData;
+-    float decay;
+-    float result;
+-    float w = weight;
+-    w *= ftd->xF4;
+-
+-    if (hit->x28 != 0) {
+-        float x118;
+-
+-        decay = ftd->xF8;
+-        x118 = ftd->x118;
+-
+-        result = KNOCKBACK(defense, attack, arg3, 1.0F, ftd, hit, w,
+-                           x118 * ftd->x110 + ftd->x114 * (x118 * hit->x28));
+-    } else {
+-        s32 count;
+-
+-        count = ftColl_GetDamageCount(fp, ftd);
+-
+-        result = KNOCKBACK(
+-            defense, attack, arg3, 1.0F, ftd, hit, w,
+-            ftd->x110 * (count + fp->dmg.x1838_percentTemp) +
+-                ftd->x114 * (unk_count * (count + fp->dmg.x1838_percentTemp)));
+-    }
+-
+-    if (result >= ftd->x108) {
+-        result = ftd->x108;
+-    }
+-
+-    return result;
++    return ftColl_CalcKnockback(fp, hit, unk_count, arg3, attack, defense, weight);
+ }
+ 
+ float ftColl_80079C70(Fighter* fp, Fighter* attacker, HitCapsule* hit,
+@@ -2426,105 +2420,14 @@
+     float defense = Player_GetDefenseRatio(fp->player_id);
+     float attack = Player_GetAttackRatio(attacker->player_id);
+     float stage = gm_8016B248();
+-    ftCommonData* ftd = p_ftCommonData;
+-    u32 x28 = hit->x28;
+-    float w = weight * ftd->xF4;
+-    float result;
+-    PAD_STACK(16);
+-
+-    if (x28 != 0) {
+-        float decay = ftd->xF8;
+-        float x118 = ftd->x118;
+-        /// @todo Restore expanded inline.
+-        result =
+-            defense *
+-            (attack *
+-             (stage * ((0.01F * (float) hit->x24 *
+-                        (ftd->x11C * ((decay - ((w * decay) / (1.0F + w))) *
+-                                      ((x118 * ftd->x110) +
+-                                       (ftd->x114 * (x118 * (float) x28)))) +
+-                         ftd->x120)) +
+-                       (float) hit->x2C)));
+-    } else {
+-        s32 count;
+-
+-        /// @todo Expanded inline of #ftColl_GetDamageCount; re-inline when
+-        /// the call form matches.
+-        if (fp->x2225_b7) {
+-            if (fp->x2224_b2) {
+-                count = (s32) ftd->x6D8[0];
+-            } else {
+-                count = (s32) ftd->x6D4;
+-            }
+-        } else {
+-            count = (s32) fp->dmg.x1830_percent;
+-        }
+-
+-        {
+-            float decay = ftd->xF8;
+-            /// @todo Restore expanded inline.
+-            result =
+-                defense *
+-                (attack *
+-                 (stage *
+-                  ((0.01F * (float) hit->x24 *
+-                    (ftd->x11C *
+-                         ((decay - ((w * decay) / (1.0F + w))) *
+-                          ((ftd->x110 *
+-                            ((float) count + fp->dmg.x1838_percentTemp)) +
+-                           (ftd->x114 *
+-                            ((float) (u32) unk_count *
+-                             ((float) count + fp->dmg.x1838_percentTemp))))) +
+-                     ftd->x120)) +
+-                   (float) hit->x2C)));
+-        }
+-    }
+-
+-    if (result >= ftd->x108) {
+-        result = ftd->x108;
+-    }
+-
+-    return result;
++    return ftColl_CalcKnockback(fp, hit, (u32) unk_count, stage, attack, defense,
++                                weight);
+ }
+ 
+ float ftColl_80079EA8(Fighter* fp, HitCapsule* hit, u32 unk_count)
+ {
+-    ftCommonData* ftd = p_ftCommonData;
+-    float decay;
+-    float result;
+-    float w = fp->co_attrs.weight;
+-    w *= ftd->xF4;
+-
+-    if (hit->x28 != 0) {
+-        float x118;
+-        float one = 1.0F;
+-
+-        decay = ftd->xF8;
+-        x118 = ftd->x118;
+-
+-        result = KNOCKBACK(one, one, one, one, ftd, hit, w,
+-                           x118 * ftd->x110 + ftd->x114 * (x118 * hit->x28));
+-    } else {
+-        s32 count;
+-
+-        count = ftColl_GetDamageCount(fp, ftd);
+-
+-        {
+-            float one = 1.0F;
+-
+-            result = KNOCKBACK(
+-                one, one, one, one, ftd, hit, w,
+-                ftd->x110 * (count + fp->dmg.x1838_percentTemp) +
+-                    ftd->x114 *
+-                        (unk_count * (count + fp->dmg.x1838_percentTemp)));
+-        }
+-    }
+-
+-    if (result >= ftd->x108) {
+-        result = ftd->x108;
+-    }
+-
+-    return result;
++    return ftColl_CalcKnockback(fp, hit, unk_count, 1.0F, 1.0F, 1.0F,
++                                fp->co_attrs.weight);
+ }
+ 
+ #ifdef MUST_MATCH
+@@ -2563,7 +2466,6 @@
+     int best_idx;
+     DmgLogEntry* best_entry;
+     int sfx_severity;
+-    ftCommonData* ftd;
+     Item* ip;
+     HitCapsule* hit;
+     int unk_count;
+@@ -2633,10 +2535,7 @@
+             Item* item = (Item*) entry->gobj->user_data;
+             HSD_GObj* tail_owner_gobj = item->owner;
+             float defense, stage;
+-            float w, result;
+-            float cap;
+             HitCapsule* hit;
+-            u32 damage;
+             int unk_count;
+ 
+             if (ftLib_80086960(tail_owner_gobj)) {
+@@ -2650,64 +2549,9 @@
+             defense = Player_GetDefenseRatio(fp->player_id);
+             stage = gm_8016B248();
+             hit = entry->hit0;
+-            ftd = p_ftCommonData;
+-            w = kb;
+-            w *= ftd->xF4;
+             unk_count = entry->size_of_xC;
+-
+-            if (hit->x28 != 0) {
+-                float decay = ftd->xF8;
+-                float x118 = ftd->x118;
+-
+-                result = defense *
+-                         (attack *
+-                          (stage *
+-                           ((0.01F * (float) (damage = hit->x24) *
+-                             (ftd->x11C *
+-                                  ((decay - ((w * decay) / (1.0F + w))) *
+-                                   ((x118 * ftd->x110) +
+-                                    (ftd->x114 * (x118 * (float) hit->x28)))) +
+-                              ftd->x120)) +
+-                            (float) hit->x2C)));
+-            } else {
+-                s32 count;
+-
+-                if (fp->x2225_b7) {
+-                    if (fp->x2224_b2) {
+-                        count = (s32) ftd->x6D8[0];
+-                    } else {
+-                        count = (s32) ftd->x6D4;
+-                    }
+-                } else {
+-                    count = (s32) fp->dmg.x1830_percent;
+-                }
+-
+-                {
+-                    float decay = ftd->xF8;
+-
+-                    result =
+-                        defense *
+-                        (attack *
+-                         (stage *
+-                          ((0.01F * (float) (damage = hit->x24) *
+-                            (ftd->x11C *
+-                                 ((decay - ((w * decay) / (1.0F + w))) *
+-                                  ((ftd->x110 * ((float) count +
+-                                                 fp->dmg.x1838_percentTemp)) +
+-                                   (ftd->x114 *
+-                                    ((float) (u32) unk_count *
+-                                     ((float) count +
+-                                      fp->dmg.x1838_percentTemp))))) +
+-                             ftd->x120)) +
+-                           (float) hit->x2C)));
+-                }
+-            }
+-
+-            if (result >= (cap = ftd->x108)) {
+-                result = cap;
+-            }
+-
+-            kb = result;
++            kb = ftColl_CalcKnockback(fp, hit, (u32) unk_count, stage, attack,
++                                      defense, kb);
+ 
+             if (arg4 != 0) {
+                 u32 u_dmg = (u32) entry->x20;
+@@ -2739,10 +2583,7 @@
+ 
+         case 3: {
+             float defense, stage, weight;
+-            float w, result;
+-            float cap;
+             int unk_count;
+-            ftCommonData* ftd;
+ 
+             attack = 1.0F;
+             lbColl_80008D30(&stack_hit,
+@@ -2751,64 +2592,9 @@
+             weight = co->weight;
+             defense = Player_GetDefenseRatio(fp->player_id);
+             stage = gm_8016B248();
+-            w = weight;
+-            w *= (ftd = p_ftCommonData)->xF4;
+             unk_count = stack_hit.unk_count;
+-
+-            if (stack_hit.x28 != 0) {
+-                float decay = ftd->xF8;
+-                float x118 = ftd->x118;
+-
+-                result =
+-                    defense *
+-                    (attack *
+-                     (stage *
+-                      ((0.01F * (float) stack_hit.x24 *
+-                        (ftd->x11C *
+-                             ((decay - ((w * decay) / (1.0F + w))) *
+-                              ((x118 * ftd->x110) +
+-                               (ftd->x114 * (x118 * (float) stack_hit.x28)))) +
+-                         ftd->x120)) +
+-                       (float) stack_hit.x2C)));
+-            } else {
+-                s32 count;
+-
+-                if (fp->x2225_b7) {
+-                    if (fp->x2224_b2) {
+-                        count = (s32) ftd->x6D8[0];
+-                    } else {
+-                        count = (s32) ftd->x6D4;
+-                    }
+-                } else {
+-                    count = (s32) fp->dmg.x1830_percent;
+-                }
+-
+-                {
+-                    float decay = ftd->xF8;
+-
+-                    result =
+-                        defense *
+-                        (attack *
+-                         (stage *
+-                          ((0.01F * (float) stack_hit.x24 *
+-                            (ftd->x11C *
+-                                 ((decay - ((w * decay) / (1.0F + w))) *
+-                                  ((ftd->x110 * ((float) count +
+-                                                 fp->dmg.x1838_percentTemp)) +
+-                                   (ftd->x114 *
+-                                    ((float) (u32) unk_count *
+-                                     ((float) count +
+-                                      fp->dmg.x1838_percentTemp))))) +
+-                             ftd->x120)) +
+-                           (float) stack_hit.x2C)));
+-                }
+-            }
+-
+-            if (result >= (cap = ftd->x108)) {
+-                result = cap;
+-            }
+-
+-            kb = result;
++            kb = ftColl_CalcKnockback(fp, &stack_hit, (u32) unk_count, stage,
++                                      attack, defense, weight);
+             break;
+         }
+         default:
+
+diff --git a/src/melee/lb/lb_0219.c b/src/melee/lb/lb_0219.c
+--- a/src/melee/lb/lb_0219.c
++++ b/src/melee/lb/lb_0219.c
+@@ -68,6 +68,171 @@
+     }
+ }
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++/*
++ * The native flash helpers leave their objects in global registries. The
++ * browser owns this short-lived instance, so keep exact identities and only
++ * tear it down after all callbacks have quiesced.
++ */
++extern HSD_GObj* melee_web_bg_flash_overlay_owner(void);
++extern HSD_GObj* melee_web_bg_flash_camera_owner(void);
++extern int melee_web_bg_flash_destroy(HSD_GObj* overlay, HSD_GObj* camera);
++extern void melee_web_bg_flash_save_state(void);
++extern void melee_web_bg_flash_restore_state(void);
++
++static HSD_GObj* melee_web_bg_flash_animation_owner;
++static HSD_GObj* melee_web_bg_flash_saved_overlay;
++static HSD_GObj* melee_web_bg_flash_saved_camera;
++static void* melee_web_bg_flash_saved_user_data;
++static BgFlashGlobal* melee_web_bg_flash_saved_animation;
++static struct Fighter_804D653C_t* melee_web_bg_flash_saved_col_anim;
++static f32 melee_web_bg_flash_saved_scale;
++static int melee_web_bg_flash_saved_valid;
++
++static int melee_web_bg_flash_callback_active(void)
++{
++    return HSD_GObj_804D781C != NULL || HSD_GObj_804D7814 != NULL || HSD_GObj_804D7818 != NULL;
++}
++
++static void melee_web_bg_flash_restore_private_state(void)
++{
++    if (melee_web_bg_flash_saved_valid) {
++        lbl_804D63E0 = melee_web_bg_flash_saved_animation;
++        lbl_804D63DC = melee_web_bg_flash_saved_col_anim;
++        lbl_804D63D8 = melee_web_bg_flash_saved_scale;
++        melee_web_bg_flash_saved_valid = 0;
++    }
++}
++
++static void melee_web_bg_flash_clear_created_owners(void)
++{
++    melee_web_bg_flash_saved_overlay = NULL;
++    melee_web_bg_flash_saved_camera = NULL;
++    melee_web_bg_flash_saved_user_data = NULL;
++}
++
++static int melee_web_bg_flash_release_animation(HSD_GObj* owner)
++{
++    if (owner == NULL || lbl_804D63E0 != (BgFlashGlobal*) owner ||
++        melee_web_bg_flash_callback_active() ||
++        HSD_ObjAllocGetUsing(&lbl_804336A0) != 1)
++    {
++        return 0;
++    }
++
++    HSD_GObjPLink_80390228(owner);
++    lbl_804D63E0 = NULL;
++    return HSD_ObjAllocGetUsing(&lbl_804336A0) == 0;
++}
++
++int melee_web_bg_flash_begin(void)
++{
++    HSD_GObj* animation;
++    HSD_GObj* overlay;
++    HSD_GObj* camera;
++    int cleanup_ok;
++
++    if (melee_web_bg_flash_animation_owner != NULL ||
++        melee_web_bg_flash_saved_valid || lbl_804D63E0 != NULL ||
++        melee_web_bg_flash_overlay_owner() != NULL ||
++        melee_web_bg_flash_camera_owner() != NULL ||
++        melee_web_bg_flash_callback_active() ||
++        HSD_ObjAllocGetUsing(&lbl_804336A0) != 0)
++    {
++        return 0;
++    }
++
++    melee_web_bg_flash_saved_animation = lbl_804D63E0;
++    melee_web_bg_flash_saved_col_anim = lbl_804D63DC;
++    melee_web_bg_flash_saved_scale = lbl_804D63D8;
++    melee_web_bg_flash_saved_valid = 1;
++    melee_web_bg_flash_save_state();
++
++    /* This is the original constructor, including the 0xFF alpha source. */
++    lbBgFlash_80021A18(0xFF);
++
++    animation = (HSD_GObj*) lbl_804D63E0;
++    overlay = melee_web_bg_flash_overlay_owner();
++    camera = melee_web_bg_flash_camera_owner();
++    if (animation != NULL && overlay != NULL && camera != NULL &&
++        lbl_804D63DC != NULL && animation->user_data != NULL &&
++        animation->user_data_remove_func == fn_800219E4 &&
++        HSD_ObjAllocGetUsing(&lbl_804336A0) == 1)
++    {
++        melee_web_bg_flash_animation_owner = animation;
++        melee_web_bg_flash_saved_overlay = overlay;
++        melee_web_bg_flash_saved_camera = camera;
++        melee_web_bg_flash_saved_user_data = animation->user_data;
++        return 1;
++    }
++
++    /* A partial constructor is still rolled back through the real destructors. */
++    cleanup_ok = 1;
++    if (animation != NULL) {
++        cleanup_ok = melee_web_bg_flash_release_animation(animation);
++    }
++    if (cleanup_ok) {
++        overlay = melee_web_bg_flash_overlay_owner();
++        camera = melee_web_bg_flash_camera_owner();
++        cleanup_ok = melee_web_bg_flash_destroy(overlay, camera);
++    }
++    if (cleanup_ok && HSD_ObjAllocGetUsing(&lbl_804336A0) == 0) {
++        HSD_ObjAllocInit(&lbl_804336A0, 0x84, 4);
++        melee_web_bg_flash_restore_private_state();
++        melee_web_bg_flash_restore_state();
++        melee_web_bg_flash_clear_created_owners();
++    }
++    return 0;
++}
++
++int melee_web_bg_flash_end(void)
++{
++    HSD_GObj* overlay;
++    HSD_GObj* camera;
++
++    if (melee_web_bg_flash_animation_owner == NULL ||
++        !melee_web_bg_flash_saved_valid ||
++        lbl_804D63E0 != (BgFlashGlobal*) melee_web_bg_flash_animation_owner ||
++        melee_web_bg_flash_callback_active() ||
++        HSD_ObjAllocGetUsing(&lbl_804336A0) != 1)
++    {
++        return 0;
++    }
++
++    if (melee_web_bg_flash_overlay_owner() !=
++            melee_web_bg_flash_saved_overlay ||
++        melee_web_bg_flash_camera_owner() != melee_web_bg_flash_saved_camera ||
++        melee_web_bg_flash_animation_owner->user_data !=
++            melee_web_bg_flash_saved_user_data ||
++        melee_web_bg_flash_animation_owner->user_data_remove_func !=
++            fn_800219E4)
++    {
++        return 0;
++    }
++    overlay = melee_web_bg_flash_saved_overlay;
++    camera = melee_web_bg_flash_saved_camera;
++
++    if (!melee_web_bg_flash_release_animation(
++            melee_web_bg_flash_animation_owner))
++    {
++        return 0;
++    }
++    if (!melee_web_bg_flash_destroy(overlay, camera) ||
++        HSD_ObjAllocGetUsing(&lbl_804336A0) != 0)
++    {
++        return 0;
++    }
++
++    /* Re-register a clean allocator; never restore its live-list `next`. */
++    HSD_ObjAllocInit(&lbl_804336A0, 0x84, 4);
++    melee_web_bg_flash_animation_owner = NULL;
++    melee_web_bg_flash_restore_private_state();
++    melee_web_bg_flash_restore_state();
++    melee_web_bg_flash_clear_created_owners();
++    return 1;
++}
++#endif
++
+ typedef struct BgFlashUserData {
+     u8 x0;
+     u8 pad_01[3];
+
+diff --git a/src/melee/lb/lbbgflash.c b/src/melee/lb/lbbgflash.c
+--- a/src/melee/lb/lbbgflash.c
++++ b/src/melee/lb/lbbgflash.c
+@@ -44,6 +44,7 @@
+ #include <sysdolphin/baselib/gobj.h>
+ #include <sysdolphin/baselib/gobjgxlink.h>
+ #include <sysdolphin/baselib/gobjobject.h>
++#include <sysdolphin/baselib/gobjplink.h>
+ #include <sysdolphin/baselib/gobjproc.h>
+ #include <sysdolphin/baselib/hsd_3915.h>
+ 
+@@ -367,6 +368,61 @@
+     }
+ }
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++static BgFlashData melee_web_bg_flash_saved_state;
++static int melee_web_bg_flash_saved_state_valid;
++
++void melee_web_bg_flash_save_state(void)
++{
++    melee_web_bg_flash_saved_state = lbl_80433658;
++    melee_web_bg_flash_saved_state_valid = 1;
++}
++
++void melee_web_bg_flash_restore_state(void)
++{
++    if (melee_web_bg_flash_saved_state_valid) {
++        lbl_80433658 = melee_web_bg_flash_saved_state;
++        melee_web_bg_flash_saved_state_valid = 0;
++    }
++}
++
++HSD_GObj* melee_web_bg_flash_overlay_owner(void)
++{
++    return lbl_80433658.x40;
++}
++
++HSD_GObj* melee_web_bg_flash_camera_owner(void)
++{
++    return lbl_80433658.x44;
++}
++
++int melee_web_bg_flash_destroy(HSD_GObj* overlay, HSD_GObj* camera)
++{
++    if (HSD_GObj_804D781C != NULL || HSD_GObj_804D7814 != NULL || HSD_GObj_804D7818 != NULL ||
++        lbl_80433658.x40 != overlay || lbl_80433658.x44 != camera)
++    {
++        return 0;
++    }
++
++    /* Clear private owners before unlinking so callbacks cannot observe them. */
++    lbl_80433658.x40 = NULL;
++    lbl_80433658.x44 = NULL;
++    if (overlay != NULL) {
++        HSD_GObjPLink_80390228(overlay);
++    }
++    if (camera != NULL) {
++        HSD_GObjPLink_80390228(camera);
++    }
++    return 1;
++}
++
++static void fn_800204C8_event(HSD_GObj* gobj)
++{
++    (void) gobj;
++    fn_800204C8();
++}
++#endif
++
+ /// @brief Trigger background flash.
+ /// @param duration Flash duration in frames (minimum 1).
+ void lbBgFlash_800205F0(s32 duration)
+@@ -467,7 +523,11 @@
+     gobj2_slot = &flash->x40;
+     GObj_SetupGXLink(*gobj2_slot, (GObj_RenderFunc) fn_8001FEC4, 0x10,
+                      (u8) arg0);
++#if defined(MELEE_WEB_GAMEPLAY)
++    HSD_GObj_SetupProc(*gobj2_slot, fn_800204C8_event, 0);
++#else
+     HSD_GObj_SetupProc(*gobj2_slot, (HSD_GObjEvent) fn_800204C8, 0);
++#endif
+ 
+     lbl_80433658.state.active = 1;
+     lbl_80433658.state.mode = 0;
+@@ -498,7 +558,11 @@
+     gobj2_slot = &flash->x40;
+     GObj_SetupGXLink(*gobj2_slot, (GObj_RenderFunc) fn_8001FEC4, 0x10, 0xa);
+     temp = *gobj2_slot;
++#if defined(MELEE_WEB_GAMEPLAY)
++    HSD_GObj_SetupProc(temp, fn_800204C8_event, 0);
++#else
+     HSD_GObj_SetupProc(temp, (HSD_GObjEvent) fn_800204C8, 0);
++#endif
+     lbl_80433658.state.active = 1;
+     lbl_80433658.state.mode = 0;
+ }
+
+diff --git a/src/sysdolphin/baselib/hsd_3915.c b/src/sysdolphin/baselib/hsd_3915.c
+--- a/src/sysdolphin/baselib/hsd_3915.c
++++ b/src/sysdolphin/baselib/hsd_3915.c
+@@ -416,9 +416,14 @@
+     { 0xB3808000, hsd_80392194 },
+ };
+ 
++#if !defined(MELEE_WEB_GAMEPLAY)
+ DebugFontGlyph HSD_DebugFontAtlas[] = {
+ #include <sysdolphin/baselib/debug_font.inc>
+ };
++#endif
++/* The browser links the original screen-overlay GX setup from this unit.
++ * Debug-console text is outside its closure. Keep the atlas declaration
++ * unresolved so a future console consumer requires an owned-data provider. */
+ 
+ void hsd_803921B8(void* bitmap, s32 x, s32 y, s32 dst, s32 w, s32 h,
+                   s32 stride, void* tbl)
+
+diff --git a/src/melee/ft/kinds/ftCommon/ftCo_Guard.c b/src/melee/ft/kinds/ftCommon/ftCo_Guard.c
+--- a/src/melee/ft/kinds/ftCommon/ftCo_Guard.c
++++ b/src/melee/ft/kinds/ftCommon/ftCo_Guard.c
+@@ -676,12 +676,14 @@
+         fp->x2219_b0 = true;
+     }
+     {
+-        float f = (p_ftCommonData->x28C *
+-                   (fp->x19A4 *
+-                    (1.0f - ((fp->lightshield_amount *
+-                              (p_ftCommonData->x2E8 - p_ftCommonData->x2E4)) +
+-                             p_ftCommonData->x2E4)))) +
+-                  p_ftCommonData->x290;
++        float shield_scale =
++            fmaf(fp->lightshield_amount,
++                 p_ftCommonData->x2E8 - p_ftCommonData->x2E4,
++                 p_ftCommonData->x2E4);
++        float f =
++            fmaf(p_ftCommonData->x28C,
++                 (float) fp->x19A4 * (1.0f - shield_scale),
++                 p_ftCommonData->x290);
+         ftAnim_SetAnimRate(gobj,
+                            (0.1f + lbGetJObjEndFrame(GET_JOBJ(gobj))) / f);
+         if (!arg1) {
+diff --git a/src/melee/ft/kinds/ftFox/ftfoxspecialhi.c b/src/melee/ft/kinds/ftFox/ftfoxspecialhi.c
+--- a/src/melee/ft/kinds/ftFox/ftfoxspecialhi.c
++++ b/src/melee/ft/kinds/ftFox/ftfoxspecialhi.c
+@@ -278,13 +278,16 @@
+     fp->mv.fx.SpecialHi.unk++;
+ 
+     if (fp->mv.fx.SpecialHi.unk >= da->x70_FOX_FIREFOX_DURATION_END) {
++        /* GALE01r2: X rounds accel*cos at 800E77C0 before 800E77C8
++         * fnmsubs; Y directly fuses accel*sin - old at 800E77E0. */
++        float reverse_accel = da->x78_FOX_FIREFOX_REVERSE_ACCEL;
+         fp->self_vel.x =
+-            -((fp->facing_dir * (da->x78_FOX_FIREFOX_REVERSE_ACCEL *
+-                                 cosf(fp->mv.fx.SpecialHi.rotateModel))) -
+-              fp->self_vel.x);
+-        fp->self_vel.y = -((da->x78_FOX_FIREFOX_REVERSE_ACCEL *
+-                            sinf(fp->mv.fx.SpecialHi.rotateModel)) -
+-                           fp->self_vel.y);
++            -fmaf(fp->facing_dir,
++                  reverse_accel * cosf(fp->mv.fx.SpecialHi.rotateModel),
++                  -fp->self_vel.x);
++        fp->self_vel.y =
++            -fmaf(reverse_accel, sinf(fp->mv.fx.SpecialHi.rotateModel),
++                  -fp->self_vel.y);
+     }
+ }
+ 
+
+--- a/src/melee/lb/lbvector.c
++++ b/src/melee/lb/lbvector.c
+@@ -368,7 +368,8 @@
+ {
+     u8 _[16];
+ 
+-    Mtx projMtx;
++    /* MTXPerspective/MTXOrtho write a full 4x4 projection matrix. */
++    Mtx44 projMtx;
+     float projection[7]; // projection params
+     float viewport[6];   // viewport params
+     Mtx m;
+diff --git a/src/sysdolphin/baselib/quatlib.c b/src/sysdolphin/baselib/quatlib.c
+--- a/src/sysdolphin/baselib/quatlib.c
++++ b/src/sysdolphin/baselib/quatlib.c
+@@ -137,10 +137,11 @@
+ 
+     ss = sy * sz;
+     cc = cy * cz;
+-    q->w = cx * cc + sx * ss;
+-    q->x = sx * cc - cx * ss;
+-    q->y = cz * (cx * sy) + sz * (sx * cy);
+-    q->z = sz * (cx * cy) - cz * (sx * sy);
++    /* GALE01r2 8037EED0..8037EEF0: single-precision fused endpoints. */
++    q->w = fmaf(cx, cc, sx * ss);
++    q->x = fmaf(sx, cc, -(cx * ss));
++    q->y = fmaf(cz, cx * sy, sz * (sx * cy));
++    q->z = fmaf(sz, cx * cy, -(cz * (sx * sy)));
+ 
+     return 0;
+ }
+@@ -154,7 +155,10 @@
+     f32 sp;
+     f32 sq;
+ 
+-    cosom = p->x * q->x + p->y * q->y + p->z * q->z + p->w * q->w;
++    /* 8037EF6C..8037EF94: y product first, then x/z/w fmadds. */
++    cosom = fmaf(p->x, q->x, p->y * q->y);
++    cosom = fmaf(p->z, q->z, cosom);
++    cosom = fmaf(p->w, q->w, cosom);
+ 
+     if ((1.0F + cosom) > 1e-10F) {
+         if ((1.0F - cosom) > 1e-10F) {
+@@ -166,10 +170,10 @@
+             sq = t;
+             sp = (f32) (1.0 - (f64) t);
+         }
+-        out->x = sp * p->x + sq * q->x;
+-        out->y = sp * p->y + sq * q->y;
+-        out->z = sp * p->z + sq * q->z;
+-        out->w = sp * p->w + sq * q->w;
++        out->x = fmaf(sp, p->x, sq * q->x);
++        out->y = fmaf(sp, p->y, sq * q->y);
++        out->z = fmaf(sp, p->z, sq * q->z);
++        out->w = fmaf(sp, p->w, sq * q->w);
+     } else {
+         out->x = -p->y;
+         out->y = p->x;
+@@ -179,21 +183,21 @@
+         if (t < 0.5F) {
+             sp = sinf((f32) (M_PI_2 * (1.0F - (2.0F * t))));
+             sq = sinf((f32) (M_PI_2 * (2.0F * t)));
+-            out->x = sp * p->x + sq * q->x;
+-            out->y = sp * p->y + sq * q->y;
+-            out->z = sp * p->z + sq * q->z;
+-            out->w = sp * p->w + sq * q->w;
++            out->x = fmaf(sp, p->x, sq * q->x);
++            out->y = fmaf(sp, p->y, sq * q->y);
++            out->z = fmaf(sp, p->z, sq * q->z);
++            out->w = fmaf(sp, p->w, sq * q->w);
+         } else {
+             t -= 0.5F;
+             t2 = 2.0F * t;
+             sp = sinf((f32) (M_PI_2 * (1.0F - t2)));
+             sq = sinf((f32) (M_PI_2 * t2));
+-            out->x = sp * p->x + sq * q->x;
+-            out->y = sp * p->y + sq * q->y;
+-            out->z = sp * p->z + sq * q->z;
+-            out->w = sp * p->w + sq * q->w;
+-        }
+-    }
+-
+-    return 0;
+-}
++            out->x = fmaf(sp, p->x, sq * q->x);
++            out->y = fmaf(sp, p->y, sq * q->y);
++            out->z = fmaf(sp, p->z, sq * q->z);
++            out->w = fmaf(sp, p->w, sq * q->w);
++        }
++    }
++
++    return 0;
++}
+diff --git a/src/melee/lb/lb_00B0.c b/src/melee/lb/lb_00B0.c
+--- a/src/melee/lb/lb_00B0.c
++++ b/src/melee/lb/lb_00B0.c
+@@ -1,6 +1,7 @@
+ #include "lb_00B0.h"
+ 
+ #include <dolphin/mtx.h>
++#include <math.h>
+ #include <melee/sc/types.h> // IWYU pragma: keep
+ #include <sysdolphin/baselib/aobj.h>
+ #include <sysdolphin/baselib/dobj.h> // IWYU pragma: keep
+@@ -489,15 +490,16 @@
+     float sum_square_diffs;
+     float sum_square_sums;
+ 
++    /* GALE01r2 8000C4BC..8000C528: round source2 first, then fmadds. */
+     arg2->translate.x =
+-        (jobj1->translate.x * arg8) + (jobj2->translate.x * arg9);
++        fmaf(jobj1->translate.x, arg8, jobj2->translate.x * arg9);
+     arg2->translate.y =
+-        (jobj1->translate.y * arg8) + (jobj2->translate.y * arg9);
++        fmaf(jobj1->translate.y, arg8, jobj2->translate.y * arg9);
+     arg2->translate.z =
+-        (jobj1->translate.z * arg8) + (jobj2->translate.z * arg9);
+-    arg2->scale.x = (jobj1->scale.x * arg8) + (jobj2->scale.x * arg9);
+-    arg2->scale.y = (jobj1->scale.y * arg8) + (jobj2->scale.y * arg9);
+-    arg2->scale.z = (jobj1->scale.z * arg8) + (jobj2->scale.z * arg9);
++        fmaf(jobj1->translate.z, arg8, jobj2->translate.z * arg9);
++    arg2->scale.x = fmaf(jobj1->scale.x, arg8, jobj2->scale.x * arg9);
++    arg2->scale.y = fmaf(jobj1->scale.y, arg8, jobj2->scale.y * arg9);
++    arg2->scale.z = fmaf(jobj1->scale.z, arg8, jobj2->scale.z * arg9);
+     is_quat_1 = HSD_JObjGetFlags(jobj1) & 0x20000;
+     is_quat_2 = HSD_JObjGetFlags(jobj2) & 0x20000;
+     if (!is_quat_1 && !is_quat_2) {
+@@ -593,12 +595,13 @@
+     float phi_f1_2;
+     float phi_f1_3;
+ 
+-    arg2->translate.x = (arg0->position.x * arg8) + (arg1->translate.x * arg9);
+-    arg2->translate.y = (arg0->position.y * arg8) + (arg1->translate.y * arg9);
+-    arg2->translate.z = (arg0->position.z * arg8) + (arg1->translate.z * arg9);
+-    arg2->scale.x = (arg0->scale.x * arg8) + (arg1->scale.x * arg9);
+-    arg2->scale.y = (arg0->scale.y * arg8) + (arg1->scale.y * arg9);
+-    arg2->scale.z = (arg0->scale.z * arg8) + (arg1->scale.z * arg9);
++    /* The descriptor-to-joint blend uses the same source2-first boundary. */
++    arg2->translate.x = fmaf(arg0->position.x, arg8, arg1->translate.x * arg9);
++    arg2->translate.y = fmaf(arg0->position.y, arg8, arg1->translate.y * arg9);
++    arg2->translate.z = fmaf(arg0->position.z, arg8, arg1->translate.z * arg9);
++    arg2->scale.x = fmaf(arg0->scale.x, arg8, arg1->scale.x * arg9);
++    arg2->scale.y = fmaf(arg0->scale.y, arg8, arg1->scale.y * arg9);
++    arg2->scale.z = fmaf(arg0->scale.z, arg8, arg1->scale.z * arg9);
+     temp_r31 = HSD_JObjGetFlags(arg1) & 0x20000;
+     if (temp_r31 == 0) {
+         temp_f5 = arg0->rotation.x - arg1->rotate.x;
+diff --git a/src/melee/mp/mplib.c b/src/melee/mp/mplib.c
+--- a/src/melee/mp/mplib.c
++++ b/src/melee/mp/mplib.c
+@@ -4914,17 +4914,18 @@
+         m1_3 = mtx[1][3];
+         v_r4 = &groundCollVtx[joint->inner->vtx_start];
+         for (i = 0; i < vtx_count; i++, v_r4++) {
+-            v_r4->pos.x = v_r4->x0 * m0_0 + m0_3;
+-            v_r4->pos.y = v_r4->x4 * m0_0 + m1_3;
++            /* GALE01 0x800560F0/FC: one rounding per vertex. */
++            v_r4->pos.x = fmaf(v_r4->x0, m0_0, m0_3);
++            v_r4->pos.y = fmaf(v_r4->x4, m0_0, m1_3);
+         }
+         joint->bounding_min.x =
+-            (joint->inner->left_bound * m0_0 + m0_3) - 30.0F;
++            fmaf(joint->inner->left_bound, m0_0, m0_3) - 30.0F;
+         joint->bounding_min.y =
+-            (joint->inner->bottom_bound * m0_0 + m1_3) - 30.0F;
++            fmaf(joint->inner->bottom_bound, m0_0, m1_3) - 30.0F;
+         joint->bounding_max.x =
+-            30.0F + (joint->inner->right_bound * m0_0 + m0_3);
++            30.0F + fmaf(joint->inner->right_bound, m0_0, m0_3);
+         joint->bounding_max.y =
+-            30.0F + (joint->inner->top_bound * m0_0 + m1_3);
++            30.0F + fmaf(joint->inner->top_bound, m0_0, m1_3);
+         joint->flags |= CollJoint_B8;
+         goto after0;
+     }
+diff --git a/src/melee/ft/ft_084E.c b/src/melee/ft/ft_084E.c
+--- a/src/melee/ft/ft_084E.c
++++ b/src/melee/ft/ft_084E.c
+@@ -131,8 +131,9 @@
+     f32 lstick_y = sinf(fp->lstick_angle);
+     f32 temp_f0 = fp->x6A4_transNOffset.y;
+     f32 temp_f3 = fp->x6A4_transNOffset.z * fp->facing_dir;
+-    fp->self_vel.x = (temp_f3 * lstick_x) - (temp_f0 * lstick_y);
+-    fp->self_vel.y = (temp_f3 * lstick_y) + (temp_f0 * lstick_x);
++    /* GALE01r2 80085198/9C: rounded cross-products, then fmsubs/fmadds. */
++    fp->self_vel.x = fmaf(temp_f3, lstick_x, -(temp_f0 * lstick_y));
++    fp->self_vel.y = fmaf(temp_f3, lstick_y, temp_f0 * lstick_x);
+ }
+ 
+ void ft_800851C0(Fighter_GObj* gobj)
+diff --git a/src/melee/mp/mplib.c b/src/melee/mp/mplib.c
+--- a/src/melee/mp/mplib.c
++++ b/src/melee/mp/mplib.c
+@@ -1076,18 +1076,20 @@
+     dy = ay1 - ay0;
+     f30 = px - ax0;
+     f29 = py - ay0;
+-    dist2 = (dy * dy) + (dx * dx);
++    /* GALE01r2 8004DCB0/DCF0: double-precision fused dot products. */
++    dist2 = fma(dy, dy, dx * dx);
+     if (ABS(dist2) > 0.0001) {
+         // how far along line a is point p
+-        double t = (dy * f29 + dx * f30) / dist2;
++        double t = fma(dy, f29, dx * f30) / dist2;
+         if (t > 1.0) {
+             t = 1.0;
+         } else if (t < 0.0) {
+             t = 0.0;
+         }
+ 
+-        *x_out = px + (1.0 - t) * (bx0 - ax0) + t * (bx1 - ax1);
+-        *y_out = py + (1.0 - t) * (by0 - ay0) + t * (by1 - ay1);
++        /* 8004DD30..3C: float differences, double fused sums, final frsp. */
++        *x_out = fma(t, (bx1 - ax1), fma(1.0 - t, (bx0 - ax0), px));
++        *y_out = fma(t, (by1 - ay1), fma(1.0 - t, (by0 - ay0), py));
+     } else {
+         *x_out = px + (bx0 - ax0) + (bx1 - ax0);
+         *y_out = py + (by0 - ay0) + (by1 - ay0);
+diff --git a/src/sysdolphin/baselib/spline.c b/src/sysdolphin/baselib/spline.c
+--- a/src/sysdolphin/baselib/spline.c
++++ b/src/sysdolphin/baselib/spline.c
+@@ -94,9 +94,10 @@
+         case 0:
+             // lerp
+             cp = &spline->cv[idx];
+-            p->x = (t * (cp[1].x - cp[0].x)) + cp[0].x;
+-            p->y = (t * (cp[1].y - cp[0].y)) + cp[0].y;
+-            p->z = (t * (cp[1].z - cp[0].z)) + cp[0].z;
++            /* GALE01r2 80378B58/6C/80: rounded differences, fused lerps. */
++            p->x = fmaf(t, cp[1].x - cp[0].x, cp[0].x);
++            p->y = fmaf(t, cp[1].y - cp[0].y, cp[0].y);
++            p->z = fmaf(t, cp[1].z - cp[0].z, cp[0].z);
+             return;
+         case 1:
+             cp = &spline->cv[idx * 3];
+
+diff --git a/src/melee/gr/grlib.c b/src/melee/gr/grlib.c
+--- a/src/melee/gr/grlib.c
++++ b/src/melee/gr/grlib.c
+@@ -1,6 +1,11 @@
+ #include "grlib.h"
+ 
+ #include <sysdolphin/baselib/forward.h>
++#if defined(MELEE_WEB_GAMEPLAY)
++#include <melee/cm/types.h>
++#include <sysdolphin/baselib/gobj.h>
++extern void* melee_web_camera_state(void);
++#endif
+ 
+ #include "grbigblue.h"
+ #include "gricemt.h"
+@@ -269,6 +274,29 @@
+     return gobj;
+ }
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++/* The browser's stage owner removes these original transient objects before
++ * releasing their borrowed animation descriptors, including unload mid-shake.
++ * Identify them by the source callbacks, not by a broad stage/link sweep. */
++void melee_web_ground_quakes_clear(void)
++{
++    Camera* camera = melee_web_camera_state();
++    HSD_GObj* gobj = HSD_GObj_Entities->x48;
++    while (gobj != NULL) {
++        HSD_GObj* next = gobj->next;
++        HSD_GObjProc* proc;
++        for (proc = gobj->proc; proc != NULL; proc = proc->child) {
++            if (proc->on_invoke == grLib_801C9BC8 || proc->on_invoke == grLib_801C9C40) {
++                if (camera->xA0 == gobj) camera->xA0 = NULL;
++                HSD_GObjPLink_80390228(gobj);
++                break;
++            }
++        }
++        gobj = next;
++    }
++}
++#endif
++
+ int grLib_801C9E40(void)
+ {
+     return stage_info.x708;

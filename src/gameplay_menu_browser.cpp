@@ -1,6 +1,7 @@
 #include "gameplay_menu_world.hpp"
 #include "gameplay_menu_host.h"
 #include "gameplay_match_session.hpp"
+#include "gameplay_retail_recipe.hpp"
 #include "../tests/native_menu_fighter_input.h"
 #include "../tests/native_menu_stage_input.h"
 #include "gameplay_audio_stream.h"
@@ -9,6 +10,7 @@
 #include "menu_preparation_state.hpp"
 #include "browser_input.h"
 #include "animation_clock.hpp"
+#include "source_frame_sequence.hpp"
 #include <aurora/aurora.h>
 #include <aurora/event.h>
 #include <aurora/main.h>
@@ -17,6 +19,7 @@
 #include <dolphin/vi.h>
 #include <emscripten.h>
 #include <emscripten/heap.h>
+#include <malloc.h>
 #include <SDL3/SDL_hints.h>
 #include <array>
 #include <algorithm>
@@ -31,6 +34,16 @@ melee_web::RuntimeFiles files;
 std::unique_ptr<melee_web::RuntimeArchiveCache> archive_cache;
 std::unique_ptr<melee_web::GameplayMenuWorld> world;
 std::unique_ptr<melee_web::GameplayMatchSession> match;
+std::unique_ptr<melee_web::RetailReplayRecipe> replay;
+size_t replay_cursor=0;
+bool replay_trace=false,replay_pending=false,replay_started=false,replay_final_draw=false;
+// V2 recipes come from fresh original processes and do not carry heap history.
+// Original stage callbacks can read uncleared allocation bytes (Shy Guy pattern).
+// Do not reset this eligibility on unload or normalize those gameplay bytes.
+bool reference_heap_used=false;
+unsigned reference_menu_preparations=0;
+bool replay_match_complete=false;
+int replay_outcome=0,replay_winner=-1;
 MeleeWebMenuHost* host=nullptr;
 melee_web::FixedTickClock menu_clock;
 melee_web::FixedTickClock audio_clock{melee_web::FixedTickClock::OverrunPolicy::CatchUp};
@@ -53,6 +66,9 @@ void render_audio_tick(MeleeWebAudio* audio,char* error,size_t error_size);
 struct PreparationProfile {
  double requested_at=0,audio_ready_at=0,constructed_at=0;
  double render_cpu_ms=0,max_callback_ms=0,max_draw_ms=0,max_end_ms=0;
+ double submission_wait_started=0,submission_ready_at=0;
+ unsigned submission_wait_callbacks=0,pending_staging_at_settle=0,pending_staging_at_first_arm=0;
+ bool submission_polled=false;
  uint64_t texture_upload_bytes=0;
  unsigned callbacks=0,source_draws=0,max_draw_calls=0,max_queued=0;
  int32_t queued_delta=0,created_delta=0;
@@ -77,17 +93,23 @@ struct PreparationProfile {
   const double audio_wait=audio_ready_at?audio_ready_at-requested_at:0;
   const double construction=constructed_at?constructed_at-audio_ready_at:0;
   const double render_wait=constructed_at?settled_at-constructed_at:settled_at-requested_at;
-  char profile[1024];
+  char profile[1280];
   std::snprintf(profile,sizeof(profile),
    "{\"source_transition\":%s,\"total_ms\":%.3f,\"audio_wait_ms\":%.3f,"
    "\"construction_ms\":%.3f,\"render_wait_ms\":%.3f,\"render_cpu_ms\":%.3f,"
    "\"callbacks\":%u,\"source_draws\":%u,\"max_callback_ms\":%.3f,"
    "\"max_draw_ms\":%.3f,\"max_end_ms\":%.3f,\"texture_upload_bytes\":%llu,"
-   "\"max_draw_calls\":%u,\"max_queued\":%u,\"queued_delta\":%d,\"created_delta\":%d}",
+   "\"max_draw_calls\":%u,\"max_queued\":%u,\"queued_delta\":%d,\"created_delta\":%d,"
+   "\"gpu_completion_wait_ms\":%.3f,\"gpu_completion_wait_callbacks\":%u,"
+   "\"pending_staging_at_settle\":%u,\"pending_staging_at_first_arm\":%u,"
+   "\"gpu_completion_ready\":%s}",
    source_transition?"true":"false",settled_at-requested_at,audio_wait,construction,
    render_wait,render_cpu_ms,callbacks,source_draws,max_callback_ms,max_draw_ms,max_end_ms,
    static_cast<unsigned long long>(texture_upload_bytes),max_draw_calls,max_queued,
-   queued_delta,created_delta);
+   queued_delta,created_delta,
+   submission_wait_started?submission_ready_at-submission_wait_started:0,
+   submission_wait_callbacks,pending_staging_at_settle,pending_staging_at_first_arm,
+   submission_ready_at?"true":"false");
   EM_ASM({window.menuPreparationProfile?.(JSON.parse(UTF8ToString($0)));},profile);
  }
 };
@@ -96,7 +118,7 @@ PADStatus diagnostic_pad{};
 unsigned diagnostic_pad_port=0,diagnostic_pad_remaining=0;
 std::array<float,1068> pcm;
 alignas(32) unsigned char fifo[64*1024];
-constexpr std::array<std::string_view,66> keys={"GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","EfFxData.dat","falco.ssm","GrNBa.dat","sp_zako.hps","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","fox.ssm","GrSt.dat","ystory.hps","PlMs.dat","PlMsAJ.dat","PlMsNr.dat","PlMsRe.dat","PlMsGr.dat","PlMsBk.dat","PlMsWh.dat","EfMsData.dat","mars.ssm","GrOp.dat","greens.hps","pupupu.ssm","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sislib_font.bin"};
+constexpr std::array<std::string_view,68> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","EfFxData.dat","falco.ssm","GrNBa.dat","sp_zako.hps","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","fox.ssm","GrSt.dat","ystory.hps","PlMs.dat","PlMsAJ.dat","PlMsNr.dat","PlMsRe.dat","PlMsGr.dat","PlMsBk.dat","PlMsWh.dat","EfMsData.dat","mars.ssm","GrOp.dat","greens.hps","pupupu.ssm","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sislib_font.bin"};
 constexpr unsigned kDiagnosticPadButtons=PAD_BUTTON_LEFT|PAD_BUTTON_RIGHT|PAD_BUTTON_DOWN|PAD_BUTTON_UP|
  PAD_TRIGGER_Z|PAD_TRIGGER_R|PAD_TRIGGER_L|PAD_BUTTON_A|PAD_BUTTON_B|PAD_BUTTON_X|PAD_BUTTON_Y|PAD_BUTTON_START;
 void check(int value,const char* error){if(!value)throw std::runtime_error(error);}
@@ -164,6 +186,10 @@ void close(){
   world.reset();world_exposed=false;
  }
  if(host){check(melee_web_menu_host_destroy(host,error,sizeof(error)),error);host=nullptr;}
+ if(replay&&replay_trace&&replay_final_draw&&!faulted)
+  melee_web::retail_replay_end(replay->frames.size());
+ replay.reset();replay_cursor=0;replay_trace=replay_pending=replay_started=replay_final_draw=false;
+ replay_match_complete=false;replay_outcome=0;replay_winner=-1;
  audio_phase=0;faulted=false;diagnostic_start_ticks=0;stock_check=0;stock_tick=0;render_frame=0;first_use_draw_pending=false;render_only_preparation=false;transition_audio_continues=false;menu_scene_rebuild_pending=false;audio_clock.reset();clear_diagnostic_pad();
  match_message="Original four-stock source match";
  if(had_lifetime){
@@ -173,6 +199,7 @@ void close(){
  }
 }
 void enter_world(){
+ reference_heap_used=true;
  const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
  char error[256]{};const bool prepared=world!=nullptr;
  if(!prepared)world=std::make_unique<melee_web::GameplayMenuWorld>(files,*archive_cache);
@@ -186,6 +213,13 @@ void enter_world(){
 }
 void advance(){
  char error[256]{};
+ if(replay_pending){
+  check(replay&&replay->initial_input,"Replay initialization is unavailable");
+  replay_pending=false;
+  match=std::make_unique<melee_web::GameplayMatchSession>(files,replay->selection,*archive_cache,
+      melee_web::GameplayMatchConstruction::Deferred,*replay->initial_input);
+  running=false;message="Preparing reference replay...";return;
+ }
  if(match){
   const uint32_t seed=match->random_seed();match->close();match.reset();++completed_matches;
   check(melee_web_menu_host_match_finished(host,seed,error,sizeof(error)),error);
@@ -221,19 +255,13 @@ void advance(){
 bool advance_match_construction(){
  const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
  const bool complete=match->advance_construction();
- if(complete){
-  // Emscripten grows linear memory by replacing the ArrayBuffer, which can
-  // suspend the browser long enough to trip the source timing guard. Force
-  // action/effect allocation headroom while the source clock is stopped.
-  constexpr std::size_t kLiveMatchHeadroom=192U*1024U*1024U;
-  auto* reserve=static_cast<volatile unsigned char*>(std::malloc(kLiveMatchHeadroom));
-  if(!reserve)throw std::runtime_error("Unable to reserve live-match WebAssembly heap headroom");
-  reserve[0]=0;reserve[kLiveMatchHeadroom-1]=0;std::free(const_cast<unsigned char*>(reserve));
- }
- const double reserved=emscripten_get_now();
- report_construction(complete?"match-enter":"match-enter-step",started,reserved,reserved,
+ const double constructed=emscripten_get_now();
+ report_construction(complete?"match-enter":"match-enter-step",started,constructed,constructed,
                      before,aurora_stats_snapshot());
- if(complete){first_use_draw_pending=true;running=true;message=match_message;}
+ if(complete){
+  if(replay&&replay_trace)melee_web::retail_replay_initial(*replay,true);
+  first_use_draw_pending=true;running=true;message=match_message;
+ }
  return complete;
 }
 
@@ -278,18 +306,48 @@ void render_audio_tick(MeleeWebAudio* audio,char* error,size_t error_size){
  check(melee_web_audio_render(audio,pcm.data(),count,error,error_size),error);
  EM_ASM({window.menuAudio?.(HEAPF32.slice($0>>2,($0>>2)+$1*2));},pcm.data(),count);
 }
+bool render_cache_can_flush(){
+ const AuroraStats* stats=aurora_get_stats();
+ return !world&&!match&&!host&&!running&&!pending&&!preparation.busy()&&
+        stats&&stats->queuedPipelines==0;
+}
+void service_render_cache_writes(){
+ // SQLite fsync may Asyncify-yield. Run at the top-level main-loop boundary,
+ // after source ownership is gone, never from a nested JS command/export or
+ // between source scenes. Persistence time is separate from live callbacks.
+ static bool failure_reported=false;
+ if(!render_cache_can_flush())return;
+ const auto state=aurora_pipeline_cache_status();
+ if(state==AURORA_PIPELINE_CACHE_READY)return;
+ if(state==AURORA_PIPELINE_CACHE_ERROR&&failure_reported)return;
+ const bool flushed=state==AURORA_PIPELINE_CACHE_PENDING;
+ const double started=emscripten_get_now();
+ const bool ok=flushed&&aurora_flush_pipeline_cache();
+ const double duration=emscripten_get_now()-started;
+ if(!ok)failure_reported=true;
+ EM_ASM({window.menuCacheWritesFlushed?.({ok:!!$0,flushed:!!$1,duration_ms:$2});},
+        ok,flushed,duration);
+}
 void tick(){
  EM_ASM({window.menuServiceCommands?.();});
+ service_render_cache_writes();
  const double started=emscripten_get_now();
  const bool running_at_callback_start=running;
  const AuroraStats stats_before=aurora_stats_snapshot();
  double input_done=started,simulation_done=started,begin_done=started,draw_done=started,end_done=started;
  double preparation_ms=0,preparation_started=0;
+ double render_begin_ms=0,render_draw_ms=0,render_end_ms=0,render_total_ms=0,simulation_cpu_ms=0;
+ uint32_t callback_draw_calls=0,callback_texture_upload=0,callback_staging_used=0;
+ AuroraStats callback_begin_stats{};
+ AuroraStats callback_end_stats{};
+ melee_web::SourceFrameSequence source_frames;
  int began=0,drawn=1,timing_valid=1,first_use=0;
  // A transition request owns the whole callback in which it is observed.
  // Keep the source presenter out of both the request and audio-ack waits.
- int suppress_draw=preparation.suppress_source_draw()||pending;
+ int suppress_draw=preparation.suppress_source_draw()||pending||replay_final_draw;
  bool actual_source_draw=false;
+ bool replay_completed_now=false;
+ unsigned replay_steps=0;
  try{
   for(const AuroraEvent* event=aurora_update();event&&event->type!=AURORA_NONE;++event){
    if(event->type==AURORA_EXIT){close();melee_web_input_shutdown();aurora_shutdown();emscripten_cancel_main_loop();return;}
@@ -298,6 +356,92 @@ void tick(){
   input_done=emscripten_get_now();
   const double clock_now=emscripten_get_now();
   char error[256]{};
+  const auto present_source=[&](){
+  bool drew_source=false;
+  bool began_this_frame=false;
+  const double render_started=emscripten_get_now();
+  if(aurora_begin_frame()){
+   began=1;began_this_frame=true;begin_done=emscripten_get_now();
+   GXSetCopyClear(GXColor{0,0,0,255},GX_MAX_Z24);
+   if(!suppress_draw){
+    if(!faulted){
+     if(match){match->draw();actual_source_draw=true;drew_source=true;}
+     else if(world&&host_entered){drawn=melee_web_menu_host_draw(host,error,sizeof(error));actual_source_draw=drawn!=0;drew_source=drawn!=0;}
+    }
+   }
+   draw_done=emscripten_get_now();
+   aurora_end_frame();end_done=emscripten_get_now();check(drawn,error);
+   if(replay&&!replay_final_draw&&replay_cursor==replay->frames.size()&&drew_source){
+    replay_final_draw=true;replay_completed_now=true;running=false;menu_clock.reset();
+    message="Reference replay complete; all input consumed and final frame drawn.";
+   }
+   if(drew_source&&running){
+    if(first_use_draw_pending){first_use=1;first_use_draw_pending=false;}
+   }
+  }
+  else{begin_done=draw_done=end_done=emscripten_get_now();}
+
+  render_begin_ms+=begin_done-render_started;
+  render_draw_ms+=draw_done-begin_done;
+  render_end_ms+=end_done-draw_done;
+  render_total_ms+=end_done-render_started;
+  const auto rendered=aurora_stats_snapshot();
+  callback_begin_stats.lastBeginFrameId=rendered.lastBeginFrameId;
+  callback_begin_stats.lastBeginFrameFrameSlotMs+=rendered.lastBeginFrameFrameSlotMs;
+  callback_begin_stats.lastBeginFrameFrameSlotWaitMs+=rendered.lastBeginFrameFrameSlotWaitMs;
+  callback_begin_stats.lastBeginFrameFrameSlotWaitCount+=rendered.lastBeginFrameFrameSlotWaitCount;
+  callback_begin_stats.lastBeginFrameStagingSlotMs+=rendered.lastBeginFrameStagingSlotMs;
+  callback_begin_stats.lastBeginFrameStagingSlotWaitMs+=rendered.lastBeginFrameStagingSlotWaitMs;
+  callback_begin_stats.lastBeginFrameStagingSlotWaitCount+=rendered.lastBeginFrameStagingSlotWaitCount;
+  callback_begin_stats.lastBeginFramePacketMs+=rendered.lastBeginFramePacketMs;
+  callback_begin_stats.lastBeginFrameRecordMs+=rendered.lastBeginFrameRecordMs;
+  callback_begin_stats.lastBeginFramePipelineMs+=rendered.lastBeginFramePipelineMs;
+  callback_begin_stats.lastBeginFrameWorkerMs+=rendered.lastBeginFrameWorkerMs;
+  callback_begin_stats.lastBeginFrameEncoderMs+=rendered.lastBeginFrameEncoderMs;
+  callback_begin_stats.lastBeginFrameTotalMs+=rendered.lastBeginFrameTotalMs;
+  callback_begin_stats.lastBeginFrameResidualMs+=rendered.lastBeginFrameResidualMs;
+  callback_begin_stats.lastBeginFrameStartMs=rendered.lastBeginFrameStartMs;
+  callback_begin_stats.lastBeginFrameEndMs=rendered.lastBeginFrameEndMs;
+  if(rendered.lastBeginFrameMaxWaitMs>callback_begin_stats.lastBeginFrameMaxWaitMs){
+   callback_begin_stats.lastBeginFrameMaxWaitMs=rendered.lastBeginFrameMaxWaitMs;
+   callback_begin_stats.lastBeginFrameMaxWaitStartMs=rendered.lastBeginFrameMaxWaitStartMs;
+   callback_begin_stats.lastBeginFrameMaxWaitEndMs=rendered.lastBeginFrameMaxWaitEndMs;
+   callback_begin_stats.lastBeginFrameMaxWaitKind=rendered.lastBeginFrameMaxWaitKind;
+  }
+  callback_begin_stats.lastBeginFrameOuterSurfaceMs+=rendered.lastBeginFrameOuterSurfaceMs;
+  callback_begin_stats.lastBeginFrameOuterImguiMs+=rendered.lastBeginFrameOuterImguiMs;
+  callback_begin_stats.lastBeginFrameOuterFifoMs+=rendered.lastBeginFrameOuterFifoMs;
+  callback_begin_stats.lastBeginFrameOuterTotalMs+=rendered.lastBeginFrameOuterTotalMs;
+  callback_begin_stats.lastBeginFrameOuterResidualMs+=rendered.lastBeginFrameOuterResidualMs;
+  if(began_this_frame){
+   callback_draw_calls+=rendered.drawCallCount;
+   callback_texture_upload+=rendered.lastTextureUploadSize;
+   callback_staging_used+=rendered.lastVertSize+rendered.lastUniformSize+
+                         rendered.lastIndexSize+rendered.lastStorageSize+
+                         rendered.lastTextureUploadSize;
+   callback_end_stats.lastEndFrameId=rendered.lastEndFrameId;
+   callback_end_stats.lastEndFrameFifoTextureMs+=rendered.lastEndFrameFifoTextureMs;
+   callback_end_stats.lastEndFrameGfxFinishMs+=rendered.lastEndFrameGfxFinishMs;
+   callback_end_stats.lastEndFrameStagingWritesMs+=rendered.lastEndFrameStagingWritesMs;
+   callback_end_stats.lastEndFrameSurfaceEncodeMs+=rendered.lastEndFrameSurfaceEncodeMs;
+   callback_end_stats.lastEndFrameEncoderFinishMs+=rendered.lastEndFrameEncoderFinishMs;
+   callback_end_stats.lastEndFrameQueueSubmitMs+=rendered.lastEndFrameQueueSubmitMs;
+   callback_end_stats.lastEndFrameCleanupMs+=rendered.lastEndFrameCleanupMs;
+   callback_end_stats.lastEndFrameOuterPrepMs+=rendered.lastEndFrameOuterPrepMs;
+   callback_end_stats.lastEndFrameRecordMs+=rendered.lastEndFrameRecordMs;
+   callback_end_stats.lastEndFramePacketMs+=rendered.lastEndFramePacketMs;
+   callback_end_stats.lastEndFrameCallbackMs+=rendered.lastEndFrameCallbackMs;
+   callback_end_stats.lastEndFrameCallbackPostSubmitMs+=rendered.lastEndFrameCallbackPostSubmitMs;
+   callback_end_stats.lastEndFrameObserverMs+=rendered.lastEndFrameObserverMs;
+   callback_end_stats.lastEndFrameCallbackResidualMs+=rendered.lastEndFrameCallbackResidualMs;
+   callback_end_stats.lastEndFrameTailMs+=rendered.lastEndFrameTailMs;
+   callback_end_stats.lastEndFrameWorkerMs+=rendered.lastEndFrameWorkerMs;
+   callback_end_stats.lastEndFrameWorkerResidualMs+=rendered.lastEndFrameWorkerResidualMs;
+   callback_end_stats.lastEndFrameTotalMs+=rendered.lastEndFrameTotalMs;
+   callback_end_stats.lastEndFrameResidualMs+=rendered.lastEndFrameResidualMs;
+  }
+  return drew_source;
+  };
   const bool audio_before_construction=transition_audio_continues&&
                                        (!running||preparation.busy());
   MeleeWebAudio* const audio_owner=match?match->audio():world?world->audio():nullptr;
@@ -322,8 +466,30 @@ void tick(){
    preparation_ms=emscripten_get_now()-preparation_started;preparation_started=0;
    suppress_draw=preparation.suppress_source_draw();
   }else if(preparation.arming()){
-   preparation.arm();running=true;menu_clock.reset();suppress_draw=0;
-   message=match?match_message:melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select";
+   // The final preparation draw is already submitted. Keep its image and let
+   // the browser deliver completion callbacks; never redraw or advance source
+   // state just to wait for a staging buffer to become reusable.
+   const auto submitted=aurora_browser_submission_status();
+   if(!preparation_profile.submission_polled){
+    preparation_profile.pending_staging_at_first_arm=submitted.pendingStagingBuffers;
+    preparation_profile.submission_polled=true;
+   }
+   const bool complete=submitted.pendingFramePackets==0&&submitted.pendingStagingBuffers==0&&
+                       submitted.workerBusy==0;
+   if(preparation.arm(complete)){
+    const double ready_at=emscripten_get_now();
+    preparation_profile.submission_ready_at=ready_at;
+    preparation_profile.report(ready_at);
+    EM_ASM({window.menuRenderCacheSettled?.();});
+    if(render_only_preparation)render_only_preparation=false;
+    else EM_ASM({window.menuPreparationDone?.();});
+    running=true;menu_clock.reset();suppress_draw=0;
+    message=match?match_message:melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select";
+   }else{
+    ++preparation_profile.submission_wait_callbacks;
+    check(emscripten_get_now()-preparation_profile.submission_wait_started<10000,
+          "GPU completion timed out during scene preparation");
+   }
   }else if(pending){
    begin_preparation();
   }
@@ -338,6 +504,8 @@ void tick(){
    transition_audio_continues=false;
   }
   for(unsigned step=0;step<elapsed.steps;step++){
+   if(replay&&replay_cursor==replay->frames.size())break;
+   source_frames.before_step(present_source);
    PADStatus checked_input[4];const PADStatus* sample=input->raw;bool copied_input=false;
    bool diagnostic_start_pulse=false;
    if(diagnostic_start_ticks){
@@ -363,7 +531,23 @@ void tick(){
    }
    int result=1;
    if(match){
-    match->tick(sample);int winner=-1;const int outcome=match->outcome(winner);
+    if(replay){
+     check(!match->paused()&&!match->complete(),"Replay reached an unsupported source pause/exit");
+     if(!replay_started){
+      replay_started=true;
+      EM_ASM({window.menuReplayStarted?.($0,!!$1);},replay->frames.size(),replay_trace);
+     }
+     sample=replay->frames[replay_cursor].pads.data();
+    }
+    match->tick(sample);source_frames.did_step();
+    int winner=-1;const int outcome=match->outcome(winner);
+    if(replay){
+     replay_match_complete=match->complete();replay_outcome=outcome;replay_winner=winner;
+     if(replay_trace)melee_web::retail_replay_frame(*replay,replay_cursor);
+     ++replay_cursor;
+     ++replay_steps;
+     check(!match->complete()||replay_cursor==replay->frames.size(),"Replay source match exited before all input was consumed");
+    }
     if(stock_check==-1){
      const auto player=match->player_stats(0);
      check(match->player_stats(1).stocks==4,"Stock diagnostic: stationary opponent lost a stock");
@@ -374,33 +558,23 @@ void tick(){
      if(outcome){check(winner==1&&stock_count==0&&stock_respawns==3,"Stock diagnostic: unexpected source outcome");if(match->complete())stock_check=1;}
      if(!match->complete())check(stock_tick<4000,"Stock diagnostic: no source exit after 4000 ticks");
     }
-    if(match->complete()){check(outcome,"Original match transitioned without an outcome");pending=true;result=3;}
+    if(match->complete()&&!replay){check(outcome,"Original match transitioned without an outcome");pending=true;result=3;}
    }
-   else{result=melee_web_menu_host_tick(host,sample,error,sizeof(error));check(result==1||result==3,error);}
+   else{result=melee_web_menu_host_tick(host,sample,error,sizeof(error));check(result==1||result==3,error);source_frames.did_step();}
    if(result==3){pending=true;clear_diagnostic_pad();break;}
   }
   if(!audio_before_construction&&!audio_elapsed.stalled)
    for(unsigned step=0;step<audio_elapsed.steps;step++)
     render_audio_tick(audio_owner,error,sizeof(error));
   simulation_done=emscripten_get_now();
-  begin_done=simulation_done;
-  if(aurora_begin_frame()){
-   began=1;begin_done=emscripten_get_now();
-   GXSetCopyClear(GXColor{0,0,0,255},GX_MAX_Z24);
-   if(!suppress_draw){
-    if(!faulted){
-     if(match){match->draw();actual_source_draw=true;}
-     else if(world&&host_entered){drawn=melee_web_menu_host_draw(host,error,sizeof(error));actual_source_draw=drawn!=0;}
-    }
-   }
-   draw_done=emscripten_get_now();
-   aurora_end_frame();end_done=emscripten_get_now();check(drawn,error);
-   if(actual_source_draw&&running){
-    first_use=first_use_draw_pending?1:0;
-    first_use_draw_pending=false;
-   }
-  }
-  else{draw_done=begin_done;end_done=begin_done;}
+  simulation_cpu_ms=std::max(0.0,simulation_done-input_done-preparation_ms-render_total_ms);
+  source_frames.finish(present_source);
+  // Camera callbacks mutate source state (including magnifier damage flags).
+  // A callback without a source tick must retain the last image; preparation
+  // alone may redraw a frozen scene to settle its explicitly measured resources.
+  if(source_frames.steps()==0&&(preparation.warming()||(!world&&!match)))present_source();
+  check(!replay_steps||source_frames.draws()==replay_steps,
+        "Reference replay did not draw every consumed source tick");
  }catch(const std::exception& e){running=false;faulted=true;preparation.reset();render_only_preparation=false;pending=false;clear_diagnostic_pad();menu_clock.reset();message=e.what();if(preparation_started)preparation_ms=emscripten_get_now()-preparation_started;preparation_failed(e.what());timing_valid=0;std::fprintf(stderr,"Native menu: %s\n",e.what());
   const double failed=emscripten_get_now();
   if(input_done<started)input_done=failed;
@@ -416,13 +590,12 @@ void tick(){
   stat_delta(stats_after.createdPipelines,stats_before.createdPipelines)!=0||
   stats_after.lastTextureUploadSize!=0;
  const bool was_warming=preparation.warming();
- if(was_warming)preparation_profile.observe(finished-started,draw_done-begin_done,end_done-draw_done,
+ if(was_warming)preparation_profile.observe(finished-started,render_draw_ms,render_end_ms,
                                              actual_source_draw,stats_before,stats_after);
  if(preparation.observe_render(actual_source_draw,stats_after.queuedPipelines,render_preparation_activity)){
-  preparation_profile.report(finished);
-  EM_ASM({window.menuRenderCacheSettled?.();});
-  if(render_only_preparation)render_only_preparation=false;
-  else EM_ASM({window.menuPreparationDone?.();});
+  preparation_profile.submission_wait_started=finished;
+  preparation_profile.pending_staging_at_settle=
+      aurora_browser_submission_status().pendingStagingBuffers;
  }
  // A texture upload is complete by the time it is reported here, so pausing
  // source simulation afterward cannot hide its cost. Newly constructed scenes
@@ -436,25 +609,96 @@ void tick(){
    running=false;menu_clock.reset();message="Preparing first-use rendering...";
   }
  }
- char timing[1024];
- std::snprintf(timing,sizeof(timing),
+ char timing[4096];
+ const uint32_t staging_used_bytes=callback_staging_used;
+ const int timing_written=std::snprintf(timing,sizeof(timing),
   "{\"frame\":%u,\"started\":%.3f,\"valid\":%d,\"first_use\":%d,"
   "\"input_ms\":%.3f,\"simulation_audio_ms\":%.3f,\"preparation_ms\":%.3f,"
+  "\"begin_phases\":{\"frame_slot_ms\":%.3f,\"frame_slot_wait_ms\":%.3f,"
+  "\"frame_slot_wait_count\":%u,\"staging_slot_ms\":%.3f,"
+  "\"staging_slot_wait_ms\":%.3f,\"staging_slot_wait_count\":%u,"
+  "\"packet_ms\":%.3f,\"record_ms\":%.3f,\"pipeline_ms\":%.3f,"
+  "\"worker_ms\":%.3f,\"encoder_ms\":%.3f,\"total_ms\":%.3f,"
+  "\"residual_ms\":%.3f,\"outer_surface_ms\":%.3f,"
+  "\"outer_imgui_ms\":%.3f,\"outer_fifo_ms\":%.3f,"
+  "\"outer_total_ms\":%.3f,\"outer_residual_ms\":%.3f,"
+  "\"start_ms\":%.3f,\"end_ms\":%.3f,\"max_wait_ms\":%.3f,"
+  "\"max_wait_start_ms\":%.3f,\"max_wait_end_ms\":%.3f,\"max_wait_kind\":%u,"
+  "\"last_frame_id\":%llu},"
   "\"begin_ms\":%.3f,\"draw_ms\":%.3f,\"end_ms\":%.3f,\"total_ms\":%.3f,"
+  "\"end_phases\":{\"last_frame\":%llu,\"fifo_texture_ms\":%.3f,\"gfx_finish_ms\":%.3f,"
+  "\"staging_writes_ms\":%.3f,\"surface_encode_ms\":%.3f,\"encoder_finish_ms\":%.3f,"
+  "\"queue_submit_ms\":%.3f,\"cleanup_ms\":%.3f,"
+  "\"outer_prep_ms\":%.3f,"
+  "\"record_ms\":%.3f,"
+  "\"packet_ms\":%.3f,"
+  "\"callback_ms\":%.3f,"
+  "\"callback_post_submit_ms\":%.3f,"
+  "\"observer_ms\":%.3f,"
+  "\"callback_residual_ms\":%.3f,"
+  "\"tail_ms\":%.3f,"
+  "\"worker_ms\":%.3f,"
+  "\"worker_residual_ms\":%.3f,"
+  "\"total_ms\":%.3f,"
+  "\"residual_ms\":%.3f},"
   "\"began\":%d,\"drawn\":%d,\"queued_delta\":%d,\"created_delta\":%d,"
   "\"queued_total\":%u,\"created_total\":%u,\"draw_calls\":%u,"
-  "\"texture_upload_bytes\":%u,\"wasm_heap_bytes\":%zu,\"draw_suppressed\":%d}",
+  "\"texture_upload_bytes\":%u,\"staging_used_bytes\":%u,"
+  "\"wasm_heap_bytes\":%zu,\"draw_suppressed\":%d,\"source_steps\":%zu,\"source_draws\":%zu}",
   ++render_frame,started,timing_valid,first_use,input_done-started,
-  std::max(0.0,simulation_done-input_done-preparation_ms),preparation_ms,
-  begin_done-simulation_done,draw_done-begin_done,end_done-draw_done,
-  finished-started,began,drawn,
+  simulation_cpu_ms,preparation_ms,
+  callback_begin_stats.lastBeginFrameFrameSlotMs,callback_begin_stats.lastBeginFrameFrameSlotWaitMs,
+  callback_begin_stats.lastBeginFrameFrameSlotWaitCount,
+  callback_begin_stats.lastBeginFrameStagingSlotMs,callback_begin_stats.lastBeginFrameStagingSlotWaitMs,
+  callback_begin_stats.lastBeginFrameStagingSlotWaitCount,
+  callback_begin_stats.lastBeginFramePacketMs,callback_begin_stats.lastBeginFrameRecordMs,
+  callback_begin_stats.lastBeginFramePipelineMs,callback_begin_stats.lastBeginFrameWorkerMs,
+  callback_begin_stats.lastBeginFrameEncoderMs,callback_begin_stats.lastBeginFrameTotalMs,
+  callback_begin_stats.lastBeginFrameResidualMs,callback_begin_stats.lastBeginFrameOuterSurfaceMs,
+  callback_begin_stats.lastBeginFrameOuterImguiMs,callback_begin_stats.lastBeginFrameOuterFifoMs,
+  callback_begin_stats.lastBeginFrameOuterTotalMs,callback_begin_stats.lastBeginFrameOuterResidualMs,
+  callback_begin_stats.lastBeginFrameStartMs,callback_begin_stats.lastBeginFrameEndMs,
+  callback_begin_stats.lastBeginFrameMaxWaitMs,callback_begin_stats.lastBeginFrameMaxWaitStartMs,
+  callback_begin_stats.lastBeginFrameMaxWaitEndMs,callback_begin_stats.lastBeginFrameMaxWaitKind,
+  static_cast<unsigned long long>(callback_begin_stats.lastBeginFrameId),
+  render_begin_ms,render_draw_ms,render_end_ms,
+  finished-started,static_cast<unsigned long long>(callback_end_stats.lastEndFrameId),
+  callback_end_stats.lastEndFrameFifoTextureMs,callback_end_stats.lastEndFrameGfxFinishMs,
+  callback_end_stats.lastEndFrameStagingWritesMs,callback_end_stats.lastEndFrameSurfaceEncodeMs,
+  callback_end_stats.lastEndFrameEncoderFinishMs,callback_end_stats.lastEndFrameQueueSubmitMs,
+  callback_end_stats.lastEndFrameCleanupMs,
+  callback_end_stats.lastEndFrameOuterPrepMs,
+  callback_end_stats.lastEndFrameRecordMs,
+  callback_end_stats.lastEndFramePacketMs,
+  callback_end_stats.lastEndFrameCallbackMs,
+  callback_end_stats.lastEndFrameCallbackPostSubmitMs,
+  callback_end_stats.lastEndFrameObserverMs,
+  callback_end_stats.lastEndFrameCallbackResidualMs,
+  callback_end_stats.lastEndFrameTailMs,
+  callback_end_stats.lastEndFrameWorkerMs,
+  callback_end_stats.lastEndFrameWorkerResidualMs,
+  callback_end_stats.lastEndFrameTotalMs,
+  callback_end_stats.lastEndFrameResidualMs,
+  began,drawn,
   stat_delta(stats_after.queuedPipelines,stats_before.queuedPipelines),
   stat_delta(stats_after.createdPipelines,stats_before.createdPipelines),
   stats_after.queuedPipelines,stats_after.createdPipelines,
-  stats_after.drawCallCount,stats_after.lastTextureUploadSize,
-  emscripten_get_heap_size(),suppress_draw);
+  callback_draw_calls,callback_texture_upload,staging_used_bytes,
+  emscripten_get_heap_size(),suppress_draw,source_frames.steps(),source_frames.draws());
+ if(timing_written<0||static_cast<size_t>(timing_written)>=sizeof(timing)){
+  timing_valid=0;
+  std::snprintf(timing,sizeof(timing),"{\"frame\":%u,\"valid\":0,\"timing_truncated\":true}",render_frame);
+  EM_ASM({
+   const text=UTF8ToString($0);
+   if(window.menuRuntimeTimingError)window.menuRuntimeTimingError(text);
+   else console.error(text);
+  },timing_written<0?"Native menu timing JSON formatting failed":"Native menu timing JSON exceeded 4096 bytes");
+ }
  EM_ASM({if(window.menuRuntimeTiming)window.menuRuntimeTiming(JSON.parse(UTF8ToString($0)));},timing);
  EM_ASM({window.menuFrame?.(!!$0);},running_at_callback_start?1:0);
+ if(replay_completed_now)EM_ASM({window.menuReplayCompleted?.($0,!!$1,$2,$3);},
+                                replay_cursor,replay_match_complete?1:0,
+                                replay_outcome,replay_winner);
 }
 }
 extern "C" {
@@ -475,6 +719,9 @@ int melee_web_native_menu_prepare(){try{
  // simulation callback runs during this preparation phase.
  if(!archive_cache)archive_cache=std::make_unique<melee_web::RuntimeArchiveCache>(files);
  host=melee_web_menu_host_create(error,sizeof(error));check(host!=nullptr,error);
+ // One unentered menu preparation belongs to the canonical fresh import.
+ // Repeating it changes allocation history even without entering a source scene.
+ if(reference_menu_preparations++)reference_heap_used=true;
  world=std::make_unique<melee_web::GameplayMenuWorld>(files,*archive_cache);
  const double constructed=emscripten_get_now();
  report_construction("scene-prepare",started,constructed,constructed,before,aurora_stats_snapshot());
@@ -494,19 +741,38 @@ int melee_web_native_menu_launch(){try{
  VISetFrameBufferScale(1);enter_world();return 1;
 }catch(const std::exception& e){message=e.what();running=false;return 0;}}
 int melee_web_native_menu_unload(){try{close();message="Native menus unloaded.";return 1;}catch(const std::exception& e){message=e.what();return 0;}}
+int melee_web_native_menu_replay(const uint8_t* data,unsigned size,int observe){try{
+ check(data&&size<=melee_web::kRetailReplayMaxBytes,"Invalid reference replay bytes");
+ check(observe==0||observe==1,"Invalid replay observation mode");
+ auto candidate=std::make_unique<melee_web::RetailReplayRecipe>(melee_web::read_retail_replay({data,size}));
+ check(candidate->version==2&&candidate->initial_input,"Browser reference playback requires a v2 PAD history recipe");
+ check(!reference_heap_used,"Reference replay requires a fresh application. Use Reload application state, import the disc, then play the recipe before entering menus.");
+ reference_heap_used=true;
+ close();
+ if(!archive_cache)archive_cache=std::make_unique<melee_web::RuntimeArchiveCache>(files);
+ replay=std::move(candidate);replay_trace=observe;replay_pending=true;
+ match_message="Reference replay: "+selected_match_message(replay->selection);
+ check(preparation.request(),"Replay preparation is already active");
+ preparation_profile.begin(true,emscripten_get_now());
+ VISetFrameBufferScale(1);
+ message="Preparing reference replay...";
+ EM_ASM({window.menuPreparation?.(UTF8ToString($0));},message.c_str());
+ return 1;
+}catch(const std::exception& e){message=e.what();running=false;return 0;}}
+unsigned melee_web_native_menu_replay_cursor(){return static_cast<unsigned>(replay_cursor);}
 void melee_web_native_menu_pause(int paused){
- if(faulted||preparation.busy()||pending||(!host_entered&&!match))return;
+ if(faulted||replay_final_draw||preparation.busy()||pending||(!host_entered&&!match))return;
  running=(world||match)&&!paused;menu_clock.reset();
  message=running?(match?match_message:melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select"):"Paused.";
 }
 void melee_web_native_menu_confirm_check(){
- if((host_entered||match)&&!faulted&&!preparation.busy()&&!pending&&stock_check!=-1&&diagnostic_pad_remaining==0)
+ if(!replay&&(host_entered||match)&&!faulted&&!preparation.busy()&&!pending&&stock_check!=-1&&diagnostic_pad_remaining==0)
   diagnostic_start_ticks=3;
 }
 int melee_web_native_menu_pad_sample_full(unsigned port,unsigned buttons,int stick_x,int stick_y,
                                           int cstick_x,int cstick_y,unsigned trigger_l,
                                           unsigned trigger_r,unsigned duration){try{
- if(faulted||preparation.busy()||pending||stock_check==-1||diagnostic_start_ticks!=0||!running||(!host_entered&&!match))
+ if(replay||faulted||preparation.busy()||pending||stock_check==-1||diagnostic_start_ticks!=0||!running||(!host_entered&&!match))
   throw std::runtime_error("Raw PAD samples require an active, non-diagnostic scene");
  if(port>1||buttons>0xffffU||(buttons&~kDiagnosticPadButtons)||stick_x<-80||stick_x>80||stick_y<-80||stick_y>80||
     cstick_x<-80||cstick_x>80||cstick_y<-80||cstick_y>80||trigger_l>255||trigger_r>255||duration<1||duration>120)
@@ -555,7 +821,7 @@ int melee_web_native_menu_drive_stage(int stage_kind){try{
  return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
 int melee_web_native_menu_stock_check_ready(){
- return match&&!faulted&&running&&match->ready()&&!match->paused()&&
+ return !replay&&match&&!faulted&&running&&match->ready()&&!match->paused()&&
         !match->ending()&&stock_check!=-1&&diagnostic_start_ticks==0&&diagnostic_pad_remaining==0;
 }
 int melee_web_native_menu_stock_check(){
@@ -563,6 +829,20 @@ int melee_web_native_menu_stock_check(){
     match->player_stats(0).stocks!=4||match->player_stats(1).stocks!=4)return 0;
  stock_check=-1;stock_count=4;stock_respawns=0;stock_tick=0;stock_lost=stock_jump=false;
  running=true;menu_clock.reset();return 1;
+}
+const char* melee_web_native_menu_memory(){
+ // Lifecycle diagnostics only: mallinfo walks the allocator's free lists.
+ // Reserved linear memory is not the same as live allocations and cannot shrink.
+ const auto info=mallinfo();
+ static char text[512];
+ std::snprintf(text,sizeof(text),
+  "{\"wasm_heap_bytes\":%zu,\"allocator_arena_bytes\":%zu,"
+  "\"allocator_live_bytes\":%zu,\"allocator_free_bytes\":%zu,"
+  "\"allocator_top_free_bytes\":%zu,"
+  "\"match_present\":%s,\"menu_present\":%s}",
+  emscripten_get_heap_size(),info.arena,info.uordblks,info.fordblks,info.keepcost,
+  match?"true":"false",world?"true":"false");
+ return text;
 }
 const char* melee_web_native_menu_diagnostics(){
  static char text[640];
@@ -574,7 +854,8 @@ const char* melee_web_native_menu_diagnostics(){
                 diagnostic_pad_port,static_cast<unsigned>(diagnostic_pad.button),diagnostic_pad.stickX,diagnostic_pad.stickY,diagnostic_pad_remaining);
  else
   std::snprintf(text+length,sizeof(text)-length," · raw PAD: none");
- if(match&&match->ready()){
+ // Ready/Go is already source gameplay, even before the HUD allows controls.
+ if(match&&match->construction_complete()){
   const auto player=match->player_stats(0);
   const auto length=std::char_traits<char>::length(text);
   std::snprintf(text+length,sizeof(text)-length,
@@ -599,8 +880,9 @@ const char* melee_web_native_menu_diagnostics(){
 const char* melee_web_native_menu_message(){return message.c_str();}
 int melee_web_native_menu_running(){return running;}
 int melee_web_native_menu_cache_idle(){
- const AuroraStats* stats=aurora_get_stats();
- return !world&&!match&&stats&&stats->queuedPipelines==0;
+ if(!render_cache_can_flush())return 0;
+ const auto state=aurora_pipeline_cache_status();
+ return state==AURORA_PIPELINE_CACHE_READY?1:state==AURORA_PIPELINE_CACHE_ERROR?-1:0;
 }
 int melee_web_native_menu_phase(){return match?7:host?melee_web_menu_host_phase(host):0;}
 }
@@ -610,7 +892,9 @@ int main(int argc,char** argv){
  config.windowWidth=640;config.windowHeight=480;config.msaa=1;config.vsync=true;
  config.logCallback=log_message;config.logLevel=LOG_INFO;
  if(!SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT,"#canvas"))return 1;
- aurora_initialize(argc,argv,&config);GXInit(fifo,sizeof(fifo));
+ aurora_initialize(argc,argv,&config);
+ aurora_set_deferred_pipeline_cache_writes(true);
+ GXInit(fifo,sizeof(fifo));
  if(!melee_web_input_startup())return 1;
  emscripten_set_main_loop(tick,0,1);return 0;
 }

@@ -1,5 +1,6 @@
 #include "gameplay_menu.h"
 #include "gameplay_content.h"
+#include "gameplay_match_rules.h"
 
 #include <melee/gm/gm_1601.h>
 #include <melee/mn/mncharsel.h>
@@ -185,7 +186,7 @@ static int match_selection_valid(const StartMeleeData* start)
 
     if (start == NULL || start->rules.match_kind != MatchKind_Stock ||
         !start->rules.is_stock || !start->rules.is_vs ||
-        start->rules.is_teams || start->rules.timer_enabled ||
+        start->rules.is_teams || !melee_web_match_timer_supported(&start->rules) ||
         start->rules.xB != -1 || start->rules.x20 != UINT64_MAX ||
         !melee_web_menu_stage_available(start->rules.stkind))
     {

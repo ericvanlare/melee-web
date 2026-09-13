@@ -25,6 +25,10 @@ int melee_web_gameplay_startup(size_t heap_bytes, char* error, size_t error_size
 int melee_web_gameplay_step(char* error, size_t error_size);
 int melee_web_gameplay_shutdown(char* error, size_t error_size);
 MeleeWebGameplayStats melee_web_gameplay_stats(void);
+/* Returns the live world's generation without walking SDK heap statistics.
+ * Zero means that the tables are not live, teardown is in progress, or the
+ * SDK allocator no longer owns the bootstrap arena. */
+uint64_t melee_web_gameplay_generation(void);
 /* Remains true during teardown, until the owned SDK arena is released. */
 int melee_web_gameplay_world_exists(void);
 

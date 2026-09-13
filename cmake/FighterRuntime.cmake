@@ -11,12 +11,14 @@ foreach(path IN LISTS native_paths)
       OR relative STREQUAL "melee/ft/ftparts.c" OR relative STREQUAL "melee/ft/ftchangeparam.c"
       OR relative STREQUAL "melee/ft/ftwalkcommon.c" OR relative STREQUAL "melee/mp/mpisland.c" OR relative STREQUAL "melee/mp/mplib.c"
       OR relative STREQUAL "melee/gr/ground.c" OR relative STREQUAL "melee/gr/grdynamicattr.c"
-      OR relative STREQUAL "melee/lb/lb_00B0.c" OR relative STREQUAL "melee/lb/lbspdisplay.c")
+      OR relative STREQUAL "melee/lb/lb_00B0.c" OR relative STREQUAL "melee/lb/lb_00F9.c"
+      OR relative STREQUAL "melee/lb/lbspdisplay.c")
     continue()
   endif()
   list(APPEND fighter_paths "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/${relative}")
 endforeach()
 add_library(fighter_source_runtime STATIC EXCLUDE_FROM_ALL ${fighter_paths}
+  src/gameplay_retail_setup.c src/gameplay_retail_state.c
   src/gameplay_match_flow.c src/gameplay_hud.c src/gameplay_menu.c src/gameplay_menu_host.c src/gameplay_item_runtime.c src/gameplay_stage_items.c src/dat_item_commands.c src/gameplay_crowd.c src/gameplay_render.c src/gameplay_color_commands.c src/gameplay_match_rules.c src/gameplay_stage_visual.c src/gameplay_stage_map.c src/gameplay_stage_last.c src/gameplay_stage_profile.c src/gameplay_stage_story.c src/gameplay_effect_runtime.c
   src/gameplay_stage_dream_land.c src/gameplay_audio.c src/gameplay_audio_bank_transport.c src/gameplay_audio_residency.c src/gameplay_audio_stream.c src/gameplay_io.cpp src/gameplay_audio_resample.c src/gameplay_audio_itd.c src/gameplay_audio_fx.c src/gameplay_audio_reverb.c
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/axfx/axfx.c"
@@ -25,8 +27,8 @@ add_library(fighter_source_runtime STATIC EXCLUDE_FROM_ALL ${fighter_paths}
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/ax/AXAlloc.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/ax/AXVPB.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/ax/AXCL.c"
-  "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/ax/AXAux.c" src/gameplay_sdk.c src/gameplay_action_store.c src/gameplay_bonus_data.c
-  src/gameplay_player_context.c src/gameplay_fighter_assets.c src/gameplay_effect_banks.c src/gameplay_ground_data.c src/gameplay_archive_sections.c src/gameplay_platform.c src/gameplay_match_context.c src/gameplay_font_atlas.c src/gameplay_stage_numeric.c src/dat_item_registry.c
+  "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/ax/AXAux.c" src/gameplay_sdk.c src/gameplay_action_store.c src/gameplay_bonus_data.c src/gameplay_rumble.c
+  src/gameplay_player_context.c src/gameplay_fighter_assets.c src/gameplay_effect_banks.c src/gameplay_ground_data.c src/gameplay_archive_sections.c src/gameplay_platform.c src/gameplay_match_context.c src/gameplay_pad_state.c src/gameplay_font_atlas.c src/gameplay_stage_numeric.c src/dat_item_registry.c
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/particle.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/generator.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/hsd_3A64.c"
@@ -47,10 +49,13 @@ add_library(fighter_source_runtime STATIC EXCLUDE_FROM_ALL ${fighter_paths}
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/synth.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/sislib.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/hsd_393C.c"
+  "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/hsd_3915.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/psappsrt.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/psdisptev.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/psdisp.c"
-  "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/MSL/float.c")
+  "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/MSL/float.c"
+  "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/MSL/trigf.c"
+  "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/MSL/math_data.c")
 target_include_directories(fighter_source_runtime PUBLIC src "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}"
   PRIVATE .deps/aurora/include .deps/melee/extern/dolphin/include)
 target_compile_definitions(fighter_source_runtime PUBLIC TARGET_PC PRIVATE MELEE_WEB_MENU_MARIO_FD)
@@ -63,9 +68,13 @@ set_source_files_properties(
   PROPERTIES COMPILE_OPTIONS "-include;string.h;-include;math.h")
 set_source_files_properties("${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/ax/AXCL.c" PROPERTIES COMPILE_OPTIONS "-include;string.h")
 target_compile_options(fighter_source_runtime PRIVATE -ffunction-sections -fdata-sections -ffp-contract=off
+  -fno-builtin-sinf -fno-builtin-cosf -fno-builtin-tanf
+  -fno-builtin-atanf -fno-builtin-atan2f -fno-builtin-acosf
   -include "${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h")
 target_link_libraries(fighter_source_runtime PUBLIC hsd_native_runtime aurora::pad)
 add_library(fighter_asset_runtime STATIC EXCLUDE_FROM_ALL
+  src/gameplay_retail_recipe.cpp
+  src/gameplay_replay_transport.cpp src/gameplay_replay_session.cpp
   src/runtime_archive_cache.cpp
   src/gameplay_audio_bank.cpp src/gameplay_audio_stream_asset.cpp src/dat_audio_stream.cpp src/dat_audio.cpp src/dat_audio_programs.cpp
   src/gameplay_hud_assets.cpp src/dat_scene.cpp src/gameplay_menu_world.cpp src/gameplay_match_session.cpp src/dat_menu_support.cpp src/dat_shape_animation.cpp src/dat_sis.cpp src/dat_native_menu.cpp src/dat_item_article.cpp src/dat_stage_items.cpp src/gameplay_world.cpp src/dat_color_animation.cpp src/dat_native_stage.cpp src/dat_archive.cpp src/dat_common.cpp src/dat_native_joint.cpp src/rigid_model.cpp
@@ -89,7 +98,7 @@ add_executable(gameplay_effect_banks_trace EXCLUDE_FROM_ALL tests/gameplay_effec
   src/dat_effect_banks.cpp src/native_dat.cpp src/dat_archive.cpp
   src/dat_effect_entries.cpp src/dat_native_animation.cpp src/dat_native_joint.cpp
   src/rigid_model.cpp src/dat_material.cpp src/dat_texture.cpp
-  src/dat_material_animation.cpp src/dat_animation.cpp)
+  src/dat_material_animation.cpp src/dat_animation.cpp src/dat_shape_animation.cpp)
 target_link_libraries(gameplay_effect_banks_trace PRIVATE fighter_source_runtime)
 target_link_options(gameplay_effect_banks_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1 -sEXIT_RUNTIME=1
   -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
@@ -122,7 +131,7 @@ else()
 endif()
 configure_file(web/runtime.html runtime.html @ONLY)
 configure_file(web/runtime-cache.js runtime-cache.js COPYONLY)
-foreach(module disc-image dsp-coefficients runtime-assets match-flow match-menu action-sweep)
+foreach(module disc-image dsp-coefficients runtime-assets match-flow match-menu action-sweep hitch-capture)
   configure_file(web/${module}.mjs ${module}.mjs COPYONLY)
 endforeach()
 configure_file(web/audio-ring.mjs audio-ring.mjs COPYONLY)
@@ -183,6 +192,53 @@ target_link_options(gameplay_content_match_trace PRIVATE --profiling-funcs
   -sENVIRONMENT=node -sNODERAWFS=1 -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1
   -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
 set_target_properties(gameplay_content_match_trace PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_replay_trace EXCLUDE_FROM_ALL tests/gameplay_replay_trace.cpp)
+target_link_libraries(gameplay_replay_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_replay_trace PRIVATE -UNDEBUG)
+target_link_options(gameplay_replay_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1
+  -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_replay_trace PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_retail_trace EXCLUDE_FROM_ALL
+  tests/gameplay_retail_trace.cpp)
+target_link_libraries(gameplay_retail_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_retail_trace PRIVATE
+  "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
+target_link_options(gameplay_retail_trace PRIVATE --profiling-funcs -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1
+  -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_retail_trace PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_timer_trace EXCLUDE_FROM_ALL
+  tests/gameplay_timer_trace.cpp)
+target_link_libraries(gameplay_timer_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_timer_trace PRIVATE
+  "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>"
+  -ffp-contract=off)
+target_link_options(gameplay_timer_trace PRIVATE --profiling-funcs -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1
+  -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_timer_trace PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_pad_state_trace EXCLUDE_FROM_ALL tests/gameplay_pad_state_trace.c)
+target_link_libraries(gameplay_pad_state_trace PRIVATE fighter_source_runtime)
+target_compile_options(gameplay_pad_state_trace PRIVATE -UNDEBUG
+  -include "${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h")
+target_link_options(gameplay_pad_state_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+  -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_pad_state_trace PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_rumble_trace EXCLUDE_FROM_ALL
+  tests/gameplay_rumble_trace.cpp tests/gameplay_rumble_state.c)
+target_link_libraries(gameplay_rumble_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_rumble_trace PRIVATE
+  "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
+target_link_options(gameplay_rumble_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1
+  -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_rumble_trace PROPERTIES SUFFIX ".js")
 
 add_executable(gameplay_stock_trace EXCLUDE_FROM_ALL tests/gameplay_stock_trace.cpp)
 target_link_libraries(gameplay_stock_trace PRIVATE fighter_asset_runtime)
@@ -305,14 +361,23 @@ add_executable(gameplay_menu_browser EXCLUDE_FROM_ALL src/gameplay_menu_browser.
 add_dependencies(gameplay_menu_browser gameplay_menu_pipeline_seed)
 set_property(TARGET gameplay_menu_browser APPEND PROPERTY LINK_DEPENDS "${initial_pipeline_cache}")
 target_link_libraries(gameplay_menu_browser PRIVATE fighter_asset_runtime aurora::main)
+# Emscripten's mallinfo declaration extends its normal malloc.h via include_next.
+target_include_directories(gameplay_menu_browser SYSTEM PRIVATE "${EMSCRIPTEN_SYSROOT}/include/compat")
 target_compile_options(gameplay_menu_browser PRIVATE -ffp-contract=off)
 target_link_options(gameplay_menu_browser PRIVATE --profiling-funcs -sENVIRONMENT=web
-  -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=134217728 -sSTACK_SIZE=8388608 -sEXIT_RUNTIME=0 -sASSERTIONS=2
+  -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=134217728 -sSTACK_SIZE=8388608 -sEXIT_RUNTIME=0
   --preload-file "${initial_pipeline_cache}@/initial_pipeline_cache.db"
   -sEXPORTED_RUNTIME_METHODS=FS,IDBFS,addRunDependency,removeRunDependency,HEAPU8,HEAP32,HEAPF32,UTF8ToString
   -lidbfs.js
-  -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_melee_web_native_menu_file,_melee_web_native_menu_prepare,_melee_web_native_menu_launch,_melee_web_native_menu_unload,_melee_web_native_menu_pause,_melee_web_native_menu_message,_melee_web_native_menu_running,_melee_web_native_menu_cache_idle,_melee_web_native_menu_phase,_melee_web_native_menu_confirm_check,_melee_web_native_menu_pad_sample,_melee_web_native_menu_pad_sample_full,_melee_web_native_menu_player_state,_melee_web_native_menu_drive_fighter,_melee_web_native_menu_drive_stage,_melee_web_native_menu_stock_check,_melee_web_native_menu_stock_check_ready,_melee_web_native_menu_diagnostics,_melee_web_css_observe,_melee_web_sss_observe,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_set_keyboard_port,_melee_web_input_message)
+  -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_melee_web_native_menu_file,_melee_web_native_menu_prepare,_melee_web_native_menu_launch,_melee_web_native_menu_replay,_melee_web_native_menu_replay_cursor,_melee_web_native_menu_unload,_melee_web_native_menu_pause,_melee_web_native_menu_message,_melee_web_native_menu_running,_melee_web_native_menu_cache_idle,_melee_web_native_menu_phase,_melee_web_native_menu_confirm_check,_melee_web_native_menu_pad_sample,_melee_web_native_menu_pad_sample_full,_melee_web_native_menu_player_state,_melee_web_native_menu_drive_fighter,_melee_web_native_menu_drive_stage,_melee_web_native_menu_stock_check,_melee_web_native_menu_stock_check_ready,_melee_web_native_menu_diagnostics,_melee_web_native_menu_memory,_melee_web_css_observe,_melee_web_sss_observe,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_set_keyboard_port,_melee_web_input_message)
 set_target_properties(gameplay_menu_browser PROPERTIES SUFFIX ".js")
+# Match the production/checked profiles of gameplay_browser above. Runtime
+# admission and source invariants remain explicit native checks in both builds.
+if(CMAKE_BUILD_TYPE STREQUAL "Release")
+  target_link_options(gameplay_menu_browser PRIVATE -sASSERTIONS=0 -sSAFE_HEAP=0)
+else()
+  target_link_options(gameplay_menu_browser PRIVATE -sASSERTIONS=2 -sSAFE_HEAP=1)
+endif()
 configure_file(web/native-menu.html native-menu.html @ONLY)
 
 # Shared typed scene/model tables consumed by the original match interface.

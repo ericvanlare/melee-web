@@ -255,3 +255,50 @@ int action_test_falco_operands(void)
     melee_web_commands_destroy(p);
     return valid;
 }
+
+static unsigned wind_calls;
+static Fighter_GObj* wind_gobj;
+static Fighter_Part wind_bone;
+static int wind_timer;
+static float wind_x, wind_y, wind_mag, wind_decay, wind_angle;
+bool ftCo_8009E714(Fighter_GObj* gobj, Fighter_Part bone, int timer, float x,
+                   float y, float mag, float decay, float angle)
+{
+    ++wind_calls;
+    wind_gobj = gobj; wind_bone = bone; wind_timer = timer;
+    wind_x = x; wind_y = y; wind_mag = mag; wind_decay = decay; wind_angle = angle;
+    return true;
+}
+void ftAction_80073118(HSD_GObj*, CommandInfo*);
+int action_test_wind_operands(void)
+{
+    const MeleeWebCommandWord words[] = {
+        {(58U << 26) | (0x2aaaaU << 8) | 0x7fU, UINT32_MAX},
+        {((uint32_t)(uint16_t)-7 << 16) | 0x1234U, UINT32_MAX},
+        {((uint32_t)0x8000U << 16) | (uint16_t)-9, UINT32_MAX},
+        {((uint32_t)33U << 16) | (uint16_t)-0x123, UINT32_MAX},
+        {0, UINT32_MAX},
+    };
+    union CmdUnion* p = melee_web_commands_create(words, sizeof(words) / sizeof(*words));
+    if (!p) return 0;
+    uint32_t original = 0;
+    Fighter fighter = {0}; HSD_GObj gobj = {0}; gobj.user_data = &fighter;
+    CommandInfo command = {0}; command.u = p;
+    wind_calls = 0; wind_gobj = NULL;
+    const int decoded = p[0].wind_fx_0.opcode == 58 && p[0].wind_fx_0.x0_b6_17 == 0x2aaaa &&
+        p[0].wind_fx_0.bone == 0x7f &&
+        p[1].wind_fx_1.timer == -7 && p[1].wind_fx_1.x == 0x1234 &&
+        p[2].wind_fx_2.y == (int16_t)0x8000 && p[2].wind_fx_2.mag == -9 &&
+        p[3].wind_fx_3.angle == 33 && p[3].wind_fx_3.decay == (int16_t)-0x123 &&
+        melee_web_command_original_word_checked(&p[0], &original) && original == words[0].word;
+    ftAction_80073118(&gobj, &command);
+    const int effected = wind_calls == 1 && wind_gobj == &gobj && wind_bone == 0x7f &&
+        wind_timer == 33 && wind_x == 0.003906f * -7.0f &&
+        wind_y == 0.003906f * 0x1234 &&
+        wind_mag == 0.003906f * (float)(int16_t)0x8000 &&
+        wind_decay == 0.003906f * -9.0f &&
+        wind_angle == 0.003906f * -(float)0x123 && command.u == &p[4];
+    melee_web_command_require_supported(58);
+    melee_web_commands_destroy(p);
+    return decoded && effected;
+}

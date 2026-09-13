@@ -40,7 +40,7 @@ static int collision_success(char* error, size_t size)
 static int collision_live(MeleeWebCollision* owner, char* error, size_t size)
 {
     if (!owner || owner != collision_owner || !owner->object ||
-        owner->generation != melee_web_gameplay_stats().generation)
+        owner->generation != melee_web_gameplay_generation())
         return collision_fail(error, size, "Collision storage has no live owned gameplay world");
     return 1;
 }
@@ -155,7 +155,7 @@ static void collision_release(void* data)
 
 MeleeWebCollision* melee_web_collision_create(const MeleeWebCollisionInput* in, char* error, size_t size)
 {
-    uint64_t generation = melee_web_gameplay_stats().generation;
+    uint64_t generation = melee_web_gameplay_generation();
     if (!generation || collision_owner || mpLib_804D64B4 || groundCollVtx || groundCollLine || groundCollJoint ||
         mpIsland_80458E88.next || mpIsland_80458E88.x4 || HSD_GObj_804D781C) {
         collision_fail(error, size, "Collision creation requires an idle gameplay world and exclusive original storage"); return NULL;

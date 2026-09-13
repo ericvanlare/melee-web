@@ -164,6 +164,12 @@ MeleeWebGameplayStats melee_web_gameplay_stats(void)
     return result;
 }
 
+uint64_t melee_web_gameplay_generation(void)
+{
+    if (!tables_live || shutting_down || !melee_web_gameplay_heap_owns(arena)) return 0;
+    return generation;
+}
+
 int melee_web_gameplay_shutdown(char* error, size_t error_size)
 {
     if (!arena) return success(error, error_size);

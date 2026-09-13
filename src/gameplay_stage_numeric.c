@@ -1,9 +1,11 @@
 #include "gameplay_stage_numeric.h"
 #include "gameplay_stage_profile.h"
+#include "gameplay_stage_map.h"
 #include "hsd_native_joint.h"
 #include <melee/gr/ground.h>
 #include <melee/gr/grlast.h>
 #include <melee/gr/types.h>
+#include <melee/sc/types.h>
 #include <sysdolphin/baselib/jobj.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/gobjobject.h>
@@ -14,7 +16,8 @@
 #include <stdlib.h>
 #include <string.h>
 struct MeleeWebStageMarkers {HSD_Joint* root;uint32_t offsets[261],joint_count,pair_count;uint16_t pairs[261][2];};
-struct MeleeWebStageNumeric {StageInfo saved;HSD_GObj* owner;};
+struct MeleeWebStageNumeric {StageInfo saved;HSD_GObj* owner;DynamicModelDesc* quake;};
+extern void melee_web_ground_quakes_clear(void);
 static MeleeWebStageNumeric* active;
 /* Original numeric stage-row consumer, private in ground.h. */
 extern void melee_web_ground_stage_parameters(int);
@@ -66,6 +69,9 @@ static void collect(HSD_JObj* j,HSD_JObj** list,unsigned* count){for(;j;j=j->nex
 MeleeWebStageNumeric* melee_web_stage_numeric_begin_kind(MeleeWebStageMarkers* m,int stage_kind,char* e,size_t n){
     const MeleeWebStageProfile* profile=melee_web_stage_profile(stage_kind);
     if(!profile||!m||active||!stage_info.param){fail(e,n,"Missing supported stage marker/ground data or active stage scope");return NULL;}
+    if(melee_web_stage_map_archives()){fail(e,n,"Initialize source ground state before publishing map archives");return NULL;}
+    for(unsigned i=0;i<sizeof(stage_info.map_gobjs)/sizeof(stage_info.map_gobjs[0]);i++)
+        if(stage_info.map_gobjs[i]){fail(e,n,"Initialize source ground state before creating stage objects");return NULL;}
     if(!isfinite(stage_info.param->y)||stage_info.param->y<=0){fail(e,n,"Stage marker context requires a finite positive source scale");return NULL;}
     int has_row=0;
     for(int i=0;i<stage_info.param->stage_param_count;i++)if(stage_info.param->stage_params[i].stkind==profile->stage_kind)has_row=1;
@@ -88,7 +94,11 @@ MeleeWebStageNumeric* melee_web_stage_numeric_begin_kind(MeleeWebStageMarkers* m
     HSD_GObjObject_80390A70(h->owner,HSD_GObj_JObjKind,scaled);GObj_InitUserData(h->owner,0,removed,h);
     HSD_JObj* joints[261];unsigned count=0;collect(root,joints,&count);
     if(count!=m->joint_count){HSD_GObjPLink_80390228(h->owner);free(h);fail(e,n,"Original marker tree count differs");return NULL;}
-    memset(stage_info.x280,0,sizeof(stage_info.x280));
+    /* Ground_801C0754 resets mutable ground state before publishing markers
+     * and stage data. In particular its -10000 floor sentinel permits the
+     * original camera to follow fighters below the stage. Archive publication
+     * and stage objects are absent here; saved StageInfo owns the full restore. */
+    Ground_801BFFB0();
     for(unsigned i=0;i<m->pair_count;i++)Ground_801C2D0C(m->pairs[i][1],joints[m->pairs[i][0]]);
     stage_info.grkind=profile->ground_kind;stage_info.on_touch_line=profile->source->on_touch_line;stage_info.on_check_shadow_render=profile->source->on_check_shadow_render;
     stage_info.unk8C.b4=1;stage_info.unk8C.b5=1;
@@ -130,8 +140,25 @@ int melee_web_stage_numeric_spawn(MeleeWebStageNumeric* h,uint32_t slot,float po
     position[0]=source.x;position[1]=source.y;position[2]=source.z;
     if(e&&n)*e=0;return 1;
 }
+int melee_web_stage_numeric_set_quake(MeleeWebStageNumeric* h,void* descriptor,char* e,size_t n){
+    DynamicModelDesc* quake=descriptor;
+    if(!h||active!=h||h->quake||!quake||!quake->joint||!quake->anims)
+        return fail(e,n,"Stage quake publication requires an owned checked descriptor");
+    /* The archive owner validates the four-entry source table before this call. */
+    for(unsigned i=0;i<4;i++)if(!quake->anims[i])return fail(e,n,"Stage quake animation is missing");
+    h->quake=quake;stage_info.quake_model_set=quake;if(e&&n)*e=0;return 1;
+}
+int melee_web_stage_numeric_clear_quakes(MeleeWebStageNumeric* h,char* e,size_t n){
+    if(!h||active!=h)return fail(e,n,"Stage numeric scope is not active");
+    if(h->quake){
+        if(stage_info.quake_model_set!=h->quake)return fail(e,n,"Stage quake publication changed owner");
+        melee_web_ground_quakes_clear();
+    }
+    if(e&&n)*e=0;return 1;
+}
 int melee_web_stage_numeric_end(MeleeWebStageNumeric* h,char* e,size_t n){
     if(!h)return 1;if(active!=h)return fail(e,n,"Stage numeric scope is not active");
+    if(!melee_web_stage_numeric_clear_quakes(h,e,n))return 0;
     stage_info=h->saved;active=NULL;if(h->owner)HSD_GObjPLink_80390228(h->owner);free(h);if(e&&n)*e=0;return 1;
 }
 

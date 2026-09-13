@@ -11,9 +11,15 @@ class GameplayMatchSession {
 public:
     GameplayMatchSession(const RuntimeFiles&,const MeleeWebMenuMatchSelection&);
     GameplayMatchSession(const RuntimeFiles&,const MeleeWebMenuMatchSelection&,
+                         const MeleeWebPadState&);
+    GameplayMatchSession(const RuntimeFiles&,const MeleeWebMenuMatchSelection&,
                          RuntimeArchiveCache&);
     GameplayMatchSession(const RuntimeFiles&,const MeleeWebMenuMatchSelection&,
                          RuntimeArchiveCache&,GameplayMatchConstruction);
+    // The reference snapshot must outlive deferred construction.
+    GameplayMatchSession(const RuntimeFiles&,const MeleeWebMenuMatchSelection&,
+                         RuntimeArchiveCache&,GameplayMatchConstruction,
+                         const MeleeWebPadState&);
     ~GameplayMatchSession();
     GameplayMatchSession(const GameplayMatchSession&)=delete;
     GameplayMatchSession& operator=(const GameplayMatchSession&)=delete;

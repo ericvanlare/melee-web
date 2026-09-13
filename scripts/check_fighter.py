@@ -14,7 +14,7 @@ def main():
     try:
         assets = args.assets.expanduser().resolve(strict=True)
         required = ("PlCo.dat", "PlMr.dat", "PlMrNr.dat", "PlMrAJ.dat", "GrNLa.dat",
-                    "ItCo.usd", "EfMrData.dat", "EfCoData.dat", "PdPm.dat", "sislib_font.bin")
+                    "ItCo.usd", "EfMrData.dat", "EfCoData.dat", "PdPm.dat", "LbRb.dat", "sislib_font.bin")
         missing = [name for name in required if not (assets / name).is_file()]
         if missing:
             raise ValueError("Missing local runtime assets: " + ", ".join(missing))
