@@ -3,37 +3,26 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#101210">
-  <meta name="description" content="WebMelee is an independent browser project. This public preview introduces the project; gameplay and disc selection are not yet available.">
-  <title>WebMelee · Public preview</title>
+  <meta name="theme-color" content="#000000">
+  <title>WebMelee (WIP)</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="{{STYLE_URL}}">
   <script src="{{SCRIPT_URL}}" defer></script>
 </head>
-<body>
-  <a class="skip" href="#main">Skip to content</a>
-  <div class="page">
-    <header class="masthead"><a class="wordmark" href="/">WebMelee<span class="wordmark-dot" aria-hidden="true">.</span></a><span class="edition">PUBLIC PREVIEW / 01</span></header>
-    <main id="main">
-      <section class="intro" aria-labelledby="headline">
-        <p class="eyebrow"><span class="status-dot" aria-hidden="true"></span> A browser project, in progress</p>
-        <h1 id="headline">A new place<br>for a familiar game.</h1>
-        <p class="lede">Working toward local play in your browser, using game data from a copy you are legally authorized to use.</p>
-      </section>
-      <section class="player" id="player" aria-label="Prototype preview">
-        <div class="player-top"><span>WEBMELEE</span><span class="status-label">SHELL PREVIEW</span></div>
-        <div class="player-message"><span class="stage-mark" aria-hidden="true"></span><p class="eyebrow">Still in development</p><h2>Gameplay is not available<br>in this public build.</h2><p>Disc selection will open when the player is ready.<br>No game download is provided.</p></div>
-        <div class="player-toolbar"><div class="unavailable-controls"><button type="button" disabled>Disc unavailable</button><button type="button" disabled>Play unavailable</button></div><button id="fullscreen" type="button" hidden>Fullscreen</button></div>
-        <p id="fullscreen-status" class="sr-status" role="status"></p>
-      </section>
-      <section class="details" aria-label="About this preview">
-        <article><p class="detail-number">01 / THE PROJECT</p><h2>Local play is the goal.</h2><p>An experimental project for bringing Super Smash Bros. Melee to a desktop browser. Accuracy, audio, input and performance verification are ongoing.</p></article>
-        <article><p class="detail-number">02 / YOUR FILES</p><h2>Your copy. Your device.</h2><p>This build cannot select or read files. It has no uploads, accounts, advertising or analytics code. Future disc support must keep the selected file and derived game data on your device.</p></article>
-        <article><p class="detail-number">03 / WHAT COMES NEXT</p><h2>Ready means verified.</h2><p>Gameplay remains unavailable while the production player, distribution rights and release checks are reviewed. This preview makes no claim of complete or tournament-ready gameplay.</p></article>
-      </section>
-      <aside class="disc-note"><h2>Before disc selection becomes available</h2><p>You will need to acknowledge: “I am selecting a copy of the game that I am legally authorized to use.” Owning a disc does not automatically authorize every copy or method of access. This project does not provide game files or permission from their rights holders.</p></aside>
-    </main>
-    <footer><nav aria-label="Legal"><a href="/terms">Terms of Use</a><a href="/privacy">Privacy Notice</a><a href="/copyright">Copyright & contact</a><a href="/notices">Third-party notices</a></nav><p>WebMelee is an independent project, not affiliated with, sponsored by or endorsed by Nintendo. Nintendo, GameCube and Super Smash Bros. Melee are names associated with their respective rights holders.</p><p class="footer-meta">A small preview of work in progress.</p></footer>
-  </div>
+<body class="game-page">
+  <main id="player" aria-label="WebMelee work in progress">
+    <div id="runtime-host" aria-label="Game area"></div>
+    <div id="toolbar" role="toolbar" aria-label="Game controls">
+      <button id="choose-disc" type="button" disabled>Disc</button>
+      <button id="start-game" type="button" disabled>Play</button>
+      <button id="pause-game" type="button" disabled>Pause</button>
+      <button id="controls-open" type="button" disabled>Controls</button>
+      <button id="fullscreen" type="button" hidden>Fullscreen</button>
+      <button id="end-session" type="button" disabled>Eject</button>
+      <span id="status">WIP. Gameplay is not available yet.</span>
+      <a href="/notices">About / legal</a>
+    </div>
+    <p id="fullscreen-status" role="status"></p>
+  </main>
 </body>
 </html>

@@ -22,7 +22,56 @@ def get(url):
         with urllib.request.urlopen(url, timeout=30) as response:
             return response.status, response.headers, response.read(), response.url
     except urllib.error.HTTPError as error:
-        return error.code, error.headers, error.read(), error.url
+        try:
+            body = error.read()
+        finally:
+            error.close()
+        return error.code, error.headers, body, error.url
+
+
+def require(condition, message):
+    """Raise a real verification error even when Python runs with -O."""
+    if not condition:
+        raise ValueError(message)
+
+
+def check_destination(origin, final_url, expected_paths):
+    expected, actual = urllib.parse.urlsplit(origin), urllib.parse.urlsplit(final_url)
+    if (actual.scheme, actual.netloc) != (expected.scheme, expected.netloc):
+        raise ValueError('redirect escaped the candidate origin')
+    if actual.path not in expected_paths or actual.query or actual.fragment:
+        raise ValueError(f'unexpected canonical destination: {actual.path}')
+
+
+def check_resource(origin, route, record, require_noindex):
+    status, headers, body, canonical = get(origin + route)
+    name = record['path']
+    canonical_path = '/' if name == 'index.html' else '/' + name.removesuffix('.html')
+    check_destination(origin, canonical, {route, canonical_path})
+    if status != 200 or len(body) != record['size'] or hashlib.sha256(body).hexdigest() != record['sha256']:
+        raise ValueError(f'resource byte identity/status failed: {route}, status {status}')
+    if name.endswith('.css'):
+        require(headers.get_content_type() == 'text/css', f'{route}: expected Content-Type text/css')
+        require('immutable' in headers.get('Cache-Control', ''), f'{route}: expected immutable Cache-Control')
+    if name.endswith('.js'):
+        require(headers.get_content_type() in ('application/javascript', 'text/javascript'),
+                f'{route}: expected JavaScript Content-Type')
+        require('immutable' in headers.get('Cache-Control', ''), f'{route}: expected immutable Cache-Control')
+    if name.endswith('.html'):
+        require(headers.get_content_type() == 'text/html', f'{route}: expected Content-Type text/html')
+    require("connect-src 'none'" in headers.get('Content-Security-Policy', ''),
+            f'{route}: missing CSP connect-src none')
+    require(headers.get('X-Content-Type-Options') == 'nosniff',
+            f'{route}: missing X-Content-Type-Options nosniff')
+    require(headers.get('Referrer-Policy') == 'no-referrer',
+            f'{route}: missing Referrer-Policy no-referrer')
+    require(headers.get('X-Frame-Options') == 'DENY', f'{route}: missing X-Frame-Options DENY')
+    require('fullscreen=(self)' in headers.get('Permissions-Policy', ''),
+            f'{route}: missing Permissions-Policy fullscreen self')
+    if require_noindex:
+        require('noindex' in headers.get('X-Robots-Tag', ''), f'{route}: missing X-Robots-Tag noindex')
+    return {'path': route, 'status': status, 'bytes': len(body), 'sha256': record['sha256'],
+            'canonical_path': urllib.parse.urlsplit(canonical).path}
 
 
 def verify(url, manifest):
@@ -33,34 +82,21 @@ def verify(url, manifest):
     origin = urllib.parse.urlunsplit((origin.scheme, origin.netloc, '', '', ''))
     records = json.loads(Path(manifest).read_text())
     result = {'origin': origin, 'resources': [], 'missing': [], 'result': 'pass'}
+    require_noindex = not records['index_production'] or urllib.parse.urlsplit(origin).hostname.endswith('.pages.dev')
     for record in records['files']:
         name = record['path']
         if name.startswith('_'):
             continue  # Pages consumes configuration, verified by its effects below.
-        status, headers, body, canonical = get(origin + '/' + name)
-        if status != 200 or len(body) != record['size'] or hashlib.sha256(body).hexdigest() != record['sha256']:
-            raise ValueError(f'resource byte identity/status failed: {name}, status {status}')
-        if name.endswith('.css'):
-            assert headers.get_content_type() == 'text/css', name
-            assert 'immutable' in headers.get('Cache-Control', ''), name
-        if name.endswith('.js'):
-            assert headers.get_content_type() in ('application/javascript', 'text/javascript'), name
-            assert 'immutable' in headers.get('Cache-Control', ''), name
-        if name.endswith('.html'):
-            assert headers.get_content_type() == 'text/html', name
-        assert "connect-src 'none'" in headers.get('Content-Security-Policy', ''), name
-        assert headers.get('X-Content-Type-Options') == 'nosniff', name
-        assert headers.get('Referrer-Policy') == 'no-referrer', name
-        assert headers.get('X-Frame-Options') == 'DENY', name
-        assert 'fullscreen=(self)' in headers.get('Permissions-Policy', ''), name
-        if not records['index_production'] or urllib.parse.urlsplit(origin).hostname.endswith('.pages.dev'):
-            assert 'noindex' in headers.get('X-Robots-Tag', ''), name
-        result['resources'].append({'path': name, 'status': status, 'bytes': len(body), 'sha256': record['sha256'], 'canonical_path': urllib.parse.urlsplit(canonical).path})
-    status, headers, body, _ = get(origin + '/')
-    assert status == 200 and b'Gameplay is not available' in body
-    assert b'<iframe' not in body and b'type="file"' not in body
+        result['resources'].append(check_resource(origin, '/' + name, record, require_noindex))
+    by_path = {record['path']: record for record in records['files']}
+    # The actual user links must match the same complete HTML as the file URLs.
+    result['aliases'] = [check_resource(origin, route, by_path[name], require_noindex)
+                         for route, name in (('/', 'index.html'), ('/terms', 'terms.html'),
+                                             ('/privacy', 'privacy.html'), ('/copyright', 'copyright.html'),
+                                             ('/notices', 'notices.html'))]
     for route in BLOCKED_PATHS:
-        status, _, body, _ = get(origin + route)
+        status, _, body, final_url = get(origin + route)
+        check_destination(origin, final_url, {route})
         if loopback and route in ('/_headers', '/_redirects') and status == 502 and b'ENOTDIR' in body:
             result.setdefault('local_limitations', []).append({
                 'path': route, 'status': status,

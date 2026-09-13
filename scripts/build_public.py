@@ -323,13 +323,14 @@ def _redirects(mode: str) -> str | None:
         return None
     # Cloudflare Pages `_redirects` has no host/domain matching.  Keep this
     # file explicit and empty so it cannot become a SPA fallback; configure
-    # these two host redirects in Cloudflare Bulk Redirects at deployment:
-    #   www.webmelee.gg/*     -> https://webmelee.gg/:splat (301)
-    #   webmelee.pages.dev/*  -> https://webmelee.gg/:splat (301)
+    # exact host redirects in Cloudflare Bulk Redirects at deployment. Bulk
+    # Redirects use flags for path preservation, not wildcard substitutions.
     return (
         "# Host redirects are configured with Cloudflare Bulk Redirects.\n"
-        "# www.webmelee.gg/* -> https://webmelee.gg/:splat (301)\n"
-        "# webmelee.pages.dev/* -> https://webmelee.gg/:splat (301)\n"
+        "# Sources: www.webmelee.gg/ and webmelee.pages.dev/\n"
+        "# Target: https://webmelee.gg/; status: 301\n"
+        "# Enable subpath matching, preserve path suffix and preserve query string.\n"
+        "# Leave include subdomains disabled so preview hosts remain separate.\n"
     )
 
 
@@ -349,9 +350,9 @@ def _replace_html(data: bytes, operator: str, contact: str, css_url: str, js_url
     }
     for token, value in replacements.items():
         text = text.replace(token, value)
-    if mode == "preview" and "DRAFT PREVIEW" not in text.upper():
-        marker = '<p class="draft-banner" role="note">DRAFT PREVIEW · This bundle is not a production release.</p>'
-        text = re.sub(r"(<main\b[^>]*>)", r"\1" + marker, text, count=1, flags=re.I)
+    text = text.replace('<html lang="en">', f'<html lang="en" data-environment="{mode}">', 1)
+    if mode == "preview":
+        text = text.replace('<title>', '<title>[staging] ', 1)
     if any(token in text for token in replacements):
         raise BuildError("placeholder substitution failed")
     return text.encode("utf-8")

@@ -44,7 +44,8 @@ class PublicReleaseTests(unittest.TestCase):
         output, manifest = self.paths()
         result = audit(output, manifest)
         self.assertEqual(result["mode"], "preview")
-        self.assertIn("DRAFT PREVIEW", (output / "index.html").read_text())
+        self.assertIn('data-environment="preview"', (output / "index.html").read_text())
+        self.assertIn('<title>[staging] WebMelee (WIP)</title>', (output / "index.html").read_text())
         self.assertEqual(len(list((output / "assets").iterdir())), 2)
         self.assertFalse((output / "_redirects").exists())
 
@@ -54,6 +55,7 @@ class PublicReleaseTests(unittest.TestCase):
         output, manifest = self.paths("production")
         self.assertEqual(audit(output, manifest)["mode"], "production")
         self.assertNotIn("DRAFT PREVIEW", (output / "index.html").read_text())
+        self.assertIn('data-environment="production"', (output / "index.html").read_text())
         self.assertIn("pages.dev", (output / "_headers").read_text())
 
     def test_output_must_be_fresh_and_manifest_outside_deploy_tree(self):

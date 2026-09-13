@@ -22,18 +22,28 @@ await page.addInitScript(() => {
 });
 const report = {schema: 'webmelee-public-shell-browser-v1', browser: browser.version(), checks: [], gameplay: 'unavailable; no disc import or preparation was attempted'};
 const pass = name => report.checks.push(name);
-try {
-  const response = await page.goto(args.url, {waitUntil: 'networkidle'});
+function checkPageResponse(response, pathname) {
   assert.equal(response.status(), 200);
+  assert.equal(new URL(response.url()).origin, origin);
+  assert.equal(new URL(response.url()).pathname, pathname);
   const headers = response.headers();
   assert.match(headers['content-security-policy'], /connect-src 'none'/);
   assert.equal(headers['x-content-type-options'], 'nosniff');
   assert.equal(headers['referrer-policy'], 'no-referrer');
   assert.equal(headers['x-frame-options'], 'DENY');
   assert.match(headers['permissions-policy'], /fullscreen=\(self\)/);
+  if (args['index-production'] !== 'true' || new URL(origin).hostname.endsWith('.pages.dev')) {
+    assert.match(headers['x-robots-tag'], /noindex/);
+  }
+}
+try {
+  const response = await page.goto(args.url, {waitUntil: 'networkidle'});
+  checkPageResponse(response, '/');
   assert.match(await page.locator('body').innerText(), /Gameplay is not available/);
   assert.equal(await page.locator('input,iframe,form,canvas,audio,video').count(), 0);
-  assert.equal(await page.locator('button:disabled').count(), 2);
+  assert.equal(await page.locator('button:disabled').count(), 5);
+  const environment = await page.locator('html').getAttribute('data-environment');
+  assert.ok(['preview', 'production'].includes(environment));
   pass('root, security headers, honest limitation and absent importer/runtime');
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   await page.screenshot({path: path.join(args.out, 'desktop.png'), fullPage: true});
@@ -52,10 +62,12 @@ try {
     await page.waitForFunction(() => !document.fullscreenElement);
     pass('fullscreen enters and exits through real user control');
   } else pass('fullscreen unsupported and control correctly hidden');
-  for (const route of ['/terms', '/privacy', '/copyright', '/notices']) {
+  for (const [route, heading] of Object.entries({'/terms': 'Terms of Use', '/privacy': 'Privacy Notice',
+      '/copyright': 'Copyright & contact', '/notices': 'About & legal'})) {
     const legalResponse = await page.goto(origin + route, {waitUntil: 'networkidle'});
-    assert.equal(legalResponse.status(), 200, route);
-    assert.equal(await page.locator('h1').count(), 1);
+    checkPageResponse(legalResponse, route);
+    assert.equal(await page.locator('h1').innerText(), heading);
+    assert.equal(await page.title(), `${environment === 'preview' ? '[staging] ' : ''}${heading} · WebMelee`);
     violations.push(...await page.evaluate(() => window.shellCspViolations));
   }
   pass('all legal pages load');

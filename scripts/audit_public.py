@@ -203,8 +203,10 @@ def _validate_html(data: bytes, rel: str, css_path: str, js_path: str, operator:
     if rel in {"terms.html", "privacy.html", "copyright.html"}:
         if html.escape(operator, quote=True) not in text or html.escape(contact, quote=True) not in text:
             _fail(f"configured operator/contact is missing from {rel}")
-    if mode == "preview" and "PUBLIC PREVIEW" not in text.upper():
-        _fail(f"preview marker is missing from {rel}")
+    if f'<html lang="en" data-environment="{mode}">' not in text:
+        _fail(f"deployment environment marker is missing from {rel}")
+    if mode == "preview" and '<title>[staging] ' not in text:
+        _fail(f"staging title is missing from {rel}")
     if mode == "production" and "DRAFT PREVIEW" in text.upper():
         _fail(f"draft preview marker present in production page: {rel}")
     if rel == "404.html":

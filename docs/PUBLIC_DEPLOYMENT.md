@@ -5,6 +5,22 @@ native runtime or change repository visibility. Never upload the repository,
 `web/`, a runtime build, an iframe staging package or a directory of accumulated
 work. See `PUBLIC_RELEASE_REVIEW.md` before changing the approved inventory.
 
+The page at `/` uses the original prototype's black player area and small bottom
+toolbar. Gameplay controls are disabled with a short WIP status. About and legal
+information lives on separate plain document pages. A preview is marked in its
+browser title; deployment labels do not add banners to the player.
+
+## Current launch state
+
+The `webmelee` Direct Upload Pages project and a free `webmelee.gg` zone have
+been created. No deployment or custom domain is active. Publication is waiting
+for an operator-supplied public name and working contact email. Cloudflare's DNS
+scan preserved the five existing MX records and SPF TXT record; its imported A
+and www CNAME still point to Namecheap parking and must be replaced for Pages.
+The assigned nameservers are `alan.ns.cloudflare.com` and
+`hadlee.ns.cloudflare.com`. Namecheap still uses its original nameservers.
+Recheck this state immediately before resuming; assignment alone is not cutover.
+
 ## Build, audit and preview
 
 Build using `python3 scripts/build_public.py --help`; use a fresh ignored output
@@ -14,6 +30,25 @@ values. Run `python3 scripts/audit_public.py --help` and audit the candidate
 against the sidecar manifest immediately before upload. Preserve the manifest,
 source commit, environment, tool versions and upload result together locally.
 The manifest inventories configuration files as well as public resources.
+
+For a local draft (the `build` parent must already exist):
+
+```sh
+mkdir -p build
+python3 scripts/build_public.py --output build/public-preview --mode preview
+python3 scripts/audit_public.py --output build/public-preview --manifest build/public-preview.manifest.json
+```
+
+For publication, set `WEBMELEE_PUBLIC_OPERATOR` and `WEBMELEE_PUBLIC_CONTACT` to
+the operator's approved public values in the local shell, then run:
+
+```sh
+python3 scripts/build_public.py --output build/public-production --mode production --operator "$WEBMELEE_PUBLIC_OPERATOR" --contact "$WEBMELEE_PUBLIC_CONTACT"
+python3 scripts/audit_public.py --output build/public-production --manifest build/public-production.manifest.json
+```
+
+Use a fresh output name for each candidate. The sidecar is never uploaded.
+Production remains non-indexed unless `--index-production` is explicitly chosen.
 
 Run the focused release tests and the repository's full unittest discovery.
 Native dependencies must be installed independently in this worktree using
@@ -26,18 +61,33 @@ Install tools under ignored `work/`, not the public directory. Do not put tokens
 account IDs, private contact details or local paths into Git, published manifests,
 screenshots or PR text. Use normal authenticated Wrangler or dashboard sessions.
 
-Use `wrangler pages dev OUTPUT --port 8795` for Cloudflare's actual static routing
+Use `wrangler pages dev OUTPUT --port 18960 --inspector-port 19360` on unused
+local ports for Cloudflare's actual static routing
 and header behavior. A generic file server is insufficient to certify Pages
 extensionless routing, configuration headers or 404 responses. Browser checks
 must use real HTTP, including narrow widths and fullscreen. Public images of
 this original shell are permissible evidence; no game screenshots are approved.
 
-Create a Pages project named `webmelee` if available. Create and verify a staging
+Use the existing Pages project named exactly `webmelee`; generated host-specific
+headers assume `webmelee.pages.dev`. Create and verify a staging
 branch deployment before attaching any custom domain. Upload only the audited
 output directory; the sidecar manifest is retained locally, not uploaded. Keep
 all preview hostnames non-indexed. `noindex` is a crawler instruction, not access
 control. If previews contain sensitive material, do not deploy them; this
 candidate is intended to contain only reviewed public shell content.
+
+With Wrangler authenticated, deploy the configured, audited candidate to staging:
+
+```sh
+WRANGLER_SEND_METRICS=false wrangler pages deploy build/public-production --project-name webmelee --branch staging
+```
+
+The existing signed-in Cloudflare dashboard also supports Direct Upload. A ZIP
+must contain exactly the audited directory contents at its root. Confirm the
+deployment environment before submitting; a project's first dashboard upload
+may create its default production deployment. No custom domain should be attached
+until the candidate's returned immutable Pages URL passes verification. Do not
+publish a draft containing missing-operator placeholders.
 
 ## Hosting constraints and headers
 
@@ -66,6 +116,15 @@ redirects through account-level Bulk Redirects or zone redirect rules, not
 unsupported host lines in `_redirects`. Preserve paths and query strings to the
 apex; an unknown path should ultimately remain a 404. Restrict the exact default
 production hostname, not all preview hostnames. Verify with external HTTP clients.
+
+For [Bulk Redirects](https://developers.cloudflare.com/rules/url-forwarding/bulk-redirects/reference/parameters/),
+add sources `www.webmelee.gg/` and `webmelee.pages.dev/`, target
+`https://webmelee.gg/`, status 301. Enable **Subpath matching**, **Preserve path
+suffix**, and **Preserve query string**. Leave **Include subdomains** disabled.
+Omitting the source scheme matches HTTP and HTTPS. These are URL/flag settings;
+Bulk Redirects do not use `_redirects` wildcard substitutions. Activate the list's
+rule only after the apex works, and confirm that immutable preview hosts remain
+separate.
 
 ## DNS inventory and cutover
 
@@ -108,6 +167,22 @@ retrieval. Check `/` body and headers, all legal links, noindex on previews,
 MIME types, developer-path 404s, DNS, HTTPS, www and default-host redirects.
 Repeat the browser check against the immutable deployment URL and production.
 Record exact successful URLs and deployment IDs without account identifiers.
+
+Run these against each immutable deployment origin and the apex (substitute the
+actual returned origin for `CANDIDATE_ORIGIN`):
+
+```sh
+python3 scripts/verify_public_http.py --url "$CANDIDATE_ORIGIN" --manifest build/public-production.manifest.json --report work/hosted-http.json
+node tests/public_shell_browser_test.mjs --url "$CANDIDATE_ORIGIN" --playwright ./work/deploy-tools/node_modules/playwright --out work/hosted-browser
+```
+
+HTTP verification checks full bytes and headers for each resource and each linked
+extensionless legal route. Redirects must remain on the candidate origin and use
+only the expected canonical path. Missing development routes must finish on that
+same origin with 404. A cross-origin redirect, legal link serving the homepage,
+or HTML with missing security headers is a failure. Wrangler 4.131.1 can return a
+reserved-configuration ENOTDIR/502 locally; this exception is recorded only for
+loopback and never accepted for a hosted URL.
 
 The no-upload result is scoped to this shell: it has no disc selection/preparation
 path. Do not write that a production disc import passed. Validate no file input,
