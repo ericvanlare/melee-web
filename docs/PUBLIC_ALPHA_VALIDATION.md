@@ -147,3 +147,9 @@ checks.
 Registry propagation, apex/www attachment, HTTPS, redirects and a post-migration
 receipt test remain in progress. The registrar's saved values alone are not
 proof of propagated DNS or a finished public launch.
+
+A 15-minute external watch ended at September 13, 05:29 UTC with both queried
+`.gg` authorities and public resolvers still returning the old registrar
+nameservers. Public Google MX/SPF records were correct. GitHub's public-shell
+job passed; browser-build remained pending and public-player CI was skipped.
+Those CI states are separate from the measured local and hosted checks above.

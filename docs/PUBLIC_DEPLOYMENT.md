@@ -27,8 +27,11 @@ custom nameservers after the mail and artifact gates passed. Cloudflare serves
 the Google MX/SPF/verification records and proxied apex/www CNAME records to
 `webmelee.pages.dev`. The registry delegation is still propagating; Cloudflare
 will not attach the apex until the zone is active. The two-entry
-`webmelee_canonical_hosts` redirect list is saved but inactive. Recheck these
-states before continuing; a saved registrar setting alone is not propagation.
+`webmelee_canonical_hosts` list is attached to the saved **disabled** rule
+`WebMelee canonical hostnames`; no canonical-host redirect is enabled yet.
+Always Use HTTPS is enabled, SSL mode remains Full, and the pending zone has
+no edge certificate yet. Recheck these states before continuing; a saved
+registrar setting alone is not propagation.
 
 ## Build, audit and preview
 
@@ -263,16 +266,19 @@ loopback and never accepted for a hosted URL.
 
 The player browser check runs the real public graph through startup, controls,
 invalid-disc retry, acknowledged owned-disc import, native preparation, original
-CSS/SSS navigation, pause/resume, audio context startup, Eject/reload and another
-import/launch. Inspect requests through the entire session: all application
+CSS/SSS navigation, pause/resume, Eject/reload and another import/launch. For the
+initial silent alpha it requires zero audio contexts and no audio output; a
+future audio-enabled profile needs its own license and audio validation gates.
+Inspect requests through the entire session: all application
 requests must be expected same-origin static GETs without bodies or queries;
 no disc bytes, derived assets, file names or local hashes may be transmitted.
 Check WebSocket/beacon activity, cookies, local/session storage, IndexedDB,
 Cache Storage and service workers. Only keyboard preferences should persist.
 Do not put the local disc path or game screenshots in public evidence.
 
-A real audio graph is not proof of acoustic output or PCM equivalence. A menu
-smoke is not a complete match/performance result. Record any timing-guard pause
+If audio is restored later, a real audio graph alone is not proof of acoustic
+output or PCM equivalence. A menu smoke is not a complete match/performance
+result. Record any timing-guard pause
 and manual resume in the scoped evidence. Broad game content, mobile play,
 physical controllers, retail equivalence and uninterrupted performance remain
 separate acceptance work.
