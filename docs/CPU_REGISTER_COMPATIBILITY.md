@@ -4,9 +4,13 @@
 read-only original-register diagnostics, strict comparison of their bounded
 source-state prefixes, and a port allocation-address diagnostic. It does not
 implement a gameplay compatibility model or claim a four-player accuracy pass.
+The follow-up [source-address component](SOURCE_ADDRESS_CONTEXT.md) now models
+the supported original allocation operations and defined register-word
+consumption. It is tested against untouched SDK/HSD code in native and Wasm
+builds. The original context provider and CPU call-site integration remain open.
 
-The isolated branch starts from `6b8bdda2b02a6a5e753e857891e964b5059f817f` and
-targets `codex/public-prototype-shell` in draft PR #13. PR #10's exact checkpoint
+The isolated branch started from `6b8bdda2b02a6a5e753e857891e964b5059f817f` and
+originally targeted `codex/public-prototype-shell` in draft PR #13. PR #10's exact checkpoint
 passed both the [push CI run](https://github.com/ericvanlare/melee-web/actions/runs/34733043195)
 and the [pull-request CI run](https://github.com/ericvanlare/melee-web/actions/runs/34733044472).
 No checkpoint repair or history rewrite was needed.
@@ -124,11 +128,16 @@ retain their original logic.
 This is compiled source compatibility, not a PowerPC interpreter. It requires
 source-memory context that the current match-only bootstrap does not supply.
 Captured fighter addresses, output bytes, native pointer bytes or guessed
-neutral input cannot substitute for it. No disconnected helper or guessed
-fallback was added. This prerequisite remains a proposed boundary, not an
-implemented compatibility model.
+neutral input cannot substitute for it. The new address-only component makes
+the allocator portion executable without inventing that context or installing
+a gameplay fallback. Its supported modes, differential tests, missing context
+and required shared-runtime boundary are documented in
+[Source allocation identity prerequisite](SOURCE_ADDRESS_CONTEXT.md).
 
-## Validation and retained failures
+## Diagnostic-checkpoint validation and retained failures
+
+The results in this section are retained evidence from checkpoint `d2c5db3`;
+they are not fresh comparisons of a branch reconciled with current main.
 
 The three gold pairs, full input plans, scenarios and MWRC recipes remain
 frozen. New diagnostic processes execute bounded prefixes of the same human
@@ -159,8 +168,8 @@ open as well.
 The 480-tick level-1, 480-tick level-9 and 240-tick human exact regressions are
 inherited evidence at `6b8bdda`, not newly executed checks on this branch.
 Gameplay behavior is unchanged. They must be rerun after a shared compatibility
-fix, alongside the complete matches and focused call-site tests. No tests of a
-compatibility model are claimed when no model exists.
+fix, alongside the complete matches and focused call-site tests. New component
+tests validate allocation/register representation only, not CPU caller behavior.
 
 Early diagnostics remain failures: an initial attempt was interrupted; three
 later runs tried to read the SDK's terminal stack backchain `FFFFFFFF`. The
