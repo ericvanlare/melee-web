@@ -27,7 +27,10 @@ FORBIDDEN_AUDIO_MODULES = (
 
 def get(url):
     try:
-        with urllib.request.urlopen(url, timeout=30) as response:
+        # Identify this release check explicitly; the default Python urllib agent
+        # is rejected by Cloudflare Pages browser-integrity filtering (1010).
+        request = urllib.request.Request(url, headers={"User-Agent": "WebMelee-Release-Audit/1.0"})
+        with urllib.request.urlopen(request, timeout=30) as response:
             return response.status, response.headers, response.read(), response.url
     except urllib.error.HTTPError as error:
         try:

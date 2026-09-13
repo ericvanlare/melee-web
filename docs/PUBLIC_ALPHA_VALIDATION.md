@@ -70,7 +70,10 @@ compile successfully. The 36 focused public build/audit/HTTP tests pass under
 normal Python and `python -O`, including stale source/proof rejection, exact
 manifest enforcement, legacy/audio-enabled identity rejection and forbidden
 audio routes. The new silent-clock C test runs through normal test discovery.
-The full unittest run is recorded below after final verification.
+**642 tests ran, 50 skipped, with no failures** in final unittest discovery.
+The skips require optional owned reference assets, traces or tools. The same
+36 public release tests also pass in a fresh tracked-files checkout without
+installed native dependencies or existing build output.
 
 ## Browser and gameplay evidence
 
@@ -109,3 +112,31 @@ or performance admission is claimed.
 
 Raw logs and game screenshots stay in ignored local directories. They are not
 committed or uploaded. Only original empty-player UI screenshots may be shared.
+
+## Hosted verification and launch gate
+
+The exact candidate is deployed to
+[8e2cdf90.webmelee.pages.dev](https://8e2cdf90.webmelee.pages.dev), with the
+[staging alias](https://staging.webmelee.pages.dev). It is non-indexed. The
+staging upload records implementation commit `f56dab9`; later release-record
+updates do not change its public bytes.
+
+Hosted HTTP verification passes for all **18 served files and five HTML
+aliases**, comparing bytes to the final manifest, and **32 absent routes**,
+including root and runtime-scoped development audio paths. `_headers` and
+`_redirects` are consumed hosting configuration and return 404. Security,
+isolation, MIME and caching checks pass; unversioned notices revalidate.
+Cloudflare initially rejected Python's default user agent with error 1010;
+the verifier now identifies itself as `WebMelee-Release-Audit/1.0`. Normal
+Chrome and that explicit audit client both succeed.
+
+The hosted public browser repeat passes all **10 checks**. Its request inventory
+contains only same-origin static GET requests; no browser audio contexts,
+page/CSP errors or application uploads were observed. The hosted runtime hash
+matches the locally tested silent CPU-match artifact exactly.
+
+No nameserver cutover or public custom domain was activated. The forwarding
+destination still needs to be supplied, the expired Namecheap sign-in restored,
+and actual receipt at that inbox verified. A published address, copied MX
+records or dashboard status alone is not an end-to-end mail test. The final
+artifact gate passes; the mail gate remains open.

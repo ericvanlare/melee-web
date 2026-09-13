@@ -18,7 +18,10 @@ the accepted alpha risk posture and the remaining artifact/contact gates.
 The `webmelee` Direct Upload Pages project and a free `webmelee.gg` zone have
 been created. The operator has specified **NaiadAI, LLC** and
 **legal@webmelee.gg** as the public contact. This supplies the public facts; it
-does not prove mail delivery. No deployment or custom domain is active yet. Cloudflare's DNS
+does not prove mail delivery. The audited candidate is deployed only to staging:
+[8e2cdf90.webmelee.pages.dev](https://8e2cdf90.webmelee.pages.dev). Hosted byte,
+header and 404 checks and all 10 public browser checks pass. No custom domain
+is active yet. Cloudflare's DNS
 scan preserved the five existing MX records and SPF TXT record; its imported A
 and www CNAME still point to Namecheap parking and must be replaced for Pages.
 The assigned nameservers are `alan.ns.cloudflare.com` and
