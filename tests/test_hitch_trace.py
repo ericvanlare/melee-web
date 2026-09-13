@@ -100,6 +100,41 @@ class HitchTraceTests(unittest.TestCase):
         self.assertEqual(item["renderer_tasks"]["available_count"], 0)
         self.assertEqual(item["alignment"]["status"], "wrong_thread")
 
+    def test_cache_intervals_join_offline_without_claiming_causality_or_phase_offsets(self):
+        event = native_event()
+        event['native']['current']['begin_phases'] = {'frame_slot_ms': 17, 'frame_slot_wait_count': 2}
+        value = report(event)
+        capture = value['diagnostic_capture']
+        capture.update(clock={'source': 'performance.now'},
+                       capabilities={'cache_sync': {'installed': True, 'requested': True, 'enabled': True}},
+                       cache_sync_overflow_count=0,
+                       cache_syncs=[
+                           {'id': 'one', 'clock': 'performance.now', 'started': 105, 'ended': 118,
+                            'status': 'completed', 'stack': 'fd_sync'},
+                           {'id': 'outside', 'clock': 'performance.now', 'started': 122, 'ended': 140,
+                            'status': 'completed'},
+                       ])
+        item = analyze_capture(value, self.base_trace())['events'][0]
+        self.assertEqual(item['status'], 'missing_marker')
+        # Page-clock overlap survives missing trace alignment but is not a trace attribution.
+        overlap = item['cache_sync_overlap']
+        self.assertEqual(overlap['status'], 'available')
+        self.assertEqual(len(overlap['items']), 1)
+        self.assertEqual(overlap['items'][0]['overlap_ms'], 13)
+        self.assertEqual(overlap['items'][0]['sync']['stack'], 'fd_sync')
+        self.assertEqual(item['native_begin_partition']['values']['frame_slot_wait_count'], 2)
+        self.assertTrue(all(phase['start_ms'] is None for phase in item['native_phases']))
+
+        capture['cache_syncs'].append({'id': 'pending', 'clock': 'performance.now',
+                                      'started': 90, 'ended': None, 'status': 'pending'})
+        overlap = analyze_capture(value, self.base_trace())['events'][0]['cache_sync_overlap']
+        self.assertEqual(overlap['status'], 'incomplete')
+        self.assertIsNone(overlap['items'][1]['overlap_ms'])
+        self.assertEqual(overlap['items'][1]['overlap_status'], 'possible_pending')
+        capture['clock']['source'] = 'unknown'
+        self.assertEqual(analyze_capture(value, self.base_trace())['events'][0]
+                         ['cache_sync_overlap']['status'], 'unavailable')
+
     def test_duplicate_marker_alignment_is_ambiguous(self):
         trace = self.base_trace(
             mark("melee-hitch-native-1", OFFSET_US + 100_000),

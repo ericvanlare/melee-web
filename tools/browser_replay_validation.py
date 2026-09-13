@@ -17,13 +17,9 @@ ZERO_GATES = ('browserCallbackGaps', 'browserLongTasks', 'nativeCallbacksOver33m
 # Include the separately imported asset loader, disc/PAD utilities and audio
 # transport modules; freezing only the Wasm and HTML leaves executable inputs
 # outside the development/held-out build identity.
-BUILD_ARTIFACTS = (
-    'gameplay_menu_browser.js', 'gameplay_menu_browser.wasm', 'gameplay_menu_browser.data',
-    'runtime.html', 'runtime-development.mjs', 'melee-runtime.mjs', 'runtime-cache.js', 'audio-worklet.js', 'audio-ring.mjs',
-    'disc-image.mjs', 'dsp-coefficients.mjs', 'runtime-assets.mjs',
-    'runtime-audio-assets.mjs', 'runtime-audio.mjs',
-    'match-flow.mjs', 'match-menu.mjs', 'action-sweep.mjs', 'hitch-capture.mjs',
-)
+BUILD_ARTIFACTS = tuple(json.loads(
+    Path(__file__).with_name('browser_build_artifacts.json').read_text(encoding='utf-8')
+))
 
 
 def require(condition, message):
@@ -41,6 +37,54 @@ def validate_build_artifacts(artifacts, build_directory):
 
 def finite(value):
     return type(value) in (int, float) and math.isfinite(value) and value >= 0
+
+
+def validate_cache_sync_capture(capture):
+    """Auxiliary I/O records cannot replace native/browser failure evidence."""
+    capabilities = capture.get('capabilities', {})
+    require(isinstance(capabilities, dict), 'Malformed hitch capabilities')
+    capability = capabilities.get('cache_sync', {})
+    require(isinstance(capability, dict), 'Malformed cache sync capability')
+    fields = ('cache_syncs', 'cache_sync_cap', 'cache_sync_count', 'cache_sync_overflow_count')
+    if not any(key in capture for key in fields) and capability.get('requested') is not True:
+        return  # Earlier reports predate the optional mount instrumentation.
+    rows = capture.get('cache_syncs')
+    require(isinstance(rows, list), 'Missing cache sync records')
+    require(type(capture.get('cache_sync_cap')) is int and 0 < capture['cache_sync_cap'] <= 1024
+            and len(rows) <= capture['cache_sync_cap'], 'Invalid cache sync bound')
+    require(type(capture.get('cache_sync_count')) is int and capture['cache_sync_count'] == len(rows),
+            'Cache sync count mismatch')
+    require(type(capture.get('cache_sync_overflow_count')) is int
+            and capture['cache_sync_overflow_count'] == 0, 'Overflowed cache sync capture')
+    require(type(capability.get('requested')) is bool, 'Missing cache sync request state')
+    if capability['requested']:
+        require(capability.get('installed') is True and capability.get('enabled') is True,
+                'Requested cache sync hook unavailable')
+    else:
+        require(not rows, 'Unexpected cache sync records without opt-in')
+    ids = set()
+    counts = {'calls': len(rows), 'pending': 0, 'errors': 0}
+    for row in rows:
+        require(isinstance(row, dict) and isinstance(row.get('id'), str) and row['id']
+                and row['id'] not in ids, 'Invalid or duplicate cache sync record')
+        ids.add(row['id'])
+        require(row.get('clock') == 'performance.now' and finite(row.get('started')),
+                'Missing cache sync clock')
+        require(row.get('status') in ('pending', 'completed', 'error'), 'Invalid cache sync status')
+        if row['status'] == 'pending':
+            counts['pending'] += 1
+            require(row.get('ended') is None and row.get('duration_ms') is None,
+                    'Pending cache sync has a completion')
+        else:
+            require(finite(row.get('ended')) and row['ended'] >= row['started']
+                    and finite(row.get('duration_ms'))
+                    and math.isclose(row['duration_ms'], row['ended'] - row['started'], abs_tol=0.01),
+                    'Invalid cache sync completion interval')
+            counts['errors'] += int(row['status'] == 'error')
+    for key, count in counts.items():
+        require(type(capability.get(key)) is int and capability[key] == count,
+                'Cache sync records disagree with counter: ' + key)
+    require(counts['pending'] == 0 and counts['errors'] == 0, 'Incomplete or failed cache sync evidence')
 
 
 def validate_hitch_capture(capture, metrics):
@@ -85,10 +129,29 @@ def validate_hitch_capture(capture, metrics):
     for key, count in counts.items():
         require(type(metrics.get(key)) is int and metrics[key] == count,
                 'Hitch events disagree with counter: ' + key)
+    validate_cache_sync_capture(capture)
 
 
 def validate_report(report, recipe_hash, frames, mode, cold=None, *, expected_winner=None):
     require(isinstance(report, dict), 'Browser report must be an object')
+    paint = report.get('diagnostic_page_paint')
+    require(paint is None or (isinstance(paint, dict) and paint.get('mode') == 'normal'
+                             and paint.get('diagnostic_only') is False
+                             and paint.get('restored') is True),
+            'Diagnostic page-paint control is not normal-page acceptance evidence')
+    if paint is not None:
+        require(finite(paint.get('started_ms')) and finite(paint.get('ended_ms'))
+                and paint['ended_ms'] >= paint['started_ms'], 'Invalid page-paint interval')
+        geometry = paint.get('geometry_after')
+        require(isinstance(geometry, dict) and paint.get('geometry_before') == geometry,
+                'Page-paint geometry changed or is missing')
+        require(all(type(geometry.get(k)) in (int, float) and math.isfinite(geometry[k])
+                    for k in ('x', 'y', 'width', 'height', 'buffer_width', 'buffer_height', 'dpr'))
+                and geometry['width'] > 0 and geometry['height'] > 0 and geometry['dpr'] > 0
+                and geometry['dpr'] == report.get('device_pixel_ratio')
+                and geometry['buffer_width'] == 640 * geometry['dpr']
+                and geometry['buffer_height'] == 480 * geometry['dpr'],
+                'Invalid page-paint canvas geometry')
     for key, expected in {'schema': 'melee-web-browser-retail-replay', 'version': 1,
                           'recipe_sha256': recipe_hash, 'frames': frames,
                           'mode': mode, 'complete': True, 'pass': True,

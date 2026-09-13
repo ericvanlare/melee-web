@@ -164,6 +164,24 @@ state. The visible browser must independently execute the compiled CPU logic
 and original draw traversal. A headless pass alone is insufficient, and a
 headless divergence is not hidden by a browser pass.
 
+The four-player trace demonstrates this dependency. Original
+`ifMagnify_802FBBDC` sets the offscreen flag during scene-camera drawing.
+`Fighter_8006A360` consumes that flag on subsequent ticks through
+`ifMagnify_802FC998`, incrementing `dmg.x1910` while the original player gate
+and damage limit permit it. The owned common data requires 60 qualifying ticks,
+limits the effect below 150 damage, and applies one damage point. P2 Mario's
+retail offscreen interval supplies ticks 1812–1871; the headless port leaves
+the flag clear. At 1871 the retail damage increase triggers eight HUD-shake
+`HSD_Randf` calls in `ifStatus_802F4B84`, explaining the subsequent RNG difference.
+The counter itself is not among the recorded fields; this causal explanation
+combines the observed flag interval and damage/RNG with the original source.
+
+A future native match comparison needs the real shared draw boundary:
+`GameplayMatchSession::draw()` through the original scene-camera traversal,
+including HUD/magnifier state, and `melee_web_match_flow_present()`. Inserting
+recorded offscreen flags or directly adding the missing damage would bypass
+the behavior being validated. The current headless result remains failing.
+
 ### CPU hitlag causal proof
 
 The retained GALE01r2 `ftCo_800ADE48` reaching-definition audit found that the
@@ -185,138 +203,147 @@ all callers pass `1`, except `ftCo_800AE7AC`, which forwards `arg2`, and the
 `ftCo_800B21C8` no-target path, which passes `0`. This preserves the observed retail caller carry; it does not inject recorded
 CPU outputs or depend on a difficulty, character or tick number.
 
-## Two-player complete-match evidence
+## Complete-match results
 
-The accepted retail pair in `work/cpu-corpus/case1-paired-v2/` repeats for exactly
-**1,199 source ticks and 1,199 source draws**, including result publication and
-scene ownership reset. P2 Fox wins by elimination. Both source processes start
-from the same declared original menu context and RNG `1162236032`.
+All three retail pairs now repeat in fresh processes, including generated CPU
+input, fighter/RNG/PAD state, camera/HUD observations, result publication and
+original scene ownership reset. Every recipe has a natural original ending.
+The current frozen port executions are `native-v9/` and `browser-v9/`, joined
+by each scenario's `result-v9.json`.
 
-Before the carry fix, CPU decision state first diverged at tick 864: retail
-entered state 18 during hitlag, while the port remained in state 1. RNG first
-diverged at tick 865, and the downstream HUD damage first differed at tick 960.
-Read-only retail and native diagnostics agreed on the hitlag flag and remaining
-hitlag frames, isolating the undefined caller carry rather than the collision.
-Those complete failing runs remain in `native-v1` and `browser-v1` evidence.
+| Scenario | Retail ticks / draws | Native core comparison | Visible browser core comparison |
+| --- | --- | --- | --- |
+| Mario / Fox CPU 1, FD | 1,199 / 1,199 | Exact through completion | Exact through completion |
+| Marth / Falco CPU 5 / Mario CPU 9, Yoshi's Story | 4,346 / 4,343 | First RNG difference at 2241; no ending within the recipe | Exact through completion |
+| Fox / Mario CPU 3 / Marth CPU 6 / Falco CPU 8, Dream Land | 3,838 / 3,836 | First damage/RNG difference at 1871 | First generated-input difference at 2495; reaches completion |
 
-After the fix, `native-v6/` and visible Chrome `browser-v6/` agree with both
-retail captures for all 1,199 ticks of the existing core state, including
-CPU-generated fighter input, RNG, fighter state and controller history. The
-expanded CPU decision, match-clock, HUD and published-result domains also agree.
-The browser magnifier domain agrees through every source tick and draw.
-The native trace deliberately excludes source drawing and retains its first
-magnifier difference at tick 322.
+Here “core” means the existing declared entry, supplied PAD samples, generated
+fighter input, fighter state, RNG, source match clock and all three controller
+history banks. **No scenario passes every expanded field across retail, native
+and browser.** Camera arithmetic and source-draw timing remain explicit failures.
+The two- and three-player browser CPU decision, HUD, magnifier and match-result
+domains agree independently; CPU decisions were never supplied to either port.
 
-The camera patch also preserves the original fused multiply-add boundaries
-in subject extent calculation, camera bounds, target calculation and
-interpolation. The GALE01r2 instruction addresses are recorded beside each
-changed expression. It uses explicit `fmaf` operations with the original
-separate rounding steps; compiler contraction and fast-math remain disabled.
-The initial camera X now agrees at `3507b9e0`. The first remaining transform
-differences are position X at tick 240 (`4273582b` versus `4273582d`) and
-interest X at tick 247 (`42a51592` versus `42a51593`).
+### Two players
 
-**The full expanded comparison remains failing.** The first camera
-subject bone difference is Fox Y at tick 18 (`414f25a0` versus `414f259e`). The
-browser also performs three source preparation draws before live tick zero:
-1,199 replay draws plus 3 preparation draws equals **1,202 observed source draws**.
-Those warm draws change the source camera clip planes before retail changes
-them. The separate preparation stream and strict report retain this phase
-mismatch; no field, epsilon or row was dropped to obtain a pass.
+The accepted pair in `work/cpu-corpus/case1-paired-v2/` begins at RNG
+`1162236032` and ends with P2 Fox winning by elimination. Its 1,199 source ticks
+contain nine attack-motion entries (Mario 7, Fox 2), three damage increases,
+two stock losses, one respawn and eight CPU target changes. The observed CPU
+states are 1, 2, 3, 5, 10 and 18; 12 queued command classes occur. Queue presence
+is not proof that every queued command executed.
 
-Observed coverage includes nine attack-motion entries (Mario 7, Fox 2), three
-damage increases, two stock losses, one respawn, eight CPU target changes,
-four magnifier transitions and 58 offscreen draws. CPU decision states
-1, 2, 3, 5, 10 and 18 were sampled; 12 distinct queued command classes were
-observed. Queue presence is not proof that every queued command executed.
-The duration is 19.983 nominal seconds at 60 source ticks/second, including
-intro and ending ticks; this is not a wall-time performance measurement.
+The original complete failures before the caller-carry repair remain retained:
+CPU state first differed at 864, RNG at 865 and HUD damage at 960. The shared
+carry fix restores all 1,199 core ticks. Explicit camera fused operations also
+restore the initial camera X. The remaining transform differences are position
+X at 240 (`4273582b` versus `4273582d`) and interest X at 247 (`42a51592` versus
+`42a51593`). FOV agrees throughout this workload.
 
-The existing level-1 and level-9 checkpoint recipes were rerun after the CPU
-and camera fixes without recapturing their retail references: native and visible browser
-still match 480 ticks each. The existing PAD-history human regression also
-matches 240 ticks in native and browser. Each browser checkpoint has the exact
-corresponding source step/draw count and zero recorded page errors.
-The Release browser, retail-trace and timer targets build; all 602 unit tests
-pass with 35 optional-fixture skips. The timer target also passes original
-countdown, pause/resume, timeout, repeated teardown and inconsistent-selection
-rejection checks against owned local assets.
+The entry-scale repair described below removes the Fox subject-Y mismatch at
+18. The next subject difference is Z at 82 (`bf147ce9` versus `bf147cea`).
+The browser has three preparation source draws before its 1,199 live draws,
+changing clip planes before retail does; its strict camera comparison first
+fails at live tick zero. Native has zero draws, a clip-plane difference at 1
+and a magnifier difference at 322. These fields and phases remain compared.
 
-The instrumented complete browser run recorded one callback gap over 33.3 ms
-(38.57 ms worst), while native callbacks had zero 16.67 ms misses
-(10.06 ms worst). Other captures were running on the same machine. These
-separate observations identify a timing failure without establishing an
-isolated cold/warm performance result.
+### Three players
 
-The complete two-player join is `result-v8.json`; its manifest binds the frozen
-native and browser builds, exact Node/assets, both independent reference runs,
-recipe, source teardown and before/after HTTP artifact inventories. An earlier
-browser rerun (`browser-v2/`) reached the ending and matched core state but
-failed the capture harness's response-body retrieval; it remains a failed run.
+The accepted pair in
+`work/cpu-corpus/paired-v8/marth-human-vs-falco5-mario9-yoshis-story-120s/`
+ends with P3 Mario winning by elimination. All 4,346 browser core ticks and
+CPU decision observations agree. Coverage includes 77 attack-motion entries,
+58 damage increases, five stock losses, three respawns and 134 CPU target
+changes. There are 449 offscreen player-draw observations.
 
-Three- and four-player discovery retries reached the original timeout after
-3,838 ticks. The three-player bout published two winners, Falco and Mario,
-and therefore requires Sudden Death before whole-match completion. The
-four-player bout published Falco as its sole winner. Discovery alone is not an
-accepted reference.
+The original omits camera traversal at ticks 1598, 2599 and 3600. The browser
+performs 4,346 live draws plus three preparation draws, so strict traversal
+alignment fails. Browser FOV already differs at tick zero, and its first
+subject difference is Marth Z at 67 (`bd59cc74` versus `bd59cc73`).
+The headless native run consumes all 4,346 samples but never reaches the
+original ending; its retained prefix first differs in RNG at 2241. It is a
+failed capture, with no synthesized end record or appended neutral input.
 
-The original camera traversal counts were 3,835 and 3,836 respectively.
-Three-player source ticks 1610, 2611 and 3612 had no camera traversal;
-four-player ticks 2268 and 3269 had none. The observation format retains those
-exact draw ordinals and source indices instead of equating simulation ticks
-with camera traversal counts.
+The historical one-minute workload remains intact under its separate original
+catalog ID. It timed out after 3,838 ticks and 3,835 draws with Falco and Mario
+both marked winners, requiring Sudden Death. The active workload was separately
+declared with a two-minute stock timer and 7,923-sample authored bound. It
+continues the same combat cycle, and its discovered natural 4,346-tick timeline
+was then captured twice independently. This does not turn the older tie into
+a completed whole match. Sudden Death coverage remains open.
 
-The preceding correctly prepared attempts reached 3,725 and 3,447 ticks before
-the 1,800-second debugger wall-time limit. Those partial attempts remain
-failures. The retries used the same rules and authored input with a larger
-wall-time budget and grouped read-only memory reads.
+### Four players
 
-The historical three-player 1:00 scenario remains addressable by its original
-catalog ID and hash. The active three-player workload has a separate `-120s`
-ID, an original 2:00 stock timer and a predeclared 7,923-sample input bound.
-It continues the same authored combat cycle. It must independently reach a
-natural ending and repeat in two fresh processes before becoming a reference;
-the longer timer itself proves neither completion nor agreement. This change
-does not modify the retained one-minute tie or the two-/four-player recipes.
-
-## Four-player complete reference and retained port failures
-
-The two independent fixed runs in
+The accepted pair in
 `work/cpu-corpus/paired-v7/fox-human-vs-mario3-marth6-falco8-dream-land/`
-now repeat across all 3,838 ticks and 3,836 traversals, including CPU decisions,
-camera/HUD, result and original scene teardown. Falco is the sole timeout
-winner. The corpus checker accepts this reference pair. Coverage includes
-126 attack-motion entries, four stock losses, three respawns and 116 received
-damage increases across four players.
+ends with P4 Falco as the sole timeout winner. Coverage includes 126
+attack-motion entries, 116 damage increases, four stock losses, three respawns
+and 255 CPU target changes. Original camera traversal is absent at 2268 and
+3269; the browser's extra traversals remain visible in the strict comparison.
 
-The complete `native-v6/` trace first differs in Marth's animation speed at
-tick 264: original `4034c59d`, port `4034c59e`. Headless RNG first differs at
-1871, coinciding with Mario's damage being one point below the drawn original;
-the missing magnifier traversal is a separate diagnostic lead. These are
-retained failures, not an accepted native match.
+Earlier browser attempts stopped at 22 and 18 ticks on audio timing guards.
+The shared host's timing-pause message now uses the existing development
+page's recognized prefix. Instrumented accuracy runs can explicitly resume
+and count those pauses; live play still pauses and performance capture fails.
+`runtime.html` is unchanged. The next complete retained prefix reached 2,622
+ticks before aborting on the opcode-63 unsupported-command sentinel during
+an ordinary taunt. The common-appeal repair below removes that fault.
 
-Browser attempts `browser-v6/` and `browser-v6b/` stopped after 22 and 18 ticks
-on audio timing guards (worst browser gaps 1518.89 and 1280.86 ms). The shared
-compiled host now gives both clock guards the timing-pause prefix understood
-by the existing development page. Explicitly instrumented state capture can
-therefore resume and count audio-clock pauses too. Live play still pauses,
-and performance capture still fails on a pause; no timing guard was removed.
-`runtime.html` is unchanged.
+`browser-v9/` completes all 3,838 ticks and teardown, with exact RNG, PAD history,
+HUD, magnifier and result state. Its first core difference is P2 Mario's
+CPU-generated input at 2495: retail emits stick bytes `90,40`; the port emits
+`00,00`. The source `ftCo_800AC5A0` uses uninitialized stick locals when the
+knockback vector is zero during its periodic hitlag branch. The
+[DOL register audit](CPU_ZERO_KNOCKBACK_ABI.md) shows that these bytes
+come from volatile-register and fighter-pointer residue. Matching them requires
+an explicit original ABI compatibility model; no substitute neutral rule or
+recorded CPU decisions were added.
 
-`browser-v7/` rendered the four-player match and reached 2,622 ticks, with 40
-recorded diagnostic resumes, before aborting on unsupported fighter command
-63 in the original wait/taunt transition. Its retained incomplete prefix has
-the same first animation-speed difference at 264; RNG and PAD history agree
-through all observed ticks. The prefix checker now supports the existing
-three-/four-player format while requiring complete teardown for acceptance.
-The fault and animation calculation remain under investigation.
+The native clank speed difference at 264 is repaired. Its next difference is
+the draw-dependent one-point Mario damage and subsequent RNG change at 1871,
+explained above. Complete native failures are retained. The entry-scale
+repair removes the first subject difference at 12; the next is Fox Z at 74
+(`3f123975` versus `3f123976`). Camera interest Y still differs at 184.
 
-A timed bout with multiple original winners may require Sudden Death. The
-report flags this as incomplete whole-match coverage even if the ordinary
-bout and its teardown agree. Do not claim a complete match from this boundary
-without its natural ending.
+### Shared repairs and regression checks
+
+Common appeal uses action rows 239/240, selected by motion states 264/265.
+Those rows now retain checked command storage for Mario, Fox, Falco and Marth.
+Fox's appeal also contains HSD node-visibility channel 11. Native fighter clips
+reach the existing `JObjUpdateFunc` handler, which updates `JOBJ_HIDDEN`.
+Generic inspection and the pose bridge still reject that channel; native and
+generic animation cache policies are distinct. All four owned archives pass
+command-ownership checks, and malformed streams and unsupported channels
+remain rejected.
+
+The clank repair preserves three original fused operations in `ftcoll.c`;
+see [the instruction and operand audit](FTCOLL_X191C_ROUNDING_AUDIT.md).
+The entry-scale repair separately preserves `ftCo_EntryStart_Phys`:
+GALE01r2 `0x800C6788` rounds the subtraction, `0x800C67A8` rounds the entry
+fraction, and `0x800C67AC` fuses the final multiply-add before `0x800C67B0` stores
+it. Owned common data has `x6BC = 30` and `x6C4 = 3c23d70a`. A fraction of 9/30
+and Fox's initial scale `3f75c28f` reconstruct the observed fused result
+`3e970a3e`; splitting the multiply/add gives the prior port's `3e970a3d`.
+The new native matrix diagnostic now reports the exact retail root scale at 18.
+Global contraction and fast-math remain disabled.
+
+The existing level-1 and level-9 recipes still match their unchanged retail
+references for 480 ticks each in native and browser after these repairs.
+The existing human PAD-history regression still matches 240 ticks in both.
+Browser source-step/draw counts are exact for each checkpoint and recorded
+page errors are empty. These are port reruns, not new checkpoint references.
+The browser, retail-trace and timer Release targets build. All 604 unit tests
+pass with 35 optional-fixture skips. Owned timer checks
+pass original countdown, pause/resume, timeout, repeated teardown and
+inconsistent-selection rejection.
 
 ## Coverage and integration limits
+
+The accepted retail workloads total 9,383 source ticks and 9,378 traversals,
+with 212 attack-motion entries, 177 damage increases, 11 stock losses, seven
+respawns and 397 CPU target changes. They cover CPU levels 1, 3, 5, 6, 8 and 9,
+all four fighters in CPU roles, three human-character roles and three stages.
+Falco as the human and Battlefield remain outside these three workloads.
 
 Coverage separates observed CPU decision-state samples, queued command
 inventory and executed fighter motions. Queued bytes do not prove that each
@@ -328,9 +355,21 @@ not measured wall time or an original VI cadence claim.
 Instrumented state runs retain native callbacks over 16.67 ms and browser
 gaps over 33.3 ms as separate counters. Performance admission requires later
 isolated cold/warm runs after the performance branch is integrated. These
-captures cannot establish that admission.
+captures cannot establish that admission. The accepted MWRC recipes use the
+existing development replay boundary, so the stable integrated runtime can
+reuse them in its performance mode. Fresh application state and explicitly
+controlled cache conditions remain required; these runs are not cold/warm
+profiles.
+
+Future CPU holdouts must be independently authored after the shared fixes.
+They should include unseen two-/three-/four-player fights, the currently
+uncovered difficulties 2, 4 and 7, Falco as human, Battlefield, zero-knockback
+hitlag, taunts, recovery, stock loss/respawn and consecutive-match teardown.
+Teams, other CPU kinds and Sudden Death remain outside the current admitted
+implementation boundary. All three current workloads remain development cases.
 
 Integration may touch `src/gameplay_menu_browser.cpp`, shared match ownership,
 `CMakeLists.txt`, `cmake/FighterRuntime.cmake`, and
-`patches/melee-gameplay.patch`. This work does not require changing the inline
-host in `runtime.html`, hitch tools, or renderer/cache instrumentation.
+`patches/melee-gameplay.patch`. Status/evidence integration may also overlap in
+`STATUS.md` and `docs/REPLAY_CORPUS.md`. This work does not require changing the
+inline host in `runtime.html`, hitch tools, or renderer/cache instrumentation.

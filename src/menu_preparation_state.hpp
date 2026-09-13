@@ -6,7 +6,8 @@ namespace melee_web {
 // The state is deliberately small so callers cannot arm simulation or source
 // drawing until construction has completed. A newly entered scene is rendered
 // with simulation stopped until its WebGPU pipelines have drained and remained
-// quiet for two callbacks; only then may the source clock be armed.
+// quiet for two callbacks. Submitted GPU work must then complete before the
+// source clock can be armed; that wait adds no source ticks or draws.
 class MenuPreparationState {
 public:
     enum class Phase { Idle, WaitingForAudio, Constructing, Priming, Settling, Arming };
@@ -73,9 +74,9 @@ public:
 
     bool arming() const noexcept { return phase_ == Phase::Arming; }
 
-    bool arm() noexcept
+    bool arm(bool submitted_work_complete) noexcept
     {
-        if (phase_ != Phase::Arming) return false;
+        if (phase_ != Phase::Arming || !submitted_work_complete) return false;
         phase_ = Phase::Idle;
         quiet_frames_ = 0;
         return true;
@@ -87,7 +88,8 @@ public:
     // WebGPU can discover and compile its pipelines before simulation starts.
     bool suppress_source_draw() const noexcept
     {
-        return phase_ == Phase::WaitingForAudio || phase_ == Phase::Constructing;
+        return phase_ == Phase::WaitingForAudio || phase_ == Phase::Constructing ||
+               phase_ == Phase::Arming;
     }
 
     Phase phase() const noexcept { return phase_; }

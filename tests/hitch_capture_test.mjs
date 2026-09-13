@@ -10,6 +10,8 @@ const runtime = fs.readFileSync(new URL('../web/runtime-development.mjs', import
 assert.match(runtime, /await window\.meleeHitchCaptureLoading/);
 assert.match(runtime, /diagnostic_capture:diagnosticCapture/);
 assert.match(runtime, /nativeCallbacksOverBudget/);
+assert.match(runtime, /hitchCausalFromUrl/);
+assert.match(runtime, /syncDiagnostics:hitchCausalFromUrl/);
 
 let clock = 100;
 const marks = [];
@@ -136,6 +138,67 @@ const native = (frame, total, preparation = 0) => ({
   capture.reset();
   assert.equal(capture.isEnabled(), true);
   assert.equal(instances.length, 4, 'Reset reinstalls optional observers for the next run');
+}
+
+// Render-cache syncs have a separate bounded lifecycle stream. Their clock is
+// shared with native timing, while source callback identity stays unknown until
+// an offline correlation step.
+{
+  clock = 100;
+  const capture = createHitchCapture({
+    enabled: true,
+    performance: perf,
+    now: () => clock,
+    userTiming: true,
+    cacheSyncDiagnostics: true,
+    cacheSyncCap: 2,
+  });
+  const nativeTiming = native(20, 20);
+  nativeTiming.started = 100;
+  capture.observeNativeTiming({current: nativeTiming, totalMs: 20, timestamp: 100});
+  capture.observeCacheSync({id: 'cache-sync-test', phase: 'start', source: 'explicit', operation: 'save', started: 105, stack: 'at fd_sync (libwasi.js:561)'});
+  clock = 115;
+  capture.observeCacheSync({id: 'cache-sync-test', phase: 'completion', source: 'explicit', operation: 'save', ended: 115});
+  const report = capture.report();
+  assert.equal(report.cache_sync_count, 1);
+  assert.equal(report.cache_syncs[0].status, 'completed');
+  assert.equal(report.cache_syncs[0].source, 'explicit');
+  assert.equal(report.cache_syncs[0].operation, 'save');
+  assert.equal(report.cache_syncs[0].duration_ms, 10);
+  assert.equal(report.cache_syncs[0].native_context, 'unknown');
+  assert.equal('native_overlap_ids' in report.cache_syncs[0], false, 'Interval joins belong offline');
+  assert.match(report.cache_syncs[0].stack, /fd_sync/);
+  assert.equal(report.capabilities.cache_sync.requested, true);
+  assert.equal(report.capabilities.cache_sync.observed, true);
+  assert.equal(marks.filter(mark => mark.name.startsWith('melee-cache-sync-')).length, 2);
+  capture.reset();
+  assert.equal(capture.report().cache_sync_count, 0);
+  assert.equal(capture.report().cache_sync_overflow_count, 0);
+}
+
+// The sync stream's own cap invalidates the report without changing native or
+// browser event counts.
+{
+  const capture = createHitchCapture({enabled: true, performance: perf, cacheSyncDiagnostics: true, cacheSyncCap: 1});
+  assert.equal(capture.observeCacheSync({id: 'one', started: 1}).recorded, true);
+  assert.equal(capture.observeCacheSync({id: 'two', started: 2}).recorded, false);
+  const report = capture.report();
+  assert.equal(report.event_count, 0);
+  assert.equal(report.cache_sync_count, 1);
+  assert.equal(report.cache_sync_overflow_count, 1);
+  assert.equal(report.valid, false);
+}
+
+// A startup queue loss or duplicate id cannot silently become a clean capture.
+{
+  const capture = createHitchCapture({enabled: true, performance: perf, cacheSyncDiagnostics: true});
+  capture.observeCacheSync({id: 'same', started: 1});
+  capture.observeCacheSync({id: 'same', started: 2});
+  assert.equal(capture.report().cache_syncs[0].started, 1);
+  assert.equal(capture.report().cache_sync_count, 1);
+  capture.noteCacheSyncLoss(3);
+  assert.equal(capture.report().cache_sync_overflow_count, 4);
+  assert.equal(capture.report().valid, false);
 }
 
 console.log('Bounded hitch capture boundaries, snapshots, reset, preparation exclusion, observers and overflow passed.');

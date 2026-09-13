@@ -76,7 +76,7 @@ static void dump_state(unsigned tick, const char* phase,
 int main(int argc,char** argv){try{
  bool phase_only=argc>=3&&std::strcmp(argv[2],"phase")==0;
  check(argc==2||(phase_only&&(argc==3||argc==4)),"Expected local asset directory or 'phase [finite initial_x]' variant");RuntimeFiles files;
- for(const char* name:{"PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","sislib_font.bin"})files[name]=bytes(std::filesystem::path(argv[1])/name);
+ for(const char* name:{"PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sislib_font.bin"})files[name]=bytes(std::filesystem::path(argv[1])/name);
  char error[256];
  GameplayWorld world(files);
  float initial_x=phase_only?15.4f:-20.0f;

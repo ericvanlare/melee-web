@@ -14,6 +14,15 @@ struct DatAnimationTrack {
     std::vector<std::uint8_t> bytes;
 };
 
+// Inspection accepts the ordinary SRT channels understood by HsdAnimation.
+// Native fighter-action hydration additionally retains HSD_A_J_NODE tracks:
+// the original fighter FigaTree/JObj path uses these to update visibility.
+// This policy does not make node tracks evaluable by the generic pose bridge.
+enum class DatAnimationPolicy {
+    Inspection,
+    NativeFighterAction,
+};
+
 // Fighter FigaTree, not an HSD_AnimJoint tree. Counts correspond to consecutive
 // fighter animation parts, whose mapping to the model must be established by
 // the caller. Mario Wait1 and the default Mario model both use 61 preorder nodes.
@@ -28,7 +37,8 @@ struct DatAnimation {
     std::vector<std::uint8_t> node_counts;
     std::vector<DatAnimationTrack> tracks;
 
-    DatAnimation(const DatArchive& archive, std::uint32_t root);
+    DatAnimation(const DatArchive& archive, std::uint32_t root,
+                 DatAnimationPolicy policy = DatAnimationPolicy::Inspection);
 };
 
 using AnimationPose = MeleeWebAnimationPose;

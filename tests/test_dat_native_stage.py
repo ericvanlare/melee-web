@@ -42,7 +42,7 @@ class NativeStageOriginalRuntime(unittest.TestCase):
 
     def test_original_oninit_scheduler_and_teardown(self):
         assets=ROOT/"assets-local/next-gate"
-        required=("PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","sislib_font.bin")
+        required=("PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sislib_font.bin")
         if not all((assets/name).is_file() for name in required):self.skipTest("Optional complete local runtime assets unavailable")
         output=self.run_trace("gameplay_stage_last_trace",assets)
         self.assertIn("Original FD OnInit, scheduled background transitions",output)

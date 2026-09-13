@@ -8,6 +8,51 @@ const pause=page.slice(page.indexOf("$('pause').onclick="),page.indexOf("\n$('un
 const completion=page.slice(page.indexOf('window.menuReplayCompleted='),page.indexOf('\nwindow.menuReplayPoll='));
 assert(start&&pause&&completion);
 {
+ const shared=fs.readFileSync(new URL('../web/melee-runtime.mjs',import.meta.url),'utf8');
+ const unload=shared.slice(shared.indexOf('  async function unloadAndSave() {'),shared.indexOf('  async function put('));
+ assert(unload.includes('Module._melee_web_native_menu_cache_idle()'));
+ const flush=page.slice(page.indexOf('window.menuCacheWritesFlushed='),page.indexOf('\n};',page.indexOf('window.menuCacheWritesFlushed='))+3);
+ for(const finalState of [1,-1]){
+  const events=[],display={};let idleCalls=0;
+  const scope={window:{},prepared:true,callbacks:{menuPreparationCanceled:()=>events.push('cancel')},performance,
+   emit:(name,message)=>{assert.equal(name,'cacheWriteFailed');display.textContent=message;},
+   $:()=>display,log:text=>events.push(text),syncAudio:()=>events.push('sync-audio'),
+   pauseAudioForPreparation:async()=>events.push('audio-stopped'),boundary:async run=>run(),
+   Module:{runtimeCacheState:{dirty:false},
+    _melee_web_native_menu_unload:()=>{events.push('unload');return 1;},
+    _melee_web_native_menu_cache_idle:()=>{events.push('idle-check');return idleCalls++?finalState:0;},
+    markRuntimeCacheDirty(){this.runtimeCacheState.dirty=true;events.push('dirty');},
+    saveRuntimeCache:async()=>{events.push('save');return true;}}};
+  vm.createContext(scope);vm.runInContext(unload+'\n'+flush,scope);
+  scope.window.menuCacheWritesFlushed({ok:finalState===1,flushed:true});
+  assert.equal(await scope.unloadAndSave(),true,'Optional cache failure cannot undo successful source teardown');
+  assert.deepEqual(events.filter(x=>['unload','audio-stopped','idle-check','save'].includes(x)),
+   finalState===1?['unload','audio-stopped','idle-check','idle-check','save']:['unload','audio-stopped','idle-check','idle-check']);
+  if(finalState===-1){assert.equal(scope.Module.runtimeCacheState.dirty,false);assert.match(display.textContent,/native cache writes failed/);}
+ }
+ const exportHandler=page.split('\n').find(line=>line.startsWith("$('export-render-cache').onclick="));
+ for(const cacheState of [0,-1,1]){
+  const button={},errors=[];let reads=0,saves=0;
+  const scope={$:()=>button,log:text=>errors.push(text),boundary:async run=>run(),Module:{
+   _melee_web_native_menu_cache_idle:()=>cacheState,
+   saveRuntimeCache:async()=>{saves++;return false;},
+   FS:{readdir:()=>{reads++;return [];}}}};
+  vm.createContext(scope);vm.runInContext(exportHandler,scope);await button.onclick();
+  assert.equal(reads,0,'Export must not publish stale files before native flush and persistence both succeed');
+  assert.equal(saves,cacheState===1?1:0);assert.equal(errors.length,1);
+ }
+}
+{
+ const handler=page.split('\n').find(line=>line.startsWith('window.menuRuntimeTimingError='));
+ const failed=[];
+ const scope={window:{},diagnosticCaptureInvalid:false,stop:error=>failed.push(error)};
+ vm.createContext(scope);vm.runInContext(handler,scope);
+ scope.window.menuRuntimeTimingError('Native menu timing JSON exceeded 4096 bytes');
+ assert.equal(scope.diagnosticCaptureInvalid,true);
+ assert.deepEqual(failed,['Native menu timing JSON exceeded 4096 bytes'],
+  'Missing native timing must stop the replay instead of being ignored as an inactive callback');
+}
+{
  const save=page.split('\n').find(line=>line.startsWith('async function saveEvidence('));
  let nativeCalls=0;const posted=[];const display={};
  const scope={fatal:true,retailRun:null,$:()=>display,
@@ -112,6 +157,7 @@ function harness(unload=true){
   replayMemorySnapshot:()=>({wasm_heap_bytes:2048}),
   status:()=> 'teardown failed',unloadAndSave:async()=>{calls.unload++;return unload;},
   resetTiming:()=>{calls.timingResets++;},prepareAudio:async()=>{calls.audio++;},pauseAudioForPreparation:async()=>{},
+  beginReplayPaintControl:()=>({evidence:{mode:'normal'},restore(){}}),
   boundary:async fn=>fn(),check:value=>assert.equal(value,1),syncAudio(){},
   finishRetailReplay:async reason=>{calls.failed.push(reason);calls.completedRun=scope.retailRun;scope.retailRun=null;},
   Module:{HEAPU8:new Uint8Array(2048),_malloc:()=>1,_free(){},

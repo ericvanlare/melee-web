@@ -14,7 +14,7 @@ int main(int argc,char** argv){try{
     const bool stock_mode=argc==3&&(std::strcmp(argv[2],"--stock")==0||std::strcmp(argv[2],"--stock-jab")==0);
     const bool stock_jab=argc==3&&std::strcmp(argv[2],"--stock-jab")==0;
     check(argc==2||stock_mode,"Expected local asset directory or --stock");RuntimeFiles files;
-    for(const char* name:{"PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","sislib_font.bin"}){
+    for(const char* name:{"PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sislib_font.bin"}){
         std::ifstream f(std::filesystem::path(argv[1])/name,std::ios::binary);check(bool(f),"Cannot open owned trajectory asset");
         files[name]={std::istreambuf_iterator<char>(f),{}};
     }

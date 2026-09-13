@@ -43,6 +43,7 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     group(165,181);group(183,204);                // damage, knockdown and techs
     command_motions_.insert(205);group(209,217);group(219,228);                // ledge actions
     command_motions_.insert(238);                // original EntryStart; Mario script is END
+    group(239,240);                              // ftCo_SM_AppealSR/SL action rows; states 264/265 select these rows
     group(242,258);group(262,265);                // grab, pummel, throws and Mario capture reactions
     group(286,291);                              // shield-break knockdown
     if (mario) group(295,302);                   // Mario special scripts; Article creation remains a service gate
@@ -51,7 +52,7 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     for (auto id : command_motions_) {
         const auto& action = runtime_->action(id);
         if (!action.command_offset) continue;
-        const auto selected = store_.select(id);
+        const auto selected = store_.select_native_action(id);
         const float end_frame = selected.animation ? selected.animation->end_frame : 0.0f;
         roots.push_back({*action.command_offset, end_frame,
                          static_cast<uint8_t>((action.motion_flags & (1U << 30)) != 0)});
@@ -114,7 +115,7 @@ int GameplayActionStore::select_from(GameplayActionStore& source, int motion, un
     require(fighter_, "Destination action store is unbound");
     require(bool(source.rows_), "Source action rows are unavailable");
     const auto& row = source.runtime_->action(uint32_t(motion));
-    auto selected = source.store_.select(uint32_t(motion));
+    auto selected = source.store_.select_native_action(uint32_t(motion));
     std::shared_ptr<Clip> clip;
     for (const auto& active : active_) if (active &&
         active->identity_rows.get() == source.rows_.get() &&

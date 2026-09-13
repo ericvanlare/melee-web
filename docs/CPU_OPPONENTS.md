@@ -153,6 +153,12 @@ trace comparison here. Other fighters/stages, full and consecutive matches,
 audio, physical controls and performance still require their own evidence.
 No reserved holdout was used and no gold/public admission is claimed.
 
+The later [complete-match corpus](CPU_MATCH_CORPUS.md) adds three repeatable
+retail pairs and complete browser runs totaling 9,383 ticks. Browser core state
+agrees for the two- and three-player cases; the four-player CPU input and
+expanded camera/draw comparisons remain failing. Its ledger also records port
+reruns against these unchanged 480-tick references after the shared repairs.
+
 ## Human regression control
 
 The existing Mario/Mario Final Destination development pair (`retail-a4` and
