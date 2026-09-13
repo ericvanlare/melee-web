@@ -188,7 +188,58 @@ CLI report-overwrite guard was then checked by all nine focused prefix tests.
 The affected Release browser and trace builds passed. Skip reasons are retained
 individually in the ledger; skipped checks are not claimed as passes.
 
-## Integration handoff
+## Reconciled prerequisite validation
+
+The prerequisite was preserved in `0e74ff2`, then main `e24e296` was merged
+normally in `224758c` with parents `0e74ff2` and `e24e296`. There were no merge
+conflicts, rebases or force pushes. Main's exact automatic
+[Verify run](https://github.com/ericvanlare/melee-web/actions/runs/34747201211)
+succeeded. The earlier permission failures remain in their original ledger;
+GitHub, Git writes and local sockets worked in the continuation task.
+
+Fresh Release `gameplay_menu_browser` and `gameplay_retail_trace` builds passed.
+The full local suite ran 673 tests with 46 optional-target/fixture skips and no
+failures or errors; the subsequently added browser-observer regression passed
+separately. All five source-address component tests pass, with complete retained
+synthetic differential streams. An independent allocator review found no
+actionable defects within the documented supported boundary. These checks do
+not establish original allocation history or CPU call-site semantics.
+
+The frozen development corpus was rerun in headed Chrome 153.0.8010.36 over
+real loopback HTTP, using a new immutable snapshot of the rebuilt development
+runtime. Each full run retained unchanged served-artifact hashes, a visible
+640×480 source framebuffer, complete output, and zero browser errors. CPU
+decisions remained independently generated. Both original ledgers and all 15
+frozen reference/recipe/scenario/input-plan files remain unchanged.
+
+| Fresh comparison against both retail golds | Result |
+| --- | --- |
+| 2P visible browser | All 1,199 core ticks and CPU decisions exact. Camera far plane differs at tick 0; P2 subject Z at 82. |
+| 3P visible browser | All 4,346 core ticks and CPU decisions exact. Camera FOV differs at tick 0; P1 subject Z at 67; extra draws at 1,598, 2,599 and 3,600. |
+| 4P visible browser | Completes 3,838 ticks; first core/CPU-input difference remains at 2,495 with the same command bytes. Camera interest differs at 184; P1 subject Z at 74; extra draws at 2,268 and 3,269. |
+| 4P native headless | Completes 3,838 ticks; first RNG/damage difference remains at 1,871. Gameplay-relevant drawing remains omitted. |
+
+The source-address component is still **not linked into gameplay**. This is a
+validated prerequisite suitable for separate merge review; resolving tick 2,495
+requires the original source-context provider and caller/clobber integration
+described above. The camera, preparation-draw and headless differences remain
+open. No performance, pixel, PCM, physical-input or holdout acceptance is claimed.
+
+The browser harness needed a bounded observation repair after main moved
+`retailRun` into a private module. It now observes `Module.print`/`printErr`
+before the generated loader captures them, preserves the original callbacks,
+and rejects missing or overflowed observations. Its retained core/timer streams
+match the runtime's complete exports byte for byte. A first two-player attempt
+failed after 363 ticks with zero-sized WebGPU swapchain errors at a full-page
+screenshot boundary; its partial trace, errors and invalid comparison remain
+retained. Fresh runs keep the canvas in view and use viewport screenshots, with
+the same compiled runtime. No renderer fix or failure waiver was applied.
+
+The [reconciled evidence ledger](evidence/cpu-register-reconciled-v1.json) records
+the precise build identities, full comparisons, first differing bits, skip
+reasons and retained failures. Exact-head CI is recorded on draft PR #13.
+
+## Historical integration handoff
 
 Thread 1 owns runtime/performance integration; thread 3 owns shared-player
 extraction. The eventual source-address/carry model belongs in the shared

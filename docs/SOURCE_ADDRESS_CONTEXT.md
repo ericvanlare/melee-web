@@ -88,13 +88,24 @@ receipts. Existing directories are rejected. On comparison failure the suite
 retains the complete available stream/output and first-difference error under
 `work/source-address-context-failures/`, even without that option.
 
-The [local prerequisite receipt](evidence/source-address-prerequisite-v1.json)
-records five passing component tests and 3,268 events per base/target. The full
-local suite ran 625 tests with 46 skips, 12 errors and one failure; all 13 failures
-were denied socket binds (`EPERM`) in unchanged server/capture tests. It is not
-a green full-suite result. The new receipt does not replace the prior retail or
-browser evidence. Main reconciliation, fresh paired browser runs and exact-head
-CI remain pending access to GitHub and local sockets.
+The [original prerequisite receipt](evidence/source-address-prerequisite-v1.json)
+preserves the pre-integration checkpoint: five passing component tests and 3,268
+events per base/target. That full local suite ran 625 tests with 46 skips, 12
+errors and one failure; all 13 failures were denied socket binds (`EPERM`) in
+unchanged server/capture tests. It is not a green full-suite result. Its recorded
+GitHub, socket and Git-write blockers describe that earlier task, not a property
+of this component. The receipt remains unchanged alongside the prior retail and
+browser evidence.
+
+The [reconciled receipt](evidence/cpu-register-reconciled-v1.json) records the
+successful normal merge of main, fresh Release builds, five passing component
+tests, and a green 673-test local suite with 46 optional-target/fixture skips.
+The additional browser-observer test passes separately. Fresh complete visible
+comparisons retain exact 1,199-tick 2P and 4,346-tick 3P core/CPU results; the
+3,838-tick 4P run still first differs in CPU input at tick 2,495. Other camera,
+subject and draw differences remain open. These are development state checks,
+not performance or content admission, and gameplay still does not use this
+component. See the [integration results](CPU_REGISTER_COMPATIBILITY.md#reconciled-prerequisite-validation).
 
 The native guard test requires a C++17 compiler. The four differential/Wasm tests
 require `.deps/melee`, the repository's Emscripten SDK and its local Node runtime;

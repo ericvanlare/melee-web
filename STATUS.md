@@ -1,5 +1,18 @@
 # Current status
 
+The [source-address prerequisite](docs/SOURCE_ADDRESS_CONTEXT.md) models ordinary
+original SDK/HSD allocation identity and defined register-byte consumption,
+without supplying missing original allocation history or changing gameplay.
+After a conflict-free normal merge of main, fresh complete visible CPU runs
+retain exact 1,199-tick 2P and 4,346-tick 3P core/CPU comparisons against both
+retail golds; the 3,838-tick 4P run still first differs at tick 2,495. Camera,
+subject and extra-draw differences remain open. Five synthetic component tests,
+Release browser/trace builds, and the 673-test local suite pass (46 optional
+target/fixture skips); an added browser-failure-observer test passes separately.
+The [reconciled evidence](docs/evidence/cpu-register-reconciled-v1.json) preserves
+exact identities and failures. This is reusable groundwork, not a CPU fix or
+performance/content admission.
+
 The initial public alpha uses an explicitly **audio-disabled** release profile.
 The public compile/link and JavaScript graph excludes the identified GPL-derived
 resampler and coefficient generator; normal development audio remains separate.
