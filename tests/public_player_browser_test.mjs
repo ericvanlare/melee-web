@@ -49,6 +49,11 @@ try {
   assert.match(response.headers()['content-security-policy'], /'wasm-unsafe-eval'/);
   await ready();
   await check('isolated WebGPU/Wasm startup and direct original-style player', async () => {
+    await page.waitForFunction(() => Module._melee_web_native_menu_cache_idle() !== 0, null, {timeout: 30000});
+    assert.equal(await page.evaluate(() => Module._melee_web_native_menu_cache_idle()), 1,
+      'The public renderer must open its volatile cache before consuming the bundled pipeline seed');
+    assert(await page.evaluate(() => Module.FS.stat('/melee-render-cache/pipeline_cache.db').size > 0),
+      'The bundled seed needs a writable document-local SQLite database');
     assert.equal(await page.evaluate(() => crossOriginIsolated && !!navigator.gpu), true);
     assert.equal(await page.locator('canvas').count(), 1);
     assert.equal(await page.locator('iframe,h1,header,footer,article').count(), 0);

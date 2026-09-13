@@ -12,6 +12,16 @@ delivery before and after DNS migration and the exact artifact audit. Final apex
 HTTP/browser, HTTPS and canonical redirect checks pass. This does not assert
 broader gameplay stability.
 
+A public-only startup defect prevented the live alpha from consuming its bundled
+renderer seed: its writable MEMFS cache directory was missing. The unreleased
+candidate creates that directory without persistence or native changes. Four
+local cold/warm Mario/FD captures at DPR 1/2 complete with zero live pipeline
+creation; native interactive maxima are 7.33–8.80 ms. Hosted directory controls
+also remove live discovery, but first startup/disc-ready costs reach 21–24
+seconds and remain a renderer investigation item. The live deployment is
+unchanged. See the [five-way investigation](docs/PUBLIC_PERFORMANCE_INVESTIGATION.md)
+for failed prefixes, transition costs, exact profiles and the frozen candidate.
+
 Ordinary VS CPU levels 1–9 run in the shared compiled runtime used by both
 entry pages. The [CPU match development corpus](docs/CPU_MATCH_CORPUS.md) now
 has repeatable two-, three- and four-player retail reference pairs totaling
