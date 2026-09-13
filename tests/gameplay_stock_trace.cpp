@@ -11,7 +11,7 @@ static void check(int ok,const char* why){if(!ok){std::cerr<<why<<'\n';throw Dat
 static std::vector<uint8_t> bytes(const std::filesystem::path& p){std::ifstream f(p,std::ios::binary);check(bool(f),"Open owned stock-test asset");return {std::istreambuf_iterator<char>(f),{}};}
 int main(int argc,char** argv){try{
  check(argc==2||argc==3,"Expected base asset directory and optional Mario costume directory");RuntimeFiles files;
- for(const char* name:{"PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","sislib_font.bin"})files[name]=bytes(std::filesystem::path(argv[1])/name);
+ for(const char* name:{"PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sislib_font.bin"})files[name]=bytes(std::filesystem::path(argv[1])/name);
  const bool extra_costumes=argc==3;
  if(extra_costumes)for(const char* name:{"PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat"})
    files[name]=bytes(std::filesystem::path(argv[2])/name);
