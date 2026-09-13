@@ -29,7 +29,7 @@ The DOL audit distinguishes register residue from the function's local stack:
 | `800B27A4`, `800B2AA4` | The state-dispatch caller puts the fighter pointer in `r30` and calls the helper without replacing that carry. |
 | `800B46DC`, `800B4754` | The command writer retains the argument and stores its low byte. |
 
-The kind-4 dispatch table entry at `803C5CF8` reaches `800B2F68`, then
+The original static audit found that the kind-4 dispatch entry at `803C5CF8` reaches `800B2F68`, then
 `ftCo_800B24B8`, which calls `ftCo_800ADE48` at `800B25DC`. That helper uses
 `r5` as a stack output pointer at `800ADE70`. `mpCheckFloor` copies it to
 `r17` at `8004F05C` and can replace `r5` with its own stack output at
@@ -37,10 +37,14 @@ The kind-4 dispatch table entry at `803C5CF8` reaches `800B2F68`, then
 at `800AE290`. The local conversion slots at `r1+10` and `r1+18` are skipped
 in the zero-knockback case; copying them would model the wrong source.
 
-This establishes the missing compatibility boundary. A fresh read-only
-register capture would bind the exact reaching `r5` path and original pointer
-values for this event; those registers were not part of the accepted observer.
-The existing evidence directly records the resulting bytes, not the registers.
+That floor-only explanation was incomplete for the first divergence. The
+subsequent [register investigation](CPU_REGISTER_COMPATIBILITY.md) observed
+the no-target call at `800B276C`, followed by `HSD_Randf` at `800AE21C`.
+The RNG routine replaces `r5` with the seed pointer before state-18 dispatch.
+At tick 2495, the consumed X value is therefore the seed pointer's low byte,
+not the earlier floor-output stack pointer's. The new diagnostic prefix is
+compared against both fixed gold captures; it replaces neither complete
+reference. Stack residue remains relevant to other call paths.
 
 ## Required follow-up
 
