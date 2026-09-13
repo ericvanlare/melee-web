@@ -417,3 +417,12 @@ files are changed. Future runtime extraction carries the existing compiled
 runtime dependency, including CPUs, without a separate prototype AI path.
 The only workflow change reorders pinned dependency installation ahead of tests
 in `.github/workflows/verify.yml`.
+
+## Public shell release boundary
+
+`scripts/build_public.py` builds a separate original-text/CSS shell at `/`.
+It ships neither this temporary prototype nor `runtime.html`. Disc selection and
+gameplay remain visibly unavailable. `scripts/audit_public.py` enforces its exact
+inventory and byte identity; the source inputs live under `web/public/`.
+The future mount contract above remains the integration requirement. See
+[release review](PUBLIC_RELEASE_REVIEW.md) and [deployment](PUBLIC_DEPLOYMENT.md).

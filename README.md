@@ -64,6 +64,15 @@ content admission remain open. The reusable
 implemented. Its pinned Mario/Mario Final Destination replay matches retail at
 all nine lifecycle, audio, match-data and RNG boundaries.
 
+## Public shell packaging
+
+The independent public shell uses `scripts/build_public.py`, with a fixed text-only
+allowlist and a separate manifest audit. It contains no playable runtime, disc
+selector or game data. The local iframe prototype packager is not a public release
+builder. See [release review](docs/PUBLIC_RELEASE_REVIEW.md) and
+[Cloudflare deployment](docs/PUBLIC_DEPLOYMENT.md) for the distribution and
+integration gates. This work does not widen gameplay acceptance.
+
 ## Play the current match
 
 Open `runtime.html` on the local build server and choose your own unmodified

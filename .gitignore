@@ -2,6 +2,7 @@
 .venv/
 build/
 work/
+.wrangler/
 assets-local/
 __pycache__/
 *.pyc
