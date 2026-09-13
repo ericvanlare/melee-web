@@ -23,7 +23,7 @@ int main(int argc,char** argv){
         melee_web_fighter_link_gate();
         if(argc<2||argc>4)throw DatError("Usage: fighter_runtime_probe.js LOCAL_ASSET_DIRECTORY [--movement | --action KIND]");
         RuntimeFiles files;
-        for(const char* name:{"PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","sislib_font.bin"})
+        for(const char* name:{"PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sislib_font.bin"})
             files[name]=bytes(std::filesystem::path(argv[1])/name);
         char error[256];
         for(unsigned pass=0;pass<2;pass++){

@@ -9,7 +9,7 @@ from check_gameplay import node_runtime
 class MatchCompletion(unittest.TestCase):
     def run_trace(self,target,expected):
         assets=ROOT/'assets-local/next-gate'
-        names=('PlCo.dat','PlMr.dat','PlMrNr.dat','PlMrAJ.dat','GrNLa.dat','ItCo.usd','EfMrData.dat','EfCoData.dat','PdPm.dat','sislib_font.bin')
+        names=('PlCo.dat','PlMr.dat','PlMrNr.dat','PlMrAJ.dat','GrNLa.dat','ItCo.usd','EfMrData.dat','EfCoData.dat','PdPm.dat','LbRb.dat','sislib_font.bin')
         binary=ROOT/'build/browser'/(target+'.js')
         if not binary.is_file() or not all((assets/name).is_file() for name in names):
             self.skipTest('Optional built source trace and owned runtime assets required')
@@ -35,7 +35,7 @@ class MatchCompletion(unittest.TestCase):
         assets=ROOT/'assets-local/next-gate'
         costumes=ROOT/'assets-local/native-menus'
         binary=ROOT/'build/browser/gameplay_stock_trace.js'
-        names=('PlCo.dat','PlMr.dat','PlMrNr.dat','PlMrAJ.dat','GrNLa.dat','ItCo.usd','EfMrData.dat','EfCoData.dat','PdPm.dat','sislib_font.bin')
+        names=('PlCo.dat','PlMr.dat','PlMrNr.dat','PlMrAJ.dat','GrNLa.dat','ItCo.usd','EfMrData.dat','EfCoData.dat','PdPm.dat','LbRb.dat','sislib_font.bin')
         extra=('PlMrYe.dat','PlMrBk.dat','PlMrBu.dat','PlMrGr.dat')
         if not binary.is_file() or not all((assets/name).is_file() for name in names) or not all((costumes/name).is_file() for name in extra):
             self.skipTest('Built stock trace and owned Mario costume archives required')
@@ -48,7 +48,7 @@ class MatchCompletion(unittest.TestCase):
     def run_edge_trace(self, *arguments):
         assets=ROOT/'assets-local/next-gate'
         binary=ROOT/'build/browser'/'gameplay_edge_trace.js'
-        names=('PlCo.dat','PlMr.dat','PlMrNr.dat','PlMrAJ.dat','GrNLa.dat','ItCo.usd','EfMrData.dat','EfCoData.dat','PdPm.dat','sislib_font.bin')
+        names=('PlCo.dat','PlMr.dat','PlMrNr.dat','PlMrAJ.dat','GrNLa.dat','ItCo.usd','EfMrData.dat','EfCoData.dat','PdPm.dat','LbRb.dat','sislib_font.bin')
         if not binary.is_file() or not all((assets/name).is_file() for name in names):
             self.skipTest('Optional built full-stage edge trace and owned runtime assets required')
         result=subprocess.run([str(node_runtime()),str(binary),str(assets),*arguments],cwd=ROOT,capture_output=True,text=True,timeout=90)

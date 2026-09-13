@@ -21,7 +21,7 @@ int main(int argc,char** argv){try{
  if(argc==3){std::string_view value(argv[2]);auto parsed=std::from_chars(value.data(),value.data()+value.size(),tick_limit);
   if(parsed.ec!=std::errc{}||parsed.ptr!=value.data()+value.size()||tick_limit<3600||tick_limit>60000)throw DatError("Stage tick limit must be 3600..60000");}
  RuntimeFiles files;
- for(const char* name:{"PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","sislib_font.bin"})files[name]=read(std::filesystem::path(argv[1])/name);
+ for(const char* name:{"PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sislib_font.bin"})files[name]=read(std::filesystem::path(argv[1])/name);
  char error[256];
  for(unsigned cycle=0;cycle<2;cycle++){
   GameplayWorld world(files);
