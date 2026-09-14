@@ -109,7 +109,8 @@ memory cards, captures, and other private payloads.
 
 ## Operate a capture
 
-Version 0.1.1 uses a small pinned SDL discovery helper for physical SDL devices.
+Version 0.2.0 retains the pinned SDL discovery helper for physical SDL devices
+and adds Dolphin input recording and **Replay Capture…**.
 Dolphin's controller database may assign a name different from macOS IOHID's
 product name. The helper derives the same SDL name and per-name index as Dolphin,
 then the supervisor binds that selection to observed physical vendor/product IDs.
@@ -172,6 +173,56 @@ If the operator stops the run, Dolphin exits unexpectedly, the observer reports
 an error, or semantic teardown is missing, the app leaves an inspectable
 `.partial` bundle. Do not rename it by hand or treat it as a completed retail
 run. Start a new run after correcting the cause.
+
+## Replay a recording in Dolphin
+
+New recordings contain `inputs.mwri`, an ordered stream of original Dolphin
+controller reads from boot through the declared match teardown, plus a private
+snapshot of the exact isolated configuration. Select **Replay Capture…** and
+choose the original finalized recording in `acceptedunprocessed` or `ingested`.
+Replay starts a new isolated Dolphin process and a new observed capture. It
+does not require a connected physical controller. **Stop Capture** also stops
+a replay and preserves its incomplete evidence.
+
+The installed Dolphin/observer, disc, fixture, operating system, locale and
+timing policy must match the original recording. The application rejects drift
+before launch. It restores the recorded controller configuration in a fresh
+session directory and supplies only the recorded host device samples. Original
+controller calibration, guest PAD handling and CPU decisions still execute in
+the game. No guest memory, fighter state, CPU output or captured address is
+supplied as replay input.
+
+After complete teardown, the application validates the new raw bundle and
+compares both authoritative semantic streams. The report binds both manifests
+and records the first differing event and field, with separate coverage counts
+for PAD, setup, fighter/CPU state, RNG, camera, HUD, subject, magnifier, draw,
+result, scene and teardown observations. Missing domains are explicit. It is
+an original-versus-original diagnostic comparison, not gold admission or a
+claim of web-port equivalence. Host timestamps and independent session identity
+are provenance; source observations and addresses remain comparison targets.
+
+The replay bundle and comparison report appear in the same inbox as ordinary
+captures. The raw original is never overwritten; comparison reports live under
+`Captures/derived/`. To replay again, select the original recording, rather
+than the resulting observation-only replay bundle.
+
+Recordings made before version 0.2.0 do not contain the emulator input stream.
+Their human-input recipes and web/native comparison reports remain usable, but
+faithful Dolphin boot/menu replay requires a new recording. The app explains
+this limitation instead of guessing missing controller reads.
+
+The private CLI exposes the same operation for unattended diagnostic runs:
+
+```sh
+python3 scripts/reference_capture_app.py --replay-bundle "$ORIGINAL_BUNDLE"
+python3 scripts/compare_reference_sessions.py --help
+```
+
+The [input-stream contract](../reference-capture/dolphin/INPUT_STREAM.md)
+documents the thin SI patch, format, failure conditions and reproducible source
+boundary. Physical replay and native GameCube-adapter connection transitions
+require their own operator validation; a Pipe-driven run does not establish
+those cases.
 
 ## Bundle states and validation
 

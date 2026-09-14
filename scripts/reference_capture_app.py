@@ -24,6 +24,8 @@ sys.path.insert(0, str(ROOT / "reference-capture/dolphin"))
 from reference_capture_environment import (EnvironmentError, read_settings, verify_environment,
     configured_controller, physical_devices, support_root, file_inventory, sha256)
 from reference_capture_semantics import SemanticSession
+from reference_input_stream import validate_stream, validate_status as validate_input_status
+from reference_dolphin_replay import load_source, verify_replay_environment, snapshot_profile
 from reference_session_bundle import ReferenceSessionBundle, ReferenceCaptureInbox
 
 
@@ -49,7 +51,14 @@ def prepare_user(root, identifier, profile, fixture_gc):
     user = parent / identifier
     user.mkdir(mode=0o700)
     config = user / "Config"
-    shutil.copytree(profile, config, symlinks=False)
+    if isinstance(profile, dict):
+        config.mkdir()
+        for name, data in profile.items():
+            target = config / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(data)
+    else:
+        shutil.copytree(profile, config, symlinks=False)
     (user / "GC").mkdir()
     # The observer build disables backing-store writes; this is a read-only
     # reference to the owned fixture, not a second copy of the memory card.
@@ -130,7 +139,7 @@ def isolated_dolphin_environment():
     # Controller discovery and Dolphin must see the same profile-owned SDL
     # hints, without an inherited mapping or device-filter override.
     return {key: value for key, value in os.environ.items()
-            if not key.startswith("SDL_") and key != "DOLPHIN_EMU_USERPATH"}
+            if not key.startswith(("SDL_", "MWRC_")) and key != "DOLPHIN_EMU_USERPATH"}
 
 
 class Supervisor:
@@ -139,6 +148,7 @@ class Supervisor:
         self.root.mkdir(mode=0o700, parents=True, exist_ok=True)
         self.settings_path = settings_path
         self.automated = automated
+        self.replay_source = None
         self.emit_callback = emit or (lambda row: print(json.dumps(row), flush=True))
         self.output_lock = threading.Lock()
         self.state_lock = threading.Lock()
@@ -178,7 +188,7 @@ class Supervisor:
                 self.identity["controller"].get("state") == "unavailable")
 
     def _check_controller_connection(self):
-        if self.automated:
+        if self.automated or self.replay_source is not None:
             return
         selected = (self.identity or {}).get("controller", {}).get("selected")
         devices = physical_devices()
@@ -207,12 +217,17 @@ class Supervisor:
         self.publish(state="verifying", accepted_disc=None, message="Verifying the capture environment")
         self.settings = read_settings(self.settings_path)
         self.identity = verify_environment(self.settings, self.root,
+            devices=[] if self.replay_source else None,
             progress=lambda state, message: self.publish(state=state, message=message))
         controller = self.identity["controller"]
-        ready = controller["state"] == "connected"
+        if self.settings.get("input_recording_version") != 1:
+            raise EnvironmentError("The installed Dolphin lacks replay recording. Update the reference environment before capturing.")
+        if self.replay_source:
+            verify_replay_environment(self.replay_source, self.identity)
+        ready = self.replay_source is not None or controller["state"] == "connected"
         device_name = controller.get("configured", {}).get("device", "controller")
         self.publish(state="ready" if ready else "controller_required", accepted_disc=True,
-                     physical_controller=controller["state"], dolphin="stopped", capture="idle",
+                     physical_controller="replay" if self.replay_source else controller["state"], dolphin="stopped", capture="idle",
                      message=f"Ready: {device_name}. Start Capture boots ordinary retail Melee." if ready else
                      f"Configured: {device_name}. Connect it, or choose Configure Controller to select another device.")
 
@@ -235,9 +250,13 @@ class Supervisor:
         settings_hash = sha256(self.settings_path)
         tooling_before = self.tooling_identity()
         identifier = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ-") + uuid.uuid4().hex[:12]
+        input_source = ("dolphin_input_replay" if self.replay_source else
+                        "automated_human_pipe" if self.automated else "physical_controller")
+        replay_binding = self.replay_source["manifest_sha256"] if self.replay_source else None
         bundle = ReferenceSessionBundle.begin(self.root / "Captures", identifier, "GALE01r2",
             uuid.uuid4().hex, metadata={"environment": self.identity,
-                                      "input_source": "automated_human_pipe" if self.automated else "physical_controller",
+                                      "input_source": input_source,
+                                      "replay_source_manifest_sha256": replay_binding,
                                       "private_settings_sha256": settings_hash,
                                       "tooling_sha256": tooling_before}, sequence_start=0)
         log = None
@@ -246,15 +265,16 @@ class Supervisor:
             self.stop_requested.clear()
             self.publish(state="starting", dolphin="starting", capture="armed", source_frames=0,
                          events=0, bundle_path=str(bundle.path), message="Capture armed. Starting retail Melee.")
-            user = prepare_user(self.root, identifier, Path(self.settings["paths"]["profile"]),
+            user = prepare_user(self.root, identifier, self.replay_source["profile"] if self.replay_source else Path(self.settings["paths"]["profile"]),
                                 Path(self.settings["paths"]["fixture_gc"]))
-            if self.automated:
+            if self.automated and not self.replay_source:
                 from reference_capture_automation import prepare_pipe
                 prepare_pipe(user)
             config_before = file_inventory(user / "Config")
+            write_json(bundle.path / "configuration-snapshot.json", snapshot_profile(user / "Config"))
             write_json(bundle.path / "configuration.json", {
                 "profile_files": config_before, "launch_command": dolphin_command(self.settings, user),
-                "input_source": "automated_human_pipe" if self.automated else "physical_controller",
+                "input_source": input_source,
                 "save_backing_writes": False})
             write_json(bundle.path / "environment.json", self.identity)
             raw = bundle.path / "observer.bin"
@@ -264,6 +284,13 @@ class Supervisor:
                                MWRC_DOL_SHA256=self.identity["disc"]["dol_sha256"],
                                MWRC_OBSERVER_ID=self.settings["observer_identity"],
                                LANG="en_US.UTF-8", LC_ALL="en_US.UTF-8")
+            if self.replay_source:
+                environment["MWRC_INPUT_REPLAY"] = str(self.replay_source["input_path"])
+                write_json(bundle.path / "input-source.json", {
+                    "manifest_sha256": replay_binding, "stream": self.replay_source["input"]})
+            else:
+                environment["MWRC_INPUT_RECORD"] = str(bundle.path / "inputs.mwri")
+            environment["MWRC_INPUT_STATUS"] = str(bundle.path / "input-status.json")
             # No inherited debugger, observer or user-path override may redirect
             # this explicit invocation. Only this process group is ever stopped.
             environment.pop("DOLPHIN_EMU_USERPATH", None)
@@ -287,13 +314,14 @@ class Supervisor:
                         events=observer_status["event_count"],
                         source_frames=observer_status["source_tick"],
                         elapsed_seconds=int(time.monotonic() - started),
-                        message="Recording retail play. Finish the match and continue through the results.")
+                        message=("Replaying recorded Dolphin controller input. No live controller is used." if self.replay_source else
+                                 "Recording retail play. Finish the match and continue through the results."))
                     if observer_status.get("completed") or observer_status.get("complete"):
                         completed = True
                         break
                 elif time.monotonic() - started > 45:
                     raise EnvironmentError("Dolphin started without the required observer handshake")
-                if not self.automated and time.monotonic() - last_controller_check >= 1.0:
+                if not self.automated and not self.replay_source and time.monotonic() - last_controller_check >= 1.0:
                     self._check_controller_connection()
                     last_controller_check = time.monotonic()
                 if file_inventory(user / "Config") != config_before:
@@ -359,11 +387,23 @@ class Supervisor:
                 self._refresh_partial_discovery()
                 self.publish(state="incomplete", capture="idle", message=reason)
                 return
+            if self.replay_source:
+                source_after = load_source(self.replay_source["path"])
+                if source_after["manifest_sha256"] != replay_binding:
+                    raise EnvironmentError("The original capture changed during replay")
+                input_summary = source_after["input"]
+            else:
+                input_summary = validate_stream(bundle.path / "inputs.mwri")
+            validate_input_status(bundle.path / "input-status.json", mode="replay" if self.replay_source else "record",
+                                  events=input_summary["events"])
+            write_json(bundle.path / "input-validation.json", input_summary)
             final = bundle.complete(semantic_report=report)
             self._refresh_partial_discovery()
             self.publish(state="accepted", capture="idle", bundle_path=str(final),
                          source_frames=report["source_ticks"], events=record_count,
                          message="Capture accepted. The reference bundle is ready for replay comparison.")
+            if self.replay_source:
+                self._finish_replay_comparison(identifier, final)
         except Exception as error:
             self._terminate_owned()
             if log is not None: log.close()
@@ -379,9 +419,29 @@ class Supervisor:
                            {"capture_id": identifier, "capture_path": str(bundle.path),
                             "dolphin_stopped": True})
 
+    def _finish_replay_comparison(self, identifier, final):
+        # Raw finalization is already durable. A failed derived report must
+        # never attempt to fail/reopen the closed, immutable raw bundle.
+        try:
+            from reference_session_comparison import compare_bundles
+            comparison = compare_bundles(self.replay_source["path"], final)
+            saved = ReferenceCaptureInbox(self.root / "Captures").store_derived(
+                identifier, "dolphin-replay-comparison", comparison)
+        except Exception as error:
+            self.publish(state="replay_comparison_failed", capture="idle", bundle_path=str(final),
+                         message="The replay recording is preserved, but its comparison report failed: " + str(error))
+            return
+        matched = comparison["status"] == "matched"
+        self.publish(state="replay_matched" if matched else "replay_diverged", capture="idle",
+                     comparison_path=str(saved),
+                     message=("Dolphin replay matches the original recorded observations." if matched else
+                              "Dolphin replay finished with a comparison difference. The report and both recordings are preserved."))
+
     def tooling_identity(self):
         names = ("scripts/reference_capture_app.py", "tools/reference_capture_environment.py",
                  "tools/reference_controller_probe.py",
+                 "tools/reference_input_stream.py", "tools/reference_dolphin_replay.py",
+                 "tools/reference_session_comparison.py",
                  "tools/reference_capture_semantics.py", "tools/reference_session_bundle.py",
                  "tools/reference_capture_automation.py",
                  "tools/retail_cpu_observation.py", "tools/retail_replay_validation.py",
@@ -445,7 +505,14 @@ class Supervisor:
         write_json(self.settings_path, settings)
         self.verify()
 
-    def command(self, command):
+    def replay(self, bundle_path):
+        self.replay_source = load_source(bundle_path)
+        try:
+            self.capture()
+        finally:
+            self.replay_source = None
+
+    def command(self, command, bundle_path=None):
         if command == "stop":
             self.stop_requested.set()
             self.publish(state="stopping", message="Stopping capture; partial evidence will be preserved")
@@ -457,14 +524,15 @@ class Supervisor:
             return
         with self.state_lock:
             if self.worker and self.worker.is_alive(): return
-            if command not in ("verify", "start", "configure_controller"):
+            if command not in ("verify", "start", "configure_controller", "replay"):
                 self.publish(state="failed", message="Unknown capture action")
                 return
             self.stop_requested.clear()
             def run():
                 try:
                     {"verify": self.verify, "start": self.capture,
-                     "configure_controller": self.configure_controller}[command]()
+                     "configure_controller": self.configure_controller,
+                     "replay": lambda: self.replay(bundle_path)}[command]()
                 except Exception as error:
                     self.publish(state="failed", dolphin="stopped",
                                  capture="idle", message=str(error))
@@ -483,6 +551,7 @@ def main():
     parser.add_argument("--gui", action="store_true")
     parser.add_argument("--automated", action="store_true",
                         help="Developer validation only: ordinary human port 1 Pipe inputs")
+    parser.add_argument("--replay-bundle", type=Path, help="Replay one finalized original input recording, then exit")
     parser.add_argument("--settings", type=Path,
         default=Path(os.environ.get("WEBMELEE_REFERENCE_CAPTURE_SETTINGS", support_root() / "environment.json")))
     args = parser.parse_args()
@@ -493,11 +562,19 @@ def main():
     signal.signal(signal.SIGTERM, interrupted)
     signal.signal(signal.SIGINT, interrupted)
     try:
+        if args.replay_bundle:
+            app.replay(args.replay_bundle)
+            return 0 if app.status["state"] == "replay_matched" else 2
         for line in sys.stdin:
             try:
                 value = json.loads(line)
-                if set(value) != {"command"}: raise ValueError("Invalid command envelope")
-                app.command(value["command"])
+                if not isinstance(value, dict) or set(value) not in ({"command"}, {"command", "bundle_path"}):
+                    raise ValueError("Invalid command envelope")
+                if "bundle_path" in value and (value.get("command") != "replay" or not isinstance(value["bundle_path"], str)):
+                    raise ValueError("Invalid replay request")
+                if value.get("command") == "replay" and not value.get("bundle_path"):
+                    raise ValueError("Choose a finalized capture to replay")
+                app.command(value["command"], value.get("bundle_path"))
             except (ValueError, TypeError) as error:
                 app.publish(state="failed", message=str(error))
     finally:
@@ -505,4 +582,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

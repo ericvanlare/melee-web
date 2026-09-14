@@ -30,6 +30,7 @@ public:
   static bool IsEnabled();
   static bool IsBoundary(u32 guest_pc);
   static void OnBoundary(Core::System* system, u32 guest_pc, PowerPC::PowerPCState* state);
+  static void Fail(const char* reason);
   // The environment hash is only an activation key.  Boot calls this helper
   // to hash the DOL actually read from the selected disc before emulation.
   static bool ValidateDiscDOL(const DiscIO::VolumeDisc& volume);
@@ -49,4 +50,3 @@ private:
 };
 
 }  // namespace ReferenceCapture
-

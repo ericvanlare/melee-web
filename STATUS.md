@@ -1,5 +1,18 @@
 # Current status
 
+Reference Capture 0.2.0 adds original Dolphin controller recording and replay
+from ordinary boot. A controller-driven four-stock Mario/level-1 Fox match on
+Final Destination records 61,838 SI operations and 66,231 observer events;
+two independent original replays match every declared semantic event, including
+1,639 gameplay ticks/draws and result/teardown. Its human-only recipe completes
+in native and visible browser execution with matching core state, RNG and CPU
+decisions. Camera, subject rounding and headless magnifier/draw differences
+remain explicit. All 886 tests pass (37 optional skips). This is bounded
+development evidence, without physical replay, performance or gold admission.
+Earlier captures lack the SI stream and require a new recording for faithful
+Dolphin replay. See the [bounded receipts](docs/evidence/reference-dolphin-replay-v1.json)
+and [input-stream contract](reference-capture/dolphin/INPUT_STREAM.md).
+
 The private [Reference Capture application](docs/REFERENCE_CAPTURE_APP.md)
 accepted its first operator-attested physical-controller session: four-stock
 Falco versus level-5 Marth on Yoshi's Story, with 35,519 ordered events and

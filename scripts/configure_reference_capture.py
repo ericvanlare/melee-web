@@ -321,6 +321,8 @@ def configure(*, disc, dol, build_manifest, fixture_gc, root, refresh_build=Fals
                           "rtc": 1704067200}}
     if previous is not None:
         value["controller"] = previous["controller"]
+        if "controller_probe" in previous:
+            value["controller_probe"] = previous["controller_probe"]
         archived = root / "BuildHistory" / previous["hashes"]["dolphin_binary_sha256"]
         archived.mkdir(mode=0o700, parents=True, exist_ok=True)
         for name in ("environment.json", "dolphin-build.json"):
@@ -330,6 +332,10 @@ def configure(*, disc, dol, build_manifest, fixture_gc, root, refresh_build=Fals
                 with target.open("x") as stream:
                     os.fchmod(stream.fileno(), 0o600)
                     stream.write(source.read_text())
+    if build.get("input_recording_version") is not None:
+        if type(build["input_recording_version"]) is not int or build["input_recording_version"] != 1:
+            raise ValueError("Unsupported Dolphin input recording capability")
+        value["input_recording_version"] = build["input_recording_version"]
     old_settings = settings_path.read_bytes() if settings_path.exists() else None
     receipt_path = root / "dolphin-build.json"
     old_receipt = receipt_path.read_bytes() if receipt_path.exists() else None

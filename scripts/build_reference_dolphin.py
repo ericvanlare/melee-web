@@ -319,6 +319,7 @@ def main(argv: list[str] | None = None) -> int:
         "runtime_dependencies": runtime_inventory(binary, output) if output.suffix == ".app" else [],
         "writes_guest_memory": False,
         "cpu": "JITARM64",
+        "input_recording_version": 1,
     }
     manifest.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     archive = archive_provenance(args.archive_root.expanduser().resolve(), value["binary_sha256"],

@@ -195,8 +195,15 @@ private final class BackendClient {
     }
 
     func send(command: String) {
+        send(command: command, bundlePath: nil)
+    }
+
+    func send(command: String, bundlePath: URL?) {
         guard let input = inputPipe, process?.isRunning == true else { return }
-        let object: [String: String] = ["command": command]
+        var object: [String: Any] = ["command": command]
+        if let bundlePath {
+            object["bundle_path"] = bundlePath.standardizedFileURL.path
+        }
         guard let data = try? JSONSerialization.data(withJSONObject: object),
               var line = String(data: data, encoding: .utf8) else { return }
         line.append("\n")
@@ -301,6 +308,9 @@ private final class CaptureWindowController: NSWindowController {
         client.onLog = { [weak self] line in self?.captureViewController.apply(log: line) }
         client.onExit = { [weak self] reason in self?.captureViewController.apply(exitReason: reason) }
         captureViewController.onCommand = { [weak self] command in self?.send(command: command) }
+        captureViewController.onReplay = { [weak self] bundle in
+            self?.send(command: "replay", bundlePath: bundle)
+        }
         captureViewController.onOpenURL = { url in NSWorkspace.shared.open(url) }
     }
 
@@ -322,12 +332,12 @@ private final class CaptureWindowController: NSWindowController {
         client.terminate()
     }
 
-    private func send(command: String) {
+    private func send(command: String, bundlePath: URL? = nil) {
         if command == "verify" && client.process == nil {
             launchBackend()
             return
         }
-        client.send(command: command)
+        client.send(command: command, bundlePath: bundlePath)
     }
 
     private func verifyIdentity() throws {
@@ -452,7 +462,9 @@ private final class FlippedView: NSView {
 
 private final class AdaptiveButtonStack: NSStackView {
     override func layout() {
-        let desired: NSUserInterfaceLayoutOrientation = bounds.width < 460 ? .vertical : .horizontal
+        // Switch before the four buttons' horizontal minimum can prevent the
+        // operator from narrowing the window enough to trigger this layout.
+        let desired: NSUserInterfaceLayoutOrientation = bounds.width < 620 ? .vertical : .horizontal
         if orientation != desired {
             orientation = desired
         }
@@ -462,7 +474,7 @@ private final class AdaptiveButtonStack: NSStackView {
 
 private final class AdaptiveProgressStack: NSStackView {
     override func layout() {
-        let vertical = bounds.width < 460
+        let vertical = bounds.width < 620
         let desired: NSUserInterfaceLayoutOrientation = vertical ? .vertical : .horizontal
         if orientation != desired {
             orientation = desired
@@ -474,6 +486,7 @@ private final class AdaptiveProgressStack: NSStackView {
 
 private final class CaptureViewController: NSViewController {
     var onCommand: ((String) -> Void)?
+    var onReplay: ((URL) -> Void)?
     var onOpenURL: ((URL) -> Void)?
 
     private let stateValue = NSTextField(labelWithString: "Waiting for verification")
@@ -494,6 +507,7 @@ private final class CaptureViewController: NSViewController {
     private let configureButton = NSButton(title: "Configure Controller…", target: nil, action: nil)
     private let rescanButton = NSButton(title: "Rescan", target: nil, action: nil)
     private let openButton = NSButton(title: "Open Capture Folder", target: nil, action: nil)
+    private let replayButton = NSButton(title: "Replay Capture…", target: nil, action: nil)
     private let logValue = NSTextField(labelWithString: "")
 
     private var state = "unknown"
@@ -612,10 +626,13 @@ private final class CaptureViewController: NSViewController {
         openButton.bezelStyle = .rounded
         openButton.target = self
         openButton.action = #selector(openInbox)
+        replayButton.bezelStyle = .rounded
+        replayButton.target = self
+        replayButton.action = #selector(replayCapture)
         let primaryButtons = NSStackView(views: [startButton, stopButton])
         primaryButtons.orientation = .horizontal
         primaryButtons.spacing = 10
-        let secondaryButtons = AdaptiveButtonStack(views: [configureButton, rescanButton, openButton])
+        let secondaryButtons = AdaptiveButtonStack(views: [configureButton, rescanButton, openButton, replayButton])
         secondaryButtons.orientation = .horizontal
         secondaryButtons.spacing = 10
         secondaryButtons.distribution = .fillProportionally
@@ -728,6 +745,23 @@ private final class CaptureViewController: NSViewController {
     @objc private func stopCapture() { onCommand?("stop") }
     @objc private func configureController() { onCommand?("configure_controller") }
     @objc private func rescan() { onCommand?("verify") }
+    @objc private func replayCapture() {
+        guard let window = view.window else { return }
+        let panel = NSOpenPanel()
+        panel.title = "Replay Capture"
+        panel.message = "Choose an accepted or ingested finalized recording from Captures."
+        panel.prompt = "Replay"
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        if let captures = capturesRootURL(), FileManager.default.fileExists(atPath: captures.path) {
+            panel.directoryURL = captures
+        }
+        panel.beginSheetModal(for: window) { [weak self] response in
+            guard response == .OK, let bundle = panel.url else { return }
+            self?.onReplay?(bundle.standardizedFileURL)
+        }
+    }
     @objc private func openInbox() {
         onCommand?("open_inbox")
         if let latestBundlePath {
@@ -778,22 +812,31 @@ private final class CaptureViewController: NSViewController {
 
     private func updateButtons() {
         let canStart = state == "ready" && discAccepted && controller == "connected"
-        let active = ["starting", "running", "recording", "stopping", "finalizing"].contains(state)
+        let busy = ["verifying", "configuring", "starting", "running", "recording",
+                    "stopping", "finalizing", "replay", "replaying"].contains(state)
+        let captureActive = ["starting", "running", "recording", "stopping", "finalizing"].contains(state)
+        let canReplay = discAccepted && !busy
         startButton.isEnabled = canStart
-        stopButton.isEnabled = active
-        configureButton.isEnabled = !active
-        rescanButton.isEnabled = !active
+        stopButton.isEnabled = captureActive
+        configureButton.isEnabled = !busy
+        rescanButton.isEnabled = !busy
+        replayButton.isEnabled = canReplay
         openButton.isEnabled = latestBundlePath != nil || true
     }
 
     private func descriptionForState() -> String {
         switch state {
         case "ready":
+            if controller == "replay" { return "Verified and ready to replay the recorded controller input." }
             return controller == "connected" && discAccepted ? "Verified and ready. Start Capture will launch the ordinary boot." : "The environment reported ready, but its prerequisites are incomplete."
         case "controller_required": return "Connect a physical controller and configure the isolated Dolphin profile before capturing."
         case "verifying": return "Checking the owned disc, controller profile and pinned Dolphin environment."
         case "starting": return "Launching the ordinary reference boot."
         case "running", "recording": return "Recording source frames and controller events."
+        case "replay", "replaying": return "Replaying the selected finalized capture."
+        case "replay_matched": return "Dolphin reproduced the recorded observations through teardown."
+        case "replay_diverged": return "Dolphin finished; the comparison report identifies a difference."
+        case "replay_comparison_failed": return "The replay recording is preserved. Its comparison report needs another attempt."
         case "finalizing": return "Writing and validating the capture bundle."
         case "accepted": return "The capture bundle passed its completeness checks."
         case "incomplete": return "The capture stopped before a complete bundle was produced."
@@ -804,5 +847,17 @@ private final class CaptureViewController: NSViewController {
 
     private func display(_ raw: String) -> String {
         raw.replacingOccurrences(of: "_", with: " ").capitalized
+    }
+
+    private func capturesRootURL() -> URL? {
+        guard let appSupport = try? FileManager.default.url(
+            for: .applicationSupportDirectory,
+            in: .userDomainMask,
+            appropriateFor: nil,
+            create: false
+        ) else { return nil }
+        return appSupport.appendingPathComponent(
+            "WebMelee Reference Capture/Captures", isDirectory: true
+        )
     }
 }

@@ -132,6 +132,7 @@ class ReferenceCaptureConfigureTests(unittest.TestCase):
         root = settings_path.parent
         previous = json.loads(settings_path.read_text())
         previous["controller"] = {"backend": "adapter", "device": "GameCube adapter", "port": 1}
+        previous["controller_probe"] = {"synthetic_preserved_descriptor": True}
         profile = root / "Configuration"
         (profile / "GCPadNew.ini").write_text("[GCPad1]\nDevice = SDL/0/Owned Pad\n")
         previous["hashes"]["profile"] = environment.file_inventory(profile)
@@ -152,6 +153,7 @@ class ReferenceCaptureConfigureTests(unittest.TestCase):
         updated = json.loads(new_settings_path.read_text())
 
         self.assertEqual(updated["controller"], previous["controller"])
+        self.assertEqual(updated["controller_probe"], previous["controller_probe"])
         self.assertEqual(updated["paths"]["disc"], previous["paths"]["disc"])
         self.assertEqual(updated["paths"]["dol"], previous["paths"]["dol"])
         self.assertEqual(updated["paths"]["fixture_gc"], previous["paths"]["fixture_gc"])

@@ -18,13 +18,87 @@ SPEC.loader.exec_module(APP)
 
 
 class ReferenceCaptureAppTests(unittest.TestCase):
+    def test_failed_derived_report_preserves_finalized_replay(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            app = APP.Supervisor(root / "environment.json", root=root, emit=lambda row: None)
+            final = root / "finalized"
+            final.mkdir()
+            marker = final / "manifest.json"
+            marker.write_bytes(b"immutable raw receipt")
+            app.replay_source = {"path": root / "original"}
+            try:
+                with mock.patch("reference_session_comparison.compare_bundles", return_value={"status": "matched"}), \
+                     mock.patch.object(APP.ReferenceCaptureInbox, "store_derived", side_effect=OSError("writer unavailable")):
+                    app._finish_replay_comparison("replay", final)
+                self.assertEqual(app.status["state"], "replay_comparison_failed")
+                self.assertIn("writer unavailable", app.status["message"])
+                self.assertEqual(marker.read_bytes(), b"immutable raw receipt")
+                self.assertEqual(list(final.iterdir()), [marker])
+            finally:
+                app.close()
+
+    def test_replay_does_not_probe_a_live_controller_and_clears_mode(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            app = APP.Supervisor(root / "environment.json", root=root, emit=lambda row: None)
+            source = {"path": root / "original", "header": {}}
+            try:
+                def replay_capture():
+                    self.assertIs(app.replay_source, source)
+                    with mock.patch.object(APP, "physical_devices") as devices:
+                        app._check_controller_connection()
+                        devices.assert_not_called()
+                    raise ValueError("preserved replay failure")
+                with mock.patch.object(APP, "load_source", return_value=source), \
+                     mock.patch.object(app, "capture", side_effect=replay_capture):
+                    with self.assertRaisesRegex(ValueError, "preserved replay failure"):
+                        app.replay(root / "original")
+                self.assertIsNone(app.replay_source)
+            finally:
+                app.close()
+
+    def test_verify_replay_can_be_ready_without_physical_controller(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            app = APP.Supervisor(root / "environment.json", root=root, emit=lambda row: None)
+            app.replay_source = {"path": root / "original"}
+            settings = {"input_recording_version": 1}
+            identity = {"controller": {"state": "unavailable"}}
+            try:
+                with mock.patch.object(APP, "read_settings", return_value=settings), \
+                     mock.patch.object(APP, "verify_environment", return_value=identity) as verify, \
+                     mock.patch.object(APP, "verify_replay_environment") as replay_verify:
+                    app.verify()
+                    self.assertEqual(verify.call_args.kwargs["devices"], [])
+                    replay_verify.assert_called_once_with(app.replay_source, identity)
+                self.assertEqual(app.status["state"], "ready")
+                self.assertEqual(app.status["physical_controller"], "replay")
+            finally:
+                app.close()
+
+    def test_verify_rejects_dolphin_without_input_recording_capability(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            app = APP.Supervisor(root / "environment.json", root=root, emit=lambda row: None)
+            try:
+                with mock.patch.object(APP, "read_settings", return_value={}), \
+                     mock.patch.object(APP, "verify_environment", return_value={"controller": {"state": "connected"}}):
+                    with self.assertRaisesRegex(APP.EnvironmentError, "lacks replay recording"):
+                        app.verify()
+                self.assertNotEqual(app.status["state"], "ready")
+            finally:
+                app.close()
+
     def test_dolphin_and_probe_use_profile_owned_sdl_configuration(self):
         with mock.patch.dict(APP.os.environ, {"SDL_GAMECONTROLLERCONFIG": "override",
                                              "SDL_JOYSTICK_HIDAPI": "0",
+                                             "MWRC_INPUT_REPLAY": "/private/wrong-input",
                                              "DOLPHIN_EMU_USERPATH": "/private/global"}):
             environment = APP.isolated_dolphin_environment()
         self.assertFalse(any(key.startswith("SDL_") for key in environment))
         self.assertNotIn("DOLPHIN_EMU_USERPATH", environment)
+        self.assertFalse(any(key.startswith("MWRC_") for key in environment))
 
     def test_live_sdl_connection_check_never_opens_another_sdl_client(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -163,7 +237,7 @@ class ReferenceCaptureAppTests(unittest.TestCase):
         events = []
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            settings = {"controller": {"backend": "keyboard"}}
+            settings = {"controller": {"backend": "keyboard"}, "input_recording_version": 1}
             identity = {"controller": {"state": "unavailable", "devices": []}}
             with mock.patch.object(APP, "read_settings", return_value=settings), \
                  mock.patch.object(APP, "verify_environment", return_value=identity):

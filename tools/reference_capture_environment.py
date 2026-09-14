@@ -69,10 +69,14 @@ def read_settings(path: Path) -> dict:
     expected = {"schema", "version", "paths", "hashes", "dolphin_revision",
                 "observer_identity", "controller", "timing_policy"}
     if (not isinstance(settings, dict) or not expected <= set(settings) or
-            set(settings) - expected - {"controller_probe"}):
+            set(settings) - expected - {"controller_probe", "input_recording_version"}):
         raise EnvironmentError("Unsupported local environment settings")
     if settings["schema"] != SCHEMA or settings["version"] != 1:
         raise EnvironmentError("Unsupported local environment version")
+    if "input_recording_version" in settings and (
+            type(settings["input_recording_version"]) is not int or
+            settings["input_recording_version"] != 1):
+        raise EnvironmentError("Unsupported Dolphin input recording version")
     if set(settings["paths"]) != {"disc", "dol", "dolphin", "fixture_gc", "profile"}:
         raise EnvironmentError("Missing or unknown private input paths")
     for value in settings["paths"].values():

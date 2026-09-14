@@ -65,6 +65,10 @@ FORBIDDEN_SUFFIXES = {
     ".raw",
     ".rvz",
     ".slp",
+    ".dtm",
+    ".mwri",
+    ".gci",
+    ".sav",
 }
 
 
@@ -254,8 +258,8 @@ def _plist() -> bytes:
         "CFBundleInfoDictionaryVersion": "6.0",
         "CFBundleName": "WebMelee Reference Capture",
         "CFBundlePackageType": "APPL",
-        "CFBundleShortVersionString": "0.1.1",
-        "CFBundleVersion": "2",
+        "CFBundleShortVersionString": "0.2.0",
+        "CFBundleVersion": "3",
         "NSDocumentsFolderUsageDescription": "Read the already-configured private prepared save fixture without copying or changing it.",
         "LSMinimumSystemVersion": "12.0",
         "NSHighResolutionCapable": True,
@@ -293,7 +297,7 @@ def create_bundle(staging_app: Path, *, runtime_root: Path, python: Path, swift_
     identity = {
         "schema": IDENTITY_SCHEMA,
         "application": "WebMelee Reference Capture",
-        "version": "0.1.1",
+        "version": "0.2.0",
         "app_code_sha256": sha256_file(executable),
         "python_runtime_sha256": sha256_file(python_manifest),
         "runtime_schema": RUNTIME_SCHEMA,

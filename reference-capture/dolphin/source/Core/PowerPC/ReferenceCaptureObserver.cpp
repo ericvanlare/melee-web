@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "Core/PowerPC/ReferenceCaptureObserver.h"
+#include "Core/PowerPC/ReferenceInputStream.h"
 
 #include <array>
 #include <algorithm>
@@ -257,6 +258,7 @@ struct Observer::Impl
 
   void RequestComplete()
   {
+    InputStream::RequestFinish(true);
     natural_completion.store(true);
     finish_requested.store(true);
   }
@@ -773,6 +775,8 @@ struct Observer::Impl
       const bool finished = finish_requested.load() && tail >= head_index.load();
       if (finished)
       {
+        if (!InputStream::WaitComplete())
+          SetInvalid("input stream did not complete successfully");
         if (output.IsOpen())
         {
           Slot end_slot;
@@ -936,7 +940,13 @@ bool Observer::ValidateDiscDOL(const DiscIO::VolumeDisc& volume)
   if (mbedtls_sha256_ret(dol.data(), dol.size(), sha256.data(), 0) != 0 ||
       sha256 != EXPECTED_DOL_SHA256_BYTES)
     return false;
-  return Common::SHA1::CalculateDigest(dol) == EXPECTED_DOL_SHA1_BYTES;
+  return Common::SHA1::CalculateDigest(dol) == EXPECTED_DOL_SHA1_BYTES &&
+         InputStream::Initialize();
+}
+
+void Observer::Fail(const char* reason)
+{
+  Instance().m_impl->SetInvalid(reason);
 }
 
 bool Observer::IsEnabled()

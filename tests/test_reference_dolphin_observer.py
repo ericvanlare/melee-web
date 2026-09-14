@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
+import shutil
 import subprocess
+import tempfile
 import unittest
 
 
@@ -22,6 +25,25 @@ class ReferenceDolphinObserverTests(unittest.TestCase):
             check=False,
         )
         self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_complete_observer_and_input_patch_series_applies_in_order(self) -> None:
+        checkout = ROOT / ".deps" / "reference-dolphin"
+        if not checkout.exists():
+            self.skipTest("Optional pinned Dolphin source checkout is not installed")
+        patches = sorted(PATCH.parent.glob("*.patch"))
+        with tempfile.TemporaryDirectory() as temporary:
+            staged = Path(temporary)
+            names = set()
+            for patch in patches:
+                names.update(re.findall(r"^--- a/(.+)$", patch.read_text(), re.MULTILINE))
+            for name in names:
+                target = staged / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(checkout / name, target)
+            for patch in patches:
+                result = subprocess.run(["git", "apply", str(patch)], cwd=staged,
+                                        text=True, capture_output=True, check=False)
+                self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_observer_is_read_only_and_source_identity_is_internal(self) -> None:
         source = SOURCE.read_text(encoding="utf-8")
