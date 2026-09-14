@@ -1,12 +1,13 @@
 # Current status
 
-An opt-in selective pipeline alpha candidate now imports the 508-descriptor
-catalog and prepares a compact conservative union of 280 GPU pipelines before
-interactive play. Cold and warm original Mario/FD and Fox/Battlefield lifecycles
-pass the bounded local timing gates with zero unexpected pipeline construction;
-the worst native callback is 10.300 ms and browser gap is 27.530 ms. The public
-loader, invalid-disc recovery and unload/reload checks pass. Hosted comparison
-and promotion remain pending. Production is unchanged. See the
+The opt-in selective pipeline alpha is **NO-GO** at the bounded local gate.
+Its compact certified union prepares 280 of the 508 catalog descriptors before
+interactive play. Final cold and warm Mario/FD lifecycles pass with zero misses,
+but Falco/Battlefield discovers 18 undeclared descriptors per run and adds
+852.945 ms cold / 194.295 ms warm of fallback preparation. The fallback resumes,
+but the zero-unexpected-pipeline release requirement fails. Build, focused tests,
+public loader, invalid-disc recovery and unload/reload pass. No staging preview
+or hosted comparison was run; production is unchanged. See the
 [scoped alpha evidence](docs/SELECTIVE_PIPELINE_ALPHA.md).
 
 The [source-address prerequisite](docs/SOURCE_ADDRESS_CONTEXT.md) models ordinary
