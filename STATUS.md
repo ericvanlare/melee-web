@@ -1,14 +1,17 @@
 # Current status
 
-The opt-in selective pipeline alpha is **NO-GO** at the bounded local gate.
-Its compact certified union prepares 280 of the 508 catalog descriptors before
-interactive play. Final cold and warm Mario/FD lifecycles pass with zero misses,
-but Falco/Battlefield discovers 18 undeclared descriptors per run and adds
-852.945 ms cold / 194.295 ms warm of fallback preparation. The fallback resumes,
-but the zero-unexpected-pipeline release requirement fails. Build, focused tests,
-public loader, invalid-disc recovery and unload/reload pass. No staging preview
-or hosted comparison was run; production is unchanged. See the
-[scoped alpha evidence](docs/SELECTIVE_PIPELINE_ALPHA.md).
+The shared startup/complete-catalog fix passes local cold/warm Mario/FD and
+Falco/Battlefield with zero unexpected pipelines and native/browser maxima of
+9.805/27.350 ms. Required MEMFS setup now belongs to the shared player owner;
+the public alpha still has no IDBFS. Selecting all 508 verified descriptors
+removes the 18 misses in the earlier 280-member selection, whose
+[failure evidence remains preserved](docs/SELECTIVE_PIPELINE_ALPHA.md).
+The public build, 758-test suite (31 skips), and ten public UI checks pass.
+An immutable noindex staging preview is available, but the startup-speedup
+release remains **NO-GO**: one hosted cold pair measured 3075.557 ms disc-ready
+against PR15's 3078.824 ms, and two hosted input-selection failures prevent full
+hosted signoff. Production is unchanged. See the
+[scoped fix and fast verification loop](docs/RENDERER_STARTUP_FIX.md).
 
 The [source-address prerequisite](docs/SOURCE_ADDRESS_CONTEXT.md) models ordinary
 original SDK/HSD allocation identity and defined register-byte consumption,
