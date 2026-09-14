@@ -12,6 +12,7 @@ if (cacheUnavailable) await import('../web/runtime-cache.js');
 const original = await fs.readFile(new URL('../web/melee-runtime.mjs', import.meta.url), 'utf8');
 const source = original.replace("import {loadNativeGameDisc} from './runtime-assets.mjs';", 'const loadNativeGameDisc = globalThis.testDiscReader;');
 let phase = 0, running = false, nextPointer = 16, cacheWaits = 0, audioClosed = false;
+let failedFile = null, serviceBatch = 0;
 const calls = [], states = [], listeners = new Map();
 Object.defineProperty(globalThis, 'navigator', {value: {gpu: {}}, configurable: true});
 globalThis.window = globalThis;
@@ -40,8 +41,18 @@ globalThis.AudioWorkletNode = class {
 globalThis.testDiscReader = async (file, report) => {
   calls.push(['readDisc', file.name]);
   if (file.invalid) throw Error('Invalid local disc');
-  report({complete: 0, total: 1});
-  return new Map([['local.dat', new Uint8Array([1, 2, 3])]]);
+  const entries = file.batch ? Array.from({length: 19}, (_, index) =>
+    [`local-${index}.dat`, new Uint8Array([index, index + 1, index + 2])]) :
+    file.largeBatch ? Array.from({length: 3}, (_, index) =>
+      [`large-${index}.dat`, new Uint8Array(5 * 1024 * 1024).fill(index + 1)]) :
+    file.failPut ? [['before-failure.dat', new Uint8Array([7, 8])], ['failure.dat', new Uint8Array([9, 10])],
+      ['after-failure.dat', new Uint8Array([11, 12])]] :
+    [['local.dat', new Uint8Array([1, 2, 3])]];
+  const total = entries.length + 1;
+  report({phase: 'validate', complete: 0, total});
+  for (let index = 0; index < entries.length; index++) report({phase: 'read', file: entries[index][0], complete: index, total});
+  report({phase: 'complete', complete: total, total});
+  return new Map(entries);
 };
 const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'melee-runtime-owner-'));
 const sourcePath = path.join(temporary, 'runtime.mjs');
@@ -59,6 +70,7 @@ const mounted = mountMeleeRuntime({canvas, createAudio: withAudio ? createRuntim
   } : undefined,
   onState: state => states.push(state), onOwner: context => { owner = context; }});
 assert.equal(states.at(-1).state, 'booting');
+assert.deepEqual(states[0].loading, {phase: 'boot', message: 'Starting player…', complete: 0, total: 0});
 const directories = new Set();
 Module.FS = {
   mkdirTree(directory) {
@@ -88,12 +100,17 @@ if (cacheUnavailable) {
   assert.equal(Module.runtimeCacheState, undefined, 'Public startup does not install persistence');
 }
 Object.assign(Module, {
-  HEAPU8: new Uint8Array(1024), UTF8ToString: x => x,
-  _malloc: size => { const p = nextPointer; nextPointer += size; return p; }, _free() {},
+  HEAPU8: new Uint8Array(24 * 1024 * 1024), UTF8ToString: x => x,
+  _malloc: size => { const p = nextPointer; nextPointer += size; return p; }, _free(pointer) { calls.push(['free', pointer]); },
   _melee_web_native_menu_phase: () => phase,
   _melee_web_native_menu_running: () => +running,
   _melee_web_native_menu_message: () => running ? 'Running original scene' : 'Ready',
-  _melee_web_native_menu_file() { calls.push(['put']); return 1; },
+  _melee_web_native_menu_file(np, bp, length) {
+    let end = np; while (Module.HEAPU8[end]) end++;
+    const name = new TextDecoder().decode(Module.HEAPU8.slice(np, end));
+    calls.push(['put', name, length, Module.HEAPU8[bp], Module.HEAPU8[bp + length - 1], serviceBatch]);
+    return name === failedFile ? 0 : 1;
+  },
   _melee_web_native_menu_prepare() {
     assert.equal(window.menuAudioReadyForPreparation(), true, 'Native preparation must wait for audio acknowledgement');
     calls.push(['prepare']); return 1;
@@ -110,6 +127,19 @@ Object.assign(Module, {
 Module.onRuntimeInitialized();
 const player = await mounted;
 assert.equal(player.getState().canImport, true);
+Module.pipelinePreparation = {ready: false, selected: 4, pending: 4};
+window.menuFrame(false);
+assert.deepEqual(player.getState().loading, {phase: 'catalog', message: 'Preparing graphics…', complete: 0, total: 4});
+assert.equal(player.getState().canImport, true, 'Catalog preparation does not block disc selection');
+Module.pipelinePreparation.pending = 2;
+window.menuFrame(false);
+assert.equal(player.getState().loading.complete, 2);
+Module.pipelinePreparation.pending = 0;
+window.menuFrame(false);
+assert.deepEqual(player.getState().loading, {phase: 'catalog', message: 'Preparing graphics…', complete: 0, total: 0});
+Module.pipelinePreparation.ready = true;
+window.menuFrame(false);
+assert.equal(player.getState().loading, null, 'Ready catalog clears startup loading');
 assert.equal(player.Module, undefined, 'Native module is not on the public handle');
 await assert.rejects(mountMeleeRuntime({canvas}), /Reload the page/);
 async function pump(promise) {
@@ -123,6 +153,8 @@ async function pump(promise) {
   if (failure) throw failure;
   return value;
 }
+const nativeServiceCommands = window.menuServiceCommands;
+window.menuServiceCommands = () => { ++serviceBatch; nativeServiceCommands(); };
 const queuedLayout = player.setKeyboardLayout('boxx');
 assert.equal(calls.some(row => row[0] === 'layout'), false);
 window.menuServiceCommands();
@@ -139,17 +171,58 @@ window.menuServiceCommands();
 assert.deepEqual(calls.at(-1), ['activity', 0, 1], 'Dialog focus disables input without hiding the document');
 player.focus(); window.menuServiceCommands();
 assert.deepEqual(calls.at(-1), ['activity', 1, 1]);
+const ownerPutBegin = calls.length;
+await pump(owner.put('owner.dat', new Uint8Array([4, 5, 6])));
+assert.deepEqual(calls.slice(ownerPutBegin).filter(row => row[0] === 'put').map(row => row.slice(0, 5)),
+  [['put', 'owner.dat', 3, 4, 6]], 'onOwner.put keeps the single-file ownership helper');
 await assert.rejects(pump(player.importDisc({name: 'invalid.iso', invalid: true})), /Invalid local disc/);
 assert.equal(player.getState().canImport, true, 'Invalid disc allows a new selection');
 assert.equal(player.getState().canStart, false);
+assert.equal(player.getState().loading, null, 'Invalid disc clears transient loading feedback');
 const begin = calls.length;
 await pump(player.importDisc({name: 'owned.iso'}));
 const importCalls = calls.slice(begin).filter(row => ['unload', 'readDisc', 'put', 'prepare'].includes(row[0])).map(row => row[0]);
 assert.deepEqual(importCalls, ['unload', 'readDisc', 'put', 'prepare']);
 assert.equal(player.getState().canStart, true);
+const ownedLoading = states.filter(state => state.loading).map(state => [state.loading.phase, state.loading.message]);
+assert.ok(ownedLoading.some(([phase]) => phase === 'disc'));
+assert.ok(ownedLoading.some(([phase]) => phase === 'handoff'));
+assert.ok(ownedLoading.some(([phase]) => phase === 'native'));
+assert.ok(states.every(state => !state.loading || state.loading.complete < state.loading.total || state.loading.total === 0),
+  'Active loading progress never reports a lingering 100% transfer');
 await assert.rejects(pump(player.importDisc({name: 'invalid-replacement.iso', invalid: true})), /Invalid local disc/);
 assert.equal(player.getState().canStart, false);
 assert.equal(player.getState().canUnload, true, 'A failed replacement still permits Eject of previously imported bytes');
+assert.equal(player.getState().loading, null, 'Invalid replacement clears transient loading feedback');
+await pump(player.importDisc({name: 'owned.iso'}));
+const batchStart = calls.length;
+const batchServiceStart = serviceBatch;
+await pump(player.importDisc({name: 'batch.iso', batch: true}));
+const batchPuts = calls.slice(batchStart).filter(row => row[0] === 'put');
+assert.equal(batchPuts.length, 19);
+assert.deepEqual(batchPuts.map(row => row[1]), Array.from({length: 19}, (_, index) => `local-${index}.dat`),
+  'Batched import keeps native file order');
+const batchGroups = new Map();
+for (const row of batchPuts) batchGroups.set(row[5], (batchGroups.get(row[5]) || 0) + 1);
+assert.ok(batchGroups.size > 1, 'Import uses multiple native boundaries for a larger bundle');
+assert.ok([...batchGroups.values()].every(count => count <= 8), 'File-count cap bounds each import boundary');
+assert.ok(batchPuts.every(row => row[2] === 3 && row[3] >= 0 && row[4] >= 2));
+assert.ok(serviceBatch > batchServiceStart);
+const batchFrees = calls.slice(batchStart).filter(row => row[0] === 'free');
+assert.equal(batchFrees.length, batchPuts.length * 2, 'Every batched allocation is freed');
+const largeStart = calls.length;
+await pump(player.importDisc({name: 'large.iso', largeBatch: true}));
+const largePuts = calls.slice(largeStart).filter(row => row[0] === 'put');
+assert.equal(largePuts.length, 3);
+assert.equal(new Set(largePuts.map(row => row[5])).size, 3, 'Byte cap yields a separate batch for each oversized file');
+failedFile = 'failure.dat';
+const failedStart = calls.length;
+await assert.rejects(pump(player.importDisc({name: 'failed.iso', failPut: true})), /Ready/);
+const failedPuts = calls.slice(failedStart).filter(row => row[0] === 'put');
+assert.deepEqual(failedPuts.map(row => row[1]), ['before-failure.dat', 'failure.dat']);
+assert.equal(calls.slice(failedStart).filter(row => row[0] === 'free').length, failedPuts.length * 2,
+  'A native transfer error frees the current batch allocations');
+failedFile = null;
 await pump(player.importDisc({name: 'owned.iso'}));
 await pump(player.start());
 assert.equal(player.getState().scene, 'css');

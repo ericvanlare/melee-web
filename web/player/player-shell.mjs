@@ -24,6 +24,20 @@ function renderStatus(next) {
   $('end-session').disabled = !next.canUnload;
   $('keyboard-layout').disabled = !next.ready || next.requiresReload || next.busy;
   const busy = busyStates.includes(next.state);
+  const loading = !currentError && next.state !== 'error' && !next.paused ? next.loading : null;
+  $('loading-panel').hidden = !loading;
+  if (loading) {
+    $('loading-label').textContent = loading.message;
+    const measured = Number.isFinite(loading.total) && loading.total > 0 && Number.isFinite(loading.complete);
+    if (measured) {
+      $('loading-progress').max = loading.total;
+      $('loading-progress').value = Math.max(0, Math.min(loading.complete, loading.total));
+      $('loading-detail').textContent = `${Math.floor($('loading-progress').value / loading.total * 100)}% complete`;
+    } else {
+      $('loading-progress').removeAttribute('value');
+      $('loading-detail').textContent = 'First use can take longer.';
+    }
+  }
   $('progress').hidden = !busy || next.state === 'booting';
   if (next.progress) { $('progress').max = next.progress.total; $('progress').value = next.progress.complete; }
   else $('progress').removeAttribute('value');

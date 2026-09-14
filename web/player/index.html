@@ -11,7 +11,14 @@
 </head>
 <body>
   <main id="player" aria-label="WebMelee player">
-    <div id="runtime-host" aria-label="Game"><canvas id="canvas" width="640" height="480" tabindex="0" aria-label="Game screen"></canvas></div>
+    <div id="runtime-host" aria-label="Game">
+      <canvas id="canvas" width="640" height="480" tabindex="0" aria-label="Game screen"></canvas>
+      <div id="loading-panel">
+        <p id="loading-label" role="status" aria-live="polite">Starting player…</p>
+        <progress id="loading-progress" aria-labelledby="loading-label"></progress>
+        <p id="loading-detail">First use can take longer.</p>
+      </div>
+    </div>
     <div id="toolbar" role="toolbar" aria-label="Game controls">
       <button id="choose-disc" type="button" disabled>Disc</button>
       <input id="disc-file" type="file" accept=".iso,.gcm,.ciso" aria-label="USA 1.02 disc image" hidden>
@@ -20,7 +27,7 @@
       <button id="controls-open" type="button">Controls</button>
       <button id="fullscreen" type="button">Fullscreen</button>
       <button id="end-session" type="button" disabled>Eject</button>
-      <button id="status" type="button" disabled aria-live="polite">Loading…</button>
+      <button id="status" type="button" disabled>Loading…</button>
       <progress id="progress" aria-label="Preparing local data" hidden></progress>
       <span id="edition">alpha · no audio</span> <a href="/notices">About / legal</a>
     </div>
