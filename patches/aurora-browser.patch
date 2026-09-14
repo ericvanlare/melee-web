@@ -3930,10 +3930,10 @@ index 2a4aadf..540854e 100644
  
 diff --git a/tests/pipeline_prepare_state_test.cpp b/tests/pipeline_prepare_state_test.cpp
 new file mode 100644
-index 0000000..2b3f773
+index 0000000..17fb09e
 --- /dev/null
 +++ b/tests/pipeline_prepare_state_test.cpp
-@@ -0,0 +1,110 @@
+@@ -0,0 +1,111 @@
 +#include "../lib/gfx/pipeline_prepare_state.hpp"
 +
 +#include <cassert>
@@ -3956,6 +3956,7 @@ index 0000000..2b3f773
 +      .pipeline_ref = ref,
 +      .config_version = version,
 +      .config_size = identity.configSize,
++      .sha256 = {},
 +  };
 +  std::memcpy(result.sha256, identity.sha256.data(), identity.sha256.size());
 +  return result;
