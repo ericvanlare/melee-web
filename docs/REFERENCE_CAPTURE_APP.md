@@ -281,6 +281,74 @@ compared. If a requested sidecar is malformed, the report marks
 the `invalid_input` status. It does not establish repeatability, full port
 equivalence, performance acceptance, pixels, or gold admission.
 
+If a port trace ends before successful teardown, the command validates its
+observed prefix and retains the first difference under `incomplete_prefix`.
+Exit status remains 2, even if every observed field matches. Missing port
+completion and unavailable CPU-prefix comparison are explicit coverage gaps.
+Malformed prefixes and attempted completion records still fail validation.
+This route never fabricates a second original reference or shortens the
+requested workload to make an interrupted replay pass.
+
+## First physical-controller session
+
+The operator completed a four-stock Falco versus level-5 Marth match on Yoshi's
+Story with no timer. The version 0.1.1 app accepted 35,519 contiguous observer
+events, 8,348 PAD polls, 6,492 source ticks and 6,487 draws through Falco's win
+and fighter teardown. The physical-session evidence is the operator's report,
+the connected device identity and the accepted stream. The raw preflight
+`physical_session_validated: false` and parser
+`not_performed_by_automation` fields remain immutable; the operator attestation
+lives in the separate derived report. Input latency and performance are not
+accepted: the operator reported slow, choppy play.
+
+The human-only MWRC recipe completes all 6,492 ticks in a visible Release
+browser, with the same winner. Supplied inputs, PAD state, RNG, match frame,
+HUD, magnifier and match observations agree throughout. The first core fighter
+difference is Marth's input at zero-based index 5,057; the CPU command/stick
+output first differs at the same index. CPU-generated decisions were never
+supplied as input. The cause has not been established, and no gameplay change
+was made. Camera FOV differs at tick 0, subject bone rounding at tick 73, and
+the browser has five additional draws at indices 1,631, 2,632, 3,633, 4,634 and
+5,635. Pixel and audio comparison remain excluded.
+
+The headless native trace stops after 5,704 ticks with an unsupported pause/exit
+and no successful teardown. Its first RNG/damage difference is index 1,482:
+retail has Marth's magnifier offscreen flag and one additional point of damage;
+the headless path lacks them. The visible browser reproduces this original
+offscreen damage, consistent with the already documented source-drawing
+dependency. The native run remains an incomplete diagnostic. Its CPU sidecar
+is preserved but is not admitted by the complete-only CPU validator.
+
+The inbox associates the immutable raw manifest with the input recipe and a
+separate aggregate native/browser comparison. Full traces, screenshots and
+failed attempts remain private. The [portable receipt](evidence/reference-operator-session-v1.json)
+contains artifact hashes, comparison boundaries and test results without raw
+capture payloads. The full repository suite passes 867 tests with 37 optional
+skips; all nine single-reference comparison tests pass.
+
+### Dolphin rerun boundary
+
+This recording is useful for port comparison without another Dolphin pass:
+it already contains typed retail state and CPU-output observations. It is
+not yet a demonstrated repeatable Dolphin boot/menu recording. Its passive
+PAD observations were not saved as a Dolphin input movie, and the session has
+no corresponding savestate checkpoint. Replaying the source-consumed match
+inputs alone does not prove reconstruction of the earlier scene or heap context.
+
+The existing `capture_retail_replay.py` route can instead run human inputs
+from a synthetic SSS checkpoint with setup and PAD context injection. It
+requires the matching checkpoint/GC state, template profile and provenance;
+even a passing independent pair would establish only that narrower synthetic
+match-boundary repeatability. It cannot establish this physical cold boot's
+allocation context. That rerun was not performed for this session.
+
+Reliable original-session reruns need a replayable emulator input stream plus
+an independently reproducible boot context, or a matching checkpoint with an
+explicitly narrower scope. Validate that route against the frozen original
+typed records before relying on it to add offline observations. Additional
+observers still need declared coverage; a rerun does not automatically capture
+every field needed for a future accuracy investigation.
+
 ## Observed first-session validation
 
 The [portable evidence receipt](evidence/reference-capture-app-v1.json) binds the
@@ -309,9 +377,9 @@ Failed observer boots and superseded derivations remain private and inspectable.
 
 Fresh installation, repeated replacement, Finder alias creation, relaunch,
 ordinary/narrow window layouts and shutdown during a macOS permission wait
-were exercised locally. The installed app still requires the operator's macOS
-Documents-folder permission for the configured private fixture and a real
-physical-controller session. No physical-controller behavior is claimed.
+were exercised locally. This automated validation preceded the operator's
+Documents-folder permission grant and the physical session described above;
+it makes no physical-controller or latency claim by itself.
 
 The complete local repository suite passed 851 tests with 37 documented
 optional-target/fixture skips. The subsequently added controller-setup drift

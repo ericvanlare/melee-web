@@ -19,7 +19,8 @@ from cpu_observation_validation import (
     domain_divergences,
     load_observation,
 )
-from port_replay_validation import _read_port_rows, compare_rows
+from port_replay_diagnostics import _read_port, diagnose_rows
+from port_replay_validation import compare_rows
 from reference_session_bundle import _canonical_bytes, _final_manifest
 from retail_replay_validation import CaptureError, load_capture
 
@@ -181,6 +182,28 @@ def _cpu_report(native_path: Path, target_path: Path) -> dict[str, Any]:
     }
 
 
+def _prefix_report(reference: Any, rows: list[dict[str, Any]], trace_hash: str,
+                   *, strict_error: str) -> dict[str, Any]:
+    """Run the existing strict prefix diagnostic and remove paired claims."""
+
+    diagnostic = diagnose_rows(reference, rows, port_sha256=trace_hash)
+    return {
+        "status": "incomplete_prefix",
+        "complete": False,
+        "strict_error": strict_error,
+        "requested_frames": diagnostic["requested_frames"],
+        "observed_frames": diagnostic["observed_frames"],
+        "frames_compared": diagnostic["frames_compared"],
+        "reference_frames": diagnostic["reference_frames"],
+        "missing_completion_reason": diagnostic["missing_completion_reason"],
+        "first_divergence": diagnostic["first_divergence"],
+        "first_divergence_by_group": diagnostic["first_divergence_by_group"],
+        "checks": diagnostic["checks"],
+        "performance": "not_evaluated",
+        "gold_admitted": False,
+    }
+
+
 def compare(
     derived: str | Path,
     trace: str | Path,
@@ -225,10 +248,24 @@ def compare(
         if not trace_path.is_file():
             raise ComparisonError("trace is missing or unsafe")
         reference = load_capture(binding["candidate_path"], cpu=cpu)
-        rows = _read_port_rows(trace_path.read_bytes(), trace_path)
-        replay = compare_rows(reference, rows)
+        rows, trace_hash = _read_port(trace_path)
+        try:
+            replay = compare_rows(reference, rows)
+            prefix = False
+        except (CaptureError, ValueError) as strict_error:
+            # A prefix is diagnostic-only.  The existing helper validates its
+            # records without inventing an end/teardown record or a second
+            # original reference.  Complete attempted captures remain strict
+            # failures because diagnose_rows rejects an end record.
+            try:
+                replay = _prefix_report(reference, rows, trace_hash,
+                                        strict_error=str(strict_error))
+            except (CaptureError, ValueError):
+                raise strict_error
+            prefix = True
         report.update({
-            "status": "matched" if replay.get("first_divergence") is None else "diverged",
+            "status": replay["status"] if prefix else
+                      ("matched" if replay.get("first_divergence") is None else "diverged"),
             "derived": {
                 "manifest_sha256": binding["manifest_sha256"],
                 "source_manifest_sha256": binding["source_manifest_sha256"],
@@ -236,8 +273,9 @@ def compare(
             },
             "trace": {
                 "kind": trace_kind,
-                "sha256": _sha256(trace_path),
-                "frames": len(rows) - 4 if len(rows) >= 4 else None,
+                "sha256": trace_hash,
+                "frames": (len(rows) - 4 if rows and rows[-1].get("record") == "end"
+                            else len(rows) - 3 if len(rows) >= 3 else None),
             },
             "replay": replay,
             "coverage": {
@@ -246,7 +284,14 @@ def compare(
                 "first_divergence_by_group": replay.get("first_divergence_by_group", {}),
             },
         })
-        if reference_cpu is None:
+        if prefix:
+            report["missing_coverage"] = ["port_completion", "cpu_observation"]
+            report["coverage"]["cpu"] = {
+                "status": "not_compared",
+                "reason": "strict CPU prefix validation is not available",
+                "domains": {},
+            }
+        elif reference_cpu is None:
             report["coverage"]["cpu"] = {"status": "not_requested", "domains": {}}
         else:
             reference_cpu_input = Path(reference_cpu).expanduser()
@@ -283,4 +328,4 @@ def compare(
 
 def status_exit_code(status: str) -> int:
     return {"matched": 0, "diverged": 1, "invalid": 2,
-            "invalid_input": 2}.get(status, 2)
+            "invalid_input": 2, "incomplete_prefix": 2}.get(status, 2)

@@ -113,7 +113,34 @@ class ReferenceCaptureComparisonTests(unittest.TestCase):
         self.assertEqual(report["replay"]["first_divergence"]["frame"], 1)
         self.assertEqual(report["replay"]["checks"]["inputs"], "diverged")
         self.assertEqual(report["replay"]["checks"]["fighters"], "diverged")
+        self.assertEqual(report["trace"]["frames"], 3)
         self.assertEqual(status_exit_code(report["status"]), 1)
+
+    def test_incomplete_trace_uses_single_reference_prefix_diagnostic(self):
+        prefix = deepcopy(self.port_rows[:-1])
+        prefix[4]["supplied_inputs"][0] = "01" + "00" * 10
+        prefix[5]["fighters"][1]["motion"] = 44
+        write_jsonl(self.trace, prefix)
+        report = compare(self.derived, self.trace)
+        self.assertEqual(report["status"], "incomplete_prefix")
+        self.assertFalse(report["replay"]["complete"])
+        self.assertEqual(report["replay"]["first_divergence"]["frame"], 1)
+        self.assertEqual(report["replay"]["checks"]["inputs"], "diverged")
+        self.assertEqual(report["replay"]["checks"]["fighters"], "diverged")
+        self.assertEqual(report["missing_coverage"], ["port_completion", "cpu_observation"])
+        self.assertEqual(report["claims"]["reference_repeatability"], "not_established")
+        self.assertNotIn("reference_repeatability", report["replay"])
+        self.assertNotIn("reference_a", report["replay"].get("capture_hashes", {}))
+        self.assertEqual(status_exit_code(report["status"]), 2)
+
+    def test_matching_incomplete_trace_remains_incomplete(self):
+        write_jsonl(self.trace, self.port_rows[:-1])
+        report = compare(self.derived, self.trace)
+        self.assertEqual(report["status"], "incomplete_prefix")
+        self.assertIsNone(report["replay"]["first_divergence"])
+        self.assertEqual(report["replay"]["observed_frames"], 3)
+        self.assertEqual(report["trace"]["frames"], 3)
+        self.assertEqual(report["missing_coverage"], ["port_completion", "cpu_observation"])
 
     def test_derived_binding_and_cpu_sidecar_are_checked(self):
         from test_cpu_observation import CpuObservationTests
