@@ -1,5 +1,15 @@
 # Current status
 
+The private [Reference Capture application](docs/REFERENCE_CAPTURE_APP.md)
+completed an ordinary controller-driven Mario/Fox level-1 Final Destination
+capture with 60,908 ordered events, 3,838 source ticks, original result publication
+and teardown. Its human inputs replay through native and visible browser builds;
+both retain CPU, HUD and match observations, while the first core fighter
+difference occurs at source index 1,976. Existing camera/subject/draw differences
+remain visible. This is a single-session diagnostic, with physical-controller
+validation still pending; it does not change gameplay or admit a gold reference.
+PR #16 and its allocation evidence remain unchanged and unmerged.
+
 The shared startup/complete-catalog fix passes local cold/warm Mario/FD and
 Falco/Battlefield with zero unexpected pipelines and native/browser maxima of
 9.805/27.350 ms. Required MEMFS setup now belongs to the shared player owner;

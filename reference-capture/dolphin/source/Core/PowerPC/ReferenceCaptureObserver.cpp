@@ -1,0 +1,982 @@
+// Copyright 2026 Melee Web contributors
+// SPDX-License-Identifier: GPL-2.0-or-later
+
+#include "Core/PowerPC/ReferenceCaptureObserver.h"
+
+#include <array>
+#include <algorithm>
+#include <atomic>
+#include <chrono>
+#include <cstdlib>
+#include <cstring>
+#include <filesystem>
+#include <mutex>
+#include <string>
+#include <string_view>
+#include <thread>
+#include <vector>
+
+#include "Common/DirectIOFile.h"
+#include "Common/Crypto/SHA1.h"
+#include "Core/HW/Memmap.h"
+#include "Core/PowerPC/PowerPC.h"
+#include "Core/System.h"
+#include "DiscIO/DiscUtils.h"
+#include "DiscIO/VolumeDisc.h"
+
+#include <mbedtls/sha256.h>
+
+namespace ReferenceCapture
+{
+namespace
+{
+constexpr char EXPECTED_DOL_SHA256[] =
+    "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646";
+constexpr char EXPECTED_DOL[] =
+    "08e0bf20134dfcb260699671004527b2d6bb1a45";
+constexpr char EXPECTED_COMMIT[] = "c77bbaa0f372c3f72281602a8b087206706542cb";
+constexpr u16 SCHEMA = 1;
+constexpr u32 MAGIC = 0x4f52574d; // little-endian "MWRO"
+constexpr size_t RING_SIZE = 128;
+constexpr size_t RING_PAYLOAD = 256 * 1024;
+constexpr size_t MAX_SLICES = 64;
+constexpr size_t MAX_RAW = 192 * 1024;
+constexpr u32 PAD_READ_HSD_CALLER = 0x80376A28;
+
+constexpr std::array<u8, 32> EXPECTED_DOL_SHA256_BYTES = {
+    0xdc, 0x21, 0x50, 0x45, 0x13, 0x42, 0x43, 0x50, 0xbd, 0xa1, 0x7a,
+    0x7c, 0x65, 0xe8, 0x23, 0x71, 0xb4, 0x51, 0x12, 0xa5, 0xdf, 0xc1,
+    0xe9, 0xf2, 0x74, 0x9a, 0x8b, 0x7a, 0xb0, 0xef, 0xf6, 0x46};
+constexpr std::array<u8, 20> EXPECTED_DOL_SHA1_BYTES = {
+    0x08, 0xe0, 0xbf, 0x20, 0x13, 0x4d, 0xfc, 0xb2, 0x60, 0x69,
+    0x96, 0x71, 0x00, 0x45, 0x27, 0xb2, 0xd6, 0xbb, 0x1a, 0x45};
+
+enum class Event : u16
+{
+  Handshake = 1,
+  Start = 2,
+  Boundary = 3,
+  Progress = 4,
+  Error = 5,
+  End = 6,
+};
+
+enum class Boundary : u16
+{
+  PadPoll = 1,
+  PadConsume = 2,
+  FighterCreate = 3,
+  Entry = 4,
+  Setup = 5,
+  SourceTick = 6,
+  DrawEnter = 7,
+  DrawReturn = 8,
+  ResultEnter = 9,
+  ResultReturn = 10,
+  SceneTeardown = 11,
+  SceneExit = 12,
+};
+
+enum class SliceTag : u16
+{
+  PadStatusAll4 = 1,
+  PadQueue = 2,
+  PadSlot = 3,
+  MatchSetup = 4,
+  FighterHead = 5,
+  FighterInputAnim = 6,
+  FighterDamageShield = 7,
+  FighterStocks = 8,
+  CpuState = 9,
+  Camera = 10,
+  CameraProjection = 11,
+  Hud = 12,
+  Magnifier = 13,
+  MatchClock = 14,
+  Result = 15,
+  SceneEntityHeads = 16,
+  SceneRouting = 17,
+  FighterSubject = 18,
+  RngPointer = 19,
+  RngValue = 20,
+  PadSnapshot = 21,
+  RetraceCount = 22,
+  SourceVICount = 23,
+  FighterCreateContext = 24,
+  SceneEntityCount = 25,
+  SceneEntityHeadsPointer = 26,
+  PadPollCaller = 27,
+  CameraObjectPointer = 28,
+  SceneRequest = 29,
+  SceneFrame = 30,
+};
+
+struct SliceRef
+{
+  SliceTag tag;
+  u16 flags;
+  u32 address;
+  u32 size;
+  u32 offset;
+};
+
+struct Slot
+{
+  std::atomic<bool> ready{false};
+  Event event = Event::Progress;
+  u64 sequence = 0;
+  u64 timestamp_ns = 0;
+  u32 guest_pc = 0;
+  u32 source_tick = 0;
+  u32 draw_ordinal = 0;
+  u32 payload_size = 0;
+  u32 checksum = 0;
+  std::array<u8, RING_PAYLOAD> payload{};
+};
+
+constexpr bool IsGuestRange(u32 address, size_t size)
+{
+  if (size == 0 || size > 0x100000)
+    return false;
+  const u64 end = static_cast<u64>(address) + size;
+  return (address >= 0x80000000U && end <= 0x81800000U) ||
+         (address >= 0x90000000U && end <= 0x94000000U);
+}
+
+constexpr u32 ReadBE32(const u8* bytes)
+{
+  return (static_cast<u32>(bytes[0]) << 24) | (static_cast<u32>(bytes[1]) << 16) |
+         (static_cast<u32>(bytes[2]) << 8) | static_cast<u32>(bytes[3]);
+}
+
+void PutU16(u8*& out, u16 value)
+{
+  *out++ = static_cast<u8>(value);
+  *out++ = static_cast<u8>(value >> 8);
+}
+
+void PutU32(u8*& out, u32 value)
+{
+  for (int shift = 0; shift < 32; shift += 8)
+    *out++ = static_cast<u8>(value >> shift);
+}
+
+void PutU64(u8*& out, u64 value)
+{
+  for (int shift = 0; shift < 64; shift += 8)
+    *out++ = static_cast<u8>(value >> shift);
+}
+
+std::string JsonEscape(std::string_view value)
+{
+  std::string result;
+  result.reserve(value.size() + 2);
+  for (const unsigned char c : value)
+  {
+    if (c == '"' || c == '\\')
+    {
+      result.push_back('\\');
+      result.push_back(static_cast<char>(c));
+    }
+    else if (c < 0x20)
+    {
+      result += "\\u00";
+      constexpr char hex[] = "0123456789abcdef";
+      result.push_back(hex[c >> 4]);
+      result.push_back(hex[c & 15]);
+    }
+    else
+    {
+      result.push_back(static_cast<char>(c));
+    }
+  }
+  return result;
+}
+
+std::string Env(const char* name)
+{
+  const char* value = std::getenv(name);
+  return value ? std::string(value) : std::string();
+}
+
+bool ActivationRequested()
+{
+  return Env("MWRC_ENABLE") == "1" && !Env("MWRC_OUTPUT").empty() &&
+         Env("MWRC_DOL_SHA256") == EXPECTED_DOL_SHA256 && Env("MWRC_CPU") == "JITARM64" &&
+         Env("MWRC_SOURCE_REV") == "GALE01r2";
+}
+
+}  // namespace
+
+struct Observer::Impl
+{
+  Impl() = default;
+
+  ~Impl()
+  {
+    Stop();
+  }
+
+  bool Start()
+  {
+    if (started.exchange(true))
+      return !invalid.load();
+    output_path = Env("MWRC_OUTPUT");
+    status_path = Env("MWRC_STATUS");
+    if (status_path.empty())
+      status_path = output_path + ".status.json";
+    if (output_path.empty())
+    {
+      SetInvalid("MWRC_OUTPUT must name a fresh stream");
+      return false;
+    }
+    // Dolphin builds with exceptions disabled.  std::thread reports an
+    // unavailable worker by terminating; there is no catchable error path.
+    writer = std::thread([this] { WriterMain(); });
+    PushJson(Event::Handshake,
+             std::string("{\"schema\":\"melee-web-passive-dolphin-observer\",\"version\":1,")
+                 + "\"dolphin_commit\":\"" + EXPECTED_COMMIT + "\",\"dol_sha1\":\"" +
+                 EXPECTED_DOL + "\",\"dol_sha256\":\"" + EXPECTED_DOL_SHA256 +
+                 "\",\"cpu\":\"JITARM64\",\"writes_guest_memory\":false,"
+                 "\"ring_capacity\":" + std::to_string(RING_SIZE) + "}");
+    PushJson(Event::Start,
+             std::string("{\"status\":\"recording\",\"source_revision\":\"GALE01r2\",")
+                 + "\"boundaries\":\"typed-existing-retail-harness\"}");
+    return !invalid.load();
+  }
+
+  void Stop()
+  {
+    if (!started.load())
+      return;
+    if (!finish_requested.exchange(true))
+      natural_completion.store(false);
+    if (writer.joinable())
+      writer.join();
+  }
+
+  void RequestComplete()
+  {
+    natural_completion.store(true);
+    finish_requested.store(true);
+  }
+
+  bool ReadBytes(Core::System* system, u32 address, size_t size, u8* destination) const
+  {
+    if (!IsGuestRange(address, size))
+      return false;
+    const auto* pointer = system->GetMemory().GetPointerForRange(address, size);
+    if (!pointer)
+      return false;
+    std::memcpy(destination, pointer, size);
+    return true;
+  }
+
+  bool ReadU32(Core::System* system, u32 address, u32* value) const
+  {
+    std::array<u8, 4> bytes{};
+    if (!ReadBytes(system, address, bytes.size(), bytes.data()))
+      return false;
+    *value = ReadBE32(bytes.data());
+    return true;
+  }
+
+  bool AddSlice(Core::System* system, SliceTag tag, u32 address, size_t size, u16 flags = 0)
+  {
+    if (slice_count >= MAX_SLICES || size > MAX_RAW - raw_size || size > UINT32_MAX)
+      return false;
+    if (!ReadBytes(system, address, size, raw.data() + raw_size))
+      return false;
+    slices[slice_count++] = {tag, flags, address, static_cast<u32>(size),
+                             static_cast<u32>(raw_size)};
+    raw_size += size;
+    return true;
+  }
+
+  bool AddFighterSlices(Core::System* system, u32 slot, u32 pointer)
+  {
+    if (!AddSlice(system, SliceTag::FighterHead, pointer, 0x100, static_cast<u16>(slot)) ||
+        !AddSlice(system, SliceTag::FighterInputAnim, pointer + 0x620, 0x280,
+                  static_cast<u16>(slot)) ||
+        !AddSlice(system, SliceTag::FighterDamageShield, pointer + 0x1830, 0x16c,
+                  static_cast<u16>(slot)) ||
+        !AddSlice(system, SliceTag::FighterStocks, 0x80453080 + slot * 0xe90 + 0x8e, 1,
+                  static_cast<u16>(slot)))
+      return false;
+    u32 subject = 0;
+    if (!ReadU32(system, pointer + 0x890, &subject))
+      return false;
+    if (subject && !AddSlice(system, SliceTag::FighterSubject, subject, 0x28,
+                             static_cast<u16>(slot)))
+      return false;
+    if (cpu_slots[slot] &&
+        !AddSlice(system, SliceTag::CpuState, pointer + 0x1a88, 0x57c,
+                  static_cast<u16>(slot)))
+      return false;
+    return true;
+  }
+
+  bool AddMatchSlices(Core::System* system)
+  {
+    if (!AddSlice(system, SliceTag::MatchClock, 0x8046b6a0, 0x2e) ||
+        !AddSlice(system, SliceTag::PadSnapshot, 0x804c1f84, 0x358) ||
+        !AddSlice(system, SliceTag::SceneFrame, 0x80479d58, 4))
+      return false;
+    u32 rng_pointer = 0;
+    if (!AddSlice(system, SliceTag::RngPointer, 0x804d5f94, 4) ||
+        !ReadU32(system, 0x804d5f94, &rng_pointer) || !rng_pointer ||
+        !AddSlice(system, SliceTag::RngValue, rng_pointer, 4))
+      return false;
+    for (u32 slot = 0; slot < 4; ++slot)
+    {
+      if (fighter_present[slot] && !AddFighterSlices(system, slot, fighter_pointers[slot]))
+        return false;
+      if (fighter_present[slot] &&
+          (!AddSlice(system, SliceTag::Hud, 0x804a10c8 + slot * 0x64, 0x11,
+                     static_cast<u16>(slot)) ||
+           !AddSlice(system, SliceTag::Magnifier, 0x804a1de0 + 0x14 + slot * 0x10 + 0xc, 1,
+                     static_cast<u16>(slot))))
+        return false;
+    }
+    if (!AddSlice(system, SliceTag::Camera, 0x80452c68, 0x4c))
+      return false;
+    u32 camera_object = 0;
+    u32 camera = 0;
+    if (!ReadU32(system, 0x80452c68, &camera) || !camera ||
+        !ReadU32(system, camera + 0x28, &camera_object) || !camera_object ||
+        !AddSlice(system, SliceTag::CameraObjectPointer, camera + 0x28, 4) ||
+        !AddSlice(system, SliceTag::CameraProjection, camera_object, 0x51))
+      return false;
+    return true;
+  }
+
+  static bool BoundaryForPC(u32 pc, Boundary* boundary)
+  {
+    switch (pc)
+    {
+    case 0x8034dd8c:
+      *boundary = Boundary::PadPoll;
+      return true;
+    case 0x80377584:
+      *boundary = Boundary::PadConsume;
+      return true;
+    case 0x800693a8:
+      *boundary = Boundary::FighterCreate;
+      return true;
+    case 0x8016e934:
+      *boundary = Boundary::Entry;
+      return true;
+    case 0x8016e9c4:
+      *boundary = Boundary::Setup;
+      return true;
+    case 0x80390eb4:
+      *boundary = Boundary::SourceTick;
+      return true;
+    case 0x80390fc0:
+      *boundary = Boundary::DrawEnter;
+      return true;
+    case 0x80391040:
+      *boundary = Boundary::DrawReturn;
+      return true;
+    case 0x8016e9c8:
+      *boundary = Boundary::ResultEnter;
+      return true;
+    case 0x8016ebbc:
+      *boundary = Boundary::ResultReturn;
+      return true;
+    case 0x8039157c:
+      *boundary = Boundary::SceneTeardown;
+      return true;
+    case 0x801a4b70:
+      *boundary = Boundary::SceneExit;
+      return true;
+    default:
+      return false;
+    }
+  }
+
+  bool BoundaryInstructionMatches(Core::System* system, u32 pc) const
+  {
+    u32 word = 0;
+    if (!ReadU32(system, pc, &word))
+      return false;
+    switch (pc)
+    {
+    case 0x8034dd8c:
+      {
+        u32 restore = 0;
+        return word == 0x7ec3b378 && ReadU32(system, pc + 4, &restore) &&
+               restore == 0x4bff95fd;
+      }
+    case 0x80377584:
+      return word == 0x3b7e0028;
+    case 0x8016e9c4:
+    case 0x80391040:
+    case 0x8016ebbc:
+    case 0x8039157c:
+    case 0x801a4b70:
+      return word == 0x4e800020;
+    case 0x8016e9c8:
+      return word == 0x7c0802a6;
+    default:
+      // The pinned DOL digest has already established the exact source for
+      // boundary PCs whose neighboring words are not part of the harness's
+      // published guards.
+      return word != 0;
+    }
+  }
+
+  void Observe(Core::System* system, u32 pc, PowerPC::PowerPCState* state)
+  {
+    if (!Start() || invalid.load() || finish_requested.load())
+      return;
+    Boundary boundary;
+    if (!BoundaryForPC(pc, &boundary))
+      return;
+    if (!BoundaryInstructionMatches(system, pc))
+    {
+      SetInvalid("observer boundary instruction is not resident in the pinned DOL");
+      return;
+    }
+    u32 source_tick = 0;
+    if (!ReadU32(system, 0x80479d58, &source_tick))
+    {
+      SetInvalid("source scene counter is outside the pinned RAM range");
+      return;
+    }
+    raw_size = 0;
+    slice_count = 0;
+    if (boundary == Boundary::PadPoll)
+    {
+      u32 caller = 0;
+      if (state->gpr[1] > UINT32_MAX - 0x54 ||
+          !ReadU32(system, state->gpr[1] + 0x54, &caller) || caller != PAD_READ_HSD_CALLER)
+        return;
+      if (state->gpr[31] < 0x30 ||
+          !AddSlice(system, SliceTag::PadStatusAll4, state->gpr[31] - 0x30, 0x30) ||
+          !AddSlice(system, SliceTag::PadPollCaller, state->gpr[1] + 0x54, 4) ||
+          !AddSlice(system, SliceTag::PadQueue, 0x804c1f78, 0xc) ||
+          !AddSlice(system, SliceTag::PadSnapshot, 0x804c1f84, 0x358) ||
+          !AddSlice(system, SliceTag::RetraceCount, 0x804d7420, 4) ||
+          !AddSlice(system, SliceTag::SourceVICount, 0x804a7f98, 4) ||
+          !AddSlice(system, SliceTag::SceneRouting, 0x80479d30, 6))
+        return SetInvalid("PAD poll did not expose its bounded four-port slices"), void();
+    }
+    else if (boundary == Boundary::PadConsume)
+    {
+      if (!AddSlice(system, SliceTag::PadQueue, 0x804c1f78, 0xc) ||
+          !AddSlice(system, SliceTag::PadSlot, state->gpr[25], 0x30))
+        return SetInvalid("PAD consume did not expose its bounded queue/slot slices"), void();
+      std::array<u8, 0xc> queue{};
+      const u8 qread = static_cast<u8>(state->gpr[6]);
+      if (!ReadBytes(system, 0x804c1f78, queue.size(), queue.data()) || !queue[0] ||
+          qread >= queue[0] || ReadBE32(queue.data() + 8) + qread * 0x30 != state->gpr[25])
+        return SetInvalid("PAD consume registers escaped the pinned queue"), void();
+    }
+    else if (boundary == Boundary::Entry || boundary == Boundary::Setup)
+    {
+      if (boundary == Boundary::Entry)
+      {
+        setup_pointer = state->gpr[3];
+        if (!setup_pointer || !AddSlice(system, SliceTag::MatchSetup, setup_pointer, 0x138))
+          return SetInvalid("VS entry did not expose its source setup"), void();
+        u32 rng_pointer = 0;
+        if (!AddSlice(system, SliceTag::RngPointer, 0x804d5f94, 4) ||
+            !ReadU32(system, 0x804d5f94, &rng_pointer) || !rng_pointer ||
+            !AddSlice(system, SliceTag::RngValue, rng_pointer, 4) ||
+            !AddSlice(system, SliceTag::PadSnapshot, 0x804c1f84, 0x358))
+          return SetInvalid("VS entry did not expose its bounded initial state"), void();
+        setup_ready = false;
+        result_seen = false;
+        result_pointer = 0;
+        fighter_present.fill(false);
+        fighter_pointers.fill(0);
+        cpu_slots.fill(false);
+        draw_ordinal = 0;
+        const auto* setup = system->GetMemory().GetPointerForRange(setup_pointer, 0x138);
+        if (!setup)
+          return SetInvalid("source setup pointer is invalid"), void();
+        // The same entry routine is also used by title-screen attract demos.
+        // Keep that entry record, but only arm match capture for the original
+        // VS setup bit.  Genuine VS setups retain the existing role checks.
+        match_active = (setup[4] & 0x40) != 0;
+        active_slot_count = 0;
+        if (match_active)
+        {
+          while (active_slot_count < 6 &&
+                 (setup[0x61 + active_slot_count * 0x24] == 0 ||
+                  setup[0x61 + active_slot_count * 0x24] == 1))
+            ++active_slot_count;
+          if (active_slot_count < 2 || active_slot_count > 4 ||
+              (active_slot_count < 6 && setup[0x61 + active_slot_count * 0x24] != 3))
+            return SetInvalid("VS setup has a non-contiguous active port layout"), void();
+          for (u32 slot = 0; slot < 4; ++slot)
+          {
+            const u8 type = setup[0x61 + slot * 0x24];
+            cpu_slots[slot] = slot < active_slot_count && type == 1;
+            if (slot >= active_slot_count && type != 3)
+              return SetInvalid("VS setup has an unexpected trailing port"), void();
+          }
+        }
+      }
+      else
+      {
+        if (!match_active || !setup_pointer ||
+            !AddSlice(system, SliceTag::MatchSetup, setup_pointer, 0x138))
+          return;
+        if (!std::all_of(fighter_present.begin(), fighter_present.begin() + active_slot_count,
+                         [](bool present) { return present; }) ||
+            !AddMatchSlices(system))
+          return SetInvalid("match setup completed before all bounded fighter slices were ready"),
+                 void();
+        setup_ready = true;
+      }
+    }
+    else if (boundary == Boundary::FighterCreate)
+    {
+      if (!match_active)
+        return;
+      u32 pointer = 0;
+      u8 slot = 0xff;
+      if (!AddSlice(system, SliceTag::FighterCreateContext, state->gpr[3], 0x30) ||
+          !ReadU32(system, state->gpr[3] + 0x2c, &pointer) || !pointer ||
+          !ReadBytes(system, pointer + 0xc, 1, &slot) || slot >= active_slot_count ||
+          fighter_present[slot])
+        return SetInvalid("fighter creation exposed an invalid source slot"), void();
+      fighter_pointers[slot] = pointer;
+      fighter_present[slot] = true;
+      if (!AddSlice(system, SliceTag::FighterHead, pointer, 0x100,
+                    static_cast<u16>(slot)))
+        return SetInvalid("fighter creation slices escaped the pinned ranges"), void();
+    }
+    else if (boundary == Boundary::SourceTick || boundary == Boundary::DrawEnter ||
+             boundary == Boundary::DrawReturn)
+    {
+      if (!match_active || !setup_ready ||
+          !std::all_of(fighter_present.begin(), fighter_present.begin() + active_slot_count,
+                       [](bool present) { return present; }))
+        return;
+      if (!AddMatchSlices(system))
+        return SetInvalid("match semantic slice escaped the pinned ranges"), void();
+    }
+    else if (boundary == Boundary::ResultEnter || boundary == Boundary::ResultReturn)
+    {
+      if (!match_active)
+        return;
+      if (boundary == Boundary::ResultEnter)
+        result_pointer = state->gpr[3];
+      if (!result_pointer || result_pointer != 0x80479d98 ||
+          !AddSlice(system, SliceTag::Result, result_pointer + 0xc, 0x28))
+        return SetInvalid("VS result pointer differs from the pinned source context"), void();
+      if (boundary == Boundary::ResultReturn)
+        result_seen = true;
+    }
+    else if (boundary == Boundary::SceneTeardown)
+    {
+      if (!match_active || !result_seen)
+        return;
+      const u8* count_ptr = system->GetMemory().GetPointerForRange(0x804ce380, 1);
+      u32 list_heads = 0;
+      if (!count_ptr || !ReadU32(system, 0x804d782c, &list_heads) || !list_heads ||
+          count_ptr[0] >= 64 ||
+          !AddSlice(system, SliceTag::SceneEntityCount, 0x804ce380, 1) ||
+          !AddSlice(system, SliceTag::SceneEntityHeadsPointer, 0x804d782c, 4) ||
+          !AddSlice(system, SliceTag::SceneEntityHeads, list_heads,
+                    (static_cast<size_t>(count_ptr[0]) + 1) * 4))
+        return SetInvalid("scene teardown entity lists are invalid"), void();
+      if (!AddSlice(system, SliceTag::SceneRouting, 0x80479d30, 6))
+        return SetInvalid("scene teardown routing bytes are invalid"), void();
+    }
+    else if (boundary == Boundary::SceneExit)
+    {
+      if (!match_active)
+        return;
+      if (!AddSlice(system, SliceTag::MatchClock, 0x8046b6a0, 0x30))
+        return SetInvalid("scene exit match state is invalid"), void();
+      if (!AddSlice(system, SliceTag::SceneRequest, 0x80479d64, 4))
+        return SetInvalid("scene exit request is invalid"), void();
+    }
+
+    Slot* slot = Reserve(Event::Boundary, pc, source_tick, draw_ordinal);
+    if (!slot)
+      return;
+    u8* out = slot->payload.data();
+    PutU16(out, static_cast<u16>(boundary));
+    PutU16(out, 0);
+    PutU32(out, state->spr[8]);
+    PutU32(out, 32);
+    PutU32(out, static_cast<u32>(slice_count));
+    PutU32(out, 0);
+    for (u32 value : state->gpr)
+      PutU32(out, value);
+    const size_t descriptor_size = 16 * slice_count;
+    u8* descriptor = out;
+    out += descriptor_size;
+    u32 raw_offset = static_cast<u32>(out - slot->payload.data());
+    for (size_t index = 0; index < slice_count; ++index)
+    {
+      const SliceRef& slice = slices[index];
+      PutU16(descriptor, static_cast<u16>(slice.tag));
+      PutU16(descriptor, slice.flags);
+      PutU32(descriptor, slice.address);
+      PutU32(descriptor, slice.size);
+      PutU32(descriptor, raw_offset);
+      raw_offset += slice.size;
+    }
+    if (static_cast<size_t>(out - slot->payload.data()) + raw_size > slot->payload.size())
+      return SetInvalid("observer boundary payload exceeds its bounded slot"), void();
+    std::memcpy(out, raw.data(), raw_size);
+    out += raw_size;
+    slot->payload_size = static_cast<u32>(out - slot->payload.data());
+    slot->checksum = CRC32(slot->payload.data(), slot->payload_size);
+    Publish(slot);
+    if (boundary == Boundary::DrawReturn)
+      ++draw_ordinal;
+    if (boundary == Boundary::SceneTeardown && result_seen)
+      RequestComplete();
+  }
+
+  void SetInvalid(std::string reason)
+  {
+    bool expected = false;
+    if (invalid.compare_exchange_strong(expected, true))
+    {
+      std::lock_guard lock(error_mutex);
+      error = std::move(reason);
+    }
+    finish_requested.store(true);
+  }
+
+  Slot* Reserve(Event event, u32 pc, u32 source_tick, u32 draw_count)
+  {
+    if (invalid.load() || finish_requested.load())
+      return nullptr;
+    const u64 head = head_index.load(std::memory_order_relaxed);
+    Slot& slot = ring[head % RING_SIZE];
+    if (slot.ready.load(std::memory_order_acquire))
+    {
+      SetInvalid("observer ring overflow; no record was dropped");
+      return nullptr;
+    }
+    slot.event = event;
+    slot.sequence = next_sequence++;
+    slot.timestamp_ns = static_cast<u64>(
+        std::chrono::duration_cast<std::chrono::nanoseconds>(
+            std::chrono::steady_clock::now().time_since_epoch())
+            .count());
+    slot.guest_pc = pc;
+    slot.source_tick = source_tick;
+    slot.draw_ordinal = draw_count;
+    slot.payload_size = 0;
+    slot.checksum = 0;
+    return &slot;
+  }
+
+  void Publish(Slot* slot)
+  {
+    slot->ready.store(true, std::memory_order_release);
+    head_index.fetch_add(1, std::memory_order_release);
+  }
+
+  void PushJson(Event event, const std::string& json, u32 pc = 0, u32 tick = 0,
+                u32 draw = 0)
+  {
+    Slot* slot = Reserve(event, pc, tick, draw);
+    if (!slot)
+      return;
+    if (json.size() > slot->payload.size())
+    {
+      SetInvalid("observer JSON event exceeds payload bound");
+      return;
+    }
+    std::memcpy(slot->payload.data(), json.data(), json.size());
+    slot->payload_size = static_cast<u32>(json.size());
+    slot->checksum = CRC32(slot->payload.data(), slot->payload_size);
+    Publish(slot);
+  }
+
+  static u32 CRC32(const u8* bytes, size_t size)
+  {
+    u32 crc = 0xffffffffU;
+    for (size_t i = 0; i < size; ++i)
+    {
+      crc ^= bytes[i];
+      for (int bit = 0; bit < 8; ++bit)
+        crc = (crc >> 1) ^ (0xedb88320U & (0U - (crc & 1U)));
+    }
+    return crc ^ 0xffffffffU;
+  }
+
+  void WriterMain()
+  {
+    File::DirectIOFile output(output_path, File::AccessMode::Write, File::OpenMode::Create);
+    if (!output.IsOpen())
+      SetInvalid("observer stream could not be opened");
+    if (!WriteStatus("starting", -1, 0, 0, false, true))
+      SetInvalid("observer status could not be written");
+    u64 tail = 0;
+    u64 last_seq = static_cast<u64>(-1);
+    bool error_written = false;
+    while (true)
+    {
+      bool drained = false;
+      while (tail < head_index.load(std::memory_order_acquire))
+      {
+        Slot& slot = ring[tail % RING_SIZE];
+        if (!slot.ready.load(std::memory_order_acquire))
+          break;
+        if (output.IsOpen())
+        {
+          if (!WriteFrame(output, slot))
+          {
+            SetInvalid("observer stream write failed");
+            output.Close();
+          }
+        }
+        last_seq = slot.sequence;
+        last_tick = slot.source_tick;
+        last_draw = slot.draw_ordinal;
+        ++event_count;
+        slot.ready.store(false, std::memory_order_release);
+        ++tail;
+        tail_index.store(tail, std::memory_order_release);
+        drained = true;
+        if (!WriteStatus(invalid.load() ? "invalid" : "recording", static_cast<s64>(last_seq),
+                         last_tick, last_draw, false))
+          SetInvalid("observer status could not be written");
+      }
+      if (invalid.load() && !error_written && output.IsOpen())
+      {
+        const std::string reason = Error();
+        Slot error_slot;
+        error_slot.event = Event::Error;
+        error_slot.sequence = last_seq + 1;
+        error_slot.timestamp_ns = static_cast<u64>(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(
+                std::chrono::steady_clock::now().time_since_epoch())
+                .count());
+        error_slot.payload_size = static_cast<u32>(reason.size());
+        const std::string json = "{\"error\":\"" + JsonEscape(reason) + "\"}";
+        error_slot.payload_size = static_cast<u32>(json.size());
+        std::memcpy(error_slot.payload.data(), json.data(), json.size());
+        error_slot.checksum = CRC32(error_slot.payload.data(), error_slot.payload_size);
+        error_slot.guest_pc = 0;
+        error_slot.source_tick = last_tick;
+        error_slot.draw_ordinal = last_draw;
+        if (WriteFrame(output, error_slot))
+        {
+          last_seq = error_slot.sequence;
+          ++event_count;
+          error_written = true;
+        }
+      }
+      const bool finished = finish_requested.load() && tail >= head_index.load();
+      if (finished)
+      {
+        if (output.IsOpen())
+        {
+          Slot end_slot;
+          end_slot.event = Event::End;
+          end_slot.sequence = last_seq + 1;
+          end_slot.timestamp_ns = static_cast<u64>(
+              std::chrono::duration_cast<std::chrono::nanoseconds>(
+                  std::chrono::steady_clock::now().time_since_epoch())
+                  .count());
+          const bool complete = natural_completion.load() && !invalid.load();
+          const std::string json = complete
+                                       ? "{\"status\":\"completed\",\"natural\":true}"
+                                       : "{\"status\":\"interrupted\",\"natural\":false}";
+          end_slot.payload_size = static_cast<u32>(json.size());
+          std::memcpy(end_slot.payload.data(), json.data(), json.size());
+          end_slot.checksum = CRC32(end_slot.payload.data(), end_slot.payload_size);
+          end_slot.source_tick = last_tick;
+          end_slot.draw_ordinal = last_draw;
+          if (WriteFrame(output, end_slot))
+          {
+            last_seq = end_slot.sequence;
+            ++event_count;
+          }
+          if (!output.Flush())
+            SetInvalid("observer stream flush failed");
+        }
+        const bool complete = natural_completion.load() && !invalid.load();
+        if (!WriteStatus(complete ? "completed" : (invalid.load() ? "invalid" : "interrupted"),
+                         static_cast<s64>(last_seq), last_tick, last_draw, complete, true))
+          SetInvalid("observer final status could not be written");
+        return;
+      }
+      if (!drained)
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+  }
+
+  bool WriteFrame(File::DirectIOFile& output, const Slot& slot)
+  {
+    std::array<u8, 44> header{};
+    u8* out = header.data();
+    PutU32(out, MAGIC);
+    PutU16(out, SCHEMA);
+    PutU16(out, static_cast<u16>(slot.event));
+    PutU64(out, slot.sequence);
+    PutU64(out, slot.timestamp_ns);
+    PutU32(out, slot.guest_pc);
+    PutU32(out, slot.source_tick);
+    PutU32(out, slot.draw_ordinal);
+    PutU32(out, slot.payload_size);
+    PutU32(out, slot.checksum);
+    return output.Write(header.data(), header.size()) &&
+           output.Write(slot.payload.data(), slot.payload_size);
+  }
+
+  bool WriteStatus(std::string_view state, s64 last_seq, u32 source_tick, u32 draw,
+                   bool completed, bool force = false)
+  {
+    const auto now = std::chrono::steady_clock::now();
+    if (!force && now < next_status_write)
+      return true;
+    const std::string temporary = status_path + ".tmp." +
+                                  std::to_string(reinterpret_cast<uintptr_t>(this));
+    std::error_code remove_error;
+    std::filesystem::remove(temporary, remove_error);
+    File::DirectIOFile status(temporary, File::AccessMode::Write, File::OpenMode::Create);
+    if (!status.IsOpen())
+      return false;
+    const std::string error_text = JsonEscape(Error());
+    const std::string json =
+        "{\"state\":\"" + std::string(state) + "\",\"event_count\":" +
+        std::to_string(event_count) + ",\"last_seq\":" + std::to_string(last_seq) +
+        ",\"source_tick\":" + std::to_string(source_tick) +
+        ",\"draw_ordinal\":" + std::to_string(draw) + ",\"completed\":" +
+        (completed ? "true" : "false") + ",\"invalid\":" +
+        (invalid.load() ? "true" : "false") + ",\"error\":" +
+        (error_text.empty() ? "null" : "\"" + error_text + "\"") + "}\n";
+    if (!status.Write(reinterpret_cast<const u8*>(json.data()), json.size()) || !status.Flush() ||
+        !status.Close())
+      return false;
+    std::error_code error_code;
+    std::filesystem::rename(temporary, status_path, error_code);
+    if (error_code)
+    {
+      std::filesystem::remove(temporary, error_code);
+      return false;
+    }
+    next_status_write = now + std::chrono::milliseconds(250);
+    return true;
+  }
+
+  std::string Error() const
+  {
+    std::lock_guard lock(error_mutex);
+    return error;
+  }
+
+  std::atomic<bool> started{false};
+  std::atomic<bool> invalid{false};
+  std::atomic<bool> finish_requested{false};
+  std::atomic<bool> natural_completion{false};
+  std::array<Slot, RING_SIZE> ring{};
+  std::atomic<u64> head_index{0};
+  std::atomic<u64> tail_index{0};
+  u64 next_sequence = 0;
+  std::thread writer;
+  std::string output_path;
+  std::string status_path;
+  mutable std::mutex error_mutex;
+  std::string error;
+  u64 event_count = 0;
+  u32 last_tick = 0;
+  u32 last_draw = 0;
+  std::chrono::steady_clock::time_point next_status_write{};
+  std::array<SliceRef, MAX_SLICES> slices{};
+  std::array<u8, MAX_RAW> raw{};
+  size_t slice_count = 0;
+  size_t raw_size = 0;
+  std::array<u32, 4> fighter_pointers{};
+  std::array<bool, 4> fighter_present{};
+  std::array<bool, 4> cpu_slots{};
+  u32 setup_pointer = 0;
+  u32 active_slot_count = 0;
+  bool match_active = false;
+  bool setup_ready = false;
+  bool result_seen = false;
+  u32 result_pointer = 0;
+  u32 draw_ordinal = 0;
+};
+
+Observer::Observer() : m_impl(new Impl) {}
+Observer::~Observer()
+{
+  delete m_impl;
+}
+
+Observer& Observer::Instance()
+{
+  static Observer observer;
+  return observer;
+}
+
+bool Observer::ValidateDiscDOL(const DiscIO::VolumeDisc& volume)
+{
+  const DiscIO::Partition partition = volume.GetGamePartition();
+  if (volume.GetGameID(partition) != "GALE01" || volume.GetRevision(partition) != 2)
+    return false;
+
+  const auto dol_offset = DiscIO::GetBootDOLOffset(volume, partition);
+  if (!dol_offset)
+    return false;
+  const auto dol_size = DiscIO::GetBootDOLSize(volume, partition, *dol_offset);
+  if (!dol_size || *dol_size == 0 || *dol_size > 64 * 1024 * 1024)
+    return false;
+
+  std::vector<u8> dol(*dol_size);
+  if (!volume.Read(*dol_offset, dol.size(), dol.data(), partition))
+    return false;
+
+  std::array<u8, 32> sha256{};
+  if (mbedtls_sha256_ret(dol.data(), dol.size(), sha256.data(), 0) != 0 ||
+      sha256 != EXPECTED_DOL_SHA256_BYTES)
+    return false;
+  return Common::SHA1::CalculateDigest(dol) == EXPECTED_DOL_SHA1_BYTES;
+}
+
+bool Observer::IsEnabled()
+{
+  static const bool enabled = ActivationRequested();
+  return enabled;
+}
+
+bool Observer::IsBoundary(u32 guest_pc)
+{
+  switch (guest_pc)
+  {
+  case 0x8034DD8C:
+  case 0x80377584:
+  case 0x800693A8:
+  case 0x8016E934:
+  case 0x8016E9C4:
+  case 0x80390EB4:
+  case 0x80390FC0:
+  case 0x80391040:
+  case 0x8016E9C8:
+  case 0x8016EBBC:
+  case 0x8039157C:
+  case 0x801A4B70:
+    return true;
+  default:
+    return false;
+  }
+}
+
+void Observer::OnBoundary(Core::System* system, u32 guest_pc, PowerPC::PowerPCState* state)
+{
+  if (!IsEnabled() || !system || !state)
+    return;
+  Instance().Observe(system, guest_pc, state);
+}
+
+void Observer::Observe(Core::System* system, u32 guest_pc, PowerPC::PowerPCState* state)
+{
+  m_impl->Observe(system, guest_pc, state);
+}
+
+}  // namespace ReferenceCapture

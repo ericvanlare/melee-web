@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "melee-web-reference-inbox-v1",
+  "title": "Reference capture inbox layout",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["states"],
+  "properties": {
+    "states": {
+      "type": "array",
+      "const": ["activepartials", "acceptedunprocessed", "failed", "ingested", "derived"]
+    }
+  }
+}

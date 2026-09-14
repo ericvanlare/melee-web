@@ -14,6 +14,10 @@ ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location("bootstrap", ROOT / "scripts/bootstrap.py")
 bootstrap = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(bootstrap)
+sys.path.insert(0, str(ROOT / "scripts"))
+import build_reference_dolphin
+sys.path.insert(0, str(ROOT / "tools"))
+import reference_capture_environment
 
 
 def git(path, *arguments):
@@ -177,6 +181,26 @@ class LockTests(unittest.TestCase):
         for lock in invalid:
             with self.subTest(lock=lock), self.assertRaises(ValueError):
                 self.read(lock)
+
+    def test_dolphin_source_pin_is_explicit_and_matches_consumers(self):
+        dolphin = self.lock["reference_tools"]["dolphin"]
+        self.assertEqual(dolphin["kind"], "source")
+        self.assertNotIn("package", dolphin)
+        self.assertEqual(dolphin["commit"], build_reference_dolphin.PINNED_COMMIT)
+        self.assertEqual(dolphin["commit"], reference_capture_environment.DOLPHIN_REVISION)
+        self.assertEqual(self.read(self.lock), self.lock)
+
+    def test_rejects_unpinned_dolphin_source_commit(self):
+        lock = copy.deepcopy(self.lock)
+        lock["reference_tools"]["dolphin"]["commit"] = "main"
+        with self.assertRaisesRegex(ValueError, "reference tool commit"):
+            self.read(lock)
+
+    def test_rejects_unknown_reference_tool_kind(self):
+        lock = copy.deepcopy(self.lock)
+        lock["reference_tools"]["dolphin"]["kind"] = "binary"
+        with self.assertRaisesRegex(ValueError, "unsupported reference tool kind"):
+            self.read(lock)
 
     def test_invalid_build_jobs_fail_before_accessing_dependencies(self):
         for jobs in ("0", "-1", "invalid"):
