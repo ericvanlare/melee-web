@@ -263,6 +263,35 @@ class PublicReleaseTests(unittest.TestCase):
         (fixture_root / "build" / "runtime-public-identity.json").write_bytes(identity_bytes)
         return runtime
 
+    def test_selective_public_root_preserves_artifact_seed_and_audio_binding(self):
+        runtime = self.runtime_fixture()
+        old = "build/browser-public-release"
+        new = "build/browser-public-selective-release"
+        (self.fixture_repo / old).rename(self.fixture_repo / new)
+        sidecar = runtime.parent / "runtime-public-identity.json"
+        identity = json.loads(sidecar.read_text().replace(old, new))
+        for destination in (sidecar, self.fixture_repo / "build/runtime-public-identity.json"):
+            destination.write_text(json.dumps(identity))
+        output = self.root / "selective-player"
+        build(output=output, profile="player", runtime_dir=runtime)
+        audit(output, output.with_name(output.name + ".manifest.json"))
+        # A reviewed root cannot borrow the ordinary build's audio proof.
+        identity["audio_graph"]["ninja"]["path"] = old + "/build.ninja"
+        sidecar.write_text(json.dumps(identity))
+        with self.assertRaisesRegex(BuildError, "Ninja evidence"):
+            build(output=self.root / "mixed-player", profile="player", runtime_dir=runtime)
+
+    def test_public_root_allowlist_rejects_private_or_malformed_variants(self):
+        runtime = self.runtime_fixture()
+        sidecar = runtime.parent / "runtime-public-identity.json"
+        identity = json.loads(sidecar.read_text())
+        for invalid in ("build/browser-selective-release", "build/browser-provenance-release", {}, "../browser-public-release"):
+            with self.subTest(root=invalid):
+                identity["artifact_root"] = invalid
+                sidecar.write_text(json.dumps(identity))
+                with self.assertRaisesRegex(BuildError, "artifact_root"):
+                    build(output=self.root / "invalid-root-player", profile="player", runtime_dir=runtime)
+
     def test_preview_build_is_auditable_and_uses_hashed_assets(self):
         output, manifest = self.paths()
         result = audit(output, manifest)
@@ -334,6 +363,36 @@ class PublicReleaseTests(unittest.TestCase):
         identity_path.write_text(json.dumps(identity))
         with self.assertRaisesRegex(BuildError, "identity mismatch"):
             build(output=self.root / "drift-runtime", profile="player", runtime_dir=runtime)
+
+    def test_player_rejects_unexported_cpu_address_diagnostics(self):
+        for index, marker in enumerate((b"CPU_ADDRESS_AUDIT", b"melee-web-native-cpu-address-diagnostic")):
+            with self.subTest(marker=marker):
+                runtime = self.runtime_fixture()
+                wasm = runtime / "gameplay_public.wasm"
+                # A custom section leaves the allowed export inventory intact.
+                # Re-sign the fixture identity so rejection cannot rely on drift.
+                name = b"diagnostic-fixture"
+                payload = _uleb(len(name)) + name + marker
+                wasm.write_bytes(wasm.read_bytes() + b"\x00" + _uleb(len(payload)) + payload)
+                identity_path = runtime.parent / "runtime-public-identity.json"
+                identity = json.loads(identity_path.read_text())
+                record = next(item for item in identity["artifacts"]
+                              if item["path"].endswith("/gameplay_public.wasm"))
+                record.update(bytes=wasm.stat().st_size, sha256=hashlib.sha256(wasm.read_bytes()).hexdigest())
+                encoded = json.dumps(identity).encode()
+                identity_path.write_bytes(encoded)
+                (self.fixture_repo / "build/runtime-public-identity.json").write_bytes(encoded)
+                with self.assertRaisesRegex(BuildError, "CPU address diagnostic"):
+                    build(output=self.root / f"rejected-address-{index}", profile="player", runtime_dir=runtime)
+
+                # Model an older packager accepting dormant native diagnostics;
+                # the current audit must reject that internally consistent bundle.
+                output = self.root / f"tainted-address-{index}"
+                manifest = self.root / f"tainted-address-{index}.manifest.json"
+                with patch.object(build_public, "_validate_runtime_graph", return_value=None):
+                    build(output=output, manifest=manifest, profile="player", runtime_dir=runtime)
+                with self.assertRaisesRegex(AuditError, "CPU address diagnostic"):
+                    audit(output, manifest)
 
     def test_player_rejects_legacy_identity_and_audio_policy_drift(self):
         runtime = self.runtime_fixture()

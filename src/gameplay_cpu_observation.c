@@ -312,6 +312,9 @@ void melee_web_cpu_observation_begin(const uint8_t setup[0x138], size_t frames, 
     for (unsigned i = 0; i < 0x138; ++i) put("%02x", setup[i]);
     put("\"}"); emit();
     put("{\"record\":\"initial\","); snapshot(); put("}"); emit();
+#ifndef MELEE_WEB_PUBLIC_RUNTIME
+    /* Keep native address diagnostics out of the public binary, even when
+     * unexported replay support retains this observer in the link closure. */
     if (hitlag_audit) {
         /* Native allocation identities are diagnostic data, never a retail
          * pointer model or part of the semantic CPU comparison. */
@@ -327,6 +330,7 @@ void melee_web_cpu_observation_begin(const uint8_t setup[0x138], size_t frames, 
         put("]}");
         fprintf(stderr, "CPU_ADDRESS_AUDIT %s\n", line); used = 0;
     }
+#endif
 }
 void melee_web_cpu_observation_enable_hitlag_audit(void)
 {

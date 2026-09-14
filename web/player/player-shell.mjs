@@ -116,6 +116,8 @@ $('fullscreen').onclick = async () => {
 document.addEventListener('fullscreenchange', () => { $('fullscreen').textContent = document.fullscreenElement ? 'Exit fullscreen' : 'Fullscreen'; });
 renderKeyboard();
 try {
-  player = await mountMeleeRuntime({canvas: $('canvas'), onState: renderStatus, onError: error => showError(error)});
+  player = await mountMeleeRuntime({
+    canvas: $('canvas'), onState: renderStatus, onError: error => showError(error),
+  });
   await applyKeyboard();
 } catch (error) { showError(error, true); }

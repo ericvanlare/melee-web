@@ -7664,3 +7664,43 @@ diff --git a/src/melee/ft/ft_0C31.c b/src/melee/ft/ft_0C31.c
  
      HSD_JObjSetScale(gobj->hsd_obj, &temp_r31->mv.co.entry.x14);
  
+diff --git a/src/sysdolphin/baselib/gobj.c b/src/sysdolphin/baselib/gobj.c
+--- a/src/sysdolphin/baselib/gobj.c
++++ b/src/sysdolphin/baselib/gobj.c
+@@ -1,3 +1,6 @@
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++#include "pipeline_provenance_runtime.h"
++#endif
+ #include "gobj.h"
+ 
+ #include "class.h"
+@@ -150,7 +153,14 @@
+ {
+     HSD_GObj* saved = HSD_GObj_804D7814;
+     HSD_GObj_804D7814 = cur;
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++    MeleeWebPipelineScope provenance_scope = {0};
++    melee_web_provenance_owner_begin(cur->classifier, cur->gx_link, i, &provenance_scope);
++#endif
+     cur->render_cb(cur, i);
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++    melee_web_provenance_scope_end(&provenance_scope);
++#endif
+     HSD_GObj_804D7814 = saved;
+ }
+ 
+@@ -191,7 +201,14 @@
+         if (cur->render_cb != NULL) {
+             saved = HSD_GObj_804D7818;
+             HSD_GObj_804D7818 = cur;
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++            MeleeWebPipelineScope provenance_scope = {0};
++            melee_web_provenance_owner_begin(cur->classifier, cur->gx_link, 0, &provenance_scope);
++#endif
+             cur->render_cb(cur, 0);
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++            melee_web_provenance_scope_end(&provenance_scope);
++#endif
+             HSD_GObj_804D7818 = saved;
+         }
+         cur = cur->next_gx;

@@ -178,6 +178,41 @@ int melee_web_menu_host_leave(MeleeWebMenuHost* h,int abort_scene,char* e,size_t
     h->entered=0;restore_context(h);return ok(e,n);
 }
 int melee_web_menu_host_phase(const MeleeWebMenuHost* h){return h&&h==owner?melee_web_menu_phase(h->session):MELEE_WEB_MENU_CLOSED;}
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+int melee_web_menu_host_provenance(const MeleeWebMenuHost* h,MeleeWebPipelineSourceContext* out){
+    if(!h||h!=owner||!out)return 0;
+    const int phase=melee_web_menu_phase(h->session);
+    const int sss=phase==MELEE_WEB_MENU_SSS||phase==MELEE_WEB_MENU_SSS_READY;
+    const CSSData* css=melee_web_menu_css(h->session);
+    const SSSData* stages=melee_web_menu_sss(h->session);
+    if(!css||!stages)return 0;
+    const StartMeleeData* start=sss?&stages->vs.start:&css->vs.start;
+    memset(out,0,sizeof(*out));
+    for(unsigned i=0;i<4;++i){out->players[i].motion_id=-1;out->players[i].stocks=-1;}
+    out->scene=sss?MELEE_WEB_PIPELINE_SCENE_SSS:MELEE_WEB_PIPELINE_SCENE_CSS;
+    out->phase=MELEE_WEB_PIPELINE_PHASE_INTERACTIVE;
+    out->world_generation=melee_web_gameplay_generation();
+    out->source_tick=melee_web_gameplay_provenance_tick();
+    out->owner_kind=MELEE_WEB_PIPELINE_OWNER_MENU_SCENE;
+    out->owner_id=out->scene;
+    out->stage=start->rules.stkind;out->hud_layout=start->rules.x0_3;
+    const MeleeWebStageContent* stage=melee_web_stage_content(start->rules.stkind);
+    out->ground=stage?stage->ground_kind:UINT32_MAX;
+    int count=melee_web_menu_active_player_count(start);
+    if(count<0||count>4)return 0;
+    out->active_player_count=(uint32_t)count;
+    for(int i=0;i<count;++i){
+        const PlayerInitData* source=&start->players[i];
+        const MeleeWebFighterContent* fighter=melee_web_fighter_content(source->ckind);
+        out->players[i].character=source->ckind;
+        out->players[i].fighter_kind=fighter?fighter->fighter_kind:UINT32_MAX;
+        out->players[i].costume=source->color;out->players[i].subcolor=source->sub_color;
+        out->players[i].effect_bank=fighter?fighter->effect_bank:UINT32_MAX;
+        out->players[i].motion_id=-1;out->players[i].stocks=source->stocks;
+    }
+    return 1;
+}
+#endif
 int melee_web_menu_host_selection(const MeleeWebMenuHost* h,MeleeWebMenuMatchSelection* out,char* e,size_t n){
     if(!h||h!=owner||h->entered||h->audio||!out||seed_ptr!=&h->seed)
         return fail(e,n,"Selection requires a closed menu scene with owned RNG");

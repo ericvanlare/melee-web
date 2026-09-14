@@ -6,6 +6,9 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {createRuntimeAudio} from '../web/runtime-audio.mjs';
 const withAudio = !process.argv.includes('--silent');
+const cacheUnavailable = process.argv.includes('--cache-unavailable');
+const failMkdir = process.argv.includes('--mkdir-failure');
+if (cacheUnavailable) await import('../web/runtime-cache.js');
 const original = await fs.readFile(new URL('../web/melee-runtime.mjs', import.meta.url), 'utf8');
 const source = original.replace("import {loadNativeGameDisc} from './runtime-assets.mjs';", 'const loadNativeGameDisc = globalThis.testDiscReader;');
 let phase = 0, running = false, nextPointer = 16, cacheWaits = 0, audioClosed = false;
@@ -47,8 +50,43 @@ const {mountMeleeRuntime} = await import(pathToFileURL(sourcePath));
 await fs.rm(temporary, {recursive: true});
 let owner;
 const mounted = mountMeleeRuntime({canvas, createAudio: withAudio ? createRuntimeAudio : undefined, loaderUrl: new URL('http://localhost/runtime/version/gameplay_public.js'),
+  configureModule: cacheUnavailable ? module => {
+    module.preRun = () => {
+      assert.ok(directories.has('/melee-render-cache'), 'Required setup precedes entry callbacks');
+      calls.push(['entryPreRun']);
+    };
+    globalThis.installRuntimeCache(module, event => calls.push(['cacheReport', event]));
+  } : undefined,
   onState: state => states.push(state), onOwner: context => { owner = context; }});
 assert.equal(states.at(-1).state, 'booting');
+const directories = new Set();
+Module.FS = {
+  mkdirTree(directory) {
+    calls.push(['mkdirTree', directory]);
+    if (failMkdir) throw Error('cache directory denied');
+    directories.add(directory);
+  },
+  mount() { assert.fail('Unavailable or disabled persistence must not mount storage'); },
+  syncfs() { assert.fail('Unavailable or disabled persistence must not synchronize storage'); },
+};
+assert.equal(directories.size, 0, 'The loader installs FS after module configuration');
+if (failMkdir) {
+  assert.throws(() => Module.preRun.forEach(callback => callback(Module)), /cache directory denied/);
+  Module.onAbort('cache directory denied');
+  await assert.rejects(mounted, /cache directory denied/);
+  assert.equal(states.at(-1).canImport, false);
+  console.log('Shared runtime owner: required directory failure prevents native initialization.');
+  process.exit(0);
+}
+for (const callback of Module.preRun) callback(Module);
+assert.ok(directories.has('/melee-render-cache'), 'Both entries create the required directory before native initialization');
+assert.deepEqual(calls.filter(row => row[0] === 'mkdirTree'), [['mkdirTree', '/melee-render-cache']]);
+if (cacheUnavailable) {
+  assert.equal(Module.runtimeCacheState.state, 'unavailable');
+  assert.ok(calls.some(row => row[0] === 'entryPreRun'));
+} else {
+  assert.equal(Module.runtimeCacheState, undefined, 'Public startup does not install persistence');
+}
 Object.assign(Module, {
   HEAPU8: new Uint8Array(1024), UTF8ToString: x => x,
   _malloc: size => { const p = nextPointer; nextPointer += size; return p; }, _free() {},

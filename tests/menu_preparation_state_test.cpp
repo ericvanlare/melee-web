@@ -73,6 +73,24 @@ int main()
     assert(!state.arm(true));
     assert(!state.busy());
 
+    // A final source draw can discover an undeclared pipeline after requesting
+    // a transition. Its frozen settle must drain before that transition starts.
+    assert(state.suppress_source_draw(true));
+    assert(state.request_render_settle());
+    assert(!state.request());
+    assert(!state.suppress_source_draw(true));
+    assert(!state.observe_render(true, 1, true));
+    assert(!state.observe_render(true, 0, false));
+    assert(!state.suppress_source_draw(true));
+    assert(state.observe_render(true, 0, false));
+    assert(state.suppress_source_draw(true));
+    assert(!state.arm(false));
+    assert(state.arm(true));
+    assert(state.suppress_source_draw(true));
+    assert(state.request());
+    assert(state.begin_construction(true));
+    state.finish_construction(false);
+
     state.request();
     state.reset();
     assert(state.phase() == Phase::Idle);

@@ -42,6 +42,10 @@ int melee_web_menu_host_destroy(MeleeWebMenuHost*,char*,size_t);
 /* Same phase values as the checked source session: CSS=1, SSS-ready=2,
  * SSS=3, CSS-ready=4, match-ready=5, closed=6. */
 int melee_web_menu_host_phase(const MeleeWebMenuHost*);
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+#include "pipeline_provenance.h"
+int melee_web_menu_host_provenance(const MeleeWebMenuHost*, MeleeWebPipelineSourceContext*);
+#endif
 #ifdef __cplusplus
 }
 #endif

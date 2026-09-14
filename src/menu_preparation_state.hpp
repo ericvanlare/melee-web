@@ -86,10 +86,13 @@ public:
 
     // Priming and settling intentionally draw an unchanged source scene so
     // WebGPU can discover and compile its pipelines before simulation starts.
-    bool suppress_source_draw() const noexcept
+    // A pending transition must not starve a first-use settle discovered by
+    // the outgoing scene's final draw. Finish that frozen scene before the
+    // transition takes ownership on the next idle callback.
+    bool suppress_source_draw(bool pending_transition = false) const noexcept
     {
         return phase_ == Phase::WaitingForAudio || phase_ == Phase::Constructing ||
-               phase_ == Phase::Arming;
+               phase_ == Phase::Arming || (pending_transition && !warming());
     }
 
     Phase phase() const noexcept { return phase_; }

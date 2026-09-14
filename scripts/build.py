@@ -490,7 +490,11 @@ def _write_public_identity(root, build_dir, version, cmake, ninja, gameplay_sour
     return identity_path
 
 
-def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo"):
+def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *, pipeline_provenance=False, selective_pipelines=False):
+    if selective_pipelines and (target not in {"runtime", PUBLIC_RUNTIME_TARGET} or pipeline_provenance):
+        raise ValueError("--selective-pipelines requires runtime/runtime-public without --pipeline-provenance")
+    if pipeline_provenance and target != "runtime":
+        raise ValueError("--pipeline-provenance requires the private runtime target")
     if target == PUBLIC_RUNTIME_TARGET and configuration != PUBLIC_RUNTIME_CONFIGURATION:
         raise ValueError("runtime-public is Release-only; pass --configuration Release")
     lock = read_lock(root)
@@ -522,8 +526,16 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo"):
     env["EM_CONFIG"] = str(sdk / ".emscripten")
     env["EM_CACHE"] = str(emscripten / "cache")
     env["EMSDK_PYTHON"] = sys.executable
-    build_dir = root / (PUBLIC_RUNTIME_BUILD_DIR if target == PUBLIC_RUNTIME_TARGET else
-                         ("build/browser-release" if configuration == "Release" else "build/browser"))
+    if selective_pipelines:
+        suffix = "-release" if configuration == "Release" else ""
+        build_dir = root / ("build/browser-public-selective-release" if target == PUBLIC_RUNTIME_TARGET
+                            else f"build/browser-selective{suffix}")
+    elif pipeline_provenance:
+        build_dir = root / ("build/browser-provenance-release" if configuration == "Release"
+                            else "build/browser-provenance")
+    else:
+        build_dir = root / (PUBLIC_RUNTIME_BUILD_DIR if target == PUBLIC_RUNTIME_TARGET else
+                             ("build/browser-release" if configuration == "Release" else "build/browser"))
     if (root / "build").is_symlink() or build_dir.is_symlink():
         raise ValueError("Build output must be a local directory, not a symlink")
     source_inputs_before = (
@@ -537,6 +549,8 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo"):
     configure.append(
         f"-DMELEE_WEB_PUBLIC_RUNTIME={'ON' if target == PUBLIC_RUNTIME_TARGET else 'OFF'}"
     )
+    configure.append(f"-DMELEE_WEB_PIPELINE_PROVENANCE={'ON' if pipeline_provenance else 'OFF'}")
+    configure.append(f"-DMELEE_WEB_SELECTIVE_PIPELINES={'ON' if selective_pipelines else 'OFF'}")
     subprocess.run(configure, cwd=root, env=env, check=True)
     targets = {"graphics": ["gx_probe"], "gameplay": ["gameplay_checks"],
                "runtime": ["gameplay_menu_browser"],
@@ -562,11 +576,16 @@ def main():
     parser.add_argument("--jobs", type=int, default=min(os.cpu_count() or 2, 6))
     parser.add_argument("--target", choices=("graphics", "gameplay", "fighter", "runtime", PUBLIC_RUNTIME_TARGET, "all"), default="all")
     parser.add_argument("--configuration", choices=("RelWithDebInfo", "Release"), default="RelWithDebInfo")
+    parser.add_argument("--pipeline-provenance", action="store_true",
+                        help="Compile the private runtime recorder into a separate build directory")
+    parser.add_argument("--selective-pipelines", action="store_true",
+                        help="Prepare certified upcoming pipeline unions in a separate runtime build")
     args = parser.parse_args()
     if args.jobs < 1:
         parser.error("--jobs must be positive")
     try:
-        build(args.jobs, target=args.target, configuration=args.configuration)
+        build(args.jobs, target=args.target, configuration=args.configuration,
+              pipeline_provenance=args.pipeline_provenance, selective_pipelines=args.selective_pipelines)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         raise SystemExit(f"build: {error}") from error
 
