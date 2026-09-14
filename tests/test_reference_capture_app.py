@@ -18,6 +18,33 @@ SPEC.loader.exec_module(APP)
 
 
 class ReferenceCaptureAppTests(unittest.TestCase):
+    def test_dolphin_and_probe_use_profile_owned_sdl_configuration(self):
+        with mock.patch.dict(APP.os.environ, {"SDL_GAMECONTROLLERCONFIG": "override",
+                                             "SDL_JOYSTICK_HIDAPI": "0",
+                                             "DOLPHIN_EMU_USERPATH": "/private/global"}):
+            environment = APP.isolated_dolphin_environment()
+        self.assertFalse(any(key.startswith("SDL_") for key in environment))
+        self.assertNotIn("DOLPHIN_EMU_USERPATH", environment)
+
+    def test_live_sdl_connection_check_never_opens_another_sdl_client(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            app = APP.Supervisor(root / "environment.json", root=root, emit=lambda row: None)
+            hardware = {"name": "USB Product", "vendor_id": 123, "product_id": 456,
+                        "transport": "USB", "adapter": False}
+            app.identity = {"controller": {"selected": {"source": "SDL", "hardware": hardware}}}
+            app.settings = {"controller": {"backend": "SDL", "device": "Mapped Pad", "port": 1}}
+            try:
+                with mock.patch.object(APP, "physical_devices", return_value=[hardware]) as devices:
+                    app._check_controller_connection()
+                    devices.assert_called_once_with()
+                self.assertEqual(app.status["physical_controller"], "connected")
+                with mock.patch.object(APP, "physical_devices", return_value=[dict(hardware, product_id=789)]):
+                    with self.assertRaisesRegex(APP.EnvironmentError, "disconnected"):
+                        app._check_controller_connection()
+            finally:
+                app.close()
+
     def test_controller_setup_rejects_environment_drift_before_launch(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

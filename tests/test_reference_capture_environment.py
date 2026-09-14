@@ -68,6 +68,37 @@ class EnvironmentTests(unittest.TestCase):
         self.assertEqual(self.verify(devices=[{"name": "keyboard", "adapter": False}])[
             "controller"]["state"], "unavailable")
 
+    def test_sdl_uses_pinned_backend_identity_instead_of_hid_product_name(self):
+        self.settings["controller"] = {
+            "backend": "SDL", "device": "Mapped Gamepad", "index": 1, "port": 1}
+        hid = {"name": "USB Product", "vendor_id": 123, "product_id": 456,
+               "transport": "USB", "adapter": False}
+        sdl = {"source": "SDL", "name": "Mapped Gamepad", "index": 1,
+               "vendor_id": 123, "product_id": 456, "hardware": hid}
+        self.assertEqual(self.verify(devices=[sdl])["controller"]["state"], "connected")
+        # A matching HID name alone does not identify Dolphin's selected SDL device.
+        self.assertEqual(self.verify(devices=[dict(hid, name="Mapped Gamepad")])[
+            "controller"]["state"], "unavailable")
+        self.assertEqual(self.verify(devices=[dict(sdl, index=0)])[
+            "controller"]["state"], "unavailable")
+        self.assertEqual(self.verify(devices=[dict(sdl, hardware=None)])[
+            "controller"]["state"], "unavailable")
+
+    def test_legacy_sdl_selection_defaults_only_to_index_zero(self):
+        self.settings["controller"] = {"backend": "SDL", "device": "Pad", "port": 1}
+        device = {"source": "SDL", "name": "Pad", "index": 0,
+                  "hardware": {"vendor_id": 123, "product_id": 456}}
+        self.assertEqual(self.verify(devices=[device])["controller"]["state"], "connected")
+        with self.assertRaisesRegex(env.EnvironmentError, "Ambiguous"):
+            self.verify(devices=[device, device])
+
+    def test_sdl_probe_is_used_only_when_sdl_is_configured(self):
+        self.settings["controller"] = {"backend": "SDL", "device": "Pad", "port": 1}
+        with patch.object(env.subprocess, "check_output", side_effect=[b"", b""]), \
+             patch("reference_controller_probe.enumerate_controllers", return_value=[]) as probe:
+            self.assertEqual(env.physical_devices(self.settings), [])
+            probe.assert_called_once_with(self.settings, [])
+
     def test_global_profile_rejected_even_with_matching_hashes(self):
         other = self.root / "global-profile"
         other.mkdir()

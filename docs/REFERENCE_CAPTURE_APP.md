@@ -109,6 +109,35 @@ memory cards, captures, and other private payloads.
 
 ## Operate a capture
 
+Version 0.1.1 uses a small pinned SDL discovery helper for physical SDL devices.
+Dolphin's controller database may assign a name different from macOS IOHID's
+product name. The helper derives the same SDL name and per-name index as Dolphin,
+then the supervisor binds that selection to observed physical vendor/product IDs.
+There are no device-name aliases or an "any connected controller" fallback.
+Discovery happens before launch; connection monitoring during play only reads
+the OS device inventory and does not open another SDL client.
+
+Build and install the helper after the pinned Dolphin build and before opening
+the capture app. See [the controller probe](../reference-capture/controller-probe/README.md)
+for the exact SDL source pin, build inputs, and command options. Installation
+retains the operator's existing controller mapping and saves prior settings.
+The helper binary, source receipt, and dynamic dependencies are verified before
+readiness; a mismatch keeps capture disabled.
+
+```sh
+python3 scripts/build_reference_controller_probe.py \
+  --source "$PWD/work/reference-dolphin-source" \
+  --build "$PWD/work/reference-dolphin-build" \
+  --output-root "$PWD/work/reference-controller-probe"
+python3 scripts/install_reference_controller_probe.py \
+  --manifest "$PWD/work/reference-controller-probe/build-manifest.json" \
+  --root "$CAPTURE_ROOT"
+```
+
+Quit the capture app before installing a helper or application update. The
+installer preserves the configured Dolphin mapping and recovers its exact SDL
+index when upgrading an older name-only capture setting.
+
 Launch the installed app:
 
 ```sh

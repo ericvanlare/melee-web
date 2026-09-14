@@ -126,6 +126,13 @@ def validate_observer_handshake(records, identity):
     return payload
 
 
+def isolated_dolphin_environment():
+    # Controller discovery and Dolphin must see the same profile-owned SDL
+    # hints, without an inherited mapping or device-filter override.
+    return {key: value for key, value in os.environ.items()
+            if not key.startswith("SDL_") and key != "DOLPHIN_EMU_USERPATH"}
+
+
 class Supervisor:
     def __init__(self, settings_path, *, root=None, emit=None, automated=False):
         self.root = root or support_root()
@@ -173,9 +180,21 @@ class Supervisor:
     def _check_controller_connection(self):
         if self.automated:
             return
-        controller = configured_controller(self.settings, physical_devices())
-        self.publish(physical_controller=controller["state"])
-        if controller["state"] != "connected":
+        selected = (self.identity or {}).get("controller", {}).get("selected")
+        devices = physical_devices()
+        if selected and selected.get("source") == "SDL":
+            # Do not open a second SDL client while Dolphin owns the device.
+            # The readiness probe already bound the SDL qualifier to these
+            # physical USB/HID IDs; monitor their presence without polling PAD.
+            hardware = selected["hardware"]
+            connected = any(all(device.get(key) == hardware.get(key)
+                                for key in ("vendor_id", "product_id", "transport"))
+                            for device in devices)
+            state = "connected" if connected else "unavailable"
+        else:
+            state = configured_controller(self.settings, devices)["state"]
+        self.publish(physical_controller=state)
+        if state != "connected":
             raise EnvironmentError("Physical controller disconnected during capture")
 
     def publish(self, **fields):
@@ -191,10 +210,11 @@ class Supervisor:
             progress=lambda state, message: self.publish(state=state, message=message))
         controller = self.identity["controller"]
         ready = controller["state"] == "connected"
+        device_name = controller.get("configured", {}).get("device", "controller")
         self.publish(state="ready" if ready else "controller_required", accepted_disc=True,
                      physical_controller=controller["state"], dolphin="stopped", capture="idle",
-                     message="Ready to capture. Start Capture boots ordinary retail Melee." if ready else
-                     "Connect a controller, choose Configure Controller, then check readiness again.")
+                     message=f"Ready: {device_name}. Start Capture boots ordinary retail Melee." if ready else
+                     f"Configured: {device_name}. Connect it, or choose Configure Controller to select another device.")
 
     def _terminate_owned(self):
         process = self.process
@@ -239,7 +259,7 @@ class Supervisor:
             write_json(bundle.path / "environment.json", self.identity)
             raw = bundle.path / "observer.bin"
             status_path = bundle.path / "observer-status.json"
-            environment = dict(os.environ, MWRC_ENABLE="1", MWRC_CPU="JITARM64",
+            environment = dict(isolated_dolphin_environment(), MWRC_ENABLE="1", MWRC_CPU="JITARM64",
                                MWRC_SOURCE_REV="GALE01r2", MWRC_OUTPUT=str(raw), MWRC_STATUS=str(status_path),
                                MWRC_DOL_SHA256=self.identity["disc"]["dol_sha256"],
                                MWRC_OBSERVER_ID=self.settings["observer_identity"],
@@ -361,6 +381,7 @@ class Supervisor:
 
     def tooling_identity(self):
         names = ("scripts/reference_capture_app.py", "tools/reference_capture_environment.py",
+                 "tools/reference_controller_probe.py",
                  "tools/reference_capture_semantics.py", "tools/reference_session_bundle.py",
                  "tools/reference_capture_automation.py",
                  "tools/retail_cpu_observation.py", "tools/retail_replay_validation.py",
@@ -388,7 +409,8 @@ class Supervisor:
         shutil.copytree(settings["paths"]["profile"], config)
         self.publish(state="configuring", message="In Dolphin, open Controllers and configure port 1. Close Dolphin when done.")
         self.process = subprocess.Popen([settings["paths"]["dolphin"], "-u", str(user)],
-                                       start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                                       env=isolated_dolphin_environment(), start_new_session=True,
+                                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         while self.process.poll() is None:
             if self.stop_requested.wait(0.25):
                 self._terminate_owned()
@@ -403,7 +425,10 @@ class Supervisor:
         if kind == 12:
             controller = {"backend": "adapter", "device": "GameCube adapter", "port": 1}
         elif kind == 6 and device.startswith("SDL/") and len(device.split("/", 2)) == 3:
-            controller = {"backend": "SDL", "device": device.split("/", 2)[2], "port": 1}
+            _, index, name = device.split("/", 2)
+            if not index.isdecimal():
+                raise EnvironmentError("Choose a numbered physical SDL gamepad on port 1")
+            controller = {"backend": "SDL", "device": name, "index": int(index), "port": 1}
         else:
             raise EnvironmentError("Choose a physical SDL gamepad or GameCube adapter on port 1")
         # Import only the controller mapping and selected SI device. Other Qt

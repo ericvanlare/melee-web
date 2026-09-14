@@ -68,7 +68,8 @@ def read_settings(path: Path) -> dict:
     settings = json.loads(path.read_text())
     expected = {"schema", "version", "paths", "hashes", "dolphin_revision",
                 "observer_identity", "controller", "timing_policy"}
-    if not isinstance(settings, dict) or set(settings) != expected:
+    if (not isinstance(settings, dict) or not expected <= set(settings) or
+            set(settings) - expected - {"controller_probe"}):
         raise EnvironmentError("Unsupported local environment settings")
     if settings["schema"] != SCHEMA or settings["version"] != 1:
         raise EnvironmentError("Unsupported local environment version")
@@ -118,7 +119,7 @@ def _walk_plist(value):
             yield from _walk_plist(child)
 
 
-def physical_devices() -> list[dict]:
+def physical_devices(settings: dict | None = None) -> list[dict]:
     """Observe HID game devices and Nintendo USB adapters, without serials."""
     devices = {}
     for klass in ("IOHIDDevice", "IOUSBHostDevice"):
@@ -139,12 +140,21 @@ def physical_devices() -> list[dict]:
             devices[key] = {"name": str(name), "vendor_id": vendor,
                             "product_id": product, "adapter": adapter,
                             "transport": str(row.get("Transport", "USB" if adapter else "unknown"))}
-    return sorted(devices.values(), key=lambda d: d["name"])
+    hardware = sorted(devices.values(), key=lambda d: d["name"])
+    if settings is not None and settings["controller"]["backend"] == "SDL":
+        # SDL may assign a controller database name different from IOHID's
+        # product name. Enumerate through the same pinned SDL implementation;
+        # never infer aliases from spelling or accept an unrelated gamepad.
+        from reference_controller_probe import enumerate_controllers
+        return enumerate_controllers(settings, hardware)
+    return hardware
 
 
 def configured_controller(settings: dict, devices: list[dict]) -> dict:
     controller = settings["controller"]
-    if not isinstance(controller, dict) or set(controller) != {"backend", "device", "port"}:
+    required = {"backend", "device", "port"}
+    if (not isinstance(controller, dict) or not required <= set(controller) or
+            set(controller) - required - {"index"}):
         raise EnvironmentError("Unsupported controller configuration")
     if controller["port"] != 1:
         raise EnvironmentError("This release supports the human controller on port 1")
@@ -152,13 +162,21 @@ def configured_controller(settings: dict, devices: list[dict]) -> dict:
     if backend == "adapter":
         matches = [d for d in devices if d["adapter"]]
     elif backend == "SDL":
-        matches = [d for d in devices if not d["adapter"] and d["name"] == name]
+        index = controller.get("index", 0)
+        if isinstance(index, bool) or not isinstance(index, int) or index < 0:
+            raise EnvironmentError("Invalid SDL controller index")
+        matches = [d for d in devices if d.get("source") == "SDL" and
+                   d["name"] == name and d.get("index") == index and
+                   d.get("hardware")]
     elif backend in ("keyboard", "unconfigured"):
         matches = []
     else:
         raise EnvironmentError("Unsupported physical controller backend")
+    if len(matches) > 1:
+        raise EnvironmentError("Ambiguous configured controller identity")
     return {"state": "connected" if matches else "unavailable", "configured": controller,
-            "devices": devices, "physical_session_validated": False}
+            "devices": devices, "selected": matches[0] if matches else None,
+            "physical_session_validated": False}
 
 
 def verify_environment(settings: dict, root: Path, *, progress=lambda *_: None,
@@ -199,7 +217,7 @@ def verify_environment(settings: dict, root: Path, *, progress=lambda *_: None,
     progress("verifying", "Verifying the owned GALE01 1.02 disc")
     disc = verify_disc(paths["disc"], paths["dol"], hashes["disc_image_sha256"])
     progress("verifying", "Checking the configured physical controller")
-    controller = configured_controller(settings, physical_devices() if devices is None else devices)
+    controller = configured_controller(settings, physical_devices(settings) if devices is None else devices)
     return {"disc": disc, "dolphin": {"source_revision": DOLPHIN_REVISION,
             "binary_sha256": hashes["dolphin_binary_sha256"],
             "observer_sha256": settings["observer_identity"],
