@@ -169,6 +169,12 @@ uint64_t melee_web_gameplay_generation(void)
     if (!tables_live || shutting_down || !melee_web_gameplay_heap_owns(arena)) return 0;
     return generation;
 }
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+uint64_t melee_web_gameplay_provenance_tick(void)
+{
+    return melee_web_gameplay_generation() ? ticks : 0;
+}
+#endif
 
 int melee_web_gameplay_shutdown(char* error, size_t error_size)
 {

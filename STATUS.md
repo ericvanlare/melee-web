@@ -1,5 +1,14 @@
 # Current status
 
+An opt-in selective pipeline alpha candidate now imports the 508-descriptor
+catalog and prepares a compact conservative union of 280 GPU pipelines before
+interactive play. Cold and warm original Mario/FD and Fox/Battlefield lifecycles
+pass the bounded local timing gates with zero unexpected pipeline construction;
+the worst native callback is 11.775 ms and browser gap is 30.375 ms. The public
+loader, invalid-disc recovery and unload/reload checks pass. Hosted comparison
+and promotion remain pending. Production is unchanged. See the
+[scoped alpha evidence](docs/SELECTIVE_PIPELINE_ALPHA.md).
+
 The [source-address prerequisite](docs/SOURCE_ADDRESS_CONTEXT.md) models ordinary
 original SDK/HSD allocation identity and defined register-byte consumption,
 without supplying missing original allocation history or changing gameplay.

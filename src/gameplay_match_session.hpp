@@ -3,6 +3,9 @@
 #include "gameplay_menu_host.h"
 #include "gameplay_match_context.h"
 #include <memory>
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+#include "pipeline_provenance.h"
+#endif
 namespace melee_web {
 enum class GameplayMatchConstruction { Immediate, Deferred };
 // Shared source match lifecycle. The confirmed menu payload supplies player
@@ -39,6 +42,9 @@ public:
     bool advance_construction();
     bool construction_complete() const;
     void close();
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+    MeleeWebPipelineSourceContext provenance_context() const;
+#endif
 private:
     struct Storage;
     std::unique_ptr<Storage> storage_;

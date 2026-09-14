@@ -12,6 +12,7 @@
 #include "browser_input.h"
 #include "animation_clock.hpp"
 #include "source_frame_sequence.hpp"
+#include "gameplay_pipeline_preparation.hpp"
 #include <aurora/aurora.h>
 #include <aurora/event.h>
 #include <aurora/main.h>
@@ -30,6 +31,10 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+#include "pipeline_provenance_runtime.h"
+#include "gameplay_bootstrap.h"
+#endif
 namespace {
 melee_web::RuntimeFiles files;
 std::unique_ptr<melee_web::RuntimeArchiveCache> archive_cache;
@@ -62,6 +67,54 @@ bool transition_audio_continues=false;
 bool menu_scene_rebuild_pending=false;
 melee_web::GameplayMenuScene pending_menu_scene=melee_web::GameplayMenuScene::Characters;
 unsigned render_frame=0;
+#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
+double pipeline_bootstrap_started=0,pipeline_renderer_init_ms=0,pipeline_union_requested=0;
+double pipeline_union_submit_ms=0,pipeline_union_first_ready=0;
+#endif
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+uint64_t provenance_route_epoch=1,provenance_last_world=0;
+uint32_t provenance_last_scene=MELEE_WEB_PIPELINE_SCENE_BOOT;
+bool provenance_return_draw=false;
+MeleeWebPipelineSourceContext pipeline_context(uint32_t phase_override=0,uint32_t scene_override=0){
+ MeleeWebPipelineSourceContext context{};
+ if(match)context=match->provenance_context();
+ else if(host){
+  if(!melee_web_menu_host_provenance(host,&context))
+   melee_web_provenance_invalid(MELEE_WEB_PIPELINE_INVALID_MISSING_CONTEXT);
+ }else{
+  for(auto& player:context.players){player.motion_id=-1;player.stocks=-1;}
+  context.scene=MELEE_WEB_PIPELINE_SCENE_BOOT;
+  context.phase=MELEE_WEB_PIPELINE_PHASE_PREPARATION;
+  context.owner_kind=MELEE_WEB_PIPELINE_OWNER_ROUTE_COMPOSITE;
+ }
+ if(context.scene!=provenance_last_scene||context.world_generation!=provenance_last_world){
+  ++provenance_route_epoch;provenance_last_scene=context.scene;provenance_last_world=context.world_generation;
+ }
+ context.route_epoch=provenance_route_epoch;
+ if(!phase_override&&(preparation.busy()||pending))context.phase=MELEE_WEB_PIPELINE_PHASE_PREPARATION;
+ if(provenance_return_draw&&context.scene==MELEE_WEB_PIPELINE_SCENE_CSS)
+  context.phase=MELEE_WEB_PIPELINE_PHASE_RETURN;
+ if(phase_override)context.phase=phase_override;
+ if(scene_override)context.scene=scene_override;
+ return context;
+}
+void drain_pipeline_provenance(){
+ // Keep the bounded transport independent of browser catch-up draw count.
+ // A missing collector retains records until explicit overflow; never drop.
+ MeleeWebPipelineStatus status{};
+ if(melee_web_pipeline_status(melee_web_provenance_recorder(),&status,nullptr,0)&&
+    status.valid&&status.pending_records==0)return;
+ // Recordless healthy callbacks have no evidence to transfer. Invalid status
+ // must still be exported even if an error occurred without a retained event.
+ if(EM_ASM_INT({return typeof window.meleePipelineProvenanceChunk==='function';})){
+  if(const char* chunk=melee_web_provenance_drain())
+   // The serializer owns the exact UTF-8 byte count. Avoid a second
+   // JavaScript scan of the complete chunk before decoding the same bytes.
+   EM_ASM({window.meleePipelineProvenanceChunk(UTF8ToString($0,$1,true));},
+          chunk,melee_web_provenance_chunk_bytes());
+ }
+}
+#endif
 int32_t stat_delta(uint64_t after,uint64_t before);
 void render_audio_tick(MeleeWebAudio* audio,char* error,size_t error_size);
 struct PreparationProfile {
@@ -159,9 +212,33 @@ void begin_preparation(){
  EM_ASM({if(window.menuPreparation)window.menuPreparation(UTF8ToString($0),!!$1);},
         message.c_str(),preserve_audio?1:0);
 }
+bool prepare_deferred_pipelines(){
+#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
+ const auto selected=melee_web::pipeline_preparation::status();
+ if(!selected.deferred_count)return false;
+ // The lookup retained descriptor bytes only. Stop source time before the
+ // renderer may construct a pipeline, then settle the unchanged scene.
+ running=false;menu_clock.reset();audio_clock.reset();
+ if(preparation.phase()==melee_web::MenuPreparationState::Phase::Idle){
+  check(preparation.request_render_settle(),"Could not pause for pipeline preparation");
+  preparation_profile.begin(false,emscripten_get_now());
+  render_only_preparation=true;
+ }
+ message="Preparing first-use rendering...";
+ check(aurora_pipeline_prepare_deferred()!=0,"Unexpected pipeline preparation failed");
+ return true;
+#else
+ return false;
+#endif
+}
 bool audio_ready_for_preparation(){
+#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
+ return EM_ASM_INT({return typeof window.menuAudioReadyForPreparation==='function'&&
+    window.menuAudioReadyForPreparation()?1:0;})!=0;
+#else
  return EM_ASM_INT({return window.menuAudioReadyForPreparation?
     (window.menuAudioReadyForPreparation()?1:0):1;})!=0;
+#endif
 }
 void preparation_failed(const char* error){
  EM_ASM({window.menuPreparationFailed?.(UTF8ToString($0));},error?error:"Native preparation failed");
@@ -179,6 +256,12 @@ std::string selected_match_message(const MeleeWebMenuMatchSelection& selection){
 }
 void close(){
  const bool had_lifetime=world||match||host;
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+ const bool had_source_world=melee_web_gameplay_generation()!=0;
+ const melee_web::provenance::Scope provenance(pipeline_context(
+     had_source_world?MELEE_WEB_PIPELINE_PHASE_TEARDOWN:MELEE_WEB_PIPELINE_PHASE_PREPARATION,
+     had_source_world?MELEE_WEB_PIPELINE_SCENE_TEARDOWN:0));
+#endif
  const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
  char error[256]{};running=false;pending=false;preparation.reset();menu_clock.reset();
  if(match){match->close();match.reset();}
@@ -201,8 +284,17 @@ void close(){
  }
 }
 void enter_world(){
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+ const melee_web::provenance::Scope provenance(pipeline_context(MELEE_WEB_PIPELINE_PHASE_PREPARATION));
+ provenance_return_draw=completed_matches!=0;
+#endif
  reference_heap_used=true;
  const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
+#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
+ // This owner entry is used for fresh CSS and match return. SSS uses
+ // finish_menu_scene_rebuild after its explicit source transition.
+ melee_web::pipeline_preparation::css();
+#endif
  char error[256]{};const bool prepared=world!=nullptr;
  if(!prepared)world=std::make_unique<melee_web::GameplayMenuWorld>(files,*archive_cache);
  const double constructed=emscripten_get_now();
@@ -214,9 +306,15 @@ void enter_world(){
  message=melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select";
 }
 void advance(){
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+ const melee_web::provenance::Scope provenance(pipeline_context(MELEE_WEB_PIPELINE_PHASE_PREPARATION));
+#endif
  char error[256]{};
  if(replay_pending){
   check(replay&&replay->initial_input,"Replay initialization is unavailable");
+#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
+  melee_web::pipeline_preparation::match(replay->selection);
+#endif
   replay_pending=false;
   match=std::make_unique<melee_web::GameplayMatchSession>(files,replay->selection,*archive_cache,
       melee_web::GameplayMatchConstruction::Deferred,*replay->initial_input);
@@ -224,7 +322,14 @@ void advance(){
  }
  if(match){
   const bool checking_stock=stock_check==-1;
-  const uint32_t seed=match->random_seed();match->close();match.reset();
+  const uint32_t seed=match->random_seed();
+  {
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+   const melee_web::provenance::Scope teardown(pipeline_context(
+       MELEE_WEB_PIPELINE_PHASE_TEARDOWN,MELEE_WEB_PIPELINE_SCENE_TEARDOWN));
+#endif
+   match->close();match.reset();
+  }
   if(checking_stock){
    int terminal_outcome=OUTCOME_NONE,terminal_count=0,terminal_winners[6]{};
    check(melee_web_match_rules_terminal_result(&terminal_outcome,&terminal_count,terminal_winners),
@@ -256,6 +361,9 @@ void advance(){
   MeleeWebMenuMatchSelection selection{};check(melee_web_menu_host_selection(host,&selection,error,sizeof(error)),error);
   match_message=selected_match_message(selection);
   const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
+#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
+  melee_web::pipeline_preparation::match(selection);
+#endif
   match=std::make_unique<melee_web::GameplayMatchSession>(
       files,selection,*archive_cache,melee_web::GameplayMatchConstruction::Deferred);
   const double constructed=emscripten_get_now();
@@ -266,6 +374,9 @@ void advance(){
 }
 
 bool advance_match_construction(){
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+ const melee_web::provenance::Scope provenance(pipeline_context(MELEE_WEB_PIPELINE_PHASE_PREPARATION));
+#endif
  const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
  const bool complete=match->advance_construction();
  const double constructed=emscripten_get_now();
@@ -281,6 +392,10 @@ bool advance_match_construction(){
 void finish_menu_scene_rebuild(){
  const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
  char error[256]{};
+#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
+ if(pending_menu_scene==melee_web::GameplayMenuScene::Stages)melee_web::pipeline_preparation::sss();
+ else melee_web::pipeline_preparation::css();
+#endif
  world->finish_scene_rebuild(pending_menu_scene);
  const double constructed=emscripten_get_now();
  check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);
@@ -364,6 +479,10 @@ void tick(){
  bool replay_completed_now=false;
  unsigned replay_steps=0;
  try{
+#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
+  (void)melee_web::pipeline_preparation::status();
+  (void)prepare_deferred_pipelines();
+#endif
   for(const AuroraEvent* event=aurora_update();event&&event->type!=AURORA_NONE;++event){
    if(event->type==AURORA_EXIT){close();melee_web_input_shutdown();aurora_shutdown();emscripten_cancel_main_loop();return;}
   }
@@ -371,7 +490,10 @@ void tick(){
   input_done=emscripten_get_now();
   const double clock_now=emscripten_get_now();
   char error[256]{};
-  const auto present_source=[&](){
+  const auto present_source_impl=[&](){
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+  const melee_web::provenance::Scope provenance(pipeline_context());
+#endif
   bool drew_source=false;
   bool began_this_frame=false;
   const double render_started=emscripten_get_now();
@@ -392,6 +514,10 @@ void tick(){
    }
    draw_done=emscripten_get_now();
    aurora_end_frame();end_done=emscripten_get_now();check(drawn,error);
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+   melee_web_provenance_frame(0);
+   if(drew_source)provenance_return_draw=false;
+#endif
    if(replay&&!replay_final_draw&&replay_cursor==replay->frames.size()&&drew_source){
     /* The final source frame is drawn before this close-boundary publication;
      * report the canonical MatchEnd winner after its source ranking exists. */
@@ -467,6 +593,14 @@ void tick(){
   }
   return drew_source;
   };
+  const auto present_source=[&](){
+   const bool drew_source=present_source_impl();
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+   // The source draw scope is closed before exporting this ordered chunk.
+   drain_pipeline_provenance();
+#endif
+   return drew_source;
+  };
   const bool audio_before_construction=transition_audio_continues&&
                                        (!running||preparation.busy());
   MeleeWebAudio* const audio_owner=match?match->audio():world?world->audio():nullptr;
@@ -504,7 +638,12 @@ void tick(){
    }
    const bool complete=submitted.pendingFramePackets==0&&submitted.pendingStagingBuffers==0&&
                        submitted.workerBusy==0;
-   if(preparation.arm(complete)){
+#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
+   const bool pipelines_ready=melee_web::pipeline_preparation::status().ready&&audio_ready_for_preparation();
+#else
+   const bool pipelines_ready=true;
+#endif
+   if(preparation.arm(complete&&pipelines_ready)){
     const double ready_at=emscripten_get_now();
     preparation_profile.submission_ready_at=ready_at;
     preparation_profile.report(ready_at);
@@ -534,6 +673,7 @@ void tick(){
   for(unsigned step=0;step<elapsed.steps;step++){
    if(replay&&replay_cursor==replay->frames.size())break;
    source_frames.before_step(present_source);
+   if(prepare_deferred_pipelines())break;
    PADStatus checked_input[4];const PADStatus* sample=input->raw;bool copied_input=false;
    bool diagnostic_start_pulse=false;
    if(diagnostic_start_ticks){
@@ -597,10 +737,14 @@ void tick(){
   simulation_done=emscripten_get_now();
   simulation_cpu_ms=std::max(0.0,simulation_done-input_done-preparation_ms-render_total_ms);
   source_frames.finish(present_source);
+  (void)prepare_deferred_pipelines();
   // Camera callbacks mutate source state (including magnifier damage flags).
   // A callback without a source tick must retain the last image; preparation
   // alone may redraw a frozen scene to settle its explicitly measured resources.
   if(source_frames.steps()==0&&(preparation.warming()||(!world&&!match)))present_source();
+#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
+  (void)melee_web::pipeline_preparation::status();
+#endif
   check(!replay_steps||source_frames.draws()==replay_steps,
         "Reference replay did not draw every consumed source tick");
  }catch(const std::exception& e){running=false;faulted=true;preparation.reset();render_only_preparation=false;pending=false;clear_diagnostic_pad();menu_clock.reset();message=e.what();if(preparation_started)preparation_ms=emscripten_get_now()-preparation_started;preparation_failed(e.what());timing_valid=0;std::fprintf(stderr,"Native menu: %s\n",e.what());
@@ -620,7 +764,24 @@ void tick(){
  const bool was_warming=preparation.warming();
  if(was_warming)preparation_profile.observe(finished-started,render_draw_ms,render_end_ms,
                                              actual_source_draw,stats_before,stats_after);
- if(preparation.observe_render(actual_source_draw,stats_after.queuedPipelines,render_preparation_activity)){
+#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
+ AuroraPipelinePrepareStatus selected_pipelines{};
+ aurora_pipeline_prepare_status(&selected_pipelines);
+ if(selected_pipelines.ready&&!pipeline_union_first_ready)pipeline_union_first_ready=finished;
+ EM_ASM({Module.pipelinePreparation=({state:$0,ready:!!$1,selected:$2,pending:$3,
+   unexpected_count:$4,deferred_count:$5,error_count:$6,binding_sha256:UTF8ToString($7),
+   renderer_init_ms:$8,union_submit_ms:$9,union_ready_ms:$10,bootstrap_total_ms:$11});},
+   selected_pipelines.state,selected_pipelines.ready,selected_pipelines.unique_count,
+   selected_pipelines.pending_count,selected_pipelines.unexpected_count,
+   selected_pipelines.deferred_count,selected_pipelines.error_count,
+   MELEE_WEB_PIPELINE_PREPARATION_BINDING_SHA256,pipeline_renderer_init_ms,pipeline_union_submit_ms,
+   pipeline_union_first_ready?pipeline_union_first_ready-pipeline_union_requested:0,
+   pipeline_union_first_ready?pipeline_union_first_ready-pipeline_bootstrap_started:0);
+ const unsigned pending_selected=selected_pipelines.ready?0:1;
+#else
+ const unsigned pending_selected=0;
+#endif
+ if(preparation.observe_render(actual_source_draw,stats_after.queuedPipelines+pending_selected,render_preparation_activity)){
   preparation_profile.submission_wait_started=finished;
   preparation_profile.pending_staging_at_settle=
       aurora_browser_submission_status().pendingStagingBuffers;
@@ -727,6 +888,10 @@ void tick(){
  if(replay_completed_now)EM_ASM({window.menuReplayCompleted?.($0,!!$1,$2,$3);},
                                 replay_cursor,replay_match_complete?1:0,
                                 replay_outcome,replay_winner);
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+ // Preserve lifecycle records from callbacks that did not draw a source frame.
+ drain_pipeline_provenance();
+#endif
 }
 }
 extern "C" {
@@ -741,6 +906,9 @@ int melee_web_native_menu_file(const char* name,const uint8_t* data,unsigned siz
  files[name]={data,data+size};return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
 int melee_web_native_menu_prepare(){try{
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+ const melee_web::provenance::Scope provenance(pipeline_context(MELEE_WEB_PIPELINE_PHASE_PREPARATION));
+#endif
  if(match||host_entered)throw std::runtime_error("Unload before preparing native menu resources");
  if(world&&host){message="Native menu resources already prepared.";return 1;}
  if(world||host)close();
@@ -769,7 +937,17 @@ int melee_web_native_menu_launch(){try{
  if(match||host_entered||(host&&!world))close();
  if(!archive_cache)archive_cache=std::make_unique<melee_web::RuntimeArchiveCache>(files);
  char error[256]{};if(!host){host=melee_web_menu_host_create(error,sizeof(error));check(host!=nullptr,error);}
- VISetFrameBufferScale(1);enter_world();return 1;
+ VISetFrameBufferScale(1);enter_world();
+#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
+ // The initial owner has entered but has not advanced a source tick. Settle
+ // its certified union through the same draw/submission gate as transitions.
+ check(preparation.request_render_settle(),"Initial pipeline preparation is already active");
+ preparation_profile.begin(true,emscripten_get_now());
+ running=false;menu_clock.reset();
+ message="Preparing original character select...";
+ EM_ASM({window.menuPreparation?.(UTF8ToString($0),false);},message.c_str());
+#endif
+ return 1;
 }catch(const std::exception& e){message=e.what();running=false;return 0;}}
 int melee_web_native_menu_unload(){try{close();message="Native menus unloaded.";return 1;}catch(const std::exception& e){message=e.what();return 0;}}
 int melee_web_native_menu_replay(const uint8_t* data,unsigned size,int observe){try{
@@ -918,14 +1096,46 @@ int melee_web_native_menu_cache_idle(){
 int melee_web_native_menu_phase(){return match?7:host?melee_web_menu_host_phase(host):0;}
 }
 int main(int argc,char** argv){
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+ melee_web_provenance_initialize();
+ // The private harness freezes this binding before module startup, so even
+ // the first boot draw has a case/input identity. No game data is accepted.
+ char provenance_input[65]{};
+ const uint32_t provenance_case=EM_ASM_INT({
+  const binding=window.meleePipelineProvenanceBinding;
+  if(!binding||!Number.isInteger(binding.caseId)||binding.caseId<=0||
+     binding.caseId>4294967295||typeof binding.inputSha256!=='string'||
+     !/^[0-9a-f]{64}$/.test(binding.inputSha256))return 0;
+  for(let i=0;i<64;i++)HEAPU8[$0+i]=binding.inputSha256.charCodeAt(i);
+  HEAPU8[$0+64]=0;
+  return binding.caseId;
+ },provenance_input);
+ if(provenance_case)melee_web_provenance_set_case(provenance_case,provenance_input);
+ else melee_web_provenance_invalid(MELEE_WEB_PIPELINE_INVALID_MISSING_CONTEXT);
+#endif
  AuroraConfig config{};config.appName="Melee native menus";config.desiredBackend=BACKEND_WEBGPU;
  config.cachePath="/melee-render-cache";
  config.windowWidth=640;config.windowHeight=480;config.msaa=1;config.vsync=true;
  config.logCallback=log_message;config.logLevel=LOG_INFO;
  if(!SDL_SetHint(SDL_HINT_EMSCRIPTEN_KEYBOARD_ELEMENT,"#canvas"))return 1;
+#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
+ if(!aurora_pipeline_prepare_enable())return 1;
+ pipeline_bootstrap_started=emscripten_get_now();
+#endif
  aurora_initialize(argc,argv,&config);
+#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
+ pipeline_union_requested=emscripten_get_now();
+ pipeline_renderer_init_ms=pipeline_union_requested-pipeline_bootstrap_started;
+ try{melee_web::pipeline_preparation::bootstrap();}
+ catch(const std::exception& e){message=e.what();preparation_failed(e.what());return 1;}
+ pipeline_union_submit_ms=emscripten_get_now()-pipeline_union_requested;
+#endif
  aurora_set_deferred_pipeline_cache_writes(true);
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+ {const melee_web::provenance::Scope provenance(pipeline_context());GXInit(fifo,sizeof(fifo));}
+#else
  GXInit(fifo,sizeof(fifo));
+#endif
  if(!melee_web_input_startup())return 1;
  emscripten_set_main_loop(tick,0,1);return 0;
 }

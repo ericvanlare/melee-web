@@ -36,6 +36,12 @@ def _wasm_with_exports(names):
 
 
 class PublicRuntimeBuildTests(unittest.TestCase):
+    def test_selective_profile_rejects_unrelated_targets_and_recorder(self):
+        for target, recorder in (("graphics", False), ("all", False), ("runtime", True)):
+            with self.subTest(target=target, recorder=recorder), self.assertRaisesRegex(ValueError, "selective-pipelines"):
+                public_build.build(1, root=Path("missing-source"), target=target,
+                                   pipeline_provenance=recorder, selective_pipelines=True)
+
     def test_release_target_has_a_small_explicit_api(self):
         cmake = (ROOT / "cmake/FighterRuntime.cmake").read_text(encoding="utf-8")
         public = cmake.split("# The public player", 1)[1].split(
@@ -65,6 +71,11 @@ class PublicRuntimeBuildTests(unittest.TestCase):
     def test_build_cli_rejects_non_release_public_runtime(self):
         with self.assertRaisesRegex(ValueError, "Release-only"):
             public_build.build(1, root=ROOT, target="runtime-public", configuration="RelWithDebInfo")
+
+    def test_private_provenance_is_rejected_before_public_build_work(self):
+        with self.assertRaisesRegex(ValueError, "requires the private runtime target"):
+            public_build.build(1, root=Path("missing-source"), target="runtime-public",
+                               configuration="Release", pipeline_provenance=True)
 
     def test_provenance_covers_reviewed_patch_and_build_pipeline(self):
         required = {

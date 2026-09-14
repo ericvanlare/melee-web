@@ -263,6 +263,35 @@ class PublicReleaseTests(unittest.TestCase):
         (fixture_root / "build" / "runtime-public-identity.json").write_bytes(identity_bytes)
         return runtime
 
+    def test_selective_public_root_preserves_artifact_seed_and_audio_binding(self):
+        runtime = self.runtime_fixture()
+        old = "build/browser-public-release"
+        new = "build/browser-public-selective-release"
+        (self.fixture_repo / old).rename(self.fixture_repo / new)
+        sidecar = runtime.parent / "runtime-public-identity.json"
+        identity = json.loads(sidecar.read_text().replace(old, new))
+        for destination in (sidecar, self.fixture_repo / "build/runtime-public-identity.json"):
+            destination.write_text(json.dumps(identity))
+        output = self.root / "selective-player"
+        build(output=output, profile="player", runtime_dir=runtime)
+        audit(output, output.with_name(output.name + ".manifest.json"))
+        # A reviewed root cannot borrow the ordinary build's audio proof.
+        identity["audio_graph"]["ninja"]["path"] = old + "/build.ninja"
+        sidecar.write_text(json.dumps(identity))
+        with self.assertRaisesRegex(BuildError, "Ninja evidence"):
+            build(output=self.root / "mixed-player", profile="player", runtime_dir=runtime)
+
+    def test_public_root_allowlist_rejects_private_or_malformed_variants(self):
+        runtime = self.runtime_fixture()
+        sidecar = runtime.parent / "runtime-public-identity.json"
+        identity = json.loads(sidecar.read_text())
+        for invalid in ("build/browser-selective-release", "build/browser-provenance-release", {}, "../browser-public-release"):
+            with self.subTest(root=invalid):
+                identity["artifact_root"] = invalid
+                sidecar.write_text(json.dumps(identity))
+                with self.assertRaisesRegex(BuildError, "artifact_root"):
+                    build(output=self.root / "invalid-root-player", profile="player", runtime_dir=runtime)
+
     def test_preview_build_is_auditable_and_uses_hashed_assets(self):
         output, manifest = self.paths()
         result = audit(output, manifest)

@@ -52,8 +52,17 @@ try {
     await page.waitForFunction(() => Module._melee_web_native_menu_cache_idle() !== 0, null, {timeout: 30000});
     assert.equal(await page.evaluate(() => Module._melee_web_native_menu_cache_idle()), 1,
       'The public renderer must open its volatile cache before consuming the bundled pipeline seed');
-    assert(await page.evaluate(() => Module.FS.stat('/melee-render-cache/pipeline_cache.db').size > 0),
-      'The bundled seed needs a writable document-local SQLite database');
+    const selective = await page.evaluate(() => Module.pipelinePreparation || null);
+    if (selective) {
+      assert(selective.selected > 0 && selective.selected < 508);
+      assert.equal(selective.unexpected_count, 0);
+      assert(await page.evaluate(() => Module.FS.stat('/initial_pipeline_cache.db').size > 0));
+      assert.deepEqual(await page.evaluate(() => Module.FS.readdir('/melee-render-cache').filter(name => !['.', '..'].includes(name))), [],
+        'Selective preparation retains descriptors in memory without a writable cache or IDBFS');
+    } else {
+      assert(await page.evaluate(() => Module.FS.stat('/melee-render-cache/pipeline_cache.db').size > 0),
+        'The ordinary bundled seed needs a writable document-local SQLite database');
+    }
     assert.equal(await page.evaluate(() => crossOriginIsolated && !!navigator.gpu), true);
     assert.equal(await page.locator('canvas').count(), 1);
     assert.equal(await page.locator('iframe,h1,header,footer,article').count(), 0);
