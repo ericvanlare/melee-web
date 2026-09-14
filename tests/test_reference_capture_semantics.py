@@ -30,6 +30,25 @@ class FakeMemory:
 
 
 class ReferenceCaptureSemanticsTests(unittest.TestCase):
+    def test_title_demo_entry_preserves_sequence_without_arming_a_match(self):
+        session = semantics.SemanticSession()
+        registers = [0] * 32
+        registers[3] = 0x80500000
+        setup = bytearray(0x138)
+        setup[0x61] = setup[0x85] = 1
+        row = {"seq": 17, "source_tick": 0, "draw_ordinal": 0,
+               "event": "boundary", "payload": {"pc": 0x8016E934, "boundary": "entry",
+                   "gprs": registers, "slices": [{"address": registers[3], "hex": setup.hex()}]}}
+        result = session.consume(row)
+        self.assertEqual(result["event"], "non_vs_entry")
+        self.assertEqual(result["seq"], 17)
+        self.assertFalse(result["payload"]["versus_match"])
+        self.assertIsNone(session.enter)
+        setup[4] = 0x40
+        row["payload"]["slices"][0]["hex"] = setup.hex()
+        with self.assertRaisesRegex(semantics.SemanticError, "one human P1"):
+            session.consume(row)
+
     def test_unknown_boundary_and_post_teardown_observation_fail_closed(self):
         session = semantics.SemanticSession()
         row = {"seq": 0, "source_tick": 0, "draw_ordinal": 0,

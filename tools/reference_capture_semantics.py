@@ -156,8 +156,15 @@ class SemanticSession:
                        retrace=memory.word(0x804D7420))
             self.poll_count += 1
         elif event == "match_enter":
-            if self.enter is not None: raise SemanticError("Multiple matches in one capture")
             setup = memory(reg(3), 0x138)
+            # Title attract demos use this same source constructor. Preserve
+            # their entry as scene coverage without admitting demo fighters
+            # into the human-versus-CPU comparison lifecycle.
+            if not setup[4] & 0x40:
+                result["event"] = "non_vs_entry"
+                out["versus_match"] = False
+                return result
+            if self.enter is not None: raise SemanticError("Multiple matches in one capture")
             self.types = [setup[0x61+i*0x24] for i in range(2)]
             if self.types != [0, 1] or any(setup[0x61+i*0x24] != 3 for i in range(2, 6)):
                 raise SemanticError("First release requires one human P1 versus one CPU P2")
