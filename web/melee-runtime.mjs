@@ -199,6 +199,15 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   onOwner?.({Module, boundary, handle, status, check, put, prepareAudio, pauseAudioForPreparation,
     syncAudio, unloadAndSave, prepareNativeResources, waitForAudioAck, stop, callbacks});
   configureModule?.(Module);
+  // Native seed loading needs this directory even when optional browser
+  // persistence is disabled or unavailable. Keep that prerequisite in the
+  // shared owner, ahead of any entry-specific cache mount/populate callback.
+  const configuredPreRun = Module.preRun;
+  Module.preRun = [() => {
+    Module.FS.mkdirTree('/melee-render-cache');
+    const callbacks = typeof configuredPreRun === 'function' ? [configuredPreRun] : configuredPreRun || [];
+    for (const callback of callbacks) callback(Module);
+  }];
   window.Module = Module;
   publish();
   const loader = document.createElement('script'); loader.src = String(loaderUrl);

@@ -219,10 +219,10 @@ index 94504b1..ae5908f 100644
  
 diff --git a/include/aurora/pipeline_prepare.h b/include/aurora/pipeline_prepare.h
 new file mode 100644
-index 0000000..eeafcc1
+index 0000000..51856a9
 --- /dev/null
 +++ b/include/aurora/pipeline_prepare.h
-@@ -0,0 +1,86 @@
+@@ -0,0 +1,90 @@
 +#pragma once
 +
 +/*
@@ -296,6 +296,10 @@ index 0000000..eeafcc1
 + */
 +int aurora_prepare_pipeline_union(const AuroraPipelineDescriptor *entries,
 +                                  size_t count);
++
++/* Prepare all descriptors in the verified, already imported catalog. This
++ * uses the same membership checks, queue and deduplication as an explicit union. */
++int aurora_prepare_pipeline_catalog(void);
 +
 +/* Read a synchronized status snapshot. Returns zero only for a null output. */
 +int aurora_pipeline_prepare_status(AuroraPipelinePrepareStatus *out);
@@ -1387,7 +1391,7 @@ index d50ce6a..8f7ded5 100644
    std::deque<TextureCopy> textureCopies;
    std::deque<EncoderTask> encoderTasks;
 diff --git a/lib/gfx/pipeline_cache.cpp b/lib/gfx/pipeline_cache.cpp
-index bff9b47..842e045 100644
+index bff9b47..790d316 100644
 --- a/lib/gfx/pipeline_cache.cpp
 +++ b/lib/gfx/pipeline_cache.cpp
 @@ -1,10 +1,18 @@
@@ -1557,9 +1561,9 @@ index bff9b47..842e045 100644
 +    selective_refresh_status_locked();
 +  }
 +#endif
-   g_pipelineReadyCv.notify_all();
- }
- 
++  g_pipelineReadyCv.notify_all();
++}
++
 +#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
 +static void selective_mark_unknown_locked() noexcept {
 +  g_selectivePrepareStatus.valid = 0;
@@ -1575,9 +1579,9 @@ index bff9b47..842e045 100644
 +  g_selectivePrepareStatus.ready = 0;
 +  ++g_selectivePrepareStatus.error_count;
 +  g_selectivePrepareStatus.state = AURORA_PIPELINE_PREPARE_ERROR;
-+  g_pipelineReadyCv.notify_all();
-+}
-+
+   g_pipelineReadyCv.notify_all();
+ }
+ 
 +static void selective_refresh_status_locked() noexcept {
 +  if (!g_selectivePipelineMode || !g_selectivePipelineActive) {
 +    return;
@@ -2404,7 +2408,7 @@ index bff9b47..842e045 100644
  
    queuedPipelines = 0;
    createdPipelines = 0;
-@@ -1168,14 +1867,257 @@ void begin_pipeline_frame() {
+@@ -1168,14 +1867,277 @@ void begin_pipeline_frame() {
    }
  }
  
@@ -2458,8 +2462,8 @@ index bff9b47..842e045 100644
 +    pipeline_cache_writer();
 +  }
 +#endif
-+}
-+
+ }
+ 
 +#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
 +extern "C" int aurora_pipeline_prepare_enable(void) {
 +  std::lock_guard guard{g_pipelineMutex};
@@ -2577,6 +2581,26 @@ index bff9b47..842e045 100644
 +  return 1;
 +}
 +
++extern "C" int aurora_prepare_pipeline_catalog() {
++  std::vector<AuroraPipelineDescriptor> descriptors;
++  {
++    std::lock_guard guard{g_pipelineMutex};
++    if (!g_selectivePipelineMode || !g_selectivePipelineActive || g_pipelineCacheBroken ||
++        g_selectiveSeedRegistry.size() == 0) return 0;
++    descriptors.reserve(g_selectiveSeedRegistry.size());
++    for (const auto& seed : g_selectiveSeedRegistry.entries()) {
++      AuroraPipelineDescriptor descriptor{};
++      descriptor.type = seed.identity.key.type;
++      descriptor.pipeline_ref = seed.identity.key.pipelineRef;
++      descriptor.config_version = seed.identity.key.configVersion;
++      descriptor.config_size = seed.identity.configSize;
++      std::copy(seed.identity.sha256.begin(), seed.identity.sha256.end(), descriptor.sha256);
++      descriptors.push_back(descriptor);
++    }
++  }
++  return aurora_prepare_pipeline_union(descriptors.data(), descriptors.size());
++}
++
 +extern "C" int aurora_pipeline_prepare_deferred() {
 +#if defined(MELEE_WEB_ALPHA_PIPELINE_FALLBACK)
 +  std::vector<selective::DescriptorIdentity> deferred;
@@ -2618,8 +2642,8 @@ index bff9b47..842e045 100644
 +#else
 +  return 0;
 +#endif
- }
- 
++}
++
 +extern "C" int aurora_pipeline_prepare_status(AuroraPipelinePrepareStatus* out) {
 +  if (out == nullptr) {
 +    return 0;

@@ -118,11 +118,6 @@ renderKeyboard();
 try {
   player = await mountMeleeRuntime({
     canvas: $('canvas'), onState: renderStatus, onError: error => showError(error),
-    configureModule(module) {
-      // Aurora opens its writable database before importing the bundled pipeline
-      // seed. This MEMFS directory lives only in this document; no IDBFS is mounted.
-      module.preRun = [() => module.FS.mkdirTree('/melee-render-cache')];
-    },
   });
   await applyKeyboard();
 } catch (error) { showError(error, true); }

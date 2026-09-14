@@ -47,10 +47,14 @@ inline void request(const MeleeWebPipelinePreparationDescriptor* source, size_t 
 }
 
 inline void bootstrap() {
-    request(melee_web_pipeline_preparation_union,
-            melee_web_pipeline_preparation_unionCount);
+    // The sampled 280-member union misses enabled content. Prepare every
+    // descriptor in the verified bundled catalog until narrower coverage is
+    // established. Importing the catalog itself still creates no pipelines.
+    if (!aurora_prepare_pipeline_catalog())
+        throw std::runtime_error("Pipeline preparation rejected the bundled descriptor catalog");
+    (void)status();
 }
-// One conservative union stays active for this device generation. Scene
+// One catalog selection stays active for this device generation. Scene
 // transitions rebuild source owners, while Aurora retains prepared GPU handles.
 inline void css() { (void)status(); }
 inline void sss() { (void)status(); }

@@ -768,13 +768,13 @@ void tick(){
  AuroraPipelinePrepareStatus selected_pipelines{};
  aurora_pipeline_prepare_status(&selected_pipelines);
  if(selected_pipelines.ready&&!pipeline_union_first_ready)pipeline_union_first_ready=finished;
- EM_ASM({Module.pipelinePreparation=({state:$0,ready:!!$1,selected:$2,pending:$3,
+ EM_ASM({Module.pipelinePreparation=({policy:'catalog',state:$0,ready:!!$1,selected:$2,pending:$3,
    unexpected_count:$4,deferred_count:$5,error_count:$6,binding_sha256:UTF8ToString($7),
    renderer_init_ms:$8,union_submit_ms:$9,union_ready_ms:$10,bootstrap_total_ms:$11});},
    selected_pipelines.state,selected_pipelines.ready,selected_pipelines.unique_count,
    selected_pipelines.pending_count,selected_pipelines.unexpected_count,
    selected_pipelines.deferred_count,selected_pipelines.error_count,
-   MELEE_WEB_PIPELINE_PREPARATION_BINDING_SHA256,pipeline_renderer_init_ms,pipeline_union_submit_ms,
+   MELEE_WEB_PIPELINE_PREPARATION_SEED_DECODED_SHA256,pipeline_renderer_init_ms,pipeline_union_submit_ms,
    pipeline_union_first_ready?pipeline_union_first_ready-pipeline_union_requested:0,
    pipeline_union_first_ready?pipeline_union_first_ready-pipeline_bootstrap_started:0);
  const unsigned pending_selected=selected_pipelines.ready?0:1;

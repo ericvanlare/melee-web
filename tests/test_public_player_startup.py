@@ -12,7 +12,7 @@ from check_gameplay import node_runtime
 
 
 class PublicPlayerStartupTests(unittest.TestCase):
-    def test_public_shell_prepares_volatile_cache_before_native_start(self):
+    def test_public_shell_uses_shared_owner_and_surfaces_startup_failure(self):
         if not (ROOT / ".deps/emsdk/.emscripten").is_file():
             self.skipTest("Pinned Node runtime unavailable before SDK bootstrap")
         result = subprocess.run(
@@ -23,7 +23,7 @@ class PublicPlayerStartupTests(unittest.TestCase):
             timeout=30,
         )
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("volatile cache directory ordering", result.stdout)
+        self.assertIn("shared owner startup", result.stdout)
 
 
 if __name__ == "__main__":

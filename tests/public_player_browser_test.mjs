@@ -54,7 +54,8 @@ try {
       'The public renderer must open its volatile cache before consuming the bundled pipeline seed');
     const selective = await page.evaluate(() => Module.pipelinePreparation || null);
     if (selective) {
-      assert(selective.selected > 0 && selective.selected < 508);
+      assert.equal(selective.policy, 'catalog');
+      assert.equal(selective.selected, 508);
       assert.equal(selective.unexpected_count, 0);
       assert(await page.evaluate(() => Module.FS.stat('/initial_pipeline_cache.db').size > 0));
       assert.deepEqual(await page.evaluate(() => Module.FS.readdir('/melee-render-cache').filter(name => !['.', '..'].includes(name))), [],

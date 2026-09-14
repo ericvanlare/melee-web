@@ -121,14 +121,12 @@ async function importShellWithMocks(scenario) {
   }
 }
 
-async function runScenario({name, failMkdir}) {
+async function runScenario({name, failStartup}) {
   const document = makeDocument();
   const restore = installGlobals(document);
   const trace = [];
   const keyboardCalls = [];
-  let module;
   let nativeMainCalled = false;
-  let seedOpen = false;
   let audioCreated = 0;
 
   globalThis.testKeyboardRows = (layout, second) => {
@@ -140,38 +138,8 @@ async function runScenario({name, failMkdir}) {
     assert.equal(options.canvas, document.getElementById('canvas'));
     assert.equal(options.createAudio, undefined, 'public shell must not create an audio runtime');
     if (options.createAudio) audioCreated++;
-    assert.equal(typeof options.configureModule, 'function', 'public shell must configure the runtime module');
-
-    const directories = new Set();
-    const fsCalls = [];
-    const fakeFs = {
-      mkdirTree(directoryPath) {
-        fsCalls.push(['mkdirTree', directoryPath]);
-        trace.push('fs:mkdirTree');
-        if (failMkdir) throw Error('cache directory denied');
-        directories.add(directoryPath);
-      },
-      mount(...args) { fsCalls.push(['mount', ...args]); trace.push('fs:mount'); },
-      syncfs(...args) { fsCalls.push(['syncfs', ...args]); trace.push('fs:syncfs'); },
-    };
-    // The loader installs FS after configureModule; only preRun may use it.
-    module = {};
-    options.configureModule(module);
-    assert.deepEqual(fsCalls, [], 'FS must not be touched while configureModule only installs preRun');
-    assert.ok(Array.isArray(module.preRun), 'configureModule must install a preRun callback');
-    trace.push('preRun');
-
-    module.FS = fakeFs;
-    for (const callback of module.preRun) callback(module);
-    assert.deepEqual(fsCalls, [['mkdirTree', '/melee-render-cache']],
-      'only the volatile cache directory may be created');
-    if (failMkdir) throw Error('unreachable: mkdir failure should abort preRun');
-
-    // Aurora opens its writable database in native main, after loader preRun.
-    // Data-package callback ordering is outside this shell-level test.
-    trace.push('seed-open');
-    assert.ok(directories.has('/melee-render-cache'));
-    seedOpen = true;
+    assert.equal(options.configureModule, undefined, 'required filesystem setup belongs to the shared owner');
+    if (failStartup) throw Error('cache directory denied');
     trace.push('native-main');
     nativeMainCalled = true;
     options.onState({ready: true, requiresReload: false, busy: false, state: 'idle', paused: false,
@@ -186,12 +154,9 @@ async function runScenario({name, failMkdir}) {
     await importShellWithMocks({name});
     return {
       document,
-      fsCalls: trace.filter(item => typeof item === 'string' && item.startsWith('fs:')),
       trace,
       keyboardCalls,
-      module,
       nativeMainCalled,
-      seedOpen,
       audioCreated,
     };
   } finally {
@@ -201,25 +166,17 @@ async function runScenario({name, failMkdir}) {
   }
 }
 
-const success = await runScenario({name: 'success', failMkdir: false});
-assert.deepEqual(success.fsCalls, ['fs:mkdirTree']);
-assert.deepEqual(success.trace.slice(0, 5), ['mount', 'preRun', 'fs:mkdirTree', 'seed-open', 'native-main']);
+const success = await runScenario({name: 'success', failStartup: false});
+assert.deepEqual(success.trace.slice(0, 2), ['mount', 'native-main']);
 assert.equal(success.nativeMainCalled, true);
-assert.equal(success.seedOpen, true);
-assert.equal(success.module.IDBFS, undefined);
-assert.equal(success.module.runtimeCacheState, undefined);
-assert.equal(success.module.saveRuntimeCache, undefined);
-assert.equal(success.module.markRuntimeCacheDirty, undefined);
 assert.equal(success.audioCreated, 0);
 assert.ok(success.keyboardCalls.length >= 2, 'shell must use the imported keyboard table');
 
-const failed = await runScenario({name: 'mkdir-failure', failMkdir: true});
+const failed = await runScenario({name: 'mkdir-failure', failStartup: true});
 const failedDocument = failed.document;
 assert.equal(failed.nativeMainCalled, false, 'mkdir failure must prevent an unseeded native start');
-assert.equal(failed.seedOpen, false, 'seed open must not run after cache-directory failure');
 assert.equal(failedDocument.getElementById('error-dialog').open, true);
 assert.equal(failedDocument.getElementById('retry').hidden, false);
 assert.equal(failedDocument.getElementById('error').textContent, 'cache directory denied');
-assert.deepEqual(failed.fsCalls, ['fs:mkdirTree']);
 assert.equal(failed.audioCreated, 0);
-console.log('Public player shell startup: volatile cache directory ordering, no persistence/audio, and mkdir failure propagation pass.');
+console.log('Public player shell startup: shared owner startup, no audio, and startup failure propagation pass.');
