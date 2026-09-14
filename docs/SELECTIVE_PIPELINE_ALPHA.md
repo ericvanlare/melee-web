@@ -8,10 +8,10 @@ Validation builds reject undeclared descriptors. The public alpha defers their d
 
 | Route | Cache | Native max (ms) | Browser gap max (ms) | Unexpected pipelines |
 | --- | --- | ---: | ---: | ---: |
-| mario-fd | cold | 9.795 | 28.010 | 0 |
-| mario-fd | warm | 9.345 | 27.530 | 0 |
-| fox-bf | cold | 11.775 | 30.375 | 0 |
-| fox-bf | warm | 11.290 | 29.820 | 0 |
+| mario-fd | cold | 10.300 | 27.345 | 0 |
+| mario-fd | warm | 9.115 | 27.530 | 0 |
+| fox-bf | cold | 7.910 | 25.830 | 0 |
+| fox-bf | warm | 6.245 | 20.400 | 0 |
 
 Both routes completed original CSS → original SSS → four-stock gameplay → original CSS, followed by Eject and document reload. No gameplay pipeline construction, native deadline failure or browser-gap failure was observed. These are scoped browser/performance results, not retail-equivalence or content admission.
 
@@ -28,6 +28,8 @@ The 754-test local suite passed with 31 optional skips. The 23 focused release-g
 - Raw per-draw provenance and full certificates remain in ignored local evidence; neither is packaged or committed.
 - Mario/Battlefield certificate rejection remains preserved. No repair or recapture was needed for this conservative union.
 - The initial diagnostic-object compile error and initial selective-output packaging rejection remain preserved alongside successful corrections.
+- Review found that an unexpected pipeline on a match-ending draw could starve its frozen preparation while a scene transition was pending. The preparation gate now drains that scene before allowing the transition; a native state regression covers the drain, GPU wait and subsequent transition request.
+- The first Fox/Battlefield rerun after that correction selected Mario because ordinary cursor input lasted one source tick longer. That wrong-route attempt is retained and cannot count as Fox validation. A shorter horizontal cursor movement then selected Fox reliably in the clean cold and warm rerun; the table records those runs.
 - Historical GPU stall, CPU divergences and all earlier failures remain open. Both human holdouts remain unopened.
 
 ## Follow-up scope

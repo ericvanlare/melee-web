@@ -474,7 +474,7 @@ void tick(){
  int began=0,drawn=1,timing_valid=1,first_use=0;
  // A transition request owns the whole callback in which it is observed.
  // Keep the source presenter out of both the request and audio-ack waits.
- int suppress_draw=preparation.suppress_source_draw()||pending||replay_final_draw;
+ int suppress_draw=preparation.suppress_source_draw(pending)||replay_final_draw;
  bool actual_source_draw=false;
  bool replay_completed_now=false;
  unsigned replay_steps=0;
@@ -650,7 +650,7 @@ void tick(){
     EM_ASM({window.menuRenderCacheSettled?.();});
     if(render_only_preparation)render_only_preparation=false;
     else EM_ASM({window.menuPreparationDone?.();});
-    running=true;menu_clock.reset();suppress_draw=0;
+    running=!pending;menu_clock.reset();suppress_draw=preparation.suppress_source_draw(pending);
     message=match?match_message:melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select";
    }else{
     ++preparation_profile.submission_wait_callbacks;
