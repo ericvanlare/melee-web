@@ -13,6 +13,8 @@ SOURCE = ROOT / "reference-capture" / "dolphin" / "source" / "Core" / "PowerPC" 
 class ReferenceDolphinObserverTests(unittest.TestCase):
     def test_patch_applies_to_clean_pinned_checkout(self) -> None:
         checkout = ROOT / ".deps" / "reference-dolphin"
+        if not checkout.exists():
+            self.skipTest("Optional pinned Dolphin source checkout is not installed")
         result = subprocess.run(
             ["git", "-C", str(checkout), "apply", "--check", str(PATCH)],
             text=True,
