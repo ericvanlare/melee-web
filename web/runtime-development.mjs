@@ -1,9 +1,10 @@
 /** Development tools attach to the shared player; this file is excluded from public builds. */
 import {mountMeleeRuntime} from './melee-runtime.mjs';
+import {mountControllerSettings} from './controller-settings.mjs';
 import {createRuntimeAudio} from './runtime-audio.mjs';
 import {loadNativeGameDisc} from './runtime-audio-assets.mjs';
 const developmentHooks = {};
-let owner, Module, boundary, status, check, put, prepareAudio, pauseAudioForPreparation;
+let owner, controllerSettings, Module, boundary, status, check, put, prepareAudio, pauseAudioForPreparation;
 let syncAudio, unloadAndSave, prepareNativeResources, waitForAudioAck;
 let preparationKeepsAudio = false;
 const stop = error => owner.stop(error);
@@ -85,7 +86,6 @@ $('pad-send').onclick=()=>{try{
  const port=padNumber('pad-port'),buttons=padNumber('pad-buttons'),stickX=padNumber('pad-stick-x'),stickY=padNumber('pad-stick-y'),duration=padNumber('pad-duration');
  boundary(()=>check(Module._melee_web_native_menu_pad_sample(port,buttons,stickX,stickY,duration))).then(()=>{$('pad-status').textContent=`Queued P${port+1} PAD sample for ${duration} source tick${duration===1?'':'s'}.`;inputDirty=true;}).catch(padError);
 }catch(error){padError(error);}};
-$('keyboard').onchange=$('keyboard2').onchange=()=>{inputDirty=true;owner.handle.setKeyboard(0,$('keyboard').checked);owner.handle.setKeyboard(1,$('keyboard2').checked);};
 /* Read-only source observations and the same checked raw-PAD queue used by the
  * visible diagnostics. Kept on window so browser automation can validate the
  * real CSS/SSS route without writing source selection globals. */
@@ -224,6 +224,15 @@ $('pause').onclick=()=>{
   (state.paused?owner.handle.resume():owner.handle.pause()).catch(error=>log(error.message));
 };
 $('unload').onclick=async()=>{try{await owner.handle.unload();stockCheckActive=false;}catch(error){log(error.message);}};
+controllerSettings = mountControllerSettings({
+  container: $('controls-dialog'),
+  storage: window.parent === window ? undefined : null,
+  legacyKeyboard: [$('keyboard'), $('keyboard2')],
+  expose: true,
+  onError(error){ log(error.message); $('status').textContent = error.message; },
+  focus: () => owner?.handle.focus?.(),
+  openButton: $('controls-open'),
+});
 try {
   await mountMeleeRuntime({canvas:$('canvas'),createAudio:createRuntimeAudio,readDisc:loadNativeGameDisc,loaderUrl:new URL('./gameplay_menu_browser.js',import.meta.url),
     onOwner(context){owner=context;({Module,boundary,status,check,put,prepareAudio,pauseAudioForPreparation,
@@ -241,6 +250,7 @@ try {
       $('launch').disabled=!state.canStart||!!retailRun||replayLoading;
       $('pause').disabled=!state.canPause;$('unload').disabled=!state.canUnload;
       $('reload-app').disabled=$('reset-render-cache').disabled=!ready;
+      controllerSettings.setState(state);
     },
     onError(error){log(error.message);},
     onLog(text,isError){
@@ -261,4 +271,5 @@ try {
       developmentHooks[name]?.(data);
     },
   });
+  await controllerSettings.bindPlayer(owner?.handle);
 } catch(error){log(error.message);$('status').textContent='Stopped: '+error.message;}

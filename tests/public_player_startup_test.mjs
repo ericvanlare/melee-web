@@ -27,6 +27,7 @@ class FakeElement {
   append(...children) { this.children.push(...children); }
   replaceChildren(...children) { this.children = children; }
   removeAttribute(name) { if (name === 'value') delete this.value; }
+  querySelector() { return null; }
   addEventListener(name, listener) {
     const listeners = this.listeners.get(name) || [];
     listeners.push(listener);
@@ -44,10 +45,11 @@ class FakeElement {
 
 function makeDocument() {
   const ids = [
-    'canvas', 'player', 'choose-disc', 'disc-file', 'start-game', 'pause-game',
-    'controls-open', 'controls-close', 'controls-dialog', 'keyboard-layout',
-    'keyboard-one', 'keyboard-two', 'keyboard-two-option', 'keyboard-one-label',
-    'keyboard-bindings', 'controllers', 'fullscreen', 'end-session', 'status',
+  'canvas', 'player', 'choose-disc', 'disc-file', 'start-game', 'pause-game',
+  'controls-open', 'controls-close', 'controls-dialog', 'keyboard-layout',
+    'player-one-source', 'player-two-source', 'player-one-source-status',
+    'player-two-source-status', 'boxx-source-note', 'keyboard-bindings-details',
+    'keyboard-bindings', 'controller-advanced', 'controllers', 'idle-hint', 'fullscreen', 'end-session', 'status',
     'progress', 'disc-dialog', 'disc-ack', 'disc-cancel', 'disc-continue', 'error-dialog',
     'error', 'retry', 'error-close',
     'loading-panel', 'loading-label', 'loading-progress', 'loading-detail',
@@ -55,8 +57,8 @@ function makeDocument() {
   const elements = new Map(ids.map(id => [id, new FakeElement('div', id)]));
   elements.get('canvas').focus = () => { document.activeElement = elements.get('canvas'); };
   elements.get('player').requestFullscreen = () => Promise.resolve();
-  elements.get('keyboard-one').checked = true;
-  elements.get('keyboard-two').checked = true;
+  elements.get('player-one-source').value = 'auto';
+  elements.get('player-two-source').value = 'auto';
   elements.get('keyboard-layout').disabled = true;
 
   return {
@@ -85,6 +87,8 @@ function installGlobals(document) {
     navigator: {getGamepads: () => []},
     localStorage: {getItem: () => null, setItem() {}, removeItem() {}},
     location: {reload() {}},
+    setInterval: () => 0,
+    addEventListener: () => {},
     isSecureContext: true,
     crossOriginIsolated: true,
   };
@@ -104,11 +108,11 @@ async function importShellWithMocks(scenario) {
   const source = await fs.readFile(SHELL_URL, 'utf8');
   const imports = [
     "import {mountMeleeRuntime} from '../melee-runtime.mjs';",
-    "import {keyboardRows} from '../prototype-keyboard-layouts.mjs';",
+    "import {mountControllerSettings} from '../controller-settings.mjs';",
   ].join('\n');
   const replacement = [
     'const mountMeleeRuntime = globalThis.testMountMeleeRuntime;',
-    'const keyboardRows = globalThis.testKeyboardRows;',
+    'const mountControllerSettings = globalThis.testMountControllerSettings;',
   ].join('\n');
   assert.notEqual(source.indexOf(imports), -1, 'shell imports must remain source-substitutable');
   const substituted = source.replace(imports, replacement);
@@ -126,16 +130,22 @@ async function runScenario({name, failStartup}) {
   const document = makeDocument();
   const restore = installGlobals(document);
   const trace = [];
-  const keyboardCalls = [];
+  let stateCallback;
+  let settingsOptions;
   let nativeMainCalled = false;
   let audioCreated = 0;
 
-  globalThis.testKeyboardRows = (layout, second) => {
-    keyboardCalls.push([layout, second]);
-    return [['Action', 'Key']];
+  globalThis.testMountControllerSettings = options => {
+    settingsOptions = options;
+    trace.push('settings');
+    return {
+      setState: next => trace.push(['settings-state', next?.state]),
+      bindPlayer: async runtime => { trace.push(['settings-bind', runtime]); },
+    };
   };
   globalThis.testMountMeleeRuntime = async options => {
     trace.push('mount');
+    stateCallback = options.onState;
     assert.equal(options.canvas, document.getElementById('canvas'));
     assert.equal(options.createAudio, undefined, 'public shell must not create an audio runtime');
     if (options.createAudio) audioCreated++;
@@ -148,6 +158,7 @@ async function runScenario({name, failStartup}) {
     options.onState({...idle, state: 'booting', ready: false, canImport: false,
       loading: {phase: 'engine', message: 'Starting player…', complete: null, total: null}});
     assert.equal(document.getElementById('loading-panel').hidden, false);
+    assert.equal(document.getElementById('idle-hint').hidden, true, 'Loading owns the current status');
     assert.equal(document.getElementById('loading-label').textContent, 'Starting player…');
     assert.equal(document.getElementById('loading-progress').value, undefined);
     options.onState({...idle,
@@ -161,7 +172,11 @@ async function runScenario({name, failStartup}) {
     assert.equal(document.getElementById('loading-panel').hidden, true, 'Errors replace loading feedback');
     options.onState(idle);
     assert.equal(document.getElementById('loading-panel').hidden, true, 'Ready player has no loading overlay');
+    assert.equal(document.getElementById('idle-hint').hidden, false, 'Ready player retains the disc instruction');
     return {
+      controllers: {
+        inspect: () => [], sample: () => [],
+      },
       setKeyboardLayout: async layout => { trace.push(['layout', layout]); },
       setKeyboard(slot, enabled) { trace.push(['keyboard', slot, enabled]); },
     };
@@ -172,22 +187,33 @@ async function runScenario({name, failStartup}) {
     return {
       document,
       trace,
-      keyboardCalls,
+      settingsOptions,
+      stateCallback,
       nativeMainCalled,
       audioCreated,
     };
   } finally {
     delete globalThis.testMountMeleeRuntime;
-    delete globalThis.testKeyboardRows;
+    delete globalThis.testMountControllerSettings;
     restore();
   }
 }
 
 const success = await runScenario({name: 'success', failStartup: false});
-assert.deepEqual(success.trace.slice(0, 2), ['mount', 'native-main']);
+assert.deepEqual(success.trace.slice(0, 3), ['settings', 'mount', 'native-main']);
 assert.equal(success.nativeMainCalled, true);
 assert.equal(success.audioCreated, 0);
-assert.ok(success.keyboardCalls.length >= 2, 'shell must use the imported keyboard table');
+assert.equal(success.settingsOptions.disableExtraPorts, true, 'public settings keep developer-only ports disabled');
+assert.equal(success.settingsOptions.openButton, success.document.getElementById('controls-open'));
+assert.ok(success.trace.some(row => Array.isArray(row) && row[0] === 'settings-bind'), 'shell binds settings after native startup');
+const restoreSuccess = installGlobals(success.document);
+try {
+  success.stateCallback({ready: true, running: true, requiresReload: false, busy: false, state: 'css', paused: false,
+    canImport: true, canStart: false, canPause: true, canUnload: true, progress: null, message: 'Running'});
+  assert.equal(success.document.getElementById('idle-hint').hidden, true, 'Idle hint disappears once native play starts');
+  assert.ok(success.trace.some(row => Array.isArray(row) && row[0] === 'settings-state' && row[1] === 'css'),
+    'native state is forwarded to the shared settings component');
+} finally { restoreSuccess(); }
 
 const failed = await runScenario({name: 'mkdir-failure', failStartup: true});
 const failedDocument = failed.document;
