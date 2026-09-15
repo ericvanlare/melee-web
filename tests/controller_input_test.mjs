@@ -127,3 +127,31 @@ for(const options of [{platform:'Win32'},{userAgent:'Firefox/143.0'},{getGamepad
   assert.equal(createControllerManager({...macOptions,storage:null,...options}).sample()[0].status,'needs-setup','do not apply a native mapping to an unrecognized browser layout');
 }
 console.log('Mayflash macOS suggestion, layout guards, independent pressure/clicks, hat axis 9 and saved override precedence pass.');
+
+const resting = mayflashMacPad();
+resting.axes[0]=4/128;resting.axes[1]=-9/128;resting.axes[5]=9/128;resting.axes[2]=-2/128;
+resting.axes[3]=32*2/255-1;resting.axes[4]=34*2/255-1;
+const restManager=createControllerManager({...macOptions,getGamepads:()=>[resting],storage:null});
+assert.equal(restManager.sample()[0].active,true,'nonzero hardware trigger origin must not mute the controller forever');
+assert.deepEqual(restManager.sample()[0].output.triggers,[0,0]);
+resting.axes[3]=132*2/255-1;set(resting,0);
+assert.equal(restManager.sample()[0].output.buttons,1024);assert.equal(restManager.sample()[0].output.triggers[0],100,'origin subtraction retains PAD units without stretching');
+restManager.setTesting(true);restManager.setTesting(false);assert.equal(restManager.sample()[0].active,false,'held controls still require release');
+set(resting,0,0);resting.axes[3]=32*2/255-1;assert.equal(restManager.sample()[0].active,true);
+const held=mayflashMacPad();held.axes[3]=.5;
+const heldManager=createControllerManager({...macOptions,getGamepads:()=>[held],storage:null});
+assert.equal(heldManager.sample()[0].active,false,'do not calibrate a heavily held trigger as its origin');
+held.axes[3]=32*2/255-1;assert.equal(heldManager.sample()[0].active,true);
+
+let routedPads=[standardPad(0)];
+const routed=createControllerManager({getGamepads:()=>routedPads,storage:null});routed.sample();
+routed.setPortSource(0,'keyboard');assert.equal(routed.sample()[0].port,1,'auto controller moves to P2 when P1 chooses keyboard');
+const routedHeap=new Int32Array(32);routed.writeSamples(routedHeap,0);assert.equal(routedHeap[0],0);assert.equal(routedHeap[8],1);
+routed.setPortSource(0,'auto');assert.equal(routed.sample()[0].port,0);
+routed.assign(routed.sample()[0].key,0);routed.setPortSource(0,'keyboard');
+assert.equal(routed.sample()[0].enabled,false,'keyboard overrides even a manually assigned physical controller');
+routed.writeSamples(routedHeap,0);assert.equal(routedHeap[0],0);
+routed.setPortSource(0,'controller');assert.equal(routed.sample()[0].enabled,true);
+routed.setPortSource(0,'off');routed.writeSamples(routedHeap,0);assert.equal(routedHeap[0],0);
+assert.throws(()=>routed.setPortSource(4,'auto'));assert.throws(()=>routed.setPortSource(0,'invalid'));
+console.log('Mayflash trigger-origin activation and explicit per-player keyboard/controller routing pass.');

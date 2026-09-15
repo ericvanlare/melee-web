@@ -19,6 +19,7 @@ export const STANDARD_PROFILE = Object.freeze({version: 1, name: 'Browser standa
 // indices (not SDL's native, interleaved collection indices). See CONTROLLERS.md.
 // The digital L/R click indices are provisional until a physical sweep.
 const MAYFLASH_MAC_PROFILE = {version: 1, name: 'Mayflash GameCube · Chrome on macOS', gamecube: true,
+  calibrateTriggerOrigin: true,
   buttons: {A: button(1), B: button(2), X: button(0), Y: button(3), Z: button(7), Start: button(9),
     L: button(4), R: button(5), ...Object.fromEntries(Object.entries({Up: 0, Right: 2, Down: 4, Left: 6})
       .map(([name, direction]) => [name, {kind: 'hat', index: 9, direction}]))},
@@ -41,6 +42,8 @@ export function validateProfile(profile, raw) {
   if (!profile || profile.version !== 1 || typeof profile.gamecube !== 'boolean' ||
       typeof profile.name !== 'string' || profile.name.length > 100 || !profile.buttons || !profile.axes)
     throw Error('Invalid controller profile. Run controller setup again.');
+  if (profile.calibrateTriggerOrigin != null && typeof profile.calibrateTriggerOrigin !== 'boolean')
+    throw Error('Invalid trigger origin configuration.');
   const usedButtons = new Set();
   const usedAxes = new Set();
   const usedAnalogButtons = new Set();
@@ -146,9 +149,20 @@ export function createControllerManager({getGamepads = () => navigator.getGamepa
   if (storage === undefined) { try { storage = globalThis.localStorage; } catch { storage = null; } }
   const browser = /Firefox\//.test(userAgent) ? 'Firefox' : /(?:Chrome|Chromium|Edg)\//.test(userAgent) ? 'Chromium' : 'Other';
   const records = new Map(), profiles = new Map();
+  const portSources = ['auto', 'auto', 'auto', 'auto'];
+  const acceptsController = port => port >= 0 && ['auto', 'controller'].includes(portSources[port]);
+  function routeAutomaticControllers() {
+    const occupied = new Set([...records.values()].filter(r => r.manualPort).map(r => r.port));
+    for (const record of records.values()) {
+      if (record.manualPort) continue;
+      const port = [0, 1, 2, 3].find(p => acceptsController(p) && !occupied.has(p)) ?? -1;
+      if (record.port !== port) { record.port = port; record.neutralRequired = true; }
+      occupied.add(port);
+    }
+  }
   const disconnected = [];
   function remember(record) {
-    if (record.port >= 0) disconnected.push({layout: record.layout, port: record.port});
+    if (record.port >= 0) disconnected.push({layout: record.layout, port: record.port, manualPort: record.manualPort});
     if (disconnected.length > 64) disconnected.shift();
   }
   let testing = false, storageWarning = '', inputError = '', lastRows = [];
@@ -181,12 +195,15 @@ export function createControllerManager({getGamepads = () => navigator.getGamepa
         const previous = disconnected.filter(r => r.layout === layout);
         // The API has no serial identity for identical controllers. After an
         // ambiguous reconnect, leave assignment visible instead of guessing.
-        let port = previous.length ? -1 : [0, 1, 2, 3].find(p => !occupied.has(p)) ?? -1;
+        let port = previous.length ? -1 : [0, 1, 2, 3].find(p => acceptsController(p) && !occupied.has(p)) ?? -1;
         if (previous.length === 1 && !occupied.has(previous[0].port)) {
           port = previous[0].port; disconnected.splice(disconnected.indexOf(previous[0]), 1);
+          if (!previous[0].manualPort && !acceptsController(port))
+            port = [0, 1, 2, 3].find(p => acceptsController(p) && !occupied.has(p)) ?? -1;
         }
         record = {layout, key: `${source.index}:${layout}`, port,
-          neutralRequired: true};
+          manualPort: (previous.length > 0 && port < 0) || !!previous[0]?.manualPort,
+          neutralRequired: true, triggerOrigin: null};
         records.set(source.index, record);
       }
       const raw = copyRaw(source);
@@ -197,18 +214,35 @@ export function createControllerManager({getGamepads = () => navigator.getGamepa
       if (!profile && source.mapping === 'standard' && !gamecubeIdentity(source.id)) profile = STANDARD_PROFILE;
       if (!profile) { record.neutralRequired = true; status = 'needs-setup'; reason = 'Set up this controller before playing; its button layout is not verified.'; }
       else {
-        try { validateProfile(profile, raw); pad = normalizeController(raw, profile); }
+        try {
+          validateProfile(profile, raw); pad = normalizeController(raw, profile);
+          // The PC adapter exposes unsigned trigger positions with a nonzero
+          // hardware rest (observed around 32/34), not zero-based pressure.
+          // Learn only a low, released-button/centered-stick origin and retain
+          // the smallest observed value. Subtract it in PAD byte units without
+          // stretching travel or replacing the game's own trigger clamp.
+          if (profile.calibrateTriggerOrigin) {
+            if (!pad.buttons && [...pad.stick, ...pad.cstick].every(n => Math.abs(n) < 15) &&
+                pad.triggers.every(n => n <= 64)) {
+              record.triggerOrigin = pad.triggers.map((n, i) => Math.min(n, record.triggerOrigin?.[i] ?? n));
+            }
+            if (record.triggerOrigin) pad.triggers = pad.triggers.map((n, i) => Math.max(0, n - record.triggerOrigin[i]));
+            else { record.neutralRequired = true; reason = 'Release both triggers and center the sticks to activate this controller.'; }
+          }
+        }
         catch (error) { record.neutralRequired = true; status = 'needs-setup'; reason = error.message; }
       }
       if (testing) record.neutralRequired = true;
-      if (!testing && status === 'ready' && pad.buttons === 0 &&
+      if (!testing && status === 'ready' && (!profile.calibrateTriggerOrigin || record.triggerOrigin) && pad.buttons === 0 &&
           [...pad.stick, ...pad.cstick, ...pad.triggers].every(n => Math.abs(n) < 15)) record.neutralRequired = false;
-      const active = record.port >= 0 && status === 'ready' && !testing && !record.neutralRequired;
+      const enabled = acceptsController(record.port) && status === 'ready';
+      const active = enabled && !testing && !record.neutralRequired;
+      if (!testing && enabled && record.neutralRequired && !reason) reason = 'Release the controls and center the sticks to resume input.';
       if (record.port < 0) reason = 'Choose a player port for this controller in Controls.' + (reason ? ` ${reason}` : '');
       rows.push({key: record.key, index: source.index, port: record.port, id: source.id, layout,
         gamecube: profile?.gamecube ?? gamecubeIdentity(source.id), profile: profile?.name || 'Unconfigured', status, reason, raw, pad,
         profileSource: profile ? profileSource : 'none', profileConfig: profile || null, hasSuggestion: !!suggestion,
-        output: active ? pad : empty(), active, storageWarning});
+        output: active ? pad : empty(), active, enabled, storageWarning});
     }
     lastRows = rows;
     return rows;
@@ -219,13 +253,13 @@ export function createControllerManager({getGamepads = () => navigator.getGamepa
       if (!row) throw Error('Controller disconnected. Connect it and restart setup.');
       validateProfile(profile, row.raw);
       profiles.set(row.layout, JSON.parse(JSON.stringify(profile)));
-      for (const record of records.values()) if (record.layout === row.layout) record.neutralRequired = true;
+      for (const record of records.values()) if (record.layout === row.layout) { record.neutralRequired = true; record.triggerOrigin = null; }
       persist();
     },
     clearProfile(key) {
       const row = sample().find(r => r.key === key);
       if (!row) return;
-      profiles.delete(row.layout); records.get(row.index).neutralRequired = true; persist();
+      profiles.delete(row.layout); records.get(row.index).neutralRequired = true; records.get(row.index).triggerOrigin = null; persist();
     },
     assign(key, port) {
       if (!Number.isInteger(port) || port < -1 || port > 3) throw Error('Choose player 1–4 or leave this controller unassigned.');
@@ -234,17 +268,26 @@ export function createControllerManager({getGamepads = () => navigator.getGamepa
       for (let i = disconnected.length - 1; i >= 0; --i) if (disconnected[i].layout === row.layout) disconnected.splice(i, 1);
       const record = records.get(row.index), previous = record.port;
       for (const other of records.values()) if (port >= 0 && other !== record && other.port === port) {
-        other.port = previous; other.neutralRequired = true;
+        other.port = previous; other.neutralRequired = true; other.manualPort = true;
       }
-      record.port = port; record.neutralRequired = true;
+      record.port = port; record.neutralRequired = true; record.manualPort = true;
     },
+    setPortSource(port, mode) {
+      if (!Number.isInteger(port) || port < 0 || port > 3 || !['auto', 'keyboard', 'controller', 'off'].includes(mode))
+        throw Error('Choose Auto, Keyboard, Controller or Off for a player.');
+      if (portSources[port] === mode) return;
+      portSources[port] = mode;
+      for (const record of records.values()) record.neutralRequired = true;
+      routeAutomaticControllers();
+    },
+    getPortSource(port) { return portSources[port]; },
     setTesting(value) { testing = !!value; for (const record of records.values()) record.neutralRequired = true; },
     // Narrow synchronous ABI, called once at the existing source PAD boundary.
     // Eight int32 values per port: connected, buttons, LX, LY, CX, CY, LT, RT.
     writeSamples(heap, pointer) {
       heap.fill(0, pointer >> 2, (pointer >> 2) + 32);
       for (const row of sample()) {
-        if (row.port < 0) continue;
+        if (!row.enabled) continue;
         const p = row.output, base = (pointer >> 2) + row.port * 8;
         heap.set([1, p.buttons, ...p.stick, ...p.cstick, ...p.triggers], base);
       }

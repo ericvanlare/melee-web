@@ -93,12 +93,31 @@ try {
     await sample([]);await page.keyboard.down('j');s=await sample([]);assert.equal(s.keyboard_active_mask,1);assert.equal(s.pads[0].buttons,256);await page.keyboard.up('j');await sample([]);
   });
   await check('Recognized Mayflash suggestion reaches Wasm without setup',async()=>{
-    pad=mayflashMacPad();await sample();set(0);
+    pad=mayflashMacPad();pad.axes[3]=32*2/255-1;pad.axes[4]=34*2/255-1;
+    await sample();set(0);
     assert.equal((await sample()).pads[0].buttons,1024);set(0,0);pad.axes[3]=0;
-    let p=(await sample()).pads[0];assert.equal(p.buttons,0);assert.deepEqual(p.triggers,[128,0]);
-    set(4);p=(await sample()).pads[0];assert.equal(p.buttons,64);assert.equal(p.triggers[0],128);
-    set(4,0);pad.axes[3]=-1;pad.axes[9]=-1+2*2/7;
+    let p=(await sample()).pads[0];assert.equal(p.buttons,0);assert.deepEqual(p.triggers,[96,0]);
+    set(4);p=(await sample()).pads[0];assert.equal(p.buttons,64);assert.equal(p.triggers[0],96);
+    set(4,0);pad.axes[3]=32*2/255-1;pad.axes[9]=-1+2*2/7;
     assert.equal((await sample()).pads[0].buttons,2);
+  });
+  await check('Player keyboard choice overrides a controller and routes the other player',async()=>{
+    pad.axes[9]=3.2857142857;await sample();
+    await page.evaluate(()=>{
+      Module.meleeControllers.setPortSource(0,'keyboard');
+      Module._melee_web_input_set_keyboard_port(0,1);
+      Module._melee_web_input_set_keyboard_port(1,1);
+    });
+    await sample();await page.locator('canvas').focus();await page.keyboard.down('j');
+    let state=await sample();assert.equal(state.physical_mask,2);assert.equal(state.keyboard_active_mask,1);
+    assert.equal(state.pads[0].buttons,256);set(0);assert.equal((await sample()).pads[1].buttons,1024);
+    set(0,0);await page.keyboard.up('j');await sample();
+    await page.evaluate(()=>{Module.meleeControllers.setPortSource(0,'auto');Module.meleeControllers.setPortSource(1,'keyboard');});
+    await sample();await page.keyboard.down('ShiftRight');state=await sample();
+    assert.equal(state.physical_mask,1);assert.equal(state.keyboard_active_mask,2);assert.equal(state.pads[1].buttons,256);
+    set(0);assert.equal((await sample()).pads[0].buttons,1024);set(0,0);await page.keyboard.up('ShiftRight');await sample();
+    await page.evaluate(()=>{Module.meleeControllers.setPortSource(0,'off');Module._melee_web_input_set_keyboard_port(0,0);});
+    assert.equal((await sample()).pads[0].err,-1,'off removes the player input source');
   });
   assert.deepEqual(errors,[]);
 } finally {

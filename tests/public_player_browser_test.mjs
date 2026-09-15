@@ -79,7 +79,9 @@ try {
   await check('controls, focus and preferences survive a fresh document', async () => {
     await page.locator('#controls-open').click();
     await page.locator('#keyboard-layout').selectOption('boxx');
-    assert(await page.locator('#keyboard-two-option').isHidden());
+    assert(await page.locator('#boxx-source-note').isVisible());
+    assert(await page.locator('#player-two-source option[value="keyboard"]').isDisabled());
+    assert.match(await page.locator('#player-two-source-status').innerText(),/B0XX keyboard is Player 1 only/);
     await page.locator('#controls-close').click();
     await page.waitForFunction(() => document.activeElement.id === 'canvas');
     await collectViolations(); await page.reload(); await ready();

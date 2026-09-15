@@ -6,6 +6,17 @@ layout for ordinary controllers. Face buttons use positions: south → A,
 east → B, west → X, north → Y. Right shoulder → Z; triggers → L/R.
 Controls allows an explicit custom mapping when that convention is unwanted.
 
+The public player's compact **Controls** settings select the source separately
+for Player 1 and Player 2: **Auto**, **Keyboard**, **Controller only**, or **Off**.
+Auto prefers a recognized controller and otherwise enables that player's keyboard.
+Keyboard overrides physical input for that slot; automatically assigned controllers
+move to another eligible slot. Both public slots can use the keyboard at once.
+The public player disables automatic ports 3/4, while the shared manager and probe
+retain four-port support. B0XX keyboard input remains Player 1 only.
+Source choices survive reload with the existing keyboard preferences. Detailed
+controller testing/remapping and keyboard bindings are collapsed settings sections,
+not a required step before play. **Disc**, then **Play** enters the original menus.
+
 The recognized Mayflash 0079:1843 raw layout on Chrome/macOS gets an automatic
 suggested mapping. Its binding list is visible before setup, and the live display
 uses that suggestion immediately. A single binding can be changed without
@@ -35,10 +46,25 @@ models, browsers or operating systems. Sources and adaptation:
   indexes axes by usage minus 0x30 and buttons by usage minus 1, ignoring duplicate
   usages. Thus the browser hat is axis 9, with unused axes 6–8. Applying the
   native macOS SDL database's interleaved collection indices would be wrong.
-- Analog trigger range is -1 at rest to +1 fully pressed. Hat cardinal values
+- Analog trigger HID range is -1 at byte 0 to +1 at byte 255; physical rest is
+  origin-adjusted as described below. Hat cardinal values
   occupy eight equally spaced positions in [-1,1], with neutral outside it.
   The software fixture uses this observed descriptor shape with authored values;
   it is not a recording of the user's physical inputs.
+
+The suggested PC-adapter trigger axes span the HID byte range, but their physical
+rest need not be byte zero. The attached controller displayed trigger values
+32/34 with released buttons and near-center sticks. Requiring every raw analog
+value to be below 15 therefore prevented the entire controller from activating.
+The suggestion now learns a session-local trigger origin only with released
+buttons, centered sticks (within 15 PAD units) and low triggers (at most 64).
+It retains the smallest observed origin and subtracts it in byte units; it does
+not stretch travel or replace the game's trigger clamp. Strongly held triggers
+cannot become the initial origin. If a light squeeze is held while connecting,
+release it to update the origin. Precision against a retail reference remains
+open; this is a bounded hardware-normalization fix, not a universal calibration
+claim. The resting-offset fixture now passes both activation and original Wasm
+PAD delivery, including light pressure independent of clicks.
 
 Chromium's handling of duplicate usages means this does not establish access to
 all four physical adapter ports. Four browser-visible devices are supported by
@@ -92,6 +118,7 @@ node tests/controller_browser_test.mjs --url http://127.0.0.1:8794/ --playwright
 node tests/controller_setup_browser_test.mjs --url http://127.0.0.1:8794/ --playwright "$MELEE_PLAYWRIGHT_DIR" --out work/controller-wizard
 node tests/controller_setup_browser_test.mjs --url http://127.0.0.1:8794/ --playwright "$MELEE_PLAYWRIGHT_DIR" --out work/controller-wizard-axes --signed-dpad
 node tests/controller_suggestion_browser_test.mjs --url http://127.0.0.1:8794/ --playwright "$MELEE_PLAYWRIGHT_DIR" --out work/controller-suggestion
+node tests/controller_player_browser_test.mjs --url "$PUBLIC_PREVIEW_URL" --playwright "$MELEE_PLAYWRIGHT_DIR" --out work/controller-player
 ```
 
 Use the installed Playwright package directory and Node executable. Tests launch
@@ -128,7 +155,7 @@ sweep took 0.21 seconds and the two complete setup layouts took 11.00 and 11.13
 seconds after launch. These are test durations, not gameplay latency figures.
 All seven boundary groups, both wizard runs, 13 existing native-input cases,
 23 public-package cases and the six public-browser smoke groups passed. The
-759-test suite ran with 31 skips and one outdated artifact-count assertion;
+earlier 759-test suite ran with 31 skips and one outdated artifact-count assertion;
 that assertion was updated for the three new controller files and its complete
 four-test wrapper passed on rerun. No broad gameplay/timing matrix was run.
 After adding the suggestion, all eight Wasm boundary groups pass, including
@@ -136,3 +163,12 @@ automatic Mayflash X/trigger/hat input without setup. The suggestion UI check
 passes visible bindings, live X, one-control correction, occupied-input swap,
 reload persistence and restore in about 1.5 seconds after launch. These are
 software regressions, not physical controller latency measurements.
+The player-source follow-up adds a ninth Wasm group covering P1 keyboard with P2
+controller, the reverse arrangement, and disabling a slot. Its public UI check
+uses the real compiled player with authored Gamepad values to cover automatic
+activation, compact settings, both-keyboard selection, saved choices and closing
+settings. It does not load a disc or claim gameplay acceptance.
+The final player-source candidate passes all 759 Python tests (31 skips,
+317.27 seconds), all nine Wasm groups, the packaged-player source UI test, the
+six public-browser smoke groups and the 23-case public package suite. The final
+package audit covers 22 files / 14,691,084 bytes, graph `9d88c5fbae4d3962`.
