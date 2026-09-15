@@ -45,3 +45,6 @@
 .melee-controller-panel .mcp-muted { color: #91a1b3; }
 .melee-controller-panel .mcp-danger { color: #ffb0a8; }
 .melee-controller-panel .mcp-warning { color: #f0cc72; }
+.melee-controller-panel .mcp-bindings { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .4rem; margin-top: .6rem; }
+.melee-controller-panel .mcp-binding { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .4rem; background: #101821; border-radius: 4px; }
+.melee-controller-panel .mcp-card[hidden] { display: none; }

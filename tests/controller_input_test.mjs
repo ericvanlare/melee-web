@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {createControllerManager, normalizeController, validateProfile, STANDARD_PROFILE} from '../web/controller-input.mjs';
 import {detectBindingCandidate} from '../web/controller-panel.mjs';
 
-import {standardPad, rawPad, rawProfile} from './controller-fixtures.mjs';
+import {standardPad, rawPad, rawProfile, mayflashMacPad} from './controller-fixtures.mjs';
 
 const set = (p, index, value = 1, pressed = value > 0.5) => { p.buttons[index] = {pressed, value}; };
 const memoryStorage = () => { let data = null; return {getItem: () => data, setItem: (_, v) => { data = v; }}; };
@@ -99,3 +99,31 @@ assert.equal(reconnect.sample()[0].port,2,'unique controller reconnect keeps exp
 devices=[standardPad(1,'Identical'),standardPad(2,'Identical')];reconnect.sample();devices=[];reconnect.sample();
 devices=[standardPad(3,'Identical'),standardPad(4,'Identical')];
 assert.deepEqual(reconnect.sample().map(r=>r.port),[-1,-1],'ambiguous reconnect requires visible assignment');
+
+const mayflash = mayflashMacPad();
+const macOptions = {getGamepads:()=>[mayflash],storage:memoryStorage(),platform:'MacIntel',userAgent:'Chrome/153.0.0.0'};
+const suggested = createControllerManager(macOptions);
+let suggestedRow = suggested.sample()[0];
+assert.equal(suggestedRow.profileSource,'suggested');assert.equal(suggestedRow.status,'ready');
+assert.equal(macOptions.storage.getItem(),null,'suggestion does not persist a manual override');
+for(const [index,bits] of [[0,1024],[1,256],[2,512],[3,2048],[7,16],[9,4096],[4,64],[5,32]]) {
+  set(mayflash,index); assert.equal(suggested.sample()[0].output.buttons,bits,`suggested raw button ${index}`);set(mayflash,index,0);
+}
+mayflash.axes[3]=0;assert.deepEqual(suggested.sample()[0].output.triggers,[128,0]);
+assert.equal(suggested.sample()[0].output.buttons,0,'suggested light pressure does not invent a click');
+mayflash.axes[3]=-1; mayflash.axes[5]=.625; mayflash.axes[2]=-.5;
+assert.deepEqual(suggested.sample()[0].output.cstick,[80,64]);mayflash.axes[5]=0;mayflash.axes[2]=0;
+for(const [direction,bits] of [[0,8],[1,10],[2,2],[3,6],[4,4],[5,5],[6,1],[7,9]]) {
+  mayflash.axes[9]=-1+direction*2/7; assert.equal(suggested.sample()[0].output.buttons,bits);
+}
+mayflash.axes[9]=3.2857142857;assert.equal(suggested.sample()[0].output.buttons,0);
+const override=structuredClone(suggestedRow.profileConfig);override.name='Manual correction';override.buttons.R={kind:'button',index:6};
+suggested.saveProfile(suggestedRow.key,override);suggested.sample();set(mayflash,6);
+assert.equal(suggested.sample()[0].output.buttons,32);assert.equal(suggested.sample()[0].profileSource,'saved');set(mayflash,6,0);
+assert.equal(createControllerManager(macOptions).sample()[0].profile,'Manual correction');
+suggested.clearProfile(suggestedRow.key);assert.equal(suggested.sample()[0].profileSource,'suggested');
+for(const options of [{platform:'Win32'},{userAgent:'Firefox/143.0'},{getGamepads:()=>[rawPad()]},
+  {getGamepads:()=>[{...mayflash,id:'Unknown controller'}]}, {getGamepads:()=>[{...mayflash,mapping:'standard'}]}]) {
+  assert.equal(createControllerManager({...macOptions,storage:null,...options}).sample()[0].status,'needs-setup','do not apply a native mapping to an unrecognized browser layout');
+}
+console.log('Mayflash macOS suggestion, layout guards, independent pressure/clicks, hat axis 9 and saved override precedence pass.');

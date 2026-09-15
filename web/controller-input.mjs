@@ -15,6 +15,23 @@ export const STANDARD_PROFILE = Object.freeze({version: 1, name: 'Browser standa
   axes: {stickX: axis(0), stickY: axis(1, -1), cstickX: axis(2), cstickY: axis(3, -1),
     triggerL: button(6), triggerR: button(7)}});
 
+// SDL's Mayflash face/stick definitions, adapted to Chromium/macOS HID usage
+// indices (not SDL's native, interleaved collection indices). See CONTROLLERS.md.
+// The digital L/R click indices are provisional until a physical sweep.
+const MAYFLASH_MAC_PROFILE = {version: 1, name: 'Mayflash GameCube · Chrome on macOS', gamecube: true,
+  buttons: {A: button(1), B: button(2), X: button(0), Y: button(3), Z: button(7), Start: button(9),
+    L: button(4), R: button(5), ...Object.fromEntries(Object.entries({Up: 0, Right: 2, Down: 4, Left: 6})
+      .map(([name, direction]) => [name, {kind: 'hat', index: 9, direction}]))},
+  axes: {stickX: axis(0), stickY: axis(1, -1), cstickX: axis(5), cstickY: axis(2, -1),
+    triggerL: axis(3, 1, -1), triggerR: axis(4, 1, -1)}};
+
+function suggestedProfile(source, browser, platform) {
+  if (browser !== 'Chromium' || !/^Mac/.test(platform) || source.mapping !== '' ||
+      source.buttons.length !== 16 || source.axes.length !== 10 ||
+      !/(?:Vendor: 0079 Product: 1843|0079-1843-)/i.test(source.id)) return null;
+  return MAYFLASH_MAC_PROFILE;
+}
+
 export function copyRaw(pad) {
   return {buttons: Array.from(pad.buttons, b => ({pressed: !!b.pressed, value: b.value})),
     axes: Array.from(pad.axes)};
@@ -173,7 +190,10 @@ export function createControllerManager({getGamepads = () => navigator.getGamepa
         records.set(source.index, record);
       }
       const raw = copyRaw(source);
+      const suggestion = suggestedProfile(source, browser, platform);
       let profile = profiles.get(layout), pad = empty(), reason = '', status = 'ready';
+      let profileSource = profile ? 'saved' : suggestion ? 'suggested' : 'standard';
+      if (!profile && suggestion) profile = suggestion;
       if (!profile && source.mapping === 'standard' && !gamecubeIdentity(source.id)) profile = STANDARD_PROFILE;
       if (!profile) { record.neutralRequired = true; status = 'needs-setup'; reason = 'Set up this controller before playing; its button layout is not verified.'; }
       else {
@@ -187,6 +207,7 @@ export function createControllerManager({getGamepads = () => navigator.getGamepa
       if (record.port < 0) reason = 'Choose a player port for this controller in Controls.' + (reason ? ` ${reason}` : '');
       rows.push({key: record.key, index: source.index, port: record.port, id: source.id, layout,
         gamecube: profile?.gamecube ?? gamecubeIdentity(source.id), profile: profile?.name || 'Unconfigured', status, reason, raw, pad,
+        profileSource: profile ? profileSource : 'none', profileConfig: profile || null, hasSuggestion: !!suggestion,
         output: active ? pad : empty(), active, storageWarning});
     }
     lastRows = rows;

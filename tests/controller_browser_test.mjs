@@ -5,7 +5,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
-import {standardPad, rawPad, rawProfile} from './controller-fixtures.mjs';
+import {standardPad, rawPad, rawProfile, mayflashMacPad} from './controller-fixtures.mjs';
 const {values} = parseArgs({options: Object.fromEntries(['url','playwright','out'].map(n=>[n,{type:'string'}]))});
 if (!values.url || !values.playwright || !values.out) throw Error('Use --url ORIGIN --playwright PACKAGE_DIR --out LOCAL_DIR');
 const {chromium} = await import(pathToFileURL(path.join(path.resolve(values.playwright),'index.mjs')));
@@ -15,6 +15,7 @@ const errors = [], checks = [], started = performance.now();
 page.on('pageerror', e => errors.push(e.message));
 await page.addInitScript(() => {
   window.testControllers = [];
+  Object.defineProperty(navigator, 'platform', {value:'MacIntel'});
   Object.defineProperty(navigator, 'getGamepads', {value:()=>window.testControllers});
 });
 let pad = standardPad(3);
@@ -90,6 +91,14 @@ try {
     await page.evaluate(()=>Module._melee_web_input_set_keyboard(1));await page.locator('canvas').focus();await sample();
     await page.keyboard.down('j');let s=await sample();assert.equal(s.keyboard_active_mask,0);assert.equal(s.pads[0].buttons,0);await page.keyboard.up('j');
     await sample([]);await page.keyboard.down('j');s=await sample([]);assert.equal(s.keyboard_active_mask,1);assert.equal(s.pads[0].buttons,256);await page.keyboard.up('j');await sample([]);
+  });
+  await check('Recognized Mayflash suggestion reaches Wasm without setup',async()=>{
+    pad=mayflashMacPad();await sample();set(0);
+    assert.equal((await sample()).pads[0].buttons,1024);set(0,0);pad.axes[3]=0;
+    let p=(await sample()).pads[0];assert.equal(p.buttons,0);assert.deepEqual(p.triggers,[128,0]);
+    set(4);p=(await sample()).pads[0];assert.equal(p.buttons,64);assert.equal(p.triggers[0],128);
+    set(4,0);pad.axes[3]=-1;pad.axes[9]=-1+2*2/7;
+    assert.equal((await sample()).pads[0].buttons,2);
   });
   assert.deepEqual(errors,[]);
 } finally {

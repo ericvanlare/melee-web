@@ -241,7 +241,7 @@ function installStyle() {
 }
 
 function profileFromRow(row, gamecube) {
-  const previous = row?.profile && typeof row.profile === 'object' ? row.profile : null;
+  const previous = row?.profileConfig;
   const name = typeof previous?.name === 'string' && previous.name ? previous.name : `${gamecube ? 'GameCube' : 'Controller'} profile`;
   return emptyProfile(name, gamecube);
 }
@@ -264,7 +264,7 @@ function numberPair(value, fallback = 0) {
 function meter(container, value, min, max) {
   const safe = finite(value) ? value : min;
   const ratio = Math.max(0, Math.min(1, (safe - min) / (max - min || 1)));
-  const fill = container.querySelector('progress');
+  const fill = container.matches('progress') ? container : container.querySelector('progress');
   if (fill) fill.value = Math.round(ratio * 100);
 }
 
@@ -313,7 +313,15 @@ function describeRow(row) {
 }
 
 function rowSignature(rows) {
-  return rows.map(row => [row.key, row.index, row.port, row.id, row.status, profileLabel(row), row.reason, row.storageWarning].join('\u0001')).join('\u0002');
+  return rows.map(row => [row.key, row.index, row.port, row.id, row.status, profileLabel(row), row.profileSource,
+    JSON.stringify(row.profileConfig), row.reason, row.storageWarning].join('\u0001')).join('\u0002');
+}
+
+function describeBinding(binding) {
+  if (!binding) return 'Unmapped';
+  if (binding.kind === 'button') return `Button ${binding.index}`;
+  if (binding.kind === 'hat') return `Hat axis ${binding.index} · ${['up', 'up/right', 'right', 'down/right', 'down', 'down/left', 'left', 'up/left'][binding.direction]}`;
+  return `Axis ${binding.index} · ${binding.rest} → ${binding.end}`;
 }
 
 function safeRows(manager) {
@@ -339,7 +347,7 @@ export function mountControllerPanel(container, manager) {
   const root = element('section', {className: 'melee-controller-panel', 'data-controller-panel': '', 'aria-label': 'Controller setup and test'});
   const heading = element('header');
   heading.append(element('h2', {textContent: 'Controller setup'}));
-  heading.append(element('p', {textContent: 'Connect a controller, map its controls once, then verify the logical output below. Settings and recordings stay local to this browser.'}));
+  heading.append(element('p', {textContent: 'Connect a controller and press a button. Recognized layouts work immediately; check the live display and change any binding that is wrong. Settings and recordings stay local to this browser.'}));
   const status = element('p', {'role': 'status', 'aria-live': 'polite'});
   heading.append(status); root.append(heading);
 
@@ -363,6 +371,9 @@ export function mountControllerPanel(container, manager) {
   const liveCard = element('section', {className: 'mcp-card', 'aria-labelledby': 'mcp-live-title'});
   liveCard.append(element('h3', {id: 'mcp-live-title', textContent: 'Live logical input'}));
   const live = element('div'); liveCard.append(live); root.append(liveCard);
+
+  const bindingsCard = element('section', {className: 'mcp-card', 'aria-label': 'Controller bindings'});
+  const bindings = element('div'); bindingsCard.append(bindings); root.append(bindingsCard);
 
   const recordingCard = element('section', {className: 'mcp-card', 'aria-labelledby': 'mcp-recording-title'});
   recordingCard.append(element('h3', {id: 'mcp-recording-title', textContent: 'Local recording'}));
@@ -390,6 +401,7 @@ export function mountControllerPanel(container, manager) {
   let currentRows = [];
   let selectedKey = '';
   let renderedSignature = null;
+  let bindingsSignature = null;
   let wizardState = null;
   let timer = null;
   let destroyed = false;
@@ -441,18 +453,42 @@ export function mountControllerPanel(container, manager) {
       });
       const configure = element('button', {type: 'button', textContent: 'Set up'});
       configure.addEventListener('click', () => openWizard(row.key));
-      const clear = element('button', {type: 'button', textContent: 'Clear profile', disabled: row.status !== 'ready' && profileLabel(row) === 'Unconfigured'});
+      const clear = element('button', {type: 'button', textContent: row.hasSuggestion ? 'Use suggested mapping' : 'Clear profile', disabled: row.profileSource !== 'saved'});
       clear.addEventListener('click', () => {
         try { manager.clearProfile(row.key); setStatus('Saved profile cleared.'); poll(); }
         catch (error) { setStatus(error.message || String(error), 'mcp-danger'); }
       });
       const article = element('article');
       article.append(element('h3', {textContent: `${row.id || 'Unnamed controller'} · ${row.status === 'ready' ? 'Ready' : 'Needs setup'}`}));
-      article.append(element('div', {className: 'mcp-device-meta', textContent: `${Number.isInteger(row.index) ? `Browser index ${row.index}` : 'Browser index unknown'} · ${profileLabel(row)}`}));
+      article.append(element('div', {className: 'mcp-device-meta', textContent: `${Number.isInteger(row.index) ? `Browser index ${row.index}` : 'Browser index unknown'} · ${row.profileSource === 'suggested' ? 'Suggested: ' : ''}${profileLabel(row)}`}));
       if (row.reason) article.append(element('div', {className: 'mcp-device-meta mcp-warning', textContent: row.reason}));
       article.append(element('div', {className: 'mcp-actions'}, element('label', {className: 'mcp-field'}, element('span', {textContent: 'Player port'}), portSelect), configure, clear));
       devices.append(article);
     }
+  }
+
+  function renderBindings(row) {
+    const signature = row ? `${row.key}:${row.profileSource}:${JSON.stringify(row.profileConfig)}` : '';
+    if (signature === bindingsSignature) return;
+    bindingsSignature = signature;
+    bindings.replaceChildren(); bindingsCard.hidden = !row?.profileConfig;
+    if (!row?.profileConfig) return;
+    bindings.append(element('h3', {textContent: row.profileSource === 'suggested' ? 'Suggested Mayflash mapping · active' : 'Current bindings'}));
+    if (row.profileSource === 'suggested') {
+      bindings.append(element('p', {textContent: 'This starting layout uses SDL’s Mayflash definitions, adapted to Chrome on macOS and this adapter’s USB layout. No setup is needed to try it.'}));
+      bindings.append(element('p', {className: 'mcp-warning', textContent: 'L/R click bindings are provisional. Check light pressure and each full click separately. This mapping has not yet been verified with a physical controller sweep.'}));
+    }
+    bindings.append(element('p', {className: 'mcp-caption', textContent: 'Input numbers are browser indices, starting at 0. Change only a control that needs correction; assigning an occupied input swaps the two bindings.'}));
+    const grid = element('div', {className: 'mcp-bindings'});
+    for (const action of [...BUTTON_NAMES, ...AXIS_NAMES]) {
+      const label = ({L: 'L click', R: 'R click', stickX: 'Main stick right', stickY: 'Main stick up',
+        cstickX: 'C-stick right', cstickY: 'C-stick up', triggerL: 'L pressure', triggerR: 'R pressure'})[action] || action;
+      const change = element('button', {type: 'button', textContent: 'Change', 'aria-label': `Change ${label} binding`});
+      change.addEventListener('click', () => openWizard(row.key, action));
+      grid.append(element('div', {className: 'mcp-binding', 'data-binding': action},
+        element('div', {}, element('strong', {textContent: label}), element('div', {className: 'mcp-caption', textContent: describeBinding(row.profileConfig[actionBindingSection(action)][action])})), change));
+    }
+    bindings.append(grid);
   }
 
   function renderWizard() {
@@ -475,15 +511,16 @@ export function mountControllerPanel(container, manager) {
     }
   }
 
-  function openWizard(key) {
+  function openWizard(key, action = null) {
     const row = currentRows.find(candidate => candidate.key === key);
     if (!row) { setStatus('Select a connected controller before setup.', 'mcp-warning'); return; }
     selectedKey = key; deviceSelect.value = key;
-    const gamecube = kindSelect.value === 'gamecube';
-    const profile = profileFromRow(row, gamecube);
+    const gamecube = action ? row.profileConfig.gamecube : kindSelect.value === 'gamecube';
+    const profile = action ? deepCopy(row.profileConfig) : profileFromRow(row, gamecube);
+    if (action) profile.name = `${gamecube ? 'GameCube' : 'Controller'} custom mapping`;
     wizardState = {
-      key, gamecube, profile, actions: [...BUTTON_NAMES, ...AXIS_NAMES], stepIndex: 0,
-      phase: 'release', baseline: null,
+      key, gamecube, profile, actions: action ? [action] : [...BUTTON_NAMES, ...AXIS_NAMES], stepIndex: 0,
+      phase: AXIS_NAMES.includes(action) ? 'rest' : 'release', baseline: null,
       baselineCandidate: null, lastBinding: null, releaseSamples: 0, restSamples: 0,
     };
     wizardName.value = profile.name; renderWizard();
@@ -512,7 +549,7 @@ export function mountControllerPanel(container, manager) {
     done.profile.name = name;
     try {
       manager.saveProfile(done.key, deepCopy(done.profile));
-      wizardState = null; renderWizard(); setStatus(`Saved ${name}. Hold the controller neutral before playing.`); poll();
+      wizardState = null; renderWizard(); setStatus(`Saved ${name}.${done.swapped ? ` Swapped ${done.swapped}.` : ''} Hold the controller neutral before playing.`); poll();
     } catch (error) { setStatus(error.message || String(error), 'mcp-danger'); }
   }
 
@@ -547,8 +584,14 @@ export function mountControllerPanel(container, manager) {
     const candidate = detectBindingCandidate(raw, action, wizardState.baseline);
     if (!candidate) return;
     if (bindingUsed(wizardState.profile, candidate, action)) {
-      wizardHint.textContent = 'That control is already mapped. Release it and use a different control.';
-      return;
+      const section = actionBindingSection(action), entries = wizardState.profile[section];
+      const conflict = Object.keys(entries).filter(name => name !== action && bindingUsed({[section]: {[name]: entries[name]}}, candidate, action));
+      if (wizardState.actions.length !== 1 || conflict.length !== 1 || !entries[action]) {
+        wizardHint.textContent = 'That control is already mapped. Release it and use a different control.';
+        return;
+      }
+      entries[conflict[0]] = deepCopy(entries[action]);
+      wizardState.swapped = `${action} and ${conflict[0]}`;
     }
     wizardState.profile[actionBindingSection(action)][action] = candidate;
     wizardState.lastBinding = {
@@ -623,7 +666,7 @@ export function mountControllerPanel(container, manager) {
     if (destroyed) return;
     const result = safeRows(manager);
     if (result?.error) {
-      currentRows = []; renderDeviceList([]); renderLogicalBlock(live, null);
+      currentRows = []; renderDeviceList([]); renderLogicalBlock(live, null); renderBindings(null);
       const message = result.error.message || String(result.error);
       if (message !== lastPollError) setStatus(message, 'mcp-danger');
       lastPollError = message;
@@ -632,12 +675,13 @@ export function mountControllerPanel(container, manager) {
       renderDeviceList(currentRows);
       const row = selectedRow(currentRows);
       renderLogicalBlock(live, row);
+      renderBindings(row);
       if (row?.storageWarning) setStatus(row.storageWarning, 'mcp-warning');
       recordingSample(currentRows); processWizard(currentRows);
     }
   }
 
-  deviceSelect.addEventListener('change', () => { selectedKey = deviceSelect.value; kindSelect.value = selectedRow()?.gamecube ? 'gamecube' : 'generic'; renderLogicalBlock(live, selectedRow()); });
+  deviceSelect.addEventListener('change', () => { selectedKey = deviceSelect.value; kindSelect.value = selectedRow()?.gamecube ? 'gamecube' : 'generic'; renderLogicalBlock(live, selectedRow()); renderBindings(selectedRow()); });
   configureButton.addEventListener('click', () => openWizard(deviceSelect.value || selectedKey));
   refreshButton.addEventListener('click', () => { poll(); setStatus('Controller list refreshed.'); });
   cancelButton.addEventListener('click', () => closeWizard());

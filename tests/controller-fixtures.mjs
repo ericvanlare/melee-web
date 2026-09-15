@@ -17,3 +17,12 @@ export function rawPad(index=0) {
   const pad=standardPad(index,'MAYFLASH GameCube Controller Adapter (Vendor: 0079 Product: 1843)');
   pad.mapping=''; pad.buttons=pad.buttons.slice(0,12); pad.axes=[0,0,0,-1,-1,0,3.2857142857]; return pad;
 }
+
+// The attached 0079:1843 HID descriptor + Chromium/macOS usage indexing predict
+// this shape. Values below are authored, not recorded physical button presses.
+export function mayflashMacPad(index=0) {
+  const pad = rawPad(index);
+  pad.buttons = Array.from({length:16}, () => ({pressed:false,value:0}));
+  pad.axes = [0,0,0,-1,-1,0,0,0,0,3.2857142857];
+  return pad;
+}

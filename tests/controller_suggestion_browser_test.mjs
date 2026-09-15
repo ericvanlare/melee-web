@@ -1,0 +1,64 @@
+/** Suggested defaults and individual correction with authored HID-shaped input. */
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import {pathToFileURL} from 'node:url';
+import {parseArgs} from 'node:util';
+import {mayflashMacPad} from './controller-fixtures.mjs';
+const {values} = parseArgs({options:Object.fromEntries(['url','playwright','out'].map(n=>[n,{type:'string'}]))});
+if (!values.url || !values.playwright || !values.out) throw Error('Use --url ORIGIN --playwright PACKAGE_DIR --out LOCAL_DIR');
+const {chromium} = await import(pathToFileURL(path.join(path.resolve(values.playwright),'index.mjs')));
+const browser = await chromium.launch({channel:'chrome',headless:true});
+const page = await browser.newPage({viewport:{width:1100,height:1000}}), errors=[];
+page.setDefaultTimeout(8000);page.on('pageerror',e=>errors.push(e.message));
+await page.addInitScript(()=>{
+  window.testControllers=[];
+  Object.defineProperty(navigator,'platform',{value:'MacIntel'});
+  Object.defineProperty(navigator,'getGamepads',{value:()=>window.testControllers});
+});
+let raw = mayflashMacPad();
+const send = () => page.evaluate(p=>{window.testControllers=[p];},raw);
+const saved = () => page.evaluate(()=>JSON.parse(localStorage.getItem('melee-controller-profiles-v1'))?.profiles[0]?.[1]);
+const dialog=page.getByRole('dialog',{name:'Controller mapping'});
+const started=performance.now();
+try {
+  await fs.mkdir(values.out,{recursive:true});
+  await page.goto(new URL('controller-check.html',values.url).href);await send();
+  await page.getByRole('heading',{name:'Suggested Mayflash mapping · active',exact:true}).waitFor();
+  assert.equal(await page.locator('[data-binding]').count(),18);
+  assert.match(await page.locator('[data-binding="X"]').innerText(),/Button 0/);
+  assert.match(await page.locator('[data-binding="A"]').innerText(),/Button 1/);
+  assert.match(await page.locator('[data-binding="Up"]').innerText(),/Hat axis 9/);
+  assert.equal(await saved(),undefined,'no setup or storage required');
+  raw.buttons[0]={pressed:true,value:1};await send();
+  await page.getByLabel('X pressed',{exact:true}).waitFor();assert(await page.getByLabel('A released',{exact:true}).isVisible());
+  raw.axes[3]=0;await send();await page.getByText('L trigger: 128',{exact:true}).waitFor();
+  assert.equal(await page.getByRole('progressbar',{name:'L trigger 128',exact:true}).getAttribute('value'),'50');
+  assert(await page.getByLabel('L released',{exact:true}).isVisible());
+  await page.screenshot({path:path.join(values.out,'suggested-mapping.png'),fullPage:true});
+  raw=mayflashMacPad();await send();
+  await page.getByRole('button',{name:'Change R click binding',exact:true}).click();
+  await page.waitForFunction(()=>/first pressed/.test(document.querySelector('.mcp-dialog .mcp-muted')?.textContent||''));
+  assert.match(await dialog.innerText(),/Step 1 of 1/);
+  raw.buttons[6]={pressed:true,value:1};await send();await dialog.waitFor({state:'hidden'});
+  const corrected=await saved();assert.equal(corrected.buttons.R.index,6);assert.equal(corrected.buttons.X.index,0);
+  raw=mayflashMacPad();await send();await page.reload();await send();
+  await page.getByRole('heading',{name:'Current bindings',exact:true}).waitFor();
+  assert.match(await page.locator('[data-binding="R"]').innerText(),/Button 6/);
+  await page.getByRole('button',{name:'Change X binding',exact:true}).click();
+  await page.waitForFunction(()=>/first pressed/.test(document.querySelector('.mcp-dialog .mcp-muted')?.textContent||''));
+  raw.buttons[1]={pressed:true,value:1};await send();await dialog.waitFor({state:'hidden'});
+  const swapped=await saved();assert.equal(swapped.buttons.X.index,1);assert.equal(swapped.buttons.A.index,0);
+  assert.equal(swapped.buttons.R.index,6,'unrelated corrections survive a swap');
+  raw=mayflashMacPad();await send();
+  await page.getByRole('button',{name:'Use suggested mapping',exact:true}).click();
+  await page.getByRole('heading',{name:'Suggested Mayflash mapping · active',exact:true}).waitFor();
+  assert.match(await page.locator('[data-binding="R"]').innerText(),/Button 5/);
+  assert.match(await page.locator('[data-binding="X"]').innerText(),/Button 0/);
+  assert.deepEqual(errors,[]);
+  await fs.writeFile(path.join(values.out,'report.json'),JSON.stringify({scope:'Constructed HID-shaped Mayflash suggestion, live X, 18 visible bindings, individual correction, swap, persistence and restore; not physical acceptance',seconds:(performance.now()-started)/1000,errors},null,2));
+  console.log('Suggested Mayflash mapping, live input, individual correction, swap, reload and restore pass.');
+} catch(error) {
+  await fs.writeFile(path.join(values.out,'failure.txt'),String(error)+'\n'+await page.locator('body').innerText());
+  await page.screenshot({path:path.join(values.out,'failure.png'),fullPage:true});throw error;
+} finally {await browser.close();}
