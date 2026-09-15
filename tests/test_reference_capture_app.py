@@ -18,6 +18,65 @@ SPEC.loader.exec_module(APP)
 
 
 class ReferenceCaptureAppTests(unittest.TestCase):
+    def test_replay_binds_restored_profile_after_controller_reconfiguration(self):
+        from reference_dolphin_replay import read_profile, verify_replay_environment
+        import reference_session_comparison as comparison
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            profile = root / "profile"
+            profile.mkdir()
+            controller = profile / "GCPadNew.ini"
+            original_bytes = b"[GCPad1]\nDevice = SDL/0/Original Controller\n"
+            controller.write_bytes(original_bytes)
+            settings = self._capture_settings()
+            settings["paths"]["profile"] = str(profile)
+            settings["paths"]["fixture_gc"] = str(root / "fixture")
+            (root / "environment.json").write_text(json.dumps(settings))
+
+            def prepare_capture(source=None):
+                identity = dict(self._capture_identity(), configuration_sha256=APP.file_inventory(profile))
+                app = self._capture_app(root, None, identity, settings)
+                app.replay_source = source
+                if source:
+                    self.assertTrue(verify_replay_environment(source, identity))
+                def stop_before_launch(*args, **kwargs):
+                    user = Path(args[0][args[0].index("-u") + 1])
+                    self.assertEqual((user / "Config/GCPadNew.ini").read_bytes(), original_bytes)
+                    raise APP.CaptureCancelled("Synthetic capture stops before emulation")
+                try:
+                    with mock.patch.object(app, "_spawn_owned", side_effect=stop_before_launch):
+                        app.capture()
+                    self.assertEqual(app.status["state"], "incomplete")
+                    bundle = Path(app.status["bundle_path"])
+                    header = json.loads((bundle / "header.json").read_text())
+                    self.assertEqual(json.loads((bundle / "environment.json").read_text()), header["environment"])
+                    self.assertEqual(app.identity, identity)
+                    return bundle, header
+                finally:
+                    app.close()
+
+            original, original_header = prepare_capture()
+            source = {"path": original, "header": original_header,
+                      "profile": read_profile(original / "configuration-snapshot.json"),
+                      "manifest_sha256": "a" * 64, "input": {}, "input_path": original / "inputs.mwri"}
+            controller.write_bytes(b"[GCPad1]\nDevice = SDL/0/Replacement Controller\n")
+            replay, replay_header = prepare_capture(source)
+            def compare_prepared_headers():
+                # Preparation stops before emulation; identical synthetic rows
+                # isolate the real comparator's environment identity boundary.
+                rows = [{"event": "source_tick", "seq": 0, "source_tick": 1, "payload": {}}]
+                loaded = [comparison._LoadedSession(path, header, {"manifest_sha256": str(index)},
+                    rows, rows, {"complete": True}, str(index))
+                    for index, (path, header) in enumerate(((original, original_header), (replay, replay_header)))]
+                with mock.patch.object(comparison, "_load_bundle", side_effect=loaded):
+                    return comparison.compare_bundles(original, replay)
+            self.assertEqual(compare_prepared_headers()["status"], "matched")
+            self.assertNotEqual(json.loads((replay / "preflight-environment.json").read_text())["configuration_sha256"],
+                                replay_header["environment"]["configuration_sha256"])
+            # Configuration differences remain authoritative comparison data.
+            replay_header["environment"]["configuration_sha256"] = APP.file_inventory(profile)
+            self.assertEqual(compare_prepared_headers()["status"], "diverged")
+
     def test_failed_derived_report_preserves_finalized_replay(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
