@@ -2,8 +2,9 @@
 """Provision private capture settings from explicit, already-owned inputs.
 
 Run once after building the reviewed Dolphin observer and before installation.
-The app thereafter discovers this configuration without a terminal. This never
-copies the game image, extracted game files, or prepared memory card.
+The app thereafter discovers this configuration without a terminal. The exact
+prepared save is imported once into private Application Support; the game image
+and extracted executable remain in their user-selected locations.
 """
 import argparse
 import hashlib
@@ -18,12 +19,73 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from reference_capture_environment import (SCHEMA, DOLPHIN_REVISION, file_inventory,
-    sha256, support_root, verify_disc, read_settings)
+    sha256, support_root, verify_disc, read_settings, managed_fixture_path,
+    require_managed_fixture)
 from build_reference_dolphin import bundle_inventory, runtime_inventory
 
 PREPARED_GCI = "f64c9e07e436221ffc76acac7116a70167b2a690a59d5c56c2469c6fb5f2a1e6"
 PREPARED_SRAM = "3ebf0d88061ea04d1f757894ee36e27b3e10bb9102b1ae961a7c5c644e4d59db"
 INSTALL_SCHEMA = "webmelee-reference-dolphin-install-v1"
+
+
+def prepared_fixture_inventory():
+    return {"USA/Card A/01-GALE-SuperSmashBros0110290334.gci": PREPARED_GCI,
+            "SRAM.raw": PREPARED_SRAM}
+
+
+def import_prepared_fixture(source, root, expected):
+    """Publish one verified private copy, preserving the original evidence."""
+    source, root = Path(source), Path(root)
+    if expected != prepared_fixture_inventory() or file_inventory(source) != expected:
+        raise ValueError("The independently verified private prepared fixture is required")
+    destination = managed_fixture_path(root, expected)
+    require_managed_fixture(destination, root, expected)
+    parent = destination.parent.parent
+    parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    if destination.parent.exists():
+        if file_inventory(destination) != expected:
+            raise ValueError("The installed private prepared fixture changed")
+        return destination
+    staging = Path(tempfile.mkdtemp(prefix=".fixture-", dir=parent))
+    try:
+        gc = staging / "GC"
+        for name in expected:
+            target = gc / name
+            target.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+            shutil.copyfile(source / name, target)
+            target.chmod(0o400)
+        if file_inventory(gc) != expected or file_inventory(source) != expected:
+            raise ValueError("The private prepared fixture changed during import")
+        staging.rename(destination.parent)
+    finally:
+        if staging.exists():
+            shutil.rmtree(staging)
+    return destination
+
+
+def migrate_fixture(root):
+    """Relocate only fixture settings; do not rewrite captures or game inputs."""
+    root = Path(root).expanduser().resolve()
+    settings_path = root / "environment.json"
+    previous_bytes = settings_path.read_bytes()
+    settings = read_settings(settings_path)
+    destination = import_prepared_fixture(Path(settings["paths"]["fixture_gc"]),
+                                          root, settings["hashes"]["fixture_gc"])
+    if settings["paths"]["fixture_gc"] == str(destination):
+        return settings_path
+    history = root / "ConfigurationHistory" / hashlib.sha256(previous_bytes).hexdigest()
+    history.mkdir(mode=0o700, parents=True, exist_ok=True)
+    archive = history / "environment.json"
+    if archive.exists():
+        if archive.read_bytes() != previous_bytes:
+            raise ValueError("The prior environment archive changed")
+    else:
+        with archive.open("xb") as stream:
+            os.fchmod(stream.fileno(), 0o600)
+            stream.write(previous_bytes)
+    settings["paths"]["fixture_gc"] = str(destination)
+    _write_private(settings_path, settings)
+    return settings_path
 
 
 def _tree_inventory(root):
@@ -250,8 +312,7 @@ def configure(*, disc, dol, build_manifest, fixture_gc, root, refresh_build=Fals
             runtime_inventory(binary, binary.parents[2]) != build["runtime_dependencies"]):
         raise ValueError("Dolphin runtime libraries do not match the build receipt")
     fixture = file_inventory(fixture_gc)
-    if (fixture.get("USA/Card A/01-GALE-SuperSmashBros0110290334.gci") != PREPARED_GCI or
-            fixture.get("SRAM.raw") != PREPARED_SRAM):
+    if fixture != prepared_fixture_inventory():
         raise ValueError("The independently verified private prepared fixture is required")
     disc_hash = sha256(disc)
     verify_disc(disc, dol, disc_hash)
@@ -266,8 +327,7 @@ def configure(*, disc, dol, build_manifest, fixture_gc, root, refresh_build=Fals
     profile = root / "Configuration"
     profile.mkdir(mode=0o700, exist_ok=True)
     if previous is not None:
-        expected_paths = {"disc": str(disc), "dol": str(dol),
-                          "fixture_gc": str(fixture_gc), "profile": str(profile)}
+        expected_paths = {"disc": str(disc), "dol": str(dol), "profile": str(profile)}
         if (any(previous["paths"][key] != value for key, value in expected_paths.items()) or
                 previous["hashes"]["profile"] != file_inventory(profile) or
                 previous["hashes"]["fixture_gc"] != fixture or
@@ -275,6 +335,7 @@ def configure(*, disc, dol, build_manifest, fixture_gc, root, refresh_build=Fals
             raise ValueError("Build refresh cannot adopt changed private inputs or configuration")
     elif any(profile.iterdir()):
         raise ValueError("Existing configuration is preserved; review it before provisioning")
+    fixture_gc = import_prepared_fixture(fixture_gc, root, fixture)
     installed_root = None
     created_install = False
     if install_dolphin:
@@ -375,18 +436,29 @@ def _write_private(path, value):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for flag in ("disc", "dol", "build-manifest", "fixture-gc"):
-        parser.add_argument("--" + flag, type=Path, required=True)
+        parser.add_argument("--" + flag, type=Path)
     parser.add_argument("--root", type=Path, default=support_root())
     parser.add_argument("--refresh-build", action="store_true",
                         help="Adopt a new reviewed build while preserving private inputs and controller settings")
     parser.add_argument("--install-dolphin", action="store_true",
                         help="Copy the verified Dolphin app and corresponding source archive into the private support root")
+    parser.add_argument("--migrate-fixture", action="store_true",
+                        help="Import the configured prepared save into private support storage without changing its bytes")
     args = parser.parse_args()
+    inputs = (args.disc, args.dol, args.build_manifest, args.fixture_gc)
+    if args.migrate_fixture:
+        if any(inputs) or args.refresh_build or args.install_dolphin:
+            parser.error("--migrate-fixture takes only --root")
+    elif not all(inputs):
+        parser.error("provisioning requires --disc, --dol, --build-manifest and --fixture-gc")
     from install_reference_capture import installation_guard
     with installation_guard(args.root):
-        print(configure(disc=args.disc, dol=args.dol, build_manifest=args.build_manifest,
-                        fixture_gc=args.fixture_gc, root=args.root, refresh_build=args.refresh_build,
-                        install_dolphin=args.install_dolphin))
+        if args.migrate_fixture:
+            print(migrate_fixture(args.root))
+        else:
+            print(configure(disc=args.disc, dol=args.dol, build_manifest=args.build_manifest,
+                            fixture_gc=args.fixture_gc, root=args.root, refresh_build=args.refresh_build,
+                            install_dolphin=args.install_dolphin))
 
 
 if __name__ == "__main__":

@@ -109,7 +109,11 @@ class ReferenceCaptureConfigureTests(unittest.TestCase):
         root = settings_path.parent
         value = json.loads(settings_path.read_text())
         self.assertEqual(value["paths"]["disc"], str(self.disc.resolve()))
-        self.assertEqual(value["paths"]["fixture_gc"], str(self.fixture.resolve()))
+        managed = environment.managed_fixture_path(root, environment.file_inventory(self.fixture))
+        self.assertEqual(value["paths"]["fixture_gc"], str(managed))
+        self.assertEqual(environment.file_inventory(managed), environment.file_inventory(self.fixture))
+        for name in value["hashes"]["fixture_gc"]:
+            self.assertEqual(stat.S_IMODE((managed / name).stat().st_mode), 0o400)
         self.assertEqual(value["hashes"]["profile"], environment.file_inventory(root / "Configuration"))
         self.assertEqual(value["hashes"]["fixture_gc"], environment.file_inventory(self.fixture))
         self.assertEqual(value["controller"], {"backend": "keyboard", "device": "Keyboard", "port": 1})
@@ -117,6 +121,72 @@ class ReferenceCaptureConfigureTests(unittest.TestCase):
         self.assertEqual(stat.S_IMODE((root / "dolphin-build.json").stat().st_mode), 0o600)
         self.assertTrue((root / "Configuration/Dolphin.ini").is_file())
         self.assertTrue((root / "Configuration/GCPadNew.ini").is_file())
+
+    def legacy_settings(self):
+        path = self.provision()
+        settings = json.loads(path.read_text())
+        settings["paths"]["fixture_gc"] = str(self.fixture)
+        settings["controller"] = {"backend": "adapter", "device": "Adapter", "port": 1}
+        settings["controller_probe"] = {"preserved": True}
+        path.write_text(json.dumps(settings))
+        return path
+
+    def migrate(self, root):
+        with self.fixture_patch, self.sram_patch:
+            return configure.migrate_fixture(root)
+
+    def test_migration_preserves_source_hashes_profile_controller_and_prior_settings(self):
+        path = self.legacy_settings()
+        before = path.read_bytes()
+        previous = json.loads(before)
+        source_inventory = environment.file_inventory(self.fixture)
+        self.migrate(path.parent)
+        after = json.loads(path.read_text())
+        expected = copy.deepcopy(previous)
+        expected["paths"]["fixture_gc"] = str(environment.managed_fixture_path(path.parent, source_inventory))
+        self.assertEqual(after, expected)
+        self.assertEqual(environment.file_inventory(self.fixture), source_inventory)
+        archive = path.parent / "ConfigurationHistory" / hashlib.sha256(before).hexdigest() / "environment.json"
+        self.assertEqual(archive.read_bytes(), before)
+        self.assertEqual(stat.S_IMODE(archive.stat().st_mode), 0o600)
+        # Once migrated, even provisioning no longer needs the original location.
+        self.fixture.rename(self.fixture.with_name("original-evidence-preserved"))
+        migrated = path.read_bytes()
+        self.migrate(path.parent)
+        self.assertEqual(path.read_bytes(), migrated)
+
+    def test_migration_rejects_fixture_drift_without_changing_settings(self):
+        path = self.legacy_settings()
+        before = path.read_bytes()
+        self.sram.write_bytes(b"changed")
+        with self.assertRaisesRegex(ValueError, "verified private prepared fixture"):
+            self.migrate(path.parent)
+        self.assertEqual(path.read_bytes(), before)
+
+    def test_fixture_import_rejects_redirect_and_existing_drift(self):
+        path = self.legacy_settings()
+        before = path.read_bytes()
+        inventory = json.loads(before)["hashes"]["fixture_gc"]
+        managed = environment.managed_fixture_path(path.parent, inventory)
+        gci = managed / self.gci.relative_to(self.fixture)
+        gci.chmod(0o600)
+        gci.write_bytes(b"tampered private import")
+        with self.assertRaisesRegex(ValueError, "installed private prepared fixture changed"):
+            self.migrate(path.parent)
+        self.assertEqual(path.read_bytes(), before)
+        moved = self.root / "preserved-import"
+        managed.parent.rename(moved)
+        managed.parent.symlink_to(moved, target_is_directory=True)
+        with self.assertRaisesRegex(environment.EnvironmentError, "symbolic link"):
+            self.migrate(path.parent)
+
+    def test_migration_write_failure_preserves_previous_settings(self):
+        path = self.legacy_settings()
+        before = path.read_bytes()
+        with patch.object(configure, "_write_private", side_effect=OSError("cannot publish settings")):
+            with self.assertRaisesRegex(OSError, "cannot publish"):
+                self.migrate(path.parent)
+        self.assertEqual(path.read_bytes(), before)
 
     def test_existing_settings_require_explicit_refresh_without_mutation(self):
         settings_path = self.provision()

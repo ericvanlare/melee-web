@@ -1,5 +1,16 @@
 # Current status
 
+Reference Capture 0.2.1 imports the pinned private prepared save into Application
+Support and rejects external fixture locations before reading them. The original
+fixture and existing capture bundles remain unchanged. Guarded environment
+verification makes zero Documents-access attempts. One new operator-attested
+four-stock Falco versus level-6 CPU Marth match on Yoshi's Story replays through
+the preserved 0.2.0 tools after relocation: all 47,658 semantic events, 9,019
+source ticks and 9,011 draws match through result and teardown. This is an
+original-versus-original diagnostic pair, not port or performance acceptance.
+Older recordings require their matching tooling identity; a changed capture
+build is now rejected before launch. See the [bounded receipt](docs/evidence/reference-documents-migration-v1.json).
+
 Reference Capture 0.2.0 adds original Dolphin controller recording and replay
 from ordinary boot. A controller-driven four-stock Mario/level-1 Fox match on
 Final Destination records 61,838 SI operations and 66,231 observer events;

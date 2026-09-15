@@ -62,11 +62,12 @@ class ReferenceCaptureAppTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             app = APP.Supervisor(root / "environment.json", root=root, emit=lambda row: None)
-            app.replay_source = {"path": root / "original"}
+            app.replay_source = {"path": root / "original", "header": {"tooling_sha256": {"app": "same"}}}
             settings = {"input_recording_version": 1}
             identity = {"controller": {"state": "unavailable"}}
             try:
                 with mock.patch.object(APP, "read_settings", return_value=settings), \
+                     mock.patch.object(app, "tooling_identity", return_value={"app": "same"}), \
                      mock.patch.object(APP, "verify_environment", return_value=identity) as verify, \
                      mock.patch.object(APP, "verify_replay_environment") as replay_verify:
                     app.verify()
@@ -74,6 +75,23 @@ class ReferenceCaptureAppTests(unittest.TestCase):
                     replay_verify.assert_called_once_with(app.replay_source, identity)
                 self.assertEqual(app.status["state"], "ready")
                 self.assertEqual(app.status["physical_controller"], "replay")
+            finally:
+                app.close()
+
+    def test_replay_tooling_drift_is_rejected_before_environment_reads_or_launch(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            app = APP.Supervisor(root / "environment.json", root=root, emit=lambda row: None)
+            app.replay_source = {"header": {"tooling_sha256": {"app": "prior"}}}
+            try:
+                with mock.patch.object(APP, "read_settings", return_value={}), \
+                     mock.patch.object(app, "tooling_identity", return_value={"app": "current"}), \
+                     mock.patch.object(APP, "verify_environment") as verify, \
+                     mock.patch.object(APP.subprocess, "Popen") as launch:
+                    with self.assertRaisesRegex(APP.EnvironmentError, "requires the capture build"):
+                        app.verify()
+                    verify.assert_not_called()
+                    launch.assert_not_called()
             finally:
                 app.close()
 

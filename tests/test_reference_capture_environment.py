@@ -27,6 +27,10 @@ class EnvironmentTests(unittest.TestCase):
         self.fixture = self.root / "fixture"
         self.fixture.mkdir()
         (self.fixture / "synthetic-card").write_bytes(b"synthetic test only")
+        managed = env.managed_fixture_path(self.root, env.file_inventory(self.fixture))
+        managed.parent.mkdir(parents=True)
+        self.fixture.rename(managed)
+        self.fixture = managed
         self.binary = self.root / "Dolphin.app/Contents/MacOS/Dolphin"
         self.binary.parent.mkdir(parents=True)
         self.binary.write_bytes(b"synthetic executable")
@@ -56,6 +60,22 @@ class EnvironmentTests(unittest.TestCase):
         result = self.verify()
         self.assertEqual(result["controller"]["state"], "unavailable")
         self.assertFalse(result["controller"]["physical_session_validated"])
+
+    def test_external_fixture_rejected_before_reading_any_private_input(self):
+        self.settings["paths"]["fixture_gc"] = str(self.root / "Documents/prepared-save")
+        with patch.object(env, "file_inventory") as inventory, patch.object(env, "sha256") as digest:
+            with self.assertRaisesRegex(env.EnvironmentError, "needs migration"):
+                self.verify()
+            inventory.assert_not_called()
+            digest.assert_not_called()
+
+    def test_managed_fixture_parent_cannot_redirect_outside_support(self):
+        parent = self.fixture.parent
+        moved = self.root / "external-fixture"
+        parent.rename(moved)
+        parent.symlink_to(moved, target_is_directory=True)
+        with self.assertRaisesRegex(env.EnvironmentError, "symbolic link"):
+            self.verify()
 
     def test_connected_adapter_is_detection_only(self):
         device = {"name": "adapter", "adapter": True}

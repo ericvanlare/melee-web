@@ -216,6 +216,10 @@ class Supervisor:
         self._refresh_partial_discovery()
         self.publish(state="verifying", accepted_disc=None, message="Verifying the capture environment")
         self.settings = read_settings(self.settings_path)
+        if (self.replay_source is not None and
+                self.replay_source["header"].get("tooling_sha256") != self.tooling_identity()):
+            raise EnvironmentError("This recording requires the capture build that recorded it. "
+                                   "Replay it with the matching preserved tools; the recording is unchanged.")
         self.identity = verify_environment(self.settings, self.root,
             devices=[] if self.replay_source else None,
             progress=lambda state, message: self.publish(state=state, message=message))

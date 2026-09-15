@@ -33,7 +33,9 @@ report only what the frozen bundle and later comparison actually establish.
 
 The commands below use portable paths. Keep the disc image, extracted
 `main.dol`, prepared fixture, Dolphin build receipt, and capture output under
-`$HOME`; none belongs in Git or in the application bundle.
+`$HOME`; none belongs in Git or in the application bundle. Provisioning imports
+only the two verified prepared-save files into private Application Support.
+The original fixture stays unchanged, and the disc and executable are not copied.
 
 The dependency bootstrap validates the Dolphin source pin but does not clone
 entries whose lock kind is `source`. Prepare that checkout once, or point the
@@ -78,6 +80,12 @@ python3 scripts/configure_reference_capture.py \
   --install-dolphin
 ```
 
+The imported save lives at `PreparedFixtures/<inventory-sha256>/GC` under the
+support root. Import checks both pinned file hashes before and after copying,
+publishes the directory atomically, and never overwrites an existing version.
+Subsequent launch, controller setup, recording and replay use this local copy.
+They do not revisit the original fixture directory.
+
 The settings file is private and mode-restricted. Verification binds the
 selected disc and embedded DOL, Dolphin binary, isolated profile, fixture,
 observer identity, and timing policy. It also checks the currently connected
@@ -109,8 +117,9 @@ memory cards, captures, and other private payloads.
 
 ## Operate a capture
 
-Version 0.2.0 retains the pinned SDL discovery helper for physical SDL devices
-and adds Dolphin input recording and **Replay Capture…**.
+Version 0.2.1 keeps Dolphin input recording and **Replay Capture…**, and requires
+the prepared save to live inside private Application Support. It retains the
+pinned SDL discovery helper for physical SDL devices.
 Dolphin's controller database may assign a name different from macOS IOHID's
 product name. The helper derives the same SDL name and per-name index as Dolphin,
 then the supervisor binds that selection to observed physical vendor/product IDs.
@@ -152,10 +161,22 @@ adapter, then use **Rescan** until the app reports an accepted disc and a
 connected physical controller. The **Start Capture** button is enabled only
 when both gates are ready.
 
-macOS may ask this app to access Documents when the configured prepared save
-is stored there. Allow that folder prompt to let verification read the existing
-fixture. The app explains the wait in its verification details. A denied prompt
-leaves capture unavailable; no memory-card copy or alternate profile is used.
+Older installations could reference a prepared save inside Documents. The
+application rechecked it at launch and after recording, causing protected-folder
+access requests. With the app closed, migrate that installation once before
+upgrading:
+
+```sh
+python3 scripts/configure_reference_capture.py --migrate-fixture --root "$CAPTURE_ROOT"
+```
+
+Migration preserves the exact save bytes, controller mapping, Dolphin identity,
+and original evidence. It archives the old settings privately and changes only
+the active fixture path. Existing raw bundles are never rewritten. Repeating
+the command after migration does not read the original location. The app rejects
+an external fixture path before reading it and no longer declares Documents
+access in its application metadata. Its configured disc and executable should
+also remain outside protected folders if no such access is desired.
 No Accessibility or Screen Recording permission is required by the capture app.
 
 Start Capture launches the ordinary Dolphin boot with an isolated `-u` user
@@ -164,10 +185,11 @@ reviewed JITARM64 observer, and a fixed RTC. The observer is dormant unless
 all required `MWRC_*` identity variables match. Do not use a debugger, save
 state, or custom input path for this run.
 
-The prepared unlock fixture is a private setup aid. The capture uses a
-read-only reference to its SRAM and runs with `Core.SaveDataWritable=False`;
-guest-side changes disappear with the emulation process. The fixture is not
-copied into the app, retained in the raw bundle, or used as comparison data.
+The prepared unlock fixture is a private setup aid. Each capture uses a
+read-only reference to the imported SRAM and runs with `Core.SaveDataWritable=False`;
+guest-side changes disappear with the emulation process. No save copy is made
+per capture. The fixture is not bundled into the application or raw capture;
+its hashes are provenance, rather than gameplay comparison inputs.
 
 If the operator stops the run, Dolphin exits unexpectedly, the observer reports
 an error, or semantic teardown is missing, the app leaves an inspectable
@@ -184,9 +206,14 @@ Replay starts a new isolated Dolphin process and a new observed capture. It
 does not require a connected physical controller. **Stop Capture** also stops
 a replay and preserves its incomplete evidence.
 
-The installed Dolphin/observer, disc, fixture, operating system, locale and
-timing policy must match the original recording. The application rejects drift
-before launch. It restores the recorded controller configuration in a fresh
+The capture tooling identity, installed Dolphin/observer, disc, fixture,
+operating system, locale and timing policy must match the original recording.
+The application rejects drift before launch. Captures from an earlier app
+installation require that exact preserved runtime and identity receipt;
+reinstalling or updating the app does not rewrite their provenance. Retain
+matching prior tooling with private evidence when upgrading. A byte-identical
+fixture relocation does not change replay identity. The application restores
+the recorded controller configuration in a fresh
 session directory and supplies only the recorded host device samples. Original
 controller calibration, guest PAD handling and CPU decisions still execute in
 the game. No guest memory, fighter state, CPU output or captured address is

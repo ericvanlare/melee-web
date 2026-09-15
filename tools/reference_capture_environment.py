@@ -47,6 +47,22 @@ def json_sha256(value) -> str:
                                     separators=(",", ":")).encode()).hexdigest()
 
 
+def managed_fixture_path(root: Path, inventory: dict) -> Path:
+    return Path(os.path.abspath(root)) / "PreparedFixtures" / json_sha256(inventory) / "GC"
+
+
+def require_managed_fixture(path: Path, root: Path, inventory: dict) -> Path:
+    """Reject legacy external locations before any filesystem access to them."""
+    expected = managed_fixture_path(root, inventory)
+    if Path(os.path.abspath(path)) != expected:
+        raise EnvironmentError("The prepared save needs migration into the application's private support folder. "
+                               "Re-run the capture application setup with the app closed.")
+    for directory in (Path(root), expected.parent.parent, expected.parent, expected):
+        if directory.is_symlink():
+            raise EnvironmentError("The private prepared save location cannot be a symbolic link")
+    return expected
+
+
 def file_inventory(root: Path) -> dict:
     """Bind all relative regular files; symlinks cannot redirect a profile."""
     if root.is_symlink() or not root.is_dir():
@@ -186,6 +202,7 @@ def configured_controller(settings: dict, devices: list[dict]) -> dict:
 def verify_environment(settings: dict, root: Path, *, progress=lambda *_: None,
                        devices: list[dict] | None = None) -> dict:
     paths = {key: Path(value) for key, value in settings["paths"].items()}
+    require_managed_fixture(paths["fixture_gc"], root, settings["hashes"]["fixture_gc"])
     profile = paths["profile"]
     # A caller cannot select Dolphin's implicit/global user folder, even if its
     # current hashes happen to match. The supervisor always passes -u as well.
@@ -214,7 +231,7 @@ def verify_environment(settings: dict, root: Path, *, progress=lambda *_: None,
     actual_profile = file_inventory(profile)
     if actual_profile != hashes["profile"]:
         raise EnvironmentError("Dolphin configuration changed; review it through Configure Controller")
-    progress("verifying", "Checking the private prepared save. Allow macOS folder access if prompted.")
+    progress("verifying", "Checking the private prepared save in Application Support")
     fixture = file_inventory(paths["fixture_gc"])
     if not fixture or fixture != hashes["fixture_gc"]:
         raise EnvironmentError("The private prepared unlock fixture changed")
