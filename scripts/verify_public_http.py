@@ -9,6 +9,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
+from build_public import PLAYER_ALLOWED_ARTIFACTS, PLAYER_SOURCE_ALLOWLIST
+
 BLOCKED_PATHS = (
     '/runtime.html', '/prototype.html', '/viewer.html', '/native-menu.html',
     '/hitch-capture.mjs', '/tests/', '/docs/', '/work/', '/build/',
@@ -128,13 +130,11 @@ def verify(url, manifest):
                 re.fullmatch(r'[0-9a-f]{16}', next(iter(groups))[1]):
             raise ValueError('player manifest runtime path is invalid')
         runtime_root = '/'.join(next(iter(groups)))
-        allowed = {
-            f'{runtime_root}/melee-runtime.mjs', f'{runtime_root}/runtime-assets.mjs',
-            f'{runtime_root}/disc-image.mjs', f'{runtime_root}/prototype-keyboard-layouts.mjs',
-            f'{runtime_root}/gameplay_public.js', f'{runtime_root}/gameplay_public.wasm',
-            f'{runtime_root}/gameplay_public.data', f'{runtime_root}/player/player.css',
-            f'{runtime_root}/player/player-shell.mjs',
-        }
+        # Use the producer's explicit inventory so a reviewed shared module cannot
+        # silently drift out of the deployment check. HTML stays at the origin root.
+        allowed = {f'{runtime_root}/{name}' for name in PLAYER_ALLOWED_ARTIFACTS}
+        allowed.update(f'{runtime_root}/player/{name}' for name in PLAYER_SOURCE_ALLOWLIST
+                       if not name.endswith('.html'))
         if set(runtime_paths) != allowed:
             raise ValueError('player manifest runtime graph contains unauthorized or audio modules')
         blocked_paths = BLOCKED_PATHS + tuple(f'/{runtime_root}/{name}' for name in FORBIDDEN_AUDIO_MODULES)
