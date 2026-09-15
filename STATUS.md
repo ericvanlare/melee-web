@@ -1,5 +1,22 @@
 # Current status
 
+## Controller input candidate
+
+The browser controller candidate adds browser-standard mapping, a suggested
+Mayflash 0079:1843 mapping for Chrome/macOS's 16-button/10-axis raw layout,
+individual binding corrections, and complete setup for unknown layouts. The
+suggestion adapts SDL definitions to the inspected USB descriptor and Chromium
+indexing; digital L/R clicks remain provisional. Separate GameCube trigger
+pressure/clicks and fast input-only browser regressions pass. The public player
+defaults to controllers when recognized, with per-player keyboard overrides in
+compact Controls settings. Session-local trigger-origin handling fixes activation
+with the attached Mayflash's nonzero rest values. The user reports the suggested
+mapping worked in the check page; full physical gameplay acceptance and production
+deployment remain pending.
+See [controller scope and verification](docs/CONTROLLERS.md).
+
+## Public runtime
+
 The shared startup/complete-catalog fix passes local cold/warm Mario/FD and
 Falco/Battlefield with zero unexpected pipelines and native/browser maxima of
 9.805/27.350 ms. Required MEMFS setup now belongs to the shared player owner;

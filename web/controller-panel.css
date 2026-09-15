@@ -1,0 +1,50 @@
+/* Shared by the controller check page and the runtime's controls dialog. */
+.controller-check-page { color-scheme: dark; background: #0c1118; }
+.controller-check-page { margin: 0; min-height: 100vh; background: #0c1118; }
+.controller-check-page main { padding: 1rem; }
+.controller-check-page .page-note { max-width: 860px; margin: 0 auto .8rem; color: #b9c5d4; font: 14px/1.4 system-ui, sans-serif; }
+.controller-check-page .page-note h1 { margin: 0 0 .3rem; color: #fff; font-size: 1.25rem; }
+.controller-check-page .page-note p { margin: .3rem 0; }
+.controller-check-page #input-gate { color: #f0cc72; }
+.melee-controller-panel { box-sizing: border-box; max-width: 860px; margin: 0 auto; padding: 1rem; color: #e7edf5; background: #111923; font: 14px/1.4 system-ui, -apple-system, sans-serif; border: 1px solid #334154; border-radius: 10px; }
+.melee-controller-panel * { box-sizing: border-box; }
+.melee-controller-panel h2, .melee-controller-panel h3 { margin: .1rem 0 .35rem; color: #fff; }
+.melee-controller-panel p { margin: .35rem 0; color: #b9c5d4; }
+.melee-controller-panel button, .melee-controller-panel select, .melee-controller-panel input { font: inherit; color: inherit; background: #1b2736; border: 1px solid #52657c; border-radius: 5px; padding: .35rem .5rem; }
+.melee-controller-panel button { cursor: pointer; }
+.melee-controller-panel button:hover:not(:disabled), .melee-controller-panel button:focus-visible { background: #29405b; }
+.melee-controller-panel button:disabled { cursor: not-allowed; opacity: .5; }
+.melee-controller-panel label { display: flex; align-items: center; gap: .35rem; }
+.melee-controller-panel select { min-width: 0; }
+.melee-controller-panel [role=status] { min-height: 1.4em; color: #f0cc72; }
+.melee-controller-panel .mcp-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: .5rem; margin: .8rem 0; }
+.melee-controller-panel .mcp-field { display: grid; gap: .18rem; min-width: 10rem; }
+.melee-controller-panel .mcp-field span, .melee-controller-panel .mcp-caption { font-size: .78rem; color: #9eadc0; }
+.melee-controller-panel .mcp-card { margin: .7rem 0; padding: .7rem; background: #17212e; border: 1px solid #334154; border-radius: 7px; }
+.melee-controller-panel .mcp-device-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: .55rem; }
+.melee-controller-panel .mcp-device-list article { padding: .55rem; background: #101821; border: 1px solid #334154; border-radius: 6px; }
+.melee-controller-panel .mcp-device-list h3 { font-size: .95rem; overflow-wrap: anywhere; }
+.melee-controller-panel .mcp-device-meta { color: #b9c5d4; font-size: .84rem; }
+.melee-controller-panel .mcp-actions { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; margin-top: .45rem; }
+.melee-controller-panel .mcp-live { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: .55rem; }
+.melee-controller-panel .mcp-live-block { padding: .55rem; background: #101821; border: 1px solid #334154; border-radius: 6px; }
+.melee-controller-panel .mcp-button-grid { display: flex; flex-wrap: wrap; gap: .3rem; margin-top: .35rem; }
+.melee-controller-panel .mcp-logical-button { display: inline-flex; align-items: center; justify-content: center; min-width: 2.3rem; padding: .25rem .35rem; border-radius: 4px; background: #263446; color: #b9c5d4; }
+.melee-controller-panel .mcp-logical-button[data-pressed="true"] { background: #35a672; color: #fff; box-shadow: 0 0 0 1px #78e0ab inset; }
+.melee-controller-panel .mcp-meter { display: block; width: 100%; height: .45rem; margin: .25rem 0; accent-color: #58b7e8; }
+.melee-controller-panel .mcp-value { font-variant-numeric: tabular-nums; color: #e7edf5; }
+.melee-controller-panel .mcp-dialog { position: relative; margin: .7rem 0; padding: .8rem; background: #202b3b; border: 1px solid #6b88ab; border-radius: 7px; }
+.melee-controller-panel .mcp-dialog[hidden] { display: none; }
+.melee-controller-panel .mcp-prompt-list { display: flex; flex-wrap: wrap; gap: .3rem; padding: 0; margin: .55rem 0; list-style: none; }
+.melee-controller-panel .mcp-prompt-list li { padding: .2rem .4rem; border-radius: 4px; background: #2b3a4d; color: #bcc9d9; }
+.melee-controller-panel .mcp-prompt-list li[data-current="true"] { background: #b77a2e; color: #fff; }
+.melee-controller-panel .mcp-prompt-list li[data-done="true"] { background: #23684d; color: #d7ffea; }
+.melee-controller-panel .mcp-dialog-actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .7rem; }
+.melee-controller-panel .mcp-recording { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+.melee-controller-panel .mcp-recording a { color: #83c8ff; }
+.melee-controller-panel .mcp-muted { color: #91a1b3; }
+.melee-controller-panel .mcp-danger { color: #ffb0a8; }
+.melee-controller-panel .mcp-warning { color: #f0cc72; }
+.melee-controller-panel .mcp-bindings { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .4rem; margin-top: .6rem; }
+.melee-controller-panel .mcp-binding { display: flex; align-items: center; justify-content: space-between; gap: .5rem; padding: .4rem; background: #101821; border-radius: 4px; }
+.melee-controller-panel .mcp-card[hidden] { display: none; }

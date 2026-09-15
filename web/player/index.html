@@ -11,7 +11,10 @@
 </head>
 <body>
   <main id="player" aria-label="WebMelee player">
-    <div id="runtime-host" aria-label="Game"><canvas id="canvas" width="640" height="480" tabindex="0" aria-label="Game screen"></canvas></div>
+    <div id="runtime-host" aria-label="Game">
+      <canvas id="canvas" width="640" height="480" tabindex="0" aria-label="Game screen"></canvas>
+      <p id="idle-hint" role="status">Select your local disc, then choose Play to start.</p>
+    </div>
     <div id="toolbar" role="toolbar" aria-label="Game controls">
       <button id="choose-disc" type="button" disabled>Disc</button>
       <input id="disc-file" type="file" accept=".iso,.gcm,.ciso" aria-label="USA 1.02 disc image" hidden>
@@ -32,17 +35,52 @@
     <div class="dialog-actions"><button id="disc-cancel" type="button">Cancel</button><button id="disc-continue" type="button" disabled>Choose file</button></div>
   </dialog>
   <dialog id="controls-dialog" aria-label="Controls">
+    <div class="controls-heading">
+      <div>
+        <h2>Controls</h2>
+        <p>Choose where each player gets input. Auto uses a connected controller when one is ready and falls back to the keyboard.</p>
+      </div>
+      <button id="controls-close" type="button">Done</button>
+    </div>
+    <section class="source-settings" aria-labelledby="source-settings-title">
+      <h3 id="source-settings-title">Player input</h3>
+      <div class="source-row">
+        <label for="player-one-source">Player 1</label>
+        <select id="player-one-source" data-source-port="0" aria-label="Player 1 input source" disabled>
+          <option value="auto">Auto (controller if connected, keyboard otherwise)</option>
+          <option value="keyboard">Keyboard</option>
+          <option value="controller">Controller only</option>
+          <option value="off">Off</option>
+        </select>
+        <p id="player-one-source-status" class="source-status" role="status" aria-live="polite">Auto · Keyboard until a ready controller connects</p>
+      </div>
+      <div class="source-row">
+        <label for="player-two-source">Player 2</label>
+        <select id="player-two-source" data-source-port="1" aria-label="Player 2 input source" disabled>
+          <option value="auto">Auto (controller if connected, keyboard otherwise)</option>
+          <option value="keyboard">Keyboard</option>
+          <option value="controller">Controller only</option>
+          <option value="off">Off</option>
+        </select>
+        <p id="player-two-source-status" class="source-status" role="status" aria-live="polite">Auto · Keyboard until a ready controller connects</p>
+      </div>
+      <p id="boxx-source-note" class="source-note" hidden>B0XX provides keyboard controls for Player 1 only; Player 2 keyboard input is unavailable.</p>
+    </section>
     <div class="keyboard-options">
+      <label for="keyboard-layout">Keyboard layout</label>
       <select id="keyboard-layout" aria-label="Keyboard layout" disabled>
         <option value="two">2 players</option>
         <option value="boxx">1 player · B0XX</option>
       </select>
-      <label><input id="keyboard-one" type="checkbox" checked> <span id="keyboard-one-label">P1 keyboard</span></label>
-      <label id="keyboard-two-option"><input id="keyboard-two" type="checkbox" checked> P2 keyboard</label>
     </div>
-    <table id="keyboard-bindings" aria-label="Keyboard bindings"></table>
-    <ul id="controllers" aria-label="Detected controllers"></ul>
-    <div class="dialog-actions"><button id="controls-close" type="button">Close</button></div>
+    <details id="keyboard-bindings-details">
+      <summary>Keyboard bindings</summary>
+      <table id="keyboard-bindings" aria-label="Keyboard bindings"></table>
+    </details>
+    <details id="controller-advanced">
+      <summary>Advanced controller test and remapping</summary>
+      <div id="controllers" aria-label="Controllers"></div>
+    </details>
   </dialog>
   <dialog id="error-dialog" aria-label="Player error">
     <p id="error" role="alert"></p>
