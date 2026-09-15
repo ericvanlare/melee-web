@@ -219,7 +219,7 @@ private final class BackendClient {
         // A filesystem read can wait on an unanswered macOS permission prompt.
         // Give the supervisor time to stop its Dolphin process and preserve a
         // partial, then reap only our child so relaunch cannot inherit its lock.
-        let deadline = Date().addingTimeInterval(15)
+        let deadline = Date().addingTimeInterval(30)
         while process.isRunning && Date() < deadline {
             Thread.sleep(forTimeInterval: 0.05)
         }

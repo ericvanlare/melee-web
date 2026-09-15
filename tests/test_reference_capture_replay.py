@@ -318,6 +318,21 @@ class ReferenceCaptureReplayTests(unittest.TestCase):
             self.assertTrue(bundle.exists())
             self.assertEqual(list((bundle.parent.parent / "ingested").iterdir()), [])
 
+    def test_derivation_rejects_raw_bundle_and_alias_descendants_without_mutation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            bundle, stored = self._bundle(root / "inbox")
+            alias = root / "raw-alias"
+            alias.symlink_to(bundle, target_is_directory=True)
+            before = {str(p.relative_to(bundle)): p.read_bytes() for p in bundle.rglob("*") if p.is_file()}
+            before_inventory = sorted(str(p.relative_to(bundle)) for p in bundle.rglob("*"))
+            for output in (bundle, bundle / "nested/derived", alias / "derived"):
+                with self.subTest(output=output), self.assertRaisesRegex(ReplayError, "outside.*raw bundle"):
+                    self._derive(bundle, output, stored)
+                self.assertEqual(sorted(str(p.relative_to(bundle)) for p in bundle.rglob("*")), before_inventory)
+                self.assertEqual({str(p.relative_to(bundle)): p.read_bytes() for p in bundle.rglob("*") if p.is_file()}, before)
+                self.assertFalse(REPLAY._final_manifest(bundle)[1])
+
     def test_derived_destination_is_never_overwritten(self):
         with tempfile.TemporaryDirectory() as directory:
             bundle, stored = self._bundle(Path(directory) / "inbox")

@@ -31,6 +31,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cpu", choices=("Interpreter64", "JITARM64"), default="JITARM64")
     parser.add_argument("--output", type=Path, help="optional JSON report destination")
     args = parser.parse_args(argv)
+    if args.output:
+        output = args.output.expanduser().resolve()
+        immutable_roots = [args.derived, *([args.bundle] if args.bundle else [])]
+        if any(output.is_relative_to(root.expanduser().resolve()) for root in immutable_roots):
+            parser.exit(2, "Comparison reports must be outside immutable raw and derived inputs\n")
     report = compare(args.derived, args.trace, trace_kind=args.trace_kind,
                      reference_cpu=args.reference_cpu, trace_cpu=args.trace_cpu,
                      bundle=args.bundle, cpu=args.cpu)

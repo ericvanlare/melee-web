@@ -336,6 +336,31 @@ class ReferenceCaptureConfigureTests(unittest.TestCase):
         self.assertEqual(first_version.parent, root / "Dolphin")
         self.assertTrue((root / "BuildHistory" / first["hashes"]["dolphin_binary_sha256"]).is_dir())
 
+    def test_identical_installed_version_is_idempotent(self):
+        settings_path = self.provision(install_dolphin=True)
+        root = settings_path.parent
+        before = settings_path.read_bytes()
+        self.provision(root=root, refresh_build=True, install_dolphin=True)
+        self.assertEqual(settings_path.read_bytes(), before)
+
+    def test_same_executable_with_changed_bundle_or_provenance_rejects_without_writes(self):
+        settings_path = self.provision(install_dolphin=True)
+        root = settings_path.parent
+        settings_before = settings_path.read_bytes()
+        receipt_before = (root / "dolphin-build.json").read_bytes()
+        version = Path(json.loads(settings_before)["paths"]["dolphin"]).parents[3]
+        installed_before = configure._tree_inventory(version)
+        # The executable is identical; only a bundled resource and the new
+        # corresponding-source receipt differ.
+        (self.app / "Contents/Resources/runtime.dylib").write_bytes(b"different runtime")
+        newer_manifest = self.root / "same-executable-build.json"
+        self._write_build(self.binary, newer_manifest, self.runtime_dependencies)
+        with self.assertRaisesRegex(ValueError, "version collision"):
+            self.provision(root=root, manifest=newer_manifest, refresh_build=True, install_dolphin=True)
+        self.assertEqual(settings_path.read_bytes(), settings_before)
+        self.assertEqual((root / "dolphin-build.json").read_bytes(), receipt_before)
+        self.assertEqual(configure._tree_inventory(version), installed_before)
+
     def test_existing_drifted_version_is_never_overwritten(self):
         settings_path = self.provision(install_dolphin=True)
         root = settings_path.parent

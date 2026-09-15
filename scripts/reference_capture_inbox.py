@@ -67,7 +67,7 @@ def main(argv: list[str] | None = None) -> int:
     try:
         inbox = ReferenceCaptureInbox(args.root)
         if command == "list":
-            _emit({"root": str(inbox.root), "runs": inbox.list_runs(args.state)}, pretty=args.pretty)
+            _emit({"root": str(inbox.root), "runs": inbox.list_runs(getattr(args, "state", None))}, pretty=args.pretty)
             return 0
         if command == "validate":
             report = inbox.validate(
