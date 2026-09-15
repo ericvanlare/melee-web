@@ -8,8 +8,12 @@ adapters. Both are selectable in original CSS. The Release build, owned-asset
 checks and native Dr. Mario/Roy match lifecycles in both orientations pass,
 including all five costumes, specials, damage, pause and reconstruction.
 Visible browser checks exercise each clone against Mario on Final Destination.
-These are development candidates: retail comparison and clean cold rendering
-preparation remain open, and no production deployment is part of this change.
+The first physical Roy/level-9 Dr. Mario capture now repeats exactly in Dolphin
+through 6,965 ticks and 37,825 semantic events. The browser consumes the same
+inputs but first differs in initialization RNG, then Doc's input at tick 154;
+it fails to reproduce the recorded win and has rendering stalls. These remain
+development candidates, with no production deployment. See the
+[retail diagnostic](docs/evidence/roy-dr-mario-retail-diagnostic-v1.json).
 See [exact scope, retained failures and next capture](docs/ROY_DR_MARIO_PORT_NOTES.md).
 
 ## Controller input candidate

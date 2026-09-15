@@ -148,6 +148,52 @@ other stages/costumes in a browser, remaining Roy special variants and the
 historical GPU-stall investigation are open. Production and the other
 integration owner's frozen branches are unchanged by this pass.
 
+## First human capture comparison — September 15
+
+The user's four-stock P1 Roy versus level-9 P2 Dr. Mario capture on Final
+Destination, default costumes, contains 6,965 source ticks and 6,959 draws.
+The original replay reproduces all 37,825 semantic events exactly, including
+CPU decisions, RNG, fighter state, camera/HUD observations, result and teardown.
+Roy wins with three stocks left. This is a repeatable diagnostic pair; it is
+not gold admission or a pixel/PCM comparison.
+
+One visible Chrome replay uses the frozen clone Release build at
+`c4695cee35198aec9ab3f966c6c8f8eaeaa7e948`. It consumes the complete input
+recipe, with all human samples and PAD history matching, but fails gameplay
+equivalence:
+
+| Boundary | Original | Browser |
+| --- | --- | --- |
+| Match construction complete: RNG | 1439421057 | 2325449750 |
+| Tick 154 | Doc's recorded input | First differing fighter input |
+| Tick 636 | Doc's position and action | First positional/action divergence |
+| Tick 672: Roy damage | 8% | 12% |
+| End of the 6,965-tick input stream | Roy wins, stocks 3–0 | Match unfinished, stocks 2–3 |
+
+Both start from RNG seed 1264785038. Using the original HSD generator, the
+two construction-complete states correspond to nine versus eight advances.
+This points to initialization RNG consumption as the first boundary to trace;
+the responsible source call is not yet identified. Do not force a seed or add
+an unexplained RNG call to compensate for it.
+
+The state run also retains performance failures: 165.130 ms maximum native
+callback, 178.070 ms maximum browser interval, 30 live pipeline creations,
+106 audio underrun frames, one instrumented timing resume, and 66,846,720 bytes
+of Wasm capacity growth. The worst native callback contains 161.155 ms of
+staging-slot wait and creates no pipeline itself. Match preparation reports
+198.840 ms separately. These instrumented timings are diagnostic evidence;
+no clean cold/warm performance acceptance follows from this run.
+
+The browser harness correctly exits with failure because the source match has
+not completed, despite the UI's input-stream completion flag. The strict CPU
+sidecar comparator also rejects a repeated draw `source_index` of 10; the
+overall comparison remains `invalid_input` while preserving the independent
+core-state divergence. No CPU observation was discarded to make it pass.
+Raw captures, failed browser output, screenshots and reports remain private;
+only the [compact hashes and findings](evidence/roy-dr-mario-retail-diagnostic-v1.json)
+are tracked. No gameplay code, renderer catalog, production deployment or
+holdout state changed for this comparison.
+
 ## Owned revision-2 asset hashes
 
 ```text
