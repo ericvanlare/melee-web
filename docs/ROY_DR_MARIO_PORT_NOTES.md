@@ -311,3 +311,21 @@ or callback overruns: native maximum 15.700 ms, browser gap 24.135 ms. It still
 constructs 27 live pipelines and grows Wasm capacity by 66,846,720 bytes. This
 single state capture is not cold/warm performance admission and does not close
 the retained GPU stall. See the [separate immutable evidence](evidence/roy-dr-mario-render-preparation-replay-v1.json).
+
+## Original joint-transform rounding
+
+Four `HSD_MtxSRT` endpoints used separately rounded C multiply/add while retail
+uses `fmsubs`/`fmadds` at 8037A388, 8037A38C, 8037A3B4 and 8037A3B8. Explicit
+`fmaf` restores those boundaries; inner products and outer scale operations
+remain separately rounded. At source tick 64, local parent m02 feeds world m22
+through the rotated grandparent, then Roy's subject Z. The isolated test compares
+24 original parent/child matrix words and retains an unfused failing control.
+The [producer evidence](evidence/roy-dr-mario-srt-rounding-cause-v1.json) also
+records the unsuccessful trig probes and corrected world/local interpretation.
+
+The third complete replay matches **all subject/bone fields across all 6,965
+ticks**, in addition to core, CPU decisions, HUD, magnifier and result. Camera
+interest X still first differs at source tick 427, and the six original PAD
+batches still have fewer draws. A GPU staging wait recurred (101.160 ms native,
+113.650 ms browser, 22 audio underrun frames), so performance remains open.
+See [full replay evidence](evidence/roy-dr-mario-srt-replay-v1.json).

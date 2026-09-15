@@ -1,0 +1,46 @@
+{
+  "schema": "melee-web-roy-dr-mario-srt-rounding-cause-v1",
+  "date": "2026-09-15",
+  "scope": "Original joint matrix operands, fused arithmetic instructions, and isolated source-kernel comparison; full updated replay pending",
+  "capture_manifest_sha256": "0407e4facda8745c1304e59a0bde5aa85dc54444854f7718de12c8cb7ff49dfa",
+  "original_evidence": {
+    "matrix_sha256": "e6a86126739c0056502c0d8f14c9d36771ae762ac500c062a34c1f32364255fd",
+    "instruction_disassembly_sha256": "6c855dd0d8aee9933e65df6248dbc845b0b58a587d66347c9727c6eb68af244f",
+    "selected_subject_call": 65,
+    "source_tick": 64,
+    "original_fused_instructions": [
+      "8037a388 fmsubs",
+      "8037a38c fmadds",
+      "8037a3b4 fmadds",
+      "8037a3b8 fmsubs"
+    ]
+  },
+  "cause": "HSD_MtxSRT local rotation products had separately rounded multiply/add in the port. Original fused local m02 feeds the parent world m22 through its rotated grandparent, then the target subject translation.",
+  "negative_control": {
+    "parent_world_m22": "3eff8e2b",
+    "child_world_z": "bce87daf"
+  },
+  "original_and_fixed": {
+    "parent_world_m22": "3eff8e2a",
+    "child_world_z": "bce87db0",
+    "all_parent_and_child_matrix_words": "exact (24 words)"
+  },
+  "verification": {
+    "source_kernel_test": "pass",
+    "unfused_original_C_control": "reproduces failure",
+    "native_core_prefix": "700 ticks unchanged from the prior retail-exact prefix",
+    "release_runtime_build": "pass"
+  },
+  "retained_diagnostic_failures": [
+    "original-trig-regs-01",
+    "original-trig-regs-02",
+    "original-srt-ptr-01",
+    "original-srt-trig-regs-01"
+  ],
+  "diagnostic_correction": "The captured parent matrix is a world matrix, not a local SRT output. Earlier trig-probe attempts did not obtain original function values; no trig claim or runtime change was made from those failed attempts.",
+  "claims": {
+    "scalar_original_equivalence": "pass",
+    "complete_replay_equivalence": "pending",
+    "production_deployed": false
+  }
+}

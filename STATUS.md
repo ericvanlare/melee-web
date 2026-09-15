@@ -34,6 +34,10 @@ audio underruns in this run (15.700 ms native / 24.135 ms browser maxima).
 Bone/camera rounding and six original draw-batching differences remain open;
 this is not a performance-admission claim. See the
 [renderer follow-up](docs/evidence/roy-dr-mario-render-preparation-replay-v1.json).
+Restoring four original fused joint-transform operations now also matches every
+subject/bone field in a third complete replay. Camera interest still first differs
+at tick 427; the six draw-batching differences and recurrent GPU staging stall
+remain open. See [the joint-transform replay](docs/evidence/roy-dr-mario-srt-replay-v1.json).
 
 ## Controller input candidate
 
