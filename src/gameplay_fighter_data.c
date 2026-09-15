@@ -68,13 +68,15 @@ static FtSFXArr* sound_array(const MeleeWebNativeDat* r,uint32_t slot)
     return out;
 }
 void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
-    uint32_t kind,uint32_t costumes,void* actions,void* blends,void* choices,uint32_t* unresolved)
+    uint32_t kind,uint32_t costumes,uint32_t motion_count,void* actions,void* blends,
+    void* choices,uint32_t* unresolved)
 {
     if (!r || !unresolved) return NULL;
     REQUIRE(kind==FTKIND_MARIO || kind==FTKIND_DRMARIO || kind==FTKIND_FOX ||
         kind==FTKIND_FALCO || kind==FTKIND_MARS || kind==FTKIND_EMBLEM,
         "Native fighter extension schema unavailable");
     REQUIRE(costumes>0 && costumes<=16,"Native costume count exceeds checked bound");
+    REQUIRE(motion_count>0 && motion_count<=1024,"Native motion count exceeds checked bound");
     REGION(root,0x60); ftData* d=NEW(ftData,1); *unresolved=0;
     /* Every source pointer starts explicitly unresolved until decoded below. */
     for(unsigned field=0;field<24;++field)
@@ -186,15 +188,28 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
                    "Empty native fighter dynamics has a nonnull auxiliary table");
     uint32_t dynamics_table=PTR(at+16,1);
     if(dynamics_table!=UINT32_MAX) {
-        /* Marth/Roy's five authored dynamics modes each carry one integer chain
-         * cutoff per sword/cape bone. The original field is typed FigaTree***
-         * but ftdynamics.c intentionally compares these pointer-width values
-         * as small integers; preserve that exact ABI without fabricating clips. */
+        /* Marth/Roy's authored dynamics modes each carry one integer chain
+         * cutoff per sword/cape bone. The mode selector is the second byte of
+         * every source blend row, and the original field is typed FigaTree***
+         * even though ftdynamics.c compares these pointer-width values as
+         * small integers. Derive the table extent from all authored selectors:
+         * Roy has a sixth row for selector 5, while Marth's table ends at 4.
+         * The referenced-region check below keeps an adjacent descriptor from
+         * being consumed as a fabricated mode row.
+         */
         REQUIRE((kind==FTKIND_MARS||kind==FTKIND_EMBLEM)&&d->x2C->dynamicsNum==3,
                 "Native fighter dynamics mode schema unavailable");
-        REGION(dynamics_table,5*4);
-        d->x2C->x10=NEW(FigaTree**,5);
-        for(unsigned mode=0;mode<5;++mode) {
+        REQUIRE(blends,"Native fighter dynamics selectors are missing");
+        unsigned mode_count=0;
+        const uint8_t* blend_bytes=(const uint8_t*)blends;
+        for(uint32_t motion=0;motion<motion_count;++motion) {
+            const unsigned mode=blend_bytes[motion*2+1];
+            if(mode+1>mode_count)mode_count=mode+1;
+        }
+        REQUIRE(mode_count>0,"Native fighter dynamics mode table is empty");
+        REGION(dynamics_table,(size_t)mode_count*4);
+        d->x2C->x10=NEW(FigaTree**,mode_count);
+        for(unsigned mode=0;mode<mode_count;++mode) {
             uint32_t row=required(r,dynamics_table+mode*4,
                                   d->x2C->dynamicsNum*4);
             d->x2C->x10[mode]=NEW(FigaTree*,d->x2C->dynamicsNum);

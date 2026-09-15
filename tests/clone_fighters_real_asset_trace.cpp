@@ -166,13 +166,12 @@ void check_roy(const std::shared_ptr<const DatArchive>& archive,
             "Roy source dynamics descriptor is incomplete");
     const auto dynamics = runtime->dynamics().descriptor_offset;
     const auto mode_table = *runtime->dynamics().animation_table_offset;
-    // The source consumer walks five mode pointers. The following referenced
-    // DAT target is adjacent padding/metadata, not a sixth native mode.
-    require(archive->range(mode_table, 5 * 4).size() == 5 * 4,
-            "Roy dynamics mode table is not five pointer rows");
-    const std::array<std::array<std::uint32_t, 3>, 5> modes{{
+    // Roy's authored blend selectors include mode 5 (actions 239–241).
+    require(archive->range(mode_table, 6 * 4).size() == 6 * 4,
+            "Roy dynamics mode table is not six pointer rows");
+    const std::array<std::array<std::uint32_t, 3>, 6> modes{{
         {{2, 2, 2}}, {{0, 0, 2}}, {{2, 0, 0}},
-        {{1, 1, 1}}, {{2, 1, 1}}}};
+        {{1, 1, 1}}, {{2, 1, 1}}, {{3, 0, 0}}}};
     for (std::size_t row = 0; row < modes.size(); ++row) {
         const auto target = archive->pointer(mode_table + static_cast<std::uint32_t>(row * 4), 12);
         require(target.has_value(), "Roy dynamics mode row pointer is missing");
@@ -220,7 +219,7 @@ int main(int argc, char** argv)
             throw std::runtime_error(std::string("Roy: ") + error.what());
         }
         std::cout << "Dr. Mario kind 21/303 actions, vitamin+Sheet articles, five costumes, effect bank 1/count 2; "
-                     "Roy kind 26/327 actions, Mars attributes, three dynamics chains/five mode rows, five costumes, "
+                     "Roy kind 26/327 actions, Mars attributes, three dynamics chains/six mode rows, five costumes, "
                      "effect bank 49/count 2 and audio passed\n";
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';

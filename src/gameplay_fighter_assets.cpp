@@ -98,7 +98,8 @@ struct GameplayFighterAssets::Storage {
         for(const auto& value:fighter_costumes())if(value.fighter_kind==id.fighter_kind)++costume_count;
         const uint32_t fighter_root=root(*fighter,id.fighter_symbol);
         void* data=melee_web_fighter_data_decode(arena.reader(),fighter_root,id.fighter_kind,
-            costume_count,prototype.action_rows(),prototype.blend_rows(),prototype.wait_choices(),&unresolved);
+            costume_count,static_cast<uint32_t>(prototype.runtime().actions().size()),
+            prototype.action_rows(),prototype.blend_rows(),prototype.wait_choices(),&unresolved);
         const auto item_table=fighter->pointer(fighter_root+0x48,16);
         struct ItemIdentity { uint32_t index,kind; };
         std::array<ItemIdentity,3> item_identities{};

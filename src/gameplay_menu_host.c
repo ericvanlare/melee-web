@@ -40,6 +40,7 @@ struct MeleeWebMenuHost {
     struct gmm_x1CB0 saved_preferences;
     int saved_language,saved_saved_language;
     u16 saved_characters,saved_stages;
+    u16 selected_characters,selected_stages;
     int entered,drawing,transition;
 };
 static MeleeWebMenuHost* owner;
@@ -175,6 +176,8 @@ int melee_web_menu_host_leave(MeleeWebMenuHost* h,int abort_scene,char* e,size_t
     if(!result)return 0;
     /* SSS has no SIS table of its own; the scene preparation heap is ours. */
     if(was_sss)HSD_SisLib_803A5FBC();
+    h->selected_characters=*gmMainLib_GetUnlockedCharactersBitmaskPtr();
+    h->selected_stages=*gmMainLib_8015EDA4();
     h->entered=0;restore_context(h);return ok(e,n);
 }
 int melee_web_menu_host_phase(const MeleeWebMenuHost* h){return h&&h==owner?melee_web_menu_phase(h->session):MELEE_WEB_MENU_CLOSED;}
@@ -237,7 +240,11 @@ int melee_web_menu_host_selection(const MeleeWebMenuHost* h,MeleeWebMenuMatchSel
     if(vs->start.rules.x0_3<1||vs->start.rules.x0_3>6)
         return fail(e,n,"Original HUD layout is unsupported");
     out->hud_layout=vs->start.rules.x0_3;
-    out->random_seed=h->seed;return ok(e,n);
+    out->random_seed=h->seed;
+    out->unlocked_characters=h->selected_characters;
+    out->unlocked_stages=h->selected_stages;
+    out->save_profile_present=1;
+    return ok(e,n);
 }
 int melee_web_menu_host_raw_selection(const MeleeWebMenuHost* h,StartMeleeData* out,char* e,size_t n){
     if(!h||h!=owner||h->entered||h->audio||!out||seed_ptr!=&h->seed||

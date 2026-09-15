@@ -197,7 +197,7 @@ $('retail-replay-start').onclick=async()=>{
  replayLoading=true;$('retail-replay-start').disabled=$('disc').disabled=$('launch').disabled=true;
  try{
   if(window.meleeHitchCaptureLoading)await window.meleeHitchCaptureLoading;if(window.meleeHitchCaptureLoadError&&hitchCaptureFromUrl)throw Error(`Hitch capture unavailable: ${window.meleeHitchCaptureLoadError}`);
-  const file=$('retail-replay-file').files[0];if(!file||file.size<328||file.size>1585150)throw Error('Invalid bounded MWRC input recipe');
+  const file=$('retail-replay-file').files[0];if(!file||file.size<328||file.size>1585154)throw Error('Invalid bounded MWRC input recipe');
   const bytes=new Uint8Array(await file.arrayBuffer()),hash=await replayHash(bytes),observe=$('retail-replay-mode').value==='state';
   if(!await unloadAndSave())throw Error(status());resetTiming(false);await prepareAudio();await pauseAudioForPreparation();
   for(const old of $('retail-replay-downloads').querySelectorAll('a'))URL.revokeObjectURL(old.href);$('retail-replay-downloads').replaceChildren();replayEvidence=[];$('save-replay-evidence').disabled=true;

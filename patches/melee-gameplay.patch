@@ -2375,6 +2375,20 @@ diff --git a/src/melee/lb/lbaudio_ax.c b/src/melee/lb/lbaudio_ax.c
  #include "lbaudio_ax.h"
  
  #include <stdbool.h>
+@@ -405,6 +405,13 @@
+         return cur_hps_file;
+     }
+ }
++
++#if defined(MELEE_WEB_GAMEPLAY)
++const char* melee_web_audio_music_path(int music)
++{
++    return getHPSFile(music);
++}
++#endif
+ 
+ static inline int lbAudioAx_80023F28_helper1(const char* filename)
+ {
 @@ -2095,9 +2098,11 @@
      struct AXFX_DELAY delay;
      int i;
@@ -5450,6 +5464,55 @@ diff --git a/src/melee/mn/mnstagesel.c b/src/melee/mn/mnstagesel.c
 
 --- a/src/melee/gr/stage.c
 +++ b/src/melee/gr/stage.c
+@@ -292,7 +292,13 @@
+     return false;
+ }
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++/* Select once at the original boundary; the host prepares the selected HPS
++ * before committing the original audio request. Never reroll during loading. */
++s32 melee_web_stage_select_music(s32 arg0, s32* music, int* alternate)
++#else
+ s32 Stage_80225074(s32 arg0)
++#endif
+ {
+     s32 r31;
+     s32 spC;
+@@ -325,11 +331,34 @@
+     }
+ 
+     tmp = Ground_801C28AC(selected_stage.stkind, r31, &spC);
++#if defined(MELEE_WEB_GAMEPLAY)
++    *music = spC;
++    *alternate = tmp;
++#else
+     lbAudioAx_80023F28(spC);
+     Ground_801C5A84(spC);
+     Ground_801C5AA4(tmp);
++#endif
+     return arg0;
+ }
++
++#if defined(MELEE_WEB_GAMEPLAY)
++void melee_web_stage_commit_music(s32 music, int alternate)
++{
++    lbAudioAx_80023F28(music);
++    Ground_801C5A84(music);
++    Ground_801C5AA4(alternate);
++}
++
++s32 Stage_80225074(s32 arg0)
++{
++    s32 music;
++    int alternate;
++    melee_web_stage_select_music(arg0, &music, &alternate);
++    melee_web_stage_commit_music(music, alternate);
++    return arg0;
++}
++#endif
+ 
+ StKind Stage_80225194(void)
+ {
 @@ -483,22 +483,44 @@
      { Gr_Kind_Shrine, 0, 0 },       { Gr_Kind_Battle, 0, 0 },
  };

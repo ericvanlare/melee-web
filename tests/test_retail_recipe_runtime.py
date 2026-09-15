@@ -13,7 +13,7 @@ from check_gameplay import node_runtime
 
 class RetailRecipeRuntimeTests(unittest.TestCase):
     def test_native_decoder_rejects_before_asset_or_match_construction(self):
-        target = ROOT / 'build/browser/gameplay_retail_trace.js'
+        target = ROOT / 'build/browser-release/gameplay_retail_trace.js'
         if not target.is_file():
             self.skipTest('Build gameplay_retail_trace to test the shared decoder')
         setup = bytearray(0x138)
@@ -26,12 +26,16 @@ class RetailRecipeRuntimeTests(unittest.TestCase):
         examples = [
             (b'', 'size is outside'),
             (b'NOPE' + valid_size[4:], 'input format'),
-            (valid_size[:4] + struct.pack('>I', 3) + valid_size[8:], 'input version'),
+            (valid_size[:4] + struct.pack('>I', 5) + valid_size[8:], 'input version'),
             (valid_size[:-1], 'frame count'),
             (valid_size + b'\0', 'frame count'),
             (callback, 'callback/data pointer'),
             (ratio, 'nonfinite rules'),
             (struct.pack('>4sIII', b'MWRC', 2, 0, 1) + setup + bytes(822 + 44), 'PAD'),
+            (struct.pack('>4sIIIHH', b'MWRC', 4, 0, 1, 0x7ff, 0x1c0) +
+             setup + bytes(822 + 44), 'PAD'),
+            (struct.pack('>4sIIIHH', b'MWRC', 4, 0, 1, 0x7ff, 0x1c0) +
+             setup + bytes(822 + 43), 'frame count'),
         ]
         with tempfile.TemporaryDirectory(prefix='melee-recipe-') as directory:
             root = Path(directory)

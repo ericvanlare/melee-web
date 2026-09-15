@@ -32,6 +32,7 @@ export const NATIVE_GAME_DISC_FILES=Object.freeze({
   'PlFcBu.dat':'PlFcBu.dat','PlFcGr.dat':'PlFcGr.dat',
   'EfFxData.dat':'EfFxData.dat','falco.ssm':'audio/us/falco.ssm',
   'GrNBa.dat':'GrNBa.dat','sp_zako.hps':'audio/sp_zako.hps',
+  'hyaku.hps':'audio/hyaku.hps','hyaku2.hps':'audio/hyaku2.hps',
   'PlFx.dat':'PlFx.dat','PlFxAJ.dat':'PlFxAJ.dat',
   'PlFxNr.dat':'PlFxNr.dat','PlFxOr.dat':'PlFxOr.dat',
   'PlFxLa.dat':'PlFxLa.dat','PlFxGr.dat':'PlFxGr.dat',
@@ -41,7 +42,7 @@ export const NATIVE_GAME_DISC_FILES=Object.freeze({
   'PlMsNr.dat':'PlMsNr.dat','PlMsRe.dat':'PlMsRe.dat','PlMsGr.dat':'PlMsGr.dat',
   'PlMsBk.dat':'PlMsBk.dat','PlMsWh.dat':'PlMsWh.dat',
   'EfMsData.dat':'EfMsData.dat','mars.ssm':'audio/us/mars.ssm',
-  'GrOp.dat':'GrOp.dat','greens.hps':'audio/greens.hps','pupupu.ssm':'audio/us/pupupu.ssm',
+  'GrOp.dat':'GrOp.dat','old_kb.hps':'audio/old_kb.hps','pupupu.ssm':'audio/us/pupupu.ssm',
   // Dr. Mario (source FighterKind 0x15) borrows Mario's effect bank but owns
   // its own fighter, action and costume archives and voice bank.
   'PlDr.dat':'PlDr.dat','PlDrAJ.dat':'PlDrAJ.dat',

@@ -9,9 +9,9 @@ checks and native Dr. Mario/Roy match lifecycles in both orientations pass,
 including all five costumes, specials, damage, pause and reconstruction.
 Visible browser checks exercise each clone against Mario on Final Destination.
 The first physical Roy/level-9 Dr. Mario capture now repeats exactly in Dolphin
-through 6,965 ticks and 37,825 semantic events. The browser consumes the same
-inputs but first differs in initialization RNG, then Doc's input at tick 154;
-it fails to reproduce the recorded win and has rendering stalls. These remain
+through 6,965 ticks and 37,825 semantic events. The first browser attempt consumed
+the same inputs but differed in initialization RNG, then Doc's input at tick 154;
+it failed to reproduce the recorded win and had rendering stalls. These remain
 development candidates, with no production deployment. See the
 [retail diagnostic](docs/evidence/roy-dr-mario-retail-diagnostic-v1.json).
 A bounded follow-up identifies the missing initialization RNG operation as
@@ -21,7 +21,13 @@ and all checked core-state fields for 436 ticks, then the headless trace fails
 at tick 436 in `ftCo_8009E7B4`. This is causal evidence, not an integrated runtime
 fix or a passing full replay; see the
 [RNG investigation](docs/evidence/roy-dr-mario-rng-cause-v1.json).
-See [exact scope, retained failures and next capture](docs/ROY_DR_MARIO_PORT_NOTES.md).
+The integrated music/profile and Roy dynamics fixes now reproduce all 6,965
+browser core-state ticks, every recorded CPU decision, HUD/magnifier/match state,
+and Roy's three-stock win. Expanded comparison still fails on camera/bone float
+bits and source-draw cadence; GPU stalls and audio underruns remain observed.
+The Release runtime and 754-test suite (37 skips) pass. See the
+[integrated replay evidence](docs/evidence/roy-dr-mario-integrated-replay-v1.json)
+and [exact scope and retained failures](docs/ROY_DR_MARIO_PORT_NOTES.md).
 
 ## Controller input candidate
 

@@ -51,7 +51,7 @@ typedef struct MeleeWebStageContent {
     const char* name;
     const char* archive;
     const char* music;
-    int music_id; /* Authored primary BGM; alternate music selection remains outside this slice. */
+    int music_id; /* Authored primary BGM; the original stage selector chooses the live track. */
     const char* audio_bank;
 } MeleeWebStageContent;
 
@@ -61,7 +61,7 @@ static inline const MeleeWebStageContent* melee_web_stage_content(int stkind)
         { St_Kind_Last, Gr_Kind_Last, "Final Destination", "GrNLa.dat", "sp_end.hps", 78, NULL },
         { St_Kind_Battle, Gr_Kind_Battle, "Battlefield", "GrNBa.dat", "sp_zako.hps", 81, NULL },
         { St_Kind_Story, Gr_Kind_Story, "Yoshi's Story", "GrSt.dat", "ystory.hps", 96, NULL },
-        { St_Kind_OldPupupu, Gr_Kind_OldPupupu, "Dream Land", "GrOp.dat", "greens.hps", 35, "pupupu.ssm" },
+        { St_Kind_OldPupupu, Gr_Kind_OldPupupu, "Dream Land", "GrOp.dat", "old_kb.hps", 58, "pupupu.ssm" },
     };
     for (size_t i = 0; i < sizeof(rows) / sizeof(rows[0]); ++i)
         if (rows[i].stage_kind == stkind) return &rows[i];

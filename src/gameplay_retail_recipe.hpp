@@ -25,7 +25,9 @@ struct RetailReplayRecipe {
     std::vector<RetailReplayInput> frames;
 };
 
-constexpr size_t kRetailReplayMaxBytes = 16 + 0x138 + MELEE_WEB_PAD_STATE_BYTES + 36000 * 44;
+/* MWRC v4 adds the save-profile masks immediately after the fixed header. */
+constexpr size_t kRetailReplayMaxBytes = 16 + 4 + 0x138 +
+    MELEE_WEB_PAD_STATE_BYTES + 36000 * 44;
 RetailReplayRecipe read_retail_replay(std::span<const uint8_t>);
 
 // Diagnostic JSON output; callers must disable this instrumentation for timing

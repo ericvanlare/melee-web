@@ -28,10 +28,12 @@ source initializer's seven `ItemStateTable` entries select animation indices
 
 Roy calls the original Marth initializer and uses the exact 0x98-byte
 `MarsAttributes` ABI. His Article table is null. The source dynamics header has
-three authored parameter chains, no spheres, and five native mode pointers.
-The five mode rows are `{2,2,2}`, `{0,0,2}`, `{2,0,0}`, `{1,1,1}`, and
-`{2,1,1}`. A following referenced DAT target is adjacent metadata rather than
-a sixth mode. Each character's effect DAT has a two-entry table with the
+three authored parameter chains, no spheres, and six native mode pointers.
+The mode rows are `{2,2,2}`, `{0,0,2}`, `{2,0,0}`, `{1,1,1}`, `{2,1,1}`,
+and `{3,0,0}`. The earlier five-row interpretation was incorrect: Roy's
+authored blend selectors use mode 5 for actions 239–241. The decoder now
+derives the required extent from those selectors and validates each relocated
+row. Each character's effect DAT has a two-entry table with the
 native 20-byte entry stride.
 
 ## Costumes and model ownership
@@ -236,6 +238,36 @@ pins the scripts and diagnostic artifacts. The experiment is not a shipped
 route-specific workaround: production/runtime code is unchanged. General music
 selection and save-profile ownership, the animation fault, and the previously
 recorded browser/CPU/performance failures remain open.
+
+## Integrated replay repair
+
+The original stage-music selector now runs at its original match-entry boundary,
+using save unlock masks retained from live CSS/SSS or bound from the exact capture
+fixture in MWRC v4. Selected HPS data is loaded before the original audio request;
+alternate tracks are available and the save profile is restored on teardown,
+including failed construction. The source selector still executes in silent
+builds because it consumes gameplay RNG. Dream Land's primary music metadata
+also now names the original `old_kb.hps`.
+
+Roy's tick-436 crash was a decoder error: his motion blend selectors reference
+dynamics mode 5, but the native allocation contained only five rows. Deriving
+the extent from all authored selectors retains Roy's sixth row while keeping
+Marth's five-row table bounded. No original animation or input was changed.
+
+The corrected 700-tick native prefix is exact for all core fields. A complete
+visible browser replay then matches **all 6,965 core-state ticks**, CPU decisions,
+HUD, magnifier and match state. Roy wins by elimination with stocks **3–0**, as
+in both original runs. The Release build and 754 unit tests (37 skips) pass.
+The [integrated evidence](evidence/roy-dr-mario-integrated-replay-v1.json) binds
+the unchanged HTTP artifacts, save profile, checks and retained failures.
+
+This is still an expanded-comparison failure: preparation source draws alter
+camera clip planes before tick zero, bone/camera float bits differ, and the
+original batches six pairs of controller ticks with one draw each while the
+port draws every tick. The state-capture timing also retains a 206.940 ms native
+callback and 218.770 ms browser gap, 23 live pipeline creations and 128 underrun
+frames. The historical GPU stall remains open. No pixels, PCM, production,
+other-route or human-holdout acceptance is claimed.
 
 ## Owned revision-2 asset hashes
 

@@ -512,9 +512,18 @@ these native traces, and the number of admitted gold Slippi fixtures remains zer
 
 ## Visible browser replay
 
-The ordinary Release player now accepts the paired **MWRC v2** input recipe in
+The ordinary Release player accepts paired **MWRC v1–v4** input recipes in
 Diagnostics → Reference replay. Native and browser playback share the bounded
 recipe decoder, typed original setup, PAD initialization and diagnostic observer.
+Version 4 extends the v3 transport with two big-endian 16-bit save unlock masks
+after the 16-byte header. These are initialization inputs: original stage-music
+selection can consume gameplay RNG depending on the save profile. Use
+`scripts/bind_retail_save_profile.py` with the exact prepared GCI and its SHA-256
+to bind a v3 recipe without modifying either input. The tool validates the
+original save checksum and creates a separate provenance record. Legacy recipes
+retain their layout and explicitly warn that their save profile was not recorded;
+they do not acquire an assumed all-unlocked profile. Emitted state observations
+remain v3 for v3/v4 input.
 The browser constructs a fresh source match through its existing deferred owner,
 waits for ordinary audio acknowledgement/resource preparation, and feeds one
 recipe sample to each source tick in the normal render/audio loop. It requires
