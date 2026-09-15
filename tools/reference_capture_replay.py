@@ -39,6 +39,7 @@ from retail_replay_validation import (
 )
 from reference_session_bundle import (
     ACCEPTED_UNPROCESSED,
+    INGESTED,
     MANIFEST_NAME,
     RAW_OBSERVER_NAME,
     ReferenceCaptureInbox,
@@ -454,6 +455,11 @@ def _artifact_record(path: Path, *, raw_manifest_sha256: str) -> dict[str, Any]:
     }
 
 
+def _reject_output_inside_raw(destination_root: Path, *raw_roots: Path) -> None:
+    if any(destination_root.is_relative_to(raw_root) for raw_root in raw_roots):
+        raise ReplayError("Derived output must be outside the immutable raw bundle")
+
+
 def derive_replay(bundle_path: str | Path, derived_root: str | Path, *, cpu: str = "JITARM64") -> dict[str, Any]:
     """Validate one finalized bundle and atomically write derived artifacts."""
     bundle_input = Path(bundle_path).expanduser()
@@ -461,8 +467,7 @@ def derive_replay(bundle_path: str | Path, derived_root: str | Path, *, cpu: str
         raise ReplayError("bundle is a symlink")
     bundle = bundle_input.resolve()
     destination_root = Path(derived_root).expanduser().resolve()
-    if destination_root.is_relative_to(bundle):
-        raise ReplayError("Derived output must be outside the immutable raw bundle")
+    _reject_output_inside_raw(destination_root, bundle)
     if not bundle.is_dir():
         raise ReplayError(f"bundle is not a safe directory: {bundle}")
     manifest, manifest_errors = _final_manifest(bundle)
@@ -569,10 +574,18 @@ def derive_replay(bundle_path: str | Path, derived_root: str | Path, *, cpu: str
 
 def ingest_and_derive(bundle_path: str | Path, derived_root: str | Path, *, cpu: str = "JITARM64") -> dict[str, Any]:
     """Validate, ingest an accepted bundle, then produce its derived replay."""
-    bundle = Path(bundle_path).expanduser().resolve()
+    bundle_input = Path(bundle_path).expanduser()
+    if bundle_input.is_symlink():
+        raise ReplayError("bundle is a symlink")
+    bundle = bundle_input.resolve()
+    destination_root = Path(derived_root).expanduser().resolve()
+    _reject_output_inside_raw(destination_root, bundle)
     if bundle.parent.name == ACCEPTED_UNPROCESSED:
-        inbox = ReferenceCaptureInbox(bundle.parent.parent)
         session_id = bundle.name
+        prospective_ingested = (bundle.parent.parent / INGESTED / session_id).resolve()
+        _reject_output_inside_raw(destination_root, prospective_ingested)
+        _reject_output_inside_raw((destination_root / session_id).resolve(), bundle, prospective_ingested)
+        inbox = ReferenceCaptureInbox(bundle.parent.parent)
         manifest, errors = _final_manifest(bundle)
         if errors or manifest is None:
             raise ReplayError("raw bundle manifest is invalid: " + "; ".join(errors))

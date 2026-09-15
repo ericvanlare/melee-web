@@ -224,6 +224,11 @@ controller calibration, guest PAD handling and CPU decisions still execute in
 the game. No guest memory, fighter state, CPU output or captured address is
 supplied as replay input.
 
+Changing the managed controller mapping does not change the configuration used
+by an older recording's replay. Replay metadata binds the restored snapshot's
+file hashes; a separate private preflight receipt binds the current managed
+profile, which remains checked for drift throughout the run.
+
 After complete teardown, the application validates the new raw bundle and
 compares both authoritative semantic streams. The report binds both manifests
 and records the first differing event and field, with separate coverage counts

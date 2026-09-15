@@ -6,6 +6,7 @@ import argparse
 import configparser
 from datetime import datetime, timezone
 import fcntl
+import hashlib
 from itertools import chain
 import json
 import os
@@ -284,8 +285,16 @@ class Supervisor:
         input_source = ("dolphin_input_replay" if self.replay_source else
                         "automated_human_pipe" if self.automated else "physical_controller")
         replay_binding = self.replay_source["manifest_sha256"] if self.replay_source else None
+        # Preflight still binds the current managed profile for drift checks.
+        # The recording binds the configuration actually restored for replay.
+        capture_identity = dict(self.identity)
+        if self.replay_source:
+            capture_identity["configuration_sha256"] = {
+                name: hashlib.sha256(data).hexdigest()
+                for name, data in self.replay_source["profile"].items()
+            }
         bundle = ReferenceSessionBundle.begin(self.root / "Captures", identifier, "GALE01r2",
-            uuid.uuid4().hex, metadata={"environment": self.identity,
+            uuid.uuid4().hex, metadata={"environment": capture_identity,
                                       "input_source": input_source,
                                       "replay_source_manifest_sha256": replay_binding,
                                       "private_settings_sha256": settings_hash,
@@ -301,12 +310,16 @@ class Supervisor:
                 from reference_capture_automation import prepare_pipe
                 prepare_pipe(user)
             config_before = file_inventory(user / "Config")
+            if self.replay_source and config_before != capture_identity["configuration_sha256"]:
+                raise EnvironmentError("Restored replay configuration does not match its snapshot")
             write_json(bundle.path / "configuration-snapshot.json", snapshot_profile(user / "Config"))
             write_json(bundle.path / "configuration.json", {
                 "profile_files": config_before, "launch_command": dolphin_command(self.settings, user),
                 "input_source": input_source,
                 "save_backing_writes": False})
-            write_json(bundle.path / "environment.json", self.identity)
+            write_json(bundle.path / "environment.json", capture_identity)
+            if self.replay_source:
+                write_json(bundle.path / "preflight-environment.json", self.identity)
             raw = bundle.path / "observer.bin"
             status_path = bundle.path / "observer-status.json"
             environment = dict(isolated_dolphin_environment(), MWRC_ENABLE="1", MWRC_CPU="JITARM64",
