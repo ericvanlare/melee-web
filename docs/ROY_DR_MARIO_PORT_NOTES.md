@@ -376,3 +376,28 @@ work; human holdouts remain unopened.
 
 Final combined verification: Release browser/native builds pass, as does
 `python3 -m unittest discover -s tests -v` (756 tests, 36 skips, no failures).
+
+## Captured original clock phase and strict draw match
+
+A passive isolated Dolphin probe now preserves complete strict input replay and
+all 37,822 typed semantic boundaries while observing the shared emulated PAD/VI
+clock. The opening four source ticks establish the supported NTSC two-XFB context.
+An initial-only periodic queue model predicts all six later two-update batches;
+a wrong-phase control fails and ±11-cycle quantization controls retain the result.
+MWRC v5 binds these compact initialization values to immutable input history.
+There is no source-index skip list or expected-state payload in the recipe.
+
+Replay batching can span browser callbacks, preserving original update order and
+one traversal per original batch. The complete visible browser replay now passes
+the strict comparator: 6,965 state updates and 6,959 draws, all declared domains
+matching, Roy winning with three stocks. Maxima are 16.050 ms native and 26.240 ms
+browser, with zero preparation pauses, overruns or audio underruns. The historical
+GPU stall, live first-use pipelines and heap growth remain open; this one
+instrumented state run does not establish cold/warm performance admission.
+
+Release runtime/native builds and the 757-test suite (36 skips) pass. Subsequent
+focused binding, decoder and 19 browser-report tests also pass. Raw clock rows
+stay outside Git/build output. The passive probe patch is optional diagnostic
+source, not installed into the capture app. Live controller phase, other startup
+histories/VI modes, pixels, PCM and both unopened holdouts require separate evidence.
+See [clock format](RETAIL_DRAW_CLOCK.md) and [immutable evidence](evidence/roy-dr-mario-clock-replay-v1.json).

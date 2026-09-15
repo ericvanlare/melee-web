@@ -2,6 +2,7 @@
 
 #include "gameplay_match_session.hpp"
 #include "gameplay_pad_state.h"
+#include "retail_draw_clock.hpp"
 #include <array>
 #include <memory>
 #include <span>
@@ -23,10 +24,21 @@ struct RetailReplayRecipe {
     std::unique_ptr<MeleeWebPadState, decltype(&melee_web_pad_state_free)>
         initial_input{nullptr, melee_web_pad_state_free};
     std::vector<RetailReplayInput> frames;
+    std::vector<bool> draw_boundaries;
+    std::size_t expected_draws() const {
+        if (draw_boundaries.empty()) return frames.size();
+        std::size_t count = 0;
+        for (bool closes : draw_boundaries) count += closes;
+        return count;
+    }
+    bool closes_draw_batch(std::size_t index) const {
+        return draw_boundaries.empty() || draw_boundaries.at(index);
+    }
 };
 
-/* MWRC v4 adds the save-profile masks immediately after the fixed header. */
-constexpr size_t kRetailReplayMaxBytes = 16 + 4 + 0x138 +
+/* MWRC v4 adds save masks after the fixed header. V5 then adds 40 bytes of
+ * shared PAD/VI startup clock context; expected observations remain excluded. */
+constexpr size_t kRetailReplayMaxBytes = 16 + 4 + 40 + 0x138 +
     MELEE_WEB_PAD_STATE_BYTES + 36000 * 44;
 RetailReplayRecipe read_retail_replay(std::span<const uint8_t>);
 

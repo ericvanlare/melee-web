@@ -43,6 +43,7 @@ std::unique_ptr<melee_web::GameplayMenuWorld> world;
 std::unique_ptr<melee_web::GameplayMatchSession> match;
 std::unique_ptr<melee_web::RetailReplayRecipe> replay;
 size_t replay_cursor=0;
+melee_web::SourceFrameSequence replay_source_frames;
 bool replay_trace=false,replay_pending=false,replay_started=false,replay_final_draw=false;
 // V2 recipes come from fresh original processes and do not carry heap history.
 // Original stage callbacks can read uncleared allocation bytes (Shy Guy pattern).
@@ -479,7 +480,9 @@ void tick(){
  uint32_t callback_draw_calls=0,callback_texture_upload=0,callback_staging_used=0;
  AuroraStats callback_begin_stats{};
  AuroraStats callback_end_stats{};
- melee_web::SourceFrameSequence source_frames;
+ melee_web::SourceFrameSequence callback_source_frames;
+ auto& source_frames=replay?replay_source_frames:callback_source_frames;
+ source_frames.begin_callback();
  int began=0,drawn=1,timing_valid=1,first_use=0;
  // A transition request owns the whole callback in which it is observed.
  // Keep the source presenter out of both the request and audio-ack waits.
@@ -487,6 +490,7 @@ void tick(){
  bool actual_source_draw=false;
  bool replay_completed_now=false;
  unsigned replay_steps=0;
+ unsigned replay_draw_boundaries=0;
  try{
 #if defined(MELEE_WEB_SELECTIVE_PIPELINES)
   (void)melee_web::pipeline_preparation::status();
@@ -712,17 +716,18 @@ void tick(){
      check(!match->paused()&&!match->complete(),"Replay reached an unsupported source pause/exit");
      if(!replay_started){
       replay_started=true;
-      EM_ASM({window.menuReplayStarted?.($0,!!$1);},replay->frames.size(),replay_trace);
+      EM_ASM({window.menuReplayStarted?.($0,!!$1,$2);},replay->frames.size(),replay_trace,replay->expected_draws());
      }
      sample=replay->frames[replay_cursor].pads.data();
     }
-    match->tick(sample);source_frames.did_step();
+    match->tick(sample);source_frames.did_step(!replay||replay->closes_draw_batch(replay_cursor));
     int winner=-1;const int outcome=match->outcome(winner);
     if(replay){
      replay_match_complete=match->complete();replay_outcome=outcome;replay_winner=winner;
      if(replay_trace)melee_web::retail_replay_frame(*replay,replay_cursor);
      ++replay_cursor;
      ++replay_steps;
+     replay_draw_boundaries+=replay->closes_draw_batch(replay_cursor-1)?1U:0U;
      check(!match->complete()||replay_cursor==replay->frames.size(),"Replay source match exited before all input was consumed");
     }
     if(stock_check==-1){
@@ -759,8 +764,8 @@ void tick(){
 #if defined(MELEE_WEB_SELECTIVE_PIPELINES)
   (void)melee_web::pipeline_preparation::status();
 #endif
-  check(!replay_steps||source_frames.draws()==replay_steps,
-        "Reference replay did not draw every consumed source tick");
+  check(!replay||source_frames.draws()==replay_draw_boundaries,
+        "Reference replay source draws disagree with clock batch boundaries");
  }catch(const std::exception& e){running=false;faulted=true;preparation.reset();render_only_preparation=false;pending=false;clear_diagnostic_pad();menu_clock.reset();message=e.what();if(preparation_started)preparation_ms=emscripten_get_now()-preparation_started;preparation_failed(e.what());timing_valid=0;std::fprintf(stderr,"Native menu: %s\n",e.what());
   const double failed=emscripten_get_now();
   if(input_done<started)input_done=failed;
@@ -965,6 +970,7 @@ int melee_web_native_menu_launch(){try{
 }catch(const std::exception& e){message=e.what();running=false;return 0;}}
 int melee_web_native_menu_unload(){try{close();message="Native menus unloaded.";return 1;}catch(const std::exception& e){message=e.what();return 0;}}
 int melee_web_native_menu_replay(const uint8_t* data,unsigned size,int observe){try{
+ replay_source_frames=melee_web::SourceFrameSequence{};
  check(data&&size<=melee_web::kRetailReplayMaxBytes,"Invalid reference replay bytes");
  check(observe==0||observe==1,"Invalid replay observation mode");
  auto candidate=std::make_unique<melee_web::RetailReplayRecipe>(melee_web::read_retail_replay({data,size}));

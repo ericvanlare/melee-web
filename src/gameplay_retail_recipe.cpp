@@ -30,6 +30,7 @@ struct Reader {
     }
     uint16_t u16() { const auto hi = u8(); const auto lo = u8(); return uint16_t(hi) << 8 | lo; }
     uint32_t u32() { const auto hi = u16(); const auto lo = u16(); return uint32_t(hi) << 16 | lo; }
+    uint64_t u64() { const auto hi = u32(); const auto lo = u32(); return uint64_t(hi) << 32 | lo; }
 };
 void hex(std::span<const uint8_t> bytes, std::ostream& out = std::cout) {
     static constexpr char digits[] = "0123456789abcdef";
@@ -63,7 +64,7 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
     check(input.u32() == 0x4d575243, "Unsupported reference input format");
     RetailReplayRecipe result;
     result.version = input.u32();
-    check(result.version >= 1 && result.version <= 4, "Unsupported reference input version");
+    check(result.version >= 1 && result.version <= 5, "Unsupported reference input version");
     result.seed = input.u32();
     const auto count = input.u32();
     const size_t profile_bytes = result.version >= 4 ? 4 : 0;
@@ -74,7 +75,17 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
         unlocked_characters = input.u16();
         unlocked_stages = input.u16();
     }
-    check(count && count <= 36000 && bytes.size() == 16 + profile_bytes + 0x138 +
+    const size_t clock_bytes = result.version >= 5 ? 40 : 0;
+    if (result.version >= 5) {
+        RetailDrawClock clock;
+        clock.pad_period = input.u64(); clock.vi_period = input.u64();
+        clock.next_pad = input.u64(); clock.first_vi_poll = input.u64();
+        clock.startup_draws = input.u32();
+        check(input.u32() == 0, "Unsupported clock context flags");
+        check(count && count <= 36000, "Reference input frame count is outside its bounds");
+        result.draw_boundaries = clock.boundaries(count);
+    }
+    check(count && count <= 36000 && bytes.size() == 16 + profile_bytes + clock_bytes + 0x138 +
           (result.version >= 2 ? MELEE_WEB_PAD_STATE_BYTES : 0) + size_t(count) * 44,
           "Reference input frame count disagrees with its size");
     for (auto& byte : result.setup) byte = input.u8();

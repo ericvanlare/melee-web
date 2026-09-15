@@ -119,6 +119,15 @@ and aggregate all GPU phases and transfers in a callback instead of reporting
 only its final draw. This does not recover missing historical controller samples
 or close the separate input/cadence and PCM acceptance gates.
 
+A replay carrying independently captured PAD/VI startup clocks may instead
+preserve the original queued-input batches. MWRC v5 computes boundaries from
+the periodic PAD alarm, the initial VI-gated queue check and the supported
+two-XFB startup state; it never accepts expected draw indexes. An open source
+batch can span browser callbacks without an intervening traversal. Require
+exact original draw-boundary comparison and all state domains before accepting
+that replay. Legacy recipes and live input retain the per-tick traversal policy;
+browser callbacks are not a substitute for original VI boundaries.
+
 When a replay exposes hidden state, compare the original owner construction and
 its first consumers as well as the visible formula. The expanded corpus found
 missing screen-flash ownership and a missing ground reset whose floor sentinel

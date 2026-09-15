@@ -28,6 +28,17 @@ def report():
 
 
 class BrowserReplayValidationTests(unittest.TestCase):
+    def test_captured_clock_draw_count_requires_independent_expectation(self):
+        value=report()
+        value['metrics'].update(sourceSteps=686,sourceDraws=685)
+        with self.assertRaisesRegex(ValueError,'Source tick/draw count'):
+            self.check(value)
+        self.assertIs(validate_report(value,'a'*64,686,'performance',True,
+                                     expected_draws=685),value)
+        value['metrics']['sourceDraws']=684
+        with self.assertRaisesRegex(ValueError,'Source tick/draw count'):
+            validate_report(value,'a'*64,686,'performance',True,expected_draws=685)
+
     def test_hidden_diagnostic_paint_cannot_be_accepted_as_normal_page_performance(self):
         value = report()
         geometry = dict(x=62, y=-563.5, width=900, height=675,

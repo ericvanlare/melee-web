@@ -14,17 +14,21 @@ Roy wins with three stocks, exactly as recorded. Repairs restore captured save
 unlock state and original music-selection RNG, Roy's six authored dynamics modes,
 source-free match preparation, and original fused joint/vector arithmetic.
 
-**Strict expanded equivalence remains open:** the original groups six pairs of
-PAD ticks before drawing; the browser still draws after every tick. The capture
-lacks the shared VI/PAD clock phase needed to reconstruct that cadence without
-guessing. All state values at the comparable boundaries match; no draw records
-or compared fields were removed. The latest instrumented run has maxima of
-16.020 ms native / 24.840 ms browser with no pauses or audio queue failures, but
-GPU staging stalls recurred in a preceding run and remain open. This does not
-admit cold/warm performance, pixels, PCM, other routes or holdouts. No production
-deployment was made. Release runtime/native targets and the final 756-test suite
-(36 skips) pass. See the [latest replay evidence](docs/evidence/roy-dr-mario-vector-replay-v1.json)
-and [fixes, retained failures and scope](docs/ROY_DR_MARIO_PORT_NOTES.md).
+The latest bounded replay also matches **all 6,959 original source draws**, with
+all 6,965 state updates preserved. A passive original probe recovered the opening
+PAD/VI phase without changing guest state; MWRC v5 carries compact clock context.
+The periodic model predicts the later batches from source ticks 0–3, without a
+recorded draw-index skip list. Legacy recipes and live input keep their existing
+policy; live controller phase and other startup/VI configurations remain open.
+
+This instrumented run measured 16.050 ms native / 26.240 ms browser maxima, with
+zero pauses, overruns or audio underruns. The historical GPU staging stall remains
+open. Cold/warm performance, pixels, PCM, other routes and both unopened holdouts
+are not admitted. No production deployment was made. Release runtime/native
+builds, the 757-test suite (36 skips) and subsequent focused binding/decoder/report
+checks pass. See [clock replay evidence](docs/evidence/roy-dr-mario-clock-replay-v1.json),
+[clock format and scope](docs/RETAIL_DRAW_CLOCK.md), and
+[retained failures](docs/ROY_DR_MARIO_PORT_NOTES.md).
 
 ## Controller input candidate
 

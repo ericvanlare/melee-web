@@ -26,7 +26,7 @@ class RetailRecipeRuntimeTests(unittest.TestCase):
         examples = [
             (b'', 'size is outside'),
             (b'NOPE' + valid_size[4:], 'input format'),
-            (valid_size[:4] + struct.pack('>I', 5) + valid_size[8:], 'input version'),
+            (valid_size[:4] + struct.pack('>I', 6) + valid_size[8:], 'input version'),
             (valid_size[:-1], 'frame count'),
             (valid_size + b'\0', 'frame count'),
             (callback, 'callback/data pointer'),
@@ -36,6 +36,12 @@ class RetailRecipeRuntimeTests(unittest.TestCase):
              setup + bytes(822 + 44), 'PAD'),
             (struct.pack('>4sIIIHH', b'MWRC', 4, 0, 1, 0x7ff, 0x1c0) +
              setup + bytes(822 + 43), 'frame count'),
+            (struct.pack('>4sIIIHH', b'MWRC', 5, 0, 2, 0x7ff, 0x1c0) +
+             struct.pack('>QQQQII',8100000,8108100,3388044,6732987,2,0) +
+             setup + bytes(822+88), 'PAD'),
+            (struct.pack('>4sIIIHH', b'MWRC', 5, 0, 2, 0x7ff, 0x1c0) +
+             struct.pack('>QQQQII',8100000,8108100,3388044,6732987,3,0) +
+             setup + bytes(822+88), 'Unsupported captured PAD/VI'),
         ]
         with tempfile.TemporaryDirectory(prefix='melee-recipe-') as directory:
             root = Path(directory)
