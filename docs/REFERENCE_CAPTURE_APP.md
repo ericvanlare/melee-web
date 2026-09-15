@@ -496,3 +496,16 @@ untouched while the build helper uses an ignored worktree.
 No completed original-game capture, physical-controller validation, or gold
 comparison is implied by installing this tool. Those results remain evidence
 pending until a real run and its independent checks are recorded.
+
+Capture application 0.2.3 preserves cancellation through environment verification
+and profile preparation. Interrupting command-line replay stops its owned Dolphin
+process before releasing the process handle, preserves incomplete evidence, and
+exits unsuccessfully. Session cleanup receipts report the observed process state.
+CPU comparison sidecars must match their core setup, frame count, and match clocks;
+the original sidecar must also match the derived bundle's declared artifact hash.
+
+The Dolphin builder reconstructs the expected staged patch series from the pinned
+revision before configuring and after building. It rejects and preserves unexplained
+tracked, untracked, ignored, submodule, or observer-overlay changes. Corresponding
+source receipts are archived before atomic publication; repeating an identical
+build is idempotent, and a provenance collision preserves the prior receipt.

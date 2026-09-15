@@ -18,6 +18,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -33,6 +34,138 @@ def run(command: list[str], *, cwd: Path | None = None) -> None:
 
 def git(source: Path, *args: str) -> str:
     return subprocess.check_output(["git", "-C", str(source), *args], text=True).strip()
+
+
+def _git_with_index(source: Path, index: Path, *args: str) -> str:
+    environment = os.environ.copy()
+    environment["GIT_INDEX_FILE"] = str(index)
+    return subprocess.check_output(["git", "-C", str(source), *args],
+                                   env=environment, text=True).strip()
+
+
+def _index_snapshot(source: Path, index: Path | None = None) -> str:
+    if index is None:
+        return git(source, "ls-files", "-s")
+    return _git_with_index(source, index, "ls-files", "-s")
+
+
+def _expected_index_snapshots(source: Path, patches: list[Path]) -> list[str]:
+    """Return the tracked index after each clean patch-series prefix.
+
+    Applying patches to a throwaway index checks the actual staged tree rather
+    than trusting local marker files.  The source checkout and worktree are
+    never changed by this operation.
+    """
+    with tempfile.TemporaryDirectory(prefix="reference-dolphin-index-") as temporary:
+        index = Path(temporary) / "index"
+        _git_with_index(source, index, "read-tree", "HEAD")
+        snapshots = [_index_snapshot(source, index)]
+        environment = os.environ.copy()
+        environment["GIT_INDEX_FILE"] = str(index)
+        for patch in patches:
+            subprocess.run(["git", "-C", str(source), "apply", "--cached", str(patch)],
+                           env=environment, check=True)
+            snapshots.append(_index_snapshot(source, index))
+        return snapshots
+
+
+def _untracked_paths(source: Path) -> set[str]:
+    paths: set[str] = set()
+    for flags in ((), ("--ignored",)):
+        output = subprocess.check_output(["git", "-C", str(source), "ls-files", "--others",
+                                          "--exclude-standard", *flags, "-z"])
+        paths.update(os.fsdecode(path) for path in output.split(b"\0") if path)
+    return paths
+
+
+def _overlay_targets(source_overlay: Path, work: Path) -> tuple[dict[str, Path], dict[str, Path]]:
+    targets: dict[str, Path] = {}
+    for file in sorted(source_overlay.rglob("*")):
+        if file.is_dir() and not file.is_symlink():
+            continue
+        if file.is_symlink() or not file.is_file():
+            raise SystemExit(f"observer overlay contains non-regular file: {file}")
+        relative = file.relative_to(source_overlay)
+        targets[str((Path("Source/Core/Core") / relative).as_posix())] = file
+    return {path: work / path for path in targets}, targets
+
+
+def verify_source_composition(work: Path, patches: list[Path], source_overlay: Path,
+                              *, require_complete: bool) -> int:
+    """Verify that ``work`` is exactly a clean pinned patch prefix plus overlay.
+
+    Patch markers are only a cache of progress.  The staged index is compared
+    with trees reconstructed from HEAD and every patch, while the worktree,
+    submodules, and untracked files are checked independently.
+    """
+    snapshots = _expected_index_snapshots(work, patches)
+    actual = _index_snapshot(work)
+    try:
+        prefix = snapshots.index(actual)
+    except ValueError as error:
+        raise SystemExit(f"build source has unexplained staged edits: {work}") from error
+    if require_complete and prefix != len(patches):
+        raise SystemExit(f"build source is missing the complete patch series: {work}")
+
+    # This catches edits inside initialized submodules as well as ordinary
+    # unstaged tracked edits.  The expected patch edits are staged.
+    result = subprocess.run(["git", "-C", str(work), "diff", "--quiet",
+                             "--ignore-submodules=none"], check=False)
+    if result.returncode:
+        raise SystemExit(f"build source has unexplained worktree edits: {work}")
+
+    marker_root = work / ".mwrc"
+    expected_markers = {patch.name: sha256(patch) for patch in patches[:prefix]}
+    actual_markers: dict[str, str] = {}
+    if marker_root.exists():
+        if not marker_root.is_dir() or marker_root.is_symlink():
+            raise SystemExit(f"invalid patch marker directory: {marker_root}")
+        for marker in sorted(marker_root.iterdir()):
+            if not marker.is_file() or marker.is_symlink() or marker.name not in {
+                    patch.name for patch in patches}:
+                raise SystemExit(f"unexplained patch marker: {marker}")
+            actual_markers[marker.name] = marker.read_text(encoding="utf-8").strip()
+    if set(actual_markers) - set(expected_markers):
+        raise SystemExit(f"patch marker is ahead of the staged source: {marker_root}")
+    for name, value in actual_markers.items():
+        if value != expected_markers[name]:
+            raise SystemExit(f"stale patch marker in build source: {marker_root / name}")
+
+    overlay_paths, overlay_sources = _overlay_targets(source_overlay, work)
+    allowed_untracked = set(overlay_paths) | {f".mwrc/{name}" for name in expected_markers}
+    for path in _untracked_paths(work):
+        if path not in allowed_untracked:
+            raise SystemExit(f"unexplained untracked build-source edit: {work / path}")
+    if require_complete:
+        submodules = git(work, "submodule", "status", "--recursive")
+        if any(line.startswith(("-", "+", "U")) for line in submodules.splitlines()):
+            raise SystemExit(f"build source has missing or mismatched submodules: {work}")
+
+    for relative, target in overlay_paths.items():
+        source_file = overlay_sources[relative]
+        if target.is_symlink() or target.exists():
+            if target.is_symlink() or not target.is_file() or sha256(target) != sha256(source_file):
+                raise SystemExit(f"observer overlay differs in build source: {target}")
+        elif require_complete:
+            raise SystemExit(f"observer overlay is missing from build source: {target}")
+    return prefix
+
+
+def _atomic_write(path: Path, payload: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary_name: str | None = None
+    try:
+        descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.",
+                                                      dir=path.parent)
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary_name, path)
+        temporary_name = None
+    finally:
+        if temporary_name is not None:
+            Path(temporary_name).unlink(missing_ok=True)
 
 
 def sha256(path: Path) -> str:
@@ -146,15 +279,22 @@ def runtime_inventory(binary: Path, bundle: Path) -> list[dict[str, object]]:
 
 def copy_overlay(source: Path, destination: Path) -> None:
     for file in source.rglob("*"):
-        if not file.is_file():
+        if file.is_dir() and not file.is_symlink():
             continue
+        if file.is_symlink() or not file.is_file():
+            raise SystemExit(f"observer overlay contains non-regular file: {file}")
         target = destination / file.relative_to(source)
+        if target.exists():
+            if target.is_symlink() or not target.is_file() or sha256(target) != sha256(file):
+                raise SystemExit(f"observer overlay differs in build source: {target}")
+            continue
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(file, target)
 
 
 def archive_provenance(archive_root: Path, binary_sha: str, manifest: Path,
-                       source_overlay: Path, patch_dir: Path) -> Path:
+                       source_overlay: Path, patch_dir: Path, *,
+                       manifest_bytes: bytes | None = None) -> Path:
     """Keep the small corresponding-source receipt for this exact binary.
 
     The large ignored CMake/source trees remain in their caller-selected
@@ -164,21 +304,51 @@ def archive_provenance(archive_root: Path, binary_sha: str, manifest: Path,
     capture bundle.
     """
     archive = archive_root / binary_sha
-    archive.mkdir(parents=True, exist_ok=True)
-    files: list[tuple[Path, Path]] = [(manifest, archive / manifest.name),
-                                      (Path(__file__), archive / Path(__file__).name)]
-    files.extend((patch, archive / "patches" / patch.name)
+    files: list[tuple[Path, Path, bytes | None]] = [
+        (manifest, archive / manifest.name, manifest_bytes),
+        (Path(__file__), archive / Path(__file__).name, None),
+    ]
+    files.extend((patch, archive / "patches" / patch.name, None)
                  for patch in sorted(patch_dir.glob("*.patch")))
-    files.extend((file, archive / "source" / file.relative_to(source_overlay))
-                 for file in sorted(source_overlay.rglob("*")) if file.is_file())
+    for file in sorted(source_overlay.rglob("*")):
+        if file.is_dir() and not file.is_symlink():
+            continue
+        if file.is_symlink() or not file.is_file():
+            raise SystemExit(f"observer overlay contains non-regular file: {file}")
+        files.append((file, archive / "source" / file.relative_to(source_overlay), None))
     stream_parser = ROOT / "reference-capture" / "dolphin" / "reference_observer_stream.py"
-    files.append((stream_parser, archive / stream_parser.name))
-    for source_file, destination in files:
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        if destination.exists() and sha256(destination) != sha256(source_file):
+    files.append((stream_parser, archive / stream_parser.name, None))
+
+    def source_sha(source_file: Path, payload: bytes | None) -> str:
+        return (hashlib.sha256(payload).hexdigest() if payload is not None
+                else sha256(source_file))
+
+    # Preflight every destination before creating or changing the archive, so
+    # a collision cannot leave a half-updated corresponding-source tree.
+    for source_file, destination, payload in files:
+        if destination.exists() and sha256(destination) != source_sha(source_file, payload):
             raise SystemExit(f"archive provenance collision: {destination}")
+    archive.mkdir(parents=True, exist_ok=True)
+    for source_file, destination, payload in files:
         if not destination.exists():
-            shutil.copy2(source_file, destination)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            if payload is None:
+                shutil.copy2(source_file, destination)
+            else:
+                destination.write_bytes(payload)
+    return archive
+
+
+def publish_build_receipt(value: dict[str, object], manifest: Path, archive_root: Path,
+                          source_overlay: Path, patch_dir: Path) -> Path:
+    """Archive and then atomically publish one deterministic build receipt."""
+    value = dict(value)
+    archive = archive_root / str(value["binary_sha256"])
+    value["provenance_archive"] = str(archive)
+    payload = (json.dumps(value, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    archive_provenance(archive_root, str(value["binary_sha256"]), manifest,
+                       source_overlay, patch_dir, manifest_bytes=payload)
+    _atomic_write(manifest, payload)
     return archive
 
 
@@ -215,6 +385,10 @@ def main(argv: list[str] | None = None) -> int:
     build = args.build_dir.expanduser().resolve()
     output = (args.output.expanduser().resolve() if args.output else
               build / "Binaries" / ("dolphin-emu-nogui" if args.headless else "Dolphin.app"))
+    if work == source or source in work.parents or work in source.parents:
+        raise SystemExit("build worktree must be separate from the pinned source checkout")
+    if build == source or source in build.parents:
+        raise SystemExit("build output must be outside the pinned source checkout")
     if git(source, "rev-parse", "HEAD") != PINNED_COMMIT:
         raise SystemExit(f"source checkout is not pinned to {PINNED_COMMIT}")
     if git(source, "status", "--porcelain"):
@@ -235,22 +409,21 @@ def main(argv: list[str] | None = None) -> int:
             origin = git(source, "config", "--get", "remote.origin.url")
             run(["git", "clone", "--filter=blob:none", origin, str(work)])
         run(["git", "checkout", "--detach", PINNED_COMMIT], cwd=work)
+    patches = sorted(PATCH_DIR.glob("*.patch"))
+    prefix = verify_source_composition(work, patches, SOURCE_OVERLAY / "Core", require_complete=False)
     if not args.skip_submodules:
         run(["git", "submodule", "update", "--init", "--recursive"], cwd=work)
-    for patch in sorted(PATCH_DIR.glob("*.patch")):
+    for index, patch in enumerate(patches):
+        if index >= prefix:
+            run(["git", "apply", "--index", str(patch)], cwd=work)
         marker = work / ".mwrc" / patch.name
-        expected_marker = sha256(patch)
-        if marker.exists():
-            if marker.read_text(encoding="utf-8").strip() != expected_marker:
-                raise SystemExit(f"stale patch marker in build source: {marker}")
-            continue
-        run(["git", "apply", "--index", str(patch)], cwd=work)
         marker.parent.mkdir(parents=True, exist_ok=True)
-        marker.write_text(expected_marker + "\n", encoding="utf-8")
+        marker.write_text(sha256(patch) + "\n", encoding="utf-8")
     # Dolphin keeps its core sources one level below Source/Core/Core.  Keep
     # the overlay rooted at source/Core so corresponding-source paths and the
     # generated CMake target agree exactly.
     copy_overlay(SOURCE_OVERLAY / "Core", work / "Source/Core/Core")
+    verify_source_composition(work, patches, SOURCE_OVERLAY / "Core", require_complete=True)
     build.parent.mkdir(parents=True, exist_ok=True)
     cmake = ["cmake", "-S", str(work), "-B", str(build), "-G", args.generator,
              "-DCMAKE_BUILD_TYPE=Release", "-DENABLE_AUTOUPDATE=OFF"]
@@ -267,6 +440,7 @@ def main(argv: list[str] | None = None) -> int:
             raise SystemExit("--jobs must be positive")
         command.extend(["--parallel", str(args.jobs)])
     run(command)
+    verify_source_composition(work, patches, SOURCE_OVERLAY / "Core", require_complete=True)
     manifest = (args.manifest or (output.parent / "reference-dolphin-build.json")).expanduser().resolve()
     manifest.parent.mkdir(parents=True, exist_ok=True)
     binary = output / "Contents" / "MacOS" / "Dolphin" if output.suffix == ".app" else output
@@ -321,13 +495,8 @@ def main(argv: list[str] | None = None) -> int:
         "cpu": "JITARM64",
         "input_recording_version": 1,
     }
-    manifest.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    archive = archive_provenance(args.archive_root.expanduser().resolve(), value["binary_sha256"],
-                                 manifest, SOURCE_OVERLAY, PATCH_DIR)
-    value["provenance_archive"] = str(archive)
-    manifest.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    # Keep the archived receipt self-contained after adding its own location.
-    shutil.copy2(manifest, archive / manifest.name)
+    publish_build_receipt(value, manifest, args.archive_root.expanduser().resolve(),
+                          SOURCE_OVERLAY, PATCH_DIR)
     print(f"Built passive reference Dolphin; manifest: {manifest}")
     return 0
 

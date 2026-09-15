@@ -11,6 +11,13 @@ Camera, later subject rounding, draw scheduling and headless completion failures
 remain open. See the [causal audit and scoped evidence](docs/PHYSICAL_REPLAY_SRT.md).
 The installed capture app, PR #16, PR #20 and public deployment are unchanged.
 
+Reference Capture 0.2.3 adds startup cancellation and interrupted replay cleanup,
+CPU-sidecar binding to its core timeline and derived artifact, and exact Dolphin
+source-composition checks with atomic, repeatable provenance publication. The
+existing 9,019-tick physical browser trace passes the stronger binding checks and
+preserves its known CPU-input, camera, subject, and draw differences. This is
+validation-tool hardening; it does not fix those gameplay differences.
+
 Reference Capture 0.2.2 disables Dolphin’s stop-confirmation dialog for each
 capture/replay process. The installed app passes an ordinary boot/Stop Capture
 check: Dolphin exits without a dialog and the interrupted bundle remains

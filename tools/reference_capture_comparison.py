@@ -13,6 +13,7 @@ import json
 from pathlib import Path
 import re
 from typing import Any, Mapping
+from types import SimpleNamespace
 
 from cpu_observation_validation import (
     _compare as compare_cpu_observations,
@@ -154,10 +155,17 @@ def validate_derived(derived: str | Path, *, bundle: str | Path | None = None) -
     }
 
 
-def _cpu_report(native_path: Path, target_path: Path) -> dict[str, Any]:
+def _cpu_report(native_path: Path, target_path: Path, *, binding, reference, rows) -> dict[str, Any]:
     try:
-        native = load_observation(native_path)
-        target = load_observation(target_path)
+        declared = next((item for item in binding["manifest"]["artifacts"]
+                         if item["name"] == "cpu-sidecar.jsonl"), None)
+        if declared is None or _sha256(native_path) != declared["sha256"]:
+            raise ComparisonError("Original CPU sidecar does not match the derived artifact binding")
+        native = load_observation(native_path, reference)
+        target_core = SimpleNamespace(match_enter=rows[1], initial=rows[2], frames=rows[3:-1])
+        target = load_observation(target_path, target_core)
+        if target.header["source_drawing"] != (rows[0]["rendering"] == "source_draws"):
+            raise ComparisonError("CPU drawing declaration differs from core capture")
     except (OSError, ValueError) as error:
         raise ComparisonError(f"CPU sidecar validation failed: {error}") from error
     first = compare_cpu_observations(native, target, drawing=target.header["source_drawing"])
@@ -300,7 +308,8 @@ def compare(
                 if reference_cpu_input.is_symlink() or trace_cpu_input.is_symlink():
                     raise ComparisonError("CPU observation input is a symlink")
                 cpu_result = _cpu_report(reference_cpu_input.resolve(),
-                                         trace_cpu_input.resolve())
+                                         trace_cpu_input.resolve(), binding=binding,
+                                         reference=reference, rows=rows)
             except ComparisonError as error:
                 report["cpu"] = {
                     "status": "invalid_input",
