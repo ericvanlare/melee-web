@@ -1,5 +1,11 @@
 # Current status
 
+Reference Capture 0.2.2 disables Dolphin’s stop-confirmation dialog for each
+capture/replay process. The installed app passes an ordinary boot/Stop Capture
+check: Dolphin exits without a dialog and the interrupted bundle remains
+incomplete. The saved profile and prior recordings remain unchanged. See the
+[application behavior](docs/REFERENCE_CAPTURE_APP.md).
+
 Reference Capture 0.2.1 imports the pinned private prepared save into Application
 Support and rejects external fixture locations before reading them. The original
 fixture and existing capture bundles remain unchanged. Guarded environment
