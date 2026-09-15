@@ -1,0 +1,580 @@
+{
+  "capture_provenance": {
+    "capture_frames": [
+      348,
+      349,
+      350,
+      351,
+      352
+    ],
+    "eligible_rows": 8,
+    "native_ecb_rows": 10,
+    "native_stderr_sha256": "1d9233982bc0a511cdf86f7c2b6df2b3db995be6316fee80f7364f3d3e93882d",
+    "native_trace_sha256": "0b974b7d546afbfcb491fa7f8609d110972d6e3dc1bc8d2075e1331b2cd4a95d",
+    "omitted_rows": [
+      6,
+      8
+    ],
+    "original_diagnostics_sha256": "4428e01a5daa6c296efe29c741510165945103c0f5086f36afd527b145a04635"
+  },
+  "cases": [
+    {
+      "bone": 0,
+      "depth": 3,
+      "expected_world_bits": [
+        "bd675ca5",
+        "3f7c76e4",
+        "bef7ccbb",
+        "426446ec",
+        "bf79d5d1",
+        "3e35b715",
+        "3ef3738e",
+        "3ea1dcf0",
+        "3f011e92",
+        "3ee85951",
+        "3f5da748",
+        "40430fbd"
+      ],
+      "flags": "10000009",
+      "frame": 348,
+      "name": "ecb-row-00-bone-0-depth-3",
+      "negative_world_bits": [
+        "bd675ca5",
+        "3f7c76e4",
+        "bef7ccba",
+        "426446ec",
+        "bf79d5d1",
+        "3e35b715",
+        "3ef3738e",
+        "3ea1dcf0",
+        "3f011e92",
+        "3ee85951",
+        "3f5da748",
+        "40430fbd"
+      ],
+      "parent_matrix_bits": [
+        "be90e5e9",
+        "3f859ae5",
+        "be4dda34",
+        "426446ec",
+        "bf8803a4",
+        "be8b760a",
+        "3da72fb7",
+        "3ea1dcf0",
+        "3ce2c849",
+        "3e5c5cb0",
+        "3f8a08ab",
+        "40430fbd"
+      ],
+      "parent_scale_bits": null,
+      "rotation_bits": [
+        "3e8e7800",
+        "beced2d0",
+        "3e932947",
+        "3f7e93cb"
+      ],
+      "scale_bits": [
+        "3f800000",
+        "3f800000",
+        "3f800000"
+      ],
+      "sequence": 0,
+      "translation_bits": [
+        "80000000",
+        "00000000",
+        "00000000"
+      ]
+    },
+    {
+      "bone": 0,
+      "depth": 4,
+      "expected_world_bits": [
+        "bf917ecf",
+        "bd550182",
+        "3e2a93d4",
+        "413cfb39",
+        "bc8132df",
+        "3f8fdb06",
+        "3e7912dd",
+        "410184b2",
+        "be31f710",
+        "3e73d997",
+        "bf8e47eb",
+        "bed5bce2"
+      ],
+      "flags": "10000009",
+      "frame": 348,
+      "name": "ecb-row-01-bone-0-depth-4",
+      "negative_world_bits": [
+        "bf917ecf",
+        "bd550182",
+        "3e2a93d4",
+        "413cfb39",
+        "bc8132df",
+        "3f8fdb06",
+        "3e7912dd",
+        "410184b2",
+        "be31f710",
+        "3e73d995",
+        "bf8e47eb",
+        "bed5bce2"
+      ],
+      "parent_matrix_bits": [
+        "b3897233",
+        "00000000",
+        "3f933333",
+        "414575d9",
+        "00000000",
+        "3f933333",
+        "00000000",
+        "4117063e",
+        "bf933333",
+        "80000000",
+        "b3897233",
+        "bf71f53e"
+      ],
+      "parent_scale_bits": null,
+      "rotation_bits": [
+        "be9aeded",
+        "3fb59026",
+        "bdb957b5",
+        "00000000"
+      ],
+      "scale_bits": [
+        "3f800000",
+        "3f800000",
+        "3f800000"
+      ],
+      "sequence": 1,
+      "translation_bits": [
+        "beeaf000",
+        "bf959b78",
+        "beebefff"
+      ]
+    },
+    {
+      "bone": 0,
+      "depth": 2,
+      "expected_world_bits": [
+        "bd24285b",
+        "3f3757b0",
+        "bf557def",
+        "4267be21",
+        "bf0685e3",
+        "3f3872ee",
+        "3f24dda5",
+        "bf99bbb8",
+        "3f772d85",
+        "3ed7fcd9",
+        "3ea1ba7b",
+        "40508e05"
+      ],
+      "flags": "10000009",
+      "frame": 349,
+      "name": "ecb-row-02-bone-0-depth-2",
+      "negative_world_bits": [
+        "bd24285b",
+        "3f3757b0",
+        "bf557def",
+        "4267be21",
+        "bf0685e3",
+        "3f3872ed",
+        "3f24dda5",
+        "bf99bbb8",
+        "3f772d85",
+        "3ed7fcd9",
+        "3ea1ba7b",
+        "40508e05"
+      ],
+      "parent_matrix_bits": [
+        "bb9fbcc8",
+        "3f6c2a6b",
+        "bf195f0e",
+        "42638fe4",
+        "bf614263",
+        "3eb6665b",
+        "3f0e43e5",
+        "bfcd6517",
+        "3f28fba6",
+        "3ef6a1e9",
+        "3f3c82d3",
+        "402da0a8"
+      ],
+      "parent_scale_bits": null,
+      "rotation_bits": [
+        "3e819800",
+        "bebfe800",
+        "3e5cd000",
+        "3f7ec10a"
+      ],
+      "scale_bits": [
+        "3f800000",
+        "3f800000",
+        "3f800000"
+      ],
+      "sequence": 2,
+      "translation_bits": [
+        "80000000",
+        "3f9103e2",
+        "00000000"
+      ]
+    },
+    {
+      "bone": 0,
+      "depth": 4,
+      "expected_world_bits": [
+        "bf92ce48",
+        "3cc11e55",
+        "bda55888",
+        "413c4a0f",
+        "3c898539",
+        "3f92ab5c",
+        "3dc4d17e",
+        "40fa7c35",
+        "3da8c8ce",
+        "3dc1e0aa",
+        "bf925215",
+        "bd08e7a0"
+      ],
+      "flags": "10000009",
+      "frame": 349,
+      "name": "ecb-row-03-bone-0-depth-4",
+      "negative_world_bits": [
+        "bf92ce48",
+        "3cc11e55",
+        "bda55888",
+        "413c4a0f",
+        "3c898539",
+        "3f92ab5c",
+        "3dc4d17f",
+        "40fa7c35",
+        "3da8c8ce",
+        "3dc1e0ab",
+        "bf925215",
+        "bd08e7a0"
+      ],
+      "parent_matrix_bits": [
+        "b3897233",
+        "00000000",
+        "3f933333",
+        "4144c4af",
+        "00000000",
+        "3f933333",
+        "00000000",
+        "4112bfa7",
+        "bf933333",
+        "80000000",
+        "b3897233",
+        "bf0fa546"
+      ],
+      "parent_scale_bits": null,
+      "rotation_bits": [
+        "be9174be",
+        "3fd26e85",
+        "be4dc427",
+        "00000000"
+      ],
+      "scale_bits": [
+        "3f800000",
+        "3f800000",
+        "3f800000"
+      ],
+      "sequence": 3,
+      "translation_bits": [
+        "beeaefff",
+        "bf959b78",
+        "beebefff"
+      ]
+    },
+    {
+      "bone": 5,
+      "depth": 0,
+      "expected_world_bits": [
+        "bd618cc9",
+        "3f822ecc",
+        "bed4b172",
+        "42628cf7",
+        "bf7eb5ac",
+        "3e0554c4",
+        "3ee6be00",
+        "c067f882",
+        "3eee84e5",
+        "3ecbef09",
+        "3f69d596",
+        "4019050d"
+      ],
+      "flags": "10000009",
+      "frame": 350,
+      "name": "ecb-row-04-bone-5-depth-0",
+      "negative_world_bits": [
+        "bd618cc9",
+        "3f822ecd",
+        "bed4b174",
+        "42628cf7",
+        "bf7eb5ac",
+        "3e0554c6",
+        "3ee6be00",
+        "c067f882",
+        "3eee84e5",
+        "3ecbef09",
+        "3f69d596",
+        "4019050d"
+      ],
+      "parent_matrix_bits": [
+        "beaeba26",
+        "3f8563b7",
+        "bdb2034a",
+        "42628cf7",
+        "bf814339",
+        "beb44e3c",
+        "be83b178",
+        "c067f882",
+        "be8b026f",
+        "337919f9",
+        "3f88719e",
+        "4019050d"
+      ],
+      "parent_scale_bits": null,
+      "rotation_bits": [
+        "3ea72c8d",
+        "bf2d1dc2",
+        "3ea1a234",
+        "3f75ca68"
+      ],
+      "scale_bits": [
+        "3f800000",
+        "3f800000",
+        "3f800000"
+      ],
+      "sequence": 4,
+      "translation_bits": [
+        "00000000",
+        "00000000",
+        "00000000"
+      ]
+    },
+    {
+      "bone": 0,
+      "depth": 2,
+      "expected_world_bits": [
+        "bf0f41fc",
+        "be5dbd1d",
+        "bf7b2601",
+        "413e4631",
+        "bd377123",
+        "3f904916",
+        "be649ea9",
+        "4134bab8",
+        "3f807810",
+        "bd90404e",
+        "bf0e9489",
+        "bd6b5e2c"
+      ],
+      "flags": "10000009",
+      "frame": 350,
+      "name": "ecb-row-05-bone-0-depth-2",
+      "negative_world_bits": [
+        "bf0f41fc",
+        "be5dbd1d",
+        "bf7b2601",
+        "413e4631",
+        "bd377123",
+        "3f904916",
+        "be649ea8",
+        "4134bab8",
+        "3f807810",
+        "bd90404e",
+        "bf0e9489",
+        "bd6b5e2c"
+      ],
+      "parent_matrix_bits": [
+        "bf82395b",
+        "3cfd6496",
+        "bf090600",
+        "413d7524",
+        "3d874ebc",
+        "3f92c2b6",
+        "bd72f94a",
+        "411675c3",
+        "3f0834b9",
+        "bdaa73f5",
+        "bf821014",
+        "3da3903e"
+      ],
+      "parent_scale_bits": null,
+      "rotation_bits": [
+        "3ddecb7a",
+        "3f12d6d9",
+        "be0cbccd",
+        "00000000"
+      ],
+      "scale_bits": [
+        "3f800000",
+        "3f800000",
+        "3f800000"
+      ],
+      "sequence": 5,
+      "translation_bits": [
+        "00000000",
+        "3fd33333",
+        "00000000"
+      ]
+    },
+    {
+      "bone": 0,
+      "depth": 3,
+      "expected_world_bits": [
+        "bf6ac0da",
+        "3d31094a",
+        "bf31500f",
+        "413d8d6d",
+        "3e3b2f46",
+        "3f8fa6cd",
+        "be301c0a",
+        "410fcfc5",
+        "3f2b6236",
+        "be7d2ae4",
+        "bf66da63",
+        "bd27de78"
+      ],
+      "flags": "10000009",
+      "frame": 351,
+      "name": "ecb-row-07-bone-0-depth-3",
+      "negative_world_bits": [
+        "bf6ac0da",
+        "3d31094a",
+        "bf31500e",
+        "413d8d6d",
+        "3e3b2f46",
+        "3f8fa6cd",
+        "be301c0b",
+        "410fcfc5",
+        "3f2b6236",
+        "be7d2ae4",
+        "bf66da63",
+        "bd27de78"
+      ],
+      "parent_matrix_bits": [
+        "bf81f0a3",
+        "3e015cdc",
+        "bf067db3",
+        "413abd19",
+        "3e5d1b48",
+        "3f8f5619",
+        "be1781f7",
+        "40e6867f",
+        "3efd999d",
+        "be6ac039",
+        "bf8190c4",
+        "3ec0baf4"
+      ],
+      "parent_scale_bits": null,
+      "rotation_bits": [
+        "3d415214",
+        "3e2d7460",
+        "bd4b21c3",
+        "00000000"
+      ],
+      "scale_bits": [
+        "3f800000",
+        "3f800000",
+        "3f800000"
+      ],
+      "sequence": 7,
+      "translation_bits": [
+        "00000000",
+        "3fccccd5",
+        "3d4ccccd"
+      ]
+    },
+    {
+      "bone": 0,
+      "depth": 4,
+      "expected_world_bits": [
+        "bf6ec210",
+        "3e14a860",
+        "bf282e44",
+        "413a1e86",
+        "3e9f61a8",
+        "3f8b5737",
+        "be4e338c",
+        "40d7f469",
+        "3f18b190",
+        "beaea9eb",
+        "bf6c11fc",
+        "3ef32262"
+      ],
+      "flags": "10000009",
+      "frame": 352,
+      "name": "ecb-row-09-bone-0-depth-4",
+      "negative_world_bits": [
+        "bf6ec210",
+        "3e14a860",
+        "bf282e44",
+        "413a1e86",
+        "3e9f61a8",
+        "3f8b5737",
+        "be4e338c",
+        "40d7f469",
+        "3f18b190",
+        "beaea9ec",
+        "bf6c11fc",
+        "3ef32262"
+      ],
+      "parent_matrix_bits": [
+        "b3897233",
+        "00000000",
+        "3f933333",
+        "41429926",
+        "00000000",
+        "3f933333",
+        "00000000",
+        "41017bc1",
+        "bf933333",
+        "80000000",
+        "b3897233",
+        "bd5859c3"
+      ],
+      "parent_scale_bits": null,
+      "rotation_bits": [
+        "be5eb425",
+        "400c86ed",
+        "bef64768",
+        "00000000"
+      ],
+      "scale_bits": [
+        "3f800000",
+        "3f800000",
+        "3f800000"
+      ],
+      "sequence": 9,
+      "translation_bits": [
+        "beeaf000",
+        "bf959b78",
+        "beebf000"
+      ]
+    }
+  ],
+  "schema": "melee-web-gameplay-srt-scalar-fixture",
+  "scope": "bounded original-versus-native ECB operands; scalar transform evidence only; no gameplay admission claim",
+  "source_instruction": {
+    "concat": "melee_web_ps_mtx_concat",
+    "disassembly_sha256": "c4f535658aa1a291bec80553e96885c46454ce24da66613d82a9715791568c65",
+    "fused_boundaries": [
+      "m01",
+      "m11",
+      "m02",
+      "m12"
+    ],
+    "game_revision": "GALE01r2",
+    "routine": "HSD_MtxSRT",
+    "trig_source": "MSL/trigf.c",
+    "variant_formulas": [
+      "scaleY*fmaf(cosZ,sinX*sinY,-(cosX*sinZ))",
+      "scaleY*fmaf(sinZ,sinX*sinY,cosX*cosZ)",
+      "scaleZ*fmaf(cosZ,cosX*sinY,sinX*sinZ)",
+      "scaleZ*fmaf(sinZ,cosX*sinY,-(sinX*cosZ))"
+    ]
+  },
+  "version": 1
+}

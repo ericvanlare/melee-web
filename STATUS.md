@@ -9,11 +9,22 @@ The encoded result matches the original HSD routines and passes the original
 C decoder. The installed 0.2.3 verifier accepts the new fixture, and an ordinary
 retail boot reaches the title/attract screen without a card error. A visual CSS
 check remains unverified because automated keyboard input did not reach Dolphin.
-Focused save/provisioning tests pass. The 895-test run had 16 failures/errors
-from missing dependencies in the isolated worktree (87 optional skips); after
-copying the existing pinned dependencies, all 18 tests in the affected classes
-pass. This is save/provisioning evidence, not new gameplay or port acceptance.
+Focused save/provisioning tests pass. With the pinned dependencies prepared,
+the complete 904-test suite passes (54 optional skips). The earlier attempt
+with missing dependencies remains preserved. This is save/provisioning evidence,
+not new gameplay or port acceptance.
 See the [upgrade procedure](docs/REFERENCE_CAPTURE_APP.md).
+
+The physical Falco/Marth/Yoshi replay now matches every declared fighter field
+across all 9,019 visible-browser ticks except 17 CPU-related input samples.
+Four original fused operations in `HSD_MtxSRT` remove the tick-473 position
+error; the first remaining core difference is CPU input at tick 901. Passive
+original probes establish its RNG-seed and fighter-pointer register producers,
+without using captured addresses as inputs or changing CPU integration. The
+1,199-tick 2P and 4,346-tick 3P browser core/CPU regressions remain exact.
+Camera, later subject rounding, draw scheduling and headless completion failures
+remain open. See the [causal audit and scoped evidence](docs/PHYSICAL_REPLAY_SRT.md).
+The installed capture app, PR #16, PR #20 and public deployment are unchanged.
 
 Reference Capture 0.2.3 adds startup cancellation and interrupted replay cleanup,
 CPU-sidecar binding to its core timeline and derived artifact, and exact Dolphin
@@ -68,7 +79,7 @@ see the [bounded receipt](docs/evidence/reference-operator-session-v1.json).
 No gameplay fix or gold admission is claimed. PR #16 and its allocation evidence
 remain unchanged and unmerged.
 
-## Controller input candidate
+## Browser controllers
 
 The browser controller candidate adds browser-standard mapping, a suggested
 Mayflash 0079:1843 mapping for Chrome/macOS's 16-button/10-axis raw layout,
@@ -78,12 +89,39 @@ indexing; digital L/R clicks remain provisional. Separate GameCube trigger
 pressure/clicks and fast input-only browser regressions pass. The public player
 defaults to controllers when recognized, with per-player keyboard overrides in
 compact Controls settings. Session-local trigger-origin handling fixes activation
-with the attached Mayflash's nonzero rest values. The user reports the suggested
-mapping worked in the check page; full physical gameplay acceptance and production
-deployment remain pending.
+with the attached Mayflash's nonzero rest values. The user reports that the
+physical Mayflash/OEM controller worked in the playable preview. PR #22 merged
+as `72def75a7c58292b5f7f2d3b04f70ad21b665f33` after both exact-head native CI
+runs and public checks passed. The fix is live at
+[webmelee.gg](https://webmelee.gg/); its immutable production artifact is
+[00ee2ca2.webmelee.pages.dev](https://00ee2ca2.webmelee.pages.dev). Hosted
+artifact, disc/menu lifecycle, controller and recovery checks pass. Digital
+L/R clicks, full physical gameplay and retail input precision remain unaccepted.
+
+A separate follow-up shares the compact Controls component between the public
+player and development `runtime.html`, including source choices, layout,
+preferences, optional remapping and focus behavior. Development diagnostics and
+audio remain separate.
 See [controller scope and verification](docs/CONTROLLERS.md).
 
 ## Public runtime
+
+The user-approved renderer startup fix is now live at
+[webmelee.gg](https://webmelee.gg/). PR #18 merged with green exact-head CI;
+the production artifact and apex each passed HTTP verification and ten real
+browser UI checks. The runtime bytes match the accepted preview. This is a
+functional alpha release, without a startup-speedup or expanded gameplay
+acceptance claim. See the [production record](docs/RENDERER_PRODUCTION_PROMOTION.md).
+
+A separate [loading-feedback preview](docs/PUBLIC_LOADING_FEEDBACK.md) adds
+visible startup phases and bounded file-transfer batches. One local cold/warm
+Mario/FD lifecycle pair passes with zero unexpected pipelines, 7.335/8.960 ms
+native maxima and 24.010/27.305 ms browser gaps. Disc preparation measured
+2.149/2.010 seconds; this does not establish a cold-driver startup-speedup claim.
+The production renderer artifact remains unchanged by that follow-up.
+
+The following startup measurements and rejected hosted attempts are retained
+from the pre-promotion decision:
 
 The shared startup/complete-catalog fix passes local cold/warm Mario/FD and
 Falco/Battlefield with zero unexpected pipelines and native/browser maxima of
