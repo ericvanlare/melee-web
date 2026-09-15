@@ -107,13 +107,11 @@ async function importShellWithMocks(scenario) {
   const source = await fs.readFile(SHELL_URL, 'utf8');
   const imports = [
     "import {mountMeleeRuntime} from '../melee-runtime.mjs';",
-    "import {keyboardRows} from '../prototype-keyboard-layouts.mjs';",
-    "import {mountControllerPanel} from '../controller-panel.mjs';",
+    "import {mountControllerSettings} from '../controller-settings.mjs';",
   ].join('\n');
   const replacement = [
     'const mountMeleeRuntime = globalThis.testMountMeleeRuntime;',
-    'const keyboardRows = globalThis.testKeyboardRows;',
-    'const mountControllerPanel = globalThis.testMountControllerPanel;',
+    'const mountControllerSettings = globalThis.testMountControllerSettings;',
   ].join('\n');
   assert.notEqual(source.indexOf(imports), -1, 'shell imports must remain source-substitutable');
   const substituted = source.replace(imports, replacement);
@@ -131,19 +129,19 @@ async function runScenario({name, failStartup}) {
   const document = makeDocument();
   const restore = installGlobals(document);
   const trace = [];
-  const keyboardCalls = [];
-  const sourceCalls = [];
-  const panelCalls = [];
-  const modes = ['auto', 'auto', 'off', 'off'];
   let stateCallback;
+  let settingsOptions;
   let nativeMainCalled = false;
   let audioCreated = 0;
 
-  globalThis.testKeyboardRows = (layout, second) => {
-    keyboardCalls.push([layout, second]);
-    return [['Action', 'Key']];
+  globalThis.testMountControllerSettings = options => {
+    settingsOptions = options;
+    trace.push('settings');
+    return {
+      setState: next => trace.push(['settings-state', next?.state]),
+      bindPlayer: async runtime => { trace.push(['settings-bind', runtime]); },
+    };
   };
-  globalThis.testMountControllerPanel = () => { panelCalls.push('mount'); return () => panelCalls.push('cleanup'); };
   globalThis.testMountMeleeRuntime = async options => {
     trace.push('mount');
     stateCallback = options.onState;
@@ -159,9 +157,6 @@ async function runScenario({name, failStartup}) {
     return {
       controllers: {
         inspect: () => [], sample: () => [],
-        getPortSource: port => modes[port],
-        setPortSource: (port, mode) => { sourceCalls.push([port, mode]); modes[port] = mode; },
-        setTesting(value) { trace.push(['testing', value]); },
       },
       setKeyboardLayout: async layout => { trace.push(['layout', layout]); },
       setKeyboard(slot, enabled) { trace.push(['keyboard', slot, enabled]); },
@@ -173,45 +168,32 @@ async function runScenario({name, failStartup}) {
     return {
       document,
       trace,
-      keyboardCalls,
-      sourceCalls,
-      panelCalls,
+      settingsOptions,
       stateCallback,
       nativeMainCalled,
       audioCreated,
     };
   } finally {
     delete globalThis.testMountMeleeRuntime;
-    delete globalThis.testKeyboardRows;
-    delete globalThis.testMountControllerPanel;
+    delete globalThis.testMountControllerSettings;
     restore();
   }
 }
 
 const success = await runScenario({name: 'success', failStartup: false});
-assert.deepEqual(success.trace.slice(0, 2), ['mount', 'native-main']);
+assert.deepEqual(success.trace.slice(0, 3), ['settings', 'mount', 'native-main']);
 assert.equal(success.nativeMainCalled, true);
 assert.equal(success.audioCreated, 0);
-assert.ok(success.keyboardCalls.length >= 2, 'shell must use the imported keyboard table');
+assert.equal(success.settingsOptions.disableExtraPorts, true, 'public settings keep developer-only ports disabled');
+assert.equal(success.settingsOptions.openButton, success.document.getElementById('controls-open'));
+assert.ok(success.trace.some(row => Array.isArray(row) && row[0] === 'settings-bind'), 'shell binds settings after native startup');
 const restoreSuccess = installGlobals(success.document);
 try {
-  assert.deepEqual(success.sourceCalls.slice(0, 4), [[0, 'auto'], [1, 'auto'], [2, 'off'], [3, 'off']],
-    'public startup must configure both visible ports and keep developer-only ports off');
-  assert.deepEqual(success.trace.filter(row => Array.isArray(row) && row[0] === 'keyboard').slice(-2),
-    [['keyboard', 0, true], ['keyboard', 1, true]], 'Auto keeps keyboard fallback enabled for both players');
-  const p1 = success.document.getElementById('player-one-source');
-  p1.value = 'keyboard'; p1.onchange();
-  assert.deepEqual(success.sourceCalls.slice(-4), [[0, 'keyboard'], [1, 'auto'], [2, 'off'], [3, 'off']], 'P1 source changes reach the manager');
-  assert.deepEqual(success.trace.filter(row => Array.isArray(row) && row[0] === 'keyboard').at(-2), ['keyboard', 0, true],
-    'Keyboard source enables the native keyboard fallback');
-  const advanced = success.document.getElementById('controller-advanced');
-  advanced.open = true; advanced.listeners.get('toggle')[0]();
-  assert.deepEqual(success.panelCalls, ['mount'], 'Advanced controller UI mounts only after expansion');
-  advanced.open = false; advanced.listeners.get('toggle')[0]();
-  assert.deepEqual(success.panelCalls, ['mount', 'cleanup'], 'Collapsing advanced controls releases the panel');
   success.stateCallback({ready: true, running: true, requiresReload: false, busy: false, state: 'css', paused: false,
     canImport: true, canStart: false, canPause: true, canUnload: true, progress: null, message: 'Running'});
   assert.equal(success.document.getElementById('idle-hint').hidden, true, 'Idle hint disappears once native play starts');
+  assert.ok(success.trace.some(row => Array.isArray(row) && row[0] === 'settings-state' && row[1] === 'css'),
+    'native state is forwarded to the shared settings component');
 } finally { restoreSuccess(); }
 
 const failed = await runScenario({name: 'mkdir-failure', failStartup: true});
