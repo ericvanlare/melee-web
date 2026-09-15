@@ -45,6 +45,9 @@ PLAYER_RUNTIME_FILES = (
     "runtime-assets.mjs",
     "disc-image.mjs",
     "prototype-keyboard-layouts.mjs",
+    "controller-input.mjs",
+    "controller-panel.mjs",
+    "controller-panel.css",
     "gameplay_public.js",
     "gameplay_public.wasm",
 )
@@ -54,6 +57,9 @@ PLAYER_SOURCE_RUNTIME_FILES = (
     "runtime-assets.mjs",
     "disc-image.mjs",
     "prototype-keyboard-layouts.mjs",
+    "controller-input.mjs",
+    "controller-panel.mjs",
+    "controller-panel.css",
 )
 RUNTIME_IDENTITY_SCHEMA = "melee-web-runtime-public-build-v2"
 RUNTIME_IDENTITY_NAME = "runtime-public-identity.json"
@@ -68,6 +74,8 @@ RUNTIME_SOURCE_FILES = (
     "src/gameplay_audio_bank.cpp",
     "src/browser_input.cpp",
     "src/browser_input.h",
+    "src/browser_controllers.cpp",
+    "src/browser_controllers.h",
     "scripts/bootstrap.py",
     "scripts/build.py",
     "scripts/gameplay_bool.py",
@@ -112,6 +120,8 @@ RUNTIME_TOOLCHAIN_PATHS = frozenset({
     ".venv/bin/cmake",
     ".venv/bin/ninja",
 })
+RUNTIME_ARTIFACT_ROOTS = frozenset({"build/browser-public-release",
+                                    "build/browser-public-selective-release"})
 PIPELINE_SEED_PATHS = {
     "source": "web/initial_pipeline_cache.db.gz.b64",
     "materialized": "build/browser-public-release/initial_pipeline_cache.db",
@@ -557,7 +567,7 @@ def _read_runtime_identity(runtime_dir: Path) -> tuple[dict[str, object], dict[s
         raise BuildError("runtime identity has unexpected or missing producer fields")
     if value.get("target") != "runtime-public" or value.get("configuration") != "Release":
         raise BuildError("runtime identity is not the Release runtime-public target")
-    if value.get("artifact_root") != "build/browser-public-release":
+    if not isinstance(value.get("artifact_root"), str) or value["artifact_root"] not in RUNTIME_ARTIFACT_ROOTS:
         raise BuildError("runtime identity artifact_root is not the reviewed public Release output")
     _validate_audio_policy(value)
     convention = value.get("upload_convention")
@@ -625,6 +635,9 @@ def _read_runtime_identity(runtime_dir: Path) -> tuple[dict[str, object], dict[s
 
 def _validate_audio_policy(identity: dict[str, object]) -> None:
     """Require the producer's source-bound proof that the alpha has no audio."""
+    artifact_root = identity.get("artifact_root")
+    if not isinstance(artifact_root, str) or artifact_root not in RUNTIME_ARTIFACT_ROOTS:
+        raise BuildError("runtime identity artifact_root is not the reviewed public Release output")
     policy = identity.get("audio_policy")
     expected_policy = {
         "mode": "disabled",
@@ -655,7 +668,7 @@ def _validate_audio_policy(identity: dict[str, object]) -> None:
     if not isinstance(ninja, dict) or set(ninja) != {
         "path", "target_statement_sha256", "source_archive_statement_sha256",
         "asset_archive_statement_sha256", "target_inputs", "source_archive_inputs", "asset_archive_inputs",
-    } or ninja.get("path") != "build/browser-public-release/build.ninja":
+    } or ninja.get("path") != f"{artifact_root}/build.ninja":
         raise BuildError("runtime identity audio_graph Ninja evidence is incomplete")
     ninja_path = _identity_repo_path(ninja["path"], "audio graph Ninja")
     if _is_symlink(ninja_path) or not ninja_path.is_file():
@@ -701,7 +714,7 @@ def _validate_audio_policy(identity: dict[str, object]) -> None:
     commands = proof.get("compile_commands")
     if not isinstance(commands, dict) or set(commands) != {
         "path", "public_audio_command_sha256", "public_audio_object", "public_resampler_compile_commands",
-    } or commands.get("path") != "build/browser-public-release/compile_commands.json":
+    } or commands.get("path") != f"{artifact_root}/compile_commands.json":
         raise BuildError("runtime identity audio_graph compile command evidence is incomplete")
     compile_path = _identity_repo_path(commands["path"], "audio graph compile commands")
     if _is_symlink(compile_path) or not compile_path.is_file():
@@ -733,7 +746,7 @@ def _validate_audio_policy(identity: dict[str, object]) -> None:
     depfile = proof.get("depfile")
     if not isinstance(depfile, dict) or set(depfile) != {"path", "present", "resampler_header_referenced"}:
         raise BuildError("runtime identity audio_graph depfile evidence is incomplete")
-    if depfile.get("path") != "build/browser-public-release/CMakeFiles/fighter_source_runtime_public.dir/src/gameplay_audio.c.o.d":
+    if depfile.get("path") != f"{artifact_root}/CMakeFiles/fighter_source_runtime_public.dir/src/gameplay_audio.c.o.d":
         raise BuildError("runtime identity audio_graph depfile path is invalid")
     depfile_path = _identity_repo_path(depfile["path"], "audio graph depfile")
     if _is_symlink(depfile_path):
@@ -761,7 +774,7 @@ def _validate_audio_policy(identity: dict[str, object]) -> None:
         raise BuildError("runtime identity audio_graph project Ninja is missing")
     try:
         deps_result = subprocess.run(
-            [str(ninja_path), "-C", "build/browser-public-release", "-t", "deps", ninja_deps["object"]],
+            [str(ninja_path), "-C", artifact_root, "-t", "deps", ninja_deps["object"]],
             cwd=ROOT, text=True, capture_output=True, check=False,
         )
     except OSError as exc:
@@ -867,9 +880,10 @@ def _validate_runtime_provenance(identity: dict[str, object]) -> None:
     seed = identity.get("pipeline_seed")
     if not isinstance(seed, dict):
         raise BuildError("runtime identity pipeline seed record is missing")
+    seed_paths = dict(PIPELINE_SEED_PATHS, materialized=f"{identity['artifact_root']}/initial_pipeline_cache.db")
     for key in ("source", "materialized"):
         part = seed.get(key)
-        if (not isinstance(part, dict) or part.get("path") != PIPELINE_SEED_PATHS[key]
+        if (not isinstance(part, dict) or part.get("path") != seed_paths[key]
                 or not isinstance(part.get("sha256"), str)):
             raise BuildError(f"runtime identity pipeline seed {key} record is invalid")
         path = _identity_repo_path(part["path"], f"pipeline seed {key}")
@@ -940,6 +954,12 @@ def _validate_runtime_graph(files: dict[str, bytes]) -> None:
     if forbidden_modules.intersection(files):
         raise BuildError("public runtime graph contains a development audio module")
     for rel, data in files.items():
+        # Export checks alone cannot detect dormant diagnostics retained by
+        # internal replay references in a shared native archive.
+        if any(marker in data for marker in (
+            b"CPU_ADDRESS_AUDIT", b"melee-web-native-cpu-address-diagnostic",
+        )):
+            raise BuildError(f"CPU address diagnostic rejected in public runtime: {rel}")
         if rel.endswith((".mjs", ".js")):
             try:
                 text = data.decode("utf-8")
@@ -971,7 +991,7 @@ def _validate_runtime_graph(files: dict[str, bytes]) -> None:
             if re.search(r"(?:dsp-coefficients|audio-worklet|audio-ring|runtime-audio)", text, re.I):
                 raise BuildError(f"development audio module reference rejected in runtime JavaScript: {rel}")
     required_imports = {
-        "melee-runtime.mjs": ("./runtime-assets.mjs", "./gameplay_public.js"),
+        "melee-runtime.mjs": ("./runtime-assets.mjs", "./gameplay_public.js", "./controller-input.mjs"),
         "runtime-assets.mjs": ("./disc-image.mjs",),
     }
     for rel, imports in required_imports.items():
@@ -1208,6 +1228,9 @@ def build(
             "runtime-assets.mjs": ROOT / "web" / "runtime-assets.mjs",
             "disc-image.mjs": ROOT / "web" / "disc-image.mjs",
             "prototype-keyboard-layouts.mjs": ROOT / "web" / "prototype-keyboard-layouts.mjs",
+            "controller-input.mjs": ROOT / "web" / "controller-input.mjs",
+            "controller-panel.mjs": ROOT / "web" / "controller-panel.mjs",
+            "controller-panel.css": ROOT / "web" / "controller-panel.css",
         }
         for rel, path in source_runtime.items():
             if _is_symlink(path) or not path.is_file():

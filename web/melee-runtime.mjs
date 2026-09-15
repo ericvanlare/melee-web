@@ -1,5 +1,6 @@
 /** One player owner per document. Native source ticks remain owned by the compiled player. */
 import {loadNativeGameDisc} from './runtime-assets.mjs';
+import {createControllerManager} from './controller-input.mjs';
 
 let documentClaimed = false;
 const SCENES = {1: 'css', 2: 'preparing', 3: 'sss', 4: 'preparing', 5: 'preparing', 6: 'unloaded', 7: 'match'};
@@ -27,6 +28,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   const startup = new Promise((resolve, reject) => { resolveStartup = resolve; rejectStartup = reject; });
   const Module = {
     canvas,
+    meleeControllers: createControllerManager(),
     locateFile: name => new URL(name, assetBase).href,
     print: text => onLog(String(text), false),
     printErr: text => onLog(String(text), true),
@@ -156,6 +158,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     prepared = true; callbacks.menuPreparationDone();
   }
   const handle = Object.freeze({
+    controllers: Module.meleeControllers,
     version: 1, getState: snapshot, focus,
     importDisc(file) {
       return operation('importing', async () => {
@@ -199,6 +202,15 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   onOwner?.({Module, boundary, handle, status, check, put, prepareAudio, pauseAudioForPreparation,
     syncAudio, unloadAndSave, prepareNativeResources, waitForAudioAck, stop, callbacks});
   configureModule?.(Module);
+  // Native seed loading needs this directory even when optional browser
+  // persistence is disabled or unavailable. Keep that prerequisite in the
+  // shared owner, ahead of any entry-specific cache mount/populate callback.
+  const configuredPreRun = Module.preRun;
+  Module.preRun = [() => {
+    Module.FS.mkdirTree('/melee-render-cache');
+    const callbacks = typeof configuredPreRun === 'function' ? [configuredPreRun] : configuredPreRun || [];
+    for (const callback of callbacks) callback(Module);
+  }];
   window.Module = Module;
   publish();
   const loader = document.createElement('script'); loader.src = String(loaderUrl);

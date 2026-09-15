@@ -99,7 +99,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release" AND MELEE_WEB_PUBLIC_RUNTIME)
   target_include_directories(fighter_source_runtime_public PUBLIC src "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}"
     PRIVATE .deps/aurora/include .deps/melee/extern/dolphin/include)
   target_compile_definitions(fighter_source_runtime_public PUBLIC TARGET_PC
-    PRIVATE MELEE_WEB_MENU_MARIO_FD MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+    PRIVATE MELEE_WEB_MENU_MARIO_FD MELEE_WEB_PUBLIC_AUDIO_DISABLED MELEE_WEB_PUBLIC_RUNTIME)
   target_compile_options(fighter_source_runtime_public PRIVATE -ffunction-sections -fdata-sections -ffp-contract=off
     -fno-builtin-sinf -fno-builtin-cosf -fno-builtin-tanf
     -fno-builtin-atanf -fno-builtin-atan2f -fno-builtin-acosf
@@ -139,7 +139,7 @@ foreach(trace bonus_data stage_numeric)
   set_target_properties(gameplay_${trace}_trace PROPERTIES SUFFIX ".js")
 endforeach()
 
-add_executable(gameplay_browser EXCLUDE_FROM_ALL src/gameplay_browser.cpp src/browser_input.cpp)
+add_executable(gameplay_browser EXCLUDE_FROM_ALL src/gameplay_browser.cpp src/browser_input.cpp src/browser_controllers.cpp)
 target_link_libraries(gameplay_browser PRIVATE fighter_asset_runtime aurora::main)
 target_compile_options(gameplay_browser PRIVATE -ffp-contract=off)
 target_link_options(gameplay_browser PRIVATE -sENVIRONMENT=web -sALLOW_MEMORY_GROWTH=1
@@ -157,7 +157,7 @@ else()
 endif()
 configure_file(web/runtime.html runtime.html @ONLY)
 configure_file(web/runtime-cache.js runtime-cache.js COPYONLY)
-foreach(module disc-image dsp-coefficients runtime-assets runtime-audio runtime-audio-assets match-flow match-menu action-sweep hitch-capture melee-runtime runtime-development)
+foreach(module disc-image dsp-coefficients runtime-assets runtime-audio runtime-audio-assets match-flow match-menu action-sweep hitch-capture melee-runtime runtime-development controller-input controller-panel)
   configure_file(web/${module}.mjs ${module}.mjs COPYONLY)
 endforeach()
 configure_file(web/audio-ring.mjs audio-ring.mjs COPYONLY)
@@ -382,7 +382,7 @@ add_custom_command(
   DEPENDS scripts/materialize_pipeline_cache.py web/initial_pipeline_cache.db.gz.b64
   VERBATIM)
 add_custom_target(gameplay_menu_pipeline_seed DEPENDS "${initial_pipeline_cache}")
-add_executable(gameplay_menu_browser EXCLUDE_FROM_ALL src/gameplay_menu_browser.cpp src/browser_input.cpp
+add_executable(gameplay_menu_browser EXCLUDE_FROM_ALL src/gameplay_menu_browser.cpp src/browser_input.cpp src/browser_controllers.cpp
   tests/native_menu_alarm_unavailable.c tests/native_menu_fighter_input.c tests/native_menu_stage_input.c)
 add_dependencies(gameplay_menu_browser gameplay_menu_pipeline_seed)
 set_property(TARGET gameplay_menu_browser APPEND PROPERTY LINK_DEPENDS "${initial_pipeline_cache}")
@@ -390,12 +390,19 @@ target_link_libraries(gameplay_menu_browser PRIVATE fighter_asset_runtime aurora
 # Emscripten's mallinfo declaration extends its normal malloc.h via include_next.
 target_include_directories(gameplay_menu_browser SYSTEM PRIVATE "${EMSCRIPTEN_SYSROOT}/include/compat")
 target_compile_options(gameplay_menu_browser PRIVATE -ffp-contract=off)
+set(gameplay_menu_browser_exports "_main,_malloc,_free,_melee_web_native_menu_file,_melee_web_native_menu_prepare,_melee_web_native_menu_launch,_melee_web_native_menu_replay,_melee_web_native_menu_replay_cursor,_melee_web_native_menu_unload,_melee_web_native_menu_pause,_melee_web_native_menu_message,_melee_web_native_menu_running,_melee_web_native_menu_cache_idle,_melee_web_native_menu_phase,_melee_web_native_menu_confirm_check,_melee_web_native_menu_pad_sample,_melee_web_native_menu_pad_sample_full,_melee_web_native_menu_player_state,_melee_web_native_menu_drive_fighter,_melee_web_native_menu_drive_stage,_melee_web_native_menu_stock_check,_melee_web_native_menu_stock_check_ready,_melee_web_native_menu_diagnostics,_melee_web_native_menu_memory,_melee_web_css_observe,_melee_web_sss_observe,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_set_keyboard_port,_melee_web_input_message")
+if(MELEE_WEB_PIPELINE_PROVENANCE)
+  # Emscripten consumes one complete export list. Keep every existing root
+  # and add the private collector commands only in this configuration.
+  string(APPEND gameplay_menu_browser_exports
+    ",_melee_web_provenance_set_case,_melee_web_provenance_drain,_melee_web_provenance_finish,_melee_web_provenance_status")
+endif()
 target_link_options(gameplay_menu_browser PRIVATE --profiling-funcs -sENVIRONMENT=web
   -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=134217728 -sSTACK_SIZE=8388608 -sEXIT_RUNTIME=0
   --preload-file "${initial_pipeline_cache}@/initial_pipeline_cache.db"
   -sEXPORTED_RUNTIME_METHODS=FS,IDBFS,addRunDependency,removeRunDependency,HEAPU8,HEAP32,HEAPF32,UTF8ToString
   -lidbfs.js
-  -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_melee_web_native_menu_file,_melee_web_native_menu_prepare,_melee_web_native_menu_launch,_melee_web_native_menu_replay,_melee_web_native_menu_replay_cursor,_melee_web_native_menu_unload,_melee_web_native_menu_pause,_melee_web_native_menu_message,_melee_web_native_menu_running,_melee_web_native_menu_cache_idle,_melee_web_native_menu_phase,_melee_web_native_menu_confirm_check,_melee_web_native_menu_pad_sample,_melee_web_native_menu_pad_sample_full,_melee_web_native_menu_player_state,_melee_web_native_menu_drive_fighter,_melee_web_native_menu_drive_stage,_melee_web_native_menu_stock_check,_melee_web_native_menu_stock_check_ready,_melee_web_native_menu_diagnostics,_melee_web_native_menu_memory,_melee_web_css_observe,_melee_web_sss_observe,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_set_keyboard_port,_melee_web_input_message)
+  "-sEXPORTED_FUNCTIONS=${gameplay_menu_browser_exports}")
 set_target_properties(gameplay_menu_browser PROPERTIES SUFFIX ".js")
 # Match the production/checked profiles of gameplay_browser above. Runtime
 # admission and source invariants remain explicit native checks in both builds.
@@ -413,7 +420,7 @@ configure_file(web/native-menu.html native-menu.html @ONLY)
 # Keep the development target above intact so replay and source-observation
 # checks retain their full instrumentation.
 if(CMAKE_BUILD_TYPE STREQUAL "Release" AND MELEE_WEB_PUBLIC_RUNTIME)
-  add_executable(gameplay_public EXCLUDE_FROM_ALL src/gameplay_menu_browser.cpp src/browser_input.cpp
+  add_executable(gameplay_public EXCLUDE_FROM_ALL src/gameplay_menu_browser.cpp src/browser_input.cpp src/browser_controllers.cpp
     tests/native_menu_alarm_unavailable.c tests/native_menu_fighter_input.c tests/native_menu_stage_input.c)
   add_dependencies(gameplay_public gameplay_menu_pipeline_seed)
   set_property(TARGET gameplay_public APPEND PROPERTY LINK_DEPENDS "${initial_pipeline_cache}")

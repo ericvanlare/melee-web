@@ -49,6 +49,21 @@ try {
   assert.match(response.headers()['content-security-policy'], /'wasm-unsafe-eval'/);
   await ready();
   await check('isolated WebGPU/Wasm startup and direct original-style player', async () => {
+    await page.waitForFunction(() => Module._melee_web_native_menu_cache_idle() !== 0, null, {timeout: 30000});
+    assert.equal(await page.evaluate(() => Module._melee_web_native_menu_cache_idle()), 1,
+      'The public renderer must open its volatile cache before consuming the bundled pipeline seed');
+    const selective = await page.evaluate(() => Module.pipelinePreparation || null);
+    if (selective) {
+      assert.equal(selective.policy, 'catalog');
+      assert.equal(selective.selected, 508);
+      assert.equal(selective.unexpected_count, 0);
+      assert(await page.evaluate(() => Module.FS.stat('/initial_pipeline_cache.db').size > 0));
+      assert.deepEqual(await page.evaluate(() => Module.FS.readdir('/melee-render-cache').filter(name => !['.', '..'].includes(name))), [],
+        'Selective preparation retains descriptors in memory without a writable cache or IDBFS');
+    } else {
+      assert(await page.evaluate(() => Module.FS.stat('/melee-render-cache/pipeline_cache.db').size > 0),
+        'The ordinary bundled seed needs a writable document-local SQLite database');
+    }
     assert.equal(await page.evaluate(() => crossOriginIsolated && !!navigator.gpu), true);
     assert.equal(await page.locator('canvas').count(), 1);
     assert.equal(await page.locator('iframe,h1,header,footer,article').count(), 0);
@@ -63,8 +78,14 @@ try {
   });
   await check('controls, focus and preferences survive a fresh document', async () => {
     await page.locator('#controls-open').click();
+    // This smoke drives the original menus with the keyboard, regardless of
+    // physical devices attached to the host running the browser.
+    await page.locator('#player-one-source').selectOption('keyboard');
+    await page.locator('#player-two-source').selectOption('off');
     await page.locator('#keyboard-layout').selectOption('boxx');
-    assert(await page.locator('#keyboard-two-option').isHidden());
+    assert(await page.locator('#boxx-source-note').isVisible());
+    assert(await page.locator('#player-two-source option[value="keyboard"]').isDisabled());
+    await page.waitForFunction(() => document.querySelector('#player-two-source-status').textContent === 'Off');
     await page.locator('#controls-close').click();
     await page.waitForFunction(() => document.activeElement.id === 'canvas');
     await collectViolations(); await page.reload(); await ready();
@@ -148,7 +169,7 @@ try {
     const notices = await page.request.get(origin + '/licenses/runtime-third-party.txt');
     assert.equal(notices.status(), 200); assert.match(await notices.text(), /Permission is hereby granted/);
   });
-  await check('only keyboard preferences persist; no application upload or background connections', async () => {
+  await check('keyboard-only session persists its preferences; no application upload or background connections', async () => {
     const storage = await page.evaluate(async () => ({local: Object.keys(localStorage), session: Object.keys(sessionStorage),
       indexed: await indexedDB.databases(), caches: await caches.keys(), workers: (await navigator.serviceWorker.getRegistrations()).length}));
     assert.deepEqual(storage, {local: ['melee-prototype-keyboard-v1'], session: [], indexed: [], caches: [], workers: 0});

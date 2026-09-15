@@ -34,6 +34,7 @@ html, body {
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  position: relative;
 }
 #canvas {
   display: block;
@@ -44,6 +45,23 @@ html, body {
 }
 #toolbar a, #edition { color: #aaa; }
 #toolbar a { margin-left: 6px; }
+
+#idle-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 8%;
+  max-width: min(90%, 420px);
+  margin: 0;
+  padding: 8px 12px;
+  transform: translateX(-50%);
+  color: #fff;
+  background: #000b;
+  border: 1px solid #888;
+  border-radius: 3px;
+  text-align: center;
+  line-height: 1.4;
+  pointer-events: none;
+}
 
 #toolbar {
   display: flex;
@@ -83,7 +101,7 @@ progress {
 }
 
 dialog {
-  width: min(420px, calc(100% - 24px));
+  width: min(520px, calc(100% - 24px));
   max-height: calc(100dvh - 24px);
   overflow: auto;
   padding: 16px;
@@ -96,11 +114,92 @@ dialog::backdrop {
   background: #0009;
 }
 
+.controls-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin: -4px 0 16px;
+}
+
+.controls-heading h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.controls-heading p {
+  max-width: 390px;
+  margin: 4px 0 0;
+  line-height: 1.45;
+}
+
+.controls-heading button {
+  flex: 0 0 auto;
+  font-weight: 600;
+}
+
+.source-settings {
+  margin-bottom: 16px;
+}
+
+.source-settings h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.source-row {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 4px 8px;
+  align-items: center;
+  margin: 8px 0;
+}
+
+.source-row label {
+  font-weight: 600;
+}
+
+.source-row select {
+  min-width: 0;
+  width: 100%;
+}
+
+.source-status {
+  grid-column: 2;
+  margin: 0;
+  color: #555;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.source-note {
+  margin: 8px 0 0;
+  color: #694d00;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .keyboard-options {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  align-items: center;
+  gap: 8px;
   margin-bottom: 14px;
+}
+
+details {
+  margin-top: 12px;
+  border-top: 1px solid #ddd;
+}
+
+details summary {
+  padding: 10px 0;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+details[open] summary {
+  margin-bottom: 4px;
 }
 
 table {
@@ -120,7 +219,6 @@ th {
 }
 
 #controllers {
-  padding-left: 18px;
   overflow-wrap: anywhere;
 }
 
@@ -142,4 +240,18 @@ select {
   color: #000;
   background: #fff;
   max-width: 100%;
+}
+
+@media (max-width: 420px) {
+  .controls-heading {
+    gap: 8px;
+  }
+
+  .source-row {
+    grid-template-columns: 1fr;
+  }
+
+  .source-status {
+    grid-column: 1;
+  }
 }

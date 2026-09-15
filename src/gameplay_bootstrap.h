@@ -29,6 +29,10 @@ MeleeWebGameplayStats melee_web_gameplay_stats(void);
  * Zero means that the tables are not live, teardown is in progress, or the
  * SDK allocator no longer owns the bootstrap arena. */
 uint64_t melee_web_gameplay_generation(void);
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+/* Private read-only source tick; does not walk the SDK heap. */
+uint64_t melee_web_gameplay_provenance_tick(void);
+#endif
 /* Remains true during teardown, until the owned SDK arena is released. */
 int melee_web_gameplay_world_exists(void);
 

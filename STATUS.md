@@ -1,5 +1,35 @@
 # Current status
 
+## Controller input candidate
+
+The browser controller candidate adds browser-standard mapping, a suggested
+Mayflash 0079:1843 mapping for Chrome/macOS's 16-button/10-axis raw layout,
+individual binding corrections, and complete setup for unknown layouts. The
+suggestion adapts SDL definitions to the inspected USB descriptor and Chromium
+indexing; digital L/R clicks remain provisional. Separate GameCube trigger
+pressure/clicks and fast input-only browser regressions pass. The public player
+defaults to controllers when recognized, with per-player keyboard overrides in
+compact Controls settings. Session-local trigger-origin handling fixes activation
+with the attached Mayflash's nonzero rest values. The user reports the suggested
+mapping worked in the check page; full physical gameplay acceptance and production
+deployment remain pending.
+See [controller scope and verification](docs/CONTROLLERS.md).
+
+## Public runtime
+
+The shared startup/complete-catalog fix passes local cold/warm Mario/FD and
+Falco/Battlefield with zero unexpected pipelines and native/browser maxima of
+9.805/27.350 ms. Required MEMFS setup now belongs to the shared player owner;
+the public alpha still has no IDBFS. Selecting all 508 verified descriptors
+removes the 18 misses in the earlier 280-member selection, whose
+[failure evidence remains preserved](docs/SELECTIVE_PIPELINE_ALPHA.md).
+The public build, 758-test suite (31 skips), and ten public UI checks pass.
+An immutable noindex staging preview is available, but the startup-speedup
+release remains **NO-GO**: one hosted cold pair measured 3075.557 ms disc-ready
+against PR15's 3078.824 ms, and two hosted input-selection failures prevent full
+hosted signoff. Production is unchanged. See the
+[scoped fix and fast verification loop](docs/RENDERER_STARTUP_FIX.md).
+
 The [source-address prerequisite](docs/SOURCE_ADDRESS_CONTEXT.md) models ordinary
 original SDK/HSD allocation identity and defined register-byte consumption,
 without supplying missing original allocation history or changing gameplay.
@@ -24,6 +54,16 @@ The alpha is live at [webmelee.gg](https://webmelee.gg/) after tested legal-cont
 delivery before and after DNS migration and the exact artifact audit. Final apex
 HTTP/browser, HTTPS and canonical redirect checks pass. This does not assert
 broader gameplay stability.
+
+A public-only startup defect prevented the live alpha from consuming its bundled
+renderer seed: its writable MEMFS cache directory was missing. The unreleased
+candidate creates that directory without persistence or native changes. Four
+local cold/warm Mario/FD captures at DPR 1/2 complete with zero live pipeline
+creation; native interactive maxima are 7.33–8.80 ms. Hosted directory controls
+also remove live discovery, but first startup/disc-ready costs reach 21–24
+seconds and remain a renderer investigation item. The live deployment is
+unchanged. See the [five-way investigation](docs/PUBLIC_PERFORMANCE_INVESTIGATION.md)
+for failed prefixes, transition costs, exact profiles and the frozen candidate.
 
 Ordinary VS CPU levels 1–9 run in the shared compiled runtime used by both
 entry pages. The [CPU match development corpus](docs/CPU_MATCH_CORPUS.md) now

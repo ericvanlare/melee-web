@@ -15,6 +15,11 @@
 #include <cstdlib>
 #include <stdexcept>
 #include <set>
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+#include "pipeline_provenance_runtime.h"
+#include "gameplay_bootstrap.h"
+#include <melee/ft/kinds/ftCommon/forward.h>
+#endif
 extern "C" int lbAudioAx_80023F28(int);
 extern "C" int melee_web_vs_mode_begin(void);
 extern "C" int melee_web_vs_mode_end(void);
@@ -237,6 +242,49 @@ void GameplayMatchSession::draw(){
     check(melee_web_render_draw(storage_->render,error,sizeof(error)),error);
     check(melee_web_match_flow_present(storage_->flow,error,sizeof(error)),error);
 }
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+MeleeWebPipelineSourceContext GameplayMatchSession::provenance_context() const {
+    MeleeWebPipelineSourceContext context{};
+    for(auto& player:context.players){player.motion_id=-1;player.stocks=-1;}
+    if(!storage_)return context;
+    context.scene=MELEE_WEB_PIPELINE_SCENE_MATCH;
+    context.phase=construction_complete()?MELEE_WEB_PIPELINE_PHASE_INTERACTIVE:MELEE_WEB_PIPELINE_PHASE_PREPARATION;
+    context.world_generation=melee_web_gameplay_generation();
+    // The match-flow clock begins after Entry/Ready. Provenance also needs
+    // those original source traversals, so use the world's traversal clock.
+    context.source_tick=melee_web_gameplay_provenance_tick();
+    context.stage=storage_->selected.start.rules.stkind;
+    context.ground=storage_->content.ground_kind;
+    context.hud_layout=storage_->selected.hud_layout;
+    context.active_player_count=storage_->content.player_count;
+    context.owner_kind=MELEE_WEB_PIPELINE_OWNER_ROUTE_COMPOSITE;
+    bool entry=false,dead=false,respawn=false;
+    for(unsigned i=0;i<context.active_player_count;++i){
+        const auto& selected=storage_->selected.start.players[i];
+        const auto* content=melee_web_fighter_content(selected.ckind);
+        auto& player=context.players[i];
+        player.character=selected.ckind;player.fighter_kind=storage_->content.fighter_kinds[i];
+        player.costume=selected.color;player.subcolor=selected.sub_color;
+        player.effect_bank=content?content->effect_bank:UINT32_MAX;
+        player.motion_id=-1;player.stocks=selected.stocks;
+        if(construction_complete()){
+            const auto state=player_stats(i);
+            player.motion_id=state.motion_id;player.stocks=state.stocks;
+            entry|=state.motion_id>=ftCo_MS_Entry&&state.motion_id<=ftCo_MS_EntryEnd;
+            dead|=state.motion_id>=ftCo_MS_DeadDown&&state.motion_id<=ftCo_MS_DeadUpFallHitCameraIce;
+            respawn|=state.motion_id>=ftCo_MS_Rebirth&&state.motion_id<=ftCo_MS_RebirthWait;
+        }
+    }
+    if(construction_complete()){
+        if(ending())context.phase=MELEE_WEB_PIPELINE_PHASE_ENDING;
+        else if(entry)context.phase=MELEE_WEB_PIPELINE_PHASE_ENTRY;
+        else if(!ready())context.phase=MELEE_WEB_PIPELINE_PHASE_READY;
+        else if(dead)context.phase=MELEE_WEB_PIPELINE_PHASE_DEATH;
+        else if(respawn)context.phase=MELEE_WEB_PIPELINE_PHASE_RESPAWN;
+    }
+    return context;
+}
+#endif
 bool GameplayMatchSession::ending()const{return storage_&&melee_web_match_flow_ending(storage_->flow);}
 bool GameplayMatchSession::complete()const{return storage_&&melee_web_match_flow_complete(storage_->flow);}
 bool GameplayMatchSession::paused()const{return storage_&&melee_web_match_flow_paused(storage_->flow);}
