@@ -401,3 +401,21 @@ stay outside Git/build output. The passive probe patch is optional diagnostic
 source, not installed into the capture app. Live controller phase, other startup
 histories/VI modes, pixels, PCM and both unopened holdouts require separate evidence.
 See [clock format](RETAIL_DRAW_CLOCK.md) and [immutable evidence](evidence/roy-dr-mario-clock-replay-v1.json).
+
+## Independent Yoshi’s clock rejection
+
+The fresh physical Doc/CPU Roy Yoshi’s four-stock recording repeats naturally in
+the isolated passive Dolphin probe: strict MWRI is complete/valid and all 58,668
+typed semantic events match. It contains 11,077 updates and 11,067 draws.
+The opening-only model matches seven early batches but misplaces the next:
+original 8527/8528 versus predicted 8534/8535. Subsequent batches and final counts
+agree. All ±11-cycle controls preserve this failure.
+
+At source 8527 the original queue-count return observes a poll offset of 69,564
+CPU block-clock ticks from the opening-anchored periodic schedule; adjacent normal
+checks have offset 154. It sees two queued samples. The exact producer of the
+late check is not yet established. Initial phase alone is therefore insufficient
+for this route. No recorded batch list or fitted timing was put into runtime.
+The full browser run was deferred to avoid spending CPU on a known cadence failure.
+This supersedes any implication that the first route established general clock
+correctness; its exact comparison remains valid. See [rejection evidence](evidence/doc-roy-yoshis-clock-validation-v1.json).

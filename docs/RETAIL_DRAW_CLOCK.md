@@ -74,3 +74,11 @@ Other startup histories, VI modes, framebuffer configurations, live sampling,
 pixels and PCM require their own evidence. Capture-app integration of the
 optional passive clock observer is a separate owner handoff. The historical
 GPU staging stall and both unopened human holdouts remain open.
+
+## Independent-route limitation
+
+Fresh Doc/Roy Yoshi’s validation rejects constant VI queue-poll timing even with
+correct opening phase: one observed late queue check shifts a batch seven source
+updates earlier. Final draw counts still agree. This model is a development
+candidate verified on the first recording, not a generally validated clock policy.
+See [the preserved rejection](evidence/doc-roy-yoshis-clock-validation-v1.json).

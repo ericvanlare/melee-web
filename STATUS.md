@@ -30,6 +30,15 @@ checks pass. See [clock replay evidence](docs/evidence/roy-dr-mario-clock-replay
 [clock format and scope](docs/RETAIL_DRAW_CLOCK.md), and
 [retained failures](docs/ROY_DR_MARIO_PORT_NOTES.md).
 
+**Independent clock validation failed on Doc/Roy at Yoshi’s:** the fresh original
+capture repeats exactly (11,077 updates, 11,067 draws, 58,668 typed semantic
+boundaries), but the initial-only model puts one batch seven updates too late.
+The original queue check at source 8,527 is delayed relative to the assumed
+constant VI poll offset and consumes two samples. Equal final draw counts do not
+establish exact cadence. Browser validation was deferred at this already-failing
+gate; the earlier Roy/Doc result remains valid only for its recorded case.
+See [independent rejection evidence](docs/evidence/doc-roy-yoshis-clock-validation-v1.json).
+
 ## Controller input candidate
 
 The browser controller candidate adds browser-standard mapping, a suggested
