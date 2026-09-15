@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111923">
+  <title>WebMelee controller check</title>
+  <link rel="icon" href="data:,">
+  <link data-melee-controller-panel-style rel="stylesheet" href="./controller-panel.css">
+</head>
+<body class="controller-check-page">
+  <main>
+    <div class="page-note">
+      <h1>WebMelee controller check</h1>
+      <p>Use this page to identify, configure, and inspect a browser Gamepad locally. It does not load a game or disc.</p>
+      <p id="input-gate" role="status" aria-live="polite">Controller output is muted until this page is focused.</p>
+    </div>
+    <div id="controller-panel" aria-label="Controller setup and test"></div>
+  </main>
+  <noscript><p>JavaScript is required for controller setup.</p></noscript>
+  <script type="module">
+    import {createControllerManager} from './controller-input.mjs';
+    import {mountControllerPanel} from './controller-panel.mjs';
+
+    const manager = createControllerManager();
+    const panel = mountControllerPanel(document.getElementById('controller-panel'), manager);
+    const gate = document.getElementById('input-gate');
+
+    // Input gating is a page concern. The panel continues to show diagnostics
+    // while the page loses focus, but the manager suppresses game output until
+    // the document is visible and focused again.
+    function updateInputGate() {
+      const active = document.visibilityState === 'visible' && document.hasFocus();
+      manager.setTesting(!active);
+      gate.textContent = active
+        ? 'Controller output is enabled for this focused check page.'
+        : 'Controller output is muted while this page is hidden or unfocused.';
+    }
+    updateInputGate();
+    window.addEventListener('focus', updateInputGate);
+    window.addEventListener('blur', updateInputGate);
+    document.addEventListener('visibilitychange', updateInputGate);
+    window.addEventListener('pagehide', () => {
+      manager.setTesting(true);
+      panel();
+    }, {once: true});
+  </script>
+</body>
+</html>

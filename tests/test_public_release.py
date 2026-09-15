@@ -147,6 +147,9 @@ class PublicReleaseTests(unittest.TestCase):
             "runtime-assets.mjs": fixture_root / "web" / "runtime-assets.mjs",
             "disc-image.mjs": fixture_root / "web" / "disc-image.mjs",
             "prototype-keyboard-layouts.mjs": fixture_root / "web" / "prototype-keyboard-layouts.mjs",
+            "controller-input.mjs": fixture_root / "web" / "controller-input.mjs",
+            "controller-panel.mjs": fixture_root / "web" / "controller-panel.mjs",
+            "controller-panel.css": fixture_root / "web" / "controller-panel.css",
         }
         for name, path in source_map.items():
             shutil.copyfile(path, runtime / name)

@@ -164,6 +164,9 @@ def _player_fixture() -> tuple[dict[str, bytes], dict[str, object]]:
         "runtime-assets.mjs": b"export {};",
         "disc-image.mjs": b"export {};",
         "prototype-keyboard-layouts.mjs": b"export {};",
+        "controller-input.mjs": b"export {};",
+        "controller-panel.mjs": b"export {};",
+        "controller-panel.css": b".controller-panel {}",
         "gameplay_public.js": b"// gameplay_public.wasm",
         "gameplay_public.wasm": b"\x00asm\x01\x00\x00\x00",
         "gameplay_public.data": b"SQLite format 3\x00seed",
@@ -281,6 +284,16 @@ class PublicHTTPVerifierTests(unittest.TestCase):
         self.assertIn("/runtime/0123456789abcdef/melee-runtime.mjs", runtime_paths)
         self.assertIn("/runtime/0123456789abcdef/gameplay_public.wasm", runtime_paths)
         self.assertIn("/runtime/0123456789abcdef/gameplay_public.data", runtime_paths)
+        self.assertIn("/runtime/0123456789abcdef/controller-input.mjs", runtime_paths)
+
+    def test_player_missing_controller_module_is_rejected(self):
+        files, manifest = _player_fixture()
+        manifest["files"] = [record for record in manifest["files"]
+                             if not record["path"].endswith("/controller-input.mjs")]
+        self.manifest_path.write_text(json.dumps(manifest) + "\n", encoding="utf-8")
+        origin = self.server(files=files, profile="player")
+        with self.assertRaisesRegex(ValueError, "unauthorized or audio modules"):
+            verify(origin.url, self.manifest_path)
 
     def test_player_runtime_missing_isolation_headers_are_rejected(self):
         files, manifest = _player_fixture()

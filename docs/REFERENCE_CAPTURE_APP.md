@@ -7,6 +7,11 @@ raw run until its transport and semantic lifecycle have been checked. It does
 not make a browser build, a synthetic scene, a short prefix, or one capture a
 gold reference.
 
+Capture and replay launches disable Dolphin's **Confirm on Stop** dialog with
+the process-local `Dolphin.Interface.ConfirmStop=False` option. The supervisor
+can finish or stop its owned process without a second confirmation. This does
+not rewrite the saved profile or relax incomplete-capture validation.
+
 ## Evidence boundary
 
 The current capture contract is a single ordinary boot with one human player

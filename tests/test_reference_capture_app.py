@@ -390,6 +390,7 @@ class ReferenceCaptureAppTests(unittest.TestCase):
         command = APP.dolphin_command(settings, Path("/private/session"))
         self.assertEqual(command[:6], ["/private/Dolphin", "-u", "/private/session", "-b", "-e", "/private/game.iso"])
         self.assertIn("Dolphin.Core.CPUCore=4", command)
+        self.assertIn("Dolphin.Interface.ConfirmStop=False", command)
         self.assertIn("Session.Core.SaveDataWritable=False", command)
 
     def test_dolphin_process_exit_preserves_incomplete_capture(self):

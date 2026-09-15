@@ -11,6 +11,12 @@ Camera, later subject rounding, draw scheduling and headless completion failures
 remain open. See the [causal audit and scoped evidence](docs/PHYSICAL_REPLAY_SRT.md).
 The installed capture app, PR #16, PR #20 and public deployment are unchanged.
 
+Reference Capture 0.2.2 disables Dolphin’s stop-confirmation dialog for each
+capture/replay process. The installed app passes an ordinary boot/Stop Capture
+check: Dolphin exits without a dialog and the interrupted bundle remains
+incomplete. The saved profile and prior recordings remain unchanged. See the
+[application behavior](docs/REFERENCE_CAPTURE_APP.md).
+
 Reference Capture 0.2.1 imports the pinned private prepared save into Application
 Support and rejects external fixture locations before reading them. The original
 fixture and existing capture bundles remain unchanged. Guarded environment
@@ -50,6 +56,23 @@ choppiness remains open. All 867 repository tests pass with 37 optional skips;
 see the [bounded receipt](docs/evidence/reference-operator-session-v1.json).
 No gameplay fix or gold admission is claimed. PR #16 and its allocation evidence
 remain unchanged and unmerged.
+
+## Controller input candidate
+
+The browser controller candidate adds browser-standard mapping, a suggested
+Mayflash 0079:1843 mapping for Chrome/macOS's 16-button/10-axis raw layout,
+individual binding corrections, and complete setup for unknown layouts. The
+suggestion adapts SDL definitions to the inspected USB descriptor and Chromium
+indexing; digital L/R clicks remain provisional. Separate GameCube trigger
+pressure/clicks and fast input-only browser regressions pass. The public player
+defaults to controllers when recognized, with per-player keyboard overrides in
+compact Controls settings. Session-local trigger-origin handling fixes activation
+with the attached Mayflash's nonzero rest values. The user reports the suggested
+mapping worked in the check page; full physical gameplay acceptance and production
+deployment remain pending.
+See [controller scope and verification](docs/CONTROLLERS.md).
+
+## Public runtime
 
 The shared startup/complete-catalog fix passes local cold/warm Mario/FD and
 Falco/Battlefield with zero unexpected pipelines and native/browser maxima of

@@ -201,7 +201,7 @@ target_compile_options(hsd_state PRIVATE -ffunction-sections -fdata-sections
 
 add_executable(gx_probe src/gx_probe.c src/hsd_probe.c src/dat_archive.cpp
   src/rigid_model.cpp src/asset_scene.cpp src/dat_texture.cpp src/dat_material.cpp
-  src/hsd_material.cpp src/browser_input.cpp src/dat_animation.cpp src/dat_fighter.cpp
+  src/hsd_material.cpp src/browser_input.cpp src/browser_controllers.cpp src/dat_animation.cpp src/dat_fighter.cpp
   src/dat_stage.cpp src/fighter_binding.cpp src/hsd_animation_bridge.cpp)
 target_include_directories(gx_probe PRIVATE .deps/melee/src)
 target_link_libraries(gx_probe PRIVATE hsd_state)
@@ -216,4 +216,24 @@ if(EMSCRIPTEN)
     -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_melee_web_asset_clear,_melee_web_asset_open,_melee_web_asset_symbol,_melee_web_asset_select,_melee_web_asset_message,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_message,_melee_web_asset_animation_open,_melee_web_asset_animation_play,_melee_web_asset_animation_playing,_melee_web_asset_animation_loaded,_melee_web_asset_animation_visible,_melee_web_asset_animation_message,_melee_web_asset_fighter_open,_melee_web_asset_fighter_message,_melee_web_asset_ready,_melee_web_asset_kind,_melee_web_asset_stage_count,_melee_web_asset_stage_select,_melee_web_asset_stage_message,_melee_web_asset_common_open,_melee_web_asset_common_message,_melee_web_asset_action_count,_melee_web_asset_action_name,_melee_web_asset_container_ready,_melee_web_asset_container_open,_melee_web_asset_action_select)
   configure_file(web/index.html index.html COPYONLY)
   configure_file(web/viewer.html viewer.html COPYONLY)
+endif()
+
+# Exercise the shipping input boundary without disc assets, game simulation,
+# WebGPU initialization, audio, or pipeline preparation.
+if(EMSCRIPTEN)
+  add_executable(controller_probe EXCLUDE_FROM_ALL tests/controller_probe.cpp
+    src/browser_input.cpp src/browser_controllers.cpp)
+  target_include_directories(controller_probe PRIVATE src)
+  target_link_libraries(controller_probe PRIVATE aurora::pad)
+  target_compile_options(controller_probe PRIVATE -Wall -Wextra -Werror)
+  target_link_options(controller_probe PRIVATE -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=0
+    -sEXPORTED_RUNTIME_METHODS=HEAP32,UTF8ToString
+    -sEXPORTED_FUNCTIONS=_main,_controller_probe_sample,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_set_keyboard_port)
+  set_target_properties(controller_probe PROPERTIES SUFFIX ".js")
+  foreach(module controller-input controller-panel)
+    configure_file(web/${module}.mjs ${module}.mjs COPYONLY)
+  endforeach()
+  configure_file(web/controller-panel.css controller-panel.css COPYONLY)
+  configure_file(web/controller-check.html controller-check.html COPYONLY)
+  configure_file(tests/controller-probe.html controller-probe.html COPYONLY)
 endif()
