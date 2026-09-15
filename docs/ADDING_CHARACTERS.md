@@ -6,6 +6,35 @@ written rows are not a substitute for source identity. Work in the ignored
 `assets-local/next-gate` directory so the repository and `.deps/melee` remain
 unchanged.
 
+## Fast development iteration
+
+The [Dr. Mario/Roy pass](ROY_DR_MARIO_PORT_NOTES.md) separates a playable
+development candidate from content admission. Use this bounded sequence before
+asking for a new original-game capture:
+
+1. Identify the source initializer, family ABI and every owned dependency.
+   Reuse a decoded family schema while retaining the new fighter's own DAT,
+   article kinds, effect bank and audio. Being a clone is not a data substitute.
+2. Extract and hash the dependencies once. Compile the portable parser once
+   and the model checker once, then check every costume with those binaries.
+3. Run the native pair in both player orientations, with all costumes, special
+   families, article creation/destruction, damage and repeated teardown.
+4. Build Release once after the native boundary is stable. First run the cheap
+   browser/native upload-manifest parity and generated-roster tests, then enter
+   through visible source CSS/SSS and exercise a small named action subset.
+   Use source-position feedback for test positioning, rather than assuming
+   fixed dash durations work for every fighter.
+5. Keep cold discovery and warm reload results separate. Preserve new-pipeline
+   misses and timing failures; an action reaching its expected source state is
+   not a performance pass. Add a retail donor for the new pair before widening
+   the matrix or certifying renderer coverage.
+
+Run the repository suite once per coherent implementation, then rerun the
+failed or changed boundary during iteration. Avoid recompiling an asset checker
+per costume or rerunning every route after a manifest-only correction. Complete
+the admission gates below before promotion; the bounded loop does not replace
+them.
+
 ## Repeatable workflow
 
 Set the paths to the owned disc and source checkout, then extract every source

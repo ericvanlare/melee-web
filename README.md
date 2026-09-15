@@ -47,6 +47,13 @@ completed this route on both Battlefield and Final Destination. Full ordinary
 input, uninterrupted audio, complete browser-loop and retail-reference checks
 remain open, so this does not widen the accepted first-deliverable claim.
 
+Dr. Mario and Roy are now enabled as **development candidates** through the
+same original CSS/SSS path. Their own source attributes, five costumes each,
+articles, effects and voices use the existing Mario/Marth family adapters.
+Native mixed matches run in both orientations; retail capture comparison and
+cold rendering preparation remain open. See the
+[clone port evidence and capture plan](docs/ROY_DR_MARIO_PORT_NOTES.md).
+
 A scoped 102-frame original-game jump comparison passes; this does not establish
 full-match equivalence. See [current evidence](STATUS.md),
 [the runtime gate](docs/FIGHTER_RUNTIME.md) and

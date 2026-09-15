@@ -23,7 +23,11 @@ ArticleSchema schema(uint32_t kind)
 {
     switch(kind) {
     case It_Kind_Mario_Fire:return {20,1};
-    case It_Kind_Mario_Cape:return {4,2};
+    // Seven original pill motion states select six serialized animation rows,
+    // including the throw/catch sequences used by Dr. Mario's taunt.
+    case It_Kind_DrMario_Vitamin:return {20,6};
+    case It_Kind_Mario_Cape:
+    case It_Kind_DrMario_Sheet:return {4,2};
     case It_Kind_Fox_Laser:
     case It_Kind_Falco_Laser:return {40,2};
     case It_Kind_Fox_Blaster:

@@ -42,6 +42,18 @@ export const NATIVE_GAME_DISC_FILES=Object.freeze({
   'PlMsBk.dat':'PlMsBk.dat','PlMsWh.dat':'PlMsWh.dat',
   'EfMsData.dat':'EfMsData.dat','mars.ssm':'audio/us/mars.ssm',
   'GrOp.dat':'GrOp.dat','greens.hps':'audio/greens.hps','pupupu.ssm':'audio/us/pupupu.ssm',
+  // Dr. Mario (source FighterKind 0x15) borrows Mario's effect bank but owns
+  // its own fighter, action and costume archives and voice bank.
+  'PlDr.dat':'PlDr.dat','PlDrAJ.dat':'PlDrAJ.dat',
+  'PlDrNr.dat':'PlDrNr.dat','PlDrRe.dat':'PlDrRe.dat',
+  'PlDrBu.dat':'PlDrBu.dat','PlDrGr.dat':'PlDrGr.dat','PlDrBk.dat':'PlDrBk.dat',
+  'drmario.ssm':'audio/us/drmario.ssm',
+  // Roy is source FighterKind 0x1a (CharacterKind 0x17), with a distinct
+  // effect archive and the source emblem voice bank.
+  'PlFe.dat':'PlFe.dat','PlFeAJ.dat':'PlFeAJ.dat',
+  'PlFeNr.dat':'PlFeNr.dat','PlFeRe.dat':'PlFeRe.dat',
+  'PlFeBu.dat':'PlFeBu.dat','PlFeGr.dat':'PlFeGr.dat','PlFeYe.dat':'PlFeYe.dat',
+  'EfFeData.dat':'EfFeData.dat','emblem.ssm':'audio/us/emblem.ssm',
 });
 export function loadNativeGameDisc(file,report=()=>{}) {
   return loadDiscBundle(file,report,NATIVE_GAME_DISC_FILES);

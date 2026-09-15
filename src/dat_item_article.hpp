@@ -4,7 +4,7 @@
 namespace melee_web {
 // Owns source item model/state/command graphs, published into an existing
 // registration identity only after complete validation. The current native
-// article schemas cover Mario Fire/Cape and the shared Fox/Falco laser,
+// article schemas cover Mario Fire/Cape, Dr. Mario Vitamin/Sheet and the shared Fox/Falco laser,
 // blaster and illusion/phantasm family, plus Yoshi's Story's Heiho article.
 class DatItemArticle {
 public:

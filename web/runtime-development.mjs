@@ -99,14 +99,18 @@ async function waitSourceFrame(target,observe){let stagnantSince=performance.now
 async function sweepSample(sample,observe){let remaining=sample.duration,state=window.menuObservePlayer();if(!state)throw Error('A ready source player is required.');while(remaining){const duration=Math.min(120,remaining),target=state.frame+duration;await window.menuDiagnosticPadFull(0,sample.buttons,sample.stickX,sample.stickY,sample.cstickX,sample.cstickY,sample.triggerL,sample.triggerR,duration);state=await waitSourceFrame(target,observe);remaining-=duration;}return state;}
 async function settleSweepPlayer(observe){
  const neutral=duration=>({buttons:0,stickX:0,stickY:0,cstickX:0,cstickY:0,triggerL:0,triggerR:0,duration});
- for(let n=0;n<6;n++){
+ const firstFrame=window.menuObservePlayer()?.frame;
+ for(let n=0;n<180;n++){
   const state=window.menuObservePlayer();
+  if(!state||state.frame-firstFrame>720)break;
   // Source Ottotto/OttottoWait (245/246) persist at platform edges under neutral
   // input. They accept movement like Wait; waiting longer cannot recover them.
-  if(state?.groundAir===0&&[14,245,246].includes(state.motion)){
+  if(state.groundAir===0&&((state.motion>=14&&state.motion<=23)||[245,246].includes(state.motion))){
    if(state.motion===14&&Math.abs(state.x)<=12){await sweepSample(neutral(2),observe);return;}
-   await sweepSample({...neutral(8),stickX:state.x>0?-80:80},observe);
-   await sweepSample(neutral(24),observe);
+   // Walk with frequent position feedback. Fixed dash/release bursts can
+   // oscillate past center or repeatedly turn a fighter without moving him.
+   if(Math.abs(state.x)>12)await sweepSample({...neutral(4),stickX:state.x>0?-40:40},observe);
+   else await sweepSample(neutral(24),observe);
   }else await sweepSample(neutral(120),observe);
  }
  throw Error(`P1 did not return to the grounded source Wait state near stage center within the bounded source-input recovery period: ${JSON.stringify(window.menuObservePlayer())}`);

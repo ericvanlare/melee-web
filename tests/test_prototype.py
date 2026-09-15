@@ -20,7 +20,8 @@ class PrototypeTests(unittest.TestCase):
     def test_generated_content_and_shared_roster_agree(self):
         manifest = content_manifest((ROOT / 'src/gameplay_content.h').read_text())
         # Current implementation inventory, not an acceptance statement.
-        self.assertEqual([row['name'] for row in manifest['fighters']], ['Mario', 'Fox', 'Falco', 'Marth'])
+        self.assertEqual([row['name'] for row in manifest['fighters']],
+                         ['Mario', 'Fox', 'Falco', 'Marth', 'Dr. Mario', 'Roy'])
         self.assertEqual([row['name'] for row in manifest['stages']], [
             'Final Destination', 'Battlefield', "Yoshi's Story", 'Dream Land'])
         result = subprocess.run([str(node_runtime()), str(ROOT / 'tests/prototype_content_test.mjs')],
@@ -58,7 +59,7 @@ class PrototypeTests(unittest.TestCase):
                         self.assertEqual(response.headers['Cross-Origin-Opener-Policy'], 'same-origin')
                         self.assertEqual(response.headers['Cross-Origin-Embedder-Policy'], 'require-corp')
                     with urlopen(base + '/prototype-content.json') as response:
-                        self.assertEqual(len(json.load(response)['fighters']), 4)
+                        self.assertEqual(len(json.load(response)['fighters']), 6)
                     with self.assertRaises(HTTPError) as error:
                         urlopen(base + '/private-disc.iso')
                     error.exception.close()

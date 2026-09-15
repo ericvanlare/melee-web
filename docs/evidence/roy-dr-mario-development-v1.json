@@ -1,0 +1,1073 @@
+{
+  "schema": "melee-web-clone-development-v1",
+  "date": "2026-09-14",
+  "base_head": "72def75a7c58292b5f7f2d3b04f70ad21b665f33",
+  "source_files_sha256": {
+    "src/dat_fighter_runtime.cpp": "1d46d2d9a4e4e572af6428066f92af84f93770caba46985fbde68ed679d5e490",
+    "src/dat_item_article.cpp": "9a97f0c9fc4f380029846cca6634ecb03e8b51acf89ddcb4452db5fbbf3f7061",
+    "src/dat_item_article.hpp": "d659c366a175dd953a4661cbf86e07c59cfeb04c79d90cacdef84637e1fe3e52",
+    "src/gameplay_action_store.cpp": "529d3d2844275e8835d363375e046784711e82311d7a6aaace8f7f1efaa08702",
+    "src/gameplay_content.h": "f99e8062dc26cefee99d0a0c77425b3414ba3182c3e027493bf4d2be63576464",
+    "src/gameplay_fighter_assets.cpp": "73a973753551328fc17259d4a61842b59ed2e81092520ccb05bccc6e80109850",
+    "src/gameplay_fighter_data.c": "7e0110c4e845bee8fc95864cc082a7aaa08824a74c7dd0e9cda4f27465615ff6",
+    "src/gameplay_menu_browser.cpp": "34f5e25a0c14ba18316f26beb8558e6141ee1788fd98f36fa6b6fb90e681bf64",
+    "src/gameplay_menu_world.cpp": "db843ae813da47bc933ed05764baef0a66fd81f64682e46dd615787f6160a56e",
+    "tests/clone_fighters_real_asset_trace.cpp": "0529f3aafd18345cb2bf20a59fa5153cdef30b6ee3a049cc303d8a5dc6abb8e7",
+    "tests/gameplay_content_match_state.c": "839b40a2d9fae30d56f8e8be16655b4f0d54a64e737ee8265cc56ce0b7151179",
+    "tests/gameplay_content_match_trace.cpp": "03f5d592c29604dcf8d0ee7061dc67eeb9b19d3b9f855fac869091a5942c234e",
+    "tests/native_menu_host_trace.cpp": "01a094893ecd9266a4fe3031f8c4df4fa696aec5e4de685b5b315851b46c6c89",
+    "tests/prototype_content_test.mjs": "7e60b61548f8071c4dbf1944e8b145d27ee0f6f34e3cf95f454e7d0a91488cc7",
+    "tests/runtime_disc_assets_test.mjs": "80f1fb8744bbd5584462463261642c23245523e42c992ac638aa84c0ecdefeb2",
+    "tests/test_clone_fighters_real_assets.py": "5ffa5d26deab730c24d9ff3ee9523eda8d25cb0c5cf60c005718366d136e7acc",
+    "tests/test_gameplay_content_match.py": "1e60402422fe550786fc3b6211a604043639d45c587e58411eb6d2427381b07e",
+    "tests/test_prototype.py": "02b85565404b22ac46158bcddabe06c5a3c64884013239b9c3b078d6b803cf78",
+    "tests/test_web_launch.py": "ca12f0a44b4f8386d2d303a4ef9a0dcb8c03172f03a8f3694e77d05d792d4e5b",
+    "web/action-sweep.mjs": "e18deac198c2f796bfaf8474f4fbd30586998898eac1cddc3e8c88f162892f59",
+    "web/runtime-assets.mjs": "388cde6c2b5bc647842b9b9dda638ede9b6681f12c50f0a3e5037783eab27401",
+    "web/runtime-development.mjs": "eec1cff79adfaec280244ac96bdac8b5237bec69d78e95c2b70145afb42f3b65"
+  },
+  "build": {
+    "configuration": "Release development with audio",
+    "hardware": "Apple M4",
+    "viewport": [
+      1280,
+      1100
+    ],
+    "device_scale_factor": 1,
+    "application_cold": "cleared origin in fresh browser context",
+    "driver_cache": "uncontrolled",
+    "artifacts_sha256": {
+      "gameplay_menu_browser.js": "de12ec2da053da73021c1bc21e7e98df90bcc3bfbd967181907d2706142e9dea",
+      "gameplay_menu_browser.wasm": "c38c89f0e80650b1262933185fcbab001f73a53b466089f2e68679ae4c80d513",
+      "gameplay_menu_browser.data": "cdf157ee0f1850884f07a71165fd2192177acb23c2c777313b719e70ea67546f",
+      "runtime-development.mjs": "eec1cff79adfaec280244ac96bdac8b5237bec69d78e95c2b70145afb42f3b65",
+      "action-sweep.mjs": "e18deac198c2f796bfaf8474f4fbd30586998898eac1cddc3e8c88f162892f59",
+      "runtime-assets.mjs": "388cde6c2b5bc647842b9b9dda638ede9b6681f12c50f0a3e5037783eab27401"
+    }
+  },
+  "native": {
+    "clone_pair_both_orientations_FD_all_five_costumes": "passed",
+    "clone_pair_both_orientations_Yoshis_Story_in_full_suite": "passed",
+    "existing_Mario_Falco_CSS_SSS_match_CSS_FD_and_Battlefield_twice": "passed"
+  },
+  "suite": {
+    "initial_full_run": {
+      "tests": 748,
+      "skipped": 38,
+      "failures": 2,
+      "errors": 1,
+      "log_sha256": "2605150540a622751178e2433129744bfdaabfe93b3d4004344198cc879ecaff"
+    },
+    "initial_failures": "stale generated roster and action expectations; corrected focused reruns passed",
+    "final_focused_10_tests": "passed",
+    "owned_clone_asset_test": "passed separately",
+    "registry_check": "passed"
+  },
+  "browser_attempts": [
+    {
+      "attempt": "work/browser-doc-01",
+      "identity": {
+        "browser": "153.0.8010.36",
+        "kind": 22,
+        "base": "72def75",
+        "instrumentation": "bounded authored source-PAD smoke; not retail equivalence/performance admission"
+      },
+      "artifacts_sha256": {
+        "final.png": "596bf459c5a4dcd166068db25c664439572057157b1b778ba6b80e86daf5639c",
+        "playing.png": "bb646386ce197ca743aca36142dddac0deba29af051395304bc831da73db526e",
+        "report.json": "4e2cc8e53ef4e2168cab5852e1c4f4ad1ba7ab880b8c9557cc0cdb31c2e788a5",
+        "unloaded.txt": "e485d219d013568d2de293b1dfa9fe58d7df301690824741ff202d6e5f6e9479",
+        "errors.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "selected.json": "e34971788d8fc13ecfb21f4aaaefc69b50b3483a81e954cbdd90dfbdf74786c6",
+        "native-diagnostics.txt": "f88fe84b666cd0c6892ea3bc0b8640a1a17ca4335a4580b04a7d2eb663539d12",
+        "page.txt": "4812e26deb950f584708493b0499a22c51064c22d35e13cc9db8c24bdcce2acf",
+        "identity.json": "24fb2cfd215e7fe4d97d4f9b848a84ce3ef331f42b908be05709d3530a0ae6f0",
+        "native-log.txt": "d15069392b2827791ba60e8423842aadcbc1956e5c6c93ee5c692816fc81a26c",
+        "ready.json": "7424ae24df9cd14083d3f133424ca73c365704379782f5e027f1e3128aeb29ec",
+        "entry-resumes.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "report": {
+        "version": 1,
+        "inventory": "dr-mario-visible-actions-v1-bounded-development-smoke",
+        "fighter": "Dr. Mario",
+        "fighterKind": 21,
+        "pass": false,
+        "failedCase": "acceptance",
+        "failures": [
+          "browser callback gap",
+          "native callback over 33.3 ms",
+          "audio underrun",
+          "live pipeline creation",
+          "automatic timing pause"
+        ],
+        "metrics": {
+          "sourceFrames": 896,
+          "browserCallbacks": 901,
+          "worstBrowserCallbackMs": 158.87,
+          "browserCallbackGaps": 1,
+          "browserLongTasks": 0,
+          "browserLongTaskWorstMs": 0,
+          "nativeCallbacks": 926,
+          "worstNativeCallbackMs": 405.145,
+          "nativeCallbacksOverBudget": 2,
+          "nativeCallbacksOver33ms": 2,
+          "audioUnderrunFrames": 21,
+          "livePipelinesQueued": 1,
+          "livePipelinesCreated": 9,
+          "liveTextureUploadBytes": 918016,
+          "liveStagingUsedBytes": 1104964096,
+          "peakStagingUsedBytes": 2536904,
+          "preparationPauses": 0,
+          "automaticTimingResumes": 1,
+          "focusLost": false,
+          "wasmHeapGrowthBytes": 0
+        },
+        "cases": [
+          {
+            "name": "jab",
+            "pass": true,
+            "sourceMotions": [
+              44,
+              14
+            ]
+          },
+          {
+            "name": "Dr. Mario taunt",
+            "pass": true,
+            "sourceMotions": [
+              341,
+              14
+            ]
+          },
+          {
+            "name": "Megavitamin",
+            "pass": true,
+            "sourceMotions": [
+              343,
+              14
+            ]
+          },
+          {
+            "name": "Super Sheet",
+            "pass": true,
+            "sourceMotions": [
+              345,
+              14
+            ]
+          },
+          {
+            "name": "Super Jump Punch",
+            "pass": true,
+            "sourceMotions": [
+              347,
+              35,
+              43,
+              14
+            ]
+          },
+          {
+            "name": "Dr. Tornado",
+            "pass": true,
+            "sourceMotions": [
+              350,
+              349,
+              14
+            ]
+          }
+        ],
+        "cache": {
+          "state": "dirty",
+          "bytes": 0,
+          "cleared_on_startup": true,
+          "driver_cache": "uncontrolled"
+        }
+      },
+      "entry_resumes": []
+    },
+    {
+      "attempt": "work/browser-doc-02/cold",
+      "identity": {
+        "browser": "153.0.8010.36",
+        "kind": 22,
+        "base": "72def75",
+        "instrumentation": "bounded authored source-PAD smoke; not retail equivalence/performance admission"
+      },
+      "artifacts_sha256": {
+        "final.png": "bb83665ff3a0f08e715a394b31fb86b39c4625d14d98c54a3018bbcb89905d5e",
+        "playing.png": "419d3155b5825384b1ea4ae605411de11b23aaae7cbd8388d44394d4a268642e",
+        "report.json": "00a50cf300963d3caaa8e631dea4feb882c0214187a92a3baa071587a59197b9",
+        "unloaded.txt": "52956ee46d311e891747fabbeaf2edadd727919e5cb2b46029f66ab2a3421cef",
+        "errors.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "selected.json": "e34971788d8fc13ecfb21f4aaaefc69b50b3483a81e954cbdd90dfbdf74786c6",
+        "native-diagnostics.txt": "f88fe84b666cd0c6892ea3bc0b8640a1a17ca4335a4580b04a7d2eb663539d12",
+        "page.txt": "b6ce7c043309e4b841dfcabab65131ac6f27aed62e58361ed73a640bf25c52ca",
+        "identity.json": "24fb2cfd215e7fe4d97d4f9b848a84ce3ef331f42b908be05709d3530a0ae6f0",
+        "native-log.txt": "f1d6d1f46d5f4a015063c493771c2348506f51d4b0260bfe24ee4cdf78394aa0",
+        "ready.json": "7424ae24df9cd14083d3f133424ca73c365704379782f5e027f1e3128aeb29ec",
+        "entry-resumes.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "report": {
+        "version": 1,
+        "inventory": "dr-mario-visible-actions-v1-bounded-development-smoke",
+        "fighter": "Dr. Mario",
+        "fighterKind": 21,
+        "pass": false,
+        "failedCase": "acceptance",
+        "failures": [
+          "native callback over 33.3 ms",
+          "live pipeline creation"
+        ],
+        "metrics": {
+          "sourceFrames": 922,
+          "browserCallbacks": 923,
+          "worstBrowserCallbackMs": 25.37,
+          "browserCallbackGaps": 0,
+          "browserLongTasks": 0,
+          "browserLongTaskWorstMs": 0,
+          "nativeCallbacks": 927,
+          "worstNativeCallbackMs": 110.535,
+          "nativeCallbacksOverBudget": 2,
+          "nativeCallbacksOver33ms": 2,
+          "audioUnderrunFrames": 0,
+          "livePipelinesQueued": 1,
+          "livePipelinesCreated": 9,
+          "liveTextureUploadBytes": 885248,
+          "liveStagingUsedBytes": 1135468688,
+          "peakStagingUsedBytes": 2789336,
+          "preparationPauses": 0,
+          "automaticTimingResumes": 0,
+          "focusLost": false,
+          "wasmHeapGrowthBytes": 0
+        },
+        "cases": [
+          {
+            "name": "jab",
+            "pass": true,
+            "sourceMotions": [
+              44,
+              14
+            ]
+          },
+          {
+            "name": "Dr. Mario taunt",
+            "pass": true,
+            "sourceMotions": [
+              341,
+              14
+            ]
+          },
+          {
+            "name": "Megavitamin",
+            "pass": true,
+            "sourceMotions": [
+              343,
+              14
+            ]
+          },
+          {
+            "name": "Super Sheet",
+            "pass": true,
+            "sourceMotions": [
+              345,
+              14
+            ]
+          },
+          {
+            "name": "Super Jump Punch",
+            "pass": true,
+            "sourceMotions": [
+              347,
+              35,
+              43,
+              14
+            ]
+          },
+          {
+            "name": "Dr. Tornado",
+            "pass": true,
+            "sourceMotions": [
+              350,
+              349,
+              14
+            ]
+          }
+        ],
+        "cache": {
+          "state": "dirty",
+          "bytes": 0,
+          "cleared_on_startup": true,
+          "driver_cache": "uncontrolled"
+        }
+      },
+      "entry_resumes": []
+    },
+    {
+      "attempt": "work/browser-doc-02/warm",
+      "identity": {
+        "browser": "153.0.8010.36",
+        "kind": 22,
+        "base": "72def75",
+        "instrumentation": "bounded authored source-PAD smoke; not retail equivalence/performance admission"
+      },
+      "artifacts_sha256": {
+        "final.png": "6d204d657f687696e0af2242b697d5c0088a000c29809400d90267f6580d4b8a",
+        "playing.png": "0c5eba019b69842761c3902482fbf6003df07b0c0af8f930e7e70258716c77bb",
+        "report.json": "b31995064f3b52a44fe81419da45812d646703cb0b462b3657e7011edebd960d",
+        "unloaded.txt": "2dba33dc5bb2bbe3540722dbca8a2f0c37778af8f9dbb1ee40847ec0bfddc269",
+        "errors.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "selected.json": "e34971788d8fc13ecfb21f4aaaefc69b50b3483a81e954cbdd90dfbdf74786c6",
+        "native-diagnostics.txt": "f88fe84b666cd0c6892ea3bc0b8640a1a17ca4335a4580b04a7d2eb663539d12",
+        "page.txt": "55f611ff4e2ecfb6ff7861094c784466dc635c27704b530162903feea4790f25",
+        "identity.json": "24fb2cfd215e7fe4d97d4f9b848a84ce3ef331f42b908be05709d3530a0ae6f0",
+        "native-log.txt": "8f3123f163b3e2786eee8c4afb1c16cdd552d4fc44eac4869d145ebacdc2abf9",
+        "ready.json": "6107510c50e71a3dd28f618321f625de1854b6c8a2221b908dfe0fa45c08c795",
+        "entry-resumes.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "report": {
+        "version": 1,
+        "inventory": "dr-mario-visible-actions-v1-bounded-development-smoke",
+        "fighter": "Dr. Mario",
+        "fighterKind": 21,
+        "pass": false,
+        "failedCase": "acceptance",
+        "failures": [
+          "audio underrun"
+        ],
+        "metrics": {
+          "sourceFrames": 964,
+          "browserCallbacks": 964,
+          "worstBrowserCallbackMs": 26.875,
+          "browserCallbackGaps": 0,
+          "browserLongTasks": 0,
+          "browserLongTaskWorstMs": 0,
+          "nativeCallbacks": 964,
+          "worstNativeCallbackMs": 11.56,
+          "nativeCallbacksOverBudget": 0,
+          "nativeCallbacksOver33ms": 0,
+          "audioUnderrunFrames": 64,
+          "livePipelinesQueued": 0,
+          "livePipelinesCreated": 0,
+          "liveTextureUploadBytes": 901632,
+          "liveStagingUsedBytes": 1182587860,
+          "peakStagingUsedBytes": 2522840,
+          "preparationPauses": 0,
+          "automaticTimingResumes": 0,
+          "focusLost": false,
+          "wasmHeapGrowthBytes": 0
+        },
+        "cases": [
+          {
+            "name": "jab",
+            "pass": true,
+            "sourceMotions": [
+              44,
+              14
+            ]
+          },
+          {
+            "name": "Dr. Mario taunt",
+            "pass": true,
+            "sourceMotions": [
+              341,
+              14
+            ]
+          },
+          {
+            "name": "Megavitamin",
+            "pass": true,
+            "sourceMotions": [
+              343,
+              14
+            ]
+          },
+          {
+            "name": "Super Sheet",
+            "pass": true,
+            "sourceMotions": [
+              345,
+              14
+            ]
+          },
+          {
+            "name": "Super Jump Punch",
+            "pass": true,
+            "sourceMotions": [
+              347,
+              35,
+              43,
+              14
+            ]
+          },
+          {
+            "name": "Dr. Tornado",
+            "pass": true,
+            "sourceMotions": [
+              350,
+              349,
+              14
+            ]
+          }
+        ],
+        "cache": {
+          "state": "dirty",
+          "bytes": 2879128,
+          "cleared_on_startup": false,
+          "driver_cache": "uncontrolled"
+        }
+      },
+      "entry_resumes": []
+    },
+    {
+      "attempt": "work/browser-roy-01",
+      "identity": {
+        "browser": "153.0.8010.36",
+        "kind": 23,
+        "base": "72def75",
+        "instrumentation": "bounded authored source-PAD smoke; not retail equivalence/performance admission"
+      },
+      "artifacts_sha256": {
+        "final.png": "98a0cf7f000afbd8fbadd0670c112420929d5a443514236961f6955889b40fa1",
+        "errors.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "failure.txt": "b6b1cc65f67d7beaa14cf3d38d332a3c115d11b1c067752a0b15aa4c3becf69c",
+        "page.txt": "0302210d9c9262987fa17ecb3bf27609172000c99ece22f217dfe6a224531221",
+        "identity.json": "e1bc7c23de76c7821401ded05bd14d73d933e1b390770cc8a0d0ca7efe2351d7"
+      },
+      "harness_failure": "locator.waitFor: Timeout 60000ms exceeded."
+    },
+    {
+      "attempt": "work/browser-roy-02",
+      "identity": {
+        "browser": "153.0.8010.36",
+        "kind": 23,
+        "base": "72def75",
+        "instrumentation": "bounded authored source-PAD smoke; not retail equivalence/performance admission"
+      },
+      "artifacts_sha256": {
+        "final.png": "f24941df18a59533312bfe0382223d1867cc4d1eb0b44f93350c84157c28defd",
+        "errors.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "selected.json": "249ed4c93c13bdd4fdafdca32d77857fdc658e17f84d3432276ae1d06f920f0d",
+        "failure.txt": "8c2279b80810221c6624eed3d69695c9281671f5f9a8960e9fb3f78a73a3d0fa",
+        "page.txt": "bbc4c53840562ecf39cfa32e3f04435bc7645a1f2a99eb9116abce927614c7f6",
+        "identity.json": "e1bc7c23de76c7821401ded05bd14d73d933e1b390770cc8a0d0ca7efe2351d7"
+      },
+      "harness_failure": "page.waitForFunction: Timeout 30000ms exceeded."
+    },
+    {
+      "attempt": "work/browser-roy-03",
+      "identity": {
+        "browser": "153.0.8010.36",
+        "kind": 23,
+        "base": "72def75",
+        "instrumentation": "bounded authored source-PAD smoke; not retail equivalence/performance admission"
+      },
+      "artifacts_sha256": {
+        "final.png": "a6ad5f666f1600f34af1aee29b919701d61d02c55d3d4b07cc3ea0c11d2eb2b6",
+        "errors.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "selected.json": "249ed4c93c13bdd4fdafdca32d77857fdc658e17f84d3432276ae1d06f920f0d",
+        "failure.txt": "1acd70897b6cbba28175ea8bae33645f34f52030033cefff1adf573fc9dcd41d",
+        "page.txt": "c1248b990872da982aa462cebed06468353639a28ec068d6bb9fee0efa9e503d",
+        "identity.json": "e1bc7c23de76c7821401ded05bd14d73d933e1b390770cc8a0d0ca7efe2351d7"
+      },
+      "harness_failure": "page.waitForFunction: Timeout 60000ms exceeded."
+    },
+    {
+      "attempt": "work/browser-roy-04",
+      "identity": {
+        "browser": "153.0.8010.36",
+        "kind": 23,
+        "base": "72def75",
+        "instrumentation": "bounded authored source-PAD smoke; not retail equivalence/performance admission"
+      },
+      "artifacts_sha256": {
+        "final.png": "fed743c9c627bcb466b8eafcaf917fcd954c47d37b6731f94b692e2a096f80cb",
+        "playing.png": "a81305b3dde069ad3dbc582bb58195d2d273f11f4b2296fa243db5b5efa64819",
+        "report.json": "e2f6f62e2cd90cb7c2745a4f87a731815d3ffe99514f964d97fe5791ce586950",
+        "unloaded.txt": "9af4848fe45a8344962f5837c61f132fa346161a13b0246258df7b77db2f4942",
+        "errors.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "selected.json": "249ed4c93c13bdd4fdafdca32d77857fdc658e17f84d3432276ae1d06f920f0d",
+        "native-diagnostics.txt": "f88fe84b666cd0c6892ea3bc0b8640a1a17ca4335a4580b04a7d2eb663539d12",
+        "page.txt": "9af4848fe45a8344962f5837c61f132fa346161a13b0246258df7b77db2f4942",
+        "identity.json": "e1bc7c23de76c7821401ded05bd14d73d933e1b390770cc8a0d0ca7efe2351d7",
+        "native-log.txt": "992b4998af4adb85d1350b0f81217d5f5fb7b73573242c9c02dbe3311c65698d",
+        "ready.json": "aa9755942d55df089b4b525dbf33c06d8d1562080438d7be282d92d973fc7897",
+        "entry-resumes.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "report": {
+        "version": 1,
+        "inventory": "roy-visible-actions-v1-bounded-development-smoke",
+        "fighter": "Roy",
+        "fighterKind": 26,
+        "pass": false,
+        "failedCase": "Double-Edge Dance ground high/neutral/neutral",
+        "failures": [
+          "Double-Edge Dance ground high/neutral/neutral did not reach expected source motion range(s) [[353,353],[356,356]]; saw [349,350,14]"
+        ],
+        "metrics": {
+          "browserCallbackGaps": 0,
+          "browserLongTasks": 0,
+          "nativeCallbacksOverBudget": 0,
+          "nativeCallbacksOver33ms": 0,
+          "audioUnderrunFrames": 128,
+          "livePipelinesQueued": 0,
+          "livePipelinesCreated": 1,
+          "liveTextureUploadBytes": 774144,
+          "focusLost": false
+        },
+        "cases": [
+          {
+            "name": "jab",
+            "pass": true,
+            "sourceMotions": [
+              44,
+              14
+            ]
+          },
+          {
+            "name": "Flare Blade entry",
+            "pass": true,
+            "sourceMotions": [
+              341,
+              343
+            ]
+          }
+        ]
+      },
+      "entry_resumes": []
+    },
+    {
+      "attempt": "work/browser-roy-05",
+      "identity": {
+        "browser": "153.0.8010.36",
+        "kind": 23,
+        "base": "72def75",
+        "instrumentation": "bounded authored source-PAD smoke; not retail equivalence/performance admission"
+      },
+      "artifacts_sha256": {
+        "final.png": "d1d0d650936067db04501c0bb8e040c2eba09620d4a668d83a0044f2a4b2c68e",
+        "playing.png": "53f3c112a8593e4dbb8148f65ca97dcdf2d96e4043b799a2af15a2a70d193ab5",
+        "report.json": "971b34138fa5929d5d94d79e1e5a9eb22a551f33dfa719d26235f9255cd967fd",
+        "unloaded.txt": "4e61d58271af183afaba4f699dd0c18a80623899621de84474ee29a78d28b210",
+        "errors.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "selected.json": "249ed4c93c13bdd4fdafdca32d77857fdc658e17f84d3432276ae1d06f920f0d",
+        "native-diagnostics.txt": "f88fe84b666cd0c6892ea3bc0b8640a1a17ca4335a4580b04a7d2eb663539d12",
+        "page.txt": "aa2c07882686101bdefc5a063ee821fc5d5fcedc665665b2e27f42d29bbc92d1",
+        "identity.json": "e1bc7c23de76c7821401ded05bd14d73d933e1b390770cc8a0d0ca7efe2351d7",
+        "native-log.txt": "8a22da3c11ae512809179eb33ce0d0380bfdd7113a5b4262e784b00ba223e706",
+        "ready.json": "aa9755942d55df089b4b525dbf33c06d8d1562080438d7be282d92d973fc7897",
+        "entry-resumes.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "report": {
+        "version": 1,
+        "inventory": "roy-visible-actions-v1-bounded-development-smoke",
+        "fighter": "Roy",
+        "fighterKind": 26,
+        "pass": false,
+        "failedCase": "Counter stance",
+        "failures": [
+          "P1 did not return to the grounded source Wait state near stage center within the bounded source-input recovery period: {\"fighterKind\":26,\"motion\":14,\"groundAir\":0,\"frame\":1065,\"x\":17.204313278198242,\"y\":0.00009999999747378752}"
+        ],
+        "metrics": {
+          "browserCallbackGaps": 0,
+          "browserLongTasks": 0,
+          "nativeCallbacksOverBudget": 0,
+          "nativeCallbacksOver33ms": 0,
+          "audioUnderrunFrames": 107,
+          "livePipelinesQueued": 0,
+          "livePipelinesCreated": 1,
+          "liveTextureUploadBytes": 1058816,
+          "focusLost": false
+        },
+        "cases": [
+          {
+            "name": "jab",
+            "pass": true,
+            "sourceMotions": [
+              44,
+              14
+            ]
+          },
+          {
+            "name": "Flare Blade charge/release",
+            "pass": true,
+            "sourceMotions": [
+              341,
+              342,
+              343,
+              14
+            ]
+          },
+          {
+            "name": "Double-Edge Dance chain (representative)",
+            "pass": true,
+            "sourceMotions": [
+              349,
+              351,
+              14
+            ]
+          },
+          {
+            "name": "Blazer",
+            "pass": true,
+            "sourceMotions": [
+              367,
+              35,
+              43,
+              14
+            ]
+          }
+        ]
+      },
+      "entry_resumes": []
+    },
+    {
+      "attempt": "work/browser-roy-06/cold",
+      "identity": {
+        "browser": "153.0.8010.36",
+        "kind": 23,
+        "base": "72def75",
+        "instrumentation": "bounded authored source-PAD smoke; not retail equivalence/performance admission"
+      },
+      "artifacts_sha256": {
+        "final.png": "468139e5b353c3d0ffe1d7514dfdf7c4bd2e00282b1443994ffb7068d13b0dcf",
+        "playing.png": "f86156437a763e768c4cdbaf74ac95a58586beeda61f7d7ef9b4bcc989b88e02",
+        "report.json": "6b483adf5a8459e1d62f5f4ec685417be898a5bf5e9de17146d9411de0833a63",
+        "unloaded.txt": "c0521821e2af5fa4ca4809cd0836fd96979b021f06462e0ab08f0d7356bec422",
+        "errors.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "selected.json": "249ed4c93c13bdd4fdafdca32d77857fdc658e17f84d3432276ae1d06f920f0d",
+        "native-diagnostics.txt": "f88fe84b666cd0c6892ea3bc0b8640a1a17ca4335a4580b04a7d2eb663539d12",
+        "page.txt": "e0382dd1050305b166f01b231914ec785ea87f1006ba765199f65d1f05408e37",
+        "identity.json": "e1bc7c23de76c7821401ded05bd14d73d933e1b390770cc8a0d0ca7efe2351d7",
+        "native-log.txt": "54c8c20b9b68eb56aa8132e36d4ae033fb966eac8882edf8aa758fc5c4a8c195",
+        "ready.json": "050ebaa6a9320c47dd2bf62d12acf4145bc4dc72b51daa47cc6806b631e92e7e",
+        "entry-resumes.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "report": {
+        "version": 1,
+        "inventory": "roy-visible-actions-v1-bounded-development-smoke",
+        "fighter": "Roy",
+        "fighterKind": 26,
+        "pass": false,
+        "failedCase": "jab",
+        "failures": [
+          "P1 did not return to the grounded source Wait state near stage center within the bounded source-input recovery period: {\"fighterKind\":26,\"motion\":14,\"groundAir\":0,\"frame\":410,\"x\":28.89002799987793,\"y\":0.00009999999747378752}"
+        ],
+        "metrics": {
+          "browserCallbackGaps": 0,
+          "browserLongTasks": 0,
+          "nativeCallbacksOverBudget": 0,
+          "nativeCallbacksOver33ms": 0,
+          "audioUnderrunFrames": 0,
+          "livePipelinesQueued": 0,
+          "livePipelinesCreated": 0,
+          "liveTextureUploadBytes": 1009664,
+          "focusLost": false
+        },
+        "cases": []
+      },
+      "entry_resumes": []
+    },
+    {
+      "attempt": "work/browser-roy-06/warm",
+      "identity": {
+        "browser": "153.0.8010.36",
+        "kind": 23,
+        "base": "72def75",
+        "instrumentation": "bounded authored source-PAD smoke; not retail equivalence/performance admission"
+      },
+      "artifacts_sha256": {
+        "final.png": "2965936be3511e4ce4ab61e3e5c42fce831893f16996c9d1818856c663df0332",
+        "playing.png": "4792a795f62196e39514e164da55f3bb2679a41f572b8eb42066b45e5fb77340",
+        "report.json": "e00fd8e1fb3fbe821304723719bb57190c7bb12e37e7b9018e4b58b8f9144bd9",
+        "unloaded.txt": "d9ef32fe49ecbbfe27f1946d29d55259f1437442bd09ffe93fabeb60c591ac3b",
+        "errors.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "selected.json": "249ed4c93c13bdd4fdafdca32d77857fdc658e17f84d3432276ae1d06f920f0d",
+        "native-diagnostics.txt": "f88fe84b666cd0c6892ea3bc0b8640a1a17ca4335a4580b04a7d2eb663539d12",
+        "page.txt": "bf15aadb1fe0546569ccb18b0394509d06d2f158c073485e0ee7320165d7b4ef",
+        "identity.json": "e1bc7c23de76c7821401ded05bd14d73d933e1b390770cc8a0d0ca7efe2351d7",
+        "native-log.txt": "0d1c746c689d670fdecfc417a1a49ceed83852cc9d27413ad8bef8fbddc572dc",
+        "ready.json": "050ebaa6a9320c47dd2bf62d12acf4145bc4dc72b51daa47cc6806b631e92e7e",
+        "entry-resumes.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "report": {
+        "version": 1,
+        "inventory": "roy-visible-actions-v1-bounded-development-smoke",
+        "fighter": "Roy",
+        "fighterKind": 26,
+        "pass": false,
+        "failedCase": "jab",
+        "failures": [
+          "P1 did not return to the grounded source Wait state near stage center within the bounded source-input recovery period: {\"fighterKind\":26,\"motion\":14,\"groundAir\":0,\"frame\":411,\"x\":29.230026245117188,\"y\":0.00009999999747378752}"
+        ],
+        "metrics": {
+          "browserCallbackGaps": 0,
+          "browserLongTasks": 0,
+          "nativeCallbacksOverBudget": 0,
+          "nativeCallbacksOver33ms": 0,
+          "audioUnderrunFrames": 0,
+          "livePipelinesQueued": 0,
+          "livePipelinesCreated": 0,
+          "liveTextureUploadBytes": 1009664,
+          "focusLost": false
+        },
+        "cases": []
+      },
+      "entry_resumes": []
+    },
+    {
+      "attempt": "work/browser-roy-07/cold",
+      "identity": {
+        "browser": "153.0.8010.36",
+        "kind": 23,
+        "base": "72def75",
+        "instrumentation": "bounded authored source-PAD smoke; not retail equivalence/performance admission"
+      },
+      "artifacts_sha256": {
+        "final.png": "48c8d3c87162becbcf5f6693904f6bde68400fa68f0e81f2b5cc8867a7490e56",
+        "errors.json": "d937f9f18400ce952de44b3812d6ebf0716ebc336fd2fa5e18368be9a81832e9",
+        "native-diagnostics.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "failure.txt": "11e98593dd27fbb57a12d0de36e28c1ecf4927ebbe53bc3f7e89b0ced5886ea5",
+        "page.txt": "097a526f572c2ab6d71eefb0a6bb91b7458f59c9cbc70f79e85c41e0527f2354",
+        "identity.json": "e1bc7c23de76c7821401ded05bd14d73d933e1b390770cc8a0d0ca7efe2351d7",
+        "native-log.txt": "6b6d8d936f0246164f9e3c46a50131ccce3560cd6aa044ec9839a8cbe703a425"
+      },
+      "harness_failure": "locator.waitFor: Timeout 120000ms exceeded."
+    },
+    {
+      "attempt": "work/browser-roy-07/warm",
+      "identity": {
+        "browser": "153.0.8010.36",
+        "kind": 23,
+        "base": "72def75",
+        "instrumentation": "bounded authored source-PAD smoke; not retail equivalence/performance admission"
+      },
+      "artifacts_sha256": {
+        "final.png": "8e5e37a472428394d397c753a249cb08f4b2730774a7c5f2c2e80922ffab7580",
+        "playing.png": "69521c6277bbfbec7b7558fb0c535b680c81ae1ec5e356f36ba433352a314ea7",
+        "report.json": "fab057b197adcba0ce9222124528ee54a3c2b8e1c59543a680e5fa4a2e423b87",
+        "unloaded.txt": "cd4621395a293ba2669b80d724746c3791819aab87e62ec7b44823918a506b90",
+        "errors.json": "d937f9f18400ce952de44b3812d6ebf0716ebc336fd2fa5e18368be9a81832e9",
+        "selected.json": "249ed4c93c13bdd4fdafdca32d77857fdc658e17f84d3432276ae1d06f920f0d",
+        "native-diagnostics.txt": "f88fe84b666cd0c6892ea3bc0b8640a1a17ca4335a4580b04a7d2eb663539d12",
+        "page.txt": "7bb0fedf65f04fe9188aa1bd1115c6e70fec407f48fa31cf13fac2afa28838ef",
+        "identity.json": "e1bc7c23de76c7821401ded05bd14d73d933e1b390770cc8a0d0ca7efe2351d7",
+        "native-log.txt": "14dac2afab61e7e2eccbd957fffa8b90aeb13dfdd5f2877ed53cfc77398cb09b",
+        "ready.json": "050ebaa6a9320c47dd2bf62d12acf4145bc4dc72b51daa47cc6806b631e92e7e",
+        "entry-resumes.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "report": {
+        "version": 1,
+        "inventory": "roy-visible-actions-v1-bounded-development-smoke",
+        "fighter": "Roy",
+        "fighterKind": 26,
+        "pass": false,
+        "failedCase": "acceptance",
+        "failures": [
+          "live pipeline creation"
+        ],
+        "metrics": {
+          "sourceFrames": 1070,
+          "browserCallbacks": 1070,
+          "worstBrowserCallbackMs": 25.455,
+          "browserCallbackGaps": 0,
+          "browserLongTasks": 0,
+          "browserLongTaskWorstMs": 0,
+          "nativeCallbacks": 1070,
+          "worstNativeCallbackMs": 9.665,
+          "nativeCallbacksOverBudget": 0,
+          "nativeCallbacksOver33ms": 0,
+          "audioUnderrunFrames": 0,
+          "livePipelinesQueued": 0,
+          "livePipelinesCreated": 1,
+          "liveTextureUploadBytes": 806912,
+          "liveStagingUsedBytes": 1494381856,
+          "peakStagingUsedBytes": 2839176,
+          "preparationPauses": 0,
+          "automaticTimingResumes": 0,
+          "focusLost": false,
+          "wasmHeapGrowthBytes": 66846720
+        },
+        "cases": [
+          {
+            "name": "jab",
+            "pass": true,
+            "sourceMotions": [
+              44,
+              14
+            ]
+          },
+          {
+            "name": "Flare Blade charge/release",
+            "pass": true,
+            "sourceMotions": [
+              341,
+              342,
+              343,
+              14
+            ]
+          },
+          {
+            "name": "Double-Edge Dance chain (representative)",
+            "pass": true,
+            "sourceMotions": [
+              349,
+              351,
+              14
+            ]
+          },
+          {
+            "name": "Blazer",
+            "pass": true,
+            "sourceMotions": [
+              367,
+              35,
+              43,
+              14
+            ]
+          },
+          {
+            "name": "Counter stance",
+            "pass": true,
+            "sourceMotions": [
+              369,
+              14
+            ]
+          }
+        ],
+        "cache": {
+          "state": "dirty",
+          "bytes": 0,
+          "cleared_on_startup": false,
+          "driver_cache": "uncontrolled"
+        }
+      },
+      "entry_resumes": []
+    },
+    {
+      "attempt": "work/browser-roy-08/cold",
+      "identity": {
+        "browser": "153.0.8010.36",
+        "kind": 23,
+        "base": "72def75",
+        "instrumentation": "bounded authored source-PAD smoke; not retail equivalence/performance admission"
+      },
+      "artifacts_sha256": {
+        "final.png": "ba68f17fa32750fefe31603b85d54845502fb3a2272fa12ef389cd1300d3a8af",
+        "playing.png": "7f298362c74fb7393ca3f0ae0af238b4230a312ce8830678e0f960087d3d61f4",
+        "report.json": "94d07c74165c1dffb492b530439bbc8186ed3509a0787bb636916eb39068ea9a",
+        "unloaded.txt": "e0444714d7287b096f6ac021dadebce64892507b77af6ca439219e653489b6f5",
+        "errors.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "selected.json": "249ed4c93c13bdd4fdafdca32d77857fdc658e17f84d3432276ae1d06f920f0d",
+        "native-diagnostics.txt": "f88fe84b666cd0c6892ea3bc0b8640a1a17ca4335a4580b04a7d2eb663539d12",
+        "page.txt": "aa92edbde0235ca348881c21908aeda6735318b1d147468dc3f9377513368b5d",
+        "identity.json": "e1bc7c23de76c7821401ded05bd14d73d933e1b390770cc8a0d0ca7efe2351d7",
+        "native-log.txt": "7b41dd51c22b5292be20fdcefe5f971404b25f4b3c47d56d6cab174f846db220",
+        "ready.json": "050ebaa6a9320c47dd2bf62d12acf4145bc4dc72b51daa47cc6806b631e92e7e",
+        "entry-resumes.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "report": {
+        "version": 1,
+        "inventory": "roy-visible-actions-v1-bounded-development-smoke",
+        "fighter": "Roy",
+        "fighterKind": 26,
+        "pass": false,
+        "failedCase": "acceptance",
+        "failures": [
+          "live pipeline creation"
+        ],
+        "metrics": {
+          "sourceFrames": 1070,
+          "browserCallbacks": 1070,
+          "worstBrowserCallbackMs": 21.135,
+          "browserCallbackGaps": 0,
+          "browserLongTasks": 0,
+          "browserLongTaskWorstMs": 0,
+          "nativeCallbacks": 1070,
+          "worstNativeCallbackMs": 7.27,
+          "nativeCallbacksOverBudget": 0,
+          "nativeCallbacksOver33ms": 0,
+          "audioUnderrunFrames": 0,
+          "livePipelinesQueued": 0,
+          "livePipelinesCreated": 1,
+          "liveTextureUploadBytes": 806912,
+          "liveStagingUsedBytes": 1494381856,
+          "peakStagingUsedBytes": 2768648,
+          "preparationPauses": 0,
+          "automaticTimingResumes": 0,
+          "focusLost": false,
+          "wasmHeapGrowthBytes": 66846720
+        },
+        "cases": [
+          {
+            "name": "jab",
+            "pass": true,
+            "sourceMotions": [
+              44,
+              14
+            ]
+          },
+          {
+            "name": "Flare Blade charge/release",
+            "pass": true,
+            "sourceMotions": [
+              341,
+              342,
+              343,
+              14
+            ]
+          },
+          {
+            "name": "Double-Edge Dance chain (representative)",
+            "pass": true,
+            "sourceMotions": [
+              349,
+              351,
+              14
+            ]
+          },
+          {
+            "name": "Blazer",
+            "pass": true,
+            "sourceMotions": [
+              367,
+              35,
+              43,
+              14
+            ]
+          },
+          {
+            "name": "Counter stance",
+            "pass": true,
+            "sourceMotions": [
+              369,
+              14
+            ]
+          }
+        ],
+        "cache": {
+          "state": "dirty",
+          "bytes": 0,
+          "cleared_on_startup": true,
+          "driver_cache": "uncontrolled"
+        }
+      },
+      "entry_resumes": []
+    },
+    {
+      "attempt": "work/browser-roy-08/warm",
+      "identity": {
+        "browser": "153.0.8010.36",
+        "kind": 23,
+        "base": "72def75",
+        "instrumentation": "bounded authored source-PAD smoke; not retail equivalence/performance admission"
+      },
+      "artifacts_sha256": {
+        "final.png": "8b9729a5f0bbbe8b8652f0d55b86d28626a233347b1f1beea69e8bc954156ef4",
+        "playing.png": "1cdf53361da9293f386b0b1d1fd3c6799569271e804814d6cad3c5a690dce759",
+        "report.json": "dea19b434a02e5188c66a877191d7beb6603ec954432ba2c6405b88a708cab1e",
+        "unloaded.txt": "f7170b9e8dd95bf8fcb463eaf6fabf89ec4c925e2b0464432ab5953026ec1ff6",
+        "errors.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "selected.json": "249ed4c93c13bdd4fdafdca32d77857fdc658e17f84d3432276ae1d06f920f0d",
+        "native-diagnostics.txt": "f88fe84b666cd0c6892ea3bc0b8640a1a17ca4335a4580b04a7d2eb663539d12",
+        "page.txt": "28f610369b5a04ecdbe4a7fa0ac2eaf67202b11a0ec78209d923ee2dbd234a0c",
+        "identity.json": "e1bc7c23de76c7821401ded05bd14d73d933e1b390770cc8a0d0ca7efe2351d7",
+        "native-log.txt": "6c910dabc34e18d481ed5da4b480ccf387ff4e273c283f403dac9f5b4623ae3b",
+        "ready.json": "050ebaa6a9320c47dd2bf62d12acf4145bc4dc72b51daa47cc6806b631e92e7e",
+        "entry-resumes.json": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+      },
+      "report": {
+        "version": 1,
+        "inventory": "roy-visible-actions-v1-bounded-development-smoke",
+        "fighter": "Roy",
+        "fighterKind": 26,
+        "pass": true,
+        "failedCase": null,
+        "failures": [],
+        "metrics": {
+          "sourceFrames": 1071,
+          "browserCallbacks": 1072,
+          "worstBrowserCallbackMs": 25.905,
+          "browserCallbackGaps": 0,
+          "browserLongTasks": 0,
+          "browserLongTaskWorstMs": 0,
+          "nativeCallbacks": 1072,
+          "worstNativeCallbackMs": 9.695,
+          "nativeCallbacksOverBudget": 0,
+          "nativeCallbacksOver33ms": 0,
+          "audioUnderrunFrames": 0,
+          "livePipelinesQueued": 0,
+          "livePipelinesCreated": 0,
+          "liveTextureUploadBytes": 806912,
+          "liveStagingUsedBytes": 1496101348,
+          "peakStagingUsedBytes": 2881416,
+          "preparationPauses": 0,
+          "automaticTimingResumes": 0,
+          "focusLost": false,
+          "wasmHeapGrowthBytes": 66846720
+        },
+        "cases": [
+          {
+            "name": "jab",
+            "pass": true,
+            "sourceMotions": [
+              44,
+              14
+            ]
+          },
+          {
+            "name": "Flare Blade charge/release",
+            "pass": true,
+            "sourceMotions": [
+              341,
+              342,
+              343,
+              14
+            ]
+          },
+          {
+            "name": "Double-Edge Dance chain (representative)",
+            "pass": true,
+            "sourceMotions": [
+              349,
+              351,
+              14
+            ]
+          },
+          {
+            "name": "Blazer",
+            "pass": true,
+            "sourceMotions": [
+              367,
+              35,
+              43,
+              14
+            ]
+          },
+          {
+            "name": "Counter stance",
+            "pass": true,
+            "sourceMotions": [
+              369,
+              14
+            ]
+          }
+        ],
+        "cache": {
+          "state": "dirty",
+          "bytes": 2866768,
+          "cleared_on_startup": false,
+          "driver_cache": "uncontrolled"
+        }
+      },
+      "entry_resumes": []
+    }
+  ],
+  "scope": "development candidate; not retail compared, not performance admitted, no production deployment",
+  "open": [
+    "cold pipeline preparation for both clones",
+    "Dr. Mario warm audio underruns",
+    "retail complete-match capture and comparison",
+    "browser clone-versus-clone route",
+    "remaining special variants and broader content matrix",
+    "historical GPU stall remains open; existing human holdouts untouched"
+  ]
+}

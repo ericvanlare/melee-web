@@ -108,7 +108,7 @@ DatFighterRuntime::DatFighterRuntime(std::shared_ptr<const DatArchive> archive, 
     extension_ = pointer(data, root_ + 4, 1);
     // Kind-specific schema, not a filename exception. Other kinds retain only
     // the checked extension identity; they are not native-extension-ready.
-    if (costume_->fighter_kind == 0) {
+    if (costume_->fighter_kind == 0 || costume_->fighter_kind == 21) {
         region(data, extension_, 0x84);
         mario_.emplace();
 #define READ_MARIO(at, type, name, original) mario_->name = read_##type(data, extension_ + at);
@@ -131,14 +131,14 @@ DatFighterRuntime::DatFighterRuntime(std::shared_ptr<const DatArchive> archive, 
 #undef READ_FOX
             require(fox_->reflector_bone_id < 140, "Fighter reflector bone exceeds checked part bounds");
         }
-    } else if (costume_->fighter_kind == 18) {
+    } else if (costume_->fighter_kind == 18 || costume_->fighter_kind == 26) {
         region(data, extension_, 0x98);
         mars_.emplace();
 #define READ_MARS(at, type, name, original) mars_->name = read_##type(data, extension_ + at);
         MELEE_WEB_MARS_ATTRIBUTE_FIELDS(READ_MARS)
 #undef READ_MARS
         require(mars_->absorb_bone >= 0 && mars_->absorb_bone < 140 && mars_->absorb_size > 0,
-                "Marth counter descriptor is outside checked part bounds");
+                "Marth/Roy counter descriptor is outside checked part bounds");
     }
     // ftColl_8007B320 enforces 15 hurt capsules and 11 dynamics spheres;
     // ftCo_8009CF84 enforces strictly fewer than 10 dynamics sets.

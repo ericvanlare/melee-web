@@ -107,6 +107,12 @@ struct GameplayFighterAssets::Storage {
             if(!item_table)throw DatError("Mario item Article table is missing");
             item_identities[item_count++]={0,static_cast<uint32_t>(It_Kind_Mario_Fire)};
             item_identities[item_count++]={2,static_cast<uint32_t>(It_Kind_Mario_Cape)};
+        } else if(id.fighter_kind==21) {
+            if(!item_table)throw DatError("Dr. Mario item Article table is missing");
+            const auto& attributes=prototype.runtime().mario_attributes();
+            if(!attributes)throw DatError("Dr. Mario ftData extension is not hydrated");
+            item_identities[item_count++]={1,static_cast<uint32_t>(It_Kind_DrMario_Vitamin)};
+            item_identities[item_count++]={3,static_cast<uint32_t>(attributes->specials_cape_kind)};
         } else if(id.fighter_kind==1 || id.fighter_kind==22) {
             if(!item_table)throw DatError("Fox-family item Article table is missing");
             const auto& attributes=prototype.runtime().fox_attributes();
@@ -115,7 +121,7 @@ struct GameplayFighterAssets::Storage {
             item_identities[item_count++]={1,attributes->blaster_gun_item_kind};
             item_identities[item_count++]={id.fighter_kind==1?2U:3U,
                 static_cast<uint32_t>(id.fighter_kind==1?It_Kind_Fox_Illusion:It_Kind_Falco_Phantasm)};
-        } else if(id.fighter_kind!=18) {
+        } else if(id.fighter_kind!=18 && id.fighter_kind!=26) {
             throw DatError("Fighter item Article schema is unavailable");
         }
         for(size_t n=0;n<item_count;++n) {

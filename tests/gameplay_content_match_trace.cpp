@@ -3,13 +3,16 @@
 #include "gameplay_match_session.hpp"
 #include "gameplay_menu.h"
 #include "gameplay_content.h"
+#include <melee/ft/kinds/ftMario/forward.h>
+#include <melee/ft/kinds/ftMars/forward.h>
+#include <melee/it/forward.h>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <cmath>
 
-extern "C" int melee_web_test_content_player(unsigned,int,unsigned);
+extern "C" int melee_web_test_content_player(unsigned,int,int,unsigned);
 extern "C" int melee_web_test_item_count(int);
 extern "C" int melee_web_test_quake_start(int);
 extern "C" int melee_web_test_quake_translated(void);
@@ -69,8 +72,8 @@ int main(int argc,char** argv){try{
                 check(std::isfinite(state.position[0])&&std::isfinite(state.position[1]),"Nonfinite fighter state");}};
         for(unsigned n=0;!match.ready()&&n<600;n++)tick();
         check(match.ready(),"Original Ready did not finish");
-        check(melee_web_test_content_player(0,fighter_content->fighter_kind,cycle),"Original selected-fighter identity/costume/icon differs");
-        check(melee_web_test_content_player(1,opponent_content->fighter_kind,opponent_color),"Original opponent identity/costume/icon differs");
+        check(melee_web_test_content_player(0,fighter_ckind,fighter_content->fighter_kind,cycle),"Original selected-fighter identity/costume/icon differs");
+        check(melee_web_test_content_player(1,opponent_ckind,opponent_content->fighter_kind,opponent_color),"Original opponent identity/costume/icon differs");
         if(selection.start.rules.stkind==St_Kind_Story){
             uint32_t map_mask=0;unsigned map_count=0;int randall_timer=0,shy_timer=0,shy_count=0,shy_pattern=0;
             check(melee_web_story_state(&map_mask,&map_count,&randall_timer,&shy_timer,&shy_count,&shy_pattern),
@@ -86,6 +89,9 @@ int main(int argc,char** argv){try{
         }else{
         const bool fox_family=fighter_content->fighter_kind==FTKIND_FOX||
             fighter_content->fighter_kind==FTKIND_FALCO;
+        const bool doctor=fighter_content->fighter_kind==FTKIND_DRMARIO;
+        const bool mars_family=fighter_content->fighter_kind==FTKIND_MARS||
+            fighter_content->fighter_kind==FTKIND_EMBLEM;
         // Authored versus spawns may put P2 on a platform. Drop that source
         // Fighter to P1's level before checking their real attack paths.
         for(unsigned n=0;n<180;n++){
@@ -105,12 +111,43 @@ int main(int argc,char** argv){try{
         check(std::abs(match.player_stats(1).position[0]-match.player_stats(0).position[0])<35.0f,
               "Raw input did not bring the selected fighter within laser range");
         check(match.player_stats(0).ground_or_air==0,"Selected fighter left the ground before the laser check");
+        if (cycle==0&&doctor) {
+            /* Dr. Mario's up taunt is a fighter-owned source action.  It also
+             * exercises ftDr_Init_80149910, which installs the shared Mario
+             * action IDs 341/342 and the pill lifecycle callback. */
+            bool taunt=false,pill_live=false;
+            raw[0].stickX=raw[0].stickY=0;
+            for(unsigned n=0;n<240&&!(taunt&&pill_live);n++){
+                raw[0].button=n%8==0?PAD_BUTTON_UP:0;tick();
+                const auto motion=match.player_stats(0).motion_id;
+                taunt=motion==ftMr_MS_AppealSR||motion==ftMr_MS_AppealSL;
+                pill_live|=melee_web_test_item_count(It_Kind_DrMario_Vitamin)>0;
+            }
+            raw[0].button=0;
+            check(taunt,"Dr. Mario up taunt did not enter its original source action");
+            check(pill_live,"Dr. Mario up taunt did not create its original vitamin article");
+            bool pill_cleared=false;
+            for(unsigned n=0;n<300&&!pill_cleared;n++){
+                const auto state=match.player_stats(0);
+                pill_cleared=state.ground_or_air==0&&state.motion_id!=ftMr_MS_AppealSR&&
+                   state.motion_id!=ftMr_MS_AppealSL&&
+                   melee_web_test_item_count(It_Kind_DrMario_Vitamin)==0;
+                tick();
+            }
+            check(pill_cleared,"Dr. Mario up taunt did not clear its original vitamin article");
+        }
         const auto damage=match.player_stats(1).damage_percent;
+        bool capsule=false;
         for(unsigned n=0;n<240&&match.player_stats(1).damage_percent==damage;n++){
             raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
+            if(doctor){
+                const auto motion=match.player_stats(0).motion_id;
+                capsule|=motion==ftMr_MS_SpecialN||motion==ftMr_MS_SpecialAirN;
+            }
         }
         raw[0].button=0;
         check(match.player_stats(1).damage_percent>damage,"Selected fighter ground laser did not damage the opponent");
+        if(doctor)check(capsule,"Dr. Mario ground neutral special did not enter its original capsule action");
         std::cout<<fighter_content->name<<(fox_family?" laser damage=":" neutral-special damage=")
                  <<match.player_stats(1).damage_percent<<std::endl;
         if(cycle==0&&fox_family){
@@ -127,10 +164,10 @@ int main(int argc,char** argv){try{
             }
             check(jab1&&jab2&&rapid&&rapid_end,
                   "Fox-family jab input did not complete source Attack11/12/100 start-loop-end motions");
-        }else if(cycle==0){
+        }else if(cycle==0&&(doctor||mars_family)){
             for(unsigned n=0;n<300;n++){
                 const auto motion=match.player_stats(0).motion_id;
-                if(motion<341||motion>348)break;
+                if(motion<ftMs_MS_SpecialNStart||motion>ftMs_MS_SpecialAirNEnd1)break;
                 tick();
             }
             bool jab=false;
@@ -139,7 +176,8 @@ int main(int argc,char** argv){try{
                 jab=match.player_stats(0).motion_id==44;
             }
             raw[0].button=0;
-            check(jab,"Marth jab did not enter and execute its original Attack11 script");
+            check(jab,doctor?"Dr. Mario jab did not enter and execute its original Attack11 script":
+                  "Marth-family jab did not enter and execute its original Attack11 script");
             for(unsigned n=0;n<120&&match.player_stats(0).motion_id==44;n++)tick();
         }
         for(unsigned n=0;n<120&&match.player_stats(0).ground_or_air==0;n++){
@@ -147,7 +185,16 @@ int main(int argc,char** argv){try{
         }
         raw[0].button=0;
         check(match.player_stats(0).ground_or_air==1,"Selected fighter did not jump");
-        for(unsigned n=0;n<100;n++){raw[0].button=n<20?PAD_BUTTON_B:0;tick();}
+        bool air_capsule=false;
+        for(unsigned n=0;n<100;n++){
+            raw[0].button=n<20?PAD_BUTTON_B:0;tick();
+            if(doctor){
+                const auto motion=match.player_stats(0).motion_id;
+                air_capsule|=motion==ftMr_MS_SpecialAirN;
+            }
+        }
+        if(doctor&&cycle==0)check(air_capsule,
+            "Dr. Mario aerial neutral special did not enter its original capsule action");
         if(cycle==0&&fox_family){
             for(unsigned n=0;n<300&&match.player_stats(0).ground_or_air!=0;n++)tick();
             check(match.player_stats(0).ground_or_air==0,"Selected fighter did not land after the air laser");
@@ -197,51 +244,115 @@ int main(int argc,char** argv){try{
                   "Up special did not reach its original Fire Fox launch motion");
             check(fire_bird_finished,
                   "Up special did not finish its original Fire Fox launch sequence");
-        }else if(cycle==0){
+        }else if(cycle==0&&doctor){
             raw[0].button=0;raw[0].stickX=raw[0].stickY=0;
             for(unsigned n=0;n<420;n++){
                 const auto state=match.player_stats(0);
-                if(state.ground_or_air==0&&(state.motion_id<341||state.motion_id>372))break;
+                if(state.ground_or_air==0&&(state.motion_id<ftMr_MS_SpecialN||
+                   state.motion_id>ftMr_MS_SpecialAirLw))break;
                 tick();
             }
             check(match.player_stats(0).ground_or_air==0,
+                  "Dr. Mario did not land after the aerial capsule");
+
+            bool cape=false,sheet_live=false;
+            for(unsigned n=0;n<180&&!(cape&&sheet_live);n++){
+                raw[0].stickX=80;raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
+                const auto motion=match.player_stats(0).motion_id;
+                cape=motion==ftMr_MS_SpecialS||motion==ftMr_MS_SpecialAirS;
+                sheet_live|=melee_web_test_item_count(It_Kind_DrMario_Sheet)>0;
+            }
+            raw[0].stickX=0;raw[0].button=0;
+            check(cape,"Dr. Mario side special did not enter its original cape action");
+            check(sheet_live,"Dr. Mario side special did not create its original sheet article");
+            for(unsigned n=0;n<300;n++){
+                const auto state=match.player_stats(0);
+                if(state.ground_or_air==0&&(state.motion_id<ftMr_MS_SpecialS||
+                   state.motion_id>ftMr_MS_SpecialAirLw))break;
+                tick();
+            }
+
+            bool up=false;
+            for(unsigned n=0;n<180&&!up;n++){
+                raw[0].stickY=80;raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
+                const auto motion=match.player_stats(0).motion_id;
+                up=motion==ftMr_MS_SpecialHi||motion==ftMr_MS_SpecialAirHi;
+            }
+            raw[0].stickY=0;raw[0].button=0;
+            check(up,"Dr. Mario up special did not enter its original source action");
+            for(unsigned n=0;n<420;n++){
+                const auto state=match.player_stats(0);
+                if(state.ground_or_air==0&&(state.motion_id<ftMr_MS_SpecialN||
+                   state.motion_id>ftMr_MS_SpecialAirLw))break;
+                tick();
+            }
+            check(match.player_stats(0).ground_or_air==0,
+                  "Dr. Mario did not land after the original up special");
+
+            bool down=false;
+            for(unsigned n=0;n<180&&!down;n++){
+                raw[0].stickY=-80;raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
+                const auto motion=match.player_stats(0).motion_id;
+                down=motion==ftMr_MS_SpecialLw||motion==ftMr_MS_SpecialAirLw;
+            }
+            raw[0].stickY=0;raw[0].button=0;
+            check(down,"Dr. Mario down special did not enter its original source action");
+        }else if(cycle==0&&mars_family){
+            raw[0].button=0;raw[0].stickX=raw[0].stickY=0;
+            for(unsigned n=0;n<420;n++){
+                const auto state=match.player_stats(0);
+                if(state.ground_or_air==0&&(state.motion_id<ftMs_MS_SpecialNStart||
+                   state.motion_id>ftMs_MS_SpecialAirLwHit))break;
+                tick();
+            }
+            check(match.player_stats(0).ground_or_air==0,
+                  fighter_content->fighter_kind==FTKIND_EMBLEM?
+                  "Roy did not land after the aerial neutral special":
                   "Marth did not land after the aerial neutral special");
             bool dancing_blade=false,dancing_blade_chain=false;
             for(unsigned n=0;n<180&&!dancing_blade_chain;n++){
                 raw[0].stickX=80;raw[0].button=n%7==0?PAD_BUTTON_B:0;tick();
                 const auto motion=match.player_stats(0).motion_id;
-                dancing_blade|=motion==349;
-                dancing_blade_chain|=motion>=350&&motion<=357;
+                dancing_blade|=motion==ftMs_MS_SpecialS1;
+                dancing_blade_chain|=motion>=ftMs_MS_SpecialS2Hi&&motion<=ftMs_MS_SpecialS4Lw;
             }
             raw[0].stickX=0;raw[0].button=0;
             check(dancing_blade&&dancing_blade_chain,
+                  fighter_content->fighter_kind==FTKIND_EMBLEM?
+                  "Roy Dancing Blade did not enter and chain its original shared Mars states":
                   "Marth Dancing Blade did not enter and chain its original source states");
             for(unsigned n=0;n<300;n++){
                 const auto motion=match.player_stats(0).motion_id;
-                if(motion<349||motion>366)break;
+                if(motion<ftMs_MS_SpecialS1||motion>ftMs_MS_SpecialAirS4Lw)break;
                 tick();
             }
             bool dolphin_slash=false;
             for(unsigned n=0;n<120&&!dolphin_slash;n++){
                 raw[0].stickY=80;raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
                 const auto motion=match.player_stats(0).motion_id;
-                dolphin_slash=motion==367||motion==368;
+                dolphin_slash=motion==ftMs_MS_SpecialHi||motion==ftMs_MS_SpecialAirHi;
             }
             raw[0].stickY=0;raw[0].button=0;
-            check(dolphin_slash,"Marth Dolphin Slash did not enter its original source state");
+            check(dolphin_slash,fighter_content->fighter_kind==FTKIND_EMBLEM?
+                  "Roy Dolphin Slash did not enter its original shared Mars state":
+                  "Marth Dolphin Slash did not enter its original source state");
             for(unsigned n=0;n<420;n++){
                 const auto state=match.player_stats(0);
-                if(state.ground_or_air==0&&(state.motion_id<341||state.motion_id>372))break;
+                if(state.ground_or_air==0&&(state.motion_id<ftMs_MS_SpecialNStart||
+                   state.motion_id>ftMs_MS_SpecialAirLwHit))break;
                 tick();
             }
-            check(match.player_stats(0).ground_or_air==0,"Marth did not land after Dolphin Slash");
+            check(match.player_stats(0).ground_or_air==0,fighter_content->fighter_kind==FTKIND_EMBLEM?
+                  "Roy did not land after Dolphin Slash":"Marth did not land after Dolphin Slash");
             bool counter=false;
             for(unsigned n=0;n<120&&!counter;n++){
                 raw[0].stickY=-80;raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
-                counter=match.player_stats(0).motion_id==369;
+                counter=match.player_stats(0).motion_id==ftMs_MS_SpecialLw;
             }
             raw[0].stickY=0;raw[0].button=0;
-            check(counter,"Marth Counter did not enter its original source state");
+            check(counter,fighter_content->fighter_kind==FTKIND_EMBLEM?
+                  "Roy Counter did not enter its original shared Mars state":
+                  "Marth Counter did not enter its original source state");
         }
         }
         check(melee_web_test_quake_start(2),"Original authored stage quake was not created");

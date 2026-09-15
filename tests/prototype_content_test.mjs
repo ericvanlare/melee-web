@@ -5,8 +5,9 @@ import {ROSTER, STAGES, DEFAULT_UNLOCKS} from '../web/match-flow.mjs';
 const manifest = JSON.parse(readFileSync(0, 'utf8'));
 const content = resolvePrototypeContent(manifest);
 assert.equal(content.characters.length, ROSTER.length);
-assert.equal(content.characters.filter(c => c.supported).length, 4);
-assert.equal(content.characters.filter(c => !c.supported).length, 22);
+assert.deepEqual(content.characters.filter(c => c.supported).map(c => c.sourceName).sort(),
+  manifest.fighters.map(c => c.sourceName).sort());
+assert.equal(content.characters.filter(c => !c.supported).length, ROSTER.length - manifest.fighters.length);
 for (const row of content.characters) {
   assert.equal(row.sourceId, ROSTER.find(c => c.id === row.id).sourceId);
   assert.equal(row.unlocked, DEFAULT_UNLOCKS[row.id]);

@@ -39,6 +39,25 @@ class ContentMatchTests(unittest.TestCase):
                                [menu, game, stage, fighter, opponent],
                                "Mixed source content intro")
 
+    def test_dr_mario_roy_source_lifecycles_both_orientations(self):
+        menu, game = ROOT / "assets-local/native-menus", ROOT / "assets-local/next-gate"
+        required = (
+            menu / "MnSlChr.usd", game / "PlDr.dat", game / "PlDrAJ.dat",
+            game / "PlFe.dat", game / "PlFeAJ.dat", game / "EfMrData.dat",
+            game / "EfFeData.dat",
+            game / "drmario.ssm", game / "emblem.ssm", game / "GrNLa.dat",
+        )
+        if not all(path.is_file() for path in required):
+            self.skipTest("Owned Dr. Mario/Roy and stage fixtures are required")
+        # CKIND_DRMARIO=22 and CKIND_EMBLEM=23 in the pinned source. Run both
+        # directions so each clone is exercised as the selected fighter and as
+        # the opponent while every selected costume reconstructs the world.
+        for fighter, opponent in ((22, 23), (23, 22)):
+            with self.subTest(fighter=fighter, opponent=opponent):
+                self.run_trace("gameplay_content_match_trace",
+                               [menu, game, 8, fighter, opponent],
+                               "Mixed source content intro")
+
     def test_battlefield_scaled_geometry_and_background_lifetimes(self):
         game = ROOT / "assets-local/next-gate"
         if not (game / "GrNBa.dat").is_file():

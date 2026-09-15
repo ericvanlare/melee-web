@@ -1,5 +1,17 @@
 # Current status
 
+## Dr. Mario and Roy development candidates
+
+The shared runtime now loads Dr. Mario and Roy from their original source
+identities and separate disc data, through the existing Mario/Marth family
+adapters. Both are selectable in original CSS. The Release build, owned-asset
+checks and native Dr. Mario/Roy match lifecycles in both orientations pass,
+including all five costumes, specials, damage, pause and reconstruction.
+Visible browser checks exercise each clone against Mario on Final Destination.
+These are development candidates: retail comparison and clean cold rendering
+preparation remain open, and no production deployment is part of this change.
+See [exact scope, retained failures and next capture](docs/ROY_DR_MARIO_PORT_NOTES.md).
+
 ## Controller input candidate
 
 The browser controller candidate adds browser-standard mapping, a suggested
