@@ -172,9 +172,9 @@ equivalence:
 
 Both start from RNG seed 1264785038. Using the original HSD generator, the
 two construction-complete states correspond to nine versus eight advances.
-This points to initialization RNG consumption as the first boundary to trace;
-the responsible source call is not yet identified. Do not force a seed or add
-an unexplained RNG call to compensate for it.
+That comparison identified initialization RNG consumption as the first boundary
+to trace. The follow-up below identifies the responsible source call. Do not
+force a seed or add an unexplained RNG call to compensate for it.
 
 The state run also retains performance failures: 165.130 ms maximum native
 callback, 178.070 ms maximum browser interval, 30 live pipeline creations,
@@ -193,6 +193,49 @@ Raw captures, failed browser output, screenshots and reports remain private;
 only the [compact hashes and findings](evidence/roy-dr-mario-retail-diagnostic-v1.json)
 are tracked. No gameplay code, renderer catalog, production deployment or
 holdout state changed for this comparison.
+
+### Initialization RNG cause
+
+A bounded read-only Dolphin debugger run reproduces the captured entry seed
+and records all nine initialization RNG calls. The first eight agree with the
+port: four calls from Final Destination setup and two from each fighter's
+initialization. The ninth is `HSD_Randi` at `0x80380580`, returning to
+`0x801c26b0` in `Ground_801C24F8`, through `Ground_801C28AC` and
+`Stage_80225074`. This is the original stage-music selector, called near the end
+of `fn_8016E730` after fighter creation.
+
+Final Destination's actual stage row uses selector case 6: when all unlockable
+characters are unlocked, it makes a 12-percent alternate-music choice. The
+captured save decodes to character mask `0x07ff`. The port starts a fixed music
+ID before match construction and never runs that selector. Both the omitted
+routine and its save-state dependency matter. The current input-only MWRC
+versions do not carry that unlock state, and the menu host restores its unlock
+scope when leaving the menu. A general fix must preserve the input profile
+through match construction and use the actual selected stream; assuming every
+older capture has the new unlocked save would be incorrect.
+
+An ignored linker-wrapper experiment calls the original selector after the two
+captured fighters are constructed, with the character mask decoded from the
+hash-verified prepared save. It uses the captured route's music flags, never an
+expected RNG value or an extra unexplained random call. The source chooses music
+ID 78, the primary track, while consuming the missing random choice. Both
+construction-complete RNG `1439421057` and first-tick RNG `141382586` now match.
+
+The next bounded experiment requests a 700-tick prefix. Initialization and all
+436 completed ticks (indices 0–435) match exactly for RNG, match frame, PAD
+history and every recorded fighter field, including the input difference that
+previously appeared at tick 154. The process then exits 1 with a SAFE_HEAP memory
+fault during tick 436, in `ftCo_8009E7B4` from the attack animation transition.
+That failure is retained. This headless experiment excludes GPU draws, CPU
+sidecar comparison, pixels and PCM; no browser or full-match pass is claimed.
+The first debugger attempt missed breakpoints because JIT debugging was off;
+the second omitted Randi's inlined RNG calls; both attempts remain preserved.
+
+The compact [cause and proof record](evidence/roy-dr-mario-rng-cause-v1.json)
+pins the scripts and diagnostic artifacts. The experiment is not a shipped
+route-specific workaround: production/runtime code is unchanged. General music
+selection and save-profile ownership, the animation fault, and the previously
+recorded browser/CPU/performance failures remain open.
 
 ## Owned revision-2 asset hashes
 

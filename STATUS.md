@@ -14,6 +14,13 @@ inputs but first differs in initialization RNG, then Doc's input at tick 154;
 it fails to reproduce the recorded win and has rendering stalls. These remain
 development candidates, with no production deployment. See the
 [retail diagnostic](docs/evidence/roy-dr-mario-retail-diagnostic-v1.json).
+A bounded follow-up identifies the missing initialization RNG operation as
+original stage-music selection with the captured all-character unlock state.
+Restoring that operation in an ignored diagnostic wrapper matches initialization
+and all checked core-state fields for 436 ticks, then the headless trace fails
+at tick 436 in `ftCo_8009E7B4`. This is causal evidence, not an integrated runtime
+fix or a passing full replay; see the
+[RNG investigation](docs/evidence/roy-dr-mario-rng-cause-v1.json).
 See [exact scope, retained failures and next capture](docs/ROY_DR_MARIO_PORT_NOTES.md).
 
 ## Controller input candidate
