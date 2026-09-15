@@ -128,6 +128,13 @@ exact original draw-boundary comparison and all state domains before accepting
 that replay. Legacy recipes and live input retain the per-tick traversal policy;
 browser callbacks are not a substitute for original VI boundaries.
 
+MWRC v6 can instead consume independently recorded nonempty controller-queue
+snapshots as platform inputs. This establishes only conditional gameplay
+equivalence; it does not test an original CPU/interrupt scheduling model. Require
+explicit state-capture scope, exact queue coverage, exact source draw boundaries
+and the unchanged state comparator. Host timestamps never select fixture inputs.
+See [the format and scope](RECORDED_QUEUE_REPLAY.md).
+
 When a replay exposes hidden state, compare the original owner construction and
 its first consumers as well as the visible formula. The expanded corpus found
 missing screen-flash ownership and a missing ground reset whose floor sentinel

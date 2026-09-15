@@ -112,3 +112,11 @@ Exact gameplay replay conditioned on recorded platform queue events would be a
 different evidence claim from independently reproducing original CPU interrupt
 scheduling. The latter remains unresolved; no recorded-schedule format or live
 scheduler policy change is introduced by this diagnostic/guard change.
+
+
+## Accepted next validation boundary
+
+Conditional gameplay replay now uses recorded controller-queue timing, with
+live scheduling tested separately. [MWRC v6](RECORDED_QUEUE_REPLAY.md) implements
+that explicit boundary. The rejected v5 prediction and its original
+CPU scheduling limitation remain open; a v6 pass does not turn them green.

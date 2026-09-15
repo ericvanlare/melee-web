@@ -419,3 +419,30 @@ for this route. No recorded batch list or fitted timing was put into runtime.
 The full browser run was deferred to avoid spending CPU on a known cadence failure.
 This supersedes any implication that the first route established general clock
 correctness; its exact comparison remains valid. See [rejection evidence](evidence/doc-roy-yoshis-clock-validation-v1.json).
+
+
+## Conditional replay and throw rounding
+
+The subsequent original probe identified the delayed queue check as an AI DMA
+interrupt preempting HSD bookkeeping. The initial-only model remains rejected.
+MWRC v6 now treats independently recorded queue snapshots as platform inputs,
+without supplying expected fighter state or fitting a CPU timing model.
+
+Both complete physical matches pass the unchanged state comparator and exact
+original draw alignment: Roy/Doc FD 6,965/6,959 updates/draws and Doc/Roy Yoshi's
+11,077/11,067. The initial Yoshi's conditional replay preserved core/CPU/cadence
+but differed at six Roy throw poses. Read-only original and browser probes
+isolated the hip adjustment after curve evaluation. Restoring the original
+three `fmadds` in `ftCommon_8007E3EC` resolves every declared-field difference.
+The small scalar test retains original operands, expected bits and an unfused
+negative control; future iterations do not need a full match to check this math.
+
+Full suite: 765 tests, 36 skips, zero failures. Affected Release targets build.
+Host-stall tests pass at the actual input-storage component and two original
+Dolphin prefixes, with their synthetic/prefix limits recorded. No physical
+capture-under-load acceptance is claimed. The final Yoshi's replay still has
+one native overrun, one browser gap and 22 audio underrun frames; both routes
+retain first-use pipeline creation and heap growth. These are state-comparison
+passes, not performance or content admission. Both holdouts remain unopened.
+See [format and scope](RECORDED_QUEUE_REPLAY.md) and
+[exact results and retained failures](evidence/recorded-queue-replay-v1.json).

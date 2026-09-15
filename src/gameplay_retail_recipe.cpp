@@ -64,7 +64,7 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
     check(input.u32() == 0x4d575243, "Unsupported reference input format");
     RetailReplayRecipe result;
     result.version = input.u32();
-    check(result.version >= 1 && result.version <= 5, "Unsupported reference input version");
+    check(result.version >= 1 && result.version <= 6, "Unsupported reference input version");
     result.seed = input.u32();
     const auto count = input.u32();
     const size_t profile_bytes = result.version >= 4 ? 4 : 0;
@@ -75,8 +75,8 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
         unlocked_characters = input.u16();
         unlocked_stages = input.u16();
     }
-    const size_t clock_bytes = result.version >= 5 ? 40 : 0;
-    if (result.version >= 5) {
+    size_t clock_bytes = result.version == 5 ? 40 : 0;
+    if (result.version == 5) {
         RetailDrawClock clock;
         clock.pad_period = input.u64(); clock.vi_period = input.u64();
         clock.next_pad = input.u64(); clock.first_vi_poll = input.u64();
@@ -84,6 +84,23 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
         check(input.u32() == 0, "Unsupported clock context flags");
         check(count && count <= 36000, "Reference input frame count is outside its bounds");
         result.draw_boundaries = clock.boundaries(count);
+    }
+    if (result.version == 6) {
+        const auto batches = input.u32();
+        check(input.u32() == 0, "Unsupported recorded input-queue flags");
+        check(count && count <= 36000 && batches && batches <= count,
+              "Invalid recorded input-queue size");
+        clock_bytes = 8 + size_t(batches) * 9;
+        check(bytes.size() == 20 + clock_bytes + 0x138 + MELEE_WEB_PAD_STATE_BYTES + size_t(count) * 44,
+              "Recorded input-queue size disagrees with transport");
+        std::vector<RetailQueueBatch> events;
+        events.reserve(batches);
+        for (uint32_t i = 0; i < batches; ++i) {
+            const auto poll = input.u64();
+            const auto available = input.u8();
+            events.push_back({poll, available});
+        }
+        result.draw_boundaries = retail_queue_boundaries(events, count);
     }
     check(count && count <= 36000 && bytes.size() == 16 + profile_bytes + clock_bytes + 0x138 +
           (result.version >= 2 ? MELEE_WEB_PAD_STATE_BYTES : 0) + size_t(count) * 44,

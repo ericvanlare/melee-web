@@ -1,4 +1,5 @@
 #include "retail_draw_clock.hpp"
+#include "retail_input_queue.hpp"
 #include "source_frame_sequence.hpp"
 #include <cassert>
 #include <vector>
@@ -22,6 +23,17 @@ int main() {
     try { (void)unsupported.boundaries(6965); }
     catch(const std::runtime_error&) { rejected=true; }
     assert(rejected);
+    // The queue event order survives arbitrary callback grouping/wall delays.
+    std::vector<melee_web::RetailQueueBatch> queue{{0,1},{100,2},{200,1}};
+    auto recorded=melee_web::retail_queue_boundaries(queue,4);
+    assert((recorded==std::vector<bool>{true,false,true,true}));
+    for (auto broken : std::vector<std::vector<melee_web::RetailQueueBatch>>{
+            {{0,1},{100,2}}, {{0,1},{0,3}}, {{0,0},{100,4}}, {{0,5}}}) {
+        bool failed=false;
+        try { (void)melee_web::retail_queue_boundaries(broken,4); }
+        catch(const std::runtime_error&) { failed=true; }
+        assert(failed);
+    }
     // A source batch may span browser callbacks. No intervening draw is
     // manufactured; callback counters remain accurate and final draw is kept.
     melee_web::SourceFrameSequence sequence;

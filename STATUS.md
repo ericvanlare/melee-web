@@ -2,6 +2,32 @@
 
 ## Dr. Mario and Roy development candidates
 
+The two physical development recordings now pass complete visible browser
+comparison **under their recorded controller-queue schedule**: Roy/Doc on Final
+Destination matches 6,965 updates and 6,959 draws; Doc/Roy on Yoshi's matches
+11,077 updates and 11,067 draws. Fighter/input/PAD/RNG state, CPU decisions,
+camera, subject bones, HUD, magnifier and match outcomes all match the original.
+MWRC v6 carries independently observed nonempty input-queue snapshots as platform
+inputs; it does not claim original CPU interrupt or live scheduling equivalence.
+
+The first Yoshi's run exposed six tiny throw-position differences. Restoring the
+original three fused multiply-adds in `ftCommon_8007E3EC` resolves all six without
+changing comparator fields or tolerances. A 1.2-second scalar regression covers
+original operands and the failing unfused control. Deliberate host stalls also
+preserve the tested input-storage cases and both original Dolphin prefixes;
+physical capture under stress is not claimed.
+
+The final state runs measured 16.370/31.950 ms native/browser maxima on FD and
+20.045/57.730 ms on Yoshi's. Yoshi's has one native budget overrun, one browser
+gap and 22 audio underrun frames. Both runs still create first-use pipelines
+(27/35) and grow the heap. Performance is **not admitted**. The historical GPU
+stall, pixels, PCM and both unopened holdouts remain open. Release browser/native
+builds and 765 tests (36 documented skips) pass. No deployment was made.
+See [conditional replay scope](docs/RECORDED_QUEUE_REPLAY.md) and
+[exact evidence and retained failures](docs/evidence/recorded-queue-replay-v1.json).
+
+### Earlier startup-clock evidence and rejection
+
 Dr. Mario and Roy load their own original data through the shared Mario/Marth
 family adapters and are selectable through original CSS/SSS. Native lifecycle
 checks cover both orientations, five costumes, specials, damage and reconstruction.

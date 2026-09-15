@@ -3,6 +3,7 @@
 #include "gameplay_match_session.hpp"
 #include "gameplay_pad_state.h"
 #include "retail_draw_clock.hpp"
+#include "retail_input_queue.hpp"
 #include <array>
 #include <memory>
 #include <span>
@@ -15,7 +16,8 @@ struct RetailReplayInput {
     std::array<uint8_t, 44> bytes{};
 };
 
-// Input and initialization only. Expected observations never enter the runtime.
+// Controller input, initialization and (v6) recorded platform queue inputs.
+// Expected game-state observations never enter the runtime.
 struct RetailReplayRecipe {
     uint32_t version = 0, seed = 0;
     std::array<uint8_t, 0x138> setup{};
@@ -25,6 +27,7 @@ struct RetailReplayRecipe {
         initial_input{nullptr, melee_web_pad_state_free};
     std::vector<RetailReplayInput> frames;
     std::vector<bool> draw_boundaries;
+    unsigned scheduling_mode() const { return version == 6 ? 2 : version == 5 ? 1 : 0; }
     std::size_t expected_draws() const {
         if (draw_boundaries.empty()) return frames.size();
         std::size_t count = 0;
@@ -37,8 +40,10 @@ struct RetailReplayRecipe {
 };
 
 /* MWRC v4 adds save masks after the fixed header. V5 then adds 40 bytes of
- * shared PAD/VI startup clock context; expected observations remain excluded. */
-constexpr size_t kRetailReplayMaxBytes = 16 + 4 + 40 + 0x138 +
+ * shared PAD/VI startup clock context. V6 replaces that context with u32 batch
+ * count, u32 zero flags, then (u64 relative CPU poll time, u8 available samples)
+ * per input-queue snapshot. No expected game states or draw indexes are stored. */
+constexpr size_t kRetailReplayMaxBytes = 16 + 4 + 8 + 36000 * 9 + 0x138 +
     MELEE_WEB_PAD_STATE_BYTES + 36000 * 44;
 RetailReplayRecipe read_retail_replay(std::span<const uint8_t>);
 

@@ -28,6 +28,21 @@ def report():
 
 
 class BrowserReplayValidationTests(unittest.TestCase):
+    def test_recorded_queue_requires_explicit_conditional_state_scope(self):
+        value=report()
+        value.update(input_scheduling='recorded_queue',scheduling_equivalence='not_evaluated')
+        value['metrics'].update(sourceSteps=686,sourceDraws=685)
+        with self.assertRaisesRegex(ValueError,'conditional state'):
+            self.check(value)
+        value.update(mode='state_capture',performance='not_evaluated')
+        with self.assertRaisesRegex(ValueError,'conditional state'):
+            validate_report(value,'a'*64,686,'state_capture')
+        self.assertIs(validate_report(value,'a'*64,686,'state_capture',
+                                     expected_scheduling='recorded_queue',expected_draws=685),value)
+        value['scheduling_equivalence']='passed'
+        with self.assertRaisesRegex(ValueError,'conditional state'):
+            validate_report(value,'a'*64,686,'state_capture',expected_scheduling='recorded_queue',expected_draws=685)
+
     def test_captured_clock_draw_count_requires_independent_expectation(self):
         value=report()
         value['metrics'].update(sourceSteps=686,sourceDraws=685)

@@ -140,6 +140,12 @@ configuration; do not promise exact uninterrupted behavior from missing input.
    options separate, expose failures, and seek community/organizer evaluation
    only when evidence supports it. A partial Mario/FD slice is not tournament-ready.
 
+For compiled gameplay replay, recorded controller-queue snapshots may be supplied
+as explicit platform input fixtures. Label such evidence conditional on that
+recorded schedule and retain exact game-state and source-boundary comparisons.
+It does not establish original CPU interrupt scheduling, live controller timing
+or performance acceptance. See [recorded queue replay](RECORDED_QUEUE_REPLAY.md).
+
 Acceptance is scenario- and field-scoped. Finite testing cannot prove every
 possible game state; report the precise verified scope and known failures rather
 than an unqualified 100% claim. The engineering target remains full original

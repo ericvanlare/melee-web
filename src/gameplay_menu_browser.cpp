@@ -716,7 +716,7 @@ void tick(){
      check(!match->paused()&&!match->complete(),"Replay reached an unsupported source pause/exit");
      if(!replay_started){
       replay_started=true;
-      EM_ASM({window.menuReplayStarted?.($0,!!$1,$2);},replay->frames.size(),replay_trace,replay->expected_draws());
+      EM_ASM({window.menuReplayStarted?.($0,!!$1,$2,$3);},replay->frames.size(),replay_trace,replay->expected_draws(),replay->scheduling_mode());
      }
      sample=replay->frames[replay_cursor].pads.data();
     }
@@ -974,6 +974,7 @@ int melee_web_native_menu_replay(const uint8_t* data,unsigned size,int observe){
  check(data&&size<=melee_web::kRetailReplayMaxBytes,"Invalid reference replay bytes");
  check(observe==0||observe==1,"Invalid replay observation mode");
  auto candidate=std::make_unique<melee_web::RetailReplayRecipe>(melee_web::read_retail_replay({data,size}));
+ check(candidate->version!=6||observe==1,"Recorded input-queue replay requires state-capture mode; live timing is not admitted");
  check(candidate->version>=2&&candidate->initial_input,"Browser reference playback requires a PAD history recipe (v2 or v3)");
  check(!reference_heap_used,"Reference replay requires a fresh application. Use Reload application state, import the disc, then play the recipe before entering menus.");
  reference_heap_used=true;

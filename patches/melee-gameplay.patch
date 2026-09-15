@@ -7849,3 +7849,20 @@ diff --git a/src/melee/lb/lbvector.c b/src/melee/lb/lbvector.c
          z = v->z;
          break;
      }
+diff --git a/src/melee/ft/ftcommon.c b/src/melee/ft/ftcommon.c
+--- a/src/melee/ft/ftcommon.c
++++ b/src/melee/ft/ftcommon.c
+@@ -959,9 +959,10 @@
+         sp10.x -= fp->x1A7C.x;
+         sp10.y -= fp->x1A7C.y;
+         sp10.z -= fp->x1A7C.z;
+-        fp->x1A7C.x += sp10.x * fp->x1A6C;
+-        fp->x1A7C.y += sp10.y * fp->x1A6C;
+-        fp->x1A7C.z += sp10.z * fp->x1A6C;
++        /* GALE01r2 8007E4C8/4DC/4F0: round the delta first, then fmadds. */
++        fp->x1A7C.x = fmaf(sp10.x, fp->x1A6C, fp->x1A7C.x);
++        fp->x1A7C.y = fmaf(sp10.y, fp->x1A6C, fp->x1A7C.y);
++        fp->x1A7C.z = fmaf(sp10.z, fp->x1A6C, fp->x1A7C.z);
+         HSD_JObjSetTranslate(jobj, &fp->x1A7C);
+     }
+ }

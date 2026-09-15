@@ -133,8 +133,18 @@ def validate_hitch_capture(capture, metrics):
 
 
 def validate_report(report, recipe_hash, frames, mode, cold=None, *, expected_winner=None,
-                    expected_draws=None):
+                    expected_draws=None, expected_scheduling=None):
     require(isinstance(report, dict), 'Browser report must be an object')
+    scheduling = report.get('input_scheduling', 'per_tick')
+    require(scheduling in ('per_tick', 'startup_clock', 'recorded_queue'), 'Unknown input scheduling scope')
+    if expected_scheduling is not None:
+        require(scheduling == expected_scheduling, 'Input scheduling scope mismatch')
+    if scheduling == 'recorded_queue':
+        require(mode == 'state_capture' and expected_scheduling == 'recorded_queue' and
+                report.get('scheduling_equivalence') == 'not_evaluated' and
+                type(expected_draws) is int and
+                all(key in report.get('metrics', {}) for key in ('sourceSteps', 'sourceDraws')),
+                'Recorded queue replay requires explicit conditional state comparison')
     paint = report.get('diagnostic_page_paint')
     require(paint is None or (isinstance(paint, dict) and paint.get('mode') == 'normal'
                              and paint.get('diagnostic_only') is False
