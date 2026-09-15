@@ -48,6 +48,8 @@ PLAYER_RUNTIME_FILES = (
     "controller-input.mjs",
     "controller-panel.mjs",
     "controller-panel.css",
+    "controller-settings.mjs",
+    "controller-settings.css",
     "gameplay_public.js",
     "gameplay_public.wasm",
 )
@@ -60,6 +62,8 @@ PLAYER_SOURCE_RUNTIME_FILES = (
     "controller-input.mjs",
     "controller-panel.mjs",
     "controller-panel.css",
+    "controller-settings.mjs",
+    "controller-settings.css",
 )
 RUNTIME_IDENTITY_SCHEMA = "melee-web-runtime-public-build-v2"
 RUNTIME_IDENTITY_NAME = "runtime-public-identity.json"
@@ -428,7 +432,7 @@ def _validate_player_source(source: Path) -> dict[str, bytes]:
     if not css_text.strip() or re.search(r"url\s*[(]", css_text, re.I):
         raise BuildError("player.css must be non-empty and contain no external or embedded URLs")
     shell = result["player-shell.mjs"].decode("utf-8")
-    for import_path in ("../melee-runtime.mjs", "../prototype-keyboard-layouts.mjs"):
+    for import_path in ("../melee-runtime.mjs", "../controller-settings.mjs"):
         if not re.search(rf"(?:from|import)\s*[\"']{re.escape(import_path)}[\"']", shell):
             raise BuildError(f"player-shell.mjs is missing reviewed import {import_path}")
     return result
@@ -993,6 +997,7 @@ def _validate_runtime_graph(files: dict[str, bytes]) -> None:
     required_imports = {
         "melee-runtime.mjs": ("./runtime-assets.mjs", "./gameplay_public.js", "./controller-input.mjs"),
         "runtime-assets.mjs": ("./disc-image.mjs",),
+        "controller-settings.mjs": ("./prototype-keyboard-layouts.mjs", "./controller-panel.mjs", "./controller-settings.css"),
     }
     for rel, imports in required_imports.items():
         text = files[rel].decode("utf-8")
@@ -1231,6 +1236,8 @@ def build(
             "controller-input.mjs": ROOT / "web" / "controller-input.mjs",
             "controller-panel.mjs": ROOT / "web" / "controller-panel.mjs",
             "controller-panel.css": ROOT / "web" / "controller-panel.css",
+            "controller-settings.mjs": ROOT / "web" / "controller-settings.mjs",
+            "controller-settings.css": ROOT / "web" / "controller-settings.css",
         }
         for rel, path in source_runtime.items():
             if _is_symlink(path) or not path.is_file():

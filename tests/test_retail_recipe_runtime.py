@@ -26,7 +26,7 @@ class RetailRecipeRuntimeTests(unittest.TestCase):
         examples = [
             (b'', 'size is outside'),
             (b'NOPE' + valid_size[4:], 'input format'),
-            (valid_size[:4] + struct.pack('>I', 3) + valid_size[8:], 'input version'),
+            (valid_size[:4] + struct.pack('>I', 4) + valid_size[8:], 'input version'),
             (valid_size[:-1], 'frame count'),
             (valid_size + b'\0', 'frame count'),
             (callback, 'callback/data pointer'),

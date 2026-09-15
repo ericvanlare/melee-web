@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "melee-web-reference-session-v1",
+  "title": "Melee Web reference session bundle",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema", "version", "session_id", "game_id", "run_id", "sequence_start", "records"],
+  "properties": {
+    "schema": {"const": "melee-web-reference-session-v1"},
+    "version": {"const": 1},
+    "session_id": {"$ref": "#/$defs/identifier"},
+    "game_id": {"$ref": "#/$defs/identifier"},
+    "run_id": {"$ref": "#/$defs/identifier"},
+    "sequence_start": {"type": "integer", "minimum": 0},
+    "records": {
+      "type": "array",
+      "items": {"$ref": "#/$defs/record"}
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,255}$"
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["seq", "event"],
+      "properties": {
+        "seq": {"type": "integer", "minimum": 0},
+        "event": {"type": "string", "minLength": 1},
+        "source_tick": {"type": "integer"},
+        "draw_ordinal": {"type": "integer", "minimum": 0},
+        "payload": {"type": "object"}
+      }
+    }
+  }
+}

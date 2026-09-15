@@ -1,5 +1,12 @@
 # Renderer startup fix: local regressions pass; hosted signoff incomplete
 
+**September 14 update:** the user accepted the functional preview and authorized
+production after CI passed. PR #18 is merged and the same runtime is live;
+see the [production record](RENDERER_PRODUCTION_PROMOTION.md). The measurements,
+failed attempts and speedup NO-GO below remain historical evidence, not a claim
+that the loading delay was solved. The original preview promotion command below
+was superseded by a production-mode shell package with identical runtime bytes.
+
 The shared player owner now creates `/melee-render-cache` before native startup,
 independently of optional persistence. This is a browser-memory filesystem path,
 not an HTTP endpoint. Development may subsequently mount IDBFS; the public alpha
