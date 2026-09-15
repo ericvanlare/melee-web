@@ -23,20 +23,22 @@ from reference_capture_environment import (SCHEMA, DOLPHIN_REVISION, file_invent
     require_managed_fixture)
 from build_reference_dolphin import bundle_inventory, runtime_inventory
 
-PREPARED_GCI = "f64c9e07e436221ffc76acac7116a70167b2a690a59d5c56c2469c6fb5f2a1e6"
+PREPARED_GCI = "5ff16535045fed369206141dd326ec6f72519de69d6661ccfa7766341fdc0aed"
+LEGACY_PREPARED_GCI = "f64c9e07e436221ffc76acac7116a70167b2a690a59d5c56c2469c6fb5f2a1e6"
 PREPARED_SRAM = "3ebf0d88061ea04d1f757894ee36e27b3e10bb9102b1ae961a7c5c644e4d59db"
 INSTALL_SCHEMA = "webmelee-reference-dolphin-install-v1"
 
 
-def prepared_fixture_inventory():
-    return {"USA/Card A/01-GALE-SuperSmashBros0110290334.gci": PREPARED_GCI,
+def prepared_fixture_inventory(*, legacy=False):
+    return {"USA/Card A/01-GALE-SuperSmashBros0110290334.gci":
+            LEGACY_PREPARED_GCI if legacy else PREPARED_GCI,
             "SRAM.raw": PREPARED_SRAM}
 
 
 def import_prepared_fixture(source, root, expected):
     """Publish one verified private copy, preserving the original evidence."""
     source, root = Path(source), Path(root)
-    if expected != prepared_fixture_inventory() or file_inventory(source) != expected:
+    if expected not in (prepared_fixture_inventory(), prepared_fixture_inventory(legacy=True)) or file_inventory(source) != expected:
         raise ValueError("The independently verified private prepared fixture is required")
     destination = managed_fixture_path(root, expected)
     require_managed_fixture(destination, root, expected)
@@ -61,6 +63,56 @@ def import_prepared_fixture(source, root, expected):
         if staging.exists():
             shutil.rmtree(staging)
     return destination
+
+
+def prepare_unlocked_fixture(source, root, expected):
+    """Derive the all-character save once; existing versions remain immutable."""
+    from reference_capture_save import unlock_roster_gci
+    source, root = Path(source), Path(root)
+    source = import_prepared_fixture(source, root, expected)
+    if expected == prepared_fixture_inventory():
+        return source
+    with tempfile.TemporaryDirectory(prefix=".unlock-", dir=root / "PreparedFixtures") as directory:
+        staged = Path(directory) / "GC"
+        shutil.copytree(source, staged)
+        card = staged / "USA/Card A/01-GALE-SuperSmashBros0110290334.gci"
+        original = card.read_bytes()
+        updated = unlock_roster_gci(original)
+        card.chmod(0o600)
+        card.write_bytes(updated)
+        if file_inventory(source) != expected:
+            raise ValueError("The original prepared fixture changed during upgrade")
+        return import_prepared_fixture(staged, root, prepared_fixture_inventory())
+
+
+def unlock_characters(root):
+    """Select a new private default save without changing recordings or tools."""
+    root = Path(root).expanduser().resolve()
+    settings_path = root / "environment.json"
+    previous_bytes = settings_path.read_bytes()
+    settings = read_settings(settings_path)
+    source = Path(settings["paths"]["fixture_gc"])
+    expected = settings["hashes"]["fixture_gc"]
+    require_managed_fixture(source, root, expected)
+    destination = prepare_unlocked_fixture(source, root, expected)
+    if destination == source:
+        return settings_path
+    history = root / "ConfigurationHistory" / hashlib.sha256(previous_bytes).hexdigest()
+    history.mkdir(mode=0o700, parents=True, exist_ok=True)
+    archive = history / "environment.json"
+    if archive.exists():
+        if archive.read_bytes() != previous_bytes:
+            raise ValueError("The prior environment archive changed")
+    else:
+        with archive.open("xb") as stream:
+            os.fchmod(stream.fileno(), 0o600)
+            stream.write(previous_bytes)
+            stream.flush()
+            os.fsync(stream.fileno())
+    settings["paths"]["fixture_gc"] = str(destination)
+    settings["hashes"]["fixture_gc"] = prepared_fixture_inventory()
+    _write_private(settings_path, settings)
+    return settings_path
 
 
 def migrate_fixture(root):
@@ -320,7 +372,7 @@ def configure(*, disc, dol, build_manifest, fixture_gc, root, refresh_build=Fals
             runtime_inventory(binary, binary.parents[2]) != build["runtime_dependencies"]):
         raise ValueError("Dolphin runtime libraries do not match the build receipt")
     fixture = file_inventory(fixture_gc)
-    if fixture != prepared_fixture_inventory():
+    if fixture not in (prepared_fixture_inventory(), prepared_fixture_inventory(legacy=True)):
         raise ValueError("The independently verified private prepared fixture is required")
     disc_hash = sha256(disc)
     verify_disc(disc, dol, disc_hash)
@@ -344,6 +396,9 @@ def configure(*, disc, dol, build_manifest, fixture_gc, root, refresh_build=Fals
     elif any(profile.iterdir()):
         raise ValueError("Existing configuration is preserved; review it before provisioning")
     fixture_gc = import_prepared_fixture(fixture_gc, root, fixture)
+    if previous is None:
+        fixture_gc = prepare_unlocked_fixture(fixture_gc, root, fixture)
+        fixture = prepared_fixture_inventory()
     installed_root = None
     created_install = False
     if install_dolphin:
@@ -452,17 +507,21 @@ def main():
                         help="Copy the verified Dolphin app and corresponding source archive into the private support root")
     parser.add_argument("--migrate-fixture", action="store_true",
                         help="Import the configured prepared save into private support storage without changing its bytes")
+    parser.add_argument("--unlock-characters", action="store_true",
+                        help="Use a versioned private save with every roster character unlocked; preserve prior saves and recordings")
     args = parser.parse_args()
     inputs = (args.disc, args.dol, args.build_manifest, args.fixture_gc)
-    if args.migrate_fixture:
-        if any(inputs) or args.refresh_build or args.install_dolphin:
-            parser.error("--migrate-fixture takes only --root")
+    if args.migrate_fixture or args.unlock_characters:
+        if any(inputs) or args.refresh_build or args.install_dolphin or (args.migrate_fixture and args.unlock_characters):
+            parser.error("--migrate-fixture and --unlock-characters are separate operations taking only --root")
     elif not all(inputs):
         parser.error("provisioning requires --disc, --dol, --build-manifest and --fixture-gc")
     from install_reference_capture import installation_guard
     with installation_guard(args.root):
         if args.migrate_fixture:
             print(migrate_fixture(args.root))
+        elif args.unlock_characters:
+            print(unlock_characters(args.root))
         else:
             print(configure(disc=args.disc, dol=args.dol, build_manifest=args.build_manifest,
                             fixture_gc=args.fixture_gc, root=args.root, refresh_build=args.refresh_build,

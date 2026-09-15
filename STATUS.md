@@ -1,5 +1,20 @@
 # Current status
 
+Reference Capture provisioning now defaults to all roster characters unlocked.
+Existing installations can select the new immutable private fixture with
+`--unlock-characters`, preserving the original save, configuration history,
+recordings, Dolphin binary, and physical-controller profile. The pinned GCI's
+character mask changes from `0x0024` to `0x07ff`; stage progress is unchanged.
+The encoded result matches the original HSD routines and passes the original
+C decoder. The installed 0.2.3 verifier accepts the new fixture, and an ordinary
+retail boot reaches the title/attract screen without a card error. A visual CSS
+check remains unverified because automated keyboard input did not reach Dolphin.
+Focused save/provisioning tests pass. With the pinned dependencies prepared,
+the complete 904-test suite passes (54 optional skips). The earlier attempt
+with missing dependencies remains preserved. This is save/provisioning evidence,
+not new gameplay or port acceptance.
+See the [upgrade procedure](docs/REFERENCE_CAPTURE_APP.md).
+
 The physical Falco/Marth/Yoshi replay now matches every declared fighter field
 across all 9,019 visible-browser ticks except 17 CPU-related input samples.
 Four original fused operations in `HSD_MtxSRT` remove the tick-473 position
