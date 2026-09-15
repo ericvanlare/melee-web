@@ -52,6 +52,7 @@ function makeDocument() {
     'keyboard-bindings', 'controller-advanced', 'controllers', 'idle-hint', 'fullscreen', 'end-session', 'status',
     'progress', 'disc-dialog', 'disc-ack', 'disc-cancel', 'disc-continue', 'error-dialog',
     'error', 'retry', 'error-close',
+    'loading-panel', 'loading-label', 'loading-progress', 'loading-detail',
   ];
   const elements = new Map(ids.map(id => [id, new FakeElement('div', id)]));
   elements.get('canvas').focus = () => { document.activeElement = elements.get('canvas'); };
@@ -152,8 +153,26 @@ async function runScenario({name, failStartup}) {
     if (failStartup) throw Error('cache directory denied');
     trace.push('native-main');
     nativeMainCalled = true;
-    options.onState({ready: true, requiresReload: false, busy: false, state: 'idle', paused: false,
-      canImport: true, canStart: false, canPause: false, canUnload: false, progress: null, message: 'Ready'});
+    const idle = {ready: true, requiresReload: false, busy: false, state: 'idle', paused: false,
+      canImport: true, canStart: false, canPause: false, canUnload: false, progress: null, loading: null, message: 'Ready'};
+    options.onState({...idle, state: 'booting', ready: false, canImport: false,
+      loading: {phase: 'engine', message: 'Starting player…', complete: null, total: null}});
+    assert.equal(document.getElementById('loading-panel').hidden, false);
+    assert.equal(document.getElementById('idle-hint').hidden, true, 'Loading owns the current status');
+    assert.equal(document.getElementById('loading-label').textContent, 'Starting player…');
+    assert.equal(document.getElementById('loading-progress').value, undefined);
+    options.onState({...idle,
+      loading: {phase: 'graphics', message: 'Preparing graphics…', complete: 72, total: 120}});
+    assert.equal(document.getElementById('loading-detail').textContent, '60% complete');
+    assert.equal(document.getElementById('choose-disc').disabled, false, 'Graphics feedback must not block disc selection');
+    options.onState({...idle,
+      loading: {phase: 'graphics', message: 'Preparing graphics…', complete: 507, total: 508}});
+    assert.equal(document.getElementById('loading-detail').textContent, '99% complete', 'Pending work must not round to 100%');
+    options.onState({...idle, state: 'error', loading: {message: 'Preparing graphics…'}});
+    assert.equal(document.getElementById('loading-panel').hidden, true, 'Errors replace loading feedback');
+    options.onState(idle);
+    assert.equal(document.getElementById('loading-panel').hidden, true, 'Ready player has no loading overlay');
+    assert.equal(document.getElementById('idle-hint').hidden, false, 'Ready player retains the disc instruction');
     return {
       controllers: {
         inspect: () => [], sample: () => [],

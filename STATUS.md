@@ -91,6 +91,23 @@ See [controller scope and verification](docs/CONTROLLERS.md).
 
 ## Public runtime
 
+The user-approved renderer startup fix is now live at
+[webmelee.gg](https://webmelee.gg/). PR #18 merged with green exact-head CI;
+the production artifact and apex each passed HTTP verification and ten real
+browser UI checks. The runtime bytes match the accepted preview. This is a
+functional alpha release, without a startup-speedup or expanded gameplay
+acceptance claim. See the [production record](docs/RENDERER_PRODUCTION_PROMOTION.md).
+
+A separate [loading-feedback preview](docs/PUBLIC_LOADING_FEEDBACK.md) adds
+visible startup phases and bounded file-transfer batches. One local cold/warm
+Mario/FD lifecycle pair passes with zero unexpected pipelines, 7.335/8.960 ms
+native maxima and 24.010/27.305 ms browser gaps. Disc preparation measured
+2.149/2.010 seconds; this does not establish a cold-driver startup-speedup claim.
+The production renderer artifact remains unchanged by that follow-up.
+
+The following startup measurements and rejected hosted attempts are retained
+from the pre-promotion decision:
+
 The shared startup/complete-catalog fix passes local cold/warm Mario/FD and
 Falco/Battlefield with zero unexpected pipelines and native/browser maxima of
 9.805/27.350 ms. Required MEMFS setup now belongs to the shared player owner;
