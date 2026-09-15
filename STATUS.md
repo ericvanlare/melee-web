@@ -1,5 +1,16 @@
 # Current status
 
+The physical Falco/Marth/Yoshi replay now matches every declared fighter field
+across all 9,019 visible-browser ticks except 17 CPU-related input samples.
+Four original fused operations in `HSD_MtxSRT` remove the tick-473 position
+error; the first remaining core difference is CPU input at tick 901. Passive
+original probes establish its RNG-seed and fighter-pointer register producers,
+without using captured addresses as inputs or changing CPU integration. The
+1,199-tick 2P and 4,346-tick 3P browser core/CPU regressions remain exact.
+Camera, later subject rounding, draw scheduling and headless completion failures
+remain open. See the [causal audit and scoped evidence](docs/PHYSICAL_REPLAY_SRT.md).
+The installed capture app, PR #16, PR #20 and public deployment are unchanged.
+
 Reference Capture 0.2.3 adds startup cancellation and interrupted replay cleanup,
 CPU-sidecar binding to its core timeline and derived artifact, and exact Dolphin
 source-composition checks with atomic, repeatable provenance publication. The
