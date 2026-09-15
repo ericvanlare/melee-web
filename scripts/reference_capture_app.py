@@ -73,6 +73,9 @@ def dolphin_command(settings, user):
     paths = settings["paths"]
     command = [paths["dolphin"], "-u", str(user), "-b", "-e", paths["disc"]]
     options = {
+        # The supervisor owns stop/finalization; a modal confirmation can hold
+        # the process open until its timeout escalates to a forced termination.
+        "Dolphin.Interface.ConfirmStop": "False",
         "Dolphin.Input.BackgroundInput": "True",
         "Dolphin.Display.Fullscreen": "False",
         "Dolphin.Core.CPUCore": "4", "Dolphin.Core.CPUThread": "False",
