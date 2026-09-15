@@ -1,0 +1,149 @@
+diff --git a/Source/Core/Core/CMakeLists.txt b/Source/Core/Core/CMakeLists.txt
+index e411239d17..9462c78005 100644
+--- a/Source/Core/Core/CMakeLists.txt
++++ b/Source/Core/Core/CMakeLists.txt
+@@ -665,6 +665,8 @@ elseif(_M_ARM_64)
+     PowerPC/JitArm64/Jit_Util.cpp
+     PowerPC/JitArm64/Jit_Util.h
+     PowerPC/JitArm64/JitArm64_Tables.cpp
++    PowerPC/ReferenceCaptureObserver.cpp
++    PowerPC/ReferenceCaptureObserver.h
+     PowerPC/JitArmCommon/BackPatch.h
+   )
+ endif()
+diff --git a/Source/Core/Core/Boot/Boot.cpp b/Source/Core/Core/Boot/Boot.cpp
+index 66ee9f7d2d..6e131d7cc1 100644
+--- a/Source/Core/Core/Boot/Boot.cpp
++++ b/Source/Core/Core/Boot/Boot.cpp
+@@ -53,5 +53,6 @@
+ #include "Core/PatchEngine.h"
+ #include "Core/PowerPC/PPCAnalyst.h"
+ #include "Core/PowerPC/PPCSymbolDB.h"
+ #include "Core/PowerPC/PowerPC.h"
++#include "Core/PowerPC/ReferenceCaptureObserver.h"
+ #include "Core/System.h"
+@@ -521,5 +522,8 @@ struct BootTitle
+     bool operator()(BootParameters::Disc& disc) const
+     {
+       NOTICE_LOG_FMT(BOOT, "Booting from disc: {}", disc.path);
++      if (ReferenceCapture::Observer::IsEnabled() &&
++          (!disc.volume || !ReferenceCapture::Observer::ValidateDiscDOL(*disc.volume)))
++        return false;
+       const DiscIO::VolumeDisc* volume =
+           SetDisc(system.GetDVDInterface(), std::move(disc.volume), disc.auto_disc_change_paths);
+@@ -631,4 +638,8 @@ struct BootTitle
+     bool operator()(const BootParameters::IPL& ipl) const
+     {
+       NOTICE_LOG_FMT(BOOT, "Booting GC IPL: {}", ipl.path);
++      if (ReferenceCapture::Observer::IsEnabled() &&
++          (!ipl.disc || !ipl.disc->volume ||
++          !ReferenceCapture::Observer::ValidateDiscDOL(*ipl.disc->volume)))
++        return false;
+       if (!File::Exists(ipl.path))
+diff --git a/Source/Core/Core/PowerPC/JitArm64/Jit.cpp b/Source/Core/Core/PowerPC/JitArm64/Jit.cpp
+index 5b61528fae..779d6d5b12 100644
+--- a/Source/Core/Core/PowerPC/JitArm64/Jit.cpp
++++ b/Source/Core/Core/PowerPC/JitArm64/Jit.cpp
+@@ -36,6 +36,7 @@
+ #include "Core/PowerPC/JitCommon/ConstantPropagation.h"
+ #include "Core/PowerPC/JitInterface.h"
+ #include "Core/PowerPC/PowerPC.h"
++#include "Core/PowerPC/ReferenceCaptureObserver.h"
+ #include "Core/System.h"
+ 
+ using namespace Arm64Gen;
+@@ -1200,6 +1201,28 @@ bool JitArm64::DoJit(u32 em_address, JitBlock* b, u32 nextPC)
+   gpr.Start(js.gpa);
+   fpr.Start(js.fpa);
+ 
++  // A boundary callback exports the complete PowerPC GPR array.  A normal
++  // JIT block may discard dead cache entries before the callback, which
++  // intentionally leaves no recoverable value in either the host register or
++  // PPC state.  Keep all cache entries materializable for blocks containing a
++  // boundary; register pressure still causes ordinary cache eviction, which
++  // writes the value back to PPC state.
++  const bool observer_enabled = ReferenceCapture::Observer::IsEnabled();
++  bool observer_block = false;
++  if (observer_enabled)
++  {
++    for (u32 observer_index = 0; observer_index < code_block.m_num_instructions;
++         ++observer_index)
++    {
++      const PPCAnalyst::CodeOp& observer_op = m_code_buffer[observer_index];
++      if (!observer_op.skip && ReferenceCapture::Observer::IsBoundary(observer_op.address))
++      {
++        observer_block = true;
++        break;
++      }
++    }
++  }
++
+   m_constant_propagation.Clear();
+ 
+   if (!js.noSpeculativeConstantsAddresses.contains(js.blockStart))
+@@ -1289,6 +1310,22 @@ bool JitArm64::DoJit(u32 em_address, JitBlock* b, u32 nextPC)
+       }
+     }
+ 
++    // Emit the passive observer only for exact GALE01r2 boundary PCs.  Flush
++    // guest register caches so the callback sees the completed state GDB saw
++    // at each boundary; it never writes emulated memory or changes the op.
++    if (!op.skip && observer_enabled &&
++        ReferenceCapture::Observer::IsBoundary(op.address))
++    {
++      FlushCarry();
++      // ABI_CallFunction may clobber caller-saved host registers.  Flush all
++      // cached guest state before entering the observer and invalidate the
++      // cache entries so the next generated instruction reloads them.
++      gpr.Flush(FlushMode::All, ARM64Reg::INVALID_REG);
++      fpr.Flush(FlushMode::All, ARM64Reg::INVALID_REG);
++      ABI_CallFunction(&ReferenceCapture::Observer::OnBoundary, &m_system, op.address,
++                       &m_ppc_state);
++    }
++
+     if (HandleFunctionHooking(op.address))
+       break;
+ 
+@@ -1410,7 +1447,7 @@ bool JitArm64::DoJit(u32 em_address, JitBlock* b, u32 nextPC)
+         FlushCarry();
+ 
+       // If we have a register that will never be used again, discard or flush it.
+-      if (!bJITRegisterCacheOff)
++      if (!bJITRegisterCacheOff && !observer_block)
+       {
+         gpr.DiscardRegisters(op.gprDiscardable);
+         fpr.DiscardRegisters(op.fprDiscardable);
+diff --git a/Source/Core/Core/HW/EXI/EXI.cpp b/Source/Core/Core/HW/EXI/EXI.cpp
+index 41f8e27a0b..8ec2c8a7e4 100644
+--- a/Source/Core/Core/HW/EXI/EXI.cpp
++++ b/Source/Core/Core/HW/EXI/EXI.cpp
+@@ -9,4 +9,5 @@
+ #include "Common/IOFile.h"
+ 
+ #include "Core/Config/MainSettings.h"
++#include "Core/Config/SessionSettings.h"
+ #include "Core/ConfigManager.h"
+@@ -168,7 +169,10 @@ void ExpansionInterfaceManager::Shutdown()
+   CEXIMemoryCard::Shutdown();
+ 
+   if (!m_using_overridden_sram)
+   {
++    if (!Config::Get(Config::SESSION_SAVE_DATA_WRITABLE))
++      return;
++
+     File::IOFile file(SConfig::GetInstance().m_strSRAM, "wb");
+     auto& sram = m_system.GetSRAM();
+     file.WriteArray(&sram, 1);
+
+diff --git a/Source/Core/Core/HW/GCMemcard/GCMemcardDirectory.cpp b/Source/Core/Core/HW/GCMemcard/GCMemcardDirectory.cpp
+index e3e5a4c688..d20ccb7f59 100644
+--- a/Source/Core/Core/HW/GCMemcard/GCMemcardDirectory.cpp
++++ b/Source/Core/Core/HW/GCMemcard/GCMemcardDirectory.cpp
+@@ -618,4 +618,7 @@ void GCMemcardDirectory::FlushToFile()
+ 
+ void GCMemcardDirectory::FlushToFile()
+ {
++  if (!Config::Get(Config::SESSION_SAVE_DATA_WRITABLE))
++    return;
++
+   std::unique_lock l(m_write_mutex);

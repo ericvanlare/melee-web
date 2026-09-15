@@ -1,0 +1,380 @@
+{
+  "base_commit": "df80afaf53708d12c865c9e620dcc5dba3da5ef6",
+  "browser": {
+    "all_tick_matched_fighter_fields": [
+      "slot",
+      "kind",
+      "motion",
+      "animation",
+      "ground_air",
+      "facing_bits",
+      "position_bits",
+      "velocity_bits",
+      "knockback_bits",
+      "animation_frame_bits",
+      "animation_speed_bits",
+      "damage_bits",
+      "shield_bits",
+      "stocks"
+    ],
+    "comparison_sha256": "69e9efc0cc5771ce29c9009f06bfbecf15fa762270242d7bdcf0844843fbd04f",
+    "complete": true,
+    "cpu_domains": {
+      "camera": {
+        "first_divergence": {
+          "actual": "41a00000",
+          "expected": "41f00000",
+          "field": "camera.fov_bits",
+          "phase": "frame",
+          "tick": 0
+        },
+        "status": "diverged"
+      },
+      "cpu": {
+        "first_divergence": {
+          "actual": "80008100098e017f7f",
+          "expected": "809081e0098e017f7f",
+          "field": "players[1].cpu.command_bytes",
+          "phase": "frame",
+          "tick": 901
+        },
+        "status": "diverged"
+      },
+      "hud": {
+        "first_divergence": null,
+        "status": "matched"
+      },
+      "magnifier": {
+        "first_divergence": null,
+        "status": "matched"
+      },
+      "match": {
+        "first_divergence": null,
+        "status": "matched"
+      },
+      "subject": {
+        "first_divergence": {
+          "actual": "bdd4a958",
+          "expected": "bdd4a95c",
+          "field": "players[0].subject.bone_bits[2]",
+          "phase": "frame",
+          "tick": 160
+        },
+        "status": "diverged"
+      }
+    },
+    "cpu_trace_sha256": "dc144c04a1b23862c725330ed5c2b58af936066d0e6956addcb5fd123184dd2b",
+    "draws": 9019,
+    "extra_draws": 8,
+    "field_audit_sha256": "3aab9b726258b35b731c316f1395745ed04b589d365951d2e13ca8c82f00ecd9",
+    "first_core_difference": {
+      "field": "fighters[1].input_hex",
+      "tick": 901
+    },
+    "other_all_tick_agreement": [
+      "supplied human/device input",
+      "PAD history",
+      "RNG",
+      "match clock",
+      "HUD",
+      "magnifier",
+      "match result"
+    ],
+    "reference_draws": 9011,
+    "remaining_input_samples": 17,
+    "runtime": {
+      "action-sweep.mjs": "e4de82aaa8b990b5ac2d887a6bcd12a8ac402bc99e9556393833f2e0a80f9219",
+      "audio-ring.mjs": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf",
+      "audio-worklet.js": "ef4374ac08f5bab821efa05cf5d252ca8e4b50647710d434e192beac3d7d7b4f",
+      "disc-image.mjs": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a",
+      "dsp-coefficients.mjs": "5176d1cf4400228f31dff428bcc8cd60d07694c0ceea1628a79ac19f3e112b4a",
+      "gameplay_menu_browser.data": "cdf157ee0f1850884f07a71165fd2192177acb23c2c777313b719e70ea67546f",
+      "gameplay_menu_browser.js": "341a3fd697a51432f6087edb228e15d5d48b09cee99992eea0109208787f4af2",
+      "gameplay_menu_browser.wasm": "b629f0719d0616878f499d980590e41bd9d260b928104e38ad69f234e6b720a4",
+      "hitch-capture.mjs": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3",
+      "match-flow.mjs": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f",
+      "match-menu.mjs": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba",
+      "melee-runtime.mjs": "0cb50db08ff53b910e80928b0bae9188d9ac8e43a5230561d55d4ba3451eb222",
+      "runtime-assets.mjs": "422f220df5ae8edbba2a2793e67e295359ea08c3cdf22e676f933c23882db2ce",
+      "runtime-audio-assets.mjs": "b9bfd3f841d73e4ee4987fc5ac7351832c4ae8eca48ba5cf9c95578a238c7dbc",
+      "runtime-audio.mjs": "d968d2b2f9b58d2ab5dc1a4720d2ad2114cfbcac44a888694da7850100546545",
+      "runtime-cache.js": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26",
+      "runtime-development.mjs": "138e1471207444e61615f6f7fc31ec3d6e36eae7efb158d539ce92fd7e58a0f5",
+      "runtime.html": "afd340c25023f842b241e893d5634f6019c73f922d8ddf0b67348e38227c608e"
+    },
+    "state_trace_sha256": "bffdd1bc29ac54b94477b0367766d05abbba84c2bc7ee37b099cfcc1753d7d17",
+    "strict_status": "diverged",
+    "ticks": 9019
+  },
+  "causal_boundary": {
+    "ecb_half_width_before": "402baab0",
+    "ecb_half_width_original": "402baaa8",
+    "match_frame": 350,
+    "native_and_checked_wasm": true,
+    "observed_inputs": "local scale/rotation/translation and parent matrix agree; first child world matrix differs",
+    "position_x_before": "426abaab",
+    "position_x_original": "426abaaa",
+    "routine": "HSD_MtxSRT",
+    "scalar_cases": 8,
+    "scalar_fixture_sha256": "e2cc820de0e58778ed3323ed35d0f9bdc6643747a6bf4dfe449a7e3d29db2ec8",
+    "source_pc": [
+      "8037a388",
+      "8037a38c",
+      "8037a3b4",
+      "8037a3b8"
+    ],
+    "tick": 473,
+    "unfused_control": "reproduces all eight prior native matrix outputs"
+  },
+  "cpu_register_producer": {
+    "command_x_source": "selected RNG seed pointer left in volatile r5 by HSD_Randf, observed after 800ae21c and unchanged at 800ac74c",
+    "command_y_source": "fighter pointer retained in r30 by ftCo_800B27A4, copied into r5 for 800ac75c",
+    "implementation_inputs_from_capture": false,
+    "integration_changed": false,
+    "match_frame": 778,
+    "proof_sha256": "2f19b25737d72aca913fe4486383911c10c9a9c0fd3b03e26a5458133e835922",
+    "remaining_prerequisite": "independently derived original RNG global and fighter allocation identities plus the source register-carry path; original allocation/context reconstruction remains separate",
+    "tick": 901
+  },
+  "failed_attempts": [
+    "GDB diagnostic changed input timing and was rejected before the target; retained as invalid",
+    "first scalar harness transcribed one parent operand incorrectly; corrected from parsed captured JSON, failed attempt retained privately",
+    "first development comparison requested JITARM64 for Interpreter64 references; provenance rejection preserved, rerun with the pinned original backend"
+  ],
+  "native": {
+    "comparison_sha256": "f065683c8d345e9b15f3fac006d7aca32c76d5173f9434c367df2939da6213fe",
+    "complete": false,
+    "first_fighter_difference": {
+      "field": "fighters[1].input_hex",
+      "tick": 901
+    },
+    "remaining_match_clock_first_difference": 5787,
+    "remaining_rng_first_difference": 4468,
+    "strict_status": "incomplete_prefix",
+    "ticks": 5901,
+    "trace_sha256": "ea74fedcfb682edfa5228d625e76a72f8628ad3de7c29dea8c7c597e5f8e38ff"
+  },
+  "original_diagnostic": {
+    "comparison_sha256": "2401a2629149ae79495d888e54a4707455b1b96e06cd2d299b6524be4709ce55",
+    "completion": {
+      "complete": true,
+      "missing_coverage": [
+        "audio_pcm",
+        "menu_equivalence",
+        "virtual_memory_card_comparison"
+      ],
+      "pad_polls": 10625,
+      "physical_controller_validation": "not_performed_by_automation",
+      "result": {
+        "outcome": 2,
+        "winners": [
+          0
+        ]
+      },
+      "source_draws": 9011,
+      "source_ticks": 9019
+    },
+    "diagnostics_sha256": "4428e01a5daa6c296efe29c741510165945103c0f5086f36afd527b145a04635",
+    "dolphin_binary_sha256": "d728affb6f1c8dc0d2632df47e356cd9aee61afac12dbe84f5d4b94acaffea84",
+    "events": 47658,
+    "guest_writes": false,
+    "input_events": 21268,
+    "observer_sha256": "b9fa69a0425f7ac4a633df68f65db802fc0e12cd9a613ea03324c8344274c1c0",
+    "private_observer_patch_sha256": "261268bc9f033cf869af34a88bc98878d5c2ca21ba1831f4369648c75c475687",
+    "scope": "semantics compared across explicitly changed observer identity; not ordinary same-environment bundle admission",
+    "status": "matched"
+  },
+  "physical_capture": {
+    "human_recipe_sha256": "4100b80553217fa25f2843689861ae4262895ea12783bf5125f335150493f80f",
+    "manifest_sha256": "47a9bacbd062e178033b5e16e1913c8e4383544356fd793412a6a6abb9324416",
+    "observer_sha256": "76694b0153395f6aa344e2401d60192c21b50b852f9ddb25ec73ae04d967eec4",
+    "setup": "human Falco versus level-6 CPU Marth, four stocks, Yoshi\u2019s Story",
+    "ticks": 9019
+  },
+  "regressions": {
+    "browser_three-player": {
+      "comparison_sha256": "94c9190fb4d9cd77c3b523c392949b5120ca050215c04b4b198ce8f9b44da45f",
+      "core_status": "declared_state_match",
+      "cpu_domains": {
+        "camera": {
+          "actual": "41a00000",
+          "expected": "41f00000",
+          "field": "camera.fov_bits",
+          "phase": "frame",
+          "tick": 0
+        },
+        "cpu": null,
+        "draw_alignment": {
+          "actual_count": 4346,
+          "expected_count": 4343,
+          "extra_in_actual_count": 3,
+          "extra_in_actual_first": {
+            "ordinal": 1598,
+            "source_index": 1598
+          },
+          "matched_count": 4343,
+          "missing_from_actual_count": 0,
+          "scope": "source_draws_by_source_index",
+          "status": "misaligned"
+        },
+        "hud": null,
+        "magnifier": null,
+        "match": null,
+        "subject": {
+          "actual": "41c94da7",
+          "expected": "41c94da8",
+          "field": "players[1].subject.bone_bits[1]",
+          "phase": "frame",
+          "tick": 2862
+        }
+      },
+      "cpu_status": "declared_state_divergence",
+      "first_core_difference": null,
+      "frames": 4346,
+      "trace_sha256": "0050077815b44d5259777dd98e61c924040d9f47b2d579b622881435f7f665da"
+    },
+    "browser_two-player": {
+      "comparison_sha256": "c5af0f7fd1b0ea34152f61d6d40ba90e5cb1c2270cce0cc2951f185231d1d5ea",
+      "core_status": "declared_state_match",
+      "cpu_domains": {
+        "camera": {
+          "actual": "46ea6000",
+          "expected": "46800000",
+          "field": "camera.far_bits",
+          "phase": "frame",
+          "tick": 0
+        },
+        "cpu": null,
+        "draw_alignment": {
+          "actual_count": 1199,
+          "expected_count": 1199,
+          "extra_in_actual_count": 0,
+          "matched_count": 1199,
+          "missing_from_actual_count": 0,
+          "scope": "source_draws_by_source_index",
+          "status": "aligned"
+        },
+        "hud": null,
+        "magnifier": null,
+        "match": null,
+        "subject": null
+      },
+      "cpu_status": "declared_state_divergence",
+      "first_core_difference": null,
+      "frames": 1199,
+      "trace_sha256": "75baf980adafb575936933c08359a26c172192cad4f5f2f58124aaad189e2fc9"
+    },
+    "native_three-player": {
+      "comparison_sha256": "6a066a5cb613052f8d5473b8bcf3c804e58c5bc34a5a6a77564b9544e1a0bc91",
+      "core_status": "invalid_capture",
+      "cpu_domains": null,
+      "cpu_status": "invalid_or_incomplete_port",
+      "first_core_difference": {
+        "actual": 1634373299,
+        "expected": 2750470235,
+        "field": "rng",
+        "frame": 2241,
+        "record": "frame"
+      },
+      "frames": 4346,
+      "trace_sha256": "e407f1e6021dcc434581863a895a0a0773c53a97f7f5386a61f376575589b145"
+    },
+    "native_two-player": {
+      "comparison_sha256": "32f25bc6fe4e97230490d5aa8826e7823dabc32c7866512eadf87886f4aec0f1",
+      "core_status": "declared_state_match",
+      "cpu_domains": {
+        "camera": {
+          "actual": "46800000",
+          "expected": "46ea6000",
+          "field": "camera.far_bits",
+          "phase": "frame",
+          "tick": 1
+        },
+        "cpu": null,
+        "draw_alignment": {
+          "actual_count": 0,
+          "expected_count": 1199,
+          "extra_in_actual_count": 0,
+          "matched_count": 0,
+          "missing_from_actual_count": 1199,
+          "missing_from_actual_first": {
+            "ordinal": 0,
+            "source_index": 0
+          },
+          "scope": "draws_not_compared_headless",
+          "status": "not_compared"
+        },
+        "hud": null,
+        "magnifier": {
+          "actual": 0,
+          "expected": 3,
+          "field": "players[0].magnifier.edge",
+          "phase": "frame",
+          "tick": 322
+        },
+        "match": null,
+        "subject": null
+      },
+      "cpu_status": "declared_state_divergence",
+      "first_core_difference": null,
+      "frames": 1199,
+      "trace_sha256": "e16df47394d7b26333137fbef12b5f9ddfd2106efac0a0703e2cd30654f92285"
+    }
+  },
+  "schema": "melee-web-physical-replay-srt-fix",
+  "scope": {
+    "audio_compared": false,
+    "four_player_or_holdouts_run": false,
+    "gold_admitted": false,
+    "installed_application_changed": false,
+    "performance_accepted": false,
+    "pixels_compared": false,
+    "pr16_unchanged_head": "22b71a0a81fa5bfdf7856f9a451c3f0081b01b6b",
+    "pr20_unchanged_head": "df80afaf53708d12c865c9e620dcc5dba3da5ef6",
+    "protected_payloads_tracked": false,
+    "public_deployment_changed": false
+  },
+  "source": {
+    "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+    "dolphin_commit": "c77bbaa0f372c3f72281602a8b087206706542cb",
+    "melee_commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+    "original_mtx_source_sha256": "f310c0e473efa52037f5ddaaaa415f1b705915c853b3a071241ede2a548941ac",
+    "patch_sha256": "2841d8c0447b7fffe566d144534eaf223e763b2c3b7be3e7af3f9a1ed0fb95f9",
+    "prepared_mtx_source_sha256": "10f83e5e5d1c23d1c25194499bbacc28e8debeb0c0b5b84b2bc6c1976f07accd"
+  },
+  "validation": {
+    "builds": {
+      "checked_headless_trace": "passed",
+      "release_browser": "passed"
+    },
+    "development_recipe_hashes": {
+      "three-player": {
+        "sha256": "b67336a975f0c353a3c98a850f2b2f74dd789e35937fe315cf7dbda7af833858",
+        "size": 192374,
+        "source_unchanged": true
+      },
+      "two-player": {
+        "sha256": "c26f1379ca34a2ea8d28cb0d3e903800d49eccbf677acc7e6f002f91e0e82687",
+        "size": 53906,
+        "source_unchanged": true
+      }
+    },
+    "focused_math": {
+      "log_sha256": "aea30bca43573f7f42dc4c8011b03aef851f1410d4806d89952c179d098a74c9",
+      "seconds": 10.223,
+      "status": "passed",
+      "tests": 6
+    },
+    "full_suite": {
+      "log_sha256": "ef472b1f4008ef5b078ba878ffa285d2d5dd00f018324ce66d1aec58fee95c6f",
+      "seconds": 228.718,
+      "skipped": 37,
+      "status": "passed",
+      "tests": 895
+    },
+    "installed_app_identity_sha256": "a716770d45fbaf9259718f8ef629b0affd1ec40f5704b3490b47e2e02808940c",
+    "installed_dolphin_sha256": "351c032725844b3d751d5b1f35a97802624e79dcbfbd849b1fef561ab92134d5",
+    "original_source_checkouts_clean": true
+  },
+  "version": 1
+}

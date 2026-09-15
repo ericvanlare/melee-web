@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "melee-web-reference-validation-v1",
+  "title": "Frozen semantic validation sidecar",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schema", "version", "session_id", "valid", "record_count"],
+  "properties": {
+    "schema": {"const": "melee-web-reference-validation-v1"},
+    "version": {"const": 1},
+    "session_id": {"type": "string"},
+    "valid": {"const": true},
+    "record_count": {"type": "integer", "minimum": 1},
+    "semantic": {"type": ["object", "null"]}
+  }
+}

@@ -1,0 +1,321 @@
+{
+  "application": {
+    "app_code_sha256": "f49f705051bc9a854eb15753bb06992dc3fa8e5f0efbfcccc0f0bb6dd84dd8cc",
+    "application": "WebMelee Reference Capture",
+    "version": "0.1.0"
+  },
+  "base_commit": "6ead0bbe719df7f9db5f4fac6b7b8626d494ccb9",
+  "capture": {
+    "boundaries": {
+      "draw_enter": 3836,
+      "draw_return": 3836,
+      "entry": 1,
+      "fighter_create": 2,
+      "pad_consume": 24415,
+      "pad_poll": 24972,
+      "result_enter": 1,
+      "result_return": 1,
+      "scene_exit": 1,
+      "scene_teardown": 1,
+      "setup": 1,
+      "source_tick": 3838
+    },
+    "events": 60908,
+    "lifecycle": {
+      "completed": true,
+      "end_count": 1,
+      "end_status": {
+        "natural": true,
+        "status": "completed"
+      },
+      "error_count": 0,
+      "handshake_count": 1,
+      "progress_count": 0,
+      "start_count": 1
+    },
+    "manifest_sha256": "8081c3a1774f65b38eae38da00466251f1467d13417169eef35093c08a85643b",
+    "observer_bytes": 103201837,
+    "observer_sha256": "11d1585e75f65daeb8660fc2dbc8f60fddcd4629125fd575224deb7c42d46ad1",
+    "remaining_fighter_slots": [],
+    "result": {
+      "outcome": 1,
+      "winners": [
+        1
+      ]
+    },
+    "scenario": {
+      "cpu": "Fox",
+      "cpu_level": 1,
+      "human": "Mario",
+      "items": "off",
+      "stage": "Final Destination",
+      "stocks": 2,
+      "time_limit_seconds": 60
+    }
+  },
+  "claims": {
+    "cpu_2495_fix": false,
+    "gold_admitted": false,
+    "public_deployment_changed": false,
+    "reference_repeatability": "not_established"
+  },
+  "comparisons": {
+    "browser": {
+      "core": {
+        "checks": {
+          "active_player_count": "pass",
+          "entry": "pass",
+          "fighters": "diverged",
+          "frame_count": "pass",
+          "inputs": "pass",
+          "match_frame": "pass",
+          "pad_state_hex": "pass",
+          "rng": "pass"
+        },
+        "first_divergence": {
+          "actual": "c081c074",
+          "expected": "c081c072",
+          "field": "fighters[0].position_bits[1]",
+          "frame": 1976,
+          "record": "frame"
+        },
+        "first_divergence_by_group": {
+          "fighters": {
+            "actual": "c081c074",
+            "expected": "c081c072",
+            "field": "fighters[0].position_bits[1]",
+            "frame": 1976,
+            "record": "frame"
+          }
+        },
+        "frames_compared": 3838,
+        "gold_admitted": false,
+        "performance": "not_evaluated",
+        "scope": "declared entry data, supplied inputs, fighter fields, RNG and match clock, PAD configuration and all three history banks only; pixel agreement, hardware and audio output are excluded",
+        "source_drawing": "source_draws",
+        "status": "diverged"
+      },
+      "cpu": {
+        "coverage": {
+          "camera": {
+            "first_divergence": {
+              "actual": "46ea6000",
+              "expected": "46800000",
+              "field": "camera.far_bits",
+              "phase": "frame",
+              "tick": 0
+            },
+            "status": "diverged"
+          },
+          "cpu": {
+            "first_divergence": null,
+            "status": "matched"
+          },
+          "hud": {
+            "first_divergence": null,
+            "status": "matched"
+          },
+          "magnifier": {
+            "first_divergence": null,
+            "status": "matched"
+          },
+          "match": {
+            "first_divergence": null,
+            "status": "matched"
+          },
+          "subject": {
+            "first_divergence": {
+              "actual": "bf147cea",
+              "expected": "bf147ce9",
+              "field": "players[1].subject.bone_bits[2]",
+              "phase": "frame",
+              "tick": 82
+            },
+            "status": "diverged"
+          }
+        },
+        "first_divergence": {
+          "actual": "46ea6000",
+          "expected": "46800000",
+          "field": "camera.far_bits",
+          "phase": "frame",
+          "tick": 0
+        },
+        "native_draws": 3836,
+        "native_frames": 3838,
+        "native_sha256": "c29ee86ede8e21b5289030683169e2a04e93aee7b3a2dc03f5d2032c96cb1dbe",
+        "status": "diverged",
+        "target_draws": 3838,
+        "target_frames": 3838,
+        "target_sha256": "03a0b1c70a370a86b4c38036973b23c9ee084c45b6beb0221622b9a2cda03b24"
+      },
+      "draw_alignment": {
+        "actual_count": 3838,
+        "expected_count": 3836,
+        "extra_in_actual_count": 2,
+        "matched_count": 3836,
+        "missing_from_actual_count": 0,
+        "scope": "source_draws_by_source_index",
+        "status": "misaligned"
+      },
+      "report_sha256": "4ea3c36de84c6b6c6575664a25997fbeb59a2ac6e6e8dc19d13564d3bd779d2d",
+      "status": "diverged",
+      "trace": {
+        "frames": 3838,
+        "kind": "browser",
+        "sha256": "d5ae2efeec0f2a00959f5e315961f511fa7db6e519e5c5af7be1c49a98472d01"
+      }
+    },
+    "native": {
+      "core": {
+        "checks": {
+          "active_player_count": "pass",
+          "entry": "pass",
+          "fighters": "diverged",
+          "frame_count": "pass",
+          "inputs": "pass",
+          "match_frame": "pass",
+          "pad_state_hex": "pass",
+          "rng": "pass"
+        },
+        "first_divergence": {
+          "actual": "c081c074",
+          "expected": "c081c072",
+          "field": "fighters[0].position_bits[1]",
+          "frame": 1976,
+          "record": "frame"
+        },
+        "first_divergence_by_group": {
+          "fighters": {
+            "actual": "c081c074",
+            "expected": "c081c072",
+            "field": "fighters[0].position_bits[1]",
+            "frame": 1976,
+            "record": "frame"
+          }
+        },
+        "frames_compared": 3838,
+        "gold_admitted": false,
+        "performance": "not_evaluated",
+        "scope": "declared entry data, supplied inputs, fighter fields, RNG and match clock, PAD configuration and all three history banks only; rendering, hardware and audio output are excluded",
+        "source_drawing": "excluded",
+        "status": "diverged"
+      },
+      "cpu": {
+        "coverage": {
+          "camera": {
+            "first_divergence": {
+              "actual": "46800000",
+              "expected": "46ea6000",
+              "field": "camera.far_bits",
+              "phase": "frame",
+              "tick": 1
+            },
+            "status": "diverged"
+          },
+          "cpu": {
+            "first_divergence": null,
+            "status": "matched"
+          },
+          "hud": {
+            "first_divergence": null,
+            "status": "matched"
+          },
+          "magnifier": {
+            "first_divergence": {
+              "actual": 0,
+              "expected": 3,
+              "field": "players[0].magnifier.edge",
+              "phase": "frame",
+              "tick": 2380
+            },
+            "status": "diverged"
+          },
+          "match": {
+            "first_divergence": null,
+            "status": "matched"
+          },
+          "subject": {
+            "first_divergence": {
+              "actual": "bf147cea",
+              "expected": "bf147ce9",
+              "field": "players[1].subject.bone_bits[2]",
+              "phase": "frame",
+              "tick": 82
+            },
+            "status": "diverged"
+          }
+        },
+        "first_divergence": {
+          "actual": "46800000",
+          "expected": "46ea6000",
+          "field": "camera.far_bits",
+          "phase": "frame",
+          "tick": 1
+        },
+        "native_draws": 3836,
+        "native_frames": 3838,
+        "native_sha256": "c29ee86ede8e21b5289030683169e2a04e93aee7b3a2dc03f5d2032c96cb1dbe",
+        "status": "diverged",
+        "target_draws": 0,
+        "target_frames": 3838,
+        "target_sha256": "fb2503322843dbb881a774cfeff99e4916f4bb33a855765a6713237d2046d91a"
+      },
+      "draw_alignment": {
+        "actual_count": 0,
+        "expected_count": 3836,
+        "extra_in_actual_count": 0,
+        "matched_count": 0,
+        "missing_from_actual_count": 3836,
+        "scope": "draws_not_compared_headless",
+        "status": "not_compared"
+      },
+      "report_sha256": "fde90f1adbd16f185809073e5737420130b8e80ec2630ba223760881c3cdaaa8",
+      "status": "diverged",
+      "trace": {
+        "frames": 3838,
+        "kind": "native",
+        "sha256": "01d98f3eaa8f2de303e1b69b82d8cc173d3aa7ea399ef33b7fa1b08d785499a8"
+      }
+    }
+  },
+  "derived": {
+    "cpu_decisions_are_inputs": false,
+    "human_input_ports": [
+      0
+    ],
+    "manifest_sha256": "d732d2c8b960efddb13fe5dbeb31853aa08875eb828c40e6a81f06f7b4e9725b",
+    "mwrc_sha256": "2fdb725a39de130685ab510731a670d90f28ff757a9960ffdc6a088076ce961f",
+    "version": 3
+  },
+  "dolphin": {
+    "binary_sha256": "f0c2b208af59c232e55eccd7054f312ef2d200d85aae4ed52fa077200e6a4412",
+    "commit": "c77bbaa0f372c3f72281602a8b087206706542cb",
+    "cpu": "JITARM64",
+    "writes_guest_memory": false
+  },
+  "missing_coverage": [
+    "physical_controller",
+    "menu_navigation_equivalence",
+    "audio_pcm",
+    "virtual_memory_card_comparison",
+    "pixel_equivalence",
+    "performance_acceptance"
+  ],
+  "preservation": {
+    "allocation_evidence_changes": [],
+    "allocation_evidence_files_checked": 1113,
+    "gold_changes": [],
+    "gold_files_checked": 753,
+    "pr16_head_unchanged": true,
+    "pr16_status_unchanged": true,
+    "source_changes": [],
+    "source_files_checked": 14
+  },
+  "schema": "webmelee-reference-capture-app-evidence-v1",
+  "scope": "single automated controller-driven retail session; physical controller validation pending",
+  "source": {
+    "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+    "melee_commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5"
+  }
+}

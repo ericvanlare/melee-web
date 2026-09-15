@@ -1,0 +1,177 @@
+{
+  "browser": {
+    "all_tick_agreement": [
+      "supplied human inputs",
+      "PAD state",
+      "RNG",
+      "match frame",
+      "HUD",
+      "magnifier",
+      "match observations"
+    ],
+    "camera_first_difference_field": "camera.fov_bits",
+    "camera_first_difference_tick": 0,
+    "comparison_sha256": "ab630e68dbb9ad75db2865ff93bce5cbe19c718a319a775f177f9e65a039c36a",
+    "completed_ticks": 6492,
+    "core_first_difference_field": "fighters[1].input_hex",
+    "core_first_difference_index": 5057,
+    "cpu_first_difference_field": "players[1].cpu.command_bytes",
+    "cpu_first_difference_tick": 5057,
+    "cpu_sidecar_sha256": "0655850336c7d68bdc683924314b4ef6a3fa8d0ffeae75879bafbb98a719d115",
+    "extra_draw_source_indices": [
+      1631,
+      2632,
+      3633,
+      4634,
+      5635
+    ],
+    "reference_cpu_sha256": "f7a582d8c7aa65fc2239f2200b122b1f39e24d4a0c6e09b2c1fcfd861f93032c",
+    "result_winner_slot": 0,
+    "subject_first_difference_field": "players[0].subject.bone_bits[2]",
+    "subject_first_difference_tick": 73,
+    "trace_sha256": "7ee0935c786c7802ca06225da12a7a661895ebb8a5531708b9e7aae19d5a4302"
+  },
+  "capture": {
+    "complete": true,
+    "input_policy": "Only human/device inputs replayed; CPU decisions compared as outputs.",
+    "invalid": false,
+    "manifest_sha256": "e87c40f970f2fdf57395c8188216855cf948c4c861061e34899bbb4c28064f2a",
+    "missing_coverage": [
+      "audio_pcm",
+      "menu_equivalence",
+      "virtual_memory_card_comparison"
+    ],
+    "ordered_events": 35519,
+    "pad_polls": 8348,
+    "physical_controller_evidence": "Operator attestation plus connected hardware identity and accepted ordered PAD stream.",
+    "result_winner_slot": 0,
+    "setup": {
+      "cpu": "Marth",
+      "cpu_level": 5,
+      "human": "Falco",
+      "stage": "Yoshis Story",
+      "stocks": 4,
+      "timer_enabled": false
+    },
+    "source_draws": 6487,
+    "source_ticks": 6492
+  },
+  "claims": {
+    "gameplay_fix": false,
+    "gold_admission": false,
+    "operator_reported_choppiness": "preserved, not investigated in this pass",
+    "performance_acceptance": false,
+    "protected_payloads_tracked": false,
+    "reference_repeatability": "not_established"
+  },
+  "dolphin_rerun": {
+    "bundle_has_dolphin_movie": false,
+    "bundle_has_matching_savestate_checkpoint": false,
+    "executed": false,
+    "existing_route": "Human-only source PAD replay from a synthetic SSS checkpoint; CPU decisions remain observed output.",
+    "limitation": "The current passive PAD records have not been demonstrated to reproduce original boot/menu history. The existing GDB match-boundary harness injects setup and cannot establish cold-boot equivalence.",
+    "missing_prerequisite": "A replayable emulator input stream and independently reproducible boot context, or a matching checkpoint with its declared narrower scope.",
+    "status": "not_established"
+  },
+  "identities": {
+    "app_executable_sha256": "f49f705051bc9a854eb15753bb06992dc3fa8e5f0efbfcccc0f0bb6dd84dd8cc",
+    "app_version": "0.1.1",
+    "browser": {
+      "browser": "chrome",
+      "version": "153.0.8010.36",
+      "visible_browser": true
+    },
+    "browser_artifacts_sha256": {
+      "action-sweep.mjs": "e4de82aaa8b990b5ac2d887a6bcd12a8ac402bc99e9556393833f2e0a80f9219",
+      "audio-ring.mjs": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf",
+      "audio-worklet.js": "ef4374ac08f5bab821efa05cf5d252ca8e4b50647710d434e192beac3d7d7b4f",
+      "disc-image.mjs": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a",
+      "dsp-coefficients.mjs": "5176d1cf4400228f31dff428bcc8cd60d07694c0ceea1628a79ac19f3e112b4a",
+      "gameplay_menu_browser.data": "cdf157ee0f1850884f07a71165fd2192177acb23c2c777313b719e70ea67546f",
+      "gameplay_menu_browser.js": "341a3fd697a51432f6087edb228e15d5d48b09cee99992eea0109208787f4af2",
+      "gameplay_menu_browser.wasm": "1b8a2f32390fc19c76d4683f1dd67830cca706351cd3730dddc4745aca19784b",
+      "hitch-capture.mjs": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3",
+      "match-flow.mjs": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f",
+      "match-menu.mjs": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba",
+      "melee-runtime.mjs": "0cb50db08ff53b910e80928b0bae9188d9ac8e43a5230561d55d4ba3451eb222",
+      "runtime-assets.mjs": "422f220df5ae8edbba2a2793e67e295359ea08c3cdf22e676f933c23882db2ce",
+      "runtime-audio-assets.mjs": "b9bfd3f841d73e4ee4987fc5ac7351832c4ae8eca48ba5cf9c95578a238c7dbc",
+      "runtime-audio.mjs": "d968d2b2f9b58d2ab5dc1a4720d2ad2114cfbcac44a888694da7850100546545",
+      "runtime-cache.js": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26",
+      "runtime-development.mjs": "138e1471207444e61615f6f7fc31ec3d6e36eae7efb158d539ce92fd7e58a0f5",
+      "runtime.html": "afd340c25023f842b241e893d5634f6019c73f922d8ddf0b67348e38227c608e"
+    },
+    "browser_artifacts_unchanged": true,
+    "candidate_sha256": "d94d1b187be7c32874163b6ea07aef58b848887d4984db54ac548e35353e66fa",
+    "configuration_sha256": {
+      "Dolphin.ini": "9f65ae2e01ff89396f6250c620aa372d3d45a3454eb30e250f601aa35342b402",
+      "GCPadNew.ini": "9585d7b6894c92a7c6e660102614fc58d2750b144621b322723a89e2b00ea259"
+    },
+    "controller_probe_sha256": "4cb6b282bb62152cacc6932fa5f6f35d40800fc83016d7a539f60fe70d48c9d2",
+    "derived_manifest_sha256": "10c93d5a16279119662113b86b97c10f9c2b0c360e402be60be8926ab2d1e1db",
+    "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+    "dolphin_binary_sha256": "f0c2b208af59c232e55eccd7054f312ef2d200d85aae4ed52fa077200e6a4412",
+    "dolphin_commit": "c77bbaa0f372c3f72281602a8b087206706542cb",
+    "melee_source_pin": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+    "observer_sha256": "fda85a6a31fbf3dbe2d3a9cc4aa634cfbb8eb97c55dcd945edbb5479d68c2c6e",
+    "raw_tooling_sha256": {
+      "installed_application_identity": "c1a6e6561be879d5abcfb95b3a9d5ecea67c47d5c8c3ee2a9f5b15a4996b3177",
+      "reference-capture/dolphin/reference_observer_stream.py": "cde0fc86d73529bf47847056e5024793ac387513bc83e2ad5bf133c68f3410bc",
+      "scripts/build_reference_dolphin.py": "160d382882f21708a4a4a669210c42efe685d0890e64347a2c1c77976726039a",
+      "scripts/extract_disc_file.py": "11517e6033aafc1b8b99e347e68ec2e8dc04405102663dea3a4046092e6d1754",
+      "scripts/reference_capture_app.py": "c7a7cc3dbbc331fc8fadcc75a4d7cbadbc0ee8d268e4be812730ca1a21f1f7cc",
+      "tools/reference_capture_automation.py": "123c4adb7e97e4f3a90d83ef9054da486400c1f1c014be7a23a14b04d344621a",
+      "tools/reference_capture_environment.py": "7cbd519efdd980e999f9b6a10b12cae3d0b14875adb9ed5f939761e0551dc2c2",
+      "tools/reference_capture_semantics.py": "c6545ec53998feec2e8851de4975be695218f1b60ed4394d287220ba3df16b45",
+      "tools/reference_controller_probe.py": "17d5b8653ba60d57c9370f765a8f17cd00ada92ff59bf0a0fe78b9218326a039",
+      "tools/reference_session_bundle.py": "e70f0a72c7cede94ec58b657906772caead88122f23eac83a0cc590d1822d001",
+      "tools/retail_cpu_observation.py": "a0d513136fcf5d337e98cf4024e6b4df6ab0e66b063e4e190f377f995083fd46",
+      "tools/retail_input_plan.py": "045354ca6bb2b6cf3979523b0bac5d8efdb90ddd6c88c3c891aa2412e8765219",
+      "tools/retail_replay_validation.py": "909b6b786079b4b97feb5de7cd47a6dcfbf31ae00a62ae1269ddb462c6cc474d",
+      "tools/retail_setup_validation.py": "9fb350ef9fc4f50121937e98516d7d34234ee3587d3ae90ca555a5f0e5cae4b3"
+    },
+    "recipe_sha256": "22adae72d2a96fd234766f8be2ebb19a8e11c9d7a53c82e6bc5f6b7e7db72153",
+    "sdl_commit": "5848e584a1b606de26e3dbd1c7e4ecbc34f807a6"
+  },
+  "native": {
+    "comparison_exit_code": 2,
+    "comparison_sha256": "88aaa241ed05e8388c8d79a49ccd02c9d640bf2319da3ad123e11c971d72922b",
+    "cpu_prefix_comparison": "not_available",
+    "diagnosis": "Headless offscreen/magnifier drawing dependency. The visible browser reproduces the original damage at this boundary.",
+    "first_difference_fields": [
+      "rng",
+      "fighters[1].damage_bits"
+    ],
+    "first_difference_index": 1482,
+    "observed_ticks": 5704,
+    "process_exit_code": 2,
+    "requested_ticks": 6492,
+    "status": "incomplete_prefix",
+    "stop_reason": "unsupported pause/exit",
+    "trace_sha256": "b5a96838e2b4c2e47f9da4dc2f319491b28b835c5fa279d3c36125476aafe546"
+  },
+  "preservation": {
+    "gold_files": 753,
+    "gold_hashes_unchanged": true,
+    "pr16_evidence_files": 1113,
+    "pr16_evidence_stats_unchanged": true,
+    "pr16_head_unchanged": true,
+    "pr16_source_files": 14,
+    "pr16_source_hashes_unchanged": true,
+    "pr16_status_unchanged": true
+  },
+  "private_aggregate_sha256": "e7b88518c34c8b4c6fc713f77597f579622114c799ece732b64087f9111c99da",
+  "schema": "webmelee-reference-operator-validation-receipt-v1",
+  "scope": "One operator-attested physical-controller session; single-reference native/browser diagnostics.",
+  "validation": {
+    "comparison_tests_sha256": "8bc54360ddee915bd0c7ba2f74d244d23c292690b8cc8c8303452df6a8e84891",
+    "comparison_tool_sha256": "751c43b68e5aec390887be5b30935dfca7c0d9d9c5562b474e4caa71d6338bbb",
+    "focused_comparison_tests": 9,
+    "full_repository_result": "pass",
+    "full_repository_skips": 37,
+    "full_repository_tests": 867,
+    "runtime_rebuild": "Not required for comparison-only Python changes; unchanged frozen Release artifacts replayed.",
+    "suite_log_sha256": "1b4d53b1516b80fe19c5a8bf7c02a2cbaeaa23b57d09eb4d206292b4dd3ce998"
+  },
+  "version": 1
+}
