@@ -91,6 +91,29 @@ int main()
     assert(state.begin_construction(true));
     state.finish_construction(false);
 
+    // Match preparation can drain renderer work without calling the game's
+    // camera/subject callbacks or submitting an empty frame over the last image.
+    assert(state.request());
+    assert(state.begin_construction(true));
+    state.finish_construction(true, false);
+    assert(!state.preparation_draws_source());
+    assert(state.suppress_source_draw());
+    assert(!state.observe_render(false, 3, false));
+    assert(!state.observe_render(false, 0, true));
+    assert(!state.observe_render(false, 0, false));
+    assert(state.observe_render(false, 0, false));
+    assert(!state.arm(false));
+    assert(state.arm(true));
+    assert(!state.suppress_source_draw());
+    // A pending outgoing transition cannot starve this source-free wait.
+    assert(state.request_render_settle(false));
+    assert(state.suppress_source_draw(true));
+    assert(!state.observe_render(false, 1, true));
+    assert(!state.observe_render(false, 0, false));
+    assert(state.observe_render(false, 0, false));
+    assert(state.arm(true));
+    assert(state.suppress_source_draw(true));
+
     state.request();
     state.reset();
     assert(state.phase() == Phase::Idle);

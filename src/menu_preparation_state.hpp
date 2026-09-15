@@ -4,15 +4,15 @@ namespace melee_web {
 
 // The native menu has one preparation boundary for each source transition.
 // The state is deliberately small so callers cannot arm simulation or source
-// drawing until construction has completed. A newly entered scene is rendered
-// with simulation stopped until its WebGPU pipelines have drained and remained
-// quiet for two callbacks. Submitted GPU work must then complete before the
-// source clock can be armed; that wait adds no source ticks or draws.
+// drawing until construction has completed. Scene owners can either discover
+// resources through preparation draws or service already declared pipelines
+// without invoking source callbacks. Two quiet callbacks and completion of
+// submitted GPU work are required before the source clock can be armed.
 class MenuPreparationState {
 public:
     enum class Phase { Idle, WaitingForAudio, Constructing, Priming, Settling, Arming };
 
-    void reset() noexcept { phase_ = Phase::Idle; quiet_frames_ = 0; }
+    void reset() noexcept { phase_ = Phase::Idle; quiet_frames_ = 0; source_draws_ = true; }
 
     bool request() noexcept
     {
@@ -22,10 +22,11 @@ public:
         return true;
     }
 
-    bool request_render_settle() noexcept
+    bool request_render_settle(bool source_draws = true) noexcept
     {
         if (phase_ != Phase::Idle) return false;
         quiet_frames_ = 0;
+        source_draws_ = source_draws;
         phase_ = Phase::Settling;
         return true;
     }
@@ -50,10 +51,11 @@ public:
         return true;
     }
 
-    void finish_construction(bool has_live_scene) noexcept
+    void finish_construction(bool has_live_scene, bool source_draws = true) noexcept
     {
         if (phase_ != Phase::Constructing) return;
         quiet_frames_ = 0;
+        source_draws_ = source_draws;
         phase_ = has_live_scene ? Phase::Priming : Phase::Idle;
     }
 
@@ -64,7 +66,7 @@ public:
 
     bool observe_render(bool drew_source, unsigned queued_pipelines, bool render_preparation_activity) noexcept
     {
-        if (!warming() || !drew_source) return false;
+        if (!warming() || (source_draws_ && !drew_source)) return false;
         if (phase_ == Phase::Priming) phase_ = Phase::Settling;
         quiet_frames_ = queued_pipelines == 0 && !render_preparation_activity ? quiet_frames_ + 1 : 0;
         if (quiet_frames_ < 2) return false;
@@ -83,16 +85,18 @@ public:
     }
 
     bool busy() const noexcept { return phase_ != Phase::Idle; }
+    bool preparation_draws_source() const noexcept { return warming() && source_draws_; }
 
-    // Priming and settling intentionally draw an unchanged source scene so
-    // WebGPU can discover and compile its pipelines before simulation starts.
+    // Owners that permit source preparation draws can discover pipelines
+    // before simulation starts. Other owners only service renderer queues.
     // A pending transition must not starve a first-use settle discovered by
     // the outgoing scene's final draw. Finish that frozen scene before the
     // transition takes ownership on the next idle callback.
     bool suppress_source_draw(bool pending_transition = false) const noexcept
     {
         return phase_ == Phase::WaitingForAudio || phase_ == Phase::Constructing ||
-               phase_ == Phase::Arming || (pending_transition && !warming());
+               phase_ == Phase::Arming || (warming() && !source_draws_) ||
+               (pending_transition && !warming());
     }
 
     Phase phase() const noexcept { return phase_; }
@@ -100,6 +104,7 @@ public:
 private:
     Phase phase_ = Phase::Idle;
     unsigned quiet_frames_ = 0;
+    bool source_draws_ = true;
 };
 
 } // namespace melee_web

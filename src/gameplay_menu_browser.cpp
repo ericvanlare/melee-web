@@ -17,6 +17,7 @@
 #include <aurora/event.h>
 #include <aurora/main.h>
 #include <aurora/gfx.h>
+#include <aurora/pipeline_prepare.h>
 #include <dolphin/gx.h>
 #include <dolphin/vi.h>
 #include <emscripten.h>
@@ -214,6 +215,12 @@ void begin_preparation(){
  EM_ASM({if(window.menuPreparation)window.menuPreparation(UTF8ToString($0),!!$1);},
         message.c_str(),preserve_audio?1:0);
 }
+bool preparation_uses_source_draws(){
+ // Match camera and subject callbacks mutate gameplay state. Complete-draw
+ // pipeline lookup lets the first real tick draw its full image; preparation
+ // can then service the renderer without traversing the game again.
+ return !match||!aurora_pipeline_complete_draws_enabled();
+}
 bool prepare_deferred_pipelines(){
 #if defined(MELEE_WEB_SELECTIVE_PIPELINES)
  const auto selected=melee_web::pipeline_preparation::status();
@@ -222,7 +229,7 @@ bool prepare_deferred_pipelines(){
  // renderer may construct a pipeline, then settle the unchanged scene.
  running=false;menu_clock.reset();audio_clock.reset();
  if(preparation.phase()==melee_web::MenuPreparationState::Phase::Idle){
-  check(preparation.request_render_settle(),"Could not pause for pipeline preparation");
+  check(preparation.request_render_settle(preparation_uses_source_draws()),"Could not pause for pipeline preparation");
   preparation_profile.begin(false,emscripten_get_now());
   render_only_preparation=true;
  }
@@ -421,7 +428,7 @@ void begin_transition_construction(double& preparation_ms,int& suppress_draw){
                                   (!match||match->construction_complete());
  if(!construction_complete)return;
  preparation_profile.construction_finished(emscripten_get_now());
- preparation.finish_construction(running);
+ preparation.finish_construction(running,preparation_uses_source_draws());
  if(running)running=false;
  suppress_draw=preparation.suppress_source_draw();
  if(!preparation.busy())EM_ASM({window.menuPreparationDone?.();});
@@ -625,7 +632,7 @@ void tick(){
        (finish_menu_scene_rebuild(),true):advance_match_construction();
    if(construction_complete){
     preparation_profile.construction_finished(emscripten_get_now());
-    preparation.finish_construction(true);running=false;
+    preparation.finish_construction(true,preparation_uses_source_draws());running=false;
    }
    preparation_ms=emscripten_get_now()-preparation_started;preparation_started=0;
    suppress_draw=preparation.suppress_source_draw();
@@ -741,9 +748,14 @@ void tick(){
   source_frames.finish(present_source);
   (void)prepare_deferred_pipelines();
   // Camera callbacks mutate source state (including magnifier damage flags).
-  // A callback without a source tick must retain the last image; preparation
-  // alone may redraw a frozen scene to settle its explicitly measured resources.
-  if(source_frames.steps()==0&&(preparation.warming()||(!world&&!match)))present_source();
+  // A callback without a source tick retains the last match image when the
+  // renderer guarantees complete draws. Menu priming retains its existing path.
+  if(source_frames.steps()==0&&(preparation.preparation_draws_source()||(!world&&!match)))present_source();
+  if(preparation.warming()&&!preparation.preparation_draws_source()){
+   const double service_started=emscripten_get_now();
+   check(aurora_pipeline_service_preparation(),"Renderer preparation overlapped an active frame");
+   preparation_ms+=emscripten_get_now()-service_started;
+  }
 #if defined(MELEE_WEB_SELECTIVE_PIPELINES)
   (void)melee_web::pipeline_preparation::status();
 #endif
@@ -762,7 +774,7 @@ void tick(){
  const bool render_preparation_activity=
   stat_delta(stats_after.queuedPipelines,stats_before.queuedPipelines)!=0||
   stat_delta(stats_after.createdPipelines,stats_before.createdPipelines)!=0||
-  stats_after.lastTextureUploadSize!=0;
+  (actual_source_draw&&stats_after.lastTextureUploadSize!=0);
  const bool was_warming=preparation.warming();
  if(was_warming)preparation_profile.observe(finished-started,render_draw_ms,render_end_ms,
                                              actual_source_draw,stats_before,stats_after);
@@ -794,7 +806,7 @@ void tick(){
  // outstanding asynchronous pipeline compilation justifies stopping the clock.
  if(preparation.phase()==melee_web::MenuPreparationState::Phase::Idle&&running&&actual_source_draw&&
     melee_web::MenuPreparationState::needs_live_render_settle(stats_after.queuedPipelines)){
-  if(preparation.request_render_settle()){
+  if(preparation.request_render_settle(preparation_uses_source_draws())){
    preparation_profile.begin(false,finished);
    render_only_preparation=true;
    running=false;menu_clock.reset();message="Preparing first-use rendering...";
@@ -1125,6 +1137,12 @@ int main(int argc,char** argv){
  pipeline_bootstrap_started=emscripten_get_now();
 #endif
  aurora_initialize(argc,argv,&config);
+#if !defined(MELEE_WEB_SELECTIVE_PIPELINES)
+ // Development replay must draw every requested primitive. Its first-use
+ // compilation remains measured; it must not silently skip geometry and then
+ // repair the image by invoking extra source camera callbacks.
+ if(!aurora_pipeline_set_complete_draws(1))return 1;
+#endif
 #if defined(MELEE_WEB_SELECTIVE_PIPELINES)
  pipeline_union_requested=emscripten_get_now();
  pipeline_renderer_init_ms=pipeline_union_requested-pipeline_bootstrap_started;

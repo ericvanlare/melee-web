@@ -291,3 +291,23 @@ e7a7e080b2cb3bdadd6bb59ba7faf58c5798d2f34a5b0e426b7b61f30a2daf36  PlFeRe.dat
 6707f90d06afc1b3107efdb66d8d90a797d3081fbfb5385aab095d8f66cb12d2  EfFeData.dat
 0c2a406286870c414cc66cf60b1501c08d41dd22e240e589cdc64cbd042300f1  emblem.ssm
 ```
+
+## Source-free match preparation follow-up
+
+The second complete visible replay retains exact core state, CPU decisions, HUD,
+magnifier and match result through all 6,965 ticks. Non-selective development
+rendering now resolves first-use pipelines before encoding the corresponding
+draw, using Aurora's existing blocking path. Its match preparation drains renderer
+work and waits for submitted GPU work without invoking game camera callbacks.
+Menu priming and the selective public policy retain their current behavior.
+
+This removes all nine unmatched preparation draws and restores the original
+entry clip planes. The first remaining subject difference is Roy bone Z at tick
+64, and camera interest X first differs at 427. The original's six two-tick
+batches still differ from the browser's draw-after-each-tick schedule.
+
+This instrumented run has no timing resumes, audio underruns, queued pipelines
+or callback overruns: native maximum 15.700 ms, browser gap 24.135 ms. It still
+constructs 27 live pipelines and grows Wasm capacity by 66,846,720 bytes. This
+single state capture is not cold/warm performance admission and does not close
+the retained GPU stall. See the [separate immutable evidence](evidence/roy-dr-mario-render-preparation-replay-v1.json).

@@ -28,6 +28,12 @@ bits and source-draw cadence; GPU stalls and audio underruns remain observed.
 The Release runtime and 754-test suite (37 skips) pass. See the
 [integrated replay evidence](docs/evidence/roy-dr-mario-integrated-replay-v1.json)
 and [exact scope and retained failures](docs/ROY_DR_MARIO_PORT_NOTES.md).
+A second complete replay removes all extra match preparation draws and restores
+entry camera clipping. Core/CPU/result still match, with no timing pauses or
+audio underruns in this run (15.700 ms native / 24.135 ms browser maxima).
+Bone/camera rounding and six original draw-batching differences remain open;
+this is not a performance-admission claim. See the
+[renderer follow-up](docs/evidence/roy-dr-mario-render-preparation-replay-v1.json).
 
 ## Controller input candidate
 
