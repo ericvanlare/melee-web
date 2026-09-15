@@ -38,6 +38,10 @@ constant VI poll offset and consumes two samples. Equal final draw counts do not
 establish exact cadence. Browser validation was deferred at this already-failing
 gate; the earlier Roy/Doc result remains valid only for its recorded case.
 See [independent rejection evidence](docs/evidence/doc-roy-yoshis-clock-validation-v1.json).
+A subsequent valid original prefix identifies an audio DMA interrupt preempting
+bookkeeping before the queue check; the delayed PAD processing is execution-time
+dependent. The binder now rejects this incorrect periodic prediction before
+packaging it. See [producer evidence](docs/evidence/original-audio-queue-delay-v1.json).
 
 ## Controller input candidate
 

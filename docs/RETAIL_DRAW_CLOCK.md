@@ -49,8 +49,11 @@ time-base conversion uncertainty in either direction.
 
 `scripts/bind_retail_clock.py` binds a hash-verified v4 recipe and private clock
 JSONL to a new v5 recipe. Independently validate complete strict MWRI replay and
-compare all normal semantic events first. The binder consumes only source ticks
-0 through 3 and verifies the supported queue/framebuffer startup. Its sidecar
+compare all normal semantic events first. The binder derives initialization only
+from source ticks 0 through 3 and verifies the supported queue/framebuffer startup.
+It then checks every nonempty original input-queue snapshot against the prediction
+and rejects incomplete or mismatched histories before writing a recipe. Later
+observations never adjust the model or enter the runtime recipe. Its sidecar
 contains compact context and binding hashes; raw observations stay outside Git
 and the build.
 
@@ -82,3 +85,30 @@ correct opening phase: one observed late queue check shifts a batch seven source
 updates earlier. Final draw counts still agree. This model is a development
 candidate verified on the first recording, not a generally validated clock policy.
 See [the preserved rejection](evidence/doc-roy-yoshis-clock-validation-v1.json).
+
+## Queue-check delay producer
+
+A second isolated passive probe identifies the independent-route failure:
+AI DMA interrupt 5 preempts `HSD_PerfInitStat` at original PC `0x8037e1e0`.
+`__AIDHandler` invokes `__AXOutAiCallback` and `__AXOutNewFrame`; the latter
+occupies 58,009 observed CPU block-clock ticks. Pending DSP/SI/PAD work completes
+before the main loop resumes, so another PAD sample is available at the queue
+check. This is original execution timing, separate from the browser GPU stall.
+The probe's strict input prefix remains valid and all 46,041 typed semantic
+boundaries match through source tick 8,552. A preceding observer-overflow attempt
+is retained as invalid diagnostic evidence. All 77,637 shared clock observations
+also match the earlier valid probe. The optional
+`patches/reference-dolphin-clock-delay-probe.patch` applies after the existing
+clock-probe patch and logs only the diagnostic source-tick window 8500–8560.
+It is not part of the capture app or browser build.
+
+The binder now rejects a startup model unless every nonempty original queue
+snapshot agrees. These snapshots are validation data only: they do not tune
+phase or enter the v5 payload. The first recording retains its exact payload
+hash; the Yoshi’s recording is rejected at snapshot 8,520. See
+[producer and rejection evidence](evidence/original-audio-queue-delay-v1.json).
+
+Exact gameplay replay conditioned on recorded platform queue events would be a
+different evidence claim from independently reproducing original CPU interrupt
+scheduling. The latter remains unresolved; no recorded-schedule format or live
+scheduler policy change is introduced by this diagnostic/guard change.

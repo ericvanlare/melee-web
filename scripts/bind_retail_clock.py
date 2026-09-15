@@ -2,14 +2,54 @@
 """Bind validated passive startup timing to a new MWRC v5 input recipe.
 
 The caller must separately compare the observer's semantic timeline to the
-original. This tool validates transport identity and reads only startup clocks;
-it neither derives nor accepts expected draw indexes.
+original. This tool derives context only from startup clocks, then rejects a
+model that disagrees with any observed input-queue snapshot. It neither derives
+nor accepts expected draw indexes.
 """
 import argparse
 import hashlib
 import json
 from pathlib import Path
 import struct
+
+
+def validate_queue_prediction(rows, count, next_pad, first_poll, pad_period, vi_period):
+    """Check every observed input-queue snapshot, without reading draw outputs.
+
+    The startup-only model is conditional: intervening original work can delay a
+    queue check. Refuse to package it when the capture disproves that assumption.
+    """
+    expected = [(0, 1), (1, 1)]
+    alarm = next_pad + pad_period
+    poll = first_poll
+    cursor = 2
+    while cursor < count:
+        queued = 0
+        while alarm <= poll:
+            queued += 1
+            alarm += pad_period
+        if not queued:
+            queued = 1
+            alarm += pad_period
+        queued = min(queued, count - cursor)
+        expected.append((cursor, queued))
+        cursor += queued
+        poll += vi_period
+    observed = []
+    for row in rows:
+        payload = row['payload']
+        if payload.get('clock_pc') == 0x803769d4 and payload.get('r3', 0) != 0:
+            tick, queued = row['source_tick'], payload['r3']
+            if type(tick) is not int or type(queued) is not int or not 1 <= queued <= 2:
+                raise ValueError('unsupported observed input-queue snapshot')
+            observed.append((tick, queued))
+    for index, (wanted, actual) in enumerate(zip(expected, observed)):
+        if wanted != actual:
+            raise ValueError(f'startup clock model disagrees with input queue at snapshot {index}: '
+                             f'predicted {wanted}, observed {actual}; clock binding rejected')
+    if len(observed) != len(expected):
+        raise ValueError('complete input-queue history is required for clock binding')
+    return len(expected)
 
 
 def bind(recipe, clocks, recipe_sha256, clocks_sha256):
@@ -22,11 +62,8 @@ def bind(recipe, clocks, recipe_sha256, clocks_sha256):
     magic, version, seed, count = struct.unpack_from('>4sIII', recipe)
     if magic != b'MWRC' or version != 4 or not 2 <= count <= 36000 or len(recipe) != 20+312+822+44*count:
         raise ValueError('clock binding requires a complete bounded MWRC v4 recipe')
-    startup = []
-    for line in clocks.splitlines():
-        row = json.loads(line)
-        if row['source_tick'] <= 3:
-            startup.append(row)
+    rows = [json.loads(line) for line in clocks.splitlines()]
+    startup = [row for row in rows if row['source_tick'] <= 3]
     first = next(row for row in startup if row['source_tick'] == 0 and row['payload']['clock_pc'] == 0x803769d4)
     vi = next(row for row in startup if row['source_tick'] == 2 and row['payload']['clock_pc'] == 0x803769d4)
     p = first['payload']; w = p['cadence_words']
@@ -39,12 +76,14 @@ def bind(recipe, clocks, recipe_sha256, clocks_sha256):
             sorted([p['video_words'][23], p['video_words'][47]]) != [2,7] or
             vi['payload']['r3'] != 0 or not 0 < deadline < first_poll <= vi_period):
         raise ValueError('unsupported original startup clock/buffer context')
+    snapshots = validate_queue_prediction(rows, count, deadline, first_poll, pad_period, vi_period)
     # Two original XFBs, one free and one displayed, permit two initial source
     # traversals before the first VI-gated queue check (copy waiting follows draw).
     context = struct.pack('>QQQQII', pad_period, vi_period, deadline, first_poll, 2, 0)
     payload = struct.pack('>4sIII', magic, 5, seed, count)+recipe[16:20]+context+recipe[20:]
     evidence = {'schema':'melee-web-retail-clock-binding','version':1,
-        'scope':'startup clock context only; semantic equivalence requires independent comparison',
+        'scope':'startup clock context with full input-queue prediction check; semantic equivalence requires independent comparison',
+        'input_queue_snapshots_checked':snapshots,
         'input_recipe_sha256':recipe_sha256,'clock_stream_sha256':clocks_sha256,
         'output_recipe_sha256':hashlib.sha256(payload).hexdigest(),
         'frames':count,'pad_period_cpu_ticks':pad_period,'vi_period_cpu_ticks':vi_period,
