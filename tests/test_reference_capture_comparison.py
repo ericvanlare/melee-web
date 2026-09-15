@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 import stat
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -45,11 +46,13 @@ def write_jsonl(path, rows):
                     encoding="utf-8")
 
 
-def derived_fixture(root, rows):
+def derived_fixture(root, rows, cpu_rows=None):
     derived = root / "derived"
     derived.mkdir()
     candidate_path = derived / "candidate.jsonl"
     write_jsonl(candidate_path, rows)
+    if cpu_rows is not None:
+        write_jsonl(derived / "cpu-sidecar.jsonl", cpu_rows)
     payload = b"synthetic mwrc only"
     (derived / "capture.mwrc").write_bytes(payload)
     source_hash = "a" * 64
@@ -142,14 +145,25 @@ class ReferenceCaptureComparisonTests(unittest.TestCase):
         self.assertEqual(report["trace"]["frames"], 3)
         self.assertEqual(report["missing_coverage"], ["port_completion", "cpu_observation"])
 
-    def test_derived_binding_and_cpu_sidecar_are_checked(self):
+    def bound_cpu_fixture(self):
         from test_cpu_observation import CpuObservationTests
+        rows = CpuObservationTests().capture_timeline(3)
+        for core in (self.reference_rows, self.port_rows):
+            core[1]["start_melee_hex"] = rows[0]["setup_hex"]
+        self.port_rows[0]["rendering"] = "source_draws"
+        rows[1]["match"]["frame"] = self.reference_rows[2]["match_frame"]
+        for row in rows[2:-1]:
+            index = row["source_index"] if row["record"] == "draw" else row["index"]
+            row["match"]["frame"] = self.reference_rows[3 + index]["match_frame"]
+        shutil.rmtree(self.derived)
+        self.derived = derived_fixture(self.root, self.reference_rows, rows)
+        write_jsonl(self.trace, self.port_rows)
+        target = self.root / "target-cpu.jsonl"
+        write_jsonl(target, rows)
+        return self.derived / "cpu-sidecar.jsonl", target, rows
 
-        fixture = CpuObservationTests().capture()
-        native_cpu = self.root / "native-cpu.jsonl"
-        target_cpu = self.root / "target-cpu.jsonl"
-        native_cpu.write_bytes(fixture[1])
-        target_cpu.write_bytes(fixture[1])
+    def test_derived_binding_and_cpu_sidecar_are_checked(self):
+        native_cpu, target_cpu, _ = self.bound_cpu_fixture()
         report = compare(self.derived, self.trace, reference_cpu=native_cpu,
                          trace_cpu=target_cpu)
         self.assertEqual(report["status"], "matched")
@@ -164,13 +178,7 @@ class ReferenceCaptureComparisonTests(unittest.TestCase):
         self.assertIn("binding hash mismatch", report["error"])
 
     def test_cpu_difference_reports_earliest_field_and_domain(self):
-        from test_cpu_observation import CpuObservationTests
-
-        fixture = CpuObservationTests().capture()
-        native_cpu = self.root / "native-cpu.jsonl"
-        target_cpu = self.root / "target-cpu.jsonl"
-        native_cpu.write_bytes(fixture[1])
-        rows = [json.loads(line) for line in fixture[1].decode().splitlines()]
+        native_cpu, target_cpu, rows = self.bound_cpu_fixture()
         rows[1]["players"][1]["cpu"]["buttons"] ^= 1
         write_jsonl(target_cpu, rows)
         report = compare(self.derived, self.trace, reference_cpu=native_cpu,
@@ -178,6 +186,51 @@ class ReferenceCaptureComparisonTests(unittest.TestCase):
         self.assertEqual(report["status"], "diverged")
         self.assertEqual(report["cpu"]["first_divergence"]["phase"], "initial")
         self.assertEqual(report["cpu"]["coverage"]["cpu"]["first_divergence"]["phase"], "initial")
+
+    def test_identical_unrelated_cpu_inputs_cannot_claim_coverage(self):
+        from test_cpu_observation import CpuObservationTests
+        native_cpu, target_cpu, _ = self.bound_cpu_fixture()
+        unrelated = CpuObservationTests().capture()[0]
+        external = self.root / "unrelated.jsonl"
+        write_jsonl(external, unrelated)
+        report = compare(self.derived, self.trace, reference_cpu=external, trace_cpu=external)
+        self.assertEqual(report["cpu"]["status"], "invalid_input")
+        self.assertIn("artifact binding", report["cpu"]["error"])
+        self.assertEqual(report["missing_coverage"], ["cpu_observation"])
+
+    def test_cpu_sidecars_are_bound_to_setup_and_core_timeline(self):
+        for mutation, message in (("setup", "setup differs"), ("initial", "initial clock differs"),
+                                  ("frame", "clock differs at tick"), ("count", "frame count differs")):
+            for side in ("reference", "target"):
+                with self.subTest(mutation=mutation, side=side):
+                    native_cpu, target_cpu, rows = self.bound_cpu_fixture()
+                    changed = deepcopy(rows)
+                    if mutation == "setup":
+                        changed[0]["setup_hex"] = "01" + changed[0]["setup_hex"][2:]
+                    elif mutation == "initial":
+                        changed[1]["match"]["frame"] += 1
+                    elif mutation == "frame":
+                        changed[2]["match"]["frame"] += 1
+                    else:
+                        changed = changed[:-3] + [changed[-1]]
+                        changed[0]["frames_requested"] = 2
+                        changed[-1]["frames"] = changed[-1]["draws"] = 2
+                    if side == "reference":
+                        shutil.rmtree(self.derived)
+                        self.derived = derived_fixture(self.root, self.reference_rows, changed)
+                    else:
+                        write_jsonl(target_cpu, changed)
+                    report = compare(self.derived, self.trace, reference_cpu=native_cpu, trace_cpu=target_cpu)
+                    self.assertEqual(report["status"], "invalid_input")
+                    self.assertIn(message, report["cpu"]["error"])
+
+    def test_cpu_drawing_declaration_must_match_core_trace(self):
+        native_cpu, target_cpu, rows = self.bound_cpu_fixture()
+        self.port_rows[0]["rendering"] = "excluded"
+        write_jsonl(self.trace, self.port_rows)
+        report = compare(self.derived, self.trace, reference_cpu=native_cpu, trace_cpu=target_cpu)
+        self.assertEqual(report["status"], "invalid_input")
+        self.assertIn("drawing declaration", report["cpu"]["error"])
 
     def test_invalid_cpu_sidecar_is_explicit_without_discarding_replay_result(self):
         reference_cpu = self.root / "reference-cpu.jsonl"

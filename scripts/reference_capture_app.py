@@ -145,6 +145,10 @@ def isolated_dolphin_environment():
             if not key.startswith(("SDL_", "MWRC_")) and key != "DOLPHIN_EMU_USERPATH"}
 
 
+class CaptureCancelled(Exception):
+    """Cancellation before Dolphin has consumed any game input."""
+
+
 class Supervisor:
     def __init__(self, settings_path, *, root=None, emit=None, automated=False):
         self.root = root or support_root()
@@ -252,6 +256,10 @@ class Supervisor:
     def capture(self):
         from reference_observer_stream import iter_records, read_status
         self.verify()
+        if self.stop_requested.is_set():
+            self.publish(state="stopped", dolphin="stopped", capture="idle",
+                         message="Capture cancelled during environment verification")
+            return
         if not self._capture_prerequisites_verified():
             return
         settings_hash = sha256(self.settings_path)
@@ -269,7 +277,6 @@ class Supervisor:
         log = None
         user = None
         try:
-            self.stop_requested.clear()
             self.publish(state="starting", dolphin="starting", capture="armed", source_frames=0,
                          events=0, bundle_path=str(bundle.path), message="Capture armed. Starting retail Melee.")
             user = prepare_user(self.root, identifier, self.replay_source["profile"] if self.replay_source else Path(self.settings["paths"]["profile"]),
@@ -301,6 +308,8 @@ class Supervisor:
             # No inherited debugger, observer or user-path override may redirect
             # this explicit invocation. Only this process group is ever stopped.
             environment.pop("DOLPHIN_EMU_USERPATH", None)
+            if self.stop_requested.is_set():
+                raise CaptureCancelled("Capture cancelled before Dolphin started")
             log = (bundle.path / "dolphin.log").open("xb")
             self.process = subprocess.Popen(dolphin_command(self.settings, user), env=environment,
                 stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
@@ -411,20 +420,33 @@ class Supervisor:
                          message="Capture accepted. The reference bundle is ready for replay comparison.")
             if self.replay_source:
                 self._finish_replay_comparison(identifier, final)
-        except Exception as error:
+        except BaseException as error:
             self._terminate_owned()
-            if log is not None: log.close()
-            try: bundle.fail(str(error), error_type="capture")
+            if log is not None:
+                log.close()
+                log = None
+            reason = str(error) if isinstance(error, Exception) else "Capture interrupted during shutdown"
+            cancelled = isinstance(error, CaptureCancelled) or not isinstance(error, Exception)
+            try: bundle.fail(reason, error_type="incomplete" if cancelled else "capture")
             except Exception: pass
             self._refresh_partial_discovery()
-            self.publish(state="failed", dolphin="stopped", capture="idle",
-                         message=str(error), bundle_path=str(bundle.path))
+            self.publish(state="incomplete" if cancelled else "failed", dolphin="stopped", capture="idle",
+                         message=reason, bundle_path=str(bundle.path))
+            if not isinstance(error, Exception):
+                raise
         finally:
-            self.process = None
+            # Retain ownership until the child has actually stopped, including
+            # synchronous CLI interruption by SystemExit or KeyboardInterrupt.
+            self._terminate_owned()
+            if log is not None:
+                log.close()
+            stopped = self.process is None or self.process.poll() is not None
+            if stopped:
+                self.process = None
             if user is not None:
                 write_json(self.root / "Sessions" / (identifier + ".json"),
                            {"capture_id": identifier, "capture_path": str(bundle.path),
-                            "dolphin_stopped": True})
+                            "dolphin_stopped": stopped})
 
     def _finish_replay_comparison(self, identifier, final):
         # Raw finalization is already durable. A failed derived report must
@@ -469,11 +491,19 @@ class Supervisor:
         settings = read_settings(self.settings_path)
         verify_environment(settings, self.root,
             progress=lambda state, message: self.publish(state=state, message=message))
+        if self.stop_requested.is_set():
+            self.publish(state="stopped", dolphin="stopped", capture="idle",
+                         message="Controller setup cancelled during environment verification")
+            return
         user = self.root / "ControllerSetup"
         user.mkdir(mode=0o700, exist_ok=True)
         config = user / "Config"
         if config.exists(): shutil.rmtree(config)
         shutil.copytree(settings["paths"]["profile"], config)
+        if self.stop_requested.is_set():
+            self.publish(state="stopped", dolphin="stopped", capture="idle",
+                         message="Controller setup cancelled before Dolphin started")
+            return
         self.publish(state="configuring", message="In Dolphin, open Controllers and configure port 1. Close Dolphin when done.")
         self.process = subprocess.Popen([settings["paths"]["dolphin"], "-u", str(user)],
                                        env=isolated_dolphin_environment(), start_new_session=True,
@@ -565,7 +595,7 @@ def main():
     app = Supervisor(args.settings, automated=args.automated)
     def interrupted(_signal, _frame):
         app.stop_requested.set()
-        raise SystemExit(0)
+        raise SystemExit(128 + _signal)
     signal.signal(signal.SIGTERM, interrupted)
     signal.signal(signal.SIGINT, interrupted)
     try:

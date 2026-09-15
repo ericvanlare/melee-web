@@ -189,7 +189,7 @@ class ReferenceCaptureAppTests(unittest.TestCase):
         }
 
     def _run_capture_failure(self, process, *, file_inventory_values=("stable", "stable"),
-                              observer_status=None):
+                              observer_status=None, interrupt=None, cancel_preparation=False):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             (root / "Sessions").mkdir()
@@ -225,14 +225,20 @@ class ReferenceCaptureAppTests(unittest.TestCase):
                         Path(kwargs["env"]["MWRC_STATUS"]).write_text("{}\n", encoding="utf-8")
 
                 def poll(self):
-                    return self._process.poll()
+                    return self.returncode if self.returncode is not None else self._process.poll()
 
                 def wait(self, timeout=None):
-                    return self._process.wait(timeout)
+                    self.returncode = self._process.wait(timeout)
+                    return self.returncode
+
+            def prepare(*_args):
+                if cancel_preparation:
+                    app.stop_requested.set()
+                return user
 
             patches = [
                 mock.patch.object(APP, "ReferenceSessionBundle") ,
-                mock.patch.object(APP, "prepare_user", return_value=user),
+                mock.patch.object(APP, "prepare_user", side_effect=prepare),
                 mock.patch.object(APP, "dolphin_command", return_value=["Dolphin"]),
                 mock.patch.object(APP, "verify_environment", return_value=identity),
                 mock.patch.object(APP, "file_inventory", side_effect=lambda _path: next(inventory)),
@@ -244,11 +250,19 @@ class ReferenceCaptureAppTests(unittest.TestCase):
             for patcher in patches[1:]:
                 patcher.start()
             try:
-                app.capture()
+                if interrupt is None:
+                    app.capture()
+                else:
+                    with self.assertRaises(interrupt):
+                        app.capture()
+                receipts = list((root / "Sessions").glob("*.json"))
+                if receipts:
+                    self.assertTrue(json.loads(receipts[0].read_text())["dolphin_stopped"])
+                self.assertIsNone(app.process)
             finally:
+                app.close()
                 for patcher in reversed(patches):
                     patcher.stop()
-                app.close()
             return app, bundle, process
 
     def test_verify_reports_controller_required_and_never_claims_keyboard_ready(self):
@@ -407,6 +421,70 @@ class ReferenceCaptureAppTests(unittest.TestCase):
         self.assertEqual(app.status["state"], "failed")
         self.assertIn("final status", app.status["message"])
         self.assertFalse(any(call.kwargs.get("error_type") == "accepted" for call in bundle.fail.call_args_list))
+
+    def test_cancel_during_verification_cannot_launch_dolphin(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            app = APP.Supervisor(Path(temporary) / "settings.json", root=Path(temporary), emit=lambda row: None)
+            entered, release = threading.Event(), threading.Event()
+            def verify():
+                entered.set()
+                self.assertTrue(release.wait(3))
+                app.status["state"] = "ready"
+            app.verify = verify
+            with mock.patch.object(APP.subprocess, "Popen") as launch:
+                try:
+                    app.command("start")
+                    self.assertTrue(entered.wait(3))
+                    app.command("stop")
+                    release.set()
+                    app.worker.join(3)
+                    self.assertFalse(app.worker.is_alive())
+                    self.assertEqual(app.status["state"], "stopped")
+                    launch.assert_not_called()
+                finally:
+                    release.set()
+                    app.close()
+
+    def test_cancel_controller_verification_cannot_launch_dolphin(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            app = APP.Supervisor(root / "settings.json", root=root, emit=lambda row: None)
+            with mock.patch.object(APP, "read_settings", return_value=self._capture_settings()), \
+                 mock.patch.object(APP, "verify_environment", side_effect=lambda *args, **kwargs: app.stop_requested.set()), \
+                 mock.patch.object(APP.subprocess, "Popen") as launch:
+                try:
+                    app.configure_controller()
+                    launch.assert_not_called()
+                    self.assertEqual(app.status["state"], "stopped")
+                finally:
+                    app.close()
+
+    def test_cancel_during_profile_preparation_preserves_partial_without_launch(self):
+        process = mock.Mock()
+        app, bundle, process = self._run_capture_failure(process, cancel_preparation=True)
+        process.poll.assert_not_called()
+        bundle.fail.assert_called_once()
+        self.assertEqual(bundle.fail.call_args.kwargs["error_type"], "incomplete")
+        self.assertEqual(app.status["state"], "incomplete")
+
+    def test_cli_interrupt_terminates_owned_process_and_preserves_partial(self):
+        for exception in (SystemExit, KeyboardInterrupt):
+            with self.subTest(exception=exception):
+                class Process:
+                    calls = 0
+                    waited = False
+                    def poll(self):
+                        self.calls += 1
+                        if self.calls == 1:
+                            raise exception(143)
+                        return None
+                    def wait(self, timeout=None):
+                        self.waited = True
+                        return -15
+                app, bundle, process = self._run_capture_failure(Process(), interrupt=exception)
+                self.assertTrue(process.waited)
+                self.assertEqual(app.status["state"], "incomplete")
+                self.assertEqual(bundle.fail.call_args.kwargs["error_type"], "incomplete")
 
     def test_operator_cancel_terminates_owned_process_and_preserves_partial(self):
         class Process:
