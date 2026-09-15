@@ -1,5 +1,8 @@
 #include "browser_input.h"
 #include "boxx_input.h"
+#ifdef __EMSCRIPTEN__
+#include "browser_controllers.h"
+#endif
 
 #include <SDL3/SDL_events.h>
 #ifdef __EMSCRIPTEN__
@@ -214,6 +217,11 @@ extern "C" const MeleeWebInputSnapshot* melee_web_input_poll(void)
 {
     if (!state.ready) return &state;
     uint32_t physical = 0;
+#ifdef __EMSCRIPTEN__
+    const int browser_physical = melee_web_controllers_poll();
+    if (browser_physical >= 0) physical = static_cast<uint32_t>(browser_physical);
+    else
+#endif
     for (unsigned port = 0; port < PAD_MAX_CONTROLLERS; ++port)
         if (PADGetIndexForPort(port) >= 0) physical |= 1U << port;
     // A new source must not inherit keys held during a previous source's use.
@@ -358,6 +366,9 @@ extern "C" const char* melee_web_input_message(void)
 
 extern "C" void melee_web_input_shutdown(void)
 {
+#ifdef __EMSCRIPTEN__
+    melee_web_controllers_shutdown();
+#endif
     if (state.ready) {
         PADBlockInput(true);
         for (unsigned port = 0; port < PAD_MAX_CONTROLLERS; ++port)
