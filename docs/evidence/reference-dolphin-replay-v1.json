@@ -1,0 +1,492 @@
+{
+  "application": {
+    "binary_sha256": "4c051d5e16bd683951cc11d55680e41f2885865de0c6a1d27cd846145c0aa8f3",
+    "controller_mapping_and_probe_preserved": true,
+    "folder_access": "verified; app reports Ready with accepted disc and connected Nintendo GameCube Controller",
+    "identity_manifest_sha256": "2d79883c170c180ad7752f4eada4da9cb31eae6a4ee0f5b22d3432abcde5fa56",
+    "legacy_picker_validation": "exact legacy bundle selected through native picker; actionable missing-input-stream error displayed; no Dolphin launched",
+    "physical_controller_validation": "new version requires operator session",
+    "version": "0.2.0",
+    "visual_checks": [
+      "ordinary 760x642 window",
+      "narrow 451x560 window with all controls reachable by scrolling"
+    ]
+  },
+  "base_commit": "9f377a489cc0efe8ebc2bfd257fcc3bcf6f0dad4",
+  "claims": {
+    "cpu_divergence_fixed": false,
+    "game_assets_or_raw_payloads_tracked": false,
+    "gold_admission": false,
+    "performance_acceptance": false,
+    "public_deployment_changed": false
+  },
+  "coverage_limits": [
+    "physical controller recording/replay on version 0.2.0 awaits Eric",
+    "native adapter connection transitions not exercised by Pipe recording",
+    "audio/PCM",
+    "virtual memory-card comparison",
+    "web menu equivalence",
+    "legacy physical capture lacks SI stream and cannot be replayed faithfully through Dolphin",
+    "operator-reported capture choppiness remains open",
+    "four-player CPU tick-2495 divergence remains untouched"
+  ],
+  "dolphin": {
+    "binary_sha256": "351c032725844b3d751d5b1f35a97802624e79dcbfbd849b1fef561ab92134d5",
+    "build_receipt_sha256": "637dbff7fd2728f59e108bb4e4b743f7574a7564249456d8b6b20c3a94f8e367",
+    "input_recording_version": 1,
+    "observer_identity": "4a4400f914a8da16f0407bc6fd06134aca0cd590b6d25706671c3bb55a56b590",
+    "source_revision": "c77bbaa0f372c3f72281602a8b087206706542cb"
+  },
+  "failed_tooling_drift_attempt": {
+    "admitted": false,
+    "changed_tooling": [
+      "reference-capture/app/ReferenceCaptureApp.swift",
+      "scripts/install_reference_capture.py"
+    ],
+    "session_id": "20260914T223401Z-3e92e8d65ecb",
+    "status": "failed_partial_preserved"
+  },
+  "original_input_stream": {
+    "bytes": 2473576,
+    "complete": true,
+    "events": 61838,
+    "first_emulated_tick": 123552,
+    "last_emulated_tick": 250682421132,
+    "operations": {
+      "adapter_connection": 0,
+      "pad_status": 61838
+    },
+    "ports": {
+      "0": 61838
+    },
+    "sha256": "c323d4a183694aef6956093a9defa52b78fc0c076744b7706496c2a4657b11ed",
+    "version": 1
+  },
+  "original_replays": [
+    {
+      "domains": {
+        "camera": {
+          "first_divergence": null,
+          "records_a": 3279,
+          "records_b": 3279,
+          "status": "matched"
+        },
+        "cpu": {
+          "first_divergence": null,
+          "records_a": 3279,
+          "records_b": 3279,
+          "status": "matched"
+        },
+        "draw": {
+          "first_divergence": null,
+          "records_a": 3278,
+          "records_b": 3278,
+          "status": "matched"
+        },
+        "fighter": {
+          "first_divergence": null,
+          "records_a": 1639,
+          "records_b": 1639,
+          "status": "matched"
+        },
+        "hud": {
+          "first_divergence": null,
+          "records_a": 3279,
+          "records_b": 3279,
+          "status": "matched"
+        },
+        "magnifier": {
+          "first_divergence": null,
+          "records_a": 3279,
+          "records_b": 3279,
+          "status": "matched"
+        },
+        "match": {
+          "first_divergence": null,
+          "records_a": 1639,
+          "records_b": 1639,
+          "status": "matched"
+        },
+        "pad": {
+          "first_divergence": null,
+          "records_a": 62942,
+          "records_b": 62942,
+          "status": "matched"
+        },
+        "result": {
+          "first_divergence": null,
+          "records_a": 3,
+          "records_b": 3,
+          "status": "matched"
+        },
+        "rng": {
+          "first_divergence": null,
+          "records_a": 1639,
+          "records_b": 1639,
+          "status": "matched"
+        },
+        "scene": {
+          "first_divergence": null,
+          "records_a": 35849,
+          "records_b": 35849,
+          "status": "matched"
+        },
+        "setup": {
+          "first_divergence": null,
+          "records_a": 4,
+          "records_b": 4,
+          "status": "matched"
+        },
+        "source": {
+          "first_divergence": null,
+          "records_a": 1639,
+          "records_b": 1639,
+          "status": "matched"
+        },
+        "subject": {
+          "first_divergence": null,
+          "records_a": 3279,
+          "records_b": 3279,
+          "status": "matched"
+        },
+        "teardown": {
+          "first_divergence": null,
+          "records_a": 1,
+          "records_b": 1,
+          "status": "matched"
+        },
+        "transport": {
+          "first_divergence": null,
+          "records_a": 66231,
+          "records_b": 66231,
+          "status": "matched"
+        }
+      },
+      "events_compared": 66231,
+      "first_divergence": null,
+      "observer_sha256": "238d436b6003df7b08fbaefca142414cbac079c60acc60bc21b786228f5ef733",
+      "original_manifest_sha256": "828111457d85acb2abe367555fb407f5d26c1407afa376717643b0fcd4de8b2a",
+      "replay_manifest_sha256": "54beecd44e82cf856c90f90e4035c280d27e030e92ea2a75a244c8641735a653",
+      "report_sha256": "0bebd138f43dc0736f1c4b3db3c1ed2c9fd28755d3e681069337ecb8d3ab0e3c",
+      "status": "matched"
+    },
+    {
+      "domains": {
+        "camera": {
+          "first_divergence": null,
+          "records_a": 3279,
+          "records_b": 3279,
+          "status": "matched"
+        },
+        "cpu": {
+          "first_divergence": null,
+          "records_a": 3279,
+          "records_b": 3279,
+          "status": "matched"
+        },
+        "draw": {
+          "first_divergence": null,
+          "records_a": 3278,
+          "records_b": 3278,
+          "status": "matched"
+        },
+        "fighter": {
+          "first_divergence": null,
+          "records_a": 1639,
+          "records_b": 1639,
+          "status": "matched"
+        },
+        "hud": {
+          "first_divergence": null,
+          "records_a": 3279,
+          "records_b": 3279,
+          "status": "matched"
+        },
+        "magnifier": {
+          "first_divergence": null,
+          "records_a": 3279,
+          "records_b": 3279,
+          "status": "matched"
+        },
+        "match": {
+          "first_divergence": null,
+          "records_a": 1639,
+          "records_b": 1639,
+          "status": "matched"
+        },
+        "pad": {
+          "first_divergence": null,
+          "records_a": 62942,
+          "records_b": 62942,
+          "status": "matched"
+        },
+        "result": {
+          "first_divergence": null,
+          "records_a": 3,
+          "records_b": 3,
+          "status": "matched"
+        },
+        "rng": {
+          "first_divergence": null,
+          "records_a": 1639,
+          "records_b": 1639,
+          "status": "matched"
+        },
+        "scene": {
+          "first_divergence": null,
+          "records_a": 35849,
+          "records_b": 35849,
+          "status": "matched"
+        },
+        "setup": {
+          "first_divergence": null,
+          "records_a": 4,
+          "records_b": 4,
+          "status": "matched"
+        },
+        "source": {
+          "first_divergence": null,
+          "records_a": 1639,
+          "records_b": 1639,
+          "status": "matched"
+        },
+        "subject": {
+          "first_divergence": null,
+          "records_a": 3279,
+          "records_b": 3279,
+          "status": "matched"
+        },
+        "teardown": {
+          "first_divergence": null,
+          "records_a": 1,
+          "records_b": 1,
+          "status": "matched"
+        },
+        "transport": {
+          "first_divergence": null,
+          "records_a": 66231,
+          "records_b": 66231,
+          "status": "matched"
+        }
+      },
+      "events_compared": 66231,
+      "first_divergence": null,
+      "observer_sha256": "5f2354c80e54e1f3e9167a98ba570b86327c2ceb23a117b74faaa61e87b4b586",
+      "original_manifest_sha256": "828111457d85acb2abe367555fb407f5d26c1407afa376717643b0fcd4de8b2a",
+      "replay_manifest_sha256": "04763a3d4046cd9502168c075e4ec61f3538896564de97eb5bc551118b8252f7",
+      "report_sha256": "8a5d07a6c0d8f6f63162702ccc4f2f1ce72d2b164407f8e563f5a58074ad7d19",
+      "status": "matched"
+    }
+  ],
+  "port": {
+    "native": {
+      "core_checks": {
+        "active_player_count": "pass",
+        "entry": "pass",
+        "fighters": "pass",
+        "frame_count": "pass",
+        "inputs": "pass",
+        "match_frame": "pass",
+        "pad_state_hex": "pass",
+        "rng": "pass"
+      },
+      "cpu_domains": {
+        "camera": {
+          "first_divergence": {
+            "actual": "46800000",
+            "expected": "46ea6000",
+            "field": "camera.far_bits",
+            "phase": "frame",
+            "tick": 1
+          },
+          "status": "diverged"
+        },
+        "cpu": {
+          "first_divergence": null,
+          "status": "matched"
+        },
+        "hud": {
+          "first_divergence": null,
+          "status": "matched"
+        },
+        "magnifier": {
+          "first_divergence": {
+            "actual": 0,
+            "expected": 3,
+            "field": "players[0].magnifier.edge",
+            "phase": "frame",
+            "tick": 565
+          },
+          "status": "diverged"
+        },
+        "match": {
+          "first_divergence": null,
+          "status": "matched"
+        },
+        "subject": {
+          "first_divergence": {
+            "actual": "bf147cea",
+            "expected": "bf147ce9",
+            "field": "players[1].subject.bone_bits[2]",
+            "phase": "frame",
+            "tick": 82
+          },
+          "status": "diverged"
+        }
+      },
+      "draw_alignment": {
+        "actual_count": 0,
+        "expected_count": 1639,
+        "extra_in_actual_count": 0,
+        "matched_count": 0,
+        "missing_from_actual_count": 1639,
+        "scope": "draws_not_compared_headless",
+        "status": "not_compared"
+      },
+      "frames": 1639,
+      "report_sha256": "bd5a2607b78edbd6b7ac3bb0ab7767f10c00de0382f54170c8da48c3f508e145",
+      "status": "diverged"
+    },
+    "recipe": "c6383a55b7211e739f02091fc00aaa328888e1cc4c4be1fe9cd2ea4bd5800127",
+    "visible_browser": {
+      "core_checks": {
+        "active_player_count": "pass",
+        "entry": "pass",
+        "fighters": "pass",
+        "frame_count": "pass",
+        "inputs": "pass",
+        "match_frame": "pass",
+        "pad_state_hex": "pass",
+        "rng": "pass"
+      },
+      "cpu_domains": {
+        "camera": {
+          "first_divergence": {
+            "actual": "46ea6000",
+            "expected": "46800000",
+            "field": "camera.far_bits",
+            "phase": "frame",
+            "tick": 0
+          },
+          "status": "diverged"
+        },
+        "cpu": {
+          "first_divergence": null,
+          "status": "matched"
+        },
+        "hud": {
+          "first_divergence": null,
+          "status": "matched"
+        },
+        "magnifier": {
+          "first_divergence": null,
+          "status": "matched"
+        },
+        "match": {
+          "first_divergence": null,
+          "status": "matched"
+        },
+        "subject": {
+          "first_divergence": {
+            "actual": "bf147cea",
+            "expected": "bf147ce9",
+            "field": "players[1].subject.bone_bits[2]",
+            "phase": "frame",
+            "tick": 82
+          },
+          "status": "diverged"
+        }
+      },
+      "draw_alignment": {
+        "actual_count": 1639,
+        "expected_count": 1639,
+        "extra_in_actual_count": 0,
+        "matched_count": 1639,
+        "missing_from_actual_count": 0,
+        "scope": "source_draws_by_source_index",
+        "status": "aligned"
+      },
+      "frames": 1639,
+      "report_sha256": "dba3f696aa2da9c52ab74e800e4936ac10f1a6d35a1def32bea69da1631a2eab",
+      "status": "diverged"
+    }
+  },
+  "preservation": {
+    "gold": {
+      "files": 753,
+      "hashes_unchanged": true
+    },
+    "legacy_operator_bundle": {
+      "faults": [],
+      "manifest_sha256": "e87c40f970f2fdf57395c8188216855cf948c4c861061e34899bbb4c28064f2a",
+      "valid": true
+    },
+    "pr16": {
+      "evidence_files": 1113,
+      "evidence_unchanged": true,
+      "head_unchanged": true,
+      "source_hashes_unchanged": true,
+      "status_unchanged": true
+    }
+  },
+  "schema": "melee-web-dolphin-replay-evidence",
+  "scope": "one controller-driven original boot/menu/4-stock Mario versus level-1 Fox/Final Destination match and two independent original replays",
+  "source_sha256": {
+    "reference-capture/app/ReferenceCaptureApp.swift": "074f36ce59f37e51ac3ad84de4dda6daa4179a844afabbb5365c511ad03e246a",
+    "reference-capture/dolphin/patches/0002-si-input-stream.patch": "ed5c75bef33648478727ff1c900aa6f225656e595e7e2b6478a6cf118a3d2338",
+    "reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp": "e22d74211cf701b120775484aae018918a5bc88b5a7b372636a007e0a93f4a45",
+    "reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.h": "c09703d138a02bb8ffe637d391992f1d075d28203358fe3cc7b85e8f532c43a1",
+    "reference-capture/dolphin/source/Core/PowerPC/ReferenceInputStream.cpp": "804221033f7468529b8e6e3fbe842779a6c98113d07af12d5e76942c1d6457c9",
+    "reference-capture/dolphin/source/Core/PowerPC/ReferenceInputStream.h": "9332bad0da26b079175e33f5cb1d7c10f8337c9151ecc38c045e5ac8df604dbc",
+    "scripts/build_reference_dolphin.py": "e9d5fbe6bf3554fc9ea95596e3c9416198e4d2ec27fca18bd09f63a3f7fdac79",
+    "scripts/compare_reference_sessions.py": "bfda4cb40ef9022c21f33eafbcf3740a2769241c3638147081bdd3d9eca3b0c7",
+    "scripts/configure_reference_capture.py": "36b6eb58935ae502f018d99105417e4f69e794b7bd451ec90b7fca1dbacec9d4",
+    "scripts/install_reference_capture.py": "d5d6e387ae687dba9dc9d3b4d7357f7f21a5605eba0315cf1bf5331a68939e1c",
+    "scripts/reference_capture_app.py": "e8753ae15d118d19b986d8d40681adcbecb33bc0d9d428527cfc182c054e4a7a",
+    "tests/test_reference_capture_app.py": "4f09230cf671cd7dd4e04048fae4934392c4a168f228c6ae9b448ef80e8258ec",
+    "tests/test_reference_capture_configure.py": "a93f90b34fee095aa7a7c2c879fae2c79cc80dd06adddff3c24ed45e2396fc44",
+    "tests/test_reference_dolphin_observer.py": "d3cb68f8ecd16554332b20b0bbba0e428d445f20e84f0ca4648f4fb7c1d3a67d",
+    "tests/test_reference_dolphin_replay.py": "a3188d8bc5a65963cfe80c0e7a454b95a58af6bea0d8872682728ec60bdaef10",
+    "tests/test_reference_input_stream.py": "4d731ca4898229a666a3e3abca17bc8554edcb669af2307770ce509bb3f66b22",
+    "tests/test_reference_session_comparison.py": "9135e048a2888d8cce4ff50e1d698be42f031a967c33fbc70531a7fd7d65c942",
+    "tools/reference_capture_environment.py": "b9c9c8b0f115b231cb40db563b89247a153a53374c7c22e4270d2cac3f27913f",
+    "tools/reference_dolphin_replay.py": "d2e67cbfac5b7eb91807c4c5a872b8278830c3292247d0440b6af3053407fa9c",
+    "tools/reference_input_stream.py": "104affb633b1f6256c1aca1ccb8edbb4b8d215c7f464fb743ebd93ec0ea669ec",
+    "tools/reference_session_comparison.py": "cf3cfcb75c10bf8ea910f83cf74acc5a8f0be383b318e8b7983caa6ff8881024"
+  },
+  "tests": {
+    "app_build": "passed",
+    "dolphin_build": "passed",
+    "focused": {
+      "log_sha256": "50aeb6242cfa787156410efd5bbb60e4a2d1617022bf8f85b203ce7d26949eab",
+      "run": 59,
+      "status": "passed"
+    },
+    "full_suite": {
+      "log_sha256": "60e4f75c5cfb0e813d4b78cccefe72950ca56638d2d3294c8cd54b19b0211284",
+      "run": 886,
+      "skipped": 37,
+      "status": "passed"
+    },
+    "interrupted_test_driver": {
+      "admitted": false,
+      "cause": "private test callback synchronously invoked Stop while holding its output lock; test driver was interrupted and corrected to dispatch independently",
+      "session_id": "20260914T225407Z-c38d0e7b23c8",
+      "status": "orphaned_partial_preserved"
+    },
+    "patch_series": "applies sequentially to isolated copies of pinned files",
+    "stopped_original_replay": {
+      "completion_invalidated": true,
+      "failure": [
+        "Observer status event count does not match the raw stream"
+      ],
+      "observed_result": "failed",
+      "raw_partial_preserved": true,
+      "scope": "explicit Stop may preserve either failed or incomplete; the developer driver initially asserted only incomplete",
+      "session_id": "20260914T225748Z-f0e04bc0c958.partial",
+      "status": "passed",
+      "supervisor_log_sha256": "ca4a6d8e7968a80420b1bddced4c914e81d264954eb59188eb41d7227aa75a6f"
+    }
+  },
+  "version": 1
+}

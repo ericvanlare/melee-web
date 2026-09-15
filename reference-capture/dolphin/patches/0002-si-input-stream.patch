@@ -1,0 +1,109 @@
+--- a/Source/Core/Core/CMakeLists.txt
++++ b/Source/Core/Core/CMakeLists.txt
+@@ -667,6 +667,8 @@
+     PowerPC/JitArm64/JitArm64_Tables.cpp
+     PowerPC/ReferenceCaptureObserver.cpp
+     PowerPC/ReferenceCaptureObserver.h
++    PowerPC/ReferenceInputStream.cpp
++    PowerPC/ReferenceInputStream.h
+     PowerPC/JitArmCommon/BackPatch.h
+   )
+ endif()
+--- a/Source/Core/Core/HW/SI/SI_DeviceGCController.cpp
++++ b/Source/Core/Core/HW/SI/SI_DeviceGCController.cpp
+@@ -17,6 +17,7 @@
+ #include "Core/Movie.h"
+ #include "Core/NetPlayProto.h"
+ #include "Core/System.h"
++#include "Core/PowerPC/ReferenceInputStream.h"
+ #include "InputCommon/GCPadStatus.h"
+ 
+ namespace SerialInterface
+@@ -142,14 +143,25 @@
+ {
+   GCPadStatus pad_status = {};
+ 
+-  // For netplay, the local controllers are polled in GetNetPads(), and
+-  // the remote controllers receive their status there as well
+-  if (!NetPlay::IsNetPlayRunning())
+-  {
+-    pad_status = Pad::GetStatus(m_device_number);
+-  }
+-
+-  HandleMoviePadStatus(m_system.GetMovie(), m_device_number, &pad_status);
++  if (ReferenceCapture::InputStream::IsReplaying())
++  {
++    pad_status = ReferenceCapture::InputStream::Replay(m_system, m_device_number);
++    m_system.GetMovie().SetPolledDevice();
++    m_system.GetMovie().CheckPadStatus(&pad_status, m_device_number);
++  }
++  else
++  {
++    // For netplay, the local controllers are polled in GetNetPads(), and
++    // the remote controllers receive their status there as well
++    if (!NetPlay::IsNetPlayRunning())
++    {
++      pad_status = Pad::GetStatus(m_device_number);
++    }
++  
++    HandleMoviePadStatus(m_system.GetMovie(), m_device_number, &pad_status);
++
++    ReferenceCapture::InputStream::Record(m_system, m_device_number, pad_status);
++  }
+ 
+   // Our GCAdapter code sets PAD_GET_ORIGIN when a new device has been connected.
+   // Watch for this to calibrate real controllers on connection.
+--- a/Source/Core/Core/HW/SI/SI_DeviceGCAdapter.cpp
++++ b/Source/Core/Core/HW/SI/SI_DeviceGCAdapter.cpp
+@@ -11,7 +11,9 @@
+ #include "Core/Core.h"
+ #include "Core/HW/GCPad.h"
+ #include "Core/NetPlayProto.h"
++#include "Core/Movie.h"
+ #include "Core/System.h"
++#include "Core/PowerPC/ReferenceInputStream.h"
+ #include "InputCommon/GCAdapter.h"
+ 
+ namespace SerialInterface
+@@ -32,14 +34,25 @@
+ {
+   GCPadStatus pad_status = {};
+ 
+-  // For netplay, the local controllers are polled in GetNetPads(), and
+-  // the remote controllers receive their status there as well
+-  if (!NetPlay::IsNetPlayRunning())
++  if (ReferenceCapture::InputStream::IsReplaying())
+   {
+-    pad_status = GCAdapter::Input(m_device_number);
++    pad_status = ReferenceCapture::InputStream::Replay(m_system, m_device_number);
++    m_system.GetMovie().SetPolledDevice();
++    m_system.GetMovie().CheckPadStatus(&pad_status, m_device_number);
+   }
++  else
++  {
++    // For netplay, the local controllers are polled in GetNetPads(), and
++    // the remote controllers receive their status there as well
++    if (!NetPlay::IsNetPlayRunning())
++    {
++      pad_status = GCAdapter::Input(m_device_number);
++    }
++  
++    HandleMoviePadStatus(m_system.GetMovie(), m_device_number, &pad_status);
+ 
+-  HandleMoviePadStatus(m_system.GetMovie(), m_device_number, &pad_status);
++    ReferenceCapture::InputStream::Record(m_system, m_device_number, pad_status);
++  }
+ 
+   // Our GCAdapter code sets PAD_GET_ORIGIN when a new device has been connected.
+   // Watch for this to calibrate real controllers on connection.
+@@ -59,7 +72,9 @@
+ 
+     // This returns an error value if there is no controller plugged
+     // into this port on the hardware gc adapter, exposing it to the game.
+-    if (!GCAdapter::DeviceConnected(m_device_number))
++    const bool connected = ReferenceCapture::InputStream::IsReplaying() ? false :
++                               GCAdapter::DeviceConnected(m_device_number);
++    if (!ReferenceCapture::InputStream::AdapterConnected(m_system, m_device_number, connected))
+     {
+       const u32 device = Common::swap32(SI_NONE);
+       memcpy(buffer, &device, sizeof(device));

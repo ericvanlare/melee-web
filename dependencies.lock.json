@@ -16,6 +16,11 @@
   },
   "emscripten": "6.0.9",
   "reference_tools": {
+    "dolphin": {
+      "kind": "source",
+      "url": "https://github.com/dolphin-emu/dolphin.git",
+      "commit": "c77bbaa0f372c3f72281602a8b087206706542cb"
+    },
     "slippi-js": {
       "url": "https://github.com/project-slippi/slippi-js.git",
       "commit": "ff815345e641836a331191320c0f6eae21542a5f",
