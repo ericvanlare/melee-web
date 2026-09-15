@@ -15,7 +15,8 @@ sys.path[:0] = [str(ROOT / "tools")]
 import reference_capture_replay as REPLAY  # noqa: E402
 from reference_capture_replay import ReplayError, derive_replay  # noqa: E402
 from reference_observer_stream import BOUNDARY, HEADER, MAGIC_U32, SCHEMA_VERSION  # noqa: E402
-from reference_session_bundle import RAW_OBSERVER_NAME, ReferenceSessionBundle  # noqa: E402
+from reference_session_bundle import (ACCEPTED_UNPROCESSED, INGESTED, RAW_OBSERVER_NAME,
+                                      ReferenceSessionBundle)  # noqa: E402
 from cpu_observation_validation import load_observation  # noqa: E402
 from retail_replay_validation import EXPECTED_PROVENANCE  # noqa: E402
 
@@ -317,6 +318,48 @@ class ReferenceCaptureReplayTests(unittest.TestCase):
                 REPLAY.ingest_and_derive(bundle, Path(directory) / "derived")
             self.assertTrue(bundle.exists())
             self.assertEqual(list((bundle.parent.parent / "ingested").iterdir()), [])
+
+    def test_ingest_rejects_nested_outputs_without_mutating_raw_inventories(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "inbox"
+            bundle, _ = self._bundle(root)
+            accepted_alias = Path(directory) / "accepted-alias"
+            accepted_alias.symlink_to(bundle, target_is_directory=True)
+            ingested_alias = Path(directory) / "ingested-alias"
+            ingested_alias.symlink_to(root / INGESTED, target_is_directory=True)
+            outputs = (
+                bundle.parent,
+                root / INGESTED,
+                bundle / "nested/derived",
+                accepted_alias / "nested/derived",
+                root / INGESTED / bundle.name / "nested/derived",
+                ingested_alias / bundle.name / "nested/derived",
+            )
+
+            def inventory(state):
+                return sorted(str(path.relative_to(root / state))
+                               for path in (root / state).rglob("*"))
+
+            accepted_before = inventory(ACCEPTED_UNPROCESSED)
+            ingested_before = inventory(INGESTED)
+            for output in outputs:
+                with self.subTest(output=output), self.assertRaisesRegex(
+                        ReplayError, "outside.*raw bundle"):
+                    REPLAY.ingest_and_derive(bundle, output)
+                self.assertEqual(inventory(ACCEPTED_UNPROCESSED), accepted_before)
+                self.assertEqual(inventory(INGESTED), ingested_before)
+            self.assertTrue(bundle.exists())
+
+    def test_ingest_rejects_symlink_bundle_without_mutation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "inbox"
+            bundle, _ = self._bundle(root)
+            alias = Path(directory) / "bundle-alias"
+            alias.symlink_to(bundle, target_is_directory=True)
+            with self.assertRaisesRegex(ReplayError, "bundle is a symlink"):
+                REPLAY.ingest_and_derive(alias, Path(directory) / "derived")
+            self.assertTrue(bundle.exists())
+            self.assertEqual(list((root / INGESTED).iterdir()), [])
 
     def test_derivation_rejects_raw_bundle_and_alias_descendants_without_mutation(self):
         with tempfile.TemporaryDirectory() as directory:
