@@ -2,42 +2,29 @@
 
 ## Dr. Mario and Roy development candidates
 
-The shared runtime now loads Dr. Mario and Roy from their original source
-identities and separate disc data, through the existing Mario/Marth family
-adapters. Both are selectable in original CSS. The Release build, owned-asset
-checks and native Dr. Mario/Roy match lifecycles in both orientations pass,
-including all five costumes, specials, damage, pause and reconstruction.
-Visible browser checks exercise each clone against Mario on Final Destination.
-The first physical Roy/level-9 Dr. Mario capture now repeats exactly in Dolphin
-through 6,965 ticks and 37,825 semantic events. The first browser attempt consumed
-the same inputs but differed in initialization RNG, then Doc's input at tick 154;
-it failed to reproduce the recorded win and had rendering stalls. These remain
-development candidates, with no production deployment. See the
-[retail diagnostic](docs/evidence/roy-dr-mario-retail-diagnostic-v1.json).
-A bounded follow-up identifies the missing initialization RNG operation as
-original stage-music selection with the captured all-character unlock state.
-Restoring that operation in an ignored diagnostic wrapper matches initialization
-and all checked core-state fields for 436 ticks, then the headless trace fails
-at tick 436 in `ftCo_8009E7B4`. This is causal evidence, not an integrated runtime
-fix or a passing full replay; see the
-[RNG investigation](docs/evidence/roy-dr-mario-rng-cause-v1.json).
-The integrated music/profile and Roy dynamics fixes now reproduce all 6,965
-browser core-state ticks, every recorded CPU decision, HUD/magnifier/match state,
-and Roy's three-stock win. Expanded comparison still fails on camera/bone float
-bits and source-draw cadence; GPU stalls and audio underruns remain observed.
-The Release runtime and 754-test suite (37 skips) pass. See the
-[integrated replay evidence](docs/evidence/roy-dr-mario-integrated-replay-v1.json)
-and [exact scope and retained failures](docs/ROY_DR_MARIO_PORT_NOTES.md).
-A second complete replay removes all extra match preparation draws and restores
-entry camera clipping. Core/CPU/result still match, with no timing pauses or
-audio underruns in this run (15.700 ms native / 24.135 ms browser maxima).
-Bone/camera rounding and six original draw-batching differences remain open;
-this is not a performance-admission claim. See the
-[renderer follow-up](docs/evidence/roy-dr-mario-render-preparation-replay-v1.json).
-Restoring four original fused joint-transform operations now also matches every
-subject/bone field in a third complete replay. Camera interest still first differs
-at tick 427; the six draw-batching differences and recurrent GPU staging stall
-remain open. See [the joint-transform replay](docs/evidence/roy-dr-mario-srt-replay-v1.json).
+Dr. Mario and Roy load their own original data through the shared Mario/Marth
+family adapters and are selectable through original CSS/SSS. Native lifecycle
+checks cover both orientations, five costumes, specials, damage and reconstruction.
+
+The user's physical Roy/CPU9 Dr. Mario capture now repeats exactly in Dolphin
+(6,965 source ticks, 37,825 semantic events). The latest complete visible browser
+replay matches every declared state domain: core fighter/input/RNG/PAD state,
+CPU decisions, camera, subject/bone transforms, HUD, magnifier and match result.
+Roy wins with three stocks, exactly as recorded. Repairs restore captured save
+unlock state and original music-selection RNG, Roy's six authored dynamics modes,
+source-free match preparation, and original fused joint/vector arithmetic.
+
+**Strict expanded equivalence remains open:** the original groups six pairs of
+PAD ticks before drawing; the browser still draws after every tick. The capture
+lacks the shared VI/PAD clock phase needed to reconstruct that cadence without
+guessing. All state values at the comparable boundaries match; no draw records
+or compared fields were removed. The latest instrumented run has maxima of
+16.020 ms native / 24.840 ms browser with no pauses or audio queue failures, but
+GPU staging stalls recurred in a preceding run and remain open. This does not
+admit cold/warm performance, pixels, PCM, other routes or holdouts. No production
+deployment was made. Release runtime/native targets and the final 756-test suite
+(36 skips) pass. See the [latest replay evidence](docs/evidence/roy-dr-mario-vector-replay-v1.json)
+and [fixes, retained failures and scope](docs/ROY_DR_MARIO_PORT_NOTES.md).
 
 ## Controller input candidate
 

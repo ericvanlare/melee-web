@@ -329,3 +329,50 @@ interest X still first differs at source tick 427, and the six original PAD
 batches still have fewer draws. A GPU staging wait recurred (101.160 ms native,
 113.650 ms browser, 22 audio underrun frames), so performance remains open.
 See [full replay evidence](evidence/roy-dr-mario-srt-replay-v1.json).
+
+## Full declared-state match after vector arithmetic repair
+
+The camera's `lbVector_Rotate` uses a quintic sine/cosine approximation whose two
+polynomial endpoints and six axis-rotation endpoints are fused in retail. The
+port now preserves those exact instruction boundaries. The original normalization
+sums are unfused and remain unchanged. A cheap source-kernel test retains the
+unfused failing control; the 700-tick native diagnostic then matches camera
+position, interest and FOV while retaining exact core state.
+
+The fourth complete visible replay matches **every declared state domain across
+all 6,965 ticks and all 6,959 comparable original draws**: core input/fighter/RNG/
+PAD state, CPU decisions, camera, subject/bone transforms, HUD, magnifier and match
+result. Roy wins with three stocks. It has no extra preparation draws, pauses or
+audio queue failures; measured maxima are 16.020 ms native and 24.840 ms browser.
+There are still 27 first-use pipeline constructions and 66,846,720 bytes of Wasm
+capacity growth. The preceding GPU-stall failure remains preserved, so these
+figures do not establish cold/warm performance admission.
+
+The strict comparator remains red on the six extra source draws. Original
+`gm_801A4D34` processes every queued PAD sample before drawing once. The periodic
+grouping is consistent with nominal 60 Hz PAD timing versus NTSC 59.94 Hz VI
+timing, and the independent original replay repeats the same grouping exactly.
+The current recipe does not carry a shared emulated VI/PAD alarm epoch: MWRI
+timestamps SI status requests; raw observer timestamps use host steady_clock,
+and captured `source_vi_count` is zero. Reconstructing the exact phase requires
+that missing timing input. No source-index skip list or guessed phase was added.
+Drawing only once per browser callback is also insufficient: browser callbacks
+are not original VI boundaries and previously exposed magnifier gameplay errors.
+
+The bounded debugger probes did not establish additional valid replay prefixes:
+their strict input poll timing was rejected. The saved instruction reads and
+original matrix operands are diagnostic evidence only; the independent complete
+Dolphin replay and the new full browser comparisons establish the timeline claims.
+Raw diagnostics and all failed attempts stay outside tracked source/build output.
+See [the final state-comparison evidence](evidence/roy-dr-mario-vector-replay-v1.json).
+
+For subsequent character work, this pass establishes a short iteration order:
+verify authored table extents and shared ownership, reproduce the first mismatch
+in a small scalar or native prefix, then run one complete visible replay after
+the narrow checks pass. Original save-profile context is part of initialization,
+and original fused arithmetic must be checked at shared math boundaries. Exact
+VI/PAD phase capture and the existing GPU staging stall remain separate open
+work; human holdouts remain unopened.
+
+Final combined verification: Release browser/native builds pass, as does
+`python3 -m unittest discover -s tests -v` (756 tests, 36 skips, no failures).

@@ -7788,3 +7788,64 @@ diff --git a/src/sysdolphin/baselib/mtx.c b/src/sysdolphin/baselib/mtx.c
      m[2][2] = cosY * (vec1z * cosX);
      m[0][3] = vec3->x;
      m[1][3] = vec3->y;
+diff --git a/src/melee/lb/lbvector.c b/src/melee/lb/lbvector.c
+--- a/src/melee/lb/lbvector.c
++++ b/src/melee/lb/lbvector.c
+@@ -132,9 +132,11 @@
+     } else if (angle < -M_PI) {
+         angle += M_TAU;
+     }
+-    return 0.9878619909286499f * angle -
+-           0.15527099370956421f * angle * angle * angle +
+-           0.0056429998949170113f * angle * angle * angle * angle * angle;
++    /* GALE01r2 8000DB74/78 and 8000DBD4/D8: the polynomial has two
++     * fused endpoints; its cubic and quartic terms round at each multiply. */
++    float cubic = ((0.15527099370956421f * angle) * angle) * angle;
++    float quartic = (((0.0056429998949170113f * angle) * angle) * angle) * angle;
++    return fmaf(angle, quartic, fmaf(0.9878619909286499f, angle, -cubic));
+ }
+ 
+ static float lbvector_cos(float angle)
+@@ -145,9 +147,11 @@
+     } else if (angle < -M_PI) {
+         angle += M_TAU;
+     }
+-    return 0.9878619909286499f * angle -
+-           0.15527099370956421f * angle * angle * angle +
+-           0.0056429998949170113f * angle * angle * angle * angle * angle;
++    /* GALE01r2 8000DB74/78 and 8000DBD4/D8: the polynomial has two
++     * fused endpoints; its cubic and quartic terms round at each multiply. */
++    float cubic = ((0.15527099370956421f * angle) * angle) * angle;
++    float quartic = (((0.0056429998949170113f * angle) * angle) * angle) * angle;
++    return fmaf(angle, quartic, fmaf(0.9878619909286499f, angle, -cubic));
+ }
+ 
+ /// 8000D8F4
+@@ -223,20 +227,21 @@
+     float y;
+     float z;
+ 
++    /* GALE01r2 8000DC14/18, 34/38, 54/58: fused rotation endpoints. */
+     switch (axis) {
+     case 1: // rotate about x axis
+         x = v->x;
+-        y = v->y * c - v->z * s;
+-        z = v->y * s + v->z * c;
++        y = fmaf(v->y, c, -(v->z * s));
++        z = fmaf(v->y, s, v->z * c);
+         break;
+     case 2: // rotate about y axis
+-        x = v->x * c + v->z * s;
++        x = fmaf(v->x, c, v->z * s);
+         y = v->y;
+-        z = v->z * c - v->x * s;
++        z = fmaf(v->z, c, -(v->x * s));
+         break;
+     case 4: // rotate about z axis
+-        x = v->x * c - v->y * s;
+-        y = v->x * s + v->y * c;
++        x = fmaf(v->x, c, -(v->y * s));
++        y = fmaf(v->x, s, v->y * c);
+         z = v->z;
+         break;
+     }

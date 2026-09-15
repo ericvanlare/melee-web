@@ -13,7 +13,11 @@
       "8037a38c fmadds",
       "8037a3b4 fmadds",
       "8037a3b8 fmsubs"
-    ]
+    ],
+    "diagnostic_status": {
+      "strict_input_replay": "invalid at source tick1: input poll port or emulated tick diverged",
+      "scope": "Read-only original-kernel operands/outputs only; not a valid replay trajectory. Independent complete uninstrumented Dolphin replay and full browser03 subject agreement provide timeline verification."
+    }
   },
   "cause": "HSD_MtxSRT local rotation products had separately rounded multiply/add in the port. Original fused local m02 feeds the parent world m22 through its rotated grandparent, then the target subject translation.",
   "negative_control": {
