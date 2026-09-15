@@ -28,9 +28,9 @@ jobs:
         run: python3 -m unittest discover -s tests -p 'test_hsd_*_bridge.py' -v
       - name: Compile browser and gameplay targets
         run: |
+          # The default all target already includes gameplay_menu_browser.
           python3 scripts/build.py --jobs 2
           python3 scripts/build.py --target fighter --jobs 2
-          python3 scripts/build.py --target runtime --jobs 2
       - name: Run original gameplay runtime and ABI checks
         run: |
           python3 -m unittest discover -s tests -p 'test_gameplay_*.py' -v
