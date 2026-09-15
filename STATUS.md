@@ -1,5 +1,14 @@
 # Current status
 
+## Controller input candidate
+
+The browser controller candidate adds explicit raw-device setup, browser-standard
+mapping, separate GameCube trigger pressure/clicks and fast input-only browser
+regressions. This is not physical Mayflash acceptance or a production deployment.
+See [controller scope and verification](docs/CONTROLLERS.md).
+
+## Public runtime
+
 The shared startup/complete-catalog fix passes local cold/warm Mario/FD and
 Falco/Battlefield with zero unexpected pipelines and native/browser maxima of
 9.805/27.350 ms. Required MEMFS setup now belongs to the shared player owner;

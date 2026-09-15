@@ -163,7 +163,7 @@ try {
     const notices = await page.request.get(origin + '/licenses/runtime-third-party.txt');
     assert.equal(notices.status(), 200); assert.match(await notices.text(), /Permission is hereby granted/);
   });
-  await check('only keyboard preferences persist; no application upload or background connections', async () => {
+  await check('keyboard-only session persists its preferences; no application upload or background connections', async () => {
     const storage = await page.evaluate(async () => ({local: Object.keys(localStorage), session: Object.keys(sessionStorage),
       indexed: await indexedDB.databases(), caches: await caches.keys(), workers: (await navigator.serviceWorker.getRegistrations()).length}));
     assert.deepEqual(storage, {local: ['melee-prototype-keyboard-v1'], session: [], indexed: [], caches: [], workers: 0});

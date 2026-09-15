@@ -1,5 +1,6 @@
 import {mountMeleeRuntime} from '../melee-runtime.mjs';
 import {keyboardRows} from '../prototype-keyboard-layouts.mjs';
+import {mountControllerPanel} from '../controller-panel.mjs';
 
 const $ = id => document.getElementById(id);
 let player, state, currentError = '', requiresReload = false;
@@ -95,17 +96,19 @@ for (const id of ['keyboard-layout', 'keyboard-one', 'keyboard-two']) $(id).onch
   try { localStorage.setItem(preferenceKey, JSON.stringify({layout: $('keyboard-layout').value, one: $('keyboard-one').checked, two: $('keyboard-two').checked})); }
   catch { /* Session-only controls when storage is unavailable. */ }
 };
-let controllerTimer;
-function renderControllers() {
-  const rows = Array.from(navigator.getGamepads?.() || []).filter(Boolean).map(pad => {
-    const row = document.createElement('li'); row.textContent = `Port ${pad.index + 1}: ${pad.id}`; return row;
-  });
-  if (!rows.length) { const row = document.createElement('li'); row.textContent = 'No controller detected. Press a controller button to connect.'; rows.push(row); }
-  $('controllers').replaceChildren(...rows);
+let controllerPanel;
+function renderControllerNotice() {
+  const controllers = player?.controllers.inspect() || [];
+  const needsSetup = controllers.some(row => row.status === 'needs-setup');
+  const needsPort = controllers.some(row => row.port < 0);
+  $('controls-open').textContent = player?.controllers.error ? 'Controls · unavailable' : needsSetup ? 'Controls · setup needed' : needsPort ? 'Controls · assign player' : 'Controls';
 }
-$('controls-open').onclick = () => { renderKeyboard(); renderControllers(); $('controls-dialog').showModal(); controllerTimer = setInterval(renderControllers, 1000); };
+function renderControllers() {
+  if (player && !controllerPanel) controllerPanel = mountControllerPanel($('controllers'), player.controllers);
+}
+$('controls-open').onclick = () => { renderKeyboard(); renderControllers(); player?.controllers.setTesting(true); $('controls-dialog').showModal(); };
 $('controls-close').onclick = () => $('controls-dialog').close();
-$('controls-dialog').addEventListener('close', () => { clearInterval(controllerTimer); player?.focus(); });
+$('controls-dialog').addEventListener('close', () => { controllerPanel?.(); controllerPanel = null; player?.controllers.setTesting(false); player?.focus(); });
 const fullscreenAvailable = !!document.fullscreenEnabled && typeof $('player').requestFullscreen === 'function';
 $('fullscreen').disabled = !fullscreenAvailable;
 $('fullscreen').title = fullscreenAvailable ? '' : 'Fullscreen unavailable in this browser';
@@ -120,4 +123,8 @@ try {
     canvas: $('canvas'), onState: renderStatus, onError: error => showError(error),
   });
   await applyKeyboard();
+  if ($('controls-dialog').open) { renderControllers(); player.controllers.setTesting(true); }
+  renderControllerNotice();
+  const controllerNoticeTimer = setInterval(renderControllerNotice, 1000);
+  window.addEventListener('pagehide', () => clearInterval(controllerNoticeTimer), {once: true});
 } catch (error) { showError(error, true); }

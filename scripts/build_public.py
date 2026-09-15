@@ -45,6 +45,9 @@ PLAYER_RUNTIME_FILES = (
     "runtime-assets.mjs",
     "disc-image.mjs",
     "prototype-keyboard-layouts.mjs",
+    "controller-input.mjs",
+    "controller-panel.mjs",
+    "controller-panel.css",
     "gameplay_public.js",
     "gameplay_public.wasm",
 )
@@ -54,6 +57,9 @@ PLAYER_SOURCE_RUNTIME_FILES = (
     "runtime-assets.mjs",
     "disc-image.mjs",
     "prototype-keyboard-layouts.mjs",
+    "controller-input.mjs",
+    "controller-panel.mjs",
+    "controller-panel.css",
 )
 RUNTIME_IDENTITY_SCHEMA = "melee-web-runtime-public-build-v2"
 RUNTIME_IDENTITY_NAME = "runtime-public-identity.json"
@@ -68,6 +74,8 @@ RUNTIME_SOURCE_FILES = (
     "src/gameplay_audio_bank.cpp",
     "src/browser_input.cpp",
     "src/browser_input.h",
+    "src/browser_controllers.cpp",
+    "src/browser_controllers.h",
     "scripts/bootstrap.py",
     "scripts/build.py",
     "scripts/gameplay_bool.py",
@@ -983,7 +991,7 @@ def _validate_runtime_graph(files: dict[str, bytes]) -> None:
             if re.search(r"(?:dsp-coefficients|audio-worklet|audio-ring|runtime-audio)", text, re.I):
                 raise BuildError(f"development audio module reference rejected in runtime JavaScript: {rel}")
     required_imports = {
-        "melee-runtime.mjs": ("./runtime-assets.mjs", "./gameplay_public.js"),
+        "melee-runtime.mjs": ("./runtime-assets.mjs", "./gameplay_public.js", "./controller-input.mjs"),
         "runtime-assets.mjs": ("./disc-image.mjs",),
     }
     for rel, imports in required_imports.items():
@@ -1220,6 +1228,9 @@ def build(
             "runtime-assets.mjs": ROOT / "web" / "runtime-assets.mjs",
             "disc-image.mjs": ROOT / "web" / "disc-image.mjs",
             "prototype-keyboard-layouts.mjs": ROOT / "web" / "prototype-keyboard-layouts.mjs",
+            "controller-input.mjs": ROOT / "web" / "controller-input.mjs",
+            "controller-panel.mjs": ROOT / "web" / "controller-panel.mjs",
+            "controller-panel.css": ROOT / "web" / "controller-panel.css",
         }
         for rel, path in source_runtime.items():
             if _is_symlink(path) or not path.is_file():

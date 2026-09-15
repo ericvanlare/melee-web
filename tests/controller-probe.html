@@ -1,0 +1,21 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>WebMelee input boundary test</title>
+<canvas id="canvas" width="320" height="100" tabindex="0"></canvas>
+<pre id="result">Starting input-only runtime…</pre>
+<script type="module">
+import {createControllerManager} from './controller-input.mjs';
+window.Module = {
+  canvas: document.getElementById('canvas'),
+  meleeControllers: createControllerManager(),
+  onRuntimeInitialized() {
+    // Runtime initialization precedes main; tests wait for onPostRun below.
+  },
+  postRun: [() => {
+    window.controllerProbeReady = true;
+    document.getElementById('result').textContent = 'Input boundary ready. No disc or GPU preparation.';
+  }],
+  print: console.log, printErr: console.error,
+};
+const loader = document.createElement('script'); loader.src = './controller_probe.js'; document.head.append(loader);
+</script>

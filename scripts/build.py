@@ -66,6 +66,8 @@ PUBLIC_RUNTIME_SOURCE_FILES = (
     "src/gameplay_audio_bank.cpp",
     "src/browser_input.cpp",
     "src/browser_input.h",
+    "src/browser_controllers.cpp",
+    "src/browser_controllers.h",
     "scripts/bootstrap.py",
     "scripts/build.py",
     "scripts/gameplay_bool.py",

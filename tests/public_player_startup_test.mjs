@@ -84,6 +84,8 @@ function installGlobals(document) {
     navigator: {getGamepads: () => []},
     localStorage: {getItem: () => null, setItem() {}, removeItem() {}},
     location: {reload() {}},
+    setInterval: () => 0,
+    addEventListener: () => {},
     isSecureContext: true,
     crossOriginIsolated: true,
   };
@@ -104,10 +106,12 @@ async function importShellWithMocks(scenario) {
   const imports = [
     "import {mountMeleeRuntime} from '../melee-runtime.mjs';",
     "import {keyboardRows} from '../prototype-keyboard-layouts.mjs';",
+    "import {mountControllerPanel} from '../controller-panel.mjs';",
   ].join('\n');
   const replacement = [
     'const mountMeleeRuntime = globalThis.testMountMeleeRuntime;',
     'const keyboardRows = globalThis.testKeyboardRows;',
+    'const mountControllerPanel = () => () => {};',
   ].join('\n');
   assert.notEqual(source.indexOf(imports), -1, 'shell imports must remain source-substitutable');
   const substituted = source.replace(imports, replacement);
@@ -145,6 +149,7 @@ async function runScenario({name, failStartup}) {
     options.onState({ready: true, requiresReload: false, busy: false, state: 'idle', paused: false,
       canImport: true, canStart: false, canPause: false, canUnload: false, progress: null, message: 'Ready'});
     return {
+      controllers: {inspect: () => [], setTesting() {}},
       setKeyboardLayout: async layout => { trace.push(['layout', layout]); },
       setKeyboard(slot, enabled) { trace.push(['keyboard', slot, enabled]); },
     };
