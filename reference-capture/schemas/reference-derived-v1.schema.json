@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "melee-web-reference-derived-v1",
+  "title": "Hash-bound derived reference result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "version", "session_id", "artifact", "source", "manifest_sha256"],
+  "properties": {
+    "schema": {"const": "melee-web-reference-derived-v1"},
+    "version": {"const": 1},
+    "session_id": {"type": "string"},
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "bytes", "sha256"],
+      "properties": {
+        "name": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,255}\\.json$"},
+        "bytes": {"type": "integer", "minimum": 1},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "manifest_sha256", "raw_immutable"],
+      "properties": {
+        "state": {"type": "string"},
+        "manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "raw_immutable": {"const": true}
+      }
+    },
+    "created_at_unix": {"type": "number", "minimum": 0},
+    "manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+  }
+}

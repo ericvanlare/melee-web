@@ -1,0 +1,27 @@
+{
+  "application_version": "0.1.1",
+  "dolphin_revision": "c77bbaa0f372c3f72281602a8b087206706542cb",
+  "observed_boundary": {
+    "configured_index": 0,
+    "controller_mapping_preserved": true,
+    "physical_device_ids_agree": true,
+    "physical_gameplay_validation": false,
+    "sdl_logical_ports": 4,
+    "sdl_name_differs_from_hid_product_name": true
+  },
+  "probe_binary_sha256": "4cb6b282bb62152cacc6932fa5f6f35d40800fc83016d7a539f60fe70d48c9d2",
+  "probe_build_receipt_sha256": "2fbf46103a2ed9ac0a07ac344bbd51470468dee2f3f11cfc1c0253d51a8b011e",
+  "schema": "webmelee-controller-readiness-fix-v1",
+  "scope": {
+    "dolphin_observer_changes": false,
+    "gameplay_changes": false,
+    "pr16_changes": false
+  },
+  "sdl_revision": "5848e584a1b606de26e3dbd1c7e4ecbc34f807a6",
+  "validation": {
+    "focused_final_tests": 47,
+    "helper_build": "passed",
+    "local_repository_skips": 37,
+    "local_repository_tests": 864
+  }
+}
