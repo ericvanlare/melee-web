@@ -1,6 +1,7 @@
 import json
 import fcntl
 import os
+import plistlib
 import sys
 import tempfile
 import unittest
@@ -76,19 +77,60 @@ class ReferenceCaptureInstallerTests(unittest.TestCase):
             root = Path(temporary)
             destination = root / "WebMelee Reference Capture.app"
             (destination / "Contents").mkdir(parents=True)
-            (destination / "Contents/Info.plist").write_bytes(b"old")
+            (destination / "Contents/Info.plist").write_bytes(plistlib.dumps({"CFBundleIdentifier": "org.webmelee.reference-capture", "TestVersion": "old"}))
             staging = root / "staged.app"
             (staging / "Contents").mkdir(parents=True)
-            (staging / "Contents/Info.plist").write_bytes(b"new")
+            (staging / "Contents/Info.plist").write_bytes(plistlib.dumps({"CFBundleIdentifier": "org.webmelee.reference-capture", "TestVersion": "new"}))
             installed = installer.atomic_install(staging, destination)
             self.assertEqual(installed, destination.resolve())
-            self.assertEqual((destination / "Contents/Info.plist").read_bytes(), b"new")
+            self.assertEqual(plistlib.loads((destination / "Contents/Info.plist").read_bytes())["TestVersion"], "new")
 
             failed = root / "failed.app"
             failed.mkdir()
             with self.assertRaises(installer.InstallError):
                 installer.atomic_install(failed, destination)
-            self.assertEqual((destination / "Contents/Info.plist").read_bytes(), b"new")
+            self.assertEqual(plistlib.loads((destination / "Contents/Info.plist").read_bytes())["TestVersion"], "new")
+
+    def test_installer_rejects_populated_directory_foreign_app_and_symlink(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            staging = root / "staged.app"
+            (staging / "Contents").mkdir(parents=True)
+            (staging / "Contents/Info.plist").write_bytes(installer._plist())
+            applications = root / "Applications"
+            applications.mkdir()
+            (applications / "important.txt").write_bytes(b"preserve")
+            foreign = root / "Foreign.app"
+            (foreign / "Contents").mkdir(parents=True)
+            (foreign / "Contents/Info.plist").write_bytes(plistlib.dumps({"CFBundleIdentifier": "org.someone.else"}))
+            alias = root / "WebMelee Reference Capture.app"
+            alias.symlink_to(applications, target_is_directory=True)
+            for destination in (applications, foreign, alias):
+                with self.subTest(destination=destination), self.assertRaises(installer.InstallError):
+                    installer.atomic_install(staging, destination)
+                self.assertTrue(staging.exists())
+                self.assertEqual((applications / "important.txt").read_bytes(), b"preserve")
+                self.assertEqual(plistlib.loads((foreign / "Contents/Info.plist").read_bytes())["CFBundleIdentifier"], "org.someone.else")
+                self.assertTrue(alias.is_symlink())
+
+    def test_failed_publish_restores_the_verified_previous_app(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            destination, staging = root / installer.APP_NAME, root / "staged.app"
+            for app in (destination, staging):
+                (app / "Contents").mkdir(parents=True)
+                (app / "Contents/Info.plist").write_bytes(installer._plist())
+            (destination / "preserved.txt").write_bytes(b"old application")
+            replace = os.replace
+            def fail_publish(source, target):
+                if source == staging:
+                    raise OSError("synthetic publish failure")
+                return replace(source, target)
+            with mock.patch.object(installer.os, "replace", side_effect=fail_publish):
+                with self.assertRaisesRegex(OSError, "publish failure"):
+                    installer.atomic_install(staging, destination)
+            self.assertEqual((destination / "preserved.txt").read_bytes(), b"old application")
+            self.assertTrue(staging.exists())
 
     def test_python_metadata_pins_path_version_and_binary_hash(self):
         python = installer.resolve_python(sys.executable)

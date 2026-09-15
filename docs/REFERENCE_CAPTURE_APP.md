@@ -509,3 +509,12 @@ revision before configuring and after building. It rejects and preserves unexpla
 tracked, untracked, ignored, submodule, or observer-overlay changes. Corresponding
 source receipts are archived before atomic publication; repeating an identical
 build is idempotent, and a provenance collision preserves the prior receipt.
+
+Derivation and comparison reject output locations inside their immutable input
+bundles, including paths reached through directory aliases. Reinstallation of a
+Dolphin executable requires the same bundle, runtime libraries, build receipt and
+corresponding-source inventory; a different identity is preserved as a rejected
+collision. Application upgrades accept only this application's bundle identity
+at a full `.app` destination and preserve unrelated directories and applications.
+Quitting stops the owned Dolphin process before waiting for controller discovery;
+the GUI allows up to thirty seconds for supervisor finalization.

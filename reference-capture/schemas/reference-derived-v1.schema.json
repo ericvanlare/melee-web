@@ -29,6 +29,7 @@
         "raw_immutable": {"const": true}
       }
     },
+    "created_at_unix": {"type": "number", "minimum": 0},
     "manifest_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
   }
 }

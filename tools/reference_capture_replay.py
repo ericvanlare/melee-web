@@ -456,8 +456,14 @@ def _artifact_record(path: Path, *, raw_manifest_sha256: str) -> dict[str, Any]:
 
 def derive_replay(bundle_path: str | Path, derived_root: str | Path, *, cpu: str = "JITARM64") -> dict[str, Any]:
     """Validate one finalized bundle and atomically write derived artifacts."""
-    bundle = Path(bundle_path).expanduser().resolve()
-    if not bundle.is_dir() or bundle.is_symlink():
+    bundle_input = Path(bundle_path).expanduser()
+    if bundle_input.is_symlink():
+        raise ReplayError("bundle is a symlink")
+    bundle = bundle_input.resolve()
+    destination_root = Path(derived_root).expanduser().resolve()
+    if destination_root.is_relative_to(bundle):
+        raise ReplayError("Derived output must be outside the immutable raw bundle")
+    if not bundle.is_dir():
         raise ReplayError(f"bundle is not a safe directory: {bundle}")
     manifest, manifest_errors = _final_manifest(bundle)
     if manifest_errors or manifest is None:
@@ -486,7 +492,6 @@ def derive_replay(bundle_path: str | Path, derived_root: str | Path, *, cpu: str
     extracted = _extract_semantics(records)
     candidate_rows = _prepare_candidate(header, extracted, raw_manifest_sha256, observer_path, cpu=cpu)
 
-    destination_root = Path(derived_root).expanduser().resolve()
     destination = destination_root / str(header.get("session_id", "unknown"))
     if destination.exists() or destination.is_symlink():
         raise ReplayError(f"derived destination already exists: {destination}")

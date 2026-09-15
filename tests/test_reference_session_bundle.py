@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import sys
+import subprocess
 import tempfile
 import unittest
 
@@ -211,6 +212,15 @@ class ReferenceSessionBundleTests(unittest.TestCase):
             self.assertFalse(report.valid)
             self.assertIn("manifest record count mismatch", report.errors)
 
+    def test_inbox_cli_without_subcommand_lists_normally(self):
+        with tempfile.TemporaryDirectory() as directory:
+            command = [sys.executable, str(ROOT / "scripts/reference_capture_inbox.py"), "--root", directory]
+            implicit = subprocess.run(command, capture_output=True, text=True)
+            explicit = subprocess.run(command + ["list"], capture_output=True, text=True)
+            self.assertEqual(implicit.returncode, 0, implicit.stderr)
+            self.assertEqual(explicit.returncode, 0, explicit.stderr)
+            self.assertEqual(json.loads(implicit.stdout), json.loads(explicit.stdout))
+
     def test_inbox_ingest_and_separate_derived_hash_binding(self):
         with tempfile.TemporaryDirectory() as directory:
             inbox = ReferenceCaptureInbox(directory)
@@ -220,6 +230,15 @@ class ReferenceSessionBundleTests(unittest.TestCase):
             derived = inbox.store_derived("retail-a", "comparison", {"semantic": "pass"})
             self.assertEqual(derived.parent.parent.name, DERIVED)
             derived_manifest = json.loads((derived.parent / "derived-manifest.json").read_text())
+            schema = json.loads((ROOT / "reference-capture/schemas/reference-derived-v1.schema.json").read_text())
+            for value, definition in ((derived_manifest, schema),
+                                      (derived_manifest["artifact"], schema["properties"]["artifact"]),
+                                      (derived_manifest["source"], schema["properties"]["source"])):
+                self.assertFalse(definition["additionalProperties"])
+                self.assertLessEqual(set(value), set(definition["properties"]), "Generated fields must be admitted by the shipped schema")
+                self.assertLessEqual(set(definition["required"]), set(value))
+            self.assertEqual(schema["properties"]["created_at_unix"], {"type": "number", "minimum": 0})
+            self.assertGreaterEqual(derived_manifest["created_at_unix"], 0)
             raw_manifest = json.loads((accepted / "manifest.json").read_text())
             self.assertEqual(derived_manifest["source"]["manifest_sha256"], raw_manifest["manifest_sha256"])
             ingested = inbox.ingest("retail-a", expected_manifest_sha256=raw_manifest["manifest_sha256"])

@@ -159,6 +159,7 @@ class Supervisor:
         self.emit_callback = emit or (lambda row: print(json.dumps(row), flush=True))
         self.output_lock = threading.Lock()
         self.state_lock = threading.Lock()
+        self.process_lock = threading.Lock()
         self.worker = None
         self.process = None
         self.stop_requested = threading.Event()
@@ -242,16 +243,31 @@ class Supervisor:
                      message=f"Ready: {device_name}. Start Capture boots ordinary retail Melee." if ready else
                      f"Configured: {device_name}. Connect it, or choose Configure Controller to select another device.")
 
+    def _spawn_owned(self, command, **kwargs):
+        with self.process_lock:
+            if self.stop_requested.is_set():
+                raise CaptureCancelled("Cancelled before Dolphin started")
+            self.process = subprocess.Popen(command, **kwargs)
+            return self.process
+
     def _terminate_owned(self):
-        process = self.process
-        if process is not None and process.poll() is None:
-            os.killpg(process.pid, signal.SIGTERM)
-            try: process.wait(timeout=8)
-            except subprocess.TimeoutExpired:
-                os.killpg(process.pid, signal.SIGKILL)
-                process.wait(timeout=5)
-            return True
-        return False
+        with self.process_lock:
+            process = self.process
+            if process is not None and process.poll() is None:
+                try:
+                    os.killpg(process.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass  # It exited between poll and signal; still reap it.
+                try:
+                    process.wait(timeout=8)
+                except subprocess.TimeoutExpired:
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
+                    process.wait(timeout=5)
+                return True
+            return False
 
     def capture(self):
         from reference_observer_stream import iter_records, read_status
@@ -311,7 +327,7 @@ class Supervisor:
             if self.stop_requested.is_set():
                 raise CaptureCancelled("Capture cancelled before Dolphin started")
             log = (bundle.path / "dolphin.log").open("xb")
-            self.process = subprocess.Popen(dolphin_command(self.settings, user), env=environment,
+            self._spawn_owned(dolphin_command(self.settings, user), env=environment,
                 stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
             started = time.monotonic()
             completed = False
@@ -505,7 +521,7 @@ class Supervisor:
                          message="Controller setup cancelled before Dolphin started")
             return
         self.publish(state="configuring", message="In Dolphin, open Controllers and configure port 1. Close Dolphin when done.")
-        self.process = subprocess.Popen([settings["paths"]["dolphin"], "-u", str(user)],
+        self._spawn_owned([settings["paths"]["dolphin"], "-u", str(user)],
                                        env=isolated_dolphin_environment(), start_new_session=True,
                                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         while self.process.poll() is None:
@@ -578,8 +594,10 @@ class Supervisor:
 
     def close(self):
         self.stop_requested.set()
-        if self.worker: self.worker.join()
+        # A controller probe may still be blocked. Stop and reap Dolphin now,
+        # before waiting for that worker or releasing the application lock.
         self._terminate_owned()
+        if self.worker: self.worker.join()
         self.lock_stream.close()
 
 

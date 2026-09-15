@@ -548,6 +548,53 @@ class ReferenceCaptureAppTests(unittest.TestCase):
         killpg.assert_called_once_with(process.pid, APP.signal.SIGTERM)
         self.assertTrue(process.waited)
 
+    def test_close_reaps_unresponsive_child_before_joining_delayed_controller_worker(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            app = APP.Supervisor(root / "environment.json", root=root, emit=lambda row: None)
+            bundle = APP.ReferenceSessionBundle.begin(root / "Captures", "shutdown-test", "GALE01", "run")
+            entered, reaped = threading.Event(), threading.Event()
+            worker_observed = []
+            def delayed_probe():
+                entered.set()
+                worker_observed.append(reaped.wait(3))
+                bundle.fail("Capture interrupted", error_type="incomplete")
+            class Process:
+                pid = 876
+                returncode = None
+                def poll(self):
+                    return self.returncode
+                def wait(self, timeout=None):
+                    if timeout == 8:
+                        raise APP.subprocess.TimeoutExpired("Dolphin", timeout)
+                    self.returncode = -9
+                    reaped.set()
+                    return self.returncode
+            app.process = Process()
+            app.worker = threading.Thread(target=delayed_probe)
+            app.worker.start()
+            self.assertTrue(entered.wait(3))
+            with mock.patch.object(APP.os, "killpg") as killpg:
+                app.close()
+            self.assertEqual(worker_observed, [True], "Child must stop before waiting for a slow discovery worker")
+            self.assertEqual(killpg.call_args_list, [mock.call(876, APP.signal.SIGTERM), mock.call(876, APP.signal.SIGKILL)])
+            self.assertTrue(bundle.path.exists())
+            self.assertTrue(bundle.path.name.endswith(".partial"))
+            self.assertEqual(app.process.returncode, -9)
+            # Ownership is released only after the child and worker finish.
+            reopened = APP.Supervisor(root / "environment.json", root=root, emit=lambda row: None)
+            reopened.close()
+
+    def test_shutdown_request_prevents_late_owned_process_creation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            app = APP.Supervisor(Path(temporary) / "settings", root=Path(temporary), emit=lambda row: None)
+            app.stop_requested.set()
+            with mock.patch.object(APP.subprocess, "Popen") as launch:
+                with self.assertRaises(APP.CaptureCancelled):
+                    app._spawn_owned(["Dolphin"], start_new_session=True)
+                launch.assert_not_called()
+            app.close()
+
     def test_configuration_drift_fails_before_semantic_acceptance(self):
         class Process:
             pid = 321

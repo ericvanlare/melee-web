@@ -262,6 +262,24 @@ class ReferenceCaptureComparisonTests(unittest.TestCase):
         self.assertEqual(second.returncode, 2)
         self.assertEqual(output.read_bytes(), original)
 
+    def test_cli_report_cannot_enter_raw_or_derived_input_even_through_alias(self):
+        raw = self.root / "raw"
+        raw.mkdir()
+        (raw / "manifest.json").write_text("synthetic immutable marker")
+        for source in (self.derived, raw):
+            alias = self.root / (source.name + "-output-alias")
+            alias.symlink_to(source, target_is_directory=True)
+            before = {str(p.relative_to(source)): p.read_bytes() for p in source.rglob("*") if p.is_file()}
+            for output in (source / "report.json", source / "nested/report.json", alias / "report.json"):
+                command = [sys.executable, str(ROOT / "scripts/compare_reference_capture.py"),
+                           "--derived", str(self.derived), "--trace", str(self.trace),
+                           "--bundle", str(raw), "--output", str(output)]
+                result = subprocess.run(command, capture_output=True, text=True)
+                self.assertEqual(result.returncode, 2)
+                self.assertIn("outside immutable", result.stderr)
+                self.assertEqual({str(p.relative_to(source)): p.read_bytes() for p in source.rglob("*") if p.is_file()}, before)
+                self.assertFalse((source / "nested").exists())
+
     def test_derived_symlink_root_is_rejected_before_resolution(self):
         alias = self.root / "derived-alias"
         alias.symlink_to(self.derived, target_is_directory=True)

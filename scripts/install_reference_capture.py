@@ -23,6 +23,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import uuid
 from pathlib import Path
 from typing import Iterable, Sequence
 
@@ -350,16 +351,39 @@ def relaunch_app(app_path: Path) -> bool:
     return True
 
 
+def _require_capture_app(path: Path) -> None:
+    if path.is_symlink() or not path.is_dir():
+        raise InstallError("Expected a regular WebMelee Reference Capture application bundle.")
+    try:
+        with (path / "Contents/Info.plist").open("rb") as stream:
+            info = plistlib.load(stream)
+    except (OSError, ValueError, plistlib.InvalidFileException) as error:
+        raise InstallError("Expected a valid WebMelee Reference Capture application bundle.") from error
+    if not isinstance(info, dict) or info.get("CFBundleIdentifier") != "org.webmelee.reference-capture":
+        raise InstallError("Refusing to replace an unrelated application or directory.")
+
+
+def validate_install_destination(destination: Path) -> Path:
+    destination = destination.expanduser()
+    if destination.is_symlink() or destination.suffix != ".app":
+        raise InstallError("The destination must be the full .app path, not a directory or symlink.")
+    destination = destination.resolve()
+    if destination.exists():
+        _require_capture_app(destination)
+    return destination
+
+
 def atomic_install(staging_app: Path, destination: Path) -> Path:
     """Atomically replace destination and restore the old app on failure."""
-    destination = destination.expanduser().resolve()
+    destination = validate_install_destination(destination)
+    _require_capture_app(staging_app)
     destination.parent.mkdir(parents=True, exist_ok=True)
     backup: Path | None = None
     had_previous = destination.exists()
     if had_previous:
-        backup = destination.with_name(f".{destination.name}.previous-{os.getpid()}")
-        if backup.exists():
-            shutil.rmtree(backup)
+        backup = destination.with_name(f".{destination.name}.previous-{uuid.uuid4().hex}")
+        if backup.exists() or backup.is_symlink():
+            raise InstallError("A previous-installation backup already exists; preserving it.")
         os.replace(destination, backup)
     try:
         os.replace(staging_app, destination)
@@ -398,7 +422,7 @@ def install(*, destination: Path, runtime_root: Path | None, python: Path, swift
             swiftc: str | None = None, sdk: str | None = None,
             architectures: Sequence[str] = ("arm64",), create_alias: bool = True,
             relaunch: bool = False) -> Path:
-    destination = destination.expanduser().resolve()
+    destination = validate_install_destination(destination)
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary_parent = Path(tempfile.mkdtemp(prefix=".webmelee-reference-capture-", dir=str(destination.parent)))
     staging_app = temporary_parent / APP_NAME

@@ -236,7 +236,15 @@ def _install_dolphin(*, binary, build, build_manifest, root):
     dolphin_root.mkdir(mode=0o700, parents=True, exist_ok=True)
     version_root = dolphin_root / binary_hash
     if version_root.exists():
-        _validate_installed_dolphin(version_root, expected_hash=binary_hash)
+        descriptor = _validate_installed_dolphin(version_root, expected_hash=binary_hash)
+        expected = {
+            "bundle_inventory": build["bundle_inventory"],
+            "runtime_dependencies": _runtime_identity(build["runtime_dependencies"]),
+            "receipt_sha256": sha256(Path(build_manifest)),
+            "provenance_inventory": provenance_inventory,
+        }
+        if any(descriptor.get(key) != value for key, value in expected.items()):
+            raise ValueError("Dolphin version collision: the same executable has different runtime or provenance")
         return version_root, False
 
     staging = Path(tempfile.mkdtemp(prefix=f".dolphin-{binary_hash[:12]}-",
