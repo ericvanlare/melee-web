@@ -188,6 +188,57 @@ class ReferenceCaptureConfigureTests(unittest.TestCase):
                 self.migrate(path.parent)
         self.assertEqual(path.read_bytes(), before)
 
+    def test_roster_upgrade_preserves_history_and_is_idempotent(self):
+        path = self.provision()
+        before = path.read_bytes()
+        previous = json.loads(before)
+        original = Path(previous["paths"]["fixture_gc"])
+        all_roster = b"synthetic all-roster save"
+        # Test publication/identity separately from the save-format codec.
+        with patch.object(configure, "LEGACY_PREPARED_GCI", configure.sha256(self.gci)), \
+             patch.object(configure, "PREPARED_GCI", hashlib.sha256(all_roster).hexdigest()), \
+             self.sram_patch, \
+             patch("reference_capture_save.unlock_roster_gci", return_value=all_roster) as transform:
+            configure.unlock_characters(path.parent)
+            expected = copy.deepcopy(previous)
+            inventory = configure.prepared_fixture_inventory()
+            destination = environment.managed_fixture_path(path.parent, inventory)
+            expected["paths"]["fixture_gc"] = str(destination)
+            expected["hashes"]["fixture_gc"] = inventory
+            self.assertEqual(json.loads(path.read_text()), expected)
+            self.assertEqual(environment.file_inventory(original), previous["hashes"]["fixture_gc"])
+            self.assertEqual(environment.file_inventory(destination), inventory)
+            self.assertEqual(stat.S_IMODE((destination / self.gci.relative_to(self.fixture)).stat().st_mode), 0o400)
+            archive = path.parent / "ConfigurationHistory" / hashlib.sha256(before).hexdigest() / "environment.json"
+            self.assertEqual(archive.read_bytes(), before)
+            updated = path.read_bytes()
+            configure.unlock_characters(path.parent)
+            self.assertEqual(path.read_bytes(), updated)
+            transform.assert_called_once_with(self.gci.read_bytes())
+
+    def test_roster_upgrade_rejects_unverified_output_without_changing_default(self):
+        path = self.provision()
+        before = path.read_bytes()
+        with patch.object(configure, "LEGACY_PREPARED_GCI", configure.sha256(self.gci)), \
+             patch.object(configure, "PREPARED_GCI", "a" * 64), self.sram_patch, \
+             patch("reference_capture_save.unlock_roster_gci", return_value=b"wrong output"):
+            with self.assertRaisesRegex(ValueError, "verified private prepared fixture"):
+                configure.unlock_characters(path.parent)
+        self.assertEqual(path.read_bytes(), before)
+
+    def test_fresh_provision_upgrades_the_legacy_roster(self):
+        all_roster = b"synthetic all-roster save"
+        with patch.object(configure, "LEGACY_PREPARED_GCI", configure.sha256(self.gci)), \
+             patch.object(configure, "PREPARED_GCI", hashlib.sha256(all_roster).hexdigest()), \
+             self.sram_patch, self.disc_patch, self.runtime_patch, \
+             patch("reference_capture_save.unlock_roster_gci", return_value=all_roster):
+            path = configure.configure(disc=self.disc, dol=self.dol,
+                build_manifest=self.build_manifest, fixture_gc=self.fixture,
+                root=self.root / "support")
+            self.assertEqual(json.loads(path.read_text())["hashes"]["fixture_gc"],
+                             configure.prepared_fixture_inventory())
+        self.assertEqual(self.gci.read_bytes(), b"synthetic prepared GCI")
+
     def test_existing_settings_require_explicit_refresh_without_mutation(self):
         settings_path = self.provision()
         before_settings = settings_path.read_bytes()

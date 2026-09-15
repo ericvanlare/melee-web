@@ -1,5 +1,20 @@
 # Current status
 
+Reference Capture provisioning now defaults to all roster characters unlocked.
+Existing installations can select the new immutable private fixture with
+`--unlock-characters`, preserving the original save, configuration history,
+recordings, Dolphin binary, and physical-controller profile. The pinned GCI's
+character mask changes from `0x0024` to `0x07ff`; stage progress is unchanged.
+The encoded result matches the original HSD routines and passes the original
+C decoder. The installed 0.2.3 verifier accepts the new fixture, and an ordinary
+retail boot reaches the title/attract screen without a card error. A visual CSS
+check remains unverified because automated keyboard input did not reach Dolphin.
+Focused save/provisioning tests pass. The 895-test run had 16 failures/errors
+from missing dependencies in the isolated worktree (87 optional skips); after
+copying the existing pinned dependencies, all 18 tests in the affected classes
+pass. This is save/provisioning evidence, not new gameplay or port acceptance.
+See the [upgrade procedure](docs/REFERENCE_CAPTURE_APP.md).
+
 Reference Capture 0.2.3 adds startup cancellation and interrupted replay cleanup,
 CPU-sidecar binding to its core timeline and derived artifact, and exact Dolphin
 source-composition checks with atomic, repeatable provenance publication. The

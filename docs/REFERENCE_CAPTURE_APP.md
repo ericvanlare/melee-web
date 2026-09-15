@@ -91,6 +91,37 @@ publishes the directory atomically, and never overwrites an existing version.
 Subsequent launch, controller setup, recording and replay use this local copy.
 They do not revisit the original fixture directory.
 
+Fresh provisioning selects a private save with **every roster character
+unlocked**, including all 11 unlockable characters. The original prepared
+fixture is still accepted as an input and preserved; provisioning derives a
+separate version with the all-character mask. No save bytes are shipped in Git.
+
+To upgrade an already configured application, close it and run:
+
+```sh
+python3 scripts/configure_reference_capture.py --unlock-characters
+```
+
+This operation archives the exact previous `environment.json` under
+`ConfigurationHistory/<sha256>/`, publishes the new immutable fixture, and
+changes only the default fixture path and inventory. It is repeatable and
+does not reinstall Dolphin or change the controller profile. Old recordings
+remain bound to their original fixture and tooling; use their matching archived
+configuration when replaying them. A build refresh preserves the selected fixture.
+
+The offline transformation is limited to the pinned GALE01r2 prepared GCI. It
+sets `gmMainLib_GetSaveData()->unlocked_characers_bitmask` bits 0–10, matching
+`gm_80164F18`, and recomputes the original HSD block digest and encoding.
+The character mask changes from `0x0024` to `0x07ff`; the stage mask remains
+`0x01c0`. Other decoded save fields, SRAM, and other GCI blocks are unchanged.
+The invalid secondary block remains invalid and is excluded by the original
+card reader. Input and output whole-file hashes are checked before publication:
+
+| Fixture | GCI SHA-256 |
+| --- | --- |
+| Original | `f64c9e07e436221ffc76acac7116a70167b2a690a59d5c56c2469c6fb5f2a1e6` |
+| All characters | `5ff16535045fed369206141dd326ec6f72519de69d6661ccfa7766341fdc0aed` |
+
 The settings file is private and mode-restricted. Verification binds the
 selected disc and embedded DOL, Dolphin binary, isolated profile, fixture,
 observer identity, and timing policy. It also checks the currently connected
