@@ -340,7 +340,7 @@ index 252fca7..3e36937 100644
  void PADSetVirtualStatus(u32 port, const PADStatus* status);
  void PADClearVirtualStatus(u32 port);
 diff --git a/lib/aurora.cpp b/lib/aurora.cpp
-index 9430842..f93262b 100644
+index 9430842..7d9b3a1 100644
 --- a/lib/aurora.cpp
 +++ b/lib/aurora.cpp
 @@ -1,6 +1,10 @@
@@ -486,9 +486,10 @@ index 9430842..f93262b 100644
  #endif
 +  timing.outerPrepMs = phase_now_ms() - phaseStarted;
  
-   gfx::end_frame([rmlBindGroup = std::move(rmlBindGroup), rmlOverlay, viewport,
+-  gfx::end_frame([rmlBindGroup = std::move(rmlBindGroup), rmlOverlay, viewport,
 -                  imguiDrawData = std::move(imguiDrawData)](
 -                     wgpu::CommandEncoder& encoder, std::vector<gfx::AfterSubmitCallback> afterSubmitCallbacks) {
++  gfx::end_frame([rmlBindGroup = std::move(rmlBindGroup), rmlOverlay, sourceSize = presentSource.size,
 +                  imguiDrawData = std::move(imguiDrawData), timing](
 +                     wgpu::CommandEncoder& encoder, std::vector<gfx::AfterSubmitCallback> afterSubmitCallbacks,
 +                     AuroraStats& frameStats) mutable {
@@ -496,7 +497,42 @@ index 9430842..f93262b 100644
      wgpu::Texture currentTexture;
      wgpu::TextureView currentView;
      auto surfaceStatus = wgpu::SurfaceGetCurrentTextureStatus::Error;
-@@ -367,12 +448,21 @@ void end_frame() noexcept {
+@@ -307,6 +388,13 @@ void end_frame() noexcept {
+ 
+     const bool canPresent = currentTexture && currentView;
+     if (canPresent) {
++      // Browser canvas dimensions can change before SDL processes its resize
++      // event. Encode presentation against the acquired attachment, not the
++      // previous surface configuration, so viewport/scissor bounds stay valid.
++      const auto surfaceWidth = currentTexture.GetWidth();
++      const auto surfaceHeight = currentTexture.GetHeight();
++      const auto viewport = webgpu::calculate_present_viewport(surfaceWidth, surfaceHeight,
++                                                               sourceSize.width, sourceSize.height);
+       wgpu::BindGroup presentBindGroup;
+       if (rmlBindGroup && !rmlOverlay) {
+         presentBindGroup = rmlBindGroup;
+@@ -332,8 +420,7 @@ void end_frame() noexcept {
+         // Copy EFB -> XFB (swapchain)
+         pass.SetPipeline(webgpu::g_CopyPipeline);
+         pass.SetBindGroup(0, presentBindGroup, 0, nullptr);
+-        set_present_viewport(pass, viewport, webgpu::g_graphicsConfig.surfaceConfiguration.width,
+-                             webgpu::g_graphicsConfig.surfaceConfiguration.height);
++        set_present_viewport(pass, viewport, surfaceWidth, surfaceHeight);
+ 
+         pass.Draw(3);
+         if (rmlBindGroup && rmlOverlay) {
+@@ -358,8 +445,8 @@ void end_frame() noexcept {
+             .timestampWrites = webgpu::gpu_prof::pass_writes("ImGui"),
+         };
+         const auto pass = encoder.BeginRenderPass(&renderPassDescriptor);
+-        pass.SetViewport(0.f, 0.f, static_cast<float>(webgpu::g_graphicsConfig.surfaceConfiguration.width),
+-                         static_cast<float>(webgpu::g_graphicsConfig.surfaceConfiguration.height), 0.f, 1.f);
++        pass.SetViewport(0.f, 0.f, static_cast<float>(surfaceWidth),
++                         static_cast<float>(surfaceHeight), 0.f, 1.f);
+         imgui::render(pass, imguiDrawData);
+         pass.End();
+       }
+@@ -367,12 +454,21 @@ void end_frame() noexcept {
        Log.info("Skipping present; window not presentable");
      }
      webgpu::gpu_prof::frame_end(encoder);
@@ -518,7 +554,7 @@ index 9430842..f93262b 100644
      webgpu::gpu_prof::after_submit();
      if (canPresent && g_surface) {
        ZoneScopedN("Present");
-@@ -380,7 +470,12 @@ void end_frame() noexcept {
+@@ -380,7 +476,12 @@ void end_frame() noexcept {
        {
          window::SurfaceLock surfaceLock;
          if (window::is_presentable()) {
@@ -531,7 +567,7 @@ index 9430842..f93262b 100644
          }
        }
        if (status) {
-@@ -429,7 +524,7 @@ void end_frame() noexcept {
+@@ -429,7 +530,7 @@ void end_frame() noexcept {
      TracyPlotConfig("aurora: lastStorageSize", tracy::PlotFormatType::Memory, false, true, 0);
      TracyPlotConfig("aurora: lastTextureUploadSize", tracy::PlotFormatType::Memory, false, true, 0);
  
@@ -540,7 +576,7 @@ index 9430842..f93262b 100644
      TracyPlot("aurora: queuedPipelines", static_cast<int64_t>(stats.queuedPipelines));
      TracyPlot("aurora: createdPipelines", static_cast<int64_t>(stats.createdPipelines));
      TracyPlot("aurora: drawCallCount", static_cast<int64_t>(stats.drawCallCount));
-@@ -439,8 +534,25 @@ void end_frame() noexcept {
+@@ -439,8 +540,25 @@ void end_frame() noexcept {
      TracyPlot("aurora: lastIndexSize", static_cast<int64_t>(stats.lastIndexSize));
      TracyPlot("aurora: lastStorageSize", static_cast<int64_t>(stats.lastStorageSize));
      TracyPlot("aurora: lastTextureUploadSize", static_cast<int64_t>(stats.lastTextureUploadSize));
@@ -566,7 +602,7 @@ index 9430842..f93262b 100644
  #endif
  }
  } // namespace
-@@ -454,6 +566,33 @@ void aurora_shutdown() { aurora::shutdown(); }
+@@ -454,6 +572,33 @@ void aurora_shutdown() { aurora::shutdown(); }
  const AuroraEvent* aurora_update() { return aurora::update(); }
  bool aurora_begin_frame() { return aurora::begin_frame(); }
  void aurora_end_frame() { aurora::end_frame(); }

@@ -52,6 +52,7 @@ try {
     await page.waitForFunction(() => Module._melee_web_native_menu_cache_idle() !== 0, null, {timeout: 30000});
     assert.equal(await page.evaluate(() => Module._melee_web_native_menu_cache_idle()), 1,
       'The public renderer must open its volatile cache before consuming the bundled pipeline seed');
+    await page.locator('#loading-panel').waitFor({state: 'hidden', timeout: 30000});
     const selective = await page.evaluate(() => Module.pipelinePreparation || null);
     if (selective) {
       assert.equal(selective.policy, 'catalog');
@@ -124,6 +125,7 @@ try {
       await page.locator('#start-game:not([disabled])').waitFor({timeout: 90000});
       assert(await page.locator('#error-dialog').isHidden());
       await page.locator('#start-game').click(); await phase(1);
+      assert(await page.locator('#loading-panel').isHidden(), 'Loading feedback must retire before interactive CSS');
       await page.waitForFunction(() => document.activeElement.id === 'canvas');
       assert(await page.locator('#pause-game').isEnabled());
     });

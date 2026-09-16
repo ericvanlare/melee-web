@@ -6,7 +6,8 @@ layout for ordinary controllers. Face buttons use positions: south → A,
 east → B, west → X, north → Y. Right shoulder → Z; triggers → L/R.
 Controls allows an explicit custom mapping when that convention is unwanted.
 
-The public player's compact **Controls** settings select the source separately
+The public player and development `runtime.html` use the same compact **Controls**
+component to select the source separately
 for Player 1 and Player 2: **Auto**, **Keyboard**, **Controller only**, or **Off**.
 Auto prefers a recognized controller and otherwise enables that player's keyboard.
 Keyboard overrides physical input for that slot; automatically assigned controllers
@@ -27,6 +28,22 @@ fallback guessed a generic layout, which could interpret Mayflash raw X as A.
 Native SDL database indices are not directly portable to browser mappings. The
 adapter also retains floating-point HID hats rather than narrowing their
 out-of-range neutral value into a signed joystick axis.
+
+## Shared settings boundary
+
+`web/controller-settings.mjs` owns the compact dialog markup, source choices,
+keyboard layout, preference migration/storage, source descriptions, lazy advanced
+panel, and focus/cleanup behavior. Its scoped stylesheet is shared too. Each
+entry supplies its existing player handle and lifecycle state; the component
+never creates a runtime or changes simulation sampling. New pages can mount this
+component rather than importing a page shell.
+
+Both standalone entries share preferences at the same origin. The public page
+sets `disableExtraPorts: true`; development preserves ports 3/4 for its existing
+diagnostics. The older prototype keeps its hidden keyboard-checkbox adapter,
+but layout changes now go through this settings owner. Iframe overrides remain
+session-only. Development audio, replay and rendering diagnostics stay in the
+development entry and remain absent from the public artifact.
 
 ## Suggested Mayflash layout and evidence
 
@@ -98,7 +115,7 @@ existing path.
 ## Fast verification
 
 `controller-check.html` loads no disc, Wasm game or GPU pipelines. The same panel
-is available under **Controls** in the public player. Connect the adapter, press
+is available under **Controls** in the public and development players. Connect the adapter, press
 a button to expose it to the browser, then inspect the suggested or standard
 mapping. Use an individual **Change** button for a mismatch, or complete setup
 for an unknown layout.
@@ -119,6 +136,7 @@ node tests/controller_setup_browser_test.mjs --url http://127.0.0.1:8794/ --play
 node tests/controller_setup_browser_test.mjs --url http://127.0.0.1:8794/ --playwright "$MELEE_PLAYWRIGHT_DIR" --out work/controller-wizard-axes --signed-dpad
 node tests/controller_suggestion_browser_test.mjs --url http://127.0.0.1:8794/ --playwright "$MELEE_PLAYWRIGHT_DIR" --out work/controller-suggestion
 node tests/controller_player_browser_test.mjs --url "$PUBLIC_PREVIEW_URL" --playwright "$MELEE_PLAYWRIGHT_DIR" --out work/controller-player
+node tests/controller_player_browser_test.mjs --url "$DEVELOPMENT_RUNTIME_URL" --playwright "$MELEE_PLAYWRIGHT_DIR" --out work/controller-development
 ```
 
 Use the installed Playwright package directory and Node executable. Tests launch
@@ -172,3 +190,36 @@ The final player-source candidate passes all 759 Python tests (31 skips,
 317.27 seconds), all nine Wasm groups, the packaged-player source UI test, the
 six public-browser smoke groups and the 23-case public package suite. The final
 package audit covers 22 files / 14,691,084 bytes, graph `9d88c5fbae4d3962`.
+
+The production rollout on 2026-09-14 merged PR #22 as
+`72def75a7c58292b5f7f2d3b04f70ad21b665f33` after both exact-head native CI
+runs and public checks passed. The immutable production artifact is
+[00ee2ca2.webmelee.pages.dev](https://00ee2ca2.webmelee.pages.dev); the apex is
+[webmelee.gg](https://webmelee.gg/). Its manifest SHA-256 is
+`89b4209fa9cbbb630a9f7d2e2ead93da63a8e541b9b6dc2227b781dd9ad4ec83`.
+The production-configured artifact contains 23 files / 14,691,354 bytes.
+Each hosted origin passed 21 exact resource checks and 32 forbidden/missing
+routes, plus all ten public browser groups with an owned local disc. Authored
+controller source-selection checks also passed staging and the apex. The user
+reported that the physical-controller playable preview worked well; this does
+not replace full hardware/retail precision acceptance.
+
+Two initial staging verifier/test failures remain recorded locally: a stale
+HTTP file inventory rejected the newly allowed controller modules, and a
+keyboard smoke wrongly expected no Player 2 controller when Auto correctly
+assigned the attached Mayflash there. The verifier now shares the producer's
+explicit inventory; the keyboard smoke selects keyboard/off explicitly. Those
+check fixes did not change the shipped player bytes.
+
+The separate shared-settings follow-up passes all 760 Python tests (31 skips,
+247.54 seconds), development and selective-public Release builds, both actual
+entry-page controller UI checks, the older prototype's keyboard/B0XX interface
+check, and all ten packaged public disc/menu lifecycle groups. The shared UI
+checks cover source selection for either player, saved and denied storage,
+legacy migration/session overrides, restored B0XX coercion, optional remapping,
+focus and narrow layouts. They use authored Gamepad samples, not a new physical
+controller or retail-equivalence capture. The local public package audit covers
+24 files / 14,697,688 bytes with graph `4eabcc742109c682`; its HTTP check passes
+23 exact resources and 31 missing routes, with the local Pages configuration
+route limitation retained in the report. This follow-up is a separate PR and
+has not been promoted to production.
