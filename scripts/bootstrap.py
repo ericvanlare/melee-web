@@ -53,6 +53,10 @@ def read_lock(root=ROOT):
             raise ValueError(f"{name}: missing reference tool URL")
         if not re.fullmatch(r"[0-9a-f]{40}", str(spec.get("commit", ""))):
             raise ValueError(f"{name}: reference tool commit must be a full lowercase Git SHA-1")
+        if spec.get("kind") == "source":
+            continue
+        if spec.get("kind") not in (None, "package"):
+            raise ValueError(f"{name}: unsupported reference tool kind")
         if not isinstance(spec.get("package"), str) or not spec["package"]:
             raise ValueError(f"{name}: missing reference package name")
         if not re.fullmatch(r"\d+\.\d+\.\d+", str(spec.get("version", ""))):

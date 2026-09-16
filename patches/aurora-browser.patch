@@ -313,8 +313,24 @@ index 0000000..51856a9
 +#endif
 +
 +#endif /* defined(MELEE_WEB_SELECTIVE_PIPELINES) */
+diff --git a/include/dolphin/pad.h b/include/dolphin/pad.h
+index 252fca7..3e36937 100644
+--- a/include/dolphin/pad.h
++++ b/include/dolphin/pad.h
+@@ -221,6 +221,11 @@ s32 PADGetNativeButtonPressed(u32 port);
+ PADSignedNativeAxis PADGetNativeAxisPulled(u32 port);
+ void PADRestoreDefaultMapping(u32 port);
+ void PADBlockInput(bool block);
++/* Optional physical-input transport. A true result means a connected source,
++ * including a neutral source awaiting setup. Null restores SDL hardware input.
++ * Keyboard fallback, focus suppression and the existing PADClamp stay shared. */
++typedef BOOL (*PADPhysicalInputProvider)(u32 port, PADStatus* status);
++void PADSetPhysicalInputProvider(PADPhysicalInputProvider provider);
+ 
+ void PADSetVirtualStatus(u32 port, const PADStatus* status);
+ void PADClearVirtualStatus(u32 port);
 diff --git a/lib/aurora.cpp b/lib/aurora.cpp
-index 9430842..f93262b 100644
+index 9430842..7d9b3a1 100644
 --- a/lib/aurora.cpp
 +++ b/lib/aurora.cpp
 @@ -1,6 +1,10 @@
@@ -460,9 +476,10 @@ index 9430842..f93262b 100644
  #endif
 +  timing.outerPrepMs = phase_now_ms() - phaseStarted;
  
-   gfx::end_frame([rmlBindGroup = std::move(rmlBindGroup), rmlOverlay, viewport,
+-  gfx::end_frame([rmlBindGroup = std::move(rmlBindGroup), rmlOverlay, viewport,
 -                  imguiDrawData = std::move(imguiDrawData)](
 -                     wgpu::CommandEncoder& encoder, std::vector<gfx::AfterSubmitCallback> afterSubmitCallbacks) {
++  gfx::end_frame([rmlBindGroup = std::move(rmlBindGroup), rmlOverlay, sourceSize = presentSource.size,
 +                  imguiDrawData = std::move(imguiDrawData), timing](
 +                     wgpu::CommandEncoder& encoder, std::vector<gfx::AfterSubmitCallback> afterSubmitCallbacks,
 +                     AuroraStats& frameStats) mutable {
@@ -470,7 +487,42 @@ index 9430842..f93262b 100644
      wgpu::Texture currentTexture;
      wgpu::TextureView currentView;
      auto surfaceStatus = wgpu::SurfaceGetCurrentTextureStatus::Error;
-@@ -367,12 +448,21 @@ void end_frame() noexcept {
+@@ -307,6 +388,13 @@ void end_frame() noexcept {
+ 
+     const bool canPresent = currentTexture && currentView;
+     if (canPresent) {
++      // Browser canvas dimensions can change before SDL processes its resize
++      // event. Encode presentation against the acquired attachment, not the
++      // previous surface configuration, so viewport/scissor bounds stay valid.
++      const auto surfaceWidth = currentTexture.GetWidth();
++      const auto surfaceHeight = currentTexture.GetHeight();
++      const auto viewport = webgpu::calculate_present_viewport(surfaceWidth, surfaceHeight,
++                                                               sourceSize.width, sourceSize.height);
+       wgpu::BindGroup presentBindGroup;
+       if (rmlBindGroup && !rmlOverlay) {
+         presentBindGroup = rmlBindGroup;
+@@ -332,8 +420,7 @@ void end_frame() noexcept {
+         // Copy EFB -> XFB (swapchain)
+         pass.SetPipeline(webgpu::g_CopyPipeline);
+         pass.SetBindGroup(0, presentBindGroup, 0, nullptr);
+-        set_present_viewport(pass, viewport, webgpu::g_graphicsConfig.surfaceConfiguration.width,
+-                             webgpu::g_graphicsConfig.surfaceConfiguration.height);
++        set_present_viewport(pass, viewport, surfaceWidth, surfaceHeight);
+ 
+         pass.Draw(3);
+         if (rmlBindGroup && rmlOverlay) {
+@@ -358,8 +445,8 @@ void end_frame() noexcept {
+             .timestampWrites = webgpu::gpu_prof::pass_writes("ImGui"),
+         };
+         const auto pass = encoder.BeginRenderPass(&renderPassDescriptor);
+-        pass.SetViewport(0.f, 0.f, static_cast<float>(webgpu::g_graphicsConfig.surfaceConfiguration.width),
+-                         static_cast<float>(webgpu::g_graphicsConfig.surfaceConfiguration.height), 0.f, 1.f);
++        pass.SetViewport(0.f, 0.f, static_cast<float>(surfaceWidth),
++                         static_cast<float>(surfaceHeight), 0.f, 1.f);
+         imgui::render(pass, imguiDrawData);
+         pass.End();
+       }
+@@ -367,12 +454,21 @@ void end_frame() noexcept {
        Log.info("Skipping present; window not presentable");
      }
      webgpu::gpu_prof::frame_end(encoder);
@@ -492,7 +544,7 @@ index 9430842..f93262b 100644
      webgpu::gpu_prof::after_submit();
      if (canPresent && g_surface) {
        ZoneScopedN("Present");
-@@ -380,7 +470,12 @@ void end_frame() noexcept {
+@@ -380,7 +476,12 @@ void end_frame() noexcept {
        {
          window::SurfaceLock surfaceLock;
          if (window::is_presentable()) {
@@ -505,7 +557,7 @@ index 9430842..f93262b 100644
          }
        }
        if (status) {
-@@ -429,7 +524,7 @@ void end_frame() noexcept {
+@@ -429,7 +530,7 @@ void end_frame() noexcept {
      TracyPlotConfig("aurora: lastStorageSize", tracy::PlotFormatType::Memory, false, true, 0);
      TracyPlotConfig("aurora: lastTextureUploadSize", tracy::PlotFormatType::Memory, false, true, 0);
  
@@ -514,7 +566,7 @@ index 9430842..f93262b 100644
      TracyPlot("aurora: queuedPipelines", static_cast<int64_t>(stats.queuedPipelines));
      TracyPlot("aurora: createdPipelines", static_cast<int64_t>(stats.createdPipelines));
      TracyPlot("aurora: drawCallCount", static_cast<int64_t>(stats.drawCallCount));
-@@ -439,8 +534,25 @@ void end_frame() noexcept {
+@@ -439,8 +540,25 @@ void end_frame() noexcept {
      TracyPlot("aurora: lastIndexSize", static_cast<int64_t>(stats.lastIndexSize));
      TracyPlot("aurora: lastStorageSize", static_cast<int64_t>(stats.lastStorageSize));
      TracyPlot("aurora: lastTextureUploadSize", static_cast<int64_t>(stats.lastTextureUploadSize));
@@ -540,7 +592,7 @@ index 9430842..f93262b 100644
  #endif
  }
  } // namespace
-@@ -454,6 +566,33 @@ void aurora_shutdown() { aurora::shutdown(); }
+@@ -454,6 +572,33 @@ void aurora_shutdown() { aurora::shutdown(); }
  const AuroraEvent* aurora_update() { return aurora::update(); }
  bool aurora_begin_frame() { return aurora::begin_frame(); }
  void aurora_end_frame() { aurora::end_frame(); }
@@ -589,6 +641,70 @@ index 447ead8..8514c86 100644
  #elif defined(SDL_PLATFORM_WIN32)
    std::shared_ptr<wgpu::SurfaceSourceWindowsHWND> desc = std::make_shared<wgpu::SurfaceSourceWindowsHWND>();
    desc->hwnd = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr);
+diff --git a/lib/dolphin/pad/pad.cpp b/lib/dolphin/pad/pad.cpp
+index 0a35990..11a6faf 100644
+--- a/lib/dolphin/pad/pad.cpp
++++ b/lib/dolphin/pad/pad.cpp
+@@ -292,6 +292,7 @@ constexpr PADCLampRegion ClampRegion{
+ };
+ 
+ bool g_initialized;
++PADPhysicalInputProvider g_physicalInputProvider = nullptr;
+ bool g_keyboardBindingsLoaded = false;
+ bool g_blockPAD = false;
+ bool g_suppressHeldOnRead = false;
+@@ -723,11 +724,13 @@ u32 PADRead(PADStatus* status) {
+   for (uint32_t i = 0; i < PAD_CHANMAX; ++i) {
+     memset(&status[i], 0, sizeof(PADStatus));
+     // Support device rumble on port 0 regardless of whether a controller is connected.
+-    if (device_rumble_available_for_port(i)) {
++    if (!g_physicalInputProvider && device_rumble_available_for_port(i)) {
+       rumbleSupport |= PAD_CHAN0_BIT;
+     }
+-    auto controller = aurora::input::get_controller_for_player(i);
+-    if (controller == nullptr && !g_keyboardBindings[i].m_mappingsSet && !g_virtualPadActive[i]) {
++    PADStatus physicalStatus{};
++    const bool physicalConnected = g_physicalInputProvider && g_physicalInputProvider(i, &physicalStatus);
++    auto controller = g_physicalInputProvider ? nullptr : aurora::input::get_controller_for_player(i);
++    if (!physicalConnected && controller == nullptr && !g_keyboardBindings[i].m_mappingsSet && !g_virtualPadActive[i]) {
+       status[i].err = PAD_ERR_NO_CONTROLLER;
+       g_suppressedButtons[i] = 0;
+       g_suppressLeftTrigger[i] = false;
+@@ -936,6 +939,12 @@ u32 PADRead(PADStatus* status) {
+       }
+     }
+ 
++    if (physicalConnected) {
++      // The provider has already normalized physical hardware. Never blend it
++      // with a second SDL mapping or keyboard input on the same port.
++      status[i] = physicalStatus;
++      status[i].err = PAD_ERR_NONE;
++    }
+     if (g_blockPAD) {
+       neutralize_status(status[i]);
+     } else {
+@@ -948,6 +957,11 @@ u32 PADRead(PADStatus* status) {
+   return rumbleSupport;
+ }
+ 
++void PADSetPhysicalInputProvider(PADPhysicalInputProvider provider) {
++  g_physicalInputProvider = provider;
++  g_suppressHeldOnRead = true;
++}
++
+ void PADSetVirtualStatus(const u32 port, const PADStatus* virtualStatus) {
+   if (port >= PAD_CHANMAX || virtualStatus == nullptr) {
+     return;
+@@ -973,6 +987,9 @@ void PADClearAllVirtualStatus() {
+ }
+ 
+ void PADControlMotor(const u32 chan, const u32 cmd) {
++  // This input-only provider reports no rumble support. Its port assignments
++  // are independent of SDL, so SDL/device feedback could target the wrong pad.
++  if (g_physicalInputProvider) return;
+   const auto controller = aurora::input::get_controller_for_player(chan);
+   if (should_use_device_rumble(chan, controller)) {
+     u16 low = 0;
 diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
 index b3054be..9fe8bd7 100644
 --- a/lib/gfx/encoding.cpp

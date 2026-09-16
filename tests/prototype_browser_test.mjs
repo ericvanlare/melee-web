@@ -14,6 +14,9 @@ const failures=[], errors=[], posts=[], checks=[];
 let failureState = null;
 let timingResumes = 0;
 const page = await browser.newPage({viewport:{width:1440,height:1050},deviceScaleFactor:1});
+// This suite drives keyboard input. Physical auto-assignment has a separate
+// shared-controls regression and must not replace the keyboard on this host.
+await page.addInitScript(() => Object.defineProperty(navigator, 'getGamepads', {value: () => []}));
 page.on('pageerror', error=>errors.push(error.message));
 page.on('console', message=>{if(message.type()==='error')errors.push(message.text())});
 page.on('response', response=>{if(response.status()>=400)errors.push(`${response.status()} ${new URL(response.url()).pathname}`)});
@@ -262,7 +265,11 @@ try {
       try {
         await runtime.goto(new URL('runtime.html',values.url).href);
         await runtime.locator('#disc:not([disabled])').waitFor({timeout:60000});
-        await runtime.locator('#keyboard2').uncheck();
+        await runtime.locator('#controls-open').click();
+        await runtime.locator('#keyboard-layout').selectOption('two');
+        await runtime.getByLabel('Player 1 input source', {exact:true}).selectOption('keyboard');
+        await runtime.getByLabel('Player 2 input source', {exact:true}).selectOption('off');
+        await runtime.locator('#controls-close').click();
         await runtime.locator('#disc').setInputFiles(values.disc);
         await runtime.locator('#launch:not([disabled])').waitFor({timeout:60000});
         await runtime.locator('#launch').click();

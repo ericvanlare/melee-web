@@ -11,6 +11,10 @@ CSS → original SSS → four-stock Mario/FD match → original CSS. See the
 The combined [performance and accuracy playbook](docs/PERFORMANCE_AND_ACCURACY.md)
 defines the evidence levels and admission process used for every new fighter,
 stage and shared runtime change.
+The private macOS [Reference Capture application](docs/REFERENCE_CAPTURE_APP.md)
+records ordinary retail play through a passive Dolphin observer and produces
+hash-bound human-input recipes and comparison reports. It is separate from the
+public browser application.
 The [bounded hitch-capture loop](docs/HITCH_CAPTURE.md) records every failure
 with separate native deadline and browser-gap metrics, a frozen repetition
 matrix and optional correlated traces.

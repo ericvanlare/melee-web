@@ -1,8 +1,12 @@
 /** One player owner per document. Native source ticks remain owned by the compiled player. */
 import {loadNativeGameDisc} from './runtime-assets.mjs';
+import {createControllerManager} from './controller-input.mjs';
 
 let documentClaimed = false;
 const SCENES = {1: 'css', 2: 'preparing', 3: 'sss', 4: 'preparing', 5: 'preparing', 6: 'unloaded', 7: 'match'};
+const IMPORT_BATCH_MAX_FILES = 8;
+const IMPORT_BATCH_MAX_BYTES = 8 * 1024 * 1024;
+const IMPORT_BATCH_MAX_MS = 8;
 
 export async function mountMeleeRuntime({canvas, onState = () => {}, onError = () => {},
   onEvent = () => {}, onLog = () => {}, onOwner, configureModule,
@@ -17,6 +21,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   const assetBase = new URL('.', loaderUrl);
   let ready = false, fatal = false, destroyed = false, bundle = false, prepared = false, hasLocalData = false;
   let busy = '', message = '', progress = null, inputDirty = true, lastState = '';
+  let loading = Object.freeze({phase: 'boot', message: 'Starting player…', complete: 0, total: 0});
   let preparationLabel = '', preparationKeepsAudio = false;
   let keyboard = [true, true], layout = 'two';
   const commands = [], listeners = [];
@@ -27,6 +32,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   const startup = new Promise((resolve, reject) => { resolveStartup = resolve; rejectStartup = reject; });
   const Module = {
     canvas,
+    meleeControllers: createControllerManager(),
     locateFile: name => new URL(name, assetBase).href,
     print: text => onLog(String(text), false),
     printErr: text => onLog(String(text), true),
@@ -35,7 +41,35 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   };
   const status = () => ready ? Module.UTF8ToString(Module._melee_web_native_menu_message()) : 'Starting WebGPU…';
   const check = result => { if (!result) throw Error(status()); return result; };
+  const numericProgress = (value, fallback = 0) => Number.isFinite(Number(value)) ? Math.max(0, Math.floor(Number(value))) : fallback;
+  function setLoading(phase, text, complete, total) {
+    const normalizedTotal = Math.max(0, numericProgress(total));
+    const normalizedComplete = Math.min(normalizedTotal, numericProgress(complete));
+    loading = Object.freeze({phase, message: text, complete: normalizedComplete, total: normalizedTotal});
+  }
+  function refreshCatalogLoading() {
+    if (fatal || destroyed) { loading = null; return; }
+    if (!ready) return;
+    if (['disc', 'handoff', 'native'].includes(loading?.phase)) return;
+    const preparation = Module.pipelinePreparation;
+    if (!preparation || typeof preparation !== 'object') {
+      if (loading?.phase === 'boot' || loading?.phase === 'catalog') loading = null;
+      return;
+    }
+    if (preparation.ready) {
+      if (loading?.phase === 'boot' || loading?.phase === 'catalog') loading = null;
+      return;
+    }
+    const selected = numericProgress(preparation.selected);
+    const pending = numericProgress(preparation.pending);
+    const total = pending > 0 ? Math.max(selected, pending) : 0;
+    // `pending` is the remaining count in the native status. Keep an active
+    // catalog operation visibly incomplete until native reports ready.
+    const complete = total > 0 ? Math.max(0, total - pending) : 0;
+    setLoading('catalog', 'Preparing graphics…', complete, total);
+  }
   function snapshot() {
+    refreshCatalogLoading();
     const phase = ready && !fatal && !destroyed ? Module._melee_web_native_menu_phase() : 0;
     const running = ready && !fatal && !destroyed && !!Module._melee_web_native_menu_running();
     const scene = SCENES[phase] || 'idle';
@@ -44,7 +78,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     const state = destroyed ? 'destroyed' : fatal ? 'error' : !ready ? 'booting' : busy ||
       (preparationLabel ? 'preparing' : paused ? 'paused' : active ? scene : prepared ? 'prepared' : 'idle');
     return Object.freeze({version: 1, state, scene, phase, running, paused, audio: audio ? 'enabled' : 'disabled',
-      message: message || preparationLabel || status(), progress,
+      message: message || preparationLabel || status(), progress, loading,
       ready, bundle, busy: !!busy, requiresReload: destroyed || fatal,
       canImport: ready && !fatal && !destroyed && !busy && !preparationLabel,
       canStart: ready && bundle && !active && !fatal && !destroyed && !busy && !preparationLabel,
@@ -60,7 +94,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   function stop(error) {
     if (fatal || destroyed) return;
     fatal = true; message = String(error?.message || error || 'Player stopped. Reload to recover.');
-    preparationLabel = ''; preparationKeepsAudio = false;
+    preparationLabel = ''; preparationKeepsAudio = false; loading = null;
     syncAudio();
     for (const c of commands.splice(0)) c.reject(Error(message));
     audio?.fail(Error(message));
@@ -107,10 +141,10 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
           document.hidden ? 0 : 1);
       }
     },
-    menuPreparation(label, keepAudio = false) { preparationLabel = label || 'Preparing original scene'; preparationKeepsAudio = !!keepAudio; message = ''; emit('preparation', {label: preparationLabel, keepAudio}); publish(); },
-    menuPreparationDone() { preparationLabel = ''; message = ''; emit('preparationDone'); publish(); },
-    menuPreparationCanceled() { preparationLabel = ''; preparationKeepsAudio = false; message = ''; emit('preparationCanceled'); publish(); },
-    menuPreparationFailed(error) { preparationLabel = ''; preparationKeepsAudio = false; message = error || 'Native preparation failed'; emit('preparationFailed', message); publish(); },
+    menuPreparation(label, keepAudio = false) { preparationLabel = label || 'Preparing original scene'; preparationKeepsAudio = !!keepAudio; message = ''; setLoading('native', 'Preparing game data…', 0, 0); emit('preparation', {label: preparationLabel, keepAudio}); publish(); },
+    menuPreparationDone() { preparationLabel = ''; message = ''; if (loading?.phase === 'native') { loading = null; refreshCatalogLoading(); } emit('preparationDone'); publish(); },
+    menuPreparationCanceled() { preparationLabel = ''; preparationKeepsAudio = false; message = ''; if (loading?.phase === 'native') loading = null; emit('preparationCanceled'); publish(); },
+    menuPreparationFailed(error) { preparationLabel = ''; preparationKeepsAudio = false; message = error || 'Native preparation failed'; if (loading?.phase === 'native') loading = null; emit('preparationFailed', message); publish(); },
     menuRenderCacheSettled() { Module.markRuntimeCacheDirty?.(); emit('cacheSettled'); },
     menuFrame(wasRunning) { if (!ready || fatal || destroyed) return; syncAudio(); publish(); emit('frame', wasRunning); },
   };
@@ -136,36 +170,80 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     if (Module.runtimeCacheState?.dirty) await Module.saveRuntimeCache();
     return true;
   }
+  function putNow(name, bytes) {
+    const encoded = new TextEncoder().encode(name + '\0');
+    const np = Module._malloc(encoded.length), bp = Module._malloc(bytes.length);
+    try {
+      if (!np || !bp) throw Error('Allocation failed.');
+      Module.HEAPU8.set(encoded, np); Module.HEAPU8.set(bytes, bp);
+      check(Module._melee_web_native_menu_file(np, bp, bytes.length));
+      hasLocalData = true;
+    } finally { Module._free(np); Module._free(bp); }
+  }
   async function put(name, bytes) {
-    await boundary(() => {
-      const encoded = new TextEncoder().encode(name + '\0');
-      const np = Module._malloc(encoded.length), bp = Module._malloc(bytes.length);
-      try {
-        if (!np || !bp) throw Error('Allocation failed.');
-        Module.HEAPU8.set(encoded, np); Module.HEAPU8.set(bytes, bp);
-        check(Module._melee_web_native_menu_file(np, bp, bytes.length));
-        hasLocalData = true;
-      } finally { Module._free(np); Module._free(bp); }
-    });
+    await boundary(() => putNow(name, bytes));
+  }
+  async function putBatches(entries) {
+    let complete = 0;
+    const total = entries.length;
+    while (complete < total) {
+      const offset = complete;
+      const processed = await boundary(() => {
+        const started = performance.now();
+        let count = 0, bytes = 0;
+        while (offset + count < total) {
+          const [name, data] = entries[offset + count];
+          const size = numericProgress(data?.byteLength ?? data?.length);
+          if (count && (count >= IMPORT_BATCH_MAX_FILES ||
+              bytes + size > IMPORT_BATCH_MAX_BYTES || performance.now() - started >= IMPORT_BATCH_MAX_MS)) break;
+          putNow(name, data);
+          ++count; bytes += size;
+        }
+        return count;
+      });
+      if (!processed) throw Error('Unable to transfer local game data.');
+      complete += processed;
+      // Keep this operation visibly active until native preparation starts;
+      // the final batch transitions directly so 100% cannot linger.
+      if (complete < total) { setLoading('handoff', 'Preparing game data…', complete, total); publish(); }
+    }
   }
   async function prepareNativeResources() {
     callbacks.menuPreparation('Preparing native menu resources');
-    await pauseAudioForPreparation();
-    await new Promise(resolve => setTimeout(resolve, 0));
-    await boundary(() => check(Module._melee_web_native_menu_prepare()));
-    prepared = true; callbacks.menuPreparationDone();
+    try {
+      await pauseAudioForPreparation();
+      await new Promise(resolve => setTimeout(resolve, 0));
+      await boundary(() => check(Module._melee_web_native_menu_prepare()));
+      prepared = true; callbacks.menuPreparationDone();
+    } finally {
+      if (loading?.phase === 'native') { loading = null; refreshCatalogLoading(); }
+    }
   }
   const handle = Object.freeze({
+    controllers: Module.meleeControllers,
     version: 1, getState: snapshot, focus,
     importDisc(file) {
       return operation('importing', async () => {
         bundle = false;
-        if (!await unloadAndSave()) throw Error(status());
-        const files = await readDisc(file, p => {
-          progress = Object.freeze({complete: p.complete, total: p.total}); message = `Reading local data ${p.complete}/${p.total}`; publish();
-        });
-        for (const [name, bytes] of files) await put(name, bytes);
-        await prepareNativeResources(); bundle = true; message = 'Local game data loaded.';
+        try {
+          if (!await unloadAndSave()) throw Error(status());
+          setLoading('disc', 'Reading game data…', 0, 1); publish();
+          const files = await readDisc(file, p => {
+            progress = p.phase === 'complete' ? null : Object.freeze({complete: p.complete, total: p.total});
+            message = `Reading local data ${p.complete}/${p.total}`;
+            if (p.phase === 'complete') setLoading('handoff', 'Preparing game data…', 0, p.total);
+            else setLoading('disc', 'Reading game data…', p.complete, p.total);
+            publish();
+          });
+          const entries = Array.from(files);
+          progress = null;
+          setLoading('handoff', 'Preparing game data…', 0, entries.length); publish();
+          await putBatches(entries);
+          await prepareNativeResources(); bundle = true; message = 'Local game data loaded.';
+          loading = null;
+        } finally {
+          if (['disc', 'handoff'].includes(loading?.phase)) { loading = null; refreshCatalogLoading(); }
+        }
       });
     },
     prepare() { return operation('preparing', async () => { if (!bundle) throw Error('Select a disc first.'); await prepareNativeResources(); }); },

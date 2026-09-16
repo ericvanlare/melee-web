@@ -139,7 +139,7 @@ foreach(trace bonus_data stage_numeric)
   set_target_properties(gameplay_${trace}_trace PROPERTIES SUFFIX ".js")
 endforeach()
 
-add_executable(gameplay_browser EXCLUDE_FROM_ALL src/gameplay_browser.cpp src/browser_input.cpp)
+add_executable(gameplay_browser EXCLUDE_FROM_ALL src/gameplay_browser.cpp src/browser_input.cpp src/browser_controllers.cpp)
 target_link_libraries(gameplay_browser PRIVATE fighter_asset_runtime aurora::main)
 target_compile_options(gameplay_browser PRIVATE -ffp-contract=off)
 target_link_options(gameplay_browser PRIVATE -sENVIRONMENT=web -sALLOW_MEMORY_GROWTH=1
@@ -157,9 +157,10 @@ else()
 endif()
 configure_file(web/runtime.html runtime.html @ONLY)
 configure_file(web/runtime-cache.js runtime-cache.js COPYONLY)
-foreach(module disc-image dsp-coefficients runtime-assets runtime-audio runtime-audio-assets match-flow match-menu action-sweep hitch-capture melee-runtime runtime-development)
+foreach(module disc-image dsp-coefficients runtime-assets runtime-audio runtime-audio-assets match-flow match-menu action-sweep hitch-capture melee-runtime runtime-development controller-input controller-panel controller-settings prototype-keyboard-layouts)
   configure_file(web/${module}.mjs ${module}.mjs COPYONLY)
 endforeach()
+configure_file(web/controller-settings.css controller-settings.css COPYONLY)
 configure_file(web/audio-ring.mjs audio-ring.mjs COPYONLY)
 configure_file(web/audio-worklet.js audio-worklet.js COPYONLY)
 
@@ -382,7 +383,7 @@ add_custom_command(
   DEPENDS scripts/materialize_pipeline_cache.py web/initial_pipeline_cache.db.gz.b64
   VERBATIM)
 add_custom_target(gameplay_menu_pipeline_seed DEPENDS "${initial_pipeline_cache}")
-add_executable(gameplay_menu_browser EXCLUDE_FROM_ALL src/gameplay_menu_browser.cpp src/browser_input.cpp
+add_executable(gameplay_menu_browser EXCLUDE_FROM_ALL src/gameplay_menu_browser.cpp src/browser_input.cpp src/browser_controllers.cpp
   tests/native_menu_alarm_unavailable.c tests/native_menu_fighter_input.c tests/native_menu_stage_input.c)
 add_dependencies(gameplay_menu_browser gameplay_menu_pipeline_seed)
 set_property(TARGET gameplay_menu_browser APPEND PROPERTY LINK_DEPENDS "${initial_pipeline_cache}")
@@ -420,7 +421,7 @@ configure_file(web/native-menu.html native-menu.html @ONLY)
 # Keep the development target above intact so replay and source-observation
 # checks retain their full instrumentation.
 if(CMAKE_BUILD_TYPE STREQUAL "Release" AND MELEE_WEB_PUBLIC_RUNTIME)
-  add_executable(gameplay_public EXCLUDE_FROM_ALL src/gameplay_menu_browser.cpp src/browser_input.cpp
+  add_executable(gameplay_public EXCLUDE_FROM_ALL src/gameplay_menu_browser.cpp src/browser_input.cpp src/browser_controllers.cpp
     tests/native_menu_alarm_unavailable.c tests/native_menu_fighter_input.c tests/native_menu_stage_input.c)
   add_dependencies(gameplay_public gameplay_menu_pipeline_seed)
   set_property(TARGET gameplay_public APPEND PROPERTY LINK_DEPENDS "${initial_pipeline_cache}")

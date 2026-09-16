@@ -1,0 +1,30 @@
+/* Compact controller/source settings shared by the public and development players. */
+[data-controller-settings], [data-controller-settings] * { box-sizing: border-box; }
+[data-controller-settings] { color-scheme: light; }
+[data-controller-settings] { box-sizing: border-box; width: min(520px, calc(100vw - 24px)); min-width: min(380px, calc(100vw - 40px)); max-height: calc(100dvh - 24px); overflow: auto; padding: 16px; border: 1px solid #888; background: #fff; color: #000; }
+[data-controller-settings] button { margin: 0; padding: 8px 14px; }
+[data-controller-settings]::backdrop { background: #0009; }
+[data-controller-settings] .controls-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin: -4px 0 16px; }
+[data-controller-settings] .controls-heading h2 { margin: 0; font-size: 18px; }
+[data-controller-settings] .controls-heading p { max-width: 390px; margin: 4px 0 0; line-height: 1.45; }
+[data-controller-settings] .controls-heading button { flex: 0 0 auto; font-weight: 600; }
+[data-controller-settings] .source-settings { margin-bottom: 16px; }
+[data-controller-settings] .source-settings h3 { margin: 0 0 8px; font-size: 14px; }
+[data-controller-settings] .source-row { display: grid; grid-template-columns: 72px minmax(0, 1fr); gap: 4px 8px; align-items: center; margin: 8px 0; }
+[data-controller-settings] .source-row label { font-weight: 600; }
+[data-controller-settings] .source-row select { min-width: 0; width: 100%; }
+[data-controller-settings] .source-status { grid-column: 2; margin: 0; color: #555; font-size: 12px; overflow-wrap: anywhere; }
+[data-controller-settings] .source-note { margin: 8px 0 0; color: #694d00; font-size: 12px; line-height: 1.4; }
+[data-controller-settings] .keyboard-options { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 14px; }
+[data-controller-settings] details { margin-top: 12px; border-top: 1px solid #ddd; }
+[data-controller-settings] details summary { padding: 10px 0; cursor: pointer; font-weight: 600; }
+[data-controller-settings] details[open] summary { margin-bottom: 4px; }
+[data-controller-settings] table { border-collapse: collapse; width: 100%; font-size: 12px; text-align: left; }
+[data-controller-settings] th, [data-controller-settings] td { padding: 6px; border-bottom: 1px solid #ddd; }
+[data-controller-settings] th { font-weight: 500; }
+[data-controller-settings] #controllers { overflow-wrap: anywhere; }
+@media (max-width: 420px) {
+  [data-controller-settings] .controls-heading { gap: 8px; }
+  [data-controller-settings] .source-row { grid-template-columns: 1fr; }
+  [data-controller-settings] .source-status { grid-column: 1; }
+}
