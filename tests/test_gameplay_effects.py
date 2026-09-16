@@ -34,7 +34,13 @@ class EffectContextTests(unittest.TestCase):
         asset=ROOT/"assets-local/next-gate/EfMrData.dat"
         if not asset.is_file():
             self.skipTest("Local EfMrData.dat unavailable; proprietary assets are optional")
-        self.assertIn("two native models and animation graphs; original LoadSync/evaluation/restart passed",self.run_trace(asset))
+        self.assertIn("2 native model entries and animation graphs; original LoadSync/evaluation/restart passed",self.run_trace(asset))
+
+    def test_local_link_model_only_effects_and_native_animations(self):
+        asset=ROOT/"assets-local/link-verification/EfLkData.dat"
+        if not asset.is_file():
+            self.skipTest("Local EfLkData.dat unavailable; proprietary assets are optional")
+        self.assertIn("4 native model entries and animation graphs; original LoadSync/evaluation/restart passed",self.run_trace("--link",asset))
 
 if __name__=="__main__":
     unittest.main()

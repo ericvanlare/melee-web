@@ -83,19 +83,27 @@ static void registration(std::shared_ptr<const melee_web::DatArchive> archive,co
         check(melee_web_gameplay_shutdown(error,sizeof(error)),"source world shutdown");
     }
 }
-static void effect_entries(std::shared_ptr<const melee_web::DatArchive> archive){
-    melee_web::DatEffectEntries owner(archive,"effMarioDataTable",1,2);
-    archive.reset();check(owner.entry_count()==2&&!owner.entries_ready(),"two decoded effect entries remain unpublished");
+static void effect_entries(std::shared_ptr<const melee_web::DatArchive> archive,bool model_only=false){
+    const unsigned bank=model_only?6:1;
+    // efSync_Spawn's Link spin attacks consume both 6000/6001 and the
+    // attached child effects 6002/6003, not just the first model pair.
+    const unsigned count=model_only?4:2;
+    melee_web::DatEffectEntries owner(archive,model_only?"effLinkDataTable":"effMarioDataTable",bank,count);
+    archive.reset();check(owner.entry_count()==count&&!owner.entries_ready(),"decoded effect entries remain unpublished");
     auto* descriptors=reinterpret_cast<EF_EffectDesc*>(static_cast<uint8_t*>(owner.table())+8);
-    check(descriptors[0].lifetime==13&&descriptors[1].lifetime==160,"original effect lifetimes");
-    auto previous=efAsync_DatEntries[1].data;
+    check(descriptors[0].lifetime==(model_only?80:13)&&descriptors[1].lifetime==(model_only?80:160),"original effect lifetimes");
+    check(model_only?owner.bank()==nullptr:owner.bank()!=nullptr,"Source particle bank presence is preserved");
+    const auto previous_particles=ptclref_804D0E5C[bank];
+    auto previous=efAsync_DatEntries[bank].data;
     for(unsigned pass=0;pass<2;++pass){
         check(melee_web_gameplay_startup(8U*1024U*1024U,error,sizeof(error)),"effect world startup");
         check(melee_web_native_world_enable(error,sizeof(error)),"effect native class initialization");
         check(owner.load(error,sizeof(error))&&owner.entries_ready(),"original efAsync_LoadSync publishes native entries");
-        check(efAsync_DatEntries[1].data==descriptors,"original effect lookup pointer");
+        check(efAsync_DatEntries[bank].data==descriptors,"original effect lookup pointer");
+        if(model_only)check(ptclref_804D0E5C[bank]==previous_particles,"Model-only table leaves particle registration untouched");
         check(!owner.load(error,sizeof(error)),"duplicate effect publication rejected");
-        for(unsigned i=0;i<2;++i){
+        for(unsigned i=0;i<count;++i){
+            if(model_only)check(descriptors[i].lifetime==80,"all four source Link effect lifetimes");
             const auto& d=descriptors[i].model_desc;
             auto* joint=HSD_JObjLoadJoint(d.joint);check(joint!=nullptr,"original effect model load");
             HSD_JObjAddAnimAll(joint,d.animjoint,d.matanim_joint,d.shapeanim_joint);
@@ -104,10 +112,10 @@ static void effect_entries(std::shared_ptr<const melee_web::DatArchive> archive)
         }
         efLib_EffectCount=1;check(!owner.detach(error,sizeof(error)),"live source effect prevents release");efLib_EffectCount=0;
         check(owner.detach(error,sizeof(error))&&!owner.entries_ready(),"effect scope detach");
-        check(efAsync_DatEntries[1].data==previous,"original effect lookup restored");
+        check(efAsync_DatEntries[bank].data==previous,"original effect lookup restored");
         check(melee_web_gameplay_shutdown(error,sizeof(error)),"effect world shutdown");
     }
-    std::cout<<"Local Mario effects: two native models and animation graphs; original LoadSync/evaluation/restart passed\n";
+    std::cout<<(model_only?"Local Link effects: ":"Local Mario effects: ")<<count<<" native model entries and animation graphs; original LoadSync/evaluation/restart passed\n";
 }
 static void common_entries(std::shared_ptr<const melee_web::DatArchive> archive){
     melee_web::DatEffectEntries owner(archive,"effCommonDataTable",0,47,true);archive.reset();
@@ -162,6 +170,10 @@ int main(int argc,char** argv){
             std::ifstream file(argv[2],std::ios::binary);check(bool(file),"open owned common effect archive");
             Bytes bytes((std::istreambuf_iterator<char>(file)),{});
             common_entries(std::make_shared<melee_web::DatArchive>(bytes));
+        }else if(argc==3&&std::string(argv[1])=="--link"){
+            std::ifstream file(argv[2],std::ios::binary);check(bool(file),"open Link effect archive");
+            Bytes bytes((std::istreambuf_iterator<char>(file)),{});
+            effect_entries(std::make_shared<melee_web::DatArchive>(bytes),true);
         }else if(argc==2){
             std::ifstream file(argv[1],std::ios::binary);check(bool(file),"open optional effect archive");
             Bytes bytes((std::istreambuf_iterator<char>(file)),{});

@@ -6,9 +6,16 @@ through compiled source, without a PowerPC CPU interpreter or JIT.
 - Read README.md, STATUS.md and docs/PERFORMANCE_AND_ACCURACY.md before work. Keep
   status backed by observed evidence and use the playbook's scoped evidence labels.
 - Before adding or enabling a fighter, read [docs/ADDING_CHARACTERS.md](docs/ADDING_CHARACTERS.md),
-  including its Roy/Doc lessons and verification sequence. Verify the starting
-  branch contains the current shared fixes. Derive table bounds from authored
-  data; preserve save/music RNG, original arithmetic and source draw ordering.
+  starting with its required checkpoints, failure lookup and handoff template.
+  Locate owned inputs and pass real-asset construction before a long replay;
+  missing extracted files alone do not mean the owned disc is unavailable.
+  Measure source-cursor progress, not renderer CPU usage. Inspect a preparation
+  error immediately; never repeat a timed-out run without a changed hypothesis.
+  After two experiments at the same boundary yield no new evidence, reduce the
+  reproducer or request a bounded review using the guide's evidence packet.
+  Verify the starting branch contains the current shared fixes. Derive table
+  bounds from authored data; preserve save/music RNG, original arithmetic and
+  source draw ordering.
   Reduce the first divergence to a small reproducer before another full replay.
   Recorded-queue state agreement does not establish live timing or performance.
 - Follow docs/ACCURACY_CONTRACT.md. The next deliverable is original in-game CSS

@@ -1,5 +1,30 @@
 # Current status
 
+## Link and Young Link development candidate
+
+Link and Young Link are enabled through the original CSS/SSS and shared native
+runtime on PR 25's final source tip (`23680fb`). Both retain their original
+identities, five costumes, attributes, actions, articles, sword effects and SSM
+files. Real-asset lifecycle checks cover both player orientations and all five
+costumes, including reconstruction and teardown.
+
+The physical four-stock Link/CPU2 Young Link recording on Yoshi's Story is
+**retail compared under its recorded controller-queue schedule**: all 7,070
+state updates and 7,064 draw boundaries match. The compared fields cover both
+fighters, input/PAD/RNG, CPU decisions, camera, subject bones, HUD, magnifier and
+match outcome. A fresh original replay independently matches 38,108 semantic
+events. Source fixes address hookshot stack corruption and restore the original
+inlined fused arithmetic; comparator fields and tolerances are unchanged.
+The frozen Release replay passes, and the 967-test repository suite passes
+with 50 skips. The Release state capture still records a 98.650 ms native
+callback, 110.805 ms browser callback and 214 audio underrun frames; it is not
+a performance pass.
+
+Performance, pixels, PCM, live scheduling and unexercised moves remain open;
+Young Link human-controlled coverage is not implied by this match. No deployment
+or broad character admission is claimed. See the [port notes](docs/LINK_PORT_NOTES.md)
+and [bounded evidence receipt](docs/evidence/link-young-link-replay-v1.json).
+
 ## Dr. Mario and Roy development candidates
 
 The two physical development recordings now pass complete visible browser

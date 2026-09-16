@@ -22,6 +22,9 @@ void melee_web_test_fighter_data(void* data,int actual) {
                           effect_parts[3]==55 && effect_parts[4]==9);
     }
     CHECK(d->x48_items[0] && d->x48_items[2] && !d->x48_items[1] && !d->x48_items[3]);
+    for(unsigned i=4;i<8;++i)CHECK(!melee_web_fighter_data_article(d,i));
+    CHECK(!melee_web_fighter_data_article(NULL,0));
+    { ftData empty={0}; CHECK(!melee_web_fighter_data_article(&empty,0)); }
     for(unsigned i=0;i<4;i+=2) {
         Article* article=d->x48_items[i];
         CHECK(article->x0_common_attr && melee_web_article_unresolved(article));

@@ -29,6 +29,8 @@ static inline const MeleeWebFighterContent* melee_web_fighter_content(int ckind)
         { CKIND_MARS, FTKIND_MARS, 5, "Marth", "EfMsData.dat", "effMarsDataTable", 16, 2, "mars.ssm" },
         { CKIND_DRMARIO, FTKIND_DRMARIO, 5, "Dr. Mario", "EfMrData.dat", "effMarioDataTable", 1, 2, "drmario.ssm" },
         { CKIND_EMBLEM, FTKIND_EMBLEM, 5, "Roy", "EfFeData.dat", "effEmblemDataTable", 49, 2, "emblem.ssm" },
+        { CKIND_LINK, FTKIND_LINK, 5, "Link", "EfLkData.dat", "effLinkDataTable", 6, 4, "link.ssm" },
+        { CKIND_CLINK, FTKIND_CLINK, 5, "Young Link", "EfLkData.dat", "effLinkDataTable", 6, 4, "clink.ssm" },
     };
     for (size_t i = 0; i < sizeof(rows) / sizeof(rows[0]); ++i)
         if (rows[i].character_kind == ckind) return &rows[i];
@@ -38,7 +40,7 @@ static inline const MeleeWebFighterContent* melee_web_fighter_content(int ckind)
 static inline const MeleeWebFighterContent* melee_web_fighter_content_by_kind(int kind)
 {
     const int characters[] = { CKIND_MARIO, CKIND_FOX, CKIND_FALCO, CKIND_MARS,
-                               CKIND_DRMARIO, CKIND_EMBLEM };
+                               CKIND_DRMARIO, CKIND_EMBLEM, CKIND_LINK, CKIND_CLINK };
     for (size_t i = 0; i < sizeof(characters) / sizeof(characters[0]); ++i) {
         const MeleeWebFighterContent* row = melee_web_fighter_content(characters[i]);
         if (row->fighter_kind == kind) return row;

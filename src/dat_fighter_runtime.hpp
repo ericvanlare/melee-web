@@ -75,6 +75,7 @@ public:
     // whose extension schema has not been hydrated.
     [[nodiscard]] const std::optional<MeleeWebFoxAttributes>& fox_attributes() const noexcept { return fox_; }
     [[nodiscard]] const std::optional<MeleeWebMarsAttributes>& mars_attributes() const noexcept { return mars_; }
+    [[nodiscard]] const std::optional<MeleeWebLinkAttributes>& link_attributes() const noexcept { return link_; }
     [[nodiscard]] std::uint32_t extension_offset() const noexcept { return extension_; }
     [[nodiscard]] const std::vector<DatRuntimeAction>& actions() const noexcept { return actions_; }
     [[nodiscard]] const DatRuntimeAction& action(std::uint32_t motion_id) const;
@@ -95,6 +96,7 @@ private:
     std::optional<MeleeWebMarioAttributes> mario_;
     std::optional<MeleeWebFoxAttributes> fox_;
     std::optional<MeleeWebMarsAttributes> mars_;
+    std::optional<MeleeWebLinkAttributes> link_;
     std::vector<DatRuntimeAction> actions_;
     std::vector<DatWaitChoice> wait_choices_;
     std::vector<DatFighterHurtbox> hurtboxes_;

@@ -14,10 +14,14 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat*, uint32_t root,
     uint32_t kind, uint32_t costume_count, uint32_t motion_count,
     void* actions, void* blends,
     void* wait_choices, uint32_t* unresolved_fields);
-/* Return one of the four source Article identities retained in ftData x48.
+/* Return an owned Article from ftData x48, or null for absent/out-of-range
+ * entries. Link-family Articles occupy 0..4, Young Link's Milk uses 5;
+ * slot 6 is a native part joint and is never returned as an Article.
  * The returned Article is allocated by the same reader arena as the ftData
  * root, so callers must keep that arena alive while the source Fighter runs. */
 void* melee_web_fighter_data_article(void* data, uint32_t index);
+int melee_web_fighter_data_set_link_part(void* data,void* joint,uint32_t* unresolved,
+    char* error,size_t error_size);
 /* Publish the owned guard pose descriptor; source x0[2] aliases Joint.child.
  * The descriptor owner must outlive source fighters, like the costume owner. */
 void melee_web_fighter_data_set_guard(const MeleeWebNativeDat*,uint32_t root,

@@ -32,13 +32,20 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     const bool mario = costume.fighter_kind == 0 || costume.fighter_kind == 21;
     const bool fox_family = costume.fighter_kind == 1 || costume.fighter_kind == 22;
     const bool mars = costume.fighter_kind == 18 || costume.fighter_kind == 26;
-    require(mario || fox_family || mars, "Native action store has no checked fighter command schema for this kind");
+    // Exact source FTKIND_LINK/FTKIND_CLINK values from the pinned ft forward
+    // enum. Keep this small C++ boundary independent of the source include
+    // path used by the standalone Wasm fixture compiler.
+    const bool link_family = costume.fighter_kind == 6 || costume.fighter_kind == 20;
+    require(mario || fox_family || mars || link_family, "Native action store has no checked fighter command schema for this kind");
     std::vector<DatCommandRoot> roots;
     // Explicit source ftCo submotion groups. This certifies command operand
     // graphs only, not readiness of every original world service they invoke.
     command_motions_ = {0,1,2,3,6};
     auto group=[&](uint32_t first,uint32_t last){for(uint32_t id=first;id<=last;++id)command_motions_.insert(id);};
     group(7,31);group(34,77);                     // locomotion through grounded/aerial attacks and landings
+    // Link-family bombs enter the common light-item pickup/throw actions.
+    // Opponents may also catch and throw those same original items.
+    group(78,88);group(96,103);                  // light pickup, normal/air throws and smash throws
     for(auto absent:{54U,56U,61U,63U,65U})command_motions_.erase(absent);
     group(165,181);group(183,204);                // damage, knockdown and techs
     command_motions_.insert(205);group(209,217);group(219,228);                // ledge actions
@@ -47,6 +54,7 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     group(242,258);group(262,265);                // grab, pummel, throws and Mario capture reactions
     group(286,291);                              // shield-break knockdown
     if (mario) group(295,302);                   // Mario/Dr. Mario specials; taunts use common rows 239/240 above
+    else if (link_family) group(295,313);        // Link-family action tables end at 313
     else group(295,326);                         // Fox/Falco/Marth/Roy source special command rows
     for (auto choice : runtime_->wait_choices()) command_motions_.insert(choice.motion_id);
     for (auto id : command_motions_) {

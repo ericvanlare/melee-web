@@ -1,4 +1,5 @@
 #include "gameplay_fighter_assets.h"
+#include "dat_item_commands.h"
 #include <melee/ft/ftdata.h>
 #include <melee/ft/types.h>
 #include <sysdolphin/baselib/jobj.h>
@@ -10,6 +11,21 @@ static HSD_Joint test_joint;
 static HSD_MatAnimJoint test_material;
 static ftData* previous_data;
 static UnkCostumeStruct previous_costume;
+int assets_test_item_commands(void)
+{
+    const uint32_t words[]={ (3U<<26)|5, (13U<<26)|(2U<<23)|384, (1U<<26)|2, 4U<<26, 0 };
+    union CmdUnion* commands=melee_web_item_commands_create(words,5);
+    if(!commands)return 0;
+    const int ok=commands[0].Command_03.value==5 &&
+        commands[1].set_hitbox_scale.opcode==13 && commands[1].set_hitbox_scale.idx==2 &&
+        commands[1].set_hitbox_scale.value==384 && commands[2].Command_00.value==2 &&
+        commands[3].Command_00.code==4;
+    melee_web_item_commands_destroy(commands);
+    const uint32_t invalid[]={(13U<<26)|(4U<<23),0};
+    commands=melee_web_item_commands_create(invalid,2);
+    if(commands){melee_web_item_commands_destroy(commands);return 0;}
+    return ok;
+}
 MeleeWebFighterAssetScope* assets_test_begin(void* rows,void* blends,void* waits,void* context,
     MeleeWebFighterAssetBind bind,MeleeWebFighterAssetUnbind unbind)
 {

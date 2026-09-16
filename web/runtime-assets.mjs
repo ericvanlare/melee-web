@@ -55,6 +55,15 @@ export const NATIVE_GAME_DISC_FILES=Object.freeze({
   'PlFeNr.dat':'PlFeNr.dat','PlFeRe.dat':'PlFeRe.dat',
   'PlFeBu.dat':'PlFeBu.dat','PlFeGr.dat':'PlFeGr.dat','PlFeYe.dat':'PlFeYe.dat',
   'EfFeData.dat':'EfFeData.dat','emblem.ssm':'audio/us/emblem.ssm',
+  // Link and Young Link share EfLkData.dat and the source effect table, but
+  // retain their own fighter/costume archives and voice banks.
+  'PlLk.dat':'PlLk.dat','PlLkAJ.dat':'PlLkAJ.dat',
+  'PlLkNr.dat':'PlLkNr.dat','PlLkRe.dat':'PlLkRe.dat','PlLkBu.dat':'PlLkBu.dat',
+  'PlLkBk.dat':'PlLkBk.dat','PlLkWh.dat':'PlLkWh.dat',
+  'PlCl.dat':'PlCl.dat','PlClAJ.dat':'PlClAJ.dat',
+  'PlClNr.dat':'PlClNr.dat','PlClRe.dat':'PlClRe.dat','PlClBu.dat':'PlClBu.dat',
+  'PlClWh.dat':'PlClWh.dat','PlClBk.dat':'PlClBk.dat',
+  'EfLkData.dat':'EfLkData.dat','link.ssm':'audio/us/link.ssm','clink.ssm':'audio/us/clink.ssm',
 });
 export function loadNativeGameDisc(file,report=()=>{}) {
   return loadDiscBundle(file,report,NATIVE_GAME_DISC_FILES);

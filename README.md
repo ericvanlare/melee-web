@@ -4,8 +4,10 @@ A source-port project for running vanilla Super Smash Bros. Melee
 in a desktop browser using WebAssembly and WebGPU.
 
 **Adding or enabling a character? Read [Adding a source fighter](docs/ADDING_CHARACTERS.md)
-before editing.** It includes the Roy/Doc failure modes, required source boundaries
-and a fast verification sequence. Agent instructions require the same entry point.
+before editing.** Start with its [required checkpoints](docs/ADDING_CHARACTERS.md#required-checkpoints).
+It also has a [failure lookup](docs/ADDING_CHARACTERS.md#failure-lookup), source/test
+map, and [handoff template](docs/ADDING_CHARACTERS.md#handoff-template), incorporating
+the Roy/Doc and Link/Young Link failures. Agent instructions require this entry point.
 
 The first playable goal is an accurate local **Mario-versus-Mario stock match on
 Final Destination at 60 fps**, using original gameplay code. Full vanilla Melee
@@ -62,6 +64,13 @@ Native mixed matches run in both orientations. Two complete physical recordings
 now match the original in the visible browser under recorded input-queue timing;
 live scheduling and cold rendering preparation remain open. See the
 [clone port evidence and capture plan](docs/ROY_DR_MARIO_PORT_NOTES.md).
+
+Link and Young Link are also development candidates, using their original
+articles, five costumes each, effects and voices. The physical four-stock
+Link/CPU2 Young Link recording on Yoshi's Story matches all 7,070 updates and
+7,064 draws in the visible browser under recorded controller-queue timing.
+This does not admit untested moves, live timing, pixels, PCM or performance.
+See the [Link-family source contract and evidence](docs/LINK_PORT_NOTES.md).
 
 A scoped 102-frame original-game jump comparison passes; this does not establish
 full-match equivalence. See [current evidence](STATUS.md),

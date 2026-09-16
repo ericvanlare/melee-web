@@ -12,6 +12,10 @@
 #define MELEE_WEB_ATTRIBUTE_TYPE_I32 int32_t
 #define MELEE_WEB_ATTRIBUTE_TYPE_U32 uint32_t
 #define MELEE_WEB_ATTRIBUTE_TYPE_U8 uint8_t
+/* Source marks these three Link words as UNK_T (a pointer-sized field).  The
+ * portable record retains their 32-bit bits; the native decoder casts them
+ * back to source pointer width without pretending to know their semantics. */
+#define MELEE_WEB_ATTRIBUTE_TYPE_PTR32 uint32_t
 
 #define MELEE_WEB_CO_ATTRIBUTE_FIELDS(X) \
     X(0x000, F32, walk_accel_mul, walk_accel_mul) \
@@ -255,6 +259,72 @@
     X(0x090, F32, sword_x18, x78.x18) \
     X(0x094, F32, sword_x1C, x78.x1C)
 
+/* Link and Young Link share the original ftLk_DatAttrs record.  The two
+ * fighters still retain separate source callbacks and DAT values; only this
+ * extension ABI is shared.  The four-byte filler at 0xc0 is intentionally not
+ * exposed as a semantic field. */
+#define MELEE_WEB_LINK_ATTRIBUTE_FIELDS(X) \
+    X(0x000, F32, x0, x0) \
+    X(0x004, F32, specialn_anim_rate, specialn_anim_rate) \
+    X(0x008, F32, x8, x8) \
+    X(0x00c, I32, xC, xC) \
+    X(0x010, I32, x10, x10) \
+    X(0x014, F32, x14, x14) \
+    X(0x018, F32, x18, x18) \
+    X(0x01c, F32, x1C, x1C) \
+    X(0x020, F32, x20, x20) \
+    X(0x024, F32, x24, x24) \
+    X(0x028, F32, specialhi_pos_y_offset, specialhi_pos_y_offset) \
+    X(0x02c, I32, x2C, x2C) \
+    X(0x030, F32, x30, x30) \
+    X(0x034, F32, x34, x34) \
+    X(0x038, F32, specialairhi_drift_stick_mul, specialairhi_drift_stick_mul) \
+    X(0x03c, F32, specialairhi_drift_max_mul, specialairhi_drift_max_mul) \
+    X(0x040, F32, x40, x40) \
+    X(0x044, F32, specialhi_grav_mul, specialhi_grav_mul) \
+    X(0x048, I32, x48, x48) \
+    X(0x04c, F32, attackairlw_hit_vel_y, attackairlw_hit_vel_y) \
+    X(0x050, F32, attackairlw_hit_anim_frame_start, attackairlw_hit_anim_frame_start) \
+    X(0x054, F32, attackairlw_hit_anim_frame_end, attackairlw_hit_anim_frame_end) \
+    X(0x058, U32, attackairlw_anim_flags_0, attackairlw_anim_flags[0]) \
+    X(0x05c, U32, attackairlw_anim_flags_1, attackairlw_anim_flags[1]) \
+    X(0x060, U32, attackairlw_anim_flags_2, attackairlw_anim_flags[2]) \
+    X(0x064, F32, sword_x0, x64.x0) \
+    X(0x068, F32, sword_x4, x64.x4) \
+    X(0x06c, U8, sword_x8, x64.x8) \
+    X(0x06d, U8, sword_x9, x64.x9) \
+    X(0x06e, U8, sword_xA, x64.xA) \
+    X(0x06f, U8, sword_xB, x64.xB) \
+    X(0x070, U8, sword_xC, x64.xC) \
+    X(0x071, U8, sword_xD, x64.xD) \
+    X(0x072, U8, sword_xE, x64.xE) \
+    X(0x073, U8, sword_xF, x64.xF) \
+    X(0x074, U8, sword_x10, x64.x10) \
+    X(0x078, I32, sword_x14, x64.x14) \
+    X(0x07c, F32, sword_x18, x64.x18) \
+    X(0x080, F32, sword_x1C, x64.x1C) \
+    X(0x084, I32, x84, x84) \
+    X(0x088, I32, x88, x88) \
+    X(0x08c, I32, x8C, x8C) \
+    X(0x090, I32, x90, x90) \
+    X(0x094, PTR32, x94, x94) \
+    X(0x098, I32, x98, x98) \
+    X(0x09c, PTR32, x9C, x9C) \
+    X(0x0a0, PTR32, xA0, xA0) \
+    X(0x0a4, I32, xA4, xA4) \
+    X(0x0a8, I32, xA8, xA8) \
+    X(0x0ac, I32, xAC, xAC) \
+    X(0x0b0, I32, xB0, xB0) \
+    X(0x0b4, F32, xB4, xB4) \
+    X(0x0b8, I32, xB8, xB8) \
+    X(0x0bc, I32, xBC, xBC) \
+    X(0x0c4, I32, absorb_bone, xC4.x0_bone_id) \
+    X(0x0c8, F32, absorb_offset_x, xC4.x4_offset.x) \
+    X(0x0cc, F32, absorb_offset_y, xC4.x4_offset.y) \
+    X(0x0d0, F32, absorb_offset_z, xC4.x4_offset.z) \
+    X(0x0d4, F32, absorb_size, xC4.x10_size) \
+    X(0x0d8, F32, xD8, xD8)
+
 #define MELEE_WEB_PICKUP_ATTRIBUTE_FIELDS(X) \
     X(0x000, F32, gr_light_offset_x, gr_light_offset.x) \
     X(0x004, F32, gr_light_offset_y, gr_light_offset.y) \
@@ -284,6 +354,9 @@ typedef struct MeleeWebFoxAttributes {
 typedef struct MeleeWebMarsAttributes {
     MELEE_WEB_MARS_ATTRIBUTE_FIELDS(MELEE_WEB_DECLARE_ATTRIBUTE)
 } MeleeWebMarsAttributes;
+typedef struct MeleeWebLinkAttributes {
+    MELEE_WEB_LINK_ATTRIBUTE_FIELDS(MELEE_WEB_DECLARE_ATTRIBUTE)
+} MeleeWebLinkAttributes;
 typedef struct MeleeWebItemPickup {
     MELEE_WEB_PICKUP_ATTRIBUTE_FIELDS(MELEE_WEB_DECLARE_ATTRIBUTE)
 } MeleeWebItemPickup;

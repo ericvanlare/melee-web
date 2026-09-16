@@ -11,7 +11,7 @@ void* melee_web_item_commands_create(const uint32_t* words,size_t count){
         switch(op){
         /* Opcode 15 dispatches to it_802796C4, which consumes only the
          * six-bit opcode and advances one word after clearing hitboxes. */
-        case 0:case 1:case 2:case 15:
+        case 0:case 1:case 2:case 3:case 4:case 15:
             out[i].Command_00.code=op;out[i].Command_00.value=w&0x3ffffff;break;
         /* Opcode 14 uses the same one-word 26-bit hitbox index layout before
          * dispatching to it_80279680. */
@@ -19,7 +19,11 @@ void* melee_web_item_commands_create(const uint32_t* words,size_t count){
             out[i].set_throw_flags=(struct set_throw_flags){op,w&0x3ffffff};break;
         /* Opcode 12 updates one enabled item hitbox's damage. */
         case 12:
+            if(((w>>23)&7)>=4)goto fail;
             out[i].set_hitbox_damage=(struct set_hitbox_damage){op,(w>>23)&7,w&0x7fffff};break;
+        case 13:
+            if(((w>>23)&7)>=4)goto fail;
+            out[i].set_hitbox_scale=(struct set_hitbox_scale){op,(w>>23)&7,w&0x7fffff};break;
         case 11:{
             if(i+5>=count||((w>>23)&7)>=4)goto fail;
             out[i].it_create_hitbox_0=(struct it_create_hitbox_0){op,(w>>23)&7,(w>>20)&7,(w>>13)&127,w&8191};

@@ -1,0 +1,412 @@
+{
+  "schema": "melee-web-link-young-link-replay-v1",
+  "date_utc": "2026-09-16",
+  "base": {
+    "pr": 25,
+    "source_tip": "23680fb951abb740e04c701fea256d66a623f507",
+    "merge_commit": "5eb27bc63160ab185a866df6a9113ab5be1fc56f",
+    "implementation": "verified worktree snapshot; exact program and test file hashes bound below"
+  },
+  "evidence_level": "retail compared under recorded platform input queues; visible Release source-match replay",
+  "gold_admitted": false,
+  "content_admitted": false,
+  "production_deployed": false,
+  "capture_app_modified": false,
+  "local_artifact_root": "work/link-reference-20260916/verification-runs",
+  "scenario": {
+    "p1": {
+      "character": "Link",
+      "character_kind": 6,
+      "fighter_kind": 6,
+      "controller": "human"
+    },
+    "p2": {
+      "character": "Young Link",
+      "character_kind": 21,
+      "fighter_kind": 20,
+      "controller": "CPU",
+      "cpu_level": 2
+    },
+    "stage": "Yoshi's Story",
+    "ground_kind": 8,
+    "stocks": 4,
+    "winner": 0,
+    "remaining_stocks": [
+      3,
+      0
+    ]
+  },
+  "reference": {
+    "capture_id": "20260916T041057Z-2b63a5ca6d3d",
+    "candidate_sha256": "4262960e862080a50750252dbf5acda5797dd058fac334f83c66d2f998bbd9ae",
+    "manifest_sha256": "74dee9190f52c7a3a6fe583b42f9905104057e10395ec63ddd2f7e50f9c30c19",
+    "source_manifest_sha256": "c82e9319c307381ed256ef87d5e714a7a548a305785d37465654357e4d6c62d2",
+    "observer_sha256": "5061397da28d033df473a09c1f6bfa72b87142591e7fa891ce9dd6bfb93b6c31",
+    "repeatability": {
+      "report_sha256": "8fd6132456a4fec90329db4b61d472a5242facf1a66c563adacdacd8de0a194b",
+      "probe_observer_sha256": "5318e373d6b4c57112a6bf4e88518b9c251515204d9c2ed236396a656b1d1aef",
+      "status": "repeatable",
+      "semantic_events_compared": 38108,
+      "first_difference": null,
+      "source_ticks": 7070,
+      "source_draws": 7064,
+      "original_input_complete": true,
+      "observer_complete": true
+    }
+  },
+  "queue_binding": {
+    "schema": "melee-web-retail-queue-binding",
+    "version": 1,
+    "scope": "gameplay replay conditioned on recorded nonempty input-queue snapshots",
+    "input_recipe_sha256": "482ffbd5f26c1c05f53d3406a443d9195f303127258590a4f05eadbe1b2321a8",
+    "clock_stream_sha256": "d1ab8df883c814f5eb5725f667d21d2abc8279a5b8e388867218d2bfbd2d3eb3",
+    "output_recipe_sha256": "39e7d2e4c5219796b675cd797e4cf1147a31b4831475c6b3aada17ad76280adb",
+    "frames": 7070,
+    "queue_snapshots": 7064,
+    "queue_context_bytes": 63584,
+    "observation_pc": "0x803769d4",
+    "clock": "relative emulated CPU block-clock ticks",
+    "input_bytes_preserved": true,
+    "expected_game_state_supplied": false,
+    "expected_draw_indexes_supplied": false,
+    "live_scheduling_equivalence": "not_claimed",
+    "original_cpu_scheduling_equivalence": "not_claimed",
+    "gold_admitted": false
+  },
+  "build": {
+    "configuration": "Release",
+    "target": "runtime",
+    "dependencies_lock_sha256": "b49bad1048d13ba05da31e5269bda4bed9fba04ed7a3fe96da8aa97390748d2d",
+    "melee_source_commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+    "downstream_patch_sha256": "db5f8fe39418d9ce75838717687127a719139312086cc4e1a8557ac312c2eafe",
+    "runtime_artifacts": {
+      "gameplay_menu_browser.js": "76622b5c1b0153282cf5c9135247c837b3fd8055607f9fb6141f8a68c23a4202",
+      "gameplay_menu_browser.wasm": "565adf8aed86d68c02f3492471cf387f94d01a7e0aab78f99bafd6e88b184298",
+      "gameplay_menu_browser.data": "cdf157ee0f1850884f07a71165fd2192177acb23c2c777313b719e70ea67546f",
+      "runtime.html": "7dbdba45a72835799f02df323ce93e762ed3ad9d8941522ebe4d550913460172",
+      "runtime-development.mjs": "b16bf0db0bc29852abe90e26a6bf993e4b73615b7642edb744b75e868b0c573c",
+      "melee-runtime.mjs": "f5ad8fe145e60482099eef2baa9865b797d8f6047777794cf6f83eaed37968a4",
+      "controller-input.mjs": "3388c3784717bea4b582a8fa66100880cbbcf4a0adb767c000e0a9cc779c31c8",
+      "controller-panel.mjs": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95",
+      "controller-panel.css": "289ca851412aca5b7def53dc002e8b3a897f7524e37d7b2ba2065822e7b3c16e",
+      "controller-settings.mjs": "3679207e488927e1cbd30386123bc80f26b565bb84f29916506ab72074dbd4a2",
+      "controller-settings.css": "3ac5ef6bea09babcc557f49b109fd76194a0d6ee2f5195bc731d5e8b446fcf2f",
+      "prototype-keyboard-layouts.mjs": "88dbd2c00873bad67cee89b9094bf735e0be3dc89bb2dcd95ac14de2abc30745",
+      "runtime-cache.js": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26",
+      "audio-worklet.js": "ef4374ac08f5bab821efa05cf5d252ca8e4b50647710d434e192beac3d7d7b4f",
+      "audio-ring.mjs": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf",
+      "disc-image.mjs": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a",
+      "dsp-coefficients.mjs": "5176d1cf4400228f31dff428bcc8cd60d07694c0ceea1628a79ac19f3e112b4a",
+      "runtime-assets.mjs": "48acf4ff1a8bd543f81e71a9f5167fc270ea7a4a8f6a1ed1d7cf9714ac964a35",
+      "runtime-audio-assets.mjs": "b9bfd3f841d73e4ee4987fc5ac7351832c4ae8eca48ba5cf9c95578a238c7dbc",
+      "runtime-audio.mjs": "d968d2b2f9b58d2ab5dc1a4720d2ad2114cfbcac44a888694da7850100546545",
+      "match-flow.mjs": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f",
+      "match-menu.mjs": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba",
+      "action-sweep.mjs": "e82fb08ca43b9af60d21bd26345cdd306edc098abcd06d66fa232cd60d68fe53",
+      "hitch-capture.mjs": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3"
+    },
+    "served_artifacts_unchanged": true,
+    "changed_program_and_test_files": {
+      "patches/melee-gameplay.patch": "db5f8fe39418d9ce75838717687127a719139312086cc4e1a8557ac312c2eafe",
+      "src/dat_effect_entries.cpp": "931d1828cbcfea1c9485bc5d4c36270fd5ff8063310322769562bbb100ef6473",
+      "src/dat_fighter_runtime.cpp": "62f4949f735063a23ee5d8189e12871e6bdf549e8d39d3c2c66c65c4ba4c74c6",
+      "src/dat_fighter_runtime.hpp": "0042fd868cbf711c9cb0fd887ff7baccd0f3f5d95bd9a63c92f9448c52ab076d",
+      "src/dat_item_article.cpp": "02bdfc97a768e2f82f22a753a74c1ccc8f394f7e755f9801cff20ceef3274f9c",
+      "src/dat_item_article.hpp": "11aa8c68a587a68445657ffce9b14698ca554d5ac11603e558ac3891b7bdc8ba",
+      "src/dat_item_commands.c": "5932924682f9688daefc1200e13ab9f0b2c75bdcde0ed1f8d26bfca962ad4c6e",
+      "src/dat_item_commands.hpp": "95f9ed12eb6936341304e1b00cc16eef5d1e30b5f8cd182c3f57e2c2158f2b29",
+      "src/fighter_attributes.h": "3aaea724fe41a77f964096e4d1f1228093245db25be5116b79f26a2075da6c92",
+      "src/gameplay_action_store.c": "0f851b1a537f1c680b1764a8241c7018c3fc3845a5a9463513ad0c45b19fbdeb",
+      "src/gameplay_action_store.cpp": "d1ed43afff0dff0e8226293eda3f234949d06c5b9573a8515c545c659624fbe8",
+      "src/gameplay_article_data.c": "9fab6eb3703c705d92475453bf5c53147af4d2d1dbc3e1341eef3eddfa6e9f52",
+      "src/gameplay_content.h": "8ac5637280356c999a03613bbf3975fdc15a9f672fff4aa1618e2bd9373dcd1c",
+      "src/gameplay_fighter_assets.c": "b336ed79972235b702578808743c76681697dc3dc946ff51469df6a2afc1ea38",
+      "src/gameplay_fighter_assets.cpp": "ed7fae201b0e05e7c3a1b957573b2e557dfab0fc199a718ff6da8a6975266944",
+      "src/gameplay_fighter_assets.h": "1cd39179986df02cb9f3e4023d765694dc49369aa57b497a0a5afe2f3203e6ec",
+      "src/gameplay_fighter_data.c": "a0c94c32891cf94b7eb7dd448fb0b40db6c426657501758d5658c8c7384902fa",
+      "src/gameplay_fighter_data.h": "838b8c94e261b1fceb3f95d432c638706a12daecf999adf4d6af1fa0c659dfdb",
+      "src/gameplay_hookshot_math.h": "43d44d7bdaed473fae40e96362d426c09a75b48e485f193911e45e8806cfa346",
+      "src/gameplay_menu_browser.cpp": "d22e128dbcbec6cfddded57f3d1c7b91c94b5f1c4a6cc12b93620529029847cc",
+      "src/gameplay_world.cpp": "54a1c9206c3a3c8ecd0c386f027b88f40f5029894fda13cd3b1f8e2050b60dd2",
+      "src/runtime_archive_cache.cpp": "c5d3ed5b655c310845474c0d7e7189a5700b22e6539f3bda250665acac9b4039",
+      "tests/browser_replay_lifecycle_test.mjs": "2ed93e7ef89944f0f9d7f6254ec9a6161979cf8304c1931b0be5cc3e0d23c751",
+      "tests/gameplay_action_store_trace.cpp": "8ceb5919d9a5ae0c5e7288f26063db4022c245670eee0152fb6328fda28a7bdd",
+      "tests/gameplay_content_match_state.c": "348283fe039efcd1ce7582e9324e8506bb47f66bfb8f3802a6fd06b5383c581c",
+      "tests/gameplay_effect_banks_trace.cpp": "ea28c8ed94cb617a1450ed5958b543194443b4191211963d842c631b704b32af",
+      "tests/gameplay_fighter_assets_trace.c": "a1aa6d8f22268b7f408588c16359e1ab1238993990b0aa1858927a123e0f55da",
+      "tests/gameplay_fighter_assets_trace.cpp": "df2a0530ae01ca0ff60a738f874029ac55e70b91fd89a6106662dfa3a61317d1",
+      "tests/gameplay_fighter_data_trace.c": "04300338f2654c499255e6358a4c17f07156cb2904d26f3ce90dd524da90fd16",
+      "tests/runtime_disc_assets_test.mjs": "520081f751e1399ee5850a46864b6bf7540faa16afd1591949a3341bb647fdf4",
+      "tests/test_gameplay_effects.py": "26db77efe6357defd58c12c77fed94e242df5c2c28e4da54b9cb25c8b389b347",
+      "tests/test_gameplay_fighter_assets.py": "2fc5027d4f5fe4369a0d79a92d3ff6323381992ede903c078c8ae4e215fc6155",
+      "tests/test_hookshot_stack_spill.py": "5f0093072c6d8643ed6a06e9dc2662b3b7b6b51dbb711a3b58f55127e3b598dc",
+      "tests/test_prototype.py": "4db42a80d0d88b73682ea56fd6e6b2bb9418dfb06561fb73da5ed08ad5d3f514",
+      "tests/test_web_launch.py": "e37c09943d09475e80511f5dac3a02db8cfb98e125f9a1702f2fda0c1c6b2ce2",
+      "web/action-sweep.mjs": "e82fb08ca43b9af60d21bd26345cdd306edc098abcd06d66fa232cd60d68fe53",
+      "web/runtime-assets.mjs": "48acf4ff1a8bd543f81e71a9f5167fc270ea7a4a8f6a1ed1d7cf9714ac964a35",
+      "web/runtime-development.mjs": "b16bf0db0bc29852abe90e26a6bf993e4b73615b7642edb744b75e868b0c573c"
+    },
+    "build_log_sha256": "03c02294bc01d675a6e92a2f03e70320fb309b01a67ed8520a8a847744bf0d8b"
+  },
+  "release_replay": {
+    "run": "browser-release1",
+    "status": "matched",
+    "coverage": {
+      "checks": {
+        "active_player_count": "pass",
+        "entry": "pass",
+        "fighters": "pass",
+        "frame_count": "pass",
+        "inputs": "pass",
+        "match_frame": "pass",
+        "pad_state_hex": "pass",
+        "rng": "pass"
+      },
+      "cpu": {
+        "domains": {
+          "camera": {
+            "first_divergence": null,
+            "status": "matched"
+          },
+          "cpu": {
+            "first_divergence": null,
+            "status": "matched"
+          },
+          "hud": {
+            "first_divergence": null,
+            "status": "matched"
+          },
+          "magnifier": {
+            "first_divergence": null,
+            "status": "matched"
+          },
+          "match": {
+            "first_divergence": null,
+            "status": "matched"
+          },
+          "subject": {
+            "first_divergence": null,
+            "status": "matched"
+          }
+        },
+        "status": "matched"
+      },
+      "first_divergence_by_group": {},
+      "frames_compared": 7070
+    },
+    "draw_alignment": {
+      "actual_count": 7064,
+      "expected_count": 7064,
+      "extra_in_actual": [],
+      "extra_in_actual_count": 0,
+      "matched_count": 7064,
+      "missing_from_actual": [],
+      "missing_from_actual_count": 0,
+      "scope": "source_draws_by_source_index",
+      "status": "aligned"
+    },
+    "source_match": {
+      "complete": true,
+      "outcome": 2,
+      "winner": 0
+    },
+    "report_validation": "passed unchanged validate_report with 7070 updates, 7064 draws, winner 0 and recorded_queue scope",
+    "artifact_hashes": {
+      "retail-port.jsonl": "b1b7f210e82d65e168721d7eaca0b9b9bfc54638c495db4766d60509d0630ce7",
+      "cpu-observation.jsonl": "7bb99305bab7c5ea06d3941f4d98838e16a981026659ddf19618e0df6f26936f",
+      "original-comparison.json": "b3bb8321ae5a5ab2537069f9ddf809a86bffa580df6776310657e231c36be4d5",
+      "ui-report.json": "884b5f116dbf39e8ba4f1b6e702443575f8dbad71cd2544e93e4f50f14ac5c90",
+      "browser-errors.json": "ae58cdb3e6ee5292c44c477c5666d651ee5e2e1551c872822b249317fbdf514a",
+      "playing.png": "86e57a13d5535d426bcaa2567e3b1bbd11c4a46cc058632d16f587fed32cd1db",
+      "completed.png": "f7a749aa8c04af2b1c385c7ff04b01fb33b45ce3d094cef973d46a6575370a04"
+    },
+    "browser": {
+      "browser": "chrome",
+      "version": "153.0.8010.48",
+      "visible_browser": true
+    },
+    "browser_errors": {
+      "errors": [],
+      "requests": []
+    },
+    "resolution": [
+      640,
+      480
+    ],
+    "device_pixel_ratio": 1,
+    "instrumented_timing_resumes": 0,
+    "metrics": {
+      "sourceFrames": 7070,
+      "sourceSteps": 7070,
+      "sourceDraws": 7064,
+      "browserCallbacks": 7058,
+      "worstBrowserCallbackMs": 110.80500000715256,
+      "browserCallbackGaps": 5,
+      "browserLongTasks": 0,
+      "browserLongTaskWorstMs": 0,
+      "nativeCallbacks": 7058,
+      "worstNativeCallbackMs": 98.65,
+      "nativeCallbacksOver33ms": 4,
+      "nativeCallbacksOverBudget": 6,
+      "livePipelinesQueued": 0,
+      "livePipelinesCreated": 75,
+      "liveTextureUploadBytes": 10990592,
+      "liveStagingUsedBytes": 12402237424,
+      "peakStagingUsedBytes": 12783456,
+      "preparationPauses": 0,
+      "wasmHeapGrowthBytes": 66846720,
+      "focusLost": false,
+      "firstFocusLoss": null,
+      "audioUnderrunFrames": 214,
+      "audioOverflowFrames": 0
+    },
+    "worst_native_staging_wait_ms": 94.05,
+    "performance": "not_admitted_state_capture; concurrent repository tests; GPU staging stall and audio underruns retained"
+  },
+  "hookshot_causal_prefix": {
+    "original_probe_sha256": "aa55e373d421139aa90786a002a5d7e89ef41efc099cb935b921c6a098b8155f",
+    "source_boundaries": [
+      347,
+      380
+    ],
+    "scope": "exact defined fighter/item fields, special attributes, each chain active flag and velocity-z/position-xyz; uninitialized previous-position words excluded",
+    "runs": [
+      {
+        "run": "native-hook-01",
+        "source_boundaries_compared": 34,
+        "first_difference": 363,
+        "differing_boundaries": 18,
+        "probe_log_sha256": "54bc638110a3ce821689f20c366a94746ff704a550246f08a219443b4c42f159"
+      },
+      {
+        "run": "native-hook-02",
+        "source_boundaries_compared": 34,
+        "first_difference": 366,
+        "differing_boundaries": 3,
+        "probe_log_sha256": "421334b68347859927dbc6cc2c42189ab9b101452235f8d9a5fcf1788c410f8f"
+      },
+      {
+        "run": "native-hook-03",
+        "source_boundaries_compared": 34,
+        "first_difference": null,
+        "differing_boundaries": 0,
+        "probe_log_sha256": "bcba363cf8d975e0c92bfb13b9766eee6c6fcc0b57012258c997f18c48f58ffc"
+      }
+    ],
+    "final_runtime_probe_enabled": false
+  },
+  "tests": {
+    "command": "python3 -m unittest discover -s tests -v",
+    "total": 967,
+    "skipped": 50,
+    "result": "OK",
+    "log_sha256": "c5112bf135a315ccbab3703db6c99f4d9d9db088aa67a62bf6ceb95891c176c9",
+    "native_lifecycle": {
+      "scope": "both Link/Young Link orientations, all five costumes on Yoshis, source intro/stage/pause and repeated owner teardown; not exhaustive move execution",
+      "logs": {
+        "lifecycle-link2.log": "d0f338f8e8708b18bdc10f253f21eab439efab4df41918e153eb105c1a6ce13a",
+        "lifecycle-young-link.log": "e4d0f8a8749b341a3193b997e36893fbfd88baebb6351aa46d3506096502637c"
+      }
+    }
+  },
+  "retained_runs": [
+    {
+      "run": "browser2",
+      "artifact_hashes": {
+        "browser-errors.json": "ae58cdb3e6ee5292c44c477c5666d651ee5e2e1551c872822b249317fbdf514a",
+        "browser-identity.json": "a6587ac8bcbd1db50690e2a44353547ee717b354008def8b3c17edfef7bebe08",
+        "capture-config.json": "39e005331e7aadc52dcb14cc7f68e571554e8869ce558150008c7737bc0b2958",
+        "failure.txt": "450a527ad00e882f534bd5087c40ae5e24faa3212c67a2249eb83367ec197af1",
+        "module-output-capture.json": "35e32cb3ec756eabc431aa9df76b21207aebe84c2aefdd67257269bceb273908",
+        "served-artifacts-after.json": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+        "served-artifacts.json": "8710ee713f4f2c40f7314b7b69c26044d6ad394f2084b6dd64464a94a3b48e71"
+      }
+    },
+    {
+      "run": "browser3",
+      "artifact_hashes": {
+        "browser-errors.json": "ae58cdb3e6ee5292c44c477c5666d651ee5e2e1551c872822b249317fbdf514a",
+        "browser-identity.json": "a6587ac8bcbd1db50690e2a44353547ee717b354008def8b3c17edfef7bebe08",
+        "capture-config.json": "39e005331e7aadc52dcb14cc7f68e571554e8869ce558150008c7737bc0b2958",
+        "failure.txt": "450a527ad00e882f534bd5087c40ae5e24faa3212c67a2249eb83367ec197af1",
+        "module-output-capture.json": "35e32cb3ec756eabc431aa9df76b21207aebe84c2aefdd67257269bceb273908",
+        "served-artifacts-after.json": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+        "served-artifacts.json": "8710ee713f4f2c40f7314b7b69c26044d6ad394f2084b6dd64464a94a3b48e71"
+      }
+    },
+    {
+      "run": "browser4",
+      "artifact_hashes": {
+        "browser-errors.json": "7cfece2723a5cb9df4a23816a1eecd4fd2220e53498839773f10620b8ed45512",
+        "browser-identity.json": "a6587ac8bcbd1db50690e2a44353547ee717b354008def8b3c17edfef7bebe08",
+        "capture-config.json": "bcb59a6f3763619a56437db352f4bb55cccc95082bc84990af65bf9177b3fe15",
+        "failure.txt": "2924ec9e70d1bd54b2ac5d36fe50c2c91a5546a9f9305bc1455408bc844477f2",
+        "module-output-capture.json": "95594062e3a661906c916c8f0a3156c92498cc96fbcf1f553deda5421969a5bd",
+        "original-comparison.json": "d6a45647a798f1b81c71b8fe79606c9179c84b1a4c9a2363da676b835ff249d9",
+        "playing-observation.json": "0c214fc3a59e5b2956cd156776542c947fa7d33973c028d9e68a00bd0aa16f61",
+        "playing-presentation.json": "ff6af29ac4e98e040197f7ef7926816660c6321cce0fca623062d097b926aebc",
+        "retail-browser-report.json": "c2aca94d9322e5928dd9db564b7057deaf97a9cc40a4f0ad1bef4b848e4ac4eb",
+        "served-artifacts-after.json": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+        "served-artifacts.json": "37d9262033dd566b7c11313275a9a4816187d71cb62ab2b6418570edbbca3b2b",
+        "ui-report.json": "b71cdfe2b67cfb4b0a21aa2e05c76664385694e97230f51a04d08b154d5142ba"
+      }
+    },
+    {
+      "run": "browser5",
+      "artifact_hashes": {
+        "browser-errors.json": "f07177420cd7c56d5e9fb7bd6ea145dfd98e69724f1506666fd8c6e988e8912f",
+        "browser-identity.json": "a6587ac8bcbd1db50690e2a44353547ee717b354008def8b3c17edfef7bebe08",
+        "capture-config.json": "2938364f01b895ab6702cea692f5770d68f9ea9b3d8ab787b55bf5924ff22a0c",
+        "failure.txt": "2924ec9e70d1bd54b2ac5d36fe50c2c91a5546a9f9305bc1455408bc844477f2",
+        "module-output-capture.json": "f10284070c350392364cb114ebde14316ffd4ecedccd01178ff235ca05091921",
+        "playing-observation.json": "0c214fc3a59e5b2956cd156776542c947fa7d33973c028d9e68a00bd0aa16f61",
+        "playing-presentation.json": "ff6af29ac4e98e040197f7ef7926816660c6321cce0fca623062d097b926aebc",
+        "retail-browser-report.json": "6f9bc1e4442d2fc40a47c44a66d495e44c7387117e57d0d08afc53c66199316f",
+        "served-artifacts-after.json": "ca3d163bab055381827226140568f3bef7eaac187cebd76878e0b63e9e442356",
+        "served-artifacts.json": "559214898e5b4ad61490904648d43564d478baf04469ab8ffe253cb23bfa75f6",
+        "ui-report.json": "77ed88d842ffecf3a31c7042f860c554b08c2e3454d44298dc4743b0d24f483a"
+      }
+    },
+    {
+      "run": "browser6",
+      "artifact_hashes": {
+        "browser-errors.json": "ae58cdb3e6ee5292c44c477c5666d651ee5e2e1551c872822b249317fbdf514a",
+        "browser-identity.json": "a6587ac8bcbd1db50690e2a44353547ee717b354008def8b3c17edfef7bebe08",
+        "capture-config.json": "cdf1d60145aad9dcd193d6ea659b987bd40e2b09143649289c0823027fc551a7",
+        "module-output-capture.json": "5fcf7b976c6c305ded19c4330166fc1ba4bca1098a9f2fcecd2076d2a4702fb2",
+        "original-comparison.json": "1bd10beb8ff28ec4c61c58d392d3283634da3049cebdc16216162a3b3834e07e",
+        "playing-observation.json": "0c214fc3a59e5b2956cd156776542c947fa7d33973c028d9e68a00bd0aa16f61",
+        "playing-presentation.json": "ff6af29ac4e98e040197f7ef7926816660c6321cce0fca623062d097b926aebc",
+        "retail-browser-report.json": "0a0c6d03e7b66a85b7b236d02ca1134da1f21e3fe1ab80531cf4128a6ef0240d",
+        "served-artifacts-after.json": "21db672feafe1fdb11ec71271dea44d55bbab6be273fa51a1a8b7410ff7fe63b",
+        "served-artifacts.json": "21db672feafe1fdb11ec71271dea44d55bbab6be273fa51a1a8b7410ff7fe63b",
+        "ui-report.json": "c5fc8a6565f45ed14d0e2819b715844f0a13902c65b4d6177b680a5b8257eb50"
+      }
+    },
+    {
+      "run": "browser7",
+      "artifact_hashes": {
+        "browser-errors.json": "ae58cdb3e6ee5292c44c477c5666d651ee5e2e1551c872822b249317fbdf514a",
+        "browser-identity.json": "a6587ac8bcbd1db50690e2a44353547ee717b354008def8b3c17edfef7bebe08",
+        "capture-config.json": "2d3a1de4555d21e45dc42cae5230c110e59fe951374d49cd03012af3314bf79d",
+        "module-output-capture.json": "ac6a6926e5d59805672e61e85b211613eb74485b72a1b3fcffd7d7d31a855dc8",
+        "original-comparison.json": "b3bb8321ae5a5ab2537069f9ddf809a86bffa580df6776310657e231c36be4d5",
+        "playing-observation.json": "0728eaa368dd7ddee46169bf00e0fb394ea162977e4265c0d009e80fa028b02d",
+        "playing-presentation.json": "ff6af29ac4e98e040197f7ef7926816660c6321cce0fca623062d097b926aebc",
+        "retail-browser-report.json": "fe9791541f2080639bda9d39d4012614bc2092b67c5ccf47044593969e442671",
+        "served-artifacts-after.json": "ae2bbdc6504f636e4261c97ad11f2b45093c8f9f94ecec807ada44d438443640",
+        "served-artifacts.json": "ae2bbdc6504f636e4261c97ad11f2b45093c8f9f94ecec807ada44d438443640",
+        "ui-report.json": "e5d495e067e507b981c801e9f37fc7e7066aeeb4b59d099e102cb2a7ba7553f6"
+      }
+    }
+  ],
+  "limitations": [
+    "This is one human-Link/CPU-Young-Link recording, not all moves or interactions.",
+    "Live controller and original CPU interrupt scheduling equivalence are not evaluated.",
+    "Replay enters source gameplay from recorded setup; ordinary controller CSS/SSS/match/CSS round trip remains a separate gate.",
+    "Pixels and PCM are not compared.",
+    "Cold/warm performance is not admitted; recorded stalls, first-use pipelines, heap growth and audio underruns remain.",
+    "Human-controlled Young Link, aerial hookshot and Milk need additional retail coverage.",
+    "Comparator fields and tolerances were not changed."
+  ]
+}

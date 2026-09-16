@@ -1,5 +1,6 @@
 #include "gameplay_fighter_assets.h"
 #include "gameplay_action_store.hpp"
+#include "dat_item_commands.hpp"
 #include "fighter_runtime_fixture.hpp"
 #include <cstdio>
 #include <iostream>
@@ -7,6 +8,7 @@ using namespace fighter_runtime_test;
 extern "C" {
 MeleeWebFighterAssetScope* assets_test_begin(void*,void*,void*,void*,MeleeWebFighterAssetBind,MeleeWebFighterAssetUnbind);
 int assets_test_restored(void);
+int assets_test_item_commands(void);
 Fighter* assets_test_construct_storage(void);
 int assets_test_load(Fighter*,int);
 void assets_test_destroy_storage(Fighter*);
@@ -31,12 +33,31 @@ struct Context {
 };
 int main() {
     try {
+        check(assets_test_item_commands(),"Item loop and resize words match source bitfield consumers");
+        auto script=[](std::initializer_list<uint32_t> words){
+            Bytes data(words.size()*4);size_t at=0;
+            for(auto word:words){put32(data,at,word);at+=4;}
+            return DatArchive(pack(data,{},"script"));
+        };
+        DatItemCommands item_commands;
+        check(item_commands.decode(script({(3U<<26)|4,(1U<<26)|1,4U<<26,0}),0)!=nullptr,
+              "Bounded original item loop decodes");
+        for(const auto& invalid:{script({3U<<26,4U<<26,0}),script({4U<<26,0}),
+                                script({(3U<<26)|1,0}),script({(3U<<26)|1,(3U<<26)|1,4U<<26,4U<<26,0})}){
+            bool rejected=false;try{DatItemCommands bad;bad.decode(invalid,0);}catch(const DatError&){rejected=true;}
+            check(rejected,"Item decoder rejects zero, unmatched, unfinished and over-capacity loops");
+        }
         FighterFixture f;put32(f.data,f.command_a,0);f.unlink(f.command_a+4);put32(f.data,f.command_b,0);
         auto archive=std::make_shared<const DatArchive>(f.file());
         for(unsigned restart=0;restart<2;++restart) {
+            // Link has no randomized Wait table. Preserve null through the
+            // native row owner and fighter publication, including restart.
+            if(restart){f.unlink(0x24);put32(f.data,0x24,0);archive=std::make_shared<const DatArchive>(f.file());}
             Context context;
             for(auto& store:context.stores)store=std::make_unique<GameplayActionStore>(archive,mario(),f.container);
             auto& tables=*context.stores[0];
+            check(restart?tables.wait_choices()==nullptr:tables.wait_choices()!=nullptr,
+                  "Native Wait table preserves source nullability");
             auto* scope=assets_test_begin(tables.action_rows(),tables.blend_rows(),tables.wait_choices(),&context,Context::bind,Context::unbind);
             check(scope!=nullptr,"Scoped source ftData publication");
             Fighter* a=assets_test_construct_storage();Fighter* b=assets_test_construct_storage();

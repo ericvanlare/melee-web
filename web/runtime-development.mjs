@@ -39,7 +39,7 @@ window.menuRuntimeTiming=data=>{if(!data.valid)return;const now=performance.now(
 developmentHooks.preparation=(label,keepAudio=false)=>{preparationLabel=label||'Preparing original scene';preparationKeepsAudio=!!keepAudio;preparationSince=performance.now();window.meleeHitchCapture?.setPreparation?.(true,preparationSince);activePreparation={sequence:++preparationSequence,label:preparationLabel,requested_at:preparationSince,construction:[],first_draw:false,audio_continuity:preparationKeepsAudio};uiMessage='';$('status').textContent=`${preparationLabel} · audio ${preparationKeepsAudio?'continuing':'paused'}`;};
 developmentHooks.preparationDone=()=>{if(preparationSince){const now=performance.now();window.meleeHitchCapture?.setPreparation?.(false,now);const duration=now-preparationSince;preparationCount++;preparationWorst=Math.max(preparationWorst,duration);if(activePreparation){activePreparation.preparation_done=now;activePreparation.preparation_wall_ms=duration;pendingEntryProfile=activePreparation;activePreparation=null;}log(`Native preparation boundary {"label":${JSON.stringify(preparationLabel)},"duration_ms":${duration.toFixed(3)}}`);renderConstructionMetrics();}preparationSince=0;preparationLabel='';uiMessage='';};
 developmentHooks.preparationCanceled=()=>{window.meleeHitchCapture?.setPreparation?.(false);preparationSince=0;preparationLabel='';preparationKeepsAudio=false;activePreparation=null;pendingEntryProfile=null;uiMessage='';};
-developmentHooks.preparationFailed=error=>{window.meleeHitchCapture?.setPreparation?.(false);preparationSince=0;preparationLabel='';preparationKeepsAudio=false;activePreparation=null;pendingEntryProfile=null;uiMessage=error||'Native preparation failed';$('status').textContent=uiMessage;};
+developmentHooks.preparationFailed=error=>{window.meleeHitchCapture?.setPreparation?.(false);preparationSince=0;preparationLabel='';preparationKeepsAudio=false;activePreparation=null;pendingEntryProfile=null;uiMessage=error||'Native preparation failed';$('status').textContent=uiMessage;if(retailRun)retailRun.failure=uiMessage;};
 developmentHooks.cacheSettled=()=>{Module.markRuntimeCacheDirty?.();};
 developmentHooks.cacheWriteFailed=message=>{$('cache-status').textContent=message;};
 window.menuCacheWritesFlushed=data=>{
@@ -181,6 +181,7 @@ window.menuReplayCompleted=(frames,matchComplete,outcome,winner)=>{if(retailRun)
 window.menuReplayPoll=()=>{
  $('retail-replay-start').disabled=!ready||fatal||!bundle||replayLoading||!!retailRun||!$('retail-replay-file').files[0];
  const run=retailRun;if(!run||run.finishing||run.completed)return;
+ if(run.failure){finishRetailReplay(run.failure);return;}
  if(window.meleeHitchCapture?.isInvalid?.()){diagnosticCaptureInvalid=true;if(!run.failure)run.failure='Diagnostic hitch capture overflow';}
  const now=performance.now(),cursor=Module._melee_web_native_menu_replay_cursor();
  if(cursor!==run.lastCursor){run.lastCursor=cursor;run.lastProgress=now;}

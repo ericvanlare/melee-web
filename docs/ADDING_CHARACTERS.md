@@ -6,6 +6,44 @@ written rows are not a substitute for source identity. Keep extracted assets in
 the ignored `assets-local/next-gate` directory and raw captures in ignored `work/`.
 Keep upstream checkouts intact and put downstream source changes in `patches/`.
 
+## Required checkpoints
+
+Use this sequence for every port, including clones. Record each checkpoint as
+passed, failed or not run, with its command and evidence path. These are working
+checkpoints, not a replacement for the admission gates below.
+
+1. **Base and inputs.** Read the required project guidance below; verify the
+   user-requested PR's actual tip/merge and the current worktree, not just a
+   similarly named local branch. Locate the owned disc, existing extracted assets
+   and any capture in the task's configured locations. An empty
+   `assets-local/next-gate` is not evidence that no disc exists. Extract from an
+   already available owned disc; do not wait for a gameplay recording to test
+   asset construction. Ask for a missing input only after these scoped checks.
+2. **Source contract.** Identify whether this is a supported-family extension or
+   a new runtime family. Record character kind versus fighter kind, exact roots,
+   attribute sizes, article slots and animation extents, nullability, effects
+   including child entries, and audio. Verify both original consumers and disc
+   relocation bounds. Mark unknowns; do not copy a sibling's counts as proof.
+3. **Real construction before full replay.** Build the affected native trace and
+   run original construction, at least one source tick, teardown and reconstruction
+   using the real new assets. A compile or a synthetic fixture cannot pass this
+   checkpoint. Check both player orientations and costumes with the existing
+   lifecycle trace; state which actions its actual branches execute. A skipped
+   real-asset test is still unverified, however large the green suite total.
+4. **First advancing browser frames.** Freeze one completed build, resolve the
+   documented browser-tool dependency and verify source progress using the
+   [live checks](#when-a-replay-does-not-advance). Fix the first asset/runtime
+   failure before spending a complete-match run. Do not change dependencies or
+   increase timeouts without evidence that they cause the failure.
+5. **First divergence, then complete comparison.** Validate the original fixture
+   and scheduling scope. Reduce the first differing field to its producer and
+   operands; test the repair there, then rerun the full visible Release match.
+   Preserve unchanged comparison fields/tolerances and exact source draw boundaries.
+6. **Honest handoff.** Use the [template](#handoff-template), retaining failures
+   and skips. State comparison, ordinary CSS/SSS round trip, pixels, PCM, live
+   scheduling and performance are separate gates. Do not say the task is fully
+   verified while a requested verification gate is failed or not run.
+
 ## Before editing
 
 This is required reading for adding or enabling a fighter. Start with the current
@@ -21,6 +59,90 @@ carry equivalent changes under different commits; check the implementation and
 evidence instead of blindly cherry-picking. Character notes retain chronological
 failures and superseded experiments. Their earlier passing runs are not the
 current acceptance decision.
+
+The Link/Young Link case adds the [source contract and causal repair](LINK_PORT_NOTES.md)
+and a [hash-bound receipt](evidence/link-young-link-replay-v1.json). Check that its
+shared fixes exist in your chosen base; a document describing an uncommitted
+candidate is not proof those changes are present on another branch.
+
+### Find the existing owner first
+
+Use `rg` on the exact error, symbol or source motion. Read the relevant owner and
+its focused test before inventing an adapter or a second verification framework.
+
+| Boundary | Existing code and checks |
+| --- | --- |
+| Identity and upload manifests | `src/gameplay_content.h`, `scripts/generate_fighter_registry.py`, `web/runtime-assets.mjs`; `tests/test_web_launch.py`, `tests/runtime_disc_assets_test.mjs` |
+| Fighter ABI and ownership | `src/dat_fighter_runtime.cpp`, `src/gameplay_fighter_data.c`, `src/gameplay_fighter_assets.cpp`; `tests/test_gameplay_fighter_data.py`, `tests/test_gameplay_fighter_assets.py` |
+| Articles, effects and commands | `src/dat_item_article.cpp`, `src/dat_effect_entries.cpp`, `src/dat_item_commands.hpp`, `src/gameplay_action_store.cpp`; `tests/test_gameplay_effects.py`, `tests/gameplay_fighter_assets_trace.cpp` |
+| Real construction and repeated lifetimes | `tests/gameplay_content_match_trace.cpp`, `tests/test_gameplay_content_match.py`; rebuild the actual selected executable before citing it |
+| Browser preparation and replay | `web/runtime-development.mjs`, `scripts/capture_cpu_browser.mjs`; `tests/browser_replay_lifecycle_test.mjs` |
+| Reference and comparison | `scripts/capture_cpu_native.py`, `scripts/compare_reference_capture.py`, `tools/browser_replay_validation.py`; [capture procedure](REFERENCE_CAPTURE_APP.md), [queue scope](RECORDED_QUEUE_REPLAY.md) |
+
+Inspect command-line options in these scripts or their `--help` before use.
+The browser runner requires a fresh output directory and a frozen
+`scripts/prepare_prototype.py` bundle served over real HTTP. Its optional
+`--playwright` is a package directory, not a browser executable; use the documented
+workspace runtime, not an arbitrary dependency from an unrelated project.
+
+## When a replay does not advance
+
+**An alive process is not proof of progress.** Renderer CPU/GPU activity,
+browser callback counts and missing failure files do not prove source gameplay.
+The capture runner exports several files only on completion/failure, so file
+absence also cannot diagnose a live run by itself.
+
+Within 30 seconds of starting a replay, inspect the current page status and
+source progress. Preparation may legitimately take longer: name the active phase
+and observable preparation progress instead of claiming gameplay has started.
+After gameplay begins, ten seconds without source-cursor advancement requires
+inspection. These are operator inspection triggers, not changes to simulation
+timing, performance thresholds or automatic permission to abort a slow valid run.
+
+In an already controlled development page, this read-only diagnostic uses the
+existing exports (sample twice, rather than serializing the full trace):
+
+```js
+({
+  status: document.querySelector('#status')?.textContent,
+  sourceSteps: window.nativeSourceSteps ?? null,
+  cursor: window.retailRun?.lastCursor ?? null,
+  gameplayStarted: Boolean(window.retailRun?.baseline),
+  failure: window.retailRun?.failure ?? null,
+  completed: window.lastRetailReplayReport?.complete ?? null,
+})
+```
+
+On a named preparation/abort error, preserve page text, console/native output,
+partial traces and build/recipe hashes immediately. Inspect the exact first
+error; do not wait for the outer 15-minute timeout or call the failure a browser
+dependency problem merely because it occurred in a browser. The preparation
+failure regression in `tests/browser_replay_lifecycle_test.mjs` must remain green.
+If a run truly cannot progress, retain its evidence and stop only the processes
+owned by that run. A retry must name what changed and the predicted observable
+result; do not silently retry the same failing setup.
+
+## Failure lookup
+
+These are routes to evidence, not recipes for applying the previous fix blindly.
+
+| First observed symptom | Next discriminating check |
+| --- | --- |
+| Zero source frames, DAT external/region error | Read page/native error; identify archive/root/offset. Compare original archive policy, serialized extent and nullable fields. Check real construction before another browser run. |
+| Crash when an effect spawns | Follow original effect calls and child IDs through the complete authored table. Model-only tables may have both particle roots null; a missing entry is not optional. |
+| Unsupported command or failing sentinel during a move | Follow the source action into common actions and call/jump targets; distinguish decoded operands from runtime admission and live service readiness. Bombs require opponents' common pickup/throw actions too. |
+| RNG is the first mismatch | Compare setup/save/music and nullable idle tables, then source consumers in order. Never adjust the seed or add an unexplained RNG call. |
+| Grab/position first differs, then RNG | Probe the first bad owner/chain before later AI drift. Audit matching-C out-of-object stack/global tricks with memory checks; do not compensate with a timing offset. |
+| Tiny float difference with identical inputs | Capture original operand bits and inspect the actual call-site instructions, including inlined versus standalone helpers. Preserve original fused/unfused boundaries; retain a failing control. |
+| Native prefix agrees but drawn replay differs | Check camera/magnifier dependencies and exact source draw boundaries. Headless completion, browser callback totals and equal final draw counts are insufficient. |
+
+After two experiments at the same failing boundary produce no new evidence,
+stop full-match reruns and change the diagnostic: reduce to a short prefix,
+inspect a producer, or request a bounded review with the packet below. Continue
+safe in-scope work; if missing input/authority prevents progress, name it and ask.
+Do not silently switch models, spawn a new user task or reopen unrelated scheduler
+and performance projects. Delegated work should name owned files, evidence to
+produce and a completion check; the lead still owns integration and verification.
 
 ## Roy/Doc lessons that must survive the next port
 
@@ -68,6 +190,14 @@ current acceptance decision.
   holdouts remain unopened during implementation.
 
 ## Fast development iteration
+
+The [Link/Young Link verification](LINK_PORT_NOTES.md) adds four reusable checks:
+serialized article animation rows are not callback-state counts; effect tables
+may be model-only and include child entries beyond directly spawned IDs; a null
+Wait table is semantically different from a nonnull empty table; and matching-C
+stack-placement tricks must be audited before native execution. Original inlined
+arithmetic can also differ from the same helper's out-of-line body. Reduce the
+first divergence to original operands and defined fields before another full run.
 
 The [Dr. Mario/Roy pass](ROY_DR_MARIO_PORT_NOTES.md) separates a playable
 development candidate from content admission. Use this bounded sequence before
@@ -131,6 +261,29 @@ dependencies and shared fixes, commands and scoped results, retained failures,
 and next blocking gate. Use the playbook's evidence labels. Keep development
 candidacy, retail state comparison and performance admission distinct; passing
 two matches does not certify every move, costume or stage.
+
+## Handoff template
+
+Keep this short in the character notes or an ignored working note. Use it for
+review requests and resumption too; do not make the next agent reconstruct the
+failure from a long conversation. Keep private paths and raw game data untracked.
+
+```text
+Scope: characters, family reused/new, stage/opponent and requested deliverable
+Base: requested PR/ref, actual HEAD, relevant shared fixes, preserved dirty files
+Inputs/build: source pin, owned asset/capture/recipe hashes, configuration,
+              frozen runtime hashes and local evidence location
+Checkpoints: contract / real construction / source progress / comparison / route
+             Each: passed | failed | not run, command, exact exercised scope
+First failure: phase + source tick + field/error + expected/actual (if known)
+Experiments: hypothesis -> change -> observed result; retain failed artifact paths
+Next check: smallest discriminating experiment; or exact missing input/authority
+Verification: tests and skips; state/draws, CSS/SSS loop, pixels, PCM, timing separate
+```
+
+Example: “Compiled; real construction failed before tick 0 on an archive external
+link; next inspect the original loader's external policy” is actionable.
+“Renderer is busy, probably slow; waiting another 15 minutes” is not evidence.
 
 ## Repeatable workflow
 

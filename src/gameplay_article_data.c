@@ -87,7 +87,7 @@ int melee_web_article_publish(const MeleeWebNativeDat* r,void* article,void* spe
     const MeleeWebItemStateDesc* states,uint32_t count,void* joint,uint32_t bones,int32_t attach,uint8_t flags,char* error,size_t size)
 {
     NativeArticle* a=article;
-    if(!r||!a||a->magic!=ARTICLE_MAGIC||!special||!states||!count||count>64||!joint||
+    if(!r||!a||a->magic!=ARTICLE_MAGIC||(count&&!states)||(!count&&states)||count>64||!joint||
        bones>140||(a->unresolved&~((1U<<1)|(1U<<3)|(1U<<4)))){
         if(error&&size)snprintf(error,size,"Item graph publication requires checked registration root and complete fields");return 0;
     }
@@ -95,8 +95,9 @@ int melee_web_article_publish(const MeleeWebNativeDat* r,void* article,void* spe
      * original Fox/Falco blaster roots carry a ninth, null descriptor. The
      * gameplay source patch makes this field a flexible tail; allocate the
      * exact number of source rows rather than indexing a fixed C array. */
-    struct ItemStateDesc* native_states=(struct ItemStateDesc*)r->allocate(
-        r->context,count,sizeof(struct ItemStateDesc));
+    // An all--1 source ItemStateTable (Hookshot) has no animation table.
+    struct ItemStateDesc* native_states=count?(struct ItemStateDesc*)r->allocate(
+        r->context,count,sizeof(struct ItemStateDesc)):NULL;
     ItemModelDesc* model=NEW(ItemModelDesc,1);
     for(uint32_t i=0;i<count;i++){
         native_states[i]=(struct ItemStateDesc){states[i].animation,states[i].material,states[i].shape,states[i].commands};
