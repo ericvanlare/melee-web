@@ -1,5 +1,11 @@
 # Dr. Mario and Roy source-port notes
 
+**These notes preserve chronological experiments, including superseded results.**
+For the current outcome, read [STATUS.md](../STATUS.md) and the
+[final recorded-queue evidence](evidence/recorded-queue-replay-v1.json).
+Before porting another fighter, read the required
+[character-porting lessons and verification sequence](ADDING_CHARACTERS.md).
+
 These notes record the GALE01 revision-2 source identities and the local asset
 contract used by the focused real-asset gate. Extracted files stay under the
 ignored `assets-local/next-gate` directory; only their hashes and decoded

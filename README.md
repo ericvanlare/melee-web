@@ -3,6 +3,10 @@
 A source-port project for running vanilla Super Smash Bros. Melee
 in a desktop browser using WebAssembly and WebGPU.
 
+**Adding or enabling a character? Read [Adding a source fighter](docs/ADDING_CHARACTERS.md)
+before editing.** It includes the Roy/Doc failure modes, required source boundaries
+and a fast verification sequence. Agent instructions require the same entry point.
+
 The first playable goal is an accurate local **Mario-versus-Mario stock match on
 Final Destination at 60 fps**, using original gameplay code. Full vanilla Melee
 remains the goal. The active first deliverable includes the original in-game

@@ -5,6 +5,12 @@ through compiled source, without a PowerPC CPU interpreter or JIT.
 
 - Read README.md, STATUS.md and docs/PERFORMANCE_AND_ACCURACY.md before work. Keep
   status backed by observed evidence and use the playbook's scoped evidence labels.
+- Before adding or enabling a fighter, read [docs/ADDING_CHARACTERS.md](docs/ADDING_CHARACTERS.md),
+  including its Roy/Doc lessons and verification sequence. Verify the starting
+  branch contains the current shared fixes. Derive table bounds from authored
+  data; preserve save/music RNG, original arithmetic and source draw ordering.
+  Reduce the first divergence to a small reproducer before another full replay.
+  Recorded-queue state agreement does not establish live timing or performance.
 - Follow docs/ACCURACY_CONTRACT.md. The next deliverable is original in-game CSS
   → original SSS → four-stock Mario/FD gameplay → original CSS. Temporary HTML
   menus do not satisfy it. Preserve accuracy; record and resolve existing deviations.
@@ -26,7 +32,10 @@ through compiled source, without a PowerPC CPU interpreter or JIT.
   out of tracked files. Local input belongs in ignored assets-local/ or an explicit path.
 - Validate the changed boundary with meaningful tests. Use real HTTP for server behavior,
   a real browser for graphics, and original-game traces for simulation correctness.
-- Run `python3 -m unittest discover -s tests -v`, build the affected target, inspect diffs.
+- For code changes, use focused boundary checks during iteration. Before integration,
+  run `python3 -m unittest discover -s tests -v`, build the affected target and inspect
+  diffs. Documentation-only changes require link/path and diff checks; runtime
+  builds and the full suite are unnecessary when executable behavior is unchanged.
 - A dependency upgrade requires revalidation. Do not reset or overwrite unexplained changes.
 - Subagents may own bounded files. The lead integrates, reviews, and verifies their results.
 - Use GPT-5.6 Luna with xhigh reasoning for subagents unless the user changes this

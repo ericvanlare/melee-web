@@ -2,9 +2,70 @@
 
 Character expansion starts from the pinned GALE01 revision 2 source and disc.
 The registry is generated from the original `ftdata.c` and `forward.h`; hand
-written rows are not a substitute for source identity. Work in the ignored
-`assets-local/next-gate` directory so the repository and `.deps/melee` remain
-unchanged.
+written rows are not a substitute for source identity. Keep extracted assets in
+the ignored `assets-local/next-gate` directory and raw captures in ignored `work/`.
+Keep upstream checkouts intact and put downstream source changes in `patches/`.
+
+## Before editing
+
+This is required reading for adding or enabling a fighter. Start with the current
+[status](../STATUS.md), [accuracy contract](ACCURACY_CONTRACT.md) and
+[performance/accuracy playbook](PERFORMANCE_AND_ACCURACY.md). Record the branch,
+HEAD and worktree status; preserve unrelated changes and other owners' worktrees.
+
+Verify that the chosen base includes the latest shared fixes. The Roy/Doc replay
+baseline is commit `29d2dc71f5f4104935fbc09fb3789f8cf2580a16`, with its
+[recorded-queue contract](RECORDED_QUEUE_REPLAY.md) and
+[evidence ledger](evidence/recorded-queue-replay-v1.json). A later integration may
+carry equivalent changes under different commits; check the implementation and
+evidence instead of blindly cherry-picking. Character notes retain chronological
+failures and superseded experiments. Their earlier passing runs are not the
+current acceptance decision.
+
+## Roy/Doc lessons that must survive the next port
+
+- **Shared routines do not imply identical data layouts.** Keep character-select
+  kinds and internal fighter kinds distinct. Derive each fighter's attributes,
+  actions, costumes, articles, effects, audio and relocated table extents from its
+  own source and DAT. Roy's authored blend selectors require six dynamics modes;
+  copying Marth's five-mode extent crashed during combat. Reuse family adapters,
+  but validate every referenced row and reject missing dependencies explicitly.
+- **Check initialization before blaming a move.** The first Roy/Doc RNG mismatch
+  came from the original stage-music selector and captured save unlock masks.
+  Music selection consumes gameplay RNG even in silent builds. Restore the
+  original routine, context and lifetime; never adjust a seed or insert an
+  unexplained RNG call to align a trace. Keep unlock state separate from runtime
+  availability, and preserve each capture's actual save/setup context.
+- **A one-bit float mismatch can expose a shared bug.** Roy uncovered original
+  fused-operation boundaries in joint transforms, vector rotation and the throw
+  hip adjustment. Compare original operand bits and producer/consumer boundaries
+  before changing arithmetic. Preserve fused and separately rounded operations
+  exactly where the original uses them; no blanket fusion, fast-math, tolerance
+  widening or character-specific offsets. Keep observed scalar cases and the old
+  failing implementation as a negative control.
+- **Source drawing can affect simulation.** Camera/magnifier callbacks can affect
+  later damage and RNG. Headless prefixes help locate defects but cannot establish
+  drawn gameplay equivalence. For recorded-queue comparisons, use validated MWRC
+  v6 fixtures and compare exact source draw boundaries as well as state. Browser
+  callback counts and equal final draw totals are insufficient. Do not feed
+  expected fighter/RNG/camera state into runtime or fit a draw-skip list.
+- **Keep live timing separate.** The startup-phase-only model was disproven on
+  the second capture by an original audio interrupt delaying a queue check.
+  Recorded-queue replay is conditional gameplay evidence and leaves the live
+  controller path unverified. [Issue #28](https://github.com/ericvanlare/melee-web/issues/28)
+  tracks that deferred work; character expansion does not require reopening it.
+  Preserve any new live symptoms and the historical GPU-stall failures.
+- **New effects need their own preparation evidence.** An existing descriptor
+  catalog does not automatically cover a new fighter. Discover missing pipelines
+  in visible gameplay, preserve the failures and update only the intended catalog
+  with reviewed compact descriptors and binding hashes. Keep raw per-draw data
+  local. Preparation must not run hidden gameplay, draw source callbacks, consume
+  RNG or omit effects; report preparation time separately and retain cold/warm gates.
+- **Repair the owner of the first divergence.** A new fighter often exposes a
+  shared decoder, lifecycle or math defect. Fix that boundary and rerun affected
+  existing-character regressions. If the cause is not established, retain a small
+  reproducer and report the unknown; do not add guessed success paths. Both human
+  holdouts remain unopened during implementation.
 
 ## Fast development iteration
 
@@ -19,8 +80,10 @@ asking for a new original-game capture:
    and the model checker once, then check every costume with those binaries.
 3. Run the native pair in both player orientations, with all costumes, special
    families, article creation/destruction, damage and repeated teardown.
-4. Build Release once after the native boundary is stable. First run the cheap
-   browser/native upload-manifest parity and generated-roster tests, then enter
+4. Build Release after the native boundary is stable. First run the cheap
+   browser/native upload-manifest parity and generated-roster tests. Finish the
+   build and freeze the served JS/Wasm/data together before testing; rebuild any
+   trace executable affected by the change. Then enter
    through visible source CSS/SSS and exercise a small named action subset.
    Use source-position feedback for test positioning, rather than assuming
    fixed dash durations work for every fighter.
@@ -34,6 +97,40 @@ failed or changed boundary during iteration. Avoid recompiling an asset checker
 per costume or rerunning every route after a manifest-only correction. Complete
 the admission gates below before promotion; the bounded loop does not replace
 them.
+
+Once a repeatable original capture is available:
+
+1. Check input/setup hashes and fixture validity before expensive execution.
+   Reuse immutable verified reference traces unless the reference or capture
+   boundary changes. Preserve all failed attempts.
+2. Find the first differing source phase and field. Check construction context
+   and operands, then reduce the failure to a scalar test or short native prefix.
+   Headless/drawn differences require a drawn reproducer. Fix and rerun the small
+   test before spending another complete-match run.
+3. Run the complete visible comparison after the narrow checks pass. Require all
+   declared state fields, original draw boundaries and actual source match ending;
+   input-stream completion alone is insufficient. After shared changes, rerun the
+   existing comparisons that exercise that boundary, including the Roy/Doc pair
+   when changing their shared math or queue replay behavior.
+4. At the integration checkpoint, build affected targets, run
+   `python3 -m unittest discover -s tests -v` and inspect the diff. Report skips
+   explicitly; a missing asset or stale executable is not successful validation.
+   Broaden or repeat expensive checks only for new changes, failures or unresolved
+   coverage. A passing state comparison does not remove cold/warm performance gates.
+
+Useful existing examples are the
+[clone dependency/lifecycle notes](ROY_DR_MARIO_PORT_NOTES.md),
+[real-asset test](../tests/test_clone_fighters_real_assets.py), and the compact
+[joint-transform](../tests/test_gameplay_srt.py),
+[vector-rotation](../tests/test_gameplay_vector_rotation.py) and
+[throw-rounding](../tests/test_gameplay_throw_smoothing.py) regressions. Extend the
+relevant boundary rather than building another general validation framework.
+
+At handoff, record the exact head/build and fixture identities, implemented
+dependencies and shared fixes, commands and scoped results, retained failures,
+and next blocking gate. Use the playbook's evidence labels. Keep development
+candidacy, retail state comparison and performance admission distinct; passing
+two matches does not certify every move, costume or stage.
 
 ## Repeatable workflow
 
@@ -120,7 +217,7 @@ does not prove the per-Fighter linked chain can be built.
 
 ## Shared integration boundary
 
-Character work owns the fighter data, Fox-family attributes, action and item
+Character work owns the fighter data, relevant family attributes, action and item
 decoders, costume/model owners, player-kind mapping, and the focused real-asset
 checks. The shared world and match session own one asset scope per requested
 `FighterKind`, effect-bank and audio loading, source lifecycle ordering, and

@@ -329,6 +329,10 @@ opponents, stages, browsers or devices.
 Apply this sequence to every new fighter and stage. A failed step remains an
 open gate; later evidence cannot erase it.
 
+Before fighter implementation, follow the required
+[character-porting lessons and fast iteration loop](ADDING_CHARACTERS.md).
+Use its focused checks while developing; the gates below govern content admission.
+
 1. **Pin identity and dependencies.** Record source kinds, tables, archives,
    symbols, hashes, actions/map rows, Articles, effects and audio. Reject missing
    or ambiguous relocations.
