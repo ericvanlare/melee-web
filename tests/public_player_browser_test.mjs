@@ -70,7 +70,12 @@ try {
     assert.equal(await page.locator('iframe,h1,header,footer,article').count(), 0);
     assert(await page.locator('#start-game').isDisabled());
     assert(await page.locator('#end-session').isDisabled());
-    assert.match(await page.locator('#edition').innerText(), /no audio/);
+    assert.equal(await page.locator('#brand').innerText(), 'WEBMELEE.GG');
+    assert.equal(await page.locator('#edition').innerText(), 'alpha');
+    assert.equal(await page.locator('#edition em').evaluate(node => getComputedStyle(node).fontStyle), 'italic');
+    assert.equal(await page.locator('#audio-note').textContent(), 'no audio ⓘlicensing issue, need to remove about 50 lines of Dolphin audio code still');
+    assert.deepEqual(await page.locator('#toolbar > *').evaluateAll(nodes => nodes.map(node => node.id)),
+      ['toolbar-brand', 'toolbar-actions', 'toolbar-meta']);
     assert.equal(await page.evaluate(() => typeof Module._melee_web_native_menu_replay_begin), 'undefined');
     assert.equal(await page.evaluate(() => typeof Module._melee_web_native_menu_diagnostics), 'undefined');
     assert.equal(await page.evaluate(() => typeof window.menuObservePlayer), 'undefined');
