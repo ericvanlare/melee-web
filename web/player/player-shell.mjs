@@ -60,6 +60,15 @@ $('status').onclick = () => {
   else if (state?.paused) showError(state.message);
 };
 $('error-close').onclick = () => { $('error-dialog').close(); player?.focus(); };
+const audioInfo = $('audio-info'), audioDetails = $('audio-details');
+function setAudioDetails(open) {
+  audioDetails.classList.toggle('audio-details-open', open);
+  audioDetails.setAttribute('aria-hidden', String(!open));
+  audioInfo.setAttribute('aria-expanded', String(open));
+}
+audioInfo.onclick = event => { event.stopPropagation(); setAudioDetails(!audioDetails.classList.contains('audio-details-open')); };
+audioInfo.onblur = () => setAudioDetails(false);
+audioInfo.onkeydown = event => { if (event.key === 'Escape') { setAudioDetails(false); audioInfo.blur(); } };
 
 try {
   const saved = JSON.parse(localStorage.getItem(preferenceKey));

@@ -13,16 +13,19 @@
   <main id="player" aria-label="WebMelee player">
     <div id="runtime-host" aria-label="Game"><canvas id="canvas" width="640" height="480" tabindex="0" aria-label="Game screen"></canvas></div>
     <div id="toolbar" role="toolbar" aria-label="Game controls">
-      <button id="choose-disc" type="button" disabled>Disc</button>
-      <input id="disc-file" type="file" accept=".iso,.gcm,.ciso" aria-label="USA 1.02 disc image" hidden>
-      <button id="start-game" type="button" disabled>Play</button>
-      <button id="pause-game" type="button" disabled>Pause</button>
-      <button id="controls-open" type="button">Controls</button>
-      <button id="fullscreen" type="button">Fullscreen</button>
-      <button id="end-session" type="button" disabled>Eject</button>
-      <button id="status" type="button" disabled aria-live="polite">Loading…</button>
-      <progress id="progress" aria-label="Preparing local data" hidden></progress>
-      <span id="edition">alpha · no audio</span> <a href="/notices">About / legal</a>
+      <div id="toolbar-brand"><span id="brand">WEBMELEE.GG</span><span id="edition"><em>alpha</em></span></div>
+      <div id="toolbar-actions">
+        <button id="choose-disc" type="button" disabled>Disc</button>
+        <input id="disc-file" type="file" accept=".iso,.gcm,.ciso" aria-label="USA 1.02 disc image" hidden>
+        <button id="start-game" type="button" disabled>Play</button>
+        <button id="pause-game" type="button" disabled>Pause</button>
+        <button id="controls-open" type="button">Controls</button>
+        <button id="fullscreen" type="button">Fullscreen</button>
+        <button id="end-session" type="button" disabled>Eject</button>
+        <button id="status" type="button" disabled aria-live="polite">Loading…</button>
+        <progress id="progress" aria-label="Preparing local data" hidden></progress>
+      </div>
+      <div id="toolbar-meta"><span id="audio-note">no audio <button id="audio-info" type="button" aria-label="Why there is no audio" aria-expanded="false" aria-controls="audio-details">ⓘ</button><span id="audio-details" role="tooltip" aria-hidden="true">licensing issue, need to remove about 50 lines of Dolphin audio code still</span></span><a href="/notices">About / legal</a></div>
     </div>
   </main>
   <dialog id="disc-dialog" aria-label="Select your game copy">
