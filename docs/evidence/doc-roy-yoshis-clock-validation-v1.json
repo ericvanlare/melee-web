@@ -1,0 +1,417 @@
+{
+  "schema": "melee-web-doc-roy-yoshis-clock-validation-v1",
+  "date": "2026-09-15",
+  "runtime_head": "2e72a0a0404cf4fd7aa83527806697c52fb4f42f",
+  "evidence_level": "retail compared: original replay matches; initial-only clock prediction rejected on independent route",
+  "capture_manifest_sha256": "bbc36205004933c4da1c688cf1284a151d08aa60b942b54d0e934b985783ace2",
+  "observer_sha256": "ad696686d01c68453306b1e3169a5c98db9e60e145aaabd5f61d8be1aaa06cc9",
+  "v3_recipe_sha256": "5923bc08986c4bbd0122a04f1369bb746ec75a6ef19bc37599f8b899601ca940",
+  "v4_recipe_sha256": "7c3468569a47fe303997843f59120fcb441c1c42e65fd0d8e6892b9e0f035f25",
+  "clock_stream_sha256": "a26a153bd83e47020f032cbb12dfa4f6b34737a7466f8edea45ee091905dd1c6",
+  "probe_binary_sha256": "3b5fe9dabb1acf484b8b41b4b5143308221718137d49acafbc42e9ad99f520c6",
+  "original_replay": {
+    "completion": "natural_completion",
+    "wall_seconds": 221.36996862498927,
+    "input_status": {
+      "version": 1,
+      "mode": "replay",
+      "events": 26088,
+      "complete": true,
+      "invalid": false,
+      "error": null
+    },
+    "observer_status": {
+      "state": "completed",
+      "event_count": 159035,
+      "last_seq": 159034,
+      "source_tick": 11077,
+      "draw_ordinal": 11067,
+      "completed": true,
+      "invalid": false,
+      "error": null
+    },
+    "typed_semantic_events_matched": 58668,
+    "first_difference": null,
+    "control_records_excluded": 3
+  },
+  "model": {
+    "scope": "initial-only PAD/VI/two-XFB model; no runtime change",
+    "initial_source_ticks_used": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "pad_period_cpu_ticks": 8100000,
+    "next_alarm_cpu_ticks": 16021800009,
+    "alarm_quantization_cpu_ticks": 11,
+    "first_vi_queue_check_cpu_ticks": 16025655095,
+    "vi_period_cpu_ticks": 8108100,
+    "source_ticks": 11077,
+    "predicted_draws": 11067,
+    "original_draws": 11067,
+    "first_difference": {
+      "draw_ordinal": 8520,
+      "predicted": [
+        8527
+      ],
+      "original": [
+        8527,
+        8528
+      ]
+    },
+    "predicted_multi_tick_batches": [
+      [
+        1527,
+        1528
+      ],
+      [
+        2528,
+        2529
+      ],
+      [
+        3529,
+        3530
+      ],
+      [
+        4530,
+        4531
+      ],
+      [
+        5531,
+        5532
+      ],
+      [
+        6532,
+        6533
+      ],
+      [
+        7533,
+        7534
+      ],
+      [
+        8534,
+        8535
+      ],
+      [
+        9535,
+        9536
+      ],
+      [
+        10536,
+        10537
+      ]
+    ],
+    "original_multi_tick_batches": [
+      [
+        1527,
+        1528
+      ],
+      [
+        2528,
+        2529
+      ],
+      [
+        3529,
+        3530
+      ],
+      [
+        4530,
+        4531
+      ],
+      [
+        5531,
+        5532
+      ],
+      [
+        6532,
+        6533
+      ],
+      [
+        7533,
+        7534
+      ],
+      [
+        8527,
+        8528
+      ],
+      [
+        9535,
+        9536
+      ],
+      [
+        10536,
+        10537
+      ]
+    ],
+    "quantization_controls": [
+      {
+        "draw_ordinal": 8520,
+        "predicted": [
+          8527
+        ],
+        "original": [
+          8527,
+          8528
+        ]
+      },
+      {
+        "draw_ordinal": 8520,
+        "predicted": [
+          8527
+        ],
+        "original": [
+          8527,
+          8528
+        ]
+      },
+      {
+        "draw_ordinal": 8520,
+        "predicted": [
+          8527
+        ],
+        "original": [
+          8527,
+          8528
+        ]
+      },
+      {
+        "draw_ordinal": 8520,
+        "predicted": [
+          8527
+        ],
+        "original": [
+          8527,
+          8528
+        ]
+      },
+      {
+        "draw_ordinal": 8520,
+        "predicted": [
+          8527
+        ],
+        "original": [
+          8527,
+          8528
+        ]
+      },
+      {
+        "draw_ordinal": 8520,
+        "predicted": [
+          8527
+        ],
+        "original": [
+          8527,
+          8528
+        ]
+      },
+      {
+        "draw_ordinal": 8520,
+        "predicted": [
+          8527
+        ],
+        "original": [
+          8527,
+          8528
+        ]
+      },
+      {
+        "draw_ordinal": 8520,
+        "predicted": [
+          8527
+        ],
+        "original": [
+          8527,
+          8528
+        ]
+      },
+      {
+        "draw_ordinal": 8520,
+        "predicted": [
+          8527
+        ],
+        "original": [
+          8527,
+          8528
+        ]
+      },
+      {
+        "draw_ordinal": 8520,
+        "predicted": [
+          8527
+        ],
+        "original": [
+          8527,
+          8528
+        ]
+      },
+      {
+        "draw_ordinal": 8520,
+        "predicted": [
+          8527
+        ],
+        "original": [
+          8527,
+          8528
+        ]
+      },
+      {
+        "draw_ordinal": 8520,
+        "predicted": [
+          8527
+        ],
+        "original": [
+          8527,
+          8528
+        ]
+      },
+      {
+        "draw_ordinal": 8520,
+        "predicted": [
+          8527
+        ],
+        "original": [
+          8527,
+          8528
+        ]
+      },
+      {
+        "draw_ordinal": 8520,
+        "predicted": [
+          8527
+        ],
+        "original": [
+          8527,
+          8528
+        ]
+      },
+      {
+        "draw_ordinal": 8520,
+        "predicted": [
+          8527
+        ],
+        "original": [
+          8527,
+          8528
+        ]
+      },
+      {
+        "draw_ordinal": 8520,
+        "predicted": [
+          8527
+        ],
+        "original": [
+          8527,
+          8528
+        ]
+      },
+      {
+        "draw_ordinal": 8520,
+        "predicted": [
+          8527
+        ],
+        "original": [
+          8527,
+          8528
+        ]
+      },
+      {
+        "draw_ordinal": 8520,
+        "predicted": [
+          8527
+        ],
+        "original": [
+          8527,
+          8528
+        ]
+      },
+      {
+        "draw_ordinal": 8520,
+        "predicted": [
+          8527
+        ],
+        "original": [
+          8527,
+          8528
+        ]
+      },
+      {
+        "draw_ordinal": 8520,
+        "predicted": [
+          8527
+        ],
+        "original": [
+          8527,
+          8528
+        ]
+      },
+      {
+        "draw_ordinal": 8520,
+        "predicted": [
+          8527
+        ],
+        "original": [
+          8527,
+          8528
+        ]
+      },
+      {
+        "draw_ordinal": 8520,
+        "predicted": [
+          8527
+        ],
+        "original": [
+          8527,
+          8528
+        ]
+      },
+      {
+        "draw_ordinal": 8520,
+        "predicted": [
+          8527
+        ],
+        "original": [
+          8527,
+          8528
+        ]
+      }
+    ],
+    "wrong_phase_control": {
+      "draw_ordinal": 1027,
+      "predicted": [
+        1027,
+        1028
+      ],
+      "original": [
+        1027
+      ]
+    }
+  },
+  "late_queue_check": {
+    "source_tick": 8527,
+    "pc": "0x803769d4",
+    "core_ticks": 85090520459,
+    "r3": 2,
+    "queue": [
+      5,
+      0,
+      2,
+      2
+    ],
+    "distance_from_initial_periodic_vi_poll": 69564,
+    "retrace": 10477
+  },
+  "interpretation": "At source 8527 the original queue-count check is 69564 observed block-clock CPU ticks later than the opening-anchored periodic poll (nearby baseline offset is 154). It sees two samples. The initial-only model assumes constant poll offset and instead batches 8534/8535. Exact cause of this isolated poll delay is not established; it is not attributed to the browser GPU stall.",
+  "browser_validation": "not_run: known source-cadence failure already rejects candidate; no performance or browser state claim for this capture",
+  "claims": {
+    "independent_clock_generalization": "failed",
+    "original_repeatability_for_this_recording": "matched typed boundaries and strict MWRI",
+    "public_or_live_timing": "not_claimed",
+    "pixels_or_pcm": "not_claimed"
+  },
+  "retained_failures": [
+    "Two launcher attempts failed before starting Dolphin: ingestion moved source bundle, then exclusive output directory already existed. All private logs retained.",
+    "No expected draw-index skip list, fitted phase or comparator relaxation added."
+  ],
+  "remaining_work": "The clock policy must account for actual queue-check timing variation beyond initial phase before this route can pass exact browser cadence validation. Both human holdouts and historical GPU stall remain open."
+}

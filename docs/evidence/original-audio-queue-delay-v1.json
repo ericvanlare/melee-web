@@ -1,0 +1,280 @@
+{
+  "schema": "melee-web-original-audio-queue-delay-v1",
+  "date": "2026-09-15",
+  "parent_head": "31f1e88ace4df698cedbad6af99cbd61258df092",
+  "evidence_level": "retail compared: valid strict-input semantic prefix identifies original interrupt timing producer",
+  "capture_manifest_sha256": "bbc36205004933c4da1c688cf1284a151d08aa60b942b54d0e934b985783ace2",
+  "probe_source_sha256": "1c24784abcbfb7c029becc98f0ce6b8d661be9905abea64a84b283ca67702784",
+  "probe_binary_sha256": "7e868b616cfe08b02befe05f4ce82ff251001ce5dcb0b0b8e62ca32ca90c151d",
+  "clock_stream_sha256": "2b6df038f67ea1f4c53aea2200b0ee2557a3430061f84b1281c155bd5baec642",
+  "observer_stream_sha256": "1d30463cdb726880ea7c55efad092bb70f825d432bca9ff2cd9bc7afa36fa22b",
+  "strict_prefix": {
+    "stop_reason": "intentional_prefix_limit",
+    "source_tick": 8552,
+    "source_draws": 8544,
+    "compared_typed_events": 46041,
+    "first_difference": null,
+    "input_events": 21038,
+    "input_invalid": false,
+    "observer_invalid": false,
+    "wall_seconds": 177.19898941699648,
+    "complete_match": false
+  },
+  "cause": {
+    "source_tick": 8527,
+    "interrupted_original_pc": "0x8037e1e0",
+    "interrupted_owner": "HSD_PerfInitStat",
+    "interrupt_handler": "__AIDHandler (interrupt 5)",
+    "audio_callback": "__AXOutAiCallback -> __AXOutNewFrame",
+    "audio_work_observed_cpu_ticks": 58009,
+    "audio_work_time_precision": "CoreTiming block-clock interval, not an instruction-cycle measurement",
+    "result": "Pending DSP/SI/PAD interrupt work completes before the main loop resumes; the next original queue snapshot contains two inputs. Constant VI poll offset predicts one.",
+    "not_attributed_to": "The historical browser GPU staging stall"
+  },
+  "timeline": [
+    {
+      "pc": "0x80375e18",
+      "boundary": "HSD post-retrace callback return",
+      "cpu_block_clock": 85090449036,
+      "r3": 10477
+    },
+    {
+      "pc": "0x8034eb88",
+      "boundary": "__VIRetraceHandler:last",
+      "cpu_block_clock": 85090449172,
+      "r3": 2152367832
+    },
+    {
+      "pc": "0x8034f364",
+      "boundary": "VIWaitForRetrace:last",
+      "cpu_block_clock": 85090449521,
+      "r3": 1
+    },
+    {
+      "pc": "0x803762c0",
+      "boundary": "HSD_VICopyXFBAsync:last",
+      "cpu_block_clock": 85090450555,
+      "r3": 1
+    },
+    {
+      "pc": "0x8037e328",
+      "boundary": "HSD_PerfSetTotalTime:entry",
+      "cpu_block_clock": 85090450595,
+      "r3": 2151612416
+    },
+    {
+      "pc": "0x8037e39c",
+      "boundary": "HSD_PerfSetTotalTime:last",
+      "cpu_block_clock": 85090450648,
+      "r3": 2151707160
+    },
+    {
+      "pc": "0x8037e1bc",
+      "boundary": "HSD_PerfInitStat:entry",
+      "cpu_block_clock": 85090450690,
+      "r3": 2151707160
+    },
+    {
+      "pc": "0x8034783c",
+      "boundary": "__OSDispatchInterrupt:entry",
+      "cpu_block_clock": 85090450794,
+      "r3": 4,
+      "interrupted_pc": "0x8037e1e0"
+    },
+    {
+      "pc": "0x803509c0",
+      "boundary": "__AIDHandler:entry",
+      "cpu_block_clock": 85090451018,
+      "r3": 5
+    },
+    {
+      "pc": "0x803598ac",
+      "boundary": "__AXOutAiCallback:entry",
+      "cpu_block_clock": 85090451068,
+      "r3": 2150996140
+    },
+    {
+      "pc": "0x80359724",
+      "boundary": "__AXOutNewFrame:entry",
+      "cpu_block_clock": 85090451074,
+      "r3": 0
+    },
+    {
+      "pc": "0x803598a8",
+      "boundary": "__AXOutNewFrame:last",
+      "cpu_block_clock": 85090509083,
+      "r3": 0
+    },
+    {
+      "pc": "0x80359910",
+      "boundary": "__AXOutAiCallback:last",
+      "cpu_block_clock": 85090509090,
+      "r3": 0
+    },
+    {
+      "pc": "0x80350a4c",
+      "boundary": "__AIDHandler:last",
+      "cpu_block_clock": 85090509125,
+      "r3": 2152367048
+    },
+    {
+      "pc": "0x8034783c",
+      "boundary": "__OSDispatchInterrupt:entry",
+      "cpu_block_clock": 85090509288,
+      "r3": 4,
+      "interrupted_pc": "0x8037e1e0"
+    },
+    {
+      "pc": "0x8034783c",
+      "boundary": "__OSDispatchInterrupt:entry",
+      "cpu_block_clock": 85090509848,
+      "r3": 4,
+      "interrupted_pc": "0x8037e1e0"
+    },
+    {
+      "pc": "0x8033625c",
+      "boundary": "__DSPHandler:entry",
+      "cpu_block_clock": 85090510066,
+      "r3": 7
+    },
+    {
+      "pc": "0x80359920",
+      "boundary": "__AXDSPResumeCallback:entry",
+      "cpu_block_clock": 85090510159,
+      "r3": 2152384824
+    },
+    {
+      "pc": "0x80359974",
+      "boundary": "__AXDSPResumeCallback:last",
+      "cpu_block_clock": 85090510165,
+      "r3": 2152384824
+    },
+    {
+      "pc": "0x8033667c",
+      "boundary": "__DSPHandler:last",
+      "cpu_block_clock": 85090510201,
+      "r3": 2152367048
+    },
+    {
+      "pc": "0x80343bc8",
+      "boundary": "DecrementerExceptionCallback:entry",
+      "cpu_block_clock": 85090510364,
+      "r3": 8
+    },
+    {
+      "pc": "0x800195fc",
+      "boundary": "original PAD alarm entry",
+      "cpu_block_clock": 85090511227,
+      "r3": 2151885376
+    },
+    {
+      "pc": "0x8034dd8c",
+      "boundary": "existing observer boundary",
+      "cpu_block_clock": 85090512104,
+      "r3": 2152654816
+    },
+    {
+      "pc": "0x8034783c",
+      "boundary": "__OSDispatchInterrupt:entry",
+      "cpu_block_clock": 85090516211,
+      "r3": 4,
+      "interrupted_pc": "0x8037e1e0"
+    },
+    {
+      "pc": "0x8034783c",
+      "boundary": "__OSDispatchInterrupt:entry",
+      "cpu_block_clock": 85090517753,
+      "r3": 4,
+      "interrupted_pc": "0x8037e1e0"
+    },
+    {
+      "pc": "0x8034783c",
+      "boundary": "__OSDispatchInterrupt:entry",
+      "cpu_block_clock": 85090519295,
+      "r3": 4,
+      "interrupted_pc": "0x8037e1e0"
+    },
+    {
+      "pc": "0x8037e210",
+      "boundary": "HSD_PerfInitStat:last",
+      "cpu_block_clock": 85090520290,
+      "r3": 2151707160
+    },
+    {
+      "pc": "0x80392e80",
+      "boundary": "hsd_80392E80:entry",
+      "cpu_block_clock": 85090520298,
+      "r3": 2151707160
+    },
+    {
+      "pc": "0x803931a0",
+      "boundary": "hsd_80392E80:last",
+      "cpu_block_clock": 85090520404,
+      "r3": 0
+    },
+    {
+      "pc": "0x80019894",
+      "boundary": "lb_80019894:entry",
+      "cpu_block_clock": 85090520421,
+      "r3": 0
+    },
+    {
+      "pc": "0x803769d4",
+      "boundary": "HSD raw queue count return",
+      "cpu_block_clock": 85090520459,
+      "r3": 2
+    },
+    {
+      "pc": "0x800198dc",
+      "boundary": "lb_80019894:last",
+      "cpu_block_clock": 85090520518,
+      "r3": 2
+    },
+    {
+      "pc": "0x80377584",
+      "boundary": "HSD PAD consume entry",
+      "cpu_block_clock": 85090520911,
+      "r3": 2
+    }
+  ],
+  "binding_validation": {
+    "roy_doc_fd": {
+      "status": "bound",
+      "sha256": "0e041f1f0cc6db935261e237f26c6d52ccecaa8ff29005a813df0a6aa00e0ade",
+      "snapshots_checked": 6959
+    },
+    "doc_roy_yoshis": {
+      "status": "rejected",
+      "reason": "startup clock model disagrees with input queue at snapshot 8520: predicted (8527, 1), observed (8527, 2); clock binding rejected"
+    }
+  },
+  "preserved_failure": {
+    "probe": "run-01",
+    "observer_invalid": true,
+    "reason": "observer ring overflow at source 8529 from excessive busy-loop entry/return logging",
+    "disposition": "diagnostic only; not accepted as a valid replay prefix; run-02 suppresses repeated queue entry/return rows per source tick"
+  },
+  "scope": [
+    "Existing complete original repeat remains in doc-roy-yoshis-clock-validation-v1.json.",
+    "This pass validates only the affected original prefix; it does not claim complete browser, live input, PCM or performance acceptance.",
+    "Startup-clock binding now rejects the known incorrect queue prediction; the first recipe payload hash is unchanged.",
+    "Raw observations, source data, binaries and personal paths remain outside Git and build output.",
+    "Both human holdouts and historical GPU stall remain open."
+  ],
+  "common_clock_comparison": {
+    "clock_observations_compared": 77637,
+    "first_difference": null
+  },
+  "verification": {
+    "full_suite": {
+      "tests": 761,
+      "skips": 36,
+      "failures": 0,
+      "seconds": 269.601
+    },
+    "focused_binding_tests": 3,
+    "isolated_probe_build": "passed compile/link",
+    "probe_patch_reconstruction": "applies cleanly after existing clock-probe overlay and reconstructs observed source byte-for-byte",
+    "runtime_change": "none; shared browser/native artifact identities retain prior build evidence"
+  }
+}

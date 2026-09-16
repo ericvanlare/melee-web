@@ -119,6 +119,22 @@ and aggregate all GPU phases and transfers in a callback instead of reporting
 only its final draw. This does not recover missing historical controller samples
 or close the separate input/cadence and PCM acceptance gates.
 
+A replay carrying independently captured PAD/VI startup clocks may instead
+preserve the original queued-input batches. MWRC v5 computes boundaries from
+the periodic PAD alarm, the initial VI-gated queue check and the supported
+two-XFB startup state; it never accepts expected draw indexes. An open source
+batch can span browser callbacks without an intervening traversal. Require
+exact original draw-boundary comparison and all state domains before accepting
+that replay. Legacy recipes and live input retain the per-tick traversal policy;
+browser callbacks are not a substitute for original VI boundaries.
+
+MWRC v6 can instead consume independently recorded nonempty controller-queue
+snapshots as platform inputs. This establishes only conditional gameplay
+equivalence; it does not test an original CPU/interrupt scheduling model. Require
+explicit state-capture scope, exact queue coverage, exact source draw boundaries
+and the unchanged state comparator. Host timestamps never select fixture inputs.
+See [the format and scope](RECORDED_QUEUE_REPLAY.md).
+
 When a replay exposes hidden state, compare the original owner construction and
 its first consumers as well as the visible formula. The expanded corpus found
 missing screen-flash ownership and a missing ground reset whose floor sentinel
@@ -312,6 +328,10 @@ opponents, stages, browsers or devices.
 
 Apply this sequence to every new fighter and stage. A failed step remains an
 open gate; later evidence cannot erase it.
+
+Before fighter implementation, follow the required
+[character-porting lessons and fast iteration loop](ADDING_CHARACTERS.md).
+Use its focused checks while developing; the gates below govern content admission.
 
 1. **Pin identity and dependencies.** Record source kinds, tables, archives,
    symbols, hashes, actions/map rows, Articles, effects and audio. Reject missing

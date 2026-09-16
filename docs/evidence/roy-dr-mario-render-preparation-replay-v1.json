@@ -1,0 +1,201 @@
+{
+  "schema": "melee-web-roy-dr-mario-render-preparation-replay-v1",
+  "date": "2026-09-15",
+  "evidence_level": "retail compared: complete declared core and CPU decisions; preparation camera defect fixed; expanded arithmetic/cadence comparison fails",
+  "parent_head": "c33988732aa046e3bfd53ecae05133721f2677ed",
+  "capture_manifest_sha256": "0407e4facda8745c1304e59a0bde5aa85dc54444854f7718de12c8cb7ff49dfa",
+  "bound_recipe_sha256": "cca6af8c7174a070cf044fc7653dd75061ffb0f9acab8e4393b001b30673d888",
+  "fixes": [
+    "Non-selective development rendering resolves normal first-use pipelines through the existing blocking lookup before encoding the draw.",
+    "Match preparation services renderer queues and waits for submitted work without calling source camera/subject callbacks.",
+    "Only a callback with an actual source draw treats the renderer last-frame texture upload statistic as current preparation activity."
+  ],
+  "browser": {
+    "identity": {
+      "browser": "chrome",
+      "version": "153.0.8010.36",
+      "visible_browser": true
+    },
+    "artifact_sha256": {
+      "gameplay_menu_browser.js": "0c8d7ee199784116be7a692d748b8795325cb692d2d564f4dc091befadf90257",
+      "gameplay_menu_browser.wasm": "ce2d12ad0b36eddbede9cede42519df3f6faf1edebf85a6ba5a9044ba30eb4c0",
+      "gameplay_menu_browser.data": "cdf157ee0f1850884f07a71165fd2192177acb23c2c777313b719e70ea67546f",
+      "runtime.html": "afd340c25023f842b241e893d5634f6019c73f922d8ddf0b67348e38227c608e",
+      "runtime-development.mjs": "440ee171265a55255f4b87a2582e9f700e37e73753a90d1656909b53b229587a",
+      "melee-runtime.mjs": "5539332a587a6a8fd1bd25e1641d6099f55c0e7b8cfdce7ed609ee4bf27df28b",
+      "controller-input.mjs": "3388c3784717bea4b582a8fa66100880cbbcf4a0adb767c000e0a9cc779c31c8",
+      "controller-panel.mjs": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95",
+      "controller-panel.css": "289ca851412aca5b7def53dc002e8b3a897f7524e37d7b2ba2065822e7b3c16e",
+      "runtime-cache.js": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26",
+      "audio-worklet.js": "ef4374ac08f5bab821efa05cf5d252ca8e4b50647710d434e192beac3d7d7b4f",
+      "audio-ring.mjs": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf",
+      "disc-image.mjs": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a",
+      "dsp-coefficients.mjs": "5176d1cf4400228f31dff428bcc8cd60d07694c0ceea1628a79ac19f3e112b4a",
+      "runtime-assets.mjs": "7ad80a408883ec173508dcbb2417fd1d9733c857bd8ce160baf8027b212dfa7d",
+      "runtime-audio-assets.mjs": "b9bfd3f841d73e4ee4987fc5ac7351832c4ae8eca48ba5cf9c95578a238c7dbc",
+      "runtime-audio.mjs": "d968d2b2f9b58d2ab5dc1a4720d2ad2114cfbcac44a888694da7850100546545",
+      "match-flow.mjs": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f",
+      "match-menu.mjs": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba",
+      "action-sweep.mjs": "e18deac198c2f796bfaf8474f4fbd30586998898eac1cddc3e8c88f162892f59",
+      "hitch-capture.mjs": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3"
+    },
+    "served_hashes_unchanged": true,
+    "errors": {
+      "errors": [],
+      "requests": []
+    },
+    "frames_compared": 6965,
+    "core": {
+      "active_player_count": "pass",
+      "entry": "pass",
+      "fighters": "pass",
+      "frame_count": "pass",
+      "inputs": "pass",
+      "match_frame": "pass",
+      "pad_state_hex": "pass",
+      "rng": "pass"
+    },
+    "cpu_domains": {
+      "camera": {
+        "first_divergence": {
+          "actual": "42c29626",
+          "expected": "42c29625",
+          "field": "camera.interest_bits[0]",
+          "phase": "frame",
+          "tick": 427
+        },
+        "status": "diverged"
+      },
+      "cpu": {
+        "first_divergence": null,
+        "status": "matched"
+      },
+      "hud": {
+        "first_divergence": null,
+        "status": "matched"
+      },
+      "magnifier": {
+        "first_divergence": null,
+        "status": "matched"
+      },
+      "match": {
+        "first_divergence": null,
+        "status": "matched"
+      },
+      "subject": {
+        "first_divergence": {
+          "actual": "bce87daf",
+          "expected": "bce87db0",
+          "field": "players[0].subject.bone_bits[2]",
+          "phase": "frame",
+          "tick": 64
+        },
+        "status": "diverged"
+      }
+    },
+    "draw_alignment": {
+      "actual_count": 6965,
+      "expected_count": 6959,
+      "extra_in_actual": [
+        {
+          "ordinal": 1590,
+          "source_index": 1590
+        },
+        {
+          "ordinal": 2591,
+          "source_index": 2591
+        },
+        {
+          "ordinal": 3592,
+          "source_index": 3592
+        },
+        {
+          "ordinal": 4593,
+          "source_index": 4593
+        },
+        {
+          "ordinal": 5594,
+          "source_index": 5594
+        },
+        {
+          "ordinal": 6595,
+          "source_index": 6595
+        }
+      ],
+      "extra_in_actual_count": 6,
+      "matched_count": 6959,
+      "missing_from_actual": [],
+      "missing_from_actual_count": 0,
+      "scope": "source_draws_by_source_index",
+      "status": "misaligned"
+    },
+    "preparation_source_draws": 0,
+    "preparation": {
+      "source_transition": true,
+      "total_ms": 182.325,
+      "audio_wait_ms": 0.205,
+      "construction_ms": 162.48,
+      "render_wait_ms": 19.64,
+      "render_cpu_ms": 4.295,
+      "callbacks": 2,
+      "source_draws": 0,
+      "max_callback_ms": 4.25,
+      "max_draw_ms": 0,
+      "max_end_ms": 0,
+      "texture_upload_bytes": 0,
+      "max_draw_calls": 0,
+      "max_queued": 0,
+      "queued_delta": 0,
+      "created_delta": 0,
+      "gpu_completion_wait_ms": 16.725,
+      "gpu_completion_wait_callbacks": 0,
+      "pending_staging_at_settle": 0,
+      "pending_staging_at_first_arm": 0,
+      "gpu_completion_ready": true
+    },
+    "match": {
+      "complete": true,
+      "outcome": 2,
+      "winner": 0
+    },
+    "timing_observation": {
+      "worstNativeCallbackMs": 15.7,
+      "worstBrowserCallbackMs": 24.134999990463257,
+      "livePipelinesCreated": 27,
+      "livePipelinesQueued": 0,
+      "audioUnderrunFrames": 0,
+      "audioOverflowFrames": 0,
+      "wasmHeapGrowthBytes": 66846720,
+      "focusLost": false
+    },
+    "instrumented_timing_resumes": 0,
+    "timing_scope": "One instrumented full-match state capture met callback and audio limits; cold/warm performance admission is not claimed. Prior GPU stall remains open."
+  },
+  "local_report_sha256": {
+    "browser-comparison-02.json": "995697da4cb31cf8dd671d96ea5fc43dbb1bbded869f1c9f9dfd555e51f7c826",
+    "retail-port.jsonl": "56843751917cb2e6d85f2012f5fc1a7f200dca17d0b47c265a0ae95258f81507",
+    "cpu-observation.jsonl": "339eacad5ecdf2fe3a198dfd6d78f71383aa28ea23164fbd6ebe0adc8785a4fc",
+    "ui-report.json": "72283d87772852ed89278f3c40e9c5e34743f619a82742f01c8564b244171eb7"
+  },
+  "validation": {
+    "release_runtime_build": "pass",
+    "pinned_aurora_patch_identity": "verified",
+    "aurora_preparation_tests": "2 passed",
+    "menu_preparation_source_sequence_and_recipe_tests": "3 passed",
+    "full_suite": "754 tests / 37 skips passed before this renderer follow-up; final combined suite pending"
+  },
+  "preserved_failures": [
+    "roy-dr-mario-retail-diagnostic-v1.json",
+    "roy-dr-mario-rng-cause-v1.json",
+    "roy-dr-mario-integrated-replay-v1.json"
+  ],
+  "claims": {
+    "complete_core_and_cpu_decision_comparison": "pass",
+    "entry_camera_and_preparation_source_draws": "pass",
+    "expanded_equivalence": "fail",
+    "performance_admission": "not_claimed",
+    "selective_public_behavior_changed": false,
+    "production_deployed": false,
+    "human_holdouts_opened": false
+  }
+}

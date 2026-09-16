@@ -68,12 +68,15 @@ static FtSFXArr* sound_array(const MeleeWebNativeDat* r,uint32_t slot)
     return out;
 }
 void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
-    uint32_t kind,uint32_t costumes,void* actions,void* blends,void* choices,uint32_t* unresolved)
+    uint32_t kind,uint32_t costumes,uint32_t motion_count,void* actions,void* blends,
+    void* choices,uint32_t* unresolved)
 {
     if (!r || !unresolved) return NULL;
-    REQUIRE(kind==FTKIND_MARIO || kind==FTKIND_FOX || kind==FTKIND_FALCO || kind==FTKIND_MARS,
+    REQUIRE(kind==FTKIND_MARIO || kind==FTKIND_DRMARIO || kind==FTKIND_FOX ||
+        kind==FTKIND_FALCO || kind==FTKIND_MARS || kind==FTKIND_EMBLEM,
         "Native fighter extension schema unavailable");
     REQUIRE(costumes>0 && costumes<=16,"Native costume count exceeds checked bound");
+    REQUIRE(motion_count>0 && motion_count<=1024,"Native motion count exceeds checked bound");
     REGION(root,0x60); ftData* d=NEW(ftData,1); *unresolved=0;
     /* Every source pointer starts explicitly unresolved until decoded below. */
     for(unsigned field=0;field<24;++field)
@@ -86,7 +89,9 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
 #define CO(o,t,n,orig) d->x0->orig=READ_##t(at+o);
     MELEE_WEB_CO_ATTRIBUTE_FIELDS(CO)
 #undef CO
-    if(kind==FTKIND_MARIO) {
+    if(kind==FTKIND_MARIO || kind==FTKIND_DRMARIO) {
+        /* ftMr_Init_OnLoadForDrMario copies the full Mario ABI from Dr.
+         * Mario's own DAT, including his distinct cape Article kind. */
         at=required(r,root+4,0x84); ftMario_DatAttrs* mario=NEW(ftMario_DatAttrs,1); d->ext_attr=mario;
 #define MARIO(o,t,n,orig) mario->orig=READ_##t(at+o);
         MELEE_WEB_MARIO_ATTRIBUTE_FIELDS(MARIO)
@@ -101,13 +106,13 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
         MELEE_WEB_FOX_ATTRIBUTE_FIELDS(FOX)
 #undef FOX
         REQUIRE(fox->xB0_FOX_REFLECTOR_REFLECTION.x0_bone_id<140,"Native reflector bone index invalid");
-    } else if(kind==FTKIND_MARS) {
+    } else if(kind==FTKIND_MARS || kind==FTKIND_EMBLEM) {
         at=required(r,root+4,0x98); MarsAttributes* mars=NEW(MarsAttributes,1); d->ext_attr=mars;
 #define MARS(o,t,n,orig) mars->orig=READ_##t(at+o);
         MELEE_WEB_MARS_ATTRIBUTE_FIELDS(MARS)
 #undef MARS
         REQUIRE(mars->x64.x0_bone_id>=0 && mars->x64.x0_bone_id<140 && mars->x64.x10_size>0,
-                "Native Marth counter descriptor invalid");
+                "Native Marth/Roy counter descriptor invalid");
     } else {
         REQUIRE(0,"Native fighter extension schema unavailable");
     }
@@ -183,22 +188,35 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
                    "Empty native fighter dynamics has a nonnull auxiliary table");
     uint32_t dynamics_table=PTR(at+16,1);
     if(dynamics_table!=UINT32_MAX) {
-        /* Marth's five authored dynamics modes each carry one integer chain
-         * cutoff per sword/cape bone. The original field is typed FigaTree***
-         * but ftdynamics.c intentionally compares these pointer-width values
-         * as small integers; preserve that exact ABI without fabricating clips. */
-        REQUIRE(kind==FTKIND_MARS&&d->x2C->dynamicsNum==3,
+        /* Marth/Roy's authored dynamics modes each carry one integer chain
+         * cutoff per sword/cape bone. The mode selector is the second byte of
+         * every source blend row, and the original field is typed FigaTree***
+         * even though ftdynamics.c compares these pointer-width values as
+         * small integers. Derive the table extent from all authored selectors:
+         * Roy has a sixth row for selector 5, while Marth's table ends at 4.
+         * The referenced-region check below keeps an adjacent descriptor from
+         * being consumed as a fabricated mode row.
+         */
+        REQUIRE((kind==FTKIND_MARS||kind==FTKIND_EMBLEM)&&d->x2C->dynamicsNum==3,
                 "Native fighter dynamics mode schema unavailable");
-        REGION(dynamics_table,5*4);
-        d->x2C->x10=NEW(FigaTree**,5);
-        for(unsigned mode=0;mode<5;++mode) {
+        REQUIRE(blends,"Native fighter dynamics selectors are missing");
+        unsigned mode_count=0;
+        const uint8_t* blend_bytes=(const uint8_t*)blends;
+        for(uint32_t motion=0;motion<motion_count;++motion) {
+            const unsigned mode=blend_bytes[motion*2+1];
+            if(mode+1>mode_count)mode_count=mode+1;
+        }
+        REQUIRE(mode_count>0,"Native fighter dynamics mode table is empty");
+        REGION(dynamics_table,(size_t)mode_count*4);
+        d->x2C->x10=NEW(FigaTree**,mode_count);
+        for(unsigned mode=0;mode<mode_count;++mode) {
             uint32_t row=required(r,dynamics_table+mode*4,
                                   d->x2C->dynamicsNum*4);
             d->x2C->x10[mode]=NEW(FigaTree*,d->x2C->dynamicsNum);
             for(int bone=0;bone<d->x2C->dynamicsNum;++bone) {
                 uint32_t cutoff=WORD(row+bone*4);
                 REQUIRE(cutoff<=d->x2C->ftDynamicBones->array[bone].dyn_desc.count,
-                        "Marth dynamics cutoff exceeds its source chain");
+                        "Marth/Roy dynamics cutoff exceeds its source chain");
                 d->x2C->x10[mode][bone]=(FigaTree*)(uintptr_t)cutoff;
             }
         }
@@ -266,6 +284,9 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     }
     if(kind==FTKIND_MARIO)
         REQUIRE(d->x48_items[0] && d->x48_items[2],"Mario OnLoad requires fireball and cape Articles");
+    else if(kind==FTKIND_DRMARIO)
+        REQUIRE(d->x48_items[1] && d->x48_items[3],
+            "Dr. Mario OnLoad requires vitamin and sheet Articles");
     else if(kind==FTKIND_FOX)
         REQUIRE(d->x48_items[0] && d->x48_items[1] && d->x48_items[2],
             "Fox OnLoad requires laser, blaster and illusion Articles");
@@ -273,8 +294,8 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
         REQUIRE(kind==FTKIND_FALCO && d->x48_items[0] && d->x48_items[1] && d->x48_items[3],
             "Falco OnLoad requires laser, blaster and Phantasm Articles");
     else
-        REQUIRE(kind==FTKIND_MARS && at==UINT32_MAX,
-                "Marth source ftData must not invent an Article table");
+        REQUIRE((kind==FTKIND_MARS||kind==FTKIND_EMBLEM) && at==UINT32_MAX,
+                "Marth/Roy source ftData must not invent an Article table");
     const unsigned ready[]={0,1,2,11,12,13,14,15,16,17,18,19,20,21,22};
     for(unsigned i=0;i<sizeof(ready)/sizeof(ready[0]);++i) *unresolved &= ~(1U<<ready[i]);
     if(actions) *unresolved &= ~(1U<<3);

@@ -2375,6 +2375,20 @@ diff --git a/src/melee/lb/lbaudio_ax.c b/src/melee/lb/lbaudio_ax.c
  #include "lbaudio_ax.h"
  
  #include <stdbool.h>
+@@ -405,6 +405,13 @@
+         return cur_hps_file;
+     }
+ }
++
++#if defined(MELEE_WEB_GAMEPLAY)
++const char* melee_web_audio_music_path(int music)
++{
++    return getHPSFile(music);
++}
++#endif
+ 
+ static inline int lbAudioAx_80023F28_helper1(const char* filename)
+ {
 @@ -2095,9 +2098,11 @@
      struct AXFX_DELAY delay;
      int i;
@@ -5450,6 +5464,55 @@ diff --git a/src/melee/mn/mnstagesel.c b/src/melee/mn/mnstagesel.c
 
 --- a/src/melee/gr/stage.c
 +++ b/src/melee/gr/stage.c
+@@ -292,7 +292,13 @@
+     return false;
+ }
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++/* Select once at the original boundary; the host prepares the selected HPS
++ * before committing the original audio request. Never reroll during loading. */
++s32 melee_web_stage_select_music(s32 arg0, s32* music, int* alternate)
++#else
+ s32 Stage_80225074(s32 arg0)
++#endif
+ {
+     s32 r31;
+     s32 spC;
+@@ -325,11 +331,34 @@
+     }
+ 
+     tmp = Ground_801C28AC(selected_stage.stkind, r31, &spC);
++#if defined(MELEE_WEB_GAMEPLAY)
++    *music = spC;
++    *alternate = tmp;
++#else
+     lbAudioAx_80023F28(spC);
+     Ground_801C5A84(spC);
+     Ground_801C5AA4(tmp);
++#endif
+     return arg0;
+ }
++
++#if defined(MELEE_WEB_GAMEPLAY)
++void melee_web_stage_commit_music(s32 music, int alternate)
++{
++    lbAudioAx_80023F28(music);
++    Ground_801C5A84(music);
++    Ground_801C5AA4(alternate);
++}
++
++s32 Stage_80225074(s32 arg0)
++{
++    s32 music;
++    int alternate;
++    melee_web_stage_select_music(arg0, &music, &alternate);
++    melee_web_stage_commit_music(music, alternate);
++    return arg0;
++}
++#endif
+ 
+ StKind Stage_80225194(void)
+ {
 @@ -483,22 +483,44 @@
      { Gr_Kind_Shrine, 0, 0 },       { Gr_Kind_Battle, 0, 0 },
  };
@@ -7704,6 +7767,7 @@ diff --git a/src/sysdolphin/baselib/gobj.c b/src/sysdolphin/baselib/gobj.c
              HSD_GObj_804D7818 = saved;
          }
          cur = cur->next_gx;
+diff --git a/src/sysdolphin/baselib/mtx.c b/src/sysdolphin/baselib/mtx.c
 --- a/src/sysdolphin/baselib/mtx.c
 +++ b/src/sysdolphin/baselib/mtx.c
 @@ -398,11 +398,13 @@
@@ -7712,15 +7776,93 @@ diff --git a/src/sysdolphin/baselib/gobj.c b/src/sysdolphin/baselib/gobj.c
      m[2][0] = -vec1x * sinY;
 -    m[0][1] = vec1y_2 * ((cosZ * (sinX * sinY)) - (cosX * sinZ));
 -    m[1][1] = vec1y_1 * ((sinZ * (sinX * sinY)) + (cosX * cosZ));
-+    /* GALE01r2 8037A388/38C: preserve the original fused rounding. */
++    /* GALE01r2 8037A388/38C/3B4/3B8 fuse these four operations. Keep
++     * their inner products and outer scale multiplies separately rounded. */
 +    m[0][1] = vec1y_2 * fmaf(cosZ, sinX * sinY, -(cosX * sinZ));
 +    m[1][1] = vec1y_1 * fmaf(sinZ, sinX * sinY, cosX * cosZ);
      m[2][1] = cosY * (vec1y * sinX);
 -    m[0][2] = vec1z_2 * ((cosZ * (cosX * sinY)) + (sinX * sinZ));
 -    m[1][2] = vec1z_1 * ((sinZ * (cosX * sinY)) - (sinX * cosZ));
-+    /* GALE01r2 8037A3B4/3B8; the inner products round separately. */
 +    m[0][2] = vec1z_2 * fmaf(cosZ, cosX * sinY, sinX * sinZ);
 +    m[1][2] = vec1z_1 * fmaf(sinZ, cosX * sinY, -(sinX * cosZ));
      m[2][2] = cosY * (vec1z * cosX);
      m[0][3] = vec3->x;
      m[1][3] = vec3->y;
+diff --git a/src/melee/lb/lbvector.c b/src/melee/lb/lbvector.c
+--- a/src/melee/lb/lbvector.c
++++ b/src/melee/lb/lbvector.c
+@@ -132,9 +132,11 @@
+     } else if (angle < -M_PI) {
+         angle += M_TAU;
+     }
+-    return 0.9878619909286499f * angle -
+-           0.15527099370956421f * angle * angle * angle +
+-           0.0056429998949170113f * angle * angle * angle * angle * angle;
++    /* GALE01r2 8000DB74/78 and 8000DBD4/D8: the polynomial has two
++     * fused endpoints; its cubic and quartic terms round at each multiply. */
++    float cubic = ((0.15527099370956421f * angle) * angle) * angle;
++    float quartic = (((0.0056429998949170113f * angle) * angle) * angle) * angle;
++    return fmaf(angle, quartic, fmaf(0.9878619909286499f, angle, -cubic));
+ }
+ 
+ static float lbvector_cos(float angle)
+@@ -145,9 +147,11 @@
+     } else if (angle < -M_PI) {
+         angle += M_TAU;
+     }
+-    return 0.9878619909286499f * angle -
+-           0.15527099370956421f * angle * angle * angle +
+-           0.0056429998949170113f * angle * angle * angle * angle * angle;
++    /* GALE01r2 8000DB74/78 and 8000DBD4/D8: the polynomial has two
++     * fused endpoints; its cubic and quartic terms round at each multiply. */
++    float cubic = ((0.15527099370956421f * angle) * angle) * angle;
++    float quartic = (((0.0056429998949170113f * angle) * angle) * angle) * angle;
++    return fmaf(angle, quartic, fmaf(0.9878619909286499f, angle, -cubic));
+ }
+ 
+ /// 8000D8F4
+@@ -223,20 +227,21 @@
+     float y;
+     float z;
+ 
++    /* GALE01r2 8000DC14/18, 34/38, 54/58: fused rotation endpoints. */
+     switch (axis) {
+     case 1: // rotate about x axis
+         x = v->x;
+-        y = v->y * c - v->z * s;
+-        z = v->y * s + v->z * c;
++        y = fmaf(v->y, c, -(v->z * s));
++        z = fmaf(v->y, s, v->z * c);
+         break;
+     case 2: // rotate about y axis
+-        x = v->x * c + v->z * s;
++        x = fmaf(v->x, c, v->z * s);
+         y = v->y;
+-        z = v->z * c - v->x * s;
++        z = fmaf(v->z, c, -(v->x * s));
+         break;
+     case 4: // rotate about z axis
+-        x = v->x * c - v->y * s;
+-        y = v->x * s + v->y * c;
++        x = fmaf(v->x, c, -(v->y * s));
++        y = fmaf(v->x, s, v->y * c);
+         z = v->z;
+         break;
+     }
+diff --git a/src/melee/ft/ftcommon.c b/src/melee/ft/ftcommon.c
+--- a/src/melee/ft/ftcommon.c
++++ b/src/melee/ft/ftcommon.c
+@@ -959,9 +959,10 @@
+         sp10.x -= fp->x1A7C.x;
+         sp10.y -= fp->x1A7C.y;
+         sp10.z -= fp->x1A7C.z;
+-        fp->x1A7C.x += sp10.x * fp->x1A6C;
+-        fp->x1A7C.y += sp10.y * fp->x1A6C;
+-        fp->x1A7C.z += sp10.z * fp->x1A6C;
++        /* GALE01r2 8007E4C8/4DC/4F0: round the delta first, then fmadds. */
++        fp->x1A7C.x = fmaf(sp10.x, fp->x1A6C, fp->x1A7C.x);
++        fp->x1A7C.y = fmaf(sp10.y, fp->x1A6C, fp->x1A7C.y);
++        fp->x1A7C.z = fmaf(sp10.z, fp->x1A6C, fp->x1A7C.z);
+         HSD_JObjSetTranslate(jobj, &fp->x1A7C);
+     }
+ }

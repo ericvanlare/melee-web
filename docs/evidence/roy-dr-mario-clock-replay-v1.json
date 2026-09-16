@@ -1,0 +1,630 @@
+{
+  "schema": "melee-web-roy-dr-mario-clock-replay-v1",
+  "date": "2026-09-15",
+  "parent_head": "474b6e813632e67be0f43f55538c406dbf7d8165",
+  "evidence_level": "retail compared: complete declared state and strict source-draw cadence match for one recording",
+  "capture_manifest_sha256": "0407e4facda8745c1304e59a0bde5aa85dc54444854f7718de12c8cb7ff49dfa",
+  "input_v4_recipe_sha256": "cca6af8c7174a070cf044fc7653dd75061ffb0f9acab8e4393b001b30673d888",
+  "bound_v5_recipe_sha256": "0e041f1f0cc6db935261e237f26c6d52ccecaa8ff29005a813df0a6aa00e0ade",
+  "clock_observer_sha256": "52a2cbac014cd941e8770091021deffa49d7d2f3a4286ad5c838ba8ea1ead84a",
+  "clock_probe_binary_sha256": "3b5fe9dabb1acf484b8b41b4b5143308221718137d49acafbc42e9ad99f520c6",
+  "initial_context": {
+    "pad_period_cpu_ticks": 8100000,
+    "vi_period_cpu_ticks": 8108100,
+    "next_pad_relative_cpu_ticks": 3388044,
+    "first_vi_poll_relative_cpu_ticks": 6732987,
+    "startup_draws": 2
+  },
+  "initial_only_prediction": {
+    "scope": "initial-only PAD/VI/two-XFB model; no runtime change",
+    "initial_source_ticks_used": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "pad_period_cpu_ticks": 8100000,
+    "next_alarm_cpu_ticks": 15511500006,
+    "alarm_quantization_cpu_ticks": 11,
+    "first_vi_queue_check_cpu_ticks": 15514844949,
+    "vi_period_cpu_ticks": 8108100,
+    "source_ticks": 6965,
+    "predicted_draws": 6959,
+    "original_draws": 6959,
+    "first_difference": null,
+    "predicted_multi_tick_batches": [
+      [
+        1590,
+        1591
+      ],
+      [
+        2591,
+        2592
+      ],
+      [
+        3592,
+        3593
+      ],
+      [
+        4593,
+        4594
+      ],
+      [
+        5594,
+        5595
+      ],
+      [
+        6595,
+        6596
+      ]
+    ],
+    "original_multi_tick_batches": [
+      [
+        1590,
+        1591
+      ],
+      [
+        2591,
+        2592
+      ],
+      [
+        3592,
+        3593
+      ],
+      [
+        4593,
+        4594
+      ],
+      [
+        5594,
+        5595
+      ],
+      [
+        6595,
+        6596
+      ]
+    ],
+    "quantization_controls": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ],
+    "wrong_phase_control": {
+      "draw_ordinal": 1090,
+      "predicted": [
+        1090,
+        1091
+      ],
+      "original": [
+        1090
+      ]
+    }
+  },
+  "passive_original": {
+    "source_ticks": 6965,
+    "source_draws": 6959,
+    "strict_mwri_complete": true,
+    "strict_mwri_invalid": false,
+    "typed_semantic_boundaries_matched": 37822,
+    "excluded_control_records": 3,
+    "wall_seconds": 150.438826,
+    "earlier_prefix_semantic_matches": [
+      11823,
+      11818
+    ]
+  },
+  "browser": {
+    "artifact_sha256": {
+      "gameplay_menu_browser.js": "507e8d6464bc4f1b62f6e457c7ef0f02839205ffc70b416f5a80f12fc45d269d",
+      "gameplay_menu_browser.wasm": "29a744b287630546b7383cccac206355fc7c4a28e4e40d0fb012c0aafa449764",
+      "gameplay_menu_browser.data": "cdf157ee0f1850884f07a71165fd2192177acb23c2c777313b719e70ea67546f",
+      "runtime.html": "afd340c25023f842b241e893d5634f6019c73f922d8ddf0b67348e38227c608e",
+      "runtime-development.mjs": "e86ff52052a2676bb7eb44f5e45eced2fd4d03eae18c7730f29a4fca468c541d",
+      "melee-runtime.mjs": "5539332a587a6a8fd1bd25e1641d6099f55c0e7b8cfdce7ed609ee4bf27df28b",
+      "controller-input.mjs": "3388c3784717bea4b582a8fa66100880cbbcf4a0adb767c000e0a9cc779c31c8",
+      "controller-panel.mjs": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95",
+      "controller-panel.css": "289ca851412aca5b7def53dc002e8b3a897f7524e37d7b2ba2065822e7b3c16e",
+      "runtime-cache.js": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26",
+      "audio-worklet.js": "ef4374ac08f5bab821efa05cf5d252ca8e4b50647710d434e192beac3d7d7b4f",
+      "audio-ring.mjs": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf",
+      "disc-image.mjs": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a",
+      "dsp-coefficients.mjs": "5176d1cf4400228f31dff428bcc8cd60d07694c0ceea1628a79ac19f3e112b4a",
+      "runtime-assets.mjs": "7ad80a408883ec173508dcbb2417fd1d9733c857bd8ce160baf8027b212dfa7d",
+      "runtime-audio-assets.mjs": "b9bfd3f841d73e4ee4987fc5ac7351832c4ae8eca48ba5cf9c95578a238c7dbc",
+      "runtime-audio.mjs": "d968d2b2f9b58d2ab5dc1a4720d2ad2114cfbcac44a888694da7850100546545",
+      "match-flow.mjs": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f",
+      "match-menu.mjs": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba",
+      "action-sweep.mjs": "e18deac198c2f796bfaf8474f4fbd30586998898eac1cddc3e8c88f162892f59",
+      "hitch-capture.mjs": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3"
+    },
+    "served_hashes_unchanged": true,
+    "report": {
+      "schema": "melee-web-browser-retail-replay",
+      "version": 1,
+      "recipe_sha256": "0e041f1f0cc6db935261e237f26c6d52ccecaa8ff29005a813df0a6aa00e0ade",
+      "frames": 6965,
+      "mode": "state_capture",
+      "complete": true,
+      "pass": true,
+      "failures": [],
+      "performance": "not_evaluated",
+      "gold_admitted": false,
+      "pixels": "not_compared",
+      "source_match": {
+        "complete": true,
+        "outcome": 2,
+        "winner": 0
+      },
+      "instrumented_timing_resumes": 0,
+      "metrics": {
+        "sourceFrames": 6965,
+        "worstBrowserCallback": {
+          "interval_ms": 26.240000009536743,
+          "started": 4192.625,
+          "ended": 4218.865000009537,
+          "native": {
+            "frame": 18,
+            "started": 4209.095,
+            "valid": 1,
+            "first_use": 0,
+            "input_ms": 0.035,
+            "simulation_audio_ms": 2.93,
+            "preparation_ms": 0,
+            "begin_phases": {
+              "frame_slot_ms": 0,
+              "frame_slot_wait_ms": 0,
+              "frame_slot_wait_count": 0,
+              "staging_slot_ms": 0,
+              "staging_slot_wait_ms": 0,
+              "staging_slot_wait_count": 0,
+              "packet_ms": 0.01,
+              "record_ms": 0.005,
+              "pipeline_ms": 0,
+              "worker_ms": 0.015,
+              "encoder_ms": 0.015,
+              "total_ms": 0.03,
+              "residual_ms": 0,
+              "outer_surface_ms": 0,
+              "outer_imgui_ms": 0.05,
+              "outer_fifo_ms": 0.005,
+              "outer_total_ms": 0.085,
+              "outer_residual_ms": 0,
+              "start_ms": 4212.06,
+              "end_ms": 4212.145,
+              "max_wait_ms": 0,
+              "max_wait_start_ms": 0,
+              "max_wait_end_ms": 0,
+              "max_wait_kind": 0,
+              "last_frame_id": 203
+            },
+            "begin_ms": 0.085,
+            "draw_ms": 4.63,
+            "end_ms": 1.92,
+            "total_ms": 9.605,
+            "end_phases": {
+              "last_frame": 203,
+              "fifo_texture_ms": 0.005,
+              "gfx_finish_ms": 0.275,
+              "staging_writes_ms": 1.5,
+              "surface_encode_ms": 0.065,
+              "encoder_finish_ms": 0.01,
+              "queue_submit_ms": 0.015,
+              "cleanup_ms": 0.005,
+              "outer_prep_ms": 0.02,
+              "record_ms": 0,
+              "packet_ms": 0.01,
+              "callback_ms": 0.09,
+              "callback_post_submit_ms": 0,
+              "observer_ms": 0.01,
+              "callback_residual_ms": 0,
+              "tail_ms": 0.005,
+              "worker_ms": 1.615,
+              "worker_residual_ms": 0,
+              "total_ms": 1.915,
+              "residual_ms": 0
+            },
+            "began": 1,
+            "drawn": 1,
+            "queued_delta": 0,
+            "created_delta": 2,
+            "queued_total": 0,
+            "created_total": 514,
+            "draw_calls": 228,
+            "texture_upload_bytes": 3612672,
+            "staging_used_bytes": 4697940,
+            "wasm_heap_bytes": 334102528,
+            "draw_suppressed": 0,
+            "source_steps": 1,
+            "source_draws": 1
+          },
+          "previous_native": {
+            "frame": 17,
+            "started": 4190.705,
+            "valid": 1,
+            "first_use": 0,
+            "input_ms": 0.035,
+            "simulation_audio_ms": 0.625,
+            "preparation_ms": 0,
+            "begin_phases": {
+              "frame_slot_ms": 0,
+              "frame_slot_wait_ms": 0,
+              "frame_slot_wait_count": 0,
+              "staging_slot_ms": 0.005,
+              "staging_slot_wait_ms": 0,
+              "staging_slot_wait_count": 0,
+              "packet_ms": 0.005,
+              "record_ms": 0.005,
+              "pipeline_ms": 0,
+              "worker_ms": 0.02,
+              "encoder_ms": 0.015,
+              "total_ms": 0.035,
+              "residual_ms": 0,
+              "outer_surface_ms": 0,
+              "outer_imgui_ms": 0.055,
+              "outer_fifo_ms": 0,
+              "outer_total_ms": 0.09,
+              "outer_residual_ms": 0,
+              "start_ms": 4191.365,
+              "end_ms": 4191.455,
+              "max_wait_ms": 0,
+              "max_wait_start_ms": 0,
+              "max_wait_end_ms": 0,
+              "max_wait_kind": 0,
+              "last_frame_id": 202
+            },
+            "begin_ms": 0.09,
+            "draw_ms": 0.71,
+            "end_ms": 0.41,
+            "total_ms": 1.87,
+            "end_phases": {
+              "last_frame": 202,
+              "fifo_texture_ms": 0.005,
+              "gfx_finish_ms": 0.13,
+              "staging_writes_ms": 0.145,
+              "surface_encode_ms": 0.06,
+              "encoder_finish_ms": 0.005,
+              "queue_submit_ms": 0.015,
+              "cleanup_ms": 0.005,
+              "outer_prep_ms": 0.01,
+              "record_ms": 0.005,
+              "packet_ms": 0.005,
+              "callback_ms": 0.085,
+              "callback_post_submit_ms": 0,
+              "observer_ms": 0.015,
+              "callback_residual_ms": 0.005,
+              "tail_ms": 0.005,
+              "worker_ms": 0.255,
+              "worker_residual_ms": 0,
+              "total_ms": 0.41,
+              "residual_ms": 0.005
+            },
+            "began": 1,
+            "drawn": 1,
+            "queued_delta": 0,
+            "created_delta": 0,
+            "queued_total": 0,
+            "created_total": 512,
+            "draw_calls": 103,
+            "texture_upload_bytes": 0,
+            "staging_used_bytes": 430400,
+            "wasm_heap_bytes": 334102528,
+            "draw_suppressed": 0,
+            "source_steps": 1,
+            "source_draws": 1
+          }
+        },
+        "sourceSteps": 6965,
+        "sourceDraws": 6959,
+        "browserCallbacks": 6965,
+        "worstBrowserCallbackMs": 26.240000009536743,
+        "browserCallbackGaps": 0,
+        "browserLongTasks": 0,
+        "browserLongTaskWorstMs": 0,
+        "nativeCallbacks": 6965,
+        "worstNativeCallbackMs": 16.05,
+        "nativeCallbacksOver33ms": 0,
+        "nativeCallbacksOverBudget": 0,
+        "worstNativeCallback": {
+          "frame": 13,
+          "started": 4125.6,
+          "valid": 1,
+          "first_use": 1,
+          "input_ms": 0.04,
+          "simulation_audio_ms": 6.26,
+          "preparation_ms": 0,
+          "begin_phases": {
+            "frame_slot_ms": 0,
+            "frame_slot_wait_ms": 0,
+            "frame_slot_wait_count": 0,
+            "staging_slot_ms": 0.005,
+            "staging_slot_wait_ms": 0,
+            "staging_slot_wait_count": 0,
+            "packet_ms": 0,
+            "record_ms": 0.01,
+            "pipeline_ms": 0,
+            "worker_ms": 0.02,
+            "encoder_ms": 0.02,
+            "total_ms": 0.035,
+            "residual_ms": 0,
+            "outer_surface_ms": 0.005,
+            "outer_imgui_ms": 0.055,
+            "outer_fifo_ms": 0,
+            "outer_total_ms": 0.095,
+            "outer_residual_ms": 0,
+            "start_ms": 4131.9,
+            "end_ms": 4131.995,
+            "max_wait_ms": 0,
+            "max_wait_start_ms": 0,
+            "max_wait_end_ms": 0,
+            "max_wait_kind": 0,
+            "last_frame_id": 198
+          },
+          "begin_ms": 0.095,
+          "draw_ms": 8.75,
+          "end_ms": 0.9,
+          "total_ms": 16.05,
+          "end_phases": {
+            "last_frame": 198,
+            "fifo_texture_ms": 0,
+            "gfx_finish_ms": 0.35,
+            "staging_writes_ms": 0.32,
+            "surface_encode_ms": 0.125,
+            "encoder_finish_ms": 0.01,
+            "queue_submit_ms": 0.02,
+            "cleanup_ms": 0,
+            "outer_prep_ms": 0.015,
+            "record_ms": 0,
+            "packet_ms": 0.025,
+            "callback_ms": 0.16,
+            "callback_post_submit_ms": 0.005,
+            "observer_ms": 0.02,
+            "callback_residual_ms": 0,
+            "tail_ms": 0,
+            "worker_ms": 0.535,
+            "worker_residual_ms": 0.01,
+            "total_ms": 0.9,
+            "residual_ms": 0
+          },
+          "began": 1,
+          "drawn": 1,
+          "queued_delta": 0,
+          "created_delta": 4,
+          "queued_total": 0,
+          "created_total": 512,
+          "draw_calls": 91,
+          "texture_upload_bytes": 523264,
+          "staging_used_bytes": 928064,
+          "wasm_heap_bytes": 334102528,
+          "draw_suppressed": 0,
+          "source_steps": 1,
+          "source_draws": 1,
+          "active_ms": 16.05,
+          "source": null
+        },
+        "livePipelinesQueued": 0,
+        "livePipelinesCreated": 27,
+        "liveTextureUploadBytes": 9461248,
+        "liveStagingUsedBytes": 9717297296,
+        "peakStagingUsedBytes": 4697940,
+        "preparationPauses": 0,
+        "wasmHeapGrowthBytes": 66846720,
+        "focusLost": false,
+        "firstFocusLoss": null,
+        "audioUnderrunFrames": 0,
+        "audioOverflowFrames": 0
+      },
+      "diagnostic_capture": {
+        "schema": "melee-web-diagnostic-hitch-capture",
+        "version": 1,
+        "enabled": false,
+        "stopped": true,
+        "valid": true,
+        "invalid": false,
+        "overflowed": false,
+        "overflow_count": 0,
+        "cap": 128,
+        "context_cap": 8,
+        "cache_sync_cap": 128,
+        "cache_sync_count": 0,
+        "cache_sync_overflow_count": 0,
+        "cache_syncs": [],
+        "event_count": 0,
+        "observer_count": 0,
+        "events": [],
+        "observers": [],
+        "capabilities": {
+          "longtask": {
+            "supported": true,
+            "observed": false,
+            "reason": null
+          },
+          "loaf": {
+            "supported": true,
+            "observed": false,
+            "reason": null
+          },
+          "user_timing": {
+            "requested": false,
+            "supported": true,
+            "observed": false,
+            "reason": null
+          },
+          "cache_sync": {
+            "requested": false,
+            "enabled": false,
+            "installed": false,
+            "observed": false,
+            "calls": 0,
+            "pending": 0,
+            "errors": 0,
+            "reason": null
+          }
+        },
+        "clock": {
+          "source": "performance.now",
+          "time_origin": 1789504690767.535
+        },
+        "capture_interval": {
+          "started": null,
+          "ended": 120197.06499999762
+        }
+      },
+      "diagnostic_page_paint": {
+        "mode": "normal",
+        "diagnostic_only": false,
+        "started_ms": 3904.8550000190735,
+        "ended_ms": 120231.12000000477,
+        "geometry_before": {
+          "x": 190,
+          "y": 0,
+          "width": 900,
+          "height": 675,
+          "buffer_width": 640,
+          "buffer_height": 480,
+          "dpr": 1
+        },
+        "geometry_after": {
+          "x": 190,
+          "y": 0,
+          "width": 900,
+          "height": 675,
+          "buffer_width": 640,
+          "buffer_height": 480,
+          "dpr": 1
+        },
+        "restored": true
+      },
+      "memory": {
+        "before_preparation": {
+          "wasm_heap_bytes": 334102528,
+          "allocator_arena_bytes": 274929536,
+          "allocator_live_bytes": 236081992,
+          "allocator_free_bytes": 38847544,
+          "allocator_top_free_bytes": 198464,
+          "match_present": false,
+          "menu_present": false
+        },
+        "prepared": {
+          "wasm_heap_bytes": 334102528,
+          "allocator_arena_bytes": 308287360,
+          "allocator_live_bytes": 305581904,
+          "allocator_free_bytes": 2705456,
+          "allocator_top_free_bytes": 1848,
+          "match_present": true,
+          "menu_present": false
+        },
+        "before_teardown": {
+          "wasm_heap_bytes": 400949248,
+          "allocator_arena_bytes": 333698944,
+          "allocator_live_bytes": 320601392,
+          "allocator_free_bytes": 13097552,
+          "allocator_top_free_bytes": 1960,
+          "match_present": true,
+          "menu_present": false
+        },
+        "after_teardown": {
+          "wasm_heap_bytes": 400949248,
+          "allocator_arena_bytes": 333698944,
+          "allocator_live_bytes": 265887016,
+          "allocator_free_bytes": 67811928,
+          "allocator_top_free_bytes": 1960,
+          "match_present": false,
+          "menu_present": false
+        }
+      },
+      "preparation": {
+        "source_transition": true,
+        "total_ms": 182.215,
+        "audio_wait_ms": 0.295,
+        "construction_ms": 160.73,
+        "render_wait_ms": 21.19,
+        "render_cpu_ms": 4.105,
+        "callbacks": 2,
+        "source_draws": 0,
+        "max_callback_ms": 4.06,
+        "max_draw_ms": 0,
+        "max_end_ms": 0,
+        "texture_upload_bytes": 0,
+        "max_draw_calls": 0,
+        "max_queued": 0,
+        "queued_delta": 0,
+        "created_delta": 0,
+        "gpu_completion_wait_ms": 16.6,
+        "gpu_completion_wait_callbacks": 0,
+        "pending_staging_at_settle": 0,
+        "pending_staging_at_first_arm": 0,
+        "gpu_completion_ready": true
+      },
+      "cache": {
+        "state": "ready",
+        "bytes": 0,
+        "cleared_on_startup": false,
+        "driver_cache": "uncontrolled"
+      },
+      "user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36",
+      "resolution": [
+        640,
+        480
+      ],
+      "device_pixel_ratio": 1,
+      "trace_sha256": "56843751917cb2e6d85f2012f5fc1a7f200dca17d0b47c265a0ae95258f81507"
+    },
+    "comparison_sha256": "4cb47ea9cdd4559dca9a29f4e3b940707c7bb2692681173bfd93c11eab3e459a",
+    "comparison_status": "matched",
+    "state_updates_matched": 6965,
+    "strict_draws_matched": 6959,
+    "errors": {
+      "errors": [],
+      "requests": []
+    },
+    "independent_expected_draws_validation": "passed using initial-only model count"
+  },
+  "verification": {
+    "release_runtime_build": "passed",
+    "native_gameplay_retail_trace_build": "passed",
+    "full_suite": {
+      "tests": 757,
+      "skips": 36,
+      "failures": 0,
+      "seconds": 276.813
+    },
+    "additional_focused_checks": [
+      "clock binding test passed after full-suite discovery",
+      "19 browser report tests passed, including independent draw-count check",
+      "native decoder test passed with v5 supported/unsupported contexts"
+    ],
+    "passive_patch_apply_check": "passed against original observer overlay"
+  },
+  "limitations": [
+    "One instrumented replay; cold/warm performance admission is not claimed.",
+    "Captured NTSC two-XFB replay initialization only; live controller phase and other startup/VI modes remain unvalidated.",
+    "Pixels and PCM are not compared; both human holdouts remain unopened.",
+    "Historical GPU staging stall remains open; preceding failures are retained in earlier evidence.",
+    "27 first-use pipelines and 66846720 bytes of heap growth remain observed.",
+    "No production deployment or capture-app installation."
+  ],
+  "previous_failure_evidence": [
+    "roy-dr-mario-vector-replay-v1.json",
+    "roy-dr-mario-srt-replay-v1.json"
+  ]
+}

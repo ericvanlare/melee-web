@@ -99,14 +99,18 @@ async function waitSourceFrame(target,observe){let stagnantSince=performance.now
 async function sweepSample(sample,observe){let remaining=sample.duration,state=window.menuObservePlayer();if(!state)throw Error('A ready source player is required.');while(remaining){const duration=Math.min(120,remaining),target=state.frame+duration;await window.menuDiagnosticPadFull(0,sample.buttons,sample.stickX,sample.stickY,sample.cstickX,sample.cstickY,sample.triggerL,sample.triggerR,duration);state=await waitSourceFrame(target,observe);remaining-=duration;}return state;}
 async function settleSweepPlayer(observe){
  const neutral=duration=>({buttons:0,stickX:0,stickY:0,cstickX:0,cstickY:0,triggerL:0,triggerR:0,duration});
- for(let n=0;n<6;n++){
+ const firstFrame=window.menuObservePlayer()?.frame;
+ for(let n=0;n<180;n++){
   const state=window.menuObservePlayer();
+  if(!state||state.frame-firstFrame>720)break;
   // Source Ottotto/OttottoWait (245/246) persist at platform edges under neutral
   // input. They accept movement like Wait; waiting longer cannot recover them.
-  if(state?.groundAir===0&&[14,245,246].includes(state.motion)){
+  if(state.groundAir===0&&((state.motion>=14&&state.motion<=23)||[245,246].includes(state.motion))){
    if(state.motion===14&&Math.abs(state.x)<=12){await sweepSample(neutral(2),observe);return;}
-   await sweepSample({...neutral(8),stickX:state.x>0?-80:80},observe);
-   await sweepSample(neutral(24),observe);
+   // Walk with frequent position feedback. Fixed dash/release bursts can
+   // oscillate past center or repeatedly turn a fighter without moving him.
+   if(Math.abs(state.x)>12)await sweepSample({...neutral(4),stickX:state.x>0?-40:40},observe);
+   else await sweepSample(neutral(24),observe);
   }else await sweepSample(neutral(120),observe);
  }
  throw Error(`P1 did not return to the grounded source Wait state near stage center within the bounded source-input recovery period: ${JSON.stringify(window.menuObservePlayer())}`);
@@ -165,14 +169,14 @@ async function finishRetailReplay(reason){
  metrics.audioOverflowFrames=Number(latestAudio.overflows||0)-(run.baseline?.overflows??0);
  if(diagnosticCapture?.invalid){diagnosticCaptureInvalid=true;if(!run.failure)run.failure='Diagnostic hitch capture overflow';}
  reason=reason||run.failure;
- const failures=[];if(reason)failures.push(reason);if(!teardown)failures.push('teardown incomplete');if(metrics.sourceFrames!==run.frames)failures.push('incomplete input timeline');if(metrics.sourceSteps!==run.frames||metrics.sourceDraws!==run.frames)failures.push('source tick/draw count mismatch');
+ const failures=[];if(reason)failures.push(reason);if(!teardown)failures.push('teardown incomplete');if(metrics.sourceFrames!==run.frames)failures.push('incomplete input timeline');if(metrics.sourceSteps!==run.frames||metrics.sourceDraws!==(run.expectedDraws??run.frames))failures.push('source tick/draw count mismatch');
  if(diagnosticCaptureInvalid)failures.push('diagnostic capture invalid');if(!run.observe){for(const key of ['browserCallbackGaps','browserLongTasks','nativeCallbacksOver33ms','livePipelinesQueued','livePipelinesCreated','preparationPauses','audioUnderrunFrames','audioOverflowFrames','focusLost'])if(metrics[key])failures.push(key);}
  const sourceMatch=run.sourceMatch||{complete:false,outcome:null,winner:null};
- const report={schema:'melee-web-browser-retail-replay',version:1,recipe_sha256:run.hash,frames:run.frames,mode:run.observe?'state_capture':'performance',complete:teardown&&metrics.sourceFrames===run.frames&&!reason,pass:failures.length===0,failures,performance:run.observe?'not_evaluated':'measured',gold_admitted:false,pixels:'not_compared',source_match:sourceMatch,instrumented_timing_resumes:run.timingResumes||0,metrics,diagnostic_capture:diagnosticCapture,diagnostic_page_paint:run.paintControl?.evidence||null,memory:run.memory,preparation:run.preparation,cache:run.cache,user_agent:navigator.userAgent,resolution:[640,480],device_pixel_ratio:devicePixelRatio};
+ const report={input_scheduling:['per_tick','startup_clock','recorded_queue'][run.scheduling??0],scheduling_equivalence:'not_evaluated',schema:'melee-web-browser-retail-replay',version:1,recipe_sha256:run.hash,frames:run.frames,mode:run.observe?'state_capture':'performance',complete:teardown&&metrics.sourceFrames===run.frames&&!reason,pass:failures.length===0,failures,performance:run.observe?'not_evaluated':'measured',gold_admitted:false,pixels:'not_compared',source_match:sourceMatch,instrumented_timing_resumes:run.timingResumes||0,metrics,diagnostic_capture:diagnosticCapture,diagnostic_page_paint:run.paintControl?.evidence||null,memory:run.memory,preparation:run.preparation,cache:run.cache,user_agent:navigator.userAgent,resolution:[640,480],device_pixel_ratio:devicePixelRatio};
  if(run.observe){const trace=run.rows.join('\n')+'\n';report.trace_sha256=await replayHash(new TextEncoder().encode(trace));replayDownload('retail-port.jsonl',trace);if(run.timerRows.length){const timers=run.timerRows.join('\n')+'\n';report.timer_trace_sha256=await replayHash(new TextEncoder().encode(timers));replayDownload('retail-timer.jsonl',timers);}}
  const text=JSON.stringify(report,null,2);window.lastRetailReplayReport=report;$('retail-replay-report').textContent=text;replayDownload('retail-browser-report.json',text);retailRun=null;$('launch').disabled=fatal||!bundle;$('disc').disabled=fatal||importing;$('pause').disabled=$('unload').disabled=true;syncAudio();
 }
-window.menuReplayStarted=(frames,observe)=>{const run=retailRun;if(!run)throw Error('Missing browser replay owner');run.frames=frames;run.observe=observe;run.preparation=latestNativePreparation;run.memory.prepared=replayMemorySnapshot();resetTiming(false);run.baseline={preparations:preparationCount,heap:Module.HEAPU8.length,underruns:Number(latestAudio.underruns||0),overflows:Number(latestAudio.overflows||0)};run.lastProgress=performance.now();};
+window.menuReplayStarted=(frames,observe,draws=frames,scheduling=0)=>{const run=retailRun;if(!run)throw Error('Missing browser replay owner');if(!Number.isInteger(draws)||draws<1||draws>frames)throw Error('Invalid replay clock draw count');if(![0,1,2].includes(scheduling)||(scheduling===2&&!observe))throw Error('Invalid replay scheduling scope');run.scheduling=scheduling;run.frames=frames;run.expectedDraws=draws;run.observe=observe;run.preparation=latestNativePreparation;run.memory.prepared=replayMemorySnapshot();resetTiming(false);run.baseline={preparations:preparationCount,heap:Module.HEAPU8.length,underruns:Number(latestAudio.underruns||0),overflows:Number(latestAudio.overflows||0)};run.lastProgress=performance.now();};
 window.menuReplayCompleted=(frames,matchComplete,outcome,winner)=>{if(retailRun){retailRun.consumed=frames;retailRun.completed=true;retailRun.sourceMatch={complete:!!matchComplete,outcome:Number.isInteger(outcome)?outcome:null,winner:Number.isInteger(winner)?winner:null};setTimeout(()=>finishRetailReplay(null),0);}};
 window.menuReplayPoll=()=>{
  $('retail-replay-start').disabled=!ready||fatal||!bundle||replayLoading||!!retailRun||!$('retail-replay-file').files[0];
@@ -193,7 +197,7 @@ $('retail-replay-start').onclick=async()=>{
  replayLoading=true;$('retail-replay-start').disabled=$('disc').disabled=$('launch').disabled=true;
  try{
   if(window.meleeHitchCaptureLoading)await window.meleeHitchCaptureLoading;if(window.meleeHitchCaptureLoadError&&hitchCaptureFromUrl)throw Error(`Hitch capture unavailable: ${window.meleeHitchCaptureLoadError}`);
-  const file=$('retail-replay-file').files[0];if(!file||file.size<328||file.size>1585150)throw Error('Invalid bounded MWRC input recipe');
+  const file=$('retail-replay-file').files[0];if(!file||file.size<328||file.size>1909162)throw Error('Invalid bounded MWRC input recipe');
   const bytes=new Uint8Array(await file.arrayBuffer()),hash=await replayHash(bytes),observe=$('retail-replay-mode').value==='state';
   if(!await unloadAndSave())throw Error(status());resetTiming(false);await prepareAudio();await pauseAudioForPreparation();
   for(const old of $('retail-replay-downloads').querySelectorAll('a'))URL.revokeObjectURL(old.href);$('retail-replay-downloads').replaceChildren();replayEvidence=[];$('save-replay-evidence').disabled=true;

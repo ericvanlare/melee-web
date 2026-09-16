@@ -3,6 +3,8 @@
 #include "gameplay_article_data.h"
 #include "gameplay_action_store.hpp"
 #include "fighter_runtime_fixture.hpp"
+#include <cstddef>
+#include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -10,6 +12,21 @@ using namespace fighter_runtime_test;
 extern "C" void melee_web_test_fighter_data(void*,int);
 extern "C" void melee_web_test_guard_data(const MeleeWebNativeDat*,uint32_t,void*,uint32_t*);
 namespace {
+/* Keep this focused check independent of the full source header graph. These
+ * are the two native ABI prefixes needed to inspect ftData->x2C->x10. */
+struct NativeDynamicsView {
+    int32_t dynamics_num;
+    void* bones;
+    int32_t auxiliary_count;
+    void* auxiliary;
+    void*** modes;
+};
+struct NativeFighterDataView {
+    std::byte prefix[0x2c];
+    NativeDynamicsView* dynamics;
+};
+static_assert(offsetof(NativeFighterDataView,dynamics)==0x2c);
+
 Bytes read_file(const char* path) {
     std::ifstream f(path,std::ios::binary|std::ios::ate);
     auto n=f.tellg(); check(n>0 && n<64*1024*1024,"Invalid fighter input size");
@@ -34,7 +51,9 @@ void verify(std::shared_ptr<const DatArchive> archive,const Bytes& container,int
     check(root!=UINT32_MAX,"Missing ftDataMario");
     GameplayActionStore actions(archive,mario(),container);
     NativeDatArena owner(archive);uint32_t unresolved;
-    void* data=melee_web_fighter_data_decode(owner.reader(),root,0,5,actions.action_rows(),actions.blend_rows(),actions.wait_choices(),&unresolved);
+    void* data=melee_web_fighter_data_decode(owner.reader(),root,0,5,
+        static_cast<uint32_t>(actions.runtime().actions().size()), actions.action_rows(),
+        actions.blend_rows(),actions.wait_choices(),&unresolved);
     archive.reset(); // Reader and action store retain the backing archive independently.
     melee_web_test_fighter_data(data,actual);
     check((unresolved&((1U<<3)|(1U<<4)|(1U<<9)|(1U<<18)|(1U<<22)))==0,"Reached fields remain unresolved");
@@ -44,6 +63,34 @@ void verify(std::shared_ptr<const DatArchive> archive,const Bytes& container,int
         check(unresolved==0x8000e0,"Guard descriptor was not published");
     }
     std::cout<<"Native fighter data unresolved mask: "<<std::hex<<unresolved<<std::dec<<'\n';
+}
+void verify_roy(const std::shared_ptr<const DatArchive>& archive,const Bytes& container) {
+    const auto& identity=resolve_fighter_costume("PlyEmblem5K_Share_joint");
+    check(identity.fighter_kind==26 && identity.motion_count==327,"Missing source Roy identity");
+    GameplayActionStore actions(archive,identity,container);
+    check(actions.runtime().actions().size()==identity.motion_count && actions.runtime().mars_attributes(),
+          "Roy action metadata or Mars extension is incomplete");
+    const auto symbols=archive->public_symbols();
+    uint32_t root=UINT32_MAX;
+    for(const auto& symbol:symbols)if(symbol.name=="ftDataEmblem")root=symbol.data_offset;
+    check(root!=UINT32_MAX,"Missing ftDataEmblem");
+    NativeDatArena owner(archive);uint32_t unresolved;
+    void* data=melee_web_fighter_data_decode(owner.reader(),root,26,5,
+        identity.motion_count,actions.action_rows(),actions.blend_rows(),actions.wait_choices(),&unresolved);
+    const auto* decoded=static_cast<const NativeFighterDataView*>(data);
+    check(decoded && decoded->dynamics && decoded->dynamics->dynamics_num==3 && decoded->dynamics->modes,
+          "Roy dynamics table was not decoded");
+    const auto* blends=static_cast<const uint8_t*>(actions.blend_rows());
+    check(blends && blends[239*2]==0 && blends[239*2+1]==5 &&
+          blends[240*2+1]==5 && blends[241*2+1]==5,
+          "Roy selector-5 source rows were not retained");
+    const std::array<std::array<uintptr_t,3>,6> expected{{
+        {{2,2,2}},{{0,0,2}},{{2,0,0}},{{1,1,1}},{{2,1,1}},{{3,0,0}}}};
+    for(size_t mode=0;mode<expected.size();++mode)
+        for(size_t bone=0;bone<expected[mode].size();++bone)
+            check(reinterpret_cast<uintptr_t>(decoded->dynamics->modes[mode][bone])==expected[mode][bone],
+                  "Roy dynamics mode cutoff changed");
+    std::cout<<"Native Roy dynamics selector-5 rows and six authored modes: passed\n";
 }
 }
 int main(int argc,char**argv) {
@@ -55,12 +102,12 @@ int main(int argc,char**argv) {
         for(auto slot:{0U,4U,8U,0x30U,0x48U}) {
             auto bad=fixture;bad.unlink(slot);
             rejects([&]{NativeDatArena owner(std::make_shared<const DatArchive>(bad.file()));uint32_t mask;
-                (void)melee_web_fighter_data_decode(owner.reader(),0,0,5,nullptr,nullptr,nullptr,&mask);});
+                (void)melee_web_fighter_data_decode(owner.reader(),0,0,5,6,nullptr,nullptr,nullptr,&mask);});
         }
         for(auto at:{FighterFixture::co+0x5c,fixture.hurt_rows+12}) {
             auto bad=fixture;put32(bad.data,at,0x7f800000);
             rejects([&]{NativeDatArena owner(std::make_shared<const DatArchive>(bad.file()));uint32_t mask;
-                (void)melee_web_fighter_data_decode(owner.reader(),0,0,5,nullptr,nullptr,nullptr,&mask);});
+                (void)melee_web_fighter_data_decode(owner.reader(),0,0,5,6,nullptr,nullptr,nullptr,&mask);});
         }
         NativeDatArena owner(std::make_shared<const DatArchive>(fixture.file()));auto r=owner.reader();
         rejects([&]{(void)r->word(r->context,1);});rejects([&]{(void)r->half(r->context,1);});
@@ -69,5 +116,9 @@ int main(int argc,char**argv) {
         rejects([&]{(void)r->region(r->context,0,FighterFixture::co+4);});
         std::cout<<"Owned native ftData synthetic and rejection checks: passed\n";
         if(argc==3)verify(std::make_shared<const DatArchive>(read_file(argv[1])),read_file(argv[2]),1);
+        if(argc==5) {
+            verify(std::make_shared<const DatArchive>(read_file(argv[1])),read_file(argv[2]),1);
+            verify_roy(std::make_shared<const DatArchive>(read_file(argv[3])),read_file(argv[4]));
+        }
     }catch(const std::exception&e){std::cerr<<e.what()<<'\n';return 1;}
 }

@@ -66,10 +66,16 @@ class GameplayFighterDataTests(unittest.TestCase):
             asset = ROOT / "assets-local/next-gate/PlMr.dat"
             container = ROOT / "assets-local/next-gate/PlMrAJ.dat"
             args = [str(asset),str(container)] if asset.is_file() and container.is_file() else []
+            roy_asset = ROOT / "assets-local/next-gate/PlFe.dat"
+            roy_container = ROOT / "assets-local/next-gate/PlFeAJ.dat"
+            if args and roy_asset.is_file() and roy_container.is_file():
+                args.extend((str(roy_asset),str(roy_container)))
             result = subprocess.run([str(node), str(output), *args], cwd=directory, env=env,
                                     capture_output=True, text=True, timeout=30)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("Owned native ftData synthetic and rejection checks: passed", result.stdout)
+            if len(args) == 4:
+                self.assertIn("Native Roy dynamics selector-5 rows and six authored modes: passed", result.stdout)
             print(result.stdout, end="")
 
 

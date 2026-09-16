@@ -1,7 +1,7 @@
 // Versioned visible-play inventories. These inputs enter through the same raw
 // PAD boundary as a controller and are consumed by the original source tick.
 // Add a fighter-specific inventory here before admitting a new fighter.
-export const PAD={Z:0x10,L:0x40,R:0x20,A:0x100,B:0x200,X:0x400,Y:0x800};
+export const PAD={DLEFT:0x1,DRIGHT:0x2,DUP:0x8,DDOWN:0x4,Z:0x10,L:0x40,R:0x20,A:0x100,B:0x200,X:0x400,Y:0x800};
 const input=(duration=1,buttons=0,stickX=0,stickY=0,cstickX=0,cstickY=0,triggerL=0,triggerR=0)=>
  ({duration,buttons,stickX,stickY,cstickX,cstickY,triggerL,triggerR});
 const ground=(name,expect,...inputs)=>({name,expect,settle:true,inputs});
@@ -47,8 +47,49 @@ const marth=[
  ground('Counter',[[369,372]],input(1,PAD.B,0,-80),input(120)),
 ];
 
+// The common table is shared by every source fighter, but the self-motion
+// ranges below are deliberately kept separate.  Dr. Mario inherits Mario's
+// implementation while Roy inherits Marth's implementation; their source
+// action tables still have different branch identities and must be exercised
+// by their own inventories.
+const aerialSpecial=(name,expect,stickX=0,stickY=0)=>({
+  name,expect,settle:true,inputs:[
+    input(2,PAD.X),input(4),input(1,PAD.B,stickX,stickY),input(180),
+  ],
+});
+
+const drMario=[
+  {name:'Dr. Mario taunt',expect:[[341,342]],settle:true,inputs:[input(1,PAD.DUP),input(90)]},
+  ground('Megavitamin',[[343,343]],input(1,PAD.B),input(150)),
+  aerialSpecial('Megavitamin (air)',[[344,344]]),
+  ground('Super Sheet',[[345,345]],input(1,PAD.B,80),input(150)),
+  aerialSpecial('Super Sheet (air)',[[346,346]],80),
+  ground('Super Jump Punch',[[347,347]],input(1,PAD.B,0,80),input(180)),
+  aerialSpecial('Super Jump Punch (air)',[[348,348]],0,80),
+  ground('Dr. Tornado',[[349,349]],input(1,PAD.B,0,-80),input(150)),
+  aerialSpecial('Dr. Tornado (air)',[[350,350]],0,-80),
+];
+
+const roy=[
+  // This bounded charge checks start, loop and the normal release, not the
+  // maximum-charge exit or the airborne variants.
+  ground('Flare Blade charge/release',[[341,341],[342,342],[343,343]],input(45,PAD.B),input(120)),
+  // Representative grounded chain: the source opening state 349 is followed
+  // by real B presses using the same timing as the existing Marth sweep.
+  {name:'Double-Edge Dance chain (representative)',expect:[[349,349],[350,357]],settle:true,
+    inputs:Array.from({length:8},()=>[input(1,PAD.B,80),input(6)]).flat().concat(input(140))},
+  ground('Blazer',[[367,367]],input(1,PAD.B,0,80),input(360)),
+  aerialSpecial('Blazer (air)',[[368,368]],0,80),
+  ground('Counter stance',[[369,369]],input(1,PAD.B,0,-80),input(150)),
+  aerialSpecial('Counter stance (air)',[[371,371]],0,-80),
+  // Pending target/air recipes: Flare Blade air 345-348, Double-Edge Dance
+  // air 358-366, and Counter hit exits 370/372 need additional source state.
+];
+
 export const actionInventories=new Map([
  [18,{id:'marth-visible-actions-v1',fighter:'Marth',minimumStageFrames:4200,cases:[...common,...wavedashes,...marth]}],
+ [21,{id:'dr-mario-visible-actions-v1',fighter:'Dr. Mario',minimumStageFrames:4800,cases:[...common,...wavedashes,...drMario]}],
+ [26,{id:'roy-visible-actions-v1',fighter:'Roy',minimumStageFrames:4800,cases:[...common,...wavedashes,...roy]}],
 ]);
 
 export function actionInventory(fighterKind){return actionInventories.get(fighterKind)||null;}

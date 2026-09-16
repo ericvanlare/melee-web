@@ -5,12 +5,14 @@
 extern "C" {
 #endif
 /* Returns source ftData owned by reader's arena. Action rows, blend rows and
- * Wait choices are borrowed from the action store. Unhydrated pointer fields
- * are reported by their ftData word index; callers must gate publication.
+ * Wait choices are borrowed from the action store; motion_count bounds the
+ * borrowed blend rows while deriving any dynamics mode table extent.
+ * Unhydrated pointer fields are reported by their ftData word index; callers must gate publication.
  * x48 readiness denotes owned registration roots only: each Article has a
  * separate creation mask queried by melee_web_article_unresolved. */
 void* melee_web_fighter_data_decode(const MeleeWebNativeDat*, uint32_t root,
-    uint32_t kind, uint32_t costume_count, void* actions, void* blends,
+    uint32_t kind, uint32_t costume_count, uint32_t motion_count,
+    void* actions, void* blends,
     void* wait_choices, uint32_t* unresolved_fields);
 /* Return one of the four source Article identities retained in ftData x48.
  * The returned Article is allocated by the same reader arena as the ftData

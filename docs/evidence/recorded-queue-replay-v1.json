@@ -1,0 +1,867 @@
+{
+  "schema": "melee-web-recorded-queue-replay-v1",
+  "date": "2026-09-15",
+  "parent_head": "94effc450801277962794857aefdd651170eaad5",
+  "evidence_level": "retail compared and browser exercised under recorded platform input queues",
+  "scheduling_equivalence": "not_evaluated",
+  "gold_admitted": false,
+  "production_deployed": false,
+  "human_holdouts_opened": 0,
+  "build": {
+    "parent_head": "94effc450801277962794857aefdd651170eaad5",
+    "patch_sha256": "52a90496441d27b46cfedf97f8f9eb836ac5bfd69f0e263b25f478e7a201d041",
+    "inventory_sha256": "cb5bc1cb10a70ca8f146aaed30fa0e55098cbb5905a225dd5202cc6036203ed1",
+    "runtime": {
+      "gameplay_menu_browser.js": "d0770ae0aee3199e5f52786728f5feeb2f69295f05d4f6afef0cbe2020037832",
+      "gameplay_menu_browser.wasm": "b9cabddea221a7f276121b2c10a6cfb3cb289ca1832a4058948646ec8498754f",
+      "gameplay_menu_browser.data": "cdf157ee0f1850884f07a71165fd2192177acb23c2c777313b719e70ea67546f",
+      "runtime.html": "afd340c25023f842b241e893d5634f6019c73f922d8ddf0b67348e38227c608e",
+      "runtime-development.mjs": "aaa7565936c0983581101491142a936b328e3de6e2a5f14338ea0b498352267a",
+      "melee-runtime.mjs": "5539332a587a6a8fd1bd25e1641d6099f55c0e7b8cfdce7ed609ee4bf27df28b",
+      "controller-input.mjs": "3388c3784717bea4b582a8fa66100880cbbcf4a0adb767c000e0a9cc779c31c8",
+      "controller-panel.mjs": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95",
+      "controller-panel.css": "289ca851412aca5b7def53dc002e8b3a897f7524e37d7b2ba2065822e7b3c16e",
+      "runtime-cache.js": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26",
+      "audio-worklet.js": "ef4374ac08f5bab821efa05cf5d252ca8e4b50647710d434e192beac3d7d7b4f",
+      "audio-ring.mjs": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf",
+      "disc-image.mjs": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a",
+      "dsp-coefficients.mjs": "5176d1cf4400228f31dff428bcc8cd60d07694c0ceea1628a79ac19f3e112b4a",
+      "runtime-assets.mjs": "7ad80a408883ec173508dcbb2417fd1d9733c857bd8ce160baf8027b212dfa7d",
+      "runtime-audio-assets.mjs": "b9bfd3f841d73e4ee4987fc5ac7351832c4ae8eca48ba5cf9c95578a238c7dbc",
+      "runtime-audio.mjs": "d968d2b2f9b58d2ab5dc1a4720d2ad2114cfbcac44a888694da7850100546545",
+      "match-flow.mjs": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f",
+      "match-menu.mjs": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba",
+      "action-sweep.mjs": "e18deac198c2f796bfaf8474f4fbd30586998898eac1cddc3e8c88f162892f59",
+      "hitch-capture.mjs": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3"
+    }
+  },
+  "full_browser_replays": [
+    {
+      "run": "work/queue-replay-20260915/browser-fd-01",
+      "status": "matched",
+      "coverage": {
+        "checks": {
+          "active_player_count": "pass",
+          "entry": "pass",
+          "fighters": "pass",
+          "frame_count": "pass",
+          "inputs": "pass",
+          "match_frame": "pass",
+          "pad_state_hex": "pass",
+          "rng": "pass"
+        },
+        "cpu": {
+          "domains": {
+            "camera": {
+              "first_divergence": null,
+              "status": "matched"
+            },
+            "cpu": {
+              "first_divergence": null,
+              "status": "matched"
+            },
+            "hud": {
+              "first_divergence": null,
+              "status": "matched"
+            },
+            "magnifier": {
+              "first_divergence": null,
+              "status": "matched"
+            },
+            "match": {
+              "first_divergence": null,
+              "status": "matched"
+            },
+            "subject": {
+              "first_divergence": null,
+              "status": "matched"
+            }
+          },
+          "status": "matched"
+        },
+        "first_divergence_by_group": {},
+        "frames_compared": 6965
+      },
+      "draw_alignment": {
+        "actual_count": 6959,
+        "expected_count": 6959,
+        "extra_in_actual": [],
+        "extra_in_actual_count": 0,
+        "matched_count": 6959,
+        "missing_from_actual": [],
+        "missing_from_actual_count": 0,
+        "scope": "source_draws_by_source_index",
+        "status": "aligned"
+      },
+      "source_match": {
+        "complete": true,
+        "outcome": 2,
+        "winner": 0
+      },
+      "queue_binding": {
+        "schema": "melee-web-retail-queue-binding",
+        "version": 1,
+        "scope": "gameplay replay conditioned on recorded nonempty input-queue snapshots",
+        "input_recipe_sha256": "cca6af8c7174a070cf044fc7653dd75061ffb0f9acab8e4393b001b30673d888",
+        "clock_stream_sha256": "52a2cbac014cd941e8770091021deffa49d7d2f3a4286ad5c838ba8ea1ead84a",
+        "output_recipe_sha256": "d19fa2280e343a31a89fc5f9dde8402b628d448d65e42d90afa81809a27f6979",
+        "frames": 6965,
+        "queue_snapshots": 6959,
+        "queue_context_bytes": 62639,
+        "observation_pc": "0x803769d4",
+        "clock": "relative emulated CPU block-clock ticks",
+        "input_bytes_preserved": true,
+        "expected_game_state_supplied": false,
+        "expected_draw_indexes_supplied": false,
+        "live_scheduling_equivalence": "not_claimed",
+        "original_cpu_scheduling_equivalence": "not_claimed",
+        "gold_admitted": false
+      },
+      "reference_cpu_trace_sha256": "d498aafa61be9ad1e9e38ecbac12f145ddbe245fbbb05b61f30eefb0bf743e2e",
+      "recipe_sha256": "d19fa2280e343a31a89fc5f9dde8402b628d448d65e42d90afa81809a27f6979",
+      "trace_sha256": "56843751917cb2e6d85f2012f5fc1a7f200dca17d0b47c265a0ae95258f81507",
+      "cpu_trace_sha256": "e7009d9d97680f7a556cadbe3e56da41365beaccd465a9a7f2eeb0b537e85752",
+      "comparison_sha256": "4cb47ea9cdd4559dca9a29f4e3b940707c7bb2692681173bfd93c11eab3e459a",
+      "report_sha256": "0ec0b82d371dfe975a92f754922c427e5eee330f368de4640b279aaaedbcc2e1",
+      "report_validation": {
+        "pass": true,
+        "input_scheduling": "recorded_queue",
+        "scheduling_equivalence": "not_evaluated",
+        "frames": 6965,
+        "source_draws": 6959,
+        "report_sha256": "0ec0b82d371dfe975a92f754922c427e5eee330f368de4640b279aaaedbcc2e1"
+      },
+      "instrumented_timing_resumes": 0,
+      "metrics": {
+        "sourceSteps": 6965,
+        "sourceDraws": 6959,
+        "worstNativeCallbackMs": 16.37,
+        "nativeCallbacksOverBudget": 0,
+        "nativeCallbacksOver33ms": 0,
+        "worstBrowserCallbackMs": 31.94999998807907,
+        "browserCallbackGaps": 0,
+        "livePipelinesCreated": 27,
+        "livePipelinesQueued": 0,
+        "preparationPauses": 0,
+        "audioUnderrunFrames": 0,
+        "audioOverflowFrames": 0,
+        "focusLost": false,
+        "wasmHeapGrowthBytes": 66846720
+      },
+      "performance": "not_admitted_state_capture",
+      "browser": {
+        "browser": "chrome",
+        "version": "153.0.8010.48",
+        "visible_browser": true
+      }
+    },
+    {
+      "run": "work/queue-replay-20260915/browser-yoshis-02",
+      "status": "matched",
+      "coverage": {
+        "checks": {
+          "active_player_count": "pass",
+          "entry": "pass",
+          "fighters": "pass",
+          "frame_count": "pass",
+          "inputs": "pass",
+          "match_frame": "pass",
+          "pad_state_hex": "pass",
+          "rng": "pass"
+        },
+        "cpu": {
+          "domains": {
+            "camera": {
+              "first_divergence": null,
+              "status": "matched"
+            },
+            "cpu": {
+              "first_divergence": null,
+              "status": "matched"
+            },
+            "hud": {
+              "first_divergence": null,
+              "status": "matched"
+            },
+            "magnifier": {
+              "first_divergence": null,
+              "status": "matched"
+            },
+            "match": {
+              "first_divergence": null,
+              "status": "matched"
+            },
+            "subject": {
+              "first_divergence": null,
+              "status": "matched"
+            }
+          },
+          "status": "matched"
+        },
+        "first_divergence_by_group": {},
+        "frames_compared": 11077
+      },
+      "draw_alignment": {
+        "actual_count": 11067,
+        "expected_count": 11067,
+        "extra_in_actual": [],
+        "extra_in_actual_count": 0,
+        "matched_count": 11067,
+        "missing_from_actual": [],
+        "missing_from_actual_count": 0,
+        "scope": "source_draws_by_source_index",
+        "status": "aligned"
+      },
+      "source_match": {
+        "complete": true,
+        "outcome": 2,
+        "winner": 0
+      },
+      "queue_binding": {
+        "schema": "melee-web-retail-queue-binding",
+        "version": 1,
+        "scope": "gameplay replay conditioned on recorded nonempty input-queue snapshots",
+        "input_recipe_sha256": "7c3468569a47fe303997843f59120fcb441c1c42e65fd0d8e6892b9e0f035f25",
+        "clock_stream_sha256": "a26a153bd83e47020f032cbb12dfa4f6b34737a7466f8edea45ee091905dd1c6",
+        "output_recipe_sha256": "0e74005392dc7e72ab76c873ff6736432b6949824f5c8c63a4bd1bf4b9354ee3",
+        "frames": 11077,
+        "queue_snapshots": 11067,
+        "queue_context_bytes": 99611,
+        "observation_pc": "0x803769d4",
+        "clock": "relative emulated CPU block-clock ticks",
+        "input_bytes_preserved": true,
+        "expected_game_state_supplied": false,
+        "expected_draw_indexes_supplied": false,
+        "live_scheduling_equivalence": "not_claimed",
+        "original_cpu_scheduling_equivalence": "not_claimed",
+        "gold_admitted": false
+      },
+      "reference_cpu_trace_sha256": "d5be49b2869abfb19e85c3c6597ef81451f4cc8d771eea04bb3f2210f4d9770a",
+      "recipe_sha256": "0e74005392dc7e72ab76c873ff6736432b6949824f5c8c63a4bd1bf4b9354ee3",
+      "trace_sha256": "9e69fc8344c44c2d30e0c1c5c931e03e8161618cb16697a66759bb1104973510",
+      "cpu_trace_sha256": "ead495e2df5219677bd558c5dd4c4d6a54b168323c1e89c82eb3d587df4e674e",
+      "comparison_sha256": "c55f58748a7347e3b3b39a4edbb7242337c495abddf288312fd0241a2143d673",
+      "report_sha256": "17ed08f395a591b78afd708b8196317109299d9ccd68a1bcbae902214b5df1f7",
+      "report_validation": {
+        "pass": true,
+        "input_scheduling": "recorded_queue",
+        "scheduling_equivalence": "not_evaluated",
+        "frames": 11077,
+        "source_draws": 11067,
+        "report_sha256": "17ed08f395a591b78afd708b8196317109299d9ccd68a1bcbae902214b5df1f7"
+      },
+      "instrumented_timing_resumes": 0,
+      "metrics": {
+        "sourceSteps": 11077,
+        "sourceDraws": 11067,
+        "worstNativeCallbackMs": 20.045,
+        "nativeCallbacksOverBudget": 1,
+        "nativeCallbacksOver33ms": 0,
+        "worstBrowserCallbackMs": 57.729999989271164,
+        "browserCallbackGaps": 1,
+        "livePipelinesCreated": 35,
+        "livePipelinesQueued": 0,
+        "preparationPauses": 0,
+        "audioUnderrunFrames": 22,
+        "audioOverflowFrames": 0,
+        "focusLost": false,
+        "wasmHeapGrowthBytes": 66846720
+      },
+      "performance": "not_admitted_state_capture",
+      "browser": {
+        "browser": "chrome",
+        "version": "153.0.8010.48",
+        "visible_browser": true
+      }
+    }
+  ],
+  "throw_rounding": {
+    "owner": "ftCommon_8007E3EC",
+    "original_instructions": [
+      "0x8007e4c8",
+      "0x8007e4dc",
+      "0x8007e4f0"
+    ],
+    "behavior": "Each axis rounds its delta then uses one fmadds for delta * body proportion + previous position.",
+    "original_dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+    "disassembly_sha256": "d36b7dd8a1b679b5740674edcd06260201b657406cbfcb7870222760e1062fc3",
+    "probe_build": {
+      "source_sha256": "67f17c93d2e4802950d08321271a0eaebc84320edfab25fabfbc10dab21168e5",
+      "binary_sha256": "894b744ea863b13ab0e0ff122078db7915d9f4bf18bdb26f9b99f954693e888a"
+    },
+    "observer_sha256": "4febbe2df43619bb6743ee2b4e78ca13c017dd5a0837e0400b69b1b6fb99e5ea",
+    "original_prefix": {
+      "compared_events": 24295,
+      "first_difference": null,
+      "equal": true
+    },
+    "input_status": {
+      "version": 1,
+      "mode": "replay",
+      "events": 12346,
+      "complete": false,
+      "invalid": false,
+      "error": null
+    },
+    "observer_status": {
+      "state": "interrupted",
+      "event_count": 62854,
+      "last_seq": 62853,
+      "source_tick": 4201,
+      "draw_ordinal": 4197,
+      "completed": false,
+      "invalid": false,
+      "error": null
+    },
+    "scalar_cases": {
+      "cases": [
+        {
+          "tick": 4165,
+          "previous": [
+            1053732313,
+            1076290128,
+            3219189026
+          ],
+          "authored": [
+            1053346859,
+            1076243626,
+            3220084870
+          ],
+          "scale": 1066627184,
+          "expected": [
+            1053288321,
+            1076236564,
+            3220220921
+          ]
+        },
+        {
+          "tick": 4166,
+          "previous": [
+            1053288321,
+            1076236564,
+            3220220921
+          ],
+          "authored": [
+            1055717772,
+            1077050487,
+            3221105531
+          ],
+          "scale": 1066627184,
+          "expected": [
+            1056086730,
+            1077174097,
+            3221232674
+          ]
+        },
+        {
+          "tick": 4180,
+          "previous": [
+            1059417915,
+            1083334446,
+            3226296871
+          ],
+          "authored": [
+            1058194994,
+            1083177035,
+            3226223782
+          ],
+          "scale": 1066627184,
+          "expected": [
+            1058009270,
+            1083153129,
+            3226212682
+          ]
+        }
+      ],
+      "all_window_fobj_inputs_match": true,
+      "original_bone_probe_sha256": "19111c20118d128016e5b5c9332fe737e5cf5855bc93e52fefc5c2356d70a166",
+      "browser_operand_probe_sha256": "f19ca714460d9dd371af0c9846bf18d20f50958e0d3ec1f709053e6c32d475ea"
+    },
+    "test_source_sha256": "c7a4a3ec3df1233e4aaea1815b457f6b8ae2e52b82007c75a70767d52d2023b1",
+    "focused_test_log_sha256": "5346c24f76a055d5ebb44756e1b009c5d620bd753821723b478b5e7907b587a5"
+  },
+  "host_slowdown": {
+    "storage_component": {
+      "scope": "component storage-path test with real InputStream and DirectIOFile implementations; mocked CoreTiming and observer; synthetic controller data; not a physical capture or gameplay test",
+      "pass": true,
+      "recorded_events": 2400,
+      "recorded_bytes_identical": true,
+      "stream_source_sha256": "804221033f7468529b8e6e3fbe842779a6c98113d07af12d5e76942c1d6457c9",
+      "direct_io_source_sha256": "121713d64ee1ba9bee40c417454cbe397c4733e7fc59215e41106311095ef65e",
+      "harness_sha256": "82b5a7e1e209d17aac00c1fa3f4753287cbafa05a92be71415bfe406f06f797e",
+      "recorded_stream_sha256": "014fa618169f8ea1d7a185cb6dd7646dd4a734c730bfc4bac2d40a6561fb432f",
+      "cases": [
+        {
+          "case": "normal-record",
+          "exit": 0,
+          "seconds": 0.31818124998244457,
+          "pauses": [],
+          "status": {
+            "version": 1,
+            "mode": "record",
+            "events": 2400,
+            "complete": true,
+            "invalid": false,
+            "error": null
+          }
+        },
+        {
+          "case": "slow-record",
+          "exit": 0,
+          "seconds": 0.5265821670182049,
+          "pauses": [
+            {
+              "signal": 17,
+              "pause_seconds": 0.2557962499849964
+            },
+            {
+              "signal": 17,
+              "pause_seconds": 0.260106583009474
+            }
+          ],
+          "status": {
+            "version": 1,
+            "mode": "record",
+            "events": 2400,
+            "complete": true,
+            "invalid": false,
+            "error": null
+          }
+        },
+        {
+          "case": "slow-capture-normal-playback",
+          "exit": 0,
+          "seconds": 0.004868040996370837,
+          "pauses": [],
+          "status": {
+            "version": 1,
+            "mode": "replay",
+            "events": 2400,
+            "complete": true,
+            "invalid": false,
+            "error": null
+          }
+        },
+        {
+          "case": "normal-capture-slow-playback",
+          "exit": 0,
+          "seconds": 0.520752333017299,
+          "pauses": [
+            {
+              "signal": 17,
+              "pause_seconds": 0.2601132499985397
+            },
+            {
+              "signal": 17,
+              "pause_seconds": 0.25453479200950824
+            }
+          ],
+          "status": {
+            "version": 1,
+            "mode": "replay",
+            "events": 2400,
+            "complete": true,
+            "invalid": false,
+            "error": null
+          }
+        },
+        {
+          "case": "wrong-emulated-tick",
+          "exit": 3,
+          "seconds": 0.009316832991316915,
+          "pauses": [],
+          "status": {
+            "version": 1,
+            "mode": "replay",
+            "events": 8,
+            "complete": false,
+            "invalid": true,
+            "error": "input poll port or emulated tick diverged"
+          }
+        }
+      ]
+    },
+    "original_dolphin_prefixes": [
+      {
+        "version": 1,
+        "scope": "source ticks <= 600; replay-only donor, no fresh physical input",
+        "donor": "fd",
+        "run": "slowdown/fd-stall-01",
+        "end_source_tick": 600,
+        "receipt_sha256": "b92f2b1f3f25f54683b14b7660e2bbd0e83fd49bd493a9a2d580d4b51b55c245",
+        "comparisons": {
+          "source": {
+            "semantic": {
+              "compared_events": 6010,
+              "first_difference": null,
+              "equal": true
+            },
+            "clock": {
+              "available": false,
+              "actual_rows": 6075,
+              "expected_rows": 0,
+              "common_rows": 0,
+              "first_difference": null,
+              "equal": null,
+              "reason": "expected_observer_has_no_clock_probe_channel"
+            },
+            "queue": {
+              "available": false,
+              "actual_rows": 6075,
+              "expected_rows": 0,
+              "common_rows": 0,
+              "first_difference": null,
+              "equal": null,
+              "reason": "expected_observer_has_no_clock_probe_channel"
+            },
+            "expected_observer_sha256": "ed7428a2a4658edf522282e41962673d75225d7669f97516d7caa0660f9fa4e7"
+          },
+          "baseline": {
+            "semantic": {
+              "compared_events": 6010,
+              "first_difference": null,
+              "equal": true
+            },
+            "clock": {
+              "actual_rows": 6075,
+              "expected_rows": 6075,
+              "common_rows": 6075,
+              "first_difference": null,
+              "equal": true
+            },
+            "queue": {
+              "actual_rows": 6075,
+              "expected_rows": 6075,
+              "common_rows": 6075,
+              "first_difference": null,
+              "equal": true
+            },
+            "expected_observer_sha256": "2303363ce1c3a7f0729ea76182418fad2ca298cbd28690ded396e5c4c8cf8080"
+          }
+        },
+        "run_status": {
+          "stop_reason": "source_limit_clock_probe",
+          "returncode": 0,
+          "paused_targets": [
+            100,
+            400
+          ],
+          "pause_count": 2,
+          "input_stream_replay_only": true,
+          "physical_input_recorded": false,
+          "input_status": {
+            "version": 1,
+            "mode": "replay",
+            "events": 5028,
+            "complete": false,
+            "invalid": false,
+            "error": null
+          },
+          "observer_status": {
+            "state": "interrupted",
+            "event_count": 12096,
+            "last_seq": 12095,
+            "source_tick": 601,
+            "draw_ordinal": 601,
+            "completed": false,
+            "invalid": false,
+            "error": null
+          }
+        },
+        "pause_validation": {
+          "count": 2,
+          "targets": [
+            100,
+            400
+          ],
+          "trigger_ticks": [
+            100,
+            400
+          ],
+          "measured_ms": [
+            260.070958,
+            260.073667
+          ],
+          "within_20ms_of_250": true
+        },
+        "input_validation": {
+          "mode_replay": true,
+          "invalid_false": true,
+          "error_null": true,
+          "complete": false,
+          "events": 5028
+        },
+        "pass": true
+      },
+      {
+        "version": 1,
+        "scope": "source ticks <= 600; replay-only donor, no fresh physical input",
+        "donor": "yoshi",
+        "run": "slowdown/yoshi-stall-01",
+        "end_source_tick": 600,
+        "receipt_sha256": "bed0d0c885f203eca9bc15be2a212a18db4700b53889c1bc14ea79249edb244f",
+        "comparisons": {
+          "source": {
+            "semantic": {
+              "compared_events": 6304,
+              "first_difference": null,
+              "equal": true
+            },
+            "clock": {
+              "available": false,
+              "actual_rows": 6110,
+              "expected_rows": 0,
+              "common_rows": 0,
+              "first_difference": null,
+              "equal": null,
+              "reason": "expected_observer_has_no_clock_probe_channel"
+            },
+            "queue": {
+              "available": false,
+              "actual_rows": 6110,
+              "expected_rows": 0,
+              "common_rows": 0,
+              "first_difference": null,
+              "equal": null,
+              "reason": "expected_observer_has_no_clock_probe_channel"
+            },
+            "expected_observer_sha256": "ad696686d01c68453306b1e3169a5c98db9e60e145aaabd5f61d8be1aaa06cc9"
+          },
+          "baseline": {
+            "semantic": {
+              "compared_events": 6304,
+              "first_difference": null,
+              "equal": true
+            },
+            "clock": {
+              "actual_rows": 6110,
+              "expected_rows": 6110,
+              "common_rows": 6110,
+              "first_difference": null,
+              "equal": true
+            },
+            "queue": {
+              "actual_rows": 6110,
+              "expected_rows": 6110,
+              "common_rows": 6110,
+              "first_difference": null,
+              "equal": true
+            },
+            "expected_observer_sha256": "05dba4b952010017fd83b40477caa49d4fe657aaebde9ca183ec8c9065a8b6e7"
+          }
+        },
+        "run_status": {
+          "stop_reason": "source_limit_clock_probe",
+          "returncode": 0,
+          "paused_targets": [
+            100,
+            400
+          ],
+          "pause_count": 2,
+          "input_stream_replay_only": true,
+          "physical_input_recorded": false,
+          "input_status": {
+            "version": 1,
+            "mode": "replay",
+            "events": 5154,
+            "complete": false,
+            "invalid": false,
+            "error": null
+          },
+          "observer_status": {
+            "state": "interrupted",
+            "event_count": 12425,
+            "last_seq": 12424,
+            "source_tick": 601,
+            "draw_ordinal": 601,
+            "completed": false,
+            "invalid": false,
+            "error": null
+          }
+        },
+        "pause_validation": {
+          "count": 2,
+          "targets": [
+            100,
+            400
+          ],
+          "trigger_ticks": [
+            100,
+            400
+          ],
+          "measured_ms": [
+            260.070625,
+            260.088375
+          ],
+          "within_20ms_of_250": true
+        },
+        "input_validation": {
+          "mode_replay": true,
+          "invalid_false": true,
+          "error_null": true,
+          "complete": false,
+          "events": 5154
+        },
+        "pass": true
+      }
+    ],
+    "scope": "Storage test uses synthetic pads and mocked CoreTiming with the actual input-stream/file implementations. Dolphin tests replay existing physical donors under host process stalls. No new physical recording under stress was performed."
+  },
+  "validation": {
+    "full_suite": "Ran 765 tests in 269.740s",
+    "result": "OK (skipped=36)",
+    "full_suite_log_sha256": "6816a1e5dfe40f46c46a98975d700b65641caa8caef6258c8c49cee707a28984",
+    "affected_targets": [
+      "gameplay_menu_browser",
+      "gameplay_retail_trace"
+    ],
+    "build_log_sha256": "348b16691d4244bc62ae34e86fc1d220debc12047c3259ed00146a41af630b4d"
+  },
+  "retained_failure": {
+    "run": "work/queue-replay-20260915/browser-yoshis-01",
+    "status": "diverged",
+    "coverage": {
+      "checks": {
+        "active_player_count": "pass",
+        "entry": "pass",
+        "fighters": "pass",
+        "frame_count": "pass",
+        "inputs": "pass",
+        "match_frame": "pass",
+        "pad_state_hex": "pass",
+        "rng": "pass"
+      },
+      "cpu": {
+        "domains": {
+          "camera": {
+            "first_divergence": null,
+            "status": "matched"
+          },
+          "cpu": {
+            "first_divergence": null,
+            "status": "matched"
+          },
+          "hud": {
+            "first_divergence": null,
+            "status": "matched"
+          },
+          "magnifier": {
+            "first_divergence": null,
+            "status": "matched"
+          },
+          "match": {
+            "first_divergence": null,
+            "status": "matched"
+          },
+          "subject": {
+            "first_divergence": {
+              "actual": "bd552f20",
+              "expected": "bd552f00",
+              "field": "players[1].subject.bone_bits[1]",
+              "phase": "frame",
+              "tick": 4166
+            },
+            "status": "diverged"
+          }
+        },
+        "status": "diverged"
+      },
+      "first_divergence_by_group": {},
+      "frames_compared": 11077
+    },
+    "draw_alignment": {
+      "actual_count": 11067,
+      "expected_count": 11067,
+      "extra_in_actual": [],
+      "extra_in_actual_count": 0,
+      "matched_count": 11067,
+      "missing_from_actual": [],
+      "missing_from_actual_count": 0,
+      "scope": "source_draws_by_source_index",
+      "status": "aligned"
+    },
+    "source_match": {
+      "complete": true,
+      "outcome": 2,
+      "winner": 0
+    },
+    "queue_binding": {
+      "schema": "melee-web-retail-queue-binding",
+      "version": 1,
+      "scope": "gameplay replay conditioned on recorded nonempty input-queue snapshots",
+      "input_recipe_sha256": "7c3468569a47fe303997843f59120fcb441c1c42e65fd0d8e6892b9e0f035f25",
+      "clock_stream_sha256": "a26a153bd83e47020f032cbb12dfa4f6b34737a7466f8edea45ee091905dd1c6",
+      "output_recipe_sha256": "0e74005392dc7e72ab76c873ff6736432b6949824f5c8c63a4bd1bf4b9354ee3",
+      "frames": 11077,
+      "queue_snapshots": 11067,
+      "queue_context_bytes": 99611,
+      "observation_pc": "0x803769d4",
+      "clock": "relative emulated CPU block-clock ticks",
+      "input_bytes_preserved": true,
+      "expected_game_state_supplied": false,
+      "expected_draw_indexes_supplied": false,
+      "live_scheduling_equivalence": "not_claimed",
+      "original_cpu_scheduling_equivalence": "not_claimed",
+      "gold_admitted": false
+    },
+    "reference_cpu_trace_sha256": "d5be49b2869abfb19e85c3c6597ef81451f4cc8d771eea04bb3f2210f4d9770a",
+    "recipe_sha256": "0e74005392dc7e72ab76c873ff6736432b6949824f5c8c63a4bd1bf4b9354ee3",
+    "trace_sha256": "9e69fc8344c44c2d30e0c1c5c931e03e8161618cb16697a66759bb1104973510",
+    "cpu_trace_sha256": "eeea57aaecfa4bdf0f6aa21ba5d9b574c541419aaa9c8c930a773d2afcac5bda",
+    "comparison_sha256": "218903776ce5783375f8bdfc0c76c509d382f42b20a21a2ff5bd970a2d98a9df",
+    "report_sha256": "7e48368bac1b939f64032417fe51f395260f478194b8e49fef0f5112c4af932f",
+    "report_validation": {
+      "pass": true,
+      "input_scheduling": "recorded_queue",
+      "scheduling_equivalence": "not_evaluated",
+      "frames": 11077,
+      "source_draws": 11067,
+      "report_sha256": "7e48368bac1b939f64032417fe51f395260f478194b8e49fef0f5112c4af932f"
+    },
+    "instrumented_timing_resumes": 0,
+    "metrics": {
+      "sourceSteps": 11077,
+      "sourceDraws": 11067,
+      "worstNativeCallbackMs": 23.06,
+      "nativeCallbacksOverBudget": 1,
+      "nativeCallbacksOver33ms": 0,
+      "worstBrowserCallbackMs": 58.25,
+      "browserCallbackGaps": 1,
+      "livePipelinesCreated": 35,
+      "livePipelinesQueued": 0,
+      "preparationPauses": 0,
+      "audioUnderrunFrames": 0,
+      "audioOverflowFrames": 0,
+      "focusLost": false,
+      "wasmHeapGrowthBytes": 66846720
+    },
+    "performance": "not_admitted_state_capture",
+    "browser": {
+      "browser": "chrome",
+      "version": "153.0.8010.48",
+      "visible_browser": true
+    }
+  },
+  "retained_diagnostic_runs": {
+    "intentional_browser_prefix_stops": [
+      "browser-bone-01",
+      "browser-fobj-01",
+      "browser-producer-01"
+    ],
+    "native_prefix": "native-prefix-4200: first core difference 2924; not used as a comparable matrix operand",
+    "launch_failures": [
+      "launch-notes.txt",
+      "validation-yoshis-01.log (import path)",
+      "throw-probe-build-01.log (script-generation assertion/missing generated file)",
+      "throw-probe-run-01.log (correctly rejected old binary identity)"
+    ],
+    "all_paths_relative_to": "work/queue-replay-20260915"
+  },
+  "remaining": [
+    "Independent original CPU/interrupt scheduling and live controller timing",
+    "Cold/warm performance and first-use renderer preparation; all timing failures retained",
+    "Historical GPU staging stall",
+    "Pixels, PCM and broader route/content admission",
+    "Both unopened human holdouts"
+  ]
+}

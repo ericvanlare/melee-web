@@ -1,0 +1,51 @@
+--- a/Source/Core/Core/PowerPC/ReferenceCaptureObserver.cpp
++++ b/Source/Core/Core/PowerPC/ReferenceCaptureObserver.cpp
+@@ -216,6 +216,7 @@
+ {
+   Impl() = default;
+   bool clock_queue_after_vi = false;
++  u32 delay_queue_entry_tick = ~0u, delay_queue_return_tick = ~0u;
+ 
+   ~Impl()
+   {
+@@ -484,10 +485,31 @@
+ 
+   }
+ 
++  void CaptureDelay(Core::System* system, u32 pc, PowerPC::PowerPCState* state)
++  {
++    u32 tick = 0;
++    if (!match_active || !ReadU32(system, 0x80479d58, &tick) || tick < 8500 || tick > 8560) return;
++    if (pc == 0x80019894) { if (delay_queue_entry_tick == tick) return; delay_queue_entry_tick = tick; }
++    if (pc == 0x800198dc) { if (delay_queue_return_tick == tick) return; delay_queue_return_tick = tick; }
++    u32 last_pc = 0, last_interrupt = 0, ctx_pc = 0;
++    ReadU32(system, 0x804d737c, &last_pc);
++    ReadU32(system, 0x804d7380, &last_interrupt);
++    if (state->gpr[4] >= 0x80000000 && state->gpr[4] < 0x817ffe00)
++      ReadU32(system, state->gpr[4] + 0x198, &ctx_pc);
++    PushJson(Event::Progress,
++       std::string("{\"record\":\"clock_delay_v1\",\"pc\":") + std::to_string(pc) +
++       ",\"core_ticks\":" + std::to_string(system->GetCoreTiming().GetTicks()) +
++       ",\"r3\":" + std::to_string(state->gpr[3]) + ",\"r4\":" + std::to_string(state->gpr[4]) +
++       ",\"lr\":" + std::to_string(state->spr[8]) + ",\"srr0\":" + std::to_string(state->spr[26]) +
++       ",\"ctx_pc\":" + std::to_string(ctx_pc) + ",\"last_interrupt_pc\":" + std::to_string(last_pc) +
++       ",\"last_interrupt\":" + std::to_string(last_interrupt >> 16) + "}", pc, tick, draw_ordinal);
++  }
++
+   void Observe(Core::System* system, u32 pc, PowerPC::PowerPCState* state)
+   {
+     if (!Start() || invalid.load() || finish_requested.load())
+       return;
++    if (pc == 0x80019894 || pc == 0x800198dc || pc == 0x8033625c || pc == 0x8033667c || pc == 0x8033ccd0 || pc == 0x8033cd18 || pc == 0x80343bc8 || pc == 0x80343df4 || pc == 0x8034783c || pc == 0x80347b7c || pc == 0x8034e964 || pc == 0x8034eb88 || pc == 0x8034f314 || pc == 0x8034f364 || pc == 0x803509c0 || pc == 0x80350a4c || pc == 0x80359724 || pc == 0x803598a8 || pc == 0x803598ac || pc == 0x80359910 || pc == 0x80359920 || pc == 0x80359974 || pc == 0x803761c0 || pc == 0x803762c0 || pc == 0x8037e1bc || pc == 0x8037e210 || pc == 0x8037e328 || pc == 0x8037e39c || pc == 0x80392e80 || pc == 0x803931a0) { CaptureDelay(system, pc, state); return; }
+     if (pc == 0x80375e18) clock_queue_after_vi = true;
+     if (pc == 0x803769d4 || pc == 0x80375c34 || pc == 0x80375e18 || pc == 0x800195fc)
+     {
+@@ -1028,6 +1050,8 @@
+ 
+ bool Observer::IsBoundary(u32 guest_pc)
+ {
++  const auto pc = guest_pc;
++  if (pc == 0x80019894 || pc == 0x800198dc || pc == 0x8033625c || pc == 0x8033667c || pc == 0x8033ccd0 || pc == 0x8033cd18 || pc == 0x80343bc8 || pc == 0x80343df4 || pc == 0x8034783c || pc == 0x80347b7c || pc == 0x8034e964 || pc == 0x8034eb88 || pc == 0x8034f314 || pc == 0x8034f364 || pc == 0x803509c0 || pc == 0x80350a4c || pc == 0x80359724 || pc == 0x803598a8 || pc == 0x803598ac || pc == 0x80359910 || pc == 0x80359920 || pc == 0x80359974 || pc == 0x803761c0 || pc == 0x803762c0 || pc == 0x8037e1bc || pc == 0x8037e210 || pc == 0x8037e328 || pc == 0x8037e39c || pc == 0x80392e80 || pc == 0x803931a0) return true;
+   if (guest_pc == 0x803769d4 || guest_pc == 0x80375c34 || guest_pc == 0x80375e18 || guest_pc == 0x800195fc) return true;
+   switch (guest_pc)
+   {

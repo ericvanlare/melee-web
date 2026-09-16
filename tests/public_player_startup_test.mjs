@@ -7,6 +7,13 @@ import {pathToFileURL} from 'node:url';
 
 const ROOT = new URL('../', import.meta.url);
 const SHELL_URL = new URL('web/player/player-shell.mjs', ROOT);
+const shellSource = await fs.readFile(SHELL_URL, 'utf8');
+const playerHtml = await fs.readFile(new URL('web/player/index.html', ROOT), 'utf8');
+const markupIds = new Set([...playerHtml.matchAll(/\bid="([^"]+)"/g)].map(match => match[1]));
+// Exercise the real markup contract before mocks can hide a removed element.
+for (const [, id] of shellSource.matchAll(/\$\('([^']+)'\)/g)) {
+  assert(markupIds.has(id), `Public shell requires missing HTML element #${id}`);
+}
 
 class FakeElement {
   constructor(tagName = 'div', id = '') {
@@ -54,7 +61,8 @@ function makeDocument() {
     'error', 'retry', 'error-close',
     'loading-panel', 'loading-label', 'loading-progress', 'loading-detail',
   ];
-  const elements = new Map(ids.map(id => [id, new FakeElement('div', id)]));
+  const elements = new Map([...new Set([...markupIds, ...ids])]
+    .map(id => [id, new FakeElement('div', id)]));
   elements.get('canvas').focus = () => { document.activeElement = elements.get('canvas'); };
   elements.get('player').requestFullscreen = () => Promise.resolve();
   elements.get('player-one-source').value = 'auto';

@@ -29,9 +29,9 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     : runtime_(std::make_shared<const DatFighterRuntime>(archive, costume)), store_(runtime_, container),
       rows_(nullptr, melee_web_action_rows_destroy)
 {
-    const bool mario = costume.fighter_kind == 0;
+    const bool mario = costume.fighter_kind == 0 || costume.fighter_kind == 21;
     const bool fox_family = costume.fighter_kind == 1 || costume.fighter_kind == 22;
-    const bool mars = costume.fighter_kind == 18;
+    const bool mars = costume.fighter_kind == 18 || costume.fighter_kind == 26;
     require(mario || fox_family || mars, "Native action store has no checked fighter command schema for this kind");
     std::vector<DatCommandRoot> roots;
     // Explicit source ftCo submotion groups. This certifies command operand
@@ -46,8 +46,8 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     group(239,240);                              // ftCo_SM_AppealSR/SL action rows; states 264/265 select these rows
     group(242,258);group(262,265);                // grab, pummel, throws and Mario capture reactions
     group(286,291);                              // shield-break knockdown
-    if (mario) group(295,302);                   // Mario special scripts; Article creation remains a service gate
-    else group(295,326);                         // Fox/Falco/Marth source special command rows
+    if (mario) group(295,302);                   // Mario/Dr. Mario specials; taunts use common rows 239/240 above
+    else group(295,326);                         // Fox/Falco/Marth/Roy source special command rows
     for (auto choice : runtime_->wait_choices()) command_motions_.insert(choice.motion_id);
     for (auto id : command_motions_) {
         const auto& action = runtime_->action(id);

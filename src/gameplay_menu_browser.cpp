@@ -17,6 +17,7 @@
 #include <aurora/event.h>
 #include <aurora/main.h>
 #include <aurora/gfx.h>
+#include <aurora/pipeline_prepare.h>
 #include <dolphin/gx.h>
 #include <dolphin/vi.h>
 #include <emscripten.h>
@@ -42,6 +43,7 @@ std::unique_ptr<melee_web::GameplayMenuWorld> world;
 std::unique_ptr<melee_web::GameplayMatchSession> match;
 std::unique_ptr<melee_web::RetailReplayRecipe> replay;
 size_t replay_cursor=0;
+melee_web::SourceFrameSequence replay_source_frames;
 bool replay_trace=false,replay_pending=false,replay_started=false,replay_final_draw=false;
 // V2 recipes come from fresh original processes and do not carry heap history.
 // Original stage callbacks can read uncleared allocation bytes (Shy Guy pattern).
@@ -172,7 +174,9 @@ PADStatus diagnostic_pad{};
 unsigned diagnostic_pad_port=0,diagnostic_pad_remaining=0;
 std::array<float,1068> pcm;
 alignas(32) unsigned char fifo[64*1024];
-constexpr std::array<std::string_view,68> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","EfFxData.dat","falco.ssm","GrNBa.dat","sp_zako.hps","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","fox.ssm","GrSt.dat","ystory.hps","PlMs.dat","PlMsAJ.dat","PlMsNr.dat","PlMsRe.dat","PlMsGr.dat","PlMsBk.dat","PlMsWh.dat","EfMsData.dat","mars.ssm","GrOp.dat","greens.hps","pupupu.ssm","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sislib_font.bin"};
+constexpr std::array<std::string_view,87> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","EfFxData.dat","falco.ssm","GrNBa.dat","sp_zako.hps","hyaku.hps","hyaku2.hps","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","fox.ssm","GrSt.dat","ystory.hps","PlMs.dat","PlMsAJ.dat","PlMsNr.dat","PlMsRe.dat","PlMsGr.dat","PlMsBk.dat","PlMsWh.dat","EfMsData.dat","mars.ssm","GrOp.dat","old_kb.hps","pupupu.ssm","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sislib_font.bin",
+ "PlDr.dat","PlDrAJ.dat","PlDrNr.dat","PlDrRe.dat","PlDrBu.dat","PlDrGr.dat","PlDrBk.dat","drmario.ssm",
+ "PlFe.dat","PlFeAJ.dat","PlFeNr.dat","PlFeRe.dat","PlFeBu.dat","PlFeGr.dat","PlFeYe.dat","EfFeData.dat","emblem.ssm"};
 constexpr unsigned kDiagnosticPadButtons=PAD_BUTTON_LEFT|PAD_BUTTON_RIGHT|PAD_BUTTON_DOWN|PAD_BUTTON_UP|
  PAD_TRIGGER_Z|PAD_TRIGGER_R|PAD_TRIGGER_L|PAD_BUTTON_A|PAD_BUTTON_B|PAD_BUTTON_X|PAD_BUTTON_Y|PAD_BUTTON_START;
 void check(int value,const char* error){if(!value)throw std::runtime_error(error);}
@@ -212,6 +216,12 @@ void begin_preparation(){
  EM_ASM({if(window.menuPreparation)window.menuPreparation(UTF8ToString($0),!!$1);},
         message.c_str(),preserve_audio?1:0);
 }
+bool preparation_uses_source_draws(){
+ // Match camera and subject callbacks mutate gameplay state. Complete-draw
+ // pipeline lookup lets the first real tick draw its full image; preparation
+ // can then service the renderer without traversing the game again.
+ return !match||!aurora_pipeline_complete_draws_enabled();
+}
 bool prepare_deferred_pipelines(){
 #if defined(MELEE_WEB_SELECTIVE_PIPELINES)
  const auto selected=melee_web::pipeline_preparation::status();
@@ -220,7 +230,7 @@ bool prepare_deferred_pipelines(){
  // renderer may construct a pipeline, then settle the unchanged scene.
  running=false;menu_clock.reset();audio_clock.reset();
  if(preparation.phase()==melee_web::MenuPreparationState::Phase::Idle){
-  check(preparation.request_render_settle(),"Could not pause for pipeline preparation");
+  check(preparation.request_render_settle(preparation_uses_source_draws()),"Could not pause for pipeline preparation");
   preparation_profile.begin(false,emscripten_get_now());
   render_only_preparation=true;
  }
@@ -419,7 +429,7 @@ void begin_transition_construction(double& preparation_ms,int& suppress_draw){
                                   (!match||match->construction_complete());
  if(!construction_complete)return;
  preparation_profile.construction_finished(emscripten_get_now());
- preparation.finish_construction(running);
+ preparation.finish_construction(running,preparation_uses_source_draws());
  if(running)running=false;
  suppress_draw=preparation.suppress_source_draw();
  if(!preparation.busy())EM_ASM({window.menuPreparationDone?.();});
@@ -470,7 +480,9 @@ void tick(){
  uint32_t callback_draw_calls=0,callback_texture_upload=0,callback_staging_used=0;
  AuroraStats callback_begin_stats{};
  AuroraStats callback_end_stats{};
- melee_web::SourceFrameSequence source_frames;
+ melee_web::SourceFrameSequence callback_source_frames;
+ auto& source_frames=replay?replay_source_frames:callback_source_frames;
+ source_frames.begin_callback();
  int began=0,drawn=1,timing_valid=1,first_use=0;
  // A transition request owns the whole callback in which it is observed.
  // Keep the source presenter out of both the request and audio-ack waits.
@@ -478,6 +490,7 @@ void tick(){
  bool actual_source_draw=false;
  bool replay_completed_now=false;
  unsigned replay_steps=0;
+ unsigned replay_draw_boundaries=0;
  try{
 #if defined(MELEE_WEB_SELECTIVE_PIPELINES)
   (void)melee_web::pipeline_preparation::status();
@@ -505,7 +518,7 @@ void tick(){
      if(match){
       match->draw();actual_source_draw=true;drew_source=true;
       if(replay&&replay_trace&&!replay_final_draw){
-       if(replay_cursor)melee_web::retail_replay_draw(*replay,replay_cursor-1);
+       if(source_frames.pending())melee_web::retail_replay_draw(*replay,replay_cursor-1);
        else melee_web::retail_replay_preparation_draw(*replay);
       }
      }
@@ -623,7 +636,7 @@ void tick(){
        (finish_menu_scene_rebuild(),true):advance_match_construction();
    if(construction_complete){
     preparation_profile.construction_finished(emscripten_get_now());
-    preparation.finish_construction(true);running=false;
+    preparation.finish_construction(true,preparation_uses_source_draws());running=false;
    }
    preparation_ms=emscripten_get_now()-preparation_started;preparation_started=0;
    suppress_draw=preparation.suppress_source_draw();
@@ -703,17 +716,18 @@ void tick(){
      check(!match->paused()&&!match->complete(),"Replay reached an unsupported source pause/exit");
      if(!replay_started){
       replay_started=true;
-      EM_ASM({window.menuReplayStarted?.($0,!!$1);},replay->frames.size(),replay_trace);
+      EM_ASM({window.menuReplayStarted?.($0,!!$1,$2,$3);},replay->frames.size(),replay_trace,replay->expected_draws(),replay->scheduling_mode());
      }
      sample=replay->frames[replay_cursor].pads.data();
     }
-    match->tick(sample);source_frames.did_step();
+    match->tick(sample);source_frames.did_step(!replay||replay->closes_draw_batch(replay_cursor));
     int winner=-1;const int outcome=match->outcome(winner);
     if(replay){
      replay_match_complete=match->complete();replay_outcome=outcome;replay_winner=winner;
      if(replay_trace)melee_web::retail_replay_frame(*replay,replay_cursor);
      ++replay_cursor;
      ++replay_steps;
+     replay_draw_boundaries+=replay->closes_draw_batch(replay_cursor-1)?1U:0U;
      check(!match->complete()||replay_cursor==replay->frames.size(),"Replay source match exited before all input was consumed");
     }
     if(stock_check==-1){
@@ -739,14 +753,19 @@ void tick(){
   source_frames.finish(present_source);
   (void)prepare_deferred_pipelines();
   // Camera callbacks mutate source state (including magnifier damage flags).
-  // A callback without a source tick must retain the last image; preparation
-  // alone may redraw a frozen scene to settle its explicitly measured resources.
-  if(source_frames.steps()==0&&(preparation.warming()||(!world&&!match)))present_source();
+  // A callback without a source tick retains the last match image when the
+  // renderer guarantees complete draws. Menu priming retains its existing path.
+  if(source_frames.steps()==0&&(preparation.preparation_draws_source()||(!world&&!match)))present_source();
+  if(preparation.warming()&&!preparation.preparation_draws_source()){
+   const double service_started=emscripten_get_now();
+   check(aurora_pipeline_service_preparation(),"Renderer preparation overlapped an active frame");
+   preparation_ms+=emscripten_get_now()-service_started;
+  }
 #if defined(MELEE_WEB_SELECTIVE_PIPELINES)
   (void)melee_web::pipeline_preparation::status();
 #endif
-  check(!replay_steps||source_frames.draws()==replay_steps,
-        "Reference replay did not draw every consumed source tick");
+  check(!replay||source_frames.draws()==replay_draw_boundaries,
+        "Reference replay source draws disagree with clock batch boundaries");
  }catch(const std::exception& e){running=false;faulted=true;preparation.reset();render_only_preparation=false;pending=false;clear_diagnostic_pad();menu_clock.reset();message=e.what();if(preparation_started)preparation_ms=emscripten_get_now()-preparation_started;preparation_failed(e.what());timing_valid=0;std::fprintf(stderr,"Native menu: %s\n",e.what());
   const double failed=emscripten_get_now();
   if(input_done<started)input_done=failed;
@@ -760,7 +779,7 @@ void tick(){
  const bool render_preparation_activity=
   stat_delta(stats_after.queuedPipelines,stats_before.queuedPipelines)!=0||
   stat_delta(stats_after.createdPipelines,stats_before.createdPipelines)!=0||
-  stats_after.lastTextureUploadSize!=0;
+  (actual_source_draw&&stats_after.lastTextureUploadSize!=0);
  const bool was_warming=preparation.warming();
  if(was_warming)preparation_profile.observe(finished-started,render_draw_ms,render_end_ms,
                                              actual_source_draw,stats_before,stats_after);
@@ -792,7 +811,7 @@ void tick(){
  // outstanding asynchronous pipeline compilation justifies stopping the clock.
  if(preparation.phase()==melee_web::MenuPreparationState::Phase::Idle&&running&&actual_source_draw&&
     melee_web::MenuPreparationState::needs_live_render_settle(stats_after.queuedPipelines)){
-  if(preparation.request_render_settle()){
+  if(preparation.request_render_settle(preparation_uses_source_draws())){
    preparation_profile.begin(false,finished);
    render_only_preparation=true;
    running=false;menu_clock.reset();message="Preparing first-use rendering...";
@@ -951,9 +970,11 @@ int melee_web_native_menu_launch(){try{
 }catch(const std::exception& e){message=e.what();running=false;return 0;}}
 int melee_web_native_menu_unload(){try{close();message="Native menus unloaded.";return 1;}catch(const std::exception& e){message=e.what();return 0;}}
 int melee_web_native_menu_replay(const uint8_t* data,unsigned size,int observe){try{
+ replay_source_frames=melee_web::SourceFrameSequence{};
  check(data&&size<=melee_web::kRetailReplayMaxBytes,"Invalid reference replay bytes");
  check(observe==0||observe==1,"Invalid replay observation mode");
  auto candidate=std::make_unique<melee_web::RetailReplayRecipe>(melee_web::read_retail_replay({data,size}));
+ check(candidate->version!=6||observe==1,"Recorded input-queue replay requires state-capture mode; live timing is not admitted");
  check(candidate->version>=2&&candidate->initial_input,"Browser reference playback requires a PAD history recipe (v2 or v3)");
  check(!reference_heap_used,"Reference replay requires a fresh application. Use Reload application state, import the disc, then play the recipe before entering menus.");
  reference_heap_used=true;
@@ -1123,6 +1144,12 @@ int main(int argc,char** argv){
  pipeline_bootstrap_started=emscripten_get_now();
 #endif
  aurora_initialize(argc,argv,&config);
+#if !defined(MELEE_WEB_SELECTIVE_PIPELINES)
+ // Development replay must draw every requested primitive. Its first-use
+ // compilation remains measured; it must not silently skip geometry and then
+ // repair the image by invoking extra source camera callbacks.
+ if(!aurora_pipeline_set_complete_draws(1))return 1;
+#endif
 #if defined(MELEE_WEB_SELECTIVE_PIPELINES)
  pipeline_union_requested=emscripten_get_now();
  pipeline_renderer_init_ms=pipeline_union_requested-pipeline_bootstrap_started;

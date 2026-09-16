@@ -19,6 +19,10 @@ typedef struct MeleeWebMenuMatchSelection {
     struct {uint32_t controller,stocks,costume,sub_color;} players[4];
     uint32_t player_count;
     uint32_t random_seed, hud_layout;
+    /* Source save inputs must survive the menu world's teardown. Zero present
+     * means an older diagnostic did not record a profile; it is not all-unlocked. */
+    uint16_t unlocked_characters, unlocked_stages;
+    uint8_t save_profile_present;
 } MeleeWebMenuMatchSelection;
 /* Owns source selection across separate CSS, SSS and match SDK worlds.
  * Enter only after GameplayMenuWorld has published its native assets. */
