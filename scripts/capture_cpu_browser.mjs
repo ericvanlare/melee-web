@@ -113,6 +113,9 @@ try {
   await page.locator('#canvas').scrollIntoViewIfNeeded();
   await page.waitForFunction(() => window.cpuObservationRows.length >= 360 ||
     document.querySelector('#retail-replay-downloads a'), null, {timeout});
+  // Live diagnostics above the canvas can grow after match entry. Recheck its
+  // placement once those rows exist, without changing the framebuffer size.
+  await page.locator('#canvas').scrollIntoViewIfNeeded();
   const presentation = await page.locator('#canvas').evaluate(canvas => {
     const rect = canvas.getBoundingClientRect();
     return {x:rect.x, y:rect.y, width:rect.width, height:rect.height,
