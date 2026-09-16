@@ -13,6 +13,9 @@
 #include "animation_clock.hpp"
 #include "source_frame_sequence.hpp"
 #include "gameplay_pipeline_preparation.hpp"
+#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
+#include "melee_pipeline_seed_identity.h"
+#endif
 #include <aurora/aurora.h>
 #include <aurora/event.h>
 #include <aurora/main.h>
@@ -793,7 +796,7 @@ void tick(){
    selected_pipelines.state,selected_pipelines.ready,selected_pipelines.unique_count,
    selected_pipelines.pending_count,selected_pipelines.unexpected_count,
    selected_pipelines.deferred_count,selected_pipelines.error_count,
-   MELEE_WEB_PIPELINE_PREPARATION_SEED_DECODED_SHA256,pipeline_renderer_init_ms,pipeline_union_submit_ms,
+   MELEE_WEB_PIPELINE_SEED_SHA256,pipeline_renderer_init_ms,pipeline_union_submit_ms,
    pipeline_union_first_ready?pipeline_union_first_ready-pipeline_union_requested:0,
    pipeline_union_first_ready?pipeline_union_first_ready-pipeline_bootstrap_started:0);
  const unsigned pending_selected=selected_pipelines.ready?0:1;
