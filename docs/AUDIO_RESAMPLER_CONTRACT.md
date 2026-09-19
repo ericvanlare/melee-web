@@ -48,7 +48,7 @@ caps it at `0x40000` before storing `ratioHi`/`ratioLo`.
 ## C boundary behavior
 
 `MeleeWebAudioResample.history[0..3]` is chronological, with index zero at
-the current source position. `fraction` is the low 16 bits of a non-negative
+the oldest retained sample. `fraction` is the low 16 bits of a non-negative
 Q16.16 phase. A filtered call forms `total = fraction + ratio`, consumes
 `floor(total/65536)` source samples by shifting the four-sample window left and
 appending callback data, saves `total % 65536`, and then renders from that
@@ -69,6 +69,35 @@ blend
 using the same arithmetic floor and signed 16-bit clamp. Selector 2 reads one
 source sample directly for each output, shifts the history window, ignores
 ratio, and leaves `fraction` unchanged.
+
+## Equivalence to the historical port
+
+A separate source review compared this implementation with the adapter at
+`e519c2fa4416c1ff8dba4e5467e65a2927b5ad29`. For valid objects and callbacks,
+`fraction < 65536`, `ratio <= 0x40000`, and selectors 0 through 2:
+
+1. `fraction + ratio` is at most `0x4ffff`, so it cannot overflow. Dividing it
+   into quotient and low 16-bit remainder is identical to the old repeated
+   subtraction. Both consume the same zero-to-four samples, perform the same
+   history shift before each filtered read, and update saved fraction only
+   after the reads. A callback observing state sees the same history and phase.
+2. For every retained phase `p`, `(p >> 7) & 0x1fc` equals `(p >> 9) << 2`.
+   Thus both address exactly the same four coefficients.
+3. Four signed-16-bit products sum between `-4294836224` and `4294967296`,
+   safely inside `int64_t`. The Q15 result is between `-131068` and `131072`,
+   also inside the old helper's `int32_t` return range. The weighted linear
+   blend is bounded by its signed-16-bit endpoints after Q16 division.
+4. For positive divisor `d`, C's `v/d - (v%d < 0)` is floor division. It
+   matches the old positive shift and negative `-ceil(abs(v)/d)` expression.
+   At zero linear phase, evaluating the weighted sum returns the same history
+   sample as the old special case. Both apply identical final saturation.
+5. Direct mode performs one callback before changing history, appends the same
+   sample, and preserves fraction. Struct layout and C function signature are
+   unchanged. The include-guard identifier changed; no repository caller uses
+   the old guard as an API.
+
+This is a review argument about defined C behavior under the caller contract,
+not a machine-checked proof and not a claim about inputs that violate it.
 
 ## Remaining hardware uncertainty
 
