@@ -22,6 +22,10 @@ Select parser rows appropriate to the boundary being changed. The inspection
 model parser has narrower capabilities than the original native HSD runtime;
 its rejection is parser evidence, not proof that the source stage cannot run.
 Retain such failures and use the stage-specific trace for source lifecycle claims.
+For lifecycle-only work, explicitly set `"checks": []`; the report lists asset
+parser checks as unverified and no parser is compiled or run. A nonempty `checks`
+array still runs first, and any selected parser failure stops the combined run.
+Use the standalone batch command below when only the parser boundary is changing.
 
 For example, `work/content-check.json` can contain the following **bounded sample**
 for Dr. Mario/Roy on Final Destination and the separate Battlefield trace:
@@ -72,8 +76,22 @@ python3 scripts/check_content.py --manifest work/content-check.json \
 
 The default configuration is Release; `--configuration RelWithDebInfo` selects
 the other explicit build directory. There is no selection by file timestamp
-and no option to skip the build. Ninja can reuse current objects normally.
+and no option to skip the build. The command delegates source/toolchain checks,
+configuration and compilation to `scripts/build.py`, recording them in `build.log`.
+Ninja reuses current objects normally; unchanged generated ImGui source retains
+its timestamp so configuration alone does not force a backend rebuild and relink.
 The output directory must be new, under `work/`, and outside input directories.
+
+The same selected-target build is available directly when debugging a trace:
+
+```sh
+python3 scripts/build.py --configuration Release --jobs 2 \
+  --trace-target gameplay_stage_battlefield_trace
+```
+
+Repeat `--trace-target` to build both supported traces. This selects only the
+named targets and their dependencies. It cannot be combined with a `--target`
+group or a public/provenance/selective build mode.
 
 `report.json` includes input hashes, the initial Git revision/diff hash,
 dependency lock, executed JS/Wasm hashes, exact commands, step durations,

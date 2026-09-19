@@ -10,7 +10,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 from pathlib import Path
 import subprocess
 import sys
@@ -18,6 +17,7 @@ import time
 
 from check_assets import parse_checks, unique_json_object, validate_check_paths
 from check_gameplay import node_runtime
+from build import build_directory
 
 ROOT = Path(__file__).resolve().parents[1]
 MATCH = "gameplay_content_match_trace"
@@ -44,7 +44,9 @@ def load_manifest(path: Path) -> tuple[list, list[dict]]:
     value = json.loads(path.read_text(), object_pairs_hook=unique_json_object)
     if not isinstance(value, dict) or set(value) != {"checks", "lifecycles"}:
         raise ValueError("Content manifest must contain only checks and lifecycles")
-    checks = parse_checks(value["checks"], path.parent)
+    # An explicit empty array selects lifecycle-only work. Other malformed values
+    # still fail, and selected parser rows retain their normal failure behavior.
+    checks = [] if value["checks"] == [] else parse_checks(value["checks"], path.parent)
     rows = value["lifecycles"]
     if not isinstance(rows, list) or not rows:
         raise ValueError("lifecycles must be a nonempty array")
@@ -128,8 +130,7 @@ def run_step(report: dict, out: Path, step: dict, *, timeout: int, root: Path) -
     try:
         with open(step["log"], "xb") as log:
             result = subprocess.run(step["command"], cwd=root, stdout=log,
-                                    stderr=subprocess.STDOUT, timeout=timeout,
-                                    env=os.environ | step.get("environment", {}))
+                                    stderr=subprocess.STDOUT, timeout=timeout)
         step["returncode"] = result.returncode
         if result.returncode:
             raise CheckFailed(f"Command exited {result.returncode}")
@@ -173,7 +174,9 @@ def validate(manifest: Path, out: Path, *, configuration: str, jobs: int,
     try:
         report["manifest"] = file_identity(manifest)
         checks, traces = load_manifest(manifest)
-        build_dir = root / ("build/browser-release" if configuration == "Release" else "build/browser")
+        build_dir = build_directory(root, configuration=configuration)
+        if not checks:
+            report["unverified"].append("asset parser checks (checks: [])")
         report["planned_lifecycles"] = [
             {"id": run["id"], "scope": run["scope"]}
             for run in trace_runs(traces, build_dir, Path("node"))]
@@ -192,31 +195,23 @@ def validate(manifest: Path, out: Path, *, configuration: str, jobs: int,
         next_check = "Resolve the configured project-local Node/SDK error before running checks."
         node = node_runtime(root)
         report["node"] = file_identity(node)
-        # Materialize exactly the resolved check rows for the existing checker.
-        asset_manifest = out / "assets.json"
-        asset_manifest.write_text(json.dumps({"checks": checks}, default=str, indent=2) + "\n")
-        boundary = "assets"
-        next_check = "Inspect the rejected file/root and reason in assets.log against its original source consumer."
-        run_step(report, out, {"id": boundary, "command": [sys.executable,
-                 str(root / "scripts/check_assets.py"), "--manifest", str(asset_manifest)]},
-                 timeout=600, root=root)
-        boundary = "configure"
-        next_check = "Inspect configure.log; resolve the first pinned-source or toolchain error before retrying."
-        run_step(report, out, {"id": boundary, "command": [sys.executable,
-                 str(root / "scripts/build.py"), "--target", "gameplay", "--configuration",
-                 configuration, "--configure-only"]}, timeout=600, root=root)
-        cmake = root / ".venv" / ("Scripts/cmake.exe" if os.name == "nt" else "bin/cmake")
+        if checks:
+            # Materialize exactly the resolved check rows for the existing checker.
+            asset_manifest = out / "assets.json"
+            asset_manifest.write_text(json.dumps({"checks": checks}, default=str, indent=2) + "\n")
+            boundary = "assets"
+            next_check = "Inspect the rejected file/root and reason in assets.log against its original source consumer."
+            run_step(report, out, {"id": boundary, "command": [sys.executable,
+                     str(root / "scripts/check_assets.py"), "--manifest", str(asset_manifest)]},
+                     timeout=600, root=root)
         targets = sorted({trace["target"] for trace in traces})
-        sdk = root / ".deps/emsdk"
-        environment = {"EMSDK": str(sdk), "EM_CONFIG": str(sdk / ".emscripten"),
-                       "EM_CACHE": str(sdk / "upstream/emscripten/cache"),
-                       "EMSDK_PYTHON": sys.executable,
-                       "PATH": str(cmake.parent) + os.pathsep + os.environ.get("PATH", "")}
         boundary = "build"
-        next_check = "Inspect build.log and repair the first compiler/linker failure in the selected source target."
-        run_step(report, out, {"id": boundary, "command": [str(cmake), "--build", str(build_dir),
-                 "--target", *targets, "--parallel", str(jobs)], "environment": environment},
-                 timeout=1800, root=root)
+        next_check = "Inspect build.log; resolve the first source, toolchain, configure or compiler/linker error before retrying."
+        command = [sys.executable, str(root / "scripts/build.py"),
+                   "--configuration", configuration, "--jobs", str(jobs)]
+        for target in targets:
+            command += ["--trace-target", target]
+        run_step(report, out, {"id": boundary, "command": command}, timeout=2400, root=root)
         boundary = "build-artifacts"
         next_check = "Inspect build.log and the selected target's missing output; no other build directory will be substituted."
         report["build"] = [file_identity(build_dir / (target + suffix))

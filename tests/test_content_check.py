@@ -41,8 +41,8 @@ class ContentCheckTests(unittest.TestCase):
 
     def fake_run(self, command, *, stdout, **kwargs):
         self.calls.append(command)
-        if "--build" in command:
-            build_dir = Path(command[command.index("--build") + 1])
+        if "--trace-target" in command:
+            build_dir = content.build_directory(self.root, configuration="Release")
             build_dir.mkdir(parents=True, exist_ok=True)
             for target in (content.MATCH, content.BATTLEFIELD):
                 for suffix in (".js", ".wasm"):
@@ -70,16 +70,51 @@ class ContentCheckTests(unittest.TestCase):
         status, report = self.invoke()
         self.assertEqual(status, 0)
         self.assertEqual([step["id"] for step in report["steps"]], [
-            "assets", "configure", "build", "lifecycle-00-p20-p8", "lifecycle-00-p8-p20", "lifecycle-01-battlefield"])
-        build = report["steps"][2]
-        self.assertEqual(build["command"][build["command"].index("--target") + 1:-2], sorted([content.MATCH, content.BATTLEFIELD]))
-        self.assertEqual(report["steps"][3]["command"][-3:], ["32", "20", "8"])
-        self.assertEqual(report["steps"][4]["command"][-3:], ["32", "8", "20"])
-        self.assertIn("/build/browser-release/", report["steps"][3]["command"][1])
+            "assets", "build", "lifecycle-00-p20-p8", "lifecycle-00-p8-p20", "lifecycle-01-battlefield"])
+        build = report["steps"][1]
+        self.assertEqual(build["command"][1], str(self.root / "scripts/build.py"))
+        self.assertEqual([build["command"][i + 1] for i, arg in enumerate(build["command"])
+                          if arg == "--trace-target"], sorted([content.MATCH, content.BATTLEFIELD]))
+        self.assertEqual(report["steps"][2]["command"][-3:], ["32", "20", "8"])
+        self.assertEqual(report["steps"][3]["command"][-3:], ["32", "8", "20"])
+        self.assertIn("/build/browser-release/", report["steps"][2]["command"][1])
         self.assertEqual(len(report["inputs"]), 2)
         self.assertEqual(len(report["build"]), 4)
         self.assertEqual(report["not_run"], [])
         self.assertIn("cold/warm live timing", report["unverified"])
+
+    def test_stage_lifecycle_without_parser_rows_builds_and_reports_omitted_scope(self):
+        self.spec["checks"] = []
+        self.spec["lifecycles"] = [self.spec["lifecycles"][1]]
+        self.manifest.write_text(json.dumps(self.spec))
+        status, report = self.invoke()
+        self.assertEqual(status, 0)
+        self.assertEqual([step["id"] for step in report["steps"]], ["build", "lifecycle-00-battlefield"])
+        self.assertIn("asset parser checks (checks: [])", report["unverified"])
+        self.assertEqual(len(report["inputs"]), 1)
+        self.assertFalse((self.out / "assets.json").exists())
+        self.assertEqual(report["steps"][0]["command"][-2:], ["--trace-target", content.BATTLEFIELD])
+
+    def test_lifecycle_only_still_rejects_missing_inputs_before_build(self):
+        self.spec["checks"] = []
+        self.spec["lifecycles"][0]["assets"] = "missing-assets"
+        self.manifest.write_text(json.dumps(self.spec))
+        status, report = self.invoke()
+        self.assertEqual(status, 1)
+        self.assertEqual(self.calls, [])
+        self.assertEqual(report["first_failure"]["boundary"], "inputs")
+
+    def test_empty_checks_must_be_explicit_and_lifecycles_cannot_be_empty(self):
+        for checks in (None, {}, "", False):
+            self.spec["checks"] = checks
+            self.manifest.write_text(json.dumps(self.spec))
+            with self.subTest(checks=checks), self.assertRaises(ValueError):
+                content.load_manifest(self.manifest)
+        self.spec["checks"] = []
+        self.spec["lifecycles"] = []
+        self.manifest.write_text(json.dumps(self.spec))
+        with self.assertRaisesRegex(ValueError, "lifecycles must be a nonempty array"):
+            content.load_manifest(self.manifest)
 
     def test_missing_input_fails_before_any_build_and_is_not_a_skip(self):
         (self.game / "fighter.dat").unlink()
@@ -105,13 +140,13 @@ class ContentCheckTests(unittest.TestCase):
     def test_build_failure_cannot_run_preexisting_binary(self):
         def fail(command, **kwargs):
             result = self.fake_run(command, **kwargs)
-            if "--build" in command:
+            if "--trace-target" in command:
                 kwargs["stdout"].write(b"link: missing original service\n")
                 return subprocess.CompletedProcess(command, 1)
             return result
         status, report = self.invoke(fail)
         self.assertEqual(status, 1)
-        self.assertEqual(len(self.calls), 3)
+        self.assertEqual(len(self.calls), 2)
         self.assertEqual(report["first_failure"]["boundary"], "build")
 
     def test_lifecycle_failure_retains_log_and_does_not_run_remaining_rows(self):
@@ -123,7 +158,7 @@ class ContentCheckTests(unittest.TestCase):
             return self.fake_run(command, **kwargs)
         status, report = self.invoke(fail)
         self.assertEqual(status, 1)
-        self.assertEqual(len(self.calls), 4)
+        self.assertEqual(len(self.calls), 3)
         self.assertIn("Missing Article", report["first_failure"]["diagnostic_tail"])
         self.assertEqual(report["not_run"], ["lifecycle-00-p8-p20", "lifecycle-01-battlefield"])
 
@@ -174,14 +209,14 @@ class ContentCheckTests(unittest.TestCase):
     def test_missing_artifact_after_successful_build_has_its_own_boundary(self):
         def missing(command, **kwargs):
             result = self.fake_run(command, **kwargs)
-            if "--build" in command:
+            if "--trace-target" in command:
                 (self.root / "build/browser-release" / (content.MATCH + ".wasm")).unlink()
             return result
         status, report = self.invoke(missing)
         self.assertEqual(status, 1)
         self.assertEqual(report["first_failure"]["boundary"], "build-artifacts")
         self.assertIn(content.MATCH + ".wasm", report["first_failure"]["message"])
-        self.assertEqual(len(self.calls), 3)
+        self.assertEqual(len(self.calls), 2)
 
     def test_unknown_trace_or_invalid_source_identity_is_rejected(self):
         for change in ({"target": "arbitrary_executable"}, {"p1_ckind": True}, {"stkind": -1}, {"args": []}):
