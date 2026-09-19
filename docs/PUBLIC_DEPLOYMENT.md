@@ -15,14 +15,19 @@ the accepted alpha risk posture and the artifact/contact requirements.
 
 ## Current launch state
 
-The initial silent alpha is live at **[webmelee.gg](https://webmelee.gg/)**.
+The silent alpha is live at **[webmelee.gg](https://webmelee.gg/)**.
 The operator is **NaiadAI, LLC**; the public contact is **legal@webmelee.gg**.
 Actual Google Workspace alias delivery was verified before the nameserver
 change and again after migration, before custom-domain activation. The exact
-audited candidate is deployed to staging at
-[8e2cdf90.webmelee.pages.dev](https://8e2cdf90.webmelee.pages.dev) and to the
+reviewed PR #32 candidate (`2ee80ab`) was deployed on September 19, 2026 to staging at
+[eb434dfe.webmelee-staging.pages.dev](https://eb434dfe.webmelee-staging.pages.dev) and to the
 production Pages environment at
-[928714aa.webmelee.pages.dev](https://928714aa.webmelee.pages.dev).
+[ccff0e62.webmelee.pages.dev](https://ccff0e62.webmelee.pages.dev).
+The exact same audited bytes passed HTTP verification and the public browser
+smoke on both production origins. The
+[current release receipt](evidence/public-link-release-v1.json) records identity,
+rollback, ordinary-input coverage and retained timing pauses. It does not admit
+uninterrupted performance. The initial launch record below remains historical.
 
 Namecheap saved `alan.ns.cloudflare.com` and `hadlee.ns.cloudflare.com` as the
 custom nameservers after the mail and artifact gates passed. Cloudflare serves

@@ -1,0 +1,1116 @@
+{
+  "schema": "melee-web-gpu-compilation-diagnosis-v1",
+  "scope": "Profiled diagnostic; does not establish timing acceptance or classify older a822 failure.",
+  "source_commit": "2ee80ab70ac0d697a7abf7cdf337ca216908ea3b",
+  "native_callback": {
+    "frame": 688,
+    "source_steps": 1,
+    "source_draws": 1,
+    "start_page_ms": 15389.01,
+    "end_page_ms": 15873.47,
+    "native_ms": 484.46,
+    "staging_wait_ms": 482.785,
+    "pipelines_created": 0
+  },
+  "preceding_callback": [
+    {
+      "frame": 686,
+      "started": 15355.83,
+      "source_steps": 2,
+      "source_draws": 2,
+      "created_delta": 4,
+      "total_ms": 10.895
+    }
+  ],
+  "pipeline_operations": [
+    {
+      "label": "GX Pipeline de423b8a shader 8023336c",
+      "start_page_ms": 15365.888,
+      "wall_ms": 215.299,
+      "thread_cpu_ms": 3.832
+    },
+    {
+      "label": "GX Pipeline f3f744bb shader 964311aa",
+      "start_page_ms": 15582.943,
+      "wall_ms": 173.819,
+      "thread_cpu_ms": 1.608
+    },
+    {
+      "label": "GX Pipeline d1a85940 shader 4d4a51fb",
+      "start_page_ms": 15758.494,
+      "wall_ms": 53.626,
+      "thread_cpu_ms": 1.544
+    },
+    {
+      "label": "GX Pipeline a38c3036 shader 1c170616",
+      "start_page_ms": 15813.789,
+      "wall_ms": 53.601,
+      "thread_cpu_ms": 1.776
+    }
+  ],
+  "compilation_operations_wall_ms": 496.345,
+  "chrome_marker_offset_span_us": 3.0,
+  "raw_evidence": {
+    "chrome-trace.json.gz": "05cf88c7c734a415eef2204a6050d4be820197ae9b6fcc4661c61411bda63d1d",
+    "chrome-gpu-correlation.json": "ed7192e79ffa6453f6a5522b7cdf7ae986428a6b00313abf1e80df16f37c60ae",
+    "cold.json": "6ecc2abc1f9d60d3ad7a60c0301a3d56865339412d62b763f2fec051cd93318e",
+    "public-observer.json": "551a0f64ff8ce664cd481506926d3cd6e980e53e17f23d5fd68eb89048f2ee5d",
+    "native-gpu-capture.json": "d8c85f9dd74b87807cc5345f881bffe0fb9eca17f536716d73993e6d397cd94f"
+  },
+  "diagnostic_only": true,
+  "native": {
+    "capture_exit_code": 0,
+    "owned_gpu_pid": 84459,
+    "owned_gpu_main_tid": 8645831,
+    "page_coverage_ms": [
+      7888.881,
+      16701.146
+    ],
+    "blocked_ms": 471.752,
+    "running_ms": 12.627,
+    "runnable_ms": 0.019,
+    "interrupted_ms": 0.062,
+    "compiler_kevent_overlap_ms": 467.538,
+    "blocked_stack": [
+      "kevent_id",
+      "_dispatch_sync_f_slow",
+      "MTLCompilerScheduler::buildRequest",
+      "MTLDevice::newLibraryWithSource"
+    ],
+    "export_sha256": {
+      "native-toc.xml": "431d7aa743b3a74a87e82e827b32ea662c7ea9d99b98a800ce8032d2fdf51f5a",
+      "native-thread-state.xml": "9d1d223a1f43d7fe62c3b1c4555145a4fe71be7b119124dffe795e7d3b2975cc",
+      "native-syscall.xml": "06c5b5b7586fbdd39f04418360e746d129f1f6af97774f3ce2070e266fb5ee36",
+      "native-time-profile.xml": "5bb3ea12e0f304b47ffae0127893a83aead18a4a8227415b3e1dce8467ca3949",
+      "owned-gpu-thread-states.json": "b4f6a5bbf40882055fdaf6b03aa2079b0845c4976b0fdc11829578e4955c734f"
+    }
+  },
+  "mechanism": "Four GX pipelines requested in the prior live callback synchronously compile in the GPU process, blocking queue progress; the next source draw waits for its owned staging lease.",
+  "historical_a822_classified": false,
+  "holdouts_opened": false,
+  "seed": {
+    "before_sha256": "ac57c60cc4ee1076fd801707447b696dd5717e2bc6d9224c6fba8e2b08ff98fd",
+    "after_sha256": "b935fd741f029cd12afb5ac584ef943e51bb00c34c689ae44b1e75d6ae81a8ce",
+    "decoded_bytes": 2613248,
+    "preserved_rows": 548,
+    "preserved_all_fields_byte_exact": true,
+    "added_gx_descriptors": 78,
+    "gx_pipeline_count": 625,
+    "shader_rows": 1,
+    "driver_cache_included": false,
+    "new_descriptors": [
+      {
+        "type": 1,
+        "hash": "0036a1dd",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "27acea1848d539b2631da18fd01dd3a71e919f7a2b45533b18a971b619deb7bc",
+        "first_frame_used": 2292
+      },
+      {
+        "type": 1,
+        "hash": "05d2a68e",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "266af21babcc53e0e57291d73b7262ae2228ea6c48ee1f3784664e239d5bb0c6",
+        "first_frame_used": 196
+      },
+      {
+        "type": 1,
+        "hash": "0687e398",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "f36f16768f33739bd27ce6bebd516f6ef328dd648314059a9f6c863c3b13098f",
+        "first_frame_used": 137
+      },
+      {
+        "type": 1,
+        "hash": "0fe3158b",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "f74d5bdb66697d44f676885a346dfd9ffc60f0bb0c7c86a87b82eb101ab69e17",
+        "first_frame_used": 492
+      },
+      {
+        "type": 1,
+        "hash": "11030d7f",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "65ba28c2f3e23d00968b72f872334ff2ff825f3e098c8610718e55d4d70d0cf4",
+        "first_frame_used": 196
+      },
+      {
+        "type": 1,
+        "hash": "126fa727",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "2d2171dedc192f538786cb58f1c76b933b77b0978d24b9480cbfc5cba3c2f816",
+        "first_frame_used": 1278
+      },
+      {
+        "type": 1,
+        "hash": "12936a6c",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "25b54eae65c578da7d466ab98dd29066cf61af89b2350535e6a6caddd1df2d60",
+        "first_frame_used": 2847
+      },
+      {
+        "type": 1,
+        "hash": "139ac608",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "a548f878ee3ed4a5aaa32d5fc8074642e4d6aeba81702cd9eabfe2c6a6a3a54c",
+        "first_frame_used": 137
+      },
+      {
+        "type": 1,
+        "hash": "13a03c7f",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "df1a64f54f3586f2da0e529c4fc0398513b2b7d8d408db07b26251ea7856a51d",
+        "first_frame_used": 2656
+      },
+      {
+        "type": 1,
+        "hash": "14316e02",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "28fbc5969cb83f3973df407caade0606d9a51ebf8b5f38cf4baf228b4fe14b29",
+        "first_frame_used": 2797
+      },
+      {
+        "type": 1,
+        "hash": "14eedcd8",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "c310e6ab21e602fa5295a973f1e8c07bae124f4ad7c8f67b536ecf49bf40243d",
+        "first_frame_used": 2782
+      },
+      {
+        "type": 1,
+        "hash": "17756092",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "08d64be74bf93e21e20c2981feef0c8e52f9676b66b74f7465d6df8c46c08131",
+        "first_frame_used": 492
+      },
+      {
+        "type": 1,
+        "hash": "19ce39ed",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "023bfe3fec4e4d5ff49d18d7c277818d9fb10c61ffcca9c8011dd12b507ff408",
+        "first_frame_used": 138
+      },
+      {
+        "type": 1,
+        "hash": "21161e08",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "44b9b06c2573872632ec7dba795827e84bf0571731abc58f31af2f1dfb7da42b",
+        "first_frame_used": 492
+      },
+      {
+        "type": 1,
+        "hash": "304dceb9",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "4659c3711bf48d666aec5add1edbc6281ba9d5e3d7ba3462edbb492bf0832719",
+        "first_frame_used": 2249
+      },
+      {
+        "type": 1,
+        "hash": "3056ec5b",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "cb616af39ba29c586c0e090c7b9aa4402a8050f1395d6021c6843fdb54ebba0e",
+        "first_frame_used": 137
+      },
+      {
+        "type": 1,
+        "hash": "31ea2b38",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "c4558a2eb18b5167666dba37acf239774cfde1118f16463ade146e529c2b4e2b",
+        "first_frame_used": 2782
+      },
+      {
+        "type": 1,
+        "hash": "3d7399f9",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "6b761629db3cd229ac8f48f869d89a1494faab7c401677b3ef579a07c0eae347",
+        "first_frame_used": 137
+      },
+      {
+        "type": 1,
+        "hash": "3ee36e94",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "9995639aa6c31eb2ee8ea39f4e5f005ff2392c3ff374c599a2f7120029eb306f",
+        "first_frame_used": 138
+      },
+      {
+        "type": 1,
+        "hash": "41c3447c",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "f49153519e011c1a760a6e6aadc329eb6c06f13948ddf6e7047d478382f4edcb",
+        "first_frame_used": 138
+      },
+      {
+        "type": 1,
+        "hash": "44c7b949",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "28efe68e0b8b548c574bd017144964f582cad21eec5e95673615d40f3faeb44f",
+        "first_frame_used": 2753
+      },
+      {
+        "type": 1,
+        "hash": "4582fa92",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "c1474c3564b7a184b6a806104f33c0bbe8d01c242921cdc8ecc1d9d47ca4a65b",
+        "first_frame_used": 495
+      },
+      {
+        "type": 1,
+        "hash": "4883835d",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "8320bf9d1d81fdc56be3ad30f0ac712e8af01c7af9a6dcb89b09993bbed1f6c1",
+        "first_frame_used": 492
+      },
+      {
+        "type": 1,
+        "hash": "4e1f43b1",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "7f8fc26bbd8beec8382edb25e003c1451f5897538a8e93f475fd60b666b4b92c",
+        "first_frame_used": 201
+      },
+      {
+        "type": 1,
+        "hash": "4e91a092",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "798fa09449d9e80635b2aa1c9852049eb84d0c9697e6191a577f503db7a17143",
+        "first_frame_used": 142
+      },
+      {
+        "type": 1,
+        "hash": "50853ced",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "0fdb2708072bef15c81223bfb0b1482076360e8851768efb4caf00faaa5f5a8c",
+        "first_frame_used": 137
+      },
+      {
+        "type": 1,
+        "hash": "52163c0c",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "f3c58977322a1c3cfd18de5203ab9a494de076b313807eb71f8ced94e88ce6ea",
+        "first_frame_used": 2249
+      },
+      {
+        "type": 1,
+        "hash": "632c2743",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "33337dd4a6d4a5017e43218a3feec10f8b2491ed89ccd7d507bbaecb14f20c16",
+        "first_frame_used": 201
+      },
+      {
+        "type": 1,
+        "hash": "6b05779f",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "d3f0c8337fb4c099c16a5d45f10afd9eed2a898337debca2fc85469acb2b2fca",
+        "first_frame_used": 138
+      },
+      {
+        "type": 1,
+        "hash": "6e0ef799",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "cbea99ed26a0e8e922beb4e518a8fb248336830862ed78ef7461ec15d7fab4e2",
+        "first_frame_used": 196
+      },
+      {
+        "type": 1,
+        "hash": "73983025",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "44898402aadaf467a40f58746944897ee7d6c1bf3ec22e83c75bcfb5f5ac7713",
+        "first_frame_used": 1278
+      },
+      {
+        "type": 1,
+        "hash": "73f73303",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "1ebf29d9433694972d64da255179f0dc73075b009184361235dd3c5316c5d124",
+        "first_frame_used": 137
+      },
+      {
+        "type": 1,
+        "hash": "764b7c8b",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "37d432e119a1b4373b480b74a14095fa83620244b9e7575b990fabb53e393a18",
+        "first_frame_used": 138
+      },
+      {
+        "type": 1,
+        "hash": "7667c2ab",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "974ba1b35c75664bb219a4a18a761237ba7bb23be23dbef3da5cb3661e392ce5",
+        "first_frame_used": 2782
+      },
+      {
+        "type": 1,
+        "hash": "79fd04eb",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "2179de76d733b508b8f33a2dd3a2b71130b06d47a7f160e18ccc7cb56072e74d",
+        "first_frame_used": 2621
+      },
+      {
+        "type": 1,
+        "hash": "7da568ff",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "c0f1410dad26fbb1572a0de7c7b9ca847ef7d10877271a4da0b5dd2072830038",
+        "first_frame_used": 2621
+      },
+      {
+        "type": 1,
+        "hash": "7e3e68ad",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "a0ce9925dd6e4d5fe917e3eb092d0e092a635310b9010adb234785b9a09a7143",
+        "first_frame_used": 196
+      },
+      {
+        "type": 1,
+        "hash": "7ff97bd1",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "76cd5bae18921460c203cffd0b0cac6254a5983d43955f1e0582d0e231da76cd",
+        "first_frame_used": 2249
+      },
+      {
+        "type": 1,
+        "hash": "87fe60c8",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "bcdde62ec1dd9466fc757f0f15c091b9048114f91e38baa319e252eacdcd1cad",
+        "first_frame_used": 2656
+      },
+      {
+        "type": 1,
+        "hash": "8a316d3b",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "89279af9747b6c1c17311b721a33049f54b80801653fb7c62b469196f3f3f06c",
+        "first_frame_used": 137
+      },
+      {
+        "type": 1,
+        "hash": "8dfe20ea",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "17326ac06e624de9cb56f3895f2b35ca32cc945d7577eb594481fbb4487761cf",
+        "first_frame_used": 196
+      },
+      {
+        "type": 1,
+        "hash": "9365c0d1",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "4b6137d4553d5fdafb96a21baef8c3a92c11d8885f067d19da318d0116150c41",
+        "first_frame_used": 2249
+      },
+      {
+        "type": 1,
+        "hash": "94d3e967",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "dca694b037e8026c603cd870c827672b96412c8dbc8ab5506669a53c4b379550",
+        "first_frame_used": 2750
+      },
+      {
+        "type": 1,
+        "hash": "98e03ca4",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "8b867fda8faba0a9986f19a648eb506ff1771d99ffaffa50a0704236e2be4935",
+        "first_frame_used": 142
+      },
+      {
+        "type": 1,
+        "hash": "99d3541f",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "ecb1eb4b6bf92f8bab9f063e3728acb754b4324df9211ef1f0d3334b21759daf",
+        "first_frame_used": 137
+      },
+      {
+        "type": 1,
+        "hash": "a31620e3",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "d580172cbab48462086873886a799b56ac5ff9cd24a66436d8a3778f01a3f4f7",
+        "first_frame_used": 196
+      },
+      {
+        "type": 1,
+        "hash": "a32c9279",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "040bc7f3382295a36a1abd6c4ae55a4c91a6acc7bb5cf5a7d8f97ff50467e241",
+        "first_frame_used": 2943
+      },
+      {
+        "type": 1,
+        "hash": "a38c3036",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "1170ff37aef88a06991abc6405bb7220d28b09f677b0862a1ee9ea559f92d502",
+        "first_frame_used": 544
+      },
+      {
+        "type": 1,
+        "hash": "a3c561bd",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "6719cb3125312c76df521cbd26e63d3ca96f5e78d12232c614187d1a79d6b077",
+        "first_frame_used": 137
+      },
+      {
+        "type": 1,
+        "hash": "a443cd20",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "e5c964cebe8ff43042a1f24c6bca397b59a84f5f36fd462e59d11ec2397d7afe",
+        "first_frame_used": 196
+      },
+      {
+        "type": 1,
+        "hash": "abf8e59e",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "1d01a7d29e979b16fbc3e62ead663413c8b3d4b92b49da48bac7542049e54202",
+        "first_frame_used": 798
+      },
+      {
+        "type": 1,
+        "hash": "b1726ed9",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "78f2b9beb60bfd49a4351ca7523194fbd908c7e57ca20dba48419ef2e0f15002",
+        "first_frame_used": 2262
+      },
+      {
+        "type": 1,
+        "hash": "b61b852e",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "dbe9bdbef4e9ff7519dd3af562bd9d2124a2514fc1996d32ffa81fba36791143",
+        "first_frame_used": 142
+      },
+      {
+        "type": 1,
+        "hash": "b79ba5a1",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "a3a1129a86b9a16dcc8a2626800c97e08071bf94e3579d080b34cb393042e009",
+        "first_frame_used": 492
+      },
+      {
+        "type": 1,
+        "hash": "c02ff1a8",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "384ca8c5a4c79b5fffc7cc083efefc8d26169a266515d4956267a1a1f5497c08",
+        "first_frame_used": 1278
+      },
+      {
+        "type": 1,
+        "hash": "c22b72de",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "cba1a2a65b8cfeb250832e913e9be3cff091f71f3388fcf1a203a0dcb57e789c",
+        "first_frame_used": 2782
+      },
+      {
+        "type": 1,
+        "hash": "c243e783",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "f45eeedde097a8bd0e5edfd2f048090b413ba7126c9d0c7522c0a91eb75ce123",
+        "first_frame_used": 492
+      },
+      {
+        "type": 1,
+        "hash": "c3b1f8a8",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "b7881b235dd1074a046b2296a60fe986f551268907dd5e37bb79e9723893257b",
+        "first_frame_used": 137
+      },
+      {
+        "type": 1,
+        "hash": "c41bffe2",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "e97831e0900c8ee38552600128be8c7d7f1853c3c149de4a4c17a7bdc13c0863",
+        "first_frame_used": 201
+      },
+      {
+        "type": 1,
+        "hash": "d1a85940",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "9e159f55f141abae96fd3e3ffbd2f33c8e95060286225160d7c9cc507a59df98",
+        "first_frame_used": 544
+      },
+      {
+        "type": 1,
+        "hash": "d7287b6f",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "de8b74283762acf9d8db60e34c22e97e7316b599885f5851c78536fbea1b265d",
+        "first_frame_used": 2249
+      },
+      {
+        "type": 1,
+        "hash": "d7c06d81",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "c5f390271978dd69587801ef0291f1356bd072949d553b893dc0e7ea821194c9",
+        "first_frame_used": 137
+      },
+      {
+        "type": 1,
+        "hash": "db98f0c5",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "825b5e5113f8424c1520e5dacdc300dfd0f3341950d0ef6e55de85fcd24502d3",
+        "first_frame_used": 2249
+      },
+      {
+        "type": 1,
+        "hash": "dc0d077e",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "fd5dc41c0a4dbc12f526d4792c34a7cc668206f75291ec3145bc2f4af0eab66f",
+        "first_frame_used": 2782
+      },
+      {
+        "type": 1,
+        "hash": "dd64a0af",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "1cb225d0ff5b194d58deced6eb3ffe05c862a0bebf8506138f3eccecf29409fd",
+        "first_frame_used": 2752
+      },
+      {
+        "type": 1,
+        "hash": "de423b8a",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "17aa2827133d2e10b8fe58465d1932c197e6780f41e16d3ef0f42bb24ba88f35",
+        "first_frame_used": 544
+      },
+      {
+        "type": 1,
+        "hash": "e432aa3b",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "9a9a4072c7655e2f5b64569b486ae2d427c15e8020363639b71b9e44c2f4e44b",
+        "first_frame_used": 196
+      },
+      {
+        "type": 1,
+        "hash": "e4fb0e3b",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "33c1db40bb67f9f10bb45e85da9461ed266b072061d48a5968092f9302d5a862",
+        "first_frame_used": 2249
+      },
+      {
+        "type": 1,
+        "hash": "e6f1d4c7",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "e7d0225ae6c85d699c3d1c237fc2eac7b7fd5513e074b9ab7861cbf728217e8d",
+        "first_frame_used": 2656
+      },
+      {
+        "type": 1,
+        "hash": "e9477b87",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "ea988a86ff79b48591262476b6132d4c5375c6b130fe462a4f8258282d984a19",
+        "first_frame_used": 2261
+      },
+      {
+        "type": 1,
+        "hash": "f0acf4a8",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "60f3512e28a040a00a7bc404da53ebd9ce9bc2acb98b13cf3af8f933a08e5826",
+        "first_frame_used": 137
+      },
+      {
+        "type": 1,
+        "hash": "f1eb2668",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "5e8f97f7665ff8fba32a73976f9f1fd6fce3eb191dd2b082cb78d0c68e76b92e",
+        "first_frame_used": 492
+      },
+      {
+        "type": 1,
+        "hash": "f38850a9",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "1ac3f7c2245e9eb3c6255e02abadb8b1d10c3b6c62a2d60b37cfdfda328e873a",
+        "first_frame_used": 2621
+      },
+      {
+        "type": 1,
+        "hash": "f3d78775",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "77797417b082f9b27fbc295540c58bcd2f765bcbb50e4fde83024ecb97887d95",
+        "first_frame_used": 492
+      },
+      {
+        "type": 1,
+        "hash": "f3f744bb",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "004853a34dc398d80489edd21e3c72e2b28a1f919cb819fbab7e4688101412c2",
+        "first_frame_used": 544
+      },
+      {
+        "type": 1,
+        "hash": "f48eb52f",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "95912b114744557b13035c1c7ff4c46a4b085c17b63032ccfa2f1ca2d4e75be8",
+        "first_frame_used": 137
+      },
+      {
+        "type": 1,
+        "hash": "f63b2244",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "f2248e0df47a235a61f3b6eeaa215da8edc4c71228e27d4b1dbc5e1f6ca4c288",
+        "first_frame_used": 138
+      },
+      {
+        "type": 1,
+        "hash": "feade5e3",
+        "config_version": 65549,
+        "config_size": 2772,
+        "config_sha256": "604066b7746c5338e9c33a40d40043f7c858b71ca616262c00d7c315d686f5e8",
+        "first_frame_used": 138
+      }
+    ],
+    "provenance_reconciliation": {
+      "scope": "Final logical seed re-review; original first-export WAL was checkpointed and is not recovered.",
+      "original_db_sha256": "f1c1d714b195aa1795c50ed2db1795613d868a07340cbf0b1a563384fdfebdcf",
+      "original_db_bytes_recovered": true,
+      "original_wal_sha256": "18badf4318572ca7e00229b826c06550c56729560847f92801598be521733bfe",
+      "original_wal_bytes_recovered": false,
+      "checkpointed_db_sha256": "398b86d657c81a7863bf6f88351376ce95c4a77db475d4709b6b04afb6f24d08",
+      "checkpointed_payloads_match_saved_review": true,
+      "second_export_db_wal_match_saved_hashes": true,
+      "all_78_additions_match_saved_payload_hashes": true,
+      "all_548_prior_rows_preserved_byte_exact": true,
+      "fresh_aurora_schema_only": true,
+      "driver_bytes_excluded_from_final_seed": true,
+      "raw_rereview_sha256": "b4892025d8fa5873bb681244996633dbe4f80e3dffa54a6e08747c462cdb2a06",
+      "rereview_script_sha256": "dce0d88861efe4ccd586542dd170b3a4261bcf92a253ab313e816d2b9db91315",
+      "conclusion": "Original first-review DB bytes are recovered by matching SHA-256, but its WAL is not. The final seed's 78 additions are fully accounted for as 74 rows matching the first saved review and 4 rows matching the second saved review; all 548 prior rows are payload-exact and the final database has only the reviewed Aurora schema. This supports final-seed driver-byte exclusion while retaining the first WAL provenance limitation."
+    }
+  },
+  "discovery": [
+    {
+      "name": "Link/Young Link complete verified development replay",
+      "mode": "state_capture",
+      "frames": 7070,
+      "draws": 7064,
+      "prior_verified_state_and_draw_files_byte_identical": true,
+      "new_descriptors": 74,
+      "terminal_status": "Collector failed after saving required DB/WAL/SHM because its allowlist excluded a later Dawn cache file; native teardown and state replay completed. Original DB/WAL were separately reviewed then the first export was checkpointed. Matching DB bytes are recovered; original WAL bytes are unavailable. A later logical re-review matches every payload hash from the saved review. No driver-cache bytes are included in the seed.",
+      "report_sha256": "b217038eb3028c01a489fae50cd835047d2efe6859fd34bdb139cb7479bfe8f6",
+      "state_sha256": "b1b7f210e82d65e168721d7eaca0b9b9bfc54638c495db4766d60509d0630ce7",
+      "draw_sha256": "7bb99305bab7c5ea06d3941f4d98838e16a981026659ddf19618e0df6f26936f",
+      "review_sha256": "c394664749114400577b60dd32cc2e332ae7499309192eeb614c223a2317ba4b"
+    },
+    {
+      "name": "Ordinary CSS/SSS Link/Young Link FD",
+      "mode": "descriptor_discovery",
+      "source_updates": 450,
+      "manual_resumes": 2,
+      "new_descriptors": 4,
+      "report_sha256": "603e30b8f3ecfb1facabfc383e6848116d2433d1abca8fd1b9021a93a016c27a",
+      "review_sha256": "8b67f2d9dec97923ec16ce21cd8845ad9fa7d9c221744139a93212cac2e60d9e"
+    },
+    {
+      "name": "Ordinary CSS/SSS Young Link/Link FD",
+      "mode": "descriptor_discovery",
+      "terminal_status": "Stage-select timeout before gameplay; no descriptor export. All32queued events delivered but route did not enter FD. Retained, no replacement attempt.",
+      "report_sha256": "12fe754ff9970eec52b97d349a9192c9c6d45e83de6b77f316f8b85c516a1617"
+    }
+  ],
+  "verification": {
+    "focused_seed_tests": "passed",
+    "regression_before": "All four captured first-draw descriptors absent; four expected failures",
+    "regression_after": "passed",
+    "hitch_driver_boundary_tests": "passed",
+    "original_state": "Discovery and candidate state/draw files match prior independently verified reference receipt byte for byte",
+    "performance_acceptance": "not_yet_evaluated",
+    "development_release_build": "passed",
+    "public_release_build": "passed",
+    "full_suite": "957 tests, 44 skipped; passed",
+    "public_package_audit": "passed",
+    "candidate_state_capture": {
+      "complete": true,
+      "frames": 7070,
+      "draws": 7064,
+      "state_and_draws_match_prior_verified_reference_byte_exact": true,
+      "live_pipelines_created": 0,
+      "native_max_ms": 20.865,
+      "native_budget_misses": 2,
+      "browser_max_ms": 82.84499996900558,
+      "browser_hard_gaps": 1,
+      "audio_underrun_frames": 107,
+      "heap_growth_bytes": 66846720,
+      "performance_acceptance": false,
+      "live_screenshot_present": true,
+      "report_sha256": "4a1c491450afaad999b02a5cdb1e237511f34bba4c063afcc4a06ce061a16f51",
+      "comparison_sha256": "f7ffe5dede5dfd9bb4ed852acfa1e599b87b6fe50f283558f7c5f2cd3132b8c0"
+    },
+    "public_browser_smoke": {
+      "checks": 10,
+      "status": "passed",
+      "scope": "Functional player graph, no performance acceptance"
+    },
+    "candidate_public_routes": {
+      "schema": "melee-web-link-candidate-route-verification-v1",
+      "scope": "Bounded ordinary-DOM-input functional and first-use verification; four 450-update segments, public audio disabled. Not full-match performance or physical-input acceptance.",
+      "source_commit": "5c6929a63e419973291725006542f1d3fce777cc",
+      "protocol_sha256": "3b41920bfcd42bc101a320597941ccb63688ae57d9a9944b1dac4dc6b7bac0ad",
+      "runner_sha256": "5fd35be438523374588c18fc096c77d5c51ac676b40e8360e1046f49ace29120",
+      "chrome_native_profilers": false,
+      "focus_emulation": false,
+      "live_screenshots": false,
+      "performance_acceptance": false,
+      "attempts": [
+        {
+          "route": "link-young-link-fd",
+          "warmth": "cold",
+          "complete": true,
+          "source_updates": 450,
+          "manual_resumes": 0,
+          "native_callbacks": 453,
+          "browser_intervals": 453,
+          "native_max_ms": 8.04,
+          "browser_max_ms": 24.975,
+          "native_target_misses": 0,
+          "native_hard_failures": 0,
+          "browser_hard_gaps": 0,
+          "live_pipelines_created": 0,
+          "live_long_tasks": 0,
+          "live_hidden_callbacks": 0,
+          "live_unfocused_callbacks": 0,
+          "observer_overflow": false,
+          "observer_errors": 0,
+          "dom_errors": 0,
+          "page_errors": 0,
+          "console_errors": 0,
+          "preparation_failures": 0,
+          "first_draw_pipeline_counts": [
+            0
+          ],
+          "preparation": [
+            {
+              "source_transition": true,
+              "total_ms": 200.02,
+              "audio_wait_ms": 16.82,
+              "construction_ms": 162.975,
+              "render_wait_ms": 20.225,
+              "render_cpu_ms": 1.68,
+              "callbacks": 2,
+              "source_draws": 0,
+              "max_callback_ms": 1.65,
+              "max_draw_ms": 0,
+              "max_end_ms": 0,
+              "texture_upload_bytes": 0,
+              "max_draw_calls": 92,
+              "max_queued": 0,
+              "queued_delta": 0,
+              "created_delta": 0,
+              "gpu_completion_wait_ms": 16.475,
+              "gpu_completion_wait_callbacks": 0,
+              "pending_staging_at_settle": 0,
+              "pending_staging_at_first_arm": 0,
+              "gpu_completion_ready": true
+            }
+          ],
+          "ordinary_unload_reload": true,
+          "report_sha256": "6520ea4a2aa0808ca5f20ae5167b2982ae4757ff3cfae52a3b42d8a13fbd3eca",
+          "observer_sha256": "3813f7c903d5283d757e61fdde55b0b3610c3cedba52b16ef108915af50f33f7"
+        },
+        {
+          "route": "link-young-link-fd",
+          "warmth": "warm",
+          "complete": true,
+          "source_updates": 450,
+          "manual_resumes": 0,
+          "native_callbacks": 453,
+          "browser_intervals": 453,
+          "native_max_ms": 6.99,
+          "browser_max_ms": 21.875,
+          "native_target_misses": 0,
+          "native_hard_failures": 0,
+          "browser_hard_gaps": 0,
+          "live_pipelines_created": 0,
+          "live_long_tasks": 0,
+          "live_hidden_callbacks": 0,
+          "live_unfocused_callbacks": 0,
+          "observer_overflow": false,
+          "observer_errors": 0,
+          "dom_errors": 0,
+          "page_errors": 0,
+          "console_errors": 0,
+          "preparation_failures": 0,
+          "first_draw_pipeline_counts": [
+            0
+          ],
+          "preparation": [
+            {
+              "source_transition": true,
+              "total_ms": 199.895,
+              "audio_wait_ms": 16.435,
+              "construction_ms": 160.025,
+              "render_wait_ms": 23.435,
+              "render_cpu_ms": 0.725,
+              "callbacks": 2,
+              "source_draws": 0,
+              "max_callback_ms": 0.71,
+              "max_draw_ms": 0,
+              "max_end_ms": 0,
+              "texture_upload_bytes": 0,
+              "max_draw_calls": 92,
+              "max_queued": 0,
+              "queued_delta": 0,
+              "created_delta": 0,
+              "gpu_completion_wait_ms": 16.73,
+              "gpu_completion_wait_callbacks": 0,
+              "pending_staging_at_settle": 0,
+              "pending_staging_at_first_arm": 0,
+              "gpu_completion_ready": true
+            }
+          ],
+          "ordinary_unload_reload": true,
+          "report_sha256": "f9d529b5684b437fc03fda62f67cb25829c373503a2d91d7235bb5e8a02da28e",
+          "observer_sha256": "16e9e8d778fc0948f1176ed5559c46fd1b89878be8ce46f249b01a0e877fa821"
+        },
+        {
+          "route": "young-link-link-fd",
+          "warmth": "cold",
+          "complete": true,
+          "source_updates": 450,
+          "manual_resumes": 0,
+          "native_callbacks": 453,
+          "browser_intervals": 453,
+          "native_max_ms": 8.065,
+          "browser_max_ms": 24.595,
+          "native_target_misses": 0,
+          "native_hard_failures": 0,
+          "browser_hard_gaps": 0,
+          "live_pipelines_created": 0,
+          "live_long_tasks": 0,
+          "live_hidden_callbacks": 0,
+          "live_unfocused_callbacks": 0,
+          "observer_overflow": false,
+          "observer_errors": 0,
+          "dom_errors": 0,
+          "page_errors": 0,
+          "console_errors": 0,
+          "preparation_failures": 0,
+          "first_draw_pipeline_counts": [
+            0
+          ],
+          "preparation": [
+            {
+              "source_transition": true,
+              "total_ms": 218.58,
+              "audio_wait_ms": 18.85,
+              "construction_ms": 180.69,
+              "render_wait_ms": 19.04,
+              "render_cpu_ms": 1.85,
+              "callbacks": 2,
+              "source_draws": 0,
+              "max_callback_ms": 1.815,
+              "max_draw_ms": 0,
+              "max_end_ms": 0,
+              "texture_upload_bytes": 0,
+              "max_draw_calls": 92,
+              "max_queued": 0,
+              "queued_delta": 0,
+              "created_delta": 0,
+              "gpu_completion_wait_ms": 16.695,
+              "gpu_completion_wait_callbacks": 0,
+              "pending_staging_at_settle": 0,
+              "pending_staging_at_first_arm": 0,
+              "gpu_completion_ready": true
+            }
+          ],
+          "ordinary_unload_reload": true,
+          "report_sha256": "720baf92ab90b4081bba370bc8e32d3f023c79ac206bc7c4ab65e6b3fe72934e",
+          "observer_sha256": "daed5416be0d4e9bc3bcf67a49dbdf31b98f8a8704ae6850c24fec21c2c9d92a"
+        },
+        {
+          "route": "young-link-link-fd",
+          "warmth": "warm",
+          "complete": true,
+          "source_updates": 450,
+          "manual_resumes": 0,
+          "native_callbacks": 454,
+          "browser_intervals": 454,
+          "native_max_ms": 11.37,
+          "browser_max_ms": 25.245,
+          "native_target_misses": 0,
+          "native_hard_failures": 0,
+          "browser_hard_gaps": 0,
+          "live_pipelines_created": 0,
+          "live_long_tasks": 0,
+          "live_hidden_callbacks": 0,
+          "live_unfocused_callbacks": 0,
+          "observer_overflow": false,
+          "observer_errors": 0,
+          "dom_errors": 0,
+          "page_errors": 0,
+          "console_errors": 0,
+          "preparation_failures": 0,
+          "first_draw_pipeline_counts": [
+            0
+          ],
+          "preparation": [
+            {
+              "source_transition": true,
+              "total_ms": 183.485,
+              "audio_wait_ms": 16.78,
+              "construction_ms": 143.48,
+              "render_wait_ms": 23.225,
+              "render_cpu_ms": 1.025,
+              "callbacks": 2,
+              "source_draws": 0,
+              "max_callback_ms": 0.99,
+              "max_draw_ms": 0,
+              "max_end_ms": 0,
+              "texture_upload_bytes": 0,
+              "max_draw_calls": 92,
+              "max_queued": 0,
+              "queued_delta": 0,
+              "created_delta": 0,
+              "gpu_completion_wait_ms": 16.705,
+              "gpu_completion_wait_callbacks": 0,
+              "pending_staging_at_settle": 0,
+              "pending_staging_at_first_arm": 0,
+              "gpu_completion_ready": true
+            }
+          ],
+          "ordinary_unload_reload": true,
+          "report_sha256": "778c4ff51a77ae8236d552935fdbdbe4e781034e23caa07a838c4e94f848d416",
+          "observer_sha256": "f2e935dc4a473f91027d01809a46b7c327b278bf91511affadf3042c054f9b3c"
+        }
+      ]
+    }
+  },
+  "historical_a822_control": {
+    "scope": "Two-slot exact-historical-executable diagnostic on a newer browser; no acceptance or causal classification. Original failure remains open.",
+    "original_browser": "Chrome/153.0.8010.36",
+    "control_browser": "Chrome/153.0.8010.50",
+    "original_source": "a709b6db7a29979e19876ed6d75278cfa3d33168",
+    "historical_bundle_files": 14,
+    "wasm_sha256": "66a3709265d7c5c465700946b1125f91458bba7688992bd8fb454f848d7e94b2",
+    "freeze_sha256": "c7f73bd80f00e49a165fb6cc2167e066b6174ae79767445fab7c3e3aa399a21a",
+    "slots": [
+      {
+        "slot": "01-a822-historical-native12s",
+        "complete": true,
+        "source_steps": 3892,
+        "source_draws": 3892,
+        "native_callbacks": 3892,
+        "browser_callbacks": 3892,
+        "native_max_ms": 11.86,
+        "browser_max_ms": 26.59,
+        "native_target_misses": 0,
+        "native_hard_failures": 0,
+        "browser_hard_gaps": 0,
+        "audio_underrun_frames": 0,
+        "live_pipelines_created": 0,
+        "heap_growth_bytes": 0,
+        "focus_lost": false,
+        "native_exit_code": 0,
+        "native_clean": true,
+        "report_sha256": "6fc4fb22af1fdaa50a446becc047c59e8e071f829c43eb8c619dcb3a708ec1d0",
+        "native_capture_sha256": "a2f14ae1b7d63626c840e5c0558b1d694e18df13e898a1aa590ed3b3793d8464",
+        "chrome_trace_sha256": "67a84d53b26574a55cc224f2b2259b8ded921380623c56e6f0b45bb75356e89a",
+        "trace_metadata_sha256": "c7b72c0fb341f469fd93086b6f2bedf7b4981c2c9d49512b3ea9b0cf600eb822",
+        "trace_window_sha256": "9ec936170b72bf412f26ae6d59b47c99ff913f86f70e43651dadfce4c14d0048"
+      },
+      {
+        "slot": "02-a822-historical-native12s-confirmation",
+        "complete": true,
+        "source_steps": 3892,
+        "source_draws": 3892,
+        "native_callbacks": 3892,
+        "browser_callbacks": 3892,
+        "native_max_ms": 15.455,
+        "browser_max_ms": 34.12,
+        "native_target_misses": 0,
+        "native_hard_failures": 0,
+        "browser_hard_gaps": 1,
+        "audio_underrun_frames": 0,
+        "live_pipelines_created": 0,
+        "heap_growth_bytes": 0,
+        "focus_lost": false,
+        "native_exit_code": 0,
+        "native_clean": true,
+        "report_sha256": "c945c15b9f91e8e03a5150986f5b76d86dbf2fff6c2dceb7c0528f8fb3cfe210",
+        "native_capture_sha256": "6c295e0f56a8f39414236039a46f80081a9fabe2ce77614d8cdd518f1245f8b7",
+        "chrome_trace_sha256": "a99f1157739394c3e5ce38fec54b331a54bb53eee26be1ca6171740cf275af95",
+        "trace_metadata_sha256": "efd4ee11089e74894f72633b9ba5853144f973a455bfdfe466f847e75f5ed3ce",
+        "trace_window_sha256": "3bf0feeef1ae04b4070aba4c72a267c85393ec539a311162288fefb144afb728"
+      }
+    ],
+    "historical_staging_wait_reproduced": false,
+    "primary_native_scheduler_export": "Empty thread-state table despite clean finalization; no scheduler attribution.",
+    "confirmation_native_scheduler_rows": 70604,
+    "confirmation_native_page_coverage_ms": [
+      5727.658,
+      17886.9
+    ],
+    "confirmation_browser_gap_page_ms": [
+      65192.665,
+      65226.785
+    ],
+    "confirmation_gap_outside_trace_window": true,
+    "concurrent_profiler_observed_without_causal_attribution": true,
+    "concurrent_profiler_observation_sha256": "1bb55f2de2957cbe6a51753c243b7c8ff2560e31e7c6b0542a67c0f514758e5d",
+    "holdouts_opened": false
+  }
+}
