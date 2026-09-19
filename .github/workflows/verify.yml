@@ -8,7 +8,7 @@ on:
       cache_epoch:
         description: Separate compiler-cache namespace for a measured cold run
         type: string
-        default: v1
+        default: v2
 
 permissions:
   contents: read
@@ -50,15 +50,15 @@ jobs:
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: .cache/ccache
-          key: compiler-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache_epoch || 'v1' }}-${{ hashFiles('dependencies.lock.json') }}-${{ matrix.group }}-${{ github.sha }}
+          key: compiler-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache_epoch || 'v2' }}-${{ hashFiles('dependencies.lock.json') }}-${{ matrix.group }}-${{ github.sha }}
           restore-keys: |
-            compiler-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache_epoch || 'v1' }}-${{ hashFiles('dependencies.lock.json') }}-${{ matrix.group }}-
+            compiler-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache_epoch || 'v2' }}-${{ hashFiles('dependencies.lock.json') }}-${{ matrix.group }}-
       - name: Bootstrap pinned dependencies
         run: python3 scripts/bootstrap.py
       - name: Verify isolated partition
         run: |
           ccache --zero-stats
-          python3 scripts/ci_verify.py --group '${{ matrix.group }}' --jobs 2
+          python3 scripts/ci_verify.py --group '${{ matrix.group }}' --jobs 3
       - name: Compiler cache statistics
         if: always()
         run: |

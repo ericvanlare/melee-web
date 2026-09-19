@@ -32,7 +32,20 @@ Each partition retains phase times, runner details, test outcomes, Ninja edge
 wall times and compiler-cache statistics for 14 days. These reports contain no
 game inputs or generated binaries. Summed Ninja edge time is concurrent work,
 not elapsed workflow time. GitHub run/job timestamps remain the authority for
-workflow turnaround and queue time.
+workflow turnaround and queue time. The aggregate job adds a clearly labeled
+in-progress timing snapshot to its GitHub summary. After a run completes, obtain
+the final result with:
+
+```sh
+python3 scripts/ci_report.py --run RUN_ID --output work/ci-run.json
+gh run download RUN_ID --dir work/ci-artifacts
+```
+
+`accepted` requires a completed successful workflow, successful required jobs,
+and no more than 600 seconds from creation to the last job’s completion. The
+report separates each job’s queue and execution durations; it never substitutes
+summed parallel work for elapsed turnaround. An incomplete or failed run cannot
+be accepted even when its observed elapsed time is short.
 
 Measured cold/warm acceptance, failure controls and the final run inventory are
 pending. This candidate does not yet close issue 36.
@@ -43,6 +56,13 @@ workflow creation; the larger partitions took longer. A stale test assertion
 about the old build-map text formatting failed the unit partition; the assertion
 now checks the actual target inventory. Retain this failed experiment alongside
 subsequent cold/warm measurements.
+
+The first ARM/dependency-mode control, [run 35464529105](https://github.com/ericvanlare/melee-web/actions/runs/35464529105),
+passed every partition in 10m 40s overall, so it still missed the target. Its
+reports contain all 895 distinct passed test IDs from the preceding serial
+workflow (936 passed IDs in the partition union). Runtime compilation took
+517.3s after a 46.8s configuration. The next cold namespace tests three Ninja
+workers on the same two-core ARM runner; compiler flags remain unchanged.
 
 When a new test requires a linked binary, put its suite in the owning partition’s
 `LINKED_TESTS` and add asset-free mandatory consumers to `REQUIRED_TESTS`. Full
