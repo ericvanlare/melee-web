@@ -1,8 +1,8 @@
 # Verify CI cost audit
 
-## Issue 36: parallel verification candidate
+## Issue 36: parallel Linux verification
 
-The candidate workflow keeps the existing checked `RelWithDebInfo` compilation
+The workflow keeps the existing checked `RelWithDebInfo` compilation
 flags and the exact union of `build.py`'s `all` and `fighter` targets. Two standard
 ARM Ubuntu jobs run the complete test discovery in disjoint module shards. Six
 standard ARM Ubuntu build jobs partition runtime, graphics, gameplay, fighter,
@@ -30,7 +30,8 @@ the aggregate and fails if any partition or the public shell fails, skips or is
 canceled.
 
 Automatic verification runs once for each PR revision and once after a push to
-main. The public-shell checks are part of that same aggregate; the separate
+main. Non-main branches without a PR can use `workflow_dispatch`; they do not
+start automatic verification on every push. The public-shell checks are part of that same aggregate; the separate
 public-release workflow retains manual/release public-player validation.
 
 Only ccache compiler entries persist. Build directories, linked Wasm, generated
@@ -42,11 +43,11 @@ system headers) to avoid a separate preprocessing pass on a cache miss. No
 ccache sloppiness is enabled. Source edits may reuse unrelated object
 entries, while changing the dependency lock starts a separate namespace. A manual
 `cache_epoch` can establish an empty-cache control without deleting other runs.
-The shared cache is bounded to 512 MiB. Only the runtime partition publishes
+The shared cache is bounded to 512 MB. Only the runtime partition publishes
 the merged cache for later revisions; other jobs cannot race to replace it with
 a smaller subset. Current-workflow compiler-cache archives expire after one day. Dependencies are freshly fetched
 and verified by the existing bootstrap on each build/test job and each cold seed job. CI uses standard Linux
-runners; the measured Mac trial is excluded from the proposal because of cost.
+runners; the measured Mac trial was removed because of cost.
 
 Each partition retains phase times, runner details, test outcomes, Ninja edge
 wall times and compiler-cache statistics for 14 days. These reports contain no
@@ -67,8 +68,11 @@ report separates each job’s queue and execution durations; it never substitute
 summed parallel work for elapsed turnaround. An incomplete or failed run cannot
 be accepted even when its observed elapsed time is short.
 
-The first cold-cache run passed. Representative-change repetition and explicit
-failure/cancellation controls are pending. This candidate does not yet close issue 36.
+Three consecutive representative PR revisions passed in **6m 32s, 5m 49s
+and 8m 53s**, including warm source/test changes and a cold dependency change.
+The deliberate build/test failure and obsolete-run cancellation controls also
+passed. These are measured CI results for issue 36, not a gameplay acceptance
+or a guarantee against future runner queues or duration regressions.
 
 ### Measured runs, including rejected trials
 
@@ -85,7 +89,10 @@ PR jobs check GitHub's corresponding integration commit.
 | [35465287704](https://github.com/ericvanlare/melee-web/actions/runs/35465287704) | `a60f7c6a` | Cold ARM, three workers | 11m 01s | Passed, over target |
 | [35465844190](https://github.com/ericvanlare/melee-web/actions/runs/35465844190) | `14151e1e` | One cold coalesced Mac build, Linux units | 11m 06s | Passed, over target; rejected for cost |
 | [35467082383](https://github.com/ericvanlare/melee-web/actions/runs/35467082383) | `aafd2e93` | Warm ARM, two unit shards | 6m 32s | Passed, within target |
-| [35467560724](https://github.com/ericvanlare/melee-web/actions/runs/35467560724) | `8b9bdb7f` | Cold ARM with compiler-cache seeds | 9m 49s | Passed, within target |
+| [35467560724](https://github.com/ericvanlare/melee-web/actions/runs/35467560724) | `8b9bdb7f` | Cold ARM with four compiler-cache shards | 9m 49s | Passed, within target |
+| [35468504365](https://github.com/ericvanlare/melee-web/actions/runs/35468504365) | `ec844bc8` | Source-only change, six-shard workflow, warm | 6m 32s | Representative pass 1 |
+| [35468872504](https://github.com/ericvanlare/melee-web/actions/runs/35468872504) | `993ed803` | Test-only change, warm | 5m 49s | Representative pass 2 |
+| [35469205901](https://github.com/ericvanlare/melee-web/actions/runs/35469205901) | `368dcd79` | Pinned Ninja 1.13.0 → 1.13.2, cold | 8m 53s | Representative pass 3 |
 
 The Mac proposal was removed before merge at the owner's request because of
 runner cost. All subsequent verification uses standard Linux runners. The x64
@@ -94,16 +101,89 @@ actual target inventory. The timeouts and unsuccessful trials remain part of
 the measurement record.
 
 The first ARM run retained all 895 distinct passed IDs from the latest serial
-baseline, with 936 passing IDs in its union. The warm Linux run retained those
-same 895 IDs, with 952 passing IDs. Its full discovery included 1,003 tests;
-asset-dependent skips remain explicit, and the required asset-free linked tests
-passed in their owning partitions. These counts describe verification scope,
-not gameplay acceptance.
+baseline, with 936 passing IDs in its union. The final test and dependency trials
+each retained all 895 baseline IDs, with 957 distinct passing IDs across full
+discovery and linked consumers. Both discovered 1,008 tests, including the
+concurrently merged Link seed regression. Asset-dependent skips remain explicit,
+and all required asset-free linked tests passed in their owning partitions.
+These counts describe verification scope, not gameplay acceptance.
 
 Runtime compilation was 517.3s cold and 243.3s warm. The warm runtime recorded
 1,406 direct compiler-cache hits and zero cache misses, while 210 PCH-related
 calls remained uncacheable and ran normally. Its final link took 52.8s. Compiler
 flags, PCH behavior and dependency checking remain unchanged.
+
+### Consecutive run timing breakdown
+
+The source change altered a compiled runtime prompt; the test change added a
+regression rejecting equal-sized but different discovery inventories. The Ninja
+patch-version change invalidated the dependency-lock cache namespace: every seed
+and consumer reported a persistent-cache miss. The six cold seed jobs ran, and
+the runtime then recorded 1,405 direct hits from their entries, one miss and
+210 normally compiled uncacheable PCH calls. Its configure/build phases took
+48.8/249.2 seconds. The temporary runtime prompt and Ninja version changes were
+restored after measurement; the inventory regression remains.
+
+The checked integration commits were `e6d569ff66c57e1c940acbdbea05b6d658d93e08`
+(source), `754f4de9ae92cbc2a25e421bfad87a3c2290a31b` (test), and
+`110267b08b60049a68195d2e5880d142118bdbcf` (dependency). Each cell below is
+**dependency wait / eligible queue / job execution**, in seconds. Dependency
+wait includes the upstream path; do not sum parallel rows to obtain turnaround.
+
+| Job | Source | Test | Cold dependency |
+| --- | ---: | ---: | ---: |
+| browser-build | 380/2/10 | 338/2/9 | 523/2/8 |
+| compiler seed (0) | 0/34/8 | 0/4/7 | 0/5/172 |
+| compiler seed (1) | 0/34/6 | 0/5/7 | 0/6/166 |
+| compiler seed (2) | 0/33/7 | 0/5/7 | 0/6/163 |
+| compiler seed (3) | 0/33/7 | 0/5/9 | 0/6/164 |
+| compiler seed (4) | 0/33/8 | 0/5/6 | 0/6/155 |
+| compiler seed (5) | 0/34/7 | 0/5/6 | 0/6/173 |
+| public-shell | 0/31/34 | 0/4/36 | 0/3/36 |
+| verify (effects) | 42/5/326 | 14/4/313 | 179/5/320 |
+| verify (fighter) | 42/5/319 | 14/4/312 | 179/4/317 |
+| verify (gameplay) | 42/5/243 | 14/4/225 | 179/4/228 |
+| verify (graphics) | 42/5/165 | 14/4/166 | 179/5/179 |
+| verify (menus) | 42/5/310 | 14/4/305 | 179/5/319 |
+| verify (runtime) | 42/5/333 | 14/4/320 | 179/4/340 |
+| verify (unit-0) | 0/33/262 | 0/5/292 | 0/5/263 |
+| verify (unit-1) | 0/33/230 | 0/5/230 | 0/6/227 |
+
+### Failure and revision controls
+
+[Run 35468131476](https://github.com/ericvanlare/melee-web/actions/runs/35468131476)
+on `16b678e8` deliberately introduced a compiler `#error` in the runtime source
+and a failing unittest. The runtime build and unit shard both failed; the
+aggregate rejected both failed dependencies. The report marks this run
+unaccepted. Both controls were removed in `e8cbfd0b`.
+
+The recovery [run 35468473152](https://github.com/ericvanlare/melee-web/actions/runs/35468473152)
+was running when source revision `ec844bc8` was pushed. GitHub canceled the old
+run through the PR concurrency group, and the PR's checks moved to the new
+revision. Independently, the aggregate validates every report against its own
+checked integration commit and rejects stale-commit evidence.
+
+### Runner cost
+
+Parallel jobs consume more runner minutes within a single Verify run. Removing
+the duplicate automatic push run offsets that at the PR-revision level.
+[GitHub's published rates](https://docs.github.com/en/billing/reference/actions-runner-pricing)
+are $0.005/minute for standard two-core ARM Linux, $0.006 for two-core x64 Linux,
+and $0.062 for standard Mac runners, rounding each job up to a whole minute.
+The following estimates use observed job durations and those list rates; they
+exclude included-plan minutes, credits and cache/artifact storage, so they are
+not an account bill.
+
+| Observed verification | Rounded runner minutes | Estimated compute at list rates |
+| --- | ---: | ---: |
+| Latest serial PR baseline, `35461474202` | 21 | $0.126 |
+| Its duplicate push, canceled after the PR passed, `35461471674` | 24 | $0.144 |
+| Baseline PR revision total | 45 | $0.270 |
+| Warm Linux trial, `35467082383` | 44 | $0.222 |
+| Cold four-shard Linux trial, `35467560724` | 58 | $0.292 |
+| Final workflow, source change, `35468504365` | 49 | $0.247 |
+| Final workflow, test change, `35468872504` | 48 | $0.242 |
+| Final workflow, cold dependency change, `35469205901` | 60 | $0.302 |
 
 When a new test requires a linked binary, put its suite in the owning partition’s
 `LINKED_TESTS` and add asset-free mandatory consumers to `REQUIRED_TESTS`. Full
@@ -139,10 +219,10 @@ including native and Emscripten compilation and Node execution.
 | `runtime` | 80.6 seconds | 1 | 2 |
 
 `scripts/build.py` already includes `gameplay_menu_browser` in `all`.
-The workflow now omits the final redundant `runtime` invocation while keeping
-the default and fighter targets and every test/check command. This removes
-work that took 80.6 seconds in the baseline; a subsequent cold CI run is needed
-to measure the resulting job time.
+The earlier workflow change omitted the final redundant `runtime` invocation
+while keeping the default and fighter targets and every test/check command.
+That redundant invocation took 80.6 seconds in this baseline. The newer measured
+partitioned runs above supersede that initial estimate.
 
 The redundant invocation was not a no-op: all three configurations rewrote
 `imgui_impl_wgpu_emdawn.cpp`, rebuilt its object and relinked its library. The
@@ -153,7 +233,7 @@ The logs do not show wholesale fighter recompilation during later invocations.
 
 ## Opportunities recorded in the earlier audit
 
-These items describe the earlier baseline; the candidate above implements
+These items describe the earlier baseline; the workflow above implements
 module shards, compiler caching and duplicate-trigger removal.
 
 1. Run full discovery once after all required builds, retaining a small early
@@ -161,10 +241,11 @@ module shards, compiler caching and duplicate-trigger removal.
    gameplay/HSD groups. Estimated savings are two to three minutes; preserve
    tests whose initial skips disappear when build outputs or headers exist.
    The explicit gameplay check and source census are separate commands and
-   must remain. This restructuring has not been implemented here.
+   must remain. The current workflow instead discovers once across module shards
+   and repeats only linked consumers with their build owners.
 2. Trial a compiler cache keyed by the pinned toolchain and actual compiler
-   inputs. There is currently no CI build cache. Reusing object compilations
-   could address the largest cost, but no cache speedup has been measured.
+   inputs. This baseline had no CI build cache. Reusing object compilations
+   was proposed to address the largest cost; measured results now appear above.
    Dependency/bootstrap caching alone targets only the observed 35 seconds.
 3. Measure runner utilization before increasing the fixed two build jobs.
    More parallelism may help, but available memory and link contention matter.
