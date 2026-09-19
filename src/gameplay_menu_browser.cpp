@@ -58,7 +58,7 @@ int replay_outcome=0,replay_winner=-1;
 MeleeWebMenuHost* host=nullptr;
 melee_web::FixedTickClock menu_clock;
 melee_web::FixedTickClock audio_clock{melee_web::FixedTickClock::OverrunPolicy::CatchUp};
-std::string message="Choose your local Melee disc image.";
+std::string message="Select your local Melee disc image.";
 std::string match_message="Original source match";
 bool running=false,pending=false,host_entered=false,world_exposed=false,faulted=false;
 melee_web::MenuPreparationState preparation;
