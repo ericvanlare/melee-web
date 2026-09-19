@@ -1,48 +1,114 @@
 name: Verify
 on:
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
+    inputs:
+      cache-epoch:
+        description: Separate compiler-cache namespace for a measured cold run
+        type: string
+        default: v1
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
-  group: verify-${{ github.ref }}
+  group: verify-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  browser-build:
+  partitions:
+    name: verify (${{ matrix.group }})
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [unit, runtime, graphics, gameplay, fighter, effects, menus]
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.cache/ccache
+      CCACHE_BASEDIR: ${{ github.workspace }}
+      CCACHE_COMPILERCHECK: content
+      CCACHE_MAXSIZE: 512M
+      EM_COMPILER_WRAPPER: ccache
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.12'
-      - name: Install pinned dependencies
+      - name: Install compiler cache and record runner resources
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ccache
+          ccache --version
+          lscpu
+          free -m
+          df -h .
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .cache/ccache
+          key: compiler-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache-epoch || 'v1' }}-${{ hashFiles('dependencies.lock.json') }}-${{ matrix.group }}-${{ github.sha }}
+          restore-keys: |
+            compiler-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache-epoch || 'v1' }}-${{ hashFiles('dependencies.lock.json') }}-${{ matrix.group }}-
+      - name: Bootstrap pinned dependencies
         run: python3 scripts/bootstrap.py
-      - name: Test setup, server and asset parsers
-        run: python3 -m unittest discover -s tests -v
-      - name: Validate original HSD polygon and transform paths
-        run: python3 -m unittest discover -s tests -p 'test_hsd_*_bridge.py' -v
-      - name: Compile browser and gameplay targets
+      - name: Verify isolated partition
         run: |
-          # The default all target already includes gameplay_menu_browser.
-          python3 scripts/build.py --jobs 2
-          python3 scripts/build.py --target fighter --jobs 2
-      - name: Run original gameplay runtime and ABI checks
+          ccache --zero-stats
+          python3 scripts/ci_verify.py --group '${{ matrix.group }}' --jobs 2
+      - name: Compiler cache statistics
+        if: always()
         run: |
-          python3 -m unittest discover -s tests -p 'test_gameplay_*.py' -v
-          python3 -m unittest discover -s tests -p 'test_dat_menu_support.py' -v
-          python3 -m unittest discover -s tests -p 'test_audio_transport.py' -v
-          python3 -m unittest discover -s tests -p 'test_common_tables.py' -v
-          python3 -m unittest discover -s tests -p 'test_hsd_native*.py' -v
-          python3 scripts/check_gameplay.py
-          python3 scripts/gameplay_census.py --jobs 2
-      - name: Validate browser input adapter with configured SDL headers
-        run: python3 -m unittest discover -s tests -p test_browser_input.py -v
+          ccache --show-stats --verbose
+          mkdir -p work/ci
+          ccache --print-stats > work/ci/ccache-${{ matrix.group }}.txt
+      - name: Retain bounded timing and test reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ci-${{ matrix.group }}-${{ github.run_attempt }}
+          path: work/ci/
+          retention-days: 14
+          if-no-files-found: error
 
-# GPU rendering and original-game behavioral comparisons need the documented
-# acceptance checks. The gameplay traces validate only their named boundaries;
-# a green build does not mean a fighter was initialized or a match was played.
+  public-shell:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Exercise release rejection controls
+        run: python3 -m unittest discover -s tests -p 'test_public_*.py' -v
+      - name: Build and audit the isolated shell
+        run: |
+          mkdir -p build
+          python3 scripts/build_public.py --output build/public-shell --mode preview
+          python3 scripts/audit_public.py --output build/public-shell --manifest build/public-shell.manifest.json
+
+  # Retain the existing check name as the mandatory aggregate. A missing,
+  # canceled, failed or skipped partition can never become a green result.
+  browser-build:
+    if: always()
+    needs: [partitions, public-shell]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Require every verification partition
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          results = json.loads(os.environ['RESULTS'])
+          failed = {name: value['result'] for name, value in results.items() if value['result'] != 'success'}
+          if failed:
+              raise SystemExit(f'Verification did not pass: {failed}')
+          print('All compilation, test, source-census and public-shell partitions passed.')
+          PY
+
+# GPU/original-game acceptance remains separate. These jobs preserve the
+# checked build configuration and all existing all/fighter target closures.

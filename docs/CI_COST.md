@@ -1,5 +1,42 @@
 # Verify CI cost audit
 
+## Issue 36: parallel verification candidate
+
+The candidate workflow keeps the existing checked `RelWithDebInfo` compilation
+flags and the exact union of `build.py`'s `all` and `fighter` targets. Seven
+independent standard Ubuntu jobs configure fresh build graphs: full unit tests
+and source census, runtime, graphics, gameplay checks, fighter probe, effect/data
+traces, and menu traces. Full discovery runs after configuration so generated
+headers and SDK dependencies are present. Tests that need linked binaries run
+again in their owning build job, with required asset-free consumers forbidden
+from silently skipping. `browser-build` is the aggregate and fails if any
+partition or the public shell fails, skips, or is canceled.
+
+Automatic verification runs once for each PR revision and once after a push to
+main. The public-shell checks are part of that same aggregate; the separate
+public-release workflow retains manual/release public-player validation.
+
+Only ccache compiler entries persist. Build directories, linked Wasm, generated
+JavaScript and prepared source trees are never restored. Cache namespaces include
+runner OS/architecture, the complete dependency lock, partition and an explicit
+epoch; entries still validate compiler content, arguments and source/header
+inputs. No ccache sloppiness is enabled. Source edits may reuse unrelated object
+entries, while changing the dependency lock starts a separate namespace. A manual
+`cache-epoch` can establish an empty-cache control without deleting other runs.
+The cache is bounded to 512 MiB per partition. Dependencies are freshly fetched
+and verified by the existing bootstrap on every job.
+
+Each partition retains phase times, runner details, test outcomes, Ninja edge
+wall times and compiler-cache statistics for 14 days. These reports contain no
+game inputs or generated binaries. Summed Ninja edge time is concurrent work,
+not elapsed workflow time. GitHub run/job timestamps remain the authority for
+workflow turnaround and queue time.
+
+Measured cold/warm acceptance, failure controls and the final run inventory are
+pending. This candidate does not yet close issue 36.
+
+## Preserved earlier baseline
+
 The baseline is [push Verify 34916505822](https://github.com/ericvanlare/melee-web/actions/runs/34916505822)
 at `f9f82bd29e5c3015cd69e6a558f3e54278a798ad`. Its corresponding
 [PR Verify](https://github.com/ericvanlare/melee-web/actions/runs/34916530543)
