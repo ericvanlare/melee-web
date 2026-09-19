@@ -52,7 +52,7 @@ export function createBrowserDriver(page, {surface='development', timeoutMs=6000
       throw error;
     }
   }
-  async function enabled(selector) {
+  async function enabled(selector,{allowRecovery=false}={}) {
     // waitForFunction also detects a visible application error immediately.
     const result=await page.waitForFunction(({selector,allowRecovery})=>{
       const control=document.querySelector(selector);
@@ -62,7 +62,7 @@ export function createBrowserDriver(page, {surface='development', timeoutMs=6000
       const dialog=document.querySelector('#error-dialog[open]');
       if(dialog)return {error:document.querySelector('#error')?.textContent||'Application error'};
       return ready?{ready:true}:false;
-    },{selector,allowRecovery:selector===controls.import||selector===controls.unload},{timeout:remaining()});
+    },{selector,allowRecovery},{timeout:remaining()});
     const value=await result.jsonValue();await result.dispose();
     if(value.error)throw Error(value.error);
   }
@@ -84,7 +84,7 @@ export function createBrowserDriver(page, {surface='development', timeoutMs=6000
   });
   async function selectDisc(file) {
     return step('select-disc',async()=>{
-      await enabled(controls.import);
+      await enabled(controls.import,{allowRecovery:true});
       if(surface==='development') {
         await page.locator(controls.import).setInputFiles(file,{timeout:remaining()});
       } else {
@@ -131,7 +131,7 @@ export function createBrowserDriver(page, {surface='development', timeoutMs=6000
     return next;
   }
   const unload=()=>step('unload',async()=>{
-    await enabled(controls.unload);
+    await enabled(controls.unload,{allowRecovery:true});
     if(surface==='public')await Promise.all([
       page.waitForEvent('load',{timeout:remaining()}),
       page.locator(controls.unload).click({timeout:remaining()}),
@@ -139,8 +139,15 @@ export function createBrowserDriver(page, {surface='development', timeoutMs=6000
     else await page.locator(controls.unload).click({timeout:remaining()});
     await enabled(controls.import);
     if(surface==='development') {
-      await page.waitForFunction(()=>globalThis.Module?._melee_web_native_menu_phase?.()===0,
-        null,{timeout:remaining()});
+      const result=await page.waitForFunction(()=>{
+        const error=document.querySelector('#status')?.dataset.runtimeError;
+        if(error)return {error};
+        const module=globalThis.Module;
+        return module?._melee_web_native_menu_phase?.()===0&&
+          !module._melee_web_native_menu_running()?{ready:true}:false;
+      },null,{timeout:remaining()});
+      const value=await result.jsonValue();await result.dispose();
+      if(value.error)throw Error(value.error);
     }
   });
   return {waitForImport,waitForStart,waitForPhase,selectDisc,launch,pressChord,unload,diagnostics,

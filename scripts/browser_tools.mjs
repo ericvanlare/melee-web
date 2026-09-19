@@ -3,7 +3,6 @@ import fs from 'node:fs/promises';
 import {constants} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
-import {parseArgs} from 'node:util';
 
 async function executable(file) {
   try {await fs.access(file,constants.X_OK);return (await fs.stat(file)).isFile();}
@@ -46,11 +45,4 @@ export async function loadBrowserTools(requested) {
   const config=await resolveBrowserTools(requested);
   const {chromium}=await import(pathToFileURL(path.join(config.playwrightPath,'index.mjs')).href);
   return {...config,chromium};
-}
-
-if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
-  try {
-    const {values}=parseArgs({options:{json:{type:'boolean'},playwright:{type:'string'}}});
-    console.log(JSON.stringify(await resolveBrowserTools(values.playwright)));
-  } catch(error) {console.error(error.message);process.exitCode=1;}
 }

@@ -21,6 +21,7 @@ if(!['http:','https:'].includes(new URL(values.url).protocol))throw Error('Use a
 const timeout=Number(values.timeout||90000);
 if(!Number.isInteger(timeout)||timeout<1000||timeout>300000)throw Error('Timeout must be 1000..300000 ms');
 const {chromium,browser:launchOptions}=await loadBrowserTools(values.playwright);
+await fs.mkdir(path.dirname(path.resolve(values.out)),{recursive:true});
 await fs.mkdir(values.out,{recursive:false});
 const report={schema:'melee-web-browser-smoke-v1',scope:'Readiness and optional owned-disc import, original CSS entry and teardown only. Not replay, performance, retail comparison or complete gameplay acceptance.',
   url:values.url,surface:values.surface,started_at:new Date().toISOString(),checks:[],
@@ -42,6 +43,7 @@ try {
     await driver.unload();report.checks.push('teardown and import control ready');
   }
   report.state=await driver.diagnostics();
+  if(report.state.unavailable||report.state.error)throw Error(report.state.unavailable||report.state.error);
   if(report.state.errors?.length)throw Error('Browser errors retained');
   report.result='pass';
 } catch(error){

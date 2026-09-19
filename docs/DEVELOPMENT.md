@@ -7,26 +7,11 @@ receipts instead of copying numbers into this page.
 
 ## Start with the task you are doing
 
-For a build task, check the pinned local toolchain and dependency revisions:
-
-```sh
-python3 scripts/doctor.py --task build
-```
-
-For browser work against an existing served build, check the actual Node,
-Playwright and browser configuration instead:
-
-```sh
-python3 scripts/doctor.py --task browser --disc /path/to/owned.gcm
-```
-
-The doctor is read-only and prints the checks that need attention. `--json`
-provides structured output for automation. Disc checking is optional and does
-not require extracted assets. Build freshness remains the responsibility of
-the producer and frozen-build checks in [Hitch capture](HITCH_CAPTURE.md).
-A doctor pass describes only the selected checks, not gameplay acceptance.
 Use the [build, play and inspect guide](BUILD_AND_PLAY.md) for setup and player
 commands, then choose the smallest relevant boundary check below.
+`scripts/build.py` checks pinned source and toolchain prerequisites before
+compilation. Build freshness remains the responsibility of the producer and
+frozen-build checks in [Hitch capture](HITCH_CAPTURE.md).
 
 For a browser check, serve a built directory over loopback so cross-origin
 isolation headers are present:
@@ -50,12 +35,13 @@ node scripts/browser_smoke.mjs \
   --disc /path/to/owned.gcm
 ```
 
-Use `--surface public` with the public player URL. The doctor, smoke command
-and public-player browser test share configuration: `--playwright PACKAGE_DIR`
+Use `--surface public` with the public player URL. The smoke command and
+public-player browser test share configuration: `--playwright PACKAGE_DIR`
 overrides `MELEE_PLAYWRIGHT_DIR`, followed by normal Node package resolution.
 They use installed Google Chrome unless `MELEE_BROWSER_PATH` names another
 installed Chromium executable. Invalid explicit paths fail without falling
-back. The output directory must be new and belongs under ignored `work/`.
+back. The output directory must be new and belongs under ignored `work/`;
+missing parent directories are created automatically.
 
 ## Choose by change boundary
 
@@ -87,8 +73,17 @@ it changes.
 
 Development-page failures use the explicit `#status[data-runtime-error]`
 channel; public-page failures use the error dialog. The driver reports the
-actual error immediately. Import and unload remain available for recovery
-when their controls are enabled. It never resumes a timing failure.
+actual error immediately. `selectDisc` and `unload` can begin recovery when
+their controls are enabled; readiness and completion still require success.
+It never resumes a timing failure.
+
+After changing this harness, run its focused checks and real HTTP/browser
+contract (including smoke-command failure paths):
+
+```sh
+python3 -m unittest discover -s tests -p test_browser_driver.py -v
+node tests/browser_driver_browser_test.mjs
+```
 
 ## Validation levels
 

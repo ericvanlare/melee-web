@@ -44,10 +44,14 @@ try {
   assert.match(response.headers()['content-security-policy'], /'wasm-unsafe-eval'/);
   await ready();
   await check('isolated WebGPU/Wasm startup and direct original-style player', async () => {
-    await page.waitForFunction(() => Module._melee_web_native_menu_cache_idle() !== 0, null, {timeout: 30000});
-    assert.equal(await page.evaluate(() => Module._melee_web_native_menu_cache_idle()), 1,
-      'The public renderer must open its volatile cache before consuming the bundled pipeline seed');
     await page.locator('#loading-panel').waitFor({state: 'hidden', timeout: 30000});
+    const cacheState=await page.waitForFunction(() => {
+      const state=Module._melee_web_native_menu_cache_idle();
+      return state===0?false:{state};
+    }, null, {timeout: 30000});
+    const {state}=await cacheState.jsonValue();await cacheState.dispose();
+    assert.equal(state, 1,
+      'The public renderer must open its volatile cache before consuming the bundled pipeline seed');
     const selective = await page.evaluate(() => Module.pipelinePreparation || null);
     if (selective) {
       assert.equal(selective.policy, 'catalog');
