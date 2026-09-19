@@ -4,7 +4,7 @@
 
 The candidate workflow keeps the existing checked `RelWithDebInfo` compilation
 flags and the exact union of `build.py`'s `all` and `fighter` targets. Seven
-independent standard Ubuntu jobs configure fresh build graphs: full unit tests
+independent standard ARM Ubuntu jobs configure fresh build graphs: full unit tests
 and source census, runtime, graphics, gameplay checks, fighter probe, effect/data
 traces, and menu traces. Full discovery runs after configuration so generated
 headers and SDK dependencies are present. Tests that need linked binaries run
@@ -20,9 +20,11 @@ Only ccache compiler entries persist. Build directories, linked Wasm, generated
 JavaScript and prepared source trees are never restored. Cache namespaces include
 runner OS/architecture, the complete dependency lock, partition and an explicit
 epoch; entries still validate compiler content, arguments and source/header
-inputs. No ccache sloppiness is enabled. Source edits may reuse unrelated object
+inputs. Dependency mode uses the compiler’s `-MD` dependency output (including
+system headers) to avoid a separate preprocessing pass on a cache miss. No
+ccache sloppiness is enabled. Source edits may reuse unrelated object
 entries, while changing the dependency lock starts a separate namespace. A manual
-`cache-epoch` can establish an empty-cache control without deleting other runs.
+`cache_epoch` can establish an empty-cache control without deleting other runs.
 The cache is bounded to 512 MiB per partition. Dependencies are freshly fetched
 and verified by the existing bootstrap on every job.
 
@@ -34,6 +36,17 @@ workflow turnaround and queue time.
 
 Measured cold/warm acceptance, failure controls and the final run inventory are
 pending. This candidate does not yet close issue 36.
+
+The first x64 partition experiment, [run 35463683397](https://github.com/ericvanlare/melee-web/actions/runs/35463683397),
+missed the target. Graphics completed at 9m 50s and gameplay at 11m 52s from
+workflow creation; the larger partitions took longer. A stale test assertion
+about the old build-map text formatting failed the unit partition; the assertion
+now checks the actual target inventory. Retain this failed experiment alongside
+subsequent cold/warm measurements.
+
+When a new test requires a linked binary, put its suite in the owning partition’s
+`LINKED_TESTS` and add asset-free mandatory consumers to `REQUIRED_TESTS`. Full
+discovery alone cannot establish coverage when a missing build causes a skip.
 
 ## Preserved earlier baseline
 

@@ -101,7 +101,8 @@ class RecordingResult(unittest.TextTestResult):
     def addSubTest(self, test, subtest, err):
         super().addSubTest(test, subtest, err)
         if err is not None:
-            self.outcomes.append({"test": subtest.id(), "status": "failed"})
+            status = "failed" if issubclass(err[0], test.failureException) else "error"
+            self.outcomes.append({"test": subtest.id(), "status": status})
 
 
 def run_tests(group, report):
