@@ -1,0 +1,448 @@
+{
+  "schema": "melee-web-browser-raster-stall-v1",
+  "issue": 33,
+  "diagnostic_only": true,
+  "acceptance": "not_evaluated",
+  "historical_failure_classification": "open",
+  "holdouts_opened": 0,
+  "runtime": {
+    "source_commit": "a709b6db7a29979e19876ed6d75278cfa3d33168",
+    "frozen_bundle_files": 14,
+    "wasm_sha256": "66a3709265d7c5c465700946b1125f91458bba7688992bd8fb454f848d7e94b2",
+    "recipe_sha256": "dfe5dfaf431329945091c1c50d012ce7329880d18ddff68274c111be721605ac",
+    "source_updates_and_draws": 3892
+  },
+  "browser": {
+    "product": "Chrome/153.0.8010.36",
+    "revision": "@507c6ee3e2f3b2ca0e660547e5b9ea4820c67f4c",
+    "distribution": "official Chrome for Testing mac-arm64; not byte-identical to historical consumer Chrome",
+    "archive_sha256": "1f701ef60757c63c6ccf98afaf28291dd0c8d1457d3d738e81fd62201c230ad0",
+    "codesign_deep_strict_check": false,
+    "codesign_check_detail": "code has no resources but signature indicates they must be present; no resigning or bypass; headed identity preflight succeeded"
+  },
+  "protocol": {
+    "freeze_sha256": "8d753d60d76b6a73533f9543dd87ec8b757b77b9bc675dca03d9a8e3a6dbcb5a",
+    "profile_sha256": "1e5c0497b0954ac550a42b6ba2fdc8d11bcdf74987665e1f5b4d80d94172d8a7",
+    "slot_count": 2,
+    "secondary_condition": "Primary native/Chrome coverage invalid, missing, failed finalization, or no usable failed interval",
+    "trace_window_ms": 12000,
+    "purpose": "Exact historical runtime and engine-version contrast, not a browser-upgrade fix comparison"
+  },
+  "primary": {
+    "result": "completed replay, failed timing/audio; raw attempt directory subsequently disappeared",
+    "metrics": {
+      "sourceFrames": 3892,
+      "sourceSteps": 3892,
+      "sourceDraws": 3892,
+      "browserCallbacks": 3885,
+      "worstBrowserCallbackMs": 122.42499995231628,
+      "browserCallbackGaps": 5,
+      "browserLongTasks": 0,
+      "browserLongTaskWorstMs": 0,
+      "nativeCallbacks": 3885,
+      "worstNativeCallbackMs": 104.37,
+      "nativeCallbacksOver33ms": 1,
+      "nativeCallbacksOverBudget": 3,
+      "livePipelinesQueued": 0,
+      "livePipelinesCreated": 0,
+      "liveTextureUploadBytes": 6811648,
+      "liveStagingUsedBytes": 4964847656,
+      "peakStagingUsedBytes": 10581184,
+      "preparationPauses": 0,
+      "wasmHeapGrowthBytes": 0,
+      "focusLost": false,
+      "firstFocusLoss": null,
+      "audioUnderrunFrames": 22,
+      "audioOverflowFrames": 0
+    },
+    "failed_callback": {
+      "frame": 24,
+      "started": 36758.33,
+      "total_ms": 104.37,
+      "source_steps": 2,
+      "source_draws": 2,
+      "created_delta": 0
+    },
+    "staging_wait_ms": 94.815,
+    "staging_wait_count": 29,
+    "gpu_pid": 13340,
+    "gpu_main_tid": 8844075,
+    "gpu_worker_tid": 8844177,
+    "chrome_excerpt": {
+      "sha256": "e74986f9fee26eb6b8a5d1d53c22d8d63106be257a99fa094028d9df3f1b7d87",
+      "original_parser_completeness": {
+        "complete": true,
+        "status": "complete",
+        "data_loss_occurred": false,
+        "truncated": false,
+        "trace_buffer_full": null,
+        "overflow": null,
+        "loss_events": [],
+        "metadata_sources": [
+          "metadata.complete",
+          "metadata.dataLossOccurred",
+          "metadata.truncated"
+        ],
+        "metadata_present": true
+      },
+      "clock_anchor_span_us": 5.0,
+      "events": [
+        {
+          "args": {
+            "src_file": "gpu/command_buffer/service/scheduler.cc",
+            "src_func": "RunNextTask",
+            "src_line": 654
+          },
+          "cat": "toplevel",
+          "dur": 137417,
+          "name": "ThreadControllerImpl::RunTask",
+          "ph": "X",
+          "pid": 13340,
+          "tdur": 1632,
+          "tid": 8844075,
+          "ts": 376816733110,
+          "tts": 1370490,
+          "thread_name": "CrGpuMain",
+          "overlap_us": 94461.5
+        },
+        {
+          "args": {},
+          "cat": "gpu,toplevel.flow",
+          "dur": 137415,
+          "name": "Scheduler::RunTask",
+          "ph": "X",
+          "pid": 13340,
+          "tdur": 1631,
+          "tid": 8844075,
+          "ts": 376816733111,
+          "tts": 1370490,
+          "thread_name": "CrGpuMain",
+          "overlap_us": 94460.5
+        },
+        {
+          "args": {},
+          "cat": "gpu",
+          "dur": 137411,
+          "name": "GpuChannel::ExecuteDeferredRequest",
+          "ph": "X",
+          "pid": 13340,
+          "tdur": 1629,
+          "tid": 8844075,
+          "ts": 376816733112,
+          "tts": 1370490,
+          "thread_name": "CrGpuMain",
+          "overlap_us": 94457.5
+        },
+        {
+          "args": {},
+          "cat": "gpu",
+          "dur": 137405,
+          "name": "BrowserRasterWorker",
+          "ph": "X",
+          "pid": 13340,
+          "tdur": 1625,
+          "tid": 8844075,
+          "ts": 376816733113,
+          "tts": 1370490,
+          "thread_name": "CrGpuMain",
+          "overlap_us": 94452.5
+        },
+        {
+          "args": {},
+          "cat": "gpu,toplevel.flow",
+          "dur": 137404,
+          "name": "CommandBuffer::Flush",
+          "ph": "X",
+          "pid": 13340,
+          "tdur": 1625,
+          "tid": 8844075,
+          "ts": 376816733113,
+          "tts": 1370490,
+          "thread_name": "CrGpuMain",
+          "overlap_us": 94451.5
+        },
+        {
+          "args": {
+            "put_offset": 86
+          },
+          "cat": "gpu",
+          "dur": 137403,
+          "name": "CommandBufferStub::OnAsyncFlush",
+          "ph": "X",
+          "pid": 13340,
+          "tdur": 1625,
+          "tid": 8844075,
+          "ts": 376816733114,
+          "tts": 1370490,
+          "thread_name": "CrGpuMain",
+          "overlap_us": 94451.5
+        },
+        {
+          "args": {
+            "handler": ".BrowserRasterWorker-0x13c08dae700",
+            "put_offset": 86
+          },
+          "cat": "gpu",
+          "dur": 137400,
+          "name": "CommandBufferService:PutChanged",
+          "ph": "X",
+          "pid": 13340,
+          "tdur": 1625,
+          "tid": 8844075,
+          "ts": 376816733115,
+          "tts": 1370490,
+          "thread_name": "CrGpuMain",
+          "overlap_us": 94449.5
+        },
+        {
+          "args": {},
+          "cat": "gpu",
+          "dur": 137214,
+          "name": "RasterDecoderImpl::DoEndRasterCHROMIUM",
+          "ph": "X",
+          "pid": 13340,
+          "tdur": 1444,
+          "tid": 8844075,
+          "ts": 376816733289,
+          "tts": 1370661,
+          "thread_name": "CrGpuMain",
+          "overlap_us": 94437.5
+        },
+        {
+          "args": {},
+          "cat": "gpu",
+          "dur": 137201,
+          "name": "RasterDecoderImpl::DoEndRasterCHROMIUM::Flush",
+          "ph": "X",
+          "pid": 13340,
+          "tdur": 1432,
+          "tid": 8844075,
+          "ts": 376816733290,
+          "tts": 1370661,
+          "thread_name": "CrGpuMain",
+          "overlap_us": 94425.5
+        },
+        {
+          "args": {
+            "src_file": "gpu/command_buffer/service/dawn_platform.cc",
+            "src_func": "PostWorkerTask",
+            "src_line": 107
+          },
+          "cat": "toplevel",
+          "dur": 135809,
+          "name": "ThreadPool_RunTask",
+          "ph": "X",
+          "pid": 13340,
+          "tdur": 1331,
+          "tid": 8844177,
+          "ts": 376816734510,
+          "tts": 41352,
+          "thread_name": "ThreadPoolForegroundWorker",
+          "overlap_us": 94253.5
+        },
+        {
+          "args": {},
+          "cat": "toplevel",
+          "dur": 135804,
+          "name": "DawnPlatformImpl::RunWorkerTask",
+          "ph": "X",
+          "pid": 13340,
+          "tdur": 1327,
+          "tid": 8844177,
+          "ts": 376816734512,
+          "tts": 41353,
+          "thread_name": "ThreadPoolForegroundWorker",
+          "overlap_us": 94250.5
+        },
+        {
+          "args": {
+            "label": "RP((BGRA8+D24_S8 x4->1).rgba) + CoverBoundsRenderStep[NonAAFill] + BlendCompose[LocalMatrix[CoordNormalize[HardwareImage(0)]+PreAlpha], AlphaOnlyPaintColor, SrcIn] SrcOver "
+          },
+          "cat": "gpu.dawn",
+          "dur": 135797,
+          "name": "CreatePipelineAsyncEvent::InitializeImpl",
+          "ph": "X",
+          "pid": 13340,
+          "tdur": 1321,
+          "tid": 8844177,
+          "ts": 376816734515,
+          "tts": 41356,
+          "thread_name": "ThreadPoolForegroundWorker",
+          "overlap_us": 94246.5
+        }
+      ]
+    },
+    "native_recovery": {
+      "raw_ktrace_sha256": "303e3f34143571419e5a2d14ec842f8bae61b153e05d40c59e4dfd833b091b7d",
+      "raw_ktrace_bytes": 1847957056,
+      "imported_original_capture": true,
+      "owned_rows": 76548,
+      "actual_owned_range_page_ms": [
+        35974.53759765625,
+        48437.590087890625
+      ],
+      "failed_callback_page_ms": [
+        36758.33,
+        36862.7
+      ],
+      "encloses_failed_interval": true,
+      "gpu_main_states_ms": {
+        "Blocked": 97.04499999999825,
+        "Runnable": 0.02392578125,
+        "Running": 7.24321289062209,
+        "Interrupted": 0.029296875,
+        "Preempted": 0.028564453125
+      },
+      "gpu_worker_states_ms": {
+        "Blocked": 103.40247070312034,
+        "Runnable": 0.0087890625,
+        "Running": 0.90625,
+        "Interrupted": 0.0107421875,
+        "Preempted": 0.041748046875
+      },
+      "clock_uncertainty_ms": 2,
+      "correlation_sha256": "7579206fa96b2838b5b1cfdad80182ea9d58e60d6d988aa13b3907b603c1200a",
+      "syscall_stacks": [
+        {
+          "thread": "gpu-main",
+          "syscall": "BSC_psynch_cvwait",
+          "start_ns": 747131041,
+          "duration_ms": 135.766667,
+          "wait_ms": 135.76475,
+          "cpu_ms": 0.025708
+        },
+        {
+          "thread": "gpu-worker",
+          "syscall": "BSC_kevent_id",
+          "start_ns": 787218458,
+          "duration_ms": 81.610792,
+          "wait_ms": 81.607709,
+          "cpu_ms": 0.038333
+        },
+        {
+          "thread": "gpu-worker",
+          "syscall": "BSC_kevent_id",
+          "start_ns": 868988500,
+          "duration_ms": 7.358625,
+          "wait_ms": 7.355208,
+          "cpu_ms": 0.159293
+        },
+        {
+          "thread": "gpu-worker",
+          "syscall": "BSC_kevent_id",
+          "start_ns": 876400750,
+          "duration_ms": 6.416666,
+          "wait_ms": 6.413625,
+          "cpu_ms": 0.058833
+        },
+        {
+          "thread": "gpu-worker",
+          "syscall": "MSC_mach_msg2_trap",
+          "start_ns": 882911666,
+          "duration_ms": 8.69825,
+          "wait_ms": 8.696667,
+          "cpu_ms": 0.0645
+        }
+      ],
+      "syscall_export_sha256": "ac84ff4e38f1b0215122ad99b67baa21681bbecbb85fe50c9cd8a426ea7f74de",
+      "stack_addresses_sha256": "f16e922337e6dc8e071ee5cd0752ecf18e200bfa7b63e0e3d6638173d925c875",
+      "system_symbol_corroboration": {
+        "method": "dladdr in separate owned arm64 process, same boot/current shared cache, corroborated against earlier same-host symbolized capture by LC_UUID/load base",
+        "metal_uuid": "493e76d9-74d4-333b-a3b2-e5f9bc86429d",
+        "metal_load_base": "0x1963dc000",
+        "shared_cache_uuid": "f2e86c53-6052-388b-ba71-5a0c9b569413",
+        "os_build": "25G83",
+        "boot_epoch_seconds": 1789230692,
+        "resolved_frames": [
+          {
+            "address": "0x1964dc86f",
+            "resolved": true,
+            "image": "/System/Library/Frameworks/Metal.framework/Versions/A/Metal",
+            "image_base": "0x1963dc000",
+            "symbol": "-[_MTLDevice newLibraryWithSource:options:compilerTask:error:]",
+            "symbol_address": "0x1964dc784"
+          },
+          {
+            "address": "0x19653544f",
+            "resolved": true,
+            "image": "/System/Library/Frameworks/Metal.framework/Versions/A/Metal",
+            "image_base": "0x1963dc000",
+            "symbol": "_ZN17MTLLibraryBuilder35initLibraryContainerWithRequestDataEP19MTLLibraryContainerR21MTLLibraryRequestDataP11objc_objectU13block_pointerFvvE",
+            "symbol_address": "0x196534d60"
+          },
+          {
+            "address": "0x1965368c7",
+            "resolved": true,
+            "image": "/System/Library/Frameworks/Metal.framework/Versions/A/Metal",
+            "image_base": "0x1963dc000",
+            "symbol": "_ZN17MTLLibraryBuilder32newLibraryWithRequestDataAndHashER21MTLLibraryRequestDataRK12MTLUINT256_tP11objc_objectU13block_pointerFvPU21objcproto10MTLLibrary11objc_objectP7NSErrorE",
+            "symbol_address": "0x1965367f8"
+          },
+          {
+            "address": "0x1965382a3",
+            "resolved": true,
+            "image": "/System/Library/Frameworks/Metal.framework/Versions/A/Metal",
+            "image_base": "0x1963dc000",
+            "symbol": "_ZN17MTLLibraryBuilder20newLibraryWithSourceEPU19objcproto9MTLDevice11objc_objectP8NSStringP17MTLCompileOptionsbP11objc_objectU13block_pointerFvPU21objcproto10MTLLibrary11objc_objectP7NSErrorE",
+            "symbol_address": "0x196536c50"
+          },
+          {
+            "address": "0x1965435a7",
+            "resolved": true,
+            "image": "/System/Library/Frameworks/Metal.framework/Versions/A/Metal",
+            "image_base": "0x1963dc000",
+            "symbol": "-[MTLCompiler compileFunctionRequestInternal:frameworkLinking:linkDataSize:reflectionOnly:compilerTask:completionHandler:]",
+            "symbol_address": "0x1965417a8"
+          },
+          {
+            "address": "0x19656843f",
+            "resolved": true,
+            "image": "/System/Library/Frameworks/Metal.framework/Versions/A/Metal",
+            "image_base": "0x1963dc000",
+            "symbol": "_ZN20MTLCompilerScheduler12buildRequestEjP18MTLCompilerRequestbP11objc_objectU13block_pointerFv16MTLCompilerErrorPU27objcproto16OS_dispatch_data8NSObjectPKcE",
+            "symbol_address": "0x1965683b4"
+          },
+          {
+            "address": "0x196568def",
+            "resolved": true,
+            "image": "/System/Library/Frameworks/Metal.framework/Versions/A/Metal",
+            "image_base": "0x1963dc000",
+            "symbol": "_ZN20MTLCompilerScheduler12buildRequestEjNSt3__110shared_ptrI18MTLCompilerRequestEEbP11objc_objectU13block_pointerFv16MTLCompilerErrorPU27objcproto16OS_dispatch_data8NSObjectPKcE",
+            "symbol_address": "0x1965688b0"
+          }
+        ],
+        "receipt_sha256": "1a8bddf53578e3354d0219fd43cc6f3dbebed220fa2aa92187ea3b98ad52805b",
+        "audit_sha256": "1ff3f72daf5f5a469ea544fe8829d0286db779002819e7008f4648a72e768800",
+        "limits": "Cross-trace corroboration, not capture-local image metadata. Does not identify exact UI tile, whole wait duration, or hardware completion. Chrome/private driver addresses are not assigned system symbols."
+      }
+    },
+    "retention_limit": "Full original browser report and Chrome trace not recovered. Exact callback/metrics were recovered from durable tool output; parsed Chrome event excerpt survives. Cause of original directory loss unknown."
+  },
+  "secondary": {
+    "result": "completed replay, failed focus gate; no staging reproduction",
+    "native_callbacks": 3892,
+    "native_max_ms": 10.665,
+    "browser_max_ms": 23.92500001192093,
+    "native_target_misses": 0,
+    "native_hard_misses": 0,
+    "browser_hard_gaps": 0,
+    "audio_underrun_frames": 0,
+    "live_pipelines": 0,
+    "focus_loss_page_ms": 70522.41499996185,
+    "report_sha256": "fd23e00d60cc048b790e7a5291c6744425a85be304ba772e966b3134943688f6",
+    "trace_sha256": "83908cf060fc5a04ddd36058099e9515d033b0012fea85d0bde841bad3a8a47c",
+    "native_finalization_clean": true,
+    "backup_manifest_sha256": "ea968c647b7147bded5ba5fd2345973a29cf968b0ed50e9ac11d4f3716788537"
+  },
+  "limits": [
+    "No source/gameplay/input/RNG/arithmetic/draw-order/resource-ownership changes.",
+    "Profiled timings are not acceptance results.",
+    "Browser UI context attribution does not retroactively identify the exact older generic GPU task.",
+    "The original negative measurement and retention failure remain failures.",
+    "No runtime fix, browser-upgrade fix or holdout admission follows from a passing repetition."
+  ],
+  "older_trace_review": {
+    "conclusion": "No browser-raster, client ownership or GPU flow endpoints in original September12 trace. Retain generic GPU scheduler/Dawn worker classification.",
+    "receipt_sha256": "6dd8aea92746aeff1a328f63d2d47e0e0dd5435a23b5de490a6571ff77bd1a2f"
+  }
+}

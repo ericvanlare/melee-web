@@ -111,3 +111,8 @@ attribution. Both slots are retained; no acceptance is claimed.
 Neither a passing repetition nor the Link diagnosis classifies that historical
 event. Frozen unprofiled development acceptance and the two
 untouched holdouts still require the causal gate in [HITCH_CAPTURE.md](HITCH_CAPTURE.md).
+
+A later [browser raster investigation](BROWSER_RASTER_STALL.md) reproduces a
+separate staging failure on the historical engine version. It records the
+recovered native coverage, browser-owned raster operation and missing full
+Chrome/report artifacts without claiming a historical fix or opening holdouts.

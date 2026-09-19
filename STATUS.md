@@ -13,6 +13,18 @@ See [CI timings, coverage, cache boundaries and cost](docs/CI_COST.md) for the
 measured evidence and retained outliers. This changes verification turnaround;
 gameplay accuracy and runtime performance keep their separate acceptance gates.
 
+## Historical GPU stall investigation
+
+A new exact-historical-runtime diagnostic on Chrome for Testing 153.0.8010.36
+reproduced a 104.370 ms native callback with 94.815 ms of staging waits. Its
+retained Chrome event excerpt identifies browser UI raster pipeline work;
+recovered native kernel evidence encloses the entire failure. The original
+full Chrome trace/report were lost during analysis, with partial observations
+and the recovered kernel recording retained explicitly. The second bounded
+slot did not reproduce the stall and failed focus. This is diagnostic evidence,
+not a fix or acceptance pass. See the [investigation and recovery limits](docs/BROWSER_RASTER_STALL.md).
+Issue #33, the frozen unprofiled inventory and both untouched holdouts remain open.
+
 ## Link and Young Link development candidate
 
 Link and Young Link are enabled through the original CSS/SSS and shared native
