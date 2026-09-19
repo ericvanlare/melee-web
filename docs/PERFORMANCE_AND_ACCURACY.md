@@ -228,8 +228,11 @@ missing deadline counters in older reports are unknown, not zero. The
 [bounded hitch-capture loop](HITCH_CAPTURE.md) preserves all attempts in a frozen
 matrix and adds opt-in event retention and trace correlation. Both fresh
 holdouts remain closed until the outstanding red is causally resolved or
-convincingly classified as external scheduling with evidence. Replay reports
-retain the count above this target and one worst
+convincingly classified as external scheduling with evidence. The explicitly
+owner-approved
+[2026-09-19 current-runtime holdout exception](HITCH_CAPTURE.md#approved-current-runtime-scope--2026-09-19)
+leaves the historical failure unclassified and does not waive new failures.
+Replay reports retain the count above this target and one worst
 native callback with its phase durations; a new over-budget maximum also records
 the source diagnostics. This bounded record survives later fast frames without
 collecting a per-frame state trace during performance runs. Scene preparation

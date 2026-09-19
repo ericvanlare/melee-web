@@ -6,7 +6,8 @@ import os from 'node:os';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import {BUILD_ARTIFACTS,verifyServedArtifacts,stopTrace,remainingTimeout,TRACE,traceSettings,
-  frozenTraceSettings,scheduleTraceEnd,finalizeTrace,pagePaintCondition,verifyPagePaintReport} from '../scripts/run_hitch_matrix.mjs';
+  frozenTraceSettings,scheduleTraceEnd,finalizeTrace,pagePaintCondition,verifyPagePaintReport,
+  planRole,stopAfterHoldoutFailure} from '../scripts/run_hitch_matrix.mjs';
 
 assert.deepEqual(frozenTraceSettings({trace:TRACE}),traceSettings());
 const gpu=traceSettings('gpu-startup');
@@ -18,6 +19,24 @@ assert.throws(()=>traceSettings('unknown'),/Unknown trace detail/);
 assert.throws(()=>frozenTraceSettings(profile,'standard'),/differs from frozen/);
 assert.throws(()=>frozenTraceSettings({...profile,trace_window_ms:20000}),/configuration changed/);
 assert.throws(()=>frozenTraceSettings({...profile,trace:TRACE}),/configuration changed/);
+assert.deepEqual(planRole({identities:{development_recipes:{a:{}}}}),
+  {role:'development',recipes:'development_recipes'});
+assert.deepEqual(planRole({role:'holdout',identities:{holdout_recipes:{a:{}}}}),
+  {role:'holdout',recipes:'holdout_recipes'});
+for(const plan of [null,{},
+  {role:null,identities:{development_recipes:{a:{}}}},
+  {role:'holdout',identities:{development_recipes:{a:{}}}},
+  {role:'development',identities:{holdout_recipes:{a:{}}}},
+  {role:'holdout',identities:{holdout_recipes:[]}},
+  {role:'other',identities:{development_recipes:{a:{}}}}])
+  assert.throws(()=>planRole(plan),/Unsupported|Missing/);
+assert.equal(stopAfterHoldoutFailure('holdout',{status:'completed',validation:{valid:true}}),false);
+for(const finished of [null,{status:'completed'},
+  {status:'completed',validation:{valid:false}},
+  {status:'aborted',validation:{valid:true}}]) {
+  assert.equal(stopAfterHoldoutFailure('holdout',finished),true);
+  assert.equal(stopAfterHoldoutFailure('development',finished),false);
+}
 assert.equal(pagePaintCondition({mode:'profiler'}),'normal');
 assert.throws(()=>pagePaintCondition({mode:'unprofiled',page_paint:'hidden'}),/diagnostic only/);
 assert.throws(()=>pagePaintCondition({mode:'profiler',page_paint:'unknown'}),/Unknown/);
