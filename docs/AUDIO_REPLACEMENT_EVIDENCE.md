@@ -41,7 +41,8 @@ The source-only tests contain synthetic signals, not extracted audio.
 | Affected build | Emscripten checked builds of `gameplay_audio_trace`, `gameplay_audio_fx_trace` and `gameplay_audio_stream_trace` succeeded. |
 | Owned sound effects | Five source sound IDs (`0`, `74`, `443`, `180000`, `180001`), each run twice with different callback partitioning: all reported PCM fingerprints, energy, sample selection and restart results match the baseline. |
 | Owned effects/stream | AXFX allocation, callback and three-buffer latency/restart checks pass. Two 100-second HPS runs each cross 58 payload transfers with 8 revisits; both retain PCM FNV-1a `e8957ede28b9ad45` and the baseline energy/result records. |
-| CI | [Verify run 35472491056](https://github.com/ericvanlare/melee-web/actions/runs/35472491056) passed for implementation commit `ce42469`. Subsequent edits clarify comments/provenance and record results; they change no executable behavior. |
+| Integrated full suite | `python3 -m unittest discover -s tests -v`: 1,002 tests, 46 optional skips, no failures (180.137 s), after integrating main `7d02d4c` in source commit `1604186`. The three affected audio targets also build on that combined tree. |
+| CI | [Verify run 35472491056](https://github.com/ericvanlare/melee-web/actions/runs/35472491056) passed for audio implementation commit `ce42469`. |
 
 Reproduce the scalar comparison with:
 
