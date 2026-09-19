@@ -33,6 +33,18 @@ class CiReportTests(unittest.TestCase):
         self.assertEqual(report["turnaround_seconds"], 601)
         self.assertFalse(report["within_ten_minutes"])
 
+    def test_seed_dependency_time_is_not_reported_as_runner_queue(self):
+        report = summarize(self.run_record(), [
+            self.job("compiler seed (0)", "00:05", "02:00"),
+            self.job("compiler seed (1)", "00:06", "02:15"),
+            self.job("verify (runtime)", "02:25", "08:00"),
+            self.job("verify (unit-0)", "00:10", "04:00"),
+            self.job("browser-build", "08:05", "08:15"),
+        ])
+        self.assertEqual(report["turnaround_seconds"], 495)
+        self.assertEqual([row["queue_seconds"] for row in report["jobs"]], [5, 6, 10, 10, 5])
+        self.assertEqual([row["dependency_wait_seconds"] for row in report["jobs"]], [0, 0, 135, 0, 480])
+
     def test_running_snapshot_does_not_claim_final_acceptance(self):
         report = summarize(self.run_record("in_progress"), [self.job("browser-build", "00:10", None)],
                            now=timestamp("2026-09-19T00:03:00Z"))

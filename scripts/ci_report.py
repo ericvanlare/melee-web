@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 import subprocess
 
+from ci_verify import GROUPS, UNIT_GROUPS
+
 
 def timestamp(value):
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
@@ -16,14 +18,20 @@ def summarize(run, jobs, *, now=None):
         raise ValueError("No job timing evidence")
     created = timestamp(run["created_at"])
     rows = []
-    # browser-build is the only dependent job in Verify. Earlier serial runs
-    # had no partition/public-shell jobs, so their browser-build starts at t0.
-    dependencies = [job for job in jobs if job["name"] != "browser-build"]
+    # Account for dependency waits separately from eligible-runner queue time.
+    # Older runs have no seed jobs and need no inferred seed dependency.
+    seeds = [job for job in jobs if job["name"].startswith("compiler seed (")]
+    consumers = {f"verify ({group})" for group in GROUPS if group not in UNIT_GROUPS}
     for job in jobs:
         start = timestamp(job["started_at"]) if job.get("started_at") else None
         end = timestamp(job["completed_at"]) if job.get("completed_at") else None
         ready = created
-        if job["name"] == "browser-build" and dependencies:
+        dependencies = []
+        if job["name"] == "browser-build":
+            dependencies = [item for item in jobs if item["name"] != "browser-build"]
+        elif job["name"] in consumers:
+            dependencies = seeds
+        if dependencies:
             completed = [timestamp(item["completed_at"]) for item in dependencies if item.get("completed_at")]
             if len(completed) == len(dependencies):
                 ready = max(completed)
@@ -31,6 +39,7 @@ def summarize(run, jobs, *, now=None):
                 ready = None
         rows.append({
             "name": job["name"], "status": job["status"], "conclusion": job.get("conclusion"),
+            "dependency_wait_seconds": (ready - created).total_seconds() if ready else None,
             "queue_seconds": max(0, (start - ready).total_seconds()) if start and ready else None,
             "execution_seconds": (end - start).total_seconds() if start and end else None,
         })
@@ -76,11 +85,12 @@ def main():
         label = "Final turnaround" if report["completed"] else "Elapsed at aggregate (workflow still running)"
         lines = [f"### Verification timing\n\n{label}: **{report['turnaround_seconds']:.1f} seconds** (target: 600).\n",
                  f"Commit: `{report['head_sha']}`. [Run]({report['url']}).\n",
-                 "| Job | Queue seconds | Execution seconds | Result |", "| --- | ---: | ---: | --- |"]
+                 "| Job | Dependency seconds | Queue seconds | Execution seconds | Result |", "| --- | ---: | ---: | ---: | --- |"]
         for row in report["jobs"]:
+            dependency = "—" if row["dependency_wait_seconds"] is None else f"{row['dependency_wait_seconds']:.1f}"
             queue = "—" if row["queue_seconds"] is None else f"{row['queue_seconds']:.1f}"
             duration = "—" if row["execution_seconds"] is None else f"{row['execution_seconds']:.1f}"
-            lines.append(f"| {row['name']} | {queue} | {duration} | {row['conclusion'] or row['status']} |")
+            lines.append(f"| {row['name']} | {dependency} | {queue} | {duration} | {row['conclusion'] or row['status']} |")
         with args.summary.open("a") as output:
             output.write("\n".join(lines) + "\n")
     if not report["completed"] and not args.snapshot:

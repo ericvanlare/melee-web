@@ -8,7 +8,7 @@ on:
       cache_epoch:
         description: Separate compiler-cache namespace for a measured cold run
         type: string
-        default: v2
+        default: v3
 
 permissions:
   contents: read
@@ -18,55 +18,127 @@ concurrency:
   group: verify-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  CCACHE_DIR: ${{ github.workspace }}/.cache/ccache
+  CCACHE_BASEDIR: ${{ github.workspace }}
+  CCACHE_COMPILERCHECK: content
+  CCACHE_DEPEND: true
+  CCACHE_MAXSIZE: 512M
+  EM_COMPILER_WRAPPER: ccache
+
 jobs:
-  partitions:
-    name: verify (${{ matrix.group }})
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 15
+  # These jobs only prepare ccache entries. Every downstream target still runs
+  # its normal clean configure/build, including all links and linked tests.
+  compiler-seed:
+    name: compiler seed (${{ matrix.shard }})
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - {group: unit-0, runner: ubuntu-24.04-arm, jobs: 2}
-          - {group: unit-1, runner: ubuntu-24.04-arm, jobs: 2}
-          - {group: runtime, runner: ubuntu-24.04-arm, jobs: 2}
-          - {group: graphics, runner: ubuntu-24.04-arm, jobs: 2}
-          - {group: gameplay, runner: ubuntu-24.04-arm, jobs: 2}
-          - {group: fighter, runner: ubuntu-24.04-arm, jobs: 2}
-          - {group: effects, runner: ubuntu-24.04-arm, jobs: 2}
-          - {group: menus, runner: ubuntu-24.04-arm, jobs: 2}
-    env:
-      CCACHE_DIR: ${{ github.workspace }}/.cache/ccache
-      CCACHE_BASEDIR: ${{ github.workspace }}
-      CCACHE_COMPILERCHECK: content
-      CCACHE_DEPEND: true
-      CCACHE_MAXSIZE: 512M
-      EM_COMPILER_WRAPPER: ccache
+        shard: [0, 1, 2, 3]
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: '3.12'
-      - name: Install compiler cache and record runner resources
+      - id: warm
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          lookup-only: true
+          path: .cache/ccache
+          key: compiler-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache_epoch || 'v3' }}-${{ hashFiles('dependencies.lock.json') }}-shared-${{ github.sha }}
+          restore-keys: |
+            compiler-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache_epoch || 'v3' }}-${{ hashFiles('dependencies.lock.json') }}-shared-
+      - name: Prepare pinned dependencies and compiler cache
+        if: steps.warm.outputs.cache-matched-key == ''
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends ccache
+          python3 - <<'PYTHON'
+          from concurrent.futures import ThreadPoolExecutor
+          import subprocess
+
+          def install_cache():
+              subprocess.run(['sudo', 'apt-get', 'update', '-qq'], check=True)
+              subprocess.run(['sudo', 'apt-get', 'install', '-y', '--no-install-recommends', 'ccache'], check=True)
+
+          with ThreadPoolExecutor(max_workers=2) as pool:
+              futures = [pool.submit(install_cache), pool.submit(subprocess.run, ['python3', 'scripts/bootstrap.py'], check=True)]
+              for future in futures:
+                  future.result()
+          PYTHON
           lscpu
           free -m
           ccache --version
           df -h .
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      - name: Populate one cold compiler-cache shard
+        if: steps.warm.outputs.cache-matched-key == ''
+        run: |
+          ccache --zero-stats
+          python3 scripts/ci_seed.py --shard '${{ matrix.shard }}' --jobs 2
+      - name: Pack compiler entries for this workflow
+        run: |
+          mkdir -p .cache/ccache work/seed
+          tar -cf work/seed/ccache-${{ matrix.shard }}.tar -C .cache/ccache .
+      - name: Retain seed timing and cache statistics
+        if: always() && steps.warm.outputs.cache-matched-key == ''
+        run: |
+          mkdir -p work/seed
+          if [ -f work/ci-seed/shard-${{ matrix.shard }}.json ]; then
+            cp work/ci-seed/shard-${{ matrix.shard }}.json work/seed/
+          fi
+          ccache --print-stats > work/seed/ccache-stats-${{ matrix.shard }}.txt
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: compiler-seed-${{ matrix.shard }}
+          overwrite: true
+          path: work/seed/
+          compression-level: 0
+          retention-days: 1
+          if-no-files-found: error
+
+  units:
+    name: verify (${{ matrix.group }})
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [unit-0, unit-1]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Prepare pinned dependencies and compiler cache
+        run: |
+          python3 - <<'PYTHON'
+          from concurrent.futures import ThreadPoolExecutor
+          import subprocess
+
+          def install_cache():
+              subprocess.run(['sudo', 'apt-get', 'update', '-qq'], check=True)
+              subprocess.run(['sudo', 'apt-get', 'install', '-y', '--no-install-recommends', 'ccache'], check=True)
+
+          with ThreadPoolExecutor(max_workers=2) as pool:
+              futures = [pool.submit(install_cache), pool.submit(subprocess.run, ['python3', 'scripts/bootstrap.py'], check=True)]
+              for future in futures:
+                  future.result()
+          PYTHON
+          lscpu
+          free -m
+          ccache --version
+          df -h .
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
           path: .cache/ccache
-          key: compiler-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache_epoch || 'v2' }}-${{ hashFiles('dependencies.lock.json') }}-${{ matrix.group }}-${{ github.sha }}
+          key: compiler-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache_epoch || 'v3' }}-${{ hashFiles('dependencies.lock.json') }}-shared-${{ github.sha }}
           restore-keys: |
-            compiler-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache_epoch || 'v2' }}-${{ hashFiles('dependencies.lock.json') }}-${{ matrix.group }}-
-      - name: Bootstrap pinned dependencies
-        run: python3 scripts/bootstrap.py
+            compiler-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache_epoch || 'v3' }}-${{ hashFiles('dependencies.lock.json') }}-shared-
       - name: Verify isolated partition
         run: |
           ccache --zero-stats
-          python3 scripts/ci_verify.py --group '${{ matrix.group }}' --jobs '${{ matrix.jobs }}'
+          python3 scripts/ci_verify.py --group '${{ matrix.group }}' --jobs 2
       - name: Compiler cache statistics
         if: always()
         run: |
@@ -82,6 +154,81 @@ jobs:
           path: work/ci/
           retention-days: 14
           if-no-files-found: error
+
+  partitions:
+    name: verify (${{ matrix.group }})
+    needs: compiler-seed
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        group: [runtime, graphics, gameplay, fighter, effects, menus]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Prepare pinned dependencies and compiler cache
+        run: |
+          python3 - <<'PYTHON'
+          from concurrent.futures import ThreadPoolExecutor
+          import subprocess
+
+          def install_cache():
+              subprocess.run(['sudo', 'apt-get', 'update', '-qq'], check=True)
+              subprocess.run(['sudo', 'apt-get', 'install', '-y', '--no-install-recommends', 'ccache'], check=True)
+
+          with ThreadPoolExecutor(max_workers=2) as pool:
+              futures = [pool.submit(install_cache), pool.submit(subprocess.run, ['python3', 'scripts/bootstrap.py'], check=True)]
+              for future in futures:
+                  future.result()
+          PYTHON
+          lscpu
+          free -m
+          ccache --version
+          df -h .
+      - uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .cache/ccache
+          key: compiler-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache_epoch || 'v3' }}-${{ hashFiles('dependencies.lock.json') }}-shared-${{ github.sha }}
+          restore-keys: |
+            compiler-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache_epoch || 'v3' }}-${{ hashFiles('dependencies.lock.json') }}-shared-
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: compiler-seed-*
+          path: work/compiler-seeds
+      - name: Merge current-workflow compiler entries
+        run: |
+          mkdir -p .cache/ccache
+          for shard in 0 1 2 3; do
+            tar -xf "work/compiler-seeds/compiler-seed-$shard/ccache-$shard.tar" -C .cache/ccache
+          done
+      - name: Verify isolated partition
+        run: |
+          ccache --zero-stats
+          python3 scripts/ci_verify.py --group '${{ matrix.group }}' --jobs 2
+      - name: Compiler cache statistics
+        if: always()
+        run: |
+          ccache --show-stats --verbose
+          mkdir -p work/ci
+          ccache --print-stats > work/ci/ccache-${{ matrix.group }}.txt
+      - name: Retain bounded timing and test reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ci-${{ matrix.group }}
+          overwrite: true
+          path: work/ci/
+          retention-days: 14
+          if-no-files-found: error
+      - name: Save shared compiler entries
+        if: matrix.group == 'runtime'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: .cache/ccache
+          key: compiler-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache_epoch || 'v3' }}-${{ hashFiles('dependencies.lock.json') }}-shared-${{ github.sha }}
 
   public-shell:
     runs-on: ubuntu-24.04
@@ -103,7 +250,7 @@ jobs:
   # canceled, failed or skipped partition can never become a green result.
   browser-build:
     if: always()
-    needs: [partitions, public-shell]
+    needs: [units, partitions, public-shell]
     runs-on: ubuntu-24.04
     timeout-minutes: 2
     steps:

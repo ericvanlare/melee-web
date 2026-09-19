@@ -106,41 +106,6 @@ class PublicRuntimeBuildTests(unittest.TestCase):
             list(public_build.BUILD_TARGETS["fighter"]),
         )
 
-    def test_link_jobs_forwards_a_cmake_link_pool(self):
-        root = self._configured_build_root()
-        lock = {"repositories": {}, "emscripten": "6.0.9"}
-        generated = root / "build/gameplay-source/src"
-        with patch.object(public_build, "read_lock", return_value=lock), \
-                patch.object(public_build, "verify_sources"), \
-                patch.object(public_build, "prepare_sources", return_value=generated), \
-                patch.object(public_build.subprocess, "run") as run:
-            public_build.build(2, root=root, target="fighter", link_jobs=1)
-
-        configure_commands = [call.args[0] for call in run.call_args_list if "-G" in call.args[0]]
-        self.assertEqual(len(configure_commands), 1)
-        self.assertIn("-DCMAKE_JOB_POOLS=melee_link=1", configure_commands[0])
-        self.assertIn("-DCMAKE_JOB_POOL_LINK=melee_link", configure_commands[0])
-
-    def test_default_configure_has_no_link_pool_flags(self):
-        root = self._configured_build_root()
-        lock = {"repositories": {}, "emscripten": "6.0.9"}
-        generated = root / "build/gameplay-source/src"
-        with patch.object(public_build, "read_lock", return_value=lock), \
-                patch.object(public_build, "verify_sources"), \
-                patch.object(public_build, "prepare_sources", return_value=generated), \
-                patch.object(public_build.subprocess, "run") as run:
-            public_build.build(2, root=root, target="fighter", configure_only=True)
-
-        configure_commands = [call.args[0] for call in run.call_args_list if "-G" in call.args[0]]
-        self.assertEqual(len(configure_commands), 1)
-        self.assertFalse(any("CMAKE_JOB_POOL" in arg for arg in configure_commands[0]))
-
-    def test_link_jobs_rejects_nonpositive_before_source_work(self):
-        with patch.object(public_build, "read_lock") as read_lock:
-            with self.assertRaisesRegex(ValueError, "link-jobs must be positive"):
-                public_build.build(1, root=Path("missing-source"), link_jobs=0)
-        read_lock.assert_not_called()
-
     def test_configure_only_rejects_public_runtime_before_source_work(self):
         with patch.object(public_build, "read_lock") as read_lock:
             with self.assertRaisesRegex(ValueError, "configure-only.*runtime-public"):

@@ -6,7 +6,12 @@ The candidate workflow keeps the existing checked `RelWithDebInfo` compilation
 flags and the exact union of `build.py`'s `all` and `fighter` targets. Two standard
 ARM Ubuntu jobs run the complete test discovery in disjoint module shards. Six
 standard ARM Ubuntu build jobs partition runtime, graphics, gameplay, fighter,
-effects and menu targets, with two Ninja workers per job. Linked consumers run in
+effects and menu targets, with two Ninja workers per job. On an empty shared
+compiler cache, four preceding Linux jobs compile disjoint object subsets through
+the generated Ninja graph and transfer only their ccache entries to those builds.
+A compatible shared cache skips this preparation; the seed jobs still complete
+and supply empty cache archives. Every consumer configures and builds its full
+target graph; Ninja retains ownership of generated headers, dependencies and links. Linked consumers run in
 the owning partition; the gameplay partition also runs the explicit gameplay
 check. Full discovery runs after
 configuration so generated headers and SDK dependencies are present. SHA-256 of
@@ -28,15 +33,17 @@ public-release workflow retains manual/release public-player validation.
 
 Only ccache compiler entries persist. Build directories, linked Wasm, generated
 JavaScript and prepared source trees are never restored. Cache namespaces include
-runner OS/architecture, the complete dependency lock, partition and an explicit
+runner OS/architecture, the complete dependency lock and an explicit
 epoch; entries still validate compiler content, arguments and source/header
 inputs. Dependency mode uses the compiler’s `-MD` dependency output (including
 system headers) to avoid a separate preprocessing pass on a cache miss. No
 ccache sloppiness is enabled. Source edits may reuse unrelated object
 entries, while changing the dependency lock starts a separate namespace. A manual
 `cache_epoch` can establish an empty-cache control without deleting other runs.
-The cache is bounded to 512 MiB per partition. Dependencies are freshly fetched
-and verified by the existing bootstrap on every job. CI uses standard Linux
+The shared cache is bounded to 512 MiB. Only the runtime partition publishes
+the merged cache for later revisions; other jobs cannot race to replace it with
+a smaller subset. Current-workflow compiler-cache archives expire after one day. Dependencies are freshly fetched
+and verified by the existing bootstrap on each build/test job and each cold seed job. CI uses standard Linux
 runners; the measured Mac trial is excluded from the proposal because of cost.
 
 Each partition retains phase times, runner details, test outcomes, Ninja edge
