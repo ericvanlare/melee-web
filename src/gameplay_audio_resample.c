@@ -73,8 +73,8 @@ int16_t melee_web_audio_resample(MeleeWebAudioResample* state,
 {
     if (select == 2) {
         /* The port reads one direct sample and preserves fractional phase.
-         * The original DSP clears phase at its block boundary; that existing
-         * difference is recorded in docs/AUDIO_RESAMPLER_CONTRACT.md. */
+         * Equivalence to DSP block-boundary phase writeback remains unverified;
+         * see docs/AUDIO_RESAMPLER_CONTRACT.md. */
         const int16_t output = read_sample(context);
         state->history[0] = state->history[1];
         state->history[1] = state->history[2];
@@ -86,7 +86,7 @@ int16_t melee_web_audio_resample(MeleeWebAudioResample* state,
     /* The DSP advances its source work ring before its final output loop.
      * Carry the integral phase into chronological history first, then render
      * from that state.  DSPCode.c persists only the low 16 bits at
-     * 0x0634/0x06d7. */
+     * 0x0634/0x06e0. */
     const uint32_t phase = state->fraction + ratio;
     const uint32_t consumed = phase >> 16;
     consume_source(state, consumed, read_sample, context);

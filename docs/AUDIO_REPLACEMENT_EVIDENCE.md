@@ -39,6 +39,9 @@ The source-only tests contain synthetic signals, not extracted audio.
 | Scalar comparison | 7,488,064 exact comparisons of output sample, fractional phase, all four history words and source-read count/data under AddressSanitizer and UndefinedBehaviorSanitizer. Includes all 65,536 phases, 11 boundary ratios from zero through `0x40000`, all three modes, all three actual coefficient banks, and one million deterministic changing-ratio/mode calls with synthetic signed coefficients. |
 | Independent arithmetic cases | All fractional phases for four-tap row selection and signed linear endpoint interpolation; negative floor, both saturation signs, accumulator sums exceeding signed 32-bit range, zero-to-four source reads, carry, mode changes, direct-mode behavior and the unchanged ITD ramp. |
 | Affected build | Emscripten checked builds of `gameplay_audio_trace`, `gameplay_audio_fx_trace` and `gameplay_audio_stream_trace` succeeded. |
+| Owned sound effects | Five source sound IDs (`0`, `74`, `443`, `180000`, `180001`), each run twice with different callback partitioning: all reported PCM fingerprints, energy, sample selection and restart results match the baseline. |
+| Owned effects/stream | AXFX allocation, callback and three-buffer latency/restart checks pass. Two 100-second HPS runs each cross 58 payload transfers with 8 revisits; both retain PCM FNV-1a `e8957ede28b9ad45` and the baseline energy/result records. |
+| CI | [Verify run 35472491056](https://github.com/ericvanlare/melee-web/actions/runs/35472491056) passed for implementation commit `ce42469`. Subsequent edits clarify comments/provenance and record results; they change no executable behavior. |
 
 Reproduce the scalar comparison with:
 
@@ -52,17 +55,36 @@ temporary directory. No reference object or generated table is added to a
 player target. Missing Git history is an explicit failure. The regular test
 suite exercises independent boundary cases without requiring historical source.
 
-Owned SSM/SEM/HPS fixtures are local inputs only. Their original-source voice,
-effects and stream checks are recorded separately from scalar compatibility;
-passing either does not establish original-hardware waveform equivalence.
+Owned SSM/SEM/HPS fixtures are local inputs only. Voice fingerprints (FNV-1a,
+not cryptographic content identities) match before and after:
+
+| Sound ID | PCM fingerprint |
+| --- | --- |
+| 0 | `42fc66af0c7e5ac2` |
+| 74 | `e0b89ce5e03b3709` |
+| 443 | `b16baf96b5f92367` |
+| 180000 | `23895959ef95e6d5` |
+| 180001 | `469631f296cab776` |
+
+Run the optional owned-fixture voice/effects and stream checks after building
+the targets and supplying local `assets-local/next-gate/` inputs:
+
+```sh
+python3 -m unittest discover -s tests -p 'test_gameplay_audio*.py' -v
+```
+
+These are original-source integration and regression checks. Neither their
+fingerprints nor scalar compatibility establish original-hardware waveform
+equivalence.
 
 ## Accuracy limits
 
-The original DSP direct path clears saved fractional phase at a 32-sample block
-boundary. The existing port preserves it, and this replacement preserves that
-behavior. It is a newly recorded existing deviation, requiring a focused
-original-DSP mode-transition comparison and a separate fix. DSP extreme-product
-scaling and accumulator extraction remain unverified against hardware.
+Direct-mode fractional phase writeback still needs verification against the
+original DSP. The port preserves phase. The local disassembly's accumulator
+clear and phase store use different registers, so that instruction pair does not
+establish a zero-phase reset or a confirmed port defect. A focused original-DSP
+mode-transition trace is needed. Extreme-product scaling and accumulator
+extraction also remain unverified against hardware.
 
 The coefficient approximation, outstanding audio update/depop work and broader
 audio-fidelity gates remain open. Same-output comparisons against the old port

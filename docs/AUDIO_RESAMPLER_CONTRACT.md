@@ -34,7 +34,9 @@ or a numerical substitute; the instruction addresses refer to the pinned source.
 - Filtered paths save four retained samples and the low phase word at
   `0x062b-0x0634` and `0x06d7-0x06e0`.
 - Direct SRC reads a 32-sample block at `0x0743-0x0748`, saves the four trailing
-  samples at `0x074b-0x0757`, and clears the phase at `0x0756-0x0757`.
+  samples at `0x074b-0x0755`, and writes the phase word from `ACL0` at
+  `0x0757`. The preceding `0x0756` clears `ACC1`, not `ACC0`; that pair alone
+  does not prove that the saved phase becomes zero.
 
 Selector mapping is from the original public AX setter in
 `.deps/melee/extern/dolphin/src/dolphin/ax/AXVPB.c`: `AX_SRC_TYPE_4TAP_*`
@@ -68,14 +70,15 @@ using the same arithmetic floor and signed 16-bit clamp. Selector 2 reads one
 source sample directly for each output, shifts the history window, ignores
 ratio, and leaves `fraction` unchanged.
 
-## Preserved deviation and remaining hardware uncertainty
+## Remaining hardware uncertainty
 
-The original direct path clears its saved fraction after each 32-sample block
-(`0x0756-0x0757`). The existing port instead leaves fraction unchanged in direct
-mode, including at block boundaries. This replacement preserves that behavior
-so a licensing-oriented change does not silently change mode-transition audio.
-Resolve this known deviation with a focused original-DSP transition trace and
-a separate behavioral fix. Same-output tests against the old port cannot close it.
+The port leaves fraction unchanged in direct mode. The original direct path
+writes its saved phase at `0x0757` using accumulator state. The local disassembly
+shows `CLR ACC1` followed by a store of `ACL0`, so the clear instruction alone
+cannot establish that the stored fraction is zero. Instruction semantics and
+incoming accumulator state must be verified before calling this a confirmed
+port deviation. Use a focused original-DSP direct-to-filtered transition trace;
+same-output comparisons against the old port cannot answer that question.
 
 The raw program proves the fixed-point instruction sequence, phase/index
 addressing, and state writes. It does not provide the DSP instruction-set
