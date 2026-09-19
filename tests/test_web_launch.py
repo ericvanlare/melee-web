@@ -3,6 +3,7 @@ from pathlib import Path
 import json
 import re
 import subprocess
+import sys
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -65,10 +66,11 @@ class WebLaunchTests(unittest.TestCase):
                          "native upload allowlist must match the disc manifest plus generated inputs")
 
     def test_runtime_builds_native_browser_target(self):
-        build = (ROOT / "scripts" / "build.py").read_text(encoding="utf-8")
+        sys.path.insert(0, str(ROOT / "scripts"))
+        from build import BUILD_TARGETS
         cmake = (ROOT / "cmake" / "FighterRuntime.cmake").read_text(encoding="utf-8")
-        self.assertIn('"runtime": ["gameplay_menu_browser"]', build)
-        self.assertIn('"all": ["gx_probe", "gameplay_checks", "gameplay_menu_browser"]', build)
+        self.assertEqual(BUILD_TARGETS["runtime"], ("gameplay_menu_browser",))
+        self.assertEqual(BUILD_TARGETS["all"], ("gx_probe", "gameplay_checks", "gameplay_menu_browser"))
         self.assertIn("HEAPU8,HEAP32,HEAPF32,UTF8ToString", cmake)
         self.assertIn("initial_pipeline_cache.db", cmake)
         self.assertIn("LINK_DEPENDS", cmake)

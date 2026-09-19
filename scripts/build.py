@@ -18,6 +18,27 @@ ROOT = Path(__file__).resolve().parents[1]
 PUBLIC_RUNTIME_TARGET = "runtime-public"
 PUBLIC_RUNTIME_CONFIGURATION = "Release"
 PUBLIC_RUNTIME_BUILD_DIR = "build/browser-public-release"
+
+# Keep the target closure in one place so callers that need to configure once
+# and build several target groups can use the same reviewed target names as the
+# normal CLI.  Tuples prevent accidental mutation by callers and preserve the
+# existing target groups byte-for-byte.
+BUILD_TARGETS = {
+    "graphics": ("gx_probe",),
+    "gameplay": ("gameplay_checks",),
+    "runtime": ("gameplay_menu_browser",),
+    PUBLIC_RUNTIME_TARGET: (PUBLIC_RUNTIME_TARGET,),
+    "fighter": (
+        "fighter_runtime_probe",
+        "gameplay_effect_banks_trace",
+        "gameplay_bonus_data_trace",
+        "gameplay_stage_numeric_trace",
+        "native_menu_scene_trace",
+        "dat_menu_support_trace",
+    ),
+    "all": ("gx_probe", "gameplay_checks", "gameplay_menu_browser"),
+}
+
 PUBLIC_RUNTIME_EXPORTS = (
     "_main",
     "_malloc",
@@ -492,7 +513,13 @@ def _write_public_identity(root, build_dir, version, cmake, ninja, gameplay_sour
     return identity_path
 
 
-def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *, pipeline_provenance=False, selective_pipelines=False):
+def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
+          pipeline_provenance=False, selective_pipelines=False, configure_only=False):
+    if configure_only and target == PUBLIC_RUNTIME_TARGET:
+        # The public target writes an identity sidecar only after a complete
+        # build.  A configure-only invocation must not leave an apparently
+        # usable public identity next to stale artifacts.
+        raise ValueError("--configure-only cannot be used with runtime-public")
     if selective_pipelines and (target not in {"runtime", PUBLIC_RUNTIME_TARGET} or pipeline_provenance):
         raise ValueError("--selective-pipelines requires runtime/runtime-public without --pipeline-provenance")
     if pipeline_provenance and target != "runtime":
@@ -554,13 +581,9 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *, pipe
     configure.append(f"-DMELEE_WEB_PIPELINE_PROVENANCE={'ON' if pipeline_provenance else 'OFF'}")
     configure.append(f"-DMELEE_WEB_SELECTIVE_PIPELINES={'ON' if selective_pipelines else 'OFF'}")
     subprocess.run(configure, cwd=root, env=env, check=True)
-    targets = {"graphics": ["gx_probe"], "gameplay": ["gameplay_checks"],
-               "runtime": ["gameplay_menu_browser"],
-               PUBLIC_RUNTIME_TARGET: [PUBLIC_RUNTIME_TARGET],
-               "fighter": ["fighter_runtime_probe", "gameplay_effect_banks_trace",
-                           "gameplay_bonus_data_trace", "gameplay_stage_numeric_trace",
-                           "native_menu_scene_trace", "dat_menu_support_trace"],
-               "all": ["gx_probe", "gameplay_checks", "gameplay_menu_browser"]}[target]
+    if configure_only:
+        return
+    targets = BUILD_TARGETS[target]
     subprocess.run([str(cmake), "--build", str(build_dir), "--target", *targets, "-j", str(jobs)],
                    cwd=root, env=env, check=True)
     if target == PUBLIC_RUNTIME_TARGET:
@@ -582,12 +605,15 @@ def main():
                         help="Compile the private runtime recorder into a separate build directory")
     parser.add_argument("--selective-pipelines", action="store_true",
                         help="Prepare certified upcoming pipeline unions in a separate runtime build")
+    parser.add_argument("--configure-only", action="store_true",
+                        help="Configure the selected build directory without compiling targets")
     args = parser.parse_args()
     if args.jobs < 1:
         parser.error("--jobs must be positive")
     try:
         build(args.jobs, target=args.target, configuration=args.configuration,
-              pipeline_provenance=args.pipeline_provenance, selective_pipelines=args.selective_pipelines)
+              pipeline_provenance=args.pipeline_provenance, selective_pipelines=args.selective_pipelines,
+              configure_only=args.configure_only)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         raise SystemExit(f"build: {error}") from error
 
