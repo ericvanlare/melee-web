@@ -1,0 +1,622 @@
+{
+  "schema": "melee-web-current-runtime-holdouts-evidence",
+  "version": 1,
+  "issue": 33,
+  "date": "2026-09-19",
+  "scope": "Approved current-runtime holdout campaign only. This receipt records source/reference preparation, bounded state and timer comparisons, one consumed unprofiled cold timing slot, and three slots that were never started and are permanently unstarted for this freeze. The campaign stopped on the failed slot; it does not resolve the historical September 12 causal gate or admit a gold/pass result.",
+  "acceptance": {
+    "status": "failed_stopped",
+    "issue33": "open",
+    "historical_cause": "unresolved_not_reclassified",
+    "historical_receipt": {
+      "path": "docs/evidence/browser-raster-stall-v1.json",
+      "sha256": "eb80d83a4786cf775d9056525902ed09856139392329867f8669981a502d3cc3"
+    },
+    "campaign_disposition": "stopped_after_first_failed_timing_slot",
+    "remaining_slots": "permanently_unstarted_for_this_freeze",
+    "passed": false
+  },
+  "approval": {
+    "decision": "approved",
+    "approved_by": "owner",
+    "user_message": "proceed",
+    "policy": "Retain the historical failure unresolved; freeze the current runtime; execute each untouched holdout once with unchanged hard thresholds.",
+    "record": {
+      "path": "work/issue33/holdouts/approval-and-runtime-freeze.json",
+      "sha256": "b7a30e9573125b40c6f89dd05894ef15db4e1d82c33c1bd10d594566e05fae36"
+    }
+  },
+  "runtime": {
+    "code_commit": "5c6929a63e419973291725006542f1d3fce777cc",
+    "wasm_sha256": "a0db4aec0303b8f662876327fbe6206f47048a97bee09402d779afe939106d94",
+    "seed_sha256": "b935fd741f029cd12afb5ac584ef943e51bb00c34c689ae44b1e75d6ae81a8ce",
+    "seed_records": 626,
+    "artifact_count": 24,
+    "served_build_receipt": {
+      "path": "work/issue33/holdouts/timing-attempts/01-marth-cold/served-build.json",
+      "sha256": "66d06d43104d8bb950da0a4dfad19258805d7827a871baf93ae187543a800c68"
+    },
+    "browser_profile": {
+      "path": "work/issue33/holdouts/browser-profile.json",
+      "sha256": "70adc74d3f122452d8863d281f8225edb4d57de6ceea07973b49f3cf17ba8efc",
+      "product": "Chrome/153.0.8010.50",
+      "revision": "@583c5b4655acea7450a3b5224ea5121ae8caca9b",
+      "hardware": "Apple M4; 32GiB RAM",
+      "os": "macOS26.6.2 (25G83)",
+      "logical_resolution": [
+        640,
+        480
+      ],
+      "backing_resolution": [
+        1280,
+        960
+      ],
+      "dpr": 2,
+      "headed": true,
+      "focus_emulation": false,
+      "browser_driver_cache": "uncontrolled"
+    }
+  },
+  "source_and_reference": {
+    "execution_plan": {
+      "path": "work/issue33/holdouts/holdout-execution-plan.json",
+      "sha256": "ef6d3b92af023bdc15b591571f17072d435a17dd2cdd8ca0373c4947c4c1a377"
+    },
+    "split_manifest_sha256": "db441dfb6069672a3946dc0026f0da02bdbcb1e9340b0075d72103611905748f",
+    "targets": [
+      {
+        "id": "ucf-holdout-277c7e0e",
+        "role": "holdout",
+        "fighters": "Marth/Marth",
+        "stage": "Battlefield",
+        "frames": 7347,
+        "source_sha256": "277c7e0e2f42ceb42435b16e639fb97b554fbf9a1574059e809967179aec594a",
+        "source_plan_sha256": "8e276498ff0a9655681fc729670884666395363374b86f43a093e9c6507d00b2",
+        "reference_result": {
+          "path": "work/issue33/holdouts/ucf-holdout-277c7e0e-prepared/evaluation/finish.json",
+          "sha256": "adb73a9f1016228d929485fcc574353ac6ca8785593fce3dabe036fdfcbdad39",
+          "status": "bounded_cap_exhausted",
+          "complete_original_match": false,
+          "gold_admitted": false
+        },
+        "reference_a": {
+          "path": "work/issue33/holdouts/ucf-holdout-277c7e0e-prepared/evaluation/reference-a.jsonl",
+          "sha256": "d25fbe3e730a4f47710ed0831cd803848a113506d29c6734c16aeed6e2afa159"
+        },
+        "reference_b": {
+          "path": "work/issue33/holdouts/ucf-holdout-277c7e0e-prepared/evaluation/reference-b.jsonl",
+          "sha256": "f9c72f999a09d31f4cf28a5c6b9d074959a2c2667705bd1e0805e639578d772c"
+        },
+        "draw_audit": {
+          "reference_a": {
+            "path": "work/issue33/holdouts/ucf-holdout-277c7e0e-prepared/evaluation/.retail-replay-run-goybz3kn/evidence/draw-audit.jsonl",
+            "sha256": "45abe154861d9de1ed6437b54762f95aacca6d701fb914859e98d8c78891f5d0",
+            "capture_sha256": "d25fbe3e730a4f47710ed0831cd803848a113506d29c6734c16aeed6e2afa159",
+            "draws_compared": 7341,
+            "draws_with_changes": 0,
+            "source_ticks_total": 7347,
+            "source_ticks_not_drawn_count": 6,
+            "status": "declared_state_unchanged",
+            "performance": "not_evaluated",
+            "pixels": "not_compared"
+          },
+          "reference_b": {
+            "path": "work/issue33/holdouts/ucf-holdout-277c7e0e-prepared/evaluation/.retail-replay-run-8cet2mm3/evidence/draw-audit.jsonl",
+            "sha256": "45abe154861d9de1ed6437b54762f95aacca6d701fb914859e98d8c78891f5d0",
+            "capture_sha256": "f9c72f999a09d31f4cf28a5c6b9d074959a2c2667705bd1e0805e639578d772c",
+            "draws_compared": 7341,
+            "draws_with_changes": 0,
+            "source_ticks_total": 7347,
+            "source_ticks_not_drawn_count": 6,
+            "status": "declared_state_unchanged",
+            "performance": "not_evaluated",
+            "pixels": "not_compared"
+          }
+        }
+      },
+      {
+        "id": "ucf-holdout-feeb4d6d",
+        "role": "holdout",
+        "fighters": "Falco/Falco",
+        "stage": "Final Destination",
+        "frames": 5953,
+        "source_sha256": "feeb4d6d52ccc2f25fd0eabf75794c5aebd28ee2b1bfc17e2d74f316784924cd",
+        "source_plan_sha256": "93bb1467203cfa3e291a7344e9106437ee9a4c9f52126a5e914825ff120a0e8e",
+        "reference_result": {
+          "path": "work/issue33/holdouts/ucf-holdout-feeb4d6d-reviewed/evaluation/finish.json",
+          "sha256": "5a663f6c2a726d1c12bbcb637c1166c19b1183da796520b850404a4d5720baf5",
+          "status": "complete",
+          "complete_original_match": true,
+          "gold_admitted": false
+        },
+        "reference_a": {
+          "path": "work/issue33/holdouts/ucf-holdout-feeb4d6d-reviewed/evaluation/reference-a.jsonl",
+          "sha256": "668896f670027523366d2aa0da257785ccd70ecd5d8afefa9e9adf3682c01630"
+        },
+        "reference_b": {
+          "path": "work/issue33/holdouts/ucf-holdout-feeb4d6d-reviewed/evaluation/reference-b.jsonl",
+          "sha256": "d1c0ace03bd02424329d0e0d33c2696ea2d931e8bb4d41e3eac62e7edc267586"
+        },
+        "draw_audit": {
+          "reference_a": {
+            "path": "work/issue33/holdouts/ucf-holdout-feeb4d6d-reviewed/evaluation/.retail-replay-run-ep60hgrr/evidence/draw-audit.jsonl",
+            "sha256": "ed6acf70c96d1f00ebd3713ecd8a42adcebbfec7fa02fe407ea2dc038871d723",
+            "capture_sha256": "668896f670027523366d2aa0da257785ccd70ecd5d8afefa9e9adf3682c01630",
+            "draws_compared": 5948,
+            "draws_with_changes": 0,
+            "source_ticks_total": 5953,
+            "source_ticks_not_drawn_count": 5,
+            "status": "declared_state_unchanged",
+            "performance": "not_evaluated",
+            "pixels": "not_compared"
+          },
+          "reference_b": {
+            "path": "work/issue33/holdouts/ucf-holdout-feeb4d6d-reviewed/evaluation/.retail-replay-run-zbdaxtsr/evidence/draw-audit.jsonl",
+            "sha256": "ed6acf70c96d1f00ebd3713ecd8a42adcebbfec7fa02fe407ea2dc038871d723",
+            "capture_sha256": "d1c0ace03bd02424329d0e0d33c2696ea2d931e8bb4d41e3eac62e7edc267586",
+            "draws_compared": 5948,
+            "draws_with_changes": 0,
+            "source_ticks_total": 5953,
+            "source_ticks_not_drawn_count": 5,
+            "status": "declared_state_unchanged",
+            "performance": "not_evaluated",
+            "pixels": "not_compared"
+          }
+        }
+      }
+    ]
+  },
+  "state_and_timer": {
+    "scope": "State capture compares declared entry data, inputs, RNG, match clock, fighters, PAD configuration and history banks. Timer comparison checks exact sidecar repeatability and port comparison. Neither evaluates performance, pixels, audio, or gold admission.",
+    "targets": [
+      {
+        "id": "ucf-holdout-277c7e0e",
+        "frames_compared": 7347,
+        "state": {
+          "path": "work/issue33/holdouts/marth-state/state-comparison.json",
+          "sha256": "e789bd0e941baf97d6e439d5e8c1e7f96ea52ee46e430d7a796be222dae99a4f",
+          "status": "declared_state_match",
+          "first_divergence": null,
+          "checks": "entry, inputs, RNG, match frame, fighters, PAD state, and frame count passed",
+          "performance": "not_evaluated",
+          "gold_admitted": false
+        },
+        "timer": {
+          "path": "work/issue33/holdouts/marth-state/timer-comparison.json",
+          "sha256": "88f9e7812c3eef7279f94de301401d9140182ab60c65840f6efb19b917850b53",
+          "status": "pass",
+          "frames_compared": 7347,
+          "reference_binding": "exact"
+        }
+      },
+      {
+        "id": "ucf-holdout-feeb4d6d",
+        "frames_compared": 5953,
+        "state": {
+          "path": "work/issue33/holdouts/falco-state/state-comparison.json",
+          "sha256": "a10205e37590841c03ba88085f384f1a4ae3d4a4dd0b914e31fe21ee59fd611c",
+          "status": "declared_state_match",
+          "first_divergence": null,
+          "checks": "entry, inputs, RNG, match frame, fighters, PAD state, and frame count passed",
+          "performance": "not_evaluated",
+          "gold_admitted": false
+        },
+        "timer": {
+          "path": "work/issue33/holdouts/falco-state/timer-comparison.json",
+          "sha256": "a2ce0b4431f73908890df087359c7104e162286cdf508a11df65c2d494806ab1",
+          "status": "pass",
+          "frames_compared": 5953,
+          "reference_binding": "exact"
+        }
+      }
+    ],
+    "scope_correction": "Declared state/timer values are compared. Browser per_tick draw counts are not exact original draw-cadence equivalence."
+  },
+  "development_state_preflights": {
+    "scope": "Two 180-frame development state-capture preflights only. They are not holdout timing evidence, do not admit a complete match, and explicitly report performance not evaluated and pixels not compared.",
+    "attempts": [
+      {
+        "id": "development-state-preflight",
+        "role": "development",
+        "frames": 180,
+        "finish": {
+          "path": "work/issue33/holdouts/development-state-preflight/finish.json",
+          "sha256": "29c439105e2d4ce97f06a81f9008e2a6f1191a2f55978239c3d80447beec64f8",
+          "status": "completed"
+        },
+        "report": {
+          "path": "work/issue33/holdouts/development-state-preflight/retail-browser-report.json",
+          "sha256": "8b02b1f54d432d3061b967bfc6f185c3bfedd22dabcedef349f731fc8ba60c85",
+          "pass": true,
+          "complete": true,
+          "performance": "not_evaluated",
+          "pixels": "not_compared",
+          "source_match_complete": false,
+          "recipe_sha256": "a62afb55c1e0af209169b56104d4f247d0a0f107498f92012a3c195afde08619"
+        }
+      },
+      {
+        "id": "development-state-visible-preflight",
+        "role": "development",
+        "frames": 180,
+        "finish": {
+          "path": "work/issue33/holdouts/development-state-visible-preflight/finish.json",
+          "sha256": "ed1ab5f999580268033528a5ecb3110b02e3f4dbaaa16cfcd4a706e04fae8572",
+          "status": "completed"
+        },
+        "report": {
+          "path": "work/issue33/holdouts/development-state-visible-preflight/retail-browser-report.json",
+          "sha256": "c889f2d31dc97e6641bcae09e345ee6d6a7a267f657445b42b5433b2d45794fb",
+          "pass": true,
+          "complete": true,
+          "performance": "not_evaluated",
+          "pixels": "not_compared",
+          "source_match_complete": false,
+          "recipe_sha256": "a62afb55c1e0af209169b56104d4f247d0a0f107498f92012a3c195afde08619"
+        }
+      }
+    ]
+  },
+  "timing_protocol": {
+    "plan_id": "issue33-approved-current-runtime-holdouts-20260919",
+    "role": "holdout",
+    "mode": "unprofiled",
+    "repetitions": 1,
+    "caches": [
+      "cold",
+      "warm"
+    ],
+    "timeout_ms": 300000,
+    "thresholds_ms": {
+      "browser_hard_gap": 33.333333333333336,
+      "native_hard": 33.333333333333336,
+      "native_target": 16.666666666666668
+    },
+    "plan": {
+      "path": "work/issue33/holdouts/timing-plan.json",
+      "sha256": "09dcf266bd1e45ba5a00a41ca62efb37bf85c9fad32b4b53f1033434cad0d5d0"
+    },
+    "spec": {
+      "path": "work/issue33/holdouts/timing-spec.json",
+      "sha256": "6913ed13fa30ed50fbae86d3a1da09d49c35011105cb447ca3e624293ab9bbbe"
+    },
+    "slots": [
+      {
+        "slot_id": "01-marth-cold",
+        "target_id": "ucf-holdout-277c7e0e",
+        "cache": "cold",
+        "state": "completed_failed",
+        "consumed": true
+      },
+      {
+        "slot_id": "02-marth-warm",
+        "target_id": "ucf-holdout-277c7e0e",
+        "cache": "warm",
+        "state": "pending",
+        "consumed": false,
+        "campaign_disposition": "permanently_unstarted_for_this_freeze"
+      },
+      {
+        "slot_id": "03-falco-cold",
+        "target_id": "ucf-holdout-feeb4d6d",
+        "cache": "cold",
+        "state": "pending",
+        "consumed": false,
+        "campaign_disposition": "permanently_unstarted_for_this_freeze"
+      },
+      {
+        "slot_id": "04-falco-warm",
+        "target_id": "ucf-holdout-feeb4d6d",
+        "cache": "warm",
+        "state": "pending",
+        "consumed": false,
+        "campaign_disposition": "permanently_unstarted_for_this_freeze"
+      }
+    ],
+    "campaign_status": "failed_stopped",
+    "remaining_slots_disposition": "permanently_unstarted_for_this_freeze"
+  },
+  "timing_attempts": [
+    {
+      "slot_id": "01-marth-cold",
+      "target_id": "ucf-holdout-277c7e0e",
+      "status": "completed_failed",
+      "consumed": true,
+      "frames": 7347,
+      "browser_report": {
+        "path": "work/issue33/holdouts/timing-attempts/01-marth-cold/browser-report.json",
+        "sha256": "31ce0684443af5aed5fd43c7fe87f079bd8a5ec8d155cf34fd5ffa6286f7c478",
+        "pass": false,
+        "failures": [
+          "livePipelinesCreated"
+        ],
+        "livePipelinesCreated": 2,
+        "livePipelinesQueued": 0,
+        "source_updates": 7347,
+        "source_draws": 7347,
+        "browser_callbacks": 7347,
+        "native_callbacks": 7347,
+        "worst_browser_ms": 25.05999994277954,
+        "worst_native_ms": 17.305,
+        "browser_hard_gaps": 0,
+        "native_hard_over_33ms": 0,
+        "native_over_16_67ms": 1,
+        "audio_underrun_frames": 0,
+        "audio_overflow_frames": 0,
+        "focus_lost": false,
+        "browser_errors": 0
+      },
+      "finish": {
+        "path": "work/issue33/holdouts/timing-attempts/01-marth-cold/finish.json",
+        "sha256": "a0d411b9de6c9dc8041861f9635e227e482083e51b27dc733b888e4a58a2a028",
+        "acceptance_evidence": false,
+        "validation_error": "Browser report disagrees at pass",
+        "evidence_scope": "failed acceptance measurement, not admission"
+      },
+      "acceptance_interpretation": "failed_acceptance_evidence"
+    }
+  ],
+  "recovered_resource_event": {
+    "path": "work/issue33/marth-missing-pipelines/retained-resource-events.json",
+    "sha256": "57724c7be6e3c0962c0509b12823b67335c6b99aa3bed9e3069280f96cedbb14",
+    "event_count": 1,
+    "event": {
+      "frame": 3889,
+      "source_frame": 3754,
+      "created_delta": 1,
+      "created_total": 628,
+      "queued_delta": 0,
+      "total_ms": 4.96
+    },
+    "owner": null,
+    "descriptor_hash": null,
+    "interpretation": "Aggregate second-live-creation observation only. No source draw owner or descriptor hash is retained, and no earlier creation event is retained. It cannot be used to assign causal ownership or retroactively classify the historical event."
+  },
+  "preparation_history": {
+    "first_preparation_wrong_path": {
+      "path": "work/issue33/holdouts/ucf-holdout-277c7e0e/preparation-failed.json",
+      "sha256": "3978e23cc400f2041a15565e48692f39fcf1dff3b7f59f7bf453051574b76c48",
+      "status": "failed",
+      "claim": "Dolphin was not launched; preparation did not emit a runnable recipe",
+      "failure": "The preparation referenced missing tools/extract_disc_file.py."
+    },
+    "superseded_falco_bundle": {
+      "old_bundle_log": {
+        "path": "work/issue33/holdouts/ucf-holdout-feeb4d6d-prepared.log",
+        "sha256": "ff6846270596bd7a80b5dc4d4b9150beb259f31e0db8b1ae255d5cb97eb83d30",
+        "bundle": "work/issue33/holdouts/ucf-holdout-feeb4d6d-prepared",
+        "dolphin_launched": false,
+        "phase": "preparation_wrapper"
+      },
+      "replacement_bundle_log": {
+        "path": "work/issue33/holdouts/ucf-holdout-feeb4d6d-reviewed.log",
+        "sha256": "cfd3ab30812241e6ee34b6802204a66f701feacec33ec82ef0cc084d07039ea2",
+        "bundle": "work/issue33/holdouts/ucf-holdout-feeb4d6d-reviewed",
+        "dolphin_launched": false,
+        "phase": "preparation_wrapper"
+      },
+      "interpretation": "The earlier Falco preparation wrapper was unlaunched and superseded. The reviewed preparation wrapper was also unlaunched at preparation time; run_reference_pipeline later launched that reviewed bundle for the retained complete reference evaluation. The old prepared bundle was not used for that evaluation.",
+      "evaluation": {
+        "path": "work/issue33/holdouts/ucf-holdout-feeb4d6d-reviewed/evaluation/finish.json",
+        "sha256": "5a663f6c2a726d1c12bbcb637c1166c19b1183da796520b850404a4d5720baf5",
+        "status": "complete",
+        "dolphin_launched": true,
+        "phase": "later_reference_evaluation"
+      }
+    }
+  },
+  "limits": [
+    "Marth reference preparation exhausted its 7347-frame cap and is not a complete original match.",
+    "State and timer matches are declared-scope comparisons only; they do not establish performance, pixels, audio, or gold admission.",
+    "The first timing slot failed acceptance because two live pipelines were created; the native 16.67 ms target miss is below the 33.33 ms hard threshold and is recorded separately.",
+    "The campaign stopped after that failed slot. Three timing slots were never started and are permanently unstarted for this freeze; no current-runtime timing pass or issue completion is claimed.",
+    "The retained resource event has no descriptor identity or draw-source owner. The historical September 12 operation remains unknowable from retained fields.",
+    "The recovered seed adds exactly two descriptor rows while preserving all 626 prior rows field-for-field. The corrected development state completes state and timer matching only; performance acceptance was not evaluated and the holdout timing campaign was not rerun."
+  ],
+  "recovered_seed_integration": {
+    "scope": "Read-only recovery from the immutable failed-run profile and append-only candidate seed merge after the stopped timing campaign. No replay was run during recovery; the recovered Dawn driver cache was retained as evidence but excluded from the seed.",
+    "recovery": {
+      "export_receipt": {
+        "path": "work/issue33/marth-missing-pipelines/recovery-readonly-2/export-recovery.json",
+        "sha256": "8d1f80f77dd1a0e1dc61d45b73c5c892545c68bb33d69dec2434fa4908d0c49a"
+      },
+      "source_profile_unchanged": {
+        "path": "work/issue33/marth-missing-pipelines/recovery-readonly-2/source-profile-unchanged.json",
+        "sha256": "8f4bee8f91ca47e2b71830087412f309a79f3430b883ce364fa25fe9f316551b"
+      },
+      "method": "Exact serialized FILE_DATA.contents bytes through a read-only IndexedDB cursor; no runtime loaded and no replay executed.",
+      "pipeline_db": {
+        "path": "work/issue33/marth-missing-pipelines/recovery-readonly-2/pipeline_cache.db",
+        "sha256": "f1c1d714b195aa1795c50ed2db1795613d868a07340cbf0b1a563384fdfebdcf"
+      },
+      "pipeline_wal": {
+        "path": "work/issue33/marth-missing-pipelines/recovery-readonly-2/pipeline_cache.db-wal",
+        "sha256": "3045959346af1dd00e80bbffe234bc30f4d70e874e77da8894443bc6780c2f5f"
+      },
+      "pipeline_provenance": {
+        "path": "work/issue33/marth-missing-pipelines/cache-export-provenance.json",
+        "sha256": "0e07b63277a9d48e5e9c7459dfae1f8afc19a0979774aaa4bba63b2cdd8233da",
+        "origin_cache_cleared": true,
+        "dawn_driver_cache_included": false
+      },
+      "excluded_dawn_files": [
+        "work/issue33/marth-missing-pipelines/recovery-readonly-2/dawn_cache.db",
+        "work/issue33/marth-missing-pipelines/recovery-readonly-2/dawn_cache.db-shm",
+        "work/issue33/marth-missing-pipelines/recovery-readonly-2/dawn_cache.db-wal"
+      ]
+    },
+    "review": {
+      "path": "work/issue33/marth-missing-pipelines/two-descriptor-review.json",
+      "sha256": "41bd388b37b95c01cb6d328eb394b788543315d30f6c392c8368fc9d1aab0e39",
+      "eligible": true,
+      "base_rows": 626,
+      "candidate_rows": 628,
+      "candidate_new_rows": 2,
+      "candidate_existing_payload_conflicts": 0,
+      "candidate_missing_base_rows": 0,
+      "dawn_driver_cache_included": false
+    },
+    "new_descriptors": [
+      {
+        "hash": "dfe90cff",
+        "numeric_hash": 3756592383,
+        "config_sha256": "f5b9b534b519652154580d7aba5cfde94f5c6149a46a7219de0ab36c9bb2a761",
+        "config_version": 65549,
+        "config_size": 2772,
+        "first_frame_used": 585
+      },
+      {
+        "hash": "f285d8c5",
+        "numeric_hash": 4068858053,
+        "config_sha256": "b1b50b4ce838807052b36cd70a18e0bb5dee14f134aaa7d1e22000ba6f4e5e52",
+        "config_version": 65549,
+        "config_size": 2772,
+        "first_frame_used": 4025
+      }
+    ],
+    "merged_seed": {
+      "path": "work/issue33/marth-missing-pipelines/two-descriptor-seed.db",
+      "sha256": "4bdb7c4a3e906d907d066f0c65041d7eb3472dc25c9d8c98be6e4946fdce560f",
+      "bytes": 2621440
+    },
+    "merge_report": {
+      "path": "work/issue33/marth-missing-pipelines/two-descriptor-merge.json",
+      "sha256": "41bd388b37b95c01cb6d328eb394b788543315d30f6c392c8368fc9d1aab0e39",
+      "preserved_base_rows": 626,
+      "new_rows": 2,
+      "payload_conflicts": 0
+    },
+    "seed_preservation": {
+      "path": "work/issue33/marth-missing-pipelines/seed-preservation.json",
+      "sha256": "a90ffd0c4796ddf574310b1e529ae029f982cebb9c5061c8351f813419c85a89",
+      "prior_rows_preserved_all_fields": 626,
+      "new_rows": 2,
+      "counts": [
+        [
+          0,
+          1,
+          64
+        ],
+        [
+          1,
+          627,
+          1738044
+        ]
+      ],
+      "seed_sha256": "4bdb7c4a3e906d907d066f0c65041d7eb3472dc25c9d8c98be6e4946fdce560f"
+    },
+    "regression": {
+      "before": {
+        "path": "work/issue33/marth-missing-pipelines/regression-before.log",
+        "sha256": "c2e4d0024fda5820bff4336f5dc70cdd1cda9f39df3e7a955a2e2a288556a6a6",
+        "failed_descriptors": [
+          "dfe90cff",
+          "f285d8c5"
+        ]
+      },
+      "focused": {
+        "path": "work/issue33/marth-missing-pipelines/seed-focused.log",
+        "sha256": "250a6a73f5584d53f4f87c381510e581cec70d3cf4d3748b26e9c768095669c3",
+        "tests_passed": 11
+      }
+    },
+    "development_state": {
+      "candidate_build_identity": {
+        "path": "work/issue33/marth-missing-pipelines/candidate-build-identity.json",
+        "sha256": "8035853f2a0783c05dcbbc49f31d790e2bfb043a14dac860886a4d73ae3c236a"
+      },
+      "status": "completed_state_and_timer_match",
+      "corrected_state_gate": {
+        "path": "work/issue33/marth-missing-pipelines/development-marth-state/state-gate-role-corrected.json",
+        "sha256": "5b6c98ac37077a5546481d7d3262c3641017e72324dc65616235eb040110967d",
+        "role": "development",
+        "frames": 7347,
+        "status": "declared_state_and_timer_match",
+        "input_scheduling": "per_tick",
+        "performance": "not_evaluated",
+        "correction": "Comparison helper had a hardcoded holdout label; actual capture manifest/start/finish are development. The original mislabeled state-gate remains retained; state/timer computations and runtime execution are unchanged."
+      },
+      "capture_manifest": {
+        "path": "work/issue33/marth-missing-pipelines/development-marth-state/capture-manifest.json",
+        "sha256": "8f8a2cf0f02f1852f364ef085b0011fd4fc8780da813947fc624731ee888b55d"
+      },
+      "finish": {
+        "path": "work/issue33/marth-missing-pipelines/development-marth-state/finish.json",
+        "sha256": "f4609be52a41c57dc06e80cc268663a5b81f34cf21d7b1476a049c726f27c651",
+        "status": "completed",
+        "complete": true
+      },
+      "report": {
+        "path": "work/issue33/marth-missing-pipelines/development-marth-state/retail-browser-report.json",
+        "sha256": "fb1fc2290cae34787f2f5caea345f8c85c44559ba36c30553aabc51df196ab0f",
+        "source_updates": 7347,
+        "source_draws": 7347,
+        "browser_callbacks": 7347,
+        "native_callbacks": 7347,
+        "worst_native_ms": 14.35,
+        "worst_browser_ms": 24.8,
+        "live_pipelines_created": 0,
+        "live_pipelines_queued": 0,
+        "audio_underrun_frames": 0,
+        "audio_overflow_frames": 0,
+        "focus_lost": false,
+        "performance": "not_evaluated",
+        "pixels": "not_compared",
+        "source_match_complete": false
+      },
+      "timer": {
+        "path": "work/issue33/marth-missing-pipelines/development-marth-state/timer-comparison.json",
+        "sha256": "88f9e7812c3eef7279f94de301401d9140182ab60c65840f6efb19b917850b53",
+        "status": "pass",
+        "frames_compared": 7347,
+        "reference_binding": "exact"
+      },
+      "original_mislabeled_state_gate": {
+        "path": "work/issue33/marth-missing-pipelines/development-marth-state/state-gate.json",
+        "sha256": "908d7d207ef112ea55f7f677317ddabae43e09f5259c69c8d83be9a2fd2fb707",
+        "role": "holdout"
+      },
+      "performance_acceptance": "not_evaluated_due_to_overlapping_public_build_and_full_suite",
+      "holdout_timing_rerun": "not_done"
+    },
+    "validation": {
+      "runtime_release_build": {
+        "path": "work/issue33/marth-missing-pipelines/build-runtime.log",
+        "sha256": "459336f4f6bb76e1122de8ed161ca41a438e95a20964ac28adb0a44f1b1d9a74",
+        "status": "passed"
+      },
+      "public_release_build": {
+        "path": "work/issue33/marth-missing-pipelines/build-public.log",
+        "sha256": "6c5167ce049a6922edb22e646c534e42fb12171909a442b20dcdc5a3143ac42e",
+        "status": "passed"
+      },
+      "production_package_audit": {
+        "path": "work/issue33/marth-missing-pipelines/package-audit.log",
+        "sha256": "46a3aefddfc5f8d97a6a01683d43d24881db767f2f37350b02ff15090647191f",
+        "status": "passed",
+        "files": 25,
+        "bytes": 15239544
+      },
+      "full_suite": {
+        "path": "work/issue33/marth-missing-pipelines/full-suite.log",
+        "sha256": "c1ffbb3115edccbf7738447d413fec914de7a0c800eb8dba5d2e9af607ca015d",
+        "status": "passed",
+        "tests": 1006,
+        "optional_skips": 44,
+        "elapsed_seconds": 223.575
+      },
+      "public_browser_checks": {
+        "path": "work/issue33/marth-missing-pipelines/public-browser.log",
+        "sha256": "7d5a5809a1912c04ff0fd5f46df99d9b38d60964740b847d7cc28df5a8c5c672",
+        "status": "passed",
+        "checks": 10,
+        "browser": "153.0.8010.50"
+      },
+      "public_http_audit": {
+        "path": "work/issue33/marth-missing-pipelines/public-http.json",
+        "sha256": "a510ce96b491c102328ef6992bbf389e069562ff733e876c855aeb0993eeb451",
+        "status": "passed"
+      }
+    }
+  }
+}
