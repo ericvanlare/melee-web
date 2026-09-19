@@ -13,13 +13,14 @@ assert(start&&pause&&completion);
  // the 15-minute watchdog, and teardown must not run reentrantly in Wasm.
  const failed=page.split('\n').find(line=>line.startsWith('developmentHooks.preparationFailed='));
  const poll=page.slice(page.indexOf('window.menuReplayPoll='),page.indexOf("\n$('retail-replay-start').onclick="));
- const ended=[],display={files:[{}]};
+ const ended=[],display={files:[{}],dataset:{}};
  const scope={developmentHooks:{},window:{},retailRun:{},ready:true,fatal:false,bundle:true,
   replayLoading:false,$:()=>display,finishRetailReplay:reason=>ended.push(reason)};
  vm.createContext(scope);vm.runInContext(failed+'\n'+poll,scope);
  scope.developmentHooks.preparationFailed('PlLk.dat: invalid descriptor');
  assert.equal(ended.length,0,'Teardown is deferred until the next poll');
  assert.equal(scope.preparationSince,0);
+ assert.equal(display.dataset.runtimeError,'PlLk.dat: invalid descriptor');
  scope.window.menuReplayPoll();
  assert.deepEqual(ended,['PlLk.dat: invalid descriptor']);
  scope.retailRun.finishing=true;scope.window.menuReplayPoll();
