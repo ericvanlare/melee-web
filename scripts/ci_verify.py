@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Run an isolated CI partition without reusing build products from another run."""
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -13,56 +14,96 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 
-# The union is exactly build.py's existing all + fighter target inventory.
-# Isolate the expensive links on separate ordinary GitHub runners. Every runner
-# configures its own clean graph; only compiler-cache entries cross runs.
+# One build graph reuses the shared libraries across every required target.
+# The independent unit jobs configure clean graphs and share no build outputs.
 GROUPS = {
-    "unit": (),
-    "runtime": ("gameplay_menu_browser",),
-    "graphics": ("gx_probe",),
-    "gameplay": ("gameplay_checks",),
-    "fighter": ("fighter_runtime_probe",),
-    "effects": ("gameplay_effect_banks_trace", "gameplay_bonus_data_trace", "gameplay_stage_numeric_trace"),
-    "menus": ("native_menu_scene_trace", "dat_menu_support_trace"),
+    "unit-0": (),
+    "unit-1": (),
+    "build": (
+        "gx_probe", "gameplay_checks", "gameplay_menu_browser",
+        "fighter_runtime_probe", "gameplay_effect_banks_trace",
+        "gameplay_bonus_data_trace", "gameplay_stage_numeric_trace",
+        "native_menu_scene_trace", "dat_menu_support_trace",
+    ),
 }
+UNIT_GROUPS = ("unit-0", "unit-1")
 
 # Full discovery runs after configuration, so SDK/source/SDL/fmt-dependent
-# compiler tests execute there. Only tests needing the linked artifacts repeat
-# in their owning partition. Proprietary-asset cases keep their normal skips.
+# compiler tests execute there. Only tests needing linked artifacts repeat in
+# the build job. Proprietary-asset cases keep their normal skips.
 LINKED_TESTS = {
-    "gameplay": (
+    "build": (
         "test_hsd_native.NativeJointRuntimeTests",
         "test_gameplay_common_context",
-    ),
-    "effects": (
         "test_gameplay_effects", "test_gameplay_bonus_data", "test_gameplay_stage_numeric",
-    ),
-    "menus": (
         "test_gameplay_native_menus.NativeMenuSourceTests.test_original_sis_layout_and_style_stack",
         "test_dat_menu_support",
     ),
 }
-
 REQUIRED_TESTS = {
-    "gameplay": (
+    "build": (
         "test_hsd_native.NativeJointRuntimeTests.test_original_allocation_callback_rejection_and_restart",
         "test_hsd_native.NativeJointRuntimeTests.test_replacement_heap_is_never_used_for_teardown",
         "test_gameplay_common_context.CommonContextTests.test_original_material_owners_restore_all_common_globals",
-    ),
-    "effects": ("test_gameplay_effects.EffectContextTests.test_authored_bank_bounds_lifetimes_and_restart",),
-    "menus": (
+        "test_gameplay_effects.EffectContextTests.test_authored_bank_bounds_lifetimes_and_restart",
         "test_gameplay_native_menus.NativeMenuSourceTests.test_original_sis_layout_and_style_stack",
         "test_dat_menu_support.DatMenuSupportTests.test_support_roots_and_optional_local_assets",
     ),
 }
 
-
 def check_inventory():
+    if not set(UNIT_GROUPS).issubset(GROUPS):
+        raise ValueError("CI partitions must include both unit-0 and unit-1")
     from build import BUILD_TARGETS
     expected = set(BUILD_TARGETS["all"]) | set(BUILD_TARGETS["fighter"])
     actual = [target for targets in GROUPS.values() for target in targets]
     if len(actual) != len(set(actual)) or set(actual) != expected:
         raise ValueError("CI partitions must cover every all/fighter target exactly once")
+
+
+def _test_cases(suite):
+    """Yield test cases in unittest discovery order without running them."""
+    for test in suite:
+        if isinstance(test, unittest.TestSuite):
+            yield from _test_cases(test)
+        else:
+            yield test
+
+
+def _test_module(test):
+    return type(test).__module__
+
+
+def unit_shard(module):
+    """Assign a test module to a stable unit shard."""
+    digest = hashlib.sha256(module.encode("utf-8")).digest()
+    return int.from_bytes(digest, "big") % len(UNIT_GROUPS)
+
+
+def _shard_index(group):
+    try:
+        index = UNIT_GROUPS.index(group)
+    except ValueError as exc:
+        raise ValueError(f"unknown unit shard: {group}") from exc
+    return index
+
+
+def _filter_suite(suite, shard):
+    selected = unittest.TestSuite()
+    for test in suite:
+        if isinstance(test, unittest.TestSuite):
+            child = _filter_suite(test, shard)
+            if child.countTestCases():
+                selected.addTest(child)
+        elif unit_shard(_test_module(test)) == shard:
+            selected.addTest(test)
+    return selected
+
+
+def _inventory(suite):
+    ids = [test.id() for test in _test_cases(suite)]
+    encoded = "\n".join(ids).encode("utf-8")
+    return {"count": len(ids), "sha256": hashlib.sha256(encoded).hexdigest()}
 
 
 def ninja_timings(path):
@@ -108,8 +149,13 @@ class RecordingResult(unittest.TextTestResult):
 def run_tests(group, report):
     sys.path.insert(0, str(ROOT / "tests"))
     loader = unittest.TestLoader()
-    suite = (loader.discover(str(ROOT / "tests")) if group == "unit" else
-             loader.loadTestsFromNames(LINKED_TESTS[group]))
+    if group in UNIT_GROUPS:
+        discovered = loader.discover(str(ROOT / "tests"))
+        suite = _filter_suite(discovered, _shard_index(group))
+        report["discovered"] = _inventory(discovered)
+        report["selected"] = _inventory(suite)
+    else:
+        suite = loader.loadTestsFromNames(LINKED_TESTS[group])
     result = unittest.TextTestRunner(verbosity=2, resultclass=RecordingResult).run(suite)
     report["tests"] = result.outcomes
     report["tests_run"] = result.testsRun
@@ -146,15 +192,17 @@ def run_group(group, jobs):
         subprocess.run(list(map(str, args)), cwd=ROOT, env=env, check=True)
 
     try:
-        phase("configure", lambda: command(sys.executable, ROOT / "scripts/build.py", "--configure-only"))
+        configure_args = ("--link-jobs", "1") if group == "build" else ()
+        phase("configure", lambda: command(sys.executable, ROOT / "scripts/build.py",
+                                           "--configure-only", *configure_args))
         if GROUPS[group]:
             phase("build", lambda: command(ROOT / ".venv/bin/cmake", "--build", ROOT / "build/browser",
                                             "--target", *GROUPS[group], "-j", jobs))
-        if group == "unit" or group in LINKED_TESTS:
+        if group in UNIT_GROUPS or group in LINKED_TESTS:
             phase("tests", lambda: run_tests(group, report))
-        if group == "gameplay":
+        if group == "build":
             phase("gameplay-check", lambda: command(sys.executable, ROOT / "scripts/check_gameplay.py"))
-        if group == "unit":
+        if group == "unit-0":
             phase("source-census", lambda: command(sys.executable, ROOT / "scripts/gameplay_census.py", "--jobs", jobs))
         report["status"] = "passed"
     except BaseException:
@@ -164,7 +212,7 @@ def run_group(group, jobs):
         usage = resource.getrusage(resource.RUSAGE_CHILDREN)
         report.update(seconds=time.monotonic() - started,
                       child_cpu_seconds=usage.ru_utime + usage.ru_stime,
-                      child_maxrss=usage.ru_maxrss,
+                      child_maxrss_bytes=usage.ru_maxrss * (1 if sys.platform == "darwin" else 1024),
                       ninja=ninja_timings(ROOT / "build/browser/.ninja_log"))
         (directory / f"{group}.json").write_text(json.dumps(report, indent=2) + "\n")
         print(json.dumps({key: value for key, value in report.items() if key not in {"tests", "ninja"}}, indent=2))

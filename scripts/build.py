@@ -514,7 +514,10 @@ def _write_public_identity(root, build_dir, version, cmake, ninja, gameplay_sour
 
 
 def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
-          pipeline_provenance=False, selective_pipelines=False, configure_only=False):
+          pipeline_provenance=False, selective_pipelines=False, configure_only=False,
+          link_jobs=None):
+    if link_jobs is not None and link_jobs < 1:
+        raise ValueError("--link-jobs must be positive")
     if configure_only and target == PUBLIC_RUNTIME_TARGET:
         # The public target writes an identity sidecar only after a complete
         # build.  A configure-only invocation must not leave an apparently
@@ -580,6 +583,9 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
     )
     configure.append(f"-DMELEE_WEB_PIPELINE_PROVENANCE={'ON' if pipeline_provenance else 'OFF'}")
     configure.append(f"-DMELEE_WEB_SELECTIVE_PIPELINES={'ON' if selective_pipelines else 'OFF'}")
+    if link_jobs is not None:
+        configure.extend((f"-DCMAKE_JOB_POOLS=melee_link={link_jobs}",
+                          "-DCMAKE_JOB_POOL_LINK=melee_link"))
     subprocess.run(configure, cwd=root, env=env, check=True)
     if configure_only:
         return
@@ -607,13 +613,17 @@ def main():
                         help="Prepare certified upcoming pipeline unions in a separate runtime build")
     parser.add_argument("--configure-only", action="store_true",
                         help="Configure the selected build directory without compiling targets")
+    parser.add_argument("--link-jobs", type=int,
+                        help="Limit concurrent linker jobs through CMake's melee_link pool")
     args = parser.parse_args()
     if args.jobs < 1:
         parser.error("--jobs must be positive")
+    if args.link_jobs is not None and args.link_jobs < 1:
+        parser.error("--link-jobs must be positive")
     try:
         build(args.jobs, target=args.target, configuration=args.configuration,
               pipeline_provenance=args.pipeline_provenance, selective_pipelines=args.selective_pipelines,
-              configure_only=args.configure_only)
+              configure_only=args.configure_only, link_jobs=args.link_jobs)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         raise SystemExit(f"build: {error}") from error
 
