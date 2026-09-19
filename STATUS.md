@@ -26,7 +26,17 @@ not a fix or acceptance pass. See the [investigation and recovery limits](docs/B
 The original failure remains causally unassigned. The project owner approved a
 separate [current-runtime holdout gate](docs/HITCH_CAPTURE.md#approved-current-runtime-scope--2026-09-19)
 on September 19, retaining that historical failure and every hard threshold.
-Issue #33 remains open during that separately frozen holdout evaluation.
+Issue #33 remains open: the first cold holdout failed because it created two
+live pipelines. Both original state/timer comparisons pass (7,347 Marth/Marth
+Battlefield updates and 5,953 Falco/Falco Final Destination updates), but the
+remaining three timing slots are unstarted. The failed campaign is preserved;
+both inputs are now exposed. Two fresh header/input-only donors were reserved
+before tuning. A candidate seed adds exactly the two recovered portable
+descriptors while preserving all 626 previous records. Its complete 7,347-update development regression preserves the declared state
+and timer with zero live pipelines; both Release builds, 1,006 tests (44
+optional skips), public HTTP checks and ten browser checks pass. The fresh
+holdout evaluation is in progress. Original draw cadence remains unevaluated. See the
+[failed campaign and correction evidence](docs/CURRENT_RUNTIME_HOLDOUTS_20260919.md).
 
 The current PR #38 development Release completed two cold/warm rounds on
 Fox/Marth Dream Land and Marth/Falco Yoshi's Story: 37,920 source updates/draws,
@@ -80,8 +90,8 @@ The state capture retains a browser gap and audio underruns. Four separate
 bounded public segments (both player orders cold/warm, 450 updates each) pass
 without timing pauses, live pipelines or native target misses; native/browser
 maxima are 11.370/25.245 ms. These silent functional checks do not establish
-full-match performance. The historical a822 stall, frozen performance matrix
-and both unopened holdouts remain open under #33. PR #38 is merged, and this
+full-match performance. The historical a822 stall remains unresolved. The later current-runtime
+holdout campaign failed and remains open under #33, as recorded above. PR #38 is merged, and this
 fix is now deployed at [webmelee.gg](https://webmelee.gg). The exact production
 bytes and ten headed browser checks pass on both the immutable origin and apex;
 see the [current release receipt](docs/evidence/public-link-pipeline-release-v1.json).
