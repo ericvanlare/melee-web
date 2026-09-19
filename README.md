@@ -96,9 +96,11 @@ keeps the prototype's black canvas and small toolbar. The development entry
 attaches its tools separately to that same owner. `runtime-public` is a
 Release-only native target with an audited lifecycle/input export surface. The
 initial public alpha deliberately has no audio: its native graph excludes the
-GPL-derived resampler and its browser graph excludes the DSP coefficient
+development resampler and its browser graph excludes the DSP coefficient
 generator and Web Audio transport. Development retains its existing audio and
-accuracy tests. Full public audio fidelity is on the roadmap.
+accuracy tests. The [audio replacement record](docs/AUDIO_REPLACEMENT_EVIDENCE.md)
+tracks new implementation work and its remaining provenance/accuracy limits.
+Full public audio fidelity is on the roadmap.
 
 Build it with `python3 scripts/build.py --target runtime-public --configuration Release`.
 Then run `scripts/build_public.py --profile player --runtime-dir build/browser-public-release`

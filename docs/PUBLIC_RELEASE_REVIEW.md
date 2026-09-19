@@ -4,6 +4,17 @@ Research date: September 12, 2026. Prepared for operator and qualified counsel
 review. This is a technical inventory and issue assessment, not a legal
 opinion, trademark clearance or assurance of legal protection.
 
+## September 19 development audio update
+
+The current development resampler and coefficient generator have replacement
+implementations; see [their evidence and provenance](AUDIO_REPLACEMENT_EVIDENCE.md).
+The numerical coefficient table is deliberately unchanged. The GPL audio
+inventory below describes the September 12 audit and historical artifacts.
+It must not be read as the current source implementation inventory, or as a
+new license grant for retained numerical data. Public audio remains disabled;
+this work neither redeploys the player nor changes repository visibility.
+The separate Dolphin observer retains its existing GPL notices.
+
 ## Operator-approved alpha posture
 
 The operator is **NaiadAI, LLC** and the approved public contact is
@@ -17,7 +28,7 @@ The operator prohibits distributing GPL-derived audio code without meeting its
 obligations. The immediate alpha therefore uses an explicitly audio-disabled
 public native build, excludes `gameplay_audio_resample.c/.h` and
 `dsp-coefficients.mjs`, and supplies no generated replacement DSP coefficient
-bytes. The normal development profile retains those sources and its tests;
+bytes. At that audit, the normal development profile retained those sources and tests;
 it must not be deployed. The exact production identity, compile/link closure,
 JS graph and final artifact audit must establish the exclusions. Full audio
 fidelity is on the roadmap. No source-distribution promise or repository
@@ -153,14 +164,14 @@ it is not an exact post-link SBOM. It does not establish that the combined
 executable may be distributed, provide corresponding source for GPL-covered
 adaptations, or resolve rights in recovered code or the generated pipeline seed.
 
-## GPL corresponding-source delivery for any future audio-enabled release
+## GPL corresponding-source delivery when covered code is distributed
 
-This is a future audio-enabled release obligation, not a claim that the excluded
-audio sources are part of the silent alpha. Any failure to establish their
+This applies to artifacts that include GPL-covered code, not automatically to
+every future audio implementation or to the excluded sources in the silent alpha. Any failure to establish their
 exclusion blocks the alpha artifact.
 
 
-The current worktree contains project source, the Dolphin-derived source
+At the September 12 audit, the worktree contained project source, Dolphin-derived source
 identifiers and reproducibility scripts, but it does not configure a public
 corresponding-source route, a downloadable source bundle tied to a player
 release, or a written GPL offer. No such commitment should be implied by this

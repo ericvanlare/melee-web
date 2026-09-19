@@ -1,5 +1,16 @@
 # Current status
 
+## Development audio replacement candidate
+
+The scalar resampler and browser coefficient generator have new implementations
+with recorded specifications and provenance. The coefficient output is unchanged
+byte for byte, and 7,488,064 scalar comparisons preserve the previous output,
+phase, history and source reads. This is regression evidence, not an original
+hardware accuracy pass. The [replacement record](docs/AUDIO_REPLACEMENT_EVIDENCE.md)
+also records a pre-existing direct-mode phase deviation and the retained
+coefficient-data provenance that still needs release review. The separate GPL
+Dolphin observer remains intact. Public audio and repository visibility are unchanged.
+
 ## CI verification turnaround
 
 Three consecutive full PR verification runs completed in 6m 32s for a source

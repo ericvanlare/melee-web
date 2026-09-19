@@ -88,7 +88,7 @@ target_link_libraries(fighter_asset_runtime PUBLIC fighter_source_runtime)
 target_compile_options(fighter_asset_runtime PRIVATE -ffp-contract=off)
 
 # The public alpha has an explicitly silent audio policy.  Keep its source
-# graph separate from the development graph so the GPL-derived resampler is
+# graph separate from the development graph so the development resampler is
 # absent from both the compile commands and the final link closure.  The
 # normal fighter_source_runtime/fighter_asset_runtime targets remain exactly
 # as before for development, replay, and audio trace builds.
