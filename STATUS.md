@@ -33,6 +33,16 @@ character or performance admission. See the
 [port notes](docs/LINK_PORT_NOTES.md)
 and [bounded evidence receipt](docs/evidence/link-young-link-replay-v1.json).
 
+The new [GPU compilation diagnosis](docs/LINK_GPU_STALL.md) correlates a
+482.785 ms Link staging wait with synchronous Metal compiler work for four
+missing first-draw descriptors. A candidate seed preserves all existing records
+and adds 78 reviewed descriptors. Its full 7,070-update/7,064-draw state replay
+is exact with zero live pipeline creation; both Release builds, 957 tests
+(44 optional skips), package/HTTP audit and ten public browser checks pass.
+The state capture retains a browser gap and audio underruns; separate live
+verification is pending. The historical a822 stall, frozen performance matrix
+and both unopened holdouts remain open under #33.
+
 ## Dr. Mario and Roy development candidates
 
 The two physical development recordings now pass complete visible browser
