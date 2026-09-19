@@ -67,6 +67,19 @@ class CiAggregateTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "discovered inventory count"):
             ci_aggregate.validate_reports(reports, self.commit)
 
+    def test_different_discovery_with_same_count_is_rejected(self):
+        reports = self._write_reports(
+            selected={"unit-0": ["test_a.A.test_one"], "unit-1": ["test_b.B.test_two"]},
+        )
+        path = reports / "unit-1.json"
+        report = json.loads(path.read_text())
+        report["discovered"]["sha256"] = hashlib.sha256(
+            b"test_a.A.test_one\ntest_c.C.test_three"
+        ).hexdigest()
+        path.write_text(json.dumps(report))
+        with self.assertRaisesRegex(ValueError, "discovered inventories do not match"):
+            ci_aggregate.validate_reports(reports, self.commit)
+
     def test_missing_selected_case_is_rejected(self):
         reports = self._write_reports(
             selected={"unit-0": ["test_a.A.test_one"], "unit-1": []},
