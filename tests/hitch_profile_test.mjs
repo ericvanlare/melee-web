@@ -14,6 +14,7 @@ assert.equal(new Set(BUILD_ARTIFACTS).size,24);
 for (const name of ['runtime-development.mjs','melee-runtime.mjs','runtime-audio-assets.mjs','runtime-audio.mjs','controller-input.mjs','controller-panel.mjs','controller-panel.css','controller-settings.mjs','controller-settings.css','prototype-keyboard-layouts.mjs'])
   assert(BUILD_ARTIFACTS.includes(name), `Extracted executable input must be frozen: ${name}`);
 assert(HARNESS_ARTIFACTS.includes('tools/browser_build_artifacts.json'));
+assert(HARNESS_ARTIFACTS.includes('scripts/browser_driver.mjs'));
 validateFrozenBuildProfile(profile,manifest);
 validateFrozenBuildProfile(profile,[...manifest].reverse());
 

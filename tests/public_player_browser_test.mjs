@@ -3,13 +3,14 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
+import {createBrowserDriver} from '../scripts/browser_driver.mjs';
+import {loadBrowserTools} from '../scripts/browser_tools.mjs';
 const {values} = parseArgs({options: Object.fromEntries(['url', 'playwright', 'disc', 'out'].map(name => [name, {type: 'string'}]))});
-if (!values.url || !values.playwright || !values.out) throw Error('Use --url ORIGIN --playwright PACKAGE_DIR --out LOCAL_DIR [--disc OWNED_DISC]');
-const {chromium} = await import(pathToFileURL(path.join(path.resolve(values.playwright), 'index.mjs')).href);
+if (!values.url || !values.out) throw Error('Use --url ORIGIN --out LOCAL_DIR [--playwright PACKAGE_DIR] [--disc OWNED_DISC]');
+const {chromium,browser:launchOptions} = await loadBrowserTools(values.playwright);
 await fs.mkdir(values.out, {recursive: true});
-const browser = await chromium.launch({channel: 'chrome', headless: false, chromiumSandbox: true});
+const browser = await chromium.launch({...launchOptions, headless: false, chromiumSandbox: true});
 const context = await browser.newContext({viewport: {width: 1280, height: 960}});
 const page = await context.newPage(), origin = new URL(values.url).origin;
 const requests = [], errors = [], violations = [], sockets = [], audioEvents = [];
@@ -27,20 +28,14 @@ const cdp = await context.newCDPSession(page);
 await cdp.send('WebAudio.enable');
 for (const event of ['contextCreated', 'contextChanged', 'contextWillBeDestroyed']) cdp.on('WebAudio.' + event, data => audioEvents.push({event, data}));
 const check = async (name, run) => { await run(); report.checks.push(name); console.log(name); };
-const ready = () => page.locator('#choose-disc:not([disabled])').waitFor({timeout: 90000});
+const driver = createBrowserDriver(page, {surface:'public', timeoutMs:90000});
+const ready = driver.waitForImport;
 const shot = name => page.screenshot({path: path.join(values.out, name + '.png'), fullPage: true});
-const press = async key => { await page.keyboard.down(key); await page.waitForTimeout(120); await page.keyboard.up(key); await page.waitForTimeout(150); };
-const phase = value => page.waitForFunction(value => Module._melee_web_native_menu_phase() === value &&
-  Module._melee_web_native_menu_running() && !document.querySelector('#pause-game').disabled, value, {timeout: 90000});
+const press = key => driver.pressChord([key]);
+const phase = driver.waitForPhase;
 async function collectViolations() { violations.push(...await page.evaluate(() => window.releaseCspViolations)); }
-async function selectDisc(file) {
-  await page.locator('#choose-disc').click();
-  assert(await page.locator('#disc-continue').isDisabled());
-  await page.locator('#disc-ack').check();
-  const chooser = page.waitForEvent('filechooser');
-  await page.locator('#disc-continue').click();
-  await (await chooser).setFiles(file);
-}
+const selectDisc = driver.selectDisc;
+
 try {
   const response = await page.goto(values.url);
   assert.equal(response.status(), 200);
@@ -49,10 +44,14 @@ try {
   assert.match(response.headers()['content-security-policy'], /'wasm-unsafe-eval'/);
   await ready();
   await check('isolated WebGPU/Wasm startup and direct original-style player', async () => {
-    await page.waitForFunction(() => Module._melee_web_native_menu_cache_idle() !== 0, null, {timeout: 30000});
-    assert.equal(await page.evaluate(() => Module._melee_web_native_menu_cache_idle()), 1,
-      'The public renderer must open its volatile cache before consuming the bundled pipeline seed');
     await page.locator('#loading-panel').waitFor({state: 'hidden', timeout: 30000});
+    const cacheState=await page.waitForFunction(() => {
+      const state=Module._melee_web_native_menu_cache_idle();
+      return state===0?false:{state};
+    }, null, {timeout: 30000});
+    const {state}=await cacheState.jsonValue();await cacheState.dispose();
+    assert.equal(state, 1,
+      'The public renderer must open its volatile cache before consuming the bundled pipeline seed');
     const selective = await page.evaluate(() => Module.pipelinePreparation || null);
     if (selective) {
       assert.equal(selective.policy, 'catalog');
@@ -128,9 +127,9 @@ try {
   if (values.disc) {
     await check('owned-disc import, native preparation and original CSS', async () => {
       await selectDisc(values.disc);
-      await page.locator('#start-game:not([disabled])').waitFor({timeout: 90000});
+      await driver.waitForStart();
       assert(await page.locator('#error-dialog').isHidden());
-      await page.locator('#start-game').click(); await phase(1);
+      await driver.launch();
       assert(await page.locator('#loading-panel').isHidden(), 'Loading feedback must retire before interactive CSS');
       await page.waitForFunction(() => document.activeElement.id === 'canvas');
       assert(await page.locator('#pause-game').isEnabled());
@@ -150,12 +149,13 @@ try {
     });
     await check('Eject retires the document; a second silent import can launch', async () => {
       await page.evaluate(() => { window.releaseOldDocumentMarker = true; });
-      await collectViolations(); await page.locator('#end-session').click(); await page.waitForFunction(() => !window.releaseOldDocumentMarker); await ready();
+      await collectViolations(); await driver.unload();
+      assert.equal(await page.evaluate(() => !!window.releaseOldDocumentMarker), false);
       assert(await page.locator('#start-game').isDisabled());
       assert.equal(await page.locator('#keyboard-layout').inputValue(), 'boxx');
-      await selectDisc(values.disc); await page.locator('#start-game:not([disabled])').waitFor({timeout: 90000});
-      await page.locator('#start-game').click(); await phase(1);
-      await page.locator('#end-session').click(); await ready();
+      await selectDisc(values.disc); await driver.waitForStart();
+      await driver.launch();
+      await driver.unload();
       assert(await page.locator('#start-game').isDisabled());
     });
     assert.deepEqual(audioEvents, [], 'The audio-disabled public profile must never create a Web Audio context');
@@ -197,12 +197,13 @@ try {
   report.result = 'pass';
 } catch (error) {
   report.result = 'fail'; report.failure = error.message;
+  if (error.diagnostics) report.driverFailure = {step:error.step, ...error.diagnostics};
   report.state = await page.evaluate(() => ({status: document.querySelector('#status')?.textContent,
     error: document.querySelector('#error')?.textContent, native: window.Module?._melee_web_native_menu_message ? Module.UTF8ToString(Module._melee_web_native_menu_message()) : null})).catch(() => null);
   await shot('failure').catch(() => {}); throw error;
 } finally {
   report.errors = errors; report.csp = violations; report.audioEvents = audioEvents;
   await fs.writeFile(path.join(values.out, 'report.json'), JSON.stringify(report, null, 2) + '\n');
-  await browser.close();
+  driver.dispose(); await browser.close();
 }
 console.log(JSON.stringify({result: report.result, checks: report.checks.length, browser: report.browser}));

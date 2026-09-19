@@ -9,6 +9,7 @@ import crypto from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
+import {createBrowserDriver} from './browser_driver.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
@@ -22,6 +23,7 @@ export const BUILD_ARTIFACTS=Object.freeze(await read(new URL('../tools/browser_
 export const HARNESS_ARTIFACTS=Object.freeze([
   'scripts/hitch_capture.py','tools/hitch_capture.py','tools/browser_replay_validation.py',
   'tools/browser_build_artifacts.json',
+  'scripts/browser_driver.mjs',
 ]);
 const validSha=value=>typeof value==='string'&&/^[0-9a-f]{64}$/.test(value);
 function validateHashInventory(inventory,required,label) {
@@ -318,6 +320,7 @@ async function run(options,pw) {
       const started=ledger('start',['--slot',slot.slot_id]);
       const directory=started.attempt_dir;
       const deadline=Date.now()+plan.timeout_ms;
+      const driver=createBrowserDriver(page,{surface:'development',deadline});
       const errors=[],attachments=[];let tracing=false,reportPath=null,reason=null,replayStarted=false,traceWindow=null,traceReusable=true;
       const pageError=e=>errors.push({type:'pageerror',message:String(e),at:new Date().toISOString()});
       const consoleError=m=>{if(m.type()==='error')errors.push({type:'console',message:m.text(),location:m.location(),at:new Date().toISOString()});};
@@ -336,15 +339,8 @@ async function run(options,pw) {
         await page.goto(url.href,{waitUntil:'load',timeout:remainingTimeout(deadline,60000)});
         await page.bringToFront();
         await cdp.send('Emulation.setFocusEmulationEnabled',{enabled:false});
-        await page.locator('#disc:not([disabled])').waitFor({
-          state:'visible',timeout:remainingTimeout(deadline,60000),
-        });
-        await page.locator('#disc').setInputFiles(path.resolve(options.disc),{timeout:remainingTimeout(deadline,60000)});
-        // The launch control becomes available only after the shared
-        // runtime has imported and prepared the disc. Status copy is not an API.
-        await page.locator('#launch:not([disabled])').waitFor({
-          state:'visible',timeout:remainingTimeout(deadline),
-        });
+        await driver.selectDisc(path.resolve(options.disc));
+        await driver.waitForStart();
         await page.getByText('Diagnostics',{exact:true}).click({timeout:remainingTimeout(deadline)});
         const recipe=plan.identities.development_recipes[slot.target_id];
         await page.locator('#retail-replay-file').setInputFiles(recipe.path,{timeout:remainingTimeout(deadline)});
@@ -366,6 +362,10 @@ async function run(options,pw) {
           throw Error('Unprofiled slot unexpectedly enabled causal sync diagnostics');
       } catch(error) {
         reason=String(error.stack||error);
+        if(error.diagnostics){
+          const failurePath=path.join(directory,'driver-failure.json');
+          await save(failurePath,{step:error.step,...error.diagnostics});attachments.push(failurePath);
+        }
         // Stop a timed-out/failed replay through its public control and retain
         // its partial report. This is failure teardown, never a timing resume.
         if(replayStarted&&!reportPath)try {
@@ -375,6 +375,7 @@ async function run(options,pw) {
         }catch(teardownError){reason+='\nFailure teardown: '+String(teardownError);}
       }
       finally {
+        driver.dispose();
         if(tracing)try{
           const trace=await finalizeTrace(cdp,directory,settings,traceWindow);
           attachments.push(...trace.paths);traceReusable=trace.reusable;
