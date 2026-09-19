@@ -3,6 +3,7 @@
 import copy
 import importlib.util
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -94,6 +95,63 @@ class RepositoryTests(unittest.TestCase):
         self.assertEqual(bootstrap.patch_state(self.repo, self.patch), "applied")
         self.assertEqual((self.repo / ".git/index").read_bytes(), index)
         self.assertEqual(git(self.repo, "diff", "--cached"), "")
+
+    def prepare_patch_upgrade(self):
+        bootstrap.apply_patch(self.repo, self.patch)
+        git(self.repo, "add", "alpha.txt")
+        previous = git(self.repo, "write-tree")
+        git(self.repo, "reset", "--mixed", "--quiet", "HEAD")
+        (self.repo / "alpha.txt").write_text("updated reviewed patch\n")
+        self.patch.write_text(git(self.repo, "diff", "--binary") + "\n")
+        (self.repo / "alpha.txt").write_text("patched\n")
+        return previous
+
+    def test_recognized_patch_upgrade_preserves_index_and_unchanged_file_timestamps(self):
+        previous = self.prepare_patch_upgrade()
+        steady = self.repo / "other.txt"
+        os.utime(steady, ns=(1_000_000_000, 1_000_000_000))
+        index = (self.repo / ".git/index").read_bytes()
+        bootstrap.apply_patch(self.repo, self.patch, previous_tree=previous)
+        self.assertEqual((self.repo / "alpha.txt").read_text(), "updated reviewed patch\n")
+        self.assertEqual(steady.stat().st_mtime_ns, 1_000_000_000)
+        self.assertEqual(bootstrap.patch_state(self.repo, self.patch), "applied")
+        self.assertEqual((self.repo / ".git/index").read_bytes(), index)
+        changed_mtime = (self.repo / "alpha.txt").stat().st_mtime_ns
+        bootstrap.apply_patch(self.repo, self.patch, previous_tree=previous)
+        self.assertEqual((self.repo / "alpha.txt").stat().st_mtime_ns, changed_mtime)
+
+    def test_upgrade_requires_the_exact_recognized_previous_tree(self):
+        self.prepare_patch_upgrade()
+        before = git(self.repo, "diff", "--binary")
+        for previous in (None, "0" * 40):
+            with self.subTest(previous=previous), self.assertRaisesRegex(ValueError, "changes differ"):
+                bootstrap.apply_patch(self.repo, self.patch, previous_tree=previous)
+            self.assertEqual(git(self.repo, "diff", "--binary"), before)
+
+    def test_upgrade_refuses_unrelated_edits_without_changing_any_file(self):
+        previous = self.prepare_patch_upgrade()
+        (self.repo / "other.txt").write_text("unrelated local work\n")
+        before = git(self.repo, "diff", "--binary")
+        index = (self.repo / ".git/index").read_bytes()
+        with self.assertRaisesRegex(ValueError, "changes differ"):
+            bootstrap.apply_patch(self.repo, self.patch, previous_tree=previous)
+        self.assertEqual(git(self.repo, "diff", "--binary"), before)
+        self.assertEqual((self.repo / ".git/index").read_bytes(), index)
+
+    def test_upgrade_refuses_untracked_and_staged_work(self):
+        previous = self.prepare_patch_upgrade()
+        notes = self.repo / "notes.txt"
+        notes.write_text("keep these notes\n")
+        before = git(self.repo, "diff", "--binary")
+        with self.assertRaisesRegex(ValueError, "changes differ"):
+            bootstrap.apply_patch(self.repo, self.patch, previous_tree=previous)
+        git(self.repo, "add", "notes.txt")
+        index = (self.repo / ".git/index").read_bytes()
+        with self.assertRaisesRegex(ValueError, "staged changes"):
+            bootstrap.apply_patch(self.repo, self.patch, previous_tree=previous)
+        self.assertEqual(git(self.repo, "diff", "--binary"), before)
+        self.assertEqual(notes.read_text(), "keep these notes\n")
+        self.assertEqual((self.repo / ".git/index").read_bytes(), index)
 
     def test_refuses_patch_with_unrelated_local_change(self):
         bootstrap.apply_patch(self.repo, self.patch)

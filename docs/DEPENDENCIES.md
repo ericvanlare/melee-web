@@ -31,6 +31,8 @@ its WebGPU package with SHA-512.
 The Aurora patch generates the compatible ImGui WebGPU backend only when its
 contents change. Reconfiguration preserves the generated file's timestamp when
 unchanged, avoiding needless backend recompilation and dependent target relinks.
+Existing checkouts transition from the exact previous reviewed patch by rerunning
+bootstrap, as described in [Bootstrap and build](BUILD_AND_PLAY.md#bootstrap-and-build).
 
 Python package versions are pinned without wheel hashes. This is a pinned
 integration baseline, not a hermetic or bit-for-bit reproducible release build.
