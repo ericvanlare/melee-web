@@ -90,8 +90,10 @@ A fresh audit of the older September 12 trace finds no browser-raster label,
 client-ownership field or GPU flow endpoint. Its 115.722 ms GPU task and
 114.404 ms Dawn worker therefore retain their generic classification. The
 new reproduction cannot supply fields absent from that older capture. The
-missing full primary browser artifacts also remain an explicit evidence limit. The historical red, frozen unprofiled development
-inventory and both untouched holdouts remain open under the
+missing full primary browser artifacts also remain an explicit evidence limit.
+The [current development timing inventory](DEVELOPMENT_TIMING_20260919.md)
+has since completed its workload coverage with one retained native target miss
+and no hard failures. The historical red and both untouched holdouts remain open under the
 [causal gate](HITCH_CAPTURE.md#causal-diagnosis-and-holdout-lock). A quiet retry,
 a browser upgrade or this separate Link fix cannot turn a retained failure into
 a pass.
