@@ -29,7 +29,12 @@ jobs:
         include:
           - {group: unit-0, runner: ubuntu-24.04-arm, jobs: 2}
           - {group: unit-1, runner: ubuntu-24.04-arm, jobs: 2}
-          - {group: build, runner: macos-14, jobs: 3}
+          - {group: runtime, runner: ubuntu-24.04-arm, jobs: 2}
+          - {group: graphics, runner: ubuntu-24.04-arm, jobs: 2}
+          - {group: gameplay, runner: ubuntu-24.04-arm, jobs: 2}
+          - {group: fighter, runner: ubuntu-24.04-arm, jobs: 2}
+          - {group: effects, runner: ubuntu-24.04-arm, jobs: 2}
+          - {group: menus, runner: ubuntu-24.04-arm, jobs: 2}
     env:
       CCACHE_DIR: ${{ github.workspace }}/.cache/ccache
       CCACHE_BASEDIR: ${{ github.workspace }}
@@ -37,8 +42,6 @@ jobs:
       CCACHE_DEPEND: true
       CCACHE_MAXSIZE: 512M
       EM_COMPILER_WRAPPER: ccache
-      HOMEBREW_NO_AUTO_UPDATE: 1
-      HOMEBREW_NO_INSTALL_CLEANUP: 1
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
@@ -46,15 +49,10 @@ jobs:
           python-version: '3.12'
       - name: Install compiler cache and record runner resources
         run: |
-          if [ "$RUNNER_OS" = Linux ]; then
-            sudo apt-get update -qq
-            sudo apt-get install -y --no-install-recommends ccache
-            lscpu
-            free -m
-          else
-            command -v ccache || brew install ccache
-            sysctl hw.ncpu hw.memsize machdep.cpu.brand_string
-          fi
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ccache
+          lscpu
+          free -m
           ccache --version
           df -h .
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
@@ -79,7 +77,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ci-${{ matrix.group }}-${{ github.run_attempt }}
+          name: ci-${{ matrix.group }}
+          overwrite: true
           path: work/ci/
           retention-days: 14
           if-no-files-found: error
@@ -124,8 +123,15 @@ jobs:
           failed = {name: value['result'] for name, value in results.items() if value['result'] != 'success'}
           if failed:
               raise SystemExit(f'Verification did not pass: {failed}')
-          print('All compilation, test, source-census and public-shell partitions passed.')
+          print('All verification jobs succeeded; checking their reported inventories.')
           PY
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          pattern: ci-*
+          path: work/ci-collected
+          merge-multiple: true
+      - name: Require current-revision reports and complete discovery
+        run: python3 scripts/ci_aggregate.py --reports work/ci-collected --commit "$GITHUB_SHA"
 
 # GPU/original-game acceptance remains separate. These jobs preserve the
 # checked build configuration and all existing all/fighter target closures.

@@ -14,38 +14,47 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 
-# One build graph reuses the shared libraries across every required target.
-# The independent unit jobs configure clean graphs and share no build outputs.
+# The union is exactly build.py's existing all + fighter target inventory.
+# Each Linux partition configures a clean graph; only compiler cache entries
+# cross runs. Unit shards keep module fixtures together.
 GROUPS = {
     "unit-0": (),
     "unit-1": (),
-    "build": (
-        "gx_probe", "gameplay_checks", "gameplay_menu_browser",
-        "fighter_runtime_probe", "gameplay_effect_banks_trace",
-        "gameplay_bonus_data_trace", "gameplay_stage_numeric_trace",
-        "native_menu_scene_trace", "dat_menu_support_trace",
-    ),
+    "runtime": ("gameplay_menu_browser",),
+    "graphics": ("gx_probe",),
+    "gameplay": ("gameplay_checks",),
+    "fighter": ("fighter_runtime_probe",),
+    "effects": ("gameplay_effect_banks_trace", "gameplay_bonus_data_trace", "gameplay_stage_numeric_trace"),
+    "menus": ("native_menu_scene_trace", "dat_menu_support_trace"),
 }
 UNIT_GROUPS = ("unit-0", "unit-1")
 
 # Full discovery runs after configuration, so SDK/source/SDL/fmt-dependent
 # compiler tests execute there. Only tests needing linked artifacts repeat in
-# the build job. Proprietary-asset cases keep their normal skips.
+# their owning partition. Proprietary-asset cases keep their normal skips.
 LINKED_TESTS = {
-    "build": (
+    "gameplay": (
         "test_hsd_native.NativeJointRuntimeTests",
         "test_gameplay_common_context",
+    ),
+    "effects": (
         "test_gameplay_effects", "test_gameplay_bonus_data", "test_gameplay_stage_numeric",
+    ),
+    "menus": (
         "test_gameplay_native_menus.NativeMenuSourceTests.test_original_sis_layout_and_style_stack",
         "test_dat_menu_support",
     ),
 }
 REQUIRED_TESTS = {
-    "build": (
+    "gameplay": (
         "test_hsd_native.NativeJointRuntimeTests.test_original_allocation_callback_rejection_and_restart",
         "test_hsd_native.NativeJointRuntimeTests.test_replacement_heap_is_never_used_for_teardown",
         "test_gameplay_common_context.CommonContextTests.test_original_material_owners_restore_all_common_globals",
+    ),
+    "effects": (
         "test_gameplay_effects.EffectContextTests.test_authored_bank_bounds_lifetimes_and_restart",
+    ),
+    "menus": (
         "test_gameplay_native_menus.NativeMenuSourceTests.test_original_sis_layout_and_style_stack",
         "test_dat_menu_support.DatMenuSupportTests.test_support_roots_and_optional_local_assets",
     ),
@@ -100,10 +109,13 @@ def _filter_suite(suite, shard):
     return selected
 
 
-def _inventory(suite):
-    ids = [test.id() for test in _test_cases(suite)]
+def _inventory(suite, *, include_ids=False):
+    ids = sorted(test.id() for test in _test_cases(suite))
     encoded = "\n".join(ids).encode("utf-8")
-    return {"count": len(ids), "sha256": hashlib.sha256(encoded).hexdigest()}
+    inventory = {"count": len(ids), "sha256": hashlib.sha256(encoded).hexdigest()}
+    if include_ids:
+        inventory["ids"] = ids
+    return inventory
 
 
 def ninja_timings(path):
@@ -153,7 +165,7 @@ def run_tests(group, report):
         discovered = loader.discover(str(ROOT / "tests"))
         suite = _filter_suite(discovered, _shard_index(group))
         report["discovered"] = _inventory(discovered)
-        report["selected"] = _inventory(suite)
+        report["selected"] = _inventory(suite, include_ids=True)
     else:
         suite = loader.loadTestsFromNames(LINKED_TESTS[group])
     result = unittest.TextTestRunner(verbosity=2, resultclass=RecordingResult).run(suite)
@@ -192,15 +204,14 @@ def run_group(group, jobs):
         subprocess.run(list(map(str, args)), cwd=ROOT, env=env, check=True)
 
     try:
-        configure_args = ("--link-jobs", "1") if group == "build" else ()
         phase("configure", lambda: command(sys.executable, ROOT / "scripts/build.py",
-                                           "--configure-only", *configure_args))
+                                           "--configure-only"))
         if GROUPS[group]:
             phase("build", lambda: command(ROOT / ".venv/bin/cmake", "--build", ROOT / "build/browser",
                                             "--target", *GROUPS[group], "-j", jobs))
         if group in UNIT_GROUPS or group in LINKED_TESTS:
             phase("tests", lambda: run_tests(group, report))
-        if group == "build":
+        if group == "gameplay":
             phase("gameplay-check", lambda: command(sys.executable, ROOT / "scripts/check_gameplay.py"))
         if group == "unit-0":
             phase("source-census", lambda: command(sys.executable, ROOT / "scripts/gameplay_census.py", "--jobs", jobs))

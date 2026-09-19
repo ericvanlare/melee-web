@@ -104,14 +104,14 @@ class CiVerifyTests(unittest.TestCase):
 
     def test_inventory_rejects_an_omitted_target(self):
         groups = dict(ci_verify.GROUPS)
-        groups["build"] = groups["build"][:-1]
+        groups["runtime"] = groups["runtime"][:-1]
         with patch.object(ci_verify, "GROUPS", groups):
             with self.assertRaisesRegex(ValueError, "cover every all/fighter target"):
                 ci_verify.check_inventory()
 
     def test_inventory_rejects_a_duplicate_target(self):
         groups = dict(ci_verify.GROUPS)
-        groups["duplicate"] = groups["build"]
+        groups["duplicate"] = groups["runtime"]
         with patch.object(ci_verify, "GROUPS", groups):
             with self.assertRaisesRegex(ValueError, "cover every all/fighter target"):
                 ci_verify.check_inventory()
@@ -152,9 +152,9 @@ class CiVerifyTests(unittest.TestCase):
                 patch.object(ci_verify.subprocess, "check_output", return_value="test-sha\n"), \
                 patch.object(ci_verify.subprocess, "run", side_effect=run):
             with self.assertRaises(subprocess.CalledProcessError):
-                ci_verify.run_group("build", 3)
+                ci_verify.run_group("runtime", 2)
 
-        report_path = root / "work/ci/build.json"
+        report_path = root / "work/ci/runtime.json"
         self.assertTrue(report_path.is_file())
         report = json.loads(report_path.read_text(encoding="utf-8"))
         self.assertEqual(report["status"], "failed")
@@ -178,11 +178,11 @@ class CiVerifyTests(unittest.TestCase):
 
         suite = unittest.defaultTestLoader.loadTestsFromTestCase(SkippedConsumer)
         expected_id = suite._tests[0].id()
-        with patch.object(ci_verify, "LINKED_TESTS", {"build": (expected_id,)}), \
+        with patch.object(ci_verify, "LINKED_TESTS", {"gameplay": (expected_id,)}), \
                 patch.object(ci_verify.unittest.TestLoader, "loadTestsFromNames", return_value=suite):
             report = {}
             with self.assertRaisesRegex(RuntimeError, "CI test partition failed|Required linked tests did not pass"):
-                ci_verify.run_tests("build", report)
+                ci_verify.run_tests("gameplay", report)
         self.assertEqual(report["tests_run"], 1)
         self.assertEqual(report["tests"][0]["status"], "skipped")
 

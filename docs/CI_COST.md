@@ -4,13 +4,20 @@
 
 The candidate workflow keeps the existing checked `RelWithDebInfo` compilation
 flags and the exact union of `build.py`'s `all` and `fighter` targets. Two standard
-ARM Ubuntu jobs run the complete test discovery in disjoint module shards. One
-standard `macos-14` job configures and builds the shared graph once, using three
-Ninja workers and a one-link pool to bound peak memory. All linked consumers and
-the explicit gameplay check run after that build. Full discovery runs after
+ARM Ubuntu jobs run the complete test discovery in disjoint module shards. Six
+standard ARM Ubuntu build jobs partition runtime, graphics, gameplay, fighter,
+effects and menu targets, with two Ninja workers per job. Linked consumers run in
+the owning partition; the gameplay partition also runs the explicit gameplay
+check. Full discovery runs after
 configuration so generated headers and SDK dependencies are present. SHA-256 of
 each test module selects exactly one unit shard, keeping module fixtures together;
-the reports retain full and selected inventory hashes. Source census runs once.
+the reports retain full inventory hashes and selected test IDs. The aggregate
+downloads reports from the current workflow run, verifies their checked commit
+and target lists, and requires the disjoint unit union to match full discovery.
+Missing reports, empty discovery, stale commits and overlapping shards fail.
+A job rerun replaces its named report, so failed-only reruns can retain passed
+reports from the same workflow and exact checked commit.
+Source census runs once.
 Required asset-free linked consumers cannot silently skip. `browser-build` is
 the aggregate and fails if any partition or the public shell fails, skips or is
 canceled.
@@ -28,9 +35,9 @@ system headers) to avoid a separate preprocessing pass on a cache miss. No
 ccache sloppiness is enabled. Source edits may reuse unrelated object
 entries, while changing the dependency lock starts a separate namespace. A manual
 `cache_epoch` can establish an empty-cache control without deleting other runs.
-The cache is bounded to 512 MiB per partition. Mac and Linux cache namespaces
-are separate; one Mac build shares its compiler cache across every target. Dependencies are freshly fetched
-and verified by the existing bootstrap on every job.
+The cache is bounded to 512 MiB per partition. Dependencies are freshly fetched
+and verified by the existing bootstrap on every job. CI uses standard Linux
+runners; the measured Mac trial is excluded from the proposal because of cost.
 
 Each partition retains phase times, runner details, test outcomes, Ninja edge
 wall times and compiler-cache statistics for 14 days. These reports contain no
@@ -65,11 +72,13 @@ The first ARM/dependency-mode control, [run 35464529105](https://github.com/eric
 passed every partition in 10m 40s overall, so it still missed the target. Its
 reports contain all 895 distinct passed test IDs from the preceding serial
 workflow (936 passed IDs in the partition union). Runtime compilation took
-517.3s after a 46.8s configuration. The next cold namespace tests three Ninja
-workers on the same two-core ARM runner; compiler flags remain unchanged.
-The coalesced Mac fallback is being measured because the ARM runs leave too
-little margin at the ten-minute boundary. Standard Mac runner minutes cost more
-than ARM Linux minutes; the final ledger must report this tradeoff explicitly.
+517.3s after a 46.8s configuration. The three-worker ARM cold trial,
+[run 35465287704](https://github.com/ericvanlare/melee-web/actions/runs/35465287704),
+passed in 11m 01s. A single coalesced Mac build trial,
+[run 35465844190](https://github.com/ericvanlare/melee-web/actions/runs/35465844190),
+passed in 11m 06s. Neither met the target. The Mac proposal was removed before
+merge at the owner’s request because of runner cost. Further work stays on Linux;
+compiler flags remain unchanged.
 
 When a new test requires a linked binary, put its suite in the owning partition’s
 `LINKED_TESTS` and add asset-free mandatory consumers to `REQUIRED_TESTS`. Full
