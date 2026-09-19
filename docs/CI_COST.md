@@ -9,6 +9,8 @@ standard ARM Ubuntu build jobs partition runtime, graphics, gameplay, fighter,
 effects and menu targets, with two Ninja workers per job. On an empty shared
 compiler cache, four preceding Linux jobs compile disjoint object subsets through
 the generated Ninja graph and transfer only their ccache entries to those builds.
+Clang PCH consumers are omitted from cache preparation because strict ccache
+settings cannot store them; every consumer builds those objects normally.
 A compatible shared cache skips this preparation; the seed jobs still complete
 and supply empty cache archives. Every consumer configures and builds its full
 target graph; Ninja retains ownership of generated headers, dependencies and links. Linked consumers run in
@@ -65,27 +67,43 @@ report separates each job’s queue and execution durations; it never substitute
 summed parallel work for elapsed turnaround. An incomplete or failed run cannot
 be accepted even when its observed elapsed time is short.
 
-Measured cold/warm acceptance, failure controls and the final run inventory are
-pending. This candidate does not yet close issue 36.
+The first cold-cache run passed. Representative-change repetition and explicit
+failure/cancellation controls are pending. This candidate does not yet close issue 36.
 
-The first x64 partition experiment, [run 35463683397](https://github.com/ericvanlare/melee-web/actions/runs/35463683397),
-missed the target. Graphics completed at 9m 50s and gameplay at 11m 52s from
-workflow creation; the larger partitions took longer. A stale test assertion
-about the old build-map text formatting failed the unit partition; the assertion
-now checks the actual target inventory. Retain this failed experiment alongside
-subsequent cold/warm measurements.
+### Measured runs, including rejected trials
 
-The first ARM/dependency-mode control, [run 35464529105](https://github.com/ericvanlare/melee-web/actions/runs/35464529105),
-passed every partition in 10m 40s overall, so it still missed the target. Its
-reports contain all 895 distinct passed test IDs from the preceding serial
-workflow (936 passed IDs in the partition union). Runtime compilation took
-517.3s after a 46.8s configuration. The three-worker ARM cold trial,
-[run 35465287704](https://github.com/ericvanlare/melee-web/actions/runs/35465287704),
-passed in 11m 01s. A single coalesced Mac build trial,
-[run 35465844190](https://github.com/ericvanlare/melee-web/actions/runs/35465844190),
-passed in 11m 06s. Neither met the target. The Mac proposal was removed before
-merge at the owner’s request because of runner cost. Further work stays on Linux;
-compiler flags remain unchanged.
+All durations below include the final required aggregate where present and
+start at GitHub workflow creation. The source column identifies the PR head;
+PR jobs check GitHub's corresponding integration commit.
+
+| Run | PR head | Configuration | Turnaround | Result |
+| --- | --- | --- | ---: | --- |
+| [35062784550](https://github.com/ericvanlare/melee-web/actions/runs/35062784550) | `47746bb2` | Earlier serial Linux baseline | 29m 19s | Passed, over target |
+| [35461474202](https://github.com/ericvanlare/melee-web/actions/runs/35461474202) | `e42fd88a` | Latest serial Linux baseline | 21m 01s | Passed, over target |
+| [35463683397](https://github.com/ericvanlare/melee-web/actions/runs/35463683397) | `c42a3fcf` | Cold x64 partitions | 16m 02s | Failed; unit assertion and three timeouts |
+| [35464529105](https://github.com/ericvanlare/melee-web/actions/runs/35464529105) | `36c27f6a` | Cold ARM, two workers | 10m 40s | Passed, over target |
+| [35465287704](https://github.com/ericvanlare/melee-web/actions/runs/35465287704) | `a60f7c6a` | Cold ARM, three workers | 11m 01s | Passed, over target |
+| [35465844190](https://github.com/ericvanlare/melee-web/actions/runs/35465844190) | `14151e1e` | One cold coalesced Mac build, Linux units | 11m 06s | Passed, over target; rejected for cost |
+| [35467082383](https://github.com/ericvanlare/melee-web/actions/runs/35467082383) | `aafd2e93` | Warm ARM, two unit shards | 6m 32s | Passed, within target |
+| [35467560724](https://github.com/ericvanlare/melee-web/actions/runs/35467560724) | `8b9bdb7f` | Cold ARM with compiler-cache seeds | 9m 49s | Passed, within target |
+
+The Mac proposal was removed before merge at the owner's request because of
+runner cost. All subsequent verification uses standard Linux runners. The x64
+trial's stale assertion inspected build-map text formatting; it now checks the
+actual target inventory. The timeouts and unsuccessful trials remain part of
+the measurement record.
+
+The first ARM run retained all 895 distinct passed IDs from the latest serial
+baseline, with 936 passing IDs in its union. The warm Linux run retained those
+same 895 IDs, with 952 passing IDs. Its full discovery included 1,003 tests;
+asset-dependent skips remain explicit, and the required asset-free linked tests
+passed in their owning partitions. These counts describe verification scope,
+not gameplay acceptance.
+
+Runtime compilation was 517.3s cold and 243.3s warm. The warm runtime recorded
+1,406 direct compiler-cache hits and zero cache misses, while 210 PCH-related
+calls remained uncacheable and ran normally. Its final link took 52.8s. Compiler
+flags, PCH behavior and dependency checking remain unchanged.
 
 When a new test requires a linked binary, put its suite in the owning partition’s
 `LINKED_TESTS` and add asset-free mandatory consumers to `REQUIRED_TESTS`. Full
@@ -133,7 +151,10 @@ adapter uses unconditional `file(WRITE)` for this generated source. Preserving
 its timestamp when contents agree is a separate build improvement to validate.
 The logs do not show wholesale fighter recompilation during later invocations.
 
-## Remaining opportunities
+## Opportunities recorded in the earlier audit
+
+These items describe the earlier baseline; the candidate above implements
+module shards, compiler caching and duplicate-trigger removal.
 
 1. Run full discovery once after all required builds, retaining a small early
    smoke check if desired. At least 65 test names repeat in the post-build

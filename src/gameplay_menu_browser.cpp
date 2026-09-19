@@ -1,3 +1,4 @@
+#error "CI failure propagation control for issue 36"
 #include "gameplay_menu_world.hpp"
 #include "gameplay_menu_host.h"
 #include "gameplay_match_session.hpp"

@@ -70,6 +70,14 @@ class CiSeedTests(unittest.TestCase):
             self.assertTrue((build / "generated.h").is_file())
             self.assertTrue((build / "main.o").is_file())
 
+    def test_uncacheable_pch_consumers_remain_in_full_inventory(self):
+        rows = [
+            {"output": "ordinary.o", "command": "emcc -c ordinary.c -o ordinary.o"},
+            {"output": "pch.o", "command": "emcc -Xclang -include-pch -Xclang header.pch -c pch.c -o pch.o"},
+        ]
+        self.assertEqual(ci_seed.compdb_objects(rows), ["ordinary.o", "pch.o"])
+        self.assertEqual(ci_seed.compdb_objects(rows, cacheable_only=True), ["ordinary.o"])
+
     def test_build_failure_writes_failed_report_and_propagates(self):
         temporary = tempfile.TemporaryDirectory(prefix="melee ci seed ")
         self.addCleanup(temporary.cleanup)

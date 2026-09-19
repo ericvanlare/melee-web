@@ -8,6 +8,7 @@ import os
 from pathlib import Path, PurePosixPath
 import platform
 import resource
+import shlex
 import subprocess
 import sys
 import time
@@ -50,9 +51,20 @@ def _relative_object(output):
     return path.as_posix()
 
 
-def compdb_objects(rows):
+def compdb_objects(rows, *, cacheable_only=False):
     """Return unique relative object outputs from compdb-targets rows."""
-    return sorted({output for row in rows if (output := _relative_object(row.get("output")))})
+    outputs = set()
+    for row in rows:
+        output = _relative_object(row.get("output"))
+        if output is None:
+            continue
+        # ccache rejects Clang PCH consumers with our strict settings. Building
+        # them here cannot seed a result; downstream Ninja still builds every
+        # PCH and consumer normally. Do not relax PCH/time-macro validation.
+        if cacheable_only and "-include-pch" in shlex.split(row.get("command", "")):
+            continue
+        outputs.add(output)
+    return sorted(outputs)
 
 
 def object_inventory(outputs):
@@ -120,10 +132,12 @@ def run_seed(shard, jobs=2):
         ))
         rows = phase("compdb", lambda: _compdb(root, environment, ninja))
         all_objects = compdb_objects(rows)
-        selected = select_shard(all_objects, shard)
+        cacheable_objects = compdb_objects(rows, cacheable_only=True)
+        selected = select_shard(cacheable_objects, shard)
         if not selected:
             raise ValueError(f"seed shard {shard} selected no object outputs")
         report["all_objects"] = object_inventory(all_objects)
+        report["cacheable_objects"] = object_inventory(cacheable_objects)
         report["selected_objects"] = object_inventory(selected)
         phase("build", lambda: subprocess.run(
             [str(ninja), "-C", str(build_dir), "-j", str(jobs), *selected],
