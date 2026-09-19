@@ -30,6 +30,6 @@
   },
   "python_build_packages": [
     "cmake==3.31.6",
-    "ninja==1.13.0"
+    "ninja==1.13.2"
   ]
 }
