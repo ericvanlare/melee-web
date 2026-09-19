@@ -3,7 +3,7 @@
 ## Link and Young Link development candidate
 
 Link and Young Link are enabled through the original CSS/SSS and shared native
-runtime on PR 25's final source tip (`23680fb`). Both retain their original
+runtime, merged in PR #32 at `2ee80ab`. Both retain their original
 identities, five costumes, attributes, actions, articles, sword effects and SSM
 files. Real-asset lifecycle checks cover both player orientations and all five
 costumes, including reconstruction and teardown.
@@ -15,14 +15,22 @@ fighters, input/PAD/RNG, CPU decisions, camera, subject bones, HUD, magnifier an
 match outcome. A fresh original replay independently matches 38,108 semantic
 events. Source fixes address hookshot stack corruption and restore the original
 inlined fused arithmetic; comparator fields and tolerances are unchanged.
-The frozen Release replay passes, and the 967-test repository suite passes
-with 50 skips. The Release state capture still records a 98.650 ms native
-callback, 110.805 ms browser callback and 214 audio underrun frames; it is not
-a performance pass.
+The final reviewed integration replay again matches all 7,070 updates and
+7,064 draws; its 956-test repository suite passes with 44 skips. That Release
+state capture records 145.105 ms native / 153.620 ms browser maxima, including
+140.830 ms of staging waits, and 342 audio underrun frames. It is not a
+performance pass; the earlier port receipt remains separate evidence.
 
 Performance, pixels, PCM, live scheduling and unexercised moves remain open;
-Young Link human-controlled coverage is not implied by this match. No deployment
-or broad character admission is claimed. See the [port notes](docs/LINK_PORT_NOTES.md)
+Young Link human-controlled retail coverage is not implied by this match.
+The reviewed build is deployed at [webmelee.gg](https://webmelee.gg) as the silent
+alpha. Exact hosted bytes and the public browser smoke pass. Both Link/Young
+Link orientations also complete a bounded ordinary-keyboard functional smoke
+on staging, with cold timing pauses retained under
+[#33](https://github.com/ericvanlare/melee-web/issues/33); this does not broaden
+character or performance admission. See the
+[deployment receipt](docs/evidence/public-link-release-v1.json),
+[port notes](docs/LINK_PORT_NOTES.md)
 and [bounded evidence receipt](docs/evidence/link-young-link-replay-v1.json).
 
 ## Dr. Mario and Roy development candidates
