@@ -30,6 +30,7 @@ BUILD_TARGETS = {
     PUBLIC_RUNTIME_TARGET: (PUBLIC_RUNTIME_TARGET,),
     "fighter": (
         "fighter_runtime_probe",
+        "gameplay_pad_state_trace",
         "gameplay_effect_banks_trace",
         "gameplay_bonus_data_trace",
         "gameplay_stage_numeric_trace",

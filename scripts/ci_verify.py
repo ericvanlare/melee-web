@@ -23,7 +23,7 @@ GROUPS = {
     "runtime": ("gameplay_menu_browser",),
     "graphics": ("gx_probe",),
     "gameplay": ("gameplay_checks",),
-    "fighter": ("fighter_runtime_probe",),
+    "fighter": ("fighter_runtime_probe", "gameplay_pad_state_trace"),
     "effects": ("gameplay_effect_banks_trace", "gameplay_bonus_data_trace", "gameplay_stage_numeric_trace"),
     "menus": ("native_menu_scene_trace", "dat_menu_support_trace"),
 }
@@ -33,6 +33,7 @@ UNIT_GROUPS = ("unit-0", "unit-1")
 # compiler tests execute there. Only tests needing linked artifacts repeat in
 # their owning partition. Proprietary-asset cases keep their normal skips.
 LINKED_TESTS = {
+    "fighter": ("test_pad_state.PadSnapshotTests.test_native_codec_and_source_input_edges",),
     "gameplay": (
         "test_hsd_native.NativeJointRuntimeTests",
         "test_gameplay_common_context",
@@ -46,6 +47,7 @@ LINKED_TESTS = {
     ),
 }
 REQUIRED_TESTS = {
+    "fighter": ("test_pad_state.PadSnapshotTests.test_native_codec_and_source_input_edges",),
     "gameplay": (
         "test_hsd_native.NativeJointRuntimeTests.test_original_allocation_callback_rejection_and_restart",
         "test_hsd_native.NativeJointRuntimeTests.test_replacement_heap_is_never_used_for_teardown",

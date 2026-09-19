@@ -338,6 +338,7 @@ void advance(){
  if(match){
   const bool checking_stock=stock_check==-1;
   const uint32_t seed=match->random_seed();
+  uint8_t final_input[MELEE_WEB_PAD_STATE_BYTES];melee_web_pad_state_capture(final_input);
   {
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
    const melee_web::provenance::Scope teardown(pipeline_context(
@@ -355,7 +356,7 @@ void advance(){
    stock_check=1;
   }
   ++completed_matches;
-  check(melee_web_menu_host_match_finished(host,seed,error,sizeof(error)),error);
+  check(melee_web_menu_host_match_finished(host,seed,final_input,error,sizeof(error)),error);
   pending=false;enter_world();return;
  }
  if(host_entered){check(melee_web_menu_host_leave(host,0,error,sizeof(error)),error);host_entered=false;}
@@ -379,8 +380,10 @@ void advance(){
 #if defined(MELEE_WEB_SELECTIVE_PIPELINES)
   melee_web::pipeline_preparation::match(selection);
 #endif
+  const MeleeWebPadState* input=melee_web_menu_host_input(host);
+  check(input!=nullptr,"Original menu did not retain its source PAD history");
   match=std::make_unique<melee_web::GameplayMatchSession>(
-      files,selection,*archive_cache,melee_web::GameplayMatchConstruction::Deferred);
+      files,selection,*archive_cache,melee_web::GameplayMatchConstruction::Deferred,*input);
   const double constructed=emscripten_get_now();
   report_construction("match-enter-step",started,constructed,constructed,before,aurora_stats_snapshot());
   running=false;message="Preparing original match...";return;

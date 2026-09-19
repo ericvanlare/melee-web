@@ -36,6 +36,7 @@ struct MeleeWebMenuHost {
     HSD_PadData queue;
     PadLibData saved_library;
     HSD_PadStatus saved_game[4],saved_master[4],saved_copy[4];
+    MeleeWebPadState* input;
     GameRules saved_rules;
     struct gmm_x1CB0 saved_preferences;
     int saved_language,saved_saved_language;
@@ -99,6 +100,8 @@ int melee_web_menu_host_enter(MeleeWebMenuHost* h,MeleeWebAudio* audio,char* e,s
     const MeleeWebMenuPhase phase=melee_web_menu_phase(h->session);
     if(phase!=MELEE_WEB_MENU_CREATED&&phase!=MELEE_WEB_MENU_CSS_READY&&phase!=MELEE_WEB_MENU_SSS_READY&&phase!=MELEE_WEB_MENU_READY)
         return fail(e,n,"Native menu session cannot enter from this phase");
+    if(phase!=MELEE_WEB_MENU_CREATED&&!h->input)
+        return fail(e,n,"Returning menu scene requires retained source PAD history");
     if(!melee_web_menu_clock_begin())return fail(e,n,"Original scene clock is already owned");
     h->audio=audio;h->generation=melee_web_gameplay_stats().generation;h->transition=0;
     h->saved_rules=*gmMainLib_GetGameRules();
@@ -125,6 +128,10 @@ int melee_web_menu_host_enter(MeleeWebMenuHost* h,MeleeWebAudio* audio,char* e,s
     HSD_PadLibData.clamp_analogLRShift=1;HSD_PadLibData.clamp_analogLRMax=140;
     HSD_PadLibData.clamp_analogLRMin=0;HSD_PadLibData.scale_analogLR=140;
     for(unsigned i=0;i<4;i++)HSD_PadGameStatus[i]=HSD_PadMasterStatus[i]=HSD_PadCopyStatus[i]=default_status_data;
+    /* Retail flushes the sample queue at a scene boundary, but retains HSD's
+     * edge/repeat history. Restoring only the external owner here fabricates
+     * a new LRAS press when the quitting chord is still held on CSS entry. */
+    if(h->input)melee_web_pad_state_apply(h->input);
     /* The retail bootstrap initializes the AX driver and language banks once,
      * outside ordinary CSS/SSS scene changes. The per-world audio GObj
      * allocator must still be rebound because its storage uses the fresh HSD
@@ -170,14 +177,18 @@ int melee_web_menu_host_draw(MeleeWebMenuHost* h,char* e,size_t n){
 }
 int melee_web_menu_host_leave(MeleeWebMenuHost* h,int abort_scene,char* e,size_t n){
     if(!live(h,e,n)||!h->entered||h->drawing)return fail(e,n,"Native menu leave requires an idle live scene");
+    uint8_t bytes[MELEE_WEB_PAD_STATE_BYTES];melee_web_pad_state_capture(bytes);
+    MeleeWebPadState* input=melee_web_pad_state_decode(bytes,sizeof(bytes),e,n);
+    if(!input)return 0;
     const int was_sss=melee_web_menu_phase(h->session)==MELEE_WEB_MENU_SSS;
     const int result=abort_scene?melee_web_menu_abort(h->session,e,n):
         melee_web_menu_phase(h->session)==MELEE_WEB_MENU_CSS?melee_web_menu_leave_css(h->session,e,n):melee_web_menu_leave_sss(h->session,e,n);
-    if(!result)return 0;
+    if(!result){melee_web_pad_state_free(input);return 0;}
     /* SSS has no SIS table of its own; the scene preparation heap is ours. */
     if(was_sss)HSD_SisLib_803A5FBC();
     h->selected_characters=*gmMainLib_GetUnlockedCharactersBitmaskPtr();
     h->selected_stages=*gmMainLib_8015EDA4();
+    melee_web_pad_state_free(h->input);h->input=input;
     h->entered=0;restore_context(h);return ok(e,n);
 }
 int melee_web_menu_host_phase(const MeleeWebMenuHost* h){return h&&h==owner?melee_web_menu_phase(h->session):MELEE_WEB_MENU_CLOSED;}
@@ -255,12 +266,20 @@ int melee_web_menu_host_raw_selection(const MeleeWebMenuHost* h,StartMeleeData* 
         return fail(e,n,"Original SSS has not committed a supported raw selection");
     *out=sss->vs.start;return ok(e,n);
 }
-int melee_web_menu_host_match_finished(MeleeWebMenuHost* h,uint32_t seed,char* e,size_t n){
+const MeleeWebPadState* melee_web_menu_host_input(const MeleeWebMenuHost* h){
+    if(!h||h!=owner||h->entered||h->audio||melee_web_menu_phase(h->session)!=MELEE_WEB_MENU_READY)return NULL;
+    return h->input;
+}
+int melee_web_menu_host_match_finished(MeleeWebMenuHost* h,uint32_t seed,
+    const uint8_t bytes[MELEE_WEB_PAD_STATE_BYTES],char* e,size_t n){
     if(!h||h!=owner||h->entered||h->audio||seed_ptr!=&h->seed||melee_web_menu_phase(h->session)!=MELEE_WEB_MENU_READY)
         return fail(e,n,"Match must restore its source ownership before returning to CSS");
+    MeleeWebPadState* input=melee_web_pad_state_decode(bytes,MELEE_WEB_PAD_STATE_BYTES,e,n);
+    if(!input)return 0;
+    melee_web_pad_state_free(h->input);h->input=input;
     h->seed=seed;return ok(e,n);
 }
 int melee_web_menu_host_destroy(MeleeWebMenuHost* h,char* e,size_t n){
     if(!h||h!=owner||h->entered||h->audio||seed_ptr!=&h->seed)return fail(e,n,"Close native menu scene and restore RNG before destroying host");
-    if(!melee_web_menu_session_destroy(h->session,e,n))return 0;seed_ptr=h->saved_seed;owner=NULL;free(h);return ok(e,n);
+    if(!melee_web_menu_session_destroy(h->session,e,n))return 0;seed_ptr=h->saved_seed;owner=NULL;melee_web_pad_state_free(h->input);free(h);return ok(e,n);
 }

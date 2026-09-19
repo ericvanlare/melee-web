@@ -59,6 +59,7 @@ class PublicRuntimeBuildTests(unittest.TestCase):
             public_build.BUILD_TARGETS["fighter"],
             (
                 "fighter_runtime_probe",
+                "gameplay_pad_state_trace",
                 "gameplay_effect_banks_trace",
                 "gameplay_bonus_data_trace",
                 "gameplay_stage_numeric_trace",

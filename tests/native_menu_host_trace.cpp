@@ -244,11 +244,13 @@ int main(int argc,char** argv){try{
   raw_selection.random_seed=selection_rng;
   trace.event("sss_exit_complete",world->audio(),"match",&raw_selection,&selection_rng);
   world->close();world.reset();audio_phase=0;
+  const MeleeWebPadState* menu_input=melee_web_menu_host_input(host);
+  check(menu_input!=nullptr,"Original SSS did not retain PAD history for match entry");
   bool match_entry_recorded=false;
   if(cycle==0)for(unsigned stop:{0u,60u,100u}){
    // Unload both before and after Ready's stage-start callback, then rebuild
    // the full SDK world from the same immutable native selection.
-   melee_web::GameplayMatchSession interrupted(files,selection);unsigned phase=0;
+   melee_web::GameplayMatchSession interrupted(files,selection,*menu_input);unsigned phase=0;
    if(!match_entry_recorded){const uint32_t rng=interrupted.random_seed();trace.event("match_enter_complete",interrupted.audio(),nullptr,&selection,&rng);match_entry_recorded=true;}
    for(unsigned t=0;t<stop;++t){
     PADStatus pads[4]{};pads[2].err=pads[3].err=-1;interrupted.tick(pads);
@@ -261,7 +263,7 @@ int main(int argc,char** argv){try{
    // Exercise the source-owned pause/no-contest path from the same committed
    // menu payload before the ordinary stock run.  Every source tick still
    // drains the resident audio stream.
-   melee_web::GameplayMatchSession no_contest(files,selection);unsigned phase=0;
+   melee_web::GameplayMatchSession no_contest(files,selection,*menu_input);unsigned phase=0;
    for(unsigned t=0;t<600&&!no_contest.ready();++t){
     PADStatus pads[4]{};pads[2].err=pads[3].err=-1;no_contest.tick(pads);
     phase+=32000;unsigned count=phase/60;phase%=60;
@@ -281,10 +283,12 @@ int main(int argc,char** argv){try{
     no_contest.tick(pause);phase+=32000;count=phase/60;phase%=60;
     check(melee_web_audio_render(no_contest.audio(),pcm,count,error,sizeof(error)),error);
    }
-   pause[0].button=PAD_TRIGGER_L|PAD_TRIGGER_R|PAD_BUTTON_A|PAD_BUTTON_START;
+   const uint32_t no_contest_lras=PAD_TRIGGER_L|PAD_TRIGGER_R|PAD_BUTTON_A|PAD_BUTTON_START;
+   pause[0].button=no_contest_lras;
    no_contest.tick(pause);phase+=32000;count=phase/60;phase%=60;
    check(melee_web_audio_render(no_contest.audio(),pcm,count,error,sizeof(error)),error);
-   pause[0].button=0;
+   /* Keep the exact LRAS+A+Start sample held while the source ending drains;
+    * the final HSD history handed back to CSS must be this real state. */
    for(unsigned t=0;t<500&&!no_contest.complete();++t){
     no_contest.tick(pause);phase+=32000;count=phase/60;phase%=60;
     check(melee_web_audio_render(no_contest.audio(),pcm,count,error,sizeof(error)),error);
@@ -293,10 +297,39 @@ int main(int argc,char** argv){try{
    check(no_contest.complete(),"Original No Contest did not complete its source ending");
    check(no_contest.outcome(no_contest_winner)==OUTCOME_NO_CONTEST&&no_contest_winner==-1,
          "Original No Contest outcome or winner was incorrect");
+   uint8_t held_lras_input[MELEE_WEB_PAD_STATE_BYTES];
+   melee_web_pad_state_capture(held_lras_input);
+   const uint32_t no_contest_seed=no_contest.random_seed();
    no_contest.close();
+   check(melee_web_menu_host_match_finished(host,no_contest_seed,held_lras_input,error,sizeof(error)),error);
+
+   /* Return immediately to CSS with LRAS still held. Retained HSD history must
+    * keep this sample from becoming a new source chord; a real release then
+    * ordinary Start input must still select the next match through CSS/SSS. */
+   world=std::make_unique<melee_web::GameplayMenuWorld>(files);audio_phase=0;
+   check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);
+   raw[0].button=no_contest_lras;
+   check(tick()==1,"Held LRAS unexpectedly transitioned CSS after No Contest");
+   check(melee_web_menu_host_phase(host)==1,"Held LRAS did not remain in original CSS");
+   raw[0].button=0;
+   for(unsigned t=0;t<120;t++)check(tick()==1,"CSS release unexpectedly transitioned");
+   check(melee_web_menu_host_phase(host)==1,"CSS release left the original CSS route");
+   transition();check(melee_web_menu_host_phase(host)==2,"CSS did not choose SSS after No Contest");
+   rebuild_menu_scene();
+   for(unsigned t=0;t<120;t++)check(tick()==1,"Unexpected post-No-Contest SSS transition");
+   transition();check(melee_web_menu_host_phase(host)==5,"SSS did not select the next match after No Contest");
+   MeleeWebMenuMatchSelection next_selection{};
+   check(melee_web_menu_host_selection(host,&next_selection,error,sizeof(error)),error);
+   check(next_selection.start.rules.stkind==selection.start.rules.stkind&&
+         next_selection.start.players[0].ckind==selection.start.players[0].ckind,
+         "Ordinary CSS/SSS input changed the committed No Contest match selection");
+   selection=next_selection;
+   world->close();world.reset();audio_phase=0;
   }
   {
-   melee_web::GameplayMatchSession match(files,selection);audio_phase=0;
+   const MeleeWebPadState* input=melee_web_menu_host_input(host);
+   check(input!=nullptr,"Original SSS did not retain PAD history for ordinary match entry");
+   melee_web::GameplayMatchSession match(files,selection,*input);audio_phase=0;
    if(!match_entry_recorded){const uint32_t rng=match.random_seed();trace.event("match_enter_complete",match.audio(),nullptr,&selection,&rng);match_entry_recorded=true;}
    check(!match.ready(),"Original match intro was bypassed");
    const auto entry_stats=match.player_stats(0);
@@ -458,12 +491,14 @@ int main(int argc,char** argv){try{
    }
    check(t<4000&&stocks==0&&respawns==3,"Native menu match did not complete original four-stock outcome");
    std::cout<<"Original GAME ending and source transition completed across "<<ending_ticks<<" frozen ticks\n";
+   uint8_t final_input[MELEE_WEB_PAD_STATE_BYTES];
+   melee_web_pad_state_capture(final_input);
    const uint32_t seed=match.random_seed();match.close();
    int terminal_outcome=0,winner_count=0,winners[6]{};
    check(melee_web_match_rules_terminal_result(&terminal_outcome,&winner_count,winners)&&
          terminal_outcome==OUTCOME_ELIMINATION&&winner_count==1&&winners[0]==1,
          "Native menu match did not publish the original elimination winner at close");
-   check(melee_web_menu_host_match_finished(host,seed,error,sizeof(error)),error);
+   check(melee_web_menu_host_match_finished(host,seed,final_input,error,sizeof(error)),error);
   }
   world=std::make_unique<melee_web::GameplayMenuWorld>(files);audio_phase=0;
   check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);

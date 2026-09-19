@@ -1,5 +1,16 @@
 # Current status
 
+## Versus return-loop work in progress
+
+The ordinary-keyboard No Contest crash is reproduced and repaired at the PAD
+ownership boundary. Three visible Release Mario/FD matches start and return
+to CSS in one page, including holding L+R+A+Start across the return. The host
+preserves original controller histories across scene changes instead of
+inventing a new shortcut press. See the [scoped evidence and retained failures](
+docs/VERSUS_RETURN_LOOP.md). This remains the existing Results-skipping slice;
+issue #34's original Results, whole-session retail, physical-controller,
+retained-source-heap and performance acceptance are still open.
+
 ## CI verification turnaround
 
 Three consecutive full PR verification runs completed in 6m 32s for a source
