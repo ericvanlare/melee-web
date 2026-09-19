@@ -336,11 +336,15 @@ async function run(options,pw) {
         await page.goto(url.href,{waitUntil:'load',timeout:remainingTimeout(deadline,60000)});
         await page.bringToFront();
         await cdp.send('Emulation.setFocusEmulationEnabled',{enabled:false});
+        await page.locator('#disc:not([disabled])').waitFor({
+          state:'visible',timeout:remainingTimeout(deadline,60000),
+        });
         await page.locator('#disc').setInputFiles(path.resolve(options.disc),{timeout:remainingTimeout(deadline,60000)});
-        while(!((await page.locator('#status').textContent({timeout:remainingTimeout(deadline)})).includes('Local menu data loaded.'))) {
-          if(Date.now()>deadline)throw Error('Disc preparation exceeded frozen wall-time bound');
-          await delay(remainingTimeout(deadline,500));
-        }
+        // The launch control becomes available only after the shared
+        // runtime has imported and prepared the disc. Status copy is not an API.
+        await page.locator('#launch:not([disabled])').waitFor({
+          state:'visible',timeout:remainingTimeout(deadline),
+        });
         await page.getByText('Diagnostics',{exact:true}).click({timeout:remainingTimeout(deadline)});
         const recipe=plan.identities.development_recipes[slot.target_id];
         await page.locator('#retail-replay-file').setInputFiles(recipe.path,{timeout:remainingTimeout(deadline)});
