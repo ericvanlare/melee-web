@@ -60,6 +60,11 @@ missing parent directories are created automatically.
 
 ## Shared tools
 
+For early fighter/stage iteration, [content checks](CONTENT_CHECKS.md) batch
+explicit asset roots and freshly built source lifecycle traces. The command
+retains the first failing boundary and treats missing local inputs as failures;
+it does not replace browser, original-comparison or admission checks.
+
 `scripts/browser_driver.mjs` is the shared Playwright-facing orchestration layer.
 New browser jobs should use its `createBrowserDriver(page, {surface,
 timeoutMs, deadline})` and its readiness-aware methods (`waitForImport`,

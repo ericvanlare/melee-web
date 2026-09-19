@@ -191,6 +191,11 @@ produce and a completion check; the lead still owns integration and verification
 
 ## Fast development iteration
 
+Use the [early content-check command](CONTENT_CHECKS.md) to batch exact costume
+roots and run explicitly built lifecycle targets with a retained failure report.
+Its match trace runs both orientations, but only the actions in that trace's
+actual branches count as exercised.
+
 The [Link/Young Link verification](LINK_PORT_NOTES.md) adds four reusable checks:
 serialized article animation rows are not callback-state counts; effect tables
 may be model-only and include child entries beyond directly spawned IDs; a null
@@ -313,11 +318,20 @@ separate material/texture owners. The action container is `PlFcAJ.dat`, not an
 ordinary DAT root. A model parser check can be run for every extracted costume:
 
 ```sh
-python3 scripts/check_assets.py "$OUT/PlFcNr.dat" --symbol PlyFalco5K_Share_joint
-python3 scripts/check_assets.py "$OUT/PlFcRe.dat" --symbol PlyFalco5KRe_Share_joint
-python3 scripts/check_assets.py "$OUT/PlFcBu.dat" --symbol PlyFalco5KBu_Share_joint
-python3 scripts/check_assets.py "$OUT/PlFcGr.dat" --symbol PlyFalco5KGr_Share_joint
+mkdir -p work
+cat > work/falco-model-checks.json <<'JSON'
+{"checks": [
+  {"path":"../assets-local/next-gate/PlFcNr.dat","symbol":"PlyFalco5K_Share_joint"},
+  {"path":"../assets-local/next-gate/PlFcRe.dat","symbol":"PlyFalco5KRe_Share_joint"},
+  {"path":"../assets-local/next-gate/PlFcBu.dat","symbol":"PlyFalco5KBu_Share_joint"},
+  {"path":"../assets-local/next-gate/PlFcGr.dat","symbol":"PlyFalco5KGr_Share_joint"}
+]}
+JSON
+python3 scripts/check_assets.py --manifest work/falco-model-checks.json
 ```
+
+This compiles the checker once for all four exact symbols. If extraction uses a
+different `$OUT`, update the manifest paths accordingly.
 
 The focused source checks compile a bounded native runtime and skip only when
 the local assets are absent:
