@@ -23,7 +23,16 @@ full Chrome trace/report were lost during analysis, with partial observations
 and the recovered kernel recording retained explicitly. The second bounded
 slot did not reproduce the stall and failed focus. This is diagnostic evidence,
 not a fix or acceptance pass. See the [investigation and recovery limits](docs/BROWSER_RASTER_STALL.md).
-Issue #33, the frozen unprofiled inventory and both untouched holdouts remain open.
+Issue #33's historical causal gate and both untouched holdouts remain open.
+
+The current PR #38 development Release completed two cold/warm rounds on
+Fox/Marth Dream Land and Marth/Falco Yoshi's Story: 37,920 source updates/draws,
+zero hard hitch failures and one retained native target miss at 18.300 ms
+(worst browser interval 30.675 ms). A concurrent audio build interrupted the
+initial plan; its contended and incomplete attempts remain recorded, and a
+separately frozen six-slot recovery supplied the affected cache pairs and
+unfinished coverage. No historical failure was reclassified. See the
+[complete timing inventory, memory/preparation evidence and remaining decision](docs/DEVELOPMENT_TIMING_20260919.md).
 
 ## Link and Young Link development candidate
 
