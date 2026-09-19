@@ -16,7 +16,7 @@ match outcome. A fresh original replay independently matches 38,108 semantic
 events. Source fixes address hookshot stack corruption and restore the original
 inlined fused arithmetic; comparator fields and tolerances are unchanged.
 The final reviewed integration replay again matches all 7,070 updates and
-7,064 draws; its 956-test repository suite passes with 44 skips. That Release
+7,064 draws; the PR #32 integration suite passed 956 tests with 44 skips. That Release
 state capture records 145.105 ms native / 153.620 ms browser maxima, including
 140.830 ms of staging waits, and 342 audio underrun frames. It is not a
 performance pass; the earlier port receipt remains separate evidence.
@@ -39,8 +39,11 @@ missing first-draw descriptors. A candidate seed preserves all existing records
 and adds 78 reviewed descriptors. Its full 7,070-update/7,064-draw state replay
 is exact with zero live pipeline creation; both Release builds, 957 tests
 (44 optional skips), package/HTTP audit and ten public browser checks pass.
-The state capture retains a browser gap and audio underruns; separate live
-verification is pending. The historical a822 stall, frozen performance matrix
+The state capture retains a browser gap and audio underruns. Four separate
+bounded public segments (both player orders cold/warm, 450 updates each) pass
+without timing pauses, live pipelines or native target misses; native/browser
+maxima are 11.370/25.245 ms. These silent functional checks do not establish
+full-match performance. The historical a822 stall, frozen performance matrix
 and both unopened holdouts remain open under #33.
 
 ## Dr. Mario and Roy development candidates

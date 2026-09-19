@@ -52,6 +52,15 @@ and draw captures byte for byte: 7,070 updates and 7,064 draws. Its collector
 failed after saving the required DB/WAL because its file allowlist rejected an
 additional driver-cache export. That terminal failure remains retained; the
 required files were reviewed separately, and no driver-cache data was merged.
+The first export is now checkpointed. Its original DB bytes were recovered
+by an identical hash from another export, but the original WAL bytes are
+unavailable. The old receipt is retained with that limitation.
+A separate read-only re-review verifies all 74 payloads against the saved review
+hashes, the other four against their intact DB/WAL receipt, and every field of
+all 548 prior rows. The final seed is a fresh Aurora schema containing exactly
+those records; no candidate database pages or Dawn driver-cache bytes were copied.
+This establishes the final seed's contents without claiming raw WAL recovery.
+
 The ordinary Link route completed 450 updates with two recorded resumes; this
 was discovery, not performance acceptance. The reversed-player discovery timed
 out in stage select before gameplay and remains an incomplete attempt.
@@ -66,7 +75,24 @@ The candidate's complete state replay again matches all 7,070 updates and
 instrumented capture includes a live screenshot and retains one 82.845 ms
 browser gap, two native target misses (20.865 ms maximum), 107 audio underrun
 frames and 66,846,720 bytes of heap growth. It is state-comparison evidence,
-not a performance pass. Separate live verification remains pending.
+not a performance pass.
+
+Separate bounded public checks now pass all four predeclared segments: both
+Link/Young Link player orders, each cold then warm, using ordinary DOM keyboard
+events through CSS/SSS and 450 gameplay updates. Each segment has zero manual
+resumes, live pipeline creation, native target misses, browser hard gaps, live
+long tasks, visibility/focus loss and browser errors. Native/browser maxima are
+8.040/24.975 ms and 6.990/21.875 ms for Link first, and 8.065/24.595 ms and
+11.370/25.245 ms for Young Link first. Ordinary unload/reimport also succeeds.
+The first live draw creates zero pipelines in every segment; preparation is
+reported separately. These are short functional and first-use checks of the
+silent public player, with no profilers or active screenshots. They do not
+establish full-match timing, audio or physical-controller acceptance.
+
+The earlier reversed discovery route remains a retained stage-select failure.
+Its simultaneous directional pulses ended near FD's strict hitbox edge; the
+new predeclared route uses source-derived sequential pulses to target the
+interior. Runtime menu behavior is unchanged.
 
 ## Remaining issue boundary
 
@@ -74,6 +100,14 @@ The older a822 attempt retained an 85.945 ms staging wait and an overlapping
 114.404 ms Dawn-worker task, without operation-level GPU/native evidence for
 that failure. Two bounded diagnostics on the current runtime did not reproduce
 it; their long native recordings failed finalization and are retained as invalid
-native coverage. Neither a passing repetition nor the Link diagnosis classifies
-that historical event. Frozen unprofiled development acceptance and the two
+native coverage. A further frozen two-slot control runs the exact historical 14-file bundle on
+Chrome 153.0.8010.50 (the original used 153.0.8010.36). Both complete all 3,892
+updates and draws without reproducing the staging wait. Native recordings
+finalize cleanly, but the primary's scheduler export is empty. The second's
+70,604 owned scheduler rows cover the requested startup window; its one
+34.120 ms browser gap occurs around page time 65.2 seconds, outside that window.
+An unrelated task's profiler was observed during later replay, without causal
+attribution. Both slots are retained; no acceptance is claimed.
+Neither a passing repetition nor the Link diagnosis classifies that historical
+event. Frozen unprofiled development acceptance and the two
 untouched holdouts still require the causal gate in [HITCH_CAPTURE.md](HITCH_CAPTURE.md).
