@@ -17,7 +17,7 @@ from ci_verify import GROUPS, ninja_timings
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SHARD_COUNT = 4
+SHARD_COUNT = 6
 
 
 def _ninja_path(root):

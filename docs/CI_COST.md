@@ -7,7 +7,7 @@ flags and the exact union of `build.py`'s `all` and `fighter` targets. Two stand
 ARM Ubuntu jobs run the complete test discovery in disjoint module shards. Six
 standard ARM Ubuntu build jobs partition runtime, graphics, gameplay, fighter,
 effects and menu targets, with two Ninja workers per job. On an empty shared
-compiler cache, four preceding Linux jobs compile disjoint object subsets through
+compiler cache, six preceding Linux jobs compile disjoint object subsets through
 the generated Ninja graph and transfer only their ccache entries to those builds.
 Clang PCH consumers are omitted from cache preparation because strict ccache
 settings cannot store them; every consumer builds those objects normally.
