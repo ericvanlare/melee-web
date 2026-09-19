@@ -57,13 +57,15 @@ redirect evidence is recorded in [PUBLIC_ALPHA_VALIDATION.md](PUBLIC_ALPHA_VALID
 
 The Release target preloads `web/initial_pipeline_cache.db.gz.b64` as
 `/initial_pipeline_cache.db`. Decoding the checked-in source produces a
-2,285,568-byte SQLite database with SHA-256
-`ac57c60cc4ee1076fd801707447b696dd5717e2bc6d9224c6fba8e2b08ff98fd`. Its
-schema has one `aurora_schema` row, one shader row and 547 pipeline rows. The
-Roy/Doc release candidate preserves all 508 existing descriptors and appends
-40 configurations observed in two complete visible matches. The reviewed
-[descriptor ledger](evidence/roy-doc-public-preparation-v1.json) records hashes
-and scoped evidence; no raw draw provenance or driver cache is shipped.
+2,613,248-byte SQLite database with SHA-256
+`b935fd741f029cd12afb5ac584ef943e51bb00c34c689ae44b1e75d6ae81a8ce`. Its
+schema has one `aurora_schema` row, one shader row and 625 pipeline rows. The
+Link GPU-stall candidate preserves all 548 existing descriptors and appends
+78 configurations observed in the complete development replay and ordinary
+menu route. The [Link descriptor ledger](evidence/link-gpu-compilation-v1.json)
+records hashes, retained failures and scoped evidence. The previous
+[Roy/Doc ledger](evidence/roy-doc-public-preparation-v1.json) remains historical
+evidence; no raw draw provenance or driver cache is shipped.
 
 The seed contains binary renderer configuration blobs and hashes rather than
 file names. Inspection found no raw texture, model, audio or disc bytes. That
