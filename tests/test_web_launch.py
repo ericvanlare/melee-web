@@ -52,12 +52,15 @@ class WebLaunchTests(unittest.TestCase):
             cwd=ROOT, check=True, capture_output=True, text=True,
         )
         native_block = re.search(
-            r"constexpr std::array<std::string_view,\d+> keys=\{(.*?)\};",
+            r"constexpr std::array<std::string_view,(\d+)> keys=\{(.*?)\};",
             browser, re.S,
         )
         self.assertIsNotNone(native_block)
         manifest_keys = set(json.loads(manifest.stdout))
-        native_keys = set(re.findall(r'"([^"]+)"', native_block.group(1)))
+        authored_keys = re.findall(r'"([^"]*)"', native_block.group(2))
+        self.assertEqual(int(native_block.group(1)), len(authored_keys),
+                         "native upload allowlist must not include implicit empty entries")
+        native_keys = set(authored_keys)
         self.assertEqual(native_keys, manifest_keys | {"dsp_coef.bin", "sislib_font.bin"},
                          "native upload allowlist must match the disc manifest plus generated inputs")
 
