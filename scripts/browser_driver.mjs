@@ -34,7 +34,7 @@ export function createBrowserDriver(page, {surface='development', timeoutMs=6000
           catch {return null;}
         };
         return {url:location.href,hidden:document.hidden,focused:document.hasFocus(),
-          status:text('status'),error:text('error'),log:text('log'),
+          status:text('status'),error:document.querySelector('#status')?.dataset.runtimeError||text('error'),log:text('log'),
           phase:read('_melee_web_native_menu_phase'),running:read('_melee_web_native_menu_running'),
           controls:Object.fromEntries(Object.entries(controls).map(([name,selector])=>{
             const node=document.querySelector(selector);
@@ -54,12 +54,15 @@ export function createBrowserDriver(page, {surface='development', timeoutMs=6000
   }
   async function enabled(selector) {
     // waitForFunction also detects a visible application error immediately.
-    const result=await page.waitForFunction(selector=>{
+    const result=await page.waitForFunction(({selector,allowRecovery})=>{
+      const control=document.querySelector(selector);
+      const ready=control&&!control.disabled&&control.getClientRects().length;
+      const runtimeError=document.querySelector('#status')?.dataset.runtimeError;
+      if(runtimeError&&!(allowRecovery&&ready))return {error:runtimeError};
       const dialog=document.querySelector('#error-dialog[open]');
       if(dialog)return {error:document.querySelector('#error')?.textContent||'Application error'};
-      const control=document.querySelector(selector);
-      return control&&!control.disabled&&control.getClientRects().length?{ready:true}:false;
-    },selector,{timeout:remaining()});
+      return ready?{ready:true}:false;
+    },{selector,allowRecovery:selector===controls.import||selector===controls.unload},{timeout:remaining()});
     const value=await result.jsonValue();await result.dispose();
     if(value.error)throw Error(value.error);
   }
@@ -68,6 +71,8 @@ export function createBrowserDriver(page, {surface='development', timeoutMs=6000
   const waitForPhase=phase=>step('wait-for-phase-'+phase,async()=>{
     if(!Number.isInteger(phase)||phase<0)throw Error('Invalid native scene phase');
     const result=await page.waitForFunction(({phase,pause})=>{
+      const runtimeError=document.querySelector('#status')?.dataset.runtimeError;
+      if(runtimeError)return {error:runtimeError};
       if(document.querySelector('#error-dialog[open]'))return {error:document.querySelector('#error')?.textContent||'Application error'};
       const module=globalThis.Module;
       return typeof module?._melee_web_native_menu_phase==='function'&&

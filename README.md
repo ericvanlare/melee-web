@@ -36,10 +36,10 @@ python3 scripts/serve.py --directory build/browser
 
 Open `http://127.0.0.1:8787` in a desktop browser with WebGPU. `runtime.html`
 is the original CSS/SSS player; `viewer.html` is the separate asset inspector.
-Run the read-only environment check before a long job:
+Check the local build prerequisites before a long build:
 
 ```sh
-python3 scripts/doctor.py --json
+python3 scripts/doctor.py --task build
 ```
 
 For the full validation matrix, focused gameplay targets, local asset extraction,

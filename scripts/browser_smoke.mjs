@@ -4,9 +4,9 @@
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
 import {createBrowserDriver} from './browser_driver.mjs';
+import {loadBrowserTools} from './browser_tools.mjs';
 
 const {values}=parseArgs({options:{
   ...Object.fromEntries(['url','surface','disc','out','playwright','timeout'].map(name=>[name,{type:'string'}])),
@@ -20,14 +20,14 @@ if(!values.url||!values.out||!['development','public'].includes(values.surface))
 if(!['http:','https:'].includes(new URL(values.url).protocol))throw Error('Use a real HTTP server');
 const timeout=Number(values.timeout||90000);
 if(!Number.isInteger(timeout)||timeout<1000||timeout>300000)throw Error('Timeout must be 1000..300000 ms');
-const {chromium}=values.playwright?await import(pathToFileURL(path.join(path.resolve(values.playwright),'index.mjs')).href):await import('playwright');
+const {chromium,browser:launchOptions}=await loadBrowserTools(values.playwright);
 await fs.mkdir(values.out,{recursive:false});
 const report={schema:'melee-web-browser-smoke-v1',scope:'Readiness and optional owned-disc import, original CSS entry and teardown only. Not replay, performance, retail comparison or complete gameplay acceptance.',
   url:values.url,surface:values.surface,started_at:new Date().toISOString(),checks:[],
   build_identity:'Not established by this probe; use the existing frozen-build/HTTP audit for acceptance.'};
 let browser,driver;
 try {
-  browser=await chromium.launch({channel:'chrome',headless:false,chromiumSandbox:true,timeout});
+  browser=await chromium.launch({...launchOptions,headless:false,chromiumSandbox:true,timeout});
   report.browser=browser.version();
   const page=await browser.newPage({viewport:{width:1280,height:960}});
   driver=createBrowserDriver(page,{surface:values.surface,timeoutMs:timeout,deadline:Date.now()+timeout});

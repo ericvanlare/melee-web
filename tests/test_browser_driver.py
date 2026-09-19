@@ -15,6 +15,11 @@ class BrowserDriverTests(unittest.TestCase):
                                 capture_output=True, text=True, timeout=30)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_shared_browser_configuration(self):
+        result = subprocess.run([str(node_runtime()), str(ROOT / 'tests/browser_tools_test.mjs')],
+                                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
 
 if __name__ == '__main__':
     unittest.main()

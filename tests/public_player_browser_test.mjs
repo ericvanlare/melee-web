@@ -3,14 +3,14 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
+import {loadBrowserTools} from '../scripts/browser_tools.mjs';
 const {values} = parseArgs({options: Object.fromEntries(['url', 'playwright', 'disc', 'out'].map(name => [name, {type: 'string'}]))});
-if (!values.url || !values.playwright || !values.out) throw Error('Use --url ORIGIN --playwright PACKAGE_DIR --out LOCAL_DIR [--disc OWNED_DISC]');
-const {chromium} = await import(pathToFileURL(path.join(path.resolve(values.playwright), 'index.mjs')).href);
+if (!values.url || !values.out) throw Error('Use --url ORIGIN --out LOCAL_DIR [--playwright PACKAGE_DIR] [--disc OWNED_DISC]');
+const {chromium,browser:launchOptions} = await loadBrowserTools(values.playwright);
 await fs.mkdir(values.out, {recursive: true});
-const browser = await chromium.launch({channel: 'chrome', headless: false, chromiumSandbox: true});
+const browser = await chromium.launch({...launchOptions, headless: false, chromiumSandbox: true});
 const context = await browser.newContext({viewport: {width: 1280, height: 960}});
 const page = await context.newPage(), origin = new URL(values.url).origin;
 const requests = [], errors = [], violations = [], sockets = [], audioEvents = [];

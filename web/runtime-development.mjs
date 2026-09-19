@@ -36,10 +36,10 @@ window.menuPreparationProfile=data=>{latestNativePreparation=data;const profile=
 // Keep one worst callback for budget diagnosis; no per-frame state trace or log.
 window.menuRuntimeTimingError=error=>{diagnosticCaptureInvalid=true;stop(error);};
 window.menuRuntimeTiming=data=>{if(!data.valid)return;const now=performance.now(),total=data.total_ms||0,preparation=data.preparation_ms||0,active=Math.max(0,total-preparation),resourceActivity=Number(data.queued_delta||0)||Number(data.created_delta||0)||Number(data.texture_upload_bytes||0);nativePreviousTiming=nativeLastTiming;nativeLastTiming=data;nativeTimingFrames++;nativeSourceSteps+=Number(data.source_steps||0);nativeSourceDraws+=Number(data.source_draws||0);const hitch=window.meleeHitchCapture?.isEnabled?.()?window.meleeHitchCapture.observeNativeTiming?.({current:data,previous:nativePreviousTiming,activeMs:active,totalMs:total,preparationMs:preparation,timestamp:now,context:{cache_state:Module.runtimeCacheState?.state||'unknown',cache_dirty:!!Module.runtimeCacheState?.dirty}}):null;if(hitch?.invalid||window.meleeHitchCapture?.isInvalid?.()){diagnosticCaptureInvalid=true;if(retailRun&&!retailRun.failure)retailRun.failure='Diagnostic hitch capture overflow';}if(active>1000/60)nativeOverBudgetFrames++;if(active>nativeTimingWorst){nativeTimingWorst=active;nativeWorstTiming={...data,active_ms:active,source:active>1000/60?Module.UTF8ToString(Module._melee_web_native_menu_diagnostics()):null};}if(active>1000/30)nativeLongFrames++;if(!preparation){livePipelineQueued+=Math.max(0,Number(data.queued_delta||0));livePipelineCreated+=Math.max(0,Number(data.created_delta||0));liveTextureUploads+=Math.max(0,Number(data.texture_upload_bytes||0));const stagingUsed=Math.max(0,Number(data.staging_used_bytes||0));liveStagingUsedBytes+=stagingUsed;peakStagingUsedBytes=Math.max(peakStagingUsedBytes,stagingUsed);}if(settlingEntryProfile){settlingEntryProfile.pipeline_settle_frames++;if(Number(data.queued_total||0)===0){settlingEntryProfile.pipeline_settle_ms=Math.max(0,now-settlingEntryProfile.first_draw_at);log(`Scene pipeline settle ${JSON.stringify({sequence:settlingEntryProfile.sequence,kind:settlingEntryProfile.kind,duration_ms:settlingEntryProfile.pipeline_settle_ms,callbacks:settlingEntryProfile.pipeline_settle_frames,created_total:Number(data.created_total||0)})}`);settlingEntryProfile=null;renderConstructionMetrics();}}if(data.first_use){nativeFirstUse++;nativeFirstUseWorst=Math.max(nativeFirstUseWorst,active);if(pendingEntryProfile){const profile=pendingEntryProfile;pendingEntryProfile=null;profile.first_draw=true;profile.first_draw_at=now;profile.kind=profile.construction.length?profile.construction[profile.construction.length-1].kind:'source-scene';profile.construction_ms=profile.construction.reduce((sum,item)=>sum+Number(item.total_ms||0),0);profile.wait_schedule_ms=Math.max(0,profile.preparation_wall_ms-profile.construction_ms);profile.first_draw_delay_ms=Math.max(0,now-profile.preparation_done);profile.first_draw_ms=total;profile.draw_ms=Number(data.draw_ms||0);profile.end_ms=Number(data.end_ms||0);profile.texture_upload_bytes=Number(data.texture_upload_bytes||0);profile.queued_delta=Number(data.queued_delta||0);profile.created_delta=Number(data.created_delta||0);profile.queued_total=Number(data.queued_total||0);profile.created_total=Number(data.created_total||0);profile.wasm_heap_bytes=Number(data.wasm_heap_bytes||0);profile.render_cache_state=Module.runtimeCacheState?.state||'unknown';profile.render_cache_bytes=Number(Module.runtimeCacheState?.fileBytes||0);profile.pipeline_settle_frames=0;if(profile.queued_total)settlingEntryProfile=profile;else profile.pipeline_settle_ms=0;entryProfiles.push(profile);log(`Scene entry profile ${JSON.stringify(profile)}`);renderConstructionMetrics();}}if(data.first_use||active>1000/30||preparation||resourceActivity)log(`${!preparation&&resourceActivity?'Live render resource':'Native callback'} ${JSON.stringify({...data,source:Module.UTF8ToString(Module._melee_web_native_menu_diagnostics())})}`);};
-developmentHooks.preparation=(label,keepAudio=false)=>{preparationLabel=label||'Preparing original scene';preparationKeepsAudio=!!keepAudio;preparationSince=performance.now();window.meleeHitchCapture?.setPreparation?.(true,preparationSince);activePreparation={sequence:++preparationSequence,label:preparationLabel,requested_at:preparationSince,construction:[],first_draw:false,audio_continuity:preparationKeepsAudio};uiMessage='';$('status').textContent=`${preparationLabel} · audio ${preparationKeepsAudio?'continuing':'paused'}`;};
+developmentHooks.preparation=(label,keepAudio=false)=>{$('status').dataset.runtimeError='';preparationLabel=label||'Preparing original scene';preparationKeepsAudio=!!keepAudio;preparationSince=performance.now();window.meleeHitchCapture?.setPreparation?.(true,preparationSince);activePreparation={sequence:++preparationSequence,label:preparationLabel,requested_at:preparationSince,construction:[],first_draw:false,audio_continuity:preparationKeepsAudio};uiMessage='';$('status').textContent=`${preparationLabel} · audio ${preparationKeepsAudio?'continuing':'paused'}`;};
 developmentHooks.preparationDone=()=>{if(preparationSince){const now=performance.now();window.meleeHitchCapture?.setPreparation?.(false,now);const duration=now-preparationSince;preparationCount++;preparationWorst=Math.max(preparationWorst,duration);if(activePreparation){activePreparation.preparation_done=now;activePreparation.preparation_wall_ms=duration;pendingEntryProfile=activePreparation;activePreparation=null;}log(`Native preparation boundary {"label":${JSON.stringify(preparationLabel)},"duration_ms":${duration.toFixed(3)}}`);renderConstructionMetrics();}preparationSince=0;preparationLabel='';uiMessage='';};
 developmentHooks.preparationCanceled=()=>{window.meleeHitchCapture?.setPreparation?.(false);preparationSince=0;preparationLabel='';preparationKeepsAudio=false;activePreparation=null;pendingEntryProfile=null;uiMessage='';};
-developmentHooks.preparationFailed=error=>{window.meleeHitchCapture?.setPreparation?.(false);preparationSince=0;preparationLabel='';preparationKeepsAudio=false;activePreparation=null;pendingEntryProfile=null;uiMessage=error||'Native preparation failed';$('status').textContent=uiMessage;if(retailRun)retailRun.failure=uiMessage;};
+developmentHooks.preparationFailed=error=>{window.meleeHitchCapture?.setPreparation?.(false);preparationSince=0;preparationLabel='';preparationKeepsAudio=false;activePreparation=null;pendingEntryProfile=null;uiMessage=error||'Native preparation failed';$('status').dataset.runtimeError=uiMessage;$('status').textContent=uiMessage;if(retailRun)retailRun.failure=uiMessage;};
 developmentHooks.cacheSettled=()=>{Module.markRuntimeCacheDirty?.();};
 developmentHooks.cacheWriteFailed=message=>{$('cache-status').textContent=message;};
 window.menuCacheWritesFlushed=data=>{
@@ -212,23 +212,23 @@ $('retail-replay-start').onclick=async()=>{
 };
 
 $('disc').onchange=async()=>{
-  const file=$('disc').files[0];if(!file)return;stockCheckActive=false;resetTiming();
-  try{await owner.handle.importDisc(file);}catch(error){log(error.message);$('status').textContent=error.message;}
+  const file=$('disc').files[0];if(!file)return;$('status').dataset.runtimeError='';stockCheckActive=false;resetTiming();
+  try{await owner.handle.importDisc(file);}catch(error){log(error.message);$('status').dataset.runtimeError=error.message;$('status').textContent=error.message;}
   finally{$('disc').value='';}
 };
 $('launch').onclick=async()=>{
-  if($('launch').disabled)return;
+  if($('launch').disabled)return;$('status').dataset.runtimeError='';
   try{if(window.meleeHitchCaptureLoading)await window.meleeHitchCaptureLoading;
     if(window.meleeHitchCaptureLoadError&&hitchCaptureFromUrl)throw Error(window.meleeHitchCaptureLoadError);
     resetTiming(false);await owner.handle.start();
-  }catch(error){log(error.message);$('status').textContent=error.message;}
+  }catch(error){log(error.message);$('status').dataset.runtimeError=error.message;$('status').textContent=error.message;}
 };
 $('pause').onclick=()=>{
   if(retailRun&&!retailRun.observe){finishRetailReplay('Manual pause/resume requested during performance replay');return;}
   const state=owner.handle.getState();
   (state.paused?owner.handle.resume():owner.handle.pause()).catch(error=>log(error.message));
 };
-$('unload').onclick=async()=>{try{await owner.handle.unload();stockCheckActive=false;}catch(error){log(error.message);}};
+$('unload').onclick=async()=>{$('status').dataset.runtimeError='';try{await owner.handle.unload();stockCheckActive=false;}catch(error){log(error.message);$('status').dataset.runtimeError=error.message;}};
 controllerSettings = mountControllerSettings({
   container: $('controls-dialog'),
   storage: window.parent === window ? undefined : null,
@@ -257,7 +257,7 @@ try {
       $('reload-app').disabled=$('reset-render-cache').disabled=!ready;
       controllerSettings.setState(state);
     },
-    onError(error){log(error.message);},
+    onError(error){log(error.message);$('status').dataset.runtimeError=error.message;},
     onLog(text,isError){
       if(retailRun?.observe&&!isError&&text.startsWith('{"record":')){
         if(retailRun.rows.length>=36004)throw Error('Replay trace exceeded its record bound');retailRun.rows.push(text);
@@ -277,4 +277,4 @@ try {
     },
   });
   await controllerSettings.bindPlayer(owner?.handle);
-} catch(error){log(error.message);$('status').textContent='Stopped: '+error.message;}
+} catch(error){log(error.message);$('status').dataset.runtimeError=error.message;$('status').textContent='Stopped: '+error.message;}

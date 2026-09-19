@@ -5,22 +5,28 @@ the detailed contracts, not a second status report. `STATUS.md` is the current
 evidence index; follow its links for measurements, retained failures and exact
 receipts instead of copying numbers into this page.
 
-## First five minutes
+## Start with the task you are doing
+
+For a build task, check the pinned local toolchain and dependency revisions:
 
 ```sh
-python3 scripts/doctor.py --json
+python3 scripts/doctor.py --task build
 ```
 
-Run `python3 scripts/bootstrap.py` first when `.deps/` or `.venv/` is absent.
-The doctor is read-only. Add `--disc /path/to/owned.gcm` to check a local disc
-and `--build build/browser-public-release` to verify a public Release producer
-receipt and its source/artifact hashes. Other build formats report freshness as
-unknown; development captures use the frozen-build checks in
-[Hitch capture](HITCH_CAPTURE.md). Keep local input paths untracked. A doctor
-pass describes environment readiness, not gameplay or
-performance acceptance. After the doctor, choose the smallest boundary check;
-the [build, play and inspect guide](BUILD_AND_PLAY.md) has the local player,
-asset and packaging commands. Run the full suite and affected build at handoff.
+For browser work against an existing served build, check the actual Node,
+Playwright and browser configuration instead:
+
+```sh
+python3 scripts/doctor.py --task browser --disc /path/to/owned.gcm
+```
+
+The doctor is read-only and prints the checks that need attention. `--json`
+provides structured output for automation. Disc checking is optional and does
+not require extracted assets. Build freshness remains the responsibility of
+the producer and frozen-build checks in [Hitch capture](HITCH_CAPTURE.md).
+A doctor pass describes only the selected checks, not gameplay acceptance.
+Use the [build, play and inspect guide](BUILD_AND_PLAY.md) for setup and player
+commands, then choose the smallest relevant boundary check below.
 
 For a browser check, serve a built directory over loopback so cross-origin
 isolation headers are present:
@@ -44,9 +50,12 @@ node scripts/browser_smoke.mjs \
   --disc /path/to/owned.gcm
 ```
 
-Use `--surface public` with the public player URL. Pass `--playwright` when the
-package is not available through the project Node resolution path. The output
-directory must be new and belongs under ignored `work/`.
+Use `--surface public` with the public player URL. The doctor, smoke command
+and public-player browser test share configuration: `--playwright PACKAGE_DIR`
+overrides `MELEE_PLAYWRIGHT_DIR`, followed by normal Node package resolution.
+They use installed Google Chrome unless `MELEE_BROWSER_PATH` names another
+installed Chromium executable. Invalid explicit paths fail without falling
+back. The output directory must be new and belongs under ignored `work/`.
 
 ## Choose by change boundary
 
@@ -58,7 +67,7 @@ directory must be new and belongs under ignored `work/`.
 | Stage | [Adding a source stage](ADDING_STAGES.md) | Derive map bounds from authored data; run stage construction and lifecycle checks | Stage-specific source, render, collision and teardown scope |
 | Browser player or menu | [Accuracy contract](ACCURACY_CONTRACT.md) | Run `node scripts/browser_smoke.mjs ...` for readiness; use `runtime.html` through the original CSS/SSS route and the shared `scripts/browser_driver.mjs` helper in automation | Browser exercised; menu/transition and input claims need their own comparison |
 | Browser hitch or first-use preparation | [Hitch capture](HITCH_CAPTURE.md), [browser performance](PERFORMANCE.md) | Run the frozen matrix; separate native deadlines, browser gaps, preparation and live callbacks | Cold/warm performance is named-machine evidence, never an average FPS claim |
-| Native timing or retained capture | [Reference capture](REFERENCE_CAPTURE_APP.md) and [hitch capture](HITCH_CAPTURE.md) | Run `python3 scripts/native_capture.py preflight --output work/native-preflight`; validate its receipt, then use `record --pid` | A finalized trace is required; a failed or partial capture remains explicit evidence |
+| Native timing or retained capture | [Reference capture](REFERENCE_CAPTURE_APP.md) and [hitch capture](HITCH_CAPTURE.md) | Follow the owned-process capture procedure and verify the actual exported interval | A finalized trace is required; a failed or partial capture remains explicit evidence |
 | Retail comparison or controller input | [Reference capture](REFERENCE_CAPTURE_APP.md), [original comparison](ORIGINAL_COMPARISON.md) | Use the private capture workflow and its hash-bound reports | Retail compared only for declared fields and source boundaries |
 | Replay or recorded queue | [Recorded queue replay](RECORDED_QUEUE_REPLAY.md) | Validate the exact queue/draw/state inventory and first divergence | Conditional schedule evidence does not establish live timing or performance |
 | Public player/package | [Public release review](PUBLIC_RELEASE_REVIEW.md) | Build `runtime-public` in Release, package, audit, then follow the deployment document | Packaging/deployment identity is separate from gameplay admission |
@@ -76,28 +85,10 @@ console evidence show otherwise. The helper does not turn a diagnostic route
 into acceptance. Hitch profiles hash this helper; re-profile old manifests when
 it changes.
 
-`python3 scripts/native_capture.py` is the native capture entry point; see the
-[native capture guide](NATIVE_CAPTURE.md) for scope and coverage details. Run
-`preflight --output NEW_DIRECTORY` first, then validate its immutable receipt:
-
-```sh
-python3 scripts/native_capture.py preflight --output work/native-preflight
-python3 scripts/native_capture.py validate --receipt work/native-preflight/preflight.json
-python3 scripts/native_capture.py record --pid PID --output work/native-capture \
-  --preflight-receipt work/native-preflight/preflight.json
-```
-
-The receipt states recorder attachment, bounded stop/finalization, XML export
-and rolling-window retention evidence. It does not establish game-clock
-alignment, gameplay correctness, GPU execution time or browser timing. Supply
-the capture's actual coverage range when using `record`; keep raw captures and
-generated receipts under ignored local paths. Do not rerun a failed capture
-unchanged, and do not discard a useful negative receipt.
-
-`python3 scripts/doctor.py --json` reports environment readiness. Optional
-`--disc PATH` and `--build PATH` add local input/output checks. It never changes
-dependencies, source trees, build artifacts or disc files. JSON is intended for
-automation; human-readable output is the default when `--json` is omitted.
+Development-page failures use the explicit `#status[data-runtime-error]`
+channel; public-page failures use the error dialog. The driver reports the
+actual error immediately. Import and unload remain available for recovery
+when their controls are enabled. It never resumes a timing failure.
 
 ## Validation levels
 
