@@ -383,16 +383,19 @@ set_target_properties(native_menu_host_trace PROPERTIES SUFFIX ".js")
 # once the source CSS/SSS/match handoff passes acceptance.
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 set(initial_pipeline_cache "${CMAKE_CURRENT_BINARY_DIR}/initial_pipeline_cache.db")
+set(initial_pipeline_identity "${CMAKE_CURRENT_BINARY_DIR}/melee_pipeline_seed_identity.h")
 add_custom_command(
-  OUTPUT "${initial_pipeline_cache}"
+  OUTPUT "${initial_pipeline_cache}" "${initial_pipeline_identity}"
   COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/materialize_pipeline_cache.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/web/initial_pipeline_cache.db.gz.b64" "${initial_pipeline_cache}"
+    --identity-header "${initial_pipeline_identity}"
   DEPENDS scripts/materialize_pipeline_cache.py web/initial_pipeline_cache.db.gz.b64
   VERBATIM)
-add_custom_target(gameplay_menu_pipeline_seed DEPENDS "${initial_pipeline_cache}")
+add_custom_target(gameplay_menu_pipeline_seed DEPENDS "${initial_pipeline_cache}" "${initial_pipeline_identity}")
 add_executable(gameplay_menu_browser EXCLUDE_FROM_ALL src/gameplay_menu_browser.cpp src/browser_input.cpp src/browser_controllers.cpp
   tests/native_menu_alarm_unavailable.c tests/native_menu_fighter_input.c tests/native_menu_stage_input.c)
 add_dependencies(gameplay_menu_browser gameplay_menu_pipeline_seed)
+target_include_directories(gameplay_menu_browser PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 set_property(TARGET gameplay_menu_browser APPEND PROPERTY LINK_DEPENDS "${initial_pipeline_cache}")
 target_link_libraries(gameplay_menu_browser PRIVATE fighter_asset_runtime aurora::main)
 # Emscripten's mallinfo declaration extends its normal malloc.h via include_next.
@@ -431,6 +434,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release" AND MELEE_WEB_PUBLIC_RUNTIME)
   add_executable(gameplay_public EXCLUDE_FROM_ALL src/gameplay_menu_browser.cpp src/browser_input.cpp src/browser_controllers.cpp
     tests/native_menu_alarm_unavailable.c tests/native_menu_fighter_input.c tests/native_menu_stage_input.c)
   add_dependencies(gameplay_public gameplay_menu_pipeline_seed)
+  target_include_directories(gameplay_public PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
   set_property(TARGET gameplay_public APPEND PROPERTY LINK_DEPENDS "${initial_pipeline_cache}")
   target_compile_definitions(gameplay_public PRIVATE MELEE_WEB_PUBLIC_RUNTIME)
   target_compile_definitions(gameplay_public PRIVATE MELEE_WEB_PUBLIC_AUDIO_DISABLED)

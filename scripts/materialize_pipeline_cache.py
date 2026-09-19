@@ -9,10 +9,10 @@ from pathlib import Path
 import tempfile
 
 
-EXPECTED_SHA256 = "cdf157ee0f1850884f07a71165fd2192177acb23c2c777313b719e70ea67546f"
+EXPECTED_SHA256 = "ac57c60cc4ee1076fd801707447b696dd5717e2bc6d9224c6fba8e2b08ff98fd"
 
 
-def materialize(source: Path, output: Path) -> None:
+def materialize(source: Path, output: Path, identity_header: Path | None = None) -> None:
     encoded = "".join(source.read_text(encoding="ascii").split())
     payload = gzip.decompress(base64.b64decode(encoded, validate=True))
     digest = hashlib.sha256(payload).hexdigest()
@@ -26,14 +26,22 @@ def materialize(source: Path, output: Path) -> None:
         temporary.write(payload)
         temporary_path = Path(temporary.name)
     temporary_path.replace(output)
+    if identity_header is not None:
+        identity_header.parent.mkdir(parents=True, exist_ok=True)
+        identity_header.write_text(
+            '#pragma once\n'
+            f'#define MELEE_WEB_PIPELINE_SEED_SHA256 "{digest}"\n',
+            encoding="ascii",
+        )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("source", type=Path)
     parser.add_argument("output", type=Path)
+    parser.add_argument("--identity-header", type=Path)
     args = parser.parse_args()
-    materialize(args.source, args.output)
+    materialize(args.source, args.output, args.identity_header)
 
 
 if __name__ == "__main__":

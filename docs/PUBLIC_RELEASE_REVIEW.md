@@ -57,12 +57,13 @@ redirect evidence is recorded in [PUBLIC_ALPHA_VALIDATION.md](PUBLIC_ALPHA_VALID
 
 The Release target preloads `web/initial_pipeline_cache.db.gz.b64` as
 `/initial_pipeline_cache.db`. Decoding the checked-in source produces a
-2,113,536-byte SQLite database with SHA-256
-`cdf157ee0f1850884f07a71165fd2192177acb23c2c777313b719e70ea67546f`. Its
-schema has one `aurora_schema` row, one shader row and 507 pipeline rows. The
-seed was updated in commit
-`9c90e52569ef66409d5a4ca7431548095bc14b6b` after Aurora descriptors were
-observed while rendering development game routes.
+2,285,568-byte SQLite database with SHA-256
+`ac57c60cc4ee1076fd801707447b696dd5717e2bc6d9224c6fba8e2b08ff98fd`. Its
+schema has one `aurora_schema` row, one shader row and 547 pipeline rows. The
+Roy/Doc release candidate preserves all 508 existing descriptors and appends
+40 configurations observed in two complete visible matches. The reviewed
+[descriptor ledger](evidence/roy-doc-public-preparation-v1.json) records hashes
+and scoped evidence; no raw draw provenance or driver cache is shipped.
 
 The seed contains binary renderer configuration blobs and hashes rather than
 file names. Inspection found no raw texture, model, audio or disc bytes. That

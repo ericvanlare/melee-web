@@ -101,6 +101,7 @@ html, body {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   padding: 8px;
 }
@@ -115,7 +116,6 @@ html, body {
 #toolbar-meta { justify-content: flex-start; }
 
 @media (max-width: 1100px) {
-  #toolbar { justify-content: center; }
   #toolbar-brand, #toolbar-actions, #toolbar-meta { width: 100%; flex: 0 0 100%; justify-content: center; }
   #toolbar-actions { flex-wrap: wrap; }
 }
