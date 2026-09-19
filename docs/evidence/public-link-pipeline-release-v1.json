@@ -1,0 +1,103 @@
+{
+  "schema": "melee-web-public-link-pipeline-release-v1",
+  "status": "deployed_and_verified",
+  "date": "2026-09-19",
+  "pull_request": "https://github.com/ericvanlare/melee-web/pull/38",
+  "merge_commit": "90ff3717b19aca0818483153670cb6832d67165f",
+  "reviewed_source_commit": "b3b9da416917af1c1ab064616f25440e19877df7",
+  "code_verification_commit": "5c6929a63e419973291725006542f1d3fce777cc",
+  "code_ci_run": "https://github.com/ericvanlare/melee-web/actions/runs/35467303817",
+  "final_commit_scope": "Only STATUS and diagnosis/evidence documents changed after full code CI; executable inputs are unchanged.",
+  "production_url": "https://webmelee.gg",
+  "immutable_url": "https://24f92d33.webmelee.pages.dev",
+  "deployment_id": "24f92d33-f61b-4772-80ef-244084cbb68c",
+  "manifest_sha256": "e3269d5d928b09207b5bb6a88d490fe46ba37b29c43dfa717b418a09d9cf6af7",
+  "runtime_hash": "d655109ed47ef1f4",
+  "files": 25,
+  "bytes": 15231352,
+  "pipeline_seed_sha256": "b935fd741f029cd12afb5ac584ef943e51bb00c34c689ae44b1e75d6ae81a8ce",
+  "native_files": [
+    {
+      "path": "runtime/d655109ed47ef1f4/gameplay_public.data",
+      "sha256": "b935fd741f029cd12afb5ac584ef943e51bb00c34c689ae44b1e75d6ae81a8ce",
+      "size": 2613248
+    },
+    {
+      "path": "runtime/d655109ed47ef1f4/gameplay_public.wasm",
+      "sha256": "cc56e0dadf0f44f48d14e7e84a7102657e1a1b7ada09b58414d4a94daef1bb8d",
+      "size": 12025439
+    }
+  ],
+  "staging": {
+    "immutable_url": "https://236f2265.webmelee-staging.pages.dev",
+    "deployment_id": "236f2265-aa4d-461a-ad7f-f2ac666e1450",
+    "exact_same_candidate_bytes": true,
+    "http_result": "pass"
+  },
+  "rollback": {
+    "deployment_id": "ccff0e62-aa8b-4295-8b3b-d3e978422e01",
+    "immutable_url": "https://ccff0e62.webmelee.pages.dev",
+    "manifest_sha256": "fa3614a3701cefa8a0e1c1f322cd9d1eb10483c5f7e22a9961431e492099a7ff"
+  },
+  "verification": {
+    "browser-staging": {
+      "result": "pass",
+      "checks": 10,
+      "browser": "153.0.8010.50",
+      "report_sha256": "e57d557b3dbf3fafc96ca214368259213ec5191011b07444400988545284eb94"
+    },
+    "browser-production-apex": {
+      "result": "pass",
+      "checks": 10,
+      "browser": "153.0.8010.50",
+      "report_sha256": "dd85fd8c56caeb2f48013bfbd9a399960c7032e73c70976c85029073253f28ec"
+    },
+    "browser-production-immutable": {
+      "result": "pass",
+      "checks": 10,
+      "browser": "153.0.8010.50",
+      "report_sha256": "e57d557b3dbf3fafc96ca214368259213ec5191011b07444400988545284eb94"
+    },
+    "http-production-apex": {
+      "report_sha256": "282dd1f1ec4c2a01b17a040b80215c1f5aea561676d4c757a401a69f010f798e",
+      "result": "pass",
+      "scope": "Verifier exited0 after all exact-resource and missing-route assertions"
+    },
+    "http-production-immutable": {
+      "report_sha256": "196283f048ab022f7a4914932935b5503d4d74e3f3b011e31d4386c17228c09a",
+      "result": "pass",
+      "scope": "Verifier exited0 after all exact-resource and missing-route assertions"
+    }
+  },
+  "staging_link_route": [
+    {
+      "warmth": "cold",
+      "complete": true,
+      "source_updates": 451,
+      "native_callbacks": 453,
+      "manual_resumes": 0,
+      "native_max_ms": 10.92,
+      "browser_max_ms": 28.35,
+      "native_target_misses": 0,
+      "browser_hard_gaps": 0,
+      "live_pipelines_created": 0,
+      "report_sha256": "a399d8b1ba985a419a54bafe7068d75ed4d0678e98b6bac104116a5efae44538",
+      "observer_sha256": "1215d5e3227914a12e585dbaaf7bd85d461afc4a10313abc671233cf75c6a695"
+    },
+    {
+      "warmth": "warm",
+      "complete": true,
+      "source_updates": 450,
+      "native_callbacks": 453,
+      "manual_resumes": 0,
+      "native_max_ms": 5.95,
+      "browser_max_ms": 19.615,
+      "native_target_misses": 0,
+      "browser_hard_gaps": 0,
+      "live_pipelines_created": 0,
+      "report_sha256": "67e0b8adc39733b30144951dd753662e5ca3a9a5c14132d0b945b509c1c4956c",
+      "observer_sha256": "f9c8d7d9d1d5ce1426d870248ae117f4d4227bcfab617ae9787e13a27fe4bb81"
+    }
+  ],
+  "scope": "Silent functional alpha; short ordinary-DOM-input first-use checks. No full-match performance, physical-input, pixels or PCM admission. Historical a822 remains unclassified and issue33 stays open; neither holdout was opened."
+}

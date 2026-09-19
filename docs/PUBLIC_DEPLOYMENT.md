@@ -18,16 +18,20 @@ the accepted alpha risk posture and the artifact/contact requirements.
 The silent alpha is live at **[webmelee.gg](https://webmelee.gg/)**.
 The operator is **NaiadAI, LLC**; the public contact is **legal@webmelee.gg**.
 Actual Google Workspace alias delivery was verified before the nameserver
-change and again after migration, before custom-domain activation. The exact
-reviewed PR #32 candidate (`2ee80ab`) was deployed on September 19, 2026 to staging at
-[eb434dfe.webmelee-staging.pages.dev](https://eb434dfe.webmelee-staging.pages.dev) and to the
-production Pages environment at
-[ccff0e62.webmelee.pages.dev](https://ccff0e62.webmelee.pages.dev).
-The exact same audited bytes passed HTTP verification and the public browser
-smoke on both production origins. The
-[current release receipt](evidence/public-link-release-v1.json) records identity,
-rollback, ordinary-input coverage and retained timing pauses. It does not admit
-uninterrupted performance. The initial launch record below remains historical.
+change and again after migration, before custom-domain activation. The reviewed
+PR #38 pipeline-preparation fix (`b3b9da4`, merged as `90ff371`) was deployed on
+September 19, 2026 to staging at
+[236f2265.webmelee-staging.pages.dev](https://236f2265.webmelee-staging.pages.dev)
+and production at
+[24f92d33.webmelee.pages.dev](https://24f92d33.webmelee.pages.dev).
+The exact audited bytes passed HTTP verification and all ten public browser
+checks on both production origins. The hosted Link/Young Link route also passes
+cold and warm without timing resumes or live pipeline creation.
+The [current release receipt](evidence/public-link-pipeline-release-v1.json)
+records identity, rollback and scoped verification. These short silent-player
+checks do not admit full-match performance. The preceding
+[PR #32 release receipt](evidence/public-link-release-v1.json) and initial launch
+record below remain historical.
 
 Namecheap saved `alan.ns.cloudflare.com` and `hadlee.ns.cloudflare.com` as the
 custom nameservers after the mail and artifact gates passed. Cloudflare serves

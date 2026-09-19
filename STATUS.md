@@ -23,8 +23,8 @@ performance pass; the earlier port receipt remains separate evidence.
 
 Performance, pixels, PCM, live scheduling and unexercised moves remain open;
 Young Link human-controlled retail coverage is not implied by this match.
-The reviewed build is deployed at [webmelee.gg](https://webmelee.gg) as the silent
-alpha. Exact hosted bytes and the public browser smoke pass. Both Link/Young
+The PR #32 build was deployed at [webmelee.gg](https://webmelee.gg) as the silent
+alpha. Its exact hosted bytes and public browser smoke passed. Both Link/Young
 Link orientations also complete a bounded ordinary-keyboard functional smoke
 on staging, with cold timing pauses retained under
 [#33](https://github.com/ericvanlare/melee-web/issues/33); this does not broaden
@@ -35,7 +35,7 @@ and [bounded evidence receipt](docs/evidence/link-young-link-replay-v1.json).
 
 The new [GPU compilation diagnosis](docs/LINK_GPU_STALL.md) correlates a
 482.785 ms Link staging wait with synchronous Metal compiler work for four
-missing first-draw descriptors. A candidate seed preserves all existing records
+missing first-draw descriptors. The reviewed seed preserves all existing records
 and adds 78 reviewed descriptors. Its full 7,070-update/7,064-draw state replay
 is exact with zero live pipeline creation; both Release builds, 957 tests
 (44 optional skips), package/HTTP audit and ten public browser checks pass.
@@ -44,7 +44,10 @@ bounded public segments (both player orders cold/warm, 450 updates each) pass
 without timing pauses, live pipelines or native target misses; native/browser
 maxima are 11.370/25.245 ms. These silent functional checks do not establish
 full-match performance. The historical a822 stall, frozen performance matrix
-and both unopened holdouts remain open under #33.
+and both unopened holdouts remain open under #33. PR #38 is merged, and this
+fix is now deployed at [webmelee.gg](https://webmelee.gg). The exact production
+bytes and ten headed browser checks pass on both the immutable origin and apex;
+see the [current release receipt](docs/evidence/public-link-pipeline-release-v1.json).
 
 ## Dr. Mario and Roy development candidates
 
