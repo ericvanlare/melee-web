@@ -2,8 +2,10 @@
 
 The current PR #38 Release runtime completed the declared development workload
 coverage with **zero hard hitch failures**, one native 16.67 ms target miss,
-and both holdouts still unopened. This is recorded-queue development timing,
-not live controller, pixel/PCM, consecutive-match or historical-cause acceptance.
+and both holdouts still unopened at the time of measurement. The reports use
+`per_tick` replay scheduling; live scheduling equivalence is not evaluated.
+This is development replay timing, with separate live controller, pixel/PCM,
+consecutive-match and historical-cause acceptance gates.
 The [receipt](evidence/development-timing-20260919-v1.json) binds the runtime,
 profiles, plans, all started attempts, reports and interruption evidence.
 
@@ -92,12 +94,13 @@ the operation/client identity needed for that classification. The later
 [browser-raster reproduction](BROWSER_RASTER_STALL.md) is a separate event;
 another replay cannot reconstruct fields absent from the original recording.
 
-Under the existing criteria, issue #33 remains open. No further replay is
+Under the original criteria, issue #33 remained open. No further replay is
 justified merely to seek a passing result or relabel the historical failure.
-Proceeding with current-runtime holdout acceptance would require an explicit
-scope decision: preserve the old failure as measured and causally unresolved,
+The project owner approved the following scope decision on 2026-09-19:
+preserve the old failure as measured and causally unresolved,
 while allowing a separately frozen current-runtime/seed/protocol gate to run
-both untouched holdouts once with all existing hard thresholds. Such a decision
+both reserved holdouts once with all existing hard thresholds. This decision
 would not establish the old cause, erase its failure, waive new failures or
-constitute a performance pass. This document records that unresolved decision;
-it does not change the acceptance contract or open either holdout.
+constitute a performance pass. The bounded exception is recorded in the
+[holdout protocol](HITCH_CAPTURE.md#approved-current-runtime-scope--2026-09-19).
+Issue #33 remains open until the approved current-runtime evaluation passes.

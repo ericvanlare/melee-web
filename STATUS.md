@@ -23,7 +23,10 @@ full Chrome trace/report were lost during analysis, with partial observations
 and the recovered kernel recording retained explicitly. The second bounded
 slot did not reproduce the stall and failed focus. This is diagnostic evidence,
 not a fix or acceptance pass. See the [investigation and recovery limits](docs/BROWSER_RASTER_STALL.md).
-Issue #33's historical causal gate and both untouched holdouts remain open.
+The original failure remains causally unassigned. The project owner approved a
+separate [current-runtime holdout gate](docs/HITCH_CAPTURE.md#approved-current-runtime-scope--2026-09-19)
+on September 19, retaining that historical failure and every hard threshold.
+Issue #33 remains open during that separately frozen holdout evaluation.
 
 The current PR #38 development Release completed two cold/warm rounds on
 Fox/Marth Dream Land and Marth/Falco Yoshi's Story: 37,920 source updates/draws,
