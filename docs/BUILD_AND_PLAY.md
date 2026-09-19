@@ -10,6 +10,11 @@ The pinned environment is Python 3, Git, CMake/Ninja from the project virtual
 environment, and desktop Chromium with WebGPU. Bootstrap downloads the exact
 Aurora, Melee and Emscripten revisions into `.deps/` and installs build tools in
 `.venv/`; it does not modify an upstream checkout that has unexpected changes.
+After pulling the incremental ImGui build fix, rerun bootstrap before building.
+It recognizes the exact previous reviewed Aurora source tree and applies only
+the reviewed difference. Caches and the real Git index remain intact; unchanged
+files retain their timestamps. Additional local edits,
+staged changes or untracked files cause bootstrap to stop without upgrading.
 
 ```sh
 python3 scripts/bootstrap.py

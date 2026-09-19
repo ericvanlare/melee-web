@@ -65,6 +65,10 @@ and then restore the saved `StageInfo`.
 
 ## Validation and dependencies
 
+The [early content-check command](CONTENT_CHECKS.md) runs batched asset checks
+and explicitly built lifecycle targets. It includes the existing Battlefield
+trace contract; a new stage still needs its own source-specific lifecycle probe.
+
 Add a focused real-data trace under `tests/` that repeats the complete stage
 owner lifecycle at least twice. It should check, in order:
 

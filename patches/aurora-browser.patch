@@ -88,7 +88,7 @@ diff --git a/extern/CMakeLists.txt b/extern/CMakeLists.txt
 index e1feaca..5051b3e 100644
 --- a/extern/CMakeLists.txt
 +++ b/extern/CMakeLists.txt
-@@ -213,11 +213,29 @@ if (AURORA_ENABLE_GX)
+@@ -213,11 +213,36 @@ if (AURORA_ENABLE_GX)
      )
      target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR})
  
@@ -107,7 +107,14 @@ index e1feaca..5051b3e 100644
 +        "WGPUVertexBufferLayout buffer_layouts[1] = {};"
 +        _aurora_imgui_wgpu "${_aurora_imgui_wgpu}")
 +      set(_aurora_imgui_wgpu_source "${CMAKE_CURRENT_BINARY_DIR}/imgui_impl_wgpu_emdawn.cpp")
-+      file(WRITE "${_aurora_imgui_wgpu_source}" "${_aurora_imgui_wgpu}")
++      # Preserve the timestamp on unchanged output so reconfigure does not
++      # recompile this backend and relink every dependent trace.
++      if (EXISTS "${_aurora_imgui_wgpu_source}")
++        file(READ "${_aurora_imgui_wgpu_source}" _aurora_imgui_wgpu_previous)
++      endif ()
++      if (NOT EXISTS "${_aurora_imgui_wgpu_source}" OR NOT _aurora_imgui_wgpu_previous STREQUAL _aurora_imgui_wgpu)
++        file(WRITE "${_aurora_imgui_wgpu_source}" "${_aurora_imgui_wgpu}")
++      endif ()
 +    endif ()
      add_library(imgui_backends STATIC
        ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp
