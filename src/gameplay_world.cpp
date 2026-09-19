@@ -146,10 +146,10 @@ struct GameplayWorld::Storage {
         archive_cache=cache;
         stage=melee_web_stage_content_by_ground(selection.ground_kind);
         if(!stage)throw DatError("No runtime owner for selected source ground kind");
-        auto load=[&](std::string_view name){
+        auto load=[&](std::string_view name,DatExternalPolicy policy=DatExternalPolicy::Reject){
             if(archives.contains(name))return;
-            const auto policy=name=="ItCo.usd"?DatExternalPolicy::PreserveUnresolved:
-                name==stage->archive?DatExternalPolicy::ResolveNull:DatExternalPolicy::Reject;
+            if(name=="ItCo.usd")policy=DatExternalPolicy::PreserveUnresolved;
+            else if(name==stage->archive)policy=DatExternalPolicy::ResolveNull;
             auto value=archive_cache?archive_cache->archive(name,policy):
                 std::make_shared<const DatArchive>(file(files,name),policy);
             if(!archive_cache)
@@ -164,7 +164,14 @@ struct GameplayWorld::Storage {
             const auto kind=selection.fighter_kinds[slot];
             if(!melee_web_fighter_content_by_kind(kind))throw DatError("No runtime owner for selected source fighter kind");
             for(const auto& costume:fighter_costumes())if(costume.fighter_kind==kind){
-                if(costume.costume_index==0){identities[kind]=&costume;load(costume.fighter_filename);load(costume.model_filename);}
+                if(costume.costume_index==0){
+                    identities[kind]=&costume;
+                    // Fighter DATs follow lbArchive_InitializeDAT, which clears
+                    // every validated external chain before loading sections.
+                    // Link's optional Hookshot material/shape tracks use this.
+                    load(costume.fighter_filename,DatExternalPolicy::ResolveNull);
+                    load(costume.model_filename);
+                }
                 else if(selected_costumes[kind].contains(costume.costume_index)){
                     if(!files.contains(costume.model_filename))
                         throw DatError("Selected fighter costume model is missing");

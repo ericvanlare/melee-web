@@ -86,10 +86,23 @@ const roy=[
   // air 358-366, and Counter hit exits 370/372 need additional source state.
 ];
 
+const link=[
+  ground('Bow charge/release',[[344,346]],input(45,PAD.B),input(150)),
+  aerialSpecial('Bow (air)',[[347,349]]),
+  ground('Boomerang',[[350,351]],input(1,PAD.B,80),input(180)),
+  aerialSpecial('Boomerang (air)',[[353,354]],80),
+  ground('Spin Attack',[[356,356]],input(1,PAD.B,0,80),input(240)),
+  aerialSpecial('Spin Attack (air)',[[357,357]],0,80),
+  ground('Bomb',[[358,358]],input(1,PAD.B,0,-80),input(180)),
+  aerialSpecial('Bomb (air)',[[359,359]],0,-80),
+];
+
 export const actionInventories=new Map([
  [18,{id:'marth-visible-actions-v1',fighter:'Marth',minimumStageFrames:4200,cases:[...common,...wavedashes,...marth]}],
  [21,{id:'dr-mario-visible-actions-v1',fighter:'Dr. Mario',minimumStageFrames:4800,cases:[...common,...wavedashes,...drMario]}],
  [26,{id:'roy-visible-actions-v1',fighter:'Roy',minimumStageFrames:4800,cases:[...common,...wavedashes,...roy]}],
+ [6,{id:'link-visible-actions-v1',fighter:'Link',minimumStageFrames:4800,cases:[...common,...wavedashes,...link]}],
+ [20,{id:'young-link-visible-actions-v1',fighter:'Young Link',minimumStageFrames:4800,cases:[...common,...wavedashes,...link]}],
 ]);
 
 export function actionInventory(fighterKind){return actionInventories.get(fighterKind)||null;}

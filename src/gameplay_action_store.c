@@ -325,12 +325,12 @@ struct MeleeWebNativeActionRows {
 MeleeWebNativeActionRows* melee_web_action_rows_create(const MeleeWebActionRow* rows, size_t count,
     const MeleeWebWaitChoice* waits, size_t wait_count)
 {
-    if (!rows || !count || count > 1024 || !waits || !wait_count || wait_count > count) return NULL;
+    if (!rows || !count || count > 1024 || (wait_count && !waits) || wait_count > count) return NULL;
     MeleeWebNativeActionRows* p = calloc(1, sizeof(*p)); if (!p) return NULL;
     p->rows = calloc(count, sizeof(*p->rows)); p->symbols = calloc(count + 1, sizeof(*p->symbols));
     p->blends = malloc(count * 2);
-    p->waits = calloc(wait_count + 1, sizeof(*p->waits));
-    if (!p->rows || !p->symbols || !p->blends || !p->waits) { melee_web_action_rows_destroy(p); return NULL; }
+    p->waits = wait_count ? calloc(wait_count + 1, sizeof(*p->waits)) : NULL;
+    if (!p->rows || !p->symbols || !p->blends || (wait_count && !p->waits)) { melee_web_action_rows_destroy(p); return NULL; }
     for (size_t i = 0; i < count; ++i) {
         if (!rows[i].symbol) { melee_web_action_rows_destroy(p); return NULL; }
         const size_t symbol_size = strlen(rows[i].symbol) + 1;
@@ -345,7 +345,12 @@ MeleeWebNativeActionRows* melee_web_action_rows_create(const MeleeWebActionRow* 
                 strcmp(rows[j].symbol, rows[i].symbol) == 0) { p->rows[i].x14 = p->rows[j].x14; break; }
         memcpy(p->blends + i * 2, rows[i].blend, 2);
     }
-    memcpy(p->waits, waits, wait_count * sizeof(*waits)); p->waits[wait_count] = (MeleeWebWaitChoice){UINT32_MAX, UINT32_MAX};
+    // A null source table repeats the current idle without consuming RNG
+    // (ftCo_8008A7A8). An allocated empty/sentinel table is not equivalent.
+    if(wait_count){
+        memcpy(p->waits, waits, wait_count * sizeof(*waits));
+        p->waits[wait_count] = (MeleeWebWaitChoice){UINT32_MAX, UINT32_MAX};
+    }
     return p;
 }
 void melee_web_action_rows_destroy(MeleeWebNativeActionRows* p)
@@ -362,6 +367,9 @@ void* melee_web_action_waits(MeleeWebNativeActionRows* p) { return p->waits; }
 void melee_web_command_require_supported(uint32_t opcode)
 {
     switch (opcode) {
+    // Adjust Hitbox Damage uses the already-decoded set_hitbox_damage fields
+    // and original ftAction_8007162C / ftColl_8007ABD0 (Link's down air).
+    case 12: return;
     case 0: case 1: case 2: case 3: case 4: case 5: case 6: case 7: case 8: case 10: case 11: case 13: case 16: case 17: case 18: case 19: case 20: case 23: case 24: case 25: case 26: case 27: case 28: case 29: case 30: case 31: case 34: case 35: case 37: case 38: case 40: case 41: case 43: case 46: case 49: case 52: case 54: case 55: case 56: case 58: return;
     default:
         fprintf(stderr, "Unsupported native fighter command opcode %u\n", opcode);

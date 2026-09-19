@@ -2214,6 +2214,142 @@ index 0eed414..6c59223 100644
 +#endif
  
  #endif
+diff --git a/src/melee/it/kinds/itlinkhookshot.c b/src/melee/it/kinds/itlinkhookshot.c
+--- a/src/melee/it/kinds/itlinkhookshot.c
++++ b/src/melee/it/kinds/itlinkhookshot.c
+@@ -1,4 +1,7 @@
+ #include "itlinkhookshot.h"
++#ifdef TARGET_PC
++#include "gameplay_hookshot_math.h"
++#endif
+ 
+ #include <math.h>
+ #include <placeholder.h>
+@@ -1102,6 +1105,13 @@
+     }
+ }
+ 
++#ifdef TARGET_PC
++#define IT_HOOKSHOT_NORMALIZE melee_web_hookshot_normalize
++#define IT_HOOKSHOT_MADD fmaf
++#else
++#define IT_HOOKSHOT_NORMALIZE it_802A3C98
++#define IT_HOOKSHOT_MADD(a, b, c) ((a) * (b) + (c))
++#endif
+ void it_802A44CC(ItemLink* link_0, Vec3* arg1, itLinkHookshotAttributes* arg2,
+                  f32 arg8)
+ {
+@@ -1113,11 +1123,11 @@
+ 
+     link_1 = link_0->prev;
+ 
+-    it_802A3C98(&link_0->pos, arg1, &vec);
+-
+-    link_0->pos.x = (vec.x * arg8) + arg1->x;
+-    link_0->pos.y = (vec.y * arg8) + arg1->y;
+-    link_0->pos.z = (vec.z * arg8) + arg1->z;
++    IT_HOOKSHOT_NORMALIZE(&link_0->pos, arg1, &vec);
++
++    link_0->pos.x = IT_HOOKSHOT_MADD(vec.x, arg8, arg1->x);
++    link_0->pos.y = IT_HOOKSHOT_MADD(vec.y, arg8, arg1->y);
++    link_0->pos.z = IT_HOOKSHOT_MADD(vec.z, arg8, arg1->z);
+ 
+     while (link_1 != NULL) {
+         link_1->vel.y -= arg2->x3C;
+@@ -1126,16 +1136,19 @@
+         link_1->pos.z += link_1->vel.z;
+         it_802A40D0(link_1, arg2->x30);
+ 
+-        len = it_802A3C98(&link_1->pos, &link_0->pos, &vec);
++        len = IT_HOOKSHOT_NORMALIZE(&link_1->pos, &link_0->pos, &vec);
+         if (len > arg2->x30) {
+-            link_1->pos.x = (vec.x * arg2->x30) + link_0->pos.x;
+-            link_1->pos.y = (vec.y * arg2->x30) + link_0->pos.y;
+-            link_1->pos.z = (vec.z * arg2->x30) + link_0->pos.z;
++            link_1->pos.x = IT_HOOKSHOT_MADD(vec.x, arg2->x30, link_0->pos.x);
++            link_1->pos.y = IT_HOOKSHOT_MADD(vec.y, arg2->x30, link_0->pos.y);
++            link_1->pos.z = IT_HOOKSHOT_MADD(vec.z, arg2->x30, link_0->pos.z);
+         }
+         link_0 = link_1;
+         link_1 = link_1->prev;
+     }
+ }
++
++#undef IT_HOOKSHOT_NORMALIZE
++#undef IT_HOOKSHOT_MADD
+ 
+ static inline void test_comp(Vec3* vec0, Vec3* vec1, Vec3* vec2,
+                              const f32* arg2)
+@@ -1238,8 +1251,16 @@
+         guess = 0.5 * guess * (3.0 - guess * guess * x);
+         guess = 0.5 * guess * (3.0 - guess * guess * x);
+         guess = 0.5 * guess * (3.0 - guess * guess * x);
++#ifdef TARGET_PC
++        /* The matching-build spill offset is not a C object. On a different
++         * stack layout it overwrites live chain coordinates. Preserve the
++         * retail f32 rounding using an actual owned volatile scalar. */
++        y = (f32) (x * guess);
++        return y;
++#else
+         *(&y + 6) = (f32) (x * guess);
+         return *(&y + 6);
++#endif
+     }
+     return x;
+ }
+@@ -1265,6 +1286,13 @@
+     return len;
+ }
+ 
++#ifdef TARGET_PC
++#define IT_HOOKSHOT_NORMALIZE melee_web_hookshot_normalize
++#define IT_HOOKSHOT_MADD fmaf
++#else
++#define IT_HOOKSHOT_NORMALIZE it_802A4BFC_normalize_diff
++#define IT_HOOKSHOT_MADD(a, b, c) ((a) * (b) + (c))
++#endif
+ s32 it_802A4BFC(ItemLink* link_0, Vec3* arg1, itLinkHookshotAttributes* attr,
+                 Fighter* fp)
+ {
+@@ -1319,20 +1347,20 @@
+ 
+     while (link_1 != NULL) {
+         if (link_1->x2C_b0) {
+-            len = it_802A4BFC_normalize_diff(&link_1->pos, &link_0->pos, &vec);
++            len = IT_HOOKSHOT_NORMALIZE(&link_1->pos, &link_0->pos, &vec);
+             if (len > attr->x30) {
+-                link_1->pos.x = (vec.x * attr->x30) + link_0->pos.x;
+-                link_1->pos.y = (vec.y * attr->x30) + link_0->pos.y;
+-                link_1->pos.z = (vec.z * attr->x30) + link_0->pos.z;
++                link_1->pos.x = IT_HOOKSHOT_MADD(vec.x, attr->x30, link_0->pos.x);
++                link_1->pos.y = IT_HOOKSHOT_MADD(vec.y, attr->x30, link_0->pos.y);
++                link_1->pos.z = IT_HOOKSHOT_MADD(vec.z, attr->x30, link_0->pos.z);
+             }
+             link_1->coll_data.last_pos = link_1->coll_data.cur_pos;
+             link_1->coll_data.cur_pos = link_1->pos;
+         } else {
+-            len = it_802A4BFC_normalize_diff(arg1, &link_0->pos, &vec);
++            len = IT_HOOKSHOT_NORMALIZE(arg1, &link_0->pos, &vec);
+             if (len > attr->x30) {
+-                link_1->pos.x = (vec.x * attr->x30) + link_0->pos.x;
+-                link_1->pos.y = (vec.y * attr->x30) + link_0->pos.y;
+-                link_1->pos.z = (vec.z * attr->x30) + link_0->pos.z;
++                link_1->pos.x = IT_HOOKSHOT_MADD(vec.x, attr->x30, link_0->pos.x);
++                link_1->pos.y = IT_HOOKSHOT_MADD(vec.y, attr->x30, link_0->pos.y);
++                link_1->pos.z = IT_HOOKSHOT_MADD(vec.z, attr->x30, link_0->pos.z);
+                 link_1->x2C_b0 = 1;
+                 link_1->coll_data.cur_pos = link_1->pos;
+                 link_1->coll_data.last_pos = link_1->coll_data.cur_pos;
+@@ -1359,6 +1387,9 @@
+     it_802A44CC(link_0, arg1, attr, attr->x30);
+     return 2;
+ }
++
++#undef IT_HOOKSHOT_NORMALIZE
++#undef IT_HOOKSHOT_MADD
+ 
+ s32 it_802A5320(ItemLink* link_0, Vec3* arg1, itLinkHookshotAttributes* attr,
+                 Fighter* fp)
 diff --git a/src/melee/it/kinds/itcoin.c b/src/melee/it/kinds/itcoin.c
 index 066959e..3f313a9 100644
 --- a/src/melee/it/kinds/itcoin.c

@@ -70,7 +70,9 @@ struct GameplayFighterAssets::Storage {
     std::vector<uint8_t> animation;
     GameplayActionStore prototype;
     NativeDatArena arena;
-    std::array<std::unique_ptr<DatItemArticle>,4> articles;
+    std::array<std::unique_ptr<DatItemArticle>,7> articles;
+    std::unique_ptr<DatNativeJoint> link_part_model;
+    std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> link_part_native{nullptr,destroy_joint};
     DatNativeJoint model;
     DatMaterialAnimation material;
     std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> native;
@@ -100,9 +102,10 @@ struct GameplayFighterAssets::Storage {
         void* data=melee_web_fighter_data_decode(arena.reader(),fighter_root,id.fighter_kind,
             costume_count,static_cast<uint32_t>(prototype.runtime().actions().size()),
             prototype.action_rows(),prototype.blend_rows(),prototype.wait_choices(),&unresolved);
-        const auto item_table=fighter->pointer(fighter_root+0x48,16);
+        const bool link=id.fighter_kind==FTKIND_LINK||id.fighter_kind==FTKIND_CLINK;
+        const auto item_table=fighter->pointer(fighter_root+0x48,link?28:16);
         struct ItemIdentity { uint32_t index,kind; };
-        std::array<ItemIdentity,3> item_identities{};
+        std::array<ItemIdentity,6> item_identities{};
         size_t item_count=0;
         if(id.fighter_kind==0) {
             if(!item_table)throw DatError("Mario item Article table is missing");
@@ -122,6 +125,17 @@ struct GameplayFighterAssets::Storage {
             item_identities[item_count++]={1,attributes->blaster_gun_item_kind};
             item_identities[item_count++]={id.fighter_kind==1?2U:3U,
                 static_cast<uint32_t>(id.fighter_kind==1?It_Kind_Fox_Illusion:It_Kind_Falco_Phantasm)};
+        } else if(link) {
+            if(!item_table)throw DatError("Link family item Article table is missing");
+            const auto& attributes=prototype.runtime().link_attributes();
+            if(!attributes)throw DatError("Link family ftData extension is not hydrated");
+            item_identities[item_count++]={0,static_cast<uint32_t>(attributes->x48)};
+            item_identities[item_count++]={1,static_cast<uint32_t>(attributes->x2C)};
+            item_identities[item_count++]={2,static_cast<uint32_t>(attributes->xBC)};
+            item_identities[item_count++]={3,static_cast<uint32_t>(attributes->xC)};
+            item_identities[item_count++]={4,static_cast<uint32_t>(attributes->x10)};
+            if(id.fighter_kind==FTKIND_CLINK)
+                item_identities[item_count++]={5,static_cast<uint32_t>(It_Kind_CLink_Milk)};
         } else if(id.fighter_kind!=18 && id.fighter_kind!=26) {
             throw DatError("Fighter item Article schema is unavailable");
         }
@@ -132,6 +146,16 @@ struct GameplayFighterAssets::Storage {
             auto* registered=melee_web_fighter_data_article(data,item.index);
             if(!registered)throw DatError("Fighter item Article registration identity is missing");
             articles[item.index]=std::make_unique<DatItemArticle>(fighter,*article_root,item.kind,registered);
+        }
+        if(link) {
+            const auto part_root=fighter->pointer(*item_table+6*4,64);
+            if(!part_root)throw DatError("Link family parts joint is missing");
+            link_part_model=std::make_unique<DatNativeJoint>(fighter,*part_root);
+            link_part_native.reset(melee_web_native_joint_hydrate(&link_part_model->graph(),error,sizeof(error)));
+            if(!link_part_native)throw DatError(error);
+            if(!melee_web_fighter_data_set_link_part(data,
+                melee_web_native_joint_descriptor(link_part_native.get(),error,sizeof(error)),
+                &unresolved,error,sizeof(error)))throw DatError(error);
         }
         const auto metal_root=fighter->pointer(root(*fighter,id.fighter_symbol)+0x5c,64);
         if(!metal_root)throw DatError("Fighter constructor requires its original metal graph");

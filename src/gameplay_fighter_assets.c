@@ -40,8 +40,8 @@ MeleeWebFighterAssetScope* melee_web_fighter_assets_begin(uint32_t kind,uint32_t
         fail(error,size,"Fighter asset scope identity is invalid or another scope is active");return NULL;
     }
     ftData* native=data;
-    if(!native->xC || !native->x10 || !native->x24 || !native->x5C) {
-        fail(error,size,"Fighter asset scope requires decoded action, Wait and metal descriptors");return NULL;
+    if(!native->xC || !native->x10 || !native->x5C) {
+        fail(error,size,"Fighter asset scope requires decoded action and metal descriptors");return NULL;
     }
     MeleeWebFighterAssetScope* h=calloc(1,sizeof(*h));
     if(!h){fail(error,size,"Fighter asset scope allocation failed");return NULL;}

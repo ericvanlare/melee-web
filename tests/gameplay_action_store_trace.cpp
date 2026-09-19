@@ -37,6 +37,8 @@ Bytes read_file(const char* path)
 void verify(std::shared_ptr<const DatArchive> archive, const Bytes& container, bool actual)
 {
     GameplayActionStore store(archive, mario(), container);
+    for(unsigned id=78;id<=88;++id)check(store.command_ready(id),"Shared light-item pickup and throw command graphs are ready");
+    for(unsigned id=96;id<=103;++id)check(store.command_ready(id),"Shared light-item smash throw command graphs are ready");
     Fighter* fp = action_test_fighter(); check(fp != nullptr, "Fighter allocation"); store.bind(fp);
     check(action_test_load(fp, 2, 0) > 0 && action_test_load(fp, 6, 1) > 0 && action_test_alias(fp), "Original loader preserves 2/6 clip aliases");
     const auto frames = action_test_frames(fp); check(frames > 0, "Original FigaTree frames consumer");

@@ -5,6 +5,7 @@
 #include <melee/ft/kinds/ftMario/types.h>
 #include <melee/ft/kinds/ftFox/types.h>
 #include <melee/ft/kinds/ftMars/types.h>
+#include <melee/ft/kinds/ftLink/types.h>
 #include <sysdolphin/baselib/jobj.h>
 #include <stddef.h>
 #include <math.h>
@@ -14,6 +15,7 @@
 _Static_assert(sizeof(ftData) == 0x60 && sizeof(void*) == 4, "Native fighter ABI");
 typedef struct Counted { uint32_t count; void* data; } Counted;
 _Static_assert(sizeof(Counted) == 8, "Visibility descriptor ABI");
+_Static_assert(sizeof(ftLk_DatAttrs) == 0xDC, "Link extension ABI");
 #define WORD(o) r->word(r->context, (o))
 #define BYTE(o) r->byte(r->context, (o))
 #define PTR(o,n) r->pointer(r->context, (o),(n))
@@ -73,7 +75,8 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
 {
     if (!r || !unresolved) return NULL;
     REQUIRE(kind==FTKIND_MARIO || kind==FTKIND_DRMARIO || kind==FTKIND_FOX ||
-        kind==FTKIND_FALCO || kind==FTKIND_MARS || kind==FTKIND_EMBLEM,
+        kind==FTKIND_FALCO || kind==FTKIND_MARS || kind==FTKIND_EMBLEM ||
+        kind==FTKIND_LINK || kind==FTKIND_CLINK,
         "Native fighter extension schema unavailable");
     REQUIRE(costumes>0 && costumes<=16,"Native costume count exceeds checked bound");
     REQUIRE(motion_count>0 && motion_count<=1024,"Native motion count exceeds checked bound");
@@ -86,6 +89,7 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
 #define READ_I32(o) ((int32_t)WORD(o))
 #define READ_U32(o) WORD(o)
 #define READ_U8(o) BYTE(o)
+#define READ_PTR32(o) ((void*)(uintptr_t)READ_U32(o))
 #define CO(o,t,n,orig) d->x0->orig=READ_##t(at+o);
     MELEE_WEB_CO_ATTRIBUTE_FIELDS(CO)
 #undef CO
@@ -113,6 +117,13 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
 #undef MARS
         REQUIRE(mars->x64.x0_bone_id>=0 && mars->x64.x0_bone_id<140 && mars->x64.x10_size>0,
                 "Native Marth/Roy counter descriptor invalid");
+    } else if(kind==FTKIND_LINK || kind==FTKIND_CLINK) {
+        at=required(r,root+4,0xDC); ftLk_DatAttrs* link=NEW(ftLk_DatAttrs,1); d->ext_attr=link;
+#define LINK(o,t,n,orig) link->orig=READ_##t(at+o);
+        MELEE_WEB_LINK_ATTRIBUTE_FIELDS(LINK)
+#undef LINK
+        REQUIRE(link->xC4.x0_bone_id>=0 && link->xC4.x0_bone_id<140 && link->xC4.x10_size>0,
+                "Native Link absorb descriptor invalid");
     } else {
         REQUIRE(0,"Native fighter extension schema unavailable");
     }
@@ -273,13 +284,24 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     d->x58->x10=BYTE(at+16); d->x58->x11=BYTE(at+17); d->x58->x18=floating(r,at+24);
     REQUIRE(d->x58->x0<140 && d->x58->x1<140 && d->x58->x8<140 && d->x58->x9<140 &&
         d->x58->x10<140 && d->x58->x11<140,"Native IK bone index invalid");
-    d->x48_items=NEW(void*,4);
-    at=PTR(root+0x48,16);
+    const unsigned item_slots=(kind==FTKIND_LINK||kind==FTKIND_CLINK)?7:4;
+    /* Fixed native capacity bounds the shared accessor for every admitted
+     * family; only the exact source extent is read and remaining slots stay
+     * null. Slot 6 is a Link joint, never an Article. */
+    d->x48_items=NEW(void*,7);
+    at=PTR(root+0x48,item_slots*4);
     if(at!=UINT32_MAX) {
-        REGION(at,16);
-        for(unsigned i=0;i<4;++i) {
-            uint32_t p=PTR(at+i*4,24), article_unresolved;
-            if(p!=UINT32_MAX) d->x48_items[i]=melee_web_article_decode(r,p,&article_unresolved);
+        REGION(at,item_slots*4);
+        for(unsigned i=0;i<item_slots;++i) {
+            const size_t minimum=i==6?64:24;
+            uint32_t p=PTR(at+i*4,minimum), article_unresolved;
+            /* Link's seventh entry is the source HSD_Joint descriptor used by
+             * ftParts_800753D4, not an Article root. Its native descriptor is
+             * hydrated by the C++ asset owner after this ftData decode. */
+            if(i==6) {
+                REQUIRE((kind==FTKIND_LINK||kind==FTKIND_CLINK)&&p!=UINT32_MAX,
+                    "Link part descriptor is missing");
+            } else if(p!=UINT32_MAX) d->x48_items[i]=melee_web_article_decode(r,p,&article_unresolved);
         }
     }
     if(kind==FTKIND_MARIO)
@@ -293,11 +315,20 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     else if(kind==FTKIND_FALCO)
         REQUIRE(kind==FTKIND_FALCO && d->x48_items[0] && d->x48_items[1] && d->x48_items[3],
             "Falco OnLoad requires laser, blaster and Phantasm Articles");
+    else if(kind==FTKIND_LINK || kind==FTKIND_CLINK)
+        REQUIRE(at!=UINT32_MAX && d->x48_items[0] && d->x48_items[1] && d->x48_items[2] &&
+            d->x48_items[3] && d->x48_items[4],
+            "Link OnLoad requires its five Article identities and part descriptor");
     else
         REQUIRE((kind==FTKIND_MARS||kind==FTKIND_EMBLEM) && at==UINT32_MAX,
                 "Marth/Roy source ftData must not invent an Article table");
     const unsigned ready[]={0,1,2,11,12,13,14,15,16,17,18,19,20,21,22};
-    for(unsigned i=0;i<sizeof(ready)/sizeof(ready[0]);++i) *unresolved &= ~(1U<<ready[i]);
+    for(unsigned i=0;i<sizeof(ready)/sizeof(ready[0]);++i) {
+        /* Keep the Link part descriptor unresolved until its source HSD_Joint
+         * has been converted to the native 32-bit descriptor ABI. */
+        if(ready[i]==18 && (kind==FTKIND_LINK||kind==FTKIND_CLINK)) continue;
+        *unresolved &= ~(1U<<ready[i]);
+    }
     if(actions) *unresolved &= ~(1U<<3);
     if(blends) *unresolved &= ~(1U<<4);
     if(choices) *unresolved &= ~(1U<<9);
@@ -306,8 +337,19 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
 
 void* melee_web_fighter_data_article(void* data, uint32_t index)
 {
-    if (!data || index >= 4) return NULL;
+    if (!data || index >= 6 || !((ftData*)data)->x48_items) return NULL;
     return ((ftData*)data)->x48_items[index];
+}
+
+int melee_web_fighter_data_set_link_part(void* data,void* joint,uint32_t* unresolved,
+    char* error,size_t size)
+{
+    ftData* d=data;
+#define LINK_PART_REQUIRE(c,m) do { if(!(c)){if(error&&size)snprintf(error,size,"%s",m);return 0;} } while(0)
+    LINK_PART_REQUIRE(d&&d->x48_items&&joint&&unresolved&&(*unresolved&(1U<<18))&&!d->x48_items[6],
+        "Link part descriptor requires an unresolved source part root");
+    d->x48_items[6]=joint;*unresolved&=~(1U<<18);if(error&&size)*error=0;return 1;
+#undef LINK_PART_REQUIRE
 }
 
 int melee_web_fighter_data_set_metal(void* data,void* joint,uint32_t costumes,

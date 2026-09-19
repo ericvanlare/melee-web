@@ -53,6 +53,7 @@ class GameplayFighterAssetsTests(unittest.TestCase):
                 [sys.executable, str(compiler / "emcc.py"), *common, "-std=c11", "-I", str(source),
                  "-include", str(ROOT / "src/gameplay_compat.h"), "-c",
                  str(ROOT / "src/gameplay_fighter_assets.c"), str(ROOT / "src/gameplay_action_store.c"),
+                 str(ROOT / "src/dat_item_commands.c"),
                  str(source / "melee/ft/ftdata.c"), str(costumes), str(ROOT / "tests/gameplay_fighter_assets_trace.c")],
                 [sys.executable, str(compiler / "em++.py"), *common, "-std=c++20", "-c",
                  *[str(ROOT / "src" / (name+".cpp")) for name in ("dat_archive","dat_animation","fighter_binding","dat_fighter_runtime","dat_commands","gameplay_action_store")],

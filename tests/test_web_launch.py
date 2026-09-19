@@ -52,12 +52,15 @@ class WebLaunchTests(unittest.TestCase):
             cwd=ROOT, check=True, capture_output=True, text=True,
         )
         native_block = re.search(
-            r"constexpr std::array<std::string_view,\d+> keys=\{(.*?)\};",
+            r"constexpr std::array<std::string_view,(\d+)> keys=\{(.*?)\};",
             browser, re.S,
         )
         self.assertIsNotNone(native_block)
         manifest_keys = set(json.loads(manifest.stdout))
-        native_keys = set(re.findall(r'"([^"]+)"', native_block.group(1)))
+        authored_keys = re.findall(r'"([^"]*)"', native_block.group(2))
+        self.assertEqual(int(native_block.group(1)), len(authored_keys),
+                         "native upload allowlist must not include implicit empty entries")
+        native_keys = set(authored_keys)
         self.assertEqual(native_keys, manifest_keys | {"dsp_coef.bin", "sislib_font.bin"},
                          "native upload allowlist must match the disc manifest plus generated inputs")
 
@@ -119,6 +122,34 @@ for(const id of [341,342,343])if(!hasExpectation(roy,id,id))process.exit(6);
 if(!hasExpectation(roy,349,349) ||
    !hasExpectation(roy,350,357))process.exit(6);
 for(const id of [367,368,369,371])if(!hasExpectation(roy,id,id))process.exit(6);
+"""
+        subprocess.run(
+            ["node", "--input-type=module", "-e", script],
+            cwd=ROOT, check=True,
+        )
+
+    def test_link_and_young_link_visible_action_inventories_use_source_ids(self):
+        script = """
+import {actionInventory} from './web/action-sweep.mjs';
+const hasExpectation=(inventory,first,last)=>inventory.cases.some(item=>
+  item.expect.some(([actualFirst,actualLast])=>actualFirst===first&&actualLast===last));
+const commonNames=new Set(['jab','forward smash','down aerial','air dodge',
+                           'wavedash left 10/10','wavedash right 10/10']);
+const link=actionInventory(6), young=actionInventory(20);
+if(!link || link.id!=='link-visible-actions-v1' || link.fighter!=='Link')process.exit(1);
+if(!young || young.id!=='young-link-visible-actions-v1' || young.fighter!=='Young Link')process.exit(2);
+for(const inventory of [link,young]) {
+  const names=new Set(inventory.cases.map(item=>item.name));
+  for(const name of commonNames)if(!names.has(name))process.exit(3);
+  for(const name of ['Bow charge/release','Bow (air)','Boomerang','Boomerang (air)',
+                     'Spin Attack','Spin Attack (air)','Bomb','Bomb (air)'])
+    if(!names.has(name))process.exit(4);
+  if(inventory.cases.length<40 || inventory.minimumStageFrames<4200)process.exit(5);
+  if(!hasExpectation(inventory,344,346) || !hasExpectation(inventory,350,351) ||
+     !hasExpectation(inventory,353,354) || !hasExpectation(inventory,356,356) ||
+     !hasExpectation(inventory,357,357) || !hasExpectation(inventory,358,358) ||
+     !hasExpectation(inventory,359,359))process.exit(6);
+}
 """
         subprocess.run(
             ["node", "--input-type=module", "-e", script],

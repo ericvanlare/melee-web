@@ -43,6 +43,7 @@ std::uint32_t scalar(const DatArchive& archive, std::uint32_t at)
     return archive.be32(at);
 }
 std::uint32_t read_U32(const DatArchive& archive, std::uint32_t at) { return scalar(archive, at); }
+std::uint32_t read_PTR32(const DatArchive& archive, std::uint32_t at) { return read_U32(archive, at); }
 std::int32_t read_I32(const DatArchive& archive, std::uint32_t at)
 {
     return std::bit_cast<std::int32_t>(scalar(archive, at));
@@ -139,6 +140,14 @@ DatFighterRuntime::DatFighterRuntime(std::shared_ptr<const DatArchive> archive, 
 #undef READ_MARS
         require(mars_->absorb_bone >= 0 && mars_->absorb_bone < 140 && mars_->absorb_size > 0,
                 "Marth/Roy counter descriptor is outside checked part bounds");
+    } else if (costume_->fighter_kind == 6 || costume_->fighter_kind == 20) {
+        region(data, extension_, 0xDC);
+        link_.emplace();
+#define READ_LINK(at, type, name, original) link_->name = read_##type(data, extension_ + at);
+        MELEE_WEB_LINK_ATTRIBUTE_FIELDS(READ_LINK)
+#undef READ_LINK
+        require(link_->absorb_bone >= 0 && link_->absorb_bone < 140 && link_->absorb_size > 0,
+                "Link absorb descriptor is outside checked part bounds");
     }
     // ftColl_8007B320 enforces 15 hurt capsules and 11 dynamics spheres;
     // ftCo_8009CF84 enforces strictly fewer than 10 dynamics sets.
@@ -260,6 +269,7 @@ void DatFighterRuntime::validate_part_indices(std::size_t count) const
     if (mario_) require(mario_->cape_reflection_x0_bone_id < count, "Fighter reflector bone is outside the bound skeleton");
     if (fox_) require(fox_->reflector_bone_id < count, "Fighter reflector bone is outside the bound skeleton");
     if (mars_) require(std::size_t(mars_->absorb_bone) < count, "Marth counter bone is outside the bound skeleton");
+    if (link_) require(std::size_t(link_->absorb_bone) < count, "Link absorb bone is outside the bound skeleton");
 }
 std::optional<DatPackedCommands> DatFighterRuntime::commands(std::uint32_t id) const
 {

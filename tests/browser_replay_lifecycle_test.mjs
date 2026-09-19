@@ -8,6 +8,24 @@ const pause=page.slice(page.indexOf("$('pause').onclick="),page.indexOf("\n$('un
 const completion=page.slice(page.indexOf('window.menuReplayCompleted='),page.indexOf('\nwindow.menuReplayPoll='));
 assert(start&&pause&&completion);
 {
+ // Construction can fail before menuReplayStarted publishes a baseline.
+ // Its exact error must finish the replay on the next callback, not after
+ // the 15-minute watchdog, and teardown must not run reentrantly in Wasm.
+ const failed=page.split('\n').find(line=>line.startsWith('developmentHooks.preparationFailed='));
+ const poll=page.slice(page.indexOf('window.menuReplayPoll='),page.indexOf("\n$('retail-replay-start').onclick="));
+ const ended=[],display={files:[{}]};
+ const scope={developmentHooks:{},window:{},retailRun:{},ready:true,fatal:false,bundle:true,
+  replayLoading:false,$:()=>display,finishRetailReplay:reason=>ended.push(reason)};
+ vm.createContext(scope);vm.runInContext(failed+'\n'+poll,scope);
+ scope.developmentHooks.preparationFailed('PlLk.dat: invalid descriptor');
+ assert.equal(ended.length,0,'Teardown is deferred until the next poll');
+ assert.equal(scope.preparationSince,0);
+ scope.window.menuReplayPoll();
+ assert.deepEqual(ended,['PlLk.dat: invalid descriptor']);
+ scope.retailRun.finishing=true;scope.window.menuReplayPoll();
+ assert.equal(ended.length,1,'A failing replay cannot start teardown twice');
+}
+{
  const shared=fs.readFileSync(new URL('../web/melee-runtime.mjs',import.meta.url),'utf8');
  const unload=shared.slice(shared.indexOf('  async function unloadAndSave() {'),shared.indexOf('  async function put('));
  assert(unload.includes('Module._melee_web_native_menu_cache_idle()'));
