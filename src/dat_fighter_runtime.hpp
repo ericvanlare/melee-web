@@ -2,6 +2,7 @@
 
 #include "fighter_attributes.h"
 #include "fighter_binding.hpp"
+#include "gameplay_pikachu_schema.h"
 #include <array>
 #include <memory>
 
@@ -71,6 +72,9 @@ public:
     [[nodiscard]] const MeleeWebFighterBaseAttributes& base_attributes() const noexcept { return base_; }
     [[nodiscard]] const std::optional<MeleeWebMarioAttributes>& mario_attributes() const noexcept { return mario_; }
     [[nodiscard]] const std::optional<MeleeWebLuigiAttributes>& luigi_attributes() const noexcept { return luigi_; }
+    // Pikachu and Pichu use the shared original ftPikachuAttributes ABI;
+    // their decoded values and Article identities remain family-specific.
+    [[nodiscard]] const std::optional<MeleeWebPikachuAttributes>& pikachu_attributes() const noexcept { return pikachu_; }
     // Captain and Ganondorf use the shared original ftCaptain_DatAttrs layout.
     [[nodiscard]] const std::optional<MeleeWebCaptainAttributes>& captain_attributes() const noexcept { return captain_; }
     // Fox and Falco use the shared original ftFox_DatAttrs layout.  The
@@ -98,6 +102,7 @@ private:
     MeleeWebFighterBaseAttributes base_{};
     std::optional<MeleeWebMarioAttributes> mario_;
     std::optional<MeleeWebLuigiAttributes> luigi_;
+    std::optional<MeleeWebPikachuAttributes> pikachu_;
     std::optional<MeleeWebCaptainAttributes> captain_;
     std::optional<MeleeWebFoxAttributes> fox_;
     std::optional<MeleeWebMarsAttributes> mars_;

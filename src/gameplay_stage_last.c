@@ -18,6 +18,9 @@ extern int melee_web_stage_selection_begin(int);
 extern int melee_web_stage_selection_end(void);
 extern int melee_web_ground_map_storage_begin(void);
 extern int melee_web_ground_map_storage_end(void);
+extern int melee_web_ground_remove_unmapped(HSD_GObj*);
+extern void melee_web_ground_remove_camera(HSD_GObj*);
+extern void melee_web_ground_load_map_lights(void);
 struct MeleeWebStageLast {
     StageInfo saved;
     struct ftDeviceUnk3 device1[1],device3[1];
@@ -27,6 +30,7 @@ struct MeleeWebStageLast {
     void* yaku;
     const MeleeWebStageProfile* definition;
     HSD_GObj* manager;
+    HSD_GObj* map_lights;
     uint64_t generation;
 };
 static MeleeWebStageLast* active;
@@ -39,6 +43,9 @@ static MeleeWebStageLast* begin_stage(const MeleeWebStageProfile* definition,voi
  if(map_bank&&!melee_web_effect_bank_stats(map_bank,&bank,e,n)||map_bank&&(bank.bank!=64||!bank.particle_bank_ready)){fail(e,n,"Stage requires its actual registered particle bank64");return NULL;}
  if(active||!yaku||!definition->source||!melee_web_effect_runtime_active()||!melee_web_stage_map_archives()||!stage_info.param||stage_info.grkind!=definition->ground_kind){fail(e,n,"Stage requires original effects and published native map/numeric stage contexts");return NULL;}
  for(unsigned i=0;i<sizeof(stage_info.map_gobjs)/sizeof(stage_info.map_gobjs[0]);i++)if(stage_info.map_gobjs[i]){fail(e,n,"Stage requires an empty source stage object registry");return NULL;}
+ for(HSD_GObj* obj=((HSD_GObj**)HSD_GObj_Entities)[5];obj;obj=obj->next)
+  if(obj->classifier==HSD_GOBJ_CLASS_STAGE){fail(e,n,"Stage requires exclusive ownership of source stage objects");return NULL;}
+ if(Ground_801C498C()){fail(e,n,"Stage requires exclusive ownership of selected map lights");return NULL;}
  MeleeWebStageLast* h=calloc(1,sizeof(*h));if(!h){fail(e,n,"Cannot allocate stage ownership scope");return NULL;}
  h->saved=stage_info;h->generation=melee_web_gameplay_stats().generation;
  h->definition=definition;
@@ -46,8 +53,15 @@ static MeleeWebStageLast* begin_stage(const MeleeWebStageProfile* definition,voi
  if(!melee_web_ground_map_storage_begin()){free(h);fail(e,n,"Original Ground collision-state storage is already owned");return NULL;}
  if(!melee_web_stage_selection_begin(definition->stage_kind)){melee_web_ground_map_storage_end();free(h);fail(e,n,"Original selected stage is already owned");return NULL;}
  h->yaku=definition->exchange_yakumono?definition->exchange_yakumono(yaku):NULL;stage_info.yakumono_param=yaku;active=h;
+ /* Ground_801C0800 constructs the selected map lights before on_init.
+  * Reuse that original owner without repeating the already-owned collision,
+  * item and particle setup performed by the typed world boundaries. */
+ melee_web_ground_load_map_lights();
+ h->map_lights=Ground_801C498C();
+ if(!h->map_lights){melee_web_stage_last_end(h,NULL,0);fail(e,n,"Original selected map-light owner was not created");return NULL;}
  definition->source->on_init();
  for(unsigned i=0;i<definition->required_map_count;i++)if(definition->required_map_ids[i]>=sizeof(stage_info.map_gobjs)/sizeof(stage_info.map_gobjs[0])||!stage_info.map_gobjs[definition->required_map_ids[i]]){melee_web_stage_last_end(h,NULL,0);fail(e,n,"Original stage initializer did not create every required map object");return NULL;}
+ Stage_80225298();
  if(!defer_start)Stage_802252E4((StKind)definition->stage_kind,NULL);
  ok(e,n);return h;
 }
@@ -75,7 +89,48 @@ int melee_web_stage_last_end(MeleeWebStageLast* h,char* e,size_t n){
   }
  }
  if(h->manager){HSD_GObjPLink_80390228(h->manager);h->manager=NULL;}
- for(int i=(int)(sizeof(stage_info.map_gobjs)/sizeof(stage_info.map_gobjs[0]))-1;i>=0;i--)if(stage_info.map_gobjs[i])Ground_801C4A08(stage_info.map_gobjs[i]);
+ /* x18 is a shared camera reference on some stages: Fountain's two
+  * platforms and reflection surface all reference the same camera. End its
+  * lifetime once after all consumers; never let per-map removal free it
+  * while another source object still references it. No source tick runs here. */
+ HSD_GObj* cameras[64];size_t camera_count=0;
+ for(HSD_GObj* obj=((HSD_GObj**)HSD_GObj_Entities)[5];obj;obj=obj->next){
+  if(obj->classifier!=HSD_GOBJ_CLASS_STAGE||!obj->user_data)continue;
+  Ground* gp=obj->user_data;
+  if(!gp->x18)continue;
+  size_t i=0;for(;i<camera_count;i++)if(cameras[i]==gp->x18)break;
+  if(i==camera_count){
+   if(camera_count==sizeof(cameras)/sizeof(cameras[0]))return fail(e,n,"Stage camera ownership exceeds source map capacity");
+   cameras[camera_count++]=gp->x18;
+  }
+ }
+ for(HSD_GObj* obj=((HSD_GObj**)HSD_GObj_Entities)[5];obj;obj=obj->next)
+  if(obj->classifier==HSD_GOBJ_CLASS_STAGE&&obj->user_data)((Ground*)obj->user_data)->x18=NULL;
+ /* A map descriptor may create several live objects (Fountain creates two
+  * map-4 platforms). The source registry retains only the latest one. Retire
+  * every instance in the established reverse-map order while descriptor and
+  * collision owners are still alive. Rescan after each callback can unlink. */
+ for(int i=(int)(sizeof(stage_info.map_gobjs)/sizeof(stage_info.map_gobjs[0]))-1;i>=0;i--){
+  for(;;){
+   HSD_GObj* found=NULL;
+   for(HSD_GObj* obj=((HSD_GObj**)HSD_GObj_Entities)[5];obj;obj=obj->next)
+    if(obj->classifier==HSD_GOBJ_CLASS_STAGE&&obj->user_data&&((Ground*)obj->user_data)->map_id==i){found=obj;break;}
+   if(!found)break;
+   Ground_801C4A08(found);
+  }
+ }
+ for(;;){
+  HSD_GObj* found=NULL;
+  for(HSD_GObj* obj=((HSD_GObj**)HSD_GObj_Entities)[5];obj;obj=obj->next)
+   if(obj->classifier==HSD_GOBJ_CLASS_STAGE){found=obj;break;}
+  if(!found)break;
+  if(!melee_web_ground_remove_unmapped(found))return fail(e,n,"Unexpected source stage object remains during teardown");
+ }
+ for(size_t i=0;i<camera_count;i++)melee_web_ground_remove_camera(cameras[i]);
+ if(h->map_lights){
+  if(Ground_801C498C()!=h->map_lights)return fail(e,n,"Original selected map-light owner was replaced");
+  HSD_GObjPLink_80390228(h->map_lights);h->map_lights=NULL;
+ }
  if(!melee_web_ground_map_storage_end())return fail(e,n,"Original stage objects remain during collision-state release");
  memcpy(ft_80459A68,h->device1,sizeof(h->device1));memcpy(ftDevice_BuryThings,h->device2,sizeof(h->device2));memcpy(ft_80459A8C,h->device3,sizeof(h->device3));ft_804D6578=h->device4;ft_804D6570=h->count1;ftDevice_BuryThingCount=h->count2;
  if(h->definition&&h->definition->exchange_yakumono)h->definition->exchange_yakumono(h->yaku);

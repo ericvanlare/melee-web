@@ -242,6 +242,28 @@ void surface_counts()
     }
 }
 
+void native_line_and_point_packets()
+{
+    auto native=[](const Fixture& fixture){return RigidModel(fixture.archive(),Fixture::joint,
+        "native primitive",melee_web::ModelRenderPass::All,melee_web::DatMaterialPolicy::NativeDescriptors);};
+    for(const auto& [opcode,count]:std::vector<std::pair<uint8_t,uint16_t>>{{0xa8,2},{0xa8,4},{0xb0,2},{0xb0,3},{0xb8,1},{0xb8,3}}){
+        Fixture fixture;
+        std::fill(fixture.data.begin()+Fixture::display,fixture.data.end(),0);
+        fixture.data[Fixture::display]=opcode;put16(fixture.data,Fixture::display+1,count);
+        for(unsigned i=0;i<count;i++)fixture.data[Fixture::display+3+i]=i%3;
+        rejects([&]{(void)fixture.model();});
+        auto model=native(fixture);
+        check(model.draw_packets==1&&model.submitted_vertices==count,"native line/point packet retains source vertex count");
+        check(model.meshes[0].display==model.archive->data().data()+Fixture::display,"native source display bytes stay unchanged");
+        fixture.data[Fixture::display+3]=255;
+        rejects([&]{(void)native(fixture);});
+    }
+    for(const auto& [opcode,count]:std::vector<std::pair<uint8_t,uint16_t>>{{0xa8,0},{0xa8,1},{0xa8,3},{0xb0,1},{0xb8,0},{0xb9,3},{0xb8,65535}}){
+        Fixture fixture;fixture.data[Fixture::display]=opcode;put16(fixture.data,Fixture::display+1,count);
+        rejects([&]{(void)native(fixture);});
+    }
+}
+
 void truncated_packets()
 {
     Fixture fixture(false, true);
@@ -1232,6 +1254,7 @@ int main(int argc, char** argv)
         {"valid_f32_geometry", valid_f32_geometry}, {"display_commands", display_commands},
         {"signed_byte_geometry", signed_byte_geometry},
         {"surface_counts", surface_counts}, {"truncated_packets", truncated_packets},
+        {"native_line_and_point_packets", native_line_and_point_packets},
         {"indexed_array_bounds", indexed_array_bounds}, {"cyclic_graphs", cyclic_graphs},
         {"raw_joint_srt", raw_joint_srt}, {"joint_hierarchy", joint_hierarchy},
         {"invalid_joint_graphs", invalid_joint_graphs},

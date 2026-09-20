@@ -53,6 +53,9 @@ class RigidModelTests(unittest.TestCase):
     def test_primitive_counts_and_supported_surface_types(self):
         self.run_case("surface_counts")
 
+    def test_native_line_point_counts_bounds_and_viewer_rejection(self):
+        self.run_case("native_line_and_point_packets")
+
     def test_truncated_primitive_headers_and_index_payloads(self):
         self.run_case("truncated_packets")
 

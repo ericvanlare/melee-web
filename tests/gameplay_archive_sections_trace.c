@@ -30,6 +30,10 @@ int main(int argc,char** argv) {
         assert(melee_web_archive_sections_public(opened,"absent")==NULL);
         void* twice=melee_web_archive_sections_open("Authored.dat");
         assert(twice!=opened);
+        assert(!melee_web_archive_sections_close_owned(h,opened,error,sizeof(error)));
+        assert(!melee_web_archive_sections_close_owned(other,opened,error,sizeof(error)));
+        assert(melee_web_archive_sections_public(opened,"first")==&a);
+        assert(melee_web_archive_sections_public(twice,"alias")==&a);
         assert(!melee_web_archive_sections_close(h,error,sizeof(error)));
         melee_web_archive_sections_release(opened);
         if(argc==2&&!strcmp(argv[1],"released"))melee_web_archive_sections_public(opened,"first");
@@ -38,7 +42,10 @@ int main(int argc,char** argv) {
         load(NULL,"Authored.dat",&one,"first",&alias,"alias",NULL);assert(one==&a&&alias==one);
         assert(melee_web_archive_sections_close(h,error,sizeof(error)));
         load(NULL,"Second.dat",&one,"second",NULL);assert(one==&b);
-        assert(melee_web_archive_sections_close(other,error,sizeof(error)));
+        void* owned=melee_web_archive_sections_open("Second.dat");
+        assert(!melee_web_archive_sections_close_owned(other,&a,error,sizeof(error)));
+        assert(melee_web_archive_sections_public(owned,"second")==&b);
+        assert(melee_web_archive_sections_close_owned(other,owned,error,sizeof(error)));
         filename[0]='A';symbol[0]='f';
     }
     MeleeWebArchiveSymbol catalog={"Extra.dat","source_options_root",NULL};

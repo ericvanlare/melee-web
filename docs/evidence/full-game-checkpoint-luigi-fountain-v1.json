@@ -1,0 +1,370 @@
+{
+  "schema": "melee-web-full-game-checkpoint-validation",
+  "version": 1,
+  "source_base_commit": "f6e38918e658cd1ccac49b9ea6683a42d44e4b04",
+  "scope": "Development branch checkpoint with eleven selectable fighters and six stages. No whole-game, tournament, pixel, PCM, ordinary-controller, general performance or deployment admission.",
+  "automated_suite": {
+    "command": "python3 -m unittest discover -s tests -v",
+    "result": "pass",
+    "tests": 1070,
+    "seconds": 298.028,
+    "skips": 41,
+    "skip_reasons": {
+      "Bootstrap Aurora and a C++20 compiler for independent DSP comparison": 2,
+      "Build dat_scene_trace before the typed scene check": 1,
+      "Build fighter targets before running the focused bonus_data trace": 1,
+      "Build fighter targets before running the focused stage_numeric trace": 1,
+      "Build fighter targets before the original SIS consumer check": 1,
+      "Build fighter targets before the typed support check": 1,
+      "Build fighter/audio stream target and supply optional owned HPS/SSM/SEM/coefficient inputs": 1,
+      "Build gameplay_audio_trace and provide local SSM/SEM/DSP coefficient fixtures": 2,
+      "Build gameplay_music_profile_trace and provide owned menu/game assets": 1,
+      "Build gameplay_pad_state_trace": 1,
+      "Build gameplay_rumble_trace and provide owned LbRb.dat": 1,
+      "Build the native menu host and supply owned menu/game fixtures": 1,
+      "Build the native_audio_banks fighter target first": 1,
+      "Built original player context trace required": 1,
+      "Built stock trace and owned Mario costume archives required": 1,
+      "Common context trace unavailable; build gameplay first": 1,
+      "Native HSD targets unavailable; run scripts/build.py --target gameplay": 1,
+      "Optional built combat trace and owned runtime assets required": 1,
+      "Optional built full-stage edge trace and owned runtime assets required": 2,
+      "Optional built source trace and owned runtime assets required": 2,
+      "Optional built timer trace and owned runtime assets required": 1,
+      "Optional pinned Dolphin source checkout is not installed": 2,
+      "Original CSS target and owned local fixtures are required": 1,
+      "Original stage trace target unavailable": 2,
+      "Owned Dr. Mario/Roy and stage fixtures are required": 1,
+      "Owned menu, Fox/Falco and stage fixtures are required": 1,
+      "Owned stage selection archive and pinned SDK required": 1,
+      "Project SDK and Aurora build dependencies unavailable; run bootstrap/build": 4,
+      "Project SDK/Aurora build dependencies unavailable; run bootstrap/build": 1,
+      "compiled private provenance fixture not supplied": 1,
+      "pinned slippi-js fixtures are not checked out": 2
+    },
+    "local_path": "work/full-game/luigi-fountain-suite-v2.log",
+    "sha256": "775ae6289038e0b45ac750f38e227dbb8e30b54a44a82a2643b0238f5d4a6f57"
+  },
+  "release_builds": [
+    {
+      "kind": "development",
+      "result": "pass",
+      "local_path": "work/full-game/luigi-fountain-browser-build-v7.log",
+      "sha256": "b73fd600277f60b957b8bf22a8dffca2cd042d17a27c518fbe6b9d84af110ee4",
+      "artifacts": [
+        {
+          "path": "build/browser-release/gameplay_menu_browser.js",
+          "sha256": "1790ccdb6bade46f70c3d78b886fac31bb276989764b4d838ead158af6703518"
+        },
+        {
+          "path": "build/browser-release/gameplay_menu_browser.wasm",
+          "sha256": "51261187f194b70cd0b96425066ba6af7621b11fb8e23ae47a0a686dda6445a8"
+        },
+        {
+          "path": "build/browser-release/gameplay_menu_browser.data",
+          "sha256": "122eaece4fce109e9f2c958de8b0bb7315ccb670dab349eb2090da1f2fd589a6"
+        }
+      ]
+    },
+    {
+      "kind": "public",
+      "result": "pass",
+      "local_path": "work/full-game/luigi-fountain-public-build-v2.log",
+      "sha256": "672b546185b477c9164f780aa9145c3981fa0509c43ba1db4e4af3da95c3d2fd",
+      "artifacts": [
+        {
+          "bytes": 283268,
+          "path": "build/browser-public-release/gameplay_public.js",
+          "sha256": "5e80e992b2b61e1e59697d3ea4c11a9d1f1cd96b247cd8e1095ba578b06c2459"
+        },
+        {
+          "bytes": 12315379,
+          "path": "build/browser-public-release/gameplay_public.wasm",
+          "sha256": "1865f21e20faea69cfc0014b4b4eb2b3ab37fe1e5587e9dcc3704d2bcf65bb9b"
+        },
+        {
+          "bytes": 3121152,
+          "path": "build/browser-public-release/gameplay_public.data",
+          "sha256": "122eaece4fce109e9f2c958de8b0bb7315ccb670dab349eb2090da1f2fd589a6"
+        }
+      ]
+    }
+  ],
+  "browser_build": {
+    "local_path": "work/full-game/luigi-fountain-browser-build-v5/prototype-build.json",
+    "sha256": "19214c1320e19acc8df8c366fd2bf802ae861bdc62998fccebeceb5fa606e0c3",
+    "artifacts": {
+      "gameplay_menu_browser.js": "1790ccdb6bade46f70c3d78b886fac31bb276989764b4d838ead158af6703518",
+      "gameplay_menu_browser.wasm": "c8a135a4e03a267ebf2f677c7ef44d31ab3fc00fe36b2f9ed10a9d8e18b109eb",
+      "gameplay_menu_browser.data": "122eaece4fce109e9f2c958de8b0bb7315ccb670dab349eb2090da1f2fd589a6",
+      "runtime.html": "7dbdba45a72835799f02df323ce93e762ed3ad9d8941522ebe4d550913460172",
+      "runtime-development.mjs": "1833a302d0e97976946d1880687cd79b3e9f23ecebafd2af08ca76b932a14b90",
+      "melee-runtime.mjs": "f5ad8fe145e60482099eef2baa9865b797d8f6047777794cf6f83eaed37968a4",
+      "controller-input.mjs": "3388c3784717bea4b582a8fa66100880cbbcf4a0adb767c000e0a9cc779c31c8",
+      "controller-panel.mjs": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95",
+      "controller-panel.css": "289ca851412aca5b7def53dc002e8b3a897f7524e37d7b2ba2065822e7b3c16e",
+      "controller-settings.mjs": "3679207e488927e1cbd30386123bc80f26b565bb84f29916506ab72074dbd4a2",
+      "controller-settings.css": "3ac5ef6bea09babcc557f49b109fd76194a0d6ee2f5195bc731d5e8b446fcf2f",
+      "prototype-keyboard-layouts.mjs": "88dbd2c00873bad67cee89b9094bf735e0be3dc89bb2dcd95ac14de2abc30745",
+      "runtime-cache.js": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26",
+      "audio-worklet.js": "ef4374ac08f5bab821efa05cf5d252ca8e4b50647710d434e192beac3d7d7b4f",
+      "audio-ring.mjs": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf",
+      "disc-image.mjs": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a",
+      "dsp-coefficients.mjs": "5176d1cf4400228f31dff428bcc8cd60d07694c0ceea1628a79ac19f3e112b4a",
+      "runtime-assets.mjs": "e5f9adb4571fd9609f1aba99e30f0e4c8438ef465a3821377cd6509b3f5672b6",
+      "runtime-audio-assets.mjs": "b9bfd3f841d73e4ee4987fc5ac7351832c4ae8eca48ba5cf9c95578a238c7dbc",
+      "runtime-audio.mjs": "d968d2b2f9b58d2ab5dc1a4720d2ad2114cfbcac44a888694da7850100546545",
+      "match-flow.mjs": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f",
+      "match-menu.mjs": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba",
+      "action-sweep.mjs": "afea4980bf8c6903f8eda51f20d6259e9bb4a8dc6477dfd8f8e099a5c84694a1",
+      "hitch-capture.mjs": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3"
+    },
+    "later_change": "Final builds additionally enforce source model-descriptor presence at Article publication and correct the Luigi C++ table validation to its authored one-slot bound. The refreshed native probe and full suite validate this rejected-input boundary; browser measurements name the preceding frozen build explicitly."
+  },
+  "machine": {
+    "hardware": "Apple M4",
+    "os": "macOS 26.6.2 (25G83)",
+    "browser": "153.0.8010.50",
+    "canvas_backing_pixels": [
+      640,
+      480
+    ],
+    "device_pixel_ratio": 1,
+    "development_audio": true,
+    "application_cache": "Cold reset, complete world unload/persistence, then warm application reload",
+    "driver_cache": "uncontrolled"
+  },
+  "luigi": {
+    "labels": [
+      "Source identified",
+      "Native traced",
+      "Browser exercised",
+      "Performance passed"
+    ],
+    "scope": "Luigi/Mario Final Destination 30-case action-sweep windows; 5200 source frames each cold/warm. Entry and broader gameplay acceptance are separate.",
+    "local_path": "work/full-game/luigi-browser-pair-v2/report.json",
+    "sha256": "decb2ee92b926adfbafeba11fdc4ef9fd4bebe204888452e1f62d2517a1cef67",
+    "rounds": [
+      {
+        "round": "cold",
+        "pass": true,
+        "case_count": 30,
+        "metrics": {
+          "sourceFrames": 5200,
+          "browserCallbacks": 5200,
+          "worstBrowserCallbackMs": 26.58,
+          "browserCallbackGaps": 0,
+          "browserLongTasks": 0,
+          "browserLongTaskWorstMs": 0,
+          "nativeCallbacks": 5200,
+          "worstNativeCallbackMs": 8.88,
+          "nativeCallbacksOverBudget": 0,
+          "nativeCallbacksOver33ms": 0,
+          "audioUnderrunFrames": 0,
+          "livePipelinesQueued": 0,
+          "livePipelinesCreated": 0,
+          "liveTextureUploadBytes": 1444352,
+          "liveStagingUsedBytes": 6254830676,
+          "peakStagingUsedBytes": 2549104,
+          "preparationPauses": 0,
+          "automaticTimingResumes": 0,
+          "focusLost": false,
+          "wasmHeapGrowthBytes": 0
+        }
+      },
+      {
+        "round": "warm",
+        "pass": true,
+        "case_count": 30,
+        "metrics": {
+          "sourceFrames": 5200,
+          "browserCallbacks": 5200,
+          "worstBrowserCallbackMs": 22.24,
+          "browserCallbackGaps": 0,
+          "browserLongTasks": 0,
+          "browserLongTaskWorstMs": 0,
+          "nativeCallbacks": 5200,
+          "worstNativeCallbackMs": 7.57,
+          "nativeCallbacksOverBudget": 0,
+          "nativeCallbacksOver33ms": 0,
+          "audioUnderrunFrames": 0,
+          "livePipelinesQueued": 0,
+          "livePipelinesCreated": 0,
+          "liveTextureUploadBytes": 1132032,
+          "liveStagingUsedBytes": 6272478996,
+          "peakStagingUsedBytes": 2408128,
+          "preparationPauses": 0,
+          "automaticTimingResumes": 0,
+          "focusLost": false,
+          "wasmHeapGrowthBytes": 0
+        }
+      }
+    ]
+  },
+  "fountain": {
+    "labels": [
+      "Source identified",
+      "Native traced",
+      "Browser exercised"
+    ],
+    "scope": "Original CSS/SSS Mario/Mario entry, Ready/Go, first 30 gameplay frames and world unload on two application starts. Cold browser long tasks prevent a performance-pass claim.",
+    "local_path": "work/full-game/fountain-browser-entry-pair-v1/report.json",
+    "sha256": "88f8cd30b4a5481d94dca9ed8d0768d0c2ad937bd4a51b50f512810e8e0ba339",
+    "rounds": [
+      {
+        "round": "cold",
+        "result": "functional_entry_pass",
+        "first_frame": 0,
+        "last_frame": 30,
+        "timing_resumes": 0,
+        "metrics": {
+          "browser": "Active browser callbacks 337 \u00b7 worst callback interval 31.50 ms \u00b7 >33.3 ms 0 \u00b7 browser long tasks 2 (worst 68.00 ms)",
+          "native": "Native callbacks 355 \u00b7 worst active callback 14.84 ms \u00b7 >16.67 ms 0 \u00b7 >33.3 ms 0 \u00b7 first-use draws 3 (worst 14.84 ms) \u00b7 last phases p0.00 i0.02 s0.32 b0.12 d2.29 e1.70 ms (preparation excluded here and reported separately; full first-use/long callbacks in log)",
+          "construction": "Construction scene-prepare 1 \u00b7 scene-enter 1 \u00b7 scene-rebuild-step 1 \u00b7 scene-rebuild 1 \u00b7 match-enter-step 7 \u00b7 match-enter 1 \u00b7 worst 113.99 ms \u00b7 construct 113.99 ms \u00b7 preparations 4 (worst 218.64 ms; source entry/teardown separate) \u00b7 latest match-enter prep 218.64 ms (construct 114.05, wait/schedule 104.59) \u00b7 first draw 13.60 ms after 46.75 ms \u00b7 uploads 3384320 B \u00b7 pipelines q0/c0 \u00b7 pipeline settle 0.00 ms/0 callbacks \u00b7 native prep a19.30 c172.54 r26.96 ms/2 callbacks (CPU 1.90, max 1.85, uploads 0 B, pipelines q0/c0)",
+          "audio": "Audio queue 1301 frames \u00b7 underrun 0 frames \u00b7 stereo with original reverb/delay \u00b7 replacement DSP coefficients"
+        }
+      },
+      {
+        "round": "warm",
+        "result": "functional_entry_pass",
+        "first_frame": 0,
+        "last_frame": 30,
+        "timing_resumes": 0,
+        "metrics": {
+          "browser": "Active browser callbacks 328 \u00b7 worst callback interval 25.14 ms \u00b7 >33.3 ms 0 \u00b7 browser long tasks 0 (worst 0.00 ms)",
+          "native": "Native callbacks 345 \u00b7 worst active callback 7.74 ms \u00b7 >16.67 ms 0 \u00b7 >33.3 ms 0 \u00b7 first-use draws 3 (worst 6.02 ms) \u00b7 last phases p0.00 i0.03 s0.34 b0.12 d2.73 e2.06 ms (preparation excluded here and reported separately; full first-use/long callbacks in log)",
+          "construction": "Construction scene-prepare 1 \u00b7 scene-enter 1 \u00b7 scene-rebuild-step 1 \u00b7 scene-rebuild 1 \u00b7 match-enter-step 7 \u00b7 match-enter 1 \u00b7 worst 96.35 ms \u00b7 construct 96.35 ms \u00b7 preparations 4 (worst 184.78 ms; source entry/teardown separate) \u00b7 latest match-enter prep 184.78 ms (construct 89.28, wait/schedule 95.50) \u00b7 first draw 5.38 ms after 22.14 ms \u00b7 uploads 3384320 B \u00b7 pipelines q0/c0 \u00b7 pipeline settle 0.00 ms/0 callbacks \u00b7 native prep a17.77 c140.66 r26.48 ms/2 callbacks (CPU 1.00, max 0.97, uploads 0 B, pipelines q0/c0)",
+          "audio": "Audio queue 981 frames \u00b7 underrun 0 frames \u00b7 stereo with original reverb/delay \u00b7 replacement DSP coefficients"
+        }
+      }
+    ]
+  },
+  "seed": {
+    "sha256": "122eaece4fce109e9f2c958de8b0bb7315ccb670dab349eb2090da1f2fd589a6",
+    "bytes": 3121152,
+    "shader_records": 1,
+    "pipeline_records": 749,
+    "reviews": [
+      {
+        "local_path": "work/full-game/luigi-cache-review-v1.json",
+        "sha256": "3bdf5484e59351def894bc6e71986edde97d320a42d01355c2e566a040c23068"
+      },
+      {
+        "local_path": "work/full-game/fountain-cache-review-v1.json",
+        "sha256": "069b8f62b315d0cb129828ab746966da2e7e42613cd7e13106c82ffe81f79f2e"
+      }
+    ]
+  },
+  "native_evidence": [
+    {
+      "local_path": "work/full-game/luigi-fountain-native-build-v1.log",
+      "sha256": "247d638cd2e269f0c02507910cec8694c4301fcdf424f1d70bf21e09aedddc20"
+    },
+    {
+      "local_path": "work/full-game/luigi-fountain-native-build-v2.log",
+      "sha256": "098dd16ab9a3e91b44fe79f6808f7228d41c34d627fb74449840c445a2d177a1"
+    },
+    {
+      "local_path": "work/full-game/luigi-fountain-native-build-v3.log",
+      "sha256": "4db15c9f6a6a0ee502291f6b9c279e600076271e4c0a3995172b6d00b94e4c9b"
+    },
+    {
+      "local_path": "work/full-game/luigi-fountain-owner-tests-v1.log",
+      "sha256": "9cb6b7db94f41d1707e4fee24bcc2364f5c3e984ed209953a073f063c6dd08bc"
+    },
+    {
+      "local_path": "work/full-game/luigi-native-v4.log",
+      "sha256": "af019e882727def3d9dde0bb94f51c59d249f962d927b036ff833ba3b4b48ebb"
+    },
+    {
+      "local_path": "work/full-game/luigi-native-reverse-v2.log",
+      "sha256": "194734780fbdb2b8a9ce15b3fea6715d5ca82d1b4214d2c8604a649557294a1f"
+    },
+    {
+      "local_path": "work/full-game/fountain-native-v9.log",
+      "sha256": "dee01df309cdc923430c796a364d9675e2c9fea5b7a00f1bc16bf001a36b711e"
+    },
+    {
+      "local_path": "work/full-game/fountain-match-native-v1.log",
+      "sha256": "b65718a7e1af8beb8448df884e9b6d9245f2d4bf95332cfe8da9753773a589d5"
+    },
+    {
+      "local_path": "work/full-game/fountain-fd-regression-v2.log",
+      "sha256": "8e8fae586cdd815c27d68196f3a4d153e5e1f729232b2f0f4d01973ad00fe991"
+    },
+    {
+      "local_path": "work/full-game/fountain-battlefield-regression-v1.log",
+      "sha256": "e33c0824fd5688913b77b81f084fe0677dbf1032d690d0e2bd2c6575e27f158d"
+    },
+    {
+      "local_path": "work/full-game/fountain-story-regression-v1.log",
+      "sha256": "7800f24b81bb70166336983539734cde9e26333ce185c15609606c7a0a037f08"
+    },
+    {
+      "local_path": "work/full-game/fountain-dream-land-regression-v1.log",
+      "sha256": "aa98bdcc35989922d786c319fe1d345046045d2875a57168834c189545a933a5"
+    },
+    {
+      "local_path": "work/full-game/fountain-temple-regression-v2.log",
+      "sha256": "d27f6c404cd0586091314353ada938401f35986ee384ae8fc32847d3c6c52827"
+    }
+  ],
+  "original_regressions": [
+    {
+      "scope": "declared entry data, supplied inputs, fighter fields, RNG and match clock only; rendering, global PAD history, hardware and audio output are excluded",
+      "source_drawing": "excluded",
+      "frames_compared": 240,
+      "status": "declared_state_match",
+      "build_sha256": {
+        "js": "7f43ddeeda581f173840e369963a2c30c6051480dfa81bf6434e9f1055dd6c60",
+        "wasm": "818ccf94b9ae3beea3b1b4fee4c196fb7e05c8b331c6e51dad671bf3e14dfbba"
+      },
+      "local_path": "work/full-game/mario-fd-native-luigi-fountain-final-v1/core-comparison.json",
+      "sha256": "0218d6944b9ee6e3695116406b1e7fd84e6a1e8684760242bd155da61fe1e950"
+    },
+    {
+      "scope": "declared entry data, supplied inputs, fighter fields, RNG and match clock, PAD configuration and all three history banks only; rendering, hardware and audio output are excluded",
+      "source_drawing": "excluded",
+      "frames_compared": 603,
+      "status": "declared_state_match",
+      "build_sha256": {
+        "js": "7f43ddeeda581f173840e369963a2c30c6051480dfa81bf6434e9f1055dd6c60",
+        "wasm": "818ccf94b9ae3beea3b1b4fee4c196fb7e05c8b331c6e51dad671bf3e14dfbba"
+      },
+      "local_path": "work/full-game/ganondorf-native-luigi-fountain-final-v1/core-comparison.json",
+      "sha256": "8f3bec5547de5c81f5d1b644767bf971b0188c4c31a7cea57ec55ea058a7b3ad"
+    }
+  ],
+  "pikachu_pichu": {
+    "enabled": false,
+    "scope": "Shared exact 0xf8 attributes, six Article descriptor hydration/teardown cases, immutable DAT inputs and malformed/missing-model rejection. No live fighter/item gameplay claim.",
+    "local_path": "work/full-game/luigi-fountain-owner-tests-v1.log",
+    "sha256": "9cb6b7db94f41d1707e4fee24bcc2364f5c3e984ed209953a073f063c6dd08bc"
+  },
+  "retained_failure_reports": [
+    {
+      "local_path": "work/full-game/luigi-browser-discovery-v2/report.json",
+      "sha256": "d57e022a4a6353634ac1306adaaa5455ed59bb498152f754374030512aee9383"
+    },
+    {
+      "local_path": "work/full-game/fountain-browser-discovery-v1/report.json",
+      "sha256": "65d68a4dac6efc42df48df998267bbfa5677b88709ea6c2837b10b72da7d7359"
+    },
+    {
+      "local_path": "work/full-game/fountain-browser-discovery-v2/report.json",
+      "sha256": "ac63c37d472a4593d5dd8e1b406797369af1596c2fa72e4844dde0b3e28041cf"
+    },
+    {
+      "local_path": "work/full-game/fountain-browser-discovery-v3/report.json",
+      "sha256": "6b76218bb406c0163dcafbbded736dd95346c3a7e898fb6fcd805fa969bad700"
+    }
+  ],
+  "remaining_gates": [
+    "Independent drawn original comparisons for new content",
+    "Full action, costume, opponent and stage behavior coverage",
+    "Ordinary input and complete menu/match/Results loops",
+    "Pixels, emitted PCM, physical input and source scheduling",
+    "Cold/warm full-match and repeated-session performance",
+    "Remaining fighters, stages, items, rules, menus, save and single-player modes"
+  ]
+}

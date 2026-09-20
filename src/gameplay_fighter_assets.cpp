@@ -113,7 +113,8 @@ struct GameplayFighterAssets::Storage {
             costume_count,static_cast<uint32_t>(prototype.runtime().actions().size()),
             prototype.action_rows(),prototype.blend_rows(),prototype.wait_choices(),&unresolved);
         const bool link=id.fighter_kind==FTKIND_LINK||id.fighter_kind==FTKIND_CLINK;
-        const auto item_table=fighter->pointer(fighter_root+0x48,link?28:16);
+        const uint32_t item_table_bytes=link?28:id.fighter_kind==FTKIND_LUIGI?4:16;
+        const auto item_table=fighter->pointer(fighter_root+0x48,item_table_bytes);
         struct ItemIdentity { uint32_t index,kind; };
         std::array<ItemIdentity,6> item_identities{};
         size_t item_count=0;
@@ -146,6 +147,9 @@ struct GameplayFighterAssets::Storage {
             item_identities[item_count++]={4,static_cast<uint32_t>(attributes->x10)};
             if(id.fighter_kind==FTKIND_CLINK)
                 item_identities[item_count++]={5,static_cast<uint32_t>(It_Kind_CLink_Milk)};
+        } else if(id.fighter_kind==FTKIND_LUIGI) {
+            if(!item_table)throw DatError("Luigi item Article table is missing");
+            item_identities[item_count++]={0,static_cast<uint32_t>(It_Kind_Luigi_Fire)};
         } else if(id.fighter_kind==FTKIND_CAPTAIN || id.fighter_kind==FTKIND_GANON) {
             if(item_table)throw DatError("Captain-family source Article table must be null");
         } else if(id.fighter_kind!=18 && id.fighter_kind!=26) {

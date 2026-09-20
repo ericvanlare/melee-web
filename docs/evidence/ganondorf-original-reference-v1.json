@@ -1,0 +1,215 @@
+{
+  "date": "2026-09-20",
+  "evidence_level": "retail compared: independently repeated 603-frame original source pair and save-bound native declared-state prefix; not admission",
+  "exclusions": [
+    "Complete original match ending",
+    "Source-drawn equivalence",
+    "Gold admission",
+    "Human holdout",
+    "Emitted PCM and pixels",
+    "Performance",
+    "Physical input",
+    "Tournament or public acceptance"
+  ],
+  "final_checkpoint_refresh": {
+    "build": {
+      "js": "7f43ddeeda581f173840e369963a2c30c6051480dfa81bf6434e9f1055dd6c60",
+      "wasm": "818ccf94b9ae3beea3b1b4fee4c196fb7e05c8b331c6e51dad671bf3e14dfbba"
+    },
+    "core_report_path": "work/full-game/ganondorf-native-luigi-fountain-final-v1/core-comparison.json",
+    "core_report_sha256": "8f3bec5547de5c81f5d1b644767bf971b0188c4c31a7cea57ec55ea058a7b3ad",
+    "frames_compared": 603,
+    "gold_admitted": false,
+    "native_trace_path": "work/full-game/ganondorf-native-luigi-fountain-final-v1/trace.jsonl",
+    "native_trace_sha256": "8367811682b9fd293f46b911be62cf5b7dff17afb0b872c98bbb7e51c98984a6",
+    "performance": "not_evaluated",
+    "reason": "Rebuilt native target after the complete Luigi/Fountain implementation and the final Article presence/table-bound validation changes; unchanged original pair and save-bound recipe.",
+    "scope": "declared entry data, supplied inputs, fighter fields, RNG and match clock, PAD configuration and all three history banks only; rendering, hardware and audio output are excluded",
+    "source_drawing": "excluded",
+    "status": "declared_state_match"
+  },
+  "ground_light_refresh": {
+    "build": {
+      "javascript_sha256": "10ed5afbafee2f30b86c606c4acb4b4551a2a1381c612471abf43fbf11450ea7",
+      "wasm_sha256": "384e1b63eeca1929dce9350cfbffa3aed779a008b944d6ef1ae41b89bf2469ab"
+    },
+    "checks": [
+      "entry",
+      "supplied inputs",
+      "frame count",
+      "match clock",
+      "PAD state",
+      "RNG",
+      "fighter fields"
+    ],
+    "companion_mario_receipt_path": "work/full-game/mario-fd-native-ground-light-v1/receipt.json",
+    "companion_mario_receipt_sha256": "d7425177773affbec54cf3b2b707cb177365ebb6bfe9e3fd473be85a5314fcd4",
+    "core_report_path": "work/full-game/ganondorf-cpu-reference-source-v1/native-savebound-v4-ground-light-v1/core-comparison.json",
+    "core_report_sha256": "8f3bec5547de5c81f5d1b644767bf971b0188c4c31a7cea57ec55ea058a7b3ad",
+    "first_divergence": null,
+    "frames_compared": 603,
+    "gold_admitted": false,
+    "native_output_dir": "work/full-game/ganondorf-cpu-reference-source-v1/native-savebound-v4-ground-light-v1",
+    "native_trace_path": "work/full-game/ganondorf-cpu-reference-source-v1/native-savebound-v4-ground-light-v1/trace.jsonl",
+    "native_trace_rows": 607,
+    "native_trace_sha256": "8367811682b9fd293f46b911be62cf5b7dff17afb0b872c98bbb7e51c98984a6",
+    "reason": "Fresh save-bound v4 native run after Ground light/OnLoad lifecycle rebuild; original A/B and recipe were unchanged.",
+    "recipe_path": "work/full-game/ganondorf-cpu-reference-source-v1/ganondorf-mario-fd-rulefix5-prefix-savebound-v4.mwrc",
+    "recipe_sha256": "c243a108321784818c85caf950215cea4dc582f3995fc8957f722e14ef7e1ee5",
+    "scope": "Declared entry/input/fighter/RNG/match-clock/PAD/history fields only; rendering, hardware, audio output, drawn equivalence, complete ending and performance remain excluded.",
+    "status": "declared_state_match"
+  },
+  "legacy_v3_native_failure": {
+    "core_report_path": "work/full-game/ganondorf-cpu-reference-source-v1/native-rulefix5-prefix-run/core-comparison.json",
+    "core_report_sha256": "ad070264ed10af5b69380cfc8528e2fb1d9fed8ca91fa2fe5d7a2d1d24f04d70",
+    "first_divergence": {
+      "actual": 1246874497,
+      "expected": 1036156992,
+      "field": "rng",
+      "record": "match_enter_complete"
+    },
+    "later_fighter_divergence": {
+      "actual": 2,
+      "expected": 46,
+      "field": "fighters[1].animation",
+      "frame": 191
+    },
+    "native_trace_path": "work/full-game/ganondorf-cpu-reference-source-v1/native-rulefix5-prefix-run/trace.jsonl",
+    "native_trace_sha256": "d8f591b23367810c582616dd4578a957de7790654294ee7969919798a04fff57",
+    "recipe_path": "work/full-game/ganondorf-cpu-reference-source-v1/ganondorf-mario-fd-rulefix5-prefix.mwrc",
+    "recipe_sha256": "e6c807e8dbbb7d7c70d211fb14a4303f97857294724c50590823d3561d5f441f",
+    "recipe_version": 3,
+    "rng_reduction": {
+      "missing_pre_match_consumer": 1,
+      "native_consumers_before_initial": 8,
+      "receipt_path": "work/full-game/ganondorf-cpu-reference-source-v1/native-prefix-rng-reduction-rulefix5.json",
+      "receipt_sha256": "d713eca2ea1de3dee374ac02925d0e2dc98d1fb8bd0ecd5b998626d8d8db3fa1",
+      "source_consumers_before_initial": 9
+    },
+    "status": "diverged"
+  },
+  "original_source_repeatability": {
+    "captures": {
+      "a": {
+        "frames": 603,
+        "path": "work/full-game/ganondorf-cpu-reference-source-v1/reference-rulefix5-prefix-a.jsonl",
+        "sha256": "6b117b95f6c161a6e5ea86438a7386f451da178f4388c648866c68b7a47314b8"
+      },
+      "b": {
+        "frames": 603,
+        "path": "work/full-game/ganondorf-cpu-reference-source-v1/reference-rulefix5-prefix-b.jsonl",
+        "sha256": "73df66e8c651c043d58e1e7e30a67ff225e423cbb9d68319bff5ead7a9405d2d"
+      }
+    },
+    "source_core_fields": [
+      "entry",
+      "supplied inputs",
+      "frame count",
+      "match clock",
+      "PAD state",
+      "RNG",
+      "fighter fields"
+    ],
+    "source_core_repeatability": {
+      "path": "work/full-game/ganondorf-cpu-reference-source-v1/collector/rulefix5-core-comparison-ab.json",
+      "sha256": "8bcf711958edaf655ad98457b92adee0c4dfbba20ca362de3b3530925514f452",
+      "status": "repeatable"
+    },
+    "source_cpu_repeatability": {
+      "path": "work/full-game/ganondorf-cpu-reference-source-v1/collector/rulefix5-cpu-comparison-ab.json",
+      "sha256": "60a7aee7a0e4cb7549f5e8fef490f28b19457147de5e4b1fa9ef9e4a0d0857b6",
+      "status": "repeatable"
+    },
+    "source_cpu_sidecar_sha256": "e3a71a5a23da673c333e65463b35b763c4ff056c694d903f2134c86275030172",
+    "source_draw_audit_sha256": "d5d672f4b5a4d46a8b8189ef327415c21ddddb86812ba34a3032dc6a3c6de5ff"
+  },
+  "retained_cpu_sidecar_difference": {
+    "first_divergence": {
+      "actual": "46800000",
+      "expected": "46ea6000",
+      "field": "camera.far_bits",
+      "phase": "frame",
+      "tick": 1
+    },
+    "native_draw_rows": 0,
+    "report_path": "work/full-game/ganondorf-cpu-reference-source-v1/native-savebound-v4-prefix-run/cpu-comparison.json",
+    "report_sha256": "4ab5ea81cf65f0ca2f9f9fb5c74848abab929ff4b01a6b3ccfd7bebc89bdb562",
+    "scope": "headless CPU/camera/HUD sidecar; drawing rows excluded by the native harness",
+    "source_draw_rows": 603,
+    "status": "diverged"
+  },
+  "save_bound_v4_native_pass": {
+    "binding_tool": "scripts/bind_retail_save_profile.py",
+    "checks": [
+      "entry",
+      "supplied inputs",
+      "frame count",
+      "match clock",
+      "PAD state",
+      "RNG",
+      "fighter fields"
+    ],
+    "core_report_path": "work/full-game/ganondorf-cpu-reference-source-v1/native-savebound-v4-prefix-run/core-comparison.json",
+    "core_report_sha256": "8f3bec5547de5c81f5d1b644767bf971b0188c4c31a7cea57ec55ea058a7b3ad",
+    "frames_compared": 603,
+    "gold_admitted": false,
+    "input_payload_bytes": 27666,
+    "input_payload_preserved": true,
+    "input_payload_sha256": "c9c6176a1b0390093fd030f779460bfa81fc997a7b6246213f544652f4733a51",
+    "native_trace_path": "work/full-game/ganondorf-cpu-reference-source-v1/native-savebound-v4-prefix-run/trace.jsonl",
+    "native_trace_sha256": "8367811682b9fd293f46b911be62cf5b7dff17afb0b872c98bbb7e51c98984a6",
+    "profile_bytes": "07ff01c0",
+    "receipt_path": "work/full-game/ganondorf-cpu-reference-source-v1/native-savebound-v4-prefix-receipt.json",
+    "receipt_sha256": "b987fbdf15ee525b222b5e19d4f38e53033a97fbcc3f3102a2b78bb7303ab2b4",
+    "recipe_path": "work/full-game/ganondorf-cpu-reference-source-v1/ganondorf-mario-fd-rulefix5-prefix-savebound-v4.mwrc",
+    "recipe_sha256": "c243a108321784818c85caf950215cea4dc582f3995fc8957f722e14ef7e1ee5",
+    "recipe_sidecar_path": "work/full-game/ganondorf-cpu-reference-source-v1/ganondorf-mario-fd-rulefix5-prefix-savebound-v4.mwrc.json",
+    "recipe_sidecar_sha256": "78f757e0b2d331a0554daad5e1a0f9ad854133ad7e4e1de068539c1cf91ed91f",
+    "recipe_version": 4,
+    "status": "declared_state_match"
+  },
+  "save_fixture": {
+    "decoder": "tools/retail_save_profile.py read_save_profile; SHA and HSD block checksum verified",
+    "gci_path": "work/full-game/fresh-sss-pinned-v1/run-40532/user/GC/USA/Card A/01-GALE-SuperSmashBros0110290334.gci",
+    "gci_sha256": "5ff16535045fed369206141dd326ec6f72519de69d6661ccfa7766341fdc0aed",
+    "source_setup_evidence": "work/full-game/fresh-sss-pinned-v1/run-46924/rulefix-driver-receipt.json",
+    "unlocked_characters": "0x07ff",
+    "unlocked_stages": "0x01c0"
+  },
+  "scenario": {
+    "entry_seed": 2558684185,
+    "frames": 603,
+    "items": "OFF",
+    "match_kind": 1,
+    "mode": "STOCK",
+    "p1": {
+      "controller": 1,
+      "costume": 0,
+      "kind": 25,
+      "name": "Ganondorf",
+      "player_type": "human",
+      "raw_pad_authored": true
+    },
+    "p2": {
+      "controller": 2,
+      "costume": 1,
+      "cpu_kind": 4,
+      "cpu_level": 1,
+      "kind": 8,
+      "name": "Mario",
+      "pad_mode": "neutral",
+      "player_type": "CPU"
+    },
+    "pause": "ON",
+    "source_match_enter_complete_rng": 1036156992,
+    "stage": {
+      "kind": 32,
+      "name": "Final Destination"
+    },
+    "stock_time_limit": 1,
+    "stocks": 2
+  },
+  "schema": "melee-web-ganondorf-original-reference-v1",
+  "source_revision": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+  "version": 1
+}

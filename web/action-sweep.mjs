@@ -127,6 +127,20 @@ const captain=[
   aerialSpecial('Falcon Kick (air)',[[359,360]],0,-80),
 ];
 
+// Green Missile keeps the source RNG choice between ordinary and misfire
+// releases. These are entry/release recipes, not forced misfire coverage.
+const luigi=[
+  ground('Fireball',[[341,341]],input(1,PAD.B),input(150)),
+  aerialSpecial('Fireball (air)',[[342,342]]),
+  ground('Green Missile charge/release',[[343,344],[345,348]],input(45,PAD.B,80),input(300)),
+  {name:'Green Missile (air)',expect:[[349,350],[351,354]],settle:true,
+    inputs:[input(2,PAD.X),input(4),input(18,PAD.B,80),input(300)]},
+  ground('Super Jump Punch',[[355,355]],input(1,PAD.B,0,80),input(240)),
+  aerialSpecial('Super Jump Punch (air)',[[356,356]],0,80),
+  ground('Luigi Cyclone',[[357,357]],input(1,PAD.B,0,-80),input(180)),
+  aerialSpecial('Luigi Cyclone (air)',[[358,358]],0,-80),
+];
+
 export const actionInventories=new Map([
  [18,{id:'marth-visible-actions-v1',fighter:'Marth',minimumStageFrames:4200,cases:[...common,...wavedashes,...marth]}],
  [21,{id:'dr-mario-visible-actions-v1',fighter:'Dr. Mario',minimumStageFrames:4800,cases:[...common,...wavedashes,...drMario]}],
@@ -135,6 +149,7 @@ export const actionInventories=new Map([
  [20,{id:'young-link-visible-actions-v1',fighter:'Young Link',minimumStageFrames:4800,cases:[...common,...wavedashes,...link]}],
  [25,{id:'ganondorf-visible-actions-v1',fighter:'Ganondorf',minimumStageFrames:5200,cases:[...common,...ganon]}],
  [2,{id:'captain-falcon-visible-actions-v1',fighter:'Captain Falcon',minimumStageFrames:5200,cases:[...common,...captain]}],
+ [17,{id:'luigi-visible-actions-v1',fighter:'Luigi',minimumStageFrames:5200,cases:[...common,...luigi]}],
 ]);
 
 export function actionInventory(fighterKind){return actionInventories.get(fighterKind)||null;}

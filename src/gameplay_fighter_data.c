@@ -1,9 +1,12 @@
 #include "gameplay_fighter_data.h"
 #include "fighter_attributes.h"
+#include "gameplay_pikachu_schema.h"
 #include "gameplay_article_data.h"
 #include <melee/ft/types.h>
 #include <melee/ft/kinds/ftMario/types.h>
 #include <melee/ft/kinds/ftLuigi/types.h>
+#include <melee/ft/kinds/ftPikachu/types.h>
+#include <melee/ft/kinds/ftPichu/types.h>
 #include <melee/ft/kinds/ftFox/types.h>
 #include <melee/ft/kinds/ftCaptain/types.h>
 #include <melee/ft/kinds/ftMars/types.h>
@@ -20,6 +23,59 @@ _Static_assert(sizeof(Counted) == 8, "Visibility descriptor ABI");
 _Static_assert(sizeof(ftLk_DatAttrs) == 0xDC, "Link extension ABI");
 _Static_assert(sizeof(ftCaptain_DatAttrs) == 0x8C, "Captain/Ganon extension ABI");
 _Static_assert(sizeof(ftLuigiAttributes) == MELEE_WEB_LUIGI_ATTRIBUTE_BYTES, "Luigi extension ABI");
+_Static_assert(sizeof(ftPikachuAttributes) == MELEE_WEB_PIKACHU_ATTRIBUTE_BYTES,
+               "Pikachu/Pichu shared extension ABI");
+#define CHECK_PIKACHU_SOURCE_F32(value) _Generic((value), float: 1, default: 0)
+#define CHECK_PIKACHU_SOURCE_I32(value) \
+    _Generic((value), signed char: (sizeof(value) == sizeof(int32_t)), \
+             short: (sizeof(value) == sizeof(int32_t)), \
+             int: (sizeof(value) == sizeof(int32_t)), \
+             long: (sizeof(value) == sizeof(int32_t)), \
+             long long: (sizeof(value) == sizeof(int32_t)), default: 0)
+#define CHECK_PIKACHU_SOURCE_U32(value) \
+    _Generic((value), unsigned char: (sizeof(value) == sizeof(uint32_t)), \
+             unsigned short: (sizeof(value) == sizeof(uint32_t)), \
+             unsigned int: (sizeof(value) == sizeof(uint32_t)), \
+             unsigned long: (sizeof(value) == sizeof(uint32_t)), \
+             unsigned long long: (sizeof(value) == sizeof(uint32_t)), default: 0)
+#define CHECK_PIKACHU_SOURCE_ITEM(value) _Generic((value), ItemKind: 1, default: 0)
+#define CHECK_PIKACHU_PORTABLE_F32(value) _Generic((value), float: 1, default: 0)
+#define CHECK_PIKACHU_PORTABLE_I32(value) _Generic((value), int32_t: 1, default: 0)
+#define CHECK_PIKACHU_PORTABLE_U32(value) _Generic((value), uint32_t: 1, default: 0)
+#define CHECK_PIKACHU_PORTABLE_ITEM(value) _Generic((value), int32_t: 1, default: 0)
+#define CHECK_PIKACHU_PORTABLE_TYPE(type, value) CHECK_PIKACHU_PORTABLE_TYPE_IMPL(type, value)
+#define CHECK_PIKACHU_PORTABLE_TYPE_IMPL(type, value) CHECK_PIKACHU_PORTABLE_##type(value)
+#define CHECK_PIKACHU_SOURCE_TYPE(type, value) CHECK_PIKACHU_SOURCE_TYPE_IMPL(type, value)
+#define CHECK_PIKACHU_SOURCE_TYPE_IMPL(type, value) CHECK_PIKACHU_SOURCE_##type(value)
+#define CHECK_PIKACHU(offset,type,name,original,component,source) \
+    _Static_assert(offsetof(ftPikachuAttributes, original) + component == offset, \
+                   "Pikachu source attribute offset"); \
+    _Static_assert(offsetof(MeleeWebPikachuAttributes, name) == offset, \
+                   "Pikachu portable attribute offset"); \
+    _Static_assert(sizeof(((ftPikachuAttributes*)0)->source) == \
+                   sizeof(MELEE_WEB_PIKACHU_TYPE_##type), \
+                   "Pikachu source attribute width"); \
+    _Static_assert(sizeof(((MeleeWebPikachuAttributes*)0)->name) == \
+                   sizeof(MELEE_WEB_PIKACHU_TYPE_##type), \
+                   "Pikachu portable attribute width"); \
+    _Static_assert(CHECK_PIKACHU_SOURCE_TYPE(type, ((ftPikachuAttributes*)0)->source), \
+                   "Pikachu source attribute type"); \
+    _Static_assert(CHECK_PIKACHU_PORTABLE_TYPE(type, ((MeleeWebPikachuAttributes*)0)->name), \
+                   "Pikachu portable attribute type");
+MELEE_WEB_PIKACHU_ATTRIBUTE_FIELDS(CHECK_PIKACHU)
+#undef CHECK_PIKACHU
+#undef CHECK_PIKACHU_SOURCE_TYPE_IMPL
+#undef CHECK_PIKACHU_SOURCE_TYPE
+#undef CHECK_PIKACHU_PORTABLE_TYPE_IMPL
+#undef CHECK_PIKACHU_PORTABLE_TYPE
+#undef CHECK_PIKACHU_PORTABLE_U32
+#undef CHECK_PIKACHU_PORTABLE_I32
+#undef CHECK_PIKACHU_PORTABLE_F32
+#undef CHECK_PIKACHU_PORTABLE_ITEM
+#undef CHECK_PIKACHU_SOURCE_ITEM
+#undef CHECK_PIKACHU_SOURCE_U32
+#undef CHECK_PIKACHU_SOURCE_I32
+#undef CHECK_PIKACHU_SOURCE_F32
 #define CHECK_LUIGI_SOURCE_F32(value) _Generic((value), float: 1, default: 0)
 #define CHECK_LUIGI_SOURCE_I32(value) \
     _Generic((value), signed char: (sizeof(value) == sizeof(int32_t)), \
@@ -111,7 +167,7 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     REQUIRE(kind==FTKIND_MARIO || kind==FTKIND_DRMARIO || kind==FTKIND_FOX ||
         kind==FTKIND_FALCO || kind==FTKIND_MARS || kind==FTKIND_EMBLEM ||
         kind==FTKIND_LINK || kind==FTKIND_CLINK || kind==FTKIND_CAPTAIN || kind==FTKIND_GANON ||
-        kind==FTKIND_LUIGI,
+        kind==FTKIND_LUIGI || kind==FTKIND_PIKACHU || kind==FTKIND_PICHU,
         "Native fighter extension schema unavailable");
     REQUIRE(costumes>0 && costumes<=16,"Native costume count exceeds checked bound");
     REQUIRE(motion_count>0 && motion_count<=1024,"Native motion count exceeds checked bound");
@@ -123,6 +179,7 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
 #define READ_F32(o) floating(r,o)
 #define READ_I32(o) ((int32_t)WORD(o))
 #define READ_U32(o) WORD(o)
+#define READ_ITEM(o) ((int32_t)WORD(o))
 #define READ_U8(o) BYTE(o)
 #define READ_PTR32(o) ((void*)(uintptr_t)READ_U32(o))
 #define CO(o,t,n,orig) d->x0->orig=READ_##t(at+o);
@@ -164,6 +221,16 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
 #define LUIGI(o,t,n,orig) luigi->orig=READ_##t(at+o);
         MELEE_WEB_LUIGI_ATTRIBUTE_FIELDS(LUIGI)
 #undef LUIGI
+    } else if(kind==FTKIND_PIKACHU || kind==FTKIND_PICHU) {
+        /* Pichu's local header is a sparse wrapper, but ftPc_Init_OnLoad
+         * calls ftPk_Init_OnLoadForPichu and all shared special callbacks
+         * consume this complete source record. Keep one exact ABI and retain
+         * the family-specific item words from each DAT. */
+        at=required(r,root+4,MELEE_WEB_PIKACHU_ATTRIBUTE_BYTES);
+        ftPikachuAttributes* pikachu=NEW(ftPikachuAttributes,1); d->ext_attr=pikachu;
+#define PIKACHU(o,t,n,original,component,source) pikachu->source=READ_##t(at+o);
+        MELEE_WEB_PIKACHU_ATTRIBUTE_FIELDS(PIKACHU)
+#undef PIKACHU
     } else if(kind==FTKIND_CAPTAIN || kind==FTKIND_GANON) {
         at=required(r,root+4,0x8C); ftCaptain_DatAttrs* captain=NEW(ftCaptain_DatAttrs,1); d->ext_attr=captain;
 #define CAPTAIN(o,t,n,orig) captain->orig=READ_##t(at+o);
@@ -330,7 +397,8 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     REQUIRE(d->x58->x0<140 && d->x58->x1<140 && d->x58->x8<140 && d->x58->x9<140 &&
         d->x58->x10<140 && d->x58->x11<140,"Native IK bone index invalid");
     const unsigned item_slots=(kind==FTKIND_LINK||kind==FTKIND_CLINK)?7:
-                               kind==FTKIND_LUIGI?1:4;
+                               kind==FTKIND_LUIGI?1:
+                               (kind==FTKIND_PIKACHU||kind==FTKIND_PICHU)?3:4;
     /* Fixed native capacity bounds the shared accessor for every admitted
      * family; only the exact source extent is read and remaining slots stay
      * null. Slot 6 is a Link joint, never an Article. */
@@ -349,7 +417,9 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
             if(i==6) {
                 REQUIRE((kind==FTKIND_LINK||kind==FTKIND_CLINK)&&p!=UINT32_MAX,
                     "Link part descriptor is missing");
-            } else if(p!=UINT32_MAX) d->x48_items[i]=melee_web_article_decode(r,p,&article_unresolved);
+            } else if(p!=UINT32_MAX && kind!=FTKIND_PIKACHU && kind!=FTKIND_PICHU) {
+                d->x48_items[i]=melee_web_article_decode(r,p,&article_unresolved);
+            }
         }
     }
     if(kind==FTKIND_MARIO)
@@ -370,6 +440,9 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     else if(kind==FTKIND_LUIGI)
         REQUIRE(at!=UINT32_MAX && d->x48_items[0],
             "Luigi OnLoad requires its fire Article identity");
+    else if(kind==FTKIND_PIKACHU || kind==FTKIND_PICHU)
+        REQUIRE(at!=UINT32_MAX,
+            "Pikachu-family Article roots require a separate checked item owner");
     else if(kind==FTKIND_CAPTAIN || kind==FTKIND_GANON)
         REQUIRE(at==UINT32_MAX, "Captain-family source ftData Article table is not null");
     else
@@ -379,7 +452,8 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     for(unsigned i=0;i<sizeof(ready)/sizeof(ready[0]);++i) {
         /* Keep the Link part descriptor unresolved until its source HSD_Joint
          * has been converted to the native 32-bit descriptor ABI. */
-        if(ready[i]==18 && (kind==FTKIND_LINK||kind==FTKIND_CLINK)) continue;
+        if(ready[i]==18 && (kind==FTKIND_LINK||kind==FTKIND_CLINK||
+                            kind==FTKIND_PIKACHU||kind==FTKIND_PICHU)) continue;
         *unresolved &= ~(1U<<ready[i]);
     }
     if(actions) *unresolved &= ~(1U<<3);

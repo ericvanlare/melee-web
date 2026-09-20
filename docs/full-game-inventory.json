@@ -20,7 +20,7 @@
     "limitations": [
       "Version 1 decomposes the 26 playable CharacterKind identities and 31 named VS-stage slots. Items, mode-specific entities and service categories still require source-identity decomposition before they can serve as a fine-grained completion list.",
       "Statuses are scoped observations, not percentages. A source path, parser, compile, synthetic scene, short prefix or recorded-queue comparison does not by itself pass browser gameplay, retail equivalence, pixels, PCM, input latency or performance.",
-      "The current bounded integration is eight fighter identities and four stages with partial claims only; it does not imply complete moves, costumes, CPU, four-player local input, audio, results, save progression or mode coverage.",
+      "The eight-fighter/four-stage starting baseline and every added development candidate have partial claims only; source integration does not imply complete moves, costumes, CPU, four-player local input, audio, results, save progression or mode coverage.",
       "The fine-grained VS-stage census covers named StKind values from St_Kind_Izumi through St_Kind_Last; Dummy/Test and route, minigame and other mode-only stage slots remain represented by the aggregate stage rows until their callers are decomposed.",
       "STATUS.md remains the changing evidence index. This inventory links stable evidence documents and receipts without copying measurements from STATUS.md.",
       "Missing or untested behavior stays represented as not_integrated or not_evaluated until an owner records the required source, browser and reference gates."
@@ -167,7 +167,7 @@
         "docs/CAPTAIN_PORT_NOTES.md",
         "docs/evidence/captain-development-v1.json"
       ],
-      "next_step": "Run visible source CSS/SSS and the versioned action inventory, then independent original comparison; interaction and item branches remain open.",
+      "next_step": "Native lifecycles and scoped cold/warm 30-case browser action sweeps pass. Complete independent original comparison and the remaining interaction, item, costume and full-fighter gates.",
       "issue": null
     },
     {
@@ -351,7 +351,7 @@
       "id": "fighter-luigi",
       "category": "fighters",
       "title": "Luigi selectable fighter",
-      "implementation": "not_integrated",
+      "implementation": "partial",
       "acceptance": "not_evaluated",
       "source_identity": {
         "ckind": "CKIND_LUIGI",
@@ -374,7 +374,7 @@
         "docs/ACCURACY_CONTRACT.md",
         "docs/LUIGI_PORT_NOTES.md"
       ],
-      "next_step": "Exact attributes and source ABI checks pass; integrate the Luigi fire Article, nullable guard pose, effect/audio and action owners before real native construction. Luigi remains disabled.",
+      "next_step": "Add independent original comparison and remaining move/interaction/lifecycle coverage. Native costumes and both player orders pass; refreshed 30-case cold/warm browser sweeps after the shared light correction pass 10,400 frames with zero hard failures. Earlier discovery failures remain retained.",
       "issue": null
     },
     {
@@ -528,7 +528,7 @@
       "id": "fighter-pikachu",
       "category": "fighters",
       "title": "Pikachu selectable fighter",
-      "implementation": "not_integrated",
+      "implementation": "partial",
       "acceptance": "not_evaluated",
       "source_identity": {
         "ckind": "CKIND_PIKACHU",
@@ -548,9 +548,10 @@
       ],
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
-        "docs/ACCURACY_CONTRACT.md"
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/PIKACHU_PICHU_PORT_NOTES.md"
       ],
-      "next_step": "Run the fighter checkpoint for Pikachu and split its costume, action, article, effect and audio coverage into bounded receipts.",
+      "next_step": "Integrate the three source Article registrations with the fighter asset owner after the passing shared 0xf8 attribute and six-Article descriptor probes, then hydrate costumes/effects/actions/audio and verify native lifecycles before enabling either fighter.",
       "issue": null
     },
     {
@@ -858,7 +859,7 @@
       "id": "fighter-pichu",
       "category": "fighters",
       "title": "Pichu selectable fighter",
-      "implementation": "not_integrated",
+      "implementation": "partial",
       "acceptance": "not_evaluated",
       "source_identity": {
         "ckind": "CKIND_PICHU",
@@ -878,9 +879,10 @@
       ],
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
-        "docs/ACCURACY_CONTRACT.md"
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/PIKACHU_PICHU_PORT_NOTES.md"
       ],
-      "next_step": "Run the fighter checkpoint for Pichu and split its costume, action, article, effect and audio coverage into bounded receipts.",
+      "next_step": "Integrate the three source Article registrations with the fighter asset owner after the passing shared 0xf8 attribute and six-Article descriptor probes, then hydrate costumes/effects/actions/audio and verify native lifecycles before enabling either fighter.",
       "issue": null
     },
     {
@@ -907,9 +909,10 @@
       ],
       "evidence": [
         "docs/GANONDORF_PORT_NOTES.md",
-        "docs/evidence/ganondorf-development-v1.json"
+        "docs/evidence/ganondorf-development-v1.json",
+        "docs/evidence/ganondorf-original-reference-v1.json"
       ],
-      "next_step": "Complete the independent original comparison and interaction corpus, then extend the passing authored cold/warm pair across costumes, opponents and the remaining full-fighter gates.",
+      "next_step": "Extend the independently repeated 603-frame save-bound native declared-state match to an exact drawn comparison and complete original ending; retain the headless camera mismatch, legacy unbound save-profile failure and broad content/performance exclusions.",
       "issue": null
     },
     {
@@ -1140,7 +1143,7 @@
       "id": "stage-fountain-of-dreams",
       "category": "stages",
       "title": "Fountain of Dreams VS stage",
-      "implementation": "not_integrated",
+      "implementation": "partial",
       "acceptance": "not_evaluated",
       "source_identity": {
         "stkind": "St_Kind_Izumi",
@@ -1164,7 +1167,7 @@
         "docs/ACCURACY_CONTRACT.md",
         "docs/FOUNTAIN_OF_DREAMS_PORT_NOTES.md"
       ],
-      "next_step": "Source contract and isolated yakumono decoder checks pass; integrate source map callbacks, dynamic collision, reflection, effects and lifetime ownership before enabling Fountain.",
+      "next_step": "Extend the passing cold/warm CSS/SSS, Ready and 30-frame browser entry into the full stage/action matrix and independent original comparison. Two 7,200-tick native stage lifetimes and repeated match lifecycles pass. Cold entry retains two browser long tasks; pixels, PCM, ordinary-input loops and full performance gates remain open.",
       "issue": null
     },
     {

@@ -58,7 +58,7 @@ class SelectedTraceBuildTests(unittest.TestCase):
         lock = {"repositories": {}, "emscripten": "6.0.9"}
         generated = root / "build/gameplay-source/src"
         traces = ("gameplay_content_match_trace", "gameplay_stage_battlefield_trace",
-                  "gameplay_stage_temple_trace")
+                  "gameplay_stage_temple_trace", "gameplay_stage_fountain_trace")
         with patch.object(BUILD, "read_lock", return_value=lock), \
                 patch.object(BUILD, "verify_sources"), \
                 patch.object(BUILD, "prepare_sources", return_value=generated), \

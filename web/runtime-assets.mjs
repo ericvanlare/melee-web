@@ -44,6 +44,7 @@ export const NATIVE_GAME_DISC_FILES=Object.freeze({
   'EfMsData.dat':'EfMsData.dat','mars.ssm':'audio/us/mars.ssm',
   'GrOp.dat':'GrOp.dat','old_kb.hps':'audio/old_kb.hps','pupupu.ssm':'audio/us/pupupu.ssm',
   'GrSh.dat':'GrSh.dat','shrine.hps':'audio/shrine.hps','akaneia.hps':'audio/akaneia.hps',
+  'GrIz.dat':'GrIz.dat','izumi.hps':'audio/izumi.hps',
   // Dr. Mario (source FighterKind 0x15) borrows Mario's effect bank but owns
   // its own fighter, action and costume archives and voice bank.
   'PlDr.dat':'PlDr.dat','PlDrAJ.dat':'PlDrAJ.dat',
@@ -73,6 +74,9 @@ export const NATIVE_GAME_DISC_FILES=Object.freeze({
   'PlGnNr.dat':'PlGnNr.dat','PlGnRe.dat':'PlGnRe.dat','PlGnBu.dat':'PlGnBu.dat',
   'PlGnGr.dat':'PlGnGr.dat','PlGnLa.dat':'PlGnLa.dat',
   'EfGnData.dat':'EfGnData.dat','ganon.ssm':'audio/us/ganon.ssm',
+  'PlLg.dat':'PlLg.dat','PlLgAJ.dat':'PlLgAJ.dat','PlLgNr.dat':'PlLgNr.dat',
+  'PlLgWh.dat':'PlLgWh.dat','PlLgAq.dat':'PlLgAq.dat','PlLgPi.dat':'PlLgPi.dat',
+  'EfLgData.dat':'EfLgData.dat','luigi.ssm':'audio/us/luigi.ssm',
 });
 export function loadNativeGameDisc(file,report=()=>{}) {
   return loadDiscBundle(file,report,NATIVE_GAME_DISC_FILES);

@@ -127,6 +127,13 @@ void verify_common_appeals(std::shared_ptr<const DatArchive> archive, const Byte
         check(store.runtime().commands(motion).has_value() == source_has_command,
               "Common appeal source command presence changed");
     }
+    if (costume.fighter_kind == 17) {
+        for (unsigned motion = 295; motion <= 311; ++motion) {
+            check(store.command_ready(motion), "Luigi self-motion command graph is not admitted");
+            check(store.runtime().commands(motion).has_value(),
+                  "Luigi self-motion command root is not retained");
+        }
+    }
     check(action_test_common_appeals(store.action_rows(), expected_command_mask),
           "Common appeal rows did not retain checked command storage or were given the sentinel");
 }
@@ -237,6 +244,8 @@ int main(int argc, char** argv)
                 std::cout << "Owned common appeal action rows 239/240: passed\n";
             if (kinds.contains(0))
                 std::cout << "Local Mario Wait2/3/6 source command traces and startup clips: passed\n";
+            if (kinds.contains(17))
+                std::cout << "Luigi kind 17 authored self-motion command rows 295/311: passed\n";
         }
     } catch (const std::exception& e) { std::cerr << e.what() << '\n'; return 1; }
 }

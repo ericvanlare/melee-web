@@ -130,6 +130,24 @@ for(const id of [367,368,369,371])if(!hasExpectation(roy,id,id))process.exit(6);
             cwd=ROOT, check=True,
         )
 
+    def test_luigi_visible_inventory_keeps_distinct_source_moves(self):
+        script = """
+import assert from 'node:assert/strict';
+import {actionInventory} from './web/action-sweep.mjs';
+const inventory=actionInventory(17);
+assert.equal(inventory.id,'luigi-visible-actions-v1');
+assert.equal(inventory.cases.length,30);
+assert.equal(inventory.minimumStageFrames,5200);
+const moves=new Map(inventory.cases.map(item=>[item.name,item]));
+for(const [name,id] of [['Fireball',341],['Fireball (air)',342],
+  ['Super Jump Punch',355],['Super Jump Punch (air)',356],
+  ['Luigi Cyclone',357],['Luigi Cyclone (air)',358]])
+  assert.deepEqual(moves.get(name).expect,[[id,id]]);
+assert.deepEqual(moves.get('Green Missile charge/release').expect,[[343,344],[345,348]]);
+assert.deepEqual(moves.get('Green Missile (air)').expect,[[349,350],[351,354]]);
+"""
+        subprocess.run(["node", "--input-type=module", "-e", script],cwd=ROOT,check=True)
+
     def test_link_and_young_link_visible_action_inventories_use_source_ids(self):
         script = """
 import {actionInventory} from './web/action-sweep.mjs';

@@ -91,6 +91,21 @@ class GameplayFighterDataTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 self.assertIn("Native Captain extension, six-costume bounds, zero dynamics and null Article table: passed",
                               result.stdout)
+                pikachu_asset = ROOT / "assets-local/full-game-pikachu/PlPk.dat"
+                pikachu_container = ROOT / "assets-local/full-game-pikachu/PlPkAJ.dat"
+                pichu_asset = ROOT / "assets-local/full-game-pichu/PlPc.dat"
+                pichu_container = ROOT / "assets-local/full-game-pichu/PlPcAJ.dat"
+                if all(path.is_file() for path in (pikachu_asset, pikachu_container,
+                                                   pichu_asset, pichu_container)):
+                    args.extend((str(pikachu_asset), str(pikachu_container),
+                                 str(pichu_asset), str(pichu_container)))
+                    result = subprocess.run([str(node), str(output), *args], cwd=directory, env=env,
+                                            capture_output=True, text=True, timeout=30)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertIn("Native Pikachu shared 0xf8 attributes and explicit Article boundary: passed",
+                                  result.stdout)
+                    self.assertIn("Native Pichu shared 0xf8 attributes and explicit Article boundary: passed",
+                                  result.stdout)
             print(result.stdout, end="")
 
 

@@ -10,6 +10,7 @@
 #include <dolphin/vi.h>
 #include <sysdolphin/baselib/devcom.h>
 #include <stdatomic.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -25,6 +26,33 @@ BOOL OSRestoreInterrupts(BOOL level){int previous=interrupts_enabled;interrupts_
 void DCFlushRange(void* addr,u32 bytes){(void)addr;(void)bytes;atomic_signal_fence(memory_order_seq_cst);}
 void DCInvalidateRange(void* addr,u32 bytes){(void)addr;(void)bytes;atomic_signal_fence(memory_order_seq_cst);}
 void DCFlushRangeNoSync(void* addr,u32 bytes){(void)addr;(void)bytes;atomic_signal_fence(memory_order_seq_cst);}
+
+/* Aurora's SDK declarations are weak and its host implementation is disabled.
+ * Keep the original variadic ABI and route diagnostics to the process stream so
+ * source OSReport/OSPanic calls retain their format arguments and fail loudly. */
+void OSVReport(const char* msg,va_list args)
+{
+    if(msg) vfprintf(stderr,msg,args);
+    fflush(stderr);
+}
+void OSReport(const char* msg,...)
+{
+    va_list args;
+    va_start(args,msg);
+    OSVReport(msg,args);
+    va_end(args);
+}
+void OSPanic(const char* file,int line,const char* msg,...)
+{
+    va_list args;
+    fprintf(stderr,"PANIC %s:%d: ",file?file:"<unknown>",line);
+    va_start(args,msg);
+    if(msg) vfprintf(stderr,msg,args);
+    va_end(args);
+    fputc('\n',stderr);
+    fflush(stderr);
+    abort();
+}
 
 _Noreturn void melee_web_platform_unavailable(const char* operation)
 {

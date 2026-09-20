@@ -14,8 +14,10 @@ advancing Ganondorf gameplay. A reviewed 37-pipeline preload correction clears
 the 30-case, 5,200-frame drawn sweep with no hard timing/audio/pipeline failures;
 earlier cold failures remain retained. A following cold/warm pair passes all
 10,400 source frames with the same zero-failure counters at 640×480, DPR 1.
-Original comparison and broader acceptance remain open;
-see [Ganondorf scope and remaining gates](docs/GANONDORF_PORT_NOTES.md).
+An independently repeated original pair now matches all 603 declared native
+state updates after binding the actual save unlock profile. The legacy unbound
+recipe failure and headless camera mismatch remain retained; drawn comparison,
+complete ending and broader acceptance are open. See [Ganondorf scope and remaining gates](docs/GANONDORF_PORT_NOTES.md).
 Captain Falcon now passes native source lifecycles in both Captain/Mario player
 orders and all six costumes on Final Destination, including specials, stock
 loss/respawn, pause and repeated teardown. The integration preserves his
@@ -34,12 +36,30 @@ reaches advancing Temple gameplay, retaining an entry timing failure; a reviewed
 timing resumes. A cold startup long task remains visible, and the full action
 matrix and original comparison remain open; see
 [Temple evidence](docs/HYRULE_TEMPLE_PORT_NOTES.md).
-Luigi has a checked attribute ABI and real-archive regression; Fountain of
-Dreams has a source contract and checked scalar stage-parameter decoder. Both
-remain disabled while their runtime owners are unfinished.
-The current Captain/Temple checkpoint passes both Release builds and 1,060 tests
-in 284.594 seconds with 41 explicit skips; see
-[checkpoint validation](docs/evidence/full-game-checkpoint-captain-temple-v1.json).
+Luigi now passes native source lifecycles in both player orders and all four
+authored costumes. The selected-player fixture observes ground/aerial Fireball
+Articles, special-move entries, pause and repeated teardown. All 30 browser
+action cases pass over 5,200 drawn frames, retaining timing, audio and four
+live-pipeline failures. A reviewed six-descriptor preload update clears both
+5,200-frame cold/warm sweeps with zero hard failures. A fresh pair after the
+shared stage-light lifecycle correction also passes all 10,400 frames with
+zero hard failures; see [Luigi's evidence](docs/LUIGI_PORT_NOTES.md).
+Fountain of Dreams now reaches original map, reflection and star construction.
+Its shared changes preserve animated-light storage, exact reflection image
+identity and multiple map objects sharing one camera. Two 7,200-tick native scheduler
+and teardown lifetimes now pass, including moving collision and animated
+lights. Cold/warm browser entry now completes Ready/Go and 30 gameplay frames
+after a reviewed 28-pipeline preload correction. The cold run retains two
+browser long tasks; this is a functional-entry result, not a performance pass. See
+[Fountain's scope](docs/FOUNTAIN_OF_DREAMS_PORT_NOTES.md).
+Pikachu and Pichu have checked shared attributes and six Article descriptors,
+including immutable-input and missing-model rejection tests. They remain
+disabled pending fighter asset, effect, action and lifecycle integration; see
+[their current boundary](docs/PIKACHU_PICHU_PORT_NOTES.md).
+The Luigi/Fountain checkpoint passes both Release builds and 1,070 tests
+in 298.028 seconds with 41 explicit skips. The receipt names the exact browser
+build, the later Article validation guard, reference scope and retained failures;
+see [checkpoint validation](docs/evidence/full-game-checkpoint-luigi-fountain-v1.json).
 Results PR #44 and audio PR #42 remain separate draft dependencies. This branch
 work has not changed the deployed public alpha.
 

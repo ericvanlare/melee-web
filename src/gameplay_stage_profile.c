@@ -5,14 +5,17 @@
 #include <melee/gr/grstory.h>
 #include <melee/gr/groldpupupu.h>
 #include <melee/gr/grshrine.h>
+#include <melee/gr/grizumi.h>
 #include "gameplay_stage_story.h"
 #include "gameplay_stage_dream_land.h"
+#include "gameplay_stage_fountain.h"
 
 extern void* melee_web_grlast_exchange_yakumono(void*);
 extern void* melee_web_grbattle_exchange_yakumono(void*);
 extern void* melee_web_grstory_exchange_yakumono(void*);
 extern void* melee_web_groldpupupu_exchange_yakumono(void*);
 extern void* melee_web_grshrine_exchange_yakumono(void*);
+extern void* melee_web_grizumi_exchange_yakumono(void*);
 
 static const uint8_t final_destination_map_ids[] = {0, 1, 2, 3, 4, 5, 6, 7, 8};
 /* grBattle_OnInit installs the floor and live background holders only. The
@@ -82,6 +85,20 @@ static const MeleeWebStageProfile shrine = {
     1,
 };
 
+static const uint8_t fountain_map_ids[] = {0, 1, 2, 3, 4};
+static const MeleeWebStagePublic fountain_public[] = {
+    {"GrdIzumi_cd_wt_GrdIzumiDummy1_1_image_desc", MELEE_WEB_STAGE_PUBLIC_IMAGE},
+    {"GrdIzumiStar_TopN_joint", MELEE_WEB_STAGE_PUBLIC_JOINT},
+};
+static const MeleeWebStageProfile fountain = {
+    St_Kind_Izumi, Gr_Kind_Izumi, &grIz_StageData,
+    fountain_map_ids, sizeof(fountain_map_ids),
+    melee_web_grizumi_exchange_yakumono,
+    melee_web_fountain_yakumono_decode,
+    0, 5, (const uint8_t[]){1, 1, 1, 1, 1}, 5,
+    0, 0, fountain_public, sizeof(fountain_public)/sizeof(fountain_public[0]),
+};
+
 const MeleeWebStageProfile* melee_web_stage_profile(int stage_kind)
 {
     const MeleeWebStageContent* content = melee_web_stage_content(stage_kind);
@@ -97,6 +114,8 @@ const MeleeWebStageProfile* melee_web_stage_profile(int stage_kind)
         return content->ground_kind == Gr_Kind_OldPupupu ? &dream_land : NULL;
     case St_Kind_Shrine:
         return content->ground_kind == Gr_Kind_Shrine ? &shrine : NULL;
+    case St_Kind_Izumi:
+        return content->ground_kind == Gr_Kind_Izumi ? &fountain : NULL;
     default:
         return NULL;
     }

@@ -95,6 +95,27 @@ class ContentMatchTests(unittest.TestCase):
                                [common, captain, 32, fighter, opponent],
                                "Mixed source content intro, costumes, stage lifecycle, combat, pause and repeat teardown passed")
 
+    def test_luigi_source_lifecycles_both_orientations(self):
+        common = ROOT / "assets-local/full-game-ganon"
+        luigi = ROOT / "assets-local/full-game-luigi"
+        required_common = ("MnSlChr.usd", "PlMr.dat", "PlMrAJ.dat", "GrNLa.dat")
+        required_luigi = (
+            "PlLg.dat", "PlLgAJ.dat", "EfLgData.dat", "luigi.ssm",
+            "PlLgNr.dat", "PlLgWh.dat", "PlLgAq.dat", "PlLgPi.dat",
+        )
+        if not (all((common / name).is_file() for name in required_common) and
+                all((luigi / name).is_file() for name in required_luigi)):
+            self.skipTest("Owned Luigi/Mario, English costumes, menu and FD fixtures are required")
+        # CKIND_LUIGI=7 and CKIND_MARIO=8 in the pinned source. The trace's
+        # max-costume loop exercises all four Luigi models in both fighter
+        # orientations while its Luigi branch checks N/air-N/S/Hi/Lw and the
+        # Fire article's creation/destruction lifecycle.
+        for fighter, opponent in ((7, 8), (8, 7)):
+            with self.subTest(fighter=fighter, opponent=opponent):
+                self.run_trace("gameplay_content_match_trace",
+                               [common, luigi, 32, fighter, opponent],
+                               "Mixed source content intro, costumes, stage lifecycle, combat, pause and repeat teardown passed")
+
     def test_hyrule_temple_source_lifecycles(self):
         temple = ROOT / "assets-local/full-game-stage-hyrule-temple"
         common = ROOT / "assets-local/full-game-ganon"

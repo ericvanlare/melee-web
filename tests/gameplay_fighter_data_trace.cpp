@@ -1,5 +1,6 @@
 #include "native_dat.hpp"
 #include "gameplay_fighter_data.h"
+#include "gameplay_pikachu_schema.h"
 #include "gameplay_article_data.h"
 #include "gameplay_action_store.hpp"
 #include "fighter_runtime_fixture.hpp"
@@ -164,6 +165,44 @@ void verify_captain(const std::shared_ptr<const DatArchive>& archive,const Bytes
           "Captain source fields remain unresolved");
     std::cout<<"Native Captain extension, six-costume bounds, zero dynamics and null Article table: passed\n";
 }
+void verify_pikachu(const std::shared_ptr<const DatArchive>& archive,const Bytes& container,
+                    const char* costume_name, const char* root_name, uint32_t kind,
+                    int32_t ground_item, int32_t air_item, uint32_t thunder_effects,
+                    int32_t zip_duration) {
+    const auto& identity=resolve_fighter_costume(costume_name);
+    check(identity.fighter_kind==kind && identity.motion_count==320,
+          "Missing source Pikachu-family identity");
+    const auto runtime=std::make_shared<const DatFighterRuntime>(archive,identity);
+    DatFighterActions(*archive,identity).validate_container(container);
+    check(runtime->actions().size()==identity.motion_count && runtime->pikachu_attributes(),
+          "Pikachu-family action metadata or shared extension is incomplete");
+    const auto& attributes=*runtime->pikachu_attributes();
+    check(attributes.specialn_itkind==ground_item && attributes.specialairn_itkind==air_item &&
+          attributes.x60==zip_duration && attributes.xDC==thunder_effects,
+          "Pikachu-family typed attributes changed");
+    uint32_t root=UINT32_MAX;
+    for(const auto& symbol:archive->public_symbols())if(symbol.name==root_name)root=symbol.data_offset;
+    check(root!=UINT32_MAX,"Missing Pikachu-family ftData root");
+    NativeDatArena owner(archive); uint32_t unresolved=UINT32_MAX;
+    void* data=melee_web_fighter_data_decode(owner.reader(),root,kind,4,
+        identity.motion_count,runtime->actions().empty()?nullptr:
+        nullptr,nullptr,nullptr,&unresolved);
+    /* The shared native decoder owns the exact source extension ABI. The
+     * action store is intentionally omitted here because this boundary test
+     * isolates extension and nullable Article admission. */
+    auto** words=static_cast<void**>(data);
+    check(data && words[1], "Pikachu-family native extension was not allocated");
+    const auto* decoded=static_cast<const MeleeWebPikachuAttributes*>(words[1]);
+    check(decoded->specialn_itkind==ground_item && decoded->specialairn_itkind==air_item &&
+          decoded->x60==zip_duration && decoded->xDC==thunder_effects,
+          "Pikachu-family native extension did not retain typed source fields");
+    check(!melee_web_fighter_data_article(data,0) && !melee_web_fighter_data_article(data,1) &&
+          !melee_web_fighter_data_article(data,2),
+          "Pikachu-family decoder fabricated an unchecked Article owner");
+    check((unresolved&(1U<<18))!=0,"Pikachu-family Article boundary was silently marked ready");
+    std::cout<<"Native "<<(kind==12?"Pikachu":"Pichu")<<
+        " shared 0xf8 attributes and explicit Article boundary: passed\n";
+}
 }
 int main(int argc,char**argv) {
     try {
@@ -202,6 +241,16 @@ int main(int argc,char**argv) {
             verify_roy(std::make_shared<const DatArchive>(read_file(argv[3])),read_file(argv[4]));
             verify_ganon(std::make_shared<const DatArchive>(read_file(argv[5])),read_file(argv[6]));
             verify_captain(std::make_shared<const DatArchive>(read_file(argv[7])),read_file(argv[8]));
+        }
+        if(argc==13) {
+            verify(std::make_shared<const DatArchive>(read_file(argv[1])),read_file(argv[2]),1);
+            verify_roy(std::make_shared<const DatArchive>(read_file(argv[3])),read_file(argv[4]));
+            verify_ganon(std::make_shared<const DatArchive>(read_file(argv[5])),read_file(argv[6]));
+            verify_captain(std::make_shared<const DatArchive>(read_file(argv[7])),read_file(argv[8]));
+            verify_pikachu(std::make_shared<const DatArchive>(read_file(argv[9])),read_file(argv[10]),
+                          "PlyPikachu5K_Share_joint","ftDataPikachu",12,0x59,0x5a,0x51,5);
+            verify_pikachu(std::make_shared<const DatArchive>(read_file(argv[11])),read_file(argv[12]),
+                          "PlyPichu5K_Share_joint","ftDataPichu",23,0x5b,0x5c,0x52,8);
         }
     }catch(const std::exception&e){std::cerr<<e.what()<<'\n';return 1;}
 }

@@ -48,6 +48,7 @@ std::int32_t read_I32(const DatArchive& archive, std::uint32_t at)
 {
     return std::bit_cast<std::int32_t>(scalar(archive, at));
 }
+std::int32_t read_ITEM(const DatArchive& archive, std::uint32_t at) { return read_I32(archive, at); }
 float read_F32(const DatArchive& archive, std::uint32_t at)
 {
     const float value = std::bit_cast<float>(scalar(archive, at));
@@ -123,6 +124,17 @@ DatFighterRuntime::DatFighterRuntime(std::shared_ptr<const DatArchive> archive, 
 #define READ_LUIGI(at, type, name, original) luigi_->name = read_##type(data, extension_ + at);
         MELEE_WEB_LUIGI_ATTRIBUTE_FIELDS(READ_LUIGI)
 #undef READ_LUIGI
+    } else if (costume_->fighter_kind == 12 || costume_->fighter_kind == 23) {
+        // Pichu's source wrapper contains only the item words, but its
+        // OnLoad path pushes and every shared special callback consumes the
+        // complete ftPikachuAttributes record. Decode that exact 0xf8 ABI for
+        // both family identities without aliasing their authored values.
+        region(data, extension_, MELEE_WEB_PIKACHU_ATTRIBUTE_BYTES);
+        pikachu_.emplace();
+#define READ_PIKACHU(at, type, name, original, component, source) \
+        pikachu_->name = read_##type(data, extension_ + at);
+        MELEE_WEB_PIKACHU_ATTRIBUTE_FIELDS(READ_PIKACHU)
+#undef READ_PIKACHU
     } else if (costume_->fighter_kind == 2 || costume_->fighter_kind == 25) {
         // Captain and Ganondorf use the source Captain extension loader.
         // Preserve the complete 0x8c record, including authored

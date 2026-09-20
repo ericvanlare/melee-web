@@ -6,6 +6,7 @@
 #include <melee/ft/kinds/ftMario/forward.h>
 #include <melee/ft/kinds/ftMars/forward.h>
 #include <melee/ft/kinds/ftCaptain/forward.h>
+#include <melee/ft/kinds/ftLuigi/forward.h>
 #include <melee/ft/kinds/ftCommon/forward.h>
 #include <melee/it/forward.h>
 #include <filesystem>
@@ -106,6 +107,8 @@ int main(int argc,char** argv){try{
         check(match.ready(),"Original Ready did not finish");
         check(melee_web_test_content_player(0,fighter_ckind,fighter_content->fighter_kind,fighter_color),"Original selected-fighter identity/costume/icon differs");
         check(melee_web_test_content_player(1,opponent_ckind,opponent_content->fighter_kind,opponent_color),"Original opponent identity/costume/icon differs");
+        check(match.player_stats(0).stocks==4&&match.player_stats(1).stocks==4,
+              "Source stock initialization changed for the selected content pair");
         if(selection.start.rules.stkind==St_Kind_Story){
             uint32_t map_mask=0;unsigned map_count=0;int randall_timer=0,shy_timer=0,shy_count=0,shy_pattern=0;
             check(melee_web_story_state(&map_mask,&map_count,&randall_timer,&shy_timer,&shy_count,&shy_pattern),
@@ -124,6 +127,7 @@ int main(int argc,char** argv){try{
         const bool doctor=fighter_content->fighter_kind==FTKIND_DRMARIO;
         const bool captain=fighter_content->fighter_kind==FTKIND_CAPTAIN;
         const bool ganon=fighter_content->fighter_kind==FTKIND_GANON;
+        const bool luigi=fighter_content->fighter_kind==FTKIND_LUIGI;
         const bool mars_family=fighter_content->fighter_kind==FTKIND_MARS||
             fighter_content->fighter_kind==FTKIND_EMBLEM;
         // Authored versus spawns may put P2 on a platform. Drop that source
@@ -172,7 +176,7 @@ int main(int argc,char** argv){try{
             check(pill_cleared,"Dr. Mario up taunt did not clear its original vitamin article");
         }
         const auto damage=match.player_stats(1).damage_percent;
-        bool capsule=false,captain_family_punch=false;
+        bool capsule=false,captain_family_punch=false,luigi_fireball_live=false;
         for(unsigned n=0;n<240&&match.player_stats(1).damage_percent==damage;n++){
             raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
             if(ganon||captain)captain_family_punch|=match.player_stats(0).motion_id==ftCa_MS_SpecialN;
@@ -180,12 +184,21 @@ int main(int argc,char** argv){try{
                 const auto motion=match.player_stats(0).motion_id;
                 capsule|=motion==ftMr_MS_SpecialN||motion==ftMr_MS_SpecialAirN;
             }
+            if(luigi)luigi_fireball_live|=melee_web_test_item_count(It_Kind_Luigi_Fire)>0;
         }
         raw[0].button=0;
         check(match.player_stats(1).damage_percent>damage,"Selected fighter ground neutral special did not damage the opponent");
         if(ganon||captain)check(captain_family_punch,
             "Captain-family fighter did not enter its original grounded neutral special");
         if(doctor)check(capsule,"Dr. Mario ground neutral special did not enter its original capsule action");
+        if(luigi){
+            check(luigi_fireball_live,"Luigi ground neutral special did not create its original fireball article");
+            bool cleared=false;
+            for(unsigned n=0;n<600&&!cleared;n++){
+                tick();cleared=melee_web_test_item_count(It_Kind_Luigi_Fire)==0;
+            }
+            check(cleared,"Luigi ground neutral special did not destroy its original fireball article");
+        }
         std::cout<<fighter_content->name<<(fox_family?" laser damage=":" neutral-special damage=")
                  <<match.player_stats(1).damage_percent<<std::endl;
         if(cycle==0&&fox_family){
@@ -418,6 +431,90 @@ int main(int argc,char** argv){try{
             std::cout<<"Captain-family down recovery stocks="<<stocks_before_down_recovery
                      <<" -> "<<match.player_stats(0).stocks<<std::endl;
             std::cout<<fighter_content->name<<" original N/air-N/S/Hi/Lw lifecycle branches executed"<<std::endl;
+        }else if(cycle==0&&luigi){
+            auto settle_luigi=[&](){
+                raw[0].button=0;raw[0].stickX=raw[0].stickY=0;
+                for(unsigned n=0;n<600;n++){
+                    const auto state=match.player_stats(0);
+                    if(state.ground_or_air==0&&state.motion_id<ftLg_MS_SpecialN)return;
+                    tick();
+                }
+                check(false,"Luigi special did not return to grounded common motion");
+            };
+            auto jump_luigi=[&](){
+                raw[0].button=0;raw[0].stickX=raw[0].stickY=0;
+                for(unsigned n=0;n<120&&match.player_stats(0).ground_or_air==0;n++){
+                    raw[0].button=n==0?PAD_BUTTON_X:0;tick();
+                }
+                check(match.player_stats(0).ground_or_air!=0,
+                      "Luigi did not enter the authored aerial state for air neutral special");
+            };
+            settle_luigi();
+            jump_luigi();
+            bool air_n=false,air_fireball_live=false;
+            /* Entering the authored AirN motion precedes its animation command
+             * that creates the fireball. Keep observing after state entry so
+             * this fixture proves the source article lifecycle rather than
+             * treating the state transition as the spawn boundary. */
+            for(unsigned n=0;n<180&&!air_fireball_live;n++){
+                raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
+                const auto state=match.player_stats(0);
+                if(n<12)std::cout<<"Luigi air-N input tick="<<n<<" button="<<raw[0].button
+                             <<" motion="<<state.motion_id<<" ground="<<state.ground_or_air<<std::endl;
+                air_n|=state.motion_id==ftLg_MS_SpecialAirN;
+                air_fireball_live|=melee_web_test_item_count(It_Kind_Luigi_Fire)>0;
+            }
+            raw[0].button=0;
+            check(air_n,"Luigi aerial neutral special did not enter its original source state");
+            check(air_fireball_live,"Luigi aerial neutral special did not create its original fireball article");
+            bool air_fireball_cleared=false;
+            for(unsigned n=0;n<600&&!air_fireball_cleared;n++){
+                tick();air_fireball_cleared=melee_web_test_item_count(It_Kind_Luigi_Fire)==0;
+            }
+            check(air_fireball_cleared,"Luigi aerial neutral special did not destroy its original fireball article");
+            settle_luigi();
+
+            const unsigned no_state=static_cast<unsigned>(-1);
+            unsigned side_state=no_state;
+            for(unsigned n=0;n<240&&side_state==no_state;n++){
+                raw[0].stickX=80;raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
+                const auto motion=match.player_stats(0).motion_id;
+                if(motion==ftLg_MS_SpecialSStart||motion==ftLg_MS_SpecialSHold||
+                   motion==ftLg_MS_SpecialS2||motion==ftLg_MS_SpecialSEnd||
+                   motion==ftLg_MS_SpecialS||motion==ftLg_MS_SpecialSMisfire)
+                    side_state=motion;
+            }
+            raw[0].stickX=0;raw[0].button=0;
+            check(side_state!=no_state,
+                  "Luigi side special did not enter its original normal or misfire state");
+            for(unsigned n=0;n<600;n++){
+                const auto motion=match.player_stats(0).motion_id;
+                if(match.player_stats(0).ground_or_air==0&&motion<ftLg_MS_SpecialN)break;
+                tick();
+            }
+            settle_luigi();
+
+            bool up=false;
+            for(unsigned n=0;n<180&&!up;n++){
+                raw[0].stickY=80;raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
+                const auto motion=match.player_stats(0).motion_id;
+                up=motion==ftLg_MS_SpecialHi||motion==ftLg_MS_SpecialAirHi;
+            }
+            raw[0].stickY=0;raw[0].button=0;
+            check(up,"Luigi up special did not enter its original source state");
+            settle_luigi();
+
+            bool down=false;
+            for(unsigned n=0;n<180&&!down;n++){
+                raw[0].stickY=-80;raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
+                const auto motion=match.player_stats(0).motion_id;
+                down=motion==ftLg_MS_SpecialLw||motion==ftLg_MS_SpecialAirLw;
+            }
+            raw[0].stickY=0;raw[0].button=0;
+            check(down,"Luigi down special did not enter its original source state");
+            settle_luigi();
+            std::cout<<"Luigi ground/air N article lifecycle, RNG-preserving S state="
+                     <<side_state<<", Hi and Lw source states passed"<<std::endl;
         }else if(cycle==0&&mars_family){
             raw[0].button=0;raw[0].stickX=raw[0].stickY=0;
             for(unsigned n=0;n<420;n++){
@@ -487,6 +584,9 @@ int main(int argc,char** argv){try{
         raw[0].button=PAD_TRIGGER_L|PAD_TRIGGER_R|PAD_BUTTON_A|PAD_BUTTON_START;tick();raw[0].button=0;
         for(unsigned n=0;n<500&&!match.complete();n++)tick();
         check(match.complete(),"Original No Contest did not end the mixed match");
+        if(fighter_content->fighter_kind==FTKIND_LUIGI)
+            check(match.player_stats(0).stocks==4&&match.player_stats(1).stocks==4,
+                       "No Contest changed Luigi source stocks before teardown");
         // Keep every original variant live across close, including the loop
         // owned by Camera::xA0. The next costume reconstructs the same world.
         for(int variant=1;variant<=4;variant++)

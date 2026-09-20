@@ -13,7 +13,7 @@ await assert.rejects(loadRuntimeDisc(new Blob([bytes])),/Invalid game executable
 console.log('Runtime disc language paths and executable rejection checks passed');
 
 assert.equal(Object.keys(NATIVE_MENU_DISC_FILES).length,15);
-assert.equal(Object.keys(NATIVE_GAME_DISC_FILES).length,124);
+assert.equal(Object.keys(NATIVE_GAME_DISC_FILES).length,134);
 for(const name of ['nr_select','nr_title','nr_name','pokemon','end']) {
   assert.equal(NATIVE_MENU_DISC_FILES[name+'.ssm'],'audio/us/'+name+'.ssm');
   assert.equal(NATIVE_GAME_DISC_FILES[name+'.ssm'],'audio/us/'+name+'.ssm');
@@ -32,7 +32,8 @@ for(const name of ['LbRb.dat','LbBf.dat','GmPause.usd','IfAll.usd','IfCoGet.dat'
   'EfLkData.dat','PlGn.dat','PlGnAJ.dat','PlGnNr.dat','PlGnRe.dat','PlGnBu.dat',
   'PlGnGr.dat','PlGnLa.dat','EfGnData.dat',
   'PlCa.dat','PlCaAJ.dat','PlCaNr.dat','PlCaGy.dat','PlCaRe.usd','PlCaWh.dat',
-  'PlCaGr.dat','PlCaBu.dat','EfCaData.dat'])
+  'PlCaGr.dat','PlCaBu.dat','EfCaData.dat','GrIz.dat',
+  'PlLg.dat','PlLgAJ.dat','PlLgNr.dat','PlLgWh.dat','PlLgAq.dat','PlLgPi.dat','EfLgData.dat'])
   assert.equal(NATIVE_GAME_DISC_FILES[name],name);
 assert.equal(NATIVE_GAME_DISC_FILES['falco.ssm'],'audio/us/falco.ssm');
 assert.equal(NATIVE_GAME_DISC_FILES['fox.ssm'],'audio/us/fox.ssm');
@@ -41,12 +42,14 @@ assert.equal(NATIVE_GAME_DISC_FILES['drmario.ssm'],'audio/us/drmario.ssm');
 assert.equal(NATIVE_GAME_DISC_FILES['emblem.ssm'],'audio/us/emblem.ssm');
 assert.equal(NATIVE_GAME_DISC_FILES['captain.ssm'],'audio/us/captain.ssm');
 assert.equal(NATIVE_GAME_DISC_FILES['ganon.ssm'],'audio/us/ganon.ssm');
+assert.equal(NATIVE_GAME_DISC_FILES['luigi.ssm'],'audio/us/luigi.ssm');
 assert.equal(NATIVE_GAME_DISC_FILES['pupupu.ssm'],'audio/us/pupupu.ssm');
 assert.equal(NATIVE_GAME_DISC_FILES['sp_zako.hps'],'audio/sp_zako.hps');
 assert.equal(NATIVE_GAME_DISC_FILES['ystory.hps'],'audio/ystory.hps');
 assert.equal(NATIVE_GAME_DISC_FILES['old_kb.hps'],'audio/old_kb.hps');
 assert.equal(NATIVE_GAME_DISC_FILES['shrine.hps'],'audio/shrine.hps');
 assert.equal(NATIVE_GAME_DISC_FILES['akaneia.hps'],'audio/akaneia.hps');
+assert.equal(NATIVE_GAME_DISC_FILES['izumi.hps'],'audio/izumi.hps');
 for(const loader of [loadNativeMenuDisc,loadNativeGameDisc]) {
   await assert.rejects(loader({name:'game.rvz'}),/RVZ is not supported/);
   await assert.rejects(loader(new Blob([bytes])),/Invalid game executable section/);

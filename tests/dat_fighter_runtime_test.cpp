@@ -3,6 +3,7 @@
 #include <functional>
 #include <iostream>
 #include <iterator>
+#include <algorithm>
 #include <map>
 #include <limits>
 
@@ -173,7 +174,7 @@ Bytes read_real_archive(const char* path)
           "Luigi real fighter archive is truncated");
     return bytes;
 }
-void real_luigi(const char* path)
+void real_luigi(const char* path, const char* effect_path)
 {
     const auto identity = resolve_fighter_costume("PlyLuigi5K_Share_joint");
     check(identity.fighter_kind == 17 && identity.motion_count == 312,
@@ -187,12 +188,73 @@ void real_luigi(const char* path)
     check(sizeof(MeleeWebLuigiAttributes) == 0x98 &&
           archive->next_target_offset(runtime->extension_offset()) - runtime->extension_offset() == 0x98,
           "Luigi extension does not retain its exact 0x98 source bound");
+    const auto fighter_root = runtime->root_offset();
+    const auto item_table = archive->pointer(fighter_root + 0x48, 16);
+    check(item_table && archive->pointer(*item_table, 24),
+          "Luigi source Article table is not a single authored slot");
+    const auto article = *archive->pointer(*item_table, 24);
+    const auto special = archive->pointer(article + 4, 16);
+    const auto states = archive->pointer(article + 12, 16);
+    const auto model = archive->pointer(article + 16, 16);
+    check(special && archive->next_target_offset(*special) - *special == 16 &&
+          states && archive->next_target_offset(*states) - *states == 16 && model,
+          "Luigi fire Article does not retain its 16-byte special and one-state bounds");
+    const auto guard_desc = archive->pointer(fighter_root + 0x20, 4);
+    check(guard_desc && archive->pointer(*guard_desc, 64),
+          "Luigi source guard descriptor is not a required non-null model graph");
+    check(*guard_desc == 9736 && *archive->pointer(*guard_desc, 64) == 36608,
+          "Luigi source guard graph target changed");
+    for (std::uint32_t motion = 295; motion <= 311; ++motion) {
+        const auto command = runtime->commands(motion);
+        check(command && !command->bytes().empty(),
+              "Luigi authored self-motion command boundary is missing");
+    }
+    const DatArchive effects(read_real_archive(effect_path));
+    const auto effect_root = std::find_if(effects.public_symbols().begin(), effects.public_symbols().end(),
+        [](const auto& symbol) { return symbol.name == "effLuigiDataTable"; });
+    check(effect_root != effects.public_symbols().end() && effect_root->data_offset == 0 &&
+          effects.next_target_offset(effect_root->data_offset) - effect_root->data_offset == 64,
+          "Luigi effect bank does not retain its authored two-entry bound");
     const auto& attributes = *runtime->luigi_attributes();
     check(attributes.greenmissile_misfire_chance == 8.0f &&
           attributes.greenmissile_smash == 3.0f &&
           attributes.greenmissile_charge_rate == 20.0f &&
           attributes.cyclone_unk == 3 && attributes.cyclone_landing_lag == 0,
           "Luigi authored float/integer attributes changed");
+}
+void real_pikachu_family(const char* path, bool pichu)
+{
+    const char* const prefix = pichu ? "PlyPichu5K" : "PlyPikachu5K";
+    const auto& first = resolve_fighter_costume(std::string(prefix) + "_Share_joint");
+    check(first.fighter_kind == (pichu ? 23U : 12U) && first.motion_count == 320,
+          "Pikachu-family source identity changed");
+    auto archive = std::make_shared<const DatArchive>(read_real_archive(path));
+    for (unsigned costume = 0; costume < 4; ++costume) {
+        const char* suffixes[] = {"_Share_joint", "Re_Share_joint", "Bu_Share_joint", "Gr_Share_joint"};
+        const auto identity = resolve_fighter_costume(std::string(prefix) + suffixes[costume]);
+        const auto runtime = std::make_shared<const DatFighterRuntime>(archive, identity);
+        check(runtime->actions().size() == 320 && runtime->pikachu_attributes(),
+              "Pikachu-family action count or shared extension is missing");
+        check(!runtime->mario_attributes() && !runtime->luigi_attributes(),
+              "Pikachu-family extension was aliased to a Mario-family schema");
+        check(archive->next_target_offset(runtime->extension_offset()) - runtime->extension_offset() ==
+                  MELEE_WEB_PIKACHU_ATTRIBUTE_BYTES,
+              "Pikachu-family extension does not retain its exact 0xf8 source bound");
+        const auto& attributes = *runtime->pikachu_attributes();
+        if (pichu) {
+            check(attributes.specialn_itkind == 0x5b && attributes.specialairn_itkind == 0x5c &&
+                      attributes.xDC == 0x52 && attributes.x60 == 8,
+                  "Pichu authored item or integer attributes changed");
+        } else {
+            check(attributes.specialn_itkind == 0x59 && attributes.specialairn_itkind == 0x5a &&
+                      attributes.xDC == 0x51 && attributes.x60 == 5,
+                  "Pikachu authored item or integer attributes changed");
+        }
+        check(attributes.x5C == 10 && attributes.xD4 == 4 && attributes.xD8 == 8 &&
+                  runtime->dynamics().bones.empty() && runtime->dynamics().spheres.empty() &&
+                  !runtime->dynamics().animation_table_offset,
+              "Pikachu-family integer or authored zero-dynamics fields changed");
+    }
 }
 }
 int main(int argc, char** argv)
@@ -202,8 +264,13 @@ int main(int argc, char** argv)
         {"malformed_actions", malformed_actions}, {"owned_command_boundary", owned_command_boundary},
         {"selected_motion_identity", selected_motion_identity}, {"hurtbox_dynamics", hurtbox_dynamics}};
     try {
-        if (argc == 3 && std::string_view(argv[1]) == "real_luigi") {
-            real_luigi(argv[2]);
+        if (argc == 4 && std::string_view(argv[1]) == "real_luigi") {
+            real_luigi(argv[2], argv[3]);
+            return 0;
+        }
+        if (argc == 3 && (std::string_view(argv[1]) == "real_pikachu" ||
+                          std::string_view(argv[1]) == "real_pichu")) {
+            real_pikachu_family(argv[2], std::string_view(argv[1]) == "real_pichu");
             return 0;
         }
         check(argc == 2, "expected case");

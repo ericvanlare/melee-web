@@ -356,15 +356,19 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
                 reject("Nonzero commands after display-list padding");
             break;
         }
-        if (opcode != 0x80 && opcode != 0x90 && opcode != 0x98 && opcode != 0xA0)
-            reject("Unsupported display command or vertex format; only VAT0 surface primitives are accepted");
+        const bool native_line_or_point = policy == DatMaterialPolicy::NativeDescriptors &&
+            (opcode == 0xA8 || opcode == 0xB0 || opcode == 0xB8);
+        if (opcode != 0x80 && opcode != 0x90 && opcode != 0x98 && opcode != 0xA0 && !native_line_or_point)
+            reject("Unsupported display command or vertex format; expected an owned VAT0 primitive");
         if (bytes.size() - cursor < 2) reject("Truncated display primitive header");
         const auto count = uint32_t(bytes[cursor]) * 256 + bytes[cursor + 1];
         cursor += 2;
         if ((opcode == 0x80 && (count < 4 || count % 4)) ||
             (opcode == 0x90 && (count < 3 || count % 3)) ||
-            ((opcode == 0x98 || opcode == 0xA0) && count < 3))
-            reject("Invalid vertex count for surface primitive");
+            ((opcode == 0x98 || opcode == 0xA0) && count < 3) ||
+            (opcode == 0xA8 && (count < 2 || count % 2)) ||
+            (opcode == 0xB0 && count < 2) || (opcode == 0xB8 && count < 1))
+            reject("Invalid vertex count for primitive");
         if (++model.draw_packets > max_packets || count > max_vertices - model.submitted_vertices)
             reject("Model exceeds primitive or vertex budget");
         model.submitted_vertices += count;

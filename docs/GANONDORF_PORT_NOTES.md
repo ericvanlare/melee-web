@@ -78,6 +78,27 @@ restricted preview policy. That failure is retained separately from the full
 native HSD ownership path, which constructs the costumes. It is not an exemption
 or a successful rendering comparison.
 
+An independently repeated original-source diagnostic now retains two exact
+603-frame Ganondorf/Mario/Final Destination captures with matching declared
+entry, input, PAD, RNG, clock and fighter fields. The legacy version-3 native
+transport is retained with its first `match_enter_complete.rng` mismatch; a
+separately save-bound version-4 recipe, using the hash-verified original GCI
+profile and the identical input payload, reaches a declared-state match across
+all 603 frames. The scoped receipt is
+[ganondorf-original-reference-v1.json](evidence/ganondorf-original-reference-v1.json).
+The accompanying headless CPU sidecar still diverges at tick 1 on
+`camera.far_bits`; drawing rows are excluded from that comparison. This evidence
+does not claim drawn equivalence, a complete match ending, performance, pixels,
+PCM, physical-input fidelity, a human holdout, gold admission or public
+acceptance.
+
+After the Ground light/OnLoad lifecycle rebuild, one fresh run of the unchanged
+save-bound v4 recipe retained the same declared-state match across all 603
+frames. A second refresh after the final Luigi/Fountain Article validation
+changes also matches all 603 frames and produces the same trace hash. Both
+build identities are recorded in the scoped receipt; these refreshes do not
+broaden the field or acceptance scope.
+
 Both development and public Release builds succeed. The complete regression
 suite passes 1,048 tests with 43 optional skips after correcting two stale
 prototype roster expectations. GitHub Verify passes checkpoint `ca692dd` in

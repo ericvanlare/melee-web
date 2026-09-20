@@ -219,7 +219,7 @@ struct GameplayWorld::Storage {
         if(!common_data.roots[20].data_offset)throw DatError("Missing common root20");
         DatNativeJoint common_joint(archive("PlCo.dat"),*common_data.roots[20].data_offset);
         DatCollision collision_data(*archive(stage->archive));
-        DatLights light_data(*archive(stage->archive));
+        DatLights light_data(*archive(stage->archive),"map_plit",true);
         items=std::make_unique<DatItemRegistryNative>(archive("ItCo.usd"));
         stage_arena=std::make_unique<NativeDatArena>(archive(stage->archive));
         bonus_arena=std::make_unique<NativeDatArena>(archive("PdPm.dat"));
@@ -261,6 +261,11 @@ struct GameplayWorld::Storage {
         for(uint32_t i=0;i<light_data.lights.size();i++){
             auto flags=read_dat_light_override(*archive(stage->archive),light_data.lights[i].source_offset);
             check(melee_web_stage_lights_set_override(lights,i,flags.has_value(),flags.value_or(0),error,sizeof(error)),error);
+            if(light_data.animation_tables[i]){
+                if(!full_stage)full_stage=std::make_unique<DatNativeStage>(archive(stage->archive),stage->stage_kind);
+                check(melee_web_stage_lights_set_animations(lights,i,
+                    full_stage->light_animation_table(*light_data.animation_tables[i]),error,sizeof(error)),error);
+            }
         }
         check(melee_web_stage_lights_attach(lights,error,sizeof(error)),error);
         previous_ground=melee_web_ground_data_publish(ground);ground_published=true;
@@ -369,7 +374,7 @@ struct GameplayWorld::Storage {
         if(stage_visual)throw DatError("Close selected stage visual before full initialization");
         check(melee_web_stage_lights_load(lights,error,sizeof(error)),error);
         auto source=archive(stage->archive);
-        full_stage=std::make_unique<DatNativeStage>(source,stage->stage_kind);
+        if(!full_stage)full_stage=std::make_unique<DatNativeStage>(source,stage->stage_kind);
         const auto* profile=melee_web_stage_profile(stage->stage_kind);
         check(profile!=nullptr,"Stage has no complete source callback profile");
         const bool has_commands=has_symbol(*source,"map_ptcl");
@@ -390,6 +395,8 @@ struct GameplayWorld::Storage {
                 throw DatError("Stage animation requires unpublished particle bank/command "+
                     std::to_string(event.bank)+"/"+std::to_string(event.command));
         stage_map=melee_web_stage_map_publish(full_stage->map_head(),error,sizeof(error));check(stage_map!=nullptr,error);
+        const auto& symbols=full_stage->public_symbols();
+        check(melee_web_stage_map_set_public(stage_map,symbols.data(),symbols.size(),error,sizeof(error)),error);
         const auto& overrides=full_stage->light_overrides();
         check(melee_web_stage_map_set_overrides(stage_map,overrides.data(),overrides.size(),error,sizeof(error)),error);
         stage_last=melee_web_stage_begin_kind(stage->stage_kind,full_stage->yakumono(),stage_effects?stage_effects->bank():nullptr,defer_start,error,sizeof(error));check(stage_last!=nullptr,error);
@@ -418,7 +425,7 @@ struct GameplayWorld::Storage {
         item_colors.reset();item_arena.reset();
         if(effect_started){check(melee_web_effect_runtime_end(error,sizeof(error)),error);effect_started=false;}
         if(stage_map){check(melee_web_stage_map_close(stage_map,error,sizeof(error)),error);stage_map=nullptr;}
-        stage_effects.reset();full_stage.reset();
+        stage_effects.reset();
         if(stage_native){check(melee_web_native_joint_destroy(stage_native,error,sizeof(error)),error);stage_native=nullptr;}
         stage_material_animation.reset();stage_animation.reset();stage_model.reset();
         if(bonus_published){check(melee_web_bonus_data_end(bonus,error,sizeof(error)),error);bonus_published=false;}
@@ -440,6 +447,9 @@ struct GameplayWorld::Storage {
         if(started){check(melee_web_gameplay_shutdown(error,sizeof(error)),error);started=false;}
         if(ground_published){melee_web_ground_data_publish(previous_ground);ground_published=false;}
         if(lights){check(melee_web_stage_lights_destroy(lights,error,sizeof(error)),error);lights=nullptr;}
+        // Global stage-light animations borrow the stage descriptor arena.
+        // Keep it until both original and host light GObjs have retired.
+        full_stage.reset();
         if(font){check(melee_web_font_atlas_close(font,error,sizeof(error)),error);font=nullptr;}
         verify();
     }

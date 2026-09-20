@@ -27,6 +27,8 @@ TRACE_TARGETS = (
     "gameplay_content_match_trace",
     "gameplay_stage_battlefield_trace",
     "gameplay_stage_temple_trace",
+    "gameplay_stage_fountain_trace",
+    "gameplay_pikachu_articles_trace",
 )
 
 # Keep the target closure in one place so callers that need to configure once

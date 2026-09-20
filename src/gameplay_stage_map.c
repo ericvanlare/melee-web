@@ -5,9 +5,11 @@
 #include <melee/gr/ground.h>
 #include <melee/gr/types.h>
 #include <melee/sc/types.h>
+#include <sysdolphin/baselib/gobj.h>
 #include <stdio.h>
 #include <stdlib.h>
-struct MeleeWebStageMap {UnkArchiveStruct archives[4];uint64_t generation;const MeleeWebMapLightOverride* overrides;size_t override_count;};
+#include <string.h>
+struct MeleeWebStageMap {UnkArchiveStruct archives[4];uint64_t generation;const MeleeWebMapLightOverride* overrides;size_t override_count;MeleeWebArchiveSections* sections;};
 static MeleeWebStageMap* owner;
 static int fail(char* e,size_t n,const char* m){if(e&&n)snprintf(e,n,"%s",m);return 0;}
 static int ok(char* e,size_t n){if(e&&n)*e=0;return 1;}
@@ -23,6 +25,16 @@ MeleeWebStageMap* melee_web_stage_map_publish(void* input,char* e,size_t n){
     h->generation=stats.generation;h->archives[0].unk4=map;owner=h;ok(e,n);return h;
 }
 void* melee_web_stage_map_archives(void){return owner?owner->archives:NULL;}
+int melee_web_stage_map_set_public(MeleeWebStageMap* h,const MeleeWebArchiveSymbol* entries,size_t count,char* e,size_t n){
+    if(!h||h!=owner||h->sections||!entries||!count)
+        return fail(e,n,"Native stage public catalog missing or already published");
+    for(size_t i=0;i<count;i++)if(!entries[i].filename||!entries[0].filename||strcmp(entries[i].filename,entries[0].filename))
+        return fail(e,n,"Native stage public catalog must belong to one archive");
+    h->sections=melee_web_archive_sections_register(entries,count,e,n);
+    if(!h->sections)return 0;
+    h->archives[0].unk0=melee_web_archive_sections_open(entries[0].filename);
+    return ok(e,n);
+}
 void* melee_web_stage_map_lookup(int id){
     if(!owner||id<0)return NULL;
     UnkStageDat* m=owner->archives[0].unk4;
@@ -34,6 +46,15 @@ int melee_web_stage_map_close(MeleeWebStageMap* h,char* e,size_t n){
         return fail(e,n,"Native map publication lost its source world ownership");
     for(unsigned i=0;i<sizeof(stage_info.map_gobjs)/sizeof(stage_info.map_gobjs[0]);i++)
         if(stage_info.map_gobjs[i])return fail(e,n,"Remove original stage GObjs before closing native map descriptors");
+    for(HSD_GObj* obj=((HSD_GObj**)HSD_GObj_Entities)[5];obj;obj=obj->next)
+        if(obj->classifier==HSD_GOBJ_CLASS_STAGE)
+            return fail(e,n,"Remove all original stage instances before closing native map descriptors");
+    if(Ground_801C498C())
+        return fail(e,n,"Remove original map lights before closing native map descriptors");
+    if(h->sections){
+        if(!melee_web_archive_sections_close_owned(h->sections,h->archives[0].unk0,e,n))return 0;
+        h->sections=NULL;h->archives[0].unk0=NULL;
+    }
     owner=NULL;free(h);return ok(e,n);
 }
 

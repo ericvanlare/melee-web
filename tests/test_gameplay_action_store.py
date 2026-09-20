@@ -89,6 +89,7 @@ class GameplayActionStoreTests(unittest.TestCase):
                 (ROOT / "assets-local/next-gate/PlFx.dat", ROOT / "assets-local/next-gate/PlFxAJ.dat"),
                 (ROOT / "assets-local/next-gate/PlFc.dat", ROOT / "assets-local/next-gate/PlFcAJ.dat"),
                 (ROOT / "assets-local/next-gate/PlMs.dat", ROOT / "assets-local/next-gate/PlMsAJ.dat"),
+                (ROOT / "assets-local/full-game-luigi/PlLg.dat", ROOT / "assets-local/full-game-luigi/PlLgAJ.dat"),
             ]
             available_pairs = [pair for pair in owned_pairs if all(path.is_file() for path in pair)]
             args = [str(path) for pair in available_pairs for path in pair]
@@ -96,10 +97,12 @@ class GameplayActionStoreTests(unittest.TestCase):
                                     capture_output=True, text=True, timeout=30)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("Original owned action loaders and checked Wait command execution: passed", result.stdout)
-            if len(available_pairs) == len(owned_pairs):
+            if all(pair in available_pairs for pair in owned_pairs[:4]) and owned_pairs[4] not in available_pairs:
                 self.assertIn("Owned common appeal action rows 239/240 for Mario, Fox, Falco and Marth: passed", result.stdout)
             if owned_pairs[0] in available_pairs:
                 self.assertIn("Local Mario Wait2/3/6 source command traces and startup clips: passed", result.stdout)
+            if owned_pairs[4] in available_pairs:
+                self.assertIn("Luigi kind 17 authored self-motion command rows 295/311: passed", result.stdout)
             print(result.stdout, end="")
 
 

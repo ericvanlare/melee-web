@@ -23,9 +23,21 @@ ArticleSchema schema(uint32_t kind)
 {
     switch(kind) {
     case It_Kind_Mario_Fire:return {20,1,true};
+    // Luigi's fireball uses the shared five-float source type selectively:
+    // its callback consumes x0, x4 and xC, while x8/x10 belong to Mario's
+    // distinct fireball record. The authored Luigi region is four floats.
+    case It_Kind_Luigi_Fire:return {16,1,true};
     // Seven original pill motion states select six serialized animation rows,
     // including the throw/catch sequences used by Dr. Mario's taunt.
     case It_Kind_DrMario_Vitamin:return {20,6,true};
+    // Thunder has three source callbacks, but the callback state IDs are
+    // [-1, 0, 0] and the DAT carries one serialized animation descriptor.
+    case It_Kind_Pikachu_Thunder:
+    case It_Kind_Pichu_Thunder:return {12,1,true};
+    case It_Kind_Pikachu_TJolt_Ground:
+    case It_Kind_Pichu_TJolt_Ground:return {16,2,true};
+    case It_Kind_Pikachu_TJolt_Air:
+    case It_Kind_Pichu_TJolt_Air:return {4,1,true};
     case It_Kind_Mario_Cape:
     case It_Kind_DrMario_Sheet:return {4,2,true};
     case It_Kind_Fox_Laser:
@@ -117,7 +129,15 @@ DatItemArticle::DatItemArticle(std::shared_ptr<const DatArchive> archive,uint32_
                            " crosses source region (requested "+std::to_string(size)+" bytes)");
         (void)a.range(at,size);
     };
-    auto pointer=[&](uint32_t at,size_t size){auto p=a.pointer(at,size);require(bool(p),"Required item descriptor missing");record(*p,size);return *p;};
+    auto pointer=[&](uint32_t at,size_t size){
+        auto p=a.pointer(at,size);
+        if(!p) {
+            throw DatError("Required item descriptor missing at DAT slot " +
+                           std::to_string(at) + " (" + std::to_string(size) +
+                           " bytes, item kind " + std::to_string(kind) + ")");
+        }
+        record(*p,size);return *p;
+    };
     record(root,24);const uint32_t special_size=article_schema.special_bytes;
     std::optional<uint32_t> special_at;
     if(special_size) {
@@ -147,20 +167,40 @@ DatItemArticle::DatItemArticle(std::shared_ptr<const DatArchive> archive,uint32_
         if(float_field(kind,i))require(std::isfinite(a.f32(scalar_at)),"Item special scalar is nonfinite");
         std::memcpy(static_cast<uint8_t*>(special)+i,&value,4);
     }
-    uint32_t at=pointer(root+16,16);const uint32_t model_root=pointer(at,64);
-    s.model=std::make_unique<DatNativeJoint>(archive,model_root);const auto& graph=s.model->graph();
+    uint32_t at=pointer(root+16,16);
+    const auto model_root=a.pointer(at,64);
+    const bool null_model=!model_root;
     const uint32_t bones=a.be32(at+4);const int32_t attach=int32_t(a.be32(at+8));
     const uint8_t flags=a.range(at+12,1)[0];
     require(!a.has_relocation(at+4)&&!a.has_relocation(at+8)&&!a.has_relocation(at+12),"Item model scalar is relocated");
-    require((bones==0||bones==graph.joint_count)&&graph.joint_count<=140,
-            "Item model bone count does not match native topology");
-    require(attach>=0&&uint32_t(attach)<graph.joint_count,"Item attachment bone is outside native model");
-    s.native.reset(melee_web_native_joint_hydrate(&graph,error,sizeof(error)));require(bool(s.native),error);
-    void* joint=melee_web_native_joint_descriptor(s.native.get(),error,sizeof(error));require(joint,error);
+    MeleeWebNativeGraph empty_graph{};
+    const MeleeWebNativeGraph* graph_ptr=&empty_graph;
+    void* joint=nullptr;
     std::vector<void*> descriptors;
-    for(uint32_t j=0;j<graph.joint_count;j++){
-        void* d=melee_web_native_joint_descriptor_at(s.native.get(),j,graph.joints[j].source_offset,error,sizeof(error));require(d,error);descriptors.push_back(d);
+    if(null_model) {
+        /* item.c copies this authored null to xC8_joint; Item_802680CC then
+         * creates the source identity JObj. Keep the model descriptor and
+         * its scalar fields while requiring the zero-bone form below. */
+        require(bones==0&&attach==0,
+                "Null item model has nonzero bone or attachment fields");
+    } else {
+        record(*model_root,64);
+        s.model=std::make_unique<DatNativeJoint>(archive,*model_root);
+        graph_ptr=&s.model->graph();
+        const auto& graph=*graph_ptr;
+        require((bones==0||bones==graph.joint_count)&&graph.joint_count<=140,
+                "Item model bone count does not match native topology");
+        require(attach>=0&&uint32_t(attach)<graph.joint_count,
+                "Item attachment bone is outside native model");
+        s.native.reset(melee_web_native_joint_hydrate(&graph,error,sizeof(error)));
+        require(bool(s.native),error);
+        joint=melee_web_native_joint_descriptor(s.native.get(),error,sizeof(error));
+        require(joint,error);
+        for(uint32_t j=0;j<graph.joint_count;j++){
+            void* d=melee_web_native_joint_descriptor_at(s.native.get(),j,graph.joints[j].source_offset,error,sizeof(error));require(d,error);descriptors.push_back(d);
+        }
     }
+    const auto& graph=*graph_ptr;
 
     auto special_joint=[&](uint32_t offset)->DatNativeJoint* {
         require(bool(special_at),"Item special joint has no special attributes");
@@ -229,6 +269,7 @@ DatItemArticle::DatItemArticle(std::shared_ptr<const DatArchive> archive,uint32_
     for(uint32_t i=0;i<s.count;i++){
         const uint32_t row=at+16*i;auto& state=s.states[i];
         if(auto p=a.pointer(row,20)){
+            require(!null_model,"Null item model has an animation descriptor");
             // Item animation containers use the original particle callback
             // channel for source effects (Mario's fireball and cape each carry
             // one). Preserve those packed event tracks so the source HSD
@@ -237,16 +278,19 @@ DatItemArticle::DatItemArticle(std::shared_ptr<const DatArchive> archive,uint32_
             state.animation=animation->descriptor();s.animations.push_back(std::move(animation));
         }
         if(auto p=a.pointer(row+4,12)){
+            require(!null_model,"Null item model has a material descriptor");
             auto animation=std::make_unique<DatMaterialAnimation>(archive,*p,graph);
             state.material=animation->descriptor();s.materials.push_back(std::move(animation));
         }
         if(auto p=a.pointer(row+8,12)){
+            require(!null_model,"Null item model has a shape descriptor");
             auto animation=std::make_unique<DatShapeAnimation>(archive,*p,graph);
             state.shape=animation->descriptor();s.shapes.push_back(std::move(animation));
         }
         if(auto p=a.pointer(row+12,4))state.commands=s.commands.decode(a,*p);
     }
-    require(melee_web_article_publish(reader,article,special,s.states.get(),s.count,joint,bones,attach,flags,error,sizeof(error)),error);
+    require(melee_web_article_publish(reader,article,special,s.states.get(),s.count,joint,bones,attach,flags,
+                                      null_model?1:0,error,sizeof(error)),error);
 }
 DatItemArticle::~DatItemArticle()=default;
 uint32_t DatItemArticle::state_count()const noexcept{return storage_->count;}

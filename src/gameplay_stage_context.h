@@ -5,8 +5,9 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-/* CPU descriptors own no HSD objects. This first boundary accepts source ambient
- * and infinite lights only; animation, custom classes and WObj constraints reject. */
+/* CPU descriptors own no HSD objects. This boundary accepts source ambient and
+ * infinite lights; custom classes and WObj constraints still reject. Light
+ * animation tables are attached separately only after checked native hydration. */
 typedef struct MeleeWebStageLightDesc {
     uint32_t source_offset;
     uint16_t flags, attenuation_flags;
@@ -20,6 +21,11 @@ MeleeWebStageLights* melee_web_stage_lights_create(const MeleeWebStageLightDesc*
  * set before publication; found=0 means a validated absence, not an omission. */
 int melee_web_stage_lights_set_override(MeleeWebStageLights*, uint32_t index,
     int found, uint8_t flags, char*, size_t);
+/* Borrow a checked, typed HSD_LightAnim* pointer table for one source
+ * LightList. The table must remain alive until the stage-light context is
+ * destroyed. This is valid only before publication or LObj loading. */
+int melee_web_stage_lights_set_animations(MeleeWebStageLights*, uint32_t index,
+    void* checked_HSD_LightAnim_pointer_table, char*, size_t);
 /* Source lookup adapter: 0 means this descriptor is outside the owned context. */
 int melee_web_stage_lights_lookup_override(void* descriptor, int* found, uint8_t* flags);
 /* Actual LightList** for original Ground/lb consumers. Storage survives until
