@@ -61,6 +61,9 @@ The public alpha is a separate Release build with its own audited source graph
 and deliberately disabled audio. Follow [public release review](docs/PUBLIC_RELEASE_REVIEW.md)
 and [public deployment](docs/PUBLIC_DEPLOYMENT.md) for packaging or deployment;
 those documents do not widen gameplay acceptance.
+The [development audio replacement record](docs/AUDIO_REPLACEMENT_EVIDENCE.md)
+tracks implementation provenance, compatibility checks and remaining accuracy
+limits; it does not enable public audio.
 
 This project is independent of Nintendo, doldecomp and Aurora. Preserve upstream
 source provenance and notices; see [third-party notices](THIRD_PARTY.md).

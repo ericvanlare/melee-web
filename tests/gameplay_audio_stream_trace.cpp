@@ -20,6 +20,7 @@ int main(int argc,char** argv){try{
    for(float v:pcm){CHECK(std::isfinite(v));energy+=double(v)*v;uint32_t bits=std::bit_cast<uint32_t>(v);for(unsigned b=0;b<4;b++){hash^=(bits>>(b*8))&255;hash*=1099511628211ULL;}}
   }
   uint32_t completed,revisited;CHECK(melee_web_audio_stream_progress(bank.get(),&completed,&revisited));CHECK(completed>50&&revisited>0);printf("HPS payloads%u revisited%u\n",completed,revisited);
+  printf("HPS cycle%u PCM FNV-1a %016llx\n",cycle,(unsigned long long)hash);
   if(cycle)CHECK(hash==first_hash);else first_hash=hash;
   CHECK(energy>1);printf("Original HPS cycle%u 100 seconds, energy%.9f\n",cycle,energy);
  }

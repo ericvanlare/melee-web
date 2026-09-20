@@ -2,12 +2,11 @@
 
 Dependencies are fetched separately and pinned in dependencies.lock.json.
 
-The public shell built by `scripts/build_public.py` ships none of the runtime
-components below. It contains only original HTML/CSS and a fullscreen script,
-uses device-provided system fonts and has no shipped package dependencies.
-Its public notices are in `web/public/notices.html`. This exclusion is not
-clearance for distributing a future playable build; see
-[the release review](docs/PUBLIC_RELEASE_REVIEW.md).
+The silent public player packages a compiled runtime and a fixed browser graph;
+the optional maintenance shell has no runtime. See the exact artifact boundary
+in [the release review](docs/PUBLIC_RELEASE_REVIEW.md) and its notice inventory.
+Development audio and the separate Dolphin reference application are excluded
+from the public player.
 
 | Source | Role | License/notice |
 | --- | --- | --- |
@@ -20,23 +19,32 @@ clearance for distributing a future playable build; see
 Aurora fetches further dependencies (SDL, Dawn bindings, Abseil, fmt, ImGui,
 texture/image libraries, SQLite and Tracy). Their source notices remain with each
 download. License attribution for a distributable bundle must be assembled from the
-actual dependency graph before a playable public release. None is included in
-the independent public shell.
+actual dependency graph before a playable public release. The maintenance shell includes none of those runtime components.
 
 No Nintendo disc images, extracted assets, audio, textures or game executables
 are tracked. This repository does not grant rights to upstream code or game data.
 
-## Free DSP coefficient generator
+## Audio implementation and separate Dolphin reference tools
 
-`web/dsp-coefficients.mjs` adapts Dolphin’s free replacement coefficient
-generator at revision `a2efdf1197be8132674b90fe9cf4761df39752ed`:
-https://github.com/dolphin-emu/dolphin/blob/a2efdf1197be8132674b90fe9cf4761df39752ed/docs/DSP/free_dsp_rom/generate_coefs.py
+The current `src/gameplay_audio_resample.c/.h` and `web/dsp-coefficients.mjs`
+are replacement implementations. Their specifications, numerical compatibility
+evidence and limitations are recorded in
+[the audio replacement record](docs/AUDIO_REPLACEMENT_EVIDENCE.md).
+The coefficient generator preserves the existing approximation byte for byte,
+including numerical compatibility values from Dolphin's replacement DROM; this
+does not make the table original hardware data or close its provenance review.
+No generated coefficient binary is tracked and no project-wide license is chosen.
 
-Retain GPL-2.0-or-later attribution and upstream notices. The generated 4096-byte
-replacement is checked against SHA-256
-`d7741279c2e8ec5c5fb318f8fbdd6de6bf583520d288e836a5383233a4238179`.
-It is not a Nintendo hardware ROM dump and is only approximately equivalent.
-The source generator is included; no generated coefficient binary is tracked.
+Earlier versions of those source files adapted Dolphin revision
+`a2efdf1197be8132674b90fe9cf4761df39752ed`, under GPL-2.0-or-later.
+Their history and previously built artifacts retain that provenance and any
+applicable obligations. The [GPL text](docs/licenses/dolphin-gpl-2.0-or-later.txt)
+and historical release inventory remain available.
+
+The reference observer remains in `reference-capture/dolphin/`, with its
+[license inventory](reference-capture/dolphin/LICENSES.md), source notices and
+Dolphin patches intact. It builds a separate reference application; it is not
+linked into the browser player. Replacing player audio does not relicense it.
 
 ## B0XX-style keyboard mapping
 
@@ -49,14 +57,9 @@ See [keyboard behavior and scope](docs/KEYBOARD_LAYOUTS.md).
 
 ## Additional development-runtime release findings
 
-The September 2026 launch audit inspected the pinned source trees and build
-configuration. The following are **not shipped in the public shell**:
+The September 2026 launch audit identified the audio adaptations described
+above. The following upstream findings still apply:
 
-- `src/gameplay_audio_resample.c/.h` adapts Dolphin Emulator audio code and
-  retains GPL-2.0-or-later notices; see `src/gameplay_audio_provenance.md` and
-  [Dolphin's pinned source](https://github.com/dolphin-emu/dolphin/tree/a2efdf1197be8132674b90fe9cf4761df39752ed).
-  The combined runtime's corresponding-source and license obligations remain
-  a release review item, separate from Nintendo rights.
 - `cmake/FighterRuntime.cmake` also compiles recovered original platform code
   from Melee's `extern/dolphin`: `AXAlloc.c`, `AXVPB.c`, `AXCL.c`, `AXAux.c`,
   `axfx.c`, `delay.c` and `reverb_std.c`. That directory name refers to the

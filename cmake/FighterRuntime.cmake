@@ -88,7 +88,7 @@ target_link_libraries(fighter_asset_runtime PUBLIC fighter_source_runtime)
 target_compile_options(fighter_asset_runtime PRIVATE -ffp-contract=off)
 
 # The public alpha has an explicitly silent audio policy.  Keep its source
-# graph separate from the development graph so the GPL-derived resampler is
+# graph separate from the development graph so the development resampler is
 # absent from both the compile commands and the final link closure.  The
 # normal fighter_source_runtime/fighter_asset_runtime targets remain exactly
 # as before for development, replay, and audio trace builds.
@@ -111,6 +111,32 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release" AND MELEE_WEB_PUBLIC_RUNTIME)
   target_compile_definitions(fighter_asset_runtime_public PRIVATE MELEE_WEB_PUBLIC_AUDIO_DISABLED)
   target_compile_options(fighter_asset_runtime_public PRIVATE -ffp-contract=off)
   target_link_libraries(fighter_asset_runtime_public PUBLIC fighter_source_runtime_public)
+endif()
+
+# The hosted audio preview is a separate Release graph.  It keeps the public
+# path-redaction boundary and the production export surface, while retaining
+# the development audio provider (resampler, FX and stream) for listening.
+# Never retarget the silent public archives: their source graph and identity
+# proof are intentionally independent of this staging profile.
+if(CMAKE_BUILD_TYPE STREQUAL "Release" AND MELEE_WEB_AUDIO_PREVIEW_RUNTIME)
+  get_target_property(_audio_preview_source_files fighter_source_runtime SOURCES)
+  add_library(fighter_source_runtime_audio_preview STATIC EXCLUDE_FROM_ALL ${_audio_preview_source_files})
+  target_include_directories(fighter_source_runtime_audio_preview PUBLIC src "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}"
+    PRIVATE .deps/aurora/include .deps/melee/extern/dolphin/include)
+  target_compile_definitions(fighter_source_runtime_audio_preview PUBLIC TARGET_PC
+    PRIVATE MELEE_WEB_MENU_MARIO_FD MELEE_WEB_PUBLIC_RUNTIME MELEE_WEB_AUDIO_PREVIEW_RUNTIME)
+  target_compile_options(fighter_source_runtime_audio_preview PRIVATE -ffunction-sections -fdata-sections -ffp-contract=off
+    -fno-builtin-sinf -fno-builtin-cosf -fno-builtin-tanf
+    -fno-builtin-atanf -fno-builtin-atan2f -fno-builtin-acosf
+    -include "${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h")
+  target_link_libraries(fighter_source_runtime_audio_preview PUBLIC hsd_native_runtime aurora::pad)
+
+  get_target_property(_audio_preview_asset_files fighter_asset_runtime SOURCES)
+  add_library(fighter_asset_runtime_audio_preview STATIC EXCLUDE_FROM_ALL ${_audio_preview_asset_files})
+  target_compile_definitions(fighter_asset_runtime_audio_preview PRIVATE
+    MELEE_WEB_PUBLIC_RUNTIME MELEE_WEB_AUDIO_PREVIEW_RUNTIME)
+  target_compile_options(fighter_asset_runtime_audio_preview PRIVATE -ffp-contract=off)
+  target_link_libraries(fighter_asset_runtime_audio_preview PUBLIC fighter_source_runtime_audio_preview)
 endif()
 add_executable(fighter_runtime_probe EXCLUDE_FROM_ALL tests/fighter_runtime_probe.c tests/fighter_runtime_probe.cpp tests/gameplay_match_context_trace.c tests/gameplay_action_trace.c)
 target_link_libraries(fighter_runtime_probe PRIVATE fighter_asset_runtime)
@@ -508,6 +534,30 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release" AND MELEE_WEB_PUBLIC_RUNTIME)
     -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_melee_web_native_asset_begin,_melee_web_native_asset_count,_melee_web_native_asset_name,_melee_web_native_asset_file,_melee_web_native_asset_commit,_melee_web_native_asset_abort,_melee_web_native_menu_file,_melee_web_native_menu_prepare,_melee_web_native_menu_launch,_melee_web_native_menu_unload,_melee_web_native_menu_pause,_melee_web_native_menu_message,_melee_web_native_menu_running,_melee_web_native_menu_phase,_melee_web_native_menu_cache_idle,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_set_keyboard_port,_melee_web_input_set_keyboard_layout)
   set_target_properties(gameplay_public PROPERTIES SUFFIX ".js")
   add_custom_target(runtime-public DEPENDS gameplay_public)
+endif()
+
+# Release staging profile with the same minimal browser API as gameplay_public.
+# Audio PCM is delivered by the existing synchronous menuAudio callback from
+# gameplay_menu_browser.cpp; no additional native export is permitted here.
+if(CMAKE_BUILD_TYPE STREQUAL "Release" AND MELEE_WEB_AUDIO_PREVIEW_RUNTIME)
+  add_executable(gameplay_audio_preview EXCLUDE_FROM_ALL src/gameplay_menu_browser.cpp src/browser_input.cpp src/browser_controllers.cpp
+    tests/native_menu_alarm_unavailable.c tests/native_menu_fighter_input.c tests/native_menu_stage_input.c)
+  add_dependencies(gameplay_audio_preview gameplay_menu_pipeline_seed)
+  target_include_directories(gameplay_audio_preview PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+  set_property(TARGET gameplay_audio_preview APPEND PROPERTY LINK_DEPENDS "${initial_pipeline_cache}")
+  target_compile_definitions(gameplay_audio_preview PRIVATE MELEE_WEB_PUBLIC_RUNTIME MELEE_WEB_AUDIO_PREVIEW_RUNTIME)
+  target_link_libraries(gameplay_audio_preview PRIVATE fighter_asset_runtime_audio_preview aurora::main)
+  target_include_directories(gameplay_audio_preview SYSTEM PRIVATE "${EMSCRIPTEN_SYSROOT}/include/compat")
+  target_compile_options(gameplay_audio_preview PRIVATE -ffp-contract=off)
+  target_link_options(gameplay_audio_preview PRIVATE -sENVIRONMENT=web -sDYNAMIC_EXECUTION=0
+    -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=134217728 -sSTACK_SIZE=8388608 -sEXIT_RUNTIME=0
+    --preload-file "${initial_pipeline_cache}@/initial_pipeline_cache.db"
+    -sEXPORTED_RUNTIME_METHODS=FS,IDBFS,addRunDependency,removeRunDependency,HEAPU8,UTF8ToString
+    -lidbfs.js
+    -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_melee_web_native_asset_begin,_melee_web_native_asset_count,_melee_web_native_asset_name,_melee_web_native_asset_file,_melee_web_native_asset_commit,_melee_web_native_asset_abort,_melee_web_native_menu_file,_melee_web_native_menu_prepare,_melee_web_native_menu_launch,_melee_web_native_menu_unload,_melee_web_native_menu_pause,_melee_web_native_menu_message,_melee_web_native_menu_running,_melee_web_native_menu_phase,_melee_web_native_menu_cache_idle,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_set_keyboard_port,_melee_web_input_set_keyboard_layout)
+  set_target_properties(gameplay_audio_preview PROPERTIES SUFFIX ".js")
+  target_link_options(gameplay_audio_preview PRIVATE -sASSERTIONS=0 -sSAFE_HEAP=0)
+  add_custom_target(runtime-audio-preview DEPENDS gameplay_audio_preview)
 endif()
 
 # Shared typed scene/model tables consumed by the original match interface.

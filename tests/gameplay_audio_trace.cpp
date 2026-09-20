@@ -3,6 +3,7 @@
 #include <stdexcept>
 #define CHECK(condition) do {if(!(condition)) throw std::runtime_error("Audio trace check failed: " #condition);} while(0)
 #include <cmath>
+#include <bit>
 #include <cstdio>
 #include <fstream>
 extern "C" int lbAudioAx_800237A8(int,int,int);
@@ -21,6 +22,9 @@ int main(int argc,char**argv){try{
    printf("SEM sound%d selects original sample%u\n",sound,ids[0]);
    if(!melee_web_audio_render(a,pcm.data()+320,31840,error,sizeof(error)))throw melee_web::DatError(error);
    double energy=0;for(float value:pcm){CHECK(std::isfinite(value)&&value>=-1&&value<=1);energy+=value*value;}CHECK(energy>0);
+   uint64_t hash=14695981039346656037ULL;
+   for(float value:pcm){uint32_t bits=std::bit_cast<uint32_t>(value);for(unsigned b=0;b<4;b++){hash^=(bits>>(b*8))&255;hash*=1099511628211ULL;}}
+   printf("sound%d cycle%u PCM FNV-1a %016llx\n",sound,cycle,(unsigned long long)hash);
    if(cycle)CHECK(pcm==reference);else reference=std::move(pcm);
    printf("cycle%u source voice PCM energy %.9f\n",cycle,energy);
   }

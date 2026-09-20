@@ -7,6 +7,16 @@ artifact, compare this inventory with the linked binary's actual symbols and
 the dependency lock, then expose the applicable full texts and any source
 delivery required by the selected licenses under the same release.
 
+## September 19 development source update
+
+The resampler and coefficient generator now have replacement implementations.
+See [the replacement record](../AUDIO_REPLACEMENT_EVIDENCE.md), including retained
+numerical-data provenance and the limits of compatibility testing. The GPL audio
+rows below are historical September 12 audit findings and still describe prior
+artifacts, not a new license determination for the current source. The public
+profile continues to exclude these modules and emit no PCM. The separate
+Dolphin reference observer retains its GPL notices and is not a player input.
+
 ## Artifact boundary
 
 The Release `gameplay_public` target links the recovered Melee/HSD source tree,
@@ -90,8 +100,8 @@ binary-level SBOM, corresponding-source delivery, or counsel review.
 
 ## GPL-related inventory findings
 
-The only GPL-marked implementation identified in the audited project/runtime
-paths is the Dolphin-derived resampler in `src/gameplay_audio_resample.c/.h`
+At the September 12 audit, the GPL-marked implementation identified in the
+then-audited project/runtime paths was the Dolphin-derived resampler in `src/gameplay_audio_resample.c/.h`
 and the matching browser coefficient generator in `web/dsp-coefficients.mjs`.
 The public profile excludes all three source paths and the generated
 `dsp_coef.bin` payload. No GPL marker or Dolphin Emulator provenance was found

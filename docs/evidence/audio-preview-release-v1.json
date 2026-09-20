@@ -1,0 +1,129 @@
+{
+  "aliases": [
+    "https://audio-pr-42.webmelee-staging.pages.dev"
+  ],
+  "branch": "audio-pr-42",
+  "canonical_staging_unchanged": "0a3cfb39-0ee0-42e1-8a87-9ecce6416054",
+  "deployment_id": "2cc618aa-573a-4717-b52c-d5bc561a74a3",
+  "environment": "preview",
+  "immutable_url": "https://2cc618aa.webmelee-staging.pages.dev",
+  "manifest_sha256": "809d67fc64cb31891066be42e94f1f284832d423bd7a0323104fe90e63badcf8",
+  "production_project_modified": false,
+  "project": "webmelee-staging",
+  "runtime_hash": "ff9f8d84072a0a8e",
+  "schema": "melee-web-audio-preview-release-v1",
+  "source_sha": "8717eb60b33007cb77d2ba74dde8fc93e1ebe9fb",
+  "status": "deployed_and_verified",
+  "recorded_at_utc": "2026-09-20T20:53:51.843305+00:00",
+  "pull_request": "https://github.com/ericvanlare/melee-web/pull/42",
+  "evidence_label": "Browser exercised",
+  "scope": "Owner-requested staging listening preview. Nonzero PCM reaches a connected 32000 Hz AudioWorklet through original CSS, SSS and Mario/Final Destination match entry (Ready countdown); pause/resume and Eject pass. No full-match performance, physical speaker quality, original PCM equivalence or licensing-clearance claim.",
+  "identity_sha256": "a81c874d3e118640a76964b5d6445791b8ac12f72131f8432a7c8590c6a3c5f8",
+  "manifest": {
+    "path": "work/audio-staging/site-verified.manifest.json",
+    "sha256": "809d67fc64cb31891066be42e94f1f284832d423bd7a0323104fe90e63badcf8"
+  },
+  "files": 32,
+  "native_files": [
+    {
+      "path": "runtime/ff9f8d84072a0a8e/gameplay_audio_preview.data",
+      "sha256": "4bdb7c4a3e906d907d066f0c65041d7eb3472dc25c9d8c98be6e4946fdce560f",
+      "size": 2621440
+    },
+    {
+      "path": "runtime/ff9f8d84072a0a8e/gameplay_audio_preview.js",
+      "sha256": "67c155ff14886bcd9a2b71cfad941b827af7cc0b90222737a9cecd0b2adfabc2",
+      "size": 283095
+    },
+    {
+      "path": "runtime/ff9f8d84072a0a8e/gameplay_audio_preview.wasm",
+      "sha256": "916e69948dcb7469a84514f47f2492f3256b638f5ba5d6e1d619cd1fb2ad60b2",
+      "size": 12038559
+    }
+  ],
+  "build": {
+    "target": "runtime-audio-preview",
+    "configuration": "Release",
+    "result": "pass",
+    "log": {
+      "path": "work/audio-staging/build.log",
+      "sha256": "d64a075b20c9476e5fe9c5bedc51b3e547889469ebaa7fcb99dfe3bc412d8b92"
+    }
+  },
+  "unit_tests": {
+    "result": "pass",
+    "tests": 1054,
+    "optional_skips": 46,
+    "log": {
+      "path": "work/audio-staging/full-suite.log",
+      "sha256": "2a361b386e7ad290a4851ddf1f1aaa1e95cd0883faa11c634c095730ebd295be"
+    }
+  },
+  "verification": {
+    "local-browser": {
+      "result": "pass",
+      "report": {
+        "path": "work/audio-staging/local-browser-verified/report.json",
+        "sha256": "36072949dcc5e3274a9d88f3fa4076a39938d0208e119e5edd54099785b9aae6"
+      },
+      "checks": 7,
+      "browser": "153.0.8010.50",
+      "playwright": "1.62.1"
+    },
+    "hosted-browser": {
+      "result": "pass",
+      "report": {
+        "path": "work/audio-staging/hosted-browser/report.json",
+        "sha256": "c335a0807a750af93c6e4ed9ad5252205828fd4b0b88dc3175086258b7f91445"
+      },
+      "checks": 7,
+      "browser": "153.0.8010.50",
+      "playwright": "1.62.1"
+    },
+    "hosted-http": {
+      "result": "pass",
+      "report": {
+        "path": "work/audio-staging/hosted-http.json",
+        "sha256": "1282ada091986757e6c88fe5b4bbeca4710e16f06f7aa814d8a0a83f9af0b047"
+      },
+      "resources": 30
+    }
+  },
+  "retained_failures": [
+    {
+      "path": "work/audio-staging/local-browser/report.json",
+      "reason": "Playwright 1.55 stalled worklet loading; an isolated worklet probe succeeded with 1.62.1, with no player change."
+    },
+    {
+      "path": "work/audio-staging/local-browser-current/report.json",
+      "reason": "Harness confirmed SSS while the original cursor remained below stage tiles; corrected ordinary keyboard navigation after visual/source inspection."
+    },
+    {
+      "path": "work/audio-staging/local-browser-final/report.json",
+      "reason": "Harness expected destruction although Chrome reported the matching AudioContext closed; now observes per-context closure or destruction."
+    }
+  ],
+  "capture_policy": "Owned-disc inputs, screenshots and full reports stay in ignored local work storage; no game assets were uploaded.",
+  "visual_inspection": {
+    "result": "pass",
+    "scope": "Local and hosted stage-target captures show Final Destination highlighted; match captures show its platform and Mario stock icons during Ready countdown.",
+    "captures": [
+      {
+        "path": "work/audio-staging/local-browser-verified/stage-target.png",
+        "sha256": "e298f95a68ce68a7c07e716713db86aca42ca0a84036ca15c4471a591a708baf"
+      },
+      {
+        "path": "work/audio-staging/local-browser-verified/match.png",
+        "sha256": "32acbdb0f07d57b8088a8c437c779af3a542dc2538be145fc93417f6999cf315"
+      },
+      {
+        "path": "work/audio-staging/hosted-browser/stage-target.png",
+        "sha256": "7f67689a126fe12b0e4965d3afe1265372239db998065bb718b71714e0ca2b19"
+      },
+      {
+        "path": "work/audio-staging/hosted-browser/match.png",
+        "sha256": "290ff4e64ccd0e12931314dfb07970fa22a20104faecb83b97fac63005aadc58"
+      }
+    ]
+  }
+}

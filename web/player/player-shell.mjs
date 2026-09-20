@@ -88,9 +88,11 @@ function setAudioDetails(open) {
   audioDetails.setAttribute('aria-hidden', String(!open));
   audioInfo.setAttribute('aria-expanded', String(open));
 }
-audioInfo.onclick = event => { event.stopPropagation(); setAudioDetails(!audioDetails.classList.contains('audio-details-open')); };
-audioInfo.onblur = () => setAudioDetails(false);
-audioInfo.onkeydown = event => { if (event.key === 'Escape') { setAudioDetails(false); audioInfo.blur(); } };
+if (audioInfo && audioDetails) {
+  audioInfo.onclick = event => { event.stopPropagation(); setAudioDetails(!audioDetails.classList.contains('audio-details-open')); };
+  audioInfo.onblur = () => setAudioDetails(false);
+  audioInfo.onkeydown = event => { if (event.key === 'Escape') { setAudioDetails(false); audioInfo.blur(); } };
+}
 
 settings = mountControllerSettings({
   container: $('controls-dialog'),

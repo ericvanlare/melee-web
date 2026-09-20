@@ -1,5 +1,9 @@
 # Public staging package
 
+For the separately authorized audio-enabled listening build of PR #42, use
+[Audio listening preview](AUDIO_PREVIEW.md). The silent package and deployment
+contract below remains the production baseline.
+
 `scripts/stage_public.py` prepares a static, no-audio player package for the
 isolated Cloudflare Pages project `webmelee-staging`, branch `staging`, and
 working URL `https://webmelee-staging.pages.dev`. The custom hostname

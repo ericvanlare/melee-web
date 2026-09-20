@@ -13,7 +13,7 @@ import {
   preflightScope,
 } from "../web/disc-session.mjs";
 import {openNativeGameSession} from "../web/runtime-audio-assets.mjs";
-import {DSP_COEFFICIENT_SHA256} from "../web/dsp-coefficients.mjs";
+import {AUDIO_FILTER_SHA256} from "../web/dsp-coefficients.mjs";
 
 const entries = new Map([
   ["stage.dat", {offset: 0x1000, size: 12}],
@@ -155,7 +155,7 @@ if (discPath) {
     new Uint8Array(await crypto.subtle.digest("SHA-256", audio.get("dsp_coef.bin"))),
     value => value.toString(16).padStart(2, "0"),
   ).join("");
-  assert.equal(digest, DSP_COEFFICIENT_SHA256);
+  assert.equal(digest, AUDIO_FILTER_SHA256);
   console.log("Disc session real-file validation, preflight, close, font, and DSP checks passed");
 } else {
   console.log("Disc session pure preflight/File-ownership checks passed (set MELEE_DISC_PATH for real-disc scope checks)");

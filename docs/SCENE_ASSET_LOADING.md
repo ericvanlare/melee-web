@@ -9,9 +9,9 @@ not additional fighter, stage, mode or performance acceptance.
 `DiscAssetSession` accepts a local File, validates the pinned USA revision-2 DOL,
 indexes the FST once, and checks the entire requested path set before reading
 payloads. The existing 64 MiB per-file and 128 MiB requested-FST limits remain.
-DOL-derived font bytes are explicit inputs. Development additionally imports
-independently generated, integrity-checked DSP coefficients; public descriptors
-and the public disc wrapper reject those coefficients. Generated inputs are
+DOL-derived font bytes are explicit inputs. Development and the audio listening
+preview additionally import generated, integrity-checked DSP coefficients; the
+silent public descriptors and disc wrapper reject those coefficients. Generated inputs are
 counted separately from FST bytes.
 Closing the session invalidates pending reads and releases its File/DOL/FST
 references; already returned byte maps remain owned by their callers.

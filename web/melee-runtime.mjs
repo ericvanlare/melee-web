@@ -300,7 +300,9 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     start() {
       if (!snapshot().canStart) return Promise.reject(Error('Prepare a valid local disc first.'));
       return operation('preparing', async () => {
-        await prepareNativeResources(); await prepareAudio();
+        // Create the audio context while still handling the user's Play click;
+        // native preparation may yield long enough to lose activation.
+        await prepareAudio(); await prepareNativeResources();
         await boundary(() => check(Module._melee_web_native_menu_launch())); prepared = false; focus(); syncAudio();
       });
     },

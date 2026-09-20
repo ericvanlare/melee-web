@@ -1,0 +1,61 @@
+{
+  "aliases": [
+    "https://audio-pr-42.webmelee-staging.pages.dev"
+  ],
+  "branch": "audio-pr-42",
+  "canonical_staging_unchanged": "b2e6cf3b-39f6-4145-8f01-7a5e12324721",
+  "deployment_id": "10af0790-360f-46d5-9340-b4ed389dc81f",
+  "environment": "preview",
+  "immutable_url": "https://10af0790.webmelee-staging.pages.dev",
+  "manifest_sha256": "5363b96804585e04c970a266597f3f93523263350ae85de226c28d01ab15dc5a",
+  "production_project_modified": false,
+  "project": "webmelee-staging",
+  "runtime_hash": "2d1e8b53f8a754a8",
+  "schema": "melee-web-audio-preview-ui-update-v1",
+  "source_sha": "ba9f49641bcf837ea66637d9e22e165bfa3766bc",
+  "status": "deployed_and_verified",
+  "recorded_at_utc": "2026-09-20T21:22:48.704824+00:00",
+  "baseline_receipt": "docs/evidence/audio-preview-release-v1.json",
+  "change": "Remove the audio-preview label, info button and tooltip from the player, and omit the preview-audio sentence in the disc dialog. Shared shell tolerates absence of the optional audio-info controls.",
+  "native_build_unchanged": true,
+  "owner_listening_feedback": "Owner reported that the sound sounded good on the preceding preview; this update changes only the player UI and packaging.",
+  "evidence_label": "Browser exercised",
+  "scope": "In-app browser inspection on localhost and hosted URL confirmed startup, toolbar with no audio label/info control, and working disc dialog without preview-audio copy. No new gameplay, timing or waveform claim; native/audio implementation bytes match the baseline preview.",
+  "verification": {
+    "package": {
+      "result": "pass",
+      "manifest": {
+        "path": "work/audio-staging/site-ui-cleanup.manifest.json",
+        "sha256": "5363b96804585e04c970a266597f3f93523263350ae85de226c28d01ab15dc5a"
+      }
+    },
+    "unit_suite": {
+      "result": "pass",
+      "tests": 1054,
+      "optional_skips": 46,
+      "log": {
+        "path": "work/audio-staging/ui-cleanup-full-suite.log",
+        "sha256": "ca524a33e742eec82d5123fbf922f3657b8ba42282f432e8115cc6fccbc781b9"
+      }
+    },
+    "hosted_http": {
+      "result": "pass",
+      "resources": 30,
+      "report": {
+        "path": "work/audio-staging/ui-cleanup-hosted-http.json",
+        "sha256": "d4edf264bd9776e742e36439256d6eb857f8c3a3e9b9d5f23b07eb37411bbb47"
+      }
+    },
+    "browser_ui": {
+      "result": "pass",
+      "method": "In-app browser accessibility state and local screenshot; hosted startup and disc open/cancel also observed."
+    }
+  },
+  "retained_local_http_failure": {
+    "log": {
+      "path": "work/audio-staging/ui-cleanup-local-http.log",
+      "sha256": "43baa1db2c07c2475617d6359675559e22194122b9a58ed349e744ef135fb63d"
+    },
+    "boundary": "Wrangler local serving returned 502 for /_headers because it attempted _headers/index.html (ENOTDIR). The hosted blocked-route check passes; this local full HTTP verification did not pass."
+  }
+}

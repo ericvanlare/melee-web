@@ -1,0 +1,181 @@
+{
+  "aliases": [
+    "https://audio-pr-42.webmelee-staging.pages.dev"
+  ],
+  "branch": "audio-pr-42",
+  "canonical_staging_unchanged": "b2e6cf3b-39f6-4145-8f01-7a5e12324721",
+  "deployment_id": "12aedbff-28de-4dc5-a201-2ee4aced8b5f",
+  "environment": "preview",
+  "immutable_url": "https://12aedbff.webmelee-staging.pages.dev",
+  "manifest_sha256": "e589b0fe7b35d186f554af0731cdada7476fec99ae4533aba6c559f6c3505770",
+  "production_project_modified": false,
+  "project": "webmelee-staging",
+  "runtime_hash": "a141c4ee0c74a9c0",
+  "schema": "melee-web-audio-main-integration-v1",
+  "source_sha": "f2f913ebd9359a45963bea31a9ef023fc9cda20a",
+  "status": "deployed_and_verified",
+  "recorded_at_utc": "2026-09-20T21:39:07.649699+00:00",
+  "integrated_main": "979fd09ade521afbc1f70f2b7d68231285f692a3",
+  "pull_request": "https://github.com/ericvanlare/melee-web/pull/42",
+  "evidence_label": "Browser exercised",
+  "scope": "Original CSS/SSS to Mario/Final Destination, ordinary source pause and No Contest to CSS, second match entry, outer pause/resume and Eject. Four exact asset generations include generated DSP coefficients; nonzero PCM reaches the connected 32 kHz worklet after scene handoffs. This is bounded functional lifecycle evidence, not a full-game, full-match performance, hardware PCM or licensing-clearance claim.",
+  "integration_changes": [
+    "Preserve Play-gesture AudioContext preparation and main scoped-owner prepared-state reset.",
+    "Use the replacement coefficient API in each main audio-enabled disc session scope.",
+    "Override the silent public shell disc opener with the audio-enabled scoped opener.",
+    "Export all six native asset transaction functions in the audio-preview Release target.",
+    "Preserve main roster restrictions, source scene lifetimes and the removed preview-label UI."
+  ],
+  "replacement_implementations_unchanged_from": "f701adaa493ef1c9688e99b7e01004c30089b4d8",
+  "identity_sha256": "87f15400c70f655e33e570c006e9d8c16181c1f42aaaa992f3f0ce56cf7a2fe7",
+  "manifest": {
+    "path": "work/audio-staging/main-integration/site.manifest.json",
+    "sha256": "e589b0fe7b35d186f554af0731cdada7476fec99ae4533aba6c559f6c3505770"
+  },
+  "native_files": [
+    {
+      "path": "runtime/a141c4ee0c74a9c0/gameplay_audio_preview.data",
+      "sha256": "8df6a998cef19b88a3eff0ee61f666e42791f5f73841818961aa3b224cad2c4b",
+      "size": 3518464
+    },
+    {
+      "path": "runtime/a141c4ee0c74a9c0/gameplay_audio_preview.js",
+      "sha256": "b5f1d6bd6ab4fb2dc2686f432ccefc6cae61dd9ec1fe0d6b95fdb6a994240c49",
+      "size": 284218
+    },
+    {
+      "path": "runtime/a141c4ee0c74a9c0/gameplay_audio_preview.wasm",
+      "sha256": "dbd3f18b1d0aec342b0a4a0b818378ba938f6236c8a3b69466646caa50414f4f",
+      "size": 12442286
+    }
+  ],
+  "verification": {
+    "audio_release_build": {
+      "result": "pass",
+      "target": "runtime-audio-preview",
+      "log": {
+        "path": "work/audio-staging/main-integration/audio-build.log",
+        "sha256": "96dfcf8811a8e5f1f71813d2098ce3fcad67a686ae11499f8a0e39ab367f696a"
+      }
+    },
+    "silent_public_release_build": {
+      "result": "pass",
+      "target": "runtime-public",
+      "log": {
+        "path": "work/audio-staging/main-integration/public-build.log",
+        "sha256": "39258d585e640664bf750b2962f5813e845d358f4a51f74365d570a171ed7931"
+      }
+    },
+    "full_suite": {
+      "result": "pass",
+      "tests": 1114,
+      "explicit_skips": 70,
+      "seconds": 238.906,
+      "log": {
+        "path": "work/audio-staging/main-integration/full-suite.log",
+        "sha256": "872107afbbbb0956ad5b316e10707a73a0c920c53f939649710fcf020133ef86"
+      }
+    },
+    "owned_disc_scope": {
+      "result": "pass",
+      "log": {
+        "path": "work/audio-staging/main-integration/disc-session.log",
+        "sha256": "3b4312b6d832059881fe5f38137bcefd5bbe95cfeb3316270c199b469d5a67f7"
+      },
+      "scope": "Actual local CISO preflight, repeated reads, concurrent close, DOL font and generated coefficient hash."
+    },
+    "local_browser": {
+      "result": "pass",
+      "report": {
+        "path": "work/audio-staging/main-integration/local-browser/report.json",
+        "sha256": "2c6acddc696b53b5a51fbf18955f6a13b77f100d48e7d7f8c943e74b21a69a4c"
+      },
+      "checks": 11,
+      "browser": "153.0.8010.50",
+      "playwright": "1.62.1",
+      "scopes": [
+        {
+          "generation": 1,
+          "file_count": 33
+        },
+        {
+          "generation": 2,
+          "file_count": 28
+        },
+        {
+          "generation": 3,
+          "file_count": 33
+        },
+        {
+          "generation": 4,
+          "file_count": 28
+        }
+      ],
+      "legacy_file_calls": 0,
+      "audio_phases": [
+        "css",
+        "css-resume",
+        "sss",
+        "match",
+        "css-after-no-contest",
+        "sss-after-no-contest",
+        "match-after-no-contest"
+      ]
+    },
+    "hosted_browser": {
+      "result": "pass",
+      "report": {
+        "path": "work/audio-staging/main-integration/hosted-browser/report.json",
+        "sha256": "a74dc716f17b1e1edf154f7a7dde9af2024d1e6ce1afed54071ce0493207d468"
+      },
+      "checks": 11,
+      "browser": "153.0.8010.50",
+      "playwright": "1.62.1",
+      "scopes": [
+        {
+          "generation": 1,
+          "file_count": 33
+        },
+        {
+          "generation": 2,
+          "file_count": 28
+        },
+        {
+          "generation": 3,
+          "file_count": 33
+        },
+        {
+          "generation": 4,
+          "file_count": 28
+        }
+      ],
+      "legacy_file_calls": 0,
+      "audio_phases": [
+        "css",
+        "css-resume",
+        "sss",
+        "match",
+        "css-after-no-contest",
+        "sss-after-no-contest",
+        "match-after-no-contest"
+      ]
+    },
+    "hosted_http": {
+      "result": "pass",
+      "report": {
+        "path": "work/audio-staging/main-integration/hosted-http.json",
+        "sha256": "466f01a957c11f430aa59a171271869eb7a8f036c9078fa09c8971306a8164b6"
+      },
+      "resources": 31
+    }
+  },
+  "visual_inspection": {
+    "result": "pass",
+    "scope": "Local and hosted source-pause screenshots show the original pause artwork and two Mario fighters. Second selection highlights Final Destination; second-match screenshot shows its platform and Mario stock icons."
+  },
+  "prior_receipts": [
+    "docs/evidence/audio-preview-release-v1.json",
+    "docs/evidence/audio-preview-ui-update-v1.json"
+  ],
+  "capture_policy": "Owned game data and screenshot captures stay in ignored local work storage."
+}
