@@ -74,6 +74,13 @@ scenario. It does not establish physical speaker quality, exact original PCM,
 controller latency or full-match performance. The owner's listening test is
 the purpose of the preview.
 
+Use the current bundled browser tools (the initial check used Playwright
+1.62.1 with Chrome 153). Playwright 1.55 stalled AudioWorklet module loading
+even in an isolated probe. Preserve that failure separately from player
+failures. The short stage-selection keyboard recipe is visually checked using
+the retained local `stage-target.png` and `match.png` captures; a phase number
+alone does not identify the stage.
+
 Open the supplied preview URL in a desktop WebGPU browser, select an owned
 USA 1.02 ISO/GCM/CISO, and press Play. Start with the CSS/SSS music, then a
 Mario/Final Destination match. Listen for missing music/effects, clicks,

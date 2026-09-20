@@ -278,7 +278,13 @@ try {
   });
 
   await check('ordinary B0XX A confirms the supported Mario/Final Destination match', async () => {
-    await page.waitForTimeout(700);
+    await page.waitForTimeout(1000);
+    // The original cursor starts below the stage tiles. This bounded keyboard
+    // recipe was visually checked against the displayed Final Destination
+    // highlight; no native selection or PAD state is written by the harness.
+    await driver.pressChord(['4'], {holdMs: 75, releaseMs: 100});
+    await driver.pressChord([']'], {holdMs: 45, releaseMs: 100});
+    await screenshot('stage-target');
     await press('m');
     await phase(7);
     const before = await trace();
