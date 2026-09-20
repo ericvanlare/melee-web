@@ -9,7 +9,15 @@ phase, history and source reads. This is regression evidence, not an original
 hardware accuracy pass. The [replacement record](docs/AUDIO_REPLACEMENT_EVIDENCE.md)
 also records an unverified original-DSP phase-writeback boundary and the retained
 coefficient-data provenance that still needs release review. The separate GPL
-Dolphin observer remains intact. Public audio and repository visibility are unchanged.
+Dolphin observer remains intact. Production audio and repository visibility are unchanged.
+
+The owner-requested [audio listening preview](docs/AUDIO_PREVIEW.md) is deployed
+on a separate staging preview branch. **Browser exercised**: original CSS/SSS
+and Mario/Final Destination match entry deliver nonzero PCM to a connected
+AudioWorklet; pause/resume and Eject pass. The
+[deployment receipt](docs/evidence/audio-preview-release-v1.json) binds the
+hosted bytes and checks. This does not establish hardware PCM equivalence,
+speaker quality or full-match timing.
 
 ## CI verification turnaround
 

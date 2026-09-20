@@ -7,6 +7,11 @@ It preserves the public player UI and minimal native API, includes music and
 effects, and uses the latest checked-in pipeline seed. It is a listening
 preview, not a hardware-fidelity or licensing-clearance claim.
 
+The [verified listening preview](https://2cc618aa.webmelee-staging.pages.dev)
+is frozen at source commit `8717eb6`. The
+[deployment receipt](evidence/audio-preview-release-v1.json) records the
+package identity, local and hosted checks, retained failures and evidence scope.
+
 The normal `runtime-public`, public packaging auditor and silent staging
 wrapper remain unchanged in policy. They do not accept this profile's identity
 or manifest. Production audio remains disabled. The audio preview belongs on
@@ -68,7 +73,7 @@ node tests/audio_preview_browser_test.mjs \
 
 The HTTP check verifies exact bytes, security/isolation headers, noindex and
 missing development routes. The browser check observes the real audio graph
-and nonzero PCM through original menus and a supported match, then exercises
+and nonzero PCM through original menus and supported match entry, then exercises
 pause/resume and Eject. It is **Browser exercised** evidence for that short
 scenario. It does not establish physical speaker quality, exact original PCM,
 controller latency or full-match performance. The owner's listening test is
