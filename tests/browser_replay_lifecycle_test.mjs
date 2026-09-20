@@ -120,11 +120,17 @@ assert(start&&pause&&completion);
  scope.window.menuRuntimeTiming({valid:1,total_ms:8,source_steps:2,source_draws:2});
  report=scope.replayMetrics({consumed:42,baseline:{heap:2048,preparations:0}});
  assert.equal(report.sourceSteps,2);assert.equal(report.sourceDraws,2);
+ assert.equal(report.nativeSourceActiveCallbacks,1);
+ assert.equal(report.nativeZeroSourceCallbacks,10004);
+ assert.equal(report.nativeSourceActiveCallbacks+report.nativeZeroSourceCallbacks,report.nativeCallbacks,
+  'Source-active and zero-source callback counts must partition every valid native callback');
  assert.equal(report.nativeCallbacksOverBudget,2);
  assert.equal(report.nativeCallbacksOver33ms,1);
  scope.resetTiming(false);
  report=scope.replayMetrics({consumed:42,baseline:{heap:2048,preparations:0}});
  assert.equal(report.sourceSteps,0);assert.equal(report.sourceDraws,0);
+ assert.equal(report.nativeSourceActiveCallbacks,0);
+ assert.equal(report.nativeZeroSourceCallbacks,0);
  assert.equal(report.worstNativeCallback,null);
  assert.equal(report.nativeCallbacksOverBudget,0,'A new replay starts its own bounded timing record');
 }

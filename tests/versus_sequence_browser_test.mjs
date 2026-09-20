@@ -1,21 +1,26 @@
 #!/usr/bin/env node
 /**
  * Ordinary two-keyboard whole-match sequences for the selected development
- * fighters. This records functional route evidence only; it does not claim
- * retail equivalence, rendering/audio equivalence, latency or performance.
+ * fighters. Default runs record functional route evidence. An explicit frozen
+ * timing plan additionally measures the named visible cold/warm sequence;
+ * neither mode claims retail, pixel, PCM or latency equivalence.
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {parseArgs} from 'node:util';
+import os from 'node:os';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {loadBrowserTools} from '../scripts/browser_tools.mjs';
+import {LAUNCH,BUILD_ARTIFACTS,verifyServedArtifacts} from '../scripts/run_hitch_matrix.mjs';
+import {timingFailures,accountLongTasks} from '../scripts/versus_sequence_timing.mjs';
 
 const {values}=parseArgs({options:Object.fromEntries(
-  ['url','disc','out','playwright','sequence'].map(key=>[key,{type:'string'}]))});
+  ['url','disc','out','playwright','sequence','timing-plan','timing-condition'].map(key=>[key,{type:'string'}]))});
 if(!values.url||!values.disc||!values.out)
   throw Error('Use --url DEVELOPMENT_RUNTIME_URL --disc OWNED_DISC --out NEW_LOCAL_DIRECTORY [--sequence NAME] [--playwright PACKAGE_DIR]');
+const started=Date.now(),wallTimeMs=1800000,deadline=started+wallTimeMs;
 
 const evidencePath=path.resolve(new URL('../docs/evidence/versus-sequences-v1.json',import.meta.url).pathname);
 const inventory=JSON.parse(await fs.readFile(evidencePath,'utf8'));
@@ -25,21 +30,91 @@ const selected=values.sequence?
   inventory.inventories.filter(item=>item.name===values.sequence):inventory.inventories;
 if(values.sequence&&!selected.length)throw Error(`Unknown predeclared sequence: ${values.sequence}`);
 await fs.mkdir(values.out); // Preserve the first failure; never overwrite a run.
+const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
+const harnessDependencies=['scripts/browser_driver.mjs','scripts/browser_tools.mjs',
+  'scripts/run_hitch_matrix.mjs','tools/browser_build_artifacts.json','scripts/versus_sequence_timing.mjs'];
+const harnessArtifacts=Object.fromEntries(await Promise.all(harnessDependencies.map(async name=>
+  [name,sha(await fs.readFile(new URL('../'+name,import.meta.url)))])));
+let timingPlan=null,servedArtifacts=null;
+const condition=values['timing-condition'];
+let runtimeUrl=values.url;
+if(values['timing-plan']){
+  timingPlan=JSON.parse(await fs.readFile(values['timing-plan'],'utf8'));
+  assert.equal(timingPlan.schema,'melee-web-versus-timing-plan-v1');
+  assert.equal(timingPlan.wall_time_ms,wallTimeMs,'Timing wall-time bound changed');
+  assert.equal(timingPlan.sequence,values.sequence,'Timing requires one declared sequence');
+  assert.ok(values.sequence&&selected.length===1);
+  assert.deepEqual(timingPlan.rounds,['cold','warm'],'Timing inventory must contain exactly two rounds');
+  assert.ok(timingPlan.rounds.includes(condition),'Choose --timing-condition cold or warm');
+  assert.ok(path.isAbsolute(timingPlan.browser_profile),'Timing browser profile must be absolute');
+  assert.equal(timingPlan.inventory_sha256,sha(await fs.readFile(evidencePath)));
+  assert.equal(timingPlan.harness_sha256,sha(await fs.readFile(new URL(import.meta.url))));
+  assert.deepEqual(timingPlan.harness_artifacts,harnessArtifacts,'Harness dependency changed');
+  assert.deepEqual(timingPlan.launch,LAUNCH,'Timing launch configuration changed');
+  const receiptBytes=await fs.readFile(timingPlan.build_receipt.path);
+  assert.equal(sha(receiptBytes),timingPlan.build_receipt.sha256);
+  const receipt=JSON.parse(receiptBytes);
+  // The same complete served-artifact verifier used by the frozen hitch matrix
+  // binds this run before any game input. Each declared slot is consumed once.
+  const planHash=sha(await fs.readFile(values['timing-plan']));
+  if(condition==='warm'){
+    const coldStart=JSON.parse(await fs.readFile(values['timing-plan']+'.cold.started.json','utf8'));
+    assert.equal(coldStart.plan_sha256,planHash);
+    const cold=JSON.parse(await fs.readFile(path.join(coldStart.out,'report.json'),'utf8'));
+    assert.equal(cold.completed,true,'Warm requires the cold sequence and unload to complete');
+    assert.ok(cold.final_cache?.file_bytes>0,'Cold unload did not retain a render cache');
+  }
+  await fs.writeFile(values['timing-plan']+'.'+condition+'.started.json',JSON.stringify({
+    out:path.resolve(values.out),started:new Date().toISOString(),plan_sha256:planHash
+  },null,2)+'\n',{flag:'wx'});
+  if(condition==='cold')await fs.mkdir(timingPlan.browser_profile);
+  else assert.ok((await fs.stat(timingPlan.browser_profile)).isDirectory());
+  const url=new URL(values.url);url.searchParams.set('hitch-capture','1');
+  if(condition==='cold')url.searchParams.set('render-cache','clear');
+  else url.searchParams.delete('render-cache');
+  runtimeUrl=url.href;
+  servedArtifacts=await verifyServedArtifacts({url:values.url,
+    artifacts:Object.fromEntries(BUILD_ARTIFACTS.map(name=>[name,receipt.files[name]]))},deadline);
+}
+const runs=timingPlan?[{...selected[0],
+  inventory_name:selected[0].name,name:`${selected[0].name} ${condition}`,condition}]:selected;
 
 const {chromium,browser:launchOptions}=await loadBrowserTools(values.playwright);
-const browser=await chromium.launch({...launchOptions,headless:false});
-const page=await browser.newPage({viewport:{width:1280,height:960}});
-const driver=createBrowserDriver(page,{timeoutMs:60000,deadline:Date.now()+1800000});
+const context=timingPlan?await chromium.launchPersistentContext(timingPlan.browser_profile,
+  {...LAUNCH,...launchOptions}):null;
+const browser=context?context.browser():await chromium.launch({...launchOptions,headless:false});
+const page=context?(context.pages()[0]||await context.newPage()):
+  await browser.newPage({viewport:{width:1280,height:960}});
+const driver=createBrowserDriver(page,{timeoutMs:60000,deadline});
 const report={schema:inventory.report_schema,inventory:evidencePath,
   inventory_spec:inventory,
+  timing_plan:timingPlan,timing_condition:condition||null,served_artifacts:servedArtifacts,
+  harness_artifacts:harnessArtifacts,
+  machine:{platform:os.platform(),arch:os.arch(),release:os.release(),cpu:os.cpus()[0]?.model},
   harness_sha256:createHash('sha256').update(await fs.readFile(new URL(import.meta.url))).digest('hex'),
   inventory_sha256:createHash('sha256').update(await fs.readFile(evidencePath)).digest('hex'),
   inventory_status:inventory.status,browser:browser.version(),sequence_filter:values.sequence||null,
   scope:inventory.scope,checks:[],boundaries:[],sequences:[],owner_lifetime_limit:128,
   owner_lifetime:null,completed:false};
+const watchdog=setTimeout(()=>{report.deadline_exhausted=true;void page.close().catch(()=>{});},
+  Math.max(1,deadline-Date.now()));
 
 const check=async(name,run)=>{await run();report.checks.push(name);console.log(name);};
 const runtimeError=()=>page.locator('#status').getAttribute('data-runtime-error');
+async function waitForPhase(phase){
+  if(!timingPlan)return driver.waitForPhase(phase);
+  const result=await page.waitForFunction(phase=>{
+    const status=document.querySelector('#status')?.textContent||'';
+    if(status.startsWith('Paused after a timing disruption'))return {error:status};
+    const error=document.querySelector('#status')?.dataset.runtimeError;
+    if(error)return {error};
+    const pause=document.querySelector('#pause');
+    return Module._melee_web_native_menu_phase()===phase&&Module._melee_web_native_menu_running()&&
+      pause&&!pause.disabled?{ready:true}:false;
+  },phase,{timeout:60000,polling:125});
+  const value=await result.jsonValue();await result.dispose();
+  if(value?.error)throw Error(value.error);
+}
 async function snapshot(boundary,sequence,matchIndex,stage){
   const state=await page.evaluate(()=>({
     phase:Module._melee_web_native_menu_phase(),
@@ -54,48 +129,56 @@ async function snapshot(boundary,sequence,matchIndex,stage){
   return state;
 }
 async function waitMatchReady(){
-  await page.waitForFunction(()=>{
+  await page.waitForFunction(timingMode=>{
+    const status=document.querySelector('#status')?.textContent||'';
+    if(timingMode&&status.startsWith('Paused after a timing disruption'))return {error:status};
     const error=document.querySelector('#status')?.dataset.runtimeError;
     if(error)return {error};
     const state=window.menuObserveMatch?.();
     return Module._melee_web_native_menu_phase()===7&&Module._melee_web_native_menu_running()&&
       state?.frame>0&&state.ready&&!state.paused&&!state.ending?{ready:true}:false;
-  },null,{timeout:60000}).then(async result=>{
+  },!!timingPlan,{timeout:60000,polling:timingPlan?125:"raf"}).then(async result=>{
     const value=await result.jsonValue();await result.dispose();
     if(value?.error)throw Error(value.error);
   });
 }
 async function waitForStockDrop(previous){
-  const result=await page.waitForFunction(previous=>{
+  const result=await page.waitForFunction(({previous,timingMode})=>{
+    const status=document.querySelector('#status')?.textContent||'';
+    if(timingMode&&status.startsWith('Paused after a timing disruption'))return {error:status};
     const error=document.querySelector('#status')?.dataset.runtimeError;
     if(error)return {error};
     const state=window.menuObserveMatch?.();
     if(!state?.players)return false;
     return state.complete||(state.ready&&state.players[0].stocks<previous)?state:false;
-  },previous,{timeout:45000});
+  },{previous,timingMode:!!timingPlan},{timeout:45000,polling:timingPlan?125:"raf"});
   const value=await result.jsonValue();await result.dispose();
   if(value?.error)throw Error(value.error);
   return value;
 }
 async function waitForGroundedRespawn(stocks){
-  const result=await page.waitForFunction(stocks=>{
+  const result=await page.waitForFunction(({stocks,timingMode})=>{
+    const status=document.querySelector('#status')?.textContent||'';
+    if(timingMode&&status.startsWith('Paused after a timing disruption'))return {error:status};
     const error=document.querySelector('#status')?.dataset.runtimeError;
     if(error)return {error};
     const state=window.menuObserveMatch?.();
     const player=state?.players?.[0];
     return state?.ready&&!state.paused&&!state.ending&&player?.stocks===stocks&&
       player.motion===14&&player.groundAir===0?{ready:true}:false;
-  },stocks,{timeout:45000});
+  },{stocks,timingMode:!!timingPlan},{timeout:45000,polling:timingPlan?125:"raf"});
   const value=await result.jsonValue();await result.dispose();
   if(value?.error)throw Error(value.error);
 }
 async function waitForCssOrPrize(){
-  const result=await page.waitForFunction(()=>{
+  const result=await page.waitForFunction(timingMode=>{
+    const status=document.querySelector('#status')?.textContent||'';
+    if(timingMode&&status.startsWith('Paused after a timing disruption'))return {error:status};
     const error=document.querySelector('#status')?.dataset.runtimeError;
     if(error)return {error};
     const phase=Module._melee_web_native_menu_phase();
     return (phase===1||phase===9)&&Module._melee_web_native_menu_running()?{phase}:false;
-  },null,{timeout:60000});
+  },!!timingPlan,{timeout:60000,polling:timingPlan?125:"raf"});
   const value=await result.jsonValue();await result.dispose();
   if(value?.error)throw Error(value.error);
   return value.phase;
@@ -200,13 +283,13 @@ async function selectStage(stage){
   throw Error(`SSS stage ${stage} did not converge through ordinary keyboard input`);
 }
 async function enterMatch(match){
-  await driver.waitForPhase(1);
+  await waitForPhase(1);
   await selectFighter(match.p1,0);await selectFighter(match.p2,1);
   // Original CSS ignores Start during its 30-tick entry debounce. A default
   // Mario selection can converge before even one source tick has elapsed.
   await page.waitForTimeout(700);
   await driver.pressChord([startKey(0),startKey(1)],{holdMs:100,releaseMs:200});
-  await driver.waitForPhase(3);await page.waitForTimeout(700);await selectStage(match.stage);
+  await waitForPhase(3);await page.waitForTimeout(700);await selectStage(match.stage);
   await driver.pressChord([attackKey(0)],{holdMs:100,releaseMs:180});
   await waitMatchReady();
   const state=await page.evaluate(()=>window.menuObserveMatch());
@@ -238,11 +321,16 @@ async function eliminateP1(sequence,matchIndex){
   }
   // Source MatchEnd publishes winners at close, after the ending flow has
   // reported complete. Observe its terminal ranking rather than guessing.
-  const completeHandle=await page.waitForFunction(()=>{
+  const completeHandle=await page.waitForFunction(timingMode=>{
+    const status=document.querySelector('#status')?.textContent||'';
+    if(timingMode&&status.startsWith('Paused after a timing disruption'))return {error:status};
+    const error=document.querySelector('#status')?.dataset.runtimeError;
+    if(error)return {error};
     const state=window.menuObserveMatch();
     return state?.complete&&state.terminal?state:false;
-  },null,{timeout:60000});
+  },!!timingPlan,{timeout:60000,polling:timingPlan?125:"raf"});
   const final=await completeHandle.jsonValue();await completeHandle.dispose();
+  if(final?.error)throw Error(final.error);
   assert.deepEqual(stockPath,[4,3,2,1,0],'Observed P1 stock path differs from four-stock elimination');
   assert.equal(respawns,3,'Observed respawn count differs from three respawns');
   assert.equal(final.complete,true,'Source match did not report completion');
@@ -253,14 +341,14 @@ async function eliminateP1(sequence,matchIndex){
     winner:final.terminal.winners[0],actions,final};
 }
 async function confirmResults(sequence,matchIndex){
-  await driver.waitForPhase(8);await snapshot('Results',sequence,matchIndex,'Results');
+  await waitForPhase(8);await snapshot('Results',sequence,matchIndex,'Results');
   // Results can stay on the original statistics page after one Start. Keep
   // sending ordinary release-separated Start chords while phase 8 remains;
   // each attempt is bounded and the source phase decides when to stop.
   let resultConfirmations=0;
   for(;resultConfirmations<8;resultConfirmations++){
     if(await page.evaluate(()=>Module._melee_web_native_menu_phase())!==8)break;
-    await driver.waitForPhase(8);
+    await waitForPhase(8);
     await driver.pressChord([startKey(0),startKey(1)],{holdMs:120,releaseMs:1380});
   }
   const phase=await waitForCssOrPrize();
@@ -271,10 +359,10 @@ async function confirmResults(sequence,matchIndex){
     let prizeConfirmations=0;
     for(;prizeConfirmations<8;prizeConfirmations++){
       if(await page.evaluate(()=>Module._melee_web_native_menu_phase())!==9)break;
-      await driver.waitForPhase(9);
+      await waitForPhase(9);
       await driver.pressChord([startKey(0),startKey(1)],{holdMs:120,releaseMs:1380});
     }
-    await driver.waitForPhase(1);
+    await waitForPhase(1);
   }
   else assert.equal(phase,1,'Results did not return to CSS or the original Prize route');
   await snapshot('CSS after Results/Prize',sequence,matchIndex,'CSS');
@@ -282,7 +370,20 @@ async function confirmResults(sequence,matchIndex){
 }
 
 try{
-  await page.goto(values.url);
+  if(timingPlan)assert.equal(browser.version(),timingPlan.browser_version,'Browser version differs from the frozen plan');
+  if(timingPlan){
+    const cdp=await page.context().newCDPSession(page);
+    await cdp.send('Emulation.setFocusEmulationEnabled',{enabled:false});
+    await page.bringToFront();
+    report.browser_identity=await cdp.send('Browser.getVersion');
+    report.browser_command_line=await cdp.send('Browser.getBrowserCommandLine');
+    const browserCdp=await browser.newBrowserCDPSession();
+    report.browser_system_info=await browserCdp.send('SystemInfo.getInfo');
+    await browserCdp.detach();
+    await cdp.detach();
+    report.focus_emulation=false;
+  }
+  await page.goto(runtimeUrl);
   // Native owner teardown hooks are diagnostics only. The collector is
   // bounded so a runaway callback cannot turn a browser run into unbounded
   // evidence; overflow is rejected by this test, never by the runtime.
@@ -295,18 +396,56 @@ try{
     };
   },128);
   await driver.waitForImport();
-  await page.waitForFunction(()=>Module._melee_web_native_menu_cache_idle()===1,null,{timeout:60000});
+  await page.waitForFunction(timingMode=>{
+    const status=document.querySelector('#status')?.textContent||'';
+    if(timingMode&&status.startsWith('Paused after a timing disruption'))return {error:status};
+    const error=document.querySelector('#status')?.dataset.runtimeError;
+    if(error)return {error};
+    return Module._melee_web_native_menu_cache_idle()===1?{ready:true}:false;
+  },!!timingPlan,{timeout:60000}).then(async result=>{
+    const value=await result.jsonValue();await result.dispose();
+    if(value?.error)throw Error(value.error);
+  });
+  if(timingPlan){
+    report.initial_cache=await page.evaluate(()=>({state:Module.runtimeCacheState?.state,
+      file_bytes:Number(Module.runtimeCacheState?.fileBytes||0),driver_cache:'uncontrolled'}));
+    assert.equal(report.initial_cache.state,condition==='cold'?'cleared':'ready');
+    if(condition==='warm')assert.ok(report.initial_cache.file_bytes>0);
+  }
   await page.locator('#controls-open').click();
   await page.locator('#keyboard-layout').selectOption('two');
   await page.getByLabel('Player 1 input source',{exact:true}).selectOption('keyboard');
   await page.getByLabel('Player 2 input source',{exact:true}).selectOption('keyboard');
   await page.locator('#controls-close').click();
   await check('owned disc -> original CSS',async()=>{await driver.selectDisc(values.disc);await driver.waitForStart();await driver.launch();});
+  if(timingPlan)await page.waitForFunction(timingMode=>{
+    const status=document.querySelector('#status')?.textContent||'';
+    if(timingMode&&status.startsWith('Paused after a timing disruption'))return {error:status};
+    const error=document.querySelector('#status')?.dataset.runtimeError;
+    if(error)return {error};
+    const metrics=window.menuSequenceMetrics();
+    return metrics.native.callbacks.live>0&&!metrics.scenes.preparation.active&&
+      !metrics.scenes.preparation.pending_entry?{ready:true}:false;
+  },true,{timeout:60000,polling:125}).then(async result=>{
+    const value=await result.jsonValue();await result.dispose();
+    if(value?.error)throw Error(value.error);
+  });
   const documentMarker=`versus-sequences-${Date.now()}`;
   await page.evaluate(marker=>{window.versusSequencesDocument=marker;},documentMarker);
-  for(const sequence of selected){
-    const sequenceReport={name:sequence.name,matches:[],started:false,completed:false};
+  report.initial_metrics=timingPlan?await page.evaluate(()=>window.menuSequenceMetrics()):null;
+  if(timingPlan){
+    report.canvas=await page.evaluate(()=>{const c=document.querySelector('#canvas'),r=c.getBoundingClientRect();
+      return {dpr:devicePixelRatio,buffer_width:c.width,buffer_height:c.height,
+        x:r.x,y:r.y,width:r.width,height:r.height,hidden:document.hidden,has_focus:document.hasFocus()};});
+    assert.equal(report.canvas.dpr,2);assert.equal(report.canvas.buffer_width,1280);
+    assert.equal(report.canvas.buffer_height,960);assert.ok(report.canvas.width>0&&report.canvas.height>0);
+    assert.equal(report.canvas.hidden,false);assert.equal(report.canvas.has_focus,true);
+  }
+  for(const sequence of runs){
+    const sequenceReport={name:sequence.name,inventory_name:sequence.inventory_name||sequence.name,
+      condition:sequence.condition||'functional',matches:[],started:false,completed:false};
     report.sequences.push(sequenceReport);
+    if(timingPlan)sequenceReport.timing_start=await page.evaluate(()=>window.menuSequenceMetrics({begin:true}));
     await check(`${sequence.name}: pre-match CSS boundary`,async()=>{
       await snapshot('CSS before match',sequence.name,null,'CSS');
     });
@@ -329,6 +468,16 @@ try{
     }
     sequenceReport.completed=true;
     await snapshot('CSS after sequence',sequence.name,null,'CSS');
+    if(timingPlan){
+      sequenceReport.timing=await page.evaluate(()=>window.menuSequenceMetrics());
+      sequenceReport.timing.browser.longtasks.preparation_accounting=accountLongTasks(
+        sequenceReport.timing.browser.longtasks.records,sequenceReport.timing.scenes.entries,
+        {sequenceStart:sequenceReport.timing.sequence.started_ms});
+      sequenceReport.browser_diagnostics=await driver.diagnostics();
+      sequenceReport.timing_failures=timingFailures(sequenceReport.timing,
+        {errors:sequenceReport.browser_diagnostics.errors});
+      await fs.writeFile(path.join(values.out,`${sequence.condition}-timing.json`),JSON.stringify(sequenceReport.timing,null,2)+'\n',{flag:'wx'});
+    }
   }
   await check('same source backing arena across every CSS/Results/Prize boundary',async()=>{
     const owned=report.boundaries.filter(entry=>entry.memory?.source_session_owned);
@@ -367,13 +516,25 @@ try{
     assert.equal(memory.source_allocation_bytes,0);
   });
   report.completed=true;
+  if(timingPlan)report.final_cache=await page.evaluate(()=>({state:Module.runtimeCacheState?.state,
+    file_bytes:Number(Module.runtimeCacheState?.fileBytes||0),driver_cache:'uncontrolled'}));
+  if(timingPlan){
+    report.performance_pass=report.sequences.every(s=>s.timing_failures.length===0);
+    if(!report.performance_pass)process.exitCode=1;
+  }
 }catch(error){
   report.failure={message:error.message,stack:error.stack,diagnostics:error.diagnostics||null,
     status:await runtimeError().catch(()=>null)};
   process.exitCode=1;console.error(error.stack||error.message);
 }finally{
+  clearTimeout(watchdog);
+  report.elapsed_ms=Date.now()-started;
+  if(timingPlan)report.final_metrics=await page.evaluate(()=>window.menuSequenceMetrics()).catch(error=>({unavailable:error.message}));
   report.owner_lifetime=await ownerLifetimeState().catch(error=>({unavailable:error.message}));
   report.diagnostics=await driver.diagnostics().catch(error=>({unavailable:error.message}));
+  if(timingPlan&&(report.diagnostics.unavailable||report.diagnostics.errors?.length)){
+    report.performance_pass=false;process.exitCode=1;
+  }
   report.source=await page.evaluate(()=>({
     native:Module.UTF8ToString(Module._melee_web_native_menu_diagnostics()),
     input:JSON.parse(Module.UTF8ToString(Module._melee_web_input_message())),
@@ -381,5 +542,5 @@ try{
   })).catch(error=>({unavailable:error.message}));
   await fs.writeFile(path.join(values.out,'report.json'),JSON.stringify(report,null,2)+'\n');
   await page.screenshot({path:path.join(values.out,'boundary.png'),fullPage:true}).catch(()=>{});
-  driver.dispose();await browser.close();
+  driver.dispose();if(context)await context.close();else await browser.close();
 }
