@@ -60,7 +60,7 @@ The Release target preloads `web/initial_pipeline_cache.db.gz.b64` as
 2,621,440-byte SQLite database with SHA-256
 `4bdb7c4a3e906d907d066f0c65041d7eb3472dc25c9d8c98be6e4946fdce560f`. Its
 schema has one `aurora_schema` row, one shader row and 627 pipeline rows. The
-current candidate preserves all 626 previous records, including the 78 added
+current release preserves all 626 previous records, including the 78 added
 for Link/Young Link, and appends two portable configurations recovered from the
 failed Marth/Battlefield holdout's saved pipeline DB/WAL. The
 [current holdout evidence](CURRENT_RUNTIME_HOLDOUTS_20260919.md) records that
@@ -68,8 +68,8 @@ failure, exact descriptor identities and preservation checks. The
 [Link descriptor ledger](evidence/link-gpu-compilation-v1.json) and
 [Roy/Doc ledger](evidence/roy-doc-public-preparation-v1.json) remain historical
 evidence. No raw draw provenance, IndexedDB/profile pages, or Dawn driver cache
-is shipped. This describes the candidate seed; the deployed release remains
-identified by the [deployment receipt](evidence/public-link-pipeline-release-v1.json).
+is shipped. The deployed release is identified by the
+[deployment receipt](evidence/public-marth-pipeline-release-v1.json).
 
 The seed contains binary renderer configuration blobs and hashes rather than
 file names. Inspection found no raw texture, model, audio or disc bytes. That
@@ -254,7 +254,7 @@ WebMelee clearance or completeness.
    provides the configured notice texts. A complete post-link SBOM remains a
    follow-up; permissive licenses are not described as requiring GPL-style
    corresponding-source publication.
-6. Decide whether the preloaded 507-row Aurora seed can be distributed and
+6. Decide whether the preloaded 628-record Aurora seed can be distributed and
    retain its exact provenance, hash and notice treatment.
 7. Have counsel review the disc-access workflow, access controls and applicable
    Section 1201/local-law questions.

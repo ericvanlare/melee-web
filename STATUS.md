@@ -26,17 +26,32 @@ not a fix or acceptance pass. See the [investigation and recovery limits](docs/B
 The original failure remains causally unassigned. The project owner approved a
 separate [current-runtime holdout gate](docs/HITCH_CAPTURE.md#approved-current-runtime-scope--2026-09-19)
 on September 19, retaining that historical failure and every hard threshold.
-Issue #33 remains open: the first cold holdout failed because it created two
-live pipelines. Both original state/timer comparisons pass (7,347 Marth/Marth
-Battlefield updates and 5,953 Falco/Falco Final Destination updates), but the
-remaining three timing slots are unstarted. The failed campaign is preserved;
-both inputs are now exposed. Two fresh header/input-only donors were reserved
-before tuning. A candidate seed adds exactly the two recovered portable
-descriptors while preserving all 626 previous records. Its complete 7,347-update development regression preserves the declared state
-and timer with zero live pipelines; both Release builds, 1,006 tests (44
-optional skips), public HTTP checks and ten browser checks pass. The fresh
-holdout evaluation is in progress. Original draw cadence remains unevaluated. See the
-[failed campaign and correction evidence](docs/CURRENT_RUNTIME_HOLDOUTS_20260919.md).
+Issue #33's approved current-runtime gate now passes. The first campaign failed
+on two live pipelines and remains preserved with its final three slots unstarted.
+PR #47 adds exactly the two recovered portable descriptors while preserving all
+626 previous records. Its 7,347-update development regression matches declared
+state and timer with zero live pipelines. Both Release builds, 1,006 tests
+(44 optional skips) and full GitHub Verify pass; Verify took 6m 06s.
+
+Two replacement inputs were reserved from header/input-only evidence before
+tuning. Independent original reference pairs and browser comparisons match
+6,432 Marth/Marth Battlefield and 8,561 Falco/Falco Final Destination declared
+state updates and exact timers. All four frozen unprofiled cold/warm runs pass:
+29,986 updates/draws, no native target misses, hard gaps, long tasks, audio
+underruns/overflows, live pipelines, timing resumes, focus losses or browser
+errors. Native/browser maxima are 13.695/29.000 ms on Apple M4, macOS 26.6.2,
+Chrome 153.0.8010.50, 640×480 at DPR 2. Preparation takes 149.600–166.200 ms;
+Marth retains 66,846,720 bytes of live heap growth and Falco zero. Both inputs
+exhaust their frozen cap before original match ending; neither is a complete
+original match. These are `per_tick` measurements, without original draw-cadence,
+live-controller, pixel or PCM admission. See the
+[failed campaign, correction and accepted replacement evidence](docs/CURRENT_RUNTIME_HOLDOUTS_20260919.md).
+
+PR #47 is merged and deployed at [webmelee.gg](https://webmelee.gg). Both
+production origins pass exact HTTP verification and all ten public browser
+checks. The public alpha remains deliberately silent; its hosted functional
+checks are separate from the audio-enabled development performance gate.
+See the [current release receipt](docs/evidence/public-marth-pipeline-release-v1.json).
 
 The current PR #38 development Release completed two cold/warm rounds on
 Fox/Marth Dream Land and Marth/Falco Yoshi's Story: 37,920 source updates/draws,
@@ -90,11 +105,13 @@ The state capture retains a browser gap and audio underruns. Four separate
 bounded public segments (both player orders cold/warm, 450 updates each) pass
 without timing pauses, live pipelines or native target misses; native/browser
 maxima are 11.370/25.245 ms. These silent functional checks do not establish
-full-match performance. The historical a822 stall remains unresolved. The later current-runtime
-holdout campaign failed and remains open under #33, as recorded above. PR #38 is merged, and this
-fix is now deployed at [webmelee.gg](https://webmelee.gg). The exact production
+full-match performance. The historical a822 stall remains unresolved. The first
+current-runtime holdout campaign failed; a separately frozen replacement
+campaign passes with the two-descriptor correction and fresh inputs recorded
+above. PR #38 is merged, and this
+fix remains deployed at [webmelee.gg](https://webmelee.gg). Its original production
 bytes and ten headed browser checks pass on both the immutable origin and apex;
-see the [current release receipt](docs/evidence/public-link-pipeline-release-v1.json).
+see the [PR #38 release receipt](docs/evidence/public-link-pipeline-release-v1.json).
 
 ## Dr. Mario and Roy development candidates
 
