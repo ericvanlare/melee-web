@@ -7,10 +7,11 @@ It preserves the public player UI and minimal native API, includes music and
 effects, and uses the latest checked-in pipeline seed. It is a listening
 preview, not a hardware-fidelity or licensing-clearance claim.
 
-The [verified listening preview](https://2cc618aa.webmelee-staging.pages.dev)
-is frozen at source commit `8717eb6`. The
-[deployment receipt](evidence/audio-preview-release-v1.json) records the
-package identity, local and hosted checks, retained failures and evidence scope.
+The [verified listening preview](https://10af0790.webmelee-staging.pages.dev)
+is frozen at source commit `ba9f496`. The
+[UI update receipt](evidence/audio-preview-ui-update-v1.json) records this package
+and its checks. The [original deployment receipt](evidence/audio-preview-release-v1.json)
+retains the audio, lifecycle and compatibility evidence for the unchanged native build.
 
 The normal `runtime-public`, public packaging auditor and silent staging
 wrapper remain unchanged in policy. They do not accept this profile's identity

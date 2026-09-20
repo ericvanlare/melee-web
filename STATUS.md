@@ -15,8 +15,10 @@ The owner-requested [audio listening preview](docs/AUDIO_PREVIEW.md) is deployed
 on a separate staging preview branch. **Browser exercised**: original CSS/SSS
 and Mario/Final Destination match entry deliver nonzero PCM to a connected
 AudioWorklet; pause/resume and Eject pass. The
-[deployment receipt](docs/evidence/audio-preview-release-v1.json) binds the
-hosted bytes and checks. This does not establish hardware PCM equivalence,
+[deployment receipt](docs/evidence/audio-preview-release-v1.json) records the
+audio checks. The later [UI update](docs/evidence/audio-preview-ui-update-v1.json)
+removes the audio-preview label and tooltip after the owner
+reported that the sound sounded good; its native/audio bytes are unchanged. This does not establish hardware PCM equivalence,
 speaker quality or full-match timing.
 
 ## CI verification turnaround
