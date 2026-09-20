@@ -195,12 +195,13 @@ int main(int argc,char** argv){try{
  const char* input_recipe=argc==7?argv[6]:nullptr;
  const bool retail_fd_recipe=input_recipe&&std::string(input_recipe)=="retail-stock-fd-v1";
  const bool results_mario_recipe=input_recipe&&std::string(input_recipe)=="results-mario-v1";
- if(input_recipe&&!retail_fd_recipe&&!results_mario_recipe)throw std::runtime_error("Unknown transition input recipe");
+ const bool link_css_unload_recipe=input_recipe&&std::string(input_recipe)=="link-css-unload-v1";
+ if(input_recipe&&!retail_fd_recipe&&!results_mario_recipe&&!link_css_unload_recipe)throw std::runtime_error("Unknown transition input recipe");
  if((retail_fd_recipe||results_mario_recipe)&&stage_kind!=St_Kind_Last)
    throw std::runtime_error("Explicit FD recipes require Final Destination");
  TransitionTrace trace(trace_path,source_revision,input_recipe);
  melee_web::RuntimeFiles files;
- for(const char* key:{"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","GrNLa.dat","GrNBa.dat","GrSt.dat","hyaku.hps","hyaku2.hps","sp_zako.hps","ystory.hps","ItCo.usd","EfMrData.dat","EfFxData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","fox.ssm","falco.ssm","mars.ssm","drmario.ssm","emblem.ssm","pupupu.ssm","dsp_coef.bin","sislib_font.bin"}){
+ for(const char* key:{"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","GrNLa.dat","GrNBa.dat","GrSt.dat","hyaku.hps","hyaku2.hps","sp_zako.hps","ystory.hps","ItCo.usd","EfMrData.dat","EfFxData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","fox.ssm","falco.ssm","mars.ssm","drmario.ssm","emblem.ssm","pupupu.ssm","link.ssm","clink.ssm","dsp_coef.bin","sislib_font.bin"}){
  const auto root=std::filesystem::exists(std::filesystem::path(argv[1])/key)?argv[1]:argv[2];
   std::ifstream input(std::filesystem::path(root)/key,std::ios::binary);if(!input)throw std::runtime_error("Missing owned menu host fixture");
   files[key]={(std::istreambuf_iterator<char>(input)),{}};
@@ -278,17 +279,18 @@ int main(int argc,char** argv){try{
                                          &initial_music_revisited)&&
         initial_music_completed>0,
         "Original CSS music did not load an HPS payload");
-  if(cycle==1){
-   bool falco_selected=false;
+  if(cycle==1||link_css_unload_recipe){
+   const int target_kind=link_css_unload_recipe?(cycle==0?CKIND_LINK:CKIND_CLINK):CKIND_FALCO;
+   bool target_selected=false;
    for(unsigned t=0;t<180;t++){
     MeleeWebFighterInputObservation observed{};
-    check(melee_web_fighter_input_observe(CKIND_FALCO,&observed),
+    check(melee_web_fighter_input_observe(target_kind,&observed),
           "Original CSS fighter observation unavailable");
-    const int state=melee_web_fighter_input_drive(raw,&observed,CKIND_FALCO);
+    const int state=melee_web_fighter_input_drive(raw,&observed,target_kind);
     check(state!=MELEE_WEB_FIGHTER_INPUT_INVALID,
-          "Original CSS Falco target is invalid");
+          "Original CSS fighter target is invalid");
     if(state==MELEE_WEB_FIGHTER_INPUT_ALREADY_SELECTED){
-     falco_selected=true;break;
+     target_selected=true;break;
     }
     if(state==MELEE_WEB_FIGHTER_INPUT_PICKUP_READY||
        state==MELEE_WEB_FIGHTER_INPUT_TARGET_READY)
@@ -297,13 +299,23 @@ int main(int argc,char** argv){try{
     melee_web_fighter_input_neutral(raw);
     check(tick()==1,"CSS button release unexpectedly transitioned");
    }
-   check(falco_selected,"Original CSS did not commit Falco through raw PAD input");
+   check(target_selected,"Original CSS did not commit requested fighter through raw PAD input");
    // The source keeps the door/model confirmation animation active briefly
    // after the drop.  Give that original process time to reach its ordinary
    // Start-accepting state before requesting the scene transition.
    melee_web_fighter_input_neutral(raw);
    for(unsigned settle=0;settle<30;++settle)
-    check(tick()==1,"CSS transitioned during Falco confirmation settle");
+    check(tick()==1,"CSS transitioned during fighter confirmation settle");
+  }
+  if(link_css_unload_recipe){
+   check(melee_web_menu_host_phase(host)==1,"CSS unload recipe left the original CSS phase");
+   check(melee_web_menu_host_leave(host,1,error,sizeof(error)),error);
+   world->verify_immutable_archives();
+   world->close();world.reset();
+   check(melee_web_menu_host_destroy(host,error,sizeof(error)),error);
+   host=nullptr;
+   std::cout<<"Original CSS "<<(cycle==0?"Link":"Young Link")<<" audio registry entered, aborted and unloaded\n";
+   continue;
   }
   transition();check(melee_web_menu_host_phase(host)==2,"CSS did not choose original SSS");
   trace.event("css_exit_complete",world->audio());
@@ -669,7 +681,9 @@ int main(int argc,char** argv){try{
         "Menu/match teardown replaced the application's retained source arena");
  }
  check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
- if(results_mario_recipe)
+ if(link_css_unload_recipe)
+  std::cout<<"Native Link/Young Link CSS audio registry and unload smoke passed; no match/rendered claim\n";
+ else if(results_mario_recipe)
   std::cout<<"Native source Mario Results smoke (No Contest and elimination) returned to CSS; no retail/rendered claim\n";
  else
   std::cout<<"Native original CSS Mario/Falco to SSS to four-stock match to CSS passed twice; no browser or equivalence claim\n";

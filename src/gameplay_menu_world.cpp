@@ -37,17 +37,17 @@ namespace {
 
 constexpr std::size_t kWorldHeapBytes = 32U * 1024U * 1024U;
 
-constexpr std::array<std::string_view, 23> kRequiredFiles = {
+constexpr std::array<std::string_view, 25> kRequiredFiles = {
     "MnSlChr.usd", "MnSlMap.usd", "SdSlChr.usd", "MnExtAll.usd",
     "LbMcGame.usd", "NtMemAc.usd", "sislib_font.bin", "smash2.sem",
     "dsp_coef.bin", "menu01.hps", "main.ssm", "mario.ssm", "fox.ssm", "falco.ssm", "mars.ssm", "pupupu.ssm",
     "nr_select.ssm", "nr_title.ssm", "nr_name.ssm", "pokemon.ssm",
-    "end.ssm", "drmario.ssm", "emblem.ssm",
+    "end.ssm", "drmario.ssm", "emblem.ssm", "link.ssm", "clink.ssm",
 };
 
-constexpr std::array<std::string_view, 13> kBankFiles = {
+constexpr std::array<std::string_view, 15> kBankFiles = {
     "main.ssm", "mario.ssm", "fox.ssm", "falco.ssm", "mars.ssm", "pupupu.ssm", "nr_select.ssm", "nr_title.ssm",
-    "nr_name.ssm", "pokemon.ssm", "end.ssm", "drmario.ssm", "emblem.ssm",
+    "nr_name.ssm", "pokemon.ssm", "end.ssm", "drmario.ssm", "emblem.ssm", "link.ssm", "clink.ssm",
 };
 
 [[noreturn]] void fail(const char* message)
