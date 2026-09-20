@@ -26,6 +26,13 @@ The candidate has not been merged or deployed. Final pushed-head GitHub checks
 are the merge gate; see the [release checkpoint](docs/PRODUCTION_CHECKPOINT_20260920.md)
 and [hash-bound receipt](docs/evidence/production-checkpoint-20260920-v1.json).
 
+The subsequent PR review's two P3 findings are corrected: reports reject
+untracked original-source files, and Fountain's music tuple matches its authored
+four words. All seven tuples and derived music sets pass owned-archive checks;
+both Release targets and the refreshed candidate audit pass. See the
+[review-fix receipt](docs/evidence/production-checkpoint-review-fixes-v1.json);
+final full-suite and pushed-head verification are recorded on PR #49.
+
 ## Full-game integration branch
 
 `codex/full-game-integration` tracks the remaining offline vanilla game through

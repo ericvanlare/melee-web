@@ -145,7 +145,11 @@ def make_report(root, inventory_path):
     actual = subprocess.check_output(['git', '-C', str(source), 'rev-parse', 'HEAD'], text=True).strip()
     if actual != pin:
         raise ValueError('Original checkout does not match dependency pin')
-    subprocess.run(['git', '-C', str(source), 'diff', '--quiet', 'HEAD'], check=True)
+    changes = subprocess.check_output(
+        ['git', '-C', str(source), 'status', '--porcelain=v1', '--untracked-files=all'],
+        text=True)
+    if changes:
+        raise ValueError('Original checkout contains local changes')
     data = json.loads(inventory_path.read_text())
     if data.get('source', {}).get('commit') != pin:
         raise ValueError('Acceptance inventory source pin is stale')

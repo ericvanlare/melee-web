@@ -112,12 +112,25 @@ class GameplayAssetManifestTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         return result.stdout.splitlines()
 
+    def _descriptor_music_words(self):
+        source = (ROOT / "src/gameplay_asset_manifest.cpp").read_text()
+        table = re.search(r"kStageMusicWords\s*=\s*\{\{(.*?)\}\};", source, re.S)
+        self.assertIsNotNone(table, "Source-word descriptor table is missing")
+        rows = re.findall(r"\{(St_Kind_\w+),\s*\{([^}]+)\}\}", table.group(1))
+        self.assertEqual(len(rows), len(STAGE_ARCHIVES))
+        words = {name: tuple(int(word.strip()) for word in values.split(','))
+                 for name, values in rows}
+        self.assertEqual(set(words), set(STAGE_ARCHIVES))
+        self.assertTrue(all(len(row) == 4 for row in words.values()))
+        return words
+
     def test_music_candidates_bind_to_owned_stage_params(self):
         missing = [path for path in STAGE_ARCHIVES.values() if not path.is_file()]
         if missing:
             self.skipTest("Owned Gr* archives unavailable: " + ", ".join(map(str, missing)))
 
         stage_values = self._source_stage_values()
+        descriptor_words = self._descriptor_music_words()
         hps_files = self._source_hps_files()
         ground_source = (ROOT / ".deps/melee/src/melee/gr/ground.c").read_text()
         stage_source = (ROOT / ".deps/melee/src/melee/gr/stage.c").read_text()
@@ -139,6 +152,8 @@ class GameplayAssetManifestTests(unittest.TestCase):
             self.assertEqual(len(rows), 1,
                              f"Expected one authored {name} StageParam row in {archive}")
             words = rows[0][1:]
+            self.assertEqual(descriptor_words[name], words,
+                             f"Descriptor music words disagree with {archive}")
             self.assertNotIn(-2, words,
                              f"{name} uses dynamic BGM -2; add the source fighter bridge before admission")
             ids = {word for word in words if word >= 0}

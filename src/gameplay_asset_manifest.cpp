@@ -136,7 +136,7 @@ constexpr std::array<StageMusicWords, 7> kStageMusicWords = {{
     {St_Kind_Story,     {96, -1, 96, -1}},
     {St_Kind_OldPupupu, {58, -1, 58, -1}},
     {St_Kind_Shrine,    {75, 1, 75, 1}},
-    {St_Kind_Izumi,     {49, -1, 49, 49}},
+    {St_Kind_Izumi,     {49, -1, 49, -1}},
     {St_Kind_OldYoshi,  {59, -1, 59, -1}},
 }};
 

@@ -58,6 +58,17 @@ The final control also verifies that status/loading panels are hidden during
 active play and after return. This supports instrumentation sensitivity without
 establishing general performance or erasing the earlier pauses.
 
+## Review follow-up
+
+The two P3 findings from the independent PR review are corrected. Source reports
+now reject modified, staged and untracked dependency files. Fountain's fourth
+music word is the authored `-1`; all seven stages' exact four-word tuples are
+checked against their owned archives as well as their derived HPS file sets.
+Fifteen focused checks and both Release builds pass. The refreshed local
+candidate v2 passes the package audit; prior browser/reference evidence remains
+bound to v1. See the [review-fix receipt](evidence/production-checkpoint-review-fixes-v1.json).
+Final full-suite and pushed-head CI results are recorded on PR #49.
+
 ## Release boundary and next work
 
 The audited candidate is local and has not been deployed. The live alpha remains

@@ -2,6 +2,7 @@
 import copy
 import json
 from pathlib import Path
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -107,10 +108,9 @@ class FullGameReportTests(unittest.TestCase):
         config.mkdir(parents=True)
         (config / 'symbols.txt').write_text('f = .text:0x100; // type:function size:0x10')
         (config / 'splits.txt').write_text('melee/ft/fighter.c:\n\t.text start:0x100 end:0x110')
-        # Only Git identity/diff queries are isolated. No successful compiler or
+        # Only Git identity/cleanliness/diff queries are isolated. No successful compiler or
         # reference comparison is simulated: neither is performed by this tool.
-        with patch('full_game_report.subprocess.check_output', side_effect=['a' * 40, 'b' * 40, b'']), \
-             patch('full_game_report.subprocess.run'):
+        with patch('full_game_report.subprocess.check_output', side_effect=['a' * 40, '', 'b' * 40, b'']):
             report = make_report(self.root, inventory)
         self.assertIsNone(report['coverage']['browser_linked_functions'])
         self.assertIsNone(report['coverage']['reference_tested_functions'])
@@ -121,6 +121,52 @@ class FullGameReportTests(unittest.TestCase):
         page = report_html({'features': [{'title': '</script><script>bad()</script>'}]})
         self.assertNotIn('<script>bad()', page)
         self.assertIn('\\u003c/script>', page)
+
+    def test_report_rejects_modified_staged_and_untracked_original_sources(self):
+        def git(directory, *args):
+            return subprocess.check_output(
+                ['git', '-C', str(directory), *args], text=True,
+                stderr=subprocess.DEVNULL).strip()
+
+        config = self.source / 'config/GALE01'
+        config.mkdir(parents=True)
+        (config / 'symbols.txt').write_text('f = .text:0x100; // type:function size:0x10')
+        (config / 'splits.txt').write_text('melee/ft/fighter.c:\n\t.text start:0x100 end:0x110')
+        git(self.source, 'init', '--quiet')
+        git(self.source, 'add', '.')
+        git(self.source, '-c', 'user.name=Test Fixture',
+            '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'Source fixture')
+        self.data['source']['commit'] = git(self.source, 'rev-parse', 'HEAD')
+        inventory = self.root / 'inventory.json'
+        inventory.write_text(json.dumps(self.data))
+        (self.root / 'dependencies.lock.json').write_text(json.dumps({
+            'repositories': {'melee': {'commit': self.data['source']['commit']}}}))
+        (self.root / '.gitignore').write_text('.deps/\n')
+        git(self.root, 'init', '--quiet')
+        git(self.root, 'add', '.')
+        git(self.root, '-c', 'user.name=Test Fixture',
+            '-c', 'user.email=fixture@example.invalid', 'commit', '--quiet', '-m', 'Report fixture')
+        self.assertEqual(make_report(self.root, inventory)['source'], self.data['source'])
+
+        tracked = self.source / 'src/melee/ft/fighter.c'
+        original = tracked.read_text()
+        extra = self.source / 'src/melee/ft/untracked.c'
+        for mode in ('modified', 'staged', 'untracked'):
+            with self.subTest(mode=mode):
+                if mode == 'untracked':
+                    extra.write_text('void untracked(void) {}\n')
+                else:
+                    tracked.write_text(original + '\n/* local change */\n')
+                    if mode == 'staged':
+                        git(self.source, 'add', '.')
+                try:
+                    with self.assertRaisesRegex(ValueError, 'Original checkout contains local changes'):
+                        make_report(self.root, inventory)
+                finally:
+                    tracked.write_text(original)
+                    extra.unlink(missing_ok=True)
+                    git(self.source, 'add', '.')
+        self.assertEqual(make_report(self.root, inventory)['source'], self.data['source'])
 
 
 if __name__ == '__main__':
