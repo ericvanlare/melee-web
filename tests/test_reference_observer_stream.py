@@ -31,6 +31,20 @@ def boundary_payload() -> bytes:
     return prefix + gprs + descriptor + raw
 
 
+def whole_boundary_payload(kind: int = 13, *, match_index: int = 0,
+                           flags: int = stream.WHOLE_SESSION_FLAG,
+                           metadata_kind: int | None = None,
+                           metadata_reserved: int = 0) -> bytes:
+    raw = b"css-state"
+    prefix = stream.BOUNDARY.pack(kind, flags, 0x80300000, 32, 1, 0)
+    gprs = struct.pack("<32I", *range(32))
+    descriptor_offset = stream.BOUNDARY.size + 32 * 4 + stream.SLICE.size
+    descriptor = stream.SLICE.pack(31, 0, 0x804D6CC0, len(raw), descriptor_offset)
+    metadata = stream.WHOLE_METADATA.pack(
+        match_index, kind if metadata_kind is None else metadata_kind, metadata_reserved)
+    return prefix + gprs + descriptor + raw + metadata
+
+
 class ObserverStreamTests(unittest.TestCase):
     def test_decodes_strict_boundary_and_named_slices(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -78,6 +92,51 @@ class ObserverStreamTests(unittest.TestCase):
             path.write_text(json.dumps(value))
             with self.assertRaises(stream.ObserverStreamError):
                 stream.read_status(path)
+
+    def test_decodes_opt_in_whole_session_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "whole.mwro"
+            path.write_bytes(
+                frame(1, 0, b'{"whole_session":true,"match_count":3}')
+                + frame(2, 1, b'{"whole_session":true,"match_count":3}')
+                + frame(3, 2, whole_boundary_payload(match_index=2),
+                       pc=0x8026688C))
+            records = list(stream.iter_records(path))
+        payload = records[-1]["payload"]
+        self.assertTrue(payload["whole_session"])
+        self.assertEqual(payload["match_index"], 2)
+        self.assertEqual(payload["whole_boundary_kind"], 13)
+
+    def test_rejects_invalid_whole_metadata_or_missing_opt_in(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "whole-invalid.mwro"
+            path.write_bytes(frame(3, 0, whole_boundary_payload(), pc=0x8026688C))
+            with self.assertRaises(stream.ObserverStreamError):
+                list(stream.iter_records(path))
+
+            path.write_bytes(
+                frame(1, 0, b'{"whole_session":true,"match_count":3}')
+                + frame(2, 1, b'{"whole_session":true,"match_count":3}')
+                + frame(3, 2, whole_boundary_payload(flags=3),
+                       pc=0x8026688C))
+            with self.assertRaises(stream.ObserverStreamError):
+                list(stream.iter_records(path))
+
+            path.write_bytes(
+                frame(1, 0, b'{"whole_session":true,"match_count":3}')
+                + frame(2, 1, b'{"whole_session":true,"match_count":3}')
+                + frame(3, 2, whole_boundary_payload(metadata_kind=14),
+                       pc=0x8026688C))
+            with self.assertRaises(stream.ObserverStreamError):
+                list(stream.iter_records(path))
+
+            path.write_bytes(
+                frame(1, 0, b'{"whole_session":true,"match_count":3}')
+                + frame(2, 1, b'{"whole_session":true,"match_count":3}')
+                + frame(3, 2, whole_boundary_payload(metadata_reserved=1),
+                       pc=0x8026688C))
+            with self.assertRaises(stream.ObserverStreamError):
+                list(stream.iter_records(path))
 
 
 if __name__ == "__main__":

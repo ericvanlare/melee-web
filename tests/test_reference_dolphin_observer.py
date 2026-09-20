@@ -80,6 +80,26 @@ class ReferenceDolphinObserverTests(unittest.TestCase):
         self.assertIn("if (match_active)", entry)
         self.assertIn("!match_active || !setup_pointer", source)
 
+    def test_whole_session_is_opt_in_and_has_pinned_source_boundaries(self) -> None:
+        source = SOURCE.read_text(encoding="utf-8")
+        self.assertIn("MWRC_WHOLE_SESSION_MATCHES", source)
+        self.assertIn("WHOLE_SESSION_MIN_MATCHES = 3", source)
+        for address in ("0x8026688c", "0x80266d70", "0x8025a998",
+                        "0x8025bb5c", "0x801a5af0", "0x80177368",
+                        "0x80177704", "0x801a5f64", "0x80179350"):
+            self.assertIn(address, source)
+        self.assertIn("ResultsGObjProcess", source)
+        self.assertIn("ReturnCss", source)
+        self.assertIn("return word == 0x7c0802a6", source)
+        process = source[source.index("else\n      {\n        if (!results_enter_seen"):
+                         source.index("else if (boundary == Boundary::SceneTeardown)")]
+        self.assertIn("SliceTag::Result, 0x80479d98 + 0xc, 0x28", process)
+        self.assertIn("AddSessionSlices(system)", process)
+        self.assertIn("whole_session_enabled() ? WHOLE_SESSION_FLAG : 0", source)
+        self.assertIn("PutU16(out, static_cast<u16>(match_index))", source)
+        self.assertNotIn("Write_U", source)
+        self.assertNotIn("WriteToEmu", source)
+
 
 if __name__ == "__main__":
     unittest.main()

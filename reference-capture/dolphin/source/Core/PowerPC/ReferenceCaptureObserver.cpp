@@ -43,6 +43,9 @@ constexpr size_t RING_PAYLOAD = 256 * 1024;
 constexpr size_t MAX_SLICES = 64;
 constexpr size_t MAX_RAW = 192 * 1024;
 constexpr u32 PAD_READ_HSD_CALLER = 0x80376A28;
+constexpr u16 WHOLE_SESSION_FLAG = 1;
+constexpr u32 WHOLE_SESSION_MIN_MATCHES = 3;
+constexpr u32 WHOLE_SESSION_MAX_MATCHES = 64;
 
 constexpr std::array<u8, 32> EXPECTED_DOL_SHA256_BYTES = {
     0xdc, 0x21, 0x50, 0x45, 0x13, 0x42, 0x43, 0x50, 0xbd, 0xa1, 0x7a,
@@ -76,6 +79,18 @@ enum class Boundary : u16
   ResultReturn = 10,
   SceneTeardown = 11,
   SceneExit = 12,
+  CssEnter = 13,
+  CssExit = 14,
+  SssEnter = 15,
+  SssExit = 16,
+  VsExit = 17,
+  VsExitReturn = 18,
+  VsModeExit = 19,
+  ResultsEnter = 20,
+  ResultsExit = 21,
+  ResultsModeExit = 22,
+  ResultsGObjProcess = 23,
+  ReturnCss = 24,
 };
 
 enum class SliceTag : u16
@@ -110,6 +125,10 @@ enum class SliceTag : u16
   CameraObjectPointer = 28,
   SceneRequest = 29,
   SceneFrame = 30,
+  MenuCssState = 31,
+  MenuSssState = 32,
+  MenuAudio = 33,
+  MenuAudioVoice = 34,
 };
 
 struct SliceRef
@@ -207,6 +226,23 @@ bool ActivationRequested()
          Env("MWRC_SOURCE_REV") == "GALE01r2";
 }
 
+u32 WholeSessionMatchCount()
+{
+  const std::string value = Env("MWRC_WHOLE_SESSION_MATCHES");
+  if (value.empty())
+    return 0;
+  u32 result = 0;
+  for (const char digit : value)
+  {
+    if (digit < '0' || digit > '9' || result > WHOLE_SESSION_MAX_MATCHES / 10)
+      return 0;
+    result = result * 10 + static_cast<u32>(digit - '0');
+    if (result > WHOLE_SESSION_MAX_MATCHES)
+      return 0;
+  }
+  return result >= WHOLE_SESSION_MIN_MATCHES ? result : 0;
+}
+
 }  // namespace
 
 struct Observer::Impl
@@ -231,18 +267,36 @@ struct Observer::Impl
       SetInvalid("MWRC_OUTPUT must name a fresh stream");
       return false;
     }
+    whole_session_matches = WholeSessionMatchCount();
     // Dolphin builds with exceptions disabled.  std::thread reports an
     // unavailable worker by terminating; there is no catchable error path.
     writer = std::thread([this] { WriterMain(); });
-    PushJson(Event::Handshake,
-             std::string("{\"schema\":\"melee-web-passive-dolphin-observer\",\"version\":1,")
-                 + "\"dolphin_commit\":\"" + EXPECTED_COMMIT + "\",\"dol_sha1\":\"" +
-                 EXPECTED_DOL + "\",\"dol_sha256\":\"" + EXPECTED_DOL_SHA256 +
-                 "\",\"cpu\":\"JITARM64\",\"writes_guest_memory\":false,"
-                 "\"ring_capacity\":" + std::to_string(RING_SIZE) + "}");
-    PushJson(Event::Start,
-             std::string("{\"status\":\"recording\",\"source_revision\":\"GALE01r2\",")
-                 + "\"boundaries\":\"typed-existing-retail-harness\"}");
+    if (!Env("MWRC_WHOLE_SESSION_MATCHES").empty() && whole_session_matches == 0)
+    {
+      SetInvalid("MWRC_WHOLE_SESSION_MATCHES must be a decimal count from 3 through 64");
+      return false;
+    }
+    std::string handshake =
+        std::string("{\"schema\":\"melee-web-passive-dolphin-observer\",\"version\":1,") +
+        "\"dolphin_commit\":\"" + EXPECTED_COMMIT + "\",\"dol_sha1\":\"" + EXPECTED_DOL +
+        "\",\"dol_sha256\":\"" + EXPECTED_DOL_SHA256 +
+        "\",\"cpu\":\"JITARM64\",\"writes_guest_memory\":false,\"ring_capacity\":" +
+        std::to_string(RING_SIZE);
+    if (whole_session_enabled())
+      handshake += ",\"whole_session\":true,\"match_count\":" +
+                   std::to_string(whole_session_matches);
+    handshake += "}";
+    PushJson(Event::Handshake, handshake);
+    std::string start =
+        "{\"status\":\"recording\",\"source_revision\":\"GALE01r2\",\"boundaries\":\""
+        "typed-existing-retail-harness";
+    if (whole_session_enabled())
+      start += "\",\"whole_session\":true,\"match_count\":" +
+               std::to_string(whole_session_matches);
+    else
+      start += "\"";
+    start += "}";
+    PushJson(Event::Start, start);
     return !invalid.load();
   }
 
@@ -352,7 +406,41 @@ struct Observer::Impl
     return true;
   }
 
-  static bool BoundaryForPC(u32 pc, Boundary* boundary)
+  bool AddSessionSlices(Core::System* system)
+  {
+    u32 rng_pointer = 0;
+    return AddSlice(system, SliceTag::PadSnapshot, 0x804c1f84, 0x358) &&
+           AddSlice(system, SliceTag::SceneRouting, 0x80479d30, 6) &&
+           AddSlice(system, SliceTag::SceneFrame, 0x80479d58, 4) &&
+           AddSlice(system, SliceTag::RngPointer, 0x804d5f94, 4) &&
+           ReadU32(system, 0x804d5f94, &rng_pointer) && rng_pointer &&
+           AddSlice(system, SliceTag::RngValue, rng_pointer, 4);
+  }
+
+  bool AddMenuSlices(Core::System* system, Boundary boundary, u32 entry_argument)
+  {
+    const bool css = boundary == Boundary::CssEnter || boundary == Boundary::CssExit ||
+                     boundary == Boundary::ReturnCss;
+    const u32 pointer_address = css ? 0x804d6cb0 : 0x804d6c90;
+    const bool entering = boundary == Boundary::CssEnter || boundary == Boundary::SssEnter ||
+                          boundary == Boundary::ReturnCss;
+    // These raw hooks run at function entry, before OnEnter assigns the
+    // scene's static pointer. Use its actual argument for entry records;
+    // exit records use the pointer published by that original initializer.
+    // Completed menu callbacks still require the transition-trace join.
+    u32 state_pointer = entry_argument;
+    if ((!entering && !ReadU32(system, pointer_address, &state_pointer)) || !state_pointer ||
+        state_pointer > UINT32_MAX - 0x10 ||
+        !AddSlice(system, css ? SliceTag::MenuCssState : SliceTag::MenuSssState,
+                  state_pointer + 0x10, 0xf0) ||
+        !AddSlice(system, SliceTag::MenuAudio, 0x803bb300, 0x40) ||
+        !AddSlice(system, SliceTag::MenuAudioVoice, 0x804d6038, 4) ||
+        !AddSessionSlices(system))
+      return false;
+    return true;
+  }
+
+  static bool BoundaryForPC(u32 pc, bool whole_session, Boundary* boundary)
   {
     switch (pc)
     {
@@ -381,10 +469,10 @@ struct Observer::Impl
       *boundary = Boundary::DrawReturn;
       return true;
     case 0x8016e9c8:
-      *boundary = Boundary::ResultEnter;
+      *boundary = whole_session ? Boundary::VsExit : Boundary::ResultEnter;
       return true;
     case 0x8016ebbc:
-      *boundary = Boundary::ResultReturn;
+      *boundary = whole_session ? Boundary::VsExitReturn : Boundary::ResultReturn;
       return true;
     case 0x8039157c:
       *boundary = Boundary::SceneTeardown;
@@ -392,6 +480,33 @@ struct Observer::Impl
     case 0x801a4b70:
       *boundary = Boundary::SceneExit;
       return true;
+    case 0x8026688c:
+      *boundary = Boundary::CssEnter;
+      return whole_session;
+    case 0x80266d70:
+      *boundary = Boundary::CssExit;
+      return whole_session;
+    case 0x8025a998:
+      *boundary = Boundary::SssEnter;
+      return whole_session;
+    case 0x8025bb5c:
+      *boundary = Boundary::SssExit;
+      return whole_session;
+    case 0x801a5af0:
+      *boundary = Boundary::VsModeExit;
+      return whole_session;
+    case 0x80177368:
+      *boundary = Boundary::ResultsEnter;
+      return whole_session;
+    case 0x80177704:
+      *boundary = Boundary::ResultsExit;
+      return whole_session;
+    case 0x801a5f64:
+      *boundary = Boundary::ResultsModeExit;
+      return whole_session;
+    case 0x80179350:
+      *boundary = Boundary::ResultsGObjProcess;
+      return whole_session;
     default:
       return false;
     }
@@ -420,6 +535,18 @@ struct Observer::Impl
       return word == 0x4e800020;
     case 0x8016e9c8:
       return word == 0x7c0802a6;
+    case 0x8026688c:
+    case 0x80266d70:
+    case 0x8025a998:
+    case 0x8025bb5c:
+    case 0x801a5af0:
+    case 0x80177368:
+    case 0x80177704:
+    case 0x801a5f64:
+    case 0x80179350:
+      // These source function entries are pinned to the owned DOL's
+      // prologue word.  The digest check establishes the remaining bytes.
+      return word == 0x7c0802a6;
     default:
       // The pinned DOL digest has already established the exact source for
       // boundary PCs whose neighboring words are not part of the harness's
@@ -433,8 +560,10 @@ struct Observer::Impl
     if (!Start() || invalid.load() || finish_requested.load())
       return;
     Boundary boundary;
-    if (!BoundaryForPC(pc, &boundary))
+    if (!BoundaryForPC(pc, whole_session_enabled(), &boundary))
       return;
+    if (whole_session_enabled() && boundary == Boundary::CssEnter && whole_phase == 6)
+      boundary = Boundary::ReturnCss;
     if (!BoundaryInstructionMatches(system, pc))
     {
       SetInvalid("observer boundary instruction is not resident in the pinned DOL");
@@ -448,7 +577,46 @@ struct Observer::Impl
     }
     raw_size = 0;
     slice_count = 0;
-    if (boundary == Boundary::PadPoll)
+    if (boundary == Boundary::CssEnter || boundary == Boundary::CssExit ||
+        boundary == Boundary::SssEnter || boundary == Boundary::SssExit ||
+        boundary == Boundary::ReturnCss)
+    {
+      if (boundary == Boundary::ReturnCss)
+      {
+        if (whole_phase != 6 || (!pending_next_match && !awaiting_final_css))
+          return SetInvalid("whole-session return CSS was missing or out of order"), void();
+        whole_phase = awaiting_final_css ? 7 : 1;
+      }
+      else if (boundary == Boundary::CssEnter)
+      {
+        if (whole_phase != 0)
+        {
+          return SetInvalid("whole-session CSS enter was missing or out of order"), void();
+        }
+        whole_phase = 1;
+      }
+      else if (boundary == Boundary::CssExit)
+      {
+        if (whole_phase != 1)
+          return SetInvalid("whole-session CSS exit was missing or out of order"), void();
+        whole_phase = 2;
+      }
+      else if (boundary == Boundary::SssEnter)
+      {
+        if (whole_phase != 2)
+          return SetInvalid("whole-session SSS enter was missing or out of order"), void();
+        whole_phase = 3;
+      }
+      else
+      {
+        if (whole_phase != 3)
+          return SetInvalid("whole-session SSS exit was missing or out of order"), void();
+        whole_phase = 4;
+      }
+      if (!AddMenuSlices(system, boundary, state->gpr[3]))
+        return SetInvalid("menu boundary did not expose its pinned state/audio slices"), void();
+    }
+    else if (boundary == Boundary::PadPoll)
     {
       u32 caller = 0;
       if (state->gpr[1] > UINT32_MAX - 0x54 ||
@@ -479,6 +647,8 @@ struct Observer::Impl
     {
       if (boundary == Boundary::Entry)
       {
+        if (whole_session_enabled() && whole_phase != 4)
+          return SetInvalid("whole-session VS entry was missing its SSS route"), void();
         setup_pointer = state->gpr[3];
         if (!setup_pointer || !AddSlice(system, SliceTag::MatchSetup, setup_pointer, 0x138))
           return SetInvalid("VS entry did not expose its source setup"), void();
@@ -491,6 +661,13 @@ struct Observer::Impl
         setup_ready = false;
         result_seen = false;
         result_pointer = 0;
+        vs_exit_seen = false;
+        vs_exit_return_seen = false;
+        vs_mode_exit_seen = false;
+        results_enter_seen = false;
+        results_gobj_seen = false;
+        results_exit_seen = false;
+        results_mode_exit_seen = false;
         fighter_present.fill(false);
         fighter_pointers.fill(0);
         cpu_slots.fill(false);
@@ -520,6 +697,8 @@ struct Observer::Impl
               return SetInvalid("VS setup has an unexpected trailing port"), void();
           }
         }
+        if (whole_session_enabled())
+          whole_phase = 5;
       }
       else
       {
@@ -573,9 +752,77 @@ struct Observer::Impl
       if (boundary == Boundary::ResultReturn)
         result_seen = true;
     }
+    else if (boundary == Boundary::VsExit || boundary == Boundary::VsExitReturn ||
+             boundary == Boundary::VsModeExit || boundary == Boundary::ResultsEnter ||
+             boundary == Boundary::ResultsExit || boundary == Boundary::ResultsModeExit ||
+             boundary == Boundary::ResultsGObjProcess)
+    {
+      if (!whole_session_enabled() || !match_active || !setup_ready)
+        return SetInvalid("whole-session source hook occurred outside an active VS match"), void();
+      if (boundary == Boundary::VsExit)
+      {
+        if (vs_exit_seen)
+          return SetInvalid("duplicate gm_Scene_Vs_OnExit hook"), void();
+        result_pointer = 0x80479d98;
+        if (!AddSlice(system, SliceTag::Result, result_pointer + 0xc, 0x28) ||
+            !AddSessionSlices(system))
+          return SetInvalid("VS exit did not expose its pinned result/session slices"), void();
+        vs_exit_seen = true;
+      }
+      else if (boundary == Boundary::VsExitReturn)
+      {
+        if (!vs_exit_seen || vs_exit_return_seen)
+          return SetInvalid("VS exit return is missing or duplicated"), void();
+        if (!AddSessionSlices(system))
+          return SetInvalid("VS exit return did not expose PAD/RNG state"), void();
+        vs_exit_return_seen = true;
+        result_seen = true;
+      }
+      else if (boundary == Boundary::VsModeExit)
+      {
+        if (!vs_exit_return_seen || vs_mode_exit_seen || !AddSessionSlices(system))
+          return SetInvalid("VS mode exit is missing its ordered source hook"), void();
+        vs_mode_exit_seen = true;
+      }
+      else if (boundary == Boundary::ResultsEnter)
+      {
+        if (!vs_mode_exit_seen || results_enter_seen || !AddSessionSlices(system))
+          return SetInvalid("Results enter is missing its ordered source hook"), void();
+        results_enter_seen = true;
+      }
+      else if (boundary == Boundary::ResultsExit)
+      {
+        if (!results_enter_seen || !results_gobj_seen || results_exit_seen ||
+            !AddSessionSlices(system))
+          return SetInvalid("Results exit is missing its ordered source hook"), void();
+        results_exit_seen = true;
+      }
+      else if (boundary == Boundary::ResultsModeExit)
+      {
+        if (!results_exit_seen || !results_gobj_seen || results_mode_exit_seen ||
+            !AddSessionSlices(system))
+          return SetInvalid("Results mode exit is missing its ordered source hook"), void();
+        results_mode_exit_seen = true;
+      }
+      else
+      {
+        if (!results_enter_seen || results_exit_seen || !AddSessionSlices(system) ||
+            !AddSlice(system, SliceTag::Result, 0x80479d98 + 0xc, 0x28))
+          return SetInvalid("Results GObj process did not expose input/RNG/result state"), void();
+        results_gobj_seen = true;
+      }
+    }
     else if (boundary == Boundary::SceneTeardown)
     {
-      if (!match_active || !result_seen)
+      if (whole_session_enabled())
+      {
+        if (!match_active || !result_seen || !vs_exit_seen || !vs_exit_return_seen ||
+            !vs_mode_exit_seen || !results_enter_seen || !results_exit_seen ||
+            !results_gobj_seen || !results_mode_exit_seen)
+          return SetInvalid("whole-session scene reset is missing an ordered VS/Results hook"),
+                 void();
+      }
+      else if (!match_active || !result_seen)
         return;
       const u8* count_ptr = system->GetMemory().GetPointerForRange(0x804ce380, 1);
       u32 list_heads = 0;
@@ -588,6 +835,10 @@ struct Observer::Impl
         return SetInvalid("scene teardown entity lists are invalid"), void();
       if (!AddSlice(system, SliceTag::SceneRouting, 0x80479d30, 6))
         return SetInvalid("scene teardown routing bytes are invalid"), void();
+      if (whole_session_enabled() && !AddSessionSlices(system))
+        return SetInvalid("whole-session scene reset did not expose PAD/RNG state"), void();
+      if (whole_session_enabled())
+        whole_phase = 6;
     }
     else if (boundary == Boundary::SceneExit)
     {
@@ -604,7 +855,7 @@ struct Observer::Impl
       return;
     u8* out = slot->payload.data();
     PutU16(out, static_cast<u16>(boundary));
-    PutU16(out, 0);
+    PutU16(out, whole_session_enabled() ? WHOLE_SESSION_FLAG : 0);
     PutU32(out, state->spr[8]);
     PutU32(out, 32);
     PutU32(out, static_cast<u32>(slice_count));
@@ -625,17 +876,58 @@ struct Observer::Impl
       PutU32(descriptor, raw_offset);
       raw_offset += slice.size;
     }
-    if (static_cast<size_t>(out - slot->payload.data()) + raw_size > slot->payload.size())
+    const size_t metadata_size = whole_session_enabled() ? 8 : 0;
+    if (static_cast<size_t>(out - slot->payload.data()) + raw_size + metadata_size >
+        slot->payload.size())
       return SetInvalid("observer boundary payload exceeds its bounded slot"), void();
     std::memcpy(out, raw.data(), raw_size);
     out += raw_size;
+    if (whole_session_enabled())
+    {
+      PutU16(out, static_cast<u16>(match_index));
+      PutU16(out, static_cast<u16>(boundary));
+      PutU32(out, 0);
+    }
     slot->payload_size = static_cast<u32>(out - slot->payload.data());
     slot->checksum = CRC32(slot->payload.data(), slot->payload_size);
     Publish(slot);
     if (boundary == Boundary::DrawReturn)
       ++draw_ordinal;
     if (boundary == Boundary::SceneTeardown && result_seen)
-      RequestComplete();
+    {
+      if (!whole_session_enabled())
+      {
+        RequestComplete();
+      }
+      else if (match_index + 1 >= whole_session_matches)
+      {
+        // The declared sequence is complete only after the source has
+        // re-entered CSS following the final Results teardown.
+        awaiting_final_css = true;
+        match_active = false;
+      }
+      else
+      {
+        // Keep the completed match index on the return-to-CSS boundary.  The
+        // next CSS enter advances it, so menu rows and source rows retain the
+        // same index at each observed boundary.
+        pending_next_match = true;
+        match_active = false;
+      }
+    }
+    if (boundary == Boundary::ReturnCss)
+    {
+      if (awaiting_final_css)
+      {
+        awaiting_final_css = false;
+        RequestComplete();
+      }
+      else if (pending_next_match)
+      {
+        ++match_index;
+        pending_next_match = false;
+      }
+    }
   }
 
   void SetInvalid(std::string reason)
@@ -905,6 +1197,20 @@ struct Observer::Impl
   bool result_seen = false;
   u32 result_pointer = 0;
   u32 draw_ordinal = 0;
+  u32 whole_session_matches = 0;
+  u32 match_index = 0;
+  u32 whole_phase = 0;  // CSS, SSS, VS, completed match, or return CSS.
+  bool pending_next_match = false;
+  bool awaiting_final_css = false;
+  bool vs_exit_seen = false;
+  bool vs_exit_return_seen = false;
+  bool vs_mode_exit_seen = false;
+  bool results_enter_seen = false;
+  bool results_gobj_seen = false;
+  bool results_exit_seen = false;
+  bool results_mode_exit_seen = false;
+
+  bool whole_session_enabled() const { return whole_session_matches != 0; }
 };
 
 Observer::Observer() : m_impl(new Impl) {}
@@ -971,6 +1277,15 @@ bool Observer::IsBoundary(u32 guest_pc)
   case 0x8016EBBC:
   case 0x8039157C:
   case 0x801A4B70:
+  case 0x8026688C:
+  case 0x80266D70:
+  case 0x8025A998:
+  case 0x8025BB5C:
+  case 0x801A5AF0:
+  case 0x80177368:
+  case 0x80177704:
+  case 0x801A5F64:
+  case 0x80179350:
     return true;
   default:
     return false;
