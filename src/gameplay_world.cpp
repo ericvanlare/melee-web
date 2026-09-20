@@ -13,6 +13,7 @@
 #include "dat_native_stage.hpp"
 #include "dat_scene.hpp"
 #include "gameplay_stage_last.h"
+#include "gameplay_stage_profile.h"
 #include "gameplay_stage_visual.h"
 #include "gameplay_effect_runtime.h"
 #include "dat_lights.hpp"
@@ -41,8 +42,20 @@
 using namespace melee_web;
 namespace {
 void check(int ok,const char* error){if(!ok)throw DatError(error);}
+std::string_view melee_web_runtime_file_name_impl(const RuntimeFiles& files,
+                                                  std::string_view authored_name,
+                                                  DatMenuSupportLanguage setting_language,
+                                                  DatMenuSupportLanguage saved_language)
+{
+    const auto resolved=DatMenuSupport::resolve_filename(
+        authored_name,setting_language,saved_language);
+    const auto found=files.find(resolved);
+    return found==files.end()?std::string_view{}:found->first;
+}
 const std::vector<uint8_t>& file(const RuntimeFiles& files,std::string_view name){
-    auto found=files.find(name);
+    const auto resolved=melee_web_runtime_file_name_impl(
+        files,name,DatMenuSupportLanguage::English,DatMenuSupportLanguage::English);
+    auto found=resolved.empty()?files.end():files.find(resolved);
     if(found==files.end()||found->second.empty()||found->second.size()>DatArchive::max_archive_bytes)
         throw DatError("Missing or invalid runtime file: "+std::string(name));
     return found->second;
@@ -50,6 +63,10 @@ const std::vector<uint8_t>& file(const RuntimeFiles& files,std::string_view name
 uint32_t symbol(const DatArchive& a,std::string_view name) {
     for(const auto& s:a.public_symbols())if(s.name==name)return s.data_offset;
     throw DatError("Required public symbol missing: "+std::string(name));
+}
+bool has_symbol(const DatArchive& a,std::string_view name) {
+    for(const auto& s:a.public_symbols())if(s.name==name)return true;
+    return false;
 }
 MeleeWebCollision* load_collision(const melee_web::DatCollision& data, int stage_kind, float scale)
 {
@@ -84,6 +101,14 @@ MeleeWebCollision* load_collision(const melee_web::DatCollision& data, int stage
 }
 }
 namespace melee_web {
+std::string_view melee_web_runtime_file_name(const RuntimeFiles& files,
+                                             std::string_view authored_name,
+                                             DatMenuSupportLanguage setting_language,
+                                             DatMenuSupportLanguage saved_language)
+{
+    return melee_web_runtime_file_name_impl(files,authored_name,
+                                            setting_language,saved_language);
+}
 struct GameplayWorld::Storage {
     std::map<std::string,std::shared_ptr<const DatArchive>,std::less<>> archives;
     std::map<std::string,std::vector<uint8_t>,std::less<>> snapshots;
@@ -148,9 +173,12 @@ struct GameplayWorld::Storage {
         if(!stage)throw DatError("No runtime owner for selected source ground kind");
         auto load=[&](std::string_view name,DatExternalPolicy policy=DatExternalPolicy::Reject){
             if(archives.contains(name))return;
+            const auto resolved=melee_web_runtime_file_name(
+                files,name,DatMenuSupportLanguage::English,DatMenuSupportLanguage::English);
+            if(resolved.empty())throw DatError("Missing runtime file: "+std::string(name));
             if(name=="ItCo.usd")policy=DatExternalPolicy::PreserveUnresolved;
             else if(name==stage->archive)policy=DatExternalPolicy::ResolveNull;
-            auto value=archive_cache?archive_cache->archive(name,policy):
+            auto value=archive_cache?archive_cache->archive(resolved,policy):
                 std::make_shared<const DatArchive>(file(files,name),policy);
             if(!archive_cache)
                 snapshots[std::string(name)]={value->data().begin(),value->data().end()};
@@ -173,7 +201,10 @@ struct GameplayWorld::Storage {
                     load(costume.model_filename);
                 }
                 else if(selected_costumes[kind].contains(costume.costume_index)){
-                    if(!files.contains(costume.model_filename))
+                    if(melee_web_runtime_file_name(
+                           files,costume.model_filename,
+                           DatMenuSupportLanguage::English,
+                           DatMenuSupportLanguage::English).empty())
                         throw DatError("Selected fighter costume model is missing");
                     load(costume.model_filename);
                 }
@@ -188,7 +219,7 @@ struct GameplayWorld::Storage {
         if(!common_data.roots[20].data_offset)throw DatError("Missing common root20");
         DatNativeJoint common_joint(archive("PlCo.dat"),*common_data.roots[20].data_offset);
         DatCollision collision_data(*archive(stage->archive));
-        DatLights light_data(*archive(stage->archive));
+        DatLights light_data(*archive(stage->archive),"map_plit",true);
         items=std::make_unique<DatItemRegistryNative>(archive("ItCo.usd"));
         stage_arena=std::make_unique<NativeDatArena>(archive(stage->archive));
         bonus_arena=std::make_unique<NativeDatArena>(archive("PdPm.dat"));
@@ -230,6 +261,11 @@ struct GameplayWorld::Storage {
         for(uint32_t i=0;i<light_data.lights.size();i++){
             auto flags=read_dat_light_override(*archive(stage->archive),light_data.lights[i].source_offset);
             check(melee_web_stage_lights_set_override(lights,i,flags.has_value(),flags.value_or(0),error,sizeof(error)),error);
+            if(light_data.animation_tables[i]){
+                if(!full_stage)full_stage=std::make_unique<DatNativeStage>(archive(stage->archive),stage->stage_kind);
+                check(melee_web_stage_lights_set_animations(lights,i,
+                    full_stage->light_animation_table(*light_data.animation_tables[i]),error,sizeof(error)),error);
+            }
         }
         check(melee_web_stage_lights_attach(lights,error,sizeof(error)),error);
         previous_ground=melee_web_ground_data_publish(ground);ground_published=true;
@@ -338,20 +374,32 @@ struct GameplayWorld::Storage {
         if(stage_visual)throw DatError("Close selected stage visual before full initialization");
         check(melee_web_stage_lights_load(lights,error,sizeof(error)),error);
         auto source=archive(stage->archive);
-        full_stage=std::make_unique<DatNativeStage>(source,stage->stage_kind);
-        stage_effects=std::make_unique<DatEffectBanks>(source,"map_ptcl","map_texg",64);
-        check(melee_web_effect_bank_attach(stage_effects->bank(),error,sizeof(error)),error);
-        // grDatFiles publishes bank64 for stage loading; Ground initialization
-        // publishes the same map data at bank30 for authored joint events.
-        check(melee_web_effect_bank_attach(stage_effects->alias(30),error,sizeof(error)),error);
+        if(!full_stage)full_stage=std::make_unique<DatNativeStage>(source,stage->stage_kind);
+        const auto* profile=melee_web_stage_profile(stage->stage_kind);
+        check(profile!=nullptr,"Stage has no complete source callback profile");
+        const bool has_commands=has_symbol(*source,"map_ptcl");
+        const bool has_textures=has_symbol(*source,"map_texg");
+        if(has_commands!=has_textures)
+            throw DatError("Source stage particle roots are incomplete");
+        if(!has_commands&&!profile->allow_absent_particle_bank)
+            throw DatError("Source stage particle roots are absent for a required bank");
+        if(has_commands){
+            stage_effects=std::make_unique<DatEffectBanks>(source,"map_ptcl","map_texg",64);
+            check(melee_web_effect_bank_attach(stage_effects->bank(),error,sizeof(error)),error);
+            // grDatFiles publishes bank64 for stage loading; Ground initialization
+            // publishes the same map data at bank30 for authored joint events.
+            check(melee_web_effect_bank_attach(stage_effects->alias(30),error,sizeof(error)),error);
+        }
         for(const auto& event:full_stage->particle_events())
             if(!melee_web_effect_bank_has_command(event.bank,event.command))
                 throw DatError("Stage animation requires unpublished particle bank/command "+
                     std::to_string(event.bank)+"/"+std::to_string(event.command));
         stage_map=melee_web_stage_map_publish(full_stage->map_head(),error,sizeof(error));check(stage_map!=nullptr,error);
+        const auto& symbols=full_stage->public_symbols();
+        check(melee_web_stage_map_set_public(stage_map,symbols.data(),symbols.size(),error,sizeof(error)),error);
         const auto& overrides=full_stage->light_overrides();
         check(melee_web_stage_map_set_overrides(stage_map,overrides.data(),overrides.size(),error,sizeof(error)),error);
-        stage_last=melee_web_stage_begin_kind(stage->stage_kind,full_stage->yakumono(),stage_effects->bank(),defer_start,error,sizeof(error));check(stage_last!=nullptr,error);
+        stage_last=melee_web_stage_begin_kind(stage->stage_kind,full_stage->yakumono(),stage_effects?stage_effects->bank():nullptr,defer_start,error,sizeof(error));check(stage_last!=nullptr,error);
     }
     void end_stage(){
         if(numeric)check(melee_web_stage_numeric_clear_quakes(numeric,error,sizeof(error)),error);
@@ -377,7 +425,7 @@ struct GameplayWorld::Storage {
         item_colors.reset();item_arena.reset();
         if(effect_started){check(melee_web_effect_runtime_end(error,sizeof(error)),error);effect_started=false;}
         if(stage_map){check(melee_web_stage_map_close(stage_map,error,sizeof(error)),error);stage_map=nullptr;}
-        stage_effects.reset();full_stage.reset();
+        stage_effects.reset();
         if(stage_native){check(melee_web_native_joint_destroy(stage_native,error,sizeof(error)),error);stage_native=nullptr;}
         stage_material_animation.reset();stage_animation.reset();stage_model.reset();
         if(bonus_published){check(melee_web_bonus_data_end(bonus,error,sizeof(error)),error);bonus_published=false;}
@@ -399,6 +447,9 @@ struct GameplayWorld::Storage {
         if(started){check(melee_web_gameplay_shutdown(error,sizeof(error)),error);started=false;}
         if(ground_published){melee_web_ground_data_publish(previous_ground);ground_published=false;}
         if(lights){check(melee_web_stage_lights_destroy(lights,error,sizeof(error)),error);lights=nullptr;}
+        // Global stage-light animations borrow the stage descriptor arena.
+        // Keep it until both original and host light GObjs have retired.
+        full_stage.reset();
         if(font){check(melee_web_font_atlas_close(font,error,sizeof(error)),error);font=nullptr;}
         verify();
     }

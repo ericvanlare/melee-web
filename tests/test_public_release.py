@@ -46,6 +46,10 @@ def _uleb(value: int) -> bytes:
 
 
 class PublicReleaseTests(unittest.TestCase):
+    def test_producer_and_packager_require_the_same_public_api(self) -> None:
+        from build import PUBLIC_RUNTIME_EXPORTS
+        self.assertEqual(tuple(RUNTIME_REQUIRED_EXPORTS), tuple(PUBLIC_RUNTIME_EXPORTS))
+
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory(prefix="melee-public-release-")
         self.addCleanup(self.temp.cleanup)
@@ -146,6 +150,7 @@ class PublicReleaseTests(unittest.TestCase):
             "melee-runtime.mjs": fixture_root / "web" / "melee-runtime.mjs",
             "runtime-assets.mjs": fixture_root / "web" / "runtime-assets.mjs",
             "disc-image.mjs": fixture_root / "web" / "disc-image.mjs",
+            "disc-session.mjs": fixture_root / "web" / "disc-session.mjs",
             "prototype-keyboard-layouts.mjs": fixture_root / "web" / "prototype-keyboard-layouts.mjs",
             "controller-input.mjs": fixture_root / "web" / "controller-input.mjs",
             "controller-panel.mjs": fixture_root / "web" / "controller-panel.mjs",

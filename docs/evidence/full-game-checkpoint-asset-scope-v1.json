@@ -1,0 +1,534 @@
+{
+  "schema": "melee-web-full-game-checkpoint-validation",
+  "version": 1,
+  "source_base_commit": "28faab9d9ad93e483e65598c02e2fd008dfc041a",
+  "scope": "Development local-disc session and transactional menu/match asset lifetimes. Sixteen development fighters and seven stages remain partially accepted. No new whole-game, performance, memory plateau, pixel, PCM, physical-controller or deployment acceptance.",
+  "automated_suite": {
+    "local_path": "work/full-game/asset-scope-suite-v1.log",
+    "sha256": "2c2eec1016455e840ebe8820b7077134f207bbed2490c6b8550e17b156605a8b",
+    "bytes": 203219,
+    "command": "python3 -m unittest discover -s tests -v",
+    "tests": 1096,
+    "seconds": 366.767,
+    "skips": 41,
+    "result": "pass_after_focused_rerun",
+    "initial_result": "one_failure",
+    "initial_failure": "Hitch frozen-artifact test still expected 24 files after disc-session.mjs increased the explicit inventory to 25. Corrected the three count assertions and required the new module explicitly.",
+    "focused_rerun": {
+      "local_path": "work/full-game/asset-scope-hitch-profile-fix-v1.log",
+      "sha256": "f6becda0957538339986ee8c32e0b741ff02ba719eddfdba3ffea6d9ba10d7b4",
+      "bytes": 810
+    },
+    "focused_rerun_tests": 4,
+    "full_suite_rerun_after_test_only_fix": false,
+    "skip_reasons": {
+      "build output unavailable": 1,
+      "Bootstrap Aurora and a C++20 compiler for independent DSP comparison": 2,
+      "Build fighter targets before the typed support check": 1,
+      "Original stage trace target unavailable": 2,
+      "Build dat_scene_trace before the typed scene check": 1,
+      "Owned stage selection archive and pinned SDK required": 1,
+      "Build gameplay_audio_trace and provide local SSM/SEM/DSP coefficient fixtures": 2,
+      "Build fighter/audio stream target and supply optional owned HPS/SSM/SEM/coefficient inputs": 1,
+      "Build fighter targets before running the focused bonus_data trace": 1,
+      "Project SDK and Aurora build dependencies unavailable; run bootstrap/build": 4,
+      "Optional built combat trace and owned runtime assets required": 1,
+      "Common context trace unavailable; build gameplay first": 1,
+      "Owned menu, Fox/Falco and stage fixtures are required": 1,
+      "Owned Dr. Mario/Roy and stage fixtures are required": 1,
+      "Project SDK/Aurora build dependencies unavailable; run bootstrap/build": 1,
+      "Built stock trace and owned Mario costume archives required": 1,
+      "Built original player context trace required": 1,
+      "Optional built source trace and owned runtime assets required": 2,
+      "Optional built full-stage edge trace and owned runtime assets required": 2,
+      "Optional built timer trace and owned runtime assets required": 1,
+      "Build gameplay_music_profile_trace and provide owned menu/game assets": 1,
+      "Build fighter targets before the original SIS consumer check": 1,
+      "Original CSS target and owned local fixtures are required": 1,
+      "Build the native menu host and supply owned menu/game fixtures": 1,
+      "Build gameplay_rumble_trace and provide owned LbRb.dat": 1,
+      "Build fighter targets before running the focused stage_numeric trace": 1,
+      "Native HSD targets unavailable; run scripts/build.py --target gameplay": 1,
+      "Build the native_audio_banks fighter target first": 1,
+      "Build gameplay_pad_state_trace": 1,
+      "compiled private provenance fixture not supplied": 1,
+      "Optional pinned Dolphin source checkout is not installed": 2,
+      "pinned slippi-js fixtures are not checked out": 2
+    }
+  },
+  "focused_checks": [
+    {
+      "local_path": "work/full-game/asset-scope-focused-v3.log",
+      "sha256": "87f59600e965660902ed1d78752449d9d0604198e636f72878c5c501c746fcc6",
+      "bytes": 2346
+    },
+    {
+      "local_path": "work/full-game/asset-scope-packaging-v1.log",
+      "sha256": "6e8a1b4d2735b1b6e5a1df107e1f0337be958c80ac892664b2a8fd3d826299b6",
+      "bytes": 9242
+    },
+    {
+      "local_path": "work/full-game/disc-session-owned-v1.log",
+      "sha256": "3b4312b6d832059881fe5f38137bcefd5bbe95cfeb3316270c199b469d5a67f7",
+      "bytes": 81
+    }
+  ],
+  "release_builds": [
+    {
+      "kind": "development",
+      "result": "pass",
+      "local_path": "work/full-game/asset-scope-build-v7.log",
+      "sha256": "6451e3e05e6718548b432ba09a68f7a5cdad658a4c941e90fcbb8fd36c63271b",
+      "bytes": 11714
+    },
+    {
+      "kind": "public",
+      "result": "pass",
+      "local_path": "work/full-game/asset-scope-public-build-v1.log",
+      "sha256": "1365c40975af2c06e6a5c3c961bdd6b103baf630c9ab951c632f159d21ce80d3",
+      "bytes": 11913
+    },
+    {
+      "kind": "native_menu_host_trace",
+      "result": "pass",
+      "local_path": "work/full-game/asset-scope-native-build-v1.log",
+      "sha256": "9096f41ef0589aff7c1f9c59362b83ef3a788d2c2d2a198a3f1087bf4cac276c",
+      "bytes": 195
+    }
+  ],
+  "browser_build": {
+    "local_path": "work/full-game/asset-scope-browser-build-v3/prototype-build.json",
+    "sha256": "17086305fe143a2ee1e1f033de37af37348f2b754c63d95597ecee5154a2dfaf",
+    "bytes": 3458,
+    "artifacts": [
+      {
+        "local_path": "work/full-game/asset-scope-browser-build-v3/gameplay_menu_browser.js",
+        "sha256": "8cf300acf7fe71081a3cad41690627f49091e0d97d90d04fb649df514820cd43",
+        "bytes": 286159
+      },
+      {
+        "local_path": "work/full-game/asset-scope-browser-build-v3/gameplay_menu_browser.wasm",
+        "sha256": "64a62fde8e44d4a28d06da33ad602e9fbd983584a800625942ed3b2a2fec57da",
+        "bytes": 13178886
+      },
+      {
+        "local_path": "work/full-game/asset-scope-browser-build-v3/gameplay_menu_browser.data",
+        "sha256": "8df6a998cef19b88a3eff0ee61f666e42791f5f73841818961aa3b224cad2c4b",
+        "bytes": 3518464
+      },
+      {
+        "local_path": "work/full-game/asset-scope-browser-build-v3/disc-session.mjs",
+        "sha256": "34847f2c06f732e2de447ea4d696387b9f96f01ec26c931c6cfb79f827adb88b",
+        "bytes": 6175
+      },
+      {
+        "local_path": "work/full-game/asset-scope-browser-build-v3/melee-runtime.mjs",
+        "sha256": "a521dc21df2f3b1989582c3dffc17dbeb3e9d46c430d1741de7a369beb747a03",
+        "bytes": 20123
+      },
+      {
+        "local_path": "work/full-game/asset-scope-browser-build-v3/runtime-audio-assets.mjs",
+        "sha256": "a083af27855ecaebcc8b8e207d72af42979b6b32373fb989c68fc049214eeec9",
+        "bytes": 3211
+      },
+      {
+        "local_path": "work/full-game/asset-scope-browser-build-v3/runtime-assets.mjs",
+        "sha256": "f422b53a6e8469421c6efa14eb084b41f3a28b46a5af13064a58f8351e6b5656",
+        "bytes": 8616
+      },
+      {
+        "local_path": "work/full-game/asset-scope-browser-build-v3/runtime-development.mjs",
+        "sha256": "9b5b409438d7441d14da198223901ff33909d06730e8b03353d2867494e9eaac",
+        "bytes": 48042
+      }
+    ]
+  },
+  "browser_check": {
+    "local_path": "work/full-game/asset-scope-browser-check-v4/report.json",
+    "sha256": "7721a3d1283bbef48752f7872ff5e05e331f2d293eeb6a5e0ab32608b13f47cc",
+    "bytes": 21361,
+    "driver": {
+      "local_path": "work/full-game/asset-scope-browser-v3.mjs",
+      "sha256": "5da6d2483e0b94b9b7ef1de38a350c23fd07e3e78fe9478ceb5ce1c5c3363a54",
+      "bytes": 7537
+    },
+    "browser": "153.0.8010.50",
+    "result": "scoped_lifecycle_pass",
+    "instrumented": true,
+    "performance": "not_evaluated",
+    "cycles": [
+      {
+        "p1_character_kind": 8,
+        "stage_kind": 32,
+        "four_stock_diagnostic": true,
+        "gate_start": {
+          "steps": 153,
+          "memory": {
+            "wasm_heap_bytes": 278396928,
+            "allocator_arena_bytes": 249823232,
+            "allocator_live_bytes": 136541720,
+            "allocator_free_bytes": 113281512,
+            "allocator_top_free_bytes": 1720,
+            "match_present": false,
+            "menu_present": false,
+            "scoped_assets": true,
+            "asset_files": 0,
+            "asset_bytes": 0,
+            "asset_source_bytes": 0,
+            "staged_asset_files": 0,
+            "staged_asset_bytes": 0,
+            "asset_generation": 2
+          }
+        },
+        "gate_end": {
+          "steps": 153,
+          "memory": {
+            "wasm_heap_bytes": 278396928,
+            "allocator_arena_bytes": 249823232,
+            "allocator_live_bytes": 136541720,
+            "allocator_free_bytes": 113281512,
+            "allocator_top_free_bytes": 1720,
+            "match_present": false,
+            "menu_present": false,
+            "scoped_assets": true,
+            "asset_files": 0,
+            "asset_bytes": 0,
+            "asset_source_bytes": 0,
+            "staged_asset_files": 0,
+            "staged_asset_bytes": 0,
+            "asset_generation": 2
+          }
+        },
+        "match_memory": {
+          "wasm_heap_bytes": 278396928,
+          "allocator_arena_bytes": 249823232,
+          "allocator_live_bytes": 234515136,
+          "allocator_free_bytes": 15308096,
+          "allocator_top_free_bytes": 1720,
+          "match_present": true,
+          "menu_present": false,
+          "scoped_assets": true,
+          "asset_files": 28,
+          "asset_bytes": 19077674,
+          "asset_source_bytes": 18926634,
+          "staged_asset_files": 0,
+          "staged_asset_bytes": 0,
+          "asset_generation": 0
+        },
+        "returned_memory": {
+          "wasm_heap_bytes": 278396928,
+          "allocator_arena_bytes": 255963136,
+          "allocator_live_bytes": 254092328,
+          "allocator_free_bytes": 1870808,
+          "allocator_top_free_bytes": 1272,
+          "match_present": false,
+          "menu_present": true,
+          "scoped_assets": true,
+          "asset_files": 33,
+          "asset_bytes": 18452982,
+          "asset_source_bytes": 18301942,
+          "staged_asset_files": 0,
+          "staged_asset_bytes": 0,
+          "asset_generation": 0
+        },
+        "diagnostics": "Completed matches: 1 \u00b7 stock check: 1 \u00b7 ticks: 2125 \u00b7 stocks: 0 \u00b7 respawns: 3 \u00b7 raw PAD: none \u00b7 menu audio blocks: 0 \u00b7 revisits: 0"
+      },
+      {
+        "p1_character_kind": 5,
+        "stage_kind": 2,
+        "four_stock_diagnostic": false,
+        "gate_start": {
+          "steps": 2676,
+          "memory": {
+            "wasm_heap_bytes": 278396928,
+            "allocator_arena_bytes": 256110592,
+            "allocator_live_bytes": 143391880,
+            "allocator_free_bytes": 112718712,
+            "allocator_top_free_bytes": 8483480,
+            "match_present": false,
+            "menu_present": false,
+            "scoped_assets": true,
+            "asset_files": 0,
+            "asset_bytes": 0,
+            "asset_source_bytes": 0,
+            "staged_asset_files": 0,
+            "staged_asset_bytes": 0,
+            "asset_generation": 4
+          }
+        },
+        "gate_end": {
+          "steps": 2676,
+          "memory": {
+            "wasm_heap_bytes": 278396928,
+            "allocator_arena_bytes": 256110592,
+            "allocator_live_bytes": 143391880,
+            "allocator_free_bytes": 112718712,
+            "allocator_top_free_bytes": 8483480,
+            "match_present": false,
+            "menu_present": false,
+            "scoped_assets": true,
+            "asset_files": 0,
+            "asset_bytes": 0,
+            "asset_source_bytes": 0,
+            "staged_asset_files": 0,
+            "staged_asset_bytes": 0,
+            "asset_generation": 4
+          }
+        },
+        "match_memory": {
+          "wasm_heap_bytes": 278396928,
+          "allocator_arena_bytes": 256753664,
+          "allocator_live_bytes": 253018768,
+          "allocator_free_bytes": 3734896,
+          "allocator_top_free_bytes": 3192,
+          "match_present": true,
+          "menu_present": false,
+          "scoped_assets": true,
+          "asset_files": 31,
+          "asset_bytes": 21401641,
+          "asset_source_bytes": 21250601,
+          "staged_asset_files": 0,
+          "staged_asset_bytes": 0,
+          "asset_generation": 0
+        },
+        "returned_memory": {
+          "wasm_heap_bytes": 334102528,
+          "allocator_arena_bytes": 269598720,
+          "allocator_live_bytes": 262184120,
+          "allocator_free_bytes": 7414600,
+          "allocator_top_free_bytes": 3216,
+          "match_present": false,
+          "menu_present": true,
+          "scoped_assets": true,
+          "asset_files": 33,
+          "asset_bytes": 18452982,
+          "asset_source_bytes": 18301942,
+          "staged_asset_files": 0,
+          "staged_asset_bytes": 0,
+          "asset_generation": 0
+        },
+        "diagnostics": "Completed matches: 2 \u00b7 stock check: 1 \u00b7 ticks: 2125 \u00b7 stocks: 0 \u00b7 respawns: 3 \u00b7 raw PAD: none \u00b7 menu audio blocks: 0 \u00b7 revisits: 0"
+      }
+    ],
+    "unloaded": {
+      "wasm_heap_bytes": 334102528,
+      "allocator_arena_bytes": 269598720,
+      "allocator_live_bytes": 151046888,
+      "allocator_free_bytes": 118551832,
+      "allocator_top_free_bytes": 3216,
+      "match_present": false,
+      "menu_present": false,
+      "scoped_assets": true,
+      "asset_files": 0,
+      "asset_bytes": 0,
+      "asset_source_bytes": 0,
+      "staged_asset_files": 0,
+      "staged_asset_bytes": 0,
+      "asset_generation": 0
+    },
+    "restarted": {
+      "wasm_heap_bytes": 334102528,
+      "allocator_arena_bytes": 269598720,
+      "allocator_live_bytes": 261753848,
+      "allocator_free_bytes": 7844872,
+      "allocator_top_free_bytes": 3216,
+      "match_present": false,
+      "menu_present": true,
+      "scoped_assets": true,
+      "asset_files": 33,
+      "asset_bytes": 18452982,
+      "asset_source_bytes": 18301942,
+      "staged_asset_files": 0,
+      "staged_asset_bytes": 0,
+      "asset_generation": 0
+    },
+    "visuals": [
+      {
+        "local_path": "work/full-game/asset-scope-browser-check-v4/match-8.png",
+        "sha256": "dc3f087a9ce0128d599b5810974586e5c2015af13c48743e6975f85dad0b6b72",
+        "bytes": 569693
+      },
+      {
+        "local_path": "work/full-game/asset-scope-browser-check-v4/match-5.png",
+        "sha256": "5e302d28f96ee63b77dff8aa3e224cdd674ec079d4cbd06053e2eb7c4df8f0b6",
+        "bytes": 870440
+      }
+    ]
+  },
+  "drawn_original_comparison": {
+    "local_path": "work/full-game/asset-scope-browser-check-v4/core-comparison.json",
+    "sha256": "a74e993ff26c03e6910769d21884e4f26e5e0f613d6e572ead0179cd5f1cc5df",
+    "bytes": 961,
+    "capture_hashes": {
+      "port": "943d74e40f3b47e12355dd6398992a463ce2c0b0c3f784d12874036569fac8da",
+      "reference_a": "ce5561fc4e52b887006a2d90ddca764586b749c05ea5c2328ada97a80a1d69d3",
+      "reference_b": "616a5849655cc732446b0b50cb35e2663f4633fc64c3659b1157e2b5e9c509c5"
+    },
+    "checks": {
+      "entry": "pass",
+      "fighters": "pass",
+      "frame_count": "pass",
+      "inputs": "pass",
+      "match_frame": "pass",
+      "pad_state_hex": "pass",
+      "rng": "pass"
+    },
+    "first_divergence": null,
+    "first_divergence_by_group": {},
+    "frames_compared": 240,
+    "gold_admitted": false,
+    "performance": "not_evaluated",
+    "reference_cpu": "Interpreter64",
+    "reference_repeatability": "pass",
+    "scope": "declared entry data, supplied inputs, fighter fields, RNG and match clock, PAD configuration and all three history banks only; pixel agreement, hardware and audio output are excluded",
+    "source_drawing": "source_draws",
+    "status": "declared_state_match",
+    "trace": {
+      "local_path": "work/full-game/asset-scope-browser-check-v4/retail-port.jsonl",
+      "sha256": "943d74e40f3b47e12355dd6398992a463ce2c0b0c3f784d12874036569fac8da",
+      "bytes": 740927
+    },
+    "recipe_sha256": "7f618e179ff1e69da282b713da62f2c1faf2d02345048d0a25bf399e33167513",
+    "replay_frames": 240,
+    "source_steps": 240,
+    "source_draws": 240,
+    "source_match_complete": false,
+    "scope_note": "240-frame Mario/FD neutral control with independent original v2 references; not a complete match, Bowser comparison, pixel/PCM or live timing result."
+  },
+  "retained_browser_failures": [
+    {
+      "attempt": 1,
+      "local_path": "work/full-game/asset-scope-browser-check-v1/report.json",
+      "sha256": "87c7e64bfaa2b8a08070753004f76dc7a505b687120ff7f84c1308f34b5eb3de",
+      "bytes": 10739,
+      "cause": "Driver sent No Contest before original pause cooldown; subsequent driver waits 20 source ticks."
+    },
+    {
+      "attempt": 2,
+      "local_path": "work/full-game/asset-scope-browser-check-v2/report.json",
+      "sha256": "b05f41d23b88fecd4ab2102d20f46835ca1cdd97f814bd9193449b90459ef784",
+      "bytes": 11301,
+      "cause": "Original CSS OnExit requested the missing Bowser voice bank during unload. Shared menu closure now includes all admitted fighter/stage banks."
+    },
+    {
+      "attempt": 3,
+      "local_path": "work/full-game/asset-scope-browser-check-v3/report.json",
+      "sha256": "9b05eff482cbdcee5e444598e438e052fe2cfa7a84468576812855604ee120fc",
+      "bytes": 20620,
+      "cause": "Both scene loops and unload/restart passed, then browser correctly rejected the old v1 recipe lacking PAD history. Final run uses existing independent v2 references."
+    }
+  ],
+  "retained_build_failures": [
+    {
+      "local_path": "work/full-game/asset-scope-build-v1.log",
+      "sha256": "152e3979d3a152056547e2e8a94035f4bdd6c811ff214b3af24b52437d59c60e",
+      "bytes": 19168
+    },
+    {
+      "local_path": "work/full-game/asset-scope-build-v2.log",
+      "sha256": "cb2ab659c3c1562de77b195aabf699808cc7fdf95bcd651524cbbe309289e295",
+      "bytes": 14546
+    },
+    {
+      "local_path": "work/full-game/asset-scope-build-v3.log",
+      "sha256": "afdd4a28c78ca485bc9b35ffcfae6019b8eaa7fd9a976f6585643737f8fcdff7",
+      "bytes": 17078
+    }
+  ],
+  "retained_legacy_transition_comparison": {
+    "local_path": "work/full-game/asset-scope-native-transition-v1/comparison.json",
+    "sha256": "9c09f5f9528f82b4d24b1d8d958bde4b5226ba76d452bfaac3a85d7e200f040c",
+    "bytes": 309,
+    "result": "fail",
+    "first_divergence": {
+      "index": 7,
+      "event": "sss_exit_complete",
+      "field": "$.selection.players[0].flags_c",
+      "retail": 64,
+      "port": 192
+    },
+    "native_loop": {
+      "local_path": "work/full-game/asset-scope-native-transition-v1/native.log",
+      "sha256": "47e3581a40baf52ff3f207a1c3d44e6b43250d4eb9de853bf98a243dcdd377e6",
+      "bytes": 1332
+    },
+    "trace": {
+      "local_path": "work/full-game/asset-scope-native-transition-v1/port.jsonl",
+      "sha256": "20c8adc67271e585fd46437b965d186acf6aeae4c239802a6758dc00ae367331",
+      "bytes": 9452
+    },
+    "scope": "Original CSS/SSS continuity and two native matches complete; legacy reference comparison fails. See adjudicated baseline audit; no source setting, reference or tolerance changed.",
+    "baseline_audit": {
+      "local_path": "work/full-game/asset-scope-native-transition-v1/baseline-audit-v1.md",
+      "sha256": "1a97aab599f8f761a13dde94cb9fc40891f4d9f4a57cad36d42a0371ffb0bc32",
+      "scope": "HEAD-derived driver with only the newly required fixture bank names, linked current runtime libraries; not a clean HEAD runtime rebuild. All 18 event rows equal the current trace. Rumble assignments predate this checkpoint; music-source change also predates it, but the extra RNG consumer is not independently isolated."
+    }
+  },
+  "reviews": [
+    {
+      "local_path": "work/full-game/asset-scope-lifecycle-review-v1.md",
+      "sha256": "6a0459b1b4550c106d0894ac84c736885c03a557181a248e6f68d6fbcbbaa3ab",
+      "bytes": 3081
+    },
+    {
+      "local_path": "work/full-game/menu-audio-bank-owner-reducer-v1.md",
+      "sha256": "7ce89557876ea76f014c9534ee45562df1e51f0750b35688e9543d15330b7e49",
+      "bytes": 7165
+    },
+    {
+      "local_path": "work/full-game/asset-scope-native-review-v2.md",
+      "sha256": "77c917d4a53249a2ea0e8f20cf254d5c7c7124a07b882d0ead576874f0648941",
+      "bytes": 3719
+    },
+    {
+      "local_path": "work/full-game/asset-scope-native-review-v3.md",
+      "sha256": "28af6c81972f56aa5d020116ab9621c0394178dbb4fa2da7673ce6b4f04cac31",
+      "bytes": 3111
+    }
+  ],
+  "budget": {
+    "per_file_bytes": 67108864,
+    "requested_fst_bytes": 134217728,
+    "changed": false,
+    "scope_total_includes_generated_font_and_dsp": true,
+    "public_fixed_fst_bytes": 127314690
+  },
+  "preceding_checkpoint_ci": {
+    "local_path": "work/full-game/koopa-github-verify-v1.json",
+    "sha256": "2317e8e1217a0497ae0178dcc15f1574b4a8ded3cd061c3f4171bea5651bda1d",
+    "bytes": 40481,
+    "url": "https://github.com/ericvanlare/melee-web/actions/runs/35529943305",
+    "result": "pass",
+    "all_jobs_seconds": 376
+  },
+  "remaining_gates": [
+    "Public scoped imports before the fixed import exceeds 128 MiB",
+    "All-player/costume/stage and mode dependency closure",
+    "At least three retained complete lifetimes with live-allocation ownership and performance evidence",
+    "Reconcile the legacy native transition setup/reference mismatch without changing source semantics",
+    "Independent pixels, PCM, physical input and broad original-state acceptance",
+    "Donkey Battlefield Pass terminal SPL0 crash remains unresolved; all three original consumer attempts are invalid for that boundary",
+    "Results PR44 and audio PR42 remain separate draft dependencies; no merge/deploy here"
+  ],
+  "source_files": {
+    "src/runtime_asset_scope.hpp": "8a469bac8307013e9cbb1e89faa7f9a6ea73482d5f19bcf757406c62ea9df136",
+    "src/gameplay_asset_manifest.cpp": "ed5772125fe755783ec835be0e0083e95c6a9d9136caff868e844eef98e0a5b6",
+    "src/gameplay_asset_manifest.hpp": "9297c6882059dcecbd182418f0bc422ca21b972bdb56f372299f8f6d41ed0276",
+    "src/gameplay_menu_browser.cpp": "b5eb25101ff388b5487016fbf993e94f533b48c0de2517ad3a144324d214eaf2",
+    "src/gameplay_menu_world.cpp": "a2185df6c6dbee28e072c56498769b599d0b530b560bb9ca4c79b65e23790681",
+    "web/disc-session.mjs": "34847f2c06f732e2de447ea4d696387b9f96f01ec26c931c6cfb79f827adb88b",
+    "web/runtime-assets.mjs": "f422b53a6e8469421c6efa14eb084b41f3a28b46a5af13064a58f8351e6b5656",
+    "web/runtime-audio-assets.mjs": "a083af27855ecaebcc8b8e207d72af42979b6b32373fb989c68fc049214eeec9",
+    "web/melee-runtime.mjs": "a521dc21df2f3b1989582c3dffc17dbeb3e9d46c430d1741de7a369beb747a03",
+    "web/runtime-development.mjs": "9b5b409438d7441d14da198223901ff33909d06730e8b03353d2867494e9eaac",
+    "tests/native_menu_host_trace.cpp": "b4f5b217649ca025ca04720b476ae312b928148fc6063af51fb70fdbd4e57073",
+    "tests/hitch_profile_test.mjs": "a07c09067981a50c270a1ee314b4ac40c1c5766065b0777283138048cb8033ca"
+  },
+  "inventory": {
+    "local_path": "work/full-game/asset-scope-inventory-v2/report.json",
+    "sha256": "05ebbd2d3c6a5c58a42e09f3e9f21d73fc23045139e3cfbe4e2f3eb713657dc1",
+    "features": 87,
+    "function_symbols": 19827,
+    "accepted_fraction": null
+  }
+}

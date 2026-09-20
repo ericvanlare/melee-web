@@ -8002,3 +8002,138 @@ diff --git a/src/melee/ft/ftcommon.c b/src/melee/ft/ftcommon.c
          HSD_JObjSetTranslate(jobj, &fp->x1A7C);
      }
  }
+diff --git a/src/melee/gr/grshrine.c b/src/melee/gr/grshrine.c
+--- a/src/melee/gr/grshrine.c
++++ b/src/melee/gr/grshrine.c
+@@ -39,6 +39,16 @@
+ 
+ static void* yakumono_param;
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++/* Restore the original stage-local pointer after all source objects retire. */
++void* melee_web_grshrine_exchange_yakumono(void* value)
++{
++    void* previous = yakumono_param;
++    yakumono_param = value;
++    return previous;
++}
++#endif
++
+ static StageCallbacks grSh_StageCallbacks[3] = {
+     { grShrine_80201E08, grShrine_80201E34, grShrine_80201E3C,
+       grShrine_80201E40, 0 },
+diff --git a/src/melee/gr/ground.c b/src/melee/gr/ground.c
+--- a/src/melee/gr/ground.c
++++ b/src/melee/gr/ground.c
+@@ -3356,3 +3356,34 @@
+ 
+ /// @todo Is this used by base pointer anywhere? Not stripped by mwcc.
+ static int unused_ints[] = { 1, 1, 0, 0, 0, 180, 0, 0, 0 };
++
++#if defined(MELEE_WEB_GAMEPLAY)
++/* Ground_801C1A20 may create a source-owned object with no map index. Scene
++ * teardown must retire its callbacks/audio/child object without indexing the
++ * map arrays with -1 (Ground_801C4A08 is only for indexed map objects). */
++int melee_web_ground_remove_unmapped(HSD_GObj* gobj)
++{
++    Ground* gp;
++    if (gobj == NULL || gobj->classifier != HSD_GOBJ_CLASS_STAGE ||
++        gobj->p_link != 5 || gobj->user_data == NULL) return 0;
++    gp = gobj->user_data;
++    if (gp->map_id != -1) return 0;
++    if (gp->x1C_callback != NULL) gp->x1C_callback(gobj);
++    Ground_801C55AC(gp);
++    if (gp->x18 != NULL) {
++        removeStageGObj(gp->x18);
++        HSD_GObjPLink_80390228(gp->x18);
++    }
++    HSD_GObjPLink_80390228(gobj);
++    return 1;
++}
++void melee_web_ground_remove_camera(HSD_GObj* gobj)
++{
++    removeStageGObj(gobj);
++    HSD_GObjPLink_80390228(gobj);
++}
++void melee_web_ground_load_map_lights(void)
++{
++    Ground_801C466C();
++}
++#endif
+diff --git a/src/melee/gr/grizumi.c b/src/melee/gr/grizumi.c
+--- a/src/melee/gr/grizumi.c
++++ b/src/melee/gr/grizumi.c
+@@ -879,3 +879,12 @@
+     int size = GXGetTexBufferSize(80, 60, 4, '\0', 0);
+     lbDvd_80017740(0, 2001, 4, 4, size + 31 & ~31, 0, 7, 16, 0);
+ }
++
++#if defined(MELEE_WEB_GAMEPLAY)
++void* melee_web_grizumi_exchange_yakumono(void* value)
++{
++    void* previous = yakumono_param;
++    yakumono_param = value;
++    return previous;
++}
++#endif
+diff --git a/src/melee/gr/grdisplay.c b/src/melee/gr/grdisplay.c
+--- a/src/melee/gr/grdisplay.c
++++ b/src/melee/gr/grdisplay.c
+@@ -84,9 +84,14 @@ void grDisplay_801C5DB0(HSD_GObj* gobj, int code)
+     gp = GET_GROUND(gobj);
+     if (gp->x11_flags.b012 == Camera_8003108C()) {
+         if (gp->x18 != NULL) {
++#if !defined(MELEE_WEB_GAMEPLAY)
++            /* Cached GameCube object addresses have the high bit set.
++             * Wasm pointers are linear-memory offsets, so this console-only
++             * diagnostic would misclassify every valid host camera. */
+             if (((intptr_t) gp->x18 & ~0x7FFFFFFF) == 0) {
+                 OSReport("oioi... %08x\n", gp->x18);
+             }
++#endif
+             if (HSD_GObj_804D7818->hsd_obj != gp->x18->hsd_obj) {
+                 HSD_CObj* cobj;
+                 if (gp->x10_flags.b3 == 0) {
+diff --git a/src/melee/gr/groldyoshi.c b/src/melee/gr/groldyoshi.c
+--- a/src/melee/gr/groldyoshi.c
++++ b/src/melee/gr/groldyoshi.c
+@@ -64,6 +64,15 @@
+     s16 x18;
+ }* yakumono_param;
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++void* melee_web_groldyoshi_exchange_yakumono(void* value)
++{
++    void* previous = yakumono_param;
++    yakumono_param = value;
++    return previous;
++}
++#endif
++
+ void grOldYoshi_8020E798(bool arg) {}
+ 
+ void grOldYoshi_8020E79C(void)
+diff --git a/src/melee/ft/kinds/ftPurin/ftpurin.c b/src/melee/ft/kinds/ftPurin/ftpurin.c
+--- a/src/melee/ft/kinds/ftPurin/ftpurin.c
++++ b/src/melee/ft/kinds/ftPurin/ftpurin.c
+@@ -447,6 +447,20 @@
+     ft_8045A1E0[4] = NULL;
+ }
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++/* Scope the original descriptor cache with its costume archive owners. */
++void melee_web_purin_exchange_hat_cache(void** values)
++{
++    unsigned i;
++    _Static_assert(sizeof(ft_8045A1E0) / sizeof(ft_8045A1E0[0]) == 6, "Purin cache ABI");
++    for (i = 0; i < sizeof(ft_8045A1E0) / sizeof(ft_8045A1E0[0]); ++i) {
++        void* previous = ft_8045A1E0[i];
++        ft_8045A1E0[i] = values[i];
++        values[i] = previous;
++    }
++}
++#endif
++
+ void ftPr_Init_OnDeath(HSD_GObj* gobj)
+ {
+     ftParts_80074A4C(gobj, 0, 0);

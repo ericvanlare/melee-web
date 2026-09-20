@@ -30,6 +30,7 @@ const report = {
   scope: 'Authorized local disc through original CSS, SSS and supported Mario/Final Destination match; Web Audio lifecycle and PCM transport only. No long replay or performance claim.',
   checks: [],
   audio: {phases: {}, cdp: []},
+  assets: {transactions: [], legacyCalls: 0},
 };
 
 // Install before the module graph runs. The trace observes the public Web
@@ -193,6 +194,72 @@ const selectDisc = driver.selectDisc;
 const press = key => driver.pressChord([key]);
 const phase = driver.waitForPhase;
 const trace = () => page.evaluate(() => window.audioPreviewTrace?.snapshot() || null);
+const assetTrace = () => page.evaluate(() => window.audioPreviewAssetTrace?.snapshot() || null);
+const installAssetTrace = async () => page.evaluate(() => {
+  const module = globalThis.Module;
+  const names = ['_melee_web_native_asset_begin', '_melee_web_native_asset_count',
+    '_melee_web_native_asset_name', '_melee_web_native_asset_file',
+    '_melee_web_native_asset_commit', '_melee_web_native_asset_abort'];
+  if (!module || names.some(name => typeof module[name] !== 'function'))
+    throw Error('Audio preview does not expose the native scoped asset API.');
+  const begin = module._melee_web_native_asset_begin;
+  const count = module._melee_web_native_asset_count;
+  const name = module._melee_web_native_asset_name;
+  const file = module._melee_web_native_asset_file;
+  const commit = module._melee_web_native_asset_commit;
+  const abort = module._melee_web_native_asset_abort;
+  const events = [];
+  const legacy = module._melee_web_native_menu_file;
+  const recordScope = generation => {
+    const total = generation ? count.call(module, generation) : 0;
+    const expected = [];
+    for (let index = 0; index < total; ++index) {
+      const pointer = name.call(module, generation, index);
+      if (!pointer) throw Error(`Native scoped asset name ${index} is unavailable.`);
+      expected.push(module.UTF8ToString(pointer));
+    }
+    return expected;
+  };
+  const assetsRequested = globalThis.menuAssetsRequested;
+  if (typeof assetsRequested !== 'function') throw Error('Audio preview does not expose its scoped asset request callback.');
+  const recordRequest = (event, generation) => {
+    events.push({event, generation, names: recordScope(generation)});
+  };
+  module._melee_web_native_asset_begin = function(...args) {
+    const generation = begin.apply(this, args);
+    recordRequest('begin', generation);
+    return generation;
+  };
+  module._melee_web_native_asset_file = function(generation, namePointer, dataPointer, size) {
+    const logicalName = module.UTF8ToString(namePointer);
+    const result = file.apply(this, arguments);
+    events.push({event: 'file', generation, name: logicalName, size, result});
+    return result;
+  };
+  module._melee_web_native_asset_commit = function(generation, ...args) {
+    const result = commit.apply(this, [generation, ...args]);
+    events.push({event: 'commit', generation, result});
+    return result;
+  };
+  module._melee_web_native_asset_abort = function(generation, ...args) {
+    const result = abort.apply(this, [generation, ...args]);
+    events.push({event: 'abort', generation, result});
+    return result;
+  };
+  if (typeof legacy === 'function') {
+    module._melee_web_native_menu_file = function(...args) {
+      events.push({event: 'legacy-file'});
+      return legacy.apply(this, args);
+    };
+  }
+  globalThis.menuAssetsRequested = function(generation, ...args) {
+    recordRequest('request', generation);
+    return assetsRequested.apply(this, [generation, ...args]);
+  };
+  globalThis.audioPreviewAssetTrace = {
+    snapshot: () => ({legacyAvailable: typeof legacy === 'function', events: events.map(event => ({...event}))}),
+  };
+});
 const total = (snapshot, field) => (snapshot?.worklets || []).reduce((sum, worklet) => sum + Number(worklet[field] || 0), 0);
 const observeAudio = async (name, before) => {
   const baseline = total(before, 'nonzeroPcmMessages');
@@ -236,6 +303,7 @@ try {
       return typeof module?.['_melee_web_native_menu_diagnostics'];
     }), 'undefined',
       'The browser check must not depend on diagnostic native exports');
+    await installAssetTrace();
     // Match the public player's ordinary recipe: configure B0XX through the
     // visible controls before using its Start key on the original CSS.
     await page.locator('#controls-open').click();
@@ -290,6 +358,78 @@ try {
     const before = await trace();
     await observeAudio('match', before);
     await screenshot('match');
+  });
+
+  await check('ordinary B0XX pause and No Contest return through original CSS with audio', async () => {
+    const before = await trace();
+    // Phase 7 begins the source Ready countdown; let that bounded entry state
+    // finish before sending Start so the original match can accept the chord.
+    await page.waitForTimeout(5000);
+    // Source pause keeps the native loop running, so the outer player toolbar
+    // still says Pause. Allow its input lockout to settle before the chord.
+    await press('7');
+    await page.waitForTimeout(700);
+    await screenshot('source-pause');
+    await driver.pressChord(['q', '9', 'm', '7'], {holdMs: 250, releaseMs: 200});
+    await phase(1);
+    await page.locator('#loading-panel').waitFor({state: 'hidden', timeout: 30000});
+    await observeAudio('css-after-no-contest', before);
+    await screenshot('css-after-no-contest');
+  });
+
+  await check('second ordinary B0XX CSS to SSS transition emits audio', async () => {
+    await page.waitForTimeout(1200);
+    await press('7');
+    await phase(3);
+    const before = await trace();
+    await observeAudio('sss-after-no-contest', before);
+    await screenshot('sss-after-no-contest');
+  });
+
+  await check('second ordinary B0XX entry reaches Mario/Final Destination with audio', async () => {
+    await page.waitForTimeout(1000);
+    // Repeat the checked stage cursor recipe after the fresh SSS asset scope.
+    await driver.pressChord(['4'], {holdMs: 75, releaseMs: 100});
+    await driver.pressChord([']'], {holdMs: 45, releaseMs: 100});
+    await screenshot('stage-target-after-no-contest');
+    await press('m');
+    await phase(7);
+    const before = await trace();
+    await observeAudio('match-after-no-contest', before);
+    await screenshot('match-after-no-contest');
+  });
+
+  await check('scoped audio asset generations are complete and never use legacy file upload', async () => {
+    const observed = await assetTrace();
+    assert(observed, 'Scoped asset trace is unavailable');
+    const begins = observed.events.filter(event => event.event === 'begin' || event.event === 'request');
+    const commits = observed.events.filter(event => event.event === 'commit');
+    const aborts = observed.events.filter(event => event.event === 'abort');
+    assert(begins.length >= 4, `Expected initial menu, match, return-menu and second match scopes; saw ${begins.length}`);
+    assert.equal(new Set(begins.map(begin => begin.generation)).size, begins.length,
+      'Scoped asset generations must be unique');
+    assert.equal(aborts.length, 0, 'Audio preview must not abort a scoped asset transfer');
+    assert.equal(commits.length, begins.length, 'Every observed scoped asset generation must commit');
+    for (const begin of begins) {
+      assert(begin.generation > 0, 'Scoped asset generation must be positive');
+      assert(begin.names.includes('dsp_coef.bin'), 'Every audio scope must include generated DSP coefficients');
+      assert(begin.names.includes('sislib_font.bin'), 'Every audio scope must include generated font bytes');
+      const files = observed.events.filter(event => event.event === 'file' && event.generation === begin.generation);
+      assert(files.every(file => file.result), `Generation ${begin.generation} rejected a transferred file`);
+      assert.deepEqual(new Set(files.map(file => file.name)), new Set(begin.names),
+        `Generation ${begin.generation} did not transfer its complete expected name set`);
+      assert.equal(files.length, begin.names.length,
+        `Generation ${begin.generation} transferred a duplicate or missing file`);
+      assert(observed.events.some(event => event.event === 'commit' && event.generation === begin.generation && event.result),
+        `Generation ${begin.generation} did not report a successful commit`);
+    }
+    assert.equal(observed.events.filter(event => event.event === 'legacy-file').length, 0,
+      'Audio preview must use scoped transfers instead of _melee_web_native_menu_file');
+    report.assets = {
+      transactions: begins.map(begin => ({generation: begin.generation, names: begin.names})),
+      legacyCalls: observed.events.filter(event => event.event === 'legacy-file').length,
+      legacyAvailable: observed.legacyAvailable,
+    };
   });
 
   await check('Eject closes Web Audio and reloads the player document', async () => {

@@ -1,4 +1,5 @@
 import {openDiscImage,fontFileRange} from './disc-image.mjs';
+import {openDiscSession} from './disc-session.mjs';
 
 // Exact revision/language paths: audio/ also contains Japanese alternatives.
 export const RUNTIME_DISC_FILES=Object.freeze({
@@ -18,7 +19,9 @@ export const NATIVE_MENU_DISC_FILES=Object.freeze({
   'SdSlChr.usd':'SdSlChr.usd','MnExtAll.usd':'MnExtAll.usd',
   'LbMcGame.usd':'LbMcGame.usd','NtMemAc.usd':'NtMemAc.usd',
   'menu01.hps':'audio/menu01.hps','smash2.sem':'audio/us/smash2.sem',
-  ...Object.fromEntries(['main','mario','nr_select','nr_title','nr_name','pokemon','end']
+  ...Object.fromEntries(['main','nr_select','nr_title','nr_name','pokemon','end',
+    'captain','dk','fox','koopa','link','luigi','mario','mars','pikachu','purin',
+    'falco','clink','drmario','emblem','pichu','ganon','pupupu']
     .map(name=>[name+'.ssm','audio/us/'+name+'.ssm']))
 });
 export const NATIVE_GAME_DISC_FILES=Object.freeze({
@@ -43,6 +46,8 @@ export const NATIVE_GAME_DISC_FILES=Object.freeze({
   'PlMsBk.dat':'PlMsBk.dat','PlMsWh.dat':'PlMsWh.dat',
   'EfMsData.dat':'EfMsData.dat','mars.ssm':'audio/us/mars.ssm',
   'GrOp.dat':'GrOp.dat','old_kb.hps':'audio/old_kb.hps','pupupu.ssm':'audio/us/pupupu.ssm',
+  'GrSh.dat':'GrSh.dat','shrine.hps':'audio/shrine.hps','akaneia.hps':'audio/akaneia.hps',
+  'GrIz.dat':'GrIz.dat','izumi.hps':'audio/izumi.hps',
   // Dr. Mario (source FighterKind 0x15) borrows Mario's effect bank but owns
   // its own fighter, action and costume archives and voice bank.
   'PlDr.dat':'PlDr.dat','PlDrAJ.dat':'PlDrAJ.dat',
@@ -64,9 +69,71 @@ export const NATIVE_GAME_DISC_FILES=Object.freeze({
   'PlClNr.dat':'PlClNr.dat','PlClRe.dat':'PlClRe.dat','PlClBu.dat':'PlClBu.dat',
   'PlClWh.dat':'PlClWh.dat','PlClBk.dat':'PlClBk.dat',
   'EfLkData.dat':'EfLkData.dat','link.ssm':'audio/us/link.ssm','clink.ssm':'audio/us/clink.ssm',
+  'PlCa.dat':'PlCa.dat','PlCaAJ.dat':'PlCaAJ.dat','PlCaNr.dat':'PlCaNr.dat',
+  'PlCaGy.dat':'PlCaGy.dat','PlCaRe.usd':'PlCaRe.usd','PlCaWh.dat':'PlCaWh.dat',
+  'PlCaGr.dat':'PlCaGr.dat','PlCaBu.dat':'PlCaBu.dat',
+  'EfCaData.dat':'EfCaData.dat','captain.ssm':'audio/us/captain.ssm',
+  'PlGn.dat':'PlGn.dat','PlGnAJ.dat':'PlGnAJ.dat',
+  'PlGnNr.dat':'PlGnNr.dat','PlGnRe.dat':'PlGnRe.dat','PlGnBu.dat':'PlGnBu.dat',
+  'PlGnGr.dat':'PlGnGr.dat','PlGnLa.dat':'PlGnLa.dat',
+  'EfGnData.dat':'EfGnData.dat','ganon.ssm':'audio/us/ganon.ssm',
+  'PlLg.dat':'PlLg.dat','PlLgAJ.dat':'PlLgAJ.dat','PlLgNr.dat':'PlLgNr.dat',
+  'PlLgWh.dat':'PlLgWh.dat','PlLgAq.dat':'PlLgAq.dat','PlLgPi.dat':'PlLgPi.dat',
+  'EfLgData.dat':'EfLgData.dat','luigi.ssm':'audio/us/luigi.ssm',
+  'PlPk.dat':'PlPk.dat','PlPkAJ.dat':'PlPkAJ.dat','PlPkNr.dat':'PlPkNr.dat',
+  'PlPkRe.dat':'PlPkRe.dat','PlPkBu.dat':'PlPkBu.dat','PlPkGr.dat':'PlPkGr.dat',
+  'PlPc.dat':'PlPc.dat','PlPcAJ.dat':'PlPcAJ.dat','PlPcNr.dat':'PlPcNr.dat',
+  'PlPcRe.dat':'PlPcRe.dat','PlPcBu.dat':'PlPcBu.dat','PlPcGr.dat':'PlPcGr.dat',
+  'EfPkData.dat':'EfPkData.dat',
+  'pikachu.ssm':'audio/us/pikachu.ssm','pichu.ssm':'audio/us/pichu.ssm',
+  'GrOy.dat':'GrOy.dat','old_ys.hps':'audio/old_ys.hps',
+  'PlPr.dat':'PlPr.dat','PlPrAJ.dat':'PlPrAJ.dat','PlPrNr.dat':'PlPrNr.dat',
+  'PlPrRe.dat':'PlPrRe.dat','PlPrBu.dat':'PlPrBu.dat','PlPrGr.dat':'PlPrGr.dat','PlPrYe.dat':'PlPrYe.dat',
+  'EfPrData.dat':'EfPrData.dat','purin.ssm':'audio/us/purin.ssm',
+  'PlDk.dat':'PlDk.dat','PlDkAJ.dat':'PlDkAJ.dat','PlDkNr.dat':'PlDkNr.dat',
+  'PlDkBk.dat':'PlDkBk.dat','PlDkRe.dat':'PlDkRe.dat','PlDkBu.dat':'PlDkBu.dat','PlDkGr.dat':'PlDkGr.dat',
+  'EfDkData.dat':'EfDkData.dat','dk.ssm':'audio/us/dk.ssm',
+  'PlKp.dat':'PlKp.dat','PlKpAJ.dat':'PlKpAJ.dat','PlKpNr.dat':'PlKpNr.dat',
+  'PlKpRe.dat':'PlKpRe.dat','PlKpBu.dat':'PlKpBu.dat','PlKpBk.dat':'PlKpBk.dat',
+  'EfKpData.dat':'EfKpData.dat','koopa.ssm':'audio/us/koopa.ssm',
 });
 export function loadNativeGameDisc(file,report=()=>{}) {
   return loadDiscBundle(file,report,NATIVE_GAME_DISC_FILES);
+}
+/**
+ * Open a silent public native-disc session. The native scope supplies the
+ * exact logical names for each scene; the shared session preflights every
+ * corresponding FST path before reading any payload.
+ */
+export async function openNativeGameDiscSession(file) {
+  const session = await openDiscSession(file);
+  return Object.freeze({
+    close: () => session.close(),
+    async readScope(names, report = () => {}) {
+      const paths = Object.create(null), seen = new Set();
+      for (const name of names) {
+        if (typeof name !== 'string' || seen.has(name))
+          throw Error('Invalid or duplicate native asset name.');
+        seen.add(name);
+        if (name === 'sislib_font.bin') continue;
+        if (name === 'dsp_coef.bin')
+          throw Error('Public native scenes do not accept DSP coefficients.');
+        if (!Object.hasOwn(NATIVE_GAME_DISC_FILES, name))
+          throw Error('Unknown native scene asset: ' + name);
+        paths[name] = NATIVE_GAME_DISC_FILES[name];
+      }
+      const total = names.length;
+      report({phase: 'validate', complete: 0, total});
+      const files = await session.readScope(paths, {
+        beforeRead: ({name, index}) =>
+          report({phase: 'read', file: name, complete: index, total}),
+      });
+      if (seen.has('sislib_font.bin')) files.set('sislib_font.bin', session.fontBytes());
+      report({phase: 'complete', complete: total, total});
+      session.metadata();
+      return files;
+    },
+  });
 }
 /** Read only the selected source scene's data; no upload or persistence. */
 export function loadRuntimeDisc(file,report=()=>{}) {

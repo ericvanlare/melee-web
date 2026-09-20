@@ -1,5 +1,6 @@
 #include "dat_native_stage.hpp"
 #include "dat_material_animation.hpp"
+#include "dat_shape_animation.hpp"
 #include "dat_stage.hpp"
 #include "dat_lights.hpp"
 #include "gameplay_stage_numeric.h"
@@ -18,6 +19,7 @@
 #include <sysdolphin/baselib/jobj.h>
 #include <sysdolphin/baselib/mobj.h>
 #include <sysdolphin/baselib/spline.h>
+#include <sysdolphin/baselib/tobj.h>
 #include <sysdolphin/baselib/wobj.h>
 #pragma GCC diagnostic pop
 #include <cmath>
@@ -37,9 +39,12 @@ struct DatNativeStage::Storage {
     std::vector<MeleeWebNativeJoint*> native;
     std::vector<std::unique_ptr<DatNativeAnimation>> animations;
     std::vector<std::unique_ptr<DatMaterialAnimation>> materials;
+    std::vector<std::unique_ptr<DatShapeAnimation>> shapes;
     std::vector<DatParticleEvent> events;
     std::vector<MeleeWebMapLightOverride> overrides;
+    std::vector<MeleeWebArchiveSymbol> public_symbols;
     std::map<uint32_t,HSD_Joint*> joints;
+    std::map<uint32_t,HSD_ImageDesc*> images;
     std::map<uint32_t,HSD_CObjDesc*> cameras;
     std::map<uint32_t,std::vector<HSD_MObjDesc*>> material_descriptors;
     std::map<uint32_t,HSD_LightDesc*> lights;
@@ -125,8 +130,11 @@ struct DatNativeStage::Storage {
         if(auto p=archive->pointer(o+4,68)){record(*p,68);auto* f=make<HSD_FogAdjDesc>();f->center=archive->be16(*p);f->width=archive->be16(*p+2);for(unsigned i=0;i<16;i++)f->mtx[i/4][i%4]=number(*p+4+4*i);d->fogadjdesc=f;}return d;}
     HSD_Joint* spline_joint(uint32_t o){
         if(joints.contains(o))return joints.at(o);record(o,64);
-        require(archive->be32(o+4)==0x4000&&!archive->pointer(o)&&!archive->pointer(o+8)&&!archive->pointer(o+12)&&!archive->pointer(o+56)&&!archive->pointer(o+60),"Native scene spline reference requires a simple spline joint");
-        auto* d=make<HSD_Joint>();d->flags=0x4000;d->u.spline=spline(pointer(o+16,24));
+        const uint32_t flags=archive->be32(o+4);
+        // Classical scale and hidden are ordinary source joint properties,
+        // including on a WObj animation's spline carrier. Keep both intact.
+        require((flags&JOBJ_SPLINE)&&!(flags&~uint32_t(JOBJ_SPLINE|JOBJ_CLASSICAL_SCALE|JOBJ_HIDDEN))&&!archive->pointer(o)&&!archive->pointer(o+8)&&!archive->pointer(o+12)&&!archive->pointer(o+56)&&!archive->pointer(o+60),"Native scene spline reference requires a simple spline joint");
+        auto* d=make<HSD_Joint>();d->flags=flags;d->u.spline=spline(pointer(o+16,24));
         d->rotation=*vector(o+20);d->scale=*vector(o+32);d->position=*vector(o+44);
         require(d->scale.x!=0&&d->scale.y!=0&&d->scale.z!=0,"Native spline joint has singular scale");joints[o]=d;return d;
     }
@@ -162,23 +170,42 @@ DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive, int st
         native,i,graph->graph().joints[i].source_offset,error,sizeof(error));
     require(native_joint_descriptors[i],error);
    }
-   for(uint32_t i=0;i<graph->graph().material_count;i++){auto* material=static_cast<HSD_MObjDesc*>(melee_web_native_joint_material_descriptor(native,i,error,sizeof(error)));require(material,error);s.material_descriptors[graph->graph().materials[i].source_offset].push_back(material);}
+   for(uint32_t i=0;i<graph->graph().material_count;i++){
+    const auto& checked=graph->graph().materials[i];
+    auto* material=static_cast<HSD_MObjDesc*>(melee_web_native_joint_material_descriptor(native,i,error,sizeof(error)));require(material,error);
+    s.material_descriptors[checked.source_offset].push_back(material);
+    // The DAT may alias an image descriptor across several TObjs and map
+    // models. Preserve that identity before source loaders copy the pointers.
+    // Fountain's source reflection lookup compares this exact pointer.
+    auto* texture=material->texdesc;
+    for(uint32_t j=0;j<checked.material.texture_count;j++){
+     require(texture&&texture->imagedesc,"Native stage texture descriptor missing");
+     const uint32_t image_offset=s.pointer(checked.textures[j].source_offset+76,24);
+     auto [entry,inserted]=s.images.emplace(image_offset,texture->imagedesc);
+     if(!inserted)texture->imagedesc=entry->second;
+     texture=texture->next;
+    }
+    require(!texture,"Native stage texture count differs from checked graph");
+   }
    // Source callbacks select animation slots per entry. These are consumer
    // counts, not inferred DAT extents; the complete map descriptor table above
    // is still hydrated for every archive entry.
    const unsigned count=profile->animation_counts[e.index];
    require(count>0&&count<=64,"Native stage profile has an invalid animation consumer count");
    out.unk4=s.make<HSD_AnimJoint*>(count+1);out.unk8=s.make<HSD_MatAnimJoint*>(count+1);
+   if(e.shape_animation_table)out.unkC=s.make<HSD_ShapeAnimJoint*>(count+1);
    for(unsigned i=0;i<count;i++){
     if(e.joint_animation_table){s.record(*e.joint_animation_table,count*4);if(auto p=a.pointer(*e.joint_animation_table+4*i,20)){
      auto anim=std::make_unique<DatNativeAnimation>(archive,*p,graph->graph(),DatNativeAnimationPolicy::ParticleDescriptors,native_joint_descriptors);out.unk4[i]=static_cast<HSD_AnimJoint*>(anim->indexed_descriptor());s.events.insert(s.events.end(),anim->particle_events().begin(),anim->particle_events().end());s.animations.push_back(std::move(anim));}}
     if(e.material_animation_table){s.record(*e.material_animation_table,count*4);if(auto p=a.pointer(*e.material_animation_table+4*i,12)){
      auto anim=std::make_unique<DatMaterialAnimation>(archive,*p,graph->graph());out.unk8[i]=static_cast<HSD_MatAnimJoint*>(anim->indexed_descriptor());s.materials.push_back(std::move(anim));}}
+    if(e.shape_animation_table){s.record(*e.shape_animation_table,count*4);if(auto p=a.pointer(*e.shape_animation_table+4*i,12)){
+     auto anim=std::make_unique<DatShapeAnimation>(archive,*p,graph->graph());out.unkC[i]=anim->descriptor();s.shapes.push_back(std::move(anim));}}
    }
    if(e.animation_flags_offset){auto* flags=s.make<u8>(count);auto bytes=a.range(*e.animation_flags_offset,count);std::memcpy(flags,bytes.data(),count);out.x28=flags;}
    s.graphs.push_back(std::move(graph));
   }
-  require(!e.shape_animation_table,"Native stage shape animation unsupported");
+  require(e.index!=0||!e.shape_animation_table,"Native stage marker shape animation unsupported");
   if(e.camera_offset)out.x10=&s.camera(*e.camera_offset)->perspective;
   if(e.unknown_14_offset)out.x14=s.table<HSD_CameraAnim>(*e.unknown_14_offset,[&](uint32_t p){return s.camera_anim(p);});
   if(e.light_table_offset)out.x18=s.light_table(*e.light_table_offset);
@@ -206,6 +233,14 @@ DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive, int st
  s.map.unk1C=meta.light_override_table.count;s.map.unk18=nullptr;
  for(const auto& symbol:a.public_symbols())if(symbol.name=="yakumono_param"){
   if(profile->decode_yakumono){s.yaku=profile->decode_yakumono(s.arena.reader(),symbol.data_offset);require(s.yaku,"Native stage yakumono decoder returned null");continue;}
+  if(profile->opaque_yakumono){
+   s.record(symbol.data_offset,4);
+   auto* opaque=s.make<uint8_t>(4);
+   auto bytes=a.range(symbol.data_offset,4);
+   std::memcpy(opaque,bytes.data(),bytes.size());
+   s.yaku=opaque;
+   continue;
+  }
  // Original grLast uses four pointers to material command programs. Typed
   // command hydration is required before exposing its native pointer table.
   // The word count is part of the source stage ABI: Battlefield has two
@@ -236,10 +271,46 @@ DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive, int st
  for(const auto& [offset,light]:s.lights){auto flags=read_dat_light_override(a,offset);s.overrides.push_back({light,flags.has_value(),flags.value_or(0)});}
  require(s.yaku,"Native stage yakumono symbol absent");
  s.native_map=melee_web_stage_map_build(s.arena.reader(),&s.map);
+ const auto* content=melee_web_stage_content(stage_kind);
+ require(content,"Native stage public catalog has no archive identity");
+ for(const auto& symbol:a.public_symbols()){
+  void* value=nullptr;
+  if(symbol.name=="map_head")value=s.native_map;
+  else if(symbol.name=="yakumono_param")value=s.yaku;
+  for(size_t i=0;i<profile->public_symbol_count;i++){
+   const auto& request=profile->public_symbols[i];
+   if(symbol.name!=request.name)continue;
+   if(request.kind==MELEE_WEB_STAGE_PUBLIC_IMAGE){
+    require(s.images.contains(symbol.data_offset),"Stage public image is not owned by its map texture graph");
+    value=s.images.at(symbol.data_offset);
+   }else if(request.kind==MELEE_WEB_STAGE_PUBLIC_JOINT){
+    if(!s.joints.contains(symbol.data_offset)){
+     auto graph=std::make_unique<DatNativeJoint>(archive,symbol.data_offset);
+     char error[256];auto* native=melee_web_native_joint_hydrate(&graph->graph(),error,sizeof(error));require(native,error);
+     s.native.push_back(native);
+     auto* descriptor=static_cast<HSD_Joint*>(melee_web_native_joint_descriptor(native,error,sizeof(error)));require(descriptor,error);
+     s.joints.emplace(symbol.data_offset,descriptor);s.graphs.push_back(std::move(graph));
+    }
+    value=s.joints.at(symbol.data_offset);
+   }else require(false,"Unknown native stage public descriptor kind");
+  }
+  // Retain unhydrated public names as explicit unsupported capabilities.
+  s.public_symbols.push_back({content->archive,symbol.name.c_str(),value});
+ }
+ for(size_t i=0;i<profile->public_symbol_count;i++){
+  bool found=false;
+  for(const auto& symbol:s.public_symbols)if(std::strcmp(symbol.symbol,profile->public_symbols[i].name)==0&&symbol.native_data)found=true;
+  require(found,"Required original stage public symbol missing");
+ }
 }
 DatNativeStage::~DatNativeStage()=default;
 void* DatNativeStage::map_head()const noexcept{return storage_->native_map;}
 void* DatNativeStage::yakumono()const noexcept{return storage_->yaku;}
 const std::vector<MeleeWebMapLightOverride>& DatNativeStage::light_overrides()const noexcept{return storage_->overrides;}
 const std::vector<DatParticleEvent>& DatNativeStage::particle_events()const noexcept{return storage_->events;}
+const std::vector<MeleeWebArchiveSymbol>& DatNativeStage::public_symbols()const noexcept{return storage_->public_symbols;}
+void* DatNativeStage::light_animation_table(uint32_t offset){
+ auto& s=*storage_;
+ return s.table<HSD_LightAnim>(offset,[&](uint32_t root){return s.light_anim(root);});
+}
 }

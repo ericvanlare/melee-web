@@ -22,6 +22,12 @@ int action_test_rows(void*, void*, void*);
 int action_test_movement_operands(void);
 int action_test_jab_operands(void);
 int action_test_dobj_operands(void);
+int action_test_opcode14_consumer(void);
+int action_test_opcode15_consumer(void);
+int action_test_opcode50_consumer(void);
+int action_test_opcode51_consumer(void);
+int action_test_opcode21_consumer(void);
+int action_test_opcode36_consumer(void);
 int action_test_common_operands(void);
 int action_test_falco_operands(void);
 int action_test_wind_operands(void);
@@ -39,6 +45,7 @@ void verify(std::shared_ptr<const DatArchive> archive, const Bytes& container, b
     GameplayActionStore store(archive, mario(), container);
     for(unsigned id=78;id<=88;++id)check(store.command_ready(id),"Shared light-item pickup and throw command graphs are ready");
     for(unsigned id=96;id<=103;++id)check(store.command_ready(id),"Shared light-item smash throw command graphs are ready");
+    for(unsigned id=267;id<=275;++id)check(store.command_ready(id),"Shared cargo victim command graphs are ready");
     Fighter* fp = action_test_fighter(); check(fp != nullptr, "Fighter allocation"); store.bind(fp);
     check(action_test_load(fp, 2, 0) > 0 && action_test_load(fp, 6, 1) > 0 && action_test_alias(fp), "Original loader preserves 2/6 clip aliases");
     const auto frames = action_test_frames(fp); check(frames > 0, "Original FigaTree frames consumer");
@@ -113,7 +120,35 @@ void verify_common_appeals(std::shared_ptr<const DatArchive> archive, const Byte
         catch (const melee_web::DatError&) { generic_rejected = true; }
         check(generic_rejected, "generic and native-action animation cache policies were conflated");
     }
+    if (costume.fighter_kind == 3) {
+        auto runtime = std::make_shared<const DatFighterRuntime>(archive, costume);
+        DatFighterAnimationStore policy_store(runtime, container);
+        const auto wall = policy_store.select_native_action(0);
+        check(wall.animation && std::any_of(wall.animation->tracks.begin(), wall.animation->tracks.end(),
+                                           [](const auto& track) { return track.type == 12; }),
+              "Donkey WallDamage must retain its original branch visibility channel");
+        rejects([&] { (void) policy_store.select(0); });
+    }
     GameplayActionStore store(std::move(archive), costume, container);
+    // Koopa's side-special victim MS rows 278..287 map to the authored
+    // submotion rows SM_None, SM 278..283, SM_None, SM 281..283. The action
+    // store accepts submotion IDs, so only SM 278..283 require command graph
+    // admission; the MS None rows intentionally have no command root.
+    for (unsigned motion = 278; motion <= 283; ++motion) {
+        check(store.command_ready(motion), "Koopa victim source submotion graph is not admitted");
+        check(store.runtime().commands(motion).has_value() ==
+                  store.runtime().action(motion).command_offset.has_value(),
+              "Koopa victim source command presence changed");
+    }
+    if (costume.fighter_kind == 5) {
+        check(costume.motion_count == 316, "Koopa authored action count changed");
+        for (unsigned motion = 295; motion < costume.motion_count; ++motion) {
+            check(store.command_ready(motion), "Koopa self-motion graph is not admitted");
+            check(store.runtime().commands(motion).has_value() ==
+                      store.runtime().action(motion).command_offset.has_value(),
+                  "Koopa self-motion source command presence changed");
+        }
+    }
     unsigned expected_command_mask = 0;
     for (unsigned index = 0; index < 2; ++index) {
         const unsigned motion = 239 + index;
@@ -122,6 +157,35 @@ void verify_common_appeals(std::shared_ptr<const DatArchive> archive, const Byte
         check(store.command_ready(motion), "Common appeal action row is not admitted");
         check(store.runtime().commands(motion).has_value() == source_has_command,
               "Common appeal source command presence changed");
+    }
+    if (costume.fighter_kind == 17) {
+        for (unsigned motion = 295; motion <= 311; ++motion) {
+            check(store.command_ready(motion), "Luigi self-motion command graph is not admitted");
+            check(store.runtime().commands(motion).has_value(),
+                  "Luigi self-motion command root is not retained");
+        }
+    }
+    if (costume.fighter_kind == 12 || costume.fighter_kind == 23) {
+        check(costume.motion_count == 320, "Pikachu-family authored action count changed");
+        for (unsigned motion = 295; motion < costume.motion_count; ++motion) {
+            check(store.command_ready(motion), "Pikachu-family self-motion graph is not admitted");
+            check(store.runtime().commands(motion).has_value() ==
+                      store.runtime().action(motion).command_offset.has_value(),
+                  "Pikachu-family self-motion source command presence changed");
+        }
+    }
+    if (costume.fighter_kind == 3) {
+        check(costume.motion_count == 337, "Donkey authored action count changed");
+        for (unsigned motion = 295; motion < costume.motion_count; ++motion)
+            check(store.command_ready(motion), "Donkey cargo/special command graph is not admitted");
+        Fighter* fighter = action_test_fighter();
+        check(fighter, "Donkey action fixture allocation failed");
+        store.bind(fighter);
+        for (int motion : {0, 24, 296, 297, 298})
+            check(action_test_load(fighter, motion, 1) > 0,
+                  "Donkey WallDamage/fall/OnLoad cargo walk clip is not hydrated");
+        store.unbind(); action_test_destroy(fighter);
+        std::cout << "Donkey branch visibility, fall and cargo OnLoad clips: passed\n";
     }
     check(action_test_common_appeals(store.action_rows(), expected_command_mask),
           "Common appeal rows did not retain checked command storage or were given the sentinel");
@@ -133,6 +197,12 @@ int main(int argc, char** argv)
         check(action_test_movement_operands(), "Native movement operand ABI and truncation rejection");
         check(action_test_jab_operands(),"Native hitbox fields and canonical alias bounds/lifetime");
         check(action_test_dobj_operands(),"Native DObj visibility command operands and admission");
+        check(action_test_opcode14_consumer(),"Opcode 14 hitbox flag consumer and native admission");
+        check(action_test_opcode15_consumer(),"Opcode 15 hitbox disable consumer and native admission");
+        check(action_test_opcode50_consumer(),"Opcode 50 dynamics consumer and native admission");
+        check(action_test_opcode51_consumer(),"Opcode 51 signed self-damage consumer and native admission");
+        check(action_test_opcode21_consumer(),"Opcode 21 throw-flag consumer and native admission");
+        check(action_test_opcode36_consumer(),"Opcode 36 source article-visibility consumer and native admission");
         check(action_test_common_operands(),"Common attack operands and original finite-loop execution");
         check(action_test_falco_operands(),"Falco special opcode schemas retain source fields and canonical words");
         check(action_test_wind_operands(),"Marth wind command decodes source fields and reaches ftCo_8009E714");
@@ -229,6 +299,11 @@ int main(int argc, char** argv)
                 std::cout << "Owned common appeal action rows 239/240: passed\n";
             if (kinds.contains(0))
                 std::cout << "Local Mario Wait2/3/6 source command traces and startup clips: passed\n";
+            if (kinds.contains(17))
+                std::cout << "Luigi kind 17 authored self-motion command rows 295/311: passed\n";
+            for (unsigned kind : {12U, 23U})
+                if (kinds.contains(kind))
+                    std::cout << "Pikachu-family kind " << kind << " authored self-motion rows 295/319: passed\n";
         }
     } catch (const std::exception& e) { std::cerr << e.what() << '\n'; return 1; }
 }

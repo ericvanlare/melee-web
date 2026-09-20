@@ -117,10 +117,12 @@ async function importShellWithMocks(scenario) {
   const imports = [
     "import {mountMeleeRuntime} from '../melee-runtime.mjs';",
     "import {mountControllerSettings} from '../controller-settings.mjs';",
+    "import {openNativeGameDiscSession} from '../runtime-assets.mjs';",
   ].join('\n');
   const replacement = [
     'const mountMeleeRuntime = globalThis.testMountMeleeRuntime;',
     'const mountControllerSettings = globalThis.testMountControllerSettings;',
+    'const openNativeGameDiscSession = globalThis.testOpenNativeGameDiscSession;',
   ].join('\n');
   assert.notEqual(source.indexOf(imports), -1, 'shell imports must remain source-substitutable');
   const substituted = source.replace(imports, replacement);
@@ -151,10 +153,15 @@ async function runScenario({name, failStartup}) {
       bindPlayer: async runtime => { trace.push(['settings-bind', runtime]); },
     };
   };
+  globalThis.testOpenNativeGameDiscSession = async () => {
+    throw Error('public startup test must not open a disc during mount');
+  };
   globalThis.testMountMeleeRuntime = async options => {
     trace.push('mount');
     stateCallback = options.onState;
     assert.equal(options.canvas, document.getElementById('canvas'));
+    assert.equal(options.openDisc, globalThis.testOpenNativeGameDiscSession,
+      'public shell must provide the audio-free scoped disc opener');
     assert.equal(options.createAudio, undefined, 'public shell must not create an audio runtime');
     if (options.createAudio) audioCreated++;
     assert.equal(options.configureModule, undefined, 'required filesystem setup belongs to the shared owner');
@@ -203,6 +210,7 @@ async function runScenario({name, failStartup}) {
   } finally {
     delete globalThis.testMountMeleeRuntime;
     delete globalThis.testMountControllerSettings;
+    delete globalThis.testOpenNativeGameDiscSession;
     restore();
   }
 }

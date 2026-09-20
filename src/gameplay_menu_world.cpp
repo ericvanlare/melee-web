@@ -1,6 +1,7 @@
 #include "gameplay_compat.h"
 #include "gameplay_menu_world.hpp"
 #include "runtime_archive_cache.hpp"
+#include "gameplay_asset_manifest.hpp"
 
 #include "dat_archive.hpp"
 #include "dat_menu_support.hpp"
@@ -36,19 +37,6 @@ namespace melee_web {
 namespace {
 
 constexpr std::size_t kWorldHeapBytes = 32U * 1024U * 1024U;
-
-constexpr std::array<std::string_view, 23> kRequiredFiles = {
-    "MnSlChr.usd", "MnSlMap.usd", "SdSlChr.usd", "MnExtAll.usd",
-    "LbMcGame.usd", "NtMemAc.usd", "sislib_font.bin", "smash2.sem",
-    "dsp_coef.bin", "menu01.hps", "main.ssm", "mario.ssm", "fox.ssm", "falco.ssm", "mars.ssm", "pupupu.ssm",
-    "nr_select.ssm", "nr_title.ssm", "nr_name.ssm", "pokemon.ssm",
-    "end.ssm", "drmario.ssm", "emblem.ssm",
-};
-
-constexpr std::array<std::string_view, 13> kBankFiles = {
-    "main.ssm", "mario.ssm", "fox.ssm", "falco.ssm", "mars.ssm", "pupupu.ssm", "nr_select.ssm", "nr_title.ssm",
-    "nr_name.ssm", "pokemon.ssm", "end.ssm", "drmario.ssm", "emblem.ssm",
-};
 
 [[noreturn]] void fail(const char* message)
 {
@@ -88,7 +76,8 @@ struct GameplayMenuWorld::Storage {
     std::span<const std::uint8_t> coefficients;
     std::span<const std::uint8_t> hps;
     std::span<const std::uint8_t> font_bytes;
-    std::array<std::span<const std::uint8_t>, kBankFiles.size()> bank_bytes;
+    const std::vector<std::string> bank_names=menu_audio_bank_names();
+    std::vector<std::span<const std::uint8_t>> bank_bytes;
 
     std::unique_ptr<GameplayAudioBank> audio_bank;
     std::unique_ptr<GameplayAudioStream> music;
@@ -115,7 +104,7 @@ struct GameplayMenuWorld::Storage {
 
     void load_archives(const RuntimeFiles& files)
     {
-        for (const auto name : kRequiredFiles) {
+        for (const auto& name : menu_asset_names()) {
 #if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
             // The public alpha carries no GPL resampler or DROM coefficients.
             // Keep the source file inventory explicit while letting the
@@ -188,8 +177,8 @@ struct GameplayMenuWorld::Storage {
     {
         if (archive_cache) {
             std::vector<std::shared_ptr<const DatAudioBank>> decoded;
-            decoded.reserve(kBankFiles.size());
-            for (const auto name : kBankFiles)
+            decoded.reserve(bank_names.size());
+            for (const auto& name : bank_names)
                 decoded.push_back(archive_cache->audio_bank(name));
             audio_bank = std::make_unique<GameplayAudioBank>(
                 sem, std::move(decoded), coefficients);
@@ -205,7 +194,7 @@ struct GameplayMenuWorld::Storage {
         check(residency != nullptr, error,
               "Native menu audio residency creation failed");
         for (std::size_t i = 0; i < bank_bytes.size(); ++i) {
-            const std::string path = "/audio/us/" + std::string(kBankFiles[i]);
+            const std::string path = "/audio/us/" + bank_names[i];
             const MeleeWebAudioResidencyAsset asset = {
                 path.c_str(), bank_bytes[i].data(), bank_bytes[i].size(),
                 100 + static_cast<int>(i),
@@ -243,8 +232,9 @@ struct GameplayMenuWorld::Storage {
         coefficients = std::span<const std::uint8_t>{require_file(files, "dsp_coef.bin")};
 #endif
         hps = std::span<const std::uint8_t>{require_file(files, "menu01.hps")};
-        for (std::size_t i = 0; i < kBankFiles.size(); ++i)
-            bank_bytes[i] = std::span<const std::uint8_t>{require_file(files, kBankFiles[i])};
+        bank_bytes.reserve(bank_names.size());
+        for (const auto& name : bank_names)
+            bank_bytes.emplace_back(require_file(files, name));
 
         start_scene(GameplayMenuScene::Characters);
         start_audio();

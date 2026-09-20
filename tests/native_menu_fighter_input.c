@@ -1,4 +1,6 @@
+#include "gameplay_compat.h"
 #include "native_menu_fighter_input.h"
+#include <melee/ft/forward.h>
 
 #include <math.h>
 
@@ -59,7 +61,7 @@ int melee_web_fighter_input_observe_valid(
     if (!observation || observation->cursor_port < 0 ||
         observation->cursor_port >= PAD_MAX_CONTROLLERS ||
         observation->held_door < -1 || observation->held_door >= 4 ||
-        character_kind < 0 || character_kind >= 0x19 ||
+        character_kind < 0 || character_kind >= CKIND_PLAYABLE_COUNT ||
         !finite_float(observation->cursor_x) ||
         !finite_float(observation->cursor_y) ||
         !finite_float(observation->model_x) ||

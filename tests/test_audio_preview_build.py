@@ -42,6 +42,17 @@ class AudioPreviewBuildTests(unittest.TestCase):
                                 target=BUILD.AUDIO_PREVIEW_RUNTIME_TARGET, **kwargs)
                 read_lock.assert_not_called()
 
+    def test_release_preview_exports_the_scoped_public_asset_api(self):
+        cmake = (ROOT / "cmake" / "FighterRuntime.cmake").read_text(encoding="utf-8")
+        marker = "if(CMAKE_BUILD_TYPE STREQUAL \"Release\" AND MELEE_WEB_AUDIO_PREVIEW_RUNTIME)"
+        start = cmake.rindex(marker)
+        block = cmake[start:]
+        export_line = next(line for line in block.splitlines() if "-sEXPORTED_FUNCTIONS=" in line)
+        exported = export_line.split("-sEXPORTED_FUNCTIONS=", 1)[1].split(")", 1)[0].split(",")
+        self.assertEqual(tuple(exported), BUILD.PUBLIC_RUNTIME_EXPORTS)
+        self.assertNotIn("_melee_web_native_menu_replay", exported)
+        self.assertNotIn("_melee_web_native_menu_diagnostics", exported)
+
     def test_graph_proof_requires_audio_sources_and_no_silent_definition(self):
         with tempfile.TemporaryDirectory(prefix="melee audio preview graph ") as directory:
             root = Path(directory)

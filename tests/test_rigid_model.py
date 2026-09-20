@@ -33,8 +33,9 @@ class RigidModelTests(unittest.TestCase):
         if result.returncode:
             raise RuntimeError(f"Model test compilation failed:\n{result.stdout}{result.stderr}")
 
-    def run_case(self, name):
-        result = subprocess.run([str(self.binary), name], capture_output=True, text=True, timeout=20)
+    def run_case(self, name, *arguments):
+        result = subprocess.run([str(self.binary), name, *map(str, arguments)],
+                                capture_output=True, text=True, timeout=20)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_valid_fixed_point_model_with_relocated_zero_array(self):
@@ -51,6 +52,9 @@ class RigidModelTests(unittest.TestCase):
 
     def test_primitive_counts_and_supported_surface_types(self):
         self.run_case("surface_counts")
+
+    def test_native_line_point_counts_bounds_and_viewer_rejection(self):
+        self.run_case("native_line_and_point_packets")
 
     def test_truncated_primitive_headers_and_index_payloads(self):
         self.run_case("truncated_packets")
@@ -90,6 +94,23 @@ class RigidModelTests(unittest.TestCase):
 
     def test_direct_rgba8_packet_layout_and_original_vertex_material_requirements(self):
         self.run_case("direct_rgba8_geometry")
+
+    def test_native_indexed_rgba8_array_bounds_and_viewer_boundary(self):
+        self.run_case("indexed_rgba8_geometry")
+
+    def test_native_indexed_rgb565_index16_width_and_source_count(self):
+        self.run_case("indexed_rgb565_index16_geometry")
+
+    def test_real_captain_six_costume_native_packed_color_construction(self):
+        directory = ROOT / "assets-local/full-game-captain"
+        required = [
+            directory / name for name in
+            ("PlCaNr.dat", "PlCaGy.dat", "PlCaRe.usd", "PlCaWh.dat",
+             "PlCaGr.dat", "PlCaBu.dat")
+        ]
+        if not all(path.is_file() for path in required):
+            self.skipTest("Owned Captain model fixtures are required")
+        self.run_case("real_captain", directory)
 
     def test_native_interleaved_nbt_and_cull_flags_preserve_source_metadata(self):
         self.run_case("native_nbt_geometry_and_cull")

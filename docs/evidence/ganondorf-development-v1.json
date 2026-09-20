@@ -1,0 +1,645 @@
+{
+  "schema": "melee-web-ganondorf-development",
+  "version": 1,
+  "status": "development_candidate",
+  "source_commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+  "base_port_commit": "89df0eac4595aa02115310d15e82af8d593e7fe2",
+  "fighter": {
+    "ckind": 25,
+    "ftkind": 25,
+    "costumes": 5,
+    "motion_rows": 318,
+    "attributes_bytes": 140,
+    "material_animation": "authored_null_all_five_costumes",
+    "dynamic_bones": 3,
+    "dynamics_modes": 2,
+    "article_table": "authored_null",
+    "effect_bank": 19,
+    "effect_entries": 6
+  },
+  "asset_sha256": {
+    "PlGn.dat": "5e38291dae0e0cb70e1d337ea824081f5f9a19a592a2427c7525b3ef3f8f2388",
+    "PlGnAJ.dat": "a114e63dba362a50a07fd6663233c6d1b4db6c8b3a2660a7a4825eb90828335a",
+    "PlGnNr.dat": "0d95bb9a89a9f5703f0edbc298d8083ac9c960843eea993eed9c0781403c6f8f",
+    "PlGnRe.dat": "39126b8cf1d2d726baf5920cb90cbee9f1565119022cf9067e9b7a73bad8581f",
+    "PlGnBu.dat": "40183f89e0292da870d89b1578c1434d9eb2a96ae0d0ae84cbd075c66f58b421",
+    "PlGnGr.dat": "2c5b108ee19431d5dc4c0aad885c1a6bac930315b1617ce1950f6ac19f7411e0",
+    "PlGnLa.dat": "706c3fdaafa5dac3aa808bfd6343ddeec2e0fbce37386e4d4276aa193b46b0a3",
+    "EfGnData.dat": "c4c34be81027d6065f6cb0f5422d7937814ede4f99955e1c705d7ad58f7c676c",
+    "ganon.ssm": "68636b0a9a055b6264b71af4dd2240e342435f530d1c823274b320cbfb262cbb"
+  },
+  "native_lifecycle": [
+    {
+      "local_path": "work/full-game/ganon-native-v7.log",
+      "sha256": "8b5f211ba49e76bf133e023b1eb33c1ed51de9426192a5adadd1f1f5d4cc2210",
+      "scope": "Source construction/combat/pause/NoContest/teardown and reconstruction; authored fixture, no independent original comparison."
+    },
+    {
+      "local_path": "work/full-game/ganon-native-v8-reverse.log",
+      "sha256": "45b502972017589dce82e62bf7509e06a33cdbb2feadd983fe4b2969e1b670f2",
+      "scope": "Source construction/combat/pause/NoContest/teardown and reconstruction; authored fixture, no independent original comparison."
+    },
+    {
+      "local_path": "work/full-game/existing-fighters-native-v1.log",
+      "sha256": "956ebc87238b363349577939baddfa74f137593ee6107e2265cea19c54d1a748",
+      "scope": "Source construction/combat/pause/NoContest/teardown and reconstruction; authored fixture, no independent original comparison."
+    }
+  ],
+  "browser_discovery": [
+    {
+      "raw": {
+        "local_path": "work/full-game/ganon-browser-entry-v6/report.json",
+        "sha256": "c77e9a7590a5e9cb710cc356653c6b6bf350966f187fcd203c24f86836c36eb9",
+        "scope": "Drawn original-menu and action reachability diagnostic; timing gate failed."
+      },
+      "browser": "153.0.8010.50",
+      "result": "functional_entry_pass_action_gate_failed",
+      "entry_frames": [
+        1,
+        32
+      ],
+      "action_inventory": "ganondorf-visible-actions-v1",
+      "cases": 30,
+      "metrics": {
+        "sourceFrames": 5200,
+        "browserCallbacks": 5197,
+        "worstBrowserCallbackMs": 1065.995,
+        "browserCallbackGaps": 7,
+        "browserLongTasks": 0,
+        "browserLongTaskWorstMs": 0,
+        "nativeCallbacks": 5247,
+        "worstNativeCallbackMs": 1055.755,
+        "nativeCallbacksOverBudget": 6,
+        "nativeCallbacksOver33ms": 4,
+        "audioUnderrunFrames": 255,
+        "livePipelinesQueued": 0,
+        "livePipelinesCreated": 23,
+        "liveTextureUploadBytes": 692224,
+        "liveStagingUsedBytes": 7192692496,
+        "peakStagingUsedBytes": 9929236,
+        "preparationPauses": 0,
+        "automaticTimingResumes": 3,
+        "focusLost": false,
+        "wasmHeapGrowthBytes": 0
+      },
+      "failures": [
+        "browser callback gap",
+        "native callback over 33.3 ms",
+        "audio underrun",
+        "live pipeline creation",
+        "automatic timing pause"
+      ],
+      "origin_cache_cleared": false
+    },
+    {
+      "raw": {
+        "local_path": "work/full-game/ganon-browser-entry-v7/report.json",
+        "sha256": "ade8e93a16e7a0b737d8c8982e8319f99e819dd97614c3f31734f97456e2fa33",
+        "scope": "Drawn original-menu and action reachability diagnostic; timing gate failed."
+      },
+      "browser": "153.0.8010.50",
+      "result": "functional_entry_pass_action_gate_failed",
+      "entry_frames": [
+        1,
+        31
+      ],
+      "action_inventory": "ganondorf-visible-actions-v1",
+      "cases": 30,
+      "metrics": {
+        "sourceFrames": 5200,
+        "browserCallbacks": 5204,
+        "worstBrowserCallbackMs": 220.22,
+        "browserCallbackGaps": 3,
+        "browserLongTasks": 0,
+        "browserLongTaskWorstMs": 0,
+        "nativeCallbacks": 5242,
+        "worstNativeCallbackMs": 208.035,
+        "nativeCallbacksOverBudget": 3,
+        "nativeCallbacksOver33ms": 3,
+        "audioUnderrunFrames": 214,
+        "livePipelinesQueued": 0,
+        "livePipelinesCreated": 23,
+        "liveTextureUploadBytes": 692224,
+        "liveStagingUsedBytes": 7193532676,
+        "peakStagingUsedBytes": 5752320,
+        "preparationPauses": 0,
+        "automaticTimingResumes": 2,
+        "focusLost": false,
+        "wasmHeapGrowthBytes": 0
+      },
+      "failures": [
+        "browser callback gap",
+        "native callback over 33.3 ms",
+        "audio underrun",
+        "live pipeline creation",
+        "automatic timing pause"
+      ],
+      "origin_cache_cleared": true
+    }
+  ],
+  "pipeline_review": {
+    "raw": {
+      "local_path": "work/full-game/ganon-cache-review-v4.json",
+      "sha256": "7f8af9df9ee83292416dd6cb70d6ca9c397128cafdc22f773e456601b157221c",
+      "scope": "Portable-descriptor append audit; does not imply gameplay or performance acceptance."
+    },
+    "preserved_base_rows": 628,
+    "new_pipeline_rows": 37,
+    "shader_rows": 1,
+    "result_pipeline_rows": 664,
+    "seed_sha256": "632b6b1beb1c07563668863fbcc81fa19e12795e8a4f3284413406f421be0901",
+    "new_rows": [
+      {
+        "config_sha256": "efa038a650d7c850229b3b7bc12b935db48eecdf0eb4ed4d70fa823c1ce0c79b",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 493,
+        "hash": 18048112,
+        "type": 1
+      },
+      {
+        "config_sha256": "e66df0c1b3b3c8eb0385ddce90dd9b9fbc9ead7f7ec92af1549bc211bb11a975",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 493,
+        "hash": 250522159,
+        "type": 1
+      },
+      {
+        "config_sha256": "5fa7c5a669fdd35803c2249e737eb99a01464e8c83744b7a13a8f2174ddfac97",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 1395,
+        "hash": 378919708,
+        "type": 1
+      },
+      {
+        "config_sha256": "94ea62195ff8460387eee6f18b57446b716872ae110eb21a6f30e563f273130d",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 3456,
+        "hash": 416424021,
+        "type": 1
+      },
+      {
+        "config_sha256": "ec8c5d6d23ff21f2e0f7b46aa5ae2a887e920f2880f959de980a07679048bb0c",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 3416,
+        "hash": 718147659,
+        "type": 1
+      },
+      {
+        "config_sha256": "0259290f0d0ff9777e7b22cdf227cf313e7a971b5a9e4d5ab7ff6405e4b02f20",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 3458,
+        "hash": 872525329,
+        "type": 1
+      },
+      {
+        "config_sha256": "5219ba7f6179c9aea369597947b162bde69a754a00336c504cb0390635828bfa",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 1395,
+        "hash": 988814910,
+        "type": 1
+      },
+      {
+        "config_sha256": "51967d745285133080518e4452028cc36746395818d2fdd977cdfc517054649e",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 493,
+        "hash": 1036721840,
+        "type": 1
+      },
+      {
+        "config_sha256": "6dc888985d39e2e0d780501f3cb272d7e4395064349d03bad35d14720c55f053",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 434,
+        "hash": 1055393248,
+        "type": 1
+      },
+      {
+        "config_sha256": "59ad5f8c53bf5e397eda65edeb25d951f07e0a69c202cc2eb5960ecf9f3a7801",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 3458,
+        "hash": 1296256490,
+        "type": 1
+      },
+      {
+        "config_sha256": "75b330974768f4e67b0fb5e8fee765d730e1bf4d137e8083aef78fc98268e3a1",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 434,
+        "hash": 1321975467,
+        "type": 1
+      },
+      {
+        "config_sha256": "3b405cc386bd031055e934ee04d9edfcbccb3d6c0068b5a3fec98f08a6fe7ef8",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 434,
+        "hash": 1383013381,
+        "type": 1
+      },
+      {
+        "config_sha256": "e9b8f9be854584cc6e71e275fac98ca50e6966ed06e2f0e249f5ef612311203a",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 3456,
+        "hash": 1549441527,
+        "type": 1
+      },
+      {
+        "config_sha256": "ab17a4b3486081599fb8398f781fb647ef90c7aa21e5308759730c2300dc9e02",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 1395,
+        "hash": 1684972167,
+        "type": 1
+      },
+      {
+        "config_sha256": "517d5a29f49af90bdef1d01cb628532a643793a1ad15c73ba4c30108ce7263f5",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 1395,
+        "hash": 2105544289,
+        "type": 1
+      },
+      {
+        "config_sha256": "8c48d9fc690cc18b118e44c3567b32c865f4c068aa5d75d2dd71617b6c5e158d",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 434,
+        "hash": 2120394452,
+        "type": 1
+      },
+      {
+        "config_sha256": "ca56ca9ba9b0427c8736a133b26a1e91c5bdcf54d6287205cf66736062b790ce",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 493,
+        "hash": 2175882297,
+        "type": 1
+      },
+      {
+        "config_sha256": "d28d5253b302ef0a3c9c5b520f612cdb314111b993da0a94cb58bec7995d56b4",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 5097,
+        "hash": 2273446307,
+        "type": 1
+      },
+      {
+        "config_sha256": "ccd89a2c5b7aaf1ba8825d9aee9972966e4272906ceed05ae6196242136f26a4",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 5097,
+        "hash": 2273710819,
+        "type": 1
+      },
+      {
+        "config_sha256": "8df8bc5082e3e9d3b82f8bee4fde54f72bcad1307eb9bb2b0488681f3bfcd457",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 1395,
+        "hash": 2375789412,
+        "type": 1
+      },
+      {
+        "config_sha256": "24fe0b8a750014bc4700e962c8c8e42b8c74040f7d30af7d2f4b0016137b81a3",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 3458,
+        "hash": 2441651026,
+        "type": 1
+      },
+      {
+        "config_sha256": "ec947bc37055e73e88c3fda7b1031b5868a4fce5d8d3f37cf9c4f78c3c4de1f7",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 434,
+        "hash": 2480110389,
+        "type": 1
+      },
+      {
+        "config_sha256": "c19b884d08b8f3dc2b9aecfaceb4d6c8b93bc425054bb81a37ec3fdb80046560",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 434,
+        "hash": 2619451332,
+        "type": 1
+      },
+      {
+        "config_sha256": "bc962d1397a41e9b85ff3d719dd430f235e44817f380dede9b89ef2725ef91de",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 493,
+        "hash": 2722118293,
+        "type": 1
+      },
+      {
+        "config_sha256": "90d03b584fbc2c777671ad73a29cd5538b260cb3f394c4030fb9e9efbe7cccac",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 1395,
+        "hash": 2755594713,
+        "type": 1
+      },
+      {
+        "config_sha256": "736da6452ac8dbe0ce05cc2604bdce98c8b1a135b7f2778f3c96eefac9f4a49a",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 3458,
+        "hash": 2791439565,
+        "type": 1
+      },
+      {
+        "config_sha256": "573b2bec16229d467df0aa71bb21c57c40152f765a1539cdd1ae63a81cd114ff",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 5096,
+        "hash": 3091291943,
+        "type": 1
+      },
+      {
+        "config_sha256": "6d9d3213a3a4fac258a9ba8b14fca77abf28822b4a0c234a3bbd04083289f702",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 3458,
+        "hash": 3537185157,
+        "type": 1
+      },
+      {
+        "config_sha256": "fb8ec03e50cc07a7c224ed323e9f1e00e2b680f199deb42904b078b4436f3070",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 3761,
+        "hash": 3553892379,
+        "type": 1
+      },
+      {
+        "config_sha256": "72e986eb20fa6be8c787b05daa0bfa28d276a9eaba12eeacaff1fec21d0e158c",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 3423,
+        "hash": 3584851434,
+        "type": 1
+      },
+      {
+        "config_sha256": "12baa0936663b78a4975b497c4d834e5b5fd15207512bf279dc99ef5f5cbd341",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 3456,
+        "hash": 3650723614,
+        "type": 1
+      },
+      {
+        "config_sha256": "ca2cfb047225284d0fbaf1e185676298a3f0e765b2b7ff589166a97a4a46f30f",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 434,
+        "hash": 3913753813,
+        "type": 1
+      },
+      {
+        "config_sha256": "0e823459acfc44f64be3dac878acb938b31a55bb390f1908327684e1a8993cbc",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 3421,
+        "hash": 4055828652,
+        "type": 1
+      },
+      {
+        "config_sha256": "5e30bf9e27614e21253dedbe3d361088b4387acbead5a15adec1c542e3d4b692",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 3458,
+        "hash": 4149420034,
+        "type": 1
+      },
+      {
+        "config_sha256": "cebadd74e3c48a5f5b1876568df8d1c0b6f86f0248f174f366b38a37ebba7114",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 5102,
+        "hash": 4194222646,
+        "type": 1
+      },
+      {
+        "config_sha256": "d257c78327bf0edc244f491c016fba84d80cd372952989fb9fab9e35f0083fb0",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 493,
+        "hash": 4221979778,
+        "type": 1
+      },
+      {
+        "config_sha256": "9dd8ba4ab1dec17fc7558f3241c363578279015a031b1d4a02c27e7748113994",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 493,
+        "hash": 4231511917,
+        "type": 1
+      }
+    ],
+    "existing_payload_conflicts": 0,
+    "missing_base_rows": 0
+  },
+  "verification": {
+    "full_suite_v1": {
+      "tests": 1048,
+      "failures": 2,
+      "skipped": 44,
+      "seconds": 242.474,
+      "scope": "Two stale prototype roster expectations; corrected focused prototype tests and the full v2 suite pass."
+    },
+    "full_suite_v2": {
+      "tests": 1048,
+      "failures": 0,
+      "skipped": 43,
+      "seconds": 238.235,
+      "log_sha256": "39afd3041d32a7cacbc65675b41993cc66696f86c5c6e2c9904fe03936db6113"
+    },
+    "development_release_build": {
+      "result": "pass",
+      "log_sha256": "9bfe4530355d50fb18dfe7221601413cdc4e90b74168db7cbdbd5f1adbcd3818"
+    },
+    "public_release_build": {
+      "result": "pass",
+      "log_sha256": "41027389c54523e9334419ff7b313a7b1b5f497bbb2f98b1f086c8160c0faedc"
+    },
+    "mario_original_regression": {
+      "frames": 240,
+      "status": "declared_state_match",
+      "gold_admitted": false,
+      "scope": "Declared entry, supplied input, fighter, RNG and match clock fields; source drawing, global PAD history, pixels, PCM, hardware and performance excluded.",
+      "report_sha256": "0218d6944b9ee6e3695116406b1e7fd84e6a1e8684760242bd155da61fe1e950"
+    },
+    "github": {
+      "commit": "ca692dd122e94ef886a1379dbd9b887339fc4ebb",
+      "workflow": "Verify",
+      "result": "success",
+      "seconds": 392,
+      "url": "https://github.com/ericvanlare/melee-web/actions/runs/35506996732"
+    }
+  },
+  "remaining": [
+    "independent_original_comparison",
+    "complete_interaction_corpus",
+    "all_costume_and_opponent_render_states",
+    "broader_costume_and_interaction_cold_warm_performance",
+    "full_match_and_retained_menu_loops",
+    "pixel_equivalence",
+    "pcm_equivalence",
+    "physical_input_and_latency"
+  ],
+  "full_fighter_admitted": false,
+  "frozen_discovery_build": {
+    "local_directory": "work/full-game/ganon-browser-build-v5",
+    "artifact_sha256": {
+      "gameplay_menu_browser.js": "d45a609468b3df0a2115c4c38f1179a4403b8612635716d1f8e712d3117ef046",
+      "gameplay_menu_browser.wasm": "cb63244930b82ae2764d980db2a8cbb57de022f86b3799069122d101b92fda94",
+      "gameplay_menu_browser.data": "4bdb7c4a3e906d907d066f0c65041d7eb3472dc25c9d8c98be6e4946fdce560f",
+      "prototype-build.json": "cd71b575ce4c5c0d60556306240d9abf8515ce7cc775a634cbe29ec3f1187f03"
+    }
+  },
+  "post_preload_cleared_origin": {
+    "raw_report_sha256": "afa637562c872a1b153166c333485f4d2e4b017f21b12ac69eeb0f64999900c0",
+    "frozen_build_identity_sha256": "3d1da65e3e21673a16246d1ddf259aebad99231a5b32f7513713828feb06a386",
+    "browser": "153.0.8010.50",
+    "scope": "Single cleared-origin authored30-case/5200-frame drawn action/performance sweep; no original equivalence, physical input, pixels/PCM, warm pair or full match claim.",
+    "pass": true,
+    "metrics": {
+      "sourceFrames": 5200,
+      "browserCallbacks": 5200,
+      "worstBrowserCallbackMs": 27.605,
+      "browserCallbackGaps": 0,
+      "browserLongTasks": 0,
+      "browserLongTaskWorstMs": 0,
+      "nativeCallbacks": 5200,
+      "worstNativeCallbackMs": 9.965,
+      "nativeCallbacksOverBudget": 0,
+      "nativeCallbacksOver33ms": 0,
+      "audioUnderrunFrames": 0,
+      "livePipelinesQueued": 0,
+      "livePipelinesCreated": 0,
+      "liveTextureUploadBytes": 692224,
+      "liveStagingUsedBytes": 7193071084,
+      "peakStagingUsedBytes": 2921240,
+      "preparationPauses": 0,
+      "automaticTimingResumes": 0,
+      "focusLost": false,
+      "wasmHeapGrowthBytes": 0
+    },
+    "entry_timing_resumes": 0
+  },
+  "post_preload_cold_warm": {
+    "scope": "One cold-origin then warm-application authored30-case/5200-frame pair with normal drawing and audio; no independent original semantics, complete match, all-costume matrix, pixels/PCM equivalence or physical input claim.",
+    "pass": true,
+    "local_path": "work/full-game/ganon-browser-pair-v1/report.json",
+    "raw_report_sha256": "001b4a392d786ef3229f40ed22729f0c49bc12c321a85e0a4bc0f1a55b7cda8d",
+    "plan_sha256": "9ae8864da7309bd9222696ac66ab23ef6aed5468b6c56900447f2c80b587fea5",
+    "frozen_build_identity_sha256": "3d1da65e3e21673a16246d1ddf259aebad99231a5b32f7513713828feb06a386",
+    "browser": "153.0.8010.50",
+    "machine": "Apple M4",
+    "os": "macOS26.6.2 build25G83",
+    "runs": [
+      {
+        "round": "cold",
+        "geometry": {
+          "buffer": [
+            640,
+            480
+          ],
+          "css": [
+            900,
+            675
+          ],
+          "devicePixelRatio": 1,
+          "viewport": [
+            1280,
+            960
+          ],
+          "hidden": false,
+          "focused": true
+        },
+        "metrics": {
+          "sourceFrames": 5200,
+          "browserCallbacks": 5200,
+          "worstBrowserCallbackMs": 27.17,
+          "browserCallbackGaps": 0,
+          "browserLongTasks": 0,
+          "browserLongTaskWorstMs": 0,
+          "nativeCallbacks": 5200,
+          "worstNativeCallbackMs": 9.595,
+          "nativeCallbacksOverBudget": 0,
+          "nativeCallbacksOver33ms": 0,
+          "audioUnderrunFrames": 0,
+          "livePipelinesQueued": 0,
+          "livePipelinesCreated": 0,
+          "liveTextureUploadBytes": 692224,
+          "liveStagingUsedBytes": 7194219620,
+          "peakStagingUsedBytes": 2921240,
+          "preparationPauses": 0,
+          "automaticTimingResumes": 0,
+          "focusLost": false,
+          "wasmHeapGrowthBytes": 0
+        },
+        "entry_timing_resumes": 0
+      },
+      {
+        "round": "warm",
+        "geometry": {
+          "buffer": [
+            640,
+            480
+          ],
+          "css": [
+            900,
+            675
+          ],
+          "devicePixelRatio": 1,
+          "viewport": [
+            1280,
+            960
+          ],
+          "hidden": false,
+          "focused": true
+        },
+        "metrics": {
+          "sourceFrames": 5200,
+          "browserCallbacks": 5200,
+          "worstBrowserCallbackMs": 27.655,
+          "browserCallbackGaps": 0,
+          "browserLongTasks": 0,
+          "browserLongTaskWorstMs": 0,
+          "nativeCallbacks": 5200,
+          "worstNativeCallbackMs": 9.555,
+          "nativeCallbacksOverBudget": 0,
+          "nativeCallbacksOver33ms": 0,
+          "audioUnderrunFrames": 0,
+          "livePipelinesQueued": 0,
+          "livePipelinesCreated": 0,
+          "liveTextureUploadBytes": 692224,
+          "liveStagingUsedBytes": 7192499824,
+          "peakStagingUsedBytes": 2921240,
+          "preparationPauses": 0,
+          "automaticTimingResumes": 0,
+          "focusLost": false,
+          "wasmHeapGrowthBytes": 0
+        },
+        "entry_timing_resumes": 0
+      }
+    ]
+  },
+  "captain_shared_boundary_regression": {
+    "status": "pass",
+    "local_log": "work/full-game/ganon-native-captain-regression-v1.log",
+    "sha256": "73fcfd2686b362f2a86b3b5dcd57ad2a47fcb914a1fbceb5cc41f65ceba37460",
+    "scope": "Fresh native Ganondorf/Mario FD source lifecycles across five costumes after shared Captain filename, geometry and particle-palette changes; no browser or original-comparison claim."
+  }
+}

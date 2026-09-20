@@ -163,6 +163,7 @@ def _player_fixture() -> tuple[dict[str, bytes], dict[str, object]]:
         "melee-runtime.mjs": b"export {};",
         "runtime-assets.mjs": b"export {};",
         "disc-image.mjs": b"export {};",
+        "disc-session.mjs": b"export {};",
         "prototype-keyboard-layouts.mjs": b"export {};",
         "controller-input.mjs": b"export {};",
         "controller-panel.mjs": b"export {};",

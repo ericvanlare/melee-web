@@ -438,6 +438,7 @@ def _validate_player_runtime(output: Path, runtime: dict[str, Any], records: lis
         "melee-runtime.mjs": ROOT / "web" / "melee-runtime.mjs",
         "runtime-assets.mjs": ROOT / "web" / "runtime-assets.mjs",
         "disc-image.mjs": ROOT / "web" / "disc-image.mjs",
+        "disc-session.mjs": ROOT / "web" / "disc-session.mjs",
         "prototype-keyboard-layouts.mjs": ROOT / "web" / "prototype-keyboard-layouts.mjs",
         "controller-input.mjs": ROOT / "web" / "controller-input.mjs",
         "controller-panel.mjs": ROOT / "web" / "controller-panel.mjs",

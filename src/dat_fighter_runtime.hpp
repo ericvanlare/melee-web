@@ -2,6 +2,10 @@
 
 #include "fighter_attributes.h"
 #include "fighter_binding.hpp"
+#include "gameplay_donkey_schema.h"
+#include "gameplay_koopa_schema.h"
+#include "gameplay_pikachu_schema.h"
+#include "gameplay_purin_schema.h"
 #include <array>
 #include <memory>
 
@@ -35,10 +39,13 @@ struct DatFighterDynamicsSphere {
 };
 struct DatFighterDynamics {
     std::uint32_t descriptor_offset;
+    std::uint32_t active_bone_count=0;
+    // Authored descriptors can also contain costume-part chains outside the
+    // initial body count (Purin blue/green hats).
     std::vector<DatFighterDynamicsBone> bones;
     std::vector<DatFighterDynamicsSphere> spheres;
-    // Mars uses this target as five rows of three pointer-width integer chain
-    // cutoffs. Other fighter-specific table schemas remain unadmitted.
+    // Authored selector rows hold pointer-width integer chain cutoffs. The
+    // native owner validates each admitted fighter's body count and selectors.
     std::optional<std::uint32_t> animation_table_offset;
 };
 
@@ -70,6 +77,18 @@ public:
     [[nodiscard]] std::uint32_t root_offset() const noexcept { return root_; }
     [[nodiscard]] const MeleeWebFighterBaseAttributes& base_attributes() const noexcept { return base_; }
     [[nodiscard]] const std::optional<MeleeWebMarioAttributes>& mario_attributes() const noexcept { return mario_; }
+    [[nodiscard]] const std::optional<MeleeWebLuigiAttributes>& luigi_attributes() const noexcept { return luigi_; }
+    [[nodiscard]] const std::optional<MeleeWebDonkeyAttributes>& donkey_attributes() const noexcept { return donkey_; }
+    // Koopa uses the exact ftKoopaAttributes ABI; the asset owner owns its Flame Article.
+    [[nodiscard]] const std::optional<MeleeWebKoopaAttributes>& koopa_attributes() const noexcept { return koopa_; }
+    // Pikachu and Pichu use the shared original ftPikachuAttributes ABI;
+    // their decoded values and Article identities remain family-specific.
+    [[nodiscard]] const std::optional<MeleeWebPikachuAttributes>& pikachu_attributes() const noexcept { return pikachu_; }
+    // Purin's 0x100 attribute record is decoded exactly, while its authored
+    // x48 custom parts have a separate checked native owner.
+    [[nodiscard]] const std::optional<MeleeWebPurinAttributes>& purin_attributes() const noexcept { return purin_; }
+    // Captain and Ganondorf use the shared original ftCaptain_DatAttrs layout.
+    [[nodiscard]] const std::optional<MeleeWebCaptainAttributes>& captain_attributes() const noexcept { return captain_; }
     // Fox and Falco use the shared original ftFox_DatAttrs layout.  The
     // optional is keyed by source kind; it is absent for Mario and for kinds
     // whose extension schema has not been hydrated.
@@ -80,6 +99,7 @@ public:
     [[nodiscard]] const std::vector<DatRuntimeAction>& actions() const noexcept { return actions_; }
     [[nodiscard]] const DatRuntimeAction& action(std::uint32_t motion_id) const;
     [[nodiscard]] const std::vector<DatWaitChoice>& wait_choices() const noexcept { return wait_choices_; }
+    [[nodiscard]] const std::vector<DatWaitChoice>& squat_wait_choices() const noexcept { return squat_wait_choices_; }
     [[nodiscard]] const std::vector<DatFighterHurtbox>& hurtboxes() const noexcept { return hurtboxes_; }
     [[nodiscard]] const DatFighterDynamics& dynamics() const noexcept { return dynamics_; }
     // Checks source part indices before a consumer binds any native JObj. Bone
@@ -94,11 +114,17 @@ private:
     std::uint32_t root_, extension_;
     MeleeWebFighterBaseAttributes base_{};
     std::optional<MeleeWebMarioAttributes> mario_;
+    std::optional<MeleeWebLuigiAttributes> luigi_;
+    std::optional<MeleeWebDonkeyAttributes> donkey_;
+    std::optional<MeleeWebKoopaAttributes> koopa_;
+    std::optional<MeleeWebPikachuAttributes> pikachu_;
+    std::optional<MeleeWebPurinAttributes> purin_;
+    std::optional<MeleeWebCaptainAttributes> captain_;
     std::optional<MeleeWebFoxAttributes> fox_;
     std::optional<MeleeWebMarsAttributes> mars_;
     std::optional<MeleeWebLinkAttributes> link_;
     std::vector<DatRuntimeAction> actions_;
-    std::vector<DatWaitChoice> wait_choices_;
+    std::vector<DatWaitChoice> wait_choices_, squat_wait_choices_;
     std::vector<DatFighterHurtbox> hurtboxes_;
     DatFighterDynamics dynamics_{};
 };

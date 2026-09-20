@@ -70,13 +70,70 @@ class GameplayFighterDataTests(unittest.TestCase):
             roy_container = ROOT / "assets-local/next-gate/PlFeAJ.dat"
             if args and roy_asset.is_file() and roy_container.is_file():
                 args.extend((str(roy_asset),str(roy_container)))
+            ganon_asset = ROOT / "assets-local/full-game-ganon/PlGn.dat"
+            ganon_container = ROOT / "assets-local/full-game-ganon/PlGnAJ.dat"
+            if len(args) == 4 and ganon_asset.is_file() and ganon_container.is_file():
+                args.extend((str(ganon_asset),str(ganon_container)))
             result = subprocess.run([str(node), str(output), *args], cwd=directory, env=env,
                                     capture_output=True, text=True, timeout=30)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("Owned native ftData synthetic and rejection checks: passed", result.stdout)
-            if len(args) == 4:
+            if len(args) >= 4:
                 self.assertIn("Native Roy dynamics selector-5 rows and six authored modes: passed", result.stdout)
+            if len(args) == 6:
+                self.assertIn("Native Ganondorf Captain extension and null Article table: passed", result.stdout)
+            captain_asset = ROOT / "assets-local/full-game-captain/PlCa.dat"
+            captain_container = ROOT / "assets-local/full-game-captain/PlCaAJ.dat"
+            if len(args) == 6 and captain_asset.is_file() and captain_container.is_file():
+                args.extend((str(captain_asset),str(captain_container)))
+                result = subprocess.run([str(node), str(output), *args], cwd=directory, env=env,
+                                        capture_output=True, text=True, timeout=30)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("Native Captain extension, six-costume bounds, zero dynamics and null Article table: passed",
+                              result.stdout)
+                pikachu_asset = ROOT / "assets-local/full-game-pikachu/PlPk.dat"
+                pikachu_container = ROOT / "assets-local/full-game-pikachu/PlPkAJ.dat"
+                pichu_asset = ROOT / "assets-local/full-game-pichu/PlPc.dat"
+                pichu_container = ROOT / "assets-local/full-game-pichu/PlPcAJ.dat"
+                if all(path.is_file() for path in (pikachu_asset, pikachu_container,
+                                                   pichu_asset, pichu_container)):
+                    args.extend((str(pikachu_asset), str(pikachu_container),
+                                 str(pichu_asset), str(pichu_container)))
+                    result = subprocess.run([str(node), str(output), *args], cwd=directory, env=env,
+                                            capture_output=True, text=True, timeout=30)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertIn("Native Pikachu shared 0xf8 attributes and three Article registrations: passed",
+                                  result.stdout)
+                    self.assertIn("Native Pichu shared 0xf8 attributes and three Article registrations: passed",
+                                  result.stdout)
+                    purin_asset = ROOT / "assets-local/full-game-jigglypuff/PlPr.dat"
+                    purin_container = ROOT / "assets-local/full-game-jigglypuff/PlPrAJ.dat"
+                    if purin_asset.is_file() and purin_container.is_file():
+                        args.extend((str(purin_asset), str(purin_container)))
+                        result = subprocess.run([str(node), str(output), *args], cwd=directory, env=env,
+                                                capture_output=True, text=True, timeout=30)
+                        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                        self.assertIn("Native Purin 0x100 ABI, five-costume custom-part visibility, and no Article exposure: passed",
+                                      result.stdout)
+                        donkey_asset = ROOT / "assets-local/full-game-donkey/PlDk.dat"
+                        donkey_container = ROOT / "assets-local/full-game-donkey/PlDkAJ.dat"
+                        if donkey_asset.is_file() and donkey_container.is_file():
+                            args.extend((str(donkey_asset), str(donkey_container)))
+                            result = subprocess.run([str(node), str(output), *args], cwd=directory,
+                                                    env=env, capture_output=True, text=True, timeout=30)
+                            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                            self.assertIn("Native Donkey 0x74 ABI, exact dynamics and null Article table: passed",
+                                          result.stdout)
             print(result.stdout, end="")
+            koopa_asset = ROOT / "assets-local/full-game-koopa/PlKp.dat"
+            if koopa_asset.is_file():
+                koopa = subprocess.run([str(node), str(output), "--koopa", str(koopa_asset)],
+                                       cwd=directory, env=env, capture_output=True,
+                                       text=True, timeout=30)
+                self.assertEqual(koopa.returncode, 0, koopa.stdout + koopa.stderr)
+                self.assertIn("Native Koopa 0xa0 typed ABI and single Flame registration: passed",
+                              koopa.stdout)
+                print(koopa.stdout, end="")
 
 
 if __name__ == "__main__":

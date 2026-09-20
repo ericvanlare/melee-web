@@ -24,6 +24,19 @@ class NativeStageDescriptors(unittest.TestCase):
             self.assertIn("FD complete nine visual graphs",result.stdout)
 
 class NativeStageOriginalRuntime(unittest.TestCase):
+    def test_map_publication_source_queries_and_lifetime(self):
+        targets=[ROOT/"build"/directory/"gameplay_stage_map_trace.js"
+                 for directory in ("browser","browser-release")]
+        targets=[path for path in targets if path.is_file()]
+        if not targets:self.skipTest("Build the native stage-map publication trace")
+        import sys
+        sys.path.insert(0,str(ROOT/"scripts"))
+        from check_gameplay import node_runtime
+        result=subprocess.run([str(node_runtime()),str(max(targets,key=lambda path:path.stat().st_mtime))],
+                              cwd=ROOT,capture_output=True,text=True,timeout=30)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertIn("Original native map publication/lookup/lifetime/restart passed",result.stdout)
+
     def run_trace(self,name,argument):
         target=ROOT/"build/browser"/(name+".js")
         if not target.is_file():self.skipTest("Original stage trace target unavailable")

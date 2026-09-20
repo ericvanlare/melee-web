@@ -125,6 +125,20 @@ int melee_web_archive_sections_close(MeleeWebArchiveSections* h,char* e,size_t n
     for(size_t i=0;i<h->count;i++){free((void*)h->entries[i].filename);free((void*)h->entries[i].symbol);}free(h);
     if(e&&n)*e=0;return 1;
 }
+int melee_web_archive_sections_close_owned(MeleeWebArchiveSections* scope,void* candidate,char* e,size_t n) {
+    MeleeWebArchiveSections* registered=scopes;while(registered&&registered!=scope)registered=registered->next;
+    if(!registered||scope->heap_generation)return fail(e,n,"Owned-handle close requires a registered descriptor scope");
+    ArchiveHandle* owned=handles;while(owned&&owned!=candidate)owned=owned->next;
+    if(!owned)return fail(e,n,"Owned archive handle is not open");
+    int belongs=0;
+    for(size_t i=0;i<scope->count;i++)if(!strcmp(owned->filename,scope->entries[i].filename))belongs=1;
+    if(!belongs)return fail(e,n,"Owned archive handle belongs to another scope");
+    for(ArchiveHandle* opened=handles;opened;opened=opened->next)if(opened!=owned)
+        for(size_t i=0;i<scope->count;i++)if(!strcmp(opened->filename,scope->entries[i].filename))
+            return fail(e,n,"Native archive scope still has other open handles");
+    melee_web_archive_sections_release(owned);
+    return melee_web_archive_sections_close(scope,e,n);
+}
 void melee_web_archive_sections_load(void* archive,const char* filename,void* first,va_list args) {
     if(!filename||!first)fatal(filename,NULL,"Missing archive name or output");
     void** destinations[64];void* values[64];size_t count=0;void* output=first;

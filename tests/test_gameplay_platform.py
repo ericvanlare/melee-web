@@ -33,3 +33,12 @@ class GameplayPlatformTests(unittest.TestCase):
                 self.assertNotEqual(result.returncode,0)
                 self.assertIn('Unsupported gameplay platform operation: '+name,result.stderr)
                 self.assertNotIn('UNEXPECTED_',result.stdout+result.stderr)
+    def test_osreport_and_osvreport_preserve_format_arguments(self):
+        result=subprocess.run([str(self.binary),'report'],capture_output=True,text=True,timeout=20)
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertEqual(result.stdout,'')
+        self.assertEqual(result.stderr,'report 7 ok 1.50\nvreport 11 ok\n')
+    def test_ospanic_reports_location_and_aborts(self):
+        result=subprocess.run([str(self.binary),'panic'],capture_output=True,text=True,timeout=20)
+        self.assertNotEqual(result.returncode,0)
+        self.assertIn('PANIC platform-test.c:37: panic 5 boom\n',result.stderr)

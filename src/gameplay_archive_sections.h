@@ -24,6 +24,9 @@ MeleeWebArchiveSections* melee_web_archive_sections_register(const MeleeWebArchi
  * then releases any source handles discarded by those original callers. */
 MeleeWebArchiveSections* melee_web_archive_sections_register_heap(const MeleeWebArchiveSymbol*, size_t, char*, size_t);
 int melee_web_archive_sections_close(MeleeWebArchiveSections*, char*, size_t);
+/* Atomically release the scope's one owned handle and close it. Any other
+ * open consumer rejects without changing the handle or scope. */
+int melee_web_archive_sections_close_owned(MeleeWebArchiveSections*,void* handle,char*,size_t);
 /* Opaque source archive handles resolve only registered, owned typed symbols.
  * No archive bytes are reinterpreted or relocated in place. Every open must be
  * released before a scope containing that archive can close. Unknown handles

@@ -48,6 +48,7 @@ std::int32_t read_I32(const DatArchive& archive, std::uint32_t at)
 {
     return std::bit_cast<std::int32_t>(scalar(archive, at));
 }
+std::int32_t read_ITEM(const DatArchive& archive, std::uint32_t at) { return read_I32(archive, at); }
 float read_F32(const DatArchive& archive, std::uint32_t at)
 {
     const float value = std::bit_cast<float>(scalar(archive, at));
@@ -115,6 +116,81 @@ DatFighterRuntime::DatFighterRuntime(std::shared_ptr<const DatArchive> archive, 
 #define READ_MARIO(at, type, name, original) mario_->name = read_##type(data, extension_ + at);
         MELEE_WEB_MARIO_ATTRIBUTE_FIELDS(READ_MARIO)
 #undef READ_MARIO
+    } else if (costume_->fighter_kind == 3) {
+        // Donkey keeps a distinct 0x74 source extension. Its signed motion
+        // state/counter words must not be read through a float-only schema.
+        region(data, extension_, MELEE_WEB_DONKEY_ATTRIBUTE_BYTES);
+        donkey_.emplace();
+#define READ_DONKEY(at, type, name, original) donkey_->name = read_##type(data, extension_ + at);
+        MELEE_WEB_DONKEY_ATTRIBUTE_FIELDS(READ_DONKEY)
+#undef READ_DONKEY
+    } else if (costume_->fighter_kind == 5) {
+        // Koopa's source extension is a distinct 0xa0 ABI. Preserve x4/x20
+        // as signed words and x2c/unk50 as unsigned words.
+        region(data, extension_, MELEE_WEB_KOOPA_ATTRIBUTE_BYTES);
+        koopa_.emplace();
+#define READ_KOOPA(at, type, name, original) koopa_->name = read_##type(data, extension_ + at);
+        MELEE_WEB_KOOPA_ATTRIBUTE_FIELDS(READ_KOOPA)
+#undef READ_KOOPA
+    } else if (costume_->fighter_kind == 17) {
+        // Luigi has a distinct 0x98 source extension; do not alias Mario's
+        // fields just because both fighters are in the Mario family.
+        region(data, extension_, MELEE_WEB_LUIGI_ATTRIBUTE_BYTES);
+        luigi_.emplace();
+#define READ_LUIGI(at, type, name, original) luigi_->name = read_##type(data, extension_ + at);
+        MELEE_WEB_LUIGI_ATTRIBUTE_FIELDS(READ_LUIGI)
+#undef READ_LUIGI
+    } else if (costume_->fighter_kind == 12 || costume_->fighter_kind == 23) {
+        // Pichu's source wrapper contains only the item words, but its
+        // OnLoad path pushes and every shared special callback consumes the
+        // complete ftPikachuAttributes record. Decode that exact 0xf8 ABI for
+        // both family identities without aliasing their authored values.
+        region(data, extension_, MELEE_WEB_PIKACHU_ATTRIBUTE_BYTES);
+        pikachu_.emplace();
+#define READ_PIKACHU(at, type, name, original, component, source) \
+        pikachu_->name = read_##type(data, extension_ + at);
+        MELEE_WEB_PIKACHU_ATTRIBUTE_FIELDS(READ_PIKACHU)
+#undef READ_PIKACHU
+    } else if (costume_->fighter_kind == 15) {
+        // Purin's source extension is a distinct 0x100 ABI.  Keep the two
+        // opaque words opaque and preserve the authored Vec2 component order;
+        // its x48 hat-part root is handled by the native part owner, not this
+        // attribute decoder.
+        region(data, extension_, MELEE_WEB_PURIN_ATTRIBUTE_BYTES);
+        purin_.emplace();
+#define PURIN_READ_F32(at, dst) purin_->dst = read_F32(data, extension_ + at);
+#define PURIN_READ_I32(at, dst) purin_->dst = read_I32(data, extension_ + at);
+#define PURIN_READ_OPAQUE32(at, dst) purin_->dst = read_U32(data, extension_ + at);
+#define PURIN_READ_PAD4(at, dst) do { \
+        for (unsigned purin_byte = 0; purin_byte < 4; ++purin_byte) \
+            purin_->dst[purin_byte] = read_U8(data, extension_ + at + purin_byte); \
+    } while (0)
+#define PURIN_READ_PAD8(at, dst) do { \
+        for (unsigned purin_byte = 0; purin_byte < 8; ++purin_byte) \
+            purin_->dst[purin_byte] = read_U8(data, extension_ + at + purin_byte); \
+    } while (0)
+#define PURIN_READ_IMPL(type, at, dst) PURIN_READ_##type(at, dst)
+#define PURIN_READ(type, at, dst) PURIN_READ_IMPL(type, at, dst)
+#define READ_PURIN(at, type, dst, member, component, source, source_expr) \
+        PURIN_READ(type, at, dst);
+        MELEE_WEB_PURIN_ATTRIBUTE_FIELDS(READ_PURIN)
+#undef READ_PURIN
+#undef PURIN_READ
+#undef PURIN_READ_IMPL
+#undef PURIN_READ_PAD8
+#undef PURIN_READ_PAD4
+#undef PURIN_READ_OPAQUE32
+#undef PURIN_READ_I32
+#undef PURIN_READ_F32
+    } else if (costume_->fighter_kind == 2 || costume_->fighter_kind == 25) {
+        // Captain and Ganondorf use the source Captain extension loader.
+        // Preserve the complete 0x8c record, including authored
+        // unknowns and integer fields, until the native consumer is hydrated.
+        region(data, extension_, 0x8C);
+        captain_.emplace();
+#define READ_CAPTAIN(at, type, name, original) captain_->name = read_##type(data, extension_ + at);
+        MELEE_WEB_CAPTAIN_ATTRIBUTE_FIELDS(READ_CAPTAIN)
+#undef READ_CAPTAIN
     } else if (costume_->fighter_kind == 1 || costume_->fighter_kind == 22) {
         /* Fox and Falco intentionally share ftFox_DatAttrs and all of the
          * original ftFx special-state consumers.  Their PlFx/PlFc values and
@@ -180,11 +256,25 @@ DatFighterRuntime::DatFighterRuntime(std::shared_ptr<const DatArchive> archive, 
     const auto bones = data.pointer(dyn + 4, bone_count ? std::size_t(bone_count) * 24 : 1);
     const auto spheres = data.pointer(dyn + 12, sphere_count ? std::size_t(sphere_count) * 20 : 1);
     require((bones || !bone_count) && (spheres || !sphere_count), "Fighter dynamics records are missing");
-    if (bone_count) region(data, *bones, std::size_t(bone_count) * 24);
+    dynamics_.active_bone_count=bone_count;
+    uint32_t stored_bones=bone_count;
+    if(costume_->fighter_kind==15) {
+        // ftCo_8009DC54 retains body slot 0, installs hat slots 1/2 and sets
+        // the live count to three; the serialized body count must stay one.
+        require(bone_count==1, "Purin costume dynamics require one initial body chain");
+        // The descriptor rows selected for the blue/green hats are 1/2 or 3/4.
+        require(bones.has_value(), "Purin authored dynamics table is missing");
+        const auto bytes=data.next_target_offset(*bones)-*bones;
+        require(bytes%24==0 && bytes/24>=5 && bytes/24<=10,
+                "Purin authored dynamics extent cannot cover its costume chains");
+        stored_bones=bytes/24;
+        require(stored_bones>=std::uint32_t(bone_count), "Active dynamics exceed authored descriptors");
+    }
+    if (stored_bones) region(data, *bones, std::size_t(stored_bones) * 24);
     if (sphere_count) region(data, *spheres, std::size_t(sphere_count) * 20);
     dynamics_.animation_table_offset = data.pointer(dyn + 16, 4);
     std::uint32_t total_parameters = 0;
-    for (std::int32_t i = 0; i < bone_count; ++i) {
+    for (std::uint32_t i = 0; i < stored_bones; ++i) {
         const auto at = *bones + std::uint32_t(i) * 24;
         DatFighterDynamicsBone bone{};
         bone.descriptor_offset = at; bone.bone_index = read_U32(data, at);
@@ -236,7 +326,8 @@ DatFighterRuntime::DatFighterRuntime(std::shared_ptr<const DatArchive> archive, 
         actions_.push_back(std::move(action));
     }
     for (const auto& action : archive_actions_.actions) actions_[action.motion_id].symbol = action.symbol;
-    if (const auto choices = data.pointer(root_ + 0x24, 8)) {
+    auto decode_wait_choices = [&](uint32_t field, std::vector<DatWaitChoice>& output) {
+      if (const auto choices = data.pointer(root_ + field, 8)) {
         require(*choices % 4 == 0, "Fighter Wait choices are unaligned");
         const auto capacity = std::min<std::uint32_t>(1025, (data.next_target_offset(*choices) - *choices) / 8);
         std::uint64_t total = 0;
@@ -250,10 +341,13 @@ DatFighterRuntime::DatFighterRuntime(std::shared_ptr<const DatArchive> archive, 
                     "Fighter Wait choice has invalid motion ID or weight");
             total += std::uint32_t(weight);
             require(total <= std::numeric_limits<std::int32_t>::max(), "Fighter Wait cumulative weight overflows original int");
-            wait_choices_.push_back({std::uint32_t(id), std::uint32_t(weight)});
+            output.push_back({std::uint32_t(id), std::uint32_t(weight)});
         }
         require(terminated && total >= 100, "Fighter Wait choices do not terminate or cover source random range 1..100");
-    }
+      }
+    };
+    decode_wait_choices(0x24, wait_choices_);
+    decode_wait_choices(0x28, squat_wait_choices_);
 }
 const DatRuntimeAction& DatFighterRuntime::action(std::uint32_t id) const
 {
@@ -264,7 +358,8 @@ void DatFighterRuntime::validate_part_indices(std::size_t count) const
 {
     require(count > 0 && count <= 140, "Fighter part count exceeds the checked animation boundary");
     for (const auto& box : hurtboxes_) require(box.bone_index < count, "Fighter hurtbox bone is outside the bound skeleton");
-    for (const auto& bone : dynamics_.bones) require(bone.bone_index < count, "Fighter dynamics bone is outside the bound skeleton");
+    for (std::uint32_t i=0;i<dynamics_.active_bone_count;++i)
+        require(dynamics_.bones[i].bone_index < count, "Fighter dynamics bone is outside the bound skeleton");
     for (const auto& sphere : dynamics_.spheres) require(sphere.bone_index < count, "Fighter sphere bone is outside the bound skeleton");
     if (mario_) require(mario_->cape_reflection_x0_bone_id < count, "Fighter reflector bone is outside the bound skeleton");
     if (fox_) require(fox_->reflector_bone_id < count, "Fighter reflector bone is outside the bound skeleton");
@@ -306,7 +401,12 @@ DatSelectedAction DatFighterAnimationStore::select_impl(std::uint32_t id, DatAni
     }
     const DatArchive archive(fighter_->archive_actions().slice(container_, id));
     const auto offset = root(archive, result.action.symbol);
-    result.animation = std::make_shared<const DatAnimation>(archive, offset, policy);
+    try {
+        result.animation = std::make_shared<const DatAnimation>(archive, offset, policy);
+    } catch (const DatError& error) {
+        throw DatError("Fighter action "+std::to_string(id)+" ("+
+                       result.action.symbol+"): "+error.what());
+    }
     cache_[next_] = {result.action.container_offset, result.action.archive_bytes, result.action.symbol,
                      native_action, result.animation};
     next_ = (next_ + 1) % cache_.size();

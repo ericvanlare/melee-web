@@ -1,0 +1,83 @@
+{
+  "schema": "melee-web-production-checkpoint-review-fixes",
+  "version": 1,
+  "source_base": "eb98f6afe2de2903a7e4153448347c3a225caf7a",
+  "scope": "Two P3 review corrections only: reject dirty original-source reports and preserve exact authored Fountain music words. New feature additions remain paused.",
+  "changes": [
+    {
+      "file": "scripts/full_game_report.py",
+      "behavior": "Reject modified, staged and untracked original dependency changes before creating a pinned-source report. Normal build provenance checks were already strict."
+    },
+    {
+      "file": "src/gameplay_asset_manifest.cpp",
+      "behavior": "Fountain tuple is (49,-1,49,-1), matching the owned archive. All seven stages retain the same derived HPS filename sets."
+    }
+  ],
+  "retained_red": {
+    "local_path": "work/full-game/pr49-review-fixes-red-v1.log",
+    "sha256": "b35a0ef5c2199a9388f0074ce7f317d69df9929aeee05bf9a5abfdd05b5dcf10",
+    "bytes": 5641
+  },
+  "focused_checks": {
+    "local_path": "work/full-game/pr49-review-fixes-focused-v1.log",
+    "sha256": "39e760fcb6bd02d6755c38bd6bd9eb71a2e1a5ceaf3e1f7167974ea5c07031ed",
+    "bytes": 2564,
+    "result": "pass",
+    "tests": 15,
+    "seconds": 6.575
+  },
+  "builds": [
+    {
+      "local_path": "work/full-game/pr49-review-fixes-public-build-v1.log",
+      "sha256": "a5c1074168c08ce06aa2fdb0506bef18f431bb457402749bff4843aee77b8ede",
+      "bytes": 11724,
+      "target": "runtime-public",
+      "configuration": "Release",
+      "result": "pass"
+    },
+    {
+      "local_path": "work/full-game/pr49-review-fixes-dev-build-v1.log",
+      "sha256": "1d5f9c41af0c23a300d8f65210e24d705db254dbd7718b1ac782312387b76780",
+      "bytes": 11662,
+      "target": "runtime",
+      "configuration": "Release",
+      "result": "pass"
+    }
+  ],
+  "inventory": {
+    "local_path": "work/full-game/pr49-review-fixes-inventory-v1/report.json",
+    "sha256": "5dcc5d018f1d404c722b223ce2de136d48c1404ed17bab4f34c5d50f456d24aa",
+    "bytes": 7106351,
+    "result": "pass",
+    "features": 87,
+    "source_functions": 19827
+  },
+  "candidate": {
+    "manifest": {
+      "local_path": "work/full-game/checkpoint-player-candidate-v2.manifest.json",
+      "sha256": "a1f0e06e081dd384b0dddecc32270004abe4f5597634fffa63e50ac134a941e7",
+      "bytes": 158822
+    },
+    "identity": {
+      "local_path": "build/runtime-public-identity.json",
+      "sha256": "96edceffbc0c987c2723411e305a3ae57fec7cfe83cd39b0b38a943749982e96",
+      "bytes": 144390
+    },
+    "runtime_hash": "c9786dfc9a0e2f79",
+    "files": 26,
+    "audit": {
+      "local_path": "work/full-game/pr49-review-fixes-audit-v1.log",
+      "sha256": "2a2ae8ef237ca6374f4d29965238be11f4b7e50658e0abaefc1340e0f652ae18",
+      "bytes": 59
+    },
+    "comparison": {
+      "local_path": "work/full-game/pr49-review-fixes-candidate-comparison-v1.json",
+      "sha256": "9b363dfdae815665d4fa658ba7cfce516c50a75ab082ba6c7e6b622823e570d9",
+      "bytes": 5920
+    },
+    "deployed": false
+  },
+  "prior_runtime_evidence": "docs/evidence/production-checkpoint-20260920-v1.json",
+  "validation_boundary": "The earlier browser, HTTP and drawn-original checks remain evidence for candidate v1. These review fixes are validated through dirty-checkout rejection, exact owned-archive music tuples, unchanged derived asset filenames, both Release builds and the v2 package audit. They do not broaden gameplay or performance admission.",
+  "integration_gate": "The final full-suite and pushed-head CI results are reported on PR #49. No merge or deployment is part of this follow-up."
+}

@@ -26,6 +26,8 @@ class AudioPreviewPackageTests(unittest.TestCase):
         self.assertEqual({name.removeprefix(group) for name in files if name.startswith(group)},
                          set(preview.MODULES) | set(preview.NATIVE) |
                          {'player/player-shell.mjs', 'player/player.css'})
+        self.assertIn('disc-session.mjs', preview.MODULES)
+        self.assertIn(b"from './disc-session.mjs'", files[group + 'runtime-audio-assets.mjs'])
         self.assertIn(b'../audio-preview-runtime.mjs', files[group + 'player/player-shell.mjs'])
         self.assertIn(b'createAudio: createRuntimeAudio', files[group + 'audio-preview-runtime.mjs'])
         self.assertNotIn(b'audio-note', files['index.html'])

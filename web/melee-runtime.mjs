@@ -10,7 +10,7 @@ const IMPORT_BATCH_MAX_MS = 8;
 
 export async function mountMeleeRuntime({canvas, onState = () => {}, onError = () => {},
   onEvent = () => {}, onLog = () => {}, onOwner, configureModule,
-  readDisc = loadNativeGameDisc, createAudio,
+  readDisc = loadNativeGameDisc, openDisc, createAudio,
   loaderUrl = new URL('./gameplay_public.js', import.meta.url), startupTimeout = 60000} = {}) {
   if (!canvas || canvas.id !== 'canvas') throw Error('The player requires its own #canvas.');
   if (documentClaimed) throw Error('Reload the page to start a fresh player.');
@@ -23,6 +23,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   let busy = '', message = '', progress = null, inputDirty = true, lastState = '';
   let loading = Object.freeze({phase: 'boot', message: 'Starting player…', complete: 0, total: 0});
   let preparationLabel = '', preparationKeepsAudio = false;
+  let discSession = null, assetTransfer = null;
   let keyboard = [true, true], layout = 'two';
   const commands = [], listeners = [];
   const audio = createAudio?.({assetBase, onEvent: data => emit('audio', data),
@@ -94,6 +95,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   function stop(error) {
     if (fatal || destroyed) return;
     fatal = true; message = String(error?.message || error || 'Player stopped. Reload to recover.');
+    discSession?.close(); discSession = null;
     preparationLabel = ''; preparationKeepsAudio = false; loading = null;
     syncAudio();
     for (const c of commands.splice(0)) c.reject(Error(message));
@@ -145,6 +147,15 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     menuPreparationDone() { preparationLabel = ''; message = ''; if (loading?.phase === 'native') { loading = null; refreshCatalogLoading(); } emit('preparationDone'); publish(); },
     menuPreparationCanceled() { preparationLabel = ''; preparationKeepsAudio = false; message = ''; if (loading?.phase === 'native') loading = null; emit('preparationCanceled'); publish(); },
     menuPreparationFailed(error) { preparationLabel = ''; preparationKeepsAudio = false; message = error || 'Native preparation failed'; if (loading?.phase === 'native') loading = null; emit('preparationFailed', message); publish(); },
+    menuAssetsRequested(generation) {
+      // Native only requests after closing the outgoing owners. Keep its
+      // Constructing gate stopped until the complete scope commits.
+      if (assetTransfer) { stop(Error('A native asset transfer is already active.')); return; }
+      prepared = false;
+      assetTransfer = operation('preparing', () => transferScope(generation))
+        .catch(stop).finally(() => { assetTransfer = null; });
+    },
+    menuAssetScopeReleased(receipt) { emit('assetScopeReleased', receipt); },
     menuRenderCacheSettled() { Module.markRuntimeCacheDirty?.(); emit('cacheSettled'); },
     menuFrame(wasRunning) { if (!ready || fatal || destroyed) return; syncAudio(); publish(); emit('frame', wasRunning); },
   };
@@ -170,20 +181,21 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     if (Module.runtimeCacheState?.dirty) await Module.saveRuntimeCache();
     return true;
   }
-  function putNow(name, bytes) {
+  function putNow(name, bytes, generation = 0) {
     const encoded = new TextEncoder().encode(name + '\0');
     const np = Module._malloc(encoded.length), bp = Module._malloc(bytes.length);
     try {
       if (!np || !bp) throw Error('Allocation failed.');
       Module.HEAPU8.set(encoded, np); Module.HEAPU8.set(bytes, bp);
-      check(Module._melee_web_native_menu_file(np, bp, bytes.length));
+      check(generation ? Module._melee_web_native_asset_file(generation, np, bp, bytes.length) :
+        Module._melee_web_native_menu_file(np, bp, bytes.length));
       hasLocalData = true;
     } finally { Module._free(np); Module._free(bp); }
   }
   async function put(name, bytes) {
     await boundary(() => putNow(name, bytes));
   }
-  async function putBatches(entries) {
+  async function putBatches(entries, generation = 0) {
     let complete = 0;
     const total = entries.length;
     while (complete < total) {
@@ -196,7 +208,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
           const size = numericProgress(data?.byteLength ?? data?.length);
           if (count && (count >= IMPORT_BATCH_MAX_FILES ||
               bytes + size > IMPORT_BATCH_MAX_BYTES || performance.now() - started >= IMPORT_BATCH_MAX_MS)) break;
-          putNow(name, data);
+          putNow(name, data, generation);
           ++count; bytes += size;
         }
         return count;
@@ -208,10 +220,43 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
       if (complete < total) { setLoading('handoff', 'Preparing game data…', complete, total); publish(); }
     }
   }
+  function reportDiscRead(p) {
+    progress = p.phase === 'complete' ? null : Object.freeze({complete: p.complete, total: p.total});
+    message = `Reading local data ${p.complete}/${p.total}`;
+    if (p.phase === 'complete') setLoading('handoff', 'Preparing game data…', 0, p.total);
+    else setLoading('disc', 'Reading game data…', p.complete, p.total);
+    publish();
+  }
+  async function transferScope(generation) {
+    if (!discSession) throw Error('The local disc session is unavailable.');
+    try {
+      await pauseAudioForPreparation();
+      const names = await boundary(() => {
+        const count = check(Module._melee_web_native_asset_count(generation));
+        return Array.from({length: count}, (_, index) =>
+          Module.UTF8ToString(check(Module._melee_web_native_asset_name(generation, index))));
+      });
+      const files = await discSession.readScope(names, reportDiscRead);
+      const entries = Array.from(files);
+      setLoading('handoff', 'Preparing game data…', 0, entries.length); publish();
+      await putBatches(entries, generation);
+      await boundary(() => check(Module._melee_web_native_asset_commit(generation)));
+      emit('assetScopeCommitted', {generation, files: entries.length,
+        bytes: entries.reduce((sum, [, data]) => sum + data.byteLength, 0)});
+      setLoading('native', 'Preparing game data…', 0, 0);
+    } catch (error) {
+      if (!fatal && !destroyed) await boundary(() => Module._melee_web_native_asset_abort(generation));
+      throw error;
+    }
+  }
   async function prepareNativeResources() {
     callbacks.menuPreparation('Preparing native menu resources');
     try {
       await pauseAudioForPreparation();
+      if (discSession && !prepared) {
+        const generation = await boundary(() => check(Module._melee_web_native_asset_begin()));
+        await transferScope(generation);
+      }
       await new Promise(resolve => setTimeout(resolve, 0));
       await boundary(() => check(Module._melee_web_native_menu_prepare()));
       prepared = true; callbacks.menuPreparationDone();
@@ -227,18 +272,23 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
         bundle = false;
         try {
           if (!await unloadAndSave()) throw Error(status());
+          discSession?.close(); discSession = null;
           setLoading('disc', 'Reading game data…', 0, 1); publish();
-          const files = await readDisc(file, p => {
-            progress = p.phase === 'complete' ? null : Object.freeze({complete: p.complete, total: p.total});
-            message = `Reading local data ${p.complete}/${p.total}`;
-            if (p.phase === 'complete') setLoading('handoff', 'Preparing game data…', 0, p.total);
-            else setLoading('disc', 'Reading game data…', p.complete, p.total);
-            publish();
-          });
-          const entries = Array.from(files);
-          progress = null;
-          setLoading('handoff', 'Preparing game data…', 0, entries.length); publish();
-          await putBatches(entries);
+          if (openDisc) {
+            const opened = await openDisc(file);
+            if (fatal || destroyed) {
+              opened.close();
+              throw Error('The player stopped while opening the local disc.');
+            }
+            discSession = opened;
+          }
+          else {
+            const files = await readDisc(file, reportDiscRead);
+            const entries = Array.from(files);
+            progress = null;
+            setLoading('handoff', 'Preparing game data…', 0, entries.length); publish();
+            await putBatches(entries);
+          }
           await prepareNativeResources(); bundle = true; message = 'Local game data loaded.';
           loading = null;
         } finally {
@@ -253,7 +303,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
         // Create the audio context while still handling the user's Play click;
         // native preparation may yield long enough to lose activation.
         await prepareAudio(); await prepareNativeResources();
-        await boundary(() => check(Module._melee_web_native_menu_launch())); focus(); syncAudio();
+        await boundary(() => check(Module._melee_web_native_menu_launch())); prepared = false; focus(); syncAudio();
       });
     },
     pause() { if (!snapshot().canPause) return Promise.reject(Error('No active scene to pause.')); return operation('pausing', async () => { await boundary(() => Module._melee_web_native_menu_pause(1)); focus(); syncAudio(); }); },
@@ -266,11 +316,20 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     unload() { return operation('unloading', async () => { check(await unloadAndSave()); }); },
     async destroy() {
       if (destroyed) return Object.freeze({requiresReload: true});
-      if (!fatal) await handle.unload();
-      destroyed = true; syncAudio();
-      await audio?.destroy();
-      for (const [type, listener] of listeners) window.removeEventListener(type, listener, true);
-      publish();
+      try {
+        if (!fatal) await handle.unload();
+      } catch (error) {
+        stop(error);
+        throw error;
+      } finally {
+        destroyed = true; syncAudio();
+        discSession?.close(); discSession = null;
+        try { await audio?.destroy(); }
+        finally {
+          for (const [type, listener] of listeners) window.removeEventListener(type, listener, true);
+          publish();
+        }
+      }
       // The global Emscripten heap and main loop live until this document retires.
       return Object.freeze({requiresReload: true});
     },

@@ -9,7 +9,7 @@ from pathlib import Path
 import tempfile
 
 
-EXPECTED_SHA256 = "4bdb7c4a3e906d907d066f0c65041d7eb3472dc25c9d8c98be6e4946fdce560f"
+EXPECTED_SHA256 = "8df6a998cef19b88a3eff0ee61f666e42791f5f73841818961aa3b224cad2c4b"
 
 
 def materialize(source: Path, output: Path, identity_header: Path | None = None) -> None:
