@@ -534,6 +534,16 @@
         "bytes": 19565
       },
       "cause": "240-update replay passed and unloaded itself. The runner then waited for the deliberately disabled Unload control. The corrected runner checks native phase/owners/file bytes after automatic replay retirement."
+    },
+    {
+      "evidence": {
+        "local_path": "work/full-game/checkpoint-ci-public-shell-failure-v1.log",
+        "sha256": "0d553d409cf05ddf04e28c8316c3b4159b19dfd68ca09ffebb000bc612e12290",
+        "bytes": 27645
+      },
+      "url": "https://github.com/ericvanlare/melee-web/actions/runs/35535079344/job/106142537273",
+      "source_commit": "7c4ebf161335f2b942ce34f0a094b757487f9666",
+      "cause": "The new Node test called the pinned SDK helper before bootstrap in the lightweight public-shell job. Added the same explicit SDK prerequisite used by existing public startup tests; SDK-equipped partitions still execute the test. No shipped runtime changes."
     }
   ],
   "previous_checkpoint_ci": {
@@ -558,5 +568,24 @@
     "Broader fighter/stage interactions, four-player modes and complete game scope",
     "Original visual/PCM, physical input, retained-history memory and expanded cold/warm performance acceptance",
     "Merge and hosted deployment verification have not run for this local candidate."
-  ]
+  ],
+  "public_test_harness_correction": {
+    "with_sdk": {
+      "local_path": "work/full-game/checkpoint-public-tests-v2.log",
+      "sha256": "ee0845cb3e5052257ebbed54179d54745b145575e288ffa15a431236d4bfc9c1",
+      "bytes": 9104,
+      "result": "pass",
+      "tests": 56,
+      "skips": 0
+    },
+    "without_sdk": {
+      "local_path": "work/full-game/checkpoint-public-tests-unbootstrapped-v1.log",
+      "sha256": "da16a3f06ab00100a7b0c14902d6bd185acd556ba427be993d8fbb9699eecc31",
+      "bytes": 9236,
+      "result": "pass",
+      "tests": 56,
+      "skips": 2,
+      "scope": "Fresh tracked-source archive plus the corrected test, with no .deps directory. Both SDK-dependent Node tests explicitly skipped."
+    }
+  }
 }

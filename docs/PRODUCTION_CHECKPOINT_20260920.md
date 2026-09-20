@@ -41,7 +41,11 @@ scoped loading; the exclusion and candidate evidence address those boundaries.
 The preceding development scene checkpoint passed all GitHub Verify jobs in
 6m 04s.
 
-Failed attempts remain retained. An export-list ordering mismatch was caught
+Failed attempts remain retained. The first checkpoint CI public-shell job
+exposed a missing SDK prerequisite in the new Node test. It now follows the
+existing explicit pre-bootstrap skip; SDK-equipped verification partitions
+still execute the test. No shipped runtime changed for this correction.
+An export-list ordering mismatch was caught
 by packaging. One public lifecycle harness wrongly required transfer order
 instead of an exact complete asset set; both match loops had passed before that
 assertion. A state-control harness waited for an Unload control after replay
