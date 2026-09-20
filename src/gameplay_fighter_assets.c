@@ -1,5 +1,6 @@
 #include "gameplay_fighter_assets.h"
 #include "gameplay_action_store.h"
+#include "fighter_binding.h"
 #include <melee/ft/ftdata.h>
 #include <melee/ft/types.h>
 #include <stdio.h>
@@ -34,8 +35,9 @@ MeleeWebFighterAssetScope* melee_web_fighter_assets_begin(uint32_t kind,uint32_t
     void* data,void* joint,void* mat,uint32_t count,void* context,
     MeleeWebFighterAssetBind bind,MeleeWebFighterAssetUnbind unbind,char* error,size_t size)
 {
-    if(kind>=FTKIND_NONE || owners[kind] || !data || !joint || !mat || !context || !bind || !unbind ||
+    if(kind>=FTKIND_NONE || owners[kind] || !data || !joint || !context || !bind || !unbind ||
         costume>=16 || costume>=CostumeListsForeachCharacter[kind].numCostumes ||
+        melee_web_fighter_costume_material_required(kind,costume)!=(mat!=NULL) ||
         count!=(uint32_t)ftData_Table_Unk0[kind].count) {
         fail(error,size,"Fighter asset scope identity is invalid or another scope is active");return NULL;
     }
@@ -56,8 +58,9 @@ uint32_t melee_web_fighter_assets_live(const MeleeWebFighterAssetScope* h)
 int melee_web_fighter_assets_add_costume(MeleeWebFighterAssetScope* h,uint32_t costume,
     void* joint,void* mat,char* error,size_t size)
 {
-    if(!h || h->kind>=FTKIND_NONE || owners[h->kind]!=h || melee_web_fighter_assets_live(h) || !joint || !mat ||
+    if(!h || h->kind>=FTKIND_NONE || owners[h->kind]!=h || melee_web_fighter_assets_live(h) || !joint ||
        costume>=16 || costume>=CostumeListsForeachCharacter[h->kind].numCostumes ||
+       melee_web_fighter_costume_material_required(h->kind,costume)!=(mat!=NULL) ||
        h->costume_owned[costume] || gFtDataList[h->kind]!=h->data)
         return fail(error,size,"Additional costume requires an idle owned fighter scope and distinct valid identity");
     h->previous_costume[costume]=CostumeListsForeachCharacter[h->kind].costume_list[costume];

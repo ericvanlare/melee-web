@@ -1,6 +1,7 @@
 #include "gameplay_menu.h"
 #include "gameplay_content.h"
 #include "gameplay_player_selection.h"
+#include "native_menu_fighter_input.h"
 
 #include <melee/ft/forward.h>
 #include <melee/pl/forward.h>
@@ -118,6 +119,15 @@ static void setup(CSSData* css)
 
 int main(void)
 {
+    /* CSS has 25 icons because Zelda and Sheik share an icon, while its
+     * CharacterKind namespace has 26 playable entries, ending in Ganondorf. */
+    MeleeWebFighterInputObservation observed={0};
+    observed.held_door=-1;observed.target_left=-1;observed.target_right=1;
+    observed.target_bottom=-1;observed.target_top=1;
+    for(int kind=0;kind<CKIND_PLAYABLE_COUNT;kind++)
+        if(!melee_web_fighter_input_observe_valid(&observed,kind))return 100;
+    if(melee_web_fighter_input_observe_valid(&observed,-1)||
+       melee_web_fighter_input_observe_valid(&observed,CKIND_PLAYABLE_COUNT))return 101;
     CSSData css;
     SSSData sss;
     setup(&css);

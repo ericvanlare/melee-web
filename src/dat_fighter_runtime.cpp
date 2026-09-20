@@ -115,6 +115,15 @@ DatFighterRuntime::DatFighterRuntime(std::shared_ptr<const DatArchive> archive, 
 #define READ_MARIO(at, type, name, original) mario_->name = read_##type(data, extension_ + at);
         MELEE_WEB_MARIO_ATTRIBUTE_FIELDS(READ_MARIO)
 #undef READ_MARIO
+    } else if (costume_->fighter_kind == 25) {
+        // Ganondorf's source loader delegates its extension to the Captain
+        // family.  Preserve the complete 0x8c record, including authored
+        // unknowns and integer fields, until the native consumer is hydrated.
+        region(data, extension_, 0x8C);
+        captain_.emplace();
+#define READ_CAPTAIN(at, type, name, original) captain_->name = read_##type(data, extension_ + at);
+        MELEE_WEB_CAPTAIN_ATTRIBUTE_FIELDS(READ_CAPTAIN)
+#undef READ_CAPTAIN
     } else if (costume_->fighter_kind == 1 || costume_->fighter_kind == 22) {
         /* Fox and Falco intentionally share ftFox_DatAttrs and all of the
          * original ftFx special-state consumers.  Their PlFx/PlFc values and

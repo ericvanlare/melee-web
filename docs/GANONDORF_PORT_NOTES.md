@@ -1,0 +1,99 @@
+# Ganondorf development integration
+
+This is work on `codex/full-game-integration`, based on the eight-fighter,
+four-stage runtime. Ganondorf is a development candidate; the public release
+and the full-game acceptance boundary are unchanged.
+
+## Original source and data boundary
+
+Ganondorf is `CKIND_GANON` / `FTKIND_GANON` (25). The original fighter uses
+Captain-family callbacks with its own 318-row action/animation table,
+`ftCaptain_DatAttrs` (0x8c bytes), model trees, effects and sound bank. The source
+costume table has five entries: neutral, red, blue, green and lavender.
+**All five authored material-animation symbols are null.** The adapter now
+preserves that source distinction; it still requires a real material-animation
+root for costumes whose source table names one. Unknown fighter/costume pairs
+remain errors.
+
+The owned `PlGn.dat` / `PlGnAJ.dat` decode confirms three dynamic bones,
+no dynamic collision spheres, two authored dynamics modes and no fighter
+Article table. Mode counts follow the authored action blend selectors.
+`EfGnData.dat` owns `effGanonDataTable`: bank 19, six source table entries.
+`ganon.ssm` is the source sound bank. Owned bytes and generated binaries stay
+outside Git.
+
+The runtime carries the complete Captain attribute layout across its C/C++
+boundary, admits the bounded Ganon self-motion command graph and preserves
+original command consumers. Opcodes 14, 15, 21 and 50 were already decoded but
+missing from readiness. They now reach the original hitbox flag/disable,
+throw-flag and dynamics callbacks. Hitbox indices reject values outside the
+source four-capsule array. The audited admitted roots include call/jump targets;
+item-only opcodes outside those roots remain explicitly unsupported.
+
+The source CSS has 25 icon positions but 26 playable CharacterKind values:
+Zelda and Sheik share an icon. Its raw-input diagnostic observation now uses
+`CKIND_PLAYABLE_COUNT`, allowing Ganondorf's final identity without changing
+the source icon count or selection behavior.
+
+## Observed scope
+
+Fresh Release `gameplay_content_match_trace` runs pass both Ganondorf/Mario
+orientations on Final Destination, reconstructing all five selected costumes.
+They exercise the original intro, grounded and aerial neutral special,
+opponent damage, source pause/No Contest and repeated world teardown. The
+Ganondorf-first run also enters Raptor Boost, Dark Dive and Wizard's Foot and
+returns to grounded common actions. Warlock Punch produces 30 damage in this
+authored diagnostic. These runs use fixture setup and raw PAD; they are native
+lifecycle evidence, not an original-state comparison or complete move coverage.
+
+A headed Chrome development run imports an owned disc, selects Ganondorf
+through original CSS raw PAD, selects Final Destination through original SSS,
+reaches Ready/Go and advances 30 observed gameplay frames with Ganondorf and
+Mario rendered. It retains first-use pipeline creation and timing pauses;
+explicit diagnostic resumes allow functional exploration but cannot pass a
+performance gate. No physical-controller, pixel or PCM equivalence is claimed.
+
+The complete 30-case `ganondorf-visible-actions-v1` development sweep reaches
+all expected ground/air entries over 5,200 source frames. Two discovery runs
+retain timing, audio-underrun and live-pipeline failures; one runs during the
+regression suite. They establish action reachability only. The cleared-origin
+export contains 37 new portable pipeline descriptors. Review preserves all 628
+prior rows (one shader and 627 pipelines), verifies no existing payload changes,
+and adds only the 37 descriptors. The resulting seed contains 664 pipelines
+and one shader; post-preload browser verification is a separate gate.
+
+The narrow rigid-model asset inspector rejects the costume materials under its
+restricted preview policy. That failure is retained separately from the full
+native HSD ownership path, which constructs the costumes. It is not an exemption
+or a successful rendering comparison.
+
+Both development and public Release builds succeed. The complete regression
+suite passes 1,048 tests with 43 optional skips after correcting two stale
+prototype roster expectations. Fresh native lifecycle checks also pass all
+eight existing fighters, and the retained 240-frame Mario original pair matches
+the fresh port for its declared entry/input/fighter/RNG/clock fields. This small
+regression excludes drawing, global PAD history, pixels, PCM and performance.
+The [hash-bound development receipt](evidence/ganondorf-development-v1.json)
+retains the measurements and failed discovery attempts.
+
+## Retained failures and next gates
+
+Early construction diagnostics exposed the missing Ganon command-family gate,
+dynamics schema, and an eye-animation telemetry assumption that required two
+material TObjs for every fighter. The latter now follows the original authored
+null material and zero-TObj contract. The next runs exposed command 21 in
+Warlock Punch and command 15 in Dark Dive; focused original-consumer tests and
+a reachable-command audit cover the corrections above.
+
+Browser attempts retained a rejected CharacterKind bound, one invalid run made
+from stale output after a failed build, an early Start sample during the
+original ten-tick CSS cooldown, cold rendering pauses, and a harness click on
+a collapsed diagnostic panel. Those attempts do not count as acceptance.
+
+Remaining gates include the complete visible action and interaction corpus,
+independent original comparison, all costume/opponent render states, reviewed
+pipeline coverage, cold/warm performance, complete match endings and repeated
+menu loops, pixels, PCM and physical input. Catch/throw follow-ups need actual
+opponent interactions; entering a special does not establish those branches.
+The [whole-game inventory](FULL_GAME_PORT.md) keeps this candidate separate
+from full fighter admission.

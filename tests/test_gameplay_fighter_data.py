@@ -70,12 +70,18 @@ class GameplayFighterDataTests(unittest.TestCase):
             roy_container = ROOT / "assets-local/next-gate/PlFeAJ.dat"
             if args and roy_asset.is_file() and roy_container.is_file():
                 args.extend((str(roy_asset),str(roy_container)))
+            ganon_asset = ROOT / "assets-local/full-game-ganon/PlGn.dat"
+            ganon_container = ROOT / "assets-local/full-game-ganon/PlGnAJ.dat"
+            if len(args) == 4 and ganon_asset.is_file() and ganon_container.is_file():
+                args.extend((str(ganon_asset),str(ganon_container)))
             result = subprocess.run([str(node), str(output), *args], cwd=directory, env=env,
                                     capture_output=True, text=True, timeout=30)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("Owned native ftData synthetic and rejection checks: passed", result.stdout)
-            if len(args) == 4:
+            if len(args) >= 4:
                 self.assertIn("Native Roy dynamics selector-5 rows and six authored modes: passed", result.stdout)
+            if len(args) == 6:
+                self.assertIn("Native Ganondorf Captain extension and null Article table: passed", result.stdout)
             print(result.stdout, end="")
 
 

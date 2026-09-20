@@ -1,5 +1,21 @@
 # Current status
 
+## Full-game integration branch
+
+`codex/full-game-integration` tracks the remaining offline vanilla game through
+[a versioned feature and source inventory](docs/FULL_GAME_PORT.md). The report
+retains all source functions and missing features; it does not turn compilation
+or declared feature status into an accepted-game percentage.
+
+Ganondorf is the first added development candidate. Fresh native checks pass
+both player orientations and all five costumes on Final Destination, including
+original combat, pause and teardown. The browser reaches original CSS/SSS and
+advancing Ganondorf gameplay, with cold pipeline creation and timing pauses
+retained as failures. Original comparison and broader acceptance remain open;
+see [Ganondorf scope and remaining gates](docs/GANONDORF_PORT_NOTES.md).
+Results PR #44 and audio PR #42 remain separate draft dependencies. This branch
+work has not changed the deployed public alpha.
+
 ## CI verification turnaround
 
 Three consecutive full PR verification runs completed in 6m 32s for a source

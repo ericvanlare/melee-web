@@ -97,12 +97,27 @@ const link=[
   aerialSpecial('Bomb (air)',[[359,359]],0,-80),
 ];
 
+// ftGanon uses the original Captain-family motion IDs, with its own authored
+// animation and command tables. Catch/throw exits require a separate target
+// recipe; these inputs cover the unassisted ground and air entries.
+const ganon=[
+  ground('Warlock Punch',[[347,347]],input(1,PAD.B),input(180)),
+  aerialSpecial('Warlock Punch (air)',[[348,348]]),
+  ground('Raptor Boost',[[349,350]],input(1,PAD.B,80),input(240)),
+  aerialSpecial('Raptor Boost (air)',[[351,352]],80),
+  ground('Dark Dive',[[353,353]],input(1,PAD.B,0,80),input(240)),
+  aerialSpecial('Dark Dive (air)',[[354,354]],0,80),
+  ground("Wizard's Foot",[[357,358]],input(1,PAD.B,0,-80),input(240)),
+  aerialSpecial("Wizard's Foot (air)",[[359,360]],0,-80),
+];
+
 export const actionInventories=new Map([
  [18,{id:'marth-visible-actions-v1',fighter:'Marth',minimumStageFrames:4200,cases:[...common,...wavedashes,...marth]}],
  [21,{id:'dr-mario-visible-actions-v1',fighter:'Dr. Mario',minimumStageFrames:4800,cases:[...common,...wavedashes,...drMario]}],
  [26,{id:'roy-visible-actions-v1',fighter:'Roy',minimumStageFrames:4800,cases:[...common,...wavedashes,...roy]}],
  [6,{id:'link-visible-actions-v1',fighter:'Link',minimumStageFrames:4800,cases:[...common,...wavedashes,...link]}],
  [20,{id:'young-link-visible-actions-v1',fighter:'Young Link',minimumStageFrames:4800,cases:[...common,...wavedashes,...link]}],
+ [25,{id:'ganondorf-visible-actions-v1',fighter:'Ganondorf',minimumStageFrames:5200,cases:[...common,...ganon]}],
 ]);
 
 export function actionInventory(fighterKind){return actionInventories.get(fighterKind)||null;}

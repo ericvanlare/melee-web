@@ -191,7 +191,79 @@ int action_test_dobj_operands(void)
 }
 
 void ftAction_80073008(HSD_GObj*,CommandInfo*);
+void ftAction_80071908(HSD_GObj*,CommandInfo*);
 void ftAction_80071974(HSD_GObj*,CommandInfo*);
+void ftAction_80071708(HSD_GObj*,CommandInfo*);
+void ftAction_80071784(HSD_GObj*,CommandInfo*);
+void ftAction_80072B94(HSD_GObj*,CommandInfo*);
+static int throw_disable_idx;
+void ftColl_8007AFC8(HSD_GObj* gobj,int hit_idx)
+{
+    if(!gobj||!gobj->user_data||hit_idx<0||hit_idx>=4)abort();
+    ((Fighter*)gobj->user_data)->x914[hit_idx].state=HitCapsule_Disabled;
+    throw_disable_idx=hit_idx;
+}
+static HSD_GObj* dynamics_gobj;
+static Fighter_Part dynamics_part;
+static float dynamics_frame;
+enum_t ftCo_8009E318(HSD_GObj* gobj,Fighter_Part part,float frame)
+{
+    dynamics_gobj=gobj; dynamics_part=part; dynamics_frame=frame; return 0;
+}
+int action_test_opcode14_consumer(void)
+{
+    const MeleeWebCommandWord words[]={
+        {(14U<<26)|(2U<<2)|1U,UINT32_MAX},
+        {(14U<<26)|(2U<<2)|(1U<<1)|1U,UINT32_MAX},{0,UINT32_MAX}};
+    union CmdUnion* p=melee_web_commands_create(words,3);if(!p)return 0;
+    Fighter fighter={0};HSD_GObj gobj={0};gobj.user_data=&fighter;CommandInfo command={0};command.u=p;
+    ftAction_80071708(&gobj,&command);
+    const int first=fighter.x914[2].x42_b5&& !fighter.x914[2].x42_b7&&command.u==&p[1];
+    ftAction_80071708(&gobj,&command);
+    const int valid=first&&fighter.x914[2].x42_b7&&command.u==&p[2];
+    melee_web_command_require_supported(14);melee_web_commands_destroy(p);
+    const MeleeWebCommandWord invalid[]={{(14U<<26)|(4U<<2),UINT32_MAX}};
+    p=melee_web_commands_create(invalid,1);if(p){melee_web_commands_destroy(p);return 0;}
+    return valid;
+}
+int action_test_opcode15_consumer(void)
+{
+    const MeleeWebCommandWord words[]={{(15U<<26)|2U,UINT32_MAX},{0,UINT32_MAX}};
+    union CmdUnion* p=melee_web_commands_create(words,2);if(!p)return 0;
+    Fighter fighter={0};HSD_GObj gobj={0};gobj.user_data=&fighter;fighter.x914[2].state=HitCapsule_Enabled;
+    CommandInfo command={0};command.u=p;throw_disable_idx=-1;ftAction_80071784(&gobj,&command);
+    const int valid=p[0].set_throw_flags.hit_idx==2&&throw_disable_idx==2&&
+        fighter.x914[2].state==HitCapsule_Disabled&&command.u==&p[1];
+    melee_web_command_require_supported(15);melee_web_commands_destroy(p);
+    const MeleeWebCommandWord invalid[]={{(15U<<26)|4U,UINT32_MAX}};
+    p=melee_web_commands_create(invalid,1);if(p){melee_web_commands_destroy(p);return 0;}
+    return valid;
+}
+int action_test_opcode50_consumer(void)
+{
+    const MeleeWebCommandWord words[]={{(50U<<26)|50U,UINT32_MAX},{0,UINT32_MAX}};
+    union CmdUnion* p=melee_web_commands_create(words,2);if(!p)return 0;
+    Fighter fighter={0};HSD_GObj gobj={0};gobj.user_data=&fighter;fighter.cur_anim_frame=17.25f;
+    CommandInfo command={0};command.u=p;dynamics_gobj=NULL;dynamics_part=0;dynamics_frame=0;
+    ftAction_80072B94(&gobj,&command);
+    const int valid=p[0].unk17.unk1==50&&dynamics_gobj==&gobj&&dynamics_part==50&&
+        dynamics_frame==17.25f&&command.u==&p[1];
+    melee_web_command_require_supported(50);melee_web_commands_destroy(p);return valid;
+}
+int action_test_opcode21_consumer(void)
+{
+    const MeleeWebCommandWord words[]={{21U << 26,UINT32_MAX},{0,UINT32_MAX}};
+    union CmdUnion* p=melee_web_commands_create(words,sizeof(words)/sizeof(*words));
+    if(!p)return 0;
+    Fighter fighter={0};HSD_GObj gobj={0};gobj.user_data=&fighter;
+    const int initially_clear=!fighter.throw_flags_b1;
+    CommandInfo command={0};command.u=&p[0];
+    ftAction_80071908(&gobj,&command);
+    const int valid=initially_clear&&fighter.throw_flags_b1&&command.u==&p[1];
+    melee_web_command_require_supported(21);
+    melee_web_commands_destroy(p);
+    return valid;
+}
 int action_test_common_operands(void)
 {
     const MeleeWebCommandWord words[]={

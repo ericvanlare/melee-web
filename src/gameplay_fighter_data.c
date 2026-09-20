@@ -4,6 +4,7 @@
 #include <melee/ft/types.h>
 #include <melee/ft/kinds/ftMario/types.h>
 #include <melee/ft/kinds/ftFox/types.h>
+#include <melee/ft/kinds/ftCaptain/types.h>
 #include <melee/ft/kinds/ftMars/types.h>
 #include <melee/ft/kinds/ftLink/types.h>
 #include <sysdolphin/baselib/jobj.h>
@@ -16,6 +17,7 @@ _Static_assert(sizeof(ftData) == 0x60 && sizeof(void*) == 4, "Native fighter ABI
 typedef struct Counted { uint32_t count; void* data; } Counted;
 _Static_assert(sizeof(Counted) == 8, "Visibility descriptor ABI");
 _Static_assert(sizeof(ftLk_DatAttrs) == 0xDC, "Link extension ABI");
+_Static_assert(sizeof(ftCaptain_DatAttrs) == 0x8C, "Captain/Ganon extension ABI");
 #define WORD(o) r->word(r->context, (o))
 #define BYTE(o) r->byte(r->context, (o))
 #define PTR(o,n) r->pointer(r->context, (o),(n))
@@ -76,7 +78,7 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     if (!r || !unresolved) return NULL;
     REQUIRE(kind==FTKIND_MARIO || kind==FTKIND_DRMARIO || kind==FTKIND_FOX ||
         kind==FTKIND_FALCO || kind==FTKIND_MARS || kind==FTKIND_EMBLEM ||
-        kind==FTKIND_LINK || kind==FTKIND_CLINK,
+        kind==FTKIND_LINK || kind==FTKIND_CLINK || kind==FTKIND_GANON,
         "Native fighter extension schema unavailable");
     REQUIRE(costumes>0 && costumes<=16,"Native costume count exceeds checked bound");
     REQUIRE(motion_count>0 && motion_count<=1024,"Native motion count exceeds checked bound");
@@ -124,6 +126,11 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
 #undef LINK
         REQUIRE(link->xC4.x0_bone_id>=0 && link->xC4.x0_bone_id<140 && link->xC4.x10_size>0,
                 "Native Link absorb descriptor invalid");
+    } else if(kind==FTKIND_GANON) {
+        at=required(r,root+4,0x8C); ftCaptain_DatAttrs* captain=NEW(ftCaptain_DatAttrs,1); d->ext_attr=captain;
+#define CAPTAIN(o,t,n,orig) captain->orig=READ_##t(at+o);
+        MELEE_WEB_CAPTAIN_ATTRIBUTE_FIELDS(CAPTAIN)
+#undef CAPTAIN
     } else {
         REQUIRE(0,"Native fighter extension schema unavailable");
     }
@@ -199,7 +206,7 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
                    "Empty native fighter dynamics has a nonnull auxiliary table");
     uint32_t dynamics_table=PTR(at+16,1);
     if(dynamics_table!=UINT32_MAX) {
-        /* Marth/Roy's authored dynamics modes each carry one integer chain
+        /* Marth/Roy/Ganondorf's authored dynamics modes each carry one integer chain
          * cutoff per sword/cape bone. The mode selector is the second byte of
          * every source blend row, and the original field is typed FigaTree***
          * even though ftdynamics.c compares these pointer-width values as
@@ -208,7 +215,7 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
          * The referenced-region check below keeps an adjacent descriptor from
          * being consumed as a fabricated mode row.
          */
-        REQUIRE((kind==FTKIND_MARS||kind==FTKIND_EMBLEM)&&d->x2C->dynamicsNum==3,
+        REQUIRE((kind==FTKIND_MARS||kind==FTKIND_EMBLEM||kind==FTKIND_GANON)&&d->x2C->dynamicsNum==3,
                 "Native fighter dynamics mode schema unavailable");
         REQUIRE(blends,"Native fighter dynamics selectors are missing");
         unsigned mode_count=0;
@@ -290,6 +297,8 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
      * null. Slot 6 is a Link joint, never an Article. */
     d->x48_items=NEW(void*,7);
     at=PTR(root+0x48,item_slots*4);
+    REQUIRE(kind!=FTKIND_GANON || at==UINT32_MAX,
+            "Ganon source ftData must not invent an Article table");
     if(at!=UINT32_MAX) {
         REGION(at,item_slots*4);
         for(unsigned i=0;i<item_slots;++i) {
@@ -319,6 +328,8 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
         REQUIRE(at!=UINT32_MAX && d->x48_items[0] && d->x48_items[1] && d->x48_items[2] &&
             d->x48_items[3] && d->x48_items[4],
             "Link OnLoad requires its five Article identities and part descriptor");
+    else if(kind==FTKIND_GANON)
+        REQUIRE(at==UINT32_MAX, "Ganon source ftData Article table is not null");
     else
         REQUIRE((kind==FTKIND_MARS||kind==FTKIND_EMBLEM) && at==UINT32_MAX,
                 "Marth/Roy source ftData must not invent an Article table");

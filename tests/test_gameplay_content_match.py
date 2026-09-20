@@ -58,6 +58,18 @@ class ContentMatchTests(unittest.TestCase):
                                [menu, game, 8, fighter, opponent],
                                "Mixed source content intro")
 
+    def test_ganondorf_source_lifecycles_both_orientations(self):
+        game = ROOT / "assets-local/full-game-ganon"
+        required = ("MnSlChr.usd", "PlGn.dat", "PlGnAJ.dat", "PlMr.dat",
+                    "PlMrAJ.dat", "EfGnData.dat", "ganon.ssm", "GrNLa.dat")
+        if not all((game / name).is_file() for name in required):
+            self.skipTest("Owned Ganondorf/Mario, menu and FD fixtures are required")
+        for fighter, opponent in ((25, 8), (8, 25)):
+            with self.subTest(fighter=fighter, opponent=opponent):
+                self.run_trace("gameplay_content_match_trace",
+                               [game, game, 32, fighter, opponent],
+                               "Mixed source content intro, costumes, stage lifecycle, combat, pause and repeat teardown passed")
+
     def test_battlefield_scaled_geometry_and_background_lifetimes(self):
         game = ROOT / "assets-local/next-gate"
         if not (game / "GrNBa.dat").is_file():

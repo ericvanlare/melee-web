@@ -31,6 +31,16 @@ bool canonical_costume(const FighterCostume& candidate) noexcept
 }
 void destroy_joint(MeleeWebNativeJoint* joint)
 {char error[128];if(!melee_web_native_joint_destroy(joint,error,sizeof(error))){std::fprintf(stderr,"%s\n",error);std::abort();}}
+std::unique_ptr<DatMaterialAnimation> costume_material(
+    std::shared_ptr<const DatArchive> archive,const FighterCostume& id,
+    const MeleeWebNativeGraph& graph)
+{
+    // ftData_80085820 publishes null only when the source costume string is
+    // null. A required symbol still passes through the exact-root lookup.
+    if(!canonical_costume(id))throw DatError("Fighter costume identity is not authored by the source registry");
+    if(id.material_animation_symbol.empty())return nullptr;
+    return std::make_unique<DatMaterialAnimation>(archive,root(*archive,id.material_animation_symbol),graph);
+}
 struct NativePartAnimationGroup {
     uint16_t start_part=0;
     uint16_t part_count=0;
@@ -48,12 +58,12 @@ struct OwnedPartAnimationGroup {
 struct OwnedAdditionalCostume {
     FighterCostume identity;
     DatNativeJoint model;
-    DatMaterialAnimation material;
+    std::unique_ptr<DatMaterialAnimation> material;
     std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> native{nullptr,destroy_joint};
     OwnedAdditionalCostume(std::shared_ptr<const DatArchive> archive,const FighterCostume& id,
                            const MeleeWebNativeGraph& base)
         :identity(id),model(archive,root(*archive,id.model_symbol)),
-         material(archive,root(*archive,id.material_animation_symbol),model.graph())
+         material(costume_material(archive,id,model.graph()))
     {
         const auto& graph=model.graph();
         if(graph.joint_count!=base.joint_count)throw DatError("Additional costume joint count differs from shared metal/guard topology");
@@ -74,7 +84,7 @@ struct GameplayFighterAssets::Storage {
     std::unique_ptr<DatNativeJoint> link_part_model;
     std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> link_part_native{nullptr,destroy_joint};
     DatNativeJoint model;
-    DatMaterialAnimation material;
+    std::unique_ptr<DatMaterialAnimation> material;
     std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> native;
     std::unique_ptr<DatNativeJoint> metal_model;
     std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> metal_native;
@@ -91,7 +101,7 @@ struct GameplayFighterAssets::Storage {
             std::span<const uint8_t> aj,const FighterCostume& id)
       :fighter(std::move(ft)),identity(id),animation(aj.begin(),aj.end()),prototype(fighter,id,aj),arena(fighter),
        model(costume,root(*costume,id.model_symbol)),
-       material(costume,root(*costume,id.material_animation_symbol),model.graph()),native(nullptr,destroy_joint),metal_native(nullptr,destroy_joint)
+       material(costume_material(costume,id,model.graph())),native(nullptr,destroy_joint),metal_native(nullptr,destroy_joint)
     {
         char error[256];
         native.reset(melee_web_native_joint_hydrate(&model.graph(),error,sizeof(error)));
@@ -136,6 +146,8 @@ struct GameplayFighterAssets::Storage {
             item_identities[item_count++]={4,static_cast<uint32_t>(attributes->x10)};
             if(id.fighter_kind==FTKIND_CLINK)
                 item_identities[item_count++]={5,static_cast<uint32_t>(It_Kind_CLink_Milk)};
+        } else if(id.fighter_kind==FTKIND_GANON) {
+            if(item_table)throw DatError("Ganondorf source Article table must be null");
         } else if(id.fighter_kind!=18 && id.fighter_kind!=26) {
             throw DatError("Fighter item Article schema is unavailable");
         }
@@ -242,7 +254,7 @@ struct GameplayFighterAssets::Storage {
         constexpr uint32_t neutral_unreached=(1U<<5)|(1U<<6);
         if(!data || (unresolved&~neutral_unreached))throw DatError("Creation-reachable fighter data is not hydrated");
         scope=melee_web_fighter_assets_begin(id.fighter_kind,id.costume_index,data,
-            melee_web_native_joint_descriptor(native.get(),error,sizeof(error)),material.descriptor(),
+            melee_web_native_joint_descriptor(native.get(),error,sizeof(error)),material?material->descriptor():nullptr,
             uint32_t(prototype.runtime().actions().size()),this,bind,unbind,error,sizeof(error));
         if(!scope)throw DatError(error);
     }
@@ -278,7 +290,7 @@ void GameplayFighterAssets::add_costume(std::shared_ptr<const DatArchive> archiv
     auto value=std::make_unique<OwnedAdditionalCostume>(std::move(archive),id,storage_->model.graph());
     char error[256];
     if(!melee_web_fighter_assets_add_costume(storage_->scope,id.costume_index,
-       melee_web_native_joint_descriptor(value->native.get(),error,sizeof(error)),value->material.descriptor(),error,sizeof(error)))
+       melee_web_native_joint_descriptor(value->native.get(),error,sizeof(error)),value->material?value->material->descriptor():nullptr,error,sizeof(error)))
         throw DatError(error);
     storage_->additional[id.costume_index]=std::move(value);
 }

@@ -11,6 +11,28 @@ static HSD_Joint test_joint;
 static HSD_MatAnimJoint test_material;
 static ftData* previous_data;
 static UnkCostumeStruct previous_costume;
+int assets_test_nullable_material(void* rows,void* blends,void* context,
+    MeleeWebFighterAssetBind bind,MeleeWebFighterAssetUnbind unbind)
+{
+    ftData data={0};data.xC=rows;data.x10=blends;data.x5C=&test_joint;
+    char error[160];
+    ftData* saved_data=gFtDataList[FTKIND_GANON];
+    UnkCostumeStruct saved[5];
+    memcpy(saved,CostumeListsForeachCharacter[FTKIND_GANON].costume_list,sizeof(saved));
+    /* Required Mario material cannot be omitted; authored Ganon null cannot
+     * be replaced by a fabricated descriptor. No gameplay is run here. */
+    if(melee_web_fighter_assets_begin(FTKIND_MARIO,0,&data,&test_joint,NULL,303,context,bind,unbind,error,sizeof(error)))return 0;
+    if(melee_web_fighter_assets_begin(FTKIND_GANON,0,&data,&test_joint,&test_material,318,context,bind,unbind,error,sizeof(error)))return 0;
+    MeleeWebFighterAssetScope* scope=melee_web_fighter_assets_begin(FTKIND_GANON,0,&data,&test_joint,NULL,318,context,bind,unbind,error,sizeof(error));
+    if(!scope)return 0;
+    if(melee_web_fighter_assets_add_costume(scope,1,&test_joint,&test_material,error,sizeof(error)))return 0;
+    for(unsigned i=1;i<5;i++)if(!melee_web_fighter_assets_add_costume(scope,i,&test_joint,NULL,error,sizeof(error)))return 0;
+    if(melee_web_fighter_assets_add_costume(scope,5,&test_joint,NULL,error,sizeof(error)))return 0;
+    for(unsigned i=0;i<5;i++)if(CostumeListsForeachCharacter[FTKIND_GANON].costume_list[i].x4!=NULL)return 0;
+    return melee_web_fighter_assets_end(scope,error,sizeof(error)) &&
+        gFtDataList[FTKIND_GANON]==saved_data &&
+        !memcmp(saved,CostumeListsForeachCharacter[FTKIND_GANON].costume_list,sizeof(saved));
+}
 int assets_test_item_commands(void)
 {
     const uint32_t words[]={ (3U<<26)|5, (13U<<26)|(2U<<23)|384, (1U<<26)|2, 4U<<26, 0 };

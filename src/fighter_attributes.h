@@ -151,6 +151,46 @@
     X(0x07c, F32, cape_reflection_x1C_speed_mul, cape_reflection.x1C_speed_mul) \
     X(0x080, U8, cape_reflection_x20_behavior, cape_reflection.x20_behavior)
 
+/* Captain and Ganondorf use the original ftCaptain_DatAttrs extension.  The
+ * source keeps several fields intentionally unnamed; retain those names and
+ * their scalar widths instead of collapsing the record to a guessed subset. */
+#define MELEE_WEB_CAPTAIN_ATTRIBUTE_FIELDS(X) \
+    X(0x000, F32, specialn_stick_range_y_neg, specialn_stick_range_y_neg) \
+    X(0x004, F32, specialn_stick_range_y_pos, specialn_stick_range_y_pos) \
+    X(0x008, F32, specialn_angle_diff, specialn_angle_diff) \
+    X(0x00c, F32, specialn_vel_x, specialn_vel_x) \
+    X(0x010, F32, specialn_vel_mul, specialn_vel_mul) \
+    X(0x014, F32, specials_gr_vel_x, specials_gr_vel_x) \
+    X(0x018, F32, specials_grav, specials_grav) \
+    X(0x01c, F32, specials_terminal_vel, specials_terminal_vel) \
+    X(0x020, F32, specials_unk0, specials_unk0) \
+    X(0x024, F32, specials_unk1, specials_unk1) \
+    X(0x028, F32, specials_unk2, specials_unk2) \
+    X(0x02c, F32, specials_unk3, specials_unk3) \
+    X(0x030, F32, specials_unk4, specials_unk4) \
+    X(0x034, F32, specials_unk5, specials_unk5) \
+    X(0x038, F32, specials_miss_landing_lag, specials_miss_landing_lag) \
+    X(0x03c, F32, specials_hit_landing_lag, specials_hit_landing_lag) \
+    X(0x040, F32, specialhi_air_friction_mul, specialhi_air_friction_mul) \
+    X(0x044, F32, specialhi_horz_vel, specialhi_horz_vel) \
+    X(0x048, F32, specialhi_freefall_air_spd_mul, specialhi_freefall_air_spd_mul) \
+    X(0x04c, F32, specialhi_landing_lag, specialhi_landing_lag) \
+    X(0x050, F32, specialhi_unk0, specialhi_unk0) \
+    X(0x054, F32, specialhi_unk1, specialhi_unk1) \
+    X(0x058, F32, specialhi_input_var, specialhi_input_var) \
+    X(0x05c, F32, specialhi_unk2, specialhi_unk2) \
+    X(0x060, F32, specialhi_catch_grav, specialhi_catch_grav) \
+    X(0x064, I32, specialhi_air_var, specialhi_air_var) \
+    X(0x068, F32, x68, x68) \
+    X(0x06c, U32, speciallw_unk1, speciallw_unk1) \
+    X(0x070, F32, speciallw_flame_particle_angle, speciallw_flame_particle_angle) \
+    X(0x074, F32, speciallw_on_hit_spd_modifier, speciallw_on_hit_spd_modifier) \
+    X(0x078, I32, speciallw_unk2, speciallw_unk2) \
+    X(0x07c, F32, speciallw_ground_lag_mul, speciallw_ground_lag_mul) \
+    X(0x080, F32, speciallw_landing_lag_mul, speciallw_landing_lag_mul) \
+    X(0x084, F32, speciallw_ground_traction, speciallw_ground_traction) \
+    X(0x088, F32, speciallw_air_landing_traction, speciallw_air_landing_traction)
+
 /* Fox and Falco share the original ftFox_DatAttrs layout.  Their special
  * moves are implemented by the same source routines, while PlFx.dat and
  * PlFc.dat provide different scalar values and Article identities.  Keep the
@@ -347,6 +387,9 @@ typedef struct MeleeWebCoAttributes {
 typedef struct MeleeWebMarioAttributes {
     MELEE_WEB_MARIO_ATTRIBUTE_FIELDS(MELEE_WEB_DECLARE_ATTRIBUTE)
 } MeleeWebMarioAttributes;
+typedef struct MeleeWebCaptainAttributes {
+    MELEE_WEB_CAPTAIN_ATTRIBUTE_FIELDS(MELEE_WEB_DECLARE_ATTRIBUTE)
+} MeleeWebCaptainAttributes;
 typedef struct MeleeWebFoxAttributes {
     MELEE_WEB_FOX_ATTRIBUTE_FIELDS(MELEE_WEB_DECLARE_ATTRIBUTE)
     uint8_t reserved[3];

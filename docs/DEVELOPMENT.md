@@ -43,6 +43,10 @@ installed Chromium executable. Invalid explicit paths fail without falling
 back. The output directory must be new and belongs under ignored `work/`;
 missing parent directories are created automatically.
 
+For the remaining offline game scope and its searchable source inventory, use
+[the full-game integration workflow](FULL_GAME_PORT.md). It keeps implementation
+status separate from original-comparison and browser acceptance.
+
 ## Choose by change boundary
 
 | Change | Start here | Focused command or procedure | Evidence boundary |

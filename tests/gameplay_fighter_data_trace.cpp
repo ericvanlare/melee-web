@@ -5,6 +5,8 @@
 #include "fighter_runtime_fixture.hpp"
 #include <cstddef>
 #include <cstdint>
+#include <cmath>
+#include <vector>
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -92,6 +94,37 @@ void verify_roy(const std::shared_ptr<const DatArchive>& archive,const Bytes& co
                   "Roy dynamics mode cutoff changed");
     std::cout<<"Native Roy dynamics selector-5 rows and six authored modes: passed\n";
 }
+void verify_ganon(const std::shared_ptr<const DatArchive>& archive,const Bytes& container) {
+    const auto& identity=resolve_fighter_costume("PlyGanon5K_Share_joint");
+    check(identity.fighter_kind==25 && identity.motion_count==318 && identity.material_animation_symbol.empty(),
+          "Missing source Ganondorf identity or authored null material animation");
+    const auto runtime=std::make_shared<const DatFighterRuntime>(archive,identity);
+    DatFighterActions(*archive,identity).validate_container(container);
+    check(runtime->actions().size()==identity.motion_count && runtime->captain_attributes(),
+          "Ganondorf action metadata or Captain extension is incomplete");
+    const auto& captain=*runtime->captain_attributes();
+    check(std::isfinite(captain.specialn_stick_range_y_neg) &&
+          std::isfinite(captain.specialhi_air_friction_mul) &&
+          std::isfinite(captain.speciallw_air_landing_traction),
+          "Ganondorf Captain extension contains a nonfinite scalar");
+    const auto symbols=archive->public_symbols();
+    uint32_t root=UINT32_MAX;
+    for(const auto& symbol:symbols)if(symbol.name=="ftDataGanon")root=symbol.data_offset;
+    check(root!=UINT32_MAX,"Missing ftDataGanon");
+    NativeDatArena owner(archive); uint32_t unresolved;
+    std::vector<std::uint8_t> ganon_blends(identity.motion_count * 2, 0);
+    for (const auto& action:runtime->actions()) {
+        ganon_blends[action.motion_id*2]=action.blend_dynamics[0];
+        ganon_blends[action.motion_id*2+1]=action.blend_dynamics[1];
+    }
+    void* data=melee_web_fighter_data_decode(owner.reader(),root,25,5,
+        identity.motion_count,nullptr,ganon_blends.data(),nullptr,&unresolved);
+    check(data && !melee_web_fighter_data_article(data,0) && !melee_web_fighter_data_article(data,5),
+          "Ganondorf source ftData unexpectedly published an Article");
+    check((unresolved&((1U<<18)|(1U<<22)))==0,
+          "Ganondorf source fields remain unresolved");
+    std::cout<<"Native Ganondorf Captain extension and null Article table: passed\n";
+}
 }
 int main(int argc,char**argv) {
     try {
@@ -119,6 +152,11 @@ int main(int argc,char**argv) {
         if(argc==5) {
             verify(std::make_shared<const DatArchive>(read_file(argv[1])),read_file(argv[2]),1);
             verify_roy(std::make_shared<const DatArchive>(read_file(argv[3])),read_file(argv[4]));
+        }
+        if(argc==7) {
+            verify(std::make_shared<const DatArchive>(read_file(argv[1])),read_file(argv[2]),1);
+            verify_roy(std::make_shared<const DatArchive>(read_file(argv[3])),read_file(argv[4]));
+            verify_ganon(std::make_shared<const DatArchive>(read_file(argv[5])),read_file(argv[6]));
         }
     }catch(const std::exception&e){std::cerr<<e.what()<<'\n';return 1;}
 }

@@ -5,6 +5,7 @@
 #include "gameplay_content.h"
 #include <melee/ft/kinds/ftMario/forward.h>
 #include <melee/ft/kinds/ftMars/forward.h>
+#include <melee/ft/kinds/ftCaptain/forward.h>
 #include <melee/it/forward.h>
 #include <filesystem>
 #include <fstream>
@@ -90,6 +91,7 @@ int main(int argc,char** argv){try{
         const bool fox_family=fighter_content->fighter_kind==FTKIND_FOX||
             fighter_content->fighter_kind==FTKIND_FALCO;
         const bool doctor=fighter_content->fighter_kind==FTKIND_DRMARIO;
+        const bool ganon=fighter_content->fighter_kind==FTKIND_GANON;
         const bool mars_family=fighter_content->fighter_kind==FTKIND_MARS||
             fighter_content->fighter_kind==FTKIND_EMBLEM;
         // Authored versus spawns may put P2 on a platform. Drop that source
@@ -102,14 +104,15 @@ int main(int argc,char** argv){try{
         raw[1].stickY=0;
         check(std::abs(match.player_stats(1).position[1]-match.player_stats(0).position[1])<5.0f,
               "Raw input did not bring both fighters to the same stage level");
+        const float attack_distance=ganon?16.0f:35.0f;
         for(unsigned n=0;n<120;n++){
             const auto p1=match.player_stats(0),p2=match.player_stats(1);
-            if(std::abs(p2.position[0]-p1.position[0])<35.0f)break;
+            if(std::abs(p2.position[0]-p1.position[0])<attack_distance)break;
             raw[0].stickX=p2.position[0]>p1.position[0]?80:-80;tick();
         }
         raw[0].stickX=0;
-        check(std::abs(match.player_stats(1).position[0]-match.player_stats(0).position[0])<35.0f,
-              "Raw input did not bring the selected fighter within laser range");
+        check(std::abs(match.player_stats(1).position[0]-match.player_stats(0).position[0])<attack_distance,
+              "Raw input did not bring the selected fighter within neutral-special range");
         check(match.player_stats(0).ground_or_air==0,"Selected fighter left the ground before the laser check");
         if (cycle==0&&doctor) {
             /* Dr. Mario's up taunt is a fighter-owned source action.  It also
@@ -137,16 +140,18 @@ int main(int argc,char** argv){try{
             check(pill_cleared,"Dr. Mario up taunt did not clear its original vitamin article");
         }
         const auto damage=match.player_stats(1).damage_percent;
-        bool capsule=false;
+        bool capsule=false,warlock_punch=false;
         for(unsigned n=0;n<240&&match.player_stats(1).damage_percent==damage;n++){
             raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
+            if(ganon)warlock_punch|=match.player_stats(0).motion_id==ftCa_MS_SpecialN;
             if(doctor){
                 const auto motion=match.player_stats(0).motion_id;
                 capsule|=motion==ftMr_MS_SpecialN||motion==ftMr_MS_SpecialAirN;
             }
         }
         raw[0].button=0;
-        check(match.player_stats(1).damage_percent>damage,"Selected fighter ground laser did not damage the opponent");
+        check(match.player_stats(1).damage_percent>damage,"Selected fighter ground neutral special did not damage the opponent");
+        if(ganon)check(warlock_punch,"Ganondorf did not enter original ground Warlock Punch");
         if(doctor)check(capsule,"Dr. Mario ground neutral special did not enter its original capsule action");
         std::cout<<fighter_content->name<<(fox_family?" laser damage=":" neutral-special damage=")
                  <<match.player_stats(1).damage_percent<<std::endl;
@@ -185,9 +190,10 @@ int main(int argc,char** argv){try{
         }
         raw[0].button=0;
         check(match.player_stats(0).ground_or_air==1,"Selected fighter did not jump");
-        bool air_capsule=false;
+        bool air_capsule=false,air_warlock_punch=false;
         for(unsigned n=0;n<100;n++){
             raw[0].button=n<20?PAD_BUTTON_B:0;tick();
+            if(ganon)air_warlock_punch|=match.player_stats(0).motion_id==ftCa_MS_SpecialAirN;
             if(doctor){
                 const auto motion=match.player_stats(0).motion_id;
                 air_capsule|=motion==ftMr_MS_SpecialAirN;
@@ -195,6 +201,7 @@ int main(int argc,char** argv){try{
         }
         if(doctor&&cycle==0)check(air_capsule,
             "Dr. Mario aerial neutral special did not enter its original capsule action");
+        if(ganon)check(air_warlock_punch,"Ganondorf did not enter original aerial Warlock Punch");
         if(cycle==0&&fox_family){
             for(unsigned n=0;n<300&&match.player_stats(0).ground_or_air!=0;n++)tick();
             check(match.player_stats(0).ground_or_air==0,"Selected fighter did not land after the air laser");
@@ -297,6 +304,54 @@ int main(int argc,char** argv){try{
             }
             raw[0].stickY=0;raw[0].button=0;
             check(down,"Dr. Mario down special did not enter its original source action");
+        }else if(cycle==0&&ganon){
+            auto settle=[&](){
+                raw[0].button=0;raw[0].stickX=raw[0].stickY=0;
+                for(unsigned n=0;n<480;n++){
+                    const auto state=match.player_stats(0);
+                    if(state.ground_or_air==0&&state.motion_id<ftCa_MS_SwordSwing4)return;
+                    tick();
+                }
+                check(false,"Ganondorf special did not return to grounded common motion");
+            };
+            auto center=[&](){
+                settle();
+                for(unsigned n=0;n<240;n++){
+                    const auto state=match.player_stats(0);
+                    if(std::abs(state.position[0])<8)break;
+                    raw[0].stickX=state.position[0]>0?-80:80;tick();
+                }
+                raw[0].stickX=0;
+                for(unsigned n=0;n<30;n++)tick();
+                check(std::abs(match.player_stats(0).position[0])<18,
+                      "Raw movement did not recenter Ganondorf for special lifecycle check");
+            };
+            center();
+            bool side=false;
+            for(unsigned n=0;n<180&&!side;n++){
+                raw[0].stickX=match.player_stats(0).position[0]>0?-80:80;
+                raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
+                const auto motion=match.player_stats(0).motion_id;
+                side=motion==ftCa_MS_SpecialSStart||motion==ftCa_MS_SpecialS;
+            }
+            check(side,"Ganondorf Raptor Boost did not enter its original source state");
+            center();
+            bool up=false;
+            for(unsigned n=0;n<180&&!up;n++){
+                raw[0].stickY=80;raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
+                const auto motion=match.player_stats(0).motion_id;
+                up=motion==ftCa_MS_SpecialHi||motion==ftCa_MS_SpecialAirHi;
+            }
+            check(up,"Ganondorf Dark Dive did not enter its original source state");
+            center();
+            bool down=false;
+            for(unsigned n=0;n<180&&!down;n++){
+                raw[0].stickY=-80;raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
+                down=match.player_stats(0).motion_id==ftCa_MS_SpecialLw;
+            }
+            check(down,"Ganondorf Wizard's Foot did not enter its original source state");
+            settle();
+            std::cout<<"Ganondorf original N/air-N/S/Hi/Lw lifecycle branches executed"<<std::endl;
         }else if(cycle==0&&mars_family){
             raw[0].button=0;raw[0].stickX=raw[0].stickY=0;
             for(unsigned n=0;n<420;n++){

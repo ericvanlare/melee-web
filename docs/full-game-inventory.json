@@ -1,0 +1,2679 @@
+{
+  "schema": "melee-web-full-game-inventory",
+  "version": 1,
+  "source": {
+    "revision": "GALE01 revision 2",
+    "commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5"
+  },
+  "scope": {
+    "included": [
+      "Offline vanilla GALE01 gameplay and presentation, including the source-enumerated fighters, moves, costumes, transformations, partner and boss entities, stages, items, CPU, local multiplayer, VS rules, single-player modes, minigames, events, menus, results, unlocks, trophies, movies, save and memory-card behavior, audio, graphics, input and browser lifecycle",
+      "Compiled WebAssembly execution using the pinned original source routines, source identities and disc-derived assets",
+      "The current original CSS to SSS to match to CSS path as a partial integration baseline"
+    ],
+    "excluded": [
+      "Netplay, online services and rollback transport",
+      "Custom fighters, custom stages, mods and user-authored content",
+      "Non-vanilla product extras and revisions other than the pinned GALE01 revision 2 source",
+      "Tournament acceptance or a claim that the browser is already a complete game"
+    ],
+    "limitations": [
+      "Version 1 decomposes the 26 playable CharacterKind identities and 31 named VS-stage slots. Items, mode-specific entities and service categories still require source-identity decomposition before they can serve as a fine-grained completion list.",
+      "Statuses are scoped observations, not percentages. A source path, parser, compile, synthetic scene, short prefix or recorded-queue comparison does not by itself pass browser gameplay, retail equivalence, pixels, PCM, input latency or performance.",
+      "The current bounded integration is eight fighter identities and four stages with partial claims only; it does not imply complete moves, costumes, CPU, four-player local input, audio, results, save progression or mode coverage.",
+      "The fine-grained VS-stage census covers named StKind values from St_Kind_Izumi through St_Kind_Last; Dummy/Test and route, minigame and other mode-only stage slots remain represented by the aggregate stage rows until their callers are decomposed.",
+      "STATUS.md remains the changing evidence index. This inventory links stable evidence documents and receipts without copying measurements from STATUS.md.",
+      "Missing or untested behavior stays represented as not_integrated or not_evaluated until an owner records the required source, browser and reference gates."
+    ]
+  },
+  "features": [
+    {
+      "id": "source-provenance-and-revision-boundary",
+      "category": "foundation",
+      "title": "Pinned GALE01 revision and source identity boundary",
+      "implementation": "integrated",
+      "acceptance": "passed",
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/gr/forward.h",
+        "melee/it/forward.h",
+        "melee/lb/lbarchive.c"
+      ],
+      "depends_on": [],
+      "pass_criteria": [
+        "The inventory validator resolves the locked Melee commit and confirms every source_ref exists in the pinned checkout.",
+        "Each future feature records its source kind, authored table bounds and source-relative paths before an implementation status changes."
+      ],
+      "evidence": [
+        "docs/DEPENDENCIES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Keep the source lock and GALE01 revision identity in every fine-grained content receipt.",
+      "issue": null
+    },
+    {
+      "id": "runtime-archive-memory-and-ownership",
+      "category": "foundation",
+      "title": "Archive decoding, memory regions and source object ownership",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_refs": [
+        "melee/lb/lbarchive.c",
+        "melee/lb/lbfile.c",
+        "melee/lb/lbmemory.c",
+        "melee/lb/lbheap.c",
+        "melee/gm/gmboot.c"
+      ],
+      "depends_on": [
+        "source-provenance-and-revision-boundary"
+      ],
+      "pass_criteria": [
+        "Required DAT/HSD roots, relocations, ARAM-backed data, file completion and heap ownership are decoded with checked source bounds.",
+        "Every supported scene and mode releases source objects and restores shared globals on unload and repeated entry.",
+        "Missing file, card, graphics, audio or device services fail explicitly at the owning boundary."
+      ],
+      "evidence": [
+        "docs/DEPENDENCIES.md",
+        "docs/FIGHTER_RUNTIME.md",
+        "docs/CONTENT_CHECKS.md"
+      ],
+      "next_step": "Split this boundary into archive, DVD/file, memory/heap and per-mode ownership rows with source table extents and lifecycle receipts.",
+      "issue": null
+    },
+    {
+      "id": "scheduler-clock-and-simulation-boundary",
+      "category": "foundation",
+      "title": "Original GObj/process scheduling, fixed simulation and source clocks",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_refs": [
+        "melee/gm/gmmain.c",
+        "melee/gm/gm_1A3F.c",
+        "melee/gm/gm_1A45.c",
+        "melee/vi/vi.c",
+        "melee/lb/lbtime.c"
+      ],
+      "depends_on": [
+        "runtime-archive-memory-and-ownership"
+      ],
+      "pass_criteria": [
+        "Object and process order, source tick boundaries, controller sampling and retrace/file completion ordering agree with the declared original reference boundary.",
+        "Browser stalls do not manufacture historical input samples or advance hidden simulation while preparation and teardown are in progress.",
+        "A repeated source lifecycle returns to the same clock and ownership state without an unexplained RNG or music-selection change."
+      ],
+      "evidence": [
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/RETAIL_DRAW_CLOCK.md",
+        "docs/RECORDED_QUEUE_REPLAY.md"
+      ],
+      "next_step": "Decompose source clock, input sampling, simulation catch-up and draw-boundary timing into independently evidenced rows.",
+      "issue": null
+    },
+    {
+      "id": "fighter-roster-and-identities",
+      "category": "fighters",
+      "title": "All selectable fighter identities and source fighter kinds",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/ft/fighter.c",
+        "melee/ft/ftdata.c",
+        "melee/gm/gm_1601.c",
+        "melee/gm/gmmain_lib.c"
+      ],
+      "depends_on": [
+        "runtime-archive-memory-and-ownership",
+        "scheduler-clock-and-simulation-boundary"
+      ],
+      "pass_criteria": [
+        "Every source selectable CharacterKind and backing FighterKind, including Zelda/Sheik and Ice Climbers identity relationships, has an explicit registry row.",
+        "Each row records its DAT roots, attributes, action table extent, article/effect/audio dependencies, stock icon identity and CSS/SSS handoff.",
+        "Each fighter passes real-asset construction, both player orientations, every authored costume, source action coverage, browser entry, teardown and independent original comparison."
+      ],
+      "evidence": [
+        "docs/ADDING_CHARACTERS.md",
+        "docs/FIGHTER_RUNTIME.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Expand this category into one row per source selectable identity and retain the exact source kind and authored data bounds.",
+      "issue": null
+    },
+    {
+      "id": "fighter-captain-falcon",
+      "category": "fighters",
+      "title": "Captain Falcon selectable fighter",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "ckind": "CKIND_CAPTAIN",
+        "ftkind": "FTKIND_CAPTAIN"
+      },
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/ft/kinds/ftCaptain/ftcaptain.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities"
+      ],
+      "pass_criteria": [
+        "CKIND_CAPTAIN and FTKIND_CAPTAIN retain distinct source identity, DAT roots, attributes, actions, articles, effects, audio and stock icon mapping.",
+        "Real source construction, every authored costume and move family, both orientations, CSS/SSS handoff and teardown pass without a sibling identity substitution.",
+        "Independent browser and original comparison covers this fighter before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_CHARACTERS.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the fighter checkpoint for Captain Falcon and split its costume, action, article, effect and audio coverage into bounded receipts.",
+      "issue": null
+    },
+    {
+      "id": "fighter-donkey-kong",
+      "category": "fighters",
+      "title": "Donkey Kong selectable fighter",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "ckind": "CKIND_DONKEY",
+        "ftkind": "FTKIND_DONKEY"
+      },
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/ft/kinds/ftDonkey/ftdonkey.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities"
+      ],
+      "pass_criteria": [
+        "CKIND_DONKEY and FTKIND_DONKEY retain distinct source identity, DAT roots, attributes, actions, articles, effects, audio and stock icon mapping.",
+        "Real source construction, every authored costume and move family, both orientations, CSS/SSS handoff and teardown pass without a sibling identity substitution.",
+        "Independent browser and original comparison covers this fighter before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_CHARACTERS.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the fighter checkpoint for Donkey Kong and split its costume, action, article, effect and audio coverage into bounded receipts.",
+      "issue": null
+    },
+    {
+      "id": "fighter-fox",
+      "category": "fighters",
+      "title": "Fox selectable fighter",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_identity": {
+        "ckind": "CKIND_FOX",
+        "ftkind": "FTKIND_FOX"
+      },
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/ft/kinds/ftFox/ftfox.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities"
+      ],
+      "pass_criteria": [
+        "CKIND_FOX and FTKIND_FOX retain distinct source identity, DAT roots, attributes, actions, articles, effects, audio and stock icon mapping.",
+        "Real source construction, every authored costume and move family, both orientations, CSS/SSS handoff and teardown pass without a sibling identity substitution.",
+        "Independent browser and original comparison covers this fighter before acceptance."
+      ],
+      "evidence": [
+        "docs/FOX_PORT_NOTES.md",
+        "docs/REPLAY_CORPUS.md",
+        "docs/ADDING_CHARACTERS.md"
+      ],
+      "next_step": "Split Fox's existing bounded action and costume coverage into fine-grained receipts, then close ordinary input, reference, pixel, PCM and performance gates.",
+      "issue": null
+    },
+    {
+      "id": "fighter-mr-game-and-watch",
+      "category": "fighters",
+      "title": "Mr. Game & Watch selectable fighter",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "ckind": "CKIND_GAMEWATCH",
+        "ftkind": "FTKIND_GAMEWATCH"
+      },
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/ft/kinds/ftGameWatch/ftgamewatch.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities"
+      ],
+      "pass_criteria": [
+        "CKIND_GAMEWATCH and FTKIND_GAMEWATCH retain distinct source identity, DAT roots, attributes, actions, articles, effects, audio and stock icon mapping.",
+        "Real source construction, every authored costume and move family, both orientations, CSS/SSS handoff and teardown pass without a sibling identity substitution.",
+        "Independent browser and original comparison covers this fighter before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_CHARACTERS.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the fighter checkpoint for Mr. Game & Watch and split its costume, action, article, effect and audio coverage into bounded receipts.",
+      "issue": null
+    },
+    {
+      "id": "fighter-kirby",
+      "category": "fighters",
+      "title": "Kirby selectable fighter",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "ckind": "CKIND_KIRBY",
+        "ftkind": "FTKIND_KIRBY"
+      },
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/ft/kinds/ftKirby/ftkirby.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities",
+        "fighter-transformations-and-copy-abilities"
+      ],
+      "pass_criteria": [
+        "CKIND_KIRBY and FTKIND_KIRBY retain distinct source identity, DAT roots, attributes, actions, articles, effects, audio and stock icon mapping.",
+        "Real source construction, every authored costume and move family, both orientations, CSS/SSS handoff and teardown pass without a sibling identity substitution.",
+        "Independent browser and original comparison covers this fighter and its copy states before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_CHARACTERS.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the fighter checkpoint for Kirby, then attach copy-ability and costume-specific action receipts.",
+      "issue": null
+    },
+    {
+      "id": "fighter-bowser",
+      "category": "fighters",
+      "title": "Bowser selectable fighter",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "ckind": "CKIND_KOOPA",
+        "ftkind": "FTKIND_KOOPA"
+      },
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/ft/kinds/ftKoopa/ftkoopa.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities"
+      ],
+      "pass_criteria": [
+        "CKIND_KOOPA and FTKIND_KOOPA retain distinct source identity, DAT roots, attributes, actions, articles, effects, audio and stock icon mapping.",
+        "Real source construction, every authored costume and move family, both orientations, CSS/SSS handoff and teardown pass without a sibling identity substitution.",
+        "Independent browser and original comparison covers this fighter before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_CHARACTERS.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the fighter checkpoint for Bowser and split its costume, action, article, effect and audio coverage into bounded receipts.",
+      "issue": null
+    },
+    {
+      "id": "fighter-link",
+      "category": "fighters",
+      "title": "Link selectable fighter",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_identity": {
+        "ckind": "CKIND_LINK",
+        "ftkind": "FTKIND_LINK"
+      },
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/ft/kinds/ftLink/ftlink.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities"
+      ],
+      "pass_criteria": [
+        "CKIND_LINK and FTKIND_LINK retain distinct source identity, DAT roots, attributes, actions, articles, effects, audio and stock icon mapping.",
+        "Real source construction, every authored costume and move family, both orientations, CSS/SSS handoff and teardown pass without a sibling identity substitution.",
+        "Independent browser and original comparison covers this fighter before acceptance."
+      ],
+      "evidence": [
+        "docs/LINK_PORT_NOTES.md",
+        "docs/evidence/link-young-link-replay-v1.json",
+        "docs/ADDING_CHARACTERS.md"
+      ],
+      "next_step": "Split Link's existing bounded action, article and costume coverage into fine-grained receipts, then close ordinary input, reference, pixel, PCM and performance gates.",
+      "issue": null
+    },
+    {
+      "id": "fighter-luigi",
+      "category": "fighters",
+      "title": "Luigi selectable fighter",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "ckind": "CKIND_LUIGI",
+        "ftkind": "FTKIND_LUIGI"
+      },
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/ft/kinds/ftLuigi/ftluigi.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities"
+      ],
+      "pass_criteria": [
+        "CKIND_LUIGI and FTKIND_LUIGI retain distinct source identity, DAT roots, attributes, actions, articles, effects, audio and stock icon mapping.",
+        "Real source construction, every authored costume and move family, both orientations, CSS/SSS handoff and teardown pass without a sibling identity substitution.",
+        "Independent browser and original comparison covers this fighter before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_CHARACTERS.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the fighter checkpoint for Luigi and split its costume, action, article, effect and audio coverage into bounded receipts.",
+      "issue": null
+    },
+    {
+      "id": "fighter-mario",
+      "category": "fighters",
+      "title": "Mario selectable fighter",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_identity": {
+        "ckind": "CKIND_MARIO",
+        "ftkind": "FTKIND_MARIO"
+      },
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/ft/kinds/ftMario/ftmario.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities"
+      ],
+      "pass_criteria": [
+        "CKIND_MARIO and FTKIND_MARIO retain distinct source identity, DAT roots, attributes, actions, articles, effects, audio and stock icon mapping.",
+        "Real source construction, every authored costume and move family, both orientations, CSS/SSS handoff and teardown pass without a sibling identity substitution.",
+        "Independent browser and original comparison covers this fighter before acceptance."
+      ],
+      "evidence": [
+        "docs/FIGHTER_RUNTIME.md",
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/evidence/reference-dolphin-replay-v1.json"
+      ],
+      "next_step": "Split Mario's existing bounded action, article and costume coverage into fine-grained receipts, then close ordinary input, reference, pixel, PCM and performance gates.",
+      "issue": null
+    },
+    {
+      "id": "fighter-marth",
+      "category": "fighters",
+      "title": "Marth selectable fighter",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_identity": {
+        "ckind": "CKIND_MARS",
+        "ftkind": "FTKIND_MARS"
+      },
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/ft/kinds/ftMars/ftmars.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities"
+      ],
+      "pass_criteria": [
+        "CKIND_MARS and FTKIND_MARS retain distinct source identity, DAT roots, attributes, actions, articles, effects, audio and stock icon mapping.",
+        "Real source construction, every authored costume and move family, both orientations, CSS/SSS handoff and teardown pass without a sibling identity substitution.",
+        "Independent browser and original comparison covers this fighter before acceptance."
+      ],
+      "evidence": [
+        "docs/MARTH_PORT_NOTES.md",
+        "docs/REPLAY_CORPUS.md",
+        "docs/ADDING_CHARACTERS.md"
+      ],
+      "next_step": "Split Marth's existing bounded action and costume coverage into fine-grained receipts, then close ordinary input, reference, pixel, PCM and performance gates.",
+      "issue": null
+    },
+    {
+      "id": "fighter-mewtwo",
+      "category": "fighters",
+      "title": "Mewtwo selectable fighter",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "ckind": "CKIND_MEWTWO",
+        "ftkind": "FTKIND_MEWTWO"
+      },
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/ft/kinds/ftMewtwo/ftmewtwo.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities"
+      ],
+      "pass_criteria": [
+        "CKIND_MEWTWO and FTKIND_MEWTWO retain distinct source identity, DAT roots, attributes, actions, articles, effects, audio and stock icon mapping.",
+        "Real source construction, every authored costume and move family, both orientations, CSS/SSS handoff and teardown pass without a sibling identity substitution.",
+        "Independent browser and original comparison covers this fighter before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_CHARACTERS.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the fighter checkpoint for Mewtwo and split its costume, action, article, effect and audio coverage into bounded receipts.",
+      "issue": null
+    },
+    {
+      "id": "fighter-ness",
+      "category": "fighters",
+      "title": "Ness selectable fighter",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "ckind": "CKIND_NESS",
+        "ftkind": "FTKIND_NESS"
+      },
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/ft/kinds/ftNess/ftness.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities"
+      ],
+      "pass_criteria": [
+        "CKIND_NESS and FTKIND_NESS retain distinct source identity, DAT roots, attributes, actions, articles, effects, audio and stock icon mapping.",
+        "Real source construction, every authored costume and move family, both orientations, CSS/SSS handoff and teardown pass without a sibling identity substitution.",
+        "Independent browser and original comparison covers this fighter before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_CHARACTERS.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the fighter checkpoint for Ness and split its costume, action, article, effect and audio coverage into bounded receipts.",
+      "issue": null
+    },
+    {
+      "id": "fighter-peach",
+      "category": "fighters",
+      "title": "Peach selectable fighter",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "ckind": "CKIND_PEACH",
+        "ftkind": "FTKIND_PEACH"
+      },
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/ft/kinds/ftPeach/ftpeach.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities"
+      ],
+      "pass_criteria": [
+        "CKIND_PEACH and FTKIND_PEACH retain distinct source identity, DAT roots, attributes, actions, articles, effects, audio and stock icon mapping.",
+        "Real source construction, every authored costume and move family, both orientations, CSS/SSS handoff and teardown pass without a sibling identity substitution.",
+        "Independent browser and original comparison covers this fighter before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_CHARACTERS.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the fighter checkpoint for Peach and split its costume, action, article, effect and audio coverage into bounded receipts.",
+      "issue": null
+    },
+    {
+      "id": "fighter-pikachu",
+      "category": "fighters",
+      "title": "Pikachu selectable fighter",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "ckind": "CKIND_PIKACHU",
+        "ftkind": "FTKIND_PIKACHU"
+      },
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/ft/kinds/ftPikachu/ftpikachu.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities"
+      ],
+      "pass_criteria": [
+        "CKIND_PIKACHU and FTKIND_PIKACHU retain distinct source identity, DAT roots, attributes, actions, articles, effects, audio and stock icon mapping.",
+        "Real source construction, every authored costume and move family, both orientations, CSS/SSS handoff and teardown pass without a sibling identity substitution.",
+        "Independent browser and original comparison covers this fighter before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_CHARACTERS.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the fighter checkpoint for Pikachu and split its costume, action, article, effect and audio coverage into bounded receipts.",
+      "issue": null
+    },
+    {
+      "id": "fighter-ice-climbers",
+      "category": "fighters",
+      "title": "Ice Climbers selectable fighter",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "ckind": "CKIND_POPONANA",
+        "ftkind": [
+          "FTKIND_POPO",
+          "FTKIND_NANA"
+        ]
+      },
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/ft/kinds/ftPopo/ftpopo.c",
+        "melee/ft/kinds/ftNana/ftnana.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities",
+        "fighter-partners-and-companions"
+      ],
+      "pass_criteria": [
+        "CKIND_POPONANA retains the paired FTKIND_POPO and FTKIND_NANA source identities, data roots, attributes, actions, articles, effects, audio and stock icon mapping.",
+        "Real source construction, partner input/AI, every authored costume and move family, desynchronization, KO/recovery, CSS/SSS handoff and teardown pass.",
+        "Independent browser and original comparison covers both partner entities before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_CHARACTERS.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run paired Popo/Nana construction and partner lifecycle checkpoints before splitting their shared and individual action rows.",
+      "issue": null
+    },
+    {
+      "id": "fighter-jigglypuff",
+      "category": "fighters",
+      "title": "Jigglypuff selectable fighter",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "ckind": "CKIND_PURIN",
+        "ftkind": "FTKIND_PURIN"
+      },
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/ft/kinds/ftPurin/ftpurin.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities"
+      ],
+      "pass_criteria": [
+        "CKIND_PURIN and FTKIND_PURIN retain distinct source identity, DAT roots, attributes, actions, articles, effects, audio and stock icon mapping.",
+        "Real source construction, every authored costume and move family, both orientations, CSS/SSS handoff and teardown pass without a sibling identity substitution.",
+        "Independent browser and original comparison covers this fighter before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_CHARACTERS.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the fighter checkpoint for Jigglypuff and split its costume, action, article, effect and audio coverage into bounded receipts.",
+      "issue": null
+    },
+    {
+      "id": "fighter-samus",
+      "category": "fighters",
+      "title": "Samus selectable fighter",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "ckind": "CKIND_SAMUS",
+        "ftkind": "FTKIND_SAMUS"
+      },
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/ft/kinds/ftSamus/ftsamus.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities"
+      ],
+      "pass_criteria": [
+        "CKIND_SAMUS and FTKIND_SAMUS retain distinct source identity, DAT roots, attributes, actions, articles, effects, audio and stock icon mapping.",
+        "Real source construction, every authored costume and move family, both orientations, CSS/SSS handoff and teardown pass without a sibling identity substitution.",
+        "Independent browser and original comparison covers this fighter before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_CHARACTERS.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the fighter checkpoint for Samus and split its costume, action, article, effect and audio coverage into bounded receipts.",
+      "issue": null
+    },
+    {
+      "id": "fighter-yoshi",
+      "category": "fighters",
+      "title": "Yoshi selectable fighter",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "ckind": "CKIND_YOSHI",
+        "ftkind": "FTKIND_YOSHI"
+      },
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/ft/kinds/ftYoshi/ftyoshi.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities"
+      ],
+      "pass_criteria": [
+        "CKIND_YOSHI and FTKIND_YOSHI retain distinct source identity, DAT roots, attributes, actions, articles, effects, audio and stock icon mapping.",
+        "Real source construction, every authored costume and move family, both orientations, CSS/SSS handoff and teardown pass without a sibling identity substitution.",
+        "Independent browser and original comparison covers this fighter before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_CHARACTERS.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the fighter checkpoint for Yoshi and split its costume, action, article, effect and audio coverage into bounded receipts.",
+      "issue": null
+    },
+    {
+      "id": "fighter-zelda",
+      "category": "fighters",
+      "title": "Zelda selectable fighter and transformation owner",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "ckind": "CKIND_ZELDA",
+        "ftkind": "FTKIND_ZELDA"
+      },
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/ft/kinds/ftZelda/ftzelda.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities",
+        "fighter-transformations-and-copy-abilities"
+      ],
+      "pass_criteria": [
+        "CKIND_ZELDA and FTKIND_ZELDA retain distinct source identity, DAT roots, attributes, actions, articles, effects, audio and stock icon mapping.",
+        "Real source construction, Zelda costume/action coverage and Zelda-to-Sheik transformation ownership survive both orientations, CSS/SSS handoff and teardown.",
+        "Independent browser and original comparison covers this fighter and its transformation before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_CHARACTERS.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the Zelda/Sheik transformation checkpoint and split each form's costume, action, article, effect and audio rows.",
+      "issue": null
+    },
+    {
+      "id": "fighter-sheik",
+      "category": "fighters",
+      "title": "Sheik selectable identity and transformation form",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "ckind": "CKIND_SEAK",
+        "ftkind": "FTKIND_SEAK"
+      },
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/ft/kinds/ftSeak/ftseak.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities",
+        "fighter-transformations-and-copy-abilities"
+      ],
+      "pass_criteria": [
+        "CKIND_SEAK and FTKIND_SEAK retain distinct source identity, DAT roots, attributes, actions, articles, effects, audio and stock icon mapping.",
+        "Real source construction, Sheik costume/action coverage and Sheik-to-Zelda transformation ownership survive both orientations, CSS/SSS handoff and teardown.",
+        "Independent browser and original comparison covers this fighter and its transformation before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_CHARACTERS.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the Sheik/Zelda transformation checkpoint and split each form's costume, action, article, effect and audio rows.",
+      "issue": null
+    },
+    {
+      "id": "fighter-falco",
+      "category": "fighters",
+      "title": "Falco selectable fighter",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_identity": {
+        "ckind": "CKIND_FALCO",
+        "ftkind": "FTKIND_FALCO"
+      },
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/ft/kinds/ftFalco/ftfalco.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities"
+      ],
+      "pass_criteria": [
+        "CKIND_FALCO and FTKIND_FALCO retain distinct source identity, DAT roots, attributes, actions, articles, effects, audio and stock icon mapping.",
+        "Real source construction, every authored costume and move family, both orientations, CSS/SSS handoff and teardown pass without a sibling identity substitution.",
+        "Independent browser and original comparison covers this fighter before acceptance."
+      ],
+      "evidence": [
+        "docs/REPLAY_CORPUS.md",
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/evidence/current-runtime-holdouts-20260919-v2.json"
+      ],
+      "next_step": "Split Falco's existing bounded action, article and costume coverage into fine-grained receipts, then close ordinary input, reference, pixel, PCM and performance gates.",
+      "issue": null
+    },
+    {
+      "id": "fighter-young-link",
+      "category": "fighters",
+      "title": "Young Link selectable fighter",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_identity": {
+        "ckind": "CKIND_CLINK",
+        "ftkind": "FTKIND_CLINK"
+      },
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/ft/kinds/ftCLink/ftclink.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities"
+      ],
+      "pass_criteria": [
+        "CKIND_CLINK and FTKIND_CLINK retain distinct source identity, DAT roots, attributes, actions, articles, effects, audio and stock icon mapping.",
+        "Real source construction, every authored costume and move family, both orientations, CSS/SSS handoff and teardown pass without a sibling identity substitution.",
+        "Independent browser and original comparison covers this fighter before acceptance."
+      ],
+      "evidence": [
+        "docs/LINK_PORT_NOTES.md",
+        "docs/evidence/link-young-link-replay-v1.json",
+        "docs/ADDING_CHARACTERS.md"
+      ],
+      "next_step": "Split Young Link's existing bounded action, article and costume coverage into fine-grained receipts, then close ordinary input, reference, pixel, PCM and performance gates.",
+      "issue": null
+    },
+    {
+      "id": "fighter-dr-mario",
+      "category": "fighters",
+      "title": "Dr. Mario selectable fighter",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_identity": {
+        "ckind": "CKIND_DRMARIO",
+        "ftkind": "FTKIND_DRMARIO"
+      },
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/ft/kinds/ftDrMario/ftdrmario.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities"
+      ],
+      "pass_criteria": [
+        "CKIND_DRMARIO and FTKIND_DRMARIO retain distinct source identity, DAT roots, attributes, actions, articles, effects, audio and stock icon mapping.",
+        "Real source construction, every authored costume and move family, both orientations, CSS/SSS handoff and teardown pass without a sibling identity substitution.",
+        "Independent browser and original comparison covers this fighter before acceptance."
+      ],
+      "evidence": [
+        "docs/ROY_DR_MARIO_PORT_NOTES.md",
+        "docs/evidence/roy-dr-mario-integrated-replay-v1.json",
+        "docs/ADDING_CHARACTERS.md"
+      ],
+      "next_step": "Split Dr. Mario's existing bounded action, article and costume coverage into fine-grained receipts, then close ordinary input, reference, pixel, PCM and performance gates.",
+      "issue": null
+    },
+    {
+      "id": "fighter-roy",
+      "category": "fighters",
+      "title": "Roy selectable fighter",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_identity": {
+        "ckind": "CKIND_EMBLEM",
+        "ftkind": "FTKIND_EMBLEM"
+      },
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/ft/kinds/ftEmblem/ftemblem.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities"
+      ],
+      "pass_criteria": [
+        "CKIND_EMBLEM and FTKIND_EMBLEM retain distinct source identity, DAT roots, attributes, actions, articles, effects, audio and stock icon mapping.",
+        "Real source construction, every authored costume and move family, both orientations, CSS/SSS handoff and teardown pass without a sibling identity substitution.",
+        "Independent browser and original comparison covers this fighter before acceptance."
+      ],
+      "evidence": [
+        "docs/ROY_DR_MARIO_PORT_NOTES.md",
+        "docs/evidence/roy-dr-mario-integrated-replay-v1.json",
+        "docs/ADDING_CHARACTERS.md"
+      ],
+      "next_step": "Split Roy's existing bounded action, article and costume coverage into fine-grained receipts, then close ordinary input, reference, pixel, PCM and performance gates.",
+      "issue": null
+    },
+    {
+      "id": "fighter-pichu",
+      "category": "fighters",
+      "title": "Pichu selectable fighter",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "ckind": "CKIND_PICHU",
+        "ftkind": "FTKIND_PICHU"
+      },
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/ft/kinds/ftPichu/ftpichu.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities"
+      ],
+      "pass_criteria": [
+        "CKIND_PICHU and FTKIND_PICHU retain distinct source identity, DAT roots, attributes, actions, articles, effects, audio and stock icon mapping.",
+        "Real source construction, every authored costume and move family, both orientations, CSS/SSS handoff and teardown pass without a sibling identity substitution.",
+        "Independent browser and original comparison covers this fighter before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_CHARACTERS.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the fighter checkpoint for Pichu and split its costume, action, article, effect and audio coverage into bounded receipts.",
+      "issue": null
+    },
+    {
+      "id": "fighter-ganondorf",
+      "category": "fighters",
+      "title": "Ganondorf selectable fighter",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_identity": {
+        "ckind": "CKIND_GANON",
+        "ftkind": "FTKIND_GANON"
+      },
+      "source_refs": [
+        "melee/ft/forward.h",
+        "melee/ft/kinds/ftGanon/ftganon.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities"
+      ],
+      "pass_criteria": [
+        "CKIND_GANON and FTKIND_GANON retain distinct source identity, DAT roots, attributes, actions, articles, effects, audio and stock icon mapping.",
+        "Lead confirms runnable source construction, every authored costume and move family, both orientations, CSS/SSS handoff and teardown before implementation changes from not_integrated.",
+        "Independent browser and original comparison covers this fighter before acceptance."
+      ],
+      "evidence": [
+        "docs/GANONDORF_PORT_NOTES.md",
+        "docs/evidence/ganondorf-development-v1.json"
+      ],
+      "next_step": "Complete the original comparison and visible interaction corpus, close discovered pipelines, then verify cold/warm performance and the remaining full-fighter gates.",
+      "issue": null
+    },
+    {
+      "id": "fighter-moves-common-actions-and-physics",
+      "category": "fighters",
+      "title": "Common fighter actions, moves, collision, damage and numerics",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_refs": [
+        "melee/ft/ftcommon.c",
+        "melee/ft/ftaction.c",
+        "melee/ft/ftcoll.c",
+        "melee/ft/ftdynamics.c",
+        "melee/ft/ftcmdscript.c",
+        "melee/pl/plattack.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities",
+        "items-and-article-runtime"
+      ],
+      "pass_criteria": [
+        "Every source action family and fighter-specific action table is enumerated with its motion, command, collision, hitbox, hurtbox, damage, knockback, animation, effect and sound consumers.",
+        "Ground, air, shield, grab, throw, ledge, tech, transformation, hitlag, KO, respawn and numerical edge cases match source traces at the same source boundaries.",
+        "The action matrix runs from original CSS/SSS through match ending and teardown for every fighter/stage combination admitted by the matrix."
+      ],
+      "evidence": [
+        "docs/ADDING_CHARACTERS.md",
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/REPLAY_CORPUS.md"
+      ],
+      "next_step": "Generate the move and action-family census from each fighter directory and attach one bounded trace per source family before broadening the roster.",
+      "issue": null
+    },
+    {
+      "id": "fighter-costumes-and-alternate-parts",
+      "category": "fighters",
+      "title": "Costumes, alternate parts, materials and authored color variants",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_refs": [
+        "melee/ft/ftdata.c",
+        "melee/ft/ftparts.c",
+        "melee/ft/ftmaterial.c",
+        "melee/ft/ftdynamics.c",
+        "melee/ft/fighter.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities"
+      ],
+      "pass_criteria": [
+        "Every source costume row and alternate part mask is bound to the correct model, material animation, dynamics modes, fighter data and stock icon identity.",
+        "All authored costumes survive both orientations, source moves, effects, HUD stock rendering, reconstruction and teardown without borrowing a sibling identity.",
+        "Costume selection and tint values reach the original match initializer from CSS/SSS and are included in original comparison evidence."
+      ],
+      "evidence": [
+        "docs/ADDING_CHARACTERS.md",
+        "docs/LINK_PORT_NOTES.md",
+        "docs/MARTH_PORT_NOTES.md",
+        "docs/FOX_PORT_NOTES.md"
+      ],
+      "next_step": "Turn the generated source costume registry into per-fighter inventory rows and add missing costume lifecycle and reference receipts.",
+      "issue": null
+    },
+    {
+      "id": "fighter-transformations-and-copy-abilities",
+      "category": "fighters",
+      "title": "Transformations and copy abilities",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_refs": [
+        "melee/ft/ftdynamics.c",
+        "melee/ft/kinds/ftZelda/ftzelda.c",
+        "melee/ft/kinds/ftSeak/ftseak.c",
+        "melee/ft/kinds/ftKirby/ftkirby.c",
+        "melee/ft/kinds/ftKirby/ftkirbydata.c"
+      ],
+      "depends_on": [
+        "fighter-moves-common-actions-and-physics",
+        "fighter-costumes-and-alternate-parts"
+      ],
+      "pass_criteria": [
+        "Zelda/Sheik transformation and Kirby copy state preserve source fighter identity, articles, dynamics, actions, effects, audio, animation and ownership across interruption and teardown.",
+        "Every Kirby copy source listed by the original copy tables is exercised with its source projectile/article and loss/reacquisition behavior.",
+        "Transformation and copy transitions are compared against an independent original reference, including RNG and menu/match handoff state."
+      ],
+      "evidence": [
+        "docs/ADDING_CHARACTERS.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Extract transformation and Kirby copy tables from the pinned source and create one fixture per transition and copied move family.",
+      "issue": null
+    },
+    {
+      "id": "fighter-partners-and-companions",
+      "category": "fighters",
+      "title": "Partner and companion entities",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_refs": [
+        "melee/ft/kinds/ftPopo/ftpopo.c",
+        "melee/ft/kinds/ftNana/ftnana.c",
+        "melee/ft/ftlib.c",
+        "melee/pl/player.c",
+        "melee/gm/gm_17C0.c"
+      ],
+      "depends_on": [
+        "fighter-moves-common-actions-and-physics",
+        "local-multiplayer-and-player-slots"
+      ],
+      "pass_criteria": [
+        "Popo/Nana partner creation, ownership, AI/input sharing, desynchronization, tethering, KO, respawn, costume identity and teardown follow the original source processes.",
+        "Companion entities used by source fighter actions remain ordered with the owner and expose their original effects, collision and audio dependencies.",
+        "A two-player and multi-player original comparison covers partner spawn, loss, recovery and match ending."
+      ],
+      "evidence": [
+        "docs/ADDING_CHARACTERS.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Inventory every source partner/companion process and add explicit owner, lifetime and input-routing contracts.",
+      "issue": null
+    },
+    {
+      "id": "fighter-boss-and-special-entities",
+      "category": "fighters",
+      "title": "Boss, wireframe, Giga Bowser and special entity fighters",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_refs": [
+        "melee/ft/ftbosslib.c",
+        "melee/ft/kinds/ftMasterHand/ftmasterhand.c",
+        "melee/ft/kinds/ftCrazyHand/ftcrazyhand.c",
+        "melee/ft/kinds/ftGigaKoopa/ftgkoopa.c",
+        "melee/ft/kinds/ftZakoBoy/ftboy.c",
+        "melee/ft/kinds/ftZakoGirl/ftgirl.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities",
+        "items-and-article-runtime",
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "Master Hand, Crazy Hand, Giga Bowser, male/female wireframes and Sandbag have explicit source identities, actions, attributes, articles/effects, stage rules and lifecycle owners.",
+        "Boss-specific multi-entity processes, damage rules, camera bounds, hazards, victory transitions and source ending routes match original traces.",
+        "Boss and special entities cannot be admitted through a normal fighter row or a guessed selectable-character mapping."
+      ],
+      "evidence": [
+        "docs/ADDING_CHARACTERS.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Enumerate source boss and special entity entry points from ftBossLib and game-mode callers, then assign stage and mode owners.",
+      "issue": null
+    },
+    {
+      "id": "current-eight-fighter-bound",
+      "category": "fighters",
+      "title": "Current eight-fighter source/runtime boundary",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_refs": [
+        "melee/ft/kinds/ftMario/ftmario.c",
+        "melee/ft/kinds/ftFox/ftfox.c",
+        "melee/ft/kinds/ftFalco/ftfalco.c",
+        "melee/ft/kinds/ftMars/ftmars.c",
+        "melee/ft/kinds/ftLink/ftlink.c",
+        "melee/ft/kinds/ftCLink/ftclink.c",
+        "melee/ft/kinds/ftDrMario/ftdrmario.c",
+        "melee/ft/kinds/ftEmblem/ftemblem.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities",
+        "fighter-moves-common-actions-and-physics",
+        "fighter-costumes-and-alternate-parts",
+        "runtime-archive-memory-and-ownership",
+        "fighter-mario",
+        "fighter-fox",
+        "fighter-falco",
+        "fighter-marth",
+        "fighter-link",
+        "fighter-young-link",
+        "fighter-dr-mario",
+        "fighter-roy"
+      ],
+      "pass_criteria": [
+        "Mario, Fox, Falco, Marth, Link, Young Link, Dr. Mario and Roy retain distinct CharacterKind/FighterKind, data roots, costumes, actions, articles, effects, audio and stock icon identities.",
+        "The eight-fighter boundary passes real source construction, selected source actions, repeated teardown and the declared CSS/SSS browser route with missing services failing explicitly.",
+        "A complete fine-grained action, ordinary-input, retail-reference, audio, pixel and performance matrix exists before this row can move beyond partial."
+      ],
+      "evidence": [
+        "docs/FIGHTER_RUNTIME.md",
+        "docs/REPLAY_CORPUS.md",
+        "docs/evidence/link-young-link-replay-v1.json",
+        "docs/evidence/recorded-queue-replay-v1.json"
+      ],
+      "next_step": "Use this bounded set as the first integration cohort, then split each fighter into identity, costume, action, article, effect, audio and acceptance rows.",
+      "issue": null
+    },
+    {
+      "id": "stage-roster-and-source-identities",
+      "category": "stages",
+      "title": "All source stage and ground identities",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/ground.c",
+        "melee/gr/stage.c",
+        "melee/gr/grdatfiles.c",
+        "melee/gm/gm_1601.c"
+      ],
+      "depends_on": [
+        "runtime-archive-memory-and-ownership",
+        "scheduler-clock-and-simulation-boundary"
+      ],
+      "pass_criteria": [
+        "Every source StKind and GrKind used by vanilla offline modes has an explicit row with archive filename, authored GroundParam, primary music identity and unlock/selection behavior.",
+        "Each stage row records every authored map entry, source callback, collision scale, marker, camera/blast bounds, lights, effects, Articles and deferred background service.",
+        "Every row completes two source-backed lifecycles, source match entry/exit, teardown and independent original comparison before browser admission."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ROADMAP.md",
+        "docs/DEPENDENCIES.md"
+      ],
+      "next_step": "Decompose the StKind/GrKind tables into one feature row per playable and mode-only stage, retaining explicitly unused or route-only source entries.",
+      "issue": null
+    },
+    {
+      "id": "stage-fountain-of-dreams",
+      "category": "stages",
+      "title": "Fountain of Dreams VS stage",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "stkind": "St_Kind_Izumi",
+        "grkind": "Gr_Kind_Izumi"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/grizumi.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_Izumi selects Gr_Kind_Izumi with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the stage checkpoint for Fountain of Dreams and split map, collision, visual, hazard, audio and browser gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-pokemon-stadium",
+      "category": "stages",
+      "title": "Pokemon Stadium VS stage",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "stkind": "St_Kind_PStadium",
+        "grkind": "Gr_Kind_PStadium"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/grpstadium.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_PStadium selects Gr_Kind_PStadium with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the stage checkpoint for Pokemon Stadium and split map, collision, visual, hazard, audio and browser gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-peachs-castle",
+      "category": "stages",
+      "title": "Princess Peach's Castle VS stage",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "stkind": "St_Kind_Castle",
+        "grkind": "Gr_Kind_Castle"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/grcastle.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_Castle selects Gr_Kind_Castle with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the stage checkpoint for Princess Peach's Castle and split map, collision, visual, hazard, audio and browser gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-kongo-jungle",
+      "category": "stages",
+      "title": "Kongo Jungle VS stage",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "stkind": "St_Kind_Kongo",
+        "grkind": "Gr_Kind_Kongo"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/grkongo.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_Kongo selects Gr_Kind_Kongo with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the stage checkpoint for Kongo Jungle and split map, collision, visual, hazard, audio and browser gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-brinstar",
+      "category": "stages",
+      "title": "Brinstar VS stage",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "stkind": "St_Kind_Zebes",
+        "grkind": "Gr_Kind_Zebes"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/grzebes.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_Zebes selects Gr_Kind_Zebes with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the stage checkpoint for Brinstar and split map, collision, visual, hazard, audio and browser gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-corneria",
+      "category": "stages",
+      "title": "Corneria VS stage",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "stkind": "St_Kind_Corneria",
+        "grkind": "Gr_Kind_Corneria"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/grcorneria.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_Corneria selects Gr_Kind_Corneria with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the stage checkpoint for Corneria and split map, collision, visual, hazard, audio and browser gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-yoshis-story",
+      "category": "stages",
+      "title": "Yoshi's Story VS stage",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_identity": {
+        "stkind": "St_Kind_Story",
+        "grkind": "Gr_Kind_Story"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/grstory.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_Story selects Gr_Kind_Story with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/YOSHIS_STORY_PORT_NOTES.md",
+        "docs/evidence/development-timing-20260919-v1.json",
+        "docs/ADDING_STAGES.md"
+      ],
+      "next_step": "Split Yoshi's Story's existing map, Randall, Shy Guy, collision and costume interactions into fine-grained receipts, then close ordinary input, reference, pixel, PCM and performance gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-onett",
+      "category": "stages",
+      "title": "Onett VS stage",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "stkind": "St_Kind_Onett",
+        "grkind": "Gr_Kind_Onett"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/gronett.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_Onett selects Gr_Kind_Onett with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the stage checkpoint for Onett and split map, collision, visual, hazard, audio and browser gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-mute-city",
+      "category": "stages",
+      "title": "Mute City VS stage",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "stkind": "St_Kind_MuteCity",
+        "grkind": "Gr_Kind_MuteCity"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/grmutecity.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_MuteCity selects Gr_Kind_MuteCity with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the stage checkpoint for Mute City and split map, collision, visual, hazard, audio and browser gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-rainbow-cruise",
+      "category": "stages",
+      "title": "Rainbow Cruise VS stage",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "stkind": "St_Kind_RCruise",
+        "grkind": "Gr_Kind_RCruise"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/grrcruise.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_RCruise selects Gr_Kind_RCruise with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the stage checkpoint for Rainbow Cruise and split map, collision, visual, hazard, audio and browser gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-jungle-japes",
+      "category": "stages",
+      "title": "Jungle Japes VS stage",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "stkind": "St_Kind_Garden",
+        "grkind": "Gr_Kind_Garden"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/grgarden.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_Garden selects Gr_Kind_Garden with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the stage checkpoint for Jungle Japes and split map, collision, visual, hazard, audio and browser gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-great-bay",
+      "category": "stages",
+      "title": "Great Bay VS stage",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "stkind": "St_Kind_GreatBay",
+        "grkind": "Gr_Kind_GreatBay"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/grgreatbay.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_GreatBay selects Gr_Kind_GreatBay with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the stage checkpoint for Great Bay and split map, collision, visual, hazard, audio and browser gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-hyrule-temple",
+      "category": "stages",
+      "title": "Hyrule Temple VS stage",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "stkind": "St_Kind_Shrine",
+        "grkind": "Gr_Kind_Shrine"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/grshrine.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_Shrine selects Gr_Kind_Shrine with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the stage checkpoint for Hyrule Temple and split map, collision, visual, hazard, audio and browser gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-brinstar-depths",
+      "category": "stages",
+      "title": "Brinstar Depths VS stage",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "stkind": "St_Kind_Kraid",
+        "grkind": "Gr_Kind_Kraid"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/grkraid.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_Kraid selects Gr_Kind_Kraid with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the stage checkpoint for Brinstar Depths and split map, collision, visual, hazard, audio and browser gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-yoshis-island",
+      "category": "stages",
+      "title": "Yoshi's Island VS stage",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "stkind": "St_Kind_Yoster",
+        "grkind": "Gr_Kind_Yorster"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/gryorster.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_Yoster selects Gr_Kind_Yorster with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the stage checkpoint for Yoshi's Island and split map, collision, visual, hazard, audio and browser gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-green-greens",
+      "category": "stages",
+      "title": "Green Greens VS stage",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "stkind": "St_Kind_Greens",
+        "grkind": "Gr_Kind_Greens"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/grgreens.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_Greens selects Gr_Kind_Greens with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the stage checkpoint for Green Greens and split map, collision, visual, hazard, audio and browser gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-fourside",
+      "category": "stages",
+      "title": "Fourside VS stage",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "stkind": "St_Kind_Fourside",
+        "grkind": "Gr_Kind_Fourside"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/grfourside.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_Fourside selects Gr_Kind_Fourside with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the stage checkpoint for Fourside and split map, collision, visual, hazard, audio and browser gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-mushroom-kingdom",
+      "category": "stages",
+      "title": "Mushroom Kingdom VS stage",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "stkind": "St_Kind_Inishie1",
+        "grkind": "Gr_Kind_Inishie1"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/grinishie1.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_Inishie1 selects Gr_Kind_Inishie1 with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the stage checkpoint for Mushroom Kingdom and split map, collision, visual, hazard, audio and browser gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-mushroom-kingdom-ii",
+      "category": "stages",
+      "title": "Mushroom Kingdom II VS stage",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "stkind": "St_Kind_Inishie2",
+        "grkind": "Gr_Kind_Inishie2"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/grinishie2.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_Inishie2 selects Gr_Kind_Inishie2 with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the stage checkpoint for Mushroom Kingdom II and split map, collision, visual, hazard, audio and browser gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-akaneia",
+      "category": "stages",
+      "title": "Akaneia source stage slot",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "stkind": "St_Kind_Akaneia",
+        "grkind": "Gr_Kind_Unk26"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/ground.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_Akaneia retains its source stage slot and Gr_Kind_Unk26 mapping without inventing a missing archive or callback.",
+        "Any source mode that reaches this slot either completes its authored services or fails explicitly at the unavailable boundary.",
+        "Browser and independent original comparison cover this stage slot before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Resolve the authored Akaneia source/archive ownership from the pinned tables before implementation; preserve the explicit unavailable state meanwhile.",
+      "issue": null
+    },
+    {
+      "id": "stage-venom",
+      "category": "stages",
+      "title": "Venom VS stage",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "stkind": "St_Kind_Venom",
+        "grkind": "Gr_Kind_Venom"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/grvenom.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_Venom selects Gr_Kind_Venom with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the stage checkpoint for Venom and split map, collision, visual, hazard, audio and browser gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-poke-floats",
+      "category": "stages",
+      "title": "Poke Floats VS stage",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "stkind": "St_Kind_Pura",
+        "grkind": "Gr_Kind_Pura"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/grpura.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_Pura selects Gr_Kind_Pura with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the stage checkpoint for Poke Floats and split map, collision, visual, hazard, audio and browser gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-big-blue",
+      "category": "stages",
+      "title": "Big Blue VS stage",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "stkind": "St_Kind_BigBlue",
+        "grkind": "Gr_Kind_BigBlue"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/grbigblue.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_BigBlue selects Gr_Kind_BigBlue with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the stage checkpoint for Big Blue and split map, collision, visual, hazard, audio and browser gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-icicle-mountain",
+      "category": "stages",
+      "title": "Icicle Mountain VS stage",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "stkind": "St_Kind_Icemt",
+        "grkind": "Gr_Kind_Icemt"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/gricemt.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_Icemt selects Gr_Kind_Icemt with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the stage checkpoint for Icicle Mountain and split map, collision, visual, hazard, audio and browser gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-icicle-mountain-top",
+      "category": "stages",
+      "title": "Icicle Mountain top source stage slot",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "stkind": "St_Kind_Icetop",
+        "grkind": "Gr_Kind_Icemt"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/gricemt.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_Icetop retains its source stage identity while selecting the shared Gr_Kind_Icemt data only where the original mapping does so.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without guessed stage data.",
+        "Browser and independent original comparison cover this stage slot before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Resolve Icetop's authored stage-data distinction from source tables before implementation; retain the shared Gr_Kind mapping explicitly.",
+      "issue": null
+    },
+    {
+      "id": "stage-flat-zone",
+      "category": "stages",
+      "title": "Flat Zone VS stage",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "stkind": "St_Kind_Flatzone",
+        "grkind": "Gr_Kind_Flatzone"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/grflatzone.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_Flatzone selects Gr_Kind_Flatzone with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the stage checkpoint for Flat Zone and split map, collision, visual, hazard, audio and browser gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-dream-land",
+      "category": "stages",
+      "title": "Dream Land VS stage",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_identity": {
+        "stkind": "St_Kind_OldPupupu",
+        "grkind": "Gr_Kind_OldPupupu"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/groldpupupu.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_OldPupupu selects Gr_Kind_OldPupupu with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/DREAM_LAND_PORT_NOTES.md",
+        "docs/evidence/development-timing-20260919-v1.json",
+        "docs/ADDING_STAGES.md"
+      ],
+      "next_step": "Split Dream Land's existing map, animation, collision, lights, effects and scheduler coverage into fine-grained receipts, then close ordinary input, reference, pixel, PCM and performance gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-yoshis-island-64",
+      "category": "stages",
+      "title": "Yoshi's Island 64 source stage",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "stkind": "St_Kind_OldYoshi",
+        "grkind": "Gr_Kind_OldYoshi"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/groldyoshi.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_OldYoshi selects Gr_Kind_OldYoshi with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the stage checkpoint for Yoshi's Island 64 and split map, collision, visual, hazard, audio and browser gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-kongo-jungle-64",
+      "category": "stages",
+      "title": "Kongo Jungle 64 source stage",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_identity": {
+        "stkind": "St_Kind_OldKongo",
+        "grkind": "Gr_Kind_OldKongo"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/groldkongo.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_OldKongo selects Gr_Kind_OldKongo with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Run the stage checkpoint for Kongo Jungle 64 and split map, collision, visual, hazard, audio and browser gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-battlefield",
+      "category": "stages",
+      "title": "Battlefield VS stage",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_identity": {
+        "stkind": "St_Kind_Battle",
+        "grkind": "Gr_Kind_Battle"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/grbattle.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_Battle selects Gr_Kind_Battle with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/REPLAY_CORPUS.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Split Battlefield's existing map, collision, visual, action and browser coverage into fine-grained receipts, then close ordinary input, reference, pixel, PCM and performance gates.",
+      "issue": null
+    },
+    {
+      "id": "stage-final-destination",
+      "category": "stages",
+      "title": "Final Destination VS stage",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_identity": {
+        "stkind": "St_Kind_Last",
+        "grkind": "Gr_Kind_Last"
+      },
+      "source_refs": [
+        "melee/gr/forward.h",
+        "melee/gr/stage.c",
+        "melee/gr/grlast.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities"
+      ],
+      "pass_criteria": [
+        "St_Kind_Last selects Gr_Kind_Last with its authored archive, GroundParam, primary music, map descriptors and callback owner.",
+        "Source map, collision, markers, camera, lights, effects, hazards, item data, scheduler transitions and teardown pass twice without another stage's data.",
+        "Browser and independent original comparison cover this stage before acceptance."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/evidence/reference-dolphin-replay-v1.json",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Split Final Destination's existing map, collision, visual, action and browser coverage into fine-grained receipts, then close ordinary input, reference, pixel, PCM and performance gates.",
+      "issue": null
+    },
+    {
+      "id": "current-four-stage-bound",
+      "category": "stages",
+      "title": "Current four-stage source/runtime boundary",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_refs": [
+        "melee/gr/grlast.c",
+        "melee/gr/grbattle.c",
+        "melee/gr/grstory.c",
+        "melee/gr/groldpupupu.c",
+        "melee/gr/ground.c",
+        "melee/gr/stage.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities",
+        "current-eight-fighter-bound",
+        "stage-final-destination",
+        "stage-battlefield",
+        "stage-yoshis-story",
+        "stage-dream-land"
+      ],
+      "pass_criteria": [
+        "Final Destination, Battlefield, Yoshi's Story and Dream Land retain their source StKind/GrKind, map descriptors, collision, lights, camera, effects, background schedulers and primary music identities.",
+        "Each of the four stage owners repeats source initialization, gameplay services, deferred objects, match exit and teardown without borrowing another stage's data or callback.",
+        "Browser ordinary input, cold/warm preparation, audio, pixels, retail comparison and performance remain separate gates for every stage."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/evidence/roy-dr-mario-integrated-replay-v1.json",
+        "docs/evidence/development-timing-20260919-v1.json",
+        "docs/YOSHIS_STORY_PORT_NOTES.md",
+        "docs/DREAM_LAND_PORT_NOTES.md"
+      ],
+      "next_step": "Split the four stage rows into stage-specific data, map, callback, collision, article, visual and acceptance features before expanding the stage roster.",
+      "issue": null
+    },
+    {
+      "id": "stage-unique-services-and-hazards",
+      "category": "stages",
+      "title": "Stage-specific movement, hazards, routes and background services",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_refs": [
+        "melee/gr/grcastle.c",
+        "melee/gr/grpstadium.c",
+        "melee/gr/grbigblue.c",
+        "melee/gr/grmutecity.c",
+        "melee/gr/gronett.c",
+        "melee/gr/grshrineroute.c",
+        "melee/gr/grzebesroute.c"
+      ],
+      "depends_on": [
+        "stage-roster-and-source-identities",
+        "items-and-article-runtime"
+      ],
+      "pass_criteria": [
+        "Moving platforms, scrolling/route stages, hazards, stage Articles, stage-owned objects, camera changes and background transitions execute with their original process order and parameters.",
+        "Collision, lights, shadows, effects, animation paths and stage-owned item tables remain alive for the exact source lifetime and are restored on exit.",
+        "A stage-specific trace reaches each authored scheduler transition rather than accepting a static map preview."
+      ],
+      "evidence": [
+        "docs/ADDING_STAGES.md",
+        "docs/CONTENT_CHECKS.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Enumerate map and scheduler callbacks from each gr source file and assign a lifecycle trace to each unique service family.",
+      "issue": null
+    },
+    {
+      "id": "items-and-article-runtime",
+      "category": "items",
+      "title": "Common items, item physics, drops, articles and item lifecycle",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_refs": [
+        "melee/it/forward.h",
+        "melee/it/item.c",
+        "melee/it/itspawn.c",
+        "melee/it/itdrop.c",
+        "melee/it/itcoll.c",
+        "melee/it/itdraw.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities",
+        "stage-roster-and-source-identities",
+        "runtime-archive-memory-and-ownership"
+      ],
+      "pass_criteria": [
+        "Every source ItemKind, common item, character article, Pok\u00e9mon, monster, projectile, effect article and item-related fighter action has an explicit owner and authored table bound.",
+        "Spawn/drop rules, collision, pickup/throw, damage, animation, material, effects, audio, persistence, owner changes and teardown match source traces.",
+        "Items can be enabled or disabled through original VS rules without silently skipping required item services."
+      ],
+      "evidence": [
+        "docs/FIGHTER_RUNTIME.md",
+        "docs/LINK_PORT_NOTES.md",
+        "docs/ADDING_STAGES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Generate the item-kind census from it/forward.h and map each row to its source implementation, archive data and consuming fighter/stage modes.",
+      "issue": null
+    },
+    {
+      "id": "cpu-opponents-and-difficulty",
+      "category": "cpu",
+      "title": "CPU opponents, levels, decisions and source-generated input",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_refs": [
+        "melee/ft/ftcpuattack.c",
+        "melee/ft/ftcmdscript.c",
+        "melee/gm/gmvsmelee.c",
+        "melee/gm/gmvsmode.c",
+        "melee/pl/player.c"
+      ],
+      "depends_on": [
+        "fighter-moves-common-actions-and-physics",
+        "items-and-article-runtime",
+        "vs-rules-and-match-initialization"
+      ],
+      "pass_criteria": [
+        "CPU levels 1 through 9, character-specific decision tables, command generation, targeting, item use, team/partner behavior and source RNG consumption match original references.",
+        "Two-, three- and four-player CPU configurations preserve player slots, difficulty, costumes, stage, rules, camera, draw and ending state.",
+        "Generated input is compared at its source producer; equal final outcomes or a recorded queue alone do not pass live CPU timing."
+      ],
+      "evidence": [
+        "docs/CPU_OPPONENTS.md",
+        "docs/CPU_MATCH_CORPUS.md",
+        "docs/evidence/cpu-match-development-v1.json"
+      ],
+      "next_step": "Split CPU levels, decision families, player counts and item-aware behavior into bounded reference workloads with first-divergence reports.",
+      "issue": null
+    },
+    {
+      "id": "local-multiplayer-and-player-slots",
+      "category": "multiplayer",
+      "title": "Local two-, three- and four-player routing",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_refs": [
+        "melee/pl/player.c",
+        "melee/gm/gmvsmelee.c",
+        "melee/gm/gmvsmode.c",
+        "melee/gm/gmmain_lib.c",
+        "melee/if/ifstock.c"
+      ],
+      "depends_on": [
+        "input-and-controller-routing",
+        "vs-rules-and-match-initialization",
+        "fighter-roster-and-identities"
+      ],
+      "pass_criteria": [
+        "Four local controller slots preserve source PAD sampling, player records, ports, teams, costumes, stocks, names, markers, HUD and teardown.",
+        "Simultaneous local input, disconnected/empty slots, controller reassignment, rumble and repeated match entry/exit follow original behavior.",
+        "Human local input is validated independently from CPU-generated input and recorded-queue replay."
+      ],
+      "evidence": [
+        "docs/CONTROLLERS.md",
+        "docs/CPU_OPPONENTS.md",
+        "docs/REFERENCE_CAPTURE_APP.md"
+      ],
+      "next_step": "Add physical and ordinary-input two-, three- and four-human recipes with source PAD boundary and teardown evidence.",
+      "issue": null
+    },
+    {
+      "id": "vs-rules-and-match-initialization",
+      "category": "vs",
+      "title": "VS rules, options, teams, stocks, time, items and match handoff",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_refs": [
+        "melee/gm/gmvsmelee.c",
+        "melee/gm/gmvsmode.c",
+        "melee/gm/gm_16AE.c",
+        "melee/mn/mnmainrule.c",
+        "melee/mn/mnruleplus.c",
+        "melee/gm/gmmain_lib.c"
+      ],
+      "depends_on": [
+        "scheduler-clock-and-simulation-boundary",
+        "fighter-roster-and-identities",
+        "stage-roster-and-source-identities",
+        "items-and-article-runtime"
+      ],
+      "pass_criteria": [
+        "Every original VS rule field and option reaches StartMeleeData with its authored default, bounds, save state, RNG/music effect and player/stage handoff.",
+        "Stock, time, score, team, handicap, damage ratio, items, pause, No Contest, sudden death and match-ending behavior match source references.",
+        "Unsupported or missing rules fail at selection or preparation rather than entering a partial match with substituted defaults."
+      ],
+      "evidence": [
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/TRANSITION_EQUIVALENCE.md",
+        "docs/REFERENCE_CAPTURE_APP.md"
+      ],
+      "next_step": "Enumerate rule fields from the source structs and menu mode callers, then add a source/retail/browsing receipt per options family.",
+      "issue": null
+    },
+    {
+      "id": "css-sss-and-menu-transitions",
+      "category": "menus",
+      "title": "Original title, character select, stage select and menu transitions",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_refs": [
+        "melee/mn/mnmain.c",
+        "melee/mn/mncharsel.c",
+        "melee/mn/mnstagesel.c",
+        "melee/mn/mnmainrule.c",
+        "melee/gm/gmmenu.c",
+        "melee/gm/gmtitle.c"
+      ],
+      "depends_on": [
+        "vs-rules-and-match-initialization",
+        "input-and-controller-routing",
+        "audio-engine-and-assets"
+      ],
+      "pass_criteria": [
+        "Original CSS/SSS assets, cursors, animations, confirmation/cancellation, held-button behavior, unlock visibility and typed StartMeleeData handoff match the source route.",
+        "The browser completes CSS to SSS to match to CSS and repeated entry without an HTML substitute or hidden fixture selection.",
+        "Menu sounds, HPS/SSM ownership, language/font data and transition timing are compared independently from gameplay state."
+      ],
+      "evidence": [
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/TRANSITION_EQUIVALENCE.md",
+        "docs/CONTROLLERS.md"
+      ],
+      "next_step": "Decompose title, main menu, CSS, SSS, rules and name-entry screens into source mode rows and extend retail transition receipts beyond the current bounded route.",
+      "issue": null
+    },
+    {
+      "id": "results-and-match-end-routing",
+      "category": "menus",
+      "title": "Results screen, standings, rewards and return routing",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_refs": [
+        "melee/gm/gmresult.c",
+        "melee/gm/gmresultplayer.c",
+        "melee/gm/gmgover.c",
+        "melee/gm/gmregenddisp.c",
+        "melee/if/ifall.c"
+      ],
+      "depends_on": [
+        "css-sss-and-menu-transitions",
+        "vs-rules-and-match-initialization",
+        "audio-engine-and-assets"
+      ],
+      "pass_criteria": [
+        "Original match-end ownership enters Results with correct winner, standings, stats, bonuses, replay/save decisions, music, animations and input routing.",
+        "Results navigation returns to the correct source menu or next match and releases the prior match's fighters, stage, audio and graphics owners.",
+        "The complete route is compared against an independent original reference for every supported player count and relevant mode."
+      ],
+      "evidence": [
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/ROADMAP.md"
+      ],
+      "next_step": "Implement and receipt the Results owner and route only after the current match-end boundary remains source-equivalent; draft PR #44 remains a dependency and the tracking issue is #34.",
+      "issue": 34
+    },
+    {
+      "id": "unlocks-progress-and-challenges",
+      "category": "progression",
+      "title": "Unlock conditions, challengers, stage progress and persistent progression",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_refs": [
+        "melee/gm/gm_1601.c",
+        "melee/gm/gmregcommon.c",
+        "melee/gm/gmregclear.c",
+        "melee/gm/gmevent.c",
+        "melee/mn/mncount.c"
+      ],
+      "depends_on": [
+        "results-and-match-end-routing",
+        "save-and-memory-card"
+      ],
+      "pass_criteria": [
+        "Character, stage, mode, trophy and challenge unlock conditions use the source bit masks, counters, RNG and completion records without conflating runtime availability with save progression.",
+        "New challenger, continue, retry, overwrite and completion paths match original source behavior and persist only after the original save boundary.",
+        "A fresh and previously progressed memory-card fixture repeat the same unlock decisions in the original and browser implementations."
+      ],
+      "evidence": [
+        "docs/REFERENCE_CAPTURE_APP.md",
+        "docs/evidence/reference-documents-migration-v1.json",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Separate character, stage, mode and trophy unlock tables into source-identity rows and add original/browser persistence receipts.",
+      "issue": null
+    },
+    {
+      "id": "trophies-gallery-and-collection",
+      "category": "collection",
+      "title": "Trophy collection, gallery, lottery and figure display",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_refs": [
+        "melee/ty/toy.c",
+        "melee/ty/tylist.c",
+        "melee/ty/tydisplay.c",
+        "melee/ty/tyfigupon.c",
+        "melee/gm/gmtoygallery.c",
+        "melee/gm/gmtoylottery.c"
+      ],
+      "depends_on": [
+        "unlocks-progress-and-challenges",
+        "save-and-memory-card",
+        "graphics-rendering-and-presentation"
+      ],
+      "pass_criteria": [
+        "Every source trophy/figure identity, model, animation, description, unlock state, collection count and display camera is represented.",
+        "Gallery, lottery, collection sorting, figure placement, save/load and exit paths use original input, audio, graphics and memory ownership.",
+        "Collection updates are compared through the original persistent save boundary and survive repeated browser lifecycle operations."
+      ],
+      "evidence": [
+        "docs/ROADMAP.md",
+        "docs/REFERENCE_CAPTURE_APP.md"
+      ],
+      "next_step": "Census the toy/figure tables and gallery modes from the pinned source, then attach save and visual lifecycle receipts per collection family.",
+      "issue": null
+    },
+    {
+      "id": "singleplayer-classic-adventure-allstar",
+      "category": "singleplayer",
+      "title": "Classic, Adventure, All-Star and single-player progression",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_refs": [
+        "melee/gm/gmclassic.c",
+        "melee/gm/gmadventure.c",
+        "melee/gm/gmallstar.c",
+        "melee/gm/gmgiant.c",
+        "melee/gm/gminvisible.c",
+        "melee/gm/gmstamina.c",
+        "melee/gm/gmsupersudden.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities",
+        "stage-roster-and-source-identities",
+        "items-and-article-runtime",
+        "results-and-match-end-routing",
+        "unlocks-progress-and-challenges"
+      ],
+      "pass_criteria": [
+        "Each source single-player mode has explicit stage/opponent order, rules, continue/lives, difficulty, bonus, boss, camera, music, transition and save ownership.",
+        "Mode-specific variants such as giant, invisible, stamina and sudden-death behavior execute the original fighter, item, stage and results paths.",
+        "A complete mode run reaches its source ending and persistence boundary with no direct stage/fighter substitution."
+      ],
+      "evidence": [
+        "docs/ROADMAP.md",
+        "docs/ADDING_CHARACTERS.md",
+        "docs/ADDING_STAGES.md"
+      ],
+      "next_step": "Split Classic, Adventure and All-Star into stage-order, opponent-roster, boss, bonus and ending features before implementing their shared runner.",
+      "issue": null
+    },
+    {
+      "id": "events-and-event-specific-rules",
+      "category": "singleplayer",
+      "title": "Event Matches and event-specific fighters, items and stage rules",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_refs": [
+        "melee/gm/gmevent.c",
+        "melee/mn/mnevent.c",
+        "melee/gm/gm_1601.c",
+        "melee/gm/gmmain_lib.c",
+        "melee/it/itspawn.c"
+      ],
+      "depends_on": [
+        "singleplayer-classic-adventure-allstar",
+        "items-and-article-runtime",
+        "fighter-boss-and-special-entities"
+      ],
+      "pass_criteria": [
+        "Every source event entry, unlock condition, opponent setup, stage, rule override, item/article, timer, win/loss condition and result path is represented.",
+        "Event-only entities and stage callbacks use their source identities and are not admitted through ordinary VS defaults.",
+        "All event completion and failure branches update progression at the same source save boundary as the original."
+      ],
+      "evidence": [
+        "docs/ROADMAP.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Generate an event table census from gmEvent and mnEvent, grouping entries by shared source runner and unique rule override.",
+      "issue": null
+    },
+    {
+      "id": "minigames-training-and-multiman",
+      "category": "singleplayer",
+      "title": "Training, How-To, Multi-Man, Target Test, Home-Run and Stadium minigames",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_refs": [
+        "melee/gm/gmtrainingmode.c",
+        "melee/gm/gmhowto.c",
+        "melee/gm/gmmultiman.c",
+        "melee/gm/gmhomerun.c",
+        "melee/gm/gmtou_0.c",
+        "melee/gm/gmtou_1.c",
+        "melee/gm/gmtou_2.c",
+        "melee/gm/gmtoulib.c"
+      ],
+      "depends_on": [
+        "fighter-roster-and-identities",
+        "stage-roster-and-source-identities",
+        "items-and-article-runtime",
+        "input-and-controller-routing",
+        "save-and-memory-card"
+      ],
+      "pass_criteria": [
+        "Each minigame has an explicit source mode, stage, target/object roster, timer/score rules, camera/HUD, input, audio, result and persistence contract.",
+        "Training reset, target and obstacle lifetimes, Multi-Man waves, Home-Run Sandbag/bat behavior and Tournament/Target Test variants follow source processes.",
+        "Minigame result and unlock records survive repeated entry, failure, reset and browser unload."
+      ],
+      "evidence": [
+        "docs/ROADMAP.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Split this row by source mode and then by shared object runner, beginning with the mode tables and score/result owners.",
+      "issue": null
+    },
+    {
+      "id": "movies-opening-and-staff-roll",
+      "category": "movies",
+      "title": "Opening movie, movie end, staff roll and THP playback",
+      "implementation": "not_integrated",
+      "acceptance": "not_evaluated",
+      "source_refs": [
+        "melee/gm/gmopening.c",
+        "melee/gm/gmopeningmode.c",
+        "melee/gm/gmmovieend.c",
+        "melee/gm/gmstaffroll.c",
+        "melee/lb/lbmthp.c"
+      ],
+      "depends_on": [
+        "runtime-archive-memory-and-ownership",
+        "audio-engine-and-assets",
+        "graphics-rendering-and-presentation",
+        "browser-lifecycle-and-failure-recovery"
+      ],
+      "pass_criteria": [
+        "Opening, attract, movie-end and staff-roll mode transitions select the original movie assets, language/text data, timing and input behavior.",
+        "THP video/audio decode, buffering, frame presentation, skip, completion and teardown preserve source ordering and fail explicitly when unavailable.",
+        "Movie playback survives browser visibility/lifecycle changes and returns to the exact original menu owner."
+      ],
+      "evidence": [
+        "docs/ROADMAP.md",
+        "docs/DEPENDENCIES.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Inventory THP files and movie mode callers from the pinned source, then define a browser decode and lifecycle receipt before implementation.",
+      "issue": null
+    },
+    {
+      "id": "save-and-memory-card",
+      "category": "persistence",
+      "title": "Save data, memory-card I/O, initialization and failure recovery",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_refs": [
+        "melee/lb/lbcardgame.c",
+        "melee/lb/lbcardnew.c",
+        "melee/gm/gmregcommon.c",
+        "melee/gm/gmregclear.c",
+        "melee/lb/lbmemory.c",
+        "melee/lb/lbfile.c"
+      ],
+      "depends_on": [
+        "runtime-archive-memory-and-ownership",
+        "browser-lifecycle-and-failure-recovery"
+      ],
+      "pass_criteria": [
+        "New card, load, save, overwrite, continue-without-saving, corrupt/missing card, full card, removal and interrupted I/O paths match original source behavior.",
+        "Character, stage, mode, trophy, name, controller and settings fields preserve their source masks, endian layout, checksums and save timing.",
+        "Browser persistence is local and recoverable while retaining source write ordering and explicit device/error feedback."
+      ],
+      "evidence": [
+        "docs/REFERENCE_CAPTURE_APP.md",
+        "docs/evidence/reference-documents-migration-v1.json",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Separate card protocol, save schema, progression fields and browser backing store into rows with original decoder/encoder receipts.",
+      "issue": null
+    },
+    {
+      "id": "audio-engine-and-assets",
+      "category": "audio",
+      "title": "AX audio, SSM/HPS banks, voices, effects, music and PCM output",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_refs": [
+        "melee/lb/lbaudio_ax.c",
+        "melee/sfx/crowdsfx.c",
+        "melee/gm/gmmenu.c",
+        "melee/mn/mnsound.c",
+        "melee/lb/lbmthp.c"
+      ],
+      "depends_on": [
+        "runtime-archive-memory-and-ownership",
+        "scheduler-clock-and-simulation-boundary"
+      ],
+      "pass_criteria": [
+        "AX voice allocation, ADPCM/sample residency, SSM/HPS loops, bank lifetimes, effects, crowd, menu music, character themes and true owner transitions preserve source order and timing.",
+        "Audio preparation, disabled-state acknowledgement, playback, underrun/overflow, repeated teardown and browser device failure are explicit and observable.",
+        "Emitted PCM is compared against an independent original reference for menus, gameplay, transitions and movies; a silent build does not pass audio."
+      ],
+      "evidence": [
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/PERFORMANCE_AND_ACCURACY.md",
+        "docs/evidence/original-audio-queue-delay-v1.json"
+      ],
+      "next_step": "Continue the separate audio work in draft PR #42, preserving this row as a dependency until bank, PCM, timing and teardown evidence is integrated.",
+      "issue": null
+    },
+    {
+      "id": "graphics-rendering-and-presentation",
+      "category": "graphics",
+      "title": "HSD/GX scene rendering, materials, camera, viewport and presentation",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_refs": [
+        "melee/lb/lbgx.c",
+        "melee/gr/grdisplay.c",
+        "melee/gr/grmaterial.c",
+        "melee/cm/camera.c",
+        "melee/if/ifall.c",
+        "melee/vi/vi.c"
+      ],
+      "depends_on": [
+        "runtime-archive-memory-and-ownership",
+        "stage-roster-and-source-identities",
+        "fighter-roster-and-identities"
+      ],
+      "pass_criteria": [
+        "Source draw order, HSD objects, GX state, materials, textures, palettes, animation, camera, viewport, depth/blend, effects, HUD and magnifier render with original ownership and numeric semantics.",
+        "Every admitted fighter, costume, stage, item, menu, result, trophy and movie route has an independent pixel/output comparison at a declared baseline.",
+        "First-use resource preparation and GPU completion boundaries are measured separately from simulation and cannot hide a live pipeline or browser stall."
+      ],
+      "evidence": [
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/RENDERER_STARTUP_FIX.md",
+        "docs/PERFORMANCE.md"
+      ],
+      "next_step": "Split renderer acceptance into scene, fighter, stage, interface, effects and presentation rows and attach pixel comparison receipts.",
+      "issue": null
+    },
+    {
+      "id": "input-and-controller-routing",
+      "category": "input",
+      "title": "PAD, gamepad, keyboard, rumble, analog thresholds and controller routing",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_refs": [
+        "melee/lb/lbcommand.c",
+        "melee/gm/gmmain.c",
+        "melee/gm/gmmain_lib.c",
+        "melee/pl/player.c",
+        "melee/mn/mncharsel.c"
+      ],
+      "depends_on": [
+        "scheduler-clock-and-simulation-boundary"
+      ],
+      "pass_criteria": [
+        "Raw PAD sampling, normalization, dead zones, triggers, analog thresholds, button chords, held input, keyboard/gamepad mapping and player-port ownership match source behavior.",
+        "Ordinary human input reaches CSS, SSS, rules, match, pause, No Contest, results and teardown without a scripted selection or hidden fixture.",
+        "Rumble, disconnect/reconnect, focus/visibility changes and end-to-end input latency are independently measured and compared."
+      ],
+      "evidence": [
+        "docs/CONTROLLERS.md",
+        "docs/REFERENCE_CAPTURE_APP.md",
+        "docs/ACCURACY_CONTRACT.md"
+      ],
+      "next_step": "Create per-device and per-player-slot input rows with source sampling-boundary receipts, including simultaneous four-player local input.",
+      "issue": null
+    },
+    {
+      "id": "browser-lifecycle-and-failure-recovery",
+      "category": "browser",
+      "title": "Browser startup, preparation, visibility, unload, errors and repeated lifecycle",
+      "implementation": "partial",
+      "acceptance": "partial",
+      "source_refs": [
+        "melee/gm/gmboot.c",
+        "melee/gm/gmmain.c",
+        "melee/lb/lbfile.c",
+        "melee/lb/lbdvd.c",
+        "melee/lb/lbmemory.c"
+      ],
+      "depends_on": [
+        "runtime-archive-memory-and-ownership",
+        "scheduler-clock-and-simulation-boundary",
+        "audio-engine-and-assets",
+        "graphics-rendering-and-presentation",
+        "input-and-controller-routing"
+      ],
+      "pass_criteria": [
+        "Disc/file import, source preparation, explicit readiness, CSS/SSS/match transitions, visibility/focus loss, browser navigation, unload and restart preserve source ownership and clock order.",
+        "Every missing/invalid archive, unsupported service, preparation timeout, device error and teardown failure is reported at its owning boundary and leaves no live source object.",
+        "Cold and warm repeated lifecycle runs retain source progress, memory high-water, input, audio, draw and browser callback evidence separately."
+      ],
+      "evidence": [
+        "docs/BUILD_AND_PLAY.md",
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/HITCH_CAPTURE.md",
+        "docs/TRANSITION_EQUIVALENCE.md"
+      ],
+      "next_step": "Split browser preparation, live loop, visibility/recovery, unload and restart into bounded scenarios with retained failure receipts.",
+      "issue": null
+    }
+  ]
+}

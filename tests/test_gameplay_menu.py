@@ -37,6 +37,7 @@ class GameplayMenuContractTests(unittest.TestCase):
                     str(ROOT / "src/gameplay_compat.h"),
                     str(ROOT / "src/gameplay_menu.c"),
                     str(ROOT / "src/gameplay_match_rules.c"),
+                    str(ROOT / "tests/native_menu_fighter_input.c"),
                     str(ROOT / "tests/gameplay_menu_trace.c"),
                     "-sENVIRONMENT=node", "-sEXIT_RUNTIME=1", "-o", str(output),
                 ], cwd=ROOT, env=env, capture_output=True, text=True, timeout=120,
