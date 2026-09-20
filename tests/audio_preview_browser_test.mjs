@@ -292,8 +292,11 @@ try {
     await screenshot('match');
   });
 
-  await check('Eject destroys Web Audio and reloads the player document', async () => {
-    const contextDestroyEvents = audioEvents.filter(row => row.event === 'contextWillBeDestroyed').length;
+  await check('Eject closes Web Audio and reloads the player document', async () => {
+    const contextIds = audioEvents.filter(row => row.event === 'contextCreated')
+      .map(row => row.data.context.contextId);
+    assert(contextIds.length > 0, 'The session must have an observed AudioContext');
+    const eventCount = audioEvents.length;
     const navigationCount = report.navigations || 0;
     await collectViolations();
     await driver.unload();
@@ -301,8 +304,14 @@ try {
     await driver.waitForImport();
     const fresh = await trace();
     assert(fresh && fresh.contexts.length === 0, 'Reloaded player must not retain the old AudioContext');
-    assert(audioEvents.filter(row => row.event === 'contextWillBeDestroyed').length > contextDestroyEvents,
-      'Eject must destroy the prior AudioContext');
+    // Closing a context releases its audio resources. Chrome may retain the
+    // closed object until collection without emitting contextWillBeDestroyed.
+    const teardownEvents = audioEvents.slice(eventCount);
+    assert(contextIds.every(id => teardownEvents.some(row =>
+      (row.event === 'contextChanged' && row.data.context.contextId === id &&
+        row.data.context.contextState === 'closed') ||
+      (row.event === 'contextWillBeDestroyed' && row.data.contextId === id))),
+    'Eject must close every prior AudioContext');
     assert(await page.locator('#start-game').isDisabled());
     report.audio.afterEject = fresh;
   });
