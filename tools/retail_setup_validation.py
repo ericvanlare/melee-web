@@ -1,4 +1,4 @@
-"""Validate a named development execution plan against a retail setup."""
+"""Validate a named, role-bound execution plan against a retail setup."""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from retail_replay_validation import load_capture
 SCHEMA = "melee-web-retail-setup-validation"
 VERSION = 1
 EXECUTION_SCHEMA = "melee-web-ucf-off-development-execution"
+HOLDOUT_EXECUTION_SCHEMA = "melee-web-ucf-off-holdout-execution"
 EXECUTION_VERSION = 1
 SETUP_BYTES = 0x138
 MAX_ACTIVE_PLAYERS = 4
@@ -330,26 +331,61 @@ def _verify_capture_prefix(capture: Any, full_plan: dict[str, Any]) -> str:
 
 def validate_setup(plan_path: str | Path, name: str, capture_path: str | Path,
                    *, cpu: str = "Interpreter64", repo_root: str | Path | None = None) -> dict[str, Any]:
-    """Validate one named development entry against a complete retail capture."""
+    """Validate one named entry without changing its development/holdout role."""
 
     plan_file = Path(plan_path).resolve()
     root = Path(repo_root).resolve() if repo_root is not None else None
     execution, execution_sha256 = _read_json(plan_file)
-    _require(execution.get("schema") == EXECUTION_SCHEMA and
+    _require(execution.get("schema") in (EXECUTION_SCHEMA, HOLDOUT_EXECUTION_SCHEMA) and
              type(execution.get("version")) is int and
              execution["version"] == EXECUTION_VERSION,
              "unsupported execution plan schema or version")
     entries = execution.get("selected_before_reference_execution")
-    _require(isinstance(entries, list), "execution plan is missing development entries")
+    _require(isinstance(entries, list), "execution plan is missing workload entries")
+    role = "holdout" if execution["schema"] == HOLDOUT_EXECUTION_SCHEMA else "development"
+    _require(all(isinstance(entry, dict) and entry.get("role") == role for entry in entries),
+             f"execution plan must contain only {role} workload entries")
+    names = [entry.get("name") for entry in entries]
+    _require(all(isinstance(value, str) and value for value in names) and
+             len(names) == len(set(names)), "execution plan workload names must be unique and nonempty")
     matches = [entry for entry in entries if isinstance(entry, dict) and entry.get("name") == name]
     _require(len(matches) == 1, f"execution plan must contain exactly one entry named {name!r}")
     entry = matches[0]
-    _require(entry.get("role") == "development", f"entry {name!r} is not a development workload")
+    _require(entry.get("role") == role, f"entry {name!r} is not a {role} workload")
     expected = _validate_expected_setup(entry.get("expected_setup"))
     source_sha256 = _hash(entry.get("source_sha256"), f"entry {name}.source_sha256")
     declared_plan_sha256 = _hash(entry.get("plan_sha256"), f"entry {name}.plan_sha256")
     candidate_manifest_sha256 = _hash(
         execution.get("candidate_manifest_sha256"), "execution_plan.candidate_manifest_sha256")
+    if role == "holdout":
+        # A separate schema is not permission to relabel an executed donor.
+        # Bind the reserved role to the original pre-execution selection.
+        manifest_file = _resolve(execution.get("candidate_manifest_path"), root,
+                                 "execution_plan.candidate_manifest_path")
+        manifest, manifest_sha256 = _read_json(manifest_file)
+        _require(manifest_sha256 == candidate_manifest_sha256,
+                 "holdout reservation manifest SHA-256 mismatch")
+        _require(manifest.get("schema") == "melee-web-vanilla-candidate-split-v2" and
+                 manifest.get("status") == "frozen_before_runtime",
+                 "unsupported holdout reservation manifest")
+        selection = manifest.get("selection", {})
+        _require(isinstance(selection, dict), "holdout reservation selection is missing")
+        reserved_sources = selection.get("held_out_reserved_sha256")
+        development_sources = selection.get("development_sha256")
+        _require(isinstance(reserved_sources, list) and isinstance(development_sources, list) and
+                 source_sha256 in reserved_sources and source_sha256 not in development_sources,
+                 "source is not exclusively reserved as a holdout")
+        records = manifest.get("records", [])
+        _require(isinstance(records, list), "holdout reservation records are missing")
+        reserved = [record for record in records if isinstance(record, dict) and
+                    record.get("source_sha256") == source_sha256]
+        _require(len(reserved) == 1 and reserved[0].get("role") == "held_out_reserved",
+                 "source lacks a unique held-out reservation record")
+        receipt = reserved[0].get("plan_receipt", {})
+        _require(isinstance(receipt, dict) and
+                 receipt.get("source_sha256") == source_sha256 and
+                 receipt.get("sha256") == declared_plan_sha256,
+                 "holdout input plan differs from its reserved identity")
 
     source_file = _resolve(entry.get("source"), root, f"entry {name}.source")
     input_plan_file = _resolve(entry.get("plan"), root, f"entry {name}.plan")

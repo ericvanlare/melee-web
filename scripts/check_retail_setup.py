@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check one named development workload's exact retail StartMeleeData setup."""
+"""Check one role-bound workload's exact retail StartMeleeData setup."""
 
 import argparse
 import json
@@ -13,9 +13,9 @@ from retail_setup_validation import validate_setup
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--plan", required=True, type=Path,
-                        help="immutable development execution-plan-v3 JSON")
+                        help="immutable development or reserved-holdout execution plan")
     parser.add_argument("--name", required=True,
-                        help="exact development entry name")
+                        help="exact workload entry name")
     parser.add_argument("--capture", required=True, type=Path,
                         help="complete pinned retail capture JSONL")
     parser.add_argument("--cpu", choices=("Interpreter64", "JITARM64"), default="Interpreter64")
@@ -35,6 +35,9 @@ def main(argv: list[str] | None = None) -> int:
         try:
             execution = json.loads(args.plan.read_text(encoding="utf-8"))
             root = args.repo_root.resolve() if args.repo_root is not None else None
+            if "candidate_manifest_path" in execution:
+                path = Path(execution["candidate_manifest_path"])
+                immutable.add((root / path if root is not None and not path.is_absolute() else path).resolve())
             for entry in execution.get("selected_before_reference_execution", []):
                 if isinstance(entry, dict) and entry.get("name") == args.name:
                     for key in ("source", "plan"):

@@ -12,6 +12,11 @@ candidate, and then execute the two untouched holdouts. Native 16.67 ms target
 misses remain visible separately from browser callback gaps; the 33.3 ms hard
 failure threshold stays unchanged.
 
+For #33, the owner approved a separate
+[current-runtime holdout gate](HITCH_CAPTURE.md#approved-current-runtime-scope--2026-09-19)
+while retaining the September 12 failure as causally unresolved. This bounded
+exception leaves all new-failure thresholds and later milestones unchanged.
+
 After those holdouts, the public four-character/four-stage loop still requires
 the separate [consecutive-match validation track](HITCH_CAPTURE.md#consecutive-match-track-after-holdouts).
 Use whole-sequence original references and retain source heap history through

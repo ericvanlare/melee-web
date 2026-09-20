@@ -51,7 +51,44 @@ full Chrome trace/report were lost during analysis, with partial observations
 and the recovered kernel recording retained explicitly. The second bounded
 slot did not reproduce the stall and failed focus. This is diagnostic evidence,
 not a fix or acceptance pass. See the [investigation and recovery limits](docs/BROWSER_RASTER_STALL.md).
-Issue #33, the frozen unprofiled inventory and both untouched holdouts remain open.
+The original failure remains causally unassigned. The project owner approved a
+separate [current-runtime holdout gate](docs/HITCH_CAPTURE.md#approved-current-runtime-scope--2026-09-19)
+on September 19, retaining that historical failure and every hard threshold.
+Issue #33's approved current-runtime gate now passes. The first campaign failed
+on two live pipelines and remains preserved with its final three slots unstarted.
+PR #47 adds exactly the two recovered portable descriptors while preserving all
+626 previous records. Its 7,347-update development regression matches declared
+state and timer with zero live pipelines. Both Release builds, 1,006 tests
+(44 optional skips) and full GitHub Verify pass; Verify took 6m 06s.
+
+Two replacement inputs were reserved from header/input-only evidence before
+tuning. Independent original reference pairs and browser comparisons match
+6,432 Marth/Marth Battlefield and 8,561 Falco/Falco Final Destination declared
+state updates and exact timers. All four frozen unprofiled cold/warm runs pass:
+29,986 updates/draws, no native target misses, hard gaps, long tasks, audio
+underruns/overflows, live pipelines, timing resumes, focus losses or browser
+errors. Native/browser maxima are 13.695/29.000 ms on Apple M4, macOS 26.6.2,
+Chrome 153.0.8010.50, 640×480 at DPR 2. Preparation takes 149.600–166.200 ms;
+Marth retains 66,846,720 bytes of live heap growth and Falco zero. Both inputs
+exhaust their frozen cap before original match ending; neither is a complete
+original match. These are `per_tick` measurements, without original draw-cadence,
+live-controller, pixel or PCM admission. See the
+[failed campaign, correction and accepted replacement evidence](docs/CURRENT_RUNTIME_HOLDOUTS_20260919.md).
+
+PR #47 is merged and deployed at [webmelee.gg](https://webmelee.gg). Both
+production origins pass exact HTTP verification and all ten public browser
+checks. The public alpha remains deliberately silent; its hosted functional
+checks are separate from the audio-enabled development performance gate.
+See the [current release receipt](docs/evidence/public-marth-pipeline-release-v1.json).
+
+The current PR #38 development Release completed two cold/warm rounds on
+Fox/Marth Dream Land and Marth/Falco Yoshi's Story: 37,920 source updates/draws,
+zero hard hitch failures and one retained native target miss at 18.300 ms
+(worst browser interval 30.675 ms). A concurrent audio build interrupted the
+initial plan; its contended and incomplete attempts remain recorded, and a
+separately frozen six-slot recovery supplied the affected cache pairs and
+unfinished coverage. No historical failure was reclassified. See the
+[complete timing inventory, memory/preparation evidence and remaining decision](docs/DEVELOPMENT_TIMING_20260919.md).
 
 ## Link and Young Link development candidate
 
@@ -96,11 +133,13 @@ The state capture retains a browser gap and audio underruns. Four separate
 bounded public segments (both player orders cold/warm, 450 updates each) pass
 without timing pauses, live pipelines or native target misses; native/browser
 maxima are 11.370/25.245 ms. These silent functional checks do not establish
-full-match performance. The historical a822 stall, frozen performance matrix
-and both unopened holdouts remain open under #33. PR #38 is merged, and this
-fix is now deployed at [webmelee.gg](https://webmelee.gg). The exact production
+full-match performance. The historical a822 stall remains unresolved. The first
+current-runtime holdout campaign failed; a separately frozen replacement
+campaign passes with the two-descriptor correction and fresh inputs recorded
+above. PR #38 is merged, and this
+fix remains deployed at [webmelee.gg](https://webmelee.gg). Its original production
 bytes and ten headed browser checks pass on both the immutable origin and apex;
-see the [current release receipt](docs/evidence/public-link-pipeline-release-v1.json).
+see the [PR #38 release receipt](docs/evidence/public-link-pipeline-release-v1.json).
 
 ## Dr. Mario and Roy development candidates
 

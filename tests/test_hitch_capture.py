@@ -32,7 +32,13 @@ class HitchCaptureTests(unittest.TestCase):
         files = {}
         for name, text in (("runtime.wasm", "wasm"), ("runtime.js", "js"),
                            ("profile.json", "profile"), ("a822.mwrc", "a822 recipe"),
-                           ("dca.mwrc", "dca recipe"), ("old-red.json", "old red")):
+                           ("dca.mwrc", "dca recipe"), ("holdout.mwrc", "holdout recipe"),
+                           ("old-red.json", "old red"),
+                           ("scope.json", json.dumps({
+                               "schema": "melee-web-approved-holdout-scope",
+                               "version": 1,
+                               "approval": {"user_message": "proceed", "decision": "approved"},
+                           }))):
             path = root / name
             path.write_text(text, encoding="utf-8")
             files[name] = path
@@ -56,6 +62,35 @@ class HitchCaptureTests(unittest.TestCase):
         plan = create_plan(spec, plan_path)
         return root, plan_path, plan, files
 
+    def holdout_fixture(self):
+        root, _, _, files = self.fixture()
+        spec = {
+            "role": "holdout",
+            "holdout_allowlist": ["holdout-a"],
+            "targets": [{"id": "holdout-a", "label": "held-out", "frames": 2,
+                         "role": "holdout"}],
+            "modes": ["unprofiled"],
+            "caches": ["cold", "warm"],
+            "repetitions": 1,
+            "acceptance_scope": {
+                "record": files["scope.json"],
+                "decision": "proceed",
+                "approved_by": "owner",
+            },
+            "identities": {
+                "build_artifacts": [files["runtime.wasm"], files["runtime.js"]],
+                "profile": files["profile.json"],
+                "holdout_recipes": {"holdout-a": files["holdout.mwrc"]},
+                "historical_context": [files["old-red.json"]],
+                "legacy_red_reports": [],
+            },
+            "attempts_dir": "holdout-attempts",
+            "timeout_ms": 1234,
+        }
+        plan_path = root / "holdout-plan.json"
+        plan = create_plan(spec, plan_path)
+        return root, plan_path, plan, files
+
     def tearDown(self):
         if hasattr(self, "temporary"):
             self.temporary.cleanup()
@@ -72,17 +107,18 @@ class HitchCaptureTests(unittest.TestCase):
         }), encoding="utf-8")
         return path
 
-    def valid_browser_report(self, root, plan, files):
+    def valid_browser_report(self, root, plan, files, *, target_id="a822",
+                             recipe_name="a822.mwrc", frames=2):
         path = root / "valid-browser-report.json"
-        recipe_hash = hashlib.sha256(files["a822.mwrc"].read_bytes()).hexdigest()
+        recipe_hash = hashlib.sha256(files[recipe_name].read_bytes()).hexdigest()
         path.write_text(json.dumps({
             "schema": "melee-web-browser-retail-replay", "version": 1,
-            "recipe_sha256": recipe_hash, "frames": 2, "mode": "performance",
+            "recipe_sha256": recipe_hash, "frames": frames, "mode": "performance",
             "complete": True, "pass": True, "failures": [], "gold_admitted": False,
             "pixels": "not_compared", "performance": "measured",
             "instrumented_timing_resumes": 0,
             "metrics": {
-                "sourceFrames": 2, "browserCallbacks": 2, "nativeCallbacks": 2,
+                "sourceFrames": frames, "browserCallbacks": frames, "nativeCallbacks": frames,
                 "worstBrowserCallbackMs": 20, "worstNativeCallbackMs": 8,
                 "nativeCallbacksOverBudget": 0, "browserCallbackGaps": 0, "browserLongTasks": 0,
                 "browserLongTaskWorstMs": 0,
@@ -119,7 +155,56 @@ class HitchCaptureTests(unittest.TestCase):
                 "development_allowlist": ["a822"], "targets": ["a822", "holdout"],
                 "identities": {"build_artifacts": [], "profile": None,
                                 "development_recipes": {}, "legacy_red_reports": []},
-            })}, root / "bad.json")
+        })}, root / "bad.json")
+
+    def test_legacy_development_plan_without_role_context_fields_remains_valid(self):
+        root, _, plan, _ = self.fixture()
+        legacy = copy.deepcopy(plan)
+        legacy.pop("role")
+        legacy["identities"].pop("historical_context")
+        legacy["identities"].pop("acceptance_scope")
+        legacy_path = root / "legacy-plan.json"
+        legacy_path.write_text(json.dumps(legacy), encoding="utf-8")
+
+        loaded, _ = load_plan(legacy_path)
+        self.assertNotIn("role", loaded)
+        current = status(legacy_path)
+        self.assertEqual(current["role"], "development")
+        self.assertEqual(current["historical_context"], [])
+        self.assertIsNone(current["acceptance_scope"])
+        self.assertFalse(current["acceptance_evidence"])
+
+    def test_explicit_null_role_is_rejected_before_status(self):
+        root, _, plan, _ = self.fixture()
+        plan["role"] = None
+        path = root / "null-role.json"
+        path.write_text(json.dumps(plan))
+        with self.assertRaisesRegex(HitchCaptureError, "role must"):
+            status(path)
+
+    def test_holdout_profiler_rows_cannot_be_frozen_for_acceptance(self):
+        root, _, plan, _ = self.holdout_fixture()
+        plan["modes"] = ["profiler"]
+        for slot in plan["slots"]:
+            slot["mode"] = "profiler"
+        with self.assertRaisesRegex(HitchCaptureError, "only unprofiled"):
+            create_plan(plan, root / "profiler-holdout.json")
+
+    def test_finish_checks_start_role_and_identity_snapshot_before_publication(self):
+        root, plan_path, plan, _ = self.holdout_fixture()
+        slot = plan["slots"][0]["slot_id"]
+        started = begin_attempt(plan_path, slot)
+        path = Path(started["attempt_dir"]) / "start.json"
+        original = json.loads(path.read_text())
+        for field, value in (("role", "development"), ("identities", {})):
+            changed = dict(original)
+            changed[field] = value
+            changed.pop("record_sha256")
+            changed = hitch_module._seal(changed)
+            path.write_text(json.dumps(changed))
+            with self.assertRaisesRegex(HitchCaptureError, "role changed|identities changed"):
+                finish_attempt(plan_path, slot, status="interrupted", reason="test mutation")
+            self.assertFalse((path.parent / "finish.json").exists())
 
     def test_hidden_slot_cannot_accept_a_report_with_its_control_field_removed(self):
         root, _, plan, files = self.fixture()
@@ -166,6 +251,81 @@ class HitchCaptureTests(unittest.TestCase):
         current = status(plan_path)
         self.assertFalse(current["acceptance_evidence"])
         self.assertEqual(current["counts"]["failed_reports"], 0)
+
+    def test_holdout_role_retains_context_and_admits_only_complete_valid_matrix(self):
+        root, plan_path, plan, files = self.holdout_fixture()
+        self.assertEqual(plan["role"], "holdout")
+        self.assertEqual(plan["holdout_allowlist"], ["holdout-a"])
+        self.assertNotIn("development_allowlist", plan)
+        self.assertEqual(list(plan["identities"]["holdout_recipes"]), ["holdout-a"])
+        self.assertEqual(plan["identities"]["legacy_red_reports"], [])
+        self.assertEqual(len(plan["identities"]["historical_context"]), 1)
+        self.assertEqual(plan["identities"]["acceptance_scope"]["decision"], "proceed")
+
+        for index, slot in enumerate(plan["slots"]):
+            started = begin_attempt(plan_path, slot["slot_id"])
+            self.assertEqual(started["role"], "holdout")
+            report = self.valid_browser_report(
+                root, plan, files, target_id=slot["target_id"],
+                recipe_name="holdout.mwrc", frames=slot["frames"],
+            )
+            if slot["cache"] == "warm":
+                value = json.loads(report.read_text(encoding="utf-8"))
+                value["cache"].update(cleared_on_startup=False, state="ready", bytes=100)
+                report.write_text(json.dumps(value), encoding="utf-8")
+            finished = finish_attempt(plan_path, slot["slot_id"], report_path=report)
+            self.assertTrue(finished["validation"]["valid"])
+            self.assertEqual(finished["role"], "holdout")
+            self.assertTrue(finished["acceptance_evidence"])
+
+        current = status(plan_path)
+        self.assertEqual(current["role"], "holdout")
+        self.assertTrue(current["acceptance_evidence"])
+        self.assertEqual(current["legacy_unresolved_reds"], 0)
+        self.assertEqual(len(current["historical_context"]), 1)
+        self.assertEqual(current["acceptance_scope"]["approved_by"], "owner")
+
+    def test_holdout_plan_rejects_missing_scope_authorization_and_mixed_role_inputs(self):
+        root, _, plan, files = self.holdout_fixture()
+
+        missing_scope = copy.deepcopy(plan)
+        missing_scope["plan_id"] = "holdout-missing-scope"
+        missing_scope["identities"]["acceptance_scope"] = None
+        with self.assertRaisesRegex(HitchCaptureError, "acceptance_scope"):
+            create_plan(missing_scope, root / "missing-scope.json")
+
+        files["scope.json"].write_text(json.dumps({"schema": "arbitrary"}), encoding="utf-8")
+        arbitrary_scope = copy.deepcopy(plan)
+        arbitrary_scope["plan_id"] = "holdout-arbitrary-scope"
+        arbitrary_scope["identities"]["acceptance_scope"]["record"].pop("sha256")
+        with self.assertRaisesRegex(HitchCaptureError, "unsupported schema"):
+            create_plan(arbitrary_scope, root / "arbitrary-scope.json")
+
+        mixed_recipes = copy.deepcopy(plan)
+        mixed_recipes["plan_id"] = "holdout-mixed-recipes"
+        mixed_recipes["identities"]["development_recipes"] = {
+            "holdout-a": files["a822.mwrc"],
+        }
+        with self.assertRaisesRegex(HitchCaptureError, "development_recipes"):
+            create_plan(mixed_recipes, root / "mixed-recipes.json")
+
+        mixed_allowlist = copy.deepcopy(plan)
+        mixed_allowlist["plan_id"] = "holdout-mixed-allowlist"
+        mixed_allowlist["development_allowlist"] = ["holdout-a"]
+        with self.assertRaisesRegex(HitchCaptureError, "development_allowlist"):
+            create_plan(mixed_allowlist, root / "mixed-allowlist.json")
+
+        wrong_role = copy.deepcopy(plan)
+        wrong_role["plan_id"] = "holdout-wrong-role"
+        wrong_role["role"] = "development"
+        with self.assertRaisesRegex(HitchCaptureError, "allowlist"):
+            create_plan(wrong_role, root / "wrong-role.json")
+
+        target_role = copy.deepcopy(plan)
+        target_role["plan_id"] = "holdout-target-role"
+        target_role["targets"][0]["role"] = "development"
+        with self.assertRaisesRegex(HitchCaptureError, "target.*role|targets.*holdout"):
+            create_plan(target_role, root / "target-role.json")
 
     def test_missing_deadlines_are_unknown_and_not_zero(self):
         root, plan_path, plan, _ = self.fixture()
