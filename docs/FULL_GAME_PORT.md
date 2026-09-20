@@ -143,9 +143,12 @@ native and browser action checks in [his port notes](BOWSER_PORT_NOTES.md).
 Every added fighter retains `partial` acceptance. The development player now
 uses [scene-specific asset scopes](SCENE_ASSET_LOADING.md)
 with explicit source teardown and asynchronous reads while its clock is stopped.
-The public player still uses the 127,314,690-byte fixed import, leaving
-6,903,038 bytes under the request cap. Carry the same ownership boundary into
-the public profile before further roster growth exceeds that import budget.
+The public player now uses the same scoped ownership boundary and excludes
+DSP coefficients. The production checkpoint exposes fifteen fighters: Donkey
+Kong remains available in development but is disabled in public until
+[issue #50](https://github.com/ericvanlare/melee-web/issues/50) resolves his
+platform shield-drop crash. New feature additions are paused for this release
+checkpoint; four-player residency and additional modes remain open.
 
 ## Validation before handoff
 

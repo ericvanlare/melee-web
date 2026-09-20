@@ -1,4 +1,5 @@
 import {openDiscImage,fontFileRange} from './disc-image.mjs';
+import {openDiscSession} from './disc-session.mjs';
 
 // Exact revision/language paths: audio/ also contains Japanese alternatives.
 export const RUNTIME_DISC_FILES=Object.freeze({
@@ -98,6 +99,41 @@ export const NATIVE_GAME_DISC_FILES=Object.freeze({
 });
 export function loadNativeGameDisc(file,report=()=>{}) {
   return loadDiscBundle(file,report,NATIVE_GAME_DISC_FILES);
+}
+/**
+ * Open a silent public native-disc session. The native scope supplies the
+ * exact logical names for each scene; the shared session preflights every
+ * corresponding FST path before reading any payload.
+ */
+export async function openNativeGameDiscSession(file) {
+  const session = await openDiscSession(file);
+  return Object.freeze({
+    close: () => session.close(),
+    async readScope(names, report = () => {}) {
+      const paths = Object.create(null), seen = new Set();
+      for (const name of names) {
+        if (typeof name !== 'string' || seen.has(name))
+          throw Error('Invalid or duplicate native asset name.');
+        seen.add(name);
+        if (name === 'sislib_font.bin') continue;
+        if (name === 'dsp_coef.bin')
+          throw Error('Public native scenes do not accept DSP coefficients.');
+        if (!Object.hasOwn(NATIVE_GAME_DISC_FILES, name))
+          throw Error('Unknown native scene asset: ' + name);
+        paths[name] = NATIVE_GAME_DISC_FILES[name];
+      }
+      const total = names.length;
+      report({phase: 'validate', complete: 0, total});
+      const files = await session.readScope(paths, {
+        beforeRead: ({name, index}) =>
+          report({phase: 'read', file: name, complete: index, total}),
+      });
+      if (seen.has('sislib_font.bin')) files.set('sislib_font.bin', session.fontBytes());
+      report({phase: 'complete', complete: total, total});
+      session.metadata();
+      return files;
+    },
+  });
 }
 /** Read only the selected source scene's data; no upload or persistence. */
 export function loadRuntimeDisc(file,report=()=>{}) {

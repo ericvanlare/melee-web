@@ -12,16 +12,22 @@
 namespace melee_web {
 namespace {
 
-constexpr std::array<std::string_view, 10> kMenuFiles = {
+constexpr auto kMenuFiles = std::to_array<std::string_view>({
     "MnSlChr.usd", "MnSlMap.usd", "SdSlChr.usd", "MnExtAll.usd",
     "LbMcGame.usd", "NtMemAc.usd", "sislib_font.bin", "smash2.sem",
-    "dsp_coef.bin", "menu01.hps",
-};
+#if !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+    "dsp_coef.bin",
+#endif
+    "menu01.hps",
+});
 
-constexpr std::array<std::string_view, 8> kMatchCommonAudio = {
+constexpr auto kMatchCommonAudio = std::to_array<std::string_view>({
     "main.ssm", "nr_select.ssm", "nr_title.ssm", "nr_name.ssm",
-    "pokemon.ssm", "end.ssm", "smash2.sem", "dsp_coef.bin",
-};
+    "pokemon.ssm", "end.ssm", "smash2.sem",
+#if !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+    "dsp_coef.bin",
+#endif
+});
 
 [[noreturn]] void reject(const char* message)
 {

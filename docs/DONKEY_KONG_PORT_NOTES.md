@@ -4,7 +4,11 @@ Donkey Kong's typed fighter data, all five costumes and bounded native move
 lifetimes now execute on the full-game branch. A corrected cold/warm Final
 Destination action sweep passes. **Platform shield drop still crashes** at an
 undefined original animation-output boundary; the candidate is not complete.
-Independent original comparison remains open.
+Independent original comparison remains open. For the September 20 production
+checkpoint, Donkey is disabled in public character selection and the final
+match handoff, while his development implementation remains available.
+[Issue #50](https://github.com/ericvanlare/melee-web/issues/50) tracks the crash
+and the verification required before public re-enablement.
 
 ## Source data and shared behavior
 

@@ -41,6 +41,7 @@ class GameplayAssetManifestTests(unittest.TestCase):
                    str(ROOT / "src/gameplay_asset_manifest.cpp"),
                    str(ROOT / "tests/gameplay_asset_manifest_test.cpp"),
                    "-o", str(cls.binary)]
+        cls.compile_command = command
         result = subprocess.run(command, cwd=ROOT, capture_output=True, text=True, timeout=120)
         if result.returncode:
             raise RuntimeError(result.stdout + result.stderr)
@@ -60,6 +61,21 @@ class GameplayAssetManifestTests(unittest.TestCase):
                                 capture_output=True, text=True, timeout=20)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("Source menu/match asset descriptors", result.stdout)
+
+    def test_public_descriptor_excludes_only_coefficients(self):
+        public = Path(self.temp.name) / "gameplay_asset_manifest_public_test"
+        command = [*self.compile_command[:-2], "-DMELEE_WEB_PUBLIC_AUDIO_DISABLED",
+                   "-o", str(public)]
+        subprocess.run(command, cwd=ROOT, check=True, capture_output=True, timeout=120)
+        run = subprocess.run([str(public)], cwd=ROOT, capture_output=True,
+                             text=True, timeout=20)
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        for arguments in [["--menu-names"], *[["--descriptor-stage", str(stage)]
+                                             for stage in self._source_stage_values().values()]]:
+            development = subprocess.check_output([str(self.binary), *arguments], text=True).splitlines()
+            silent = subprocess.check_output([str(public), *arguments], text=True).splitlines()
+            self.assertIn("dsp_coef.bin", development)
+            self.assertEqual(silent, [name for name in development if name != "dsp_coef.bin"])
 
     def _source_stage_values(self):
         source = (ROOT / ".deps/melee/src/melee/gr/forward.h").read_text()

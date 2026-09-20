@@ -1,8 +1,7 @@
 # Scene asset loading boundary
 
-The integration branch's development player keeps one validated local disc
-session and imports an exact menu or selected-match scope. The public player
-still uses the existing fixed import. This change is an asset lifetime boundary,
+The integration branch's development and public players keep one validated local disc
+session and import an exact menu or selected-match scope. This change is an asset lifetime boundary,
 not additional fighter, stage, mode or performance acceptance.
 
 ## Ownership and source ordering
@@ -10,12 +9,14 @@ not additional fighter, stage, mode or performance acceptance.
 `DiscAssetSession` accepts a local File, validates the pinned USA revision-2 DOL,
 indexes the FST once, and checks the entire requested path set before reading
 payloads. The existing 64 MiB per-file and 128 MiB requested-FST limits remain.
-DOL-derived font bytes and independently generated, integrity-checked DSP
-coefficients are explicit inputs. They are counted separately from FST bytes.
+DOL-derived font bytes are explicit inputs. Development additionally imports
+independently generated, integrity-checked DSP coefficients; public descriptors
+and the public disc wrapper reject those coefficients. Generated inputs are
+counted separately from FST bytes.
 Closing the session invalidates pending reads and releases its File/DOL/FST
 references; already returned byte maps remain owned by their callers.
 
-Native descriptors contain all 33 required menu inputs or the selected match's
+Native descriptors contain 33 development or 32 public menu inputs, or the selected match's
 common, HUD, fighter/action, neutral and selected costume, effect, stage and
 audio inputs. The menu bank registry includes each admitted fighter voice: original CSS OnExit
 can request those banks even while abandoning a scene. The old fixed 13-bank
@@ -85,6 +86,6 @@ the independently repeated original v2 references. The preceding browser
 attempt had completed both scene loops and restart but correctly rejected the
 older v1 recipe without PAD history; that failure remains retained.
 Browser, full-suite and integration receipts are indexed by the corresponding
-checkpoint in STATUS.md. Broader scene modes, public scoped imports, four-player
+checkpoint in STATUS.md. Broader scene modes, four-player
 residency, long-run memory plateaus and complete original/pixel/PCM/performance
 acceptance remain separate work.

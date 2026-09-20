@@ -92,10 +92,16 @@ MeleeWebMenuMatchSelection selection(int stage, int first, int second,
 void menu_contract()
 {
     const auto names = menu_asset_names();
+#if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+    check(names.size()==32, "Silent menu descriptor excludes only DSP coefficients");
+    check(!has(names,"dsp_coef.bin"), "Public scope must not request DSP coefficients");
+#else
     check(names.size()==33, "Menu descriptor must include each admitted CSS voice bank");
+    check(has(names,"dsp_coef.bin"), "Development scope requires DSP coefficients");
+#endif
     for(const auto name:{"MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd",
                          "LbMcGame.usd","NtMemAc.usd","sislib_font.bin","smash2.sem",
-                         "dsp_coef.bin","menu01.hps"})
+                         "menu01.hps"})
         check(std::find(names.begin(),names.end(),name)!=names.end(),"Missing menu resource");
     const auto banks=menu_audio_bank_names();
     no_duplicates(banks);
@@ -122,6 +128,11 @@ void source_fighter_closure()
         auto value = selection(St_Kind_Last, character, CKIND_MARIO,
                                content->costumes - 1, 0);
         const auto names = match_asset_names(value);
+#if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+        check(!has(names,"dsp_coef.bin"), "Public match must not request DSP coefficients");
+#else
+        check(has(names,"dsp_coef.bin"), "Development match requires DSP coefficients");
+#endif
         const auto selected = std::find_if(fighter_costumes().begin(), fighter_costumes().end(),
             [&](const FighterCostume& row) {
                 return row.fighter_kind == static_cast<std::uint32_t>(content->fighter_kind) &&

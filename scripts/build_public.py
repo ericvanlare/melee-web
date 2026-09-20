@@ -44,6 +44,7 @@ PLAYER_RUNTIME_FILES = (
     "melee-runtime.mjs",
     "runtime-assets.mjs",
     "disc-image.mjs",
+    "disc-session.mjs",
     "prototype-keyboard-layouts.mjs",
     "controller-input.mjs",
     "controller-panel.mjs",
@@ -58,6 +59,7 @@ PLAYER_SOURCE_RUNTIME_FILES = (
     "melee-runtime.mjs",
     "runtime-assets.mjs",
     "disc-image.mjs",
+    "disc-session.mjs",
     "prototype-keyboard-layouts.mjs",
     "controller-input.mjs",
     "controller-panel.mjs",
@@ -98,7 +100,14 @@ RUNTIME_SOURCE_FILES = (
     "tests/native_menu_stage_input.c",
 )
 RUNTIME_REQUIRED_EXPORTS = (
-    "_main", "_malloc", "_free", "_melee_web_native_menu_file",
+    "_main", "_malloc", "_free",
+    "_melee_web_native_asset_begin",
+    "_melee_web_native_asset_count",
+    "_melee_web_native_asset_name",
+    "_melee_web_native_asset_file",
+    "_melee_web_native_asset_commit",
+    "_melee_web_native_asset_abort",
+    "_melee_web_native_menu_file",
     "_melee_web_native_menu_prepare", "_melee_web_native_menu_launch",
     "_melee_web_native_menu_unload", "_melee_web_native_menu_pause",
     "_melee_web_native_menu_message", "_melee_web_native_menu_running",
@@ -999,7 +1008,8 @@ def _validate_runtime_graph(files: dict[str, bytes]) -> None:
                 raise BuildError(f"development audio module reference rejected in runtime JavaScript: {rel}")
     required_imports = {
         "melee-runtime.mjs": ("./runtime-assets.mjs", "./gameplay_public.js", "./controller-input.mjs"),
-        "runtime-assets.mjs": ("./disc-image.mjs",),
+        "runtime-assets.mjs": ("./disc-image.mjs", "./disc-session.mjs"),
+        "disc-session.mjs": ("./disc-image.mjs",),
         "controller-settings.mjs": ("./prototype-keyboard-layouts.mjs", "./controller-panel.mjs", "./controller-settings.css"),
     }
     for rel, imports in required_imports.items():
@@ -1235,6 +1245,7 @@ def build(
             "melee-runtime.mjs": ROOT / "web" / "melee-runtime.mjs",
             "runtime-assets.mjs": ROOT / "web" / "runtime-assets.mjs",
             "disc-image.mjs": ROOT / "web" / "disc-image.mjs",
+            "disc-session.mjs": ROOT / "web" / "disc-session.mjs",
             "prototype-keyboard-layouts.mjs": ROOT / "web" / "prototype-keyboard-layouts.mjs",
             "controller-input.mjs": ROOT / "web" / "controller-input.mjs",
             "controller-panel.mjs": ROOT / "web" / "controller-panel.mjs",

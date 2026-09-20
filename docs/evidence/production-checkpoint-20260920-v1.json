@@ -1,0 +1,562 @@
+{
+  "schema": "melee-web-release-checkpoint-validation-v1",
+  "date": "2026-09-20",
+  "source_base_commit": "3103b650e80246cee459e39c6cac68e83f7e4e10",
+  "pull_request": "https://github.com/ericvanlare/melee-web/pull/49",
+  "scope": "Production-ready candidate checkpoint: fifteen public fighters, seven stages, scoped local-disc imports, silent audio. Sixteen development fighters remain. No full-game, complete-match, broad performance, original pixel/PCM, physical-input or deployment acceptance.",
+  "donkey_public_exclusion": {
+    "issue": "https://github.com/ericvanlare/melee-web/issues/50",
+    "user_approved": true,
+    "boundary": "Public CSS availability and final match selection; development implementation retained."
+  },
+  "automated_suite": {
+    "local_path": "work/full-game/public-scope-suite-v1.log",
+    "sha256": "e346ee212e97d6f2ebb134a5979b04aec6031e5b556cae83730bbf0595b4d4c6",
+    "bytes": 202548,
+    "result": "pass",
+    "tests": 1099,
+    "skips": 41,
+    "seconds": 374.968,
+    "skip_reasons": {
+      "build output unavailable": 1,
+      "Bootstrap Aurora and a C++20 compiler for independent DSP comparison": 2,
+      "Build fighter targets before the typed support check": 1,
+      "Original stage trace target unavailable": 2,
+      "Build dat_scene_trace before the typed scene check": 1,
+      "Owned stage selection archive and pinned SDK required": 1,
+      "Build gameplay_audio_trace and provide local SSM/SEM/DSP coefficient fixtures": 2,
+      "Build fighter/audio stream target and supply optional owned HPS/SSM/SEM/coefficient inputs": 1,
+      "Build fighter targets before running the focused bonus_data trace": 1,
+      "Project SDK and Aurora build dependencies unavailable; run bootstrap/build": 4,
+      "Optional built combat trace and owned runtime assets required": 1,
+      "Common context trace unavailable; build gameplay first": 1,
+      "Owned menu, Fox/Falco and stage fixtures are required": 1,
+      "Owned Dr. Mario/Roy and stage fixtures are required": 1,
+      "Project SDK/Aurora build dependencies unavailable; run bootstrap/build": 1,
+      "Built stock trace and owned Mario costume archives required": 1,
+      "Built original player context trace required": 1,
+      "Optional built source trace and owned runtime assets required": 2,
+      "Optional built full-stage edge trace and owned runtime assets required": 2,
+      "Optional built timer trace and owned runtime assets required": 1,
+      "Build gameplay_music_profile_trace and provide owned menu/game assets": 1,
+      "Build fighter targets before the original SIS consumer check": 1,
+      "Original CSS target and owned local fixtures are required": 1,
+      "Build the native menu host and supply owned menu/game fixtures": 1,
+      "Build gameplay_rumble_trace and provide owned LbRb.dat": 1,
+      "Build fighter targets before running the focused stage_numeric trace": 1,
+      "Native HSD targets unavailable; run scripts/build.py --target gameplay": 1,
+      "Build the native_audio_banks fighter target first": 1,
+      "Build gameplay_pad_state_trace": 1,
+      "compiled private provenance fixture not supplied": 1,
+      "Optional pinned Dolphin source checkout is not installed": 2,
+      "pinned slippi-js fixtures are not checked out": 2
+    },
+    "scope_note": "Full suite completed before the subsequent narrow public Donkey exclusion. That change passed the focused menu/public checks below; final pushed-head CI is a separate merge gate."
+  },
+  "focused_after_exclusion": {
+    "local_path": "work/full-game/checkpoint-public-gate-focused-v1.log",
+    "sha256": "935c056cc3075465bcaf7f79718d44433bc6f72b3c3c93e9c2240618b563065d",
+    "bytes": 4462,
+    "tests": 26,
+    "seconds": 14.907,
+    "result": "pass"
+  },
+  "public_scope_focused": {
+    "local_path": "work/full-game/public-scope-focused-v1.log",
+    "sha256": "ed4b4029f3a66ffe1c0005cdce9fd1996b5b95b8964e95fe4cb952d99f52fe6c",
+    "bytes": 7529,
+    "tests": 45,
+    "seconds": 30.693,
+    "result": "pass"
+  },
+  "builds": [
+    {
+      "kind": "public",
+      "result": "pass",
+      "local_path": "work/full-game/checkpoint-public-build-v1.log",
+      "sha256": "b2083952bf2d9b26c206a89d88d0c2122f1161532e565d766bd65e60f23600a2",
+      "bytes": 11576
+    },
+    {
+      "kind": "development",
+      "result": "pass",
+      "local_path": "work/full-game/checkpoint-dev-build-v1.log",
+      "sha256": "054c9763f14a96899230f14f512f973b5a6e280d17ef6279d83613f67723fda4",
+      "bytes": 11514
+    }
+  ],
+  "candidate": {
+    "local_path": "work/full-game/checkpoint-player-candidate-v1.manifest.json",
+    "sha256": "45dbf468f5e860964c0e342031374456e513c1d5d39fe6e52d20e8552ec13228",
+    "bytes": 158822,
+    "profile": "player",
+    "mode": "production",
+    "runtime_hash": "46a1fa0a3f1fb7ff",
+    "identity_sha256": "c8af1b461f4cd6f2b2afd81cb0b264f98671327532a388506fefa3344cb2beb9",
+    "files": 26,
+    "artifact_bytes": 16553938,
+    "native_artifacts": [
+      {
+        "bytes": 284111,
+        "path": "build/browser-public-release/gameplay_public.js",
+        "sha256": "fb847f7a1d5378cbda4f4ee3ff8ecc20b6ed135a375c07331c6b59ebadeddcec"
+      },
+      {
+        "bytes": 12428947,
+        "path": "build/browser-public-release/gameplay_public.wasm",
+        "sha256": "f1ec3c1005f543fec9f8b244dc437c9c1e520cb37a1728da1aad16e7cf1682bd"
+      },
+      {
+        "bytes": 3518464,
+        "path": "build/browser-public-release/gameplay_public.data",
+        "sha256": "8df6a998cef19b88a3eff0ee61f666e42791f5f73841818961aa3b224cad2c4b"
+      }
+    ],
+    "audit": {
+      "local_path": "work/full-game/checkpoint-audit-v1.log",
+      "sha256": "2a2ae8ef237ca6374f4d29965238be11f4b7e50658e0abaefc1340e0f652ae18",
+      "bytes": 59
+    },
+    "deployed": false
+  },
+  "http": {
+    "local_path": "work/full-game/checkpoint-http-v1.json",
+    "sha256": "3850984a925c8f443dc119947e06ad7ae5f655dc3b097850f68e9e25717f14d5",
+    "bytes": 9758,
+    "result": "pass",
+    "scope": "Local Wrangler exact bytes/security headers/routes only; reserved-config 502 limitations remain local-only and do not satisfy a hosted release gate.",
+    "local_limitations": [
+      {
+        "path": "/_headers",
+        "status": 502,
+        "reason": "Wrangler 4.131.1 reserved-config routing error; hosted verification still requires 404"
+      },
+      {
+        "path": "/_redirects",
+        "status": 502,
+        "reason": "Wrangler 4.131.1 reserved-config routing error; hosted verification still requires 404"
+      }
+    ]
+  },
+  "public_browser": {
+    "local_path": "work/full-game/checkpoint-public-browser-v1/report.json",
+    "sha256": "71133a5eb54eb5abd7ac6d73a9f32b3ecc5b91274d8537b04a89f847f729e247",
+    "bytes": 9123,
+    "result": "pass",
+    "checks": [
+      "isolated WebGPU/Wasm startup and direct original-style player",
+      "controls, focus and preferences survive a fresh document",
+      "acknowledgement, invalid-disc errors and selectable retry",
+      "narrow layouts and fullscreen",
+      "owned-disc import, native preparation and original CSS",
+      "pause/resume acknowledges the shared native owner",
+      "ordinary B0XX keyboard enters original SSS and cancels back to CSS",
+      "Eject retires the document; a second silent import can launch",
+      "legal pages use their readable document stylesheet and serve full notices",
+      "keyboard-only session persists its preferences; no application upload or background connections"
+    ],
+    "browser": "153.0.8010.50",
+    "audio_events": 0,
+    "errors": [],
+    "csp": []
+  },
+  "public_lifecycle": {
+    "local_path": "work/full-game/checkpoint-public-lifecycle-v2/report.json",
+    "sha256": "02658072ae802b2c368a58eaae5fc64257e31b96dc1d2491c033aa5585045293",
+    "bytes": 6627163,
+    "driver": {
+      "local_path": "work/full-game/public-scope-browser-v2.mjs",
+      "sha256": "91814abb3c727bb5c1d40b777b28d03c923ece2a105d59ca76eb02427736044f",
+      "bytes": 28042
+    },
+    "result": "functional_pass",
+    "cycles": 2,
+    "scope_checks": {
+      "first_document": {
+        "generations": [
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "requested": 150,
+        "transferred": 150,
+        "releases": 5
+      },
+      "reimport_document": {
+        "generations": [
+          1
+        ],
+        "requested": 32,
+        "transferred": 32,
+        "releases": 1
+      }
+    },
+    "released_scopes": [
+      {
+        "files": 0,
+        "bytes": 0,
+        "remainingFiles": 0
+      },
+      {
+        "files": 32,
+        "bytes": 18448886,
+        "remainingFiles": 0
+      },
+      {
+        "files": 27,
+        "bytes": 19073578,
+        "remainingFiles": 0
+      },
+      {
+        "files": 32,
+        "bytes": 18448886,
+        "remainingFiles": 0
+      },
+      {
+        "files": 27,
+        "bytes": 19073578,
+        "remainingFiles": 0
+      }
+    ],
+    "before_eject_state": {
+      "phase": 1,
+      "running": 0,
+      "message": "Paused after a timing disruption. Resume to continue.",
+      "source_steps": 1421,
+      "queued": 4,
+      "delivered": 92,
+      "cancelled": 4,
+      "status": "Paused",
+      "error": "",
+      "error_open": false,
+      "controls": {
+        "choose-disc": {
+          "disabled": false,
+          "visible": true
+        },
+        "start-game": {
+          "disabled": true,
+          "visible": true
+        },
+        "pause-game": {
+          "disabled": false,
+          "visible": true
+        },
+        "end-session": {
+          "disabled": false,
+          "visible": true
+        }
+      }
+    },
+    "reimport_css": {
+      "phase": 1,
+      "running": 1,
+      "message": "Original character select",
+      "source_steps": 0,
+      "queued": 0,
+      "delivered": 0,
+      "cancelled": 0,
+      "status": "Loading\u2026",
+      "error": "",
+      "error_open": false,
+      "controls": {
+        "choose-disc": {
+          "disabled": false,
+          "visible": true
+        },
+        "start-game": {
+          "disabled": true,
+          "visible": true
+        },
+        "pause-game": {
+          "disabled": false,
+          "visible": true
+        },
+        "end-session": {
+          "disabled": false,
+          "visible": true
+        }
+      }
+    },
+    "timing_acceptance": "not_evaluated; instrumented functional route; retained v1 timing pause is not an acceptance pass",
+    "no_automatic_timing_resume": true,
+    "bounded_observation_controls": {
+      "change": "Omit duplicate full timing/service callback payloads while retaining native asset transactions, timing summaries and source-step counts. No product code change.",
+      "runs": [
+        {
+          "local_path": "work/full-game/checkpoint-public-lifecycle-v3/report.json",
+          "sha256": "cf8007a1410ab0a73d6580b0941dd52c8530a93fbc5502960732a508658988a6",
+          "bytes": 790379,
+          "driver": {
+            "local_path": "work/full-game/public-scope-browser-v3.mjs",
+            "sha256": "a8db351c6a65361d4be1913e441fd6056949296e5ee3c6c47bf20a9aedfe41f8",
+            "bytes": 28614
+          },
+          "result": "functional_pass",
+          "scope_checks": {
+            "first_document": {
+              "generations": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ],
+              "requested": 150,
+              "transferred": 150,
+              "releases": 5
+            },
+            "reimport_document": {
+              "generations": [
+                1
+              ],
+              "requested": 32,
+              "transferred": 32,
+              "releases": 1
+            }
+          },
+          "post_snapshot_progress": {
+            "phase": 1,
+            "running": 1,
+            "message": "Original character select",
+            "source_steps": 1544,
+            "queued": 0,
+            "delivered": 92,
+            "cancelled": 8,
+            "status": "Loading\u2026",
+            "error": "",
+            "error_open": false,
+            "controls": {
+              "choose-disc": {
+                "disabled": false,
+                "visible": true
+              },
+              "start-game": {
+                "disabled": true,
+                "visible": true
+              },
+              "pause-game": {
+                "disabled": false,
+                "visible": true
+              },
+              "end-session": {
+                "disabled": false,
+                "visible": true
+              }
+            }
+          },
+          "post_snapshot_advancing_ticks": 120,
+          "errors": [],
+          "page_errors": [],
+          "console_errors": []
+        },
+        {
+          "local_path": "work/full-game/checkpoint-public-lifecycle-v4/report.json",
+          "sha256": "d130798bc657a5e5c924ba1942c22fc142d6620c651d2b55c1324f2998798a51",
+          "bytes": 792109,
+          "driver": {
+            "local_path": "work/full-game/public-scope-browser-v4.mjs",
+            "sha256": "e34d45f288ff36886137da0c720079bc4c8290f81da76ed23fb7be894d735337",
+            "bytes": 29130
+          },
+          "result": "functional_pass",
+          "scope_checks": {
+            "first_document": {
+              "generations": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ],
+              "requested": 150,
+              "transferred": 150,
+              "releases": 5
+            },
+            "reimport_document": {
+              "generations": [
+                1
+              ],
+              "requested": 32,
+              "transferred": 32,
+              "releases": 1
+            }
+          },
+          "post_snapshot_progress": {
+            "phase": 1,
+            "running": 1,
+            "message": "Original character select",
+            "source_steps": 1544,
+            "queued": 0,
+            "delivered": 92,
+            "cancelled": 8,
+            "status": "Loading\u2026",
+            "status_visible": false,
+            "loading_visible": false,
+            "error": "",
+            "error_open": false,
+            "controls": {
+              "choose-disc": {
+                "disabled": false,
+                "visible": true
+              },
+              "start-game": {
+                "disabled": true,
+                "visible": true
+              },
+              "pause-game": {
+                "disabled": false,
+                "visible": true
+              },
+              "end-session": {
+                "disabled": false,
+                "visible": true
+              }
+            }
+          },
+          "post_snapshot_advancing_ticks": 120,
+          "errors": [],
+          "page_errors": [],
+          "console_errors": []
+        }
+      ],
+      "ui_visibility": "v4 verifies both status and loading panels hidden in both active matches and after 120 advancing CSS ticks. Hidden Loading text is not a visible loading state.",
+      "interpretation": "Supports instrumentation sensitivity only; v1/v2 timing pauses remain retained. This is not a general performance or causal acceptance result.",
+      "automatic_timing_resumes": 0
+    }
+  },
+  "drawn_control": {
+    "local_path": "work/full-game/checkpoint-drawn-control-v2/core-comparison.json",
+    "sha256": "a74e993ff26c03e6910769d21884e4f26e5e0f613d6e572ead0179cd5f1cc5df",
+    "bytes": 961,
+    "capture_hashes": {
+      "port": "943d74e40f3b47e12355dd6398992a463ce2c0b0c3f784d12874036569fac8da",
+      "reference_a": "ce5561fc4e52b887006a2d90ddca764586b749c05ea5c2328ada97a80a1d69d3",
+      "reference_b": "616a5849655cc732446b0b50cb35e2663f4633fc64c3659b1157e2b5e9c509c5"
+    },
+    "checks": {
+      "entry": "pass",
+      "fighters": "pass",
+      "frame_count": "pass",
+      "inputs": "pass",
+      "match_frame": "pass",
+      "pad_state_hex": "pass",
+      "rng": "pass"
+    },
+    "first_divergence": null,
+    "first_divergence_by_group": {},
+    "frames_compared": 240,
+    "gold_admitted": false,
+    "performance": "not_evaluated",
+    "reference_cpu": "Interpreter64",
+    "reference_repeatability": "pass",
+    "scope": "declared entry data, supplied inputs, fighter fields, RNG and match clock, PAD configuration and all three history banks only; pixel agreement, hardware and audio output are excluded",
+    "source_drawing": "source_draws",
+    "status": "declared_state_match",
+    "report": {
+      "local_path": "work/full-game/checkpoint-drawn-control-v2/report.json",
+      "sha256": "8920e6292414608162fafa7f119ae998862faaf3b4f8f42a7bcb4d09cce40d65",
+      "bytes": 14473
+    },
+    "driver": {
+      "local_path": "work/full-game/checkpoint-drawn-control-v2.mjs",
+      "sha256": "8b15ff7ddc4b41150faf37310cf06e977cc7507e9591bb29c8418518517c9997",
+      "bytes": 2903
+    },
+    "build": {
+      "local_path": "work/full-game/checkpoint-dev-frozen-v1/prototype-build.json",
+      "sha256": "ac8892bba2b973510e3e5f09668c86cfb55c720d5e6393a15199a9cb66fb72d5",
+      "bytes": 3458
+    },
+    "retired": {
+      "phase": 0,
+      "running": 0,
+      "memory": {
+        "wasm_heap_bytes": 278396928,
+        "allocator_arena_bytes": 240787456,
+        "allocator_live_bytes": 138931952,
+        "allocator_free_bytes": 101855504,
+        "allocator_top_free_bytes": 624,
+        "match_present": false,
+        "menu_present": false,
+        "scoped_assets": true,
+        "asset_files": 0,
+        "asset_bytes": 0,
+        "asset_source_bytes": 0,
+        "staged_asset_files": 0,
+        "staged_asset_bytes": 0,
+        "asset_generation": 0
+      }
+    },
+    "complete_original_match": false
+  },
+  "review": [
+    {
+      "local_path": "work/full-game/public-scope-review-v1.md",
+      "sha256": "53b283d14a097ec25e1685323c714d24b0e44dd73f30ca4098be81c9d1d284d7",
+      "bytes": 2672
+    },
+    {
+      "local_path": "work/full-game/checkpoint-runtime-review-v1.md",
+      "sha256": "fb63ec24104c1bbe95a5d94fef1f8ef4423ade53d50ec3f2b7f257589f0fffad",
+      "bytes": 7449
+    },
+    {
+      "local_path": "work/full-game/checkpoint-public-gate-review-v1.md",
+      "sha256": "0fa04624e995a2d6c364d8ae2915023990122d455e0ed4d185aecef69429ec4f",
+      "bytes": 2496
+    }
+  ],
+  "review_adjudication": "Cumulative review identified Donkey public exposure and unverified public scopes as release blockers. Public Donkey exclusion is approved and checked; audited candidate, HTTP and browser evidence above close the scoped-loader release gate. No other concrete runtime finding remained.",
+  "retained_failures": [
+    {
+      "evidence": {
+        "local_path": "work/full-game/public-scope-package-v1.log",
+        "sha256": "b94018820bbf771cdbdb92e6a8744b3613a7ba2143473b31017f7c343883c438",
+        "bytes": 90
+      },
+      "cause": "Producer and packager required-export ordering differed. Corrected the list and added an equality regression; candidate packaging and audit pass."
+    },
+    {
+      "evidence": {
+        "local_path": "work/full-game/checkpoint-public-lifecycle-v1/report.json",
+        "sha256": "24bff45a083de9db0bbf4a38c68acd37feee6be957db4673bf41accf7772f24f",
+        "bytes": 11141167
+      },
+      "cause": "Both match loops and returns passed; the harness wrongly required requested/transfer order equality although the generated font is appended to the returned map. Native transactions require an exact complete name set. A timing pause was also observed and remains unaccepted performance evidence."
+    },
+    {
+      "evidence": {
+        "local_path": "work/full-game/checkpoint-drawn-control-v1/report.json",
+        "sha256": "7dc4fc79d6bcab0f59233aad6d9ba5d4f64a6b131f92ea1e5466eb972013651d",
+        "bytes": 19565
+      },
+      "cause": "240-update replay passed and unloaded itself. The runner then waited for the deliberately disabled Unload control. The corrected runner checks native phase/owners/file bytes after automatic replay retirement."
+    }
+  ],
+  "previous_checkpoint_ci": {
+    "commit": "3103b650e80246cee459e39c6cac68e83f7e4e10",
+    "url": "https://github.com/ericvanlare/melee-web/actions/runs/35533126120",
+    "result": "success",
+    "elapsed_seconds": 364,
+    "local_path": "work/full-game/asset-scope-github-verify-v1.json",
+    "sha256": "fd6a83d33be2f3a42e030f7291e33d980b22d203dec0eedc05552a94bc76d5a9",
+    "bytes": 40506
+  },
+  "rollback": {
+    "unchanged_production_url": "https://webmelee.gg",
+    "immutable_url": "https://61b8658f.webmelee.pages.dev",
+    "deployment_id": "61b8658f-7548-44d6-a788-0166d8053b0c",
+    "receipt": "docs/evidence/public-marth-pipeline-release-v1.json"
+  },
+  "remaining": [
+    "Issue50 Donkey original-consumer repair and public re-enablement",
+    "Results PR44 and independent audio PR42 remain separate drafts",
+    "Legacy native transition rumble/RNG reference reconciliation",
+    "Broader fighter/stage interactions, four-player modes and complete game scope",
+    "Original visual/PCM, physical input, retained-history memory and expanded cold/warm performance acceptance",
+    "Merge and hosted deployment verification have not run for this local candidate."
+  ]
+}

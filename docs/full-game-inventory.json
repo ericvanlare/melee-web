@@ -77,9 +77,10 @@
         "docs/FIGHTER_RUNTIME.md",
         "docs/CONTENT_CHECKS.md",
         "docs/SCENE_ASSET_LOADING.md",
-        "docs/evidence/full-game-checkpoint-asset-scope-v1.json"
+        "docs/evidence/full-game-checkpoint-asset-scope-v1.json",
+        "docs/evidence/production-checkpoint-20260920-v1.json"
       ],
-      "next_step": "Development menu/match scopes now close source/cache owners before transactional replacement. Extend the boundary to the public profile, four-player selections and additional mode graphs; measure retained live allocations across repeated complete lifetimes and split the remaining file/heap service inventory.",
+      "next_step": "Development and public menu/match scopes now close source/cache owners before transactional replacement. Extend to four-player selections and additional mode graphs; measure retained live allocations across repeated complete lifetimes and split the remaining file/heap service inventory.",
       "issue": null
     },
     {
@@ -198,10 +199,11 @@
         "docs/ADDING_CHARACTERS.md",
         "docs/ACCURACY_CONTRACT.md",
         "docs/DONKEY_KONG_PORT_NOTES.md",
-        "docs/evidence/full-game-checkpoint-donkey-v1.json"
+        "docs/evidence/full-game-checkpoint-donkey-v1.json",
+        "docs/evidence/production-checkpoint-20260920-v1.json"
       ],
-      "next_step": "Native five-costume FD lifetimes in both player orders pass with specials and raw cargo wait/walk/throw. A reviewed 15-descriptor preload clears fresh 33-case cold/warm FD sweeps over 14,000 frames. Resolve the reproduced Battlefield Pass shield-drop crash at undefined terminal SPL0 output using independent original consumer evidence; StopCeil and broader interactions remain untested. Original state/pixel/PCM and physical-input admission remain open.",
-      "issue": null
+      "next_step": "Public selection is disabled for the September 20 checkpoint. Resolve the reproduced Battlefield Pass shield-drop crash at undefined terminal SPL0 output using independent original consumer evidence before public re-enablement. Existing native five-costume lifetimes and 14,000 drawn FD action frames remain scoped development evidence; StopCeil, broader interactions and original/pixel/PCM/physical-input admission remain open.",
+      "issue": 50
     },
     {
       "id": "fighter-fox",
@@ -2693,9 +2695,10 @@
         "docs/HITCH_CAPTURE.md",
         "docs/TRANSITION_EQUIVALENCE.md",
         "docs/SCENE_ASSET_LOADING.md",
-        "docs/evidence/full-game-checkpoint-asset-scope-v1.json"
+        "docs/evidence/full-game-checkpoint-asset-scope-v1.json",
+        "docs/evidence/production-checkpoint-20260920-v1.json"
       ],
-      "next_step": "Development scoped import, delayed handoff, two match-to-CSS routes, unload/restart and drawn Mario/FD state comparison pass their declared checks. Extend public scoped loading and failure recovery, reconcile the legacy transition reference setup, and collect repeated-lifetime memory plus cold/warm performance evidence.",
+      "next_step": "Scoped development/public import and lifecycle checks retain their declared evidence. Reconcile the legacy transition reference setup, broaden failure recovery and modes, and collect repeated-lifetime memory plus cold/warm performance evidence.",
       "issue": null
     }
   ]

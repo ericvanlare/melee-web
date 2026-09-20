@@ -1,5 +1,31 @@
 # Current status
 
+## September 20 production checkpoint
+
+Feature additions are paused at PR #49. The candidate exposes fifteen public
+fighters and seven stages; Donkey Kong remains development-only under the
+owner-approved restriction tracked in [issue #50](https://github.com/ericvanlare/melee-web/issues/50).
+Both public and development players now load exact scene asset scopes from a
+validated local disc session. Public audio remains disabled.
+
+Both Release builds and the local 1,099-test suite pass (374.968 seconds,
+41 explicit skips). The subsequent Donkey restriction passes 26 focused menu
+and release checks. The audited production candidate passes local HTTP checks,
+all ten public browser checks, two ordinary-key Mario/FD pause/No Contest
+round trips, Eject/reload and reimport. Public menu and Mario/FD scopes contain
+32/27 inputs and 18,448,886/19,073,578 bytes. A fresh drawn Mario/FD control
+matches all 240 declared updates and PAD-history fields against the independent
+original pair and retires all native scene/file owners afterward.
+
+Retained harness failures and an instrumented timing pause are recorded. Two
+controls with reduced duplicate callback logging pass the same route and 120
+further CSS ticks without a resume; the final control verifies hidden loading
+panels. These lifecycle checks do not establish performance or complete-game
+acceptance.
+The candidate has not been merged or deployed. Final pushed-head GitHub checks
+are the merge gate; see the [release checkpoint](docs/PRODUCTION_CHECKPOINT_20260920.md)
+and [hash-bound receipt](docs/evidence/production-checkpoint-20260920-v1.json).
+
 ## Full-game integration branch
 
 `codex/full-game-integration` tracks the remaining offline vanilla game through
@@ -20,12 +46,16 @@ replay matches all 240 declared updates and PAD-history fields against the
 independent original v2 pair. The earlier missing Bowser voice-bank unload
 crash and two driver/recipe failures remain retained; see
 [scene asset ownership](docs/SCENE_ASSET_LOADING.md).
-The public player still uses the fixed all-game import. Public scoped loading,
-four-player residency and broader mode/lifetime checks remain open.
+The public player now uses the same scoped import while excluding DSP
+coefficients. Four-player residency and broader mode/lifetime checks remain open.
+New additions are paused for a production checkpoint with fifteen public
+fighters and seven stages. Donkey remains development-only pending
+[issue #50](https://github.com/ericvanlare/melee-web/issues/50).
 Both Release builds pass. The 1,096-test run took 366.767 seconds with
 41 skips and one stale artifact-count assertion; correcting that test yields
 four passing checks in the affected module. The original failed suite log is
-retained, with full GitHub verification pending for this checkpoint. See the
+retained. Commit `3103b65` subsequently passed full GitHub verification in
+6m 04s across all jobs. See the
 [scene-loading checkpoint receipt](docs/evidence/full-game-checkpoint-asset-scope-v1.json).
 The refreshed legacy native transition comparison fails on a rumble flag and
 match-entry RNG; a HEAD-derived driver reproduces the same event rows with

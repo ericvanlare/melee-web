@@ -131,6 +131,12 @@ int melee_web_menu_character_available(int ckind)
     /* Availability is intentionally narrower than the retail unlock table.
      * All CSS entries may be unlocked by the host; only implemented source
      * owners are admitted to this development boundary. */
+#if defined(MELEE_WEB_PUBLIC_RUNTIME)
+    /* Issue #50: the original platform-drop animation still reaches an
+     * unresolved terminal SPL0 consumer. Retain the development owner, but
+     * exclude this known crash from public selection until it is repaired. */
+    if (ckind == CKIND_DONKEY) return 0;
+#endif
     return melee_web_fighter_content(ckind) != NULL;
 }
 
@@ -222,7 +228,7 @@ static int match_selection_valid(const StartMeleeData* start)
         if (!melee_web_player_selection_supported(player) || player->stocks < 1 ||
             player->stocks > 5 ||
             player->rumble_enabled != (player->slot_type == Gm_PKind_Human) ||
-            content == NULL ||
+            content == NULL || !melee_web_menu_character_available(player->ckind) ||
             (player->slot ? player->slot - 1 : i) != i ||
             player->color >= content->costumes || player->sub_color > 4)
         {

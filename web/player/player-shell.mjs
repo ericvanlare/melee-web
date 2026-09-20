@@ -1,5 +1,6 @@
 import {mountMeleeRuntime} from '../melee-runtime.mjs';
 import {mountControllerSettings} from '../controller-settings.mjs';
+import {openNativeGameDiscSession} from '../runtime-assets.mjs';
 
 const $ = id => document.getElementById(id);
 let player, state, settings, currentError = '', requiresReload = false, hasStarted = false;
@@ -111,6 +112,7 @@ document.addEventListener('fullscreenchange', () => { $('fullscreen').textConten
 try {
   player = await mountMeleeRuntime({
     canvas: $('canvas'), onState: renderStatus, onError: error => showError(error),
+    openDisc: openNativeGameDiscSession,
   });
   await settings.bindPlayer(player);
 } catch (error) { showError(error, true); }
