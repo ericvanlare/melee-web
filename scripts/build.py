@@ -18,6 +18,10 @@ ROOT = Path(__file__).resolve().parents[1]
 PUBLIC_RUNTIME_TARGET = "runtime-public"
 PUBLIC_RUNTIME_CONFIGURATION = "Release"
 PUBLIC_RUNTIME_BUILD_DIR = "build/browser-public-release"
+AUDIO_PREVIEW_RUNTIME_TARGET = "runtime-audio-preview"
+AUDIO_PREVIEW_RUNTIME_CONFIGURATION = "Release"
+AUDIO_PREVIEW_RUNTIME_BUILD_DIR = "build/browser-audio-preview-release"
+AUDIO_PREVIEW_RUNTIME_EXECUTABLE = "gameplay_audio_preview"
 
 # These are the only lifecycle executables that the content-check workflow may
 # select directly.  Keep this list deliberately small and explicit: adding a
@@ -37,6 +41,7 @@ BUILD_TARGETS = {
     "gameplay": ("gameplay_checks",),
     "runtime": ("gameplay_menu_browser",),
     PUBLIC_RUNTIME_TARGET: (PUBLIC_RUNTIME_TARGET,),
+    AUDIO_PREVIEW_RUNTIME_TARGET: (AUDIO_PREVIEW_RUNTIME_EXECUTABLE,),
     "fighter": (
         "fighter_runtime_probe",
         "gameplay_effect_banks_trace",
@@ -70,6 +75,8 @@ def build_directory(root=ROOT, target="all", configuration="RelWithDebInfo", *,
     if pipeline_provenance:
         return root / ("build/browser-provenance-release" if configuration == "Release"
                        else "build/browser-provenance")
+    if target == AUDIO_PREVIEW_RUNTIME_TARGET:
+        return root / AUDIO_PREVIEW_RUNTIME_BUILD_DIR
     return root / (PUBLIC_RUNTIME_BUILD_DIR if target == PUBLIC_RUNTIME_TARGET else
                    ("build/browser-release" if configuration == "Release" else "build/browser"))
 
@@ -422,6 +429,118 @@ def _public_audio_graph_proof(root, build_dir):
     }
 
 
+def _audio_preview_graph_proof(root, build_dir):
+    """Capture source/link proof for the isolated audio-enabled preview graph."""
+    ninja_path = build_dir / "build.ninja"
+    if ninja_path.is_symlink() or not ninja_path.is_file():
+        raise ValueError(f"{ninja_path}: audio preview build graph is missing")
+    ninja_text = ninja_path.read_text(encoding="utf-8")
+    target_block = _ninja_build_block(ninja_text, "gameplay_audio_preview.js")
+    source_archive_block = _ninja_build_block(
+        ninja_text, "libfighter_source_runtime_audio_preview.a"
+    )
+    asset_archive_block = _ninja_build_block(
+        ninja_text, "libfighter_asset_runtime_audio_preview.a"
+    )
+    all_graph = "\n".join(target_block + source_archive_block + asset_archive_block)
+    required_sources = (
+        "gameplay_audio_resample.c",
+        "gameplay_audio_fx.c",
+        "gameplay_audio_stream.c",
+    )
+    missing_sources = [name for name in required_sources if name not in all_graph]
+    if missing_sources:
+        raise ValueError(
+            "audio preview Ninja graph omits audio provider sources: "
+            + ", ".join(missing_sources)
+        )
+    forbidden_archives = (
+        "libfighter_source_runtime.a",
+        "libfighter_asset_runtime.a",
+        "libfighter_source_runtime_public.a",
+        "libfighter_asset_runtime_public.a",
+    )
+    private_archive_inputs = [name for name in forbidden_archives if name in all_graph]
+    if private_archive_inputs:
+        raise ValueError(
+            "audio preview Ninja graph references an unreviewed fighter archive: "
+            + ", ".join(private_archive_inputs)
+        )
+
+    try:
+        compile_commands = json.loads(
+            (build_dir / "compile_commands.json").read_text(encoding="utf-8")
+        )
+    except (OSError, json.JSONDecodeError) as error:
+        raise ValueError(f"{build_dir}: audio preview compile command database is unavailable") from error
+    preview_entries = [
+        entry for entry in compile_commands
+        if isinstance(entry, dict)
+        and "fighter_source_runtime_audio_preview.dir" in entry.get("command", "")
+    ]
+    audio_commands = [
+        entry for entry in preview_entries
+        if entry.get("file", "").endswith("/src/gameplay_audio.c")
+    ]
+    resampler_commands = [
+        entry for entry in preview_entries
+        if entry.get("file", "").endswith("/src/gameplay_audio_resample.c")
+    ]
+    if len(audio_commands) != 1 or len(resampler_commands) != 1:
+        raise ValueError(
+            "audio preview compile commands do not prove the audio provider closure"
+        )
+    audio_command = audio_commands[0].get("command", "")
+    resampler_command = resampler_commands[0].get("command", "")
+    if "MELEE_WEB_PUBLIC_RUNTIME" not in audio_command:
+        raise ValueError("audio preview gameplay_audio.c compile command lacks path redaction")
+    if "MELEE_WEB_PUBLIC_AUDIO_DISABLED" in " ".join(
+        entry.get("command", "") for entry in preview_entries
+    ):
+        raise ValueError("audio preview compile commands contain the silent audio definition")
+    if "MELEE_WEB_PUBLIC_AUDIO_DISABLED" in resampler_command:
+        raise ValueError("audio preview resampler compile command contains the silent audio definition")
+
+    def tokens(block):
+        return [
+            token for token in " ".join(block).split()
+            if token.startswith("CMakeFiles/") or token.startswith("lib")
+        ]
+
+    return {
+        "schema": "melee-web-audio-preview-graph-v1",
+        "target": "gameplay_audio_preview",
+        "required_sources": list(required_sources),
+        "ninja": {
+            "path": ninja_path.relative_to(root).as_posix(),
+            "target_statement_sha256": hashlib.sha256("\n".join(target_block).encode()).hexdigest(),
+            "source_archive_statement_sha256": hashlib.sha256("\n".join(source_archive_block).encode()).hexdigest(),
+            "asset_archive_statement_sha256": hashlib.sha256("\n".join(asset_archive_block).encode()).hexdigest(),
+            "target_inputs": tokens(target_block),
+            "source_archive_inputs": tokens(source_archive_block),
+            "asset_archive_inputs": tokens(asset_archive_block),
+        },
+        "compile_commands": {
+            "path": (build_dir / "compile_commands.json").relative_to(root).as_posix(),
+            "audio_command_sha256": hashlib.sha256(audio_command.encode()).hexdigest(),
+            "resampler_command_sha256": hashlib.sha256(resampler_command.encode()).hexdigest(),
+            "audio_object": "CMakeFiles/fighter_source_runtime_audio_preview.dir/src/gameplay_audio.c.o",
+            "resampler_object": "CMakeFiles/fighter_source_runtime_audio_preview.dir/src/gameplay_audio_resample.c.o",
+            "resampler_compile_commands": len(resampler_commands),
+        },
+        "checks": {
+            "resampler_c_in_audio_preview_ninja_graph": "gameplay_audio_resample.c" in all_graph,
+            "fx_c_in_audio_preview_ninja_graph": "gameplay_audio_fx.c" in all_graph,
+            "stream_c_in_audio_preview_ninja_graph": "gameplay_audio_stream.c" in all_graph,
+            "public_audio_disabled_in_preview_compile_commands": any(
+                "MELEE_WEB_PUBLIC_AUDIO_DISABLED" in entry.get("command", "")
+                for entry in preview_entries
+            ),
+            "private_fighter_archive_in_preview_ninja_graph": bool(private_archive_inputs),
+        },
+    }
+
+
 def _source_inputs_record(root, gameplay_source):
     """Return the complete native-input fingerprint used by the producer."""
     root_files = {
@@ -547,6 +666,74 @@ def _write_public_identity(root, build_dir, version, cmake, ninja, gameplay_sour
     return identity_path
 
 
+def _write_audio_preview_identity(root, build_dir, version, cmake, ninja,
+                                  gameplay_source, expected_source_inputs=None):
+    """Write the source-bound identity for the audio-enabled staging runtime."""
+    artifact_names = (
+        f"{AUDIO_PREVIEW_RUNTIME_EXECUTABLE}.js",
+        f"{AUDIO_PREVIEW_RUNTIME_EXECUTABLE}.wasm",
+        f"{AUDIO_PREVIEW_RUNTIME_EXECUTABLE}.data",
+    )
+    artifacts = []
+    for name in artifact_names:
+        path = build_dir / name
+        if path.is_symlink() or not path.is_file():
+            raise ValueError(f"{path}: audio preview runtime artifact is missing or a symlink")
+        artifacts.append(_file_record(path, root))
+    wasm = build_dir / f"{AUDIO_PREVIEW_RUNTIME_EXECUTABLE}.wasm"
+    javascript = build_dir / f"{AUDIO_PREVIEW_RUNTIME_EXECUTABLE}.js"
+    exports = _verify_public_exports(wasm, javascript)
+    source_inputs = _source_inputs_record(root, gameplay_source)
+    if expected_source_inputs is not None and source_inputs != expected_source_inputs:
+        raise ValueError("native source inputs changed during the audio preview runtime build")
+    emscripten_version = root / ".deps/emsdk/upstream/emscripten/emscripten-version.txt"
+    emscripten_config = root / ".deps/emsdk/.emscripten"
+    emcc = root / ".deps/emsdk/upstream/emscripten/emcc"
+    tool_paths = (emscripten_version, emscripten_config, emcc, cmake, ninja)
+    tool_hashes = {
+        path.relative_to(root).as_posix(): _sha256(path)
+        for path in tool_paths
+    }
+    identity = {
+        "schema": "melee-web-runtime-audio-preview-build-v1",
+        "target": AUDIO_PREVIEW_RUNTIME_TARGET,
+        "configuration": AUDIO_PREVIEW_RUNTIME_CONFIGURATION,
+        "artifact_root": build_dir.relative_to(root).as_posix(),
+        "artifacts": artifacts,
+        "wasm_exports": exports,
+        "audio_policy": {
+            "mode": "enabled-preview",
+            "pcm_output": True,
+            "dsp_resampler": True,
+            "dsp_coefficients_required": True,
+        },
+        "audio_graph": _audio_preview_graph_proof(root, build_dir),
+        "source_inputs": source_inputs,
+        "toolchain": {
+            "emscripten": version,
+            "sha256": tool_hashes,
+            "cmake": subprocess.check_output([str(cmake), "--version"], text=True).splitlines()[0],
+            "ninja": subprocess.check_output([str(ninja), "--version"], text=True).strip(),
+        },
+        "pipeline_seed": _pipeline_seed_record(root, build_dir),
+        "upload_convention": {
+            "group": "audio preview artifacts plus the reviewed staging-player files",
+            "identity_path": "build/runtime-audio-preview-identity.json",
+            "identity_is_outside_artifact_root": True,
+        },
+    }
+    identity_path = root / "build/runtime-audio-preview-identity.json"
+    if identity_path.is_symlink():
+        raise ValueError(f"{identity_path}: identity sidecar must not be a symlink")
+    identity_path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = identity_path.with_name(identity_path.name + ".tmp")
+    if temporary.is_symlink():
+        raise ValueError(f"{temporary}: refusing a symlink identity temporary")
+    temporary.write_text(json.dumps(identity, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    temporary.replace(identity_path)
+    return identity_path
+
+
 def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
           pipeline_provenance=False, selective_pipelines=False, configure_only=False,
           trace_targets=None):
@@ -559,17 +746,17 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
             raise ValueError(f"Unsupported trace target: {unknown[0]}")
         if pipeline_provenance or selective_pipelines:
             raise ValueError("trace targets require the private development build")
-    if configure_only and target == PUBLIC_RUNTIME_TARGET:
-        # The public target writes an identity sidecar only after a complete
-        # build.  A configure-only invocation must not leave an apparently
-        # usable public identity next to stale artifacts.
-        raise ValueError("--configure-only cannot be used with runtime-public")
+    if configure_only and target in {PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET}:
+        # Release profiles write an identity sidecar only after a complete
+        # build. A configure-only invocation must not leave an apparently
+        # usable identity next to stale artifacts.
+        raise ValueError(f"--configure-only cannot be used with {target}")
     if selective_pipelines and (target not in {"runtime", PUBLIC_RUNTIME_TARGET} or pipeline_provenance):
         raise ValueError("--selective-pipelines requires runtime/runtime-public without --pipeline-provenance")
     if pipeline_provenance and target != "runtime":
         raise ValueError("--pipeline-provenance requires the private runtime target")
-    if target == PUBLIC_RUNTIME_TARGET and configuration != PUBLIC_RUNTIME_CONFIGURATION:
-        raise ValueError("runtime-public is Release-only; pass --configuration Release")
+    if target in {PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET} and configuration != "Release":
+        raise ValueError(f"{target} is Release-only; pass --configuration Release")
     lock = read_lock(root)
     verify_sources(root, lock)
     # Registry strings/counts are generated from the pinned source, not game
@@ -607,14 +794,17 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
         raise ValueError("Build output must be a local directory, not a symlink")
     source_inputs_before = (
         _source_inputs_record(root, gameplay_source)
-        if target == PUBLIC_RUNTIME_TARGET else None
+        if target in {PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET} else None
     )
     configure = [str(emcmake), str(cmake), "-S", str(root), "-B", str(build_dir),
                  "-G", "Ninja", f"-DCMAKE_BUILD_TYPE={configuration}",
                  f"-DMELEE_WEB_GAMEPLAY_SOURCE_DIR={gameplay_source}",
                  f"-DCMAKE_MAKE_PROGRAM={ninja}"]
     configure.append(
-        f"-DMELEE_WEB_PUBLIC_RUNTIME={'ON' if target == PUBLIC_RUNTIME_TARGET else 'OFF'}"
+        f"-DMELEE_WEB_PUBLIC_RUNTIME={'ON' if target in {PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET} else 'OFF'}"
+    )
+    configure.append(
+        f"-DMELEE_WEB_AUDIO_PREVIEW_RUNTIME={'ON' if target == AUDIO_PREVIEW_RUNTIME_TARGET else 'OFF'}"
     )
     configure.append(f"-DMELEE_WEB_PIPELINE_PROVENANCE={'ON' if pipeline_provenance else 'OFF'}")
     configure.append(f"-DMELEE_WEB_SELECTIVE_PIPELINES={'ON' if selective_pipelines else 'OFF'}")
@@ -624,20 +814,27 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
     targets = trace_targets if trace_targets else BUILD_TARGETS[target]
     subprocess.run([str(cmake), "--build", str(build_dir), "--target", *targets, "-j", str(jobs)],
                    cwd=root, env=env, check=True)
-    if target == PUBLIC_RUNTIME_TARGET:
+    if target in {PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET}:
         if _source_inputs_record(root, gameplay_source) != source_inputs_before:
-            raise ValueError("native source inputs changed during the public runtime build")
-        identity_path = _write_public_identity(
-            root, build_dir, version, cmake, ninja, gameplay_source,
-            expected_source_inputs=source_inputs_before,
-        )
+            raise ValueError(f"native source inputs changed during the {target} build")
+        if target == PUBLIC_RUNTIME_TARGET:
+            identity_path = _write_public_identity(
+                root, build_dir, version, cmake, ninja, gameplay_source,
+                expected_source_inputs=source_inputs_before,
+            )
+        else:
+            identity_path = _write_audio_preview_identity(
+                root, build_dir, version, cmake, ninja, gameplay_source,
+                expected_source_inputs=source_inputs_before,
+            )
         print(f"Wrote {identity_path.relative_to(root)}")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--jobs", type=int, default=min(os.cpu_count() or 2, 6))
-    parser.add_argument("--target", choices=("graphics", "gameplay", "fighter", "runtime", PUBLIC_RUNTIME_TARGET, "all"))
+    parser.add_argument("--target", choices=("graphics", "gameplay", "fighter", "runtime",
+                                              PUBLIC_RUNTIME_TARGET, AUDIO_PREVIEW_RUNTIME_TARGET, "all"))
     parser.add_argument("--trace-target", dest="trace_targets", choices=TRACE_TARGETS,
                         action="append",
                         help="Build one reviewed lifecycle trace; repeat for multiple traces")

@@ -225,7 +225,11 @@ assert.equal(calls.slice(failedStart).filter(row => row[0] === 'free').length, f
   'A native transfer error frees the current batch allocations');
 failedFile = null;
 await pump(player.importDisc({name: 'owned.iso'}));
-await pump(player.start());
+const startCalls = calls.length;
+const starting = player.start();
+if (withAudio) assert.ok(calls.slice(startCalls).some(row => row[0] === 'worklet'),
+  'Play must initialize Web Audio before yielding to native preparation');
+await pump(starting);
 assert.equal(player.getState().scene, 'css');
 assert.equal(player.getState().canPause, true);
 if (withAudio) assert.ok(calls.findIndex(row => row[0] === 'audioResume') < calls.findIndex(row => row[0] === 'launch'));

@@ -14,8 +14,12 @@ set(BUILD_SHARED_LIBS OFF CACHE BOOL "Static dependencies" FORCE)
 # policy while covering the native sources and pinned dependencies compiled in
 # this directory.
 option(MELEE_WEB_PUBLIC_RUNTIME "Redact local paths from public artifacts" OFF)
+option(MELEE_WEB_AUDIO_PREVIEW_RUNTIME "Build the Release audio-enabled staging runtime" OFF)
 option(MELEE_WEB_PIPELINE_PROVENANCE "Private pipeline-use coverage recorder" OFF)
 option(MELEE_WEB_SELECTIVE_PIPELINES "Prepare certified descriptor unions before source interaction" OFF)
+if(MELEE_WEB_AUDIO_PREVIEW_RUNTIME AND NOT MELEE_WEB_PUBLIC_RUNTIME)
+  message(FATAL_ERROR "Audio preview runtime must use the redacted public source boundary")
+endif()
 if(MELEE_WEB_SELECTIVE_PIPELINES)
   if(MELEE_WEB_PIPELINE_PROVENANCE)
     message(FATAL_ERROR "Capture the complete seed separately from selective preparation")
