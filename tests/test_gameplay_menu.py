@@ -13,6 +13,12 @@ from check_gameplay import node_runtime
 
 class GameplayMenuContractTests(unittest.TestCase):
     def test_lifecycle_boundary_and_return_contract(self):
+        self.run_contract(public=False)
+
+    def test_public_donkey_exclusion_at_css_and_final_match_handoff(self):
+        self.run_contract(public=True)
+
+    def run_contract(self, *, public):
         sdk = ROOT / ".deps/emsdk"
         compiler = sdk / "upstream/emscripten/emcc"
         config = sdk / ".emscripten"
@@ -28,6 +34,7 @@ class GameplayMenuContractTests(unittest.TestCase):
             result = subprocess.run(
                 [
                     str(compiler), "-Wall", "-Wextra", "-Werror", "-DAURORA",
+                    *(["-DMELEE_WEB_PUBLIC_RUNTIME"] if public else []),
                     "-DTARGET_PC", "-I", str(ROOT / "src"), "-I",
                     str(ROOT / "build/gameplay-source/src"), "-I",
                     str(ROOT / ".deps/aurora/include"), "-I",
@@ -37,6 +44,7 @@ class GameplayMenuContractTests(unittest.TestCase):
                     str(ROOT / "src/gameplay_compat.h"),
                     str(ROOT / "src/gameplay_menu.c"),
                     str(ROOT / "src/gameplay_match_rules.c"),
+                    str(ROOT / "tests/native_menu_fighter_input.c"),
                     str(ROOT / "tests/gameplay_menu_trace.c"),
                     "-sENVIRONMENT=node", "-sEXIT_RUNTIME=1", "-o", str(output),
                 ], cwd=ROOT, env=env, capture_output=True, text=True, timeout=120,

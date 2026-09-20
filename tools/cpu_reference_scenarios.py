@@ -66,6 +66,7 @@ CHARACTERS = {
     "Mario": 8,
     "Marth": 9,
     "Falco": 20,
+    "Ganondorf": 25,
 }
 STAGES = {
     "Yoshis Story": 8,
@@ -250,6 +251,12 @@ SCENARIOS: dict[str, dict[str, Any]] = {
         [_player(1, "Mario", 0, "human"), _player(2, "Fox", 1, "cpu", 1)],
         0,
     ),
+    "ganondorf-human-vs-mario-cpu1-final-destination": _scenario(
+        "ganondorf-human-vs-mario-cpu1-final-destination",
+        "Final Destination",
+        [_player(1, "Ganondorf", 0, "human"), _player(2, "Mario", 1, "cpu", 1)],
+        0,
+    ),
     ACTIVE_THREE_PLAYER_SCENARIO_ID: _scenario(
         ACTIVE_THREE_PLAYER_SCENARIO_ID,
         "Yoshis Story",
@@ -382,8 +389,8 @@ def validate_catalog() -> None:
     summary = catalog_summary()
     if summary["distinct_cpu_levels"] != [1, 3, 5, 6, 8, 9]:
         raise ValueError("catalog must cover the six requested distinct CPU levels")
-    if summary["characters"] != ["Falco", "Fox", "Mario", "Marth"]:
-        raise ValueError("catalog must cover all four requested characters")
+    if summary["characters"] != ["Falco", "Fox", "Ganondorf", "Mario", "Marth"]:
+        raise ValueError("catalog must cover all five requested characters")
     if summary["stages"] != ["Dream Land", "Final Destination", "Yoshis Story"]:
         raise ValueError("catalog must cover the three requested stages")
 

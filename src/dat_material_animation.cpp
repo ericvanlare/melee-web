@@ -140,8 +140,6 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
             t.image_table[i] = &t.images[i];
         }
         t.palettes.resize(np); t.palette_table.resize(np);
-        for (const auto& im : images)
-            require(np || (im.format != 8 && im.format != 9 && im.format != 10), "Indexed animated image requires palettes");
         const auto ao = required(*offset+8,16); record(ao,16);
         const auto flags = a.be32(ao); const auto end = a.f32(ao+4);
         require(!(flags & ~0x30000000U) && std::isfinite(end) && end >= 0 && end <= 65535,
@@ -201,11 +199,7 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
                 palette_track->descriptor.frac_value &&
             image_track->bytes == palette_track->bytes;
 
-        auto validate_image_palette = [&](uint32_t image_index,
-                                          uint32_t palette_index) {
-            const auto& im = images[image_index];
-            require(im.format == 8 || im.format == 9 || im.format == 10,
-                    "Palette animation requires indexed images");
+        auto maximum_index = [&](const DatTextureImage& im) {
             auto found = image_max_indices.find(im.descriptor_offset);
             if (found == image_max_indices.end()) {
                 palette_validation_bytes += im.bytes.size();
@@ -214,18 +208,58 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
                 found = image_max_indices.emplace(im.descriptor_offset,
                     dat_texture_max_palette_index(im)).first;
             }
-            const auto offset_palette = required(*pt + 4 * palette_index, 16);
-            const auto pal = read_dat_texture_palette_descriptor(
-                a, offset_palette, im.format);
-            require(found->second < pal.entries,
-                    "Image references an index outside its TLUT palette");
+            return found->second;
+        };
+        auto store_palette = [&](uint32_t palette_index, const DatTexturePalette& pal) {
             t.palettes[palette_index] = {
                 const_cast<uint8_t*>(pal.bytes.data()),
                 static_cast<GXTlutFmt>(pal.format), pal.source_name, pal.entries};
             t.palette_table[palette_index] = &t.palettes[palette_index];
         };
+        auto validate_image_palette = [&](uint32_t image_index,
+                                          uint32_t palette_index) {
+            const auto& im = images[image_index];
+            const bool indexed = im.format == 8 || im.format == 9 || im.format == 10;
+            const auto offset_palette = required(*pt + 4 * palette_index, 16);
+            // HSD_TObjUpdateFunc updates TIMG and TCLT independently. The
+            // selected TLUT is consumed by HSD_TObjSetup only for CI images;
+            // I/IA/RGB/CMPR images still require an authored TLUT descriptor
+            // and an in-range TCLT table index, but do not interpret palette
+            // entries for their pixels. Use the largest GX CI table capacity
+            // for this descriptor-only non-CI path.
+            const auto pal = read_dat_texture_palette_descriptor(
+                a, offset_palette, indexed ? im.format : 10);
+            if (indexed) {
+                const auto maximum = maximum_index(im);
+                if (maximum >= pal.entries)
+                    throw DatError("Animated image references an index outside its TLUT palette: texture=" +
+                        std::to_string(*offset) + " image=" + std::to_string(im.descriptor_offset) +
+                        " palette=" + std::to_string(offset_palette) + " image_index=" +
+                        std::to_string(image_index) + " palette_index=" + std::to_string(palette_index) +
+                        " maximum=" + std::to_string(maximum) + " entries=" +
+                        std::to_string(pal.entries));
+            }
+            store_palette(palette_index, pal);
+        };
 
-        if (synchronized_index_tracks) {
+        if (!palette_track) {
+            // HSD_TObjAddAnim resets tlut_no to -1. TIMG only changes the
+            // image; without TCLT, HSD_TObjSetup keeps the model's base TLUT.
+            // Retain every authored table descriptor, but do not pair these
+            // unselected palettes with animated images.
+            for (uint32_t p = 0; p < np; ++p)
+                store_palette(p, read_dat_texture_palette_descriptor(
+                    a, required(*pt + 4*p, 16), 10));
+            for (const auto& im : images) {
+                if (im.format != 8 && im.format != 9 && im.format != 10) continue;
+                const auto& base = native_texture->texture;
+                require(base.palette_data && base.palette_entries &&
+                        base.palette_bytes >= size_t(base.palette_entries)*2,
+                        "Indexed animated image requires the source base palette");
+                require(maximum_index(im) < base.palette_entries,
+                        "Animated image references an index outside its source base TLUT palette");
+            }
+        } else if (synchronized_index_tracks) {
             for (uint32_t i = 0; i < ni; ++i)
                 validate_image_palette(i, i);
         } else {

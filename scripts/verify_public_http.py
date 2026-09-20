@@ -15,7 +15,7 @@ BLOCKED_PATHS = (
     '/runtime.html', '/prototype.html', '/viewer.html', '/native-menu.html',
     '/hitch-capture.mjs', '/tests/', '/docs/', '/work/', '/build/',
     '/.git/config', '/_worker.js', '/assets/', '/unrecognized-test-route',
-    '/_headers', '/_redirects', '/disc-image.mjs', '/runtime-cache.js',
+    '/_headers', '/_redirects', '/disc-image.mjs', '/disc-session.mjs', '/runtime-cache.js',
     '/runtime/',
     '/dsp-coefficients.mjs', '/runtime-audio-assets.mjs', '/runtime-audio.mjs',
     '/audio-worklet.js', '/audio-ring.mjs', '/dsp_coef.bin',

@@ -56,7 +56,7 @@ try {
     if (selective) {
       assert.equal(selective.policy, 'catalog');
       assert.equal(selective.selected, 626);
-      assert.equal(selective.binding_sha256, '4bdb7c4a3e906d907d066f0c65041d7eb3472dc25c9d8c98be6e4946fdce560f');
+      assert.equal(selective.binding_sha256, '122eaece4fce109e9f2c958de8b0bb7315ccb670dab349eb2090da1f2fd589a6');
       assert.equal(selective.unexpected_count, 0);
       assert(await page.evaluate(() => Module.FS.stat('/initial_pipeline_cache.db').size > 0));
       assert.deepEqual(await page.evaluate(() => Module.FS.readdir('/melee-render-cache').filter(name => !['.', '..'].includes(name))), [],

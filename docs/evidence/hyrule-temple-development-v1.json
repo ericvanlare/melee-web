@@ -1,0 +1,296 @@
+{
+  "schema": "melee-web-temple-development",
+  "version": 1,
+  "status": "native_stage_and_match_lifetimes_and_scoped_browser_entry_pair_pass",
+  "source_commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+  "stage": {
+    "stage_kind": 14,
+    "ground_kind": 7,
+    "archive": "GrSh.dat",
+    "scale": 0.9,
+    "map_ids": [
+      0,
+      1,
+      2
+    ],
+    "animation_consumers": [
+      1,
+      1,
+      1
+    ],
+    "collision_vertices": 98,
+    "collision_lines": 91,
+    "collision_joints": 11,
+    "global_lights": 3,
+    "item_table": "authored_empty",
+    "particle_banks": "both_public_roots_absent",
+    "yakumono": "present_opaque_four_byte_public_root"
+  },
+  "assets": {
+    "shrine.hps": "9a3382bd4bdadf6f6cbe8af251c240e6e503ef20dfacf542785ff983f9fb8feb",
+    "GrSh.dat": "3129fe18a0fc954a07467a65e1d3649a6868e32c0ab4a89d484ddfb230acfdd8",
+    "akaneia.hps": "da00a3eb181121217b0fd70c8368c382333e034ec5e135085395a8b348da1f46"
+  },
+  "native": {
+    "status": "pass",
+    "cycles": 2,
+    "source_ticks_per_cycle": 120,
+    "scope": "Original stage OnInit, map callbacks, exact scaled markers/bounds/live global lights, identity overrides, one authored floor-chain query, four forced music masks, immutable archive and zero-object teardown. Does not instantiate a GameplayMatchSession.",
+    "map_mask": 7,
+    "global_light_flags": [
+      4,
+      1025,
+      13
+    ],
+    "global_light_overrides": [
+      0,
+      32,
+      192
+    ],
+    "live_light_positions": [
+      -8.1,
+      6.75,
+      7.2,
+      -6.3,
+      1.8,
+      6.2752975
+    ],
+    "music_candidates": [
+      75,
+      1,
+      75,
+      1
+    ],
+    "log_local_path": "work/full-game/temple-native-v7.log",
+    "log_sha256": "db9e1922b0cac874d65f9b2613815e2c6172a711eea65b39bc57f914756b92aa",
+    "build_log_sha256": "5ae7288099466ce7fb4ee5c7ab8481a27f789e5aaa57d91363d994fcffbfe886",
+    "source_state_repair_in_probes": false
+  },
+  "retained_fixture_failures": [
+    {
+      "local_path": "work/full-game/temple-native-v1.log",
+      "sha256": "5dfcd5304b1127474c52625c2e36bfe23526b071b198bc85191b9476ec416952",
+      "cause": "Broad light-list assertion",
+      "runtime_semantics_changed_for_failure": false
+    },
+    {
+      "local_path": "work/full-game/temple-native-v2.log",
+      "sha256": "b942d02a69dd7becafa7033b7da80c60a0231f33967b0a45b119828fb26841ea",
+      "cause": "Expected serialized flags rather than original Ground override results",
+      "runtime_semantics_changed_for_failure": false
+    },
+    {
+      "local_path": "work/full-game/temple-native-v3.log",
+      "sha256": "c0ac840c0a28bba525dd352ef3376ccc9c3bcccab2c170afda5ce5d8ec169bee",
+      "cause": "Live light coordinates expected from incorrect serialized layout",
+      "runtime_semantics_changed_for_failure": false
+    },
+    {
+      "local_path": "work/full-game/temple-native-v4.log",
+      "sha256": "d3b30222473e8a41cdb3a952551cfcc7e7f4d23f5af0bc8bbdf8122a5edaed82",
+      "cause": "Diagnostic confirms actual scaled coordinates",
+      "runtime_semantics_changed_for_failure": false
+    },
+    {
+      "local_path": "work/full-game/temple-native-v5.log",
+      "sha256": "36e679b9896095a57119559e5c80933b6aa6b36ad6986fa5044065a4d2012cec",
+      "cause": "Global light identities incorrectly queried through map-entry owner",
+      "runtime_semantics_changed_for_failure": false
+    },
+    {
+      "local_path": "work/full-game/temple-native-v6.log",
+      "sha256": "a47e9d949ca256dd629c972d0de5d83c7d710ce1f18cd81854219852e7de2cbe",
+      "cause": "Floor-chain query used x0 outside selected island",
+      "runtime_semantics_changed_for_failure": false
+    }
+  ],
+  "remaining": [
+    "full_fighter_stage_matrix",
+    "independent_original_comparison",
+    "cold_warm_performance",
+    "random_and_unlock_music_branches",
+    "pixels",
+    "pcm",
+    "physical_input"
+  ],
+  "full_stage_admitted": false,
+  "light_coordinate_proof": {
+    "local_path": "work/full-game/temple-light-coordinate-proof-v1.json",
+    "sha256": "1471aac505ad282ba04d9aef96529b6456d3b19c5ebed242c19c82b801cb10f7",
+    "ABI": "HSD_WObjDesc Vec3 begins at byte4 after class_name"
+  },
+  "native_match": {
+    "status": "pass",
+    "cycles": 2,
+    "players": "Mario/Mario",
+    "scope": "Explicit four-stock source start, original Ready, 120 source ticks with stocks retained, source pause, L+R+A+Start No Contest, completion and idempotent teardown to zero objects. Not a CSS/SSS input or complete elimination match.",
+    "log_local_path": "work/full-game/temple-native-v8.log",
+    "log_sha256": "bf3594000e157fee236d6915c5a61bfb47e923aafca0fe945f06ad799ef5196e",
+    "build_log_sha256": "57ff9c487e431dc9d690d819621e43fb694c110ccf5416f94a8a27f513df0746"
+  },
+  "browser_entry": {
+    "status": "functional_entry_pass",
+    "scope": "Original Mario/Mario CSS/SSS raw PAD input to Temple and 30 advancing drawn source frames; timing failure retained.",
+    "report_local_path": "work/full-game/temple-browser-entry-v2/report.json",
+    "report_sha256": "3517b029fbef6a2099c9ff3c7be23b0f6ab1a5536024e18646e55e176de64a5b",
+    "plan_local_path": "work/full-game/temple-browser-entry-plan-v2.json",
+    "plan_sha256": "d84238657ed61875a3bd917218b726a1b51df01ca045df083f74000dd01566ff",
+    "browser": "153.0.8010.50",
+    "source_player_before": {
+      "fighterKind": 0,
+      "motion": 14,
+      "groundAir": 0,
+      "frame": 3,
+      "x": -92.69999694824219,
+      "y": 15.299407005310059
+    },
+    "source_player_after": {
+      "fighterKind": 0,
+      "motion": 14,
+      "groundAir": 0,
+      "frame": 33,
+      "x": -92.69999694824219,
+      "y": 15.299407005310059
+    },
+    "entry_timing_resumes": 1,
+    "screenshot_metrics": {
+      "worst_browser_interval_ms": 815.1,
+      "hard_browser_gaps": 2,
+      "worst_native_callback_ms": 801.65,
+      "native_over_budget": 3,
+      "native_over_33ms": 2,
+      "audio_underrun_frames": 64,
+      "browser_long_tasks": 1,
+      "browser_long_task_worst_ms": 69.0
+    },
+    "timing_pass": false
+  },
+  "browser_fixture_failure": {
+    "local_path": "work/full-game/temple-browser-entry-v1/report.json",
+    "sha256": "784776395c5cfd8f649bc7c15de0f5f42b38e82c6159c0af5a47eb40b6967f03",
+    "cause": "Default Mario requires original initial30-tick CSS Start cooldown; driver waited15 for the changed-selection10-tick case. Source correctly ignored early Start. v2 waits35 source ticks; no game code changed."
+  },
+  "pipeline_preload": {
+    "status": "reviewed_seed_and_scoped_entry_followup_pass",
+    "added_pipelines": 16,
+    "preserved_base_rows": 700,
+    "seed_rows": 716,
+    "pipeline_rows": 715,
+    "seed_bytes": 2981888,
+    "seed_sha256": "8ed7b36627f2580a46bfb708d8f461f0b2309a02bdf1eaafaa87e8248457c7f8",
+    "review_local_path": "work/full-game/temple-cache-review-v1.json",
+    "review_sha256": "c330f795fb84f47975ef66fce742eee18752918ba0c28fd89dadde8e54f86f93"
+  },
+  "browser_entry_pair": {
+    "status": "scoped_entry_pair_pass",
+    "scope": "Original CSS/SSS and 30 advancing drawn source frames on Temple per cold/warm application run, without diagnostic timing resumes. Not a fighter action matrix or broad performance pass.",
+    "report_local_path": "work/full-game/temple-browser-entry-pair-v1/report.json",
+    "report_sha256": "30be3af93427fd41f14958450be0ab9efa716b2087a6e94d4a565cb8203b65c4",
+    "plan_local_path": "work/full-game/temple-browser-entry-pair-plan-v1.json",
+    "plan_sha256": "73a25f2d769f0c1bcdef31e6e4c4febbdad65411e6e2767b61c59329fdba2296",
+    "rounds": [
+      {
+        "round": "cold",
+        "entry_timing_resumes": 0,
+        "source_before": {
+          "fighterKind": 0,
+          "motion": 14,
+          "groundAir": 0,
+          "frame": 1,
+          "x": -92.69999694824219,
+          "y": 15.299407005310059
+        },
+        "source_after": {
+          "fighterKind": 0,
+          "motion": 14,
+          "groundAir": 0,
+          "frame": 31,
+          "x": -92.69999694824219,
+          "y": 15.299407005310059
+        },
+        "geometry": {
+          "buffer": [
+            640,
+            480
+          ],
+          "css": [
+            900,
+            675
+          ],
+          "devicePixelRatio": 1,
+          "viewport": [
+            1280,
+            960
+          ],
+          "hidden": false,
+          "focused": true
+        },
+        "before_30_frame_window_metrics": {
+          "browser": "Active browser callbacks 288 \u00b7 worst callback interval 31.63 ms \u00b7 >33.3 ms 0 \u00b7 browser long tasks 1 (worst 71.00 ms)",
+          "native": "Native callbacks 306 \u00b7 worst active callback 14.96 ms \u00b7 >16.67 ms 0 \u00b7 >33.3 ms 0 \u00b7 first-use draws 3 (worst 14.96 ms) \u00b7 last phases p0.00 i0.02 s0.76 b0.15 d4.18 e2.10 ms (preparation excluded here and reported separately; full first-use/long callbacks in log)",
+          "construction": "Construction scene-prepare 1 \u00b7 scene-enter 1 \u00b7 scene-rebuild-step 1 \u00b7 scene-rebuild 1 \u00b7 match-enter-step 7 \u00b7 match-enter 1 \u00b7 worst 113.86 ms \u00b7 construct 113.86 ms \u00b7 preparations 4 (worst 200.68 ms; source entry/teardown separate) \u00b7 latest match-enter prep 200.68 ms (construct 110.92, wait/schedule 89.76) \u00b7 first draw 11.67 ms after 29.46 ms \u00b7 uploads 6729728 B \u00b7 pipelines q0/c0 \u00b7 pipeline settle 0.00 ms/0 callbacks \u00b7 native prep a18.55 c156.97 r25.32 ms/2 callbacks (CPU 2.00, max 1.97, uploads 0 B, pipelines q0/c0)",
+          "audio": "Audio queue 1621 frames \u00b7 underrun 0 frames \u00b7 stereo with original reverb/delay \u00b7 replacement DSP coefficients"
+        },
+        "final_page_metrics": [
+          "Active browser callbacks 334 \u00b7 worst callback interval 31.63 ms \u00b7 >33.3 ms 0 \u00b7 browser long tasks 1 (worst 71.00 ms)",
+          "Native callbacks 352 \u00b7 worst active callback 14.96 ms \u00b7 >16.67 ms 0 \u00b7 >33.3 ms 0 \u00b7 first-use draws 3 (worst 14.96 ms) \u00b7 last phases p0.00 i0.02 s0.49 b0.16 d3.46 e2.21 ms (preparation excluded here and reported separately; full first-use/long callbacks in log)",
+          "Construction scene-prepare 1 \u00b7 scene-enter 1 \u00b7 scene-rebuild-step 1 \u00b7 scene-rebuild 1 \u00b7 match-enter-step 7 \u00b7 match-enter 1 \u00b7 worst 113.86 ms \u00b7 construct 113.86 ms \u00b7 preparations 4 (worst 200.68 ms; source entry/teardown separate) \u00b7 latest match-enter prep 200.68 ms (construct 110.92, wait/schedule 89.76) \u00b7 first draw 11.67 ms after 29.46 ms \u00b7 uploads 6729728 B \u00b7 pipelines q0/c0 \u00b7 pipeline settle 0.00 ms/0 callbacks \u00b7 native prep a18.55 c156.97 r25.32 ms/2 callbacks (CPU 2.00, max 1.97, uploads 0 B, pipelines q0/c0)",
+          "Audio queue 1237 frames \u00b7 underrun 0 frames \u00b7 stereo with original reverb/delay \u00b7 replacement DSP coefficients"
+        ],
+        "report_sha256": "f4f48ca827dbdceee413210d24d36aad2effba1ceb91c8322ea9c2b55c66b194"
+      },
+      {
+        "round": "warm",
+        "entry_timing_resumes": 0,
+        "source_before": {
+          "fighterKind": 0,
+          "motion": 14,
+          "groundAir": 0,
+          "frame": 0,
+          "x": -92.69999694824219,
+          "y": 15.299407005310059
+        },
+        "source_after": {
+          "fighterKind": 0,
+          "motion": 14,
+          "groundAir": 0,
+          "frame": 30,
+          "x": -92.69999694824219,
+          "y": 15.299407005310059
+        },
+        "geometry": {
+          "buffer": [
+            640,
+            480
+          ],
+          "css": [
+            900,
+            675
+          ],
+          "devicePixelRatio": 1,
+          "viewport": [
+            1280,
+            960
+          ],
+          "hidden": false,
+          "focused": true
+        },
+        "before_30_frame_window_metrics": {
+          "browser": "Active browser callbacks 293 \u00b7 worst callback interval 25.13 ms \u00b7 >33.3 ms 0 \u00b7 browser long tasks 0 (worst 0.00 ms)",
+          "native": "Native callbacks 310 \u00b7 worst active callback 7.13 ms \u00b7 >16.67 ms 0 \u00b7 >33.3 ms 0 \u00b7 first-use draws 3 (worst 6.12 ms) \u00b7 last phases p0.00 i0.03 s0.36 b0.09 d2.35 e1.08 ms (preparation excluded here and reported separately; full first-use/long callbacks in log)",
+          "construction": "Construction scene-prepare 1 \u00b7 scene-enter 1 \u00b7 scene-rebuild-step 1 \u00b7 scene-rebuild 1 \u00b7 match-enter-step 7 \u00b7 match-enter 1 \u00b7 worst 100.38 ms \u00b7 construct 100.38 ms \u00b7 preparations 4 (worst 166.35 ms; source entry/teardown separate) \u00b7 latest match-enter prep 166.35 ms (construct 83.53, wait/schedule 82.82) \u00b7 first draw 6.12 ms after 39.46 ms \u00b7 uploads 6729728 B \u00b7 pipelines q0/c0 \u00b7 pipeline settle 0.00 ms/0 callbacks \u00b7 native prep a16.91 c121.77 r27.77 ms/2 callbacks (CPU 1.06, max 1.02, uploads 0 B, pipelines q0/c0)",
+          "audio": "Audio queue 1045 frames \u00b7 underrun 0 frames \u00b7 stereo with original reverb/delay \u00b7 replacement DSP coefficients"
+        },
+        "final_page_metrics": [
+          "Active browser callbacks 324 \u00b7 worst callback interval 25.13 ms \u00b7 >33.3 ms 0 \u00b7 browser long tasks 0 (worst 0.00 ms)",
+          "Native callbacks 341 \u00b7 worst active callback 7.13 ms \u00b7 >16.67 ms 0 \u00b7 >33.3 ms 0 \u00b7 first-use draws 3 (worst 6.12 ms) \u00b7 last phases p0.00 i0.06 s0.53 b0.17 d3.12 e1.70 ms (preparation excluded here and reported separately; full first-use/long callbacks in log)",
+          "Construction scene-prepare 1 \u00b7 scene-enter 1 \u00b7 scene-rebuild-step 1 \u00b7 scene-rebuild 1 \u00b7 match-enter-step 7 \u00b7 match-enter 1 \u00b7 worst 100.38 ms \u00b7 construct 100.38 ms \u00b7 preparations 4 (worst 166.35 ms; source entry/teardown separate) \u00b7 latest match-enter prep 166.35 ms (construct 83.53, wait/schedule 82.82) \u00b7 first draw 6.12 ms after 39.46 ms \u00b7 uploads 6729728 B \u00b7 pipelines q0/c0 \u00b7 pipeline settle 0.00 ms/0 callbacks \u00b7 native prep a16.91 c121.77 r27.77 ms/2 callbacks (CPU 1.06, max 1.02, uploads 0 B, pipelines q0/c0)",
+          "Audio queue 1194 frames \u00b7 underrun 0 frames \u00b7 stereo with original reverb/delay \u00b7 replacement DSP coefficients"
+        ],
+        "report_sha256": "35ebce590c631a11dd7dfd1ec031a0cf23d79e54b52619952b2f9d89deb477d1"
+      }
+    ],
+    "performance_admitted": false,
+    "retained_cold_longtask": "Cold entry reports one 71ms browser long task. It is retained without claiming it belongs exclusively to preparation; both entries have no hard active callback gaps or audio underruns. Full-route performance is not admitted."
+  }
+}

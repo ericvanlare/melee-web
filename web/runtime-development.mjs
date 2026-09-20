@@ -2,7 +2,7 @@
 import {mountMeleeRuntime} from './melee-runtime.mjs';
 import {mountControllerSettings} from './controller-settings.mjs';
 import {createRuntimeAudio} from './runtime-audio.mjs';
-import {loadNativeGameDisc} from './runtime-audio-assets.mjs';
+import {loadNativeGameDisc, openNativeGameSession} from './runtime-audio-assets.mjs';
 const developmentHooks = {};
 let owner, controllerSettings, Module, boundary, status, check, put, prepareAudio, pauseAudioForPreparation;
 let syncAudio, unloadAndSave, prepareNativeResources, waitForAudioAck;
@@ -239,7 +239,7 @@ controllerSettings = mountControllerSettings({
   openButton: $('controls-open'),
 });
 try {
-  await mountMeleeRuntime({canvas:$('canvas'),createAudio:createRuntimeAudio,readDisc:loadNativeGameDisc,loaderUrl:new URL('./gameplay_menu_browser.js',import.meta.url),
+  await mountMeleeRuntime({canvas:$('canvas'),createAudio:createRuntimeAudio,readDisc:loadNativeGameDisc,openDisc:openNativeGameSession,loaderUrl:new URL('./gameplay_menu_browser.js',import.meta.url),
     onOwner(context){owner=context;({Module,boundary,status,check,put,prepareAudio,pauseAudioForPreparation,
       syncAudio,unloadAndSave,prepareNativeResources,waitForAudioAck}=context);},
     configureModule(module){
@@ -266,6 +266,9 @@ try {
       }else log(text);
     },
     onEvent(name,data){
+      if(name==='assetScopeReleased'||name==='assetScopeCommitted'){
+        log(`Native asset scope ${name} ${JSON.stringify(data)}`);return;
+      }
       if(name==='preparation'){developmentHooks.preparation(data.label,data.keepAudio);return;}
       if(name==='audio'){
         latestAudio={...latestAudio,...data};

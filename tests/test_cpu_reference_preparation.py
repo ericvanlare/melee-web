@@ -51,6 +51,7 @@ class CpuReferencePreparationTests(unittest.TestCase):
     def test_all_scenarios_emit_native_v3_four_port_plans(self):
         for scenario_id in (
             "mario-human-vs-fox-cpu1-final-destination",
+            "ganondorf-human-vs-mario-cpu1-final-destination",
             ACTIVE_THREE_PLAYER_SCENARIO_ID,
             "fox-human-vs-mario3-marth6-falco8-dream-land",
         ):
@@ -67,6 +68,7 @@ class CpuReferencePreparationTests(unittest.TestCase):
             scenario_ids(),
             [
                 "fox-human-vs-mario3-marth6-falco8-dream-land",
+                "ganondorf-human-vs-mario-cpu1-final-destination",
                 "mario-human-vs-fox-cpu1-final-destination",
                 ACTIVE_THREE_PLAYER_SCENARIO_ID,
             ],
@@ -74,7 +76,8 @@ class CpuReferencePreparationTests(unittest.TestCase):
         summary = catalog_summary()
         self.assertEqual(summary["player_counts"], [2, 3, 4])
         self.assertEqual(summary["distinct_cpu_levels"], [1, 3, 5, 6, 8, 9])
-        self.assertEqual(len(summary["scenario_ids"]), 3)
+        self.assertEqual(summary["characters"], ["Falco", "Fox", "Ganondorf", "Mario", "Marth"])
+        self.assertEqual(len(summary["scenario_ids"]), 4)
 
         expected_hashes = {
             "mario-human-vs-fox-cpu1-final-destination":

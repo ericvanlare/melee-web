@@ -2,6 +2,7 @@
 #include "gameplay_match_rules.h"
 #include "gameplay_bootstrap.h"
 #include "gameplay_crowd.h"
+#include "fighter_binding.h"
 #include <melee/cm/camera.h>
 #include <melee/cm/types.h>
 #include <melee/ft/types.h>
@@ -323,11 +324,19 @@ static HSD_TObjDesc* owned_base_texture(HSD_Joint* root,HSD_TObj* runtime)
 }
 static int eye_stats(Fighter* fp,MeleeWebMatchStats* out,char* e,size_t n)
 {
-    if(fp->tobj_list.n_costume_tobjs!=2)
-        return fail(e,n,"Mario Wait requires exactly two original costume eye TObjs");
     HSD_MatAnimJoint* desc=CostumeListsForeachCharacter[fp->kind].costume_list[fp->x619_costume_id].x4;
     HSD_Joint* owned_joint=CostumeListsForeachCharacter[fp->kind].costume_list[fp->x619_costume_id].joint;
     if(!owned_joint)return fail(e,n,"Original eye telemetry has no owned costume descriptor graph");
+    const int material_required=melee_web_fighter_costume_material_required(fp->kind,fp->x619_costume_id);
+    if(material_required<0)return fail(e,n,"Original eye telemetry has no source costume identity");
+    if(!material_required){
+        if(desc||fp->tobj_list.n_costume_tobjs)
+            return fail(e,n,"Authored null costume material unexpectedly has animated texture owners");
+        out->eye_count=0;
+        return 1;
+    }
+    if(fp->tobj_list.n_costume_tobjs!=2)
+        return fail(e,n,"Animated costume telemetry requires exactly two original eye TObjs");
     out->eye_count=2;
     for(unsigned eye=0;eye<2;eye++){
         HSD_TObj* tobj=fp->tobj_list.costume_tobjs[eye];

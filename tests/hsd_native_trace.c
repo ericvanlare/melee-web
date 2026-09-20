@@ -8,10 +8,46 @@
 #include <sysdolphin/baselib/jobj.h>
 #include <sysdolphin/baselib/dobj.h>
 #include <sysdolphin/baselib/pobj.h>
+#include <sysdolphin/baselib/aobj.h>
+#include <sysdolphin/baselib/fobj.h>
 #include <stdlib.h>
 #define CHECK(c) do { if (!(c)) { fprintf(stderr, "CHECK failed: %s at %d\n", #c, __LINE__); abort(); } } while (0)
 #include <stdio.h>
 #include <string.h>
+
+/* Native NODE affects one joint; BRANCH affects its subtree only. */
+static void original_visibility_channels(void)
+{
+    HSD_JObj branch={0},child={0},sibling={0},outside={0};
+    branch.child=&child;child.next=&sibling;branch.next=&outside;
+    HSD_ObjData visibility={0};visibility.fv=0.5f;
+    JObjUpdateFunc(&branch,HSD_A_J_BRANCH,&visibility);
+    CHECK((branch.flags&JOBJ_HIDDEN)&&(child.flags&JOBJ_HIDDEN)&&
+          (sibling.flags&JOBJ_HIDDEN)&&!(outside.flags&JOBJ_HIDDEN));
+    visibility.fv=1.0f;JObjUpdateFunc(&branch,HSD_A_J_BRANCH,&visibility);
+    CHECK(!(branch.flags&JOBJ_HIDDEN)&&!(child.flags&JOBJ_HIDDEN)&&
+          !(sibling.flags&JOBJ_HIDDEN));
+    visibility.fv=0.0f;JObjUpdateFunc(&branch,HSD_A_J_NODE,&visibility);
+    CHECK((branch.flags&JOBJ_HIDDEN)&&!(child.flags&JOBJ_HIDDEN)&&
+          !(sibling.flags&JOBJ_HIDDEN));
+    HSD_JObjClearFlagsAll(&branch,JOBJ_HIDDEN);
+    // Exact Donkey FallAerialF branch stream. Its start bits represent -34
+    // in the original FObj; the 16-frame clip ends before its first callback.
+    u8 bytes[]={1,0,0};
+    HSD_FObjDesc track={0};track.ad=bytes;track.length=sizeof(bytes);
+    track.startframe=-34;track.type=HSD_A_J_BRANCH;
+    track.frac_value=track.frac_slope=0x88;
+    HSD_AObjDesc desc={0};desc.end_frame=16;desc.fobjdesc=&track;
+    HSD_AObj* animation=HSD_AObjLoadDesc(&desc);
+    CHECK(animation);
+    for(unsigned cycle=0;cycle<3;cycle++) {
+        HSD_AObjReqAnim(animation,0);
+        for(unsigned frame=0;frame<17;frame++)
+            HSD_AObjInterpretAnim(animation,&branch,JObjUpdateFunc);
+        CHECK(!(branch.flags&JOBJ_HIDDEN)&&!(child.flags&JOBJ_HIDDEN));
+    }
+    HSD_AObjRemove(animation);
+}
 
 static unsigned rejected_callback_deletions;
 static void callback_deletion(HSD_GObj* object)
@@ -156,6 +192,33 @@ static void descriptor_only_source_lifetime(void)
  * parent links and destruction before each arena is released. */
 int main(int argc, char** argv)
 {
+    if(argc==2 && (!strcmp(argv[1],"--undefined-branch-linear") ||
+                   !strcmp(argv[1],"--undefined-branch-spline") ||
+                   !strcmp(argv[1],"--undefined-pass-endpoint") ||
+                   !strcmp(argv[1],"--undefined-stop-ceil-endpoint"))) {
+        char error[256];
+        CHECK(melee_web_gameplay_startup(4U*1024U*1024U,error,sizeof(error)));
+        CHECK(melee_web_native_world_enable(error,sizeof(error)));
+        u8 bytes[]={!strcmp(argv[1],"--undefined-branch-linear")?2:3,0,0};
+        const unsigned delay=!strcmp(argv[1],"--undefined-pass-endpoint")?25:
+            !strcmp(argv[1],"--undefined-stop-ceil-endpoint")?8:0;
+        HSD_FObjDesc track={0};track.ad=bytes;track.length=sizeof(bytes);
+        track.startframe=-(s16)delay;
+        track.type=HSD_A_J_BRANCH;track.frac_value=track.frac_slope=0x88;
+        HSD_AObjDesc desc={0};desc.end_frame=delay?delay:1;desc.fobjdesc=&track;
+        HSD_AObj* animation=HSD_AObjLoadDesc(&desc);
+        HSD_JObj joint={0};
+        HSD_AObjReqAnim(animation,0);
+        // Pass/StopCeil have delay == end: the source interprets the terminal
+        // frame before stopping. Only earlier frames are dormant.
+        for(unsigned frame=0;frame<delay;frame++) {
+            HSD_AObjInterpretAnim(animation,&joint,JObjUpdateFunc);
+            CHECK(!(joint.flags&JOBJ_HIDDEN));
+        }
+        HSD_AObjInterpretAnim(animation,&joint,JObjUpdateFunc);
+        CHECK(!"Undefined source interpolation must fail before visibility output");
+        return 1;
+    }
     if (argc == 2 && strcmp(argv[1], "--replace-heap") == 0) {
         managed_native_lifetimes(1);
         return 0;
@@ -166,6 +229,8 @@ int main(int argc, char** argv)
         CHECK(melee_web_gameplay_startup(4U * 1024U * 1024U, error, sizeof(error)));
         HSD_IDInitAllocData();
         HSD_IDSetup();
+        CHECK(melee_web_native_world_enable(error,sizeof(error)));
+        original_visibility_channels();
         HSD_Joint child = {0}, root = {0};
         root.scale = child.scale = (Vec3) {1, 1, 1};
         root.child = &child;

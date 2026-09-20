@@ -1,5 +1,9 @@
 #include "gameplay_fighter_data.h"
 #include <melee/ft/types.h>
+#include <melee/ft/kinds/ftPurin/types.h>
+#include <melee/ft/kinds/ftDonkey/types.h>
+#include <melee/ft/kinds/ftKoopa/types.h>
+#include <melee/ft/ftwaitanim.h>
 #include "gameplay_article_data.h"
 #include <melee/it/types.h>
 #include <sysdolphin/baselib/jobj.h>
@@ -22,9 +26,9 @@ void melee_web_test_fighter_data(void* data,int actual) {
                           effect_parts[3]==55 && effect_parts[4]==9);
     }
     CHECK(d->x48_items[0] && d->x48_items[2] && !d->x48_items[1] && !d->x48_items[3]);
-    for(unsigned i=4;i<8;++i)CHECK(!melee_web_fighter_data_article(d,i));
-    CHECK(!melee_web_fighter_data_article(NULL,0));
-    { ftData empty={0}; CHECK(!melee_web_fighter_data_article(&empty,0)); }
+    for(unsigned i=4;i<8;++i)CHECK(!melee_web_fighter_data_article(d,0,i));
+    CHECK(!melee_web_fighter_data_article(NULL,0,0));
+    { ftData empty={0}; CHECK(!melee_web_fighter_data_article(&empty,0,0)); }
     for(unsigned i=0;i<4;i+=2) {
         Article* article=d->x48_items[i];
         CHECK(article->x0_common_attr && melee_web_article_unresolved(article));
@@ -60,4 +64,65 @@ void melee_web_test_guard_data(const MeleeWebNativeDat* r,uint32_t root,void* da
     melee_web_fighter_data_set_guard(r,root,d,&joint,mask);
     CHECK(d->x20&&d->x20->x0[2]==&child&&d->x20->x8==0&& !(*mask&(1U<<8)));
     d->x20=NULL; /* The test's borrowed descriptor expires here. */
+}
+
+void melee_web_test_donkey_data(void* data) {
+    ftData* d=data;
+    CHECK(d && d->ext_attr && d->x2C && d->x2C->dynamicsNum==1 &&
+          d->x2C->ftDynamicBones && d->x2C->x4==1 && d->x2C->x8 && d->x48_items);
+    ftDonkeyAttributes* attrs=(ftDonkeyAttributes*)d->ext_attr;
+    CHECK(attrs->motion_state==341 && attrs->x4_motion_state==351 &&
+          attrs->SpecialN.x2C_MAX_ARM_SWINGS==10 &&
+          attrs->SpecialN.x30_DAMAGE_PER_SWING==2 &&
+          attrs->cargo_hold.x20_TURN_SPEED==6.0f &&
+          attrs->cargo_hold.x24_JUMP_STARTUP_LAG==3.0f &&
+          attrs->cargo_hold.x28_LANDING_LAG==15.0f);
+    for(unsigned i=0;i<7;++i) CHECK(!d->x48_items[i]);
+    for(unsigned i=0;i<6;++i) CHECK(!melee_web_fighter_data_article(data,FTKIND_DONKEY,i));
+}
+
+void melee_web_test_koopa_data(void* data,int typed) {
+    ftData* d=data;
+    CHECK(d && d->ext_attr && d->x2C && d->x2C->dynamicsNum==1 &&
+          d->x2C->ftDynamicBones && d->x2C->x4==0 && !d->x2C->x10 && d->x48_items);
+    const ftKoopaAttributes* attrs=d->ext_attr;
+    CHECK(attrs->x4==(typed?-40:40) && attrs->x20==(typed?-30:30) &&
+          attrs->x2C==3U && attrs->unk50==(typed?0x80000001U:0U) &&
+          attrs->x54==1.78f && attrs->x94==-7.5f);
+    CHECK(d->x48_items[0] && melee_web_fighter_data_article(data,FTKIND_KOOPA,0));
+    for(unsigned i=1;i<7;++i) CHECK(!d->x48_items[i]);
+}
+
+void melee_web_test_purin_data(void* data) {
+    ftData* d=data;
+    CHECK(d && d->ext_attr && d->x28 && d->x28[0].u.i.x==31 && d->x28[0].u.i.y==80 &&
+          d->x28[1].u.i.x==32 && d->x28[1].u.i.y==20 &&
+          d->x28[2].u.i.x==-1 && d->x28[2].u.i.y==-1 && d->x48_items &&
+          !d->x48_items[0] && d->x48_items[1]);
+    ftPurinAttributes* attrs=(ftPurinAttributes*)d->ext_attr;
+    CHECK(attrs->x2C==341 && attrs->x30==-1 && attrs->x34==90 && attrs->x38==20 &&
+          attrs->x70==8 && attrs->x9C==32 && attrs->specialn_vel.x==-0.13f &&
+          attrs->specialn_vel.y==1.6f && (uintptr_t)attrs->xE8==0x3e800000U &&
+          (uintptr_t)attrs->xEC==0x3e4ccccdU);
+    CHECK(attrs->_48[0]==0x3d && attrs->_48[1]==0x4c &&
+          attrs->_48[2]==0xcc && attrs->_48[3]==0xcd &&
+          attrs->_60[0]==0x3f && attrs->_60[1]==0x80 && attrs->_60[4]==0x40 &&
+          attrs->_B0[0]==0x41 && attrs->_B0[1]==0xa0 &&
+          attrs->_F8[0]==0 && attrs->_F8[7]==0);
+    /* dynamicsNum is the active body count consumed by ftCo_8009CF84.
+     * Purin's authored ArticleDynamicBones table is longer: costume 2/3
+     * source code indexes rows 1..4 while attaching the hat. */
+    CHECK(d->x2C && d->x2C->dynamicsNum==1 && d->x2C->ftDynamicBones);
+    {
+        static const unsigned ids[5]={7,3,7,3,9};
+        static const unsigned counts[5]={3,3,3,5,5};
+        static const float z[5]={0.00001f,0.145f,0.145f,0.145f,0.145f};
+        for(unsigned i=0;i<5;++i) {
+            const BoneDynamicsDesc* row=&d->x2C->ftDynamicBones->array[i];
+            CHECK(row->bone_id==ids[i] && row->dyn_desc.count==counts[i] &&
+                  row->dyn_desc.pos.x==1.0f && row->dyn_desc.pos.y==1.0f &&
+                  row->dyn_desc.pos.z==z[i] && row->dyn_desc.data);
+        }
+    }
+    for(unsigned i=0;i<6;++i)CHECK(!melee_web_fighter_data_article(data,FTKIND_PURIN,i));
 }

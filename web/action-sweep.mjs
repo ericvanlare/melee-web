@@ -97,12 +97,139 @@ const link=[
   aerialSpecial('Bomb (air)',[[359,359]],0,-80),
 ];
 
+// ftGanon uses the original Captain-family motion IDs, with its own authored
+// animation and command tables. Catch/throw exits require a separate target
+// recipe; these inputs cover the unassisted ground and air entries.
+const ganon=[
+  ground('Warlock Punch',[[347,347]],input(1,PAD.B),input(180)),
+  aerialSpecial('Warlock Punch (air)',[[348,348]]),
+  ground('Raptor Boost',[[349,350]],input(1,PAD.B,80),input(240)),
+  aerialSpecial('Raptor Boost (air)',[[351,352]],80),
+  ground('Dark Dive',[[353,353]],input(1,PAD.B,0,80),input(240)),
+  aerialSpecial('Dark Dive (air)',[[354,354]],0,80),
+  ground("Wizard's Foot",[[357,358]],input(1,PAD.B,0,-80),input(240)),
+  aerialSpecial("Wizard's Foot (air)",[[359,360]],0,-80),
+];
+
+// Captain shares the ftCaptain motion-state enum with Ganondorf, but has
+// independent authored animations, hitboxes, movement and effects. Keep a
+// separate inventory so a Ganondorf pass cannot stand in for Captain.
+// Target-dependent Raptor Boost and Falcon Dive follow-ups remain separate
+// interaction cases; these inputs exercise their unassisted entry paths.
+const captain=[
+  ground('Falcon Punch',[[347,347]],input(1,PAD.B),input(180)),
+  aerialSpecial('Falcon Punch (air)',[[348,348]]),
+  ground('Raptor Boost',[[349,350]],input(1,PAD.B,80),input(240)),
+  aerialSpecial('Raptor Boost (air)',[[351,352]],80),
+  ground('Falcon Dive',[[353,353]],input(1,PAD.B,0,80),input(240)),
+  aerialSpecial('Falcon Dive (air)',[[354,354]],0,80),
+  ground('Falcon Kick',[[357,358]],input(1,PAD.B,0,-80),input(240)),
+  aerialSpecial('Falcon Kick (air)',[[359,360]],0,-80),
+];
+
+// Green Missile keeps the source RNG choice between ordinary and misfire
+// releases. These are entry/release recipes, not forced misfire coverage.
+const luigi=[
+  ground('Fireball',[[341,341]],input(1,PAD.B),input(150)),
+  aerialSpecial('Fireball (air)',[[342,342]]),
+  ground('Green Missile charge/release',[[343,344],[345,348]],input(45,PAD.B,80),input(300)),
+  {name:'Green Missile (air)',expect:[[349,350],[351,354]],settle:true,
+    inputs:[input(2,PAD.X),input(4),input(18,PAD.B,80),input(300)]},
+  ground('Super Jump Punch',[[355,355]],input(1,PAD.B,0,80),input(240)),
+  aerialSpecial('Super Jump Punch (air)',[[356,356]],0,80),
+  ground('Luigi Cyclone',[[357,357]],input(1,PAD.B,0,-80),input(180)),
+  aerialSpecial('Luigi Cyclone (air)',[[358,358]],0,-80),
+];
+
+// ftPichu retains the ftPikachu source motion-state table. Its command graph
+// additionally applies the original self-damage consumer; it runs separately.
+const pikachuFamily=(upMove)=>[
+  ground('Thunder Jolt',[[341,341]],input(1,PAD.B),input(180)),
+  aerialSpecial('Thunder Jolt (air)',[[342,342]]),
+  ground('Skull Bash charge/release',[[343,344],[345,347]],input(45,PAD.B,80),input(300)),
+  {name:'Skull Bash (air)',expect:[[348,349],[350,352]],settle:true,
+    inputs:[input(2,PAD.X),input(4),input(18,PAD.B,80),input(300)]},
+  ground(upMove,[[353,355]],input(1,PAD.B,0,80),input(240)),
+  aerialSpecial(`${upMove} (air)`,[[356,358]],0,80),
+  ground('Thunder',[[359,362]],input(1,PAD.B,0,-80),input(240)),
+  aerialSpecial('Thunder (air)',[[363,366]],0,-80),
+];
+
+// Purin has five distinct source aerial jumps and facing-specific Sing/Rest
+// states. These windows enter through raw PAD and retain the original motion
+// transitions; complete interactions and independent comparison stay separate.
+const purin=[
+  {name:'five aerial jumps',expect:[[341,341],[342,342],[343,343],[344,344],[345,345]],settle:true,
+    // Later multijumps accept held XY when the source command opens its gate.
+    inputs:[input(2,PAD.X),input(10),input(180,PAD.X),input(300)]},
+  ground('Rollout charge/release',[[346,347],[348,349],[350,353]],input(45,PAD.B),input(360)),
+  {name:'Rollout (air)',expect:[[354,355],[356,361]],settle:true,
+    inputs:[input(2,PAD.X),input(8),input(45,PAD.B),input(360)]},
+  ground('Pound',[[363,363]],input(1,PAD.B,80),input(180)),
+  aerialSpecial('Pound (air)',[[364,364]],80),
+  ground('Sing',[[365,367]],input(1,PAD.B,0,80),input(300)),
+  aerialSpecial('Sing (air)',[[366,368]],0,80),
+  ground('Rest',[[369,371]],input(1,PAD.B,0,-80),input(360)),
+  aerialSpecial('Rest (air)',[[370,372]],0,-80),
+];
+
+// Donkey's source neutral special charges on its own and releases on a fresh
+// B edge; releasing the button is not a punch. Cargo/target interactions have
+// a separate native fixture and are not certified by this unassisted sweep.
+const donkey=[
+  ground('Giant Punch partial charge/release',[[369,369],[370,370],[372,372]],
+    input(1,PAD.B),input(45),input(1,PAD.B),input(180)),
+  ground('Giant Punch charge cancel',[[369,369],[370,370],[371,371]],
+    input(1,PAD.B),input(45),input(1,PAD.L,0,0,0,0,255),input(180)),
+  ground('Giant Punch full charge/release',[[369,369],[370,370],[373,373]],
+    input(1,PAD.B),input(300),input(1,PAD.B),input(180)),
+  {name:'Giant Punch partial release (air)',expect:[[374,374],[375,375],[377,377]],settle:true,
+    inputs:[input(12,PAD.X),input(1,PAD.B),input(30),input(1,PAD.B),input(180)]},
+  {name:'Giant Punch cancel (air)',expect:[[374,374],[375,375],[376,376]],settle:true,
+    inputs:[input(12,PAD.X),input(1,PAD.B),input(30),input(1,PAD.L,0,0,0,0,255),input(180)]},
+  ground('Giant Punch full release (air)',[[369,369],[370,370],[378,378]],
+    input(1,PAD.B),input(300),input(12,PAD.X),input(1,PAD.B),input(180)),
+  ground('Headbutt',[[379,379]],input(1,PAD.B,80),input(180)),
+  aerialSpecial('Headbutt (air)',[[380,380]],80),
+  ground('Spinning Kong',[[381,381]],input(1,PAD.B,0,80),input(240)),
+  aerialSpecial('Spinning Kong (air)',[[382,382]],0,80),
+  ground('Hand Slap',[[383,383],[384,384],[385,385]],input(1,PAD.B,0,-80),input(180)),
+];
+
+// Koopa's authored jump_startup_time is eight ticks. Hold the ordinary jump
+// input through that startup before issuing aerial inputs; no source timing
+// or fighter state is changed by the diagnostic recipe.
+const koopaCommon=common.map(row=>row.inputs[0].buttons===PAD.X ?
+  {...row,inputs:[input(10,PAD.X),...row.inputs.slice(1)]}:row);
+const koopaAir=(name,expect,stickX=0,stickY=0,hold=1)=>({
+  name,expect,settle:true,inputs:[input(10,PAD.X),input(hold,PAD.B,stickX,stickY),input(240)],
+});
+const koopa=[
+  ground('Fire Breath',[[341,341],[342,342],[343,343]],input(120,PAD.B),input(180)),
+  koopaAir('Fire Breath (air)',[[344,344],[345,345]],0,0,90),
+  // Target-dependent catch and throw exits have separate interaction probes.
+  ground('Koopa Klaw',[[347,347]],input(1,PAD.B,80),input(180)),
+  koopaAir('Koopa Klaw (air)',[[353,353]],80),
+  ground('Whirling Fortress',[[359,359]],input(1,PAD.B,0,80),input(240)),
+  koopaAir('Whirling Fortress (air)',[[360,360]],0,80),
+  ground('Bowser Bomb',[[361,361],[363,363]],input(1,PAD.B,0,-80),input(240)),
+  koopaAir('Bowser Bomb (air)',[[362,362],[363,363]],0,-80),
+];
+
 export const actionInventories=new Map([
  [18,{id:'marth-visible-actions-v1',fighter:'Marth',minimumStageFrames:4200,cases:[...common,...wavedashes,...marth]}],
  [21,{id:'dr-mario-visible-actions-v1',fighter:'Dr. Mario',minimumStageFrames:4800,cases:[...common,...wavedashes,...drMario]}],
  [26,{id:'roy-visible-actions-v1',fighter:'Roy',minimumStageFrames:4800,cases:[...common,...wavedashes,...roy]}],
  [6,{id:'link-visible-actions-v1',fighter:'Link',minimumStageFrames:4800,cases:[...common,...wavedashes,...link]}],
  [20,{id:'young-link-visible-actions-v1',fighter:'Young Link',minimumStageFrames:4800,cases:[...common,...wavedashes,...link]}],
+ [25,{id:'ganondorf-visible-actions-v1',fighter:'Ganondorf',minimumStageFrames:5200,cases:[...common,...ganon]}],
+ [2,{id:'captain-falcon-visible-actions-v1',fighter:'Captain Falcon',minimumStageFrames:5200,cases:[...common,...captain]}],
+ [17,{id:'luigi-visible-actions-v1',fighter:'Luigi',minimumStageFrames:5200,cases:[...common,...luigi]}],
+ [12,{id:'pikachu-visible-actions-v1',fighter:'Pikachu',minimumStageFrames:5600,cases:[...common,...pikachuFamily('Quick Attack')]}],
+ [23,{id:'pichu-visible-actions-v1',fighter:'Pichu',minimumStageFrames:5600,cases:[...common,...pikachuFamily('Agility')]}],
+ [15,{id:'jigglypuff-visible-actions-v1',fighter:'Jigglypuff',minimumStageFrames:6400,cases:[...common,...purin]}],
+ [3,{id:'donkey-kong-visible-actions-v1',fighter:'Donkey Kong',minimumStageFrames:7000,cases:[...common,...donkey]}],
+ [5,{id:'bowser-visible-actions-v1',fighter:'Bowser',minimumStageFrames:5600,cases:[...koopaCommon,...koopa]}],
 ]);
 
 export function actionInventory(fighterKind){return actionInventories.get(fighterKind)||null;}

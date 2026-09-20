@@ -1,4 +1,5 @@
 #include "fighter_binding.hpp"
+#include "fighter_binding.h"
 
 #include <algorithm>
 #include <numeric>
@@ -194,3 +195,11 @@ FighterAnimationBinding bind_fighter_animation(
     return binding;
 }
 } // namespace melee_web
+
+extern "C" int melee_web_fighter_costume_material_required(uint32_t kind,uint32_t costume)
+{
+    for(const auto& row:melee_web::fighter_costumes())
+        if(row.fighter_kind==kind && row.costume_index==costume)
+            return !row.material_animation_symbol.empty();
+    return -1;
+}

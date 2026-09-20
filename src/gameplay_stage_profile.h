@@ -13,6 +13,14 @@ extern "C" {
 
 typedef void* (*MeleeWebStageYakumonoExchange)(void* value);
 typedef void* (*MeleeWebStageYakumonoDecode)(const MeleeWebNativeDat*, uint32_t root);
+typedef enum MeleeWebStagePublicKind {
+    MELEE_WEB_STAGE_PUBLIC_JOINT,
+    MELEE_WEB_STAGE_PUBLIC_IMAGE,
+} MeleeWebStagePublicKind;
+typedef struct MeleeWebStagePublic {
+    const char* name;
+    MeleeWebStagePublicKind kind;
+} MeleeWebStagePublic;
 
 /* Source callback and object-layout details live here. Content names and
  * archive filenames remain in gameplay_content.h; this profile only describes
@@ -37,6 +45,19 @@ typedef struct MeleeWebStageProfile {
     size_t entry_count;
     const uint8_t* animation_counts;
     size_t animation_count_count;
+    /* Source grDatFiles initializes particle bank64 and Ground's bank30 only
+     * when both map_ptcl and map_texg are present. Keep this capability
+     * explicit so a valid source-null stage does not receive a fake bank while
+     * a required stage still fails at its boundary. */
+    int allow_absent_particle_bank;
+    /* Some source stages publish a present four-byte opaque yakumono_param
+     * root whose contents are zero and whose callbacks never dereference it.
+     * Preserve that source pointer's presence with an arena-owned copy. */
+    int opaque_yakumono;
+    /* Additional original HSD archive queries outside map_head. Images must
+     * resolve to the very same descriptor used by the map texture graph. */
+    const MeleeWebStagePublic* public_symbols;
+    size_t public_symbol_count;
 } MeleeWebStageProfile;
 
 /* NULL means that this stage has no complete source callback profile yet. */

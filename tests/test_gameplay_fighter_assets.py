@@ -46,7 +46,11 @@ class GameplayFighterAssetsTests(unittest.TestCase):
             start = table_text.index("struct UnkCostumeList CostumeListsForeachCharacter")
             table_text = table_text[start:table_text.index("};",start)]
             costumes = directory / "costume_storage.c"
-            names = sorted(set(re.findall(r"ft[A-Za-z]+_CostumeList",table_text)))
+            # Purin's real source object owns its exact five-entry costume
+            # table, cache and scoped exchange hook. Keep that definition out
+            # of the synthetic storage; all other source tables remain
+            # fixture-owned so unrelated kind callbacks stay out of this test.
+            names = sorted(set(re.findall(r"ft[A-Za-z]+_CostumeList",table_text)) - {"ftPr_CostumeList"})
             costumes.write_text('#include <melee/ft/types.h>\n' + ''.join(
                 f'UnkCostumeStruct {name}[16];\n' for name in names))
             commands = [
@@ -54,7 +58,9 @@ class GameplayFighterAssetsTests(unittest.TestCase):
                  "-include", str(ROOT / "src/gameplay_compat.h"), "-c",
                  str(ROOT / "src/gameplay_fighter_assets.c"), str(ROOT / "src/gameplay_action_store.c"),
                  str(ROOT / "src/dat_item_commands.c"),
-                 str(source / "melee/ft/ftdata.c"), str(costumes), str(ROOT / "tests/gameplay_fighter_assets_trace.c")],
+                 str(source / "melee/ft/ftdata.c"),
+                 str(source / "melee/ft/kinds/ftPurin/ftpurin.c"), str(costumes),
+                 str(ROOT / "tests/gameplay_fighter_assets_trace.c")],
                 [sys.executable, str(compiler / "em++.py"), *common, "-std=c++20", "-c",
                  *[str(ROOT / "src" / (name+".cpp")) for name in ("dat_archive","dat_animation","fighter_binding","dat_fighter_runtime","dat_commands","gameplay_action_store")],
                  str(ROOT / "tests/gameplay_fighter_assets_trace.cpp"), "-o", str(directory / "invalid.o")],

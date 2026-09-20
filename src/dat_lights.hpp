@@ -9,8 +9,15 @@ namespace melee_web {
 std::optional<uint8_t> read_dat_light_override(const DatArchive&, uint32_t light_offset);
 class DatLights {
 public:
-    explicit DatLights(const DatArchive&, const std::string& symbol = "map_plit");
+    /* The default keeps the existing strict boundary: a source light
+     * animation table is rejected until its checked native owner is ready.
+     * The opt-in path records only each table's validated DAT offset; it does
+     * not decode or borrow any HSD objects. */
+    explicit DatLights(const DatArchive&, const std::string& symbol = "map_plit",
+                       bool retain_animation_tables = false);
     uint32_t root_offset = 0;
     std::vector<MeleeWebStageLightDesc> lights;
+    /* One entry per lights[] item, preserving source LightList order. */
+    std::vector<std::optional<uint32_t>> animation_tables;
 };
 }

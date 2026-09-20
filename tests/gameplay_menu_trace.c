@@ -1,6 +1,7 @@
 #include "gameplay_menu.h"
 #include "gameplay_content.h"
 #include "gameplay_player_selection.h"
+#include "native_menu_fighter_input.h"
 
 #include <melee/ft/forward.h>
 #include <melee/pl/forward.h>
@@ -62,7 +63,7 @@ void mnCharSel_Scene_OnExit(void* data)
 {
     (void) data;
     active_css->pending_scene_change = 1;
-    if (invalid_exit == 1) active_css->vs.start.players[0].ckind = CKIND_CAPTAIN;
+    if (invalid_exit == 1) active_css->vs.start.players[0].ckind = CKIND_PLAYABLE_COUNT;
     active_css = NULL;
 }
 void mnStageSel_Scene_OnEnter(void* data) { active_sss = data; }
@@ -72,6 +73,7 @@ void mnStageSel_Scene_OnExit(void* data)
     (void) data;
     active_sss->start_game = true;
     if (invalid_exit == 2) active_sss->vs.start.rules.stkind = 25;
+    if (invalid_exit == 3) active_sss->vs.start.players[0].ckind = CKIND_DONKEY;
     active_sss = NULL;
 }
 
@@ -118,14 +120,30 @@ static void setup(CSSData* css)
 
 int main(void)
 {
+    /* CSS has 25 icons because Zelda and Sheik share an icon, while its
+     * CharacterKind namespace has 26 playable entries, ending in Ganondorf. */
+    MeleeWebFighterInputObservation observed={0};
+    observed.held_door=-1;observed.target_left=-1;observed.target_right=1;
+    observed.target_bottom=-1;observed.target_top=1;
+    for(int kind=0;kind<CKIND_PLAYABLE_COUNT;kind++)
+        if(!melee_web_fighter_input_observe_valid(&observed,kind))return 100;
+    if(melee_web_fighter_input_observe_valid(&observed,-1)||
+       melee_web_fighter_input_observe_valid(&observed,CKIND_PLAYABLE_COUNT))return 101;
     CSSData css;
     SSSData sss;
     setup(&css);
     if (!melee_web_menu_character_available(CKIND_MARIO) ||
         !melee_web_menu_character_available(CKIND_FOX) ||
-        melee_web_menu_character_available(CKIND_CAPTAIN) ||
+        !melee_web_menu_character_available(CKIND_CAPTAIN) ||
+#if defined(MELEE_WEB_PUBLIC_RUNTIME)
+        melee_web_menu_character_available(CKIND_DONKEY) ||
+#else
+        !melee_web_menu_character_available(CKIND_DONKEY) ||
+#endif
+        melee_web_menu_character_available(CKIND_PLAYABLE_COUNT) ||
         !melee_web_menu_stage_available(MELEE_WEB_MENU_FD_ST_KIND) ||
         !melee_web_menu_stage_available(St_Kind_Story) ||
+        !melee_web_menu_stage_available(St_Kind_Shrine) ||
         melee_web_menu_stage_available(25) ||
         !melee_web_menu_css_selection_valid(&css))
         return 1;
@@ -155,9 +173,21 @@ int main(void)
     css.vs.start.players[2].slot_type = Gm_PKind_NA;
     css.vs.start.players[1].color = 4;
     if (melee_web_menu_css_selection_valid(&css)) return 52;
-    css.vs.start.players[1].ckind = CKIND_CAPTAIN;
-    css.vs.start.players[1].color = 0;
+    css.vs.start.players[1].ckind = CKIND_DONKEY;
+    css.vs.start.players[1].color = 4;
+    if (
+#if defined(MELEE_WEB_PUBLIC_RUNTIME)
+        melee_web_menu_css_selection_valid(&css) ||
+#else
+        !melee_web_menu_css_selection_valid(&css) ||
+#endif
+        melee_web_fighter_content(CKIND_DONKEY)->fighter_kind != FTKIND_DONKEY)
+        return 102;
+    css.vs.start.players[1].color = 5;
     if (melee_web_menu_css_selection_valid(&css)) return 53;
+    css.vs.start.players[1].ckind = CKIND_PLAYABLE_COUNT;
+    css.vs.start.players[1].color = 0;
+    if (melee_web_menu_css_selection_valid(&css)) return 103;
     css.vs.start.players[1].ckind = CKIND_FALCO;
     css.vs.start.players[1].color = 3;
     css.vs.start.rules.stkind = St_Kind_Battle;
@@ -294,7 +324,7 @@ int main(void)
                                                           sizeof(error)))
             return 5;
         css = *(CSSData*) melee_web_menu_css(session);
-        css.vs.start.players[0].ckind = CKIND_CAPTAIN;
+        css.vs.start.players[0].ckind = CKIND_PLAYABLE_COUNT;
         *(CSSData*) melee_web_menu_css(session) = css;
         if (melee_web_menu_tick(session, error, sizeof(error)) !=
             MELEE_WEB_MENU_RESULT_SELECTION_REJECTED)
@@ -378,7 +408,12 @@ int main(void)
     }
     /* Source-private state can be published only by OnExit. The host must
      * never expose a READY payload that was invalidated by that callback. */
-    for (invalid_exit = 1; invalid_exit <= 2; ++invalid_exit) {
+#if defined(MELEE_WEB_PUBLIC_RUNTIME)
+    const int invalid_exit_cases = 3;
+#else
+    const int invalid_exit_cases = 2;
+#endif
+    for (invalid_exit = 1; invalid_exit <= invalid_exit_cases; ++invalid_exit) {
         MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition};
         char error[128];
         MeleeWebMenuSession* session =

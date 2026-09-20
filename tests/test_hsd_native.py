@@ -35,6 +35,24 @@ class NativeJointDescriptorTests(unittest.TestCase):
                 self.assertIn("Local Mario metal graph:61 matching joints,8 DObj occurrences,21 PObjs passed",result.stdout)
 
 
+class NativeFighterOutputGuardTests(unittest.TestCase):
+    def test_undefined_singleton_output_is_rejected_at_source_consumer(self):
+        targets = [ROOT / 'build' / directory / 'hsd_native_trace.js'
+                   for directory in ('browser', 'browser-release')]
+        targets = [path for path in targets if path.is_file()]
+        if not targets:
+            self.skipTest('Build hsd_native_trace for source interpolation guard checks')
+        target = max(targets, key=lambda path: path.stat().st_mtime)
+        for mode in ('--undefined-branch-linear', '--undefined-branch-spline',
+                     '--undefined-pass-endpoint', '--undefined-stop-ceil-endpoint'):
+            with self.subTest(mode=mode):
+                result = subprocess.run([str(node_runtime()), str(target), mode], cwd=ROOT,
+                                        capture_output=True, text=True, timeout=30)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn('Native FObj reached undefined interpolation output',
+                              result.stdout + result.stderr)
+
+
 class NativeJointRuntimeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

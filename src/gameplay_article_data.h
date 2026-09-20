@@ -11,9 +11,13 @@ void* melee_web_article_decode(const MeleeWebNativeDat*, uint32_t root, uint32_t
 /* Publish fully checked borrowed item graphs into the existing registration
  * identity. All owners must outlive original item instances. */
 typedef struct MeleeWebItemStateDesc {void* animation;void* material;void* shape;void* commands;} MeleeWebItemStateDesc;
+/* joint_optional is reserved for a checked source model descriptor whose
+ * x0_joint is authored null. It does not make a missing model descriptor
+ * publishable, and its zero-bone/zero-attachment form is validated here. The
+ * authored scalar flag is preserved for source consumers. */
 int melee_web_article_publish(const MeleeWebNativeDat*,void* article,void* special,
     const MeleeWebItemStateDesc*,uint32_t states,void* joint,uint32_t bones,int32_t attach,uint8_t flags,
-    char* error,size_t error_size);
+    int joint_optional,char* error,size_t error_size);
 uint32_t melee_web_article_unresolved(const void* article);
 void melee_web_article_require_ready(const void* article);
 #ifdef __cplusplus

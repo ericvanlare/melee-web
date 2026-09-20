@@ -36,7 +36,14 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     // enum. Keep this small C++ boundary independent of the source include
     // path used by the standalone Wasm fixture compiler.
     const bool link_family = costume.fighter_kind == 6 || costume.fighter_kind == 20;
-    require(mario || fox_family || mars || link_family, "Native action store has no checked fighter command schema for this kind");
+    const bool purin = costume.fighter_kind == 15;
+    const bool donkey = costume.fighter_kind == 3;
+    const bool koopa = costume.fighter_kind == 5;
+    const bool luigi = costume.fighter_kind == 17;
+    const bool pikachu_family = costume.fighter_kind == 12 || costume.fighter_kind == 23;
+    const bool captain = costume.fighter_kind == 2;
+    const bool ganon = costume.fighter_kind == 25;
+    require(mario || fox_family || mars || link_family || luigi || pikachu_family || purin || donkey || koopa || captain || ganon, "Native action store has no checked fighter command schema for this kind");
     std::vector<DatCommandRoot> roots;
     // Explicit source ftCo submotion groups. This certifies command operand
     // graphs only, not readiness of every original world service they invoke.
@@ -52,11 +59,32 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     command_motions_.insert(238);                // original EntryStart; Mario script is END
     group(239,240);                              // ftCo_SM_AppealSR/SL action rows; states 264/265 select these rows
     group(242,258);group(262,265);                // grab, pummel, throws and Mario capture reactions
+    // Donkey's cargo moves drive the victim's original Shouldered/ThrownF*
+    // actions. These source command graphs belong to every possible victim.
+    group(267,275);
+    // Koopa's side special drives the common CaptureKoopa/CaptureDamageKoopa/
+    // CaptureWaitKoopa and ThrownKoopa ground/air rows on its victim. These
+    // rows likewise belong to every possible victim action store. The common
+    // MS rows 278..287 map to source submotions SM_None,
+    // SM_CaptureDamageKoopa..SM_ThrownKoopaAirB; the native action store is
+    // indexed by those authored submotion rows, so retain exactly SM 278..283.
+    group(278,283);
     group(286,291);                              // shield-break knockdown
     if (mario) group(295,302);                   // Mario/Dr. Mario specials; taunts use common rows 239/240 above
     else if (link_family) group(295,313);        // Link-family action tables end at 313
+    // The Captain-family range is source-complete through the final authored
+    // action. Captain rows 295/297 include command opcodes 45/42 whose
+    // original consumers require live sword/parasol item services; the
+    // shared command readiness guard intentionally remains explicit there.
+    else if (captain || ganon) group(295,costume.motion_count-1);
+    else if (luigi) group(295,costume.motion_count-1); // Luigi's authored special rows end at 311.
+    else if (pikachu_family) group(295,costume.motion_count-1); // Both authored tables end at 319.
+    else if (purin) group(295,costume.motion_count-1); // Purin five aerial jumps and original specials.
+    else if (donkey) group(295,costume.motion_count-1); // Heavy carry, cargo throws and Donkey specials.
+    else if (koopa) group(295,costume.motion_count-1); // Koopa's authored self rows end at 315.
     else group(295,326);                         // Fox/Falco/Marth/Roy source special command rows
     for (auto choice : runtime_->wait_choices()) command_motions_.insert(choice.motion_id);
+    for (auto choice : runtime_->squat_wait_choices()) command_motions_.insert(choice.motion_id);
     for (auto id : command_motions_) {
         const auto& action = runtime_->action(id);
         if (!action.command_offset) continue;

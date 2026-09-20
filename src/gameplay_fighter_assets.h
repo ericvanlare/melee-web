@@ -10,16 +10,18 @@ typedef struct MeleeWebFighterAssetScope MeleeWebFighterAssetScope;
 typedef int (*MeleeWebFighterAssetBind)(void*,struct Fighter*,void** actions,void** blends,char*,size_t);
 typedef void (*MeleeWebFighterAssetUnbind)(void*,struct Fighter*);
 /* Publish one decoded source fighter costume and ftData after common
- * initialization. Mario, Fox, Falco, Link and Young Link currently have
- * native extension/article schemas; other kinds are rejected by their decoders.
+ * initialization. A costume archive is required exactly when the source owns
+ * an additional costume part; its descriptor owner must outlive the scope.
  * Source globals are restored only after every bound Fighter has unloaded. */
 MeleeWebFighterAssetScope* melee_web_fighter_assets_begin(uint32_t kind,uint32_t costume,
-    void* data,void* joint,void* material_animation,uint32_t motion_count,void* context,
+    void* data,void* joint,void* material_animation,void* costume_archive,uint32_t motion_count,void* context,
     MeleeWebFighterAssetBind,MeleeWebFighterAssetUnbind,char*,size_t);
+/* Original optional costume-part public name; null when the costume has none. */
+const char* melee_web_fighter_costume_part_symbol(uint32_t kind,uint32_t costume);
 /* Add another costume of the same decoded kind before creating Fighters.
  * Shares ftData and action ownership while retaining distinct native models. */
 int melee_web_fighter_assets_add_costume(MeleeWebFighterAssetScope*,uint32_t costume,
-    void* joint,void* material_animation,char*,size_t);
+    void* joint,void* material_animation,void* costume_archive,char*,size_t);
 int melee_web_fighter_assets_end(MeleeWebFighterAssetScope*,char*,size_t);
 uint32_t melee_web_fighter_assets_live(const MeleeWebFighterAssetScope*);
 /* Storage hooks for the original constructor/loader/unload call sites. */

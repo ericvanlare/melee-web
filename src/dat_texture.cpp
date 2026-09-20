@@ -171,8 +171,12 @@ DatTexturePalette palette(const DatArchive& archive, std::uint32_t offset,
                            const DatTextureImage& image)
 {
     auto result = palette_descriptor(archive, offset, image.format);
-    if (maximum_palette_index(image) >= result.entries)
-        reject("Image references an index outside its TLUT palette");
+    const auto maximum = maximum_palette_index(image);
+    if (maximum >= result.entries)
+        throw DatError("Image references an index outside its TLUT palette: image=" +
+                       std::to_string(image.descriptor_offset) + " palette=" +
+                       std::to_string(offset) + " maximum=" + std::to_string(maximum) +
+                       " entries=" + std::to_string(result.entries));
     return result;
 }
 

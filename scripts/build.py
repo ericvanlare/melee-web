@@ -26,6 +26,10 @@ PUBLIC_RUNTIME_BUILD_DIR = "build/browser-public-release"
 TRACE_TARGETS = (
     "gameplay_content_match_trace",
     "gameplay_stage_battlefield_trace",
+    "gameplay_stage_temple_trace",
+    "gameplay_stage_fountain_trace",
+    "gameplay_stage_old_yoshi_trace",
+    "gameplay_pikachu_articles_trace",
 )
 
 # Keep the target closure in one place so callers that need to configure once
@@ -77,6 +81,12 @@ PUBLIC_RUNTIME_EXPORTS = (
     "_main",
     "_malloc",
     "_free",
+    "_melee_web_native_asset_begin",
+    "_melee_web_native_asset_count",
+    "_melee_web_native_asset_name",
+    "_melee_web_native_asset_file",
+    "_melee_web_native_asset_commit",
+    "_melee_web_native_asset_abort",
     "_melee_web_native_menu_file",
     "_melee_web_native_menu_prepare",
     "_melee_web_native_menu_launch",
@@ -115,6 +125,9 @@ PUBLIC_RUNTIME_SOURCE_FILES = (
     "cmake/FighterRuntime.cmake",
     "patches/melee-gameplay.patch",
     "src/gameplay_menu_browser.cpp",
+    "src/gameplay_asset_manifest.cpp",
+    "src/gameplay_asset_manifest.hpp",
+    "src/runtime_asset_scope.hpp",
     "src/gameplay_menu_world.cpp",
     "src/gameplay_match_session.cpp",
     "src/gameplay_audio.c",
