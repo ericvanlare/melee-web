@@ -102,9 +102,9 @@ class GameplayFighterDataTests(unittest.TestCase):
                     result = subprocess.run([str(node), str(output), *args], cwd=directory, env=env,
                                             capture_output=True, text=True, timeout=30)
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                    self.assertIn("Native Pikachu shared 0xf8 attributes and explicit Article boundary: passed",
+                    self.assertIn("Native Pikachu shared 0xf8 attributes and three Article registrations: passed",
                                   result.stdout)
-                    self.assertIn("Native Pichu shared 0xf8 attributes and explicit Article boundary: passed",
+                    self.assertIn("Native Pichu shared 0xf8 attributes and three Article registrations: passed",
                                   result.stdout)
             print(result.stdout, end="")
 

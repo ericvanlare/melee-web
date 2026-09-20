@@ -417,7 +417,7 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
             if(i==6) {
                 REQUIRE((kind==FTKIND_LINK||kind==FTKIND_CLINK)&&p!=UINT32_MAX,
                     "Link part descriptor is missing");
-            } else if(p!=UINT32_MAX && kind!=FTKIND_PIKACHU && kind!=FTKIND_PICHU) {
+            } else if(p!=UINT32_MAX) {
                 d->x48_items[i]=melee_web_article_decode(r,p,&article_unresolved);
             }
         }
@@ -441,8 +441,8 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
         REQUIRE(at!=UINT32_MAX && d->x48_items[0],
             "Luigi OnLoad requires its fire Article identity");
     else if(kind==FTKIND_PIKACHU || kind==FTKIND_PICHU)
-        REQUIRE(at!=UINT32_MAX,
-            "Pikachu-family Article roots require a separate checked item owner");
+        REQUIRE(at!=UINT32_MAX && d->x48_items[0] && d->x48_items[1] && d->x48_items[2],
+            "Pikachu-family OnLoad requires its three Article identities");
     else if(kind==FTKIND_CAPTAIN || kind==FTKIND_GANON)
         REQUIRE(at==UINT32_MAX, "Captain-family source ftData Article table is not null");
     else
@@ -452,8 +452,7 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     for(unsigned i=0;i<sizeof(ready)/sizeof(ready[0]);++i) {
         /* Keep the Link part descriptor unresolved until its source HSD_Joint
          * has been converted to the native 32-bit descriptor ABI. */
-        if(ready[i]==18 && (kind==FTKIND_LINK||kind==FTKIND_CLINK||
-                            kind==FTKIND_PIKACHU||kind==FTKIND_PICHU)) continue;
+        if(ready[i]==18 && (kind==FTKIND_LINK||kind==FTKIND_CLINK)) continue;
         *unresolved &= ~(1U<<ready[i]);
     }
     if(actions) *unresolved &= ~(1U<<3);

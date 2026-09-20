@@ -44,6 +44,8 @@ static const MeleeWebSourceIdentity* melee_web_source_identity(int ckind){
         {CKIND_CAPTAIN, FTKIND_CAPTAIN, ICONHUD_CAPTAIN},
         {CKIND_GANON, FTKIND_GANON, ICONHUD_GANON},
         {CKIND_LUIGI, FTKIND_LUIGI, ICONHUD_LUIGI},
+        {CKIND_PIKACHU, FTKIND_PIKACHU, ICONHUD_PIKACHU},
+        {CKIND_PICHU, FTKIND_PICHU, ICONHUD_PICHU},
     };
     for (unsigned i=0;i<sizeof(rows)/sizeof(rows[0]);++i)
         if (rows[i].character==(CharacterKind)ckind) return &rows[i];

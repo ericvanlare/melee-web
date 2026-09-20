@@ -549,9 +549,10 @@
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
         "docs/ACCURACY_CONTRACT.md",
-        "docs/PIKACHU_PICHU_PORT_NOTES.md"
+        "docs/PIKACHU_PICHU_PORT_NOTES.md",
+        "docs/evidence/full-game-checkpoint-pikachu-old-yoshi-v1.json"
       ],
-      "next_step": "Integrate the three source Article registrations with the fighter asset owner after the passing shared 0xf8 attribute and six-Article descriptor probes, then hydrate costumes/effects/actions/audio and verify native lifecycles before enabling either fighter.",
+      "next_step": "Add independent original comparison and remaining move/interaction/lifecycle coverage. Both player orders and all costumes pass native construction; forward fixtures drive Pikachu specials. Fresh cold/warm 30-case browser sweeps pass 11,200 frames with zero timing/audio/live-pipeline failures; discovery failures remain retained.",
       "issue": null
     },
     {
@@ -867,6 +868,7 @@
       },
       "source_refs": [
         "melee/ft/forward.h",
+        "melee/ft/ftaction.c",
         "melee/ft/kinds/ftPichu/ftpichu.c"
       ],
       "depends_on": [
@@ -880,9 +882,10 @@
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
         "docs/ACCURACY_CONTRACT.md",
-        "docs/PIKACHU_PICHU_PORT_NOTES.md"
+        "docs/PIKACHU_PICHU_PORT_NOTES.md",
+        "docs/evidence/full-game-checkpoint-pikachu-old-yoshi-v1.json"
       ],
-      "next_step": "Integrate the three source Article registrations with the fighter asset owner after the passing shared 0xf8 attribute and six-Article descriptor probes, then hydrate costumes/effects/actions/audio and verify native lifecycles before enabling either fighter.",
+      "next_step": "Add independent original comparison and remaining move/interaction/lifecycle coverage. Native forward fixtures observe jolt/Thunder lifetimes and source self-damage; reverse fixtures drive Mario. Fresh cold/warm 30-case browser sweeps pass 11,200 frames with zero timing/audio/live-pipeline failures; discovery failures remain retained.",
       "issue": null
     },
     {
@@ -1958,7 +1961,7 @@
       "id": "stage-yoshis-island-64",
       "category": "stages",
       "title": "Yoshi's Island 64 source stage",
-      "implementation": "not_integrated",
+      "implementation": "partial",
       "acceptance": "not_evaluated",
       "source_identity": {
         "stkind": "St_Kind_OldYoshi",
@@ -1979,9 +1982,11 @@
       ],
       "evidence": [
         "docs/ADDING_STAGES.md",
-        "docs/ACCURACY_CONTRACT.md"
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/YOSHIS_ISLAND_64_PORT_NOTES.md",
+        "docs/evidence/full-game-checkpoint-pikachu-old-yoshi-v1.json"
       ],
-      "next_step": "Run the stage checkpoint for Yoshi's Island 64 and split map, collision, visual, hazard, audio and browser gates.",
+      "next_step": "Extend two 5,000-tick native scheduler/cloud/guest lifetimes and five entry-only match lifetimes into full combat and original drawn comparison. Fresh cold/warm CSS/SSS entry passes without resumes/gaps/audio underruns, retaining one 69 ms cold browser long task. Full stage performance, pixels, PCM and ordinary-input loops remain open.",
       "issue": null
     },
     {

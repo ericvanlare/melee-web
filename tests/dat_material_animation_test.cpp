@@ -129,6 +129,10 @@ int main() {
         repeated.link(0xa00,0x4000);put32(repeated.data,0xa04,0x04000400);
         put32(repeated.data,0xa08,9); // 1024x1024 CI8, one checked image
         repeated.link(0xa20,0x104000);put32(repeated.data,0xa2c,1U<<16);
+        repeated.link(76,160);put32(repeated.data,164,4);
+        repeated.data[172]=10;repeated.data[173]=0x85;repeated.link(176,192);
+        std::copy(repeated.data.begin()+96,repeated.data.begin()+100,repeated.data.begin()+192);
+        repeated.data[195]=0; // independent TCLT keeps Cartesian validation
         melee_web::DatMaterialAnimation repeated_tables(repeated.archive(),0,model);
         check(repeated_tables.image_count()==256,"aliased image tables stay within actual validation work budget");
         repeated.data[0x4000]=1;rejected(repeated); // still rejects invalid indices
@@ -146,6 +150,30 @@ int main() {
         PairedFixture out_of_range;
         put16(out_of_range.data,476,1); // selected image[1] index one is invalid
         rejected(out_of_range);
+
+        // An authored palette table alone does not select its entries.
+        // HSD_TObjAddAnim starts tlut_no at -1 and TIMG leaves it unchanged.
+        PairedFixture image_only;
+        image_only.relocations.erase(std::remove(image_only.relocations.begin(),
+            image_only.relocations.end(),76),image_only.relocations.end());
+        put32(image_only.data,76,0);
+        const uint16_t base_palette[2] = {0,0};
+        texture.texture.palette_data=base_palette;
+        texture.texture.palette_bytes=sizeof(base_palette);
+        texture.texture.palette_entries=2;
+        melee_web::DatMaterialAnimation base_tlut(image_only.archive(),0,model);
+        check(base_tlut.texture_animation_count()==1,
+              "TIMG-only animation keeps the source base palette");
+        auto absent_table=image_only;
+        absent_table.relocations.erase(std::remove(absent_table.relocations.begin(),
+            absent_table.relocations.end(),44),absent_table.relocations.end());
+        put32(absent_table.data,44,0);put32(absent_table.data,48,2U<<16);
+        melee_web::DatMaterialAnimation base_without_table(absent_table.archive(),0,model);
+        auto broken_unused=image_only;put16(broken_unused.data,476,0);
+        rejected(broken_unused); // unselected descriptors still need valid storage
+        texture.texture.palette_entries=1;rejected(image_only);
+        texture.texture.palette_entries=2;
+        texture.texture.palette_data=nullptr;rejected(image_only);
         std::cout<<"owned material animation topology/index/bounds checks passed\n";
     }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
 }

@@ -366,5 +366,15 @@
     "Pixels, emitted PCM, physical input and source scheduling",
     "Cold/warm full-match and repeated-session performance",
     "Remaining fighters, stages, items, rules, menus, save and single-player modes"
-  ]
+  ],
+  "github_verify": {
+    "head_commit": "9ec1009480d2591df1dc3658e34ac24b39998b0d",
+    "run_url": "https://github.com/ericvanlare/melee-web/actions/runs/35517397085",
+    "conclusion": "success",
+    "created_at": "2026-09-20T14:44:17Z",
+    "updated_at": "2026-09-20T14:50:42Z",
+    "wall_seconds": 385,
+    "evidence": "work/full-game/luigi-fountain-github-verify-v1.json",
+    "sha256": "6f7843e39c0ea9809e5c0fa3e23efd1b44efbd7782f2f50d87088b7f4a12fed8"
+  }
 }

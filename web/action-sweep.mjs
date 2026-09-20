@@ -141,6 +141,20 @@ const luigi=[
   aerialSpecial('Luigi Cyclone (air)',[[358,358]],0,-80),
 ];
 
+// ftPichu retains the ftPikachu source motion-state table. Its command graph
+// additionally applies the original self-damage consumer; it runs separately.
+const pikachuFamily=(upMove)=>[
+  ground('Thunder Jolt',[[341,341]],input(1,PAD.B),input(180)),
+  aerialSpecial('Thunder Jolt (air)',[[342,342]]),
+  ground('Skull Bash charge/release',[[343,344],[345,347]],input(45,PAD.B,80),input(300)),
+  {name:'Skull Bash (air)',expect:[[348,349],[350,352]],settle:true,
+    inputs:[input(2,PAD.X),input(4),input(18,PAD.B,80),input(300)]},
+  ground(upMove,[[353,355]],input(1,PAD.B,0,80),input(240)),
+  aerialSpecial(`${upMove} (air)`,[[356,358]],0,80),
+  ground('Thunder',[[359,362]],input(1,PAD.B,0,-80),input(240)),
+  aerialSpecial('Thunder (air)',[[363,366]],0,-80),
+];
+
 export const actionInventories=new Map([
  [18,{id:'marth-visible-actions-v1',fighter:'Marth',minimumStageFrames:4200,cases:[...common,...wavedashes,...marth]}],
  [21,{id:'dr-mario-visible-actions-v1',fighter:'Dr. Mario',minimumStageFrames:4800,cases:[...common,...wavedashes,...drMario]}],
@@ -150,6 +164,8 @@ export const actionInventories=new Map([
  [25,{id:'ganondorf-visible-actions-v1',fighter:'Ganondorf',minimumStageFrames:5200,cases:[...common,...ganon]}],
  [2,{id:'captain-falcon-visible-actions-v1',fighter:'Captain Falcon',minimumStageFrames:5200,cases:[...common,...captain]}],
  [17,{id:'luigi-visible-actions-v1',fighter:'Luigi',minimumStageFrames:5200,cases:[...common,...luigi]}],
+ [12,{id:'pikachu-visible-actions-v1',fighter:'Pikachu',minimumStageFrames:5600,cases:[...common,...pikachuFamily('Quick Attack')]}],
+ [23,{id:'pichu-visible-actions-v1',fighter:'Pichu',minimumStageFrames:5600,cases:[...common,...pikachuFamily('Agility')]}],
 ]);
 
 export function actionInventory(fighterKind){return actionInventories.get(fighterKind)||null;}

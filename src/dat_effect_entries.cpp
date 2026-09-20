@@ -71,9 +71,18 @@ DatEffectEntries::DatEffectEntries(std::shared_ptr<const DatArchive> archive,std
         auto owner=std::make_unique<Entry>();auto& e=*owner;const uint32_t at=*root+8+20*i;
         const float lifetime=a.f32(at);
         if(!std::isfinite(lifetime)||lifetime<0||lifetime>65535)throw DatError("Effect lifetime exceeds native source range");
+        auto& out=reinterpret_cast<EF_EffectDesc*>(s.table+1)[i];out.lifetime=lifetime;
         const auto model=a.pointer(at+4,64),animation=a.pointer(at+8,20),material=a.pointer(at+12,12);
-        if(!model)throw DatError("Effect static model has no joint descriptor");
         const auto shape=a.pointer(at+16,12);
+        if(!model){
+            // Source tables can retain an empty model row beside particle
+            // commands with the same numeric suffix (Pikachu's row 7005).
+            // Keep its index and exact zero descriptor; no model is invented.
+            if(lifetime!=0||animation||material||shape)
+                throw DatError("Effect null model row has a lifetime or animation descriptor");
+            s.entries.push_back(std::move(owner));
+            continue;
+        }
         e.model=std::make_unique<DatNativeJoint>(s.archive,*model);char error[256];
         e.native=melee_web_native_joint_hydrate(&e.model->graph(),error,sizeof(error));
         if(!e.native)throw DatError(error);
@@ -90,7 +99,6 @@ DatEffectEntries::DatEffectEntries(std::shared_ptr<const DatArchive> archive,std
         }
         if(material)e.material_animation=std::make_unique<DatMaterialAnimation>(s.archive,*material,e.model->graph());
         if(shape)e.shape_animation=std::make_unique<DatShapeAnimation>(s.archive,*shape,e.model->graph());
-        auto& out=reinterpret_cast<EF_EffectDesc*>(s.table+1)[i];out.lifetime=lifetime;
         out.model_desc.joint=static_cast<HSD_Joint*>(melee_web_native_joint_descriptor(e.native,error,sizeof(error)));
         out.model_desc.animjoint=e.animation?static_cast<HSD_AnimJoint*>(e.animation->descriptor()):nullptr;
         out.model_desc.matanim_joint=e.material_animation?static_cast<HSD_MatAnimJoint*>(e.material_animation->descriptor()):nullptr;

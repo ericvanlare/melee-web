@@ -1,7 +1,9 @@
 """Owned source fixtures for new content; not keyboard, rendering or retail acceptance."""
 from pathlib import Path
+import os
 import subprocess
 import sys
+import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -10,6 +12,18 @@ from check_gameplay import node_runtime
 
 
 class ContentMatchTests(unittest.TestCase):
+    def merged_asset_roots(self, *roots):
+        """Expose one flat source directory without adding generated assets."""
+        directory = tempfile.TemporaryDirectory(prefix="melee-web-content-")
+        merged = Path(directory.name)
+        for root in roots:
+            for source in root.iterdir():
+                target = merged / source.name
+                if target.exists():
+                    continue
+                os.symlink(source.resolve(), target)
+        return directory, merged
+
     def run_trace(self, name, arguments, expected):
         targets = [ROOT / "build" / directory / (name + ".js")
                    for directory in ("browser", "browser-release")]
@@ -115,6 +129,54 @@ class ContentMatchTests(unittest.TestCase):
                 self.run_trace("gameplay_content_match_trace",
                                [common, luigi, 32, fighter, opponent],
                                "Mixed source content intro, costumes, stage lifecycle, combat, pause and repeat teardown passed")
+
+    def test_pikachu_pichu_source_lifecycles_both_orientations(self):
+        common = ROOT / "assets-local/full-game-ganon"
+        pikachu = ROOT / "assets-local/full-game-pikachu"
+        pichu = ROOT / "assets-local/full-game-pichu"
+        required_common = ("MnSlChr.usd", "PlMr.dat", "PlMrAJ.dat", "GrNLa.dat")
+        required_pikachu = (
+            "PlPk.dat", "PlPkAJ.dat", "PlPkNr.dat", "PlPkRe.dat",
+            "PlPkBu.dat", "PlPkGr.dat", "EfPkData.dat",
+            "pikachu-root.ssm", "pikachu.ssm",
+        )
+        required_pichu = (
+            "PlPc.dat", "PlPcAJ.dat", "PlPcNr.dat", "PlPcRe.dat",
+            "PlPcBu.dat", "PlPcGr.dat", "pichu-root.ssm", "pichu.ssm",
+        )
+        if not all((common / name).is_file() for name in required_common):
+            self.skipTest("Owned common Mario, menu and FD fixtures are required")
+        if not all((pikachu / name).is_file() for name in required_pikachu):
+            self.skipTest("Owned Pikachu and shared effect/audio fixtures are required")
+        if not all((pichu / name).is_file() for name in required_pichu):
+            self.skipTest("Owned Pichu fixtures are required")
+
+        # CKIND_PIKACHU=13 and CKIND_PICHU=24. The source trace's larger-side
+        # loop reconstructs all four authored family costumes in either player
+        # orientation. Pichu reuses EfPkData.dat from the shared family root.
+        for family, ckind in ((pikachu, 13), (pichu, 24)):
+            roots = (common, pikachu, pichu) if family == pichu else (common, pikachu)
+            temporary, merged = self.merged_asset_roots(*roots)
+            try:
+                for fighter, opponent in ((ckind, 8), (8, ckind)):
+                    with self.subTest(fighter=fighter, opponent=opponent):
+                        self.run_trace(
+                            "gameplay_content_match_trace",
+                            [merged, merged, 32, fighter, opponent],
+                            "Mixed source content intro, costumes, stage lifecycle, combat, pause and repeat teardown passed")
+            finally:
+                temporary.cleanup()
+
+    def test_old_yoshi_source_match_entry_and_repeat_teardown(self):
+        common = ROOT / "assets-local/full-game-ganon"
+        stage = ROOT / "assets-local/full-game-stage-yoshis-island-64"
+        if not all((root / name).is_file() for root, names in (
+                (common, ("MnSlChr.usd", "PlMr.dat", "PlMrAJ.dat", "mario.ssm")),
+                (stage, ("GrOy.dat", "old_ys.hps"))) for name in names):
+            self.skipTest("Owned Old Yoshi, Mario and menu fixtures are required")
+        self.run_trace("gameplay_content_match_trace",
+                       [common, stage, 29, 8, 8, "--entry-only"],
+                       "Source content entry, costumes, stage lifecycle, pause and repeat teardown passed")
 
     def test_hyrule_temple_source_lifecycles(self):
         temple = ROOT / "assets-local/full-game-stage-hyrule-temple"

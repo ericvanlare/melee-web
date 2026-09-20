@@ -2,6 +2,7 @@
 #include "gameplay_compat.h"
 #include <melee/ft/types.h>
 #include <melee/ft/ftdata.h>
+#include <melee/ft/fighter.h>
 #include <melee/lb/lbanim.h>
 #include <melee/lb/lbcommand.h>
 #include <sysdolphin/baselib/gobj.h>
@@ -249,6 +250,31 @@ int action_test_opcode50_consumer(void)
     const int valid=p[0].unk17.unk1==50&&dynamics_gobj==&gobj&&dynamics_part==50&&
         dynamics_frame==17.25f&&command.u==&p[1];
     melee_web_command_require_supported(50);melee_web_commands_destroy(p);return valid;
+}
+static Fighter* damage_fighter;
+static float damage_amount;
+static unsigned damage_calls;
+void Fighter_TakeDamage_8006CC7C(Fighter* fighter, float amount)
+{
+    damage_fighter=fighter;damage_amount=amount;++damage_calls;
+}
+void ftAction_80072BF4(HSD_GObj*, CommandInfo*);
+int action_test_opcode51_consumer(void)
+{
+    const int amounts[]={0,1,4,-1,-33554432,33554431};
+    for(unsigned i=0;i<sizeof(amounts)/sizeof(*amounts);++i){
+        const MeleeWebCommandWord words[]={
+            {(51U<<26)|((uint32_t)amounts[i]&0x3ffffffU),UINT32_MAX},{0,UINT32_MAX}};
+        union CmdUnion* p=melee_web_commands_create(words,2);if(!p)return 0;
+        Fighter fighter={0};HSD_GObj gobj={0};gobj.user_data=&fighter;
+        CommandInfo command={0};command.u=p;
+        damage_fighter=NULL;damage_amount=0;damage_calls=0;
+        ftAction_80072BF4(&gobj,&command);
+        const int valid=p[0].unk18.damage_amount==amounts[i]&&damage_calls==1&&
+            damage_fighter==&fighter&&damage_amount==(float)amounts[i]&&command.u==&p[1];
+        melee_web_commands_destroy(p);if(!valid)return 0;
+    }
+    melee_web_command_require_supported(51);return 1;
 }
 int action_test_opcode21_consumer(void)
 {

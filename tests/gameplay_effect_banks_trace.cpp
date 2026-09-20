@@ -2,6 +2,7 @@
 #include "dat_effect_entries.hpp"
 #include "hsd_native_joint.h"
 #include "gameplay_bootstrap.h"
+#include "gameplay_effect_runtime.h"
 #include "gameplay_compat.h"
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wwrite-strings"
@@ -32,6 +33,58 @@ using Bytes=std::vector<uint8_t>;
 static char error[256];
 static void check(bool ok,const char* why){if(!ok)throw std::runtime_error(std::string(why)+": "+error);}
 static void put32(Bytes& b,uint32_t o,uint32_t v){for(unsigned i=0;i<4;++i)b.at(o+i)=uint8_t(v>>(24-8*i));}
+static Bytes effect_table_fixture(uint32_t lifetime_bits,int nonnull_descriptor=-1){
+    // A one-row effect table rooted at data offset zero.  The optional
+    // relocation can provide a static model or an animation without a model.
+    constexpr uint32_t data_size=96;
+    const uint32_t relocation_count=nonnull_descriptor<0?0:1;
+    const uint32_t relocation_start=32+data_size;
+    const uint32_t public_start=relocation_start+4*relocation_count;
+    const uint32_t names_start=public_start+8;
+    Bytes b(names_start+2,0);
+    put32(b,0,uint32_t(b.size()));put32(b,4,data_size);put32(b,8,relocation_count);put32(b,12,1);put32(b,16,0);
+    put32(b,32+8,lifetime_bits);
+    if(nonnull_descriptor>=0){
+        if(nonnull_descriptor>3)throw std::runtime_error("invalid synthetic effect descriptor index");
+        const uint32_t slot=32+12+4*uint32_t(nonnull_descriptor);
+        put32(b,slot,32);
+        put32(b,relocation_start,12+4*uint32_t(nonnull_descriptor));
+    }
+    put32(b,public_start,0);put32(b,public_start+4,0);b[names_start]='r';
+    return b;
+}
+static void null_effect_row_boundaries(){
+    {
+        auto archive=std::make_shared<melee_web::DatArchive>(effect_table_fixture(0));
+        melee_web::DatEffectEntries owner(archive,"r",1,1);
+        auto* entries=reinterpret_cast<EF_EffectDesc*>(static_cast<uint8_t*>(owner.table())+8);
+        check(owner.entry_count()==1&&!owner.entries_ready(),"complete-null effect row remains unpublished");
+        check(entries[0].lifetime==0&&!entries[0].model_desc.joint&&
+              !entries[0].model_desc.animjoint&&!entries[0].model_desc.matanim_joint&&
+              !entries[0].model_desc.shapeanim_joint,
+              "complete-null effect row preserves zero source descriptor");
+    }
+    {
+        melee_web::DatEffectEntries static_model(
+            std::make_shared<melee_web::DatArchive>(effect_table_fixture(0,0)),"r",1,1);
+        auto* entry=reinterpret_cast<EF_EffectDesc*>(static_cast<uint8_t*>(static_model.table())+8);
+        check(entry->model_desc.joint&&!entry->model_desc.animjoint,
+              "static model without animation remains a valid source row");
+    }
+    for(unsigned slot=1;slot<4;++slot){
+        bool rejected=false;
+        try{melee_web::DatEffectEntries owner(
+            std::make_shared<melee_web::DatArchive>(effect_table_fixture(0,int(slot))),"r",1,1);}
+        catch(const melee_web::DatError&){rejected=true;}
+        check(rejected,"partial-null effect descriptor rejected");
+    }
+    bool rejected=false;
+    try{melee_web::DatEffectEntries owner(
+        std::make_shared<melee_web::DatArchive>(effect_table_fixture(0x3f800000)),"r",1,1);}
+    catch(const melee_web::DatError&){rejected=true;}
+    check(rejected,"nonzero-lifetime null effect descriptor rejected");
+    std::cout<<"Complete-null effect row admission and partial/nonzero-null rejection passed\n";
+}
 static Bytes fixture(){
     Bytes b(32+0xe0+8+8+2);put32(b,0,uint32_t(b.size()));put32(b,4,0xe0);put32(b,8,2);put32(b,12,1);
     auto put=[&](uint32_t o,uint32_t v){put32(b,32+o,v);};
@@ -150,6 +203,50 @@ static void effect_entries(std::shared_ptr<const melee_web::DatArchive> archive,
     }
     std::cout<<(model_only?"Local Link effects: ":"Local Mario effects: ")<<count<<" native model entries and animation graphs; original LoadSync/evaluation/restart passed\n";
 }
+static void pikachu_entries(std::shared_ptr<const melee_web::DatArchive> archive){
+    constexpr unsigned bank=7,count=6;
+    melee_web::DatEffectEntries owner(archive,"effPikachuDataTable",bank,count,true);
+    archive.reset();
+    check(owner.entry_count()==count&&owner.bank()!=nullptr&&!owner.entries_ready(),
+          "Pikachu source retains six entries and particle bank before publication");
+    auto* entries=reinterpret_cast<EF_EffectDesc*>(static_cast<uint8_t*>(owner.table())+8);
+    const float lifetimes[5]={13,14,35,14,35};
+    for(unsigned i=0;i<5;++i){
+        check(entries[i].lifetime==lifetimes[i]&&entries[i].model_desc.joint&&
+              entries[i].model_desc.animjoint&&entries[i].model_desc.matanim_joint,
+              "Pikachu source model rows retain authored descriptors");
+    }
+    check(entries[5].lifetime==0&&!entries[5].model_desc.joint&&
+          !entries[5].model_desc.animjoint&&!entries[5].model_desc.matanim_joint&&
+          !entries[5].model_desc.shapeanim_joint,
+          "Pikachu entry 5 retains authored null source descriptor");
+    const auto previous=efAsync_DatEntries[bank].data;
+    for(unsigned pass=0;pass<2;++pass){
+        check(melee_web_gameplay_startup(8U*1024U*1024U,error,sizeof(error)),"Pikachu effect world startup");
+        check(melee_web_native_world_enable(error,sizeof(error)),"Pikachu native class initialization");
+        check(melee_web_effect_runtime_begin(error,sizeof(error)),"Pikachu original particle callbacks");
+        check(owner.load(error,sizeof(error))&&owner.entries_ready(),"Pikachu original effect publication");
+        check(efAsync_DatEntries[bank].data==entries,"Pikachu original effect lookup pointer");
+        for(unsigned i=0;i<5;++i){
+            const auto& d=entries[i].model_desc;
+            HSD_JObj* joint=HSD_JObjLoadJoint(d.joint);
+            check(joint!=nullptr,"Pikachu original effect model load");
+            HSD_JObjAddAnimAll(joint,d.animjoint,d.matanim_joint,d.shapeanim_joint);
+            for(float frame:{0.0f,1.0f,6.0f,12.0f,24.0f,34.0f}){
+                HSD_JObjReqAnimAll(joint,frame);HSD_JObjAnimAll(joint);
+            }
+            HSD_JObjRemoveAll(joint);
+        }
+        check(HSD_JObjLoadJoint(entries[5].model_desc.joint)==nullptr,
+              "Pikachu entry 5 source null joint remains non-rendering");
+        check(!owner.load(error,sizeof(error)),"duplicate Pikachu effect publication rejected");
+        check(melee_web_effect_runtime_end(error,sizeof(error)),"Pikachu original particle teardown");
+        check(owner.detach(error,sizeof(error))&&!owner.entries_ready(),"Pikachu effect scope detach");
+        check(efAsync_DatEntries[bank].data==previous,"Pikachu original effect lookup restored");
+        check(melee_web_gameplay_shutdown(error,sizeof(error)),"Pikachu effect world teardown");
+    }
+    std::cout<<"Pikachu bank7 six-entry model/null-row publication, animation, restart and detach passed\n";
+}
 static void common_entries(std::shared_ptr<const melee_web::DatArchive> archive){
     melee_web::DatEffectEntries owner(archive,"effCommonDataTable",0,47,true);archive.reset();
     check(owner.entry_count()==47,"all common source effect descriptors hydrated");
@@ -184,6 +281,7 @@ static void common_entries(std::shared_ptr<const melee_web::DatArchive> archive)
 }
 int main(int argc,char** argv){
     try{
+        null_effect_row_boundaries();
         registration(std::make_shared<melee_web::DatArchive>(fixture()),"r",false);
         palette_format_word();
         for(unsigned mutation=0;mutation<5;++mutation){
@@ -208,6 +306,10 @@ int main(int argc,char** argv){
             std::ifstream file(argv[2],std::ios::binary);check(bool(file),"open Link effect archive");
             Bytes bytes((std::istreambuf_iterator<char>(file)),{});
             effect_entries(std::make_shared<melee_web::DatArchive>(bytes),true);
+        }else if(argc==3&&std::string(argv[1])=="--pikachu"){
+            std::ifstream file(argv[2],std::ios::binary);check(bool(file),"open Pikachu effect archive");
+            Bytes bytes((std::istreambuf_iterator<char>(file)),{});
+            pikachu_entries(std::make_shared<melee_web::DatArchive>(bytes));
         }else if(argc==2){
             std::ifstream file(argv[1],std::ios::binary);check(bool(file),"open optional effect archive");
             Bytes bytes((std::istreambuf_iterator<char>(file)),{});

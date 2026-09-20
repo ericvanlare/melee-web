@@ -51,10 +51,10 @@ class GameplayActionStoreTests(unittest.TestCase):
                 return text[start:end]
             subset = directory / "action_consumers.c"
             subset.write_text('#include "gameplay_compat.h"\n#include "gameplay_action_store.h"\n'
-                '#include <melee/ft/types.h>\n#include <melee/ft/ftdynamics.h>\n#include <melee/ft/inlines.h>\n#include <melee/ft/ft_0DF0.h>\n'
+                '#include <melee/ft/types.h>\n#include <melee/ft/fighter.h>\n#include <melee/ft/ftdynamics.h>\n#include <melee/ft/inlines.h>\n#include <melee/ft/ft_0DF0.h>\n'
                 '#include <melee/lb/inlines.h>\n#include <melee/lb/lbcommand.h>\n'
                 'void ftAnim_800704F0(HSD_GObj*, int, float);\nvoid ft_8008A1B8(HSD_GObj*, int);\nvoid ftColl_8007AFC8(HSD_GObj*, int);\n'
-                + function("ftAction_80071708") + '\n' + function("ftAction_80071784") + '\n' + function("ftAction_80071908") + '\n' + function("ftAction_80071974") + '\n' + function("ftAction_80072B94") + '\n' + function("ftAction_80073008") + '\n' + function("ftAction_80071820") + '\n' + function("ftAction_800726F4") + '\n' + function("ftAction_80072C6C") + '\n' + function("ftAction_80073118")
+                + function("ftAction_80071708") + '\n' + function("ftAction_80071784") + '\n' + function("ftAction_80071908") + '\n' + function("ftAction_80071974") + '\n' + function("ftAction_80072BF4") + '\n' + function("ftAction_80072B94") + '\n' + function("ftAction_80073008") + '\n' + function("ftAction_80071820") + '\n' + function("ftAction_800726F4") + '\n' + function("ftAction_80072C6C") + '\n' + function("ftAction_80073118")
                 + '\nstatic void (*ftAction_803C06E8[49])(HSD_GObj*, CommandInfo*) = '
                 '{[30]=ftAction_800726F4,[42]=ftAction_80072C6C};\n'
                 + function("ftAction_80073240"))
@@ -90,6 +90,8 @@ class GameplayActionStoreTests(unittest.TestCase):
                 (ROOT / "assets-local/next-gate/PlFc.dat", ROOT / "assets-local/next-gate/PlFcAJ.dat"),
                 (ROOT / "assets-local/next-gate/PlMs.dat", ROOT / "assets-local/next-gate/PlMsAJ.dat"),
                 (ROOT / "assets-local/full-game-luigi/PlLg.dat", ROOT / "assets-local/full-game-luigi/PlLgAJ.dat"),
+                (ROOT / "assets-local/full-game-pikachu/PlPk.dat", ROOT / "assets-local/full-game-pikachu/PlPkAJ.dat"),
+                (ROOT / "assets-local/full-game-pichu/PlPc.dat", ROOT / "assets-local/full-game-pichu/PlPcAJ.dat"),
             ]
             available_pairs = [pair for pair in owned_pairs if all(path.is_file() for path in pair)]
             args = [str(path) for pair in available_pairs for path in pair]
@@ -97,12 +99,15 @@ class GameplayActionStoreTests(unittest.TestCase):
                                     capture_output=True, text=True, timeout=30)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("Original owned action loaders and checked Wait command execution: passed", result.stdout)
-            if all(pair in available_pairs for pair in owned_pairs[:4]) and owned_pairs[4] not in available_pairs:
+            if available_pairs == owned_pairs[:4]:
                 self.assertIn("Owned common appeal action rows 239/240 for Mario, Fox, Falco and Marth: passed", result.stdout)
             if owned_pairs[0] in available_pairs:
                 self.assertIn("Local Mario Wait2/3/6 source command traces and startup clips: passed", result.stdout)
             if owned_pairs[4] in available_pairs:
                 self.assertIn("Luigi kind 17 authored self-motion command rows 295/311: passed", result.stdout)
+            for index, kind in ((5, 12), (6, 23)):
+                if owned_pairs[index] in available_pairs:
+                    self.assertIn(f"Pikachu-family kind {kind} authored self-motion rows 295/319: passed", result.stdout)
             print(result.stdout, end="")
 
 

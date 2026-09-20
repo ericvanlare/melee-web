@@ -37,9 +37,10 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     // path used by the standalone Wasm fixture compiler.
     const bool link_family = costume.fighter_kind == 6 || costume.fighter_kind == 20;
     const bool luigi = costume.fighter_kind == 17;
+    const bool pikachu_family = costume.fighter_kind == 12 || costume.fighter_kind == 23;
     const bool captain = costume.fighter_kind == 2;
     const bool ganon = costume.fighter_kind == 25;
-    require(mario || fox_family || mars || link_family || luigi || captain || ganon, "Native action store has no checked fighter command schema for this kind");
+    require(mario || fox_family || mars || link_family || luigi || pikachu_family || captain || ganon, "Native action store has no checked fighter command schema for this kind");
     std::vector<DatCommandRoot> roots;
     // Explicit source ftCo submotion groups. This certifies command operand
     // graphs only, not readiness of every original world service they invoke.
@@ -64,6 +65,7 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     // shared command readiness guard intentionally remains explicit there.
     else if (captain || ganon) group(295,costume.motion_count-1);
     else if (luigi) group(295,costume.motion_count-1); // Luigi's authored special rows end at 311.
+    else if (pikachu_family) group(295,costume.motion_count-1); // Both authored tables end at 319.
     else group(295,326);                         // Fox/Falco/Marth/Roy source special command rows
     for (auto choice : runtime_->wait_choices()) command_motions_.insert(choice.motion_id);
     for (auto id : command_motions_) {

@@ -8094,3 +8094,22 @@ diff --git a/src/melee/gr/grdisplay.c b/src/melee/gr/grdisplay.c
              if (HSD_GObj_804D7818->hsd_obj != gp->x18->hsd_obj) {
                  HSD_CObj* cobj;
                  if (gp->x10_flags.b3 == 0) {
+diff --git a/src/melee/gr/groldyoshi.c b/src/melee/gr/groldyoshi.c
+--- a/src/melee/gr/groldyoshi.c
++++ b/src/melee/gr/groldyoshi.c
+@@ -64,6 +64,15 @@
+     s16 x18;
+ }* yakumono_param;
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++void* melee_web_groldyoshi_exchange_yakumono(void* value)
++{
++    void* previous = yakumono_param;
++    yakumono_param = value;
++    return previous;
++}
++#endif
++
+ void grOldYoshi_8020E798(bool arg) {}
+ 
+ void grOldYoshi_8020E79C(void)

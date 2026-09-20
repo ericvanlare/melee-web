@@ -47,5 +47,12 @@ class EffectContextTests(unittest.TestCase):
             self.skipTest("Local EfLkData.dat unavailable; proprietary assets are optional")
         self.assertIn("4 native model entries and animation graphs; original LoadSync/evaluation/restart passed",self.run_trace("--link",asset))
 
+    def test_local_pikachu_null_effect_row_and_original_restart(self):
+        asset=ROOT/"assets-local/full-game-pikachu/EfPkData.dat"
+        if not asset.is_file():
+            self.skipTest("Local EfPkData.dat unavailable; proprietary assets are optional")
+        self.assertIn("Pikachu bank7 six-entry model/null-row publication, animation, restart and detach passed",
+                      self.run_trace("--pikachu",asset))
+
 if __name__=="__main__":
     unittest.main()

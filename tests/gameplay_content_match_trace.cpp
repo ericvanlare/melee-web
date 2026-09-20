@@ -7,6 +7,7 @@
 #include <melee/ft/kinds/ftMars/forward.h>
 #include <melee/ft/kinds/ftCaptain/forward.h>
 #include <melee/ft/kinds/ftLuigi/forward.h>
+#include <melee/ft/kinds/ftPikachu/forward.h>
 #include <melee/ft/kinds/ftCommon/forward.h>
 #include <melee/it/forward.h>
 #include <filesystem>
@@ -23,7 +24,9 @@ extern "C" int melee_web_test_quake_translated(void);
 extern "C" int melee_web_story_state(uint32_t*,unsigned*,int*,int*,int*,int*);
 static void check(bool value,const char* message){if(!value)throw std::runtime_error(message);}
 int main(int argc,char** argv){try{
-    if(argc<3||argc>6)throw std::runtime_error("Expected owned menu/game directories and optional StKind/P1 CKind/P2 CKind");
+    if(argc<3||argc>7)throw std::runtime_error("Expected owned menu/game directories and optional StKind/P1 CKind/P2 CKind/--entry-only");
+    const bool entry_only=argc==7&&std::string(argv[6])=="--entry-only";
+    if(argc==7&&!entry_only)throw std::runtime_error("Unknown source match trace scope");
     melee_web::RuntimeFiles files;
     for(const auto* root:{argv[1],argv[2]})for(const auto& entry:std::filesystem::directory_iterator(root)){
         if(!entry.is_regular_file())continue;
@@ -109,7 +112,13 @@ int main(int argc,char** argv){try{
         check(melee_web_test_content_player(1,opponent_ckind,opponent_content->fighter_kind,opponent_color),"Original opponent identity/costume/icon differs");
         check(match.player_stats(0).stocks==4&&match.player_stats(1).stocks==4,
               "Source stock initialization changed for the selected content pair");
-        if(selection.start.rules.stkind==St_Kind_Story){
+        if(entry_only){
+            // Stage entry has its own scope: do not reuse the FD combat
+            // positioning recipe on geometry where that walk leaves a ledge.
+            for(unsigned n=0;n<60;n++)tick();
+            check(match.player_stats(0).stocks==4&&match.player_stats(1).stocks==4,
+                  "Source entry-only window changed initial stocks");
+        }else if(selection.start.rules.stkind==St_Kind_Story){
             uint32_t map_mask=0;unsigned map_count=0;int randall_timer=0,shy_timer=0,shy_count=0,shy_pattern=0;
             check(melee_web_story_state(&map_mask,&map_count,&randall_timer,&shy_timer,&shy_count,&shy_pattern),
                   "Yoshi's Story original map lifecycle is incomplete");
@@ -128,6 +137,9 @@ int main(int argc,char** argv){try{
         const bool captain=fighter_content->fighter_kind==FTKIND_CAPTAIN;
         const bool ganon=fighter_content->fighter_kind==FTKIND_GANON;
         const bool luigi=fighter_content->fighter_kind==FTKIND_LUIGI;
+        const bool pikachu_family=fighter_content->fighter_kind==FTKIND_PIKACHU||
+            fighter_content->fighter_kind==FTKIND_PICHU;
+        const bool pichu=fighter_content->fighter_kind==FTKIND_PICHU;
         const bool mars_family=fighter_content->fighter_kind==FTKIND_MARS||
             fighter_content->fighter_kind==FTKIND_EMBLEM;
         // Authored versus spawns may put P2 on a platform. Drop that source
@@ -177,6 +189,13 @@ int main(int argc,char** argv){try{
         }
         const auto damage=match.player_stats(1).damage_percent;
         bool capsule=false,captain_family_punch=false,luigi_fireball_live=false;
+        bool pikachu_ground_n=false,pikachu_ground_article_live=false;
+        const int pikachu_ground_kind=pichu?It_Kind_Pichu_TJolt_Ground:
+            It_Kind_Pikachu_TJolt_Ground;
+        const int pikachu_thunder_kind=pichu?It_Kind_Pichu_Thunder:
+            It_Kind_Pikachu_Thunder;
+        const float pikachu_damage_before_specials=match.player_stats(0).damage_percent;
+        bool pichu_self_damage_seen=false;
         for(unsigned n=0;n<240&&match.player_stats(1).damage_percent==damage;n++){
             raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
             if(ganon||captain)captain_family_punch|=match.player_stats(0).motion_id==ftCa_MS_SpecialN;
@@ -185,6 +204,15 @@ int main(int argc,char** argv){try{
                 capsule|=motion==ftMr_MS_SpecialN||motion==ftMr_MS_SpecialAirN;
             }
             if(luigi)luigi_fireball_live|=melee_web_test_item_count(It_Kind_Luigi_Fire)>0;
+            if(pikachu_family){
+                pikachu_ground_n|=match.player_stats(0).motion_id==ftPk_MS_SpecialN;
+                pikachu_ground_article_live|=
+                    melee_web_test_item_count(pikachu_ground_kind)>0;
+            }
+            if(pichu)
+                pichu_self_damage_seen|=
+                    match.player_stats(0).damage_percent>
+                    pikachu_damage_before_specials+0.001f;
         }
         raw[0].button=0;
         check(match.player_stats(1).damage_percent>damage,"Selected fighter ground neutral special did not damage the opponent");
@@ -198,6 +226,23 @@ int main(int argc,char** argv){try{
                 tick();cleared=melee_web_test_item_count(It_Kind_Luigi_Fire)==0;
             }
             check(cleared,"Luigi ground neutral special did not destroy its original fireball article");
+        }
+        if(pikachu_family){
+            check(pikachu_ground_n,
+                  "Pikachu-family ground neutral special did not enter its original source state");
+            check(pikachu_ground_article_live,
+                  "Pikachu-family ground neutral special did not create its authored jolt article");
+            bool cleared=false;
+            for(unsigned n=0;n<600&&!cleared;n++){
+                tick();
+                if(pichu)
+                    pichu_self_damage_seen|=
+                        match.player_stats(0).damage_percent>
+                        pikachu_damage_before_specials+0.001f;
+                cleared=melee_web_test_item_count(pikachu_ground_kind)==0;
+            }
+            check(cleared,
+                  "Pikachu-family ground neutral special did not destroy its authored jolt article");
         }
         std::cout<<fighter_content->name<<(fox_family?" laser damage=":" neutral-special damage=")
                  <<match.player_stats(1).damage_percent<<std::endl;
@@ -237,6 +282,7 @@ int main(int argc,char** argv){try{
         raw[0].button=0;
         check(match.player_stats(0).ground_or_air==1,"Selected fighter did not jump");
         bool air_capsule=false,air_captain_family_punch=false;
+        bool pikachu_air_n=false,pikachu_air_article_live=false;
         for(unsigned n=0;n<100;n++){
             raw[0].button=n<20?PAD_BUTTON_B:0;tick();
             if(ganon||captain)air_captain_family_punch|=match.player_stats(0).motion_id==ftCa_MS_SpecialAirN;
@@ -244,11 +290,40 @@ int main(int argc,char** argv){try{
                 const auto motion=match.player_stats(0).motion_id;
                 air_capsule|=motion==ftMr_MS_SpecialAirN;
             }
+            if(pikachu_family){
+                const auto motion=match.player_stats(0).motion_id;
+                pikachu_air_n|=motion==ftPk_MS_SpecialAirN;
+                // ftpikachuspecialn.c passes specialn_itkind for both the
+                // ground and air callbacks; retain that source identity here.
+                pikachu_air_article_live|=
+                    melee_web_test_item_count(pikachu_ground_kind)>0;
+            }
+            if(pichu)
+                pichu_self_damage_seen|=
+                    match.player_stats(0).damage_percent>
+                    pikachu_damage_before_specials+0.001f;
         }
         if(doctor&&cycle==0)check(air_capsule,
             "Dr. Mario aerial neutral special did not enter its original capsule action");
         if(ganon||captain)check(air_captain_family_punch,
             "Captain-family fighter did not enter its original aerial neutral special");
+        if(pikachu_family&&cycle==0){
+            check(pikachu_air_n,
+                  "Pikachu-family aerial neutral special did not enter its original source state");
+            check(pikachu_air_article_live,
+                  "Pikachu-family aerial neutral special did not create its source jolt article");
+            bool cleared=false;
+            for(unsigned n=0;n<600&&!cleared;n++){
+                tick();
+                if(pichu)
+                    pichu_self_damage_seen|=
+                        match.player_stats(0).damage_percent>
+                        pikachu_damage_before_specials+0.001f;
+                cleared=melee_web_test_item_count(pikachu_ground_kind)==0;
+            }
+            check(cleared,
+                  "Pikachu-family aerial neutral special did not destroy its source jolt article");
+        }
         if(cycle==0&&fox_family){
             for(unsigned n=0;n<300&&match.player_stats(0).ground_or_air!=0;n++)tick();
             check(match.player_stats(0).ground_or_air==0,"Selected fighter did not land after the air laser");
@@ -515,6 +590,80 @@ int main(int argc,char** argv){try{
             settle_luigi();
             std::cout<<"Luigi ground/air N article lifecycle, RNG-preserving S state="
                      <<side_state<<", Hi and Lw source states passed"<<std::endl;
+        }else if(cycle==0&&pikachu_family){
+            auto pika_tick=[&](){
+                tick();
+                if(pichu)
+                    pichu_self_damage_seen|=
+                        match.player_stats(0).damage_percent>
+                        pikachu_damage_before_specials+0.001f;
+            };
+            auto settle_pikachu=[&](){
+                raw[0].button=0;raw[0].stickX=raw[0].stickY=0;
+                for(unsigned n=0;n<720;n++){
+                    const auto state=match.player_stats(0);
+                    if(state.ground_or_air==0&&state.motion_id<ftPk_MS_SpecialN)
+                        return;
+                    pika_tick();
+                }
+                check(false,
+                      "Pikachu-family special did not return to grounded common motion");
+            };
+
+            settle_pikachu();
+            bool side=false;
+            for(unsigned n=0;n<240&&!side;n++){
+                raw[0].stickX=80;raw[0].button=n%8==0?PAD_BUTTON_B:0;
+                pika_tick();
+                const auto motion=match.player_stats(0).motion_id;
+                // The source S state machine has authored charge/release
+                // stages; accept any of its ground or air motion states.
+                side=(motion>=ftPk_MS_SpecialSStart&&motion<=ftPk_MS_SpecialS0)||
+                    (motion>=ftPk_MS_SpecialAirSStart&&motion<=ftPk_MS_SpecialAirS0);
+            }
+            raw[0].stickX=0;raw[0].button=0;
+            check(side,
+                  "Pikachu-family side special did not enter its original source state");
+            settle_pikachu();
+
+            bool up=false;
+            for(unsigned n=0;n<240&&!up;n++){
+                raw[0].stickY=80;raw[0].button=n%8==0?PAD_BUTTON_B:0;
+                pika_tick();
+                const auto motion=match.player_stats(0).motion_id;
+                up=(motion>=ftPk_MS_SpecialHiStart0&&motion<=ftPk_MS_SpecialHiEnd)||
+                    (motion>=ftPk_MS_SpecialAirHiStart0&&motion<=ftPk_MS_SpecialAirHiEnd);
+            }
+            raw[0].stickY=0;raw[0].button=0;
+            check(up,
+                  "Pikachu-family up special did not enter its original source state");
+            settle_pikachu();
+
+            bool down=false,thunder_live=false;
+            for(unsigned n=0;n<720;n++){
+                raw[0].stickY=-80;raw[0].button=n%8==0?PAD_BUTTON_B:0;
+                pika_tick();
+                const auto motion=match.player_stats(0).motion_id;
+                down|=(motion>=ftPk_MS_SpecialLwStart&&motion<=ftPk_MS_SpecialLwEnd)||
+                    (motion>=ftPk_MS_SpecialAirLwStart&&motion<=ftPk_MS_SpecialAirLwEnd);
+                thunder_live|=melee_web_test_item_count(pikachu_thunder_kind)>0;
+                if(down&&thunder_live&&n>120)break;
+            }
+            raw[0].stickY=0;raw[0].button=0;
+            check(down,
+                  "Pikachu-family down special did not enter its original source state");
+            check(thunder_live,
+                  "Pikachu-family down special did not create its authored Thunder article");
+            for(unsigned n=0;n<720&&melee_web_test_item_count(pikachu_thunder_kind)>0;n++)
+                pika_tick();
+            check(melee_web_test_item_count(pikachu_thunder_kind)==0,
+                  "Pikachu-family down special did not tear down its Thunder article");
+            if(pichu)
+                check(pichu_self_damage_seen,
+                      "Pichu authored special command did not apply source self damage");
+            std::cout<<fighter_content->name
+                     <<" original N/air-N/S/Hi/Lw Article lifecycle passed"
+                     <<(pichu?" with source self damage":"")<<std::endl;
         }else if(cycle==0&&mars_family){
             raw[0].button=0;raw[0].stickX=raw[0].stickY=0;
             for(unsigned n=0;n<420;n++){
@@ -593,5 +742,7 @@ int main(int argc,char** argv){try{
             check(melee_web_test_quake_start(variant),"Stage quake variant is missing");
         match.close();match.close();
     }
-    std::cout<<"Mixed source content intro, costumes, stage lifecycle, combat, pause and repeat teardown passed\n";
+    std::cout<<(entry_only?
+        "Source content entry, costumes, stage lifecycle, pause and repeat teardown passed\n":
+        "Mixed source content intro, costumes, stage lifecycle, combat, pause and repeat teardown passed\n");
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

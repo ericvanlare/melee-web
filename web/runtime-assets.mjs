@@ -77,6 +77,13 @@ export const NATIVE_GAME_DISC_FILES=Object.freeze({
   'PlLg.dat':'PlLg.dat','PlLgAJ.dat':'PlLgAJ.dat','PlLgNr.dat':'PlLgNr.dat',
   'PlLgWh.dat':'PlLgWh.dat','PlLgAq.dat':'PlLgAq.dat','PlLgPi.dat':'PlLgPi.dat',
   'EfLgData.dat':'EfLgData.dat','luigi.ssm':'audio/us/luigi.ssm',
+  'PlPk.dat':'PlPk.dat','PlPkAJ.dat':'PlPkAJ.dat','PlPkNr.dat':'PlPkNr.dat',
+  'PlPkRe.dat':'PlPkRe.dat','PlPkBu.dat':'PlPkBu.dat','PlPkGr.dat':'PlPkGr.dat',
+  'PlPc.dat':'PlPc.dat','PlPcAJ.dat':'PlPcAJ.dat','PlPcNr.dat':'PlPcNr.dat',
+  'PlPcRe.dat':'PlPcRe.dat','PlPcBu.dat':'PlPcBu.dat','PlPcGr.dat':'PlPcGr.dat',
+  'EfPkData.dat':'EfPkData.dat',
+  'pikachu.ssm':'audio/us/pikachu.ssm','pichu.ssm':'audio/us/pichu.ssm',
+  'GrOy.dat':'GrOy.dat','old_ys.hps':'audio/old_ys.hps',
 });
 export function loadNativeGameDisc(file,report=()=>{}) {
   return loadDiscBundle(file,report,NATIVE_GAME_DISC_FILES);

@@ -196,12 +196,16 @@ void verify_pikachu(const std::shared_ptr<const DatArchive>& archive,const Bytes
     check(decoded->specialn_itkind==ground_item && decoded->specialairn_itkind==air_item &&
           decoded->x60==zip_duration && decoded->xDC==thunder_effects,
           "Pikachu-family native extension did not retain typed source fields");
-    check(!melee_web_fighter_data_article(data,0) && !melee_web_fighter_data_article(data,1) &&
-          !melee_web_fighter_data_article(data,2),
-          "Pikachu-family decoder fabricated an unchecked Article owner");
-    check((unresolved&(1U<<18))!=0,"Pikachu-family Article boundary was silently marked ready");
+    for(unsigned slot=0;slot<3;++slot) {
+        void* article=melee_web_fighter_data_article(data,slot);
+        check(article && melee_web_article_unresolved(article)==
+              ((1U<<1)|(1U<<3)|(1U<<4)),
+              "Pikachu-family Article registration identity is incomplete");
+    }
+    check((unresolved&(1U<<18))==0,
+          "Pikachu-family Article registration roots remain unresolved");
     std::cout<<"Native "<<(kind==12?"Pikachu":"Pichu")<<
-        " shared 0xf8 attributes and explicit Article boundary: passed\n";
+        " shared 0xf8 attributes and three Article registrations: passed\n";
 }
 }
 int main(int argc,char**argv) {

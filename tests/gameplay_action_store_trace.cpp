@@ -25,6 +25,7 @@ int action_test_dobj_operands(void);
 int action_test_opcode14_consumer(void);
 int action_test_opcode15_consumer(void);
 int action_test_opcode50_consumer(void);
+int action_test_opcode51_consumer(void);
 int action_test_opcode21_consumer(void);
 int action_test_common_operands(void);
 int action_test_falco_operands(void);
@@ -134,6 +135,15 @@ void verify_common_appeals(std::shared_ptr<const DatArchive> archive, const Byte
                   "Luigi self-motion command root is not retained");
         }
     }
+    if (costume.fighter_kind == 12 || costume.fighter_kind == 23) {
+        check(costume.motion_count == 320, "Pikachu-family authored action count changed");
+        for (unsigned motion = 295; motion < costume.motion_count; ++motion) {
+            check(store.command_ready(motion), "Pikachu-family self-motion graph is not admitted");
+            check(store.runtime().commands(motion).has_value() ==
+                      store.runtime().action(motion).command_offset.has_value(),
+                  "Pikachu-family self-motion source command presence changed");
+        }
+    }
     check(action_test_common_appeals(store.action_rows(), expected_command_mask),
           "Common appeal rows did not retain checked command storage or were given the sentinel");
 }
@@ -147,6 +157,7 @@ int main(int argc, char** argv)
         check(action_test_opcode14_consumer(),"Opcode 14 hitbox flag consumer and native admission");
         check(action_test_opcode15_consumer(),"Opcode 15 hitbox disable consumer and native admission");
         check(action_test_opcode50_consumer(),"Opcode 50 dynamics consumer and native admission");
+        check(action_test_opcode51_consumer(),"Opcode 51 signed self-damage consumer and native admission");
         check(action_test_opcode21_consumer(),"Opcode 21 throw-flag consumer and native admission");
         check(action_test_common_operands(),"Common attack operands and original finite-loop execution");
         check(action_test_falco_operands(),"Falco special opcode schemas retain source fields and canonical words");
@@ -246,6 +257,9 @@ int main(int argc, char** argv)
                 std::cout << "Local Mario Wait2/3/6 source command traces and startup clips: passed\n";
             if (kinds.contains(17))
                 std::cout << "Luigi kind 17 authored self-motion command rows 295/311: passed\n";
+            for (unsigned kind : {12U, 23U})
+                if (kinds.contains(kind))
+                    std::cout << "Pikachu-family kind " << kind << " authored self-motion rows 295/319: passed\n";
         }
     } catch (const std::exception& e) { std::cerr << e.what() << '\n'; return 1; }
 }

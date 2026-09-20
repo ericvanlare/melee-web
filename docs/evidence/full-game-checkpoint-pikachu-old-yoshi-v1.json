@@ -1,0 +1,939 @@
+{
+  "schema": "melee-web-full-game-checkpoint-validation",
+  "version": 1,
+  "source_base_commit": "9ec1009480d2591df1dc3658e34ac24b39998b0d",
+  "scope": "Development branch checkpoint with thirteen selectable fighters and seven stages. No whole-game, tournament, pixel, PCM, ordinary-controller, general performance or deployment admission.",
+  "automated_suite": {
+    "local_path": "work/full-game/pikachu-old-yoshi-suite-v2.log",
+    "sha256": "e0487413067459078d7d4c9c2d1ced1290f48b49d07c95ccce419f0c8f15b4e9",
+    "command": "python3 -m unittest discover -s tests -v",
+    "result": "pass",
+    "tests": 1075,
+    "seconds": 334.49,
+    "skips": 41,
+    "skip_reasons": {
+      "Bootstrap Aurora and a C++20 compiler for independent DSP comparison": 2,
+      "Build fighter targets before the typed support check": 1,
+      "Original stage trace target unavailable": 2,
+      "Build dat_scene_trace before the typed scene check": 1,
+      "Owned stage selection archive and pinned SDK required": 1,
+      "Build gameplay_audio_trace and provide local SSM/SEM/DSP coefficient fixtures": 2,
+      "Build fighter/audio stream target and supply optional owned HPS/SSM/SEM/coefficient inputs": 1,
+      "Build fighter targets before running the focused bonus_data trace": 1,
+      "Project SDK and Aurora build dependencies unavailable; run bootstrap/build": 4,
+      "Optional built combat trace and owned runtime assets required": 1,
+      "Common context trace unavailable; build gameplay first": 1,
+      "Owned menu, Fox/Falco and stage fixtures are required": 1,
+      "Owned Dr. Mario/Roy and stage fixtures are required": 1,
+      "Project SDK/Aurora build dependencies unavailable; run bootstrap/build": 1,
+      "Built stock trace and owned Mario costume archives required": 1,
+      "Built original player context trace required": 1,
+      "Optional built source trace and owned runtime assets required": 2,
+      "Optional built full-stage edge trace and owned runtime assets required": 2,
+      "Optional built timer trace and owned runtime assets required": 1,
+      "Build gameplay_music_profile_trace and provide owned menu/game assets": 1,
+      "Build fighter targets before the original SIS consumer check": 1,
+      "Original CSS target and owned local fixtures are required": 1,
+      "Build the native menu host and supply owned menu/game fixtures": 1,
+      "Build gameplay_rumble_trace and provide owned LbRb.dat": 1,
+      "Build fighter targets before running the focused stage_numeric trace": 1,
+      "Native HSD targets unavailable; run scripts/build.py --target gameplay": 1,
+      "Build the native_audio_banks fighter target first": 1,
+      "Build gameplay_pad_state_trace": 1,
+      "compiled private provenance fixture not supplied": 1,
+      "Optional pinned Dolphin source checkout is not installed": 2,
+      "pinned slippi-js fixtures are not checked out": 2
+    }
+  },
+  "release_builds": [
+    {
+      "local_path": "work/full-game/pikachu-old-yoshi-browser-build-v4.log",
+      "sha256": "47e60e70edff8ed54529fd4e5837d9f85e9e8135a5c97e5337e5d959f3ac7537",
+      "kind": "development",
+      "result": "pass",
+      "artifacts": [
+        {
+          "local_path": "build/browser-release/gameplay_menu_browser.js",
+          "sha256": "5f1da21b6b19352e303d5f53da73a026b7e3340ab42cc040c1eb272678664373",
+          "bytes": 285316
+        },
+        {
+          "local_path": "build/browser-release/gameplay_menu_browser.wasm",
+          "sha256": "2269f898ab03068f99bbbda04c5ab7c17b56c1bcb3296cdf5f5ea84aec8038c3",
+          "bytes": 13069535
+        },
+        {
+          "local_path": "build/browser-release/gameplay_menu_browser.data",
+          "sha256": "00beb96a91ac23bfc639d7fb25b9ff9feb886b48779384159efd525682ccc2d5",
+          "bytes": 3305472
+        }
+      ]
+    },
+    {
+      "local_path": "work/full-game/pikachu-old-yoshi-public-build-v2.log",
+      "sha256": "39910bb237ec12d095ebda14ecac900ed386a0f68ff3929edeebb1b77af78cab",
+      "kind": "public",
+      "result": "pass",
+      "artifacts": [
+        {
+          "local_path": "build/browser-public-release/gameplay_public.js",
+          "sha256": "35eed1ae315881c5ada3161e34476e80cde214921c98a5157133d1e6ce02609b",
+          "bytes": 283268
+        },
+        {
+          "local_path": "build/browser-public-release/gameplay_public.wasm",
+          "sha256": "ba97d12eb3fe4369d8d74ffbb698eca8ab9addb55d4691d8dc39d49760b791e0",
+          "bytes": 12325836
+        },
+        {
+          "local_path": "build/browser-public-release/gameplay_public.data",
+          "sha256": "00beb96a91ac23bfc639d7fb25b9ff9feb886b48779384159efd525682ccc2d5",
+          "bytes": 3305472
+        }
+      ]
+    }
+  ],
+  "machine": {
+    "hardware": "Apple M4",
+    "os": "macOS 26.6.2 (25G83)",
+    "browser": "153.0.8010.50",
+    "canvas_backing_pixels": [
+      640,
+      480
+    ],
+    "device_pixel_ratio": 1,
+    "development_audio": true,
+    "application_cache": "Cold origin reset, source world teardown and persistence, then complete warm application reload",
+    "driver_cache": "uncontrolled"
+  },
+  "browser_build": {
+    "local_path": "work/full-game/pikachu-old-yoshi-browser-build-v4/prototype-build.json",
+    "sha256": "a6450034fb0e60717459f020c9ce9d056448df56eb0a089914d6419b3c86c202",
+    "artifacts": {
+      "gameplay_menu_browser.js": "5f1da21b6b19352e303d5f53da73a026b7e3340ab42cc040c1eb272678664373",
+      "gameplay_menu_browser.wasm": "2269f898ab03068f99bbbda04c5ab7c17b56c1bcb3296cdf5f5ea84aec8038c3",
+      "gameplay_menu_browser.data": "00beb96a91ac23bfc639d7fb25b9ff9feb886b48779384159efd525682ccc2d5",
+      "runtime.html": "7dbdba45a72835799f02df323ce93e762ed3ad9d8941522ebe4d550913460172",
+      "runtime-development.mjs": "1833a302d0e97976946d1880687cd79b3e9f23ecebafd2af08ca76b932a14b90",
+      "melee-runtime.mjs": "f5ad8fe145e60482099eef2baa9865b797d8f6047777794cf6f83eaed37968a4",
+      "controller-input.mjs": "3388c3784717bea4b582a8fa66100880cbbcf4a0adb767c000e0a9cc779c31c8",
+      "controller-panel.mjs": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95",
+      "controller-panel.css": "289ca851412aca5b7def53dc002e8b3a897f7524e37d7b2ba2065822e7b3c16e",
+      "controller-settings.mjs": "3679207e488927e1cbd30386123bc80f26b565bb84f29916506ab72074dbd4a2",
+      "controller-settings.css": "3ac5ef6bea09babcc557f49b109fd76194a0d6ee2f5195bc731d5e8b446fcf2f",
+      "prototype-keyboard-layouts.mjs": "88dbd2c00873bad67cee89b9094bf735e0be3dc89bb2dcd95ac14de2abc30745",
+      "runtime-cache.js": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26",
+      "audio-worklet.js": "ef4374ac08f5bab821efa05cf5d252ca8e4b50647710d434e192beac3d7d7b4f",
+      "audio-ring.mjs": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf",
+      "disc-image.mjs": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a",
+      "dsp-coefficients.mjs": "5176d1cf4400228f31dff428bcc8cd60d07694c0ceea1628a79ac19f3e112b4a",
+      "runtime-assets.mjs": "9f94fb63f89ebe024d39c440f36b69391f75c73a407738482e9e28a6da713f69",
+      "runtime-audio-assets.mjs": "b9bfd3f841d73e4ee4987fc5ac7351832c4ae8eca48ba5cf9c95578a238c7dbc",
+      "runtime-audio.mjs": "d968d2b2f9b58d2ab5dc1a4720d2ad2114cfbcac44a888694da7850100546545",
+      "match-flow.mjs": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f",
+      "match-menu.mjs": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba",
+      "action-sweep.mjs": "b3052dd20b71a6796cc26308958f795fb0be30eaa76b9eb3a3c92115b882d2c9",
+      "hitch-capture.mjs": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3"
+    }
+  },
+  "native_scope": "Both fighter player orders, all four family costumes in five Mario/family lifetimes; forward fixtures drive Pikachu/Pichu specials, reverse fixtures drive Mario. Ground-jolt parent and Thunder spawn/drain, self damage, pause/No Contest/reconstruction. Separate Old Yoshi two 5,000-tick source scheduler/cloud/guest lifetimes and five entry-only Mario costume lifetimes; no full stage combat or independent original comparison for new content.",
+  "native_evidence": [
+    {
+      "local_path": "work/full-game/pikachu-native-v2.log",
+      "sha256": "da571f900a97fb71591e7a1cb4d642e137a10b07bced9beaf7353b4886bcd35a"
+    },
+    {
+      "local_path": "work/full-game/pikachu-native-reverse-v1.log",
+      "sha256": "60485b33ef82730e2a7174a85504fe996b69f7bffb7c65155e22ec5498bbb7da"
+    },
+    {
+      "local_path": "work/full-game/pichu-native-v1.log",
+      "sha256": "951c40f3984b226991b3cfe8efa7b9408a122e655e28f06815b0c3e885e60885"
+    },
+    {
+      "local_path": "work/full-game/pichu-native-reverse-v1.log",
+      "sha256": "7b4cf84677a4d22dcdbcaa6e01824b2b2579d8e3e5bf85ab3e662aa5f325cab3"
+    },
+    {
+      "local_path": "work/full-game/pikachu-effects-native-v3.log",
+      "sha256": "478d231a9c3a19430eb5fcc42e2a5d6bd9df7e7ca24e70a7b75f402a82f24048"
+    },
+    {
+      "local_path": "work/full-game/old-yoshi-native-v5.log",
+      "sha256": "c2f674989a1e84c79d3d050530f65dd4ae6941d3aab06853b5c0653f0762824d"
+    },
+    {
+      "local_path": "work/full-game/old-yoshi-match-entry-v1.log",
+      "sha256": "9cb0b03ad77276ed9990403e84fa769be9299e775ce3e9e1f884d273da258707"
+    },
+    {
+      "local_path": "work/full-game/old-yoshi-palette-tests-v1.log",
+      "sha256": "22382c8f1f7d08eece0ae201c8c0ef5c90eeda4a526ce2ffda85a792e035b09a"
+    },
+    {
+      "local_path": "work/full-game/pikachu-action-tests-v1.log",
+      "sha256": "c9260aac0aa87902bb535bea09d05719569cd983f7240d8e4604583b38c01bca"
+    },
+    {
+      "local_path": "work/full-game/pikachu-old-yoshi-final-native-build-v2.log",
+      "sha256": "b6b4e83ff17a3db24ff813af80b69447000f4b2cb0a94f994af99ad5fd6ee39b"
+    }
+  ],
+  "browser_checks": {
+    "pikachu": {
+      "local_path": "work/full-game/pikachu-browser-pair-v1/report.json",
+      "sha256": "31ea1950871b3842020d545a2c1a257f013dacb4ba6f8bc847a6503316f650f6",
+      "result": "scoped_pair_pass",
+      "rounds": [
+        {
+          "round": "cold",
+          "result": "functional_entry_pass",
+          "diagnostic_timing_resumes": 0,
+          "geometry": {
+            "buffer": [
+              640,
+              480
+            ],
+            "css": [
+              900,
+              675
+            ],
+            "devicePixelRatio": 1,
+            "viewport": [
+              1280,
+              960
+            ],
+            "hidden": false,
+            "focused": true
+          },
+          "errors": [],
+          "pass_gate": true,
+          "case_count": 30,
+          "passing_cases": 30,
+          "failures": [],
+          "metrics": {
+            "sourceFrames": 5600,
+            "browserCallbacks": 5600,
+            "worstBrowserCallbackMs": 23.14,
+            "browserCallbackGaps": 0,
+            "browserLongTasks": 0,
+            "browserLongTaskWorstMs": 0,
+            "nativeCallbacks": 5600,
+            "worstNativeCallbackMs": 8.205,
+            "nativeCallbacksOverBudget": 0,
+            "nativeCallbacksOver33ms": 0,
+            "audioUnderrunFrames": 0,
+            "livePipelinesQueued": 0,
+            "livePipelinesCreated": 0,
+            "liveTextureUploadBytes": 1623552,
+            "liveStagingUsedBytes": 6202407368,
+            "peakStagingUsedBytes": 2358752,
+            "preparationPauses": 0,
+            "automaticTimingResumes": 0,
+            "focusLost": false,
+            "wasmHeapGrowthBytes": 0
+          }
+        },
+        {
+          "round": "warm",
+          "result": "functional_entry_pass",
+          "diagnostic_timing_resumes": 0,
+          "geometry": {
+            "buffer": [
+              640,
+              480
+            ],
+            "css": [
+              900,
+              675
+            ],
+            "devicePixelRatio": 1,
+            "viewport": [
+              1280,
+              960
+            ],
+            "hidden": false,
+            "focused": true
+          },
+          "errors": [],
+          "pass_gate": true,
+          "case_count": 30,
+          "passing_cases": 30,
+          "failures": [],
+          "metrics": {
+            "sourceFrames": 5600,
+            "browserCallbacks": 5600,
+            "worstBrowserCallbackMs": 25.835,
+            "browserCallbackGaps": 0,
+            "browserLongTasks": 0,
+            "browserLongTaskWorstMs": 0,
+            "nativeCallbacks": 5600,
+            "worstNativeCallbackMs": 8.095,
+            "nativeCallbacksOverBudget": 0,
+            "nativeCallbacksOver33ms": 0,
+            "audioUnderrunFrames": 0,
+            "livePipelinesQueued": 0,
+            "livePipelinesCreated": 0,
+            "liveTextureUploadBytes": 1623552,
+            "liveStagingUsedBytes": 6203836812,
+            "peakStagingUsedBytes": 2358752,
+            "preparationPauses": 0,
+            "automaticTimingResumes": 0,
+            "focusLost": false,
+            "wasmHeapGrowthBytes": 0
+          }
+        }
+      ]
+    },
+    "pichu": {
+      "local_path": "work/full-game/pichu-browser-pair-v1/report.json",
+      "sha256": "0aee65d10d9f9e87e302b0ab79a775500c290a821ec6057427fbf80986d28c3f",
+      "result": "scoped_pair_pass",
+      "rounds": [
+        {
+          "round": "cold",
+          "result": "functional_entry_pass",
+          "diagnostic_timing_resumes": 0,
+          "geometry": {
+            "buffer": [
+              640,
+              480
+            ],
+            "css": [
+              900,
+              675
+            ],
+            "devicePixelRatio": 1,
+            "viewport": [
+              1280,
+              960
+            ],
+            "hidden": false,
+            "focused": true
+          },
+          "errors": [],
+          "pass_gate": true,
+          "case_count": 30,
+          "passing_cases": 30,
+          "failures": [],
+          "metrics": {
+            "sourceFrames": 5600,
+            "browserCallbacks": 5601,
+            "worstBrowserCallbackMs": 26.035,
+            "browserCallbackGaps": 0,
+            "browserLongTasks": 0,
+            "browserLongTaskWorstMs": 0,
+            "nativeCallbacks": 5601,
+            "worstNativeCallbackMs": 8,
+            "nativeCallbacksOverBudget": 0,
+            "nativeCallbacksOver33ms": 0,
+            "audioUnderrunFrames": 0,
+            "livePipelinesQueued": 0,
+            "livePipelinesCreated": 0,
+            "liveTextureUploadBytes": 1482240,
+            "liveStagingUsedBytes": 5795369476,
+            "peakStagingUsedBytes": 2226144,
+            "preparationPauses": 0,
+            "automaticTimingResumes": 0,
+            "focusLost": false,
+            "wasmHeapGrowthBytes": 0
+          }
+        },
+        {
+          "round": "warm",
+          "result": "functional_entry_pass",
+          "diagnostic_timing_resumes": 0,
+          "geometry": {
+            "buffer": [
+              640,
+              480
+            ],
+            "css": [
+              900,
+              675
+            ],
+            "devicePixelRatio": 1,
+            "viewport": [
+              1280,
+              960
+            ],
+            "hidden": false,
+            "focused": true
+          },
+          "errors": [],
+          "pass_gate": true,
+          "case_count": 30,
+          "passing_cases": 30,
+          "failures": [],
+          "metrics": {
+            "sourceFrames": 5600,
+            "browserCallbacks": 5600,
+            "worstBrowserCallbackMs": 26.425,
+            "browserCallbackGaps": 0,
+            "browserLongTasks": 0,
+            "browserLongTaskWorstMs": 0,
+            "nativeCallbacks": 5600,
+            "worstNativeCallbackMs": 8.16,
+            "nativeCallbacksOverBudget": 0,
+            "nativeCallbacksOver33ms": 0,
+            "audioUnderrunFrames": 0,
+            "livePipelinesQueued": 0,
+            "livePipelinesCreated": 0,
+            "liveTextureUploadBytes": 1482240,
+            "liveStagingUsedBytes": 5795545596,
+            "peakStagingUsedBytes": 2229656,
+            "preparationPauses": 0,
+            "automaticTimingResumes": 0,
+            "focusLost": false,
+            "wasmHeapGrowthBytes": 0
+          }
+        }
+      ]
+    },
+    "yoshis_island_64": {
+      "local_path": "work/full-game/old-yoshi-browser-entry-pair-v1/report.json",
+      "sha256": "23d8e3f3f3dec67fa75d1ad005cc5f51ad8b0d2670c81607ad323b1f9d05fdd0",
+      "result": "functional_entry_pair_pass",
+      "rounds": [
+        {
+          "round": "cold",
+          "result": "functional_entry_pass",
+          "diagnostic_timing_resumes": 0,
+          "geometry": {
+            "buffer": [
+              640,
+              480
+            ],
+            "css": [
+              900,
+              675
+            ],
+            "devicePixelRatio": 1,
+            "viewport": [
+              1280,
+              960
+            ],
+            "hidden": false,
+            "focused": true
+          },
+          "errors": [],
+          "before": {
+            "fighterKind": 0,
+            "motion": 14,
+            "groundAir": 0,
+            "frame": 1,
+            "x": -40,
+            "y": 28.736854553222656
+          },
+          "after": {
+            "fighterKind": 0,
+            "motion": 14,
+            "groundAir": 0,
+            "frame": 31,
+            "x": -40,
+            "y": 28.736854553222656
+          },
+          "entry_metrics": {
+            "browser": "Active browser callbacks 318 \u00b7 worst callback interval 31.29 ms \u00b7 >33.3 ms 0 \u00b7 browser long tasks 1 (worst 69.00 ms)",
+            "native": "Native callbacks 336 \u00b7 worst active callback 14.67 ms \u00b7 >16.67 ms 0 \u00b7 >33.3 ms 0 \u00b7 first-use draws 3 (worst 14.67 ms) \u00b7 last phases p0.00 i0.04 s0.47 b0.12 d1.47 e0.91 ms (preparation excluded here and reported separately; full first-use/long callbacks in log)",
+            "construction": "Construction scene-prepare 1 \u00b7 scene-enter 1 \u00b7 scene-rebuild-step 1 \u00b7 scene-rebuild 1 \u00b7 match-enter-step 7 \u00b7 match-enter 1 \u00b7 worst 114.58 ms \u00b7 construct 114.58 ms \u00b7 preparations 4 (worst 200.16 ms; source entry/teardown separate) \u00b7 latest match-enter prep 200.16 ms (construct 101.58, wait/schedule 98.57) \u00b7 first draw 7.79 ms after 25.67 ms \u00b7 uploads 977152 B \u00b7 pipelines q0/c0 \u00b7 pipeline settle 0.00 ms/0 callbacks \u00b7 native prep a17.66 c156.65 r26.02 ms/2 callbacks (CPU 1.67, max 1.63, uploads 0 B, pipelines q0/c0)",
+            "audio": "Audio queue 1002 frames \u00b7 underrun 0 frames \u00b7 stereo with original reverb/delay \u00b7 replacement DSP coefficients"
+          }
+        },
+        {
+          "round": "warm",
+          "result": "functional_entry_pass",
+          "diagnostic_timing_resumes": 0,
+          "geometry": {
+            "buffer": [
+              640,
+              480
+            ],
+            "css": [
+              900,
+              675
+            ],
+            "devicePixelRatio": 1,
+            "viewport": [
+              1280,
+              960
+            ],
+            "hidden": false,
+            "focused": true
+          },
+          "errors": [],
+          "before": {
+            "fighterKind": 0,
+            "motion": 14,
+            "groundAir": 0,
+            "frame": 3,
+            "x": -40,
+            "y": 28.736854553222656
+          },
+          "after": {
+            "fighterKind": 0,
+            "motion": 14,
+            "groundAir": 0,
+            "frame": 33,
+            "x": -40,
+            "y": 28.736854553222656
+          },
+          "entry_metrics": {
+            "browser": "Active browser callbacks 323 \u00b7 worst callback interval 23.32 ms \u00b7 >33.3 ms 0 \u00b7 browser long tasks 0 (worst 0.00 ms)",
+            "native": "Native callbacks 340 \u00b7 worst active callback 7.48 ms \u00b7 >16.67 ms 0 \u00b7 >33.3 ms 0 \u00b7 first-use draws 3 (worst 6.67 ms) \u00b7 last phases p0.00 i0.02 s0.61 b0.11 d2.23 e1.39 ms (preparation excluded here and reported separately; full first-use/long callbacks in log)",
+            "construction": "Construction scene-prepare 1 \u00b7 scene-enter 1 \u00b7 scene-rebuild-step 1 \u00b7 scene-rebuild 1 \u00b7 match-enter-step 7 \u00b7 match-enter 1 \u00b7 worst 101.06 ms \u00b7 construct 101.06 ms \u00b7 preparations 4 (worst 166.71 ms; source entry/teardown separate) \u00b7 latest match-enter prep 166.71 ms (construct 76.79, wait/schedule 89.92) \u00b7 first draw 2.23 ms after 19.00 ms \u00b7 uploads 977152 B \u00b7 pipelines q0/c0 \u00b7 pipeline settle 0.00 ms/0 callbacks \u00b7 native prep a17.63 c123.36 r25.84 ms/2 callbacks (CPU 0.79, max 0.76, uploads 0 B, pipelines q0/c0)",
+            "audio": "Audio queue 938 frames \u00b7 underrun 0 frames \u00b7 stereo with original reverb/delay \u00b7 replacement DSP coefficients"
+          }
+        }
+      ]
+    }
+  },
+  "retained_discovery": {
+    "pikachu": {
+      "local_path": "work/full-game/pikachu-browser-discovery-v1/report.json",
+      "sha256": "c666b860567829d47e563a0306ae952c604626764c2fa799b752853a87d539ef",
+      "result": "scoped_pair_failed",
+      "rounds": [
+        {
+          "round": "cold",
+          "result": "functional_entry_pass_action_gate_failed",
+          "diagnostic_timing_resumes": 0,
+          "geometry": {
+            "buffer": [
+              640,
+              480
+            ],
+            "css": [
+              900,
+              675
+            ],
+            "devicePixelRatio": 1,
+            "viewport": [
+              1280,
+              960
+            ],
+            "hidden": false,
+            "focused": true
+          },
+          "errors": [],
+          "pass_gate": false,
+          "case_count": 30,
+          "passing_cases": 30,
+          "failures": [
+            "browser callback gap",
+            "native callback over 33.3 ms",
+            "live pipeline creation"
+          ],
+          "metrics": {
+            "sourceFrames": 5600,
+            "browserCallbacks": 5594,
+            "worstBrowserCallbackMs": 55.035,
+            "browserCallbackGaps": 3,
+            "browserLongTasks": 0,
+            "browserLongTaskWorstMs": 0,
+            "nativeCallbacks": 5594,
+            "worstNativeCallbackMs": 42.14,
+            "nativeCallbacksOverBudget": 3,
+            "nativeCallbacksOver33ms": 3,
+            "audioUnderrunFrames": 0,
+            "livePipelinesQueued": 0,
+            "livePipelinesCreated": 9,
+            "liveTextureUploadBytes": 1623552,
+            "liveStagingUsedBytes": 6202562476,
+            "peakStagingUsedBytes": 4637204,
+            "preparationPauses": 0,
+            "automaticTimingResumes": 0,
+            "focusLost": false,
+            "wasmHeapGrowthBytes": 0
+          }
+        },
+        {
+          "round": "warm",
+          "result": "functional_entry_pass",
+          "diagnostic_timing_resumes": 0,
+          "geometry": {
+            "buffer": [
+              640,
+              480
+            ],
+            "css": [
+              900,
+              675
+            ],
+            "devicePixelRatio": 1,
+            "viewport": [
+              1280,
+              960
+            ],
+            "hidden": false,
+            "focused": true
+          },
+          "errors": [],
+          "pass_gate": true,
+          "case_count": 30,
+          "passing_cases": 30,
+          "failures": [],
+          "metrics": {
+            "sourceFrames": 5600,
+            "browserCallbacks": 5600,
+            "worstBrowserCallbackMs": 28.575,
+            "browserCallbackGaps": 0,
+            "browserLongTasks": 0,
+            "browserLongTaskWorstMs": 0,
+            "nativeCallbacks": 5600,
+            "worstNativeCallbackMs": 10,
+            "nativeCallbacksOverBudget": 0,
+            "nativeCallbacksOver33ms": 0,
+            "audioUnderrunFrames": 0,
+            "livePipelinesQueued": 0,
+            "livePipelinesCreated": 0,
+            "liveTextureUploadBytes": 1623552,
+            "liveStagingUsedBytes": 6203362684,
+            "peakStagingUsedBytes": 2440336,
+            "preparationPauses": 0,
+            "automaticTimingResumes": 0,
+            "focusLost": false,
+            "wasmHeapGrowthBytes": 0
+          }
+        }
+      ]
+    },
+    "pichu": {
+      "local_path": "work/full-game/pichu-browser-discovery-v1/report.json",
+      "sha256": "7f9bac956c66949691a4ebb37b80d56b0931918e5acd1d0e5982b60c56181456",
+      "result": "scoped_pair_failed",
+      "rounds": [
+        {
+          "round": "cold",
+          "result": "functional_entry_pass_action_gate_failed",
+          "diagnostic_timing_resumes": 0,
+          "geometry": {
+            "buffer": [
+              640,
+              480
+            ],
+            "css": [
+              900,
+              675
+            ],
+            "devicePixelRatio": 1,
+            "viewport": [
+              1280,
+              960
+            ],
+            "hidden": false,
+            "focused": true
+          },
+          "errors": [],
+          "pass_gate": false,
+          "case_count": 30,
+          "passing_cases": 30,
+          "failures": [
+            "browser callback gap",
+            "live pipeline creation"
+          ],
+          "metrics": {
+            "sourceFrames": 5600,
+            "browserCallbacks": 5599,
+            "worstBrowserCallbackMs": 46.285,
+            "browserCallbackGaps": 1,
+            "browserLongTasks": 0,
+            "browserLongTaskWorstMs": 0,
+            "nativeCallbacks": 5599,
+            "worstNativeCallbackMs": 32.02,
+            "nativeCallbacksOverBudget": 1,
+            "nativeCallbacksOver33ms": 0,
+            "audioUnderrunFrames": 0,
+            "livePipelinesQueued": 0,
+            "livePipelinesCreated": 9,
+            "liveTextureUploadBytes": 1482240,
+            "liveStagingUsedBytes": 5796531844,
+            "peakStagingUsedBytes": 2217272,
+            "preparationPauses": 0,
+            "automaticTimingResumes": 0,
+            "focusLost": false,
+            "wasmHeapGrowthBytes": 0
+          }
+        },
+        {
+          "round": "warm",
+          "result": "functional_entry_pass",
+          "diagnostic_timing_resumes": 0,
+          "geometry": {
+            "buffer": [
+              640,
+              480
+            ],
+            "css": [
+              900,
+              675
+            ],
+            "devicePixelRatio": 1,
+            "viewport": [
+              1280,
+              960
+            ],
+            "hidden": false,
+            "focused": true
+          },
+          "errors": [],
+          "pass_gate": true,
+          "case_count": 30,
+          "passing_cases": 30,
+          "failures": [],
+          "metrics": {
+            "sourceFrames": 5600,
+            "browserCallbacks": 5600,
+            "worstBrowserCallbackMs": 27.505,
+            "browserCallbackGaps": 0,
+            "browserLongTasks": 0,
+            "browserLongTaskWorstMs": 0,
+            "nativeCallbacks": 5600,
+            "worstNativeCallbackMs": 8.995,
+            "nativeCallbacksOverBudget": 0,
+            "nativeCallbacksOver33ms": 0,
+            "audioUnderrunFrames": 0,
+            "livePipelinesQueued": 0,
+            "livePipelinesCreated": 0,
+            "liveTextureUploadBytes": 1482240,
+            "liveStagingUsedBytes": 5795864960,
+            "peakStagingUsedBytes": 2255256,
+            "preparationPauses": 0,
+            "automaticTimingResumes": 0,
+            "focusLost": false,
+            "wasmHeapGrowthBytes": 0
+          }
+        }
+      ]
+    },
+    "yoshis_island_64": {
+      "local_path": "work/full-game/old-yoshi-browser-discovery-v1/report.json",
+      "sha256": "fd8e1a645df1e74146690ba6d33c7b887b590c24037e8e9a0fa6e9fa9f271cf1",
+      "result": "functional_entry_pair_failed",
+      "rounds": [
+        {
+          "round": "cold",
+          "result": "functional_entry_pass",
+          "diagnostic_timing_resumes": 1,
+          "geometry": {
+            "buffer": [
+              640,
+              480
+            ],
+            "css": [
+              900,
+              675
+            ],
+            "devicePixelRatio": 1,
+            "viewport": [
+              1280,
+              960
+            ],
+            "hidden": false,
+            "focused": true
+          },
+          "errors": [],
+          "before": {
+            "fighterKind": 0,
+            "motion": 14,
+            "groundAir": 0,
+            "frame": 3,
+            "x": -40,
+            "y": 28.736854553222656
+          },
+          "after": {
+            "fighterKind": 0,
+            "motion": 14,
+            "groundAir": 0,
+            "frame": 33,
+            "x": -40,
+            "y": 28.736854553222656
+          },
+          "entry_metrics": {
+            "browser": "Active browser callbacks 317 \u00b7 worst callback interval 1615.71 ms \u00b7 >33.3 ms 3 \u00b7 browser long tasks 1 (worst 68.00 ms)",
+            "native": "Native callbacks 337 \u00b7 worst active callback 1604.01 ms \u00b7 >16.67 ms 3 \u00b7 >33.3 ms 2 \u00b7 first-use draws 3 (worst 14.67 ms) \u00b7 last phases p0.00 i0.01 s0.48 b0.07 d2.11 e1.23 ms (preparation excluded here and reported separately; full first-use/long callbacks in log)",
+            "construction": "Construction scene-prepare 1 \u00b7 scene-enter 1 \u00b7 scene-rebuild-step 1 \u00b7 scene-rebuild 1 \u00b7 match-enter-step 7 \u00b7 match-enter 1 \u00b7 worst 115.58 ms \u00b7 construct 115.58 ms \u00b7 preparations 4 (worst 201.75 ms; source entry/teardown separate) \u00b7 latest match-enter prep 201.75 ms (construct 102.56, wait/schedule 99.18) \u00b7 first draw 10.03 ms after 43.33 ms \u00b7 uploads 977152 B \u00b7 pipelines q0/c15 \u00b7 pipeline settle 0.00 ms/0 callbacks \u00b7 native prep a19.25 c155.83 r26.75 ms/2 callbacks (CPU 1.67, max 1.60, uploads 0 B, pipelines q0/c0)",
+            "audio": "Audio queue 1174 frames \u00b7 underrun 0 frames \u00b7 stereo with original reverb/delay \u00b7 replacement DSP coefficients"
+          }
+        },
+        {
+          "round": "warm",
+          "result": "functional_entry_pass",
+          "diagnostic_timing_resumes": 0,
+          "geometry": {
+            "buffer": [
+              640,
+              480
+            ],
+            "css": [
+              900,
+              675
+            ],
+            "devicePixelRatio": 1,
+            "viewport": [
+              1280,
+              960
+            ],
+            "hidden": false,
+            "focused": true
+          },
+          "errors": [],
+          "before": {
+            "fighterKind": 0,
+            "motion": 14,
+            "groundAir": 0,
+            "frame": 0,
+            "x": -40,
+            "y": 28.736854553222656
+          },
+          "after": {
+            "fighterKind": 0,
+            "motion": 14,
+            "groundAir": 0,
+            "frame": 30,
+            "x": -40,
+            "y": 28.736854553222656
+          },
+          "entry_metrics": {
+            "browser": "Active browser callbacks 308 \u00b7 worst callback interval 26.76 ms \u00b7 >33.3 ms 0 \u00b7 browser long tasks 0 (worst 0.00 ms)",
+            "native": "Native callbacks 325 \u00b7 worst active callback 8.32 ms \u00b7 >16.67 ms 0 \u00b7 >33.3 ms 0 \u00b7 first-use draws 3 (worst 6.87 ms) \u00b7 last phases p0.00 i0.01 s0.43 b0.06 d2.04 e1.30 ms (preparation excluded here and reported separately; full first-use/long callbacks in log)",
+            "construction": "Construction scene-prepare 1 \u00b7 scene-enter 1 \u00b7 scene-rebuild-step 1 \u00b7 scene-rebuild 1 \u00b7 match-enter-step 7 \u00b7 match-enter 1 \u00b7 worst 98.72 ms \u00b7 construct 98.72 ms \u00b7 preparations 4 (worst 164.70 ms; source entry/teardown separate) \u00b7 latest match-enter prep 164.70 ms (construct 57.20, wait/schedule 107.50) \u00b7 first draw 2.15 ms after 20.91 ms \u00b7 uploads 977152 B \u00b7 pipelines q0/c0 \u00b7 pipeline settle 0.00 ms/0 callbacks \u00b7 native prep a16.79 c121.92 r25.97 ms/2 callbacks (CPU 0.78, max 0.74, uploads 0 B, pipelines q0/c0)",
+            "audio": "Audio queue 938 frames \u00b7 underrun 0 frames \u00b7 stereo with original reverb/delay \u00b7 replacement DSP coefficients"
+          }
+        }
+      ]
+    }
+  },
+  "retained_native_failures": [
+    {
+      "local_path": "work/full-game/pikachu-native-v1.log",
+      "sha256": "5e5c8e6c6d9c2bd770584bf7fa5bf2ee7860c076d25527ba073708cb160895c8",
+      "reason": "Shared decoder required model for authored complete-null effect row."
+    },
+    {
+      "local_path": "work/full-game/pikachu-effects-native-v1.log",
+      "sha256": "85777f9d0f5675611f3903383f219b66aa3d5447ba9ba6be059b3026cef95e28",
+      "reason": "Fixture incorrectly rejected valid static model with no animations; corrected assertion."
+    },
+    {
+      "local_path": "work/full-game/pikachu-effects-native-v2.log",
+      "sha256": "ad212cb9cb37e9f498103b7989133d85e8f166c8d9351688c7f9cb005ca63c9f",
+      "reason": "Real effect fixture omitted original particle runtime begin/end; corrected fixture ownership."
+    },
+    {
+      "local_path": "work/full-game/old-yoshi-match-native-v1.log",
+      "sha256": "ca615d92342595e12d2ee7b0e51da9455c01e12fe34bca58b5fbc0d6df04cbf8",
+      "reason": "Shared loader paired TIMG-only image with unused animated palette."
+    },
+    {
+      "local_path": "work/full-game/old-yoshi-match-native-v2.log",
+      "sha256": "c98bf0fe7a50684ee2b52b0608d70d4c5a36fda4eb929a9a4b64aa594299bf9d",
+      "reason": "Diagnostic retains exact first image/palette mismatch before base-TLUT correction."
+    },
+    {
+      "local_path": "work/full-game/old-yoshi-match-native-v3.log",
+      "sha256": "84d470ef8d9813a2a6dfd06d63b90ffb58d4780d6a69bd3bd6f3bd5b5afcc99d",
+      "reason": "Final Destination combat positioning recipe leaves Old Yoshi platform; separate entry-only scope added."
+    },
+    {
+      "local_path": "work/full-game/old-yoshi-native-v3.log",
+      "sha256": "7f7e473cce0acc24332a776a6419704314ec459dadcaa5ab9d6f31622a17e8ab",
+      "reason": "Stage fixture asserted incorrect equal-priority map list order."
+    },
+    {
+      "local_path": "work/full-game/old-yoshi-native-v4.log",
+      "sha256": "bc67e99106eb010c7f47c08df760d176ac5a1c62f36bb14911e5aab512b4bf4b",
+      "reason": "Diagnostics retained reverse-order expectation before original append-order correction."
+    }
+  ],
+  "pipeline_seed": {
+    "sha256": "00beb96a91ac23bfc639d7fb25b9ff9feb886b48779384159efd525682ccc2d5",
+    "bytes": 3305472,
+    "shader_rows": 1,
+    "pipeline_rows": 794,
+    "added_pipeline_rows": 45,
+    "preserves_previous_rows": 750,
+    "reviews": [
+      {
+        "local_path": "work/full-game/pikachu-cache-review-v1.json",
+        "sha256": "463ecdd76e048d5a1d06e71c0aea9929a80755c27ab585de00a4754a3b2ffa69",
+        "eligible": true,
+        "added_pipelines": 11,
+        "preserved_base_rows": 750,
+        "payload_conflicts": 0
+      },
+      {
+        "local_path": "work/full-game/pichu-cache-review-v1.json",
+        "sha256": "dc908dfc8a35629a39c036e53e9cb62592135fba1c18153f377dea991d1499c0",
+        "eligible": true,
+        "added_pipelines": 2,
+        "preserved_base_rows": 761,
+        "payload_conflicts": 0
+      },
+      {
+        "local_path": "work/full-game/old-yoshi-cache-review-v1.json",
+        "sha256": "0e83d387a3c05ce87082371d2b82ad389f6c243f3c35f6591bcee7c8df164129",
+        "eligible": true,
+        "added_pipelines": 32,
+        "preserved_base_rows": 763,
+        "payload_conflicts": 0
+      }
+    ],
+    "focused_tests": {
+      "local_path": "work/full-game/pikachu-old-yoshi-seed-tests-v1.log",
+      "sha256": "c4c06e578b339fad9d3d42e964dc74d0a490107defe5c79faf2378f3d8f84f3a"
+    }
+  },
+  "import_budget": {
+    "local_path": "work/full-game/pikachu-old-yoshi-import-budget-v1.json",
+    "sha256": "5a64c2ad6e2fb297e90593f8138ea67655126a4528b88fc9628c01f2e632c706",
+    "files": 151,
+    "bytes": 114769156,
+    "limit_bytes": 134217728,
+    "fits": true
+  },
+  "shared_original_regressions": [
+    {
+      "local_path": "work/full-game/ganondorf-native-pikachu-old-yoshi-final-v1/refresh-receipt.json",
+      "sha256": "fd00b853fb90e5946e9c1499c28c77681465555b124d659879852125b5fe9df6",
+      "comparison": {
+        "local_path": "work/full-game/ganondorf-native-pikachu-old-yoshi-final-v1/core-comparison.json",
+        "sha256": "8f3bec5547de5c81f5d1b644767bf971b0188c4c31a7cea57ec55ea058a7b3ad"
+      },
+      "result": "declared_state_match",
+      "scope": "Declared headless state only; prior camera counterexample and absence of drawn/ending admission retained"
+    },
+    {
+      "local_path": "work/full-game/mario-fd-native-pikachu-old-yoshi-final-v1/refresh-receipt.json",
+      "sha256": "d43f799f33fde212445bf3920f38290048691528919d2a2c5f6b450e8a2b1f7d",
+      "comparison": {
+        "local_path": "work/full-game/mario-fd-native-pikachu-old-yoshi-final-v1/core-comparison.json",
+        "sha256": "0218d6944b9ee6e3695116406b1e7fd84e6a1e8684760242bd155da61fe1e950"
+      },
+      "result": "declared_state_match",
+      "scope": "Declared headless state only; prior camera counterexample and absence of drawn/ending admission retained"
+    }
+  ],
+  "retained_verification_failure": {
+    "local_path": "work/full-game/pikachu-old-yoshi-suite-v1.log",
+    "sha256": "44b4b13e22267850bc9c995559b98acf391261ca8bb2d73d8c7f6915067a76ff",
+    "tests": 1075,
+    "seconds": 334.138,
+    "failures": 2,
+    "skips": 41,
+    "reason": "Two stale prototype packaging assertions expected 11 fighters / 6 stages. Updated to 13 / 7; focused three-test realHTTP/package rerun passes.",
+    "focused_correction": {
+      "local_path": "work/full-game/pikachu-old-yoshi-prototype-tests-v1.log",
+      "sha256": "1911cfa3c426a3c6948ead0e0d0d17e3dd34f519dd0efd9febd235688eaf00c3"
+    }
+  },
+  "remaining_gates": [
+    "Independent original drawn comparison for Pikachu/Pichu/OldYoshi",
+    "Full authored moves, costume and fighter/stage interaction matrix",
+    "Complete ordinary menu round trip and full matches",
+    "Physical input/live scheduling, pixels and PCM",
+    "Long-run performance, heap/resource lifetime and independent holdouts",
+    "Results PR44 and audio PR42 remain separate draft dependencies",
+    "Whole remaining offline game inventory remains open; no merge or deployment"
+  ]
+}

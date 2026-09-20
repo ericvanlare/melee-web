@@ -34,6 +34,8 @@ static inline const MeleeWebFighterContent* melee_web_fighter_content(int ckind)
         { CKIND_CAPTAIN, FTKIND_CAPTAIN, 6, "Captain Falcon", "EfCaData.dat", "effCaptainDataTable", 4, 6, "captain.ssm" },
         { CKIND_GANON, FTKIND_GANON, 5, "Ganondorf", "EfGnData.dat", "effGanonDataTable", 19, 6, "ganon.ssm" },
         { CKIND_LUIGI, FTKIND_LUIGI, 4, "Luigi", "EfLgData.dat", "effLuigiDataTable", 18, 2, "luigi.ssm" },
+        { CKIND_PIKACHU, FTKIND_PIKACHU, 4, "Pikachu", "EfPkData.dat", "effPikachuDataTable", 7, 6, "pikachu.ssm" },
+        { CKIND_PICHU, FTKIND_PICHU, 4, "Pichu", "EfPkData.dat", "effPikachuDataTable", 7, 6, "pichu.ssm" },
     };
     for (size_t i = 0; i < sizeof(rows) / sizeof(rows[0]); ++i)
         if (rows[i].character_kind == ckind) return &rows[i];
@@ -43,7 +45,8 @@ static inline const MeleeWebFighterContent* melee_web_fighter_content(int ckind)
 static inline const MeleeWebFighterContent* melee_web_fighter_content_by_kind(int kind)
 {
     const int characters[] = { CKIND_MARIO, CKIND_FOX, CKIND_FALCO, CKIND_MARS,
-                               CKIND_DRMARIO, CKIND_EMBLEM, CKIND_LINK, CKIND_CLINK, CKIND_CAPTAIN, CKIND_GANON, CKIND_LUIGI };
+                               CKIND_DRMARIO, CKIND_EMBLEM, CKIND_LINK, CKIND_CLINK, CKIND_CAPTAIN, CKIND_GANON, CKIND_LUIGI,
+                               CKIND_PIKACHU, CKIND_PICHU };
     for (size_t i = 0; i < sizeof(characters) / sizeof(characters[0]); ++i) {
         const MeleeWebFighterContent* row = melee_web_fighter_content(characters[i]);
         if (row->fighter_kind == kind) return row;
@@ -69,6 +72,7 @@ static inline const MeleeWebStageContent* melee_web_stage_content(int stkind)
         { St_Kind_OldPupupu, Gr_Kind_OldPupupu, "Dream Land", "GrOp.dat", "old_kb.hps", 58, "pupupu.ssm" },
         { St_Kind_Shrine, Gr_Kind_Shrine, "Hyrule Temple", "GrSh.dat", "shrine.hps", 75, NULL },
         { St_Kind_Izumi, Gr_Kind_Izumi, "Fountain of Dreams", "GrIz.dat", "izumi.hps", 49, NULL },
+        { St_Kind_OldYoshi, Gr_Kind_OldYoshi, "Yoshi's Island 64", "GrOy.dat", "old_ys.hps", 59, NULL },
     };
     for (size_t i = 0; i < sizeof(rows) / sizeof(rows[0]); ++i)
         if (rows[i].stage_kind == stkind) return &rows[i];
@@ -78,7 +82,7 @@ static inline const MeleeWebStageContent* melee_web_stage_content(int stkind)
 static inline const MeleeWebStageContent* melee_web_stage_content_by_ground(int grkind)
 {
     const int stages[] = { St_Kind_Last, St_Kind_Battle, St_Kind_Story,
-                           St_Kind_OldPupupu, St_Kind_Shrine, St_Kind_Izumi };
+                           St_Kind_OldPupupu, St_Kind_Shrine, St_Kind_Izumi, St_Kind_OldYoshi };
     for (size_t i = 0; i < sizeof(stages) / sizeof(stages[0]); ++i) {
         const MeleeWebStageContent* row = melee_web_stage_content(stages[i]);
         if (row->ground_kind == grkind) return row;

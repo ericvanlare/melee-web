@@ -52,11 +52,32 @@ lights. Cold/warm browser entry now completes Ready/Go and 30 gameplay frames
 after a reviewed 28-pipeline preload correction. The cold run retains two
 browser long tasks; this is a functional-entry result, not a performance pass. See
 [Fountain's scope](docs/FOUNTAIN_OF_DREAMS_PORT_NOTES.md).
-Pikachu and Pichu have checked shared attributes and six Article descriptors,
-including immutable-input and missing-model rejection tests. They remain
-disabled pending fighter asset, effect, action and lifecycle integration; see
-[their current boundary](docs/PIKACHU_PICHU_PORT_NOTES.md).
-The Luigi/Fountain checkpoint passes both Release builds and 1,070 tests
+Pikachu and Pichu are now enabled as development candidates, bringing the
+branch to thirteen fighters. Native fixtures pass both player orders and all
+four family costumes, including source jolt/Thunder creation and teardown,
+Pichu self-damage, pause and No Contest. Both browser discovery sweeps complete
+30 action cases over 5,600 frames; their failed cold timing/pipeline gates
+remain retained. A reviewed preload correction clears all four fresh cold/warm
+sweeps: 22,400 source frames with no hard failures, native target misses or
+heap growth. Shared fixes preserve complete-null effect
+rows and the signed self-damage command. See
+[their measured scope](docs/PIKACHU_PICHU_PORT_NOTES.md).
+Yoshi's Island 64 is the seventh development stage. Its native owner passes two
+5,000-tick source scheduler lifetimes, including cloud collapse/collision
+removal/reappearance, guest selection and teardown. Five Mario/Mario entry,
+pause and No Contest lifetimes also pass. The original browser menu route
+reaches advancing gameplay, retaining a cold entry stall and one diagnostic
+resume. Fresh cold/warm entry passes after the preload correction without
+resumes, gaps or audio underruns; one 69 ms cold browser long task remains.
+This is functional entry, not a stage-performance pass.
+The shared material loader now preserves the source base TLUT for
+TIMG-only animation; see [stage evidence](docs/YOSHIS_ISLAND_64_PORT_NOTES.md).
+The Pikachu/Pichu/Old Yoshi checkpoint passes both Release builds and 1,075
+tests in 334.490 seconds with 41 explicit skips. Fresh headless comparisons
+still match 603 Ganondorf/FD and 240 Mario/FD declared source updates; the
+new content has no independent original comparison yet. See the
+[current checkpoint receipt](docs/evidence/full-game-checkpoint-pikachu-old-yoshi-v1.json).
+The preceding Luigi/Fountain checkpoint passed both Release builds and 1,070 tests
 in 298.028 seconds with 41 explicit skips. The receipt names the exact browser
 build, the later Article validation guard, reference scope and retained failures;
 see [checkpoint validation](docs/evidence/full-game-checkpoint-luigi-fountain-v1.json).

@@ -22,9 +22,11 @@ class PrototypeTests(unittest.TestCase):
         # Current implementation inventory, not an acceptance statement.
         self.assertEqual([row['name'] for row in manifest['fighters']],
                          ['Mario', 'Fox', 'Falco', 'Marth', 'Dr. Mario', 'Roy',
-                          'Link', 'Young Link', 'Captain Falcon', 'Ganondorf', 'Luigi'])
+                          'Link', 'Young Link', 'Captain Falcon', 'Ganondorf', 'Luigi',
+                          'Pikachu', 'Pichu'])
         self.assertEqual([row['name'] for row in manifest['stages']], [
-            'Final Destination', 'Battlefield', "Yoshi's Story", 'Dream Land', 'Hyrule Temple', 'Fountain of Dreams'])
+            'Final Destination', 'Battlefield', "Yoshi's Story", 'Dream Land', 'Hyrule Temple',
+            'Fountain of Dreams', "Yoshi's Island 64"])
         result = subprocess.run([str(node_runtime()), str(ROOT / 'tests/prototype_content_test.mjs')],
                                 input=json.dumps(manifest), text=True, capture_output=True)
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -60,7 +62,7 @@ class PrototypeTests(unittest.TestCase):
                         self.assertEqual(response.headers['Cross-Origin-Opener-Policy'], 'same-origin')
                         self.assertEqual(response.headers['Cross-Origin-Embedder-Policy'], 'require-corp')
                     with urlopen(base + '/prototype-content.json') as response:
-                        self.assertEqual(len(json.load(response)['fighters']), 11)
+                        self.assertEqual(len(json.load(response)['fighters']), 13)
                     with self.assertRaises(HTTPError) as error:
                         urlopen(base + '/private-disc.iso')
                     error.exception.close()
