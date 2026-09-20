@@ -11,15 +11,16 @@ also records an unverified original-DSP phase-writeback boundary and the retaine
 coefficient-data provenance that still needs release review. The separate GPL
 Dolphin observer remains intact. Production audio and repository visibility are unchanged.
 
-The owner-requested [audio listening preview](docs/AUDIO_PREVIEW.md) is deployed
-on a separate staging preview branch. **Browser exercised**: original CSS/SSS
-and Mario/Final Destination match entry deliver nonzero PCM to a connected
-AudioWorklet; pause/resume and Eject pass. The
-[deployment receipt](docs/evidence/audio-preview-release-v1.json) records the
-audio checks. The later [UI update](docs/evidence/audio-preview-ui-update-v1.json)
-removes the audio-preview label and tooltip after the owner
-reported that the sound sounded good; its native/audio bytes are unchanged. This does not establish hardware PCM equivalence,
-speaker quality or full-match timing.
+The owner-requested [audio listening preview](docs/AUDIO_PREVIEW.md) now includes
+main `979fd09` (PR #49) and its per-scene asset loading. **Browser exercised**:
+original CSS/SSS → Mario/Final Destination → ordinary pause/No Contest → CSS →
+a second match entry retains nonzero PCM at the connected worklet. Four complete
+asset scopes include the generated coefficients; outer pause/resume and Eject
+pass. Both Release builds and the full local suite pass. The
+[integration receipt](docs/evidence/audio-main-integration-v1.json) binds the
+new hosted bytes and checks. The earlier owner listening feedback remains bound
+to the preceding preview. Hardware PCM, broader gameplay and performance gates
+remain open.
 
 ## September 20 production checkpoint
 

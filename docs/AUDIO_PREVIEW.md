@@ -7,11 +7,13 @@ It preserves the public player UI and minimal native API, includes music and
 effects, and uses the latest checked-in pipeline seed. It is a listening
 preview, not a hardware-fidelity or licensing-clearance claim.
 
-The [verified listening preview](https://10af0790.webmelee-staging.pages.dev)
-is frozen at source commit `ba9f496`. The
-[UI update receipt](evidence/audio-preview-ui-update-v1.json) records this package
-and its checks. The [original deployment receipt](evidence/audio-preview-release-v1.json)
-retains the audio, lifecycle and compatibility evidence for the unchanged native build.
+The [verified listening preview](https://12aedbff.webmelee-staging.pages.dev)
+is frozen at source commit `f2f913e`, integrating main `979fd09` (PR #49).
+The [integration receipt](evidence/audio-main-integration-v1.json) records both
+Release builds, the full suite, actual-disc scope checks and local/hosted browser
+loops. The preview uses the new per-scene disc loading with audio enabled.
+The [initial preview](evidence/audio-preview-release-v1.json) and
+[UI update](evidence/audio-preview-ui-update-v1.json) remain historical records.
 
 The normal `runtime-public`, public packaging auditor and silent staging
 wrapper remain unchanged in policy. They do not accept this profile's identity
@@ -74,8 +76,9 @@ node tests/audio_preview_browser_test.mjs \
 
 The HTTP check verifies exact bytes, security/isolation headers, noindex and
 missing development routes. The browser check observes the real audio graph
-and nonzero PCM through original menus and supported match entry, then exercises
-pause/resume and Eject. It is **Browser exercised** evidence for that short
+and nonzero PCM through original menus, Mario/Final Destination, ordinary pause
+and No Contest back to CSS, and a second match entry. It checks four complete
+asset generations with DSP coefficients, plus outer pause/resume and Eject. It is **Browser exercised** evidence for that short
 scenario. It does not establish physical speaker quality, exact original PCM,
 controller latency or full-match performance. The owner's listening test is
 the purpose of the preview.
