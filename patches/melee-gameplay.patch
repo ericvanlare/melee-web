@@ -4600,6 +4600,7 @@ diff --git a/src/sysdolphin/baselib/archive.c b/src/sysdolphin/baselib/archive.c
  
  char* HSD_ArchiveGetExtern(HSD_Archive* archive, int offset)
 diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
+index 4a66512..2e85ce4 100644
 --- a/src/melee/mn/mncharsel.c
 +++ b/src/melee/mn/mncharsel.c
 @@ -1,3 +1,11 @@
@@ -4614,7 +4615,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
  #include "mncharsel.h"
  
  #include <melee/ft/forward.h>
-@@ -308,17 +316,9 @@
+@@ -308,17 +316,9 @@ static struct CSSDoorsData2 data2 = {
      },
  };
  
@@ -4635,7 +4636,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
  
  TextKerning* mnCharSel_8025BC20(TextKerning* arg0, u32 arg1)
  {
-@@ -2032,14 +2032,14 @@
+@@ -2032,14 +2032,14 @@ void mnCharSel_8025FB50(u8 door, s32 arg1)
  {
      s32 icon_idx;
      s32 icon_offset;
@@ -4652,7 +4653,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
  
      mnCharSel_804D6CB0->vs.start.players[getPlayerForDoor(door)].ckind =
          (&icons[0].char_kind)[icon_offset];
-@@ -2058,8 +2058,8 @@
+@@ -2058,8 +2058,8 @@ void mnCharSel_8025FB50(u8 door, s32 arg1)
      }
  
      mnCharSel_804A0BD0[door]->x5 = 0;
@@ -4663,7 +4664,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
      if (arg1 != 0) {
          mnCharSel_804A0BD0[door]->x10 = mnCharSel_804A0BD0[door]->x8;
          mnCharSel_804A0BD0[door]->x14 = mnCharSel_804A0BD0[door]->xC;
-@@ -2069,20 +2069,20 @@
+@@ -2069,20 +2069,20 @@ void mnCharSel_8025FB50(u8 door, s32 arg1)
  
      if (mnCharSel_804D6CF5 == 1) {
          lb_80011E24(mnCharSel_804D6CC0, &icon_jobj,
@@ -4688,7 +4689,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
          gm_80168C5C((u32) char_kinds[sel * sizeof(CSSIcon)]);
      }
  }
-@@ -2097,7 +2097,6 @@
+@@ -2097,7 +2097,6 @@ s32 mnCharSel_8025FDEC(u8 door)
      int player;
      s8 c_kind;
      int icon_idx;
@@ -4696,7 +4697,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
  
      if (mnCharSel_804D6CF5 == 1) {
          if (door != 0) {
-@@ -2112,15 +2111,19 @@
+@@ -2112,15 +2111,19 @@ s32 mnCharSel_8025FDEC(u8 door)
      css = mnCharSel_804D6CB0;
      c_kind = css->vs.start.players[player].ckind;
  
@@ -4718,7 +4719,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
              for (icon_idx = 0; icon_idx < 0x19; icon_idx++) {
                  if (css->vs.start.players[player].ckind ==
                      icon[icon_idx].char_kind)
-@@ -2131,9 +2134,9 @@
+@@ -2131,9 +2134,9 @@ s32 mnCharSel_8025FDEC(u8 door)
          }
  
          mnCharSel_804A0BD0[door]->x8 =
@@ -4730,7 +4731,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
  
          mnCharSel_803F0DFC.doors[door].sel_icon_prev = icon_idx;
          mnCharSel_803F0DFC.doors[door].sel_icon = icon_idx;
-@@ -2146,15 +2149,15 @@
+@@ -2146,15 +2149,15 @@ s32 mnCharSel_8025FDEC(u8 door)
  
          if (mnCharSel_804D6CF5 == 1) {
              lb_80011E24(mnCharSel_804D6CC0, &sp10,
@@ -4749,7 +4750,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
  
          {
              int door_idx = door;
-@@ -2172,9 +2175,9 @@
+@@ -2172,9 +2175,9 @@ s32 mnCharSel_8025FDEC(u8 door)
  
          if (mnCharSel_804D6CF6 != 3 && mnCharSel_804D6CF6 != 4) {
              u8 sel = mnCharSel_803F0DFC.doors[door].sel_icon;
@@ -4761,7 +4762,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
          }
          return 0;
      }
-@@ -2224,7 +2227,6 @@
+@@ -2224,7 +2227,6 @@ static inline void updateCursorDisplay(HSD_JObj* jobj,
                                         HSD_JObj** state_jobj,
                                         HSD_JObj** color_jobj)
  {
@@ -4769,7 +4770,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
  
      if (cursor->x5 != 1) {
          f32 y = cursor->x10;
-@@ -2255,7 +2257,7 @@
+@@ -2255,7 +2257,7 @@ static inline void updateCursorDisplay(HSD_JObj* jobj,
              color_idx = cursor->x4;
          } else {
              color_idx =
@@ -4778,7 +4779,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                                         .team];
          }
  
-@@ -2401,7 +2403,6 @@
+@@ -2401,7 +2403,6 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
      u32 next_port;
      HSD_JObj* jobj = GET_JOBJ(gobj);
      struct CSSCursorData* cursor = gobj->user_data;
@@ -4786,7 +4787,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
      u32 trigger;
      int n_doors;
      u32 buttons;
-@@ -2457,32 +2458,32 @@
+@@ -2457,32 +2458,32 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                              }
                          } else if (door <= 7U) {
                              cpu_door = door - 4;
@@ -4828,7 +4829,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                          .is_hold_handicap_slider = 0;
                  }
                  cursor->x5 = 3;
-@@ -2514,27 +2515,27 @@
+@@ -2514,27 +2515,27 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
          cursor->xC = (f32) ((0.0002f * dx) + cursor->xC);
          cursor->x10 = (f32) ((0.0002f * dy) + cursor->x10);
  
@@ -4862,7 +4863,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                          (f32) (cursor->x10 - (-14.8f + sp88.y));
                      cursor->x10 = (f32) (-14.8f + sp88.y);
                  }
-@@ -2562,7 +2563,7 @@
+@@ -2562,7 +2563,7 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
  
          {
              u8 port = cursor->x4;
@@ -4871,7 +4872,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
              if (tag->state == 0) {
                  if (cursor->x5 == 1) {
                      door = cursor->x6;
-@@ -2574,13 +2575,13 @@
+@@ -2574,13 +2575,13 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                          if (cursor->x10 < 0.2f) {
                              if ((s32) port != (s32) door ||
                                  ((s32) port == (s32) door &&
@@ -4887,7 +4888,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                                      0x19;
                                  {
                                      s32 player_idx;
-@@ -2650,7 +2651,7 @@
+@@ -2650,7 +2651,7 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                                          m2->xC > icons[i].bound_d &&
                                          icons[i].state >= 1)
                                      {
@@ -4896,7 +4897,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                                              .sel_icon = (u8) i;
                                          mnCharSel_8025DB34(door);
                                          if (trigger & HSD_PAD_A) {
-@@ -2666,10 +2667,18 @@
+@@ -2666,10 +2667,18 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                                              } else {
                                                  player_idx = door;
                                              }
@@ -4916,7 +4917,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                                                                 .doors[door]
                                                                 .sel_icon]
                                                      .char_kind;
-@@ -2693,19 +2702,19 @@
+@@ -2693,19 +2702,19 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                                                  mnCharSel_804A0BC0
                                                      [mnCharSel_804D6CF5 - 1]
                                                          ->gobj);
@@ -4940,7 +4941,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                                                          .char_kind);
                                              }
                                              lbAudioAx_800237A8(0xB8, 0x7F,
-@@ -2718,12 +2727,12 @@
+@@ -2718,12 +2727,12 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
  
                                  mnCharSel_8025D5AC((s32) door, 0, 1);
                                  {
@@ -4955,7 +4956,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                                      .sel_icon_prev = 0x19;
                                  if (trigger & HSD_PAD_A) {
                                      lbAudioAx_80024030(3);
-@@ -2748,7 +2757,7 @@
+@@ -2748,7 +2757,7 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                      case 7: {
                          s32 slider_door = door - 4;
                          updateGrabbedSlider(
@@ -4964,7 +4965,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                              slider_door, trigger, &sp98, &sp88, false);
                      } break;
                      case 8:
-@@ -2757,7 +2766,7 @@
+@@ -2757,7 +2766,7 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                      case 0xB: {
                          s32 hc_door = door - 8;
                          updateGrabbedSlider(
@@ -4973,7 +4974,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                              hc_door, trigger, &sp98, &sp88, true);
                      } break;
                      }
-@@ -2817,24 +2826,24 @@
+@@ -2817,24 +2826,24 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                      cpu_level_widget:
                          if (mnCharSel_804D6CB0->match_type <= 0xDU) {
                              f32 cy2 = cursor->x10;
@@ -5004,7 +5005,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                                              mnCharSel_804D6CB0->vs.start
                                                  .players
                                                      [(s8) (u8)
-@@ -2847,20 +2856,20 @@
+@@ -2847,20 +2856,20 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                                      } else {
                                          goto door_clicks;
                                      }
@@ -5029,7 +5030,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                                              mnCharSel_804D6CB0->vs.start
                                                  .players
                                                      [(s8) (u8)
-@@ -2886,6 +2895,7 @@
+@@ -2886,6 +2895,7 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                      goto update_display;
                  }
  
@@ -5037,7 +5038,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                  if (mnCharSel_804D6CB0->match_type != 2) {
                      f32 cx3 = cursor->xC;
                      if (cx3 > -17.0f && cx3 < 15.0f && cursor->x10 > 22.0f) {
-@@ -2907,6 +2917,8 @@
+@@ -2907,6 +2917,8 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                          }
                      }
                  }
@@ -5046,7 +5047,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
  
                  if (cursor->xC < -25.5f && cursor->x10 > 22.0f) {
                      switch ((s32) mnCharSel_804D6CB0->match_type) {
-@@ -2923,6 +2935,11 @@
+@@ -2923,6 +2935,11 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                      case VS_SLOWMO:
                          cursor->x8 = 1;
                          if (trigger & HSD_PAD_A) {
@@ -5058,7 +5059,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                              sfxMove();
                              {
                                  u8* is_teams = &mnCharSel_804D6CB0->vs.start
-@@ -2971,7 +2988,7 @@
+@@ -2971,7 +2988,7 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                      u8 cport2 = cursor->x4;
                      if (mnCharSel_804A0BD0[cport2]->x5 == 0 &&
                          mnCharSel_804D6CB0->vs.start.rules.is_teams == 0 &&
@@ -5067,7 +5068,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                      {
                          mnCharSel_CostumeChange((s32) cport2, trigger);
                      }
-@@ -3183,18 +3200,17 @@
+@@ -3183,18 +3200,17 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                          {
                              if ((cursor->x4 != 3 ||
                                   mnCharSel_804D6CB0->match_type != 1) &&
@@ -5089,7 +5090,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                                              .name_jointl,
                                          -1);
                                  }
-@@ -3209,13 +3225,13 @@
+@@ -3209,13 +3225,13 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                                              if (mnCharSel_804D6CF5 == 1) {
                                                  lb_80011E24(
                                                      mnCharSel_804D6CC0, &sp74,
@@ -5105,7 +5106,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                                                          .list_joint,
                                                      -1);
                                              }
-@@ -3223,7 +3239,7 @@
+@@ -3223,7 +3239,7 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                                              cursor->xC = sp88.x;
                                              cursor->x10 =
                                                  (f32) (sp88.y - 5.0f);
@@ -5114,7 +5115,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                                                  .data->state = 1;
                                          }
                                      }
-@@ -3317,10 +3333,10 @@
+@@ -3317,10 +3333,10 @@ void mnCharSel_CursorThink(HSD_GObj* gobj)
                              if (cport6 != 3 ||
                                  mnCharSel_804D6CB0->match_type != 1)
                              {
@@ -5127,7 +5128,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                                          0;
                                      mnCharSel_804D6CB0->vs.start
                                          .players[cursor->x4]
-@@ -3735,6 +3751,12 @@
+@@ -3735,6 +3751,12 @@ void fn_80262F44(HSD_GObj* gobj)
  
          if (mnCharSel_804D6CF2 == 0 && (trigger & HSD_PAD_START)) {
              if (mnCharSel_804D6CF7 != 0) {
@@ -5140,7 +5141,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                  mnCharSel_804D6CF6 = 1;
                  mnCharSel_804D6CF2 = 0xFF;
                  if (mnCharSel_804D6CF5 == 1) {
-@@ -4052,6 +4074,7 @@
+@@ -4052,6 +4074,7 @@ void fn_802633B0(HSD_GObj* gobj)
              }
  
              if ((s32) tag->next_tag == row) {
@@ -5148,7 +5149,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                  if (IsNameListFull() == 0) {
                      if (mnCharSel_804D6CF5 == 1) {
                          mnCharSel_804D6CF9 = mnCharSel_804D6CF0;
-@@ -4072,6 +4095,8 @@
+@@ -4072,6 +4095,8 @@ void fn_802633B0(HSD_GObj* gobj)
                      }
                      return;
                  }
@@ -5157,7 +5158,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
                  goto check_cancel;
              }
  
-@@ -4316,7 +4341,8 @@
+@@ -4316,7 +4341,8 @@ s32 mnCharSel_802640A0(void)
          HSD_Fog* fog = HSD_FogLoadDesc(MODELS->fog);
          HSD_GObjObject_80390A70(gobj, HSD_GObj_FogKind, fog);
      }
@@ -5167,7 +5168,7 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
  
      gobj = GObj_Create(4, 5, 0x80);
      jobj = HSD_JObjLoadJoint(ANIM[0].joint);
-@@ -5456,14 +5482,22 @@
+@@ -5456,14 +5482,22 @@ void mnCharSel_Scene_OnFrame(void)
      case 3:
          mn_8022F138(1, 8);
          HSD_SisLib_803A5E70();
@@ -5190,6 +5191,52 @@ diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
          mnCharSel_804D6CF6 = 5;
          sfxForward();
          break;
+@@ -5528,3 +5562,45 @@ void mnCharSel_Scene_OnExit(void* unused)
+     lbAudioAx_8002702C(4, tmp);
+     lbAudioAx_80027168();
+ }
++
++#if defined(MELEE_WEB_GAMEPLAY)
++/* Observation only: expose the live cursor/model geometry and the exact
++ * source icon bounds. Tests feed resulting PAD samples through the host. */
++int melee_web_css_observe_port(unsigned port, int ckind, int ids[4], float geometry[8])
++{
++    struct CSSCursorData* cursor;
++    struct CSSCharModel* model;
++    int target = -1;
++    int selected = -1;
++    int i;
++    if (port >= 4 || !ids || !geometry || !mnCharSel_804A0BC0[port] ||
++        !mnCharSel_804A0BD0[port]) return 0;
++    for (i = 0; i < 25; ++i) {
++        if (icons[i].char_kind == ckind && icons[i].state >= 1) {
++            target = i;
++            break;
++        }
++    }
++    if (target < 0) return 0;
++    cursor = mnCharSel_804A0BC0[port];
++    model = mnCharSel_804A0BD0[port];
++    if (mnCharSel_803F0DFC.doors[port].sel_icon < 25)
++        selected = icons[mnCharSel_803F0DFC.doors[port].sel_icon].char_kind;
++    ids[0] = cursor->x4;
++    ids[1] = cursor->x5 == 1 && cursor->x6 < 4 ? cursor->x6 : -1;
++    ids[2] = selected;
++    ids[3] = target;
++    geometry[0] = cursor->xC; geometry[1] = cursor->x10;
++    geometry[2] = model->x8; geometry[3] = model->xC;
++    geometry[4] = icons[target].bound_l;
++    geometry[5] = icons[target].bound_r;
++    geometry[6] = icons[target].bound_u;
++    geometry[7] = icons[target].bound_d;
++    return 1;
++}
++int melee_web_css_observe(int ckind, int ids[4], float geometry[8])
++{
++    return melee_web_css_observe_port(0, ckind, ids, geometry);
++}
++
++#endif
 diff --git a/src/melee/lb/lb_0195.c b/src/melee/lb/lb_0195.c
 --- a/src/melee/lb/lb_0195.c
 +++ b/src/melee/lb/lb_0195.c
@@ -5998,50 +6045,6 @@ diff --git a/src/melee/it/types.h b/src/melee/it/types.h
      struct ItemStateDesc x0_itemStateDesc[8];
 +#endif
  };
-diff --git a/src/melee/mn/mncharsel.c b/src/melee/mn/mncharsel.c
---- a/src/melee/mn/mncharsel.c
-+++ b/src/melee/mn/mncharsel.c
-@@ -5528,3 +5528,40 @@
-     lbAudioAx_8002702C(4, tmp);
-     lbAudioAx_80027168();
- }
-+
-+#if defined(MELEE_WEB_GAMEPLAY)
-+/* Observation only: expose the live P1 cursor/model geometry and the exact
-+ * source icon bounds. Tests feed resulting PAD samples through the host. */
-+int melee_web_css_observe(int ckind, int ids[4], float geometry[8])
-+{
-+    struct CSSCursorData* cursor;
-+    struct CSSCharModel* model;
-+    int target = -1;
-+    int selected = -1;
-+    int i;
-+    if (!ids || !geometry || !mnCharSel_804A0BC0[0] ||
-+        !mnCharSel_804A0BD0[0]) return 0;
-+    for (i = 0; i < 25; ++i) {
-+        if (icons[i].char_kind == ckind && icons[i].state >= 1) {
-+            target = i;
-+            break;
-+        }
-+    }
-+    if (target < 0) return 0;
-+    cursor = mnCharSel_804A0BC0[0];
-+    model = mnCharSel_804A0BD0[0];
-+    if (mnCharSel_803F0DFC.doors[0].sel_icon < 25)
-+        selected = icons[mnCharSel_803F0DFC.doors[0].sel_icon].char_kind;
-+    ids[0] = cursor->x4;
-+    ids[1] = cursor->x5 == 1 && cursor->x6 < 4 ? cursor->x6 : -1;
-+    ids[2] = selected;
-+    ids[3] = target;
-+    geometry[0] = cursor->xC; geometry[1] = cursor->x10;
-+    geometry[2] = model->x8; geometry[3] = model->xC;
-+    geometry[4] = icons[target].bound_l;
-+    geometry[5] = icons[target].bound_r;
-+    geometry[6] = icons[target].bound_u;
-+    geometry[7] = icons[target].bound_d;
-+    return 1;
-+}
-+#endif
 diff --git a/src/melee/gr/grstory.c b/src/melee/gr/grstory.c
 --- a/src/melee/gr/grstory.c
 +++ b/src/melee/gr/grstory.c
@@ -8400,3 +8403,496 @@ index 1321fe1..0dfbaba 100644
  /* 17A318 */ HSD_GObj* fn_8017A318(s32);
  /* 17A67C */ Fighter_GObj* fn_8017A67C(CharacterKind c_kind, int, int);
  /* 17A9B4 */ void fn_8017A9B4(int);
+diff --git a/src/melee/if/ifprize.c b/src/melee/if/ifprize.c
+index 23da703..f559be3 100644
+--- a/src/melee/if/ifprize.c
++++ b/src/melee/if/ifprize.c
+@@ -344,3 +344,36 @@ found:
+ }
+ 
+ void ifPrize_Scene_OnExit(void* unused) {}
++
++#if defined(MELEE_WEB_GAMEPLAY)
++/* The host owns one original Prize scene at a time. Retain the typed source
++ * globals so unload/re-entry does not publish pointers into a released heap. */
++static struct un_803F9D48 melee_web_prize_saved;
++static HSD_Archive* melee_web_prize_saved_archive;
++static SceneDesc* melee_web_prize_saved_scene;
++static int melee_web_prize_owned;
++
++int melee_web_prize_source_begin(void)
++{
++    if (melee_web_prize_owned || un_803F9D48.x0a || un_803F9D48.x0b) {
++        return 0;
++    }
++    melee_web_prize_saved = un_803F9D48;
++    melee_web_prize_saved_archive = un_804D6D98;
++    melee_web_prize_saved_scene = un_804D6D9C;
++    melee_web_prize_owned = 1;
++    return 1;
++}
++
++int melee_web_prize_source_end(void)
++{
++    if (!melee_web_prize_owned) {
++        return 0;
++    }
++    un_803F9D48 = melee_web_prize_saved;
++    un_804D6D98 = melee_web_prize_saved_archive;
++    un_804D6D9C = melee_web_prize_saved_scene;
++    melee_web_prize_owned = 0;
++    return 1;
++}
++#endif
+diff --git a/src/melee/gm/gmmain_lib.c b/src/melee/gm/gmmain_lib.c
+index a8d99f9..f90cbda 100644
+--- a/src/melee/gm/gmmain_lib.c
++++ b/src/melee/gm/gmmain_lib.c
+@@ -1219,8 +1219,31 @@ void gmMainLib_8015F600(int arg0, int arg1)
+                                1);
+         }
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++        /* The source initializer is eight big-endian words, not a native
++         * struct image. Preserve its authored fields on little-endian hosts. */
++        {
++            struct gmm_x1CB0 defaults = { 0 };
++            int j;
++            defaults.item_freq = (u32) gmMainLib_803D4A60[0] >> 24;
++            for (j = 0; j < 7; ++j)
++                defaults.pad_x1[j] = (u32) gmMainLib_803D4A60[(j + 1) / 4] >>
++                    (24 - ((j + 1) % 4) * 8);
++            defaults.item_mask = (u64) (u32) gmMainLib_803D4A60[2] << 32 |
++                                (u32) gmMainLib_803D4A60[3];
++            for (j = 0; j < PAD_MAX_CONTROLLERS; ++j)
++                defaults.rumble_enabled[j] = (u32) gmMainLib_803D4A60[4] >> (24 - j * 8);
++            defaults.sound_balance = (u32) gmMainLib_803D4A60[5] >> 24;
++            defaults.deflicker = (u32) gmMainLib_803D4A60[5] >> 16;
++            defaults.saved_language = (u32) gmMainLib_803D4A60[5] >> 8;
++            defaults.stage_mask = (u32) gmMainLib_803D4A60[6];
++            defaults.padding_x16[0] = (u32) gmMainLib_803D4A60[7] >> 24;
++            gmMainLib_804D3EE0->thing.x1CB0 = defaults;
++        }
++#else
+         gmMainLib_804D3EE0->thing.x1CB0 =
+             *(struct gmm_x1CB0*) gmMainLib_803D4A60;
++#endif
+ 
+         {
+             switch (lbLang_GetLanguageSetting()) {
+diff --git a/src/melee/ty/types.h b/src/melee/ty/types.h
+--- a/src/melee/ty/types.h
++++ b/src/melee/ty/types.h
+@@ -179,10 +179,46 @@
+     /* 0x3F0 */ union {
+         ToyAnimState anim;
+         void* x3F0;
+     };
+ };
++
++#if defined(MELEE_WEB_GAMEPLAY)
++/*
++ * The retail linker places these declarations at one contiguous 0x404-byte
++ * address range.  The source uses both the first 0xC bytes as
++ * _Toy_804A26B8_t and the range from +0x194 as Toy_804A284C, while the final
++ * +0x3F0 bytes are Toy_804A2AA8. Keep those views in one object on portable
++ * builds so a profile snapshot cannot omit the linker-adjacent bytes.
++ */
++struct ToyRuntimeAggregate {
++    union {
++        struct {
++            /* 0x000 */ struct Toy26B8* x0;
++            /* 0x004 */ UNK_T x4;
++            /* 0x008 */ UNK_T x8;
++            /* 0x00C */ char devtext_26c4[0x8C];
++            /* 0x098 */ char devtext_2750[0xFC];
++            /* 0x194 */ u16 trophy_table[302];
++            /* 0x3F0 */ ToyAnimState anim;
++        };
++        struct Toy26B8 toy_view;
++    };
++};
++
++STATIC_ASSERT(sizeof(struct Toy26B8) == 0x404);
++STATIC_ASSERT(sizeof(struct ToyRuntimeAggregate) == sizeof(struct Toy26B8));
++STATIC_ASSERT(offsetof(struct ToyRuntimeAggregate, x0) ==
++              offsetof(struct Toy26B8, x0));
++STATIC_ASSERT(offsetof(struct ToyRuntimeAggregate, devtext_26c4) == 0xC);
++STATIC_ASSERT(offsetof(struct ToyRuntimeAggregate, devtext_2750) == 0x98);
++STATIC_ASSERT(offsetof(struct ToyRuntimeAggregate, trophy_table) +
++                  5 * sizeof(u16) ==
++              offsetof(struct Toy26B8, trophy_flags));
++STATIC_ASSERT(offsetof(struct ToyRuntimeAggregate, anim) ==
++              offsetof(struct Toy26B8, anim));
++#endif
+ 
+ struct _Toy_804A26B8_t {
+     struct Toy26B8* x0;
+     UNK_T x4;
+     UNK_T x8;
+diff --git a/src/melee/ty/toy.h b/src/melee/ty/toy.h
+--- a/src/melee/ty/toy.h
++++ b/src/melee/ty/toy.h
+@@ -63,12 +63,21 @@
+ /* 31234C */ void Toy_8031234C(s32);
+ /* 3124BC */ void Toy_803124BC(void);
+ /* 31263C */ void Toy_8031263C(void);
+ /* 3127D4 */ void Toy_803127D4(void);
+ /* 3FE5E8 */ extern char Toy_str_ScMenFigure_cam_int1_camera[];
++#if defined(MELEE_WEB_GAMEPLAY)
++/* These names remain source-compatible aliases into the authored Toy range. */
++extern struct ToyRuntimeAggregate melee_web_toy_state;
++#define Toy_804A284C (melee_web_toy_state.trophy_table)
++#define Toy_804A2AA8 (melee_web_toy_state.anim)
++int melee_web_toy_profile_begin(void);
++int melee_web_toy_profile_end(void);
++#else
+ /* 4A284C */ extern u16 Toy_804A284C[302];
+ /* 4A2AA8 */ extern ToyAnimState Toy_804A2AA8;
++#endif
+ /* 4D6EAC */ extern TyDspEntry* Toy_sbss_804D6EAC;
+ /* 4D6EB0 */ extern TyDspEntry* Toy_sbss_804D6EB0;
+ /* 4D6EC8 */ extern HSD_Archive* Toy_sbss_804D6EC8;
+ /* 4D6ED4 */ extern ToyCameraControl* Toy_sbss_804D6ED4;
+ /* 4D6ED8 */ extern ToyED8Data* Toy_sbss_804D6ED8;
+diff --git a/src/melee/ty/toy.c b/src/melee/ty/toy.c
+--- a/src/melee/ty/toy.c
++++ b/src/melee/ty/toy.c
+@@ -239,15 +239,23 @@
+ /* 3B8904 */ static Vec3 const _Toy_803B8904 = { 0 };
+ /* 3B8910 */ static ToyEntry const _Toy_803B8910[] = {
+     { 7, 65 }, { 6, 66 }, { 5, 67 }, { 4, 68 }, { 3, 69 },
+     { 2, 70 }, { 0, 73 }, { 1, 88 }, { 8, 83 },
+ };
++#if defined(MELEE_WEB_GAMEPLAY)
++/* Keep the four linker-adjacent retail views in one typed object. */
++struct ToyRuntimeAggregate melee_web_toy_state;
++#define _Toy_804A26B8 melee_web_toy_state
++#define _Toy_devtext_buf_804A26C4 (melee_web_toy_state.devtext_26c4)
++#define _Toy_devtext_buf_804A2750 (melee_web_toy_state.devtext_2750)
++#else
+ /* 4A26B8 */ static struct _Toy_804A26B8_t _Toy_804A26B8;
+ /* 4A26C4 */ static char _Toy_devtext_buf_804A26C4[0x8C];
+ /* 4A2750 */ static char _Toy_devtext_buf_804A2750[0xFC];
+ /* 4A284C */ u16 Toy_804A284C[302];
+ /* 4A2AA8 */ ToyAnimState Toy_804A2AA8;
++#endif
+ /* 4D5A40 */ static GXColor _Toy_color_E2E2E2FF = { 0xE2, 0xE2, 0xE2, 0xFF };
+ /* 4D5A44 */ static GXColor _Toy_color_FF8020FF = { 0xFF, 0x80, 0x20, 0xFF };
+ 
+ /// Number of sort keys held per trophy.
+ #define TY_SORT_KEY_COUNT 3
+@@ -299,10 +307,52 @@
+ /* 4D6E50 */ s8 _Toy_sbss_804D6E50;
+ 
+ ASSERT_SIZE(_Toy_803B8910, 0x48);
+ ASSERT_SIZE(_Toy_devtext_buf_804A26C4, 0x8C);
+ ASSERT_SIZE(_Toy_devtext_buf_804A2750, 0xFC);
++
++#if defined(MELEE_WEB_GAMEPLAY)
++static struct Toy26B8 melee_web_toy_profile_saved;
++static int melee_web_toy_profile_owned;
++static int melee_web_toy_scene_active;
++
++static int melee_web_toy_scene_aliases_live(void)
++{
++    /* The scene heap is reclaimed by the source mode transition.  The
++     * explicit scene marker is cleared by Toy_803127D4 at that boundary;
++     * pointer checks catch an entered scene before its teardown callback. */
++    return melee_web_toy_scene_active ||
++           _Toy_sbss_804D6E68 != NULL || _Toy_sbss_804D6E64 != NULL ||
++           _Toy_sbss_804D6E6C != NULL || _Toy_sbss_804D6E5C != NULL ||
++           _Toy_sbss_804D6E98 != NULL || _Toy_sbss_804D6E9C != NULL ||
++           Toy_sbss_804D6ED4 != NULL || Toy_sbss_804D6ED8 != NULL ||
++           Toy_sbss_804D6EDC != NULL || Toy_sbss_804D6EE0 != NULL ||
++           melee_web_toy_state.anim.gobj != NULL ||
++           melee_web_toy_state.anim.jobj[0] != NULL ||
++           melee_web_toy_state.anim.jobj[1] != NULL;
++}
++
++int melee_web_toy_profile_begin(void)
++{
++    if (melee_web_toy_profile_owned || melee_web_toy_scene_aliases_live())
++        return 0;
++    memcpy(&melee_web_toy_profile_saved, &melee_web_toy_state,
++           sizeof(struct Toy26B8));
++    melee_web_toy_profile_owned = 1;
++    return 1;
++}
++
++int melee_web_toy_profile_end(void)
++{
++    if (!melee_web_toy_profile_owned || melee_web_toy_scene_aliases_live())
++        return 0;
++    memcpy(&melee_web_toy_state, &melee_web_toy_profile_saved,
++           sizeof(struct Toy26B8));
++    melee_web_toy_profile_owned = 0;
++    return 1;
++}
++#endif
+ 
+ /// @todo .sdata2 order hack
+ #ifdef MUST_MATCH
+ static void order_sdata2_0(void)
+ {
+@@ -6418,10 +6468,13 @@
+     ((u16*) base)[0x1F6] = 0;
+ }
+ 
+ void Toy_Scene_OnEnter(void* arg0)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_toy_scene_active = 1;
++#endif
+     u8* base;
+     s16* selp;
+     u32 buttons;
+     s32 count;
+ 
+@@ -6794,10 +6847,13 @@
+     Toy_8031234C(0);
+ }
+ 
+ void Toy_803127D4(void)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_toy_scene_active = 0;
++#endif
+     _Toy_sbss_804D6ED0 = NULL;
+     _Toy_sbss_804D6EC4 = NULL;
+     _Toy_sbss_804D6EC0 = NULL;
+     _Toy_sbss_804D6EBC = NULL;
+     _Toy_sbss_804D6EB8 = NULL;
+diff --git a/src/melee/gm/types.h b/src/melee/gm/types.h
+--- a/src/melee/gm/types.h
++++ b/src/melee/gm/types.h
+@@ -197,10 +197,25 @@
+ };
+ 
+ struct NameTagDataBank {
+     struct NameTagData inner[19];
+ };
++
++#if defined(MELEE_WEB_GAMEPLAY)
++/*
++ * The original gmMainLib_8015F600(2..8) sequence initializes seven
++ * consecutive authored banks.  The generated SaveData view contains only
++ * the first two because the remaining banks continue through the adjacent
++ * object in gmMainLib_8045A6C0[2]. Keep the source bounds explicit without
++ * changing the ABI size of struct gmm_x1868.
++ */
++struct gmm_name_tag_bank_storage {
++    struct NameTagDataBank banks[7];
++};
++STATIC_ASSERT(sizeof(struct gmm_name_tag_bank_storage) ==
++              7 * sizeof(struct NameTagDataBank));
++#endif
+ 
+ struct GameRules {
+     /* 0x00 */ u8 force_main_menu;
+     /* 0x01 */ u8 bgm;
+     /* 0x02 */ u8 mode;
+@@ -414,10 +429,40 @@
+ ASSERT_SIZE(struct EventData, 0x588 - 0x530);
+ ASSERT_SIZE(struct gmm_x0_vsdata, 0x588 - 0x51C);
+ ASSERT_SIZE(struct gmm_x0_vsmodes, 0x1850 - 0x588);
+ ASSERT_SIZE(struct gmm_x0, 0x8518);
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++/*
++ * gmMainLib_8045A6C0 is one authored two-object backing. The first two
++ * banks are part of gmm_x1868, while all seven F600 name banks continue
++ * through that backing and finish four bytes before its end. The union keeps
++ * the original roots view and the checked typed name-bank view on the same
++ * complete object.
++ */
++struct gmm_profile_name_bank_view {
++    u8 prefix[offsetof(struct gmm_x0, thing) +
++              offsetof(struct gmm_x1868, x2FF8)];
++    struct gmm_name_tag_bank_storage storage;
++    u8 suffix[sizeof(struct gmm_x0) * 2 -
++              offsetof(struct gmm_x0, thing) -
++              offsetof(struct gmm_x1868, x2FF8) -
++              sizeof(struct gmm_name_tag_bank_storage)];
++};
++union gmm_mainlib_profile_storage {
++    struct gmm_x0 roots[2];
++    struct gmm_profile_name_bank_view name_bank_view;
++};
++STATIC_ASSERT(offsetof(struct gmm_profile_name_bank_view, storage) ==
++              offsetof(struct gmm_x0, thing) +
++                  offsetof(struct gmm_x1868, x2FF8));
++STATIC_ASSERT(sizeof(struct gmm_profile_name_bank_view) ==
++              sizeof(struct gmm_x0) * 2);
++STATIC_ASSERT(sizeof(union gmm_mainlib_profile_storage) ==
++              sizeof(struct gmm_x0) * 2);
++#endif
++
+ /// @todo ::MatchEnd
+ struct lbl_8046B6A0_24C_t {
+     UNK_T x0;
+     u8 x4; ///< MatchOutcome
+     u8 x5; ///< match mode
+diff --git a/src/melee/gm/gmmain_lib.h b/src/melee/gm/gmmain_lib.h
+--- a/src/melee/gm/gmmain_lib.h
++++ b/src/melee/gm/gmmain_lib.h
+@@ -6,10 +6,14 @@
+ #include <melee/gm/forward.h>
+ 
+ #include <melee/gm/types.h>
+ 
+ /* 15CC34 */ GameRules* gmMainLib_GetGameRules(void);
++#if defined(MELEE_WEB_GAMEPLAY)
++/* Canonical first root of the authored two-object profile backing. */
++struct gmm_x0* gmMainLib_GetProfileRoot(void);
++#endif
+ /* 15CC40 */ struct gmm_x1868* gmMainLib_GetSaveData(void);
+ /* 15CC4C */ void* gmMainLib_8015CC4C(void);
+ /* 15CC58 */ struct gmm_x1CB0* gmMainLib_8015CC58(void);
+ /* 15CC64 */ struct FighterData*
+     GetPersistentFighterData(SelectableCharacterKind);
+diff --git a/src/melee/gm/gmmain_lib.c b/src/melee/gm/gmmain_lib.c
+--- a/src/melee/gm/gmmain_lib.c
++++ b/src/melee/gm/gmmain_lib.c
+@@ -21,12 +21,36 @@
+ #include <sysdolphin/baselib/random.h>
+ #include <sysdolphin/baselib/video.h>
+ 
+ /* 15D888 */ static void gmMainLib_8015D888(u32);
+ /* 46B0F0 */ struct gmMainLib_8046B0F0_t gmMainLib_8046B0F0;
++#if defined(MELEE_WEB_GAMEPLAY)
++/* 45A6C0 */ union gmm_mainlib_profile_storage gmMainLib_8045A6C0;
++/* 4D3EE0 */ struct gmm_x0* gmMainLib_804D3EE0 = gmMainLib_8045A6C0.roots;
++#else
+ /* 45A6C0 */ struct gmm_x0 gmMainLib_8045A6C0[2];
+ /* 4D3EE0 */ struct gmm_x0* gmMainLib_804D3EE0 = gmMainLib_8045A6C0;
++#endif
++
++#if defined(MELEE_WEB_GAMEPLAY)
++static struct NameTagDataBank* gmMainLib_GetPersistentNameBanks(void)
++{
++    /* Refuse a moved root before selecting the union view. */
++    if (gmMainLib_804D3EE0 != gmMainLib_8045A6C0.roots)
++        return NULL;
++    return gmMainLib_8045A6C0.name_bank_view.storage.banks;
++}
++
++/* Seven banks fit in the authored two-object backing and end before its last
++ * four bytes. This guards the typed overlay against source-layout drift. */
++STATIC_ASSERT(sizeof(gmMainLib_8045A6C0) == sizeof(struct gmm_x0) * 2);
++#else
++static struct NameTagDataBank* gmMainLib_GetPersistentNameBanks(void)
++{
++    return gmMainLib_GetSaveData()->x2FF8;
++}
++#endif
+ 
+ GameRules gmMainLib_803D4A48 = {
+     0,
+     0x34,
+     0,  // mode
+@@ -94,18 +118,25 @@
+ GameRules* gmMainLib_GetGameRules(void)
+ {
+     return &gmMainLib_804D3EE0->x1850;
+ }
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++struct gmm_x0* gmMainLib_GetProfileRoot(void)
++{
++    return gmMainLib_8045A6C0.roots;
++}
++#endif
++
+ struct gmm_x1868* gmMainLib_GetSaveData(void)
+ {
+     return &gmMainLib_804D3EE0->thing;
+ }
+ 
+ void* gmMainLib_8015CC4C(void)
+ {
+-    return &gmMainLib_GetSaveData()->x2FF8;
++    return gmMainLib_GetPersistentNameBanks();
+ }
+ 
+ struct gmm_x1CB0* gmMainLib_8015CC58(void)
+ {
+     return &gmMainLib_GetSaveData()->x1CB0;
+@@ -132,11 +163,11 @@
+     return &gmMainLib_GetSaveData()->trophy_count;
+ }
+ 
+ struct NameTagData* GetPersistentNameData(s32 arg0)
+ {
+-    struct NameTagDataBank* base = &gmMainLib_GetSaveData()->x2FF8[0];
++    struct NameTagDataBank* base = gmMainLib_GetPersistentNameBanks();
+     struct NameTagData* inner = base[arg0 / 19].inner;
+     return &inner[arg0 % 19];
+ }
+ 
+ void* gmMainLib_8015CCE4(void)
+@@ -266,11 +297,11 @@
+         if (arg0 < PAD_MAX_CONTROLLERS) {
+             return &gmMainLib_804D3EE0->modes.nametags[arg0];
+         }
+         return 0;
+     } else {
+-        struct NameTagDataBank* base = &gmMainLib_GetSaveData()->x2FF8[0];
++        struct NameTagDataBank* base = gmMainLib_GetPersistentNameBanks();
+         struct NameTagData* inner = &base[arg1 / 19].inner[0];
+         return &inner[arg1 % 19].x1A2;
+     }
+ }
+ 
+@@ -1046,11 +1077,11 @@
+     struct NameTagDataBank* bank;
+     int i;
+ 
+     PAD_STACK(16);
+ 
+-    bank = gmMainLib_804D3EE0->thing.x2FF8;
++    bank = gmMainLib_GetPersistentNameBanks();
+     data = &bank[(u8) arg0 / 19].inner[(u8) arg0 % 19];
+     for (i = 0; i < 120; i++) {
+         data->vs_kos[i] = 0;
+     }
+     gmMainLib_8015EF30((struct gmMainLib_8015EF30_s*) &data->sd_count);
+@@ -1111,11 +1142,11 @@
+     for (i = 0; i < 120; i++) {
+         struct NameTagData* data;
+         struct NameTagDataBank* bank;
+ 
+         int j;
+-        bank = gmMainLib_804D3EE0->thing.x2FF8;
++        bank = gmMainLib_GetPersistentNameBanks();
+         data = &bank[(u8) i / 19].inner[(u8) i % 19];
+ 
+         for (j = 0; j < 120; j++) {
+             data->vs_kos[j] = 0;
+         }
+@@ -1251,11 +1282,11 @@
+             s32 idx;
+             idx = j + bank_offset;
+ 
+             InitializePersistentNameData(idx);
+ 
+-            bank = gmMainLib_804D3EE0->thing.x2FF8;
++            bank = gmMainLib_GetPersistentNameBanks();
+             {
+                 struct NameTagData* tmp =
+                     &bank[(u8) idx / 19].inner[(u8) idx % 19];
+                 data = tmp;
+             }
+@@ -1336,11 +1367,11 @@
+     } else {
+         lbLang_SetLanguageSetting(0);
+         lbLang_SetSavedLanguage(0);
+     }
+ 
+-    gmMainLib_8045A6C0[0].x1850 = gmMainLib_803D4A48;
++    gmMainLib_804D3EE0->x1850 = gmMainLib_803D4A48;
+     for (i = 1; i < 9; i++) {
+         gmMainLib_8015F600(i, 1);
+     }
+     lbAudioAx_80028690();
+     gmMainLib_8015F500();

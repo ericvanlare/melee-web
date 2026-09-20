@@ -59,6 +59,14 @@ int melee_web_menu_host_results_begin(MeleeWebMenuHost*,
 int melee_web_menu_host_results_exit(MeleeWebMenuHost*,char*,size_t);
 int melee_web_menu_host_results_end(MeleeWebMenuHost*,uint32_t random_seed,
     const uint8_t input[MELEE_WEB_PAD_STATE_BYTES],char*,size_t);
+/* Results may request the original Prize state (192). Its mode entry runs
+ * only after the new Prize heap and assets exist; the linked payload belongs
+ * to that heap until Prize's original scene and mode exits complete. */
+int melee_web_menu_host_results_destination(const MeleeWebMenuHost*);
+int melee_web_menu_host_prize_enter(MeleeWebMenuHost*,char*,size_t);
+int melee_web_menu_host_prize_exit(MeleeWebMenuHost*,char*,size_t);
+int melee_web_menu_host_prize_end(MeleeWebMenuHost*,uint32_t random_seed,
+    const uint8_t input[MELEE_WEB_PAD_STATE_BYTES],char*,size_t);
 int melee_web_menu_host_destroy(MeleeWebMenuHost*,char*,size_t);
 /* Same phase values as the checked source session: CSS=1, SSS-ready=2,
  * SSS=3, CSS-ready=4, match-ready=5, closed=6. */

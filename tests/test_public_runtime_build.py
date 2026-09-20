@@ -60,6 +60,7 @@ class PublicRuntimeBuildTests(unittest.TestCase):
             (
                 "fighter_runtime_probe",
                 "gameplay_pad_state_trace",
+                "gameplay_save_profile_trace",
                 "gameplay_effect_banks_trace",
                 "gameplay_bonus_data_trace",
                 "gameplay_stage_numeric_trace",

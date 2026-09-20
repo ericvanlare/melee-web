@@ -25,6 +25,8 @@ public:
     [[nodiscard]] std::shared_ptr<const DatAudioBank>
     audio_bank(std::string_view name);
     void verify(const std::shared_ptr<const DatArchive>& archive) const;
+    [[nodiscard]] std::size_t archive_count() const { return entries_.size(); }
+    [[nodiscard]] std::size_t audio_bank_count() const { return audio_entries_.size(); }
 
 private:
     struct Key {

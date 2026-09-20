@@ -108,7 +108,7 @@ static std::array<std::uint8_t, MELEE_WEB_PAD_STATE_BYTES> neutral_pad_snapshot(
     return bytes;
 }
 
-static int run_real_eight(const melee_web::RuntimeFiles& files)
+static int run_real_eight(const melee_web::RuntimeFiles& files, bool confirm)
 {
     char error[256]{};
     if (!melee_web_gameplay_session_begin(32U * 1024U * 1024U,
@@ -144,6 +144,26 @@ static int run_real_eight(const melee_web::RuntimeFiles& files)
                     session.tick(neutral);
                 if (session.source_frames() != 2 || session.requested())
                     throw std::runtime_error("Short Results tick changed source transition state");
+                if (confirm) {
+                    float pcm[1068];
+                    unsigned audio_phase = 0;
+                    for (unsigned tick = 0; tick < 900 && !session.requested(); ++tick) {
+                        PADStatus pads[4]{};
+                        pads[2].err = pads[3].err = -1;
+                        if (tick >= 240 && tick % 90 == 0)
+                            pads[0].button = pads[1].button = PAD_BUTTON_START;
+                        session.tick(pads);
+                        audio_phase += 32000;
+                        const unsigned samples = audio_phase / 60;
+                        audio_phase %= 60;
+                        if (!melee_web_audio_render(session.audio(), pcm, samples,
+                                                     error, sizeof(error)))
+                            throw std::runtime_error(error);
+                    }
+                    if (!session.requested())
+                        throw std::runtime_error("Original Results Start confirmation did not finish");
+                    session.exit_scene();
+                }
                 session.close();
                 check_results_teardown();
                 ++completed;
@@ -154,7 +174,8 @@ static int run_real_eight(const melee_web::RuntimeFiles& files)
             throw std::runtime_error(error);
         ended = true;
         std::cout << "Validated " << completed
-                  << " real eight-fighter Results constructions with short ticks\n";
+                  << (confirm ? " real eight-fighter Results confirmations and teardown\n" :
+                                " real eight-fighter Results constructions with short ticks\n");
         return 0;
     } catch (...) {
         if (!ended) melee_web_gameplay_session_end(error, sizeof(error));
@@ -204,7 +225,8 @@ static void check_source_entry(const melee_web::GameplayWorld& world)
 }
 
 int main(int argc,char** argv){try{
-    const bool real_eight = argc >= 2 && std::string(argv[1]) == "--real-eight";
+    const bool confirm = argc >= 2 && std::string(argv[1]) == "--real-eight-confirm";
+    const bool real_eight = confirm || (argc >= 2 && std::string(argv[1]) == "--real-eight");
     if ((!real_eight && argc != 3) || (real_eight && argc != 5))
         throw std::runtime_error(real_eight ?
             "Expected --real-eight <common/fighter> <Results shared/music> <Results fighters>" :
@@ -213,7 +235,7 @@ int main(int argc,char** argv){try{
     const int first_directory = real_eight ? 2 : 1;
     for (int directory = first_directory; directory < argc; ++directory)
         load_directory(files, argv[directory]);
-    if (real_eight) return run_real_eight(files);
+    if (real_eight) return run_real_eight(files, confirm);
     const melee_web::FighterCostume* mario=nullptr;
     for(const auto& identity:melee_web::fighter_costumes())
         if(identity.fighter_kind==0&&identity.costume_index==0)mario=&identity;

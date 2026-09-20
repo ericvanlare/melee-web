@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Ordinary keyboard regression for the No Contest -> Results -> CSS route.
+/** Ordinary keyboard regression for the No Contest -> Results -> optional Prize -> CSS route.
  * Does not establish retail equivalence, physical input, or performance acceptance.
  */
 import fs from 'node:fs/promises';
@@ -19,12 +19,48 @@ const page=await browser.newPage({viewport:{width:1280,height:960}});
 const driver=createBrowserDriver(page,{timeoutMs:60000,deadline:Date.now()+300000});
 const report={schema:'melee-web-versus-return-browser-v1',browser:browser.version(),
   scope:'Ordinary B0XX keyboard, human P1/CPU P2, Mario/FD, three No Contest Results returns in one document with the same source arena. No retail allocator equivalence, physical input or performance acceptance.',
-  checks:[],memory:[],completed:false};
+  checks:[],memory:[],prizeVisits:[],completed:false};
 async function check(name,run){await run();report.checks.push(name);console.log(name);}
 async function memory(boundary){report.memory.push({boundary,...await page.evaluate(()=>
   JSON.parse(Module.UTF8ToString(Module._melee_web_native_menu_memory())))});}
 async function waitSourcePause(){
   await page.waitForFunction(()=>Module.UTF8ToString(Module._melee_web_native_menu_diagnostics()).includes('source pause: 1'),null,{timeout:15000});
+}
+async function confirmResults(match){
+  // The first Start can open the original statistics panels. A later Start
+  // confirms the human panel; retain ordinary release edges between presses.
+  for(let confirmation=0;confirmation<8;confirmation++){
+    if(await page.evaluate(()=>Module._melee_web_native_menu_phase())!==8)break;
+    await driver.waitForPhase(8);
+    await driver.pressChord(['7'],{holdMs:120,releaseMs:1380});
+  }
+  assert.notEqual(await page.evaluate(()=>Module._melee_web_native_menu_phase()),8,
+    'Original Results did not finish its bounded Start confirmation sequence');
+  // Original profile progress may select Prize before returning to CSS.
+  // Observe that route and confirm with ordinary Start presses; do not alter
+  // pending flags, source routing, or the timing pause policy.
+  const boundary=await page.waitForFunction(()=>{
+    const error=document.querySelector('#status')?.dataset.runtimeError;
+    if(error)return {error};
+    const phase=Module._melee_web_native_menu_phase();
+    return (phase===1||phase===9)&&Module._melee_web_native_menu_running()?{phase}:false;
+  },null,{timeout:60000});
+  const state=await boundary.jsonValue();await boundary.dispose();
+  if(state.error)throw Error(state.error);
+  if(state.phase===9){
+    report.prizeVisits.push(match);await memory(`prize-match-${match}`);
+    for(let confirmation=0;confirmation<120;confirmation++){
+      await driver.waitForPhase(9);
+      await driver.pressChord(['7'],{holdMs:120,releaseMs:380});
+      const next=await page.evaluate(()=>({
+        phase:Module._melee_web_native_menu_phase(),
+        error:document.querySelector('#status')?.dataset.runtimeError,
+      }));
+      if(next.error)throw Error(next.error);
+      if(next.phase!==9)break;
+    }
+  }
+  await driver.waitForPhase(1);
 }
 async function enterMatch(){
   await driver.pressChord(['7']);await driver.waitForPhase(3);
@@ -75,8 +111,7 @@ try {
         await page.locator('#canvas').screenshot({path:path.join(values.out,'results.png')});
         await page.locator('#pause').click();
       }
-      await driver.pressChord(['7']);
-      await driver.waitForPhase(1);await page.waitForTimeout(1200);await driver.waitForPhase(1);
+      await confirmResults(match);await page.waitForTimeout(1200);await driver.waitForPhase(1);
       assert.equal(await page.evaluate(()=>window.versusReturnDocument),marker);
       assert.match(await page.evaluate(()=>Module.UTF8ToString(Module._melee_web_native_menu_diagnostics())),
         new RegExp(`Completed matches: ${match} ·`));

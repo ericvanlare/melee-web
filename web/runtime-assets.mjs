@@ -26,6 +26,7 @@ export const NATIVE_GAME_DISC_FILES=Object.freeze({
   'IfAll.usd':'IfAll.usd','IfCoGet.dat':'IfCoGet.dat','SdIntro.dat':'SdIntro.dat','GmPause.usd':'GmPause.usd',
   'LbBf.dat':'LbBf.dat',
   'GmRst.usd':'GmRst.usd','SdRst.usd':'SdRst.usd','TyDatai.usd':'TyDatai.usd',
+  's_info1.hps':'audio/s_info1.hps','s_info2.hps':'audio/s_info2.hps','s_info3.hps':'audio/s_info3.hps','IfPrize.usd':'IfPrize.usd','SdPrize.usd':'SdPrize.usd',
   ...Object.fromEntries(['Mr','Dr','Fx','Fc','Ms','Fe','Lk','Cl']
     .map(kind=>[`GmRstM${kind}.dat`,`GmRstM${kind}.dat`])),
   ...Object.fromEntries(['mario','fox','emb','link']

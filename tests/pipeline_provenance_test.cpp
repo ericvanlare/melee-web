@@ -17,7 +17,8 @@ MeleeWebPipelineSourceContext context(uint32_t scene, uint32_t phase) {
     value.scene = scene;
     value.phase = phase;
     value.world_generation = (scene == MELEE_WEB_PIPELINE_SCENE_BOOT ||
-                              scene == MELEE_WEB_PIPELINE_SCENE_RESULTS) ? 0 : 7;
+                              scene == MELEE_WEB_PIPELINE_SCENE_RESULTS ||
+                              scene == MELEE_WEB_PIPELINE_SCENE_PRIZE) ? 0 : 7;
     value.route_epoch = 11;
     value.source_tick = 19;
     value.coverage_case_id = 23;
@@ -196,12 +197,12 @@ void check_missing_context_and_scope_pair() {
     assert(melee_web_pipeline_recorder_destroy(recorder, error, sizeof(error)));
 }
 
-void check_results_preparation_context() {
+void check_results_preparation_context(uint32_t scene) {
     const auto boot = context(MELEE_WEB_PIPELINE_SCENE_BOOT,
                               MELEE_WEB_PIPELINE_PHASE_PREPARATION);
     auto* recorder = recorder_with(boot);
     char error[256]{};
-    auto results = context(MELEE_WEB_PIPELINE_SCENE_RESULTS,
+    auto results = context(scene,
                            MELEE_WEB_PIPELINE_PHASE_PREPARATION);
     MeleeWebPipelineSourceToken token{};
     assert(melee_web_pipeline_source_scope_begin(recorder, &results, &token,
@@ -549,7 +550,8 @@ int main(int argc, char** argv) {
     check_descriptor_digest_vectors();
     check_full_capture();
     check_missing_context_and_scope_pair();
-    check_results_preparation_context();
+    check_results_preparation_context(MELEE_WEB_PIPELINE_SCENE_RESULTS);
+    check_results_preparation_context(MELEE_WEB_PIPELINE_SCENE_PRIZE);
     check_overflow_and_stale_token();
     check_final_snapshot_preserves_unpaired_evidence();
     check_thread_local_deferred_context_and_nonce();

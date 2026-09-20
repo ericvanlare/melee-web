@@ -40,6 +40,7 @@ BUILD_TARGETS = {
     "fighter": (
         "fighter_runtime_probe",
         "gameplay_pad_state_trace",
+        "gameplay_save_profile_trace",
         "gameplay_effect_banks_trace",
         "gameplay_bonus_data_trace",
         "gameplay_stage_numeric_trace",
@@ -100,6 +101,7 @@ PUBLIC_RUNTIME_FORBIDDEN_EXPORTS = frozenset(
         "_melee_web_native_menu_pad_sample",
         "_melee_web_native_menu_pad_sample_full",
         "_melee_web_native_menu_player_state",
+        "_melee_web_native_menu_match_observe",
         "_melee_web_native_menu_drive_fighter",
         "_melee_web_native_menu_drive_stage",
         "_melee_web_native_menu_stock_check",
@@ -107,6 +109,7 @@ PUBLIC_RUNTIME_FORBIDDEN_EXPORTS = frozenset(
         "_melee_web_native_menu_diagnostics",
         "_melee_web_native_menu_memory",
         "_melee_web_css_observe",
+        "_melee_web_css_observe_port",
         "_melee_web_sss_observe",
         "_melee_web_input_message",
     }

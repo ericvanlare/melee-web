@@ -8,7 +8,7 @@ let owner, controllerSettings, Module, boundary, status, check, put, prepareAudi
 let syncAudio, unloadAndSave, prepareNativeResources, waitForAudioAck;
 let preparationKeepsAudio = false;
 const stop = error => owner.stop(error);
-const $=id=>document.getElementById(id);const startupUrl=new URL(location.href),clearRenderCacheOnLoad=startupUrl.searchParams.get('render-cache')==='clear',hitchCaptureFromUrl=startupUrl.searchParams.get('hitch-capture')==='1',hitchCausalFromUrl=startupUrl.searchParams.get('hitch-causal')==='1',hitchUserTimingFromUrl=startupUrl.searchParams.get('hitch-marks')==='1';if(clearRenderCacheOnLoad){startupUrl.searchParams.delete('render-cache');history.replaceState(null,'',startupUrl);}let ready=false,fatal=false,bundle=false,inputDirty=true,importing=false,uiMessage="";let frameLast=0,perfLastReport=0,activeFrames=0,worstFrame=0,worstBrowserCallback=null,longFrames=0,browserLongTasks=0,browserLongTaskWorst=0;let nativeTimingFrames=0,nativeTimingWorst=0,nativeLongFrames=0,nativeOverBudgetFrames=0,nativeSourceSteps=0,nativeSourceDraws=0,nativeWorstTiming=null,nativeFirstUse=0,nativeFirstUseWorst=0,nativePreviousTiming=null,nativeLastTiming=null,livePipelineQueued=0,livePipelineCreated=0,liveTextureUploads=0,liveStagingUsedBytes=0,peakStagingUsedBytes=0;let constructionCounts={},constructionWorst=0,constructionFirstUseWorst=0,preparationSince=0,preparationLabel="",preparationSequence=0,activePreparation=null,pendingEntryProfile=null,settlingEntryProfile=null,entryProfiles=[],latestNativePreparation=null;let preparationCount=0,preparationWorst=0;let diagnosticCaptureInvalid=false,audioStateAcknowledged=true,audioAckWaiters=[],stockCheckActive=false,latestAudio={queued:0,underruns:0,overflows:0},actionSweepActive=false,actionSweepFocusLost=false,selectionDriveActive=false,sweepAutomaticResumes=0;
+const $=id=>document.getElementById(id);const startupUrl=new URL(location.href),clearRenderCacheOnLoad=startupUrl.searchParams.get('render-cache')==='clear',hitchCaptureFromUrl=startupUrl.searchParams.get('hitch-capture')==='1',hitchCausalFromUrl=startupUrl.searchParams.get('hitch-causal')==='1',hitchUserTimingFromUrl=startupUrl.searchParams.get('hitch-marks')==='1';if(clearRenderCacheOnLoad){startupUrl.searchParams.delete('render-cache');history.replaceState(null,'',startupUrl);}let ready=false,fatal=false,bundle=false,inputDirty=true,importing=false,uiMessage="";let frameLast=0,perfLastReport=0,activeFrames=0,worstFrame=0,worstBrowserCallback=null,longFrames=0,browserLongTasks=0,browserLongTaskWorst=0,browserLongTaskWorstRecord=null;let nativeTimingFrames=0,nativeTimingWorst=0,nativeLongFrames=0,nativeOverBudgetFrames=0,nativeLiveTimingFrames=0,nativePreparationTimingFrames=0,nativeLiveLongFrames=0,nativeLiveOverBudgetFrames=0,nativeSourceSteps=0,nativeSourceDraws=0,nativeWorstTiming=null,nativeFirstUse=0,nativeFirstUseWorst=0,nativePreviousTiming=null,nativeLastTiming=null,livePipelineQueued=0,livePipelineCreated=0,liveTextureUploads=0,liveStagingUsedBytes=0,peakStagingUsedBytes=0;let constructionCounts={},constructionWorst=0,constructionFirstUseWorst=0,preparationSince=0,preparationLabel="",preparationSequence=0,activePreparation=null,pendingEntryProfile=null,settlingEntryProfile=null,entryProfiles=[],latestNativePreparation=null;let preparationCount=0,preparationWorst=0,sequenceMetricsId=0,sequenceMetricsBaseline=null,sequenceFocusLost=false,sequenceFirstFocusLoss=null;let diagnosticCaptureInvalid=false,audioStateAcknowledged=true,audioAckWaiters=[],stockCheckActive=false,latestAudio={queued:0,underruns:0,overflows:0},actionSweepActive=false,actionSweepFocusLost=false,selectionDriveActive=false,sweepAutomaticResumes=0;
 window.meleeHitchCapture=null;let runtimeCacheSyncCapability=null,runtimeCacheSyncDropped=0;const runtimeCacheSyncQueue=[];const reportRuntimeCacheSync=event=>{const capture=window.meleeHitchCapture;if(capture?.observeCacheSync){capture.observeCacheSync(event);return;}if(hitchCausalFromUrl){if(runtimeCacheSyncQueue.length<128)runtimeCacheSyncQueue.push(event);else runtimeCacheSyncDropped++;}};const hitchCaptureLoading=import('./hitch-capture.mjs').then(({createHitchCapture})=>{const capture=createHitchCapture({enabled:hitchCaptureFromUrl,userTiming:hitchUserTimingFromUrl,cacheSyncDiagnostics:hitchCausalFromUrl});window.meleeHitchCapture=capture;if(runtimeCacheSyncCapability)capture.setCacheSyncCapability(runtimeCacheSyncCapability);for(const event of runtimeCacheSyncQueue.splice(0))capture.observeCacheSync(event);if(runtimeCacheSyncDropped)capture.noteCacheSyncLoss(runtimeCacheSyncDropped);const toggle=$('hitch-capture');if(toggle){toggle.checked=hitchCaptureFromUrl;toggle.onchange=()=>{capture.setEnabled(toggle.checked);if(hitchCausalFromUrl)Module?.setRuntimeCacheSyncDiagnostics?.(toggle.checked);};}return capture;}).catch(error=>{window.meleeHitchCaptureLoadError=String(error?.message||error);const toggle=$('hitch-capture');if(toggle)toggle.disabled=true;return null;});window.meleeHitchCaptureLoading=hitchCaptureLoading;
 // Diagnostic A/B only. Visibility preserves layout and every DOM/counter update;
 // activation and geometry checks happen before native replay entry, outside play.
@@ -28,14 +28,18 @@ function beginReplayPaintControl(){
   }catch(error){restore();throw error;}
 }
 const log=text=>$('log').textContent=($('log').textContent+'\n'+text).slice(-16000);
-if(typeof PerformanceObserver==='function'&&PerformanceObserver.supportedEntryTypes?.includes('longtask'))new PerformanceObserver(list=>{for(const entry of list.getEntries()){browserLongTasks++;browserLongTaskWorst=Math.max(browserLongTaskWorst,entry.duration);log(`Browser long task ${JSON.stringify({started:entry.startTime,duration_ms:entry.duration,name:entry.name})}`);}}).observe({type:'longtask',buffered:true});
-function resetTiming(clearConstruction=true){frameLast=0;perfLastReport=0;activeFrames=0;worstFrame=0;worstBrowserCallback=null;longFrames=0;browserLongTasks=0;browserLongTaskWorst=0;nativeTimingFrames=0;nativeTimingWorst=0;nativeLongFrames=0;nativeOverBudgetFrames=0;nativeSourceSteps=0;nativeSourceDraws=0;nativeWorstTiming=null;nativeFirstUse=0;nativeFirstUseWorst=0;nativePreviousTiming=null;nativeLastTiming=null;livePipelineQueued=0;livePipelineCreated=0;liveTextureUploads=0;liveStagingUsedBytes=0;peakStagingUsedBytes=0;diagnosticCaptureInvalid=false;window.meleeHitchCapture?.reset?.();if(clearConstruction){constructionCounts={};constructionWorst=0;constructionFirstUseWorst=0;preparationCount=0;preparationWorst=0;preparationSince=0;preparationLabel='';preparationSequence=0;activePreparation=null;pendingEntryProfile=null;settlingEntryProfile=null;entryProfiles=[];latestNativePreparation=null;}$('render-metrics').textContent='Native timing diagnostics are waiting for the native player.';if(clearConstruction)$('construction-metrics').textContent='Scene construction diagnostics are waiting for the native player.';}
+if(typeof PerformanceObserver==='function'&&PerformanceObserver.supportedEntryTypes?.includes('longtask'))new PerformanceObserver(list=>{for(const entry of list.getEntries()){browserLongTasks++;if(entry.duration>=browserLongTaskWorst){browserLongTaskWorst=entry.duration;browserLongTaskWorstRecord={started:entry.startTime,duration_ms:entry.duration,name:entry.name};}log(`Browser long task ${JSON.stringify({started:entry.startTime,duration_ms:entry.duration,name:entry.name})}`);}}).observe({type:'longtask',buffered:true});
+function resetTiming(clearConstruction=true){frameLast=0;perfLastReport=0;activeFrames=0;worstFrame=0;worstBrowserCallback=null;longFrames=0;browserLongTasks=0;browserLongTaskWorst=0;browserLongTaskWorstRecord=null;nativeTimingFrames=0;nativeTimingWorst=0;nativeLongFrames=0;nativeOverBudgetFrames=0;nativeLiveTimingFrames=0;nativePreparationTimingFrames=0;nativeLiveLongFrames=0;nativeLiveOverBudgetFrames=0;nativeSourceSteps=0;nativeSourceDraws=0;nativeWorstTiming=null;nativeFirstUse=0;nativeFirstUseWorst=0;nativePreviousTiming=null;nativeLastTiming=null;livePipelineQueued=0;livePipelineCreated=0;liveTextureUploads=0;liveStagingUsedBytes=0;peakStagingUsedBytes=0;diagnosticCaptureInvalid=false;window.meleeHitchCapture?.reset?.();if(clearConstruction){constructionCounts={};constructionWorst=0;constructionFirstUseWorst=0;preparationCount=0;preparationWorst=0;preparationSince=0;preparationLabel='';preparationSequence=0;activePreparation=null;pendingEntryProfile=null;settlingEntryProfile=null;entryProfiles=[];latestNativePreparation=null;}$('render-metrics').textContent='Native timing diagnostics are waiting for the native player.';if(clearConstruction)$('construction-metrics').textContent='Scene construction diagnostics are waiting for the native player.';}
 function renderConstructionMetrics(){const construction=Object.entries(constructionCounts).map(([name,count])=>`${name} ${count}`).join(' · ')||'none';const latest=entryProfiles.length?entryProfiles[entryProfiles.length-1]:null;const settle=latest&&latest.pipeline_settle_ms!==undefined?` · pipeline settle ${latest.pipeline_settle_ms.toFixed(2)} ms/${latest.pipeline_settle_frames} callbacks`:latest&&settlingEntryProfile===latest?` · pipelines settling (${latest.queued_total} initially queued)`:'';const profile=latest?` · latest ${latest.kind} prep ${latest.preparation_wall_ms.toFixed(2)} ms (construct ${latest.construction_ms.toFixed(2)}, wait/schedule ${latest.wait_schedule_ms.toFixed(2)}) · first draw ${latest.first_draw_ms.toFixed(2)} ms after ${latest.first_draw_delay_ms.toFixed(2)} ms · uploads ${latest.texture_upload_bytes} B · pipelines q${latest.queued_delta}/c${latest.created_delta}${settle}`:'';const p=latestNativePreparation,detail=p?` · native prep a${Number(p.audio_wait_ms).toFixed(2)} c${Number(p.construction_ms).toFixed(2)} r${Number(p.render_wait_ms).toFixed(2)} ms/${p.callbacks} callbacks (CPU ${Number(p.render_cpu_ms).toFixed(2)}, max ${Number(p.max_callback_ms).toFixed(2)}, uploads ${p.texture_upload_bytes} B, pipelines q${p.queued_delta}/c${p.created_delta})`:'';$('construction-metrics').textContent=`Construction ${construction} · worst ${constructionWorst.toFixed(2)} ms · construct ${constructionFirstUseWorst.toFixed(2)} ms · preparations ${preparationCount} (worst ${preparationWorst.toFixed(2)} ms; source entry/teardown separate)${profile}${detail}`;}
 window.menuConstructionTiming=data=>{const kind=data.kind||'unknown';constructionCounts[kind]=(constructionCounts[kind]||0)+1;constructionWorst=Math.max(constructionWorst,data.total_ms||0);constructionFirstUseWorst=Math.max(constructionFirstUseWorst,data.construct_ms||0);const profile=activePreparation||pendingEntryProfile;if(profile&&!profile.first_draw)profile.construction.push(data);log(`Native construction ${JSON.stringify(data)}`);renderConstructionMetrics();};
 window.menuPreparationProfile=data=>{latestNativePreparation=data;const profile=activePreparation||pendingEntryProfile;if(profile)profile.native_preparation=data;log(`Native preparation profile ${JSON.stringify(data)}`);renderConstructionMetrics();};
 // Keep one worst callback for budget diagnosis; no per-frame state trace or log.
 window.menuRuntimeTimingError=error=>{diagnosticCaptureInvalid=true;stop(error);};
 window.menuRuntimeTiming=data=>{if(!data.valid)return;const now=performance.now(),total=data.total_ms||0,preparation=data.preparation_ms||0,active=Math.max(0,total-preparation),resourceActivity=Number(data.queued_delta||0)||Number(data.created_delta||0)||Number(data.texture_upload_bytes||0);nativePreviousTiming=nativeLastTiming;nativeLastTiming=data;nativeTimingFrames++;nativeSourceSteps+=Number(data.source_steps||0);nativeSourceDraws+=Number(data.source_draws||0);const hitch=window.meleeHitchCapture?.isEnabled?.()?window.meleeHitchCapture.observeNativeTiming?.({current:data,previous:nativePreviousTiming,activeMs:active,totalMs:total,preparationMs:preparation,timestamp:now,context:{cache_state:Module.runtimeCacheState?.state||'unknown',cache_dirty:!!Module.runtimeCacheState?.dirty}}):null;if(hitch?.invalid||window.meleeHitchCapture?.isInvalid?.()){diagnosticCaptureInvalid=true;if(retailRun&&!retailRun.failure)retailRun.failure='Diagnostic hitch capture overflow';}if(active>1000/60)nativeOverBudgetFrames++;if(active>nativeTimingWorst){nativeTimingWorst=active;nativeWorstTiming={...data,active_ms:active,source:active>1000/60?Module.UTF8ToString(Module._melee_web_native_menu_diagnostics()):null};}if(active>1000/30)nativeLongFrames++;if(!preparation){livePipelineQueued+=Math.max(0,Number(data.queued_delta||0));livePipelineCreated+=Math.max(0,Number(data.created_delta||0));liveTextureUploads+=Math.max(0,Number(data.texture_upload_bytes||0));const stagingUsed=Math.max(0,Number(data.staging_used_bytes||0));liveStagingUsedBytes+=stagingUsed;peakStagingUsedBytes=Math.max(peakStagingUsedBytes,stagingUsed);}if(settlingEntryProfile){settlingEntryProfile.pipeline_settle_frames++;if(Number(data.queued_total||0)===0){settlingEntryProfile.pipeline_settle_ms=Math.max(0,now-settlingEntryProfile.first_draw_at);log(`Scene pipeline settle ${JSON.stringify({sequence:settlingEntryProfile.sequence,kind:settlingEntryProfile.kind,duration_ms:settlingEntryProfile.pipeline_settle_ms,callbacks:settlingEntryProfile.pipeline_settle_frames,created_total:Number(data.created_total||0)})}`);settlingEntryProfile=null;renderConstructionMetrics();}}if(data.first_use){nativeFirstUse++;nativeFirstUseWorst=Math.max(nativeFirstUseWorst,active);if(pendingEntryProfile){const profile=pendingEntryProfile;pendingEntryProfile=null;profile.first_draw=true;profile.first_draw_at=now;profile.kind=profile.construction.length?profile.construction[profile.construction.length-1].kind:'source-scene';profile.construction_ms=profile.construction.reduce((sum,item)=>sum+Number(item.total_ms||0),0);profile.wait_schedule_ms=Math.max(0,profile.preparation_wall_ms-profile.construction_ms);profile.first_draw_delay_ms=Math.max(0,now-profile.preparation_done);profile.first_draw_ms=total;profile.draw_ms=Number(data.draw_ms||0);profile.end_ms=Number(data.end_ms||0);profile.texture_upload_bytes=Number(data.texture_upload_bytes||0);profile.queued_delta=Number(data.queued_delta||0);profile.created_delta=Number(data.created_delta||0);profile.queued_total=Number(data.queued_total||0);profile.created_total=Number(data.created_total||0);profile.wasm_heap_bytes=Number(data.wasm_heap_bytes||0);profile.render_cache_state=Module.runtimeCacheState?.state||'unknown';profile.render_cache_bytes=Number(Module.runtimeCacheState?.fileBytes||0);profile.pipeline_settle_frames=0;if(profile.queued_total)settlingEntryProfile=profile;else profile.pipeline_settle_ms=0;entryProfiles.push(profile);log(`Scene entry profile ${JSON.stringify(profile)}`);renderConstructionMetrics();}}if(data.first_use||active>1000/30||preparation||resourceActivity)log(`${!preparation&&resourceActivity?'Live render resource':'Native callback'} ${JSON.stringify({...data,source:Module.UTF8ToString(Module._melee_web_native_menu_diagnostics())})}`);};
+// Keep preparation callbacks out of the live-sequence budget while retaining
+// the existing timing hook and counters unchanged for the UI/replay reports.
+const menuRuntimeTimingForSequence=window.menuRuntimeTiming;
+window.menuRuntimeTiming=data=>{if(!data.valid)return;const preparation=Number(data.preparation_ms||0)>0||preparationSince>0;const active=Math.max(0,Number(data.total_ms||0)-Number(data.preparation_ms||0));if(preparation)nativePreparationTimingFrames++;else nativeLiveTimingFrames++;if(!preparation&&active>1000/60)nativeLiveOverBudgetFrames++;if(!preparation&&active>1000/30)nativeLiveLongFrames++;menuRuntimeTimingForSequence(data);};
 developmentHooks.preparation=(label,keepAudio=false)=>{$('status').dataset.runtimeError='';preparationLabel=label||'Preparing original scene';preparationKeepsAudio=!!keepAudio;preparationSince=performance.now();window.meleeHitchCapture?.setPreparation?.(true,preparationSince);activePreparation={sequence:++preparationSequence,label:preparationLabel,requested_at:preparationSince,construction:[],first_draw:false,audio_continuity:preparationKeepsAudio};uiMessage='';$('status').textContent=`${preparationLabel} · audio ${preparationKeepsAudio?'continuing':'paused'}`;};
 developmentHooks.preparationDone=()=>{if(preparationSince){const now=performance.now();window.meleeHitchCapture?.setPreparation?.(false,now);const duration=now-preparationSince;preparationCount++;preparationWorst=Math.max(preparationWorst,duration);if(activePreparation){activePreparation.preparation_done=now;activePreparation.preparation_wall_ms=duration;pendingEntryProfile=activePreparation;activePreparation=null;}log(`Native preparation boundary {"label":${JSON.stringify(preparationLabel)},"duration_ms":${duration.toFixed(3)}}`);renderConstructionMetrics();}preparationSince=0;preparationLabel='';uiMessage='';};
 developmentHooks.preparationCanceled=()=>{window.meleeHitchCapture?.setPreparation?.(false);preparationSince=0;preparationLabel='';preparationKeepsAudio=false;activePreparation=null;pendingEntryProfile=null;uiMessage='';};
@@ -74,7 +78,7 @@ developmentHooks.frame=wasRunning=>{
  $('drive-dream-land').disabled=selectionDriveActive||actionSweepActive||fatal||stockCheckActive||nativePhase!==3||!Module._melee_web_native_menu_running();
  syncAudio();
 };
-for(const type of ['focus','blur','visibilitychange','focusin','focusout'])window.addEventListener(type,event=>{inputDirty=true;const lost=document.hidden||!document.hasFocus();if(actionSweepActive&&lost)actionSweepFocusLost=true;if(retailRun&&lost){retailRun.focusLost=true;retailRun.firstFocusLoss??={at:performance.now(),type:event.type,hidden:document.hidden,active_element:document.activeElement?.id||null,source_started:!!retailRun.baseline,preparation:preparationLabel||null};}},true);
+for(const type of ['focus','blur','visibilitychange','focusin','focusout'])window.addEventListener(type,event=>{inputDirty=true;const lost=document.hidden||!document.hasFocus();if(actionSweepActive&&lost)actionSweepFocusLost=true;if(sequenceMetricsBaseline&&lost){sequenceFocusLost=true;sequenceFirstFocusLoss??={at:performance.now(),type:event.type,hidden:document.hidden,active_element:document.activeElement?.id||null};}if(retailRun&&lost){retailRun.focusLost=true;retailRun.firstFocusLoss??={at:performance.now(),type:event.type,hidden:document.hidden,active_element:document.activeElement?.id||null,source_started:!!retailRun.baseline,preparation:preparationLabel||null};}},true);
 $('stock-check').onclick=()=>boundary(()=>check(Module._melee_web_native_menu_stock_check())).then(()=>{stockCheckActive=true;$('canvas').focus();inputDirty=true;});
 $('confirm-check').onclick=()=>boundary(()=>Module._melee_web_native_menu_confirm_check()).then(()=>{$('canvas').focus();inputDirty=true;});
 async function driveSourceSelection(button,nativeStep,kind,label){if(selectionDriveActive)return;selectionDriveActive=true;button.disabled=true;$('canvas').focus();inputDirty=true;try{for(let tick=0;tick<240;tick++){const result=await boundary(()=>nativeStep(kind));check(result);if(result===2){$('pad-status').textContent=`${label} reached through original source input after ${tick} steps.`;return;}await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));}throw Error(`${label} did not converge within 240 source input steps.`);}catch(error){padError(error);}finally{selectionDriveActive=false;}}
@@ -89,10 +93,11 @@ $('pad-send').onclick=()=>{try{
 /* Read-only source observations and the same checked raw-PAD queue used by the
  * visible diagnostics. Kept on window so browser automation can validate the
  * real CSS/SSS route without writing source selection globals. */
-window.menuObserveFighter=kind=>{const ids=Module._malloc(16),geometry=Module._malloc(32);try{if(!Module._melee_web_css_observe(kind,ids,geometry))return null;return{ids:Array.from(Module.HEAP32.subarray(ids>>2,(ids>>2)+4)),geometry:Array.from(Module.HEAPF32.subarray(geometry>>2,(geometry>>2)+8))};}finally{Module._free(ids);Module._free(geometry);}};
+window.menuObserveFighter=(kind,port=0)=>{const ids=Module._malloc(16),geometry=Module._malloc(32);try{if(!Module._melee_web_css_observe_port(port,kind,ids,geometry))return null;return{ids:Array.from(Module.HEAP32.subarray(ids>>2,(ids>>2)+4)),geometry:Array.from(Module.HEAPF32.subarray(geometry>>2,(geometry>>2)+8))};}finally{Module._free(ids);Module._free(geometry);}};
 window.menuObserveStage=kind=>{const ids=Module._malloc(16),geometry=Module._malloc(24);try{if(!Module._melee_web_sss_observe(kind,ids,geometry))return null;return{ids:Array.from(Module.HEAP32.subarray(ids>>2,(ids>>2)+4)),geometry:Array.from(Module.HEAPF32.subarray(geometry>>2,(geometry>>2)+6))};}finally{Module._free(ids);Module._free(geometry);}};
 window.menuDiagnosticPad=(port,buttons,stickX,stickY,duration=1)=>boundary(()=>check(Module._melee_web_native_menu_pad_sample(port,buttons,stickX,stickY,duration)));
 window.menuDiagnosticPadFull=(port,buttons,stickX,stickY,cstickX,cstickY,triggerL,triggerR,duration=1)=>boundary(()=>check(Module._melee_web_native_menu_pad_sample_full(port,buttons,stickX,stickY,cstickX,cstickY,triggerL,triggerR,duration)));
+window.menuObserveMatch=()=>JSON.parse(Module.UTF8ToString(Module._melee_web_native_menu_match_observe()));
 window.menuObservePlayer=(player=0)=>{const storage=Module._malloc(24);try{if(!Module._melee_web_native_menu_player_state(player,storage,storage+4,storage+8,storage+12,storage+16,storage+20))return null;return{fighterKind:Module.HEAP32[storage>>2],motion:Module.HEAP32[(storage>>2)+1],groundAir:Module.HEAP32[(storage>>2)+2],frame:(Module.HEAP32[(storage>>2)+3]>>>0),x:Module.HEAPF32[(storage>>2)+4],y:Module.HEAPF32[(storage>>2)+5]};}finally{Module._free(storage);}};
 const nextAnimationFrame=()=>new Promise(resolve=>requestAnimationFrame(resolve));
 async function waitSourceFrame(target,observe){let stagnantSince=performance.now(),last=-1;for(;;){await nextAnimationFrame();const state=window.menuObservePlayer();if(!state)throw Error('The source match stopped before the sweep completed.');observe?.(state);if(state.frame>=target)return state;if(state.frame!==last){last=state.frame;stagnantSince=performance.now();continue;}const stoppedFor=performance.now()-stagnantSince;if(stoppedFor>500&&status().startsWith('Paused after a timing disruption')){await boundary(()=>Module._melee_web_native_menu_pause(0));sweepAutomaticResumes++;stagnantSince=performance.now();continue;}if(stoppedFor>1800)throw Error(`Source frame ${state.frame} stopped advancing: ${status()}`);}}
@@ -148,6 +153,103 @@ Object.defineProperties(window, {
   nativeSourceSteps: {get: () => nativeSourceSteps},
   retailRun: {get: () => retailRun},
 });
+// Whole-sequence snapshot for bounded development harnesses. Native timing
+// records produced during preparation are labelled separately so the initial
+// pre-CSS import cannot be reported as live sequence work. Calling this without
+// begin is read-only; begin resets diagnostics counters only and never touches
+// the source clock or installs an observer.
+const sequenceMetricsCopy=value=>value===undefined||value===null?value:
+  typeof value==='object'?JSON.parse(JSON.stringify(value)):value;
+window.menuSequenceMetrics=(options={})=>{
+  if(options?.begin){
+    if(fatal)throw Error('Cannot begin sequence diagnostics after a fatal runtime error');
+    if(diagnosticCaptureInvalid||window.meleeHitchCapture?.isInvalid?.())
+      throw Error('Cannot begin sequence diagnostics after invalid timing capture');
+    if(preparationSince)throw Error('Cannot begin sequence diagnostics during preparation');
+    if(retailRun)throw Error('Cannot begin sequence diagnostics during replay');
+    // Diagnostics-only checkpoint: resetTiming(false) clears existing timing
+    // counters and hitch samples, never source/input/audio/heap state.
+    resetTiming(false);
+    sequenceFocusLost=false;sequenceFirstFocusLoss=null;
+    sequenceMetricsBaseline={id:++sequenceMetricsId,started_ms:performance.now(),
+      audio:{underruns:Number(latestAudio.underruns||0),overflows:Number(latestAudio.overflows||0)},
+      preparations:preparationCount,entries:entryProfiles.length,
+      construction_counts:{...constructionCounts},construction_worst:constructionWorst,
+      construction_first_use_worst:constructionFirstUseWorst,preparation_worst:preparationWorst};
+  }
+  const baseline=sequenceMetricsBaseline;
+  const sequenceEntries=baseline?entryProfiles.slice(baseline.entries):entryProfiles;
+  const sequenceConstruction=Object.fromEntries(Object.entries(constructionCounts)
+    .map(([name,count])=>[name,count-(baseline?.construction_counts[name]||0)])
+    .filter(([,count])=>count>0));
+  const sequenceConstructionRecords=sequenceEntries.flatMap(profile=>
+    Array.isArray(profile?.construction)?profile.construction:[]);
+  const intervalConstructionWorst=sequenceConstructionRecords.length?
+    Math.max(...sequenceConstructionRecords.map(item=>Number(item.total_ms||0))):null;
+  const intervalFirstUseWorst=sequenceConstructionRecords.length?
+    Math.max(...sequenceConstructionRecords.map(item=>Number(item.construct_ms||0))):null;
+  const sequencePreparationRecords=sequenceEntries
+    .map(profile=>Number(profile?.preparation_wall_ms))
+    .filter(value=>Number.isFinite(value));
+  const intervalPreparationWorst=sequencePreparationRecords.length?
+    Math.max(...sequencePreparationRecords):null;
+  const nativeRunning=!!(Module&&Module._melee_web_native_menu_running&&Module._melee_web_native_menu_running());
+  const hasFocus=typeof document.hasFocus==='function'?document.hasFocus():null;
+  return {
+    schema:'melee-web-menu-sequence-metrics',version:1,
+    sequence:{id:baseline?.id||null,started_ms:baseline?.started_ms||null,
+      elapsed_ms:baseline?Math.max(0,performance.now()-baseline.started_ms):null,
+      checkpointed:!!baseline,
+      note:'begin:true resets diagnostics counters only; source/input/audio/heap are untouched.'},
+    interval:{audio_underruns:baseline?Math.max(0,Number(latestAudio.underruns||0)-baseline.audio.underruns):null,
+      audio_overflows:baseline?Math.max(0,Number(latestAudio.overflows||0)-baseline.audio.overflows):null,
+      preparations:baseline?Math.max(0,preparationCount-baseline.preparations):null,
+      pre_sequence_profiles_excluded:baseline?baseline.entries:0,
+      pre_sequence_note:'Initial pre-CSS import timing is excluded after begin:true.'},
+    source:{steps:nativeSourceSteps,draws:nativeSourceDraws,
+      note:'Native source totals include preparation records; inspect native.callbacks.live for live sequence work.'},
+    native:{
+      callbacks:{total:nativeTimingFrames,live:nativeLiveTimingFrames,preparation:nativePreparationTimingFrames},
+      budget:{threshold_ms:1000/60,total:nativeOverBudgetFrames,live:nativeLiveOverBudgetFrames},
+      over_33ms:{threshold_ms:1000/30,total:nativeLongFrames,live:nativeLiveLongFrames},
+      worst:sequenceMetricsCopy(nativeWorstTiming),
+      last:sequenceMetricsCopy(nativeLastTiming),
+      first_use:{count:nativeFirstUse,worst_ms:nativeFirstUseWorst},
+    },
+    browser:{
+      callbacks:activeFrames,
+      gaps_over_33ms:longFrames,
+      worst_gap:sequenceMetricsCopy(worstBrowserCallback),
+      longtasks:{count:browserLongTasks,worst_ms:browserLongTaskWorst,
+        worst:sequenceMetricsCopy(browserLongTaskWorstRecord)},
+    },
+    pipelines:{queued:livePipelineQueued,created:livePipelineCreated,
+      texture_upload_bytes:liveTextureUploads,staging_used_bytes:liveStagingUsedBytes,
+      peak_staging_used_bytes:peakStagingUsedBytes},
+    audio:{latest:sequenceMetricsCopy(latestAudio),
+      queued:Number(latestAudio.queued||0),underruns:Number(latestAudio.underruns||0),
+      overflows:Number(latestAudio.overflows||0),
+      underruns_delta:baseline?Math.max(0,Number(latestAudio.underruns||0)-baseline.audio.underruns):null,
+      overflows_delta:baseline?Math.max(0,Number(latestAudio.overflows||0)-baseline.audio.overflows):null,
+      acknowledged:audioStateAcknowledged},
+    scenes:{
+      entries:sequenceMetricsCopy(sequenceEntries),
+      latest_native_preparation:sequenceMetricsCopy(latestNativePreparation),
+      construction:{counts:sequenceConstruction,
+        worst_ms:intervalConstructionWorst,lifetime_worst_ms:constructionWorst,
+        first_use_worst_ms:intervalFirstUseWorst,lifetime_first_use_worst_ms:constructionFirstUseWorst},
+      preparation:{count:preparationCount,count_delta:baseline?Math.max(0,preparationCount-baseline.preparations):null,
+        worst_ms:intervalPreparationWorst,lifetime_worst_ms:preparationWorst,
+        active:!!preparationSince,label:preparationLabel||null,sequence:preparationSequence,
+        current:sequenceMetricsCopy(activePreparation),pending_entry:sequenceMetricsCopy(pendingEntryProfile)},
+    },
+    state:{timing_invalid:diagnosticCaptureInvalid,fatal,running:nativeRunning,
+      replay_running:!!retailRun,focus:{has_focus:hasFocus,hidden:!!document.hidden,
+        visibility:document.visibilityState||null,sequence_lost:sequenceFocusLost,
+        first_sequence_loss:sequenceMetricsCopy(sequenceFirstFocusLoss)},
+      importing:!!importing,preparation_active:!!preparationSince},
+  };
+};
 const replayHash=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),v=>v.toString(16).padStart(2,'0')).join('');
 function replayDownload(name,text){replayEvidence.push([name,text]);$('save-replay-evidence').disabled=false;const link=document.createElement('a');link.href=URL.createObjectURL(new Blob([text],{type:'application/json'}));link.download=name;link.textContent=`Download ${name}`;$('retail-replay-downloads').append(' ',link);}
 // Sample allocator ownership outside the live source clock, never per tick.

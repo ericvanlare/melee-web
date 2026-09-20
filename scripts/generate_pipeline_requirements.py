@@ -70,6 +70,7 @@ SOURCE_SCENE_IDS: dict[str, int] = {
     "teardown": 5,
     "return": 6,
     "results": 7,
+    "prize": 8,
 }
 # BOOT/PREPARATION is a valid global setup boundary.  Every other native
 # source scene requires a live world for non-preparation lifecycle evidence;
@@ -81,6 +82,7 @@ SOURCE_WORLD_SCENES = frozenset((
     SOURCE_SCENE_IDS["teardown"],
     SOURCE_SCENE_IDS["return"],
     SOURCE_SCENE_IDS["results"],
+    SOURCE_SCENE_IDS["prize"],
 ))
 MENU_FIXED_FIELD_GROUPS = (
     ("menu fighters", ("menu_fighter_numeric_ids", "menu_fighter_ids", "menu_fighters")),

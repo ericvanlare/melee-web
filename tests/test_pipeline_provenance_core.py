@@ -124,14 +124,15 @@ class PipelineProvenanceCoreStaticTests(unittest.TestCase):
 
     def test_scene_ids_are_stable_and_results_is_preparation_only_without_world(self):
         values = dict(re.findall(
-            r"MELEE_WEB_PIPELINE_SCENE_(BOOT|CSS|SSS|MATCH|TEARDOWN|RETURN|RESULTS)\s*=\s*(\d+)",
+            r"MELEE_WEB_PIPELINE_SCENE_(BOOT|CSS|SSS|MATCH|TEARDOWN|RETURN|RESULTS|PRIZE)\s*=\s*(\d+)",
             self.header))
         self.assertEqual(values, {
             "BOOT": "1", "CSS": "2", "SSS": "3", "MATCH": "4",
-            "TEARDOWN": "5", "RETURN": "6", "RESULTS": "7",
+            "TEARDOWN": "5", "RETURN": "6", "RESULTS": "7", "PRIZE": "8",
         })
-        self.assertIn("scene <= MELEE_WEB_PIPELINE_SCENE_RESULTS", self.source)
+        self.assertIn("scene <= MELEE_WEB_PIPELINE_SCENE_PRIZE", self.source)
         self.assertIn("context.scene != MELEE_WEB_PIPELINE_SCENE_RESULTS", self.source)
+        self.assertIn("context.scene != MELEE_WEB_PIPELINE_SCENE_PRIZE", self.source)
         self.assertIn("check_results_preparation_context", self.fixture)
         self.assertIn("MELEE_WEB_PIPELINE_PHASE_INTERACTIVE", self.fixture)
 

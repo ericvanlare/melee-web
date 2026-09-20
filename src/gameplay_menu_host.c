@@ -1,14 +1,17 @@
 #include "gameplay_menu_host.h"
 #include "gameplay_menu.h"
+#include "gameplay_save_profile.h"
 #include "gameplay_content.h"
 #include "gameplay_bootstrap.h"
 #include "gameplay_results_context.h"
+#include "gameplay_prize_context.h"
 #include "gameplay_audio_bank_transport.h"
 #include <melee/gm/gm_1A36.h>
 #include <melee/gm/gm_1A3F.h>
 #include <melee/gm/gmmain_lib.h>
 #include <melee/gm/gmvsmelee.h>
 #include <melee/gm/gmvsmode.h>
+#include <melee/gm/gm_unsplit.h>
 #include <melee/lb/lbaudio_ax.h>
 #include <melee/lb/lbcardgame.h>
 #include <melee/lb/lblanguage.h>
@@ -38,6 +41,7 @@ extern int melee_web_vs_mode_select_state(int);
 extern int melee_web_vs_mode_next_state(void);
 struct MeleeWebMenuHost {
     MeleeWebMenuSession* session;
+    MeleeWebSaveProfileOwner* profile;
     MeleeWebAudio* audio;
     uint64_t generation,audio_generation;
     u32 seed,*saved_seed;
@@ -56,8 +60,9 @@ struct MeleeWebMenuHost {
     VsModeData route_saved_vs;
     MatchExitInfo route_saved_exit;
     ResultsMatchInfo route_saved_result;
+    ChallengerData route_saved_challenger;
     u8 route_saved_ko[GM_MAX_PLAYERS];
-    int results_active,results_exited,results_committed;
+    int results_active,results_exited,results_committed,prize_active;
     int entered,drawing,transition;
 };
 static MeleeWebMenuHost* owner;
@@ -68,7 +73,7 @@ static int live(MeleeWebMenuHost* h,char* e,size_t n){
        h->generation!=melee_web_gameplay_stats().generation||
        !melee_web_audio_is_active(h->audio)||!melee_web_audio_bank_transport_active())
         return fail(e,n,"Native menu world/audio ownership changed");
-    return 1;
+    return melee_web_save_profile_owner_live(h->profile,e,n);
 }
 static int runtime_check(void* data,MeleeWebMenuScene scene,char* e,size_t n){
     (void)scene;return live(data,e,n);
@@ -90,8 +95,24 @@ MeleeWebMenuHost* melee_web_menu_host_create(char* e,size_t n){
     MeleeWebMenuHost* h=calloc(1,sizeof(*h));if(!h){fail(e,n,"Cannot allocate native menu host");return NULL;}
     MeleeWebMenuRuntime runtime={h,runtime_check,runtime_scheduler,runtime_transition};
     MeleeWebMenuConfig config={4,0,0};
+    h->profile=melee_web_save_profile_owner_create(e,n);
+    if(!h->profile){free(h);return NULL;}
+    if(!melee_web_save_profile_owner_activate(h->profile,e,n)){
+        if(!melee_web_save_profile_owner_destroy(h->profile,NULL,0))abort();
+        free(h);return NULL;
+    }
+    if(!melee_web_save_profile_owner_initialize_default(h->profile,e,n)||
+       !melee_web_save_profile_owner_set_roster(h->profile,0x07ff,0x01c0,e,n)){
+        if(!melee_web_save_profile_owner_deactivate(h->profile,NULL,0)||
+           !melee_web_save_profile_owner_destroy(h->profile,NULL,0))abort();
+        free(h);return NULL;
+    }
     h->session=melee_web_menu_session_create(&runtime,&config,e,n);
-    if(!h->session){free(h);return NULL;}
+    if(!h->session){
+        if(!melee_web_save_profile_owner_deactivate(h->profile,NULL,0)||
+           !melee_web_save_profile_owner_destroy(h->profile,NULL,0))abort();
+        free(h);return NULL;
+    }
     h->saved_seed=seed_ptr;h->seed=*seed_ptr;seed_ptr=&h->seed;
     owner=h;ok(e,n);return h;
 }
@@ -136,7 +157,8 @@ int melee_web_menu_host_enter(MeleeWebMenuHost* h,MeleeWebAudio* audio,char* e,s
         gmMainLib_8015CC58()->item_mask=UINT64_MAX;
         gmMainLib_8015CC58()->rumble_enabled[0]=true;
         gmMainLib_8015CC58()->rumble_enabled[1]=true;
-        *gmMainLib_GetUnlockedCharactersBitmaskPtr()=0xffff;*gmMainLib_8015EDA4()=0xffff;
+        /* Exact authored profile masks were installed once at host creation.
+         * Scene entry must not reset source unlock or Prize progress. */
     }else{
         *gmMainLib_GetGameRules()=h->selected_rules;
         *gmMainLib_8015CC58()=h->selected_preferences;
@@ -308,13 +330,14 @@ static void restore_results_route(MeleeWebMenuHost* h){
     *gmVsMelee_GetVsData()=h->route_saved_vs;
     gmVsMelee_VsExitInfo=h->route_saved_exit;
     gmVsMelee_ResultsEnterData=h->route_saved_result;
+    *gm_GetChallengerData()=h->route_saved_challenger;
     memcpy(gmVsMelee_GetKOCounts(),h->route_saved_ko,sizeof(h->route_saved_ko));
     *gmMainLib_GetGameRules()=h->route_saved_rules;
     *gmMainLib_8015CC58()=h->route_saved_preferences;
     *gmMainLib_GetUnlockedCharactersBitmaskPtr()=h->route_saved_characters;
     *gmMainLib_8015EDA4()=h->route_saved_stages;
     if(!melee_web_vs_mode_end())abort();
-    h->results_active=h->results_exited=h->results_committed=0;
+    h->results_active=h->results_exited=h->results_committed=h->prize_active=0;
 }
 int melee_web_menu_host_results_begin(MeleeWebMenuHost* h,
     const MatchExitInfo* exit_info,uint32_t seed,ResultsMatchInfo* result,
@@ -327,6 +350,7 @@ int melee_web_menu_host_results_begin(MeleeWebMenuHost* h,
     h->route_saved_vs=*gmVsMelee_GetVsData();
     h->route_saved_exit=gmVsMelee_VsExitInfo;
     h->route_saved_result=gmVsMelee_ResultsEnterData;
+    h->route_saved_challenger=*gm_GetChallengerData();
     memcpy(h->route_saved_ko,gmVsMelee_GetKOCounts(),sizeof(h->route_saved_ko));
     h->route_saved_rules=*gmMainLib_GetGameRules();
     h->route_saved_preferences=*gmMainLib_8015CC58();
@@ -354,17 +378,7 @@ int melee_web_menu_host_results_begin(MeleeWebMenuHost* h,
     *result=gmVsMelee_ResultsEnterData;
     return ok(e,n);
 }
-int melee_web_menu_host_results_exit(MeleeWebMenuHost* h,char* e,size_t n){
-    if(!h||h!=owner||!h->results_active||h->results_exited||
-       !melee_web_results_context_exit_ready())
-        return fail(e,n,"Results mode exit requires its live source world");
-    gm_Mode_Vs_States[4].on_exit(&gm_Mode_Vs_States[4]);
-    h->results_exited=1;
-    const int next=melee_web_vs_mode_next_state();
-    if(next!=gmVsMode_State_Css){
-        if(e&&n)snprintf(e,n,"Original Results requested unsupported state %d",next);
-        return 0;
-    }
+static int commit_results_route(MeleeWebMenuHost* h,char* e,size_t n){
     if(!melee_web_menu_commit_results(h->session,gmVsMelee_GetVsData(),
         gmVsMelee_GetKOCounts(),e,n))return 0;
     h->selected_characters=*gmMainLib_GetUnlockedCharactersBitmaskPtr();
@@ -374,16 +388,75 @@ int melee_web_menu_host_results_exit(MeleeWebMenuHost* h,char* e,size_t n){
     h->results_committed=1;
     return ok(e,n);
 }
+int melee_web_menu_host_results_exit(MeleeWebMenuHost* h,char* e,size_t n){
+    if(!h||h!=owner||!h->results_active||h->results_exited||
+       !melee_web_results_context_exit_ready())
+        return fail(e,n,"Results mode exit requires its live source world");
+    gm_Mode_Vs_States[4].on_exit(&gm_Mode_Vs_States[4]);
+    h->results_exited=1;
+    const int next=melee_web_vs_mode_next_state();
+    if(next==gmVsMode_State_Prize)return ok(e,n);
+    if(next!=gmVsMode_State_Css){
+        if(e&&n)snprintf(e,n,"Original Results requested unsupported state %d",next);
+        return 0;
+    }
+    return commit_results_route(h,e,n);
+}
 int melee_web_menu_host_results_end(MeleeWebMenuHost* h,uint32_t seed,
     const uint8_t input[MELEE_WEB_PAD_STATE_BYTES],char* e,size_t n){
-    if(!h||h!=owner||!h->results_active||!h->results_committed||
+    if(!h||h!=owner||!h->results_active||!h->results_exited||h->prize_active||
        melee_web_gameplay_generation()||seed_ptr!=&h->seed)
         return fail(e,n,"Results must tear down before restoring its route owner");
+    if(!h->results_committed){
+        if(melee_web_vs_mode_next_state()!=gmVsMode_State_Prize)
+            return fail(e,n,"Results has no supported continuation");
+        MeleeWebPadState* next_input=melee_web_pad_state_decode(input,MELEE_WEB_PAD_STATE_BYTES,e,n);
+        if(!next_input)return 0;
+        melee_web_pad_state_free(h->input);h->input=next_input;h->seed=seed;
+        return ok(e,n);
+    }
+    restore_results_route(h);
+    return melee_web_menu_host_match_finished(h,seed,input,e,n);
+}
+int melee_web_menu_host_results_destination(const MeleeWebMenuHost* h){
+    if(!h||h!=owner)return -1;
+    return h->results_active&&h->results_exited?melee_web_vs_mode_next_state():gmVsMode_State_Css;
+}
+int melee_web_menu_host_prize_enter(MeleeWebMenuHost* h,char* e,size_t n){
+    if(!h||h!=owner||!h->results_active||!h->results_exited||h->results_committed||
+       h->prize_active||!melee_web_gameplay_generation()||
+       melee_web_vs_mode_next_state()!=gmVsMode_State_Prize)
+        return fail(e,n,"Prize mode entry requires the retained Results route and a prepared world");
+    if(!melee_web_vs_mode_select_state(gmVsMode_State_Prize))abort();
+    gm_Mode_Vs_States[7].on_enter(&gm_Mode_Vs_States[7]);
+    h->prize_active=1;
+    return ok(e,n);
+}
+int melee_web_menu_host_prize_exit(MeleeWebMenuHost* h,char* e,size_t n){
+    if(!h||h!=owner||!h->prize_active||h->results_committed||
+       !melee_web_prize_context_exit_ready())
+        return fail(e,n,"Prize mode exit requires its completed live source scene");
+    gm_Mode_Vs_States[7].on_exit(&gm_Mode_Vs_States[7]);
+    const int next=melee_web_vs_mode_next_state();
+    if(next!=gmVsMode_State_Css){
+        if(e&&n)snprintf(e,n,"Original Prize requested unsupported state %d",next);
+        return 0;
+    }
+    return commit_results_route(h,e,n);
+}
+int melee_web_menu_host_prize_end(MeleeWebMenuHost* h,uint32_t seed,
+    const uint8_t input[MELEE_WEB_PAD_STATE_BYTES],char* e,size_t n){
+    if(!h||h!=owner||!h->prize_active||!h->results_committed||
+       melee_web_gameplay_generation()||seed_ptr!=&h->seed)
+        return fail(e,n,"Prize must tear down before restoring its route owner");
     restore_results_route(h);
     return melee_web_menu_host_match_finished(h,seed,input,e,n);
 }
 int melee_web_menu_host_destroy(MeleeWebMenuHost* h,char* e,size_t n){
     if(!h||h!=owner||h->entered||h->audio||seed_ptr!=&h->seed)return fail(e,n,"Close native menu scene and restore RNG before destroying host");
     if(h->results_active)restore_results_route(h);
-    if(!melee_web_menu_session_destroy(h->session,e,n))return 0;seed_ptr=h->saved_seed;owner=NULL;melee_web_pad_state_free(h->input);free(h);return ok(e,n);
+    if(!melee_web_menu_session_destroy(h->session,e,n))return 0;
+    if(!melee_web_save_profile_owner_deactivate(h->profile,e,n)||
+       !melee_web_save_profile_owner_destroy(h->profile,e,n))return 0;
+    seed_ptr=h->saved_seed;owner=NULL;melee_web_pad_state_free(h->input);free(h);return ok(e,n);
 }

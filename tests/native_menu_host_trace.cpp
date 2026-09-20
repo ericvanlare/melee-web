@@ -2,6 +2,7 @@
 #include "gameplay_menu_host.h"
 #include "gameplay_match_session.hpp"
 #include "gameplay_results_session.hpp"
+#include "gameplay_prize_session.hpp"
 #include "gameplay_match_rules.h"
 #include "gameplay_bootstrap.h"
 #include "gameplay_audio_stream.h"
@@ -86,6 +87,28 @@ void run_results_source_smoke(const melee_web::RuntimeFiles& files,
     melee_web_pad_state_capture(input_bytes);
     session.close();
     check(melee_web_menu_host_results_end(host,seed,input_bytes,error,sizeof(error)),error);
+    if(melee_web_menu_host_results_destination(host)==192){
+        const MeleeWebPadState* retained=melee_web_menu_host_input(host);
+        check(retained!=nullptr,"Results did not retain Prize PAD input");
+        melee_web::GameplayPrizeSession prize(files,host,seed,*retained);
+        check(!melee_web_menu_host_prize_exit(host,error,sizeof(error)),
+              "Prize mode exited before source confirmation");
+        for(unsigned t=0;t<3600&&!prize.requested();++t){
+            PADStatus pads[4]{};pads[2].err=pads[3].err=-1;
+            if(t>=20&&t%20==0)pads[0].button=PAD_BUTTON_START;
+            prize.tick(pads);
+            audio_phase+=32000;const unsigned count=audio_phase/60;audio_phase%=60;
+            check(melee_web_audio_render(prize.audio(),pcm,count,error,sizeof(error)),error);
+        }
+        check(prize.requested(),"Original Prize did not finish within the bounded confirmation script");
+        prize.exit_scene();
+        check(melee_web_menu_host_prize_exit(host,error,sizeof(error)),error);
+        check(!melee_web_menu_host_prize_exit(host,error,sizeof(error)),"Prize mode exit ran twice");
+        seed=prize.random_seed();melee_web_pad_state_capture(input_bytes);
+        std::cout<<"Original Prize confirmed in "<<prize.source_frames()<<" source ticks\n";
+        prize.close();
+        check(melee_web_menu_host_prize_end(host,seed,input_bytes,error,sizeof(error)),error);
+    }
 }
 void write_player(std::ostream& out,const PlayerInitData& player){
  const unsigned flags_c=(unsigned(player.rumble_enabled)<<7)|(unsigned(player.xC_b1)<<6)|
@@ -183,7 +206,7 @@ int main(int argc,char** argv){try{
   files[key]={(std::istreambuf_iterator<char>(input)),{}};
  }
  if(results_mario_recipe){
-  for(const char* key:{"GmRst.usd","SdRst.usd","GmRstMMr.dat","ff_mario.hps","TyDatai.usd"}){
+  for(const char* key:{"GmRst.usd","SdRst.usd","GmRstMMr.dat","ff_mario.hps","TyDatai.usd","IfPrize.usd","SdPrize.usd","s_info1.hps","s_info2.hps","s_info3.hps"}){
    std::ifstream input(std::filesystem::path(argv[2])/key,std::ios::binary);
    if(!input)throw std::runtime_error("Missing owned Results fixture");
    files[key]={(std::istreambuf_iterator<char>(input)),{}};

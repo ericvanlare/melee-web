@@ -790,18 +790,18 @@ class PipelineRequirementsTests(unittest.TestCase):
         self.assertEqual(result["status"]["incomplete_scopes"], [])
         self.assertEqual(result["groups"][0]["members"], [])
 
-    def test_worldless_results_preparation_is_valid_but_interactive_is_unbound(self):
+    def _check_worldless_notification_preparation(self, scene_name, scene_id):
         coverage = dict(self.coverage)
         coverage["cases"] = [{
             "case_id": "mario-fd", "route_id": "mario-fd", "route": {"route_id": "mario-fd"},
-            "expected_phases": [{"scene": "results", "phase": "preparation"}],
+            "expected_phases": [{"scene": scene_name, "phase": "preparation"}],
             "expected_actions": [], "expected_costumes": [], "lifecycle": ["preparation"],
             "input": {"capture_id": self.capture_id, "sha256": self.input_digest},
         }]
         metadata = dict(self.metadata)
         metadata["coverage_manifest_sha256"] = sha256_json(coverage)
         scope = {"scope_id": "results-s", "case_id": "mario-fd", "route_id": "mario-fd",
-                 "scene": 7, "phase": 1, "world_generation": 0,
+                 "scene": scene_id, "phase": 1, "world_generation": 0,
                  "input_manifest_sha256": self.input_digest}
         capture = self.capture(records=[
             {"sequence": 1, "kind": "scope_begin", "scope": scope},
@@ -818,7 +818,7 @@ class PipelineRequirementsTests(unittest.TestCase):
 
         interactive_coverage = dict(coverage)
         interactive_coverage["cases"] = [dict(coverage["cases"][0],
-            expected_phases=[{"scene": "results", "phase": "interactive"}],
+            expected_phases=[{"scene": scene_name, "phase": "interactive"}],
             expected_actions=["Jab"], expected_costumes=[0], lifecycle=["interactive"])]
         interactive_metadata = dict(self.metadata,
                                     coverage_manifest_sha256=sha256_json(interactive_coverage))
@@ -839,6 +839,13 @@ class PipelineRequirementsTests(unittest.TestCase):
         self.assertEqual(result["status"]["kind"], "incomplete")
         self.assertFalse(result["status"]["certified"])
         self.assertGreater(result["status"]["incomplete_scopes"][0]["unbound_source_scopes"], 0)
+
+
+    def test_worldless_results_preparation_is_valid_but_interactive_is_unbound(self):
+        self._check_worldless_notification_preparation("results", 7)
+
+    def test_worldless_prize_preparation_is_valid_but_interactive_is_unbound(self):
+        self._check_worldless_notification_preparation("prize", 8)
 
     def test_empty_boot_and_preparation_scopes_do_not_validate_route_content(self):
         coverage = dict(self.coverage)

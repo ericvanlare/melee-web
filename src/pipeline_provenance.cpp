@@ -63,7 +63,7 @@ const char* reason_name(uint32_t reason) {
 
 bool valid_scene(uint32_t scene) {
     return scene >= MELEE_WEB_PIPELINE_SCENE_BOOT &&
-           scene <= MELEE_WEB_PIPELINE_SCENE_RESULTS;
+           scene <= MELEE_WEB_PIPELINE_SCENE_PRIZE;
 }
 
 bool valid_phase(uint32_t phase) {
@@ -86,14 +86,15 @@ bool context_valid(const MeleeWebPipelineSourceContext& context) {
         return false;
     }
     /* Before world construction, only an explicitly preparation-phase BOOT,
-     * CSS, MATCH or RESULTS context may carry world zero.  Never manufacture
+     * CSS, MATCH, RESULTS or PRIZE context may carry world zero. Never manufacture
      * a world generation for an unloaded route. */
     if (context.world_generation == 0 &&
         (context.phase != MELEE_WEB_PIPELINE_PHASE_PREPARATION ||
          (context.scene != MELEE_WEB_PIPELINE_SCENE_BOOT &&
           context.scene != MELEE_WEB_PIPELINE_SCENE_CSS &&
           context.scene != MELEE_WEB_PIPELINE_SCENE_MATCH &&
-          context.scene != MELEE_WEB_PIPELINE_SCENE_RESULTS))) {
+          context.scene != MELEE_WEB_PIPELINE_SCENE_RESULTS &&
+          context.scene != MELEE_WEB_PIPELINE_SCENE_PRIZE))) {
         return false;
     }
     for (unsigned i = context.active_player_count; i != 4; ++i) {

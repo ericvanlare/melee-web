@@ -345,6 +345,11 @@ class PreparationManifestTests(unittest.TestCase):
 
         requirements["groups"][-1]["scene"] = 8
         pair["requirements"].write_bytes(canonical_json(requirements) + b"\n")
+        metadata, _header = generate_preparation([pair])
+        self.assertEqual(metadata["descriptor_count"], 5)
+
+        requirements["groups"][-1]["scene"] = 9
+        pair["requirements"].write_bytes(canonical_json(requirements) + b"\n")
         self.assertEqual(self._error_code(generate_preparation, [pair]), "group_scene")
 
     def test_empty_groups_and_unused_dictionary_rows_do_not_add_descriptors(self) -> None:
