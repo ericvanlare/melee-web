@@ -1,5 +1,18 @@
 # Current status
 
+## Production audio release path
+
+PR #42 is merged on top of #49. The owner approved promoting replacement
+audio to production independently of Results PR #44. The production package
+now has an explicit `audio-player` identity and uses the same restricted Release
+audio runtime as the combined listening preview. Its auditor binds the native
+source/tool/seed identity, exact audio module inventory, production notices and
+hosting policy. The legacy silent profile remains available for rollback.
+See [production audio release](docs/AUDIO_PRODUCTION.md) for the commands and
+verification gates. The combined preview's existing evidence remains scoped to
+[its recorded browser and PCM checks](docs/evidence/audio-main-integration-v1.json);
+it does not establish full-match performance or original hardware fidelity.
+
 ## Development audio replacement candidate
 
 The scalar resampler and browser coefficient generator have new implementations
@@ -9,7 +22,8 @@ phase, history and source reads. This is regression evidence, not an original
 hardware accuracy pass. The [replacement record](docs/AUDIO_REPLACEMENT_EVIDENCE.md)
 also records an unverified original-DSP phase-writeback boundary and the retained
 coefficient-data provenance that still needs release review. The separate GPL
-Dolphin observer remains intact. Production audio and repository visibility are unchanged.
+Dolphin observer remains intact. The production release path is described above;
+repository visibility is unchanged.
 
 The owner-requested [audio listening preview](docs/AUDIO_PREVIEW.md) now includes
 main `979fd09` (PR #49) and its per-scene asset loading. **Browser exercised**:
@@ -28,7 +42,7 @@ Feature additions are paused at PR #49. The candidate exposes fifteen public
 fighters and seven stages; Donkey Kong remains development-only under the
 owner-approved restriction tracked in [issue #50](https://github.com/ericvanlare/melee-web/issues/50).
 Both public and development players now load exact scene asset scopes from a
-validated local disc session. Public audio remains disabled.
+validated local disc session. That checkpoint's public audio was disabled.
 
 Both Release builds and the local 1,099-test suite pass (374.968 seconds,
 41 explicit skips). The subsequent Donkey restriction passes 26 focused menu
@@ -44,9 +58,13 @@ controls with reduced duplicate callback logging pass the same route and 120
 further CSS ticks without a resume; the final control verifies hidden loading
 panels. These lifecycle checks do not establish performance or complete-game
 acceptance.
-The candidate has not been merged or deployed. Final pushed-head GitHub checks
-are the merge gate; see the [release checkpoint](docs/PRODUCTION_CHECKPOINT_20260920.md)
-and [hash-bound receipt](docs/evidence/production-checkpoint-20260920-v1.json).
+PR #49 merged as `979fd09` and its exact staging-tested package was deployed to
+[production](https://bed694b0.webmelee.pages.dev). Both the immutable origin and
+webmelee.gg passed exact resource/header/route checks and ten public browser
+checks each. The owner also tested staging and reported multi-CPU loading lag
+as follow-up work. See the [release record on PR #49](https://github.com/ericvanlare/melee-web/pull/49),
+[release checkpoint](docs/PRODUCTION_CHECKPOINT_20260920.md) and
+[hash-bound receipt](docs/evidence/production-checkpoint-20260920-v1.json).
 
 The subsequent PR review's two P3 findings are corrected: reports reject
 untracked original-source files, and Fountain's music tuple matches its authored

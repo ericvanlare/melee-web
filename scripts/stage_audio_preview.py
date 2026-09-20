@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Prepare, audit and HTTP-verify a separate audio-enabled staging preview.
+"""Prepare, audit and HTTP-verify the explicit audio-enabled release graph.
 
-This schema is deliberately not accepted by the silent production packager or
-staging deployment wrapper. Only an explicit file inventory is uploaded; the
-producer identity and manifest remain outside the upload directory.
+This entry point remains staging-only. release_audio_player.py selects the
+production package policy while reusing the same source-bound native producer.
+Neither schema is accepted by the legacy silent packager. Only the explicit
+file inventory is uploaded; producer identities and manifests stay outside it.
 """
 import argparse
 import hashlib
@@ -18,6 +19,7 @@ import verify_public_http as http
 
 ROOT = Path(__file__).resolve().parents[1]
 SCHEMA = 'melee-web-audio-preview-package-v1'
+PRODUCTION_SCHEMA = 'melee-web-audio-player-package-v1'
 BUILD_DIR = 'build/browser-audio-preview-release'
 IDENTITY = 'build/runtime-audio-preview-identity.json'
 NATIVE = tuple('gameplay_audio_preview.' + ext for ext in ('js', 'wasm', 'data'))
@@ -93,21 +95,23 @@ def player_html(text):
     return replace_once(text, 'Audio is disabled in this alpha. ', '')
 
 
-def notices(text):
+def notices(text, *, production=False):
     # Preserve the surrounding contact/rights and dependency notices, while
     # replacing paragraphs that describe a different, deliberately silent build.
     paragraphs = {
         '<p>When the player is available, the current prototype supports':
-            '<p>This staging preview enables the replacement audio implementations for listening tests. '
+            ('<p>This public alpha enables music and sound effects using the replacement audio implementations. '
+             if production else '<p>This staging preview enables the replacement audio implementations for listening tests. ') +
             'It is experimental: complete original-game accuracy, audio fidelity, all content, '
             'mobile support and full performance are not claimed.</p>',
         '<h2>What the public artifact contains</h2><p>':
-            '<h2>What this preview contains</h2><p>The package contains the compiled player, '
+            ('<h2>What the public artifact contains</h2><p>' if production else
+             '<h2>What this preview contains</h2><p>') + 'The package contains the compiled player, '
             'replacement resampler and coefficient generator, browser audio transport and generated '
             'renderer pipeline data. The selected disc and its extracted audio stay in the browser; '
             'no game image, extracted archive or recording is hosted.</p>',
         '<li><strong>Dolphin-derived audio:</strong>':
-            '<li><strong>Replacement audio:</strong> this preview uses newly authored implementations '
+            '<li><strong>Replacement audio:</strong> this player uses newly authored implementations '
             'that preserve the previous port behavior. The coefficient table retains numerical parameters '
             'and 20 compatibility values from Dolphin revision '
             '<code>a2efdf1197be8132674b90fe9cf4761df39752ed</code>. Data provenance and licensing review '
@@ -126,12 +130,13 @@ def notices(text):
     return text
 
 
-def license_notice(text):
+def license_notice(text, *, production=False):
     start = text.index('Public alpha profile\n')
     end = text.index('The aggregate delivers license', start)
     text = text[:start] + (
-        'Audio staging preview\n---------------------\n'
-        'This preview enables the replacement audio implementations and browser transport.\n'
+        ('Audio-enabled public alpha\n--------------------------\n' if production else
+         'Audio staging preview\n---------------------\n') +
+        'This player enables the replacement audio implementations and browser transport.\n'
         'The coefficient table retains Dolphin-derived numerical parameters and 20\n'
         'compatibility values. Provenance/licensing review remains open. This record\n'
         'makes no hardware accuracy, formal clean-room or licensing-clearance claim.\n\n') + text[end:]
@@ -149,13 +154,16 @@ def license_notice(text):
     return text
 
 
-def expected_files():
+def expected_files(*, production=False):
+    mode = 'production' if production else 'preview'
     files, identity_hash = runtime()
     files.update({name: read(ROOT / 'web' / name) for name in MODULES})
     shell = read(ROOT / 'web/player/player-shell.mjs').decode()
     files['player/player-shell.mjs'] = replace_once(
         shell, "from '../melee-runtime.mjs'", "from '../audio-preview-runtime.mjs'").encode()
     files['player/player.css'] = read(ROOT / 'web/player/player.css')
+    if production:
+        public._validate_runtime_graph(files, audio=True)
     for name, data in files.items():
         require(len(data) <= public.MAX_FILE_BYTES, f'Asset exceeds Pages limit: {name}')
         require(not any(marker in data for marker in (
@@ -172,16 +180,19 @@ def expected_files():
         if name == 'index.html':
             text = player_html(text)
         elif name == 'notices.html':
-            text = notices(text)
+            text = notices(text, production=production)
         output[name] = public._replace_html(
             text.encode(), OPERATOR, CONTACT,
             f'/runtime/{group}/player/player.css' if name == 'index.html' else '/' + css_path,
-            f'/runtime/{group}/player/player-shell.mjs', 'preview')
-    output['licenses/runtime-third-party.txt'] = license_notice(read(ROOT / public.LEGAL_NOTICE_SOURCE).decode()).encode()
+            f'/runtime/{group}/player/player-shell.mjs', mode)
+    output['licenses/runtime-third-party.txt'] = license_notice(
+        read(ROOT / public.LEGAL_NOTICE_SOURCE).decode(), production=production).encode()
     output['licenses/dolphin-gpl-2.0-or-later.txt'] = read(ROOT / 'docs/licenses/dolphin-gpl-2.0-or-later.txt')
-    output['_headers'] = public._headers('preview', False, 'player').encode()
-    output['_redirects'] = b'# Audio listening preview only. No host redirects.\n'
-    output['robots.txt'] = public._robots('preview', False).encode()
+    output['_headers'] = public._headers(mode, False, 'player').encode()
+    output['_redirects'] = (public._redirects(mode).encode() if production else
+                            b'# Audio listening preview only. No host redirects.\n')
+    output['robots.txt'] = public._robots(mode, False).encode()
+    require(all(len(data) <= public.MAX_FILE_BYTES for data in output.values()), 'Audio package asset exceeds Pages limit')
     require(sum(map(len, output.values())) <= public.RUNTIME_MAX_TOTAL_BYTES, 'Preview exceeds size limit')
     return output, {'source_sha': source_commit(), 'runtime_hash': group, 'identity_sha256': identity_hash}
 
@@ -190,57 +201,107 @@ def inventory(files):
     return [{'path': name, 'size': len(data), 'sha256': digest(data)} for name, data in sorted(files.items())]
 
 
-def audit(output, manifest):
-    require(output.is_dir() and not output.is_symlink(), 'Missing preview directory')
-    expected, meta = expected_files()
-    actual = {}
-    for path in output.rglob('*'):
-        require(not path.is_symlink(), 'Symlink in preview')
-        if path.is_file():
-            actual[path.relative_to(output).as_posix()] = path.read_bytes()
-    require(actual == expected, 'Preview bytes or inventory differ from reviewed sources')
-    record = json.loads(manifest.read_bytes())
-    require(record == {'schema': SCHEMA, 'project': 'webmelee-staging', 'profile': 'audio-preview',
-                       **meta, 'files': inventory(expected)}, 'Preview manifest mismatch')
+def read_manifest(path):
+    require(path.is_file() and not path.is_symlink(), 'Manifest must be a regular file')
+    record = json.loads(path.read_bytes(), object_pairs_hook=public._unique_object)
+    require(isinstance(record, dict), 'Manifest must be an object')
     return record
 
 
-def prepare(output, manifest):
-    require(not output.exists() and not output.is_symlink() and not manifest.exists(), 'Use fresh output paths')
+def package_record(files, meta, *, production=False):
+    return {'schema': PRODUCTION_SCHEMA if production else SCHEMA,
+            'project': 'webmelee' if production else 'webmelee-staging',
+            'profile': 'audio-player' if production else 'audio-preview',
+            **meta, 'files': inventory(files)}
+
+
+def audit(output, manifest, *, production=False):
+    require(output.is_dir() and not output.is_symlink(), 'Missing preview directory')
+    expected, meta = expected_files(production=production)
+    actual = {}
+    for path in output.rglob('*'):
+        require(not path.is_symlink(), 'Symlink in preview')
+        require(path.is_file() or path.is_dir(), 'Non-file entry in audio package')
+        if path.is_file():
+            actual[path.relative_to(output).as_posix()] = path.read_bytes()
+    require(actual == expected, 'Preview bytes or inventory differ from reviewed sources')
+    record = read_manifest(manifest)
+    require(record == package_record(expected, meta, production=production), 'Audio manifest mismatch')
+    return record
+
+
+def prepare(output, manifest, *, production=False):
+    require(not output.exists() and not output.is_symlink() and not manifest.exists() and
+            not manifest.is_symlink(), 'Use fresh output paths')
     require(not manifest.resolve().is_relative_to(output.resolve()), 'Manifest must remain outside upload')
-    files, meta = expected_files()
+    files, meta = expected_files(production=production)
     output.mkdir(parents=True)
     for name, data in files.items():
         path = output / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
-    manifest.write_text(json.dumps({'schema': SCHEMA, 'project': 'webmelee-staging', 'profile': 'audio-preview',
-                                   **meta, 'files': inventory(files)}, indent=2, sort_keys=True) + '\n')
-    return audit(output, manifest)
+    manifest.write_text(json.dumps(package_record(files, meta, production=production),
+                                   indent=2, sort_keys=True) + '\n')
+    return audit(output, manifest, production=production)
 
 
-def verify(origin, manifest):
-    require(re.fullmatch(r'https://[a-z0-9-]+\.webmelee-staging\.pages\.dev', origin) or
-            re.fullmatch(r'http://(?:127\.0\.0\.1|localhost):\d+', origin),
-            'Audio verification is restricted to staging previews or loopback')
-    record = json.loads(manifest.read_bytes())
-    require(record.get('schema') == SCHEMA and record.get('project') == 'webmelee-staging', 'Wrong preview manifest')
+def verify(origin, manifest, *, production=False):
+    loopback = bool(re.fullmatch(r'http://(?:127\.0\.0\.1|localhost):\d+', origin or ''))
+    allowed = (origin == 'https://webmelee.gg' or
+               re.fullmatch(r'https://[0-9a-f]{8}\.webmelee\.pages\.dev', origin or '') or
+               origin == 'https://webmelee-staging.pages.dev' or
+               re.fullmatch(r'https://[0-9a-f]{8}\.webmelee-staging\.pages\.dev', origin or '')) if production else \
+              re.fullmatch(r'https://[a-z0-9-]+\.webmelee-staging\.pages\.dev', origin or '')
+    require(allowed or loopback, 'Audio verification is restricted to the selected release origins or loopback')
+    record = read_manifest(manifest)
+    require(record.get('schema') == (PRODUCTION_SCHEMA if production else SCHEMA) and
+            record.get('project') == ('webmelee' if production else 'webmelee-staging') and
+            record.get('profile') == ('audio-player' if production else 'audio-preview'), 'Wrong audio manifest')
+    group = record.get('runtime_hash', '')
+    require(re.fullmatch(r'[0-9a-f]{16}', group or '') and
+            re.fullmatch(r'[0-9a-f]{40}', record.get('source_sha', '') or '') and
+            re.fullmatch(r'[0-9a-f]{64}', record.get('identity_sha256', '') or ''), 'Invalid audio manifest identity')
+    records = record.get('files', [])
+    require(isinstance(records, list) and all(isinstance(item, dict) for item in records), 'Invalid audio inventory')
+    paths = [item.get('path') for item in records]
+    require(all(isinstance(name, str) for name in paths) and len(paths) == len(set(paths)), 'Invalid audio inventory paths')
+    expected_paths = {f'runtime/{group}/{name}' for name in (*MODULES, *NATIVE, 'player/player-shell.mjs', 'player/player.css')}
+    expected_paths.update((*public.HTML_INPUTS, '_headers', '_redirects', 'robots.txt',
+                           'licenses/runtime-third-party.txt', 'licenses/dolphin-gpl-2.0-or-later.txt'))
+    css_paths = [name for name in paths if re.fullmatch(r'assets/site\.[0-9a-f]{16}\.css', name)]
+    require(len(css_paths) == 1 and set(paths) == expected_paths | set(css_paths), 'Unauthorized audio inventory')
+    require(all(type(item.get('size')) is int and 0 <= item['size'] <= public.MAX_FILE_BYTES and
+                re.fullmatch(r'[0-9a-f]{64}', item.get('sha256', '') or '') for item in records), 'Invalid audio inventory hashes or sizes')
+    require(sum(item['size'] for item in records) <= public.RUNTIME_MAX_TOTAL_BYTES, 'Audio inventory exceeds size limit')
     checked = []
-    for item in record['files']:
+    for item in records:
         if item['path'] in ('_headers', '_redirects'):
             continue
         http.check_resource(origin, '/' + item['path'], item, True, 'player')
         checked.append(item['path'])
-    for path in (*http.BLOCKED_PATHS, '/manifest.json', '/runtime-audio-preview-identity.json', '/src/'):
-        status, headers, _, destination = http.get(origin + path)
+    by_path = {item['path']: item for item in records}
+    aliases = [http.check_resource(origin, route, by_path[name], True, 'player')
+               for route, name in (('/', 'index.html'), ('/terms', 'terms.html'), ('/privacy', 'privacy.html'),
+                                   ('/copyright', 'copyright.html'), ('/notices', 'notices.html'))]
+    missing, limitations = [], []
+    maps = tuple('/' + name + '.map' for name in paths if name.endswith(('.wasm', '.js', '.mjs')))
+    for path in (*http.BLOCKED_PATHS, '/manifest.json', '/runtime-audio-preview-identity.json', '/src/',
+                 f'/runtime/{group}/dsp_coef.bin', f'/runtime/{group}/runtime-diagnostics.mjs', *maps):
+        status, headers, body, destination = http.get(origin + path)
         http.check_destination(origin, destination, {path})
+        if loopback and path in ('/_headers', '/_redirects') and status == 502 and b'ENOTDIR' in body:
+            limitations.append({'path': path, 'status': status, 'reason': 'Local Wrangler reserved-config routing error; hosted verification requires 404'})
+            continue
         require(status == 404, f'Unexpected exposed route: {path}')
         require('noindex' in headers.get('X-Robots-Tag', ''), 'Missing preview noindex on 404')
-    return {'result': 'pass', 'origin': origin, 'source_sha': record['source_sha'], 'resources': checked,
+        missing.append({'path': path, 'status': status})
+    return {'result': 'pass', 'origin': origin, 'source_sha': record['source_sha'],
+            'manifest_sha256': digest(manifest.read_bytes()), 'resources': checked,
+            'aliases': aliases, 'missing': missing, 'local_limitations': limitations,
             'scope': 'Hosted bytes, headers and missing routes; browser audio checked separately.'}
 
 
-def main():
+def main(*, production=False):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('action', choices=('prepare', 'audit', 'verify'))
     parser.add_argument('--output', type=Path)
@@ -249,10 +310,10 @@ def main():
     parser.add_argument('--report', type=Path)
     args = parser.parse_args()
     if args.action == 'verify':
-        result = verify(args.url, args.manifest)
+        result = verify(args.url, args.manifest, production=production)
     else:
         require(args.output is not None, '--output is required')
-        result = (prepare if args.action == 'prepare' else audit)(args.output, args.manifest)
+        result = (prepare if args.action == 'prepare' else audit)(args.output, args.manifest, production=production)
     if args.report:
         with args.report.open('x') as stream:
             json.dump(result, stream, indent=2, sort_keys=True)

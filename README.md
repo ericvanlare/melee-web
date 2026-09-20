@@ -57,13 +57,16 @@ validation, and do not call a partial browser route tournament-ready.
 
 ## Public packaging
 
-The public alpha is a separate Release build with its own audited source graph
-and deliberately disabled audio. Follow [public release review](docs/PUBLIC_RELEASE_REVIEW.md)
-and [public deployment](docs/PUBLIC_DEPLOYMENT.md) for packaging or deployment;
-those documents do not widen gameplay acceptance.
+The public release has two separate audited Release profiles: `audio-player`
+for the authorized production-audio path and `player` as the silent rollback
+identity. The audio profile has a source-bound package and byte-preserving
+promotion path; see [production audio](docs/AUDIO_PRODUCTION.md), [public release review](docs/PUBLIC_RELEASE_REVIEW.md)
+and [public deployment](docs/PUBLIC_DEPLOYMENT.md). These documents do not
+widen gameplay acceptance or substitute for the release receipt.
 The [development audio replacement record](docs/AUDIO_REPLACEMENT_EVIDENCE.md)
 tracks implementation provenance, compatibility checks and remaining accuracy
-limits; it does not enable public audio.
+limits, while the [audio listening preview](docs/AUDIO_PREVIEW.md) links the
+bounded PR #42 browser evidence.
 
 This project is independent of Nintendo, doldecomp and Aurora. Preserve upstream
 source provenance and notices; see [third-party notices](THIRD_PARTY.md).
