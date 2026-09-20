@@ -39,6 +39,9 @@ _SHA_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 _ATTEMPT_STATUSES = frozenset(
     {"completed", "aborted", "crashed", "interrupted", "timeout"}
 )
+_PLAN_ROLES = frozenset({"development", "holdout"})
+_APPROVAL_SCOPE_SCHEMA = "melee-web-approved-holdout-scope"
+_DERIVED_SCOPE_SCHEMA = "melee-web-hitch-acceptance-scope"
 
 
 class HitchCaptureError(ValueError):
@@ -310,18 +313,44 @@ def _normalize_artifacts(value: Any, *, base: Path) -> list[dict[str, str]]:
     return result
 
 
-def _normalize_allowlist(value: Any) -> list[str]:
+def _normalize_allowlist(value: Any, *, key: str = "development_allowlist") -> list[str]:
     _require(isinstance(value, list) and value,
-             "development_allowlist must be an explicit non-empty list")
+             f"{key} must be an explicit non-empty list")
     result: list[str] = []
     for index, item in enumerate(value):
         target_id = item.get("id") if isinstance(item, Mapping) else item
         _require(isinstance(target_id, str) and target_id,
-                 f"development_allowlist[{index}] must be a target id")
+                 f"{key}[{index}] must be a target id")
         _require(target_id not in result,
-                 f"development_allowlist contains duplicate target {target_id}")
+                 f"{key} contains duplicate target {target_id}")
         result.append(target_id)
     return result
+
+
+def _normalize_role(value: Any) -> str:
+    _require(isinstance(value, str) and value in _PLAN_ROLES,
+             "role must be development or holdout")
+    return value
+
+
+def _validate_target_roles(targets: Any, *, role: str) -> None:
+    _require(isinstance(targets, list) and targets, "targets must be a non-empty list")
+    declared: list[str] = []
+    for index, target in enumerate(targets):
+        _require(isinstance(target, Mapping), f"targets[{index}] must be an object")
+        target_role = target.get("role")
+        if target_role is None:
+            continue
+        _require(target_role in _PLAN_ROLES,
+                 f"targets[{index}].role must be development or holdout")
+        declared.append(target_role)
+    _require(len(set(declared)) <= 1, "targets contain mixed roles")
+    if role == "holdout":
+        _require(len(declared) == len(targets) and declared[0] == "holdout",
+                 "holdout plans require every target to declare role holdout")
+    else:
+        _require("holdout" not in declared,
+                 "development plans cannot include holdout targets")
 
 
 def _normalize_targets(value: Any) -> list[dict[str, Any]]:
@@ -391,13 +420,13 @@ def _slot_id(value: Any, ordinal: int) -> str:
 
 
 def _build_slots(spec: Mapping[str, Any], targets: list[dict[str, Any]],
-                 allowlist: list[str]) -> list[dict[str, Any]]:
+                 allowlist: list[str], *, allowlist_key: str = "development_allowlist") -> list[dict[str, Any]]:
     target_ids = [target["id"] for target in targets]
     target_by_id = {target["id"]: target for target in targets}
     allowed_modes = _normalize_modes(spec.get("modes"))
     allowed_caches = _normalize_caches(spec.get("caches"))
     _require(set(target_ids) <= set(allowlist),
-             "Every target must be explicitly present in development_allowlist")
+             f"Every target must be explicitly present in {allowlist_key}")
     target_set = set(target_ids)
     supplied_slots = spec.get("slots")
     matrix_cells = spec.get("matrix") if supplied_slots is None else None
@@ -413,7 +442,7 @@ def _build_slots(spec: Mapping[str, Any], targets: list[dict[str, Any]],
             _require(isinstance(target_id, str) and target_id in target_set,
                      f"slots[{index}] names an unknown target")
             _require(target_id in allowlist,
-                     f"slot {slot['slot_id']} target is not in development_allowlist")
+                     f"slot {slot['slot_id']} target is not in {allowlist_key}")
             slot["target_id"] = target_id
             if "frames" not in slot:
                 if "frames" in target_by_id[target_id]:
@@ -452,7 +481,7 @@ def _build_slots(spec: Mapping[str, Any], targets: list[dict[str, Any]],
             _require(cache in allowed_caches, f"matrix[{cell_index}] uses an unfrozen cache")
             for target_id in raw_targets:
                 _require(target_id in target_set and target_id in allowlist,
-                         f"matrix[{cell_index}] names a target outside the development allowlist")
+                         f"matrix[{cell_index}] names a target outside the {allowlist_key}")
                 for repetition in range(1, repetitions + 1):
                     raw_slots.append({
                         "target_id": target_id,
@@ -503,37 +532,107 @@ def _build_slots(spec: Mapping[str, Any], targets: list[dict[str, Any]],
 
 
 def _normalize_recipe_identities(value: Any, *, base: Path,
-                                 allowlist: list[str]) -> dict[str, dict[str, str]]:
+                                 allowlist: list[str], key: str = "development_recipes") -> dict[str, dict[str, str]]:
     _require(isinstance(value, Mapping),
-             "identities.development_recipes must map target ids to files")
+             f"identities.{key} must map target ids to files")
     result: dict[str, dict[str, str]] = {}
     for target_id in allowlist:
         raw = value.get(target_id)
         _require(raw is not None,
-                 f"Missing development recipe identity for target {target_id}")
+                 f"Missing {key} identity for target {target_id}")
         result[target_id] = _identity(raw, base=base,
-                                      context=f"development_recipes[{target_id}]")
+                                      context=f"{key}[{target_id}]")
     return result
+
+
+def _normalize_identity_list(value: Any, *, base: Path, key: str,
+                             required: bool = False) -> list[dict[str, str]]:
+    if value is None:
+        value = []
+    _require(isinstance(value, list), f"{key} must be a list")
+    if required:
+        _require(value, f"{key} must retain at least one hashed context record")
+    return [_identity(item, base=base, context=f"{key}[{index}]")
+            for index, item in enumerate(value)]
+
+
+def _normalize_acceptance_scope(value: Any, *, base: Path) -> dict[str, Any]:
+    _require(isinstance(value, Mapping),
+             "holdout plans require an explicit acceptance_scope record")
+    record = value.get("record")
+    decision = value.get("decision")
+    approved_by = value.get("approved_by")
+    _require(decision == "proceed",
+             "acceptance_scope.decision must be proceed")
+    _require(approved_by == "owner",
+             "acceptance_scope.approved_by must be owner")
+    record_identity = _identity(record, base=base, context="acceptance_scope.record")
+    _validate_acceptance_scope_record(record_identity, approved_by)
+    return {
+        "record": record_identity,
+        "decision": decision,
+        "approved_by": approved_by,
+    }
+
+
+def _validate_acceptance_scope_record(record_identity: Mapping[str, Any], approved_by: str) -> None:
+    record_value, _ = _read_json(record_identity["path"])
+    _require(isinstance(record_value, Mapping),
+             "acceptance_scope.record must contain a structured JSON receipt")
+    schema = record_value.get("schema")
+    if schema == _APPROVAL_SCOPE_SCHEMA:
+        approval = record_value.get("approval")
+        _require(record_value.get("version") == 1 and isinstance(approval, Mapping)
+                 and approval.get("user_message") == "proceed"
+                 and approval.get("decision") == "approved",
+                 "acceptance_scope.record does not contain an approved proceed decision")
+    elif schema == _DERIVED_SCOPE_SCHEMA:
+        _require(record_value.get("version") == 1
+                 and record_value.get("decision") == "proceed"
+                 and record_value.get("approved_by") == approved_by,
+                 "acceptance_scope.record decision does not match its authorization")
+    else:
+        _require(False, "acceptance_scope.record has an unsupported schema")
 
 
 def _normalize_plan(spec: Mapping[str, Any], *, spec_path: Path,
                     output_path: Path) -> dict[str, Any]:
-    allowlist = _normalize_allowlist(spec.get("development_allowlist"))
+    role = _normalize_role(spec.get("role", "development"))
+    if role == "development":
+        _require(spec.get("holdout_allowlist") in (None, []),
+                 "development plans cannot declare holdout_allowlist")
+        allowlist_key = "development_allowlist"
+        recipe_key = "development_recipes"
+        allowlist = _normalize_allowlist(spec.get(allowlist_key), key=allowlist_key)
+    else:
+        _require(spec.get("development_allowlist") in (None, []),
+                 "holdout plans cannot declare development_allowlist")
+        allowlist_key = "holdout_allowlist"
+        recipe_key = "holdout_recipes"
+        allowlist = _normalize_allowlist(spec.get(allowlist_key), key=allowlist_key)
     targets = _normalize_targets(spec.get("targets"))
+    _validate_target_roles(targets, role=role)
     target_ids = {target["id"] for target in targets}
     _require(set(allowlist) <= target_ids,
-             "development_allowlist names a target absent from targets")
-    slots = _build_slots(spec, targets, allowlist)
+             f"{allowlist_key} names a target absent from targets")
+    slots = _build_slots(spec, targets, allowlist, allowlist_key=allowlist_key)
 
     identities_raw = spec.get("identities")
     if identities_raw is None:
         identities_raw = {
             "build_artifacts": spec.get("build_artifacts"),
             "profile": spec.get("profile"),
-            "development_recipes": spec.get("development_recipes"),
+            recipe_key: spec.get(recipe_key),
             "legacy_red_reports": spec.get("legacy_red_reports", []),
+            "historical_context": spec.get("historical_context", []),
         }
     _require(isinstance(identities_raw, Mapping), "identities must be an object")
+    if role == "development":
+        _require(identities_raw.get("holdout_recipes") in (None, {}),
+                 "development plans cannot declare holdout_recipes")
+    else:
+        _require(identities_raw.get("development_recipes") in (None, {}),
+                 "holdout plans cannot declare development_recipes")
     build_artifacts = _normalize_artifacts(
         identities_raw.get("build_artifacts"), base=spec_path.parent
     )
@@ -541,16 +640,42 @@ def _normalize_plan(spec: Mapping[str, Any], *, spec_path: Path,
         identities_raw.get("profile"), base=spec_path.parent, context="profile"
     )
     recipes = _normalize_recipe_identities(
-        identities_raw.get("development_recipes"),
+        identities_raw.get(recipe_key),
         base=spec_path.parent,
         allowlist=allowlist,
+        key=recipe_key,
     )
     raw_reds = identities_raw.get("legacy_red_reports", [])
     _require(isinstance(raw_reds, list), "legacy_red_reports must be a list")
+    if role == "holdout":
+        _require(not raw_reds,
+                 "holdout plans must keep legacy red reports in historical_context")
     red_reports = [
         _identity(value, base=spec_path.parent, context=f"legacy_red_reports[{index}]")
         for index, value in enumerate(raw_reds)
     ]
+    historical_context = _normalize_identity_list(
+        identities_raw.get("historical_context"), base=spec_path.parent,
+        key="historical_context", required=role == "holdout"
+    )
+    if role == "development":
+        _require(not historical_context,
+                 "development plans cannot declare historical_context")
+        acceptance_scope = None
+        _require(spec.get("acceptance_scope") in (None, {}),
+                 "development plans cannot declare acceptance_scope")
+        _require(identities_raw.get("acceptance_scope") in (None, {}),
+                 "development plans cannot declare acceptance_scope")
+    else:
+        raw_scope = spec.get("acceptance_scope")
+        identity_scope = identities_raw.get("acceptance_scope")
+        if raw_scope is not None and identity_scope is not None:
+            _require(raw_scope == identity_scope,
+                     "acceptance_scope differs between plan and identities")
+        acceptance_scope = _normalize_acceptance_scope(
+            raw_scope if raw_scope is not None else identity_scope,
+            base=spec_path.parent,
+        )
 
     timeout_ms = spec.get("timeout_ms", DEFAULT_TIMEOUT_MS)
     _require(type(timeout_ms) is int and timeout_ms > 0,
@@ -582,11 +707,12 @@ def _normalize_plan(spec: Mapping[str, Any], *, spec_path: Path,
     plan = {
         "schema": PLAN_SCHEMA,
         "version": PLAN_VERSION,
+        "role": role,
         "plan_id": str(spec.get("plan_id") or uuid.uuid4()),
         "created_at": _utc_now(),
         "attempts_dir": attempts_dir_value,
         "timeout_ms": timeout_ms,
-        "development_allowlist": allowlist,
+        allowlist_key: allowlist,
         "targets": targets,
         "modes": _normalize_modes(spec.get("modes")),
         "caches": _normalize_caches(spec.get("caches")),
@@ -595,8 +721,10 @@ def _normalize_plan(spec: Mapping[str, Any], *, spec_path: Path,
         "identities": {
             "build_artifacts": build_artifacts,
             "profile": profile,
-            "development_recipes": recipes,
+            recipe_key: recipes,
             "legacy_red_reports": red_reports,
+            "historical_context": historical_context,
+            "acceptance_scope": acceptance_scope,
         },
         "slots": slots,
     }
@@ -608,17 +736,24 @@ def _validate_plan(plan: Any) -> None:
     _require(isinstance(plan, Mapping), "Plan must be an object")
     _require(plan.get("schema") == PLAN_SCHEMA and plan.get("version") == PLAN_VERSION,
              "Unsupported hitch plan schema")
+    role = _normalize_role(plan.get("role", "development"))
     _require(isinstance(plan.get("plan_id"), str) and plan["plan_id"],
              "Plan id is required")
-    allowlist = plan.get("development_allowlist")
+    allowlist_key = "development_allowlist" if role == "development" else "holdout_allowlist"
+    other_allowlist_key = "holdout_allowlist" if role == "development" else "development_allowlist"
+    allowlist = plan.get(allowlist_key)
     _require(isinstance(allowlist, list) and allowlist,
-             "Plan has no explicit development allowlist")
+             f"Plan has no explicit {allowlist_key}")
     _require(all(isinstance(value, str) and value for value in allowlist)
              and len(set(allowlist)) == len(allowlist),
-             "Plan development allowlist is malformed")
+             f"Plan {allowlist_key} is malformed")
+    _require(plan.get(other_allowlist_key) in (None, []),
+             f"{role} plan cannot include {other_allowlist_key}")
     _require(isinstance(plan.get("slots"), list) and plan["slots"],
              "Plan has no frozen slots")
     modes = plan.get("modes")
+    if role == "holdout":
+        _require(modes == ["unprofiled"], "holdout acceptance requires only unprofiled slots")
     caches = plan.get("caches")
     _require(isinstance(modes, list) and modes and
              all(isinstance(value, str) and value for value in modes) and
@@ -646,6 +781,7 @@ def _validate_plan(plan: Any) -> None:
     ids = set()
     target_ids = {item.get("id") for item in plan.get("targets", [])
                   if isinstance(item, Mapping)}
+    _validate_target_roles(plan.get("targets"), role=role)
     for index, slot in enumerate(plan["slots"]):
         _require(isinstance(slot, Mapping), f"Plan slot {index} is not an object")
         slot_id = slot.get("slot_id")
@@ -657,7 +793,7 @@ def _validate_plan(plan: Any) -> None:
                  f"Plan slot {slot_id} ordinal is not sequential")
         target_id = slot.get("target_id")
         _require(target_id in target_ids and target_id in set(allowlist),
-                 f"Plan slot {slot_id} is outside the development allowlist")
+                 f"Plan slot {slot_id} is outside the {allowlist_key}")
         _require(slot.get("mode") in modes,
                  f"Plan slot {slot_id} uses an unfrozen mode")
         _require(slot.get("cache") in caches,
@@ -675,10 +811,38 @@ def _validate_plan(plan: Any) -> None:
     _require(isinstance(identities.get("build_artifacts"), list)
              and identities["build_artifacts"], "Plan build artifact identities are missing")
     _require(isinstance(identities.get("profile"), Mapping), "Plan profile identity is missing")
-    _require(isinstance(identities.get("development_recipes"), Mapping),
-             "Plan development recipe identities are missing")
+    recipe_key = "development_recipes" if role == "development" else "holdout_recipes"
+    other_recipe_key = "holdout_recipes" if role == "development" else "development_recipes"
+    recipes = identities.get(recipe_key)
+    _require(isinstance(recipes, Mapping),
+             f"Plan {recipe_key} identities are missing")
+    _require(set(recipes) == set(allowlist),
+             f"Plan {recipe_key} identities must exactly match {allowlist_key}")
+    _require(identities.get(other_recipe_key) in (None, {}),
+             f"{role} plan cannot include {other_recipe_key}")
     _require(isinstance(identities.get("legacy_red_reports"), list),
              "Plan legacy red identities are missing")
+    historical_context = identities.get("historical_context", [])
+    _require(isinstance(historical_context, list),
+             "Plan historical context identities are missing")
+    if role == "development":
+        _require(not historical_context,
+                 "development plans cannot declare historical_context")
+        _require(identities.get("acceptance_scope") in (None, {}),
+                 "development plans cannot declare acceptance_scope")
+    else:
+        _require(not identities["legacy_red_reports"],
+                 "holdout plans must keep legacy red reports in historical_context")
+        _require(historical_context,
+                 "holdout plans must retain historical context identities")
+        scope = identities.get("acceptance_scope")
+        _require(isinstance(scope, Mapping),
+                 "holdout plans require an acceptance_scope identity")
+        _require(scope.get("decision") == "proceed"
+                 and scope.get("approved_by") == "owner",
+                 "holdout acceptance_scope is not owner-approved")
+        _require(isinstance(scope.get("record"), Mapping),
+                 "holdout acceptance_scope record identity is missing")
 
 
 def _verify_identity(identity: Mapping[str, Any], context: str) -> None:
@@ -693,13 +857,22 @@ def _verify_identity(identity: Mapping[str, Any], context: str) -> None:
 
 def _verify_plan_identities(plan: Mapping[str, Any]) -> None:
     identities = plan["identities"]
+    role = _normalize_role(plan.get("role", "development"))
     for index, identity in enumerate(identities["build_artifacts"]):
         _verify_identity(identity, f"build_artifacts[{index}]")
     _verify_identity(identities["profile"], "profile")
-    for target_id, identity in identities["development_recipes"].items():
-        _verify_identity(identity, f"development_recipes[{target_id}]")
+    recipe_key = "development_recipes" if role == "development" else "holdout_recipes"
+    for target_id, identity in identities[recipe_key].items():
+        _verify_identity(identity, f"{recipe_key}[{target_id}]")
     for index, identity in enumerate(identities["legacy_red_reports"]):
         _verify_identity(identity, f"legacy_red_reports[{index}]")
+    for index, identity in enumerate(identities.get("historical_context", [])):
+        _verify_identity(identity, f"historical_context[{index}]")
+    if role == "holdout":
+        _verify_identity(identities["acceptance_scope"]["record"],
+                         "acceptance_scope.record")
+        _validate_acceptance_scope_record(identities["acceptance_scope"]["record"],
+                                          identities["acceptance_scope"]["approved_by"])
 
 
 def load_plan(plan_path: str | os.PathLike[str], *, verify: bool = True) -> tuple[dict[str, Any], str]:
@@ -837,6 +1010,7 @@ def begin_attempt(plan_path: str | os.PathLike[str], slot_id: str,
         "version": RECORD_VERSION,
         "plan_id": plan["plan_id"],
         "plan_sha256": plan_digest,
+        "role": plan.get("role", "development"),
         "slot_id": slot_id,
         "ordinal": slot["ordinal"],
         "target_id": slot["target_id"],
@@ -1001,7 +1175,7 @@ def _attachment_spec(value: Any, index: int) -> tuple[Path, str]:
 
 
 def _validate_browser_report(report: Any, plan: Mapping[str, Any],
-                            slot: Mapping[str, Any]) -> dict[str, Any]:
+                             slot: Mapping[str, Any]) -> dict[str, Any]:
     """Validate report identity and the existing browser gate when possible.
 
     A bad report is still retained as evidence.  ``valid`` only controls the
@@ -1012,6 +1186,8 @@ def _validate_browser_report(report: Any, plan: Mapping[str, Any],
     if not isinstance(report, Mapping):
         return {"valid": False, "errors": ["report is not a JSON object"],
                 "validator": "browser_replay_validation.validate_report"}
+    role = _normalize_role(plan.get("role", "development"))
+    recipe_key = "development_recipes" if role == "development" else "holdout_recipes"
     target_id = slot["target_id"]
     if "page_paint" in slot:
         paint = report.get("diagnostic_page_paint")
@@ -1021,9 +1197,9 @@ def _validate_browser_report(report: Any, plan: Mapping[str, Any],
             errors.append("report page-paint condition does not match the frozen slot")
         if slot["page_paint"] == "hidden":
             errors.append("hidden page-paint slot is diagnostic only, not normal-page acceptance")
-    expected_recipe = plan["identities"]["development_recipes"][target_id]["sha256"]
+    expected_recipe = plan["identities"][recipe_key][target_id]["sha256"]
     if report.get("recipe_sha256") != expected_recipe:
-        errors.append("report recipe_sha256 does not match the frozen development recipe")
+        errors.append("report recipe_sha256 does not match the frozen recipe")
     expected_frames = slot.get("frames")
     if expected_frames is None:
         target = next((value for value in plan["targets"] if value.get("id") == target_id), {})
@@ -1154,12 +1330,7 @@ def finish_attempt(plan_path: str | os.PathLike[str], slot_id: str, *,
     if start_path.exists():
         _require(start_path.is_file(), f"Slot {slot_id} start record is not a file")
         start, _ = _read_sealed(start_path, START_SCHEMA, f"slot {slot_id} start")
-        _require(start.get("plan_id") == plan["plan_id"] and start.get("slot_id") == slot_id,
-                 f"slot {slot_id} start does not belong to this plan")
-        _require(start.get("plan_sha256") == plan_digest,
-                 f"slot {slot_id} started under a different plan file")
-        _require(start.get("identity_bundle_sha256") == _identity_bundle_hash(plan),
-                 f"slot {slot_id} identity bundle changed")
+        _verify_start_against_plan(start, plan, plan_digest, slot_id)
     else:
         _require(status == "interrupted",
                  f"Slot {slot_id} has no durable start record; only interrupted may close it")
@@ -1246,17 +1417,22 @@ def finish_attempt(plan_path: str | os.PathLike[str], slot_id: str, *,
     # derived result, so malformed or stale reports remain failed evidence.
     summary.pop("reported_pass", None)
     summary["validated"] = bool(validation.get("valid"))
+    role = _normalize_role(plan.get("role", "development"))
     acceptance_evidence = bool(
         status == "completed"
         and slot.get("mode") == "unprofiled"
         and validation.get("valid") is True
-        and not plan["identities"]["legacy_red_reports"]
+        and (
+            (role == "development" and not plan["identities"]["legacy_red_reports"])
+            or (role == "holdout" and plan["identities"].get("acceptance_scope") is not None)
+        )
     )
     finish: dict[str, Any] = {
         "schema": FINISH_SCHEMA,
         "version": RECORD_VERSION,
         "plan_id": plan["plan_id"],
         "plan_sha256": plan_digest,
+        "role": role,
         "slot_id": slot_id,
         "attempt_id": start.get("attempt_id") if start is not None else None,
         "reservation_only": start is None,
@@ -1287,6 +1463,8 @@ def _verify_start_against_plan(start: Mapping[str, Any], plan: Mapping[str, Any]
              f"slot {slot_id} start does not belong to this plan")
     _require(start.get("plan_sha256") == plan_digest,
              f"slot {slot_id} start references a different plan")
+    _require(start.get("role", "development") == plan.get("role", "development"),
+             f"slot {slot_id} role changed")
     _require(start.get("identity_bundle_sha256") == _identity_bundle_hash(plan),
              f"slot {slot_id} start identity bundle changed")
     _require(start.get("identities") == plan["identities"],
@@ -1405,6 +1583,8 @@ def status(plan_path: str | os.PathLike[str]) -> dict[str, Any]:
                  and finish.get("slot_id") == slot_id
                  and finish.get("attempt_id") == (start.get("attempt_id") if start else None),
                  f"slot {slot_id} finish does not belong to its start")
+        _require(finish.get("role", "development") == plan.get("role", "development"),
+                 f"slot {slot_id} finish role changed")
         _require(finish.get("reservation_only") is (start is None),
                  f"slot {slot_id} finish reservation state disagrees with start")
         report = finish.get("report")
@@ -1454,14 +1634,20 @@ def status(plan_path: str | os.PathLike[str]) -> dict[str, Any]:
     acceptance_evidence = bool(
         counts["completed"] == len(plan["slots"])
         and not counts["failed_reports"]
-        and not plan["identities"]["legacy_red_reports"]
         and all(slot.get("mode") == "unprofiled" for slot in plan["slots"])
+        and (
+            (plan.get("role", "development") == "development"
+             and not plan["identities"]["legacy_red_reports"])
+            or (plan.get("role") == "holdout"
+                and plan["identities"].get("acceptance_scope") is not None)
+        )
     )
     return {
         "schema": "melee-web-hitch-status",
         "version": 1,
         "plan_id": plan["plan_id"],
         "plan_sha256": plan_digest,
+        "role": plan.get("role", "development"),
         "matrix_state": matrix_state,
         "planned": len(plan["slots"]),
         "pending": pending,
@@ -1469,9 +1655,15 @@ def status(plan_path: str | os.PathLike[str]) -> dict[str, Any]:
         "open": open_count,
         "consumed": consumed,
         "counts": counts,
-        "development_allowlist": list(plan["development_allowlist"]),
+        "allowlist": list(plan.get(
+            "development_allowlist" if plan.get("role", "development") == "development"
+            else "holdout_allowlist")),
+        "development_allowlist": copy.deepcopy(plan.get("development_allowlist")),
+        "holdout_allowlist": copy.deepcopy(plan.get("holdout_allowlist")),
         "legacy_red_reports": copy.deepcopy(plan["identities"]["legacy_red_reports"]),
         "legacy_unresolved_reds": len(plan["identities"]["legacy_red_reports"]),
+        "historical_context": copy.deepcopy(plan["identities"].get("historical_context", [])),
+        "acceptance_scope": copy.deepcopy(plan["identities"].get("acceptance_scope")),
         # The acceptance aggregate excludes profiler rows.  Those rows stay
         # available in the per-mode diagnostic view and are never presented
         # as unprofiled timing evidence.

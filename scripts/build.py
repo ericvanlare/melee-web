@@ -19,6 +19,15 @@ PUBLIC_RUNTIME_TARGET = "runtime-public"
 PUBLIC_RUNTIME_CONFIGURATION = "Release"
 PUBLIC_RUNTIME_BUILD_DIR = "build/browser-public-release"
 
+# These are the only lifecycle executables that the content-check workflow may
+# select directly.  Keep this list deliberately small and explicit: adding a
+# trace requires reviewing its source contract before it becomes a build
+# surface for the workflow.
+TRACE_TARGETS = (
+    "gameplay_content_match_trace",
+    "gameplay_stage_battlefield_trace",
+)
+
 # Keep the target closure in one place so callers that need to configure once
 # and build several target groups can use the same reviewed target names as the
 # normal CLI.  Tuples prevent accidental mutation by callers and preserve the
@@ -38,6 +47,31 @@ BUILD_TARGETS = {
     ),
     "all": ("gx_probe", "gameplay_checks", "gameplay_menu_browser"),
 }
+
+
+def build_directory(root=ROOT, target="all", configuration="RelWithDebInfo", *,
+                    pipeline_provenance=False, selective_pipelines=False):
+    """Return the build directory selected by the normal build contract.
+
+    Trace targets use the private development build directory and intentionally
+    cannot be combined with either alternate graph.  Keeping this resolution
+    here lets focused callers use the same path as :func:`build` without
+    duplicating the SDK/build-directory rules.
+    """
+    root = Path(root)
+    if target not in BUILD_TARGETS and target not in TRACE_TARGETS:
+        raise ValueError(f"Unsupported build target: {target}")
+    if target in TRACE_TARGETS and (pipeline_provenance or selective_pipelines):
+        raise ValueError("trace targets require the private development build")
+    if selective_pipelines:
+        suffix = "-release" if configuration == "Release" else ""
+        return root / ("build/browser-public-selective-release" if target == PUBLIC_RUNTIME_TARGET
+                       else f"build/browser-selective{suffix}")
+    if pipeline_provenance:
+        return root / ("build/browser-provenance-release" if configuration == "Release"
+                       else "build/browser-provenance")
+    return root / (PUBLIC_RUNTIME_BUILD_DIR if target == PUBLIC_RUNTIME_TARGET else
+                   ("build/browser-release" if configuration == "Release" else "build/browser"))
 
 PUBLIC_RUNTIME_EXPORTS = (
     "_main",
@@ -514,7 +548,17 @@ def _write_public_identity(root, build_dir, version, cmake, ninja, gameplay_sour
 
 
 def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
-          pipeline_provenance=False, selective_pipelines=False, configure_only=False):
+          pipeline_provenance=False, selective_pipelines=False, configure_only=False,
+          trace_targets=None):
+    trace_targets = tuple(trace_targets or ())
+    if trace_targets:
+        if target != "all":
+            raise ValueError("--target and --trace-target are mutually exclusive")
+        unknown = [name for name in trace_targets if name not in TRACE_TARGETS]
+        if unknown:
+            raise ValueError(f"Unsupported trace target: {unknown[0]}")
+        if pipeline_provenance or selective_pipelines:
+            raise ValueError("trace targets require the private development build")
     if configure_only and target == PUBLIC_RUNTIME_TARGET:
         # The public target writes an identity sidecar only after a complete
         # build.  A configure-only invocation must not leave an apparently
@@ -555,16 +599,10 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
     env["EM_CONFIG"] = str(sdk / ".emscripten")
     env["EM_CACHE"] = str(emscripten / "cache")
     env["EMSDK_PYTHON"] = sys.executable
-    if selective_pipelines:
-        suffix = "-release" if configuration == "Release" else ""
-        build_dir = root / ("build/browser-public-selective-release" if target == PUBLIC_RUNTIME_TARGET
-                            else f"build/browser-selective{suffix}")
-    elif pipeline_provenance:
-        build_dir = root / ("build/browser-provenance-release" if configuration == "Release"
-                            else "build/browser-provenance")
-    else:
-        build_dir = root / (PUBLIC_RUNTIME_BUILD_DIR if target == PUBLIC_RUNTIME_TARGET else
-                             ("build/browser-release" if configuration == "Release" else "build/browser"))
+    build_target = trace_targets[0] if trace_targets else target
+    build_dir = build_directory(root, target=build_target, configuration=configuration,
+                                pipeline_provenance=pipeline_provenance,
+                                selective_pipelines=selective_pipelines)
     if (root / "build").is_symlink() or build_dir.is_symlink():
         raise ValueError("Build output must be a local directory, not a symlink")
     source_inputs_before = (
@@ -583,7 +621,7 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
     subprocess.run(configure, cwd=root, env=env, check=True)
     if configure_only:
         return
-    targets = BUILD_TARGETS[target]
+    targets = trace_targets if trace_targets else BUILD_TARGETS[target]
     subprocess.run([str(cmake), "--build", str(build_dir), "--target", *targets, "-j", str(jobs)],
                    cwd=root, env=env, check=True)
     if target == PUBLIC_RUNTIME_TARGET:
@@ -599,7 +637,10 @@ def build(jobs, root=ROOT, target="all", configuration="RelWithDebInfo", *,
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--jobs", type=int, default=min(os.cpu_count() or 2, 6))
-    parser.add_argument("--target", choices=("graphics", "gameplay", "fighter", "runtime", PUBLIC_RUNTIME_TARGET, "all"), default="all")
+    parser.add_argument("--target", choices=("graphics", "gameplay", "fighter", "runtime", PUBLIC_RUNTIME_TARGET, "all"))
+    parser.add_argument("--trace-target", dest="trace_targets", choices=TRACE_TARGETS,
+                        action="append",
+                        help="Build one reviewed lifecycle trace; repeat for multiple traces")
     parser.add_argument("--configuration", choices=("RelWithDebInfo", "Release"), default="RelWithDebInfo")
     parser.add_argument("--pipeline-provenance", action="store_true",
                         help="Compile the private runtime recorder into a separate build directory")
@@ -610,10 +651,12 @@ def main():
     args = parser.parse_args()
     if args.jobs < 1:
         parser.error("--jobs must be positive")
+    if args.target is not None and args.trace_targets:
+        parser.error("--target and --trace-target are mutually exclusive")
     try:
-        build(args.jobs, target=args.target, configuration=args.configuration,
+        build(args.jobs, target=args.target or "all", configuration=args.configuration,
               pipeline_provenance=args.pipeline_provenance, selective_pipelines=args.selective_pipelines,
-              configure_only=args.configure_only)
+              configure_only=args.configure_only, trace_targets=args.trace_targets)
     except (OSError, ValueError, subprocess.CalledProcessError) as error:
         raise SystemExit(f"build: {error}") from error
 

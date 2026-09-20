@@ -1,6 +1,8 @@
 """Focused tests for the exact development setup gate."""
 
 import hashlib
+import importlib.util
+import io
 import json
 from pathlib import Path
 import sys
@@ -8,6 +10,7 @@ import tempfile
 import unittest
 from types import SimpleNamespace
 from unittest.mock import patch
+from contextlib import redirect_stderr
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -96,6 +99,101 @@ def write_inputs(root: Path):
 
 
 class RetailSetupValidationTests(unittest.TestCase):
+    def _holdout_inputs(self, root, mutate=None):
+        execution, source, plan, entry, capture = write_inputs(root)
+        manifest = {
+            "schema": "melee-web-vanilla-candidate-split-v2",
+            "status": "frozen_before_runtime",
+            "selection": {"held_out_reserved_sha256": [entry["source_sha256"]],
+                          "development_sha256": []},
+            "records": [{"source_sha256": entry["source_sha256"],
+                         "role": "held_out_reserved",
+                         "plan_receipt": {"source_sha256": entry["source_sha256"],
+                                          "sha256": entry["plan_sha256"]}}],
+        }
+        if mutate:
+            mutate(manifest)
+        reservation = root / "reservation.json"
+        reservation.write_text(json.dumps(manifest))
+        value = json.loads(execution.read_text())
+        value["schema"] = VALIDATION.HOLDOUT_EXECUTION_SCHEMA
+        value["selected_before_reference_execution"][0]["role"] = "holdout"
+        value["candidate_manifest_path"] = str(reservation.relative_to(root))
+        value["candidate_manifest_sha256"] = hashlib.sha256(reservation.read_bytes()).hexdigest()
+        execution.write_text(json.dumps(value))
+        return execution, capture, reservation
+
+    def test_reserved_holdout_keeps_role_and_exact_setup_checks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            execution, capture, _ = self._holdout_inputs(root)
+            with patch.object(VALIDATION, "load_capture", return_value=capture):
+                result = VALIDATION.validate_setup(execution, "dev-a", "capture.jsonl", repo_root=root)
+            self.assertEqual(result["entry"]["role"], "holdout")
+            self.assertEqual(result["setup"]["actual"], expected_setup())
+            changed = bytearray(setup_bytes()); changed[0x63] = 3
+            capture.match_enter["start_melee_hex"] = changed.hex()
+            with patch.object(VALIDATION, "load_capture", return_value=capture):
+                with self.assertRaisesRegex(VALIDATION.SetupValidationError, "costume"):
+                    VALIDATION.validate_setup(execution, "dev-a", "capture.jsonl", repo_root=root)
+
+    def test_holdout_cannot_relabel_a_development_or_different_input(self):
+        changes = [
+            (lambda m: m["selection"]["development_sha256"].extend(m["selection"]["held_out_reserved_sha256"]), "exclusively reserved"),
+            (lambda m: m["records"][0].update(role="development"), "reservation record"),
+            (lambda m: m["records"][0]["plan_receipt"].update(sha256="f" * 64), "reserved identity"),
+            (lambda m: m["selection"].update(held_out_reserved_sha256=m["selection"]["held_out_reserved_sha256"][0]), "exclusively reserved"),
+        ]
+        for mutate, error in changes:
+            with self.subTest(error=error), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                execution, _, _ = self._holdout_inputs(root, mutate)
+                with patch.object(VALIDATION, "load_capture") as load:
+                    with self.assertRaisesRegex(VALIDATION.SetupValidationError, error):
+                        VALIDATION.validate_setup(execution, "dev-a", "capture.jsonl", repo_root=root)
+                load.assert_not_called()
+
+    def test_holdout_rejects_changed_reservation_before_capture_read(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            execution, _, reservation = self._holdout_inputs(root)
+            reservation.write_text(reservation.read_text() + "\n")
+            with patch.object(VALIDATION, "load_capture") as load:
+                with self.assertRaisesRegex(VALIDATION.SetupValidationError, "manifest SHA-256"):
+                    VALIDATION.validate_setup(execution, "dev-a", "capture.jsonl", repo_root=root)
+            load.assert_not_called()
+
+    def test_holdout_rejects_mixed_roles_and_duplicate_names_before_capture(self):
+        for extra, error in (([{"name": "dev-b", "role": "development"}], "only holdout"),
+                             ([{"name": "b", "role": "holdout"}] * 2, "unique")):
+            with self.subTest(error=error), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                execution, _, _ = self._holdout_inputs(root)
+                value = json.loads(execution.read_text())
+                value["selected_before_reference_execution"].extend(extra)
+                execution.write_text(json.dumps(value))
+                with patch.object(VALIDATION, "load_capture") as load:
+                    with self.assertRaisesRegex(VALIDATION.SetupValidationError, error):
+                        VALIDATION.validate_setup(execution, "dev-a", "capture.jsonl", repo_root=root)
+                load.assert_not_called()
+
+    def test_setup_cli_cannot_overwrite_holdout_reservation(self):
+        spec = importlib.util.spec_from_file_location(
+            "holdout_setup_cli", ROOT / "scripts/check_retail_setup.py")
+        cli = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cli)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            execution, _, reservation = self._holdout_inputs(root)
+            original = reservation.read_bytes()
+            with patch.object(cli, "validate_setup", return_value={"status": "pass"}), redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as stopped:
+                    cli.main(["--plan", str(execution), "--name", "dev-a",
+                              "--capture", str(root / "capture.jsonl"),
+                              "--repo-root", str(root), "--output", str(reservation)])
+            self.assertEqual(stopped.exception.code, 2)
+            self.assertEqual(reservation.read_bytes(), original)
+
     def test_decode_accepts_ordinary_vs_cpu_and_keeps_human_shape(self):
         raw = setup_bytes()
         raw[0x85] = 1
@@ -247,7 +345,7 @@ class RetailSetupValidationTests(unittest.TestCase):
             execution_value["selected_before_reference_execution"][0]["role"] = "heldout"
             execution.write_text(json.dumps(execution_value), encoding="utf-8")
             with patch.object(VALIDATION, "load_capture") as load:
-                with self.assertRaisesRegex(VALIDATION.SetupValidationError, "not a development"):
+                with self.assertRaisesRegex(VALIDATION.SetupValidationError, "only development"):
                     VALIDATION.validate_setup(execution, "dev-a", "capture.jsonl", repo_root=root)
             load.assert_not_called()
 

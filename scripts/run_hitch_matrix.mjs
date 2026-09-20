@@ -123,6 +123,21 @@ export function pagePaintCondition(slot) {
   return mode;
 }
 
+export function planRole(plan) {
+  const role=plan?.role===undefined?'development':plan.role;
+  if(role!=='development'&&role!=='holdout')throw Error('Unsupported hitch plan role');
+  const recipes=role==='holdout'?'holdout_recipes':'development_recipes';
+  if(!plan?.identities?.[recipes]||Array.isArray(plan.identities[recipes])||
+     typeof plan.identities[recipes]!=='object')
+    throw Error(`Missing ${recipes} for ${role} hitch plan`);
+  return {role,recipes};
+}
+
+export function stopAfterHoldoutFailure(role, finished) {
+  return role==='holdout' &&
+    (finished?.status!=='completed' || finished?.validation?.valid!==true);
+}
+
 export function verifyPagePaintReport(report,slot) {
   const mode=pagePaintCondition(slot),paint=report.diagnostic_page_paint;
   if(slot.page_paint===undefined&&paint==null)return; // Earlier normal-page builds.
@@ -294,6 +309,7 @@ async function publicReport(page, deadline) {
 
 async function run(options,pw) {
   const planPath=path.resolve(options.plan),plan=await read(planPath);
+  const planIdentity=planRole(plan);
   const machine=await read(plan.identities.profile.path);
   validateFrozenBuildProfile(machine,plan.identities.build_artifacts);
   for(const slot of plan.slots)pagePaintCondition(slot);
@@ -325,7 +341,7 @@ async function run(options,pw) {
       const pageError=e=>errors.push({type:'pageerror',message:String(e),at:new Date().toISOString()});
       const consoleError=m=>{if(m.type()==='error')errors.push({type:'console',message:m.text(),location:m.location(),at:new Date().toISOString()});};
       page.on('pageerror',pageError);page.on('console',consoleError);
-      console.log(JSON.stringify({event:'started',slot:slot.slot_id,target:slot.target_id,mode:slot.mode,cache:slot.cache}));
+      console.log(JSON.stringify({event:'started',role:planIdentity.role,slot:slot.slot_id,target:slot.target_id,mode:slot.mode,cache:slot.cache}));
       try {
         // Fetch outside the source clock, after the durable slot reservation.
         // A server pointing to another build consumes a failed slot too.
@@ -342,7 +358,8 @@ async function run(options,pw) {
         await driver.selectDisc(path.resolve(options.disc));
         await driver.waitForStart();
         await page.getByText('Diagnostics',{exact:true}).click({timeout:remainingTimeout(deadline)});
-        const recipe=plan.identities.development_recipes[slot.target_id];
+        const recipe=plan.identities[planIdentity.recipes][slot.target_id];
+        if(!recipe)throw Error(`Missing ${planIdentity.recipes} identity for ${slot.target_id}`);
         await page.locator('#retail-replay-file').setInputFiles(recipe.path,{timeout:remainingTimeout(deadline)});
         await page.locator('#retail-replay-mode').selectOption('performance',{timeout:remainingTimeout(deadline)});
         if(slot.mode==='profiler'){
@@ -398,6 +415,8 @@ async function run(options,pw) {
         const finished=ledger('finish',args);
         console.log(JSON.stringify({event:'finished',slot:slot.slot_id,status:finished.status,
           validation:finished.validation,summary:finished.performance_summary}));
+        if(stopAfterHoldoutFailure(planIdentity.role,finished))
+          throw Error('Holdout failed; browser closed. Remaining slots are unconsumed.');
         // A failed end could deliver a late completion for the wrong slot.
         // Preserve this attempt, then close the context without starting another.
         if(!traceReusable)throw Error('Trace state unresolved; browser closed. Remaining slots are unconsumed.');

@@ -19,17 +19,19 @@ The silent alpha is live at **[webmelee.gg](https://webmelee.gg/)**.
 The operator is **NaiadAI, LLC**; the public contact is **legal@webmelee.gg**.
 Actual Google Workspace alias delivery was verified before the nameserver
 change and again after migration, before custom-domain activation. The reviewed
-PR #38 pipeline-preparation fix (`b3b9da4`, merged as `90ff371`) was deployed on
-September 19, 2026 to staging at
-[236f2265.webmelee-staging.pages.dev](https://236f2265.webmelee-staging.pages.dev)
+PR #47 two-descriptor pipeline-preparation fix (`e254401`, merged as `6fe77fa`)
+was deployed on September 19, 2026 (Pacific time) to staging at
+[0a3cfb39.webmelee-staging.pages.dev](https://0a3cfb39.webmelee-staging.pages.dev)
 and production at
-[24f92d33.webmelee.pages.dev](https://24f92d33.webmelee.pages.dev).
+[61b8658f.webmelee.pages.dev](https://61b8658f.webmelee.pages.dev).
 The exact audited bytes passed HTTP verification and all ten public browser
-checks on both production origins. The hosted Link/Young Link route also passes
-cold and warm without timing resumes or live pipeline creation.
-The [current release receipt](evidence/public-link-pipeline-release-v1.json)
-records identity, rollback and scoped verification. These short silent-player
-checks do not admit full-match performance. The preceding
+checks on both production origins. The separately frozen audio-enabled
+development Release passes the approved replacement holdout gate; its exact
+[state/timer and performance scope](CURRENT_RUNTIME_HOLDOUTS_20260919.md) does
+not establish public full-match, original draw-cadence, live-input, pixel or PCM
+admission. The [current release receipt](evidence/public-marth-pipeline-release-v1.json)
+records identity, rollback and scoped verification. The preceding
+[PR #38 release receipt](evidence/public-link-pipeline-release-v1.json),
 [PR #32 release receipt](evidence/public-link-release-v1.json) and initial launch
 record below remain historical.
 
