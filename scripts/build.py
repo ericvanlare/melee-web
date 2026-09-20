@@ -26,6 +26,7 @@ PUBLIC_RUNTIME_BUILD_DIR = "build/browser-public-release"
 TRACE_TARGETS = (
     "gameplay_content_match_trace",
     "gameplay_stage_battlefield_trace",
+    "gameplay_stage_temple_trace",
 )
 
 # Keep the target closure in one place so callers that need to configure once

@@ -36,8 +36,9 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     // enum. Keep this small C++ boundary independent of the source include
     // path used by the standalone Wasm fixture compiler.
     const bool link_family = costume.fighter_kind == 6 || costume.fighter_kind == 20;
+    const bool captain = costume.fighter_kind == 2;
     const bool ganon = costume.fighter_kind == 25;
-    require(mario || fox_family || mars || link_family || ganon, "Native action store has no checked fighter command schema for this kind");
+    require(mario || fox_family || mars || link_family || captain || ganon, "Native action store has no checked fighter command schema for this kind");
     std::vector<DatCommandRoot> roots;
     // Explicit source ftCo submotion groups. This certifies command operand
     // graphs only, not readiness of every original world service they invoke.
@@ -56,7 +57,11 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     group(286,291);                              // shield-break knockdown
     if (mario) group(295,302);                   // Mario/Dr. Mario specials; taunts use common rows 239/240 above
     else if (link_family) group(295,313);        // Link-family action tables end at 313
-    else if (ganon) group(295,costume.motion_count-1); // Source Captain-family item swings and specials, through Ganon's final throw
+    // The Captain-family range is source-complete through the final authored
+    // action. Captain rows 295/297 include command opcodes 45/42 whose
+    // original consumers require live sword/parasol item services; the
+    // shared command readiness guard intentionally remains explicit there.
+    else if (captain || ganon) group(295,costume.motion_count-1);
     else group(295,326);                         // Fox/Falco/Marth/Roy source special command rows
     for (auto choice : runtime_->wait_choices()) command_motions_.insert(choice.motion_id);
     for (auto id : command_motions_) {

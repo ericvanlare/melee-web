@@ -77,6 +77,37 @@ class ContentMatchTests(unittest.TestCase):
         self.run_trace("gameplay_stage_battlefield_trace", [game],
                        "Original Battlefield")
 
+    def test_captain_source_lifecycles_both_orientations(self):
+        common = ROOT / "assets-local/full-game-ganon"
+        captain = ROOT / "assets-local/full-game-captain"
+        required_common = ("MnSlChr.usd", "PlMr.dat", "PlMrAJ.dat", "GrNLa.dat")
+        required_captain = ("PlCa.dat", "PlCaAJ.dat", "EfCaData.dat", "captain.ssm",
+                            "PlCaNr.dat", "PlCaGy.dat", "PlCaRe.usd", "PlCaWh.dat",
+                            "PlCaGr.dat", "PlCaBu.dat")
+        if not (all((common / name).is_file() for name in required_common) and
+                all((captain / name).is_file() for name in required_captain)):
+            self.skipTest("Owned Captain/Mario, English costumes, menu and FD fixtures are required")
+        # The trace cycles the larger of the two authored costume counts,
+        # including Captain's sixth costume when Captain is the opponent.
+        for fighter, opponent in ((0, 8), (8, 0)):
+            with self.subTest(fighter=fighter, opponent=opponent):
+                self.run_trace("gameplay_content_match_trace",
+                               [common, captain, 32, fighter, opponent],
+                               "Mixed source content intro, costumes, stage lifecycle, combat, pause and repeat teardown passed")
+
+    def test_hyrule_temple_source_lifecycles(self):
+        temple = ROOT / "assets-local/full-game-stage-hyrule-temple"
+        common = ROOT / "assets-local/full-game-ganon"
+        required_temple = ("GrSh.dat", "shrine.hps", "akaneia.hps")
+        required_common = ("PlCo.dat", "ItCo.usd", "EfCoData.dat", "PdPm.dat",
+                           "LbRb.dat", "PlMr.dat", "PlMrAJ.dat", "EfMrData.dat",
+                           "mario.ssm", "sislib_font.bin")
+        if not (all((temple / name).is_file() for name in required_temple) and
+                all((common / name).is_file() for name in required_common)):
+            self.skipTest("Owned Temple and common Mario/runtime fixtures are required")
+        self.run_trace("gameplay_stage_temple_trace", [temple, common],
+                       "Original Hyrule Temple source maps, scaled collision, lights, BGM1/BGM75 readiness and two-lifetime teardown passed")
+
 
 if __name__ == "__main__":
     unittest.main()

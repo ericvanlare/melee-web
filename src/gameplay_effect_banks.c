@@ -126,7 +126,10 @@ MeleeWebEffectBank* melee_web_effect_bank_decode_roots(const MeleeWebNativeDat* 
         REQUIRE(images&&images<=256&&!(palflag&~1u)&&palnum<=256,"Particle texture group counts/flags exceed bounds");
         const int indexed=format==8||format==9;
         const uint32_t palettes=indexed?((palflag&1)?1:palnum?palnum:images):0;
-        REQUIRE(!indexed||tlutfmt<=2,"Particle palette format is unsupported");
+        /* psdisp narrows HSD_PSTexGroup::tlutfmt to u8 before GXInitTlutObj.
+         * Preserve the full authored word below, but validate the format that
+         * the original consumer actually passes to GX. */
+        REQUIRE(!indexed||(uint8_t)tlutfmt<=2,"Particle palette format is unsupported");
         const size_t image_size=tiled_bytes(d,format,width,height);
         d->region(d->context,at,0x18+(size_t)(images+palettes)*4);
         REQUIRE((size_t)(at-tb)+0x18+(size_t)(images+palettes)*4<=texture_bytes,

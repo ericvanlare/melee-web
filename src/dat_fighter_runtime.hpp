@@ -70,6 +70,7 @@ public:
     [[nodiscard]] std::uint32_t root_offset() const noexcept { return root_; }
     [[nodiscard]] const MeleeWebFighterBaseAttributes& base_attributes() const noexcept { return base_; }
     [[nodiscard]] const std::optional<MeleeWebMarioAttributes>& mario_attributes() const noexcept { return mario_; }
+    [[nodiscard]] const std::optional<MeleeWebLuigiAttributes>& luigi_attributes() const noexcept { return luigi_; }
     // Captain and Ganondorf use the shared original ftCaptain_DatAttrs layout.
     [[nodiscard]] const std::optional<MeleeWebCaptainAttributes>& captain_attributes() const noexcept { return captain_; }
     // Fox and Falco use the shared original ftFox_DatAttrs layout.  The
@@ -96,6 +97,7 @@ private:
     std::uint32_t root_, extension_;
     MeleeWebFighterBaseAttributes base_{};
     std::optional<MeleeWebMarioAttributes> mario_;
+    std::optional<MeleeWebLuigiAttributes> luigi_;
     std::optional<MeleeWebCaptainAttributes> captain_;
     std::optional<MeleeWebFoxAttributes> fox_;
     std::optional<MeleeWebMarsAttributes> mars_;

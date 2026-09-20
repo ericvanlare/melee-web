@@ -1,15 +1,25 @@
 #pragma once
 #include "gameplay_collision.h"
+#include "dat_menu_support.hpp"
 #include <array>
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 #include <cstdint>
 
 struct StartMeleeData;
 namespace melee_web {
 using RuntimeFiles = std::map<std::string, std::vector<uint8_t>, std::less<>>;
+// Source lbFileGetFullName treats a trailing-dot basename as a language
+// selector. This bridge applies its setting/saved-language rules and then
+// requires the selected archive to exist; it never changes source identity
+// by selecting another available locale.
+[[nodiscard]] std::string_view melee_web_runtime_file_name(
+    const RuntimeFiles&, std::string_view authored_name,
+    DatMenuSupportLanguage setting_language = DatMenuSupportLanguage::English,
+    DatMenuSupportLanguage saved_language = DatMenuSupportLanguage::English);
 class RuntimeArchiveCache;
 enum class GameplayWorldConstruction { Immediate, Deferred };
 // Original FTKind and GrKind values, never CSS/SSS grid indices. Defaults keep

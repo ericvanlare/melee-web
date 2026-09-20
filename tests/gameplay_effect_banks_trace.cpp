@@ -41,6 +41,39 @@ static Bytes fixture(){
     std::fill(b.begin()+32+0xc0,b.begin()+32+0xe0,0x73);
     put32(b,32+0xe0,0);put32(b,32+0xe0+4,4);b[32+0xe0+16]='r';return b;
 }
+static Bytes palette_fixture(uint32_t format_word){
+    // One C4 image and its palette, each in a bounded 32-byte region.
+    auto b=fixture();b.resize(32+0x100+8+8+2);
+    put32(b,0,uint32_t(b.size()));put32(b,4,0x100);
+    put32(b,32+0xa4,8);put32(b,32+0xa8,format_word);
+    put32(b,32+0xb4,1);put32(b,32+0xbc,0x60);
+    std::fill(b.begin()+32+0xe0,b.begin()+32+0x100,0x55);
+    std::fill(b.begin()+32+0x100,b.end(),0);
+    put32(b,32+0x100,0);put32(b,32+0x104,4);b[32+0x110]='r';
+    return b;
+}
+static void palette_format_word(){
+    const uint32_t authored=0x01000002; // Exact Captain particle group6 word.
+    melee_web::DatEffectBanks owner(
+        std::make_shared<melee_web::DatArchive>(palette_fixture(authored)),"r",1);
+    check(melee_web_gameplay_startup(4U*1024U*1024U,error,sizeof(error)),"palette source startup");
+    check(melee_web_effect_bank_attach(owner.bank(),error,sizeof(error)),"palette source registration");
+    const auto* group=psTexGroupArray[1][0];
+    check(group->tlutfmt==authored&&static_cast<u8>(group->tlutfmt)==2,
+          "full authored palette word and original psdisp low-byte format preserved");
+    check(group->texTable[0][0]==0x73&&group->texTable[1][0]==0x55,
+          "indexed particle image and palette retain independent bounded bytes");
+    check(melee_web_effect_bank_detach(owner.bank(),error,sizeof(error)),"palette source detach");
+    check(melee_web_gameplay_shutdown(error,sizeof(error)),"palette source teardown");
+    for(const uint32_t invalid:{0x01000003U,0x010000ffU}){
+        bool rejected=false;
+        try{melee_web::DatEffectBanks bad(
+            std::make_shared<melee_web::DatArchive>(palette_fixture(invalid)),"r",1);}
+        catch(const melee_web::DatError&){rejected=true;}
+        check(rejected,"invalid consumed palette format rejected despite upper metadata");
+    }
+    std::cout<<"Original particle palette low-byte format and complete source word passed\n";
+}
 static void registration(std::shared_ptr<const melee_web::DatArchive> archive,const char* symbol,bool real){
     melee_web::DatEffectBanks owner(archive,symbol,1);archive.reset();
     MeleeWebEffectBankStats stats{};
@@ -152,6 +185,7 @@ static void common_entries(std::shared_ptr<const melee_web::DatArchive> archive)
 int main(int argc,char** argv){
     try{
         registration(std::make_shared<melee_web::DatArchive>(fixture()),"r",false);
+        palette_format_word();
         for(unsigned mutation=0;mutation<5;++mutation){
             auto bytes=fixture();
             switch(mutation){

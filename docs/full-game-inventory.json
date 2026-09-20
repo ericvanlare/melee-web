@@ -143,7 +143,7 @@
       "id": "fighter-captain-falcon",
       "category": "fighters",
       "title": "Captain Falcon selectable fighter",
-      "implementation": "not_integrated",
+      "implementation": "partial",
       "acceptance": "not_evaluated",
       "source_identity": {
         "ckind": "CKIND_CAPTAIN",
@@ -163,9 +163,11 @@
       ],
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
-        "docs/ACCURACY_CONTRACT.md"
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/CAPTAIN_PORT_NOTES.md",
+        "docs/evidence/captain-development-v1.json"
       ],
-      "next_step": "Run the fighter checkpoint for Captain Falcon and split its costume, action, article, effect and audio coverage into bounded receipts.",
+      "next_step": "Run visible source CSS/SSS and the versioned action inventory, then independent original comparison; interaction and item branches remain open.",
       "issue": null
     },
     {
@@ -369,9 +371,10 @@
       ],
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
-        "docs/ACCURACY_CONTRACT.md"
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/LUIGI_PORT_NOTES.md"
       ],
-      "next_step": "Run the fighter checkpoint for Luigi and split its costume, action, article, effect and audio coverage into bounded receipts.",
+      "next_step": "Exact attributes and source ABI checks pass; integrate the Luigi fire Article, nullable guard pose, effect/audio and action owners before real native construction. Luigi remains disabled.",
       "issue": null
     },
     {
@@ -906,7 +909,7 @@
         "docs/GANONDORF_PORT_NOTES.md",
         "docs/evidence/ganondorf-development-v1.json"
       ],
-      "next_step": "Complete the original comparison and visible interaction corpus, close discovered pipelines, then verify cold/warm performance and the remaining full-fighter gates.",
+      "next_step": "Complete the independent original comparison and interaction corpus, then extend the passing authored cold/warm pair across costumes, opponents and the remaining full-fighter gates.",
       "issue": null
     },
     {
@@ -1158,9 +1161,10 @@
       ],
       "evidence": [
         "docs/ADDING_STAGES.md",
-        "docs/ACCURACY_CONTRACT.md"
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/FOUNTAIN_OF_DREAMS_PORT_NOTES.md"
       ],
-      "next_step": "Run the stage checkpoint for Fountain of Dreams and split map, collision, visual, hazard, audio and browser gates.",
+      "next_step": "Source contract and isolated yakumono decoder checks pass; integrate source map callbacks, dynamic collision, reflection, effects and lifetime ownership before enabling Fountain.",
       "issue": null
     },
     {
@@ -1498,7 +1502,7 @@
       "id": "stage-hyrule-temple",
       "category": "stages",
       "title": "Hyrule Temple VS stage",
-      "implementation": "not_integrated",
+      "implementation": "partial",
       "acceptance": "not_evaluated",
       "source_identity": {
         "stkind": "St_Kind_Shrine",
@@ -1519,9 +1523,11 @@
       ],
       "evidence": [
         "docs/ADDING_STAGES.md",
-        "docs/ACCURACY_CONTRACT.md"
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/HYRULE_TEMPLE_PORT_NOTES.md",
+        "docs/evidence/hyrule-temple-development-v1.json"
       ],
-      "next_step": "Run the stage checkpoint for Hyrule Temple and split map, collision, visual, hazard, audio and browser gates.",
+      "next_step": "Native stage/match lifetimes and scoped cold/warm browser entry pass. Expand stage interactions, independent original comparison and the complete fighter action matrix; retain the cold startup long task.",
       "issue": null
     },
     {

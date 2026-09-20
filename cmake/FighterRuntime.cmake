@@ -210,6 +210,16 @@ target_link_options(gameplay_stage_battlefield_trace PRIVATE --profiling-funcs
   -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
 set_target_properties(gameplay_stage_battlefield_trace PROPERTIES SUFFIX ".js")
 
+add_executable(gameplay_stage_temple_trace EXCLUDE_FROM_ALL
+  tests/gameplay_stage_temple_trace.cpp tests/gameplay_stage_temple_trace.c)
+target_link_libraries(gameplay_stage_temple_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_stage_temple_trace PRIVATE -UNDEBUG
+  "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
+target_link_options(gameplay_stage_temple_trace PRIVATE --profiling-funcs
+  -sENVIRONMENT=node -sNODERAWFS=1 -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1
+  -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_stage_temple_trace PROPERTIES SUFFIX ".js")
+
 add_executable(gameplay_content_match_trace EXCLUDE_FROM_ALL
   tests/gameplay_content_match_trace.cpp tests/gameplay_content_match_state.c)
 target_link_libraries(gameplay_content_match_trace PRIVATE fighter_asset_runtime)

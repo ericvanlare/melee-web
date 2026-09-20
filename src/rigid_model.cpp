@@ -159,23 +159,39 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
             continue;
         }
         if (color) {
-            // The original native PObj path consumes all six GX packed direct
-            // color encodings. RGB565/RGB8/RGBX8 carry GX_CLR_RGB while
-            // RGBA4/RGBA6/RGBA8 carry GX_CLR_RGBA. These bytes live in the
-            // display list, so no host vertex array is fabricated. Viewer
+            // The original native PObj path consumes all six GX packed color
+            // encodings. RGB565/RGB8/RGBX8 carry GX_CLR_RGB while
+            // RGBA4/RGBA6/RGBA8 carry GX_CLR_RGBA. Direct values live in the
+            // display list; indexed values use a packed color array. Viewer
             // imports retain the narrower direct RGBA8 contract.
             static constexpr uint32_t packed_widths[] = {2, 3, 4, 2, 3, 4};
-            const bool native_packed = policy == DatMaterialPolicy::NativeDescriptors &&
-                type < std::size(packed_widths) && count == (type >= 3 ? 1u : 0u);
-            const bool viewer_rgba8 = type == 5 && count == 1;
-            const uint32_t packed_width = type < std::size(packed_widths)
-                ? packed_widths[type] : 0;
-            if (mode != direct || (!native_packed && !viewer_rgba8) || frac != 0 ||
-                (stride != 0 && stride != packed_width && stride != 4))
-                reject("Only supported direct vertex color formats are accepted");
-            absent(a, d + 20, "Direct vertex colors cannot reference a vertex array");
+            if (type >= std::size(packed_widths) || count > 1 || frac != 0)
+                reject("Unsupported packed color component descriptor");
+            const uint32_t packed_width = packed_widths[type];
+            if (mode == direct) {
+                const bool native_packed = policy == DatMaterialPolicy::NativeDescriptors &&
+                    count == (type >= 3 ? 1u : 0u);
+                const bool viewer_rgba8 = type == 5 && count == 1;
+                if ((!native_packed && !viewer_rgba8) ||
+                    (stride != 0 && stride != packed_width && stride != 4))
+                    reject("Unsupported direct packed color descriptor");
+                absent(a, d + 20, "Direct vertex colors cannot reference a vertex array");
+                widths[i] = packed_width;
+                mesh.attributes.push_back({attr, mode, count, type, frac, stride, nullptr, 0});
+                continue;
+            }
+            if (policy != DatMaterialPolicy::NativeDescriptors ||
+                (mode != index8 && mode != index16))
+                reject("Indexed packed colors require the original native PObj path");
+            components[i] = 0; // Packed colors are not scalar geometry bounds.
             widths[i] = packed_width;
-            mesh.attributes.push_back({attr, mode, count, type, frac, stride, nullptr, 0});
+            if (stride < packed_width || stride > 255)
+                reject("Indexed packed color stride is out of range");
+            auto array = a.pointer(d + 20, packed_width);
+            if (!array) reject("Indexed packed color array pointer is null");
+            array_offsets[i] = *array;
+            mesh.attributes.push_back({attr, mode, count, type, frac, stride,
+                                       a.range(*array, packed_width).data(), 0});
             continue;
         }
         if (mode != index8 && mode != index16) reject("Only indexed vertex attributes are supported");

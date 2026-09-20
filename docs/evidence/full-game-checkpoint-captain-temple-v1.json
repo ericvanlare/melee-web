@@ -1,0 +1,61 @@
+{
+  "schema": "melee-web-full-game-checkpoint-validation",
+  "version": 1,
+  "automated_suite": {
+    "command": "python3 -m unittest discover -s tests -v",
+    "result": "pass",
+    "tests": 1060,
+    "skips": 41,
+    "seconds": 284.594,
+    "local_log": "work/full-game/captain-temple-suite-v2.log",
+    "sha256": "b020a63ec82942615181b71701d69d6d8b8fe0ef217899e1d5eddb3cbd24b4f5",
+    "skip_reasons": {
+      "Bootstrap Aurora and a C++20 compiler for independent DSP comparison": 2,
+      "Build fighter targets before the typed support check": 1,
+      "Original stage trace target unavailable": 2,
+      "Build dat_scene_trace before the typed scene check": 1,
+      "Owned stage selection archive and pinned SDK required": 1,
+      "Build gameplay_audio_trace and provide local SSM/SEM/DSP coefficient fixtures": 2,
+      "Build fighter/audio stream target and supply optional owned HPS/SSM/SEM/coefficient inputs": 1,
+      "Build fighter targets before running the focused bonus_data trace": 1,
+      "Project SDK and Aurora build dependencies unavailable; run bootstrap/build": 4,
+      "Optional built combat trace and owned runtime assets required": 1,
+      "Common context trace unavailable; build gameplay first": 1,
+      "Owned menu, Fox/Falco and stage fixtures are required": 1,
+      "Owned Dr. Mario/Roy and stage fixtures are required": 1,
+      "Project SDK/Aurora build dependencies unavailable; run bootstrap/build": 1,
+      "Built stock trace and owned Mario costume archives required": 1,
+      "Built original player context trace required": 1,
+      "Optional built source trace and owned runtime assets required": 2,
+      "Optional built full-stage edge trace and owned runtime assets required": 2,
+      "Optional built timer trace and owned runtime assets required": 1,
+      "Build gameplay_music_profile_trace and provide owned menu/game assets": 1,
+      "Build fighter targets before the original SIS consumer check": 1,
+      "Original CSS target and owned local fixtures are required": 1,
+      "Build the native menu host and supply owned menu/game fixtures": 1,
+      "Build gameplay_rumble_trace and provide owned LbRb.dat": 1,
+      "Build fighter targets before running the focused stage_numeric trace": 1,
+      "Native HSD targets unavailable; run scripts/build.py --target gameplay": 1,
+      "Build the native_audio_banks fighter target first": 1,
+      "Build gameplay_pad_state_trace": 1,
+      "compiled private provenance fixture not supplied": 1,
+      "Optional pinned Dolphin source checkout is not installed": 2,
+      "pinned slippi-js fixtures are not checked out": 2
+    }
+  },
+  "release_builds": [
+    {
+      "kind": "development",
+      "result": "pass",
+      "local_log": "work/full-game/captain-temple-browser-build-v3.log",
+      "sha256": "fe9a4dc22a9518f8a4d89cd50a6b3b254821beae59781188a3ef3ac775e2f070"
+    },
+    {
+      "kind": "public",
+      "result": "pass",
+      "local_log": "work/full-game/captain-temple-public-build-v3.log",
+      "sha256": "9117a58bbd1886514fe493f20d098b34b7cefae3bd9f31652738af7acf74dfd8"
+    }
+  ],
+  "scope": "Development checkpoint. No complete-game, original-fidelity, public deployment or general performance admission."
+}

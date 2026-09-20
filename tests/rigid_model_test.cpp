@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <cmath>
 #include <functional>
+#include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <map>
 #include <memory>
@@ -993,6 +995,113 @@ void direct_rgba4_geometry()
     rejects([&] { (void) fixture.model(); });
 }
 
+void indexed_rgba8_geometry()
+{
+    Fixture fixture;
+    put32(fixture.data, Fixture::mobj + 4, 2);
+    // Captain's authored color stream is GX_INDEX8/GX_CLR_RGBA/GX_RGBA8,
+    // with a relocated array target at offset zero in the retail DAT. Keep
+    // the synthetic array at a separate bounded target so the position array
+    // remains independently checked.
+    fixture.attribute(Fixture::descriptors + 24, 11, 2, 1, 5, 0, 4, 32);
+    put32(fixture.data, Fixture::descriptors + 48, 255);
+    for (uint8_t i = 0; i < 3; ++i) {
+        const auto color = 32 + i * 4;
+        fixture.data[color] = 0x10 + i;
+        fixture.data[color + 1] = 0x20 + i;
+        fixture.data[color + 2] = 0x30 + i;
+        fixture.data[color + 3] = 0x40 + i;
+        const auto vertex = Fixture::display + 3 + i * 2;
+        fixture.data[vertex] = i;
+        fixture.data[vertex + 1] = i;
+    }
+    const auto model = RigidModel(fixture.archive(), Fixture::joint, "indexed-rgba8",
+                                  melee_web::ModelRenderPass::All,
+                                  melee_web::DatMaterialPolicy::NativeDescriptors);
+    const auto& mesh = model.meshes[0];
+    check(mesh.attributes.size() == 2 && mesh.attributes[1].attr == 11 &&
+          mesh.attributes[1].attr_type == 2 && mesh.attributes[1].comp_cnt == 1 &&
+          mesh.attributes[1].comp_type == 5 && mesh.attributes[1].data ==
+              model.archive->data().data() + 32 && mesh.attributes[1].byte_size == 12 &&
+          model.submitted_vertices == 3,
+          "native indexed RGBA8 retains its packed array descriptor and bounded span");
+    rejects([&] { (void) fixture.model(); }); // Viewer policy keeps its direct-RGBA8 boundary.
+
+    auto invalid = fixture;
+    invalid.data[Fixture::display + 3 + 1] = 8;
+    rejects([&] { (void) RigidModel(invalid.archive(), Fixture::joint, "color-index-bound",
+                                    melee_web::ModelRenderPass::All,
+                                    melee_web::DatMaterialPolicy::NativeDescriptors); });
+    invalid = fixture;
+    put16(invalid.data, Fixture::descriptors + 42, 3);
+    rejects([&] { (void) RigidModel(invalid.archive(), Fixture::joint, "color-stride",
+                                    melee_web::ModelRenderPass::All,
+                                    melee_web::DatMaterialPolicy::NativeDescriptors); });
+    invalid = fixture;
+    invalid.unlink(Fixture::descriptors + 44);
+    rejects([&] { (void) RigidModel(invalid.archive(), Fixture::joint, "color-array-null",
+                                    melee_web::ModelRenderPass::All,
+                                    melee_web::DatMaterialPolicy::NativeDescriptors); });
+}
+
+void indexed_rgb565_index16_geometry()
+{
+    Fixture fixture;
+    put32(fixture.data, Fixture::mobj + 4, 2);
+    // GX_INDEX16 uses the source RGB565 count-zero pairing. The indexed
+    // consumer still reads the packed two-byte GX color element; count is
+    // meaningful for direct descriptors but remains <= 1 for indexed ones.
+    fixture.attribute(Fixture::descriptors + 24, 11, 3, 0, 0, 0, 2, 32);
+    put32(fixture.data, Fixture::descriptors + 48, 255);
+    for (uint8_t i = 0; i < 3; ++i) {
+        put16(fixture.data, 32 + i * 2, uint16_t(0x1200 + i));
+        const auto vertex = Fixture::display + 3 + i * 3;
+        fixture.data[vertex] = i;
+        fixture.data[vertex + 1] = 0;
+        fixture.data[vertex + 2] = i;
+    }
+    const auto model = RigidModel(fixture.archive(), Fixture::joint, "indexed-rgb565-16",
+                                  melee_web::ModelRenderPass::All,
+                                  melee_web::DatMaterialPolicy::NativeDescriptors);
+    const auto& color = model.meshes[0].attributes[1];
+    check(color.attr_type == 3 && color.comp_cnt == 0 && color.comp_type == 0 &&
+              color.stride == 2 && color.byte_size == 6 && model.submitted_vertices == 3,
+          "native indexed RGB565 retains its GX_INDEX16 packed width and source count");
+    rejects([&] { (void) fixture.model(); });
+}
+
+Bytes read_bytes(const std::filesystem::path& path)
+{
+    std::ifstream stream(path, std::ios::binary);
+    check(bool(stream), "real Captain model asset is unavailable");
+    return {std::istreambuf_iterator<char>(stream), {}};
+}
+
+void real_captain(const std::filesystem::path& directory)
+{
+    using Entry = std::pair<const char*, const char*>;
+    const Entry models[] = {
+        {"PlCaNr.dat", "PlyCaptain5K_Share_joint"},
+        {"PlCaGy.dat", "PlyCaptain5KGy_Share_joint"},
+        {"PlCaRe.usd", "PlyCaptain5KRe_Share_joint"},
+        {"PlCaWh.dat", "PlyCaptain5KWh_Share_joint"},
+        {"PlCaGr.dat", "PlyCaptain5KGr_Share_joint"},
+        {"PlCaBu.dat", "PlyCaptain5KBu_Share_joint"},
+    };
+    for (const auto& [filename, symbol] : models) {
+        auto archive = std::make_shared<DatArchive>(read_bytes(directory / filename));
+        uint32_t root = UINT32_MAX;
+        for (const auto& public_symbol : archive->public_symbols())
+            if (public_symbol.name == symbol) root = public_symbol.data_offset;
+        check(root != UINT32_MAX, "real Captain model symbol is unavailable");
+        const RigidModel model(archive, root, symbol, melee_web::ModelRenderPass::All,
+                               melee_web::DatMaterialPolicy::NativeDescriptors);
+        check(!model.joints.empty() && !model.meshes.empty() && model.draw_packets,
+              "real Captain native model has no checked geometry");
+    }
+    std::cout << "Real Captain six-costume native packed-color construction: passed\n";
+}
+
 void native_nbt_geometry_and_cull()
 {
     Fixture fixture;
@@ -1134,6 +1243,8 @@ int main(int argc, char** argv)
         {"missing_model_content", missing_model_content},
         {"direct_rgba8_geometry", direct_rgba8_geometry},
         {"direct_rgba4_geometry", direct_rgba4_geometry},
+        {"indexed_rgba8_geometry", indexed_rgba8_geometry},
+        {"indexed_rgb565_index16_geometry", indexed_rgb565_index16_geometry},
         {"native_nbt_geometry_and_cull", native_nbt_geometry_and_cull},
         {"explicit_opaque_pass", explicit_opaque_pass},
         {"opaque_envelope_dependency_closure", opaque_envelope_dependency_closure},
@@ -1146,11 +1257,21 @@ int main(int argc, char** argv)
         {"dobj_preorder_mapping", dobj_preorder_mapping},
         {"active_texture_matrix_contract", active_texture_matrix_contract},
     };
-    if (argc != 2 || !cases.contains(argv[1])) {
-        std::cerr << "Usage: rigid_model_test <known case name>\n";
+    if (argc < 2) {
+        std::cerr << "Usage: rigid_model_test <known case name> [real Captain asset directory]\n";
         return 2;
     }
-    try { cases.at(argv[1])(); }
+    const std::string name = argv[1];
+    const bool real_captain_case = name == "real_captain";
+    if ((real_captain_case && argc != 3) ||
+        (!real_captain_case && (argc != 2 || !cases.contains(name)))) {
+        std::cerr << "Usage: rigid_model_test <known case name> [real Captain asset directory]\n";
+        return 2;
+    }
+    try {
+        if (real_captain_case) real_captain(argv[2]);
+        else cases.at(name)();
+    }
     catch (const std::exception& error) {
         std::cerr << argv[1] << ": " << error.what() << '\n';
         return 1;

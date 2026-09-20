@@ -34,7 +34,9 @@ static int fail(char* e,size_t n,const char* m){if(e&&n)snprintf(e,n,"%s",m);ret
 static int ok(char* e,size_t n){if(e&&n)*e=0;return 1;}
 static MeleeWebStageLast* begin_stage(const MeleeWebStageProfile* definition,void* yaku,MeleeWebEffectBank* map_bank,int defer_start,char* e,size_t n){
  MeleeWebEffectBankStats bank;
- if(!definition||!melee_web_effect_bank_stats(map_bank,&bank,e,n)||bank.bank!=64||!bank.particle_bank_ready){fail(e,n,"Stage requires its actual registered particle bank64");return NULL;}
+ if(!definition){fail(e,n,"Stage has no complete source callback profile");return NULL;}
+ if(!map_bank&&!definition->allow_absent_particle_bank){fail(e,n,"Stage requires its actual registered particle bank64");return NULL;}
+ if(map_bank&&!melee_web_effect_bank_stats(map_bank,&bank,e,n)||map_bank&&(bank.bank!=64||!bank.particle_bank_ready)){fail(e,n,"Stage requires its actual registered particle bank64");return NULL;}
  if(active||!yaku||!definition->source||!melee_web_effect_runtime_active()||!melee_web_stage_map_archives()||!stage_info.param||stage_info.grkind!=definition->ground_kind){fail(e,n,"Stage requires original effects and published native map/numeric stage contexts");return NULL;}
  for(unsigned i=0;i<sizeof(stage_info.map_gobjs)/sizeof(stage_info.map_gobjs[0]);i++)if(stage_info.map_gobjs[i]){fail(e,n,"Stage requires an empty source stage object registry");return NULL;}
  MeleeWebStageLast* h=calloc(1,sizeof(*h));if(!h){fail(e,n,"Cannot allocate stage ownership scope");return NULL;}

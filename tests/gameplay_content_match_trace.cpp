@@ -6,12 +6,14 @@
 #include <melee/ft/kinds/ftMario/forward.h>
 #include <melee/ft/kinds/ftMars/forward.h>
 #include <melee/ft/kinds/ftCaptain/forward.h>
+#include <melee/ft/kinds/ftCommon/forward.h>
 #include <melee/it/forward.h>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <stdexcept>
 #include <cmath>
+#include <algorithm>
 
 extern "C" int melee_web_test_content_player(unsigned,int,int,unsigned);
 extern "C" int melee_web_test_item_count(int);
@@ -29,6 +31,32 @@ int main(int argc,char** argv){try{
         std::ifstream stream(entry.path(),std::ios::binary);
         files[name]={(std::istreambuf_iterator<char>(stream)),{}};
     }
+    // The source Captain registry intentionally stores PlCaRe.  Both source
+    // language owners are explicit: a US setting selects .usd while a saved
+    // non-US language selects .dat. A missing selected locale must remain a
+    // hard boundary even when the other suffix is present.
+    using melee_web::DatMenuSupportLanguage;
+    melee_web::RuntimeFiles resolver_files{{"PlCaRe.dat",{1}},{"PlCaRe.usd",{1}},
+                                            {"PlMsNr.dat",{1}}};
+    check(melee_web::melee_web_runtime_file_name(
+              resolver_files,"PlCaRe.",DatMenuSupportLanguage::English,
+              DatMenuSupportLanguage::English)=="PlCaRe.usd",
+          "Source trailing-dot filename did not select the US setting archive");
+    check(melee_web::melee_web_runtime_file_name(
+              resolver_files,"PlCaRe.",DatMenuSupportLanguage::Other,
+              DatMenuSupportLanguage::Other)=="PlCaRe.dat",
+          "Source trailing-dot filename did not select the non-US setting archive");
+    check(melee_web::melee_web_runtime_file_name(
+              resolver_files,"PlCaRe.",DatMenuSupportLanguage::English,
+              DatMenuSupportLanguage::Other)=="PlCaRe.usd",
+          "Source trailing-dot filename used saved locale instead of setting locale");
+    melee_web::RuntimeFiles only_dat{{"PlCaRe.dat",{1}}};
+    check(melee_web::melee_web_runtime_file_name(
+              only_dat,"PlCaRe.",DatMenuSupportLanguage::English,
+              DatMenuSupportLanguage::English).empty(),
+          "Source trailing-dot filename silently fell back to another locale");
+    check(melee_web::melee_web_runtime_file_name(resolver_files,"PlMsNr.dat")=="PlMsNr.dat",
+          "Exact source filename resolution changed");
     char error[256]{};
     MeleeWebMenuRuntime services{nullptr,
         [](void*,MeleeWebMenuScene,char*,size_t){return 1;},
@@ -57,11 +85,14 @@ int main(int argc,char** argv){try{
     check(opponent_content,"Selected opponent has no admitted source content");
     selection.start.players[0].ckind=fighter_ckind;
     selection.start.players[1].ckind=opponent_ckind;
-    for(unsigned cycle=0;cycle<fighter_content->costumes;cycle++){
-        selection.start.players[0].color=cycle;
+    const unsigned costume_cycles=fighter_content->costumes>opponent_content->costumes?
+        fighter_content->costumes:opponent_content->costumes;
+    for(unsigned cycle=0;cycle<costume_cycles;cycle++){
+        const unsigned fighter_color=cycle%fighter_content->costumes;
+        selection.start.players[0].color=fighter_color;
         const unsigned opponent_color=cycle%opponent_content->costumes;
         selection.start.players[1].color=opponent_color;
-        selection.players[0]={0,4,cycle,0};
+        selection.players[0]={0,4,fighter_color,0};
         selection.players[1]={1,4,opponent_color,0};
         std::cout<<"Construct mixed content stage="<<selection.start.rules.stkind<<" costume="<<cycle<<std::endl;
         melee_web::GameplayMatchSession match(files,selection);
@@ -73,7 +104,7 @@ int main(int argc,char** argv){try{
                 check(std::isfinite(state.position[0])&&std::isfinite(state.position[1]),"Nonfinite fighter state");}};
         for(unsigned n=0;!match.ready()&&n<600;n++)tick();
         check(match.ready(),"Original Ready did not finish");
-        check(melee_web_test_content_player(0,fighter_ckind,fighter_content->fighter_kind,cycle),"Original selected-fighter identity/costume/icon differs");
+        check(melee_web_test_content_player(0,fighter_ckind,fighter_content->fighter_kind,fighter_color),"Original selected-fighter identity/costume/icon differs");
         check(melee_web_test_content_player(1,opponent_ckind,opponent_content->fighter_kind,opponent_color),"Original opponent identity/costume/icon differs");
         if(selection.start.rules.stkind==St_Kind_Story){
             uint32_t map_mask=0;unsigned map_count=0;int randall_timer=0,shy_timer=0,shy_count=0,shy_pattern=0;
@@ -91,6 +122,7 @@ int main(int argc,char** argv){try{
         const bool fox_family=fighter_content->fighter_kind==FTKIND_FOX||
             fighter_content->fighter_kind==FTKIND_FALCO;
         const bool doctor=fighter_content->fighter_kind==FTKIND_DRMARIO;
+        const bool captain=fighter_content->fighter_kind==FTKIND_CAPTAIN;
         const bool ganon=fighter_content->fighter_kind==FTKIND_GANON;
         const bool mars_family=fighter_content->fighter_kind==FTKIND_MARS||
             fighter_content->fighter_kind==FTKIND_EMBLEM;
@@ -104,7 +136,7 @@ int main(int argc,char** argv){try{
         raw[1].stickY=0;
         check(std::abs(match.player_stats(1).position[1]-match.player_stats(0).position[1])<5.0f,
               "Raw input did not bring both fighters to the same stage level");
-        const float attack_distance=ganon?16.0f:35.0f;
+        const float attack_distance=(ganon||captain)?16.0f:35.0f;
         for(unsigned n=0;n<120;n++){
             const auto p1=match.player_stats(0),p2=match.player_stats(1);
             if(std::abs(p2.position[0]-p1.position[0])<attack_distance)break;
@@ -140,10 +172,10 @@ int main(int argc,char** argv){try{
             check(pill_cleared,"Dr. Mario up taunt did not clear its original vitamin article");
         }
         const auto damage=match.player_stats(1).damage_percent;
-        bool capsule=false,warlock_punch=false;
+        bool capsule=false,captain_family_punch=false;
         for(unsigned n=0;n<240&&match.player_stats(1).damage_percent==damage;n++){
             raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
-            if(ganon)warlock_punch|=match.player_stats(0).motion_id==ftCa_MS_SpecialN;
+            if(ganon||captain)captain_family_punch|=match.player_stats(0).motion_id==ftCa_MS_SpecialN;
             if(doctor){
                 const auto motion=match.player_stats(0).motion_id;
                 capsule|=motion==ftMr_MS_SpecialN||motion==ftMr_MS_SpecialAirN;
@@ -151,7 +183,8 @@ int main(int argc,char** argv){try{
         }
         raw[0].button=0;
         check(match.player_stats(1).damage_percent>damage,"Selected fighter ground neutral special did not damage the opponent");
-        if(ganon)check(warlock_punch,"Ganondorf did not enter original ground Warlock Punch");
+        if(ganon||captain)check(captain_family_punch,
+            "Captain-family fighter did not enter its original grounded neutral special");
         if(doctor)check(capsule,"Dr. Mario ground neutral special did not enter its original capsule action");
         std::cout<<fighter_content->name<<(fox_family?" laser damage=":" neutral-special damage=")
                  <<match.player_stats(1).damage_percent<<std::endl;
@@ -190,10 +223,10 @@ int main(int argc,char** argv){try{
         }
         raw[0].button=0;
         check(match.player_stats(0).ground_or_air==1,"Selected fighter did not jump");
-        bool air_capsule=false,air_warlock_punch=false;
+        bool air_capsule=false,air_captain_family_punch=false;
         for(unsigned n=0;n<100;n++){
             raw[0].button=n<20?PAD_BUTTON_B:0;tick();
-            if(ganon)air_warlock_punch|=match.player_stats(0).motion_id==ftCa_MS_SpecialAirN;
+            if(ganon||captain)air_captain_family_punch|=match.player_stats(0).motion_id==ftCa_MS_SpecialAirN;
             if(doctor){
                 const auto motion=match.player_stats(0).motion_id;
                 air_capsule|=motion==ftMr_MS_SpecialAirN;
@@ -201,7 +234,8 @@ int main(int argc,char** argv){try{
         }
         if(doctor&&cycle==0)check(air_capsule,
             "Dr. Mario aerial neutral special did not enter its original capsule action");
-        if(ganon)check(air_warlock_punch,"Ganondorf did not enter original aerial Warlock Punch");
+        if(ganon||captain)check(air_captain_family_punch,
+            "Captain-family fighter did not enter its original aerial neutral special");
         if(cycle==0&&fox_family){
             for(unsigned n=0;n<300&&match.player_stats(0).ground_or_air!=0;n++)tick();
             check(match.player_stats(0).ground_or_air==0,"Selected fighter did not land after the air laser");
@@ -304,27 +338,56 @@ int main(int argc,char** argv){try{
             }
             raw[0].stickY=0;raw[0].button=0;
             check(down,"Dr. Mario down special did not enter its original source action");
-        }else if(cycle==0&&ganon){
+        }else if(cycle==0&&(ganon||captain)){
             auto settle=[&](){
                 raw[0].button=0;raw[0].stickX=raw[0].stickY=0;
                 for(unsigned n=0;n<480;n++){
                     const auto state=match.player_stats(0);
-                    if(state.ground_or_air==0&&state.motion_id<ftCa_MS_SwordSwing4)return;
+                    if(state.ground_or_air==0&&state.motion_id<ftCa_MS_SwordSwing4){
+                        raw[0].stickX=0;
+                        return;
+                    }
+                    // An unassisted Falcon Kick can cross FD's ledge. Leave
+                    // the original rebirth platform with ordinary movement
+                    // rather than spending its complete neutral-input timer.
+                    raw[0].stickX=state.motion_id==ftCo_MS_RebirthWait?
+                        (state.position[0]>0?-40:40):0;
                     tick();
                 }
-                check(false,"Ganondorf special did not return to grounded common motion");
+                const auto failed=match.player_stats(0);
+                std::cout<<"Captain-family settle failure x="<<failed.position[0]
+                         <<" y="<<failed.position[1]<<" motion="<<failed.motion_id
+                         <<" air="<<failed.ground_or_air<<std::endl;
+                check(false,"Captain-family special did not return to grounded common motion");
             };
             auto center=[&](){
                 settle();
-                for(unsigned n=0;n<240;n++){
+                const auto before=match.player_stats(0);
+                std::cout<<"Captain-family recenter entry x="<<before.position[0]
+                         <<" y="<<before.position[1]<<" motion="<<before.motion_id<<std::endl;
+                // Use the same feedback-driven walk recovery as the visible
+                // sweep. Captain's authored run/brake momentum carried the
+                // old full-stick dash past center after input was released.
+                for(unsigned elapsed=0;elapsed<720;){
                     const auto state=match.player_stats(0);
-                    if(std::abs(state.position[0])<8)break;
-                    raw[0].stickX=state.position[0]>0?-80:80;tick();
+                    if(state.ground_or_air==0&&state.motion_id==14&&
+                       std::abs(state.position[0])<=12)break;
+                    const bool can_walk=state.ground_or_air==0&&
+                        ((state.motion_id>=14&&state.motion_id<=23)||
+                         state.motion_id==245||state.motion_id==246);
+                    const bool walk=can_walk&&std::abs(state.position[0])>12;
+                    raw[0].stickX=walk?(state.position[0]>0?-40:40):0;
+                    const unsigned duration=std::min(720-elapsed,walk?4U:can_walk?24U:120U);
+                    for(unsigned n=0;n<duration;n++)tick();
+                    elapsed+=duration;
                 }
                 raw[0].stickX=0;
-                for(unsigned n=0;n<30;n++)tick();
-                check(std::abs(match.player_stats(0).position[0])<18,
-                      "Raw movement did not recenter Ganondorf for special lifecycle check");
+                for(unsigned n=0;n<2;n++)tick();
+                const auto after=match.player_stats(0);
+                std::cout<<"Captain-family recenter result x="<<after.position[0]
+                         <<" y="<<after.position[1]<<" motion="<<after.motion_id<<std::endl;
+                check(after.ground_or_air==0&&after.motion_id==14&&std::abs(after.position[0])<18,
+                      "Raw movement did not recenter the Captain-family fighter for special lifecycle check");
             };
             center();
             bool side=false;
@@ -334,7 +397,7 @@ int main(int argc,char** argv){try{
                 const auto motion=match.player_stats(0).motion_id;
                 side=motion==ftCa_MS_SpecialSStart||motion==ftCa_MS_SpecialS;
             }
-            check(side,"Ganondorf Raptor Boost did not enter its original source state");
+            check(side,"Captain-family Raptor Boost did not enter its original source state");
             center();
             bool up=false;
             for(unsigned n=0;n<180&&!up;n++){
@@ -342,16 +405,19 @@ int main(int argc,char** argv){try{
                 const auto motion=match.player_stats(0).motion_id;
                 up=motion==ftCa_MS_SpecialHi||motion==ftCa_MS_SpecialAirHi;
             }
-            check(up,"Ganondorf Dark Dive did not enter its original source state");
+            check(up,"Captain-family up special did not enter its original source state");
             center();
             bool down=false;
             for(unsigned n=0;n<180&&!down;n++){
                 raw[0].stickY=-80;raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
                 down=match.player_stats(0).motion_id==ftCa_MS_SpecialLw;
             }
-            check(down,"Ganondorf Wizard's Foot did not enter its original source state");
+            check(down,"Captain-family down special did not enter its original source state");
+            const auto stocks_before_down_recovery=match.player_stats(0).stocks;
             settle();
-            std::cout<<"Ganondorf original N/air-N/S/Hi/Lw lifecycle branches executed"<<std::endl;
+            std::cout<<"Captain-family down recovery stocks="<<stocks_before_down_recovery
+                     <<" -> "<<match.player_stats(0).stocks<<std::endl;
+            std::cout<<fighter_content->name<<" original N/air-N/S/Hi/Lw lifecycle branches executed"<<std::endl;
         }else if(cycle==0&&mars_family){
             raw[0].button=0;raw[0].stickX=raw[0].stickY=0;
             for(unsigned n=0;n<420;n++){

@@ -206,6 +206,14 @@ DatNativeStage::DatNativeStage(std::shared_ptr<const DatArchive> archive, int st
  s.map.unk1C=meta.light_override_table.count;s.map.unk18=nullptr;
  for(const auto& symbol:a.public_symbols())if(symbol.name=="yakumono_param"){
   if(profile->decode_yakumono){s.yaku=profile->decode_yakumono(s.arena.reader(),symbol.data_offset);require(s.yaku,"Native stage yakumono decoder returned null");continue;}
+  if(profile->opaque_yakumono){
+   s.record(symbol.data_offset,4);
+   auto* opaque=s.make<uint8_t>(4);
+   auto bytes=a.range(symbol.data_offset,4);
+   std::memcpy(opaque,bytes.data(),bytes.size());
+   s.yaku=opaque;
+   continue;
+  }
  // Original grLast uses four pointers to material command programs. Typed
   // command hydration is required before exposing its native pointer table.
   // The word count is part of the source stage ABI: Battlefield has two

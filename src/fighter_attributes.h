@@ -17,6 +17,9 @@
  * back to source pointer width without pretending to know their semantics. */
 #define MELEE_WEB_ATTRIBUTE_TYPE_PTR32 uint32_t
 
+/* Luigi's 0x98 extension is kept in its own source-derived table. */
+#include "gameplay_luigi_schema.h"
+
 #define MELEE_WEB_CO_ATTRIBUTE_FIELDS(X) \
     X(0x000, F32, walk_accel_mul, walk_accel_mul) \
     X(0x004, F32, walk_accel_base, walk_accel_base) \

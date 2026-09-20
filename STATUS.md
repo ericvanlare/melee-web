@@ -12,9 +12,34 @@ both player orientations and all five costumes on Final Destination, including
 original combat, pause and teardown. The browser reaches original CSS/SSS and
 advancing Ganondorf gameplay. A reviewed 37-pipeline preload correction clears
 the 30-case, 5,200-frame drawn sweep with no hard timing/audio/pipeline failures;
-earlier cold failures remain retained. Original comparison, the warm pair and
-broader acceptance remain open;
+earlier cold failures remain retained. A following cold/warm pair passes all
+10,400 source frames with the same zero-failure counters at 640×480, DPR 1.
+Original comparison and broader acceptance remain open;
 see [Ganondorf scope and remaining gates](docs/GANONDORF_PORT_NOTES.md).
+Captain Falcon now passes native source lifecycles in both Captain/Mario player
+orders and all six costumes on Final Destination, including specials, stock
+loss/respawn, pause and repeated teardown. The integration preserves his
+original English costume resolution, indexed vertex colors and particle palette
+metadata. The browser completes all 30 action cases over 5,200 drawn frames;
+the first diagnostic run fails timing/audio/pipeline gates. After a reviewed
+35-descriptor preload correction, both cold/warm action sweeps pass all 10,400
+frames with zero hard failures. Startup and broader performance remain separate,
+and independent original comparison is pending; see
+[Captain Falcon's measured scope](docs/CAPTAIN_PORT_NOTES.md).
+Hyrule Temple passes two native stage-owner lifetimes, including scaled geometry,
+original map callbacks, light identity overrides, music candidates and teardown.
+Two original Ready/pause/No Contest match lifetimes also pass. The browser
+reaches advancing Temple gameplay, retaining an entry timing failure; a reviewed
+16-descriptor preload correction clears both cold/warm entry reruns without
+timing resumes. A cold startup long task remains visible, and the full action
+matrix and original comparison remain open; see
+[Temple evidence](docs/HYRULE_TEMPLE_PORT_NOTES.md).
+Luigi has a checked attribute ABI and real-archive regression; Fountain of
+Dreams has a source contract and checked scalar stage-parameter decoder. Both
+remain disabled while their runtime owners are unfinished.
+The current Captain/Temple checkpoint passes both Release builds and 1,060 tests
+in 284.594 seconds with 41 explicit skips; see
+[checkpoint validation](docs/evidence/full-game-checkpoint-captain-temple-v1.json).
 Results PR #44 and audio PR #42 remain separate draft dependencies. This branch
 work has not changed the deployed public alpha.
 

@@ -111,6 +111,22 @@ const ganon=[
   aerialSpecial("Wizard's Foot (air)",[[359,360]],0,-80),
 ];
 
+// Captain shares the ftCaptain motion-state enum with Ganondorf, but has
+// independent authored animations, hitboxes, movement and effects. Keep a
+// separate inventory so a Ganondorf pass cannot stand in for Captain.
+// Target-dependent Raptor Boost and Falcon Dive follow-ups remain separate
+// interaction cases; these inputs exercise their unassisted entry paths.
+const captain=[
+  ground('Falcon Punch',[[347,347]],input(1,PAD.B),input(180)),
+  aerialSpecial('Falcon Punch (air)',[[348,348]]),
+  ground('Raptor Boost',[[349,350]],input(1,PAD.B,80),input(240)),
+  aerialSpecial('Raptor Boost (air)',[[351,352]],80),
+  ground('Falcon Dive',[[353,353]],input(1,PAD.B,0,80),input(240)),
+  aerialSpecial('Falcon Dive (air)',[[354,354]],0,80),
+  ground('Falcon Kick',[[357,358]],input(1,PAD.B,0,-80),input(240)),
+  aerialSpecial('Falcon Kick (air)',[[359,360]],0,-80),
+];
+
 export const actionInventories=new Map([
  [18,{id:'marth-visible-actions-v1',fighter:'Marth',minimumStageFrames:4200,cases:[...common,...wavedashes,...marth]}],
  [21,{id:'dr-mario-visible-actions-v1',fighter:'Dr. Mario',minimumStageFrames:4800,cases:[...common,...wavedashes,...drMario]}],
@@ -118,6 +134,7 @@ export const actionInventories=new Map([
  [6,{id:'link-visible-actions-v1',fighter:'Link',minimumStageFrames:4800,cases:[...common,...wavedashes,...link]}],
  [20,{id:'young-link-visible-actions-v1',fighter:'Young Link',minimumStageFrames:4800,cases:[...common,...wavedashes,...link]}],
  [25,{id:'ganondorf-visible-actions-v1',fighter:'Ganondorf',minimumStageFrames:5200,cases:[...common,...ganon]}],
+ [2,{id:'captain-falcon-visible-actions-v1',fighter:'Captain Falcon',minimumStageFrames:5200,cases:[...common,...captain]}],
 ]);
 
 export function actionInventory(fighterKind){return actionInventories.get(fighterKind)||null;}

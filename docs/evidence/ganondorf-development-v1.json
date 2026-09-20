@@ -491,7 +491,7 @@
     "independent_original_comparison",
     "complete_interaction_corpus",
     "all_costume_and_opponent_render_states",
-    "cold_warm_performance",
+    "broader_costume_and_interaction_cold_warm_performance",
     "full_match_and_retained_menu_loops",
     "pixel_equivalence",
     "pcm_equivalence",
@@ -536,5 +536,110 @@
       "wasmHeapGrowthBytes": 0
     },
     "entry_timing_resumes": 0
+  },
+  "post_preload_cold_warm": {
+    "scope": "One cold-origin then warm-application authored30-case/5200-frame pair with normal drawing and audio; no independent original semantics, complete match, all-costume matrix, pixels/PCM equivalence or physical input claim.",
+    "pass": true,
+    "local_path": "work/full-game/ganon-browser-pair-v1/report.json",
+    "raw_report_sha256": "001b4a392d786ef3229f40ed22729f0c49bc12c321a85e0a4bc0f1a55b7cda8d",
+    "plan_sha256": "9ae8864da7309bd9222696ac66ab23ef6aed5468b6c56900447f2c80b587fea5",
+    "frozen_build_identity_sha256": "3d1da65e3e21673a16246d1ddf259aebad99231a5b32f7513713828feb06a386",
+    "browser": "153.0.8010.50",
+    "machine": "Apple M4",
+    "os": "macOS26.6.2 build25G83",
+    "runs": [
+      {
+        "round": "cold",
+        "geometry": {
+          "buffer": [
+            640,
+            480
+          ],
+          "css": [
+            900,
+            675
+          ],
+          "devicePixelRatio": 1,
+          "viewport": [
+            1280,
+            960
+          ],
+          "hidden": false,
+          "focused": true
+        },
+        "metrics": {
+          "sourceFrames": 5200,
+          "browserCallbacks": 5200,
+          "worstBrowserCallbackMs": 27.17,
+          "browserCallbackGaps": 0,
+          "browserLongTasks": 0,
+          "browserLongTaskWorstMs": 0,
+          "nativeCallbacks": 5200,
+          "worstNativeCallbackMs": 9.595,
+          "nativeCallbacksOverBudget": 0,
+          "nativeCallbacksOver33ms": 0,
+          "audioUnderrunFrames": 0,
+          "livePipelinesQueued": 0,
+          "livePipelinesCreated": 0,
+          "liveTextureUploadBytes": 692224,
+          "liveStagingUsedBytes": 7194219620,
+          "peakStagingUsedBytes": 2921240,
+          "preparationPauses": 0,
+          "automaticTimingResumes": 0,
+          "focusLost": false,
+          "wasmHeapGrowthBytes": 0
+        },
+        "entry_timing_resumes": 0
+      },
+      {
+        "round": "warm",
+        "geometry": {
+          "buffer": [
+            640,
+            480
+          ],
+          "css": [
+            900,
+            675
+          ],
+          "devicePixelRatio": 1,
+          "viewport": [
+            1280,
+            960
+          ],
+          "hidden": false,
+          "focused": true
+        },
+        "metrics": {
+          "sourceFrames": 5200,
+          "browserCallbacks": 5200,
+          "worstBrowserCallbackMs": 27.655,
+          "browserCallbackGaps": 0,
+          "browserLongTasks": 0,
+          "browserLongTaskWorstMs": 0,
+          "nativeCallbacks": 5200,
+          "worstNativeCallbackMs": 9.555,
+          "nativeCallbacksOverBudget": 0,
+          "nativeCallbacksOver33ms": 0,
+          "audioUnderrunFrames": 0,
+          "livePipelinesQueued": 0,
+          "livePipelinesCreated": 0,
+          "liveTextureUploadBytes": 692224,
+          "liveStagingUsedBytes": 7192499824,
+          "peakStagingUsedBytes": 2921240,
+          "preparationPauses": 0,
+          "automaticTimingResumes": 0,
+          "focusLost": false,
+          "wasmHeapGrowthBytes": 0
+        },
+        "entry_timing_resumes": 0
+      }
+    ]
+  },
+  "captain_shared_boundary_regression": {
+    "status": "pass",
+    "local_log": "work/full-game/ganon-native-captain-regression-v1.log",
+    "sha256": "73fcfd2686b362f2a86b3b5dcd57ad2a47fcb914a1fbceb5cc41f65ceba37460",
+    "scope": "Fresh native Ganondorf/Mario FD source lifecycles across five costumes after shared Captain filename, geometry and particle-palette changes; no browser or original-comparison claim."
   }
 }

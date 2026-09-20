@@ -64,8 +64,14 @@ and one shader. A fresh cleared-origin follow-up on Chrome 153.0.8010.50
 passes the same 30 cases and 5,200 source frames with no timing gaps, long
 tasks, native target misses, audio underruns, live pipelines, preparation
 pauses, automatic resumes, focus losses or heap growth. Native/browser maxima
-are 9.965/27.605 ms. This is one authored cleared-origin sweep; the warm pair,
-original comparison and broader fighter gates remain separate.
+are 9.965/27.605 ms. A following frozen cold/warm pair passes both 30-case,
+5,200-frame runs with the same zero-failure counters. Native/browser maxima
+are 9.595/27.170 ms cold and 9.555/27.655 ms warm. Both runs record a 640×480
+backing canvas, 900×675 CSS size, DPR 1 and a 1280×960 viewport on Apple M4,
+macOS 26.6.2, Chrome 153.0.8010.50. Warm means a complete unload, awaited cache
+save and full application reload in the same browser context. This establishes
+that authored action pair; original comparison, the full costume/interaction
+matrix and broader fighter gates remain separate.
 
 The narrow rigid-model asset inspector rejects the costume materials under its
 restricted preview policy. That failure is retained separately from the full

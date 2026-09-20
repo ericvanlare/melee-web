@@ -8002,3 +8002,23 @@ diff --git a/src/melee/ft/ftcommon.c b/src/melee/ft/ftcommon.c
          HSD_JObjSetTranslate(jobj, &fp->x1A7C);
      }
  }
+diff --git a/src/melee/gr/grshrine.c b/src/melee/gr/grshrine.c
+--- a/src/melee/gr/grshrine.c
++++ b/src/melee/gr/grshrine.c
+@@ -39,6 +39,16 @@
+ 
+ static void* yakumono_param;
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++/* Restore the original stage-local pointer after all source objects retire. */
++void* melee_web_grshrine_exchange_yakumono(void* value)
++{
++    void* previous = yakumono_param;
++    yakumono_param = value;
++    return previous;
++}
++#endif
++
+ static StageCallbacks grSh_StageCallbacks[3] = {
+     { grShrine_80201E08, grShrine_80201E34, grShrine_80201E3C,
+       grShrine_80201E40, 0 },

@@ -43,6 +43,7 @@ export const NATIVE_GAME_DISC_FILES=Object.freeze({
   'PlMsBk.dat':'PlMsBk.dat','PlMsWh.dat':'PlMsWh.dat',
   'EfMsData.dat':'EfMsData.dat','mars.ssm':'audio/us/mars.ssm',
   'GrOp.dat':'GrOp.dat','old_kb.hps':'audio/old_kb.hps','pupupu.ssm':'audio/us/pupupu.ssm',
+  'GrSh.dat':'GrSh.dat','shrine.hps':'audio/shrine.hps','akaneia.hps':'audio/akaneia.hps',
   // Dr. Mario (source FighterKind 0x15) borrows Mario's effect bank but owns
   // its own fighter, action and costume archives and voice bank.
   'PlDr.dat':'PlDr.dat','PlDrAJ.dat':'PlDrAJ.dat',
@@ -64,6 +65,10 @@ export const NATIVE_GAME_DISC_FILES=Object.freeze({
   'PlClNr.dat':'PlClNr.dat','PlClRe.dat':'PlClRe.dat','PlClBu.dat':'PlClBu.dat',
   'PlClWh.dat':'PlClWh.dat','PlClBk.dat':'PlClBk.dat',
   'EfLkData.dat':'EfLkData.dat','link.ssm':'audio/us/link.ssm','clink.ssm':'audio/us/clink.ssm',
+  'PlCa.dat':'PlCa.dat','PlCaAJ.dat':'PlCaAJ.dat','PlCaNr.dat':'PlCaNr.dat',
+  'PlCaGy.dat':'PlCaGy.dat','PlCaRe.usd':'PlCaRe.usd','PlCaWh.dat':'PlCaWh.dat',
+  'PlCaGr.dat':'PlCaGr.dat','PlCaBu.dat':'PlCaBu.dat',
+  'EfCaData.dat':'EfCaData.dat','captain.ssm':'audio/us/captain.ssm',
   'PlGn.dat':'PlGn.dat','PlGnAJ.dat':'PlGnAJ.dat',
   'PlGnNr.dat':'PlGnNr.dat','PlGnRe.dat':'PlGnRe.dat','PlGnBu.dat':'PlGnBu.dat',
   'PlGnGr.dat':'PlGnGr.dat','PlGnLa.dat':'PlGnLa.dat',

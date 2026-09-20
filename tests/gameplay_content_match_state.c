@@ -41,6 +41,7 @@ static const MeleeWebSourceIdentity* melee_web_source_identity(int ckind){
         {CKIND_EMBLEM, FTKIND_EMBLEM, ICONHUD_EMBLEM},
         {CKIND_LINK, FTKIND_LINK, ICONHUD_LINK},
         {CKIND_CLINK, FTKIND_CLINK, ICONHUD_CLINK},
+        {CKIND_CAPTAIN, FTKIND_CAPTAIN, ICONHUD_CAPTAIN},
         {CKIND_GANON, FTKIND_GANON, ICONHUD_GANON},
     };
     for (unsigned i=0;i<sizeof(rows)/sizeof(rows[0]);++i)

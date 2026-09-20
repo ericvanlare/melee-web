@@ -3,6 +3,7 @@
 #include "gameplay_article_data.h"
 #include <melee/ft/types.h>
 #include <melee/ft/kinds/ftMario/types.h>
+#include <melee/ft/kinds/ftLuigi/types.h>
 #include <melee/ft/kinds/ftFox/types.h>
 #include <melee/ft/kinds/ftCaptain/types.h>
 #include <melee/ft/kinds/ftMars/types.h>
@@ -18,6 +19,37 @@ typedef struct Counted { uint32_t count; void* data; } Counted;
 _Static_assert(sizeof(Counted) == 8, "Visibility descriptor ABI");
 _Static_assert(sizeof(ftLk_DatAttrs) == 0xDC, "Link extension ABI");
 _Static_assert(sizeof(ftCaptain_DatAttrs) == 0x8C, "Captain/Ganon extension ABI");
+_Static_assert(sizeof(ftLuigiAttributes) == MELEE_WEB_LUIGI_ATTRIBUTE_BYTES, "Luigi extension ABI");
+#define CHECK_LUIGI_SOURCE_F32(value) _Generic((value), float: 1, default: 0)
+#define CHECK_LUIGI_SOURCE_I32(value) \
+    _Generic((value), signed char: (sizeof(value) == sizeof(int32_t)), \
+             short: (sizeof(value) == sizeof(int32_t)), \
+             int: (sizeof(value) == sizeof(int32_t)), \
+             long: (sizeof(value) == sizeof(int32_t)), \
+             long long: (sizeof(value) == sizeof(int32_t)), default: 0)
+#define CHECK_LUIGI_PORTABLE_F32(value) _Generic((value), float: 1, default: 0)
+#define CHECK_LUIGI_PORTABLE_I32(value) _Generic((value), int32_t: 1, default: 0)
+#define CHECK_LUIGI_SOURCE_TYPE(type, value) CHECK_LUIGI_SOURCE_TYPE_IMPL(type, value)
+#define CHECK_LUIGI_SOURCE_TYPE_IMPL(type, value) CHECK_LUIGI_SOURCE_##type(value)
+#define CHECK_LUIGI_PORTABLE_TYPE(type, value) CHECK_LUIGI_PORTABLE_TYPE_IMPL(type, value)
+#define CHECK_LUIGI_PORTABLE_TYPE_IMPL(type, value) CHECK_LUIGI_PORTABLE_##type(value)
+#define CHECK_LUIGI(offset,type,name,original) \
+    _Static_assert(offsetof(ftLuigiAttributes, original) == offset, "Luigi source attribute offset"); \
+    _Static_assert(offsetof(MeleeWebLuigiAttributes, name) == offset, "Luigi portable attribute offset"); \
+    _Static_assert(sizeof(((ftLuigiAttributes*)0)->original) == sizeof(MELEE_WEB_LUIGI_TYPE_##type), "Luigi source attribute width"); \
+    _Static_assert(sizeof(((MeleeWebLuigiAttributes*)0)->name) == sizeof(MELEE_WEB_LUIGI_TYPE_##type), "Luigi portable attribute width"); \
+    _Static_assert(CHECK_LUIGI_SOURCE_TYPE(type, ((ftLuigiAttributes*)0)->original), "Luigi source attribute type"); \
+    _Static_assert(CHECK_LUIGI_PORTABLE_TYPE(type, ((MeleeWebLuigiAttributes*)0)->name), "Luigi portable attribute type");
+MELEE_WEB_LUIGI_ATTRIBUTE_FIELDS(CHECK_LUIGI)
+#undef CHECK_LUIGI
+#undef CHECK_LUIGI_PORTABLE_TYPE_IMPL
+#undef CHECK_LUIGI_PORTABLE_TYPE
+#undef CHECK_LUIGI_SOURCE_TYPE_IMPL
+#undef CHECK_LUIGI_SOURCE_TYPE
+#undef CHECK_LUIGI_PORTABLE_I32
+#undef CHECK_LUIGI_PORTABLE_F32
+#undef CHECK_LUIGI_SOURCE_I32
+#undef CHECK_LUIGI_SOURCE_F32
 #define WORD(o) r->word(r->context, (o))
 #define BYTE(o) r->byte(r->context, (o))
 #define PTR(o,n) r->pointer(r->context, (o),(n))
@@ -78,7 +110,8 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     if (!r || !unresolved) return NULL;
     REQUIRE(kind==FTKIND_MARIO || kind==FTKIND_DRMARIO || kind==FTKIND_FOX ||
         kind==FTKIND_FALCO || kind==FTKIND_MARS || kind==FTKIND_EMBLEM ||
-        kind==FTKIND_LINK || kind==FTKIND_CLINK || kind==FTKIND_GANON,
+        kind==FTKIND_LINK || kind==FTKIND_CLINK || kind==FTKIND_CAPTAIN || kind==FTKIND_GANON ||
+        kind==FTKIND_LUIGI,
         "Native fighter extension schema unavailable");
     REQUIRE(costumes>0 && costumes<=16,"Native costume count exceeds checked bound");
     REQUIRE(motion_count>0 && motion_count<=1024,"Native motion count exceeds checked bound");
@@ -126,7 +159,12 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
 #undef LINK
         REQUIRE(link->xC4.x0_bone_id>=0 && link->xC4.x0_bone_id<140 && link->xC4.x10_size>0,
                 "Native Link absorb descriptor invalid");
-    } else if(kind==FTKIND_GANON) {
+    } else if(kind==FTKIND_LUIGI) {
+        at=required(r,root+4,MELEE_WEB_LUIGI_ATTRIBUTE_BYTES); ftLuigiAttributes* luigi=NEW(ftLuigiAttributes,1); d->ext_attr=luigi;
+#define LUIGI(o,t,n,orig) luigi->orig=READ_##t(at+o);
+        MELEE_WEB_LUIGI_ATTRIBUTE_FIELDS(LUIGI)
+#undef LUIGI
+    } else if(kind==FTKIND_CAPTAIN || kind==FTKIND_GANON) {
         at=required(r,root+4,0x8C); ftCaptain_DatAttrs* captain=NEW(ftCaptain_DatAttrs,1); d->ext_attr=captain;
 #define CAPTAIN(o,t,n,orig) captain->orig=READ_##t(at+o);
         MELEE_WEB_CAPTAIN_ATTRIBUTE_FIELDS(CAPTAIN)
@@ -291,14 +329,15 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     d->x58->x10=BYTE(at+16); d->x58->x11=BYTE(at+17); d->x58->x18=floating(r,at+24);
     REQUIRE(d->x58->x0<140 && d->x58->x1<140 && d->x58->x8<140 && d->x58->x9<140 &&
         d->x58->x10<140 && d->x58->x11<140,"Native IK bone index invalid");
-    const unsigned item_slots=(kind==FTKIND_LINK||kind==FTKIND_CLINK)?7:4;
+    const unsigned item_slots=(kind==FTKIND_LINK||kind==FTKIND_CLINK)?7:
+                               kind==FTKIND_LUIGI?1:4;
     /* Fixed native capacity bounds the shared accessor for every admitted
      * family; only the exact source extent is read and remaining slots stay
      * null. Slot 6 is a Link joint, never an Article. */
     d->x48_items=NEW(void*,7);
     at=PTR(root+0x48,item_slots*4);
-    REQUIRE(kind!=FTKIND_GANON || at==UINT32_MAX,
-            "Ganon source ftData must not invent an Article table");
+    REQUIRE((kind!=FTKIND_CAPTAIN && kind!=FTKIND_GANON) || at==UINT32_MAX,
+            "Captain-family source ftData must not invent an Article table");
     if(at!=UINT32_MAX) {
         REGION(at,item_slots*4);
         for(unsigned i=0;i<item_slots;++i) {
@@ -328,8 +367,11 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
         REQUIRE(at!=UINT32_MAX && d->x48_items[0] && d->x48_items[1] && d->x48_items[2] &&
             d->x48_items[3] && d->x48_items[4],
             "Link OnLoad requires its five Article identities and part descriptor");
-    else if(kind==FTKIND_GANON)
-        REQUIRE(at==UINT32_MAX, "Ganon source ftData Article table is not null");
+    else if(kind==FTKIND_LUIGI)
+        REQUIRE(at!=UINT32_MAX && d->x48_items[0],
+            "Luigi OnLoad requires its fire Article identity");
+    else if(kind==FTKIND_CAPTAIN || kind==FTKIND_GANON)
+        REQUIRE(at==UINT32_MAX, "Captain-family source ftData Article table is not null");
     else
         REQUIRE((kind==FTKIND_MARS||kind==FTKIND_EMBLEM) && at==UINT32_MAX,
                 "Marth/Roy source ftData must not invent an Article table");

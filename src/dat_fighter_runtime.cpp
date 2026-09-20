@@ -115,9 +115,17 @@ DatFighterRuntime::DatFighterRuntime(std::shared_ptr<const DatArchive> archive, 
 #define READ_MARIO(at, type, name, original) mario_->name = read_##type(data, extension_ + at);
         MELEE_WEB_MARIO_ATTRIBUTE_FIELDS(READ_MARIO)
 #undef READ_MARIO
-    } else if (costume_->fighter_kind == 25) {
-        // Ganondorf's source loader delegates its extension to the Captain
-        // family.  Preserve the complete 0x8c record, including authored
+    } else if (costume_->fighter_kind == 17) {
+        // Luigi has a distinct 0x98 source extension; do not alias Mario's
+        // fields just because both fighters are in the Mario family.
+        region(data, extension_, MELEE_WEB_LUIGI_ATTRIBUTE_BYTES);
+        luigi_.emplace();
+#define READ_LUIGI(at, type, name, original) luigi_->name = read_##type(data, extension_ + at);
+        MELEE_WEB_LUIGI_ATTRIBUTE_FIELDS(READ_LUIGI)
+#undef READ_LUIGI
+    } else if (costume_->fighter_kind == 2 || costume_->fighter_kind == 25) {
+        // Captain and Ganondorf use the source Captain extension loader.
+        // Preserve the complete 0x8c record, including authored
         // unknowns and integer fields, until the native consumer is hydrated.
         region(data, extension_, 0x8C);
         captain_.emplace();

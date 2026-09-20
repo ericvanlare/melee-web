@@ -2,6 +2,7 @@
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <iterator>
 #include <map>
 #include <limits>
 
@@ -159,6 +160,40 @@ void selected_motion_identity()
     DatFighterAnimationStore malformed(data, fixture.container);
     rejects([&] { (void) malformed.select(2); });
 }
+Bytes read_real_archive(const char* path)
+{
+    std::ifstream input(path, std::ios::binary | std::ios::ate);
+    check(bool(input), "cannot open Luigi real fighter archive");
+    const auto size = input.tellg();
+    check(size > 0 && size <= std::streamoff(DatArchive::max_archive_bytes),
+          "Luigi real fighter archive exceeds bounds");
+    Bytes bytes(static_cast<std::size_t>(size));
+    input.seekg(0);
+    check(bool(input.read(reinterpret_cast<char*>(bytes.data()), size)),
+          "Luigi real fighter archive is truncated");
+    return bytes;
+}
+void real_luigi(const char* path)
+{
+    const auto identity = resolve_fighter_costume("PlyLuigi5K_Share_joint");
+    check(identity.fighter_kind == 17 && identity.motion_count == 312,
+          "Luigi source identity changed");
+    auto bytes = read_real_archive(path);
+    auto archive = std::make_shared<const DatArchive>(bytes);
+    const auto runtime = std::make_shared<const DatFighterRuntime>(archive, identity);
+    check(runtime->actions().size() == 312, "Luigi source action count changed");
+    check(!runtime->mario_attributes() && runtime->luigi_attributes(),
+          "Luigi extension was not kept distinct from Mario");
+    check(sizeof(MeleeWebLuigiAttributes) == 0x98 &&
+          archive->next_target_offset(runtime->extension_offset()) - runtime->extension_offset() == 0x98,
+          "Luigi extension does not retain its exact 0x98 source bound");
+    const auto& attributes = *runtime->luigi_attributes();
+    check(attributes.greenmissile_misfire_chance == 8.0f &&
+          attributes.greenmissile_smash == 3.0f &&
+          attributes.greenmissile_charge_rate == 20.0f &&
+          attributes.cyclone_unk == 3 && attributes.cyclone_landing_lag == 0,
+          "Luigi authored float/integer attributes changed");
+}
 }
 int main(int argc, char** argv)
 {
@@ -166,6 +201,13 @@ int main(int argc, char** argv)
         {"decoded_values", decoded_values}, {"malformed_attributes", malformed_attributes},
         {"malformed_actions", malformed_actions}, {"owned_command_boundary", owned_command_boundary},
         {"selected_motion_identity", selected_motion_identity}, {"hurtbox_dynamics", hurtbox_dynamics}};
-    try { check(argc == 2, "expected case"); cases.at(argv[1])(); }
+    try {
+        if (argc == 3 && std::string_view(argv[1]) == "real_luigi") {
+            real_luigi(argv[2]);
+            return 0;
+        }
+        check(argc == 2, "expected case");
+        cases.at(argv[1])();
+    }
     catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
 }

@@ -82,6 +82,15 @@ class GameplayFighterDataTests(unittest.TestCase):
                 self.assertIn("Native Roy dynamics selector-5 rows and six authored modes: passed", result.stdout)
             if len(args) == 6:
                 self.assertIn("Native Ganondorf Captain extension and null Article table: passed", result.stdout)
+            captain_asset = ROOT / "assets-local/full-game-captain/PlCa.dat"
+            captain_container = ROOT / "assets-local/full-game-captain/PlCaAJ.dat"
+            if len(args) == 6 and captain_asset.is_file() and captain_container.is_file():
+                args.extend((str(captain_asset),str(captain_container)))
+                result = subprocess.run([str(node), str(output), *args], cwd=directory, env=env,
+                                        capture_output=True, text=True, timeout=30)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn("Native Captain extension, six-costume bounds, zero dynamics and null Article table: passed",
+                              result.stdout)
             print(result.stdout, end="")
 
 

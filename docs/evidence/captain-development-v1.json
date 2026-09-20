@@ -1,0 +1,355 @@
+{
+  "schema": "melee-web-captain-development",
+  "version": 1,
+  "status": "native_and_scoped_cold_warm_action_pair_pass_original_comparison_pending",
+  "source_commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+  "fighter": {
+    "ckind": 0,
+    "ftkind": 2,
+    "costumes": 6,
+    "motion_rows": 318,
+    "attribute_bytes": 140,
+    "material_animation": "authored_null_all_six_costumes",
+    "dynamic_bones": 0,
+    "dynamics_modes": 0,
+    "article_table": "authored_null",
+    "effect_bank": 4,
+    "effect_entries": 6,
+    "audio_bank": 6
+  },
+  "profile": {
+    "setting_language": "English",
+    "saved_language": "English",
+    "authored_red_basename": "PlCaRe.",
+    "resolved_red_model": "PlCaRe.usd",
+    "other_locale_fallback": false
+  },
+  "asset_sha256": {
+    "EfCaData.dat": "13795a9316adb7fe5c2320da9610839aebf22a8959dcde629f0ac081faa8dc4c",
+    "PlCa.dat": "4cf61a52737d464df9298fd15573345fb3b9a15c79ab47dce4fd2e3e707917af",
+    "PlCaAJ.dat": "a9a0ccc2382a2f02d5423675469719488540dd119a14577712c97348f70e1c1a",
+    "PlCaBu.dat": "4aaa5e2d321ca338de03861388ff4b40a3a1cff41f1b6007a6cc92f2c6c59167",
+    "PlCaGr.dat": "0b12baf26ce9072fca50467b4701124230b2ec72e8b96129c75d90eb4ac3b601",
+    "PlCaGy.dat": "dcc34bbb428f978858e95b18e29d4a476b4582d59cdc5daca3814dcaf2eef872",
+    "PlCaNr.dat": "bdc91f7bde1da16ceefe332876c20b65b36ba2f30a1e94b59bb24a2f9fcfe163",
+    "PlCaRe.dat": "16f23de2fe53a10f8b2c885691d0aa6073abe4ecc1b6300d0d5b78a3d35544ad",
+    "PlCaRe.usd": "748c69ecc7c0028ceee773112dc39580eed736968d8ce735887b1ddca322cea1",
+    "PlCaWh.dat": "c4e0b8e5423d47a1c87b68212b6ae5d36d051f21bb71f15e9cb1eca3b727adde",
+    "captain.ssm": "62c8a0c9623b98f93fb7e128b4a9f0266f826e7bf305a8ee58725264897993f8"
+  },
+  "retained_failures": [
+    {
+      "local_path": "work/full-game/captain-native-v1.log",
+      "sha256": "0c03a77e5689e7bebdf9dc0591ed65b0f73cfc8de55d0ca6d727c2671d3f0325",
+      "scope": "Native constructor, first selected costume, direct vertex-color descriptor rejection; no gameplay or timing claim.",
+      "error": "Only supported direct vertex color formats are accepted"
+    },
+    {
+      "local_path": "work/full-game/captain-native-v2.log",
+      "sha256": "0ce077241b69bc8e3c5aafd51665187b5a9a4121f5bbf76a5ff3da0a414ba118",
+      "scope": "Native constructor after indexed-color correction; no source gameplay reached.",
+      "error": "Particle palette format is unsupported"
+    },
+    {
+      "local_path": "work/full-game/captain-native-v3.log",
+      "sha256": "55f6830289eb2c84d6854037e66c70c881047aa7fc13200397c209af45ae6d2a",
+      "scope": "First advancing native gameplay after palette correction; Falcon Punch damage 25; full-stick fixture overshoots.",
+      "error": "Raw movement did not recenter the Captain-family fighter for special lifecycle check"
+    },
+    {
+      "local_path": "work/full-game/captain-native-v4.log",
+      "sha256": "738a7f1726b91280ba14e5f8c4077cd3ab8b4c68f27b6bf7a6bacc5ff72ec01c",
+      "scope": "Position diagnostic confirms x70.2845 to -25.8954 overshoot under full-stick input.",
+      "error": "Raw movement did not recenter the Captain-family fighter for special lifecycle check"
+    },
+    {
+      "local_path": "work/full-game/captain-native-v5.log",
+      "sha256": "a7e78906595b9dbc97406dbe8d842c819a67eb00e0663436784c8f9e25c128f0",
+      "scope": "Feedback walking succeeds; neutral input after Falcon Kick exhausts fixture recovery bound.",
+      "error": "Captain-family special did not return to grounded common motion"
+    },
+    {
+      "local_path": "work/full-game/captain-native-v6.log",
+      "sha256": "8e5d45c7d31d7e3477001f75cbb12f5ae6eb2c536c33d3f7811bbb9e260ae264",
+      "scope": "Recovery diagnostic ends in source Fall at x16 y17.7; no simulation code changed.",
+      "error": "Captain-family special did not return to grounded common motion"
+    }
+  ],
+  "full_fighter_admitted": false,
+  "remaining": [
+    "independent_original_comparison",
+    "interaction_and_item_services",
+    "broader_stage_and_full_route_performance",
+    "full_match_and_retained_menu_loops",
+    "pixels",
+    "pcm",
+    "physical_input"
+  ],
+  "geometry": {
+    "source_file": "PlCaNr.dat",
+    "pobj_offset": 119496,
+    "descriptor_offset": 54284,
+    "attribute": 11,
+    "mode": 2,
+    "component_count": 1,
+    "component_type": 5,
+    "fraction": 0,
+    "stride": 4,
+    "relocated_array_offset": 0,
+    "fix_scope": "Native descriptor parsing for indexed packed GX colors, preserving original data and bounded display indices; viewer policy unchanged.",
+    "focused_tests": [
+      "indexed_RGBA8_spans_and_invalid_indices_stride_null_array",
+      "indexed16_RGB565_packed_width",
+      "all_six_owned_Captain_models"
+    ],
+    "source_consumer": "sysdolphin/baselib/pobj.c",
+    "native_bridge": "src/hsd_pobj_bridge.c",
+    "private_report_sha256": "3bc49fac37fe87668254eb9cbbb6ef934a7ef487a1654d382d5b56c8833706ca"
+  },
+  "particle_palette": {
+    "asset": "EfCaData.dat",
+    "texture_group": 6,
+    "image_format": 9,
+    "authored_tlut_word": 16777218,
+    "source_consumed_low_byte": 2,
+    "source_consumer": "sysdolphin/baselib/psdisp.c",
+    "fix": "Validate original u8 format while preserving complete source word",
+    "focused_test_result": "pass",
+    "focused_log_sha256": "32c1d1f95e170cdd70f0724bf29dc72f4f7dd0f6bca7f7435def12cc914aeb5f"
+  },
+  "native": {
+    "status": "pass",
+    "stage_kind": 32,
+    "opponent_character_kind": 8,
+    "costume_cycles_per_orientation": 6,
+    "orientations": [
+      [
+        0,
+        8
+      ],
+      [
+        8,
+        0
+      ]
+    ],
+    "selected_captain_actions": "Ground and aerial neutral specials on every costume; side/up/down source entry and recovery on first costume; original pause/No Contest and repeated teardown.",
+    "neutral_special_damage": 25,
+    "down_special_recovery": "Unassisted ground Falcon Kick crosses FD ledge, loses one stock, then returns through source rebirth; ordinary movement leaves RebirthWait.",
+    "source_state_modified_by_fixture": false,
+    "logs": [
+      {
+        "local_path": "work/full-game/captain-native-v8.log",
+        "sha256": "dd931bb2b2cb6d3e17203adc5977d7292cf35b0615f7fe65b787d6a16f1aff41"
+      },
+      {
+        "local_path": "work/full-game/captain-native-v9-reverse.log",
+        "sha256": "e9e51f961612d5bf6b810594d64bd947a35baaa7a6b9bf2f0573fe1298246ceb"
+      }
+    ],
+    "trace_wasm_sha256": "6421e5cd58cc81ab66eabe91f616f82994236595e1732adb9aac7b53d464fd85",
+    "diagnostic_recovery_log": {
+      "local_path": "work/full-game/captain-native-v7.log",
+      "sha256": "2559a97a2f9012bcfed25296f2057d88f28f354032cb823b023914a026ad5e38",
+      "scope": "Extra observation window identifies original SpecialLw 357 -> End 358 -> Fall 29 -> DeadDown 0 -> Rebirth 12 -> RebirthWait 13 -> Fall; diagnostic only, replaced by bounded ordinary-input recovery."
+    }
+  },
+  "shared_regressions": {
+    "status": "pass",
+    "results": [
+      {
+        "local_path": "work/full-game/captain-mario-regression-compare-v1.json",
+        "sha256": "0218d6944b9ee6e3695116406b1e7fd84e6a1e8684760242bd155da61fe1e950"
+      },
+      {
+        "local_path": "work/full-game/captain-battlefield-regression-v1.log",
+        "sha256": "69169399de5ed39ed9edb000ea143b78792dcfeabe3db4b93ff732022dd033e2"
+      },
+      {
+        "local_path": "work/full-game/ganon-native-captain-regression-v1.log",
+        "sha256": "73fcfd2686b362f2a86b3b5dcd57ad2a47fcb914a1fbceb5cc41f65ceba37460"
+      }
+    ],
+    "scope": "Fresh 240-frame Mario comparison: declared entry, inputs, fighters, RNG and match clock, no source drawing. Two 7200-tick Battlefield stage lifetimes. Five-costume native Ganondorf/Mario lifecycle regression."
+  },
+  "browser_discovery": {
+    "status": "functional_entry_pass_action_gate_failed",
+    "scope": "Visible original CSS/SSS raw PAD entry plus 30 action cases; declared concurrent native tests/builds; diagnostic, not isolated performance acceptance.",
+    "report_local_path": "work/full-game/captain-browser-entry-v1/report.json",
+    "report_sha256": "418003bb299518469de217c6840d0262dc7e16f18f7c83112ed061c1f71922a2",
+    "plan_local_path": "work/full-game/captain-browser-discovery-plan-v1.json",
+    "browser": "153.0.8010.50",
+    "inventory": "captain-falcon-visible-actions-v1",
+    "cases": 30,
+    "all_action_cases_completed": true,
+    "acceptance_pass": false,
+    "failures": [
+      "browser callback gap",
+      "native callback over 33.3 ms",
+      "audio underrun",
+      "live pipeline creation",
+      "automatic timing pause"
+    ],
+    "entry_timing_resumes": 1,
+    "metrics": {
+      "sourceFrames": 5200,
+      "browserCallbacks": 5200,
+      "worstBrowserCallbackMs": 444.465,
+      "browserCallbackGaps": 6,
+      "browserLongTasks": 0,
+      "browserLongTaskWorstMs": 0,
+      "nativeCallbacks": 5242,
+      "worstNativeCallbackMs": 431.275,
+      "nativeCallbacksOverBudget": 8,
+      "nativeCallbacksOver33ms": 6,
+      "audioUnderrunFrames": 404,
+      "livePipelinesQueued": 0,
+      "livePipelinesCreated": 26,
+      "liveTextureUploadBytes": 941568,
+      "liveStagingUsedBytes": 6931779216,
+      "peakStagingUsedBytes": 7946496,
+      "preparationPauses": 0,
+      "automaticTimingResumes": 4,
+      "focusLost": false,
+      "wasmHeapGrowthBytes": 0
+    }
+  },
+  "pipeline_preload": {
+    "status": "reviewed_seed_and_scoped_pair_pass",
+    "scope": "35 descriptors discovered across original visible Captain entry/gameplay; 26 created during action sweep. Existing 665 records retained without payload or first-frame changes.",
+    "added_pipelines": 35,
+    "seed_rows": 700,
+    "pipeline_rows": 699,
+    "seed_bytes": 2916352,
+    "seed_sha256": "ef1630d0eb52f3c3b564074f59d6f32c78cebfbd2fafb5d80cbf451b3ba054d2",
+    "review_local_path": "work/full-game/captain-cache-review-v1.json",
+    "review_sha256": "4fbfb333d5048c0071c4b350039a8ef312155818654f9c2c90b7e03fe63c467f"
+  },
+  "browser_pair": {
+    "status": "scoped_pair_pass",
+    "scope": "Thirty authored action cases on Final Destination, 5200 drawn source frames in each cold/warm run. Source menu entry also succeeds without timing resumes. Sweep counters reset at sweep start; startup/preparation are separate.",
+    "report_local_path": "work/full-game/captain-browser-pair-v1/report.json",
+    "report_sha256": "d417774bee6befbf310780dcae36dfb35c9d0b1cfaf21c6b03bdbdfcb4658a33",
+    "plan_local_path": "work/full-game/captain-browser-pair-plan-v1.json",
+    "plan_sha256": "d476ca4d922e81f40377066e7ca9f3ea5aab7957fa0e9ce4a5be3d220b5a1004",
+    "browser": "153.0.8010.50",
+    "machine": "Apple M4",
+    "os": "macOS 26.6.2 (25G83)",
+    "rounds": [
+      {
+        "round": "cold",
+        "pass": true,
+        "case_count": 30,
+        "entry_timing_resumes": 0,
+        "geometry": {
+          "buffer": [
+            640,
+            480
+          ],
+          "css": [
+            900,
+            675
+          ],
+          "devicePixelRatio": 1,
+          "viewport": [
+            1280,
+            960
+          ],
+          "hidden": false,
+          "focused": true
+        },
+        "cache": {
+          "state": "dirty",
+          "bytes": 0,
+          "cleared_on_startup": true,
+          "driver_cache": "uncontrolled"
+        },
+        "metrics": {
+          "sourceFrames": 5200,
+          "browserCallbacks": 5200,
+          "worstBrowserCallbackMs": 24.41,
+          "browserCallbackGaps": 0,
+          "browserLongTasks": 0,
+          "browserLongTaskWorstMs": 0,
+          "nativeCallbacks": 5200,
+          "worstNativeCallbackMs": 8.515,
+          "nativeCallbacksOverBudget": 0,
+          "nativeCallbacksOver33ms": 0,
+          "audioUnderrunFrames": 0,
+          "livePipelinesQueued": 0,
+          "livePipelinesCreated": 0,
+          "liveTextureUploadBytes": 941568,
+          "liveStagingUsedBytes": 6933811884,
+          "peakStagingUsedBytes": 2804936,
+          "preparationPauses": 0,
+          "automaticTimingResumes": 0,
+          "focusLost": false,
+          "wasmHeapGrowthBytes": 0
+        }
+      },
+      {
+        "round": "warm",
+        "pass": true,
+        "case_count": 30,
+        "entry_timing_resumes": 0,
+        "geometry": {
+          "buffer": [
+            640,
+            480
+          ],
+          "css": [
+            900,
+            675
+          ],
+          "devicePixelRatio": 1,
+          "viewport": [
+            1280,
+            960
+          ],
+          "hidden": false,
+          "focused": true
+        },
+        "cache": {
+          "state": "dirty",
+          "bytes": 3764928,
+          "cleared_on_startup": false,
+          "driver_cache": "uncontrolled"
+        },
+        "metrics": {
+          "sourceFrames": 5200,
+          "browserCallbacks": 5200,
+          "worstBrowserCallbackMs": 25.14,
+          "browserCallbackGaps": 0,
+          "browserLongTasks": 0,
+          "browserLongTaskWorstMs": 0,
+          "nativeCallbacks": 5200,
+          "worstNativeCallbackMs": 8.275,
+          "nativeCallbacksOverBudget": 0,
+          "nativeCallbacksOver33ms": 0,
+          "audioUnderrunFrames": 0,
+          "livePipelinesQueued": 0,
+          "livePipelinesCreated": 0,
+          "liveTextureUploadBytes": 941568,
+          "liveStagingUsedBytes": 6933283844,
+          "peakStagingUsedBytes": 2804936,
+          "preparationPauses": 0,
+          "automaticTimingResumes": 0,
+          "focusLost": false,
+          "wasmHeapGrowthBytes": 0
+        }
+      }
+    ],
+    "startup_observation": "Cold pre-sweep screenshot displays one 69ms long task before the action counters reset; this is retained and not classified as an action-sweep failure or a proven preparation-only event. Full-route timing is not admitted.",
+    "startup_screenshot_sha256": "c550bcffe60d51fb4007ad3bfc18b9c4d0ac0e3d29e4b3acc95a3230a1253128"
+  },
+  "final_shared_mario_regression": {
+    "status": "declared_state_match",
+    "frames_compared": 240,
+    "first_divergence": null,
+    "scope": "declared entry data, supplied inputs, fighter fields, RNG and match clock only; rendering, global PAD history, hardware and audio output are excluded",
+    "source_drawing": "excluded",
+    "gold_admitted": false,
+    "report_local_path": "work/full-game/captain-temple-mario-regression-compare-v2.json",
+    "report_sha256": "0218d6944b9ee6e3695116406b1e7fd84e6a1e8684760242bd155da61fe1e950",
+    "native_log_sha256": "721dcdb3a39417d6d3339eb483252a8281a51c800f9e80d35fdfa0f6e3932f44"
+  }
+}

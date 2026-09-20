@@ -63,7 +63,7 @@ void mnCharSel_Scene_OnExit(void* data)
 {
     (void) data;
     active_css->pending_scene_change = 1;
-    if (invalid_exit == 1) active_css->vs.start.players[0].ckind = CKIND_CAPTAIN;
+    if (invalid_exit == 1) active_css->vs.start.players[0].ckind = CKIND_DONKEY;
     active_css = NULL;
 }
 void mnStageSel_Scene_OnEnter(void* data) { active_sss = data; }
@@ -133,9 +133,11 @@ int main(void)
     setup(&css);
     if (!melee_web_menu_character_available(CKIND_MARIO) ||
         !melee_web_menu_character_available(CKIND_FOX) ||
-        melee_web_menu_character_available(CKIND_CAPTAIN) ||
+        !melee_web_menu_character_available(CKIND_CAPTAIN) ||
+        melee_web_menu_character_available(CKIND_DONKEY) ||
         !melee_web_menu_stage_available(MELEE_WEB_MENU_FD_ST_KIND) ||
         !melee_web_menu_stage_available(St_Kind_Story) ||
+        !melee_web_menu_stage_available(St_Kind_Shrine) ||
         melee_web_menu_stage_available(25) ||
         !melee_web_menu_css_selection_valid(&css))
         return 1;
@@ -165,7 +167,7 @@ int main(void)
     css.vs.start.players[2].slot_type = Gm_PKind_NA;
     css.vs.start.players[1].color = 4;
     if (melee_web_menu_css_selection_valid(&css)) return 52;
-    css.vs.start.players[1].ckind = CKIND_CAPTAIN;
+    css.vs.start.players[1].ckind = CKIND_DONKEY;
     css.vs.start.players[1].color = 0;
     if (melee_web_menu_css_selection_valid(&css)) return 53;
     css.vs.start.players[1].ckind = CKIND_FALCO;
@@ -304,7 +306,7 @@ int main(void)
                                                           sizeof(error)))
             return 5;
         css = *(CSSData*) melee_web_menu_css(session);
-        css.vs.start.players[0].ckind = CKIND_CAPTAIN;
+        css.vs.start.players[0].ckind = CKIND_DONKEY;
         *(CSSData*) melee_web_menu_css(session) = css;
         if (melee_web_menu_tick(session, error, sizeof(error)) !=
             MELEE_WEB_MENU_RESULT_SELECTION_REJECTED)
