@@ -88,12 +88,9 @@ def replace_once(text, old, new):
 
 
 def player_html(text):
-    text = replace_once(text, 'no audio <button', 'audio preview <button')
-    text = replace_once(text, 'aria-label="Why there is no audio"', 'aria-label="About preview audio"')
-    text = replace_once(text, 'licensing issue, need to remove about 50 lines of Dolphin audio code still',
-                        'Experimental replacement audio. Listen and report differences; exact hardware fidelity is not established.')
-    return replace_once(text, 'Audio is disabled in this alpha.',
-                        'Experimental audio is enabled in this staging preview.')
+    text, count = re.subn(r'<span id="audio-note">.*?</span></span>', '', text)
+    require(count == 1, 'Reviewed preview template boundary changed')
+    return replace_once(text, 'Audio is disabled in this alpha. ', '')
 
 
 def notices(text):

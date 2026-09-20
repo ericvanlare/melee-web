@@ -45,9 +45,9 @@ hash, and stays outside the upload. No disc image, extracted audio, coefficient
 binary, diagnostic page, source checkout or build sidecar is uploaded.
 
 The player uses the normal local disc import with a generated coefficient
-table, a 32 kHz AudioContext and the existing AudioWorklet. Its toolbar and
-notices explicitly describe enabled experimental audio and retained numerical
-data provenance. No production template is changed by this transformation.
+table, a 32 kHz AudioContext and the existing AudioWorklet. The player omits the
+audio-status label and tooltip; its notices retain the implementation and
+numerical-data provenance. No production template is changed by this transformation.
 
 ## Verify and deploy
 
