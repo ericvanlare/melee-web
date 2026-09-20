@@ -174,6 +174,44 @@ Bytes read_real_archive(const char* path)
           "Luigi real fighter archive is truncated");
     return bytes;
 }
+void real_donkey(const char* path)
+{
+    const auto identity = resolve_fighter_costume("PlyDonkey5K_Share_joint");
+    check(identity.fighter_kind == 3 && identity.motion_count == 337,
+          "Donkey source identity or authored action count changed");
+    auto archive = std::make_shared<const DatArchive>(read_real_archive(path));
+    const auto runtime = std::make_shared<const DatFighterRuntime>(archive, identity);
+    check(runtime->actions().size() == 337 && runtime->donkey_attributes(),
+          "Donkey action count or exact extension is missing");
+    check(!runtime->mario_attributes() && !runtime->luigi_attributes() &&
+          !runtime->pikachu_attributes() && !runtime->purin_attributes() &&
+          !runtime->captain_attributes(),
+          "Donkey extension was aliased to another fighter schema");
+    check(sizeof(MeleeWebDonkeyAttributes) == 0x74 &&
+          archive->next_target_offset(runtime->extension_offset()) - runtime->extension_offset() == 0x74,
+          "Donkey extension does not retain its exact 0x74 source bound");
+    const auto& attributes = *runtime->donkey_attributes();
+    check(attributes.motion_state == 341 && attributes.x4_motion_state == 351 &&
+          attributes.specialn_x2C_MAX_ARM_SWINGS == 10 &&
+          attributes.specialn_x30_DAMAGE_PER_SWING == 2,
+          "Donkey signed motion-state or Giant Punch counters changed");
+    check(attributes.cargo_hold_x20_TURN_SPEED == 6.0f &&
+          attributes.cargo_hold_x24_JUMP_STARTUP_LAG == 3.0f &&
+          attributes.cargo_hold_x28_LANDING_LAG == 15.0f,
+          "Donkey cargo hold floats changed");
+    check(runtime->dynamics().active_bone_count == 1 && runtime->dynamics().bones.size() == 1 &&
+          runtime->dynamics().spheres.size() == 1 && runtime->dynamics().animation_table_offset &&
+          *runtime->dynamics().animation_table_offset == 0x2a88,
+          "Donkey authored dynamics descriptor was omitted or fabricated");
+    check(!archive->pointer(runtime->root_offset() + 0x48, 4),
+          "Donkey x48 Article root is not authored");
+    auto malformed = read_real_archive(path);
+    put32(malformed, 0x20 + runtime->extension_offset() + 0x20, 0x7fc00000U);
+    rejects([&] {
+        (void) DatFighterRuntime(std::make_shared<const DatArchive>(malformed), identity);
+    });
+    std::cout << "Donkey 0x74 attributes, signed counters, cargo floats, authored dynamics and null x48: passed\n";
+}
 void real_luigi(const char* path, const char* effect_path)
 {
     const auto identity = resolve_fighter_costume("PlyLuigi5K_Share_joint");
@@ -335,6 +373,10 @@ int main(int argc, char** argv)
         {"malformed_actions", malformed_actions}, {"owned_command_boundary", owned_command_boundary},
         {"selected_motion_identity", selected_motion_identity}, {"hurtbox_dynamics", hurtbox_dynamics}};
     try {
+        if (argc == 3 && std::string_view(argv[1]) == "real_donkey") {
+            real_donkey(argv[2]);
+            return 0;
+        }
         if (argc == 4 && std::string_view(argv[1]) == "real_luigi") {
             real_luigi(argv[2], argv[3]);
             return 0;

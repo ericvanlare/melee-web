@@ -44,6 +44,7 @@ void verify(std::shared_ptr<const DatArchive> archive, const Bytes& container, b
     GameplayActionStore store(archive, mario(), container);
     for(unsigned id=78;id<=88;++id)check(store.command_ready(id),"Shared light-item pickup and throw command graphs are ready");
     for(unsigned id=96;id<=103;++id)check(store.command_ready(id),"Shared light-item smash throw command graphs are ready");
+    for(unsigned id=267;id<=275;++id)check(store.command_ready(id),"Shared cargo victim command graphs are ready");
     Fighter* fp = action_test_fighter(); check(fp != nullptr, "Fighter allocation"); store.bind(fp);
     check(action_test_load(fp, 2, 0) > 0 && action_test_load(fp, 6, 1) > 0 && action_test_alias(fp), "Original loader preserves 2/6 clip aliases");
     const auto frames = action_test_frames(fp); check(frames > 0, "Original FigaTree frames consumer");
@@ -118,6 +119,15 @@ void verify_common_appeals(std::shared_ptr<const DatArchive> archive, const Byte
         catch (const melee_web::DatError&) { generic_rejected = true; }
         check(generic_rejected, "generic and native-action animation cache policies were conflated");
     }
+    if (costume.fighter_kind == 3) {
+        auto runtime = std::make_shared<const DatFighterRuntime>(archive, costume);
+        DatFighterAnimationStore policy_store(runtime, container);
+        const auto wall = policy_store.select_native_action(0);
+        check(wall.animation && std::any_of(wall.animation->tracks.begin(), wall.animation->tracks.end(),
+                                           [](const auto& track) { return track.type == 12; }),
+              "Donkey WallDamage must retain its original branch visibility channel");
+        rejects([&] { (void) policy_store.select(0); });
+    }
     GameplayActionStore store(std::move(archive), costume, container);
     unsigned expected_command_mask = 0;
     for (unsigned index = 0; index < 2; ++index) {
@@ -143,6 +153,19 @@ void verify_common_appeals(std::shared_ptr<const DatArchive> archive, const Byte
                       store.runtime().action(motion).command_offset.has_value(),
                   "Pikachu-family self-motion source command presence changed");
         }
+    }
+    if (costume.fighter_kind == 3) {
+        check(costume.motion_count == 337, "Donkey authored action count changed");
+        for (unsigned motion = 295; motion < costume.motion_count; ++motion)
+            check(store.command_ready(motion), "Donkey cargo/special command graph is not admitted");
+        Fighter* fighter = action_test_fighter();
+        check(fighter, "Donkey action fixture allocation failed");
+        store.bind(fighter);
+        for (int motion : {0, 24, 296, 297, 298})
+            check(action_test_load(fighter, motion, 1) > 0,
+                  "Donkey WallDamage/fall/OnLoad cargo walk clip is not hydrated");
+        store.unbind(); action_test_destroy(fighter);
+        std::cout << "Donkey branch visibility, fall and cargo OnLoad clips: passed\n";
     }
     check(action_test_common_appeals(store.action_rows(), expected_command_mask),
           "Common appeal rows did not retain checked command storage or were given the sentinel");

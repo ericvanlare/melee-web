@@ -92,6 +92,7 @@ class GameplayActionStoreTests(unittest.TestCase):
                 (ROOT / "assets-local/full-game-luigi/PlLg.dat", ROOT / "assets-local/full-game-luigi/PlLgAJ.dat"),
                 (ROOT / "assets-local/full-game-pikachu/PlPk.dat", ROOT / "assets-local/full-game-pikachu/PlPkAJ.dat"),
                 (ROOT / "assets-local/full-game-pichu/PlPc.dat", ROOT / "assets-local/full-game-pichu/PlPcAJ.dat"),
+                (ROOT / "assets-local/full-game-donkey/PlDk.dat", ROOT / "assets-local/full-game-donkey/PlDkAJ.dat"),
             ]
             available_pairs = [pair for pair in owned_pairs if all(path.is_file() for path in pair)]
             args = [str(path) for pair in available_pairs for path in pair]
@@ -108,6 +109,8 @@ class GameplayActionStoreTests(unittest.TestCase):
             for index, kind in ((5, 12), (6, 23)):
                 if owned_pairs[index] in available_pairs:
                     self.assertIn(f"Pikachu-family kind {kind} authored self-motion rows 295/319: passed", result.stdout)
+            if owned_pairs[7] in available_pairs:
+                self.assertIn("Donkey branch visibility, fall and cargo OnLoad clips: passed", result.stdout)
             print(result.stdout, end="")
 
 

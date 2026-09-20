@@ -1,5 +1,6 @@
 #include "gameplay_fighter_data.h"
 #include "fighter_attributes.h"
+#include "gameplay_donkey_schema.h"
 #include "gameplay_pikachu_schema.h"
 #include "gameplay_purin_schema.h"
 #include "gameplay_article_data.h"
@@ -7,6 +8,7 @@
 #include <melee/ft/ftwaitanim.h>
 #include <melee/ft/kinds/ftMario/types.h>
 #include <melee/ft/kinds/ftLuigi/types.h>
+#include <melee/ft/kinds/ftDonkey/types.h>
 #include <melee/ft/kinds/ftPikachu/types.h>
 #include <melee/ft/kinds/ftPichu/types.h>
 #include <melee/ft/kinds/ftPurin/types.h>
@@ -26,6 +28,7 @@ _Static_assert(sizeof(Counted) == 8, "Visibility descriptor ABI");
 _Static_assert(sizeof(ftLk_DatAttrs) == 0xDC, "Link extension ABI");
 _Static_assert(sizeof(ftCaptain_DatAttrs) == 0x8C, "Captain/Ganon extension ABI");
 _Static_assert(sizeof(ftLuigiAttributes) == MELEE_WEB_LUIGI_ATTRIBUTE_BYTES, "Luigi extension ABI");
+_Static_assert(sizeof(ftDonkeyAttributes) == MELEE_WEB_DONKEY_ATTRIBUTE_BYTES, "Donkey extension ABI");
 _Static_assert(sizeof(ftPikachuAttributes) == MELEE_WEB_PIKACHU_ATTRIBUTE_BYTES,
                "Pikachu/Pichu shared extension ABI");
 _Static_assert(sizeof(ftPurinAttributes) == MELEE_WEB_PURIN_ATTRIBUTE_BYTES,
@@ -111,6 +114,36 @@ MELEE_WEB_LUIGI_ATTRIBUTE_FIELDS(CHECK_LUIGI)
 #undef CHECK_LUIGI_PORTABLE_F32
 #undef CHECK_LUIGI_SOURCE_I32
 #undef CHECK_LUIGI_SOURCE_F32
+#define CHECK_DONKEY_SOURCE_F32(value) _Generic((value), float: 1, default: 0)
+#define CHECK_DONKEY_SOURCE_I32(value) \
+    _Generic((value), signed char: (sizeof(value) == sizeof(int32_t)), \
+             short: (sizeof(value) == sizeof(int32_t)), \
+             int: (sizeof(value) == sizeof(int32_t)), \
+             long: (sizeof(value) == sizeof(int32_t)), \
+             long long: (sizeof(value) == sizeof(int32_t)), default: 0)
+#define CHECK_DONKEY_PORTABLE_F32(value) _Generic((value), float: 1, default: 0)
+#define CHECK_DONKEY_PORTABLE_I32(value) _Generic((value), int32_t: 1, default: 0)
+#define CHECK_DONKEY_SOURCE_TYPE(type, value) CHECK_DONKEY_SOURCE_TYPE_IMPL(type, value)
+#define CHECK_DONKEY_SOURCE_TYPE_IMPL(type, value) CHECK_DONKEY_SOURCE_##type(value)
+#define CHECK_DONKEY_PORTABLE_TYPE(type, value) CHECK_DONKEY_PORTABLE_TYPE_IMPL(type, value)
+#define CHECK_DONKEY_PORTABLE_TYPE_IMPL(type, value) CHECK_DONKEY_PORTABLE_##type(value)
+#define CHECK_DONKEY(offset,type,name,original) \
+    _Static_assert(offsetof(ftDonkeyAttributes, original) == offset, "Donkey source attribute offset"); \
+    _Static_assert(offsetof(MeleeWebDonkeyAttributes, name) == offset, "Donkey portable attribute offset"); \
+    _Static_assert(sizeof(((ftDonkeyAttributes*)0)->original) == sizeof(MELEE_WEB_DONKEY_TYPE_##type), "Donkey source attribute width"); \
+    _Static_assert(sizeof(((MeleeWebDonkeyAttributes*)0)->name) == sizeof(MELEE_WEB_DONKEY_TYPE_##type), "Donkey portable attribute width"); \
+    _Static_assert(CHECK_DONKEY_SOURCE_TYPE(type, ((ftDonkeyAttributes*)0)->original), "Donkey source attribute type"); \
+    _Static_assert(CHECK_DONKEY_PORTABLE_TYPE(type, ((MeleeWebDonkeyAttributes*)0)->name), "Donkey portable attribute type");
+MELEE_WEB_DONKEY_ATTRIBUTE_FIELDS(CHECK_DONKEY)
+#undef CHECK_DONKEY
+#undef CHECK_DONKEY_PORTABLE_TYPE_IMPL
+#undef CHECK_DONKEY_PORTABLE_TYPE
+#undef CHECK_DONKEY_SOURCE_TYPE_IMPL
+#undef CHECK_DONKEY_SOURCE_TYPE
+#undef CHECK_DONKEY_PORTABLE_I32
+#undef CHECK_DONKEY_PORTABLE_F32
+#undef CHECK_DONKEY_SOURCE_I32
+#undef CHECK_DONKEY_SOURCE_F32
 #define CHECK_PURIN_SOURCE_F32(value) _Generic((value), float: 1, default: 0)
 #define CHECK_PURIN_SOURCE_I32(value) \
     _Generic((value), signed char: (sizeof(value) == sizeof(int32_t)), \
@@ -307,7 +340,7 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     REQUIRE(kind==FTKIND_MARIO || kind==FTKIND_DRMARIO || kind==FTKIND_FOX ||
         kind==FTKIND_FALCO || kind==FTKIND_MARS || kind==FTKIND_EMBLEM ||
         kind==FTKIND_LINK || kind==FTKIND_CLINK || kind==FTKIND_CAPTAIN || kind==FTKIND_GANON ||
-        kind==FTKIND_LUIGI || kind==FTKIND_PIKACHU || kind==FTKIND_PICHU ||
+        kind==FTKIND_DONKEY || kind==FTKIND_LUIGI || kind==FTKIND_PIKACHU || kind==FTKIND_PICHU ||
         kind==FTKIND_PURIN,
         "Native fighter extension schema unavailable");
     REQUIRE(costumes>0 && costumes<=16,"Native costume count exceeds checked bound");
@@ -357,6 +390,11 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
 #undef LINK
         REQUIRE(link->xC4.x0_bone_id>=0 && link->xC4.x0_bone_id<140 && link->xC4.x10_size>0,
                 "Native Link absorb descriptor invalid");
+    } else if(kind==FTKIND_DONKEY) {
+        at=required(r,root+4,MELEE_WEB_DONKEY_ATTRIBUTE_BYTES); ftDonkeyAttributes* donkey=NEW(ftDonkeyAttributes,1); d->ext_attr=donkey;
+#define DONKEY(o,t,n,orig) donkey->orig=READ_##t(at+o);
+        MELEE_WEB_DONKEY_ATTRIBUTE_FIELDS(DONKEY)
+#undef DONKEY
     } else if(kind==FTKIND_LUIGI) {
         at=required(r,root+4,MELEE_WEB_LUIGI_ATTRIBUTE_BYTES); ftLuigiAttributes* luigi=NEW(ftLuigiAttributes,1); d->ext_attr=luigi;
 #define LUIGI(o,t,n,orig) luigi->orig=READ_##t(at+o);
@@ -494,8 +532,8 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
                    "Empty native fighter dynamics has a nonnull auxiliary table");
     uint32_t dynamics_table=PTR(at+16,1);
     if(dynamics_table!=UINT32_MAX) {
-        /* Marth/Roy/Ganondorf's authored dynamics modes each carry one integer chain
-         * cutoff per sword/cape bone. The mode selector is the second byte of
+        /* Authored dynamics modes carry one integer chain cutoff per active
+         * body (Marth/Roy/Ganondorf: three; Donkey: one). The mode selector is the second byte of
          * every source blend row, and the original field is typed FigaTree***
          * even though ftdynamics.c compares these pointer-width values as
          * small integers. Derive the table extent from all authored selectors:
@@ -503,7 +541,11 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
          * The referenced-region check below keeps an adjacent descriptor from
          * being consumed as a fabricated mode row.
          */
-        REQUIRE((kind==FTKIND_MARS||kind==FTKIND_EMBLEM||kind==FTKIND_GANON)&&d->x2C->dynamicsNum==3,
+        const bool sword_or_cape_modes =
+            (kind==FTKIND_MARS||kind==FTKIND_EMBLEM||kind==FTKIND_GANON) &&
+            d->x2C->dynamicsNum==3;
+        const bool donkey_modes = kind==FTKIND_DONKEY && d->x2C->dynamicsNum==1;
+        REQUIRE(sword_or_cape_modes || donkey_modes,
                 "Native fighter dynamics mode schema unavailable");
         REQUIRE(blends,"Native fighter dynamics selectors are missing");
         unsigned mode_count=0;
@@ -522,7 +564,7 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
             for(int bone=0;bone<d->x2C->dynamicsNum;++bone) {
                 uint32_t cutoff=WORD(row+bone*4);
                 REQUIRE(cutoff<=d->x2C->ftDynamicBones->array[bone].dyn_desc.count,
-                        "Marth/Roy dynamics cutoff exceeds its source chain");
+                        "Native fighter dynamics cutoff exceeds its source chain");
                 d->x2C->x10[mode][bone]=(FigaTree*)(uintptr_t)cutoff;
             }
         }
@@ -596,6 +638,8 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
         d->x48_items[1]=purin_parts(r,at,costumes);
     } else {
         at=PTR(root+0x48,item_slots*4);
+        if(kind==FTKIND_DONKEY)
+            REQUIRE(at==UINT32_MAX,"Donkey source ftData Article table is not null");
         REQUIRE((kind!=FTKIND_CAPTAIN && kind!=FTKIND_GANON) || at==UINT32_MAX,
                 "Captain-family source ftData must not invent an Article table");
         if(at!=UINT32_MAX) {
@@ -638,6 +682,8 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
             "Pikachu-family OnLoad requires its three Article identities");
     else if(kind==FTKIND_CAPTAIN || kind==FTKIND_GANON)
         REQUIRE(at==UINT32_MAX, "Captain-family source ftData Article table is not null");
+    else if(kind==FTKIND_DONKEY)
+        REQUIRE(at==UINT32_MAX, "Donkey source ftData Article table is not null");
     else if(kind==FTKIND_PURIN)
         REQUIRE(at!=UINT32_MAX && d->x48_items[0]==NULL && d->x48_items[1]!=NULL,
             "Purin custom-part wrapper is missing");

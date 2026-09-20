@@ -63,7 +63,7 @@ void mnCharSel_Scene_OnExit(void* data)
 {
     (void) data;
     active_css->pending_scene_change = 1;
-    if (invalid_exit == 1) active_css->vs.start.players[0].ckind = CKIND_DONKEY;
+    if (invalid_exit == 1) active_css->vs.start.players[0].ckind = CKIND_PLAYABLE_COUNT;
     active_css = NULL;
 }
 void mnStageSel_Scene_OnEnter(void* data) { active_sss = data; }
@@ -134,7 +134,8 @@ int main(void)
     if (!melee_web_menu_character_available(CKIND_MARIO) ||
         !melee_web_menu_character_available(CKIND_FOX) ||
         !melee_web_menu_character_available(CKIND_CAPTAIN) ||
-        melee_web_menu_character_available(CKIND_DONKEY) ||
+        !melee_web_menu_character_available(CKIND_DONKEY) ||
+        melee_web_menu_character_available(CKIND_PLAYABLE_COUNT) ||
         !melee_web_menu_stage_available(MELEE_WEB_MENU_FD_ST_KIND) ||
         !melee_web_menu_stage_available(St_Kind_Story) ||
         !melee_web_menu_stage_available(St_Kind_Shrine) ||
@@ -168,8 +169,15 @@ int main(void)
     css.vs.start.players[1].color = 4;
     if (melee_web_menu_css_selection_valid(&css)) return 52;
     css.vs.start.players[1].ckind = CKIND_DONKEY;
-    css.vs.start.players[1].color = 0;
+    css.vs.start.players[1].color = 4;
+    if (!melee_web_menu_css_selection_valid(&css) ||
+        melee_web_fighter_content(CKIND_DONKEY)->fighter_kind != FTKIND_DONKEY)
+        return 102;
+    css.vs.start.players[1].color = 5;
     if (melee_web_menu_css_selection_valid(&css)) return 53;
+    css.vs.start.players[1].ckind = CKIND_PLAYABLE_COUNT;
+    css.vs.start.players[1].color = 0;
+    if (melee_web_menu_css_selection_valid(&css)) return 103;
     css.vs.start.players[1].ckind = CKIND_FALCO;
     css.vs.start.players[1].color = 3;
     css.vs.start.rules.stkind = St_Kind_Battle;
@@ -306,7 +314,7 @@ int main(void)
                                                           sizeof(error)))
             return 5;
         css = *(CSSData*) melee_web_menu_css(session);
-        css.vs.start.players[0].ckind = CKIND_DONKEY;
+        css.vs.start.players[0].ckind = CKIND_PLAYABLE_COUNT;
         *(CSSData*) melee_web_menu_css(session) = css;
         if (melee_web_menu_tick(session, error, sizeof(error)) !=
             MELEE_WEB_MENU_RESULT_SELECTION_REJECTED)

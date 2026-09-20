@@ -32,6 +32,16 @@ class DatFighterRuntimeTests(unittest.TestCase):
                 result = subprocess.run([str(self.binary), case], capture_output=True, text=True, timeout=20)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_real_donkey_attribute_boundary(self):
+        asset = ROOT / "assets-local/full-game-donkey/PlDk.dat"
+        if not asset.is_file():
+            self.skipTest("owned Donkey fighter archive is unavailable")
+        result = subprocess.run([str(self.binary), "real_donkey", str(asset)],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Donkey 0x74 attributes, signed counters, cargo floats, authored dynamics and null x48: passed",
+                      result.stdout)
+
     def test_real_luigi_attribute_boundary(self):
         asset = ROOT / "assets-local/full-game-luigi/PlLg.dat"
         effects = ROOT / "assets-local/full-game-luigi/EfLgData.dat"

@@ -2,6 +2,7 @@
 
 #include "fighter_attributes.h"
 #include "fighter_binding.hpp"
+#include "gameplay_donkey_schema.h"
 #include "gameplay_pikachu_schema.h"
 #include "gameplay_purin_schema.h"
 #include <array>
@@ -42,8 +43,8 @@ struct DatFighterDynamics {
     // initial body count (Purin blue/green hats).
     std::vector<DatFighterDynamicsBone> bones;
     std::vector<DatFighterDynamicsSphere> spheres;
-    // Mars uses this target as five rows of three pointer-width integer chain
-    // cutoffs. Other fighter-specific table schemas remain unadmitted.
+    // Authored selector rows hold pointer-width integer chain cutoffs. The
+    // native owner validates each admitted fighter's body count and selectors.
     std::optional<std::uint32_t> animation_table_offset;
 };
 
@@ -76,6 +77,7 @@ public:
     [[nodiscard]] const MeleeWebFighterBaseAttributes& base_attributes() const noexcept { return base_; }
     [[nodiscard]] const std::optional<MeleeWebMarioAttributes>& mario_attributes() const noexcept { return mario_; }
     [[nodiscard]] const std::optional<MeleeWebLuigiAttributes>& luigi_attributes() const noexcept { return luigi_; }
+    [[nodiscard]] const std::optional<MeleeWebDonkeyAttributes>& donkey_attributes() const noexcept { return donkey_; }
     // Pikachu and Pichu use the shared original ftPikachuAttributes ABI;
     // their decoded values and Article identities remain family-specific.
     [[nodiscard]] const std::optional<MeleeWebPikachuAttributes>& pikachu_attributes() const noexcept { return pikachu_; }
@@ -110,6 +112,7 @@ private:
     MeleeWebFighterBaseAttributes base_{};
     std::optional<MeleeWebMarioAttributes> mario_;
     std::optional<MeleeWebLuigiAttributes> luigi_;
+    std::optional<MeleeWebDonkeyAttributes> donkey_;
     std::optional<MeleeWebPikachuAttributes> pikachu_;
     std::optional<MeleeWebPurinAttributes> purin_;
     std::optional<MeleeWebCaptainAttributes> captain_;

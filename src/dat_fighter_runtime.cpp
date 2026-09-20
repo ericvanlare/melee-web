@@ -116,6 +116,14 @@ DatFighterRuntime::DatFighterRuntime(std::shared_ptr<const DatArchive> archive, 
 #define READ_MARIO(at, type, name, original) mario_->name = read_##type(data, extension_ + at);
         MELEE_WEB_MARIO_ATTRIBUTE_FIELDS(READ_MARIO)
 #undef READ_MARIO
+    } else if (costume_->fighter_kind == 3) {
+        // Donkey keeps a distinct 0x74 source extension. Its signed motion
+        // state/counter words must not be read through a float-only schema.
+        region(data, extension_, MELEE_WEB_DONKEY_ATTRIBUTE_BYTES);
+        donkey_.emplace();
+#define READ_DONKEY(at, type, name, original) donkey_->name = read_##type(data, extension_ + at);
+        MELEE_WEB_DONKEY_ATTRIBUTE_FIELDS(READ_DONKEY)
+#undef READ_DONKEY
     } else if (costume_->fighter_kind == 17) {
         // Luigi has a distinct 0x98 source extension; do not alias Mario's
         // fields just because both fighters are in the Mario family.
@@ -385,7 +393,12 @@ DatSelectedAction DatFighterAnimationStore::select_impl(std::uint32_t id, DatAni
     }
     const DatArchive archive(fighter_->archive_actions().slice(container_, id));
     const auto offset = root(archive, result.action.symbol);
-    result.animation = std::make_shared<const DatAnimation>(archive, offset, policy);
+    try {
+        result.animation = std::make_shared<const DatAnimation>(archive, offset, policy);
+    } catch (const DatError& error) {
+        throw DatError("Fighter action "+std::to_string(id)+" ("+
+                       result.action.symbol+"): "+error.what());
+    }
     cache_[next_] = {result.action.container_offset, result.action.archive_bytes, result.action.symbol,
                      native_action, result.animation};
     next_ = (next_ + 1) % cache_.size();

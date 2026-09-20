@@ -173,6 +173,29 @@ const purin=[
   aerialSpecial('Rest (air)',[[370,372]],0,-80),
 ];
 
+// Donkey's source neutral special charges on its own and releases on a fresh
+// B edge; releasing the button is not a punch. Cargo/target interactions have
+// a separate native fixture and are not certified by this unassisted sweep.
+const donkey=[
+  ground('Giant Punch partial charge/release',[[369,369],[370,370],[372,372]],
+    input(1,PAD.B),input(45),input(1,PAD.B),input(180)),
+  ground('Giant Punch charge cancel',[[369,369],[370,370],[371,371]],
+    input(1,PAD.B),input(45),input(1,PAD.L,0,0,0,0,255),input(180)),
+  ground('Giant Punch full charge/release',[[369,369],[370,370],[373,373]],
+    input(1,PAD.B),input(300),input(1,PAD.B),input(180)),
+  {name:'Giant Punch partial release (air)',expect:[[374,374],[375,375],[377,377]],settle:true,
+    inputs:[input(12,PAD.X),input(1,PAD.B),input(30),input(1,PAD.B),input(180)]},
+  {name:'Giant Punch cancel (air)',expect:[[374,374],[375,375],[376,376]],settle:true,
+    inputs:[input(12,PAD.X),input(1,PAD.B),input(30),input(1,PAD.L,0,0,0,0,255),input(180)]},
+  ground('Giant Punch full release (air)',[[369,369],[370,370],[378,378]],
+    input(1,PAD.B),input(300),input(12,PAD.X),input(1,PAD.B),input(180)),
+  ground('Headbutt',[[379,379]],input(1,PAD.B,80),input(180)),
+  aerialSpecial('Headbutt (air)',[[380,380]],80),
+  ground('Spinning Kong',[[381,381]],input(1,PAD.B,0,80),input(240)),
+  aerialSpecial('Spinning Kong (air)',[[382,382]],0,80),
+  ground('Hand Slap',[[383,383],[384,384],[385,385]],input(1,PAD.B,0,-80),input(180)),
+];
+
 export const actionInventories=new Map([
  [18,{id:'marth-visible-actions-v1',fighter:'Marth',minimumStageFrames:4200,cases:[...common,...wavedashes,...marth]}],
  [21,{id:'dr-mario-visible-actions-v1',fighter:'Dr. Mario',minimumStageFrames:4800,cases:[...common,...wavedashes,...drMario]}],
@@ -185,6 +208,7 @@ export const actionInventories=new Map([
  [12,{id:'pikachu-visible-actions-v1',fighter:'Pikachu',minimumStageFrames:5600,cases:[...common,...pikachuFamily('Quick Attack')]}],
  [23,{id:'pichu-visible-actions-v1',fighter:'Pichu',minimumStageFrames:5600,cases:[...common,...pikachuFamily('Agility')]}],
  [15,{id:'jigglypuff-visible-actions-v1',fighter:'Jigglypuff',minimumStageFrames:6400,cases:[...common,...purin]}],
+ [3,{id:'donkey-kong-visible-actions-v1',fighter:'Donkey Kong',minimumStageFrames:7000,cases:[...common,...donkey]}],
 ]);
 
 export function actionInventory(fighterKind){return actionInventories.get(fighterKind)||null;}

@@ -84,6 +84,35 @@ class ContentMatchTests(unittest.TestCase):
                                [game, game, 32, fighter, opponent],
                                "Mixed source content intro, costumes, stage lifecycle, combat, pause and repeat teardown passed")
 
+    def test_donkey_source_lifecycles_both_orientations(self):
+        common = ROOT / "assets-local/full-game-ganon"
+        donkey = ROOT / "assets-local/full-game-donkey"
+        required_common = ("MnSlChr.usd", "PlMr.dat", "PlMrAJ.dat",
+                           "EfMrData.dat", "mario.ssm", "GrNLa.dat")
+        required_donkey = (
+            "PlDk.dat", "PlDkAJ.dat", "PlDkNr.dat", "PlDkBk.dat",
+            "PlDkRe.dat", "PlDkBu.dat", "PlDkGr.dat", "EfDkData.dat",
+            "dk.ssm",
+        )
+        if not (all((common / name).is_file() for name in required_common) and
+                all((donkey / name).is_file() for name in required_donkey)):
+            self.skipTest("Owned Donkey/Mario, English costumes, menu and FD fixtures are required")
+        # CKIND_DONKEY=1 and CKIND_MARIO=8 in the pinned source. The trace
+        # reconstructs all five Donkey source costume archives in both player
+        # orientations. Only the Donkey-as-P1 orientation drives specials and
+        # cargo; the reverse orientation still validates opponent lifetime and
+        # teardown without inventing a P2 input recipe.
+        temporary, merged = self.merged_asset_roots(common, donkey)
+        try:
+            for fighter, opponent in ((1, 8), (8, 1)):
+                with self.subTest(fighter=fighter, opponent=opponent):
+                    self.run_trace(
+                        "gameplay_content_match_trace",
+                        [merged, merged, 32, fighter, opponent],
+                        "Mixed source content intro, costumes, stage lifecycle, combat, pause and repeat teardown passed")
+        finally:
+            temporary.cleanup()
+
     def test_battlefield_scaled_geometry_and_background_lifetimes(self):
         game = ROOT / "assets-local/next-gate"
         if not (game / "GrNBa.dat").is_file():

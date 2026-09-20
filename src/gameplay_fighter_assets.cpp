@@ -238,6 +238,8 @@ struct GameplayFighterAssets::Storage {
             // x48 contains a custom FtPartsDesc wrapper, never an Article.
         } else if(id.fighter_kind==FTKIND_CAPTAIN || id.fighter_kind==FTKIND_GANON) {
             if(item_table)throw DatError("Captain-family source Article table must be null");
+        } else if(id.fighter_kind==FTKIND_DONKEY) {
+            if(item_table)throw DatError("Donkey source Article table must be null");
         } else if(id.fighter_kind!=18 && id.fighter_kind!=26) {
             throw DatError("Fighter item Article schema is unavailable");
         }

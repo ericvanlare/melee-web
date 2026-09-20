@@ -2,6 +2,7 @@
 #include "gameplay_fighter_data.h"
 #include "gameplay_pikachu_schema.h"
 #include "gameplay_purin_schema.h"
+#include "gameplay_donkey_schema.h"
 #include "gameplay_article_data.h"
 #include "gameplay_action_store.hpp"
 #include "fighter_runtime_fixture.hpp"
@@ -16,6 +17,7 @@ using namespace fighter_runtime_test;
 extern "C" void melee_web_test_fighter_data(void*,int);
 extern "C" void melee_web_test_guard_data(const MeleeWebNativeDat*,uint32_t,void*,uint32_t*);
 extern "C" void melee_web_test_purin_data(void*);
+extern "C" void melee_web_test_donkey_data(void*);
 namespace {
 /* Keep this focused check independent of the full source header graph. These
  * are the two native ABI prefixes needed to inspect ftData->x2C->x10. */
@@ -224,6 +226,78 @@ void verify_pikachu(const std::shared_ptr<const DatArchive>& archive,const Bytes
     std::cout<<"Native "<<(kind==12?"Pikachu":"Pichu")<<
         " shared 0xf8 attributes and three Article registrations: passed\n";
 }
+void verify_donkey(const Bytes& source,const Bytes& container) {
+    const auto archive=std::make_shared<const DatArchive>(source);
+    const auto& identity=resolve_fighter_costume("PlyDonkey5K_Share_joint");
+    check(identity.fighter_kind==3 && identity.motion_count==337,
+          "Missing source Donkey identity");
+    const auto runtime=std::make_shared<const DatFighterRuntime>(archive,identity);
+    DatFighterActions(*archive,identity).validate_container(container);
+    check(runtime->actions().size()==identity.motion_count && runtime->donkey_attributes(),
+          "Donkey action metadata or 0x74 extension is incomplete");
+    const auto& attributes=*runtime->donkey_attributes();
+    check(attributes.motion_state==341 && attributes.x4_motion_state==351 &&
+          attributes.specialn_x2C_MAX_ARM_SWINGS==10 &&
+          attributes.specialn_x30_DAMAGE_PER_SWING==2 &&
+          attributes.cargo_hold_x20_TURN_SPEED==6.0f &&
+          attributes.cargo_hold_x24_JUMP_STARTUP_LAG==3.0f &&
+          attributes.cargo_hold_x28_LANDING_LAG==15.0f,
+          "Donkey portable ABI values changed");
+    check(runtime->dynamics().active_bone_count==1 && runtime->dynamics().bones.size()==1 &&
+          runtime->dynamics().spheres.size()==1 && runtime->dynamics().animation_table_offset,
+          "Donkey authored dynamics descriptor was omitted or fabricated");
+    uint32_t root=UINT32_MAX;
+    for(const auto& symbol:archive->public_symbols())if(symbol.name=="ftDataDonkey")root=symbol.data_offset;
+    check(root!=UINT32_MAX,"Missing ftDataDonkey root");
+    std::vector<std::uint8_t> donkey_blends(identity.motion_count * 2, 0);
+    for (const auto& action : runtime->actions()) {
+        donkey_blends[action.motion_id * 2] = action.blend_dynamics[0];
+        donkey_blends[action.motion_id * 2 + 1] = action.blend_dynamics[1];
+    }
+    check(donkey_blends.size() == identity.motion_count * 2,
+          "Donkey source dynamics rows were not retained");
+    for (std::size_t motion = 0; motion < identity.motion_count; ++motion)
+        check(donkey_blends[motion * 2 + 1] == 0,
+              "Donkey source dynamics selector changed");
+    NativeDatArena owner(archive); uint32_t unresolved=UINT32_MAX;
+    void* data=melee_web_fighter_data_decode(owner.reader(),root,3,5,
+        identity.motion_count,nullptr,donkey_blends.data(),nullptr,&unresolved);
+    check(data,"Donkey native ftData was not decoded");
+    const auto* decoded=static_cast<const NativeFighterDataView*>(data);
+    check(decoded->dynamics && decoded->dynamics->dynamics_num==1 &&
+          decoded->dynamics->modes &&
+          reinterpret_cast<std::uintptr_t>(decoded->dynamics->modes[0][0])==1,
+          "Donkey native dynamics mode selector or cutoff changed");
+    melee_web_test_donkey_data(data);
+    auto malformed=source;
+    put32(malformed,0x20+runtime->extension_offset()+0x20,0x7fc00000U);
+    rejects([&] {
+        NativeDatArena rejected(std::make_shared<const DatArchive>(malformed));
+        uint32_t mask=0;
+        (void)melee_web_fighter_data_decode(rejected.reader(),root,3,5,
+            identity.motion_count,nullptr,donkey_blends.data(),nullptr,&mask);
+    });
+    auto bad_cutoff=source;
+    const auto cutoff_row=archive->pointer(*runtime->dynamics().animation_table_offset,4);
+    check(cutoff_row.has_value(),"Donkey source cutoff row is missing");
+    put32(bad_cutoff,0x20+*cutoff_row,
+          static_cast<uint32_t>(runtime->dynamics().bones[0].parameters.size()+1));
+    rejects([&] {
+        NativeDatArena rejected(std::make_shared<const DatArchive>(bad_cutoff));
+        uint32_t mask=0;
+        (void)melee_web_fighter_data_decode(rejected.reader(),root,3,5,
+            identity.motion_count,nullptr,donkey_blends.data(),nullptr,&mask);
+    });
+    auto bad_blends=donkey_blends;
+    bad_blends[1]=1; // Source table has only selector zero; reject an adjacent row.
+    rejects([&] {
+        NativeDatArena rejected(archive);
+        uint32_t mask=0;
+        (void)melee_web_fighter_data_decode(rejected.reader(),root,3,5,
+            identity.motion_count,nullptr,bad_blends.data(),nullptr,&mask);
+    });
+    std::cout<<"Native Donkey 0x74 ABI, exact dynamics and null Article table: passed\n";
+}
 void verify_purin(const Bytes& source,const Bytes& container) {
     const auto archive=std::make_shared<const DatArchive>(source);
     const auto& identity=resolve_fighter_costume("PlyPurin5K_Share_joint");
@@ -405,6 +479,18 @@ int main(int argc,char**argv) {
             verify_pikachu(std::make_shared<const DatArchive>(read_file(argv[11])),read_file(argv[12]),
                           "PlyPichu5K_Share_joint","ftDataPichu",23,0x5b,0x5c,0x52,8);
             verify_purin(read_file(argv[13]),read_file(argv[14]));
+        }
+        if(argc==17) {
+            verify(std::make_shared<const DatArchive>(read_file(argv[1])),read_file(argv[2]),1);
+            verify_roy(std::make_shared<const DatArchive>(read_file(argv[3])),read_file(argv[4]));
+            verify_ganon(std::make_shared<const DatArchive>(read_file(argv[5])),read_file(argv[6]));
+            verify_captain(std::make_shared<const DatArchive>(read_file(argv[7])),read_file(argv[8]));
+            verify_pikachu(std::make_shared<const DatArchive>(read_file(argv[9])),read_file(argv[10]),
+                          "PlyPikachu5K_Share_joint","ftDataPikachu",12,0x59,0x5a,0x51,5);
+            verify_pikachu(std::make_shared<const DatArchive>(read_file(argv[11])),read_file(argv[12]),
+                          "PlyPichu5K_Share_joint","ftDataPichu",23,0x5b,0x5c,0x52,8);
+            verify_purin(read_file(argv[13]),read_file(argv[14]));
+            verify_donkey(read_file(argv[15]),read_file(argv[16]));
         }
     }catch(const std::exception&e){std::cerr<<e.what()<<'\n';return 1;}
 }

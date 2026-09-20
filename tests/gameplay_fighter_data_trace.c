@@ -1,6 +1,7 @@
 #include "gameplay_fighter_data.h"
 #include <melee/ft/types.h>
 #include <melee/ft/kinds/ftPurin/types.h>
+#include <melee/ft/kinds/ftDonkey/types.h>
 #include <melee/ft/ftwaitanim.h>
 #include "gameplay_article_data.h"
 #include <melee/it/types.h>
@@ -62,6 +63,21 @@ void melee_web_test_guard_data(const MeleeWebNativeDat* r,uint32_t root,void* da
     melee_web_fighter_data_set_guard(r,root,d,&joint,mask);
     CHECK(d->x20&&d->x20->x0[2]==&child&&d->x20->x8==0&& !(*mask&(1U<<8)));
     d->x20=NULL; /* The test's borrowed descriptor expires here. */
+}
+
+void melee_web_test_donkey_data(void* data) {
+    ftData* d=data;
+    CHECK(d && d->ext_attr && d->x2C && d->x2C->dynamicsNum==1 &&
+          d->x2C->ftDynamicBones && d->x2C->x4==1 && d->x2C->x8 && d->x48_items);
+    ftDonkeyAttributes* attrs=(ftDonkeyAttributes*)d->ext_attr;
+    CHECK(attrs->motion_state==341 && attrs->x4_motion_state==351 &&
+          attrs->SpecialN.x2C_MAX_ARM_SWINGS==10 &&
+          attrs->SpecialN.x30_DAMAGE_PER_SWING==2 &&
+          attrs->cargo_hold.x20_TURN_SPEED==6.0f &&
+          attrs->cargo_hold.x24_JUMP_STARTUP_LAG==3.0f &&
+          attrs->cargo_hold.x28_LANDING_LAG==15.0f);
+    for(unsigned i=0;i<7;++i) CHECK(!d->x48_items[i]);
+    for(unsigned i=0;i<6;++i) CHECK(!melee_web_fighter_data_article(data,FTKIND_DONKEY,i));
 }
 
 void melee_web_test_purin_data(void* data) {

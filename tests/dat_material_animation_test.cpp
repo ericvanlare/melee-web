@@ -144,6 +144,22 @@ int main() {
         melee_web::DatMaterialAnimation synchronized(paired.archive(),0,model);
         check(synchronized.texture_animation_count()==1,
               "synchronized index/palette tracks use diagonal validation");
+
+        // HSD keeps the authored TCLT table even when a selected TIMG image
+        // is non-CI; setup ignores that TLUT for I/IA/RGB/CMPR images. The
+        // image table and palette table remain independently bounds-checked.
+        PairedFixture mixed_nonindexed;
+        put32(mixed_nonindexed.data,132,14); // image[1]: CMPR, not indexed
+        put16(mixed_nonindexed.data,476,1);  // one valid, unused TLUT entry
+        melee_web::DatMaterialAnimation mixed(mixed_nonindexed.archive(),0,model);
+        check(mixed.texture_animation_count()==1,
+              "nonindexed selected image preserves authored TCLT table");
+        auto mixed_bad_tlut = mixed_nonindexed;
+        put16(mixed_bad_tlut.data,476,0);
+        rejected(mixed_bad_tlut); // non-CI still requires a valid authored TLUT descriptor
+        auto mixed_bad_tclt = mixed_nonindexed;
+        mixed_bad_tclt.data[195]=64; // TCLT value 2, outside its two-entry table
+        rejected(mixed_bad_tclt); // table-index bounds remain enforced before setup
         PairedFixture divergent;
         divergent.data[195]=0; // TCLT selects a different second index
         rejected(divergent);

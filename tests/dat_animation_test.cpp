@@ -62,23 +62,24 @@ void unsupported_channels_and_formats()
 void native_action_channel_policy()
 {
     Bytes node_stream = segment(2, 0, 10, 10);
-    MeleeWebAnimationTrack node{node_stream.data(), node_stream.size(), 0, 11, 0, 0};
     char error[256];
-    check(!melee_web_animation_validate_track(&node, error, sizeof(error)) && error[0],
-          "generic inspection validation rejects source node visibility channels");
-    check(!melee_web_animation_validate_native_track(&node, error, sizeof(error)) && error[0],
-          "generic native pose validation rejects source node visibility channels");
-    check(melee_web_animation_validate_native_action_track(&node, error, sizeof(error)) && !error[0],
-          "native fighter action validation admits source node visibility channels");
+    for (std::uint8_t type : {11, 12}) {
+        MeleeWebAnimationTrack track{node_stream.data(), node_stream.size(), 0, type, 0, 0};
+        check(!melee_web_animation_validate_track(&track, error, sizeof(error)) && error[0],
+              "generic inspection validation rejects source visibility channels");
+        check(!melee_web_animation_validate_native_track(&track, error, sizeof(error)) && error[0],
+              "generic native pose validation rejects source visibility channels");
+        check(melee_web_animation_validate_native_action_track(&track, error, sizeof(error)) && !error[0],
+              "native fighter action validation admits source visibility channels");
+        Fixture fixture(node_stream, type);
+        rejects([&] { (void) fixture.animation(); });
+        const auto action = melee_web::DatAnimation(
+            fixture.archive(), Fixture::root, melee_web::DatAnimationPolicy::NativeFighterAction);
+        check(action.tracks.size() == 1 && action.tracks[0].type == type,
+              "native fighter action policy retains the checked visibility track");
+    }
 
-    Fixture fixture(node_stream, 11);
-    rejects([&] { (void) fixture.animation(); });
-    const auto action = melee_web::DatAnimation(
-        fixture.archive(), Fixture::root, melee_web::DatAnimationPolicy::NativeFighterAction);
-    check(action.tracks.size() == 1 && action.tracks[0].type == 11,
-          "native fighter action policy retains the checked node track");
-
-    for (auto type : {12, 20, 255}) {
+    for (auto type : {0, 4, 20, 255}) {
         MeleeWebAnimationTrack unsupported{node_stream.data(), node_stream.size(), 0,
                                            std::uint8_t(type), 0, 0};
         check(!melee_web_animation_validate_native_action_track(&unsupported, error, sizeof(error)) && error[0],
@@ -151,6 +152,18 @@ void native_single_value_guard()
     check(!native_valid(lin), "native terminal single-LIN stream cannot produce an interpolation value");
     check(!native_valid(spl0), "native terminal single-SPL stream cannot produce an interpolation value");
     check(native_valid(key), "native single-KEY stream retains source key semantics");
+    for (auto* bytes : {&con, &lin, &spl0, &key}) {
+        const MeleeWebAnimationTrack track{bytes->data(), bytes->size(), 0, 12, 0, 0};
+        char error[256];
+        const bool valid=melee_web_animation_validate_native_action_track(&track,error,sizeof(error));
+        check(valid,
+              "native fighter streams retain singleton bytes for guarded source execution");
+    }
+    Bytes delayed_zero{1,0,0};
+    const MeleeWebAnimationTrack delayed{delayed_zero.data(),delayed_zero.size(),0xffde,12,0x88,0x88};
+    char error[256];
+    check(melee_web_animation_validate_native_action_track(&delayed,error,sizeof(error)),
+          "Donkey delayed zero branch stream retains signed start bits and native CON policy");
 }
 
 int main(int argc, char** argv)

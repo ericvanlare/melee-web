@@ -64,10 +64,10 @@ validation.
    graphics resources, audio ownership and browser preparation/teardown. A
    missing service must fail at its owning boundary; a successful stub is not a
    feature.
-2. Decompose and harden the current eight-fighter/four-stage cohort. Preserve
+2. Decompose and harden the starting eight-fighter/four-stage cohort. Preserve
    each CharacterKind/FighterKind and StKind/GrKind identity, authored table
    bounds, costumes, actions, articles, effects, music, map services and
-   teardown. The current cohort's eight fighter rows and four stage rows are
+   teardown. That cohort's eight fighter rows and four stage rows are
    explicitly `partial` implementation and `partial` scoped acceptance; they
    remain below full-game
    acceptance until its ordinary-input, reference, pixel, PCM and performance
@@ -92,6 +92,27 @@ validation.
    independent original comparison, pixel, PCM, physical-input, lifecycle and
    cold/warm performance evidence. A recorded controller queue is conditional
    evidence and does not establish live timing or input equivalence.
+
+## Asset residency boundary
+
+The owned USA revision-2 FST audit finds 110,925,567 bytes in 224 unique paths
+for the full playable fighter set: 27 source fighter kinds, including Nana and
+the separate Zelda/Sheik forms, rather than 27 CSS slots. The 29 concrete VS
+ground archives occupy another 28,856,907 bytes. Deduplicating these with the
+Jigglypuff checkpoint's existing menu/shared/music imports yields 287 paths and
+192,035,176 bytes. This is a lower bound: remaining stage music and other game
+modes are still outside that union.
+
+That lower bound exceeds the browser's 128 MiB requested-file budget by
+57,817,448 bytes. Full-roster integration therefore needs explicit scene asset
+plans and teardown ownership. Keep executable identity, exact FST paths,
+per-file bounds and complete-request preflight; derive each menu or match plan
+from the source identities and selected stage's authored music candidates.
+Release retained bytes only after the corresponding native owners close.
+The cap must not be raised implicitly or missing assets made optional to admit
+the roster. The ignored audit is retained at
+`work/full-game/full-roster-import-boundary-v1.md`; its totals describe the
+Jigglypuff checkpoint, not browser memory use or gameplay readiness.
 
 ## Status and acceptance rules
 

@@ -115,6 +115,15 @@ class GameplayFighterDataTests(unittest.TestCase):
                         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                         self.assertIn("Native Purin 0x100 ABI, five-costume custom-part visibility, and no Article exposure: passed",
                                       result.stdout)
+                        donkey_asset = ROOT / "assets-local/full-game-donkey/PlDk.dat"
+                        donkey_container = ROOT / "assets-local/full-game-donkey/PlDkAJ.dat"
+                        if donkey_asset.is_file() and donkey_container.is_file():
+                            args.extend((str(donkey_asset), str(donkey_container)))
+                            result = subprocess.run([str(node), str(output), *args], cwd=directory,
+                                                    env=env, capture_output=True, text=True, timeout=30)
+                            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                            self.assertIn("Native Donkey 0x74 ABI, exact dynamics and null Article table: passed",
+                                          result.stdout)
             print(result.stdout, end="")
 
 

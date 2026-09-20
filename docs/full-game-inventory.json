@@ -174,8 +174,8 @@
       "id": "fighter-donkey-kong",
       "category": "fighters",
       "title": "Donkey Kong selectable fighter",
-      "implementation": "not_integrated",
-      "acceptance": "not_evaluated",
+      "implementation": "partial",
+      "acceptance": "partial",
       "source_identity": {
         "ckind": "CKIND_DONKEY",
         "ftkind": "FTKIND_DONKEY"
@@ -194,9 +194,11 @@
       ],
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
-        "docs/ACCURACY_CONTRACT.md"
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/DONKEY_KONG_PORT_NOTES.md",
+        "docs/evidence/full-game-checkpoint-donkey-v1.json"
       ],
-      "next_step": "Run the fighter checkpoint for Donkey Kong and split its costume, action, article, effect and audio coverage into bounded receipts.",
+      "next_step": "Native five-costume FD lifetimes in both player orders pass with specials and raw cargo wait/walk/throw. A reviewed 15-descriptor preload clears fresh 33-case cold/warm FD sweeps over 14,000 frames. Resolve the reproduced Battlefield Pass shield-drop crash at undefined terminal SPL0 output using independent original consumer evidence; StopCeil and broader interactions remain untested. Original state/pixel/PCM and physical-input admission remain open.",
       "issue": null
     },
     {

@@ -6,6 +6,7 @@
 #include <melee/ft/kinds/ftMario/forward.h>
 #include <melee/ft/kinds/ftMars/forward.h>
 #include <melee/ft/kinds/ftCaptain/forward.h>
+#include <melee/ft/kinds/ftDonkey/forward.h>
 #include <melee/ft/kinds/ftLuigi/forward.h>
 #include <melee/ft/kinds/ftPikachu/forward.h>
 #include <melee/ft/kinds/ftPurin/forward.h>
@@ -19,6 +20,7 @@
 #include <algorithm>
 
 extern "C" int melee_web_test_content_player(unsigned,int,int,unsigned);
+extern "C" int melee_web_test_donkey_cargo(unsigned,int);
 extern "C" int melee_web_test_item_count(int);
 extern "C" int melee_web_test_purin_anim_id(int);
 extern "C" int melee_web_test_quake_start(int);
@@ -26,9 +28,10 @@ extern "C" int melee_web_test_quake_translated(void);
 extern "C" int melee_web_story_state(uint32_t*,unsigned*,int*,int*,int*,int*);
 static void check(bool value,const char* message){if(!value)throw std::runtime_error(message);}
 int main(int argc,char** argv){try{
-    if(argc<3||argc>7)throw std::runtime_error("Expected owned menu/game directories and optional StKind/P1 CKind/P2 CKind/--entry-only");
+    if(argc<3||argc>7)throw std::runtime_error("Expected owned menu/game directories and optional StKind/P1 CKind/P2 CKind/trace scope");
     const bool entry_only=argc==7&&std::string(argv[6])=="--entry-only";
-    if(argc==7&&!entry_only)throw std::runtime_error("Unknown source match trace scope");
+    const bool platform_pass=argc==7&&std::string(argv[6])=="--platform-pass";
+    if(argc==7&&!entry_only&&!platform_pass)throw std::runtime_error("Unknown source match trace scope");
     melee_web::RuntimeFiles files;
     for(const auto* root:{argv[1],argv[2]})for(const auto& entry:std::filesystem::directory_iterator(root)){
         if(!entry.is_regular_file())continue;
@@ -114,7 +117,34 @@ int main(int argc,char** argv){try{
         check(melee_web_test_content_player(1,opponent_ckind,opponent_content->fighter_kind,opponent_color),"Original opponent identity/costume/icon differs");
         check(match.player_stats(0).stocks==4&&match.player_stats(1).stocks==4,
               "Source stock initialization changed for the selected content pair");
-        if(entry_only){
+        if(platform_pass){
+            check(selection.start.rules.stkind==St_Kind_Battle&&
+                  opponent_content->fighter_kind==FTKIND_DONKEY,
+                  "Platform Pass probe requires Battlefield with Donkey in P2");
+            // Source Battlefield slot 1 is the upper platform. Guard + down
+            // enters original Pass without changing the Fighter or collision.
+            const auto initial=match.player_stats(1);
+            std::cout<<"Donkey platform start x="<<initial.position[0]
+                     <<" y="<<initial.position[1]<<" motion="<<initial.motion_id<<std::endl;
+            raw[1].button=PAD_TRIGGER_L;tick();
+            bool entered=false;
+            for(unsigned n=0;n<8&&!entered;n++){
+                // Source x464 is .66, while earlier spot-dodge IASA uses
+                // x314=-.70. Raw -54/80 lies between those authored gates.
+                raw[1].button=PAD_TRIGGER_L;raw[1].stickY=-54;tick();
+                std::cout<<"Donkey platform input frame="<<n<<" motion="
+                         <<match.player_stats(1).motion_id<<std::endl;
+                entered=match.player_stats(1).motion_id==ftCo_MS_Pass;
+            }
+            raw[1].button=0;raw[1].stickY=0;
+            check(entered,"Battlefield raw shield/down did not enter Donkey Pass");
+            unsigned pass_ticks=0;
+            for(;pass_ticks<40&&match.player_stats(1).motion_id==ftCo_MS_Pass;pass_ticks++)tick();
+            check(match.player_stats(1).motion_id!=ftCo_MS_Pass,
+                  "Donkey source Pass did not finish its animation lifetime");
+            std::cout<<"Donkey original Pass exited after "<<pass_ticks
+                     <<" ticks, motion="<<match.player_stats(1).motion_id<<std::endl;
+        }else if(entry_only){
             // Stage entry has its own scope: do not reuse the FD combat
             // positioning recipe on geometry where that walk leaves a ledge.
             for(unsigned n=0;n<60;n++)tick();
@@ -311,6 +341,7 @@ int main(int argc,char** argv){try{
         const bool doctor=fighter_content->fighter_kind==FTKIND_DRMARIO;
         const bool captain=fighter_content->fighter_kind==FTKIND_CAPTAIN;
         const bool ganon=fighter_content->fighter_kind==FTKIND_GANON;
+        const bool donkey=fighter_content->fighter_kind==FTKIND_DONKEY;
         const bool luigi=fighter_content->fighter_kind==FTKIND_LUIGI;
         const bool pikachu_family=fighter_content->fighter_kind==FTKIND_PIKACHU||
             fighter_content->fighter_kind==FTKIND_PICHU;
@@ -327,7 +358,7 @@ int main(int argc,char** argv){try{
         raw[1].stickY=0;
         check(std::abs(match.player_stats(1).position[1]-match.player_stats(0).position[1])<5.0f,
               "Raw input did not bring both fighters to the same stage level");
-        const float attack_distance=(ganon||captain)?16.0f:35.0f;
+        const float attack_distance=(ganon||captain||donkey)?16.0f:35.0f;
         for(unsigned n=0;n<120;n++){
             const auto p1=match.player_stats(0),p2=match.player_stats(1);
             if(std::abs(p2.position[0]-p1.position[0])<attack_distance)break;
@@ -364,6 +395,7 @@ int main(int argc,char** argv){try{
         }
         const auto damage=match.player_stats(1).damage_percent;
         bool capsule=false,captain_family_punch=false,luigi_fireball_live=false;
+        bool donkey_ground_n=false;
         bool pikachu_ground_n=false,pikachu_ground_article_live=false;
         const int pikachu_ground_kind=pichu?It_Kind_Pichu_TJolt_Ground:
             It_Kind_Pikachu_TJolt_Ground;
@@ -374,6 +406,8 @@ int main(int argc,char** argv){try{
         for(unsigned n=0;n<240&&match.player_stats(1).damage_percent==damage;n++){
             raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
             if(ganon||captain)captain_family_punch|=match.player_stats(0).motion_id==ftCa_MS_SpecialN;
+            if(donkey)donkey_ground_n|=match.player_stats(0).motion_id>=ftDk_MS_SpecialNStart&&
+                match.player_stats(0).motion_id<=ftDk_MS_SpecialNFull;
             if(doctor){
                 const auto motion=match.player_stats(0).motion_id;
                 capsule|=motion==ftMr_MS_SpecialN||motion==ftMr_MS_SpecialAirN;
@@ -393,6 +427,8 @@ int main(int argc,char** argv){try{
         check(match.player_stats(1).damage_percent>damage,"Selected fighter ground neutral special did not damage the opponent");
         if(ganon||captain)check(captain_family_punch,
             "Captain-family fighter did not enter its original grounded neutral special");
+        if(donkey)check(donkey_ground_n,
+            "Donkey did not enter an original grounded Giant Punch state");
         if(doctor)check(capsule,"Dr. Mario ground neutral special did not enter its original capsule action");
         if(luigi){
             check(luigi_fireball_live,"Luigi ground neutral special did not create its original fireball article");
@@ -681,6 +717,148 @@ int main(int argc,char** argv){try{
             std::cout<<"Captain-family down recovery stocks="<<stocks_before_down_recovery
                      <<" -> "<<match.player_stats(0).stocks<<std::endl;
             std::cout<<fighter_content->name<<" original N/air-N/S/Hi/Lw lifecycle branches executed"<<std::endl;
+        }else if(cycle==0&&donkey){
+            // The common neutral loop above already proves grounded Giant
+            // Punch damage and an authored N state.  This branch drives the
+            // remaining Donkey state machines with raw PAD edges and records
+            // source motion IDs only; it never writes Fighter state.
+            auto settle_donkey=[&](){
+                raw[0].button=0;raw[0].stickX=raw[0].stickY=0;
+                for(unsigned n=0;n<720;n++){
+                    const auto state=match.player_stats(0);
+                    if(state.ground_or_air==0&&state.motion_id<ftDk_MS_HeavyWait)
+                        return;
+                    tick();
+                }
+                const auto state=match.player_stats(0);
+                std::cout<<"Donkey settle failure motion="<<state.motion_id
+                         <<" ground="<<state.ground_or_air<<" x="<<state.position[0]
+                         <<" y="<<state.position[1]<<std::endl;
+                check(false,"Donkey special did not return to a grounded common motion");
+            };
+            auto jump_donkey=[&](){
+                settle_donkey();
+                raw[0].stickX=raw[0].stickY=0;
+                // Hold through the original jump-squat gate for a full jump;
+                // a one-tick pulse selects a short hop and can land before
+                // the neutral-special start/loop/release sequence finishes.
+                raw[0].button=PAD_BUTTON_X;
+                for(unsigned n=0;n<12;n++)tick();
+                raw[0].button=0;
+                for(unsigned n=0;n<120&&match.player_stats(0).ground_or_air==0;n++)tick();
+                check(match.player_stats(0).ground_or_air!=0,
+                      "Donkey did not enter an authored aerial state");
+            };
+            auto run_special=[&](bool air,int ground_motion,int air_motion,
+                                 int stick_x,int stick_y,const char* failure){
+                if(air)jump_donkey();else settle_donkey();
+                bool entered=false;
+                int observed=-1;
+                for(unsigned n=0;n<240&&!entered;n++){
+                    raw[0].stickX=stick_x;raw[0].stickY=stick_y;
+                    raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
+                    const auto state=match.player_stats(0);
+                    if(observed!=state.motion_id)
+                        std::cout<<"Donkey special transition frame="<<n
+                                 <<" motion="<<state.motion_id<<" air="<<state.ground_or_air
+                                 <<" y="<<state.position[1]<<std::endl;
+                    observed=state.motion_id;
+                    entered=observed==(air?air_motion:ground_motion);
+                    // Earlier source input can leave a stored Giant Punch.
+                    // Preserve that history: AirN_Enter selects Full at ten
+                    // swings, otherwise Loop_IASA selects the partial punch.
+                    if(air&&air_motion==ftDk_MS_SpecialAirN)
+                        entered|=observed==ftDk_MS_SpecialAirNFull;
+                }
+                raw[0].button=0;raw[0].stickX=raw[0].stickY=0;
+                check(entered,failure);
+                std::cout<<"Donkey "<<(air?"air":"ground")
+                         <<" special motion="<<observed<<std::endl;
+                settle_donkey();
+            };
+
+            // Source ftdonkeyspecialn.c uses a separate air state table.  A
+            // single raw jump followed by B edges reaches the AirN entry;
+            // no animation/state is manufactured when falling short.
+            run_special(true,ftDk_MS_SpecialN,ftDk_MS_SpecialAirN,0,0,
+                        "Donkey aerial Giant Punch did not enter its original source state");
+            run_special(false,ftDk_MS_SpecialS,ftDk_MS_SpecialAirS,80,0,
+                        "Donkey grounded Headbutt did not enter its original source state");
+            run_special(true,ftDk_MS_SpecialS,ftDk_MS_SpecialAirS,80,0,
+                        "Donkey aerial Headbutt did not enter its original source state");
+            run_special(false,ftDk_MS_SpecialHi,ftDk_MS_SpecialAirHi,0,80,
+                        "Donkey grounded Spinning Kong did not enter its original source state");
+            run_special(true,ftDk_MS_SpecialHi,ftDk_MS_SpecialAirHi,0,80,
+                        "Donkey aerial Spinning Kong did not enter its original source state");
+            run_special(false,ftDk_MS_SpecialLwStart,ftDk_MS_SpecialLwStart,0,-80,
+                        "Donkey grounded Hand Slap did not enter its original source state");
+
+            // Approach with source movement, then neutralize the stick while
+            // the ordinary Z edge enters Catch/CatchPull.
+            // ftCo_CatchWait_IASA then requires a *new* stick threshold crossing
+            // to select common ThrowF/ThrowB; holding the walk direction during
+            // Z retries would never provide that source edge.
+            settle_donkey();
+            raw[1].button=0;raw[1].stickX=0;raw[1].stickY=-80;
+            for(unsigned n=0;n<90;n++)tick();
+            raw[1].stickY=0;
+            bool catch_wait=false;
+            for(unsigned n=0;n<300&&!catch_wait;n++){
+                const auto player=match.player_stats(0),target=match.player_stats(1);
+                const float delta=target.position[0]-player.position[0];
+                const bool in_range=std::abs(delta)<18.0f && delta*player.facing_direction>0;
+                raw[0].stickX=in_range?0:delta>0?80:-80;raw[0].stickY=0;
+                raw[0].button=in_range&&n%20==0?PAD_TRIGGER_Z:0;tick();
+                catch_wait=melee_web_test_donkey_cargo(4,FTKIND_MARIO)!=0;
+            }
+            raw[0].button=0;raw[0].stickX=raw[0].stickY=0;
+            check(catch_wait,"Donkey raw Z input did not reach source CatchWait with Mario as victim");
+            // Establish the neutral previous stick, then cross the source
+            // horizontal threshold toward the victim. The edge selects the
+            // ordinary ThrowF/ThrowB callback; DK's x2222_b0 callback converts
+            // that source throw into its 351.. cargo states at animation end.
+            tick();
+            const auto catch_p1=match.player_stats(0),catch_p2=match.player_stats(1);
+            raw[0].stickX=catch_p2.position[0]>catch_p1.position[0]?80:-80;
+            tick();
+            const auto edge_motion=match.player_stats(0).motion_id;
+            bool common_throw=edge_motion==ftCo_MS_ThrowF||edge_motion==ftCo_MS_ThrowB;
+            bool cargo=false;
+            for(unsigned n=0;n<240&&!(common_throw&&cargo);n++){
+                raw[0].stickX=0;raw[0].button=0;tick();
+                const auto motion=match.player_stats(0).motion_id;
+                common_throw|=motion==ftCo_MS_ThrowF||motion==ftCo_MS_ThrowB;
+                cargo|=melee_web_test_donkey_cargo(0,FTKIND_MARIO)!=0;
+            }
+            raw[0].button=0;raw[0].stickX=0;
+            check(common_throw,"Donkey CatchWait stick edge did not enter source ThrowF/ThrowB");
+            check(cargo,"Donkey source ThrowF/ThrowB did not reach CargoWait with Mario as victim");
+            bool cargo_walk=false;
+            for(unsigned n=0;n<30;n++){
+                const auto state=match.player_stats(0);
+                raw[0].stickX=state.position[0]>0?-80:80;
+                tick();
+                cargo_walk|=melee_web_test_donkey_cargo(2,FTKIND_MARIO)!=0;
+            }
+            raw[0].stickX=0;
+            check(cargo_walk,"Donkey source CargoWait did not select authored CargoWalk 352..354");
+
+            // ftCo_CargoThrow.c selects +10/+11/+12/+13 from an A/B press
+            // plus stick direction. Use the stage-center direction after the
+            // walk and accept any authored ground cargo throw state.
+            bool cargo_throw=false;
+            for(unsigned n=0;n<180&&!cargo_throw;n++){
+                const auto state=match.player_stats(0);
+                raw[0].stickX=state.position[0]>0?-80:80;
+                raw[0].button=n==0?PAD_BUTTON_A:0;tick();
+                cargo_throw=melee_web_test_donkey_cargo(1,FTKIND_MARIO)!=0;
+            }
+            raw[0].button=0;raw[0].stickX=0;
+            check(cargo_throw,
+                  "Donkey source CargoWait did not select a raw-input cargo throw motion");
+            settle_donkey();
+            std::cout<<"Donkey original ground/air N/S/Hi, ground Lw, raw CargoWait/walk/throw passed"
+                     <<std::endl;
         }else if(cycle==0&&luigi){
             auto settle_luigi=[&](){
                 raw[0].button=0;raw[0].stickX=raw[0].stickY=0;
@@ -918,7 +1096,8 @@ int main(int argc,char** argv){try{
             check(melee_web_test_quake_start(variant),"Stage quake variant is missing");
         match.close();match.close();
     }
-    std::cout<<(entry_only?
+    std::cout<<(platform_pass?
+        "Donkey platform Pass, costumes, pause and repeat teardown passed\n":entry_only?
         "Source content entry, costumes, stage lifecycle, pause and repeat teardown passed\n":
         "Mixed source content intro, costumes, stage lifecycle, combat, pause and repeat teardown passed\n");
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

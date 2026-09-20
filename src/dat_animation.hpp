@@ -15,9 +15,11 @@ struct DatAnimationTrack {
 };
 
 // Inspection accepts the ordinary SRT channels understood by HsdAnimation.
-// Native fighter-action hydration additionally retains HSD_A_J_NODE tracks:
+// Native fighter-action hydration additionally retains HSD_A_J_NODE/BRANCH tracks:
 // the original fighter FigaTree/JObj path uses these to update visibility.
-// This policy does not make node tracks evaluable by the generic pose bridge.
+// This policy does not make visibility tracks evaluable by the generic pose bridge.
+// Native action decoding retains structurally valid singleton tracks;
+// the native FObj guard must remain enabled to reject undefined reached output.
 enum class DatAnimationPolicy {
     Inspection,
     NativeFighterAction,

@@ -219,19 +219,26 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
         auto validate_image_palette = [&](uint32_t image_index,
                                           uint32_t palette_index) {
             const auto& im = images[image_index];
-            require(im.format == 8 || im.format == 9 || im.format == 10,
-                    "Palette animation requires indexed images");
-            const auto maximum = maximum_index(im);
+            const bool indexed = im.format == 8 || im.format == 9 || im.format == 10;
             const auto offset_palette = required(*pt + 4 * palette_index, 16);
+            // HSD_TObjUpdateFunc updates TIMG and TCLT independently. The
+            // selected TLUT is consumed by HSD_TObjSetup only for CI images;
+            // I/IA/RGB/CMPR images still require an authored TLUT descriptor
+            // and an in-range TCLT table index, but do not interpret palette
+            // entries for their pixels. Use the largest GX CI table capacity
+            // for this descriptor-only non-CI path.
             const auto pal = read_dat_texture_palette_descriptor(
-                a, offset_palette, im.format);
-            if (maximum >= pal.entries)
-                throw DatError("Animated image references an index outside its TLUT palette: texture=" +
-                    std::to_string(*offset) + " image=" + std::to_string(im.descriptor_offset) +
-                    " palette=" + std::to_string(offset_palette) + " image_index=" +
-                    std::to_string(image_index) + " palette_index=" + std::to_string(palette_index) +
-                    " maximum=" + std::to_string(maximum) + " entries=" +
-                    std::to_string(pal.entries));
+                a, offset_palette, indexed ? im.format : 10);
+            if (indexed) {
+                const auto maximum = maximum_index(im);
+                if (maximum >= pal.entries)
+                    throw DatError("Animated image references an index outside its TLUT palette: texture=" +
+                        std::to_string(*offset) + " image=" + std::to_string(im.descriptor_offset) +
+                        " palette=" + std::to_string(offset_palette) + " image_index=" +
+                        std::to_string(image_index) + " palette_index=" + std::to_string(palette_index) +
+                        " maximum=" + std::to_string(maximum) + " entries=" +
+                        std::to_string(pal.entries));
+            }
             store_palette(palette_index, pal);
         };
 

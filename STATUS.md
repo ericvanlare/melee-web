@@ -84,7 +84,26 @@ retained; see [Jigglypuff's measured scope](docs/JIGGLYPUFF_PORT_NOTES.md).
 The Jigglypuff checkpoint passes both Release builds and the 1,077-test suite
 in 346.034 seconds with 41 explicit skips. Fresh shared headless comparisons
 still match 603 Ganondorf/FD and 240 Mario/FD declared source updates. Its
-pipeline seed is unchanged; see the [current checkpoint receipt](docs/evidence/full-game-checkpoint-purin-v1.json).
+pipeline seed is unchanged; see the [Jigglypuff checkpoint receipt](docs/evidence/full-game-checkpoint-purin-v1.json).
+Donkey Kong is the fifteenth development candidate. Native checks pass both
+player orders and all five costumes, with first-lifetime ground/air specials
+and raw cargo grab/walk/throw. Shared fixes preserve branch visibility,
+source dynamics modes, mixed indexed/compressed texture animations and the
+carried fighter's original command graphs. Both browser discovery rounds
+complete 33 action cases and 7,000 frames; cold fails timing/audio/pipeline
+gates while warm passes. After a reviewed 15-descriptor preload correction,
+both fresh rounds pass all 14,000 action frames with zero hard failures.
+A separate Battlefield shield-drop probe exposes a real crash at the
+undefined terminal SPL0 animation output; independent original consumer
+capture is pending. Ceiling lifetimes, original comparison and broader
+acceptance remain open; see
+[Donkey Kong's measured scope](docs/DONKEY_KONG_PORT_NOTES.md).
+The Donkey checkpoint passes both Release builds and the full 1,080-test suite
+in 358.963 seconds with 41 explicit skips. Fresh shared headless comparisons
+still match 603 Ganondorf/FD and 240 Mario/FD declared source updates. The
+receipt retains the failed cold discovery, the corrected pair, and the separate
+unresolved shield-drop crash; see the
+[current checkpoint receipt](docs/evidence/full-game-checkpoint-donkey-v1.json).
 The preceding Pikachu/Pichu/Old Yoshi checkpoint passes both Release builds and 1,075
 tests in 334.490 seconds with 41 explicit skips. Fresh headless comparisons
 still match 603 Ganondorf/FD and 240 Mario/FD declared source updates; the

@@ -1,6 +1,7 @@
 #include "gameplay_compat.h"
 #include <melee/pl/player.h>
 #include <melee/ft/types.h>
+#include <melee/ft/kinds/ftDonkey/forward.h>
 #include <melee/ft/ftdata.h>
 #include <melee/gm/gm_1601.h>
 #include <melee/it/it_26B1.h>
@@ -47,6 +48,7 @@ static const MeleeWebSourceIdentity* melee_web_source_identity(int ckind){
         {CKIND_PIKACHU, FTKIND_PIKACHU, ICONHUD_PIKACHU},
         {CKIND_PICHU, FTKIND_PICHU, ICONHUD_PICHU},
         {CKIND_PURIN, FTKIND_PURIN, ICONHUD_PURIN},
+        {CKIND_DONKEY, FTKIND_DONKEY, ICONHUD_DONKEY},
     };
     for (unsigned i=0;i<sizeof(rows)/sizeof(rows[0]);++i)
         if (rows[i].character==(CharacterKind)ckind) return &rows[i];
@@ -75,4 +77,30 @@ int melee_web_test_purin_anim_id(int expected)
     if(!entity || !entity->user_data)return 0;
     Fighter* fighter=entity->user_data;
     return fighter->kind==FTKIND_PURIN && fighter->anim_id==expected;
+}
+
+
+/* Donkey cargo observation. The native fixture uses this
+ * narrow source-owned relation check instead of writing a victim/state. */
+int melee_web_test_donkey_cargo(unsigned phase, int expected_fighter_kind)
+{
+    HSD_GObj* entity = Player_GetEntity(0);
+    if (!entity || !entity->user_data) return 0;
+    Fighter* fighter = entity->user_data;
+    if (fighter->kind != FTKIND_DONKEY || !fighter->victim_gobj ||
+        !fighter->victim_gobj->user_data)
+        return 0;
+    Fighter* victim = fighter->victim_gobj->user_data;
+    const int motion = fighter->motion_id;
+    const int catch_wait = motion == ftCo_MS_CatchWait;
+    const int cargo_wait = motion >= ftDk_MS_ThrowFWait0 &&
+                           motion <= ftDk_MS_ThrowFWait2;
+    const int cargo_walk = motion >= ftDk_MS_ThrowFWalkSlow &&
+                           motion <= ftDk_MS_ThrowFWalkFast;
+    const int cargo_throw = motion >= ftDk_MS_ThrowFF &&
+                            motion <= ftDk_MS_ThrowAirFLw;
+    if (victim->kind != (FighterKind) expected_fighter_kind) return 0;
+    return phase == 0 ? cargo_wait : phase == 1 ? cargo_throw :
+           phase == 2 ? cargo_walk : phase == 4 ? catch_wait :
+           cargo_wait || cargo_throw || cargo_walk || catch_wait;
 }
