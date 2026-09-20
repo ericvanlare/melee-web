@@ -138,6 +138,16 @@ confused CharacterKind with FighterKind and used a copied menu receipt. Those
 artifacts cannot justify an animation fallback or close the reproduced crash;
 a correctly observed Donkey selection and post-Ready capture are still needed.
 
+Two further attempts retained the correct FT kinds (Mario 0 / Donkey 3) on
+Battlefield, but still did not observe Pass. Attempt v2 captured 120 intro
+frames with `match_frame=0`; its L/down edge was before Ready. The v3 plan
+moved that edge to tick 140 and corrected the FObj function-entry breakpoint,
+but the bounded run ended after indices 0–120, again before an advancing match
+frame or any consumer probe. Their collector completion/status fields do not
+establish the requested scenario. Raw data and receipts remain under
+`work/full-game/donkey-pass-original-consumer-v2/` and `-v3/`. No compatibility
+fallback is justified by these captures, and the reproduced crash remains open.
+
 The requested-file manifest contains 169 FST paths totaling 122,864,276 bytes,
 leaving 11,353,452 bytes under the existing 128 MiB cap. Generated font and DSP
 coefficient ranges are outside this FST-only sum. See

@@ -75,9 +75,11 @@
       "evidence": [
         "docs/DEPENDENCIES.md",
         "docs/FIGHTER_RUNTIME.md",
-        "docs/CONTENT_CHECKS.md"
+        "docs/CONTENT_CHECKS.md",
+        "docs/SCENE_ASSET_LOADING.md",
+        "docs/evidence/full-game-checkpoint-asset-scope-v1.json"
       ],
-      "next_step": "Split this boundary into archive, DVD/file, memory/heap and per-mode ownership rows with source table extents and lifecycle receipts.",
+      "next_step": "Development menu/match scopes now close source/cache owners before transactional replacement. Extend the boundary to the public profile, four-player selections and additional mode graphs; measure retained live allocations across repeated complete lifetimes and split the remaining file/heap service inventory.",
       "issue": null
     },
     {
@@ -2689,9 +2691,11 @@
         "docs/BUILD_AND_PLAY.md",
         "docs/ACCURACY_CONTRACT.md",
         "docs/HITCH_CAPTURE.md",
-        "docs/TRANSITION_EQUIVALENCE.md"
+        "docs/TRANSITION_EQUIVALENCE.md",
+        "docs/SCENE_ASSET_LOADING.md",
+        "docs/evidence/full-game-checkpoint-asset-scope-v1.json"
       ],
-      "next_step": "Split browser preparation, live loop, visibility/recovery, unload and restart into bounded scenarios with retained failure receipts.",
+      "next_step": "Development scoped import, delayed handoff, two match-to-CSS routes, unload/restart and drawn Mario/FD state comparison pass their declared checks. Extend public scoped loading and failure recovery, reconcile the legacy transition reference setup, and collect repeated-lifetime memory plus cold/warm performance evidence.",
       "issue": null
     }
   ]

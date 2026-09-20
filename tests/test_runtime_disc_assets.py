@@ -9,6 +9,9 @@ class RuntimeDiscAssetsTests(unittest.TestCase):
     def test_bounded_disc_reader(self):
         self.run_node("disc_image_test.mjs")
 
+    def test_scene_disc_session(self):
+        self.run_node("disc_session_test.mjs")
+
     def test_language_and_executable_validation(self):
         self.run_node("runtime_disc_assets_test.mjs")
 

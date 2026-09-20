@@ -15,6 +15,7 @@
   "audio-worklet.js",
   "audio-ring.mjs",
   "disc-image.mjs",
+  "disc-session.mjs",
   "dsp-coefficients.mjs",
   "runtime-assets.mjs",
   "runtime-audio-assets.mjs",

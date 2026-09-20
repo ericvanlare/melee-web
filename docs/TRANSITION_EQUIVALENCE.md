@@ -107,3 +107,22 @@ construction consumes the same final eight steps. The strict report passes all
 nine lifecycle, audio, semantic-state and RNG comparisons. This is scoped
 Mario/Mario FD transition evidence, not a claim for other configurations or
 later gameplay.
+
+## September 20 refresh limitation
+
+The scene-asset checkpoint rebuilt `native_menu_host_trace` and retained a
+failure against the older `retail-stock-fd-v1` reference. Lifecycle order and
+menu audio continuity pass; event 7 differs on the two human players' rumble
+flags (retail 64, port 192), and match entry advances RNG nine steps versus
+the old reference's eight. The current host's rumble assignments and original
+stage-music selection implementation predate this checkpoint.
+
+An isolated HEAD-derived driver, with only the additional required voice-bank
+fixture names, reproduces all 18 current event rows exactly. It links current
+runtime archives, so it is not a clean old-runtime comparison. The extra RNG
+consumer has not been independently isolated. This check does not establish
+current transition equivalence; the earlier passing result above is historical
+and requires reconciliation with the current source and captured save/setup
+context. The reference, source settings, and strict comparator were preserved.
+See the [scene-loading checkpoint receipt](evidence/full-game-checkpoint-asset-scope-v1.json)
+for the retained failure and audit.

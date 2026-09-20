@@ -7,6 +7,31 @@
 retains all source functions and missing features; it does not turn compilation
 or declared feature status into an accepted-game percentage.
 
+The development player now imports scene-specific assets from one validated
+local disc session, closing source owners and releasing outgoing files before
+loading the next scene. A real browser check completes Mario/FD four-stock
+ending, Bowser/Mario Fountain pause and No Contest, both returns to original
+CSS, unload and restart. Delayed handoffs keep source steps stopped and retain
+zero outgoing file bytes. Menus use 18,452,982 native input bytes; Mario/FD uses
+19,077,674 and Bowser/Fountain 21,401,641. Unload clears all imported files.
+Wasm capacity still grows across the sequence; this is functional lifecycle
+evidence, not a memory plateau or performance pass. A fresh drawn Mario/FD
+replay matches all 240 declared updates and PAD-history fields against the
+independent original v2 pair. The earlier missing Bowser voice-bank unload
+crash and two driver/recipe failures remain retained; see
+[scene asset ownership](docs/SCENE_ASSET_LOADING.md).
+The public player still uses the fixed all-game import. Public scoped loading,
+four-player residency and broader mode/lifetime checks remain open.
+Both Release builds pass. The 1,096-test run took 366.767 seconds with
+41 skips and one stale artifact-count assertion; correcting that test yields
+four passing checks in the affected module. The original failed suite log is
+retained, with full GitHub verification pending for this checkpoint. See the
+[scene-loading checkpoint receipt](docs/evidence/full-game-checkpoint-asset-scope-v1.json).
+The refreshed legacy native transition comparison fails on a rumble flag and
+match-entry RNG; a HEAD-derived driver reproduces the same event rows with
+current libraries. Its setup/source reconciliation remains open separately;
+see [the retained transition limitation](docs/TRANSITION_EQUIVALENCE.md#september-20-refresh-limitation).
+
 Ganondorf is the first added development candidate. Fresh native checks pass
 both player orientations and all five costumes on Final Destination, including
 original combat, pause and teardown. The browser reaches original CSS/SSS and
@@ -119,8 +144,9 @@ The Bowser checkpoint passes both Release builds and 1,083 tests in 357.995
 seconds with 41 explicit skips. Fresh shared headless comparisons still
 match all 603 Ganondorf/FD and 240 Mario/FD declared source updates. The
 [Bowser checkpoint receipt](docs/evidence/full-game-checkpoint-koopa-v1.json)
-binds the builds, browser pair, review and retained failures. The preceding
-Donkey checkpoint's GitHub Verify completed in 6m 20s.
+binds the builds, browser pair, review and retained failures. The Bowser
+checkpoint's full GitHub Verify completed in 6m 16s across all jobs;
+the preceding Donkey checkpoint completed in 6m 20s.
 The preceding Pikachu/Pichu/Old Yoshi checkpoint passes both Release builds and 1,075
 tests in 334.490 seconds with 41 explicit skips. Fresh headless comparisons
 still match 603 Ganondorf/FD and 240 Mario/FD declared source updates; the

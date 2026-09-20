@@ -140,9 +140,12 @@ than silently dropping them.
 
 The branch now has sixteen development fighters, including Bowser's scoped
 native and browser action checks in [his port notes](BOWSER_PORT_NOTES.md).
-Every added fighter retains `partial` acceptance. The current import plan
-leaves 6,903,038 bytes under the request cap; explicit scene ownership is the
-next shared integration boundary before the whole roster can fit.
+Every added fighter retains `partial` acceptance. The development player now
+uses [scene-specific asset scopes](SCENE_ASSET_LOADING.md)
+with explicit source teardown and asynchronous reads while its clock is stopped.
+The public player still uses the 127,314,690-byte fixed import, leaving
+6,903,038 bytes under the request cap. Carry the same ownership boundary into
+the public profile before further roster growth exceeds that import budget.
 
 ## Validation before handoff
 

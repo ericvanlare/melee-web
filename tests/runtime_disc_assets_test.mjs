@@ -12,7 +12,9 @@ view.setUint32(0x600,0x100);view.setUint32(0x690,0x10000000);
 await assert.rejects(loadRuntimeDisc(new Blob([bytes])),/Invalid game executable section/);
 console.log('Runtime disc language paths and executable rejection checks passed');
 
-assert.equal(Object.keys(NATIVE_MENU_DISC_FILES).length,15);
+assert.equal(Object.keys(NATIVE_MENU_DISC_FILES).length,31);
+for (const name of Object.keys(NATIVE_MENU_DISC_FILES).filter(name => name.endsWith('.ssm')))
+  assert.equal(NATIVE_MENU_DISC_FILES[name], 'audio/us/' + name);
 assert.equal(Object.keys(NATIVE_GAME_DISC_FILES).length,177);
 for(const name of ['nr_select','nr_title','nr_name','pokemon','end']) {
   assert.equal(NATIVE_MENU_DISC_FILES[name+'.ssm'],'audio/us/'+name+'.ssm');
