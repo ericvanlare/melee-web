@@ -43,6 +43,7 @@ constexpr size_t RING_PAYLOAD = 256 * 1024;
 constexpr size_t MAX_SLICES = 64;
 constexpr size_t MAX_RAW = 192 * 1024;
 constexpr u32 PAD_READ_HSD_CALLER = 0x80376A28;
+constexpr u32 MENU_AUDIO_STREAM_START = 0x8038E8EC;
 constexpr u16 WHOLE_SESSION_FLAG = 1;
 constexpr u32 WHOLE_SESSION_MIN_MATCHES = 3;
 constexpr u32 WHOLE_SESSION_MAX_MATCHES = 64;
@@ -91,6 +92,12 @@ enum class Boundary : u16
   ResultsModeExit = 22,
   ResultsGObjProcess = 23,
   ReturnCss = 24,
+  CssCancelEnter = 25,
+  PrizeModeEnter = 26,
+  PrizeSceneEnter = 27,
+  PrizeSceneExit = 28,
+  PrizeModeExit = 29,
+  StartupPrizeModeExit = 30,
 };
 
 enum class SliceTag : u16
@@ -129,6 +136,9 @@ enum class SliceTag : u16
   MenuSssState = 32,
   MenuAudio = 33,
   MenuAudioVoice = 34,
+  MenuSssRoute = 35,
+  ProfileCharacters = 36,
+  ProfileStages = 37,
 };
 
 struct SliceRef
@@ -243,6 +253,21 @@ u32 WholeSessionMatchCount()
   return result >= WHOLE_SESSION_MIN_MATCHES ? result : 0;
 }
 
+bool ValidIdentity(std::string_view value)
+{
+  if (value.empty() || value.size() > 128)
+    return false;
+  for (const unsigned char character : value)
+  {
+    if (!((character >= 'a' && character <= 'z') ||
+          (character >= 'A' && character <= 'Z') ||
+          (character >= '0' && character <= '9') || character == '-' || character == '_' ||
+          character == '.'))
+      return false;
+  }
+  return true;
+}
+
 }  // namespace
 
 struct Observer::Impl
@@ -268,12 +293,19 @@ struct Observer::Impl
       return false;
     }
     whole_session_matches = WholeSessionMatchCount();
+    capture_id = Env("MWRC_CAPTURE_ID");
+    sequence_id = Env("MWRC_SEQUENCE_ID");
     // Dolphin builds with exceptions disabled.  std::thread reports an
     // unavailable worker by terminating; there is no catchable error path.
     writer = std::thread([this] { WriterMain(); });
     if (!Env("MWRC_WHOLE_SESSION_MATCHES").empty() && whole_session_matches == 0)
     {
       SetInvalid("MWRC_WHOLE_SESSION_MATCHES must be a decimal count from 3 through 64");
+      return false;
+    }
+    if (whole_session_enabled() && (!ValidIdentity(capture_id) || !ValidIdentity(sequence_id)))
+    {
+      SetInvalid("whole-session capture and sequence IDs must be safe non-empty strings");
       return false;
     }
     std::string handshake =
@@ -284,7 +316,9 @@ struct Observer::Impl
         std::to_string(RING_SIZE);
     if (whole_session_enabled())
       handshake += ",\"whole_session\":true,\"match_count\":" +
-                   std::to_string(whole_session_matches);
+                   std::to_string(whole_session_matches) + ",\"capture_id\":\"" +
+                   JsonEscape(capture_id) + "\",\"sequence_id\":\"" +
+                   JsonEscape(sequence_id) + "\"";
     handshake += "}";
     PushJson(Event::Handshake, handshake);
     std::string start =
@@ -292,7 +326,9 @@ struct Observer::Impl
         "typed-existing-retail-harness";
     if (whole_session_enabled())
       start += "\",\"whole_session\":true,\"match_count\":" +
-               std::to_string(whole_session_matches);
+               std::to_string(whole_session_matches) + ",\"capture_id\":\"" +
+               JsonEscape(capture_id) + "\",\"sequence_id\":\"" +
+               JsonEscape(sequence_id) + "\"";
     else
       start += "\"";
     start += "}";
@@ -406,10 +442,25 @@ struct Observer::Impl
     return true;
   }
 
+  bool AddProfileSlices(Core::System* system)
+  {
+    u32 main_data = 0;
+    // gmMainLib_804D3EE0 points at the source-owned gmm_x0. The retail
+    // gmMainLib_GetSaveData/15ED8C/15EDA4 instruction bodies load the save
+    // block at +0x1868 and its first two u16 masks at +0/+2.
+    if (!ReadU32(system, 0x804d3ee0, &main_data) || !main_data ||
+        main_data > UINT32_MAX - 0x186a ||
+        !AddSlice(system, SliceTag::ProfileCharacters, main_data + 0x1868, 2) ||
+        !AddSlice(system, SliceTag::ProfileStages, main_data + 0x186a, 2))
+      return false;
+    return true;
+  }
+
   bool AddSessionSlices(Core::System* system)
   {
     u32 rng_pointer = 0;
-    return AddSlice(system, SliceTag::PadSnapshot, 0x804c1f84, 0x358) &&
+    return AddProfileSlices(system) &&
+           AddSlice(system, SliceTag::PadSnapshot, 0x804c1f84, 0x358) &&
            AddSlice(system, SliceTag::SceneRouting, 0x80479d30, 6) &&
            AddSlice(system, SliceTag::SceneFrame, 0x80479d58, 4) &&
            AddSlice(system, SliceTag::RngPointer, 0x804d5f94, 4) &&
@@ -419,10 +470,13 @@ struct Observer::Impl
 
   bool AddMenuSlices(Core::System* system, Boundary boundary, u32 entry_argument)
   {
-    const bool css = boundary == Boundary::CssEnter || boundary == Boundary::CssExit ||
+    const bool css = boundary == Boundary::CssEnter || boundary == Boundary::CssCancelEnter ||
+                     boundary == Boundary::CssExit ||
                      boundary == Boundary::ReturnCss;
     const u32 pointer_address = css ? 0x804d6cb0 : 0x804d6c90;
-    const bool entering = boundary == Boundary::CssEnter || boundary == Boundary::SssEnter ||
+    const bool entering = boundary == Boundary::CssEnter ||
+                          boundary == Boundary::CssCancelEnter ||
+                          boundary == Boundary::SssEnter ||
                           boundary == Boundary::ReturnCss;
     // These raw hooks run at function entry, before OnEnter assigns the
     // scene's static pointer. Use its actual argument for entry records;
@@ -433,6 +487,8 @@ struct Observer::Impl
         state_pointer > UINT32_MAX - 0x10 ||
         !AddSlice(system, css ? SliceTag::MenuCssState : SliceTag::MenuSssState,
                   state_pointer + 0x10, 0xf0) ||
+        (!css && (state_pointer > UINT32_MAX - 4 ||
+                  !AddSlice(system, SliceTag::MenuSssRoute, state_pointer + 4, 1))) ||
         !AddSlice(system, SliceTag::MenuAudio, 0x803bb300, 0x40) ||
         !AddSlice(system, SliceTag::MenuAudioVoice, 0x804d6038, 4) ||
         !AddSessionSlices(system))
@@ -507,6 +563,21 @@ struct Observer::Impl
     case 0x80179350:
       *boundary = Boundary::ResultsGObjProcess;
       return whole_session;
+    case 0x801bfcfc:
+      *boundary = Boundary::PrizeModeEnter;
+      return whole_session;
+    case 0x802febe0:
+      *boundary = Boundary::PrizeSceneEnter;
+      return whole_session;
+    case 0x802fed10:
+      *boundary = Boundary::PrizeSceneExit;
+      return whole_session;
+    case 0x801a6308:
+      *boundary = Boundary::PrizeModeExit;
+      return whole_session;
+    case 0x801bff7c:
+      *boundary = Boundary::StartupPrizeModeExit;
+      return whole_session;
     default:
       return false;
     }
@@ -544,9 +615,16 @@ struct Observer::Impl
     case 0x80177704:
     case 0x801a5f64:
     case 0x80179350:
+    case 0x801bfcfc:
+    case 0x802febe0:
+    case 0x801a6308:
+    case 0x801bff7c:
       // These source function entries are pinned to the owned DOL's
       // prologue word.  The digest check establishes the remaining bytes.
       return word == 0x7c0802a6;
+    case 0x802fed10:
+      // The retail Prize scene has an empty OnExit callback (blr at entry).
+      return word == 0x4e800020;
     default:
       // The pinned DOL digest has already established the exact source for
       // boundary PCs whose neighboring words are not part of the harness's
@@ -559,11 +637,18 @@ struct Observer::Impl
   {
     if (!Start() || invalid.load() || finish_requested.load())
       return;
+    if (whole_session_enabled() && pc == MENU_AUDIO_STREAM_START)
+    {
+      ++audio_owner_epoch;
+      return;
+    }
     Boundary boundary;
     if (!BoundaryForPC(pc, whole_session_enabled(), &boundary))
       return;
     if (whole_session_enabled() && boundary == Boundary::CssEnter && whole_phase == 6)
       boundary = Boundary::ReturnCss;
+    else if (whole_session_enabled() && boundary == Boundary::CssEnter && whole_phase == 8)
+      boundary = Boundary::CssCancelEnter;
     if (!BoundaryInstructionMatches(system, pc))
     {
       SetInvalid("observer boundary instruction is not resident in the pinned DOL");
@@ -577,7 +662,8 @@ struct Observer::Impl
     }
     raw_size = 0;
     slice_count = 0;
-    if (boundary == Boundary::CssEnter || boundary == Boundary::CssExit ||
+    if (boundary == Boundary::CssEnter || boundary == Boundary::CssCancelEnter ||
+        boundary == Boundary::CssExit ||
         boundary == Boundary::SssEnter || boundary == Boundary::SssExit ||
         boundary == Boundary::ReturnCss)
     {
@@ -592,6 +678,17 @@ struct Observer::Impl
         if (whole_phase != 0)
         {
           return SetInvalid("whole-session CSS enter was missing or out of order"), void();
+        }
+        if (startup_prize_pending)
+          return SetInvalid("whole-session CSS enter preceded startup Prize mode exit"), void();
+        whole_phase = 1;
+      }
+      else if (boundary == Boundary::CssCancelEnter)
+      {
+        if (whole_phase != 8)
+        {
+          return SetInvalid("whole-session canceled CSS enter was missing or out of order"),
+                 void();
         }
         whole_phase = 1;
       }
@@ -611,7 +708,12 @@ struct Observer::Impl
       {
         if (whole_phase != 3)
           return SetInvalid("whole-session SSS exit was missing or out of order"), void();
-        whole_phase = 4;
+        u32 sss_pointer = 0;
+        u8 route = 0;
+        if (!ReadU32(system, 0x804d6c90, &sss_pointer) || !sss_pointer ||
+            sss_pointer > UINT32_MAX - 4 || !ReadBytes(system, sss_pointer + 4, 1, &route))
+          return SetInvalid("whole-session SSS exit did not expose its source route"), void();
+        whole_phase = route ? 4 : 8;
       }
       if (!AddMenuSlices(system, boundary, state->gpr[3]))
         return SetInvalid("menu boundary did not expose its pinned state/audio slices"), void();
@@ -647,7 +749,16 @@ struct Observer::Impl
     {
       if (boundary == Boundary::Entry)
       {
-        if (whole_session_enabled() && whole_phase != 4)
+        u8 current_mode = 0;
+        if (whole_session_enabled() &&
+            !ReadBytes(system, 0x80479d30, 1, &current_mode))
+          return SetInvalid("VS entry did not expose source mode routing"), void();
+        // Opening movie attract demos reuse the VS constructor and can run
+        // while the outer routing record still names GM_OPENING_MV. They are
+        // pre-CSS source coverage, not the supported SSS-to-match route.
+        if (whole_session_enabled() && current_mode == 0x18 && whole_phase == 0)
+          return;
+        if (whole_session_enabled() && (current_mode != 0x02 || whole_phase != 4))
           return SetInvalid("whole-session VS entry was missing its SSS route"), void();
         setup_pointer = state->gpr[3];
         if (!setup_pointer || !AddSlice(system, SliceTag::MatchSetup, setup_pointer, 0x138))
@@ -658,6 +769,8 @@ struct Observer::Impl
             !AddSlice(system, SliceTag::RngValue, rng_pointer, 4) ||
             !AddSlice(system, SliceTag::PadSnapshot, 0x804c1f84, 0x358))
           return SetInvalid("VS entry did not expose its bounded initial state"), void();
+        if (!AddProfileSlices(system))
+          return SetInvalid("VS entry did not expose its loaded profile masks"), void();
         setup_ready = false;
         result_seen = false;
         result_pointer = 0;
@@ -668,6 +781,12 @@ struct Observer::Impl
         results_gobj_seen = false;
         results_exit_seen = false;
         results_mode_exit_seen = false;
+        completed_match_pending_prize = false;
+        startup_prize_pending = false;
+        prize_mode_enter_seen = false;
+        prize_scene_enter_seen = false;
+        prize_scene_exit_seen = false;
+        prize_mode_exit_seen = false;
         fighter_present.fill(false);
         fighter_pointers.fill(0);
         cpu_slots.fill(false);
@@ -676,9 +795,12 @@ struct Observer::Impl
         if (!setup)
           return SetInvalid("source setup pointer is invalid"), void();
         // The same entry routine is also used by title-screen attract demos.
-        // Keep that entry record, but only arm match capture for the original
-        // VS setup bit.  Genuine VS setups retain the existing role checks.
-        match_active = (setup[4] & 0x40) != 0;
+        // Their setup can carry the ordinary VS bit, so the source mode is
+        // part of the guard: the whole-session contract arms only the
+        // ordinary GM_VS route reached from SSS. Keep the legacy observer's
+        // setup-only behavior when whole-session capture is disabled.
+        match_active = (setup[4] & 0x40) != 0 &&
+                      (!whole_session_enabled() || current_mode == 0x02);
         active_slot_count = 0;
         if (match_active)
         {
@@ -755,67 +877,130 @@ struct Observer::Impl
     else if (boundary == Boundary::VsExit || boundary == Boundary::VsExitReturn ||
              boundary == Boundary::VsModeExit || boundary == Boundary::ResultsEnter ||
              boundary == Boundary::ResultsExit || boundary == Boundary::ResultsModeExit ||
-             boundary == Boundary::ResultsGObjProcess)
+             boundary == Boundary::ResultsGObjProcess || boundary == Boundary::PrizeModeEnter ||
+             boundary == Boundary::PrizeSceneEnter || boundary == Boundary::PrizeSceneExit ||
+             boundary == Boundary::PrizeModeExit || boundary == Boundary::StartupPrizeModeExit)
     {
-      if (!whole_session_enabled() || !match_active || !setup_ready)
-        return SetInvalid("whole-session source hook occurred outside an active VS match"), void();
-      if (boundary == Boundary::VsExit)
+      if (boundary == Boundary::PrizeModeEnter || boundary == Boundary::PrizeSceneEnter ||
+          boundary == Boundary::PrizeSceneExit || boundary == Boundary::PrizeModeExit ||
+          boundary == Boundary::StartupPrizeModeExit)
       {
-        if (vs_exit_seen)
-          return SetInvalid("duplicate gm_Scene_Vs_OnExit hook"), void();
-        result_pointer = 0x80479d98;
-        if (!AddSlice(system, SliceTag::Result, result_pointer + 0xc, 0x28) ||
-            !AddSessionSlices(system))
-          return SetInvalid("VS exit did not expose its pinned result/session slices"), void();
-        vs_exit_seen = true;
-      }
-      else if (boundary == Boundary::VsExitReturn)
-      {
-        if (!vs_exit_seen || vs_exit_return_seen)
-          return SetInvalid("VS exit return is missing or duplicated"), void();
-        if (!AddSessionSlices(system))
-          return SetInvalid("VS exit return did not expose PAD/RNG state"), void();
-        vs_exit_return_seen = true;
-        result_seen = true;
-      }
-      else if (boundary == Boundary::VsModeExit)
-      {
-        if (!vs_exit_return_seen || vs_mode_exit_seen || !AddSessionSlices(system))
-          return SetInvalid("VS mode exit is missing its ordered source hook"), void();
-        vs_mode_exit_seen = true;
-      }
-      else if (boundary == Boundary::ResultsEnter)
-      {
-        if (!vs_mode_exit_seen || results_enter_seen || !AddSessionSlices(system))
-          return SetInvalid("Results enter is missing its ordered source hook"), void();
-        results_enter_seen = true;
-      }
-      else if (boundary == Boundary::ResultsExit)
-      {
-        if (!results_enter_seen || !results_gobj_seen || results_exit_seen ||
-            !AddSessionSlices(system))
-          return SetInvalid("Results exit is missing its ordered source hook"), void();
-        results_exit_seen = true;
-      }
-      else if (boundary == Boundary::ResultsModeExit)
-      {
-        if (!results_exit_seen || !results_gobj_seen || results_mode_exit_seen ||
-            !AddSessionSlices(system))
-          return SetInvalid("Results mode exit is missing its ordered source hook"), void();
-        results_mode_exit_seen = true;
+        if (!whole_session_enabled() || match_active ||
+            (!completed_match_pending_prize && !startup_prize_pending && whole_phase != 0))
+          return SetInvalid("whole-session Prize hook occurred outside a completed match"), void();
+        if (boundary == Boundary::PrizeModeEnter)
+        {
+          if (prize_mode_enter_seen || prize_scene_enter_seen || prize_scene_exit_seen ||
+              (completed_match_pending_prize && startup_prize_pending) ||
+              !AddSessionSlices(system))
+            return SetInvalid("Prize mode enter is missing its completed Results handoff"), void();
+          if (!completed_match_pending_prize)
+            startup_prize_pending = true;
+          prize_mode_enter_seen = true;
+        }
+        else if (boundary == Boundary::PrizeSceneEnter)
+        {
+          if (!prize_mode_enter_seen || prize_scene_enter_seen || !AddSessionSlices(system))
+            return SetInvalid("Prize scene enter is missing its ordered mode hook"), void();
+          prize_scene_enter_seen = true;
+        }
+        else if (boundary == Boundary::PrizeSceneExit)
+        {
+          if (!prize_scene_enter_seen || prize_scene_exit_seen || !AddSessionSlices(system))
+            return SetInvalid("Prize scene exit is missing its ordered scene hook"), void();
+          prize_scene_exit_seen = true;
+        }
+        else if (boundary == Boundary::StartupPrizeModeExit)
+        {
+          if (!startup_prize_pending || !prize_scene_exit_seen || prize_mode_exit_seen ||
+              !AddSessionSlices(system))
+            return SetInvalid("startup Prize mode exit is missing its ordered scene hook"), void();
+          prize_mode_exit_seen = true;
+          startup_prize_pending = false;
+        }
+        else
+        {
+          if (startup_prize_pending || !completed_match_pending_prize ||
+              !prize_scene_exit_seen || prize_mode_exit_seen || !AddSessionSlices(system))
+            return SetInvalid("Prize mode exit is missing its ordered scene hook"), void();
+          prize_mode_exit_seen = true;
+          completed_match_pending_prize = false;
+          startup_prize_pending = false;
+        }
       }
       else
       {
-        if (!results_enter_seen || results_exit_seen || !AddSessionSlices(system) ||
-            !AddSlice(system, SliceTag::Result, 0x80479d98 + 0xc, 0x28))
-          return SetInvalid("Results GObj process did not expose input/RNG/result state"), void();
-        results_gobj_seen = true;
+        u8 current_mode = 0;
+        if (whole_session_enabled() && !match_active && whole_phase == 0 &&
+            ReadBytes(system, 0x80479d30, 1, &current_mode) && current_mode == 0x18)
+          return;
+        if (!whole_session_enabled() || !match_active || !setup_ready)
+          return SetInvalid("whole-session source hook occurred outside an active VS match"), void();
+        if (boundary == Boundary::VsExit)
+        {
+          if (vs_exit_seen)
+            return SetInvalid("duplicate gm_Scene_Vs_OnExit hook"), void();
+          result_pointer = 0x80479d98;
+          if (!AddSlice(system, SliceTag::Result, result_pointer + 0xc, 0x28) ||
+              !AddSessionSlices(system))
+            return SetInvalid("VS exit did not expose its pinned result/session slices"), void();
+          vs_exit_seen = true;
+        }
+        else if (boundary == Boundary::VsExitReturn)
+        {
+          if (!vs_exit_seen || vs_exit_return_seen)
+            return SetInvalid("VS exit return is missing or duplicated"), void();
+          if (!AddSessionSlices(system))
+            return SetInvalid("VS exit return did not expose PAD/RNG state"), void();
+          vs_exit_return_seen = true;
+          result_seen = true;
+        }
+        else if (boundary == Boundary::VsModeExit)
+        {
+          if (!vs_exit_return_seen || vs_mode_exit_seen || !AddSessionSlices(system))
+            return SetInvalid("VS mode exit is missing its ordered source hook"), void();
+          vs_mode_exit_seen = true;
+        }
+        else if (boundary == Boundary::ResultsEnter)
+        {
+          if (!vs_mode_exit_seen || results_enter_seen || !AddSessionSlices(system))
+            return SetInvalid("Results enter is missing its ordered source hook"), void();
+          results_enter_seen = true;
+        }
+        else if (boundary == Boundary::ResultsExit)
+        {
+          if (!results_enter_seen || !results_gobj_seen || results_exit_seen ||
+              !AddSessionSlices(system))
+            return SetInvalid("Results exit is missing its ordered source hook"), void();
+          results_exit_seen = true;
+        }
+        else if (boundary == Boundary::ResultsModeExit)
+        {
+          if (!results_exit_seen || !results_gobj_seen || results_mode_exit_seen ||
+              !AddSessionSlices(system))
+            return SetInvalid("Results mode exit is missing its ordered source hook"), void();
+          results_mode_exit_seen = true;
+        }
+        else
+        {
+          if (!results_enter_seen || results_exit_seen || !AddSessionSlices(system) ||
+              !AddSlice(system, SliceTag::Result, 0x80479d98 + 0xc, 0x28))
+            return SetInvalid("Results GObj process did not expose input/RNG/result state"), void();
+          results_gobj_seen = true;
+        }
       }
     }
     else if (boundary == Boundary::SceneTeardown)
     {
       if (whole_session_enabled())
       {
+        // Retail performs an early scene reset while booting the original
+        // title, before the first CSS callback has established the whole
+        // session route.  It is not a completed match teardown.  Ignore only
+        // this pre-route reset; once a route is active, keep the strict
+        // VS/Results ordering below.
+        if (!match_active && whole_phase == 0)
+          return;
         if (!match_active || !result_seen || !vs_exit_seen || !vs_exit_return_seen ||
             !vs_mode_exit_seen || !results_enter_seen || !results_exit_seen ||
             !results_gobj_seen || !results_mode_exit_seen)
@@ -839,6 +1024,8 @@ struct Observer::Impl
         return SetInvalid("whole-session scene reset did not expose PAD/RNG state"), void();
       if (whole_session_enabled())
         whole_phase = 6;
+      if (whole_session_enabled())
+        completed_match_pending_prize = true;
     }
     else if (boundary == Boundary::SceneExit)
     {
@@ -876,7 +1063,7 @@ struct Observer::Impl
       PutU32(descriptor, raw_offset);
       raw_offset += slice.size;
     }
-    const size_t metadata_size = whole_session_enabled() ? 8 : 0;
+    const size_t metadata_size = whole_session_enabled() ? 12 : 0;
     if (static_cast<size_t>(out - slot->payload.data()) + raw_size + metadata_size >
         slot->payload.size())
       return SetInvalid("observer boundary payload exceeds its bounded slot"), void();
@@ -886,6 +1073,7 @@ struct Observer::Impl
     {
       PutU16(out, static_cast<u16>(match_index));
       PutU16(out, static_cast<u16>(boundary));
+      PutU32(out, audio_owner_epoch);
       PutU32(out, 0);
     }
     slot->payload_size = static_cast<u32>(out - slot->payload.data());
@@ -1198,6 +1386,7 @@ struct Observer::Impl
   u32 result_pointer = 0;
   u32 draw_ordinal = 0;
   u32 whole_session_matches = 0;
+  u32 audio_owner_epoch = 0;
   u32 match_index = 0;
   u32 whole_phase = 0;  // CSS, SSS, VS, completed match, or return CSS.
   bool pending_next_match = false;
@@ -1209,6 +1398,14 @@ struct Observer::Impl
   bool results_gobj_seen = false;
   bool results_exit_seen = false;
   bool results_mode_exit_seen = false;
+  bool completed_match_pending_prize = false;
+  bool startup_prize_pending = false;
+  bool prize_mode_enter_seen = false;
+  bool prize_scene_enter_seen = false;
+  bool prize_scene_exit_seen = false;
+  bool prize_mode_exit_seen = false;
+  std::string capture_id;
+  std::string sequence_id;
 
   bool whole_session_enabled() const { return whole_session_matches != 0; }
 };
@@ -1286,6 +1483,12 @@ bool Observer::IsBoundary(u32 guest_pc)
   case 0x80177704:
   case 0x801A5F64:
   case 0x80179350:
+  case 0x801BFCFC:
+  case 0x802FEBE0:
+  case 0x802FED10:
+  case 0x801A6308:
+  case 0x801BFF7C:
+  case 0x8038E8EC:
     return true;
   default:
     return false;

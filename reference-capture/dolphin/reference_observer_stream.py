@@ -24,6 +24,10 @@ BOUNDARY = struct.Struct("<HHIIII")
 SLICE = struct.Struct("<HHIII")
 WHOLE_SESSION_FLAG = 1
 WHOLE_METADATA = struct.Struct("<HHI")
+# Version 1 whole-session records retain the original eight-byte tail.  The
+# extended tail carries the source audio owner epoch while keeping the old
+# decoder shape readable for preserved diagnostic streams.
+WHOLE_AUDIO_METADATA = struct.Struct("<HHII")
 MAX_PAYLOAD = 1024 * 1024
 MAX_SLICES = 256
 MAX_GPRS = 32
@@ -61,6 +65,12 @@ BOUNDARY_NAMES = {
     22: "results_mode_exit",
     23: "results_gobj",
     24: "return_css",
+    25: "css_cancel_enter",
+    26: "prize_mode_enter",
+    27: "prize_scene_enter",
+    28: "prize_scene_exit",
+    29: "prize_mode_exit",
+    30: "startup_prize_mode_exit",
 }
 
 # Keep these labels stable: they are the semantic memory names shared by the
@@ -100,6 +110,9 @@ SLICE_NAMES = {
     32: "menu_sss_state",
     33: "menu_audio",
     34: "menu_audio_voice",
+    35: "menu_sss_route",
+    36: "profile_characters",
+    37: "profile_stages",
 }
 
 
@@ -141,13 +154,29 @@ def _boundary_payload(raw: bytes, pc: int, source_tick: int,
     payload_end = len(raw)
     match_index = None
     whole_boundary_kind = None
+    audio_owner_epoch = None
     if flags & WHOLE_SESSION_FLAG:
         if len(raw) < descriptor_end + WHOLE_METADATA.size:
             raise ObserverStreamError(f"{context}: truncated whole-session metadata")
-        payload_end = len(raw) - WHOLE_METADATA.size
-        match_index, whole_boundary_kind, metadata_reserved = WHOLE_METADATA.unpack_from(
-            raw, payload_end)
-        if metadata_reserved != 0 or whole_boundary_kind != kind:
+        # Prefer the extended form only when its kind and reserved word are
+        # valid.  This makes the old format unambiguous and preserves old
+        # captures as explicit, incomplete evidence in the semantic adapter.
+        extended_end = len(raw) - WHOLE_AUDIO_METADATA.size
+        if extended_end >= descriptor_end:
+            candidate_match, candidate_kind, candidate_epoch, candidate_reserved = (
+                WHOLE_AUDIO_METADATA.unpack_from(raw, extended_end))
+            if candidate_kind == kind and candidate_reserved == 0:
+                payload_end = extended_end
+                match_index = candidate_match
+                whole_boundary_kind = candidate_kind
+                audio_owner_epoch = candidate_epoch
+        if match_index is None:
+            payload_end = len(raw) - WHOLE_METADATA.size
+            match_index, whole_boundary_kind, metadata_reserved = WHOLE_METADATA.unpack_from(
+                raw, payload_end)
+            if metadata_reserved != 0 or whole_boundary_kind != kind:
+                raise ObserverStreamError(f"{context}: invalid whole-session metadata")
+        elif audio_owner_epoch is None:
             raise ObserverStreamError(f"{context}: invalid whole-session metadata")
     gprs = list(struct.unpack_from(f"<{gpr_count}I", raw, BOUNDARY.size))
     slices: list[dict[str, Any]] = []
@@ -190,6 +219,8 @@ def _boundary_payload(raw: bytes, pc: int, source_tick: int,
     if flags & WHOLE_SESSION_FLAG:
         decoded.update({"whole_session": True, "match_index": match_index,
                         "whole_boundary_kind": whole_boundary_kind})
+        if audio_owner_epoch is not None:
+            decoded["audio_owner_epoch"] = audio_owner_epoch
     return decoded
 
 

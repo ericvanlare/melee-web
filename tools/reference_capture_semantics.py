@@ -277,10 +277,11 @@ class SemanticSession:
 # single-match observer stream above. A v1 stream has no sequence identity and
 # cannot be promoted by concatenating rows from several captures. The opt-in
 # Dolphin observer now emits the passive CSS/SSS, VS/Results, Results GObj,
-# and return-CSS boundaries below. It still does not emit the existing
-# transition-trace join, menu audio owner epoch, or capture identity.
-# Consequently this reducer remains an experimental contract and is not
-# connected to accepted replay-bundle completion.
+# and return-CSS boundaries below. The adapter joins those menu rows to a
+# same-capture transition trace and owner epoch, while retaining separate
+# missing coverage for PCM and final profile semantics. Consequently this
+# reducer remains an experimental contract and is not connected to accepted
+# replay-bundle completion.
 WHOLE_SESSION_SCHEMA = "melee-web-reference-whole-session"
 WHOLE_SESSION_VERSION = 2
 WHOLE_SESSION_HEADER_KEYS = {
@@ -317,6 +318,11 @@ WHOLE_SESSION_SOURCE_HOOK_PCS = {
     "gm_Scene_Results_OnEnter": 0x80177368,
     "gm_Scene_Results_OnExit": 0x80177704,
     "gmVsMelee_ExitResults": 0x801A5F64,
+    "gm_ModeState_Prize_OnEnter": 0x801BFCFC,
+    "ifPrize_Scene_OnEnter": 0x802FEBE0,
+    "ifPrize_Scene_OnExit": 0x802FED10,
+    "gm_ModeState_Prize_OnExit": 0x801A6308,
+    "gm_ModeState_ChallengerPrize_OnExit": 0x801BFF7C,
 }
 
 
@@ -334,11 +340,12 @@ class WholeSessionSemanticSession:
     that the current observer does not yet emit. It is never an arbitrary
     dictionary accepted as proof of a transition.
 
-    A future emitter must provide one header and all rows from one capture,
-    retaining the typed menu context and the per-match draw, exit, result,
-    Results, and scene-reset boundaries. The reducer intentionally reports
-    ``experimental`` and ``accepted_for_reference_bundle=False`` even for a
-    syntactically complete stream until that emitter is integrated.
+    A future normalizer must still provide one header and all rows from one
+    capture, retaining the typed menu context and the per-match draw, exit,
+    result, Results, and scene-reset boundaries. The reducer intentionally
+    reports ``experimental`` and ``accepted_for_reference_bundle=False`` even
+    for a syntactically complete stream because PCM and final profile evidence
+    remain outside this observer join.
     """
 
     def __init__(self):
@@ -779,6 +786,7 @@ WHOLE_OBSERVER_ORDER = (
 )
 WHOLE_OBSERVER_PCS = {
     "css_enter": 0x8026688C,
+    "css_cancel_enter": 0x8026688C,
     "css_exit": 0x80266D70,
     "sss_enter": 0x8025A998,
     "sss_exit": 0x8025BB5C,
@@ -794,18 +802,161 @@ WHOLE_OBSERVER_PCS = {
     "results_mode_exit": 0x801A5F64,
     "scene_teardown": 0x8039157C,
     "return_css": 0x8026688C,
+    "prize_mode_enter": 0x801BFCFC,
+    "prize_scene_enter": 0x802FEBE0,
+    "prize_scene_exit": 0x802FED10,
+    "prize_mode_exit": 0x801A6308,
+    "startup_prize_mode_exit": 0x801BFF7C,
 }
 
 
-def validate_whole_session_observer_records(records):
-    """Audit one decoded opt-in observer stream without certifying it.
+def _whole_slice(row, name):
+    return next((item for item in row["payload"].get("slices", [])
+                 if item.get("name") == name), None)
+
+
+def _whole_profile_masks(row):
+    """Decode the two source-owned masks published at session boundaries."""
+    boundary = row["payload"].get("boundary", "boundary")
+    values = {}
+    for name in ("profile_characters", "profile_stages"):
+        item = _whole_slice(row, name)
+        if item is None:
+            raise WholeSessionSemanticError(
+                f"{boundary} lacks its loaded {name} profile mask")
+        if item.get("size") != 2:
+            raise WholeSessionSemanticError(
+                f"{boundary} {name} profile mask must be exactly two bytes")
+        try:
+            raw = bytes.fromhex(item.get("hex", ""))
+        except (TypeError, ValueError) as error:
+            raise WholeSessionSemanticError(
+                f"{boundary} {name} profile mask is not hexadecimal") from error
+        if len(raw) != 2:
+            raise WholeSessionSemanticError(
+                f"{boundary} {name} profile mask must be exactly two bytes")
+        # Guest RAM is PowerPC big-endian. Keep this as a typed u16 in the
+        # normalized report rather than treating the bytes as an opaque claim.
+        values[name.removeprefix("profile_")] = int.from_bytes(raw, "big")
+    return values
+
+
+def _whole_menu_audio(row):
+    stream_slice = _whole_slice(row, "menu_audio")
+    voice_slice = _whole_slice(row, "menu_audio_voice")
+    if stream_slice is None or voice_slice is None:
+        return None
+    try:
+        stream = bytes.fromhex(stream_slice["hex"]).split(b"\0", 1)[0].decode("ascii")
+        voice_bytes = bytes.fromhex(voice_slice["hex"])
+    except (ValueError, UnicodeDecodeError):
+        raise WholeSessionSemanticError("menu audio slices are malformed")
+    if len(voice_bytes) != 4:
+        raise WholeSessionSemanticError("menu audio voice slice has the wrong size")
+    return {"active": int.from_bytes(voice_bytes, "big") != 0xffffffff,
+            "stream": stream}
+
+
+def _join_whole_transition_trace(boundaries, transition_trace, capture_id, sequence_id):
+    """Join a continuous transition trace to passive menu boundaries.
+
+    The GDB collector and passive observer must carry the same IDs.  Events are
+    matched in source order, with route bytes from the observer's SSS state
+    slice checked against the collector's completed callback route.  No event
+    is synthesized for a missing return or a separate capture.
+    """
+    rows = list(transition_trace)
+    headers = [row for row in rows if row.get("record") == "header"]
+    if len(headers) != 1:
+        raise WholeSessionSemanticError("transition trace requires exactly one header")
+    header = headers[0]
+    if header.get("schema") != "melee-web-transition-trace" or header.get("version") != 1:
+        raise WholeSessionSemanticError("unsupported transition trace schema")
+    if header.get("capture_id") != capture_id or header.get("sequence_id") != sequence_id:
+        raise WholeSessionSemanticError("transition trace identity disagrees with observer capture")
+    events = [row for row in rows if row.get("record") == "event"]
+    if not events:
+        raise WholeSessionSemanticError("transition trace has no lifecycle events")
+    for event in events:
+        if event.get("capture_id") != capture_id or event.get("sequence_id") != sequence_id:
+            raise WholeSessionSemanticError("transition event identity disagrees with observer capture")
+    by_run = {}
+    for event in events:
+        run = event.get("run")
+        index = event.get("index")
+        if type(run) is not int or run < 0 or type(index) is not int or index < 0:
+            raise WholeSessionSemanticError("transition event has invalid run/index")
+        by_run.setdefault(run, []).append(event)
+    ordered = []
+    for run, run_events in sorted(by_run.items()):
+        run_events.sort(key=lambda event: event["index"])
+        if [event["index"] for event in run_events] != list(range(len(run_events))):
+            raise WholeSessionSemanticError("transition event indices are not consecutive")
+        ordered.extend(run_events)
+
+    menu = [row for row in boundaries if row["payload"]["boundary"] in {
+        "css_enter", "css_cancel_enter", "css_exit", "sss_enter", "sss_exit", "entry",
+    }]
+    cursor = 0
+    joined = []
+    expected = {
+        "capture_begin": "css_enter",
+        "css_exit_complete": "css_exit",
+        "sss_enter_complete": "sss_enter",
+        "sss_exit_complete": "sss_exit",
+        "css_enter_complete": "css_cancel_enter",
+        "match_enter_complete": "entry",
+    }
+    for event in ordered:
+        name = event.get("event")
+        if name not in expected:
+            raise WholeSessionSemanticError(f"unsupported transition event {name!r}")
+        target_name = expected[name]
+        if name == "css_enter_complete":
+            # A collector started from a captured CSS can see a CSS entry
+            # after the SSS cancel. A direct CSS entry is only accepted when
+            # the producer labels it explicitly with the same event.
+            candidates = {"css_cancel_enter", "css_enter"}
+        else:
+            candidates = {target_name}
+        if cursor >= len(menu) or menu[cursor]["payload"]["boundary"] not in candidates:
+            raise WholeSessionSemanticError(
+                f"transition event {name} does not match the next passive boundary")
+        # A later matching event cannot cover an omitted transition. Every
+        # boundary in this same-capture join must be consumed exactly once.
+        row = menu[cursor]
+        cursor += 1
+        if name == "sss_exit_complete":
+            route_slice = _whole_slice(row, "menu_sss_route")
+            if route_slice is None or bytes.fromhex(route_slice["hex"]) not in (b"\0", b"\1"):
+                raise WholeSessionSemanticError("SSS exit lacks its source route byte")
+            route = "match" if bytes.fromhex(route_slice["hex"]) == b"\1" else "css"
+            if event.get("route") != route:
+                raise WholeSessionSemanticError("transition SSS route disagrees with source state")
+        audio = event.get("audio")
+        if not isinstance(audio, dict) or type(audio.get("owner_epoch")) is not int:
+            raise WholeSessionSemanticError("transition event lacks typed audio owner epoch")
+        if (name != "match_enter_complete" and
+                row["payload"].get("audio_owner_epoch") != audio["owner_epoch"]):
+            raise WholeSessionSemanticError("menu audio owner epoch disagrees with transition trace")
+        menu_audio = _whole_menu_audio(row) if name != "match_enter_complete" else None
+        if menu_audio is not None:
+            if menu_audio["active"] != audio.get("active") or menu_audio["stream"] != audio.get("stream"):
+                raise WholeSessionSemanticError("menu audio slices disagree with transition trace")
+        joined.append({"event": name, "observer_seq": row["seq"],
+                       "transition_run": event["run"], "transition_index": event["index"]})
+    if cursor != len(menu):
+        raise WholeSessionSemanticError("observer menu boundaries extend beyond transition trace")
+    return joined
+
+
+def validate_whole_session_observer_records(records, *, transition_trace=None):
+    """Validate one decoded opt-in observer stream and its continuous joins.
 
     This adapter consumes records decoded by reference_observer_stream.  It
-    enforces source boundary order and per-match metadata emitted by the
-    observer.  The current passive emitter has no transition-trace owner
-    epoch or capture identity, so a structurally
-    complete stream returns explicit incomplete evidence and can never pass
-    the normalized whole-session reducer above.
+    enforces source boundary order, identity, typed audio owner epochs, and a
+    same-capture transition trace.  It still reports audio PCM and final
+    profile semantics as separate missing evidence.
     """
     records = list(records)
     starts = [row for row in records if row.get("event") == "start"]
@@ -818,6 +969,16 @@ def validate_whole_session_observer_records(records):
     match_count = start.get("match_count")
     if type(match_count) is not int or not 3 <= match_count <= 64:
         raise WholeSessionSemanticError("observer stream has an invalid declared match_count")
+    handshakes = [row for row in records if row.get("event") == "handshake"]
+    if len(handshakes) != 1:
+        raise WholeSessionSemanticError("whole-session observer stream must contain one handshake")
+    handshake = handshakes[0]["payload"]
+    capture_id = start.get("capture_id")
+    sequence_id = start.get("sequence_id")
+    if not isinstance(capture_id, str) or not capture_id or not isinstance(sequence_id, str) or not sequence_id:
+        raise WholeSessionSemanticError("whole-session observer start lacks capture/sequence identity")
+    if handshake.get("capture_id") != capture_id or handshake.get("sequence_id") != sequence_id:
+        raise WholeSessionSemanticError("observer handshake identity disagrees with start")
 
     boundaries = []
     for row in records:
@@ -851,45 +1012,113 @@ def validate_whole_session_observer_records(records):
             if name in WHOLE_OBSERVER_PCS and row["payload"].get("pc") != WHOLE_OBSERVER_PCS[name]:
                 raise WholeSessionSemanticError(
                     f"match {match_index} {name} boundary has an unpinned source PC")
+        menu_names = {"css_enter", "css_cancel_enter", "css_exit", "sss_enter", "sss_exit"}
+        profile_names = menu_names | {
+            "entry", "vs_exit", "vs_exit_return", "vs_mode_exit", "results_enter",
+            "results_gobj", "results_exit", "results_mode_exit", "scene_teardown",
+            "prize_mode_enter", "prize_scene_enter", "prize_scene_exit", "prize_mode_exit",
+            "startup_prize_mode_exit",
+        }
+        profile_snapshots = {}
+        for row in rows_for_match:
+            name = row["payload"]["boundary"]
+            if name in profile_names:
+                profile_snapshots.setdefault(name, _whole_profile_masks(row))
+        prize_names = {"prize_mode_enter", "prize_scene_enter", "prize_scene_exit",
+                       "prize_mode_exit"}
+        startup_prize_name = "startup_prize_mode_exit"
+        all_prize_names = prize_names | {startup_prize_name}
+        startup_prize_order = ["prize_mode_enter", "prize_scene_enter",
+                               "prize_scene_exit", startup_prize_name]
+        startup_prize = []
+        route_rows = rows_for_match
+        route_names = names
+        if match_index == 0 and names[:1] and names[0] in all_prize_names:
+            if names[:4] != startup_prize_order:
+                raise WholeSessionSemanticError(
+                    "match 0 has an incomplete or out-of-order startup Prize prelude")
+            startup_prize = names[:4]
+            route_rows = rows_for_match[4:]
+            route_names = names[4:]
+        elif any(name in all_prize_names for name in names[:4]):
+            raise WholeSessionSemanticError(
+                "startup Prize prelude is only valid before match 0 CSS enter")
         for name in WHOLE_OBSERVER_REQUIRED:
             if name == "draw_return":
-                if names.count(name) == 0:
+                if route_names.count(name) == 0:
                     raise WholeSessionSemanticError(
                         f"match {match_index} is missing a source draw return")
             elif name == "results_gobj":
-                if names.count(name) == 0:
+                if route_names.count(name) == 0:
                     raise WholeSessionSemanticError(
                         f"match {match_index} is missing a Results GObj process boundary")
             elif name == "css_enter" and match_index != 0:
-                if names.count(name) != 0:
+                if route_names.count(name) != 0:
                     raise WholeSessionSemanticError(
                         f"match {match_index} has an unexpected CSS enter boundary")
-            elif names.count(name) != 1:
+            elif name in menu_names:
+                if route_names.count(name) == 0:
+                    raise WholeSessionSemanticError(
+                        f"match {match_index} is missing {name} boundary")
+            elif route_names.count(name) != 1:
                 raise WholeSessionSemanticError(
                     f"match {match_index} has missing or duplicate {name} boundary")
-        order_positions = []
-        expected_order = (WHOLE_OBSERVER_ORDER if match_index == 0 else
-                          tuple(name for name in WHOLE_OBSERVER_ORDER
-                                if name != "css_enter"))
-        for name in expected_order:
-            positions = [index for index, actual in enumerate(names) if actual == name]
-            order_positions.append(positions[0])
-        if order_positions != sorted(order_positions):
+        # The source permits an SSS cancel route before the match route.  It
+        # returns to CSS and repeats CSS->SSS; preserve every such cycle rather
+        # than collapsing it into a synthetic single transition.
+        entry_position = route_names.index("entry")
+        menu_prefix = route_names[:entry_position]
+        menu_cursor = 0
+        if match_index == 0:
+            if menu_prefix[:1] != ["css_enter"]:
+                raise WholeSessionSemanticError(
+                    f"match {match_index} is missing its initial CSS enter boundary")
+            menu_cursor = 1
+        while True:
+            expected_menu = ("css_exit", "sss_enter", "sss_exit")
+            if menu_prefix[menu_cursor:menu_cursor + 3] != list(expected_menu):
+                raise WholeSessionSemanticError(
+                    f"match {match_index} has an out-of-order CSS/SSS lifecycle")
+            menu_cursor += 3
+            if menu_cursor < len(menu_prefix) and menu_prefix[menu_cursor] == "css_cancel_enter":
+                menu_cursor += 1
+                continue
+            break
+        if menu_cursor != len(menu_prefix):
+            raise WholeSessionSemanticError(
+                f"match {match_index} has an out-of-order CSS/SSS lifecycle")
+        suffix = route_names[entry_position:]
+        has_prize = bool(prize_names & set(suffix))
+        if has_prize and not all(suffix.count(name) == 1 for name in prize_names):
+            raise WholeSessionSemanticError(
+                f"match {match_index} has an incomplete Prize lifecycle")
+        if not has_prize and any(name in prize_names for name in suffix):
+            raise WholeSessionSemanticError(
+                f"match {match_index} has an incomplete Prize lifecycle")
+        expected_suffix = list(WHOLE_OBSERVER_ORDER[4:])
+        if has_prize:
+            expected_suffix = [
+                "entry", "setup", "vs_exit", "vs_exit_return", "vs_mode_exit", "results_enter",
+                "results_gobj", "results_exit", "results_mode_exit", "scene_teardown",
+                "prize_mode_enter", "prize_scene_enter", "prize_scene_exit",
+                "prize_mode_exit", "return_css",
+            ]
+        if [name for name in suffix if name != "draw_return"] != expected_suffix:
             raise WholeSessionSemanticError(
                 f"match {match_index} has an out-of-order source lifecycle")
-        vs_exit_position = names.index("vs_exit")
-        if any(index > vs_exit_position for index, actual in enumerate(names)
+        vs_exit_position = route_names.index("vs_exit")
+        if any(index > vs_exit_position for index, actual in enumerate(route_names)
                if actual == "draw_return"):
             raise WholeSessionSemanticError(
                 f"match {match_index} has a draw return after VS exit")
         draws_before_exit = [
-            row for row in rows_for_match[:vs_exit_position]
+            row for row in route_rows[:vs_exit_position]
             if row["payload"]["boundary"] == "draw_return"
         ]
         if not draws_before_exit:
             raise WholeSessionSemanticError(
                 f"match {match_index} has no final draw before VS exit")
-        result_row = rows_for_match[vs_exit_position]
+        result_row = route_rows[vs_exit_position]
         if not any(item["name"] == "result"
                    for item in result_row["payload"].get("slices", [])):
             raise WholeSessionSemanticError(
@@ -897,6 +1126,7 @@ def validate_whole_session_observer_records(records):
         reports.append({
             "match_index": match_index,
             "boundary_order": names,
+            "startup_prize_prelude": startup_prize,
             "final_draw_seq": draws_before_exit[-1]["seq"],
             "vs_exit_seq": result_row["seq"],
             "scene_reset_seq": next(
@@ -905,21 +1135,40 @@ def validate_whole_session_observer_records(records):
             "return_css_seq": next(
                 row["seq"] for row in rows_for_match
                 if row["payload"]["boundary"] == "return_css"),
+            "loaded_profile_masks": profile_snapshots,
         })
+
+    menu_boundaries = [row for row in boundaries if row["payload"]["boundary"] in {
+        "css_enter", "css_cancel_enter", "css_exit", "sss_enter", "sss_exit", "return_css",
+    }]
+    audio_missing = [row["seq"] for row in menu_boundaries
+                     if row["payload"].get("audio_owner_epoch") is None]
+    transition_join = None
+    missing = []
+    if transition_trace is None:
+        missing.append("transition_trace_css_sss_join")
+    elif audio_missing:
+        # Keep the cause visible before attempting a join against an untyped
+        # stream; callers must retain the old raw capture for diagnosis.
+        missing.append("menu_audio_owner_epoch")
+    else:
+        transition_join = _join_whole_transition_trace(
+            boundaries, transition_trace, capture_id, sequence_id)
+    if audio_missing and "menu_audio_owner_epoch" not in missing:
+        missing.append("menu_audio_owner_epoch")
+    if not transition_join and "transition_trace_css_sss_join" not in missing:
+        missing.append("transition_trace_css_sss_join")
 
     return {
         "schema": WHOLE_SESSION_SCHEMA,
         "version": WHOLE_SESSION_VERSION,
-        "complete": False,
+        "complete": not missing,
         "experimental": True,
         "accepted_for_reference_bundle": False,
-        "observer_integration": "incomplete",
-        "capture_identity": None,
+        "observer_integration": "complete" if not missing else "incomplete",
+        "capture_identity": {"capture_id": capture_id, "sequence_id": sequence_id},
         "match_count": match_count,
         "matches": reports,
-        "missing_coverage": [
-            "capture_id_and_sequence_id",
-            "transition_trace_css_sss_join",
-            "menu_audio_owner_epoch",
-        ],
+        "transition_join": transition_join,
+        "missing_coverage": missing + ["audio_pcm", "final_profile_semantics"],
     }

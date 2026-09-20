@@ -162,18 +162,24 @@ def _observer_boundary(kind, match_index, *, result=False):
     raw = b"result" if result else b"state"
     tag = 15 if result else 31
     prefix = observer_stream.BOUNDARY.pack(
-        kind, observer_stream.WHOLE_SESSION_FLAG, 0x80300000, 32, 1, 0)
+        kind, observer_stream.WHOLE_SESSION_FLAG, 0x80300000, 32, 3, 0)
     gprs = struct.pack("<32I", *range(32))
     descriptor_offset = (observer_stream.BOUNDARY.size + 32 * 4 +
-                         observer_stream.SLICE.size)
+                         observer_stream.SLICE.size * 3)
     descriptor = observer_stream.SLICE.pack(
         tag, 0, 0x80479D98 if result else 0x804D6CC0,
         len(raw), descriptor_offset)
+    profile_characters = observer_stream.SLICE.pack(
+        36, 0, 0x8045C538, 2, descriptor_offset + len(raw))
+    profile_stages = observer_stream.SLICE.pack(
+        37, 0, 0x8045C53A, 2, descriptor_offset + len(raw) + 2)
     metadata = observer_stream.WHOLE_METADATA.pack(match_index, kind, 0)
-    return prefix + gprs + descriptor + raw + metadata
+    return (prefix + gprs + descriptor + profile_characters + profile_stages + raw +
+            b"\x07\xff\x01\xc0" + metadata)
 
 
-def _decoded_observer_rows(match_count=3):
+def _decoded_observer_rows(match_count=3, *, include_prize=False,
+                            include_startup_prize=False):
     kinds = (
         (14, "css_exit"), (15, "sss_enter"),
         (16, "sss_exit"), (4, "entry"), (5, "setup"), (8, "draw_return"),
@@ -181,19 +187,35 @@ def _decoded_observer_rows(match_count=3):
         (20, "results_enter"), (23, "results_gobj"), (21, "results_exit"),
         (22, "results_mode_exit"), (11, "scene_teardown"), (24, "return_css"),
     )
+    if include_prize:
+        kinds = kinds[:-1] + (
+            (26, "prize_mode_enter"), (27, "prize_scene_enter"),
+            (28, "prize_scene_exit"), (29, "prize_mode_exit"), (24, "return_css"),
+        )
     pcs = {
         13: 0x8026688C, 14: 0x80266D70, 15: 0x8025A998, 16: 0x8025BB5C,
         4: 0x8016E934, 5: 0x8016E9C4, 8: 0x80391040, 17: 0x8016E9C8,
         18: 0x8016EBBC, 19: 0x801A5AF0, 20: 0x80177368, 21: 0x80177704,
         22: 0x801A5F64, 23: 0x80179350, 11: 0x8039157C,
-        24: 0x8026688C,
+        24: 0x8026688C, 26: 0x801BFCFC, 27: 0x802FEBE0,
+        28: 0x802FED10, 29: 0x801A6308, 30: 0x801BFF7C,
     }
     stream_bytes = _observer_frame(
-        2, 0, json.dumps({"whole_session": True,
-                          "match_count": match_count}).encode())
-    sequence = 1
+        1, 0, json.dumps({"schema": "melee-web-passive-dolphin-observer",
+                          "version": 1, "whole_session": True,
+                          "match_count": match_count, "capture_id": "capture-36",
+                          "sequence_id": "sequence-36"}).encode())
+    stream_bytes += _observer_frame(
+        2, 1, json.dumps({"whole_session": True, "match_count": match_count,
+                          "capture_id": "capture-36", "sequence_id": "sequence-36"}).encode())
+    sequence = 2
     for match_index in range(match_count):
-        match_kinds = ((13, "css_enter"),) + kinds if match_index == 0 else kinds
+        startup = (
+            ((26, "prize_mode_enter"), (27, "prize_scene_enter"),
+             (28, "prize_scene_exit"), (30, "startup_prize_mode_exit"))
+            if match_index == 0 and include_startup_prize else ())
+        match_kinds = (startup + ((13, "css_enter"),) + kinds
+                       if match_index == 0 else kinds)
         for kind, _name in match_kinds:
             stream_bytes += _observer_frame(
                 3, sequence,
@@ -438,7 +460,148 @@ class ReferenceCaptureSemanticsTests(unittest.TestCase):
         self.assertIn("menu_audio_owner_epoch", report["missing_coverage"])
         self.assertEqual(report["matches"][2]["return_css_seq"],
                          report["matches"][2]["scene_reset_seq"] + 1)
-        self.assertIsNone(report["capture_identity"])
+        self.assertEqual(report["capture_identity"],
+                         {"capture_id": "capture-36", "sequence_id": "sequence-36"})
+
+    def test_observer_adapter_requires_source_loaded_profile_masks(self):
+        records = _decoded_observer_rows()
+        first_css = next(row for row in records
+                         if row.get("payload", {}).get("boundary") == "css_enter")
+        first_css["payload"]["slices"] = [
+            item for item in first_css["payload"]["slices"]
+            if item["name"] != "profile_stages"
+        ]
+        with self.assertRaisesRegex(semantics.WholeSessionSemanticError,
+                                    "loaded profile_stages"):
+            semantics.validate_whole_session_observer_records(records)
+
+    def test_observer_adapter_retains_optional_prize_lifecycle(self):
+        records = _decoded_observer_rows(include_prize=True)
+        report = semantics.validate_whole_session_observer_records(records)
+        prize = [row for row in report["matches"][0]["boundary_order"]
+                  if row.startswith("prize_")]
+        self.assertEqual(prize, ["prize_mode_enter", "prize_scene_enter",
+                                 "prize_scene_exit", "prize_mode_exit"])
+        self.assertEqual(report["matches"][0]["loaded_profile_masks"]["css_enter"],
+                         {"characters": 0x07FF, "stages": 0x01C0})
+
+    def test_observer_adapter_retains_startup_prize_as_separate_prelude(self):
+        records = _decoded_observer_rows(include_startup_prize=True)
+        report = semantics.validate_whole_session_observer_records(records)
+        self.assertEqual(report["matches"][0]["startup_prize_prelude"], [
+            "prize_mode_enter", "prize_scene_enter", "prize_scene_exit",
+            "startup_prize_mode_exit",
+        ])
+        self.assertEqual(report["matches"][0]["boundary_order"][:4],
+                         report["matches"][0]["startup_prize_prelude"])
+        self.assertEqual(report["matches"][0]["boundary_order"][4], "css_enter")
+        self.assertEqual(report["matches"][0]["loaded_profile_masks"]["css_enter"],
+                         {"characters": 0x07FF, "stages": 0x01C0})
+
+    def test_observer_adapter_rejects_startup_prize_on_later_match(self):
+        records = _decoded_observer_rows()
+        # A later match must not acquire a pre-CSS lifecycle by relabeling its
+        # first source boundary; the observer's match index is part of the
+        # same-capture ordering contract.
+        row = records[2].copy()
+        row["payload"] = {"boundary": "startup_prize_mode_exit", "boundary_kind": 30,
+                          "pc": 0x801BFF7C, "whole_session": True,
+                          "whole_boundary_kind": 30, "match_index": 1,
+                          "slices": records[2]["payload"]["slices"]}
+        insert_at = next(index for index, item in enumerate(records)
+                         if item.get("payload", {}).get("match_index") == 1)
+        records.insert(insert_at, row)
+        with self.assertRaisesRegex(semantics.WholeSessionSemanticError,
+                                    "startup Prize prelude"):
+            semantics.validate_whole_session_observer_records(records)
+
+    def test_observer_adapter_joins_same_capture_menu_trace_and_audio_epoch(self):
+        records = _decoded_observer_rows()
+        menu_names = {"css_enter", "css_exit", "sss_enter", "sss_exit", "return_css"}
+        for row in records:
+            payload = row.get("payload", {})
+            if payload.get("boundary") not in menu_names:
+                continue
+            payload["audio_owner_epoch"] = 0
+            payload["slices"].extend([
+                {"name": "menu_audio", "hex": (b"menu01.hps\0" + bytes(55)).hex()},
+                {"name": "menu_audio_voice", "hex": "00000001"},
+            ])
+            if payload["boundary"] == "sss_exit":
+                payload["slices"].append({"name": "menu_sss_route", "hex": "01"})
+        trace = [{"record": "header", "schema": "melee-web-transition-trace", "version": 1,
+                  "capture_id": "capture-36", "sequence_id": "sequence-36"}]
+        event_index = 0
+        for row in records:
+            boundary = row.get("payload", {}).get("boundary")
+            mapping = {"css_enter": "capture_begin", "css_exit": "css_exit_complete",
+                       "sss_enter": "sss_enter_complete", "sss_exit": "sss_exit_complete",
+                       "entry": "match_enter_complete"}
+            if boundary not in mapping:
+                continue
+            event = {"record": "event", "run": 0, "index": event_index,
+                     "event": mapping[boundary], "capture_id": "capture-36",
+                     "sequence_id": "sequence-36",
+                     "audio": {"active": True, "owner_epoch": 0,
+                               "stream": "menu01.hps"}}
+            if boundary == "sss_exit":
+                event["route"] = "match"
+            trace.append(event)
+            event_index += 1
+        report = semantics.validate_whole_session_observer_records(
+            records, transition_trace=trace)
+        self.assertTrue(report["complete"])
+        self.assertEqual(report["observer_integration"], "complete")
+        self.assertEqual(len(report["transition_join"]), event_index)
+        self.assertIn("audio_pcm", report["missing_coverage"])
+        self.assertFalse(report["accepted_for_reference_bundle"])
+
+        for omitted in ("capture_begin", "css_exit_complete", "sss_enter_complete"):
+            with self.subTest(omitted=omitted):
+                incomplete = deepcopy(trace)
+                incomplete.pop(next(index for index, row in enumerate(incomplete)
+                                    if row.get("event") == omitted))
+                for index, row in enumerate(incomplete[1:]):
+                    row["index"] = index
+                with self.assertRaisesRegex(semantics.WholeSessionSemanticError,
+                                            "next passive boundary"):
+                    semantics.validate_whole_session_observer_records(
+                        records, transition_trace=incomplete)
+
+    def test_observer_adapter_rejects_transition_trace_from_another_capture(self):
+        records = _decoded_observer_rows()
+        for row in records:
+            if row.get("payload", {}).get("boundary") in {
+                    "css_enter", "css_exit", "sss_enter", "sss_exit", "return_css"}:
+                row["payload"]["audio_owner_epoch"] = 0
+        trace = [{"record": "header", "schema": "melee-web-transition-trace", "version": 1,
+                  "capture_id": "other-capture", "sequence_id": "sequence-36"}]
+        with self.assertRaisesRegex(semantics.WholeSessionSemanticError, "identity"):
+            semantics.validate_whole_session_observer_records(records, transition_trace=trace)
+
+    def test_observer_adapter_retains_sss_cancel_cycle_before_match(self):
+        records = _decoded_observer_rows()
+        match_zero = [index for index, row in enumerate(records)
+                      if row.get("payload", {}).get("match_index") == 0]
+        first_exit = next(index for index in match_zero
+                          if records[index]["payload"].get("boundary") == "sss_exit")
+        entry = next(index for index in match_zero
+                     if records[index]["payload"].get("boundary") == "entry")
+        cancel = deepcopy(records[first_exit])
+        cancel["payload"]["boundary"] = "css_cancel_enter"
+        cancel["payload"]["boundary_kind"] = 25
+        cancel["payload"]["whole_boundary_kind"] = 25
+        cancel["payload"]["pc"] = 0x8026688C
+        repeated = [deepcopy(records[index]) for index in (first_exit - 2, first_exit - 1, first_exit)]
+        records[first_exit + 1:first_exit + 1] = [cancel, *repeated]
+        # The retained fixture has no extended audio metadata, so this test
+        # exercises the source order reducer while preserving incomplete
+        # capture evidence semantics.
+        report = semantics.validate_whole_session_observer_records(records)
+        self.assertIn("transition_trace_css_sss_join", report["missing_coverage"])
+        names = report["matches"][0]["boundary_order"]
+        self.assertIn("css_cancel_enter", names)
+        self.assertLess(names.index("css_cancel_enter"), names.index("entry"))
 
     def test_observer_adapter_rejects_missing_or_duplicate_source_boundaries(self):
         records = _decoded_observer_rows()

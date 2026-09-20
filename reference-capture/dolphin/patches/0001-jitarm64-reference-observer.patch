@@ -1,3 +1,36 @@
+diff --git a/Source/Core/Core/Boot/Boot.cpp b/Source/Core/Core/Boot/Boot.cpp
+index 2ddadfec72..a770c0ddac 100644
+--- a/Source/Core/Core/Boot/Boot.cpp
++++ b/Source/Core/Core/Boot/Boot.cpp
+@@ -52,6 +52,7 @@
+ #include "Core/PowerPC/PPCAnalyst.h"
+ #include "Core/PowerPC/PPCSymbolDB.h"
+ #include "Core/PowerPC/PowerPC.h"
++#include "Core/PowerPC/ReferenceCaptureObserver.h"
+ #include "Core/System.h"
+ 
+ #include "DiscIO/Enums.h"
+@@ -522,6 +523,9 @@ bool CBoot::BootUp(Core::System& system, const Core::CPUThreadGuard& guard,
+     bool operator()(BootParameters::Disc& disc) const
+     {
+       NOTICE_LOG_FMT(BOOT, "Booting from disc: {}", disc.path);
++      if (ReferenceCapture::Observer::IsEnabled() &&
++          (!disc.volume || !ReferenceCapture::Observer::ValidateDiscDOL(*disc.volume)))
++        return false;
+       const DiscIO::VolumeDisc* volume =
+           SetDisc(system.GetDVDInterface(), std::move(disc.volume), disc.auto_disc_change_paths);
+       AchievementManager::GetInstance().LoadGame(volume);
+@@ -631,6 +635,10 @@ bool CBoot::BootUp(Core::System& system, const Core::CPUThreadGuard& guard,
+     bool operator()(const BootParameters::IPL& ipl) const
+     {
+       NOTICE_LOG_FMT(BOOT, "Booting GC IPL: {}", ipl.path);
++      if (ReferenceCapture::Observer::IsEnabled() &&
++          (!ipl.disc || !ipl.disc->volume ||
++          !ReferenceCapture::Observer::ValidateDiscDOL(*ipl.disc->volume)))
++        return false;
+       if (!File::Exists(ipl.path))
+       {
+         if (ipl.disc)
 diff --git a/Source/Core/Core/CMakeLists.txt b/Source/Core/Core/CMakeLists.txt
 index e411239d17..9462c78005 100644
 --- a/Source/Core/Core/CMakeLists.txt
@@ -11,37 +44,44 @@ index e411239d17..9462c78005 100644
      PowerPC/JitArmCommon/BackPatch.h
    )
  endif()
-diff --git a/Source/Core/Core/Boot/Boot.cpp b/Source/Core/Core/Boot/Boot.cpp
-index 66ee9f7d2d..6e131d7cc1 100644
---- a/Source/Core/Core/Boot/Boot.cpp
-+++ b/Source/Core/Core/Boot/Boot.cpp
-@@ -53,5 +53,6 @@
- #include "Core/PatchEngine.h"
- #include "Core/PowerPC/PPCAnalyst.h"
- #include "Core/PowerPC/PPCSymbolDB.h"
- #include "Core/PowerPC/PowerPC.h"
-+#include "Core/PowerPC/ReferenceCaptureObserver.h"
- #include "Core/System.h"
-@@ -521,5 +522,8 @@ struct BootTitle
-     bool operator()(BootParameters::Disc& disc) const
-     {
-       NOTICE_LOG_FMT(BOOT, "Booting from disc: {}", disc.path);
-+      if (ReferenceCapture::Observer::IsEnabled() &&
-+          (!disc.volume || !ReferenceCapture::Observer::ValidateDiscDOL(*disc.volume)))
-+        return false;
-       const DiscIO::VolumeDisc* volume =
-           SetDisc(system.GetDVDInterface(), std::move(disc.volume), disc.auto_disc_change_paths);
-@@ -631,4 +638,8 @@ struct BootTitle
-     bool operator()(const BootParameters::IPL& ipl) const
-     {
-       NOTICE_LOG_FMT(BOOT, "Booting GC IPL: {}", ipl.path);
-+      if (ReferenceCapture::Observer::IsEnabled() &&
-+          (!ipl.disc || !ipl.disc->volume ||
-+          !ReferenceCapture::Observer::ValidateDiscDOL(*ipl.disc->volume)))
-+        return false;
-       if (!File::Exists(ipl.path))
+diff --git a/Source/Core/Core/HW/EXI/EXI.cpp b/Source/Core/Core/HW/EXI/EXI.cpp
+index 144fdd57b9..73a91fead6 100644
+--- a/Source/Core/Core/HW/EXI/EXI.cpp
++++ b/Source/Core/Core/HW/EXI/EXI.cpp
+@@ -11,6 +11,7 @@
+ #include "Common/IOFile.h"
+ 
+ #include "Core/Config/MainSettings.h"
++#include "Core/Config/SessionSettings.h"
+ #include "Core/ConfigManager.h"
+ #include "Core/CoreTiming.h"
+ #include "Core/HW/EXI/EXI_Channel.h"
+@@ -171,6 +172,9 @@ void ExpansionInterfaceManager::Shutdown()
+ 
+   if (!m_using_overridden_sram)
+   {
++    if (!Config::Get(Config::SESSION_SAVE_DATA_WRITABLE))
++      return;
++
+     File::IOFile file(SConfig::GetInstance().m_strSRAM, "wb");
+     auto& sram = m_system.GetSRAM();
+     file.WriteArray(&sram, 1);
+diff --git a/Source/Core/Core/HW/GCMemcard/GCMemcardDirectory.cpp b/Source/Core/Core/HW/GCMemcard/GCMemcardDirectory.cpp
+index 791b471be4..18ba62fa1d 100644
+--- a/Source/Core/Core/HW/GCMemcard/GCMemcardDirectory.cpp
++++ b/Source/Core/Core/HW/GCMemcard/GCMemcardDirectory.cpp
+@@ -619,6 +619,9 @@ bool GCMemcardDirectory::SetUsedBlocks(int save_index)
+ 
+ void GCMemcardDirectory::FlushToFile()
+ {
++  if (!Config::Get(Config::SESSION_SAVE_DATA_WRITABLE))
++    return;
++
+   std::unique_lock l(m_write_mutex);
+   Memcard::DEntry invalid;
+   for (Memcard::GCIFile& save : m_saves)
 diff --git a/Source/Core/Core/PowerPC/JitArm64/Jit.cpp b/Source/Core/Core/PowerPC/JitArm64/Jit.cpp
-index 5b61528fae..779d6d5b12 100644
+index 5b61528fae..a28adc3da2 100644
 --- a/Source/Core/Core/PowerPC/JitArm64/Jit.cpp
 +++ b/Source/Core/Core/PowerPC/JitArm64/Jit.cpp
 @@ -36,6 +36,7 @@
@@ -81,7 +121,7 @@ index 5b61528fae..779d6d5b12 100644
    m_constant_propagation.Clear();
  
    if (!js.noSpeculativeConstantsAddresses.contains(js.blockStart))
-@@ -1289,6 +1310,22 @@ bool JitArm64::DoJit(u32 em_address, JitBlock* b, u32 nextPC)
+@@ -1289,6 +1312,22 @@ bool JitArm64::DoJit(u32 em_address, JitBlock* b, u32 nextPC)
        }
      }
  
@@ -104,7 +144,7 @@ index 5b61528fae..779d6d5b12 100644
      if (HandleFunctionHooking(op.address))
        break;
  
-@@ -1410,7 +1447,7 @@ bool JitArm64::DoJit(u32 em_address, JitBlock* b, u32 nextPC)
+@@ -1410,7 +1449,7 @@ bool JitArm64::DoJit(u32 em_address, JitBlock* b, u32 nextPC)
          FlushCarry();
  
        // If we have a register that will never be used again, discard or flush it.
@@ -113,37 +153,3 @@ index 5b61528fae..779d6d5b12 100644
        {
          gpr.DiscardRegisters(op.gprDiscardable);
          fpr.DiscardRegisters(op.fprDiscardable);
-diff --git a/Source/Core/Core/HW/EXI/EXI.cpp b/Source/Core/Core/HW/EXI/EXI.cpp
-index 41f8e27a0b..8ec2c8a7e4 100644
---- a/Source/Core/Core/HW/EXI/EXI.cpp
-+++ b/Source/Core/Core/HW/EXI/EXI.cpp
-@@ -9,4 +9,5 @@
- #include "Common/IOFile.h"
- 
- #include "Core/Config/MainSettings.h"
-+#include "Core/Config/SessionSettings.h"
- #include "Core/ConfigManager.h"
-@@ -168,7 +169,10 @@ void ExpansionInterfaceManager::Shutdown()
-   CEXIMemoryCard::Shutdown();
- 
-   if (!m_using_overridden_sram)
-   {
-+    if (!Config::Get(Config::SESSION_SAVE_DATA_WRITABLE))
-+      return;
-+
-     File::IOFile file(SConfig::GetInstance().m_strSRAM, "wb");
-     auto& sram = m_system.GetSRAM();
-     file.WriteArray(&sram, 1);
-
-diff --git a/Source/Core/Core/HW/GCMemcard/GCMemcardDirectory.cpp b/Source/Core/Core/HW/GCMemcard/GCMemcardDirectory.cpp
-index e3e5a4c688..d20ccb7f59 100644
---- a/Source/Core/Core/HW/GCMemcard/GCMemcardDirectory.cpp
-+++ b/Source/Core/Core/HW/GCMemcard/GCMemcardDirectory.cpp
-@@ -618,4 +618,7 @@ void GCMemcardDirectory::FlushToFile()
- 
- void GCMemcardDirectory::FlushToFile()
- {
-+  if (!Config::Get(Config::SESSION_SAVE_DATA_WRITABLE))
-+    return;
-+
-   std::unique_lock l(m_write_mutex);

@@ -19,6 +19,21 @@ CARD_BLOCK_BYTES = 0x2000
 GAME_DATA_BLOCK = 1
 SAVE_OFFSET = 0x20
 ALL_CHARACTER_BITS = (1 << 11) - 1
+# gm_1601.c's lbl_803B790C has exactly eleven authored stage unlock rows,
+# indexed by bits 0..10.  Bits above this range are not unlock data.
+AUTHORED_STAGE_UNLOCK_MASK = (1 << 11) - 1
+# These are the authored unlock rows used by gm_80164430/gm_80164504 in
+# gm_1601.c.  Yoshi's Story (Gr_Kind_Story, 0x0A) is a default stage and has
+# no row in lbl_803B790C, so it contributes no save bit.
+SUPPORTED_STAGE_UNLOCK_BITS = {
+    "battlefield": 1 << 6,
+    "final_destination": 1 << 7,
+    "dream_land": 1 << 8,
+    "yoshis_story": 0,
+}
+SUPPORTED_STAGE_MASK = (SUPPORTED_STAGE_UNLOCK_BITS["battlefield"] |
+                        SUPPORTED_STAGE_UNLOCK_BITS["final_destination"] |
+                        SUPPORTED_STAGE_UNLOCK_BITS["dream_land"])
 
 
 def card_digest(payload: bytes) -> bytes:
@@ -60,17 +75,36 @@ def encode_block(decoded: bytes) -> bytes:
     return bytes(result)
 
 
-def unlock_roster_gci(gci: bytes) -> bytes:
-    """Update the checked prepared fixture's GameData mask and block encoding.
+def unlock_profile_gci(gci: bytes, *, character_bits: int = 0,
+                       stage_bits: int = 0) -> bytes:
+    """OR explicit authored unlock bits into every valid GameData copy.
+
+    This helper intentionally cannot write an arbitrary save image: it only
+    changes the two unlock masks, then validates the original HSD checksum and
+    encoding by decoding the newly encoded block again.  Callers should pass
+    bits identified in the pinned source tables, rather than a guessed
+    all-stages value.
 
     lbcardgame.c binds manifest entry 1 to gmMainLib_GetSaveData(). The HSD
     card writer fn_803B1338 places the primary in block 1 after a 0x20-byte
     protected-block header. gmmain_lib.h puts unlocked_characers_bitmask at
-    save offset 0; gm_80164F18 sets bits 0..10. Stage availability at +2 and
-    every other decoded byte are preserved. In this hash-pinned prepared
-    fixture block 10 has no valid HSD checksum; it is preserved as-is, never
-    repaired into a newly selectable copy. This is not a general save editor.
+    save offset 0; gm_80164F18 sets bits 0..10. Stage availability is at +2.
+    The original reader can select a later physical copy with the same logical
+    identity (fn_803ADF90), including block 10 in a freshly created save. Update
+    all checksum-valid copies so the prepared availability does not depend on
+    which copy is selected. Invalid secondary blocks are preserved, never
+    repaired into newly selectable copies. This is not a general save editor.
     """
+    for name, value in (("character_bits", character_bits),
+                        ("stage_bits", stage_bits)):
+        if (isinstance(value, bool) or not isinstance(value, int) or
+                not 0 <= value <= 0xFFFF):
+            raise ValueError(f"{name} must be an integer in the range 0..0xffff")
+        if name == "stage_bits" and value & ~AUTHORED_STAGE_UNLOCK_MASK:
+            raise ValueError("stage_bits contains bits outside authored unlock rows")
+        if name == "character_bits" and value & ~ALL_CHARACTER_BITS:
+            raise ValueError("character_bits contains bits outside authored unlock rows")
+
     if (len(gci) != GCI_HEADER_BYTES + 11 * CARD_BLOCK_BYTES or
             gci[:6] != b"GALE01" or
             gci[8:40].rstrip(b"\0") != b"SuperSmashBros0110290334" or
@@ -81,9 +115,30 @@ def unlock_roster_gci(gci: bytes) -> bytes:
     decoded = bytearray(decode_block(gci[start:end]))
     if decoded[16:18] != b"\x00\x01":
         raise ValueError("Prepared GameData block has the wrong logical identity")
-    mask = int.from_bytes(decoded[SAVE_OFFSET:SAVE_OFFSET + 2], "big")
-    decoded[SAVE_OFFSET:SAVE_OFFSET + 2] = (mask | ALL_CHARACTER_BITS).to_bytes(2, "big")
-    encoded = encode_block(decoded)
-    if decode_block(encoded)[16:] != decoded[16:]:
-        raise ValueError("Updated HSD card block did not round-trip")
-    return gci[:start] + encoded + gci[end:]
+    result = bytearray(gci)
+    for block in range(GAME_DATA_BLOCK, 11):
+        start = GCI_HEADER_BYTES + block * CARD_BLOCK_BYTES
+        end = start + CARD_BLOCK_BYTES
+        try:
+            decoded = bytearray(decode_block(gci[start:end]))
+        except ValueError:
+            # The primary was checked above; an invalid spare remains invalid.
+            continue
+        if decoded[16:18] != b"\x00\x01":
+            continue
+        character_mask = int.from_bytes(decoded[SAVE_OFFSET:SAVE_OFFSET + 2], "big")
+        stage_mask = int.from_bytes(decoded[SAVE_OFFSET + 2:SAVE_OFFSET + 4], "big")
+        decoded[SAVE_OFFSET:SAVE_OFFSET + 2] = (
+            character_mask | character_bits).to_bytes(2, "big")
+        decoded[SAVE_OFFSET + 2:SAVE_OFFSET + 4] = (
+            stage_mask | stage_bits).to_bytes(2, "big")
+        encoded = encode_block(decoded)
+        if decode_block(encoded)[16:] != decoded[16:]:
+            raise ValueError("Updated HSD card block did not round-trip")
+        result[start:end] = encoded
+    return bytes(result)
+
+
+def unlock_roster_gci(gci: bytes) -> bytes:
+    """Backward-compatible all-character-only prepared-save update."""
+    return unlock_profile_gci(gci, character_bits=ALL_CHARACTER_BITS)

@@ -282,6 +282,7 @@ class Supervisor:
         settings_hash = sha256(self.settings_path)
         tooling_before = self.tooling_identity()
         identifier = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ-") + uuid.uuid4().hex[:12]
+        sequence_id = uuid.uuid4().hex
         input_source = ("dolphin_input_replay" if self.replay_source else
                         "automated_human_pipe" if self.automated else "physical_controller")
         replay_binding = self.replay_source["manifest_sha256"] if self.replay_source else None
@@ -326,6 +327,7 @@ class Supervisor:
                                MWRC_SOURCE_REV="GALE01r2", MWRC_OUTPUT=str(raw), MWRC_STATUS=str(status_path),
                                MWRC_DOL_SHA256=self.identity["disc"]["dol_sha256"],
                                MWRC_OBSERVER_ID=self.settings["observer_identity"],
+                               MWRC_CAPTURE_ID=identifier, MWRC_SEQUENCE_ID=sequence_id,
                                LANG="en_US.UTF-8", LC_ALL="en_US.UTF-8")
             if self.replay_source:
                 environment["MWRC_INPUT_REPLAY"] = str(self.replay_source["input_path"])
@@ -502,6 +504,7 @@ class Supervisor:
                  "tools/reference_session_comparison.py",
                  "tools/reference_capture_semantics.py", "tools/reference_session_bundle.py",
                  "tools/reference_capture_automation.py",
+                 "tools/reference_transition_capture.py",
                  "tools/retail_cpu_observation.py", "tools/retail_replay_validation.py",
                  "tools/retail_setup_validation.py", "tools/retail_input_plan.py",
                  "scripts/build_reference_dolphin.py", "scripts/extract_disc_file.py",
