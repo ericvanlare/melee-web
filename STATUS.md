@@ -72,11 +72,24 @@ resumes, gaps or audio underruns; one 69 ms cold browser long task remains.
 This is functional entry, not a stage-performance pass.
 The shared material loader now preserves the source base TLUT for
 TIMG-only animation; see [stage evidence](docs/YOSHIS_ISLAND_64_PORT_NOTES.md).
-The Pikachu/Pichu/Old Yoshi checkpoint passes both Release builds and 1,075
+Jigglypuff is the fourteenth development fighter. Native checks cover all five
+costume lifetimes, including original hat archives and dynamics, crouch
+animation variation, five aerial jumps and ground/air special states. The
+original browser CSS/SSS route passes 31 action cases in each cold/warm run:
+12,800 source frames with no action-window timing, audio, pipeline or heap-growth
+failures. Shared fixes retain the complete stored dynamics table separately
+from its active body count, the custom-part owner/cache and original crouch
+Wait selection. Earlier loader, blue-hat and input-recipe failures remain
+retained; see [Jigglypuff's measured scope](docs/JIGGLYPUFF_PORT_NOTES.md).
+The Jigglypuff checkpoint passes both Release builds and the 1,077-test suite
+in 346.034 seconds with 41 explicit skips. Fresh shared headless comparisons
+still match 603 Ganondorf/FD and 240 Mario/FD declared source updates. Its
+pipeline seed is unchanged; see the [current checkpoint receipt](docs/evidence/full-game-checkpoint-purin-v1.json).
+The preceding Pikachu/Pichu/Old Yoshi checkpoint passes both Release builds and 1,075
 tests in 334.490 seconds with 41 explicit skips. Fresh headless comparisons
 still match 603 Ganondorf/FD and 240 Mario/FD declared source updates; the
 new content has no independent original comparison yet. See the
-[current checkpoint receipt](docs/evidence/full-game-checkpoint-pikachu-old-yoshi-v1.json).
+[Pikachu/Pichu/Old Yoshi receipt](docs/evidence/full-game-checkpoint-pikachu-old-yoshi-v1.json).
 The preceding Luigi/Fountain checkpoint passed both Release builds and 1,070 tests
 in 298.028 seconds with 41 explicit skips. The receipt names the exact browser
 build, the later Article validation guard, reference scope and retained failures;

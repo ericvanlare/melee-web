@@ -167,6 +167,27 @@ class ContentMatchTests(unittest.TestCase):
             finally:
                 temporary.cleanup()
 
+    def test_purin_source_lifecycles_both_orientations(self):
+        common = ROOT / "assets-local/full-game-ganon"
+        purin = ROOT / "assets-local/full-game-jigglypuff"
+        required_common = ("MnSlChr.usd", "PlMr.dat", "PlMrAJ.dat", "mario.ssm",
+                           "GrNLa.dat")
+        required_purin = ("PlPr.dat", "PlPrAJ.dat", "PlPrNr.dat", "PlPrRe.dat",
+                          "PlPrBu.dat", "PlPrGr.dat", "PlPrYe.dat", "EfPrData.dat",
+                          "purin.ssm")
+        if not (all((common / name).is_file() for name in required_common) and
+                all((purin / name).is_file() for name in required_purin)):
+            self.skipTest("Owned Purin/Mario, English costumes, menu and FD fixtures are required")
+        # CKIND_PURIN=15 and CKIND_MARIO=8. The trace's five-costume loop
+        # reconstructs every Purin hat/material in either player orientation;
+        # only the forward orientation drives Purin's special fixture.
+        for fighter, opponent in ((15, 8), (8, 15)):
+            with self.subTest(fighter=fighter, opponent=opponent):
+                self.run_trace(
+                    "gameplay_content_match_trace",
+                    [common, purin, 32, fighter, opponent],
+                    "Mixed source content intro, costumes, stage lifecycle, combat, pause and repeat teardown passed")
+
     def test_old_yoshi_source_match_entry_and_repeat_teardown(self):
         common = ROOT / "assets-local/full-game-ganon"
         stage = ROOT / "assets-local/full-game-stage-yoshis-island-64"

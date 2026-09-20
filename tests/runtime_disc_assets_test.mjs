@@ -13,7 +13,7 @@ await assert.rejects(loadRuntimeDisc(new Blob([bytes])),/Invalid game executable
 console.log('Runtime disc language paths and executable rejection checks passed');
 
 assert.equal(Object.keys(NATIVE_MENU_DISC_FILES).length,15);
-assert.equal(Object.keys(NATIVE_GAME_DISC_FILES).length,151);
+assert.equal(Object.keys(NATIVE_GAME_DISC_FILES).length,160);
 for(const name of ['nr_select','nr_title','nr_name','pokemon','end']) {
   assert.equal(NATIVE_MENU_DISC_FILES[name+'.ssm'],'audio/us/'+name+'.ssm');
   assert.equal(NATIVE_GAME_DISC_FILES[name+'.ssm'],'audio/us/'+name+'.ssm');
@@ -36,7 +36,8 @@ for(const name of ['LbRb.dat','LbBf.dat','GmPause.usd','IfAll.usd','IfCoGet.dat'
   'PlLg.dat','PlLgAJ.dat','PlLgNr.dat','PlLgWh.dat','PlLgAq.dat','PlLgPi.dat','EfLgData.dat',
   'PlPk.dat','PlPkAJ.dat','PlPkNr.dat','PlPkRe.dat','PlPkBu.dat','PlPkGr.dat',
   'PlPc.dat','PlPcAJ.dat','PlPcNr.dat','PlPcRe.dat','PlPcBu.dat','PlPcGr.dat',
-  'EfPkData.dat','GrOy.dat'])
+  'EfPkData.dat','GrOy.dat',
+  'PlPr.dat','PlPrAJ.dat','PlPrNr.dat','PlPrRe.dat','PlPrBu.dat','PlPrGr.dat','PlPrYe.dat','EfPrData.dat'])
   assert.equal(NATIVE_GAME_DISC_FILES[name],name);
 assert.equal(NATIVE_GAME_DISC_FILES['falco.ssm'],'audio/us/falco.ssm');
 assert.equal(NATIVE_GAME_DISC_FILES['fox.ssm'],'audio/us/fox.ssm');
@@ -48,6 +49,7 @@ assert.equal(NATIVE_GAME_DISC_FILES['ganon.ssm'],'audio/us/ganon.ssm');
 assert.equal(NATIVE_GAME_DISC_FILES['luigi.ssm'],'audio/us/luigi.ssm');
 assert.equal(NATIVE_GAME_DISC_FILES['pikachu.ssm'],'audio/us/pikachu.ssm');
 assert.equal(NATIVE_GAME_DISC_FILES['pichu.ssm'],'audio/us/pichu.ssm');
+assert.equal(NATIVE_GAME_DISC_FILES['purin.ssm'],'audio/us/purin.ssm');
 assert.equal(NATIVE_GAME_DISC_FILES['old_ys.hps'],'audio/old_ys.hps');
 assert.equal(NATIVE_GAME_DISC_FILES['pupupu.ssm'],'audio/us/pupupu.ssm');
 assert.equal(NATIVE_GAME_DISC_FILES['sp_zako.hps'],'audio/sp_zako.hps');

@@ -10,6 +10,7 @@ MeleeWebFighterAssetScope* assets_test_begin(void*,void*,void*,void*,MeleeWebFig
 int assets_test_restored(void);
 int assets_test_item_commands(void);
 int assets_test_nullable_material(void*,void*,void*,MeleeWebFighterAssetBind,MeleeWebFighterAssetUnbind);
+int assets_test_purin_archive_contract(void*,void*,void*,MeleeWebFighterAssetBind,MeleeWebFighterAssetUnbind);
 Fighter* assets_test_construct_storage(void);
 int assets_test_load(Fighter*,int);
 void assets_test_destroy_storage(Fighter*);
@@ -59,6 +60,8 @@ int main() {
             auto& tables=*context.stores[0];
             check(assets_test_nullable_material(tables.action_rows(),tables.blend_rows(),&context,Context::bind,Context::unbind),
                   "Source-authored null material publishes all costumes and restores ownership; required or fabricated material is rejected");
+            check(assets_test_purin_archive_contract(tables.action_rows(),tables.blend_rows(),&context,Context::bind,Context::unbind),
+                  "Purin neutral and hat archive contracts, mutation checks, duplicate scopes and repeated six-entry cache restoration");
             check(restart?tables.wait_choices()==nullptr:tables.wait_choices()!=nullptr,
                   "Native Wait table preserves source nullability");
             auto* scope=assets_test_begin(tables.action_rows(),tables.blend_rows(),tables.wait_choices(),&context,Context::bind,Context::unbind);

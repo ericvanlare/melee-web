@@ -36,11 +36,12 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     // enum. Keep this small C++ boundary independent of the source include
     // path used by the standalone Wasm fixture compiler.
     const bool link_family = costume.fighter_kind == 6 || costume.fighter_kind == 20;
+    const bool purin = costume.fighter_kind == 15;
     const bool luigi = costume.fighter_kind == 17;
     const bool pikachu_family = costume.fighter_kind == 12 || costume.fighter_kind == 23;
     const bool captain = costume.fighter_kind == 2;
     const bool ganon = costume.fighter_kind == 25;
-    require(mario || fox_family || mars || link_family || luigi || pikachu_family || captain || ganon, "Native action store has no checked fighter command schema for this kind");
+    require(mario || fox_family || mars || link_family || luigi || pikachu_family || purin || captain || ganon, "Native action store has no checked fighter command schema for this kind");
     std::vector<DatCommandRoot> roots;
     // Explicit source ftCo submotion groups. This certifies command operand
     // graphs only, not readiness of every original world service they invoke.
@@ -66,8 +67,10 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     else if (captain || ganon) group(295,costume.motion_count-1);
     else if (luigi) group(295,costume.motion_count-1); // Luigi's authored special rows end at 311.
     else if (pikachu_family) group(295,costume.motion_count-1); // Both authored tables end at 319.
+    else if (purin) group(295,costume.motion_count-1); // Purin five aerial jumps and original specials.
     else group(295,326);                         // Fox/Falco/Marth/Roy source special command rows
     for (auto choice : runtime_->wait_choices()) command_motions_.insert(choice.motion_id);
+    for (auto choice : runtime_->squat_wait_choices()) command_motions_.insert(choice.motion_id);
     for (auto id : command_motions_) {
         const auto& action = runtime_->action(id);
         if (!action.command_offset) continue;

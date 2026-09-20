@@ -57,6 +57,14 @@ class DatFighterRuntimeTests(unittest.TestCase):
                                 capture_output=True, text=True, timeout=20)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_real_purin_attribute_boundary(self):
+        asset = ROOT / "assets-local/full-game-jigglypuff/PlPr.dat"
+        if not asset.is_file():
+            self.skipTest("owned Purin fighter archive is unavailable")
+        result = subprocess.run([str(self.binary), "real_purin", str(asset)],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
 
 if __name__ == "__main__":
     unittest.main()

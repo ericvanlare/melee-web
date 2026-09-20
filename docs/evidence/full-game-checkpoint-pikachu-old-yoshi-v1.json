@@ -935,5 +935,13 @@
     "Long-run performance, heap/resource lifetime and independent holdouts",
     "Results PR44 and audio PR42 remain separate draft dependencies",
     "Whole remaining offline game inventory remains open; no merge or deployment"
-  ]
+  ],
+  "github_verify": {
+    "head_commit": "d37fd76d78c1e6496fe2249cf44ea0cec0ddb4cf",
+    "result": "pass",
+    "seconds": 375,
+    "url": "https://github.com/ericvanlare/melee-web/actions/runs/35521029449",
+    "local_receipt": "work/full-game/pikachu-old-yoshi-github-verify-v1.json",
+    "sha256": "79ef58c51cf7e90b2a55176f58dbbbf639b4d99d945cbc3e7efc3490a03c46e7"
+  }
 }

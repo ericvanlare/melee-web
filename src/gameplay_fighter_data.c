@@ -1,12 +1,15 @@
 #include "gameplay_fighter_data.h"
 #include "fighter_attributes.h"
 #include "gameplay_pikachu_schema.h"
+#include "gameplay_purin_schema.h"
 #include "gameplay_article_data.h"
 #include <melee/ft/types.h>
+#include <melee/ft/ftwaitanim.h>
 #include <melee/ft/kinds/ftMario/types.h>
 #include <melee/ft/kinds/ftLuigi/types.h>
 #include <melee/ft/kinds/ftPikachu/types.h>
 #include <melee/ft/kinds/ftPichu/types.h>
+#include <melee/ft/kinds/ftPurin/types.h>
 #include <melee/ft/kinds/ftFox/types.h>
 #include <melee/ft/kinds/ftCaptain/types.h>
 #include <melee/ft/kinds/ftMars/types.h>
@@ -25,6 +28,8 @@ _Static_assert(sizeof(ftCaptain_DatAttrs) == 0x8C, "Captain/Ganon extension ABI"
 _Static_assert(sizeof(ftLuigiAttributes) == MELEE_WEB_LUIGI_ATTRIBUTE_BYTES, "Luigi extension ABI");
 _Static_assert(sizeof(ftPikachuAttributes) == MELEE_WEB_PIKACHU_ATTRIBUTE_BYTES,
                "Pikachu/Pichu shared extension ABI");
+_Static_assert(sizeof(ftPurinAttributes) == MELEE_WEB_PURIN_ATTRIBUTE_BYTES,
+               "Purin extension ABI");
 #define CHECK_PIKACHU_SOURCE_F32(value) _Generic((value), float: 1, default: 0)
 #define CHECK_PIKACHU_SOURCE_I32(value) \
     _Generic((value), signed char: (sizeof(value) == sizeof(int32_t)), \
@@ -106,6 +111,56 @@ MELEE_WEB_LUIGI_ATTRIBUTE_FIELDS(CHECK_LUIGI)
 #undef CHECK_LUIGI_PORTABLE_F32
 #undef CHECK_LUIGI_SOURCE_I32
 #undef CHECK_LUIGI_SOURCE_F32
+#define CHECK_PURIN_SOURCE_F32(value) _Generic((value), float: 1, default: 0)
+#define CHECK_PURIN_SOURCE_I32(value) \
+    _Generic((value), signed char: (sizeof(value) == sizeof(int32_t)), \
+             short: (sizeof(value) == sizeof(int32_t)), \
+             int: (sizeof(value) == sizeof(int32_t)), \
+             long: (sizeof(value) == sizeof(int32_t)), \
+             long long: (sizeof(value) == sizeof(int32_t)), default: 0)
+/* UNK_T is void* in the pinned source build.  Keep this category opaque and
+ * prove only its pointer-width storage; no pointer is published by this ABI. */
+#define CHECK_PURIN_SOURCE_OPAQUE32(value) (sizeof(value) == sizeof(uint32_t))
+#define CHECK_PURIN_SOURCE_PAD4(value) (sizeof(value) == 4)
+#define CHECK_PURIN_SOURCE_PAD8(value) (sizeof(value) == 8)
+#define CHECK_PURIN_PORTABLE_F32(value) _Generic((value), float: 1, default: 0)
+#define CHECK_PURIN_PORTABLE_I32(value) _Generic((value), int32_t: 1, default: 0)
+#define CHECK_PURIN_PORTABLE_OPAQUE32(value) _Generic((value), uint32_t: 1, default: 0)
+#define CHECK_PURIN_PORTABLE_PAD4(value) (sizeof(value) == 4)
+#define CHECK_PURIN_PORTABLE_PAD8(value) (sizeof(value) == 8)
+#define CHECK_PURIN_SOURCE_TYPE(type, value) CHECK_PURIN_SOURCE_TYPE_IMPL(type, value)
+#define CHECK_PURIN_SOURCE_TYPE_IMPL(type, value) CHECK_PURIN_SOURCE_##type(value)
+#define CHECK_PURIN_PORTABLE_TYPE(type, value) CHECK_PURIN_PORTABLE_TYPE_IMPL(type, value)
+#define CHECK_PURIN_PORTABLE_TYPE_IMPL(type, value) CHECK_PURIN_PORTABLE_##type(value)
+#define CHECK_PURIN(offset,type,dst,portable_member,portable_component,source_member,source_expr) \
+    _Static_assert(offsetof(ftPurinAttributes, source_member) + portable_component == offset, \
+                   "Purin source attribute offset"); \
+    _Static_assert(offsetof(MeleeWebPurinAttributes, portable_member) + portable_component == offset, \
+                   "Purin portable attribute offset"); \
+    _Static_assert(sizeof(((ftPurinAttributes*)0)->source_expr) == \
+                   MELEE_WEB_PURIN_TYPE_BYTES_##type, "Purin source attribute width"); \
+    _Static_assert(sizeof(((MeleeWebPurinAttributes*)0)->dst) == \
+                   MELEE_WEB_PURIN_TYPE_BYTES_##type, "Purin portable attribute width"); \
+    _Static_assert(CHECK_PURIN_SOURCE_TYPE(type, ((ftPurinAttributes*)0)->source_expr), \
+                   "Purin source attribute type"); \
+    _Static_assert(CHECK_PURIN_PORTABLE_TYPE(type, ((MeleeWebPurinAttributes*)0)->dst), \
+                   "Purin portable attribute type");
+MELEE_WEB_PURIN_ATTRIBUTE_FIELDS(CHECK_PURIN)
+#undef CHECK_PURIN
+#undef CHECK_PURIN_PORTABLE_TYPE_IMPL
+#undef CHECK_PURIN_PORTABLE_TYPE
+#undef CHECK_PURIN_SOURCE_TYPE_IMPL
+#undef CHECK_PURIN_SOURCE_TYPE
+#undef CHECK_PURIN_PORTABLE_PAD8
+#undef CHECK_PURIN_PORTABLE_PAD4
+#undef CHECK_PURIN_PORTABLE_OPAQUE32
+#undef CHECK_PURIN_PORTABLE_I32
+#undef CHECK_PURIN_PORTABLE_F32
+#undef CHECK_PURIN_SOURCE_PAD8
+#undef CHECK_PURIN_SOURCE_PAD4
+#undef CHECK_PURIN_SOURCE_OPAQUE32
+#undef CHECK_PURIN_SOURCE_I32
+#undef CHECK_PURIN_SOURCE_F32
 #define WORD(o) r->word(r->context, (o))
 #define BYTE(o) r->byte(r->context, (o))
 #define PTR(o,n) r->pointer(r->context, (o),(n))
@@ -159,6 +214,91 @@ static FtSFXArr* sound_array(const MeleeWebNativeDat* r,uint32_t slot)
     for(int i=0;i<out->num;++i) out->sfx_ids[i]=(s32)WORD(data+i*4);
     return out;
 }
+static WaitStruct* crouch_wait_choices(const MeleeWebNativeDat* r,uint32_t root,uint32_t motions)
+{
+    uint32_t at=PTR(root+0x28,8);
+    if(at==UINT32_MAX)return NULL;
+    REQUIRE(r->extent,"Crouch Wait requires authored table bounds");
+    const uint32_t capacity=r->extent(r->context,at)/8;
+    uint32_t count=0;
+    uint64_t total=0;
+    for(;;++count) {
+        REQUIRE(count<capacity && count<=1024,"Crouch Wait choices do not terminate within source bound");
+        REGION(at+count*8,8);
+        int32_t motion=(int32_t)WORD(at+count*8);
+        if(motion==-1)break;
+        REQUIRE(count<1024,"Crouch Wait choices exceed checked capacity");
+        int32_t weight=(int32_t)WORD(at+count*8+4);
+        REQUIRE(motion>=0 && (uint32_t)motion<motions && weight>=0,
+                "Crouch Wait motion or weight is invalid");
+        total+=(uint32_t)weight;
+        REQUIRE(total<=INT32_MAX,"Crouch Wait weights overflow original int");
+    }
+    REQUIRE(total>=100,"Crouch Wait choices do not cover the original random range");
+    WaitStruct* out=NEW(WaitStruct,count+1);
+    for(uint32_t i=0;i<=count;++i) {
+        out[i].u.i.x=(int32_t)WORD(at+i*8);
+        out[i].u.i.y=(int32_t)WORD(at+i*8+4);
+    }
+    return out;
+}
+static void* purin_parts(const MeleeWebNativeDat* r,uint32_t table,uint32_t costumes)
+{
+    typedef struct { uint32_t unused; FtPartsDesc desc; } PurinParts;
+    _Static_assert(offsetof(PurinParts,desc)==4 && sizeof(PurinParts)==12,
+                   "Purin source custom-part wrapper ABI");
+    REQUIRE(PTR(table,1)==UINT32_MAX,"Purin first custom-part slot must be null");
+    uint32_t at=required(r,table+4,12);
+    PurinParts* out=NEW(PurinParts,1);
+    out->unused=WORD(at);
+    out->desc.model_num=WORD(at+4);
+    REQUIRE(out->desc.model_num>0 && out->desc.model_num<=11,
+            "Purin custom-part model count exceeds source capacity");
+    uint32_t visibility_table=required(r,at+8,costumes*16);
+    /* All four categories use the same 32-entry fighter_x2040 DObj owner. */
+    out->desc.vis_table=r->allocate(r->context,costumes,16);
+    for(uint32_t c=0;c<costumes;++c)for(unsigned category=0;category<4;++category) {
+        uint32_t p=PTR(visibility_table+c*16+category*4,out->desc.model_num*8);
+        if(p!=UINT32_MAX)
+            out->desc.vis_table[c][category]=visibility(r,p,out->desc.model_num,2);
+    }
+    return out;
+}
+
+int melee_web_fighter_data_check_purin_part(void* data,uint32_t costume,
+    uint32_t dobj_count,char* error,size_t size)
+{
+#define PURIN_REQUIRE(c,m) do { if(!(c)){if(error&&size)snprintf(error,size,"%s",m);return 0;} } while(0)
+    ftData* d=data;
+    PURIN_REQUIRE(d && d->x48_items && !d->x48_items[0] && d->x48_items[1] &&
+                  costume>0 && costume<5 && dobj_count>0 && dobj_count<=32,
+                  "Purin custom-part owner identity is invalid");
+    FtPartsDesc* desc=(FtPartsDesc*)((char*)d->x48_items[1]+4);
+    PURIN_REQUIRE(desc->model_num>0 && desc->model_num<=11 && desc->vis_table,
+                  "Purin custom-part descriptor is incomplete");
+    for(unsigned category=0;category<4;++category) {
+        Counted* groups=desc->vis_table[costume][category];
+        if(!groups)groups=desc->vis_table[0][category];
+        if(!groups)continue;
+        for(uint32_t m=0;m<desc->model_num;++m) {
+            Counted* variants=groups[m].data;
+            PURIN_REQUIRE(groups[m].count<=128 && (!groups[m].count || variants),
+                          "Purin custom-part visibility variants are invalid");
+            for(uint32_t v=0;v<groups[m].count;++v) {
+                uint8_t* indices=variants[v].data;
+                PURIN_REQUIRE(variants[v].count<=32 && (!variants[v].count || indices),
+                              "Purin custom-part visibility indices are missing");
+                for(uint32_t i=0;i<variants[v].count;++i)
+                    PURIN_REQUIRE(indices[i]<dobj_count,
+                                  "Purin custom-part index exceeds its hydrated DObj occurrences");
+            }
+        }
+    }
+    if(error&&size)*error=0;
+    return 1;
+#undef PURIN_REQUIRE
+}
+
 void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     uint32_t kind,uint32_t costumes,uint32_t motion_count,void* actions,void* blends,
     void* choices,uint32_t* unresolved)
@@ -167,7 +307,8 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     REQUIRE(kind==FTKIND_MARIO || kind==FTKIND_DRMARIO || kind==FTKIND_FOX ||
         kind==FTKIND_FALCO || kind==FTKIND_MARS || kind==FTKIND_EMBLEM ||
         kind==FTKIND_LINK || kind==FTKIND_CLINK || kind==FTKIND_CAPTAIN || kind==FTKIND_GANON ||
-        kind==FTKIND_LUIGI || kind==FTKIND_PIKACHU || kind==FTKIND_PICHU,
+        kind==FTKIND_LUIGI || kind==FTKIND_PIKACHU || kind==FTKIND_PICHU ||
+        kind==FTKIND_PURIN,
         "Native fighter extension schema unavailable");
     REQUIRE(costumes>0 && costumes<=16,"Native costume count exceeds checked bound");
     REQUIRE(motion_count>0 && motion_count<=1024,"Native motion count exceeds checked bound");
@@ -231,6 +372,33 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
 #define PIKACHU(o,t,n,original,component,source) pikachu->source=READ_##t(at+o);
         MELEE_WEB_PIKACHU_ATTRIBUTE_FIELDS(PIKACHU)
 #undef PIKACHU
+    } else if(kind==FTKIND_PURIN) {
+        at=required(r,root+4,MELEE_WEB_PURIN_ATTRIBUTE_BYTES);
+        ftPurinAttributes* purin=NEW(ftPurinAttributes,1); d->ext_attr=purin;
+#define PURIN_READ_F32(o,dst) purin->dst=floating(r,at+o)
+#define PURIN_READ_I32(o,dst) purin->dst=READ_I32(at+o)
+#define PURIN_READ_OPAQUE32(o,dst) purin->dst=(void*)(uintptr_t)READ_U32(at+o)
+#define PURIN_READ_PAD4(o,dst) do { \
+        for(unsigned purin_byte=0; purin_byte<4; ++purin_byte) \
+            purin->dst[purin_byte]=BYTE(at+o+purin_byte); \
+    } while(0)
+#define PURIN_READ_PAD8(o,dst) do { \
+        for(unsigned purin_byte=0; purin_byte<8; ++purin_byte) \
+            purin->dst[purin_byte]=BYTE(at+o+purin_byte); \
+    } while(0)
+#define PURIN_READ_IMPL(type,o,dst) PURIN_READ_##type(o,dst)
+#define PURIN_READ(type,o,dst) PURIN_READ_IMPL(type,o,dst)
+#define PURIN(o,type,dst,portable_member,portable_component,source_member,source_expr) \
+        PURIN_READ(type,o,source_expr);
+        MELEE_WEB_PURIN_ATTRIBUTE_FIELDS(PURIN)
+#undef PURIN
+#undef PURIN_READ
+#undef PURIN_READ_IMPL
+#undef PURIN_READ_PAD8
+#undef PURIN_READ_PAD4
+#undef PURIN_READ_OPAQUE32
+#undef PURIN_READ_I32
+#undef PURIN_READ_F32
     } else if(kind==FTKIND_CAPTAIN || kind==FTKIND_GANON) {
         at=required(r,root+4,0x8C); ftCaptain_DatAttrs* captain=NEW(ftCaptain_DatAttrs,1); d->ext_attr=captain;
 #define CAPTAIN(o,t,n,orig) captain->orig=READ_##t(at+o);
@@ -258,16 +426,31 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     d->x8->x10=BYTE(at+16); d->x8->x11=BYTE(at+17); d->x8->x12=BYTE(at+18);
     d->x8->x13=BYTE(at+19); d->x8->x14=BYTE(at+20);
     d->xC=actions; d->x10=blends; d->x24=choices;
+    d->x28=crouch_wait_choices(r,root,motion_count);
     at=required(r,root+0x2c,20); d->x2C=NEW(ftDynamics,1);
     d->x2C->dynamicsNum=READ_I32(at);
     const unsigned dynamics_capacity=sizeof(((struct ArticleDynamicBones*)0)->array)/
                                      sizeof(((struct ArticleDynamicBones*)0)->array[0]);
     REQUIRE(d->x2C->dynamicsNum>=0 && (unsigned)d->x2C->dynamicsNum<dynamics_capacity,
             "Native fighter dynamics count exceeds source Fighter storage");
+    REQUIRE(kind!=FTKIND_PURIN || d->x2C->dynamicsNum==1,
+            "Purin costume dynamics require one initial body chain");
     if(d->x2C->dynamicsNum) {
         const uint32_t bones=required(r,at+4,(size_t)d->x2C->dynamicsNum*sizeof(BoneDynamicsDesc));
+        uint32_t stored_bones=d->x2C->dynamicsNum;
+        if(kind==FTKIND_PURIN) {
+            REQUIRE(r->extent,"Purin costume dynamics require authored table bounds");
+            const uint32_t bytes=r->extent(r->context,bones);
+            REQUIRE(bytes%sizeof(BoneDynamicsDesc)==0,
+                    "Purin dynamics extent contains a partial descriptor");
+            stored_bones=bytes/sizeof(BoneDynamicsDesc);
+            REQUIRE(stored_bones>=5 && stored_bones<=dynamics_capacity &&
+                    stored_bones>=(uint32_t)d->x2C->dynamicsNum,
+                    "Purin dynamics extent cannot cover source costume chains");
+            REGION(bones,bytes);
+        }
         d->x2C->ftDynamicBones=NEW(struct ArticleDynamicBones,1);
-        for(int i=0;i<d->x2C->dynamicsNum;++i) {
+        for(uint32_t i=0;i<stored_bones;++i) {
             const uint32_t row=bones+(uint32_t)i*sizeof(BoneDynamicsDesc);
             BoneDynamicsDesc* out=&d->x2C->ftDynamicBones->array[i];
             out->bone_id=(enum_t)READ_I32(row);
@@ -398,27 +581,37 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
         d->x58->x10<140 && d->x58->x11<140,"Native IK bone index invalid");
     const unsigned item_slots=(kind==FTKIND_LINK||kind==FTKIND_CLINK)?7:
                                kind==FTKIND_LUIGI?1:
-                               (kind==FTKIND_PIKACHU||kind==FTKIND_PICHU)?3:4;
+                               (kind==FTKIND_PIKACHU||kind==FTKIND_PICHU)?3:
+                               kind==FTKIND_PURIN?2:4;
     /* Fixed native capacity bounds the shared accessor for every admitted
      * family; only the exact source extent is read and remaining slots stay
      * null. Slot 6 is a Link joint, never an Article. */
-    d->x48_items=NEW(void*,7);
-    at=PTR(root+0x48,item_slots*4);
-    REQUIRE((kind!=FTKIND_CAPTAIN && kind!=FTKIND_GANON) || at==UINT32_MAX,
-            "Captain-family source ftData must not invent an Article table");
-    if(at!=UINT32_MAX) {
-        REGION(at,item_slots*4);
-        for(unsigned i=0;i<item_slots;++i) {
-            const size_t minimum=i==6?64:24;
-            uint32_t p=PTR(at+i*4,minimum), article_unresolved;
-            /* Link's seventh entry is the source HSD_Joint descriptor used by
-             * ftParts_800753D4, not an Article root. Its native descriptor is
-             * hydrated by the C++ asset owner after this ftData decode. */
-            if(i==6) {
-                REQUIRE((kind==FTKIND_LINK||kind==FTKIND_CLINK)&&p!=UINT32_MAX,
-                    "Link part descriptor is missing");
-            } else if(p!=UINT32_MAX) {
-                d->x48_items[i]=melee_web_article_decode(r,p,&article_unresolved);
+    d->x48_items=NEW(void*,7); memset(d->x48_items,0,7*sizeof(void*));
+    at=UINT32_MAX;
+    if(kind==FTKIND_PURIN) {
+        /* Purin owns a custom visibility wrapper in x48 slot 1. Its native
+         * costume graph and archive handle are retained by the asset owner. */
+        REQUIRE(costumes==5,"Purin custom-part visibility requires five source costumes");
+        at=required(r,root+0x48,8);
+        d->x48_items[1]=purin_parts(r,at,costumes);
+    } else {
+        at=PTR(root+0x48,item_slots*4);
+        REQUIRE((kind!=FTKIND_CAPTAIN && kind!=FTKIND_GANON) || at==UINT32_MAX,
+                "Captain-family source ftData must not invent an Article table");
+        if(at!=UINT32_MAX) {
+            REGION(at,item_slots*4);
+            for(unsigned i=0;i<item_slots;++i) {
+                const size_t minimum=i==6?64:24;
+                uint32_t p=PTR(at+i*4,minimum), article_unresolved;
+                /* Link's seventh entry is the source HSD_Joint descriptor used by
+                 * ftParts_800753D4, not an Article root. Its native descriptor is
+                 * hydrated by the C++ asset owner after this ftData decode. */
+                if(i==6) {
+                    REQUIRE((kind==FTKIND_LINK||kind==FTKIND_CLINK)&&p!=UINT32_MAX,
+                        "Link part descriptor is missing");
+                } else if(p!=UINT32_MAX) {
+                    d->x48_items[i]=melee_web_article_decode(r,p,&article_unresolved);
+                }
             }
         }
     }
@@ -445,10 +638,13 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
             "Pikachu-family OnLoad requires its three Article identities");
     else if(kind==FTKIND_CAPTAIN || kind==FTKIND_GANON)
         REQUIRE(at==UINT32_MAX, "Captain-family source ftData Article table is not null");
+    else if(kind==FTKIND_PURIN)
+        REQUIRE(at!=UINT32_MAX && d->x48_items[0]==NULL && d->x48_items[1]!=NULL,
+            "Purin custom-part wrapper is missing");
     else
         REQUIRE((kind==FTKIND_MARS||kind==FTKIND_EMBLEM) && at==UINT32_MAX,
                 "Marth/Roy source ftData must not invent an Article table");
-    const unsigned ready[]={0,1,2,11,12,13,14,15,16,17,18,19,20,21,22};
+    const unsigned ready[]={0,1,2,10,11,12,13,14,15,16,17,18,19,20,21,22};
     for(unsigned i=0;i<sizeof(ready)/sizeof(ready[0]);++i) {
         /* Keep the Link part descriptor unresolved until its source HSD_Joint
          * has been converted to the native 32-bit descriptor ABI. */
@@ -461,9 +657,9 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     return d;
 }
 
-void* melee_web_fighter_data_article(void* data, uint32_t index)
+void* melee_web_fighter_data_article(void* data, uint32_t kind, uint32_t index)
 {
-    if (!data || index >= 6 || !((ftData*)data)->x48_items) return NULL;
+    if (!data || kind==FTKIND_PURIN || index >= 6 || !((ftData*)data)->x48_items) return NULL;
     return ((ftData*)data)->x48_items[index];
 }
 

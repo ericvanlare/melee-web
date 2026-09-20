@@ -46,6 +46,7 @@ static const MeleeWebSourceIdentity* melee_web_source_identity(int ckind){
         {CKIND_LUIGI, FTKIND_LUIGI, ICONHUD_LUIGI},
         {CKIND_PIKACHU, FTKIND_PIKACHU, ICONHUD_PIKACHU},
         {CKIND_PICHU, FTKIND_PICHU, ICONHUD_PICHU},
+        {CKIND_PURIN, FTKIND_PURIN, ICONHUD_PURIN},
     };
     for (unsigned i=0;i<sizeof(rows)/sizeof(rows[0]);++i)
         if (rows[i].character==(CharacterKind)ckind) return &rows[i];
@@ -58,8 +59,20 @@ int melee_web_test_content_player(unsigned slot,int ckind,int kind,unsigned cost
     Fighter* fighter=entity->user_data;
     const MeleeWebSourceIdentity* identity=melee_web_source_identity(ckind);
     if(!identity || identity->fighter!=(FighterKind)kind)return 0;
+    if(fighter && kind==FTKIND_PURIN) {
+        if((fighter->u.pr.x223C!=NULL)!=(costume!=0))return 0;
+        if(costume && (!fighter->u.pr.x2240.data || fighter->u.pr.x2248.model_num!=1))return 0;
+    }
     const float icon=identity->stock_icon+30*costume;
     return fighter&&fighter->kind==identity->fighter&&Player_GetPlayerCharacter(slot)==identity->character&&
         Player_GetCostumeId(slot)==costume&&gm_80168BF8(slot)==icon;
 }
 int melee_web_test_item_count(int kind){return it_8026B3C0((ItemKind)kind);}
+
+int melee_web_test_purin_anim_id(int expected)
+{
+    HSD_GObj* entity=Player_GetEntity(0);
+    if(!entity || !entity->user_data)return 0;
+    Fighter* fighter=entity->user_data;
+    return fighter->kind==FTKIND_PURIN && fighter->anim_id==expected;
+}

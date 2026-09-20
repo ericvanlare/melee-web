@@ -155,6 +155,24 @@ const pikachuFamily=(upMove)=>[
   aerialSpecial('Thunder (air)',[[363,366]],0,-80),
 ];
 
+// Purin has five distinct source aerial jumps and facing-specific Sing/Rest
+// states. These windows enter through raw PAD and retain the original motion
+// transitions; complete interactions and independent comparison stay separate.
+const purin=[
+  {name:'five aerial jumps',expect:[[341,341],[342,342],[343,343],[344,344],[345,345]],settle:true,
+    // Later multijumps accept held XY when the source command opens its gate.
+    inputs:[input(2,PAD.X),input(10),input(180,PAD.X),input(300)]},
+  ground('Rollout charge/release',[[346,347],[348,349],[350,353]],input(45,PAD.B),input(360)),
+  {name:'Rollout (air)',expect:[[354,355],[356,361]],settle:true,
+    inputs:[input(2,PAD.X),input(8),input(45,PAD.B),input(360)]},
+  ground('Pound',[[363,363]],input(1,PAD.B,80),input(180)),
+  aerialSpecial('Pound (air)',[[364,364]],80),
+  ground('Sing',[[365,367]],input(1,PAD.B,0,80),input(300)),
+  aerialSpecial('Sing (air)',[[366,368]],0,80),
+  ground('Rest',[[369,371]],input(1,PAD.B,0,-80),input(360)),
+  aerialSpecial('Rest (air)',[[370,372]],0,-80),
+];
+
 export const actionInventories=new Map([
  [18,{id:'marth-visible-actions-v1',fighter:'Marth',minimumStageFrames:4200,cases:[...common,...wavedashes,...marth]}],
  [21,{id:'dr-mario-visible-actions-v1',fighter:'Dr. Mario',minimumStageFrames:4800,cases:[...common,...wavedashes,...drMario]}],
@@ -166,6 +184,7 @@ export const actionInventories=new Map([
  [17,{id:'luigi-visible-actions-v1',fighter:'Luigi',minimumStageFrames:5200,cases:[...common,...luigi]}],
  [12,{id:'pikachu-visible-actions-v1',fighter:'Pikachu',minimumStageFrames:5600,cases:[...common,...pikachuFamily('Quick Attack')]}],
  [23,{id:'pichu-visible-actions-v1',fighter:'Pichu',minimumStageFrames:5600,cases:[...common,...pikachuFamily('Agility')]}],
+ [15,{id:'jigglypuff-visible-actions-v1',fighter:'Jigglypuff',minimumStageFrames:6400,cases:[...common,...purin]}],
 ]);
 
 export function actionInventory(fighterKind){return actionInventories.get(fighterKind)||null;}

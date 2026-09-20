@@ -18,6 +18,8 @@ typedef struct MeleeWebNativeDat {
     const void* (*region)(void*, uint32_t, size_t);
     void* (*allocate)(void*, size_t, size_t);
     void (*reject)(void*, const char*);
+    /* Bytes to the next authored reference target, for variable-length tables. */
+    uint32_t (*extent)(void*, uint32_t);
 } MeleeWebNativeDat;
 #ifdef __cplusplus
 }

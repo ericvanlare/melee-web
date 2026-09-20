@@ -106,6 +106,15 @@ class GameplayFighterDataTests(unittest.TestCase):
                                   result.stdout)
                     self.assertIn("Native Pichu shared 0xf8 attributes and three Article registrations: passed",
                                   result.stdout)
+                    purin_asset = ROOT / "assets-local/full-game-jigglypuff/PlPr.dat"
+                    purin_container = ROOT / "assets-local/full-game-jigglypuff/PlPrAJ.dat"
+                    if purin_asset.is_file() and purin_container.is_file():
+                        args.extend((str(purin_asset), str(purin_container)))
+                        result = subprocess.run([str(node), str(output), *args], cwd=directory, env=env,
+                                                capture_output=True, text=True, timeout=30)
+                        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                        self.assertIn("Native Purin 0x100 ABI, five-costume custom-part visibility, and no Article exposure: passed",
+                                      result.stdout)
             print(result.stdout, end="")
 
 

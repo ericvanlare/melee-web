@@ -78,7 +78,7 @@ struct Reader {
 
     MeleeWebNativeDat api()
     {
-        return {this, word, half, byte, pointer, region, allocate, reject};
+        return {this, word, half, byte, pointer, region, allocate, reject, nullptr};
     }
 
     void put_word(uint32_t offset, uint32_t value)

@@ -256,6 +256,77 @@ void real_pikachu_family(const char* path, bool pichu)
               "Pikachu-family integer or authored zero-dynamics fields changed");
     }
 }
+void real_purin(const char* path)
+{
+    const auto identity = resolve_fighter_costume("PlyPurin5K_Share_joint");
+    check(identity.fighter_kind == 15 && identity.motion_count == 327,
+          "Purin source identity changed");
+    auto archive = std::make_shared<const DatArchive>(read_real_archive(path));
+    const auto runtime = std::make_shared<const DatFighterRuntime>(archive, identity);
+    check(runtime->actions().size() == 327 && runtime->purin_attributes(),
+          "Purin action count or exact extension is missing");
+    check(!runtime->mario_attributes() && !runtime->luigi_attributes() &&
+          !runtime->pikachu_attributes(),
+          "Purin extension was aliased to another fighter schema");
+    check(sizeof(MeleeWebPurinAttributes) == 0x100 &&
+          archive->next_target_offset(runtime->extension_offset()) - runtime->extension_offset() == 0x100,
+          "Purin extension does not retain its exact 0x100 source bound");
+    const auto& attributes = *runtime->purin_attributes();
+    check(attributes.x2C == 341 && attributes.x30 == -1 && attributes.x34 == 90 &&
+          attributes.x38 == 20 && attributes.x70 == 8 && attributes.x9C == 32 &&
+          attributes.specialn_vel.x == -0.13f && attributes.specialn_vel.y == 1.6f &&
+          attributes.xE8 == 0x3e800000U && attributes.xEC == 0x3e4ccccdU,
+          "Purin signed, Vec2 and opaque attribute values changed");
+    check(archive->be32(runtime->extension_offset()+0x48) == 0x3d4ccccdU &&
+          archive->be32(runtime->extension_offset()+0x60) == 0x3f800000U &&
+          archive->be32(runtime->extension_offset()+0xb0) == 0x41a00000U,
+          "Purin authored padding words changed");
+    check(attributes._48[0] == 0x3d && attributes._48[1] == 0x4c &&
+          attributes._48[2] == 0xcc && attributes._48[3] == 0xcd &&
+          attributes._60[0] == 0x3f && attributes._60[1] == 0x80 &&
+          attributes._60[4] == 0x40 && attributes._B0[0] == 0x41 &&
+          attributes._B0[1] == 0xa0 && attributes._F8[0] == 0 &&
+          attributes._F8[7] == 0,
+          "Purin portable padding bytes changed");
+    {
+        static const std::uint32_t ids[5] = {7, 3, 7, 3, 9};
+        static const std::size_t parameter_counts[5] = {3, 3, 3, 5, 5};
+        static const float z[5] = {0.00001f, 0.145f, 0.145f, 0.145f, 0.145f};
+        const auto& bones = runtime->dynamics().bones;
+        check(runtime->dynamics().active_bone_count == 1 && bones.size() == 5 &&
+                  runtime->dynamics().spheres.empty() &&
+                  !runtime->dynamics().animation_table_offset,
+              "Purin authored five-row zero-sphere dynamics table changed");
+        for (std::size_t i = 0; i < 5; ++i)
+            check(bones[i].bone_index == ids[i] && bones[i].parameters.size() == parameter_counts[i] &&
+                      bones[i].position[0] == 1.0f && bones[i].position[1] == 1.0f &&
+                      bones[i].position[2] == z[i],
+                  "Purin authored dynamics descriptor row changed");
+    }
+    check(runtime->squat_wait_choices().size() == 2 &&
+          runtime->squat_wait_choices()[0].motion_id == 31 &&
+          runtime->squat_wait_choices()[0].weight == 80 &&
+          runtime->squat_wait_choices()[1].motion_id == 32 &&
+          runtime->squat_wait_choices()[1].weight == 20,
+          "Purin authored crouch Wait choices changed");
+    constexpr std::size_t dat_header = 0x20, squat_choices = 0x6e40;
+    auto malformed = read_real_archive(path);
+    put32(malformed, dat_header + squat_choices + 4, 0xffffffffU);
+    rejects([&] { (void) DatFighterRuntime(std::make_shared<const DatArchive>(malformed), identity); });
+    malformed = read_real_archive(path);
+    put32(malformed, dat_header + squat_choices + 12, 19U);
+    rejects([&] { (void) DatFighterRuntime(std::make_shared<const DatArchive>(malformed), identity); });
+    malformed = read_real_archive(path);
+    put32(malformed, dat_header + squat_choices, identity.motion_count);
+    rejects([&] { (void) DatFighterRuntime(std::make_shared<const DatArchive>(malformed), identity); });
+    const auto dynamics = archive->pointer(runtime->root_offset() + 0x2c, 20);
+    check(dynamics.has_value(), "Purin dynamics root is missing");
+    for (const auto active_count : {0U, 2U}) {
+        malformed = read_real_archive(path);
+        put32(malformed, dat_header + *dynamics, active_count);
+        rejects([&] { (void) DatFighterRuntime(std::make_shared<const DatArchive>(malformed), identity); });
+    }
+}
 }
 int main(int argc, char** argv)
 {
@@ -271,6 +342,10 @@ int main(int argc, char** argv)
         if (argc == 3 && (std::string_view(argv[1]) == "real_pikachu" ||
                           std::string_view(argv[1]) == "real_pichu")) {
             real_pikachu_family(argv[2], std::string_view(argv[1]) == "real_pichu");
+            return 0;
+        }
+        if (argc == 3 && std::string_view(argv[1]) == "real_purin") {
+            real_purin(argv[2]);
             return 0;
         }
         check(argc == 2, "expected case");

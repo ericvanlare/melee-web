@@ -593,8 +593,8 @@
       "id": "fighter-jigglypuff",
       "category": "fighters",
       "title": "Jigglypuff selectable fighter",
-      "implementation": "not_integrated",
-      "acceptance": "not_evaluated",
+      "implementation": "partial",
+      "acceptance": "partial",
       "source_identity": {
         "ckind": "CKIND_PURIN",
         "ftkind": "FTKIND_PURIN"
@@ -613,9 +613,10 @@
       ],
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
-        "docs/ACCURACY_CONTRACT.md"
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/JIGGLYPUFF_PORT_NOTES.md"
       ],
-      "next_step": "Run the fighter checkpoint for Jigglypuff and split its costume, action, article, effect and audio coverage into bounded receipts.",
+      "next_step": "Native five-costume lifetimes, crouch variation, five aerial jumps and ground/air special states pass. Original CSS/SSS reaches 31-case cold/warm action sweeps with 12,800 total source frames and zero hard action-window failures. Broaden authored move/costume and fighter/stage interactions, complete ordinary matches, and perform independent original, pixel, PCM and physical-input comparisons before acceptance.",
       "issue": null
     },
     {

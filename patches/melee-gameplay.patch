@@ -8113,3 +8113,27 @@ diff --git a/src/melee/gr/groldyoshi.c b/src/melee/gr/groldyoshi.c
  void grOldYoshi_8020E798(bool arg) {}
  
  void grOldYoshi_8020E79C(void)
+diff --git a/src/melee/ft/kinds/ftPurin/ftpurin.c b/src/melee/ft/kinds/ftPurin/ftpurin.c
+--- a/src/melee/ft/kinds/ftPurin/ftpurin.c
++++ b/src/melee/ft/kinds/ftPurin/ftpurin.c
+@@ -447,6 +447,20 @@
+     ft_8045A1E0[4] = NULL;
+ }
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++/* Scope the original descriptor cache with its costume archive owners. */
++void melee_web_purin_exchange_hat_cache(void** values)
++{
++    unsigned i;
++    _Static_assert(sizeof(ft_8045A1E0) / sizeof(ft_8045A1E0[0]) == 6, "Purin cache ABI");
++    for (i = 0; i < sizeof(ft_8045A1E0) / sizeof(ft_8045A1E0[0]); ++i) {
++        void* previous = ft_8045A1E0[i];
++        ft_8045A1E0[i] = values[i];
++        values[i] = previous;
++    }
++}
++#endif
++
+ void ftPr_Init_OnDeath(HSD_GObj* gobj)
+ {
+     ftParts_80074A4C(gobj, 0, 0);

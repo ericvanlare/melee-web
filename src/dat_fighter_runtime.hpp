@@ -3,6 +3,7 @@
 #include "fighter_attributes.h"
 #include "fighter_binding.hpp"
 #include "gameplay_pikachu_schema.h"
+#include "gameplay_purin_schema.h"
 #include <array>
 #include <memory>
 
@@ -36,6 +37,9 @@ struct DatFighterDynamicsSphere {
 };
 struct DatFighterDynamics {
     std::uint32_t descriptor_offset;
+    std::uint32_t active_bone_count=0;
+    // Authored descriptors can also contain costume-part chains outside the
+    // initial body count (Purin blue/green hats).
     std::vector<DatFighterDynamicsBone> bones;
     std::vector<DatFighterDynamicsSphere> spheres;
     // Mars uses this target as five rows of three pointer-width integer chain
@@ -75,6 +79,9 @@ public:
     // Pikachu and Pichu use the shared original ftPikachuAttributes ABI;
     // their decoded values and Article identities remain family-specific.
     [[nodiscard]] const std::optional<MeleeWebPikachuAttributes>& pikachu_attributes() const noexcept { return pikachu_; }
+    // Purin's 0x100 attribute record is decoded exactly, while its authored
+    // x48 custom parts have a separate checked native owner.
+    [[nodiscard]] const std::optional<MeleeWebPurinAttributes>& purin_attributes() const noexcept { return purin_; }
     // Captain and Ganondorf use the shared original ftCaptain_DatAttrs layout.
     [[nodiscard]] const std::optional<MeleeWebCaptainAttributes>& captain_attributes() const noexcept { return captain_; }
     // Fox and Falco use the shared original ftFox_DatAttrs layout.  The
@@ -87,6 +94,7 @@ public:
     [[nodiscard]] const std::vector<DatRuntimeAction>& actions() const noexcept { return actions_; }
     [[nodiscard]] const DatRuntimeAction& action(std::uint32_t motion_id) const;
     [[nodiscard]] const std::vector<DatWaitChoice>& wait_choices() const noexcept { return wait_choices_; }
+    [[nodiscard]] const std::vector<DatWaitChoice>& squat_wait_choices() const noexcept { return squat_wait_choices_; }
     [[nodiscard]] const std::vector<DatFighterHurtbox>& hurtboxes() const noexcept { return hurtboxes_; }
     [[nodiscard]] const DatFighterDynamics& dynamics() const noexcept { return dynamics_; }
     // Checks source part indices before a consumer binds any native JObj. Bone
@@ -103,12 +111,13 @@ private:
     std::optional<MeleeWebMarioAttributes> mario_;
     std::optional<MeleeWebLuigiAttributes> luigi_;
     std::optional<MeleeWebPikachuAttributes> pikachu_;
+    std::optional<MeleeWebPurinAttributes> purin_;
     std::optional<MeleeWebCaptainAttributes> captain_;
     std::optional<MeleeWebFoxAttributes> fox_;
     std::optional<MeleeWebMarsAttributes> mars_;
     std::optional<MeleeWebLinkAttributes> link_;
     std::vector<DatRuntimeAction> actions_;
-    std::vector<DatWaitChoice> wait_choices_;
+    std::vector<DatWaitChoice> wait_choices_, squat_wait_choices_;
     std::vector<DatFighterHurtbox> hurtboxes_;
     DatFighterDynamics dynamics_{};
 };

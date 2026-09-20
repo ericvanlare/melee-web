@@ -8,6 +8,7 @@
 #include <melee/ft/kinds/ftCaptain/forward.h>
 #include <melee/ft/kinds/ftLuigi/forward.h>
 #include <melee/ft/kinds/ftPikachu/forward.h>
+#include <melee/ft/kinds/ftPurin/forward.h>
 #include <melee/ft/kinds/ftCommon/forward.h>
 #include <melee/it/forward.h>
 #include <filesystem>
@@ -19,6 +20,7 @@
 
 extern "C" int melee_web_test_content_player(unsigned,int,int,unsigned);
 extern "C" int melee_web_test_item_count(int);
+extern "C" int melee_web_test_purin_anim_id(int);
 extern "C" int melee_web_test_quake_start(int);
 extern "C" int melee_web_test_quake_translated(void);
 extern "C" int melee_web_story_state(uint32_t*,unsigned*,int*,int*,int*,int*);
@@ -84,7 +86,7 @@ int main(int argc,char** argv){try{
     const int fighter_ckind=argc>=5?std::stoi(argv[4]):CKIND_FALCO;
     const auto* fighter_content=melee_web_fighter_content(fighter_ckind);
     check(fighter_content,"Selected fighter has no admitted source content");
-    const int opponent_ckind=argc==6?std::stoi(argv[5]):CKIND_MARIO;
+    const int opponent_ckind=argc>=6?std::stoi(argv[5]):CKIND_MARIO;
     const auto* opponent_content=melee_web_fighter_content(opponent_ckind);
     check(opponent_content,"Selected opponent has no admitted source content");
     selection.start.players[0].ckind=fighter_ckind;
@@ -130,6 +132,179 @@ int main(int argc,char** argv){try{
             check(shy_live,"Yoshi's Story did not create an original Shy Guy item after its 120-frame timer");
             std::cout<<"Yoshi's Story maps="<<map_count<<" Randall timer="<<randall_timer
                      <<" Shy timer="<<shy_timer<<" pattern="<<shy_pattern<<std::endl;
+        }else{
+        const bool purin=fighter_content->fighter_kind==FTKIND_PURIN;
+        if(purin){
+            // Keep the source FD placement constraints used by the other
+            // fighter branches, then drive Purin from raw controller edges.
+            for(unsigned n=0;n<180;n++){
+                const auto p1=match.player_stats(0),p2=match.player_stats(1);
+                if(std::abs(p2.position[1]-p1.position[1])<5.0f)break;
+                raw[1].stickY=-80;tick();
+            }
+            raw[1].stickY=0;
+            check(std::abs(match.player_stats(1).position[1]-match.player_stats(0).position[1])<5.0f,
+                  "Raw input did not bring Purin's opponent to the same stage level");
+            for(unsigned n=0;n<120;n++){
+                const auto p1=match.player_stats(0),p2=match.player_stats(1);
+                if(std::abs(p2.position[0]-p1.position[0])<35.0f)break;
+                raw[0].stickX=p2.position[0]>p1.position[0]?80:-80;tick();
+            }
+            raw[0].stickX=0;
+            check(std::abs(match.player_stats(1).position[0]-match.player_stats(0).position[0])<35.0f &&
+                  match.player_stats(0).ground_or_air==0,
+                  "Raw input did not place Purin in the authored ground-special range");
+
+            if(cycle==0){
+            auto settle_purin=[&](){
+                raw[0].button=0;raw[0].stickX=raw[0].stickY=0;
+                for(unsigned n=0;n<720;n++){
+                    const auto state=match.player_stats(0);
+                    if(state.ground_or_air==0&&state.motion_id==ftCo_MS_Wait)return;
+                    tick();
+                }
+                check(false,"Purin special did not return to a grounded common motion");
+            };
+            auto jump_purin=[&](){
+                raw[0].stickX=raw[0].stickY=0;raw[0].button=PAD_BUTTON_X;tick();
+                raw[0].button=0;
+                for(unsigned n=0;n<120&&match.player_stats(0).ground_or_air==0;n++)tick();
+                check(match.player_stats(0).ground_or_air!=0,
+                      "Purin did not enter the authored aerial state");
+            };
+            auto jump_high_purin=[&](){
+                raw[0].stickX=raw[0].stickY=0;raw[0].button=PAD_BUTTON_X;tick();tick();
+                raw[0].button=0;
+                for(unsigned n=0;n<10;n++)tick();
+                bool fifth=false;
+                for(unsigned n=0;n<180&&!fifth;n++){
+                    raw[0].button=PAD_BUTTON_X;tick();
+                    fifth=match.player_stats(0).motion_id==ftPr_MS_JumpAerialF5;
+                }
+                raw[0].button=0;
+                // JumpAerial IASA checks air specials before the jump gate.
+                // Enter at the fifth jump, while rising; waiting for its
+                // animation to finish loses the altitude needed to charge.
+                check(fifth&&match.player_stats(0).ground_or_air!=0,
+                      "Purin raw multi-jump input did not retain an aerial state");
+            };
+
+            // x28 is the source WaitStruct {(31,80),(32,20),(-1,-1)}. Hold
+            // crouch until the original callback selects animation 32; the
+            // fixture observes Fighter.anim_id and never substitutes a state.
+            bool crouch_anim32=false;
+            raw[0].stickY=-80;
+            for(unsigned n=0;n<720&&!crouch_anim32;n++){
+                tick();crouch_anim32|=melee_web_test_purin_anim_id(32)!=0;
+            }
+            raw[0].stickY=0;
+            check(crouch_anim32,"Purin crouch Wait did not observe source anim_id 32");
+            settle_purin();
+
+            // The first ground jump is common; holding X after the source's
+            // grounded grace period must visit JumpAerialF1..F5.  The held
+            // input is required by ftCo_800D730C for the later jumps.
+            bool aerial_jumps[5]={false,false,false,false,false};
+            bool aerial_jump_logged[5]={false,false,false,false,false};
+            raw[0].button=PAD_BUTTON_X;tick();tick();raw[0].button=0;
+            for(unsigned n=0;n<10;n++)tick();
+            for(unsigned n=0;n<180;n++){
+                raw[0].button=PAD_BUTTON_X;tick();
+                const auto motion=match.player_stats(0).motion_id;
+                for(unsigned jump=0;jump<5;jump++){
+                    aerial_jumps[jump]|=motion==ftPr_MS_JumpAerialF1+(int)jump;
+                    if(aerial_jumps[jump]&&!aerial_jump_logged[jump]){
+                        aerial_jump_logged[jump]=true;
+                        std::cout<<"Purin aerial jump state="<<motion<<" frame="<<n
+                                 <<" y="<<match.player_stats(0).position[1]<<std::endl;
+                    }
+                }
+                if(aerial_jumps[0]&&aerial_jumps[1]&&aerial_jumps[2]&&
+                   aerial_jumps[3]&&aerial_jumps[4])break;
+            }
+            raw[0].button=0;
+            for(unsigned jump=0;jump<5;jump++)
+                check(aerial_jumps[jump],"Purin aerial jump state was not observed");
+            settle_purin();
+
+            bool rollout_start=false,rollout_full=false,rollout_release=false;
+            for(unsigned n=0;n<300&&!rollout_release;n++){
+                raw[0].button=n<150?PAD_BUTTON_B:0;tick();
+                const auto motion=match.player_stats(0).motion_id;
+                rollout_start|=motion==ftPr_MS_SpecialNStartR||motion==ftPr_MS_SpecialNStartL||
+                    motion==ftPr_MS_SpecialNLoop;
+                rollout_full|=motion==ftPr_MS_SpecialNFull;
+                rollout_release|=motion==ftPr_MS_SpecialNRelease;
+            }
+            raw[0].button=0;
+            check(rollout_start&&rollout_full&&rollout_release,
+                  "Purin ground Rollout did not preserve its authored charge/release states");
+            settle_purin();
+
+            bool air_rollout_start=false,air_rollout_full=false,air_rollout_release=false;
+            bool air_rollout_full_seen=false;
+            jump_high_purin();
+            int air_rollout_previous=-1;
+            for(unsigned n=0;n<240&&!air_rollout_release;n++){
+                // Charge starts at xA0, then advances by xA8 up to xA4.
+                // Release only after observing ChargeFull, so the
+                // source IASA callback enters ChargeRelease naturally.
+                raw[0].button=air_rollout_full_seen?0:PAD_BUTTON_B;tick();
+                const auto motion=match.player_stats(0).motion_id;
+                const bool aerial=match.player_stats(0).ground_or_air!=0;
+                if(motion!=air_rollout_previous) {
+                    air_rollout_previous=motion;
+                    std::cout<<"Purin air Rollout state="<<motion<<" frame="<<n
+                             <<" aerial="<<aerial<<" y="<<match.player_stats(0).position[1]
+                             <<std::endl;
+                }
+                air_rollout_start|=aerial&&(motion==ftPr_MS_SpecialAirNStartR||
+                    motion==ftPr_MS_SpecialAirNStartL||
+                    motion==ftPr_MS_SpecialAirNChargeLoop);
+                air_rollout_full|=aerial&&motion==ftPr_MS_SpecialAirNChargeFull;
+                air_rollout_release|=aerial&&motion==ftPr_MS_SpecialAirNChargeRelease;
+                air_rollout_full_seen|=air_rollout_full;
+            }
+            raw[0].button=0;
+            check(air_rollout_start&&air_rollout_full&&air_rollout_release,
+                  "Purin aerial Rollout did not preserve its authored charge/full/release states");
+            settle_purin();
+
+            auto run_simple_special=[&](bool air,int ground_left,int ground_right,
+                                        int air_left,int air_right,int stick_x,int stick_y,
+                                        const char* failure){
+                if(air)jump_purin();else settle_purin();
+                bool entered=false;
+                for(unsigned n=0;n<240&&!entered;n++){
+                    raw[0].stickX=stick_x;raw[0].stickY=stick_y;
+                    raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
+                    const auto motion=match.player_stats(0).motion_id;
+                    entered|=motion==(air?air_left:ground_left)||
+                        motion==(air?air_right:ground_right);
+                }
+                raw[0].button=0;raw[0].stickX=raw[0].stickY=0;
+                check(entered,failure);settle_purin();
+            };
+            run_simple_special(false,ftPr_MS_SpecialS,ftPr_MS_SpecialS,
+                               ftPr_MS_SpecialAirS,ftPr_MS_SpecialAirS,80,0,
+                               "Purin ground Pound did not enter its original source state");
+            run_simple_special(true,ftPr_MS_SpecialS,ftPr_MS_SpecialS,
+                               ftPr_MS_SpecialAirS,ftPr_MS_SpecialAirS,80,0,
+                               "Purin aerial Pound did not enter its original source state");
+            run_simple_special(false,ftPr_MS_SpecialHiL,ftPr_MS_SpecialHiR,
+                               ftPr_MS_SpecialAirHiL,ftPr_MS_SpecialAirHiR,0,80,
+                               "Purin ground Sing did not enter its original source state");
+            run_simple_special(true,ftPr_MS_SpecialHiL,ftPr_MS_SpecialHiR,
+                               ftPr_MS_SpecialAirHiL,ftPr_MS_SpecialAirHiR,0,80,
+                               "Purin aerial Sing did not enter its original source state");
+            run_simple_special(false,ftPr_MS_SpecialLwL,ftPr_MS_SpecialLwR,
+                               ftPr_MS_SpecialAirLwL,ftPr_MS_SpecialAirLwR,0,-80,
+                               "Purin ground Rest did not enter its original source state");
+            run_simple_special(true,ftPr_MS_SpecialLwL,ftPr_MS_SpecialLwR,
+                               ftPr_MS_SpecialAirLwL,ftPr_MS_SpecialAirLwR,0,-80,
+                               "Purin aerial Rest did not enter its original source state");
+            std::cout<<"Purin original Wait anim_id32, five aerial jumps, Rollout charge/release, and ground/air Pound/Sing/Rest states passed"<<std::endl;
+            }
         }else{
         const bool fox_family=fighter_content->fighter_kind==FTKIND_FOX||
             fighter_content->fighter_kind==FTKIND_FALCO;
@@ -720,6 +895,7 @@ int main(int argc,char** argv){try{
             check(counter,fighter_content->fighter_kind==FTKIND_EMBLEM?
                   "Roy Counter did not enter its original shared Mars state":
                   "Marth Counter did not enter its original source state");
+        }
         }
         }
         check(melee_web_test_quake_start(2),"Original authored stage quake was not created");
