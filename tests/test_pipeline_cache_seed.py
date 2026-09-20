@@ -40,6 +40,28 @@ class PipelineCacheSeedTests(unittest.TestCase):
                         self.assertEqual((65549, 2772), row[:2])
                         self.assertEqual(digest, hashlib.sha256(row[2]).hexdigest())
 
+    def test_results_gpu_compile_stall_descriptors_are_prepared(self):
+        # Correlated Results frame-163 GPU trace names these game pipelines.
+        # Their Metal library compilation blocked the source staging slot.
+        expected = {
+            0x3d26c2f2: "1e5a4981a4a4fa105654914d68f09dc87448e6c46ac9e4e902c8740555de1062",
+            0xaff9ff0d: "72287dac06eb4ce0869c279ae5636580d9c76b9845aaaa80ba064ae7f77ac087",
+            0xe46b0b91: "3ae44cc0039c5ffb39f5eeba45f8be5beb982324f90042e55dee469417bfd0a5",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "seed.db"
+            materialize(SEED, output)
+            with sqlite3.connect(output) as database:
+                for key, digest in expected.items():
+                    with self.subTest(pipeline=f"{key:08x}"):
+                        row = database.execute(
+                            "SELECT config_version, config_size, config FROM pipeline_cache "
+                            "WHERE type=1 AND hash=?", (key,)
+                        ).fetchone()
+                        self.assertIsNotNone(row, "Results must find its reviewed descriptor")
+                        self.assertEqual((65549, 2772), row[:2])
+                        self.assertEqual(digest, hashlib.sha256(row[2]).hexdigest())
+
     def test_consumed_marth_holdout_descriptors_are_prepared(self):
         # The first frozen cold Marth/Battlefield holdout created two live
         # pipelines. Its exact saved IDBFS DB/WAL contains these new records;
@@ -84,12 +106,12 @@ class PipelineCacheSeedTests(unittest.TestCase):
             output = Path(directory) / "initial_pipeline_cache.db"
             materialize(SEED, output)
 
-            self.assertEqual(2621440, output.stat().st_size)
+            self.assertEqual(2732032, output.stat().st_size)
             self.assertEqual(EXPECTED_SHA256, hashlib.sha256(output.read_bytes()).hexdigest())
             with sqlite3.connect(output) as database:
                 self.assertEqual([(1,)], database.execute("SELECT value FROM aurora_schema").fetchall())
                 self.assertEqual(
-                    [(0, 1, 64), (1, 627, 1738044)],
+                    [(0, 1, 64), (1, 654, 1812888)],
                     database.execute(
                         "SELECT type, COUNT(*), SUM(length(config)) FROM pipeline_cache GROUP BY type"
                     ).fetchall(),

@@ -1,0 +1,237 @@
+{
+  "schema": "melee-web-results-pipeline-seed-v1",
+  "scope": "One finite ordinary-keyboard seven-match discovery inventory, original Results/Prize/CSS returns and native unload. No retail or performance acceptance.",
+  "base_decoded_sha256": "4bdb7c4a3e906d907d066f0c65041d7eb3472dc25c9d8c98be6e4946fdce560f",
+  "seed_decoded_sha256": "417b4939c41068ca7a44fe0e4329be3f85e41f607e78e4253a7bb095bb0137d9",
+  "preserved_rows": 628,
+  "appended_gx_descriptors": 27,
+  "total_rows": 655,
+  "source_report_sha256": "6a6ca5b953d185e2867a433e99f0bc7f22960f74d173450f522374e2ebd01b09",
+  "producer_receipt_sha256": "cec33338a21299973e4a93b1f295f7da925f4c14b97c898e4eeb6368e8ff3958",
+  "inventory_sha256": "603bc58f23c5d7405d53d7fca49aab17a9504908060028dc6302040b128d8c0e",
+  "review_sha256": "47e1fc628e947b58b0b389830abd4da0711d0e1abca81da6f55c98ccd304b6b4",
+  "portable_cache_provenance_sha256": "ba5da109b2e9f28deeeacfc14535f095784ca7e974be63da51dd8deaf0bdc4f2",
+  "gpu_diagnostic_report_sha256": "1fd64db48a2f01e42a426001402ffff1d8ad75266e7047b4a69d1760bed56c13",
+  "gpu_trace_sha256": "acac9e34ec2b52b8030aa380603cb8c474aad40eac77a3d54d5bdab1936659ff",
+  "gpu_evidence_sha256": "686a166fb189637f3d700e636632f835197168af4af6d989a822b56fc5447618",
+  "origin_cache_cleared": true,
+  "driver_cache_included": false,
+  "new_descriptors": [
+    {
+      "config_sha256": "5bbbecf33989ff78f03bbddca2c4d1c7e8a17fcdeeba27a619db63313e4dbee4",
+      "config_size": 2772,
+      "config_version": 65549,
+      "first_frame_used": 3102,
+      "hash": 18707426,
+      "type": 1
+    },
+    {
+      "config_sha256": "dedcd09a95aa9c3d68480760d4dfee610e2faa3009cf3d199057faf6586b32a0",
+      "config_size": 2772,
+      "config_version": 65549,
+      "first_frame_used": 18353,
+      "hash": 34965578,
+      "type": 1
+    },
+    {
+      "config_sha256": "5b7427c9885783360fcc7932dbb995bc823f1b2ff75cb77dadcace5c9e066623",
+      "config_size": 2772,
+      "config_version": 65549,
+      "first_frame_used": 2860,
+      "hash": 216020688,
+      "type": 1
+    },
+    {
+      "config_sha256": "c1179b4ea9ea3c272cb6ffa899bda65e14ff102268a80228e1b25a5d4d0300a2",
+      "config_size": 2772,
+      "config_version": 65549,
+      "first_frame_used": 2700,
+      "hash": 266549284,
+      "type": 1
+    },
+    {
+      "config_sha256": "4b7cfef587c3d5856bb412b4ff6ea8fef7c875891ca8ef98d4dcbac2bc93d1f5",
+      "config_size": 2772,
+      "config_version": 65549,
+      "first_frame_used": 2860,
+      "hash": 364687610,
+      "type": 1
+    },
+    {
+      "config_sha256": "619ee91030631fcace41a1f41bae2164d4bda1cd6a8b3382ab0a644e13cc7080",
+      "config_size": 2772,
+      "config_version": 65549,
+      "first_frame_used": 3108,
+      "hash": 847889710,
+      "type": 1
+    },
+    {
+      "config_sha256": "1e5a4981a4a4fa105654914d68f09dc87448e6c46ac9e4e902c8740555de1062",
+      "config_size": 2772,
+      "config_version": 65549,
+      "first_frame_used": 2860,
+      "hash": 1025950450,
+      "type": 1
+    },
+    {
+      "config_sha256": "75b4c5712653d5ca0e4b39a2213a77dc7c2d2f616937a69ce98bdb1602df545d",
+      "config_size": 2772,
+      "config_version": 65549,
+      "first_frame_used": 2860,
+      "hash": 1125497914,
+      "type": 1
+    },
+    {
+      "config_sha256": "86895b8e5cd1903d1e8405a15da8dc9a58925a7467e1bd00b403c9c40d1f12c3",
+      "config_size": 2772,
+      "config_version": 65549,
+      "first_frame_used": 3102,
+      "hash": 1287895650,
+      "type": 1
+    },
+    {
+      "config_sha256": "67dab5427117bae41cbcdf8006811b9b54e15aa5f0ab35a0f1cf7fbb33087c54",
+      "config_size": 2772,
+      "config_version": 65549,
+      "first_frame_used": 2870,
+      "hash": 1314946213,
+      "type": 1
+    },
+    {
+      "config_sha256": "648183c16c79fed1f7ede71adb5ba440159329bd3869f410bf210a790ff819df",
+      "config_size": 2772,
+      "config_version": 65549,
+      "first_frame_used": 2860,
+      "hash": 1437166959,
+      "type": 1
+    },
+    {
+      "config_sha256": "0d5248b3094e07f54b118d7c057952d6aa3fdd54d7e12841b62c52d9164384e0",
+      "config_size": 2772,
+      "config_version": 65549,
+      "first_frame_used": 2700,
+      "hash": 2120048216,
+      "type": 1
+    },
+    {
+      "config_sha256": "d95c54a99ac3c57c5308712fd5086228ce9eed932d0e8d944cfa3be56c47664a",
+      "config_size": 2772,
+      "config_version": 65549,
+      "first_frame_used": 2860,
+      "hash": 2255057247,
+      "type": 1
+    },
+    {
+      "config_sha256": "01e4194929cbfa58e82c3af7295df54297a5647b5009184a9b5eaf1ae8402332",
+      "config_size": 2772,
+      "config_version": 65549,
+      "first_frame_used": 2870,
+      "hash": 2366666163,
+      "type": 1
+    },
+    {
+      "config_sha256": "cbdc1de53f51749f483cf584d49c4371ddce286a7bf2f9053aae9cb8f92ade4d",
+      "config_size": 2772,
+      "config_version": 65549,
+      "first_frame_used": 2860,
+      "hash": 2393306298,
+      "type": 1
+    },
+    {
+      "config_sha256": "681d33ff22f2466cc37f691afe0f25e6706dd437822fd576cee9e072dda39958",
+      "config_size": 2772,
+      "config_version": 65549,
+      "first_frame_used": 2860,
+      "hash": 2424502830,
+      "type": 1
+    },
+    {
+      "config_sha256": "3b80063dd6ae091120aeefa93845048e190005609aafa2d88dfabf0be92ef07e",
+      "config_size": 2772,
+      "config_version": 65549,
+      "first_frame_used": 3102,
+      "hash": 2445154366,
+      "type": 1
+    },
+    {
+      "config_sha256": "35f0e97aad544d241341ba0c3e213d65e2527ef6f40a6e56d326e451b0523222",
+      "config_size": 2772,
+      "config_version": 65549,
+      "first_frame_used": 12216,
+      "hash": 2802578815,
+      "type": 1
+    },
+    {
+      "config_sha256": "72287dac06eb4ce0869c279ae5636580d9c76b9845aaaa80ba064ae7f77ac087",
+      "config_size": 2772,
+      "config_version": 65549,
+      "first_frame_used": 2860,
+      "hash": 2952396557,
+      "type": 1
+    },
+    {
+      "config_sha256": "3c677d7d9bd2927df7a3fce1713a0fa6fad85e5be5505b1d2a71ccf1df2dabe8",
+      "config_size": 2772,
+      "config_version": 65549,
+      "first_frame_used": 2700,
+      "hash": 2961392613,
+      "type": 1
+    },
+    {
+      "config_sha256": "c111f9b6671cbe8e49a92c9eeda49eb47c65ad85a85455021ecd4ccb9f152622",
+      "config_size": 2772,
+      "config_version": 65549,
+      "first_frame_used": 2870,
+      "hash": 3477970606,
+      "type": 1
+    },
+    {
+      "config_sha256": "4fe74449b92af9aa99391e3675fa6617a9a820bfe2ea69a456530c3ed91a1a78",
+      "config_size": 2772,
+      "config_version": 65549,
+      "first_frame_used": 2860,
+      "hash": 3827607789,
+      "type": 1
+    },
+    {
+      "config_sha256": "3ae44cc0039c5ffb39f5eeba45f8be5beb982324f90042e55dee469417bfd0a5",
+      "config_size": 2772,
+      "config_version": 65549,
+      "first_frame_used": 2860,
+      "hash": 3832220561,
+      "type": 1
+    },
+    {
+      "config_sha256": "25d6d5b09a3dc9bcc0738cc0ba90f3c990ae5b42549c5d0ad1819664a98016b7",
+      "config_size": 2772,
+      "config_version": 65549,
+      "first_frame_used": 3102,
+      "hash": 3923658353,
+      "type": 1
+    },
+    {
+      "config_sha256": "f05605caeafacaa43c671ce475e86f78fa2245ece4d7fc51f9c700f35c40721b",
+      "config_size": 2772,
+      "config_version": 65549,
+      "first_frame_used": 15185,
+      "hash": 3923838453,
+      "type": 1
+    },
+    {
+      "config_sha256": "eedc20fd2302a576c8b6cfea3664e2557761f470d1ef9ae5f7b421af97819193",
+      "config_size": 2772,
+      "config_version": 65549,
+      "first_frame_used": 2860,
+      "hash": 4100332491,
+      "type": 1
+    },
+    {
+      "config_sha256": "63a1b83e00ab1381f7592475994518f1aed4a101249d6e4bb3a13b27b2675a7c",
+      "config_size": 2772,
+      "config_version": 65549,
+      "first_frame_used": 2700,
+      "hash": 4205866553,
+      "type": 1
+    }
+  ]
+}

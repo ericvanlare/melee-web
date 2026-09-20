@@ -2,31 +2,40 @@
 
 ## Versus return-loop work in progress
 
-The ordinary-keyboard No Contest crash is reproduced and repaired at the PAD
-ownership boundary. Three visible Release Mario/FD matches start and return
-to CSS in one page, including holding L+R+A+Start across the return. The host
-preserves original controller histories across scene changes instead of
-inventing a new shortcut press. See the [scoped evidence and retained failures](
-docs/VERSUS_RETURN_LOOP.md). This remains the existing Results-skipping slice;
-issue #34's original Results, whole-session retail, physical-controller,
-source-heap equivalence and performance acceptance are still open. A separate
-three-match Chrome run now also retains the same 32 MiB source allocation across
-all menu/match worlds, with original SDK payload-retention checks. This does not
-yet establish a memory bound or retail allocation-history equivalence.
+The original Results → optional Prize → CSS route now runs through ordinary
+keyboard input. Three No Contest matches and a separate three-match normal
+four-stock Mario/Final Destination sequence return in one document, preserving
+PAD history and one source arena. Original MatchEnd supplies the winner; each
+completed source-world teardown releases its objects and processes. The normal
+sequence's final test assertion incorrectly expected numeric zero for a boolean;
+its retained unload observation shows the arena released. The named four-match
+rotation also passes, including Yoshi's Story after Marth and successful final
+unload after fixing missing Link/Young Link menu audio-bank registration. See the exact scope,
+build receipts and retained failures in [versus return-loop evidence](
+docs/VERSUS_RETURN_LOOP.md#profile-and-prize-integration-2026-09-20).
 
-The draft Results implementation now renders the original No Contest screen
-in Chrome, including text, panels and Mario demo animation. The retained
-diagnostic reaches 316 source ticks but requires one timing-pause resume;
-it is rendering evidence, not performance or return-loop acceptance. All 73
-authored Results animation clips decode for the eight development fighters;
-all sixteen native scene cases (each fighter winning/losing against Mario)
-construct, advance two source ticks and tear down in one retained arena.
-The real source mode-exit callback currently requests Prize state 192 from
-the synthetic all-unlocked profile. That transition fails explicitly pending
-coherent profile/Prize handling; it is not forced to CSS. The prepared save
-fixture and physical-controller input needed for independent whole-session
-comparison are not yet available locally. See the [current checkpoint and
-remaining gates](docs/VERSUS_RETURN_LOOP.md#original-results-rendering-and-mode-routing-checkpoint).
+Original profile initialization and complete profile/Toy/language restoration
+are checked against linked source. All eight development fighters pass the
+native winning/losing Results construction and confirmation cases. The named
+whole-session retail comparisons, repeated allocation bounds and cold/warm
+whole-loop performance remain in progress. The first cold timing attempt fails
+on CSS/Results GPU staging waits, live Results pipeline creation and audio
+underruns; its warm slot and the rotation timing slots remain unstarted. A
+correlated GPU trace identifies Results game-shader compilation. Appending 27
+observed portable descriptors preserves all prior seed rows; one reduced cold
+Mario/Results/Prize/CSS regression now passes with zero live pipeline creation,
+timing misses or audio faults. This does not replace the full matrix. See
+[the retained failure](docs/VERSUS_RETURN_LOOP.md#first-whole-loop-timing-failure-2026-09-20). The owner accepts
+keyboard-only validation for this PR; physical-controller testing remains
+separate under #35.
+
+A fresh original-game save has corrected all-character/four-stage derivatives
+that update both valid GameData copies. A visible original boot verifies those
+masks at first CSS. Matching its initial profile context to the browser and two
+independent reference captures per whole sequence remain open. The branch
+includes current main's completed #33 gate, which does not establish this
+consecutive-match scope. No new gameplay admission or public deployment is
+claimed.
 
 ## CI verification turnaround
 

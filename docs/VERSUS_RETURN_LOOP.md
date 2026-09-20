@@ -2,8 +2,10 @@
 
 [Issue #34](https://github.com/ericvanlare/melee-web/issues/34) extends the old
 Results-skipping playable slice. Its acceptance remains open: the original
-Results scene, whole-session retail comparison, physical input and retained
-source-heap equivalence are separate from the keyboard crash repair below.
+Results scene, whole-session retail comparison and retained source-heap
+equivalence are separate from the keyboard crash repair below. The owner has
+accepted keyboard-only input validation for this PR; physical-controller
+hardware acceptance remains separate under #35.
 
 ## No Contest input ownership, 2026-09-19
 
@@ -225,3 +227,351 @@ now emits repeated-match and Results-process boundaries, but still lacks the
 capture identity, transition-trace join and menu audio epoch required to
 promote a complete reference bundle. Final cold/warm acceptance also depends
 on the separate issue #33 gate.
+
+
+## Profile and Prize integration, 2026-09-20
+
+The branch includes current main's completed #33 runtime gate. That gate does
+not establish whole-loop performance; new cold/warm consecutive-match runs are
+still required. Keyboard-only testing is authorized for this PR. Missing
+physical-controller hardware is not a merge prerequisite.
+
+**Source identified.** A fresh owned original-game save was generated through
+ordinary Dolphin Pipe input and normal memory-card saving, then decoded with
+the strict HSD checksum/layout checks. The corrected, explicitly versioned
+`fresh-all-characters-four-stages-v2` derivative changes only the authored
+character and stage unlock masks: `0x07ff` and `0x01c0`. Battlefield, Final
+Destination and Dream Land use stage unlock bits 6, 7 and 8; Yoshi's Story is a
+default stage. Trophy/achievement pending and claimed state is not invented or
+cleared. The old private fixture is unchanged. The local derivative's GCI
+SHA-256 is `39171db67ec4e6b85837107f7cd7e1231402e239ec7f74bfc9efa35d5a2879ce`;
+its SRAM SHA-256 is
+`49dee06d38cb76aaa8f90bfb2e937face180243d1a170078b4e13226b012f82c`.
+The original-created save has two checksum-valid GameData copies (physical
+blocks 1 and 10); the original reader can select the later copy. Both are
+updated in v2. The retained v1 derivatives changed only block 1 and are rejected
+as comparison context. Their immutable manifests also incorrectly described
+block 10 as invalid. The correction receipt at
+`work/issue34/fresh-reference-v1/baselines/v1-correction.json` has SHA-256
+`12a4de3f72fd0c743ec03bc65115aaf7c718e630f1caf211802eec7968f3cd44`.
+Original load verification remains required. This establishes the prepared
+bytes, not repeatable sequence capture or agreement with the browser profile.
+
+**Native traced.** The expanded Results scene check passes all sixteen cases:
+each of the eight integrated fighters winning and losing against Mario. Each
+case runs original processes/audio requests through ordinary Start confirmation
+and scene teardown in one retained source arena. MatchEnd inputs are synthesized
+for this focused scene test. It does not run the original VS mode routing,
+source draws, browser rendering or retail/PCM comparison. The immutable
+`work/issue34/results-native-checkpoint-3/receipt.json` has SHA-256
+`eafb25ce24f029127f7b8608e90dc00c98cfdbe3bb4fb3cbed0db5aaa84f9c31`;
+`results-eight-confirm-1.log` has SHA-256
+`d19b3d9d01f1904d41ba99624ec738a49b1108312c789e037897484e8cc0ed33`.
+
+**Compiled / native traced at the asset boundary.** Prize has a checked owner
+for the exact original SceneDesc, SIS, trophy and card roots. The integrated
+real-asset check validates those roots and closes after the source world. The
+first integrated mode-route run reaches Prize and then rejects a missing HPS
+registry in `un_802FE918`. That failure is retained in
+`work/issue34/prize-mode-route-2.log`. The checked registry now owns all three
+authored `s_info` streams. The following native run completes original Prize
+confirmation, returns to CSS, starts another match, finishes all four stocks
+and confirms Results back to CSS. Its log,
+`work/issue34/prize-mode-route-3.log`, has SHA-256
+`c658ef9368b6266f71cddc6052f5b7fc760aee022a377f30a21ec55aa9c61b38`.
+This run still used the earlier synthetic profile; it does not validate the
+new profile initializer, source draws, browser route, retail agreement or
+performance. Those gates remain open.
+
+
+**Native traced, initialized profile.** The follow-up profile test links the
+actual original `gmMainLib_8015F600` routines and verifies source preference
+initialization, Toy-table mutation and restoration of the complete owned
+profile/Toy backing. The native mode loop also passes with this initializer:
+No Contest → Results → Prize → CSS, then another full four-stock match →
+Results → CSS. The immutable checkpoint at
+`work/issue34/profile-native-checkpoint-1/receipt.json` has SHA-256
+`411758887283a197cc8840adad26391669b08d18f77ff2e2eced98401a52331c`.
+It preserves the binaries and both logs. Its source hashes were sampled after
+later edits and do not establish the exact producer source closure. This
+checkpoint predates the typed seven-bank name-data repair and includes no source
+draws, browser, retail, memory-bound or performance acceptance.
+
+
+**Browser exercised, keyboard No Contest.** The initialized-profile Release
+build completes three Mario/Final Destination No Contest matches in one visible
+Chrome 153.0.8010.48 document. Each returns through original Results to CSS;
+the first also confirms original Prize. Matches two and three hold LRAS across
+the ownership change. The same 32 MiB source backing identity/generation is
+retained throughout. This functional run deliberately pauses once for a Results
+screenshot and makes no performance, retail, pixel or PCM-equivalence claim.
+
+The immutable build receipt at
+`work/issue34/profile-browser-checkpoint-1/receipt.json` has SHA-256
+`bf66bb37c4d8a11e9bb8d32dac51ec924f474cbe182843394bf221ca15b8033c`;
+the successful `work/issue34/profile-browser-return-2/report.json` has SHA-256
+`fb286ce33b7ea139378025a39ae3df76198ec7e4bd8b020db87dda9d3ab766c2`.
+The preceding `profile-browser-return-1` report is a retained harness failure:
+a single Start entered the original statistics panels but did not confirm the
+human panel. The scene continued running without a reported runtime error.
+The corrected script supplies distinct bounded Start presses, as the native
+source trace already did. This checkpoint predates the typed seven-bank
+name-data repair and the expanded owner-teardown memory observations.
+
+**Compiled / regression checked.** The complete local suite passes 1,091 tests
+with 49 optional skips (`work/issue34/full-regression-3.log`, SHA-256
+`0f4cbda37b1b6da923b986842fe8cda04183208143f8da8670ee973180e3a327`).
+The preceding run is retained: discovery read the new sequence test while it
+was being written and reported a syntax error. The settled module and complete
+rerun pass. A subsequent focused source test verifies that profile activation
+restores both original language settings, including an early unload before menu
+entry (`profile-source-language-1.log`, SHA-256
+`91145d3277adc41e111aa653f8d3dc0b3b3b07d74affb2401eb09e57eb5eb582`).
+The Release public build and its audio/export checks also pass; its identity
+receipt has SHA-256
+`af00070d2b2dd7a6b188fad16937b10d9bf1cccf02cd6c93fca739f40b5d6a33`.
+These checks do not establish browser sequence or retail acceptance.
+
+**Browser exercised, normal stock completion.** The named `repeatMario`
+inventory completes three Mario/Mario Final Destination matches in visible
+Chrome 153.0.8010.48, using the ordinary two-player keyboard layout. Each match
+observes P1 stocks `4 → 3 → 2 → 1 → 0`, three respawns, original MatchEnd's
+P2 winner, Results confirmation and return to CSS. The first match also visits
+Prize. There is no reload or source-state injection between matches.
+
+The frozen Release build is `profile-browser-checkpoint-3/receipt.json`
+(SHA-256 `5b94f9ef27d1022fd8c25abc706431c205361d52155bcd1e361996fce14bf4b2`).
+The report is `sequence-browser-repeat-4/report.json`
+(SHA-256 `27f9e0db1a0646d7ae49f49903b2836d0eb8f383df2042f315a623d7d56cb5ec`),
+both under `work/issue34/`. Its sequence and teardown assertions pass, but the
+command's final unload assertion fails because the harness expected numeric
+`0` for the boolean `source_session_owned`. The retained unload observation is
+`false`, with zero arena identity, generation, bytes, source world, objects and
+processes. The assertion is corrected without rewriting that report.
+
+All 28 owner observations retain the scene boundaries. Every completed source
+world teardown has zero objects and processes. One 32 MiB arena serves all three
+matches. Post-return CSS live allocations are 323,349,488, 323,351,208 and
+323,351,096 bytes; cached archive/audio-bank counts stay at 21/13, and Wasm
+capacity stays at 400,949,248 bytes after the first match. These samples show no
+growth from match two to three; broader sequence bounds remain unestablished.
+
+The earlier `sequence-browser-repeat-1` through `-3` attempts remain failures:
+Start during the original CSS entry debounce; a stage tile ID mistaken for a
+controller port; and a winner assertion before source MatchEnd publishes its
+ranking at close. The final driver waits for the source's terminal ranking and
+uses source cursor geometry only for observation. This is functional route and
+lifecycle evidence, not retail, pixel, PCM or cold/warm performance acceptance.
+
+**Browser exercised, rotation; unload failure retained.** The corrected `rotate`
+inventory completes Dr. Mario/Falco on Battlefield, Fox/Roy on Dream Land,
+Marth/Link on Final Destination, then Young Link/Link on Yoshi's Story. Every
+match observes four stock losses, three respawns, the original P2 winner and
+Results confirmation back to CSS. Together with `repeatMario`, this exercises
+the eight development fighters and four stages in the declared pairs. It does
+not establish other pairings or costume permutations.
+
+The checkpoint-3 run `sequence-browser-rotate-2/report.json` has SHA-256
+`b2548a138e79c22c5a1199b8637babdc1e54e24da364e978b53d52292c370816`.
+All four match routes and their owner teardown checks pass; final unload from
+CSS aborts when original CSS exit requests `/audio/us/clink.ssm`. The menu owner
+registered thirteen resident banks and omitted Link and Young Link, although
+the gameplay importer already owned their bytes. Both banks are now required
+and registered by the menu owner, with existing registry ordering preserved.
+This retained run remains a failed command until a new browser run verifies
+the corrected final unload.
+
+The preceding `sequence-browser-rotate-1/report.json` has SHA-256
+`291a14c1438a12f48f58ab2465d7b2d8bc069c198ed0cc3e47911c87bd9cfa4b`.
+It completes three matches and then times out in SSS because the inventory
+mistakenly requests stage 16 (Yoshi's Island). Source `St_Kind_Story` is 8.
+The original inventory is retained alongside that report as `inventory-used.json`;
+the next run uses the corrected predeclared inventory. Neither failed run is
+retail, pixel, PCM or performance acceptance.
+
+**Browser exercised, corrected rotation and unload.** The following frozen
+Release build (`profile-browser-checkpoint-4/receipt.json`, SHA-256
+`a99a1a0f57820ee3c8034a916d96eddb18e2cde4e71bc351583cf7f00b47520e`)
+registers both missing banks. `sequence-browser-rotate-3/report.json` has SHA-256
+`6cad06ca5f865e37f5b0a3a35a357d43e9e7e3d933d4b55d522c008e90ddc56d`.
+The complete four-match inventory and final unload pass, with no console or
+page errors. All 36 owner observations fit the 128-event bound. Every completed
+source-world teardown has zero live objects and processes; final unload also
+zeros the retained arena identity, generation and allocation bytes.
+
+The finite inventory retains 39 immutable archive entries and 15 decoded audio
+banks after unload. Those caches belong to the browser runtime and intentionally
+outlive the source scene owners. Final allocator live bytes are 296,214,176;
+Wasm capacity remains 400,949,248 bytes. These allocator and cache values are
+different measures from source-world liveness and the released 32 MiB source
+arena. This establishes the named four-match lifecycle, not unrestricted leak
+freedom or a retail/performance comparison.
+
+**Original source observed, startup context only.** A visible original-game boot
+from the corrected v2 save reaches CSS through ordinary controller Pipe input.
+The passive first-CSS row observes character mask `07ff`, stage mask `01c0` and
+RNG `f1415e10`; the screenshot shows the unlocked roster. Startup presents the
+all-characters message and Kirby Hat 4/5 trophies, each confirmed through A.
+The retained `original-visual-startup-1/receipt.json` has SHA-256
+`aa2898d4f2b12ede3e70f32d10d8b3160b02e89a484f2d60abb564eb58af5867`.
+Its binary identity is
+`40fc32dd292ecdaf57ec0d18aff48b89328fbae59ebefb8a0ec3aadde699cdd1`,
+bound by `reference-observer-checkpoint-v4/reference-dolphin-build.json`.
+
+This is a diagnostic stopped at CSS, not a whole-sequence reference. P2's Pipe
+qualifier incorrectly used ID 1; Dolphin assigns IDs separately for each device
+name, so both distinct Pipe names need ID 0. P1 input is observed at the source.
+The startup observer also omitted Challenger's `onExitPrize` at `801bff7c`;
+the post-match VS Prize exit hook at `801a6308` does not run on that route.
+Both defects are reduced before another original capture. The preceding private
+boot helper had a separate neutral-axis conversion defect and cannot serve as
+a correct input recipe; its available raw attempts remain retained.
+
+The loaded masks are now verified, but the browser and original first-CSS
+profiles are not yet equivalent: the original has consumed startup Prize and
+loads its saved profile, while the browser initializes a source default profile
+and reaches its Prize route after the first match. This difference must be
+resolved explicitly before claiming whole-sequence agreement.
+
+**Regression checked.** `full-regression-4.log` passes 1,099 tests with 49 optional
+skips (SHA-256
+`f2310ae71ff24ecd4ad23c9a3b2e094538b6a8cb3d0ae1b5288e6a73dc7db0a9`).
+Later observer/scheduler corrections still require their own focused checks and
+the final integration suite.
+
+
+### First whole-loop timing failure, 2026-09-20
+
+**Performance measured, failed.** The first reserved `repeatMario` cold slot
+uses `profile-browser-checkpoint-5/receipt.json` (SHA-256
+`cec33338a21299973e4a93b1f295f7da925f4c14b97c898e4eeb6368e8ff3958`)
+and the immutable `versus-timing-plan-1/repeatMario.json`. The report is
+`sequence-timing-repeatMario-cold-1/report.json` (SHA-256
+`c809d6520845f8c1a638185a79b0e47582e163e52db5ed97f396cb10a104ec02`),
+all under `work/issue34/`. It reaches the first original Results after four
+stock losses and three respawns, then stops at Results source frame 163 with
+a native timing pause. No resume or replacement attempt occurred. The warm
+slot is ineligible because the cold route and cache-saving unload did not
+complete; all rotation timing slots remain unstarted.
+
+The three native deadline violations are 82.895 ms in initial CSS, 31.655 ms
+near Results entry, and 522.645 ms in Results. Their staging-slot waits are
+80.745, 28.845 and 519.340 ms. Corresponding browser gaps are 96.630, 45.270 and
+535.620 ms. Sixteen pipelines are created live in Results: four on its first
+source draw and twelve two callbacks before the final stall. This is missing
+pipeline coverage; temporal proximity alone does not prove why GPU completion
+waited. Results preparation invokes zero source draws by design because its
+source camera callbacks are not assumed pure. Do not fix the gap by advancing
+hidden gameplay or adding unverified extra source traversals.
+
+The report retains 2,718 source steps/draws, three native target violations,
+two native hard violations, three browser hard gaps and 171 audio underruns.
+Its 6,416 native callback count includes the paused wait after failure and is
+not an active-play denominator. Focus remained present and the page visible;
+no console/page error was recorded. The sole 118 ms browser long task falls
+wholly inside declared Results construction/preparation. These failed
+measurements remain separate from functional keyboard route evidence.
+
+The pushed audio-bank fix at `0b97a81` passes Linux Verify run `35542790426`.
+The corrected private reference observer v6 passes 41 focused checks; its
+binary SHA-256 is
+`fa65f028b7703985515831409a9d6e8d9ff9e25feb1fb6357f8b4f9ed262bcd6`,
+with receipt `reference-observer-checkpoint-v6/reference-dolphin-build.json`.
+The earlier v5 producer omitted the JIT boundary predicate and remains
+preserved as incomplete evidence. No v6 original capture is claimed yet.
+
+### Results shader preparation checkpoint, 2026-09-20
+
+**Source identified / browser exercised; timing diagnosis.** The one-match
+`results-gpu-diagnostic-1` run reproduces a 159.825 ms staging wait at Results
+source frame 163. Its complete 30-second Chrome trace names game GX pipelines
+`3d26c2f2`, `e46b0b91` and `aff9ff0d`: three Metal library compilations consume
+approximately 120 ms inside that wait. Browser layout/paint and UI raster work
+follow the wait. This identifies game pipeline compilation in the reproduced
+Results failure; it does not retrospectively classify the separate initial CSS
+stall or every event in the earlier unprofiled report.
+
+The diagnostic report is SHA-256
+`1fd64db48a2f01e42a426001402ffff1d8ad75266e7047b4a69d1760bed56c13`;
+its trace is `acac9e34ec2b52b8030aa380603cb8c474aad40eac77a3d54d5bdab1936659ff`.
+The correlated event packet `gpu-trace-evidence-v1.json` is
+`686a166fb189637f3d700e636632f835197168af4af6d989a822b56fc5447618`.
+The route completes with one explicitly recorded timing resume. Its cache-export
+step then fails because the export button is inside closed Diagnostics. The
+complete trace remains usable diagnostic evidence; the command remains failed.
+
+**Browser exercised, finite descriptor discovery.** A separately declared
+seven-match pass completes `repeatMario` followed by `rotate` in one document
+and arena, including Results/Prize/CSS and final unload. No timing resume or
+console/page error occurs. The portable cache is read only after native cache
+idle; the private browser profile is retained. Its report
+`results-seed-discovery-1/report.json` is
+`6a6ca5b953d185e2867a433e99f0bc7f22960f74d173450f522374e2ebd01b09`.
+All 60 owner observations fit the bound, and every source-world teardown is
+empty. The three repeated Mario CSS live allocations are 325,536,456,
+325,538,248 and 325,536,688 bytes. The following rotation introduces more assets;
+it ends with 42 immutable archives and 15 audio banks. This is finite lifecycle
+and discovery evidence, not an unrestricted allocation bound or acceptance timing.
+
+The cache review adds exactly 27 observed GX descriptors and preserves all 628
+previous rows field-for-field, including their original first-use metadata.
+There are no payload conflicts or missing base rows, and no Dawn driver-cache
+bytes are included. The decoded seed is now
+`417b4939c41068ca7a44fe0e4329be3f85e41f607e78e4253a7bb095bb0137d9`:
+one Clear row and 654 GX rows. The source scene receives no extra draws or
+ticks. The [portable seed receipt](evidence/results-pipeline-seed-v1.json)
+binds the producer, inventory, export, review and all appended descriptor
+identities. Twelve focused cache/seed checks and the affected development
+Release build pass.
+
+Timing diagnostics now distinguish callbacks with source work from callbacks
+with no source work while preserving all existing deadline counters. Timing
+waits fail promptly on a native timing pause and never resume it. The first
+failed acceptance plan remains sealed; no replacement acceptance slot is
+consumed by this reduced regression.
+
+**Reduced browser regression passed.** The frozen updated Release receipt is
+`results-seed-checkpoint-1/receipt.json` (SHA-256
+`8a8a28a03c4547a072950d38b094f89e6caee491733d982dc05f1481d18b2277`).
+The one reserved cold-origin Mario/Mario Final Destination prefix completes
+four stock losses, three respawns, five visible seconds of Results, its original
+Prize/CSS route and final unload, without a timing resume. Its report
+`results-seed-check-1/report.json` is
+`acaf1369c0e402a9b418c9daae6ee9dc5a7f5fcee12c687d4a08cbbdab6508b7`.
+Chrome 153.0.8010.48 runs visibly at DPR 2 with audible audio and focus emulation
+disabled. Driver caches remain uncontrolled.
+
+The measured interval contains 3,393 source steps/draws, zero live pipeline
+creations/queues, zero native target/hard misses, zero browser hard gaps,
+zero audio underruns/overflows, and no browser errors or focus loss. Native and
+browser maxima are 8.465 and 26.060 ms. Both browser long tasks fall wholly
+inside declared scene preparation. All 3,427 native callbacks are explicitly
+partitioned into 3,346 callbacks with source work and 81 without it. This
+supports the narrow seed correction; it is one reduced diagnostic, not a new
+whole-sequence cold/warm acceptance matrix. Earlier failures remain retained.
+
+### Resume boundary after the usage-conservation checkpoint
+
+Prize and repeated keyboard match returns are functional. Finish the independent
+original-comparison and whole-loop timing gates before marking #34 complete or
+merging this draft. No physical controller is required for this PR.
+
+The next original-comparison implementation is a typed first-CSS context and
+continuous whole-session input replay, reusing the current observer and scene
+owners. The DOL getters establish GameRules at profile root `+0x1850` (0x18
+bytes), SaveData at `+0x1868` (0x1790 bytes), and seven name banks starting at
+`+0x2ff8` (each 0x1f2c bytes). Capture/decode those fields with explicit endian
+and packed-field handling, plus the existing RNG/PAD/setup observations. The
+current observer carries only the two profile masks. The current browser replay
+accepts only one match and deliberately rejects a used source heap; it cannot
+be treated as a whole-session replay by concatenating recipes. The opt-in
+extension must retain one source arena and cursor through the real scene chain.
+
+Results comparison also needs full typed MatchEnd/standings and the source
+post-OnEnter display state. The current observer's 0x28-byte result prefix does
+not cover player standings. No importer, new Results snapshot or whole-session
+browser replay was implemented at this checkpoint. Two independent original
+captures per named sequence, browser comparisons, repeated rotation allocation
+bounds and a fresh frozen cold/warm matrix remain open. Run the required final
+full suite, affected public build and CI after these changes settle; focused
+checks do not replace integration verification.
