@@ -478,6 +478,13 @@
       "gold_admitted": false,
       "scope": "Declared entry, supplied input, fighter, RNG and match clock fields; source drawing, global PAD history, pixels, PCM, hardware and performance excluded.",
       "report_sha256": "0218d6944b9ee6e3695116406b1e7fd84e6a1e8684760242bd155da61fe1e950"
+    },
+    "github": {
+      "commit": "ca692dd122e94ef886a1379dbd9b887339fc4ebb",
+      "workflow": "Verify",
+      "result": "success",
+      "seconds": 392,
+      "url": "https://github.com/ericvanlare/melee-web/actions/runs/35506996732"
     }
   },
   "remaining": [
@@ -499,5 +506,35 @@
       "gameplay_menu_browser.data": "4bdb7c4a3e906d907d066f0c65041d7eb3472dc25c9d8c98be6e4946fdce560f",
       "prototype-build.json": "cd71b575ce4c5c0d60556306240d9abf8515ce7cc775a634cbe29ec3f1187f03"
     }
+  },
+  "post_preload_cleared_origin": {
+    "raw_report_sha256": "afa637562c872a1b153166c333485f4d2e4b017f21b12ac69eeb0f64999900c0",
+    "frozen_build_identity_sha256": "3d1da65e3e21673a16246d1ddf259aebad99231a5b32f7513713828feb06a386",
+    "browser": "153.0.8010.50",
+    "scope": "Single cleared-origin authored30-case/5200-frame drawn action/performance sweep; no original equivalence, physical input, pixels/PCM, warm pair or full match claim.",
+    "pass": true,
+    "metrics": {
+      "sourceFrames": 5200,
+      "browserCallbacks": 5200,
+      "worstBrowserCallbackMs": 27.605,
+      "browserCallbackGaps": 0,
+      "browserLongTasks": 0,
+      "browserLongTaskWorstMs": 0,
+      "nativeCallbacks": 5200,
+      "worstNativeCallbackMs": 9.965,
+      "nativeCallbacksOverBudget": 0,
+      "nativeCallbacksOver33ms": 0,
+      "audioUnderrunFrames": 0,
+      "livePipelinesQueued": 0,
+      "livePipelinesCreated": 0,
+      "liveTextureUploadBytes": 692224,
+      "liveStagingUsedBytes": 7193071084,
+      "peakStagingUsedBytes": 2921240,
+      "preparationPauses": 0,
+      "automaticTimingResumes": 0,
+      "focusLost": false,
+      "wasmHeapGrowthBytes": 0
+    },
+    "entry_timing_resumes": 0
   }
 }

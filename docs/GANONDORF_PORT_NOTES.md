@@ -60,7 +60,12 @@ regression suite. They establish action reachability only. The cleared-origin
 export contains 37 new portable pipeline descriptors. Review preserves all 628
 prior rows (one shader and 627 pipelines), verifies no existing payload changes,
 and adds only the 37 descriptors. The resulting seed contains 664 pipelines
-and one shader; post-preload browser verification is a separate gate.
+and one shader. A fresh cleared-origin follow-up on Chrome 153.0.8010.50
+passes the same 30 cases and 5,200 source frames with no timing gaps, long
+tasks, native target misses, audio underruns, live pipelines, preparation
+pauses, automatic resumes, focus losses or heap growth. Native/browser maxima
+are 9.965/27.605 ms. This is one authored cleared-origin sweep; the warm pair,
+original comparison and broader fighter gates remain separate.
 
 The narrow rigid-model asset inspector rejects the costume materials under its
 restricted preview policy. That failure is retained separately from the full
@@ -69,7 +74,8 @@ or a successful rendering comparison.
 
 Both development and public Release builds succeed. The complete regression
 suite passes 1,048 tests with 43 optional skips after correcting two stale
-prototype roster expectations. Fresh native lifecycle checks also pass all
+prototype roster expectations. GitHub Verify passes checkpoint `ca692dd` in
+6m 32s. Fresh native lifecycle checks also pass all
 eight existing fighters, and the retained 240-frame Mario original pair matches
 the fresh port for its declared entry/input/fighter/RNG/clock fields. This small
 regression excludes drawing, global PAD history, pixels, PCM and performance.

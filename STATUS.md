@@ -10,8 +10,10 @@ or declared feature status into an accepted-game percentage.
 Ganondorf is the first added development candidate. Fresh native checks pass
 both player orientations and all five costumes on Final Destination, including
 original combat, pause and teardown. The browser reaches original CSS/SSS and
-advancing Ganondorf gameplay, with cold pipeline creation and timing pauses
-retained as failures. Original comparison and broader acceptance remain open;
+advancing Ganondorf gameplay. A reviewed 37-pipeline preload correction clears
+the 30-case, 5,200-frame drawn sweep with no hard timing/audio/pipeline failures;
+earlier cold failures remain retained. Original comparison, the warm pair and
+broader acceptance remain open;
 see [Ganondorf scope and remaining gates](docs/GANONDORF_PORT_NOTES.md).
 Results PR #44 and audio PR #42 remain separate draft dependencies. This branch
 work has not changed the deployed public alpha.
