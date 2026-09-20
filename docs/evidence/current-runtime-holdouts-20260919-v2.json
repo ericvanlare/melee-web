@@ -1,0 +1,764 @@
+{
+  "schema": "melee-web-current-runtime-holdouts",
+  "version": 2,
+  "issue": 33,
+  "recorded_date": "2026-09-20",
+  "scope": "Replacement current-runtime holdout campaign after the retained v1 failure. This receipt records fresh role-preserving sources, bounded reference preparation, declared state/timer comparison, and one unprofiled cold/warm timing pair per replacement holdout.",
+  "acceptance": {
+    "status": "passed_current_runtime_holdout_timing",
+    "acceptance_evidence": true,
+    "timing_matrix": "complete",
+    "causal_classification": "NOT_CLASSIFIED",
+    "historical_cause": "unresolved_not_reclassified",
+    "issue_completion": "outside_this_receipt",
+    "historical_receipt": {
+      "path": "docs/evidence/browser-raster-stall-v1.json",
+      "sha256": "eb80d83a4786cf775d9056525902ed09856139392329867f8669981a502d3cc3"
+    },
+    "prior_failed_campaign": {
+      "receipt": {
+        "path": "docs/evidence/current-runtime-holdouts-20260919-v1.json",
+        "sha256": "300040b7719baf63d8aef1f6028bd53b8cf75c38d9a60a1dd72d08fe4b4f1f12"
+      },
+      "failed_report": {
+        "path": "work/issue33/holdouts/timing-attempts/01-marth-cold/browser-report.json",
+        "sha256": "31ce0684443af5aed5fd43c7fe87f079bd8a5ec8d155cf34fd5ffa6286f7c478"
+      },
+      "failure": "livePipelinesCreated=2; livePipelinesQueued=0; acceptance_evidence=false"
+    }
+  },
+  "authorization_and_freeze": {
+    "acceptance_scope": {
+      "path": "work/issue33/replacement-holdouts/acceptance-scope.json",
+      "sha256": "b252a4b7407369d18b1c183d627d49b7651aea40663f19e1fa2948f8693eb8bd",
+      "decision": "proceed",
+      "approved_by": "owner",
+      "basis": "Continuation of the prior user-authorized scope; no new owner decision asserted."
+    },
+    "approval_and_runtime_freeze": {
+      "path": "work/issue33/replacement-holdouts/approval-and-runtime-freeze.json",
+      "sha256": "3ccf5362b72ebe48c6543226afe591faac00383fac86b3549329465b53d228d7",
+      "approval_status": "existing_owner_scope_applied",
+      "runtime_frozen": true,
+      "runtime_code_commit": "713e45a8b6f67e00ef5fb88c045419a48c82c230",
+      "seed_sha256": "4bdb7c4a3e906d907d066f0c65041d7eb3472dc25c9d8c98be6e4946fdce560f"
+    },
+    "execution_plan": {
+      "path": "work/issue33/replacement-holdouts/holdout-execution-plan.json",
+      "sha256": "50fd6b945741f31136e702070249df9c318da74acfc47cf38ece77d4267532da"
+    },
+    "freeze_metadata_clarification": {
+      "path": "work/issue33/replacement-holdouts/freeze-metadata-clarification.json",
+      "sha256": "e7488b4dc370b66f78af1bce5b1baf3e536a9e192e36770241cc3857180111fe",
+      "frozen_plan_modified": false,
+      "runtime_or_input_modified": false,
+      "interpretation": "Nested pre-freeze approval_status is historical; final top-level freeze and hashed approval receipt govern execution."
+    },
+    "policy": "No runtime or seed tuning after freeze; one independent original pair, one visible state comparison, and one unprofiled cold/warm pair per fresh source. Failed consumed inputs are never relabeled or rerun as fresh."
+  },
+  "selection_and_provenance": {
+    "selection_manifest": {
+      "path": "work/issue33/replacement-holdouts/selection-manifest.json",
+      "sha256": "6f190b2dc71279f29d5f0dab8e6d10e173bedb092eefa53f2ba8cdae6470351b",
+      "status": "reserved_before_runtime",
+      "runtime_executed": false,
+      "gold_admitted": false,
+      "policy": "Fresh whole-donor SHA-256 identities, header/input eligibility and pre-frame intent; no donor post-frame state or donor positions."
+    },
+    "setup_audit": {
+      "path": "work/issue33/replacement-holdouts/setup-audit.json",
+      "sha256": "ee7e955a708b61d7597057268e0bd28102b06166213667f435df0143ea4a5457",
+      "header_only": true,
+      "runtime_executed": false
+    },
+    "canonical_reservation_manifest": {
+      "path": "work/issue33/replacement-holdouts/canonical-reservation-manifest.json",
+      "sha256": "be52f16661da2696268fc50ed6b43c4d6b5f8a1974859c98d2cfa6e2b8d852ab",
+      "status": "frozen_before_runtime",
+      "selected_roles": "held_out_reserved",
+      "historical_old_holdouts_retained": true
+    },
+    "reference_evaluation_protocol": {
+      "path": "work/issue33/replacement-holdouts/reference-evaluation-protocol.json",
+      "sha256": "9f8e8c93fe84e36019f3d905f2a72dff98e133784a908b06512b4894f08e1f54"
+    }
+  },
+  "runtime": {
+    "code_commit": "713e45a8b6f67e00ef5fb88c045419a48c82c230",
+    "seed_sha256": "4bdb7c4a3e906d907d066f0c65041d7eb3472dc25c9d8c98be6e4946fdce560f",
+    "artifacts": {
+      "gameplay_menu_browser.js": "e58fcef03d22cf7082b45a9a146ee8cdd32c75a71d3e93affd25cb46b4d5fe10",
+      "gameplay_menu_browser.wasm": "d3d6ce22ddecfa17c258931942a451f8882ff97e66b226daaa1b78af017496a3",
+      "gameplay_menu_browser.data": "4bdb7c4a3e906d907d066f0c65041d7eb3472dc25c9d8c98be6e4946fdce560f"
+    },
+    "browser_profile": {
+      "path": "work/issue33/replacement-holdouts/browser-profile.json",
+      "sha256": "ea8dba91833d227ca6b55a1e16c22a984a7f148ab5ea063412de0d27d3cf3dc5",
+      "product": "Chrome/153.0.8010.50",
+      "hardware": "Mac16,12; Apple M4; 32 GiB",
+      "os": "macOS 26.6.2 (25G83)",
+      "power": "AC power; low power mode disabled",
+      "resolution": [
+        640,
+        480
+      ],
+      "device_pixel_ratio": 2,
+      "headed": true,
+      "focus_emulation": false,
+      "gpu_backend": "Chrome browser Skia GraphiteDawnMetal backend; not the game WebGPU backend",
+      "driver_cache": "uncontrolled",
+      "application_reset": "Fresh document and Wasm heap per attempt; one browser context/process and its driver caches retained across the matrix.",
+      "base_commit": "6fe77fafc653b44ed168a8f091ecef4dbfbbd84a"
+    }
+  },
+  "source_and_reference": {
+    "targets": [
+      {
+        "id": "ucf-off-replacement-marth-bf-e6903468",
+        "role": "holdout",
+        "fighters": "Marth/Marth",
+        "stage": "Battlefield",
+        "frames": 6432,
+        "source_sha256": "e6903468493f93fec6401d7496f840a914ed939f800d0513e6d42b630bd296dd",
+        "source_plan_sha256": "4826f205f51e3ce1844e0b1070246c9cb4fe2267a03f4792a535b4434b5e03e7",
+        "recipe_sha256": "c443284216a19a08cf0d40d4f09987ce676d9ee5f3902911d861a8c8b65ffc55",
+        "reference_result": {
+          "path": "work/issue33/replacement-holdouts/ucf-off-replacement-marth-bf-e6903468-prepared/evaluation/finish.json",
+          "sha256": "0e42657347a8167add764161ccd598667faf6013b3b2fcfd8fb624a2f6b84290",
+          "status": "bounded_cap_exhausted",
+          "frames_cap": 6432,
+          "frames_actual": 6432,
+          "complete_original_match": false,
+          "gold_admitted": false,
+          "discovery": {
+            "path": "work/issue33/replacement-holdouts/ucf-off-replacement-marth-bf-e6903468-prepared/evaluation/discovery.jsonl",
+            "sha256": "d354c9a789dd9e556d71d2d0392972f54e3165a7de5fec3dd9207025edc396ed",
+            "stop_reason": "frame_cap",
+            "final_draw_source_index": 6431
+          }
+        },
+        "reference_a": {
+          "path": "work/issue33/replacement-holdouts/ucf-off-replacement-marth-bf-e6903468-prepared/evaluation/reference-a.jsonl",
+          "sha256": "7b9ee54107ea34ed3bf85d943c4cea27a1fa8811fdff48ed0bc7ac3e2405a7a4"
+        },
+        "reference_b": {
+          "path": "work/issue33/replacement-holdouts/ucf-off-replacement-marth-bf-e6903468-prepared/evaluation/reference-b.jsonl",
+          "sha256": "687e2eca6e46ede0653fbc39800a8e72bbff1b928b438107dc2b00d3cc021628"
+        }
+      },
+      {
+        "id": "ucf-off-replacement-falco-fd-90cb8348",
+        "role": "holdout",
+        "fighters": "Falco/Falco",
+        "stage": "Final Destination",
+        "frames": 8561,
+        "source_sha256": "90cb8348fdac8a1f4cdc7fef31469c79dfd40d515d25ce8d41e47582ee7f5730",
+        "source_plan_sha256": "9fca96cb1a4c1091d2a99175bd675540d3b2e9e81af6ddf2e4ac43405110f8b3",
+        "recipe_sha256": "9c1ed600ff1e553b714a7c57b95b9ca915591c84cdb1396e8e6da9289b5a699b",
+        "reference_result": {
+          "path": "work/issue33/replacement-holdouts/ucf-off-replacement-falco-fd-90cb8348-prepared/evaluation/finish.json",
+          "sha256": "2b09ec6c7502255dc8dfb65f08a88bc2cb7f1338b036bf07e4d93e9fdb56d92c",
+          "status": "bounded_cap_exhausted",
+          "frames_cap": 8561,
+          "frames_actual": 8561,
+          "complete_original_match": false,
+          "gold_admitted": false,
+          "discovery": {
+            "path": "work/issue33/replacement-holdouts/ucf-off-replacement-falco-fd-90cb8348-prepared/evaluation/discovery.jsonl",
+            "sha256": "964943c80fbaf073dfe2172442d58c75e21ae1f296477b765b932643279c0db6",
+            "stop_reason": "frame_cap",
+            "final_draw_source_index": 8560
+          }
+        },
+        "reference_a": {
+          "path": "work/issue33/replacement-holdouts/ucf-off-replacement-falco-fd-90cb8348-prepared/evaluation/reference-a.jsonl",
+          "sha256": "c1a35c01f17e6afb09b8d8db02384927e0d43e92672d30999a6680d8fec46ccc"
+        },
+        "reference_b": {
+          "path": "work/issue33/replacement-holdouts/ucf-off-replacement-falco-fd-90cb8348-prepared/evaluation/reference-b.jsonl",
+          "sha256": "b9e50556eb144ef7009058ff43b8ca8ac8e4b5bd902461ce6594a446fb61fda9"
+        }
+      }
+    ],
+    "preparation_scope": "Original-menu setup, calibration and bounded source discovery only. Both donors reached their complete input-plan caps without an original match ending; cap exhaustion is retained as incomplete and is not gold admission."
+  },
+  "state_and_timer": {
+    "acceptance_receipt": {
+      "path": "work/issue33/replacement-holdouts/state-acceptance.json",
+      "sha256": "e01d670cb1bd16d9b397a429667b8b2577c8400a155ad164c914c28073c411cf"
+    },
+    "total_updates": 14993,
+    "scope": "Declared entry data, supplied inputs, fighter fields, RNG, match clock, PAD configuration and three history banks, plus exact timer-sidecar repeatability and port comparison. Per-tick traversals are not original draw-cadence equivalence; pixels, hardware output, audio, performance and gold admission are excluded.",
+    "targets": [
+      {
+        "id": "ucf-off-replacement-marth-bf-e6903468",
+        "frames_compared": 6432,
+        "state_gate": {
+          "path": "work/issue33/replacement-holdouts/marth-state/state-gate.json",
+          "sha256": "913f683da4e6c2628d2af0bdbdbf72f592a054f079711750bd62ac93716c351d"
+        },
+        "state_comparison": {
+          "path": "work/issue33/replacement-holdouts/marth-state/state-comparison.json",
+          "sha256": "77274292927623f8681e99c0e1e8c8c816c3ea4ab40d5d529619e35bfbd90ab3"
+        },
+        "timer_comparison": {
+          "path": "work/issue33/replacement-holdouts/marth-state/timer-comparison.json",
+          "sha256": "e32a9dbcc36edf8d741308994add12fc2a56daf2bed04c1d9a9e240d76af7419"
+        },
+        "status": "declared_state_and_timer_match",
+        "input_scheduling": "per_tick",
+        "first_divergence": null,
+        "performance": "not_evaluated",
+        "pixels": "not_compared",
+        "gold_admitted": false
+      },
+      {
+        "id": "ucf-off-replacement-falco-fd-90cb8348",
+        "frames_compared": 8561,
+        "state_gate": {
+          "path": "work/issue33/replacement-holdouts/falco-state/state-gate.json",
+          "sha256": "31f8851d61ccee7752640125d1e1ebcc6013921119f3093109b92a48bfc1f14e"
+        },
+        "state_comparison": {
+          "path": "work/issue33/replacement-holdouts/falco-state/state-comparison.json",
+          "sha256": "5017cce93f49675402940b697f64c1efc627e4757782bff48a95766aa50028db"
+        },
+        "timer_comparison": {
+          "path": "work/issue33/replacement-holdouts/falco-state/timer-comparison.json",
+          "sha256": "6567f29cc714d766f592657d06b4832d6d06ab7f195e17f55040522b3446c89e"
+        },
+        "status": "declared_state_and_timer_match",
+        "input_scheduling": "per_tick",
+        "first_divergence": null,
+        "performance": "not_evaluated",
+        "pixels": "not_compared",
+        "gold_admitted": false
+      }
+    ]
+  },
+  "timing": {
+    "plan": {
+      "path": "work/issue33/replacement-holdouts/timing-plan.json",
+      "sha256": "c55d67468a6efcc9784f82dc10793abb14ceae410b2dead4c156ea0bf299d5f3"
+    },
+    "spec": {
+      "path": "work/issue33/replacement-holdouts/timing-spec.json",
+      "sha256": "1833217cb5c6e50b7e76f37ce9278441311b59328044d8627e9ac150f5f5fa3c"
+    },
+    "status": {
+      "path": "work/issue33/replacement-holdouts/timing-status.json",
+      "sha256": "d8d4eb7365e9461f01ff52dc207fdf5efe2e573051ab065798888b81e27744e4"
+    },
+    "plan_id": "issue33-replacement-holdouts-20260919",
+    "role": "holdout",
+    "mode": "unprofiled",
+    "caches": [
+      "cold",
+      "warm"
+    ],
+    "repetitions": 1,
+    "timeout_ms": 300000,
+    "thresholds_ms": {
+      "browser_hard_gap": 33.333333333333336,
+      "native_hard": 33.333333333333336,
+      "native_target": 16.666666666666668
+    },
+    "slots_consumed": 4,
+    "total_updates": 29986,
+    "aggregate": {
+      "browser_hard_gaps": 0,
+      "native_hard_over_33ms": 0,
+      "native_over_16_67ms": 0,
+      "browser_long_tasks": 0,
+      "audio_underrun_frames": 0,
+      "audio_overflow_frames": 0,
+      "live_pipelines_created": 0,
+      "live_pipelines_queued": 0,
+      "browser_errors": 0,
+      "focus_lost": false,
+      "maximum_browser_ms": 29.0,
+      "maximum_native_ms": 13.695,
+      "denominator": 29986,
+      "causal_classification": "NOT_CLASSIFIED"
+    },
+    "attempts": [
+      {
+        "slot_id": "01-marth-cold",
+        "target_id": "ucf-off-replacement-marth-bf-e6903468",
+        "cache": "cold",
+        "mode": "performance",
+        "frames": 6432,
+        "role": "holdout",
+        "status": "completed",
+        "consumed": true,
+        "acceptance_evidence": true,
+        "start": {
+          "path": "work/issue33/replacement-holdouts/timing-attempts/01-marth-cold/start.json",
+          "sha256": "ffe2f14b4f88ccb792b6ea45b058e50bee737cf626b7313ed3f7461cb33f8d09"
+        },
+        "report": {
+          "path": "work/issue33/replacement-holdouts/timing-attempts/01-marth-cold/browser-report.json",
+          "sha256": "c5062cfdd2290087ab0123f91f03f5dd9cf85463c0e8f126597ca035223ee6f6"
+        },
+        "finish": {
+          "path": "work/issue33/replacement-holdouts/timing-attempts/01-marth-cold/finish.json",
+          "sha256": "be220a9c0da34f1e0373bf34a1804c53e057b5978a18d636a2402dfc3b74934b"
+        },
+        "report_failures": [],
+        "recipe_sha256": "c443284216a19a08cf0d40d4f09987ce676d9ee5f3902911d861a8c8b65ffc55",
+        "validation": {
+          "valid": true,
+          "errors": [],
+          "validator": "browser_replay_validation.validate_report"
+        },
+        "source_match": {
+          "complete": false,
+          "outcome": 2,
+          "winner": 1
+        },
+        "scheduling_equivalence": "not_evaluated",
+        "metrics": {
+          "source_updates": 6432,
+          "source_draws": 6432,
+          "browser_callbacks": 6432,
+          "native_callbacks": 6432,
+          "worst_browser_ms": 25.905000030994415,
+          "worst_native_ms": 13.695,
+          "browser_hard_gaps": 0,
+          "browser_long_tasks": 0,
+          "native_hard_over_33ms": 0,
+          "native_over_16_67ms": 0,
+          "live_pipelines_queued": 0,
+          "live_pipelines_created": 0,
+          "audio_underrun_frames": 0,
+          "audio_overflow_frames": 0,
+          "focus_lost": false,
+          "live_texture_upload_bytes": 5969920,
+          "live_staging_used_bytes": 10796538896,
+          "peak_staging_used_bytes": 3673936,
+          "wasm_heap_growth_bytes": 66846720,
+          "preparation_pauses": 0
+        },
+        "preparation": {
+          "source_transition": true,
+          "total_ms": 166.2,
+          "audio_wait_ms": 0.345,
+          "construction_ms": 150.205,
+          "render_wait_ms": 15.65,
+          "render_cpu_ms": 2.57,
+          "callbacks": 2,
+          "source_draws": 0,
+          "max_callback_ms": 2.525,
+          "gpu_completion_wait_ms": 13.84,
+          "gpu_completion_wait_callbacks": 0,
+          "texture_upload_bytes": 0,
+          "queued_delta": 0,
+          "created_delta": 0,
+          "pending_staging_at_settle": 0,
+          "gpu_completion_ready": true
+        },
+        "memory": {
+          "cache": {
+            "state": "cleared",
+            "bytes": 0,
+            "cleared_on_startup": true,
+            "driver_cache": "uncontrolled"
+          },
+          "wasm_heap_bytes": {
+            "before_preparation": 334102528,
+            "prepared": 334102528,
+            "before_teardown": 400949248,
+            "after_teardown": 400949248
+          },
+          "allocator_live_bytes": {
+            "before_preparation": 245543040,
+            "prepared": 310592640,
+            "before_teardown": 327272712,
+            "after_teardown": 275812512
+          }
+        },
+        "diagnostics": {
+          "valid": true,
+          "overflowed": false,
+          "event_count": 0,
+          "page_paint": "normal"
+        }
+      },
+      {
+        "slot_id": "02-marth-warm",
+        "target_id": "ucf-off-replacement-marth-bf-e6903468",
+        "cache": "warm",
+        "mode": "performance",
+        "frames": 6432,
+        "role": "holdout",
+        "status": "completed",
+        "consumed": true,
+        "acceptance_evidence": true,
+        "start": {
+          "path": "work/issue33/replacement-holdouts/timing-attempts/02-marth-warm/start.json",
+          "sha256": "5dc079aa2df803a402493c78bcd2a8c48be7fbe18b1df422212274ca7e66ccaa"
+        },
+        "report": {
+          "path": "work/issue33/replacement-holdouts/timing-attempts/02-marth-warm/browser-report.json",
+          "sha256": "23d6c10266e52cb3df08f4567b3c69365b84f922019d41871c312b1ba82b3226"
+        },
+        "finish": {
+          "path": "work/issue33/replacement-holdouts/timing-attempts/02-marth-warm/finish.json",
+          "sha256": "6fe21fc3fbd7a2125a9b7d59397068719c0d313d64800af1e033575b0c19a8c8"
+        },
+        "report_failures": [],
+        "recipe_sha256": "c443284216a19a08cf0d40d4f09987ce676d9ee5f3902911d861a8c8b65ffc55",
+        "validation": {
+          "valid": true,
+          "errors": [],
+          "validator": "browser_replay_validation.validate_report"
+        },
+        "source_match": {
+          "complete": false,
+          "outcome": 2,
+          "winner": 1
+        },
+        "scheduling_equivalence": "not_evaluated",
+        "metrics": {
+          "source_updates": 6432,
+          "source_draws": 6432,
+          "browser_callbacks": 6432,
+          "native_callbacks": 6432,
+          "worst_browser_ms": 24.555000007152557,
+          "worst_native_ms": 9.07,
+          "browser_hard_gaps": 0,
+          "browser_long_tasks": 0,
+          "native_hard_over_33ms": 0,
+          "native_over_16_67ms": 0,
+          "live_pipelines_queued": 0,
+          "live_pipelines_created": 0,
+          "audio_underrun_frames": 0,
+          "audio_overflow_frames": 0,
+          "focus_lost": false,
+          "live_texture_upload_bytes": 5969920,
+          "live_staging_used_bytes": 10796538896,
+          "peak_staging_used_bytes": 3517488,
+          "wasm_heap_growth_bytes": 66846720,
+          "preparation_pauses": 0
+        },
+        "preparation": {
+          "source_transition": true,
+          "total_ms": 149.72,
+          "audio_wait_ms": 0.255,
+          "construction_ms": 129.865,
+          "render_wait_ms": 19.6,
+          "render_cpu_ms": 0.935,
+          "callbacks": 2,
+          "source_draws": 0,
+          "max_callback_ms": 0.91,
+          "gpu_completion_wait_ms": 16.725,
+          "gpu_completion_wait_callbacks": 0,
+          "texture_upload_bytes": 0,
+          "queued_delta": 0,
+          "created_delta": 0,
+          "pending_staging_at_settle": 0,
+          "gpu_completion_ready": true
+        },
+        "memory": {
+          "cache": {
+            "state": "ready",
+            "bytes": 3464168,
+            "cleared_on_startup": false,
+            "driver_cache": "uncontrolled"
+          },
+          "wasm_heap_bytes": {
+            "before_preparation": 334102528,
+            "prepared": 334102528,
+            "before_teardown": 400949248,
+            "after_teardown": 400949248
+          },
+          "allocator_live_bytes": {
+            "before_preparation": 245538328,
+            "prepared": 310588128,
+            "before_teardown": 327268320,
+            "after_teardown": 275807960
+          }
+        },
+        "diagnostics": {
+          "valid": true,
+          "overflowed": false,
+          "event_count": 0,
+          "page_paint": "normal"
+        }
+      },
+      {
+        "slot_id": "03-falco-cold",
+        "target_id": "ucf-off-replacement-falco-fd-90cb8348",
+        "cache": "cold",
+        "mode": "performance",
+        "frames": 8561,
+        "role": "holdout",
+        "status": "completed",
+        "consumed": true,
+        "acceptance_evidence": true,
+        "start": {
+          "path": "work/issue33/replacement-holdouts/timing-attempts/03-falco-cold/start.json",
+          "sha256": "574c6669b36dc0671a262de1fbc0ab7fb5ee8140625f0106ce3eb0ee787d4931"
+        },
+        "report": {
+          "path": "work/issue33/replacement-holdouts/timing-attempts/03-falco-cold/browser-report.json",
+          "sha256": "60e7140cee418dc69461fd0bb09485454185fd7101cf0789784aa9ece027e8e3"
+        },
+        "finish": {
+          "path": "work/issue33/replacement-holdouts/timing-attempts/03-falco-cold/finish.json",
+          "sha256": "419b7c7964e239e7deab74bc7c6c99eef02296063e684e62eff99d017389099a"
+        },
+        "report_failures": [],
+        "recipe_sha256": "9c1ed600ff1e553b714a7c57b95b9ca915591c84cdb1396e8e6da9289b5a699b",
+        "validation": {
+          "valid": true,
+          "errors": [],
+          "validator": "browser_replay_validation.validate_report"
+        },
+        "source_match": {
+          "complete": false,
+          "outcome": 2,
+          "winner": 0
+        },
+        "scheduling_equivalence": "not_evaluated",
+        "metrics": {
+          "source_updates": 8561,
+          "source_draws": 8561,
+          "browser_callbacks": 8561,
+          "native_callbacks": 8561,
+          "worst_browser_ms": 29,
+          "worst_native_ms": 10.765,
+          "browser_hard_gaps": 0,
+          "browser_long_tasks": 0,
+          "native_hard_over_33ms": 0,
+          "native_over_16_67ms": 0,
+          "live_pipelines_queued": 0,
+          "live_pipelines_created": 0,
+          "audio_underrun_frames": 0,
+          "audio_overflow_frames": 0,
+          "focus_lost": false,
+          "live_texture_upload_bytes": 4169728,
+          "live_staging_used_bytes": 9893205012,
+          "peak_staging_used_bytes": 2990012,
+          "wasm_heap_growth_bytes": 0,
+          "preparation_pauses": 0
+        },
+        "preparation": {
+          "source_transition": true,
+          "total_ms": 149.6,
+          "audio_wait_ms": 0.255,
+          "construction_ms": 122.54,
+          "render_wait_ms": 26.805,
+          "render_cpu_ms": 0.91,
+          "callbacks": 2,
+          "source_draws": 0,
+          "max_callback_ms": 0.88,
+          "gpu_completion_wait_ms": 16.665,
+          "gpu_completion_wait_callbacks": 0,
+          "texture_upload_bytes": 0,
+          "queued_delta": 0,
+          "created_delta": 0,
+          "pending_staging_at_settle": 0,
+          "gpu_completion_ready": true
+        },
+        "memory": {
+          "cache": {
+            "state": "cleared",
+            "bytes": 0,
+            "cleared_on_startup": true,
+            "driver_cache": "uncontrolled"
+          },
+          "wasm_heap_bytes": {
+            "before_preparation": 334102528,
+            "prepared": 334102528,
+            "before_teardown": 334102528,
+            "after_teardown": 334102528
+          },
+          "allocator_live_bytes": {
+            "before_preparation": 245542200,
+            "prepared": 308619776,
+            "before_teardown": 317206616,
+            "after_teardown": 267049328
+          }
+        },
+        "diagnostics": {
+          "valid": true,
+          "overflowed": false,
+          "event_count": 0,
+          "page_paint": "normal"
+        }
+      },
+      {
+        "slot_id": "04-falco-warm",
+        "target_id": "ucf-off-replacement-falco-fd-90cb8348",
+        "cache": "warm",
+        "mode": "performance",
+        "frames": 8561,
+        "role": "holdout",
+        "status": "completed",
+        "consumed": true,
+        "acceptance_evidence": true,
+        "start": {
+          "path": "work/issue33/replacement-holdouts/timing-attempts/04-falco-warm/start.json",
+          "sha256": "ff0ec79264a3aa7d2ac9e41cf3b5cf2b3a8d228ab9e40d5025e3a7d9be943adf"
+        },
+        "report": {
+          "path": "work/issue33/replacement-holdouts/timing-attempts/04-falco-warm/browser-report.json",
+          "sha256": "f569f381cc332028ad585e62d9c42b24c3e476551d42772caed9293586126735"
+        },
+        "finish": {
+          "path": "work/issue33/replacement-holdouts/timing-attempts/04-falco-warm/finish.json",
+          "sha256": "56f4b65edbad464e92b284f45896df74eddb0a56b047f7a822d264569a8f1212"
+        },
+        "report_failures": [],
+        "recipe_sha256": "9c1ed600ff1e553b714a7c57b95b9ca915591c84cdb1396e8e6da9289b5a699b",
+        "validation": {
+          "valid": true,
+          "errors": [],
+          "validator": "browser_replay_validation.validate_report"
+        },
+        "source_match": {
+          "complete": false,
+          "outcome": 2,
+          "winner": 0
+        },
+        "scheduling_equivalence": "not_evaluated",
+        "metrics": {
+          "source_updates": 8561,
+          "source_draws": 8561,
+          "browser_callbacks": 8561,
+          "native_callbacks": 8561,
+          "worst_browser_ms": 26.3400000333786,
+          "worst_native_ms": 9.83,
+          "browser_hard_gaps": 0,
+          "browser_long_tasks": 0,
+          "native_hard_over_33ms": 0,
+          "native_over_16_67ms": 0,
+          "live_pipelines_queued": 0,
+          "live_pipelines_created": 0,
+          "audio_underrun_frames": 0,
+          "audio_overflow_frames": 0,
+          "focus_lost": false,
+          "live_texture_upload_bytes": 4169728,
+          "live_staging_used_bytes": 9893205012,
+          "peak_staging_used_bytes": 2710456,
+          "wasm_heap_growth_bytes": 0,
+          "preparation_pauses": 0
+        },
+        "preparation": {
+          "source_transition": true,
+          "total_ms": 149.745,
+          "audio_wait_ms": 0.225,
+          "construction_ms": 123.015,
+          "render_wait_ms": 26.505,
+          "render_cpu_ms": 0.77,
+          "callbacks": 2,
+          "source_draws": 0,
+          "max_callback_ms": 0.745,
+          "gpu_completion_wait_ms": 16.655,
+          "gpu_completion_wait_callbacks": 0,
+          "texture_upload_bytes": 0,
+          "queued_delta": 0,
+          "created_delta": 0,
+          "pending_staging_at_settle": 0,
+          "gpu_completion_ready": true
+        },
+        "memory": {
+          "cache": {
+            "state": "ready",
+            "bytes": 3373528,
+            "cleared_on_startup": false,
+            "driver_cache": "uncontrolled"
+          },
+          "wasm_heap_bytes": {
+            "before_preparation": 334102528,
+            "prepared": 334102528,
+            "before_teardown": 334102528,
+            "after_teardown": 334102528
+          },
+          "allocator_live_bytes": {
+            "before_preparation": 245539080,
+            "prepared": 308616496,
+            "before_teardown": 317203664,
+            "after_teardown": 267046448
+          }
+        },
+        "diagnostics": {
+          "valid": true,
+          "overflowed": false,
+          "event_count": 0,
+          "page_paint": "normal"
+        }
+      }
+    ]
+  },
+  "limitations": [
+    "Both replacement reference preparations ended at their bounded input caps (Marth 6432, Falco 8561) with incomplete original-match discovery and no gold admission; no donor ending was synthesized.",
+    "State/timer evidence is declared per_tick comparison only. It does not establish original draw-cadence or scheduling equivalence, full-game equivalence, live-input behavior, pixels, PCM, hardware output, or consecutive-match admission.",
+    "Timing is one visible headed Chrome unprofiled cold/warm pair per fresh holdout. Preparation, memory growth/teardown, source progress, callback denominators, cache conditions and uploads are recorded separately from acceptance counters.",
+    "The browser profile did not throttle CPU, hide source ticks, add synthetic warmup, or control the driver cache. Cold attempts cleared the optional render cache; warm attempts retained the browser context and driver caches. The driver cache remains uncontrolled.",
+    "The four timing reports classify no causal owner. The prior v1 live-pipeline failure and the historical September 12 GPU operation remain retained and unclassified; a passing replacement campaign does not retroactively assign that historical event.",
+    "Production release verification is separately bound in the production receipt; its hosted checks do not add public full-match, live-controller, original draw-cadence, pixel or PCM admission."
+  ],
+  "coordination": {
+    "normalization_preflight": {
+      "status": "rejected_then_derived_scope_accepted",
+      "receipt": {
+        "path": "work/issue33/replacement-holdouts/timing-quiet-start.json",
+        "sha256": "6069af46d9b361e0db3409d6e34dd0b976ba8dc13c79a2e153f39cc004549f3d"
+      },
+      "rejection": "Initial plan normalization rejected the approval receipt shape; no timing slot started. The existing supported derived-scope receipt then bound the original approval and new freeze; the original spec and failed log were preserved.",
+      "derived_scope": {
+        "path": "work/issue33/replacement-holdouts/timing-spec-derived-scope.json",
+        "sha256": "6cac2d8a211dc57ed784cd80f89f28420734df156cfa7e445ac011bfc2c76cd7"
+      },
+      "derived_plan_log": {
+        "path": "work/issue33/replacement-holdouts/timing-derived-plan.log",
+        "sha256": "e71d87d21d5eddad9a159cec835be8916d4bf92891fcf73465e33413fb608b01"
+      }
+    },
+    "quiet_start": {
+      "path": "work/issue33/replacement-holdouts/timing-quiet-start.json",
+      "sha256": "6069af46d9b361e0db3409d6e34dd0b976ba8dc13c79a2e153f39cc004549f3d",
+      "preflight_heavy_processes": [],
+      "audio_acknowledged": true
+    },
+    "quiet_extension": {
+      "path": "work/issue33/replacement-holdouts/timing-quiet-extension.json",
+      "sha256": "638d961a7163f5aa550b4bbf18d2243a65de401ba3ac2e4c94098b2bcb4aa112",
+      "audio_task_acknowledged": true,
+      "released_earlier_on_completion_or_failure": true
+    },
+    "quiet_release": {
+      "path": "work/issue33/replacement-holdouts/timing-quiet-release.json",
+      "sha256": "c80047b98348cb2cf1e4d3d55406118206beecb43cbbe64799b021029df61bcc",
+      "all_four_slots_valid": true,
+      "runner_exit_code": 0,
+      "record_created_at_utc": "2026-09-20T00:14:28.648324+00:00",
+      "timing_note": "The audio release message preceded receipt creation; record_created_at_utc is not the exact message time."
+    }
+  },
+  "retention": {
+    "final_backup": {
+      "path": "work/issue33/replacement-evidence-backup-complete-v1/manifest.json",
+      "sha256": "487bacc3fda66aa63c83623265ff60241ea4bb5f2a6a1142dd599b0dce652b5d",
+      "status": "completed_hash_verified",
+      "regular_files_verified": 860,
+      "bytes": 803034750,
+      "skipped_nonregular_entries": 32,
+      "scope": "Complete replacement original references, state and all four finished timing attempts plus frozen runtime; earlier failed campaigns retained in prior backups."
+    }
+  },
+  "production_release": {
+    "receipt": {
+      "path": "docs/evidence/public-marth-pipeline-release-v1.json",
+      "sha256": "61942ae356d1134ab5df144ce0b668f5ebcdb9ec3942f1c50c550ba30f1ad32a"
+    },
+    "status": "deployed_and_verified",
+    "code_verification_commit": "713e45a8b6f67e00ef5fb88c045419a48c82c230",
+    "merge_commit": "6fe77fafc653b44ed168a8f091ecef4dbfbbd84a",
+    "immutable_url": "https://61b8658f.webmelee.pages.dev",
+    "manifest_sha256": "be76fb247b35eb5f0896ea1cac95473070b3469a210cee2eb7f62218175f1010",
+    "verification_scope": "Hosted HTTP and headed browser checks; no public full-match, live-controller, original draw-cadence, pixel or PCM admission."
+  }
+}
