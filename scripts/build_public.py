@@ -961,14 +961,15 @@ def _runtime_graph_hash(files: dict[str, bytes]) -> str:
     return hashlib.sha256(canonical).hexdigest()[:16]
 
 
-def _validate_runtime_graph(files: dict[str, bytes]) -> None:
+def _validate_runtime_graph(files: dict[str, bytes], *, audio: bool = False) -> None:
     """Validate the small public loader graph and reject evidence/upload code."""
     forbidden_modules = {
         "dsp-coefficients.mjs", "audio-worklet.js", "audio-ring.mjs",
         "runtime-audio-assets.mjs", "runtime-audio.mjs",
     }
-    if forbidden_modules.intersection(files):
+    if not audio and forbidden_modules.intersection(files):
         raise BuildError("public runtime graph contains a development audio module")
+    loader = "gameplay_audio_preview.js" if audio else "gameplay_public.js"
     for rel, data in files.items():
         # Export checks alone cannot detect dormant diagnostics retained by
         # internal replay references in a shared native archive.
@@ -986,10 +987,10 @@ def _validate_runtime_graph(files: dict[str, bytes]) -> None:
             for name, pattern in FORBIDDEN_TEXT_PATTERNS:
                 if name in {"network API", "runtime/importer code", "file input", "persistent browser storage API"}:
                     continue
-                if rel == "gameplay_public.js" and name == "diagnostic code":
+                if rel == loader and name == "diagnostic code":
                     continue
                 matches = list(pattern.finditer(text))
-                if name == "private path" and rel == "gameplay_public.js":
+                if name == "private path" and rel == loader:
                     # Emscripten emits this fixed virtual HOME in its standard
                     # runtime boilerplate. Permit only the exact literal and
                     # only when it is not extended into another path.
@@ -1004,7 +1005,7 @@ def _validate_runtime_graph(files: dict[str, bytes]) -> None:
                 raise BuildError(f"upload/evidence code rejected in runtime JavaScript: {rel}")
             if re.search(r"https?://|(?:from|import)\s*[\"'](?:https?:|//)", text, re.I):
                 raise BuildError(f"external runtime URL rejected in runtime JavaScript: {rel}")
-            if re.search(r"(?:dsp-coefficients|audio-worklet|audio-ring|runtime-audio)", text, re.I):
+            if not audio and re.search(r"(?:dsp-coefficients|audio-worklet|audio-ring|runtime-audio)", text, re.I):
                 raise BuildError(f"development audio module reference rejected in runtime JavaScript: {rel}")
     required_imports = {
         "melee-runtime.mjs": ("./runtime-assets.mjs", "./gameplay_public.js", "./controller-input.mjs"),
@@ -1012,13 +1013,21 @@ def _validate_runtime_graph(files: dict[str, bytes]) -> None:
         "disc-session.mjs": ("./disc-image.mjs",),
         "controller-settings.mjs": ("./prototype-keyboard-layouts.mjs", "./controller-panel.mjs", "./controller-settings.css"),
     }
+    if audio:
+        required_imports.update({
+            "audio-preview-runtime.mjs": ("./melee-runtime.mjs", "./runtime-audio-assets.mjs", "./runtime-audio.mjs", "./gameplay_audio_preview.js"),
+            "runtime-audio-assets.mjs": ("./disc-session.mjs", "./dsp-coefficients.mjs"),
+            "runtime-audio.mjs": ("audio-worklet.js",),
+            "audio-worklet.js": ("./audio-ring.mjs",),
+        })
     for rel, imports in required_imports.items():
         text = files[rel].decode("utf-8")
         for import_path in imports:
             if import_path not in text:
                 raise BuildError(f"runtime graph is missing {import_path} from {rel}")
-    if b"gameplay_public.wasm" not in files["gameplay_public.js"]:
-        raise BuildError("gameplay_public.js does not bind gameplay_public.wasm")
+    wasm_name = loader.removesuffix(".js") + ".wasm"
+    if wasm_name.encode() not in files[loader]:
+        raise BuildError(f"{loader} does not bind {wasm_name}")
     # A runtime data file is only admitted when declared by the producer.  It
     # may be binary, but it cannot be a renamed disc or archive.
     for rel, data in files.items():

@@ -15,12 +15,17 @@ loops. The preview uses the new per-scene disc loading with audio enabled.
 The [initial preview](evidence/audio-preview-release-v1.json) and
 [UI update](evidence/audio-preview-ui-update-v1.json) remain historical records.
 
-The normal `runtime-public`, public packaging auditor and silent staging
-wrapper remain unchanged in policy. They do not accept this profile's identity
-or manifest. Production audio remains disabled. The audio preview belongs on
+The normal `runtime-public` and public packaging paths remain the silent
+rollback identity. This staging wrapper remains staging-only and its
+`melee-web-audio-preview-package-v1` manifest is not a production manifest.
+The authorized production path is documented in [Production audio](AUDIO_PRODUCTION.md)
+and uses `scripts/release_audio_player.py` with the distinct
+`melee-web-audio-player-package-v1` / `audio-player` / `webmelee` identity.
+That path must promote the same audited bytes from staging; this preview record
+does not claim that production audio has been deployed. The preview belongs on
 a separate branch such as `audio-pr-42` in the existing `webmelee-staging`
-Pages project; keep the stable staging alias and `webmelee` project unchanged.
-Pages preview URLs are publicly reachable; noindex is not access control.
+Pages project; keep the stable staging alias unchanged. Pages preview URLs are
+publicly reachable; noindex is not access control.
 
 ## Build and package
 

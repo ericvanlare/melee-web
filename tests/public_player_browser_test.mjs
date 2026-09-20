@@ -6,8 +6,11 @@ import path from 'node:path';
 import {parseArgs} from 'node:util';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
 import {loadBrowserTools} from '../scripts/browser_tools.mjs';
-const {values} = parseArgs({options: Object.fromEntries(['url', 'playwright', 'disc', 'out'].map(name => [name, {type: 'string'}]))});
-if (!values.url || !values.out) throw Error('Use --url ORIGIN --out LOCAL_DIR [--playwright PACKAGE_DIR] [--disc OWNED_DISC]');
+const {values} = parseArgs({options: {
+  ...Object.fromEntries(['url', 'playwright', 'disc', 'out'].map(name => [name, {type: 'string'}])),
+  audio: {type: 'boolean', default: false},
+}});
+if (!values.url || !values.out) throw Error('Use --url ORIGIN --out LOCAL_DIR [--playwright PACKAGE_DIR] [--disc OWNED_DISC] [--audio]');
 const {chromium,browser:launchOptions} = await loadBrowserTools(values.playwright);
 await fs.mkdir(values.out, {recursive: true});
 const browser = await chromium.launch({...launchOptions, headless: false, chromiumSandbox: true});
@@ -15,6 +18,7 @@ const context = await browser.newContext({viewport: {width: 1280, height: 960}})
 const page = await context.newPage(), origin = new URL(values.url).origin;
 const requests = [], errors = [], violations = [], sockets = [], audioEvents = [];
 const report = {schema: 'webmelee-public-player-browser-v1', browser: browser.version(), checks: [],
+  profile: values.audio ? 'audio-player' : 'player',
   scope: 'Production entry, ordinary keyboard UI, lifecycle and application network smoke. No retail comparison, physical-controller, PCM or performance claim.'};
 page.on('request', request => requests.push({url: request.url(), method: request.method(), body: request.postData()}));
 page.on('pageerror', error => errors.push(error.message));
@@ -73,7 +77,9 @@ try {
     assert.equal(await page.locator('#brand').innerText(), 'WEBMELEE.GG');
     assert.equal(await page.locator('#edition').innerText(), 'alpha');
     assert.equal(await page.locator('#edition em').evaluate(node => getComputedStyle(node).fontStyle), 'italic');
-    assert.equal(await page.locator('#audio-note').textContent(), 'no audio ⓘlicensing issue, need to remove about 50 lines of Dolphin audio code still');
+    if (values.audio) {
+      assert.equal(await page.locator('#audio-note,#audio-info,#audio-details').count(), 0);
+    } else assert.equal(await page.locator('#audio-note').textContent(), 'no audio ⓘlicensing issue, need to remove about 50 lines of Dolphin audio code still');
     assert.deepEqual(await page.locator('#toolbar > *').evaluateAll(nodes => nodes.map(node => node.id)),
       ['toolbar-brand', 'toolbar-actions', 'toolbar-meta']);
     assert.equal(await page.evaluate(() => typeof Module._melee_web_native_menu_replay_begin), 'undefined');
@@ -147,7 +153,7 @@ try {
       await page.waitForTimeout(700);
       await press('o'); await phase(1);
     });
-    await check('Eject retires the document; a second silent import can launch', async () => {
+    await check('Eject retires the document; a second import can launch', async () => {
       await page.evaluate(() => { window.releaseOldDocumentMarker = true; });
       await collectViolations(); await driver.unload();
       assert.equal(await page.evaluate(() => !!window.releaseOldDocumentMarker), false);
@@ -158,8 +164,15 @@ try {
       await driver.unload();
       assert(await page.locator('#start-game').isDisabled());
     });
-    assert.deepEqual(audioEvents, [], 'The audio-disabled public profile must never create a Web Audio context');
-    report.audio = 'Audio explicitly disabled. No Web Audio contexts were created during import, menus, pause/resume or second launch. No audio fidelity claim.';
+    if (values.audio) {
+      const created = audioEvents.filter(row => row.event === 'contextCreated');
+      assert.equal(created.length, 2, 'Each imported document must create exactly one audio context');
+      assert(created.every(row => row.data.context.sampleRate === 32000));
+      report.audio = 'One 32 kHz context per imported document. PCM and match transitions are checked by the separate audio lifecycle test; no fidelity claim.';
+    } else {
+      assert.deepEqual(audioEvents, [], 'The audio-disabled public profile must never create a Web Audio context');
+      report.audio = 'Audio explicitly disabled. No Web Audio contexts were created during import, menus, pause/resume or second launch. No audio fidelity claim.';
+    }
   } else report.disc = 'Not supplied; native import, menus and audio not exercised.';
   await check('legal pages use their readable document stylesheet and serve full notices', async () => {
     await collectViolations();
@@ -188,7 +201,7 @@ try {
       const url = new URL(request.url);
       assert.equal(url.origin, origin); assert.equal(request.method, 'GET'); assert.equal(request.body, null);
       assert.equal(url.search, '');
-      assert.doesNotMatch(url.pathname, /dsp-coefficients|runtime-audio|audio-worklet|audio-ring/);
+      if (!values.audio) assert.doesNotMatch(url.pathname, /dsp-coefficients|runtime-audio|audio-worklet|audio-ring/);
       assert(['/', '/terms', '/privacy', '/copyright', '/notices'].includes(url.pathname) ||
         /^\/runtime\/[a-f0-9]+\/[a-z0-9/_.-]+$/i.test(url.pathname) || /^\/assets\/site\.[a-f0-9]+\.css$/.test(url.pathname), url.pathname);
     }

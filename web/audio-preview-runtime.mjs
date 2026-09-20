@@ -1,4 +1,4 @@
-/** Staging listening preview. The production player does not import this module. */
+/** Audio-enabled public player. The legacy silent profile excludes this module. */
 import {mountMeleeRuntime as mountPlayer} from './melee-runtime.mjs';
 import {loadNativeGameDisc, openNativeGameSession} from './runtime-audio-assets.mjs';
 import {createRuntimeAudio} from './runtime-audio.mjs';

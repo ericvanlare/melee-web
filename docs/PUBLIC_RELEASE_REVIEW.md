@@ -4,16 +4,23 @@ Research date: September 12, 2026. Prepared for operator and qualified counsel
 review. This is a technical inventory and issue assessment, not a legal
 opinion, trademark clearance or assurance of legal protection.
 
-## September 19 development audio update
+## September 19 audio implementation and preview update
 
-The current development resampler and coefficient generator have replacement
+The current resampler and coefficient generator have replacement
 implementations; see [their evidence and provenance](AUDIO_REPLACEMENT_EVIDENCE.md).
-The numerical coefficient table is deliberately unchanged. The GPL audio
-inventory below describes the September 12 audit and historical artifacts.
-It must not be read as the current source implementation inventory, or as a
-new license grant for retained numerical data. Public audio remains disabled;
-this work neither redeploys the player nor changes repository visibility.
-The separate Dolphin observer retains its existing GPL notices.
+The numerical coefficient table is deliberately unchanged. The [PR #42
+integration receipt](evidence/audio-main-integration-v1.json) records bounded
+browser-exercised audio through CSS/SSS and a Mario/Final Destination scenario;
+it does not establish full-match performance, original PCM or hardware
+fidelity, or licensing clearance.
+
+The operator has authorized a separate production-audio candidate path,
+described in [Production audio](AUDIO_PRODUCTION.md). This review update does
+defines the release boundary; completed audits and deployments are recorded
+with the corresponding release. The GPL audio inventory below
+describes the September 12 audit and historical artifacts, and must not be read
+as a new license grant for retained numerical data. The separate Dolphin
+observer retains its existing GPL notices.
 
 ## Operator-approved alpha posture
 
@@ -24,15 +31,14 @@ rough product-risk reference. That acceptance is not a legal comparison,
 clearance or evidence of another service's rights. Do not re-open the accepted
 risk posture as an automatic deployment-approval gate.
 
-The operator prohibits distributing GPL-derived audio code without meeting its
-obligations. The immediate alpha therefore uses an explicitly audio-disabled
-public native build, excludes `gameplay_audio_resample.c/.h` and
-`dsp-coefficients.mjs`, and supplies no generated replacement DSP coefficient
-bytes. At that audit, the normal development profile retained those sources and tests;
-it must not be deployed. The exact production identity, compile/link closure,
-JS graph and final artifact audit must establish the exclusions. Full audio
-fidelity is on the roadmap. No source-distribution promise or repository
-visibility change is made by this release path.
+The operator prohibits distributing historical GPL-derived audio code without
+meeting its obligations. The silent rollback profile has no audio transport or
+generated replacement DSP coefficient bytes. The authorized audio candidate uses the
+replacement implementations and retains the coefficient table's historical
+provenance and GPL notice; its exact producer identity, compile/link closure,
+JS graph and final artifact audit must establish the package contents. This
+authorization does not resolve the retained-data licensing question, make a
+legal-clearance claim or change repository visibility.
 
 Forwarding to the intended inbox must be tested and the final candidate audit
 must pass before public-domain activation. The approved address alone does not
@@ -42,20 +48,24 @@ release posture.
 
 ## Candidate and scope
 
-This review covers the current `web/player` loader, `web/melee-runtime.mjs`, the
-Release `gameplay_public` target and the legal pages in `web/public/`. The final
-artifact identity, runtime hash and deployed URL must come from the packager's
-fresh manifest. A development runtime, diagnostics page and evidence server are
-outside the public player graph.
+This review covers the current `web/player` loader, the silent Release
+`runtime-public` target, the authorized `runtime-audio-preview` Release target
+and the legal pages in `web/public/`. The final artifact identity, runtime hash
+and deployed URL must come from the selected packager's fresh manifest. A
+development runtime, diagnostics page and evidence server are outside either
+public player graph.
 
-The player profile serves the reviewed legal pages plus a compiled Emscripten
-JavaScript/Wasm/data runtime and the small JavaScript modules needed for local
-disc reads and input. Public audio output is disabled; no Web Audio transport
-or DSP coefficient generator is included. It does not serve a retail disc image, extracted
-game archive, standalone game asset or repository source checkout. The compiled
-program is nevertheless built from recovered Melee/HSD and original platform
-source, so excluding source files and retail assets from the upload does not
-resolve the rights in the executable.
+The silent `player` profile serves the reviewed legal pages plus a compiled
+Emscripten JavaScript/Wasm/data runtime and the small JavaScript modules needed
+for local disc reads and input; public audio output is disabled. The separate
+`audio-player` profile adds the reviewed browser audio transport and replacement
+audio modules, with the exact inventory bound to
+`build/runtime-audio-preview-identity.json` and
+`melee-web-audio-player-package-v1`. Neither profile serves a retail disc image,
+extracted game archive, standalone game asset or repository source checkout.
+The compiled programs are nevertheless built from recovered Melee/HSD and
+original platform source, so excluding source files and retail assets from the
+upload does not resolve the rights in the executable.
 
 The legal templates retain build placeholders. Production packaging substitutes
 NaiadAI, LLC and legal@webmelee.gg, as expressly supplied by the operator. The
@@ -136,20 +146,25 @@ visitor to select a copy, provides no disc image, and does not publish
 circumvention instructions. Counsel must evaluate the actual dumping/access
 workflow, local law and any claimed exception.
 
-The compiled source/dependency inventory includes these rights boundaries; the
-GPL audio row describes the development implementation excluded from the alpha:
+The compiled source/dependency inventory includes these rights boundaries. The
+GPL audio row describes historical implementations and retained data; the
+authorized audio package preserves that provenance notice while using the
+replacement implementation:
 
 - Recovered Melee/HSD code at commit
   `b43912cc78606f96c9569f5d6229bc9d7e265ea5` has no identified root license.
 - Original platform AX/AXFX units under Melee's `extern/dolphin` path have no
   per-file license header identified. The directory name does not make them
   Dolphin Emulator code or GPL code; their provenance and rights remain open.
-- `src/gameplay_audio_resample.c/.h` and the free DSP coefficient generator
-  retain GPL-2.0-or-later provenance in development only, from Dolphin revision
-  `a2efdf1197be8132674b90fe9cf4761df39752ed`. Their implementations and generated
-  coefficient bytes are excluded from the public alpha. The development license
-  text remains in [`docs/licenses/dolphin-gpl-2.0-or-later.txt`](licenses/dolphin-gpl-2.0-or-later.txt).
-  GPL compliance does not resolve rights in recovered Melee or platform code.
+- The historical `src/gameplay_audio_resample.c/.h` and free DSP coefficient
+  generator retain GPL-2.0-or-later provenance from Dolphin revision
+  `a2efdf1197be8132674b90fe9cf4761df39752ed`. The silent public alpha excludes
+  those historical implementations and generated coefficient bytes. The
+  authorized audio package uses replacement implementations, but retains the
+  coefficient table's numerical provenance and the historical GPL notice in
+  [`docs/licenses/dolphin-gpl-2.0-or-later.txt`](licenses/dolphin-gpl-2.0-or-later.txt).
+  This is provenance disclosure, not a legal-clearance conclusion. GPL
+  compliance does not resolve rights in recovered Melee or platform code.
 - Aurora at commit `749d6ee7a22bdfab78c8ece9047bca5d79aa72ca` is MIT. The
   B0XX-derived keyboard mapping retains its MIT notice at
   [`licenses/b0xx-ahk.txt`](../licenses/b0xx-ahk.txt); both are included in the
@@ -256,9 +271,11 @@ WebMelee clearance or completeness.
 3. The operator accepts unresolved recovered Melee/HSD and original SDK
    distribution risk for the alpha. No permission is inferred from a DOL hash,
    local disc processing or an open repository.
-4. GPL audio implementation exclusion is verified in the exact silent alpha. Before
-   restoring those implementations, fulfill their source obligations or replace
-   them with independently authored permissive implementations and validate them.
+4. GPL audio implementation exclusion is verified in the exact silent alpha. The
+   authorized audio candidate uses replacement implementations and retains the
+   historical coefficient provenance and notice; its own package, hosted HTTP,
+   browser and deployment receipts must be retained before treating production
+   audio as deployed. No legal-clearance conclusion follows from those receipts.
 5. Retain required notices and check the actual native input inventory against
    the selected licenses for Aurora, Emscripten/Dawn and active dependencies.
    [`docs/licenses/runtime-third-party.txt`](licenses/runtime-third-party.txt)
@@ -276,6 +293,9 @@ WebMelee clearance or completeness.
    operational retention assumptions remain distinct from application behavior.
    Revisit this review before any account, online match,
    analytics or hosted user-content feature.
+10. The production audio path is authorized but has no new release receipt in
+    this review. Keep the previously verified silent deployment available as
+    rollback until the exact audio package and same-byte promotion are recorded.
 
 The supplied operator facts and accepted alpha risk posture are recorded above.
 Artifact verification and tested mail forwarding passed before activation and
