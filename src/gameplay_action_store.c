@@ -92,6 +92,8 @@ void melee_web_action_load(Fighter* destination, Fighter* source, int motion, un
     }
     fprintf(stderr, "Owned action load failed: %s\n", error); abort();
 }
+void* melee_web_action_fighter_table(Fighter* fighter)
+{ return fighter ? fighter->x24 : NULL; }
 struct NativeCommandAllocation {
     union CmdUnion* native;
     uint32_t* canonical;
@@ -321,6 +323,7 @@ struct MeleeWebNativeActionRows {
     char** symbols;
     uint8_t* blends;
     MeleeWebWaitChoice* waits;
+    size_t count;
 };
 MeleeWebNativeActionRows* melee_web_action_rows_create(const MeleeWebActionRow* rows, size_t count,
     const MeleeWebWaitChoice* waits, size_t wait_count)
@@ -330,13 +333,16 @@ MeleeWebNativeActionRows* melee_web_action_rows_create(const MeleeWebActionRow* 
     p->rows = calloc(count, sizeof(*p->rows)); p->symbols = calloc(count + 1, sizeof(*p->symbols));
     p->blends = malloc(count * 2);
     p->waits = wait_count ? calloc(wait_count + 1, sizeof(*p->waits)) : NULL;
+    p->count = count;
     if (!p->rows || !p->symbols || !p->blends || (wait_count && !p->waits)) { melee_web_action_rows_destroy(p); return NULL; }
     for (size_t i = 0; i < count; ++i) {
-        if (!rows[i].symbol) { melee_web_action_rows_destroy(p); return NULL; }
-        const size_t symbol_size = strlen(rows[i].symbol) + 1;
-        p->symbols[i] = malloc(symbol_size);
-        if (!p->symbols[i]) { melee_web_action_rows_destroy(p); return NULL; }
-        memcpy(p->symbols[i], rows[i].symbol, symbol_size);
+        if (!rows[i].symbol && rows[i].size) { melee_web_action_rows_destroy(p); return NULL; }
+        if (rows[i].symbol) {
+            const size_t symbol_size = strlen(rows[i].symbol) + 1;
+            p->symbols[i] = malloc(symbol_size);
+            if (!p->symbols[i]) { melee_web_action_rows_destroy(p); return NULL; }
+            memcpy(p->symbols[i], rows[i].symbol, symbol_size);
+        }
         p->rows[i] = (struct Fighter_WaitAnimData){p->symbols[i], rows[i].offset, rows[i].size,
             rows[i].commands, rows[i].flags, rows[i].size ? (uint32_t)(uintptr_t)&p->rows[i] : 0};
         /* Match source archive identity across distinct motion rows. */
@@ -355,10 +361,11 @@ MeleeWebNativeActionRows* melee_web_action_rows_create(const MeleeWebActionRow* 
 }
 void melee_web_action_rows_destroy(MeleeWebNativeActionRows* p)
 { if (p) {
-    if (p->symbols) for (size_t i = 0; p->rows && p->symbols[i]; ++i) free(p->symbols[i]);
+    if (p->symbols) for (size_t i = 0; i < p->count; ++i) free(p->symbols[i]);
     free(p->symbols); free(p->rows); free(p->blends); free(p->waits); free(p);
 } }
 void* melee_web_action_rows(MeleeWebNativeActionRows* p) { return p->rows; }
+size_t melee_web_action_row_count(const MeleeWebNativeActionRows* p) { return p ? p->count : 0; }
 void* melee_web_action_identity(MeleeWebNativeActionRows* p, size_t motion)
 { return (void*)(uintptr_t)p->rows[motion].x14; }
 void* melee_web_action_blends(MeleeWebNativeActionRows* p) { return p->blends; }

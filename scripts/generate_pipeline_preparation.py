@@ -37,6 +37,7 @@ SCENE_SSS = 3
 SCENE_MATCH = 4
 SCENE_TEARDOWN = 5
 SCENE_RETURN = 6
+SCENE_RESULTS = 7
 CLEAR_DESCRIPTOR_TYPE = 0  # Aurora gfx::ShaderType::Clear
 
 
@@ -355,7 +356,8 @@ def _process_groups(requirements: Mapping[str, Any], route_ids: set[str],
         _require(route_id in route_ids, "unknown_route", f"group {group_index} route is absent from coverage cases")
         scene = group.get("scene")
         _require(isinstance(scene, int) and not isinstance(scene, bool) and
-                 scene in {SCENE_BOOT, SCENE_CSS, SCENE_SSS, SCENE_MATCH, SCENE_TEARDOWN, SCENE_RETURN},
+                 scene in {SCENE_BOOT, SCENE_CSS, SCENE_SSS, SCENE_MATCH, SCENE_TEARDOWN,
+                           SCENE_RETURN, SCENE_RESULTS},
                  "group_scene", f"requirements group {group_index} has no recognized numeric scene")
         for member_index, member in enumerate(members):
             descriptor = _validate_group_member(member, catalog,

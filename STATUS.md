@@ -9,7 +9,24 @@ preserves original controller histories across scene changes instead of
 inventing a new shortcut press. See the [scoped evidence and retained failures](
 docs/VERSUS_RETURN_LOOP.md). This remains the existing Results-skipping slice;
 issue #34's original Results, whole-session retail, physical-controller,
-retained-source-heap and performance acceptance are still open.
+source-heap equivalence and performance acceptance are still open. A separate
+three-match Chrome run now also retains the same 32 MiB source allocation across
+all menu/match worlds, with original SDK payload-retention checks. This does not
+yet establish a memory bound or retail allocation-history equivalence.
+
+The draft Results implementation now renders the original No Contest screen
+in Chrome, including text, panels and Mario demo animation. The retained
+diagnostic reaches 316 source ticks but requires one timing-pause resume;
+it is rendering evidence, not performance or return-loop acceptance. All 73
+authored Results animation clips decode for the eight development fighters;
+all sixteen native scene cases (each fighter winning/losing against Mario)
+construct, advance two source ticks and tear down in one retained arena.
+The real source mode-exit callback currently requests Prize state 192 from
+the synthetic all-unlocked profile. That transition fails explicitly pending
+coherent profile/Prize handling; it is not forced to CSS. The prepared save
+fixture and physical-controller input needed for independent whole-session
+comparison are not yet available locally. See the [current checkpoint and
+remaining gates](docs/VERSUS_RETURN_LOOP.md#original-results-rendering-and-mode-routing-checkpoint).
 
 ## CI verification turnaround
 

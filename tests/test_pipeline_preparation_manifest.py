@@ -327,6 +327,26 @@ class PreparationManifestTests(unittest.TestCase):
         metadata, _header = generate_preparation([pair])
         self.assertEqual(metadata["descriptor_count"], 5)
 
+    def test_results_scene_is_recognized_but_unknown_scene_is_rejected(self) -> None:
+        pair = self._pair("results", "route-results")
+        requirements = json.loads(pair["requirements"].read_text())
+        match_group = next(group for group in requirements["groups"]
+                           if group["scene"] == 4)
+        requirements["groups"].append({
+            "id": "route-results:results",
+            "route_id": "route-results",
+            "scene": 7,
+            "phase": 1,
+            "members": [match_group["members"][0]],
+        })
+        pair["requirements"].write_bytes(canonical_json(requirements) + b"\n")
+        metadata, _header = generate_preparation([pair])
+        self.assertEqual(metadata["descriptor_count"], 5)
+
+        requirements["groups"][-1]["scene"] = 8
+        pair["requirements"].write_bytes(canonical_json(requirements) + b"\n")
+        self.assertEqual(self._error_code(generate_preparation, [pair]), "group_scene")
+
     def test_empty_groups_and_unused_dictionary_rows_do_not_add_descriptors(self) -> None:
         pair = self._pair("one", "route-one")
         metadata, _header = generate_preparation([pair])

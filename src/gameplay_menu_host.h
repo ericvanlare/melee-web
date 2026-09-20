@@ -49,6 +49,16 @@ const MeleeWebPadState* melee_web_menu_host_input(const MeleeWebMenuHost*);
  * Only semantic PAD configuration/history transfers, never queue pointers. */
 int melee_web_menu_host_match_finished(MeleeWebMenuHost*,uint32_t random_seed,
     const uint8_t input[MELEE_WEB_PAD_STATE_BYTES],char*,size_t);
+/* Enclose the original Results scene with ordinary VS mode callbacks. Begin
+ * follows match teardown. Exit follows Results scene OnExit with its assets
+ * still resident. End follows Results teardown and transfers final PAD/RNG.
+ * Unsupported source routes are reported; they are never forced to CSS. */
+int melee_web_menu_host_results_begin(MeleeWebMenuHost*,
+    const struct MatchExitInfo*,uint32_t random_seed,
+    struct ResultsMatchInfo*,char*,size_t);
+int melee_web_menu_host_results_exit(MeleeWebMenuHost*,char*,size_t);
+int melee_web_menu_host_results_end(MeleeWebMenuHost*,uint32_t random_seed,
+    const uint8_t input[MELEE_WEB_PAD_STATE_BYTES],char*,size_t);
 int melee_web_menu_host_destroy(MeleeWebMenuHost*,char*,size_t);
 /* Same phase values as the checked source session: CSS=1, SSS-ready=2,
  * SSS=3, CSS-ready=4, match-ready=5, closed=6. */

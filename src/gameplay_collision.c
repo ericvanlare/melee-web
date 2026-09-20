@@ -145,6 +145,39 @@ static void collision_release(void* data)
     owner->map = (MapCollData) {0}; owner->object = NULL; collision_owner = NULL;
 }
 
+int melee_web_collision_source_available(void)
+{
+    return !collision_owner && !mpLib_804D64B4 && !groundCollVtx &&
+        !groundCollLine && !groundCollJoint && !mpIsland_80458E88.next &&
+        !mpIsland_80458E88.x4 && !HSD_GObj_804D781C;
+}
+
+MeleeWebCollision* melee_web_collision_adopt_dummy(char* error,size_t size)
+{
+    const uint64_t generation=melee_web_gameplay_generation();
+    HSD_GObj* object=NULL;
+    if(!generation||collision_owner||mpLib_804D64B4!=&mpLib_803BF760||
+       !groundCollVtx||!groundCollLine||!groundCollJoint||
+       HSD_GObj_804D781C||stage_info.grkind!=Gr_Kind_Unk00){
+        collision_fail(error,size,"Source dummy collision requires the initialized dummy stage");return NULL;
+    }
+    for(HSD_GObj* candidate=((HSD_GObj**)HSD_GObj_Entities)[6];candidate;candidate=candidate->next){
+        if(candidate->classifier!=1)continue;
+        if(object||candidate->user_data||!candidate->proc||
+           candidate->proc->child||candidate->proc->s_link!=4||
+           candidate->proc->on_invoke!=mpLib_800587FC){
+            collision_fail(error,size,"Source dummy collision process ownership is ambiguous");return NULL;
+        }
+        object=candidate;
+    }
+    if(!object){collision_fail(error,size,"Source dummy collision process is missing");return NULL;}
+    MeleeWebCollision* owner=calloc(1,sizeof(*owner));
+    if(!owner){collision_fail(error,size,"Cannot own source dummy collision storage");return NULL;}
+    owner->generation=generation;owner->object=object;collision_owner=owner;
+    GObj_InitUserData(object,0,collision_release,owner);
+    collision_success(error,size);return owner;
+}
+
 #define COPY_RANGES(to, from) do { \
     (to).floor_start = (from)[0].start; (to).floor_count = (from)[0].count; \
     (to).ceiling_start = (from)[1].start; (to).ceiling_count = (from)[1].count; \

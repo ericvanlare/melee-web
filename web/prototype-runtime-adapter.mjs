@@ -18,7 +18,7 @@ export function mountPrototypePlayer({root, onStatus = () => {}, onSceneChange =
     if (state.scene !== lastScene) { lastScene = state.scene; onSceneChange(state.scene); }
   };
   // These phases are the existing #status data-phase values, not simulation state.
-  const scenes = {1: 'character-select', 2: 'preparing', 3: 'stage-select', 4: 'preparing', 5: 'preparing', 6: 'closed', 7: 'match'};
+  const scenes = {1: 'character-select', 2: 'preparing', 3: 'stage-select', 4: 'preparing', 5: 'preparing', 6: 'closed', 7: 'match', 8: 'results'};
   function snapshot() {
     const message = $('status')?.textContent.trim() || 'Starting the player…';
     const phase = $('status')?.dataset.phase;

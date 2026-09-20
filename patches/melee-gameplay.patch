@@ -933,7 +933,7 @@ index 3ed33e4..217e86f 100644
  
  void ftCo_800BFFAC(Fighter* fp)
 diff --git a/src/melee/ft/ftdata.c b/src/melee/ft/ftdata.c
-index 4592a59..b7a6a19 100644
+index 4592a59..e1ffdce 100644
 --- a/src/melee/ft/ftdata.c
 +++ b/src/melee/ft/ftdata.c
 @@ -1,3 +1,6 @@
@@ -1039,17 +1039,19 @@ index 4592a59..b7a6a19 100644
  }
  
  void ftData_80085B98(Fighter* fp, int arg1, int arg2)
-@@ -1728,6 +1761,9 @@ void ftData_80085B98(Fighter* fp, int arg1, int arg2)
+@@ -1728,6 +1761,11 @@ void ftData_80085B98(Fighter* fp, int arg1, int arg2)
  
  void ftData_80085CD8(Fighter* fp, Fighter* arg1, int msid)
  {
 +#if defined(MELEE_WEB_GAMEPLAY)
-+    melee_web_action_load(fp, arg1, msid, 0);
++    if (msid < arg1->x58C) {
++        melee_web_action_load(fp, arg1, msid, 0);
++    }
 +#else
      HSD_Archive sp14;
      Fighter* temp_r3_3;
      s32 temp_ret;
-@@ -1777,10 +1813,15 @@ void ftData_80085CD8(Fighter* fp, Fighter* arg1, int msid)
+@@ -1777,10 +1815,18 @@ void ftData_80085CD8(Fighter* fp, Fighter* arg1, int msid)
              fp->x5A4 = (void*) temp_r3->x14;
          }
      }
@@ -1059,13 +1061,16 @@ index 4592a59..b7a6a19 100644
  FigaTree* ftData_80085E50(Fighter* arg0, int msid)
  {
 +#if defined(MELEE_WEB_GAMEPLAY)
-+    melee_web_action_load(arg0, arg0, msid, 1);
-+    return arg0->x598;
++    if (msid < arg0->x58C) {
++        melee_web_action_load(arg0, arg0, msid, 1);
++        return arg0->x598;
++    }
++    return NULL;
 +#else
      HSD_Archive sp10;
      Fighter* temp_r3_3;
      int temp_ret;
-@@ -1832,6 +1873,7 @@ FigaTree* ftData_80085E50(Fighter* arg0, int msid)
+@@ -1832,6 +1878,7 @@ FigaTree* ftData_80085E50(Fighter* arg0, int msid)
          return arg0->x598;
      }
      return NULL;
@@ -1328,6 +1333,7 @@ index ab267c4..571a070 100644
  };
  
 diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
+index cd7e31a..98fa9d4 100644
 --- a/src/melee/gm/gm_16AE.c
 +++ b/src/melee/gm/gm_16AE.c
 @@ -1,4 +1,5 @@
@@ -1336,7 +1342,7 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
  
  #include <string.h>
  
-@@ -355,6 +356,13 @@
+@@ -355,6 +356,13 @@ static float get_unk_float(void)
      }
  }
  
@@ -1350,7 +1356,7 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
  bool gm_IsCurrently1PMode(void)
  {
      return gm_Is1PMode(gm_GetCurrentGameMode());
-@@ -473,6 +481,20 @@
+@@ -473,6 +481,20 @@ void fn_8016B784(void)
      grStadium_801D4150();
  }
  
@@ -1371,20 +1377,19 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
  void fn_8016B7B4(int arg0)
  {
      Ground_801C1154();
-@@ -493,9 +515,9 @@
+@@ -493,9 +515,9 @@ void fn_8016B7F8(void)
      Stage_802252E4(tmp->x24C8.stkind, NULL);
      grStadium_801D4040();
      if (!tmp->x24C8.x1_3) {
 -        ifStatus_802F6EA4(4, -1, -1, 0, NULL, fn_8016B784);
--    } else {
--        ifStatus_802F6EA4(8, -1, -1, 0, NULL, fn_8016B784);
 +        ifStatus_802F6EA4(4, -1, -1, 0, NULL, (Event) melee_web_hud_enable);
-+    } else {
+     } else {
+-        ifStatus_802F6EA4(8, -1, -1, 0, NULL, fn_8016B784);
 +        ifStatus_802F6EA4(8, -1, -1, 0, NULL, (Event) melee_web_hud_enable);
      }
      un_802FD428();
  }
-@@ -1325,6 +1347,17 @@
+@@ -1325,6 +1347,17 @@ static inline void fn_8016CFE0_inline(void)
      }
  }
  
@@ -1402,7 +1407,7 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
  void fn_8016CFE0(void)
  {
      lbl_8046B6A0_t* tmp = &lbl_8046B6A0;
-@@ -1387,11 +1420,7 @@
+@@ -1387,11 +1420,7 @@ void fn_8016CFE0(void)
      }
      if (tmp->match_result != OUTCOME_NONE) {
      block_51:
@@ -1415,7 +1420,7 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
      } else {
          fn_8016CD98(tmp);
      }
-@@ -1661,7 +1690,11 @@
+@@ -1661,7 +1690,11 @@ void fn_8016DCC0(StartMeleeData* arg0)
      lbl_8046B6A0_t* tmp = &lbl_8046B6A0;
      int i;
  
@@ -1427,7 +1432,7 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
      lbl_8046B6A0.unk_D = 6;
      lbl_8046B6A0.unk_1C = (void*) &lbl_803D5630;
      lbl_8046B6A0.unk_20 = (void*) &lbl_803D5620;
-@@ -1871,6 +1904,33 @@
+@@ -1871,6 +1904,33 @@ void fn_8016E124(void)
      }
  }
  
@@ -1461,7 +1466,7 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
  /// @todo The loop's SFX flag load uses a different equivalent address form.
  void fn_8016E2BC(void)
  {
-@@ -1915,26 +1975,8 @@
+@@ -1915,26 +1975,8 @@ void fn_8016E2BC(void)
          fn_8016DEEC();
          for (i = 0; i < 6; i++) {
              if (Player_GetPlayerSlotType(i) != Gm_PKind_NA) {
@@ -1489,20 +1494,19 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
                  Player_80031AD0(i);
                  if (tmp->FighterMatchInfo[i].x4_b4) {
                      lbAudioAx_800237A8(0x41F4E, 0x7F, 0x40);
-@@ -2036,9 +2078,9 @@
+@@ -2036,9 +2078,9 @@ void gm_Scene_Vs_OnEnter(void* arg0)
      StartMeleeData* tmp = arg0;
      fn_8016E730(tmp);
      if (tmp->rules.x1_2) {
 -        ifStatus_802F6EA4(8, -1, -1, 0, (void*) fn_8016B7B4, fn_8016B7F8);
--    } else {
--        ifStatus_802F6EA4(3, -1, -1, 0, (void*) fn_8016B7B4, fn_8016B7F8);
 +        ifStatus_802F6EA4(8, -1, -1, 0, (void*) fn_8016B7B4, (Event) melee_web_hud_intro_finished);
-+    } else {
+     } else {
+-        ifStatus_802F6EA4(3, -1, -1, 0, (void*) fn_8016B7B4, fn_8016B7F8);
 +        ifStatus_802F6EA4(3, -1, -1, 0, (void*) fn_8016B7B4, (Event) melee_web_hud_intro_finished);
      }
      ifTime_CreateTimers();
      ifStatus_802F665C(tmp->rules.x0_3);
-@@ -2119,7 +2161,7 @@
+@@ -2119,7 +2161,7 @@ void gm_Scene_SuddenDeath_OnEnter(void* user_data)
      StartMeleeData* data = user_data;
      data->rules.x6 = true;
      fn_8016E730(data);
@@ -1511,20 +1515,19 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
      ifTime_CreateTimers();
      ifStatus_802F665C(data->rules.x0_3);
  }
-@@ -2138,9 +2180,9 @@
+@@ -2138,9 +2180,9 @@ void gm_Scene_Training_OnEnter(void* user_data)
      Stage_802252E4(tmp2->x24C8.stkind, NULL);
      grStadium_801D4040();
      if (!lbl_8046B6A0.x24C8.x1_3) {
 -        ifStatus_802F6EA4(4, -1, -1, 0, 0, fn_8016B784);
--    } else {
--        ifStatus_802F6EA4(8, -1, -1, 0, 0, fn_8016B784);
 +        ifStatus_802F6EA4(4, -1, -1, 0, 0, (Event) melee_web_hud_enable);
-+    } else {
+     } else {
+-        ifStatus_802F6EA4(8, -1, -1, 0, 0, fn_8016B784);
 +        ifStatus_802F6EA4(8, -1, -1, 0, 0, (Event) melee_web_hud_enable);
      }
      un_802FD428();
      ifStatus_802F665C(data->rules.x0_3);
-@@ -2277,3 +2319,170 @@
+@@ -2277,3 +2319,175 @@ int fn_8016F160(int arg0, int arg1)
  {
      return pl_80039418(arg0, arg1);
  }
@@ -1551,42 +1554,47 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
 +{
 +    return lbl_8046B6A0.match_result;
 +}
-+/* EndMeleeData.xC is a copy in the retail OnExit path. Keep the same
-+ * bounded destination so publishing does not overwrite the live x24C cache
-+ * before the source scene performs its own exit copy. */
-+static MatchEnd melee_web_match_end_snapshot;
-+/* Publish the same MatchEnd ranking that the original VS scene publishes in
-+ * gm_Scene_Vs_OnExit. The caller must invoke this at the shared close/exit
-+ * boundary while source fighter state is still resident. */
++/* Retain the complete retail OnExit destination, including the timer and
++ * stage fields preceding MatchEnd. The live x24C cache stays source-owned. */
++static MatchExitInfo melee_web_match_exit_snapshot;
++static bool melee_web_match_exit_published;
++void melee_web_match_source_result_reset(void)
++{
++    melee_web_match_exit_published = false;
++}
++/* Invoke the original VS exit exactly once while source fighters are still
++ * resident. Results requires the full statistics payload, not just ranking. */
 +int melee_web_match_source_publish_result(void)
 +{
 +    lbl_8046B6A0_t* data = &lbl_8046B6A0;
-+    MatchEnd* end = &melee_web_match_end_snapshot;
 +    int result = data->match_result;
 +    if (result == OUTCOME_NONE) result = gm_GetMatchOutcome();
 +    if (result == OUTCOME_NONE || result == OUTCOME_RETRY) return 0;
 +    if (result != OUTCOME_TIMEOUT && result != OUTCOME_ELIMINATION &&
 +        result != OUTCOME_TEAM_ELIMINATION && result != OUTCOME_NO_CONTEST) return 0;
-+    if (data->match_over == 0) {
-+        /* Exact result-building operation from original OnExit. */
-+        *end = *(MatchEnd*) &data->x24C;
-+        end->is_teams = data->x24C8.is_teams;
-+        end->outcome = result;
-+        gm_80166378((lbl_8046B6A0_24C_t*) end);
-+        data->match_over = 1;
++    if (!melee_web_match_exit_published) {
++        /* Publish the complete original exit payload, including source
++         * player statistics and timer/stage fields used by Results. */
++        gm_Scene_Vs_OnExit(&melee_web_match_exit_snapshot);
++        melee_web_match_exit_published = true;
 +    }
++    return 1;
++}
++int melee_web_match_source_result_data(MatchExitInfo* out)
++{
++    if (out == NULL || !melee_web_match_exit_published) return 0;
++    *out = melee_web_match_exit_snapshot;
 +    return 1;
 +}
 +/* Read only the source-published MatchEnd ranking. A caller that needs a
 + * terminal result must call melee_web_match_source_publish_result first. */
 +int melee_web_match_source_result_winners(int* count, int winners[6])
 +{
-+    lbl_8046B6A0_t* data = &lbl_8046B6A0;
-+    MatchEnd* end = &melee_web_match_end_snapshot;
++    MatchEnd* end = &melee_web_match_exit_snapshot.match_end;
 +    int i;
 +    if (count == NULL || winners == NULL) return 0;
 +    for (i = 0; i < 6; ++i) winners[i] = -1;
-+    if (data->match_over == 0) {
++    if (!melee_web_match_exit_published) {
 +        *count = 0;
 +        return 0;
 +    }
@@ -1696,30 +1704,39 @@ diff --git a/src/melee/gm/gm_16AE.c b/src/melee/gm/gm_16AE.c
 +
 +#endif
 diff --git a/src/melee/gm/types.h b/src/melee/gm/types.h
-index 2014b73..10d3df0 100644
+index 2014b73..c1d825a 100644
 --- a/src/melee/gm/types.h
 +++ b/src/melee/gm/types.h
-@@ -22,6 +22,16 @@
+@@ -22,14 +22,25 @@
  typedef union UnkFlagStruct {
      u8 u8;
      struct {
+-        u8 b0 : 1;
+-        u8 b1 : 1;
+-        u8 b2 : 1;
+-        u8 b3 : 1;
+-        u8 b4 : 1;
+-        u8 b5 : 1;
+-        u8 b6 : 1;
+-        u8 b7 : 1;
 +#if defined(TARGET_PC) && __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-+        u8 b7 : 1;
-+        u8 b6 : 1;
-+        u8 b5 : 1;
-+        u8 b4 : 1;
-+        u8 b3 : 1;
-+        u8 b2 : 1;
-+        u8 b1 : 1;
-+        u8 b0 : 1;
++        unsigned char b7 : 1;
++        unsigned char b6 : 1;
++        unsigned char b5 : 1;
++        unsigned char b4 : 1;
++        unsigned char b3 : 1;
++        unsigned char b2 : 1;
++        unsigned char b1 : 1;
++        unsigned char b0 : 1;
 +#else
-         u8 b0 : 1;
-         u8 b1 : 1;
-         u8 b2 : 1;
-@@ -30,6 +40,7 @@ typedef union UnkFlagStruct {
-         u8 b5 : 1;
-         u8 b6 : 1;
-         u8 b7 : 1;
++        unsigned char b0 : 1;
++        unsigned char b1 : 1;
++        unsigned char b2 : 1;
++        unsigned char b3 : 1;
++        unsigned char b4 : 1;
++        unsigned char b5 : 1;
++        unsigned char b6 : 1;
++        unsigned char b7 : 1;
 +#endif
      };
  } UnkFlagStruct;
@@ -1991,14 +2008,18 @@ index 64c921e..2011582 100644
  
  /// @copydoc mpLib_JointCollisionCallback
 diff --git a/src/melee/gr/ground.c b/src/melee/gr/ground.c
-index 6c26c02..70f263b 100644
+index 6c26c02..fdc952b 100644
 --- a/src/melee/gr/ground.c
 +++ b/src/melee/gr/ground.c
-@@ -284,6 +284,24 @@ void Ground_801C0378(int arg0)
+@@ -284,6 +284,28 @@ void Ground_801C0378(int arg0)
      zeroBuffer();
  }
  
 +#ifdef TARGET_PC
++int melee_web_ground_map_storage_available(void)
++{
++    return Ground_804D6950 == NULL;
++}
 +int melee_web_ground_map_storage_begin(void)
 +{
 +    if (Ground_804D6950 != NULL) return 0;
@@ -2019,7 +2040,7 @@ index 6c26c02..70f263b 100644
  void mem_free(void* ptr)
  {
      HSD_Free(ptr);
-@@ -694,8 +712,13 @@ void Ground_801C0FB8(StageIdPair* pair)
+@@ -694,8 +716,13 @@ void Ground_801C0FB8(StageIdPair* pair)
  {
      struct {
          void* unk0;
@@ -2033,7 +2054,7 @@ index 6c26c02..70f263b 100644
      }* cur;
      void* next;
      stage_datas[pair->grkind]->on_start();
-@@ -1187,6 +1210,19 @@ static inline bool find_light_override(UnkArchiveStruct* archive,
+@@ -1187,6 +1214,19 @@ static inline bool find_light_override(UnkArchiveStruct* archive,
                                         HSD_LightDesc* desc, bool* b6, bool* b7,
                                         bool* b5)
  {
@@ -2053,7 +2074,7 @@ index 6c26c02..70f263b 100644
      UnkStageDat* dat = archive->unk4;
      s32 count = dat->unk1C;
      s32 i;
-@@ -1210,6 +1246,19 @@ static inline bool find_light_override_in_dat(UnkStageDat* dat,
+@@ -1210,6 +1250,19 @@ static inline bool find_light_override_in_dat(UnkStageDat* dat,
                                                HSD_LightDesc* desc, bool* b6,
                                                bool* b7, bool* b5)
  {
@@ -2073,7 +2094,7 @@ index 6c26c02..70f263b 100644
      s32 count = dat->unk1C;
      s32 i;
  
-@@ -1523,6 +1572,13 @@ void Ground_801C28CC(s32* arg0, StKind stkind)
+@@ -1523,6 +1576,13 @@ void Ground_801C28CC(s32* arg0, StKind stkind)
      panicMissingStageParam(stkind, count);
  }
  
@@ -5759,9 +5780,10 @@ diff --git a/src/melee/mn/mnstagesel.c b/src/melee/mn/mnstagesel.c
      idesc = player0->idesc;
 
 diff --git a/src/melee/gm/gm_1A3F.c b/src/melee/gm/gm_1A3F.c
+index 9fc7d6b..234ad51 100644
 --- a/src/melee/gm/gm_1A3F.c
 +++ b/src/melee/gm/gm_1A3F.c
-@@ -359,3 +359,23 @@
+@@ -359,3 +359,37 @@ void gm_801A4510(void)
          gamestate->routing.curr_mode = next_mode;
      }
  }
@@ -5784,8 +5806,21 @@ diff --git a/src/melee/gm/gm_1A3F.c b/src/melee/gm/gm_1A3F.c
 +    melee_web_vs_mode_owned = false;
 +    return 1;
 +}
++int melee_web_vs_mode_select_state(int id)
++{
++    if (!melee_web_vs_mode_owned || id < 0 || id >= 255) return 0;
++    state_machine.routing.prev_state_id = state_machine.routing.curr_state_id;
++    state_machine.routing.curr_state_id = id;
++    state_machine.routing.next_state_id = 0;
++    return 1;
++}
++int melee_web_vs_mode_next_state(void)
++{
++    if (!melee_web_vs_mode_owned || !state_machine.routing.next_state_id)
++        return -1;
++    return state_machine.routing.next_state_id - 1;
++}
 +#endif
-
 diff --git a/src/melee/gm/gm_1A36.c b/src/melee/gm/gm_1A36.c
 --- a/src/melee/gm/gm_1A36.c
 +++ b/src/melee/gm/gm_1A36.c
@@ -8002,3 +8037,366 @@ diff --git a/src/melee/ft/ftcommon.c b/src/melee/ft/ftcommon.c
          HSD_JObjSetTranslate(jobj, &fp->x1A7C);
      }
  }
+
+diff --git a/src/melee/gm/gmresultplayer.static.h b/src/melee/gm/gmresultplayer.static.h
+index 706ec65..55e8f92 100644
+--- a/src/melee/gm/gmresultplayer.static.h
++++ b/src/melee/gm/gmresultplayer.static.h
+@@ -118,9 +118,20 @@ extern u32 gmResultScoreTableInit[0x20 / sizeof(u32)];
+ extern ResultsCharacterData gmResultCharacterData;
+ extern HSD_CameraDescPerspective gmResultCameraDesc;
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++/* Retail places these four symbols consecutively and accesses them through
++ * ResultsDisplayLayout. A portable linker does not preserve that adjacency. */
++extern ResultsDisplayLayout melee_web_results_display;
++#define lbl_8046E1B0 melee_web_results_display
++#define lbl_8046E38C (melee_web_results_display.gobjs)
++#define lbl_8046E39C (melee_web_results_display.jobjs)
++#define lbl_8046E3AC (melee_web_results_display.state)
++void melee_web_results_init_layout_tables(void);
++#else
+ extern ResultsDisplayData lbl_8046E1B0;
+ extern HSD_GObj* lbl_8046E38C[4];
+ extern HSD_JObj* lbl_8046E39C[4];
+ extern lbl_8046E3AC_t lbl_8046E3AC;
++#endif
+ 
+ #endif
+diff --git a/src/melee/ft/ftdemo.c b/src/melee/ft/ftdemo.c
+index 6c6e71e..561b857 100644
+--- a/src/melee/ft/ftdemo.c
++++ b/src/melee/ft/ftdemo.c
+@@ -1,5 +1,9 @@
+ #include "ftdemo.h"
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++#include "gameplay_fighter_assets.h"
++#endif
++
+ #include <Runtime/platform.h>
+ 
+ #include <melee/pl/forward.h>
+@@ -68,8 +72,10 @@ Fighter_GObj* ftDemo_CreateFighter(plAllocInfo2* alloc_info)
+         fp->x18 = 14;
+         fp->x1C_actionStateList = ftData_803C52A0;
+         fp->x20_actionStateList = ftData_UnkMotionStates0[fp->kind];
++#if !defined(MELEE_WEB_GAMEPLAY)
+         fp->x24 = fp->ft_data->x14;
+         fp->x28 = fp->ft_data->x18;
++#endif
+         efAsync_LoadSync(ftData_UnkBytePerCharacter[fp->kind]);
+         if (!alloc_info->b0) {
+             ftData_80085820(fp->kind, fp->x619_costume_id);
+@@ -94,7 +100,13 @@ Fighter_GObj* ftDemo_CreateFighter(plAllocInfo2* alloc_info)
+                 a = 0;
+                 b = 9;
+             }
++#if defined(MELEE_WEB_GAMEPLAY)
++            /* The owned demo domain retains the source x14/x18 rows and
++             * nested result archives instead of overlaying big-endian bytes. */
++            melee_web_fighter_assets_bind_demo_created(fp, a, b);
++#else
+             ftData_80085B98(fp, a, b);
++#endif
+         }
+         ftParts_80074E58(fp);
+         ftParts_SetupParts(gobj);
+@@ -129,7 +141,13 @@ Fighter_GObj* ftDemo_CreateFighter(plAllocInfo2* alloc_info)
+ 
+ void ftDemo_ObjAllocInit(void)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_fighter_assets_demo_init_begin();
++#endif
+     Fighter_800679B0();
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_fighter_assets_demo_init_end();
++#endif
+     HSD_ObjAllocInit(&fighter_x59C_alloc_data, 0xB000, 0x20);
+ }
+ 
+diff --git a/src/melee/pl/player.c b/src/melee/pl/player.c
+index 288afe9..b6394ed 100644
+--- a/src/melee/pl/player.c
++++ b/src/melee/pl/player.c
+@@ -2053,6 +2053,15 @@ void Player_80036DD8(void)
+ 
+ void Player_80036E20(CharacterKind ckind, HSD_Archive* archive, s32 arg2)
+ {
++#if defined(MELEE_WEB_GAMEPLAY)
++    /* The retail string/mapping globals are adjacent; native linkers need
++     * the actual table owner rather than a cast beyond the string object. */
++    ftMapping* mapping = &ftMapping_list[ckind];
++    ftDemo_SetArchiveData(mapping->internal_id, archive, arg2);
++    if (mapping->extra_internal_id != -1 && !mapping->has_transformation) {
++        ftDemo_SetArchiveData(mapping->extra_internal_id, archive, arg2);
++    }
++#else
+     struct Unk_Struct_w_Array* unkStruct =
+         (struct Unk_Struct_w_Array*) &str_PdPmdat_start_of_data;
+     ftDemo_SetArchiveData(unkStruct->vec_arr[ckind].x, archive, arg2);
+@@ -2061,6 +2070,7 @@ void Player_80036E20(CharacterKind ckind, HSD_Archive* archive, s32 arg2)
+     {
+         ftDemo_SetArchiveData(unkStruct->vec_arr[ckind].y, archive, arg2);
+     }
++#endif
+ }
+ 
+ HSD_JObj* Player_80036EA0(s32 slot)
+diff --git a/src/melee/gm/gmresult.c b/src/melee/gm/gmresult.c
+index b5cc0e5..d6ba392 100644
+--- a/src/melee/gm/gmresult.c
++++ b/src/melee/gm/gmresult.c
+@@ -17,7 +17,12 @@ static void order_sdata(void)
+ #endif
+ 
+ struct ResultsData lbl_8046DBE8;
++#if defined(MELEE_WEB_GAMEPLAY)
++/* These packed retail words are Shift-JIS strings, not numeric scalars. */
++static char lbl_804D3F8C[8] = "\x81\x7c\x81\x7c\x81\x7c";
++#else
+ static u32 lbl_804D3F8C[2] = { 0x817C817C, 0x817C0000 };
++#endif
+ 
+ #ifdef MUST_MATCH
+ static void gmresult_sdata2_order(void)
+@@ -50,12 +55,18 @@ static void gmresult_sdata2_order(void)
+ }
+ #endif
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++char lbl_804D3FA0[4] = "\x81\x7c";
++char lbl_804D3FA4[4] = "\x81\x7b";
++struct { char text[8]; } lbl_804D3FA8 = { "\x81\x7c\x81\x46\x81\x7c" };
++#else
+ u32 lbl_804D3FA0 = 0x817C0000;
+ u32 lbl_804D3FA4 = 0x817B0000;
+ union {
+     u32 words[2];
+     char text[8];
+ } lbl_804D3FA8 = { { 0x817C8146, 0x817C0000 } };
++#endif
+ 
+ HSD_Archive* lbl_804D65B8;
+ 
+diff --git a/src/melee/gm/gm_1798.c b/src/melee/gm/gm_1798.c
+index 255324f..59cde8f 100644
+--- a/src/melee/gm/gm_1798.c
++++ b/src/melee/gm/gm_1798.c
+@@ -40,10 +40,14 @@
+ 
+ extern ResultsData lbl_8046DBE8;
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++ResultsDisplayLayout melee_web_results_display;
++#else
+ ResultsDisplayData lbl_8046E1B0;
+ HSD_GObj* lbl_8046E38C[4];
+ HSD_JObj* lbl_8046E39C[4];
+ lbl_8046E3AC_t lbl_8046E3AC;
++#endif
+ 
+ static U32Pair lbl_804D3FD0 ATTRIBUTE_ALIGN(8) = { 0x00500050, 0x00460034 };
+ static U32Pair lbl_804D3FD8 = { 0x006E0072, 0x0064004A };
+@@ -52,6 +56,39 @@ static U32Pair lbl_804D3FE8 = { 0x004A004A, 0x004A004A };
+ static U32Pair lbl_804D3FF0 = { 0x000C0008, 0x00060000 };
+ static U32Pair lbl_804D3FF8 = { 0x000E000E, 0x00060000 };
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++/* The original constants are packed big-endian halfwords. Copy their numeric
++ * halves, not the host representation of the containing words. */
++static void melee_web_results_unpack_pair(u16 out[4], U32Pair pair)
++{
++    out[0] = (u16) (pair.lo >> 16);
++    out[1] = (u16) pair.lo;
++    out[2] = (u16) (pair.hi >> 16);
++    out[3] = (u16) pair.hi;
++}
++
++void melee_web_results_init_layout_tables(void)
++{
++    int i, j;
++    melee_web_results_unpack_pair(lbl_8046E3AC.dim_w1, lbl_804D3FD0);
++    melee_web_results_unpack_pair(lbl_8046E3AC.dim_h1, lbl_804D3FD8);
++    melee_web_results_unpack_pair(lbl_8046E3AC.dim_w2, lbl_804D3FE0);
++    melee_web_results_unpack_pair(lbl_8046E3AC.dim_h2, lbl_804D3FE8);
++    melee_web_results_unpack_pair(lbl_8046E3AC.scissor_y, lbl_804D3FF0);
++    melee_web_results_unpack_pair(lbl_8046E3AC.scissor_x, lbl_804D3FF8);
++    for (i = 0; i < 4; ++i) {
++        for (j = 0; j < 4; ++j) {
++            int word = i * 2 + j / 2;
++            int shift = (j & 1) ? 0 : 16;
++            lbl_8046E3AC.score_tbl[i].h[j] =
++                (s16) (gmResultScoreTableInit[word] >> shift);
++            lbl_8046E3AC.x22F4[i].h[j] =
++                (s16) (gmResultX22F4Init[word] >> shift);
++        }
++    }
++}
++#endif
++
+ /// @todo .sdata2 order hack
+ #ifdef MUST_MATCH
+ static void sdata2_order(void)
+@@ -314,7 +351,7 @@ void fn_8017A004(void)
+     GObj_SetupGXLink(gobj, HSD_GObj_LObjCallback, 0, 0);
+ }
+ 
+-void fn_8017A078(s32 arg0)
++HSD_GObj* fn_8017A078(s32 arg0)
+ {
+     ResultsDisplayLayout* disp = (ResultsDisplayLayout*) &lbl_8046E1B0;
+     ResultsPlayerConfig const* config = &lbl_803B7B68;
+@@ -362,13 +399,17 @@ void fn_8017A078(s32 arg0)
+     HSD_CObjSetEyePosition(cobj, &eye);
+     HSD_CObjSetInterest(cobj, &interest);
+     GObj_SetupGXLinkMax(gobj, callbacks.funcs[arg0], 5);
++    /* GALE01r2 returns this camera in r3 through SetupGXLinkMax. */
++    return gobj;
+ }
+ 
+ HSD_GObj* fn_8017A318(s32 arg0)
+ {
+     static Scissor const scissor_init = { 270, 370, 124, 276 };
+     u32* config = (u32*) &lbl_803B7B68;
++#if !defined(MELEE_WEB_GAMEPLAY)
+     CameraKindData* data = (CameraKindData*) gmResultPlayerColors;
++#endif
+     ResultsDisplayLayout* disp = (ResultsDisplayLayout*) &lbl_8046E1B0;
+     MatchEnd* match_end = &disp->state.match_end;
+     s32 _pad[2];
+@@ -401,7 +442,13 @@ HSD_GObj* fn_8017A318(s32 arg0)
+     }
+ 
+     gobj = GObj_Create(0x13, 0x14, 0);
++#if defined(MELEE_WEB_GAMEPLAY)
++    /* CameraKindData overlays separately linked retail globals. Use each
++     * original owner directly, preserving the original arithmetic below. */
++    cobj = HSD_CObjLoadDesc((HSD_CObjDesc*) &gmResultCameraDesc);
++#else
+     cobj = HSD_CObjLoadDesc(&data->cobj_desc);
++#endif
+     HSD_GObjObject_80390A70(gobj, HSD_GObj_CameraKind, cobj);
+ 
+     {
+@@ -414,30 +461,42 @@ HSD_GObj* fn_8017A318(s32 arg0)
+ 
+     vi = ((s32) variant <= 2) ? variant : 3;
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++#define RESULT_X(kind, v) gmResultCharacterScaleData[kind].x0[v]
++#define RESULT_Y(kind, v) gmResultCharacterScaleData[kind].x0[4 + (v)]
++#define RESULT_Z(kind, v) gmResultCharacterScaleData[kind].x20[v]
++#define RESULT_SLOT(kind, axis, slot) \
++    gmResultCharacterData.slot_off[kind][axis][slot]
++#else
++#define RESULT_X(k, v) data->kind[k].x_off[v]
++#define RESULT_Y(k, v) data->kind[k].y_off[v]
++#define RESULT_Z(k, v) data->kind[k].z_scale[v]
++#define RESULT_SLOT(kind, axis, slot) data->slot_off[kind][axis][slot]
++#endif
+     kind_data = disp->state.char_kind[arg0];
+     (void) kind_data;
+-    eye.y += data->kind[kind_data].y_off[vi];
++    eye.y += RESULT_Y(kind_data, vi);
+ 
+     vi = ((s32) variant <= 2) ? variant : 3;
+-    interest.y += data->kind[kind_data].y_off[vi];
++    interest.y += RESULT_Y(kind_data, vi);
+ 
+     vi = ((s32) variant <= 2) ? variant : 3;
+-    eye.x += data->kind[kind_data].x_off[vi];
++    eye.x += RESULT_X(kind_data, vi);
+ 
+     {
+         f32 interest_x;
+         vi = ((s32) variant <= 2) ? variant : 3;
+-        interest_x = interest.x + data->kind[kind_data].x_off[vi];
++        interest_x = interest.x + RESULT_X(kind_data, vi);
+ 
+         {
+             f32 x_off, y_off;
+ 
+             interest.x = interest_x;
+-            x_off = data->slot_off[kind_data][0][slot];
++            x_off = RESULT_SLOT(kind_data, 0, slot);
+             eye.x += x_off;
+             interest.x += x_off;
+ 
+-            eye.y = eye.y + (y_off = data->slot_off[kind_data][1][slot]);
++            eye.y = eye.y + (y_off = RESULT_SLOT(kind_data, 1, slot));
+             interest.y += y_off;
+         }
+     }
+@@ -447,12 +506,12 @@ HSD_GObj* fn_8017A318(s32 arg0)
+     }
+ 
+     vi = ((s32) variant <= 2) ? variant : 3;
+-    if ((1.0f - data->kind[kind_data].z_scale[vi]) < 0.0f) {
++    if ((1.0f - RESULT_Z(kind_data, vi)) < 0.0f) {
+         vi = ((s32) variant <= 2) ? variant : 3;
+-        eye.z += 100.0f * (1.0f - data->kind[kind_data].z_scale[vi]);
++        eye.z += 100.0f * (1.0f - RESULT_Z(kind_data, vi));
+     } else {
+         vi = ((s32) variant <= 2) ? variant : 3;
+-        eye.z += 300.0f * (1.0f - data->kind[kind_data].z_scale[vi]);
++        eye.z += 300.0f * (1.0f - RESULT_Z(kind_data, vi));
+     }
+ 
+     HSD_CObjSetEyePosition(cobj, &eye);
+@@ -461,8 +520,13 @@ HSD_GObj* fn_8017A318(s32 arg0)
+     GObj_SetupGXLinkMax(gobj, callbacks.funcs[arg0], 0);
+ 
+     if (slot == 0) {
+-        fn_8017A078(arg0);
++        return fn_8017A078(arg0);
+     }
++    return gobj;
++#undef RESULT_X
++#undef RESULT_Y
++#undef RESULT_Z
++#undef RESULT_SLOT
+ }
+ 
+ Fighter_GObj* fn_8017A67C(CharacterKind kind, int arg1, int arg2)
+@@ -619,12 +683,16 @@ void fn_8017AA78(const u8* arg0)
+     lbl_8046E3AC.x0_4 = 0;
+     lbl_8046E3AC.x0_6 = 0;
+ 
++#if defined(MELEE_WEB_GAMEPLAY)
++    melee_web_results_init_layout_tables();
++#else
+     *(U32Pair*) lbl_8046E3AC.dim_w1 = lbl_804D3FD0;
+     *(U32Pair*) lbl_8046E3AC.dim_h1 = lbl_804D3FD8;
+     *(U32Pair*) lbl_8046E3AC.dim_w2 = lbl_804D3FE0;
+     *(U32Pair*) lbl_8046E3AC.dim_h2 = lbl_804D3FE8;
+     *(U32Pair*) lbl_8046E3AC.scissor_y = lbl_804D3FF0;
+     *(U32Pair*) lbl_8046E3AC.scissor_x = lbl_804D3FF8;
++#endif
+ 
+     for (i = 0; i < 4; i++) {
+         lbl_8046E3AC.player_flags[i] = 0;
+@@ -637,7 +705,9 @@ void fn_8017AA78(const u8* arg0)
+                 .is_big_loser = 1;
+         }
+         lbl_8046E3AC.x6[i] = 0;
++#if !defined(MELEE_WEB_GAMEPLAY)
+         lbl_8046E3AC.score_tbl[i] = ((PackedS16x4*) gmResultScoreTableInit)[i];
+         lbl_8046E3AC.x22F4[i] = ((PackedS16x4*) gmResultX22F4Init)[i];
++#endif
+     }
+ }
+diff --git a/src/melee/gm/gm_1798.h b/src/melee/gm/gm_1798.h
+index 1321fe1..0dfbaba 100644
+--- a/src/melee/gm/gm_1798.h
++++ b/src/melee/gm/gm_1798.h
+@@ -19,7 +19,7 @@
+ /* 179F6C */ void fn_80179F6C(int idx, HSD_GObj* value);
+ /* 179F84 */ void fn_80179F84(HSD_JObj*);
+ /* 17A004 */ UNK_RET fn_8017A004(UNK_PARAMS);
+-/* 17A078 */ void fn_8017A078(s32);
++/* 17A078 */ HSD_GObj* fn_8017A078(s32);
+ /* 17A318 */ HSD_GObj* fn_8017A318(s32);
+ /* 17A67C */ Fighter_GObj* fn_8017A67C(CharacterKind c_kind, int, int);
+ /* 17A9B4 */ void fn_8017A9B4(int);

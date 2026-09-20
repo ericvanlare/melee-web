@@ -19,6 +19,7 @@ foreach(path IN LISTS native_paths)
 endforeach()
 add_library(fighter_source_runtime STATIC EXCLUDE_FROM_ALL ${fighter_paths}
   src/gameplay_retail_setup.c src/gameplay_retail_state.c src/gameplay_cpu_observation.c
+  src/gameplay_results_context.c
   src/gameplay_match_flow.c src/gameplay_hud.c src/gameplay_menu.c src/gameplay_menu_host.c src/gameplay_item_runtime.c src/gameplay_stage_items.c src/dat_item_commands.c src/gameplay_crowd.c src/gameplay_render.c src/gameplay_color_commands.c src/gameplay_match_rules.c src/gameplay_stage_visual.c src/gameplay_stage_map.c src/gameplay_stage_last.c src/gameplay_stage_profile.c src/gameplay_stage_story.c src/gameplay_effect_runtime.c
   src/gameplay_stage_dream_land.c src/gameplay_audio.c src/gameplay_audio_bank_transport.c src/gameplay_audio_residency.c src/gameplay_audio_stream.c src/gameplay_io.cpp src/gameplay_audio_resample.c src/gameplay_audio_itd.c src/gameplay_audio_fx.c src/gameplay_audio_reverb.c
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/axfx/axfx.c"
@@ -73,6 +74,7 @@ target_compile_options(fighter_source_runtime PRIVATE -ffunction-sections -fdata
   -include "${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h")
 target_link_libraries(fighter_source_runtime PUBLIC hsd_native_runtime aurora::pad)
 add_library(fighter_asset_runtime STATIC EXCLUDE_FROM_ALL
+  src/gameplay_results_assets.cpp src/gameplay_results_session.cpp src/dat_trophy_data.cpp
   src/gameplay_retail_recipe.cpp
   src/gameplay_replay_transport.cpp src/gameplay_replay_session.cpp
   src/runtime_archive_cache.cpp
@@ -460,3 +462,15 @@ target_link_libraries(dat_scene_trace PRIVATE fighter_asset_runtime)
 target_link_options(dat_scene_trace PRIVATE --profiling-funcs -sENVIRONMENT=node -sNODERAWFS=1
   -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSTACK_SIZE=8388608)
 set_target_properties(dat_scene_trace PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_results_assets_test EXCLUDE_FROM_ALL tests/gameplay_results_assets_test.cpp)
+target_link_libraries(gameplay_results_assets_test PRIVATE fighter_asset_runtime)
+target_link_options(gameplay_results_assets_test PRIVATE --profiling-funcs -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_results_assets_test PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_results_scene_trace EXCLUDE_FROM_ALL tests/gameplay_results_scene_trace.cpp)
+target_link_libraries(gameplay_results_scene_trace PRIVATE fighter_asset_runtime)
+target_link_options(gameplay_results_scene_trace PRIVATE --profiling-funcs -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_results_scene_trace PROPERTIES SUFFIX ".js")

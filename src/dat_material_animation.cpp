@@ -103,7 +103,7 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
     auto& s = *storage_; s.archive = std::move(archive);
     require(bool(s.archive), "Material animation requires its archive owner");
     const auto& a = *s.archive;
-    std::set<uint32_t> joint_seen, material_seen, texture_seen, track_seen;
+    std::set<uint32_t> joint_seen, material_seen, texture_seen;
     size_t stream_bytes = 0, palette_validation_bytes = 0;
     std::map<uint32_t,uint32_t> image_max_indices;
     auto record = [&](uint32_t offset, size_t length) {
@@ -149,8 +149,12 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
         require(!a.pointer(ao+12), "Material animation object references are unsupported");
         t.animation.flags = flags; t.animation.end_frame = end;
         auto fo = a.pointer(ao+8,20); unsigned channels = 0;
+        // A source FObj may be shared by separate texture AObjs. Detect a
+        // cycle within this chain while allowing authored aliases across
+        // independent material channels.
+        std::set<uint32_t> texture_track_seen;
         while (fo) {
-            require(t.tracks.size()<24 && track_seen.insert(*fo).second, "Texture animation track cycle or count limit"); record(*fo,20);
+            require(t.tracks.size()<24 && texture_track_seen.insert(*fo).second, "Texture animation track cycle or count limit"); record(*fo,20);
             auto track = std::make_unique<NativeTrack>(); auto& f = track->descriptor;
             f.length = a.be32(*fo+4); f.startframe = a.f32(*fo+8);
             const auto fields = a.range(*fo+12,4); f.type=fields[0]; f.frac_value=fields[1]; f.frac_slope=fields[2];
@@ -254,8 +258,11 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
                     "Material alpha animation flags or end frame are invalid");
             require(!a.pointer(*ao+12),"Material alpha animation object reference is unsupported");
             auto fo=a.pointer(*ao+8,20);unsigned material_channels=0;
+            // Separate material AObjs can share an authored FObj. The
+            // chain-local set still rejects a real next-pointer cycle.
+            std::set<uint32_t> material_track_seen;
             while(fo) {
-                require(n.tracks.size()<10&&track_seen.insert(*fo).second,"Material alpha animation duplicate track or cycle");
+                require(n.tracks.size()<10&&material_track_seen.insert(*fo).second,"Material alpha animation duplicate track or cycle");
                 record(*fo,20); auto track=std::make_unique<NativeTrack>(); auto& f=track->descriptor;
                 f.length=a.be32(*fo+4);f.startframe=a.f32(*fo+8);
                 const auto fields=a.range(*fo+12,4);f.type=fields[0];f.frac_value=fields[1];f.frac_slope=fields[2];

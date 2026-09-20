@@ -13,7 +13,17 @@ await assert.rejects(loadRuntimeDisc(new Blob([bytes])),/Invalid game executable
 console.log('Runtime disc language paths and executable rejection checks passed');
 
 assert.equal(Object.keys(NATIVE_MENU_DISC_FILES).length,15);
-assert.equal(Object.keys(NATIVE_GAME_DISC_FILES).length,102);
+assert.equal(Object.keys(NATIVE_GAME_DISC_FILES).length,117);
+for(const name of ['GmRst.usd','SdRst.usd','TyDatai.usd',
+  'GmRstMMr.dat','GmRstMDr.dat','GmRstMFx.dat','GmRstMFc.dat',
+  'GmRstMMs.dat','GmRstMFe.dat','GmRstMLk.dat','GmRstMCl.dat'])
+  assert.equal(NATIVE_GAME_DISC_FILES[name],name,
+    `Results archive ${name} must be imported from its authored root path`);
+for(const [name,path] of Object.entries({
+  'ff_mario.hps':'audio/ff_mario.hps','ff_fox.hps':'audio/ff_fox.hps',
+  'ff_emb.hps':'audio/ff_emb.hps','ff_link.hps':'audio/ff_link.hps',
+})) assert.equal(NATIVE_GAME_DISC_FILES[name],path,
+  `Results voice ${name} must use its authored audio path`);
 for(const name of ['nr_select','nr_title','nr_name','pokemon','end']) {
   assert.equal(NATIVE_MENU_DISC_FILES[name+'.ssm'],'audio/us/'+name+'.ssm');
   assert.equal(NATIVE_GAME_DISC_FILES[name+'.ssm'],'audio/us/'+name+'.ssm');

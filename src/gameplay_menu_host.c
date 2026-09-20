@@ -2,9 +2,13 @@
 #include "gameplay_menu.h"
 #include "gameplay_content.h"
 #include "gameplay_bootstrap.h"
+#include "gameplay_results_context.h"
 #include "gameplay_audio_bank_transport.h"
 #include <melee/gm/gm_1A36.h>
+#include <melee/gm/gm_1A3F.h>
 #include <melee/gm/gmmain_lib.h>
+#include <melee/gm/gmvsmelee.h>
+#include <melee/gm/gmvsmode.h>
 #include <melee/lb/lbaudio_ax.h>
 #include <melee/lb/lbcardgame.h>
 #include <melee/lb/lblanguage.h>
@@ -28,6 +32,10 @@ extern int melee_web_menu_clock_request(int*);
 extern int melee_web_menu_clock_tick(void);
 extern int melee_web_menu_clock_present(void);
 extern int melee_web_menu_clock_end(void);
+extern int melee_web_vs_mode_begin(void);
+extern int melee_web_vs_mode_end(void);
+extern int melee_web_vs_mode_select_state(int);
+extern int melee_web_vs_mode_next_state(void);
 struct MeleeWebMenuHost {
     MeleeWebMenuSession* session;
     MeleeWebAudio* audio;
@@ -38,10 +46,18 @@ struct MeleeWebMenuHost {
     HSD_PadStatus saved_game[4],saved_master[4],saved_copy[4];
     MeleeWebPadState* input;
     GameRules saved_rules;
+    GameRules selected_rules, route_saved_rules;
     struct gmm_x1CB0 saved_preferences;
+    struct gmm_x1CB0 selected_preferences, route_saved_preferences;
     int saved_language,saved_saved_language;
     u16 saved_characters,saved_stages;
     u16 selected_characters,selected_stages;
+    u16 route_saved_characters,route_saved_stages;
+    VsModeData route_saved_vs;
+    MatchExitInfo route_saved_exit;
+    ResultsMatchInfo route_saved_result;
+    u8 route_saved_ko[GM_MAX_PLAYERS];
+    int results_active,results_exited,results_committed;
     int entered,drawing,transition;
 };
 static MeleeWebMenuHost* owner;
@@ -94,7 +110,7 @@ static void restore_context(MeleeWebMenuHost* h){
 }
 int melee_web_menu_host_enter(MeleeWebMenuHost* h,MeleeWebAudio* audio,char* e,size_t n){
     const uint64_t audio_generation=melee_web_audio_generation(audio);
-    if(!h||h!=owner||h->entered||h->audio||seed_ptr!=&h->seed||!melee_web_audio_is_active(audio)||
+    if(!h||h!=owner||h->entered||h->audio||h->results_active||seed_ptr!=&h->seed||!melee_web_audio_is_active(audio)||
        !audio_generation||!melee_web_audio_bank_transport_active()||!melee_web_gameplay_stats().generation)
         return fail(e,n,"Native menu enter requires a fresh owned world and source audio");
     const MeleeWebMenuPhase phase=melee_web_menu_phase(h->session);
@@ -113,13 +129,20 @@ int melee_web_menu_host_enter(MeleeWebMenuHost* h,MeleeWebAudio* audio,char* e,s
     memcpy(h->saved_master,HSD_PadMasterStatus,sizeof(h->saved_master));
     memcpy(h->saved_copy,HSD_PadCopyStatus,sizeof(h->saved_copy));
     lbLang_SetLanguageSetting(LANG_US);lbLang_SetSavedLanguage(LANG_US);
-    *gmMainLib_GetGameRules()=gmMainLib_803D4A48;
-    gmMainLib_GetGameRules()->mode=1;gmMainLib_GetGameRules()->stock_count=4;
-    gmMainLib_8015CC58()->item_freq=(u8)-1;
-    gmMainLib_8015CC58()->item_mask=UINT64_MAX;
-    gmMainLib_8015CC58()->rumble_enabled[0]=true;
-    gmMainLib_8015CC58()->rumble_enabled[1]=true;
-    *gmMainLib_GetUnlockedCharactersBitmaskPtr()=0xffff;*gmMainLib_8015EDA4()=0xffff;
+    if(phase==MELEE_WEB_MENU_CREATED){
+        *gmMainLib_GetGameRules()=gmMainLib_803D4A48;
+        gmMainLib_GetGameRules()->mode=1;gmMainLib_GetGameRules()->stock_count=4;
+        gmMainLib_8015CC58()->item_freq=(u8)-1;
+        gmMainLib_8015CC58()->item_mask=UINT64_MAX;
+        gmMainLib_8015CC58()->rumble_enabled[0]=true;
+        gmMainLib_8015CC58()->rumble_enabled[1]=true;
+        *gmMainLib_GetUnlockedCharactersBitmaskPtr()=0xffff;*gmMainLib_8015EDA4()=0xffff;
+    }else{
+        *gmMainLib_GetGameRules()=h->selected_rules;
+        *gmMainLib_8015CC58()=h->selected_preferences;
+        *gmMainLib_GetUnlockedCharactersBitmaskPtr()=h->selected_characters;
+        *gmMainLib_8015EDA4()=h->selected_stages;
+    }
     HSD_PadLibData=default_libinfo_data;
     HSD_PadLibData.rumble_info=h->saved_library.rumble_info;
     HSD_PadLibData.qnum=1;HSD_PadLibData.queue=&h->queue;
@@ -188,6 +211,8 @@ int melee_web_menu_host_leave(MeleeWebMenuHost* h,int abort_scene,char* e,size_t
     if(was_sss)HSD_SisLib_803A5FBC();
     h->selected_characters=*gmMainLib_GetUnlockedCharactersBitmaskPtr();
     h->selected_stages=*gmMainLib_8015EDA4();
+    h->selected_rules=*gmMainLib_GetGameRules();
+    h->selected_preferences=*gmMainLib_8015CC58();
     melee_web_pad_state_free(h->input);h->input=input;
     h->entered=0;restore_context(h);return ok(e,n);
 }
@@ -272,14 +297,93 @@ const MeleeWebPadState* melee_web_menu_host_input(const MeleeWebMenuHost* h){
 }
 int melee_web_menu_host_match_finished(MeleeWebMenuHost* h,uint32_t seed,
     const uint8_t bytes[MELEE_WEB_PAD_STATE_BYTES],char* e,size_t n){
-    if(!h||h!=owner||h->entered||h->audio||seed_ptr!=&h->seed||melee_web_menu_phase(h->session)!=MELEE_WEB_MENU_READY)
+    if(!h||h!=owner||h->entered||h->audio||h->results_active||seed_ptr!=&h->seed||melee_web_menu_phase(h->session)!=MELEE_WEB_MENU_READY)
         return fail(e,n,"Match must restore its source ownership before returning to CSS");
     MeleeWebPadState* input=melee_web_pad_state_decode(bytes,MELEE_WEB_PAD_STATE_BYTES,e,n);
     if(!input)return 0;
     melee_web_pad_state_free(h->input);h->input=input;
     h->seed=seed;return ok(e,n);
 }
+static void restore_results_route(MeleeWebMenuHost* h){
+    *gmVsMelee_GetVsData()=h->route_saved_vs;
+    gmVsMelee_VsExitInfo=h->route_saved_exit;
+    gmVsMelee_ResultsEnterData=h->route_saved_result;
+    memcpy(gmVsMelee_GetKOCounts(),h->route_saved_ko,sizeof(h->route_saved_ko));
+    *gmMainLib_GetGameRules()=h->route_saved_rules;
+    *gmMainLib_8015CC58()=h->route_saved_preferences;
+    *gmMainLib_GetUnlockedCharactersBitmaskPtr()=h->route_saved_characters;
+    *gmMainLib_8015EDA4()=h->route_saved_stages;
+    if(!melee_web_vs_mode_end())abort();
+    h->results_active=h->results_exited=h->results_committed=0;
+}
+int melee_web_menu_host_results_begin(MeleeWebMenuHost* h,
+    const MatchExitInfo* exit_info,uint32_t seed,ResultsMatchInfo* result,
+    char* e,size_t n){
+    if(!h||h!=owner||h->entered||h->audio||h->results_active||
+       seed_ptr!=&h->seed||!exit_info||!result||
+       melee_web_menu_phase(h->session)!=MELEE_WEB_MENU_READY)
+        return fail(e,n,"Results routing requires a completed closed match");
+    if(!melee_web_vs_mode_begin())return fail(e,n,"Original VS mode is already owned");
+    h->route_saved_vs=*gmVsMelee_GetVsData();
+    h->route_saved_exit=gmVsMelee_VsExitInfo;
+    h->route_saved_result=gmVsMelee_ResultsEnterData;
+    memcpy(h->route_saved_ko,gmVsMelee_GetKOCounts(),sizeof(h->route_saved_ko));
+    h->route_saved_rules=*gmMainLib_GetGameRules();
+    h->route_saved_preferences=*gmMainLib_8015CC58();
+    h->route_saved_characters=*gmMainLib_GetUnlockedCharactersBitmaskPtr();
+    h->route_saved_stages=*gmMainLib_8015EDA4();
+    h->results_active=1;h->results_exited=h->results_committed=0;h->seed=seed;
+    *gmMainLib_GetGameRules()=h->selected_rules;
+    *gmMainLib_8015CC58()=h->selected_preferences;
+    *gmMainLib_GetUnlockedCharactersBitmaskPtr()=h->selected_characters;
+    *gmMainLib_8015EDA4()=h->selected_stages;
+    const CSSData* css=melee_web_menu_css(h->session);
+    *gmVsMelee_GetVsData()=css->vs;
+    memcpy(gmVsMelee_GetKOCounts(),css->ko_counts,sizeof(h->route_saved_ko));
+    gmVsMelee_VsExitInfo=*exit_info;
+    if(!melee_web_vs_mode_select_state(gmVsMode_State_Vs))abort();
+    gm_Mode_Vs_States[2].on_exit(&gm_Mode_Vs_States[2]);
+    const int next=melee_web_vs_mode_next_state();
+    if(next!=gmVsMode_State_Results){
+        restore_results_route(h);
+        if(e&&n)snprintf(e,n,"Original VS requested unsupported state %d before Results",next);
+        return 0;
+    }
+    if(!melee_web_vs_mode_select_state(gmVsMode_State_Results))abort();
+    gm_Mode_Vs_States[4].on_enter(&gm_Mode_Vs_States[4]);
+    *result=gmVsMelee_ResultsEnterData;
+    return ok(e,n);
+}
+int melee_web_menu_host_results_exit(MeleeWebMenuHost* h,char* e,size_t n){
+    if(!h||h!=owner||!h->results_active||h->results_exited||
+       !melee_web_results_context_exit_ready())
+        return fail(e,n,"Results mode exit requires its live source world");
+    gm_Mode_Vs_States[4].on_exit(&gm_Mode_Vs_States[4]);
+    h->results_exited=1;
+    const int next=melee_web_vs_mode_next_state();
+    if(next!=gmVsMode_State_Css){
+        if(e&&n)snprintf(e,n,"Original Results requested unsupported state %d",next);
+        return 0;
+    }
+    if(!melee_web_menu_commit_results(h->session,gmVsMelee_GetVsData(),
+        gmVsMelee_GetKOCounts(),e,n))return 0;
+    h->selected_characters=*gmMainLib_GetUnlockedCharactersBitmaskPtr();
+    h->selected_stages=*gmMainLib_8015EDA4();
+    h->selected_rules=*gmMainLib_GetGameRules();
+    h->selected_preferences=*gmMainLib_8015CC58();
+    h->results_committed=1;
+    return ok(e,n);
+}
+int melee_web_menu_host_results_end(MeleeWebMenuHost* h,uint32_t seed,
+    const uint8_t input[MELEE_WEB_PAD_STATE_BYTES],char* e,size_t n){
+    if(!h||h!=owner||!h->results_active||!h->results_committed||
+       melee_web_gameplay_generation()||seed_ptr!=&h->seed)
+        return fail(e,n,"Results must tear down before restoring its route owner");
+    restore_results_route(h);
+    return melee_web_menu_host_match_finished(h,seed,input,e,n);
+}
 int melee_web_menu_host_destroy(MeleeWebMenuHost* h,char* e,size_t n){
     if(!h||h!=owner||h->entered||h->audio||seed_ptr!=&h->seed)return fail(e,n,"Close native menu scene and restore RNG before destroying host");
+    if(h->results_active)restore_results_route(h);
     if(!melee_web_menu_session_destroy(h->session,e,n))return 0;seed_ptr=h->saved_seed;owner=NULL;melee_web_pad_state_free(h->input);free(h);return ok(e,n);
 }

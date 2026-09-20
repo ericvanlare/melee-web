@@ -128,6 +128,9 @@ const SSSData* melee_web_menu_sss(const MeleeWebMenuSession*);
 /* Returns the separate VS-entry payload after the original source adapter has
  * applied persistent rules, stocks, item settings and rumble. */
 const VsModeData* melee_web_menu_ready_vs(const MeleeWebMenuSession*);
+/* Commit the ordinary VS Results callback's persistent menu payload. */
+int melee_web_menu_commit_results(MeleeWebMenuSession*, const VsModeData*,
+    const uint8_t ko_counts[GM_MAX_PLAYERS], char*, size_t);
 
 /* Return the contiguous active source-player count in [2,4], or zero for a
  * malformed/non-match shape.  Slots after the returned count must be NA. */

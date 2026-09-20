@@ -5,6 +5,7 @@
 #include <melee/mp/mplib.h>
 #include <melee/gr/grdynamicattr.h>
 #include <sysdolphin/baselib/gobj.h>
+#include <sysdolphin/baselib/gobjplink.h>
 #include <sysdolphin/baselib/gobjproc.h>
 #include <math.h>
 #include <stdio.h>
@@ -27,6 +28,45 @@ static const MeleeWebCollisionJoint joint = {{{0, 3}, {3, 1}, {4, 0}, {4, 0}, {0
 static MeleeWebCollisionInput input = {
     vertices, 4, lines, 4, &joint, 1, {{0, 3}, {3, 1}, {4, 0}, {4, 0}, {0, 0}}, 0, Gr_Kind_Last, 2.0F};
 
+static void source_dummy_case(void)
+{
+    check(melee_web_collision_source_available(), "empty source collision storage is available before dummy load");
+    check(!melee_web_collision_adopt_dummy(error, sizeof(error)),
+          "dummy adoption rejects an uninitialized source world");
+
+    /* Reproduce the original Results entry seam: mpLibLoad(NULL) selects the
+     * authored dummy map, then the original link-6/process-4 owner is made.
+     * No copied map descriptor or synthetic process is involved. */
+    stage_info.grkind = Gr_Kind_Pura;
+    mpLibLoad(NULL);
+    mpLib_80058820();
+    check(!melee_web_collision_source_available(),
+          "nonempty source collision storage is not advertised as available");
+    check(!melee_web_collision_adopt_dummy(error, sizeof(error)),
+          "dummy adoption rejects a non-dummy stage context");
+    stage_info.grkind = Gr_Kind_Unk00;
+    MeleeWebCollision* owner = melee_web_collision_adopt_dummy(error, sizeof(error));
+    check(owner != NULL, "dummy collision adopts original arrays and process");
+    check(!melee_web_collision_adopt_dummy(error, sizeof(error)),
+          "duplicate dummy adoption rejects live ownership");
+    check(!melee_web_collision_create(&input, error, sizeof(error)),
+          "ordinary collision construction rejects live dummy ownership");
+
+    HSD_GObj* updater = ((HSD_GObj**) HSD_GObj_Entities)[6];
+    check(updater && updater->user_data == owner && updater->proc && updater->proc->s_link == 4,
+          "adopted dummy uses the original collision GObj userdata lifetime");
+    HSD_GObjPLink_80390228(updater);
+    check(mpLib_8004D164() == NULL && mpGetGroundCollVtx() == NULL &&
+              mpGetGroundCollLine() == NULL && mpGetGroundCollJoint() == NULL &&
+              melee_web_gameplay_stats().objects == 0 &&
+              melee_web_gameplay_stats().processes == 0,
+          "original dummy GObj destruction releases collision globals and process");
+    check(melee_web_collision_destroy(owner, error, sizeof(error)),
+          "stale adopted handle releases after original GObj destruction");
+    check(melee_web_collision_source_available(),
+          "source collision storage is available again after GObj destruction");
+}
+
 int main(void)
 {
     check(!melee_web_collision_create(&input, error, sizeof(error)), "uninitialized world rejects");
@@ -45,6 +85,7 @@ int main(void)
     check(!melee_web_collision_create(&invalid, error, sizeof(error)), "SDK normal arithmetic overflow rejects");
     invalid = input; invalid.line_count = 1537;
     check(!melee_web_collision_create(&invalid, error, sizeof(error)), "source line capacity enforced before reads");
+    source_dummy_case();
     lines[2].next0 = 0;
     check(!melee_web_collision_create(&input, error, sizeof(error)), "cyclic island chains reject before original traversal");
     lines[2].next0 = -1;

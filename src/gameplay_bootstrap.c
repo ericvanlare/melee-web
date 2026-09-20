@@ -21,8 +21,11 @@ _Static_assert(sizeof(HSD_ObjAllocData) == 0x2c, "Original object allocator layo
 extern HSD_ObjAllocData gobj_alloc_data, gobjproc_alloc_data;
 
 static void* arena;
+static size_t arena_bytes;
+static void* session_arena;
+static size_t session_bytes;
 static OSHeapHandle heap = -1;
-static uint64_t ticks, disabled_links, generation;
+static uint64_t ticks, disabled_links, generation, allocation_generation;
 static int stepping, shutting_down, tables_live;
 static unsigned object_kind_count;
 static void (*finish_hsd_objects)(void);
@@ -53,21 +56,102 @@ static int has_render_objects(void)
     return 0;
 }
 
+static uint64_t next_allocation_generation(void)
+{
+    ++allocation_generation;
+    if (allocation_generation == 0) ++allocation_generation;
+    return allocation_generation;
+}
+
+static void* allocation_arena(void)
+{
+    return arena ? arena : session_arena;
+}
+
+int melee_web_gameplay_session_active(void)
+{
+    return session_arena != NULL;
+}
+
+MeleeWebGameplayAllocation melee_web_gameplay_allocation(void)
+{
+    MeleeWebGameplayAllocation result = {0};
+    void* candidate = allocation_arena();
+    if (!candidate) return result;
+    /* A live world or an already initialized session must still own the
+     * original SDK roots. Before the first world, heap_available() proves
+     * that no foreign allocator has claimed the raw session allocation. */
+    if ((arena && !melee_web_gameplay_heap_owns(candidate)) ||
+        (!arena && !melee_web_gameplay_heap_owns(candidate) &&
+         !melee_web_gameplay_heap_available()))
+        return result;
+    result.identity = (uint64_t) (uintptr_t) candidate;
+    result.generation = allocation_generation;
+    result.bytes = (uint64_t) (arena ? arena_bytes : session_bytes);
+    return result;
+}
+
+int melee_web_gameplay_session_begin(size_t bytes, char* error, size_t error_size)
+{
+    if (session_arena || arena || HSD_GObj_Entities || HSD_GetHeap() != -1 ||
+        !melee_web_gameplay_heap_available())
+        return fail(error, error_size, "An idle process with no SDK allocator is required for a gameplay session");
+    if (bytes < 65536 || bytes > 64U * 1024U * 1024U)
+        return fail(error, error_size, "Gameplay session arena must be between 64 KiB and 64 MiB");
+    void* candidate = malloc(bytes);
+    if (!candidate) return fail(error, error_size, "Unable to allocate gameplay session arena");
+    session_arena = candidate;
+    session_bytes = bytes;
+    next_allocation_generation();
+    return success(error, error_size);
+}
+
+int melee_web_gameplay_session_end(char* error, size_t error_size)
+{
+    if (!session_arena) return success(error, error_size);
+    if (arena || tables_live || HSD_GetHeap() != -1)
+        return fail(error, error_size, "Gameplay session cannot end while a world is live");
+    if (melee_web_gameplay_heap_owns(session_arena)) {
+        if (!melee_web_gameplay_heap_release(session_arena, error, error_size)) return 0;
+    } else if (!melee_web_gameplay_heap_available()) {
+        return fail(error, error_size, "Gameplay session SDK arena ownership changed");
+    }
+    free(session_arena);
+    session_arena = NULL;
+    session_bytes = 0;
+    return success(error, error_size);
+}
+
 int melee_web_gameplay_startup(size_t bytes, char* error, size_t error_size)
 {
-    if (arena || HSD_GObj_Entities || !melee_web_gameplay_heap_available() || HSD_GetHeap() != -1)
+    if (arena || HSD_GObj_Entities || HSD_GetHeap() != -1)
         return fail(error, error_size, "An HSD object world or SDK heap already exists");
     if (bytes < 65536 || bytes > 64U * 1024U * 1024U)
         return fail(error, error_size, "Gameplay bootstrap heap must be between 64 KiB and 64 MiB");
-    arena = malloc(bytes);
-    if (!arena) return fail(error, error_size, "Unable to allocate gameplay bootstrap arena");
-    void* start = melee_web_gameplay_heap_initialize(arena, bytes, error, error_size);
-    heap = start ? OSCreateHeap(start, (unsigned char*) arena + bytes) : -1;
+    const int retained = session_arena != NULL;
+    if (retained && bytes != session_bytes)
+        return fail(error, error_size, "Gameplay world heap size differs from its session arena");
+    void* candidate = retained ? session_arena : malloc(bytes);
+    if (!candidate) return fail(error, error_size, "Unable to allocate gameplay bootstrap arena");
+    void* start = NULL;
+    if (retained && melee_web_gameplay_heap_owns(candidate)) {
+        if (!melee_web_gameplay_heap_recreate(candidate, &heap, error, error_size))
+            return 0;
+    } else {
+        if (retained && !melee_web_gameplay_heap_available()) {
+            return fail(error, error_size, "Gameplay session SDK arena ownership changed");
+        }
+        start = melee_web_gameplay_heap_initialize(candidate, bytes, error, error_size);
+        heap = start ? OSCreateHeap(start, (unsigned char*) candidate + bytes) : -1;
+    }
     if (heap < 0) {
-        if (start && !melee_web_gameplay_heap_release(arena, error, error_size)) return 0;
-        free(arena); arena = NULL;
+        if (start && !melee_web_gameplay_heap_release(candidate, error, error_size)) return 0;
+        if (!retained) free(candidate);
         return fail(error, error_size, "SDK heap initialization failed");
     }
+    arena = candidate;
+    arena_bytes = bytes;
+    if (!retained) next_allocation_generation();
     OSSetCurrentHeap(heap);
     HSD_SetHeap(heap);
     HSD_ObjSetHeap((u32) bytes, NULL);
@@ -213,11 +297,22 @@ int melee_web_gameplay_shutdown(char* error, size_t error_size)
     OSDestroyHeap(heap);
     heap = -1;
     tables_live = 0;
+    if (session_arena) {
+        /* Keep the claimed descriptor array and its inactive heap metadata so
+         * the next world can call heap_recreate over the same bounds. This is
+         * the isolated equivalent of retail HSD_CreateMainHeap: the object
+         * tables above are gone, the old OS heap is destroyed, and no payload
+         * bytes are cleared between scenes. */
+        arena = NULL;
+        arena_bytes = 0;
+        shutting_down = 0;
+        return success(error, error_size);
+    }
     if (!melee_web_gameplay_heap_release(arena, error, error_size)) {
         shutting_down = 0;
         return 0;
     }
-    free(arena); arena = NULL;
+    free(arena); arena = NULL; arena_bytes = 0;
     shutting_down = 0;
     return success(error, error_size);
 }

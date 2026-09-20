@@ -102,9 +102,9 @@ DatEffectEntries::DatEffectEntries(std::shared_ptr<const DatArchive> archive,std
     }
 }
 DatEffectEntries::~DatEffectEntries(){if(!detach(nullptr,0))std::terminate();}
-bool DatEffectEntries::load(char* error,size_t size){
+bool DatEffectEntries::publish_for_source(char* error,size_t size){
     auto& s=*storage_;
-    if(s.needs_particles&&!melee_web_effect_runtime_active())return fail(error,size,"Effect particle descriptors require the original callback runtime");
+    if(s.needs_particles&&!melee_web_effect_runtime_prepared())return fail(error,size,"Effect particle descriptors require an owned callback runtime");
     if(s.registration)return fail(error,size,"Effect entries are already published");
     if(efLib_EffectCount)return fail(error,size,"Live source effects prevent descriptor replacement");
     if(s.bank_index>=50)return fail(error,size,"Effect source bank index is invalid");
@@ -116,17 +116,29 @@ bool DatEffectEntries::load(char* error,size_t size){
     s.registration=melee_web_archive_sections_register(&entry,1,error,size);
     if(!s.registration){if(s.bank)melee_web_effect_bank_detach(s.bank->bank(),nullptr,0);return false;}
     s.previous_data=lookup.data;lookup.data=nullptr;
-    efAsync_LoadSync(int(s.bank_index));
+    if(error&&size)*error=0;return true;
+}
+bool DatEffectEntries::verify_source_load(char* error,size_t size){
+    auto& s=*storage_;
+    if(!s.registration)return fail(error,size,"Effect entries are not published");
+    const auto& lookup=efAsync_DatEntries[s.bank_index];
     s.ready=lookup.data==s.table+1;
     if(!s.ready)return fail(error,size,"Original effect loader did not publish owned entries");
     if(error&&size)*error=0;return true;
+}
+bool DatEffectEntries::load(char* error,size_t size){
+    if(storage_->needs_particles&&!melee_web_effect_runtime_active())
+        return fail(error,size,"Effect particle descriptors require the initialized original callback runtime");
+    if(!publish_for_source(error,size))return false;
+    efAsync_LoadSync(int(storage_->bank_index));
+    return verify_source_load(error,size);
 }
 bool DatEffectEntries::detach(char* error,size_t size){
     auto& s=*storage_;
     if(!s.registration)return true;
     if(efLib_EffectCount)return fail(error,size,"Live source effects prevent descriptor release");
     auto& lookup=efAsync_DatEntries[s.bank_index];
-    if(lookup.data!=s.table+1)return fail(error,size,"Effect lookup ownership changed");
+    if(lookup.data!=s.table+1&&(s.ready||lookup.data))return fail(error,size,"Effect lookup ownership changed");
     if(s.bank&&!melee_web_effect_bank_detach(s.bank->bank(),error,size))return false;
     lookup.data=s.previous_data;
     if(!melee_web_archive_sections_close(s.registration,error,size))std::terminate();

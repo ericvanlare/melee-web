@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-/** Ordinary keyboard regression for the existing No Contest -> CSS route.
- * Does not establish retail Results, physical input, or performance acceptance.
+/** Ordinary keyboard regression for the No Contest -> Results -> CSS route.
+ * Does not establish retail equivalence, physical input, or performance acceptance.
  */
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -18,7 +18,7 @@ const browser=await chromium.launch({...options,headless:false});
 const page=await browser.newPage({viewport:{width:1280,height:960}});
 const driver=createBrowserDriver(page,{timeoutMs:60000,deadline:Date.now()+300000});
 const report={schema:'melee-web-versus-return-browser-v1',browser:browser.version(),
-  scope:'Ordinary B0XX keyboard, human P1/CPU P2, Mario/FD, three No Contest returns in one document. No retail, Results, physical input, retained source-heap or performance acceptance.',
+  scope:'Ordinary B0XX keyboard, human P1/CPU P2, Mario/FD, three No Contest Results returns in one document with the same source arena. No retail allocator equivalence, physical input or performance acceptance.',
   checks:[],memory:[],completed:false};
 async function check(name,run){await run();report.checks.push(name);console.log(name);}
 async function memory(boundary){report.memory.push({boundary,...await page.evaluate(()=>
@@ -62,11 +62,20 @@ try {
   for(let match=1;match<=3;match++){
     await page.waitForTimeout(1200);await memory(`css-before-match-${match}`);
     await check(`match ${match}: original CSS -> SSS -> playable match`,enterMatch);
-    await check(`match ${match}: source pause -> LRAS -> stable CSS`,async()=>{
+    await check(`match ${match}: source pause -> LRAS -> Results -> Start -> stable CSS`,async()=>{
       await driver.pressChord(['7']);await waitSourcePause();await page.waitForTimeout(700);
       // First use the reported short chord; subsequent runs hold it across
       // the ownership change to catch fabricated button edges on CSS entry.
       await driver.pressChord(['q','9','m','7'],{holdMs:match===1?120:1000,releaseMs:150});
+      await driver.waitForPhase(8);await page.waitForTimeout(4500);
+      await memory(`results-match-${match}`);
+      if(match===1){
+        // Explicit host pause for a stable rendering artifact, outside timing evidence.
+        await page.locator('#pause').click();
+        await page.locator('#canvas').screenshot({path:path.join(values.out,'results.png')});
+        await page.locator('#pause').click();
+      }
+      await driver.pressChord(['7']);
       await driver.waitForPhase(1);await page.waitForTimeout(1200);await driver.waitForPhase(1);
       assert.equal(await page.evaluate(()=>window.versusReturnDocument),marker);
       assert.match(await page.evaluate(()=>Module.UTF8ToString(Module._melee_web_native_menu_diagnostics())),
@@ -74,6 +83,17 @@ try {
     });
     await memory(`css-after-match-${match}`);
   }
+  await check('same source backing arena across all three matches',async()=>{
+    const first=report.memory[0];
+    assert.equal(first.source_session_owned,true);
+    assert.equal(first.source_allocation_bytes,32*1024*1024);
+    assert.ok(first.source_allocation_identity>0&&first.source_allocation_generation>0);
+    for(const entry of report.memory){
+      assert.equal(entry.source_session_owned,true);
+      for(const field of ['source_allocation_identity','source_allocation_generation','source_allocation_bytes'])
+        assert.equal(entry[field],first[field],`${entry.boundary}: ${field}`);
+    }
+  });
   report.completed=true;
 } catch(error){
   report.failure={message:error.message,stack:error.stack,diagnostics:error.diagnostics};

@@ -16,7 +16,8 @@ MeleeWebPipelineSourceContext context(uint32_t scene, uint32_t phase) {
     MeleeWebPipelineSourceContext value{};
     value.scene = scene;
     value.phase = phase;
-    value.world_generation = scene == MELEE_WEB_PIPELINE_SCENE_BOOT ? 0 : 7;
+    value.world_generation = (scene == MELEE_WEB_PIPELINE_SCENE_BOOT ||
+                              scene == MELEE_WEB_PIPELINE_SCENE_RESULTS) ? 0 : 7;
     value.route_epoch = 11;
     value.source_tick = 19;
     value.coverage_case_id = 23;
@@ -191,6 +192,35 @@ void check_missing_context_and_scope_pair() {
                                                 error, sizeof(error)));
     assert(melee_web_pipeline_status(recorder, &status, error, sizeof(error)));
     assert(status.invalid_reason == MELEE_WEB_PIPELINE_INVALID_UNPAIRED_SCOPE);
+    assert(melee_web_pipeline_capture_end(recorder, error, sizeof(error)));
+    assert(melee_web_pipeline_recorder_destroy(recorder, error, sizeof(error)));
+}
+
+void check_results_preparation_context() {
+    const auto boot = context(MELEE_WEB_PIPELINE_SCENE_BOOT,
+                              MELEE_WEB_PIPELINE_PHASE_PREPARATION);
+    auto* recorder = recorder_with(boot);
+    char error[256]{};
+    auto results = context(MELEE_WEB_PIPELINE_SCENE_RESULTS,
+                           MELEE_WEB_PIPELINE_PHASE_PREPARATION);
+    MeleeWebPipelineSourceToken token{};
+    assert(melee_web_pipeline_source_scope_begin(recorder, &results, &token,
+                                                 error, sizeof(error)));
+    assert(melee_web_pipeline_source_scope_end(recorder, &token,
+                                               error, sizeof(error)));
+    assert(melee_web_pipeline_capture_end(recorder, error, sizeof(error)));
+    assert(melee_web_pipeline_recorder_destroy(recorder, error, sizeof(error)));
+
+    /* Results with no world is only legal while the source is preparing the
+     * scene; an interactive context must carry a live world generation. */
+    recorder = recorder_with(boot);
+    results.phase = MELEE_WEB_PIPELINE_PHASE_INTERACTIVE;
+    assert(!melee_web_pipeline_source_scope_begin(recorder, &results, &token,
+                                                  error, sizeof(error)));
+    MeleeWebPipelineStatus status{};
+    assert(melee_web_pipeline_status(recorder, &status, error, sizeof(error)));
+    assert(!status.valid &&
+           status.invalid_reason == MELEE_WEB_PIPELINE_INVALID_INVALID_CONTEXT);
     assert(melee_web_pipeline_capture_end(recorder, error, sizeof(error)));
     assert(melee_web_pipeline_recorder_destroy(recorder, error, sizeof(error)));
 }
@@ -519,6 +549,7 @@ int main(int argc, char** argv) {
     check_descriptor_digest_vectors();
     check_full_capture();
     check_missing_context_and_scope_pair();
+    check_results_preparation_context();
     check_overflow_and_stale_token();
     check_final_snapshot_preserves_unpaired_evidence();
     check_thread_local_deferred_context_and_nonce();

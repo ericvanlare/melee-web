@@ -66,6 +66,13 @@ or retail-reference result. The later MarioReady operation-55 representation
 defect is fixed, and fresh native whole-match routes pass on both admitted
 stages.
 
+Issue #34 extends the historical Results-skipping slice with the original
+Results scene and retained source heap across successive matches. The draft
+renders No Contest Results in a scoped browser diagnostic; actual mode exit
+currently requests an unsupported Prize from the synthetic profile. It does
+not yet pass the full return loop. See the [Results checkpoint](VERSUS_RETURN_LOOP.md#original-results-rendering-and-mode-routing-checkpoint)
+for the retained failures, precise evidence and remaining original-game gates.
+
 ## Optimization policy
 
 - Keep source action logic, collision, damage, RNG consumption, object/process

@@ -790,6 +790,56 @@ class PipelineRequirementsTests(unittest.TestCase):
         self.assertEqual(result["status"]["incomplete_scopes"], [])
         self.assertEqual(result["groups"][0]["members"], [])
 
+    def test_worldless_results_preparation_is_valid_but_interactive_is_unbound(self):
+        coverage = dict(self.coverage)
+        coverage["cases"] = [{
+            "case_id": "mario-fd", "route_id": "mario-fd", "route": {"route_id": "mario-fd"},
+            "expected_phases": [{"scene": "results", "phase": "preparation"}],
+            "expected_actions": [], "expected_costumes": [], "lifecycle": ["preparation"],
+            "input": {"capture_id": self.capture_id, "sha256": self.input_digest},
+        }]
+        metadata = dict(self.metadata)
+        metadata["coverage_manifest_sha256"] = sha256_json(coverage)
+        scope = {"scope_id": "results-s", "case_id": "mario-fd", "route_id": "mario-fd",
+                 "scene": 7, "phase": 1, "world_generation": 0,
+                 "input_manifest_sha256": self.input_digest}
+        capture = self.capture(records=[
+            {"sequence": 1, "kind": "scope_begin", "scope": scope},
+            {"sequence": 2, "kind": "scope_end", "scope": scope},
+        ])
+        capture["descriptors"] = []
+        capture["sequence_end"] = 2
+        capture["status"] = dict(capture["status"], total_records=2, drained_records=2)
+        capture["provenance"] = dict(capture["provenance"],
+                                      coverage_manifest_sha256=metadata["coverage_manifest_sha256"])
+        result = generate(capture, self.seed, metadata, coverage)
+        self.assertEqual(result["status"]["kind"], "certificate")
+        self.assertTrue(result["status"]["certified"])
+
+        interactive_coverage = dict(coverage)
+        interactive_coverage["cases"] = [dict(coverage["cases"][0],
+            expected_phases=[{"scene": "results", "phase": "interactive"}],
+            expected_actions=["Jab"], expected_costumes=[0], lifecycle=["interactive"])]
+        interactive_metadata = dict(self.metadata,
+                                    coverage_manifest_sha256=sha256_json(interactive_coverage))
+        live_scope = dict(scope, scope_id="results-interactive-s", phase=4)
+        interactive_capture = self.capture(records=[
+            {"sequence": 1, "kind": "scope_begin", "scope": live_scope},
+            {"sequence": 2, "kind": "draw_use",
+             "scope": dict(live_scope, action="Jab", costumes=[0], lifecycle="interactive"),
+             "descriptor": self.descriptor(7, b"descriptor-seven")},
+            {"sequence": 3, "kind": "scope_end", "scope": live_scope},
+        ])
+        interactive_capture["sequence_end"] = 3
+        interactive_capture["status"] = dict(interactive_capture["status"], total_records=3, drained_records=3)
+        interactive_capture["provenance"] = dict(
+            interactive_capture["provenance"],
+            coverage_manifest_sha256=interactive_metadata["coverage_manifest_sha256"])
+        result = generate(interactive_capture, self.seed, interactive_metadata, interactive_coverage)
+        self.assertEqual(result["status"]["kind"], "incomplete")
+        self.assertFalse(result["status"]["certified"])
+        self.assertGreater(result["status"]["incomplete_scopes"][0]["unbound_source_scopes"], 0)
+
     def test_empty_boot_and_preparation_scopes_do_not_validate_route_content(self):
         coverage = dict(self.coverage)
         coverage["cases"] = [{

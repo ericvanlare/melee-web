@@ -1,7 +1,12 @@
 #include "gameplay_menu_world.hpp"
 #include "gameplay_menu_host.h"
 #include "gameplay_match_session.hpp"
+#include "gameplay_results_session.hpp"
+extern "C" {
+#include <melee/gm/types.h>
+}
 #include "gameplay_match_rules.h"
+#include "gameplay_bootstrap.h"
 #include "gameplay_retail_recipe.hpp"
 #include "../tests/native_menu_fighter_input.h"
 #include "../tests/native_menu_stage_input.h"
@@ -37,13 +42,16 @@
 #include <string_view>
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
 #include "pipeline_provenance_runtime.h"
-#include "gameplay_bootstrap.h"
 #endif
 namespace {
 melee_web::RuntimeFiles files;
 std::unique_ptr<melee_web::RuntimeArchiveCache> archive_cache;
 std::unique_ptr<melee_web::GameplayMenuWorld> world;
+bool source_session_owned=false;
 std::unique_ptr<melee_web::GameplayMatchSession> match;
+std::unique_ptr<melee_web::GameplayResultsSession> results;
+ResultsMatchInfo results_info{};
+bool results_route_active=false;
 std::unique_ptr<melee_web::RetailReplayRecipe> replay;
 size_t replay_cursor=0;
 melee_web::SourceFrameSequence replay_source_frames;
@@ -82,7 +90,26 @@ uint32_t provenance_last_scene=MELEE_WEB_PIPELINE_SCENE_BOOT;
 bool provenance_return_draw=false;
 MeleeWebPipelineSourceContext pipeline_context(uint32_t phase_override=0,uint32_t scene_override=0){
  MeleeWebPipelineSourceContext context{};
- if(match)context=match->provenance_context();
+ if(results_route_active){
+  for(auto& player:context.players){player.motion_id=-1;player.stocks=-1;}
+  context.scene=MELEE_WEB_PIPELINE_SCENE_RESULTS;
+  context.phase=MELEE_WEB_PIPELINE_PHASE_INTERACTIVE;
+  context.world_generation=melee_web_gameplay_generation();
+  context.source_tick=melee_web_gameplay_provenance_tick();
+  context.owner_kind=MELEE_WEB_PIPELINE_OWNER_MENU_SCENE;
+  context.owner_id=MELEE_WEB_PIPELINE_SCENE_RESULTS;
+  for(unsigned i=0;i<4;++i){
+   const auto& source=results_info.match_end.player_standings[i];
+   if(source.slot_type==Gm_PKind_NA)continue;
+   ++context.active_player_count;
+   auto& player=context.players[i];
+   player.character=source.ckind;player.costume=source.x3;player.stocks=source.stocks;
+   const auto* content=melee_web_fighter_content(source.ckind);
+   player.fighter_kind=content?content->fighter_kind:UINT32_MAX;
+   player.effect_bank=content?content->effect_bank:UINT32_MAX;
+  }
+ }
+ else if(match)context=match->provenance_context();
  else if(host){
   if(!melee_web_menu_host_provenance(host,&context))
    melee_web_provenance_invalid(MELEE_WEB_PIPELINE_INVALID_MISSING_CONTEXT);
@@ -177,14 +204,24 @@ PADStatus diagnostic_pad{};
 unsigned diagnostic_pad_port=0,diagnostic_pad_remaining=0;
 std::array<float,1068> pcm;
 alignas(32) unsigned char fifo[64*1024];
-constexpr std::array<std::string_view,104> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","EfFxData.dat","falco.ssm","GrNBa.dat","sp_zako.hps","hyaku.hps","hyaku2.hps","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","fox.ssm","GrSt.dat","ystory.hps","PlMs.dat","PlMsAJ.dat","PlMsNr.dat","PlMsRe.dat","PlMsGr.dat","PlMsBk.dat","PlMsWh.dat","EfMsData.dat","mars.ssm","GrOp.dat","old_kb.hps","pupupu.ssm","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sislib_font.bin",
+constexpr std::array<std::string_view,119> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","EfFxData.dat","falco.ssm","GrNBa.dat","sp_zako.hps","hyaku.hps","hyaku2.hps","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","fox.ssm","GrSt.dat","ystory.hps","PlMs.dat","PlMsAJ.dat","PlMsNr.dat","PlMsRe.dat","PlMsGr.dat","PlMsBk.dat","PlMsWh.dat","EfMsData.dat","mars.ssm","GrOp.dat","old_kb.hps","pupupu.ssm","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sislib_font.bin",
  "PlDr.dat","PlDrAJ.dat","PlDrNr.dat","PlDrRe.dat","PlDrBu.dat","PlDrGr.dat","PlDrBk.dat","drmario.ssm",
  "PlFe.dat","PlFeAJ.dat","PlFeNr.dat","PlFeRe.dat","PlFeBu.dat","PlFeGr.dat","PlFeYe.dat","EfFeData.dat","emblem.ssm",
  "PlLk.dat","PlLkAJ.dat","PlLkNr.dat","PlLkRe.dat","PlLkBu.dat","PlLkBk.dat","PlLkWh.dat",
- "PlCl.dat","PlClAJ.dat","PlClNr.dat","PlClRe.dat","PlClBu.dat","PlClWh.dat","PlClBk.dat","EfLkData.dat","link.ssm","clink.ssm"};
+ "PlCl.dat","PlClAJ.dat","PlClNr.dat","PlClRe.dat","PlClBu.dat","PlClWh.dat","PlClBk.dat","EfLkData.dat","link.ssm","clink.ssm",
+ "GmRst.usd","SdRst.usd","TyDatai.usd",
+ "GmRstMMr.dat","GmRstMDr.dat","GmRstMFx.dat","GmRstMFc.dat",
+ "GmRstMMs.dat","GmRstMFe.dat","GmRstMLk.dat","GmRstMCl.dat",
+ "ff_mario.hps","ff_fox.hps","ff_emb.hps","ff_link.hps"};
 constexpr unsigned kDiagnosticPadButtons=PAD_BUTTON_LEFT|PAD_BUTTON_RIGHT|PAD_BUTTON_DOWN|PAD_BUTTON_UP|
  PAD_TRIGGER_Z|PAD_TRIGGER_R|PAD_TRIGGER_L|PAD_BUTTON_A|PAD_BUTTON_B|PAD_BUTTON_X|PAD_BUTTON_Y|PAD_BUTTON_START;
 void check(int value,const char* error){if(!value)throw std::runtime_error(error);}
+void begin_source_session(){
+ if(source_session_owned)return;
+ char error[256]{};
+ check(melee_web_gameplay_session_begin(32U*1024U*1024U,error,sizeof(error)),error);
+ source_session_owned=true;
+}
 void clear_diagnostic_pad(){diagnostic_pad={};diagnostic_pad_port=0;diagnostic_pad_remaining=0;}
 AuroraStats aurora_stats_snapshot(){
  AuroraStats result{};if(const AuroraStats* stats=aurora_get_stats())result=*stats;return result;
@@ -194,22 +231,25 @@ int32_t stat_delta(uint64_t after,uint64_t before){
 }
 void report_construction(const char* kind,double started,double constructed,double entered,
                          const AuroraStats& before,const AuroraStats& after){
+ const auto allocation=melee_web_gameplay_allocation();
  EM_ASM({if(window.menuConstructionTiming)window.menuConstructionTiming({
    kind:UTF8ToString($0),total_ms:$1,construct_ms:$2,entry_ms:$3,
    queued_delta:$4,created_delta:$5,draw_calls:$6,texture_upload_bytes:$7,
-   queued_total:$8,created_total:$9,wasm_heap_bytes:$10
+   queued_total:$8,created_total:$9,wasm_heap_bytes:$10,
+   source_allocation_identity:$11,source_allocation_generation:$12,source_allocation_bytes:$13
  });},kind,entered-started,constructed-started,entered-constructed,
         stat_delta(after.queuedPipelines,before.queuedPipelines),
         stat_delta(after.createdPipelines,before.createdPipelines),
         after.drawCallCount,after.lastTextureUploadSize,after.queuedPipelines,
-        after.createdPipelines,emscripten_get_heap_size());
+        after.createdPipelines,emscripten_get_heap_size(),
+        double(allocation.identity),double(allocation.generation),double(allocation.bytes));
 }
 void begin_preparation(){
  if(!preparation.request())return;
  preparation_profile.begin(true,emscripten_get_now());
  clear_diagnostic_pad();pending=false;running=false;menu_clock.reset();
  bool preserve_audio=false;
- if(!match&&host_entered){
+ if(!match&&!results&&host_entered){
   char error[256]{};
   check(melee_web_menu_host_leave(host,0,error,sizeof(error)),error);host_entered=false;
   const int phase=melee_web_menu_host_phase(host);
@@ -217,7 +257,7 @@ void begin_preparation(){
  }
  transition_audio_continues=preserve_audio;
  if(!preserve_audio)audio_clock.reset();
- message=match?"Preparing original character select...":"Preparing original next scene...";
+ message=match?"Preparing original Results...":results?"Preparing original character select...":"Preparing original next scene...";
  EM_ASM({if(window.menuPreparation)window.menuPreparation(UTF8ToString($0),!!$1);},
         message.c_str(),preserve_audio?1:0);
 }
@@ -225,7 +265,7 @@ bool preparation_uses_source_draws(){
  // Match camera and subject callbacks mutate gameplay state. Complete-draw
  // pipeline lookup lets the first real tick draw its full image; preparation
  // can then service the renderer without traversing the game again.
- return !match||!aurora_pipeline_complete_draws_enabled();
+ return (!match&&!results)||!aurora_pipeline_complete_draws_enabled();
 }
 bool prepare_deferred_pipelines(){
 #if defined(MELEE_WEB_SELECTIVE_PIPELINES)
@@ -270,7 +310,7 @@ std::string selected_match_message(const MeleeWebMenuMatchSelection& selection){
  return result;
 }
 void close(){
- const bool had_lifetime=world||match||host;
+ const bool had_lifetime=world||match||results||host;
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
  const bool had_source_world=melee_web_gameplay_generation()!=0;
  const melee_web::provenance::Scope provenance(pipeline_context(
@@ -280,12 +320,18 @@ void close(){
  const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
  char error[256]{};running=false;pending=false;preparation.reset();menu_clock.reset();
  if(match){match->close();match.reset();}
+ if(results){results->close();results.reset();}
  if(world){
   if(host_entered){check(melee_web_menu_host_leave(host,1,error,sizeof(error)),error);host_entered=false;}
   if(world_exposed)world->close();else world->close_prepared();
   world.reset();world_exposed=false;
  }
  if(host){check(melee_web_menu_host_destroy(host,error,sizeof(error)),error);host=nullptr;}
+ results_route_active=false;
+ if(source_session_owned){
+  check(melee_web_gameplay_session_end(error,sizeof(error)),error);
+  source_session_owned=false;
+ }
  if(replay&&replay_trace&&replay_final_draw&&!faulted)
   melee_web::retail_replay_end(replay->frames.size());
  replay.reset();replay_cursor=0;replay_trace=replay_pending=replay_started=replay_final_draw=false;
@@ -335,6 +381,16 @@ void advance(){
       melee_web::GameplayMatchConstruction::Deferred,*replay->initial_input);
   running=false;message="Preparing reference replay...";return;
  }
+ if(results){
+  results->exit_scene();
+  check(melee_web_menu_host_results_exit(host,error,sizeof(error)),error);
+  const uint32_t seed=results->random_seed();
+  uint8_t final_input[MELEE_WEB_PAD_STATE_BYTES];melee_web_pad_state_capture(final_input);
+  results->close();results.reset();
+  check(melee_web_menu_host_results_end(host,seed,final_input,error,sizeof(error)),error);
+  results_route_active=false;
+  pending=false;enter_world();return;
+ }
  if(match){
   const bool checking_stock=stock_check==-1;
   const uint32_t seed=match->random_seed();
@@ -356,8 +412,19 @@ void advance(){
    stock_check=1;
   }
   ++completed_matches;
-  check(melee_web_menu_host_match_finished(host,seed,final_input,error,sizeof(error)),error);
-  pending=false;enter_world();return;
+  MatchExitInfo terminal{};
+  check(melee_web_match_rules_terminal_data(&terminal),"Original VS exit payload is unavailable");
+  check(melee_web_menu_host_results_begin(host,&terminal,seed,&results_info,error,sizeof(error)),error);
+  results_route_active=true;
+  std::unique_ptr<MeleeWebPadState,decltype(&melee_web_pad_state_free)> input(
+      melee_web_pad_state_decode(final_input,sizeof(final_input),error,sizeof(error)),melee_web_pad_state_free);
+  check(input!=nullptr,error);
+  const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
+  results=std::make_unique<melee_web::GameplayResultsSession>(files,results_info,seed,*input);
+  const double constructed=emscripten_get_now();
+  report_construction("results-enter",started,constructed,constructed,before,aurora_stats_snapshot());
+  first_use_draw_pending=true;pending=false;running=true;audio_phase=0;
+  menu_clock.reset();audio_clock.reset();message="Original Results";return;
  }
  if(host_entered){check(melee_web_menu_host_leave(host,0,error,sizeof(error)),error);host_entered=false;}
  const int phase=melee_web_menu_host_phase(host);
@@ -456,7 +523,7 @@ void render_audio_tick(MeleeWebAudio* audio,char* error,size_t error_size){
 }
 bool render_cache_can_flush(){
  const AuroraStats* stats=aurora_get_stats();
- return !world&&!match&&!host&&!running&&!pending&&!preparation.busy()&&
+ return !world&&!match&&!results&&!host&&!running&&!pending&&!preparation.busy()&&
         stats&&stats->queuedPipelines==0;
 }
 void service_render_cache_writes(){
@@ -530,6 +597,7 @@ void tick(){
        else melee_web::retail_replay_preparation_draw(*replay);
       }
      }
+     else if(results){results->draw();actual_source_draw=true;drew_source=true;}
      else if(world&&host_entered){drawn=melee_web_menu_host_draw(host,error,sizeof(error));actual_source_draw=drawn!=0;drew_source=drawn!=0;}
     }
    }
@@ -624,7 +692,7 @@ void tick(){
   };
   const bool audio_before_construction=transition_audio_continues&&
                                        (!running||preparation.busy());
-  MeleeWebAudio* const audio_owner=match?match->audio():world?world->audio():nullptr;
+  MeleeWebAudio* const audio_owner=match?match->audio():results?results->audio():world?world->audio():nullptr;
   const auto audio_elapsed=audio_clock.tick(
       clock_now,audio_owner&&input->visible&&(running||transition_audio_continues));
   if(audio_elapsed.stalled){
@@ -672,7 +740,7 @@ void tick(){
     if(render_only_preparation)render_only_preparation=false;
     else EM_ASM({window.menuPreparationDone?.();});
     running=!pending;menu_clock.reset();suppress_draw=preparation.suppress_source_draw(pending);
-    message=match?match_message:melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select";
+    message=match?match_message:results?"Original Results":melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select";
    }else{
     ++preparation_profile.submission_wait_callbacks;
     check(emscripten_get_now()-preparation_profile.submission_wait_started<10000,
@@ -686,7 +754,7 @@ void tick(){
   // first active gameplay interval on the following callback.
   const double simulation_clock_now=emscripten_get_now();
   const auto elapsed=menu_clock.tick(
-      simulation_clock_now,running&&(world||match)&&input->visible);
+      simulation_clock_now,running&&(world||match||results)&&input->visible);
   if(elapsed.stalled){running=false;message="Paused after a timing disruption. Resume to continue.";}
   if(elapsed.steps&&transition_audio_continues){
    transition_audio_continues=false;
@@ -750,6 +818,7 @@ void tick(){
     }
     if(match->complete()&&!replay){check(outcome,"Original match transitioned without an outcome");pending=true;result=3;}
    }
+   else if(results){results->tick(sample);source_frames.did_step();if(results->requested())result=3;}
    else{result=melee_web_menu_host_tick(host,sample,error,sizeof(error));check(result==1||result==3,error);source_frames.did_step();}
    if(result==3){pending=true;clear_diagnostic_pad();break;}
   }
@@ -763,7 +832,7 @@ void tick(){
   // Camera callbacks mutate source state (including magnifier damage flags).
   // A callback without a source tick retains the last match image when the
   // renderer guarantees complete draws. Menu priming retains its existing path.
-  if(source_frames.steps()==0&&(preparation.preparation_draws_source()||(!world&&!match)))present_source();
+  if(source_frames.steps()==0&&(preparation.preparation_draws_source()||(!world&&!match&&!results)))present_source();
   if(preparation.warming()&&!preparation.preparation_draws_source()){
    const double service_started=emscripten_get_now();
    check(aurora_pipeline_service_preparation(),"Renderer preparation overlapped an active frame");
@@ -923,7 +992,7 @@ void tick(){
 }
 extern "C" {
 int melee_web_native_menu_file(const char* name,const uint8_t* data,unsigned size){try{
- if(world||match||!name||!data||!size||size>64*1024*1024)throw std::runtime_error("Unload before importing valid local files");
+ if(world||match||results||!name||!data||!size||size>64*1024*1024)throw std::runtime_error("Unload before importing valid local files");
 #if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
  if(std::string_view{name}=="dsp_coef.bin")throw std::runtime_error("Public audio-disabled runtime does not accept DSP coefficient input");
 #endif
@@ -936,7 +1005,7 @@ int melee_web_native_menu_prepare(){try{
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
  const melee_web::provenance::Scope provenance(pipeline_context(MELEE_WEB_PIPELINE_PHASE_PREPARATION));
 #endif
- if(match||host_entered)throw std::runtime_error("Unload before preparing native menu resources");
+ if(match||results||host_entered)throw std::runtime_error("Unload before preparing native menu resources");
  if(world&&host){message="Native menu resources already prepared.";return 1;}
  if(world||host)close();
  char error[256]{};const double started=emscripten_get_now();const AuroraStats before=aurora_stats_snapshot();
@@ -944,6 +1013,7 @@ int melee_web_native_menu_prepare(){try{
  // RNG/session ownership before the SDK world is started. No source scene or
  // simulation callback runs during this preparation phase.
  if(!archive_cache)archive_cache=std::make_unique<melee_web::RuntimeArchiveCache>(files);
+ begin_source_session();
  host=melee_web_menu_host_create(error,sizeof(error));check(host!=nullptr,error);
  // One unentered menu preparation belongs to the canonical fresh import.
  // Repeating it changes allocation history even without entering a source scene.
@@ -956,13 +1026,18 @@ int melee_web_native_menu_prepare(){try{
  if(world&&!host_entered){try{world->close_prepared();}catch(...){}}
  world.reset();
  if(host&&!host_entered){char ignored[256]{};melee_web_menu_host_destroy(host,ignored,sizeof(ignored));host=nullptr;}
+ if(source_session_owned&&!world&&!host){
+  char ignored[256]{};
+  if(melee_web_gameplay_session_end(ignored,sizeof(ignored)))source_session_owned=false;
+ }
  message=e.what();return 0;
 }}
 int melee_web_native_menu_launch(){try{
  if(preparation.busy()||pending)
   throw std::runtime_error("Native menu transition is still preparing");
- if(match||host_entered||(host&&!world))close();
+ if(match||results||host_entered||(host&&!world))close();
  if(!archive_cache)archive_cache=std::make_unique<melee_web::RuntimeArchiveCache>(files);
+ begin_source_session();
  char error[256]{};if(!host){host=melee_web_menu_host_create(error,sizeof(error));check(host!=nullptr,error);}
  VISetFrameBufferScale(1);enter_world();
 #if defined(MELEE_WEB_SELECTIVE_PIPELINES)
@@ -999,9 +1074,9 @@ int melee_web_native_menu_replay(const uint8_t* data,unsigned size,int observe){
 }catch(const std::exception& e){message=e.what();running=false;return 0;}}
 unsigned melee_web_native_menu_replay_cursor(){return static_cast<unsigned>(replay_cursor);}
 void melee_web_native_menu_pause(int paused){
- if(faulted||replay_final_draw||preparation.busy()||pending||(!host_entered&&!match))return;
- running=(world||match)&&!paused;menu_clock.reset();
- message=running?(match?match_message:melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select"):"Paused.";
+ if(faulted||replay_final_draw||preparation.busy()||pending||(!host_entered&&!match&&!results))return;
+ running=(world||match||results)&&!paused;menu_clock.reset();
+ message=running?(match?match_message:results?"Original Results":melee_web_menu_host_phase(host)==1?"Original character select":"Original stage select"):"Paused.";
 }
 void melee_web_native_menu_confirm_check(){
  if(!replay&&(host_entered||match)&&!faulted&&!preparation.busy()&&!pending&&stock_check!=-1&&diagnostic_pad_remaining==0)
@@ -1010,7 +1085,7 @@ void melee_web_native_menu_confirm_check(){
 int melee_web_native_menu_pad_sample_full(unsigned port,unsigned buttons,int stick_x,int stick_y,
                                           int cstick_x,int cstick_y,unsigned trigger_l,
                                           unsigned trigger_r,unsigned duration){try{
- if(replay||faulted||preparation.busy()||pending||stock_check==-1||diagnostic_start_ticks!=0||!running||(!host_entered&&!match))
+ if(replay||faulted||preparation.busy()||pending||stock_check==-1||diagnostic_start_ticks!=0||!running||(!host_entered&&!match&&!results))
   throw std::runtime_error("Raw PAD samples require an active, non-diagnostic scene");
  if(port>1||buttons>0xffffU||(buttons&~kDiagnosticPadButtons)||stick_x<-80||stick_x>80||stick_y<-80||stick_y>80||
     cstick_x<-80||cstick_x>80||cstick_y<-80||cstick_y>80||trigger_l>255||trigger_r>255||duration<1||duration>120)
@@ -1072,14 +1147,19 @@ const char* melee_web_native_menu_memory(){
  // Lifecycle diagnostics only: mallinfo walks the allocator's free lists.
  // Reserved linear memory is not the same as live allocations and cannot shrink.
  const auto info=mallinfo();
+ const auto allocation=melee_web_gameplay_allocation();
  static char text[512];
  std::snprintf(text,sizeof(text),
   "{\"wasm_heap_bytes\":%zu,\"allocator_arena_bytes\":%zu,"
   "\"allocator_live_bytes\":%zu,\"allocator_free_bytes\":%zu,"
   "\"allocator_top_free_bytes\":%zu,"
-  "\"match_present\":%s,\"menu_present\":%s}",
+  "\"source_allocation_identity\":%llu,\"source_allocation_generation\":%llu,"
+  "\"source_allocation_bytes\":%llu,\"source_session_owned\":%s,"
+  "\"match_present\":%s,\"menu_present\":%s,\"results_present\":%s}",
   emscripten_get_heap_size(),info.arena,info.uordblks,info.fordblks,info.keepcost,
-  match?"true":"false",world?"true":"false");
+  (unsigned long long)allocation.identity,(unsigned long long)allocation.generation,
+  (unsigned long long)allocation.bytes,source_session_owned?"true":"false",
+  match?"true":"false",world?"true":"false",results?"true":"false");
  return text;
 }
 const char* melee_web_native_menu_diagnostics(){
@@ -1105,6 +1185,10 @@ const char* melee_web_native_menu_diagnostics(){
   const auto length=std::char_traits<char>::length(text);
   std::snprintf(text+length,sizeof(text)-length," · match preparing · ready: 0");
  }
+ else if(results){
+  const auto length=std::char_traits<char>::length(text);
+  std::snprintf(text+length,sizeof(text)-length," · Results source frame: %u",results->source_frames());
+ }
  else if(world){
   uint32_t completed=0,revisited=0;
   if(melee_web_audio_stream_progress(world->audio(),&completed,&revisited)){
@@ -1122,7 +1206,7 @@ int melee_web_native_menu_cache_idle(){
  const auto state=aurora_pipeline_cache_status();
  return state==AURORA_PIPELINE_CACHE_READY?1:state==AURORA_PIPELINE_CACHE_ERROR?-1:0;
 }
-int melee_web_native_menu_phase(){return match?7:host?melee_web_menu_host_phase(host):0;}
+int melee_web_native_menu_phase(){return match?7:results?8:host?melee_web_menu_host_phase(host):0;}
 }
 int main(int argc,char** argv){
 #if defined(MELEE_WEB_PIPELINE_PROVENANCE)
