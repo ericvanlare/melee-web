@@ -242,8 +242,8 @@
       "sha256": "c55d67468a6efcc9784f82dc10793abb14ceae410b2dead4c156ea0bf299d5f3"
     },
     "spec": {
-      "path": "work/issue33/replacement-holdouts/timing-spec.json",
-      "sha256": "1833217cb5c6e50b7e76f37ce9278441311b59328044d8627e9ac150f5f5fa3c"
+      "path": "work/issue33/replacement-holdouts/timing-spec-derived-scope.json",
+      "sha256": "6cac2d8a211dc57ed784cd80f89f28420734df156cfa7e445ac011bfc2c76cd7"
     },
     "status": {
       "path": "work/issue33/replacement-holdouts/timing-status.json",
@@ -690,7 +690,11 @@
           "page_paint": "normal"
         }
       }
-    ]
+    ],
+    "original_rejected_spec": {
+      "path": "work/issue33/replacement-holdouts/timing-spec.json",
+      "sha256": "1833217cb5c6e50b7e76f37ce9278441311b59328044d8627e9ac150f5f5fa3c"
+    }
   },
   "limitations": [
     "Both replacement reference preparations ended at their bounded input caps (Marth 6432, Falco 8561) with incomplete original-match discovery and no gold admission; no donor ending was synthesized.",
@@ -704,8 +708,8 @@
     "normalization_preflight": {
       "status": "rejected_then_derived_scope_accepted",
       "receipt": {
-        "path": "work/issue33/replacement-holdouts/timing-quiet-start.json",
-        "sha256": "6069af46d9b361e0db3409d6e34dd0b976ba8dc13c79a2e153f39cc004549f3d"
+        "path": "work/issue33/replacement-holdouts/timing-plan-command.log",
+        "sha256": "86bf6739983a4a4e00601aaa99f06f75a24b3d16185abe73514ed50bf5e5b780"
       },
       "rejection": "Initial plan normalization rejected the approval receipt shape; no timing slot started. The existing supported derived-scope receipt then bound the original approval and new freeze; the original spec and failed log were preserved.",
       "derived_scope": {
