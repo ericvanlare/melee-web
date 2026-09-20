@@ -90,6 +90,9 @@ export const NATIVE_GAME_DISC_FILES=Object.freeze({
   'PlDk.dat':'PlDk.dat','PlDkAJ.dat':'PlDkAJ.dat','PlDkNr.dat':'PlDkNr.dat',
   'PlDkBk.dat':'PlDkBk.dat','PlDkRe.dat':'PlDkRe.dat','PlDkBu.dat':'PlDkBu.dat','PlDkGr.dat':'PlDkGr.dat',
   'EfDkData.dat':'EfDkData.dat','dk.ssm':'audio/us/dk.ssm',
+  'PlKp.dat':'PlKp.dat','PlKpAJ.dat':'PlKpAJ.dat','PlKpNr.dat':'PlKpNr.dat',
+  'PlKpRe.dat':'PlKpRe.dat','PlKpBu.dat':'PlKpBu.dat','PlKpBk.dat':'PlKpBk.dat',
+  'EfKpData.dat':'EfKpData.dat','koopa.ssm':'audio/us/koopa.ssm',
 });
 export function loadNativeGameDisc(file,report=()=>{}) {
   return loadDiscBundle(file,report,NATIVE_GAME_DISC_FILES);

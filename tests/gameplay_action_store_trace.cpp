@@ -27,6 +27,7 @@ int action_test_opcode15_consumer(void);
 int action_test_opcode50_consumer(void);
 int action_test_opcode51_consumer(void);
 int action_test_opcode21_consumer(void);
+int action_test_opcode36_consumer(void);
 int action_test_common_operands(void);
 int action_test_falco_operands(void);
 int action_test_wind_operands(void);
@@ -129,6 +130,25 @@ void verify_common_appeals(std::shared_ptr<const DatArchive> archive, const Byte
         rejects([&] { (void) policy_store.select(0); });
     }
     GameplayActionStore store(std::move(archive), costume, container);
+    // Koopa's side-special victim MS rows 278..287 map to the authored
+    // submotion rows SM_None, SM 278..283, SM_None, SM 281..283. The action
+    // store accepts submotion IDs, so only SM 278..283 require command graph
+    // admission; the MS None rows intentionally have no command root.
+    for (unsigned motion = 278; motion <= 283; ++motion) {
+        check(store.command_ready(motion), "Koopa victim source submotion graph is not admitted");
+        check(store.runtime().commands(motion).has_value() ==
+                  store.runtime().action(motion).command_offset.has_value(),
+              "Koopa victim source command presence changed");
+    }
+    if (costume.fighter_kind == 5) {
+        check(costume.motion_count == 316, "Koopa authored action count changed");
+        for (unsigned motion = 295; motion < costume.motion_count; ++motion) {
+            check(store.command_ready(motion), "Koopa self-motion graph is not admitted");
+            check(store.runtime().commands(motion).has_value() ==
+                      store.runtime().action(motion).command_offset.has_value(),
+                  "Koopa self-motion source command presence changed");
+        }
+    }
     unsigned expected_command_mask = 0;
     for (unsigned index = 0; index < 2; ++index) {
         const unsigned motion = 239 + index;
@@ -182,6 +202,7 @@ int main(int argc, char** argv)
         check(action_test_opcode50_consumer(),"Opcode 50 dynamics consumer and native admission");
         check(action_test_opcode51_consumer(),"Opcode 51 signed self-damage consumer and native admission");
         check(action_test_opcode21_consumer(),"Opcode 21 throw-flag consumer and native admission");
+        check(action_test_opcode36_consumer(),"Opcode 36 source article-visibility consumer and native admission");
         check(action_test_common_operands(),"Common attack operands and original finite-loop execution");
         check(action_test_falco_operands(),"Falco special opcode schemas retain source fields and canonical words");
         check(action_test_wind_operands(),"Marth wind command decodes source fields and reaches ftCo_8009E714");

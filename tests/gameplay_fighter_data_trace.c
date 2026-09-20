@@ -2,6 +2,7 @@
 #include <melee/ft/types.h>
 #include <melee/ft/kinds/ftPurin/types.h>
 #include <melee/ft/kinds/ftDonkey/types.h>
+#include <melee/ft/kinds/ftKoopa/types.h>
 #include <melee/ft/ftwaitanim.h>
 #include "gameplay_article_data.h"
 #include <melee/it/types.h>
@@ -78,6 +79,18 @@ void melee_web_test_donkey_data(void* data) {
           attrs->cargo_hold.x28_LANDING_LAG==15.0f);
     for(unsigned i=0;i<7;++i) CHECK(!d->x48_items[i]);
     for(unsigned i=0;i<6;++i) CHECK(!melee_web_fighter_data_article(data,FTKIND_DONKEY,i));
+}
+
+void melee_web_test_koopa_data(void* data,int typed) {
+    ftData* d=data;
+    CHECK(d && d->ext_attr && d->x2C && d->x2C->dynamicsNum==1 &&
+          d->x2C->ftDynamicBones && d->x2C->x4==0 && !d->x2C->x10 && d->x48_items);
+    const ftKoopaAttributes* attrs=d->ext_attr;
+    CHECK(attrs->x4==(typed?-40:40) && attrs->x20==(typed?-30:30) &&
+          attrs->x2C==3U && attrs->unk50==(typed?0x80000001U:0U) &&
+          attrs->x54==1.78f && attrs->x94==-7.5f);
+    CHECK(d->x48_items[0] && melee_web_fighter_data_article(data,FTKIND_KOOPA,0));
+    for(unsigned i=1;i<7;++i) CHECK(!d->x48_items[i]);
 }
 
 void melee_web_test_purin_data(void* data) {

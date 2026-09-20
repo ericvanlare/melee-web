@@ -138,6 +138,12 @@ Ganondorf is a `partial` development candidate with scoped native lifecycle
 and browser-entry evidence in [its port notes](GANONDORF_PORT_NOTES.md). Keep unused, route-only, event-only and boss entities visible rather
 than silently dropping them.
 
+The branch now has sixteen development fighters, including Bowser's scoped
+native and browser action checks in [his port notes](BOWSER_PORT_NOTES.md).
+Every added fighter retains `partial` acceptance. The current import plan
+leaves 6,903,038 bytes under the request cap; explicit scene ownership is the
+next shared integration boundary before the whole roster can fit.
+
 ## Validation before handoff
 
 For inventory-only updates, validate JSON syntax and run the report command

@@ -196,6 +196,26 @@ const donkey=[
   ground('Hand Slap',[[383,383],[384,384],[385,385]],input(1,PAD.B,0,-80),input(180)),
 ];
 
+// Koopa's authored jump_startup_time is eight ticks. Hold the ordinary jump
+// input through that startup before issuing aerial inputs; no source timing
+// or fighter state is changed by the diagnostic recipe.
+const koopaCommon=common.map(row=>row.inputs[0].buttons===PAD.X ?
+  {...row,inputs:[input(10,PAD.X),...row.inputs.slice(1)]}:row);
+const koopaAir=(name,expect,stickX=0,stickY=0,hold=1)=>({
+  name,expect,settle:true,inputs:[input(10,PAD.X),input(hold,PAD.B,stickX,stickY),input(240)],
+});
+const koopa=[
+  ground('Fire Breath',[[341,341],[342,342],[343,343]],input(120,PAD.B),input(180)),
+  koopaAir('Fire Breath (air)',[[344,344],[345,345]],0,0,90),
+  // Target-dependent catch and throw exits have separate interaction probes.
+  ground('Koopa Klaw',[[347,347]],input(1,PAD.B,80),input(180)),
+  koopaAir('Koopa Klaw (air)',[[353,353]],80),
+  ground('Whirling Fortress',[[359,359]],input(1,PAD.B,0,80),input(240)),
+  koopaAir('Whirling Fortress (air)',[[360,360]],0,80),
+  ground('Bowser Bomb',[[361,361],[363,363]],input(1,PAD.B,0,-80),input(240)),
+  koopaAir('Bowser Bomb (air)',[[362,362],[363,363]],0,-80),
+];
+
 export const actionInventories=new Map([
  [18,{id:'marth-visible-actions-v1',fighter:'Marth',minimumStageFrames:4200,cases:[...common,...wavedashes,...marth]}],
  [21,{id:'dr-mario-visible-actions-v1',fighter:'Dr. Mario',minimumStageFrames:4800,cases:[...common,...wavedashes,...drMario]}],
@@ -209,6 +229,7 @@ export const actionInventories=new Map([
  [23,{id:'pichu-visible-actions-v1',fighter:'Pichu',minimumStageFrames:5600,cases:[...common,...pikachuFamily('Agility')]}],
  [15,{id:'jigglypuff-visible-actions-v1',fighter:'Jigglypuff',minimumStageFrames:6400,cases:[...common,...purin]}],
  [3,{id:'donkey-kong-visible-actions-v1',fighter:'Donkey Kong',minimumStageFrames:7000,cases:[...common,...donkey]}],
+ [5,{id:'bowser-visible-actions-v1',fighter:'Bowser',minimumStageFrames:5600,cases:[...koopaCommon,...koopa]}],
 ]);
 
 export function actionInventory(fighterKind){return actionInventories.get(fighterKind)||null;}

@@ -3,6 +3,7 @@
 #include "fighter_attributes.h"
 #include "fighter_binding.hpp"
 #include "gameplay_donkey_schema.h"
+#include "gameplay_koopa_schema.h"
 #include "gameplay_pikachu_schema.h"
 #include "gameplay_purin_schema.h"
 #include <array>
@@ -78,6 +79,8 @@ public:
     [[nodiscard]] const std::optional<MeleeWebMarioAttributes>& mario_attributes() const noexcept { return mario_; }
     [[nodiscard]] const std::optional<MeleeWebLuigiAttributes>& luigi_attributes() const noexcept { return luigi_; }
     [[nodiscard]] const std::optional<MeleeWebDonkeyAttributes>& donkey_attributes() const noexcept { return donkey_; }
+    // Koopa uses the exact ftKoopaAttributes ABI; the asset owner owns its Flame Article.
+    [[nodiscard]] const std::optional<MeleeWebKoopaAttributes>& koopa_attributes() const noexcept { return koopa_; }
     // Pikachu and Pichu use the shared original ftPikachuAttributes ABI;
     // their decoded values and Article identities remain family-specific.
     [[nodiscard]] const std::optional<MeleeWebPikachuAttributes>& pikachu_attributes() const noexcept { return pikachu_; }
@@ -113,6 +116,7 @@ private:
     std::optional<MeleeWebMarioAttributes> mario_;
     std::optional<MeleeWebLuigiAttributes> luigi_;
     std::optional<MeleeWebDonkeyAttributes> donkey_;
+    std::optional<MeleeWebKoopaAttributes> koopa_;
     std::optional<MeleeWebPikachuAttributes> pikachu_;
     std::optional<MeleeWebPurinAttributes> purin_;
     std::optional<MeleeWebCaptainAttributes> captain_;

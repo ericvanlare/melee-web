@@ -130,6 +130,14 @@ and failed to reach Pass. These failures are retained; the passing FD sweeps
 do not cover platform drops. An independent original consumer capture is the
 next discriminating check, before any compatibility rule is considered.
 
+The first independent capture attempt is explicitly unsuccessful:
+`work/full-game/donkey-pass-original-consumer-v1/reference-v2.jsonl` records
+Mario versus Mr. Game & Watch (FT kind 24), not Donkey. Its 40 frames remain
+inside the locked intro, and it has no FObj consumer observations. The setup
+confused CharacterKind with FighterKind and used a copied menu receipt. Those
+artifacts cannot justify an animation fallback or close the reproduced crash;
+a correctly observed Donkey selection and post-Ready capture are still needed.
+
 The requested-file manifest contains 169 FST paths totaling 122,864,276 bytes,
 leaving 11,353,452 bytes under the existing 128 MiB cap. Generated font and DSP
 coefficient ranges are outside this FST-only sum. See

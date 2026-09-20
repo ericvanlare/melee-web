@@ -27,6 +27,9 @@ ArticleSchema schema(uint32_t kind)
     // its callback consumes x0, x4 and xC, while x8/x10 belong to Mario's
     // distinct fireball record. The authored Luigi region is four floats.
     case It_Kind_Luigi_Fire:return {16,1,true};
+    // Koopa's Flame uses six source floats, one serialized state row, and
+    // the source-valid null-joint ItemModelDesc form.
+    case It_Kind_Koopa_Flame:return {24,1,true};
     // Seven original pill motion states select six serialized animation rows,
     // including the throw/catch sequences used by Dr. Mario's taunt.
     case It_Kind_DrMario_Vitamin:return {20,6,true};

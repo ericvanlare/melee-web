@@ -3,11 +3,20 @@
 #include <melee/ft/types.h>
 #include <melee/ft/ftdata.h>
 #include <melee/ft/fighter.h>
+#include <melee/ft/kinds/ftCommon/forward.h>
 #include <melee/lb/lbanim.h>
 #include <melee/lb/lbcommand.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <stdlib.h>
 #include <stdio.h>
+/* The C++ action store intentionally uses DAT submotion indices without
+ * including the source headers. Bind its Koopa victim range to those source
+ * constants here; motion-state IDs 278..287 are a different enumeration. */
+_Static_assert(ftCo_SM_CaptureDamageKoopa == 278 &&
+               ftCo_SM_ThrownKoopaF == 279 && ftCo_SM_ThrownKoopaB == 280 &&
+               ftCo_SM_CaptureDamageKoopaAir == 281 &&
+               ftCo_SM_ThrownKoopaAirF == 282 && ftCo_SM_ThrownKoopaAirB == 283,
+               "Koopa victim DAT submotion range");
 static unsigned texture_count, mode_count;
 static int texture_frames[32], texture_indices[32];
 void ftAnim_800704F0(HSD_GObj* gobj, int idx, float frame)
@@ -238,6 +247,22 @@ int action_test_opcode15_consumer(void)
     melee_web_command_require_supported(15);melee_web_commands_destroy(p);
     const MeleeWebCommandWord invalid[]={{(15U<<26)|4U,UINT32_MAX}};
     p=melee_web_commands_create(invalid,1);if(p){melee_web_commands_destroy(p);return 0;}
+    return valid;
+}
+void ftAction_80071F78(HSD_GObj*,CommandInfo*);
+int action_test_opcode36_consumer(void)
+{
+    const MeleeWebCommandWord words[]={
+        {(36U<<26)|1U,UINT32_MAX},{36U<<26,UINT32_MAX},{0,UINT32_MAX}};
+    union CmdUnion* p=melee_web_commands_create(words,3);if(!p)return 0;
+    Fighter fighter={0};HSD_GObj gobj={0};gobj.user_data=&fighter;
+    fighter.x221E_b5=1;
+    CommandInfo command={0};command.u=p;
+    ftAction_80071F78(&gobj,&command);
+    const int enabled=fighter.x221E_b4&&fighter.x221E_b5&&command.u==&p[1];
+    ftAction_80071F78(&gobj,&command);
+    const int valid=enabled&&!fighter.x221E_b4&&fighter.x221E_b5&&command.u==&p[2];
+    melee_web_command_require_supported(36);melee_web_commands_destroy(p);
     return valid;
 }
 int action_test_opcode50_consumer(void)

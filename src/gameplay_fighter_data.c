@@ -1,6 +1,7 @@
 #include "gameplay_fighter_data.h"
 #include "fighter_attributes.h"
 #include "gameplay_donkey_schema.h"
+#include "gameplay_koopa_schema.h"
 #include "gameplay_pikachu_schema.h"
 #include "gameplay_purin_schema.h"
 #include "gameplay_article_data.h"
@@ -9,6 +10,7 @@
 #include <melee/ft/kinds/ftMario/types.h>
 #include <melee/ft/kinds/ftLuigi/types.h>
 #include <melee/ft/kinds/ftDonkey/types.h>
+#include <melee/ft/kinds/ftKoopa/types.h>
 #include <melee/ft/kinds/ftPikachu/types.h>
 #include <melee/ft/kinds/ftPichu/types.h>
 #include <melee/ft/kinds/ftPurin/types.h>
@@ -29,6 +31,7 @@ _Static_assert(sizeof(ftLk_DatAttrs) == 0xDC, "Link extension ABI");
 _Static_assert(sizeof(ftCaptain_DatAttrs) == 0x8C, "Captain/Ganon extension ABI");
 _Static_assert(sizeof(ftLuigiAttributes) == MELEE_WEB_LUIGI_ATTRIBUTE_BYTES, "Luigi extension ABI");
 _Static_assert(sizeof(ftDonkeyAttributes) == MELEE_WEB_DONKEY_ATTRIBUTE_BYTES, "Donkey extension ABI");
+_Static_assert(sizeof(ftKoopaAttributes) == MELEE_WEB_KOOPA_ATTRIBUTE_BYTES, "Koopa extension ABI");
 _Static_assert(sizeof(ftPikachuAttributes) == MELEE_WEB_PIKACHU_ATTRIBUTE_BYTES,
                "Pikachu/Pichu shared extension ABI");
 _Static_assert(sizeof(ftPurinAttributes) == MELEE_WEB_PURIN_ATTRIBUTE_BYTES,
@@ -144,6 +147,45 @@ MELEE_WEB_DONKEY_ATTRIBUTE_FIELDS(CHECK_DONKEY)
 #undef CHECK_DONKEY_PORTABLE_F32
 #undef CHECK_DONKEY_SOURCE_I32
 #undef CHECK_DONKEY_SOURCE_F32
+#define CHECK_KOOPA_SOURCE_F32(value) _Generic((value), float: 1, default: 0)
+#define CHECK_KOOPA_SOURCE_I32(value) \
+    _Generic((value), signed char: (sizeof(value) == sizeof(int32_t)), \
+             short: (sizeof(value) == sizeof(int32_t)), \
+             int: (sizeof(value) == sizeof(int32_t)), \
+             long: (sizeof(value) == sizeof(int32_t)), \
+             long long: (sizeof(value) == sizeof(int32_t)), default: 0)
+#define CHECK_KOOPA_SOURCE_U32(value) \
+    _Generic((value), unsigned char: (sizeof(value) == sizeof(uint32_t)), \
+             unsigned short: (sizeof(value) == sizeof(uint32_t)), \
+             unsigned int: (sizeof(value) == sizeof(uint32_t)), \
+             unsigned long: (sizeof(value) == sizeof(uint32_t)), \
+             unsigned long long: (sizeof(value) == sizeof(uint32_t)), default: 0)
+#define CHECK_KOOPA_PORTABLE_F32(value) _Generic((value), float: 1, default: 0)
+#define CHECK_KOOPA_PORTABLE_I32(value) _Generic((value), int32_t: 1, default: 0)
+#define CHECK_KOOPA_PORTABLE_U32(value) _Generic((value), uint32_t: 1, default: 0)
+#define CHECK_KOOPA_SOURCE_TYPE(type, value) CHECK_KOOPA_SOURCE_TYPE_IMPL(type, value)
+#define CHECK_KOOPA_SOURCE_TYPE_IMPL(type, value) CHECK_KOOPA_SOURCE_##type(value)
+#define CHECK_KOOPA_PORTABLE_TYPE(type, value) CHECK_KOOPA_PORTABLE_TYPE_IMPL(type, value)
+#define CHECK_KOOPA_PORTABLE_TYPE_IMPL(type, value) CHECK_KOOPA_PORTABLE_##type(value)
+#define CHECK_KOOPA(offset,type,name,original) \
+    _Static_assert(offsetof(ftKoopaAttributes, original) == offset, "Koopa source attribute offset"); \
+    _Static_assert(offsetof(MeleeWebKoopaAttributes, name) == offset, "Koopa portable attribute offset"); \
+    _Static_assert(sizeof(((ftKoopaAttributes*)0)->original) == sizeof(MELEE_WEB_KOOPA_TYPE_##type), "Koopa source attribute width"); \
+    _Static_assert(sizeof(((MeleeWebKoopaAttributes*)0)->name) == sizeof(MELEE_WEB_KOOPA_TYPE_##type), "Koopa portable attribute width"); \
+    _Static_assert(CHECK_KOOPA_SOURCE_TYPE(type, ((ftKoopaAttributes*)0)->original), "Koopa source attribute type"); \
+    _Static_assert(CHECK_KOOPA_PORTABLE_TYPE(type, ((MeleeWebKoopaAttributes*)0)->name), "Koopa portable attribute type");
+MELEE_WEB_KOOPA_ATTRIBUTE_FIELDS(CHECK_KOOPA)
+#undef CHECK_KOOPA
+#undef CHECK_KOOPA_PORTABLE_TYPE_IMPL
+#undef CHECK_KOOPA_PORTABLE_TYPE
+#undef CHECK_KOOPA_SOURCE_TYPE_IMPL
+#undef CHECK_KOOPA_SOURCE_TYPE
+#undef CHECK_KOOPA_PORTABLE_U32
+#undef CHECK_KOOPA_PORTABLE_I32
+#undef CHECK_KOOPA_PORTABLE_F32
+#undef CHECK_KOOPA_SOURCE_U32
+#undef CHECK_KOOPA_SOURCE_I32
+#undef CHECK_KOOPA_SOURCE_F32
 #define CHECK_PURIN_SOURCE_F32(value) _Generic((value), float: 1, default: 0)
 #define CHECK_PURIN_SOURCE_I32(value) \
     _Generic((value), signed char: (sizeof(value) == sizeof(int32_t)), \
@@ -340,7 +382,7 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     REQUIRE(kind==FTKIND_MARIO || kind==FTKIND_DRMARIO || kind==FTKIND_FOX ||
         kind==FTKIND_FALCO || kind==FTKIND_MARS || kind==FTKIND_EMBLEM ||
         kind==FTKIND_LINK || kind==FTKIND_CLINK || kind==FTKIND_CAPTAIN || kind==FTKIND_GANON ||
-        kind==FTKIND_DONKEY || kind==FTKIND_LUIGI || kind==FTKIND_PIKACHU || kind==FTKIND_PICHU ||
+        kind==FTKIND_DONKEY || kind==FTKIND_KOOPA || kind==FTKIND_LUIGI || kind==FTKIND_PIKACHU || kind==FTKIND_PICHU ||
         kind==FTKIND_PURIN,
         "Native fighter extension schema unavailable");
     REQUIRE(costumes>0 && costumes<=16,"Native costume count exceeds checked bound");
@@ -395,6 +437,12 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
 #define DONKEY(o,t,n,orig) donkey->orig=READ_##t(at+o);
         MELEE_WEB_DONKEY_ATTRIBUTE_FIELDS(DONKEY)
 #undef DONKEY
+    } else if(kind==FTKIND_KOOPA) {
+        at=required(r,root+4,MELEE_WEB_KOOPA_ATTRIBUTE_BYTES);
+        ftKoopaAttributes* koopa=NEW(ftKoopaAttributes,1); d->ext_attr=koopa;
+#define KOOPA(o,t,n,orig) koopa->orig=READ_##t(at+o);
+        MELEE_WEB_KOOPA_ATTRIBUTE_FIELDS(KOOPA)
+#undef KOOPA
     } else if(kind==FTKIND_LUIGI) {
         at=required(r,root+4,MELEE_WEB_LUIGI_ATTRIBUTE_BYTES); ftLuigiAttributes* luigi=NEW(ftLuigiAttributes,1); d->ext_attr=luigi;
 #define LUIGI(o,t,n,orig) luigi->orig=READ_##t(at+o);
@@ -622,7 +670,7 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     REQUIRE(d->x58->x0<140 && d->x58->x1<140 && d->x58->x8<140 && d->x58->x9<140 &&
         d->x58->x10<140 && d->x58->x11<140,"Native IK bone index invalid");
     const unsigned item_slots=(kind==FTKIND_LINK||kind==FTKIND_CLINK)?7:
-                               kind==FTKIND_LUIGI?1:
+                               (kind==FTKIND_LUIGI||kind==FTKIND_KOOPA)?1:
                                (kind==FTKIND_PIKACHU||kind==FTKIND_PICHU)?3:
                                kind==FTKIND_PURIN?2:4;
     /* Fixed native capacity bounds the shared accessor for every admitted
@@ -677,6 +725,9 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     else if(kind==FTKIND_LUIGI)
         REQUIRE(at!=UINT32_MAX && d->x48_items[0],
             "Luigi OnLoad requires its fire Article identity");
+    else if(kind==FTKIND_KOOPA)
+        REQUIRE(at!=UINT32_MAX && d->x48_items[0],
+            "Koopa OnLoad requires its Flame Article identity");
     else if(kind==FTKIND_PIKACHU || kind==FTKIND_PICHU)
         REQUIRE(at!=UINT32_MAX && d->x48_items[0] && d->x48_items[1] && d->x48_items[2],
             "Pikachu-family OnLoad requires its three Article identities");

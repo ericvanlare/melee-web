@@ -7,6 +7,7 @@
 #include <melee/ft/kinds/ftMars/forward.h>
 #include <melee/ft/kinds/ftCaptain/forward.h>
 #include <melee/ft/kinds/ftDonkey/forward.h>
+#include <melee/ft/kinds/ftKoopa/forward.h>
 #include <melee/ft/kinds/ftLuigi/forward.h>
 #include <melee/ft/kinds/ftPikachu/forward.h>
 #include <melee/ft/kinds/ftPurin/forward.h>
@@ -21,6 +22,7 @@
 
 extern "C" int melee_web_test_content_player(unsigned,int,int,unsigned);
 extern "C" int melee_web_test_donkey_cargo(unsigned,int);
+extern "C" int melee_web_test_koopa_capture(unsigned,int);
 extern "C" int melee_web_test_item_count(int);
 extern "C" int melee_web_test_purin_anim_id(int);
 extern "C" int melee_web_test_quake_start(int);
@@ -342,6 +344,7 @@ int main(int argc,char** argv){try{
         const bool captain=fighter_content->fighter_kind==FTKIND_CAPTAIN;
         const bool ganon=fighter_content->fighter_kind==FTKIND_GANON;
         const bool donkey=fighter_content->fighter_kind==FTKIND_DONKEY;
+        const bool koopa=fighter_content->fighter_kind==FTKIND_KOOPA;
         const bool luigi=fighter_content->fighter_kind==FTKIND_LUIGI;
         const bool pikachu_family=fighter_content->fighter_kind==FTKIND_PIKACHU||
             fighter_content->fighter_kind==FTKIND_PICHU;
@@ -396,6 +399,7 @@ int main(int argc,char** argv){try{
         const auto damage=match.player_stats(1).damage_percent;
         bool capsule=false,captain_family_punch=false,luigi_fireball_live=false;
         bool donkey_ground_n=false;
+        bool koopa_ground_n=false,koopa_flame_live=false;
         bool pikachu_ground_n=false,pikachu_ground_article_live=false;
         const int pikachu_ground_kind=pichu?It_Kind_Pichu_TJolt_Ground:
             It_Kind_Pikachu_TJolt_Ground;
@@ -404,8 +408,12 @@ int main(int argc,char** argv){try{
         const float pikachu_damage_before_specials=match.player_stats(0).damage_percent;
         bool pichu_self_damage_seen=false;
         for(unsigned n=0;n<240&&match.player_stats(1).damage_percent==damage;n++){
-            raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
+            raw[0].button=koopa||n%8==0?PAD_BUTTON_B:0;tick();
             if(ganon||captain)captain_family_punch|=match.player_stats(0).motion_id==ftCa_MS_SpecialN;
+            if(koopa){
+                koopa_ground_n|=match.player_stats(0).motion_id==ftKp_MS_SpecialN;
+                koopa_flame_live|=melee_web_test_item_count(It_Kind_Koopa_Flame)>0;
+            }
             if(donkey)donkey_ground_n|=match.player_stats(0).motion_id>=ftDk_MS_SpecialNStart&&
                 match.player_stats(0).motion_id<=ftDk_MS_SpecialNFull;
             if(doctor){
@@ -429,6 +437,17 @@ int main(int argc,char** argv){try{
             "Captain-family fighter did not enter its original grounded neutral special");
         if(donkey)check(donkey_ground_n,
             "Donkey did not enter an original grounded Giant Punch state");
+        if(koopa){
+            check(koopa_ground_n&&koopa_flame_live,
+                  "Bowser ground neutral special did not create its original Flame Article");
+            bool cleared=false;
+            for(unsigned n=0;n<600&&!cleared;n++){
+                tick();
+                cleared=melee_web_test_item_count(It_Kind_Koopa_Flame)==0 &&
+                        match.player_stats(0).motion_id<ftKp_MS_SpecialNStart;
+            }
+            check(cleared,"Bowser Flame did not end through its source lifetime");
+        }
         if(doctor)check(capsule,"Dr. Mario ground neutral special did not enter its original capsule action");
         if(luigi){
             check(luigi_fireball_live,"Luigi ground neutral special did not create its original fireball article");
@@ -717,6 +736,177 @@ int main(int argc,char** argv){try{
             std::cout<<"Captain-family down recovery stocks="<<stocks_before_down_recovery
                      <<" -> "<<match.player_stats(0).stocks<<std::endl;
             std::cout<<fighter_content->name<<" original N/air-N/S/Hi/Lw lifecycle branches executed"<<std::endl;
+        }else if(cycle==0&&koopa){
+            auto neutral_koopa=[&](){
+                raw[0].button=0;raw[0].stickX=raw[0].stickY=0;
+            };
+            auto settle_koopa=[&](){
+                neutral_koopa();
+                for(unsigned n=0;n<720;n++){
+                    const auto state=match.player_stats(0);
+                    if(state.ground_or_air==0&&state.motion_id==ftCo_MS_Wait)return;
+                    tick();
+                }
+                const auto state=match.player_stats(0);
+                std::cout<<"Bowser settle failure motion="<<state.motion_id
+                         <<" air="<<state.ground_or_air<<" x="<<state.position[0]
+                         <<" y="<<state.position[1]<<std::endl;
+                check(false,"Bowser special did not return to grounded Wait");
+            };
+            auto jump_koopa=[&](){
+                settle_koopa();
+                // Bowser's authored jump squat is eight source ticks. Hold
+                // X through that gate; no motion or velocity is injected.
+                raw[0].button=PAD_BUTTON_X;
+                for(unsigned n=0;n<12;n++)tick();
+                raw[0].button=0;
+                check(match.player_stats(0).ground_or_air!=0,
+                      "Bowser full jump did not reach the source aerial state");
+            };
+            jump_koopa();
+            bool air_n=false,air_flame=false,landed_n=false,ground_end=false;
+            int last_motion=-1;
+            for(unsigned n=0;n<240&&!air_flame;n++){
+                raw[0].button=PAD_BUTTON_B;tick();
+                const auto state=match.player_stats(0);
+                if(state.motion_id!=last_motion)
+                    std::cout<<"Bowser air Flame frame="<<n<<" motion="<<state.motion_id
+                             <<" y="<<state.position[1]<<" items="
+                             <<melee_web_test_item_count(It_Kind_Koopa_Flame)<<std::endl;
+                last_motion=state.motion_id;
+                air_n|=state.motion_id==ftKp_MS_SpecialAirN;
+                air_flame=state.motion_id==ftKp_MS_SpecialAirN&&
+                    melee_web_test_item_count(It_Kind_Koopa_Flame)>0;
+                if(state.ground_or_air==0)break;
+            }
+            neutral_koopa();
+            check(air_n&&air_flame,
+                  "Bowser aerial Flame did not spawn before source landing");
+            // This FD jump lands before the source minimum Flame hold ends.
+            // Check the actual AirN_Coll -> ground N -> ground End path;
+            // aerial End remains a separate, unexercised motion in this route.
+            bool flame_clear=false;
+            for(unsigned n=0;n<600&&!(ground_end&&flame_clear);n++){
+                tick();
+                const auto state=match.player_stats(0);
+                if(state.motion_id!=last_motion)
+                    std::cout<<"Bowser Flame release frame="<<n<<" motion="<<state.motion_id
+                             <<" y="<<state.position[1]<<std::endl;
+                last_motion=state.motion_id;
+                landed_n|=state.motion_id==ftKp_MS_SpecialN&&state.ground_or_air==0;
+                ground_end|=state.motion_id==ftKp_MS_SpecialNEnd;
+                flame_clear=melee_web_test_item_count(It_Kind_Koopa_Flame)==0;
+            }
+            check(landed_n&&ground_end&&flame_clear,
+                  "Bowser aerial Flame did not complete its source landing/end/Article teardown");
+            settle_koopa();
+            for(bool air:{false,true}){
+                if(air)jump_koopa();else settle_koopa();
+                bool entered=false;
+                for(unsigned n=0;n<240&&!entered;n++){
+                    raw[0].button=n==0?PAD_BUTTON_B:0;
+                    raw[0].stickY=n==0?80:0;tick();
+                    entered=match.player_stats(0).motion_id==
+                        (air?ftKp_MS_SpecialAirHi:ftKp_MS_SpecialHi);
+                }
+                check(entered,"Bowser up special did not enter its ground/air source motion");
+                settle_koopa();
+                std::cout<<"Bowser "<<(air?"air":"ground")<<" Fortress lifetime passed"<<std::endl;
+            }
+            for(bool air:{false,true}){
+                if(air)jump_koopa();else settle_koopa();
+                bool ground_start=false,air_drop=false,landing=false;
+                for(unsigned n=0;n<240&&!landing;n++){
+                    raw[0].button=n==0?PAD_BUTTON_B:0;
+                    raw[0].stickY=n==0?-80:0;tick();
+                    const auto motion=match.player_stats(0).motion_id;
+                    ground_start|=motion==ftKp_MS_SpecialLw;
+                    air_drop|=motion==ftKp_MS_SpecialAirLw;
+                    landing|=motion==ftKp_MS_SpecialLwLanding;
+                }
+                check((air||ground_start)&&air_drop&&landing,
+                      "Bowser Bomb did not complete source descent and landing states");
+                settle_koopa();
+                std::cout<<"Bowser "<<(air?"air":"ground")<<" Bomb lifetime passed"<<std::endl;
+            }
+            for(bool air:{false,true}){
+                settle_koopa();
+                raw[1].button=0;raw[1].stickX=raw[1].stickY=0;
+                // Let the previous throw finish before walking toward its
+                // victim. Chasing an airborne victim can walk off the stage.
+                bool victim_ready=false;
+                for(unsigned n=0;n<900&&!victim_ready;n++){
+                    const auto target=match.player_stats(1);
+                    raw[1].stickX=target.motion_id==ftCo_MS_RebirthWait?
+                        (target.position[0]>0?-40:40):0;
+                    victim_ready=target.ground_or_air==0&&target.motion_id==ftCo_MS_Wait;
+                    if(!victim_ready)tick();
+                }
+                raw[1].stickX=0;
+                check(victim_ready,"Mario did not finish Bowser's preceding throw/respawn");
+                for(unsigned n=0;n<600;n++){
+                    const auto target=match.player_stats(1);
+                    const float delta=target.position[0]-match.player_stats(0).position[0];
+                    if(target.ground_or_air==0&&target.motion_id==ftCo_MS_Wait&&
+                       std::fabs(delta)<16.0f)break;
+                    raw[0].stickX=std::fabs(delta)<14.0f?0:(delta>0?40:-40);tick();
+                }
+                neutral_koopa();
+                for(unsigned n=0;n<12;n++)tick();
+                const float delta=match.player_stats(1).position[0]-match.player_stats(0).position[0];
+                std::cout<<"Bowser catch approach air="<<air<<" delta="<<delta
+                         <<" p1motion="<<match.player_stats(0).motion_id
+                         <<" p2motion="<<match.player_stats(1).motion_id
+                         <<" p1x="<<match.player_stats(0).position[0]
+                         <<" p2x="<<match.player_stats(1).position[0]<<std::endl;
+                check(std::fabs(delta)<18.0f&&match.player_stats(1).ground_or_air==0,
+                      "Bowser raw approach did not place Mario in side-capture range");
+                const int direction=delta>0?80:-80;
+                if(air){
+                    // Offset the two authored jump-squat durations so both
+                    // fighters leave the floor together, using only PAD.
+                    for(unsigned n=0;n<12;n++){
+                        raw[0].button=PAD_BUTTON_X;
+                        raw[1].button=n>=4?PAD_BUTTON_X:0;tick();
+                    }
+                    raw[0].button=raw[1].button=0;
+                    check(match.player_stats(0).ground_or_air!=0&&
+                          match.player_stats(1).ground_or_air!=0,
+                          "Bowser/Mario capture setup did not reach both source jumps");
+                }
+                bool start=false,captured=false;
+                for(unsigned n=0;n<240&&!captured;n++){
+                    raw[0].button=n<12?PAD_BUTTON_B:0;
+                    raw[0].stickX=n==0?direction:0;tick();
+                    const auto motion=match.player_stats(0).motion_id;
+                    start|=motion==(air?ftKp_MS_SpecialAirSStart:ftKp_MS_SpecialSStart);
+                    captured=melee_web_test_koopa_capture(air?2:0,FTKIND_MARIO)!=0;
+                    if(n<24||captured)
+                        std::cout<<"Bowser "<<(air?"air":"ground")<<" catch frame="<<n
+                                 <<" motion="<<motion<<" victim="<<match.player_stats(1).motion_id
+                                 <<" captured="<<captured<<std::endl;
+                }
+                neutral_koopa();
+                check(start&&captured,"Bowser side special did not capture its original Mario victim");
+                if(!air){
+                    bool waited=false;
+                    for(unsigned n=0;n<240&&!waited;n++){
+                        tick();
+                        waited=match.player_stats(0).motion_id==ftKp_MS_SpecialSHit0_1&&
+                               melee_web_test_koopa_capture(0,FTKIND_MARIO)!=0;
+                    }
+                    check(waited,"Bowser ground catch did not reach source held-victim Wait");
+                }else tick();
+                bool thrown=false;
+                for(unsigned n=0;n<120&&!thrown;n++){
+                    raw[0].stickX=n==0?(air?-direction:direction):0;tick();
+                    thrown=melee_web_test_koopa_capture(air?3:1,FTKIND_MARIO)!=0;
+                }
+                neutral_koopa();
+                check(thrown,"Bowser side special did not reach its source linked-victim throw");
+                settle_koopa();
+                std::cout<<"Bowser "<<(air?"air":"ground")<<" catch/throw lifetime passed"<<std::endl;
+            }
         }else if(cycle==0&&donkey){
             // The common neutral loop above already proves grounded Giant
             // Punch damage and an authored N state.  This branch drives the

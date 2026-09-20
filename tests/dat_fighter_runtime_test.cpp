@@ -212,6 +212,55 @@ void real_donkey(const char* path)
     });
     std::cout << "Donkey 0x74 attributes, signed counters, cargo floats, authored dynamics and null x48: passed\n";
 }
+void real_koopa(const char* path)
+{
+    const auto identity = resolve_fighter_costume("PlyKoopa5K_Share_joint");
+    check(identity.fighter_kind == 5 && identity.motion_count == 316,
+          "Koopa source identity or authored action count changed");
+    auto bytes = read_real_archive(path);
+    auto archive = std::make_shared<const DatArchive>(bytes);
+    const auto runtime = std::make_shared<const DatFighterRuntime>(archive, identity);
+    check(runtime->actions().size() == 316 && runtime->koopa_attributes(),
+          "Koopa action count or exact extension is missing");
+    check(!runtime->mario_attributes() && !runtime->donkey_attributes() &&
+          !runtime->pikachu_attributes() && !runtime->purin_attributes(),
+          "Koopa extension was aliased to another fighter schema");
+    check(sizeof(MeleeWebKoopaAttributes) == 0xa0 &&
+          archive->next_target_offset(runtime->extension_offset()) - runtime->extension_offset() >= 0xa0,
+          "Koopa extension does not retain its 0xa0 source bound");
+    const auto& attributes = *runtime->koopa_attributes();
+    check(attributes.x0 == 0.0f && attributes.x4 == 40 && attributes.x20 == 30 &&
+          attributes.x2C == 3U && attributes.unk50 == 0U,
+          "Koopa signed/unsigned source words changed");
+    check(attributes.x8 == 0.7f && attributes.x10 == 360.0f &&
+          attributes.x54 == 1.78f && attributes.x94 == -7.5f,
+          "Koopa authored float values changed");
+    check(runtime->dynamics().active_bone_count == 1 && runtime->dynamics().bones.size() == 1 &&
+          runtime->dynamics().spheres.empty() && !runtime->dynamics().animation_table_offset,
+          "Koopa dynamics descriptor was omitted or fabricated");
+    // Drive the actual decoder with negative counters and an unsigned high
+    // bit so these source categories cannot silently become float storage.
+    auto typed = bytes;
+    put32(typed, 0x20 + runtime->extension_offset() + 4, 0xffffffd8U);
+    put32(typed, 0x20 + runtime->extension_offset() + 0x20, 0xffffffe2U);
+    put32(typed, 0x20 + runtime->extension_offset() + 0x50, 0x80000001U);
+    DatFighterRuntime typed_runtime(std::make_shared<const DatArchive>(typed), identity);
+    const auto& typed_attributes = *typed_runtime.koopa_attributes();
+    check(typed_attributes.x4 == -40 && typed_attributes.x20 == -30 &&
+          typed_attributes.unk50 == 0x80000001U,
+          "Koopa signed/unsigned decoder changed source bits");
+    auto malformed = read_real_archive(path);
+    put32(malformed, 0x20 + runtime->extension_offset() + 0x94, 0x7fc00000U);
+    rejects([&] {
+        (void) DatFighterRuntime(std::make_shared<const DatArchive>(malformed), identity);
+    });
+    malformed = read_real_archive(path);
+    put32(malformed, 0x20 + runtime->root_offset() + 4, runtime->root_offset());
+    rejects([&] {
+        (void) DatFighterRuntime(std::make_shared<const DatArchive>(malformed), identity);
+    });
+    std::cout << "Koopa 0xa0 attributes, signed/unsigned words, authored dynamics and open Flame Article boundary: passed\n";
+}
 void real_luigi(const char* path, const char* effect_path)
 {
     const auto identity = resolve_fighter_costume("PlyLuigi5K_Share_joint");
@@ -375,6 +424,10 @@ int main(int argc, char** argv)
     try {
         if (argc == 3 && std::string_view(argv[1]) == "real_donkey") {
             real_donkey(argv[2]);
+            return 0;
+        }
+        if (argc == 3 && std::string_view(argv[1]) == "real_koopa") {
+            real_koopa(argv[2]);
             return 0;
         }
         if (argc == 4 && std::string_view(argv[1]) == "real_luigi") {

@@ -18,6 +18,7 @@ extern "C" void melee_web_test_fighter_data(void*,int);
 extern "C" void melee_web_test_guard_data(const MeleeWebNativeDat*,uint32_t,void*,uint32_t*);
 extern "C" void melee_web_test_purin_data(void*);
 extern "C" void melee_web_test_donkey_data(void*);
+extern "C" void melee_web_test_koopa_data(void*,int);
 namespace {
 /* Keep this focused check independent of the full source header graph. These
  * are the two native ABI prefixes needed to inspect ftData->x2C->x10. */
@@ -298,6 +299,31 @@ void verify_donkey(const Bytes& source,const Bytes& container) {
     });
     std::cout<<"Native Donkey 0x74 ABI, exact dynamics and null Article table: passed\n";
 }
+void verify_koopa(const Bytes& source) {
+    const auto identity=resolve_fighter_costume("PlyKoopa5K_Share_joint");
+    check(identity.fighter_kind==5 && identity.motion_count==316,"Missing source Koopa identity");
+    const auto archive=std::make_shared<const DatArchive>(source);
+    const DatFighterRuntime runtime(archive,identity);
+    const auto root=runtime.root_offset(),ext=runtime.extension_offset();
+    auto decode=[&](const Bytes& bytes,int typed) {
+        NativeDatArena owner(std::make_shared<const DatArchive>(bytes));uint32_t unresolved=0;
+        void* data=melee_web_fighter_data_decode(owner.reader(),root,5,4,
+            identity.motion_count,nullptr,nullptr,nullptr,&unresolved);
+        check(data,"Koopa native ftData was not decoded");
+        melee_web_test_koopa_data(data,typed);
+    };
+    decode(source,0);
+    auto typed=source;
+    put32(typed,0x20+ext+4,0xffffffd8U);
+    put32(typed,0x20+ext+0x20,0xffffffe2U);
+    put32(typed,0x20+ext+0x50,0x80000001U);
+    decode(typed,1);
+    auto nonfinite=source;put32(nonfinite,0x20+ext+0x94,0x7fc00000U);
+    rejects([&]{decode(nonfinite,0);});
+    auto short_extension=source;put32(short_extension,0x20+root+4,root);
+    rejects([&]{decode(short_extension,0);});
+    std::cout<<"Native Koopa 0xa0 typed ABI and single Flame registration: passed\n";
+}
 void verify_purin(const Bytes& source,const Bytes& container) {
     const auto archive=std::make_shared<const DatArchive>(source);
     const auto& identity=resolve_fighter_costume("PlyPurin5K_Share_joint");
@@ -423,6 +449,9 @@ void verify_purin(const Bytes& source,const Bytes& container) {
 }
 int main(int argc,char**argv) {
     try {
+        if(argc==3 && std::string_view(argv[1])=="--koopa") {
+            verify_koopa(read_file(argv[2]));return 0;
+        }
         auto fixture=native_fixture();
         verify(std::make_shared<const DatArchive>(fixture.file()),fixture.container,0);
         // Missing required pointers and malformed typed values fail in the C decoder

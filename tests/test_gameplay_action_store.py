@@ -55,6 +55,7 @@ class GameplayActionStoreTests(unittest.TestCase):
                 '#include <melee/lb/inlines.h>\n#include <melee/lb/lbcommand.h>\n'
                 'void ftAnim_800704F0(HSD_GObj*, int, float);\nvoid ft_8008A1B8(HSD_GObj*, int);\nvoid ftColl_8007AFC8(HSD_GObj*, int);\n'
                 + function("ftAction_80071708") + '\n' + function("ftAction_80071784") + '\n' + function("ftAction_80071908") + '\n' + function("ftAction_80071974") + '\n' + function("ftAction_80072BF4") + '\n' + function("ftAction_80072B94") + '\n' + function("ftAction_80073008") + '\n' + function("ftAction_80071820") + '\n' + function("ftAction_800726F4") + '\n' + function("ftAction_80072C6C") + '\n' + function("ftAction_80073118")
+                + '\n' + function("ftAction_80071F78")
                 + '\nstatic void (*ftAction_803C06E8[49])(HSD_GObj*, CommandInfo*) = '
                 '{[30]=ftAction_800726F4,[42]=ftAction_80072C6C};\n'
                 + function("ftAction_80073240"))
@@ -93,6 +94,7 @@ class GameplayActionStoreTests(unittest.TestCase):
                 (ROOT / "assets-local/full-game-pikachu/PlPk.dat", ROOT / "assets-local/full-game-pikachu/PlPkAJ.dat"),
                 (ROOT / "assets-local/full-game-pichu/PlPc.dat", ROOT / "assets-local/full-game-pichu/PlPcAJ.dat"),
                 (ROOT / "assets-local/full-game-donkey/PlDk.dat", ROOT / "assets-local/full-game-donkey/PlDkAJ.dat"),
+                (ROOT / "assets-local/full-game-koopa/PlKp.dat", ROOT / "assets-local/full-game-koopa/PlKpAJ.dat"),
             ]
             available_pairs = [pair for pair in owned_pairs if all(path.is_file() for path in pair)]
             args = [str(path) for pair in available_pairs for path in pair]

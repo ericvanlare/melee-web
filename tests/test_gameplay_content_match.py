@@ -113,6 +113,26 @@ class ContentMatchTests(unittest.TestCase):
         finally:
             temporary.cleanup()
 
+    def test_koopa_source_lifecycles_both_orientations(self):
+        common = ROOT / "assets-local/full-game-ganon"
+        koopa = ROOT / "assets-local/full-game-koopa"
+        required_common = ("MnSlChr.usd", "PlMr.dat", "PlMrAJ.dat",
+                           "EfMrData.dat", "mario.ssm", "GrNLa.dat")
+        required_koopa = ("PlKp.dat", "PlKpAJ.dat", "PlKpNr.dat", "PlKpRe.dat",
+                          "PlKpBu.dat", "PlKpBk.dat", "EfKpData.dat", "koopa.ssm")
+        if not (all((common / name).is_file() for name in required_common) and
+                all((koopa / name).is_file() for name in required_koopa)):
+            self.skipTest("Owned Koopa/Mario, costumes, menu and FD fixtures are required")
+        temporary, merged = self.merged_asset_roots(common, koopa)
+        try:
+            for fighter, opponent in ((5, 8), (8, 5)):
+                with self.subTest(fighter=fighter, opponent=opponent):
+                    self.run_trace("gameplay_content_match_trace",
+                                   [merged, merged, 32, fighter, opponent],
+                                   "Mixed source content intro, costumes, stage lifecycle, combat, pause and repeat teardown passed")
+        finally:
+            temporary.cleanup()
+
     def test_battlefield_scaled_geometry_and_background_lifetimes(self):
         game = ROOT / "assets-local/next-gate"
         if not (game / "GrNBa.dat").is_file():

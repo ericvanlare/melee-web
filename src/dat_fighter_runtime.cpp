@@ -124,6 +124,14 @@ DatFighterRuntime::DatFighterRuntime(std::shared_ptr<const DatArchive> archive, 
 #define READ_DONKEY(at, type, name, original) donkey_->name = read_##type(data, extension_ + at);
         MELEE_WEB_DONKEY_ATTRIBUTE_FIELDS(READ_DONKEY)
 #undef READ_DONKEY
+    } else if (costume_->fighter_kind == 5) {
+        // Koopa's source extension is a distinct 0xa0 ABI. Preserve x4/x20
+        // as signed words and x2c/unk50 as unsigned words.
+        region(data, extension_, MELEE_WEB_KOOPA_ATTRIBUTE_BYTES);
+        koopa_.emplace();
+#define READ_KOOPA(at, type, name, original) koopa_->name = read_##type(data, extension_ + at);
+        MELEE_WEB_KOOPA_ATTRIBUTE_FIELDS(READ_KOOPA)
+#undef READ_KOOPA
     } else if (costume_->fighter_kind == 17) {
         // Luigi has a distinct 0x98 source extension; do not alias Mario's
         // fields just because both fighters are in the Mario family.

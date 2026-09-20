@@ -104,6 +104,23 @@ still match 603 Ganondorf/FD and 240 Mario/FD declared source updates. The
 receipt retains the failed cold discovery, the corrected pair, and the separate
 unresolved shield-drop crash; see the
 [current checkpoint receipt](docs/evidence/full-game-checkpoint-donkey-v1.json).
+Bowser is the sixteenth development fighter. Native Final Destination checks
+pass both player orders and all four costumes, including Flame creation and
+cleanup, ground/air Fortress and Bomb, and real ground/air capture and throws.
+The shared boundary now admits the victim's original command graphs and the
+source visibility cleanup command. Both browser discovery runs finish all
+30 cases; the cold timing/audio/pipeline failures remain retained. A reviewed
+36-descriptor preload correction clears the fresh cold/warm pair: 11,201
+source frames with zero action-window timing, audio, pipeline or heap-growth
+failures and no entry timing resumes. Independent original Bowser comparison,
+drawn capture interactions and broader acceptance remain open; see
+[Bowser's scope and evidence](docs/BOWSER_PORT_NOTES.md).
+The Bowser checkpoint passes both Release builds and 1,083 tests in 357.995
+seconds with 41 explicit skips. Fresh shared headless comparisons still
+match all 603 Ganondorf/FD and 240 Mario/FD declared source updates. The
+[Bowser checkpoint receipt](docs/evidence/full-game-checkpoint-koopa-v1.json)
+binds the builds, browser pair, review and retained failures. The preceding
+Donkey checkpoint's GitHub Verify completed in 6m 20s.
 The preceding Pikachu/Pichu/Old Yoshi checkpoint passes both Release builds and 1,075
 tests in 334.490 seconds with 41 explicit skips. Fresh headless comparisons
 still match 603 Ganondorf/FD and 240 Mario/FD declared source updates; the

@@ -13,7 +13,8 @@ void* melee_web_article_decode(const MeleeWebNativeDat*, uint32_t root, uint32_t
 typedef struct MeleeWebItemStateDesc {void* animation;void* material;void* shape;void* commands;} MeleeWebItemStateDesc;
 /* joint_optional is reserved for a checked source model descriptor whose
  * x0_joint is authored null. It does not make a missing model descriptor
- * publishable, and its zero-bone/zero-attachment form is validated here. */
+ * publishable, and its zero-bone/zero-attachment form is validated here. The
+ * authored scalar flag is preserved for source consumers. */
 int melee_web_article_publish(const MeleeWebNativeDat*,void* article,void* special,
     const MeleeWebItemStateDesc*,uint32_t states,void* joint,uint32_t bones,int32_t attach,uint8_t flags,
     int joint_optional,char* error,size_t error_size);

@@ -125,6 +125,15 @@ class GameplayFighterDataTests(unittest.TestCase):
                             self.assertIn("Native Donkey 0x74 ABI, exact dynamics and null Article table: passed",
                                           result.stdout)
             print(result.stdout, end="")
+            koopa_asset = ROOT / "assets-local/full-game-koopa/PlKp.dat"
+            if koopa_asset.is_file():
+                koopa = subprocess.run([str(node), str(output), "--koopa", str(koopa_asset)],
+                                       cwd=directory, env=env, capture_output=True,
+                                       text=True, timeout=30)
+                self.assertEqual(koopa.returncode, 0, koopa.stdout + koopa.stderr)
+                self.assertIn("Native Koopa 0xa0 typed ABI and single Flame registration: passed",
+                              koopa.stdout)
+                print(koopa.stdout, end="")
 
 
 if __name__ == "__main__":
