@@ -2,20 +2,19 @@
 
 ## Public repository boundary
 
-The publication workflow keeps compiler objects on each runner when the
-repository is public, or when a manual run sets `publication_mode: true`.
-Persistent cache restore/save and compiler-seed upload/download are disabled
-in that mode. All unit shards, build partitions, linked consumers and aggregate
-inventory checks still run. Private verification keeps the cache behavior
-described below.
+Public and private verification use the same compiler caching and seed jobs.
+The publication review starts a fresh `v4` cache namespace; old private caches
+are removed once at cutover. The [cache review](COMPILER_CACHE_REVIEW.md)
+separates that cleanup from ongoing caching and records the source/notice scope.
+Compiler flags, source/header validation, unit shards and build partitions are
+unchanged. Caches hold mixed-project compiler intermediates, not a licensed
+standalone player or a cache consisting only of permissive dependencies.
 
-The cached timings below describe the private workflow. Public verification is
-cold on each run and needs a separate measured turnaround claim; the earlier
-cold ARM trial took 10m 40s end to end. Public build partitions therefore have
-a 15-minute timeout, while the private cached path retains 10 minutes. This
-does not declare the public mode accepted against the earlier 600-second
-turnaround target. The [cutover procedure](PUBLICATION_CUTOVER.md) also removes
-old private caches before visibility changes.
+A manual `disable_compiler_cache: true` run remains available for a comparison
+without persistent cache restore/save or compiler-seed transfers. It permits
+15-minute build partitions; normal cached verification retains 10 minutes.
+The earlier cache-disabled publication rehearsal passed its checks but exceeded
+the 600-second turnaround target. It is not the selected public workflow.
 
 ## Issue 36: parallel Linux verification
 

@@ -101,11 +101,12 @@ inventory and third-party notices cover the remaining publication decisions.
 Keep all unresolved licensing and generated-data limits explicit in the pull
 request.
 
-Public CI keeps compiler objects on its runner and uploads only bounded text
-and JSON reports. Do not introduce compiler-cache archives or compiled game
-outputs as public artifacts or persistent caches without a separate reviewed
-distribution boundary. The `publication_mode` manual Verify input exercises
-this behavior while the repository is private.
+Public and private CI use the same reviewed compiler-cache boundary. Only
+compiler intermediates enter that cache; keep disc inputs, extracted assets,
+credentials and local captures out. Preserve the dependency notices and source
+provenance. A cache is mixed-project CI state and receives no blanket root MIT
+grant. See the [cache review](docs/COMPILER_CACHE_REVIEW.md). New playable or
+native releases still need their own concrete distribution review.
 
 ## Pull requests
 

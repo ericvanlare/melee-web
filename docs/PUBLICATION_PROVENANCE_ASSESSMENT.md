@@ -196,6 +196,17 @@ inputs against the current seed and retain the resulting receipt. If it is not
 enabled, describe the header as development metadata and do not present it as
 the current release’s pipeline certificate.
 
+## Compiler-cache follow-up
+
+The [targeted compiler-cache review](COMPILER_CACHE_REVIEW.md) retains ordinary
+CI caching after one-time private-era cache cleanup. These are intermediate
+objects from the mixed project/dependency compile graph. Their recovered-source
+and current-audio provenance remains within the documented uncertainty; neither
+public cache access nor the root license supplies additional rights. There is
+no identified cache-specific basis for a permanent blanket caching prohibition.
+Retain upstream notices and exact source provenance. This operational decision
+does not clear a combined player or authorize a new release.
+
 ## Publication wording and remaining actions
 
 The following statements are supported by this assessment:

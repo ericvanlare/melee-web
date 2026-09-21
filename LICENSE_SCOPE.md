@@ -13,8 +13,10 @@ build or serve. Preserve the license and this scope when redistributing them.
 - `scripts/ci_report.py`
 - `scripts/check_repository_content.py`
 - `scripts/audit_repository_history.py`
+- `scripts/audit_compiler_cache.py`
 - `tests/test_repository_content.py`
 - `tests/test_repository_history.py`
+- `tests/test_compiler_cache_audit.py`
 - `.github/repository-content-policy.json`
 - `.github/pull_request_template.md`
 - `.github/publication/actions-policy.json`
@@ -31,6 +33,7 @@ build or serve. Preserve the license and this scope when redistributing them.
 - `docs/PUBLICATION_CUTOVER.md`
 - `docs/REPOSITORY_HISTORY_AUDIT.md`
 - `docs/GITHUB_PUBLICATION_AUDIT.md`
+- `docs/COMPILER_CACHE_REVIEW.md`
 
 The first five implementations were read and recorded in the
 [source inventory](docs/SOURCE_LICENSE_INVENTORY.md); their recorded authorship

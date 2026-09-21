@@ -184,10 +184,11 @@ SHA-pinned actions were already configured.
   plan beforehand or make activation and verification explicit cutover steps.
 - [ ] Choose and verify approval requirements for external fork workflows once
   the public-repository settings become available.
-- [ ] Verify the public CI mode keeps compiler objects on the runner, then
+- [ ] Verify the [reviewed cached workflow](COMPILER_CACHE_REVIEW.md), then
   quiesce Actions and remove old private compiler caches before visibility
   changes. Preserve cache metadata and retained logs/reports; verify the cache
-  inventory is empty before re-enabling public CI.
+  inventory is empty before re-enabling public CI. Future compiler caching
+  remains enabled in a fresh namespace.
 - [x] Preserve read-only workflow defaults, SHA-pinned actions, and isolation
   of untrusted PR jobs from secrets, privileged execution, deployment, and paid
   external services.

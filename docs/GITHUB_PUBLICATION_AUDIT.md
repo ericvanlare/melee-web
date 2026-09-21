@@ -80,12 +80,15 @@ Only cache metadata was reviewed; no claim of zero findings covers their bytes.
 
 [GitHub documents](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching)
 that fork PRs can restore base-branch caches. Treat those caches as an exposure
-surface at public cutover. The selected path is to keep compiler objects on the
-runner in public CI, exercise that mode while private, then remove the old
-disposable caches after Actions has stopped and before changing visibility.
-Preserve logs, reports and the inventory; cache removal is not a substitute for
-reviewing retained evidence. The [cutover procedure](PUBLICATION_CUTOVER.md)
-contains the required sequence. No cache was deleted during this audit.
+surface at public cutover. The initial response disabled public caching; the
+[targeted cache review](COMPILER_CACHE_REVIEW.md) supersedes that blanket
+restriction. Public and private CI retain ordinary compiler caching in a fresh
+namespace. Unreviewed legacy caches are still removed once, after Actions has
+stopped and before changing visibility. Preserve logs, reports and the
+inventory; cache removal is not a substitute for reviewing retained evidence.
+The [cutover procedure](PUBLICATION_CUTOVER.md) contains that sequence. No cache
+was deleted during this audit. The metadata-only observation above is unchanged;
+it does not claim that the later byte inspection covers every historical key.
 
 The downloaded logs and artifacts contain compiler and source terminology and
 CI-generated runner paths. Their high-confidence secret scan found no private

@@ -41,11 +41,13 @@ read-only with PR-review approval disabled and were verified unchanged.
 ## Quiesce Actions and remove private compiler caches
 
 Persistent Actions caches are distinct from downloadable run artifacts. The
-cache metadata inventory found 75 entries totaling 8,033,127,560 bytes; their
-payloads were not covered by the archive audit. GitHub permits fork PRs to
-restore base-branch caches. The chosen public workflow keeps compiler objects
-on the runner and uploads only the existing text/JSON CI reports. Verify it
-with `publication_mode: true` while private before proceeding.
+original cache metadata inventory found 75 entries totaling 8,033,127,560
+bytes; their payloads were not covered by that archive audit. GitHub permits
+fork PRs to restore base-branch caches. The [targeted cache review](COMPILER_CACHE_REVIEW.md)
+replaces the initial blanket public-cache restriction: retain ordinary caching
+in a fresh namespace, with the existing source/provenance boundaries. Historical
+private caches still receive one-time cleanup rather than being inherited by
+public CI. Verify the updated cached workflow before proceeding.
 
 At the authorized cutover, disable new Actions execution, wait for all active
 and queued runs to finish or be deliberately stopped, and retain a fresh cache
@@ -66,12 +68,12 @@ gh api repos/ericvanlare/melee-web/actions/caches --jq .total_count
 ```
 
 Keep logs, reports, failures and the cache metadata receipt. Re-enable Actions
-using the policy below only after integrating and verifying the public mode.
+using the policy below only after integrating and verifying the reviewed workflow.
 The run query must return no non-completed runs before deleting caches; the
 cache query must then return zero before visibility changes. Use a fresh
 inventory filename if repeating the checkpoint.
 Rebase pending work onto that workflow before running it publicly; older
-workflow versions must not recreate unreviewed compiler cache uploads.
+workflow versions must not republish unreviewed local inputs or private-era caches.
 
 ## Apply controls during the public transition
 
