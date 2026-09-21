@@ -64,7 +64,7 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
     check(input.u32() == 0x4d575243, "Unsupported reference input format");
     RetailReplayRecipe result;
     result.version = input.u32();
-    check(result.version >= 1 && result.version <= 6, "Unsupported reference input version");
+    check(result.version >= 1 && result.version <= 7, "Unsupported reference input version");
     result.seed = input.u32();
     const auto count = input.u32();
     const size_t profile_bytes = result.version >= 4 ? 4 : 0;
@@ -102,9 +102,16 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
         }
         result.draw_boundaries = retail_queue_boundaries(events, count);
     }
-    check(count && count <= 36000 && bytes.size() == 16 + profile_bytes + clock_bytes + 0x138 +
-          (result.version >= 2 ? MELEE_WEB_PAD_STATE_BYTES : 0) + size_t(count) * 44,
-          "Reference input frame count disagrees with its size");
+    const size_t envelope_bytes = 16 + profile_bytes + clock_bytes + 0x138 +
+        (result.version >= 2 ? MELEE_WEB_PAD_STATE_BYTES : 0) + size_t(count) * 44;
+    if (result.version == 7)
+        // The whole-session span table follows the frames; its own length is
+        // validated once the table has been read.
+        check(count && count <= 36000 && bytes.size() >= envelope_bytes + 2,
+              "Whole-session input size disagrees with its transport");
+    else
+        check(count && count <= 36000 && bytes.size() == envelope_bytes,
+              "Reference input frame count disagrees with its size");
     for (auto& byte : result.setup) byte = input.u8();
     char error[256]{};
     check(melee_web_retail_setup(result.setup.data(), result.seed, &result.selection,
@@ -145,6 +152,29 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
             pad.err = std::bit_cast<int8_t>(input.u8());
         }
         std::copy_n(bytes.data() + offset, frame.bytes.size(), frame.bytes.data());
+    }
+    if (result.version == 7) {
+        const auto span_count = input.u16();
+        check(span_count >= 1 && span_count <= kRetailReplayMaxSpans,
+              "Whole-session span count is outside its bounds");
+        check(bytes.size() == envelope_bytes + 2 + size_t(span_count) * kRetailReplaySpanBytes,
+              "Whole-session span table disagrees with its transport");
+        result.spans.reserve(span_count);
+        uint32_t next_frame = 0;
+        for (uint32_t index = 0; index < span_count; ++index) {
+            RetailReplaySpan span;
+            span.scene = input.u8();
+            check(input.u8() == 0 && input.u16() == 0, "Unsupported whole-session span flags");
+            span.first_frame = input.u32();
+            span.last_frame = input.u32();
+            check(span.scene >= kRetailReplayCss && span.scene <= kRetailReplayPrize,
+                  "Whole-session span scene is not an admitted scene");
+            check(span.first_frame == next_frame && span.last_frame >= span.first_frame,
+                  "Whole-session spans must be ordered and contiguous");
+            next_frame = span.last_frame + 1;
+            result.spans.push_back(span);
+        }
+        check(next_frame == count, "Whole-session spans must cover every input frame");
     }
     return result;
 }

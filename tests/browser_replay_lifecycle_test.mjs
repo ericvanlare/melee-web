@@ -162,13 +162,13 @@ assert(start&&pause&&completion);
  assert.equal(vm.runInContext('replayMemorySnapshot().reason',scope),'unavailable');
  assert.equal(nativeCalls,1,'Optional diagnostics failure must not prevent replay evidence');
 }
-function harness(unload=true){
+function harness(unload=true,wholeSession=false){
  let resolveBytes;
  const pending=new Promise(resolve=>resolveBytes=resolve);
  const elements=new Map();
  const $=id=>{if(!elements.has(id))elements.set(id,{disabled:false,textContent:'',files:[],value:'performance',querySelectorAll:()=>[],replaceChildren(){},focus(){}});return elements.get(id);};
  $('retail-replay-file').files=[{size:1194,arrayBuffer:()=>pending}];
- const calls={native:0,unload:0,audio:0,paused:0,timingResets:0,failed:[]};
+ const calls={native:0,unload:0,audio:0,paused:0,timingResets:0,failed:[],launch:0};
  const scope={$,retailRun:null,replayLoading:false,ready:true,fatal:false,bundle:true,importing:false,
   replayEvidence:[],uiMessage:'',inputDirty:false,clearRenderCacheOnLoad:false,
   window:{},setTimeout:fn=>fn(),
@@ -181,6 +181,8 @@ function harness(unload=true){
   finishRetailReplay:async reason=>{calls.failed.push(reason);calls.completedRun=scope.retailRun;scope.retailRun=null;},
   Module:{HEAPU8:new Uint8Array(2048),_malloc:()=>1,_free(){},
    _melee_web_native_menu_replay:()=>{calls.native++;return 1;},
+   _melee_web_native_menu_replay_whole_session:()=>wholeSession?1:0,
+   _melee_web_native_menu_launch:()=>{calls.launch++;return 1;},
    _melee_web_native_menu_running:()=>1,
    _melee_web_native_menu_pause:()=>{calls.paused++;}}};
  vm.createContext(scope);vm.runInContext(start+'\n'+pause,scope);
@@ -216,6 +218,16 @@ function harness(unload=true){
  assert.equal(h.calls.native,0);assert.equal(h.calls.audio,0);
  assert.equal(h.$('retail-replay-report').textContent,'teardown failed');
  assert.equal(h.scope.replayLoading,false);assert.equal(h.$('disc').disabled,false);
+}
+{
+ const h=harness(true,true);const playing=h.play();h.resolveBytes(new ArrayBuffer(1194));await playing;
+ assert.equal(h.calls.native,1);
+ assert.equal(h.calls.launch,1,'A whole-session recipe enters CSS through the ordinary launch');
+}
+{
+ const h=harness();const playing=h.play();h.resolveBytes(new ArrayBuffer(1194));await playing;
+ assert.equal(h.calls.native,1);
+ assert.equal(h.calls.launch,0,'A single-match recipe keeps its direct match construction');
 }
 {
  const h=harness();h.scope.retailRun={observe:false};await h.$('pause').onclick();

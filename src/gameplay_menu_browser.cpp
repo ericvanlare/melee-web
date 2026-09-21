@@ -85,6 +85,25 @@ unsigned reference_menu_preparations=0;
 bool replay_match_complete=false;
 int replay_outcome=0,replay_winner=-1;
 MeleeWebMenuHost* host=nullptr;
+// The owner that is running right now, expressed in the recipe's scene codes.
+// Zero means the host is between scenes, so a whole-session replay skips the
+// comparison for that step instead of inventing a scene.
+int observed_replay_scene(){
+ if(match)return melee_web::kRetailReplayMatch;
+ if(results)return melee_web::kRetailReplayResults;
+ if(prize)return melee_web::kRetailReplayPrize;
+ if(host){
+  const int phase=melee_web_menu_host_phase(host);
+  if(phase==MELEE_WEB_MENU_CSS||phase==MELEE_WEB_MENU_CSS_READY)return melee_web::kRetailReplayCss;
+  if(phase==MELEE_WEB_MENU_SSS||phase==MELEE_WEB_MENU_SSS_READY)return melee_web::kRetailReplaySss;
+ }
+ return 0;
+}
+int expected_replay_scene(const melee_web::RetailReplayRecipe& recipe,size_t cursor){
+ for(const auto& span:recipe.spans)
+  if(cursor>=span.first_frame&&cursor<=span.last_frame)return span.scene;
+ return 0;
+}
 melee_web::FixedTickClock menu_clock;
 melee_web::FixedTickClock audio_clock{melee_web::FixedTickClock::OverrunPolicy::CatchUp};
 std::string message="Choose your local Melee disc image.";
@@ -816,10 +835,12 @@ void tick(){
    if(drew_source)provenance_return_draw=false;
 #endif
    if(replay&&!replay_final_draw&&replay_cursor==replay->frames.size()&&drew_source){
-    /* The final source frame is drawn before this close-boundary publication;
-     * report the canonical MatchEnd winner after its source ranking exists. */
-    (void)melee_web_match_rules_publish_result();
-    replay_outcome=melee_web_match_rules_outcome(&replay_winner);
+    if(!replay->whole_session()){
+     /* The final source frame is drawn before this close-boundary publication;
+      * report the canonical MatchEnd winner after its source ranking exists. */
+     (void)melee_web_match_rules_publish_result();
+     replay_outcome=melee_web_match_rules_outcome(&replay_winner);
+    }
     replay_final_draw=true;replay_completed_now=true;running=false;menu_clock.reset();
     message="Reference replay complete; all input consumed and final frame drawn.";
    }
@@ -996,8 +1017,17 @@ void tick(){
     --diagnostic_pad_remaining;
    }
    int result=1;
+   const bool replay_whole=replay&&replay->whole_session();
+   if(replay_whole){
+    check(replay_cursor<replay->frames.size(),"Whole-session replay ran past its declared timeline");
+    sample=replay->frames[replay_cursor].pads.data();
+    if(!replay_started){
+     replay_started=true;
+     EM_ASM({window.menuReplayStarted?.($0,!!$1,$2,$3);},replay->frames.size(),replay_trace,replay->expected_draws(),replay->scheduling_mode());
+    }
+   }
    if(match){
-    if(replay){
+    if(replay&&!replay_whole){
      check(!match->paused()&&!match->complete(),"Replay reached an unsupported source pause/exit");
      if(!replay_started){
       replay_started=true;
@@ -1005,15 +1035,19 @@ void tick(){
      }
      sample=replay->frames[replay_cursor].pads.data();
     }
+    else if(replay_whole)
+     check(!match->paused(),"Whole-session replay reached an unsupported source pause");
     match->tick(sample);source_frames.did_step(!replay||replay->closes_draw_batch(replay_cursor));
     int winner=-1;const int outcome=match->outcome(winner);
     if(replay){
      replay_match_complete=match->complete();replay_outcome=outcome;replay_winner=winner;
-     if(replay_trace)melee_web::retail_replay_frame(*replay,replay_cursor);
-     ++replay_cursor;
-     ++replay_steps;
-     replay_draw_boundaries+=replay->closes_draw_batch(replay_cursor-1)?1U:0U;
-     check(!match->complete()||replay_cursor==replay->frames.size(),"Replay source match exited before all input was consumed");
+     if(!replay_whole){
+      if(replay_trace)melee_web::retail_replay_frame(*replay,replay_cursor);
+      ++replay_cursor;
+      ++replay_steps;
+      replay_draw_boundaries+=replay->closes_draw_batch(replay_cursor-1)?1U:0U;
+      check(!match->complete()||replay_cursor==replay->frames.size(),"Replay source match exited before all input was consumed");
+     }
     }
     if(stock_check==-1){
      const auto player=match->player_stats(0);
@@ -1025,11 +1059,23 @@ void tick(){
      if(outcome)check(outcome==OUTCOME_ELIMINATION&&stock_count==0&&stock_respawns==3,"Stock diagnostic: unexpected source outcome");
      if(!match->complete())check(stock_tick<4000,"Stock diagnostic: no source exit after 4000 ticks");
     }
-    if(match->complete()&&!replay){check(outcome,"Original match transitioned without an outcome");pending=true;result=3;}
+    if(match->complete()&&(!replay||replay_whole)){check(outcome,"Original match transitioned without an outcome");pending=true;result=3;}
    }
    else if(results){results->tick(sample);source_frames.did_step();if(results->requested())result=3;}
    else if(prize){prize->tick(sample);source_frames.did_step();if(prize->requested())result=3;}
    else{result=melee_web_menu_host_tick(host,sample,error,sizeof(error));check(result==1||result==3,error);source_frames.did_step();}
+   if(replay_whole){
+    // One continuous timeline: the cursor advances once per simulation step,
+    // whichever owner consumed that step, and the owner must be the scene the
+    // recipe declared for this frame.
+    const int expected=expected_replay_scene(*replay,replay_cursor);
+    const int observed=observed_replay_scene();
+    check(!observed||observed==expected,"Whole-session replay drove an unexpected scene");
+    if(replay_trace)melee_web::retail_replay_frame(*replay,replay_cursor);
+    ++replay_cursor;
+    ++replay_steps;
+    replay_draw_boundaries+=replay->closes_draw_batch(replay_cursor-1)?1U:0U;
+   }
    if(result==3){pending=true;clear_diagnostic_pad();break;}
   }
   if(!audio_before_construction&&!audio_elapsed.stalled)
@@ -1301,12 +1347,23 @@ int melee_web_native_menu_replay(const uint8_t* data,unsigned size,int observe){
  auto candidate=std::make_unique<melee_web::RetailReplayRecipe>(melee_web::read_retail_replay({data,size}));
  check(candidate->version!=6||observe==1,"Recorded input-queue replay requires state-capture mode; live timing is not admitted");
  check(candidate->version>=2&&candidate->initial_input,"Browser reference playback requires a PAD history recipe (v2 or v3)");
- check(!reference_heap_used,"Reference replay requires a fresh application. Use Reload application state, import the disc, then play the recipe before entering menus.");
+ // A whole-session recipe is the opt-in form that keeps one source arena and
+ // cursors through the menu chain; every other version still requires a fresh
+ // application so a single-match replay cannot be resumed mid-heap.
+ check(candidate->whole_session()||!reference_heap_used,"Reference replay requires a fresh application. Use Reload application state, import the disc, then play the recipe before entering menus.");
  reference_heap_used=true;
  close();
  if(!archive_cache)archive_cache=std::make_unique<melee_web::RuntimeArchiveCache>(files);
- replay=std::move(candidate);replay_trace=observe;replay_pending=true;
+ replay=std::move(candidate);replay_trace=observe;replay_pending=!replay->whole_session();
  match_message="Reference replay: "+selected_match_message(replay->selection);
+ if(replay->whole_session()){
+  // A whole-session timeline starts at CSS, so its entry is the ordinary menu
+  // launch the caller already uses: the caller prepares the menu resources and
+  // enters the world, and the timeline then drives CSS, SSS, the match,
+  // Results and the return through one cursor.
+  message="Whole-session reference replay ready; launch to enter character select.";
+  return 1;
+ }
  check(preparation.request(),"Replay preparation is already active");
  preparation_profile.begin(true,emscripten_get_now());
  VISetFrameBufferScale(1);
@@ -1315,6 +1372,7 @@ int melee_web_native_menu_replay(const uint8_t* data,unsigned size,int observe){
  return 1;
 }catch(const std::exception& e){message=e.what();running=false;return 0;}}
 unsigned melee_web_native_menu_replay_cursor(){return static_cast<unsigned>(replay_cursor);}
+int melee_web_native_menu_replay_whole_session(){return replay&&replay->whole_session()?1:0;}
 void melee_web_native_menu_pause(int paused){
  if(faulted||replay_final_draw||preparation.busy()||pending||(!host_entered&&!match&&!results&&!prize))return;
  running=(world||match||results||prize)&&!paused;menu_clock.reset();

@@ -206,6 +206,10 @@ $('retail-replay-start').onclick=async()=>{
   uiMessage='';$('retail-replay-report').textContent='Preparing reference replay…';$('launch').disabled=true;$('pause').disabled=$('unload').disabled=false;
   retailRun.paintControl=beginReplayPaintControl();
   await boundary(()=>{const ptr=Module._malloc(bytes.length);try{if(!ptr)throw Error('Replay allocation failed');Module.HEAPU8.set(bytes,ptr);check(Module._melee_web_native_menu_replay(ptr,bytes.length,observe?1:0));}finally{Module._free(ptr);}});
+  // A whole-session recipe keeps one source arena and cursors through the real
+  // scene chain, so it enters CSS through the ordinary launch instead of the
+  // single-match replay's direct match construction.
+  if(Module._melee_web_native_menu_replay_whole_session?.())await boundary(()=>check(Module._melee_web_native_menu_launch()));
   $('canvas').focus();inputDirty=true;syncAudio();
  }catch(error){if(retailRun)await finishRetailReplay(error.message);else $('retail-replay-report').textContent=error.message;}
  finally{replayLoading=false;if(!retailRun){$('disc').disabled=fatal||importing;$('launch').disabled=fatal||!bundle;}}

@@ -114,6 +114,7 @@ PUBLIC_RUNTIME_FORBIDDEN_EXPORTS = frozenset(
     {
         "_melee_web_native_menu_replay",
         "_melee_web_native_menu_replay_cursor",
+        "_melee_web_native_menu_replay_whole_session",
         "_melee_web_native_menu_confirm_check",
         "_melee_web_native_menu_pad_sample",
         "_melee_web_native_menu_pad_sample_full",

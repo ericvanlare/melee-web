@@ -581,10 +581,21 @@ Still open in this context: the save block's persistent fighter records and
 name banks are captured as bytes but not typed, because the pinned source's own
 offsets for that region disagree with each other; the report keeps
 `persistent_record_semantics` as explicit missing coverage instead of guessing
-them. The current browser replay accepts only one match and deliberately
-rejects a used source heap; it cannot be treated as a whole-session replay by
-concatenating recipes. The opt-in extension must retain one source arena and
-cursor through the real scene chain.
+them.
+
+Whole-session input replay is implemented on the consumer side. Recipe version
+7 is the opt-in form: it keeps the version-4 envelope and appends a span table
+(`u16` count, then `u8` scene, `u8` zero, `u16` zero, `u32` first frame, `u32`
+last frame per span) that must be ordered, contiguous and cover every input
+frame. The browser accepts that form from a used source heap instead of
+requiring a fresh application, feeds the one continuous pad history to
+whichever owner is running, advances the cursor once per simulation step, and
+fails when the owner is not the scene the span declared. Every other recipe
+version still requires a fresh application, because a single-match recipe
+cannot be treated as a whole-session replay by concatenating recipes. What is
+not here yet is the producer: a whole-session recipe has to come from a
+whole-session capture (the sequence capture and input plan), so the mode has no
+captured input yet and no browser route run exercises it.
 
 Results comparison also needs full typed MatchEnd/standings and the source
 post-OnEnter display state. The current observer's 0x28-byte result prefix does
