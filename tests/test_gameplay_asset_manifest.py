@@ -39,6 +39,7 @@ class GameplayAssetManifestTests(unittest.TestCase):
                    str(ROOT / "src/dat_animation.cpp"),
                    str(ROOT / "src/fighter_binding.cpp"),
                    str(ROOT / "src/gameplay_asset_manifest.cpp"),
+                   str(ROOT / "src/gameplay_result_motion_table.cpp"),
                    str(ROOT / "tests/gameplay_asset_manifest_test.cpp"),
                    "-o", str(cls.binary)]
         cls.compile_command = command

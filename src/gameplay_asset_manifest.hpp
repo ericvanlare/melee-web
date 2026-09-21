@@ -21,4 +21,17 @@ namespace melee_web {
 [[nodiscard]] std::vector<std::string>
 match_asset_names(const MeleeWebMenuMatchSelection& selection);
 
+// Logical RuntimeFiles names for the original Results scene that follows one
+// checked source VS selection. It repeats the match compatibility checks and
+// adds the authored GmRst roots, per-fighter result-motion archives and the
+// four authored victory themes. It is a read-only descriptor.
+[[nodiscard]] std::vector<std::string>
+results_asset_names(const MeleeWebMenuMatchSelection& selection);
+
+// Logical RuntimeFiles names for the original Prize (unlock notification)
+// scene. Prize runs its own source world, so this descriptor is complete on
+// its own: the authored IfPrize/SdPrize roots, the trophy and card roots, the
+// menu audio banks and the three authored s_info voice streams.
+[[nodiscard]] std::vector<std::string> prize_asset_names();
+
 } // namespace melee_web

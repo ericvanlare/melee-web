@@ -57,6 +57,7 @@ bool scoped_assets=false,asset_committed=false;
 uint32_t asset_generation=0;
 std::vector<std::string> requested_assets;
 MeleeWebMenuMatchSelection asset_selection{};
+bool asset_selection_valid=false;
 std::unique_ptr<melee_web::RuntimeArchiveCache> archive_cache;
 std::unique_ptr<melee_web::GameplayMenuWorld> world;
 bool source_session_owned=false;
@@ -430,7 +431,9 @@ void request_assets(AssetDestination destination,
  case AssetDestination::Replay:
   check(selection!=nullptr,"This asset scope requires an original source selection");
   names=melee_web::match_asset_names(*selection);break;
- case AssetDestination::Results: names=melee_web::results_asset_names();break;
+ case AssetDestination::Results:
+  check(asset_selection_valid,"Results assets require the completed match selection");
+  names=melee_web::results_asset_names(asset_selection);break;
  case AssetDestination::Prize: names=melee_web::prize_asset_names();break;
  default: names=melee_web::menu_asset_names();break;
  }
@@ -442,7 +445,7 @@ void request_assets(AssetDestination destination,
  requested_assets=std::move(names);
  asset_generation=asset_scope.request(requested_assets);
  asset_destination=destination;asset_committed=false;
- if(selection)asset_selection=*selection;
+ if(selection){asset_selection=*selection;asset_selection_valid=true;}
  running=false;menu_clock.reset();audio_clock.reset();
  EM_ASM({window.menuAssetScopeReleased?.({files:$0,bytes:$1,remainingFiles:$2});},
         released_files,released_bytes,files.size());

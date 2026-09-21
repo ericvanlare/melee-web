@@ -2,6 +2,7 @@
 
 #include "dat_archive.hpp"
 #include "dat_trophy_data.hpp"
+#include "gameplay_result_motion_table.hpp"
 #include "runtime_archive_cache.hpp"
 #include "gameplay_archive_sections.h"
 #include "gameplay_compat.h"
@@ -52,26 +53,14 @@ const DatPublicSymbol& public_symbol(const DatArchive& archive,
     return *found;
 }
 
-struct ResultArchiveSpec {
-    std::string_view archive;
-    std::string_view root;
-};
+using ResultArchiveSpec = ResultMotionArchiveSpec;
 
 ResultArchiveSpec result_archive_spec(std::uint32_t fighter_kind)
 {
-    // Authored lbl_803D53A8 in gm_1601.c. Keep each GmRstM filename paired
-    // with its source public root; neither is inferred from local assets.
-    switch (fighter_kind) {
-    case FTKIND_MARIO:   return {"GmRstMMr.dat", "ftDemoResultMotionFileMario"};
-    case FTKIND_DRMARIO: return {"GmRstMDr.dat", "ftDemoResultMotionFileDrmario"};
-    case FTKIND_FOX:     return {"GmRstMFx.dat", "ftDemoResultMotionFileFox"};
-    case FTKIND_FALCO:   return {"GmRstMFc.dat", "ftDemoResultMotionFileFalco"};
-    case FTKIND_MARS:    return {"GmRstMMs.dat", "ftDemoResultMotionFileMars"};
-    case FTKIND_EMBLEM:  return {"GmRstMFe.dat", "ftDemoResultMotionFileEmblem"};
-    case FTKIND_LINK:    return {"GmRstMLk.dat", "ftDemoResultMotionFileLink"};
-    case FTKIND_CLINK:   return {"GmRstMCl.dat", "ftDemoResultMotionFileClink"};
-    default: throw DatError("Results fighter has no authored gm_1601 result archive");
-    }
+    const auto spec = result_motion_archive_spec(fighter_kind);
+    if (spec.archive.empty())
+        throw DatError("Results fighter has no authored gm_1601 result archive");
+    return spec;
 }
 
 bool is_result_action(std::string_view symbol)

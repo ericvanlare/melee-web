@@ -513,16 +513,22 @@ empty. The three repeated Mario CSS live allocations are 325,536,456,
 it ends with 42 immutable archives and 15 audio banks. This is finite lifecycle
 and discovery evidence, not an unrestricted allocation bound or acceptance timing.
 
+> Scope note: the seed correction and the reduced regression below depend on the
+> appended portable descriptors and land as a separate pipeline-preparation
+> change. This route change ships the scene and route ownership described above;
+> it makes no descriptor, timing or performance claim. The discovery and
+> regression receipts remain bound to that separate change.
+
 The cache review adds exactly 27 observed GX descriptors and preserves all 628
 previous rows field-for-field, including their original first-use metadata.
 There are no payload conflicts or missing base rows, and no Dawn driver-cache
 bytes are included. The decoded seed is now
 `417b4939c41068ca7a44fe0e4329be3f85e41f607e78e4253a7bb095bb0137d9`:
 one Clear row and 654 GX rows. The source scene receives no extra draws or
-ticks. The [portable seed receipt](evidence/results-pipeline-seed-v1.json)
-binds the producer, inventory, export, review and all appended descriptor
-identities. Twelve focused cache/seed checks and the affected development
-Release build pass.
+ticks. The portable seed receipt `evidence/results-pipeline-seed-v1.json` belongs
+to the separate pipeline-preparation change and binds the producer, inventory,
+export, review and all appended descriptor identities. Twelve focused cache/seed
+checks and the affected development Release build pass.
 
 Timing diagnostics now distinguish callbacks with source work from callbacks
 with no source work while preserving all existing deadline counters. Timing

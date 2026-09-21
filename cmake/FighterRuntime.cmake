@@ -75,6 +75,7 @@ target_compile_options(fighter_source_runtime PRIVATE -ffunction-sections -fdata
 target_link_libraries(fighter_source_runtime PUBLIC hsd_native_runtime aurora::pad)
 add_library(fighter_asset_runtime STATIC EXCLUDE_FROM_ALL
   src/gameplay_results_assets.cpp src/gameplay_results_session.cpp src/dat_trophy_data.cpp
+  src/gameplay_result_motion_table.cpp
   src/gameplay_prize_assets.cpp src/gameplay_prize_session.cpp
   src/gameplay_retail_recipe.cpp
   src/gameplay_replay_transport.cpp src/gameplay_replay_session.cpp
