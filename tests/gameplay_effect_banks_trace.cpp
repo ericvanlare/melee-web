@@ -4,17 +4,21 @@
 #include "gameplay_bootstrap.h"
 #include "gameplay_effect_runtime.h"
 #include "gameplay_compat.h"
+#include "gameplay_effect_runtime.h"
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wwrite-strings"
 extern "C" {
 #include <sysdolphin/baselib/particle.h>
 #include <sysdolphin/baselib/jobj.h>
+#include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/aobj.h>
 #include <sysdolphin/baselib/spline.h>
 #include <sysdolphin/baselib/mobj.h>
 #include <sysdolphin/baselib/tobj.h>
 #include <melee/ef/types.h>
 #include <melee/ef/efdata.h>
+#include <melee/ef/eflib.h>
+#include <melee/ef/efasync.h>
 extern EF_DAT_Entry efAsync_DatEntries[51];
 extern u32* hsd_804D0948[65];
 extern HSD_PSFormGroup** psFormGroupArray[65];
@@ -247,6 +251,41 @@ static void pikachu_entries(std::shared_ptr<const melee_web::DatArchive> archive
     }
     std::cout<<"Pikachu bank7 six-entry model/null-row publication, animation, restart and detach passed\n";
 }
+static void deferred_effect_entries(std::shared_ptr<const melee_web::DatArchive> archive){
+    melee_web::DatEffectEntries owner(archive,"effMarioDataTable",1,2,true);
+    archive.reset();
+    check(melee_web_gameplay_startup(8U*1024U*1024U,error,sizeof(error)),"deferred effect world startup");
+    check(melee_web_native_world_enable(error,sizeof(error)),"deferred effect native class initialization");
+    HSD_GObj** links=reinterpret_cast<HSD_GObj**>(HSD_GObj_Entities);
+    check(!links[11]&&!links[12],"deferred effect links start empty");
+    const auto previous=efAsync_DatEntries[1].data;
+    check(melee_web_effect_runtime_prepare(error,sizeof(error)),"reserve deferred original effect runtime");
+    check(!melee_web_effect_runtime_active(),"deferred effect reservation is not source initialization");
+    check(owner.publish_for_source(error,sizeof(error)),"publish deferred effect descriptors");
+    check(!owner.entries_ready()&&!efAsync_DatEntries[1].data,
+        "deferred publication waits for the original source loader");
+    /* This is the authored scene boundary: one source initializer creates both
+     * effect processes, then the source loader publishes the checked table. */
+    efLib_Init();
+    check(links[11]&&links[12]&&links[11]->proc&&links[12]->proc,
+        "original effect initializer published both GObj/process owners");
+    check(melee_web_effect_runtime_complete_source_init(error,sizeof(error)),
+        "deferred effect source initializer completed exactly once");
+    check(melee_web_effect_runtime_active(),"deferred effect runtime activates after source initialization");
+    efAsync_LoadSync(1);
+    check(owner.verify_source_load(error,sizeof(error))&&owner.entries_ready(),
+        "original deferred effect loader published owned data");
+    check(efAsync_DatEntries[1].data!=previous,"deferred effect lookup changed on source load");
+    efLib_EffectCount=1;
+    check(!owner.detach(error,sizeof(error)),"live deferred source effect blocks detach");
+    efLib_EffectCount=0;
+    check(melee_web_effect_runtime_end(error,sizeof(error)),"deferred effect runtime teardown");
+    check(!links[11]&&!links[12],"deferred effect processes tear down with source runtime");
+    check(owner.detach(error,sizeof(error))&&!owner.entries_ready(),"deferred effect descriptor detach");
+    check(efAsync_DatEntries[1].data==previous,"deferred effect lookup restored");
+    check(melee_web_gameplay_shutdown(error,sizeof(error)),"deferred effect world shutdown");
+    std::cout<<"Deferred Mario effects: source initializer, GObj/process publication, source LoadSync and teardown passed\n";
+}
 static void common_entries(std::shared_ptr<const melee_web::DatArchive> archive){
     melee_web::DatEffectEntries owner(archive,"effCommonDataTable",0,47,true);archive.reset();
     check(owner.entry_count()==47,"all common source effect descriptors hydrated");
@@ -314,6 +353,7 @@ int main(int argc,char** argv){
             std::ifstream file(argv[1],std::ios::binary);check(bool(file),"open optional effect archive");
             Bytes bytes((std::istreambuf_iterator<char>(file)),{});
             registration(std::make_shared<melee_web::DatArchive>(bytes),"effMarioDataTable",true);
+            deferred_effect_entries(std::make_shared<melee_web::DatArchive>(bytes));
             effect_entries(std::make_shared<melee_web::DatArchive>(bytes));
             std::cout<<"Local Mario particle bank:14 commands,6 groups,21 images,8 palettes; original registration/restart passed\n";
         }else check(argc==1,"unexpected effect bank trace arguments");

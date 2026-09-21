@@ -8,8 +8,12 @@ using namespace fighter_runtime_test;
 extern "C" {
 Fighter* action_test_fighter(void);
 void action_test_destroy(Fighter*);
+void action_test_install_table(Fighter*, void*, void*, unsigned);
+void action_test_set_count(Fighter*, unsigned);
 int action_test_load(Fighter*, int, int);
 int action_test_load_from(Fighter*, Fighter*, int);
+int action_test_auxiliary_out_of_range(Fighter*, int);
+int action_test_primary_out_of_range(Fighter*, Fighter*, int);
 void* action_test_identity(Fighter*);
 const char* action_test_identity_symbol(Fighter*);
 int action_test_identity_command_live(Fighter*);
@@ -47,7 +51,15 @@ void verify(std::shared_ptr<const DatArchive> archive, const Bytes& container, b
     for(unsigned id=96;id<=103;++id)check(store.command_ready(id),"Shared light-item smash throw command graphs are ready");
     for(unsigned id=267;id<=275;++id)check(store.command_ready(id),"Shared cargo victim command graphs are ready");
     Fighter* fp = action_test_fighter(); check(fp != nullptr, "Fighter allocation"); store.bind(fp);
+    action_test_install_table(fp, store.action_rows(), store.blend_rows(),
+                              static_cast<unsigned>(store.runtime().actions().size()));
     check(action_test_load(fp, 2, 0) > 0 && action_test_load(fp, 6, 1) > 0 && action_test_alias(fp), "Original loader preserves 2/6 clip aliases");
+    action_test_set_count(fp, 14);
+    check(action_test_auxiliary_out_of_range(fp, 72),
+          "Demo auxiliary action 72 returns NULL and preserves its cached slot outside the 14-row source domain");
+    check(action_test_primary_out_of_range(fp, fp, 72),
+          "Demo primary action 72 is a source no-op outside the 14-row domain");
+    action_test_set_count(fp, static_cast<unsigned>(store.runtime().actions().size()));
     const auto frames = action_test_frames(fp); check(frames > 0, "Original FigaTree frames consumer");
     action_test_load(fp, 7, 1); action_test_load(fp, 8, 1);
     check(action_test_frames(fp) == frames, "Primary clip retains stream ownership across secondary cache eviction");
@@ -77,11 +89,18 @@ void verify_cross_fighter_identity_lease(std::shared_ptr<const DatArchive> archi
     GameplayActionStore destination(archive, mario(), container);
     Fighter* thrower = action_test_fighter(); Fighter* victim = action_test_fighter();
     check(thrower && victim, "Cross-fighter test allocation"); source->bind(thrower); destination.bind(victim);
+    action_test_install_table(thrower, source->action_rows(), source->blend_rows(),
+                              static_cast<unsigned>(source->runtime().actions().size()));
+    action_test_install_table(victim, destination.action_rows(), destination.blend_rows(),
+                              static_cast<unsigned>(destination.runtime().actions().size()));
     check(action_test_load_from(victim, thrower, 2) > 0, "Cross-fighter source action load");
     const auto frames = action_test_frames(victim); const auto identity = action_test_identity(victim);
     const std::string symbol = action_test_identity_symbol(victim);
     check(frames > 0 && identity && !symbol.empty() && action_test_identity_command_live(victim),
           "Cross-fighter destination owns action identity and source command lease");
+    action_test_set_count(thrower, 1);
+    check(action_test_primary_out_of_range(victim, thrower, 2),
+          "Cross-fighter primary action guard uses the source fighter row count and preserves the destination lease");
     source.reset();
     check(action_test_frames(victim) == frames && action_test_identity(victim) == identity &&
           action_test_identity_symbol(victim) && symbol == action_test_identity_symbol(victim) &&
@@ -190,6 +209,7 @@ void verify_common_appeals(std::shared_ptr<const DatArchive> archive, const Byte
     check(action_test_common_appeals(store.action_rows(), expected_command_mask),
           "Common appeal rows did not retain checked command storage or were given the sentinel");
 }
+
 }
 int main(int argc, char** argv)
 {

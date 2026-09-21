@@ -3,23 +3,36 @@
 #include <algorithm>
 #include "gameplay_menu_host.h"
 #include "gameplay_match_session.hpp"
+#include "gameplay_results_session.hpp"
+#include "gameplay_prize_session.hpp"
 #include "gameplay_match_rules.h"
+#include "gameplay_bootstrap.h"
 #include "gameplay_audio_stream.h"
 #include "native_menu_fighter_input.h"
 #include "native_menu_stage_input.h"
 #include <melee/ft/forward.h>
 #include <melee/gm/forward.h>
+extern "C" {
+#include <melee/gm/gm_16AE.h>
+#include <melee/gm/gmresultplayer.h>
+#include <melee/gm/gmmain_lib.h>
+#include <melee/gm/types.h>
+}
 #include <melee/gr/forward.h>
 #include <sysdolphin/baselib/random.h>
 #include <bit>
 #include <cmath>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <sstream>
 #include <stdexcept>
+extern "C" int melee_web_vs_mode_begin(void);
+extern "C" int melee_web_vs_mode_end(void);
 static void check(int value,const char* error){if(!value){std::cerr<<"Check failed before teardown: "<<error<<"\n";throw std::runtime_error(error);}}
 
 namespace {
@@ -28,6 +41,76 @@ std::string hex64(uint64_t value){std::ostringstream out;out<<std::hex<<std::set
 std::string stream_name(MeleeWebAudio* audio){
  const char* path=melee_web_audio_stream_path(audio);if(!path)return {};
  std::string result(path);const auto slash=result.find_last_of("/\\");return slash==std::string::npos?result:result.substr(slash+1);
+}
+void run_results_source_smoke(const melee_web::RuntimeFiles& files,
+                              MeleeWebMenuHost* host,
+                              const MatchExitInfo& exit_info,
+                              uint32_t& seed,
+                              uint8_t input_bytes[MELEE_WEB_PAD_STATE_BYTES])
+{
+    ResultsMatchInfo result{};
+    char error[256]{};
+    const auto resets=*gmMainLib_GetMatchResetCounter();
+    const auto stock_matches=*gmMainLib_GetStockMatchTotal();
+    check(melee_web_menu_host_results_begin(host,&exit_info,seed,&result,error,sizeof(error)),error);
+    const bool canceled=exit_info.match_end.outcome==OUTCOME_NO_CONTEST;
+    check(*gmMainLib_GetMatchResetCounter()==resets+(canceled?1:0)&&
+          *gmMainLib_GetStockMatchTotal()==stock_matches+(canceled?0:1),
+          "Original VS exit did not update exactly one persistent result counter");
+    check(std::memcmp(&result.match_end,&exit_info.match_end,sizeof(result.match_end))==0,
+          "VS mode Results entry changed the completed MatchEnd");
+    std::unique_ptr<MeleeWebPadState,decltype(&melee_web_pad_state_free)> decoded(
+        melee_web_pad_state_decode(input_bytes,MELEE_WEB_PAD_STATE_BYTES,error,sizeof(error)),
+        melee_web_pad_state_free);
+    check(decoded!=nullptr,error);
+    melee_web::GameplayResultsSession session(files,result,seed,*decoded);
+    check(!melee_web_menu_host_results_exit(host,error,sizeof(error)),
+          "Mode exit was accepted before Results scene OnExit");
+    float pcm[1068];unsigned audio_phase=0;
+    auto tick=[&](const PADStatus pads[4]){
+        session.tick(pads);
+        audio_phase+=32000;unsigned count=audio_phase/60;audio_phase%=60;
+        check(melee_web_audio_render(session.audio(),pcm,count,error,sizeof(error)),error);
+    };
+    PADStatus neutral[4]{};neutral[2].err=neutral[3].err=-1;
+    for(unsigned t=0;t<240;t++)tick(neutral);
+    for(unsigned t=0;t<600&&!session.requested();t++){
+        PADStatus pads[4]{};pads[2].err=pads[3].err=-1;
+        // The original Results confirmation is Start; A changes stats pages.
+        if(t%90==0)pads[0].button=pads[1].button=PAD_BUTTON_START;
+        tick(pads);
+    }
+    check(session.requested(),"Original Results scene did not request its source exit");
+    session.exit_scene();
+    check(melee_web_menu_host_results_exit(host,error,sizeof(error)),error);
+    check(!melee_web_menu_host_results_exit(host,error,sizeof(error)),
+          "Results mode exit ran twice");
+    seed=session.random_seed();
+    melee_web_pad_state_capture(input_bytes);
+    session.close();
+    check(melee_web_menu_host_results_end(host,seed,input_bytes,error,sizeof(error)),error);
+    if(melee_web_menu_host_results_destination(host)==192){
+        const MeleeWebPadState* retained=melee_web_menu_host_input(host);
+        check(retained!=nullptr,"Results did not retain Prize PAD input");
+        melee_web::GameplayPrizeSession prize(files,host,seed,*retained);
+        check(!melee_web_menu_host_prize_exit(host,error,sizeof(error)),
+              "Prize mode exited before source confirmation");
+        for(unsigned t=0;t<3600&&!prize.requested();++t){
+            PADStatus pads[4]{};pads[2].err=pads[3].err=-1;
+            if(t>=20&&t%20==0)pads[0].button=PAD_BUTTON_START;
+            prize.tick(pads);
+            audio_phase+=32000;const unsigned count=audio_phase/60;audio_phase%=60;
+            check(melee_web_audio_render(prize.audio(),pcm,count,error,sizeof(error)),error);
+        }
+        check(prize.requested(),"Original Prize did not finish within the bounded confirmation script");
+        prize.exit_scene();
+        check(melee_web_menu_host_prize_exit(host,error,sizeof(error)),error);
+        check(!melee_web_menu_host_prize_exit(host,error,sizeof(error)),"Prize mode exit ran twice");
+        seed=prize.random_seed();melee_web_pad_state_capture(input_bytes);
+        std::cout<<"Original Prize confirmed in "<<prize.source_frames()<<" source ticks\n";
+        prize.close();
+        check(melee_web_menu_host_prize_end(host,seed,input_bytes,error,sizeof(error)),error);
+    }
 }
 void write_player(std::ostream& out,const PlayerInitData& player){
  const unsigned flags_c=(unsigned(player.rumble_enabled)<<7)|(unsigned(player.xC_b1)<<6)|
@@ -113,8 +196,11 @@ int main(int argc,char** argv){try{
  const char* source_revision=argc>=6?argv[5]:nullptr;
  const char* input_recipe=argc==7?argv[6]:nullptr;
  const bool retail_fd_recipe=input_recipe&&std::string(input_recipe)=="retail-stock-fd-v1";
- if(input_recipe&&!retail_fd_recipe)throw std::runtime_error("Unknown transition input recipe");
- if(retail_fd_recipe&&stage_kind!=St_Kind_Last)throw std::runtime_error("Retail FD recipe requires Final Destination");
+ const bool results_mario_recipe=input_recipe&&std::string(input_recipe)=="results-mario-v1";
+ const bool link_css_unload_recipe=input_recipe&&std::string(input_recipe)=="link-css-unload-v1";
+ if(input_recipe&&!retail_fd_recipe&&!results_mario_recipe&&!link_css_unload_recipe)throw std::runtime_error("Unknown transition input recipe");
+ if((retail_fd_recipe||results_mario_recipe)&&stage_kind!=St_Kind_Last)
+   throw std::runtime_error("Explicit FD recipes require Final Destination");
  TransitionTrace trace(trace_path,source_revision,input_recipe);
  melee_web::RuntimeFiles files;
  std::vector<std::string> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","GrNLa.dat","GrNBa.dat","GrSt.dat","hyaku.hps","hyaku2.hps","sp_zako.hps","ystory.hps","ItCo.usd","EfMrData.dat","EfFxData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","fox.ssm","falco.ssm","mars.ssm","drmario.ssm","emblem.ssm","pupupu.ssm","dsp_coef.bin","sislib_font.bin"};
@@ -125,9 +211,20 @@ int main(int argc,char** argv){try{
   std::ifstream input(std::filesystem::path(root)/key,std::ios::binary);if(!input)throw std::runtime_error("Missing owned menu host fixture: "+key);
   files[key]={(std::istreambuf_iterator<char>(input)),{}};
  }
- for(unsigned cycle=0;cycle<2;cycle++){
+ if(results_mario_recipe){
+  for(const char* key:{"GmRst.usd","SdRst.usd","GmRstMMr.dat","ff_mario.hps","TyDatai.usd","IfPrize.usd","SdPrize.usd","s_info1.hps","s_info2.hps","s_info3.hps"}){
+   std::ifstream input(std::filesystem::path(argv[2])/key,std::ios::binary);
+   if(!input)throw std::runtime_error("Missing owned Results fixture");
+   files[key]={(std::istreambuf_iterator<char>(input)),{}};
+  }
+ }
+ char session_error[256]{};
+ check(melee_web_gameplay_session_begin(32U*1024U*1024U,session_error,sizeof(session_error)),session_error);
+ const auto session_allocation=melee_web_gameplay_allocation();
+ const unsigned cycle_count=results_mario_recipe?1:2;
+ for(unsigned cycle=0;cycle<cycle_count;cycle++){
   trace.begin_run(cycle);
-  if(retail_fd_recipe&&cycle==0)*seed_ptr=1840631306u;
+  if((retail_fd_recipe||results_mario_recipe)&&cycle==0)*seed_ptr=1840631306u;
   char error[256]{};auto* host=melee_web_menu_host_create(error,sizeof(error));check(host!=nullptr,error);
   auto world=std::make_unique<melee_web::GameplayMenuWorld>(files);
   check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);
@@ -165,6 +262,21 @@ int main(int argc,char** argv){try{
          "CSS/SSS scene rebuild reset or advanced menu music outside an audio tick");
    check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);
   };
+  auto select_stage=[&](){
+  bool at_target=false;
+  for(unsigned t=0;t<120;t++){
+   MeleeWebStageInputObservation observed{};
+   check(melee_web_stage_input_observe(stage_kind,&observed),"Original SSS cursor observation unavailable");
+   const int state=melee_web_stage_input_drive(raw,&observed,stage_kind);
+   check(state!=MELEE_WEB_STAGE_INPUT_INVALID,"Original SSS target is invalid");
+   if(state==MELEE_WEB_STAGE_INPUT_AT_TARGET){
+    check(observed.selected_stage_kind==stage_kind,"Cursor target and source selected tile differ");
+    at_target=true;break;
+   }
+   check(tick()==1,"SSS cursor input unexpectedly transitioned");
+  }
+  check(at_target,"Original SSS cursor did not reach requested stage");
+  };
   const unsigned first_css_neutral=retail_fd_recipe&&cycle==0?187:120;
   for(unsigned t=0;t<first_css_neutral;t++)check(tick()==1,"Unexpected CSS transition");
   uint32_t initial_music_completed=0,initial_music_revisited=0;
@@ -172,17 +284,18 @@ int main(int argc,char** argv){try{
                                          &initial_music_revisited)&&
         initial_music_completed>0,
         "Original CSS music did not load an HPS payload");
-  if(cycle==1){
-   bool falco_selected=false;
+  if(cycle==1||link_css_unload_recipe){
+   const int target_kind=link_css_unload_recipe?(cycle==0?CKIND_LINK:CKIND_CLINK):CKIND_FALCO;
+   bool target_selected=false;
    for(unsigned t=0;t<180;t++){
     MeleeWebFighterInputObservation observed{};
-    check(melee_web_fighter_input_observe(CKIND_FALCO,&observed),
+    check(melee_web_fighter_input_observe(target_kind,&observed),
           "Original CSS fighter observation unavailable");
-    const int state=melee_web_fighter_input_drive(raw,&observed,CKIND_FALCO);
+    const int state=melee_web_fighter_input_drive(raw,&observed,target_kind);
     check(state!=MELEE_WEB_FIGHTER_INPUT_INVALID,
-          "Original CSS Falco target is invalid");
+          "Original CSS fighter target is invalid");
     if(state==MELEE_WEB_FIGHTER_INPUT_ALREADY_SELECTED){
-     falco_selected=true;break;
+     target_selected=true;break;
     }
     if(state==MELEE_WEB_FIGHTER_INPUT_PICKUP_READY||
        state==MELEE_WEB_FIGHTER_INPUT_TARGET_READY)
@@ -191,13 +304,23 @@ int main(int argc,char** argv){try{
     melee_web_fighter_input_neutral(raw);
     check(tick()==1,"CSS button release unexpectedly transitioned");
    }
-   check(falco_selected,"Original CSS did not commit Falco through raw PAD input");
+   check(target_selected,"Original CSS did not commit requested fighter through raw PAD input");
    // The source keeps the door/model confirmation animation active briefly
    // after the drop.  Give that original process time to reach its ordinary
    // Start-accepting state before requesting the scene transition.
    melee_web_fighter_input_neutral(raw);
    for(unsigned settle=0;settle<30;++settle)
-    check(tick()==1,"CSS transitioned during Falco confirmation settle");
+    check(tick()==1,"CSS transitioned during fighter confirmation settle");
+  }
+  if(link_css_unload_recipe){
+   check(melee_web_menu_host_phase(host)==1,"CSS unload recipe left the original CSS phase");
+   check(melee_web_menu_host_leave(host,1,error,sizeof(error)),error);
+   world->verify_immutable_archives();
+   world->close();world.reset();
+   check(melee_web_menu_host_destroy(host,error,sizeof(error)),error);
+   host=nullptr;
+   std::cout<<"Original CSS "<<(cycle==0?"Link":"Young Link")<<" audio registry entered, aborted and unloaded\n";
+   continue;
   }
   transition();check(melee_web_menu_host_phase(host)==2,"CSS did not choose original SSS");
   trace.event("css_exit_complete",world->audio());
@@ -219,19 +342,7 @@ int main(int argc,char** argv){try{
   for(unsigned t=0;t<120;t++)check(tick()==1,"Unexpected second SSS transition");
   // Move the original SSS cursor with raw PAD input. Random is deliberately
   // not used: adding an available stage must not change the FD regression.
-  bool at_target=false;
-  for(unsigned t=0;t<120;t++){
-   MeleeWebStageInputObservation observed{};
-   check(melee_web_stage_input_observe(stage_kind,&observed),"Original SSS cursor observation unavailable");
-   const int state=melee_web_stage_input_drive(raw,&observed,stage_kind);
-   check(state!=MELEE_WEB_STAGE_INPUT_INVALID,"Original SSS target is invalid");
-   if(state==MELEE_WEB_STAGE_INPUT_AT_TARGET){
-    check(observed.selected_stage_kind==stage_kind,"Cursor target and source selected tile differ");
-    at_target=true;break;
-   }
-   check(tick()==1,"SSS cursor input unexpectedly transitioned");
-  }
-  check(at_target,"Original SSS cursor did not reach requested stage");
+  select_stage();
   uint32_t continued_music_completed=0,continued_music_revisited=0;
   check(melee_web_audio_stream_progress(world->audio(),&continued_music_completed,
                                          &continued_music_revisited)&&
@@ -249,11 +360,13 @@ int main(int argc,char** argv){try{
   raw_selection.random_seed=selection_rng;
   trace.event("sss_exit_complete",world->audio(),"match",&raw_selection,&selection_rng);
   world->close();world.reset();audio_phase=0;
+  const MeleeWebPadState* menu_input=melee_web_menu_host_input(host);
+  check(menu_input!=nullptr,"Original SSS did not retain PAD history for match entry");
   bool match_entry_recorded=false;
   if(cycle==0)for(unsigned stop:{0u,60u,100u}){
    // Unload both before and after Ready's stage-start callback, then rebuild
    // the full SDK world from the same immutable native selection.
-   melee_web::GameplayMatchSession interrupted(files,selection);unsigned phase=0;
+   melee_web::GameplayMatchSession interrupted(files,selection,*menu_input);unsigned phase=0;
    if(!match_entry_recorded){const uint32_t rng=interrupted.random_seed();trace.event("match_enter_complete",interrupted.audio(),nullptr,&selection,&rng);match_entry_recorded=true;}
    for(unsigned t=0;t<stop;++t){
     PADStatus pads[4]{};pads[2].err=pads[3].err=-1;interrupted.tick(pads);
@@ -266,7 +379,7 @@ int main(int argc,char** argv){try{
    // Exercise the source-owned pause/no-contest path from the same committed
    // menu payload before the ordinary stock run.  Every source tick still
    // drains the resident audio stream.
-   melee_web::GameplayMatchSession no_contest(files,selection);unsigned phase=0;
+   melee_web::GameplayMatchSession no_contest(files,selection,*menu_input);unsigned phase=0;
    for(unsigned t=0;t<600&&!no_contest.ready();++t){
     PADStatus pads[4]{};pads[2].err=pads[3].err=-1;no_contest.tick(pads);
     phase+=32000;unsigned count=phase/60;phase%=60;
@@ -286,10 +399,12 @@ int main(int argc,char** argv){try{
     no_contest.tick(pause);phase+=32000;count=phase/60;phase%=60;
     check(melee_web_audio_render(no_contest.audio(),pcm,count,error,sizeof(error)),error);
    }
-   pause[0].button=PAD_TRIGGER_L|PAD_TRIGGER_R|PAD_BUTTON_A|PAD_BUTTON_START;
+   const uint32_t no_contest_lras=PAD_TRIGGER_L|PAD_TRIGGER_R|PAD_BUTTON_A|PAD_BUTTON_START;
+   pause[0].button=no_contest_lras;
    no_contest.tick(pause);phase+=32000;count=phase/60;phase%=60;
    check(melee_web_audio_render(no_contest.audio(),pcm,count,error,sizeof(error)),error);
-   pause[0].button=0;
+   /* Keep the exact LRAS+A+Start sample held while the source ending drains;
+    * the final HSD history handed back to CSS must be this real state. */
    for(unsigned t=0;t<500&&!no_contest.complete();++t){
     no_contest.tick(pause);phase+=32000;count=phase/60;phase%=60;
     check(melee_web_audio_render(no_contest.audio(),pcm,count,error,sizeof(error)),error);
@@ -298,10 +413,66 @@ int main(int argc,char** argv){try{
    check(no_contest.complete(),"Original No Contest did not complete its source ending");
    check(no_contest.outcome(no_contest_winner)==OUTCOME_NO_CONTEST&&no_contest_winner==-1,
          "Original No Contest outcome or winner was incorrect");
+   uint8_t held_lras_input[MELEE_WEB_PAD_STATE_BYTES];
+   melee_web_pad_state_capture(held_lras_input);
+   uint32_t no_contest_seed=no_contest.random_seed();
    no_contest.close();
+   MatchExitInfo canceled{};
+   check(melee_web_match_rules_terminal_data(&canceled),"No Contest Results payload absent");
+   std::cout<<"No Contest Results: outcome="<<unsigned(canceled.match_end.outcome)
+            <<" winners="<<unsigned(canceled.match_end.n_winners)
+            <<" kind="<<unsigned(canceled.match_end.match_kind)
+            <<" selected-kind="<<unsigned(selection.start.rules.match_kind)<<'\n';
+   check(
+         canceled.match_end.outcome==OUTCOME_NO_CONTEST&&
+         // Source ranking retains both equal-stock players even though the
+         // canceled outcome has no gameplay winner. Do not normalize it.
+         canceled.match_end.n_winners==selection.player_count&&
+         canceled.match_end.match_kind==selection.start.rules.match_kind,
+         "No Contest lost its complete original Results payload");
+   if(results_mario_recipe){
+    run_results_source_smoke(files,host,canceled,no_contest_seed,held_lras_input);
+   }else check(melee_web_menu_host_match_finished(host,no_contest_seed,held_lras_input,error,sizeof(error)),error);
+
+   /* Return immediately to CSS. The explicit Results recipe has handed the
+    * source Results PAD back to the host, so let CSS settle on a neutral
+    * sample before ordinary Start input selects the next match. The retail
+    * recipe keeps its held-LRAS regression exactly as exercised above. */
+   world=std::make_unique<melee_web::GameplayMenuWorld>(files);audio_phase=0;
+   check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);
+   if(results_mario_recipe){
+    raw[0].button=0;
+    for(unsigned t=0;t<120;t++)check(tick()==1,"Results PAD history left CSS route unexpectedly");
+   }else{
+    raw[0].button=no_contest_lras;
+    check(tick()==1,"Held LRAS unexpectedly transitioned CSS after No Contest");
+    check(melee_web_menu_host_phase(host)==1,"Held LRAS did not remain in original CSS");
+    raw[0].button=0;
+    for(unsigned t=0;t<120;t++)check(tick()==1,"CSS release unexpectedly transitioned");
+   }
+   check(melee_web_menu_host_phase(host)==1,"CSS release left the original CSS route");
+   transition();check(melee_web_menu_host_phase(host)==2,"CSS did not choose SSS after No Contest");
+   rebuild_menu_scene();
+   for(unsigned t=0;t<120;t++)check(tick()==1,"Unexpected post-No-Contest SSS transition");
+   // Results consumes its own original RNG. Select the actual tile rather
+   // than depending on the initial random-hover choice repeating afterward.
+   if(results_mario_recipe)select_stage();
+   transition();check(melee_web_menu_host_phase(host)==5,"SSS did not select the next match after No Contest");
+   MeleeWebMenuMatchSelection next_selection{};
+   check(melee_web_menu_host_selection(host,&next_selection,error,sizeof(error)),error);
+   check(next_selection.start.rules.stkind==selection.start.rules.stkind&&
+         next_selection.start.players[0].ckind==selection.start.players[0].ckind,
+         "Ordinary CSS/SSS input changed the committed No Contest match selection");
+   selection=next_selection;
+   world->close();world.reset();audio_phase=0;
   }
   {
-   melee_web::GameplayMatchSession match(files,selection);audio_phase=0;
+  const MeleeWebPadState* input=melee_web_menu_host_input(host);
+   check(input!=nullptr,"Original SSS did not retain PAD history for ordinary match entry");
+   melee_web::GameplayMatchSession match(files,selection,*input);audio_phase=0;
+   MatchExitInfo fresh_result{};
+   check(!melee_web_match_rules_terminal_data(&fresh_result),
+         "Fresh source match retained a prior Results payload");
    if(!match_entry_recorded){const uint32_t rng=match.random_seed();trace.event("match_enter_complete",match.audio(),nullptr,&selection,&rng);match_entry_recorded=true;}
    check(!match.ready(),"Original match intro was bypassed");
    const auto entry_stats=match.player_stats(0);
@@ -463,12 +634,44 @@ int main(int argc,char** argv){try{
    }
    check(t<4000&&stocks==0&&respawns==3,"Native menu match did not complete original four-stock outcome");
    std::cout<<"Original GAME ending and source transition completed across "<<ending_ticks<<" frozen ticks\n";
-   const uint32_t seed=match.random_seed();match.close();
+   uint8_t final_input[MELEE_WEB_PAD_STATE_BYTES];
+   melee_web_pad_state_capture(final_input);
+   int timer_before_close=0;
+   GetMatchTimer(&timer_before_close);
+   MatchExitInfo published_once{},published_twice{};
+   check(melee_web_match_rules_publish_result(),
+         "Completed source match did not publish its Results payload");
+   check(melee_web_match_rules_terminal_data(&published_once),
+         "Completed source match did not retain its first Results payload");
+   check(melee_web_match_rules_publish_result(),
+         "Repeated source Results publication was not idempotent");
+   check(melee_web_match_rules_terminal_data(&published_twice)&&
+         std::memcmp(&published_once,&published_twice,sizeof(published_once))==0,
+         "Repeated source Results publication changed the retained payload");
+   uint32_t seed=match.random_seed();match.close();
    int terminal_outcome=0,winner_count=0,winners[6]{};
    check(melee_web_match_rules_terminal_result(&terminal_outcome,&winner_count,winners)&&
          terminal_outcome==OUTCOME_ELIMINATION&&winner_count==1&&winners[0]==1,
          "Native menu match did not publish the original elimination winner at close");
-   check(melee_web_menu_host_match_finished(host,seed,error,sizeof(error)),error);
+   MatchExitInfo result{};
+   check(melee_web_match_rules_terminal_data(&result)&&
+         result.x0==selection.start.rules.x18&&result.x4==uint32_t(timer_before_close)&&
+         result.match_end.outcome==terminal_outcome&&
+         result.match_end.match_kind==selection.start.rules.match_kind&&
+         result.match_end.frame_count>0&&result.match_end.n_winners==1&&
+         result.match_end.winners[0]==1,
+         "Original VS OnExit did not retain complete Results metadata");
+   for(unsigned slot=0;slot<selection.player_count;++slot){
+    const auto& player=result.match_end.player_standings[slot];
+    check(player.ckind==selection.start.players[slot].ckind&&
+          player.slot_type==selection.start.players[slot].slot_type&&
+          player.x3==selection.start.players[slot].color&&
+          player.stocks==(slot==0?0:4),
+          "Original Results player identity or final stocks were lost at teardown");
+   }
+   if(results_mario_recipe){
+    run_results_source_smoke(files,host,result,seed,final_input);
+   }else check(melee_web_menu_host_match_finished(host,seed,final_input,error,sizeof(error)),error);
   }
   world=std::make_unique<melee_web::GameplayMenuWorld>(files);audio_phase=0;
   check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);
@@ -476,6 +679,17 @@ int main(int argc,char** argv){try{
   check(melee_web_menu_host_leave(host,1,error,sizeof(error)),error);
   world->verify_immutable_archives();world->close();world->close();world.reset();
   check(melee_web_menu_host_destroy(host,error,sizeof(error)),error);
+  const auto retained=melee_web_gameplay_allocation();
+  check(retained.identity==session_allocation.identity&&
+        retained.generation==session_allocation.generation&&
+        retained.bytes==session_allocation.bytes&&!melee_web_gameplay_world_exists(),
+        "Menu/match teardown replaced the application's retained source arena");
  }
- std::cout<<"Native original CSS Mario/Falco to SSS to four-stock match to CSS passed twice; no browser or equivalence claim\n";
+ check(melee_web_gameplay_session_end(session_error,sizeof(session_error)),session_error);
+ if(link_css_unload_recipe)
+  std::cout<<"Native Link/Young Link CSS audio registry and unload smoke passed; no match/rendered claim\n";
+ else if(results_mario_recipe)
+  std::cout<<"Native source Mario Results smoke (No Contest and elimination) returned to CSS; no retail/rendered claim\n";
+ else
+  std::cout<<"Native original CSS Mario/Falco to SSS to four-stock match to CSS passed twice; no browser or equivalence claim\n";
 }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}}

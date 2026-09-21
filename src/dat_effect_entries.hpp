@@ -14,6 +14,10 @@ public:
     // Registers the original source filename/symbol and executes efAsync_LoadSync.
     // Detach after all effect instances are removed, before source shutdown.
     bool load(char* error,size_t error_size);
+    // Publish checked assets before an original scene owns efLib_Init and
+    // efAsync_LoadSync. Require the actual source load after scene entry.
+    bool publish_for_source(char* error,size_t error_size);
+    bool verify_source_load(char* error,size_t error_size);
     bool detach(char* error,size_t error_size);
     bool entries_ready()const noexcept;
     void* table()const noexcept;

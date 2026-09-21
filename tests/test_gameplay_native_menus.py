@@ -60,6 +60,27 @@ class NativeMenuSourceTests(unittest.TestCase):
                     "Native original CSS Mario/Falco to SSS to four-stock match to CSS passed twice",
                     run.stdout)
 
+    def test_link_audio_registry_css_unload(self):
+        targets = [ROOT / "build" / name / "native_menu_host_trace.js"
+                   for name in ("browser", "browser-release")]
+        targets = [path for path in targets if path.is_file()]
+        menu = game = ROOT / "assets-local/issue34"
+        if not targets or not (menu / "MnSlChr.usd").is_file() or not all(
+                (game / name).is_file() for name in ("link.ssm", "clink.ssm")):
+            self.skipTest("Build the native menu host and supply owned Link audio fixtures")
+        target = max(targets, key=lambda path: path.stat().st_mtime)
+        source_revision = subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+        with tempfile.TemporaryDirectory(prefix="link css unload trace ") as directory:
+            trace = Path(directory) / "port.jsonl"
+            run = subprocess.run(
+                [str(node_runtime()), str(target), str(menu), str(game), "32",
+                 str(trace), source_revision, "link-css-unload-v1"],
+                cwd=ROOT, capture_output=True, text=True, timeout=120)
+        self.assertEqual(run.returncode, 0, (run.stdout + run.stderr)[-4000:])
+        self.assertIn("Original CSS Link audio registry entered, aborted and unloaded", run.stdout)
+        self.assertIn("Original CSS Young Link audio registry entered, aborted and unloaded", run.stdout)
+
     def test_original_sis_layout_and_style_stack(self):
         candidates = [ROOT / "build" / directory / "native_menu_scene_trace.js"
                       for directory in ("browser", "browser-release")]

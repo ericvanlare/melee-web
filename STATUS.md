@@ -1,240 +1,34 @@
 # Current status
 
-## Production audio release path
+## Versus return-loop work in progress
 
-PR #42 is merged on top of #49. The owner approved promoting replacement
-audio to production independently of Results PR #44. The production package
-now has an explicit `audio-player` identity and uses the same restricted Release
-audio runtime as the combined listening preview. Its auditor binds the native
-source/tool/seed identity, exact audio module inventory, production notices and
-hosting policy. The legacy silent profile remains available for rollback.
-See [production audio release](docs/AUDIO_PRODUCTION.md) for the commands and
-verification gates. The combined preview's existing evidence remains scoped to
-[its recorded browser and PCM checks](docs/evidence/audio-main-integration-v1.json);
-it does not establish full-match performance or original hardware fidelity.
+The original Results → optional Prize → CSS route runs through ordinary
+keyboard input. Three No Contest matches and a separate three-match normal
+four-stock Mario/Final Destination sequence return in one document, preserving
+PAD history and one source arena. Original MatchEnd supplies the winner; each
+completed source-world teardown releases its objects and processes. The named
+four-match rotation also passes, including Yoshi's Story after Marth and the
+rotation's final unload once the missing Link/Young Link menu audio banks are
+registered. See the exact scope, build receipts and retained failures in
+[versus return-loop evidence](docs/VERSUS_RETURN_LOOP.md#profile-and-prize-integration-2026-09-20).
 
-## Development audio replacement candidate
+Original profile initialization and complete profile/Toy/language restoration
+are checked against linked source. All eight development fighters pass the
+native winning/losing Results construction and confirmation cases. The named
+whole-session retail comparisons, repeated allocation bounds and cold/warm
+whole-loop performance remain in progress. The first cold timing attempt fails
+on CSS/Results GPU staging waits and live Results pipeline creation; its warm
+slot and the rotation timing slots remain unstarted. The correlated GPU trace
+and the portable 27-descriptor seed correction that addresses the Results
+shader compilation are a separate pipeline change and are not part of this
+route. The owner accepts keyboard-only validation for this PR;
+physical-controller testing remains separate under #35.
 
-The scalar resampler and browser coefficient generator have new implementations
-with recorded specifications and provenance. The coefficient output is unchanged
-byte for byte, and 7,488,064 scalar comparisons preserve the previous output,
-phase, history and source reads. This is regression evidence, not an original
-hardware accuracy pass. The [replacement record](docs/AUDIO_REPLACEMENT_EVIDENCE.md)
-also records an unverified original-DSP phase-writeback boundary and the retained
-coefficient-data provenance that still needs release review. The separate GPL
-Dolphin observer remains intact. The production release path is described above;
-repository visibility is unchanged.
-
-The owner-requested [audio listening preview](docs/AUDIO_PREVIEW.md) now includes
-main `979fd09` (PR #49) and its per-scene asset loading. **Browser exercised**:
-original CSS/SSS → Mario/Final Destination → ordinary pause/No Contest → CSS →
-a second match entry retains nonzero PCM at the connected worklet. Four complete
-asset scopes include the generated coefficients; outer pause/resume and Eject
-pass. Both Release builds and the full local suite pass. The
-[integration receipt](docs/evidence/audio-main-integration-v1.json) binds the
-new hosted bytes and checks. The earlier owner listening feedback remains bound
-to the preceding preview. Hardware PCM, broader gameplay and performance gates
-remain open.
-
-## September 20 production checkpoint
-
-Feature additions are paused at PR #49. The candidate exposes fifteen public
-fighters and seven stages; Donkey Kong remains development-only under the
-owner-approved restriction tracked in [issue #50](https://github.com/ericvanlare/melee-web/issues/50).
-Both public and development players now load exact scene asset scopes from a
-validated local disc session. That checkpoint's public audio was disabled.
-
-Both Release builds and the local 1,099-test suite pass (374.968 seconds,
-41 explicit skips). The subsequent Donkey restriction passes 26 focused menu
-and release checks. The audited production candidate passes local HTTP checks,
-all ten public browser checks, two ordinary-key Mario/FD pause/No Contest
-round trips, Eject/reload and reimport. Public menu and Mario/FD scopes contain
-32/27 inputs and 18,448,886/19,073,578 bytes. A fresh drawn Mario/FD control
-matches all 240 declared updates and PAD-history fields against the independent
-original pair and retires all native scene/file owners afterward.
-
-Retained harness failures and an instrumented timing pause are recorded. Two
-controls with reduced duplicate callback logging pass the same route and 120
-further CSS ticks without a resume; the final control verifies hidden loading
-panels. These lifecycle checks do not establish performance or complete-game
-acceptance.
-PR #49 merged as `979fd09` and its exact staging-tested package was deployed to
-[production](https://bed694b0.webmelee.pages.dev). Both the immutable origin and
-webmelee.gg passed exact resource/header/route checks and ten public browser
-checks each. The owner also tested staging and reported multi-CPU loading lag
-as follow-up work. See the [release record on PR #49](https://github.com/ericvanlare/melee-web/pull/49),
-[release checkpoint](docs/PRODUCTION_CHECKPOINT_20260920.md) and
-[hash-bound receipt](docs/evidence/production-checkpoint-20260920-v1.json).
-
-The subsequent PR review's two P3 findings are corrected: reports reject
-untracked original-source files, and Fountain's music tuple matches its authored
-four words. All seven tuples and derived music sets pass owned-archive checks;
-both Release targets and the refreshed candidate audit pass. See the
-[review-fix receipt](docs/evidence/production-checkpoint-review-fixes-v1.json);
-final full-suite and pushed-head verification are recorded on PR #49.
-
-## Full-game integration branch
-
-`codex/full-game-integration` tracks the remaining offline vanilla game through
-[a versioned feature and source inventory](docs/FULL_GAME_PORT.md). The report
-retains all source functions and missing features; it does not turn compilation
-or declared feature status into an accepted-game percentage.
-
-The development player now imports scene-specific assets from one validated
-local disc session, closing source owners and releasing outgoing files before
-loading the next scene. A real browser check completes Mario/FD four-stock
-ending, Bowser/Mario Fountain pause and No Contest, both returns to original
-CSS, unload and restart. Delayed handoffs keep source steps stopped and retain
-zero outgoing file bytes. Menus use 18,452,982 native input bytes; Mario/FD uses
-19,077,674 and Bowser/Fountain 21,401,641. Unload clears all imported files.
-Wasm capacity still grows across the sequence; this is functional lifecycle
-evidence, not a memory plateau or performance pass. A fresh drawn Mario/FD
-replay matches all 240 declared updates and PAD-history fields against the
-independent original v2 pair. The earlier missing Bowser voice-bank unload
-crash and two driver/recipe failures remain retained; see
-[scene asset ownership](docs/SCENE_ASSET_LOADING.md).
-The public player now uses the same scoped import while excluding DSP
-coefficients. Four-player residency and broader mode/lifetime checks remain open.
-New additions are paused for a production checkpoint with fifteen public
-fighters and seven stages. Donkey remains development-only pending
-[issue #50](https://github.com/ericvanlare/melee-web/issues/50).
-Both Release builds pass. The 1,096-test run took 366.767 seconds with
-41 skips and one stale artifact-count assertion; correcting that test yields
-four passing checks in the affected module. The original failed suite log is
-retained. Commit `3103b65` subsequently passed full GitHub verification in
-6m 04s across all jobs. See the
-[scene-loading checkpoint receipt](docs/evidence/full-game-checkpoint-asset-scope-v1.json).
-The refreshed legacy native transition comparison fails on a rumble flag and
-match-entry RNG; a HEAD-derived driver reproduces the same event rows with
-current libraries. Its setup/source reconciliation remains open separately;
-see [the retained transition limitation](docs/TRANSITION_EQUIVALENCE.md#september-20-refresh-limitation).
-
-Ganondorf is the first added development candidate. Fresh native checks pass
-both player orientations and all five costumes on Final Destination, including
-original combat, pause and teardown. The browser reaches original CSS/SSS and
-advancing Ganondorf gameplay. A reviewed 37-pipeline preload correction clears
-the 30-case, 5,200-frame drawn sweep with no hard timing/audio/pipeline failures;
-earlier cold failures remain retained. A following cold/warm pair passes all
-10,400 source frames with the same zero-failure counters at 640×480, DPR 1.
-An independently repeated original pair now matches all 603 declared native
-state updates after binding the actual save unlock profile. The legacy unbound
-recipe failure and headless camera mismatch remain retained; drawn comparison,
-complete ending and broader acceptance are open. See [Ganondorf scope and remaining gates](docs/GANONDORF_PORT_NOTES.md).
-Captain Falcon now passes native source lifecycles in both Captain/Mario player
-orders and all six costumes on Final Destination, including specials, stock
-loss/respawn, pause and repeated teardown. The integration preserves his
-original English costume resolution, indexed vertex colors and particle palette
-metadata. The browser completes all 30 action cases over 5,200 drawn frames;
-the first diagnostic run fails timing/audio/pipeline gates. After a reviewed
-35-descriptor preload correction, both cold/warm action sweeps pass all 10,400
-frames with zero hard failures. Startup and broader performance remain separate,
-and independent original comparison is pending; see
-[Captain Falcon's measured scope](docs/CAPTAIN_PORT_NOTES.md).
-Hyrule Temple passes two native stage-owner lifetimes, including scaled geometry,
-original map callbacks, light identity overrides, music candidates and teardown.
-Two original Ready/pause/No Contest match lifetimes also pass. The browser
-reaches advancing Temple gameplay, retaining an entry timing failure; a reviewed
-16-descriptor preload correction clears both cold/warm entry reruns without
-timing resumes. A cold startup long task remains visible, and the full action
-matrix and original comparison remain open; see
-[Temple evidence](docs/HYRULE_TEMPLE_PORT_NOTES.md).
-Luigi now passes native source lifecycles in both player orders and all four
-authored costumes. The selected-player fixture observes ground/aerial Fireball
-Articles, special-move entries, pause and repeated teardown. All 30 browser
-action cases pass over 5,200 drawn frames, retaining timing, audio and four
-live-pipeline failures. A reviewed six-descriptor preload update clears both
-5,200-frame cold/warm sweeps with zero hard failures. A fresh pair after the
-shared stage-light lifecycle correction also passes all 10,400 frames with
-zero hard failures; see [Luigi's evidence](docs/LUIGI_PORT_NOTES.md).
-Fountain of Dreams now reaches original map, reflection and star construction.
-Its shared changes preserve animated-light storage, exact reflection image
-identity and multiple map objects sharing one camera. Two 7,200-tick native scheduler
-and teardown lifetimes now pass, including moving collision and animated
-lights. Cold/warm browser entry now completes Ready/Go and 30 gameplay frames
-after a reviewed 28-pipeline preload correction. The cold run retains two
-browser long tasks; this is a functional-entry result, not a performance pass. See
-[Fountain's scope](docs/FOUNTAIN_OF_DREAMS_PORT_NOTES.md).
-Pikachu and Pichu are now enabled as development candidates, bringing the
-branch to thirteen fighters. Native fixtures pass both player orders and all
-four family costumes, including source jolt/Thunder creation and teardown,
-Pichu self-damage, pause and No Contest. Both browser discovery sweeps complete
-30 action cases over 5,600 frames; their failed cold timing/pipeline gates
-remain retained. A reviewed preload correction clears all four fresh cold/warm
-sweeps: 22,400 source frames with no hard failures, native target misses or
-heap growth. Shared fixes preserve complete-null effect
-rows and the signed self-damage command. See
-[their measured scope](docs/PIKACHU_PICHU_PORT_NOTES.md).
-Yoshi's Island 64 is the seventh development stage. Its native owner passes two
-5,000-tick source scheduler lifetimes, including cloud collapse/collision
-removal/reappearance, guest selection and teardown. Five Mario/Mario entry,
-pause and No Contest lifetimes also pass. The original browser menu route
-reaches advancing gameplay, retaining a cold entry stall and one diagnostic
-resume. Fresh cold/warm entry passes after the preload correction without
-resumes, gaps or audio underruns; one 69 ms cold browser long task remains.
-This is functional entry, not a stage-performance pass.
-The shared material loader now preserves the source base TLUT for
-TIMG-only animation; see [stage evidence](docs/YOSHIS_ISLAND_64_PORT_NOTES.md).
-Jigglypuff is the fourteenth development fighter. Native checks cover all five
-costume lifetimes, including original hat archives and dynamics, crouch
-animation variation, five aerial jumps and ground/air special states. The
-original browser CSS/SSS route passes 31 action cases in each cold/warm run:
-12,800 source frames with no action-window timing, audio, pipeline or heap-growth
-failures. Shared fixes retain the complete stored dynamics table separately
-from its active body count, the custom-part owner/cache and original crouch
-Wait selection. Earlier loader, blue-hat and input-recipe failures remain
-retained; see [Jigglypuff's measured scope](docs/JIGGLYPUFF_PORT_NOTES.md).
-The Jigglypuff checkpoint passes both Release builds and the 1,077-test suite
-in 346.034 seconds with 41 explicit skips. Fresh shared headless comparisons
-still match 603 Ganondorf/FD and 240 Mario/FD declared source updates. Its
-pipeline seed is unchanged; see the [Jigglypuff checkpoint receipt](docs/evidence/full-game-checkpoint-purin-v1.json).
-Donkey Kong is the fifteenth development candidate. Native checks pass both
-player orders and all five costumes, with first-lifetime ground/air specials
-and raw cargo grab/walk/throw. Shared fixes preserve branch visibility,
-source dynamics modes, mixed indexed/compressed texture animations and the
-carried fighter's original command graphs. Both browser discovery rounds
-complete 33 action cases and 7,000 frames; cold fails timing/audio/pipeline
-gates while warm passes. After a reviewed 15-descriptor preload correction,
-both fresh rounds pass all 14,000 action frames with zero hard failures.
-A separate Battlefield shield-drop probe exposes a real crash at the
-undefined terminal SPL0 animation output; independent original consumer
-capture is pending. Ceiling lifetimes, original comparison and broader
-acceptance remain open; see
-[Donkey Kong's measured scope](docs/DONKEY_KONG_PORT_NOTES.md).
-The Donkey checkpoint passes both Release builds and the full 1,080-test suite
-in 358.963 seconds with 41 explicit skips. Fresh shared headless comparisons
-still match 603 Ganondorf/FD and 240 Mario/FD declared source updates. The
-receipt retains the failed cold discovery, the corrected pair, and the separate
-unresolved shield-drop crash; see the
-[current checkpoint receipt](docs/evidence/full-game-checkpoint-donkey-v1.json).
-Bowser is the sixteenth development fighter. Native Final Destination checks
-pass both player orders and all four costumes, including Flame creation and
-cleanup, ground/air Fortress and Bomb, and real ground/air capture and throws.
-The shared boundary now admits the victim's original command graphs and the
-source visibility cleanup command. Both browser discovery runs finish all
-30 cases; the cold timing/audio/pipeline failures remain retained. A reviewed
-36-descriptor preload correction clears the fresh cold/warm pair: 11,201
-source frames with zero action-window timing, audio, pipeline or heap-growth
-failures and no entry timing resumes. Independent original Bowser comparison,
-drawn capture interactions and broader acceptance remain open; see
-[Bowser's scope and evidence](docs/BOWSER_PORT_NOTES.md).
-The Bowser checkpoint passes both Release builds and 1,083 tests in 357.995
-seconds with 41 explicit skips. Fresh shared headless comparisons still
-match all 603 Ganondorf/FD and 240 Mario/FD declared source updates. The
-[Bowser checkpoint receipt](docs/evidence/full-game-checkpoint-koopa-v1.json)
-binds the builds, browser pair, review and retained failures. The Bowser
-checkpoint's full GitHub Verify completed in 6m 16s across all jobs;
-the preceding Donkey checkpoint completed in 6m 20s.
-The preceding Pikachu/Pichu/Old Yoshi checkpoint passes both Release builds and 1,075
-tests in 334.490 seconds with 41 explicit skips. Fresh headless comparisons
-still match 603 Ganondorf/FD and 240 Mario/FD declared source updates; the
-new content has no independent original comparison yet. See the
-[Pikachu/Pichu/Old Yoshi receipt](docs/evidence/full-game-checkpoint-pikachu-old-yoshi-v1.json).
-The preceding Luigi/Fountain checkpoint passed both Release builds and 1,070 tests
-in 298.028 seconds with 41 explicit skips. The receipt names the exact browser
-build, the later Article validation guard, reference scope and retained failures;
-see [checkpoint validation](docs/evidence/full-game-checkpoint-luigi-fountain-v1.json).
-Results PR #44 and audio PR #42 remain separate draft dependencies. This branch
-work has not changed the deployed public alpha.
+A fresh original-game save has corrected all-character/four-stage derivatives
+that update both valid GameData copies. A visible original boot verifies those
+masks at first CSS. Matching its initial profile context to the browser and two
+independent reference captures per whole sequence remain open. No new gameplay
+admission or public deployment is claimed.
 
 ## CI verification turnaround
 

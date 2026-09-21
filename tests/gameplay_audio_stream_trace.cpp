@@ -5,12 +5,28 @@
 #include <cmath>
 #include <bit>
 #include <cstdint>
+#include <array>
+#include <string>
+#include <utility>
 #include <stdexcept>
 #define CHECK(c) do{if(!(c))throw std::runtime_error("HPS trace check: " #c);}while(0)
 extern "C" int lbAudioAx_80023F28(int);
 static std::vector<uint8_t> read(const char* path){std::ifstream f(path,std::ios::binary);CHECK(f.good());return {std::istreambuf_iterator<char>(f),{}};}
 int main(int argc,char** argv){try{
- CHECK(argc==6);auto main=read(argv[1]),mario=read(argv[2]),sem=read(argv[3]),coef=read(argv[4]),hps=read(argv[5]);uint64_t first_hash=0;
+ CHECK(argc==6||argc==9);auto main=read(argv[1]),mario=read(argv[2]),sem=read(argv[3]),coef=read(argv[4]),hps=read(argv[5]);uint64_t first_hash=0;
+ if(argc==9){
+  auto info1=read(argv[6]),info2=read(argv[7]),info3=read(argv[8]);
+  const std::array<melee_web::GameplayAudioStreamFile,3> files{{
+   {"/audio/s_info1.hps",info1},{"/audio/s_info2.hps",info2},{"/audio/s_info3.hps",info3}}};
+  melee_web::GameplayAudioBank bank(sem,{main,mario},coef);melee_web::GameplayAudioStream stream(bank.get(),files);
+  char error[256];std::vector<float> pcm(64000);
+  for(const auto& selected:std::array<std::pair<int,const char*>,3>{{{0x43,"/audio/s_info1.hps"},{0x44,"/audio/s_info2.hps"},{0x45,"/audio/s_info3.hps"}}}){
+   CHECK(lbAudioAx_80023F28(selected.first)==0);CHECK(std::string(melee_web_audio_stream_path(bank.get()))==selected.second);
+   CHECK(melee_web_audio_render(bank.get(),pcm.data(),32000,error,sizeof(error)));
+  }
+  uint32_t completed,revisited;CHECK(melee_web_audio_stream_progress(bank.get(),&completed,&revisited));CHECK(completed>0);
+  puts("Original HPS registry selected three authored files and preserved source changes");return 0;
+ }
  for(unsigned cycle=0;cycle<2;cycle++){
   melee_web::GameplayAudioBank bank(sem,{main,mario},coef);melee_web::GameplayAudioStream stream(bank.get(),"/audio/sp_end.hps",hps);
   CHECK(lbAudioAx_80023F28(78)==0);char error[256];std::vector<float> pcm(64000);double energy=0;uint64_t hash=14695981039346656037ULL;

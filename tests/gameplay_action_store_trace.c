@@ -30,6 +30,11 @@ void lbBgFlash_80021C48(int a, int b) { (void)a; (void)b; abort(); }
 void ftAction_80073240(HSD_GObj*);
 Fighter* action_test_fighter(void) { return calloc(1, sizeof(Fighter)); }
 void action_test_destroy(Fighter* fp) { free(fp); }
+void action_test_install_table(Fighter* fp, void* rows, void* blends, unsigned count)
+{
+    fp->x24 = rows; fp->x28 = (unsigned char (*)[2])blends; fp->x58C = count;
+}
+void action_test_set_count(Fighter* fp, unsigned count) { fp->x58C = count; }
 int action_test_load(Fighter* fp, int motion, int slot)
 {
     if (slot) ftData_80085E50(fp, motion); else ftData_80085CD8(fp, fp, motion);
@@ -39,6 +44,20 @@ int action_test_load(Fighter* fp, int motion, int slot)
     while (tree->nodes[nodes] != -1) { tracks += tree->nodes[nodes]; if (++nodes > 140) abort(); }
     for (unsigned i = 0; i < tracks; ++i) if (!tree->tracks[i].ad_head || !tree->tracks[i].length) abort();
     return (int)nodes;
+}
+int action_test_auxiliary_out_of_range(Fighter* fp, int motion)
+{
+    FigaTree* before_tree = fp->x598;
+    void* before_identity = fp->x5A8;
+    FigaTree* result = ftData_80085E50(fp, motion);
+    return result == NULL && fp->x598 == before_tree && fp->x5A8 == before_identity;
+}
+int action_test_primary_out_of_range(Fighter* destination, Fighter* source, int motion)
+{
+    FigaTree* before_tree = destination->x590;
+    void* before_identity = destination->x5A4;
+    ftData_80085CD8(destination, source, motion);
+    return destination->x590 == before_tree && destination->x5A4 == before_identity;
 }
 int action_test_load_from(Fighter* destination, Fighter* source, int motion)
 {

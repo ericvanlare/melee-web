@@ -91,9 +91,63 @@ static int replaced_heap_case(void)
     return 0;
 }
 
+static int retained_session_case(void)
+{
+    const size_t bytes = 1024 * 1024;
+    check(!melee_web_gameplay_session_active(), "fresh process has no gameplay session");
+    check(melee_web_gameplay_session_begin(bytes, error, sizeof(error)),
+          "session backing arena begins");
+    MeleeWebGameplayAllocation allocation = melee_web_gameplay_allocation();
+    check(melee_web_gameplay_session_active() && allocation.identity != 0 &&
+              allocation.generation != 0 && allocation.bytes == bytes,
+          "session exposes its backing allocation identity and size");
+    check(!melee_web_gameplay_startup(bytes + 32, error, sizeof(error)),
+          "session rejects a world with a different arena size");
+    check(melee_web_gameplay_startup(bytes, error, sizeof(error)),
+          "session world starts over its retained arena");
+    const MeleeWebGameplayAllocation live = melee_web_gameplay_allocation();
+    check(live.identity == allocation.identity && live.generation == allocation.generation &&
+              live.bytes == allocation.bytes,
+          "world startup preserves the session allocation identity");
+
+    const int free_before_probe = OSCheckHeap(0);
+    check(free_before_probe > 0x10000, "original SDK heap leaves room for the retention probe");
+    unsigned char* filler = (unsigned char*) OSAlloc((u32) free_before_probe - 0x10000U);
+    check(filler != NULL, "original SDK allocation reserves the retention guard");
+    unsigned char* retained = (unsigned char*) OSAlloc(0x400);
+    check(retained != NULL, "original SDK allocation reserves the retention probe");
+    (void) filler;
+    memset(retained, 0xA5, 0x400);
+    check(!melee_web_gameplay_session_end(error, sizeof(error)),
+          "session cannot end while its world is live");
+    check(melee_web_gameplay_shutdown(error, sizeof(error)),
+          "session world shuts down without releasing its arena");
+    for (unsigned i = 0; i < 0x400; ++i)
+        check(retained[i] == 0xA5, "world teardown does not clear retained arena bytes");
+    check(melee_web_gameplay_session_active(), "session remains active after world shutdown");
+    check(melee_web_gameplay_startup(bytes, error, sizeof(error)),
+          "next world recreates the original SDK heap in place");
+    const MeleeWebGameplayAllocation restarted = melee_web_gameplay_allocation();
+    check(restarted.identity == allocation.identity &&
+              restarted.generation == allocation.generation && restarted.bytes == allocation.bytes,
+          "recreated world keeps allocation identity generation and size");
+    for (unsigned i = 0; i < 0x400; ++i)
+        check(retained[i] == 0xA5, "same-arena reset retains payload bytes");
+    check(melee_web_gameplay_shutdown(error, sizeof(error)),
+          "recreated session world shuts down");
+    check(melee_web_gameplay_session_end(error, sizeof(error)),
+          "session release frees the backing arena after all worlds close");
+    check(!melee_web_gameplay_session_active() &&
+              melee_web_gameplay_allocation().identity == 0,
+          "session release clears the allocation identity");
+    puts("Original gameplay session arena retention trace: passed");
+    return 0;
+}
+
 int main(int argc, char** argv)
 {
     if (argc == 2 && !strcmp(argv[1], "replaced_heap")) return replaced_heap_case();
+    if (argc == 2 && !strcmp(argv[1], "retained_session")) return retained_session_case();
     check(argc == 1, "unexpected bootstrap trace arguments");
     check(!melee_web_gameplay_step(error, sizeof(error)), "uninitialized ticks reject");
     check(melee_web_gameplay_generation() == 0, "uninitialized generation rejects");
