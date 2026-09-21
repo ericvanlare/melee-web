@@ -417,15 +417,13 @@ int main(int argc,char** argv){try{
         const float pikachu_damage_before_specials=match.player_stats(0).damage_percent;
         bool pichu_self_damage_seen=false;
         for(unsigned n=0;n<240&&match.player_stats(1).damage_percent==damage;n++){
-            // Ness's flash fires from a B release after the charge loop, so
-            // hold B to charge and release mid-loop instead of pulsing.
+            // Ness and Mewtwo hold B through the source charge gate
+            // (Start+Loop reach LoopFull inside 130 ticks) and their balls
+            // release from a fresh B edge, so the recipe re-presses B once;
+            // Ness's flash fires from a B release after the charge loop.
             raw[0].button=ness?(n<120?PAD_BUTTON_B:0):
-                koopa||n%8==0?PAD_BUTTON_B:0;tick();
-            // Mewtwo holds B through the source charge gate (Start+Loop reach
-            // LoopFull inside 130 ticks). Like Donkey's Giant Punch, the ball
-            // releases from a fresh B edge, so the recipe re-presses B once.
-            raw[0].button=koopa?PAD_BUTTON_B:
                 mewtwo?((n<130||n==132)?PAD_BUTTON_B:0):
+                koopa?PAD_BUTTON_B:
                 (n%8==0?PAD_BUTTON_B:0);tick();
             if(ganon||captain)captain_family_punch|=match.player_stats(0).motion_id==ftCa_MS_SpecialN;
             if(koopa){
