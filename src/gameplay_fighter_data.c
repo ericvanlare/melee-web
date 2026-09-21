@@ -554,7 +554,10 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
         uint32_t p=PTR(table+c*16+category*4,d->x8->x0.model_num*8);
         if(p!=UINT32_MAX) d->x8->x0.vis_table[c][category]=visibility(r,p,d->x8->x0.model_num,category);
     }
-    d->x8->x8.x8=WORD(at+8); REQUIRE(d->x8->x8.x8<=8,"Costume texture map exceeds source capacity");
+    /* ftAnim_80070200 stores this count into CostumeTObjList::costume_tobjs[5]
+     * and asserts "fighter tobj num over!" beyond it; larger maps have no
+     * defined original state. */
+    d->x8->x8.x8=WORD(at+8); REQUIRE(d->x8->x8.x8<=5,"Costume texture map exceeds source capacity");
     table=required(r,at+12,costumes*4); d->x8->x8.xC=NEW(u16*,costumes);
     for(uint32_t c=0;c<costumes;++c) {
         uint32_t p=PTR(table+c*4,d->x8->x8.x8*2);

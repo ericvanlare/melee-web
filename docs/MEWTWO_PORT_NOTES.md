@@ -31,8 +31,9 @@ with ten serialized animation rows. Mewtwo is the first fighter whose
 authored costume texture map contains four TObjs rather than two; the
 original eye telemetry requirement "exactly two eye TObjs" was a sibling
 assumption. The match-stats owner now requires the runtime collection to
-match the fighter's authored `ftData` texture map (bounded by the decoder's
-eight-row capacity), validates every authored TObj against the owned costume
+match the fighter's authored `ftData` texture map (the original collector
+stores at most five costume TObjs and asserts beyond that), validates every
+authored TObj against the owned costume
 descriptor graph, and keeps the declared two recorded eye slots and all
 existing comparison fields unchanged.
 

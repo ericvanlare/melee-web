@@ -337,10 +337,15 @@ static int eye_stats(Fighter* fp,MeleeWebMatchStats* out,char* e,size_t n)
     }
     /* The costume texture map is authored per fighter (Mario/Mewtwo four-part
      * families differ). The runtime collection must match that authored count
-     * exactly; the declared per-tick eye stats keep two recorded slots. */
+     * exactly; the declared per-tick eye stats keep two recorded slots. The
+     * original collector stores at most five costume TObjs (ftAnim_80070200
+     * asserts against CostumeTObjList::costume_tobjs[5]), so a larger authored
+     * map has no defined runtime state to observe. */
     const unsigned authored=fp->ft_data->x8->x8.x8;
-    if(fp->tobj_list.n_costume_tobjs!=authored||!authored||authored>8)
+    if(fp->tobj_list.n_costume_tobjs!=authored||!authored||authored>5)
         return fail(e,n,"Animated costume telemetry does not match its authored texture map");
+    if(authored<2)
+        return fail(e,n,"Animated costume telemetry requires at least two authored texture TObjs");
     out->eye_count=2;
     for(unsigned eye=0;eye<authored;eye++){
         HSD_TObj* tobj=fp->tobj_list.costume_tobjs[eye];

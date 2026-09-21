@@ -280,6 +280,12 @@ the failed v5 cold discovery and its provenance, review and passing pair are
 retained under `work/full-game/`. See
 [Mewtwo's scope and evidence](docs/MEWTWO_PORT_NOTES.md) and the
 [current checkpoint receipt](docs/evidence/full-game-checkpoint-mewtwo-v1.json).
+After merging main (Donkey's re-enablement and the Captain Falcon dive
+catch), an independent review corrected the telemetry bounds to the original
+five-slot collector and the merged tree re-passes: 1,131 tests OK in final
+suite form with 57 documented skips, both native orientations, and a fresh
+cold/warm browser pair (all 32 cases, native/browser maxima 7.625/23.265 ms
+cold and 6.910/25.460 ms warm) with zero hard-gate failures.
 The preceding Pikachu/Pichu/Old Yoshi checkpoint passes both Release builds and 1,075
 tests in 334.490 seconds with 41 explicit skips. Fresh headless comparisons
 still match 603 Ganondorf/FD and 240 Mario/FD declared source updates; the
