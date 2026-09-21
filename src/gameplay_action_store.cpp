@@ -76,9 +76,11 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     if (mario) group(295,302);                   // Mario/Dr. Mario specials; taunts use common rows 239/240 above
     else if (link_family) group(295,313);        // Link-family action tables end at 313
     // The Captain-family range is source-complete through the final authored
-    // action. Captain rows 295/297 include command opcodes 45/42 whose
-    // original consumers require live sword/parasol item services; the
-    // shared command readiness guard intentionally remains explicit there.
+    // action. Captain rows 295/297 include command opcodes 45/42; 42
+    // (ftCommon_8007E83C parasol item rate) is now admitted globally, so
+    // executing those rows without a held parasol trips the consumer's own
+    // HSD_ASSERT rather than this guard — both outcomes are loud, and the
+    // retail path cannot reach them either.
     // A dive catch runs the common CaptureCaptain submotion row 276 on the
     // catcher's own store (grab_cb -> ftCo_8009CA0C); without admission that
     // row dispatches the unsupported-command sentinel and aborts mid-match.
