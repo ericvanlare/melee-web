@@ -63,3 +63,14 @@ are in its `LICENSE.txt`; Dolphin's corresponding source and notices are kept
 in that checkout. The build manifest records these revisions, input hashes,
 probe source hashes, compiler identity/options, and the Mach-O runtime
 inventory used for installation verification.
+
+The same pinned Dolphin tree records bundled libusb at revision
+`15a7ebb4d426c5ce196684347d2b7cafad862626`. Its
+[source headers](https://github.com/libusb/libusb/blob/15a7ebb4d426c5ce196684347d2b7cafad862626/libusb/core.c)
+declare LGPL-2.1-or-later and its
+[COPYING](https://github.com/libusb/libusb/blob/15a7ebb4d426c5ce196684347d2b7cafad862626/COPYING)
+contains the full LGPLv2.1 text. The builder currently hashes the libusb archive
+without validating the libusb source tree. Complete that correspondence and the
+applicable native dependency notice/source delivery before distributing the
+probe binary; see [the source/license inventory](../../docs/SOURCE_LICENSE_INVENTORY.md).
+These dependencies are separate from the browser runtime's SDL graph.

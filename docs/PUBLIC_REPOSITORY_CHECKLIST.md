@@ -22,6 +22,8 @@ for current gameplay evidence and limitations.
 Start with the source ownership and license inventory in section 1. Produce a
 reviewable map of project-authored code, upstream adaptations, recovered
 Melee/SDK material, generated data, and separately licensed reference tools.
+The [first-pass inventory and license proposal](SOURCE_LICENSE_INVENTORY.md)
+now records that map, its evidence, and four specific decisions to resolve.
 Use it to make the project-license decision and identify the precise remaining
 audio-data questions. This avoids choosing a root license whose scope is
 unclear. The independent engineering work in sections 3 and 4 can proceed while
@@ -39,9 +41,12 @@ Owner decisions, supported by a technical inventory. No root project license
 exists at the reviewed checkpoint. Start with [third-party provenance](../THIRD_PARTY.md),
 [dependency boundaries](DEPENDENCIES.md), and [the release review](PUBLIC_RELEASE_REVIEW.md).
 
-- [ ] Inventory the files and directories the project has authority to license,
-  identifying project-authored code separately from third-party adaptations,
-  recovered Melee/HSD and original SDK code, patches, and generated material.
+- [x] Complete a [first-pass technical inventory](SOURCE_LICENSE_INVENTORY.md)
+  distinguishing project-license candidates, identified adaptations, recovered
+  Melee/HSD and original SDK material, patches, generated data and reference tools.
+- [ ] Confirm authority to license the proposed project-authored files/portions;
+  turn the candidate map into an affirmative license scope. The technical
+  inventory alone does not establish ownership or contributor assignments.
 - [ ] Choose and add a root `LICENSE` with an explicit scope and documented
   exceptions. Preserve upstream notices and separately licensed components.
 - [ ] Record the decision for publishing recovered-source adaptations, patch

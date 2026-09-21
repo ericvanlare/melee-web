@@ -2,11 +2,16 @@
 
 Dependencies are fetched separately and pinned in dependencies.lock.json.
 
-The silent public player packages a compiled runtime and a fixed browser graph;
-the optional maintenance shell has no runtime. See the exact artifact boundary
-in [the release review](docs/PUBLIC_RELEASE_REVIEW.md) and its notice inventory.
-Development audio and the separate Dolphin reference application are excluded
-from the public player.
+The public player has separate silent and audio-enabled package identities;
+the optional maintenance shell has no runtime. See the exact artifact boundaries
+in [the release review](docs/PUBLIC_RELEASE_REVIEW.md) and
+[production audio](docs/AUDIO_PRODUCTION.md). The separate Dolphin reference
+application is outside either browser package.
+
+Repository publication also exposes tracked source, patches, generated material
+and history. The [first-pass source/license inventory](docs/SOURCE_LICENSE_INVENTORY.md)
+maps those boundaries and proposes a license for confirmed project-authored
+portions. It does not grant that license or resolve the remaining rights questions.
 
 | Source | Role | License/notice |
 | --- | --- | --- |
@@ -54,6 +59,33 @@ at commit `7c070f8e0f135c8108cfb0af9a37dc6809070b15`.
 The MIT notice is retained in [licenses/b0xx-ahk.txt](licenses/b0xx-ahk.txt).
 The default key positions come from the same project's `hotkeys.ini`.
 See [keyboard behavior and scope](docs/KEYBOARD_LAYOUTS.md).
+
+## Additional tracked-source origins
+
+`src/gameplay_fres.h` attributes its reciprocal-estimate table and integer steps
+to Andrew Church's `calc_fres` hardware test at
+[ppc750cl.s](https://achurch.org/cpu-tests/ppc750cl.s), described by the source
+header as public domain. The September 20 first-pass inventory could not retrieve
+that URL (HTTP 403); a pinned source digest and the actual dedication still need
+to be retained. This origin is separate from Aurora, Dolphin and Melee.
+
+The player audio replacement covers the resampler and coefficient generator.
+Other native files retain original-source translations: for example,
+`src/gameplay_audio_reverb.c` translates the original AXFX `HandleReverb`, and
+`src/gameplay_ps_math.c` preserves original paired-single instruction arithmetic.
+Original implementation includes, generated schemas and source-derived tables
+are listed in the [source/license inventory](docs/SOURCE_LICENSE_INVENTORY.md).
+Do not infer that all native code or audio is newly independent because those
+two audio implementations were replaced.
+
+The standalone `reference-capture/controller-probe/` target imports SDL3 and
+libusb static archives from the pinned reference build. The pinned Dolphin
+submodules identify SDL `5848e584a1b606de26e3dbd1c7e4ecbc34f807a6` (permissive
+SDL notice) and libusb `15a7ebb4d426c5ce196684347d2b7cafad862626`
+(LGPL-2.1-or-later). Their exact notice sources and remaining source/manifest
+correspondence work are recorded in the [inventory](docs/SOURCE_LICENSE_INVENTORY.md).
+The browser runtime inventory does not establish that native probe binary's
+distribution requirements.
 
 ## Additional development-runtime release findings
 
