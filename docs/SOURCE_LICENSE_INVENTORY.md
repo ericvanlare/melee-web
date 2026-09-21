@@ -1,5 +1,14 @@
 # Source ownership and license inventory: first pass
 
+**Current disposition:** the owner accepted an internal review without outside
+outreach on September 20, 2026. The [follow-up assessment](PUBLICATION_PROVENANCE_ASSESSMENT.md)
+and operative [license scope](../LICENSE_SCOPE.md) supersede the proposed/open
+decision statuses below. The historical technical inventory is retained as
+evidence. Recovered-source and current audio/data publication risks remain
+disclosed; acceptance is not a finding of third-party permission. The `fres`
+primary-source notice is now verified and native probe dependency texts are
+retained. Native binaries remain local pending their separate release work.
+
 This is the first implementation step in [the publication checklist](PUBLIC_REPOSITORY_CHECKLIST.md)
 for [issue #2](https://github.com/ericvanlare/melee-web/issues/2). It records
 technical provenance and a proposed licensing approach, not a license grant or

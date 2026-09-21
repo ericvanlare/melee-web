@@ -92,3 +92,8 @@ the snapshot check and its focused tests before the existing build/test jobs.
 The aggregate `browser-build` job includes its result and requires all of its
 dependencies to succeed. Requiring that aggregate in GitHub remains a separate
 cutover step; a local test pass does not establish a configured branch rule.
+
+For deleted files, historical path aliases, branches and PR refs, use the
+separate [history audit procedure](REPOSITORY_HISTORY_AUDIT.md). It binds the
+policy and selected refs to a report and leaves historical findings visible
+for explicit review instead of broadening current-tree exceptions.

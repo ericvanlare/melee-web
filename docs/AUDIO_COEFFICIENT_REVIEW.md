@@ -1,5 +1,16 @@
 # Audio coefficient provenance review
 
+**Current repository decision (September 20, 2026):** the owner accepted a
+thorough internal pass in place of outside outreach or mandatory counsel.
+Keep the current implementation and coefficients, preserve historical GPL
+attribution, and exclude current audio/data from the initial root MIT grant.
+The [publication assessment](PUBLICATION_PROVENANCE_ASSESSMENT.md#d3-current-audio-and-gpl-history)
+and [license scope](../LICENSE_SCOPE.md) record this disposition. It accepts the
+described rights uncertainty; it does not establish independence, permission,
+or compliance for a new binary/package distribution. The earlier analysis
+below remains the evidence and risk record, rather than an outstanding demand
+to contact third parties.
+
 Working packet for decision D3 in the [source license inventory](SOURCE_LICENSE_INVENTORY.md)
 and section 2 of the [publication checklist](PUBLIC_REPOSITORY_CHECKLIST.md).
 Prepared September 20, 2026 against source commit
@@ -255,14 +266,19 @@ game disc. It would not resolve historical source or combined-program rights.
   findings, proposed license treatment and questions requiring legal judgment.
 - [x] Map applicable existing-license obligations onto source/history,
   separate reference tools, generated output and combined player distribution.
-- [ ] Record a supported disposition with exact files/data, terms, notices,
+- [x] Record the owner-accepted repository disposition with exact files/data,
+  existing terms and excluded project-license scope in the
+  [assessment](PUBLICATION_PROVENANCE_ASSESSMENT.md#d3-current-audio-and-gpl-history).
+  This closes the internal repository decision, with uncertainty retained.
+- [ ] For any new binary/package distribution, bind its terms, notices,
   affected distribution surfaces, evidence, date and owner decision. Preserve
   unresolved questions explicitly; no response or elapsed time closes them.
 - [ ] If existing terms cannot support the intended use, prepare and validate a
   bounded replacement proposal before changing the shipping audio path.
-- [ ] Implement the resulting notices/scope or validated replacement and run
-  checks appropriate to that change. Preserve historical GPL evidence.
-- [ ] Update D3 and the publication checklist only for the scope actually closed.
+- [x] Implement the repository notices/scope without changing coefficients or
+  claiming a new independent derivation. Preserve historical GPL evidence.
+- [x] Update D3 and the publication checklist for the repository scope actually
+  closed; binary/package obligations retain their separate release gate.
 
 Repository safeguards and contributor documentation can proceed during this
 review. Full hardware-audio acceptance is a separate milestone from publishing

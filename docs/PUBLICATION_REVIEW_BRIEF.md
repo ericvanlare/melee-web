@@ -1,5 +1,10 @@
 # Publication review brief
 
+**Status:** the owner chose the [internal assessment](PUBLICATION_PROVENANCE_ASSESSMENT.md)
+without outside outreach. This is an optional, unsent brief for a future review,
+not an outstanding publication gate. Current project terms are in
+[LICENSE_SCOPE.md](../LICENSE_SCOPE.md).
+
 This is a cover sheet for a qualified legal review of repository publication.
 It is not a license grant, blanket clearance, ownership finding, or
 authorization to change repository visibility. No external outreach is part of

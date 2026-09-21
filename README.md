@@ -71,3 +71,8 @@ bounded PR #42 browser evidence.
 
 This project is independent of Nintendo, doldecomp and Aurora. Preserve upstream
 source provenance and notices; see [third-party notices](THIRD_PARTY.md).
+The [root MIT grant](LICENSE) covers only the explicit
+[project-file scope](LICENSE_SCOPE.md). It does not cover recovered game/SDK
+material, current audio/data, or the combined player. See the
+[publication assessment](docs/PUBLICATION_PROVENANCE_ASSESSMENT.md) for those
+boundaries and the owner's accepted publication risk.

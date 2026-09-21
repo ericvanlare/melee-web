@@ -80,7 +80,7 @@ def git(repo: Path, *args: str, input: bytes | None = None) -> bytes:
     return result.stdout
 
 
-def snapshot(repo: Path, ref: str | None) -> tuple[str, list[Entry]]:
+def snapshot(repo: Path, ref: str | None, *, allow_empty=False) -> tuple[str, list[Entry]]:
     if ref is None:
         label = "index"
         records = git(repo, "ls-files", "--stage", "-z")
@@ -104,7 +104,7 @@ def snapshot(repo: Path, ref: str | None) -> tuple[str, list[Entry]]:
         except UnicodeDecodeError:
             raise CheckError("A tracked path is not UTF-8") from None
         entries.append(Entry(path, mode, oid))
-    if not entries:
+    if not entries and not allow_empty:
         raise CheckError("The requested snapshot has no tracked files")
     return label, entries
 

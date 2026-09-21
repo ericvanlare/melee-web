@@ -1,5 +1,15 @@
 # Pinned SDL controller identity probe
 
+This is a local development utility. Repository publication does not authorize
+distribution of its statically linked binary. The exact
+[SDL notice](../../docs/licenses/controller-probe-sdl-zlib.txt) and
+[libusb LGPL text](../../docs/licenses/controller-probe-libusb-lgpl-2.1-or-later.txt)
+are retained. Before a binary release, verify the libusb source checkout's
+pinned commit and clean state, bind it to the binary manifest, and provide
+applicable source/relink materials. The current builder's archive hash alone
+does not establish that correspondence. See the
+[assessment](../../docs/PUBLICATION_PROVENANCE_ASSESSMENT.md#native-controller-probe).
+
 `webmelee-controller-probe` is a short-lived, read-only readiness helper for
 the reference-capture app. It links to the already-built SDL 3.4.4 archive
 used by the pinned Dolphin build and follows Dolphin's SDL backend enumeration

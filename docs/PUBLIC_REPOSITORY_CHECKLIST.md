@@ -19,19 +19,19 @@ for current gameplay evidence and limitations.
 
 ## Start here
 
-Start with the source ownership and license inventory in section 1. Produce a
-reviewable map of project-authored code, upstream adaptations, recovered
-Melee/SDK material, generated data, and separately licensed reference tools.
-The [first-pass inventory and license proposal](SOURCE_LICENSE_INVENTORY.md)
-now records that map, its evidence, and four specific decisions to resolve.
-Use it to make the project-license decision and identify the precise remaining
-audio-data questions. This avoids choosing a root license whose scope is
-unclear. The independent engineering work in sections 3 and 4 can proceed while
-those decisions are reviewed.
+The owner accepted a thorough internal pass without outside outreach on
+September 20, 2026. The [assessment](PUBLICATION_PROVENANCE_ASSESSMENT.md) records
+the source/audio/generated-data disposition and accepted uncertainties. The
+[root license](../LICENSE) now grants MIT only to an explicit
+[file scope](../LICENSE_SCOPE.md). Recovered and upstream material is not
+relicensed. Qualified outside review is optional, not a remaining workflow gate.
+The [earlier review brief](PUBLICATION_REVIEW_BRIEF.md) remains available if the
+owner later wants it.
 
-The [publication review brief](PUBLICATION_REVIEW_BRIEF.md) now collects the
-file, data, history and distribution questions for a qualified reviewer. It is
-prepared for owner use; no external outreach has been authorized or performed.
+The [history review](REPOSITORY_HISTORY_AUDIT.md),
+[GitHub-surface audit](GITHUB_PUBLICATION_AUDIT.md), and
+[cutover procedure](PUBLICATION_CUTOVER.md) distinguish completed preparation
+from activation and final verification. No visibility change is recorded here.
 
 Suggested sequence: ownership and license inventory; audio disposition;
 repository safeguards and contributor documents; preparation of GitHub controls;
@@ -41,28 +41,29 @@ deferral and its rationale rather than silently treating it as complete.
 
 ## 1. Project license and source publication decisions
 
-Owner decisions, supported by a technical inventory. No root project license
-exists at the reviewed checkpoint. Start with [third-party provenance](../THIRD_PARTY.md),
+Owner decisions, supported by the recorded internal assessment and an explicit
+initial license scope. Start with [third-party provenance](../THIRD_PARTY.md),
 [dependency boundaries](DEPENDENCIES.md), and [the release review](PUBLIC_RELEASE_REVIEW.md).
 
 - [x] Complete a [first-pass technical inventory](SOURCE_LICENSE_INVENTORY.md)
   distinguishing project-license candidates, identified adaptations, recovered
   Melee/HSD and original SDK material, patches, generated data and reference tools.
-- [ ] Confirm authority to license the proposed project-authored files/portions;
-  turn the candidate map into an affirmative license scope. The technical
-  inventory alone does not establish ownership or contributor assignments.
-- [ ] Choose and add a root `LICENSE` with an explicit scope and documented
+- [x] Adopt an affirmative scope for reviewed project-authored files on the
+  owner's authority, supported by their recorded authorship and this branch's
+  new work. Unlisted material receives no new grant; this is not an ownership
+  warranty or a substitute for a contributor assignment where one is needed.
+- [x] Choose and add a root `LICENSE` with an explicit scope and documented
   exceptions. Preserve upstream notices and separately licensed components.
-- [ ] Record the decision for publishing recovered-source adaptations, patch
-  context, generated declarations/data, and any distributed executable. The
-  accepted website-alpha risk posture does not itself settle repository
-  publication or establish upstream permission. Obtain qualified review where
-  needed for the intended model.
-- [ ] Complete the repository-facing provenance map, including dependency pins,
+- [x] Record the owner-accepted repository decision for recovered-source
+  adaptations, patch context and generated declarations/data in the
+  [assessment](PUBLICATION_PROVENANCE_ASSESSMENT.md). Rights uncertainty remains
+  explicit. New executable distributions need their own concrete inventory and
+  applicable source delivery; this pass does not authorize one.
+- [x] Complete the repository-facing provenance map, including dependency pins,
   adapted versus reference-only material, and original changes within patches.
   Identify the generated pipeline seed and preparation header, their inputs,
   rights treatment, and any limits on public regeneration.
-- [ ] Verify that applicable full license texts and copyright notices accompany
+- [x] Retain identified full license texts and copyright notices with
   the material being published, including the separate Dolphin reference tools.
 
 Making a repository public does not itself provide an open-source license;
@@ -88,18 +89,19 @@ Functional compatibility does not resolve the retained-data licensing question.
   across repository history, silent/audio player packages, generated output,
   the separate Dolphin observer and the local comparator. This source review
   does not certify a hosted artifact or close the combined-program decision.
-- [ ] Decide and document the license/provenance treatment of the replacement
+- [x] Decide and document the license/provenance treatment of the replacement
   implementations and retained numerical values; preserve the factual history
   in [the source provenance record](../src/gameplay_audio_provenance.md).
-- [ ] Include historical GPL-derived player sources and the separately licensed
+- [x] Include historical GPL-derived player sources and the separately licensed
   [Dolphin observer](../reference-capture/dolphin/LICENSES.md) in the publication
   inventory. Their exclusion from a website package does not exclude them from
   a public repository and its history.
-- [ ] Inventory any binaries being distributed that contain GPL-covered code
-  and verify the applicable notices and corresponding-source arrangements for
-  those artifacts. Distinguish source publication from binary-distribution
-  obligations; do not infer that every audio implementation has the same license.
-- [ ] Keep retail DSP/ROM and other owned-game inputs local. Document their
+- [x] Inventory repository binary surfaces: the [GitHub audit](GITHUB_PUBLICATION_AUDIT.md)
+  found no releases or nonempty compiled-output artifacts among available
+  downloads. Reference binaries remain local; new binary or hosted-player
+  distributions require their own notices/source-delivery review and are not
+  authorized by this repository pass.
+- [x] Keep retail DSP/ROM and other owned-game inputs local. Document their
   loading/provenance requirements and distinguish them from the generated
   approximation described by [the filter design](AUDIO_FILTER_DESIGN.md).
 
@@ -122,7 +124,7 @@ They do not scan all tracked repository content or all historical branches.
 - [x] Exercise the guard with synthetic rejection and permitted-fixture cases,
   then make it part of required verification. Keep real credentials and game
   payloads out of test fixtures.
-- [ ] Define a repeatable final history/ref scan in addition to the ongoing
+- [x] Define a repeatable final history/ref scan in addition to the ongoing
   tracked-tree guard. Preserve scan scope and findings without exposing secrets
   in reports or CI logs.
 
@@ -131,19 +133,22 @@ implemented snapshot boundary, exact hash policy, focused real-Git tests and
 limits. [Verify](../.github/workflows/verify.yml) includes the guard in the
 `browser-build` aggregate; requiring that aggregate in GitHub is still open in
 section 5. A passing content exception does not establish licensing clearance.
-The local full-suite attempt is not green: pinned source/toolchain dependencies
-are absent in this worktree. Its failures are retained under ignored
-`work/public-readiness/safeguards-first-pass/`. Run the full verification in a
-bootstrapped checkout or CI before integrating this pass; the focused guard
-and public-shell build/audit can run without those dependencies.
+The earlier missing-dependency failures are retained under ignored
+`work/public-readiness/safeguards-first-pass/`. After bootstrapping the pinned
+dependencies, gameplay and default builds passed, and the full suite completed
+with 1,155 tests and 74 skips. The final focused audit suite passed all 28 tests,
+including the last two oversized-object regressions. The
+[validation receipt](evidence/publication-validation-v1.json) binds code and log
+hashes; raw logs remain under `work/public-readiness/final-validation/`.
 
 ## 4. Contributor and security-reporting documents
 
 The initial reviewed tree had no contributor or security-reporting documents.
 [CONTRIBUTING.md](../CONTRIBUTING.md) and the
 [PR template](../.github/pull_request_template.md) now cover the contribution
-workflow. A usable private security-reporting route remains to be selected and
-verified before publishing its policy.
+workflow. [SECURITY.md](../SECURITY.md) selects GitHub private vulnerability
+reporting and accurately states its current availability limit. Activation and
+verification remain public-cutover steps.
 
 - [x] Add `CONTRIBUTING.md` with supported prerequisites and setup/build/test
   commands, linking to [build and play](BUILD_AND_PLAY.md) and
@@ -154,9 +159,10 @@ verified before publishing its policy.
   validation, and the prohibition on uploading game assets or secrets.
 - [x] Add a concise PR template requesting the behavior change, relevant
   source/provenance basis, and validation results and limitations.
-- [ ] Add `SECURITY.md` with a usable private reporting route for issues such
-  as native/Wasm asset-parser vulnerabilities. Verify the selected inbox or
-  reporting mechanism; an address or link alone is insufficient.
+- [x] Prepare `SECURITY.md` for native/Wasm asset-parser and other vulnerabilities,
+  selecting GitHub's private reporting form without inventing an inbox.
+- [ ] Verify the reporting mechanism is enabled and usable; the prepared policy
+  is not evidence that the private reporting form is available.
 - [ ] If selecting GitHub private vulnerability reporting, prepare the policy
   and enable/verify the feature during public cutover. See
   [GitHub's reporting setup](https://docs.github.com/en/code-security/how-tos/report-and-fix-vulnerabilities/configure-vulnerability-reporting/configure-for-a-repository).
@@ -168,36 +174,41 @@ returned the private-plan restriction; fork-approval settings could not be
 queried for a private repository. Read-only default workflow permissions and
 SHA-pinned actions were already configured.
 
-- [ ] Prepare and enable `main` protection: require the aggregate
+- [x] Prepare [concrete main/fork/workflow policies](PUBLICATION_CUTOVER.md).
+- [ ] Enable `main` protection: require the aggregate
   `browser-build` check, restrict force pushes and deletion, and choose an
   appropriate reviewed-change policy.
 - [ ] Verify protections through GitHub after configuring them. Use an eligible
   plan beforehand or make activation and verification explicit cutover steps.
 - [ ] Choose and verify approval requirements for external fork workflows once
   the public-repository settings become available.
-- [ ] Preserve read-only workflow defaults, SHA-pinned actions, and isolation
+- [x] Preserve read-only workflow defaults, SHA-pinned actions, and isolation
   of untrusted PR jobs from secrets, privileged execution, deployment, and paid
   external services.
-- [ ] Recheck that the new repository-content guard is included in required
-  verification and cannot be bypassed by a missing or skipped job.
+- [x] Verify the guard is included in the `browser-build` dependency gate and
+  that the gate rejects failed/skipped dependencies. Making the aggregate
+  required through GitHub still needs the activation steps above.
 
 ## 6. Final publication checkpoint and cutover
 
-The September 20 review was targeted, not a comprehensive legal/security
-clearance. Its history scan found no obvious credentials or disc/extracted-asset
-files in the inspected refs. Current-main CI passed; its log and three sampled
-artifacts showed no credential-pattern hits. A complete final artifact/log and
-discussion review remains open. Unlike the original issue audit, Actions now
-retains many artifacts, including CI reports and compiler-seed archives.
+The September 20 internal review covers 285 commits across 80 selected Git
+roots, all 498 retained Actions run-log archives, all 626 downloadable artifacts,
+and the API-visible issue/PR discussion surface. The linked receipts record no
+credential-pattern findings, the 40 reviewed historical content findings, and
+182 expired artifacts whose bytes were unavailable. This is a bounded review,
+not comprehensive legal/security clearance. Recheck new material at the final
+publication checkpoint, including CI generated after this inventory.
 
 - [ ] Freeze the intended publication commit and list all branches, tags,
   reachable history, and other repository surfaces that will become public.
-- [ ] Recheck source/history for game inputs, secrets, personal paths, and
-  provenance gaps. Review PRs, issues, comments, attachments, Actions logs and
-  artifacts, releases, and any other exposed publication material.
-- [ ] Decide whether existing personal commit-email addresses are acceptable.
-  Configure a noreply identity for future commits if desired. Coordinate any
-  separately approved history rewrite with active worktrees and contributors.
+- [x] Audit the recorded source/history and GitHub checkpoint for game inputs,
+  secrets, personal paths and provenance gaps; scope, unavailable expired
+  artifacts and findings are in the linked receipts. Recheck changed material
+  after the final publication commit is frozen.
+- [x] Preserve existing commit attribution rather than rewrite active history.
+  Use the verified account's noreply identity for this pass's new commit without
+  changing another worktree's configuration. Existing addresses remain in
+  history as documented in the cutover decision.
 - [ ] Validate the final code checkpoint using its applicable tests/builds and
   retain CI evidence. Keep README and evidence links accurate for that commit;
   preserve experimental status and the separate accuracy/performance gates.

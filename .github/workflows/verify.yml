@@ -37,8 +37,8 @@ jobs:
           python-version: '3.12'
       - name: Check the complete tracked snapshot
         run: python3 scripts/check_repository_content.py
-      - name: Exercise snapshot rejection and exception boundaries
-        run: python3 -m unittest discover -s tests -p test_repository_content.py -v
+      - name: Exercise snapshot and history audit boundaries
+        run: python3 -m unittest discover -s tests -p 'test_repository_*.py' -v
 
   # These jobs only prepare ccache entries. Every downstream target still runs
   # its normal clean configure/build, including all links and linked tests.

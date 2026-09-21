@@ -1,0 +1,253 @@
+{
+  "schema": "melee-web-github-publication-audit-v1",
+  "repository": "ericvanlare/melee-web",
+  "observed_at": "2026-09-20",
+  "method": "Read-only GitHub REST API collection with gh; paginated endpoints were retained under ignored work/public-readiness/github-audit/raw.",
+  "repository_state": {
+    "visibility": "private",
+    "default_branch": "main",
+    "main_head_sha": "2c2b687f5bb7dbfcb3c75dc0394c04bb97f2114d",
+    "has_issues": true,
+    "has_wiki": false,
+    "has_discussions": false,
+    "allow_forking": true,
+    "license_field": null,
+    "branches": 38,
+    "protected_branches_listed": 0,
+    "tags": 0,
+    "releases": 0,
+    "active_workflows": 2
+  },
+  "community_profile": {
+    "health_percentage": 28,
+    "code_of_conduct": false,
+    "contributing": false,
+    "issue_template": false,
+    "pull_request_template": false,
+    "license": false,
+    "main_protected": false
+  },
+  "pagination": {
+    "branches": [
+      38
+    ],
+    "tags": [
+      0
+    ],
+    "releases": [
+      0
+    ],
+    "issues_all": [
+      53
+    ],
+    "pulls_all": [
+      37
+    ],
+    "workflow_runs": [
+      100,
+      100,
+      100,
+      100,
+      98
+    ],
+    "artifacts": [
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      100,
+      8
+    ]
+  },
+  "issues_and_pull_requests": {
+    "issue_records_in_all_issues": 53,
+    "issue_only_records": 16,
+    "open_issues": 12,
+    "closed_issues": 4,
+    "all_issues_endpoint_open_records_including_pull_requests": 16,
+    "all_issues_endpoint_closed_records_including_pull_requests": 37,
+    "pull_requests": 37,
+    "open_pull_requests": 4,
+    "closed_pull_requests": 33,
+    "issue_comments": 7,
+    "issue_events": 136,
+    "repository_commit_comments": 0,
+    "pull_request_reviews": 0,
+    "pull_request_review_comments": 0,
+    "pull_request_commits": 205,
+    "recognized_github_user_upload_attachment_urls": 0,
+    "attachment_limit": "GitHub does not expose a separate attachment collection through the REST endpoints used here; all issue/PR bodies, issue comments, review objects and review comments were scanned for known GitHub user-upload URL forms."
+  },
+  "actions": {
+    "workflow_runs": 498,
+    "workflow_runs_all_completed": true,
+    "conclusions": {
+      "success": 347,
+      "failure": 73,
+      "cancelled": 78
+    },
+    "events": {
+      "push": 297,
+      "pull_request": 196,
+      "workflow_dispatch": 5
+    },
+    "run_logs": {
+      "records": 498,
+      "downloaded": 498,
+      "download_failures": 0,
+      "downloaded_archive_bytes": 70681849,
+      "empty_zip_archives": 9,
+      "empty_zip_note": "The nine empty archives were valid ZIP responses associated with cancelled runs; no log payload was retained in those responses."
+    },
+    "artifacts": {
+      "records": 808,
+      "unexpired_records": 626,
+      "expired_records": 182,
+      "unexpired_downloaded": 626,
+      "download_failures": 0,
+      "downloaded_archive_bytes": 8794811,
+      "expired_surface": "Expired artifact archives were unavailable for download and were retained only as API metadata."
+    },
+    "safe_archive_scan": {
+      "archives_scanned": 1124,
+      "zip_members": 3774,
+      "zip_member_uncompressed_bytes": 675953482,
+      "nested_tar_archives": 150,
+      "nested_tar_nonempty_members": 0,
+      "path_traversal_members": 0,
+      "symlink_members": 0,
+      "member_scan_size_limits_hit": 0,
+      "archive_parse_errors": 0,
+      "execution": "No archive member was extracted or executed."
+    },
+    "content_shape": {
+      "run_log_members": {
+        "text_or_source_extensions": 2728,
+        "binary_or_archive_extensions": 0
+      },
+      "artifact_members": {
+        "text_or_source_extensions": 896,
+        "json_members": 420,
+        "empty_compiler_cache_tar_members": 150,
+        "raw_wasm_object_archive_members": 0,
+        "license_or_copyright_term_hits": 0,
+        "note": "Compiler-seed artifacts contain ccache tar shells whose only tar entry is an empty directory; they contain no nonempty object/source/license member. CI reports and logs contain compiler/path words, but no binary compiler output member was found."
+      }
+    }
+  },
+  "settings_queries": {
+    "actions_permissions": {
+      "enabled": true,
+      "allowed_actions": "all",
+      "sha_pinning_required": false
+    },
+    "workflow_permissions": {
+      "default_workflow_permissions": "read",
+      "can_approve_pull_request_reviews": false
+    },
+    "fork_pr_contributor_approval": {
+      "status": "unavailable",
+      "http_status": 422,
+      "reason": "Fork PR approval is not allowed for private repositories."
+    },
+    "main_branch_protection": {
+      "status": "unavailable",
+      "http_status": 403,
+      "reason": "GitHub reported that the plan must be upgraded or the repository made public."
+    },
+    "repository_rulesets": {
+      "status": "unavailable",
+      "http_status": 403,
+      "reason": "GitHub reported that the plan must be upgraded or the repository made public."
+    },
+    "private_vulnerability_reporting": {
+      "status": "unavailable",
+      "http_status": 404,
+      "reason": "Endpoint returned Not Found while repository is private."
+    },
+    "vulnerability_alerts": {
+      "status": "disabled_or_unavailable",
+      "http_status": 404,
+      "reason": "GitHub reported that vulnerability alerts are disabled."
+    },
+    "automated_security_fixes": {
+      "enabled": false,
+      "paused": false
+    },
+    "wiki_pages": {
+      "status": "unavailable",
+      "http_status": 404,
+      "reason": "Wiki feature is disabled."
+    },
+    "discussions": {
+      "status": "unavailable",
+      "http_status": 410,
+      "reason": "Discussions are disabled for this repository."
+    }
+  },
+  "content_scans": {
+    "tracked_head": {
+      "tracked_entries": 1047,
+      "high_confidence_secret_or_personal_path_findings": 0,
+      "command": "python3 scripts/check_repository_content.py --ref HEAD",
+      "commit": "7930221343adab157a2283adc76fab2aec0407a2"
+    },
+    "github_api_json": {
+      "json_files_scanned": 331,
+      "high_confidence_secret_hits": 0,
+      "nonrunner_personal_path_hits": 0,
+      "runner_path_hits": 0
+    },
+    "downloaded_logs_and_artifacts": {
+      "high_confidence_secret_hits": 0,
+      "nonrunner_personal_path_hits": 0,
+      "synthetic_runner_path_matches": 1468515,
+      "note": "Runner-path matches are CI-generated paths and were separated from non-runner personal paths; raw matched values were not retained in this tracked evidence. Pattern checks are bounded and do not establish a universal secret-free claim."
+    }
+  },
+  "local_evidence": {
+    "ignored_download_root": "work/public-readiness/github-audit",
+    "raw_api_responses": "work/public-readiness/github-audit/raw",
+    "run_logs": "work/public-readiness/github-audit/logs",
+    "artifacts": "work/public-readiness/github-audit/artifacts",
+    "scan_script": "work/public-readiness/github-audit/notes/scan_archives.py",
+    "sanitized_scan_reports": [
+      "work/public-readiness/github-audit/notes/archive-inventory.json",
+      "work/public-readiness/github-audit/notes/nested-archive-inventory.json",
+      "work/public-readiness/github-audit/notes/artifact-content-summary.json",
+      "work/public-readiness/github-audit/notes/compiler-seed-sample.json",
+      "work/public-readiness/github-audit/notes/github-text-scan.json",
+      "work/public-readiness/github-audit/notes/attachments-inventory.json",
+      "work/public-readiness/github-audit/notes/archive-scan-final.json"
+    ]
+  },
+  "subsequent_control_change": {
+    "date": "2026-09-20",
+    "actions_permissions": {
+      "allowed_actions": "all",
+      "enabled": true,
+      "sha_pinning_required": true
+    },
+    "method": "PUT prepared actions-policy JSON, then GET readback; original read-only observation retained above."
+  },
+  "lead_artifact_recheck": {
+    "counts": {
+      "tar_archives": 150,
+      "tar_entries": 150,
+      "text_members": 896,
+      "valid_json": 420
+    },
+    "issues": []
+  },
+  "lead_archive_recheck": {
+    "report_sha256": "20aa9ede29226c1425df82bcaec6374d5339c9ba5156d8d1742f729497c55354",
+    "script_sha256": "4b72458604fa188653df42604128b9e38d037505449ef733e78b73c1cee815e1",
+    "archives": 1124,
+    "zip_members": 3774,
+    "credential_or_nonrunner_path_findings": 0,
+    "chunk_boundary_handling": "Carry-over matches are counted when their end extends into the newly read chunk."
+  }
+}

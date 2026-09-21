@@ -1,0 +1,53 @@
+{
+  "schema": "melee-web-publication-validation-v1",
+  "date": "2026-09-20",
+  "base_commit": "7930221343adab157a2283adc76fab2aec0407a2",
+  "scope": "Local publication-preparation validation; exact final code hashes below. This is build/test evidence, not gameplay, timing, pixels, PCM or rights acceptance. Remote CI and final cutover remain separate.",
+  "file_sha256": {
+    "scripts/check_repository_content.py": "af90151fe591db67ea35680c985a337099dfe49ab40f0647e6c800fa457adf99",
+    "scripts/audit_repository_history.py": "912169fe0053794c528fd2fc08397f40fc35f9d37144108dbf8292c948204898",
+    "tests/test_repository_content.py": "34ae02d57dbb75d8897410d6e15eb726021283e1aa89672abece8802f7905574",
+    "tests/test_repository_history.py": "a56fd202fae10c356ca434eab596868560b6a934866a02232b358e264d34543d",
+    ".github/workflows/verify.yml": "8bddc937a84e33de1e99a1b6ede918a0da8a70e8d71c842d93c075f7cbeee1ab",
+    "dependencies.lock.json": "b49bad1048d13ba05da31e5269bda4bed9fba04ed7a3fe96da8aa97390748d2d"
+  },
+  "checks": [
+    {
+      "command": "python3 scripts/bootstrap.py",
+      "exit_code": 0,
+      "result": "Passed; pinned dependency setup completed.",
+      "ignored_log": "work/public-readiness/final-validation/bootstrap.log",
+      "log_sha256": "71b081d7c865b92bb86f38e60b8d942a76f78c4a89b4d1d9b2681f96f29d1ba6"
+    },
+    {
+      "command": "python3 scripts/build.py --target gameplay",
+      "exit_code": 0,
+      "result": "Passed; gameplay target closure built.",
+      "ignored_log": "work/public-readiness/final-validation/gameplay-build.log",
+      "log_sha256": "9734581c12cb475c28db5a34d5f10cc6b2365f6250573ebb8298ae06417f9ecc"
+    },
+    {
+      "command": "python3 scripts/build.py",
+      "exit_code": 0,
+      "result": "Passed; default target closure built.",
+      "ignored_log": "work/public-readiness/final-validation/default-build.log",
+      "log_sha256": "e99bf753db3519592af75ce3bd92a633f795bb98b89efd8a6a0af7169ace6ec1"
+    },
+    {
+      "command": "python3 -m unittest discover -s tests -v",
+      "exit_code": 0,
+      "result": "Passed: 1155 tests, 74 skipped. Run before the final oversized-object audit fix and its two added tests.",
+      "ignored_log": "work/public-readiness/final-validation/full-suite-final.log",
+      "log_sha256": "ae9713776de5f9a7666397866ffc4848dcfb3c35f61ac4cd2579f5103e188969"
+    },
+    {
+      "command": "python3 -m unittest discover -s tests -p 'test_repository_*.py' -v",
+      "exit_code": 0,
+      "result": "Passed: 28 tests, no skips. Covers final snapshot/history scanner code including both oversized-object regressions.",
+      "ignored_log": "work/public-readiness/final-validation/repository-audits-final.log",
+      "log_sha256": "a71f9dc48361e9d54fc8ca7f0a121374e91d555b10b0f1bd67c4b1e273881a7c"
+    }
+  ],
+  "retained_failures": "Earlier missing-dependency failures remain under work/public-readiness/safeguards-first-pass/; pinned bootstrap and later builds/suite resolved that prerequisite.",
+  "skips": "74 conditional tests were skipped in the full suite; this receipt does not treat skips as passed coverage."
+}

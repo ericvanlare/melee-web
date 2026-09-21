@@ -1,0 +1,750 @@
+{
+  "schema": "melee-web-history-audit-v1",
+  "roots": [
+    {
+      "ref": "HEAD",
+      "object": "7930221343adab157a2283adc76fab2aec0407a2",
+      "commit": "7930221343adab157a2283adc76fab2aec0407a2"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/acquired-surface-bounds",
+      "object": "04f4dd6475adac444a5e503f9609f59c6d173db8",
+      "commit": "04f4dd6475adac444a5e503f9609f59c6d173db8"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/capture-unlock-roster",
+      "object": "d1c2a781ff42811c723a3e4abd7c8a829f1d5537",
+      "commit": "d1c2a781ff42811c723a3e4abd7c8a829f1d5537"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/center-player-toolbar",
+      "object": "8bb991166fee1e949a7e529d7653bc7b5dc79411",
+      "commit": "8bb991166fee1e949a7e529d7653bc7b5dc79411"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/ci-remove-redundant-runtime",
+      "object": "ca1a6c37d41681c640ef1a47331177700a268a7a",
+      "commit": "ca1a6c37d41681c640ef1a47331177700a268a7a"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/ci-under-ten-minutes",
+      "object": "5470fe8117f9cc5daea8c86fb15884b51d4669a3",
+      "commit": "5470fe8117f9cc5daea8c86fb15884b51d4669a3"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/content-validation",
+      "object": "e12ce3a7ce95ad3d1a8705937c929c67cec46bec",
+      "commit": "e12ce3a7ce95ad3d1a8705937c929c67cec46bec"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/controller-input",
+      "object": "7ae10e310ad1dd8d454295f2aa272b8a71b016bd",
+      "commit": "7ae10e310ad1dd8d454295f2aa272b8a71b016bd"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/cpu-register-compatibility",
+      "object": "edccdd37a206f73ff1cbbf66577554aa706c8218",
+      "commit": "edccdd37a206f73ff1cbbf66577554aa706c8218"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/current-runtime-holdout-gate",
+      "object": "0ade026c447b828c0f9c25289c3d959b0dd0a60d",
+      "commit": "0ade026c447b828c0f9c25289c3d959b0dd0a60d"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/dev-tooling",
+      "object": "4ca345a7585e92f50d05c84f1bf8ed5f001423d2",
+      "commit": "4ca345a7585e92f50d05c84f1bf8ed5f001423d2"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/full-game-integration",
+      "object": "4f7704335ff30618c9cbefa41872c903ae0e9fc9",
+      "commit": "4f7704335ff30618c9cbefa41872c903ae0e9fc9"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/gpu-stall",
+      "object": "b3b9da416917af1c1ab064616f25440e19877df7",
+      "commit": "b3b9da416917af1c1ab064616f25440e19877df7"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/gpu-stall-browser-evidence",
+      "object": "5840b94f11b1b230d24368f37265ab1faf0fdd4f",
+      "commit": "5840b94f11b1b230d24368f37265ab1faf0fdd4f"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/gpu-stall-development-results",
+      "object": "2d8545730b7cd053b844aac3adf44299d1a08849",
+      "commit": "2d8545730b7cd053b844aac3adf44299d1a08849"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/gpu-stall-followup",
+      "object": "9f3549cd34f0b9975b88e987dffdb506bd8c1aae",
+      "commit": "9f3549cd34f0b9975b88e987dffdb506bd8c1aae"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/homepage-audio-info",
+      "object": "846f7cc46af3763c5ed4526c641abfb31164edff",
+      "commit": "846f7cc46af3763c5ed4526c641abfb31164edff"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/independent-audio",
+      "object": "93495b1a58bc850825641ffd83fc7f042e02fe7d",
+      "commit": "93495b1a58bc850825641ffd83fc7f042e02fe7d"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/isolated-staging",
+      "object": "681fc0ab1c34fca75426934b55b4b760057f2448",
+      "commit": "681fc0ab1c34fca75426934b55b4b760057f2448"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/link-young-link",
+      "object": "e42fd88a8d1ee117f7c53d526d3303264ae54bc7",
+      "commit": "e42fd88a8d1ee117f7c53d526d3303264ae54bc7"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/marth-holdout-completion",
+      "object": "8b8740f68d6e84244922e015ce135801b96df565",
+      "commit": "8b8740f68d6e84244922e015ce135801b96df565"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/marth-pipeline-holdout-fix",
+      "object": "e254401ff681159a7e156ba9329afcc3df861925",
+      "commit": "e254401ff681159a7e156ba9329afcc3df861925"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/original-allocation-history",
+      "object": "22b71a0a81fa5bfdf7856f9a451c3f0081b01b6b",
+      "commit": "22b71a0a81fa5bfdf7856f9a451c3f0081b01b6b"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/physical-replay-accuracy",
+      "object": "5d2d7df997d9f533e560a1c462f5dd1c5b70ea83",
+      "commit": "5d2d7df997d9f533e560a1c462f5dd1c5b70ea83"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/public-audio-release",
+      "object": "44f1f685a0aa4335fc09b1f777d8c16ab554963d",
+      "commit": "44f1f685a0aa4335fc09b1f777d8c16ab554963d"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/public-loading-feedback",
+      "object": "4ff955f411c71e2471e40b50ba9009feb2b13c3a",
+      "commit": "4ff955f411c71e2471e40b50ba9009feb2b13c3a"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/public-performance-investigation",
+      "object": "08b02660fd2a09120342ffaf116e36fe8656af23",
+      "commit": "08b02660fd2a09120342ffaf116e36fe8656af23"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/public-prototype-shell",
+      "object": "b2133a78305f5075a2ff1a64cb58ecaf393f1f5d",
+      "commit": "b2133a78305f5075a2ff1a64cb58ecaf393f1f5d"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/retail-reference-capture-app",
+      "object": "dc48d141b000c92f0088aac7b9a0a4484bbcd852",
+      "commit": "dc48d141b000c92f0088aac7b9a0a4484bbcd852"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/roy-doc-public-release",
+      "object": "e571dc967582bcf06da3b683fc70f2a6a8b377b5",
+      "commit": "e571dc967582bcf06da3b683fc70f2a6a8b377b5"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/roy-dr-mario",
+      "object": "23680fb951abb740e04c701fea256d66a623f507",
+      "commit": "23680fb951abb740e04c701fea256d66a623f507"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/selective-pipeline-preparation",
+      "object": "00f5a8c6903dde5d5d43df11bb5d4285a1e4677c",
+      "commit": "00f5a8c6903dde5d5d43df11bb5d4285a1e4677c"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/shared-controller-settings",
+      "object": "e6d99c387b8a46d7fac43f2f49e624e2f18c01ec",
+      "commit": "e6d99c387b8a46d7fac43f2f49e624e2f18c01ec"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/versus-return-loop",
+      "object": "5755d32aa055e76ca5cb9fbf6917dfb316a21c8f",
+      "commit": "5755d32aa055e76ca5cb9fbf6917dfb316a21c8f"
+    },
+    {
+      "ref": "refs/publication-audit/heads/codex/webmelee-launch",
+      "object": "1332081c755ecacd2d81cca11a81184f0146d934",
+      "commit": "1332081c755ecacd2d81cca11a81184f0146d934"
+    },
+    {
+      "ref": "refs/publication-audit/heads/fix-captain-falcon-crash",
+      "object": "78696d128f3a8e8df8f42c5d2c913e9bda6e3a3a",
+      "commit": "78696d128f3a8e8df8f42c5d2c913e9bda6e3a3a"
+    },
+    {
+      "ref": "refs/publication-audit/heads/fix-dk-platform-drop-bug",
+      "object": "b1d7b70a9ed2737939117a183b8cfa4b238fe5c7",
+      "commit": "b1d7b70a9ed2737939117a183b8cfa4b238fe5c7"
+    },
+    {
+      "ref": "refs/publication-audit/heads/main",
+      "object": "2c2b687f5bb7dbfcb3c75dc0394c04bb97f2114d",
+      "commit": "2c2b687f5bb7dbfcb3c75dc0394c04bb97f2114d"
+    },
+    {
+      "ref": "refs/publication-audit/heads/port/fighter-runtime",
+      "object": "5b0facf4f5dfe2ebf66cb31de7f90fbef5c09cb4",
+      "commit": "5b0facf4f5dfe2ebf66cb31de7f90fbef5c09cb4"
+    },
+    {
+      "ref": "refs/publication-audit/pull/10/head",
+      "object": "b2133a78305f5075a2ff1a64cb58ecaf393f1f5d",
+      "commit": "b2133a78305f5075a2ff1a64cb58ecaf393f1f5d"
+    },
+    {
+      "ref": "refs/publication-audit/pull/11/head",
+      "object": "5b0facf4f5dfe2ebf66cb31de7f90fbef5c09cb4",
+      "commit": "5b0facf4f5dfe2ebf66cb31de7f90fbef5c09cb4"
+    },
+    {
+      "ref": "refs/publication-audit/pull/12/head",
+      "object": "1332081c755ecacd2d81cca11a81184f0146d934",
+      "commit": "1332081c755ecacd2d81cca11a81184f0146d934"
+    },
+    {
+      "ref": "refs/publication-audit/pull/13/head",
+      "object": "edccdd37a206f73ff1cbbf66577554aa706c8218",
+      "commit": "edccdd37a206f73ff1cbbf66577554aa706c8218"
+    },
+    {
+      "ref": "refs/publication-audit/pull/15/head",
+      "object": "08b02660fd2a09120342ffaf116e36fe8656af23",
+      "commit": "08b02660fd2a09120342ffaf116e36fe8656af23"
+    },
+    {
+      "ref": "refs/publication-audit/pull/16/head",
+      "object": "22b71a0a81fa5bfdf7856f9a451c3f0081b01b6b",
+      "commit": "22b71a0a81fa5bfdf7856f9a451c3f0081b01b6b"
+    },
+    {
+      "ref": "refs/publication-audit/pull/16/merge",
+      "object": "fc7f865742eddd0e0d2d1054e64bf18d104710ec",
+      "commit": "fc7f865742eddd0e0d2d1054e64bf18d104710ec"
+    },
+    {
+      "ref": "refs/publication-audit/pull/17/head",
+      "object": "681fc0ab1c34fca75426934b55b4b760057f2448",
+      "commit": "681fc0ab1c34fca75426934b55b4b760057f2448"
+    },
+    {
+      "ref": "refs/publication-audit/pull/18/head",
+      "object": "00f5a8c6903dde5d5d43df11bb5d4285a1e4677c",
+      "commit": "00f5a8c6903dde5d5d43df11bb5d4285a1e4677c"
+    },
+    {
+      "ref": "refs/publication-audit/pull/19/head",
+      "object": "4ff955f411c71e2471e40b50ba9009feb2b13c3a",
+      "commit": "4ff955f411c71e2471e40b50ba9009feb2b13c3a"
+    },
+    {
+      "ref": "refs/publication-audit/pull/20/head",
+      "object": "dc48d141b000c92f0088aac7b9a0a4484bbcd852",
+      "commit": "dc48d141b000c92f0088aac7b9a0a4484bbcd852"
+    },
+    {
+      "ref": "refs/publication-audit/pull/21/head",
+      "object": "5d2d7df997d9f533e560a1c462f5dd1c5b70ea83",
+      "commit": "5d2d7df997d9f533e560a1c462f5dd1c5b70ea83"
+    },
+    {
+      "ref": "refs/publication-audit/pull/22/head",
+      "object": "7ae10e310ad1dd8d454295f2aa272b8a71b016bd",
+      "commit": "7ae10e310ad1dd8d454295f2aa272b8a71b016bd"
+    },
+    {
+      "ref": "refs/publication-audit/pull/23/head",
+      "object": "e6d99c387b8a46d7fac43f2f49e624e2f18c01ec",
+      "commit": "e6d99c387b8a46d7fac43f2f49e624e2f18c01ec"
+    },
+    {
+      "ref": "refs/publication-audit/pull/24/head",
+      "object": "ca1a6c37d41681c640ef1a47331177700a268a7a",
+      "commit": "ca1a6c37d41681c640ef1a47331177700a268a7a"
+    },
+    {
+      "ref": "refs/publication-audit/pull/25/head",
+      "object": "23680fb951abb740e04c701fea256d66a623f507",
+      "commit": "23680fb951abb740e04c701fea256d66a623f507"
+    },
+    {
+      "ref": "refs/publication-audit/pull/26/head",
+      "object": "04f4dd6475adac444a5e503f9609f59c6d173db8",
+      "commit": "04f4dd6475adac444a5e503f9609f59c6d173db8"
+    },
+    {
+      "ref": "refs/publication-audit/pull/27/head",
+      "object": "d1c2a781ff42811c723a3e4abd7c8a829f1d5537",
+      "commit": "d1c2a781ff42811c723a3e4abd7c8a829f1d5537"
+    },
+    {
+      "ref": "refs/publication-audit/pull/29/head",
+      "object": "846f7cc46af3763c5ed4526c641abfb31164edff",
+      "commit": "846f7cc46af3763c5ed4526c641abfb31164edff"
+    },
+    {
+      "ref": "refs/publication-audit/pull/30/head",
+      "object": "e571dc967582bcf06da3b683fc70f2a6a8b377b5",
+      "commit": "e571dc967582bcf06da3b683fc70f2a6a8b377b5"
+    },
+    {
+      "ref": "refs/publication-audit/pull/31/head",
+      "object": "8bb991166fee1e949a7e529d7653bc7b5dc79411",
+      "commit": "8bb991166fee1e949a7e529d7653bc7b5dc79411"
+    },
+    {
+      "ref": "refs/publication-audit/pull/32/head",
+      "object": "e42fd88a8d1ee117f7c53d526d3303264ae54bc7",
+      "commit": "e42fd88a8d1ee117f7c53d526d3303264ae54bc7"
+    },
+    {
+      "ref": "refs/publication-audit/pull/37/head",
+      "object": "5470fe8117f9cc5daea8c86fb15884b51d4669a3",
+      "commit": "5470fe8117f9cc5daea8c86fb15884b51d4669a3"
+    },
+    {
+      "ref": "refs/publication-audit/pull/38/head",
+      "object": "b3b9da416917af1c1ab064616f25440e19877df7",
+      "commit": "b3b9da416917af1c1ab064616f25440e19877df7"
+    },
+    {
+      "ref": "refs/publication-audit/pull/39/head",
+      "object": "4ca345a7585e92f50d05c84f1bf8ed5f001423d2",
+      "commit": "4ca345a7585e92f50d05c84f1bf8ed5f001423d2"
+    },
+    {
+      "ref": "refs/publication-audit/pull/40/head",
+      "object": "9f3549cd34f0b9975b88e987dffdb506bd8c1aae",
+      "commit": "9f3549cd34f0b9975b88e987dffdb506bd8c1aae"
+    },
+    {
+      "ref": "refs/publication-audit/pull/41/head",
+      "object": "5840b94f11b1b230d24368f37265ab1faf0fdd4f",
+      "commit": "5840b94f11b1b230d24368f37265ab1faf0fdd4f"
+    },
+    {
+      "ref": "refs/publication-audit/pull/42/head",
+      "object": "93495b1a58bc850825641ffd83fc7f042e02fe7d",
+      "commit": "93495b1a58bc850825641ffd83fc7f042e02fe7d"
+    },
+    {
+      "ref": "refs/publication-audit/pull/43/head",
+      "object": "2d8545730b7cd053b844aac3adf44299d1a08849",
+      "commit": "2d8545730b7cd053b844aac3adf44299d1a08849"
+    },
+    {
+      "ref": "refs/publication-audit/pull/44/head",
+      "object": "5755d32aa055e76ca5cb9fbf6917dfb316a21c8f",
+      "commit": "5755d32aa055e76ca5cb9fbf6917dfb316a21c8f"
+    },
+    {
+      "ref": "refs/publication-audit/pull/44/merge",
+      "object": "107dd26aeadd8cc7c652a3d0b90c1926ca0c9cbc",
+      "commit": "107dd26aeadd8cc7c652a3d0b90c1926ca0c9cbc"
+    },
+    {
+      "ref": "refs/publication-audit/pull/45/head",
+      "object": "e12ce3a7ce95ad3d1a8705937c929c67cec46bec",
+      "commit": "e12ce3a7ce95ad3d1a8705937c929c67cec46bec"
+    },
+    {
+      "ref": "refs/publication-audit/pull/46/head",
+      "object": "0ade026c447b828c0f9c25289c3d959b0dd0a60d",
+      "commit": "0ade026c447b828c0f9c25289c3d959b0dd0a60d"
+    },
+    {
+      "ref": "refs/publication-audit/pull/47/head",
+      "object": "e254401ff681159a7e156ba9329afcc3df861925",
+      "commit": "e254401ff681159a7e156ba9329afcc3df861925"
+    },
+    {
+      "ref": "refs/publication-audit/pull/48/head",
+      "object": "8b8740f68d6e84244922e015ce135801b96df565",
+      "commit": "8b8740f68d6e84244922e015ce135801b96df565"
+    },
+    {
+      "ref": "refs/publication-audit/pull/49/head",
+      "object": "4f7704335ff30618c9cbefa41872c903ae0e9fc9",
+      "commit": "4f7704335ff30618c9cbefa41872c903ae0e9fc9"
+    },
+    {
+      "ref": "refs/publication-audit/pull/51/head",
+      "object": "44f1f685a0aa4335fc09b1f777d8c16ab554963d",
+      "commit": "44f1f685a0aa4335fc09b1f777d8c16ab554963d"
+    },
+    {
+      "ref": "refs/publication-audit/pull/52/head",
+      "object": "b1d7b70a9ed2737939117a183b8cfa4b238fe5c7",
+      "commit": "b1d7b70a9ed2737939117a183b8cfa4b238fe5c7"
+    },
+    {
+      "ref": "refs/publication-audit/pull/52/merge",
+      "object": "4b33c8245290c116d7f1dcbef008bb68913ad21b",
+      "commit": "4b33c8245290c116d7f1dcbef008bb68913ad21b"
+    },
+    {
+      "ref": "refs/publication-audit/pull/53/head",
+      "object": "78696d128f3a8e8df8f42c5d2c913e9bda6e3a3a",
+      "commit": "78696d128f3a8e8df8f42c5d2c913e9bda6e3a3a"
+    },
+    {
+      "ref": "refs/publication-audit/pull/53/merge",
+      "object": "2e26a243650a77275a20257f05fc68fdd526e8bf",
+      "commit": "2e26a243650a77275a20257f05fc68fdd526e8bf"
+    }
+  ],
+  "observed_at": "2026-09-21T02:53:31.694308+00:00",
+  "scanner_sha256": "912169fe0053794c528fd2fc08397f40fc35f9d37144108dbf8292c948204898",
+  "content_guard_sha256": "af90151fe591db67ea35680c985a337099dfe49ab40f0647e6c800fa457adf99",
+  "policy_commit": "7930221343adab157a2283adc76fab2aec0407a2",
+  "policy_sha256": "2d2e7bd21c4f151a261c2f8490f184de98cc778d3bb039263c3592ca59e2ccc4",
+  "commits": 285,
+  "trees": 249,
+  "path_blob_pairs": 3528,
+  "regular_blobs": 3525,
+  "unique_regular_blob_bytes": 58989331,
+  "commit_email_sha256": [
+    "23a054f66f00f66d2619676df99ebb79e01eb5a8edb4c729e5904a8649dcd87a",
+    "3c205d8fc749f72977b9331e3179773c315bb1f4860c366de2abe9ec9337730b",
+    "8c7ba04ae121f7e2664b99d2dffb27505e2dec7e9016c89257f9b1fd151b042a",
+    "ea4b938dc4b60ad6bd40f623770260b0705b4ad39a2099b0a60a984446c54d0d"
+  ],
+  "findings": [
+    {
+      "path": "web/initial_pipeline_cache.db.gz.b64",
+      "rule": "encoded_payload",
+      "line": null,
+      "blob": "04a2e44321abdc172d721a01ba289414370e09ef",
+      "example_commit": "0cc47017a8100d429bc59a3a1865e2766b3b615c"
+    },
+    {
+      "path": "web/initial_pipeline_cache.db.gz.b64",
+      "rule": "encoded_payload",
+      "line": null,
+      "blob": "058cbb06c117187d5fb4dd07d3f7f4557b1422af",
+      "example_commit": "ce359233cd76ad500a61df250cfaaa2a8c5af5b9"
+    },
+    {
+      "path": "web/initial_pipeline_cache.db.gz.b64",
+      "rule": "encoded_payload",
+      "line": null,
+      "blob": "06b76515d8430b5da968b223ae4e48f73490a3ec",
+      "example_commit": "293dda499b64c4702b7e9301cb823e25809bc91b"
+    },
+    {
+      "path": "web/initial_pipeline_cache.db.gz.b64",
+      "rule": "encoded_payload",
+      "line": null,
+      "blob": "0b8a1702813f2f358d627477e0c0ddeaef7a3853",
+      "example_commit": "0362e78b9b948df4b7e7d6924030b713279e68e5"
+    },
+    {
+      "path": "docs/images/public-shell-desktop.png",
+      "rule": "binary_content",
+      "line": null,
+      "blob": "244367f4460cf8e325867a1a36e9e45fc49491c3",
+      "example_commit": "7ed1926102490303dc286db735c95bbf1b09f410"
+    },
+    {
+      "path": "tests/test_public_release.py",
+      "rule": "personal_path",
+      "line": 203,
+      "blob": "2598a8391e3d1e94e1379c51b1514c06ea6de60a",
+      "example_commit": "d433ed2c6701013c36cec05962add67474895919"
+    },
+    {
+      "path": "tests/test_pipeline_requirements.py",
+      "rule": "personal_path",
+      "line": 245,
+      "blob": "26a978664787bcaf86bdb2020e771cb221510b62",
+      "example_commit": "107dd26aeadd8cc7c652a3d0b90c1926ca0c9cbc"
+    },
+    {
+      "path": "tests/test_audio_player_release.py",
+      "rule": "personal_path",
+      "line": 120,
+      "blob": "31d47850a0caa319fee65bfc5f297487494e0124",
+      "example_commit": "11410f31be0930f8a69a3ff358527286a8f19c2a"
+    },
+    {
+      "path": "web/initial_pipeline_cache.db.gz.b64",
+      "rule": "encoded_payload",
+      "line": null,
+      "blob": "37ba6357f218e432afcc0358666f0c4c9838ec0e",
+      "example_commit": "16e4eb4707328a6fd6b5002b25a9a38ab81860d4"
+    },
+    {
+      "path": "tests/test_public_release.py",
+      "rule": "personal_path",
+      "line": 486,
+      "blob": "40425ec839cef68ee4a372dcb6c925ed39b45fd4",
+      "example_commit": "00f5a8c6903dde5d5d43df11bb5d4285a1e4677c"
+    },
+    {
+      "path": "web/initial_pipeline_cache.db.gz.b64",
+      "rule": "encoded_payload",
+      "line": null,
+      "blob": "43ba2cfbf6802c309bd50664b6b96104e434c4e0",
+      "example_commit": "9ec1009480d2591df1dc3658e34ac24b39998b0d"
+    },
+    {
+      "path": "web/initial_pipeline_cache.db.gz.b64",
+      "rule": "encoded_payload",
+      "line": null,
+      "blob": "4ab05ee2625e8b630d49d8e4b441a394515561a7",
+      "example_commit": "cb4882cc54103a8879baaf57ede9e91d33bfac88"
+    },
+    {
+      "path": "web/initial_pipeline_cache.db.gz.b64",
+      "rule": "encoded_payload",
+      "line": null,
+      "blob": "4b041f6c43a193b10ef6a031b9e7b9e4bfc3c7e9",
+      "example_commit": "a331422e5ca8b7bac85e3d1e4cce6b8e77c1546d"
+    },
+    {
+      "path": "docs/images/public-shell-desktop.png",
+      "rule": "binary_content",
+      "line": null,
+      "blob": "4cc870f91f0d89ea05e7b3ea1f8777c0b93a53b5",
+      "example_commit": "8a7f2bb093405bc7892f3cc98b64a07bd63a09b4"
+    },
+    {
+      "path": "tests/test_public_release.py",
+      "rule": "personal_path",
+      "line": 489,
+      "blob": "6c821daa104cfdf509977aabfb7c99e4ff96460e",
+      "example_commit": "2640f450d82a3fe989506eeada76e14bcf0a760f"
+    },
+    {
+      "path": "web/initial_pipeline_cache.db.gz.b64",
+      "rule": "encoded_payload",
+      "line": null,
+      "blob": "810b22f05bcfb5a54c3e3172577953a6a8942fc8",
+      "example_commit": "0b97a81fe21e00c620fe1b8c6fb1dba1be2b689c"
+    },
+    {
+      "path": "web/initial_pipeline_cache.db.gz.b64",
+      "rule": "encoded_payload",
+      "line": null,
+      "blob": "8747c7bd51ae11a3fb916f8a275363b1dc88d123",
+      "example_commit": "01fd0f3ca421d15e5aeb375ec8e6ebd7e854fd2c"
+    },
+    {
+      "path": "tests/test_public_release.py",
+      "rule": "personal_path",
+      "line": 491,
+      "blob": "9c37cb59a5664a2ae356f1a2bb9c344e1d7e1f8a",
+      "example_commit": "0362e78b9b948df4b7e7d6924030b713279e68e5"
+    },
+    {
+      "path": "tests/test_public_staging.py",
+      "rule": "personal_path",
+      "line": 233,
+      "blob": "a60972705025d9bfd5e601d677b124e5511c5ea7",
+      "example_commit": "0362e78b9b948df4b7e7d6924030b713279e68e5"
+    },
+    {
+      "path": "web/initial_pipeline_cache.db.gz.b64",
+      "rule": "encoded_payload",
+      "line": null,
+      "blob": "a77e54dd2c18a6673633a23cc9888d3583a8dbc1",
+      "example_commit": "00f5a8c6903dde5d5d43df11bb5d4285a1e4677c"
+    },
+    {
+      "path": "docs/images/public-shell-mobile.png",
+      "rule": "binary_content",
+      "line": null,
+      "blob": "aa80e6ef4a370edccef18dbbdd9afb45b2bdabb0",
+      "example_commit": "7ed1926102490303dc286db735c95bbf1b09f410"
+    },
+    {
+      "path": "web/initial_pipeline_cache.db.gz.b64",
+      "rule": "encoded_payload",
+      "line": null,
+      "blob": "ae411dbbb83407c4dd4e86ae7a4252afa67f4183",
+      "example_commit": "5755d32aa055e76ca5cb9fbf6917dfb316a21c8f"
+    },
+    {
+      "path": "web/initial_pipeline_cache.db.gz.b64",
+      "rule": "encoded_payload",
+      "line": null,
+      "blob": "b353f8268440110b27ed1f4f153d98b72c4af308",
+      "example_commit": "e5372249b69e876f09500a5b2ebc8998316ad59c"
+    },
+    {
+      "path": "tests/test_public_release.py",
+      "rule": "personal_path",
+      "line": 278,
+      "blob": "c71d0417280ed2a4b9be8ef71cbaacf32c51821e",
+      "example_commit": "8a7f2bb093405bc7892f3cc98b64a07bd63a09b4"
+    },
+    {
+      "path": "web/initial_pipeline_cache.db.gz.b64",
+      "rule": "encoded_payload",
+      "line": null,
+      "blob": "ce4eea95c6f1103fa74e6af1ac4a08c50be7fde6",
+      "example_commit": "1648ffcbdcf1f25a65c37654300fc7fe9593fd4b"
+    },
+    {
+      "path": "web/initial_pipeline_cache.db.gz.b64",
+      "rule": "encoded_payload",
+      "line": null,
+      "blob": "ce70b725e4aec3844220edcc134e3cdcce557dd1",
+      "example_commit": "f6e38918e658cd1ccac49b9ea6683a42d44e4b04"
+    },
+    {
+      "path": "tests/test_pipeline_requirements.py",
+      "rule": "personal_path",
+      "line": 245,
+      "blob": "cf23661af3ac35cbc49095a450fe0334304a8e38",
+      "example_commit": "00f5a8c6903dde5d5d43df11bb5d4285a1e4677c"
+    },
+    {
+      "path": "docs/images/public-shell-mobile.png",
+      "rule": "binary_content",
+      "line": null,
+      "blob": "d0e7f004d901a09787260ffa072db899bf94e125",
+      "example_commit": "8a7f2bb093405bc7892f3cc98b64a07bd63a09b4"
+    },
+    {
+      "path": "web/initial_pipeline_cache.db.gz.b64",
+      "rule": "encoded_payload",
+      "line": null,
+      "blob": "d49f425111a83f632424966b6c2379472dc886f0",
+      "example_commit": "2add8173a0686dbe866ea7928579c66a3f222766"
+    },
+    {
+      "path": "docs/images/public-shell-mobile.png",
+      "rule": "binary_content",
+      "line": null,
+      "blob": "d4d0a82d048c4e5057e9bf766d3edd0f71358328",
+      "example_commit": "b5040c93e8a2bc714508bd7ec29cea162f73acf1"
+    },
+    {
+      "path": "web/initial_pipeline_cache.db.gz.b64",
+      "rule": "encoded_payload",
+      "line": null,
+      "blob": "dc67f06f9148a793b1f89a415bee1c009503b75b",
+      "example_commit": "ca692dd122e94ef886a1379dbd9b887339fc4ebb"
+    },
+    {
+      "path": "web/initial_pipeline_cache.db.gz.b64",
+      "rule": "encoded_payload",
+      "line": 1,
+      "blob": "dcde1e52fcdffc8147309cd66c1df894a256cddf",
+      "example_commit": "6ece78fe90d33cbe9a31f94c842b868911ef3fda"
+    },
+    {
+      "path": "web/initial_pipeline_cache.db.gz.b64",
+      "rule": "encoded_payload",
+      "line": null,
+      "blob": "e323cb54db85f15c5c02a7c3a0f21b35d7383271",
+      "example_commit": "806c08403923eb2e2797aea9b4389e91adbd2960"
+    },
+    {
+      "path": "tests/test_public_release.py",
+      "rule": "personal_path",
+      "line": 457,
+      "blob": "e33073bfe5b8f84c2c662dcb3a5a52757841d196",
+      "example_commit": "08b02660fd2a09120342ffaf116e36fe8656af23"
+    },
+    {
+      "path": "tests/test_public_release.py",
+      "rule": "personal_path",
+      "line": 427,
+      "blob": "e631677cb6bf87586a3ac196b9025acce75103a4",
+      "example_commit": "1332081c755ecacd2d81cca11a81184f0146d934"
+    },
+    {
+      "path": "tests/test_pipeline_requirements.py",
+      "rule": "personal_path",
+      "line": 245,
+      "blob": "ee36d88a14807b4b6385e2e63091b98240448742",
+      "example_commit": "0b97a81fe21e00c620fe1b8c6fb1dba1be2b689c"
+    },
+    {
+      "path": "tests/test_public_release.py",
+      "rule": "personal_path",
+      "line": 496,
+      "blob": "f7f222172410a6756c807775d931aaae187ba20f",
+      "example_commit": "11410f31be0930f8a69a3ff358527286a8f19c2a"
+    },
+    {
+      "path": "docs/images/public-shell-desktop.png",
+      "rule": "binary_content",
+      "line": null,
+      "blob": "f96d2eac01cbd93c386fd5dee9c62f9a7d13f258",
+      "example_commit": "b5040c93e8a2bc714508bd7ec29cea162f73acf1"
+    },
+    {
+      "path": "web/initial_pipeline_cache.db.gz.b64",
+      "rule": "encoded_payload",
+      "line": null,
+      "blob": "fd9e39b92703763ada96d4efb02601ba3c8278d5",
+      "example_commit": "04907b8e7987226eb6a70cddd6252dd2a05c5c62"
+    },
+    {
+      "path": "web/initial_pipeline_cache.db.gz.b64",
+      "rule": "encoded_payload",
+      "line": null,
+      "blob": "ff964727c38e07fbff20ef91ac2e1d07df2722b3",
+      "example_commit": "6e3bd08c33a0929647f7a9e9865c84bb8462dfe4"
+    }
+  ],
+  "metadata_findings": [],
+  "finding_counts": {
+    "binary_content": 6,
+    "encoded_payload": 21,
+    "personal_path": 13
+  },
+  "limits": [
+    "Only the selected reachable Git histories and tag annotations are covered.",
+    "No reflogs, unreachable objects, server-only refs, discussions or Actions material.",
+    "The content guard's pattern and encoding limits also apply here.",
+    "Findings require review; an empty result is not rights or security clearance."
+  ],
+  "review": {
+    "date": "2026-09-20",
+    "result": "All 40 findings classified; no detected credential or raw disc/extracted-game payload in this selected history.",
+    "dispositions": [
+      {
+        "rule": "binary_content",
+        "count": 6,
+        "paths": [
+          "docs/images/public-shell-desktop.png",
+          "docs/images/public-shell-mobile.png"
+        ],
+        "decision": "Six historical PNG blobs visually inspected: project maintenance shell or empty black player with toolbar, no game scene."
+      },
+      {
+        "rule": "encoded_payload",
+        "count": 21,
+        "path": "web/initial_pipeline_cache.db.gz.b64",
+        "decision": "All 21 decoded with a 16 MiB bound; SQLite renderer schema and pipeline_cache descriptors, 516096\u20133366912 decoded bytes. Decoded data had zero matches for the guard credential rules. Generated-data publication risk remains disclosed."
+      },
+      {
+        "rule": "personal_path",
+        "count": 13,
+        "paths": [
+          "tests/test_audio_player_release.py",
+          "tests/test_pipeline_requirements.py",
+          "tests/test_public_release.py",
+          "tests/test_public_staging.py"
+        ],
+        "decision": "Matched lines verified as the four known synthetic home-path rejection fixtures; current readiness branch constructs these inputs at runtime."
+      }
+    ],
+    "historical_exceptions_added_to_current_guard": false,
+    "raw_report_sha256": "b9abc819436470d3e44323806f0249b8634902972ec0122c10b2d59caafc5391",
+    "seed_inspection_sha256": "0122c3335568ed4b9ff6b13f801d7ad3ce0bd4f53d4cca6cf818f0a1c0c86782"
+  }
+}
