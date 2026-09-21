@@ -68,9 +68,14 @@ data. They are reproduced as unsigned hexadecimal words at these word offsets:
 ```
 
 These numerical compatibility values were observed in the Dolphin replacement
-DROM. Its [pinned readme](https://github.com/dolphin-emu/dolphin/blob/a2efdf1197be8132674b90fe9cf4761df39752ed/docs/DSP/free_dsp_rom/dsp_rom_readme.txt) describes the corrections as serving GBA microcode. This table is an approximation, not original Nintendo ROM data. That observation documents why the values are
-retained; it does not claim new coefficients or eliminate every data-provenance
-question.
+DROM. Its [pinned readme](https://github.com/dolphin-emu/dolphin/blob/a2efdf1197be8132674b90fe9cf4761df39752ed/docs/DSP/free_dsp_rom/dsp_rom_readme.txt)
+describes the corrections as serving GBA microcode. The whole table is a
+generated approximation rather than a complete Nintendo ROM dump; the
+[introducing commit](https://github.com/dolphin-emu/dolphin/commit/e3531d17d700339828d7bab192c66fba5fcbac86)
+describes the individual compatibility constants as observed DSP memory values.
+The [coefficient review packet](AUDIO_COEFFICIENT_REVIEW.md) tracks that distinction
+and the unresolved reuse terms. Retaining these values does not establish an
+independent derivation or settle their provenance treatment.
 
 ## Focused check
 

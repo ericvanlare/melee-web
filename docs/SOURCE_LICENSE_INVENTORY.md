@@ -152,7 +152,9 @@ separately authored probe source by assumption.
 | D3: Current coefficient/replacement and historical audio | Preserve present behavior during the review. Keep historical GPL attribution and assess the replacement implementation separately from retained parameter/table provenance | Resolve the retained data's treatment and any combined-distribution implications; do not remove compatibility values or claim they are independently derived as a paperwork fix |
 | D4: Generated/reference materials | Keep reproducible code and non-sensitive metadata reviewable; retain private retail inputs and captures outside Git; document known regeneration limits | Confirm pipeline metadata treatment, verify the reciprocal-estimate attribution, and complete native controller-probe dependency notices |
 
-For D3, the [pinned upstream generator](https://github.com/dolphin-emu/dolphin/blob/a2efdf1197be8132674b90fe9cf4761df39752ed/docs/DSP/free_dsp_rom/generate_coefs.py)
+For D3, use the [coefficient review packet](AUDIO_COEFFICIENT_REVIEW.md) for the
+retained-data scope, upstream contribution history, unsent inquiry and decision
+log. The [pinned upstream generator](https://github.com/dolphin-emu/dolphin/blob/a2efdf1197be8132674b90fe9cf4761df39752ed/docs/DSP/free_dsp_rom/generate_coefs.py)
 contains the compatibility entries, including duplicate/zero writes that explain
 why its entry count differs from this port's 20 effective overlays. Its
 [readme](https://github.com/dolphin-emu/dolphin/blob/a2efdf1197be8132674b90fe9cf4761df39752ed/docs/DSP/free_dsp_rom/dsp_rom_readme.txt)
