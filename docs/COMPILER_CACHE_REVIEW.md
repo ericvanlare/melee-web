@@ -21,8 +21,9 @@ Use the exact key from a retained cache API inventory. The optional
 `compiler-cache-audit` job in [Verify](../.github/workflows/verify.yml) restores
 that identity, uses ccache's inspection/extraction commands in bounded
 subprocesses, and uploads only its report. Ordinary CI does not run this job.
-Cached compiler outputs are never executed by the auditor. The normal Verify
-jobs still run when this optional inspection is requested.
+Cached compiler outputs are never executed by the auditor. This explicit
+manual mode runs only the content guard and inspection; it does not produce
+the required `browser-build` result or substitute for normal PR verification.
 
 ```sh
 gh api --paginate --slurp repos/ericvanlare/melee-web/actions/caches \

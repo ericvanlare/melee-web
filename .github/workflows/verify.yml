@@ -14,7 +14,7 @@ on:
         type: boolean
         default: false
       audit_compiler_cache:
-        description: Inspect an existing compiler cache and retain a redacted report
+        description: Run only the content guard and an existing compiler-cache inspection
         type: boolean
         default: false
       audit_cache_key:
@@ -118,7 +118,7 @@ jobs:
   # These jobs only prepare ccache entries. Every downstream target still runs
   # its normal clean configure/build, including all links and linked tests.
   compiler-seed:
-    if: ${{ !inputs.disable_compiler_cache }}
+    if: ${{ !inputs.audit_compiler_cache && !inputs.disable_compiler_cache }}
     needs: repository-content
     name: compiler seed (${{ matrix.shard }})
     runs-on: ubuntu-24.04-arm
@@ -189,6 +189,7 @@ jobs:
           if-no-files-found: error
 
   units:
+    if: ${{ !inputs.audit_compiler_cache }}
     needs: repository-content
     name: verify (${{ matrix.group }})
     runs-on: ubuntu-24.04-arm
@@ -251,7 +252,7 @@ jobs:
   partitions:
     name: verify (${{ matrix.group }})
     if: >-
-      always() && needs.repository-content.result == 'success' &&
+      always() && !inputs.audit_compiler_cache && needs.repository-content.result == 'success' &&
       (needs.compiler-seed.result == 'success' ||
        (needs.compiler-seed.result == 'skipped' &&
         inputs.disable_compiler_cache))
@@ -334,6 +335,7 @@ jobs:
           key: compiler-${{ runner.os }}-${{ runner.arch }}-${{ inputs.cache_epoch || 'v4' }}-${{ hashFiles('dependencies.lock.json') }}-shared-${{ github.sha }}
 
   public-shell:
+    if: ${{ !inputs.audit_compiler_cache }}
     needs: repository-content
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -353,7 +355,7 @@ jobs:
   # Retain the existing check name as the mandatory aggregate. A missing,
   # canceled, failed or skipped partition can never become a green result.
   browser-build:
-    if: always()
+    if: always() && !inputs.audit_compiler_cache
     needs: [repository-content, units, partitions, public-shell]
     runs-on: ubuntu-24.04
     timeout-minutes: 2

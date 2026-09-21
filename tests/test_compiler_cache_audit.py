@@ -66,12 +66,22 @@ def _make_fake_ccache(directory: Path) -> Path:
 def _cache_entry(cache: Path, *, digest_char: str = "a", kind: str = "R") -> Path:
     fanout = cache / digest_char / digest_char
     fanout.mkdir(parents=True, exist_ok=True)
-    path = fanout / (digest_char * 38 + kind)
+    path = fanout / (digest_char * 2 + "v" * 28 + "u" + kind)
     path.write_bytes(b"synthetic ccache entry")
     return path
 
 
 class CompilerCacheAuditTests(unittest.TestCase):
+    def test_ccache_mixed_hex_base32_identity(self):
+        # Regression from the real 4.9.1 runner: local names are not 40 hex
+        # characters. The format uses base32hex after the four hex digits.
+        digest = "abcd" + "v" * 28 + "u"
+        for depth in (2, 3, 4):
+            with self.subTest(depth=depth):
+                self.assertEqual(AUDIT._entry_kind(Path(digest[depth:] + "R"), tuple(digest[:depth])), "result")
+        self.assertIsNone(AUDIT._entry_kind(Path("a" * 38 + "R"), ("a", "a")))
+        self.assertIsNone(AUDIT._entry_kind(Path(digest[2:-1] + "vR"), ("a", "b")))
+
     def test_empty_cache_is_incomplete(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -112,7 +122,7 @@ class CompilerCacheAuditTests(unittest.TestCase):
             unknown.write_bytes(b"unknown")
             target = root / "outside"
             target.write_bytes(b"target")
-            link = fanout / ("a" * 38 + "R")
+            link = fanout / ("a" * 2 + "v" * 28 + "uR")
             try:
                 link.symlink_to(target)
             except OSError:

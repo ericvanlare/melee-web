@@ -48,7 +48,9 @@ COMMAND_TIMEOUT_SECONDS = 15
 RESOURCE_MEMORY_BYTES = 256 * 1024 * 1024
 RESOURCE_FILE_BYTES = MAX_DECODED_TOTAL_BYTES
 HEX = re.compile(r"^[0-9a-f]$")
-DIGEST = re.compile(r"^[0-9a-f]+$")
+# ccache 4.9 util::format_digest: first two bytes in hex, remaining eighteen
+# bytes in base32hex (29 characters, with one zero padding bit at the end).
+DIGEST = re.compile(r"^[0-9a-f]{4}[0-9a-v]{28}[02468acegikmoqsu]$")
 ASSET_INPUT = re.compile(rb"(?i)(?:assets-local|captures)[/\\][^\s\"'<>]+")
 WASM_MAGIC = b"\x00asm"
 ELF_MAGIC = b"\x7fELF"
@@ -307,17 +309,15 @@ def _cache_env(cache_dir: Path, temporary_dir: Path) -> dict[str, str]:
 def _entry_kind(path: Path, fanout_parts: tuple[str, ...]) -> str | None:
     """Recognize a v4 local filename after 2, 3, or 4 fanout levels.
 
-    Ccache's 20-byte digest is rendered as 40 lowercase hex characters. The
-    fanout characters are directory names, so the filename contains the
-    remaining digest characters plus the R/M type suffix.
+    Ccache's 20-byte digest is rendered as four hex and 29 base32hex characters.
+    The fanout consumes two to four initial hex characters. See ccache v4.9.1
+    src/util/string.cpp format_digest and storage/local/LocalStorage.cpp.
     """
     name = path.name
     if not name or name[-1] not in "RM":
         return None
     digest_part = name[:-1]
-    if len(digest_part) != 40 - len(fanout_parts) or not digest_part:
-        return None
-    if not all(HEX.fullmatch(part) for part in fanout_parts) or not DIGEST.fullmatch(digest_part):
+    if not all(HEX.fullmatch(part) for part in fanout_parts) or not DIGEST.fullmatch("".join(fanout_parts) + digest_part):
         return None
     return "result" if name[-1] == "R" else "manifest"
 
