@@ -133,6 +133,31 @@ class ContentMatchTests(unittest.TestCase):
         finally:
             temporary.cleanup()
 
+    def test_mewtwo_source_lifecycles_both_orientations(self):
+        common = ROOT / "assets-local/full-game-ganon"
+        mewtwo = ROOT / "assets-local/full-game-mewtwo"
+        required_common = ("MnSlChr.usd", "PlMr.dat", "PlMrAJ.dat",
+                           "EfMrData.dat", "mario.ssm", "GrNLa.dat")
+        required_mewtwo = ("PlMt.dat", "PlMtAJ.dat", "PlMtNr.dat", "PlMtRe.dat",
+                           "PlMtBu.dat", "PlMtGr.dat", "EfMtData.dat", "mewtwo.ssm")
+        if not (all((common / name).is_file() for name in required_common) and
+                all((mewtwo / name).is_file() for name in required_mewtwo)):
+            self.skipTest("Owned Mewtwo/Mario, costumes, menu and FD fixtures are required")
+        temporary, merged = self.merged_asset_roots(common, mewtwo)
+        try:
+            # CKIND_MEWTWO=10 and CKIND_MARIO=8 in the pinned source. The
+            # trace reconstructs all four Mewtwo source costume archives in
+            # both player orientations. Only Mewtwo-as-P1 drives specials;
+            # the reverse orientation still validates opponent lifetime and
+            # teardown without inventing a P2 input recipe.
+            for fighter, opponent in ((10, 8), (8, 10)):
+                with self.subTest(fighter=fighter, opponent=opponent):
+                    self.run_trace("gameplay_content_match_trace",
+                                   [merged, merged, 32, fighter, opponent],
+                                   "Mixed source content intro, costumes, stage lifecycle, combat, pause and repeat teardown passed")
+        finally:
+            temporary.cleanup()
+
     def test_battlefield_scaled_geometry_and_background_lifetimes(self):
         game = ROOT / "assets-local/next-gate"
         if not (game / "GrNBa.dat").is_file():

@@ -335,10 +335,19 @@ static int eye_stats(Fighter* fp,MeleeWebMatchStats* out,char* e,size_t n)
         out->eye_count=0;
         return 1;
     }
-    if(fp->tobj_list.n_costume_tobjs!=2)
-        return fail(e,n,"Animated costume telemetry requires exactly two original eye TObjs");
+    /* The costume texture map is authored per fighter (Mario/Mewtwo four-part
+     * families differ). The runtime collection must match that authored count
+     * exactly; the declared per-tick eye stats keep two recorded slots. The
+     * original collector stores at most five costume TObjs (ftAnim_80070200
+     * asserts against CostumeTObjList::costume_tobjs[5]), so a larger authored
+     * map has no defined runtime state to observe. */
+    const unsigned authored=fp->ft_data->x8->x8.x8;
+    if(fp->tobj_list.n_costume_tobjs!=authored||!authored||authored>5)
+        return fail(e,n,"Animated costume telemetry does not match its authored texture map");
+    if(authored<2)
+        return fail(e,n,"Animated costume telemetry requires at least two authored texture TObjs");
     out->eye_count=2;
-    for(unsigned eye=0;eye<2;eye++){
+    for(unsigned eye=0;eye<authored;eye++){
         HSD_TObj* tobj=fp->tobj_list.costume_tobjs[eye];
         if(!tobj||!tobj->aobj||!tobj->aobj->fobj||!tobj->imagetbl)
             return fail(e,n,"Original eye TObj has no attached native animation/image table");
@@ -346,23 +355,25 @@ static int eye_stats(Fighter* fp,MeleeWebMatchStats* out,char* e,size_t n)
         HSD_TexAnim* tex=find_texture(desc,tobj,&budget);
         if(!tex||!tex->n_imagetbl||!tex->imagetbl||!tex->aobjdesc)
             return fail(e,n,"Original eye TObj does not borrow an owned costume texture table");
-        MeleeWebMatchEyeStats* result=&out->eyes[eye];
-        result->image_count=tex->n_imagetbl;result->palette_count=tex->n_tluttbl;
-        result->image_index=UINT32_MAX;
-        for(unsigned i=0;i<tex->n_imagetbl;i++)
-            if(tex->imagetbl[i]==tobj->imagedesc){result->image_index=i;break;}
+        MeleeWebMatchEyeStats* result=eye<2?&out->eyes[eye]:NULL;
+        const unsigned image_count=tex->n_imagetbl;
+        unsigned image_index=UINT32_MAX;
+        for(unsigned i=0;i<image_count;i++)
+            if(tex->imagetbl[i]==tobj->imagedesc){image_index=i;break;}
         HSD_TObjDesc* base=NULL;
-        if(result->image_index==UINT32_MAX){
+        int image_is_base;
+        if(image_index==UINT32_MAX){
             base=owned_base_texture(owned_joint,tobj);
             if(!base||!base->imagedesc||!base->imagedesc->image_ptr)
                 return fail(e,n,"Original eye base TObj is outside its owned costume descriptor graph");
-            result->image_is_base=1;
+            image_is_base=1;
         }else{
-            result->image_is_base=0;
+            image_is_base=0;
         }
         if(!tobj->imagedesc||!tobj->imagedesc->image_ptr)
             return fail(e,n,"Original eye selected a malformed image descriptor");
-        result->palette_index=UINT32_MAX;
+        unsigned palette_index=UINT32_MAX;
+        int palette_is_base;
         if(tex->n_tluttbl){
             if(!tex->tluttbl||!tobj->tluttbl)
                 return fail(e,n,"Original eye has no owned runtime palette table");
@@ -375,15 +386,15 @@ static int eye_stats(Fighter* fp,MeleeWebMatchStats* out,char* e,size_t n)
             if(tobj->tluttbl[tex->n_tluttbl]!=NULL)
                 return fail(e,n,"Original eye runtime palette table has no bounded terminator");
             if(tobj->tlut_no<tex->n_tluttbl){
-                result->palette_index=tobj->tlut_no;
-                result->palette_is_base=0;
+                palette_index=tobj->tlut_no;
+                palette_is_base=0;
             }else{
                 if(!base)base=owned_base_texture(owned_joint,tobj);
                 if(!base)return fail(e,n,"Original eye base palette has no owned costume descriptor");
                 if((base->tlutdesc&&!base_tlut_matches(tobj->tlut,base->tlutdesc))||
                    (!base->tlutdesc&&tobj->tlut))
                     return fail(e,n,"Original eye base palette is outside its owned costume descriptor");
-                result->palette_is_base=1;
+                palette_is_base=1;
             }
         }else{
             if(tobj->tlut){
@@ -391,15 +402,21 @@ static int eye_stats(Fighter* fp,MeleeWebMatchStats* out,char* e,size_t n)
                 if(!base||!base->tlutdesc||!base_tlut_matches(tobj->tlut,base->tlutdesc))
                     return fail(e,n,"Original eye base palette is outside its owned costume descriptor");
             }
-            result->palette_is_base=1;
+            palette_is_base=1;
         }
-        result->animation_frame=tobj->aobj->curr_frame;
-        result->animation_rate=tobj->aobj->framerate;
-        if(result->animation_rate!=0)
+        const float animation_frame=tobj->aobj->curr_frame;
+        const float animation_rate=tobj->aobj->framerate;
+        if(animation_rate!=0)
             return fail(e,n,"Original costume eye animation must retain source command-controlled zero rate");
+        if(result){
+            result->image_count=image_count;result->palette_count=tex->n_tluttbl;
+            result->image_index=image_index;result->image_is_base=(uint8_t)image_is_base;
+            result->palette_index=palette_index;result->palette_is_base=(uint8_t)palette_is_base;
+            result->animation_frame=animation_frame;result->animation_rate=animation_rate;
+        }
     }
     if(fp->tobj_list.costume_tobjs[0]==fp->tobj_list.costume_tobjs[1])
-        return fail(e,n,"Mario eye slots unexpectedly share one runtime TObj");
+        return fail(e,n,"Recorded eye slots unexpectedly share one runtime TObj");
     return 1;
 }
 int melee_web_match_stats(MeleeWebMatchContext* h,MeleeWebMatchStats* out,char* e,size_t n)

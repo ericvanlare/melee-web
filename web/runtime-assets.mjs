@@ -20,7 +20,7 @@ export const NATIVE_MENU_DISC_FILES=Object.freeze({
   'LbMcGame.usd':'LbMcGame.usd','NtMemAc.usd':'NtMemAc.usd',
   'menu01.hps':'audio/menu01.hps','smash2.sem':'audio/us/smash2.sem',
   ...Object.fromEntries(['main','nr_select','nr_title','nr_name','pokemon','end',
-    'captain','dk','fox','koopa','link','luigi','mario','mars','pikachu','purin',
+    'captain','dk','fox','koopa','link','luigi','mario','mars','mewtwo','pikachu','purin',
     'falco','clink','drmario','emblem','pichu','ganon','pupupu']
     .map(name=>[name+'.ssm','audio/us/'+name+'.ssm']))
 });
@@ -96,6 +96,9 @@ export const NATIVE_GAME_DISC_FILES=Object.freeze({
   'PlKp.dat':'PlKp.dat','PlKpAJ.dat':'PlKpAJ.dat','PlKpNr.dat':'PlKpNr.dat',
   'PlKpRe.dat':'PlKpRe.dat','PlKpBu.dat':'PlKpBu.dat','PlKpBk.dat':'PlKpBk.dat',
   'EfKpData.dat':'EfKpData.dat','koopa.ssm':'audio/us/koopa.ssm',
+  'PlMt.dat':'PlMt.dat','PlMtAJ.dat':'PlMtAJ.dat','PlMtNr.dat':'PlMtNr.dat',
+  'PlMtRe.dat':'PlMtRe.dat','PlMtBu.dat':'PlMtBu.dat','PlMtGr.dat':'PlMtGr.dat',
+  'EfMtData.dat':'EfMtData.dat','mewtwo.ssm':'audio/us/mewtwo.ssm',
 });
 export function loadNativeGameDisc(file,report=()=>{}) {
   return loadDiscBundle(file,report,NATIVE_GAME_DISC_FILES);

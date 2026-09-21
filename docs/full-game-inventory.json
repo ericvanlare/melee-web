@@ -449,8 +449,8 @@
       "id": "fighter-mewtwo",
       "category": "fighters",
       "title": "Mewtwo selectable fighter",
-      "implementation": "not_integrated",
-      "acceptance": "not_evaluated",
+      "implementation": "partial",
+      "acceptance": "partial",
       "source_identity": {
         "ckind": "CKIND_MEWTWO",
         "ftkind": "FTKIND_MEWTWO"
@@ -468,10 +468,11 @@
         "Independent browser and original comparison covers this fighter before acceptance."
       ],
       "evidence": [
+        "docs/MEWTWO_PORT_NOTES.md",
         "docs/ADDING_CHARACTERS.md",
         "docs/ACCURACY_CONTRACT.md"
       ],
-      "next_step": "Run the fighter checkpoint for Mewtwo and split its costume, action, article, effect and audio coverage into bounded receipts.",
+      "next_step": "Broaden Mewtwo beyond scoped FD native/all-costume and cold/warm action-window evidence: independent original state/pixel/PCM comparisons, complete ordinary-input matches and the full move/costume/stage matrix.",
       "issue": null
     },
     {
