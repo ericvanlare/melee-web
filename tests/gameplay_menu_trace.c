@@ -73,7 +73,6 @@ void mnStageSel_Scene_OnExit(void* data)
     (void) data;
     active_sss->start_game = true;
     if (invalid_exit == 2) active_sss->vs.start.rules.stkind = 25;
-    if (invalid_exit == 3) active_sss->vs.start.players[0].ckind = CKIND_DONKEY;
     active_sss = NULL;
 }
 
@@ -135,11 +134,7 @@ int main(void)
     if (!melee_web_menu_character_available(CKIND_MARIO) ||
         !melee_web_menu_character_available(CKIND_FOX) ||
         !melee_web_menu_character_available(CKIND_CAPTAIN) ||
-#if defined(MELEE_WEB_PUBLIC_RUNTIME)
-        melee_web_menu_character_available(CKIND_DONKEY) ||
-#else
         !melee_web_menu_character_available(CKIND_DONKEY) ||
-#endif
         melee_web_menu_character_available(CKIND_PLAYABLE_COUNT) ||
         !melee_web_menu_stage_available(MELEE_WEB_MENU_FD_ST_KIND) ||
         !melee_web_menu_stage_available(St_Kind_Story) ||
@@ -175,12 +170,7 @@ int main(void)
     if (melee_web_menu_css_selection_valid(&css)) return 52;
     css.vs.start.players[1].ckind = CKIND_DONKEY;
     css.vs.start.players[1].color = 4;
-    if (
-#if defined(MELEE_WEB_PUBLIC_RUNTIME)
-        melee_web_menu_css_selection_valid(&css) ||
-#else
-        !melee_web_menu_css_selection_valid(&css) ||
-#endif
+    if (!melee_web_menu_css_selection_valid(&css) ||
         melee_web_fighter_content(CKIND_DONKEY)->fighter_kind != FTKIND_DONKEY)
         return 102;
     css.vs.start.players[1].color = 5;
@@ -408,11 +398,7 @@ int main(void)
     }
     /* Source-private state can be published only by OnExit. The host must
      * never expose a READY payload that was invalidated by that callback. */
-#if defined(MELEE_WEB_PUBLIC_RUNTIME)
-    const int invalid_exit_cases = 3;
-#else
     const int invalid_exit_cases = 2;
-#endif
     for (invalid_exit = 1; invalid_exit <= invalid_exit_cases; ++invalid_exit) {
         MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition};
         char error[128];
