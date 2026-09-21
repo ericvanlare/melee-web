@@ -23,12 +23,14 @@ Ness is integrated as a development candidate with his original
 `CKIND_NESS`/`FTKIND_NESS` identity, four costumes, the unique 0xDC
 `ftNessAttributes` extension, empty authored dynamics, null Wait table,
 eleven authored Article slots, model-only effect bank 10 (four rows, entries
-0-2 consumed) and `ness.ssm`. The real-asset attribute boundary test passes.
-The FD lifecycle trace is retained at a construction segfault reached after
-the effect-bank blending relaxation; source-cited shared repairs admitted item
-command opcode 16, cross-boundary item script tails and the unclamped original
-TObj blending constant. Browser frames, original comparison, pixels, PCM and
-performance are not run; see [Ness's retained failure and scope](docs/NESS_PORT_NOTES.md).
+0-2 consumed) and `ness.ssm`. The real-asset attribute boundary test passes
+and the native FD lifecycle trace passes end to end after the item-command
+decoder repair (source-cited shared repairs: exact consumed lengths for item
+opcodes 10/16, admission of common opcodes 5-9 with followed jump targets,
+tolerance of the source's unbalanced SetLoop, the item opcode 16 admission,
+cross-boundary item script tails and the unclamped original TObj blending
+constant). Browser frames, original comparison, pixels, PCM and performance
+are not run; see [Ness's scope](docs/NESS_PORT_NOTES.md).
 
 ## Donkey Kong platform shield-drop repair
 
