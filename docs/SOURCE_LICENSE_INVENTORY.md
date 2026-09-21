@@ -155,7 +155,13 @@ separately authored probe source by assumption.
 For D3, use the [coefficient review packet](AUDIO_COEFFICIENT_REVIEW.md) for the
 retained-data scope, upstream contribution history, existing-terms review and
 decision log. The owner declined contributor outreach; replacement remains a
-fallback if the intended use cannot be supported under existing terms. The [pinned upstream generator](https://github.com/dolphin-emu/dolphin/blob/a2efdf1197be8132674b90fe9cf4761df39752ed/docs/DSP/free_dsp_rom/generate_coefs.py)
+fallback if the intended use cannot be supported under existing terms. Its
+[completed disposition table](AUDIO_COEFFICIENT_REVIEW.md#disposition-table)
+recommends retaining the current implementation and methods, preserving known
+GPL history, and resolving the retained data's narrow treatment before assigning
+publication terms. It records additional historical README evidence about the
+replacement DSP output; the rights decision remains open. The
+[pinned upstream generator](https://github.com/dolphin-emu/dolphin/blob/a2efdf1197be8132674b90fe9cf4761df39752ed/docs/DSP/free_dsp_rom/generate_coefs.py)
 contains the compatibility entries, including duplicate/zero writes that explain
 why its entry count differs from this port's 20 effective overlays. Its
 [readme](https://github.com/dolphin-emu/dolphin/blob/a2efdf1197be8132674b90fe9cf4761df39752ed/docs/DSP/free_dsp_rom/dsp_rom_readme.txt)

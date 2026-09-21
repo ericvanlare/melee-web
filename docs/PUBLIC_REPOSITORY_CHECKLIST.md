@@ -76,6 +76,14 @@ Functional compatibility does not resolve the retained-data licensing question.
   the retained data, source consumers and upstream contributions. The owner
   declined outreach; its active work log now tracks existing-terms review and
   a replacement fallback. Preparation does not close the rights question.
+- [x] Complete the packet's [six-category disposition table](AUDIO_COEFFICIENT_REVIEW.md#disposition-table),
+  distinguishing standard math, current implementation, retained parameter/data
+  choices, generated output and historical GPL adaptations. Record the upstream
+  historical README representation without treating it as a new license grant.
+- [x] Map the packet's [distribution surfaces and source-delivery gaps](AUDIO_COEFFICIENT_REVIEW.md#distribution-obligations)
+  across repository history, silent/audio player packages, generated output,
+  the separate Dolphin observer and the local comparator. This source review
+  does not certify a hosted artifact or close the combined-program decision.
 - [ ] Decide and document the license/provenance treatment of the replacement
   implementations and retained numerical values; preserve the factual history
   in [the source provenance record](../src/gameplay_audio_provenance.md).

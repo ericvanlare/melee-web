@@ -4,8 +4,10 @@ Working packet for decision D3 in the [source license inventory](SOURCE_LICENSE_
 and section 2 of the [publication checklist](PUBLIC_REPOSITORY_CHECKLIST.md).
 Prepared September 20, 2026 against source commit
 `bbdd675deab05151f7296b2d8c3c449e16dcfa1d`. Updated September 20, 2026 after the
-owner declined contributor outreach. Status: public-record review is the active
-path; no outreach sent, permission received, or legal conclusion made.
+owner declined contributor outreach. The disposition pass below reviews
+`e5ebdcf27a43deb61f9bb481c33eda94b4f61d51`. Status: the technical classification
+is complete; the final rights/distribution decision remains open. No outreach
+was sent, new permission received, or project license applied.
 Evidence scope: **Source identified**, including a static comparison of retained
 values. This packet adds no runtime or original-hardware validation.
 
@@ -84,11 +86,31 @@ an observation-derived origin. Neither description supplies a reuse grant.
 
 The pinned generator has no per-file license header. Dolphin's [COPYING][copying]
 describes most original code as GPLv2-or-later and points to per-file terms and
-exceptions. Existing project records retain the historical GPL provenance.
-No coefficient-specific permissive grant was identified in this limited review.
+exceptions. The project [README at the pin][pinned-readme] and at both relevant
+introducing revisions declares GPLv2-or-later. Existing project records retain
+the historical GPL provenance. No coefficient-specific MIT/CC0 grant was
+identified in this limited review.
 The file history does not establish assignments, complete rights ownership,
 or the absence of other relevant contributors. These names record provenance;
 they are not a contact list or an assumption of sole ownership.
+
+### Additional published evidence
+
+The README at the [2015 generator introduction][initial-readme] and the
+[2017 compatibility update][compatibility-readme], in their Sys Files sections,
+describes the included DSP replacement files as written from scratch and says
+they "do not contain any copyrighted material". This is an upstream
+representation about the bundled replacements, including `GC/dsp_coef.bin`.
+It strengthens the basis for treating numerical output separately from the
+generator implementation. It was missing from the initial review packet.
+
+That passage is absent from the README at the pinned `a2efdf1` revision. This
+pass does not infer why it was removed. The historical statement is not an
+explicit MIT/CC0 grant or a finding that every table choice is unprotectable;
+it may be describing the absence of proprietary material in the replacements.
+The introducing commit's account of observed memory values must remain part
+of the record. Preserve both pieces of evidence rather than characterizing the
+table as either a full Nintendo ROM dump or wholly new project-authored data.
 
 ## Questions the disposition must answer
 
@@ -113,15 +135,27 @@ to the reviewer; do not characterize that process as formal clean-room work.
 Original-hardware PCM agreement is separately unresolved, even if reuse terms
 are established. See the [accuracy contract](ACCURACY_CONTRACT.md).
 
-## Path without contributor outreach
+## Disposition table
 
-### 1. Classify the exact retained material
+Reviewed by reading the three complete current implementation files, their
+historical versions at `e519c2fa4416c1ff8dba4e5467e65a2927b5ad29`, the pinned
+upstream generator, mathematical references, upstream notices and contribution
+history. The existing [replacement report](AUDIO_REPLACEMENT_EVIDENCE.md)
+supplies regression evidence; it was not rerun for this documentation change.
 
-Separate the current implementation, standard mathematical methods, selected
-filter parameters, observed compatibility values, complete generated table,
-and historical copied implementation. Each needs a stated basis; neither
-"all numbers are GPL" nor "a rewritten generator makes everything MIT" is an
-established conclusion.
+**Keep** below is an engineering recommendation, not approval to publish the
+combined program. **Existing GPL** identifies a supported license route for
+known covered material. **Decision open** names the specific remaining scope;
+it does not assert that a violation or mandatory rewrite has been established.
+
+| Category and exact scope | Established technical / published basis | Proposed disposition and remaining gate |
+| --- | --- | --- |
+| Current implementation: [resampler C](../src/gameplay_audio_resample.c), [header](../src/gameplay_audio_resample.h), and generator logic in [dsp-coefficients.mjs](../web/dsp-coefficients.mjs), distinct from retained choices/data below | The C file uses separate state-consumption/render helpers and quotient/remainder floor arithmetic; the JS evaluates Bessel's integral by Simpson quadrature rather than the prior series implementation. The [contract](AUDIO_RESAMPLER_CONTRACT.md) and replacement record disclose the specification author's access to prior GPL code and the original DSP program. Changed structure and passing comparisons do not decide derivative-work status. | **Keep; project-license candidate, decision open.** MIT is the existing D1 proposal for portions the project has authority to license. Do not add an unqualified MIT/SPDX grant to these whole files until that scope and any retained protected expression are assessed. No additional rewrite is established as necessary by this source review. |
+| Standard mathematical methods: sinc, Hamming/Kaiser definitions, Bessel integral, fixed-point arithmetic | [SciPy Hamming][hamming], [SciPy Kaiser][kaiser] and [NIST Bessel integral][bessel] independently describe the formulas. The current JS generator imports no NumPy/SciPy implementation. The original DSP contract separately identifies the phase/tap interface. | **Keep the methods.** There is no identified reason to replace standard mathematics. A project's source expression still needs its own license; citation to a formula is not an upstream code-license grant. Do not attribute Dolphin-specific tuning choices to these general references. |
+| Selected filter design: bank/window order, cutoffs, `9 pi / 4`, endpoint/grid convention, row normalization and rounding | These choices deliberately reproduce the [pinned generator][generator]; the [filter design](AUDIO_FILTER_DESIGN.md) records them. General mathematical references do not independently justify this exact selection as original Melee behavior. | **Retain pending the numerical-data decision.** The proposed keep route treats the choices as functional design facts/methods. Whether protectable selection/expression remains is unresolved. If it does, assess the existing GPL route and combined-program implications; do not silently label these choices MIT. |
+| Twenty observed compatibility values and their offsets | Exact correspondence and bank reachability are recorded above. The [introducing commit][observations] identifies observations of DSP memory. Our project inherited the values; it did not independently measure them. | **Retain pending the numerical-data decision.** Functional/interoperability observations are the proposed basis for keeping the values, supported by the historical README representation. This is a proposed interpretation, not a legal finding. Deleting only the four unused-bank values does not resolve the remaining sixteen or the parameter selection. |
+| Complete generated 4,096-byte table, plus its expected hash and representative test words | No coefficient binary is tracked. The browser generates the table and the audio consumer reads it. GPL section 0 distinguishes generator execution from covered output. The historical README representation concerns these replacement DSP files; regression fingerprints establish identity, not ownership or hardware fidelity. | **Keep generation; output treatment follows the two data rows above.** Do not assert that every output is GPL merely because of its generator's history, or that generation in the browser exempts the distributed source/data. If the data must be replaced, update generator, specification and dependent tests together after validation. |
+| Historical implementations and their copies: pre-replacement `src/gameplay_audio_resample.c/.h`, `web/dsp-coefficients.mjs`; [compatibility checker](../scripts/check_audio_compatibility.py) retrieving the old C implementation | The [historical C source][old-c] and [JS source][old-js] explicitly declare GPL-2.0-or-later; original references and Git history remain. The checker builds the old C code in a temporary local test executable. Its orchestration is a separate source-review scope. | **Existing GPL; preserve.** Retain notices/license and modification provenance. Assess any redistributed old or comparison binaries for source delivery. Replacing current code would not relicense or remove historical obligations. No history rewrite is selected. |
 
 The U.S. Copyright Office distinguishes a program's copyrightable expression
 from its functional algorithms and logic in [Circular 61][programs], and
@@ -129,34 +163,65 @@ explains the exclusion of underlying ideas/methods in [Circular 33][methods].
 These general principles support asking whether protected expression remains;
 they do not decide the treatment of this particular table, its arrangement,
 or every relevant jurisdiction. GPL section 0 separately conditions output
-coverage on the contents. Do not treat a byte match alone as a legal test.
+coverage on the contents. These are the bases for the proposed functional-data
+treatment, not a conclusion that the retained artifact is public domain.
 
-The next deliverable is a disposition matrix for these six categories, with
-exact source links, the proposed existing terms or other basis, and remaining
-uncertainties. Escalate specific legal questions for qualified review where
-needed; do not present a technical classification as a legal opinion.
+## Distribution obligations
 
-### 2. Assess whether the existing terms fit distribution
+The existing GPL route requires applicable notices, modification records and
+license terms; covered binaries also require a compliant corresponding-source
+delivery arrangement, including relevant build materials. Sections 1–3 and
+the distinction between separate and combined works govern the assessment.
+The recovered Melee/SDK boundary remains separate: a blanket GPL declaration
+cannot supply missing rights in that source.
 
-Where covered material is used under GPL, preserve applicable notices,
-modification records and license texts, and identify corresponding-source and
-build-material requirements for distributed binaries. Assess the combined
-player explicitly. Merely moving a file to another folder does not establish
-that it is an independent work.
+This is a source/configuration map at the reviewed commit. No hosted package,
+external release attachment or native binary was re-audited in this pass.
 
-GPL sections 1–3 provide a conditional reuse/distribution route without a
-separate permission request. That route still requires authority to distribute
-all included material under compatible terms. The recovered Melee/SDK source
-has its own unresolved rights boundary, so adding a blanket GPL license would
-not settle the combined program's status. The source repository, historical
-versions, reference tool, and browser executable need distinct inventory rows.
+| Publication surface | What the inspected code actually delivers | Treatment and concrete remaining work |
+| --- | --- | --- |
+| Source repository and reachable history | Current replacement files coexist with the historical GPL versions accessible through Git. [THIRD_PARTY.md](../THIRD_PARTY.md) retains provenance and the repository contains the [full GPL text](licenses/dolphin-gpl-2.0-or-later.txt). | Preserve the historical terms and identify changes. Apply the six-category disposition to current source. Publishing the repository would expose old versions even when a selected website package excludes them. Complete D1/D2 and the final ref/artifact inventory before public visibility. |
+| Audio browser package: source modules and combined Wasm | [stage_audio_preview.py](../scripts/stage_audio_preview.py), `MODULES` and `expected_files()`, includes the generator and audio modules with the native `runtime-audio-preview` producer. Its `license_notice()` and output map deliver historical provenance plus GPL text. [release_audio_player.py](../scripts/release_audio_player.py) selects the production identity. [FighterRuntime.cmake](../cmake/FighterRuntime.cmake) compiles the replacement C alongside recovered AX/AXFX and other sources. | Existing notice delivery is identifiable. It is not a determination that current code/table is GPL, or proof of rights in the combined program. If covered material remains, the inspected packager does not supply a release-specific corresponding-source bundle or offer; choose, implement and verify an applicable source-delivery route. Bind any claimed compliance to the exact release manifest and source/dependency graph. |
+| Generated coefficient bytes | [runtime-audio-assets.mjs](../web/runtime-audio-assets.mjs) generates the bytes in memory; the audio package includes the generator, not a hosted coefficient binary. Hosted verification in `stage_audio_preview.py` expects the coefficient-file route to be absent. | The absence of a binary file is intentional, not a missing package input. The source still carries parameters and values. Apply the numerical-data disposition to both source and resulting output; client-side generation is not itself a licensing conclusion. |
+| Silent browser package | [build_public.py](../scripts/build_public.py) and the public branch in [FighterRuntime.cmake](../cmake/FighterRuntime.cmake) exclude the resampler and browser audio modules, while retaining the other selected recovered/runtime sources. [public notices](../web/public/notices.html) describe the silent boundary. | Keep its separate inventory. Its audio exclusion does not clear repository history, the audio package, or the recovered code retained in the silent executable. No new silent-package audit is claimed here. |
+| Separate Dolphin observer source and any native binary | [LICENSES.md](../reference-capture/dolphin/LICENSES.md) records GPL-2.0-or-later and the pinned downstream composition. [build_reference_dolphin.py](../scripts/build_reference_dolphin.py), `archive_provenance()`, saves a small manifest/patch/overlay/helper archive keyed by binary identity; the full upstream source/build trees remain outside that archive. | **Existing GPL; keep as a separate tool.** The small reconstruction receipt is useful evidence but is not by itself a complete corresponding-source delivery. If distributing the binary, verify the full applicable source/build/dependency materials and recipient access. Do not infer player licensing from this separate tool. |
+| Local historical comparator | [check_audio_compatibility.py](../scripts/check_audio_compatibility.py) obtains the old C/header from Git, compiles both implementations with the comparison driver into a temporary executable, and removes its temporary outputs. | Preserve original notices and its local-test scope. There is no comparator package produced by this script. A future distributed comparator would need its own source/notices inventory; local execution does not establish a player distribution obligation. |
 
-If this review supports keeping the current data, document the basis and add
-the required notices/scope. No new upstream grant would be necessary for that
-supported existing-terms route. Qualified review may still be needed to resolve
-applicability; the current public record alone has not closed D3.
+The [release review](PUBLIC_RELEASE_REVIEW.md#gpl-corresponding-source-delivery-when-covered-code-is-distributed)
+records the source-delivery gap. Reading the current audio packager confirms
+that it supplies notices but does not add a corresponding-source mechanism.
+Repository availability alone would not demonstrate correspondence for every
+published binary, dependency or downstream change. The
+[production-audio runbook](AUDIO_PRODUCTION.md) is a procedure; this pass found
+no `melee-web-audio-player-package-v1` receipt in tracked `docs/evidence/` and
+does not infer the live deployment state from that absence.
 
-### 3. Replace only if the retained dependency cannot be supported
+## Recommendation after the pass
+
+Keep the working implementation and table while recording the proposed
+functional-data treatment. This pass found stronger published support for
+that route and did not establish a mandatory audio rewrite. Preserve the
+known GPL history/reference-tool terms and current provenance notices.
+
+Two determinations remain before closing the audio publication decision:
+
+1. Whether the current replacement retains protected implementation expression
+   or the chosen parameters/observations/table retain protectable expression
+   requiring an upstream license. The source comparisons, mathematical
+   references and historical README representation are the evidence packet
+   for this specific question; they are not legal clearance.
+2. If covered material remains, whether the intended combined source/binary
+   distribution can satisfy the existing terms given the recovered-source
+   boundary, and what exact source delivery is required. Record that decision
+   against the real release inventory, with qualified review where needed.
+
+Standard methods can remain; historical covered sources can retain their
+existing terms. New project-license assignments still depend on D1 authority.
+No outreach, blanket relicensing, history rewrite or coefficient change is
+needed to finish the technical classification. Repository safeguards and
+contributor documentation can proceed while these rights questions are resolved.
+
+## When a replacement would be justified
 
 Prepare a bounded engineering proposal derived from documented original
 behavior and standard signal-processing methods. Justify the required filter
@@ -186,9 +251,9 @@ game disc. It would not resolve historical source or combined-program rights.
 - [x] Record the owner's no-outreach preference and replace the active inquiry
   workflow with public-record review. The earlier unsent draft remains in Git
   history; no messages were sent.
-- [ ] Complete the six-category disposition matrix, distinguishing technical
+- [x] Complete the six-category disposition matrix, distinguishing technical
   findings, proposed license treatment and questions requiring legal judgment.
-- [ ] Map applicable existing-license obligations onto source/history,
+- [x] Map applicable existing-license obligations onto source/history,
   separate reference tools, generated output and combined player distribution.
 - [ ] Record a supported disposition with exact files/data, terms, notices,
   affected distribution surfaces, evidence, date and owner decision. Preserve
@@ -213,3 +278,11 @@ remove source/history from the repository-publication review.
 [gpl]: https://opensource.org/license/gpl-2.0
 [programs]: https://www.copyright.gov/circs/circ61.pdf
 [methods]: https://www.copyright.gov/circs/circ33.pdf
+[initial-readme]: https://github.com/dolphin-emu/dolphin/blob/388ab13db1c2a10534a9b81acba8fef98d96409c/Readme.md
+[compatibility-readme]: https://github.com/dolphin-emu/dolphin/blob/e3531d17d700339828d7bab192c66fba5fcbac86/Readme.md
+[pinned-readme]: https://github.com/dolphin-emu/dolphin/blob/a2efdf1197be8132674b90fe9cf4761df39752ed/Readme.md
+[hamming]: https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.windows.hamming.html
+[kaiser]: https://docs.scipy.org/doc/scipy/reference/generated/scipy.signal.windows.kaiser.html
+[bessel]: https://dlmf.nist.gov/10.32.E1
+[old-c]: https://github.com/ericvanlare/melee-web/blob/e519c2fa4416c1ff8dba4e5467e65a2927b5ad29/src/gameplay_audio_resample.c
+[old-js]: https://github.com/ericvanlare/melee-web/blob/e519c2fa4416c1ff8dba4e5467e65a2927b5ad29/web/dsp-coefficients.mjs

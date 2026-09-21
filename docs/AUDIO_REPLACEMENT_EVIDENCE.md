@@ -2,10 +2,14 @@
 
 September 19, 2026. Scope: the scalar resampler and browser coefficient generator.
 The separate Dolphin reference observer and its patches/licenses remain intact.
-The production public profile remains silent and excludes these audio modules.
-The later owner-requested [staging listening preview](AUDIO_PREVIEW.md) uses a
-separate audio-enabled profile. Repository visibility and the project license
-are unchanged.
+At this replacement checkpoint, the production public profile was silent and
+excluded these audio modules. The later owner-requested [staging listening
+preview](AUDIO_PREVIEW.md) and [production audio](AUDIO_PRODUCTION.md) use separate
+audio-enabled profiles. Consult those boundaries for current packaging; this
+historical replacement report does not record a deployment. The
+[coefficient disposition review](AUDIO_COEFFICIENT_REVIEW.md) tracks the remaining
+implementation/data licensing questions without changing repository visibility
+or selecting a project license.
 
 ## Implementation and provenance
 
