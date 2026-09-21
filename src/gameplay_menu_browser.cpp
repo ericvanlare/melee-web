@@ -399,6 +399,7 @@ if(scoped_assets){
   asset_scope.release();
   asset_destination=AssetDestination::None;asset_generation=0;asset_committed=false;
   requested_assets.clear();
+  asset_selection_valid=false;
  }
  results_route_active=false;
  prize_route_active=false;
