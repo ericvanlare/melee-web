@@ -70,6 +70,15 @@ results are recorded separately. The versioned
 and unassisted ground/air special cases over 5,200 drawn source frames. Raptor Boost
 hit branches and Falcon Dive catches/throws require actual interactions.
 
+The first live match reports exposed the excluded catch branch: a dive catch
+runs the common CaptureCaptain submotion row 276 on the catcher's own store
+(`grab_cb` -> `ftCo_8009CA0C`), and the unadmitted row dispatched the
+unsupported-command sentinel, aborting the player mid-match. Ganondorf's Dark
+Dive shares the same state. Real Ganon data confirms row 276 carries a one-word
+END command stream, so the focused action-store check admits it for both
+Captain-family kinds; a full browser dive-catch interaction remains unexercised
+until a next gate run.
+
 The first visible sweep was declared diagnostic with concurrent native checks.
 It completed every action case but failed timing/audio/pipeline acceptance:
 26 live pipelines, six browser gaps, six native callbacks over 33.3 ms,
