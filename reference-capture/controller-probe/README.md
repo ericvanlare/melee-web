@@ -1,5 +1,15 @@
 # Pinned SDL controller identity probe
 
+This is a local development utility. Repository publication does not authorize
+distribution of its statically linked binary. The exact
+[SDL notice](../../docs/licenses/controller-probe-sdl-zlib.txt) and
+[libusb LGPL text](../../docs/licenses/controller-probe-libusb-lgpl-2.1-or-later.txt)
+are retained. Before a binary release, verify the libusb source checkout's
+pinned commit and clean state, bind it to the binary manifest, and provide
+applicable source/relink materials. The current builder's archive hash alone
+does not establish that correspondence. See the
+[assessment](../../docs/PUBLICATION_PROVENANCE_ASSESSMENT.md#native-controller-probe).
+
 `webmelee-controller-probe` is a short-lived, read-only readiness helper for
 the reference-capture app. It links to the already-built SDL 3.4.4 archive
 used by the pinned Dolphin build and follows Dolphin's SDL backend enumeration
@@ -63,3 +73,14 @@ are in its `LICENSE.txt`; Dolphin's corresponding source and notices are kept
 in that checkout. The build manifest records these revisions, input hashes,
 probe source hashes, compiler identity/options, and the Mach-O runtime
 inventory used for installation verification.
+
+The same pinned Dolphin tree records bundled libusb at revision
+`15a7ebb4d426c5ce196684347d2b7cafad862626`. Its
+[source headers](https://github.com/libusb/libusb/blob/15a7ebb4d426c5ce196684347d2b7cafad862626/libusb/core.c)
+declare LGPL-2.1-or-later and its
+[COPYING](https://github.com/libusb/libusb/blob/15a7ebb4d426c5ce196684347d2b7cafad862626/COPYING)
+contains the full LGPLv2.1 text. The builder currently hashes the libusb archive
+without validating the libusb source tree. Complete that correspondence and the
+applicable native dependency notice/source delivery before distributing the
+probe binary; see [the source/license inventory](../../docs/SOURCE_LICENSE_INVENTORY.md).
+These dependencies are separate from the browser runtime's SDL graph.

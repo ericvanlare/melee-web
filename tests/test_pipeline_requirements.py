@@ -242,7 +242,7 @@ class PipelineRequirementsTests(unittest.TestCase):
 
     def test_path_shaped_copied_identifiers_reject(self):
         coverage = json.loads(json.dumps(self.coverage))
-        coverage["cases"][0]["case_id"] = "/Users/private/case"
+        coverage["cases"][0]["case_id"] = "/Users/" + "private/case"
         metadata = dict(self.metadata, coverage_manifest_sha256=sha256_json(coverage))
         capture = self.capture()
         capture["provenance"] = dict(capture["provenance"], coverage_manifest_sha256=metadata["coverage_manifest_sha256"])

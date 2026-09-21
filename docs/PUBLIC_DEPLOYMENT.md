@@ -41,7 +41,8 @@ The September 20 [PR #49 release](https://github.com/ericvanlare/melee-web/pull/
 expanded the public roster and added scoped scene loading. Its silent deployment
 is retained at [bed694b0.webmelee.pages.dev](https://bed694b0.webmelee.pages.dev)
 for rollback. Production audio uses the separate [audio release path](AUDIO_PRODUCTION.md);
-its completed package and hosted checks are recorded with the corresponding release.
+record its completed package and hosted checks with the corresponding release,
+and link that receipt before describing an audio deployment as verified here.
 
 Namecheap saved `alan.ns.cloudflare.com` and `hadlee.ns.cloudflare.com` as the
 custom nameservers after the mail and artifact gates passed. Cloudflare serves
