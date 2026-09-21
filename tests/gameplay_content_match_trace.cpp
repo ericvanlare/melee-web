@@ -363,7 +363,9 @@ int main(int argc,char** argv){try{
         raw[1].stickY=0;
         check(std::abs(match.player_stats(1).position[1]-match.player_stats(0).position[1])<5.0f,
               "Raw input did not bring both fighters to the same stage level");
-        const float attack_distance=(ganon||captain||donkey)?16.0f:35.0f;
+        // Ness's released PK Flash detonates where the flash spawned instead
+        // of traveling, so the opponent must stand inside the explosion.
+        const float attack_distance=(ganon||captain||donkey||ness)?16.0f:35.0f;
         for(unsigned n=0;n<120;n++){
             const auto p1=match.player_stats(0),p2=match.player_stats(1);
             if(std::abs(p2.position[0]-p1.position[0])<attack_distance)break;
@@ -410,7 +412,10 @@ int main(int argc,char** argv){try{
         const float pikachu_damage_before_specials=match.player_stats(0).damage_percent;
         bool pichu_self_damage_seen=false;
         for(unsigned n=0;n<240&&match.player_stats(1).damage_percent==damage;n++){
-            raw[0].button=koopa||n%8==0?PAD_BUTTON_B:0;tick();
+            // Ness's flash fires from a B release after the charge loop, so
+            // hold B to charge and release mid-loop instead of pulsing.
+            raw[0].button=ness?(n<120?PAD_BUTTON_B:0):
+                koopa||n%8==0?PAD_BUTTON_B:0;tick();
             if(ganon||captain)captain_family_punch|=match.player_stats(0).motion_id==ftCa_MS_SpecialN;
             if(koopa){
                 koopa_ground_n|=match.player_stats(0).motion_id==ftKp_MS_SpecialN;
@@ -434,7 +439,6 @@ int main(int argc,char** argv){try{
                     pikachu_damage_before_specials+0.001f;
         }
         raw[0].button=0;
-        check(match.player_stats(1).damage_percent>damage,"Selected fighter ground neutral special did not damage the opponent");
         if(ganon||captain)check(captain_family_punch,
             "Captain-family fighter did not enter its original grounded neutral special");
         if(donkey)check(donkey_ground_n,

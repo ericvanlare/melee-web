@@ -13,9 +13,9 @@ change.
 | Checkpoint | Status | Evidence |
 | --- | --- | --- |
 | 2. Source contract | Passed | `work/NessPrep/ness_source_contract.md` (byte-level, parser-backed); re-verified during implementation |
-| 3. Real construction | **Failed (retained)** | Real `PlNs.dat` attribute boundary passes; the FD lifecycle trace constructs all four costumes' data and reaches effect-bank loading, then **aborts (Wasm segfault) during construction** — retained, see below |
-| 4. First advancing browser frames | Not run | Blocked by the checkpoint-3 construction failure |
-| Integration (build + suite) | Partial | `gameplay_content_match_trace` Release target builds; focused real-asset attribute test passes; full suite result recorded in the commit message |
+| 3. Real construction | **Passed** | `gameplay_content_match_trace` Release, Battlefield Ness(Mario) 32/11/8: exit 0 — both orientations' data/article/effect-bank construction, PK Flash ground+aerial charge/fire lifetimes, PK Fire ground+air lifetimes, Yo-Yo smash, all four costumes, combat, pause and repeat teardown ("Mixed source content intro, costumes, stage lifecycle, combat, pause and repeat teardown passed") |
+| 4. First advancing browser frames | Not run | Browser-side route gate still open |
+| Integration (build + suite) | Partial | Release and RelWithDebInfo trace targets rebuilt from the repaired decoder; focused real-asset attribute test passes; full suite result recorded in the commit message |
 | Comparison / pixels / PCM / performance | Not run | Separate gates, untouched |
 
 ## Source data and shared boundaries
@@ -98,25 +98,47 @@ the Donkey cargo branch now derives the victim kind from the selection so
 `p1=Donkey, p2=Ness` drives a real shouldered-Ness capture through the same
 code paths that pass for Mario.
 
-## Retained failure (checkpoint 3)
+## Checkpoint-3 segfault: root cause and repair (resolved)
 
-The Release `gameplay_content_match_trace` (Final Destination, Ness/Mario)
-passes Ness attribute/article/effect construction far enough to begin effect
-bank 10 loading and then aborts with a Wasm segmentation fault during
-construction. The immediately preceding failure (`Effect bank 10 entry 2:
-Texture blending value must be finite and between zero and one`) was repaired
-by the source-cited relaxation above; the segfault that replaced it is not yet
-reduced to a producer. Suspects: the admitted out-of-range blending value
-reaching native TEV/material setup for the PSI Magnet effect model, or a
-subsequent construction phase. Retain the log; the smallest next experiment is
-running the trace with the blending relaxation reverted (expect the clean
-rejection) and then dumping the authored value to decide whether the native
-TEV constant path or the model hydration owns the fault.
+The retained construction segfault reduced to the shared item-command
+decoder, not the blending relaxation: reverting the TObj relaxation did not
+restore the clean rejection (the crash is upstream of texture loading), and
+instrumented runs localized the fault to the item anim-command dispatch
+(`it_802799E4`, `itanimlist.c:384`) reading an out-of-bounds handler-table
+entry (native opcode 36) and calling the item render callback with a garbage
+index. The decoder's consumed-length table disagreed with the original
+interpreter:
+
+- **Opcode 16** (`it_8027978C`) consumes its command word plus one operand
+  word, plus a second operand word when the sub-opcode in source bits 25..18
+  is 0..2 (three words total); the decoder consumed one, so every subsequent
+  dispatch walked into operand bytes.
+- **Opcode 10** (`it_80278F2C`) consumes five words; the decoder consumed one.
+- Common opcodes 5/6/7/8/9 (subroutine, return, goto, SetTimerAnimation,
+  flash) were rejected outright; 5/7 additionally require following the
+  relocated jump target and patching the emitted pointer word to the target's
+  native index.
+- An unterminated SetLoop (body executes once; Ness's PK Flash explosion
+  script authors exactly this) was rejected although the original runtime
+  never validates loop balance.
+
+The repair lives in `src/dat_item_commands.{hpp,c}`: exact consumed lengths
+for 10/16, admission and native encodings for 5/6/7/8/9 (jump targets patched
+to native indices), and tolerance for the source's unbalanced SetLoop. The
+trace harness also needed Ness-specific input recipes in the shared damage
+loop: close approach (the released flash detonates where it spawned) and a
+hold-charge-then-release B pattern (the pulsing pattern restarts
+`SpecialNStart` forever and never reaches the charge loop). The earlier
+"Release vs RelWithDebInfo" discrepancy was a stale served binary: the
+browser-release target was not rebuilt by the unqualified
+`--trace-target` invocation; always pass `--configuration Release` and verify
+the served directory matches the built configuration.
 
 ## Honest scope
 
 Development candidacy only. Independent original comparison, pixels, PCM,
 live scheduling, performance admission, CSS/SSS round trip and complete
 move/costume/stage coverage remain open. Ness is enabled in content
-registration and menu availability by the source-owned content row; a registry
-row alone does not admit the fighter past the retained checkpoint-3 failure.
+registration and menu availability by the source-owned content row; the
+native checkpoint-3 lifecycle now passes end to end and the browser route
+gate remains the next admission step.

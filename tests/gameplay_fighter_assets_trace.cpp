@@ -45,10 +45,16 @@ int main() {
         check(item_commands.decode(script({(3U<<26)|4,(1U<<26)|1,4U<<26,0}),0)!=nullptr,
               "Bounded original item loop decodes");
         for(const auto& invalid:{script({3U<<26,4U<<26,0}),script({4U<<26,0}),
-                                script({(3U<<26)|1,0}),script({(3U<<26)|1,(3U<<26)|1,4U<<26,4U<<26,0})}){
+                                script({(3U<<26)|1,(3U<<26)|1,4U<<26,4U<<26,0})}){
             bool rejected=false;try{DatItemCommands bad;bad.decode(invalid,0);}catch(const DatError&){rejected=true;}
-            check(rejected,"Item decoder rejects zero, unmatched, unfinished and over-capacity loops");
+            check(rejected,"Item decoder rejects zero, unmatched op4, and over-capacity loops");
         }
+        /* An unterminated SetLoop body executes once in the original
+         * interpreter and its leaked event_return slots are reset by the next
+         * state change; Ness's PK Flash explosion script authors exactly
+         * this, so the decoder mirrors the runtime instead of rejecting it. */
+        check(DatItemCommands().decode(script({(3U<<26)|1,0}),0)!=nullptr,
+              "Unbalanced SetLoop decodes like the original interpreter");
         FighterFixture f;put32(f.data,f.command_a,0);f.unlink(f.command_a+4);put32(f.data,f.command_b,0);
         auto archive=std::make_shared<const DatArchive>(f.file());
         for(unsigned restart=0;restart<2;++restart) {
