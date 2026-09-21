@@ -117,6 +117,7 @@ SLICE_NAMES = {
     41: "stage_select_index",
     42: "stage_select_kind",
     43: "menu_css_cursor",
+    44: "menu_css_doors",
 }
 
 

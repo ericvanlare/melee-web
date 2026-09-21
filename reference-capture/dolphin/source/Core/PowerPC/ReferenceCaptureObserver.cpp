@@ -54,6 +54,10 @@ constexpr size_t STAGE_SELECT_COUNT = 30;
 constexpr size_t STAGE_SELECT_KIND_OFFSET = 0xB;
 constexpr u32 STAGE_SELECT_INDEX = 0x804D6CAE;
 constexpr u32 CSS_CURSOR_POINTERS = 0x804A0BC0;
+// mnCharSel_803F0DFC is the authored CSS door state (0x90 bytes: four 0x24
+// entries carrying each port's selected icon and door coordinates).
+constexpr u32 CSS_DOORS_STATE = 0x803F0DFC;
+constexpr size_t CSS_DOORS_BYTES = 0x90;
 constexpr size_t CSS_CURSOR_BYTES = 0x14;
 constexpr size_t CSS_CURSOR_PORTS = 4;
 constexpr u16 WHOLE_SESSION_FLAG = 1;
@@ -157,6 +161,7 @@ enum class SliceTag : u16
   StageSelectIndex = 41,
   StageSelectKind = 42,
   MenuCssCursor = 43,
+  MenuCssDoors = 44,
 };
 
 struct SliceRef
@@ -505,6 +510,8 @@ struct Observer::Impl
           return false;
       }
     }
+    if (!AddSlice(system, SliceTag::MenuCssDoors, CSS_DOORS_STATE, CSS_DOORS_BYTES))
+      return false;
     for (u32 port = 0; port < CSS_CURSOR_PORTS; ++port)
     {
       u32 cursor = 0;
