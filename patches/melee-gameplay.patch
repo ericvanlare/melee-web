@@ -3361,13 +3361,13 @@ index fb87d01..991e6d7 100644
          return;
      }
 +#ifdef TARGET_PC
-+    /* A terminal single-CON stream has no interpolation pair. The original
-+     * passes an uninitialized stack word here. Use its authored constant;
-+     * the observed FD visibility transition remains hidden (see port docs). */
-+    if (fobj->op_intrp == HSD_A_OP_NONE && fobj->op == HSD_A_OP_CON &&
-+        HSD_FObjGetState(fobj) == FOBJ_LOAD_DATA && fobj->nb_pack == 0 &&
-+        fobj->fterm == 0 && fobj->time >= 0 &&
-+        fobj->ad == fobj->ad_head + fobj->length) {
++    /* A terminal single-datum stream has no interpolation pair. The original
++     * passes an uninitialized stack word; define the output as its authored
++     * last value. Each type's own zero-duration path emits p1 (CON, LIN and
++     * the splines); a KEY terminal is already defined by FObjLaunchKeyData. */
++    if (fobj->op_intrp == HSD_A_OP_NONE && fobj->nb_pack == 0 &&
++        HSD_FObjGetState(fobj) == FOBJ_LOAD_DATA && fobj->fterm == 0 &&
++        fobj->time >= 0 && fobj->ad == fobj->ad_head + fobj->length) {
 +        fobjdata.fv = fobj->p1;
 +        obj_update(obj, fobj->obj_type, &fobjdata);
 +        return;
