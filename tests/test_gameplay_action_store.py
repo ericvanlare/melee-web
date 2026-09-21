@@ -97,6 +97,7 @@ class GameplayActionStoreTests(unittest.TestCase):
                 (ROOT / "assets-local/full-game-koopa/PlKp.dat", ROOT / "assets-local/full-game-koopa/PlKpAJ.dat"),
                 (ROOT / "assets-local/full-game-captain/PlCa.dat", ROOT / "assets-local/full-game-captain/PlCaAJ.dat"),
                 (ROOT / "assets-local/full-game-ganon/PlGn.dat", ROOT / "assets-local/full-game-ganon/PlGnAJ.dat"),
+                (ROOT / "assets-local/full-game-mewtwo/PlMt.dat", ROOT / "assets-local/full-game-mewtwo/PlMtAJ.dat"),
             ]
             available_pairs = [pair for pair in owned_pairs if all(path.is_file() for path in pair)]
             args = [str(path) for pair in available_pairs for path in pair]

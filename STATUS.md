@@ -255,6 +255,37 @@ match all 603 Ganondorf/FD and 240 Mario/FD declared source updates. The
 binds the builds, browser pair, review and retained failures. The Bowser
 checkpoint's full GitHub Verify completed in 6m 16s across all jobs;
 the preceding Donkey checkpoint completed in 6m 20s.
+Mewtwo is the seventeenth development fighter on `codex/mewtwo-integration`.
+Native Final Destination checks pass both player orders and all four
+costumes, including ground and aerial Shadow Ball charge with fresh-B-edge
+release and Article teardown, Teleport, Confusion and Disable lifetimes. The
+source contract preserves the 0x88 `ftMewtwoAttributes` extension, the
+two-slot Article table (Disable 0x6e, Shadow Ball 0x70 with twelve
+serialized special words and ten animation rows), effect bank 13 with four
+static rows and the authored four-TObj costume texture map: the match-stats
+eye telemetry now requires the runtime collection to match each fighter's
+authored texture map while keeping the two declared recorded slots and all
+existing comparison fields. The versioned `mewtwo-visible-actions-v1`
+inventory has 32 cases; a fresh-origin cold export supplied 12 new portable
+pipeline descriptors (zero payload conflicts, all 846 previous records
+preserved), producing the reviewed seed of one shader and 857 pipelines
+(SHA-256 `f85858ff99f368d38ca16fa18727a12f778d57543e2898d29507f92585db2c2b`).
+After that preload correction both fresh cold/warm rounds pass all 32 cases
+over 6,400 frames with zero hard-gate failures, native/browser maxima
+6.645/24.720 ms cold and 5.920/21.710 ms warm, and zero timing resumes or
+heap growth. The local 1,127-test suite passes in 278.909 seconds with 60
+documented optional skips. Independent original comparison, pixels, PCM,
+physical controllers, complete matches and broader performance remain open;
+the failed v5 cold discovery and its provenance, review and passing pair are
+retained under `work/full-game/`. See
+[Mewtwo's scope and evidence](docs/MEWTWO_PORT_NOTES.md) and the
+[current checkpoint receipt](docs/evidence/full-game-checkpoint-mewtwo-v1.json).
+After merging main (Donkey's re-enablement and the Captain Falcon dive
+catch), an independent review corrected the telemetry bounds to the original
+five-slot collector and the merged tree re-passes: 1,131 tests OK in final
+suite form with 57 documented skips, both native orientations, and a fresh
+cold/warm browser pair (all 32 cases, native/browser maxima 7.625/23.265 ms
+cold and 6.910/25.460 ms warm) with zero hard-gate failures.
 The preceding Pikachu/Pichu/Old Yoshi checkpoint passes both Release builds and 1,075
 tests in 334.490 seconds with 41 explicit skips. Fresh headless comparisons
 still match 603 Ganondorf/FD and 240 Mario/FD declared source updates; the

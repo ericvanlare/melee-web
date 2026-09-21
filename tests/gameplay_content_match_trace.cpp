@@ -8,6 +8,7 @@
 #include <melee/ft/kinds/ftCaptain/forward.h>
 #include <melee/ft/kinds/ftDonkey/forward.h>
 #include <melee/ft/kinds/ftKoopa/forward.h>
+#include <melee/ft/kinds/ftMewtwo/forward.h>
 #include <melee/ft/kinds/ftLuigi/forward.h>
 #include <melee/ft/kinds/ftPikachu/forward.h>
 #include <melee/ft/kinds/ftPurin/forward.h>
@@ -345,6 +346,7 @@ int main(int argc,char** argv){try{
         const bool ganon=fighter_content->fighter_kind==FTKIND_GANON;
         const bool donkey=fighter_content->fighter_kind==FTKIND_DONKEY;
         const bool koopa=fighter_content->fighter_kind==FTKIND_KOOPA;
+        const bool mewtwo=fighter_content->fighter_kind==FTKIND_MEWTWO;
         const bool luigi=fighter_content->fighter_kind==FTKIND_LUIGI;
         const bool pikachu_family=fighter_content->fighter_kind==FTKIND_PIKACHU||
             fighter_content->fighter_kind==FTKIND_PICHU;
@@ -400,6 +402,7 @@ int main(int argc,char** argv){try{
         bool capsule=false,captain_family_punch=false,luigi_fireball_live=false;
         bool donkey_ground_n=false;
         bool koopa_ground_n=false,koopa_flame_live=false;
+        bool mewtwo_ground_n=false,mewtwo_ball_live=false;
         bool pikachu_ground_n=false,pikachu_ground_article_live=false;
         const int pikachu_ground_kind=pichu?It_Kind_Pichu_TJolt_Ground:
             It_Kind_Pikachu_TJolt_Ground;
@@ -408,11 +411,21 @@ int main(int argc,char** argv){try{
         const float pikachu_damage_before_specials=match.player_stats(0).damage_percent;
         bool pichu_self_damage_seen=false;
         for(unsigned n=0;n<240&&match.player_stats(1).damage_percent==damage;n++){
-            raw[0].button=koopa||n%8==0?PAD_BUTTON_B:0;tick();
+            // Mewtwo holds B through the source charge gate (Start+Loop reach
+            // LoopFull inside 130 ticks). Like Donkey's Giant Punch, the ball
+            // releases from a fresh B edge, so the recipe re-presses B once.
+            raw[0].button=koopa?PAD_BUTTON_B:
+                mewtwo?((n<130||n==132)?PAD_BUTTON_B:0):
+                (n%8==0?PAD_BUTTON_B:0);tick();
             if(ganon||captain)captain_family_punch|=match.player_stats(0).motion_id==ftCa_MS_SpecialN;
             if(koopa){
                 koopa_ground_n|=match.player_stats(0).motion_id==ftKp_MS_SpecialN;
                 koopa_flame_live|=melee_web_test_item_count(It_Kind_Koopa_Flame)>0;
+            }
+            if(mewtwo){
+                const auto motion=match.player_stats(0).motion_id;
+                mewtwo_ground_n|=motion>=ftMt_MS_SpecialNStart&&motion<=ftMt_MS_SpecialNEnd;
+                mewtwo_ball_live|=melee_web_test_item_count(It_Kind_Mewtwo_ShadowBall)>0;
             }
             if(donkey)donkey_ground_n|=match.player_stats(0).motion_id>=ftDk_MS_SpecialNStart&&
                 match.player_stats(0).motion_id<=ftDk_MS_SpecialNFull;
@@ -447,6 +460,17 @@ int main(int argc,char** argv){try{
                         match.player_stats(0).motion_id<ftKp_MS_SpecialNStart;
             }
             check(cleared,"Bowser Flame did not end through its source lifetime");
+        }
+        if(mewtwo){
+            check(mewtwo_ground_n&&mewtwo_ball_live,
+                  "Mewtwo ground neutral special did not spawn its original Shadow Ball article");
+            bool cleared=false;
+            for(unsigned n=0;n<600&&!cleared;n++){
+                tick();
+                cleared=melee_web_test_item_count(It_Kind_Mewtwo_ShadowBall)==0 &&
+                        match.player_stats(0).motion_id<ftMt_MS_SpecialNStart;
+            }
+            check(cleared,"Mewtwo Shadow Ball did not end through its source lifetime");
         }
         if(doctor)check(capsule,"Dr. Mario ground neutral special did not enter its original capsule action");
         if(luigi){
@@ -514,7 +538,9 @@ int main(int argc,char** argv){try{
         bool air_capsule=false,air_captain_family_punch=false;
         bool pikachu_air_n=false,pikachu_air_article_live=false;
         for(unsigned n=0;n<100;n++){
-            raw[0].button=n<20?PAD_BUTTON_B:0;tick();
+            // Mewtwo's held aerial charge also releases from a fresh B edge.
+            raw[0].button=mewtwo?((n<20||(n>=21&&n<23))?PAD_BUTTON_B:0):
+                (n<20?PAD_BUTTON_B:0);tick();
             if(ganon||captain)air_captain_family_punch|=match.player_stats(0).motion_id==ftCa_MS_SpecialAirN;
             if(doctor){
                 const auto motion=match.player_stats(0).motion_id;
@@ -907,6 +933,125 @@ int main(int argc,char** argv){try{
                 settle_koopa();
                 std::cout<<"Bowser "<<(air?"air":"ground")<<" catch/throw lifetime passed"<<std::endl;
             }
+        }else if(cycle==0&&mewtwo){
+            auto neutral_mewtwo=[&](){
+                raw[0].button=0;raw[0].stickX=raw[0].stickY=0;
+            };
+            auto settle_mewtwo=[&](){
+                neutral_mewtwo();
+                for(unsigned n=0;n<720;n++){
+                    const auto state=match.player_stats(0);
+                    if(state.ground_or_air==0&&state.motion_id==ftCo_MS_Wait)return;
+                    tick();
+                }
+                const auto state=match.player_stats(0);
+                std::cout<<"Mewtwo settle failure motion="<<state.motion_id
+                         <<" air="<<state.ground_or_air<<" x="<<state.position[0]
+                         <<" y="<<state.position[1]<<std::endl;
+                check(false,"Mewtwo special did not return to grounded Wait");
+            };
+            auto jump_mewtwo=[&](){
+                settle_mewtwo();
+                raw[0].button=PAD_BUTTON_X;
+                for(unsigned n=0;n<12;n++)tick();
+                raw[0].button=0;
+                check(match.player_stats(0).ground_or_air!=0,
+                      "Mewtwo full jump did not reach the source aerial state");
+            };
+            jump_mewtwo();
+            bool air_loop=false,air_ball=false;
+            int last_motion=-1;
+            for(unsigned n=0;n<240&&!air_loop;n++){
+                raw[0].button=PAD_BUTTON_B;tick();
+                const auto state=match.player_stats(0);
+                if(state.motion_id!=last_motion)
+                    std::cout<<"Mewtwo air charge frame="<<n<<" motion="<<state.motion_id
+                             <<" y="<<state.position[1]<<" items="
+                             <<melee_web_test_item_count(It_Kind_Mewtwo_ShadowBall)<<std::endl;
+                last_motion=state.motion_id;
+                air_loop|=state.motion_id==ftMt_MS_SpecialAirNLoop;
+            }
+            neutral_mewtwo();
+            for(unsigned n=0;n<2;n++)tick();
+            raw[0].button=PAD_BUTTON_B;tick();
+            neutral_mewtwo();
+            check(air_loop,"Mewtwo aerial charge did not reach its source Loop motion");
+            bool air_end=false,air_ball_live=false,landed=false;
+            for(unsigned n=0;n<600&&!(landed&&air_end&&air_ball_live);n++){
+                tick();
+                const auto state=match.player_stats(0);
+                if(state.motion_id!=last_motion)
+                    std::cout<<"Mewtwo air release frame="<<n<<" motion="<<state.motion_id
+                             <<" y="<<state.position[1]<<" items="
+                             <<melee_web_test_item_count(It_Kind_Mewtwo_ShadowBall)<<std::endl;
+                last_motion=state.motion_id;
+                air_end|=state.motion_id==ftMt_MS_SpecialAirNEnd;
+                air_ball_live|=melee_web_test_item_count(It_Kind_Mewtwo_ShadowBall)>0;
+                landed|=state.ground_or_air==0;
+            }
+            check(air_end&&air_ball_live,
+                  "Mewtwo aerial release did not spawn its original Shadow Ball article");
+            for(unsigned n=0;n<600;n++){
+                tick();
+                if(melee_web_test_item_count(It_Kind_Mewtwo_ShadowBall)==0)break;
+            }
+            check(melee_web_test_item_count(It_Kind_Mewtwo_ShadowBall)==0,
+                  "Mewtwo aerial Shadow Ball did not end through its source lifetime");
+            settle_mewtwo();
+            for(bool air:{false,true}){
+                if(air)jump_mewtwo();else settle_mewtwo();
+                bool entered=false,lost=false;
+                for(unsigned n=0;n<240&&!entered;n++){
+                    raw[0].button=n==0?PAD_BUTTON_B:0;
+                    raw[0].stickY=n==0?80:0;tick();
+                    const auto motion=match.player_stats(0).motion_id;
+                    entered=motion==(air?ftMt_MS_SpecialAirHiStart:ftMt_MS_SpecialHiStart);
+                    lost|=motion==ftMt_MS_SpecialHiLost;
+                }
+                check(entered,"Mewtwo up special did not enter its ground/air source motion");
+                settle_mewtwo();
+                std::cout<<"Mewtwo "<<(air?"air":"ground")<<" Teleport lifetime passed"
+                         <<(lost?" (HiLost observed)":"")<<std::endl;
+            }
+            for(bool air:{false,true}){
+                if(air)jump_mewtwo();else settle_mewtwo();
+                bool entered=false;
+                for(unsigned n=0;n<240&&!entered;n++){
+                    raw[0].button=n==0?PAD_BUTTON_B:0;
+                    raw[0].stickX=n==0?(air?-80:80):0;tick();
+                    entered=match.player_stats(0).motion_id==
+                        (air?ftMt_MS_SpecialAirS:ftMt_MS_SpecialS);
+                }
+                check(entered,"Mewtwo side special did not enter its ground/air source motion");
+                settle_mewtwo();
+                std::cout<<"Mewtwo "<<(air?"air":"ground")<<" Confusion lifetime passed"<<std::endl;
+            }
+            for(bool air:{false,true}){
+                if(air)jump_mewtwo();else settle_mewtwo();
+                bool entered=false,disable_live=false;
+                for(unsigned n=0;n<240&&!entered;n++){
+                    raw[0].button=n==0?PAD_BUTTON_B:0;
+                    raw[0].stickY=n==0?-80:0;tick();
+                    entered=match.player_stats(0).motion_id==
+                        (air?ftMt_MS_SpecialAirLw:ftMt_MS_SpecialLw);
+                }
+                check(entered,"Mewtwo down special did not enter its ground/air source motion");
+                for(unsigned n=0;n<120&&!disable_live;n++){
+                    tick();
+                    disable_live=melee_web_test_item_count(It_Kind_Mewtwo_Disable)>0;
+                }
+                check(disable_live,
+                      "Mewtwo down special did not create its original Disable article");
+                bool cleared=false;
+                for(unsigned n=0;n<600&&!cleared;n++){
+                    tick();
+                    cleared=melee_web_test_item_count(It_Kind_Mewtwo_Disable)==0;
+                }
+                check(cleared,"Mewtwo Disable did not end through its source lifetime");
+                settle_mewtwo();
+                std::cout<<"Mewtwo "<<(air?"air":"ground")<<" Disable lifetime passed"<<std::endl;
+            }
+            std::cout<<fighter_content->name<<" original N/air-N/S/Hi/Lw lifecycle branches executed"<<std::endl;
         }else if(cycle==0&&donkey){
             // The common neutral loop above already proves grounded Giant
             // Punch damage and an authored N state.  This branch drives the
