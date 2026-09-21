@@ -44,6 +44,18 @@ constexpr size_t MAX_SLICES = 64;
 constexpr size_t MAX_RAW = 192 * 1024;
 constexpr u32 PAD_READ_HSD_CALLER = 0x80376A28;
 constexpr u32 MENU_AUDIO_STREAM_START = 0x8038E8EC;
+// Menu steering sources, as the retail menu owners read them:
+// mnStageSel_803F06D0 is the 30-entry authored stage list (stride 0x1C, stage
+// kind at +0xB), mnStageSel_804D6CAE is the highlighted index, and
+// mnCharSel_804A0BC0 holds one CSS cursor pointer per port.
+constexpr u32 STAGE_SELECT_TABLE = 0x803F06D0;
+constexpr size_t STAGE_SELECT_STRIDE = 0x1C;
+constexpr size_t STAGE_SELECT_COUNT = 30;
+constexpr size_t STAGE_SELECT_KIND_OFFSET = 0xB;
+constexpr u32 STAGE_SELECT_INDEX = 0x804D6CAE;
+constexpr u32 CSS_CURSOR_POINTERS = 0x804A0BC0;
+constexpr size_t CSS_CURSOR_BYTES = 0x14;
+constexpr size_t CSS_CURSOR_PORTS = 4;
 constexpr u16 WHOLE_SESSION_FLAG = 1;
 constexpr u32 WHOLE_SESSION_MIN_MATCHES = 3;
 constexpr u32 WHOLE_SESSION_MAX_MATCHES = 64;
@@ -142,6 +154,9 @@ enum class SliceTag : u16
   // 38 and 39 are the typed profile-context tags in the next change; this
   // one takes the next free number so no shipped tag is ever renumbered.
   SceneKind = 40,
+  StageSelectIndex = 41,
+  StageSelectKind = 42,
+  MenuCssCursor = 43,
 };
 
 struct SliceRef
@@ -472,6 +487,38 @@ struct Observer::Impl
     return AddSlice(system, SliceTag::SceneKind, scene_pointer, 1);
   }
 
+  bool AddMenuSteeringSlices(Core::System* system)
+  {
+    // Steering evidence for the ordinary menu route: the highlighted stage
+    // index, the authored stage kind it points at, and each CSS cursor. Every
+    // part is optional so a boundary outside those menus stays valid.
+    u8 stage_index = 0;
+    if (ReadBytes(system, STAGE_SELECT_INDEX, 1, &stage_index))
+    {
+      if (!AddSlice(system, SliceTag::StageSelectIndex, STAGE_SELECT_INDEX, 1))
+        return false;
+      if (stage_index < STAGE_SELECT_COUNT)
+      {
+        const u32 kind_address = STAGE_SELECT_TABLE +
+            static_cast<u32>(stage_index) * STAGE_SELECT_STRIDE + STAGE_SELECT_KIND_OFFSET;
+        if (!AddSlice(system, SliceTag::StageSelectKind, kind_address, 1))
+          return false;
+      }
+    }
+    for (u32 port = 0; port < CSS_CURSOR_PORTS; ++port)
+    {
+      u32 cursor = 0;
+      if (!ReadU32(system, CSS_CURSOR_POINTERS + port * 4, &cursor))
+        return false;
+      if (!cursor)
+        continue;
+      if (!AddSlice(system, SliceTag::MenuCssCursor, cursor, CSS_CURSOR_BYTES,
+                    static_cast<u16>(port)))
+        return false;
+    }
+    return true;
+  }
+
   bool AddSessionSlices(Core::System* system)
   {
     u32 rng_pointer = 0;
@@ -749,7 +796,8 @@ struct Observer::Impl
           !AddSlice(system, SliceTag::RetraceCount, 0x804d7420, 4) ||
           !AddSlice(system, SliceTag::SourceVICount, 0x804a7f98, 4) ||
           !AddSlice(system, SliceTag::SceneRouting, 0x80479d30, 6) ||
-          !AddSceneKindSlice(system))
+          !AddSceneKindSlice(system) ||
+          !AddMenuSteeringSlices(system))
         return SetInvalid("PAD poll did not expose its bounded four-port slices"), void();
     }
     else if (boundary == Boundary::PadConsume)

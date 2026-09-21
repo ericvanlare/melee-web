@@ -114,6 +114,9 @@ SLICE_NAMES = {
     36: "profile_characters",
     37: "profile_stages",
     40: "scene_kind",
+    41: "stage_select_index",
+    42: "stage_select_kind",
+    43: "menu_css_cursor",
 }
 
 
