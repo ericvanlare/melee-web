@@ -43,7 +43,6 @@ constexpr size_t RING_PAYLOAD = 256 * 1024;
 constexpr size_t MAX_SLICES = 64;
 constexpr size_t MAX_RAW = 192 * 1024;
 constexpr u32 PAD_READ_HSD_CALLER = 0x80376A28;
-constexpr u32 MENU_AUDIO_STREAM_START = 0x8038E8EC;
 // Menu steering sources, as the retail menu owners read them:
 // mnStageSel_803F06D0 is the 30-entry authored stage list (stride 0x1C, stage
 // kind at +0xB), mnStageSel_804D6CAE is the highlighted index, and
@@ -60,6 +59,23 @@ constexpr u32 CSS_DOORS_STATE = 0x803F0DFC;
 constexpr size_t CSS_DOORS_BYTES = 0x90;
 constexpr size_t CSS_CURSOR_BYTES = 0x14;
 constexpr size_t CSS_CURSOR_PORTS = 4;
+constexpr u32 MENU_AUDIO_STREAM_START = 0x8038E8EC;
+// Authored gmm_x0 layout behind gmMainLib_804D3EE0. gmMainLib_GetSaveData
+// returns &gmm_x0.thing, whose block the retail accessors read at +0x1868:
+// GameRules is the asserted 0x18-byte rules block at +0x1850, so the save
+// block starts at +0x1868 and its asserted 0x55E8 bytes end at the +0x6E50
+// trailing pad. (The decomp's own /* 0x1898 */ comment on that member
+// contradicts both ASSERT_SIZE(struct GameRules, 0x18) and the 0x6E50 pad, so
+// the observer keeps the arithmetic-consistent offset and reads the block the
+// accessors actually use.) The observer copies these ranges as authored; field
+// and packed-bit interpretation belongs to the offline decoder.
+constexpr u32 PROFILE_ROOT_GLOBAL = 0x804D3EE0;
+constexpr u32 PROFILE_GAME_RULES_OFFSET = 0x1850;
+constexpr size_t PROFILE_GAME_RULES_SIZE = 0x18;
+constexpr u32 PROFILE_SAVE_DATA_OFFSET = 0x1868;
+constexpr size_t PROFILE_SAVE_DATA_SIZE = 0x55E8;
+constexpr u32 PROFILE_LAST_BYTE_OFFSET =
+    PROFILE_SAVE_DATA_OFFSET + PROFILE_SAVE_DATA_SIZE - 1;
 constexpr u16 WHOLE_SESSION_FLAG = 1;
 constexpr u32 WHOLE_SESSION_MIN_MATCHES = 3;
 constexpr u32 WHOLE_SESSION_MAX_MATCHES = 64;
@@ -155,8 +171,10 @@ enum class SliceTag : u16
   MenuSssRoute = 35,
   ProfileCharacters = 36,
   ProfileStages = 37,
-  // 38 and 39 are the typed profile-context tags in the next change; this
-  // one takes the next free number so no shipped tag is ever renumbered.
+  ProfileGameRules = 38,
+  ProfileSaveData = 39,
+  // 40 takes the next free number after the typed profile tags so no shipped
+  // tag is ever renumbered.
   SceneKind = 40,
   StageSelectIndex = 41,
   StageSelectKind = 42,
@@ -465,14 +483,18 @@ struct Observer::Impl
     return true;
   }
 
-  bool AddProfileSlices(Core::System* system)
+  bool ReadProfileRoot(Core::System* system, u32* main_data) const
   {
-    u32 main_data = 0;
     // gmMainLib_804D3EE0 points at the source-owned gmm_x0. The retail
     // gmMainLib_GetSaveData/15ED8C/15EDA4 instruction bodies load the save
     // block at +0x1868 and its first two u16 masks at +0/+2.
-    if (!ReadU32(system, 0x804d3ee0, &main_data) || !main_data ||
-        main_data > UINT32_MAX - 0x186a ||
+    return ReadU32(system, PROFILE_ROOT_GLOBAL, main_data) && *main_data != 0;
+  }
+
+  bool AddProfileSlices(Core::System* system)
+  {
+    u32 main_data = 0;
+    if (!ReadProfileRoot(system, &main_data) || main_data > UINT32_MAX - 0x186a ||
         !AddSlice(system, SliceTag::ProfileCharacters, main_data + 0x1868, 2) ||
         !AddSlice(system, SliceTag::ProfileStages, main_data + 0x186a, 2))
       return false;
@@ -526,6 +548,24 @@ struct Observer::Impl
     return true;
   }
 
+  bool AddProfileContextSlices(Core::System* system)
+  {
+    // Typed first-CSS context. Every CSS entry publishes the authored rules
+    // and save block once, so the offline comparison can bind the profile the
+    // first CSS ran with instead of only the two unlock masks. The save block
+    // contains the persistent fighter records and name banks, so they are not
+    // captured a second time.
+    u32 main_data = 0;
+    if (!ReadProfileRoot(system, &main_data) ||
+        main_data > UINT32_MAX - PROFILE_LAST_BYTE_OFFSET ||
+        !AddSlice(system, SliceTag::ProfileGameRules,
+                  main_data + PROFILE_GAME_RULES_OFFSET, PROFILE_GAME_RULES_SIZE) ||
+        !AddSlice(system, SliceTag::ProfileSaveData,
+                  main_data + PROFILE_SAVE_DATA_OFFSET, PROFILE_SAVE_DATA_SIZE))
+      return false;
+    return true;
+  }
+
   bool AddSessionSlices(Core::System* system)
   {
     u32 rng_pointer = 0;
@@ -562,6 +602,7 @@ struct Observer::Impl
                   !AddSlice(system, SliceTag::MenuSssRoute, state_pointer + 4, 1))) ||
         !AddSlice(system, SliceTag::MenuAudio, 0x803bb300, 0x40) ||
         !AddSlice(system, SliceTag::MenuAudioVoice, 0x804d6038, 4) ||
+        (css && entering && !AddProfileContextSlices(system)) ||
         !AddSessionSlices(system))
       return false;
     return true;

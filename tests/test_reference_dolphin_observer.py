@@ -80,6 +80,37 @@ class ReferenceDolphinObserverTests(unittest.TestCase):
         self.assertIn("if (match_active)", entry)
         self.assertIn("!match_active || !setup_pointer", source)
 
+    def test_menu_steering_slices_read_the_authored_menu_sources(self) -> None:
+        source = SOURCE.read_text(encoding="utf-8")
+        self.assertIn("STAGE_SELECT_TABLE = 0x803F06D0", source)
+        self.assertIn("STAGE_SELECT_STRIDE = 0x1C", source)
+        self.assertIn("STAGE_SELECT_INDEX = 0x804D6CAE", source)
+        self.assertIn("CSS_CURSOR_POINTERS = 0x804A0BC0", source)
+        steering = source.split("bool AddMenuSteeringSlices", 1)[1].split("bool AddProfileContextSlices", 1)[0]
+        self.assertIn("AddSlice(system, SliceTag::StageSelectIndex, STAGE_SELECT_INDEX, 1)", steering)
+        self.assertIn("AddSlice(system, SliceTag::MenuCssCursor, cursor, CSS_CURSOR_BYTES", steering)
+        self.assertIn("!AddMenuSteeringSlices(system))", source)
+
+    def test_typed_first_css_context_reads_authored_profile_ranges(self) -> None:
+        source = SOURCE.read_text(encoding="utf-8")
+        for authored in ("PROFILE_ROOT_GLOBAL = 0x804D3EE0",
+                         "PROFILE_GAME_RULES_OFFSET = 0x1850",
+                         "PROFILE_GAME_RULES_SIZE = 0x18",
+                         "PROFILE_SAVE_DATA_OFFSET = 0x1868",
+                         "PROFILE_SAVE_DATA_SIZE = 0x55E8"):
+            self.assertIn(authored, source)
+        context = source.split("bool AddProfileContextSlices", 1)[1].split("bool AddSessionSlices", 1)[0]
+        self.assertIn("main_data > UINT32_MAX - PROFILE_LAST_BYTE_OFFSET", context)
+        self.assertIn("SliceTag::ProfileGameRules", context)
+        self.assertIn("SliceTag::ProfileSaveData", context)
+        # The save block already carries the persistent fighter records and
+        # name banks, so the context captures each authored range once.
+        self.assertNotIn("ProfileNameBank", source)
+        # Only CSS entry publishes the typed context, and the observer copies
+        # the authored ranges instead of reinterpreting their fields.
+        self.assertIn("(css && entering && !AddProfileContextSlices(system))", source)
+        self.assertNotIn("ProfileSaveData", source.split("bool AddSessionSlices", 1)[1])
+
     def test_whole_session_is_opt_in_and_has_pinned_source_boundaries(self) -> None:
         source = SOURCE.read_text(encoding="utf-8")
         self.assertIn("MWRC_WHOLE_SESSION_MATCHES", source)

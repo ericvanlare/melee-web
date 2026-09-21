@@ -279,8 +279,8 @@ class SemanticSession:
 # Dolphin observer now emits the passive CSS/SSS, VS/Results, Results GObj,
 # and return-CSS boundaries below. The adapter joins those menu rows to a
 # same-capture transition trace and owner epoch, while retaining separate
-# missing coverage for PCM and final profile semantics. Consequently this
-# reducer remains an experimental contract and is not connected to accepted
+# missing coverage for PCM and the save block's persistent records. Consequently
+# this reducer remains an experimental contract and is not connected to accepted
 # replay-bundle completion.
 WHOLE_SESSION_SCHEMA = "melee-web-reference-whole-session"
 WHOLE_SESSION_VERSION = 2
@@ -841,6 +841,104 @@ def _whole_profile_masks(row):
     return values
 
 
+# Authored gmm_x0 layout behind the typed first-CSS context. GameRules is the
+# asserted 0x18-byte rules block at +0x1850 (src/melee/gm/types.h:203-226).
+# gmMainLib_GetSaveData() returns &gmm_x0.thing, the block the matched retail
+# accessors read at +0x1868; its 0x55E8 bytes end at the +0x6E50 trailing pad
+# (src/melee/gm/gmmain_lib.c:99-102, src/melee/gm/types.h:258-317,410-411).
+# Field offsets below are the ones matched accessors read, so a decoder binds
+# the profile the first CSS ran with instead of only its two unlock masks.
+GAME_RULES_SIZE = 0x18
+SAVE_DATA_SIZE = 0x55E8
+SAVE_UNLOCKED_CHARACTERS = 0x0000
+SAVE_UNLOCKED_STAGES = 0x0002
+SAVE_UNLOCKED_FEATURES = 0x0004
+SAVE_MATCH_COUNTERS = (
+    ("time_matches", 0x01B0), ("stock_matches", 0x01B4), ("coin_matches", 0x01B8),
+    ("bonus_matches", 0x01BC), ("stamina_matches", 0x01C0), ("match_resets", 0x01C4),
+)
+SAVE_TROPHY_COUNT = 0x0468
+SAVE_TROPHY_CATEGORY_FLAGS = 0x046A
+SAVE_TROPHY_FLAGS = 0x046C
+# src/melee/ty/forward.h: #define TY_TROPHY_COUNT 293
+TROPHY_FLAG_COUNT = 293
+GAME_RULES_BYTES = (
+    ("force_main_menu", 0x00), ("bgm", 0x01), ("mode", 0x02), ("time_limit", 0x03),
+    ("stock_count", 0x04), ("handicap", 0x05), ("damage_ratio", 0x06), ("unk_x7", 0x07),
+    ("stock_time_limit", 0x08), ("friendly_fire", 0x09), ("pause", 0x0A),
+    ("score_display", 0x0B), ("unk_xc", 0x0C), ("xD", 0x0D), ("xE", 0x0E), ("xF", 0x0F),
+    ("unk_x10", 0x10), ("x11", 0x11), ("x12", 0x12), ("x13", 0x13),
+)
+GAME_RULES_LAST_FIELD = ("unk_14", 0x14)
+
+
+def _typed_slice_bytes(row, name, size):
+    boundary = row["payload"].get("boundary", "boundary")
+    item = _whole_slice(row, name)
+    if item is None:
+        raise WholeSessionSemanticError(f"{boundary} lacks its typed {name} slice")
+    if item.get("size") != size:
+        raise WholeSessionSemanticError(f"{boundary} {name} must be exactly {size:#x} bytes")
+    try:
+        raw = bytes.fromhex(item.get("hex", ""))
+    except (TypeError, ValueError) as error:
+        raise WholeSessionSemanticError(f"{boundary} {name} is not hexadecimal") from error
+    if len(raw) != size:
+        raise WholeSessionSemanticError(f"{boundary} {name} must be exactly {size:#x} bytes")
+    return raw
+
+
+def _packed_bits(raw):
+    """Expand one guest big-endian packed mask into its authored bit indices."""
+    value = int.from_bytes(raw, "big")
+    return {"value": value,
+            "set": [index for index in range(len(raw) * 8) if value >> index & 1]}
+
+
+def _whole_profile_context(row):
+    """Decode the typed first-CSS context the observer publishes at CSS entry.
+
+    The observer copies the authored ranges; every field here is decoded with
+    its explicit width and signedness from guest big-endian bytes. The
+    persistent fighter records and name banks inside the save block are
+    captured as bytes but not typed: the pinned source's own offsets for that
+    region disagree with each other, so this decoder does not guess them.
+
+    Returns ``None`` when the stream predates the typed context, so an older
+    capture stays readable as explicit, incomplete evidence.
+    """
+    boundary = row["payload"].get("boundary", "boundary")
+    if (_whole_slice(row, "profile_game_rules") is None and
+            _whole_slice(row, "profile_save_data") is None):
+        return None
+    rules = _typed_slice_bytes(row, "profile_game_rules", GAME_RULES_SIZE)
+    save = _typed_slice_bytes(row, "profile_save_data", SAVE_DATA_SIZE)
+    game_rules = {name: rules[offset] for name, offset in GAME_RULES_BYTES}
+    last_name, last_offset = GAME_RULES_LAST_FIELD
+    game_rules[last_name] = int.from_bytes(rules[last_offset:last_offset + 4], "big",
+                                           signed=True)
+    counters = {name: int.from_bytes(save[offset:offset + 4], "big")
+                for name, offset in SAVE_MATCH_COUNTERS}
+    trophy_flags = [int.from_bytes(save[SAVE_TROPHY_FLAGS + 2 * index:
+                                        SAVE_TROPHY_FLAGS + 2 * index + 2], "big")
+                    for index in range(TROPHY_FLAG_COUNT)]
+    return {
+        "boundary": boundary,
+        "game_rules": game_rules,
+        "unlocked_characters": _packed_bits(
+            save[SAVE_UNLOCKED_CHARACTERS:SAVE_UNLOCKED_CHARACTERS + 2]),
+        "unlocked_stages": _packed_bits(save[SAVE_UNLOCKED_STAGES:SAVE_UNLOCKED_STAGES + 2]),
+        "unlocked_features": _packed_bits(
+            save[SAVE_UNLOCKED_FEATURES:SAVE_UNLOCKED_FEATURES + 1]),
+        "match_counters": counters,
+        "trophy_count": int.from_bytes(save[SAVE_TROPHY_COUNT:SAVE_TROPHY_COUNT + 2],
+                                       "big", signed=True),
+        "trophy_category_flags": int.from_bytes(
+            save[SAVE_TROPHY_CATEGORY_FLAGS:SAVE_TROPHY_CATEGORY_FLAGS + 2], "big"),
+        "trophy_flags": trophy_flags,
+    }
+
+
 def _whole_menu_audio(row):
     stream_slice = _whole_slice(row, "menu_audio")
     voice_slice = _whole_slice(row, "menu_audio_voice")
@@ -954,9 +1052,10 @@ def validate_whole_session_observer_records(records, *, transition_trace=None):
     """Validate one decoded opt-in observer stream and its continuous joins.
 
     This adapter consumes records decoded by reference_observer_stream.  It
-    enforces source boundary order, identity, typed audio owner epochs, and a
-    same-capture transition trace.  It still reports audio PCM and final
-    profile semantics as separate missing evidence.
+    enforces source boundary order, identity, typed audio owner epochs, a
+    same-capture transition trace, and the typed first-CSS profile context when
+    the stream publishes it.  It still reports audio PCM and the save block's
+    persistent-record semantics as separate missing evidence.
     """
     records = list(records)
     starts = [row for row in records if row.get("event") == "start"]
@@ -1005,6 +1104,7 @@ def validate_whole_session_observer_records(records, *, transition_trace=None):
             f"whole-session observer stream is missing match indices {missing}")
 
     reports = []
+    profile_context = None
     for match_index, rows_for_match in grouped.items():
         names = [row["payload"]["boundary"] for row in rows_for_match]
         for row in rows_for_match:
@@ -1024,6 +1124,10 @@ def validate_whole_session_observer_records(records, *, transition_trace=None):
             name = row["payload"]["boundary"]
             if name in profile_names:
                 profile_snapshots.setdefault(name, _whole_profile_masks(row))
+            # The typed first-CSS context is the profile the first CSS entry
+            # ran with; later entries are already compared through the masks.
+            if name in {"css_enter", "css_cancel_enter"} and profile_context is None:
+                profile_context = _whole_profile_context(row)
         prize_names = {"prize_mode_enter", "prize_scene_enter", "prize_scene_exit",
                        "prize_mode_exit"}
         startup_prize_name = "startup_prize_mode_exit"
@@ -1136,6 +1240,7 @@ def validate_whole_session_observer_records(records, *, transition_trace=None):
                 row["seq"] for row in rows_for_match
                 if row["payload"]["boundary"] == "return_css"),
             "loaded_profile_masks": profile_snapshots,
+            "loaded_profile_context": profile_context,
         })
 
     menu_boundaries = [row for row in boundaries if row["payload"]["boundary"] in {
@@ -1170,5 +1275,12 @@ def validate_whole_session_observer_records(records, *, transition_trace=None):
         "match_count": match_count,
         "matches": reports,
         "transition_join": transition_join,
-        "missing_coverage": missing + ["audio_pcm", "final_profile_semantics"],
+        # The typed first-CSS context replaces the coarse final-profile gap.
+        # What stays open is the save block's persistent fighter records and
+        # name banks: they are captured as bytes, but the pinned source's own
+        # offsets for that region disagree, so no decoder may claim them yet.
+        "missing_coverage": missing + [
+            "audio_pcm",
+            "final_profile_semantics" if profile_context is None
+            else "persistent_record_semantics"],
     }

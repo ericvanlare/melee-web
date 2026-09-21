@@ -564,14 +564,27 @@ merging this draft. No physical controller is required for this PR.
 
 The next original-comparison implementation is a typed first-CSS context and
 continuous whole-session input replay, reusing the current observer and scene
-owners. The DOL getters establish GameRules at profile root `+0x1850` (0x18
-bytes), SaveData at `+0x1868` (0x1790 bytes), and seven name banks starting at
-`+0x2ff8` (each 0x1f2c bytes). Capture/decode those fields with explicit endian
-and packed-field handling, plus the existing RNG/PAD/setup observations. The
-current observer carries only the two profile masks. The current browser replay
-accepts only one match and deliberately rejects a used source heap; it cannot
-be treated as a whole-session replay by concatenating recipes. The opt-in
-extension must retain one source arena and cursor through the real scene chain.
+owners. The typed context is implemented: every CSS entry now publishes the
+authored rules and save block as `profile_game_rules` and `profile_save_data`
+slices, and the semantic adapter decodes them with explicit widths, signedness
+and packed-bit handling into `loaded_profile_context`. The layout is the one
+the matched accessors use: GameRules at profile root `+0x1850` (`ASSERT_SIZE`
+0x18; `gm/types.h:203-226`), and `gmMainLib_GetSaveData()` returning
+`&gmm_x0.thing` at `+0x1868` with the 0x55E8 bytes that end at the `+0x6E50`
+trailing pad (`gmmain_lib.c:99-102`, `gm/types.h:258-317,410-411`). The same
+offsets are already used by `tools/retail_cpu_menu_prepare.py`. Two claims that
+appeared here earlier are wrong and are corrected: the save block is not 0x1790
+bytes, and `0x2ff8`/`0x1f2c` are decomp member names (`NameTagDataBank x2FF8`,
+`FighterData x1F2C`), not offsets or strides.
+
+Still open in this context: the save block's persistent fighter records and
+name banks are captured as bytes but not typed, because the pinned source's own
+offsets for that region disagree with each other; the report keeps
+`persistent_record_semantics` as explicit missing coverage instead of guessing
+them. The current browser replay accepts only one match and deliberately
+rejects a used source heap; it cannot be treated as a whole-session replay by
+concatenating recipes. The opt-in extension must retain one source arena and
+cursor through the real scene chain.
 
 Results comparison also needs full typed MatchEnd/standings and the source
 post-OnEnter display state. The current observer's 0x28-byte result prefix does
