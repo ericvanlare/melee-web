@@ -217,6 +217,7 @@ void verify_common_appeals(std::shared_ptr<const DatArchive> archive, const Byte
             check(store.command_ready(motion),
                   "Peach shared Koopa victim rows are not admitted");
         std::cout << "Peach kind 9 authored self-motion rows 295/317 and empty victim dispatch: passed\n";
+    }
     if (costume.fighter_kind == 16) {
         check(costume.motion_count == 314, "Mewtwo authored action count changed");
         for (unsigned motion = 295; motion < costume.motion_count; ++motion) {

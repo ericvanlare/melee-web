@@ -327,6 +327,16 @@ void real_ness(const char* path)
           "Ness signed decoder changed source bits");
     auto malformed = read_real_archive(path);
     put32(malformed, 0x20 + runtime->extension_offset() + 0x10, 0x7fc00000U);
+    rejects([&] {
+        (void) DatFighterRuntime(std::make_shared<const DatArchive>(malformed), identity);
+    });
+    malformed = read_real_archive(path);
+    put32(malformed, 0x20 + runtime->extension_offset() + 0x98, 0xfffffffeU);
+    rejects([&] {
+        (void) DatFighterRuntime(std::make_shared<const DatArchive>(malformed), identity);
+    });
+    std::cout << "Ness 0xDC attributes, integer counters, absorb/reflection records, empty dynamics and null Wait: passed\n";
+}
 void real_mewtwo(const char* path)
 {
     const auto identity = resolve_fighter_costume("PlyMewtwo5K_Share_joint");
@@ -653,6 +663,8 @@ int main(int argc, char** argv)
         }
         if (argc == 3 && std::string_view(argv[1]) == "real_peach") {
             real_peach(argv[2]);
+            return 0;
+        }
         if (argc == 3 && std::string_view(argv[1]) == "real_mewtwo") {
             real_mewtwo(argv[2]);
             return 0;

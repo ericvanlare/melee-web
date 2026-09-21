@@ -63,7 +63,7 @@ class PrototypeTests(unittest.TestCase):
                         self.assertEqual(response.headers['Cross-Origin-Opener-Policy'], 'same-origin')
                         self.assertEqual(response.headers['Cross-Origin-Embedder-Policy'], 'require-corp')
                     with urlopen(base + '/prototype-content.json') as response:
-                        self.assertEqual(len(json.load(response)['fighters']), 18)
+                        self.assertEqual(len(json.load(response)['fighters']), 19)
                     with self.assertRaises(HTTPError) as error:
                         urlopen(base + '/private-disc.iso')
                     error.exception.close()
