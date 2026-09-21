@@ -44,19 +44,20 @@ for rollback. Production audio uses the separate [audio release path](AUDIO_PROD
 record its completed package and hosted checks with the corresponding release,
 and link that receipt before describing an audio deployment as verified here.
 
-The September 21 deployment of latest main `4e521f6` (PR #52 Donkey
-re-enablement, PR #53 Captain Falcon dive-catch admission) promoted the audited
-`audio-player` package unchanged from staging deployment
-`0c32134e-4099-41ca-a7ee-da282789012d` to production deployment
-`a8d318f2-8d93-438e-8259-d613c0ced56f`
-([immutable](https://a8d318f2.webmelee.pages.dev), [apex](https://webmelee.gg)).
+The September 21 deployment of latest main `dab94e2` (PR #52 Donkey
+re-enablement, PR #53 Captain Falcon dive-catch admission, PR #54 repository
+readiness) promoted the audited `audio-player` package unchanged from staging
+deployment `3309b04e-87f1-4a1d-8f24-cf0129e00a52` to production deployment
+`59cf5240-7deb-4447-9d38-4435c85c519f`
+([immutable](https://59cf5240.webmelee.pages.dev), [apex](https://webmelee.gg)).
 HTTP verification passed on the staging immutable/stable origins, the
 production immutable origin and the apex; the ten public-player and eleven
-audio/PCM browser checks passed on both production origins. The preceding
-`aa3d4852` audio release and the `bed694b0`/`516608f3` silent deployments remain
-rollback targets. The deployment record and per-origin reports live under
-ignored local `work/`; hosted checks do not widen the gameplay acceptance
-boundaries in [the accuracy contract](ACCURACY_CONTRACT.md).
+audio/PCM browser checks passed on both production origins. The same-session
+`a8d318f2` deployment of main `4e521f6`, the PR #51 audio release `aa3d4852`
+and the `bed694b0`/`516608f3` silent deployments remain rollback targets. The
+deployment records and per-origin reports live under ignored local `work/`;
+hosted checks do not widen the gameplay acceptance boundaries in
+[the accuracy contract](ACCURACY_CONTRACT.md).
 
 Namecheap saved `alan.ns.cloudflare.com` and `hadlee.ns.cloudflare.com` as the
 custom nameservers after the mail and artifact gates passed. Cloudflare serves
