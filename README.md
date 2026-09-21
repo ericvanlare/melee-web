@@ -40,6 +40,7 @@ is the original CSS/SSS player; `viewer.html` is the separate asset inspector.
 For the full validation matrix, focused gameplay targets, local asset extraction,
 public packaging and reference capture, use [Developer entry](docs/DEVELOPMENT.md)
 and the linked boundary documents.
+For contribution and pull-request requirements, read [Contributing](CONTRIBUTING.md).
 
 ## Evidence and scope
 

@@ -29,6 +29,10 @@ audio-data questions. This avoids choosing a root license whose scope is
 unclear. The independent engineering work in sections 3 and 4 can proceed while
 those decisions are reviewed.
 
+The [publication review brief](PUBLICATION_REVIEW_BRIEF.md) now collects the
+file, data, history and distribution questions for a qualified reviewer. It is
+prepared for owner use; no external outreach has been authorized or performed.
+
 Suggested sequence: ownership and license inventory; audio disposition;
 repository safeguards and contributor documents; preparation of GitHub controls;
 final checkpoint audit and owner-controlled visibility transition. Record an
@@ -105,35 +109,50 @@ The existing [packager](../scripts/build_public.py) and
 [artifact auditor](../scripts/audit_public.py) protect selected output graphs.
 They do not scan all tracked repository content or all historical branches.
 
-- [ ] Expand [.gitignore](../.gitignore) for relevant extracted-game formats,
+- [x] Expand [.gitignore](../.gitignore) for relevant extracted-game formats,
   including `.usd`, `.ssm`, `.hps`, `.mth`, `.thp`, `.sem`, `.dsp`, and `.dtm`,
   and known sensitive input paths. Avoid blanket exclusions that prevent
   legitimate documented fixtures or images.
-- [ ] Add a CI check of tracked file names and content for prohibited game
+- [x] Add a CI check of tracked file names and content for prohibited game
   assets, sensitive inputs, and secrets. It must reject force-added files;
   ignore rules alone are insufficient.
-- [ ] Document explicit exceptions for authored synthetic fixtures, properly
+- [x] Document explicit exceptions for authored synthetic fixtures, properly
   licensed material, and generated renderer metadata such as the pipeline seed.
   Do not treat a renamed extension as proof that a file is safe to publish.
-- [ ] Exercise the guard with synthetic rejection and permitted-fixture cases,
+- [x] Exercise the guard with synthetic rejection and permitted-fixture cases,
   then make it part of required verification. Keep real credentials and game
   payloads out of test fixtures.
 - [ ] Define a repeatable final history/ref scan in addition to the ongoing
   tracked-tree guard. Preserve scan scope and findings without exposing secrets
   in reports or CI logs.
 
+The [guard and exception guide](REPOSITORY_CONTENT_CHECK.md) documents the
+implemented snapshot boundary, exact hash policy, focused real-Git tests and
+limits. [Verify](../.github/workflows/verify.yml) includes the guard in the
+`browser-build` aggregate; requiring that aggregate in GitHub is still open in
+section 5. A passing content exception does not establish licensing clearance.
+The local full-suite attempt is not green: pinned source/toolchain dependencies
+are absent in this worktree. Its failures are retained under ignored
+`work/public-readiness/safeguards-first-pass/`. Run the full verification in a
+bootstrapped checkout or CI before integrating this pass; the focused guard
+and public-shell build/audit can run without those dependencies.
+
 ## 4. Contributor and security-reporting documents
 
-The reviewed tree has no `CONTRIBUTING.md`, PR template, or `SECURITY.md`.
+The initial reviewed tree had no contributor or security-reporting documents.
+[CONTRIBUTING.md](../CONTRIBUTING.md) and the
+[PR template](../.github/pull_request_template.md) now cover the contribution
+workflow. A usable private security-reporting route remains to be selected and
+verified before publishing its policy.
 
-- [ ] Add `CONTRIBUTING.md` with supported prerequisites and setup/build/test
+- [x] Add `CONTRIBUTING.md` with supported prerequisites and setup/build/test
   commands, linking to [build and play](BUILD_AND_PLAY.md) and
   [the developer entry](DEVELOPMENT.md). Recommend a normal local checkout
   outside cloud-synced folders.
-- [ ] Document generated-source and patch workflows, coordination on shared
+- [x] Document generated-source and patch workflows, coordination on shared
   runtime/generated files, source-grounded behavior changes, meaningful
   validation, and the prohibition on uploading game assets or secrets.
-- [ ] Add a concise PR template requesting the behavior change, relevant
+- [x] Add a concise PR template requesting the behavior change, relevant
   source/provenance basis, and validation results and limitations.
 - [ ] Add `SECURITY.md` with a usable private reporting route for issues such
   as native/Wasm asset-parser vulnerabilities. Verify the selected inbox or
