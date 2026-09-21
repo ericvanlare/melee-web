@@ -107,9 +107,14 @@ try {
       await memory(`results-match-${match}`);
       if(match===1){
         // Explicit host pause for a stable rendering artifact, outside timing evidence.
+        // Wait for each pause/resume to publish its state before the next click:
+        // a second click that lands during the first operation is rejected, which
+        // would leave the scene paused for the rest of the route.
         await page.locator('#pause').click();
+        await page.waitForFunction(()=>document.querySelector('#status').textContent.startsWith('Paused'),null,{timeout:15000});
         await page.locator('#canvas').screenshot({path:path.join(values.out,'results.png')});
         await page.locator('#pause').click();
+        await page.waitForFunction(()=>!document.querySelector('#status').textContent.startsWith('Paused'),null,{timeout:15000});
       }
       await confirmResults(match);await page.waitForTimeout(1200);await driver.waitForPhase(1);
       assert.equal(await page.evaluate(()=>window.versusReturnDocument),marker);

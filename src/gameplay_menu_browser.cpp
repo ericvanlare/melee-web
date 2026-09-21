@@ -635,8 +635,8 @@ bool finish_asset_handoff(){
   results_input.reset();
   const double constructed=emscripten_get_now();
   report_construction("results-enter",started,constructed,constructed,before,aurora_stats_snapshot());
-  first_use_draw_pending=true;running=true;audio_phase=0;menu_clock.reset();audio_clock.reset();
-  message="Original Results";return false;
+  first_use_draw_pending=true;pending=false;running=true;audio_phase=0;menu_clock.reset();audio_clock.reset();
+  message="Original Results";return true;
  }
  if(destination==AssetDestination::Prize){
   const MeleeWebPadState* input=melee_web_menu_host_input(host);
@@ -645,8 +645,8 @@ bool finish_asset_handoff(){
   prize=std::make_unique<melee_web::GameplayPrizeSession>(files,host,prize_seed,*input);
   const double constructed=emscripten_get_now();
   report_construction("prize-enter",started,constructed,constructed,before,aurora_stats_snapshot());
-  first_use_draw_pending=true;running=true;audio_phase=0;menu_clock.reset();audio_clock.reset();
-  message="Original unlock notification";return false;
+  first_use_draw_pending=true;pending=false;running=true;audio_phase=0;menu_clock.reset();audio_clock.reset();
+  message="Original unlock notification";return true;
  }
  check(destination==AssetDestination::Match||destination==AssetDestination::Replay,
        "Initial menu scope must be prepared through the import boundary");
