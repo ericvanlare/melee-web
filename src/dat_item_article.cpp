@@ -61,6 +61,13 @@ ArticleSchema schema(uint32_t kind)
     case It_Kind_Peach_Parasol:return {4,2,true};
     case It_Kind_Peach_Toad:return {4,2,true};
     case It_Kind_Peach_ToadSpore:return {0x10,1,true};
+    // Mewtwo's Disable is the authored two-float itMDisableAttributes record
+    // (lifetime and horizontal velocity) with one serialized state row.
+    case It_Kind_Mewtwo_Disable:return {8,1,true};
+    // Shadow Ball's serialized special record is twelve words; the doldecomp
+    // header's x30..x3C tail is not serialized by the disc record. Ten
+    // serialized animation rows back the eighteen callback states.
+    case It_Kind_Mewtwo_ShadowBall:return {0x30,10,true};
     // Seven original pill motion states select six serialized animation rows,
     // including the throw/catch sequences used by Dr. Mario's taunt.
     case It_Kind_DrMario_Vitamin:return {20,6,true};
@@ -108,10 +115,6 @@ bool pointer_field(uint32_t kind,uint32_t offset)
         (offset>=0x4c&&offset<0x64&&((offset-0x4c)%4==0));
     case It_Kind_Link_Arrow:
     case It_Kind_CLink_Arrow:return offset==0x24||offset==0x28;
-    // The Yo-Yo's serialized record ends with the original HSD_Joint string,
-    // HSD_Joint yoyo and HSD_MatAnimJoint material pointers. The asset owner
-    // hydrates them into native descriptors below.
-    case It_Kind_Ness_Yoyo:return offset==0x50||offset==0x54||offset==0x58;
     default:return false;
     }
 }
@@ -127,17 +130,6 @@ bool float_field(uint32_t kind,uint32_t offset)
     case It_Kind_CLink_HShot:return offset!=0xc&&offset!=0x2c;
     case It_Kind_Link_Arrow:
     case It_Kind_CLink_Arrow:return true;
-    // The Yo-Yo record keeps its original integer words (string segment
-    // counts at 0x00..0x08, rotation frames at 0x40..0x4C) beside the float
-    // scalars at 0x0C..0x3C.
-    case It_Kind_Ness_Yoyo:return offset>=0xC&&offset<=0x3C;
-    // The vegetable record's lifetime is its only float; the odds/damage
-    // pairs and the authored turnip-type count are integers. The parasol and
-    // Toad records keep one unread integer word each, while the spore record
-    // is four serialized floats.
-    case It_Kind_Peach_Turnip:return offset==0x0;
-    case It_Kind_Peach_Parasol:
-    case It_Kind_Peach_Toad:return false;
     default:return true;
     }
 }
@@ -311,14 +303,6 @@ DatItemArticle::DatItemArticle(std::shared_ptr<const DatArchive> archive,uint32_
         special_material(0x50,first->graph());special_shape(0x54,first->graph());
         special_animation(0x58,second->graph(),second_native);
         special_material(0x5c,second->graph());special_shape(0x60,second->graph());
-    } else if(kind==It_Kind_Ness_Yoyo) {
-        /* it_802BE65C loads the string and yoyo joints from the special
-         * record and it_802BE5D8 attaches the material animation to the
-         * loaded yoyo joint, so the material binds that joint's graph. */
-        auto string_joint=special_joint(0x50);
-        auto yoyo_joint=special_joint(0x54);
-        (void)string_joint;
-        special_material(0x58,yoyo_joint->graph());
     }
     s.count=article_schema.state_count;
     if(s.count){at=pointer(root+12,s.count*16);s.states=std::make_unique<MeleeWebItemStateDesc[]>(s.count);}

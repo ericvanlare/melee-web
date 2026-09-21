@@ -1,0 +1,159 @@
+{
+  "schema": "melee-web-full-game-checkpoint",
+  "version": 1,
+  "source_base_commit": "2c2b687f5bb7dbfcb3c75dc0394c04bb97f2114d",
+  "scope": "Mewtwo development candidacy: exact source identity (CKIND_MEWTWO 0x0a / FTKIND_MEWTWO 0x10), 0x88 attribute extension, 314 actions, four costumes, Disable and Shadow Ball Articles, effect bank 13 (four static rows), mewtwo.ssm voice bank, authored one-chain dynamics with one selector row, native all-costume lifecycles in both orientations and a fresh-origin cold/warm 32-case browser action sweep. Not independent original equivalence, full fighter acceptance or a deployment change.",
+  "automated_suite": {
+    "local_path": "work/full-game/mewtwo-local-suite-v1.log",
+    "sha256": "73fb4a60065ab8c3f84309322482670cfcabd4f4c960cfbdef2bb4d8130248fb",
+    "command": "python3 -m unittest discover -s tests -v",
+    "tests": 1127,
+    "seconds": 278.909,
+    "result": "pass",
+    "skips": 60,
+    "skip_reasons": {
+      "Owned local asset fixtures are unavailable in this worktree": "documented optional skips; Mewtwo's own real-asset and match-trace tests ran without skips"
+    }
+  },
+  "machine": {
+    "hardware": "Apple M4 (Mac16,12-class), 32 GiB",
+    "os": "macOS 26.6.2",
+    "browser": "153.0.8010.50",
+    "canvas_backing_pixels": [640, 480],
+    "device_pixel_ratio": 1,
+    "development_audio": "replacement DSP coefficients, stereo with original reverb/delay",
+    "application_cache": "fresh origin per round (fresh Chromium profile per launch)",
+    "driver_cache": "uncontrolled"
+  },
+  "browser_build": {
+    "local_path": "build/browser-release",
+    "sha256": "32f8245cbf484fed6b20317834030d785c31b736439e5416de6e838bf77bd502",
+    "artifacts": {
+      "gameplay_menu_browser.js": "c8ead7af8bc149fc4e92df2d0f2b16ec7228e6ce1ddbc58f5d222df01422be0c",
+      "gameplay_menu_browser.wasm": "32f8245cbf484fed6b20317834030d785c31b736439e5416de6e838bf77bd502",
+      "gameplay_menu_browser.data": "f85858ff99f368d38ca16fa18727a12f778d57543e2898d29507f92585db2c2b",
+      "runtime.html": "7dbdba45a72835799f02df323ce93e762ed3ad9d8941522ebe4d550913460172",
+      "initial_pipeline_cache_seed": "6487a68d0d39b97761bb8f4764e3de05797afcb9bafe64847a0cf4f9b13afeef"
+    }
+  },
+  "native_scope": {
+    "forward": "Mewtwo (P1, all four costumes) versus Mario on Final Destination: original CSS entry, costumes, stage lifecycle, combat, pause, No Contest, teardown and repeat construction passed.",
+    "reverse": "Mario (P1) versus Mewtwo (P2): opponent lifetime and teardown passed without a P2 input recipe.",
+    "costumes": 4,
+    "forward_first_lifetime": [
+      "Ground Shadow Ball full charge through Start/Loop/LoopFull, fresh-B-edge release, 25 damage to Mario and Article cleanup.",
+      "Aerial charge through air Loop, fresh-B-edge release in the air (air End 350) and Article teardown.",
+      "Ground and aerial Teleport returning through source recovery.",
+      "Ground and aerial Confusion.",
+      "Ground and aerial Disable with Disable projectile creation and source lifetime teardown."
+    ],
+    "remaining": [
+      "Independent original Mewtwo state comparison.",
+      "Drawn capture interactions, pixels and PCM.",
+      "Complete ordinary-input matches and the full move/costume/stage matrix.",
+      "Broader performance and admission gates."
+    ],
+    "scope": "Per the Adding-a-source-fighter checkpoints; not acceptance."
+  },
+  "native_evidence": [
+    {
+      "local_path": "work/full-game/mewtwo-native-forward-v1.log",
+      "sha256": "d0aada6441c2e774e6777aed48f24e6b0b21b3c28a705f20912c00bbbe15ccc1"
+    },
+    {
+      "local_path": "work/full-game/mewtwo-native-reverse-v1.log",
+      "sha256": "4990357d8b85de37505c1842d4e07873d98230fab53002489b6773e1117d6a03"
+    },
+    {
+      "local_path": "tests/test_dat_fighter_runtime.py#test_real_mewtwo_attribute_boundary",
+      "sha256": "in-suite",
+      "note": "Mewtwo real-attribute boundary ran inside the captured full-suite log without a standalone log"
+    },
+    {
+      "local_path": "work/full-game/mewtwo-browser-discovery-v6/cold/pipeline_cache.db",
+      "sha256": "67f3d4457b840a07a0fca7ea74e07d83f7be2114713de8514e09077215ffe6f7",
+      "note": "v5 cold export that fed the reviewed preload merge"
+    }
+  ],
+  "browser_checks": {
+    "mewtwo": {
+      "local_path": "work/full-game/mewtwo-browser-discovery-v6/report.json",
+      "sha256": "c415bdb293eae2b737fe617c2aacc04bb815eef91a45f1a890d470fe28af3b6d",
+      "result": "scoped_pair_pass",
+      "rounds": {
+        "cold": {
+          "pass": true,
+          "cases": 32,
+          "source_frames": 6400,
+          "worst_native_callback_ms": 6.645,
+          "worst_browser_callback_ms": 24.72,
+          "failures": []
+        },
+        "warm": {
+          "pass": true,
+          "cases": 32,
+          "source_frames": 6400,
+          "worst_native_callback_ms": 5.92,
+          "worst_browser_callback_ms": 21.71,
+          "failures": []
+        }
+      }
+    }
+  },
+  "preload_correction": {
+    "failed_discovery": {
+      "local_path": "work/full-game/mewtwo-browser-discovery-v5",
+      "report_sha256": "c858e283112eef02bcde675c7c5c2ca42e20d49d1484830c5d7c2fcfcac1db72",
+      "result": "cold acceptance failures retained: browser callback gaps, native callbacks over 33.3 ms, audio underruns; all 32 cases completed"
+    },
+    "provenance_manifest": {
+      "local_path": "work/full-game/mewtwo-browser-discovery-v5/cold/cache-provenance.json",
+      "sha256": "c801073ae14f5fd15af0988d6c5689fa13d984c1b40682377324d6cbb9df6435"
+    },
+    "cache_review": {
+      "local_path": "work/full-game/mewtwo-cache-review-merged-v1.json",
+      "sha256": "1375a26918019b188f77ce699a29f0f590d0b456eac4f7ee02febe13f8052aab",
+      "new_type1_rows": 12,
+      "payload_conflicts": 0,
+      "preserved_base_rows": 846,
+      "merged_seed_rows": {"type0": 1, "type1": 857},
+      "merged_seed_bytes": 3567616,
+      "merged_seed_sha256": "f85858ff99f368d38ca16fa18727a12f778d57543e2898d29507f92585db2c2b"
+    }
+  },
+  "scoped_code_review": {
+    "local_path": "docs/MEWTWO_PORT_NOTES.md",
+    "sha256": "inline",
+    "result": "lead review of the full integration diff: source contract from the pinned ftMewtwo sources and disc bytes (no sibling counts copied), exact authored bounds asserted, failure paths explicit; two recipe corrections (authored Turn duration, full-hop aerial charge) and one telemetry generalization (authored costume texture map count) are recorded in the notes.",
+    "independent_review": "reviewer subagent verdict correct with no blocking findings; three accuracy nits fixed: the telemetry and decoder bounds now match the original five-slot CostumeTObjList collector (ftAnim_80070200 asserts beyond it), a one-map authored count fails explicitly before the two recorded slots are compared, and the CKIND_MEWTOW typo is corrected."
+  },
+  "merged_tree_revalidation": {
+    "merged_main": "e8c756a (PR #52 Donkey re-enablement, PR #53 Captain Falcon dive catch) merged into this branch; both shared FObj/dynamics changes do not alter Mewtwo's observed lifetimes.",
+    "suite_pre_fix": {
+      "local_path": "work/full-game/mewtwo-merged-suite-v3.log",
+      "sha256": "a780e2d1a5000e926c0804a8a0b8a8d21a450610caf74c5811d9c7330794f1a9",
+      "result": "1131 tests OK, 57 skipped, 282.502 seconds (a first merged-tree run reported 5 failures, all traced to concurrently rebuilt trace binaries, and was superseded by a clean rerun)"
+    },
+    "suite_post_fix": {
+      "local_path": "work/full-game/mewtwo-final-suite-v4.log",
+      "sha256": "ba10d5e24ce660cd2faf18dd852c3e0a25152b243f9134bddbf7c02dbe832f2b",
+      "result": "1131 tests OK, 57 skipped, 282.032 seconds, after the review corrections"
+    },
+    "native_logs": [
+      {
+        "local_path": "work/full-game/mewtwo-native-forward-v3.log",
+        "sha256": "a92a42610c6832c87939cda6506a2ccf4a843b50e9530df84ffe1ec1c2e81b62"
+      },
+      {
+        "local_path": "work/full-game/mewtwo-native-reverse-v3.log",
+        "sha256": "80dea8d702a23084e97109f7f721d5ea90a1e8f78c639a38ac724decc4125490"
+      }
+    ],
+    "browser_checks": {
+      "local_path": "work/full-game/mewtwo-browser-discovery-v7/report.json",
+      "sha256": "c8c5df48d7b49f2f3ad08409ad153eb4ecd9cfc2fb643d4992401a74d2e80663",
+      "result": "scoped_pair_pass; cold/warm all 32 cases over 6,400 frames, zero gaps, over-budget or 33.3 ms callbacks, underruns, live pipelines, timing resumes or heap growth; native/browser maxima 7.625/23.265 ms cold and 6.910/25.460 ms warm"
+    },
+    "scope": "Pre-merge checkpoint numbers above describe their declared base; this block re-observes the same scoped evidence on the merged tree."
+  }
+}

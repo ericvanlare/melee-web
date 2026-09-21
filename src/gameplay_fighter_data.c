@@ -2,6 +2,7 @@
 #include "fighter_attributes.h"
 #include "gameplay_donkey_schema.h"
 #include "gameplay_koopa_schema.h"
+#include "gameplay_mewtwo_schema.h"
 #include "gameplay_pikachu_schema.h"
 #include "gameplay_purin_schema.h"
 #include "gameplay_article_data.h"
@@ -11,6 +12,7 @@
 #include <melee/ft/kinds/ftLuigi/types.h>
 #include <melee/ft/kinds/ftDonkey/types.h>
 #include <melee/ft/kinds/ftKoopa/types.h>
+#include <melee/ft/kinds/ftMewtwo/types.h>
 #include <melee/ft/kinds/ftPikachu/types.h>
 #include <melee/ft/kinds/ftPichu/types.h>
 #include <melee/ft/kinds/ftPurin/types.h>
@@ -36,6 +38,7 @@ _Static_assert(sizeof(ftCaptain_DatAttrs) == 0x8C, "Captain/Ganon extension ABI"
 _Static_assert(sizeof(ftLuigiAttributes) == MELEE_WEB_LUIGI_ATTRIBUTE_BYTES, "Luigi extension ABI");
 _Static_assert(sizeof(ftDonkeyAttributes) == MELEE_WEB_DONKEY_ATTRIBUTE_BYTES, "Donkey extension ABI");
 _Static_assert(sizeof(ftKoopaAttributes) == MELEE_WEB_KOOPA_ATTRIBUTE_BYTES, "Koopa extension ABI");
+_Static_assert(sizeof(ftMewtwoAttributes) == MELEE_WEB_MEWTWO_ATTRIBUTE_BYTES, "Mewtwo extension ABI");
 _Static_assert(sizeof(ftPikachuAttributes) == MELEE_WEB_PIKACHU_ATTRIBUTE_BYTES,
                "Pikachu/Pichu shared extension ABI");
 _Static_assert(sizeof(ftPurinAttributes) == MELEE_WEB_PURIN_ATTRIBUTE_BYTES,
@@ -190,6 +193,50 @@ MELEE_WEB_KOOPA_ATTRIBUTE_FIELDS(CHECK_KOOPA)
 #undef CHECK_KOOPA_SOURCE_U32
 #undef CHECK_KOOPA_SOURCE_I32
 #undef CHECK_KOOPA_SOURCE_F32
+#define CHECK_MEWTWO_SOURCE_F32(value) _Generic((value), float: 1, default: 0)
+#define CHECK_MEWTWO_SOURCE_I32(value) \
+    _Generic((value), signed char: (sizeof(value) == sizeof(int32_t)), \
+             short: (sizeof(value) == sizeof(int32_t)), \
+             int: (sizeof(value) == sizeof(int32_t)), \
+             long: (sizeof(value) == sizeof(int32_t)), \
+             long long: (sizeof(value) == sizeof(int32_t)), default: 0)
+#define CHECK_MEWTWO_SOURCE_U32(value) \
+    _Generic((value), unsigned char: (sizeof(value) == sizeof(uint32_t)), \
+             unsigned short: (sizeof(value) == sizeof(uint32_t)), \
+             unsigned int: (sizeof(value) == sizeof(uint32_t)), \
+             unsigned long: (sizeof(value) == sizeof(uint32_t)), \
+             unsigned long long: (sizeof(value) == sizeof(uint32_t)), default: 0)
+#define CHECK_MEWTWO_SOURCE_U8(value) \
+    _Generic((value), unsigned char: 1, default: 0)
+#define CHECK_MEWTWO_PORTABLE_F32(value) _Generic((value), float: 1, default: 0)
+#define CHECK_MEWTWO_PORTABLE_I32(value) _Generic((value), int32_t: 1, default: 0)
+#define CHECK_MEWTWO_PORTABLE_U32(value) _Generic((value), uint32_t: 1, default: 0)
+#define CHECK_MEWTWO_PORTABLE_U8(value) _Generic((value), uint8_t: 1, default: 0)
+#define CHECK_MEWTWO_SOURCE_TYPE(type, value) CHECK_MEWTWO_SOURCE_TYPE_IMPL(type, value)
+#define CHECK_MEWTWO_SOURCE_TYPE_IMPL(type, value) CHECK_MEWTWO_SOURCE_##type(value)
+#define CHECK_MEWTWO_PORTABLE_TYPE(type, value) CHECK_MEWTWO_PORTABLE_TYPE_IMPL(type, value)
+#define CHECK_MEWTWO_PORTABLE_TYPE_IMPL(type, value) CHECK_MEWTWO_PORTABLE_##type(value)
+#define CHECK_MEWTWO(offset,type,name,original) \
+    _Static_assert(offsetof(ftMewtwoAttributes, original) == offset, "Mewtwo source attribute offset"); \
+    _Static_assert(offsetof(MeleeWebMewtwoAttributes, name) == offset, "Mewtwo portable attribute offset"); \
+    _Static_assert(sizeof(((ftMewtwoAttributes*)0)->original) == sizeof(MELEE_WEB_MEWTWO_TYPE_##type), "Mewtwo source attribute width"); \
+    _Static_assert(sizeof(((MeleeWebMewtwoAttributes*)0)->name) == sizeof(MELEE_WEB_MEWTWO_TYPE_##type), "Mewtwo portable attribute width"); \
+    _Static_assert(CHECK_MEWTWO_SOURCE_TYPE(type, ((ftMewtwoAttributes*)0)->original), "Mewtwo source attribute type"); \
+    _Static_assert(CHECK_MEWTWO_PORTABLE_TYPE(type, ((MeleeWebMewtwoAttributes*)0)->name), "Mewtwo portable attribute type");
+MELEE_WEB_MEWTWO_ATTRIBUTE_FIELDS(CHECK_MEWTWO)
+#undef CHECK_MEWTWO
+#undef CHECK_MEWTWO_PORTABLE_TYPE_IMPL
+#undef CHECK_MEWTWO_PORTABLE_TYPE
+#undef CHECK_MEWTWO_SOURCE_TYPE_IMPL
+#undef CHECK_MEWTWO_SOURCE_TYPE
+#undef CHECK_MEWTWO_PORTABLE_U8
+#undef CHECK_MEWTWO_PORTABLE_U32
+#undef CHECK_MEWTWO_PORTABLE_I32
+#undef CHECK_MEWTWO_PORTABLE_F32
+#undef CHECK_MEWTWO_SOURCE_U8
+#undef CHECK_MEWTWO_SOURCE_U32
+#undef CHECK_MEWTWO_SOURCE_I32
+#undef CHECK_MEWTWO_SOURCE_F32
 #define CHECK_PURIN_SOURCE_F32(value) _Generic((value), float: 1, default: 0)
 #define CHECK_PURIN_SOURCE_I32(value) \
     _Generic((value), signed char: (sizeof(value) == sizeof(int32_t)), \
@@ -387,7 +434,7 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
         kind==FTKIND_FALCO || kind==FTKIND_MARS || kind==FTKIND_EMBLEM ||
         kind==FTKIND_LINK || kind==FTKIND_CLINK || kind==FTKIND_CAPTAIN || kind==FTKIND_GANON ||
         kind==FTKIND_DONKEY || kind==FTKIND_KOOPA || kind==FTKIND_LUIGI || kind==FTKIND_PIKACHU || kind==FTKIND_PICHU ||
-        kind==FTKIND_NESS || kind==FTKIND_PURIN || kind==FTKIND_PEACH,
+        kind==FTKIND_NESS || kind==FTKIND_MEWTWO || kind==FTKIND_PURIN || kind==FTKIND_PEACH,
         "Native fighter extension schema unavailable");
     REQUIRE(costumes>0 && costumes<=16,"Native costume count exceeds checked bound");
     REQUIRE(motion_count>0 && motion_count<=1024,"Native motion count exceeds checked bound");
@@ -478,6 +525,12 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
 #define KOOPA(o,t,n,orig) koopa->orig=READ_##t(at+o);
         MELEE_WEB_KOOPA_ATTRIBUTE_FIELDS(KOOPA)
 #undef KOOPA
+    } else if(kind==FTKIND_MEWTWO) {
+        at=required(r,root+4,MELEE_WEB_MEWTWO_ATTRIBUTE_BYTES);
+        ftMewtwoAttributes* mewtwo=NEW(ftMewtwoAttributes,1); d->ext_attr=mewtwo;
+#define MEWTWO(o,t,n,orig) mewtwo->orig=READ_##t(at+o);
+        MELEE_WEB_MEWTWO_ATTRIBUTE_FIELDS(MEWTWO)
+#undef MEWTWO
     } else if(kind==FTKIND_LUIGI) {
         at=required(r,root+4,MELEE_WEB_LUIGI_ATTRIBUTE_BYTES); ftLuigiAttributes* luigi=NEW(ftLuigiAttributes,1); d->ext_attr=luigi;
 #define LUIGI(o,t,n,orig) luigi->orig=READ_##t(at+o);
@@ -536,7 +589,10 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
         uint32_t p=PTR(table+c*16+category*4,d->x8->x0.model_num*8);
         if(p!=UINT32_MAX) d->x8->x0.vis_table[c][category]=visibility(r,p,d->x8->x0.model_num,category);
     }
-    d->x8->x8.x8=WORD(at+8); REQUIRE(d->x8->x8.x8<=8,"Costume texture map exceeds source capacity");
+    /* ftAnim_80070200 stores this count into CostumeTObjList::costume_tobjs[5]
+     * and asserts "fighter tobj num over!" beyond it; larger maps have no
+     * defined original state. */
+    d->x8->x8.x8=WORD(at+8); REQUIRE(d->x8->x8.x8<=5,"Costume texture map exceeds source capacity");
     table=required(r,at+12,costumes*4); d->x8->x8.xC=NEW(u16*,costumes);
     for(uint32_t c=0;c<costumes;++c) {
         uint32_t p=PTR(table+c*4,d->x8->x8.x8*2);
@@ -632,11 +688,14 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
             (kind==FTKIND_MARS||kind==FTKIND_EMBLEM||kind==FTKIND_GANON) &&
             d->x2C->dynamicsNum==3;
         const bool donkey_modes = kind==FTKIND_DONKEY && d->x2C->dynamicsNum==1;
+        /* Mewtwo and Peach author dynamics modes over their blend rows like
+         * the sword/cape families above. */
+        const bool mewtwo_modes = kind==FTKIND_MEWTWO && d->x2C->dynamicsNum==1;
         /* Peach authors 86 dynamics modes over her nine body chains; the
          * selector is the second byte of every blend row like the families
          * above. */
         const bool peach_modes = kind==FTKIND_PEACH && d->x2C->dynamicsNum==9;
-        REQUIRE(sword_or_cape_modes || donkey_modes || peach_modes,
+        REQUIRE(sword_or_cape_modes || donkey_modes || mewtwo_modes || peach_modes,
                 "Native fighter dynamics mode schema unavailable");
         REQUIRE(blends,"Native fighter dynamics selectors are missing");
         unsigned mode_count=0;
@@ -720,7 +779,7 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     const unsigned item_slots=(kind==FTKIND_LINK||kind==FTKIND_CLINK)?7:
                                (kind==FTKIND_LUIGI||kind==FTKIND_KOOPA)?1:
                                (kind==FTKIND_PIKACHU||kind==FTKIND_PICHU)?3:
-                               kind==FTKIND_PURIN?2:
+                               kind==FTKIND_PURIN||kind==FTKIND_MEWTWO?2:
                                kind==FTKIND_NESS?11:
                                kind==FTKIND_PEACH?5:4;
     /* Fixed native capacity bounds the shared accessor for every admitted
@@ -783,6 +842,9 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     else if(kind==FTKIND_KOOPA)
         REQUIRE(at!=UINT32_MAX && d->x48_items[0],
             "Koopa OnLoad requires its Flame Article identity");
+    else if(kind==FTKIND_MEWTWO)
+        REQUIRE(at!=UINT32_MAX && d->x48_items[0] && d->x48_items[1],
+            "Mewtwo OnLoad requires its Disable and Shadow Ball Article identities");
     else if(kind==FTKIND_PIKACHU || kind==FTKIND_PICHU)
         REQUIRE(at!=UINT32_MAX && d->x48_items[0] && d->x48_items[1] && d->x48_items[2],
             "Pikachu-family OnLoad requires its three Article identities");

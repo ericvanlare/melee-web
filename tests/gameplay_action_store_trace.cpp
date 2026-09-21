@@ -217,6 +217,14 @@ void verify_common_appeals(std::shared_ptr<const DatArchive> archive, const Byte
             check(store.command_ready(motion),
                   "Peach shared Koopa victim rows are not admitted");
         std::cout << "Peach kind 9 authored self-motion rows 295/317 and empty victim dispatch: passed\n";
+    if (costume.fighter_kind == 16) {
+        check(costume.motion_count == 314, "Mewtwo authored action count changed");
+        for (unsigned motion = 295; motion < costume.motion_count; ++motion) {
+            check(store.command_ready(motion), "Mewtwo self-motion graph is not admitted");
+            check(store.runtime().commands(motion).has_value() ==
+                      store.runtime().action(motion).command_offset.has_value(),
+                  "Mewtwo self-motion source command presence changed");
+        }
     }
     unsigned expected_command_mask = 0;
     for (unsigned index = 0; index < 2; ++index) {
@@ -373,6 +381,8 @@ int main(int argc, char** argv)
             for (unsigned kind : {12U, 23U})
                 if (kinds.contains(kind))
                     std::cout << "Pikachu-family kind " << kind << " authored self-motion rows 295/319: passed\n";
+            if (kinds.contains(16))
+                std::cout << "Mewtwo kind 16 authored self-motion rows 295/313: passed\n";
         }
     } catch (const std::exception& e) { std::cerr << e.what() << '\n'; return 1; }
 }

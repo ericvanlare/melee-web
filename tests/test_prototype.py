@@ -24,7 +24,7 @@ class PrototypeTests(unittest.TestCase):
                          ['Mario', 'Fox', 'Falco', 'Marth', 'Dr. Mario', 'Roy',
                           'Link', 'Young Link', 'Captain Falcon', 'Ganondorf', 'Luigi',
                           'Pikachu', 'Pichu', 'Jigglypuff', 'Donkey Kong', 'Bowser',
-                          'Ness', 'Peach'])
+                          'Ness', 'Peach', 'Mewtwo'])
         self.assertEqual([row['name'] for row in manifest['stages']], [
             'Final Destination', 'Battlefield', "Yoshi's Story", 'Dream Land', 'Hyrule Temple',
             'Fountain of Dreams', "Yoshi's Island 64"])

@@ -41,11 +41,12 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     const bool koopa = costume.fighter_kind == 5;
     const bool ness = costume.fighter_kind == 8;
     const bool peach = costume.fighter_kind == 9;
+    const bool mewtwo = costume.fighter_kind == 16;
     const bool luigi = costume.fighter_kind == 17;
     const bool pikachu_family = costume.fighter_kind == 12 || costume.fighter_kind == 23;
     const bool captain = costume.fighter_kind == 2;
     const bool ganon = costume.fighter_kind == 25;
-    require(mario || fox_family || mars || link_family || luigi || pikachu_family || purin || donkey || koopa || ness || peach || captain || ganon, "Native action store has no checked fighter command schema for this kind");
+    require(mario || fox_family || mars || link_family || luigi || pikachu_family || purin || donkey || koopa || ness || peach || mewtwo || captain || ganon, "Native action store has no checked fighter command schema for this kind");
     std::vector<DatCommandRoot> roots;
     // Explicit source ftCo submotion groups. This certifies command operand
     // graphs only, not readiness of every original world service they invoke.
@@ -101,6 +102,7 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     // the authored ItemParasolOpen/Fall rows 316/317. The final else group's
     // (295,326) extent would overrun her table.
     else if (peach) group(295,costume.motion_count-1);
+    else if (mewtwo) group(295,costume.motion_count-1); // Mewtwo's authored self rows end at 313.
     else group(295,326);                         // Fox/Falco/Marth/Roy source special command rows
     for (auto choice : runtime_->wait_choices()) command_motions_.insert(choice.motion_id);
     for (auto choice : runtime_->squat_wait_choices()) command_motions_.insert(choice.motion_id);

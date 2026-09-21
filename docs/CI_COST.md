@@ -1,5 +1,21 @@
 # Verify CI cost audit
 
+## Public repository boundary
+
+Public and private verification use the same compiler caching and seed jobs.
+The publication review starts a fresh `v4` cache namespace; old private caches
+are removed once at cutover. The [cache review](COMPILER_CACHE_REVIEW.md)
+separates that cleanup from ongoing caching and records the source/notice scope.
+Compiler flags, source/header validation, unit shards and build partitions are
+unchanged. Caches hold mixed-project compiler intermediates, not a licensed
+standalone player or a cache consisting only of permissive dependencies.
+
+A manual `disable_compiler_cache: true` run remains available for a comparison
+without persistent cache restore/save or compiler-seed transfers. It permits
+15-minute build partitions; normal cached verification retains 10 minutes.
+The earlier cache-disabled publication rehearsal passed its checks but exceeded
+the 600-second turnaround target. It is not the selected public workflow.
+
 ## Issue 36: parallel Linux verification
 
 The workflow keeps the existing checked `RelWithDebInfo` compilation

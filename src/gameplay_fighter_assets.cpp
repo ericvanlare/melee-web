@@ -191,7 +191,7 @@ struct GameplayFighterAssets::Storage {
         const bool link=id.fighter_kind==FTKIND_LINK||id.fighter_kind==FTKIND_CLINK;
         const uint32_t item_table_bytes=link?28:
             (id.fighter_kind==FTKIND_LUIGI||id.fighter_kind==FTKIND_KOOPA)?4:
-            id.fighter_kind==FTKIND_PURIN?8:
+            (id.fighter_kind==FTKIND_PURIN||id.fighter_kind==FTKIND_MEWTWO)?8:
             (id.fighter_kind==FTKIND_PIKACHU||id.fighter_kind==FTKIND_PICHU)?12:
             id.fighter_kind==FTKIND_NESS?44:
             id.fighter_kind==FTKIND_PEACH?20:16;
@@ -258,6 +258,10 @@ struct GameplayFighterAssets::Storage {
             item_identities[item_count++]={2,static_cast<uint32_t>(It_Kind_Peach_Parasol)};
             item_identities[item_count++]={3,static_cast<uint32_t>(It_Kind_Peach_Toad)};
             item_identities[item_count++]={4,static_cast<uint32_t>(It_Kind_Peach_ToadSpore)};
+        } else if(id.fighter_kind==FTKIND_MEWTWO) {
+            if(!item_table)throw DatError("Mewtwo item Article table is missing");
+            item_identities[item_count++]={0,static_cast<uint32_t>(It_Kind_Mewtwo_Disable)};
+            item_identities[item_count++]={1,static_cast<uint32_t>(It_Kind_Mewtwo_ShadowBall)};
         } else if(id.fighter_kind==FTKIND_PIKACHU || id.fighter_kind==FTKIND_PICHU) {
             if(!item_table)throw DatError("Pikachu-family item Article table is missing");
             const auto& attributes=prototype.runtime().pikachu_attributes();
