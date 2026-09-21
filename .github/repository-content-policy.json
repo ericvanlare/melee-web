@@ -22,8 +22,8 @@
     {
       "path": "web/initial_pipeline_cache.db.gz.b64",
       "rule": "encoded_payload",
-      "sha256": "6e5feac7f48421eacf5f4215fecd9d8f219bd49164c8689ca6820bcd0f48c349",
-      "reason": "Existing generated Aurora renderer metadata; identity checked by materialize_pipeline_cache.py. This content exception is not licensing clearance; D4 remains open."
+      "sha256": "6487a68d0d39b97761bb8f4764e3de05797afcb9bafe64847a0cf4f9b13afeef",
+      "reason": "Reviewed PR55/Mewtwo renderer metadata: 858 records including 857 pipeline descriptors. See docs/evidence/compiler-review-pipeline-seed-v2.json for bounded decode, identity and content review. This exception is not licensing clearance; documented provenance uncertainty remains."
     }
   ],
   "synthetic_secrets": [

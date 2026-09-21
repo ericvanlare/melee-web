@@ -74,5 +74,28 @@ and generated material retain the uncertainties accepted in the
 receive no new blanket MIT grant. This decision does not authorize a new
 playable or native release.
 
-The byte inspection and updated CI timing receipt remain to be recorded below.
-No cache deletion or visibility change is authorized by running this inspection.
+## Observed inspection
+
+[Run 35560432544](https://github.com/ericvanlare/melee-web/actions/runs/35560432544)
+passed the real-ccache regression and inspected the selected `main` cache for
+`e8c756a72fe49ea4ec5b6eae7dbd88907142070c` using ccache 4.9.1. The
+[receipt](evidence/compiler-cache-review-v1.json) binds the cache key, API ID,
+scanner hash, full-report hash, compile-graph evidence and limits.
+
+All 3,092 entries were inspected: 1,532 manifests and 1,560 results. Decoding
+produced 1,560 Wasm relocatable objects, 1,559 dependency files and 245 diagnostic
+members, totaling 267,756,885 decoded bytes. The bounded scan found no credential,
+non-runner personal-path, local-asset-input, unexpected-output or incomplete
+inspection findings. This supports the selected cache boundary; it does not
+clear every historical key or establish rights in the objects.
+
+The first runner attempt caught a filename-format bug in the new auditor before
+it inspected the selected cache. The corrected implementation uses ccache 4.9's
+mixed hex/base32hex identity and passes a real cached-compile regression. The
+failed attempt and its log remain retained. The audit is an explicit manual job;
+normal PR verification supplies the separate CI timing evidence.
+
+The subsequently merged Mewtwo seed received its own
+[bounded metadata review](evidence/compiler-review-pipeline-seed-v2.json) before
+updating the content guard's exact hash exception. No cache deletion or
+visibility change was performed.

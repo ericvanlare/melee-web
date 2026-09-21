@@ -1,0 +1,132 @@
+{
+  "schema": "melee-web-compiler-review-pipeline-seed-v2",
+  "reviewed_at": "2026-09-20",
+  "review_status": "reviewed_generated_renderer_metadata",
+  "reviewed_head": "c199f88a328d256a93f145e736a153501015c197",
+  "upstream_main": "4e521f6c0774458f81caf4e705ea7faa076d68a5",
+  "source": {
+    "path": "web/initial_pipeline_cache.db.gz.b64",
+    "encoded_file_bytes": 106825,
+    "encoded_sha256": "6487a68d0d39b97761bb8f4764e3de05797afcb9bafe64847a0cf4f9b13afeef",
+    "compressed_bytes": 80118,
+    "decoded_bytes": 3567616,
+    "decoded_sha256": "f85858ff99f368d38ca16fa18727a12f778d57543e2898d29507f92585db2c2b"
+  },
+  "bounded_decode": {
+    "method": "ASCII base64 with validate=True, then zlib.decompressobj(16 + MAX_WBITS)",
+    "maximum_decoded_bytes": 16777216,
+    "base64_stream_valid": true,
+    "gzip_stream_complete": true,
+    "unused_or_trailing_bytes": 0,
+    "sqlite_header": "SQLite format 3\\x00",
+    "raw_payload_retained": false
+  },
+  "materializer": {
+    "command": "python3 scripts/materialize_pipeline_cache.py web/initial_pipeline_cache.db.gz.b64 <temporary-output>",
+    "script": "scripts/materialize_pipeline_cache.py",
+    "expected_decoded_sha256": "f85858ff99f368d38ca16fa18727a12f778d57543e2898d29507f92585db2c2b",
+    "decoded_digest_matches": true,
+    "output_materialized": true
+  },
+  "sqlite": {
+    "integrity_check": "ok",
+    "tables": [
+      "aurora_schema",
+      "pipeline_cache"
+    ],
+    "aurora_schema": {
+      "columns": [
+        "value INTEGER"
+      ],
+      "row_count": 1,
+      "value_types": [
+        "integer"
+      ],
+      "raw_values_retained": false
+    },
+    "pipeline_cache": {
+      "columns": [
+        "type INTEGER",
+        "hash INTEGER",
+        "config_version INTEGER",
+        "config_size INTEGER",
+        "config BLOB",
+        "first_frame_used INTEGER"
+      ],
+      "primary_key": [
+        "type",
+        "hash"
+      ],
+      "row_count": 858,
+      "groups": [
+        {
+          "type": 0,
+          "rows": 1,
+          "config_bytes_sum": 64,
+          "config_bytes_min": 64,
+          "config_bytes_max": 64
+        },
+        {
+          "type": 1,
+          "rows": 857,
+          "config_bytes_sum": 2375604,
+          "config_bytes_min": 2772,
+          "config_bytes_max": 2772
+        }
+      ],
+      "config_versions": {
+        "type_0": {
+          "4": 1
+        },
+        "type_1": {
+          "65549": 857
+        }
+      },
+      "null_config_values": 0,
+      "raw_payload_retained": false
+    }
+  },
+  "shared_guard_scan": {
+    "implementation": "SECRET_RULES and PERSONAL_PATH from scripts/check_repository_content.py",
+    "encoded_source": {
+      "secret_rule_hits": {},
+      "personal_path_hits": 0
+    },
+    "decoded_sqlite": {
+      "secret_rule_hits": {},
+      "personal_path_hits": 0
+    },
+    "raw_matches_retained": false,
+    "policy_exception_matches_shared_guard": true
+  },
+  "provenance": {
+    "references": [
+      "docs/MEWTWO_PORT_NOTES.md",
+      "docs/evidence/full-game-checkpoint-mewtwo-v1.json",
+      "STATUS.md"
+    ],
+    "reviewed_seed_claim": "PR55/Mewtwo provenance records one fresh-origin export adding 12 type-1 descriptors, preserving 846 prior records, with zero payload conflicts; the merged seed contains one shader and 857 pipelines.",
+    "identity_consistency": "The provenance references agree on decoded SQLite SHA-256 f85858ff99f368d38ca16fa18727a12f778d57543e2898d29507f92585db2c2b and 3,567,616 decoded bytes. The encoded source SHA-256 is tracked separately.",
+    "scope_note": "The Mewtwo notes characterize this as a development candidate and leave independent original equivalence, full acceptance, and deployment open."
+  },
+  "publication_treatment": {
+    "category": "generated Aurora renderer metadata",
+    "matches_reviewed_renderer_metadata_category": true,
+    "unusual_content": [],
+    "rights_disposition": "Content-guard identity review only; this exception is not licensing clearance or a permission grant. The documented provenance uncertainty remains.",
+    "policy_exception": {
+      "path": "web/initial_pipeline_cache.db.gz.b64",
+      "rule": "encoded_payload",
+      "sha256": "6487a68d0d39b97761bb8f4764e3de05797afcb9bafe64847a0cf4f9b13afeef"
+    }
+  },
+  "preservation": {
+    "previous_seed_sha256": "6e5feac7f48421eacf5f4215fecd9d8f219bd49164c8689ca6820bcd0f48c349",
+    "prior_history_findings_preserved": true,
+    "prior_receipts_modified": [],
+    "review_scope_files": [
+      "docs/evidence/compiler-review-pipeline-seed-v2.json",
+      ".github/repository-content-policy.json"
+    ]
+  }
+}
