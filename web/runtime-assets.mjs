@@ -20,7 +20,7 @@ export const NATIVE_MENU_DISC_FILES=Object.freeze({
   'LbMcGame.usd':'LbMcGame.usd','NtMemAc.usd':'NtMemAc.usd',
   'menu01.hps':'audio/menu01.hps','smash2.sem':'audio/us/smash2.sem',
   ...Object.fromEntries(['main','nr_select','nr_title','nr_name','pokemon','end',
-    'captain','dk','fox','koopa','link','luigi','mario','mars','ness','pikachu','purin',
+    'captain','dk','fox','koopa','link','luigi','mario','mars','ness','peach','pikachu','purin',
     'falco','clink','drmario','emblem','pichu','ganon','pupupu']
     .map(name=>[name+'.ssm','audio/us/'+name+'.ssm']))
 });
@@ -101,6 +101,11 @@ export const NATIVE_GAME_DISC_FILES=Object.freeze({
   'PlNs.dat':'PlNs.dat','PlNsAJ.dat':'PlNsAJ.dat','PlNsNr.dat':'PlNsNr.dat',
   'PlNsYe.dat':'PlNsYe.dat','PlNsBu.dat':'PlNsBu.dat','PlNsGr.dat':'PlNsGr.dat',
   'EfNsData.dat':'EfNsData.dat','ness.ssm':'audio/us/ness.ssm',
+  // Peach is source FighterKind 9 (CharacterKind 0x0C) with five costume
+  // owners and its own effect archive and voice bank.
+  'PlPe.dat':'PlPe.dat','PlPeAJ.dat':'PlPeAJ.dat','PlPeNr.dat':'PlPeNr.dat',
+  'PlPeYe.dat':'PlPeYe.dat','PlPeWh.dat':'PlPeWh.dat','PlPeBu.dat':'PlPeBu.dat',
+  'PlPeGr.dat':'PlPeGr.dat','EfPeData.dat':'EfPeData.dat','peach.ssm':'audio/us/peach.ssm',
 });
 export function loadNativeGameDisc(file,report=()=>{}) {
   return loadDiscBundle(file,report,NATIVE_GAME_DISC_FILES);

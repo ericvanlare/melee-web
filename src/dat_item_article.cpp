@@ -49,6 +49,18 @@ ArticleSchema schema(uint32_t kind)
     case It_Kind_Ness_PKFlush_Explode:return {0x14,1,true};
     case It_Kind_Ness_Bat:return {4,1,true};
     case It_Kind_Ness_Yoyo:return {0x5C,0,true};
+    // Peach's authored scalar extents come from the PlPe.dat article regions.
+    // The Bomber explosion has no special record, two command-only state rows
+    // and the source-valid null-joint ItemModelDesc form. The vegetable's
+    // itPeachTurnipAttributes record is its lifetime float, the authored
+    // turnip-type count and eight {odds, damage} pairs; the parasol and Toad
+    // keep one authored unread scalar word each; the spore record is the
+    // four-float itPeachToadSporeAttributes with one command-only state row.
+    case It_Kind_Peach_Explode:return {0,2,false};
+    case It_Kind_Peach_Turnip:return {0x48,3,true};
+    case It_Kind_Peach_Parasol:return {4,2,true};
+    case It_Kind_Peach_Toad:return {4,2,true};
+    case It_Kind_Peach_ToadSpore:return {0x10,1,true};
     // Seven original pill motion states select six serialized animation rows,
     // including the throw/catch sequences used by Dr. Mario's taunt.
     case It_Kind_DrMario_Vitamin:return {20,6,true};
@@ -119,6 +131,13 @@ bool float_field(uint32_t kind,uint32_t offset)
     // counts at 0x00..0x08, rotation frames at 0x40..0x4C) beside the float
     // scalars at 0x0C..0x3C.
     case It_Kind_Ness_Yoyo:return offset>=0xC&&offset<=0x3C;
+    // The vegetable record's lifetime is its only float; the odds/damage
+    // pairs and the authored turnip-type count are integers. The parasol and
+    // Toad records keep one unread integer word each, while the spore record
+    // is four serialized floats.
+    case It_Kind_Peach_Turnip:return offset==0x0;
+    case It_Kind_Peach_Parasol:
+    case It_Kind_Peach_Toad:return false;
     default:return true;
     }
 }

@@ -1,5 +1,22 @@
 # Current status
 
+## Peach development checkpoint
+
+Peach is integrated as a development candidate with her original
+`CKIND_PEACH`/`FTKIND_PEACH` identity, five costumes, the unique 0xC0
+`ftPe_DatAttrs` extension, authored dynamics `dynamicsNum=9` with 86 mode rows
+(the 0x100 whole-chain cutoff is source-cited), five Article slots (Explode,
+Turnip, Parasol, Toad, ToadSpore), model-only effect bank 15 (one row) and
+`peach.ssm`. The real-asset attribute boundary test and the Battlefield
+lifecycle trace pass end to end in Release and RelWithDebInfo, both player
+orientations and all five costumes, including ground/aerial Toad and vegetable
+article lifetimes, the Parasol article lifetime and the authored Float state.
+Shared repairs surfaced by Peach: eye-telemetry base-palette ownership proof
+for animation-replaced images and fighter command opcode 42 (parasol item
+rate). Browser frames, original comparison, pixels, PCM and performance are
+not run; Toad spores and float-aerial interactions need their own evidence;
+see [Peach's retained scope](docs/PEACH_PORT_NOTES.md).
+
 ## Ness development checkpoint
 
 Ness is integrated as a development candidate with his original

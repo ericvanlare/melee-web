@@ -27,6 +27,12 @@ static inline const MeleeWebFighterContent* melee_web_fighter_content(int ckind)
      * complete null row. The original efSync dispatch reaches bank 10
      * entries 0-2 (gfx ids 10000-10002) from PK Thunder and PSI Magnet;
      * entry 3 keeps its authored index and zero descriptors. */
+    /* effPeachDataTable is a model-only table with exactly one authored
+     * 20-byte entry (lifetime 10.0, one joint and one anim, both particle
+     * roots null). The original efSync dispatch reaches bank 15 entry 0
+     * (gfx id 15000, vegetable pull) from ftpeachspeciallw.c; the float
+     * sparkle and Toad spore generators (286, 370, 371) live in
+     * already-parsed common banks. */
     static const MeleeWebFighterContent rows[] = {
         { CKIND_MARIO, FTKIND_MARIO, 5, "Mario", "EfMrData.dat", "effMarioDataTable", 1, 2, "mario.ssm" },
         { CKIND_FOX, FTKIND_FOX, 4, "Fox", "EfFxData.dat", "effFoxDataTable", 3, 6, "fox.ssm" },
@@ -45,6 +51,7 @@ static inline const MeleeWebFighterContent* melee_web_fighter_content(int ckind)
         { CKIND_DONKEY, FTKIND_DONKEY, 5, "Donkey Kong", "EfDkData.dat", "effDonkeyDataTable", 8, 7, "dk.ssm" },
         { CKIND_KOOPA, FTKIND_KOOPA, 4, "Bowser", "EfKpData.dat", "effKoopaDataTable", 12, 4, "koopa.ssm" },
         { CKIND_NESS, FTKIND_NESS, 4, "Ness", "EfNsData.dat", "effNessDataTable", 10, 4, "ness.ssm" },
+        { CKIND_PEACH, FTKIND_PEACH, 5, "Peach", "EfPeData.dat", "effPeachDataTable", 15, 1, "peach.ssm" },
     };
     for (size_t i = 0; i < sizeof(rows) / sizeof(rows[0]); ++i)
         if (rows[i].character_kind == ckind) return &rows[i];
@@ -55,7 +62,8 @@ static inline const MeleeWebFighterContent* melee_web_fighter_content_by_kind(in
 {
     const int characters[] = { CKIND_MARIO, CKIND_FOX, CKIND_FALCO, CKIND_MARS,
                                CKIND_DRMARIO, CKIND_EMBLEM, CKIND_LINK, CKIND_CLINK, CKIND_CAPTAIN, CKIND_GANON, CKIND_LUIGI,
-                               CKIND_PIKACHU, CKIND_PICHU, CKIND_PURIN, CKIND_DONKEY, CKIND_KOOPA, CKIND_NESS };
+                               CKIND_PIKACHU, CKIND_PICHU, CKIND_PURIN, CKIND_DONKEY, CKIND_KOOPA, CKIND_NESS,
+                               CKIND_PEACH };
     for (size_t i = 0; i < sizeof(characters) / sizeof(characters[0]); ++i) {
         const MeleeWebFighterContent* row = melee_web_fighter_content(characters[i]);
         if (row->fighter_kind == kind) return row;

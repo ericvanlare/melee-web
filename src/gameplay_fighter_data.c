@@ -19,6 +19,7 @@
 #include <melee/ft/kinds/ftMars/types.h>
 #include <melee/ft/kinds/ftLink/types.h>
 #include <melee/ft/kinds/ftNess/types.h>
+#include <melee/ft/kinds/ftPeach/types.h>
 #include <sysdolphin/baselib/jobj.h>
 #include <stddef.h>
 #include <math.h>
@@ -30,6 +31,7 @@ typedef struct Counted { uint32_t count; void* data; } Counted;
 _Static_assert(sizeof(Counted) == 8, "Visibility descriptor ABI");
 _Static_assert(sizeof(ftLk_DatAttrs) == 0xDC, "Link extension ABI");
 _Static_assert(sizeof(ftNessAttributes) == 0xDC, "Ness extension ABI");
+_Static_assert(sizeof(ftPe_DatAttrs) == 0xC0, "Peach extension ABI");
 _Static_assert(sizeof(ftCaptain_DatAttrs) == 0x8C, "Captain/Ganon extension ABI");
 _Static_assert(sizeof(ftLuigiAttributes) == MELEE_WEB_LUIGI_ATTRIBUTE_BYTES, "Luigi extension ABI");
 _Static_assert(sizeof(ftDonkeyAttributes) == MELEE_WEB_DONKEY_ATTRIBUTE_BYTES, "Donkey extension ABI");
@@ -385,7 +387,7 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
         kind==FTKIND_FALCO || kind==FTKIND_MARS || kind==FTKIND_EMBLEM ||
         kind==FTKIND_LINK || kind==FTKIND_CLINK || kind==FTKIND_CAPTAIN || kind==FTKIND_GANON ||
         kind==FTKIND_DONKEY || kind==FTKIND_KOOPA || kind==FTKIND_LUIGI || kind==FTKIND_PIKACHU || kind==FTKIND_PICHU ||
-        kind==FTKIND_NESS || kind==FTKIND_PURIN,
+        kind==FTKIND_NESS || kind==FTKIND_PURIN || kind==FTKIND_PEACH,
         "Native fighter extension schema unavailable");
     REQUIRE(costumes>0 && costumes<=16,"Native costume count exceeds checked bound");
     REQUIRE(motion_count>0 && motion_count<=1024,"Native motion count exceeds checked bound");
@@ -449,6 +451,22 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
         REQUIRE(ness->xB8_BASEBALL_BAT.x0_bone_id<140 && ness->xB8_BASEBALL_BAT.x4_max_damage>0 &&
                     ness->xB8_BASEBALL_BAT.x14_size>0,
                 "Native Ness bat reflection descriptor invalid");
+    } else if(kind==FTKIND_PEACH) {
+        /* Peach owns a unique ftPe_DatAttrs ABI at root+4. The authored
+         * extent is exactly 0xC0 bytes; the Toad counter's held-item table
+         * keeps its source {odds, ItemKind} pairs and xAC is the original
+         * AbsorbDesc. floatfallf/b_anim_start are authored zero and filled
+         * at load from motions 18/19 by ftPe_Init_OnLoad. */
+        at=required(r,root+4,0xC0); ftPe_DatAttrs* peach=NEW(ftPe_DatAttrs,1); d->ext_attr=peach;
+#define PEACH(o,t,n,orig) peach->orig=READ_##t(at+o);
+        MELEE_WEB_PEACH_ATTRIBUTE_FIELDS(PEACH)
+#undef PEACH
+        REQUIRE(peach->speciallw_item_table_count>0 &&
+                    peach->speciallw_item_table_count<=
+                        (int)(sizeof(peach->speciallw_item_table)/sizeof(peach->speciallw_item_table[0])),
+                "Native Peach Toad counter item table exceeds its source extent");
+        REQUIRE(peach->xAC.x0_bone_id>=0 && peach->xAC.x0_bone_id<140 && peach->xAC.x10_size>0,
+                "Native Peach absorb descriptor invalid");
     } else if(kind==FTKIND_DONKEY) {
         at=required(r,root+4,MELEE_WEB_DONKEY_ATTRIBUTE_BYTES); ftDonkeyAttributes* donkey=NEW(ftDonkeyAttributes,1); d->ext_attr=donkey;
 #define DONKEY(o,t,n,orig) donkey->orig=READ_##t(at+o);
@@ -593,8 +611,12 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
             d->x2C->x8[i].x4=(Vec3){floating(r,row+4),floating(r,row+8),floating(r,row+12)};
             d->x2C->x8[i].x10=floating(r,row+16);
         }
-    } else REQUIRE(PTR(at+12,1)==UINT32_MAX,
+    } else REQUIRE(PTR(at+12,1)==UINT32_MAX || kind==FTKIND_PEACH,
                    "Empty native fighter dynamics has a nonnull auxiliary table");
+    /* Peach's authored x4 auxiliary count is zero, but the +0xC pointer is
+     * relocated and points just past her bone table. The original
+     * ftData dynamics consumers ignore the pointer when the count is zero,
+     * so that shape stays admissible instead of inventing an auxiliary row. */
     uint32_t dynamics_table=PTR(at+16,1);
     if(dynamics_table!=UINT32_MAX) {
         /* Authored dynamics modes carry one integer chain cutoff per active
@@ -610,7 +632,11 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
             (kind==FTKIND_MARS||kind==FTKIND_EMBLEM||kind==FTKIND_GANON) &&
             d->x2C->dynamicsNum==3;
         const bool donkey_modes = kind==FTKIND_DONKEY && d->x2C->dynamicsNum==1;
-        REQUIRE(sword_or_cape_modes || donkey_modes,
+        /* Peach authors 86 dynamics modes over her nine body chains; the
+         * selector is the second byte of every blend row like the families
+         * above. */
+        const bool peach_modes = kind==FTKIND_PEACH && d->x2C->dynamicsNum==9;
+        REQUIRE(sword_or_cape_modes || donkey_modes || peach_modes,
                 "Native fighter dynamics mode schema unavailable");
         REQUIRE(blends,"Native fighter dynamics selectors are missing");
         unsigned mode_count=0;
@@ -628,7 +654,12 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
             d->x2C->x10[mode]=NEW(FigaTree*,d->x2C->dynamicsNum);
             for(int bone=0;bone<d->x2C->dynamicsNum;++bone) {
                 uint32_t cutoff=WORD(row+bone*4);
-                REQUIRE(cutoff<=d->x2C->ftDynamicBones->array[bone].dyn_desc.count,
+                /* ftdynamics.c compares the authored value as an int against
+                 * the chain index, so 0x100 (ftCo_8009CB40's own sentinel)
+                 * selects the whole chain instead of a bounded cutoff.
+                 * Peach's mode[0] bones 2-7 author exactly this value;
+                 * Marth/Roy/Ganondorf/Donkey never do. */
+                REQUIRE(cutoff==0x100 || cutoff<=d->x2C->ftDynamicBones->array[bone].dyn_desc.count,
                         "Native fighter dynamics cutoff exceeds its source chain");
                 d->x2C->x10[mode][bone]=(FigaTree*)(uintptr_t)cutoff;
             }
@@ -690,7 +721,8 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
                                (kind==FTKIND_LUIGI||kind==FTKIND_KOOPA)?1:
                                (kind==FTKIND_PIKACHU||kind==FTKIND_PICHU)?3:
                                kind==FTKIND_PURIN?2:
-                               kind==FTKIND_NESS?11:4;
+                               kind==FTKIND_NESS?11:
+                               kind==FTKIND_PEACH?5:4;
     /* Fixed native capacity bounds the shared accessor for every admitted
      * family; only the exact source extent is read and remaining slots stay
      * null. Ness's authored table has eleven Article slots (all required by
@@ -766,6 +798,10 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
             d->x48_items[3] && d->x48_items[4] && d->x48_items[5] && d->x48_items[6] &&
             d->x48_items[7] && d->x48_items[8] && d->x48_items[9] && d->x48_items[10],
             "Ness OnLoad requires its eleven PK Fire/Flash/Thunder, Bat and Yoyo Articles");
+    else if(kind==FTKIND_PEACH)
+        REQUIRE(at!=UINT32_MAX && d->x48_items[0] && d->x48_items[1] && d->x48_items[2] &&
+            d->x48_items[3] && d->x48_items[4],
+            "Peach OnLoad requires its five Explode/Turnip/Parasol/Toad/ToadSpore Articles");
     else
         REQUIRE((kind==FTKIND_MARS||kind==FTKIND_EMBLEM) && at==UINT32_MAX,
                 "Marth/Roy source ftData must not invent an Article table");

@@ -193,7 +193,8 @@ struct GameplayFighterAssets::Storage {
             (id.fighter_kind==FTKIND_LUIGI||id.fighter_kind==FTKIND_KOOPA)?4:
             id.fighter_kind==FTKIND_PURIN?8:
             (id.fighter_kind==FTKIND_PIKACHU||id.fighter_kind==FTKIND_PICHU)?12:
-            id.fighter_kind==FTKIND_NESS?44:16;
+            id.fighter_kind==FTKIND_NESS?44:
+            id.fighter_kind==FTKIND_PEACH?20:16;
         const auto item_table=fighter->pointer(fighter_root+0x48,item_table_bytes);
         struct ItemIdentity { uint32_t index,kind; };
         std::array<ItemIdentity,11> item_identities{};
@@ -248,6 +249,15 @@ struct GameplayFighterAssets::Storage {
             item_identities[item_count++]={8,static_cast<uint32_t>(It_Kind_Ness_PKFlush_Explode)};
             item_identities[item_count++]={9,static_cast<uint32_t>(It_Kind_Ness_Bat)};
             item_identities[item_count++]={10,static_cast<uint32_t>(It_Kind_Ness_Yoyo)};
+        } else if(id.fighter_kind==FTKIND_PEACH) {
+            if(!item_table)throw DatError("Peach item Article table is missing");
+            /* All five slots are required by ftPe_Init_OnLoad, in this
+             * original registration order. */
+            item_identities[item_count++]={0,static_cast<uint32_t>(It_Kind_Peach_Explode)};
+            item_identities[item_count++]={1,static_cast<uint32_t>(It_Kind_Peach_Turnip)};
+            item_identities[item_count++]={2,static_cast<uint32_t>(It_Kind_Peach_Parasol)};
+            item_identities[item_count++]={3,static_cast<uint32_t>(It_Kind_Peach_Toad)};
+            item_identities[item_count++]={4,static_cast<uint32_t>(It_Kind_Peach_ToadSpore)};
         } else if(id.fighter_kind==FTKIND_PIKACHU || id.fighter_kind==FTKIND_PICHU) {
             if(!item_table)throw DatError("Pikachu-family item Article table is missing");
             const auto& attributes=prototype.runtime().pikachu_attributes();

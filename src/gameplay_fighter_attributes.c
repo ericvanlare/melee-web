@@ -5,6 +5,7 @@
 #include <melee/ft/kinds/ftFox/types.h>
 #include <melee/ft/kinds/ftCaptain/types.h>
 #include <melee/ft/kinds/ftNess/types.h>
+#include <melee/ft/kinds/ftPeach/types.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <math.h>
 #include <stddef.h>
@@ -17,6 +18,7 @@ _Static_assert(sizeof(ftMario_DatAttrs) == 0x84, "Original Mario attribute size"
 _Static_assert(sizeof(ftFox_DatAttrs) == 0xD4, "Original Fox/Falco attribute size");
 _Static_assert(sizeof(ftCaptain_DatAttrs) == 0x8C, "Original Captain/Ganon attribute size");
 _Static_assert(sizeof(ftNessAttributes) == 0xDC, "Original Ness attribute size");
+_Static_assert(sizeof(ftPe_DatAttrs) == 0xC0, "Original Peach attribute size");
 _Static_assert(sizeof(itPickup) == 0x30, "Original item pickup size");
 _Static_assert(sizeof(ftData) == 0x60, "Original fighter data size");
 _Static_assert(sizeof(ftHurtboxInit) == 40 && offsetof(ftHurtboxInit, scale) == 36 &&
@@ -49,6 +51,8 @@ MELEE_WEB_CAPTAIN_ATTRIBUTE_FIELDS(CHECK_CAPTAIN)
 MELEE_WEB_FOX_ATTRIBUTE_FIELDS(CHECK_FOX)
 #define CHECK_NESS(at, type, name, original) CHECK_FIELD(ftNessAttributes, MeleeWebNessAttributes, at, type, name, original)
 MELEE_WEB_NESS_ATTRIBUTE_FIELDS(CHECK_NESS)
+#define CHECK_PEACH(at, type, name, original) CHECK_FIELD(ftPe_DatAttrs, MeleeWebPeachAttributes, at, type, name, original)
+MELEE_WEB_PEACH_ATTRIBUTE_FIELDS(CHECK_PEACH)
 #define CHECK_PICKUP(at, type, name, original) CHECK_FIELD(itPickup, MeleeWebItemPickup, at, type, name, original)
 MELEE_WEB_PICKUP_ATTRIBUTE_FIELDS(CHECK_PICKUP)
 #undef CHECK_CO
@@ -56,6 +60,7 @@ MELEE_WEB_PICKUP_ATTRIBUTE_FIELDS(CHECK_PICKUP)
 #undef CHECK_CAPTAIN
 #undef CHECK_FOX
 #undef CHECK_NESS
+#undef CHECK_PEACH
 #undef CHECK_PICKUP
 #undef CHECK_FIELD
 

@@ -508,7 +508,7 @@
       "id": "fighter-peach",
       "category": "fighters",
       "title": "Peach selectable fighter",
-      "implementation": "not_integrated",
+      "implementation": "partial",
       "acceptance": "not_evaluated",
       "source_identity": {
         "ckind": "CKIND_PEACH",
@@ -528,9 +528,10 @@
       ],
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
-        "docs/ACCURACY_CONTRACT.md"
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/PEACH_PORT_NOTES.md"
       ],
-      "next_step": "Run the fighter checkpoint for Peach and split its costume, action, article, effect and audio coverage into bounded receipts.",
+      "next_step": "Browser frames (checkpoint 4), CSS/SSS round trip, original comparison, pixels/PCM and performance admission; the Toad spore counter and float-aerial interactions need their own evidence.",
       "issue": null
     },
     {

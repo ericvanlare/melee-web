@@ -9,6 +9,7 @@
 #include <melee/ft/kinds/ftDonkey/forward.h>
 #include <melee/ft/kinds/ftKoopa/forward.h>
 #include <melee/ft/kinds/ftNess/forward.h>
+#include <melee/ft/kinds/ftPeach/forward.h>
 #include <melee/ft/kinds/ftLuigi/forward.h>
 #include <melee/ft/kinds/ftPikachu/forward.h>
 #include <melee/ft/kinds/ftPurin/forward.h>
@@ -347,6 +348,7 @@ int main(int argc,char** argv){try{
         const bool donkey=fighter_content->fighter_kind==FTKIND_DONKEY;
         const bool koopa=fighter_content->fighter_kind==FTKIND_KOOPA;
         const bool ness=fighter_content->fighter_kind==FTKIND_NESS;
+        const bool peach=fighter_content->fighter_kind==FTKIND_PEACH;
         const bool luigi=fighter_content->fighter_kind==FTKIND_LUIGI;
         const bool pikachu_family=fighter_content->fighter_kind==FTKIND_PIKACHU||
             fighter_content->fighter_kind==FTKIND_PICHU;
@@ -1197,6 +1199,156 @@ int main(int argc,char** argv){try{
                   "Ness Yo-Yo article did not end through its source lifetime");
             settle_ness();
             std::cout<<"Ness original N/air-N/S/Hi/Lw and Yo-Yo smash lifecycle branches executed"<<std::endl;
+        }else if(cycle==0&&peach){
+            // Drives every Peach special family plus her signature float from
+            // raw PAD edges. Records source motion IDs and article lifetimes
+            // only; no Fighter state is manufactured. Peach's Toad spore
+            // generators need an opponent hit on the counter and stay out of
+            // scope here.
+            auto settle_peach=[&](){
+                raw[0].button=0;raw[0].stickX=raw[0].stickY=0;
+                for(unsigned n=0;n<720;n++){
+                    const auto state=match.player_stats(0);
+                    if(state.ground_or_air==0&&state.motion_id<ftPe_MS_Float)return;
+                    tick();
+                }
+                const auto state=match.player_stats(0);
+                std::cout<<"Peach settle failure motion="<<state.motion_id
+                         <<" ground="<<state.ground_or_air<<" x="<<state.position[0]
+                         <<" y="<<state.position[1]<<std::endl;
+                check(false,"Peach special did not return to a grounded common motion");
+            };
+            auto jump_peach=[&](){
+                settle_peach();
+                // A landing or late IASA frame can swallow one X edge; keep
+                // pressing on the source jump window until the authored
+                // aerial state is reached.
+                raw[0].button=0;
+                for(unsigned n=0;n<90&&match.player_stats(0).ground_or_air==0;n++){
+                    raw[0].button=n%12==0?PAD_BUTTON_X:0;tick();
+                }
+                raw[0].button=0;
+                check(match.player_stats(0).ground_or_air!=0,
+                      "Peach full jump did not reach the source aerial state");
+            };
+            // Ground neutral: the Toad counter spawns its original Toad
+            // article, then tears it down through the source counter lifetime.
+            settle_peach();
+            bool toad_start=false,toad_live=false;
+            for(unsigned n=0;n<240&&!(toad_start&&toad_live);n++){
+                raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
+                const auto motion=match.player_stats(0).motion_id;
+                toad_start|=motion>=ftPe_MS_SpecialN&&motion<=ftPe_MS_SpecialNHit;
+                toad_live|=melee_web_test_item_count(It_Kind_Peach_Toad)>0;
+            }
+            raw[0].button=0;
+            check(toad_start&&toad_live,
+                  "Peach ground neutral special did not spawn its original Toad article");
+            bool toad_cleared=false;
+            for(unsigned n=0;n<600&&!toad_cleared;n++){
+                tick();
+                toad_cleared=melee_web_test_item_count(It_Kind_Peach_Toad)==0&&
+                    match.player_stats(0).ground_or_air==0&&
+                    match.player_stats(0).motion_id<ftPe_MS_Float;
+            }
+            check(toad_cleared,"Peach Toad did not end through its source lifetime");
+            // Aerial neutral: the same counter in the air, then land.
+            jump_peach();
+            bool air_toad=false;
+            for(unsigned n=0;n<200&&!air_toad;n++){
+                raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
+                const auto motion=match.player_stats(0).motion_id;
+                air_toad|=motion>=ftPe_MS_SpecialAirN&&motion<=ftPe_MS_SpecialAirNHit;
+            }
+            raw[0].button=0;
+            check(air_toad,"Peach aerial neutral special did not enter its source motion");
+            for(unsigned n=0;n<600&&match.player_stats(0).ground_or_air!=0;n++)tick();
+            settle_peach();
+            std::cout<<"Peach ground/aerial Toad counter lifetimes passed"<<std::endl;
+            // Down special: the vegetable pull spawns the authored turnip
+            // article with its model, material states and its own command
+            // stream. The pull keeps the vegetable held; its lifetime tears
+            // it down afterwards.
+            for(bool air:{false,true}){
+                if(air)jump_peach();else settle_peach();
+                bool veg_entered=false,veg_live=false;
+                for(unsigned n=0;n<240&&!(veg_entered&&veg_live);n++){
+                    raw[0].button=n%8==0?PAD_BUTTON_B:0;
+                    raw[0].stickX=0;raw[0].stickY=-80;tick();
+                    const auto motion=match.player_stats(0).motion_id;
+                    veg_entered|=motion==ftPe_MS_SpecialLw||motion==ftPe_MS_SpecialAirLw;
+                    veg_live|=melee_web_test_item_count(It_Kind_Peach_Turnip)>0;
+                }
+                raw[0].button=0;raw[0].stickY=0;
+                check(veg_entered&&veg_live,
+                      "Peach down special did not pull its original vegetable article");
+                for(unsigned n=0;n<600&&match.player_stats(0).ground_or_air!=0;n++)tick();
+                settle_peach();
+                // A held vegetable never expires; the source light-item throw
+                // releases it and the authored turnip lifetime tears the free
+                // item down.
+                raw[0].button=PAD_BUTTON_A;tick();raw[0].button=0;
+                for(unsigned n=0;n<900&&melee_web_test_item_count(It_Kind_Peach_Turnip)>0;n++)tick();
+                check(melee_web_test_item_count(It_Kind_Peach_Turnip)==0,
+                      "Peach vegetable did not end through its source lifetime");
+                settle_peach();
+                std::cout<<"Peach "<<(air?"air":"ground")<<" vegetable pull lifetime passed"<<std::endl;
+            }
+            // Side special: the Bomber ground/air states with no owned item.
+            for(bool air:{false,true}){
+                if(air)jump_peach();else settle_peach();
+                bool entered=false;
+                for(unsigned n=0;n<200&&!entered;n++){
+                    raw[0].button=n%8==0?PAD_BUTTON_B:0;
+                    raw[0].stickX=air?-80:80;raw[0].stickY=0;tick();
+                    const auto motion=match.player_stats(0).motion_id;
+                    entered=(motion>=ftPe_MS_SpecialSStart&&motion<=ftPe_MS_SpecialSJump)||
+                            (motion>=ftPe_MS_SpecialAirSStart&&motion<=ftPe_MS_SpecialAirSJump);
+                }
+                raw[0].button=0;raw[0].stickX=0;
+                check(entered,"Peach side special did not enter its ground/air source motion");
+                for(unsigned n=0;n<600&&match.player_stats(0).ground_or_air!=0;n++)tick();
+                settle_peach();
+                std::cout<<"Peach "<<(air?"air":"ground")<<" Bomber state passed"<<std::endl;
+            }
+            // Up special: the Parasol opens its owned article for the rise and
+            // tears it down through the source landing.
+            for(bool air:{false,true}){
+                if(air)jump_peach();else settle_peach();
+                bool entered=false,parasol_live=false;
+                for(unsigned n=0;n<240&&!(entered&&parasol_live);n++){
+                    raw[0].button=n%8==0?PAD_BUTTON_B:0;
+                    raw[0].stickX=0;raw[0].stickY=air?80:80;tick();
+                    const auto motion=match.player_stats(0).motion_id;
+                    entered=motion==ftPe_MS_SpecialHiStart||motion==ftPe_MS_SpecialHiEnd||
+                            motion==ftPe_MS_SpecialAirHiStart||motion==ftPe_MS_SpecialAirHiEnd;
+                    parasol_live|=melee_web_test_item_count(It_Kind_Peach_Parasol)>0;
+                }
+                raw[0].button=0;raw[0].stickY=0;
+                check(entered,"Peach up special did not enter its ground/air source motion");
+                check(parasol_live,"Peach up special did not open its original Parasol article");
+                for(unsigned n=0;n<900&&match.player_stats(0).ground_or_air!=0;n++)tick();
+                for(unsigned n=0;n<600&&melee_web_test_item_count(It_Kind_Peach_Parasol)>0;n++)tick();
+                check(melee_web_test_item_count(It_Kind_Peach_Parasol)==0,
+                      "Peach Parasol article did not end through its source lifetime");
+                settle_peach();
+                std::cout<<"Peach "<<(air?"air":"ground")<<" Parasol lifetime passed"<<std::endl;
+            }
+            // The float: checkStartFloatInput requires holding X/Y with the
+            // stick beyond the down threshold, and ftCo_Jump/ftCo_Fall probe
+            // it during ascent, so hold both through the jump.
+            jump_peach();
+            bool float_seen=false;
+            for(unsigned n=0;n<300&&!float_seen;n++){
+                raw[0].button=PAD_BUTTON_X;raw[0].stickY=-80;tick();
+                const auto motion=match.player_stats(0).motion_id;
+                float_seen|=motion>=ftPe_MS_Float&&motion<=ftPe_MS_FloatAttackAirLw;
+            }
+            raw[0].button=0;raw[0].stickY=0;
+            check(float_seen,"Peach holding down+jump did not enter the authored Float state");
+            for(unsigned n=0;n<600&&match.player_stats(0).ground_or_air!=0;n++)tick();
+            settle_peach();
+            std::cout<<"Peach original N/air-N/Float/Lw/S/Hi and vegetable/Toad/Parasol article lifetimes passed"<<std::endl;
         }else if(cycle==0&&luigi){
             auto settle_luigi=[&](){
                 raw[0].button=0;raw[0].stickX=raw[0].stickY=0;

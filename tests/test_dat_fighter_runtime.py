@@ -60,6 +60,15 @@ class DatFighterRuntimeTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("Ness 0xDC attributes", result.stdout)
 
+    def test_real_peach_attribute_boundary(self):
+        asset = ROOT / "assets-local/full-game-peach/PlPe.dat"
+        if not asset.is_file():
+            self.skipTest("owned Peach fighter archive is unavailable")
+        result = subprocess.run([str(self.binary), "real_peach", str(asset)],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Peach 0xC0 attributes", result.stdout)
+
     def test_real_luigi_attribute_boundary(self):
         asset = ROOT / "assets-local/full-game-luigi/PlLg.dat"
         effects = ROOT / "assets-local/full-game-luigi/EfLgData.dat"

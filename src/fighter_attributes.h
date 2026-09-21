@@ -430,6 +430,65 @@
     X(0x0d4, F32, bat_reflect_speed_mul, xB8_BASEBALL_BAT.x1C_speed_mul) \
     X(0x0d8, U8, bat_reflect_behavior, xB8_BASEBALL_BAT.x20_behavior)
 
+/* Peach owns the unique 0xC0 ftPe_DatAttrs extension. The float-fall anim
+ * starts are authored zero and filled at load from motions 18/19
+ * (ftPe_Init_OnLoad -> lbAnim_8001E8F8); the Toad counter's held-item table
+ * keeps its source {odds, ItemKind} pairs. The pinned header annotates
+ * speciallw_item_table at +0x1C, but three 8-byte entries cannot end before
+ * the +0x30 member and the real C layout places the table at +0x18, which is
+ * where the decoded pairs (2,0x06),(3,0x07),(1,0x0C) and the pickVeg consumer
+ * (ftpeachspeciallw.c) both land. xAC is the original AbsorbDesc, so its
+ * source member designators stay in the rows. */
+#define MELEE_WEB_PEACH_ATTRIBUTE_FIELDS(X) \
+    X(0x000, F32, floatfallf_anim_start, floatfallf_anim_start) \
+    X(0x004, F32, floatfallb_anim_start, floatfallb_anim_start) \
+    X(0x008, F32, floatfall_anim_start_offset, floatfall_anim_start_offset) \
+    X(0x00c, F32, xC, xC) \
+    X(0x010, I32, speciallw_item_table_count, speciallw_item_table_count) \
+    X(0x014, I32, x14, x14) \
+    X(0x018, I32, speciallw_item_0_randi_max, speciallw_item_table[0].randi_max) \
+    X(0x01c, I32, speciallw_item_0_kind, speciallw_item_table[0].kind) \
+    X(0x020, I32, speciallw_item_1_randi_max, speciallw_item_table[1].randi_max) \
+    X(0x024, I32, speciallw_item_1_kind, speciallw_item_table[1].kind) \
+    X(0x028, I32, speciallw_item_2_randi_max, speciallw_item_table[2].randi_max) \
+    X(0x02c, I32, speciallw_item_2_kind, speciallw_item_table[2].kind) \
+    X(0x030, I32, x30, x30) \
+    X(0x034, F32, x34, x34) \
+    X(0x038, F32, specials_start_accel, specials_start_accel) \
+    X(0x03c, F32, specials_start_vel_x, specials_start_vel_x) \
+    X(0x040, F32, x40, x40) \
+    X(0x044, F32, specials_vel_x, specials_vel_x) \
+    X(0x048, F32, specials_smash_vel_x, specials_smash_vel_x) \
+    X(0x04c, F32, specials_vel_y, specials_vel_y) \
+    X(0x050, F32, x50_gravity, x50_gravity) \
+    X(0x054, F32, x54, x54) \
+    X(0x058, F32, x58_gravity, x58_gravity) \
+    X(0x05c, F32, x5C_terminal_vel, x5C_terminal_vel) \
+    X(0x060, F32, specials_end_vel_x, specials_end_vel_x) \
+    X(0x064, F32, specials_end_vel_y, specials_end_vel_y) \
+    X(0x068, F32, x68, x68) \
+    X(0x06c, F32, x6C, x6C) \
+    X(0x070, F32, x70, x70) \
+    X(0x074, F32, x74, x74) \
+    X(0x078, F32, x78, x78) \
+    X(0x07c, F32, x7C, x7C) \
+    X(0x080, F32, x80, x80) \
+    X(0x084, F32, x84, x84) \
+    X(0x088, F32, x88, x88) \
+    X(0x08c, F32, x8C, x8C) \
+    X(0x090, I32, x90, x90) \
+    X(0x094, F32, specialairn_vel_x_div, specialairn_vel_x_div) \
+    X(0x098, F32, x98, x98) \
+    X(0x09c, F32, specialairn_vel_y, specialairn_vel_y) \
+    X(0x0a0, F32, xA0, xA0) \
+    X(0x0a4, F32, xA4, xA4) \
+    X(0x0a8, F32, xA8, xA8) \
+    X(0x0ac, I32, absorb_bone, xAC.x0_bone_id) \
+    X(0x0b0, F32, absorb_offset_x, xAC.x4_offset.x) \
+    X(0x0b4, F32, absorb_offset_y, xAC.x4_offset.y) \
+    X(0x0b8, F32, absorb_offset_z, xAC.x4_offset.z) \
+    X(0x0bc, F32, absorb_size, xAC.x10_size)
+
 #define MELEE_WEB_PICKUP_ATTRIBUTE_FIELDS(X) \
     X(0x000, F32, gr_light_offset_x, gr_light_offset.x) \
     X(0x004, F32, gr_light_offset_y, gr_light_offset.y) \
@@ -468,6 +527,9 @@ typedef struct MeleeWebLinkAttributes {
 typedef struct MeleeWebNessAttributes {
     MELEE_WEB_NESS_ATTRIBUTE_FIELDS(MELEE_WEB_DECLARE_ATTRIBUTE)
 } MeleeWebNessAttributes;
+typedef struct MeleeWebPeachAttributes {
+    MELEE_WEB_PEACH_ATTRIBUTE_FIELDS(MELEE_WEB_DECLARE_ATTRIBUTE)
+} MeleeWebPeachAttributes;
 typedef struct MeleeWebItemPickup {
     MELEE_WEB_PICKUP_ATTRIBUTE_FIELDS(MELEE_WEB_DECLARE_ATTRIBUTE)
 } MeleeWebItemPickup;

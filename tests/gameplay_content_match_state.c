@@ -53,6 +53,7 @@ static const MeleeWebSourceIdentity* melee_web_source_identity(int ckind){
         {CKIND_DONKEY, FTKIND_DONKEY, ICONHUD_DONKEY},
         {CKIND_KOOPA, FTKIND_KOOPA, ICONHUD_KOOPA},
         {CKIND_NESS, FTKIND_NESS, ICONHUD_NESS},
+        {CKIND_PEACH, FTKIND_PEACH, ICONHUD_PEACH},
     };
     for (unsigned i=0;i<sizeof(rows)/sizeof(rows[0]);++i)
         if (rows[i].character==(CharacterKind)ckind) return &rows[i];

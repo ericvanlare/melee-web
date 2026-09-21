@@ -188,6 +188,36 @@ void verify_common_appeals(std::shared_ptr<const DatArchive> archive, const Byte
                   "Ness shared Koopa victim rows are not admitted");
         std::cout << "Ness kind 8 authored self-motion rows 295/325 and empty victim dispatch: passed\n";
     }
+    if (costume.fighter_kind == 9) {
+        check(costume.motion_count == 318, "Peach authored action count changed");
+        for (unsigned motion = 295; motion < costume.motion_count; ++motion) {
+            check(store.command_ready(motion), "Peach self-motion graph is not admitted");
+            check(store.runtime().commands(motion).has_value() ==
+                      store.runtime().action(motion).command_offset.has_value(),
+                  "Peach self-motion source command presence changed");
+        }
+        // Peach's own victim-side rows 259-261 and 266-285 are empty motions
+        // (no authored clip bytes), exactly like Ness's and Marth's identical
+        // table shape: the shared cargo victim groups 267-275 and 278-283 are
+        // admitted, the remaining rows keep the same non-admitted command
+        // treatment as every other fighter and the animation identity comes
+        // from the thrower's store, so a captured/shouldered Peach never
+        // reaches a divergent state relative to the admitted Mario victim.
+        for (unsigned motion : {259U, 260U, 261U, 266U, 267U, 268U, 269U, 270U,
+                                271U, 272U, 273U, 274U, 275U, 276U, 277U, 278U,
+                                279U, 280U, 281U, 282U, 283U, 284U, 285U}) {
+            const auto& action = store.runtime().action(motion);
+            check(!action.archive_bytes,
+                  "Peach authored victim motion unexpectedly gained clip data");
+        }
+        for (unsigned motion = 267; motion <= 275; ++motion)
+            check(store.command_ready(motion),
+                  "Peach shared cargo victim rows are not admitted");
+        for (unsigned motion = 278; motion <= 283; ++motion)
+            check(store.command_ready(motion),
+                  "Peach shared Koopa victim rows are not admitted");
+        std::cout << "Peach kind 9 authored self-motion rows 295/317 and empty victim dispatch: passed\n";
+    }
     unsigned expected_command_mask = 0;
     for (unsigned index = 0; index < 2; ++index) {
         const unsigned motion = 239 + index;
