@@ -1,5 +1,6 @@
 #include "gameplay_rumble.h"
 #include <melee/lb/types.h>
+#include <sysdolphin/baselib/rumble.h>
 #include <stdio.h>
 
 struct MeleeWebRumble {
@@ -58,12 +59,20 @@ MeleeWebRumble* melee_web_rumble_decode(const MeleeWebNativeDat* r,
     return h;
 }
 
+static HSD_PadRumbleListData world_rumble_lists[12];
+
 int melee_web_rumble_begin(MeleeWebRumble* h, char* e, size_t n)
 {
     if (!h || active) {
         if (e && n) snprintf(e, n, "Rumble data owner missing or already active");
         return 0;
     }
+    /* Source boot (gmMain_8015FD24 -> HSD_PadInit) installs a 12-entry
+     * interpreter pool before any scene runs. Without it the pad library's
+     * rumble_info points at uninitialized memory, and the first original
+     * rumble request — the CSS confirm rumble — faults on it. The match
+     * context installs its own equivalent pool and restores this one. */
+    HSD_PadRumbleInit(12, world_rumble_lists);
     h->previous = melee_web_rumble_exchange(h->rows); active = h;
     return 1;
 }

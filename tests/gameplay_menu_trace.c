@@ -5,12 +5,22 @@
 
 #include <melee/ft/forward.h>
 #include <melee/pl/forward.h>
+#include <sysdolphin/baselib/gobj.h>
+#include <sysdolphin/baselib/gobjplink.h>
 
 #include <stdio.h>
 #include <string.h>
 
 /* These stubs exercise the lifecycle contract only. They deliberately do not
  * claim that the source CSS/SSS assets or their HSD services execute here. */
+
+/* The retained one-world runtime destroys the leaving menu scene's gobj
+ * entity lists through the real HSD gobj primitives; this contract fixture
+ * has no gobj system, so the teardown observes empty stub lists. */
+static HSD_GObj* menu_trace_gobj_heads[15];
+HSD_GObjList* HSD_GObj_Entities = (HSD_GObjList*)menu_trace_gobj_heads;
+void HSD_GObjPLink_80390228(HSD_GObj* gobj) { (void)gobj; }
+
 void gm_InitVsMode(VsModeData* vs)
 {
     memset(vs, 0, sizeof(*vs));

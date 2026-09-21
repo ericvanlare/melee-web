@@ -5,8 +5,11 @@
 
 #include <melee/gm/gm_1601.h>
 #include <melee/mn/mncharsel.h>
+#include <melee/mn/mnmain.h>
 #include <melee/mn/mnstagesel.h>
 #include <melee/pl/forward.h>
+#include <sysdolphin/baselib/gobj.h>
+#include <sysdolphin/baselib/gobjplink.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,6 +31,39 @@ struct MeleeWebMenuSession {
 };
 
 static MeleeWebMenuSession* owner;
+
+/* The original game-mode layer re-initializes the HSD gobj library at every
+ * scene change (gm_801A4BD4), which destroys the previous scene's gobj entity
+ * lists. The retained one-world port shares those lists with its own retained
+ * owners, so instead the host snapshots each list's head when the scene's
+ * original enter runs and destroys exactly the gobjs created since that
+ * snapshot when the scene leaves, with the source's own per-gobj teardown
+ * primitive (HSD_GObjPLink_80390228, as mn_8022F0F0 walks it for menu
+ * back-outs). Without this, menu gobjs such as the CSS confirm-tag processor
+ * fn_80262F44 keep running their processes inside later scenes; its confirm
+ * rumble then faults against the next world's rumble state and stops the
+ * player. */
+#define MELEE_WEB_MENU_TEARDOWN_LISTS 15
+static HSD_GObj* menu_gobj_heads[MELEE_WEB_MENU_TEARDOWN_LISTS];
+static void melee_web_menu_gobj_snapshot(void)
+{
+    if(!HSD_GObj_Entities)return;
+    for(unsigned i=1;i<MELEE_WEB_MENU_TEARDOWN_LISTS;++i)
+        menu_gobj_heads[i]=((HSD_GObj**)HSD_GObj_Entities)[i];
+}
+static void melee_web_menu_gobj_teardown(void)
+{
+    if(!HSD_GObj_Entities)return;
+    for(unsigned i=1;i<MELEE_WEB_MENU_TEARDOWN_LISTS;++i){
+        HSD_GObj* stop=menu_gobj_heads[i];
+        HSD_GObj* curr=((HSD_GObj**)HSD_GObj_Entities)[i];
+        while(curr&&curr!=stop){
+            HSD_GObj* next=curr->next;
+            HSD_GObjPLink_80390228(curr);
+            curr=next;
+        }
+    }
+}
 
 extern int melee_web_vs_prepare_start_source(StartMeleeData*,
                                               const VsModeData*);
@@ -406,6 +442,7 @@ static int enter_css(MeleeWebMenuSession* session, int after_match,
     session->selection_rejected = 0;
     session->transition_failed = 0;
     session->transition_requested = 0;
+    melee_web_menu_gobj_snapshot();
     mnCharSel_Scene_OnEnter(&session->css);
     session->css_open = 1;
     session->phase = MELEE_WEB_MENU_CSS;
@@ -462,6 +499,7 @@ int melee_web_menu_enter_sss(MeleeWebMenuSession* session, char* error,
     session->selection_rejected = 0;
     session->transition_failed = 0;
     session->transition_requested = 0;
+    melee_web_menu_gobj_snapshot();
     mnStageSel_Scene_OnEnter(&session->sss);
     session->sss_open = 1;
     session->phase = MELEE_WEB_MENU_SSS;
@@ -562,6 +600,7 @@ int melee_web_menu_leave_css(MeleeWebMenuSession* session, char* error,
                     "Cannot commit an unavailable character selection");
     }
     mnCharSel_Scene_OnExit(NULL);
+    melee_web_menu_gobj_teardown();
     session->css_open = 0;
     session->transition_requested = 0;
     pending = session->css.pending_scene_change;
@@ -606,6 +645,7 @@ int melee_web_menu_leave_sss(MeleeWebMenuSession* session, char* error,
                     "Cannot commit an unavailable stage selection");
     }
     mnStageSel_Scene_OnExit(NULL);
+    melee_web_menu_gobj_teardown();
     session->sss_open = 0;
     session->transition_requested = 0;
     if (!melee_web_menu_sss_selection_valid(&session->sss)) {
@@ -645,6 +685,7 @@ int melee_web_menu_abort(MeleeWebMenuSession* session, char* error,
         mnStageSel_Scene_OnExit(NULL);
         session->sss_open = 0;
     }
+    melee_web_menu_gobj_teardown();
     session->phase = MELEE_WEB_MENU_CLOSED;
     return ok(error, error_size);
 }
