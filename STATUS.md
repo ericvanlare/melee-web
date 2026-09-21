@@ -1,5 +1,18 @@
 # Current status
 
+## Ness development checkpoint
+
+Ness is integrated as a development candidate with his original
+`CKIND_NESS`/`FTKIND_NESS` identity, four costumes, the unique 0xDC
+`ftNessAttributes` extension, empty authored dynamics, null Wait table,
+eleven authored Article slots, model-only effect bank 10 (four rows, entries
+0-2 consumed) and `ness.ssm`. The real-asset attribute boundary test passes.
+The FD lifecycle trace is retained at a construction segfault reached after
+the effect-bank blending relaxation; source-cited shared repairs admitted item
+command opcode 16, cross-boundary item script tails and the unclamped original
+TObj blending constant. Browser frames, original comparison, pixels, PCM and
+performance are not run; see [Ness's retained failure and scope](docs/NESS_PORT_NOTES.md).
+
 ## Donkey Kong platform shield-drop repair
 
 The Battlefield shield-drop crash from [issue #50](https://github.com/ericvanlare/melee-web/issues/50)

@@ -8,6 +8,7 @@
 #include <melee/ft/kinds/ftCaptain/forward.h>
 #include <melee/ft/kinds/ftDonkey/forward.h>
 #include <melee/ft/kinds/ftKoopa/forward.h>
+#include <melee/ft/kinds/ftNess/forward.h>
 #include <melee/ft/kinds/ftLuigi/forward.h>
 #include <melee/ft/kinds/ftPikachu/forward.h>
 #include <melee/ft/kinds/ftPurin/forward.h>
@@ -345,6 +346,7 @@ int main(int argc,char** argv){try{
         const bool ganon=fighter_content->fighter_kind==FTKIND_GANON;
         const bool donkey=fighter_content->fighter_kind==FTKIND_DONKEY;
         const bool koopa=fighter_content->fighter_kind==FTKIND_KOOPA;
+        const bool ness=fighter_content->fighter_kind==FTKIND_NESS;
         const bool luigi=fighter_content->fighter_kind==FTKIND_LUIGI;
         const bool pikachu_family=fighter_content->fighter_kind==FTKIND_PIKACHU||
             fighter_content->fighter_kind==FTKIND_PICHU;
@@ -983,6 +985,10 @@ int main(int argc,char** argv){try{
             run_special(false,ftDk_MS_SpecialLwStart,ftDk_MS_SpecialLwStart,0,-80,
                         "Donkey grounded Hand Slap did not enter its original source state");
 
+            // The cargo victim can be any admitted fighter; running this
+            // branch with P2=Ness dispatches Ness empty victim rows 267..283
+            // from the thrower store and exercises his own empty rows.
+            const int cargo_victim_kind=opponent_content->fighter_kind;
             // Approach with source movement, then neutralize the stick while
             // the ordinary Z edge enters Catch/CatchPull.
             // ftCo_CatchWait_IASA then requires a *new* stick threshold crossing
@@ -999,7 +1005,7 @@ int main(int argc,char** argv){try{
                 const bool in_range=std::abs(delta)<18.0f && delta*player.facing_direction>0;
                 raw[0].stickX=in_range?0:delta>0?80:-80;raw[0].stickY=0;
                 raw[0].button=in_range&&n%20==0?PAD_TRIGGER_Z:0;tick();
-                catch_wait=melee_web_test_donkey_cargo(4,FTKIND_MARIO)!=0;
+                catch_wait=melee_web_test_donkey_cargo(4,cargo_victim_kind)!=0;
             }
             raw[0].button=0;raw[0].stickX=raw[0].stickY=0;
             check(catch_wait,"Donkey raw Z input did not reach source CatchWait with Mario as victim");
@@ -1018,7 +1024,7 @@ int main(int argc,char** argv){try{
                 raw[0].stickX=0;raw[0].button=0;tick();
                 const auto motion=match.player_stats(0).motion_id;
                 common_throw|=motion==ftCo_MS_ThrowF||motion==ftCo_MS_ThrowB;
-                cargo|=melee_web_test_donkey_cargo(0,FTKIND_MARIO)!=0;
+                cargo|=melee_web_test_donkey_cargo(0,cargo_victim_kind)!=0;
             }
             raw[0].button=0;raw[0].stickX=0;
             check(common_throw,"Donkey CatchWait stick edge did not enter source ThrowF/ThrowB");
@@ -1028,7 +1034,7 @@ int main(int argc,char** argv){try{
                 const auto state=match.player_stats(0);
                 raw[0].stickX=state.position[0]>0?-80:80;
                 tick();
-                cargo_walk|=melee_web_test_donkey_cargo(2,FTKIND_MARIO)!=0;
+                cargo_walk|=melee_web_test_donkey_cargo(2,cargo_victim_kind)!=0;
             }
             raw[0].stickX=0;
             check(cargo_walk,"Donkey source CargoWait did not select authored CargoWalk 352..354");
@@ -1041,7 +1047,7 @@ int main(int argc,char** argv){try{
                 const auto state=match.player_stats(0);
                 raw[0].stickX=state.position[0]>0?-80:80;
                 raw[0].button=n==0?PAD_BUTTON_A:0;tick();
-                cargo_throw=melee_web_test_donkey_cargo(1,FTKIND_MARIO)!=0;
+                cargo_throw=melee_web_test_donkey_cargo(1,cargo_victim_kind)!=0;
             }
             raw[0].button=0;raw[0].stickX=0;
             check(cargo_throw,
@@ -1049,6 +1055,144 @@ int main(int argc,char** argv){try{
             settle_donkey();
             std::cout<<"Donkey original ground/air N/S/Hi, ground Lw, raw CargoWait/walk/throw passed"
                      <<std::endl;
+        }else if(cycle==0&&ness){
+            // Drives every Ness special family plus the Yo-Yo up smash from
+            // raw PAD edges. Records source motion IDs and article lifetimes
+            // only; no Fighter state is manufactured.
+            auto settle_ness=[&](){
+                raw[0].button=0;raw[0].stickX=raw[0].stickY=0;
+                for(unsigned n=0;n<720;n++){
+                    const auto state=match.player_stats(0);
+                    if(state.ground_or_air==0&&state.motion_id<ftNs_MS_AttackS4)return;
+                    tick();
+                }
+                const auto state=match.player_stats(0);
+                std::cout<<"Ness settle failure motion="<<state.motion_id
+                         <<" ground="<<state.ground_or_air<<" x="<<state.position[0]
+                         <<" y="<<state.position[1]<<std::endl;
+                check(false,"Ness special did not return to a grounded common motion");
+            };
+            auto jump_ness=[&](){
+                settle_ness();
+                raw[0].button=PAD_BUTTON_X;
+                for(unsigned n=0;n<12;n++)tick();
+                raw[0].button=0;
+                check(match.player_stats(0).ground_or_air!=0,
+                      "Ness full jump did not reach the source aerial state");
+            };
+            // Ground neutral: PK Flash Start+Loop charge, fresh-B-edge
+            // release, original charge-loop article, teardown.
+            settle_ness();
+            bool n_start=false,n_article=false;
+            for(unsigned n=0;n<240&&!n_article;n++){
+                raw[0].button=PAD_BUTTON_B;tick();
+                const auto motion=match.player_stats(0).motion_id;
+                n_start|=motion>=ftNs_MS_SpecialNStart&&motion<=ftNs_MS_SpecialNEnd;
+                n_article|=melee_web_test_item_count(It_Kind_Ness_PKFlush)>0;
+            }
+            check(n_start&&n_article,
+                  "Ness ground neutral special did not spawn its original PK Flash article");
+            raw[0].button=0;
+            for(unsigned n=0;n<2;n++)tick();
+            raw[0].button=PAD_BUTTON_B;tick();
+            raw[0].button=0;
+            bool n_cleared=false;
+            for(unsigned n=0;n<600&&!n_cleared;n++){
+                tick();
+                n_cleared=melee_web_test_item_count(It_Kind_Ness_PKFlush)==0&&
+                          match.player_stats(0).motion_id<ftNs_MS_AttackS4;
+            }
+            check(n_cleared,"Ness PK Flash did not end through its source lifetime");
+            // Aerial neutral: charge in the air, release, land.
+            jump_ness();
+            bool air_n=false;
+            for(unsigned n=0;n<200&&!air_n;n++){
+                raw[0].button=PAD_BUTTON_B;tick();
+                air_n|=match.player_stats(0).motion_id>=ftNs_MS_SpecialAirNStart&&
+                       match.player_stats(0).motion_id<=ftNs_MS_SpecialAirNEnd;
+            }
+            check(air_n,"Ness aerial neutral special did not enter its source motion");
+            for(unsigned n=0;n<600&&match.player_stats(0).ground_or_air!=0;n++)tick();
+            settle_ness();
+            std::cout<<"Ness ground/aerial PK Flash lifetimes passed"<<std::endl;
+            for(bool air:{false,true}){
+                if(air)jump_ness();else settle_ness();
+                bool entered=false,fire_live=false;
+                for(unsigned n=0;n<200&&!entered;n++){
+                    raw[0].button=n%8==0?PAD_BUTTON_B:0;
+                    raw[0].stickX=air?-80:80;raw[0].stickY=0;tick();
+                    entered=match.player_stats(0).motion_id==
+                        (air?ftNs_MS_SpecialAirS:ftNs_MS_SpecialS);
+                }
+                check(entered,"Ness side special did not enter its ground/air source motion");
+                for(unsigned n=0;n<120&&!fire_live;n++){
+                    tick();
+                    fire_live=melee_web_test_item_count(It_Kind_Ness_PKFire)>0;
+                }
+                check(fire_live,"Ness side special did not create its original PK Fire article");
+                for(unsigned n=0;n<600&&match.player_stats(0).ground_or_air!=0;n++)tick();
+                for(unsigned n=0;n<600&&melee_web_test_item_count(It_Kind_Ness_PKFire)>0;n++)tick();
+                check(melee_web_test_item_count(It_Kind_Ness_PKFire)==0,
+                      "Ness PK Fire did not end through its source lifetime");
+                settle_ness();
+                std::cout<<"Ness "<<(air?"air":"ground")<<" PK Fire lifetime passed"<<std::endl;
+            }
+            for(bool air:{false,true}){
+                if(air)jump_ness();else settle_ness();
+                bool entered=false,thunder_live=false;
+                for(unsigned n=0;n<200&&!entered;n++){
+                    raw[0].button=n%8==0?PAD_BUTTON_B:0;
+                    raw[0].stickX=0;raw[0].stickY=80;tick();
+                    entered=match.player_stats(0).motion_id==
+                        (air?ftNs_MS_SpecialAirHiStart:ftNs_MS_SpecialHiStart);
+                }
+                check(entered,"Ness up special did not enter its ground/air source motion");
+                for(unsigned n=0;n<120&&!thunder_live;n++){
+                    tick();
+                    thunder_live=melee_web_test_item_count(It_Kind_Ness_PKThunder)>0;
+                }
+                check(thunder_live,"Ness up special did not create its original PK Thunder article");
+                for(unsigned n=0;n<900&&match.player_stats(0).ground_or_air!=0;n++)tick();
+                for(unsigned n=0;n<600&&melee_web_test_item_count(It_Kind_Ness_PKThunder)>0;n++)tick();
+                check(melee_web_test_item_count(It_Kind_Ness_PKThunder)==0,
+                      "Ness PK Thunder did not end through its source lifetime");
+                settle_ness();
+                std::cout<<"Ness "<<(air?"air":"ground")<<" PK Thunder lifetime passed"<<std::endl;
+            }
+            for(bool air:{false,true}){
+                if(air)jump_ness();else settle_ness();
+                bool entered=false;
+                for(unsigned n=0;n<200&&!entered;n++){
+                    raw[0].button=n%8==0?PAD_BUTTON_B:0;
+                    raw[0].stickX=0;raw[0].stickY=-80;tick();
+                    entered=match.player_stats(0).motion_id==
+                        (air?ftNs_MS_SpecialAirLwStart:ftNs_MS_SpecialLwStart);
+                }
+                check(entered,"Ness down special did not enter its ground/air source motion");
+                for(unsigned n=0;n<600&&match.player_stats(0).ground_or_air!=0;n++)tick();
+                settle_ness();
+                std::cout<<"Ness "<<(air?"air":"ground")<<" PSI Magnet lifetime passed"<<std::endl;
+            }
+            // Up smash enters the authored Yo-Yo charge states and spawns the
+            // yoyo Article with its string/yoyo joints and material record.
+            settle_ness();
+            bool yoyo_start=false,yoyo_live=false;
+            for(unsigned n=0;n<120&&!(yoyo_start&&yoyo_live);n++){
+                raw[0].button=n%4==0?PAD_BUTTON_A:0;
+                raw[0].stickX=0;raw[0].stickY=n<6?80:0;tick();
+                const auto motion=match.player_stats(0).motion_id;
+                yoyo_start|=motion>=ftNs_MS_AttackHi4&&motion<=ftNs_MS_AttackLw4Release;
+                yoyo_live|=melee_web_test_item_count(It_Kind_Ness_Yoyo)>0;
+            }
+            check(yoyo_start&&yoyo_live,
+                  "Ness up smash did not spawn its original Yo-Yo article");
+            raw[0].button=0;raw[0].stickY=0;
+            for(unsigned n=0;n<600&&match.player_stats(0).ground_or_air!=0;n++)tick();
+            for(unsigned n=0;n<600&&melee_web_test_item_count(It_Kind_Ness_Yoyo)>0;n++)tick();
+            check(melee_web_test_item_count(It_Kind_Ness_Yoyo)==0,
+                  "Ness Yo-Yo article did not end through its source lifetime");
+            settle_ness();
+            std::cout<<"Ness original N/air-N/S/Hi/Lw and Yo-Yo smash lifecycle branches executed"<<std::endl;
         }else if(cycle==0&&luigi){
             auto settle_luigi=[&](){
                 raw[0].button=0;raw[0].stickX=raw[0].stickY=0;

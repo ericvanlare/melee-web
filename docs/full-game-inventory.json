@@ -478,7 +478,7 @@
       "id": "fighter-ness",
       "category": "fighters",
       "title": "Ness selectable fighter",
-      "implementation": "not_integrated",
+      "implementation": "partial",
       "acceptance": "not_evaluated",
       "source_identity": {
         "ckind": "CKIND_NESS",
@@ -498,9 +498,10 @@
       ],
       "evidence": [
         "docs/ADDING_CHARACTERS.md",
-        "docs/ACCURACY_CONTRACT.md"
+        "docs/ACCURACY_CONTRACT.md",
+        "docs/NESS_PORT_NOTES.md"
       ],
-      "next_step": "Run the fighter checkpoint for Ness and split its costume, action, article, effect and audio coverage into bounded receipts.",
+      "next_step": "Reduce the retained checkpoint-3 construction segfault (after the effect-bank blending relaxation) to its producer, then run the full FD lifecycle for all four costumes in both player orders before any browser admission.",
       "issue": null
     },
     {

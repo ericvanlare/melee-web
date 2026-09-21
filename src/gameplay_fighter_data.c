@@ -18,6 +18,7 @@
 #include <melee/ft/kinds/ftCaptain/types.h>
 #include <melee/ft/kinds/ftMars/types.h>
 #include <melee/ft/kinds/ftLink/types.h>
+#include <melee/ft/kinds/ftNess/types.h>
 #include <sysdolphin/baselib/jobj.h>
 #include <stddef.h>
 #include <math.h>
@@ -28,6 +29,7 @@ _Static_assert(sizeof(ftData) == 0x60 && sizeof(void*) == 4, "Native fighter ABI
 typedef struct Counted { uint32_t count; void* data; } Counted;
 _Static_assert(sizeof(Counted) == 8, "Visibility descriptor ABI");
 _Static_assert(sizeof(ftLk_DatAttrs) == 0xDC, "Link extension ABI");
+_Static_assert(sizeof(ftNessAttributes) == 0xDC, "Ness extension ABI");
 _Static_assert(sizeof(ftCaptain_DatAttrs) == 0x8C, "Captain/Ganon extension ABI");
 _Static_assert(sizeof(ftLuigiAttributes) == MELEE_WEB_LUIGI_ATTRIBUTE_BYTES, "Luigi extension ABI");
 _Static_assert(sizeof(ftDonkeyAttributes) == MELEE_WEB_DONKEY_ATTRIBUTE_BYTES, "Donkey extension ABI");
@@ -383,7 +385,7 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
         kind==FTKIND_FALCO || kind==FTKIND_MARS || kind==FTKIND_EMBLEM ||
         kind==FTKIND_LINK || kind==FTKIND_CLINK || kind==FTKIND_CAPTAIN || kind==FTKIND_GANON ||
         kind==FTKIND_DONKEY || kind==FTKIND_KOOPA || kind==FTKIND_LUIGI || kind==FTKIND_PIKACHU || kind==FTKIND_PICHU ||
-        kind==FTKIND_PURIN,
+        kind==FTKIND_NESS || kind==FTKIND_PURIN,
         "Native fighter extension schema unavailable");
     REQUIRE(costumes>0 && costumes<=16,"Native costume count exceeds checked bound");
     REQUIRE(motion_count>0 && motion_count<=1024,"Native motion count exceeds checked bound");
@@ -432,6 +434,21 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
 #undef LINK
         REQUIRE(link->xC4.x0_bone_id>=0 && link->xC4.x0_bone_id<140 && link->xC4.x10_size>0,
                 "Native Link absorb descriptor invalid");
+    } else if(kind==FTKIND_NESS) {
+        /* Ness owns a unique ftNessAttributes ABI at root+4. The authored
+         * extent is exactly 0xDC bytes; integer loop counters and the two
+         * descriptor records keep their original categories. */
+        at=required(r,root+4,0xDC); ftNessAttributes* ness=NEW(ftNessAttributes,1); d->ext_attr=ness;
+#define NESS(o,t,n,orig) ness->orig=READ_##t(at+o);
+        MELEE_WEB_NESS_ATTRIBUTE_FIELDS(NESS)
+#undef NESS
+        REQUIRE(ness->x98_PSI_MAGNET_ABSORPTION.x0_bone_id>=0 &&
+                    ness->x98_PSI_MAGNET_ABSORPTION.x0_bone_id<140 &&
+                    ness->x98_PSI_MAGNET_ABSORPTION.x10_size>0,
+                "Native Ness absorb descriptor invalid");
+        REQUIRE(ness->xB8_BASEBALL_BAT.x0_bone_id<140 && ness->xB8_BASEBALL_BAT.x4_max_damage>0 &&
+                    ness->xB8_BASEBALL_BAT.x14_size>0,
+                "Native Ness bat reflection descriptor invalid");
     } else if(kind==FTKIND_DONKEY) {
         at=required(r,root+4,MELEE_WEB_DONKEY_ATTRIBUTE_BYTES); ftDonkeyAttributes* donkey=NEW(ftDonkeyAttributes,1); d->ext_attr=donkey;
 #define DONKEY(o,t,n,orig) donkey->orig=READ_##t(at+o);
@@ -672,11 +689,16 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     const unsigned item_slots=(kind==FTKIND_LINK||kind==FTKIND_CLINK)?7:
                                (kind==FTKIND_LUIGI||kind==FTKIND_KOOPA)?1:
                                (kind==FTKIND_PIKACHU||kind==FTKIND_PICHU)?3:
-                               kind==FTKIND_PURIN?2:4;
+                               kind==FTKIND_PURIN?2:
+                               kind==FTKIND_NESS?11:4;
     /* Fixed native capacity bounds the shared accessor for every admitted
      * family; only the exact source extent is read and remaining slots stay
-     * null. Slot 6 is a Link joint, never an Article. */
-    d->x48_items=NEW(void*,7); memset(d->x48_items,0,7*sizeof(void*));
+     * null. Ness's authored table has eleven Article slots (all required by
+     * ftNs_Init_OnLoad); slot 6 remains a Link joint, never an Article. The
+     * allocation covers the accessor's index bound (seven elsewhere), while
+     * item_slots above is only the authored read extent. */
+    const unsigned item_capacity=kind==FTKIND_NESS?11:7;
+    d->x48_items=NEW(void*,item_capacity); memset(d->x48_items,0,item_capacity*sizeof(void*));
     at=UINT32_MAX;
     if(kind==FTKIND_PURIN) {
         /* Purin owns a custom visibility wrapper in x48 slot 1. Its native
@@ -693,13 +715,14 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
         if(at!=UINT32_MAX) {
             REGION(at,item_slots*4);
             for(unsigned i=0;i<item_slots;++i) {
-                const size_t minimum=i==6?64:24;
+                const bool link_joint=i==6&&(kind==FTKIND_LINK||kind==FTKIND_CLINK);
+                const size_t minimum=link_joint?64:24;
                 uint32_t p=PTR(at+i*4,minimum), article_unresolved;
                 /* Link's seventh entry is the source HSD_Joint descriptor used by
                  * ftParts_800753D4, not an Article root. Its native descriptor is
                  * hydrated by the C++ asset owner after this ftData decode. */
-                if(i==6) {
-                    REQUIRE((kind==FTKIND_LINK||kind==FTKIND_CLINK)&&p!=UINT32_MAX,
+                if(link_joint) {
+                    REQUIRE(p!=UINT32_MAX,
                         "Link part descriptor is missing");
                 } else if(p!=UINT32_MAX) {
                     d->x48_items[i]=melee_web_article_decode(r,p,&article_unresolved);
@@ -738,6 +761,11 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     else if(kind==FTKIND_PURIN)
         REQUIRE(at!=UINT32_MAX && d->x48_items[0]==NULL && d->x48_items[1]!=NULL,
             "Purin custom-part wrapper is missing");
+    else if(kind==FTKIND_NESS)
+        REQUIRE(at!=UINT32_MAX && d->x48_items[0] && d->x48_items[1] && d->x48_items[2] &&
+            d->x48_items[3] && d->x48_items[4] && d->x48_items[5] && d->x48_items[6] &&
+            d->x48_items[7] && d->x48_items[8] && d->x48_items[9] && d->x48_items[10],
+            "Ness OnLoad requires its eleven PK Fire/Flash/Thunder, Bat and Yoyo Articles");
     else
         REQUIRE((kind==FTKIND_MARS||kind==FTKIND_EMBLEM) && at==UINT32_MAX,
                 "Marth/Roy source ftData must not invent an Article table");
@@ -756,7 +784,11 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
 
 void* melee_web_fighter_data_article(void* data, uint32_t kind, uint32_t index)
 {
-    if (!data || kind==FTKIND_PURIN || index >= 6 || !((ftData*)data)->x48_items) return NULL;
+    if (!data || kind==FTKIND_PURIN || !((ftData*)data)->x48_items) return NULL;
+    /* Ness's authored table has eleven Article slots, all consumed by
+     * ftNs_Init_OnLoad. Every other family keeps the source seven-slot
+     * array bound (Link's slot 6 is a joint, never an Article). */
+    if (index >= (kind==FTKIND_NESS?11U:6U)) return NULL;
     return ((ftData*)data)->x48_items[index];
 }
 

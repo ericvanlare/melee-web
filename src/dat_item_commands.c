@@ -14,8 +14,11 @@ void* melee_web_item_commands_create(const uint32_t* words,size_t count){
         case 0:case 1:case 2:case 3:case 4:case 15:
             out[i].Command_00.code=op;out[i].Command_00.value=w&0x3ffffff;break;
         /* Opcode 14 uses the same one-word 26-bit hitbox index layout before
-         * dispatching to it_80279680. */
-        case 14:case 17:case 18:case 19:
+         * dispatching to it_80279680. Opcode 16 (it_8027978C) dispatches the
+         * embedded texture/effect sub-opcode in bits 25..18 through the
+         * original item interpreter; preserving the whole word keeps its
+         * authored operand bits and one-word advance. */
+        case 14:case 16:case 17:case 18:case 19:
             out[i].set_throw_flags=(struct set_throw_flags){op,w&0x3ffffff};break;
         /* Opcode 12 updates one enabled item hitbox's damage. */
         case 12:

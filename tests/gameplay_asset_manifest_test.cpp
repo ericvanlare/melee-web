@@ -93,10 +93,10 @@ void menu_contract()
 {
     const auto names = menu_asset_names();
 #if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
-    check(names.size()==32, "Silent menu descriptor excludes only DSP coefficients");
+    check(names.size()==33, "Silent menu descriptor excludes only DSP coefficients");
     check(!has(names,"dsp_coef.bin"), "Public scope must not request DSP coefficients");
 #else
-    check(names.size()==33, "Menu descriptor must include each admitted CSS voice bank");
+    check(names.size()==34, "Menu descriptor must include each admitted CSS voice bank");
     check(has(names,"dsp_coef.bin"), "Development scope requires DSP coefficients");
 #endif
     for(const auto name:{"MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd",
@@ -120,7 +120,7 @@ void source_fighter_closure()
         CKIND_MARIO, CKIND_FOX, CKIND_FALCO, CKIND_MARS, CKIND_DRMARIO,
         CKIND_EMBLEM, CKIND_LINK, CKIND_CLINK, CKIND_CAPTAIN, CKIND_GANON,
         CKIND_LUIGI, CKIND_PIKACHU, CKIND_PICHU, CKIND_PURIN, CKIND_DONKEY,
-        CKIND_KOOPA,
+        CKIND_KOOPA, CKIND_NESS,
     };
     for (const int character : characters) {
         const auto* content = melee_web_fighter_content(character);

@@ -224,6 +224,22 @@ DatFighterRuntime::DatFighterRuntime(std::shared_ptr<const DatArchive> archive, 
 #undef READ_LINK
         require(link_->absorb_bone >= 0 && link_->absorb_bone < 140 && link_->absorb_size > 0,
                 "Link absorb descriptor is outside checked part bounds");
+    } else if (costume_->fighter_kind == 8) {
+        // Ness owns a unique 0xDC source extension. PK Flash/PK Thunder and
+        // PSI Magnet loop counters and gravity delays are signed or unsigned
+        // integer words; the PSI Magnet absorb and baseball bat reflection
+        // records keep their original descriptor layouts.
+        region(data, extension_, 0xDC);
+        ness_.emplace();
+#define READ_NESS(at, type, name, original) ness_->name = read_##type(data, extension_ + at);
+        MELEE_WEB_NESS_ATTRIBUTE_FIELDS(READ_NESS)
+#undef READ_NESS
+        require(ness_->psimagnet_absorb_bone >= 0 && ness_->psimagnet_absorb_bone < 140 &&
+                    ness_->psimagnet_absorb_size > 0,
+                "Ness absorb descriptor is outside checked part bounds");
+        require(ness_->bat_reflect_bone_id < 140 && ness_->bat_reflect_max_damage > 0 &&
+                    ness_->bat_reflect_size > 0,
+                "Ness bat reflection descriptor is outside checked part bounds");
     }
     // ftColl_8007B320 enforces 15 hurt capsules and 11 dynamics spheres;
     // ftCo_8009CF84 enforces strictly fewer than 10 dynamics sets.
@@ -365,6 +381,12 @@ void DatFighterRuntime::validate_part_indices(std::size_t count) const
     if (fox_) require(fox_->reflector_bone_id < count, "Fighter reflector bone is outside the bound skeleton");
     if (mars_) require(std::size_t(mars_->absorb_bone) < count, "Marth counter bone is outside the bound skeleton");
     if (link_) require(std::size_t(link_->absorb_bone) < count, "Link absorb bone is outside the bound skeleton");
+    if (ness_) {
+        require(ness_->psimagnet_absorb_bone >= 0 && std::size_t(ness_->psimagnet_absorb_bone) < count,
+                "Ness absorb bone is outside the bound skeleton");
+        require(std::size_t(ness_->bat_reflect_bone_id) < count,
+                "Ness bat reflection bone is outside the bound skeleton");
+    }
 }
 std::optional<DatPackedCommands> DatFighterRuntime::commands(std::uint32_t id) const
 {

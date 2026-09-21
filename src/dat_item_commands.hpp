@@ -13,12 +13,19 @@ public:
         if(auto it=scripts_.find(root);it!=scripts_.end())return it->second.get();
         std::vector<uint32_t> words;bool end=false;uint32_t at=root;
         std::vector<uint32_t> loops;uint32_t execution_multiplier=1;
-        const uint32_t limit=a.next_target_offset(root);
+        // The conservative referenced-region bound can fall inside a shared
+        // command tail (Ness's PK Thunder ball script runs into an op16+END
+        // sequence that another authored pointer references as its own
+        // script start). Recompute the bound at each referenced boundary;
+        // every consumed word is still validated as authored, non-relocated
+        // script data, and the walk remains bounded by opcode 0 or 1024 steps.
+        uint32_t limit=a.next_target_offset(root);
         for(unsigned step=0;step<1024;step++){
+            if(at>=limit)limit=a.next_target_offset(at);
             if((at&3)||at>=limit||a.has_relocation(at))throw DatError("Item command instruction bounds or relocation invalid");
             uint32_t w=a.be32(at),op=w>>26;unsigned count=1;
             if(op==11)count=6;
-            else if(op!=0&&op!=1&&op!=2&&op!=3&&op!=4&&op!=12&&op!=13&&op!=14&&op!=15&&op!=17&&op!=18&&op!=19)
+            else if(op!=0&&op!=1&&op!=2&&op!=3&&op!=4&&op!=12&&op!=13&&op!=14&&op!=15&&op!=16&&op!=17&&op!=18&&op!=19)
                 throw DatError("Item command opcode " + std::to_string(op) +
                                " is outside checked capabilities at source offset " +
                                std::to_string(at));

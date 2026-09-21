@@ -153,7 +153,9 @@ struct GameplayFighterAssets::Storage {
     std::vector<uint8_t> animation;
     GameplayActionStore prototype;
     NativeDatArena arena;
-    std::array<std::unique_ptr<DatItemArticle>,7> articles;
+    /* Ness's authored x48 table has eleven Article slots; every other
+     * admitted family stays within the original seven-slot array. */
+    std::array<std::unique_ptr<DatItemArticle>,11> articles;
     std::unique_ptr<DatNativeJoint> link_part_model;
     std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> link_part_native{nullptr,destroy_joint};
     DatNativeJoint model;
@@ -190,10 +192,11 @@ struct GameplayFighterAssets::Storage {
         const uint32_t item_table_bytes=link?28:
             (id.fighter_kind==FTKIND_LUIGI||id.fighter_kind==FTKIND_KOOPA)?4:
             id.fighter_kind==FTKIND_PURIN?8:
-            (id.fighter_kind==FTKIND_PIKACHU||id.fighter_kind==FTKIND_PICHU)?12:16;
+            (id.fighter_kind==FTKIND_PIKACHU||id.fighter_kind==FTKIND_PICHU)?12:
+            id.fighter_kind==FTKIND_NESS?44:16;
         const auto item_table=fighter->pointer(fighter_root+0x48,item_table_bytes);
         struct ItemIdentity { uint32_t index,kind; };
-        std::array<ItemIdentity,6> item_identities{};
+        std::array<ItemIdentity,11> item_identities{};
         size_t item_count=0;
         if(id.fighter_kind==0) {
             if(!item_table)throw DatError("Mario item Article table is missing");
@@ -230,6 +233,21 @@ struct GameplayFighterAssets::Storage {
         } else if(id.fighter_kind==FTKIND_KOOPA) {
             if(!item_table)throw DatError("Koopa Flame Article table is missing");
             item_identities[item_count++]={0,static_cast<uint32_t>(It_Kind_Koopa_Flame)};
+        } else if(id.fighter_kind==FTKIND_NESS) {
+            if(!item_table)throw DatError("Ness item Article table is missing");
+            /* All eleven slots are required by ftNs_Init_OnLoad, in this
+             * original registration order. */
+            item_identities[item_count++]={0,static_cast<uint32_t>(It_Kind_Ness_PKFire)};
+            item_identities[item_count++]={1,static_cast<uint32_t>(It_Kind_Ness_PKFire_Flame)};
+            item_identities[item_count++]={2,static_cast<uint32_t>(It_Kind_Ness_PKFlush)};
+            item_identities[item_count++]={3,static_cast<uint32_t>(It_Kind_Ness_PKThunder)};
+            item_identities[item_count++]={4,static_cast<uint32_t>(It_Kind_Ness_PKThunder1)};
+            item_identities[item_count++]={5,static_cast<uint32_t>(It_Kind_Ness_PKThunder2)};
+            item_identities[item_count++]={6,static_cast<uint32_t>(It_Kind_Ness_PKThunder3)};
+            item_identities[item_count++]={7,static_cast<uint32_t>(It_Kind_Ness_PKThunder4)};
+            item_identities[item_count++]={8,static_cast<uint32_t>(It_Kind_Ness_PKFlush_Explode)};
+            item_identities[item_count++]={9,static_cast<uint32_t>(It_Kind_Ness_Bat)};
+            item_identities[item_count++]={10,static_cast<uint32_t>(It_Kind_Ness_Yoyo)};
         } else if(id.fighter_kind==FTKIND_PIKACHU || id.fighter_kind==FTKIND_PICHU) {
             if(!item_table)throw DatError("Pikachu-family item Article table is missing");
             const auto& attributes=prototype.runtime().pikachu_attributes();

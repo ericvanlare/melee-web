@@ -252,8 +252,13 @@ DatTexture read_texture(const DatArchive& archive, std::uint32_t offset, bool na
     if (((result.source_flags >> 16) & 15U) > 8 || ((result.source_flags >> 20) & 15U) > 7)
         reject("Unknown HSD texture color or alpha operation");
     result.blending = archive.f32(offset + 68);
-    if (!std::isfinite(result.blending) || result.blending < 0 || result.blending > 1)
-        reject("Texture blending value must be finite and between zero and one");
+    /* The original loads this descriptor value verbatim (tobj.c
+     * HSD_TObjMakeDesc) and consumes it as an unclamped f32 TEV constant
+     * (HSD_TExpCnst in the TEX_COLORMAP_BLEND path); Ness's authored PSI
+     * Magnet table stores a value outside [0,1], so only nonfinite bits are
+     * rejected here. */
+    if (!std::isfinite(result.blending))
+        reject("Texture blending value must be finite");
     sampler.mag_filter = archive.be32(offset + 72);
     if (sampler.mag_filter > 1) reject("Invalid texture magnification filter");
     result.image = image(archive, required(archive, offset + 76, 24));

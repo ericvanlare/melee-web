@@ -39,11 +39,12 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     const bool purin = costume.fighter_kind == 15;
     const bool donkey = costume.fighter_kind == 3;
     const bool koopa = costume.fighter_kind == 5;
+    const bool ness = costume.fighter_kind == 8;
     const bool luigi = costume.fighter_kind == 17;
     const bool pikachu_family = costume.fighter_kind == 12 || costume.fighter_kind == 23;
     const bool captain = costume.fighter_kind == 2;
     const bool ganon = costume.fighter_kind == 25;
-    require(mario || fox_family || mars || link_family || luigi || pikachu_family || purin || donkey || koopa || captain || ganon, "Native action store has no checked fighter command schema for this kind");
+    require(mario || fox_family || mars || link_family || luigi || pikachu_family || purin || donkey || koopa || ness || captain || ganon, "Native action store has no checked fighter command schema for this kind");
     std::vector<DatCommandRoot> roots;
     // Explicit source ftCo submotion groups. This certifies command operand
     // graphs only, not readiness of every original world service they invoke.
@@ -88,6 +89,12 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     else if (purin) group(295,costume.motion_count-1); // Purin five aerial jumps and original specials.
     else if (donkey) group(295,costume.motion_count-1); // Heavy carry, cargo throws and Donkey specials.
     else if (koopa) group(295,costume.motion_count-1); // Koopa's authored self rows end at 315.
+    // Ness's 326-row table ends at 325: the Yo-Yo smash rows 295-298 plus
+    // original SpecialN/S/Hi/Lw rows 299-325. Ness's own victim-side rows
+    // 259-261 and 266-285 are empty motions, so the victim groups inserted
+    // above carry no command words for a captured/shouldered Ness; the
+    // animation identity still comes from the thrower's store.
+    else if (ness) group(295,costume.motion_count-1);
     else group(295,326);                         // Fox/Falco/Marth/Roy source special command rows
     for (auto choice : runtime_->wait_choices()) command_motions_.insert(choice.motion_id);
     for (auto choice : runtime_->squat_wait_choices()) command_motions_.insert(choice.motion_id);

@@ -368,6 +368,68 @@
     X(0x0d4, F32, absorb_size, xC4.x10_size) \
     X(0x0d8, F32, xD8, xD8)
 
+/* Ness owns a unique 0xDC source extension. The PK Flash/PK Thunder and
+ * PSI Magnet loop counters and gravity delays are serialized integers; the
+ * PK Fire trajectories, Yo-Yo scalars and the two descriptor records are
+ * floats. x98 is the original AbsorbDesc and xB8 the original ReflectDesc,
+ * so their source member designators stay in each row. */
+#define MELEE_WEB_NESS_ATTRIBUTE_FIELDS(X) \
+    X(0x000, I32, pkflash_timer1_loopframes, x0_PKFLASH_TIMER1_LOOPFRAMES) \
+    X(0x004, I32, pkflash_timer2_loopframes, x4_PKFLASH_TIMER2_LOOPFRAMES) \
+    X(0x008, I32, pkflash_gravity_delay, x8_PKFLASH_GRAVITY_DELAY) \
+    X(0x00c, I32, pkflash_minchargeframes, xC_PKFLASH_MINCHARGEFRAMES) \
+    X(0x010, F32, pkflash_unk1, x10_PKFLASH_UNK1) \
+    X(0x014, F32, pkflash_fall_accel, x14_PKFLASH_FALL_ACCEL) \
+    X(0x018, F32, pkflash_unk2, x18_PKFLASH_UNK2) \
+    X(0x01c, F32, pkflash_landing_lag, x1C_PKFLASH_LANDING_LAG) \
+    X(0x020, F32, pkfire_aerial_launch_trajectory, x20_PKFIRE_AERIAL_LAUNCH_TRAJECTORY) \
+    X(0x024, F32, pkfire_aerial_velocity, x24_PKFIRE_AERIAL_VELOCITY) \
+    X(0x028, F32, pkfire_grounded_launch_trajectory, x28_PKFIRE_GROUNDED_LAUNCH_TRAJECTORY) \
+    X(0x02c, F32, pkfire_grounded_velocity, x2C_PKFIRE_GROUNDED_VELOCITY) \
+    X(0x030, F32, pkfire_spawn_x, x30_PKFIRE_SPAWN_X) \
+    X(0x034, F32, pkfire_spawn_y, x34_PKFIRE_SPAWN_Y) \
+    X(0x038, F32, pkfire_landing_lag, x38_PKFIRE_LANDING_LAG) \
+    X(0x03c, F32, pkthunder_unk1, x3C_PK_THUNDER_UNK1) \
+    X(0x040, U32, pkthunder_loop1, x40_PK_THUNDER_LOOP1) \
+    X(0x044, U32, pkthunder_loop2, x44_PK_THUNDER_LOOP2) \
+    X(0x048, U32, pkthunder_gravity_delay, x48_PK_THUNDER_GRAVITY_DELAY) \
+    X(0x04c, F32, pkthunder_unk2, x4C_PK_THUNDER_UNK2) \
+    X(0x050, F32, pkthunder_fall_accel, x50_PK_THUNDER_FALL_ACCEL) \
+    X(0x054, F32, pkthunder2_momentum, x54_PK_THUNDER_2_MOMENTUM) \
+    X(0x058, F32, pkthunder2_unk1, x58_PK_THUNDER_2_UNK1) \
+    X(0x05c, F32, pkthunder2_deceleration_rate, x5C_PK_THUNDER_2_DECELERATION_RATE) \
+    X(0x060, F32, pkthunder2_knockdown_angle, x60_PK_THUNDER_2_KNOCKDOWN_ANGLE) \
+    X(0x064, F32, pkthunder2_wallhug_angle, x64_PK_THUNDER_2_WALLHUG_ANGLE) \
+    X(0x068, F32, pkthunder2_unk2, x68_PK_THUNDER_2_UNK2) \
+    X(0x06c, F32, pkthunder2_freefall_anim_blend, x6C_PK_THUNDER_2_FREEFALL_ANIM_BLEND) \
+    X(0x070, F32, pkthunder2_landing_lag, x70_PK_THUNDER_2_LANDING_LAG) \
+    X(0x074, F32, psimagnet_release_lag, x74_PSI_MAGNET_RELEASE_LAG) \
+    X(0x078, F32, psimagnet_unk1, x78_PSI_MAGNET_UNK1) \
+    X(0x07c, F32, psimagnet_unk2, x7C_PSI_MAGNET_UNK2) \
+    X(0x080, F32, psimagnet_unk3, x80_PSI_MAGNET_UNK3) \
+    X(0x084, I32, psimagnet_frames_before_gravity, x84_PSI_MAGNET_FRAMES_BEFORE_GRAVITY) \
+    X(0x088, F32, psimagnet_momentum_preservation, x88_PSI_MAGNET_MOMENTUM_PRESERVATION) \
+    X(0x08c, F32, psimagnet_fall_accel, x8C_PSI_MAGNET_FALL_ACCEL) \
+    X(0x090, F32, psimagnet_unk4, x90_PSI_MAGNET_UNK4) \
+    X(0x094, F32, psimagnet_heal_mul, x94_PSI_MAGNET_HEAL_MUL) \
+    X(0x098, I32, psimagnet_absorb_bone, x98_PSI_MAGNET_ABSORPTION.x0_bone_id) \
+    X(0x09c, F32, psimagnet_absorb_offset_x, x98_PSI_MAGNET_ABSORPTION.x4_offset.x) \
+    X(0x0a0, F32, psimagnet_absorb_offset_y, x98_PSI_MAGNET_ABSORPTION.x4_offset.y) \
+    X(0x0a4, F32, psimagnet_absorb_offset_z, x98_PSI_MAGNET_ABSORPTION.x4_offset.z) \
+    X(0x0a8, F32, psimagnet_absorb_size, x98_PSI_MAGNET_ABSORPTION.x10_size) \
+    X(0x0ac, F32, yoyo_charge_duration, xAC_YOYO_CHARGE_DURATION) \
+    X(0x0b0, F32, yoyo_damage_mul, xB0_YOYO_DAMAGE_MUL) \
+    X(0x0b4, F32, yoyo_rehit_rate, xB4_YOYO_REHIT_RATE) \
+    X(0x0b8, U32, bat_reflect_bone_id, xB8_BASEBALL_BAT.x0_bone_id) \
+    X(0x0bc, I32, bat_reflect_max_damage, xB8_BASEBALL_BAT.x4_max_damage) \
+    X(0x0c0, F32, bat_reflect_offset_x, xB8_BASEBALL_BAT.x8_offset.x) \
+    X(0x0c4, F32, bat_reflect_offset_y, xB8_BASEBALL_BAT.x8_offset.y) \
+    X(0x0c8, F32, bat_reflect_offset_z, xB8_BASEBALL_BAT.x8_offset.z) \
+    X(0x0cc, F32, bat_reflect_size, xB8_BASEBALL_BAT.x14_size) \
+    X(0x0d0, F32, bat_reflect_damage_mul, xB8_BASEBALL_BAT.x18_damage_mul) \
+    X(0x0d4, F32, bat_reflect_speed_mul, xB8_BASEBALL_BAT.x1C_speed_mul) \
+    X(0x0d8, U8, bat_reflect_behavior, xB8_BASEBALL_BAT.x20_behavior)
+
 #define MELEE_WEB_PICKUP_ATTRIBUTE_FIELDS(X) \
     X(0x000, F32, gr_light_offset_x, gr_light_offset.x) \
     X(0x004, F32, gr_light_offset_y, gr_light_offset.y) \
@@ -403,6 +465,9 @@ typedef struct MeleeWebMarsAttributes {
 typedef struct MeleeWebLinkAttributes {
     MELEE_WEB_LINK_ATTRIBUTE_FIELDS(MELEE_WEB_DECLARE_ATTRIBUTE)
 } MeleeWebLinkAttributes;
+typedef struct MeleeWebNessAttributes {
+    MELEE_WEB_NESS_ATTRIBUTE_FIELDS(MELEE_WEB_DECLARE_ATTRIBUTE)
+} MeleeWebNessAttributes;
 typedef struct MeleeWebItemPickup {
     MELEE_WEB_PICKUP_ATTRIBUTE_FIELDS(MELEE_WEB_DECLARE_ATTRIBUTE)
 } MeleeWebItemPickup;
