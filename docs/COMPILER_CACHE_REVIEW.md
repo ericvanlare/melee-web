@@ -47,6 +47,13 @@ compiled inputs. Review the compile graph and dependency notices alongside
 the result. A selected-cache receipt covers only its recorded identity, not
 all historical cache keys or future uploads.
 
+The final PR review found that an unreadable cache directory could be omitted
+by directory traversal. The auditor now reports an incomplete inspection for
+any traversal error and counts regular files during the same checked walk.
+A real directory-permission regression verifies exit status 2 and redacted
+diagnostics. The inspection receipt below retains the scanner identity used
+for that historical run; it is not a receipt for later scanner revisions.
+
 ## Selected policy and source scope
 
 Retain ordinary compiler caching for both public and private CI. A fresh `v4`

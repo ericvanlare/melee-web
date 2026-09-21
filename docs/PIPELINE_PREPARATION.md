@@ -4,8 +4,8 @@
 
 The tracked preparation header is **stale development metadata**: it binds
 seed `cdf157ee0f1850884f07a71165fd2192177acb23c2c777313b719e70ea67546f`,
-while the current materializer requires
-`8df6a998cef19b88a3eff0ee61f666e42791f5f73841818961aa3b224cad2c4b`.
+which differs from the active seed identified by the
+[materializer](../scripts/materialize_pipeline_cache.py).
 `MELEE_WEB_SELECTIVE_PIPELINES` remains off by default. Do not use the old
 header as a certificate for the current release or enable that path without
 regenerating and validating it from matching certified inputs. This is a

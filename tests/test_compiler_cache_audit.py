@@ -91,6 +91,40 @@ class CompilerCacheAuditTests(unittest.TestCase):
             self.assertEqual(report["status"], "incomplete")
             self.assertIn("empty_cache", {item["rule"] for item in report["findings"]})
 
+    def test_unreadable_subtree_is_incomplete_and_cli_redacts_the_error(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cache = root / "cache"
+            _cache_entry(cache, digest_char="a")
+            hidden = _cache_entry(cache, digest_char="b")
+            fake = _make_fake_ccache(root)
+            readable = AUDIT.audit(cache, ccache=fake)
+            self.assertEqual(readable["status"], "passed")
+            self.assertEqual(readable["cache"]["regular_files"], 2)
+            unreadable = hidden.parent
+            original_mode = stat.S_IMODE(unreadable.stat().st_mode)
+            unreadable.chmod(0)
+            try:
+                try:
+                    list(unreadable.iterdir())
+                except PermissionError:
+                    pass
+                else:
+                    self.skipTest("This environment bypasses directory permissions")
+                output = root / "audit.json"
+                result = subprocess.run(
+                    [sys.executable, str(ROOT / "scripts/audit_compiler_cache.py"),
+                     "--cache-dir", str(cache), "--output", str(output), "--ccache", str(fake)],
+                    text=True, capture_output=True, check=False,
+                )
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                report = json.loads(output.read_text(encoding="utf-8"))
+                self.assertEqual(report["status"], "incomplete")
+                self.assertIn("audit_incomplete", {item["rule"] for item in report["findings"]})
+                self.assertNotIn(str(root), result.stdout + result.stderr + json.dumps(report))
+            finally:
+                unreadable.chmod(original_mode)
+
     def test_missing_decode_is_incomplete_and_stderr_is_not_retained(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

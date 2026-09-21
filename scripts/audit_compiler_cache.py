@@ -357,9 +357,18 @@ def _classify_tree(
     findings: list[Finding],
     counters: Counter,
     metadata_files: list[dict],
-) -> list[tuple[Path, str]]:
+) -> tuple[list[tuple[Path, str]], int]:
     entries: list[tuple[Path, str]] = []
-    for current, dirnames, filenames in os.walk(cache_dir, topdown=True, followlinks=False):
+    regular_files = 0
+
+    def fail_on_walk_error(error: OSError) -> None:
+        # os.walk otherwise silently omits unreadable subtrees. The audit's
+        # exception boundary records an incomplete result without raw paths.
+        raise error
+
+    for current, dirnames, filenames in os.walk(
+        cache_dir, topdown=True, followlinks=False, onerror=fail_on_walk_error,
+    ):
         current_path = Path(current)
         rel_current = PurePosixPath(current_path.relative_to(cache_dir).as_posix())
         if rel_current == PurePosixPath("."):
@@ -395,6 +404,7 @@ def _classify_tree(
             if not stat.S_ISREG(mode):
                 findings.append(_finding("non_regular_entry", "incomplete", identity=rel))
                 continue
+            regular_files += 1
             parts = tuple(path.relative_to(cache_dir).parts)
             entry_parent_depth = len(parts) - 1
             fanout_parts = parts[:-1]
@@ -431,7 +441,7 @@ def _classify_tree(
                 )
                 continue
             findings.append(_finding("unknown_cache_file", "incomplete", identity=rel))
-    return entries
+    return entries, regular_files
 
 
 def _version(ccache: str, cache_dir: Path, temporary_dir: Path) -> tuple[str | None, Finding | None]:
@@ -609,8 +619,8 @@ def audit(cache_dir: str | Path, *, ccache: str | Path = "ccache") -> dict:
             report["ccache"]["version"] = version
             if version_finding is not None:
                 findings.append(version_finding)
-            entries = _classify_tree(cache_path, findings, counters, report["metadata_files"])
-            report["cache"]["regular_files"] = sum(1 for path in cache_path.rglob("*") if path.is_file())
+            entries, regular_files = _classify_tree(cache_path, findings, counters, report["metadata_files"])
+            report["cache"]["regular_files"] = regular_files
             report["cache"]["entries"] = len(entries)
             report["cache"]["result_entries"] = sum(kind == "result" for _, kind in entries)
             report["cache"]["manifest_entries"] = sum(kind == "manifest" for _, kind in entries)
