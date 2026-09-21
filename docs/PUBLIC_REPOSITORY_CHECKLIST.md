@@ -72,9 +72,10 @@ documents unchanged coefficient output, 20 compatibility values originating in
 Dolphin's replacement table, and the limits of the implementation's independence.
 Functional compatibility does not resolve the retained-data licensing question.
 
-- [x] Prepare the [coefficient review packet and unsent outreach draft](AUDIO_COEFFICIENT_REVIEW.md),
-  binding the retained data, source consumers and identified upstream contributors.
-  Its work log tracks contact, review and disposition; preparation is not permission.
+- [x] Prepare the [coefficient review packet](AUDIO_COEFFICIENT_REVIEW.md), binding
+  the retained data, source consumers and upstream contributions. The owner
+  declined outreach; its active work log now tracks existing-terms review and
+  a replacement fallback. Preparation does not close the rights question.
 - [ ] Decide and document the license/provenance treatment of the replacement
   implementations and retained numerical values; preserve the factual history
   in [the source provenance record](../src/gameplay_audio_provenance.md).
