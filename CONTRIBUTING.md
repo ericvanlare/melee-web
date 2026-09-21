@@ -101,6 +101,12 @@ inventory and third-party notices cover the remaining publication decisions.
 Keep all unresolved licensing and generated-data limits explicit in the pull
 request.
 
+Public CI keeps compiler objects on its runner and uploads only bounded text
+and JSON reports. Do not introduce compiler-cache archives or compiled game
+outputs as public artifacts or persistent caches without a separate reviewed
+distribution boundary. The `publication_mode` manual Verify input exercises
+this behavior while the repository is private.
+
 ## Pull requests
 
 Explain the user-visible or boundary-level behavior change, the source or

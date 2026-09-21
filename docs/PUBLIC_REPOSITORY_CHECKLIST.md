@@ -98,7 +98,9 @@ Functional compatibility does not resolve the retained-data licensing question.
   a public repository and its history.
 - [x] Inventory repository binary surfaces: the [GitHub audit](GITHUB_PUBLICATION_AUDIT.md)
   found no releases or nonempty compiled-output artifacts among available
-  downloads. Reference binaries remain local; new binary or hosted-player
+  artifact downloads. A separate inventory found 75 persistent compiler caches;
+  their payloads were not covered by that scan and must be removed during
+  cutover. Reference binaries remain local; new binary or hosted-player
   distributions require their own notices/source-delivery review and are not
   authorized by this repository pass.
 - [x] Keep retail DSP/ROM and other owned-game inputs local. Document their
@@ -182,6 +184,10 @@ SHA-pinned actions were already configured.
   plan beforehand or make activation and verification explicit cutover steps.
 - [ ] Choose and verify approval requirements for external fork workflows once
   the public-repository settings become available.
+- [ ] Verify the public CI mode keeps compiler objects on the runner, then
+  quiesce Actions and remove old private compiler caches before visibility
+  changes. Preserve cache metadata and retained logs/reports; verify the cache
+  inventory is empty before re-enabling public CI.
 - [x] Preserve read-only workflow defaults, SHA-pinned actions, and isolation
   of untrusted PR jobs from secrets, privileged execution, deployment, and paid
   external services.
@@ -195,7 +201,9 @@ The September 20 internal review covers 285 commits across 80 selected Git
 roots, all 498 retained Actions run-log archives, all 626 downloadable artifacts,
 and the API-visible issue/PR discussion surface. The linked receipts record no
 credential-pattern findings, the 40 reviewed historical content findings, and
-182 expired artifacts whose bytes were unavailable. This is a bounded review,
+182 expired artifacts whose bytes were unavailable. Persistent compiler caches
+have a separate metadata inventory and required cutover disposition above;
+their payloads are outside the zero-findings claim. This is a bounded review,
 not comprehensive legal/security clearance. Recheck new material at the final
 publication checkpoint, including CI generated after this inventory.
 

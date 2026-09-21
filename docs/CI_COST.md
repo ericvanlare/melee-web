@@ -1,5 +1,22 @@
 # Verify CI cost audit
 
+## Public repository boundary
+
+The publication workflow keeps compiler objects on each runner when the
+repository is public, or when a manual run sets `publication_mode: true`.
+Persistent cache restore/save and compiler-seed upload/download are disabled
+in that mode. All unit shards, build partitions, linked consumers and aggregate
+inventory checks still run. Private verification keeps the cache behavior
+described below.
+
+The cached timings below describe the private workflow. Public verification is
+cold on each run and needs a separate measured turnaround claim; the earlier
+cold ARM trial took 10m 40s end to end. Public build partitions therefore have
+a 15-minute timeout, while the private cached path retains 10 minutes. This
+does not declare the public mode accepted against the earlier 600-second
+turnaround target. The [cutover procedure](PUBLICATION_CUTOVER.md) also removes
+old private caches before visibility changes.
+
 ## Issue 36: parallel Linux verification
 
 The workflow keeps the existing checked `RelWithDebInfo` compilation

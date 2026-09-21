@@ -69,6 +69,24 @@ No `license`, `copyright`, `GPL`, or `MIT license` term occurred in the
 artifact-member scan; this describes the retained CI bytes and does not replace
 the repository's separate license and provenance inventory.
 
+### Persistent compiler caches
+
+A subsequent cache API inventory returned 75 entries totaling 8,033,127,560
+bytes, including nine on `main`. These are persistent Actions caches, separate
+from the empty compiler-seed TAR artifacts above. The workflow writes compiled
+objects under `.cache/ccache`; the artifact inspection does not inspect those
+persistent cache payloads. The receipt retains their IDs, keys, refs and sizes.
+Only cache metadata was reviewed; no claim of zero findings covers their bytes.
+
+[GitHub documents](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching)
+that fork PRs can restore base-branch caches. Treat those caches as an exposure
+surface at public cutover. The selected path is to keep compiler objects on the
+runner in public CI, exercise that mode while private, then remove the old
+disposable caches after Actions has stopped and before changing visibility.
+Preserve logs, reports and the inventory; cache removal is not a substitute for
+reviewing retained evidence. The [cutover procedure](PUBLICATION_CUTOVER.md)
+contains the required sequence. No cache was deleted during this audit.
+
 The downloaded logs and artifacts contain compiler and source terminology and
 CI-generated runner paths. Their high-confidence secret scan found no private
 key, AWS/GitHub/Slack token, API-secret pattern, or long credential assignment.

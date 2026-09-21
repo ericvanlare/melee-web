@@ -38,6 +38,41 @@ read-only with PR-review approval disabled and were verified unchanged.
    visibility exposes GitHub history/logs as well as the current files; see
    [GitHub's visibility documentation](https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/managing-repository-settings/setting-repository-visibility).
 
+## Quiesce Actions and remove private compiler caches
+
+Persistent Actions caches are distinct from downloadable run artifacts. The
+cache metadata inventory found 75 entries totaling 8,033,127,560 bytes; their
+payloads were not covered by the archive audit. GitHub permits fork PRs to
+restore base-branch caches. The chosen public workflow keeps compiler objects
+on the runner and uploads only the existing text/JSON CI reports. Verify it
+with `publication_mode: true` while private before proceeding.
+
+At the authorized cutover, disable new Actions execution, wait for all active
+and queued runs to finish or be deliberately stopped, and retain a fresh cache
+inventory. Disabling Actions alone is not evidence that an already running
+job has stopped writing caches. Then remove the disposable compiler caches
+and verify the API returns zero entries. These commands are prepared cutover
+actions; no cache deletion has been performed as part of this review.
+
+```sh
+gh api --method PUT repos/ericvanlare/melee-web/actions/permissions -F enabled=false
+gh api --paginate 'repos/ericvanlare/melee-web/actions/runs?per_page=100' \
+  --jq '.workflow_runs[] | select(.status != "completed") | {id,status,head_sha}'
+mkdir -p work/public-readiness
+gh api --paginate --slurp repos/ericvanlare/melee-web/actions/caches \
+  > work/public-readiness/cache-inventory-before-cutover.json
+gh cache delete --repo ericvanlare/melee-web --all --succeed-on-no-caches
+gh api repos/ericvanlare/melee-web/actions/caches --jq .total_count
+```
+
+Keep logs, reports, failures and the cache metadata receipt. Re-enable Actions
+using the policy below only after integrating and verifying the public mode.
+The run query must return no non-completed runs before deleting caches; the
+cache query must then return zero before visibility changes. Use a fresh
+inventory filename if repeating the checkpoint.
+Rebase pending work onto that workflow before running it publicly; older
+workflow versions must not recreate unreviewed compiler cache uploads.
+
 ## Apply controls during the public transition
 
 The prepared policies require pull requests, current green aggregate CI,

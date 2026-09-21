@@ -249,5 +249,695 @@
     "zip_members": 3774,
     "credential_or_nonrunner_path_findings": 0,
     "chunk_boundary_handling": "Carry-over matches are counted when their end extends into the newly read chunk."
+  },
+  "subsequent_cache_inventory": {
+    "observed_date": "2026-09-20",
+    "endpoint": "repos/ericvanlare/melee-web/actions/caches",
+    "raw_pages_sha256": "41875aba496c3ab6423cb91a3fd07ad75b0b91cfea06a3c13b3cf1abc3023bd1",
+    "page_lengths": [
+      75
+    ],
+    "entries": 75,
+    "size_in_bytes": 8033127560,
+    "main_entries": 9,
+    "scope": "Metadata only. These persistent compiler caches are separate from the downloaded Actions artifacts; cache bytes were not included in the archive scan.",
+    "disposition": "Remove disposable private compiler caches after quiescing Actions and before making the repository public. Public verification must not export compiler cache objects; exercise that path while private. Preserve logs/reports and this cache inventory.",
+    "items": [
+      {
+        "id": 7915225868,
+        "ref": "refs/pull/54/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-3322fcf286fc2c636f41cf9f1f9037996cae11cb",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 130276569,
+        "created_at": "2026-09-21T03:06:14.584724Z",
+        "last_accessed_at": "2026-09-21T03:06:14.584724Z"
+      },
+      {
+        "id": 7910523648,
+        "ref": "refs/heads/main",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-2c2b687f5bb7dbfcb3c75dc0394c04bb97f2114d",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 130278071,
+        "created_at": "2026-09-20T22:26:55.769698Z",
+        "last_accessed_at": "2026-09-21T03:01:19.846733Z"
+      },
+      {
+        "id": 7913121344,
+        "ref": "refs/pull/52/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-4b33c8245290c116d7f1dcbef008bb68913ad21b",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 130330252,
+        "created_at": "2026-09-21T01:14:15.173059Z",
+        "last_accessed_at": "2026-09-21T01:14:15.173059Z"
+      },
+      {
+        "id": 7911830477,
+        "ref": "refs/pull/52/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-c7c4ee6fe84122ee9654c3d96263999c9f052982",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 130329902,
+        "created_at": "2026-09-20T23:58:14.617287Z",
+        "last_accessed_at": "2026-09-21T01:09:18.034750Z"
+      },
+      {
+        "id": 7912050705,
+        "ref": "refs/pull/53/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-2e26a243650a77275a20257f05fc68fdd526e8bf",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 130550117,
+        "created_at": "2026-09-21T00:13:24.391043Z",
+        "last_accessed_at": "2026-09-21T00:13:24.391043Z"
+      },
+      {
+        "id": 7910963881,
+        "ref": "refs/heads/codex/versus-return-loop",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-0b97a81fe21e00c620fe1b8c6fb1dba1be2b689c",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 194551622,
+        "created_at": "2026-09-20T22:55:47.692011Z",
+        "last_accessed_at": "2026-09-20T22:55:47.692011Z"
+      },
+      {
+        "id": 7910041584,
+        "ref": "refs/heads/main",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-494b89c9acfbbea387fd0ffce43906378966ea35",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 130283969,
+        "created_at": "2026-09-20T21:56:07.963993Z",
+        "last_accessed_at": "2026-09-20T22:21:44.017033Z"
+      },
+      {
+        "id": 7910397500,
+        "ref": "refs/pull/51/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-4e66d7eb8df67d80b082bdc19ff9e1a19f77446d",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 130280142,
+        "created_at": "2026-09-20T22:19:20.913784Z",
+        "last_accessed_at": "2026-09-20T22:19:20.913784Z"
+      },
+      {
+        "id": 7909509667,
+        "ref": "refs/heads/main",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-979fd09ade521afbc1f70f2b7d68231285f692a3",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 130233717,
+        "created_at": "2026-09-20T21:22:39.084519Z",
+        "last_accessed_at": "2026-09-20T21:51:24.546372Z"
+      },
+      {
+        "id": 7909889193,
+        "ref": "refs/pull/42/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-81b3534015ad8f9bb9809d1a4371e6f6d9a44040",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 130283807,
+        "created_at": "2026-09-20T21:46:05.414333Z",
+        "last_accessed_at": "2026-09-20T21:46:05.414333Z"
+      },
+      {
+        "id": 7909146773,
+        "ref": "refs/pull/42/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-33f523cecfb840d517c3263d5f9f58544550b528",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 122720253,
+        "created_at": "2026-09-20T21:01:22.877773Z",
+        "last_accessed_at": "2026-09-20T21:40:54.230304Z"
+      },
+      {
+        "id": 7890027008,
+        "ref": "refs/heads/main",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-89df0eac4595aa02115310d15e82af8d593e7fe2",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 122690098,
+        "created_at": "2026-09-20T00:39:42.060222Z",
+        "last_accessed_at": "2026-09-20T21:17:27.200242Z"
+      },
+      {
+        "id": 7908863752,
+        "ref": "refs/pull/42/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-1ca95da9ef31fd26dc043e439f5c3ce009257c82",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 122718391,
+        "created_at": "2026-09-20T20:45:11.691862Z",
+        "last_accessed_at": "2026-09-20T20:56:31.188454Z"
+      },
+      {
+        "id": 7909002121,
+        "ref": "refs/pull/49/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-905d839c79ac074ec110aae8503ae908cfb73c9b",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 151642859,
+        "created_at": "2026-09-20T20:53:02.515983Z",
+        "last_accessed_at": "2026-09-20T20:53:02.515983Z"
+      },
+      {
+        "id": 7908568470,
+        "ref": "refs/pull/49/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-f8e8d5fd0df38b7d455d6ed726a03b7d9561c240",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 151491573,
+        "created_at": "2026-09-20T20:28:12.596953Z",
+        "last_accessed_at": "2026-09-20T20:48:04.439710Z"
+      },
+      {
+        "id": 7888479204,
+        "ref": "refs/pull/42/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-9fd018add6b3979fe9d84efc9f46fcd586652a54",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 122720798,
+        "created_at": "2026-09-19T22:39:53.963850Z",
+        "last_accessed_at": "2026-09-20T20:40:26.563713Z"
+      },
+      {
+        "id": 7907820064,
+        "ref": "refs/pull/49/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-f3ef3390a14e64d5740b61370212c67b4c2e6379",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 151300058,
+        "created_at": "2026-09-20T19:47:17.601292Z",
+        "last_accessed_at": "2026-09-20T20:23:28.720415Z"
+      },
+      {
+        "id": 7906765841,
+        "ref": "refs/pull/49/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-719561b3077fe40d6550c0504b4c24e985fa85b5",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 150575705,
+        "created_at": "2026-09-20T18:48:47.344884Z",
+        "last_accessed_at": "2026-09-20T19:42:26.557197Z"
+      },
+      {
+        "id": 7905956554,
+        "ref": "refs/pull/49/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-822a39e0d7fd86633a193ce4db242b69c156aaef",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 146743611,
+        "created_at": "2026-09-20T18:03:33.292909Z",
+        "last_accessed_at": "2026-09-20T18:43:37.874902Z"
+      },
+      {
+        "id": 7904672731,
+        "ref": "refs/pull/49/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-2f50f6a1ae03ca01fa14540e5e9310636fe49160",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 143061499,
+        "created_at": "2026-09-20T16:48:25.011665Z",
+        "last_accessed_at": "2026-09-20T17:58:35.134577Z"
+      },
+      {
+        "id": 7903851897,
+        "ref": "refs/pull/49/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-b802a29851b54cc71bf5a862ff08c394871e9c9e",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 138479180,
+        "created_at": "2026-09-20T16:00:24.567533Z",
+        "last_accessed_at": "2026-09-20T16:43:19.698055Z"
+      },
+      {
+        "id": 7902628769,
+        "ref": "refs/pull/49/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-06f2fd3e411b62b29b0065c327e614db213b3a6a",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 135321845,
+        "created_at": "2026-09-20T14:50:12.571976Z",
+        "last_accessed_at": "2026-09-20T15:55:17.059491Z"
+      },
+      {
+        "id": 7900677320,
+        "ref": "refs/pull/49/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-f6a9647c18ccc195667ead0966e3f965f3bc6410",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 130316906,
+        "created_at": "2026-09-20T12:56:15.223835Z",
+        "last_accessed_at": "2026-09-20T14:45:18.307391Z"
+      },
+      {
+        "id": 7899106458,
+        "ref": "refs/pull/49/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-681c0ecbc894ae2425b2b7f9ea4a7d1b6cbdae4d",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 126231445,
+        "created_at": "2026-09-20T11:14:43.142058Z",
+        "last_accessed_at": "2026-09-20T12:51:04.220992Z"
+      },
+      {
+        "id": 7890402755,
+        "ref": "refs/pull/44/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-107dd26aeadd8cc7c652a3d0b90c1926ca0c9cbc",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 187245260,
+        "created_at": "2026-09-20T01:06:11.830211Z",
+        "last_accessed_at": "2026-09-20T01:06:11.830211Z"
+      },
+      {
+        "id": 7888648633,
+        "ref": "refs/pull/44/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-54c7a4596722dc28b3ba3a7928576a2d24459368",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 123894332,
+        "created_at": "2026-09-19T22:52:47.517353Z",
+        "last_accessed_at": "2026-09-20T00:59:59.275448Z"
+      },
+      {
+        "id": 7889491283,
+        "ref": "refs/heads/main",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-d7b3df02cef8e9c3306ef06737655b91fef523f1",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 122695682,
+        "created_at": "2026-09-19T23:59:52.230778Z",
+        "last_accessed_at": "2026-09-20T00:34:50.264394Z"
+      },
+      {
+        "id": 7889928599,
+        "ref": "refs/pull/48/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-21c728db70648beb2e3fdeea0b1e5fe8f8c03714",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 122701329,
+        "created_at": "2026-09-20T00:33:03.285794Z",
+        "last_accessed_at": "2026-09-20T00:33:03.285794Z"
+      },
+      {
+        "id": 7888965351,
+        "ref": "refs/heads/main",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-3b7d3fe0e11eada970d70abe4c814d00498d38a0",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 122691664,
+        "created_at": "2026-09-19T23:16:47.144104Z",
+        "last_accessed_at": "2026-09-19T23:54:48.622506Z"
+      },
+      {
+        "id": 7889406603,
+        "ref": "refs/pull/45/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-10c4cf355a08600faf0ee6389042ee75f25d1085",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 122691644,
+        "created_at": "2026-09-19T23:52:18.297809Z",
+        "last_accessed_at": "2026-09-19T23:52:18.297809Z"
+      },
+      {
+        "id": 7889084646,
+        "ref": "refs/pull/45/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-5a37531a3b46b404d26fa9f506970740fb1f803c",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 122700722,
+        "created_at": "2026-09-19T23:25:49.098352Z",
+        "last_accessed_at": "2026-09-19T23:47:15.199870Z"
+      },
+      {
+        "id": 7889346108,
+        "ref": "refs/pull/47/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-767268ace2ed708bd7911c0eccd55d964aba8799",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 122692638,
+        "created_at": "2026-09-19T23:46:39.368933Z",
+        "last_accessed_at": "2026-09-19T23:46:39.368933Z"
+      },
+      {
+        "id": 7888661126,
+        "ref": "refs/pull/45/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-25b682b5adc7b8a228df67c33b53a9d4c3f84c2d",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 122693449,
+        "created_at": "2026-09-19T22:53:41.739898Z",
+        "last_accessed_at": "2026-09-19T23:20:57.939327Z"
+      },
+      {
+        "id": 7888318141,
+        "ref": "refs/heads/main",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-3e17882e84dadd04cd612daf9764b50c9478c0f4",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 122693062,
+        "created_at": "2026-09-19T22:28:55.925296Z",
+        "last_accessed_at": "2026-09-19T23:11:55.983373Z"
+      },
+      {
+        "id": 7888878201,
+        "ref": "refs/pull/46/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-a5fb0c6fd8c75b5e33e8ca2955f2d2303ae4e354",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 122692004,
+        "created_at": "2026-09-19T23:09:59.047811Z",
+        "last_accessed_at": "2026-09-19T23:09:59.047811Z"
+      },
+      {
+        "id": 7888327937,
+        "ref": "refs/pull/42/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-8b916925ffff2c491609ce899fbf146a7d70cf23",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 122719861,
+        "created_at": "2026-09-19T22:29:38.590660Z",
+        "last_accessed_at": "2026-09-19T22:35:01.745507Z"
+      },
+      {
+        "id": 7888297144,
+        "ref": "refs/pull/43/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-778851b0ac58362fa8bf0d3657708b95184cab10",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 122692820,
+        "created_at": "2026-09-19T22:27:21.122152Z",
+        "last_accessed_at": "2026-09-19T22:27:21.122152Z"
+      },
+      {
+        "id": 7887838719,
+        "ref": "refs/heads/main",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-7d02d4c9bb12b7aa66430d8a019045dc46470b35",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 122694377,
+        "created_at": "2026-09-19T21:56:17.351392Z",
+        "last_accessed_at": "2026-09-19T22:26:42.064186Z"
+      },
+      {
+        "id": 7888123599,
+        "ref": "refs/heads/codex/independent-audio",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-ce42469f86197095c3d89edaf9bc08bb7784e05f",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 122720458,
+        "created_at": "2026-09-19T22:15:10.545897Z",
+        "last_accessed_at": "2026-09-19T22:15:10.545897Z"
+      },
+      {
+        "id": 7887434756,
+        "ref": "refs/heads/main",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-10bd21baec12f4413ef4a40d9b48400c0a091339",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 122694471,
+        "created_at": "2026-09-19T21:29:59.182074Z",
+        "last_accessed_at": "2026-09-19T21:51:11.871886Z"
+      },
+      {
+        "id": 7887719183,
+        "ref": "refs/pull/41/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-90b5c15c9930e1856b12099e439265ed81104018",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 122702178,
+        "created_at": "2026-09-19T21:48:24.224416Z",
+        "last_accessed_at": "2026-09-19T21:48:24.224416Z"
+      },
+      {
+        "id": 7887491936,
+        "ref": "refs/pull/39/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-259974ae400ce9be8e0e4450c86f5d43349cb6c2",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 122692733,
+        "created_at": "2026-09-19T21:33:51.594326Z",
+        "last_accessed_at": "2026-09-19T21:33:51.594326Z"
+      },
+      {
+        "id": 7887279354,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-0592e525cf2b3eef9779be4d1f2e976421944a9c",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 122965619,
+        "created_at": "2026-09-19T21:19:45.684332Z",
+        "last_accessed_at": "2026-09-19T21:19:45.684332Z"
+      },
+      {
+        "id": 7886990778,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-754f4de9ae92cbc2a25e421bfad87a3c2290a31b",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 122968029,
+        "created_at": "2026-09-19T21:01:13.134834Z",
+        "last_accessed_at": "2026-09-19T21:14:57.286542Z"
+      },
+      {
+        "id": 7887141254,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v3-310c4cd085f304120cfb9a18aa505bd41c6f376b734a8312d56bf8edbdc623e0-shared-110267b08b60049a68195d2e5880d142118bdbcf",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 122689356,
+        "created_at": "2026-09-19T21:11:08.759271Z",
+        "last_accessed_at": "2026-09-19T21:11:08.759271Z"
+      },
+      {
+        "id": 7886883937,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-e6d569ff66c57e1c940acbdbea05b6d658d93e08",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 122971935,
+        "created_at": "2026-09-19T20:54:30.012606Z",
+        "last_accessed_at": "2026-09-19T20:56:30.163310Z"
+      },
+      {
+        "id": 7886647573,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-a1c28f0d4d283639e1cc63b55ce636842833360a",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 122694242,
+        "created_at": "2026-09-19T20:39:32.454024Z",
+        "last_accessed_at": "2026-09-19T20:49:41.197860Z"
+      },
+      {
+        "id": 7886430741,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v2-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-effects-641eedc2a436725f50446c0d4546ee441902b634",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 105593289,
+        "created_at": "2026-09-19T20:26:19.642302Z",
+        "last_accessed_at": "2026-09-19T20:26:19.642302Z"
+      },
+      {
+        "id": 7886428662,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v2-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-runtime-641eedc2a436725f50446c0d4546ee441902b634",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 112328833,
+        "created_at": "2026-09-19T20:26:11.512940Z",
+        "last_accessed_at": "2026-09-19T20:26:11.512940Z"
+      },
+      {
+        "id": 7886427364,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v2-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-fighter-641eedc2a436725f50446c0d4546ee441902b634",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 112286114,
+        "created_at": "2026-09-19T20:26:06.340909Z",
+        "last_accessed_at": "2026-09-19T20:26:06.340909Z"
+      },
+      {
+        "id": 7886425024,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v2-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-menus-641eedc2a436725f50446c0d4546ee441902b634",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 112327938,
+        "created_at": "2026-09-19T20:25:57.868689Z",
+        "last_accessed_at": "2026-09-19T20:25:57.868689Z"
+      },
+      {
+        "id": 7886408669,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v2-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-unit-0-641eedc2a436725f50446c0d4546ee441902b634",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 1378534,
+        "created_at": "2026-09-19T20:24:48.850927Z",
+        "last_accessed_at": "2026-09-19T20:24:48.850927Z"
+      },
+      {
+        "id": 7886404269,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v2-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-gameplay-641eedc2a436725f50446c0d4546ee441902b634",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 38690222,
+        "created_at": "2026-09-19T20:24:29.408064Z",
+        "last_accessed_at": "2026-09-19T20:24:29.408064Z"
+      },
+      {
+        "id": 7886402634,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v2-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-unit-1-641eedc2a436725f50446c0d4546ee441902b634",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 995544,
+        "created_at": "2026-09-19T20:24:22.320197Z",
+        "last_accessed_at": "2026-09-19T20:24:22.320197Z"
+      },
+      {
+        "id": 7886390132,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v2-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-graphics-641eedc2a436725f50446c0d4546ee441902b634",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 34026580,
+        "created_at": "2026-09-19T20:23:34.001934Z",
+        "last_accessed_at": "2026-09-19T20:23:34.001934Z"
+      },
+      {
+        "id": 7885894033,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v2-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-fighter-d2d166353e0f10d0f23b0ccb5a9bd38a384bbcb7",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 112350014,
+        "created_at": "2026-09-19T19:54:36.269761Z",
+        "last_accessed_at": "2026-09-19T20:20:55.717516Z"
+      },
+      {
+        "id": 7885895113,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v2-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-effects-d2d166353e0f10d0f23b0ccb5a9bd38a384bbcb7",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 105655461,
+        "created_at": "2026-09-19T19:54:41.503848Z",
+        "last_accessed_at": "2026-09-19T20:20:55.615899Z"
+      },
+      {
+        "id": 7885982720,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v2-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-unit-1-1391b2d2a12464b8820dfb3742a0ce6dbb4cd88a",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 980623,
+        "created_at": "2026-09-19T20:00:02.276393Z",
+        "last_accessed_at": "2026-09-19T20:20:54.298066Z"
+      },
+      {
+        "id": 7885910150,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v2-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-menus-d2d166353e0f10d0f23b0ccb5a9bd38a384bbcb7",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 112392189,
+        "created_at": "2026-09-19T19:55:34.407513Z",
+        "last_accessed_at": "2026-09-19T20:20:53.941838Z"
+      },
+      {
+        "id": 7885994922,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v2-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-unit-0-1391b2d2a12464b8820dfb3742a0ce6dbb4cd88a",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 1335326,
+        "created_at": "2026-09-19T20:00:43.723311Z",
+        "last_accessed_at": "2026-09-19T20:20:52.543560Z"
+      },
+      {
+        "id": 7885849576,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v2-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-gameplay-d2d166353e0f10d0f23b0ccb5a9bd38a384bbcb7",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 38708150,
+        "created_at": "2026-09-19T19:52:01.905189Z",
+        "last_accessed_at": "2026-09-19T20:20:49.811164Z"
+      },
+      {
+        "id": 7885899853,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v2-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-runtime-d2d166353e0f10d0f23b0ccb5a9bd38a384bbcb7",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 112389065,
+        "created_at": "2026-09-19T19:55:01.865662Z",
+        "last_accessed_at": "2026-09-19T20:20:49.609602Z"
+      },
+      {
+        "id": 7885827846,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v2-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-graphics-d2d166353e0f10d0f23b0ccb5a9bd38a384bbcb7",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 34044894,
+        "created_at": "2026-09-19T19:50:42.471171Z",
+        "last_accessed_at": "2026-09-19T20:20:48.833322Z"
+      },
+      {
+        "id": 7886107227,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-macOS-ARM64-v2-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-build-1391b2d2a12464b8820dfb3742a0ce6dbb4cd88a",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 122123045,
+        "created_at": "2026-09-19T20:06:58.804148Z",
+        "last_accessed_at": "2026-09-19T20:06:58.804148Z"
+      },
+      {
+        "id": 7885839507,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v2-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-unit-d2d166353e0f10d0f23b0ccb5a9bd38a384bbcb7",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 1940274,
+        "created_at": "2026-09-19T19:51:20.553398Z",
+        "last_accessed_at": "2026-09-19T19:51:20.553398Z"
+      },
+      {
+        "id": 7885660819,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v1-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-runtime-e58d55962003da4f01b803e148e2513ce04b7c0f",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 112387326,
+        "created_at": "2026-09-19T19:40:37.165615Z",
+        "last_accessed_at": "2026-09-19T19:40:37.165615Z"
+      },
+      {
+        "id": 7885654854,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v1-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-menus-e58d55962003da4f01b803e148e2513ce04b7c0f",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 112389700,
+        "created_at": "2026-09-19T19:40:16.594452Z",
+        "last_accessed_at": "2026-09-19T19:40:16.594452Z"
+      },
+      {
+        "id": 7885653717,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v1-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-fighter-e58d55962003da4f01b803e148e2513ce04b7c0f",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 112345484,
+        "created_at": "2026-09-19T19:40:13.059300Z",
+        "last_accessed_at": "2026-09-19T19:40:13.059300Z"
+      },
+      {
+        "id": 7885642361,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v1-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-effects-e58d55962003da4f01b803e148e2513ce04b7c0f",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 105653257,
+        "created_at": "2026-09-19T19:39:31.129921Z",
+        "last_accessed_at": "2026-09-19T19:39:31.129921Z"
+      },
+      {
+        "id": 7885607430,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v1-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-unit-e58d55962003da4f01b803e148e2513ce04b7c0f",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 1944515,
+        "created_at": "2026-09-19T19:37:19.278805Z",
+        "last_accessed_at": "2026-09-19T19:37:19.278805Z"
+      },
+      {
+        "id": 7885604651,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v1-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-gameplay-e58d55962003da4f01b803e148e2513ce04b7c0f",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 38709467,
+        "created_at": "2026-09-19T19:37:10.510745Z",
+        "last_accessed_at": "2026-09-19T19:37:10.510745Z"
+      },
+      {
+        "id": 7885584202,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-ARM64-v1-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-graphics-e58d55962003da4f01b803e148e2513ce04b7c0f",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 34044749,
+        "created_at": "2026-09-19T19:36:00.589932Z",
+        "last_accessed_at": "2026-09-19T19:36:00.589932Z"
+      },
+      {
+        "id": 7885406772,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-X64-v1-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-gameplay-db741f1b03fa18c8cfd6a8ca3d9bb4a2eebffe6e",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 38024240,
+        "created_at": "2026-09-19T19:25:32.357824Z",
+        "last_accessed_at": "2026-09-19T19:25:32.357824Z"
+      },
+      {
+        "id": 7885373167,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-X64-v1-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-graphics-db741f1b03fa18c8cfd6a8ca3d9bb4a2eebffe6e",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 33920230,
+        "created_at": "2026-09-19T19:23:32.247018Z",
+        "last_accessed_at": "2026-09-19T19:23:32.247018Z"
+      },
+      {
+        "id": 7885372079,
+        "ref": "refs/pull/37/merge",
+        "key": "compiler-Linux-X64-v1-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-fighter-db741f1b03fa18c8cfd6a8ca3d9bb4a2eebffe6e",
+        "version": "916ea2e913477e5260e869e48ec08754cc9707dd14c49c219cee3709cb349d02",
+        "size_in_bytes": 112152243,
+        "created_at": "2026-09-19T19:23:29.322864Z",
+        "last_accessed_at": "2026-09-19T19:23:29.322864Z"
+      }
+    ]
   }
 }
