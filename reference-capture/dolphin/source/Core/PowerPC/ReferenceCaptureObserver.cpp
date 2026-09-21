@@ -139,6 +139,9 @@ enum class SliceTag : u16
   MenuSssRoute = 35,
   ProfileCharacters = 36,
   ProfileStages = 37,
+  // 38 and 39 are the typed profile-context tags in the next change; this
+  // one takes the next free number so no shipped tag is ever renumbered.
+  SceneKind = 40,
 };
 
 struct SliceRef
@@ -456,6 +459,19 @@ struct Observer::Impl
     return true;
   }
 
+  bool AddSceneKindSlice(Core::System* system)
+  {
+    // 0x804D6720 holds the source scene object; its first byte is the scene
+    // kind the source routing and menu owners branch on. Capture it beside the
+    // routing bytes so a capture can be steered without guest memory access.
+    // The scene object does not exist before the first scene is created, so an
+    // absent pointer omits the slice instead of invalidating the boundary.
+    u32 scene_pointer = 0;
+    if (!ReadU32(system, 0x804d6720, &scene_pointer) || !scene_pointer)
+      return true;
+    return AddSlice(system, SliceTag::SceneKind, scene_pointer, 1);
+  }
+
   bool AddSessionSlices(Core::System* system)
   {
     u32 rng_pointer = 0;
@@ -463,6 +479,7 @@ struct Observer::Impl
            AddSlice(system, SliceTag::PadSnapshot, 0x804c1f84, 0x358) &&
            AddSlice(system, SliceTag::SceneRouting, 0x80479d30, 6) &&
            AddSlice(system, SliceTag::SceneFrame, 0x80479d58, 4) &&
+           AddSceneKindSlice(system) &&
            AddSlice(system, SliceTag::RngPointer, 0x804d5f94, 4) &&
            ReadU32(system, 0x804d5f94, &rng_pointer) && rng_pointer &&
            AddSlice(system, SliceTag::RngValue, rng_pointer, 4);
@@ -731,7 +748,8 @@ struct Observer::Impl
           !AddSlice(system, SliceTag::PadSnapshot, 0x804c1f84, 0x358) ||
           !AddSlice(system, SliceTag::RetraceCount, 0x804d7420, 4) ||
           !AddSlice(system, SliceTag::SourceVICount, 0x804a7f98, 4) ||
-          !AddSlice(system, SliceTag::SceneRouting, 0x80479d30, 6))
+          !AddSlice(system, SliceTag::SceneRouting, 0x80479d30, 6) ||
+          !AddSceneKindSlice(system))
         return SetInvalid("PAD poll did not expose its bounded four-port slices"), void();
     }
     else if (boundary == Boundary::PadConsume)
