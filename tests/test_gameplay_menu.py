@@ -15,7 +15,7 @@ class GameplayMenuContractTests(unittest.TestCase):
     def test_lifecycle_boundary_and_return_contract(self):
         self.run_contract(public=False)
 
-    def test_public_donkey_exclusion_at_css_and_final_match_handoff(self):
+    def test_public_donkey_selection_at_css_and_final_match_handoff(self):
         self.run_contract(public=True)
 
     def run_contract(self, *, public):

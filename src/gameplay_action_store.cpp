@@ -77,7 +77,13 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     // action. Captain rows 295/297 include command opcodes 45/42 whose
     // original consumers require live sword/parasol item services; the
     // shared command readiness guard intentionally remains explicit there.
-    else if (captain || ganon) group(295,costume.motion_count-1);
+    // A dive catch runs the common CaptureCaptain submotion row 276 on the
+    // catcher's own store (grab_cb -> ftCo_8009CA0C); without admission that
+    // row dispatches the unsupported-command sentinel and aborts mid-match.
+    else if (captain || ganon) {
+        group(295,costume.motion_count-1);
+        command_motions_.insert(276);
+    }
     else if (luigi) group(295,costume.motion_count-1); // Luigi's authored special rows end at 311.
     else if (pikachu_family) group(295,costume.motion_count-1); // Both authored tables end at 319.
     else if (purin) group(295,costume.motion_count-1); // Purin five aerial jumps and original specials.

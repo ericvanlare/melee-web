@@ -1,5 +1,27 @@
 # Current status
 
+## Donkey Kong platform shield-drop repair
+
+The Battlefield shield-drop crash from [issue #50](https://github.com/ericvanlare/melee-web/issues/50)
+is repaired. At the terminal of a fully consumed single-datum FObj track the
+original reaches `FObjUpdateAnim` with `op_intrp` still NONE and passes an
+uninitialized stack word to the callback — the same undefined-output class as the
+observed FD terminal single-CON case. The host now defines that terminal output
+as the authored last value (`p1`), which is what each interpolation type's own
+zero-duration path emits; parser state and flags stay untouched and every other
+undefined state still fails explicitly. **Focused checks**: the endpoint
+reproducer (`hsd_native_trace --terminal-{branch-linear,branch-spline,
+pass-endpoint,stop-ceil-endpoint}`) passes after panicking pre-fix; the
+Battlefield reducer that aborted at Pass frame 25 (`donkey-platform-pass-v2.log`
+state) now completes Pass motion 244 for all five costumes with pause and
+repeated teardown; both public and development menu contracts pass with
+`CKIND_DONKEY` re-enabled; Donkey's both-orientation FD lifecycle passes
+unchanged. **Suite**: local 1,129-test run passes with 55 skips (owned fixtures
+for some skipped checks live in other worktrees). Donkey is re-enabled in
+public character selection. The independent original Donkey Pass consumer
+capture remains the open confirmation item; see
+[Donkey Kong's measured scope](docs/DONKEY_KONG_PORT_NOTES.md).
+
 ## Production audio release path
 
 PR #42 is merged on top of #49. The owner approved promoting replacement
@@ -38,15 +60,17 @@ remain open.
 
 ## September 20 production checkpoint
 
-Feature additions are paused at PR #49. The candidate exposes fifteen public
-fighters and seven stages; Donkey Kong remains development-only under the
-owner-approved restriction tracked in [issue #50](https://github.com/ericvanlare/melee-web/issues/50).
+Feature additions are paused at PR #49. The candidate exposes sixteen public
+fighters and seven stages; Donkey Kong's platform shield-drop crash is repaired
+on this branch (see [Donkey Kong's measured scope](docs/DONKEY_KONG_PORT_NOTES.md)),
+re-enabling him in public character selection pending the remaining
+[issue #50](https://github.com/ericvanlare/melee-web/issues/50) verification.
 Both public and development players now load exact scene asset scopes from a
 validated local disc session. That checkpoint's public audio was disabled.
 
 Both Release builds and the local 1,099-test suite pass (374.968 seconds,
-41 explicit skips). The subsequent Donkey restriction passes 26 focused menu
-and release checks. The audited production candidate passes local HTTP checks,
+41 explicit skips). The since-removed Donkey restriction had passed 26 focused
+menu and release checks. The audited production candidate passes local HTTP checks,
 all ten public browser checks, two ordinary-key Mario/FD pause/No Contest
 round trips, Eject/reload and reimport. Public menu and Mario/FD scopes contain
 32/27 inputs and 18,448,886/19,073,578 bytes. A fresh drawn Mario/FD control
@@ -95,9 +119,11 @@ crash and two driver/recipe failures remain retained; see
 [scene asset ownership](docs/SCENE_ASSET_LOADING.md).
 The public player now uses the same scoped import while excluding DSP
 coefficients. Four-player residency and broader mode/lifetime checks remain open.
-New additions are paused for a production checkpoint with fifteen public
-fighters and seven stages. Donkey remains development-only pending
-[issue #50](https://github.com/ericvanlare/melee-web/issues/50).
+New additions are paused for a production checkpoint with sixteen public
+fighters and seven stages. Donkey is re-enabled in public selection after the
+platform shield-drop repair; the remaining
+[issue #50](https://github.com/ericvanlare/melee-web/issues/50) verification
+stays open.
 Both Release builds pass. The 1,096-test run took 366.767 seconds with
 41 skips and one stale artifact-count assertion; correcting that test yields
 four passing checks in the affected module. The original failed suite log is
@@ -195,11 +221,16 @@ carried fighter's original command graphs. Both browser discovery rounds
 complete 33 action cases and 7,000 frames; cold fails timing/audio/pipeline
 gates while warm passes. After a reviewed 15-descriptor preload correction,
 both fresh rounds pass all 14,000 action frames with zero hard failures.
-A separate Battlefield shield-drop probe exposes a real crash at the
-undefined terminal SPL0 animation output; independent original consumer
-capture is pending. Ceiling lifetimes, original comparison and broader
-acceptance remain open; see
-[Donkey Kong's measured scope](docs/DONKEY_KONG_PORT_NOTES.md).
+A separate Battlefield shield-drop probe exposed a real crash at the
+undefined terminal SPL0 animation output. That boundary is now repaired: the
+host defines the terminal single-datum output as the authored last value (the
+documented FD terminal-CON rule extended to the whole class), and the retained
+shield-drop reducer completes Pass motion 244 on the upper platform for all
+five costumes with pause and repeated teardown. Donkey is re-enabled in public
+character selection. Independent original consumer capture, ceiling lifetimes,
+original comparison and broader acceptance remain open; see
+[Donkey Kong's measured scope](docs/DONKEY_KONG_PORT_NOTES.md) and
+[issue #50](https://github.com/ericvanlare/melee-web/issues/50).
 The Donkey checkpoint passes both Release builds and the full 1,080-test suite
 in 358.963 seconds with 41 explicit skips. Fresh shared headless comparisons
 still match 603 Ganondorf/FD and 240 Mario/FD declared source updates. The

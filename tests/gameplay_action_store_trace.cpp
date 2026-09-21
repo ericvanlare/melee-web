@@ -140,6 +140,14 @@ void verify_common_appeals(std::shared_ptr<const DatArchive> archive, const Byte
                   store.runtime().action(motion).command_offset.has_value(),
               "Koopa victim source command presence changed");
     }
+    if (costume.fighter_kind == 2 || costume.fighter_kind == 25) {
+        // Captain/Ganondorf dive catches run the common CaptureCaptain
+        // submotion row 276 on the catcher's own store.
+        check(store.command_ready(276), "Captain-family dive-catch CaptureCaptain command graph is not admitted");
+        check(store.runtime().commands(276).has_value() ==
+                  store.runtime().action(276).command_offset.has_value(),
+              "Captain-family dive-catch source command presence changed");
+    }
     if (costume.fighter_kind == 5) {
         check(costume.motion_count == 316, "Koopa authored action count changed");
         for (unsigned motion = 295; motion < costume.motion_count; ++motion) {

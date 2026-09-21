@@ -20,15 +20,20 @@ int main(int argc,char** argv)
         check(0,"Unknown interpolation must still reject");
     }
     /* Original FD's delayed zero visibility constant, then an authored one.
-     * Drive the original parser rather than manufacturing its terminal state. */
-    for(unsigned value=0;value<2;++value){
-        stream[1]=value?128:0;f.frac_value=f.frac_slope=0x87;
-        callbacks=0;output=-100;HSD_FObjReqAnimAll(&f,0);
-        for(unsigned frame=0;frame<39;++frame)HSD_FObjInterpretAnim(&f,NULL,update,1);
-        check(callbacks==0,"Delayed terminal constant fired early");
-        HSD_FObjInterpretAnim(&f,NULL,update,1);
-        check(callbacks==1&&output==(float)value,"Terminal constant lost its authored value");
-        check(f.op_intrp==HSD_A_OP_NONE,"Compatibility callback altered parser state");
+     * Drive the original parser rather than manufacturing its terminal state.
+     * The Donkey Pass and StopCeil branch tracks have the same three-byte
+     * shape with a SPL0 datum, so both opcodes share the terminal rule. */
+    for(unsigned opcode=1;opcode<=3;opcode+=2){
+        for(unsigned value=0;value<2;++value){
+            stream[0]=(unsigned char)opcode;stream[1]=value?128:0;
+            f.frac_value=f.frac_slope=0x87;
+            callbacks=0;output=-100;HSD_FObjReqAnimAll(&f,0);
+            for(unsigned frame=0;frame<39;++frame)HSD_FObjInterpretAnim(&f,NULL,update,1);
+            check(callbacks==0,"Delayed terminal constant fired early");
+            HSD_FObjInterpretAnim(&f,NULL,update,1);
+            check(callbacks==1&&output==(float)value,"Terminal constant lost its authored value");
+            check(f.op_intrp==HSD_A_OP_NONE,"Compatibility callback altered parser state");
+        }
     }
     puts("Original FObj terminal constants passed");return 0;
 }

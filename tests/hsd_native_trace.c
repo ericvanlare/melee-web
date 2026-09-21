@@ -192,16 +192,16 @@ static void descriptor_only_source_lifetime(void)
  * parent links and destruction before each arena is released. */
 int main(int argc, char** argv)
 {
-    if(argc==2 && (!strcmp(argv[1],"--undefined-branch-linear") ||
-                   !strcmp(argv[1],"--undefined-branch-spline") ||
-                   !strcmp(argv[1],"--undefined-pass-endpoint") ||
-                   !strcmp(argv[1],"--undefined-stop-ceil-endpoint"))) {
+    if(argc==2 && (!strcmp(argv[1],"--terminal-branch-linear") ||
+                   !strcmp(argv[1],"--terminal-branch-spline") ||
+                   !strcmp(argv[1],"--terminal-pass-endpoint") ||
+                   !strcmp(argv[1],"--terminal-stop-ceil-endpoint"))) {
         char error[256];
         CHECK(melee_web_gameplay_startup(4U*1024U*1024U,error,sizeof(error)));
         CHECK(melee_web_native_world_enable(error,sizeof(error)));
-        u8 bytes[]={!strcmp(argv[1],"--undefined-branch-linear")?2:3,0,0};
-        const unsigned delay=!strcmp(argv[1],"--undefined-pass-endpoint")?25:
-            !strcmp(argv[1],"--undefined-stop-ceil-endpoint")?8:0;
+        u8 bytes[]={!strcmp(argv[1],"--terminal-branch-linear")?2:3,0,0};
+        const unsigned delay=!strcmp(argv[1],"--terminal-pass-endpoint")?25:
+            !strcmp(argv[1],"--terminal-stop-ceil-endpoint")?8:0;
         HSD_FObjDesc track={0};track.ad=bytes;track.length=sizeof(bytes);
         track.startframe=-(s16)delay;
         track.type=HSD_A_J_BRANCH;track.frac_value=track.frac_slope=0x88;
@@ -216,8 +216,12 @@ int main(int argc, char** argv)
             CHECK(!(joint.flags&JOBJ_HIDDEN));
         }
         HSD_AObjInterpretAnim(animation,&joint,JObjUpdateFunc);
-        CHECK(!"Undefined source interpolation must fail before visibility output");
-        return 1;
+        // The terminal single-datum update is defined as the authored last
+        // value: each interpolation type's own zero-duration path emits p1.
+        // Zero hides the branch without changing the parser state.
+        CHECK(joint.flags&JOBJ_HIDDEN);
+        puts("original terminal branch visibility constant passed");
+        return 0;
     }
     if (argc == 2 && strcmp(argv[1], "--replace-heap") == 0) {
         managed_native_lifetimes(1);
