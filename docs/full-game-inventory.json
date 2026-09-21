@@ -202,7 +202,7 @@
         "docs/evidence/full-game-checkpoint-donkey-v1.json",
         "docs/evidence/production-checkpoint-20260920-v1.json"
       ],
-      "next_step": "Public selection is disabled for the September 20 checkpoint. Resolve the reproduced Battlefield Pass shield-drop crash at undefined terminal SPL0 output using independent original consumer evidence before public re-enablement. Existing native five-costume lifetimes and 14,000 drawn FD action frames remain scoped development evidence; StopCeil, broader interactions and original/pixel/PCM/physical-input admission remain open.",
+      "next_step": "Public selection is re-enabled after PR #52 defined the terminal single-datum FObj output as the authored last value and the Battlefield shield-drop reducer completes Pass for all five costumes. An independent original Pass-consumer capture, StopCeil lifetime exercise, original comparison and broader admission remain open under issue #50.",
       "issue": 50
     },
     {
