@@ -1,0 +1,57 @@
+{
+  "schema": "melee-web-results-prize-enabled-roster-validation",
+  "version": 1,
+  "source_base_commit": "20a2aaa1af6074a3d808f6e0107b4b558e316b76",
+  "scope": "Native source Results lifecycle coverage for every fighter currently enabled by the gameplay content manifest. This receipt extends the historical eight-fighter fixture without claiming original-game equivalence, rendered pixels, PCM, performance, or retail four-CPU workload acceptance.",
+  "fixture_source": "Owned GALE01 revision 2 disc; extracted archives are local ignored assets-local/results-fixtures inputs and are not repository content.",
+  "tracked_change": "tests/gameplay_results_scene_trace.cpp",
+  "build": {
+    "command": ".venv/bin/cmake --build build/browser-release --target gameplay_results_scene_trace -j2",
+    "local_path": "work/testlogs/pr56-results-roster-target-build-20260924.log",
+    "sha256": "ee38b6056244e58672827fb838fab1ab81f235014a51b7334736f7d4ab276032",
+    "result": "pass"
+  },
+  "enabled_roster": {
+    "fighters": [
+      "Mario", "Fox", "Falco", "Marth", "Dr. Mario", "Roy", "Link",
+      "Young Link", "Captain Falcon", "Ganondorf", "Luigi", "Pikachu",
+      "Pichu", "Jigglypuff", "Donkey Kong", "Bowser", "Mewtwo"
+    ],
+    "orientations": "Each fighter wins once and Mario wins once against each fighter.",
+    "sessions": 34
+  },
+  "focused_checks": [
+    {
+      "command": "node build/browser-release/gameplay_results_scene_trace.js --real-enabled assets-local/results-fixtures assets-local/results-fixtures assets-local/results-fixtures",
+      "local_path": "work/testlogs/results-scene-enabled-roster-20260924.log",
+      "sha256": "932e7cb44650bdc22d04a587cf6be795189b60fa393d0cd9a9afb7fb731bdd18",
+      "result": "pass",
+      "scope": "34 source Results constructions across all 17 enabled fighters and both winner orientations"
+    },
+    {
+      "command": "node build/browser-release/gameplay_results_scene_trace.js --real-enabled-confirm assets-local/results-fixtures assets-local/results-fixtures assets-local/results-fixtures",
+      "local_path": "work/testlogs/results-scene-enabled-roster-confirm-20260924.log",
+      "sha256": "3a38103b6eff79507e8c198fd6cd9d64072aa643f01eadd91ea5c9cc9a00bf75",
+      "result": "pass",
+      "scope": "34 source Results confirmations with longer ticks, source audio checks, and teardown"
+    },
+    {
+      "command": "node build/browser-release/gameplay_results_scene_trace.js --real-eight-confirm assets-local/results-fixtures assets-local/results-fixtures assets-local/results-fixtures",
+      "local_path": "work/testlogs/results-scene-eight-confirm-20260924.log",
+      "sha256": "a8c452e402c6fd907caab97f02cc5098acaacc33c0f43ff4e05dd9ca1bf66d21",
+      "result": "pass",
+      "scope": "Legacy 16 source Results confirmations across the existing eight-fighter fixture"
+    },
+    {
+      "command": "python3 -m unittest tests.test_pipeline_cache_seed tests.test_gameplay_results_layout tests.test_gameplay_audio_stream tests.test_gameplay_asset_manifest -v",
+      "local_path": "work/testlogs/pr56-results-roster-focused-unittest-20260924.log",
+      "sha256": "8b53116138d8e8ad8503fae33844cdbb7a134fff158c9c61ee97e2f155a8a668",
+      "result": "pass (12 tests, 3 optional fixture skips)"
+    }
+  ],
+  "remaining": [
+    "Original retail equivalence, rendered browser pixels, PCM comparison, performance acceptance, and four-CPU level-9 workload remain outside this native fixture receipt.",
+    "The ignored fixture is source-owned input for lifecycle coverage; it does not establish that every fighter is admitted by the retail asset corpus or that all browser routes render correctly."
+  ],
+  "deployed": false
+}
