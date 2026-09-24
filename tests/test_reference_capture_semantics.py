@@ -158,24 +158,52 @@ def _observer_frame(event, sequence, payload, *, pc=0, source_tick=0,
     return header + payload
 
 
+def _typed_profile_context_slices(kind):
+    """Authored GameRules and save-block bytes, published at CSS entry."""
+    if kind != 13:
+        return b"", b""
+    rules = bytearray(semantics.GAME_RULES_SIZE)
+    rules[0x02] = 1                      # mode
+    rules[0x04] = 4                      # stock_count
+    rules[0x14:0x18] = (-3).to_bytes(4, "big", signed=True)
+    save = bytearray(semantics.SAVE_DATA_SIZE)
+    save[0:2] = (0x0005).to_bytes(2, "big")                  # unlocked characters 0 and 2
+    save[2:4] = (0x0002).to_bytes(2, "big")                  # unlocked stage 1
+    save[4:5] = (0x21).to_bytes(1, "big")                    # unlocked features 0 and 5
+    counters = dict(semantics.SAVE_MATCH_COUNTERS)
+    save[counters["stock_matches"]:counters["stock_matches"] + 4] = (7).to_bytes(4, "big")
+    save[semantics.SAVE_TROPHY_COUNT:semantics.SAVE_TROPHY_COUNT + 2] = (2).to_bytes(2, "big", signed=True)
+    save[semantics.SAVE_TROPHY_CATEGORY_FLAGS:semantics.SAVE_TROPHY_CATEGORY_FLAGS + 2] = \
+        (0x0003).to_bytes(2, "big")
+    save[semantics.SAVE_TROPHY_FLAGS + 2 * 41:semantics.SAVE_TROPHY_FLAGS + 2 * 41 + 2] = \
+        (1).to_bytes(2, "big")
+    return bytes(rules), bytes(save)
+
+
 def _observer_boundary(kind, match_index, *, result=False):
     raw = b"result" if result else b"state"
     tag = 15 if result else 31
+    rules, save = _typed_profile_context_slices(kind)
+    # Descriptors and payload bytes share one order: the reader rejects a gap
+    # or a reordered slice, so the typed context follows the existing masks.
+    published = [(tag, 0, 0x80479D98 if result else 0x804D6CC0, raw),
+                 (36, 0, 0x8045C538, b"\x07\xff"),
+                 (37, 0, 0x8045C53A, b"\x01\xc0")]
+    if rules:
+        published += [(38, 0, 0x804D1850, rules), (39, 0, 0x804D1868, save)]
     prefix = observer_stream.BOUNDARY.pack(
-        kind, observer_stream.WHOLE_SESSION_FLAG, 0x80300000, 32, 3, 0)
+        kind, observer_stream.WHOLE_SESSION_FLAG, 0x80300000, 32, len(published), 0)
     gprs = struct.pack("<32I", *range(32))
-    descriptor_offset = (observer_stream.BOUNDARY.size + 32 * 4 +
-                         observer_stream.SLICE.size * 3)
-    descriptor = observer_stream.SLICE.pack(
-        tag, 0, 0x80479D98 if result else 0x804D6CC0,
-        len(raw), descriptor_offset)
-    profile_characters = observer_stream.SLICE.pack(
-        36, 0, 0x8045C538, 2, descriptor_offset + len(raw))
-    profile_stages = observer_stream.SLICE.pack(
-        37, 0, 0x8045C53A, 2, descriptor_offset + len(raw) + 2)
+    offset = (observer_stream.BOUNDARY.size + 32 * 4 +
+              observer_stream.SLICE.size * len(published))
+    descriptors = b""
+    payload = b""
+    for slice_tag, flags, address, value in published:
+        descriptors += observer_stream.SLICE.pack(slice_tag, flags, address, len(value), offset)
+        offset += len(value)
+        payload += value
     metadata = observer_stream.WHOLE_METADATA.pack(match_index, kind, 0)
-    return (prefix + gprs + descriptor + profile_characters + profile_stages + raw +
-            b"\x07\xff\x01\xc0" + metadata)
+    return prefix + gprs + descriptors + payload + metadata
 
 
 def _decoded_observer_rows(match_count=3, *, include_prize=False,
@@ -338,6 +366,34 @@ class ReferenceCaptureSemanticsTests(unittest.TestCase):
         session = semantics.SemanticSession()
         with self.assertRaises(KeyError):
             session.consume({"seq": 1, "event": "source_tick"})
+
+    def test_whole_session_reports_typed_first_css_profile_context(self):
+        report = semantics.validate_whole_session_observer_records(_decoded_observer_rows())
+        context = report["matches"][0]["loaded_profile_context"]
+        self.assertEqual(context["boundary"], "css_enter")
+        self.assertEqual(context["game_rules"]["mode"], 1)
+        self.assertEqual(context["game_rules"]["stock_count"], 4)
+        self.assertEqual(context["game_rules"]["unk_14"], -3)
+        self.assertEqual(context["unlocked_characters"]["set"], [0, 2])
+        self.assertEqual(context["unlocked_stages"]["set"], [1])
+        self.assertEqual(context["unlocked_features"]["set"], [0, 5])
+        self.assertEqual(context["match_counters"]["stock_matches"], 7)
+        self.assertEqual(context["trophy_count"], 2)
+        self.assertEqual(context["trophy_category_flags"], 3)
+        self.assertEqual([index for index, flag in enumerate(context["trophy_flags"]) if flag], [41])
+        self.assertNotIn("final_profile_semantics", report["missing_coverage"])
+        self.assertIn("persistent_record_semantics", report["missing_coverage"])
+
+    def test_whole_session_reports_missing_profile_semantics_for_untyped_stream(self):
+        rows = _decoded_observer_rows()
+        for row in rows:
+            if row["payload"].get("boundary") == "css_enter":
+                row["payload"]["slices"] = [item for item in row["payload"]["slices"]
+                                            if item["name"] not in {"profile_game_rules",
+                                                                    "profile_save_data"}]
+        report = semantics.validate_whole_session_observer_records(rows)
+        self.assertIsNone(report["matches"][0]["loaded_profile_context"])
+        self.assertIn("final_profile_semantics", report["missing_coverage"])
 
     def test_whole_session_preserves_three_match_boundary_sequence(self):
         report = semantics.validate_whole_session(_whole_rows())

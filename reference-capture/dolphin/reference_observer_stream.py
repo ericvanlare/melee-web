@@ -113,6 +113,8 @@ SLICE_NAMES = {
     35: "menu_sss_route",
     36: "profile_characters",
     37: "profile_stages",
+    38: "profile_game_rules",
+    39: "profile_save_data",
     40: "scene_kind",
     41: "stage_select_index",
     42: "stage_select_kind",

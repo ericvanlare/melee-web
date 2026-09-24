@@ -67,6 +67,36 @@ def prize_profile_boundary_payload() -> bytes:
     return prefix + gprs + descriptors + b"".join(values) + metadata
 
 
+PROFILE_ROOT = 0x804D0000
+PROFILE_GAME_RULES_OFFSET = 0x1850
+PROFILE_GAME_RULES_SIZE = 0x18
+PROFILE_SAVE_DATA_OFFSET = 0x1868
+PROFILE_SAVE_DATA_SIZE = 0x55E8
+
+
+def css_profile_context_boundary_payload() -> bytes:
+    # A CSS entry publishes the authored rules and save block: the asserted
+    # 0x18-byte GameRules and the 0x55E8-byte save block that carries the
+    # unlock masks, counters, persistent fighter records and name banks.
+    values = [
+        (38, 0, PROFILE_ROOT + PROFILE_GAME_RULES_OFFSET,
+         bytes((index + 1) & 0xFF for index in range(PROFILE_GAME_RULES_SIZE))),
+        (39, 0, PROFILE_ROOT + PROFILE_SAVE_DATA_OFFSET,
+         bytes((index * 7 + 3) & 0xFF for index in range(PROFILE_SAVE_DATA_SIZE))),
+    ]
+    prefix = stream.BOUNDARY.pack(13, stream.WHOLE_SESSION_FLAG, 0x8026688C,
+                                  32, len(values), 0)
+    gprs = struct.pack("<32I", *range(32))
+    descriptor_offset = stream.BOUNDARY.size + 32 * 4 + stream.SLICE.size * len(values)
+    descriptors = b""
+    offset = descriptor_offset
+    for tag, flags, address, value in values:
+        descriptors += stream.SLICE.pack(tag, flags, address, len(value), offset)
+        offset += len(value)
+    metadata = stream.WHOLE_AUDIO_METADATA.pack(0, 13, 3, 0)
+    return prefix + gprs + descriptors + b"".join(item[3] for item in values) + metadata
+
+
 def startup_prize_exit_boundary_payload() -> bytes:
     raw = b"startup-prize-exit"
     prefix = stream.BOUNDARY.pack(30, stream.WHOLE_SESSION_FLAG, 0x801BFF7C,
@@ -177,6 +207,27 @@ class ObserverStreamTests(unittest.TestCase):
         payload = records[-1]["payload"]
         self.assertEqual(payload["boundary"], "startup_prize_mode_exit")
         self.assertEqual(payload["pc"], 0x801BFF7C)
+
+    def test_decodes_css_typed_profile_context_slices(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "css-profile-context.mwro"
+            path.write_bytes(
+                frame(1, 0, b'{"whole_session":true,"match_count":3}')
+                + frame(2, 1, b'{"whole_session":true,"match_count":3}')
+                + frame(3, 2, css_profile_context_boundary_payload(), pc=0x8026688C))
+            records = list(stream.iter_records(path))
+        payload = records[-1]["payload"]
+        self.assertEqual(payload["boundary"], "css_enter")
+        self.assertEqual([item["name"] for item in payload["slices"]],
+                         ["profile_game_rules", "profile_save_data"])
+        self.assertEqual([item["size"] for item in payload["slices"]],
+                         [PROFILE_GAME_RULES_SIZE, PROFILE_SAVE_DATA_SIZE])
+        self.assertEqual([item["address"] for item in payload["slices"]],
+                         [PROFILE_ROOT + PROFILE_GAME_RULES_OFFSET,
+                          PROFILE_ROOT + PROFILE_SAVE_DATA_OFFSET])
+        self.assertEqual(payload["slices"][0]["hex"],
+                         bytes((index + 1) & 0xFF
+                               for index in range(PROFILE_GAME_RULES_SIZE)).hex())
 
     def test_rejects_invalid_whole_metadata_or_missing_opt_in(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
