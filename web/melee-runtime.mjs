@@ -219,7 +219,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     prepared = false; callbacks.menuPreparationCanceled(); await pauseAudioForPreparation();
     const deadline = performance.now() + 30000;
     let cacheState = 0;
-    while ((cacheState = await boundary(() => Module._melee_web_native_menu_cache_idle())) === 0) {
+    while ((cacheState = await boundary(readNativeCacheIdle)) === 0) {
       if (performance.now() > deadline) throw Error('Pending renderer work did not drain. Reload to recover.');
     }
     if (cacheState !== 1) {
