@@ -39,7 +39,7 @@
     {
       "command": ".venv/bin/python -m unittest discover -s tests -v",
       "result": "pass (1223 tests, 85 optional fixture skips)",
-      "scope": "Merged tree including read-only CSS setup observer commit 6ee8052; 1223 tests passed and 85 optional fixture tests skipped",
+      "scope": "Merged tree including read-only CSS setup observer commit 6ee8052; 1223 tests run, 85 optional fixture tests skipped",
       "local_path": "work/pr61-final-helper-full-suite-v1.log",
       "sha256": "c86b4142b05671e849a78f9d1783d5770feb1eef0e0f00e244c393ce0312a41c"
     }
