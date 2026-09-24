@@ -11,6 +11,10 @@ extern struct gm_80479D58_t gm_80479D58;
 extern u32 gm_GetFrameCount(void);
 static uint32_t bits(float f){uint32_t u;memcpy(&u,&f,4);return u;}
 static void vec(const Vec3* v){printf("[\"%08x\",\"%08x\",\"%08x\"]",bits(v->x),bits(v->y),bits(v->z));}
+uint32_t melee_web_retail_rng(void){
+    if(!seed_ptr)abort();
+    return *seed_ptr;
+}
 void melee_web_retail_state(void){
     if(!seed_ptr)abort();
     printf("\"rng\":%u,\"match_frame\":%u,\"fighters\":[",*seed_ptr,gm_GetFrameCount());

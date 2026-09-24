@@ -137,7 +137,7 @@ assert(start&&pause&&completion);
 }
 {
  const logHook=page.slice(page.indexOf('    onLog(text,isError){'),page.indexOf('    onEvent(name,data){'));
- const replayLimits=page.match(/const RETAIL_REPLAY_(?:LEGACY_MAX_FRAMES|WHOLE_SESSION_MAX_FRAMES|STATE_RECORD_OVERHEAD|TIMER_RECORD_OVERHEAD|MAX_BYTES)[^;]*;/g).join('\n');
+ const replayLimits=page.match(/const RETAIL_REPLAY_(?:LEGACY_MAX_FRAMES|WHOLE_SESSION_MAX_FRAMES|STATE_RECORD_OVERHEAD|SESSION_RECORD_OVERHEAD|TIMER_RECORD_OVERHEAD|MAX_BYTES)[^;]*;/g).join('\n');
  const moduleLine=replayLimits+'\nconst hooks={'+logHook+'}; var Module={print:text=>hooks.onLog(text,false),printErr:text=>hooks.onLog(text,true)};';
  const logged=[];
  const scope={$:()=>({}),retailRun:{observe:true,rows:[],timerRows:[]},
@@ -158,14 +158,14 @@ assert(start&&pause&&completion);
  scope.retailRun.observe=true;
  scope.retailRun.timerRows.length=36003;
  assert.throws(()=>scope.Module.printErr('TIMER_AUDIT '+timer),/record bound/);
- scope.retailRun={observe:true,frames:46835,rows:[],timerRows:[]};
- scope.retailRun.rows.length=108003;
+ scope.retailRun={observe:true,wholeSession:true,frames:46835,rows:[],timerRows:[]};
+ scope.retailRun.rows.length=108033;
  scope.Module.print(state);
- assert.equal(scope.retailRun.rows.length,108004,'v8 state capture keeps its three-budget record bound');
+ assert.equal(scope.retailRun.rows.length,108034,'v8 admits bounded per-span initialization records');
  scope.retailRun.timerRows.length=108002;
  scope.Module.printErr('TIMER_AUDIT '+timer);
  assert.equal(scope.retailRun.timerRows.length,108003,'v8 timer capture keeps its three-budget record bound');
- scope.retailRun.rows.length=108004;
+ scope.retailRun.rows.length=108034;
  assert.throws(()=>scope.Module.print(state),/record bound/);
  scope.retailRun.timerRows.length=108003;
  assert.throws(()=>scope.Module.printErr('TIMER_AUDIT '+timer),/record bound/);
@@ -205,7 +205,7 @@ function harness(unload=true,wholeSession=false){
    _melee_web_native_menu_launch:()=>{calls.launch++;return 1;},
    _melee_web_native_menu_running:()=>1,
    _melee_web_native_menu_pause:()=>{calls.paused++;}}};
- const replayLimits=page.match(/const RETAIL_REPLAY_(?:LEGACY_MAX_FRAMES|WHOLE_SESSION_MAX_FRAMES|STATE_RECORD_OVERHEAD|TIMER_RECORD_OVERHEAD|MAX_BYTES)[^;]*;/g).join('\n');
+ const replayLimits=page.match(/const RETAIL_REPLAY_(?:LEGACY_MAX_FRAMES|WHOLE_SESSION_MAX_FRAMES|STATE_RECORD_OVERHEAD|SESSION_RECORD_OVERHEAD|TIMER_RECORD_OVERHEAD|MAX_BYTES)[^;]*;/g).join('\n');
  vm.createContext(scope);vm.runInContext(replayLimits+'\n'+start+'\n'+pause,scope);
  return {$,scope,calls,resolveBytes,play:()=>$('retail-replay-start').onclick()};
 }

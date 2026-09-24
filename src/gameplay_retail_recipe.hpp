@@ -60,8 +60,8 @@ struct RetailReplayRecipe {
     std::unique_ptr<RetailReplayInitialCssContext> initial_css;
     // Version 8 is the opt-in whole-session form: one continuous pad history
     // with a declared scene span table and copied first-CSS source context. It
-    // retains one source arena instead of requiring a fresh application, and
-    // it is the only version that may span the menu chain around a match.
+    // starts from the fresh prepared CSS owner and retains one source arena
+    // across the menu chain and matches. A used source heap is rejected.
     bool whole_session() const { return version == 8; }
     unsigned scheduling_mode() const { return version == 6 ? 2 : version == 5 ? 1 : 0; }
     std::size_t expected_draws() const {
@@ -116,10 +116,11 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t>);
 // Diagnostic JSON output; callers must disable this instrumentation for timing
 // acceptance. Initial follows construction, frame precedes audio/drawing, and
 // end is emitted only after the complete input timeline and successful teardown.
+void retail_replay_session_initial(const RetailReplayRecipe&);
 void retail_replay_initial(const RetailReplayRecipe&, bool source_drawing);
-void retail_replay_frame(const RetailReplayRecipe&, size_t index);
+void retail_replay_frame(const RetailReplayRecipe&, size_t index, unsigned scene = 0);
 void retail_replay_draw(const RetailReplayRecipe&, size_t index);
 void retail_replay_preparation_draw(const RetailReplayRecipe&);
-void retail_replay_end(size_t frames);
+void retail_replay_end(size_t frames, bool whole_session = false);
 
 } // namespace melee_web
