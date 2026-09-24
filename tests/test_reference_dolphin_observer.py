@@ -243,7 +243,7 @@ int main() {
         self.assertIn("MWRC_WHOLE_SESSION_MATCHES", source)
         self.assertIn("WHOLE_SESSION_MIN_MATCHES = 3", source)
         for address in ("0x8026688c", "0x80266d70", "0x8025a998",
-                        "0x8025bb5c", "0x801a5af0", "0x80177368",
+                        "0x8025bbd0", "0x801a5af0", "0x80177368",
                         "0x80177704", "0x801a5f64", "0x80179350",
                         "0x801bfcfc", "0x802febe0", "0x802fed10",
                         "0x801a6308", "0x801bff7c"):
