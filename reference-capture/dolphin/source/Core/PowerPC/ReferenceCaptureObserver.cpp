@@ -692,7 +692,9 @@ struct Observer::Impl
       u32 ko_counts = 0;
       if (!AddSlice(system, SliceTag::MenuCssContext, state_pointer, 0x148) ||
           !ReadU32(system, state_pointer + 4, &ko_counts) || !ko_counts ||
-          !AddSlice(system, SliceTag::MenuCssKoCounts, ko_counts, 4))
+          // gmvsmelee.c owns ko_counts[GM_MAX_PLAYERS], including the two
+          // non-CSS source slots. Preserve the complete authored array.
+          !AddSlice(system, SliceTag::MenuCssKoCounts, ko_counts, 6))
         return false;
     }
     return true;
