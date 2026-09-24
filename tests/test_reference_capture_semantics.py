@@ -188,8 +188,8 @@ def _decoded_observer_rows(match_count=3, *, include_prize=False,
         (22, "results_mode_exit"), (11, "scene_teardown"), (24, "return_css"),
     )
     if include_prize:
-        kinds = kinds[:-1] + (
-            (26, "prize_mode_enter"), (27, "prize_scene_enter"),
+        kinds = kinds[:-2] + (
+            (26, "prize_mode_enter"), (11, "scene_teardown"), (27, "prize_scene_enter"),
             (28, "prize_scene_exit"), (29, "prize_mode_exit"), (24, "return_css"),
         )
     pcs = {

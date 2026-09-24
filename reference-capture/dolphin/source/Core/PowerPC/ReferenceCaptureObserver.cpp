@@ -837,6 +837,32 @@ struct Observer::Impl
     }
   }
 
+  enum class SceneResetAction { Ignore, BeginResults, FinishResults, Invalid };
+
+  SceneResetAction ClassifyWholeSceneReset() const
+  {
+    // gm_801A4014 initializes a fresh GObj arena for EVERY scene, after the
+    // mode's on_enter and before the scene's on_enter. Menu transitions do
+    // not complete a match; the first reset after VS releases its fighters.
+    if (!match_active)
+    {
+      if (whole_phase == 0 || whole_phase == 2 || whole_phase == 4 || whole_phase == 8)
+        return SceneResetAction::Ignore;
+      if (whole_phase == 6 && prize_scene_exit_seen && prize_mode_exit_seen)
+        return SceneResetAction::Ignore;
+      return SceneResetAction::Invalid;
+    }
+    if (whole_phase != 5 || !result_seen || !vs_exit_seen || !vs_exit_return_seen ||
+        !vs_mode_exit_seen)
+      return SceneResetAction::Invalid;
+    if (!results_enter_seen && !results_gobj_seen && !results_exit_seen &&
+        !results_mode_exit_seen)
+      return SceneResetAction::BeginResults;
+    if (results_enter_seen && results_gobj_seen && results_exit_seen && results_mode_exit_seen)
+      return SceneResetAction::FinishResults;
+    return SceneResetAction::Invalid;
+  }
+
   void Observe(Core::System* system, u32 pc, PowerPC::PowerPCState* state)
   {
     if (!Start() || invalid.load() || finish_requested.load())
@@ -1094,7 +1120,15 @@ struct Observer::Impl
           boundary == Boundary::PrizeSceneExit || boundary == Boundary::PrizeModeExit ||
           boundary == Boundary::StartupPrizeModeExit)
       {
-        if (!whole_session_enabled() || match_active ||
+        // The mode's Prize on_enter precedes the arena reset into its scene.
+        // Arm that handoff from the already ordered Results exit hooks; the
+        // following reset still publishes the final Results teardown.
+        const bool entering_prize_from_results = boundary == Boundary::PrizeModeEnter &&
+            match_active && whole_phase == 5 && results_gobj_seen && results_exit_seen &&
+            results_mode_exit_seen;
+        if (entering_prize_from_results)
+          completed_match_pending_prize = true;
+        if (!whole_session_enabled() || (match_active && !entering_prize_from_results) ||
             (!completed_match_pending_prize && !startup_prize_pending && whole_phase != 0))
           return SetInvalid("whole-session Prize hook occurred outside a completed match"), void();
         if (boundary == Boundary::PrizeModeEnter)
@@ -1163,6 +1197,9 @@ struct Observer::Impl
             return SetInvalid("VS exit return did not expose PAD/RNG state"), void();
           vs_exit_return_seen = true;
           result_seen = true;
+          // Gameplay observations end at the original VS exit. Results has
+          // its own source hooks and must never reuse these fighter pointers.
+          setup_ready = false;
         }
         else if (boundary == Boundary::VsModeExit)
         {
@@ -1203,16 +1240,17 @@ struct Observer::Impl
     {
       if (whole_session_enabled())
       {
-        // Retail performs an early scene reset while booting the original
-        // title, before the first CSS callback has established the whole
-        // session route.  It is not a completed match teardown.  Ignore only
-        // this pre-route reset; once a route is active, keep the strict
-        // VS/Results ordering below.
-        if (!match_active && whole_phase == 0)
+        const SceneResetAction reset = ClassifyWholeSceneReset();
+        if (reset == SceneResetAction::Ignore)
           return;
-        if (!match_active || !result_seen || !vs_exit_seen || !vs_exit_return_seen ||
-            !vs_mode_exit_seen || !results_enter_seen || !results_exit_seen ||
-            !results_gobj_seen || !results_mode_exit_seen)
+        if (reset == SceneResetAction::BeginResults)
+        {
+          setup_ready = false;
+          fighter_present.fill(false);
+          fighter_pointers.fill(0);
+          return;
+        }
+        if (reset == SceneResetAction::Invalid)
           return SetInvalid("whole-session scene reset is missing an ordered VS/Results hook"),
                  void();
       }
