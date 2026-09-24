@@ -142,6 +142,22 @@ model of the game's memory system. In particular:
   synthetic valid pool histories avoid that failure; model exhaustion is an
   explicit result to be handled by a future integration boundary.
 
+## Native component initialization boundary
+
+The native world initializes the public HSD component pools once per world
+in the order authored by `HSD_ObjInit`: List, AObj, FObj, ID, Vec, Mtx,
+RObj, Render, Shadow and ZList, following `HSD_IDSetup`. Scene owners reuse
+that initialization instead of resetting Shadow or ZList at individual scene
+entries. Ownership guards and world teardown remain required; initialization
+must not erase a live owner.
+
+This is the component-pool portion of startup only. `HSD_InitComponent` also
+requires original OS arena/heap, framebuffer/FIFO and platform services that
+the current browser bootstrap does not supply. The pool change does not derive
+original fighter addresses or implement CPU register carry. Its scoped checks
+and retained failures are in the
+[native initialization receipt](evidence/native-pool-initialization-v1.json).
+
 ## Remaining dependency before CPU integration
 
 The existing match-only bootstrap allocates a fresh host arena and does not

@@ -18,6 +18,9 @@
 #include <sysdolphin/baselib/tobj.h>
 #include <sysdolphin/baselib/spline.h>
 #include <sysdolphin/baselib/robj.h>
+#include <sysdolphin/baselib/shadow.h>
+#include <sysdolphin/baselib/displayfunc.h>
+#include <sysdolphin/baselib/tev.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -46,6 +49,7 @@ struct MeleeWebNativeJoint {
 };
 static uint64_t native_generation;
 extern HSD_IDTable default_table;
+extern HSD_ObjAllocData zlist_alloc_data;
 HSD_JObj* melee_web_native_common_load(HSD_Joint* descriptor, const uint8_t diffuse[4]);
 static int fail(char* error, size_t size, const char* message)
 {
@@ -54,6 +58,14 @@ static int fail(char* error, size_t size, const char* message)
 }
 static void finish_native_world(void)
 {
+    /* The source heap-reset callback forgets static display-list chains, but
+     * live allocations still belong to the caller. Drop only an empty pool so
+     * teardown cannot hide an ownership leak behind a reset. */
+    if (HSD_ShadowGetAllocData()->used || zlist_alloc_data.used) {
+        fputs("Native HSD shutdown retains shadow or Z-list allocations\n", stderr);
+        abort();
+    }
+    _HSD_DispForgetMemory(NULL, NULL);
     /* GObj shutdown has invoked real object destructors. Source consumers such
      * as ft_800C85B8 also register descriptor aliases; JObjRelease only removes
      * the object's primary ID. Release those remaining owned table entries
@@ -516,13 +528,28 @@ int melee_web_native_world_enable(char* error, size_t size)
     const MeleeWebGameplayStats world = melee_web_gameplay_stats();
     if (!world.generation || world.heap_free_bytes < 1024 * 1024)
         return fail(error, size, "Native HSD requires an owned world with at least 1 MiB free");
-    if (native_generation != world.generation && HSD_IDGetAllocData()->used)
-        return fail(error, size, "Native HSD cannot replace an existing descriptor ID context");
+    if (native_generation != world.generation &&
+        (HSD_IDGetAllocData()->used || HSD_ShadowGetAllocData()->used || zlist_alloc_data.used))
+        return fail(error, size, "Native HSD cannot replace an existing descriptor, shadow or Z-list context");
     if (!melee_web_gameplay_enable_hsd_objects(finish_native_world, error, size)) return 0;
     if (native_generation != world.generation) {
-        HSD_IDInitAllocData(); HSD_IDSetup();
-        HSD_ListInitAllocData(); HSD_MtxInitAllocData(); HSD_VecInitAllocData();
-        HSD_AObjInitAllocData(); HSD_FObjInitAllocData(); HSD_RObjInitAllocData();
+        /* Keep the source HSD_ObjInit order.  HSD_InitComponent itself cannot
+         * be reused here: gameplay_bootstrap already owns the Aurora OS heap
+         * and does not publish retail XFB/FIFO storage.  These public component
+         * initializers are the allocation-only portion of initialize.c's
+         * HSD_ObjInit, with the source ID table setup immediately before it. */
+        HSD_IDSetup();
+        HSD_ListInitAllocData();
+        HSD_AObjInitAllocData();
+        HSD_FObjInitAllocData();
+        HSD_IDInitAllocData();
+        HSD_VecInitAllocData();
+        HSD_MtxInitAllocData();
+        HSD_RObjInitAllocData();
+        HSD_RenderInitAllocData();
+        HSD_ShadowInitAllocData();
+        HSD_ZListInitAllocData();
+        _HSD_DispForgetMemory(NULL, NULL);
         native_generation = world.generation;
     }
     if (error && size) error[0] = 0;

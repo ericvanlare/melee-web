@@ -1,0 +1,279 @@
+{
+  "schema": "melee-web-native-pool-initialization",
+  "version": 1,
+  "date": "2026-09-24",
+  "scope": "Native component pool initialization and ownership within the existing host world. Original OS startup and live source-address identities are not implemented.",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced"
+  ],
+  "base_commit": "3958198cf281b97e763bdc2aa69fe79103cfd31a",
+  "source_files": [
+    {
+      "path": "CMakeLists.txt",
+      "bytes": 15909,
+      "sha256": "eb8159827df88d8a310689db110ea849a946ccad87d4e4e1ccbb865330c7afc2"
+    },
+    {
+      "path": "cmake/FighterRuntime.cmake",
+      "bytes": 45916,
+      "sha256": "e17400ccbc6938ee50b5d870307fc6bed4a52c77799eb52afac31c4d5dd217bc"
+    },
+    {
+      "path": "src/gameplay_match_context.c",
+      "bytes": 26391,
+      "sha256": "f0dcf163d58e818ec01de95ff9685e767bb7905d11256f918a075096783111fe"
+    },
+    {
+      "path": "src/gameplay_menu_host.c",
+      "bytes": 27945,
+      "sha256": "2d95a8d03a118aa5baabba33f4c8b460416dfbe6b6bbb64e65b71fa4020361ff"
+    },
+    {
+      "path": "src/gameplay_prize_context.c",
+      "bytes": 9461,
+      "sha256": "349f5538b1cbb161d098ac0ad6137dcefc6d9766210fa79abd056c6f38ee0b85"
+    },
+    {
+      "path": "src/gameplay_render.c",
+      "bytes": 10913,
+      "sha256": "81778cfe791f588f7c7bd3739f7bc78ee16ae1b6e3e94289378ba38327a276ce"
+    },
+    {
+      "path": "src/gameplay_results_context.c",
+      "bytes": 22917,
+      "sha256": "ddbb7d5504b6e404d1dcbc407f391b2c7bccc9329a91b61a2a970710e6db0bda"
+    },
+    {
+      "path": "src/hsd_native_joint.c",
+      "bytes": 34728,
+      "sha256": "ebaea3bfeb20f7a8ac910f81471bba8988a2f189412d0e903123ec158429951b"
+    },
+    {
+      "path": "tests/hsd_native_trace.c",
+      "bytes": 19128,
+      "sha256": "53ed1c4e50dfd0105699e9e885637f1b65d7621f07ca78f1e61dd6ac87b1f6c9"
+    }
+  ],
+  "implementation": {
+    "order": [
+      "HSD_IDSetup",
+      "List",
+      "AObj",
+      "FObj",
+      "ID",
+      "Vec",
+      "Mtx",
+      "RObj",
+      "Render",
+      "Shadow",
+      "ZList"
+    ],
+    "lifetime": "Once per native world generation; scene owners retain explicit ownership checks."
+  },
+  "validation": {
+    "configuration": "checked RelWithDebInfo Wasm32",
+    "prepared_source_reuse": "Configured build consumes the frozen sibling prepared tree; local and shared translated bodies are independently compared before final receipt. Canonical CI prepares its own sources.",
+    "native_lifecycle": {
+      "result": "pass",
+      "results_orientations": 16,
+      "menu_results_prize_return_to_css": true,
+      "live_zlist_replacement_rejected": true,
+      "logs": [
+        {
+          "path": "work/native-pool-order-results-menu-build-v3.log",
+          "bytes": 846,
+          "sha256": "7266411efdb5b693b4e566ae9c58ad4c3fdf29b3b003f0c621c3086da3d2ee43"
+        },
+        {
+          "path": "work/native-pool-order-hsd-native-v3.log",
+          "bytes": 201,
+          "sha256": "1a35b808e8b12611a58f5cc46d8cd413bb766e83f6ce091f98fe6e54b93dac55"
+        },
+        {
+          "path": "work/native-pool-order-native-menu-scene-v3.log",
+          "bytes": 60,
+          "sha256": "e730da5ef872bd69faa94691420aca584711df1b7d4e3a709568e2883063b436"
+        },
+        {
+          "path": "work/native-pool-order-results-scene-eight-v3.log",
+          "bytes": 1840,
+          "sha256": "0a5f8056bf272ca05d9ed09ab17d53900a081ae2b14ae2e6756fd2d62a04e7b5"
+        },
+        {
+          "path": "work/native-pool-order-native-host-results-v3.log",
+          "bytes": 1317,
+          "sha256": "d2109c41ff8831fb437eb0325793b918a1f425b18d78a5bc62755bac22a4f479"
+        }
+      ]
+    },
+    "prepared_source_comparison": {
+      "files": 2651,
+      "manifest_sha256": "f9902e3fd6ad439bcac766b3b99803d457a728c92233869cb15595acd8b83f52",
+      "local_and_configured_shared_trees_equal": true
+    },
+    "browser_prefix": {
+      "note": "Final frozen source diagnostic. Intentional prefix stop does not pass the whole-session replay gate.",
+      "scenario": "Four Mario CPU9 players, four stocks, Final Destination, recorded input queue, headless installed Chrome 153.0.8010.54, checked RelWithDebInfo Wasm.",
+      "result": "incomplete_replay",
+      "requested_source_cursor": 3800,
+      "observed_source_cursor": 3812,
+      "compared_records": 1778,
+      "first_difference": {
+        "tick": 1776,
+        "player": 4,
+        "field": "input_hex",
+        "unchanged_from_prior_baseline": true
+      },
+      "first_source_draw_batch_difference": null,
+      "browser_errors": [],
+      "unexpected_requests": [],
+      "gpu": {
+        "available": true,
+        "vendor": "apple",
+        "architecture": "metal-3"
+      },
+      "artifacts": [
+        {
+          "path": "work/session-equivalence-native-pools-browser-v4/report.json",
+          "bytes": 3347649,
+          "sha256": "be145e2452589abca1fb9bb69c0e0a17d0def7de4e4a6495ee2144ae338fb360"
+        },
+        {
+          "path": "work/session-equivalence-native-pools-browser-v4/first-match-comparison.json",
+          "bytes": 14839,
+          "sha256": "c9475871e1193af3fe902f8cea10c3c206dc045769f23fafcf40a7ad5d0eaeed"
+        },
+        {
+          "path": "work/session-equivalence-native-pools-browser-v4/retail-port.jsonl",
+          "bytes": 12833195,
+          "sha256": "123677fc59220b89818668e828882114dab34eacf319f2b5e78f3ca1c2321e97"
+        },
+        {
+          "path": "work/session-equivalence-native-pools-browser-v4/prefix.png",
+          "bytes": 565700,
+          "sha256": "b84a9e4995bc160c9f76c0781c299126e6d32f4bef98a21e312886c0dbefebc9"
+        }
+      ],
+      "source_and_build": {
+        "path": "work/session-equivalence-native-pools-final-source-v1.json",
+        "bytes": 2157,
+        "sha256": "2854511376f61af94a8cd8fb6b248e45a0f2c093026a0d3e4c720d0fcb88f1ab"
+      },
+      "visual_inspection": "Four Mario fighters and four-stock HUD rendered on Final Destination. No pixel comparison or audio acceptance."
+    },
+    "repository_content": {
+      "tracked_entries": 1211,
+      "findings": 0,
+      "artifact": {
+        "path": "work/native-pool-order-content-v1.log",
+        "bytes": 70,
+        "sha256": "4311ec037ebbe2214fa0c02a209b4308510fe6eb641a3937b3bd098ec731a62f"
+      }
+    },
+    "full_suite": {
+      "command": "python3 -m unittest discover -s tests -v",
+      "result": "pass",
+      "tests": 1355,
+      "passed": 1263,
+      "optional_skips": 92,
+      "seconds": 293.752,
+      "artifact": {
+        "path": "work/native-pool-order-full-suite-v3.log",
+        "bytes": 242219,
+        "sha256": "805d6bf6aa6c41149a624282a22818234e395f4e69be38dd47652c9bc86e9be8"
+      }
+    }
+  },
+  "historical_browser_diagnostic": {
+    "note": "Prior to final ownership review fixes; retained as diagnostic evidence, not final-source acceptance or whole-session success.",
+    "scenario": "Four Mario CPU9 players, four stocks, Final Destination, recorded input queue, headless installed Chrome 153.0.8010.54, checked RelWithDebInfo Wasm.",
+    "result": "incomplete_replay",
+    "requested_source_cursor": 3800,
+    "observed_source_cursor": 3806,
+    "compared_records": 1778,
+    "first_difference": {
+      "tick": 1776,
+      "player": 4,
+      "field": "input_hex",
+      "unchanged_from_prior_baseline": true
+    },
+    "first_source_draw_batch_difference": null,
+    "browser_errors": [],
+    "unexpected_requests": [],
+    "gpu": {
+      "available": true,
+      "vendor": "apple",
+      "architecture": "metal-3"
+    },
+    "artifacts": [
+      {
+        "path": "work/session-equivalence-native-pools-browser-v3/report.json",
+        "bytes": 3355990,
+        "sha256": "800bc1bc03e4b2007a177626fa9031add1b3c9014b58fde5ca036cf010921040"
+      },
+      {
+        "path": "work/session-equivalence-native-pools-browser-v3/first-match-comparison.json",
+        "bytes": 14839,
+        "sha256": "5b7ef2ec57c50f9c9239c5b8cf836075d6f0014a4df0c7a28bd8ac1c637c5341"
+      },
+      {
+        "path": "work/session-equivalence-native-pools-browser-v3/retail-port.jsonl",
+        "bytes": 12803207,
+        "sha256": "e18aa22034c81876cab979d7ec1492b9c2b568dca97d7057ccbb011d7f5eadd2"
+      },
+      {
+        "path": "work/session-equivalence-native-pools-browser-v3/prefix.png",
+        "bytes": 574343,
+        "sha256": "1b448d3288e8d4d0d8d494e2086a7481eaa0393cc7df30acd54fdd46ab4dd7bf"
+      },
+      {
+        "path": "work/session-equivalence-native-pools-browser-v3/build-provenance.json",
+        "bytes": 2507,
+        "sha256": "907bc02ac986146e3b3744d151c23ad23ee16a877c2939d048cc591ac4f76b30"
+      }
+    ]
+  },
+  "retained_failures": [
+    {
+      "description": "First full suite rejected a root-provisioned dependency symlink. Replaced only that owned symlink with a real clone; verified pinned sources before rerun.",
+      "artifact": {
+        "path": "work/native-pool-order-full-suite-v1.log",
+        "bytes": 254959,
+        "sha256": "69e22e8a8a63075f7bb5593ec69e262581279df5532928baa6b0b044b0101778"
+      }
+    },
+    {
+      "description": "Initial browser harness could not resolve Playwright. Explicit installed package supplied for next attempt.",
+      "artifact": {
+        "path": "work/session-equivalence-native-pools-browser-v1/failure.txt",
+        "bytes": 563,
+        "sha256": "49bcd23c7173697325018c42c742246c9b5202b81a9e12b294a4683bc14e8382"
+      }
+    },
+    {
+      "description": "Second browser attempt called checked-Wasm exports before initialization. Standard startup smoke isolated harness error; readiness guard fixed it before v3.",
+      "artifact": {
+        "path": "work/session-equivalence-native-pools-browser-v2/report.json",
+        "bytes": 24369,
+        "sha256": "6862b2ad06865ec6b4a962de5d79abe20dacbfb7f067654a963b2004817d4c72"
+      }
+    },
+    {
+      "description": "Ten-fighter Results asset scan stops at missing owned Ness asset PlNs.dat; Peach input also unavailable. No ten-fighter pass claimed.",
+      "artifact": {
+        "path": "work/native-pool-order-results-assets-v3.log",
+        "bytes": 635,
+        "sha256": "62da02763373b4efd434a5b3e4c111aa9608104518cca4c5215a7987bfd59e0e"
+      }
+    }
+  ],
+  "limits": [
+    "No live original heap context or source-to-host identity provider.",
+    "No CPU register carry implementation.",
+    "Full-session browser equivalence remains open.",
+    "No pixel, PCM, foreground timing or performance acceptance.",
+    "No deployment."
+  ]
+}

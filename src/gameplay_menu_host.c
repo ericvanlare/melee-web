@@ -6,6 +6,7 @@
 #include "gameplay_results_context.h"
 #include "gameplay_prize_context.h"
 #include "gameplay_audio_bank_transport.h"
+#include "hsd_native_joint.h"
 #include <melee/gm/gm_1A36.h>
 #include <melee/gm/gm_1A3F.h>
 #include <melee/gm/gmmain_lib.h>
@@ -17,7 +18,6 @@
 #include <melee/lb/lblanguage.h>
 #include <sysdolphin/baselib/controller.h>
 #include <sysdolphin/baselib/rumble.h>
-#include <sysdolphin/baselib/displayfunc.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/initialize.h>
 #include <sysdolphin/baselib/sislib.h>
@@ -179,6 +179,7 @@ int melee_web_menu_host_enter(MeleeWebMenuHost* h,MeleeWebAudio* audio,char* e,s
         return fail(e,n,"Native menu session cannot enter from this phase");
     if(phase!=MELEE_WEB_MENU_CREATED&&!h->input)
         return fail(e,n,"Returning menu scene requires retained source PAD history");
+    if(!melee_web_native_world_enable(e,n))return 0;
     if(!melee_web_menu_clock_begin())return fail(e,n,"Original scene clock is already owned");
     h->audio=audio;h->generation=melee_web_gameplay_stats().generation;h->transition=0;
     h->saved_rules=*gmMainLib_GetGameRules();
@@ -239,7 +240,6 @@ int melee_web_menu_host_enter(MeleeWebMenuHost* h,MeleeWebAudio* audio,char* e,s
         lbAudioAx_8002838C();lbAudioAx_80028690();
         h->audio_generation=audio_generation;
     }
-    HSD_ZListInitAllocData();
     HSD_SisLib_803A6048(phase==MELEE_WEB_MENU_SSS_READY?0x4800:0x2400);
     int accepted=phase==MELEE_WEB_MENU_SSS_READY?melee_web_menu_enter_sss(h->session,e,n):
         phase==MELEE_WEB_MENU_READY?melee_web_menu_return_to_css(h->session,e,n):melee_web_menu_enter_css(h->session,e,n);

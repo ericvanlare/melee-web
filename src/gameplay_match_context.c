@@ -3,6 +3,7 @@
 #include "gameplay_bootstrap.h"
 #include "gameplay_crowd.h"
 #include "fighter_binding.h"
+#include "hsd_native_joint.h"
 #include <melee/cm/camera.h>
 #include <melee/cm/types.h>
 #include <melee/ft/types.h>
@@ -54,7 +55,6 @@ struct MeleeWebMatchContext {
     int crowd_started,input_restored;
 };
 static MeleeWebMatchContext* owner;
-static uint64_t shadow_generation;
 static int fail(char* e,size_t n,const char* m){if(e&&n)snprintf(e,n,"%s",m);return 0;}
 static int ok(char* e,size_t n){if(e&&n)*e=0;return 1;}
 static int live(MeleeWebMatchContext* h,char* e,size_t n)
@@ -97,6 +97,9 @@ MeleeWebMatchContext* melee_web_match_begin_players(const MeleeWebPlayerSettings
     Camera* camera=melee_web_camera_state();
     if(cm_804D6458||cm_804D645C||cm_804D6460||cm_804D6468||cm_804D6464||camera->gobj||
        HSD_ShadowGetAllocData()->used){fail(e,n,"Source camera or shadow objects are already active");return NULL;}
+    /* Native HSD initialization resets component allocator metadata. Complete
+     * source ownership checks before allowing that destructive boundary. */
+    if(!melee_web_native_world_enable(e,n))return NULL;
     MeleeWebMatchContext* h=calloc(1,sizeof(*h));
     if(!h){fail(e,n,"Cannot allocate match context");return NULL;}
     for(uint32_t i=0;i<count;i++){
@@ -136,9 +139,6 @@ MeleeWebMatchContext* melee_web_match_begin_players(const MeleeWebPlayerSettings
     /* Source match reset; these are per-query collision callbacks and an unused
      * event field. No prior fighters may survive into this exclusive context. */
     mpColl_80041C78();
-    /* Keep the original allocator registered until bootstrap destroys its heap.
-     * Reinitializing within a world would discard the retained free pool. */
-    if(shadow_generation!=generation){HSD_ShadowInitAllocData();shadow_generation=generation;}
     Camera_80028B9C(camera_subjects);h->pool=cm_804D645C;
     owner=h;ok(e,n);return h;
 }
