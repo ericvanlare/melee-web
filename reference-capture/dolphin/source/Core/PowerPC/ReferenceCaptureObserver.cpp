@@ -1221,7 +1221,11 @@ struct Observer::Impl
         if (whole_session_enabled() && !match_active && whole_phase == 0 &&
             ReadBytes(system, 0x80479d30, 1, &current_mode) && current_mode == 0x18)
           return;
-        if (!whole_session_enabled() || !match_active || !setup_ready)
+        // Only VS exit still owns playable fighter state. Its return retires
+        // those pointers; the ordered mode/Results hooks remain part of this
+        // match until Results teardown and must not require them to be live.
+        if (!whole_session_enabled() || !match_active ||
+            (boundary == Boundary::VsExit && !setup_ready))
           return SetInvalid("whole-session source hook occurred outside an active VS match"), void();
         if (boundary == Boundary::VsExit)
         {
