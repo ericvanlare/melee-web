@@ -639,11 +639,10 @@ struct Observer::Impl
       return false;
     if (scene_kind == 8 && !AddCssCpuSteeringSlices(system))
       return false;
-    // Steering evidence for the ordinary menu route: the highlighted stage
-    // index, the authored stage kind it points at, and each CSS cursor. Every
-    // part is optional so a boundary outside those menus stays valid.
+    // Menu globals retain pointers after their scene arena is reclaimed.
+    // Observe each steering owner only in its live source menu scene.
     u8 stage_index = 0;
-    if (ReadBytes(system, STAGE_SELECT_INDEX, 1, &stage_index))
+    if (scene_kind == 9 && ReadBytes(system, STAGE_SELECT_INDEX, 1, &stage_index))
     {
       if (!AddSlice(system, SliceTag::StageSelectIndex, STAGE_SELECT_INDEX, 1))
         return false;
@@ -655,6 +654,8 @@ struct Observer::Impl
           return false;
       }
     }
+    if (scene_kind != 8)
+      return true;
     if (!AddSlice(system, SliceTag::MenuCssDoors, CSS_DOORS_STATE, CSS_DOORS_BYTES))
       return false;
     for (u32 port = 0; port < CSS_CURSOR_PORTS; ++port)
