@@ -1,34 +1,16 @@
 # Current status
 
-## Versus return-loop work in progress
+## Mewtwo capture and menu ownership repair
 
-The original Results → optional Prize → CSS route runs through ordinary
-keyboard input. Three No Contest matches and a separate three-match normal
-four-stock Mario/Final Destination sequence return in one document, preserving
-PAD history and one source arena. Original MatchEnd supplies the winner; each
-completed source-world teardown releases its objects and processes. The named
-four-match rotation also passes, including Yoshi's Story after Marth and the
-rotation's final unload once the missing Link/Young Link menu audio banks are
-registered. See the exact scope, build receipts and retained failures in
-[versus return-loop evidence](docs/VERSUS_RETURN_LOOP.md#profile-and-prize-integration-2026-09-20).
-
-Original profile initialization and complete profile/Toy/language restoration
-are checked against linked source. All eight development fighters pass the
-native winning/losing Results construction and confirmation cases. The named
-whole-session retail comparisons, repeated allocation bounds and cold/warm
-whole-loop performance remain in progress. The first cold timing attempt fails
-on CSS/Results GPU staging waits and live Results pipeline creation; its warm
-slot and the rotation timing slots remain unstarted. The correlated GPU trace
-and the portable 27-descriptor seed correction that addresses the Results
-shader compilation are a separate pipeline change and are not part of this
-route. The owner accepts keyboard-only validation for this PR;
-physical-controller testing remains separate under #35.
-
-A fresh original-game save has corrected all-character/four-stage derivatives
-that update both valid GameData copies. A visible original boot verifies those
-masks at first CSS. Matching its initial profile context to the browser and two
-independent reference captures per whole sequence remain open. No new gameplay
-admission or public deployment is claimed.
+The Mewtwo Confusion victim command rows and menu rumble/GObj lifetime repairs
+are validated at their declared boundaries. **Native traced**: the original
+menu/four-stock lifecycle completes twice with cancellation and teardown.
+**Browser exercised**: Release and RelWithDebInfo both select Mewtwo through
+the original CSS, cancel SSS, capture/release Mario with Confusion and unload.
+See the [merge review receipt](docs/evidence/mewtwo-crash-merge-review-v1.json)
+for exact builds, retained failures and integration checks. This repairs a
+crash; independent equivalence, full fighter admission and deployment are
+separate gates.
 
 ## Donkey Kong platform shield-drop repair
 

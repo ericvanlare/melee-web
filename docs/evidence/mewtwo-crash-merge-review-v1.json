@@ -1,0 +1,221 @@
+{
+  "schema": "melee-web-mewtwo-crash-merge-review-v1",
+  "date": "2026-09-24",
+  "source_commit": "628defc1be2b0222a029b44ab289d36c68a4a8fd",
+  "main_base": "03a5b5e1b0642e1a60ddbc4daa6f67330812d3a5",
+  "scope": "Scoped crash and ownership repair. Source identified, Compiled, Native traced and Browser exercised. No new retail equivalence, performance pass, complete fighter admission or deployment claim.",
+  "machine": {
+    "hardware": "Mac16,10, Apple M4, 16 GiB",
+    "os": "macOS 26.6",
+    "browser": "Google Chrome 153.0.8010.36"
+  },
+  "review": {
+    "gobj": "Replaced list-head sentinels and 15-link bound with per-scene retained membership and the source library link bound. Linked pinned gobjplink.c tests exercise equal-priority insertion, SSS fog link 15, and no-open-scene abort.",
+    "rumble": "Menu owns decoded LbRb.dat and a 12-entry source pool before OnEnter; interprets rumble before PAD renewal; teardown clears borrowed programs and restores enclosing state. Independent source/lifecycle review found no further actionable defect."
+  },
+  "native": {
+    "menu": {
+      "local_path": "work/pr60-menu-rumble-positive-v1.log",
+      "sha256": "df83317859db78cc6417659c29508d9885c313be2b852593253c364dbcadcae3"
+    },
+    "menu_result": "Two original CSS/SSS/four-stock-match/CSS cycles, SSS cancellation, interrupted match teardown and No Contest pass. Menu rumble row zero is queued and consumed through the normal raw PAD boundary.",
+    "rumble": "40 owned programs, source interpreter sequence, repeated publication and outstanding-program teardown pass.",
+    "content_trace": {
+      "local_path": "build/browser-release/gameplay_content_match_trace.wasm",
+      "sha256": "217c72cbbc252e90da2d6b3f33e27a929c21c0dddc20f5e98cd067b7d39aa9a1",
+      "result": "Both-orientation Mewtwo all-costume lifecycles and the available admitted fighter/stage and Dr. Mario/Roy regressions pass inside the final full suite."
+    }
+  },
+  "browser": {
+    "Release": {
+      "report": {
+        "local_path": "work/pr60-browser-release-v2/report.json",
+        "sha256": "7e3e9d68d161a4c6d94cd708366ad3b428c24654eb02ad5ad95f1c2d6321636e"
+      },
+      "result": "pass",
+      "checks": [
+        "Mewtwo selected through original CSS input",
+        "CSS to SSS",
+        "SSS cancel to CSS",
+        "Ground Confusion captured and released opponent",
+        "Clean unload"
+      ],
+      "source_motion_states": [
+        [
+          20,
+          23,
+          14,
+          21,
+          351
+        ],
+        [
+          14,
+          303,
+          38,
+          191,
+          192
+        ]
+      ],
+      "source_frames_at_unload": 374,
+      "scope": "Visible browser with raw PAD selection/capture and keyboard menu transitions. Victim reaches source ThrownMewtwo 303 and releases. No automatic timing resumes. Not a timing acceptance run."
+    },
+    "RelWithDebInfo": {
+      "report": {
+        "local_path": "work/pr60-browser-debug-v1/report.json",
+        "sha256": "69142b5f39cb03a27a61ed591a2d8c2864325cc2cd99a41d7634659d11b1e57a"
+      },
+      "result": "pass",
+      "checks": [
+        "Mewtwo selected through original CSS input",
+        "CSS to SSS",
+        "SSS cancel to CSS",
+        "Ground Confusion captured and released opponent",
+        "Clean unload"
+      ],
+      "source_motion_states": [
+        [
+          20,
+          23,
+          14,
+          351
+        ],
+        [
+          14,
+          303,
+          38,
+          191,
+          192
+        ]
+      ],
+      "source_frames_at_unload": 374,
+      "scope": "Visible browser with raw PAD selection/capture and keyboard menu transitions. Victim reaches source ThrownMewtwo 303 and releases. No automatic timing resumes. Not a timing acceptance run."
+    }
+  },
+  "builds": {
+    "Release": {
+      "log": {
+        "local_path": "work/pr60-build-runtime-v5.log",
+        "sha256": "e3cfaa855f7cfee0e5b5e0d427c40e73e393cbd6c491a4454ae2b68c65a67216"
+      },
+      "artifacts": [
+        {
+          "local_path": "build/browser-release/gameplay_menu_browser.js",
+          "sha256": "4d0ea1a242d1030ea61117c8652f867180c9ce1e938240267d24db4b83de5529"
+        },
+        {
+          "local_path": "build/browser-release/gameplay_menu_browser.wasm",
+          "sha256": "4bb9a6f0cb1bf5a6840078bce608cb8e23e85b70da3a044841e5e8de5066d9dd"
+        },
+        {
+          "local_path": "build/browser-release/gameplay_menu_browser.data",
+          "sha256": "f85858ff99f368d38ca16fa18727a12f778d57543e2898d29507f92585db2c2b"
+        }
+      ]
+    },
+    "RelWithDebInfo": {
+      "log": {
+        "local_path": "work/pr60-build-debug-v1.log",
+        "sha256": "c41017178249a9055373baf34c7693b5c8e6aeb553e47d5926c2d9bcb40b95b3"
+      },
+      "artifacts": [
+        {
+          "local_path": "build/browser/gameplay_menu_browser.js",
+          "sha256": "e9d0c19c0fd7e6f4213a2a8e1e2188f1954fc59021e57ccb25f1539a38e91486"
+        },
+        {
+          "local_path": "build/browser/gameplay_menu_browser.wasm",
+          "sha256": "697475acf6b9ca25b4f447a580b9d91d3fccd2ec066ce5bd91cff0835b357a6f"
+        },
+        {
+          "local_path": "build/browser/gameplay_menu_browser.data",
+          "sha256": "f85858ff99f368d38ca16fa18727a12f778d57543e2898d29507f92585db2c2b"
+        }
+      ]
+    }
+  },
+  "retained_failures": [
+    {
+      "evidence": {
+        "local_path": "work/pr60-menu-rumble-negative-v2.log",
+        "sha256": "050cebcc55436379d540bdba498dae38943e90c2204859552364a78bedf7579e"
+      },
+      "result": "Before repair, real menu owner fails to publish an available source rumble pool."
+    },
+    {
+      "evidence": {
+        "local_path": "work/pr60-browser-release-v1/report.json",
+        "sha256": "037e75d8b07bf279175c7ce1b4a2194e6a085dbb67b13d12f479b70d07658d7b"
+      },
+      "result": "Harness sent Back before original stage-select lockout expired. No runtime exception; corrected wait follows source mnStageSel_804D6CA4 lockout."
+    },
+    {
+      "evidence": {
+        "local_path": "work/pr60-full-suite-v1.log",
+        "sha256": "d5de9bf55efd27709d599c68430f07d52c136705467ecce4384bb7d24e1624a2"
+      },
+      "result": "11 failures from absolute symlink asset directory arguments rejected by NODERAWFS directory_iterator. Asset roots replaced by real local directories, preserving file contents."
+    }
+  ],
+  "automated_suite": {
+    "command": "python3 -m unittest discover -s tests -v",
+    "local_path": "work/pr60-full-suite-v2.log",
+    "sha256": "ae252722f62fae74f60b42aa303c884b310cf2cfc8fbf63be59aad70a3624fad",
+    "tests": 1168,
+    "seconds": 338.168,
+    "result": "pass",
+    "skips": 56,
+    "skip_reasons": {
+      "build output unavailable": 1,
+      "ccache 4.9 and a C compiler are required": 1,
+      "owned Donkey fighter archive is unavailable": 1,
+      "owned Koopa fighter archive is unavailable": 1,
+      "owned Luigi fighter/effect archives are unavailable": 1,
+      "owned Pichu fighter archive is unavailable": 1,
+      "owned Pikachu fighter archive is unavailable": 1,
+      "owned Purin fighter archive is unavailable": 1,
+      "Build fighter targets before the typed support check": 1,
+      "Build the native stage-map publication trace": 1,
+      "Original stage trace target unavailable": 2,
+      "Build dat_scene_trace before the typed scene check": 1,
+      "Owned Fountain and common runtime fixtures are required": 1,
+      "Build gameplay_audio_trace and provide local SSM/SEM/DSP coefficient fixtures": 2,
+      "Build fighter/audio stream target and supply optional owned HPS/SSM/SEM/coefficient inputs": 1,
+      "Build fighter targets before running the focused bonus_data trace": 1,
+      "Optional built combat trace and owned runtime assets required": 1,
+      "Common context trace unavailable; build gameplay first": 1,
+      "Build the source content trace targets": 1,
+      "Owned Captain/Mario, English costumes, menu and FD fixtures are required": 1,
+      "Owned Donkey/Mario, English costumes, menu and FD fixtures are required": 1,
+      "Owned Ganondorf/Mario, menu and FD fixtures are required": 1,
+      "Owned Temple and common Mario/runtime fixtures are required": 1,
+      "Owned Koopa/Mario, costumes, menu and FD fixtures are required": 1,
+      "Owned Luigi/Mario, English costumes, menu and FD fixtures are required": 1,
+      "Owned Old Yoshi, Mario and menu fixtures are required": 1,
+      "Owned Pikachu and shared effect/audio fixtures are required": 1,
+      "Owned Purin/Mario, English costumes, menu and FD fixtures are required": 1,
+      "Effect trace unavailable; build gameplay_effect_banks_trace first": 1,
+      "Built stock trace and owned Mario costume archives required": 1,
+      "Built original player context trace required": 1,
+      "Optional built source trace and owned runtime assets required": 2,
+      "Optional built full-stage edge trace and owned runtime assets required": 2,
+      "Optional built timer trace and owned runtime assets required": 1,
+      "Build gameplay_music_profile_trace and provide owned menu/game assets": 1,
+      "Build fighter targets before the original SIS consumer check": 1,
+      "Original CSS target and owned local fixtures are required": 1,
+      "Build gameplay_rumble_trace and provide owned LbRb.dat": 1,
+      "Build fighter targets before running the focused stage_numeric trace": 1,
+      "Build hsd_native_trace for source interpolation guard checks": 1,
+      "Native HSD targets unavailable; run scripts/build.py --target gameplay": 1,
+      "Owned Koopa fighter archive is required": 1,
+      "Build the native_audio_banks fighter target first": 1,
+      "Owned Old Yoshi and common runtime fixtures are required": 1,
+      "Build gameplay_pad_state_trace": 1,
+      "Owned Pikachu and Pichu fighter archives are required": 1,
+      "compiled private provenance fixture not supplied": 1,
+      "Build gameplay_retail_trace to test the shared decoder": 1,
+      "Owned Captain model fixtures are required": 1,
+      "pinned slippi-js fixtures are not checked out": 2,
+      "A required optional local real-asset fixture was absent": 1
+    }
+  }
+}
