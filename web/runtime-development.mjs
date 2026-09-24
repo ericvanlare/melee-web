@@ -9,6 +9,11 @@ const RETAIL_REPLAY_WHOLE_SESSION_MAX_FRAMES = 108000;
 const RETAIL_REPLAY_STATE_RECORD_OVERHEAD = 4;
 const RETAIL_REPLAY_SESSION_RECORD_OVERHEAD = 32 + 2;
 const RETAIL_REPLAY_TIMER_RECORD_OVERHEAD = 3;
+const RETAIL_REPLAY_LEGACY_WALL_TIME_MS = 900000;
+const RETAIL_REPLAY_WHOLE_SESSION_WALL_TIME_MS = RETAIL_REPLAY_LEGACY_WALL_TIME_MS * 3;
+function retailReplayWallTimeMs(wholeSession) {
+  return wholeSession ? RETAIL_REPLAY_WHOLE_SESSION_WALL_TIME_MS : RETAIL_REPLAY_LEGACY_WALL_TIME_MS;
+}
 // Keep the upload ceiling identical to kRetailReplayWholeSessionMaxBytes in
 // gameplay_retail_recipe.hpp. The span table admits all 32 bounded spans;
 // rejecting the final 31 would make the browser stricter than the decoder.
@@ -203,7 +208,7 @@ window.menuReplayPoll=()=>{
   if(run.observe&&reason.startsWith('Paused after a timing disruption')){run.timingResumes=(run.timingResumes||0)+1;run.lastProgress=now;boundary(()=>Module._melee_web_native_menu_pause(0));}
   else finishRetailReplay(reason||'Replay stopped');
  }}
- if(now-run.started>900000)finishRetailReplay('Replay exceeded bounded wall time');
+ if(now-run.started>retailReplayWallTimeMs(run.wholeSession))finishRetailReplay('Replay exceeded bounded wall time');
 };
 $('retail-replay-start').onclick=async()=>{
  if(replayLoading||retailRun||!ready||fatal||!bundle)return;
