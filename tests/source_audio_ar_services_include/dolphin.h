@@ -22,7 +22,7 @@ int melee_web_audio_ar_disable_interrupts(void);
 void melee_web_audio_ar_restore_interrupts(int enabled);
 void melee_web_audio_ar_set_handler(int exception,
                                     void (*handler)(short, OSContext*));
-void melee_web_audio_ar_unmask(u32 mask);
+OSInterruptMask melee_web_audio_ar_unmask(OSInterruptMask mask);
 void melee_web_audio_ar_clear_context(void* context);
 void melee_web_audio_ar_set_context(void* context);
 void melee_web_audio_ar_flush(void* address, u32 length);
