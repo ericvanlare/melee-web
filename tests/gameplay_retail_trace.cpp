@@ -22,14 +22,16 @@ void check(bool value,const char* message){if(!value)throw std::runtime_error(me
 }
 
 int main(int argc,char** argv){try{
-    check(argc>=4&&argc<=6,
+    check(argc>=4&&argc<=7,
           "Expected owned menu/game directories, MWRC reference input, and optional diagnostic flags");
     bool require_match_complete=false;
     bool cpu_hitlag_diagnostic=false;
+    bool decode_only=false;
     for(int i=4;i<argc;i++){
         const std::string option=argv[i];
         if(option=="--require-match-complete") require_match_complete=true;
         else if(option=="--cpu-hitlag-diagnostic") cpu_hitlag_diagnostic=true;
+        else if(option=="--decode-only") decode_only=true;
         else throw std::runtime_error("Unknown gameplay_retail_trace option: "+option);
     }
     if(cpu_hitlag_diagnostic) melee_web_cpu_observation_enable_hitlag_audit();
@@ -39,6 +41,24 @@ int main(int argc,char** argv){try{
     std::vector<uint8_t> bytes{std::istreambuf_iterator<char>(stream),{}};
     check(bytes.size()==size,"Reference input read was incomplete");
     auto recipe=melee_web::read_retail_replay(bytes);
+    if(decode_only){
+        std::cout << "{\"schema\":\"melee-web-retail-replay-decode\",\"version\":"
+                  << recipe.version << ",\"frame_count\":" << recipe.frames.size()
+                  << ",\"span_count\":" << recipe.spans.size()
+                  << ",\"initial_css_context\":"
+                  << (recipe.initial_css != nullptr ? "true" : "false")
+                  << ",\"players\":[";
+        for(unsigned i=0;i<recipe.selection.player_count;i++){
+            if(i) std::cout << ',';
+            const auto& player=recipe.selection.start.players[i];
+            std::cout << "{\"slot_type\":" << static_cast<unsigned>(player.slot_type)
+                      << ",\"cpu_kind\":" << static_cast<unsigned>(player.cpu_kind)
+                      << ",\"cpu_level\":" << static_cast<unsigned>(player.cpu_level)
+                      << "}";
+        }
+        std::cout << "]}\n";
+        return 0;
+    }
     melee_web::RuntimeFiles files;
     for(const auto* root:{argv[1],argv[2]}){
         for(const auto& entry:std::filesystem::directory_iterator(root)){

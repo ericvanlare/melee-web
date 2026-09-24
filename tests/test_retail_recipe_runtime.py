@@ -1,4 +1,5 @@
 """Exercise malformed transport rejection in the real shared Wasm decoder."""
+import json
 from pathlib import Path
 import struct
 import subprocess
@@ -17,9 +18,44 @@ PAD_SNAPSHOT = (bytes.fromhex('0000002d00000008001e0000000000007f0000ff0000ff007
 assert len(PAD_SNAPSHOT) == 822
 
 
+def _native_target() -> Path:
+    for candidate in (ROOT / 'build/browser-release/gameplay_retail_trace.js',
+                      ROOT / 'build/browser/gameplay_retail_trace.js'):
+        if candidate.is_file():
+            return candidate
+    return ROOT / 'build/browser-release/gameplay_retail_trace.js'
+
+
+def _whole_session_v8_fixture() -> bytes:
+    """Build a parser-only v8 input with four ordinary level-9 CPUs."""
+    setup = bytearray(0x138)
+    for player in range(6):
+        base = 0x60 + player * 0x24
+        if player >= 4:
+            setup[base + 1] = 3  # Gm_PKind_NA
+            continue
+        setup[base:base + 5] = bytes((8, 1, 4, player, 0))
+        setup[base + 14] = 4  # ordinary VS CPU kind
+        setup[base + 15] = 9
+        for offset in (0x18, 0x1C, 0x20):
+            struct.pack_into('>f', setup, base + offset, 1.0)
+
+    characters, stages = 0x07FF, 0x01C0
+    context = (struct.pack('>HHI', 2, 0, 0x574E) +
+               bytes(0x18) + struct.pack('>HH', characters, stages) +
+               bytes(0x55E8 - 4) + bytes(0x148) + bytes(6))
+    frame_count = 32
+    spans = struct.pack('>H', 32) + b''.join(
+        struct.pack('>BBHII', 1 + index % 5, 0, 0, index, index)
+        for index in range(frame_count))
+    return (struct.pack('>4sIIIHH', b'MWRC', 8, 0x12345678, frame_count,
+                        characters, stages) + context + bytes(setup) +
+            PAD_SNAPSHOT + bytes(44 * frame_count) + spans)
+
+
 class RetailRecipeRuntimeTests(unittest.TestCase):
     def test_native_decoder_rejects_before_asset_or_match_construction(self):
-        target = ROOT / 'build/browser-release/gameplay_retail_trace.js'
+        target = _native_target()
         if not target.is_file():
             self.skipTest('Build gameplay_retail_trace to test the shared decoder')
         setup = bytearray(0x138)
@@ -71,7 +107,7 @@ class RetailRecipeRuntimeTests(unittest.TestCase):
                 self.assertNotIn('directory_iterator', result.stderr)
 
     def test_whole_session_transport_is_admitted_before_asset_loading(self):
-        target = ROOT / 'build/browser-release/gameplay_retail_trace.js'
+        target = _native_target()
         if not target.is_file():
             self.skipTest('Build gameplay_retail_trace to test the shared decoder')
         setup = bytearray(0x138)
@@ -89,3 +125,27 @@ class RetailRecipeRuntimeTests(unittest.TestCase):
                 capture_output=True, text=True, timeout=30)
         # The old v7 transport is rejected before it can reach asset loading.
         self.assertIn('v7 is unsupported', result.stderr)
+
+    def test_native_v8_decoder_preserves_four_cpu9_rows_and_max_spans(self):
+        target = _native_target()
+        if not target.is_file():
+            self.skipTest('Build gameplay_retail_trace to test the shared decoder')
+        with tempfile.TemporaryDirectory(prefix='melee-recipe-v8-') as directory:
+            path = Path(directory) / 'whole-session.mwrc'
+            path.write_bytes(_whole_session_v8_fixture())
+            result = subprocess.run([str(node_runtime()), str(target),
+                str(Path(directory) / 'absent-menu'),
+                str(Path(directory) / 'absent-game'), str(path), '--decode-only'],
+                capture_output=True, text=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        decoded = json.loads(result.stdout)
+        self.assertEqual(decoded['schema'], 'melee-web-retail-replay-decode')
+        self.assertEqual(decoded['version'], 8)
+        self.assertEqual(decoded['frame_count'], 32)
+        self.assertEqual(decoded['span_count'], 32)
+        self.assertTrue(decoded['initial_css_context'])
+        self.assertEqual(len(decoded['players']), 4)
+        self.assertTrue(all(player['slot_type'] == 1 and
+                            player['cpu_kind'] == 4 and
+                            player['cpu_level'] == 9
+                            for player in decoded['players']))
