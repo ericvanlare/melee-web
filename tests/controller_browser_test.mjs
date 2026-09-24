@@ -3,13 +3,13 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
 import {standardPad, rawPad, rawProfile, mayflashMacPad} from './controller-fixtures.mjs';
+import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 const {values} = parseArgs({options: Object.fromEntries(['url','playwright','out'].map(n=>[n,{type:'string'}]))});
 if (!values.url || !values.playwright || !values.out) throw Error('Use --url ORIGIN --playwright PACKAGE_DIR --out LOCAL_DIR');
-const {chromium} = await import(pathToFileURL(path.join(path.resolve(values.playwright),'index.mjs')));
-const browser = await chromium.launch({channel:'chrome',headless:true});
+const {chromium, browser: launchOptions} = await loadBrowserTools(values.playwright);
+const browser = await chromium.launch(browserLaunchOptions(launchOptions));
 const page = await browser.newPage();
 const errors = [], checks = [], started = performance.now();
 page.on('pageerror', e => errors.push(e.message));
@@ -122,6 +122,6 @@ try {
   assert.deepEqual(errors,[]);
 } finally {
   await fs.mkdir(values.out,{recursive:true});
-  await fs.writeFile(path.join(values.out,'report.json'),JSON.stringify({scope:'Authored Gamepad → browser mapper → real Wasm/Aurora PAD; no physical or gameplay claim',browser:browser.version(),checks,errors,seconds:(performance.now()-started)/1000},null,2));
+  await fs.writeFile(path.join(values.out,'report.json'),JSON.stringify({scope:'Authored Gamepad → browser mapper → real Wasm/Aurora PAD; no physical or gameplay claim',browser:browser.version(),browser_mode:'headless',checks,errors,seconds:(performance.now()-started)/1000},null,2));
   await browser.close();
 }

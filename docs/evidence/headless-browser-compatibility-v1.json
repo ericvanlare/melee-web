@@ -1,0 +1,389 @@
+{
+  "schema": "melee-web-headless-browser-compatibility-v1",
+  "evidence_label": "Browser exercised",
+  "recorded_date_utc": "2026-09-24",
+  "scope": "Bounded agent browser utility and functional player checks under headless Chrome; no performance, physical-device, audible-output, original PCM or pixel-equivalence acceptance.",
+  "conclusion": "The listed functional utilities remain available headlessly. Public immediate-import preparation failure remains retained; cache-ready variants pass. Existing launch defaults are not changed by this investigation.",
+  "harness_base_commit": "03a5b5e1b0642e1a60ddbc4daa6f67330812d3a5",
+  "machine": {
+    "os": "macOS 26.6",
+    "architecture": "arm64",
+    "model": "Mac16,10",
+    "browser": "153.0.8010.54",
+    "playwright": "1.62.1",
+    "gpu": {
+      "vendor": "apple",
+      "architecture": "metal-3",
+      "device": "",
+      "description": "",
+      "isFallbackAdapter": false,
+      "subgroupMinSize": 32,
+      "subgroupMaxSize": 32
+    },
+    "gpu_backend": {
+      "available": true,
+      "webgpuFeature": "*   WebGPU: Hardware accelerated",
+      "skiaBackend": "GraphiteDawnMetal",
+      "displayType": "ANGLE_METAL",
+      "gpu0": "VENDOR= 0x106b [Google Inc. (Apple)], DEVICE=0x0000 [ANGLE (Apple, ANGLE Metal Renderer: Apple M4, Version 26.6 (Build 25G72))], DRIVER_VENDOR=Apple, DRIVER_VERSION=26.6 *ACTIVE*",
+      "effectiveFlags": {
+        "headless": true,
+        "muteAudio": true,
+        "backgroundTimerThrottlingDisabled": true,
+        "rendererBackgroundingDisabled": true,
+        "backgroundOccludedWindowsDisabled": true,
+        "unsafeSwiftShaderEnabled": false
+      }
+    },
+    "launch": {
+      "requested": {
+        "executable": "Google Chrome",
+        "headless": true,
+        "chromiumSandbox": true,
+        "args": [],
+        "ignoreDefaultArgs": [
+          "--enable-unsafe-swiftshader"
+        ],
+        "channel": null,
+        "proxy": null
+      },
+      "context": {
+        "viewport": {
+          "width": 900,
+          "height": 700
+        }
+      },
+      "effectiveDefaults": "Chrome/Playwright defaults; effective flags are recorded from chrome://gpu when available",
+      "effectiveFlags": {
+        "headless": true,
+        "muteAudio": true,
+        "backgroundTimerThrottlingDisabled": true,
+        "rendererBackgroundingDisabled": true,
+        "backgroundOccludedWindowsDisabled": true,
+        "unsafeSwiftShaderEnabled": false
+      }
+    }
+  },
+  "builds": {
+    "development": {
+      "inventory": {
+        "path": "work/headless-validation/build-sha256.json",
+        "sha256": "2178c781a328fe76c82fc20499208ca91f0d347ea61f0ab3625340ea0cdc87df"
+      },
+      "identity_scope": "Copied executable bytes frozen before runs; this probe does not establish producer source/build provenance."
+    },
+    "public": {
+      "origin": "https://webmelee.gg/",
+      "runtime_directory": "runtime/dd225834e115117f/",
+      "entry": {
+        "path": "work/headless-validation/public-entry.html",
+        "sha256": "20b63bbe9536541b7a0add964b66bb438b5ad2e24f0d2d308c1e4330bd160bf4"
+      },
+      "identity_scope": "Hosted package used for compatibility checks; no deployment performed."
+    }
+  },
+  "runner_variants": {
+    "path": "work/headless-validation/runner-manifest.json",
+    "sha256": "1118b51bd4c81bc0eebf5fab315f80b955fbf09ca82c1e95022ab36797083989"
+  },
+  "additional_runners": [
+    {
+      "path": "work/headless-validation/runners/audio-pcm-lifecycle-ready.mjs",
+      "sha256": "c98c296c5af52c33caadca7b6af92da94e4d48af15db541195c9cc0c95c1955d"
+    },
+    {
+      "path": "work/headless-validation/runners/public-preparation-probe.mjs",
+      "sha256": "0e887d76ab118f66a531b0a8e82f4b893f8e6911644f1749bb13de456ef5433d"
+    },
+    {
+      "path": "work/headless-validation/runners/public-smoke-ready.mjs",
+      "sha256": "5d00f66d46ba9a5390f502c0f90e6a4e1f0dad2af42ef7884142a16c1b20c328"
+    },
+    {
+      "path": "work/headless-validation/runners/regression-with-ui-monitor.mjs",
+      "sha256": "ebd08262d6d383f8c283f21cdfab585966484a5054d6a9423d92bb0962876c9c"
+    }
+  ],
+  "functional_scenarios": [
+    {
+      "name": "capabilities-final",
+      "scope": "Synthetic browser utility",
+      "result": "pass",
+      "report": {
+        "path": "work/headless-validation/capabilities-final/report.json",
+        "sha256": "7a1bc21ec9eeb17afa4e207cda28f2860ee5cd9c5c43464cb19f0489457f3bb7"
+      },
+      "checks": [
+        "real HTTP server publishes COOP/COEP and page is cross-origin isolated",
+        "DOM/evaluate inspection and same-origin network request are observable",
+        "real WebGPU render, framebuffer resize, and GPU readback values validate",
+        "ordinary keyboard text entry, mouse click, and DOM focus are observable",
+        "Playwright filechooser upload reaches the page and file bytes validate",
+        "Playwright download saves and byte contents validate",
+        "console and pageerror diagnostics are captured",
+        "inspectable screenshot artifact retained"
+      ]
+    },
+    {
+      "name": "development-smoke",
+      "scope": "Development owned-disc readiness and unload",
+      "result": "pass",
+      "report": {
+        "path": "work/headless-validation/development-smoke/report.json",
+        "sha256": "b4564bc68700ed58042f830bd7dfb797caebd4b45bead68f65e51e67defb0337"
+      },
+      "checks": [
+        "import control ready",
+        "owned disc prepared",
+        "original CSS running",
+        "teardown and import control ready"
+      ]
+    },
+    {
+      "name": "development-controller",
+      "scope": "Development authored controller settings",
+      "result": "pass",
+      "report": {
+        "path": "work/headless-validation/development-controller/report.json",
+        "sha256": "1e97f009c98c069d5b7c4dff3b6eaa629360cc21e97b67410fe067f233d82e24"
+      }
+    },
+    {
+      "name": "controller-suggestion",
+      "scope": "Suggested controller mapping",
+      "result": "pass",
+      "report": {
+        "path": "work/headless-validation/controller-suggestion/report.json",
+        "sha256": "f580badbde775e16000494021efbb21c6380d29a06e8e1e3e548512e7173ecde"
+      }
+    },
+    {
+      "name": "controller-setup",
+      "scope": "Controller wizard with hat D-pad",
+      "result": "pass",
+      "report": {
+        "path": "work/headless-validation/controller-setup/report.json",
+        "sha256": "0bcd752d540fd5e2a806fb4c65eff7b9199a3c0a1a2e238c8310174365dfb89d"
+      }
+    },
+    {
+      "name": "controller-setup-signed",
+      "scope": "Controller wizard with signed D-pad axes",
+      "result": "pass",
+      "report": {
+        "path": "work/headless-validation/controller-setup-signed/report.json",
+        "sha256": "2c3514631b941d1d873d28f0540fda8fcbb49fdcd921aa74e47d9c5d31853115"
+      }
+    },
+    {
+      "name": "public-controller",
+      "scope": "Public authored controller settings",
+      "result": "pass",
+      "report": {
+        "path": "work/headless-validation/public-controller/report.json",
+        "sha256": "b53eba1fdc35e0b41e4445e08390c324f8cb16a6f677531d90bf0d7f7ceb2621"
+      }
+    },
+    {
+      "name": "public-resize",
+      "scope": "Public WebGPU framebuffer resize",
+      "result": "pass",
+      "report": {
+        "path": "work/headless-validation/public-resize/report.json",
+        "sha256": "b51b62f660fe7804995911ea83baf423e4ac637696681a3dfd754cc3920bffb0"
+      }
+    },
+    {
+      "name": "public-lifecycle",
+      "scope": "Public production UI and repeated disc lifecycle",
+      "result": "pass",
+      "report": {
+        "path": "work/headless-validation/public-lifecycle/report.json",
+        "sha256": "6a38aae1f276b4d13b21089629e061c7e71e80be4aec2fddec31ca4bbea0d4a3"
+      },
+      "checks": [
+        "isolated WebGPU/Wasm startup and direct original-style player",
+        "controls, focus and preferences survive a fresh document",
+        "acknowledgement, invalid-disc errors and selectable retry",
+        "narrow layouts and fullscreen",
+        "owned-disc import, native preparation and original CSS",
+        "pause/resume acknowledges the shared native owner",
+        "ordinary B0XX keyboard enters original SSS and cancels back to CSS",
+        "Eject retires the document; a second import can launch",
+        "legal pages use their readable document stylesheet and serve full notices",
+        "keyboard-only session persists its preferences; no application upload or background connections"
+      ]
+    },
+    {
+      "name": "public-smoke-ready",
+      "scope": "Public smoke with cache-ready preflight",
+      "result": "pass",
+      "report": {
+        "path": "work/headless-validation/public-smoke-ready/report.json",
+        "sha256": "e1d51991e09fff39d9a46df297c63eeb0c2d69688ab253e071dfd34ce40fd9e8"
+      },
+      "checks": [
+        "import control ready",
+        "owned disc prepared",
+        "original CSS running",
+        "teardown and import control ready"
+      ],
+      "additional_preflight": "Wait for native cache-idle export to report 1 before first disc import; original assertions and renderer-drain deadline unchanged."
+    },
+    {
+      "name": "audio-pcm-lifecycle-ready",
+      "scope": "Public original-menu/match audio and PCM lifecycle",
+      "result": "pass",
+      "report": {
+        "path": "work/headless-validation/audio-pcm-lifecycle-ready/report.json",
+        "sha256": "c8a3c908906e7da589d4f5af812daa530830dbffa6e16e82f4844fc7c47523b0"
+      },
+      "checks": [
+        "headless preview startup and reviewed native artifact names",
+        "authorized-disc import and original CSS emits nonzero PCM",
+        "pause and resume preserve the audio owner",
+        "ordinary B0XX input enters original SSS with audio",
+        "ordinary B0XX A confirms the supported Mario/Final Destination match",
+        "ordinary B0XX pause and No Contest return through original CSS with audio",
+        "second ordinary B0XX CSS to SSS transition emits audio",
+        "second ordinary B0XX entry reaches Mario/Final Destination with audio",
+        "scoped audio asset generations are complete and never use legacy file upload",
+        "Eject closes Web Audio and reloads the player document",
+        "same-origin GET-only session has no page, CSP, socket or upload failures"
+      ],
+      "additional_preflight": "Wait for native cache-idle export to report 1 before first disc import; original assertions and renderer-drain deadline unchanged."
+    },
+    {
+      "name": "regression-macos-ui",
+      "scope": "Mewtwo regression with macOS UI observation",
+      "result": "pass",
+      "report": {
+        "path": "work/headless-validation/regression-macos-ui/report.json",
+        "sha256": "efc4da89fb2f6fc8b261232e27cc24a1ed7790cbb66563e8e09993eeee44d3c9"
+      },
+      "checks": [
+        "Mewtwo selected through original CSS input",
+        "CSS to SSS",
+        "SSS cancel to CSS",
+        "Ground Confusion captured and released opponent",
+        "Clean unload"
+      ]
+    },
+    {
+      "name": "driver-contract",
+      "scope": "Synthetic real HTTP/browser driver and failure contract, including failing smoke child",
+      "result": "pass",
+      "log": {
+        "path": "work/headless-validation/driver-contract.log",
+        "sha256": "0ae787208331befb0d3bc5eebef383786c11c2699022891586b4ea68315b408c"
+      }
+    }
+  ],
+  "early_import_failure": {
+    "result": "fail",
+    "report": {
+      "path": "work/headless-validation/public-smoke/report.json",
+      "sha256": "dccdca35003e953c6979d40daf34967e40122784adb458e25bc01a9d09c02b96"
+    },
+    "message": "Pending renderer work did not drain. Reload to recover.",
+    "trigger": "Select the disc immediately after the public import control becomes enabled.",
+    "reducer": {
+      "path": "work/headless-validation/public-preparation-probe/report.json",
+      "sha256": "e6e3a1ab8ef9e63c07a3a4e2cd9e2c10fa54c65295be96784a466b8f48945f70"
+    },
+    "interpretation": "Cache-idle readiness arrives after import readiness. The existing full public test already waits for cache idle and passed. Separate smoke/audio preflight variants passed. This does not clear immediate import or establish whether the failure is headless-specific.",
+    "plan": {
+      "path": "work/headless-validation/ready-plan.json",
+      "sha256": "41367051d4ed73944850e90f019b50805bd92fa6ff411550272d0529aaa8b5ed"
+    }
+  },
+  "macos_desktop_observation": {
+    "report": {
+      "path": "work/headless-validation/macos-ui-observation.json",
+      "sha256": "e56767820b0d5f1a8ea8194b557fdff057d428287fe137cedf1d9daef75beae7"
+    },
+    "monitor_source": {
+      "path": "work/headless-validation/watch_browser_ui.m",
+      "sha256": "0846b6229e12d41071bfcae6136006e6bfac4fc92429500ac77e014a9054d849"
+    },
+    "browser_pid_identification": "CDP SystemInfo.getProcessInfo browser process ID",
+    "completed": true,
+    "activation_events": 0,
+    "frontmost_samples": 0,
+    "on_screen_window_observations": 0,
+    "samples": 969,
+    "window_list_available": true,
+    "scope": "Chrome activation notifications across the monitored run; 20ms sampled foreground/window observations after PID discovery. No claim of exhaustive detection of every transient window."
+  },
+  "visual_inspection": {
+    "result": "inspected",
+    "scope": "Synthetic page artifact, original pause artwork and Mario/Final Destination second entry are inspectable. No screenshot equality or original-game pixel comparison performed.",
+    "screenshots": [
+      {
+        "path": "work/headless-validation/capabilities-final/capabilities.png",
+        "sha256": "c9f93dfcbc6b1bf8fdd11fc6b0e8d2b7ef5cf8c42e2c94da061a11bac6c070eb"
+      },
+      {
+        "path": "work/headless-validation/audio-pcm-lifecycle-ready/source-pause.png",
+        "sha256": "c93b1d72df0bef09916e8bb8741b800cc10f8ee4c25175725aa36ee08438dbff"
+      },
+      {
+        "path": "work/headless-validation/audio-pcm-lifecycle-ready/match-after-no-contest.png",
+        "sha256": "6aea5dc71891a82f3fb022e5971c5a3f2c7ab8f987c8a444b4273bc77cf1e346"
+      },
+      {
+        "path": "work/headless-validation/regression-macos-ui/match.png",
+        "sha256": "68b6aa5f0e1a7e5ab3d315d934bc37b0143087f412d4338d9a5ce2b7dd165f7e"
+      }
+    ]
+  },
+  "verification": {
+    "syntax": "node --check tests/browser_headless_capabilities_test.mjs passed",
+    "driver_unit": {
+      "path": "work/headless-validation/driver-unit-v2.log",
+      "sha256": "ff6dcf0161f3d4e64502e7860a91ca519103768ae6a7c5438e34778d419c517c"
+    },
+    "documentation_links": {
+      "path": "work/headless-validation/link-check.txt",
+      "sha256": "af6592aa36f45a94ac00dca8f10753792b41dd30327d35c756e2151a5d830f2c"
+    },
+    "affected_build": "The only executable change is the standalone Node capability test. Node syntax validation and its real-browser execution passed; no native runtime target changed.",
+    "initial_missing_dependencies": {
+      "unit_log": {
+        "path": "work/headless-validation/driver-unit.log",
+        "sha256": "9c1fa9d01f346bf70fccf6c05d30264b30f7c125446e050acfba856f34d3d8a8"
+      },
+      "suite_log": {
+        "path": "work/headless-validation/full-suite.log",
+        "sha256": "ebb7e377515e8f37a19a7ed6cb2bc85f90e6fa1a603b6680847a758f3655ac19"
+      },
+      "reason": "This worktree initially lacked pinned Emscripten/Node, Melee sources and the reviewed Aurora patch. Installed local independent copies, reactivated pinned Emscripten and verified sources before rerun."
+    },
+    "full_suite": {
+      "log": {
+        "path": "work/headless-validation/full-suite-v2.log",
+        "sha256": "f9bc4350b2cdc7e99162fba02d8dc28bd56c423da9ef204604f88b4afd062b51"
+      },
+      "tests": 1147,
+      "seconds": 211.348,
+      "result": "OK (skipped=85)",
+      "skips": 85
+    }
+  },
+  "remaining_boundaries": [
+    "Immediate public import before cache-ready is not cleared.",
+    "Visible real-time/cold-warm performance and display presentation use their existing foreground protocol.",
+    "DOM focus/fullscreen does not establish operating-system focus/fullscreen behavior.",
+    "Authored Gamepad tests do not establish physical device routing, disconnects or latency.",
+    "Worklet PCM evidence does not establish speaker output, hardware latency or original PCM equivalence.",
+    "No full-game, full-match, replay/admission or pixel-equivalence claim."
+  ],
+  "reusable_probe": {
+    "path": "tests/browser_headless_capabilities_test.mjs",
+    "sha256": "2e57f08e27edb47227a96f554d48ac91f50a3c79c5e1f9cb8b86fbde9f994548"
+  },
+  "probe_development_runs": {
+    "location": "work/browser-headless-capabilities-run1 through run8",
+    "notes": "Retained development runs refined favicon-error handling, dynamic chrome://gpu metadata readiness, effective flag recording, modern fallback identity and watchdog/error handling. Final reviewed probe is capabilities-final."
+  }
+}

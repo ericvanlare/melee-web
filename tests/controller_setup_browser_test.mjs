@@ -2,13 +2,13 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
 import {rawPad, rawProfile} from './controller-fixtures.mjs';
+import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 const {values} = parseArgs({options:{...Object.fromEntries(['url','playwright','out'].map(n=>[n,{type:'string'}])), 'signed-dpad':{type:'boolean'}}});
 if (!values.url || !values.playwright || !values.out) throw Error('Use --url ORIGIN --playwright PACKAGE_DIR --out LOCAL_DIR');
-const {chromium} = await import(pathToFileURL(path.join(path.resolve(values.playwright),'index.mjs')));
-const browser = await chromium.launch({channel:'chrome',headless:true});
+const {chromium, browser: launchOptions} = await loadBrowserTools(values.playwright);
+const browser = await chromium.launch(browserLaunchOptions(launchOptions));
 const page = await browser.newPage({viewport:{width:1100,height:1000}}), errors=[];
 page.setDefaultTimeout(8000);
 page.on('pageerror',e=>errors.push(e.message));
@@ -72,7 +72,7 @@ try {
   await page.getByLabel('X pressed',{exact:true}).waitFor();assert(await page.getByLabel('A released',{exact:true}).isVisible());
   await page.screenshot({path:path.join(values.out,'controller-panel.png'),fullPage:true});
   assert.deepEqual(errors,[]);
-  await fs.writeFile(path.join(values.out,'report.json'),JSON.stringify({scope:'18-control wizard with constructed raw GameCube layout, including held-control release, prompt capture, saved mapping and physical-X simulation',seconds:(performance.now()-started)/1000,errors},null,2));
+  await fs.writeFile(path.join(values.out,'report.json'),JSON.stringify({scope:'18-control wizard with constructed raw GameCube layout, including held-control release, prompt capture, saved mapping and physical-X simulation',browser_mode:'headless',seconds:(performance.now()-started)/1000,errors},null,2));
   console.log('All 18 wizard steps, held controls, local recording and saved GameCube profile pass.');
 } catch (error) {
   await fs.mkdir(values.out,{recursive:true});
