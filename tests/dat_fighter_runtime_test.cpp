@@ -261,6 +261,82 @@ void real_koopa(const char* path)
     });
     std::cout << "Koopa 0xa0 attributes, signed/unsigned words, authored dynamics and open Flame Article boundary: passed\n";
 }
+void real_ness(const char* path)
+{
+    const auto identity = resolve_fighter_costume("PlyNess5K_Share_joint");
+    check(identity.fighter_kind == 8 && identity.motion_count == 326,
+          "Ness source identity or authored action count changed");
+    auto bytes = read_real_archive(path);
+    auto archive = std::make_shared<const DatArchive>(bytes);
+    const auto runtime = std::make_shared<const DatFighterRuntime>(archive, identity);
+    check(runtime->actions().size() == 326 && runtime->ness_attributes(),
+          "Ness action count or exact extension is missing");
+    check(!runtime->mario_attributes() && !runtime->donkey_attributes() &&
+          !runtime->koopa_attributes() && !runtime->pikachu_attributes() &&
+          !runtime->purin_attributes() && !runtime->luigi_attributes() &&
+          !runtime->fox_attributes() && !runtime->mars_attributes() && !runtime->link_attributes(),
+          "Ness extension was aliased to another fighter schema");
+    check(runtime->dynamics().active_bone_count == 0 && runtime->dynamics().bones.empty() &&
+              runtime->dynamics().spheres.empty() && !runtime->dynamics().animation_table_offset,
+          "Ness authored dynamics are empty with a null mode table");
+    check(runtime->wait_choices().empty(),
+          "Ness authored null Wait table must decode as semantically empty");
+    check(runtime->squat_wait_choices().size() == 2 &&
+              runtime->squat_wait_choices()[0].motion_id == 31 &&
+              runtime->squat_wait_choices()[0].weight == 50 &&
+              runtime->squat_wait_choices()[1].motion_id == 32 &&
+              runtime->squat_wait_choices()[1].weight == 50,
+          "Ness authored Squat Wait choices changed");
+    check(sizeof(MeleeWebNessAttributes) == 0xDC &&
+          archive->next_target_offset(runtime->extension_offset()) - runtime->extension_offset() == 0xDC,
+          "Ness extension does not retain its exact 0xDC source bound");
+    const auto& attributes = *runtime->ness_attributes();
+    check(attributes.pkflash_timer1_loopframes == 30 && attributes.pkflash_timer2_loopframes == 25 &&
+              attributes.pkflash_gravity_delay == 10 && attributes.pkflash_minchargeframes == 30 &&
+              attributes.pkflash_fall_accel == 0.017f && attributes.pkflash_landing_lag == 30.0f,
+          "Ness PK Flash counters or floats changed");
+    check(attributes.pkfire_aerial_launch_trajectory == -0.663225114f &&
+              attributes.pkfire_aerial_velocity == 2.5f &&
+              attributes.pkfire_grounded_launch_trajectory == -0.062831849f &&
+              attributes.pkfire_spawn_x == 3.2f && attributes.pkfire_spawn_y == 1.1f,
+          "Ness PK Fire trajectories or spawn offsets changed");
+    check(attributes.pkthunder_loop1 == 30 && attributes.pkthunder_loop2 == 24 &&
+              attributes.pkthunder_gravity_delay == 30 &&
+              attributes.pkthunder2_knockdown_angle == 65.0f &&
+              attributes.pkthunder2_wallhug_angle == 60.0f,
+          "Ness PK Thunder counters or self-hit angles changed");
+    check(attributes.psimagnet_release_lag == 30.0f && attributes.psimagnet_heal_mul == 2.0f &&
+              attributes.psimagnet_absorb_bone == 1 &&
+              attributes.psimagnet_absorb_offset_y == 6.5f &&
+              attributes.psimagnet_absorb_size == 8.5f,
+          "Ness PSI Magnet record changed");
+    check(attributes.yoyo_charge_duration == 60.0f && attributes.yoyo_damage_mul == 350.0f &&
+              attributes.yoyo_rehit_rate == 30.0f,
+          "Ness Yo-Yo scalars changed");
+    check(attributes.bat_reflect_bone_id == 4 && attributes.bat_reflect_max_damage == 50 &&
+              attributes.bat_reflect_size == 6.5f &&
+              attributes.bat_reflect_damage_mul == 1.5f &&
+              attributes.bat_reflect_speed_mul == 1.0f && attributes.bat_reflect_behavior == 0,
+          "Ness baseball bat reflection record changed");
+    // Drive the actual decoder with a negative PK Flash loop counter so this
+    // source category cannot silently become float storage.
+    auto typed = bytes;
+    put32(typed, 0x20 + runtime->extension_offset(), 0xfffffff0U);
+    DatFighterRuntime typed_runtime(std::make_shared<const DatArchive>(typed), identity);
+    check(typed_runtime.ness_attributes()->pkflash_timer1_loopframes == -16,
+          "Ness signed decoder changed source bits");
+    auto malformed = read_real_archive(path);
+    put32(malformed, 0x20 + runtime->extension_offset() + 0x10, 0x7fc00000U);
+    rejects([&] {
+        (void) DatFighterRuntime(std::make_shared<const DatArchive>(malformed), identity);
+    });
+    malformed = read_real_archive(path);
+    put32(malformed, 0x20 + runtime->extension_offset() + 0x98, 0xfffffffeU);
+    rejects([&] {
+        (void) DatFighterRuntime(std::make_shared<const DatArchive>(malformed), identity);
+    });
+    std::cout << "Ness 0xDC attributes, integer counters, absorb/reflection records, empty dynamics and null Wait: passed\n";
+}
 void real_mewtwo(const char* path)
 {
     const auto identity = resolve_fighter_costume("PlyMewtwo5K_Share_joint");
@@ -337,6 +413,80 @@ void real_mewtwo(const char* path)
         (void) DatFighterRuntime(std::make_shared<const DatArchive>(malformed), identity);
     });
     std::cout << "Mewtwo 0x88 attributes, signed counters, reflection record, authored dynamics and Disable/Shadow Ball Article boundary: passed\n";
+}
+void real_peach(const char* path)
+{
+    const auto identity = resolve_fighter_costume("PlyPeach5K_Share_joint");
+    check(identity.fighter_kind == 9 && identity.motion_count == 318,
+          "Peach source identity or authored action count changed");
+    auto bytes = read_real_archive(path);
+    auto archive = std::make_shared<const DatArchive>(bytes);
+    const auto runtime = std::make_shared<const DatFighterRuntime>(archive, identity);
+    check(runtime->actions().size() == 318 && runtime->peach_attributes(),
+          "Peach action count or exact extension is missing");
+    check(!runtime->mario_attributes() && !runtime->donkey_attributes() &&
+              !runtime->koopa_attributes() && !runtime->pikachu_attributes() &&
+              !runtime->purin_attributes() && !runtime->luigi_attributes() &&
+              !runtime->fox_attributes() && !runtime->mars_attributes() &&
+              !runtime->link_attributes() && !runtime->ness_attributes(),
+          "Peach extension was aliased to another fighter schema");
+    // Peach authors nine body chains, an empty auxiliary count whose +0xC
+    // pointer is nonetheless relocated, and 86 dynamics mode rows.
+    check(runtime->dynamics().active_bone_count == 9 &&
+              runtime->dynamics().bones.size() == 9 &&
+              runtime->dynamics().spheres.empty() &&
+              runtime->dynamics().animation_table_offset.has_value(),
+          "Peach authored dynamics shape changed");
+    check(runtime->wait_choices().size() == 4 &&
+              runtime->wait_choices()[0].motion_id == 2 &&
+              runtime->wait_choices()[0].weight == 25 &&
+              runtime->wait_choices()[3].motion_id == 5 &&
+              runtime->wait_choices()[3].weight == 25,
+          "Peach authored Wait choices changed");
+    check(runtime->squat_wait_choices().empty(),
+          "Peach authored null Squat Wait table must decode as semantically empty");
+    check(sizeof(MeleeWebPeachAttributes) == 0xC0 &&
+              archive->next_target_offset(runtime->extension_offset()) - runtime->extension_offset() == 0xC0,
+          "Peach extension does not retain its exact 0xC0 source bound");
+    const auto& attributes = *runtime->peach_attributes();
+    check(attributes.floatfallf_anim_start == 0.0f && attributes.floatfallb_anim_start == 0.0f &&
+              attributes.floatfall_anim_start_offset == 5.0f && attributes.xC == 150.0f,
+          "Peach float-fall record changed");
+    check(attributes.speciallw_item_table_count == 3 && attributes.x14 == 128 &&
+              attributes.speciallw_item_0_randi_max == 2 && attributes.speciallw_item_0_kind == 6 &&
+              attributes.speciallw_item_1_randi_max == 3 && attributes.speciallw_item_1_kind == 7 &&
+              attributes.speciallw_item_2_randi_max == 1 && attributes.speciallw_item_2_kind == 12,
+          "Peach Toad counter item table changed");
+    check(attributes.x30 == 3 && attributes.x34 == 0.1f && attributes.x90 == 600 &&
+              attributes.specialairn_vel_x_div == 2.0f && attributes.specialairn_vel_y == 0.7f,
+          "Peach special scalars changed");
+    check(attributes.absorb_bone == 3 && attributes.absorb_offset_x == 0.0f &&
+              attributes.absorb_offset_y == 1.0f && attributes.absorb_offset_z == 3.5f &&
+              attributes.absorb_size == 6.0f,
+          "Peach Toad absorb record changed");
+    // Drive the actual decoder with a negative Toad counter threshold so this
+    // source category cannot silently become float storage.
+    auto typed = bytes;
+    put32(typed, 0x20 + runtime->extension_offset() + 0x14, 0xffffff80U);
+    DatFighterRuntime typed_runtime(std::make_shared<const DatArchive>(typed), identity);
+    check(typed_runtime.peach_attributes()->x14 == -128,
+          "Peach signed decoder changed source bits");
+    auto malformed = read_real_archive(path);
+    put32(malformed, 0x20 + runtime->extension_offset() + 0x94, 0x7fc00000U);
+    rejects([&] {
+        (void) DatFighterRuntime(std::make_shared<const DatArchive>(malformed), identity);
+    });
+    malformed = read_real_archive(path);
+    put32(malformed, 0x20 + runtime->extension_offset() + 0xAC, 0xfffffffeU);
+    rejects([&] {
+        (void) DatFighterRuntime(std::make_shared<const DatArchive>(malformed), identity);
+    });
+    malformed = read_real_archive(path);
+    put32(malformed, 0x20 + runtime->root_offset() + 4, runtime->root_offset());
+    rejects([&] {
+        (void) DatFighterRuntime(std::make_shared<const DatArchive>(malformed), identity);
+    });
+    std::cout << "Peach 0xC0 attributes, Toad counter pairs, absorb record, nine authored dynamics chains and null Squat Wait: passed\n";
 }
 void real_luigi(const char* path, const char* effect_path)
 {
@@ -505,6 +655,14 @@ int main(int argc, char** argv)
         }
         if (argc == 3 && std::string_view(argv[1]) == "real_koopa") {
             real_koopa(argv[2]);
+            return 0;
+        }
+        if (argc == 3 && std::string_view(argv[1]) == "real_ness") {
+            real_ness(argv[2]);
+            return 0;
+        }
+        if (argc == 3 && std::string_view(argv[1]) == "real_peach") {
+            real_peach(argv[2]);
             return 0;
         }
         if (argc == 3 && std::string_view(argv[1]) == "real_mewtwo") {

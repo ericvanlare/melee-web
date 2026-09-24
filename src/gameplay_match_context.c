@@ -322,6 +322,42 @@ static HSD_TObjDesc* owned_base_texture(HSD_Joint* root,HSD_TObj* runtime)
     if(!find_base_texture(root,&search,&budget))return NULL;
     return search.exact;
 }
+/* HSD_TObjLoadDesc copies the authored TlutDesc (same LUT storage, format and
+ * entry count) into the runtime TObj, and a playing TIMG animation repoints
+ * imagedesc into the borrowed animation table, so a base descriptor can no
+ * longer be found by imagedesc identity. Prove palette ownership instead: the
+ * runtime palette must be the authored LUT of a retained costume texture with
+ * the same texture id. */
+static int find_base_palette(HSD_Joint* joint,HSD_TObj* runtime,unsigned* budget)
+{
+    for(;joint;joint=joint->next){
+        if(!*budget)return 0;
+        --*budget;
+        if(!(joint->flags&(JOBJ_PTCL|JOBJ_SPLINE))){
+            HSD_DObjDesc* dobj=joint->u.dobjdesc;
+            for(;dobj;dobj=dobj->next){
+                if(!*budget)return 0;
+                --*budget;
+                HSD_MObjDesc* mobj=dobj->mobjdesc;
+                if(mobj){
+                    for(HSD_TObjDesc* tex=mobj->texdesc;tex;tex=tex->next){
+                        if(!*budget)return 0;
+                        --*budget;
+                        if(tex->id==runtime->id&&base_tlut_matches(runtime->tlut,tex->tlutdesc))
+                            return 1;
+                    }
+                }
+            }
+        }
+        if(find_base_palette(joint->child,runtime,budget))return 1;
+    }
+    return 0;
+}
+static int owned_base_palette(HSD_Joint* root,HSD_TObj* runtime)
+{
+    unsigned budget=16384;
+    return find_base_palette(root,runtime,&budget);
+}
 static int eye_stats(Fighter* fp,MeleeWebMatchStats* out,char* e,size_t n)
 {
     HSD_MatAnimJoint* desc=CostumeListsForeachCharacter[fp->kind].costume_list[fp->x619_costume_id].x4;
@@ -399,7 +435,8 @@ static int eye_stats(Fighter* fp,MeleeWebMatchStats* out,char* e,size_t n)
         }else{
             if(tobj->tlut){
                 if(!base)base=owned_base_texture(owned_joint,tobj);
-                if(!base||!base->tlutdesc||!base_tlut_matches(tobj->tlut,base->tlutdesc))
+                if(!(base&&base->tlutdesc&&base_tlut_matches(tobj->tlut,base->tlutdesc))&&
+                   !owned_base_palette(owned_joint,tobj))
                     return fail(e,n,"Original eye base palette is outside its owned costume descriptor");
             }
             palette_is_base=1;

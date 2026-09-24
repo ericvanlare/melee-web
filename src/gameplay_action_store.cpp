@@ -40,12 +40,14 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     const bool purin = costume.fighter_kind == 15;
     const bool donkey = costume.fighter_kind == 3;
     const bool koopa = costume.fighter_kind == 5;
+    const bool ness = costume.fighter_kind == 8;
+    const bool peach = costume.fighter_kind == 9;
     const bool mewtwo = costume.fighter_kind == 16;
     const bool luigi = costume.fighter_kind == 17;
     const bool pikachu_family = costume.fighter_kind == 12 || costume.fighter_kind == 23;
     const bool captain = costume.fighter_kind == 2;
     const bool ganon = costume.fighter_kind == 25;
-    require(mario || fox_family || mars || link_family || luigi || pikachu_family || purin || donkey || koopa || mewtwo || captain || ganon, "Native action store has no checked fighter command schema for this kind");
+    require(mario || fox_family || mars || link_family || luigi || pikachu_family || purin || donkey || koopa || ness || peach || mewtwo || captain || ganon, "Native action store has no checked fighter command schema for this kind");
     std::vector<DatCommandRoot> roots;
     // Explicit source ftCo submotion groups. This certifies command operand
     // graphs only, not readiness of every original world service they invoke.
@@ -79,9 +81,11 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     if (mario) group(295,302);                   // Mario/Dr. Mario specials; taunts use common rows 239/240 above
     else if (link_family) group(295,313);        // Link-family action tables end at 313
     // The Captain-family range is source-complete through the final authored
-    // action. Captain rows 295/297 include command opcodes 45/42 whose
-    // original consumers require live sword/parasol item services; the
-    // shared command readiness guard intentionally remains explicit there.
+    // action. Captain rows 295/297 include command opcodes 45/42; 42
+    // (ftCommon_8007E83C parasol item rate) is now admitted globally, so
+    // executing those rows without a held parasol trips the consumer's own
+    // HSD_ASSERT rather than this guard — both outcomes are loud, and the
+    // retail path cannot reach them either.
     // A dive catch runs the common CaptureCaptain submotion row 276 on the
     // catcher's own store (grab_cb -> ftCo_8009CA0C); without admission that
     // row dispatches the unsupported-command sentinel and aborts mid-match.
@@ -94,6 +98,17 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     else if (purin) group(295,costume.motion_count-1); // Purin five aerial jumps and original specials.
     else if (donkey) group(295,costume.motion_count-1); // Heavy carry, cargo throws and Donkey specials.
     else if (koopa) group(295,costume.motion_count-1); // Koopa's authored self rows end at 315.
+    // Ness's 326-row table ends at 325: the Yo-Yo smash rows 295-298 plus
+    // original SpecialN/S/Hi/Lw rows 299-325. Ness's own victim-side rows
+    // 259-261 and 266-285 are empty motions, so the victim groups inserted
+    // above carry no command words for a captured/shouldered Ness; the
+    // animation identity still comes from the thrower's store.
+    else if (ness) group(295,costume.motion_count-1);
+    // Peach's 318-row table ends at 317: the Float/float-aerial rows 295-297,
+    // the three AttackS4 weapons, original SpecialN/S/Hi/Lw rows 298-315 and
+    // the authored ItemParasolOpen/Fall rows 316/317. The final else group's
+    // (295,326) extent would overrun her table.
+    else if (peach) group(295,costume.motion_count-1);
     else if (mewtwo) group(295,costume.motion_count-1); // Mewtwo's authored self rows end at 313.
     else group(295,326);                         // Fox/Falco/Marth/Roy source special command rows
     for (auto choice : runtime_->wait_choices()) command_motions_.insert(choice.motion_id);

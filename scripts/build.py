@@ -128,6 +128,7 @@ PUBLIC_RUNTIME_FORBIDDEN_EXPORTS = frozenset(
         "_melee_web_native_menu_memory",
         "_melee_web_css_observe",
         "_melee_web_css_observe_port",
+        "_melee_web_css_observe_setup",
         "_melee_web_sss_observe",
         "_melee_web_input_message",
     }

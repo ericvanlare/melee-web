@@ -1,4 +1,5 @@
 #include "gameplay_fighter_assets.h"
+#include <melee/lb/lbcommand.h>
 #include "dat_item_commands.h"
 #include <melee/ft/ftdata.h>
 #include <melee/ft/types.h>
@@ -6,6 +7,19 @@
 #include <sysdolphin/baselib/mobj.h>
 #include <stdlib.h>
 #include <string.h>
+
+void lbBgFlash_80021C48(unsigned int, unsigned int) {}
+
+int assets_test_item_backward_handlers(void* entry)
+{
+    union CmdUnion* root=(union CmdUnion*)entry;
+    if(!root||root[1].Command_05.ptr!=root-1)return 0;
+    CommandInfo info={0};info.u=root;
+    Command_05(&info);
+    if(info.u!=root-1||info.loop_count!=1||info.event_return[0]!=root+2)return 0;
+    Command_06(&info);
+    return info.u==root+2&&info.loop_count==0;
+}
 static ftData test_data;
 static HSD_Joint test_joint;
 static HSD_MatAnimJoint test_material;
@@ -129,6 +143,43 @@ int assets_test_item_commands(void)
     const uint32_t invalid[]={(13U<<26)|(4U<<23),0};
     commands=melee_web_item_commands_create(invalid,2);
     if(commands){melee_web_item_commands_destroy(commands);return 0;}
+    /* Item subroutine/goto commands store their relocated target in the
+     * following command union. The target is not payload in the dispatch
+     * word itself. */
+    const uint32_t flow[]={(5U<<26),3,4U<<26,0};
+    commands=melee_web_item_commands_create(flow,4);
+    if(!commands || commands[0].Command_00.code!=5 ||
+       commands[1].Command_05.ptr!=&commands[3]){
+        if(commands)melee_web_item_commands_destroy(commands);
+        return 0;
+    }
+    melee_web_item_commands_destroy(commands);
+    /* it_8027978C has three-word forms for sub 0..2 and 10..11, and
+     * two-word forms for every other sub-opcode. Keep a valid END immediately
+     * after each authored form so an over-consumption changes the observed
+     * command boundary. */
+    const unsigned two_operand_subs[]={0,1,2,10,11};
+    for(size_t n=0;n<sizeof(two_operand_subs)/sizeof(two_operand_subs[0]);++n){
+        const uint32_t texture[]={
+            (16U<<26)|(two_operand_subs[n]<<18),0x12345678,0x87654321,0};
+        commands=melee_web_item_commands_create(texture,4);
+        if(!commands || commands[3].Command_00.code!=0){
+            if(commands)melee_web_item_commands_destroy(commands);
+            return 0;
+        }
+        melee_web_item_commands_destroy(commands);
+    }
+    const unsigned one_operand_subs[]={3,9,12,255};
+    for(size_t n=0;n<sizeof(one_operand_subs)/sizeof(one_operand_subs[0]);++n){
+        const uint32_t texture[]={
+            (16U<<26)|(one_operand_subs[n]<<18),0x12345678,0};
+        commands=melee_web_item_commands_create(texture,3);
+        if(!commands || commands[2].Command_00.code!=0){
+            if(commands)melee_web_item_commands_destroy(commands);
+            return 0;
+        }
+        melee_web_item_commands_destroy(commands);
+    }
     return ok;
 }
 MeleeWebFighterAssetScope* assets_test_begin(void* rows,void* blends,void* waits,void* context,

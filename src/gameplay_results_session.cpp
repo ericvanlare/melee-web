@@ -66,8 +66,13 @@ const VictoryMusic* victory_music(int ckind)
         return &music;
     }
     case CKIND_KOOPA:
-    case CKIND_LUIGI: {
+    case CKIND_LUIGI:
+    case CKIND_PEACH: {
         static constexpr VictoryMusic music{0x16, "/audio/ff_mario.hps"};
+        return &music;
+    }
+    case CKIND_NESS: {
+        static constexpr VictoryMusic music{0x17, "/audio/ff_nes.hps"};
         return &music;
     }
     case CKIND_MEWTWO:
