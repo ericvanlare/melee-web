@@ -12,6 +12,7 @@
 #include <sysdolphin/baselib/gobjplink.h>
 
 #include <stdio.h>
+#include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -333,6 +334,43 @@ static void decode_reference_player(PlayerInitData* target,
     target->model_scale = reference_be_float(source + 32);
 }
 
+/* The capture is taken at the CSS boundary, before the source CSS enter has
+ * assigned its door icons.  Retail uses CHKIND_NONE for the pre-enter
+ * initialized doors and CKIND_PLAYABLE_COUNT for an unassigned door after
+ * CSS construction; an unassigned human door can carry the latter while its
+ * cursor is being joined.  These are source-owned transient values, not
+ * playable fighter selections.  Validate the shape here without imposing
+ * the later VS CPU kind/level or stage-commit rules. */
+static int reference_initial_css_players_valid(const CSSData* css)
+{
+    int saw_inactive = 0;
+
+    for (int i = 0; i < GM_MAX_PLAYERS; ++i) {
+        const PlayerInitData* player = &css->vs.start.players[i];
+        if (player->slot_type == Gm_PKind_NA) {
+            if (player->ckind != CHKIND_NONE &&
+                player->ckind != CKIND_PLAYABLE_COUNT)
+                return 0;
+            saw_inactive = 1;
+            continue;
+        }
+        if (saw_inactive ||
+            (player->slot_type != Gm_PKind_Human &&
+             player->slot_type != Gm_PKind_Cpu))
+            return 0;
+        if (player->ckind == CKIND_PLAYABLE_COUNT) {
+            /* mnCharSel_Scene_OnEnter uses this sentinel for an unassigned
+             * human door and converts that door to NA. A CPU door must carry
+             * an authored fighter before it is admitted. */
+            if (player->slot_type != Gm_PKind_Human)
+                return 0;
+        } else if (!melee_web_menu_character_available(player->ckind)) {
+            return 0;
+        }
+    }
+    return 1;
+}
+
 static int session_live(const MeleeWebMenuSession* session, char* error,
                         size_t error_size)
 {
@@ -383,10 +421,23 @@ int melee_web_menu_apply_reference_css_context(
     decoded.vs.unk_0x6 = source[14];
     decoded.vs.unk_0x7 = source[15];
     decode_reference_rules(&decoded.vs.start.rules, source + 0x10);
+    if (!isfinite(decoded.vs.start.rules.x2C) ||
+        !isfinite(decoded.vs.start.rules.x30) ||
+        !isfinite(decoded.vs.start.rules.game_speed))
+        return fail(error, error_size,
+                    "First-CSS context contains a non-finite source rule float");
     for (size_t i = 0; i < GM_MAX_PLAYERS; ++i) {
         decode_reference_player(&decoded.vs.start.players[i],
                                 source + 0x70 + i * 0x24);
+        if (!isfinite(decoded.vs.start.players[i].attack_ratio) ||
+            !isfinite(decoded.vs.start.players[i].defense_ratio) ||
+            !isfinite(decoded.vs.start.players[i].model_scale))
+            return fail(error, error_size,
+                        "First-CSS context contains a non-finite player float");
     }
+    if (!reference_initial_css_players_valid(&decoded))
+        return fail(error, error_size,
+                    "First-CSS context contains an unsupported source player slot");
     memcpy(session->css_ko_counts, ko_counts, GM_MAX_PLAYERS);
     decoded.ko_counts = session->css_ko_counts;
     decoded.vs.start.rules.on_unpause_override = NULL;

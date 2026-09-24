@@ -134,6 +134,10 @@ int melee_web_menu_host_apply_replay_context(
        melee_web_menu_phase(h->session)!=MELEE_WEB_MENU_CREATED||
        seed_ptr!=&h->seed)
         return fail(e,n,"Whole-session first-CSS context requires an unentered menu host");
+    /* Profile application is the other owner mutation in this operation.
+     * Check its aliases before decoding or installing CSS so a stale profile
+     * cannot leave an unentered session holding a committed CSS context. */
+    if(!melee_web_save_profile_owner_live(h->profile,e,n))return 0;
     input=melee_web_pad_state_decode(pad_state,MELEE_WEB_PAD_STATE_BYTES,e,n);
     if(!input)return 0;
     if(!melee_web_menu_apply_reference_css_context(

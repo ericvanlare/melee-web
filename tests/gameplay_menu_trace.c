@@ -360,7 +360,12 @@ int main(void)
         memset(css_context + 0x10 + 0x20, 0xff, 8);
         for (int i = 0; i < GM_MAX_PLAYERS; ++i) {
             const size_t base = 0x70 + (size_t) i * 0x24;
-            css_context[base] = i == 1 ? CKIND_FOX : CKIND_MARIO;
+            /* The first source packet is captured before CSS OnEnter. Its
+             * inactive doors carry CHKIND_NONE; the first active human may
+             * still carry the authored unassigned-door sentinel. */
+            css_context[base] = i == 1 ? CKIND_FOX
+                                       : i == 0 ? CKIND_PLAYABLE_COUNT
+                                                 : CHKIND_NONE;
             css_context[base + 1] = i < 2 ? Gm_PKind_Human : Gm_PKind_NA;
             css_context[base + 4] = 0;
             css_context[base + 0x0C] = i < 2 ? 0x80 : 0;
@@ -368,7 +373,54 @@ int main(void)
             css_context[base + 0x1C] = 0x80;
             css_context[base + 0x20] = 0x00;
         }
-        if (!session || !melee_web_menu_apply_reference_css_context(
+        if (!session) return 59;
+        {
+            uint8_t inactive_context[0x148];
+            memcpy(inactive_context, css_context, sizeof(inactive_context));
+            for (int i = 0; i < GM_MAX_PLAYERS; ++i) {
+                const size_t base = 0x70 + (size_t) i * 0x24;
+                inactive_context[base] = CHKIND_NONE;
+                inactive_context[base + 1] = Gm_PKind_NA;
+            }
+            if (!melee_web_menu_apply_reference_css_context(
+                    session, inactive_context, ko_counts, error, sizeof(error)) ||
+                !melee_web_menu_session_destroy(session, error, sizeof(error)))
+                return 113;
+            session = melee_web_menu_session_create(&runtime, NULL, error,
+                                                    sizeof(error));
+            if (!session) return 114;
+            for (int i = 0; i < GM_MAX_PLAYERS; ++i) {
+                const size_t base = 0x70 + (size_t) i * 0x24;
+                inactive_context[base] = CKIND_PLAYABLE_COUNT;
+            }
+            if (!melee_web_menu_apply_reference_css_context(
+                    session, inactive_context, ko_counts, error, sizeof(error)) ||
+                !melee_web_menu_session_destroy(session, error, sizeof(error)))
+                return 115;
+            session = melee_web_menu_session_create(&runtime, NULL, error,
+                                                    sizeof(error));
+            if (!session) return 116;
+        }
+        {
+            uint8_t malformed[0x148];
+            memcpy(malformed, css_context, sizeof(malformed));
+            /* A decoded PPC float must never become an HSD NaN/Inf in the
+             * source-owned menu object. Rejection happens before any owner
+             * state is committed. */
+            malformed[0x10 + 0x2C] = 0x7f;
+            malformed[0x10 + 0x2D] = 0x80;
+            malformed[0x10 + 0x2E] = 0x00;
+            malformed[0x10 + 0x2F] = 0x00;
+            if (melee_web_menu_apply_reference_css_context(
+                    session, malformed, ko_counts, error, sizeof(error)))
+                return 117;
+            memcpy(malformed, css_context, sizeof(malformed));
+            malformed[0x70] = 0xff;
+            if (melee_web_menu_apply_reference_css_context(
+                    session, malformed, ko_counts, error, sizeof(error)))
+                return 118;
+        }
+        if (!melee_web_menu_apply_reference_css_context(
                 session, css_context, ko_counts, error, sizeof(error)) ||
             !melee_web_menu_enter_css(session, error, sizeof(error)))
             return 59;
