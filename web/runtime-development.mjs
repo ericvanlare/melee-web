@@ -4,6 +4,15 @@ import {mountControllerSettings} from './controller-settings.mjs';
 import {createRuntimeAudio} from './runtime-audio.mjs';
 import {loadNativeGameDisc, openNativeGameSession} from './runtime-audio-assets.mjs';
 const developmentHooks = {};
+const RETAIL_REPLAY_LEGACY_MAX_FRAMES = 36000;
+const RETAIL_REPLAY_WHOLE_SESSION_MAX_FRAMES = 108000;
+const RETAIL_REPLAY_STATE_RECORD_OVERHEAD = 4;
+const RETAIL_REPLAY_TIMER_RECORD_OVERHEAD = 3;
+// Keep the upload ceiling identical to kRetailReplayWholeSessionMaxBytes in
+// gameplay_retail_recipe.hpp. The span table admits all 32 bounded spans;
+// rejecting the final 31 would make the browser stricter than the decoder.
+const RETAIL_REPLAY_MAX_BYTES = 16 + 4 + 8 + (0x18 + 0x55E8 + 0x148 + 6) +
+  0x138 + 822 + RETAIL_REPLAY_WHOLE_SESSION_MAX_FRAMES * 44 + 2 + 32 * 12;
 let owner, controllerSettings, Module, boundary, status, check, put, prepareAudio, pauseAudioForPreparation;
 let syncAudio, unloadAndSave, prepareNativeResources, waitForAudioAck;
 let preparationKeepsAudio = false;
@@ -202,7 +211,7 @@ $('retail-replay-start').onclick=async()=>{
   // whole-session 108,000-frame limit after reading the version. This upload
   // bound admits the largest checked v8 envelope without widening legacy
   // formats or allowing an unbounded allocation.
-  const file=$('retail-replay-file').files[0];if(!file||file.size<328||file.size>4775526)throw Error('Invalid bounded MWRC input recipe');
+  const file=$('retail-replay-file').files[0];if(!file||file.size<328||file.size>RETAIL_REPLAY_MAX_BYTES)throw Error('Invalid bounded MWRC input recipe');
   const bytes=new Uint8Array(await file.arrayBuffer()),hash=await replayHash(bytes),observe=$('retail-replay-mode').value==='state';
   if(!await unloadAndSave())throw Error(status());resetTiming(false);await prepareAudio();await pauseAudioForPreparation();
   for(const old of $('retail-replay-downloads').querySelectorAll('a'))URL.revokeObjectURL(old.href);$('retail-replay-downloads').replaceChildren();replayEvidence=[];$('save-replay-evidence').disabled=true;
@@ -268,9 +277,15 @@ try {
     onError(error){log(error.message);$('status').dataset.runtimeError=error.message;},
     onLog(text,isError){
       if(retailRun?.observe&&!isError&&text.startsWith('{"record":')){
-        if(retailRun.rows.length>=36004)throw Error('Replay trace exceeded its record bound');retailRun.rows.push(text);
+        const limit=retailRun.frames>RETAIL_REPLAY_LEGACY_MAX_FRAMES
+          ? RETAIL_REPLAY_WHOLE_SESSION_MAX_FRAMES+RETAIL_REPLAY_STATE_RECORD_OVERHEAD
+          : RETAIL_REPLAY_LEGACY_MAX_FRAMES+RETAIL_REPLAY_STATE_RECORD_OVERHEAD;
+        if(retailRun.rows.length>=limit)throw Error('Replay trace exceeded its record bound');retailRun.rows.push(text);
       }else if(retailRun?.observe&&isError&&text.startsWith('TIMER_AUDIT ')){
-        if(retailRun.timerRows.length>=36003)throw Error('Timer trace exceeded its record bound');retailRun.timerRows.push(text.slice(12));
+        const limit=retailRun.frames>RETAIL_REPLAY_LEGACY_MAX_FRAMES
+          ? RETAIL_REPLAY_WHOLE_SESSION_MAX_FRAMES+RETAIL_REPLAY_TIMER_RECORD_OVERHEAD
+          : RETAIL_REPLAY_LEGACY_MAX_FRAMES+RETAIL_REPLAY_TIMER_RECORD_OVERHEAD;
+        if(retailRun.timerRows.length>=limit)throw Error('Timer trace exceeded its record bound');retailRun.timerRows.push(text.slice(12));
       }else log(text);
     },
     onEvent(name,data){

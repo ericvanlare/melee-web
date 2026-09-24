@@ -137,7 +137,8 @@ assert(start&&pause&&completion);
 }
 {
  const logHook=page.slice(page.indexOf('    onLog(text,isError){'),page.indexOf('    onEvent(name,data){'));
- const moduleLine='const hooks={'+logHook+'}; var Module={print:text=>hooks.onLog(text,false),printErr:text=>hooks.onLog(text,true)};';
+ const replayLimits=page.match(/const RETAIL_REPLAY_(?:LEGACY_MAX_FRAMES|WHOLE_SESSION_MAX_FRAMES|STATE_RECORD_OVERHEAD|TIMER_RECORD_OVERHEAD|MAX_BYTES)[^;]*;/g).join('\n');
+ const moduleLine=replayLimits+'\nconst hooks={'+logHook+'}; var Module={print:text=>hooks.onLog(text,false),printErr:text=>hooks.onLog(text,true)};';
  const logged=[];
  const scope={$:()=>({}),retailRun:{observe:true,rows:[],timerRows:[]},
   log:text=>logged.push(text),stop(){}};
@@ -156,6 +157,17 @@ assert(start&&pause&&completion);
  assert.equal(scope.retailRun.timerRows.length,1,'Performance runs do not collect state');
  scope.retailRun.observe=true;
  scope.retailRun.timerRows.length=36003;
+ assert.throws(()=>scope.Module.printErr('TIMER_AUDIT '+timer),/record bound/);
+ scope.retailRun={observe:true,frames:46835,rows:[],timerRows:[]};
+ scope.retailRun.rows.length=108003;
+ scope.Module.print(state);
+ assert.equal(scope.retailRun.rows.length,108004,'v8 state capture keeps its three-budget record bound');
+ scope.retailRun.timerRows.length=108002;
+ scope.Module.printErr('TIMER_AUDIT '+timer);
+ assert.equal(scope.retailRun.timerRows.length,108003,'v8 timer capture keeps its three-budget record bound');
+ scope.retailRun.rows.length=108004;
+ assert.throws(()=>scope.Module.print(state),/record bound/);
+ scope.retailRun.timerRows.length=108003;
  assert.throws(()=>scope.Module.printErr('TIMER_AUDIT '+timer),/record bound/);
 }
 {
@@ -192,7 +204,8 @@ function harness(unload=true,wholeSession=false){
    _melee_web_native_menu_launch:()=>{calls.launch++;return 1;},
    _melee_web_native_menu_running:()=>1,
    _melee_web_native_menu_pause:()=>{calls.paused++;}}};
- vm.createContext(scope);vm.runInContext(start+'\n'+pause,scope);
+ const replayLimits=page.match(/const RETAIL_REPLAY_(?:LEGACY_MAX_FRAMES|WHOLE_SESSION_MAX_FRAMES|STATE_RECORD_OVERHEAD|TIMER_RECORD_OVERHEAD|MAX_BYTES)[^;]*;/g).join('\n');
+ vm.createContext(scope);vm.runInContext(replayLimits+'\n'+start+'\n'+pause,scope);
  return {$,scope,calls,resolveBytes,play:()=>$('retail-replay-start').onclick()};
 }
 {
@@ -215,7 +228,8 @@ function harness(unload=true,wholeSession=false){
 }
 {
  const h=harness();const first=h.play();const duplicate=h.play();
- assert.equal(h.scope.replayLoading,true);assert.equal(h.$('disc').disabled,true);
+ assert.equal(h.scope.replayLoading,true,'replayLoading is set before the first async read');
+ assert.equal(h.$('disc').disabled,true,'disc import is disabled during replay loading');
  h.resolveBytes(new ArrayBuffer(1194));await Promise.all([first,duplicate]);
  assert.equal(h.calls.unload,1);assert.equal(h.calls.native,1);assert.equal(h.scope.replayLoading,false);
  await h.play();assert.equal(h.calls.native,1,'An active replay cannot be replaced');
