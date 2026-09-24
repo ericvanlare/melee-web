@@ -47,11 +47,8 @@ python3 -m unittest tests.test_cpu_r5_source_context \
   tests.test_gameplay_cpu_r5_carry -v
 ```
 
-The latest owned-input receipt is retained at
-`work/cpu-r5-carry-evidence/run-_rif2kw5/receipt.json`. The provisioned full
-suite receipt and log are
-`work/cpu-r5-carry-evidence/full-suite-owned-provisioned-v1.json` and
-`work/cpu-r5-carry-evidence/full-suite-owned-provisioned-v1.log`.
+The [scoped evidence receipt](evidence/cpu-r5-carry-v1.json) binds the owned
+seed derivation, implementation hashes, full-suite log and retained failures.
 
 This is compiled and source-adapter evidence only. It does not establish a
 live browser gameplay result, general CPU compatibility, floor/standings

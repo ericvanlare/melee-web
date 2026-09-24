@@ -243,3 +243,13 @@ The [original AIInit fixture](SOURCE_AI_INIT_PROFILE.md) separately checks the
 source Audio Interface startup boundary. Its owned synthetic DMA programming
 does not establish live audio buffers, AX/DSP initialization or full-session
 equivalence.
+
+## Typed CPU carry prerequisite
+
+The [CPU r5 sidecar](CPU_R5_CARRY.md) separates known seed-global words, explicit
+zero and unavailable values. Its owner token checks world, source allocation
+and sidecar lifetime generations. The [scoped receipt](evidence/cpu-r5-carry-v1.json)
+records an owned seed derivation and an explicitly synthetic fighter identity.
+This does not supply a live Fighter binding or execute the source CPU dispatch
+path. Runtime publish/consume hooks and all unsupported reaching definitions
+remain open.
