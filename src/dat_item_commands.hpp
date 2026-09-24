@@ -40,10 +40,10 @@ public:
                  * and three Vec2 words. */
                 else if(op==10)count=5;
                 /* it_8027978C reads its sub-opcode from source bits 25..18
-                 * and consumes the command word plus one operand word, plus
-                 * a second operand word when the sub-opcode selects the
-                 * arg2/arg3 form (sub 0..2). */
-                else if(op==16)count=((w>>18)&0xff)<=2?3:2;
+                 * and always consumes the command word plus two operand
+                 * words. The low 0..2 forms use both operands; the other
+                 * forms ignore them but still advance over both. */
+                else if(op==16)count=3;
                 else if(op!=0&&op!=1&&op!=2&&op!=3&&op!=4&&op!=5&&op!=6&&op!=7&&op!=8&&op!=9&&op!=12&&
                         op!=13&&op!=14&&op!=15&&op!=17&&op!=18&&op!=19)
                     throw DatError("Item command opcode " + std::to_string(op) +

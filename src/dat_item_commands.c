@@ -25,8 +25,13 @@ void* melee_web_item_commands_create(const uint32_t* words,size_t count){
          * reads no operand. */
         case 5:case 7:{
             if(i+1>=count)goto fail;
+            const uint32_t target=((uint32_t*)&words[i+1])[0]&0x3ffffff;
+            if(target>=count)goto fail;
             ((uint32_t*)&out[i])[0]=op;
-            out[i+1].Command_07.ptr=out+(w&0x3ffffff);
+            /* Command_05/07 advances once before reading its pointer. The
+             * checked decoder stores the emitted target index in that
+             * following union, not in the source dispatch word's payload. */
+            out[i+1].Command_07.ptr=out+target;
             i+=1;break;
         }
         case 6:
@@ -41,22 +46,23 @@ void* melee_web_item_commands_create(const uint32_t* words,size_t count){
          * The native handler reads the same field from native bits 6..13,
          * so emit the dispatch opcode in bits 0..5 and the authored
          * sub-opcode in bits 6..13, then carry the authored operand words
-         * verbatim: the handler consumes one extra word (two when sub<=2)
+         * verbatim: the handler consumes two extra words for every sub-opcode
          * and, in the arg2/arg3 form, reads bytes 2..3 of the last word,
          * which stay in source byte order like the opcode-11 byte word. */
         case 16:{
             unsigned sub=(w>>18)&0xff;
-            unsigned extra=sub<=2?2:1;
+            /* The original handler always advances over two operand unions:
+             * the low 0..2 forms read both, while the other forms ignore
+             * their values but still consume them before returning. */
+            unsigned extra=2;
             if(i+extra>=count)goto fail;
             out[i].set_throw_flags=(struct set_throw_flags){16,sub};
             for(unsigned k=1;k<=extra;k++)((uint32_t*)&out[i+k])[0]=words[i+k];
-            if(extra==2){
-                uint32_t v=words[i+2];
-                ((uint8_t*)&out[i+2])[0]=v>>24;
-                ((uint8_t*)&out[i+2])[1]=v>>16;
-                ((uint8_t*)&out[i+2])[2]=v>>8;
-                ((uint8_t*)&out[i+2])[3]=v;
-            }
+            uint32_t v=words[i+2];
+            ((uint8_t*)&out[i+2])[0]=v>>24;
+            ((uint8_t*)&out[i+2])[1]=v>>16;
+            ((uint8_t*)&out[i+2])[2]=v>>8;
+            ((uint8_t*)&out[i+2])[3]=v;
             i+=extra;break;
         }
         /* Opcode 10 (it_80278F2C) consumes five words. The handler reads

@@ -349,9 +349,9 @@ static int find_base_palette(HSD_Joint* joint,HSD_TObj* runtime,unsigned* budget
                 }
             }
         }
-        if(!find_base_palette(joint->child,runtime,budget))return 0;
+        if(find_base_palette(joint->child,runtime,budget))return 1;
     }
-    return 1;
+    return 0;
 }
 static int owned_base_palette(HSD_Joint* root,HSD_TObj* runtime)
 {

@@ -129,6 +129,27 @@ int assets_test_item_commands(void)
     const uint32_t invalid[]={(13U<<26)|(4U<<23),0};
     commands=melee_web_item_commands_create(invalid,2);
     if(commands){melee_web_item_commands_destroy(commands);return 0;}
+    /* Item subroutine/goto commands store their relocated target in the
+     * following command union. The target is not payload in the dispatch
+     * word itself. */
+    const uint32_t flow[]={(5U<<26),3,4U<<26,0};
+    commands=melee_web_item_commands_create(flow,4);
+    if(!commands || commands[0].Command_00.code!=5 ||
+       commands[1].Command_05.ptr!=&commands[3]){
+        if(commands)melee_web_item_commands_destroy(commands);
+        return 0;
+    }
+    melee_web_item_commands_destroy(commands);
+    /* it_8027978C advances over two operand unions even for an ignored
+     * high sub-opcode. A following invalid opcode therefore remains after
+     * the complete three-word command. */
+    const uint32_t texture[]={(16U<<26)|(10U<<18),0x12345678,63U<<26,0};
+    commands=melee_web_item_commands_create(texture,4);
+    if(!commands || commands[3].Command_00.code!=0){
+        if(commands)melee_web_item_commands_destroy(commands);
+        return 0;
+    }
+    melee_web_item_commands_destroy(commands);
     return ok;
 }
 MeleeWebFighterAssetScope* assets_test_begin(void* rows,void* blends,void* waits,void* context,
