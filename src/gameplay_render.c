@@ -40,7 +40,6 @@ struct MeleeWebRender {
     int drawing;
 };
 static MeleeWebRender* owner;
-static uint64_t zlist_generation;
 static int fail(char* e,size_t n,const char* m){if(e&&n)snprintf(e,n,"%s",m);return 0;}
 static int ok(char* e,size_t n){if(e&&n)*e=0;return 1;}
 static int valid(const MeleeWebRenderSettings* s,char* e,size_t n)
@@ -86,12 +85,9 @@ static MeleeWebRender* begin_render(const MeleeWebRenderSettings* s,int original
     if(!valid(s,e,n))return NULL;
     Camera* source=melee_web_camera_state();
     if(owner||source->gobj||cm_804D6464){fail(e,n,"Original camera storage already has an owner");return NULL;}
+    if(zlist_alloc_data.used){fail(e,n,"Native render cannot replace an existing Z-list pool");return NULL;}
     if(!melee_web_native_world_enable(e,n))return NULL;
     uint64_t generation=melee_web_gameplay_generation();
-    if(zlist_generation!=generation){
-        if(zlist_alloc_data.used){fail(e,n,"Native render cannot replace an existing Z-list pool");return NULL;}
-        HSD_ZListInitAllocData();zlist_generation=generation;
-    }
     MeleeWebRender* h=calloc(1,sizeof(*h));if(!h){fail(e,n,"Cannot allocate native render owner");return NULL;}
     h->generation=generation;
     if(original){
