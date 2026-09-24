@@ -22,8 +22,8 @@
     {
       "path": "web/initial_pipeline_cache.db.gz.b64",
       "rule": "encoded_payload",
-      "sha256": "6487a68d0d39b97761bb8f4764e3de05797afcb9bafe64847a0cf4f9b13afeef",
-      "reason": "Reviewed PR55/Mewtwo renderer metadata: 858 records including 857 pipeline descriptors. See docs/evidence/compiler-review-pipeline-seed-v2.json for bounded decode, identity and content review. This exception is not licensing clearance; documented provenance uncertainty remains."
+      "sha256": "8aa03d3eca17d71b9eab9cf0b9ad60e45dd45ab5789441e48824da3ed5c7e839",
+      "reason": "Reviewed PR56 Results/Prize renderer metadata: 884 records including 883 pipeline descriptors. See docs/evidence/results-prize-pipeline-seed-v1.json for bounded decode, identity and content review. This exception is not licensing clearance; documented provenance uncertainty remains."
     }
   ],
   "synthetic_secrets": [

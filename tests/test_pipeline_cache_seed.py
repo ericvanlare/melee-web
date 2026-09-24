@@ -84,15 +84,47 @@ class PipelineCacheSeedTests(unittest.TestCase):
             output = Path(directory) / "initial_pipeline_cache.db"
             materialize(SEED, output)
 
-            self.assertEqual(3567616, output.stat().st_size)
+            self.assertEqual(3674112, output.stat().st_size)
             self.assertEqual(EXPECTED_SHA256, hashlib.sha256(output.read_bytes()).hexdigest())
             with sqlite3.connect(output) as database:
                 self.assertEqual([(1,)], database.execute("SELECT value FROM aurora_schema").fetchall())
                 self.assertEqual(
-                    [(0, 1, 64), (1, 857, 2375604)],
+                    [(0, 1, 64), (1, 883, 2447676)],
                     database.execute(
                         "SELECT type, COUNT(*), SUM(length(config)) FROM pipeline_cache GROUP BY type"
                     ).fetchall(),
+                )
+
+    def test_reviewed_results_extension_contains_26_new_descriptors(self):
+        # The reviewed Results/Prize export is append-only over the existing
+        # seed: all 26 newly observed type-1 descriptors must survive the
+        # materializer merge with their authored config shape.
+        expected = {
+            18707426, 34965578, 216020688, 266549284, 364687610, 847889710,
+            1025950450, 1125497914, 1287895650, 1314946213, 1437166959,
+            2255057247, 2366666163, 2393306298, 2424502830, 2445154366,
+            2802578815, 2952396557, 2961392613, 3477970606, 3827607789,
+            3832220561, 3923658353, 3923838453, 4100332491, 4205866553,
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "initial_pipeline_cache.db"
+            materialize(SEED, output)
+            with sqlite3.connect(output) as database:
+                actual = {
+                    row[0]
+                    for row in database.execute(
+                        "SELECT hash FROM pipeline_cache WHERE type=1 AND hash IN ("
+                        + ",".join("?" for _ in expected)
+                        + ")", tuple(expected)
+                    )
+                }
+                self.assertEqual(expected, actual)
+                self.assertEqual(
+                    (65549, 2772),
+                    database.execute(
+                        "SELECT config_version, config_size FROM pipeline_cache "
+                        "WHERE type=1 AND hash=?", (min(expected),)
+                    ).fetchone(),
                 )
 
 
