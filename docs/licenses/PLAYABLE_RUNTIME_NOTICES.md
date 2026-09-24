@@ -13,11 +13,13 @@ The resampler and coefficient generator now have replacement implementations.
 See [the replacement record](../AUDIO_REPLACEMENT_EVIDENCE.md), including retained
 numerical-data provenance and the limits of compatibility testing. The GPL audio
 rows below are historical September 12 audit findings and still describe prior
-artifacts, not a new license determination for the current source. The public
-profile continues to exclude these modules and emit no PCM. The separate
-Dolphin reference observer retains its GPL notices and is not a player input.
+artifacts, not a new license determination for the current source. The silent
+profile continues to exclude these modules and emit no PCM; the separate
+[production audio profile](../AUDIO_PRODUCTION.md) has its own inventory and
+notices. The separate Dolphin reference observer retains its GPL notices and
+is not a player input.
 
-## Artifact boundary
+## Historical silent artifact boundary
 
 The Release `gameplay_public` target links the recovered Melee/HSD source tree,
 the original platform source under its `extern/dolphin` directory, project
@@ -33,9 +35,9 @@ claim is made. No retail disc image or extracted game archive is a release
 input.
 
 The target preloads `web/initial_pipeline_cache.db.gz.b64` as
-`/initial_pipeline_cache.db`. The current decoded seed is 2,113,536 bytes with
-SHA-256
-`cdf157ee0f1850884f07a71165fd2192177acb23c2c777313b719e70ea67546f` and has
+`/initial_pipeline_cache.db`. The historical seed at the commit below was
+2,113,536 bytes with SHA-256
+`cdf157ee0f1850884f07a71165fd2192177acb23c2c777313b719e70ea67546f` and had
 one Aurora schema row, one shader row and 507 pipeline rows. The source was
 captured from Aurora pipeline descriptors observed while rendering development
 game routes (the seed update is commit
@@ -43,7 +45,10 @@ game routes (the seed update is commit
 model, audio or disc bytes and no filename fields in the SQLite schema, but
 that observation does not settle whether generated descriptors are covered by
 any upstream or game-related rights. Treat the seed as a distributed,
-game-derived renderer artifact for the rights and notice review.
+game-derived renderer artifact for the rights and notice review. This historical
+identity does not describe the current checked-in seed; use
+[the materializer](../../scripts/materialize_pipeline_cache.py) and the exact
+release receipt linked from [STATUS.md](../../STATUS.md) for a new candidate.
 
 The public browser source does not load `runtime-cache.js`, mount IDBFS, or
 write the native `/melee-render-cache` path to browser persistence. Aurora's

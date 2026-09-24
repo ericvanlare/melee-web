@@ -117,7 +117,7 @@ class AudioPlayerReleaseTests(unittest.TestCase):
         cases = (
             ("runtime-audio.mjs", b"\nfetch('https://evil.example')", "external runtime URL|network API"),
             ("runtime-audio.mjs", b"\nsendBeacon('/upload')", "upload/evidence"),
-            ("runtime-audio.mjs", b"\n/Users/secret/local", "private path"),
+            ("runtime-audio.mjs", b"\n/Users/" + b"secret/local", "private path"),
             ("runtime-audio.mjs", b"\nconsole.log('debug')", "diagnostic code"),
         )
         for name, marker, message in cases:

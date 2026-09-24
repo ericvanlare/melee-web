@@ -1,0 +1,37 @@
+{
+  "schema": "melee-web-repository-content-policy-v1",
+  "file_exceptions": [
+    {
+      "path": "docs/images/player-toolbar-centered.png",
+      "rule": "binary_content",
+      "sha256": "f3f0e869ae1f50c41a04cf1b3e347515e403eccef9ff94ca57cf5f658e664bcb",
+      "reason": "Reviewed project UI screenshot of the toolbar and empty player surface; no game scene."
+    },
+    {
+      "path": "docs/images/public-shell-desktop.png",
+      "rule": "binary_content",
+      "sha256": "cf6a29cedcd1d7003ab97a9635d85de591fef24269241039b1167d7451cccd47",
+      "reason": "Reviewed project desktop shell screenshot with no game scene."
+    },
+    {
+      "path": "docs/images/public-shell-mobile.png",
+      "rule": "binary_content",
+      "sha256": "723a74f180c62d6bec0c854206b5c56c3340fb00f1aa581550e0cc2dcfd86624",
+      "reason": "Reviewed project mobile shell screenshot with no game scene."
+    },
+    {
+      "path": "web/initial_pipeline_cache.db.gz.b64",
+      "rule": "encoded_payload",
+      "sha256": "6487a68d0d39b97761bb8f4764e3de05797afcb9bafe64847a0cf4f9b13afeef",
+      "reason": "Reviewed PR55/Mewtwo renderer metadata: 858 records including 857 pipeline descriptors. See docs/evidence/compiler-review-pipeline-seed-v2.json for bounded decode, identity and content review. This exception is not licensing clearance; documented provenance uncertainty remains."
+    }
+  ],
+  "synthetic_secrets": [
+    {
+      "path": "tests/test_public_release.py",
+      "rule": "aws_access_key",
+      "sha256": "743554670c6065b3f7f13ac4f07e392f977b3556ceb7457411633c454bcbece8",
+      "reason": "Existing nonfunctional rejection fixture: the access-key prefix followed by the ascending sequence 1234567890ABCDEF. The digest covers only that exact synthetic token, not the rest of the file."
+    }
+  ]
+}
