@@ -1,11 +1,18 @@
 #include "gameplay_rumble.h"
 #include <melee/lb/types.h>
+#include <sysdolphin/baselib/controller.h>
 #include <sysdolphin/baselib/rumble.h>
 #include <stdio.h>
+#include <string.h>
+
+extern HSD_RumbleData HSD_Rumble_804C22E0[4];
 
 struct MeleeWebRumble {
     struct Fighter_804D653C_t* rows;
     struct Fighter_804D653C_t* previous;
+    RumbleInfo previous_info;
+    HSD_RumbleData previous_ports[4];
+    HSD_PadRumbleListData lists[12];
 };
 extern struct Fighter_804D653C_t* melee_web_rumble_exchange(struct Fighter_804D653C_t*);
 static MeleeWebRumble* active;
@@ -59,8 +66,6 @@ MeleeWebRumble* melee_web_rumble_decode(const MeleeWebNativeDat* r,
     return h;
 }
 
-static HSD_PadRumbleListData world_rumble_lists[12];
-
 int melee_web_rumble_begin(MeleeWebRumble* h, char* e, size_t n)
 {
     if (!h || active) {
@@ -72,7 +77,9 @@ int melee_web_rumble_begin(MeleeWebRumble* h, char* e, size_t n)
      * rumble_info points at uninitialized memory, and the first original
      * rumble request — the CSS confirm rumble — faults on it. The match
      * context installs its own equivalent pool and restores this one. */
-    HSD_PadRumbleInit(12, world_rumble_lists);
+    h->previous_info = HSD_PadLibData.rumble_info;
+    memcpy(h->previous_ports, HSD_Rumble_804C22E0, sizeof(h->previous_ports));
+    HSD_PadRumbleInit(12, h->lists);
     h->previous = melee_web_rumble_exchange(h->rows); active = h;
     return 1;
 }
@@ -83,6 +90,13 @@ int melee_web_rumble_end(MeleeWebRumble* h, char* e, size_t n)
         if (e && n) snprintf(e, n, "Rumble data publication lost ownership");
         return 0;
     }
+    /* Source programs borrow this owner's decoded arena. Release those
+     * pointers and stop the actuator before restoring the enclosing scope. */
+    HSD_PadRumbleRemoveAll();
+    for (unsigned i = 0; i < 4; ++i) HSD_PadRumbleOffN(i);
+    HSD_PadRumbleInterpret();
+    HSD_PadLibData.rumble_info = h->previous_info;
+    memcpy(HSD_Rumble_804C22E0, h->previous_ports, sizeof(h->previous_ports));
     melee_web_rumble_exchange(h->previous); active = NULL;
     return 1;
 }

@@ -12,6 +12,7 @@
 #include <sysdolphin/baselib/gobjplink.h>
 
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -28,41 +29,129 @@ struct MeleeWebMenuSession {
     int selection_rejected;
     int transition_failed;
     int transition_requested;
+    HSD_GObj** gobj_snapshot;
+    size_t gobj_snapshot_count;
+    HSD_GObjList* gobj_snapshot_entities;
+    u8 gobj_snapshot_p_link_max;
+    int gobj_snapshot_active;
 };
 
 static MeleeWebMenuSession* owner;
 
+static int fail(char* error, size_t error_size, const char* message);
+static int ok(char* error, size_t error_size);
+
 /* The original game-mode layer re-initializes the HSD gobj library at every
  * scene change (gm_801A4BD4), which destroys the previous scene's gobj entity
  * lists. The retained one-world port shares those lists with its own retained
- * owners, so instead the host snapshots each list's head when the scene's
- * original enter runs and destroys exactly the gobjs created since that
- * snapshot when the scene leaves, with the source's own per-gobj teardown
- * primitive (HSD_GObjPLink_80390228, as mn_8022F0F0 walks it for menu
- * back-outs). Without this, menu gobjs such as the CSS confirm-tag processor
- * fn_80262F44 keep running their processes inside later scenes; its confirm
- * rumble then faults against the next world's rumble state and stops the
- * player. */
-#define MELEE_WEB_MENU_TEARDOWN_LISTS 15
-static HSD_GObj* menu_gobj_heads[MELEE_WEB_MENU_TEARDOWN_LISTS];
-static void melee_web_menu_gobj_snapshot(void)
+ * owners, so instead the host snapshots every object present when the
+ * scene's original enter runs and destroys exactly the objects absent from
+ * that snapshot when the scene leaves. This uses the source's own per-gobj
+ * teardown primitive (HSD_GObjPLink_80390228, as mn_8022F0F0 walks it for
+ * menu back-outs). A list-head sentinel is not sufficient because the source
+ * inserts GObjs by priority and can place a new object behind a retained
+ * object. Without this ownership boundary, menu gobjs such as the CSS
+ * confirm-tag processor fn_80262F44 keep running their processes inside later
+ * scenes; its confirm rumble then faults against the next world's rumble
+ * state and stops the player. */
+static void melee_web_menu_gobj_snapshot_clear(MeleeWebMenuSession* session)
 {
-    if(!HSD_GObj_Entities)return;
-    for(unsigned i=1;i<MELEE_WEB_MENU_TEARDOWN_LISTS;++i)
-        menu_gobj_heads[i]=((HSD_GObj**)HSD_GObj_Entities)[i];
+    free(session->gobj_snapshot);
+    session->gobj_snapshot = NULL;
+    session->gobj_snapshot_count = 0;
+    session->gobj_snapshot_entities = NULL;
+    session->gobj_snapshot_p_link_max = 0;
+    session->gobj_snapshot_active = 0;
 }
-static void melee_web_menu_gobj_teardown(void)
+
+static int melee_web_menu_gobj_snapshot(MeleeWebMenuSession* session,
+                                        char* error, size_t error_size)
 {
-    if(!HSD_GObj_Entities)return;
-    for(unsigned i=1;i<MELEE_WEB_MENU_TEARDOWN_LISTS;++i){
-        HSD_GObj* stop=menu_gobj_heads[i];
-        HSD_GObj* curr=((HSD_GObj**)HSD_GObj_Entities)[i];
-        while(curr&&curr!=stop){
-            HSD_GObj* next=curr->next;
-            HSD_GObjPLink_80390228(curr);
-            curr=next;
+    HSD_GObj** links;
+    HSD_GObj* object;
+    size_t link_count;
+    size_t object_count = 0;
+    size_t index = 0;
+
+    if (session->gobj_snapshot_active) {
+        return fail(error, error_size,
+                    "Native menu GObj snapshot is already active");
+    }
+    if (HSD_GObj_Entities == NULL) {
+        return fail(error, error_size,
+                    "Native menu GObj entity lists are required");
+    }
+    link_count = (size_t) HSD_GObjLibInitData.p_link_max + 1;
+    links = (HSD_GObj**) HSD_GObj_Entities;
+    for (size_t link = 0; link < link_count; ++link) {
+        for (object = links[link]; object != NULL; object = object->next) {
+            ++object_count;
         }
     }
+    if (object_count != 0) {
+        if (object_count > SIZE_MAX / sizeof(*session->gobj_snapshot)) {
+            return fail(error, error_size,
+                        "Native menu GObj snapshot is too large");
+        }
+        session->gobj_snapshot = calloc(object_count,
+                                        sizeof(*session->gobj_snapshot));
+        if (session->gobj_snapshot == NULL) {
+            return fail(error, error_size,
+                        "Cannot allocate native menu GObj snapshot");
+        }
+    }
+    for (size_t link = 0; link < link_count; ++link) {
+        for (object = links[link]; object != NULL; object = object->next) {
+            session->gobj_snapshot[index++] = object;
+        }
+    }
+    session->gobj_snapshot_count = object_count;
+    session->gobj_snapshot_entities = HSD_GObj_Entities;
+    session->gobj_snapshot_p_link_max = HSD_GObjLibInitData.p_link_max;
+    session->gobj_snapshot_active = 1;
+    return ok(error, error_size);
+}
+
+static int melee_web_menu_gobj_was_present(
+    const MeleeWebMenuSession* session, const HSD_GObj* object)
+{
+    for (size_t i = 0; i < session->gobj_snapshot_count; ++i) {
+        if (session->gobj_snapshot[i] == object) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
+static int melee_web_menu_gobj_teardown(MeleeWebMenuSession* session,
+                                        char* error, size_t error_size)
+{
+    HSD_GObj** links;
+
+    if (!session->gobj_snapshot_active) {
+        return ok(error, error_size);
+    }
+    if (HSD_GObj_Entities == NULL ||
+        HSD_GObj_Entities != session->gobj_snapshot_entities ||
+        HSD_GObjLibInitData.p_link_max != session->gobj_snapshot_p_link_max) {
+        melee_web_menu_gobj_snapshot_clear(session);
+        return fail(error, error_size,
+                    "Native menu GObj entity lists changed during scene");
+    }
+    links = (HSD_GObj**) HSD_GObj_Entities;
+    for (size_t link = 0;
+         link <= (size_t) HSD_GObjLibInitData.p_link_max; ++link) {
+        HSD_GObj* object = links[link];
+        while (object != NULL) {
+            HSD_GObj* next = object->next;
+            if (!melee_web_menu_gobj_was_present(session, object)) {
+                HSD_GObjPLink_80390228(object);
+            }
+            object = next;
+        }
+    }
+    melee_web_menu_gobj_snapshot_clear(session);
+    return ok(error, error_size);
 }
 
 extern int melee_web_vs_prepare_start_source(StartMeleeData*,
@@ -402,7 +491,8 @@ int melee_web_menu_session_destroy(MeleeWebMenuSession* session, char* error,
     if (!session_live(session, error, error_size)) {
         return 0;
     }
-    if (session->css_open || session->sss_open) {
+    if (session->css_open || session->sss_open ||
+        session->gobj_snapshot_active) {
         return fail(error, error_size,
                     "Leave or abort the live native menu scene before destroy");
     }
@@ -442,7 +532,9 @@ static int enter_css(MeleeWebMenuSession* session, int after_match,
     session->selection_rejected = 0;
     session->transition_failed = 0;
     session->transition_requested = 0;
-    melee_web_menu_gobj_snapshot();
+    if (!melee_web_menu_gobj_snapshot(session, error, error_size)) {
+        return 0;
+    }
     mnCharSel_Scene_OnEnter(&session->css);
     session->css_open = 1;
     session->phase = MELEE_WEB_MENU_CSS;
@@ -499,7 +591,9 @@ int melee_web_menu_enter_sss(MeleeWebMenuSession* session, char* error,
     session->selection_rejected = 0;
     session->transition_failed = 0;
     session->transition_requested = 0;
-    melee_web_menu_gobj_snapshot();
+    if (!melee_web_menu_gobj_snapshot(session, error, error_size)) {
+        return 0;
+    }
     mnStageSel_Scene_OnEnter(&session->sss);
     session->sss_open = 1;
     session->phase = MELEE_WEB_MENU_SSS;
@@ -600,9 +694,12 @@ int melee_web_menu_leave_css(MeleeWebMenuSession* session, char* error,
                     "Cannot commit an unavailable character selection");
     }
     mnCharSel_Scene_OnExit(NULL);
-    melee_web_menu_gobj_teardown();
     session->css_open = 0;
     session->transition_requested = 0;
+    if (!melee_web_menu_gobj_teardown(session, error, error_size)) {
+        session->phase = MELEE_WEB_MENU_CLOSED;
+        return 0;
+    }
     pending = session->css.pending_scene_change;
     if (pending == CSSPendingSceneChange_2) {
         session->phase = MELEE_WEB_MENU_CLOSED;
@@ -645,9 +742,12 @@ int melee_web_menu_leave_sss(MeleeWebMenuSession* session, char* error,
                     "Cannot commit an unavailable stage selection");
     }
     mnStageSel_Scene_OnExit(NULL);
-    melee_web_menu_gobj_teardown();
     session->sss_open = 0;
     session->transition_requested = 0;
+    if (!melee_web_menu_gobj_teardown(session, error, error_size)) {
+        session->phase = MELEE_WEB_MENU_CLOSED;
+        return 0;
+    }
     if (!melee_web_menu_sss_selection_valid(&session->sss)) {
         session->phase = MELEE_WEB_MENU_CLOSED;
         return fail(error, error_size, "SSS published an unavailable selection");
@@ -685,7 +785,10 @@ int melee_web_menu_abort(MeleeWebMenuSession* session, char* error,
         mnStageSel_Scene_OnExit(NULL);
         session->sss_open = 0;
     }
-    melee_web_menu_gobj_teardown();
+    if (!melee_web_menu_gobj_teardown(session, error, error_size)) {
+        session->phase = MELEE_WEB_MENU_CLOSED;
+        return 0;
+    }
     session->phase = MELEE_WEB_MENU_CLOSED;
     return ok(error, error_size);
 }
