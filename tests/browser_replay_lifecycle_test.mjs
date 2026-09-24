@@ -191,7 +191,8 @@ function harness(unload=true,wholeSession=false){
  const scope={$,retailRun:null,replayLoading:false,ready:true,fatal:false,bundle:true,importing:false,
   replayEvidence:[],uiMessage:'',inputDirty:false,clearRenderCacheOnLoad:false,
   window:{},setTimeout:fn=>fn(),
-  TextEncoder,Uint8Array,URL,performance,replayHash:async()=> 'a'.repeat(64),
+  owner:{handle:{getState:()=>({state:'prepared'})}},
+  TextEncoder,Uint8Array,DataView,URL,performance,replayHash:async()=> 'a'.repeat(64),
   replayMemorySnapshot:()=>({wasm_heap_bytes:2048}),
   status:()=> 'teardown failed',unloadAndSave:async()=>{calls.unload++;return unload;},
   resetTiming:()=>{calls.timingResets++;},prepareAudio:async()=>{calls.audio++;},pauseAudioForPreparation:async()=>{},
@@ -241,9 +242,24 @@ function harness(unload=true,wholeSession=false){
  assert.equal(h.scope.replayLoading,false);assert.equal(h.$('disc').disabled,false);
 }
 {
- const h=harness(true,true);const playing=h.play();h.resolveBytes(new ArrayBuffer(1194));await playing;
+ const h=harness(true,true);const playing=h.play();
+ const bytes=new ArrayBuffer(1194),header=new DataView(bytes);
+ header.setUint32(0,0x4d575243,false);header.setUint32(4,8,false);
+ h.resolveBytes(bytes);await playing;
+ assert.equal(h.calls.unload,0,'Whole-session replay retains the canonical prepared CSS assets');
  assert.equal(h.calls.native,1);
  assert.equal(h.calls.launch,1,'A whole-session recipe enters CSS through the ordinary launch');
+}
+{
+ const h=harness(true,true);
+ h.scope.owner.handle.getState=()=>({state:'match'});
+ const playing=h.play(),bytes=new ArrayBuffer(1194),header=new DataView(bytes);
+ header.setUint32(0,0x4d575243,false);header.setUint32(4,8,false);
+ h.resolveBytes(bytes);await playing;
+ assert.equal(h.calls.unload,0,'A rejected late upload must preserve the active match');
+ assert.equal(h.calls.native,0);assert.equal(h.calls.launch,0);
+ assert.equal(h.calls.failed.length,0,'No replay owner exists to tear down');
+ assert.match(h.$('retail-replay-report').textContent,/freshly imported disc/);
 }
 {
  const h=harness();const playing=h.play();h.resolveBytes(new ArrayBuffer(1194));await playing;

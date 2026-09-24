@@ -1370,12 +1370,16 @@ int melee_web_native_menu_replay(const uint8_t* data,unsigned size,int observe){
  auto candidate=std::make_unique<melee_web::RetailReplayRecipe>(melee_web::read_retail_replay({data,size}));
  check(candidate->version!=6||observe==1,"Recorded input-queue replay requires state-capture mode; live timing is not admitted");
  check(candidate->version>=2&&candidate->initial_input,"Browser reference playback requires a PAD history recipe (v2 or v3)");
- // A whole-session recipe is the opt-in form that keeps one source arena and
- // cursors through the menu chain; every other version still requires a fresh
- // application so a single-match replay cannot be resumed mid-heap.
- check(candidate->whole_session()||!reference_heap_used,"Reference replay requires a fresh application. Use Reload application state, import the disc, then play the recipe before entering menus.");
+ // Both replay forms start in a fresh application. A whole-session recipe
+ // retains the canonical unentered CSS preparation and its scoped assets;
+ // close() would release them before launch can enter the original scene.
+ check(!reference_heap_used,"Reference replay requires a fresh application. Use Reload application state, import the disc, then play the recipe before entering menus.");
+ if(candidate->whole_session())
+  check(world&&host&&!host_entered&&!world_exposed&&!match&&!results&&!prize&&
+        melee_web_menu_host_phase(host)==MELEE_WEB_MENU_CREATED,
+        "Whole-session replay requires the fresh prepared character-select owner");
  reference_heap_used=true;
- close();
+ if(!candidate->whole_session())close();
  if(!archive_cache)archive_cache=std::make_unique<melee_web::RuntimeArchiveCache>(files);
  replay=std::move(candidate);replay_trace=observe;replay_pending=!replay->whole_session();
  match_message="Reference replay: "+selected_match_message(replay->selection);

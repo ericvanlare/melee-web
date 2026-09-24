@@ -213,7 +213,14 @@ $('retail-replay-start').onclick=async()=>{
   // formats or allowing an unbounded allocation.
   const file=$('retail-replay-file').files[0];if(!file||file.size<328||file.size>RETAIL_REPLAY_MAX_BYTES)throw Error('Invalid bounded MWRC input recipe');
   const bytes=new Uint8Array(await file.arrayBuffer()),hash=await replayHash(bytes),observe=$('retail-replay-mode').value==='state';
-  if(!await unloadAndSave())throw Error(status());resetTiming(false);await prepareAudio();await pauseAudioForPreparation();
+  // The v8 route enters the canonical, freshly prepared CSS owner. Unloading
+  // here would discard its scoped assets before native launch. This header
+  // probe selects ownership only; the native decoder validates the recipe and
+  // rejects an already used source heap before accepting it.
+  const header=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+  const wholeSession=bytes.length>=8&&header.getUint32(0,false)===0x4d575243&&header.getUint32(4,false)===8;
+  if(wholeSession&&owner.handle.getState().state!=='prepared')throw Error('Whole-session replay requires a freshly imported disc before opening character select.');
+  if(!wholeSession&&!await unloadAndSave())throw Error(status());resetTiming(false);await prepareAudio();await pauseAudioForPreparation();
   for(const old of $('retail-replay-downloads').querySelectorAll('a'))URL.revokeObjectURL(old.href);$('retail-replay-downloads').replaceChildren();replayEvidence=[];$('save-replay-evidence').disabled=true;
   retailRun={hash,observe,rows:[],timerRows:[],memory:{before_preparation:replayMemorySnapshot()},frames:0,started:performance.now(),lastProgress:performance.now(),lastCursor:0,focusLost:false,cache:{state:Module.runtimeCacheState?.state||'unknown',bytes:Number(Module.runtimeCacheState?.fileBytes||0),cleared_on_startup:clearRenderCacheOnLoad,driver_cache:'uncontrolled'}};
   uiMessage='';$('retail-replay-report').textContent='Preparing reference replay…';$('launch').disabled=true;$('pause').disabled=$('unload').disabled=false;
