@@ -180,6 +180,8 @@ enum class SliceTag : u16
   StageSelectKind = 42,
   MenuCssCursor = 43,
   MenuCssDoors = 44,
+  MenuMainFlow = 45,
+  MenuMainInput = 46,
 };
 
 struct SliceRef
@@ -516,6 +518,20 @@ struct Observer::Impl
 
   bool AddMenuSteeringSlices(Core::System* system)
   {
+    // mnmain.h: MenuFlow (0x18) and MenuInputState (8), at the
+    // GALE01r2 symbols mn_804A04F0 and mn_804D6BC8. The original main
+    // menu rejects input during its source cooldown; observing that boundary
+    // avoids treating a wall-clock delay as proof that an input was accepted.
+    u32 scene_pointer = 0;
+    u8 scene_kind = 0;
+    if (!ReadU32(system, 0x804d6720, &scene_pointer) || !scene_pointer)
+      return true;
+    if (!ReadBytes(system, scene_pointer, 1, &scene_kind))
+      return false;
+    if (scene_kind == 1 &&
+        (!AddSlice(system, SliceTag::MenuMainFlow, 0x804a04f0, 0x18) ||
+         !AddSlice(system, SliceTag::MenuMainInput, 0x804d6bc8, 8)))
+      return false;
     // Steering evidence for the ordinary menu route: the highlighted stage
     // index, the authored stage kind it points at, and each CSS cursor. Every
     // part is optional so a boundary outside those menus stays valid.
