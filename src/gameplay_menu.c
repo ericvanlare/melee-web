@@ -611,7 +611,13 @@ static int css_progress_valid(const CSSData* css)
         /* A newly joined door has a live slot before the original CSS has
          * assigned its character icon.  Keep the transient source state
          * valid for progress checks without waking dormant doors. */
-        if (p->slot_type != Gm_PKind_NA && p->ckind == CHKIND_NONE) {
+        if (p->slot_type != Gm_PKind_NA &&
+            (p->ckind == CHKIND_NONE ||
+             (p->slot_type == Gm_PKind_Human &&
+              p->ckind == CKIND_PLAYABLE_COUNT))) {
+            /* CursorThink joins an inactive human door before assigning
+             * the held token's icon. Its 26 sentinel remains uncommitted;
+             * the strict CSS exit/match validators still reject it. */
             p->ckind = CKIND_MARIO;
         }
     }

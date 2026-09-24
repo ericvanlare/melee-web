@@ -499,6 +499,16 @@ int main(void)
         css = *(CSSData*) melee_web_menu_css(session);
         css.vs.start.players[0].ckind = CKIND_PLAYABLE_COUNT;
         *(CSSData*) melee_web_menu_css(session) = css;
+        transition_request = 0;
+        if (melee_web_menu_tick(session, error, sizeof(error)) !=
+                MELEE_WEB_MENU_RESULT_TICKED ||
+            melee_web_menu_css_selection_valid(melee_web_menu_css(session)) ||
+            melee_web_menu_css(session)->vs.start.players[0].ckind !=
+                CKIND_PLAYABLE_COUNT) return 113;
+        /* The same value is not an admitted CPU fighter. */
+        active_css->vs.start.players[0].slot_type = Gm_PKind_Cpu;
+        active_css->vs.start.players[0].cpu_kind = CpuKind_4;
+        active_css->vs.start.players[0].cpu_level = 9;
         if (melee_web_menu_tick(session, error, sizeof(error)) !=
             MELEE_WEB_MENU_RESULT_SELECTION_REJECTED)
             return 6;
