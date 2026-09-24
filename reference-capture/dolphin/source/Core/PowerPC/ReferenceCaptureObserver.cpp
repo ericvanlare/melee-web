@@ -11,7 +11,10 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <limits>
+#include <memory>
 #include <mutex>
+#include <new>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -80,6 +83,14 @@ constexpr u32 PROFILE_LAST_BYTE_OFFSET =
 constexpr u16 WHOLE_SESSION_FLAG = 1;
 constexpr u32 WHOLE_SESSION_MIN_MATCHES = 3;
 constexpr u32 WHOLE_SESSION_MAX_MATCHES = 64;
+constexpr size_t CPU_PROBE_TICK_WINDOW_MAX = 64;
+constexpr size_t CPU_PROBE_MAX_RECORDS = 4096;
+constexpr size_t CPU_PROBE_MAX_JSON_BYTES = 64 * 1024 * 1024;
+constexpr u32 CPU_PROBE_STACK_SIZE = 0x100;
+constexpr u32 CPU_PROBE_FIGHTER_HEAD_SIZE = 0x100;
+constexpr u32 CPU_PROBE_FIGHTER_CPU_SIZE = 0x57c;
+constexpr u32 CPU_PROBE_FIGHTER_FLAGS_OFFSET = 0x2218;
+constexpr u32 CPU_PROBE_RANDOM_ADDRESS = 0x804d5f90;
 
 constexpr std::array<u8, 32> EXPECTED_DOL_SHA256_BYTES = {
     0xdc, 0x21, 0x50, 0x45, 0x13, 0x42, 0x43, 0x50, 0xbd, 0xa1, 0x7a,
@@ -213,6 +224,29 @@ struct Slot
   std::array<u8, RING_PAYLOAD> payload{};
 };
 
+struct CpuProbeFighterRecord
+{
+  u32 pointer = 0;
+  std::array<u8, CPU_PROBE_FIGHTER_HEAD_SIZE> head{};
+  std::array<u8, CPU_PROBE_FIGHTER_CPU_SIZE> cpu{};
+  std::array<u8, 8> flags{};
+};
+
+struct CpuProbeRecord
+{
+  u32 pc = 0;
+  u32 expected_word = 0;
+  u32 source_tick = 0;
+  u32 match = 0;
+  u32 lr = 0;
+  std::array<u32, 32> gpr{};
+  std::array<u64, 7> fpr{};
+  std::array<u8, CPU_PROBE_STACK_SIZE> stack{};
+  std::array<u8, 8> random_seed_and_pointer{};
+  std::array<bool, 4> fighter_present{};
+  std::array<CpuProbeFighterRecord, 4> fighters{};
+};
+
 constexpr bool IsGuestRange(u32 address, size_t size)
 {
   if (size == 0 || size > 0x100000)
@@ -220,6 +254,14 @@ constexpr bool IsGuestRange(u32 address, size_t size)
   const u64 end = static_cast<u64>(address) + size;
   return (address >= 0x80000000U && end <= 0x81800000U) ||
          (address >= 0x90000000U && end <= 0x94000000U);
+}
+
+constexpr bool IsMem1Range(u32 address, size_t size)
+{
+  if (size == 0 || size > 0x100000)
+    return false;
+  const u64 end = static_cast<u64>(address) + size;
+  return address >= 0x80000000U && end <= 0x81800000U;
 }
 
 constexpr u32 ReadBE32(const u8* bytes)
@@ -317,6 +359,170 @@ bool ValidIdentity(std::string_view value)
   return true;
 }
 
+struct CpuProbePoint
+{
+  const char* label;
+  u32 address;
+  u32 expected_word;
+};
+
+// These are the fixed addresses and instruction words from
+// tools/cpu-register-gale01r2.json.  They intentionally remain compiled
+// constants: a probe cannot turn an unverified guest PC into an observer
+// boundary by supplying a different file at runtime.
+constexpr std::array<CpuProbePoint, 32> CPU_PROBE_POINTS = {{
+    {"after_kind_dispatch", 0x800b3924, 0x7fe3fb78},
+    {"state_dispatch_entry", 0x800b2790, 0x7c0802a6},
+    {"before_hitlag_sticks", 0x800b2aa8, 0x4bff9af9},
+    {"after_hitlag_sticks", 0x800b2aac, 0x48000028},
+    {"hitlag_sticks_entry", 0x800ac5a0, 0x7c0802a6},
+    {"near_zero_predicate", 0x800ac6cc, 0x2c000000},
+    {"near_zero_branch", 0x800ac6d0, 0x40820074},
+    {"stick_setup", 0x800ac744, 0x387d0000},
+    {"write_stick_x", 0x800ac74c, 0x48007f6d},
+    {"after_stick_x", 0x800ac750, 0x387d0000},
+    {"write_stick_y", 0x800ac75c, 0x48007f5d},
+    {"after_stick_y", 0x800ac760, 0x48000024},
+    {"hitlag_sticks_exit", 0x800ac7b8, 0x80010034},
+    {"kind4_command_carry", 0x800b24e4, 0x7c651b79},
+    {"target_common_call", 0x800b25dc, 0x4bffb86d},
+    {"target_common_return", 0x800b25e0, 0x48000190},
+    {"no_target_common_call", 0x800b276c, 0x4bffb6dd},
+    {"no_target_common_return", 0x800b2770, 0x8001004c},
+    {"common_entry", 0x800ade48, 0x7c0802a6},
+    {"after_floor_output_setup", 0x800ade74, 0xdbc10080},
+    {"floor_call", 0x800adebc, 0x4bfa114d},
+    {"floor_return", 0x800adec0, 0x7c7c1b79},
+    {"floor_exit", 0x8004f3c4, 0x7f63db78},
+    {"state18_test", 0x800ae1b8, 0x801e0018},
+    {"state18_return", 0x800ae290, 0x38600001},
+    {"command_writer", 0x800b46b8, 0x7c0802a6},
+    {"reset_cpu_commands_entry", 0x800b4a78, 0x38831a88},
+    {"after_behavior_change", 0x800ae280, 0x38000012},
+    {"reset_cpu_commands_return", 0x800b4aac, 0x4e800020},
+    {"hitlag_random_call", 0x800ae21c, 0x482d230d},
+    {"hitlag_random_return", 0x800ae220, 0x807b0010},
+    {"randf_return", 0x8038057c, 0x4e800020},
+}};
+
+const CpuProbePoint* FindCpuProbePoint(u32 address)
+{
+  for (const CpuProbePoint& point : CPU_PROBE_POINTS)
+  {
+    if (point.address == address)
+      return &point;
+  }
+  return nullptr;
+}
+
+bool ParseBoundedDecimal(std::string_view value, u32 maximum, u32* result)
+{
+  if (value.empty())
+    return false;
+  u32 parsed = 0;
+  for (const char digit : value)
+  {
+    if (digit < '0' || digit > '9')
+      return false;
+    const u32 number = static_cast<u32>(digit - '0');
+    if (number > maximum || parsed > (maximum - number) / 10)
+      return false;
+    parsed = parsed * 10 + number;
+  }
+  *result = parsed;
+  return true;
+}
+
+struct CpuProbeSettings
+{
+  bool present = false;
+  bool valid = false;
+  std::string output_path;
+  std::string error;
+  u32 match = 0;
+  u32 first_tick = 0;
+  u32 last_tick = 0;
+};
+
+const CpuProbeSettings& CpuProbeEnvironment()
+{
+  static const CpuProbeSettings settings = [] {
+    CpuProbeSettings result;
+    const std::string output = Env("MWRC_CPU_PROBE_OUTPUT");
+    const std::string match = Env("MWRC_CPU_PROBE_MATCH");
+    const std::string first_tick = Env("MWRC_CPU_PROBE_FIRST_TICK");
+    const std::string last_tick = Env("MWRC_CPU_PROBE_LAST_TICK");
+    result.present = !output.empty() || !match.empty() || !first_tick.empty() ||
+                     !last_tick.empty();
+    if (!result.present)
+      return result;
+    if (output.empty() || output.size() > 4096)
+    {
+      result.error = "MWRC_CPU_PROBE_OUTPUT must be a non-empty path of at most 4096 bytes";
+      return result;
+    }
+    result.output_path = output;
+    if (!ParseBoundedDecimal(match, WHOLE_SESSION_MAX_MATCHES - 1, &result.match) ||
+        !ParseBoundedDecimal(first_tick, std::numeric_limits<u32>::max(),
+                             &result.first_tick) ||
+        !ParseBoundedDecimal(last_tick, std::numeric_limits<u32>::max(), &result.last_tick))
+    {
+      result.error =
+          "MWRC_CPU_PROBE_MATCH, FIRST_TICK, and LAST_TICK must be unsigned decimal values";
+      return result;
+    }
+    if (result.first_tick > result.last_tick ||
+        static_cast<u64>(result.last_tick) - result.first_tick >= CPU_PROBE_TICK_WINDOW_MAX)
+    {
+      result.error = "CPU probe tick window must contain at most 64 source ticks";
+      return result;
+    }
+    result.valid = true;
+    return result;
+  }();
+  return settings;
+}
+
+bool CpuProbeEnabled()
+{
+  const CpuProbeSettings& settings = CpuProbeEnvironment();
+  return ActivationRequested() && settings.present && settings.valid;
+}
+
+bool AppendBounded(std::string* output, std::string_view value)
+{
+  if (output->size() > CPU_PROBE_MAX_JSON_BYTES ||
+      value.size() > CPU_PROBE_MAX_JSON_BYTES - output->size())
+    return false;
+  output->append(value);
+  return true;
+}
+
+bool AppendHex(std::string* output, u64 value, size_t digits)
+{
+  constexpr char hex[] = "0123456789abcdef";
+  std::array<char, 16> buffer{};
+  if (digits > buffer.size())
+    return false;
+  for (size_t index = 0; index < digits; ++index)
+    buffer[digits - index - 1] = hex[(value >> (index * 4)) & 0xf];
+  return AppendBounded(output, std::string_view(buffer.data(), digits));
+}
+
+bool AppendHexBytes(std::string* output, const u8* bytes, size_t size)
+{
+  constexpr char hex[] = "0123456789abcdef";
+  if (output->size() > CPU_PROBE_MAX_JSON_BYTES ||
+      size > (CPU_PROBE_MAX_JSON_BYTES - output->size()) / 2)
+    return false;
+  for (size_t index = 0; index < size; ++index)
+  {
+    output->push_back(hex[bytes[index] >> 4]);
+    output->push_back(hex[bytes[index] & 0xf]);
+  }
+  return true;
+}
+
 }  // namespace
 
 struct Observer::Impl
@@ -344,6 +550,22 @@ struct Observer::Impl
     whole_session_matches = WholeSessionMatchCount();
     capture_id = Env("MWRC_CAPTURE_ID");
     sequence_id = Env("MWRC_SEQUENCE_ID");
+    const CpuProbeSettings& cpu_probe = CpuProbeEnvironment();
+    cpu_probe_configured = cpu_probe.present;
+    cpu_probe_valid = cpu_probe.valid;
+    if (cpu_probe.valid)
+    {
+      cpu_probe_output_path = cpu_probe.output_path;
+      cpu_probe_match = cpu_probe.match;
+      cpu_probe_first_tick = cpu_probe.first_tick;
+      cpu_probe_last_tick = cpu_probe.last_tick;
+      cpu_probe_records.reset(new (std::nothrow) CpuProbeRecord[CPU_PROBE_MAX_RECORDS]);
+      if (!cpu_probe_records)
+      {
+        cpu_probe_valid = false;
+        cpu_probe_error = "CPU probe record buffer allocation failed";
+      }
+    }
     // Dolphin builds with exceptions disabled.  std::thread reports an
     // unavailable worker by terminating; there is no catchable error path.
     writer = std::thread([this] { WriterMain(); });
@@ -356,6 +578,26 @@ struct Observer::Impl
     {
       SetInvalid("whole-session capture and sequence IDs must be safe non-empty strings");
       return false;
+    }
+    if (cpu_probe_configured)
+    {
+      if (!cpu_probe_valid)
+      {
+        SetInvalid("invalid CPU probe configuration: " +
+                   (cpu_probe_error.empty() ? cpu_probe.error : cpu_probe_error));
+        return false;
+      }
+      if (cpu_probe_output_path == output_path)
+      {
+        SetInvalid("CPU probe output must be separate from MWRC_OUTPUT");
+        return false;
+      }
+      if ((whole_session_enabled() && cpu_probe_match >= whole_session_matches) ||
+          (!whole_session_enabled() && cpu_probe_match != 0))
+      {
+        SetInvalid("CPU probe match is outside the configured whole-session matches");
+        return false;
+      }
     }
     std::string handshake =
         std::string("{\"schema\":\"melee-web-passive-dolphin-observer\",\"version\":1,") +
@@ -420,6 +662,95 @@ struct Observer::Impl
       return false;
     *value = ReadBE32(bytes.data());
     return true;
+  }
+
+  bool ReadMem1(Core::System* system, u32 address, size_t size, u8* destination) const
+  {
+    if (!IsMem1Range(address, size))
+      return false;
+    const auto* pointer = system->GetMemory().GetPointerForRange(address, size);
+    if (!pointer)
+      return false;
+    std::memcpy(destination, pointer, size);
+    return true;
+  }
+
+  void CloseCpuProbe()
+  {
+    if (!cpu_probe_configured || cpu_probe_closed)
+      return;
+    cpu_probe_closed = true;
+    // The callback is the sole writer.  Once this release is visible, the
+    // writer owns an immutable snapshot and can serialize it without taking a
+    // lock or touching guest memory from its thread.
+    cpu_probe_published.store(true, std::memory_order_release);
+  }
+
+  void RecordCpuProbe(Core::System* system, u32 pc, const CpuProbePoint& point,
+                      PowerPC::PowerPCState* state, u32 source_tick)
+  {
+    if (!cpu_probe_configured || !cpu_probe_valid || cpu_probe_closed || !match_active ||
+        !setup_ready || match_index != cpu_probe_match)
+      return;
+    u32 instruction = 0;
+    if (!ReadU32(system, pc, &instruction) || instruction != point.expected_word)
+    {
+      SetInvalid("CPU probe instruction differs from the verified GALE01r2 word");
+      return;
+    }
+    if (source_tick > cpu_probe_last_tick)
+    {
+      CloseCpuProbe();
+      return;
+    }
+    if (source_tick < cpu_probe_first_tick || match_index != cpu_probe_match)
+      return;
+    if (cpu_probe_record_count >= CPU_PROBE_MAX_RECORDS)
+    {
+      SetInvalid("CPU probe record bound exceeded");
+      return;
+    }
+
+    CpuProbeRecord& record = cpu_probe_records[cpu_probe_record_count];
+    record.pc = pc;
+    record.expected_word = point.expected_word;
+    record.source_tick = source_tick;
+    record.match = match_index;
+    record.lr = state->spr[8];
+    for (size_t index = 0; index < record.gpr.size(); ++index)
+      record.gpr[index] = state->gpr[index];
+    for (size_t index = 0; index < record.fpr.size(); ++index)
+      record.fpr[index] = state->ps[index].PS0AsU64();
+    if (!ReadMem1(system, state->gpr[1], record.stack.size(), record.stack.data()) ||
+        !ReadMem1(system, CPU_PROBE_RANDOM_ADDRESS, record.random_seed_and_pointer.size(),
+                  record.random_seed_and_pointer.data()))
+    {
+      SetInvalid("CPU probe stack or random-seed range is outside MEM1");
+      return;
+    }
+    for (u32 slot = 0; slot < record.fighters.size(); ++slot)
+    {
+      if (!fighter_present[slot])
+        continue;
+      const u32 pointer = fighter_pointers[slot];
+      if (!IsMem1Range(pointer, CPU_PROBE_FIGHTER_FLAGS_OFFSET + 8))
+      {
+        SetInvalid("CPU probe fighter pointer is outside MEM1");
+        return;
+      }
+      CpuProbeFighterRecord& fighter = record.fighters[slot];
+      record.fighter_present[slot] = true;
+      fighter.pointer = pointer;
+      if (!ReadMem1(system, pointer, fighter.head.size(), fighter.head.data()) ||
+          !ReadMem1(system, pointer + 0x1a88, fighter.cpu.size(), fighter.cpu.data()) ||
+          !ReadMem1(system, pointer + CPU_PROBE_FIGHTER_FLAGS_OFFSET, fighter.flags.size(),
+                    fighter.flags.data()))
+      {
+        SetInvalid("CPU probe fighter snapshot could not be read from MEM1");
+        return;
+      }
+    }
+    ++cpu_probe_record_count;
   }
 
   bool AddSlice(Core::System* system, SliceTag tag, u32 address, size_t size, u16 flags = 0)
@@ -928,6 +1259,17 @@ struct Observer::Impl
     if (whole_session_enabled() && pc == MENU_AUDIO_STREAM_START)
     {
       ++audio_owner_epoch;
+      return;
+    }
+    if (const CpuProbePoint* probe = FindCpuProbePoint(pc))
+    {
+      u32 source_tick = 0;
+      if (!ReadU32(system, 0x80479d58, &source_tick))
+      {
+        SetInvalid("CPU probe source counter is outside the pinned RAM range");
+        return;
+      }
+      RecordCpuProbe(system, pc, *probe, state, source_tick);
       return;
     }
     Boundary boundary;
@@ -1505,6 +1847,122 @@ struct Observer::Impl
     return crc ^ 0xffffffffU;
   }
 
+  bool BuildCpuProbeJson(std::string* json) const
+  {
+    if (!cpu_probe_records || !cpu_probe_published.load(std::memory_order_acquire) ||
+        cpu_probe_record_count > CPU_PROBE_MAX_RECORDS)
+      return false;
+    json->clear();
+    json->reserve(std::min(CPU_PROBE_MAX_JSON_BYTES, size_t(1024)));
+    const auto append = [&](std::string_view value) { return AppendBounded(json, value); };
+    const auto append_number = [&](u64 value) { return append(std::to_string(value)); };
+    const auto append_hex32 = [&](u32 value) { return AppendHex(json, value, 8); };
+    const auto append_hex64 = [&](u64 value) { return AppendHex(json, value, 16); };
+    if (!append("{\"schema\":\"melee-web-cpu-register-probe\",\"version\":1,"
+                "\"diagnostic_only\":true,\"window_complete\":true,"
+                "\"source_revision\":\"GALE01r2\",\"dol_sha256\":\""))
+      return false;
+    if (!append(EXPECTED_DOL_SHA256) || !append("\",\"capture_id\":\"") ||
+        !append(JsonEscape(capture_id)) || !append("\",\"sequence_id\":\"") ||
+        !append(JsonEscape(sequence_id)) || !append("\",\"match\":"))
+      return false;
+    if (!append_number(cpu_probe_match) || !append(",\"first_tick\":") ||
+        !append_number(cpu_probe_first_tick) || !append(",\"last_tick\":") ||
+        !append_number(cpu_probe_last_tick) || !append(",\"record_count\":") ||
+        !append_number(cpu_probe_record_count) || !append(",\"records\":["))
+      return false;
+    for (size_t record_index = 0; record_index < cpu_probe_record_count; ++record_index)
+    {
+      const CpuProbeRecord& record = cpu_probe_records[record_index];
+      const CpuProbePoint* point = FindCpuProbePoint(record.pc);
+      if (!point)
+        return false;
+      if (record_index != 0 && !append(","))
+        return false;
+      if (!append("{\"pc\":\"0x") || !append_hex32(record.pc) ||
+          !append("\",\"label\":\"") || !append(JsonEscape(point->label)) ||
+          !append("\",\"expected_word\":\"0x") || !append_hex32(record.expected_word) ||
+          !append("\",\"source_tick\":") || !append_number(record.source_tick) ||
+          !append(",\"match\":") || !append_number(record.match) ||
+          !append(",\"lr\":\"0x") || !append_hex32(record.lr) || !append("\",\"gpr\":["))
+        return false;
+      for (size_t index = 0; index < record.gpr.size(); ++index)
+      {
+        if (index != 0 && !append(","))
+          return false;
+        if (!append("\"0x") || !append_hex32(record.gpr[index]) || !append("\""))
+          return false;
+      }
+      if (!append("],\"fpr\":["))
+        return false;
+      for (size_t index = 0; index < record.fpr.size(); ++index)
+      {
+        if (index != 0 && !append(","))
+          return false;
+        if (!append("\"0x") || !append_hex64(record.fpr[index]) || !append("\""))
+          return false;
+      }
+      if (!append("],\"stack_0x100\":\"0x") ||
+          !AppendHexBytes(json, record.stack.data(), record.stack.size()) ||
+          !append("\",\"random_seed_and_pointer\":\"0x") ||
+          !AppendHexBytes(json, record.random_seed_and_pointer.data(),
+                          record.random_seed_and_pointer.size()) ||
+          !append("\",\"fighters\":["))
+        return false;
+      bool first_fighter = true;
+      for (size_t slot = 0; slot < record.fighter_present.size(); ++slot)
+      {
+        if (!record.fighter_present[slot])
+          continue;
+        if (!first_fighter && !append(","))
+          return false;
+        first_fighter = false;
+        const CpuProbeFighterRecord& fighter = record.fighters[slot];
+        if (!append("{\"slot\":") || !append_number(slot) ||
+            !append(",\"pointer\":\"0x") || !append_hex32(fighter.pointer) ||
+            !append("\",\"head_0x100\":\"0x") ||
+            !AppendHexBytes(json, fighter.head.data(), fighter.head.size()) ||
+            !append("\",\"cpu_0x57c\":\"0x") ||
+            !AppendHexBytes(json, fighter.cpu.data(), fighter.cpu.size()) ||
+            !append("\",\"flags_0x2218\":\"0x") ||
+            !AppendHexBytes(json, fighter.flags.data(), fighter.flags.size()) || !append("\"}"))
+          return false;
+      }
+      if (!append("]}"))
+        return false;
+    }
+    return append("]}\n");
+  }
+
+  bool WriteCpuProbe()
+  {
+    if (!cpu_probe_published.load(std::memory_order_acquire))
+    {
+      SetInvalid("CPU probe window did not close before capture completion");
+      return false;
+    }
+    if (cpu_probe_record_count == 0)
+    {
+      SetInvalid("CPU probe window closed without any matching records");
+      return false;
+    }
+    std::string json;
+    if (!BuildCpuProbeJson(&json))
+    {
+      SetInvalid("CPU probe JSON exceeded its bounded output or contained an unknown PC");
+      return false;
+    }
+    File::DirectIOFile output(cpu_probe_output_path, File::AccessMode::Write,
+                              File::OpenMode::Create);
+    if (!output.IsOpen() || !output.Write(reinterpret_cast<const u8*>(json.data()), json.size()) ||
+        !output.Flush() || !output.Close())
+    {
+      SetInvalid("CPU probe companion file could not be written");
+      return false;
+    }
+    return true;
+  }
+
   void WriterMain()
   {
     File::DirectIOFile output(output_path, File::AccessMode::Write, File::OpenMode::Create);
@@ -1568,11 +2026,22 @@ struct Observer::Impl
           error_written = true;
         }
       }
+      if (cpu_probe_configured && cpu_probe_valid && !cpu_probe_written &&
+          cpu_probe_published.load(std::memory_order_acquire))
+      {
+        WriteCpuProbe();
+        cpu_probe_written = true;
+      }
       const bool finished = finish_requested.load() && tail >= head_index.load();
       if (finished)
       {
         if (!InputStream::WaitComplete())
           SetInvalid("input stream did not complete successfully");
+        if (cpu_probe_configured && cpu_probe_valid && !cpu_probe_written)
+        {
+          WriteCpuProbe();
+          cpu_probe_written = true;
+        }
         if (output.IsOpen())
         {
           Slot end_slot;
@@ -1701,6 +2170,18 @@ struct Observer::Impl
   bool result_seen = false;
   u32 result_pointer = 0;
   u32 draw_ordinal = 0;
+  bool cpu_probe_configured = false;
+  bool cpu_probe_valid = false;
+  bool cpu_probe_closed = false;
+  bool cpu_probe_written = false;
+  std::atomic<bool> cpu_probe_published{false};
+  std::string cpu_probe_output_path;
+  u32 cpu_probe_match = 0;
+  u32 cpu_probe_first_tick = 0;
+  u32 cpu_probe_last_tick = 0;
+  size_t cpu_probe_record_count = 0;
+  std::unique_ptr<CpuProbeRecord[]> cpu_probe_records;
+  std::string cpu_probe_error;
   u32 whole_session_matches = 0;
   u32 audio_owner_epoch = 0;
   u32 match_index = 0;
@@ -1809,7 +2290,10 @@ bool Observer::IsBoundary(u32 guest_pc)
   case 0x8038E8EC:
     return true;
   default:
-    return false;
+    // Diagnostic CPU PCs are JIT boundaries only for the fully validated,
+    // opt-in companion configuration.  The normal observer boundary set and
+    // its disabled path remain unchanged.
+    return CpuProbeEnabled() && FindCpuProbePoint(guest_pc) != nullptr;
   }
 }
 
