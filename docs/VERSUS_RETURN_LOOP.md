@@ -621,6 +621,37 @@ post-OnEnter display state. The current observer's 0x28-byte result prefix does
 not cover player standings. Typed first-CSS import and whole-session replay
 infrastructure do not close that Results comparison gap. Two independent original
 captures per named sequence, browser comparisons, repeated rotation allocation
-bounds and a fresh frozen cold/warm matrix remain open. Run the required final
-full suite, affected public build and CI after these changes settle; focused
-checks do not replace integration verification.
+bounds and a fresh frozen cold/warm matrix remain open. The final suite and
+affected Release builds are recorded in the PR59 receipt below; focused checks
+do not replace integration verification.
+
+### PR59 whole-session producer and bounded replay evidence, 2026-09-24
+
+**Source identified / exporter pass.** The completed original v15 capture contains
+three natural four-player Mario CPU9, Final Destination, four-stock matches and
+returns through Results to CSS. `tools/whole_session_replay.py` exports one
+MWRC v8 candidate with context schema 2, 46,835 source-consumed PAD frames and
+12 contiguous spans. The candidate preserves the first-CSS GameRules,
+SaveData, CSSData and KO context. Its single-capture export and the native
+decode-only transport checks pass; this does not establish independent capture
+repeatability. See the [PR59 evidence receipt](evidence/whole-session-replay-pr59-v1.json).
+
+**Browser exercised / comparison rejected at a bounded prefix.** The v12
+headless run on the pre-`e45a108` consumer failed at the first Results boundary
+at source cursor 16,938. The corrected v13 production run and the final v16
+production run stop intentionally at a 2,700-frame diagnostic target. Their
+core state, RNG, PAD history, match frame and draw batches agree through source
+tick 1,131; the first declared difference is fighter input at source tick 1,132
+(port index 2,472). The final v16 report compares 1,134 source samples, unloads
+all source objects/processes, uses zero instrumented timing resumes and retains
+the incomplete-input failure. The v14 read-only CPU companion records the
+corresponding command 80/81 operand difference, `809081e0098e017f7f` in the
+source and `80008100098e017f7f` in the port. This remains the known source
+address/register-context limitation documented in the [CPU register
+compatibility investigation](CPU_REGISTER_COMPATIBILITY.md); it does not prove
+a new cause or authorize a compatibility rule.
+
+The route therefore remains infrastructure and transport evidence. Full
+original-versus-port whole-session equivalence, independent repeatability,
+typed Results standings, pixels, PCM, live scheduling, performance and
+tournament admission remain open.

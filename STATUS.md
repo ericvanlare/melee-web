@@ -14,6 +14,22 @@ The [typed first-CSS profile receipt](docs/evidence/typed-profile-pr58-v1.json)
 binds original GameRules/SaveData decoding to the same completed capture.
 Profile consumption and browser equivalence remain separate checks.
 
+## Whole-session replay producer and bounded consumer evidence
+
+PR59 now has a source-faithful MWRC v8 single-capture exporter and strict
+transport decoder. The retained v15 original workload contains three natural
+four-player Mario CPU9/Final Destination/four-stock matches, 46,835
+source-consumed PAD frames and 12 contiguous spans. The export and native
+decode-only checks pass, while independent repeatability remains unclaimed.
+The final headless production prefix compares exact core state, RNG, PAD
+history, match frame and draw batches through source tick 1,131, then records
+the first fighter-input difference at tick 1,132 / port index 2,472. The route
+is not accepted as whole-session equivalence; the known CPU
+address/register-context limitation remains open. The full 1,257-test suite
+passes with 80 skips and the affected Release builds pass. See the
+[PR59 evidence receipt](docs/evidence/whole-session-replay-pr59-v1.json) and
+[whole-session section](docs/VERSUS_RETURN_LOOP.md#pr59-whole-session-producer-and-bounded-replay-evidence-2026-09-24).
+
 ## Mewtwo capture and menu ownership repair
 
 The Mewtwo Confusion victim command rows and menu rumble/GObj lifetime repairs
