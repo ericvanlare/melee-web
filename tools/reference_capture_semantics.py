@@ -1224,8 +1224,8 @@ def validate_whole_session_observer_records(records, *, transition_trace=None):
         if has_prize:
             expected_suffix = [
                 "entry", "setup", "vs_exit", "vs_exit_return", "vs_mode_exit", "results_enter",
-                "results_gobj", "results_exit", "results_mode_exit", "scene_teardown",
-                "prize_mode_enter", "prize_scene_enter", "prize_scene_exit",
+                "results_gobj", "results_exit", "results_mode_exit", "prize_mode_enter",
+                "scene_teardown", "prize_scene_enter", "prize_scene_exit",
                 "prize_mode_exit", "return_css",
             ]
         if [name for name in suffix if name != "draw_return"] != expected_suffix:
