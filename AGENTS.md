@@ -50,6 +50,20 @@ the [performance and accuracy playbook](docs/PERFORMANCE_AND_ACCURACY.md),
 
 ## Change and validation rules
 
+Routine browser automation must use headless installed Chrome through
+`scripts/browser_tools.mjs`, including ad hoc Playwright scripts. A headless
+browser still renders; retain screenshots, GPU checks, diagnostics and the
+scenario's assertions. Do not open or focus a desktop browser, call
+`bringToFront()`, or fall back to headed mode after a failure during shared
+computer work. Existing functional harnesses default to headless; `--headed`
+is an explicit opt-in for an authorized foreground session.
+
+Foreground timing, OS focus/fullscreen, physical controllers and audible-output
+checks keep their own protocols. Arrange that session with the user (unless
+already authorized), or use a separate test machine; report the gate as unrun
+when neither is available. Do not claim headless functional results satisfy
+those gates. See [browser automation](docs/HEADLESS_BROWSER_VALIDATION.md).
+
 Make small coherent changes and inspect actual APIs and compiler output first.
 Keep upstream checkouts intact, pin dependencies in `dependencies.lock.json`,
 and put explained downstream changes under `patches/`. Keep disc images,

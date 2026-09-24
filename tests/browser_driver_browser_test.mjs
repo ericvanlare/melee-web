@@ -8,7 +8,7 @@ import {execFile} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {parseArgs, promisify} from 'node:util';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
-import {loadBrowserTools} from '../scripts/browser_tools.mjs';
+import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 const {values}=parseArgs({options:{playwright:{type:'string'}}});
 const {chromium,browser:launchOptions,playwrightPath}=await loadBrowserTools(values.playwright);
 const fixture=(surface,failUnload=false)=>`<!doctype html><html><body>
@@ -35,7 +35,7 @@ const server=http.createServer((req,res)=>{
 await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
 let browser;
 try {
-  browser=await chromium.launch({...launchOptions,headless:true});
+  browser=await chromium.launch(browserLaunchOptions(launchOptions));
   for(const surface of ['development','public']) {
     const page=await browser.newPage();
     const driver=createBrowserDriver(page,{surface,timeoutMs:3000});

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Headed, sequential replay driver. Only public page controls supply game input.
+/** Foreground-only, sequential replay driver. Pass --headed explicitly. Only public page controls supply game input.
  * A frozen Python ledger owns the repetition bound; this driver cannot retry slots.
  * Usage and evidence limitations: docs/HITCH_CAPTURE.md.
  */
@@ -429,9 +429,14 @@ async function run(options,pw) {
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
-  const {values,positionals}=parseArgs({allowPositionals:true,options:Object.fromEntries(
-    ['plan','disc','python','playwright','out','build','browser-profile','url','trace-detail'].map(k=>[k,{type:'string'}]))});
+  const {values,positionals}=parseArgs({allowPositionals:true,options:{
+    ...Object.fromEntries(['plan','disc','python','playwright','out','build','browser-profile','url','trace-detail']
+      .map(k=>[k,{type:'string'}])),
+    headed:{type:'boolean',default:false},
+  }});
   try {
+    if(!values.headed)
+      throw Error('Foreground browser access requires explicit --headed; no browser or capture artifacts were created.');
     const required=positionals[0]==='profile'?['out','build','browser-profile']:['plan','disc'];
     for(const key of required)if(!values[key])throw Error('Missing required --'+key+'; see docs/HITCH_CAPTURE.md');
     const pw=await playwright(values.playwright);
