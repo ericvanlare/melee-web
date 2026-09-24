@@ -408,11 +408,11 @@ void real_mewtwo(const char* path)
         (void) DatFighterRuntime(std::make_shared<const DatArchive>(malformed), identity);
     });
     malformed = read_real_archive(path);
-    put32(malformed, 0x20 + runtime->extension_offset() + 0x98, 0xfffffffeU);
+    put32(malformed, 0x20 + runtime->root_offset() + 4, runtime->root_offset());
     rejects([&] {
         (void) DatFighterRuntime(std::make_shared<const DatArchive>(malformed), identity);
     });
-    std::cout << "Ness 0xDC attributes, integer counters, absorb/reflection records, empty dynamics and null Wait: passed\n";
+    std::cout << "Mewtwo 0x88 attributes, signed counters, reflection record, authored dynamics and Disable/Shadow Ball Article boundary: passed\n";
 }
 void real_peach(const char* path)
 {
@@ -481,12 +481,12 @@ void real_peach(const char* path)
     rejects([&] {
         (void) DatFighterRuntime(std::make_shared<const DatArchive>(malformed), identity);
     });
-    std::cout << "Peach 0xC0 attributes, Toad counter pairs, absorb record, nine authored dynamics chains and null Squat Wait: passed\n";
+    malformed = read_real_archive(path);
     put32(malformed, 0x20 + runtime->root_offset() + 4, runtime->root_offset());
     rejects([&] {
         (void) DatFighterRuntime(std::make_shared<const DatArchive>(malformed), identity);
     });
-    std::cout << "Mewtwo 0x88 attributes, signed counters, reflection record, authored dynamics and Disable/Shadow Ball Article boundary: passed\n";
+    std::cout << "Peach 0xC0 attributes, Toad counter pairs, absorb record, nine authored dynamics chains and null Squat Wait: passed\n";
 }
 void real_luigi(const char* path, const char* effect_path)
 {
