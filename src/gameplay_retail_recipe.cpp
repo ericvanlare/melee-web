@@ -206,6 +206,11 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
             result.spans.push_back(span);
         }
         check(next_frame == count, "Whole-session spans must cover every input frame");
+        check(result.spans.front().scene == kRetailReplayCss,
+              "Whole-session timeline must start in CSS");
+        check(result.spans.back().scene == kRetailReplayResults ||
+              result.spans.back().scene == kRetailReplayPrize,
+              "Whole-session timeline must end in Results or Prize");
     }
     return result;
 }

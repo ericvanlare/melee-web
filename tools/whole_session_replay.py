@@ -654,6 +654,10 @@ def encode_v8(capture: Mapping[str, Any]) -> tuple[bytes, dict[str, Any]]:
         span_bytes += SPAN.pack(scene, 0, 0, first, last)
     if next_frame != len(frames):
         _fail("whole-session spans do not cover every frame at encoding")
+    if spans[0]["scene"] != SCENES["css"]:
+        _fail("whole-session timeline must start in CSS")
+    if spans[-1]["scene"] not in (SCENES["results"], SCENES["prize"]):
+        _fail("whole-session timeline must end in Results or Prize")
     payload = bytearray(HEADER.pack(MAGIC, MWRC_VERSION, seed, len(frames),
                                     characters, stages))
     payload += CONTEXT_HEADER.pack(CONTEXT_VERSION, 0, CONTEXT_BYTES)

@@ -46,7 +46,7 @@ def _whole_session_v8_fixture() -> bytes:
                bytes(0x55E8 - 4) + bytes(0x148) + bytes(6))
     frame_count = 32
     spans = struct.pack('>H', 32) + b''.join(
-        struct.pack('>BBHII', 1 + index % 5, 0, 0, index, index)
+        struct.pack('>BBHII', 1 + index % 4, 0, 0, index, index)
         for index in range(frame_count))
     return (struct.pack('>4sIIIHH', b'MWRC', 8, 0x12345678, frame_count,
                         characters, stages) + context + bytes(setup) +
@@ -54,6 +54,32 @@ def _whole_session_v8_fixture() -> bytes:
 
 
 class RetailRecipeRuntimeTests(unittest.TestCase):
+    def test_native_v8_rejects_unreachable_initial_and_final_owners(self):
+        target = _native_target()
+        if not target.is_file():
+            self.skipTest('Build gameplay_retail_trace to test the shared decoder')
+        valid = _whole_session_v8_fixture()
+        first_span = len(valid) - 32 * 12
+        cases = [(first_span, scene, 'must start in CSS')
+                 for scene in (2, 3, 4, 5)]
+        cases += [(len(valid) - 12, scene, 'must end in Results or Prize')
+                  for scene in (1, 2, 3)]
+        with tempfile.TemporaryDirectory(prefix='melee-recipe-endpoints-') as directory:
+            root = Path(directory)
+            path = root / 'invalid.mwrc'
+            for offset, scene, message in cases:
+                with self.subTest(offset=offset, scene=scene):
+                    data = bytearray(valid)
+                    data[offset] = scene
+                    path.write_bytes(data)
+                    result = subprocess.run([str(node_runtime()), str(target),
+                        str(root / 'absent-menu'), str(root / 'absent-game'),
+                        str(path), '--decode-only'], capture_output=True,
+                        text=True, timeout=30)
+                    self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                    self.assertIn(message, result.stderr)
+                    self.assertNotIn('directory_iterator', result.stderr)
+
     def test_native_decoder_rejects_before_asset_or_match_construction(self):
         target = _native_target()
         if not target.is_file():

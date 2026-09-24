@@ -269,10 +269,12 @@ class WholeSessionReplayTests(unittest.TestCase):
         count = replay.V8_MAX_FRAMES
         capture["frames"] = _RepeatedFrames(first, count)
         capture["spans"] = [{"scene": replay.SCENES["css"], "first_frame": 0,
-                              "last_frame": count - 1}]
+                              "last_frame": count - 2},
+                             {"scene": replay.SCENES["results"],
+                              "first_frame": count - 1, "last_frame": count - 1}]
         payload, transport = replay.encode_v8(capture)
         self.assertEqual(transport["frame_count"], count)
-        self.assertEqual(len(payload), 4775526)
+        self.assertEqual(len(payload), 4775538)
         self.assertEqual(replay.LEGACY_MAX_FRAMES, 36000)
 
     def test_v8_rejects_frames_above_its_bounded_cap(self):
@@ -281,6 +283,22 @@ class WholeSessionReplayTests(unittest.TestCase):
                                              replay.V8_MAX_FRAMES + 1)
         with self.assertRaisesRegex(replay.WholeSessionReplayError, "108000"):
             replay.encode_v8(capture)
+
+    def test_v8_rejects_unreachable_initial_and_final_owners(self):
+        for scene in ("sss", "match", "results", "prize"):
+            with self.subTest(initial=scene):
+                capture = replay.capture_from_records(_candidate())
+                capture["spans"][0]["scene"] = replay.SCENES[scene]
+                with self.assertRaisesRegex(replay.WholeSessionReplayError,
+                                            "must start in CSS"):
+                    replay.encode_v8(capture)
+        for scene in ("css", "sss", "match"):
+            with self.subTest(final=scene):
+                capture = replay.capture_from_records(_candidate())
+                capture["spans"][-1]["scene"] = replay.SCENES[scene]
+                with self.assertRaisesRegex(replay.WholeSessionReplayError,
+                                            "must end in Results or Prize"):
+                    replay.encode_v8(capture)
 
     def test_v8_rejects_span_index_outside_input_timeline(self):
         capture = replay.capture_from_records(_candidate())
