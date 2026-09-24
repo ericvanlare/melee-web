@@ -1,12 +1,23 @@
 # Current status
 
+## Original Synth startup joins shared audio ownership
+
+**Compiled / Source identified / Native traced / Retail compared** for the
+[bounded joined Synth fixture](docs/SOURCE_SYNTH_JOINED_STARTUP.md).
+Original Synth owns AX initialization and its first deferred DevCom request
+completes through the original AR/ARQ handlers. The
+[scoped receipt](docs/evidence/source-synth-joined-startup-v1.json) limits the
+original comparison to three AR reservation sizes, final stack and free count.
+Complete audio-driver startup, live fighter allocation binding and full-session
+equivalence remain open. This does not establish PCM, timing or browser behavior.
+
 ## Original AR and ARQ share checked DMA ownership
 
 **Compiled / Source identified / Native traced** for the [AR service fixture](docs/SOURCE_AUDIO_AR_SERVICES.md).
 Original size probing and deferred ARQ completion execute through checked cache,
 interrupt-mask and SDK context services. The [scoped receipt](docs/evidence/source-audio-ar-services-v1.json)
-records negative ownership controls. Shared AX/Synth integration and full-session
-equivalence remain open; this component does not establish PCM or timing.
+records negative ownership controls. The later Synth fixture above joins this
+owner; full-session equivalence remains open; this component does not establish PCM or timing.
 
 ## Original Synth parameters are derived independently
 
