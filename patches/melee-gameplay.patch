@@ -3988,14 +3988,14 @@ diff --git a/src/sysdolphin/baselib/synth.c b/src/sysdolphin/baselib/synth.c
                                             float mix_main, float mix_auxA,
                                             float mix_auxB);
  
-+#if defined(MELEE_WEB_GAMEPLAY)
++#if defined(MELEE_WEB_GAMEPLAY) && !defined(MELEE_WEB_ORIGINAL_STARTUP_FIXTURE)
 +extern void* melee_web_audio_heap_alloc(size_t size);
 +extern void melee_web_audio_heap_free(void* ptr);
 +#endif
 +
  void* HSD_AudioMalloc(size_t size)
  {
-+#if defined(MELEE_WEB_GAMEPLAY)
++#if defined(MELEE_WEB_GAMEPLAY) && !defined(MELEE_WEB_ORIGINAL_STARTUP_FIXTURE)
 +    return melee_web_audio_heap_alloc(size);
 +#else
      void* p = OSAllocFromHeap(HSD_Synth_804D6018, size);
@@ -4006,7 +4006,7 @@ diff --git a/src/sysdolphin/baselib/synth.c b/src/sysdolphin/baselib/synth.c
  
  void HSD_AudioFree(void* ptr)
  {
-+#if defined(MELEE_WEB_GAMEPLAY)
++#if defined(MELEE_WEB_GAMEPLAY) && !defined(MELEE_WEB_ORIGINAL_STARTUP_FIXTURE)
 +    melee_web_audio_heap_free(ptr);
 +#else
      OSFreeToHeap(HSD_Synth_804D6018, ptr);
