@@ -6,15 +6,18 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
 from tools.allocation_history_replay import (
     ModelDriver, ReplayProblem, load_trace, parse_u32, replay, validate_boot_observation,
 )
 
 
-ROOT = Path(__file__).resolve().parents[1]
 REPLAY = ROOT / "tools/allocation_history_replay.py"
 MODEL = ROOT / "tests/allocation_history_model.cpp"
 IMPL = ROOT / "src/source_address_context.cpp"
