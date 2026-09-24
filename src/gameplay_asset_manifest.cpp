@@ -296,7 +296,8 @@ results_asset_names(const MeleeWebMenuMatchSelection& selection)
     // Authored ckind victory themes in gm_1601; the winner is chosen by the
     // source Results callbacks after the scene runs.
     for (const auto* name : {"ff_mario.hps", "ff_fox.hps", "ff_emb.hps",
-                             "ff_link.hps"})
+                             "ff_link.hps", "ff_fzero.hps", "ff_dk.hps",
+                             "ff_poke.hps"})
         add_unique(result, name);
     return result;
 }
