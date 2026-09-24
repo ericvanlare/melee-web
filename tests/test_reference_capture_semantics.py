@@ -259,7 +259,7 @@ def _decoded_observer_rows(match_count=3, *, include_prize=False,
             (28, "prize_scene_exit"), (29, "prize_mode_exit"), (24, "return_css"),
         )
     pcs = {
-        13: 0x8026688C, 14: 0x80266D70, 15: 0x8025A998, 16: 0x8025BB5C,
+        13: 0x8026688C, 14: 0x80266D70, 15: 0x8025A998, 16: 0x8025BBD0,
         4: 0x8016E934, 5: 0x8016E9C4, 8: 0x80391040, 17: 0x8016E9C8,
         18: 0x8016EBBC, 19: 0x801A5AF0, 20: 0x80177368, 21: 0x80177704,
         22: 0x801A5F64, 23: 0x80179350, 11: 0x8039157C,

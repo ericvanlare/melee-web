@@ -810,7 +810,7 @@ WHOLE_OBSERVER_PCS = {
     "css_cancel_enter": 0x8026688C,
     "css_exit": 0x80266D70,
     "sss_enter": 0x8025A998,
-    "sss_exit": 0x8025BB5C,
+    "sss_exit": 0x8025BBD0,
     "entry": 0x8016E934,
     "setup": 0x8016E9C4,
     "draw_return": 0x80391040,

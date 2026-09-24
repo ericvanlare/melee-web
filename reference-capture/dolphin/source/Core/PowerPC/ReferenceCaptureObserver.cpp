@@ -791,7 +791,9 @@ struct Observer::Impl
     case 0x8025a998:
       *boundary = Boundary::SssEnter;
       return whole_session;
-    case 0x8025bb5c:
+    case 0x8025bbd0:
+      // The original OnExit writes start_game before returning. Its entry
+      // still holds the old route and would classify A-confirm as cancel.
       *boundary = Boundary::SssExit;
       return whole_session;
     case 0x801a5af0:
@@ -849,13 +851,13 @@ struct Observer::Impl
     case 0x8016ebbc:
     case 0x8039157c:
     case 0x801a4b70:
+    case 0x8025bbd0:
       return word == 0x4e800020;
     case 0x8016e9c8:
       return word == 0x7c0802a6;
     case 0x8026688c:
     case 0x80266d70:
     case 0x8025a998:
-    case 0x8025bb5c:
     case 0x801a5af0:
     case 0x80177368:
     case 0x80177704:
@@ -1219,7 +1221,11 @@ struct Observer::Impl
         if (whole_session_enabled() && !match_active && whole_phase == 0 &&
             ReadBytes(system, 0x80479d30, 1, &current_mode) && current_mode == 0x18)
           return;
-        if (!whole_session_enabled() || !match_active || !setup_ready)
+        // Only VS exit still owns playable fighter state. Its return retires
+        // those pointers; the ordered mode/Results hooks remain part of this
+        // match until Results teardown and must not require them to be live.
+        if (!whole_session_enabled() || !match_active ||
+            (boundary == Boundary::VsExit && !setup_ready))
           return SetInvalid("whole-session source hook occurred outside an active VS match"), void();
         if (boundary == Boundary::VsExit)
         {
@@ -1766,7 +1772,7 @@ bool Observer::IsBoundary(u32 guest_pc)
   case 0x8026688C:
   case 0x80266D70:
   case 0x8025A998:
-  case 0x8025BB5C:
+  case 0x8025BBD0:
   case 0x801A5AF0:
   case 0x80177368:
   case 0x80177704:

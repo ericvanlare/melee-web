@@ -1,0 +1,70 @@
+{
+  "schema": "melee-web-results-prize-validation",
+  "version": 1,
+  "source_base_commit": "d96a64feae917450a13ed49b8613f720077df7f1",
+  "scope": "PR56 Results and Prize lifecycle validation on the merged current-main tree. This receipt covers the Release build, authored Results and Prize archive bounds, eight source fighter Results construction and confirmation teardown, and the repository suite. It does not establish original-game equivalence, browser rendering, PCM, performance, or admission of fighters whose private authored archives were not present in the fixture set.",
+  "builds": [
+    {
+      "command": "python3 scripts/build.py --target gameplay --configuration Release --jobs 2",
+      "local_path": "work/testlogs/pr56-gameplay-release-build-20260923.log",
+      "sha256": "63b4bb0c5b2f180a6f740a0419c1d6415a74c93b7494f32e2bf415b2384220b7",
+      "result": "pass"
+    },
+    {
+      "command": ".venv/bin/cmake --build build/browser-release --target gameplay_results_assets_test gameplay_results_scene_trace gameplay_prize_assets_test native_menu_host_trace -j2",
+      "local_path": "work/testlogs/pr56-results-target-build-release-20260923.log",
+      "sha256": "c2ed93ffd93c840755c0e91392ae593b1b52de9b7aaf6c208123feaceb1dde2e",
+      "result": "pass"
+    }
+  ],
+  "focused_checks": [
+    {
+      "command": "node build/browser-release/gameplay_results_assets_test.js assets-local/results-fixtures",
+      "local_path": "work/testlogs/results-assets-20260923-rerun.log",
+      "sha256": "56eab424ad7ba70c249eb65fefa5288bde84cc01e59186eee1e82fa64f094537",
+      "result": "pass",
+      "scope": "73 authored clips across Mario, Dr. Mario, Fox, Falco, Marth, Roy, Link, and Young Link"
+    },
+    {
+      "command": "node build/browser-release/gameplay_prize_assets_test.js assets-local/results-fixtures",
+      "local_path": "work/testlogs/prize-assets-20260923-rerun.log",
+      "sha256": "040bd4aae900abb1a8ce53bf71e5dc5d1df90892eebc64190ec63f2651374fc3",
+      "result": "pass",
+      "scope": "Authored IfPrize SceneDesc and SdPrize SIS roots, including 393 typed entries"
+    },
+    {
+      "command": "node build/browser-release/gameplay_results_scene_trace.js --real-eight-confirm assets-local/results-fixtures assets-local/results-fixtures assets-local/results-fixtures",
+      "local_path": "work/testlogs/results-scene-confirm-20260923-rerun.log",
+      "sha256": "dbe45d31b7b1bf6890481253fe01538215b5ccce29e796bc289a4bce32c22bb1",
+      "result": "pass",
+      "scope": "16 source Results confirmations (eight fighters, both winner orientations), with post-close source ownership checks"
+    },
+    {
+      "command": "python3 -m unittest discover -s tests -v",
+      "local_path": "work/testlogs/pr56-fullsuite-20260923.log",
+      "sha256": "bdd2931ffcd9add2f18034a34ecf0ce285861c7a4383b779f8f17d0a2dec5f0c",
+      "result": "pass",
+      "tests": 1167,
+      "skips": 84,
+      "skip_scope": "Existing optional private stage/audio fixtures and other bounded targets unavailable in this checkout"
+    },
+    {
+      "command": "python3 scripts/check_repository_content.py --ref HEAD",
+      "checked_commit": "5b4daa7",
+      "result": "pass",
+      "findings": 0
+    }
+  ],
+  "retained_failure": {
+    "command": "node build/browser-release/native_menu_host_trace.js assets-local/results-fixtures assets-local/results-fixtures 32 work/testlogs/native-menu-results-trace.jsonl d96a64feae917450a13ed49b8613f720077df7f1 results-mario-v1",
+    "local_path": "work/testlogs/native-menu-results-20260923-rerun.log",
+    "sha256": "07e63b6bae9a30ba6fd24a45edd772422fc131664471844de17c7c427d16ff4e",
+    "result": "blocked_fixture",
+    "reason": "The current full menu manifest requests captain.ssm and other admitted fighter/menu files absent from the retained fixture directory; no placeholder files were added."
+  },
+  "remaining": [
+    "Real authored Results archives and victory themes for newly admitted fighters outside the eight-fighter fixture set remain unvalidated locally.",
+    "Real browser Results/Prize rendering and the four-CPU level-9 workload remain lead-owned and are not represented by this receipt."
+  ],
+  "deployed": false
+}

@@ -11,6 +11,7 @@
 #include <bit>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -58,7 +59,7 @@ static ResultsMatchInfo make_results_match(int opponent_ckind,
     const auto* opponent = melee_web_fighter_content(opponent_ckind);
     const auto* mario = melee_web_fighter_content(CKIND_MARIO);
     if (!opponent || !mario)
-        throw std::runtime_error("Results real-eight fighter content is unavailable");
+        throw std::runtime_error("Results fighter content is unavailable");
     for (auto& player : result.match_end.player_standings)
         player.slot_type = Gm_PKind_NA;
     auto fill = [](auto& player, const MeleeWebFighterContent& fighter,
@@ -108,7 +109,9 @@ static std::array<std::uint8_t, MELEE_WEB_PAD_STATE_BYTES> neutral_pad_snapshot(
     return bytes;
 }
 
-static int run_real_eight(const melee_web::RuntimeFiles& files, bool confirm)
+static int run_real_roster(const melee_web::RuntimeFiles& files,
+                           std::span<const int> opponents,
+                           const char* roster_name, bool confirm)
 {
     char error[256]{};
     if (!melee_web_gameplay_session_begin(32U * 1024U * 1024U,
@@ -122,17 +125,13 @@ static int run_real_eight(const melee_web::RuntimeFiles& files, bool confirm)
                                        error, sizeof(error)),
             melee_web_pad_state_free);
         if (!input) throw std::runtime_error(error);
-        constexpr std::array<int, 8> opponents = {
-            CKIND_MARIO, CKIND_DRMARIO, CKIND_FOX, CKIND_FALCO,
-            CKIND_MARS, CKIND_EMBLEM, CKIND_LINK, CKIND_CLINK,
-        };
         PADStatus neutral[4]{};
         neutral[2].err = neutral[3].err = -1;
         unsigned completed = 0;
         for (const int opponent : opponents) {
             for (const bool opponent_wins : {true, false}) {
                 const auto result = make_results_match(opponent, opponent_wins);
-                std::cout << "Results real-eight "
+                std::cout << "Results " << roster_name << " "
                           << melee_web_fighter_content(opponent)->name
                           << (opponent_wins ? " wins" : " Mario wins") << "..."
                           << std::flush;
@@ -173,9 +172,9 @@ static int run_real_eight(const melee_web::RuntimeFiles& files, bool confirm)
         if (!melee_web_gameplay_session_end(error, sizeof(error)))
             throw std::runtime_error(error);
         ended = true;
-        std::cout << "Validated " << completed
-                  << (confirm ? " real eight-fighter Results confirmations and teardown\n" :
-                                " real eight-fighter Results constructions with short ticks\n");
+        std::cout << "Validated " << completed << " " << roster_name
+                  << (confirm ? " Results confirmations and teardown\n" :
+                                " Results constructions with short ticks\n");
         return 0;
     } catch (...) {
         if (!ended) melee_web_gameplay_session_end(error, sizeof(error));
@@ -225,17 +224,41 @@ static void check_source_entry(const melee_web::GameplayWorld& world)
 }
 
 int main(int argc,char** argv){try{
-    const bool confirm = argc >= 2 && std::string(argv[1]) == "--real-eight-confirm";
-    const bool real_eight = confirm || (argc >= 2 && std::string(argv[1]) == "--real-eight");
-    if ((!real_eight && argc != 3) || (real_eight && argc != 5))
-        throw std::runtime_error(real_eight ?
-            "Expected --real-eight <common/fighter> <Results shared/music> <Results fighters>" :
+    const std::string command = argc >= 2 ? argv[1] : "";
+    const bool real_eight = command == "--real-eight" ||
+                            command == "--real-eight-confirm";
+    const bool real_enabled = command == "--real-enabled" ||
+                              command == "--real-enabled-confirm";
+    const bool confirm = command == "--real-eight-confirm" ||
+                         command == "--real-enabled-confirm";
+    const bool real_roster = real_eight || real_enabled;
+    if ((!real_roster && argc != 3) || (real_roster && argc != 5))
+        throw std::runtime_error(real_roster ?
+            "Expected --real-eight/--real-enabled[-confirm] <common/fighter> <Results shared/music> <Results fighters>" :
             "Expected common/fighter and Results asset directories");
     melee_web::RuntimeFiles files;
-    const int first_directory = real_eight ? 2 : 1;
+    const int first_directory = real_roster ? 2 : 1;
     for (int directory = first_directory; directory < argc; ++directory)
         load_directory(files, argv[directory]);
-    if (real_eight) return run_real_eight(files, confirm);
+    if (real_roster) {
+        constexpr std::array<int, 8> real_eight_opponents = {
+            CKIND_MARIO, CKIND_DRMARIO, CKIND_FOX, CKIND_FALCO,
+            CKIND_MARS, CKIND_EMBLEM, CKIND_LINK, CKIND_CLINK,
+        };
+        constexpr std::array<int, 17> real_enabled_opponents = {
+            CKIND_MARIO, CKIND_FOX, CKIND_FALCO, CKIND_MARS,
+            CKIND_DRMARIO, CKIND_EMBLEM, CKIND_LINK, CKIND_CLINK,
+            CKIND_CAPTAIN, CKIND_GANON, CKIND_LUIGI, CKIND_PIKACHU,
+            CKIND_PICHU, CKIND_PURIN, CKIND_DONKEY, CKIND_KOOPA,
+            CKIND_MEWTWO,
+        };
+        const auto opponents = real_enabled
+            ? std::span<const int>(real_enabled_opponents)
+            : std::span<const int>(real_eight_opponents);
+        return run_real_roster(files, opponents,
+                               real_enabled ? "enabled-roster" : "real-eight",
+                               confirm);
+    }
     const melee_web::FighterCostume* mario=nullptr;
     for(const auto& identity:melee_web::fighter_costumes())
         if(identity.fighter_kind==0&&identity.costume_index==0)mario=&identity;
