@@ -167,6 +167,8 @@ enum class SliceTag : u16
   MenuCssModel = 47,
   MenuCssLiveState = 48,
   MenuCssSlider = 49,
+  MenuCssContext = 50,
+  MenuCssKoCounts = 51,
 };
 
 struct SliceRef
@@ -566,7 +568,9 @@ struct Observer::Impl
       return false;
     if (match_type != 0)
       return true; // These controls belong to ordinary VS_MELEE.
-    if (!AddSlice(system, SliceTag::MenuCssLiveState, css, 0xf0))
+    // CSSData: 8-byte menu header, 8-byte VsModeData header, then the
+    // complete 0x138-byte StartMeleeData (including all six source slots).
+    if (!AddSlice(system, SliceTag::MenuCssLiveState, css, 0x148))
       return false;
     for (u32 port = 0; port < 4; ++port)
     {
@@ -683,6 +687,14 @@ struct Observer::Impl
         !AddSlice(system, SliceTag::MenuAudioVoice, 0x804d6038, 4) ||
         !AddSessionSlices(system))
       return false;
+    if (css)
+    {
+      u32 ko_counts = 0;
+      if (!AddSlice(system, SliceTag::MenuCssContext, state_pointer, 0x148) ||
+          !ReadU32(system, state_pointer + 4, &ko_counts) || !ko_counts ||
+          !AddSlice(system, SliceTag::MenuCssKoCounts, ko_counts, 4))
+        return false;
+    }
     return true;
   }
 

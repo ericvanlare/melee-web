@@ -123,6 +123,8 @@ SLICE_NAMES = {
     47: "menu_css_model",
     48: "menu_css_live_state",
     49: "menu_css_slider",
+    50: "menu_css_context",
+    51: "menu_css_ko_counts",
 }
 
 
