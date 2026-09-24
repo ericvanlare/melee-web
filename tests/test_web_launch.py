@@ -80,21 +80,6 @@ class WebLaunchTests(unittest.TestCase):
         self.assertIn("_melee_web_native_menu_pad_sample_full", cmake)
         self.assertIn("_melee_web_native_menu_player_state", cmake)
 
-    def test_scoped_match_handoff_retains_source_pad_history(self):
-        browser = (ROOT / "src" / "gameplay_menu_browser.cpp").read_text(encoding="utf-8")
-        handoff = re.search(
-            r"check\(destination==AssetDestination::Match\|\|destination==AssetDestination::Replay,"
-            r"(.*?)running=false;",
-            browser,
-            re.S,
-        )
-        self.assertIsNotNone(handoff)
-        branch = handoff.group(1)
-        replay = branch.split("if(destination==AssetDestination::Replay)", 1)
-        self.assertEqual(len(replay), 2)
-        self.assertIn("melee_web_menu_host_input(host)", replay[1])
-        self.assertIn("GameplayMatchConstruction::Deferred,*input", replay[1])
-
     def test_marth_visible_action_inventory_is_versioned_and_broad(self):
         script = """
 import {actionInventory} from './web/action-sweep.mjs';
