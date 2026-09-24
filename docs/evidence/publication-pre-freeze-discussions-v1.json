@@ -76,8 +76,6 @@
   "evidence_hashes": {
     "raw_file_count": 337,
     "raw_bytes": 2162743,
-    "all_retained_file_count": 338,
-    "all_retained_bytes": 2181310,
     "snapshot_manifest_sha256": "36884d66e81aa13f78d91942b4187a6e6a3fcd5185c3e67dd644ae81b44d751d",
     "repository_json_sha256": "e0a40d839ef5fadc4eabf9c5f5c29f224c0b694ea3517fefcf30bb624cfcc981",
     "issues_all_json_sha256": "80f44d4c8ae12146ed0a8a19cb4968e452f91758142f371c5568fff0ca34e7e2",
@@ -86,7 +84,10 @@
     "repository_commit_comments_json_sha256": "cf1cbb66a638b4860a516671fb74850e6ccf787fe6c4c8d29e9c04efe880bd05",
     "community_profile_json_sha256": "bbd6889138089a92197c7cf33245ed06b50eab4b8bb77d696c77b89421fe252f",
     "detailed_receipt_sha256": "1f74ace45e9383eac3d4d6f28a584c8d76ae0bcf89932fc633fa785a940b44b4",
-    "detailed_report_sha256": "da1a07d3e632b5a8cb3d47edfb6b42c1562e01f25a8a7bedf1bd44ef65e80714"
+    "detailed_report_sha256": "da1a07d3e632b5a8cb3d47edfb6b42c1562e01f25a8a7bedf1bd44ef65e80714",
+    "manifest_file_count": 338,
+    "manifest_bytes": 2181310,
+    "manifest_scope": "337 raw response files and the collector helper (338 files). The detailed receipt and report are outside this manifest and have their own SHA-256 fields below."
   },
   "raw_evidence_root": "work/publication-pre-freeze/discussions",
   "limits": [
