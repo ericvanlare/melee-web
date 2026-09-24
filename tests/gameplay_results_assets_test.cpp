@@ -62,6 +62,8 @@ constexpr Fixture fixtures[] = {
     {"Roy", 26,   "PlFe.dat", "GmRstMFe.dat", "ftDemoResultMotionFileEmblem",   14, 9},
     {"Link", 6,   "PlLk.dat", "GmRstMLk.dat", "ftDemoResultMotionFileLink",      14, 9},
     {"YoungLink", 20, "PlCl.dat", "GmRstMCl.dat", "ftDemoResultMotionFileClink", 14, 9},
+    {"Ness", 8, "PlNs.dat", "GmRstMNs.dat", "ftDemoResultMotionFileNess", 14, 9},
+    {"Peach", 9, "PlPe.dat", "GmRstMPe.dat", "ftDemoResultMotionFilePeach", 14, 9},
 };
 
 } // namespace

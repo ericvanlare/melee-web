@@ -165,7 +165,8 @@ void results_fighter_closure()
         {CKIND_LUIGI, "ff_mario.hps"}, {CKIND_PIKACHU, "ff_poke.hps"},
         {CKIND_PICHU, "ff_poke.hps"}, {CKIND_PURIN, "ff_poke.hps"},
         {CKIND_DONKEY, "ff_dk.hps"}, {CKIND_KOOPA, "ff_mario.hps"},
-        {CKIND_MEWTWO, "ff_poke.hps"},
+        {CKIND_MEWTWO, "ff_poke.hps"}, {CKIND_NESS, "ff_nes.hps"},
+        {CKIND_PEACH, "ff_mario.hps"},
     };
     for (const auto& expected : fighters) {
         const auto* content = melee_web_fighter_content(expected.character);

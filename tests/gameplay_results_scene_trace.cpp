@@ -122,9 +122,10 @@ static int run_real_eight(const melee_web::RuntimeFiles& files, bool confirm)
                                        error, sizeof(error)),
             melee_web_pad_state_free);
         if (!input) throw std::runtime_error(error);
-        constexpr std::array<int, 8> opponents = {
+        constexpr std::array<int, 10> opponents = {
             CKIND_MARIO, CKIND_DRMARIO, CKIND_FOX, CKIND_FALCO,
             CKIND_MARS, CKIND_EMBLEM, CKIND_LINK, CKIND_CLINK,
+            CKIND_NESS, CKIND_PEACH,
         };
         PADStatus neutral[4]{};
         neutral[2].err = neutral[3].err = -1;
@@ -174,8 +175,8 @@ static int run_real_eight(const melee_web::RuntimeFiles& files, bool confirm)
             throw std::runtime_error(error);
         ended = true;
         std::cout << "Validated " << completed
-                  << (confirm ? " real eight-fighter Results confirmations and teardown\n" :
-                                " real eight-fighter Results constructions with short ticks\n");
+                  << (confirm ? " real Results confirmations and teardown\n" :
+                                " real Results constructions with short ticks\n");
         return 0;
     } catch (...) {
         if (!ended) melee_web_gameplay_session_end(error, sizeof(error));
