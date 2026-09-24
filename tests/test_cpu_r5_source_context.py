@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import sys
 import tempfile
+import os
 from pathlib import Path
 import unittest
 from unittest.mock import patch
@@ -13,6 +14,25 @@ import cpu_r5_source_context as source_context
 
 
 class CpuR5SourceContextTests(unittest.TestCase):
+    def test_actual_owned_adapter_when_inputs_are_supplied(self):
+        names = ("MELEE_CPU_DOL", "MELEE_CPU_DISC", "MELEE_CPU_SYMBOLS",
+                 "MELEE_CPU_SOURCE_ROOT")
+        configured = {name: os.environ.get(name) for name in names}
+        if not all(configured.values()):
+            self.skipTest("owned DOL/disc/source inputs not configured")
+        binding = source_context.derive_owned_seed_binding(
+            dol_path=Path(configured["MELEE_CPU_DOL"]),
+            disc_path=Path(configured["MELEE_CPU_DISC"]),
+            symbols_path=Path(configured["MELEE_CPU_SYMBOLS"]),
+            source_root=Path(configured["MELEE_CPU_SOURCE_ROOT"]),
+        )
+        self.assertTrue(binding["independently_derived"])
+        self.assertEqual(binding["profile_version"], 3)
+        self.assertEqual(binding["global_id"], "seed_ptr")
+        for key in ("dol_sha256", "source_revision", "symbols_sha256",
+                    "disc_boot_header_sha256", "apploader_sha256"):
+            self.assertTrue(binding["provenance"][key])
+
     def test_derives_seed_word_only_after_owned_boot_attestation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

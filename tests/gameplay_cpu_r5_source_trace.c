@@ -4,7 +4,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <sysdolphin/baselib/random.h>
+/* Keep the test translation unit on the host-compatible side of the source
+ * ABI. random_wrapper.c includes the existing source compatibility header and
+ * the untouched random.c body; these declarations only cross that link. */
+extern uint32_t* seed_ptr;
+extern float HSD_Randf(void);
 
 static uint32_t parse_word(const char* text)
 {
@@ -35,6 +39,7 @@ int main(int argc, char** argv)
     const MeleeWebCpuSourceFighterIdentity fighter = {
         .source_word = parse_word(argv[3]),
         .world_generation = 1,
+        .allocation_generation = 1,
         .live = 1,
     };
     char error[160];

@@ -29,6 +29,7 @@ int main(void)
     const MeleeWebCpuSourceFighterIdentity fighter = {
         .source_word = 0x80abc140u,
         .world_generation = 17,
+        .allocation_generation = 41,
         .live = 1,
     };
     char error[160];
@@ -87,6 +88,7 @@ int main(void)
     const MeleeWebCpuSourceFighterIdentity replacement = {
         .source_word = fighter.source_word,
         .world_generation = fighter.world_generation,
+        .allocation_generation = fighter.allocation_generation + 1,
         .live = 1,
     };
     MeleeWebCpuR5Token replacement_token = {0};
@@ -104,6 +106,20 @@ int main(void)
     melee_web_cpu_r5_discard(&carry);
     if (melee_web_cpu_r5_end(&carry, &replacement_token, error, sizeof(error)))
         return fail("discarded fighter lifetime accepted a later end");
+
+    /* A fresh sidecar restarts its local lifetime counter. The authoritative
+     * allocation generation must still reject the retired token when the
+     * source address and world are reused. */
+    MeleeWebCpuR5Carry fresh = {0};
+    MeleeWebCpuR5Token fresh_token = {0};
+    if (!melee_web_cpu_r5_begin(&fresh, &replacement, &fresh_token, error,
+                                sizeof(error)))
+        return fail(error);
+    if (melee_web_cpu_r5_publish_seed_global(&fresh, &token, &seed, error,
+                                             sizeof(error)))
+        return fail("retired token crossed into a fresh sidecar instance");
+    if (!melee_web_cpu_r5_end(&fresh, &fresh_token, error, sizeof(error)))
+        return fail(error);
 
     MeleeWebCpuSourceGlobalBinding bad = seed;
     bad.independently_derived = 0;

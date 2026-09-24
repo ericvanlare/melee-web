@@ -50,16 +50,18 @@ typedef struct MeleeWebCpuSourceGlobalBinding {
 typedef struct MeleeWebCpuSourceFighterIdentity {
     uint32_t source_word;
     uint64_t world_generation;
+    uint64_t allocation_generation;
     uint8_t live;
     uint8_t reserved[7];
 } MeleeWebCpuSourceFighterIdentity;
 
 /* Opaque-in-practice owner capability returned by begin.  A caller must keep
  * this exact token and pass it to every transition.  World generation and
- * source fighter words alone are insufficient because a fighter address can
- * be reused within one world. */
+ * source fighter words alone are insufficient because a fighter allocation
+ * can be reused at the same address within one world. */
 typedef struct MeleeWebCpuR5Token {
     uint64_t world_generation;
+    uint64_t allocation_generation;
     uint64_t carry_lifetime;
     uint32_t source_fighter_word;
     uint8_t valid;
@@ -69,6 +71,7 @@ typedef struct MeleeWebCpuR5Token {
 typedef struct MeleeWebCpuWord {
     uint32_t source_word;
     uint64_t world_generation;
+    uint64_t allocation_generation;
     uint64_t carry_lifetime;
     uint8_t known;
     uint8_t kind;
@@ -78,6 +81,7 @@ typedef struct MeleeWebCpuWord {
 
 typedef struct MeleeWebCpuR5Carry {
     uint64_t world_generation;
+    uint64_t allocation_generation;
     uint64_t carry_lifetime;
     uint32_t source_fighter_word;
     uint8_t active;
