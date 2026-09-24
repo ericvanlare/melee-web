@@ -221,3 +221,11 @@ outputs, source-address overrides or match-specific stick rules. The prerequisit
 adds no dependency on page layout, frame scheduling or public deployment. It
 should be reviewed as groundwork; resolving tick 2,495 still requires the
 source-context and call-site work above.
+
+## Deferred source ARQ prerequisite
+
+The [original ARQ completion boundary](SOURCE_ARQ_COMPLETION.md) now exercises
+the pinned SDK queue against checked owned memory spans and deferred transfer
+completion. Its scoped source tests cover priority, cancellation, callback
+reentry and interrupt masking. It is not yet connected to original DevCom,
+audio startup or the live browser source context.

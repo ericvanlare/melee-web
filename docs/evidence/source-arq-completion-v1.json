@@ -1,0 +1,71 @@
+{
+  "schema": "melee-web-source-arq-completion-receipt",
+  "version": 1,
+  "status": "passed",
+  "scope": "checked-Wasm32 original SDK ARQ queue with a bounded deferred host-span/ARAM backend",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced"
+  ],
+  "retail_compared": false,
+  "source": {
+    "original_arq": ".deps/melee/extern/dolphin/src/dolphin/ar/arq.c",
+    "original_arq_sha256": "b8ce29ad2773743b3f657cc1203799baad5efcc65d8381beb60f4922b37a1be1",
+    "provider": "src/source_arq_context.c",
+    "provider_sha256": "0f7f3f49f0a260dee960354513bd0da56f35b6daec80ff1ef1c2e7b479452ffe",
+    "provider_header": "src/source_arq_context.h",
+    "provider_header_sha256": "22f7bd5fe65523d14da98d58d5e371e3418653836389961118ad73997dbe7823",
+    "oracle": "tests/source_arq_oracle.c",
+    "oracle_sha256": "a0013f21b82fafef564afe285211990ea74feb473b1f465b80ef562eb7f6244b",
+    "fixture_headers": {
+      "tests/source_arq_oracle_include/dolphin.h": "e696a0295905b4419ac354e4f61f22269246650a50deb1a3d1bb91b9a3f903ad",
+      "tests/source_arq_oracle_include/dolphin/ar.h": "419856d37cfdbc3289f1c44af2970c0d958b677c6f3b6d5b824c093e640b3460",
+      "tests/source_arq_oracle_include/dolphin/types.h": "f292bff645a01080739d0056b3ea61ecc0b004cfd3a04b40c5e96aacd80f88d0"
+    },
+    "test": "tests/test_source_arq_completion.py",
+    "test_sha256": "7163a8846fcc4add4d341bb72b2d293abad7353855243baa2fdf8bd2f153f140"
+  },
+  "focused": {
+    "command": "python3 -m unittest tests/test_source_arq_completion.py -v",
+    "status": "passed",
+    "tests": 2,
+    "log": "work/source-arq/focused-test.log",
+    "log_sha256": "961bece746c8a2988c4e2bd171744b8aacc03cd8a1f6406b743ae74e86183483"
+  },
+  "scenarios": [
+    "original high/low priority and source chunking with 32-byte-aligned transfers",
+    "queued removal versus active request completion",
+    "deferred full MRAM-to-ARAM and ARAM-to-MRAM copies",
+    "callback re-entry and nested pump rejection",
+    "pending rebind/callback-removal/shutdown rejection",
+    "invalid direction, range, alignment, length, busy and missing-callback rejection",
+    "nested interrupt mask/restore and masked completion deferral"
+  ],
+  "repository_suite": {
+    "command": "python3 -m unittest discover -s tests -v",
+    "status": "passed",
+    "tests": 1357,
+    "skipped": 92,
+    "log": "work/source-arq/full-suite-final.log",
+    "log_sha256": "5d1890cfc1a2e2ff87fcce2abf05afe3cbd2c24dcb3228ae03885a3bce62fa42",
+    "passed": 1265,
+    "seconds": 264.335,
+    "exit_code": 0
+  },
+  "prior_source_run": {
+    "status": "passed_before_interrupt_semantics_correction",
+    "tests": 1357,
+    "skipped": 92,
+    "log": "work/source-arq/full-suite.log",
+    "log_sha256": "fdb0da5c97c7b7972f1951415cd2b1fe4aa7353be16df37c2c3d74926f812f2a"
+  },
+  "limits": [
+    "The provider is not enabled in the browser or runtime targets.",
+    "The fixture has no hardware interrupt timing, audio, DevCom, browser, session-equivalence or performance claim.",
+    "Configured backing spans are caller-owned and must remain alive until completion; the provider only rejects its own rebind and shutdown while busy.",
+    "This receipt does not establish retail ARAM allocation order or source audio initialization equivalence."
+  ],
+  "base_commit": "dd4880f13d6ac9a04cb388dba7d05ac1c9cd72b1",
+  "evidence_note": "An intermediate receipt referenced an earlier final-suite log while that path was reused by a later run. The retained final log hash above was verified after process exit; the overwritten intermediate log is not claimed as retained evidence."
+}
