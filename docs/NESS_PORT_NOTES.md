@@ -2,7 +2,7 @@
 
 Ness is integrated as a development candidate on
 `codex/enable-ness-peach-yl`, with current `origin/main` (`fc1184a`) merged
-locally before validation. This
+locally before validation; the final local helper commit is `6ee8052`. This
 checkpoint preserves the original `CKIND_NESS` (0x0B) / `FTKIND_NESS` (8)
 identity, four costumes and authored source callbacks. It is **not**
 independent original equivalence, complete fighter acceptance or a deployment
@@ -14,9 +14,9 @@ change.
 | --- | --- | --- |
 | 2. Source contract | Passed | `work/NessPrep/ness_source_contract.md` (byte-level, parser-backed); re-verified during implementation |
 | 3. Real construction | **Passed** | `work/pr61-native-v2/ness-p1-mario-p2.log` and `ness-p2-mario-p1.log`: Release `gameplay_content_match_trace`, stage kind 32, both orientations exit 0 after the decoder ownership/stack repair — data/article/effect-bank construction, PK Flash ground+aerial charge/fire lifetimes, PK Fire ground+air lifetimes, Yo-Yo smash, all four costumes, combat, pause and repeat teardown ("Mixed source content intro, costumes, stage lifecycle, combat, pause and repeat teardown passed") |
-| 4. First advancing browser frames | **Partial** | Headless installed Chrome reached original CSS → SSS → Final Destination match after a source-grounded idle settle, then observed Ness PK Fire, PK Thunder and PSI Magnet motions; the broad action sweep remains outside this bounded receipt, so this is not a complete move or original-equivalence gate. |
+| 4. First advancing browser frames | **Partial** | Headless installed Chrome reached original CSS → SSS → Final Destination match after a source-grounded idle settle, then observed Ness PK Fire, PK Thunder and PSI Magnet motions with explicit unload. The same receipt binds a separate four-player CPU9 CSS setup and bounded source prefix for Ness, Peach, Young Link and Mario; the broad action sweep remains outside this bounded receipt, so this is not a complete move or original-equivalence gate. |
 | Results lifecycle | **Passed** | `docs/evidence/results-pr61-ness-peach-v1.json`: authored Ness Results clips plus 38 enabled-roster constructions/confirmations and teardown checks. |
-| Integration (build + suite) | **Passed for this batch** | Release runtime and Results targets rebuilt after the decoder repair; focused fighter-asset, Results, manifest and launch tests pass (one stage-asset test is skipped when its local asset is absent); runtime disc checks pass. |
+| Integration (build + suite) | **Passed for this batch** | Release runtime and Results targets rebuilt after the decoder repair; focused fighter-asset, Results, manifest and launch tests pass; the final helper full suite reports 1223 passed and 85 optional fixture skips; runtime disc checks pass. |
 | Comparison / pixels / PCM / performance | Not run | Separate gates, untouched |
 
 ## Source data and shared boundaries

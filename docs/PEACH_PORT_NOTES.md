@@ -2,7 +2,7 @@
 
 Peach is integrated as a development candidate on
 `codex/enable-ness-peach-yl`, with current `origin/main` (`fc1184a`) and the
-Ness commits merged locally before validation. This checkpoint
+Ness commits merged locally before validation; the final local helper commit is `6ee8052`. This checkpoint
 preserves the original `CKIND_PEACH` (0x0C) / `FTKIND_PEACH` (9) identity, five
 costumes and authored source callbacks. It is **not** independent original
 equivalence, complete fighter acceptance or a deployment change. The source
@@ -15,9 +15,9 @@ decode_out.txt) and re-verified during implementation.
 | --- | --- | --- |
 | 2. Source contract | Passed | `work/PeachPrep/CONTRACT.md` (byte-level, parser-backed); re-verified during implementation |
 | 3. Real construction | **Passed** | `work/pr61-native-v2/peach-p1-mario-p2.log` and `peach-p2-mario-p1.log`: Release `gameplay_content_match_trace`, stage kind 32, both orientations exit 0 after the decoder ownership/stack repair — data/article/effect-bank construction, ground+aerial Toad counter and vegetable lifetimes, Bomber and Parasol states with the Parasol article lifetime, the authored Float state, all five costumes, combat, pause and repeat teardown ("Mixed source content intro, costumes, stage lifecycle, combat, pause and repeat teardown passed") |
-| 4. First advancing browser frames | **Partial** | Headless installed Chrome reached original CSS → SSS → Final Destination match after a source-grounded idle settle, then observed Peach Toad counter, vegetable pull, Bomber and Parasol motions. The broad action sweep remains outside this bounded receipt, so no complete move or original-equivalence gate is claimed. |
+| 4. First advancing browser frames | **Partial** | Headless installed Chrome reached original CSS → SSS → Final Destination match after a source-grounded idle settle, then observed Peach Toad counter, vegetable pull, Bomber and Parasol motions with explicit unload. The same receipt binds a separate four-player CPU9 CSS setup and bounded source prefix for Ness, Peach, Young Link and Mario. The broad action sweep remains outside this bounded receipt, so no complete move or original-equivalence gate is claimed. |
 | Results lifecycle | **Passed** | `docs/evidence/results-pr61-ness-peach-v1.json`: authored Peach Results clips plus 38 enabled-roster constructions/confirmations and teardown checks. |
-| Integration (build + suite) | **Passed for this batch** | Release runtime and Results targets rebuilt after the decoder repair; focused fighter-asset, Results, manifest and launch tests pass (one stage-asset test is skipped when its local asset is absent); runtime disc checks pass. |
+| Integration (build + suite) | **Passed for this batch** | Release runtime and Results targets rebuilt after the decoder repair; focused fighter-asset, Results, manifest and launch tests pass; the final helper full suite reports 1223 passed and 85 optional fixture skips; runtime disc checks pass. |
 | Comparison / pixels / PCM / performance | Not run | Separate gates, untouched |
 
 ## Source data and shared boundaries
