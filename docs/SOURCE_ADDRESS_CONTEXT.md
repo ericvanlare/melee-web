@@ -158,6 +158,24 @@ original fighter addresses or implement CPU register carry. Its scoped checks
 and retained failures are in the
 [native initialization receipt](evidence/native-pool-initialization-v1.json).
 
+## Standalone original HSD startup boundary
+
+The checked-Wasm allocation fixture starts a fresh source-owned MEM1 context
+from independently decoded owned-disc boot geometry. It reserves the decoded
+crash-handler span, then executes original XFB/FIFO allocation and the HSD
+OS/ID/object initializers. Its partial HSD entry is compiled only into this fixture;
+ordinary gameplay cannot invoke it. Aurora supplies the OS and GX services,
+with a fixture-scoped aligned, zeroed MEM1 allocator used before `OSInit`.
+
+The comparison covers declared arena boundaries, HSD heap identities and
+component-pool metadata. It does not execute full retail platform startup,
+audio, ARAM initialization, game heaps or scene ownership. In particular,
+the original audio startup retains allocations before `lbMemory` and
+`lbHeap`; direct ARAM initialization would skip those effects. See the
+[scoped startup receipt](evidence/original-startup-allocation-v1.json) for
+source/build identity, original comparison, negative controls and retained
+failures. The browser still needs its own integrated source-context provider.
+
 ## Remaining dependency before CPU integration
 
 The existing match-only bootstrap allocates a fresh host arena and does not
