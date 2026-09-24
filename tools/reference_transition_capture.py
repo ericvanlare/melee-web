@@ -39,6 +39,9 @@ STREAM_STOP = 0x8038E968
 DRIVER_INITIALIZE = 0x8002838C
 LANGUAGE_BANK_INITIALIZE = 0x80028690
 
+CAPTURE_ID = os.environ.get("MWRC_CAPTURE_ID", os.environ.get("MELEE_TRANSITION_CAPTURE_ID", ""))
+SEQUENCE_ID = os.environ.get("MWRC_SEQUENCE_ID", os.environ.get("MELEE_TRANSITION_SEQUENCE_ID", ""))
+
 active = False
 run = 0
 event_index = 0
@@ -113,6 +116,8 @@ def emit_event(name, route=None, start_address=None):
         "run": run,
         "index": event_index,
         "event": name,
+        "capture_id": CAPTURE_ID,
+        "sequence_id": SEQUENCE_ID,
         "audio": audio_state(),
         "rng": random_state(),
         "retail_audio_diagnostics": {
@@ -297,6 +302,9 @@ class TransitionCapture(gdb.Command):
             if active:
                 raise gdb.GdbError("A transition capture is already active")
             if run == 0:
+                if not CAPTURE_ID or not SEQUENCE_ID:
+                    raise gdb.GdbError(
+                        "MWRC_CAPTURE_ID and MWRC_SEQUENCE_ID must identify the same observer capture")
                 OUTPUT.parent.mkdir(parents=True, exist_ok=True)
                 OUTPUT.write_text(json.dumps({
                     "record": "header", "schema": SCHEMA, "version": VERSION,
@@ -306,6 +314,8 @@ class TransitionCapture(gdb.Command):
                     "emulator_commit": EMULATOR_COMMIT,
                     "cpu_core": "Interpreter64", "cpu_thread": False,
                     "fixed_rtc": 1704067200,
+                    "capture_id": CAPTURE_ID,
+                    "sequence_id": SEQUENCE_ID,
                 }, separators=(",", ":")) + "\n")
             elif not OUTPUT.exists():
                 raise gdb.GdbError("Run zero must create the transition trace first")

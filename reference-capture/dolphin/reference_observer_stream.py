@@ -22,6 +22,12 @@ SCHEMA_VERSION = 1
 HEADER = struct.Struct("<IHHQQIIIII")
 BOUNDARY = struct.Struct("<HHIIII")
 SLICE = struct.Struct("<HHIII")
+WHOLE_SESSION_FLAG = 1
+WHOLE_METADATA = struct.Struct("<HHI")
+# Version 1 whole-session records retain the original eight-byte tail.  The
+# extended tail carries the source audio owner epoch while keeping the old
+# decoder shape readable for preserved diagnostic streams.
+WHOLE_AUDIO_METADATA = struct.Struct("<HHII")
 MAX_PAYLOAD = 1024 * 1024
 MAX_SLICES = 256
 MAX_GPRS = 32
@@ -47,6 +53,24 @@ BOUNDARY_NAMES = {
     10: "result_return",
     11: "scene_teardown",
     12: "scene_exit",
+    13: "css_enter",
+    14: "css_exit",
+    15: "sss_enter",
+    16: "sss_exit",
+    17: "vs_exit",
+    18: "vs_exit_return",
+    19: "vs_mode_exit",
+    20: "results_enter",
+    21: "results_exit",
+    22: "results_mode_exit",
+    23: "results_gobj",
+    24: "return_css",
+    25: "css_cancel_enter",
+    26: "prize_mode_enter",
+    27: "prize_scene_enter",
+    28: "prize_scene_exit",
+    29: "prize_mode_exit",
+    30: "startup_prize_mode_exit",
 }
 
 # Keep these labels stable: they are the semantic memory names shared by the
@@ -82,6 +106,25 @@ SLICE_NAMES = {
     28: "camera_object_pointer",
     29: "scene_request",
     30: "scene_frame",
+    31: "menu_css_state",
+    32: "menu_sss_state",
+    33: "menu_audio",
+    34: "menu_audio_voice",
+    35: "menu_sss_route",
+    36: "profile_characters",
+    37: "profile_stages",
+    40: "scene_kind",
+    41: "stage_select_index",
+    42: "stage_select_kind",
+    43: "menu_css_cursor",
+    44: "menu_css_doors",
+    45: "menu_main_flow",
+    46: "menu_main_input",
+    47: "menu_css_model",
+    48: "menu_css_live_state",
+    49: "menu_css_slider",
+    50: "menu_css_context",
+    51: "menu_css_ko_counts",
 }
 
 
@@ -106,6 +149,10 @@ def _boundary_payload(raw: bytes, pc: int, source_tick: int,
     kind, flags, lr, gpr_count, slice_count, reserved = BOUNDARY.unpack_from(raw)
     if reserved != 0:
         raise ObserverStreamError(f"{context}: nonzero boundary reserved field")
+    if flags & ~WHOLE_SESSION_FLAG:
+        raise ObserverStreamError(f"{context}: unknown boundary flags")
+    if kind >= 13 and not flags & WHOLE_SESSION_FLAG:
+        raise ObserverStreamError(f"{context}: whole-session boundary lacks its opt-in flag")
     if kind not in BOUNDARY_NAMES:
         raise ObserverStreamError(f"{context}: unknown boundary kind {kind}")
     if gpr_count != MAX_GPRS:
@@ -116,6 +163,33 @@ def _boundary_payload(raw: bytes, pc: int, source_tick: int,
     descriptor_end = gpr_end + SLICE.size * slice_count
     if descriptor_end > len(raw):
         raise ObserverStreamError(f"{context}: truncated slice descriptors")
+    payload_end = len(raw)
+    match_index = None
+    whole_boundary_kind = None
+    audio_owner_epoch = None
+    if flags & WHOLE_SESSION_FLAG:
+        if len(raw) < descriptor_end + WHOLE_METADATA.size:
+            raise ObserverStreamError(f"{context}: truncated whole-session metadata")
+        # Prefer the extended form only when its kind and reserved word are
+        # valid.  This makes the old format unambiguous and preserves old
+        # captures as explicit, incomplete evidence in the semantic adapter.
+        extended_end = len(raw) - WHOLE_AUDIO_METADATA.size
+        if extended_end >= descriptor_end:
+            candidate_match, candidate_kind, candidate_epoch, candidate_reserved = (
+                WHOLE_AUDIO_METADATA.unpack_from(raw, extended_end))
+            if candidate_kind == kind and candidate_reserved == 0:
+                payload_end = extended_end
+                match_index = candidate_match
+                whole_boundary_kind = candidate_kind
+                audio_owner_epoch = candidate_epoch
+        if match_index is None:
+            payload_end = len(raw) - WHOLE_METADATA.size
+            match_index, whole_boundary_kind, metadata_reserved = WHOLE_METADATA.unpack_from(
+                raw, payload_end)
+            if metadata_reserved != 0 or whole_boundary_kind != kind:
+                raise ObserverStreamError(f"{context}: invalid whole-session metadata")
+        elif audio_owner_epoch is None:
+            raise ObserverStreamError(f"{context}: invalid whole-session metadata")
     gprs = list(struct.unpack_from(f"<{gpr_count}I", raw, BOUNDARY.size))
     slices: list[dict[str, Any]] = []
     previous_end = descriptor_end
@@ -124,7 +198,7 @@ def _boundary_payload(raw: bytes, pc: int, source_tick: int,
         tag, slice_flags, address, size, data_offset = SLICE.unpack_from(raw, offset)
         if tag not in SLICE_NAMES:
             raise ObserverStreamError(f"{context}: unknown slice tag {tag}")
-        if size == 0 or data_offset < descriptor_end or data_offset + size > len(raw):
+        if size == 0 or data_offset < descriptor_end or data_offset + size > payload_end:
             raise ObserverStreamError(f"{context}: invalid slice range")
         # The producer packs bytes in descriptor order.  Reject overlap and
         # hidden holes so a decoder cannot silently reinterpret omitted bytes.
@@ -141,9 +215,9 @@ def _boundary_payload(raw: bytes, pc: int, source_tick: int,
             "size": size,
             "hex": raw[data_offset:previous_end].hex(),
         })
-    if previous_end != len(raw):
+    if previous_end != payload_end:
         raise ObserverStreamError(f"{context}: trailing boundary payload bytes")
-    return {
+    decoded = {
         "pc": pc,
         "lr": lr,
         "gprs": gprs,
@@ -154,6 +228,12 @@ def _boundary_payload(raw: bytes, pc: int, source_tick: int,
         "draw_ordinal": draw_ordinal,
         "slices": slices,
     }
+    if flags & WHOLE_SESSION_FLAG:
+        decoded.update({"whole_session": True, "match_index": match_index,
+                        "whole_boundary_kind": whole_boundary_kind})
+        if audio_owner_epoch is not None:
+            decoded["audio_owner_epoch"] = audio_owner_epoch
+    return decoded
 
 
 def _decode_record(header: tuple[int, ...], payload: bytes, context: str) -> dict[str, Any]:
@@ -195,6 +275,8 @@ def iter_records(path: str | Path) -> Iterator[dict[str, Any]]:
     except OSError as exc:
         raise ObserverStreamError(f"cannot open observer stream {stream_path}: {exc}") from exc
     previous_sequence = None
+    whole_session_announced = False
+    whole_session_count = None
     with stream:
         index = 0
         while True:
@@ -216,7 +298,25 @@ def iter_records(path: str | Path) -> Iterator[dict[str, Any]]:
                 raise ObserverStreamError(
                     f"{context}: sequence gap/reorder ({previous_sequence} -> {sequence})")
             previous_sequence = sequence
-            yield _decode_record(header, payload, context)
+            decoded = _decode_record(header, payload, context)
+            if decoded["event"] in {"handshake", "start"}:
+                announcement = decoded["payload"]
+                if announcement.get("whole_session") is True:
+                    count = announcement.get("match_count")
+                    if type(count) is not int or not 3 <= count <= 64:
+                        raise ObserverStreamError(
+                            f"{context}: invalid whole-session match_count")
+                    if whole_session_count is not None and count != whole_session_count:
+                        raise ObserverStreamError(
+                            f"{context}: whole-session match_count disagrees with prior announcement")
+                    whole_session_count = count
+                    whole_session_announced = True
+            elif decoded["event"] == "boundary":
+                boundary_payload = decoded["payload"]
+                if boundary_payload.get("whole_session") and not whole_session_announced:
+                    raise ObserverStreamError(
+                        f"{context}: whole-session boundary precedes opt-in announcement")
+            yield decoded
             index += 1
 
 
