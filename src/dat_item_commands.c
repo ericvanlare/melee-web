@@ -100,4 +100,8 @@ void* melee_web_item_commands_create(const uint32_t* words,size_t count){
     return out;
 fail:free(out);return NULL;
 }
+void* melee_web_item_commands_entry(void* base,size_t index){
+    if(!base||index>1024)return NULL;
+    return (union CmdUnion*)base+index;
+}
 void melee_web_item_commands_destroy(void* p){free(p);}

@@ -1,4 +1,5 @@
 #include "gameplay_fighter_assets.h"
+#include <melee/lb/lbcommand.h>
 #include "dat_item_commands.h"
 #include <melee/ft/ftdata.h>
 #include <melee/ft/types.h>
@@ -6,6 +7,19 @@
 #include <sysdolphin/baselib/mobj.h>
 #include <stdlib.h>
 #include <string.h>
+
+void lbBgFlash_80021C48(unsigned int, unsigned int) {}
+
+int assets_test_item_backward_handlers(void* entry)
+{
+    union CmdUnion* root=(union CmdUnion*)entry;
+    if(!root||root[1].Command_05.ptr!=root-1)return 0;
+    CommandInfo info={0};info.u=root;
+    Command_05(&info);
+    if(info.u!=root-1||info.loop_count!=1||info.event_return[0]!=root+2)return 0;
+    Command_06(&info);
+    return info.u==root+2&&info.loop_count==0;
+}
 static ftData test_data;
 static HSD_Joint test_joint;
 static HSD_MatAnimJoint test_material;

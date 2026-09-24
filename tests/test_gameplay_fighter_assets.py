@@ -59,6 +59,7 @@ class GameplayFighterAssetsTests(unittest.TestCase):
                  "-include", str(ROOT / "src/gameplay_compat.h"), "-c",
                  str(ROOT / "src/gameplay_fighter_assets.c"), str(ROOT / "src/gameplay_action_store.c"),
                  str(ROOT / "src/dat_item_commands.c"),
+                 str(source / "melee/lb/lbcommand.c"),
                  str(source / "melee/ft/ftdata.c"),
                  str(source / "melee/ft/kinds/ftPurin/ftpurin.c"), str(costumes),
                  str(ROOT / "tests/gameplay_fighter_assets_trace.c")],

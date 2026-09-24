@@ -10,10 +10,15 @@ namespace melee_web {
 // texture/effect interpreter entry (it_8027978C) and subroutine/goto control
 // flow; other families remain unavailable.
 class DatItemCommands {
-    std::map<uint32_t,std::unique_ptr<void,decltype(&melee_web_item_commands_destroy)>> scripts_;
+    struct Script {
+        void* allocation;
+        void* entry;
+        ~Script(){melee_web_item_commands_destroy(allocation);}
+    };
+    std::map<uint32_t,std::unique_ptr<Script>> scripts_;
 public:
     void* decode(const DatArchive& a,uint32_t root){
-        if(auto it=scripts_.find(root);it!=scripts_.end())return it->second.get();
+        if(auto it=scripts_.find(root);it!=scripts_.end())return it->second->entry;
         // Keep the graph keyed by authored source address until every
         // reachable path is known. Sorting by source address is important for
         // Command_05: after NEXT_CMD reaches its relocated pointer operand,
@@ -120,6 +125,73 @@ public:
         walk(root,walk);
         if(source_words.empty()||source_words.size()>1024)
             throw DatError("Item script is empty or exceeds the checked bound");
+
+        // Validate the actual lbcommand return stack over every reachable
+        // source path. The graph walk above discovers all addresses, but its
+        // visited set intentionally merges calls and can otherwise hide a
+        // recursive Command_05, an unmatched Command_06, or a call that
+        // shares an active two-slot loop frame. The source CommandInfo owns
+        // only three event_return slots, so reject those paths before native
+        // publication rather than allowing the original handlers to corrupt
+        // the adjacent command state.
+        struct StackEntry { uint32_t continuation; bool loop; };
+        struct Flow { uint32_t at; std::vector<StackEntry> stack; };
+        std::vector<Flow> pending{{root,{}}};
+        std::set<std::string> flow_seen;
+        auto command_count=[](uint32_t w){
+            const auto op=w>>26;
+            if(op==11)return 6U;
+            if(op==10)return 5U;
+            if(op==16){const auto sub=(w>>18)&0xff;return (sub<=2||sub==10||sub==11)?3U:2U;}
+            return 1U;
+        };
+        while(!pending.empty()){
+            auto flow=std::move(pending.back());pending.pop_back();
+            std::string key=std::to_string(flow.at)+":";
+            for(const auto& slot:flow.stack)
+                key+=(slot.loop?'L':'R')+std::to_string(slot.continuation)+",";
+            if(!flow_seen.insert(std::move(key)).second)continue;
+            const auto word_it=source_words.find(flow.at);
+            if(word_it==source_words.end())
+                throw DatError("Item command control flow leaves the decoded source graph");
+            const auto op=word_it->second>>26;
+            auto next=[&](uint32_t at,std::vector<StackEntry> stack){
+                if(source_words.contains(at))pending.push_back({at,std::move(stack)});
+                else throw DatError("Item command control flow targets an undecoded source word");
+            };
+            if(op==0)continue;
+            if(op==6){
+                if(flow.stack.empty()||flow.stack.back().loop)
+                    throw DatError("Item command return has no active subroutine");
+                const auto continuation=flow.stack.back().continuation;flow.stack.pop_back();
+                next(continuation,std::move(flow.stack));continue;
+            }
+            if(op==5){
+                const auto branch=branches.find(flow.at+4);
+                if(branch==branches.end())throw DatError("Item subroutine target is missing");
+                if(flow.stack.size()>=3)
+                    throw DatError("Item command subroutine stack exceeds source bound");
+                flow.stack.push_back({flow.at+8,false});
+                next(branch->second,std::move(flow.stack));continue;
+            }
+            if(op==7){
+                const auto branch=branches.find(flow.at+4);
+                if(branch==branches.end())throw DatError("Item goto target is missing");
+                next(branch->second,std::move(flow.stack));continue;
+            }
+            if(op==3){
+                if(flow.stack.size()>1)
+                    throw DatError("Item command loop shares the three-slot return stack");
+                flow.stack.push_back({0,true});flow.stack.push_back({0,true});
+                next(flow.at+4,std::move(flow.stack));continue;
+            }
+            if(op==4){
+                if(flow.stack.size()<2||!flow.stack.back().loop||!flow.stack[flow.stack.size()-2].loop)
+                    throw DatError("Item command loop end has no active loop frame");
+                flow.stack.pop_back();flow.stack.pop_back();
+            }
+            next(flow.at+command_count(word_it->second)*4,std::move(flow.stack));
+        }
         std::vector<uint32_t> words;std::map<uint32_t,size_t> index_of;
         words.reserve(source_words.size());
         for(const auto& [offset,word]:source_words){
@@ -134,9 +206,20 @@ public:
                 throw DatError("Item command jump operand was not emitted");
             words[operand_index->second]=static_cast<uint32_t>(target_index->second);
         }
-        void* out=melee_web_item_commands_create(words.data(),words.size());
-        if(!out)throw DatError("Item native command conversion failed");
-        scripts_.emplace(root,std::unique_ptr<void,decltype(&melee_web_item_commands_destroy)>(out,melee_web_item_commands_destroy));return out;
+        void* allocation=melee_web_item_commands_create(words.data(),words.size());
+        if(!allocation)throw DatError("Item native command conversion failed");
+        const auto root_index=index_of.find(root);
+        if(root_index==index_of.end()){
+            melee_web_item_commands_destroy(allocation);
+            throw DatError("Item command root was not emitted");
+        }
+        void* entry=melee_web_item_commands_entry(allocation,root_index->second);
+        if(!entry){
+            melee_web_item_commands_destroy(allocation);
+            throw DatError("Item native command entry allocation failed");
+        }
+        auto script=std::make_unique<Script>(Script{allocation,entry});
+        scripts_.emplace(root,std::move(script));return entry;
     }
 };
 }
