@@ -1,0 +1,236 @@
+{
+  "schema": "melee-web-source-dsp-init-profile",
+  "version": 1,
+  "date": "2026-09-24",
+  "base_commit": "a38b422bff256a94420adebc914b970ca26e7f53",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced"
+  ],
+  "scope": "Standalone synthetic DSP boot protocol with original SDK task/handler functions; fixture callback, no AXOut or DSP firmware execution",
+  "source_files": [
+    {
+      "path": "tests/source_dsp_init_trace.cpp",
+      "bytes": 21542,
+      "sha256": "04169df2f05f61150f21f72130f13fe9f38359f1dd6d2663af26a3573a4cd380"
+    },
+    {
+      "path": "tests/source_dsp_init_include/dolphin/hw_regs.h",
+      "bytes": 733,
+      "sha256": "89bbdc5d27711103309b6b7fd7122d11168cbe7b10b8a71109f920f077db212c"
+    },
+    {
+      "path": "tests/test_source_dsp_init_profile.py",
+      "bytes": 9319,
+      "sha256": "1ed97827cc74ed82c33d1d8b7102dbf94795fb8edcc5c1242a851e93cd92838a"
+    }
+  ],
+  "original_sources": {
+    ".deps/melee/extern/dolphin/src/dolphin/ax/DSPCode.c": "8807c54266535396ea190e40e370fa045a3461ddbe52c5a5ef09913e4baaddb9",
+    ".deps/melee/extern/dolphin/src/dolphin/dsp/dsp.c": "29a6864fb05a78a27e063f305844e2cf4f03af22f724863a14fbcff40ac18aa5",
+    ".deps/melee/extern/dolphin/src/dolphin/dsp/dsp_task.c": "7b212710530cc6617d15e826c2de56caa59fb6e4bc702730812f50c2fb13964f",
+    ".deps/melee/extern/dolphin/src/dolphin/os/OSInterrupt.c": "69ba045af10aaede13f77fa1040af7fa6e79658e2d317bcee1afc5992d3fca7e"
+  },
+  "artifacts": [
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/bad-image-pointer.stderr",
+      "bytes": 1409,
+      "sha256": "12320a5f7a3075afdf7100991c11e57a20faf677a36284288fbf3d890a445f6b"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/bad-image-pointer.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/bad-image-word.stderr",
+      "bytes": 1525,
+      "sha256": "f7a9627369b968a6bcc172e623ad4f0484f42b6ab5d7261b41d39e5fac22b822"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/bad-image-word.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/bad-mail.stderr",
+      "bytes": 1456,
+      "sha256": "0e17fd8ecbe3ab6fa96257316a99d7b7606b0e87a9443cc954fe19f31ab2a35b"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/bad-mail.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/bad-order.stderr",
+      "bytes": 1563,
+      "sha256": "11161f23fe52aa8c5ea78c813a4e6f438676b27fb17fd6b1b8d2741ad63f809f"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/bad-order.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/bad-register.stderr",
+      "bytes": 1519,
+      "sha256": "68f36908dc4845c4d90d5d936f63fe925e917c4c1ce9c41e6166d1ba62f9a3ab"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/bad-register.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/bad-span.stderr",
+      "bytes": 1391,
+      "sha256": "add87a0bc46c37b898ef4fce5d13729cd401607d7256fd9604449791808345b3"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/bad-span.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/bad-status.stderr",
+      "bytes": 1523,
+      "sha256": "9a3b60381c206479908028b3ea9454a730271231026bcb942ee76320f91a0851"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/bad-status.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/bad-unmask.stderr",
+      "bytes": 1509,
+      "sha256": "50ef421b283153696eff3cb770f3df43080c05eac306856cba2116a4435f5a84"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/bad-unmask.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/compile.log",
+      "bytes": 1014,
+      "sha256": "5c866aa64e4de431bc954c425241375426161e647337c5fbfb4fe922282f5329"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/masked-pump.stderr",
+      "bytes": 1877,
+      "sha256": "228e1e2c73834f01cc28bc66ed6f126f9bf955fd099ea544462b9b8439beea2d"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/masked-pump.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/repeat-pump.stderr",
+      "bytes": 1873,
+      "sha256": "2e024271bb16d8b5f1957239f3b09f0631c8b8c49eb09c65ec6bcfb35429e459"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/repeat-pump.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/source-hashes-after.json",
+      "bytes": 506,
+      "sha256": "d6cfd523ece2d2e7cefcd30247c86368bd739a5dcc381f5c48bdde926b0e986d"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/source-hashes-before.json",
+      "bytes": 506,
+      "sha256": "d6cfd523ece2d2e7cefcd30247c86368bd739a5dcc381f5c48bdde926b0e986d"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/source_dsp_init.js",
+      "bytes": 61611,
+      "sha256": "18cd3a182b0110b0e473cfa57720731cb2da62ea807893148cafa7fca7d8b274"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/source_dsp_init.wasm",
+      "bytes": 55571,
+      "sha256": "2c43659e1a01a1b6103f8d8bcec42ad6c42875c99d53641a14553a3c785b2942"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/source_dsp_init_generated.cpp",
+      "bytes": 70287,
+      "sha256": "a3c91013cf5941810f3102faffb5ac3ea28071fea19d05d172dbbba4d5fb4eed"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/stall-from.stderr",
+      "bytes": 1503,
+      "sha256": "a731e30bf94c3c3fe7d09cf47e46f2a191733b0033cd61e1dedf32f748c32c0a"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/stall-from.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/stall-to.stderr",
+      "bytes": 1503,
+      "sha256": "ca62fc2cf40fe294eb417e85a670eaa51bc0edd01d0c0f9e0f1b014682c8b110"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/stall-to.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/unknown-mode.stderr",
+      "bytes": 1495,
+      "sha256": "37d21b85320b69afb23a6052ad6d4e0184588d6a8a17079adc991fa304fc4f7c"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/unknown-mode.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/valid.stderr",
+      "bytes": 372,
+      "sha256": "c63195b08112d093b8c53d60c6d4b4ed88ae92938033564d61534966cf001295"
+    },
+    {
+      "path": "work/source-dsp-init-profile/run-41phercm/valid.stdout",
+      "bytes": 89,
+      "sha256": "47f897ac34a22488eb31593207ea6afe58b2fe9b581cd3f8df1511a382e21eb5"
+    }
+  ],
+  "validation": {
+    "full_suite": {
+      "tests": 1375,
+      "passed": 1282,
+      "skipped": 93,
+      "seconds": 288.997,
+      "exit_code": 0,
+      "new_component_tests_executed": 2,
+      "log": {
+        "path": "work/dsp-init-full-suite-final-v1.log",
+        "bytes": 245733,
+        "sha256": "d84a008080aac931676552aa27bda6b356d8c0c6e07506fdbbc69463fe83f886"
+      },
+      "scope": "Final frozen DSP executable files against main a38b422; AI PR72 not yet in this tree."
+    },
+    "repository_content": {
+      "path": "work/dsp-init-content-final-v1.log",
+      "bytes": 70,
+      "sha256": "1aef1d0e4d0e9d50cb8c12335ca439d83f83328625c441429b0866d2ca2ea8d2"
+    },
+    "documentation": "Added local links and staged diff whitespace checks pass."
+  },
+  "limits": [
+    "No original-game comparison.",
+    "Synthetic cleared DSP status and declared disabled masks; no device timing claim.",
+    "Owned task and DRAM buffer are fixture objects, not original AXOut static state.",
+    "No DSP firmware execution, command-list execution, PCM, task switching, browser integration or full-session equivalence.",
+    "No deployment."
+  ]
+}

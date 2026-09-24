@@ -1,5 +1,13 @@
 # Current status
 
+## Original DSP startup protocol boundary
+
+The [DSP startup fixture](docs/SOURCE_DSP_INIT_PROFILE.md) executes original SDK
+boot/task/handler routines with checked mailbox, interrupt and context services.
+The [scoped receipt](docs/evidence/source-dsp-init-profile-v1.json) records synthetic
+protocol validation; DSP firmware, AXOut, PCM and live browser integration
+remain open. Full-session equivalence is not established.
+
 ## Original ARInit profile boundary
 
 The [bounded ARInit oracle](docs/SOURCE_AR_INIT_PROFILE.md) executes original
