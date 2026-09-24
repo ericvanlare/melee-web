@@ -1,8 +1,8 @@
 # Ness development checkpoint
 
 Ness is integrated as a development candidate on
-`codex/enable-ness-peach-yl` (base `e8c756a`, ahead of the PR #52/#53 merges;
-the branch deliberately excludes the Mewtwo integration on `origin/main`). This
+`codex/enable-ness-peach-yl`, with current `origin/main` (`842457a`) merged
+locally before validation. This
 checkpoint preserves the original `CKIND_NESS` (0x0B) / `FTKIND_NESS` (8)
 identity, four costumes and authored source callbacks. It is **not**
 independent original equivalence, complete fighter acceptance or a deployment
@@ -13,9 +13,9 @@ change.
 | Checkpoint | Status | Evidence |
 | --- | --- | --- |
 | 2. Source contract | Passed | `work/NessPrep/ness_source_contract.md` (byte-level, parser-backed); re-verified during implementation |
-| 3. Real construction | **Passed** | `gameplay_content_match_trace` Release, Battlefield Ness(Mario) 32/11/8: exit 0 — both orientations' data/article/effect-bank construction, PK Flash ground+aerial charge/fire lifetimes, PK Fire ground+air lifetimes, Yo-Yo smash, all four costumes, combat, pause and repeat teardown ("Mixed source content intro, costumes, stage lifecycle, combat, pause and repeat teardown passed") |
-| 4. First advancing browser frames | Not run | Browser-side route gate still open |
-| Integration (build + suite) | Partial | Release and RelWithDebInfo trace targets rebuilt from the repaired decoder; focused real-asset attribute test passes; full suite result recorded in the commit message |
+| 3. Real construction | **Passed** | `work/pr61-native-v2/ness-p1-mario-p2.log` and `ness-p2-mario-p1.log`: Release `gameplay_content_match_trace`, stage kind 32, both orientations exit 0 after the decoder ownership/stack repair — data/article/effect-bank construction, PK Flash ground+aerial charge/fire lifetimes, PK Fire ground+air lifetimes, Yo-Yo smash, all four costumes, combat, pause and repeat teardown ("Mixed source content intro, costumes, stage lifecycle, combat, pause and repeat teardown passed") |
+| 4. First advancing browser frames | **Partial** | Owned browser harness reached original CSS → SSS → match for Ness, Peach and Young Link; the headed Ness targeted receipt observed PK Fire and PK Thunder source motions. The broad action sweep closed its renderer before producing a complete report, so this is not a complete move or original-equivalence gate. |
+| Integration (build + suite) | **Passed for this batch** | Release runtime and content trace rebuilt after the decoder repair; focused fighter-asset, manifest and launch tests pass (one stage-asset test is skipped when its local asset is absent); runtime disc checks pass. |
 | Comparison / pixels / PCM / performance | Not run | Separate gates, untouched |
 
 ## Source data and shared boundaries
@@ -54,10 +54,15 @@ animation binds the yoyo joint graph per `it_802BE65C`/`it_802BE5D8`.
 
 ## Shared item-command and texture relaxations (source-cited)
 
-- `DatItemCommands` now admits item opcode 16 (`it_8027978C`): a one-word
-  command whose embedded sub-opcode (bits 25..18) dispatches through the
-  original item interpreter; the checked conversion preserves the whole word
-  verbatim, exactly like the ops 14/17/18/19 precedent.
+- `DatItemCommands` now admits item opcode 16 (`it_8027978C`): its embedded
+  sub-opcode (bits 25..18) dispatches through the original item interpreter.
+  The source consumes three words for sub-opcodes 0..2 and 10..11, and two
+  words for every other sub-opcode; conversion preserves the complete words.
+- Source opcodes 5/6/7 are laid out from authored addresses, retain a separate
+  allocation owner from the requested root entry (including backward targets),
+  and are checked with the original three-slot return/loop stack shape. The
+  decoder rejects unmatched returns, recursive/deep calls and active-loop
+  nested-call overflow before publishing a script.
 - The item script walk now recomputes its conservative referenced-region
   bound at each referenced boundary instead of rejecting: Ness's PK Thunder
   ball script runs into an op16+END tail that another authored pointer
@@ -124,7 +129,8 @@ interpreter:
 
 The repair lives in `src/dat_item_commands.{hpp,c}`: exact consumed lengths
 for 10/16, admission and native encodings for 5/6/7/8/9 (jump targets patched
-to native indices), and tolerance for the source's unbalanced SetLoop. The
+to native indices), source-address entry preservation, and source-stack
+validation. The
 trace harness also needed Ness-specific input recipes in the shared damage
 loop: close approach (the released flash detonates where it spawned) and a
 hold-charge-then-release B pattern (the pulsing pattern restarts
@@ -137,8 +143,8 @@ the served directory matches the built configuration.
 ## Honest scope
 
 Development candidacy only. Independent original comparison, pixels, PCM,
-live scheduling, performance admission, CSS/SSS round trip and complete
-move/costume/stage coverage remain open. Ness is enabled in content
-registration and menu availability by the source-owned content row; the
-native checkpoint-3 lifecycle now passes end to end and the browser route
-gate remains the next admission step.
+live scheduling, performance admission and complete move/costume/stage
+coverage remain open. Ness is enabled in content registration and menu
+availability by the source-owned content row; the native checkpoint-3
+lifecycle passes end to end and the browser checkpoint is partial as described
+above.

@@ -13,6 +13,9 @@ class DatItemCommands {
     struct Script {
         void* allocation;
         void* entry;
+        Script(void* allocation_,void* entry_):allocation(allocation_),entry(entry_){}
+        Script(const Script&)=delete;
+        Script& operator=(const Script&)=delete;
         ~Script(){melee_web_item_commands_destroy(allocation);}
     };
     std::map<uint32_t,std::unique_ptr<Script>> scripts_;
@@ -218,7 +221,7 @@ public:
             melee_web_item_commands_destroy(allocation);
             throw DatError("Item native command entry allocation failed");
         }
-        auto script=std::make_unique<Script>(Script{allocation,entry});
+        auto script=std::make_unique<Script>(allocation,entry);
         scripts_.emplace(root,std::move(script));return entry;
     }
 };

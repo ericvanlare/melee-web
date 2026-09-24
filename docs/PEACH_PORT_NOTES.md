@@ -1,8 +1,8 @@
 # Peach development checkpoint
 
 Peach is integrated as a development candidate on
-`codex/enable-ness-peach-yl` (base `e8c756a` plus the Ness commits; the branch
-deliberately excludes the Mewtwo integration on `origin/main`). This checkpoint
+`codex/enable-ness-peach-yl`, with current `origin/main` (`842457a`) and the
+Ness commits merged locally before validation. This checkpoint
 preserves the original `CKIND_PEACH` (0x0C) / `FTKIND_PEACH` (9) identity, five
 costumes and authored source callbacks. It is **not** independent original
 equivalence, complete fighter acceptance or a deployment change. The source
@@ -14,9 +14,9 @@ decode_out.txt) and re-verified during implementation.
 | Checkpoint | Status | Evidence |
 | --- | --- | --- |
 | 2. Source contract | Passed | `work/PeachPrep/CONTRACT.md` (byte-level, parser-backed); re-verified during implementation |
-| 3. Real construction | **Passed** | `gameplay_content_match_trace` Release AND RelWithDebInfo, Battlefield Peach(Mario) 32/12/8 and the swapped 32/8/12 orientation: exit 0 — both orientations' data/article/effect-bank construction, ground+aerial Toad counter and vegetable lifetimes, Bomber and Parasol states with the Parasol article lifetime, the authored Float state, all five costumes, combat, pause and repeat teardown ("Mixed source content intro, costumes, stage lifecycle, combat, pause and repeat teardown passed") |
-| 4. First advancing browser frames | Not run | Browser-side route gate still open (lead owns it) |
-| Integration (build + suite) | Passed for this batch | Both configured trace targets rebuilt and run; focused real-asset attribute test passes; full suite recorded in the commit message |
+| 3. Real construction | **Passed** | `work/pr61-native-v2/peach-p1-mario-p2.log` and `peach-p2-mario-p1.log`: Release `gameplay_content_match_trace`, stage kind 32, both orientations exit 0 after the decoder ownership/stack repair — data/article/effect-bank construction, ground+aerial Toad counter and vegetable lifetimes, Bomber and Parasol states with the Parasol article lifetime, the authored Float state, all five costumes, combat, pause and repeat teardown ("Mixed source content intro, costumes, stage lifecycle, combat, pause and repeat teardown passed") |
+| 4. First advancing browser frames | **Partial** | The owned browser harness reached original CSS → SSS → match for Peach, but its targeted action probe stalled and the broad action sweep closed its renderer before producing a complete report. No Peach move or original-equivalence gate is claimed. |
+| Integration (build + suite) | **Passed for this batch** | Release runtime and content trace rebuilt after the decoder repair; focused fighter-asset, manifest and launch tests pass (one stage-asset test is skipped when its local asset is absent); runtime disc checks pass. |
 | Comparison / pixels / PCM / performance | Not run | Separate gates, untouched |
 
 ## Source data and shared boundaries
@@ -104,11 +104,19 @@ throws 96-103, light pickup 78-88).
   source-compiled, and the native `unk9` decode already matches the source
   bitfield layout. Peach's authored ItemParasol rows execute it.
 
+- **Shared item-command flow** (`dat_item_commands.{hpp,c}`): opcode 16 now
+  follows the source's two-versus-three-word sub-opcode lengths, and opcodes
+  5/6/7 preserve authored entry roots while validating the source three-slot
+  return/loop stack. Backward targets, cache hits, unmatched returns,
+  recursive/deep calls and active-loop nested-call overflow are covered by the
+  decoder regression.
+
 ## Honest scope
 
 Development candidacy only. The trace exercises the specials above; the Toad
 spore counters (which need an opponent hit on the counter), float-aerial
 attacks, the common-Parasol item scope (rows 134-136 aliases) and a complete
 move/costume/stage matrix are not evidenced. Independent original comparison,
-pixels, PCM, live scheduling, performance admission, CSS/SSS round trip and
-browser frames (checkpoint 4, owned by the lead) remain open.
+pixels, PCM, live scheduling and performance admission remain open. The
+browser CSS/SSS/match route was reached, but no complete Peach action report or
+original-equivalence gate is claimed.
