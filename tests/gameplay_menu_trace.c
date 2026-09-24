@@ -154,7 +154,8 @@ void mnStageSel_Scene_OnExit(void* data)
 {
     (void) data;
     active_sss->start_game = true;
-    if (invalid_exit == 2) active_sss->vs.start.rules.stkind = 25;
+    if (invalid_exit == 2) active_sss->vs.start.rules.stkind = St_Kind_Dummy;
+    if (invalid_exit == 3) active_sss->vs.start.rules.stkind = 25;
     active_sss = NULL;
 }
 
@@ -332,7 +333,8 @@ int main(void)
         css_context[0x10] = 2 << 2;
         css_context[0x10 + 0x0B] = 2;
         css_context[0x10 + 0x0E] = 0;
-        css_context[0x10 + 0x0F] = MELEE_WEB_MENU_FD_ST_KIND;
+        /* Retail first CSS carries its unset stage cache until SSS commits. */
+        css_context[0x10 + 0x0F] = St_Kind_Dummy;
         memset(css_context + 0x10 + 0x20, 0xff, 8);
         for (int i = 0; i < GM_MAX_PLAYERS; ++i) {
             const size_t base = 0x70 + (size_t) i * 0x24;
@@ -351,6 +353,12 @@ int main(void)
         if (active_css->unk_0x0 != 1 || active_css->vs.start.players[1].ckind != CKIND_FOX ||
             active_css->ko_counts[0] != 1 || active_css->ko_counts[5] != 6)
             return 108;
+        transition_request = 0;
+        if (active_css->vs.start.rules.stkind != St_Kind_Dummy ||
+            melee_web_menu_tick(session, error, sizeof(error)) !=
+                MELEE_WEB_MENU_RESULT_TICKED ||
+            active_css->vs.start.rules.stkind != St_Kind_Dummy)
+            return 109;
         active_css->vs.start.players[1].slot_type = Gm_PKind_Cpu;
         active_css->vs.start.players[1].cpu_kind = 4;
         active_css->vs.start.players[1].cpu_level = 9;
@@ -360,6 +368,13 @@ int main(void)
             !melee_web_menu_leave_css(session, error, sizeof(error)) ||
             !menu_trace_link_only(2, retained_p2) ||
             !melee_web_menu_enter_sss(session, error, sizeof(error))) return 60;
+        transition_request = 0;
+        if (active_sss->vs.start.rules.stkind != St_Kind_Dummy ||
+            melee_web_menu_tick(session, error, sizeof(error)) !=
+                MELEE_WEB_MENU_RESULT_TICKED ||
+            active_sss->vs.start.rules.stkind != St_Kind_Dummy)
+            return 110;
+        active_sss->vs.start.rules.stkind = MELEE_WEB_MENU_FD_ST_KIND;
         transition_request = 1;
         if (melee_web_menu_tick(session, error, sizeof(error)) !=
                 MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED ||
@@ -546,7 +561,7 @@ int main(void)
     }
     /* Source-private state can be published only by OnExit. The host must
      * never expose a READY payload that was invalidated by that callback. */
-    const int invalid_exit_cases = 2;
+    const int invalid_exit_cases = 3;
     for (invalid_exit = 1; invalid_exit <= invalid_exit_cases; ++invalid_exit) {
         MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition};
         char error[128];
