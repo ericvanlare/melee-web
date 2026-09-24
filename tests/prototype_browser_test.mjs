@@ -37,8 +37,9 @@ try {
     assert.equal(new URL(page.frames()[1].url()).search,'');
     assert(await page.locator('#end-session').isDisabled());
     const content = await (await page.request.get(new URL('prototype-content.json', values.url).href)).json();
-    assert.equal(content.fighters.length,4);
-    assert.equal(content.stages.length,4);
+    // Match the source-backed inventory checked by test_prototype.py.
+    assert.equal(content.fighters.length,17);
+    assert.equal(content.stages.length,7);
   });
   await screenshot('desktop');
   await check('controls dialog keyboard toggles and game focus',async()=>{

@@ -298,7 +298,7 @@ try {
   assert.equal(response.headers()['cross-origin-embedder-policy'], 'require-corp');
   await driver.waitForImport();
 
-  await check('headed preview startup and reviewed native artifact names', async () => {
+  await check('preview startup and reviewed native artifact names', async () => {
     assert(await page.locator('#start-game').isDisabled());
     assert(await page.locator('#end-session').isDisabled());
     assert.equal(await page.locator('iframe,h1,header,footer,article').count(), 0);
