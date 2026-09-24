@@ -99,12 +99,63 @@ broader performance remain open. Follow the [full-game
 inventory](FULL_GAME_PORT.md) and [accuracy contract](ACCURACY_CONTRACT.md)
 for the remaining product boundary.
 
-## Operator note
+## Staging side-special crash (fixed 2026-09-21)
 
-A stale served build (a RelWithDebInfo binary left in `build/browser` while
-Release outputs went to `build/browser-release`) reproduced a deterministic
-CSS→SSS segmentation fault that looked like a Mewtwo regression. The fault
-was in the rumble path and disappeared once the server actually served the
-Release build. The retained trap-stack evidence is
-`work/full-game/mewtwo-trap-stack-v1/`; the stale-binary controls are
-deleted. Always confirm the served directory matches the built configuration.
+A staging report showed the player stopping ("Player stopped. Reload to
+recover.") exactly when side-specialing with Mewtwo. Three fixes went into
+commit `1af6c92`; each is retained with its reproduction:
+
+1. **Mewtwo's side special is a source command grab.** When Confusion's hit
+   connects on the ground, `ftCo_800BCF18` runs `CaptureMewtwo` and the victim
+   enters the common `ThrownMewtwo`/`ThrownMewtwoAir` submotions (SM 292/293).
+   Those command rows were never admitted to any action store, so the victim's
+   row dispatched the unsupported-command sentinel and aborted mid-match.
+   They are now admitted for every store under the same rule as Koopa's
+   capture rows: these source command graphs belong to every possible victim.
+   The trace regression is `Mewtwo ground Confusion capture lifetime passed`
+   in `gameplay_content_match_trace` (runs per costume cycle, both Mario and
+   Young Link opponents).
+2. **The source boot-time rumble interpreter pool was missing.** Source
+   `gmMain_8015FD24` installs a 12-entry rumble list pool before any scene
+   runs; the port only installed it inside match begin, leaving the pad
+   library's `rumble_info` uninitialized for every menu scene. The world
+   now installs the pool at startup (`melee_web_rumble_begin`). The merge
+   review found that the initial repair reached match worlds only; the menu
+   world now loads and owns `LbRb.dat`, publishes the pool before source
+   OnEnter, and advances the original rumble interpreter before renewing PAD
+   samples. Teardown releases queued programs before their arena is freed.
+3. **Menu scene gobjs leaked into later scenes.** The original game-mode
+   layer re-initializes the HSD gobj library at every scene change
+   (`gm_801A4BD4`); the retained one-world port does not, so CSS gobjs —
+   including the confirm-tag processor `fn_80262F44` whose confirm rumble
+   faults against the next world's rumble state — kept running inside the
+   match. The menu host now snapshots every retained GObj before the scene's
+   original enter and destroys new objects on leave using the source teardown
+   primitive. The configured source link bound includes the SSS fog on link
+   15. Full membership also finds new equal-priority objects inserted after a
+   retained object; the earlier list-head sentinel missed those objects.
+
+The reproduction evidence is retained under `work/full-game/`: the runtime
+reflect sweep (`mewtwo-sideb-probe/progress.log`) reproduces the staging
+stop on the pre-fix build — the aborting chain was
+`melee_web_command_require_supported` ← `ftAction_80073240` ←
+`Fighter_ChangeMotionState` ← `ftCo_800BD0E8` (`CaptureMewtwo`/`ThrownMewtwo`)
+— and the post-fix Release sweep completes all 15 rounds; the local suite
+runs 1,131 tests OK (`mewtwo-crashfix-suite-v5.log`).
+
+## Merge review follow-up
+
+The earlier repair did not initialize rumble for `GameplayMenuWorld`; changing
+build configuration could conceal that missing owner. A new real-asset menu
+regression failed before the fix with `Menu startup did not publish an available
+source rumble pool`. After publication and per-sample interpreter renewal were
+added, the same native trace completes both original CSS/SSS/four-stock-match/CSS
+cycles, including SSS cancellation, No Contest, interrupted match teardown and
+repeat construction. This is **Native traced**, not retail or timing acceptance.
+
+The focused ownership regression links the pinned `gobjplink.c` implementation
+and covers equal-priority insertion behind a retained object, source link 15,
+and abort after the scene has already closed. The rumble regression uses the
+world's actual pool and checks teardown with an outstanding borrowed program.
+Builds, browser runs and the integration suite are recorded in the
+[merge review receipt](evidence/mewtwo-crash-merge-review-v1.json).
