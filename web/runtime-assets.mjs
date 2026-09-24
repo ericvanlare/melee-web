@@ -18,6 +18,7 @@ export const NATIVE_MENU_DISC_FILES=Object.freeze({
   'MnSlChr.usd':'MnSlChr.usd','MnSlMap.usd':'MnSlMap.usd',
   'SdSlChr.usd':'SdSlChr.usd','MnExtAll.usd':'MnExtAll.usd',
   'LbMcGame.usd':'LbMcGame.usd','NtMemAc.usd':'NtMemAc.usd',
+  'LbRb.dat':'LbRb.dat',
   'menu01.hps':'audio/menu01.hps','smash2.sem':'audio/us/smash2.sem',
   ...Object.fromEntries(['main','nr_select','nr_title','nr_name','pokemon','end',
     'captain','dk','fox','koopa','link','luigi','mario','mars','mewtwo','pikachu','purin',

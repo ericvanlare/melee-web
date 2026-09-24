@@ -15,7 +15,7 @@ namespace {
 
 constexpr auto kMenuFiles = std::to_array<std::string_view>({
     "MnSlChr.usd", "MnSlMap.usd", "SdSlChr.usd", "MnExtAll.usd",
-    "LbMcGame.usd", "NtMemAc.usd", "sislib_font.bin", "smash2.sem",
+    "LbMcGame.usd", "NtMemAc.usd", "LbRb.dat", "sislib_font.bin", "smash2.sem",
 #if !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
     "dsp_coef.bin",
 #endif

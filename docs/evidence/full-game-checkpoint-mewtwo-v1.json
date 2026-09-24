@@ -19,7 +19,10 @@
     "hardware": "Apple M4 (Mac16,12-class), 32 GiB",
     "os": "macOS 26.6.2",
     "browser": "153.0.8010.50",
-    "canvas_backing_pixels": [640, 480],
+    "canvas_backing_pixels": [
+      640,
+      480
+    ],
     "device_pixel_ratio": 1,
     "development_audio": "replacement DSP coefficients, stereo with original reverb/delay",
     "application_cache": "fresh origin per round (fresh Chromium profile per launch)",
@@ -116,7 +119,10 @@
       "new_type1_rows": 12,
       "payload_conflicts": 0,
       "preserved_base_rows": 846,
-      "merged_seed_rows": {"type0": 1, "type1": 857},
+      "merged_seed_rows": {
+        "type0": 1,
+        "type1": 857
+      },
       "merged_seed_bytes": 3567616,
       "merged_seed_sha256": "f85858ff99f368d38ca16fa18727a12f778d57543e2898d29507f92585db2c2b"
     }
@@ -155,5 +161,22 @@
       "result": "scoped_pair_pass; cold/warm all 32 cases over 6,400 frames, zero gaps, over-budget or 33.3 ms callbacks, underruns, live pipelines, timing resumes or heap growth; native/browser maxima 7.625/23.265 ms cold and 6.910/25.460 ms warm"
     },
     "scope": "Pre-merge checkpoint numbers above describe their declared base; this block re-observes the same scoped evidence on the merged tree."
+  },
+  "sideb_crash_fix": {
+    "date": "2026-09-21",
+    "commit": "1af6c92",
+    "symptom": "Staging player stopped exactly on Mewtwo side special (Confusion)",
+    "fixes": [
+      "Admit common ThrownMewtwo/ThrownMewtwoAir command rows (SM 292/293) for every action store: the Confusion hit is the source CaptureMewtwo command grab and the victim enters those rows",
+      "Install the source boot-time 12-entry rumble interpreter pool at world startup (gmMain_8015FD24 equivalence); the menu scenes previously ran with an uninitialized pad-library rumble_info",
+      "Destroy the leaving menu scene's gobjs at host transitions with the source per-gobj teardown primitive, ending the leaked CSS confirm-tag processor running inside the match"
+    ],
+    "validation": {
+      "trace": "Mewtwo ground Confusion capture lifetime passes per costume cycle (Mario and Young Link opponents, FD and Yoshi's Story)",
+      "suite": "work/full-game/mewtwo-crashfix-suite-v5.log: 1131 tests OK, 57 skips, 520.132 seconds",
+      "browser_sweep": "work/full-game/mewtwo-sideb-probe/progress.log: pre-fix run reproduces the staging stop; post-fix Release sweep completes all 15 rounds",
+      "trap_stack": "work/full-game/mewtwo-sideb-probe/trap-stack.txt names the aborting melee_web_command_require_supported chain",
+      "evidence_chain": "The pre-fix aborting chain was melee_web_command_require_supported <- ftAction_80073240 <- Fighter_ChangeMotionState <- ftCo_800BD0E8 (CaptureMewtwo/ThrownMewtwo); the reproduction sweep and suite logs are retained under work/full-game/"
+    }
   }
 }
