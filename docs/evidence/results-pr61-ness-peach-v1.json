@@ -35,6 +35,11 @@
       "command": "python3 menu key parser over src/gameplay_menu_browser.cpp",
       "result": "pass",
       "scope": "239 authored menu keys with mewtwo.ssm followed by PlNs.dat"
+    },
+    {
+      "command": ".venv/bin/python -m unittest discover -s tests -v",
+      "result": "pass (1176 tests, 85 optional fixture skips)",
+      "scope": "Merged tree at origin/main 77d78b7 with the Ness/Peach changes"
     }
   ],
   "native_fighter_traces": {
@@ -47,6 +52,27 @@
       "work/pr61-native-v2/peach-p2-mario-p1.log"
     ]
   },
-  "browser_scope": "The existing headless smoke and action evidence reaches original CSS to SSS to match for Ness, Peach, and Young Link. The broad action sweep closed before a complete report, and the targeted Peach action probe stalled; no complete move or original-equivalence claim is made.",
+  "browser_targeted": {
+    "launch": "Headless installed Chrome through scripts/browser_tools.mjs, local runtime server on port 8787, owned revision-2 disc",
+    "ness": {
+      "report": "work/pr61-targeted-headless-ness.json",
+      "sha256": "0afa8723fa61e7d66a101e77449a1fe2e8843e33df474b4c959d7d9b66e12771",
+      "result": "pass",
+      "scope": "CSS to SSS to Final Destination match, grounded settle, PK Fire, PK Thunder, and PSI Magnet source motions"
+    },
+    "peach": {
+      "report": "work/pr61-targeted-headless-peach.json",
+      "sha256": "c7e2305af3b0ad64fad7470de377b996b4987d4311fa98ec96c47a04606c77ae",
+      "result": "pass",
+      "scope": "CSS to SSS to Final Destination match, grounded settle, Toad counter, vegetable pull, Bomber, and Parasol source motions"
+    },
+    "young_link": {
+      "report": "work/pr61-targeted-headless-young-link.json",
+      "sha256": "c158501ed2ad43757fa89e87c9d5cb40ff0858c6220639a4773cfc728bd73149",
+      "result": "pass",
+      "scope": "CSS to SSS to Final Destination match, grounded settle, Boomerang, Spin Attack, and Bomb source motions"
+    }
+  },
+  "browser_scope": "These are bounded headless source-motion checks after a source-grounded idle settle. The broad action sweep and timing/performance gates remain outside this receipt; no original-equivalence, pixel, PCM, or four-CPU level-9 claim is made.",
   "deployed": false
 }

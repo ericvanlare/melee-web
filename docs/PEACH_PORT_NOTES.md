@@ -15,7 +15,7 @@ decode_out.txt) and re-verified during implementation.
 | --- | --- | --- |
 | 2. Source contract | Passed | `work/PeachPrep/CONTRACT.md` (byte-level, parser-backed); re-verified during implementation |
 | 3. Real construction | **Passed** | `work/pr61-native-v2/peach-p1-mario-p2.log` and `peach-p2-mario-p1.log`: Release `gameplay_content_match_trace`, stage kind 32, both orientations exit 0 after the decoder ownership/stack repair — data/article/effect-bank construction, ground+aerial Toad counter and vegetable lifetimes, Bomber and Parasol states with the Parasol article lifetime, the authored Float state, all five costumes, combat, pause and repeat teardown ("Mixed source content intro, costumes, stage lifecycle, combat, pause and repeat teardown passed") |
-| 4. First advancing browser frames | **Partial** | The owned browser harness reached original CSS → SSS → match for Peach, but its targeted action probe stalled and the broad action sweep closed its renderer before producing a complete report. No Peach move or original-equivalence gate is claimed. |
+| 4. First advancing browser frames | **Partial** | Headless installed Chrome reached original CSS → SSS → Final Destination match after a source-grounded idle settle, then observed Peach Toad counter, vegetable pull, Bomber and Parasol motions. The broad action sweep remains outside this bounded receipt, so no complete move or original-equivalence gate is claimed. |
 | Results lifecycle | **Passed** | `docs/evidence/results-pr61-ness-peach-v1.json`: authored Peach Results clips plus 38 enabled-roster constructions/confirmations and teardown checks. |
 | Integration (build + suite) | **Passed for this batch** | Release runtime and Results targets rebuilt after the decoder repair; focused fighter-asset, Results, manifest and launch tests pass (one stage-asset test is skipped when its local asset is absent); runtime disc checks pass. |
 | Comparison / pixels / PCM / performance | Not run | Separate gates, untouched |
@@ -119,5 +119,6 @@ spore counters (which need an opponent hit on the counter), float-aerial
 attacks, the common-Parasol item scope (rows 134-136 aliases) and a complete
 move/costume/stage matrix are not evidenced. Independent original comparison,
 pixels, PCM, live scheduling and performance admission remain open. The
-browser CSS/SSS/match route was reached, but no complete Peach action report or
-original-equivalence gate is claimed.
+browser CSS/SSS/match route and the four targeted Peach action recipes are
+covered by `docs/evidence/results-pr61-ness-peach-v1.json`; the broad action
+sweep and original-equivalence gate remain open.
