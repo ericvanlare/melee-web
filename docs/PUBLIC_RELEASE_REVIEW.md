@@ -77,20 +77,23 @@ redirect evidence is recorded in [PUBLIC_ALPHA_VALIDATION.md](PUBLIC_ALPHA_VALID
 ## Artifact and seed facts
 
 The Release target preloads `web/initial_pipeline_cache.db.gz.b64` as
-`/initial_pipeline_cache.db`. Decoding the checked-in source produces a
+`/initial_pipeline_cache.db`. The historical PR #47 release decoded to a
 2,621,440-byte SQLite database with SHA-256
 `4bdb7c4a3e906d907d066f0c65041d7eb3472dc25c9d8c98be6e4946fdce560f`. Its
 schema has one `aurora_schema` row, one shader row and 627 pipeline rows. The
-current release preserves all 626 previous records, including the 78 added
-for Link/Young Link, and appends two portable configurations recovered from the
+PR #47 release preserved all 626 previous records, including the 78 added
+for Link/Young Link, and appended two portable configurations recovered from the
 failed Marth/Battlefield holdout's saved pipeline DB/WAL. The
 [current holdout evidence](CURRENT_RUNTIME_HOLDOUTS_20260919.md) records that
 failure, exact descriptor identities and preservation checks. The
 [Link descriptor ledger](evidence/link-gpu-compilation-v1.json) and
 [Roy/Doc ledger](evidence/roy-doc-public-preparation-v1.json) remain historical
 evidence. No raw draw provenance, IndexedDB/profile pages, or Dawn driver cache
-is shipped. The deployed release is identified by the
+was shipped in that package. That release is identified by the
 [deployment receipt](evidence/public-marth-pipeline-release-v1.json).
+For the current seed, use [the materializer](../scripts/materialize_pipeline_cache.py)
+and the exact release evidence indexed by [STATUS.md](../STATUS.md); this
+historical paragraph does not identify newer package bytes.
 
 The seed contains binary renderer configuration blobs and hashes rather than
 file names. Inspection found no raw texture, model, audio or disc bytes. That

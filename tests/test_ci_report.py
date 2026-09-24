@@ -66,6 +66,20 @@ class CiReportTests(unittest.TestCase):
         self.assertTrue(report["within_ten_minutes"])
         self.assertFalse(report["accepted"])
 
+    def test_unrequested_cache_audit_does_not_reject_normal_verification(self):
+        audit = self.job("compiler-cache-audit", "00:00", "00:00")
+        audit["conclusion"] = "skipped"
+        report = summarize(self.run_record(), [audit, self.job("browser-build", "00:10", "00:20")])
+        self.assertTrue(report["accepted"])
+
+    def test_required_skip_and_audit_failure_still_reject_acceptance(self):
+        for name, conclusion in [("browser-build", "skipped"), ("verify (runtime)", "skipped"),
+                                 ("compiler-cache-audit", "failure"), ("compiler-cache-audit", "cancelled")]:
+            with self.subTest(name=name, conclusion=conclusion):
+                job = self.job(name, "00:00", "00:01")
+                job["conclusion"] = conclusion
+                self.assertFalse(summarize(self.run_record(), [job])["accepted"])
+
 
 if __name__ == "__main__":
     unittest.main()

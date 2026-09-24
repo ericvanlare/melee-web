@@ -5,12 +5,84 @@
 
 #include <melee/ft/forward.h>
 #include <melee/pl/forward.h>
+#include <sysdolphin/baselib/gobj.h>
+#include <sysdolphin/baselib/gobjobject.h>
+#include <sysdolphin/baselib/gobjproc.h>
+#include <sysdolphin/baselib/gobjplink.h>
+#include <sysdolphin/baselib/objalloc.h>
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 /* These stubs exercise the lifecycle contract only. They deliberately do not
  * claim that the source CSS/SSS assets or their HSD services execute here. */
+
+/* Keep the fixture's configured link range explicit so the menu boundary is
+ * exercised against the same p_link_max source contract as the runtime. */
+#define MENU_TRACE_P_LINK_MAX 63
+#define MENU_TRACE_GOBJ_CAPACITY 128
+static HSD_GObj* menu_trace_gobj_heads[MENU_TRACE_P_LINK_MAX + 1];
+static HSD_GObj* menu_trace_gobj_low[MENU_TRACE_P_LINK_MAX + 1];
+static HSD_GObj menu_trace_gobj_storage[MENU_TRACE_GOBJ_CAPACITY];
+static size_t menu_trace_gobj_count;
+HSD_GObjList* HSD_GObj_Entities = (HSD_GObjList*)menu_trace_gobj_heads;
+HSD_GObj** plinklow_gobjs = menu_trace_gobj_low;
+HSD_GObjLibInitDataType HSD_GObjLibInitData = {
+    MENU_TRACE_P_LINK_MAX, MENU_TRACE_P_LINK_MAX, 0, NULL, NULL
+};
+HSD_ObjAllocData gobj_alloc_data;
+HSD_GObj* HSD_GObj_804D781C;
+__typeof__(HSD_GObj_804CE3E4) HSD_GObj_804CE3E4;
+
+void __assert(char* file, u32 line, char* condition)
+{
+    fprintf(stderr, "GObj assertion failed at %s:%u: %s\n", file, line,
+            condition);
+    abort();
+}
+
+/* Use the source allocator entry point with a fixture-owned pool. The linked
+ * gobjplink.c supplies the real gobj_first_lower_prio/GObj_PReorder path, so
+ * equal-priority objects exercise the actual source ordering. */
+void* HSD_ObjAlloc(HSD_ObjAllocData* data)
+{
+    if (data != &gobj_alloc_data ||
+        menu_trace_gobj_count == MENU_TRACE_GOBJ_CAPACITY) {
+        return NULL;
+    }
+    ++data->used;
+    return &menu_trace_gobj_storage[menu_trace_gobj_count++];
+}
+
+void HSD_ObjFree(HSD_ObjAllocData* data, void* object)
+{
+    if (data == &gobj_alloc_data && object != NULL) {
+        --data->used;
+    }
+}
+
+void GObj_RemoveUserData(HSD_GObj* gobj) { (void)gobj; }
+void HSD_GObjObject_80390B0C(HSD_GObj* gobj)
+{
+    gobj->obj_kind = HSD_GOBJ_OBJ_NONE;
+    gobj->hsd_obj = NULL;
+}
+void HSD_GObjProc_8038FED4(HSD_GObj* gobj) { (void)gobj; }
+void HSD_GObjGXLink_8039084C(HSD_GObj* gobj) { (void)gobj; }
+
+static HSD_GObj* menu_trace_gobj_create(u16 classifier, u8 p_link,
+                                        u8 priority)
+{
+    return GObj_Create(classifier, p_link, priority);
+}
+
+static int menu_trace_link_only(u8 p_link, const HSD_GObj* expected)
+{
+    return menu_trace_gobj_heads[p_link] == expected &&
+           (expected == NULL || expected->next == NULL);
+}
+
 void gm_InitVsMode(VsModeData* vs)
 {
     memset(vs, 0, sizeof(*vs));
@@ -57,7 +129,12 @@ static int invalid_exit;
 static int source_order_enabled;
 static int source_order;
 
-void mnCharSel_Scene_OnEnter(void* data) { active_css = data; }
+void mnCharSel_Scene_OnEnter(void* data)
+{
+    active_css = data;
+    /* The source CSS enter creates its fog on p_link 2 at priority 0. */
+    menu_trace_gobj_create(HSD_GOBJ_CLASS_UI, 2, 0);
+}
 void mnCharSel_Scene_OnFrame(void) { if (source_order_enabled) source_order = 1; }
 void mnCharSel_Scene_OnExit(void* data)
 {
@@ -66,14 +143,18 @@ void mnCharSel_Scene_OnExit(void* data)
     if (invalid_exit == 1) active_css->vs.start.players[0].ckind = CKIND_PLAYABLE_COUNT;
     active_css = NULL;
 }
-void mnStageSel_Scene_OnEnter(void* data) { active_sss = data; }
+void mnStageSel_Scene_OnEnter(void* data)
+{
+    active_sss = data;
+    /* The source SSS enter creates its fog on p_link 15 at priority 0. */
+    menu_trace_gobj_create(HSD_GOBJ_CLASS_UI, 15, 0);
+}
 void mnStageSel_Scene_OnFrame(void) { if (source_order_enabled) source_order = 1; }
 void mnStageSel_Scene_OnExit(void* data)
 {
     (void) data;
     active_sss->start_game = true;
     if (invalid_exit == 2) active_sss->vs.start.rules.stkind = 25;
-    if (invalid_exit == 3) active_sss->vs.start.players[0].ckind = CKIND_DONKEY;
     active_sss = NULL;
 }
 
@@ -132,14 +213,18 @@ int main(void)
     CSSData css;
     SSSData sss;
     setup(&css);
+    HSD_GObj* retained_p2 = menu_trace_gobj_create(0x101, 2, 0);
+    HSD_GObj* retained_p15 = menu_trace_gobj_create(0x102, 15, 0);
+    HSD_GObj* retained_p1 = menu_trace_gobj_create(0x104, 1, 1);
+    if (retained_p2 == NULL || retained_p15 == NULL ||
+        retained_p1 == NULL || !menu_trace_link_only(2, retained_p2) ||
+        !menu_trace_link_only(15, retained_p15) ||
+        !menu_trace_link_only(1, retained_p1))
+        return 104;
     if (!melee_web_menu_character_available(CKIND_MARIO) ||
         !melee_web_menu_character_available(CKIND_FOX) ||
         !melee_web_menu_character_available(CKIND_CAPTAIN) ||
-#if defined(MELEE_WEB_PUBLIC_RUNTIME)
-        melee_web_menu_character_available(CKIND_DONKEY) ||
-#else
         !melee_web_menu_character_available(CKIND_DONKEY) ||
-#endif
         melee_web_menu_character_available(CKIND_PLAYABLE_COUNT) ||
         !melee_web_menu_stage_available(MELEE_WEB_MENU_FD_ST_KIND) ||
         !melee_web_menu_stage_available(St_Kind_Story) ||
@@ -175,12 +260,7 @@ int main(void)
     if (melee_web_menu_css_selection_valid(&css)) return 52;
     css.vs.start.players[1].ckind = CKIND_DONKEY;
     css.vs.start.players[1].color = 4;
-    if (
-#if defined(MELEE_WEB_PUBLIC_RUNTIME)
-        melee_web_menu_css_selection_valid(&css) ||
-#else
-        !melee_web_menu_css_selection_valid(&css) ||
-#endif
+    if (!melee_web_menu_css_selection_valid(&css) ||
         melee_web_fighter_content(CKIND_DONKEY)->fighter_kind != FTKIND_DONKEY)
         return 102;
     css.vs.start.players[1].color = 5;
@@ -249,11 +329,13 @@ int main(void)
         if (melee_web_menu_tick(session, error, sizeof(error)) !=
                 MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED ||
             !melee_web_menu_leave_css(session, error, sizeof(error)) ||
+            !menu_trace_link_only(2, retained_p2) ||
             !melee_web_menu_enter_sss(session, error, sizeof(error))) return 60;
         transition_request = 1;
         if (melee_web_menu_tick(session, error, sizeof(error)) !=
                 MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED ||
-            !melee_web_menu_leave_sss(session, error, sizeof(error))) return 61;
+            !melee_web_menu_leave_sss(session, error, sizeof(error)) ||
+            !menu_trace_link_only(15, retained_p15)) return 61;
         const VsModeData* ready = melee_web_menu_ready_vs(session);
         if (!ready || ready->start.players[1].slot_type != Gm_PKind_Cpu ||
             ready->start.players[1].cpu_kind != 4 ||
@@ -265,6 +347,33 @@ int main(void)
             active_css->vs.start.players[1].cpu_level != 9 ||
             !melee_web_menu_abort(session, error, sizeof(error)) ||
             !melee_web_menu_session_destroy(session, error, sizeof(error))) return 63;
+    }
+    {
+        MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition};
+        char error[128];
+        MeleeWebMenuSession* session =
+            melee_web_menu_session_create(&runtime, NULL, error, sizeof(error));
+        HSD_GObj* post_scene_owner;
+        if (session == NULL || !melee_web_menu_enter_css(session, error,
+                                                          sizeof(error)))
+            return 105;
+        transition_request = 1;
+        if (melee_web_menu_tick(session, error, sizeof(error)) !=
+                MELEE_WEB_MENU_RESULT_TRANSITION_REQUESTED ||
+            !melee_web_menu_leave_css(session, error, sizeof(error)))
+            return 106;
+        /* An owner created after leave must survive an abort with no open
+         * scene. A stale global snapshot would remove this priority-0 object
+         * before reaching its old saved head. */
+        post_scene_owner = menu_trace_gobj_create(0x103, 1, 0);
+        if (post_scene_owner == NULL ||
+            menu_trace_gobj_heads[1] != post_scene_owner ||
+            post_scene_owner->next != retained_p1 ||
+            !melee_web_menu_abort(session, error, sizeof(error)) ||
+            menu_trace_gobj_heads[1] != post_scene_owner ||
+            post_scene_owner->next != retained_p1 ||
+            !melee_web_menu_session_destroy(session, error, sizeof(error)))
+            return 107;
     }
     {
         MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition};
@@ -408,11 +517,7 @@ int main(void)
     }
     /* Source-private state can be published only by OnExit. The host must
      * never expose a READY payload that was invalidated by that callback. */
-#if defined(MELEE_WEB_PUBLIC_RUNTIME)
-    const int invalid_exit_cases = 3;
-#else
     const int invalid_exit_cases = 2;
-#endif
     for (invalid_exit = 1; invalid_exit <= invalid_exit_cases; ++invalid_exit) {
         MeleeWebMenuRuntime runtime = {NULL, check, scheduler, transition};
         char error[128];

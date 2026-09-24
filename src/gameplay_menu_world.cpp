@@ -14,7 +14,9 @@
 #include "gameplay_audio_stream_asset.hpp"
 #include "gameplay_bootstrap.h"
 #include "gameplay_font_atlas.h"
+#include "gameplay_rumble.h"
 #include "hsd_native_joint.h"
+#include "native_dat.hpp"
 
 extern "C" {
 #include <melee/lb/lbcardgame.h>
@@ -71,6 +73,9 @@ struct GameplayMenuWorld::Storage {
     std::unique_ptr<DatSis> sis;
     std::unique_ptr<DatMenuSupport> card_icons;
     std::unique_ptr<DatMenuSupport> card_scene;
+    std::unique_ptr<NativeDatArena> rumble_arena;
+    MeleeWebRumble* rumble = nullptr;
+    bool rumble_published = false;
 
     std::span<const std::uint8_t> sem;
     std::span<const std::uint8_t> coefficients;
@@ -135,6 +140,9 @@ struct GameplayMenuWorld::Storage {
         world_started = true;
         check(melee_web_native_world_enable(error, sizeof(error)), error,
               "Native menu HSD object lifetime setup failed");
+        check(melee_web_rumble_begin(rumble, error, sizeof(error)), error,
+              "Native menu rumble publication failed");
+        rumble_published = true;
 
         // These owners hydrate the exact source roots before publication. The
         // source files still own scene state, object creation, and animation.
@@ -224,6 +232,18 @@ struct GameplayMenuWorld::Storage {
         archive_cache = cache;
         load_archives(files);
 
+        const auto rumble_source = archive("LbRb.dat");
+        const auto symbols = rumble_source->public_symbols();
+        const auto root = std::find_if(symbols.begin(), symbols.end(),
+            [](const auto& symbol) { return symbol.name == "lbRumbleData"; });
+        if (root == symbols.end()) fail("Missing source lbRumbleData table");
+        if (rumble_source->next_target_offset(root->data_offset) -
+                root->data_offset != 40 * 8)
+            fail("GALE01r2 rumble table must contain 40 source rows");
+        rumble_arena = std::make_unique<NativeDatArena>(rumble_source);
+        rumble = melee_web_rumble_decode(rumble_arena->reader(),
+                                         root->data_offset, 40);
+
         font_bytes = std::span<const std::uint8_t>{require_file(files, "sislib_font.bin")};
         sem = std::span<const std::uint8_t>{require_file(files, "smash2.sem")};
 #if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
@@ -278,6 +298,11 @@ struct GameplayMenuWorld::Storage {
 
     void close_scene(bool discard_card_globals)
     {
+        if (rumble_published) {
+            check(melee_web_rumble_end(rumble, error, sizeof(error)), error,
+                  "Native menu rumble close failed");
+            rumble_published = false;
+        }
         if (world_started) {
             check(melee_web_gameplay_shutdown(error, sizeof(error)), error,
                   "Native menu SDK world shutdown failed");

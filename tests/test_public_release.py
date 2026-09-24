@@ -493,7 +493,8 @@ class PublicReleaseTests(unittest.TestCase):
     def test_player_rejects_nonstandard_generated_private_home_path(self):
         runtime = self.runtime_fixture()
         gameplay = runtime / "gameplay_public.js"
-        gameplay.write_text('FS.mkdir("/home/web_user/private"); // gameplay_public.wasm\n')
+        private_fixture = "/home/" + "web_user/private"
+        gameplay.write_text(f'FS.mkdir("{private_fixture}"); // gameplay_public.wasm\n')
         identity_path = runtime.parent / "runtime-public-identity.json"
         identity = json.loads(identity_path.read_text())
         record = next(item for item in identity["artifacts"] if item["path"].endswith("/gameplay_public.js"))

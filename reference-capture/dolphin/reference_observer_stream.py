@@ -120,6 +120,13 @@ SLICE_NAMES = {
     42: "stage_select_kind",
     43: "menu_css_cursor",
     44: "menu_css_doors",
+    45: "menu_main_flow",
+    46: "menu_main_input",
+    47: "menu_css_model",
+    48: "menu_css_live_state",
+    49: "menu_css_slider",
+    50: "menu_css_context",
+    51: "menu_css_ko_counts",
 }
 
 

@@ -24,7 +24,7 @@ match_asset_names(const MeleeWebMenuMatchSelection& selection);
 // Logical RuntimeFiles names for the original Results scene that follows one
 // checked source VS selection. It repeats the match compatibility checks and
 // adds the authored GmRst roots, per-fighter result-motion archives and the
-// four authored victory themes. It is a read-only descriptor.
+// seven authored victory themes. It is a read-only descriptor.
 [[nodiscard]] std::vector<std::string>
 results_asset_names(const MeleeWebMenuMatchSelection& selection);
 

@@ -3,6 +3,7 @@
 #include "dat_archive.hpp"
 #include "fighter_binding.hpp"
 #include "gameplay_content.h"
+#include "gameplay_result_motion_table.hpp"
 #include <melee/pl/forward.h>
 
 #include <algorithm>
@@ -93,14 +94,14 @@ void menu_contract()
 {
     const auto names = menu_asset_names();
 #if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
-    check(names.size()==32, "Silent menu descriptor excludes only DSP coefficients");
+    check(names.size()==34, "Silent menu descriptor excludes only DSP coefficients");
     check(!has(names,"dsp_coef.bin"), "Public scope must not request DSP coefficients");
 #else
-    check(names.size()==33, "Menu descriptor must include each admitted CSS voice bank");
+    check(names.size()==35, "Menu descriptor must include each admitted CSS voice bank");
     check(has(names,"dsp_coef.bin"), "Development scope requires DSP coefficients");
 #endif
     for(const auto name:{"MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd",
-                         "LbMcGame.usd","NtMemAc.usd","sislib_font.bin","smash2.sem",
+                         "LbMcGame.usd","NtMemAc.usd","LbRb.dat","sislib_font.bin","smash2.sem",
                          "menu01.hps"})
         check(std::find(names.begin(),names.end(),name)!=names.end(),"Missing menu resource");
     const auto banks=menu_audio_bank_names();
@@ -120,7 +121,7 @@ void source_fighter_closure()
         CKIND_MARIO, CKIND_FOX, CKIND_FALCO, CKIND_MARS, CKIND_DRMARIO,
         CKIND_EMBLEM, CKIND_LINK, CKIND_CLINK, CKIND_CAPTAIN, CKIND_GANON,
         CKIND_LUIGI, CKIND_PIKACHU, CKIND_PICHU, CKIND_PURIN, CKIND_DONKEY,
-        CKIND_KOOPA,
+        CKIND_KOOPA, CKIND_MEWTWO,
     };
     for (const int character : characters) {
         const auto* content = melee_web_fighter_content(character);
@@ -143,6 +144,38 @@ void source_fighter_closure()
               "Selected costume model is absent from descriptor");
         check(has(names, content->effect_archive) && has(names, content->audio_bank),
               "Selected fighter effect/audio closure is incomplete");
+        no_duplicates(names);
+    }
+}
+
+void results_fighter_closure()
+{
+    struct Expected {
+        int character;
+        const char* victory_theme;
+    };
+    // gm_1601.c's ckind_victory_themes, resolved through lbaudio's hps table.
+    const std::vector<Expected> fighters = {
+        {CKIND_MARIO, "ff_mario.hps"}, {CKIND_FOX, "ff_fox.hps"},
+        {CKIND_FALCO, "ff_fox.hps"}, {CKIND_MARS, "ff_emb.hps"},
+        {CKIND_DRMARIO, "ff_mario.hps"}, {CKIND_EMBLEM, "ff_emb.hps"},
+        {CKIND_LINK, "ff_link.hps"}, {CKIND_CLINK, "ff_link.hps"},
+        {CKIND_CAPTAIN, "ff_fzero.hps"}, {CKIND_GANON, "ff_link.hps"},
+        {CKIND_LUIGI, "ff_mario.hps"}, {CKIND_PIKACHU, "ff_poke.hps"},
+        {CKIND_PICHU, "ff_poke.hps"}, {CKIND_PURIN, "ff_poke.hps"},
+        {CKIND_DONKEY, "ff_dk.hps"}, {CKIND_KOOPA, "ff_mario.hps"},
+        {CKIND_MEWTWO, "ff_poke.hps"},
+    };
+    for (const auto& expected : fighters) {
+        const auto* content = melee_web_fighter_content(expected.character);
+        check(content != nullptr, "Results fighter content row is missing");
+        const auto names = results_asset_names(selection(
+            St_Kind_Last, expected.character, CKIND_MARIO));
+        const auto motion = result_motion_archive_spec(content->fighter_kind);
+        check(!motion.archive.empty() && has(names, std::string(motion.archive)),
+              "Results fighter archive is absent from descriptor");
+        check(has(names, expected.victory_theme),
+              "Results victory theme is absent from descriptor");
         no_duplicates(names);
     }
 }
@@ -254,9 +287,10 @@ int main(int argc, char** argv)
         }
         menu_contract();
         source_fighter_closure();
+        results_fighter_closure();
         source_stage_music();
         rejects_invalid_without_mutation();
-        std::cout << "Source menu/match asset descriptors, costume closure, authored music candidates, and rejection boundaries: passed\n";
+        std::cout << "Source menu/match/results asset descriptors, fighter/archive closure, authored music candidates, and rejection boundaries: passed\n";
         return 0;
     } catch (const std::exception& error) {
         std::cerr << error.what() << '\n';
