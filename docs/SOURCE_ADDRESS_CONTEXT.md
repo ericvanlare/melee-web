@@ -238,3 +238,8 @@ owned boot inputs. It has not yet joined the DevCom or live browser providers.
 The [DSP startup protocol fixture](SOURCE_DSP_INIT_PROFILE.md) validates original
 SDK task and interrupt handling behind checked synthetic services. It does not
 execute AXOut, DSP firmware or the remaining application allocation history.
+
+The [original AIInit fixture](SOURCE_AI_INIT_PROFILE.md) separately checks the
+source Audio Interface startup boundary. Its owned synthetic DMA programming
+does not establish live audio buffers, AX/DSP initialization or full-session
+equivalence.

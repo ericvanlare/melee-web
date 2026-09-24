@@ -8,6 +8,15 @@ The [scoped receipt](docs/evidence/source-dsp-init-profile-v1.json) records synt
 protocol validation; DSP firmware, AXOut, PCM and live browser integration
 remain open. Full-session equivalence is not established.
 
+## Original AIInit component boundary
+
+The [AIInit fixture](docs/SOURCE_AI_INIT_PROFILE.md) executes original SDK startup
+against a bounded GameCube Audio Interface profile. Its startup snapshot is
+separate from synthetic DMA programming and calibration checks; the
+[scoped receipt](docs/evidence/source-ai-init-profile-v1.json) records validation.
+This has not joined AX/DSP, full audio startup or live browser source bindings.
+Full-session equivalence remains open.
+
 ## Original ARInit profile boundary
 
 The [bounded ARInit oracle](docs/SOURCE_AR_INIT_PROFILE.md) executes original

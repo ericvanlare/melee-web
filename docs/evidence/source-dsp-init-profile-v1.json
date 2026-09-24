@@ -232,5 +232,9 @@
     "Owned task and DRAM buffer are fixture objects, not original AXOut static state.",
     "No DSP firmware execution, command-list execution, PCM, task switching, browser integration or full-session equivalence.",
     "No deployment."
-  ]
+  ],
+  "integration": {
+    "main_commit": "eae75c6992922d73cbc61ea9639367cfa62cd85a",
+    "resolution": "Combined independent evidence-index paragraphs; DSP executable files unchanged from the full-suite-tested commit fb4bac4. CI validates the combined tree."
+  }
 }
