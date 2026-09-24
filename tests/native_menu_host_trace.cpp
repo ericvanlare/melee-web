@@ -472,9 +472,9 @@ int main(int argc,char** argv){try{
    transition();check(melee_web_menu_host_phase(host)==2,"CSS did not choose SSS after No Contest");
    rebuild_menu_scene();
    for(unsigned t=0;t<120;t++)check(tick()==1,"Unexpected post-No-Contest SSS transition");
-   // Results consumes its own original RNG. Select the actual tile rather
-   // than depending on the initial random-hover choice repeating afterward.
-   if(results_mario_recipe)select_stage();
+   // Re-entering SSS can initialize a different source hover. Select the
+   // requested tile through ordinary raw PAD input for every recipe.
+   select_stage();
    transition();check(melee_web_menu_host_phase(host)==5,"SSS did not select the next match after No Contest");
    MeleeWebMenuMatchSelection next_selection{};
    check(melee_web_menu_host_selection(host,&next_selection,error,sizeof(error)),error);

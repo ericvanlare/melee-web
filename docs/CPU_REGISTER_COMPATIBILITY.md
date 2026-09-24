@@ -1,5 +1,9 @@
 # CPU register compatibility investigation
 
+For the current whole-session investigation, see
+[reproducible whole-session register diagnostics](#reproducible-whole-session-register-diagnostics).
+The earlier match-only evidence below remains scoped to its frozen corpus.
+
 **The four-player tick-2495 divergence remains unresolved.** This branch adds
 read-only original-register diagnostics, strict comparison of their bounded
 source-state prefixes, and a port allocation-address diagnostic. It does not
@@ -253,3 +257,63 @@ changes. `docs/CPU_ZERO_KNOCKBACK_ABI.md` corrects the earlier hypothesis.
 Other files are new CPU tooling, tests and documentation. No `runtime.html`,
 renderer/cache, performance, deployment, Cloudflare or shared-player extraction
 files changed. No additional scenarios, reserved holdouts or merges were run.
+
+## Reproducible whole-session register diagnostics
+
+The [whole-session diagnostic receipt](evidence/whole-session-cpu-register-v1.json)
+binds the original runs, instrumented build, browser prefix and retained failures.
+
+The passive JITARM64 observer now has a separate opt-in register companion for
+reducing a CPU mismatch. It observes the fixed, instruction-checked boundaries
+in `tools/cpu-register-gale01r2.json`; it neither executes replacement guest
+instructions nor writes guest memory. The browser still uses compiled source.
+
+With the normal observer and owned-input configuration, set all four variables:
+
+```sh
+MWRC_CPU_PROBE_OUTPUT=/new/local/path/cpu-registers.json
+MWRC_CPU_PROBE_MATCH=0
+MWRC_CPU_PROBE_FIRST_TICK=1768
+MWRC_CPU_PROBE_LAST_TICK=1784
+```
+
+The zero-based match index must exist in the declared capture. The inclusive
+window is limited to 64 source ticks, with at most 4,096 records and 64 MiB of
+serialized output. These are independent limits: dense CPU activity can exceed
+the record cap before 64 ticks, requiring a smaller window. The callback copies
+LR, all GPRs, FPR0–6 as raw bits, bounded
+stack/seed memory, and the existing fighters' head, CPU and flag regions. It
+collects only during the selected active, initialized match. Closing the window
+publishes an immutable buffer to the writer thread. The disabled observer does
+not allocate that buffer or add these JIT boundaries.
+
+The companion is exclusive-create JSON, independent of the primary MWRO event
+schema. It is one JSON document, not JSONL. It omits CR, CTR, XER and the remaining
+FPRs, so it is not a complete machine-state capture. `window_complete` means the
+selected diagnostic window closed; it does
+not mean that the session completed or that gameplay is equivalent. Missing or
+empty windows, invalid instruction/range checks, overflow and write failures
+invalidate the capture. Keep the raw companion and owned memory bytes local.
+Use `MWRC_INPUT_RECORD` on a baseline and `MWRC_INPUT_REPLAY` on the diagnostic
+run to compare the same exact SI samples and emulated polling ticks. Retain and
+compare the primary streams as well: extra observation must not silently
+change the original execution. Keep a receipt binding the companion's capture
+and sequence IDs to the observer binary/source, MWRO and MWRI hashes; the
+companion alone does not establish those identities.
+
+The new four-Mario CPU9, four-stock Final Destination baseline first differs
+from the headless browser at match tick 1,776, player slot 3. Declared core
+fields, PAD history, RNG and source draw batches agree through tick 1,775. The
+original command sequence is `80908180098e017f7f`; its stick values are
+`(-112, -128)`, while the port produces neutral input. The register window
+observes `HSD_Randf` replacing the earlier floor-output pointer in `r5` with
+`0x804d5f90`, followed by the zero-knockback helper consuming that low byte and
+the source fighter pointer's low byte (`r30 = 0x80d1bf80`). These are diagnostic
+observations, not permitted gameplay inputs or a derived allocation history.
+
+This confirms the required shared-runtime work: independently derive the
+original allocation context and fighter identity, preserve the relevant caller
+register definitions, then consume them only on the skipped-conversion path.
+The source-address component remains uninstalled in gameplay. This diagnostic
+change does not establish browser full-session equivalence, pixels, PCM, live
+timing, physical input or performance acceptance.
