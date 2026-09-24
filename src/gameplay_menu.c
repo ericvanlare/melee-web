@@ -547,7 +547,10 @@ static int css_selection_valid_internal(const CSSData* css,
 
 int melee_web_menu_css_selection_valid(const CSSData* css)
 {
-    return css_selection_valid_internal(css, 0);
+    /* fn_80262F44 uses this guard before accepting Start. CSS has selected
+     * fighters, but the following SSS still owns the stage selection. Keep
+     * the original unset cache value until that scene commits its stage. */
+    return css_selection_valid_internal(css, 1);
 }
 
 static int match_selection_valid(const StartMeleeData* start)

@@ -233,6 +233,28 @@ int main(void)
         melee_web_menu_stage_available(25) ||
         !melee_web_menu_css_selection_valid(&css))
         return 1;
+    {
+        /* The real CSS Start callback uses this public guard, separately
+         * from the per-tick progress and OnExit checks. The first original
+         * four-CPU9 CSS still carries stage 0 when Start is pressed. */
+        CSSData first_css = css;
+        first_css.vs.start.rules.stkind = St_Kind_Dummy;
+        for (int i = 0; i < 4; ++i) {
+            PlayerInitData* player = &first_css.vs.start.players[i];
+            player->ckind = CKIND_MARIO;
+            player->slot_type = Gm_PKind_Cpu;
+            player->cpu_kind = 4;
+            player->cpu_level = 9;
+            player->color = i;
+        }
+        if (!melee_web_menu_css_selection_valid(&first_css) ||
+            first_css.vs.start.rules.stkind != St_Kind_Dummy) return 120;
+        first_css.vs.start.rules.stkind = 25;
+        if (melee_web_menu_css_selection_valid(&first_css)) return 121;
+        first_css.vs.start.rules.stkind = St_Kind_Dummy;
+        first_css.vs.start.players[0].ckind = CKIND_PLAYABLE_COUNT;
+        if (melee_web_menu_css_selection_valid(&first_css)) return 122;
+    }
     css.vs.start.players[1].ckind = CKIND_FOX;
     css.vs.start.players[1].color = 3;
     if (!melee_web_menu_css_selection_valid(&css)) return 2;
