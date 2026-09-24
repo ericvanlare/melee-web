@@ -1,0 +1,227 @@
+{
+  "schema": "melee-web-source-ar-init-profile",
+  "version": 1,
+  "date": "2026-09-24",
+  "base_commit": "47a2dd1336c5ab341de9cedba4ad00da81d6b88a",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced",
+    "Retail compared"
+  ],
+  "scope": "Standalone declared ARInit profile; fixture-static stack array, no live source BSS binding",
+  "source_files": [
+    {
+      "path": "tests/source_ar_init_profile_oracle.cpp",
+      "bytes": 18545,
+      "sha256": "afb081c6a4af0fc686f2c61873760da0b8e0b33fc2459266df74ff0bfd5c16da"
+    },
+    {
+      "path": "tests/source_ar_init_profile_include/dolphin.h",
+      "bytes": 2830,
+      "sha256": "b4ef9e0963e33e5f4953779b08688cce2bcfecd921be5a31c9363db0dc3a0fc1"
+    },
+    {
+      "path": "tests/source_ar_init_profile_include/dolphin/ar.h",
+      "bytes": 1477,
+      "sha256": "1bec09d1cb4872d23d92ea4bc7c4a1f13221f95003d09dd01796b0cdab787b88"
+    },
+    {
+      "path": "tests/test_source_ar_init_profile.py",
+      "bytes": 10809,
+      "sha256": "6261207de5c0552af4cf79ee13ff3b96550aee21175863f4711124737ce92727"
+    },
+    {
+      "path": "tools/source_ar_init_fixture.py",
+      "bytes": 3573,
+      "sha256": "c506bb09b3cdf6b7637ca087ca06ef2e6c5b0768da70e1c459c6c1343bf1e6a9"
+    },
+    {
+      "path": "tests/test_source_ar_init_fixture.py",
+      "bytes": 3161,
+      "sha256": "ad81d80cd385e80e53b02eac78856916bb811e05190c4bedb22a9a5642c3eb09"
+    },
+    {
+      "path": "patches/melee-source-ar-init-cxx.patch",
+      "bytes": 532,
+      "sha256": "0643cbb4dfae0251776eafcaa7052c334cdc91f3af3ba27618305eca85d3f2c9"
+    }
+  ],
+  "original_sources": [
+    {
+      "path": ".deps/melee/extern/dolphin/src/dolphin/ar/ar.c",
+      "bytes": 12037,
+      "sha256": "dc2ad84463413ef6b91a8f8fe8acefb26ed35743d63dd85bf6590cec28d95cc8"
+    }
+  ],
+  "hardware_profile_sources": [
+    {
+      "path": "Boot/Boot_BS2Emu.cpp",
+      "bytes": 24436,
+      "sha256": "ed6e86f6bb58b443a0e22e03dddaed22966bf5d7fb09a2d5de4130648e5479b5"
+    },
+    {
+      "path": "HW/DSP.cpp",
+      "bytes": 22043,
+      "sha256": "4339d47f9c052dd1bb95a107ae1702d0453bd76e440cd8b0ef440ed80eb273eb"
+    },
+    {
+      "path": "HW/HSP/HSP_DeviceNull.cpp",
+      "bytes": 334,
+      "sha256": "841b97a3b4d411cdbdf73d037f1067d31c11dabc34eff2afa3f82dac78af5634"
+    }
+  ],
+  "adaptation": "Generated C++ source applies the explained patch for exactly three legacy pointer-result casts and adds four read-only private-state accessors; upstream source unchanged. No PPC interpreter.",
+  "profile": {
+    "aram_bytes": 16777216,
+    "bus_clock_hz": 162000000,
+    "stack_entries": 16,
+    "expansion": "none",
+    "synchronous_probe_transfers": true,
+    "live_source_stack_binding": false
+  },
+  "compiled": {
+    "generated": {
+      "path": "work/source-ar-init-profile/work/ar-init-checked-final-v1/ar_cxx_compat.cpp",
+      "bytes": 12491,
+      "sha256": "fb3e208fe9d88ba1956f5ea07ed1cb71385c03a55869734dfdb320e6c3a2c777"
+    },
+    "source_hashes": {
+      "path": "work/source-ar-init-profile/work/ar-init-checked-final-v1/source-hashes.json",
+      "bytes": 247,
+      "sha256": "e243f4befecf2ea1c6e3759679b3a9cb8a443866a10c177bd88c998c6a3ef93b"
+    },
+    "stdout": {
+      "path": "work/source-ar-init-profile/work/ar-init-checked-final-v1/compile.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stderr": {
+      "path": "work/source-ar-init-profile/work/ar-init-checked-final-v1/compile.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "owned_run": {
+    "source_ar_init_profile.js": {
+      "path": "work/session-equivalence-arinit-scoped-final-v1/source_ar_init_profile.js",
+      "bytes": 61618,
+      "sha256": "d7fbfe46f0d7754b2b5b45cb1fc0673f2bb941e1d805aeb90b0c0b982825e544"
+    },
+    "source_ar_init_profile.wasm": {
+      "path": "work/session-equivalence-arinit-scoped-final-v1/source_ar_init_profile.wasm",
+      "bytes": 26282,
+      "sha256": "bbe47106cd7ed58d7d4d6ef87d19681d425f4342f79371f97eb2a13195e7fbeb"
+    },
+    "stdout.txt": {
+      "path": "work/session-equivalence-arinit-scoped-final-v1/stdout.txt",
+      "bytes": 948,
+      "sha256": "096e80f2940a849c992b288de1f70f2819761d92b67e34bdb41d196241c6067c"
+    },
+    "stderr.txt": {
+      "path": "work/session-equivalence-arinit-scoped-final-v1/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "status.json": {
+      "path": "work/session-equivalence-arinit-scoped-final-v1/status.json",
+      "bytes": 143,
+      "sha256": "9e5027bf9b468ad718382b1acad8c028113344a08220aeb1debc04971e22f4a2"
+    },
+    "comparison.json": {
+      "path": "work/session-equivalence-arinit-scoped-final-v1/comparison.json",
+      "bytes": 1064,
+      "sha256": "f934bb13b77d79029ef081dffb82a37138b482694a3940520c3a654ea3c0e223"
+    },
+    "negative-comparison.json": {
+      "path": "work/session-equivalence-arinit-scoped-final-v1/negative-comparison.json",
+      "bytes": 1121,
+      "sha256": "bbc9388d6ff16bc5abdf80bb350e7a577bdca6ce8fc578d7a472eb1b0afb2c3d"
+    }
+  },
+  "comparison": {
+    "derived_input_groups": 2,
+    "runtime_relation_groups": 6,
+    "runtime_relations": [
+      "return",
+      "size",
+      "stack_pointer",
+      "free_blocks",
+      "block_length_offset",
+      "init_flag"
+    ],
+    "reference": {
+      "path": "work/session-equivalence-arinit-reference-scope-v1.json",
+      "bytes": 1308,
+      "sha256": "ab6f44534cd6e10e84986c8f86e64caa6670172e6f5592b6a0c4f636ab4d06d5"
+    },
+    "comparator": {
+      "path": "work/session-equivalence-run-arinit.py",
+      "bytes": 2486,
+      "sha256": "b7672fe7852b8136562c944b91e8f84a4a51302b31947fad1bfdba376d6aa8ff"
+    },
+    "negative_control": "Same comparator rejects a +4 block-table offset.",
+    "no_runtime_capture_inputs": true
+  },
+  "validation": {
+    "focused": {
+      "tests": 7,
+      "passed": 7,
+      "log": {
+        "path": "work/source-ar-init-profile/work/ar-init-patched-focused-v1.log",
+        "bytes": 1292,
+        "sha256": "be9ad179633280b0e4405e8e3701068bd74e84869a8424799eb288a90abe6f48"
+      }
+    },
+    "full_suite": {
+      "command": "python3 -m unittest discover -s tests -v",
+      "tests": 1373,
+      "passed": 1280,
+      "skipped": 93,
+      "seconds": 288.424,
+      "exit_code": 0,
+      "log": {
+        "path": "work/ar-init-full-suite-final-v1.log",
+        "bytes": 245419,
+        "sha256": "47581bc0eca90eef04f1b296ed6cd3602623ce86fb5d58f93a23031020c8b3f1"
+      },
+      "scope": "Frozen runtime source; builder-only adaptation moved to a checked patch during run, producing identical Wasm and passing final focused checks. DevCom linked fixture unavailable in this checkout; its required CI gate remains active."
+    },
+    "builder_change": {
+      "scope": "Moved the same three-cast adaptation into patches/ after broad discovery began; focused suite rerun with final builder. Generated Wasm identical.",
+      "before": {
+        "path": "work/source-ar-init-profile/work/ar-init-checked-final-v1/source_ar_init_profile.wasm",
+        "bytes": 26282,
+        "sha256": "bbe47106cd7ed58d7d4d6ef87d19681d425f4342f79371f97eb2a13195e7fbeb"
+      },
+      "after": {
+        "path": "work/source-ar-init-profile/work/ar-init-patched-final-v1/source_ar_init_profile.wasm",
+        "bytes": 26282,
+        "sha256": "bbe47106cd7ed58d7d4d6ef87d19681d425f4342f79371f97eb2a13195e7fbeb"
+      }
+    },
+    "repository_content": {
+      "path": "work/ar-init-content-final-v1.log",
+      "bytes": 70,
+      "sha256": "b88ca43f47efcc0193d40d6a9c6c0065f4341339fef952397c2d325c80e21aaa"
+    }
+  },
+  "retained_intermediate_failure": {
+    "log": {
+      "path": "work/source-ar-init-profile/work/ar-init-full-suite-v1.log",
+      "bytes": 271651,
+      "sha256": "79afb2d5be7f7fd96ad4ad4e41183e15038d8ee04cf01c84750ec2257897331c"
+    },
+    "tests": 1365,
+    "errors": 20,
+    "failures": 3,
+    "skipped": 101,
+    "resolution": "20 preparation errors rejected linked .deps; replaced with an isolated APFS copy. Three negative controls used mixed versions during review edits; froze source/test files before the next broad run."
+  },
+  "limits": [
+    "Synthetic ARAlloc/ARFree sequence does not execute original synth reservations or intervening calls.",
+    "No original DSP/cache/timing comparison; only declared functional register profile.",
+    "No live source-stack binding, AI/AX, mailbox/task initialization, PCM, application heaps, scene history or browser CPU carry.",
+    "Full-session equivalence remains open. No deployment."
+  ]
+}

@@ -230,3 +230,7 @@ completion. Its scoped source tests cover priority, cancellation, callback
 reentry and interrupt masking. The [standalone DevCom boundary](SOURCE_DEVCOM_STARTUP.md)
 connects the first direct type-3 request to the validated startup heap. Full
 audio startup and the live browser source context remain open.
+
+The [original ARInit profile](SOURCE_AR_INIT_PROFILE.md) separately executes
+the source hardware-size probes and allocator initialization from declared
+owned boot inputs. It has not yet joined the DevCom or live browser providers.
