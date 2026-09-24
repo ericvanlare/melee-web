@@ -556,11 +556,13 @@ partitioned into 3,346 callbacks with source work and 81 without it. This
 supports the narrow seed correction; it is one reduced diagnostic, not a new
 whole-sequence cold/warm acceptance matrix. Earlier failures remain retained.
 
-### Resume boundary after the usage-conservation checkpoint
+### Historical resume boundary after the usage-conservation checkpoint
 
-Prize and repeated keyboard match returns are functional. Finish the independent
+At this checkpoint, Prize and repeated keyboard match returns were functional.
+The outstanding draft instruction was to finish the independent
 original-comparison and whole-loop timing gates before marking #34 complete or
-merging this draft. No physical controller is required for this PR.
+merging the original Results draft. PR59's later infrastructure scope and still
+open accuracy gates are recorded below. No physical controller was required.
 
 The next original-comparison implementation is a typed first-CSS context and
 continuous whole-session input replay, reusing the current observer and scene
@@ -581,16 +583,79 @@ Still open in this context: the save block's persistent fighter records and
 name banks are captured as bytes but not typed, because the pinned source's own
 offsets for that region disagree with each other; the report keeps
 `persistent_record_semantics` as explicit missing coverage instead of guessing
-them. The current browser replay accepts only one match and deliberately
-rejects a used source heap; it cannot be treated as a whole-session replay by
-concatenating recipes. The opt-in extension must retain one source arena and
-cursor through the real scene chain.
+them.
+
+Whole-session input replay now uses MWRC version 8, context schema 2. It carries
+original first-CSS GameRules, SaveData, CSSData and KO fields alongside the PAD
+history and RNG seed. The native owner translates the PowerPC scalar fields
+into the generated host layouts before original CSS entry; guest callback
+pointers are rejected. Version 7 and the incomplete schema 1 context are
+rejected. The span table must be contiguous, cover every source-consumed sample,
+and name the source owner active at each step. V8 is bounded to 108,000 frames
+and 32 spans; legacy recipes retain their 36,000-frame bound.
+The producer and decoder require the timeline to start in CSS and end in
+Results or Prize, matching the fresh-entry and final-return owner contracts.
+
+The replay must start from a fresh prepared application. It retains that
+prepared CSS owner and the one source arena across subsequent scenes. Starting
+from a used source heap or an already active scene is rejected. Each native
+step consumes the next sample exactly once and rejects a declared scene that
+does not match its current owner. These are transport and ownership checks;
+they do not establish source-state, draw, pixel or audio agreement.
+
+Instrumented v8 output has its own `melee-web-port-session-diagnostic` schema.
+It records supplied inputs, source scene, RNG and PAD history at every step,
+plus fighter state during VS. Match-only CPU and draw-state observers are not
+run for menu scenes, and this diagnostic stream is not accepted as a legacy
+single-match comparison. Completion requires the final original Results/Prize
+return to enter CSS and finish preparation without inventing further PAD ticks.
+
+`tools/whole_session_replay.py` is the producer. It validates complete passive
+streams and derives only source-consumed PAD inputs, with the observed scene
+boundaries and first-CSS context. Single-capture mode makes no repeatability
+claim; pair mode additionally checks independently identified captures. Raw
+record CRCs and descriptors are validated before large diagnostic-only slices
+are discarded from the in-memory export projection. The completed original
+four-player CPU workload is bound by the
+[observer receipt](evidence/whole-session-observer-pr57-v1.json); browser replay
+and original-versus-port equivalence require their own evidence.
 
 Results comparison also needs full typed MatchEnd/standings and the source
 post-OnEnter display state. The current observer's 0x28-byte result prefix does
-not cover player standings. No importer, new Results snapshot or whole-session
-browser replay was implemented at this checkpoint. Two independent original
+not cover player standings. Typed first-CSS import and whole-session replay
+infrastructure do not close that Results comparison gap. Two independent original
 captures per named sequence, browser comparisons, repeated rotation allocation
-bounds and a fresh frozen cold/warm matrix remain open. Run the required final
-full suite, affected public build and CI after these changes settle; focused
-checks do not replace integration verification.
+bounds and a fresh frozen cold/warm matrix remain open. The final suite and
+affected Release builds are recorded in the PR59 receipt below; focused checks
+do not replace integration verification.
+
+### PR59 whole-session producer and bounded replay evidence, 2026-09-24
+
+**Source identified / exporter pass.** The completed original v15 capture contains
+three natural four-player Mario CPU9, Final Destination, four-stock matches and
+returns through Results to CSS. `tools/whole_session_replay.py` exports one
+MWRC v8 candidate with context schema 2, 46,835 source-consumed PAD frames and
+12 contiguous spans. The candidate preserves the first-CSS GameRules,
+SaveData, CSSData and KO context. Its single-capture export and the native
+decode-only transport checks pass; this does not establish independent capture
+repeatability. See the [PR59 evidence receipt](evidence/whole-session-replay-pr59-v1.json).
+
+**Browser exercised / comparison rejected at a bounded prefix.** The v12
+headless run on the pre-`e45a108` consumer failed at the first Results boundary
+at source cursor 16,938. The corrected v13 production run and the final v16
+production run stop intentionally at a 2,700-frame diagnostic target. Their
+core state, RNG, PAD history, match frame and draw batches agree through source
+tick 1,131; the first declared difference is fighter input at source tick 1,132
+(port index 2,472). The final v16 report compares 1,134 source samples, unloads
+all source objects/processes, uses zero instrumented timing resumes and retains
+the incomplete-input failure. The v14 read-only CPU companion records the
+corresponding command 80/81 operand difference, `809081e0098e017f7f` in the
+source and `80008100098e017f7f` in the port. This is consistent with the known
+source address/register-context limitation documented in the [CPU register
+compatibility investigation](CPU_REGISTER_COMPATIBILITY.md); it does not prove
+a new cause or authorize a compatibility rule.
+
+The route therefore remains infrastructure and transport evidence. Full
+original-versus-port whole-session equivalence, independent repeatability,
+typed Results standings, pixels, PCM, live scheduling, performance and
+tournament admission remain open.

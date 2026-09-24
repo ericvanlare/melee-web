@@ -32,7 +32,7 @@ new four-player register capture establish this chain:
 | `800AC754–800AC75C` | `r5 = r30`; command `81` consumes the fighter pointer's low byte. |
 | `800B46DC`, `800B4754` | The command writer retains its argument and stores its low byte. |
 
-At source tick 2495, P2 Mario is in original motion 228 (`ReboundStop`),
+At source tick 2495, P2 Mario is in original motion 228 (`CaptureDamageLw`),
 grounded, with zero velocity and zero knockback on all axes. Hitlag and SDI
 flags are set. CPU timer `x7C` is 330: `330 % 120 = 90` exceeds level 3's
 threshold `120 - 3 * 12 = 84`. The periodic branch reaches the nearly-zero

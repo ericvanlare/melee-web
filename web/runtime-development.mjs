@@ -4,6 +4,21 @@ import {mountControllerSettings} from './controller-settings.mjs';
 import {createRuntimeAudio} from './runtime-audio.mjs';
 import {loadNativeGameDisc, openNativeGameSession} from './runtime-audio-assets.mjs';
 const developmentHooks = {};
+const RETAIL_REPLAY_LEGACY_MAX_FRAMES = 36000;
+const RETAIL_REPLAY_WHOLE_SESSION_MAX_FRAMES = 108000;
+const RETAIL_REPLAY_STATE_RECORD_OVERHEAD = 4;
+const RETAIL_REPLAY_SESSION_RECORD_OVERHEAD = 32 + 2;
+const RETAIL_REPLAY_TIMER_RECORD_OVERHEAD = 3;
+const RETAIL_REPLAY_LEGACY_WALL_TIME_MS = 900000;
+const RETAIL_REPLAY_WHOLE_SESSION_WALL_TIME_MS = RETAIL_REPLAY_LEGACY_WALL_TIME_MS * 3;
+function retailReplayWallTimeMs(wholeSession) {
+  return wholeSession ? RETAIL_REPLAY_WHOLE_SESSION_WALL_TIME_MS : RETAIL_REPLAY_LEGACY_WALL_TIME_MS;
+}
+// Keep the upload ceiling identical to kRetailReplayWholeSessionMaxBytes in
+// gameplay_retail_recipe.hpp. The span table admits all 32 bounded spans;
+// rejecting the final 31 would make the browser stricter than the decoder.
+const RETAIL_REPLAY_MAX_BYTES = 16 + 4 + 8 + (0x18 + 0x55E8 + 0x148 + 6) +
+  0x138 + 822 + RETAIL_REPLAY_WHOLE_SESSION_MAX_FRAMES * 44 + 2 + 32 * 12;
 let owner, controllerSettings, Module, boundary, status, check, put, prepareAudio, pauseAudioForPreparation;
 let syncAudio, unloadAndSave, prepareNativeResources, waitForAudioAck;
 let preparationKeepsAudio = false;
@@ -171,15 +186,15 @@ async function finishRetailReplay(reason){
  metrics.audioOverflowFrames=Number(latestAudio.overflows||0)-(run.baseline?.overflows??0);
  if(diagnosticCapture?.invalid){diagnosticCaptureInvalid=true;if(!run.failure)run.failure='Diagnostic hitch capture overflow';}
  reason=reason||run.failure;
- const failures=[];if(reason)failures.push(reason);if(!teardown)failures.push('teardown incomplete');if(metrics.sourceFrames!==run.frames)failures.push('incomplete input timeline');if(metrics.sourceSteps!==run.frames||metrics.sourceDraws!==(run.expectedDraws??run.frames))failures.push('source tick/draw count mismatch');
+ const failures=[];if(run.wholeSession&&run.finalScene!==1)failures.push('whole-session final CSS was not entered');if(reason)failures.push(reason);if(!teardown)failures.push('teardown incomplete');if(metrics.sourceFrames!==run.frames)failures.push('incomplete input timeline');if(metrics.sourceSteps!==run.frames||metrics.sourceDraws!==(run.expectedDraws??run.frames))failures.push('source tick/draw count mismatch');
  if(diagnosticCaptureInvalid)failures.push('diagnostic capture invalid');if(!run.observe){for(const key of ['browserCallbackGaps','browserLongTasks','nativeCallbacksOver33ms','livePipelinesQueued','livePipelinesCreated','preparationPauses','audioUnderrunFrames','audioOverflowFrames','focusLost'])if(metrics[key])failures.push(key);}
  const sourceMatch=run.sourceMatch||{complete:false,outcome:null,winner:null};
- const report={input_scheduling:['per_tick','startup_clock','recorded_queue'][run.scheduling??0],scheduling_equivalence:'not_evaluated',schema:'melee-web-browser-retail-replay',version:1,recipe_sha256:run.hash,frames:run.frames,mode:run.observe?'state_capture':'performance',complete:teardown&&metrics.sourceFrames===run.frames&&!reason,pass:failures.length===0,failures,performance:run.observe?'not_evaluated':'measured',gold_admitted:false,pixels:'not_compared',source_match:sourceMatch,instrumented_timing_resumes:run.timingResumes||0,metrics,diagnostic_capture:diagnosticCapture,diagnostic_page_paint:run.paintControl?.evidence||null,memory:run.memory,preparation:run.preparation,cache:run.cache,user_agent:navigator.userAgent,resolution:[640,480],device_pixel_ratio:devicePixelRatio};
+ const report={input_scheduling:['per_tick','startup_clock','recorded_queue'][run.scheduling??0],scheduling_equivalence:'not_evaluated',schema:'melee-web-browser-retail-replay',version:1,recipe_sha256:run.hash,frames:run.frames,mode:run.observe?'state_capture':'performance',complete:teardown&&metrics.sourceFrames===run.frames&&!reason,pass:failures.length===0,failures,performance:run.observe?'not_evaluated':'measured',gold_admitted:false,pixels:'not_compared',source_match:sourceMatch,final_scene:run.finalScene??null,instrumented_timing_resumes:run.timingResumes||0,metrics,diagnostic_capture:diagnosticCapture,diagnostic_page_paint:run.paintControl?.evidence||null,memory:run.memory,preparation:run.preparation,cache:run.cache,user_agent:navigator.userAgent,resolution:[640,480],device_pixel_ratio:devicePixelRatio};
  if(run.observe){const trace=run.rows.join('\n')+'\n';report.trace_sha256=await replayHash(new TextEncoder().encode(trace));replayDownload('retail-port.jsonl',trace);if(run.timerRows.length){const timers=run.timerRows.join('\n')+'\n';report.timer_trace_sha256=await replayHash(new TextEncoder().encode(timers));replayDownload('retail-timer.jsonl',timers);}}
  const text=JSON.stringify(report,null,2);window.lastRetailReplayReport=report;$('retail-replay-report').textContent=text;replayDownload('retail-browser-report.json',text);retailRun=null;$('launch').disabled=fatal||!bundle;$('disc').disabled=fatal||importing;$('pause').disabled=$('unload').disabled=true;syncAudio();
 }
 window.menuReplayStarted=(frames,observe,draws=frames,scheduling=0)=>{const run=retailRun;if(!run)throw Error('Missing browser replay owner');if(!Number.isInteger(draws)||draws<1||draws>frames)throw Error('Invalid replay clock draw count');if(![0,1,2].includes(scheduling)||(scheduling===2&&!observe))throw Error('Invalid replay scheduling scope');run.scheduling=scheduling;run.frames=frames;run.expectedDraws=draws;run.observe=observe;run.preparation=latestNativePreparation;run.memory.prepared=replayMemorySnapshot();resetTiming(false);run.baseline={preparations:preparationCount,heap:Module.HEAPU8.length,underruns:Number(latestAudio.underruns||0),overflows:Number(latestAudio.overflows||0)};run.lastProgress=performance.now();};
-window.menuReplayCompleted=(frames,matchComplete,outcome,winner)=>{if(retailRun){retailRun.consumed=frames;retailRun.completed=true;retailRun.sourceMatch={complete:!!matchComplete,outcome:Number.isInteger(outcome)?outcome:null,winner:Number.isInteger(winner)?winner:null};setTimeout(()=>finishRetailReplay(null),0);}};
+window.menuReplayCompleted=(frames,matchComplete,outcome,winner,finalScene)=>{if(retailRun){retailRun.finalScene=finalScene;retailRun.consumed=frames;retailRun.completed=true;retailRun.sourceMatch={complete:!!matchComplete,outcome:Number.isInteger(outcome)?outcome:null,winner:Number.isInteger(winner)?winner:null};setTimeout(()=>finishRetailReplay(null),0);}};
 window.menuReplayPoll=()=>{
  $('retail-replay-start').disabled=!ready||fatal||!bundle||replayLoading||!!retailRun||!$('retail-replay-file').files[0];
  const run=retailRun;if(!run||run.finishing||run.completed)return;
@@ -193,21 +208,36 @@ window.menuReplayPoll=()=>{
   if(run.observe&&reason.startsWith('Paused after a timing disruption')){run.timingResumes=(run.timingResumes||0)+1;run.lastProgress=now;boundary(()=>Module._melee_web_native_menu_pause(0));}
   else finishRetailReplay(reason||'Replay stopped');
  }}
- if(now-run.started>900000)finishRetailReplay('Replay exceeded bounded wall time');
+ if(now-run.started>retailReplayWallTimeMs(run.wholeSession))finishRetailReplay('Replay exceeded bounded wall time');
 };
 $('retail-replay-start').onclick=async()=>{
  if(replayLoading||retailRun||!ready||fatal||!bundle)return;
  replayLoading=true;$('retail-replay-start').disabled=$('disc').disabled=$('launch').disabled=true;
  try{
   if(window.meleeHitchCaptureLoading)await window.meleeHitchCaptureLoading;if(window.meleeHitchCaptureLoadError&&hitchCaptureFromUrl)throw Error(`Hitch capture unavailable: ${window.meleeHitchCaptureLoadError}`);
-  const file=$('retail-replay-file').files[0];if(!file||file.size<328||file.size>1909162)throw Error('Invalid bounded MWRC input recipe');
+  // Native parsing applies the legacy 36,000-frame limit and the v8
+  // whole-session 108,000-frame limit after reading the version. This upload
+  // bound admits the largest checked v8 envelope without widening legacy
+  // formats or allowing an unbounded allocation.
+  const file=$('retail-replay-file').files[0];if(!file||file.size<328||file.size>RETAIL_REPLAY_MAX_BYTES)throw Error('Invalid bounded MWRC input recipe');
   const bytes=new Uint8Array(await file.arrayBuffer()),hash=await replayHash(bytes),observe=$('retail-replay-mode').value==='state';
-  if(!await unloadAndSave())throw Error(status());resetTiming(false);await prepareAudio();await pauseAudioForPreparation();
+  // The v8 route enters the canonical, freshly prepared CSS owner. Unloading
+  // here would discard its scoped assets before native launch. This header
+  // probe selects ownership only; the native decoder validates the recipe and
+  // rejects an already used source heap before accepting it.
+  const header=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+  const wholeSession=bytes.length>=8&&header.getUint32(0,false)===0x4d575243&&header.getUint32(4,false)===8;
+  if(wholeSession&&owner.handle.getState().state!=='prepared')throw Error('Whole-session replay requires a freshly imported disc before opening character select.');
+  if(!wholeSession&&!await unloadAndSave())throw Error(status());resetTiming(false);await prepareAudio();await pauseAudioForPreparation();
   for(const old of $('retail-replay-downloads').querySelectorAll('a'))URL.revokeObjectURL(old.href);$('retail-replay-downloads').replaceChildren();replayEvidence=[];$('save-replay-evidence').disabled=true;
-  retailRun={hash,observe,rows:[],timerRows:[],memory:{before_preparation:replayMemorySnapshot()},frames:0,started:performance.now(),lastProgress:performance.now(),lastCursor:0,focusLost:false,cache:{state:Module.runtimeCacheState?.state||'unknown',bytes:Number(Module.runtimeCacheState?.fileBytes||0),cleared_on_startup:clearRenderCacheOnLoad,driver_cache:'uncontrolled'}};
+  retailRun={hash,observe,wholeSession,rows:[],timerRows:[],memory:{before_preparation:replayMemorySnapshot()},frames:0,started:performance.now(),lastProgress:performance.now(),lastCursor:0,focusLost:false,cache:{state:Module.runtimeCacheState?.state||'unknown',bytes:Number(Module.runtimeCacheState?.fileBytes||0),cleared_on_startup:clearRenderCacheOnLoad,driver_cache:'uncontrolled'}};
   uiMessage='';$('retail-replay-report').textContent='Preparing reference replay…';$('launch').disabled=true;$('pause').disabled=$('unload').disabled=false;
   retailRun.paintControl=beginReplayPaintControl();
   await boundary(()=>{const ptr=Module._malloc(bytes.length);try{if(!ptr)throw Error('Replay allocation failed');Module.HEAPU8.set(bytes,ptr);check(Module._melee_web_native_menu_replay(ptr,bytes.length,observe?1:0));}finally{Module._free(ptr);}});
+  // A whole-session recipe keeps one source arena and cursors through the real
+  // scene chain, so it enters CSS through the ordinary launch instead of the
+  // single-match replay's direct match construction.
+  if(Module._melee_web_native_menu_replay_whole_session?.())await boundary(()=>check(Module._melee_web_native_menu_launch()));
   $('canvas').focus();inputDirty=true;syncAudio();
  }catch(error){if(retailRun)await finishRetailReplay(error.message);else $('retail-replay-report').textContent=error.message;}
  finally{replayLoading=false;if(!retailRun){$('disc').disabled=fatal||importing;$('launch').disabled=fatal||!bundle;}}
@@ -262,9 +292,15 @@ try {
     onError(error){log(error.message);$('status').dataset.runtimeError=error.message;},
     onLog(text,isError){
       if(retailRun?.observe&&!isError&&text.startsWith('{"record":')){
-        if(retailRun.rows.length>=36004)throw Error('Replay trace exceeded its record bound');retailRun.rows.push(text);
+        const limit=retailRun.wholeSession
+          ? RETAIL_REPLAY_WHOLE_SESSION_MAX_FRAMES+RETAIL_REPLAY_SESSION_RECORD_OVERHEAD
+          : RETAIL_REPLAY_LEGACY_MAX_FRAMES+RETAIL_REPLAY_STATE_RECORD_OVERHEAD;
+        if(retailRun.rows.length>=limit)throw Error('Replay trace exceeded its record bound');retailRun.rows.push(text);
       }else if(retailRun?.observe&&isError&&text.startsWith('TIMER_AUDIT ')){
-        if(retailRun.timerRows.length>=36003)throw Error('Timer trace exceeded its record bound');retailRun.timerRows.push(text.slice(12));
+        const limit=retailRun.frames>RETAIL_REPLAY_LEGACY_MAX_FRAMES
+          ? RETAIL_REPLAY_WHOLE_SESSION_MAX_FRAMES+RETAIL_REPLAY_TIMER_RECORD_OVERHEAD
+          : RETAIL_REPLAY_LEGACY_MAX_FRAMES+RETAIL_REPLAY_TIMER_RECORD_OVERHEAD;
+        if(retailRun.timerRows.length>=limit)throw Error('Timer trace exceeded its record bound');retailRun.timerRows.push(text.slice(12));
       }else log(text);
     },
     onEvent(name,data){

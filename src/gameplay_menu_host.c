@@ -58,6 +58,9 @@ struct MeleeWebMenuHost {
     u16 saved_characters,saved_stages;
     u16 selected_characters,selected_stages;
     u16 route_saved_characters,route_saved_stages;
+    uint8_t initial_game_rules[0x18];
+    uint8_t initial_save_data[0x55E8];
+    int initial_replay_context;
     VsModeData route_saved_vs;
     MatchExitInfo route_saved_exit;
     ResultsMatchInfo route_saved_result;
@@ -117,6 +120,42 @@ MeleeWebMenuHost* melee_web_menu_host_create(char* e,size_t n){
     h->saved_seed=seed_ptr;h->seed=*seed_ptr;seed_ptr=&h->seed;
     owner=h;ok(e,n);return h;
 }
+
+int melee_web_menu_host_apply_replay_context(
+    MeleeWebMenuHost* h, uint32_t random_seed,
+    const uint8_t pad_state[MELEE_WEB_PAD_STATE_BYTES],
+    const uint8_t css_data[0x148], const uint8_t ko_counts[GM_MAX_PLAYERS],
+    const uint8_t game_rules[0x18], const uint8_t save_data[0x55E8],
+    char* e, size_t n)
+{
+    MeleeWebPadState* input;
+    if(!h||h!=owner||h->entered||h->audio||h->initial_replay_context||
+       !pad_state||!css_data||!ko_counts||!game_rules||!save_data||
+       melee_web_menu_phase(h->session)!=MELEE_WEB_MENU_CREATED||
+       seed_ptr!=&h->seed)
+        return fail(e,n,"Whole-session first-CSS context requires an unentered menu host");
+    /* Profile application is the other owner mutation in this operation.
+     * Check its aliases before decoding or installing CSS so a stale profile
+     * cannot leave an unentered session holding a committed CSS context. */
+    if(!melee_web_save_profile_owner_live(h->profile,e,n))return 0;
+    input=melee_web_pad_state_decode(pad_state,MELEE_WEB_PAD_STATE_BYTES,e,n);
+    if(!input)return 0;
+    if(!melee_web_menu_apply_reference_css_context(
+           h->session,css_data,ko_counts,e,n)){
+        melee_web_pad_state_free(input);
+        return 0;
+    }
+    if(!melee_web_save_profile_owner_apply_reference_context(
+           h->profile,game_rules,save_data,e,n)){
+        melee_web_pad_state_free(input);
+        return 0;
+    }
+    memcpy(h->initial_game_rules,game_rules,sizeof(h->initial_game_rules));
+    memcpy(h->initial_save_data,save_data,sizeof(h->initial_save_data));
+    melee_web_pad_state_free(h->input);h->input=input;
+    h->seed=random_seed;h->initial_replay_context=1;
+    return ok(e,n);
+}
 static void restore_context(MeleeWebMenuHost* h){
     HSD_PadLibData=h->saved_library;
     memcpy(HSD_PadGameStatus,h->saved_game,sizeof(h->saved_game));
@@ -152,12 +191,24 @@ int melee_web_menu_host_enter(MeleeWebMenuHost* h,MeleeWebAudio* audio,char* e,s
     memcpy(h->saved_copy,HSD_PadCopyStatus,sizeof(h->saved_copy));
     lbLang_SetLanguageSetting(LANG_US);lbLang_SetSavedLanguage(LANG_US);
     if(phase==MELEE_WEB_MENU_CREATED){
-        *gmMainLib_GetGameRules()=gmMainLib_803D4A48;
-        gmMainLib_GetGameRules()->mode=1;gmMainLib_GetGameRules()->stock_count=4;
-        gmMainLib_8015CC58()->item_freq=(u8)-1;
-        gmMainLib_8015CC58()->item_mask=UINT64_MAX;
-        gmMainLib_8015CC58()->rumble_enabled[0]=true;
-        gmMainLib_8015CC58()->rumble_enabled[1]=true;
+        if(h->initial_replay_context){
+            /* Re-apply the copied source ranges immediately before OnEnter so
+             * construction cannot accidentally replace the declared context.
+             * The owner performs endian-aware layout translation. */
+            if(!melee_web_save_profile_owner_apply_reference_context(
+                   h->profile,h->initial_game_rules,h->initial_save_data,e,n)){
+                restore_context(h);return 0;
+            }
+        }else{
+            *gmMainLib_GetGameRules()=gmMainLib_803D4A48;
+            gmMainLib_GetGameRules()->mode=1;gmMainLib_GetGameRules()->stock_count=4;
+        }
+        if(!h->initial_replay_context){
+            gmMainLib_8015CC58()->item_freq=(u8)-1;
+            gmMainLib_8015CC58()->item_mask=UINT64_MAX;
+            gmMainLib_8015CC58()->rumble_enabled[0]=true;
+            gmMainLib_8015CC58()->rumble_enabled[1]=true;
+        }
         /* Exact authored profile masks were installed once at host creation.
          * Scene entry must not reset source unlock or Prize progress. */
     }else{

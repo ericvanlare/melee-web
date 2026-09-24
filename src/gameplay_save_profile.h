@@ -48,6 +48,14 @@ int melee_web_save_profile_owner_set_roster(MeleeWebSaveProfileOwner*,
                                             uint16_t stages, char* error,
                                             size_t error_size);
 
+/* Apply the observer's first-CSS source context while the owner is active.
+ * The two ranges are PowerPC big-endian source bytes.  This function copies
+ * them into the owned source objects through the generated layouts, swapping
+ * every typed scalar it installs; it never stores a guest pointer. */
+int melee_web_save_profile_owner_apply_reference_context(
+    MeleeWebSaveProfileOwner*, const uint8_t game_rules[0x18],
+    const uint8_t save_data[0x55E8], char* error, size_t error_size);
+
 /* Run the source's once-per-session fresh-profile initialization while the
  * complete global and Toy backing snapshots are owned. This resets source
  * profile data (never the retained scene heap), chooses the owned US language,

@@ -137,7 +137,8 @@ assert(start&&pause&&completion);
 }
 {
  const logHook=page.slice(page.indexOf('    onLog(text,isError){'),page.indexOf('    onEvent(name,data){'));
- const moduleLine='const hooks={'+logHook+'}; var Module={print:text=>hooks.onLog(text,false),printErr:text=>hooks.onLog(text,true)};';
+ const replayLimits=page.match(/const RETAIL_REPLAY_(?:LEGACY_MAX_FRAMES|WHOLE_SESSION_MAX_FRAMES|STATE_RECORD_OVERHEAD|SESSION_RECORD_OVERHEAD|TIMER_RECORD_OVERHEAD|MAX_BYTES)[^;]*;/g).join('\n');
+ const moduleLine=replayLimits+'\nconst hooks={'+logHook+'}; var Module={print:text=>hooks.onLog(text,false),printErr:text=>hooks.onLog(text,true)};';
  const logged=[];
  const scope={$:()=>({}),retailRun:{observe:true,rows:[],timerRows:[]},
   log:text=>logged.push(text),stop(){}};
@@ -157,6 +158,17 @@ assert(start&&pause&&completion);
  scope.retailRun.observe=true;
  scope.retailRun.timerRows.length=36003;
  assert.throws(()=>scope.Module.printErr('TIMER_AUDIT '+timer),/record bound/);
+ scope.retailRun={observe:true,wholeSession:true,frames:46835,rows:[],timerRows:[]};
+ scope.retailRun.rows.length=108033;
+ scope.Module.print(state);
+ assert.equal(scope.retailRun.rows.length,108034,'v8 admits bounded per-span initialization records');
+ scope.retailRun.timerRows.length=108002;
+ scope.Module.printErr('TIMER_AUDIT '+timer);
+ assert.equal(scope.retailRun.timerRows.length,108003,'v8 timer capture keeps its three-budget record bound');
+ scope.retailRun.rows.length=108034;
+ assert.throws(()=>scope.Module.print(state),/record bound/);
+ scope.retailRun.timerRows.length=108003;
+ assert.throws(()=>scope.Module.printErr('TIMER_AUDIT '+timer),/record bound/);
 }
 {
  const memory=page.slice(page.indexOf('const replayMemorySnapshot='),page.indexOf('\nfunction replayMetrics('));
@@ -169,17 +181,18 @@ assert(start&&pause&&completion);
  assert.equal(vm.runInContext('replayMemorySnapshot().reason',scope),'unavailable');
  assert.equal(nativeCalls,1,'Optional diagnostics failure must not prevent replay evidence');
 }
-function harness(unload=true){
+function harness(unload=true,wholeSession=false){
  let resolveBytes;
  const pending=new Promise(resolve=>resolveBytes=resolve);
  const elements=new Map();
  const $=id=>{if(!elements.has(id))elements.set(id,{disabled:false,textContent:'',files:[],value:'performance',querySelectorAll:()=>[],replaceChildren(){},focus(){}});return elements.get(id);};
  $('retail-replay-file').files=[{size:1194,arrayBuffer:()=>pending}];
- const calls={native:0,unload:0,audio:0,paused:0,timingResets:0,failed:[]};
+ const calls={native:0,unload:0,audio:0,paused:0,timingResets:0,failed:[],launch:0};
  const scope={$,retailRun:null,replayLoading:false,ready:true,fatal:false,bundle:true,importing:false,
   replayEvidence:[],uiMessage:'',inputDirty:false,clearRenderCacheOnLoad:false,
   window:{},setTimeout:fn=>fn(),
-  TextEncoder,Uint8Array,URL,performance,replayHash:async()=> 'a'.repeat(64),
+  owner:{handle:{getState:()=>({state:'prepared'})}},
+  TextEncoder,Uint8Array,DataView,URL,performance,replayHash:async()=> 'a'.repeat(64),
   replayMemorySnapshot:()=>({wasm_heap_bytes:2048}),
   status:()=> 'teardown failed',unloadAndSave:async()=>{calls.unload++;return unload;},
   resetTiming:()=>{calls.timingResets++;},prepareAudio:async()=>{calls.audio++;},pauseAudioForPreparation:async()=>{},
@@ -188,9 +201,12 @@ function harness(unload=true){
   finishRetailReplay:async reason=>{calls.failed.push(reason);calls.completedRun=scope.retailRun;scope.retailRun=null;},
   Module:{HEAPU8:new Uint8Array(2048),_malloc:()=>1,_free(){},
    _melee_web_native_menu_replay:()=>{calls.native++;return 1;},
+   _melee_web_native_menu_replay_whole_session:()=>wholeSession?1:0,
+   _melee_web_native_menu_launch:()=>{calls.launch++;return 1;},
    _melee_web_native_menu_running:()=>1,
    _melee_web_native_menu_pause:()=>{calls.paused++;}}};
- vm.createContext(scope);vm.runInContext(start+'\n'+pause,scope);
+ const replayLimits=page.match(/const RETAIL_REPLAY_(?:LEGACY_MAX_FRAMES|WHOLE_SESSION_MAX_FRAMES|STATE_RECORD_OVERHEAD|SESSION_RECORD_OVERHEAD|TIMER_RECORD_OVERHEAD|MAX_BYTES)[^;]*;/g).join('\n');
+ vm.createContext(scope);vm.runInContext(replayLimits+'\n'+start+'\n'+pause,scope);
  return {$,scope,calls,resolveBytes,play:()=>$('retail-replay-start').onclick()};
 }
 {
@@ -213,7 +229,8 @@ function harness(unload=true){
 }
 {
  const h=harness();const first=h.play();const duplicate=h.play();
- assert.equal(h.scope.replayLoading,true);assert.equal(h.$('disc').disabled,true);
+ assert.equal(h.scope.replayLoading,true,'replayLoading is set before the first async read');
+ assert.equal(h.$('disc').disabled,true,'disc import is disabled during replay loading');
  h.resolveBytes(new ArrayBuffer(1194));await Promise.all([first,duplicate]);
  assert.equal(h.calls.unload,1);assert.equal(h.calls.native,1);assert.equal(h.scope.replayLoading,false);
  await h.play();assert.equal(h.calls.native,1,'An active replay cannot be replaced');
@@ -223,6 +240,31 @@ function harness(unload=true){
  assert.equal(h.calls.native,0);assert.equal(h.calls.audio,0);
  assert.equal(h.$('retail-replay-report').textContent,'teardown failed');
  assert.equal(h.scope.replayLoading,false);assert.equal(h.$('disc').disabled,false);
+}
+{
+ const h=harness(true,true);const playing=h.play();
+ const bytes=new ArrayBuffer(1194),header=new DataView(bytes);
+ header.setUint32(0,0x4d575243,false);header.setUint32(4,8,false);
+ h.resolveBytes(bytes);await playing;
+ assert.equal(h.calls.unload,0,'Whole-session replay retains the canonical prepared CSS assets');
+ assert.equal(h.calls.native,1);
+ assert.equal(h.calls.launch,1,'A whole-session recipe enters CSS through the ordinary launch');
+}
+{
+ const h=harness(true,true);
+ h.scope.owner.handle.getState=()=>({state:'match'});
+ const playing=h.play(),bytes=new ArrayBuffer(1194),header=new DataView(bytes);
+ header.setUint32(0,0x4d575243,false);header.setUint32(4,8,false);
+ h.resolveBytes(bytes);await playing;
+ assert.equal(h.calls.unload,0,'A rejected late upload must preserve the active match');
+ assert.equal(h.calls.native,0);assert.equal(h.calls.launch,0);
+ assert.equal(h.calls.failed.length,0,'No replay owner exists to tear down');
+ assert.match(h.$('retail-replay-report').textContent,/freshly imported disc/);
+}
+{
+ const h=harness();const playing=h.play();h.resolveBytes(new ArrayBuffer(1194));await playing;
+ assert.equal(h.calls.native,1);
+ assert.equal(h.calls.launch,0,'A single-match recipe keeps its direct match construction');
 }
 {
  const h=harness();h.scope.retailRun={observe:false};await h.$('pause').onclick();

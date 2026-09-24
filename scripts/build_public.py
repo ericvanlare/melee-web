@@ -117,6 +117,7 @@ RUNTIME_REQUIRED_EXPORTS = (
 )
 RUNTIME_FORBIDDEN_EXPORTS = frozenset({
     "_melee_web_native_menu_replay", "_melee_web_native_menu_replay_cursor",
+    "_melee_web_native_menu_replay_whole_session",
     "_melee_web_native_menu_confirm_check", "_melee_web_native_menu_pad_sample",
     "_melee_web_native_menu_pad_sample_full", "_melee_web_native_menu_player_state",
     "_melee_web_native_menu_drive_fighter", "_melee_web_native_menu_drive_stage",
