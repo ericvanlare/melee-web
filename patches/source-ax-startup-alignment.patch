@@ -1,0 +1,36 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+Subject: [PATCH] Preserve authored AX DMA alignment requirements
+
+AXCL and AXOut assert 32-byte alignment before handing these arrays to the
+DSP/DMA path, but their declarations do not carry the SDK alignment attribute.
+This patch adds only the SDK's 32-byte alignment attribute to those existing
+objects. It keeps
+their names, element types, dimensions, order, and initialization unchanged;
+the later same-translation-unit accessors report the resulting live spans.
+
+diff --git a/extern/dolphin/src/dolphin/ax/AXCL.c b/extern/dolphin/src/dolphin/ax/AXCL.c
+--- a/extern/dolphin/src/dolphin/ax/AXCL.c
++++ b/extern/dolphin/src/dolphin/ax/AXCL.c
+@@ -4,7 +4,7 @@
+ #include <dolphin/ax.h>
+ 
+ static u16 __AXHRTFHistory[128];
+-static u16 __AXCommandList[2][384];
++static u16 __AXCommandList[2][384] ATTRIBUTE_ALIGN(32);
+ 
+ static u32 __AXCommandListPosition;
+ static u16* __AXClWrite;
+diff --git a/extern/dolphin/src/dolphin/ax/AXOut.c b/extern/dolphin/src/dolphin/ax/AXOut.c
+--- a/extern/dolphin/src/dolphin/ax/AXOut.c
++++ b/extern/dolphin/src/dolphin/ax/AXOut.c
+@@ -4,8 +4,8 @@
+ #include <dolphin/ax.h>
+ #include <dolphin/dsp.h>
+ 
+-static s16 __AXOutBuffer[2][320];
+-static long __AXOutSBuffer[160];
++static s16 __AXOutBuffer[2][320] ATTRIBUTE_ALIGN(32);
++static long __AXOutSBuffer[160] ATTRIBUTE_ALIGN(32);
+ AXPROFILE __AXLocalProfile;
+ DSPTaskInfo task;
+ u16 ax_dram_image[8192];

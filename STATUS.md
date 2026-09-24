@@ -1,5 +1,14 @@
 # Current status
 
+## Original AX startup reaches first AI DMA
+
+**Compiled / Source identified / Native traced** for the [joined AX startup fixture](docs/SOURCE_AX_STARTUP.md).
+Original AX units and the original DSP handler initialize the actual AX task and
+enable its first DMA through checked modeled services. The
+[scoped receipt](docs/evidence/source-ax-startup-v1.json) records validation and
+negative controls. DSP firmware, PCM, full Synth/application startup and live
+browser integration remain open; this does not establish session equivalence.
+
 ## CPU source-word ownership prerequisite
 
 **Compiled / Source identified** for the [typed CPU carry boundary](docs/CPU_R5_CARRY.md).
@@ -13,8 +22,8 @@ CPU call-site hooks remain open; the first session divergence is unchanged.
 The [DSP startup fixture](docs/SOURCE_DSP_INIT_PROFILE.md) executes original SDK
 boot/task/handler routines with checked mailbox, interrupt and context services.
 The [scoped receipt](docs/evidence/source-dsp-init-profile-v1.json) records synthetic
-protocol validation; DSP firmware, AXOut, PCM and live browser integration
-remain open. Full-session equivalence is not established.
+protocol validation. The later AX fixture above joins original AXOut; DSP
+firmware, PCM and live browser integration remain open. Full-session equivalence is not established.
 
 ## Original AIInit component boundary
 
@@ -22,7 +31,8 @@ The [AIInit fixture](docs/SOURCE_AI_INIT_PROFILE.md) executes original SDK start
 against a bounded GameCube Audio Interface profile. Its startup snapshot is
 separate from synthetic DMA programming and calibration checks; the
 [scoped receipt](docs/evidence/source-ai-init-profile-v1.json) records validation.
-This has not joined AX/DSP, full audio startup or live browser source bindings.
+This standalone result excludes the later AX fixture above, full audio startup
+and live browser source bindings.
 Full-session equivalence remains open.
 
 ## Original ARInit profile boundary
