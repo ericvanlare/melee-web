@@ -4,17 +4,17 @@ from __future__ import annotations
 import copy
 import json
 from pathlib import Path
+import sys
 import tempfile
 import unittest
 from unittest import mock
 
-# Keep the focused test importable when unittest invokes it by absolute path or
-# from outside the repository root, as CI does with ``python -I``.
+# Keep focused tests importable from outside the repository under python -I.
 ROOT = Path(__file__).resolve().parents[1]
-import sys
 sys.path.insert(0, str(ROOT))
 
 from tools.compaction_manager_state import FIELDS
+
 from tools.allocation_history_replay import ReplayProblem
 from tools.allocation_history_replay import ModelDriver
 from tools.allocation_lifetime_replay import (

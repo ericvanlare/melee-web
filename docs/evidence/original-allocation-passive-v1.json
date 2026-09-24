@@ -193,6 +193,11 @@
     {
       "path": "work/session-equivalence-allocation-build-v9.log",
       "reason": "Source archive refused overwrite after whitespace-only cleanup produced same binary SHA; preserved original archive and created separate final source archive."
+    },
+    {
+      "path": "work/session-equivalence-pr16-ci-unit0-raw.log",
+      "ci_run": 36020270255,
+      "reason": "Two replay test imports depended on repository root in Python path; fixed explicit test roots and verified both modules with isolated Python (-I). Other substantive CI jobs passed; aggregate reflected unit failure."
     }
   ],
   "not_established": [
@@ -282,6 +287,15 @@
         "path": "work/session-equivalence-allocation-observer-final-tests.log",
         "bytes": 776,
         "sha256": "2196ed1d2cbee2fa6455f68ff8cb2d0cbf3b8112c25aee424cfd4f1170d4e6d5"
+      }
+    },
+    "isolated_replay_import_tests": {
+      "tests": 27,
+      "result": "pass",
+      "log": {
+        "path": "work/session-equivalence-pr16-import-tests-v1.log",
+        "bytes": 5115,
+        "sha256": "7720fb3be3c79e110d8a0cf7722fb6f419b0ba62323fd90cc44d5981476240e7"
       }
     }
   }
