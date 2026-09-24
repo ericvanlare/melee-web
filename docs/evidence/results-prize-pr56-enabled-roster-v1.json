@@ -47,6 +47,12 @@
       "local_path": "work/testlogs/pr56-results-roster-focused-unittest-20260924.log",
       "sha256": "8b53116138d8e8ad8503fae33844cdbb7a134fff158c9c61ee97e2f155a8a668",
       "result": "pass (12 tests, 3 optional fixture skips)"
+    },
+    {
+      "command": "python3 -m unittest discover -s tests -v",
+      "local_path": "work/testlogs/pr56-fullsuite-enabled-roster-20260924.log",
+      "sha256": "c4a5d94e7406f63cd0cc42560f8820011b97fa8ab55f636db46eaa7dd14ee421",
+      "result": "pass (1174 tests, 84 optional fixture skips)"
     }
   ],
   "remaining": [
