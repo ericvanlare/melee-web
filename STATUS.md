@@ -1,5 +1,17 @@
 # Current status
 
+## Mewtwo capture and menu ownership repair
+
+The Mewtwo Confusion victim command rows and menu rumble/GObj lifetime repairs
+are validated at their declared boundaries. **Native traced**: the original
+menu/four-stock lifecycle completes twice with cancellation and teardown.
+**Browser exercised**: Release and RelWithDebInfo both select Mewtwo through
+the original CSS, cancel SSS, capture/release Mario with Confusion and unload.
+See the [merge review receipt](docs/evidence/mewtwo-crash-merge-review-v1.json)
+for exact builds, retained failures and integration checks. This repairs a
+crash; independent equivalence, full fighter admission and deployment are
+separate gates.
+
 ## Donkey Kong platform shield-drop repair
 
 The Battlefield shield-drop crash from [issue #50](https://github.com/ericvanlare/melee-web/issues/50)
