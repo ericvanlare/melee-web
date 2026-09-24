@@ -94,10 +94,10 @@ void menu_contract()
 {
     const auto names = menu_asset_names();
 #if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
-    check(names.size()==34, "Silent menu descriptor excludes only DSP coefficients");
+    check(names.size()==36, "Silent menu descriptor excludes only DSP coefficients");
     check(!has(names,"dsp_coef.bin"), "Public scope must not request DSP coefficients");
 #else
-    check(names.size()==35, "Menu descriptor must include each admitted CSS voice bank");
+    check(names.size()==37, "Menu descriptor must include each admitted CSS voice bank");
     check(has(names,"dsp_coef.bin"), "Development scope requires DSP coefficients");
 #endif
     for(const auto name:{"MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd",
@@ -121,7 +121,8 @@ void source_fighter_closure()
         CKIND_MARIO, CKIND_FOX, CKIND_FALCO, CKIND_MARS, CKIND_DRMARIO,
         CKIND_EMBLEM, CKIND_LINK, CKIND_CLINK, CKIND_CAPTAIN, CKIND_GANON,
         CKIND_LUIGI, CKIND_PIKACHU, CKIND_PICHU, CKIND_PURIN, CKIND_DONKEY,
-        CKIND_KOOPA, CKIND_MEWTWO,
+        CKIND_KOOPA, CKIND_NESS, CKIND_PEACH,
+        CKIND_MEWTWO,
     };
     for (const int character : characters) {
         const auto* content = melee_web_fighter_content(character);
@@ -164,7 +165,8 @@ void results_fighter_closure()
         {CKIND_LUIGI, "ff_mario.hps"}, {CKIND_PIKACHU, "ff_poke.hps"},
         {CKIND_PICHU, "ff_poke.hps"}, {CKIND_PURIN, "ff_poke.hps"},
         {CKIND_DONKEY, "ff_dk.hps"}, {CKIND_KOOPA, "ff_mario.hps"},
-        {CKIND_MEWTWO, "ff_poke.hps"},
+        {CKIND_MEWTWO, "ff_poke.hps"}, {CKIND_NESS, "ff_nes.hps"},
+        {CKIND_PEACH, "ff_mario.hps"},
     };
     for (const auto& expected : fighters) {
         const auto* content = melee_web_fighter_content(expected.character);

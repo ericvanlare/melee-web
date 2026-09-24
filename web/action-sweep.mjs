@@ -246,6 +246,52 @@ const mewtwo=[
   aerialSpecial('Disable (air)',[[360,360]],0,-80),
 ];
 
+// Ness's authored special table starts at 348 and his three smashes replace
+// the common AttackS4/Hi4/Lw4 states. These recipes preserve the source input
+// edges used by the native Ness trace: PK Flash releases from a fresh B edge
+// after its charge loop, while the other specials use a directional B edge.
+const nessCommon=common.map(row=>
+  row.name==='forward smash'?{...row,expect:[[341,341]]}:
+  row.name==='up smash'?{...row,expect:[[342,344]]}:
+  row.name==='down smash'?{...row,expect:[[345,347]]}:row);
+const ness=[
+  {name:'PK Flash charge/release',expect:[[348,351]],settle:true,
+    inputs:[input(120,PAD.B),input(2),input(1,PAD.B),input(240)]},
+  {name:'PK Flash (air)',expect:[[352,355]],settle:true,
+    inputs:[input(12,PAD.X),input(80,PAD.B),input(180)]},
+  ground('PK Fire',[[356,356]],input(1,PAD.B,80),input(180)),
+  {name:'PK Fire (air)',expect:[[357,357]],settle:true,
+    inputs:[input(12,PAD.X),input(1,PAD.B,-80),input(180)]},
+  ground('PK Thunder',[[358,361]],input(1,PAD.B,0,80),input(240)),
+  {name:'PK Thunder (air)',expect:[[362,366]],settle:true,
+    inputs:[input(12,PAD.X),input(1,PAD.B,0,80),input(240)]},
+  ground('PSI Magnet',[[367,371]],input(1,PAD.B,0,-80),input(180)),
+  {name:'PSI Magnet (air)',expect:[[372,376]],settle:true,
+    inputs:[input(12,PAD.X),input(1,PAD.B,0,-80),input(180)]},
+];
+
+// Peach's authored self-motion table starts at 341. Her forward smash uses
+// the three source weapon states; Float is driven from the original held
+// down+jump check before each aerial input.
+const peachCommon=common.map(row=>
+  row.name==='forward smash'?{...row,expect:[[349,351]]}:row);
+const peach=[
+  ground('Toad counter',[[365,366]],input(1,PAD.B),input(180)),
+  {name:'Toad counter (air)',expect:[[367,368]],settle:true,
+    inputs:[input(12,PAD.X),input(1,PAD.B),input(180)]},
+  ground('Vegetable pull',[[352,352]],input(1,PAD.B,0,-80),input(180)),
+  {name:'Vegetable pull (air)',expect:[[353,353]],settle:true,
+    inputs:[input(12,PAD.X),input(1,PAD.B,0,-80),input(180)]},
+  ground('Bomber',[[354,356]],input(1,PAD.B,80),input(240)),
+  {name:'Bomber (air)',expect:[[357,360]],settle:true,
+    inputs:[input(12,PAD.X),input(1,PAD.B,-80),input(240)]},
+  ground('Parasol',[[361,362]],input(1,PAD.B,0,80),input(300)),
+  {name:'Parasol (air)',expect:[[363,364]],settle:true,
+    inputs:[input(12,PAD.X),input(1,PAD.B,0,80),input(300)]},
+  {name:'Float',expect:[[341,348]],settle:true,
+    inputs:[input(12,PAD.X|PAD.Y,0,-80),input(180)]},
+];
+
 export const actionInventories=new Map([
  [18,{id:'marth-visible-actions-v1',fighter:'Marth',minimumStageFrames:4200,cases:[...common,...wavedashes,...marth]}],
  [21,{id:'dr-mario-visible-actions-v1',fighter:'Dr. Mario',minimumStageFrames:4800,cases:[...common,...wavedashes,...drMario]}],
@@ -261,6 +307,8 @@ export const actionInventories=new Map([
  [3,{id:'donkey-kong-visible-actions-v1',fighter:'Donkey Kong',minimumStageFrames:7000,cases:[...common,...donkey]}],
  [5,{id:'bowser-visible-actions-v1',fighter:'Bowser',minimumStageFrames:5600,cases:[...koopaCommon,...koopa]}],
  [16,{id:'mewtwo-visible-actions-v1',fighter:'Mewtwo',minimumStageFrames:6400,cases:[...mewtwoCommon,...mewtwo]}],
+ [8,{id:'ness-visible-actions-v1',fighter:'Ness',minimumStageFrames:5200,cases:[...nessCommon,...wavedashes,...ness]}],
+ [9,{id:'peach-visible-actions-v1',fighter:'Peach',minimumStageFrames:5600,cases:[...peachCommon,...wavedashes,...peach]}],
 ]);
 
 export function actionInventory(fighterKind){return actionInventories.get(fighterKind)||null;}

@@ -21,8 +21,8 @@ export const NATIVE_MENU_DISC_FILES=Object.freeze({
   'LbRb.dat':'LbRb.dat',
   'menu01.hps':'audio/menu01.hps','smash2.sem':'audio/us/smash2.sem',
   ...Object.fromEntries(['main','nr_select','nr_title','nr_name','pokemon','end',
-    'captain','dk','fox','koopa','link','luigi','mario','mars','mewtwo','pikachu','purin',
-    'falco','clink','drmario','emblem','pichu','ganon','pupupu']
+    'captain','dk','fox','koopa','link','luigi','mario','mars','ness','peach','pikachu','purin',
+    'mewtwo','falco','clink','drmario','emblem','pichu','ganon','pupupu']
     .map(name=>[name+'.ssm','audio/us/'+name+'.ssm']))
 });
 export const NATIVE_GAME_DISC_FILES=Object.freeze({
@@ -31,9 +31,9 @@ export const NATIVE_GAME_DISC_FILES=Object.freeze({
   'LbBf.dat':'LbBf.dat',
   'GmRst.usd':'GmRst.usd','SdRst.usd':'SdRst.usd','TyDatai.usd':'TyDatai.usd',
   's_info1.hps':'audio/s_info1.hps','s_info2.hps':'audio/s_info2.hps','s_info3.hps':'audio/s_info3.hps','IfPrize.usd':'IfPrize.usd','SdPrize.usd':'SdPrize.usd',
-  ...Object.fromEntries(['Mr','Dr','Fx','Fc','Ms','Fe','Lk','Cl','Ca','Dk','Gn','Kp','Lg','Mt','Pk','Pc','Pr']
+  ...Object.fromEntries(['Mr','Dr','Fx','Fc','Ms','Fe','Lk','Cl','Ca','Dk','Gn','Kp','Lg','Mt','Ns','Pe','Pk','Pc','Pr']
     .map(kind=>[`GmRstM${kind}.dat`,`GmRstM${kind}.dat`])),
-  ...Object.fromEntries(['mario','fox','emb','link','fzero','dk','poke']
+  ...Object.fromEntries(['mario','fox','emb','link','fzero','dk','poke','nes']
     .map(name=>[`ff_${name}.hps`,`audio/ff_${name}.hps`])),
   'PlMrYe.dat':'PlMrYe.dat','PlMrBk.dat':'PlMrBk.dat',
   'PlMrBu.dat':'PlMrBu.dat','PlMrGr.dat':'PlMrGr.dat',
@@ -103,6 +103,16 @@ export const NATIVE_GAME_DISC_FILES=Object.freeze({
   'PlKp.dat':'PlKp.dat','PlKpAJ.dat':'PlKpAJ.dat','PlKpNr.dat':'PlKpNr.dat',
   'PlKpRe.dat':'PlKpRe.dat','PlKpBu.dat':'PlKpBu.dat','PlKpBk.dat':'PlKpBk.dat',
   'EfKpData.dat':'EfKpData.dat','koopa.ssm':'audio/us/koopa.ssm',
+  // Ness is source FighterKind 8 (CharacterKind 0x0B) with four costume
+  // owners and its own effect archive and voice bank.
+  'PlNs.dat':'PlNs.dat','PlNsAJ.dat':'PlNsAJ.dat','PlNsNr.dat':'PlNsNr.dat',
+  'PlNsYe.dat':'PlNsYe.dat','PlNsBu.dat':'PlNsBu.dat','PlNsGr.dat':'PlNsGr.dat',
+  'EfNsData.dat':'EfNsData.dat','ness.ssm':'audio/us/ness.ssm',
+  // Peach is source FighterKind 9 (CharacterKind 0x0C) with five costume
+  // owners and its own effect archive and voice bank.
+  'PlPe.dat':'PlPe.dat','PlPeAJ.dat':'PlPeAJ.dat','PlPeNr.dat':'PlPeNr.dat',
+  'PlPeYe.dat':'PlPeYe.dat','PlPeWh.dat':'PlPeWh.dat','PlPeBu.dat':'PlPeBu.dat',
+  'PlPeGr.dat':'PlPeGr.dat','EfPeData.dat':'EfPeData.dat','peach.ssm':'audio/us/peach.ssm',
   'PlMt.dat':'PlMt.dat','PlMtAJ.dat':'PlMtAJ.dat','PlMtNr.dat':'PlMtNr.dat',
   'PlMtRe.dat':'PlMtRe.dat','PlMtBu.dat':'PlMtBu.dat','PlMtGr.dat':'PlMtGr.dat',
   'EfMtData.dat':'EfMtData.dat','mewtwo.ssm':'audio/us/mewtwo.ssm',

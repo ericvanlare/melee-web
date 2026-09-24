@@ -51,6 +51,23 @@ class DatFighterRuntimeTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("Koopa 0xa0 attributes", result.stdout)
 
+    def test_real_ness_attribute_boundary(self):
+        asset = ROOT / "assets-local/full-game-ness/PlNs.dat"
+        if not asset.is_file():
+            self.skipTest("owned Ness fighter archive is unavailable")
+        result = subprocess.run([str(self.binary), "real_ness", str(asset)],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Ness 0xDC attributes", result.stdout)
+
+    def test_real_peach_attribute_boundary(self):
+        asset = ROOT / "assets-local/full-game-peach/PlPe.dat"
+        if not asset.is_file():
+            self.skipTest("owned Peach fighter archive is unavailable")
+        result = subprocess.run([str(self.binary), "real_peach", str(asset)],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Peach 0xC0 attributes", result.stdout)
     def test_real_mewtwo_attribute_boundary(self):
         asset = ROOT / "assets-local/full-game-mewtwo/PlMt.dat"
         if not asset.is_file():

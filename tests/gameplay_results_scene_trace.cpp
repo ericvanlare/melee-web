@@ -245,12 +245,12 @@ int main(int argc,char** argv){try{
             CKIND_MARIO, CKIND_DRMARIO, CKIND_FOX, CKIND_FALCO,
             CKIND_MARS, CKIND_EMBLEM, CKIND_LINK, CKIND_CLINK,
         };
-        constexpr std::array<int, 17> real_enabled_opponents = {
+        constexpr std::array<int, 19> real_enabled_opponents = {
             CKIND_MARIO, CKIND_FOX, CKIND_FALCO, CKIND_MARS,
             CKIND_DRMARIO, CKIND_EMBLEM, CKIND_LINK, CKIND_CLINK,
             CKIND_CAPTAIN, CKIND_GANON, CKIND_LUIGI, CKIND_PIKACHU,
             CKIND_PICHU, CKIND_PURIN, CKIND_DONKEY, CKIND_KOOPA,
-            CKIND_MEWTWO,
+            CKIND_MEWTWO, CKIND_NESS, CKIND_PEACH,
         };
         const auto opponents = real_enabled
             ? std::span<const int>(real_enabled_opponents)

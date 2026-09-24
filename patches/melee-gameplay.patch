@@ -5191,7 +5191,7 @@ index 4a66512..2e85ce4 100644
          mnCharSel_804D6CF6 = 5;
          sfxForward();
          break;
-@@ -5528,3 +5562,45 @@ void mnCharSel_Scene_OnExit(void* unused)
+@@ -5528,3 +5562,94 @@ void mnCharSel_Scene_OnExit(void* unused)
      lbAudioAx_8002702C(4, tmp);
      lbAudioAx_80027168();
  }
@@ -5236,6 +5236,55 @@ index 4a66512..2e85ce4 100644
 +    return melee_web_css_observe_port(0, ckind, ids, geometry);
 +}
 +
++/* Observation only: report the authored four-door CSS state needed by an
++ * ordinary single-cursor browser recipe. Every value is copied from the live
++ * source structs; this function never writes guest state or drives input. */
++int melee_web_css_observe_setup(int cursors[4][4], int doors[4][10],
++                                float geometry[4][12])
++{
++    int i;
++    if (!mnCharSel_804D6CB0 || !mnCharSel_804D6CC0 || !cursors || !doors ||
++        !geometry) return 0;
++    for (i = 0; i < 4; ++i) {
++        struct CSSCursorData* cursor = mnCharSel_804A0BC0[i];
++        struct CSSCharModel* model = mnCharSel_804A0BD0[i];
++        CSSDoor* door = &mnCharSel_803F0DFC.doors[i];
++        HSD_JObj* slider = NULL;
++        if (!cursor || !model) return 0;
++        /* Resolve the authored joint without asking HSD to rebuild matrices.
++         * A dirty published matrix is explicitly reported as not ready. */
++        lb_80011E24(mnCharSel_804D6CC0, &slider, door->cpuslider_joint, -1);
++        if (!slider || (!(slider->flags & JOBJ_USER_DEF_MTX) &&
++                        (slider->flags & JOBJ_MTX_DIRTY))) return 0;
++        cursors[i][0] = cursor->x4;
++        cursors[i][1] = cursor->x5;
++        cursors[i][2] = cursor->x6;
++        cursors[i][3] = cursor->x7;
++        doors[i][0] = door->p_kind;
++        doors[i][1] = door->p_kind_prev;
++        doors[i][2] = door->sel_icon;
++        doors[i][3] = mnCharSel_804D6CB0->vs.start.players[i].ckind;
++        doors[i][4] = mnCharSel_804D6CB0->vs.start.players[i].slot_type;
++        doors[i][5] = mnCharSel_804D6CB0->vs.start.players[i].cpu_level;
++        doors[i][6] = mnCharSel_804D6CB0->vs.start.players[i].slot;
++        doors[i][7] = mnCharSel_804D6CF5;
++        doors[i][8] = door->cpuslider_joint;
++        doors[i][9] = door->cpuslider2_joint;
++        geometry[i][0] = cursor->xC;
++        geometry[i][1] = cursor->x10;
++        geometry[i][2] = model->x8;
++        geometry[i][3] = model->xC;
++        geometry[i][4] = door->togglebtn_left;
++        geometry[i][5] = door->togglebtn_right;
++        geometry[i][6] = door->teambtn_left;
++        geometry[i][7] = door->teambtn_right;
++        geometry[i][8] = slider->mtx[0][3] - 2.9f;
++        geometry[i][9] = slider->mtx[1][3] + 1.7f;
++        geometry[i][10] = slider->translate.x;
++        geometry[i][11] = (float) (slider->flags & JOBJ_MTX_DIRTY);
++    }
++    return 1;
++}
 +#endif
 diff --git a/src/melee/lb/lb_0195.c b/src/melee/lb/lb_0195.c
 --- a/src/melee/lb/lb_0195.c
