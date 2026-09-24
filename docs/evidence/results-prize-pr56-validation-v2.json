@@ -1,0 +1,128 @@
+{
+  "schema": "melee-web-results-prize-validation",
+  "version": 2,
+  "source_base_commit": "0e1e06c7d0b084378152e0af2ad1911dc84e6466",
+  "scope": "PR56 Results and Prize lifecycle validation on the current-main tree with the reviewed append-only pipeline seed. This receipt covers authored Results/Prize bounds, the completed native source route, a current-head Release runtime, three headless browser Results returns with one original Prize visit and CSS teardown, and the post-seed repository suite. It does not establish original-game equivalence, PCM, performance, or admission of fighters whose private authored archives were not in the fixture set.",
+  "seed_receipt": "docs/evidence/results-prize-pipeline-seed-v1.json",
+  "builds": [
+    {
+      "command": "python3 scripts/build.py --target runtime --configuration Release --jobs 2",
+      "local_path": "work/testlogs/pr56-runtime-release-build-seed-20260923.log",
+      "sha256": "093176e276c00bd7ac909c4bef0683b481a1f373ccc372f4dab2d175abb720c5",
+      "result": "pass",
+      "artifacts": {
+        "runtime.html": "7dbdba45a72835799f02df323ce93e762ed3ad9d8941522ebe4d550913460172",
+        "gameplay_menu_browser.js": "9757f35d17d12739d98a1ed327caee2797ede449fd1a36178b21b71ecda1fd67",
+        "gameplay_menu_browser.wasm": "4d952e2cfadaea4172693cd07d21157f75e731bbde9a6d9f543f6be22e305fc4",
+        "gameplay_menu_browser.data": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      }
+    },
+    {
+      "command": ".venv/bin/cmake --build build/browser-release --target gameplay_results_assets_test gameplay_results_scene_trace gameplay_prize_assets_test native_menu_host_trace -j2",
+      "local_path": "work/testlogs/pr56-results-target-build-release-20260923.log",
+      "sha256": "c2ed93ffd93c840755c0e91392ae593b1b52de9b7aaf6c208123feaceb1dde2e",
+      "result": "pass"
+    }
+  ],
+  "focused_checks": [
+    {
+      "command": "python3 -m unittest tests.test_pipeline_cache_seed -v",
+      "result": "pass (5 tests)",
+      "scope": "Decoded digest, SQLite schema/group counts, existing Link/Marth descriptors, all 26 reviewed Results additions, and identity rejection"
+    },
+    {
+      "command": "node build/browser-release/gameplay_results_assets_test.js assets-local/results-fixtures",
+      "local_path": "work/testlogs/results-assets-20260923-rerun.log",
+      "sha256": "56eab424ad7ba70c249eb65fefa5288bde84cc01e59186eee1e82fa64f094537",
+      "result": "pass",
+      "scope": "73 authored clips across Mario, Dr. Mario, Fox, Falco, Marth, Roy, Link, and Young Link"
+    },
+    {
+      "command": "node build/browser-release/gameplay_prize_assets_test.js assets-local/results-fixtures",
+      "local_path": "work/testlogs/prize-assets-20260923-rerun.log",
+      "sha256": "040bd4aae900abb1a8ce53bf71e5dc5d1df90892eebc64190ec63f2651374fc3",
+      "result": "pass",
+      "scope": "Authored IfPrize SceneDesc and SdPrize SIS roots, including 393 typed entries"
+    },
+    {
+      "command": "node build/browser-release/gameplay_results_scene_trace.js --real-eight-confirm assets-local/results-fixtures assets-local/results-fixtures assets-local/results-fixtures",
+      "local_path": "work/testlogs/results-scene-confirm-20260923-rerun.log",
+      "sha256": "dbe45d31b7b1bf6890481253fe01538215b5ccce29e796bc289a4bce32c22bb1",
+      "result": "pass",
+      "scope": "16 source Results confirmations across eight fighters and both winner orientations, with post-close source ownership checks"
+    },
+    {
+      "command": "node build/browser-release/native_menu_host_trace.js assets-local/results-fixtures assets-local/results-fixtures 32 work/testlogs/native-menu-results-trace-seed.jsonl d96a64feae917450a13ed49b8613f720077df7f1 results-mario-v1",
+      "local_path": "work/testlogs/native-menu-results-seed-20260923.log",
+      "sha256": "6298c84fc90035bb8aab93db5e02d48b71f2878bb48f098e5cfb0099ae84a69c",
+      "trace_sha256": "309b55614f0d389526730e5a0dc751dce0efa899e36b953e5e1d70b4c03345b9",
+      "result": "pass",
+      "scope": "Original No Contest Results, Prize over 88 source ticks, Ready/Go, GAME ending, transition and CSS return; no retail/rendered claim"
+    },
+    {
+      "command": "python3 -m unittest discover -s tests -v",
+      "local_path": "work/testlogs/pr56-fullsuite-seed-20260923.log",
+      "sha256": "fd5a2c7e0fba7a81124b89727bc2c836427d0e2af3c7d3df761b5bb41b1fab1b",
+      "result": "pass",
+      "tests": 1168,
+      "skips": 84,
+      "skip_scope": "Existing optional private stage/audio fixtures and other bounded targets unavailable in this checkout"
+    },
+    {
+      "command": "python3 scripts/check_repository_content.py --ref HEAD",
+      "result": "pass",
+      "findings": 0,
+      "scope": "Historical HEAD guard; staged seed/docs guard is run before commit"
+    }
+  ],
+  "browser": {
+    "command": "node work/pr56-versus-return-headless.mjs --url http://127.0.0.1:8791/runtime.html --disc <owned-local-disc> --out work/pr56-browser-results-seed-v1 --playwright <pinned-playwright>",
+    "server": "python3 scripts/serve.py --directory build/browser-release --port 8791",
+    "report": "work/pr56-browser-results-seed-v1/report.json",
+    "report_sha256": "f95f17980d73d0151a31798d682297ed60991c4f136685d7594a6443b3f93aa2",
+    "log": "work/testlogs/pr56-browser-results-seed-v1.log",
+    "log_sha256": "3608ef368360df5134b49bded50183e40ba2eda59e3dc0facc703a8cd49df1cf",
+    "results_screenshot": "work/pr56-browser-results-seed-v1/results.png",
+    "results_screenshot_sha256": "ec258b943ec7edd73b2ecdbd374e954aae0637be74938d6d5f59b23655f4862e",
+    "boundary_screenshot": "work/pr56-browser-results-seed-v1/boundary.png",
+    "boundary_screenshot_sha256": "2e980c61e61ee0940838ce2566ae4fa0027957677453ac360969db1b434b69ea",
+    "result": "pass",
+    "checks": "Owned disc to original CSS; three Mario/Final Destination No Contest CSS\u2192SSS\u2192match\u2192Results\u2192Start\u2192CSS returns; one original Prize visit; same source arena identity; no runtime errors"
+  },
+  "prize_render": {
+    "harness": "Temporary headless one-match copy of tests/versus_return_browser_test.mjs with a screenshot at the original Prize phase",
+    "report": "work/pr56-browser-prize-seed-v1/report.json",
+    "report_sha256": "5b8cf18c32031edfd3303de20b4a339eb1c27bfa06b7b88fe08b153e10282d26",
+    "log": "work/testlogs/pr56-browser-prize-seed-v1.log",
+    "log_sha256": "312458e78525cd0feb9dfef784847000efb5c119d42c3e5ada382077a6e3eaa3",
+    "screenshot": "work/pr56-browser-prize-seed-v1/prize-1.png",
+    "screenshot_sha256": "35a53d6414cccc88204e38d6c58c13222380ede33ef1436b3f97bd2c3097847e",
+    "result": "pass",
+    "scope": "Original unlock notification Prize scene observed with source ownership and subsequent CSS teardown in the one-match report"
+  },
+  "retained_failures": [
+    {
+      "local_path": "work/testlogs/native-menu-results-20260923-rerun.log",
+      "sha256": "07e63b6bae9a30ba6fd24a45edd772422fc131664471844de17c7c427d16ff4e",
+      "result": "blocked_fixture",
+      "reason": "Earlier full-menu run lacked captain.ssm; the completed fixture now includes the owned bank and the seed native route passes."
+    },
+    {
+      "local_path": "work/testlogs/pr56-browser-results-v2.log",
+      "sha256": "573048606705c946629492a6760d6e847720a1819d25595804c5626eab465f66",
+      "result": "preparation_failure",
+      "reason": "Parallel headed workload caused a browser callback/staging gap; no acceptance claim was made."
+    },
+    {
+      "local_path": "work/testlogs/pr56-browser-results-v3.log",
+      "sha256": "e8af7ca40ba89f4bd812e740c9e6dc3661630dd584c8eb1eb86b8f0cb7756ad8",
+      "result": "preparation_failure",
+      "reason": "Parallel headed workload caused a browser callback/staging gap; no acceptance claim was made."
+    }
+  ],
+  "remaining": [
+    "Original retail equivalence, PCM comparison, performance acceptance and four-CPU level-9 workload remain outside this receipt.",
+    "Real authored Results archives and victory themes for newly admitted fighters outside the eight-fighter fixture set remain unvalidated locally."
+  ],
+  "deployed": false
+}
