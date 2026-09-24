@@ -64,15 +64,36 @@ def fighter_state(memory, slot, pointer):
     return value
 
 
+def pad_snapshot_bytes(raw):
+    """Convert the observer's authored 0x358-byte PAD block to semantic PAD.
+
+    Whole-session MWRO menu boundaries publish the same source block that the
+    single-match semantic decoder reads through ``SliceMemory``.  Keeping the
+    conversion here gives derived exporters one checked path for the initial
+    CSS context; it does not turn a host input or a CPU observation into replay
+    data.
+    """
+    if not isinstance(raw, (bytes, bytearray)) or len(raw) != 0x358:
+        raise SemanticError("source PAD snapshot must be exactly 0x358 bytes")
+    value = bytes(raw[:0x20])[:10] + bytes(raw[:0x20])[12:]
+    # The source range includes an eight-byte gap between its 0x20-byte
+    # configuration prefix and the first 0x110-byte bank.
+    for offset in (0x28, 0x138, 0x248):
+        bank = raw[offset:offset + 0x110]
+        value += b"".join(bank[i:i + 66] for i in range(0, 0x110, 68))
+    result = value.hex()
+    _pad_state(result, "passive PAD state")
+    return result
+
+
 def pad_snapshot(memory):
-    config = memory(0x804C1F84, 0x20)
-    value = config[:10] + config[12:]
-    for base in (0x804C1FAC, 0x804C20BC, 0x804C21CC):
-        bank = memory(base, 0x110)
-        value += b"".join(bank[i:i+66] for i in range(0, 0x110, 68))
-    value = value.hex()
-    _pad_state(value, "passive PAD state")
-    return value
+    raw = bytearray(0x358)
+    raw[:0x20] = memory(0x804C1F84, 0x20)
+    for offset, address in ((0x28, 0x804C1FAC),
+                            (0x138, 0x804C20BC),
+                            (0x248, 0x804C21CC)):
+        raw[offset:offset + 0x110] = memory(address, 0x110)
+    return pad_snapshot_bytes(raw)
 
 
 def state_snapshot(memory, fighters):
