@@ -1,5 +1,9 @@
 # Repository history audit
 
+The [September 24 pre-freeze refresh](PUBLICATION_PRE_FREEZE.md) records the
+newer ref inventory and finding dispositions separately. The original review
+below remains historical evidence; neither snapshot freezes future refs.
+
 The September 20, 2026 pass covered the fetched remote branches and pull-request
 head/merge refs, plus readiness commit
 `7930221343adab157a2283adc76fab2aec0407a2`. The

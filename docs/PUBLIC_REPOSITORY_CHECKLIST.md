@@ -10,6 +10,11 @@ at [`2c2b687f5bb7dbfcb3c75dc0394c04bb97f2114d`](https://github.com/ericvanlare/m
 Observations below describe that checkpoint. Recheck the eventual publication
 commit and live repository settings before closing the checklist.
 
+The [September 24 pre-freeze preparation](PUBLICATION_PRE_FREEZE.md) refreshes
+the history, GitHub-content and controls evidence while the final runtime change
+is in progress. Its receipts are a baseline for the remaining delta audit;
+they do not check off the final freeze, visibility or activation steps below.
+
 Public package audits cover selected deployment files. Repository publication
 also exposes source, patches, reference tools, generated material, reachable
 history, and GitHub discussion and Actions material. Keep those scopes explicit.

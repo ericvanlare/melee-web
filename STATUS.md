@@ -1,5 +1,13 @@
 # Current status
 
+## Repository publication preparation
+
+The [pre-freeze preparation](docs/PUBLICATION_PRE_FREEZE.md) refreshes the
+publication-content and GitHub-controls evidence after PR #54. The final runtime
+change, frozen publication inventory and authorized visibility transition remain
+separate steps. The repository is still private; this is not gameplay admission
+or a new hosted/native release.
+
 ## Whole-session original observer
 
 **Compiled / Source identified**: the passive observer completed consecutive

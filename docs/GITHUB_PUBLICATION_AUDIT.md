@@ -7,6 +7,11 @@ review of GitHub history and publication surfaces before visibility changes. The
 sanitized machine-readable
 receipt is [github-publication-audit-v1.json](evidence/github-publication-audit-v1.json).
 
+The [September 24 pre-freeze refresh](PUBLICATION_PRE_FREEZE.md) has separate
+receipts for current discussions, Actions payloads and settings. Keep this
+September 20 record as historical evidence; its inventory and control values
+are not the latest observation.
+
 The exact API responses, downloaded run logs, downloaded artifacts, and local
 scan reports are retained only under the ignored
 `work/public-readiness/github-audit/` directory. Archives were inspected with

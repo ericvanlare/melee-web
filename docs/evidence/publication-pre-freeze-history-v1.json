@@ -1,0 +1,149 @@
+{
+  "schema": "melee-web-publication-pre-freeze-history-v1",
+  "observed_at": "2026-09-24T14:37:23.149341+00:00",
+  "repository": "ericvanlare/melee-web",
+  "baseline_commit": "de048792af1144c23a5d10d28fe2270cab430d82",
+  "scope": {
+    "namespace": "refs/publication-audit/pre-freeze-20260924",
+    "policy_ref": "HEAD",
+    "policy_commit": "de048792af1144c23a5d10d28fe2270cab430d82",
+    "full_audit_path": "work/publication-pre-freeze/history/history-audit-v1.json",
+    "full_audit_sha256": "6835d9535741fba34e6679a60c8e2ecff86739ff28c691b8977e20121ebdcab1",
+    "scanner_sha256": "912169fe0053794c528fd2fc08397f40fc35f9d37144108dbf8292c948204898",
+    "content_guard_sha256": "af90151fe591db67ea35680c985a337099dfe49ab40f0647e6c800fa457adf99",
+    "policy_sha256": "2c02e879172a9adb22848610a9a4f3d2c820f1900e477373f0a440b0bbb55eeb"
+  },
+  "root_inventory": {
+    "count": 94,
+    "branch_heads": 46,
+    "pull_refs": 47,
+    "tags": 0,
+    "sha256": "6b3b9b273f0deb48af04e8f4b602c95480ca54996f59480d369596f048aa3fd5",
+    "metadata_findings": 0,
+    "commit_email_hash_count": 5,
+    "commit_email_hashes_sha256": "4a17e1fba871709e614da9495c71c03c7112a650d2fe860df1b1bfca8e62113d"
+  },
+  "history_inventory": {
+    "commits": 431,
+    "trees": 384,
+    "path_blob_pairs": 4092,
+    "regular_blobs": 4089,
+    "unique_regular_blob_bytes": 75186026
+  },
+  "findings": {
+    "total": 42,
+    "counts": {
+      "binary_content": 6,
+      "encoded_payload": 23,
+      "personal_path": 13
+    },
+    "new_finding_keys_vs_repository_history_audit_v1": [
+      {
+        "rule": "encoded_payload",
+        "path": "web/initial_pipeline_cache.db.gz.b64",
+        "blob": "4a608a7ac9f02644d232ee6af3c2b7ce7046cc93",
+        "example_commit": "052309bf932bb87a1fa84f1450ae84d31ca54977",
+        "encoded_sha256": "6e5feac7f48421eacf5f4215fecd9d8f219bd49164c8689ca6820bcd0f48c349",
+        "decoded_sha256": "8df6a998cef19b88a3eff0ee61f666e42791f5f73841818961aa3b224cad2c4b",
+        "encoded_bytes": 106905,
+        "decoded_bytes": 3518464,
+        "decoded_rows": 846,
+        "disposition": "Historical 846-row generated Aurora metadata. Its encoded identity is the previous seed recorded by compiler-review-pipeline-seed-v2; the current policy intentionally names the active seed, so this older path/blob pairing requires review in the current-history scan."
+      },
+      {
+        "rule": "encoded_payload",
+        "path": "web/initial_pipeline_cache.db.gz.b64",
+        "blob": "f690ad274e700cf979cba0ca7eb3138ddefdcbdc",
+        "example_commit": "0074120127b4807e692b98d1d190da1b3392eec5",
+        "encoded_sha256": "6487a68d0d39b97761bb8f4764e3de05797afcb9bafe64847a0cf4f9b13afeef",
+        "decoded_sha256": "f85858ff99f368d38ca16fa18727a12f778d57543e2898d29507f92585db2c2b",
+        "encoded_bytes": 106825,
+        "decoded_bytes": 3567616,
+        "decoded_rows": 858,
+        "disposition": "Historical 858-row generated Aurora metadata. Its exact encoded and decoded identities match compiler-review-pipeline-seed-v2 and the PR54 follow-up lineage; no credential or personal-path matches were found in the bounded encoded or decoded scan."
+      }
+    ]
+  },
+  "current_renderer_seed": {
+    "blob": "29588938d556ff246bb1a23a52742e458d790cea",
+    "encoded_sha256": "8aa03d3eca17d71b9eab9cf0b9ad60e45dd45ab5789441e48824da3ed5c7e839",
+    "decoded_sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca",
+    "encoded_bytes": 110658,
+    "decoded_bytes": 3674112,
+    "decoded_rows": 884,
+    "type_0_rows": 1,
+    "type_1_rows": 883,
+    "sqlite_integrity": "ok",
+    "secret_pattern_hits": 0,
+    "personal_path_hits": 0,
+    "provenance_receipt": "docs/evidence/results-prize-pipeline-seed-v1.json",
+    "policy_treatment": "Current exact-hash encoded_payload exception; generated Aurora renderer metadata review remains separate from licensing clearance."
+  },
+  "prior_comparison": {
+    "receipt": "docs/evidence/repository-history-audit-v1.json",
+    "receipt_sha256": "f4ddff9606469f4212f0b631839672c87b9e62b6de0f3222d39fde4375eed93b",
+    "prior_roots": 80,
+    "prior_commits": 285,
+    "prior_trees": 249,
+    "prior_path_blob_pairs": 3528,
+    "prior_regular_blobs": 3525,
+    "prior_unique_regular_blob_bytes": 58989331,
+    "prior_findings": 40,
+    "root_delta": {
+      "added": [
+        "heads/codex/enable-ness-peach-yl",
+        "heads/codex/mewtwo-integration",
+        "heads/codex/non-disruptive-browser-checks",
+        "heads/codex/public-repository-readiness",
+        "heads/implement-observer-profile-context",
+        "heads/implement-prize-screen",
+        "heads/implement-versus-observer",
+        "heads/implement-whole-session-replay",
+        "pull/54/head",
+        "pull/55/head",
+        "pull/56/head",
+        "pull/57/head",
+        "pull/58/head",
+        "pull/59/head",
+        "pull/60/head",
+        "pull/61/head",
+        "pull/62/head"
+      ],
+      "removed": ["pull/44/merge", "pull/52/merge", "pull/53/merge"],
+      "changed": {
+        "HEAD": {
+          "from": "7930221343adab157a2283adc76fab2aec0407a2",
+          "to": "de048792af1144c23a5d10d28fe2270cab430d82"
+        },
+        "heads/main": {
+          "from": "2c2b687f5bb7dbfcb3c75dc0394c04bb97f2114d",
+          "to": "de048792af1144c23a5d10d28fe2270cab430d82"
+        }
+      }
+    }
+  },
+  "pr54_followups": {
+    "merge_commit": "0b556cf21fd9e0669dd3a17f8898db9191188322",
+    "head_ref": "heads/codex/public-repository-readiness",
+    "head_commit": "cf1757808756f7c24c2898acf8dc7673e89cbe2c",
+    "followup_commits": [
+      "519f4535b37513714fafc36733fc33c0aea6fe12",
+      "052309bf932bb87a1fa84f1450ae84d31ca54977",
+      "68c98d10614e302bb5629c590630fa17c4f122a6",
+      "8dd8dc3b7afc63e00c3d685e809d684a2f5dc5dc",
+      "c199f88a328d256a93f145e736a153501015c197",
+      "1dca8ac86fe49054d3a9df0a6c48bb85bdc9aa52",
+      "1711d7882c780833d7d183b9c034abe336aec865",
+      "fb6af03ff5d0a2ec53b52c57752182e28f6a5735",
+      "cf1757808756f7c24c2898acf8dc7673e89cbe2c"
+    ],
+    "seed_at_head_encoded_sha256": "6487a68d0d39b97761bb8f4764e3de05797afcb9bafe64847a0cf4f9b13afeef",
+    "seed_at_head_decoded_sha256": "f85858ff99f368d38ca16fa18727a12f778d57543e2898d29507f92585db2c2b"
+  },
+  "limits": [
+    "Only selected reachable Git histories and tag annotations are covered.",
+    "No reflogs, unreachable objects, server-only refs, discussions, Actions material, LFS payload retrieval or alternate encodings are covered.",
+    "Findings are content-policy review results, not rights or security clearance.",
+    "No GitHub mutation, visibility change, branch checkout, commit, cache or Actions change was performed."
+  ]
+}
