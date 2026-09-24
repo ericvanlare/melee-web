@@ -593,6 +593,8 @@ pointers are rejected. Version 7 and the incomplete schema 1 context are
 rejected. The span table must be contiguous, cover every source-consumed sample,
 and name the source owner active at each step. V8 is bounded to 108,000 frames
 and 32 spans; legacy recipes retain their 36,000-frame bound.
+The producer and decoder require the timeline to start in CSS and end in
+Results or Prize, matching the fresh-entry and final-return owner contracts.
 
 The replay must start from a fresh prepared application. It retains that
 prepared CSS owner and the one source arena across subsequent scenes. Starting

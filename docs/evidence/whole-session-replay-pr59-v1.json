@@ -44,7 +44,7 @@
   },
   "transport_verification": {
     "decode_only": {
-      "path": "work/pr59/work/pr59-final-candidate-decode-v1.json",
+      "path": "work/pr59/work/pr59-final-candidate-decode-v2.json",
       "sha256": "b9ccb68b0f7bb3b3e4eb1201bf268729647888c1018e057b4a7b39b9c169daca",
       "result": "pass",
       "frame_count": 46835,
@@ -53,12 +53,18 @@
       "players": "four CPU kind 4, level 9 rows preserved"
     },
     "native_focused_tests": {
-      "path": "work/pr59/work/pr59-final-retail-decoder-v4.log",
-      "sha256": "a5eea18d4c0081e0207c84d491bd42335c9257c9389fbceb50e555f929550842",
+      "path": "work/pr59/work/pr59-endpoint-decoder-tests-v1.log",
+      "sha256": "454438dd5fc26e5b640108093d40a4371077a2ec5d453fd0ba4ca5a9e7a9f793",
       "result": "pass",
-      "tests": 3,
-      "seconds": 1.018,
-      "coverage": "v8 four-CPU9/max-span decode and rejection before asset or match construction"
+      "tests": 4,
+      "seconds": 1.177,
+      "coverage": "v8 four-CPU9/max-span decode and malformed transport/endpoint rejection before asset or match construction"
+    },
+    "producer_tests": {
+      "path": "work/pr59/work/pr59-endpoint-export-tests-v1.log",
+      "sha256": "69d0edf193c2571255ef4d8556f7536821c2d41ceeb57f638f0ed3e9469d79cd",
+      "result": "pass",
+      "tests": 18
     }
   },
   "browser_diagnostics": {
@@ -179,26 +185,37 @@
     "cpu_followup": "docs/CPU_REGISTER_COMPATIBILITY.md"
   },
   "final_validation": {
-    "final_full_suite": {
+    "affected_release_builds": {
+      "result": "pass",
+      "runtime_log_path": "work/pr59/work/pr59-final-runtime-build-v3.log",
+      "runtime_log_sha256": "10e152d2b70eb495c866c7ee8b8267f8d5ea3f749121f1f63f4508c5ec1ad372",
+      "retail_trace_log_path": "work/pr59/work/pr59-endpoint-decoder-build-v1.log",
+      "retail_trace_log_sha256": "1148e04a75853c9ec4d83cf6c1bd2b667ae06bfa2e70e917dc06cee44281aaf4",
+      "public_runtime_log_path": "work/pr59/work/pr59-final-public-build-v3.log",
+      "public_runtime_log_sha256": "723be98fa84ebb75f91aff0d3fff1d59e81a0a5e943bc6fd11072c1ce6d4d436",
+      "package_log_path": "work/pr59/work/pr59-public-package-v3.log",
+      "package_log_sha256": "a07e7fbdb874743614e9af76164bc7368b43eee7fc097473bd27b7d15fab2e38"
+    },
+    "production_code_head": "570c7193df2ac70b5098f8d067f084fa4bb9367a",
+    "previous_full_suite": {
       "result": "pass",
       "tests": 1257,
       "skips": 80,
       "seconds": 217.936,
       "log_path": "work/pr59/work/pr59-final-full-suite-v2.log",
-      "log_sha256": "1c3677556714dba472586a3e563af1bbf004a33e9802cf0bc1879d801b3c35e6"
+      "log_sha256": "1c3677556714dba472586a3e563af1bbf004a33e9802cf0bc1879d801b3c35e6",
+      "production_code_head": "0d8dba76d2fcbd313de52bcc35e2bfdb1693aa89"
     },
-    "affected_release_builds": {
+    "post_browser_changes": "After the production v16 prefix, 570c719 added only early rejection of unreachable initial/final span owners in the producer and decoder. The actual candidate still decodes unchanged; no scene execution behavior was changed. ffa83f2 adds a compiled regression for existing Results handoff paths.",
+    "final_full_suite": {
       "result": "pass",
-      "runtime_log_path": "work/pr59/work/pr59-final-runtime-build-v2.log",
-      "runtime_log_sha256": "75d0ed5c76b16f70e5ec0e8fd773be74e5c7985aeec7ea58d355773a1ae6a755",
-      "retail_trace_log_path": "work/pr59/work/pr59-final-retail-trace-build-v2.log",
-      "retail_trace_log_sha256": "0920114cc67b6c0b3fbf46f9ceb1a350ec68e1c270b84d0018e5d19ddc67d5e6",
-      "public_runtime_log_path": "work/pr59/work/pr59-final-public-build-v2.log",
-      "public_runtime_log_sha256": "a2a65ceedf449f853f95dd33f225255543d2d5b7972cb673ad025b534bb99b16",
-      "package_log_path": "work/pr59/work/pr59-public-package-v2.log",
-      "package_log_sha256": "9059f4d4bf8c04580a5870cccbfa8d2349de8903e2a8dc9b461f7448176c3299"
-    },
-    "production_code_head": "0d8dba76d2fcbd313de52bcc35e2bfdb1693aa89"
+      "tests": 1260,
+      "skips": 80,
+      "seconds": 192.693,
+      "head": "ffa83f2e9b7e935c34df0b2ecf3d562d6162dd1f",
+      "log_path": "work/pr59/work/pr59-final-full-suite-v3.log",
+      "log_sha256": "b31953d37bbbd66858877b585f89009a908c18121a5a59f38148ea5a0e4a5d44"
+    }
   },
   "deployed": false,
   "artifact_path_base": "Paths are relative to the lead checkout; the PR59 build/test worktree is work/pr59. Local capture and build artifacts remain ignored."
