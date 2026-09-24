@@ -84,7 +84,7 @@ using u32 = std::uint32_t;
 namespace {
 constexpr const char* kDol = "08e0bf20134dfcb260699671004527b2d6bb1a45";
 constexpr const char* kRevision = "b43912cc78606f96c9569f5d6229bc9d7e265ea5";
-constexpr std::array<const char*, 45> kNames = {{
+constexpr std::array<const char*, 50> kNames = {{
   "ARInit", "ARAlloc", "ARFree", "ARGetSize", "OSInitAlloc", "OSCreateHeap",
   "OSDestroyHeap", "OSSetCurrentHeap", "OSAllocFromHeap", "OSFreeToHeap",
   "OSSetArenaLo", "OSSetArenaHi", "OSAllocFromArenaLo", "OSAllocFromArenaHi",
@@ -96,7 +96,8 @@ constexpr std::array<const char*, 45> kNames = {{
   "lbMemory_80014E24", "lbMemory_80014EEC", "lbMemory_80014FC8", "lbMemFreeToHeap",
   "lbMemory_8001529C", "lbMemory_800154D4", "lbMemory_800155A4",
   "Fighter_FirstInitialize_80067A84", "Fighter_Create", "gm_Scene_Vs_OnEnter",
-  "gm_Scene_Vs_OnExit"
+  "gm_Scene_Vs_OnExit", "fn_80015184", "lbMemory_80015320", "lbDvd_80017A80",
+  "HSD_DevComARAMCallback", "HSD_DevComRequest"
 }};
 constexpr std::array<const char*, 23> kGlobals = {{
   "HeapArray", "NumHeaps", "ArenaStart", "ArenaEnd", "__OSArenaLo", "__OSArenaHi",
@@ -106,28 +107,33 @@ constexpr std::array<const char*, 23> kGlobals = {{
   "__AR_Size", "__AR_StackPointer", "__AR_FreeBlocks", "__AR_BlockLength",
   "__AR_init_flag"
 }};
+constexpr std::array<u32, 50> kArgc = {{
+  2, 1, 1, 0, 3, 2, 1, 1, 2, 2, 1, 1, 2, 2, 0, 2, 1, 2, 1, 2, 3, 2, 1, 2, 2,
+  1, 1, 0, 2, 0, 2, 2, 3, 0, 2, 1, 2, 2, 3, 2, 0, 0, 1, 1, 1, 2, 4, 1, 1, 8
+}};
 
 struct Fixture {
   Core::System system;
   PowerPC::PowerPCState cpu;
-  std::array<FunctionIdentity, 45> functions{};
+  std::array<FunctionIdentity, 50> functions{};
   std::array<GlobalIdentity, 23> globals{};
-  std::array<u32, 45> returns{};
-  std::array<u32, 45> args{};
+  std::array<u32, 50> returns{};
+  std::array<u32, 50> args{};
   BoundProfile profile{};
 
   Fixture() {
     for (size_t i = 0; i < functions.size(); ++i) {
       const u32 address = 0x80010000u + static_cast<u32>(i * 0x100);
       returns[i] = address + 4;
-      functions[i] = {kNames[i], address, 8, 0x12340000u, 0, &returns[i], 1,
+      functions[i] = {kNames[i], address, 8, 0x12340000u, kArgc[i], &returns[i], 1,
                       "0000000000000000000000000000000000000000000000000000000000000000"};
       system.memory.Write(address, 0x12340000u);
       system.memory.Write(returns[i], 0x4e800020u);
     }
     system.memory.Write(0x8000f000u, 0x12340000u);
     for (size_t i = 0; i < globals.size(); ++i) {
-      globals[i] = {kGlobals[i], 0x81000000u + static_cast<u32>(i * 0x100), 4};
+      globals[i] = {kGlobals[i], 0x81000000u + static_cast<u32>(i * 0x100),
+                    std::string_view(kGlobals[i]) == "lbMemory_804318B0" ? 0x6f0u : 4u};
       system.memory.Write(globals[i].address, 0x1000u + static_cast<u32>(i));
     }
     system.memory.Write(0x800000e4u, 0x80000100u);
@@ -245,6 +251,68 @@ int Run(std::string_view mode, const char* output) {
     fixture.cpu.pc = fixture.returns[4];
     Observer::Observe(&fixture.system, fixture.cpu.pc, &fixture.cpu);
     assert(Observer::Finish(false));
+    return 0;
+  }
+  if (mode == "compaction-metadata") {
+    const u32 manager = fixture.globals[13].address;
+    const auto write_manager = [&](u32 offset, u32 value) {
+      fixture.system.memory.Write(manager + offset, value);
+    };
+    write_manager(0x6c8, 0x80040000u);
+    write_manager(0x6cc, 0x80060000u);
+    write_manager(0x6d0, 0x22000u);
+    write_manager(0x6d4, 0x1000u);
+    write_manager(0x6d8, 0x80021000u);
+    write_manager(0x6dc, 0x80015320u);
+    write_manager(0x6e0, 0x80022000u);
+    write_manager(0x6e4, 0x80041000u);
+    write_manager(0x6e8, 0x80017a80u);
+    const u32 handle = 0x80020000u;
+    fixture.system.memory.Write(handle + 0x0, 0x80020010u);
+    fixture.system.memory.Write(handle + 0x4, 0x80040000u);
+    fixture.system.memory.Write(handle + 0x8, 0x1000u);
+    fixture.system.memory.Write(handle + 0xc, 0x80020020u);
+    const auto invoke = [&](size_t index) {
+      fixture.cpu.pc = fixture.functions[index].address;
+      Observer::Observe(&fixture.system, fixture.cpu.pc, &fixture.cpu);
+      fixture.cpu.pc = fixture.returns[index];
+      Observer::Observe(&fixture.system, fixture.cpu.pc, &fixture.cpu);
+      assert(Observer::Error().empty());
+    };
+    fixture.cpu.gpr[3] = handle;
+    fixture.cpu.gpr[4] = 0x80025000u;
+    fixture.cpu.gpr[5] = 0x80026000u;
+    invoke(38);
+    fixture.cpu.gpr[3] = 0;
+    fixture.cpu.gpr[4] = handle;
+    fixture.cpu.gpr[5] = 0x80027000u;
+    fixture.cpu.gpr[6] = 0;
+    invoke(46);
+    fixture.cpu.gpr[4] = 0;
+    invoke(46);
+    fixture.cpu.gpr[3] = 0x80028000u;
+    fixture.cpu.gpr[4] = 0x80029000u;
+    invoke(45);
+    fixture.cpu.gpr[3] = 0x8002a000u;
+    invoke(47);
+    fixture.cpu.gpr[3] = 0x8002b000u;
+    invoke(48);
+    for (u32 index = 0; index < 8; ++index)
+      fixture.cpu.gpr[3 + index] = 0x80030000u + index * 0x100u;
+    invoke(49);
+    assert(Observer::Finish(false));
+    return 0;
+  }
+  if (mode == "compaction-invalid") {
+    const u32 manager = fixture.globals[13].address;
+    fixture.system.memory.Write(manager + 0x6d0, 0x100u);
+    fixture.system.memory.Write(manager + 0x6d4, 0x200u);
+    fixture.cpu.gpr[3] = 0x80028000u;
+    fixture.cpu.gpr[4] = 0x80029000u;
+    fixture.cpu.pc = fixture.functions[45].address;
+    Observer::Observe(&fixture.system, fixture.cpu.pc, &fixture.cpu);
+    assert(Observer::Error().find("metadata escaped") != std::string::npos);
+    assert(!Observer::Finish(false));
     return 0;
   }
   if (mode == "write-failure") {
@@ -459,7 +527,7 @@ class ReferenceAllocationObserverTests(unittest.TestCase):
         profile = synthetic_profile()
         self.assertIs(validate_profile(profile), profile)
         rendered = render_header(profile, "a" * 64)
-        self.assertIn("std::array<FunctionIdentity, 45>", rendered)
+        self.assertIn("std::array<FunctionIdentity, 50>", rendered)
         self.assertIn("std::array<GlobalIdentity, 23>", rendered)
         self.assertIn("a" * 64, rendered)
         self.assertIn("0x12340000", rendered)
@@ -520,7 +588,7 @@ class ReferenceAllocationObserverTests(unittest.TestCase):
             self.assertEqual(built.returncode, 0, built.stderr)
             for mode in ("range", "wrong-instruction", "missing-return", "unmatched-return",
                          "null-state", "finish-race", "write-failure", "fighter-invalid",
-                         "paused-burst", "queue-overflow"):
+                         "paused-burst", "queue-overflow", "compaction-invalid"):
                 checked = subprocess.run([str(binary), mode, str(temp / (mode + ".jsonl"))],
                                          capture_output=True, text=True, timeout=20)
                 self.assertEqual(checked.returncode, 0, f"{mode}: {checked.stderr}")
@@ -564,6 +632,25 @@ class ReferenceAllocationObserverTests(unittest.TestCase):
             self.assertEqual(heaps["descriptors"],
                              [[0x10000000 + index for index in range(3)],
                               [0x10000003 + index for index in range(3)]])
+            output = temp / "compaction-metadata.jsonl"
+            checked = subprocess.run([str(binary), "compaction-metadata", str(output)],
+                                     capture_output=True, text=True, timeout=20)
+            self.assertEqual(checked.returncode, 0, f"compaction-metadata: {checked.stderr}")
+            rows = [json.loads(line) for line in output.read_text().splitlines()]
+            observed = [row["observed"] for row in rows if row["record"] in ("enter", "return")]
+            compact = [row["compaction"] for row in observed if "compaction" in row]
+            self.assertEqual({item["phase"] for item in compact}, {"entry", "return"})
+            memory = next(item for item in compact if "handle" in item)
+            self.assertEqual(memory["handle"]["x4_lo"], 0x80040000)
+            self.assertEqual(memory["manager"]["chunk"], 0x19000)
+            self.assertTrue(any(item.get("handle") is None for item in compact))
+            alarm = next(item for item in compact if "alarm" in item)
+            self.assertEqual(alarm["manager"]["remaining"], 0x21000)
+            self.assertTrue(any("devcom" in item and "callback_arg" in item["devcom"]
+                               for item in observed))
+            request = next(item["devcom"] for item in observed
+                           if "devcom" in item and "dest" in item["devcom"])
+            self.assertEqual(request["callback_arg"], 0x80030700)
             output = temp / "vs-boundary.jsonl"
             checked = subprocess.run([str(binary), "vs-boundary", str(output)],
                                      capture_output=True, text=True, timeout=20)

@@ -1,16 +1,19 @@
 # Current status
 
-## Original allocation capture reaches VS initialization
+## Source allocation replay derives first-VS fighter identities
 
-**Compiled / Source identified / Native traced**: the passive allocation
-companion now reaches first VS initialization through original menus with four
-Mario CPU9 players. Three fresh cold boots produce identical allocation streams,
-including four fighter constructions. The independently rooted native and
-checked-Wasm models agree until the first unsupported asynchronous handle
-compaction; fighter addresses have been observed but not yet derived. See the
-[scoped receipt](docs/evidence/original-allocation-passive-v1.json) and
-[remaining source-context boundaries](docs/ORIGINAL_ALLOCATION_HISTORY.md#first-vs-initialization-capture).
-No browser gameplay fix or full-session equivalence is claimed.
+**Compiled / Source identified / Native traced / Retail compared** for the
+declared allocation fields and recorded operation order: native and checked-Wasm
+models now replay the entire first-VS initialization prefix and derive all four
+Mario CPU9 fighter identities. Two fresh original captures are byte-identical.
+The replay compares asynchronous compaction manager transitions, relocated
+handle identities and source-declared pools, including embedded pool members.
+See the [scoped receipt](docs/evidence/original-allocation-compaction-v1.json)
+and [remaining source-context boundaries](docs/ORIGINAL_ALLOCATION_HISTORY.md#first-vs-initialization-capture).
+The [earlier passive-capture receipt](docs/evidence/original-allocation-passive-v1.json)
+retains the previous first-compaction failure. Repeated ownership, copied payload
+contents, browser address/register context, full-session equivalence, pixels,
+PCM and live performance remain unproven. No deployment was performed.
 
 ## Reproducible whole-session CPU register boundary
 

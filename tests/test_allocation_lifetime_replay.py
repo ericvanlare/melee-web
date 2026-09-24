@@ -8,7 +8,15 @@ import tempfile
 import unittest
 from unittest import mock
 
+# Keep the focused test importable when unittest invokes it by absolute path or
+# from outside the repository root, as CI does with ``python -I``.
+ROOT = Path(__file__).resolve().parents[1]
+import sys
+sys.path.insert(0, str(ROOT))
+
+from tools.compaction_manager_state import FIELDS
 from tools.allocation_history_replay import ReplayProblem
+from tools.allocation_history_replay import ModelDriver
 from tools.allocation_lifetime_replay import (
     replay_lifetimes, validate_layout, validate_metadata_shape,
 )
@@ -55,9 +63,16 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
         "HSD_ObjSetHeap": 2,
         "HSD_ObjAllocInit": 3,
         "lbHeap_80015BD0": 2,
+        "lbHeap_80015D6C": 3,
         "lbMemory_80014FC8": 2,
+        "lbMemory_8001529C": 3,
         "lbHeap_80015CA8": 2,
         "lbMemFreeToHeap": 2,
+        "fn_80015184": 2,
+        "lbMemory_80015320": 4,
+        "lbDvd_80017A80": 1,
+        "HSD_DevComARAMCallback": 1,
+        "HSD_DevComRequest": 8,
         "Fighter_FirstInitialize_80067A84": 0,
         "Fighter_Create": 1,
         "gm_Scene_Vs_OnEnter": 1,
@@ -82,7 +97,11 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
                 "current_heap": current_heap,
             },
             "functions": [
-                {"name": name, "argc": argc}
+                ({"name": name, "argc": argc, "address": {
+                    "lbDvd_80017A80": 0x80017A80,
+                    "lbMemory_80015320": 0x80015320,
+                }[name]} if name in {"lbDvd_80017A80", "lbMemory_80015320"}
+                 else {"name": name, "argc": argc})
                 for name, argc in self.ARITIES.items()
             ],
         }
@@ -100,6 +119,8 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
                 "lbheap_descriptors": [[2, 1, 6, 0x1000], [6, 0, 0, 0]],
                 "aram_stack_table": {"address": 0x4000, "size": 0x40},
                 "lbmemory_allocator": 0x5000,
+                "lbmemory_initial_manager": dict.fromkeys(FIELDS, 0),
+                "devcom_initial_request_counter": 4,
             },
             "boot": {"arena_hi": self.CONTEXT["arena_hi"]},
             "stages": {
@@ -190,7 +211,7 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
         rows.append(self._row("end", sequence, status="captured", calls=call_id))
         return rows, enters, returns
 
-    def _replacement_stream(self, *, include_game_io=False):
+    def _replacement_stream(self, *, include_game_io=False, include_compaction=False):
         rows = [self._row("header", 0, schema="synthetic-lifetime", version=1)]
         enters = {}
         returns = {}
@@ -267,7 +288,41 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
         new_current = enter("lbMemory_800154D4", [0x300000, 0x400000], game)
         ret(new_current, 0x5638,
             {"handle_words": [0, 0x300000, 0x400000, 0]})
-        if include_game_io:
+        if include_compaction:
+            first = enter("lbHeap_80015BD0", [1, 64], game)
+            first_handle = enter("lbMemory_80014FC8", [0x5638, 64], first)
+            ret(first_handle, 0x5008, {"handle_words": [0, 0x300000, 64]})
+            ret(first, 0x300000)
+            second = enter("lbHeap_80015BD0", [1, 64], game)
+            second_handle = enter("lbMemory_80014FC8", [0x5638, 64], second)
+            ret(second_handle, 0x5014, {"handle_words": [0, 0x300040, 64]})
+            ret(second, 0x300040)
+            release = enter("lbHeap_80015CA8", [1, 0x300000], game)
+            release_handle = enter("lbMemFreeToHeap", [0x5638, 0x300000], release)
+            ret(release_handle)
+            ret(release)
+            compact = enter("lbHeap_80015D6C", [1, 0x80017A80, 4], game)
+            compact_call = enter("lbMemory_8001529C", [0x5638, 0x80017A80, 4], compact)
+            move = enter("lbMemory_80015320", [0, 0x5014, 0, 0], compact_call)
+            transfer = enter("HSD_DevComRequest",
+                             [0, 0x300040, 0x300000, 64, 0x1B, 1, 0x80015320, 0], move)
+            ret(transfer, 7)
+            ret(move, 0)
+            ret(compact_call, 1)
+            ret(compact, 1)
+            callback = enter("lbMemory_80015320", [7, 0, 0, 0])
+            preload = enter("lbDvd_80017A80", [4], callback)
+            nested_compact = enter("lbHeap_80015D6C", [1, 0x80017A80, 4], preload)
+            nested_call = enter("lbMemory_8001529C", [0x5638, 0x80017A80, 4], nested_compact)
+            ret(nested_call, 0)
+            ret(nested_compact, 0)
+            ret(preload, 0)
+            ret(callback, 0)
+            moved_release = enter("lbHeap_80015CA8", [1, 0x300000], game)
+            moved_free = enter("lbMemFreeToHeap", [0x5638, 0x300000], moved_release)
+            ret(moved_free)
+            ret(moved_release)
+        elif include_game_io:
             allocate = enter("lbHeap_80015BD0", [1, 64], game)
             allocate_handle = enter("lbMemory_80014FC8", [0x5638, 64], allocate)
             ret(allocate_handle, 0x5008,
@@ -338,6 +393,102 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
                     "fighter_alloc_data": 0x9000,
                 }), checked_wasm=False, require_complete=False,
             )
+
+    @staticmethod
+    def _async_model_commands():
+        """Build one real source-handle compaction with a DevCom boundary."""
+        return [
+            {"op": "configure", "heap_count": 2, "descriptor_base": 0x1000,
+             "arena_start": 0x1020, "arena_end": 0x20000,
+             "main_lo": 0x2020, "main_hi": 0x20000,
+             "initial_hsd_heap": 1, "pools": "", "descriptors": "2 1 6 4096"},
+            {"op": "os_snapshot"},
+            {"op": "bootstrap_heap", "index": 0},
+            {"op": "bootstrap_heap", "index": 1},
+            {"op": "os_select_hsd"},
+            {"op": "aram_init", "initial_base": 0x300000,
+             "capacity": 16, "hardware_size": 0x400000},
+            {"op": "handle_init_from_aram", "allocator": 0x5000,
+             "mem_entries": 0x5008, "heap_handles": 0x5638,
+             "current_handle_slot": 0x569C},
+            {"op": "game_init"},
+            {"op": "game_begin"},
+            {"op": "hsd_replace_begin"},
+            {"op": "pool_registry_forget"},
+            {"op": "hsd_replace_destroy"},
+            {"op": "hsd_replace_create"},
+            {"op": "os_select_hsd"},
+            {"op": "object_heap_set"},
+            {"op": "hsd_replace_end"},
+            {"op": "game_destroy_current"},
+            {"op": "game_new_current", "label": "current"},
+            {"op": "game_handle_alloc", "index": 1, "requested": 64, "label": "first"},
+            {"op": "game_handle_alloc", "index": 1, "requested": 64, "label": "second"},
+            {"op": "game_handle_free", "index": 1, "label": "first"},
+            {"op": "game_handle_compact_begin", "index": 1,
+             "callback": 0x80017A80, "callback_arg": 4},
+            {"op": "game_handle_compact_callback", "generation": 1, "cancelled": 0},
+            {"op": "game_handle_compact_devcom_complete", "generation": 2,
+             "cancelled": 0},
+            {"op": "game_handle_compact_callback", "generation": 3, "cancelled": 0},
+        ]
+
+    def _run_async_model(self, *, wasm=False, commands=None, tail=()):
+        driver = None
+        try:
+            driver = ModelDriver(
+                wasm=wasm,
+                source=ROOT / "tests/allocation_lifetime_model.cpp",
+                extra_impls=[ROOT / "src/source_game_heap_context.cpp"],
+            )
+            command_list = list(self._async_model_commands() if commands is None else commands)
+            command_list += list(tail)
+            return driver.run([json.dumps(command, sort_keys=True) for command in command_list])
+        finally:
+            if driver is not None:
+                driver.close()
+
+    def test_async_compaction_model_matches_checked_wasm(self):
+        native = self._run_async_model()
+        statuses = [item["status"] for item in native[-4:]]
+        self.assertEqual(statuses, ["compact_started", "compact_started",
+                                    "compact_in_progress", "compact_complete"])
+        self.assertEqual(native[-1]["compact"]["phase"], "complete")
+        try:
+            wasm = self._run_async_model(wasm=True)
+        except ReplayProblem as error:
+            self.skipTest(f"checked Wasm toolchain unavailable: {error}")
+        self.assertEqual(wasm, native)
+
+    def test_async_compaction_rejects_stale_generation_and_cancel(self):
+        prefix = self._async_model_commands()[:-3]
+        stale = self._run_async_model(commands=prefix, tail=[
+            {"op": "game_handle_compact_callback", "generation": 0xFFFF, "cancelled": 0},
+        ])
+        self.assertEqual(stale[-1]["status"], "invalid_generation")
+        cancelled = self._run_async_model(commands=prefix, tail=[
+            {"op": "game_handle_compact_callback", "generation": 1, "cancelled": 1},
+        ])
+        self.assertEqual(cancelled[-1]["status"], "cancelled")
+
+    def test_moved_payload_label_frees_current_address_and_is_retired(self):
+        commands = self._async_model_commands()
+        moved = self._run_async_model(commands=commands, tail=[
+            {"op": "game_handle_free", "index": 1, "label": "second"},
+        ])
+        self.assertEqual(moved[-1]['status'], 'ok')
+        self.assertEqual(moved[-1]['payload'], 0x300000)
+        self.assertEqual(moved[-1]['retired_payloads'],
+                         [{'handle': 0x5014, 'payload': 0x300000}])
+        with self.assertRaises(ReplayProblem):
+            self._run_async_model(commands=commands, tail=[
+                {"op": "game_handle_free", "index": 1, "label": "first"},
+            ])
+
+    def test_async_compaction_end_rejects_unfinished_callback(self):
+        with self.assertRaises(ReplayProblem):
+            self._run_async_model(commands=self._async_model_commands()[:-3],
+                                  tail=[{"op": "game_end"}])
 
     def test_layout_rejects_duplicate_pool_identities(self):
         verified = self.verified(pools={"first": 0x9000, "duplicate": 0x9000})
@@ -534,6 +685,50 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
         self.assertNotIn("game_handle_free",
                          [action["command"]["op"]
                           for action in altered_report["replay_actions"]])
+
+    def test_source_compaction_replays_callback_and_devcom_order(self):
+        rows, enters, returns = self._replacement_stream(include_compaction=True)
+        report = self._run(rows, enters, returns, profile=1,
+                           verified=self.verified(), checked_wasm=True)
+        self.assertEqual(report["status"], "validated_prefix")
+        self.assertTrue(report["checked_wasm_matches_native"])
+        commands = [action["command"] for action in report["replay_actions"]]
+        compact_ops = [command["op"] for command in commands
+                       if command["op"].startswith("game_handle_compact")]
+        self.assertEqual(compact_ops[0:2], ["game_handle_compact_begin",
+                                            "game_handle_compact_callback"])
+        devcom = compact_ops.index("game_handle_compact_devcom_complete")
+        final = compact_ops.index("game_handle_compact_callback", devcom + 1)
+        self.assertLess(devcom, final)
+
+    def test_compaction_manager_is_a_comparison_target(self):
+        rows, enters, returns = self._replacement_stream(include_compaction=True)
+        entry = next(row for row in rows if row.get('record') == 'enter' and
+                     row.get('function') == 'lbMemory_8001529C')
+        entry['observed'] = {'compaction': {
+            'phase': 'entry', 'manager': dict(dict.fromkeys(FIELDS, 0), remaining=0, chunk=0),
+            'handle': dict(pointer=0x5638, x0_next=0, x4_lo=0x300000,
+                           x8_hi=0x400000, xC_prev=0x5014),
+            'callback': 0x80017A80, 'callback_arg': 4,
+        }}
+        accepted = self._run(rows, enters, returns, profile=1, verified=self.verified())
+        self.assertEqual(accepted['status'], 'validated_prefix')
+        entry['observed']['compaction']['manager']['offset'] = 32
+        rejected = self._run(rows, enters, returns, profile=1, verified=self.verified())
+        self.assertEqual(rejected['status'], 'validation')
+        self.assertIn('compaction manager differs', rejected['first_unsupported']['reason'])
+
+    def test_source_compaction_rejects_cancelled_callback_in_replay(self):
+        rows, enters, returns = self._replacement_stream(include_compaction=True)
+        callback = next(row for row in rows
+                        if row.get("record") == "enter" and
+                        row.get("function") == "lbMemory_80015320" and
+                        row.get("args") == [7, 0, 0, 0])
+        callback["args"][3] = 1
+        report = self._run(rows, enters, returns, profile=1, verified=self.verified())
+        self.assertEqual(report["status"], "unsupported")
+        self.assertEqual(report["first_unsupported"]["function"], "lbMemory_80015320")
+        self.assertIn("cancelled", report["first_unsupported"]["reason"])
 
     def test_malformed_repeated_stop_is_explicit_stream_failure(self):
         rows, enters, returns = self._stream()

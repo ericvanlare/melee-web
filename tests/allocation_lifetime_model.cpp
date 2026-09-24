@@ -7,6 +7,7 @@
 
 namespace {
 namespace game_heap = melee_web::source_game_heap;
+namespace source_handle = melee_web::source_handle;
 
 struct LifetimeModel : Model {
     game_heap::Context game;
@@ -137,6 +138,82 @@ struct LifetimeModel : Model {
         require(found != snapshot.active.end(), "modeled handle descriptor is missing");
         std::cout << ",\"handle_words\":[" << found->next.value() << ',' << found->lo.value()
                   << ',' << found->hi.value() << ',' << found->prev.value() << ']';
+    }
+
+    void emit_retired_payloads()
+    {
+        const auto active = handles.snapshot().active;
+        std::cout << ",\"retired_payloads\":[";
+        bool comma = false;
+        for (auto it = payload_labels.begin(); it != payload_labels.end();) {
+            const auto identity = handle_labels.at(it->first);
+            const auto found = std::find_if(active.begin(), active.end(),
+                [&](const auto& item) { return item.identity == identity; });
+            if (found != active.end()) { ++it; continue; }
+            if (comma) std::cout << ',';
+            comma = true;
+            std::cout << "{\"handle\":" << identity.value()
+                      << ",\"payload\":" << it->second.value() << '}';
+            handle_labels.erase(it->first);
+            it = payload_labels.erase(it);
+        }
+        std::cout << ']';
+    }
+
+    static const char* compact_phase_name(source_handle::CompactPhase phase)
+    {
+        switch (phase) {
+        case source_handle::CompactPhase::idle: return "idle";
+        case source_handle::CompactPhase::awaiting_callback: return "awaiting_callback";
+        case source_handle::CompactPhase::waiting_ram_alarm: return "waiting_ram_alarm";
+        case source_handle::CompactPhase::waiting_devcom: return "waiting_devcom";
+        case source_handle::CompactPhase::awaiting_completion: return "awaiting_completion";
+        case source_handle::CompactPhase::complete: return "complete";
+        case source_handle::CompactPhase::rejected: return "rejected";
+        }
+        return "unknown";
+    }
+
+    static const char* transfer_kind_name(source_handle::TransferKind transfer)
+    {
+        switch (transfer) {
+        case source_handle::TransferKind::none: return "none";
+        case source_handle::TransferKind::ram_alarm: return "ram_alarm";
+        case source_handle::TransferKind::devcom_1b: return "devcom_1b";
+        }
+        return "unknown";
+    }
+
+    void emit_compact_state(const source_handle::CompactState& state)
+    {
+        const auto& move = state.move;
+        std::cout << ",\"compact\":{\"phase\":\"" << compact_phase_name(state.phase)
+                  << "\",\"heap\":" << state.heap.value()
+                  << ",\"callback\":" << state.callback.value()
+                  << ",\"callback_arg\":" << state.callback_arg
+                  << ",\"callback_handle\":" << state.callback_handle.value()
+                  << ",\"callback_generation\":" << state.callback_generation
+                  << ",\"cursor\":" << state.cursor.value()
+                  << ",\"callback_invoked\":" << (state.callback_invoked ? "true" : "false")
+                  << ",\"move\":{\"handle\":" << move.handle.value()
+                  << ",\"source\":" << move.source.value()
+                  << ",\"destination\":" << move.destination.value()
+                  << ",\"next\":" << move.next.value()
+                  << ",\"size\":" << move.size
+                  << ",\"offset\":" << move.offset
+                  << ",\"generation\":" << move.generation
+                  << ",\"transfer\":\"" << transfer_kind_name(move.transfer)
+                  << "\"}}";
+    }
+
+    void emit_compact_step(const std::string& op, const source_handle::CompactStepResult& result)
+    {
+        emit_begin(op, source_handle::status_name(result.status));
+        std::cout << ",\"copied\":" << result.copied
+                  << ",\"transfer_complete\":" << (result.transfer_complete ? "true" : "false")
+                  << ",\"callback_invoked\":" << (result.callback_invoked ? "true" : "false");
+        emit_compact_state(result.state);
+        std::cout << "}\n";
     }
 
     void emit_pool(std::uint32_t id)
@@ -339,6 +416,7 @@ struct LifetimeModel : Model {
             require(status == HandleStatus::ok, "source handle destruction failed");
             complete();
             emit_begin(op);
+            emit_retired_payloads();
             if (!current) std::cout << ",\"args\":[" << next.handle.value() << ']';
             emit_request(); std::cout << "}\n"; return;
         }
@@ -358,7 +436,15 @@ struct LifetimeModel : Model {
             emit_handle_words(result.handle); emit_request(); std::cout << "}\n"; return;
         }
         if (op == "game_end" || op == "game_snapshot") {
-            if (op == "game_end") require(!game.next_request().has_value(), "game heap rebuild is unfinished");
+            if (op == "game_end") {
+                require(!game.next_request().has_value(), "game heap rebuild is unfinished");
+                const auto phase = handles.compact_state().phase;
+                require(phase != source_handle::CompactPhase::awaiting_callback &&
+                            phase != source_handle::CompactPhase::waiting_ram_alarm &&
+                            phase != source_handle::CompactPhase::waiting_devcom &&
+                            phase != source_handle::CompactPhase::awaiting_completion,
+                        "source handle compaction is still pending");
+            }
             emit_begin(op); emit_game(); std::cout << "}\n"; return;
         }
         if (op == "game_owner") {
@@ -366,7 +452,17 @@ struct LifetimeModel : Model {
             const auto& owner = game.heap(number(field(line, "index")));
             require(owner.status == game_heap::HeapStatus::create, "game owner has no lifetime");
             emit_begin(op); std::cout << ",\"id\":" << static_cast<std::uint32_t>(owner.id)
-                << ",\"type\":" << owner.type << ",\"handle\":" << owner.handle.value() << "}\n";
+                << ",\"type\":" << owner.type << ",\"handle\":" << owner.handle.value();
+            if (owner.type != 0) emit_handle_words(HandleAddress(owner.handle.value()));
+            std::cout << "}\n";
+            return;
+        }
+        if (op == "game_handle_read") {
+            const auto identity = handle_labels.at(field(line, "label"));
+            emit_begin(op);
+            std::cout << ",\"handle\":" << identity.value();
+            emit_handle_words(identity);
+            std::cout << "}\n";
             return;
         }
         if (op == "game_handle_alloc" || op == "game_handle_compact" || op == "game_handle_free") {
@@ -377,6 +473,7 @@ struct LifetimeModel : Model {
                 const auto address = payload(field(line, "label"));
                 const auto status = handles.free_payload(HandleAddress(owner.handle.value()), address);
                 emit_begin(op, handle_status_name(status));
+                if (status == HandleStatus::ok) emit_retired_payloads();
                 std::cout << ",\"owner\":" << owner.handle.value()
                           << ",\"payload\":" << address.value() << "}\n";
                 return;
@@ -397,6 +494,55 @@ struct LifetimeModel : Model {
                       << ",\"owner\":" << owner.handle.value() << ",\"owner_type\":" << owner.type;
             if (result.status == HandleStatus::ok) emit_handle_words(result.handle);
             std::cout << "}\n"; return;
+        }
+        if (op == "game_handle_compact_begin") {
+            const auto index = number(field(line, "index"));
+            const auto& owner = game.heap(index);
+            require(owner.status == game_heap::HeapStatus::create && owner.type != 0,
+                    "game heap is not a created handle owner");
+            const auto result = handles.compact_begin(
+                HandleAddress(owner.handle.value()),
+                HandleAddress(number(field(line, "callback"))),
+                number(field(line, "callback_arg")));
+            emit_begin(op, source_handle::status_name(result.status));
+            std::cout << ",\"result\":" << (result.started ? 1 : 0)
+                      << ",\"owner\":" << owner.handle.value();
+            emit_compact_state(result.state);
+            std::cout << "}\n";
+            return;
+        }
+        if (op == "game_handle_compact_callback") {
+            const auto result = handles.compact_callback_transition(
+                number(field(line, "generation")), field(line, "cancelled") == "1");
+            if (result.status == HandleStatus::compact_started) {
+                for (auto& item : payload_labels) {
+                    if (handle_labels.at(item.first) == result.state.move.handle)
+                        item.second = result.state.move.destination;
+                }
+            }
+            emit_compact_step(op, result);
+            return;
+        }
+        if (op == "game_handle_compact_ram_chunk") {
+            const auto result = handles.compact_ram_alarm_chunk(
+                number(field(line, "generation")));
+            emit_compact_step(op, result);
+            return;
+        }
+        if (op == "game_handle_compact_devcom_complete") {
+            const auto result = handles.compact_devcom_complete(
+                number(field(line, "generation")), field(line, "cancelled") == "1");
+            emit_compact_step(op, result);
+            return;
+        }
+        if (op == "game_handle_compact_observe") {
+            const auto& state = handles.compact_state();
+            require(state.phase != source_handle::CompactPhase::idle,
+                    "source handle callback observed without compaction");
+            emit_begin(op);
+            emit_compact_state(state);
+            std::cout << "}\n";
+            return;
         }
         Model::run(line);
     }

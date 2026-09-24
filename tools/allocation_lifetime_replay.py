@@ -13,6 +13,8 @@ import selectors
 import subprocess
 from typing import Any
 
+from .compaction_manager_state import CompactionManagerState
+
 from .allocation_history_replay import (
     ROOT, ModelDriver, ReplayProblem, call_chain, canonical_sha256, parse_result,
     sha256_file, parse_u32,
@@ -69,7 +71,13 @@ class StreamModel:
                 raise ReplayProblem('model', f'allocator driver stopped: {error}', call=call)
             results.append(parse_result(line))
         self.outputs.append(results[0])
-        if results[0].get('status') != 'ok':
+        accepted_statuses = {'ok'}
+        if command.get('op') in {
+                'game_handle_compact_begin', 'game_handle_compact_callback',
+                'game_handle_compact_ram_chunk', 'game_handle_compact_devcom_complete'}:
+            accepted_statuses.update({'compact_started', 'compact_in_progress',
+                                      'compact_complete', 'cancelled'})
+        if results[0].get('status') not in accepted_statuses:
             raise ReplayProblem('unsupported', f"model rejected source operation: {results[0].get('status')}", call=call)
         return dict(results[0])
 
@@ -171,6 +179,7 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
     observed_labels: dict[int, str] = {}
     derived_calls: dict[int, dict] = {}
     derived_payloads: dict[int, str] = {}
+    derived_handles: dict[int, str] = {}
     completed = []
     identities = []
     ownership_events = []
@@ -219,8 +228,39 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
         'lbHeap_80015D6C', 'lbHeap_80015CA8', 'lbMemFreeToHeap', 'HSD_CreateMainHeap', 'HSD_OSInit',
         'Fighter_FirstInitialize_80067A84', 'Fighter_Create',
         'gm_Scene_Vs_OnEnter', 'gm_Scene_Vs_OnExit',
+        'fn_80015184', 'lbMemory_80015320', 'lbDvd_80017A80',
+        'HSD_DevComRequest', 'HSD_DevComARAMCallback',
     }
     declarations = {item['name']: item for item in profile.get('functions', [])}
+    # The old handle model intentionally fails closed at the first
+    # asynchronous move. Only a profile that declares every boundary needed
+    # to observe the source transfer may opt into the granular state machine.
+    async_compaction_functions = {
+        'fn_80015184', 'lbMemory_80015320', 'lbDvd_80017A80',
+        'HSD_DevComRequest', 'HSD_DevComARAMCallback',
+    }
+    async_compaction_coverage = async_compaction_functions <= set(declarations)
+    manager = None
+    if async_compaction_coverage:
+        try:
+            manager = CompactionManagerState(layout.get('lbmemory_initial_manager'))
+        except ValueError as error:
+            raise ReplayProblem('provenance', str(error)) from error
+    devcom_counter = parse_u32(layout.get('devcom_initial_request_counter', 4),
+                              'independent DevCom request counter')
+    if retail and async_compaction_coverage and 'devcom_initial_request_counter' not in layout:
+        raise ReplayProblem('provenance', 'independent DevCom request counter is missing')
+    devcom_ids = {}
+    compact_devcom_id = None
+    compact_devcom_pending = False
+    compact_generation = None
+    compact_callback_generation = None
+    compact_callback_address = None
+    compact_callback_arg = None
+    compact_state_snapshot = None
+    dvd_completion_tokens = {}
+    compaction_callback_tokens = {}
+    compaction_alarm_tokens = {}
 
     current_call = header
 
@@ -230,7 +270,11 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
 
     def run(op, call, **fields):
         modeled_functions.add(call.get('function'))
-        return model.run({'op': op, **fields}, call)
+        output = model.run({'op': op, **fields}, call)
+        for retired in output.get('retired_payloads', []):
+            derived_payloads.pop(retired['payload'], None)
+            derived_handles.pop(retired['handle'], None)
+        return output
 
     def metadata(output, row, call):
         observed = row.get('observed', {})
@@ -308,6 +352,92 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
             raise ReplayProblem('unsupported', 'pool descriptor lacks independent original static identity', call=call)
         return pool_ids[args[0]]
 
+    def source_function_address(name, call):
+        declaration = declarations.get(name)
+        if not isinstance(declaration, dict) or 'address' not in declaration:
+            raise ReplayProblem('provenance', f'{name} lacks an independently profiled source identity', call=call)
+        return parse_u32(declaration['address'], f'{name} source identity')
+
+    def compact_state(output, call):
+        state = output.get('compact') if isinstance(output, dict) else None
+        if not isinstance(state, dict) or not isinstance(state.get('move'), dict):
+            raise ReplayProblem('model', 'compaction operation lacks a complete symbolic state', call=call)
+        for key in ('heap', 'callback', 'callback_arg', 'callback_handle',
+                    'callback_generation', 'cursor'):
+            parse_u32(state.get(key), f'compaction state {key}')
+        move = state['move']
+        for key in ('handle', 'source', 'destination', 'next', 'size', 'offset', 'generation'):
+            parse_u32(move.get(key), f'compaction move {key}')
+        if state.get('phase') not in {'idle', 'awaiting_callback', 'waiting_ram_alarm',
+                                      'waiting_devcom', 'awaiting_completion',
+                                      'complete', 'rejected'}:
+            raise ReplayProblem('model', 'compaction state has an unknown phase', call=call)
+        if move.get('transfer') not in {'none', 'ram_alarm', 'devcom_1b'}:
+            raise ReplayProblem('model', 'compaction state has an unknown transfer kind', call=call)
+        return state
+
+    def compare_compaction(row, call):
+        if manager is None or call['function'] not in {
+                'lbMemory_8001529C', 'lbMemory_80015320', 'fn_80015184'}:
+            return
+        observed = row.get('observed', {}).get('compaction')
+        if observed is None and not retail:
+            return  # Synthetic fixtures may isolate a different boundary.
+        if not isinstance(observed, dict):
+            raise ReplayProblem('stream', 'compaction metadata is missing', call=call)
+        words = observed.get('manager')
+        if not isinstance(words, dict) or set(words) != set(manager.snapshot()):
+            raise ReplayProblem('stream', 'compaction manager fields are missing or unknown', call=call)
+        for name, value in words.items():
+            parse_u32(value, 'observed compaction manager ' + name)
+        equal(observed.get('phase'), 'entry' if row['record'] == 'enter' else 'return',
+              'compaction observation phase', call)
+        equal(observed.get('manager'), manager.snapshot(), 'compaction manager', call)
+        args = call['args']
+        if call['function'] == 'lbMemory_8001529C':
+            wrapper = enters.get(call.get('parent'))
+            if not wrapper or wrapper['function'] != 'lbHeap_80015D6C':
+                raise ReplayProblem('unsupported', 'compaction handle lacks its wrapper', call=call)
+            handle = run('game_owner', call, index=wrapper['args'][0])
+            words = handle['handle_words']
+            equal(observed.get('handle'), dict(pointer=handle['handle'],
+                  x0_next=words[0], x4_lo=words[1], x8_hi=words[2], xC_prev=words[3]),
+                  'compaction heap handle', call)
+            equal(observed.get('callback'), args[1], 'compaction callback metadata', call)
+            equal(observed.get('callback_arg'), args[2], 'compaction callback argument metadata', call)
+        elif call['function'] == 'lbMemory_80015320':
+            equal(observed.get('callback_arg'), args[2], 'move callback argument metadata', call)
+            equal(observed.get('cancel'), bool(args[3]), 'move cancellation metadata', call)
+            if not args[1]:
+                equal(observed.get('handle'), None, 'final callback null handle', call)
+            else:
+                label = derived_handles.get(args[1])
+                if label is None:
+                    raise ReplayProblem('unsupported', 'callback handle lacks derived producer', call=call)
+                handle = run('game_handle_read', call, label=label)
+                words = handle['handle_words']
+                equal(observed.get('handle'), dict(pointer=handle['handle'],
+                      x0_next=words[0], x4_lo=words[1], x8_hi=words[2]),
+                      'compaction allocation handle', call)
+        else:
+            equal(observed.get('alarm'), layout['lbmemory_allocator'] + 0x6A0,
+                  'source RAM alarm identity', call)
+            equal(args[0], layout['lbmemory_allocator'] + 0x6A0,
+                  'source RAM alarm argument', call)
+            equal(observed.get('context'), args[1], 'source alarm context metadata', call)
+
+    def relocate_payload(state, call):
+        if state['phase'] not in {'waiting_ram_alarm', 'waiting_devcom'}:
+            return
+        move = state['move']
+        label = derived_handles.get(move['handle'])
+        if label is None or derived_payloads.get(move['source']) != label:
+            raise ReplayProblem('model', 'compaction move lacks its derived payload producer', call=call)
+        del derived_payloads[move['source']]
+        if move['destination'] in derived_payloads:
+            raise ReplayProblem('model', 'compaction destination aliases a live payload', call=call)
+        derived_payloads[move['destination']] = label
+
     try:
         run('configure', header, heap_count=context['heap_max_num'], descriptor_base=context['arena_lo'],
             arena_start=context['arena_start'], arena_end=context['arena_end'],
@@ -345,18 +475,23 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
             args = [parse_u32(value, 'source argument') for value in call['args']]
             if function in declarations and len(args) != declarations[function]['argc']:
                 raise ReplayProblem('stream', 'source argument count differs from pinned function profile', call=call)
+            compare_compaction(row, call)
             ancestors = call_chain(call, enters)
             names = [parent['function'] for parent in ancestors]
             label = f"call_{call['call']}"
             if record == 'enter':
                 if function not in supported:
                     raise ReplayProblem('unsupported', f'no source binding for observed function {function}', call=call)
+                if function in async_compaction_functions and not async_compaction_coverage:
+                    raise ReplayProblem('unsupported',
+                                        'asynchronous compaction callback coverage is not declared by the source profile',
+                                        call=call)
                 if function == 'lbHeap_80015900':
                     run('game_begin', call)
                 elif function == 'HSD_CreateMainHeap':
                     output = run('hsd_replace_begin', call)
                     equal(args, output['args'], 'replacement bounds', call)
-                elif function in ('lbHeap_80015BD0', 'lbHeap_80015CA8'):
+                elif function in ('lbHeap_80015BD0', 'lbHeap_80015CA8', 'lbHeap_80015D6C'):
                     derived_calls[call['call']] = run('game_owner', call, index=args[0])
                 elif function == 'Fighter_FirstInitialize_80067A84':
                     # This diagnostic prefix models one source initialization.
@@ -399,6 +534,175 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
                         raise ReplayProblem('unsupported',
                                             'VS scene ownership exited without one active owner', call=call)
                     scene_exit_call = call['call']
+                elif function == 'lbMemory_8001529C' and async_compaction_coverage:
+                    if not ancestors or ancestors[0]['function'] != 'lbHeap_80015D6C':
+                        raise ReplayProblem('unsupported',
+                                            'handle compaction lacks original game-heap wrapper context', call=call)
+                    wrapper = ancestors[0]
+                    owner = wrapper['args'][0]
+                    if len(args) != 3:
+                        raise ReplayProblem('stream', 'compaction entry requires handle, callback, and callback argument',
+                                            call=call)
+                    owner_output = derived_calls.get(wrapper['call'])
+                    if not owner_output or 'handle' not in owner_output:
+                        raise ReplayProblem('unsupported',
+                                            'source compaction wrapper lacks a derived owner handle', call=call)
+                    equal(args[0], owner_output['handle'], 'source compaction owner', call)
+                    equal(args[1], wrapper['args'][1], 'source compaction callback argument', call)
+                    equal(args[2], wrapper['args'][2], 'source compaction callback context', call)
+                    callback_address = source_function_address('lbDvd_80017A80', call)
+                    equal(args[1], callback_address,
+                          'source compaction callback identity', call)
+                    output = run('game_handle_compact_begin', call, index=owner,
+                                 callback=callback_address, callback_arg=args[2])
+                    state = compact_state(output, call)
+                    if output.get('owner') != args[0]:
+                        raise ReplayProblem('validation', 'source compaction handle owner differs', call=call)
+                    if output.get('result') not in (0, 1):
+                        raise ReplayProblem('model', 'source compaction result is not a boolean start result', call=call)
+                    manager.begin(state)
+                    compact_state_snapshot = state
+                    compact_callback_address = args[1]
+                    compact_callback_arg = args[2]
+                    compact_generation = None
+                    compact_callback_generation = (state['callback_generation']
+                                                   if output['result'] else None)
+                    compact_devcom_pending = False
+                    derived_calls[call['call']] = output
+                elif function == 'fn_80015184' and async_compaction_coverage:
+                    if compact_generation is None:
+                        raise ReplayProblem('unsupported',
+                                            'RAM compaction callback has no active derived transfer', call=call)
+                    output = run('game_handle_compact_ram_chunk', call, generation=compact_generation)
+                    state = compact_state(output, call)
+                    manager.alarm(state)
+                    compact_state_snapshot = state
+                    if output.get('status') == 'invalid_generation':
+                        raise ReplayProblem('validation', 'RAM compaction callback generation was rejected', call=call)
+                    if state['phase'] == 'waiting_ram_alarm':
+                        compact_generation = state['move']['generation']
+                    elif state['phase'] in {'awaiting_callback', 'awaiting_completion'}:
+                        if not output.get('transfer_complete'):
+                            raise ReplayProblem('model',
+                                                'RAM compaction callback advanced without completing its transfer',
+                                                call=call)
+                        compact_generation = None
+                        compact_callback_generation = state['callback_generation']
+                    else:
+                        raise ReplayProblem('unsupported',
+                                            'RAM compaction callback did not preserve a pending transfer boundary',
+                                            call=call)
+                    compaction_alarm_tokens[call['call']] = {
+                        'generation': compact_generation,
+                    }
+                elif function == 'lbMemory_80015320' and async_compaction_coverage:
+                    if len(args) != 4 or args[2] != 0 or args[3] not in (0, 1):
+                        raise ReplayProblem('stream',
+                                            'source compaction callback arguments are malformed', call=call)
+                    equal(args[0], compact_devcom_id if compact_devcom_pending else 0,
+                          'source compaction callback request identity', call)
+                    if compact_devcom_pending:
+                        if compact_generation is None:
+                            raise ReplayProblem('unsupported',
+                                                'DevCom completion has no active derived transfer', call=call)
+                        output = run('game_handle_compact_devcom_complete', call,
+                                     generation=compact_generation, cancelled=args[3])
+                        state = compact_state(output, call)
+                        compact_state_snapshot = state
+                        compact_devcom_pending = False
+                        if args[3]:
+                            if output.get('status') != 'cancelled':
+                                raise ReplayProblem('model',
+                                                    'cancelled DevCom callback was not rejected by the model',
+                                                    call=call)
+                            raise ReplayProblem('unsupported',
+                                                'source compaction callback was cancelled', call=call)
+                        if state['phase'] not in {'awaiting_callback', 'awaiting_completion'}:
+                            raise ReplayProblem('model',
+                                                'DevCom completion did not expose the source callback boundary',
+                                                call=call)
+                        equal(args[1], state['callback_handle'],
+                              'source compaction handle callback identity', call)
+                        compact_generation = None
+                        compact_callback_generation = state['callback_generation']
+                    else:
+                        state = compact_state_snapshot
+                        if state is None or state['phase'] not in {
+                                'awaiting_callback', 'awaiting_completion'}:
+                            raise ReplayProblem('unsupported',
+                                                'source compaction callback has no pending symbolic transfer',
+                                                call=call)
+                        equal(args[1], state['callback_handle'],
+                              'source compaction handle callback identity', call)
+                    if compact_callback_generation is None:
+                        raise ReplayProblem('unsupported',
+                                            'source compaction callback lacks a derived callback generation', call=call)
+                    output = run('game_handle_compact_callback', call,
+                                 generation=compact_callback_generation, cancelled=args[3])
+                    state = compact_state(output, call)
+                    manager.callback(state, source_function_address('lbMemory_80015320', call))
+                    relocate_payload(state, call)
+                    compact_state_snapshot = state
+                    if output.get('status') == 'invalid_generation':
+                        raise ReplayProblem('validation',
+                                            'source compaction callback generation was rejected', call=call)
+                    if args[3]:
+                        if output.get('status') != 'cancelled':
+                            raise ReplayProblem('model',
+                                                'cancelled source compaction callback was not rejected by the model',
+                                                call=call)
+                        raise ReplayProblem('unsupported',
+                                            'source compaction callback was cancelled', call=call)
+                    if state['phase'] in {'waiting_ram_alarm', 'waiting_devcom'}:
+                        compact_generation = state['move']['generation']
+                    elif state['phase'] in {'awaiting_callback', 'awaiting_completion'}:
+                        compact_generation = None
+                    elif state['phase'] == 'complete':
+                        compact_generation = None
+                        compact_callback_generation = None
+                    else:
+                        raise ReplayProblem('unsupported',
+                                            'source compaction callback produced a rejected symbolic state',
+                                            call=call)
+                    if state['phase'] != 'complete':
+                        compact_callback_generation = state['callback_generation']
+                    compaction_callback_tokens[call['call']] = {
+                        'handle': args[1], 'phase': state['phase'],
+                    }
+                elif function == 'lbDvd_80017A80' and async_compaction_coverage:
+                    state = compact_state_snapshot
+                    if state is None or state['phase'] != 'complete' or not state['callback_invoked']:
+                        raise ReplayProblem('unsupported',
+                                            'DVD preload callback arrived before symbolic compaction completion',
+                                            call=call)
+                    callback_address = source_function_address('lbDvd_80017A80', call)
+                    equal(args[0], compact_callback_arg,
+                          'DVD preload callback argument', call)
+                    equal(callback_address, compact_callback_address,
+                          'DVD preload callback identity', call)
+                    dvd_completion_tokens[call['call']] = {
+                        'callback_arg': args[0], 'callback': callback_address,
+                    }
+                elif function == 'HSD_DevComRequest' and async_compaction_coverage:
+                    priority = args[5] if args[4] & 0x38 == 0x20 else 3
+                    if priority not in range(4):
+                        raise ReplayProblem('unsupported', 'DevCom priority is outside source queues', call=call)
+                    devcom_ids[call['call']] = (devcom_counter + priority) & 0xFFFFFFFF
+                    devcom_counter = (devcom_counter + 4) & 0xFFFFFFFF
+                    state = compact_state_snapshot
+                    callback = args[6]
+                    if callback != source_function_address('lbMemory_80015320', call):
+                        continue  # Unrelated transport; nested allocations still replay.
+                    if state is None or state['phase'] != 'waiting_devcom':
+                        raise ReplayProblem('unsupported', 'compaction DevCom request has no pending move', call=call)
+                    equal(args, [0, state['move']['source'], state['move']['destination'],
+                                 state['move']['size'], 0x1B, 1,
+                                 source_function_address('lbMemory_80015320', call),
+                                 state['move']['next']], 'DevCom move request', call)
+                    compact_devcom_id = devcom_ids[call['call']]
+                    compact_devcom_pending = True
+                elif function == 'HSD_DevComARAMCallback' and async_compaction_coverage:
+                    pass  # Transfer completion is validated at the nested handle callback.
                 continue
             output = None
             if function == 'Fighter_FirstInitialize_80067A84':
@@ -717,10 +1021,42 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
                     output = run('game_handle_alloc', call, index=owner, requested=args[1], label=label)
                     pointer(row, output, 'result', label, call)
                 else:
-                    output = run('game_handle_compact', call, index=owner)
+                    if async_compaction_coverage:
+                        output = derived_calls.get(call['call'])
+                        if not output:
+                            raise ReplayProblem('model',
+                                                'asynchronous compaction return lacks its modeled entry state',
+                                                call=call)
+                    else:
+                        output = run('game_handle_compact', call, index=owner)
                     equal(row['result'], output['result'], 'compaction result', call)
                     derived_calls[call['call']] = output
                 equal(args[0], output['owner'], 'source heap handle owner', call)
+            elif function == 'lbMemory_80015320' and async_compaction_coverage:
+                token = compaction_callback_tokens.pop(call['call'], None)
+                if token is None:
+                    raise ReplayProblem('unsupported',
+                                        'source compaction callback return lacks its validated entry token',
+                                        call=call)
+            elif function == 'fn_80015184' and async_compaction_coverage:
+                token = compaction_alarm_tokens.pop(call['call'], None)
+                if token is None:
+                    raise ReplayProblem('unsupported',
+                                        'RAM compaction callback return lacks its validated entry token',
+                                        call=call)
+            elif function == 'HSD_DevComRequest' and async_compaction_coverage:
+                equal(row['result'], devcom_ids.pop(call['call']), 'DevCom request identity', call)
+
+            elif function == 'HSD_DevComARAMCallback' and async_compaction_coverage:
+                pass
+            elif function == 'lbDvd_80017A80' and async_compaction_coverage:
+                token = dvd_completion_tokens.pop(call['call'], None)
+                if token is None:
+                    raise ReplayProblem('unsupported',
+                                        'DVD preload callback return lacks its validated entry token', call=call)
+                equal(args[0], token['callback_arg'], 'DVD preload callback argument', call)
+                equal(token['callback'], source_function_address('lbDvd_80017A80', call),
+                      'DVD preload callback identity', call)
             elif function == 'lbMemFreeToHeap':
                 if not ancestors or ancestors[0]['function'] != 'lbHeap_80015CA8':
                     raise ReplayProblem('unsupported', 'handle release lacks its original game-heap wrapper', call=call)
@@ -753,6 +1089,7 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
                 metadata(output, row, call)
                 if function == 'lbMemory_80014FC8':
                     derived_payloads[output['payload']] = label
+                    derived_handles[output['result']] = label
             completed.append(call['call'])
     except ReplayProblem as error:
         current_call = error.call or current_call

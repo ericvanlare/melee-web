@@ -71,6 +71,23 @@ payloads, archives, textures, executable bodies, or whole RAM. It does not
 pretend that observing a compaction request proves that an asynchronous move
 has been fully modeled; additional observed modes need their own boundaries.
 
+Profile version 2 also observes the original handle callback, RAM alarm chunks,
+DevCom request/completion wrapper, and DVD preload completion. The address-only
+handle model separates move start, transfer completion, and the next callback.
+RAM chunks advance at most `0x19000` bytes; low-address moves wait for explicit
+DevCom completion. Generations reject stale callbacks and unfinished teardown.
+The model moves identities, not payload bytes, and does not implement transport
+scheduling or validate copied contents.
+
+Diagnostic replay compares manager fields at entry and return, including nested
+callbacks. The original manager retains its copy fields after completion and
+clears only its active size; a nested no-op compaction may replace the global
+cursor before the earlier callback returns. Call-local completion tokens preserve
+that ordering. Initial manager words come from the independently verified DOL
+BSS range, while DevCom request numbering starts from owned executable data.
+Relocation updates derived payload labels and teardown invalidates them. Captured
+manager words, pointers, and request results remain comparison targets.
+
 ## Version-1 stream
 
 Each JSONL row has a contiguous `sequence`. The header identifies the cold DOL
@@ -253,15 +270,19 @@ The separate address-only `source_aram` component models the observed aligned AR
 LIFO release. The `source_handle` component models original `lbMemory` descriptor
 free lists, best-fit placement, the last-equal-gap rule, and descriptor recycling.
 Both receive explicit source context and reject missing or unsupported behavior.
-Compaction that would move payloads asynchronously returns `async_move_required`;
-the original captures so far only exercised no-op compaction.
+The legacy synchronous diagnostic method still returns `async_move_required`
+when movement is needed. The explicit asynchronous interface described above
+handles move start and completion at separate source boundaries.
 
 Their native ASan/UBSan and checked Wasm models are compared with the untouched
 original `ar.c` and `lbmemory.c` bodies compiled under the original 32-bit layout.
 The ARAM oracle sets its private allocator globals to declared synthetic roots;
 it tests ARAlloc/ARFree/ARGetSize, not hardware/MMIO initialization. The handle
-oracle supplies an explicit ARAM fixture and aborts if an asynchronous alarm or
-device-copy path is reached. These narrow environments are not runtime services.
+legacy oracle supplies an explicit ARAM fixture and aborts if an asynchronous
+alarm or device-copy path is reached. The separate asynchronous oracle exercises
+queued low-address DevCom completion against untouched `lbmemory.c`; its excluded
+RAM alarm services abort. RAM manager transitions are separately compared with
+the original capture. These narrow environments are not runtime services.
 Synthetic descriptor, heap and ARAM bases are relocated, with corresponding
 normalized outputs required to agree. No original assets or executable bodies
 are embedded in tests.
@@ -304,7 +325,7 @@ return boundary when it follows an unconditional BLR within a block.
 Regenerate or verify the tracked identity table with the owned profile:
 
 ```sh
-python3 tools/generate_reference_allocation_profile.py --profile work/session-equivalence-allocation-profile-v1.json --output reference-capture/dolphin/source/Core/PowerPC/ReferenceAllocationProfile.h --check
+python3 tools/generate_reference_allocation_profile.py --profile "$ALLOCATION_PROFILE" --output reference-capture/dolphin/source/Core/PowerPC/ReferenceAllocationProfile.h --check
 ```
 
 The profile JSON and raw allocation history stay under ignored work evidence.
@@ -316,21 +337,21 @@ runtime source-address provider.
 
 ## First VS initialization capture
 
-The [passive allocation receipt](evidence/original-allocation-passive-v1.json)
-records three fresh original cold boots driven by the same immutable SI input
-recording: four Mario CPU9 players, four stocks, Final Destination. All three
-allocation streams end at the first verified VS-entry return and are byte
-identical. They include all four fighter constructions. Those addresses remain
-observations: the model currently stops before reaching their derivation, at
-the first asynchronous `lbMemory_8001529C` compaction request. Native and checked
-Wasm agree through the preceding modeled operations. In the replay report,
+The [compaction receipt](evidence/original-allocation-compaction-v1.json) records
+repeat original cold boots driven by the same immutable SI input recording:
+four Mario CPU9 players, four stocks, Final Destination. The allocation streams
+end at the first verified VS-entry return and are byte-identical. Native and
+checked-Wasm replay derive all four fighter identities and compare every captured
+allocation call in this prefix. The [earlier passive receipt](evidence/original-allocation-passive-v1.json)
+retains the failure at the first asynchronous compaction. In the replay report,
 `completion_scope` describes the captured source boundary; only the status,
 completed-call count and ownership evidence describe how far replay validated.
 
-The next model boundary is the source compaction callback and its asynchronous
-transfer lifecycle. It must preserve callback order and independently derive
-moved handle payloads before comparison; completing the whole move eagerly or
-copying observed pointers would not establish equivalence. Original VS preload
+Pool identities now come from pinned source declarations joined to the symbol
+map, including allocator members at the start of larger structures. Equal-size
+unrelated globals cannot enter the inventory, and observations cannot extend it.
+
+The next model boundary is repeated fighter ownership and teardown. Original VS preload
 rebuilds the main HSD heap, but retained game heaps, preload caches and audio/ARAM
 owners still constrain its bounds. The browser therefore also needs an
 independent source-context provider, followed by register-carry integration.
