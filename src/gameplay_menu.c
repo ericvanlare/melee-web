@@ -601,6 +601,11 @@ static int css_progress_valid(const CSSData* css)
         /* Preserve the existing unplugged-controller allowance for the two
          * initial doors.  Inactive P3/P4 slots must remain dormant. */
         if (i < MELEE_WEB_MENU_MIN_PLAYERS && p->slot_type == Gm_PKind_NA) {
+            /* CSS construction (fn_8026407C) stores CKIND_PLAYABLE_COUNT when its icon
+             * search finds no selected fighter. It is an inactive-door
+             * sentinel here, not an admitted Master Hand selection. Change
+             * only the validation copy before its synthetic human slot. */
+            if (p->ckind == CKIND_PLAYABLE_COUNT) p->ckind = CKIND_MARIO;
             p->slot_type = Gm_PKind_Human;
         }
         /* A newly joined door has a live slot before the original CSS has
@@ -883,8 +888,20 @@ int melee_web_menu_tick(MeleeWebMenuSession* session, char* error,
     if (rejected) {
         session->selection_rejected = 1;
         if (error != NULL && error_size != 0) {
+            const StartMeleeData* start = scene == MELEE_WEB_MENU_SCENE_CSS
+                ? &session->css.vs.start : &session->sss.vs.start;
             snprintf(error, error_size,
-                     "Native menu selection was rejected; abort and re-enter");
+                     "Native menu selection was rejected: scene=%d stage=%d "
+                     "mode=%d stock=%d vs=%d teams=%d timer=%d xB=%d "
+                     "players=%d/%d,%d/%d,%d/%d,%d/%d; abort and re-enter",
+                     scene, start->rules.stkind, start->rules.match_kind,
+                     start->rules.is_stock, start->rules.is_vs,
+                     start->rules.is_teams, start->rules.timer_enabled,
+                     start->rules.xB,
+                     start->players[0].ckind, start->players[0].slot_type,
+                     start->players[1].ckind, start->players[1].slot_type,
+                     start->players[2].ckind, start->players[2].slot_type,
+                     start->players[3].ckind, start->players[3].slot_type);
         }
         return MELEE_WEB_MENU_RESULT_SELECTION_REJECTED;
     }

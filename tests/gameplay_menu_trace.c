@@ -359,6 +359,26 @@ int main(void)
                 MELEE_WEB_MENU_RESULT_TICKED ||
             active_css->vs.start.rules.stkind != St_Kind_Dummy)
             return 109;
+        /* Original v15 first-CSS OnEnter publishes four inactive doors with
+         * CKIND_PLAYABLE_COUNT, cpu_level=1 and the uncommitted stage=0.
+         * Reduce that observed boundary without mutating the source state
+         * during validation. The callback is stubbed in this contract test;
+         * the actual linked browser route remains a separate check. */
+        for (int i = 0; i < 4; ++i) {
+            active_css->vs.start.players[i].slot_type = Gm_PKind_NA;
+            active_css->vs.start.players[i].ckind = CKIND_PLAYABLE_COUNT;
+            active_css->vs.start.players[i].cpu_level = 1;
+        }
+        if (melee_web_menu_tick(session, error, sizeof(error)) !=
+                MELEE_WEB_MENU_RESULT_TICKED) return 111;
+        for (int i = 0; i < 4; ++i) {
+            if (active_css->vs.start.players[i].slot_type != Gm_PKind_NA ||
+                active_css->vs.start.players[i].ckind != CKIND_PLAYABLE_COUNT)
+                return 112;
+        }
+        active_css->vs.start.players[0].slot_type = Gm_PKind_Human;
+        active_css->vs.start.players[0].ckind = CKIND_MARIO;
+        active_css->vs.start.players[1].ckind = CKIND_FOX;
         active_css->vs.start.players[1].slot_type = Gm_PKind_Cpu;
         active_css->vs.start.players[1].cpu_kind = 4;
         active_css->vs.start.players[1].cpu_level = 9;
