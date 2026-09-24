@@ -269,6 +269,15 @@ class WholeSessionReplayTests(unittest.TestCase):
         with self.assertRaisesRegex(replay.WholeSessionReplayError, "multiple PAD consumes"):
             replay.capture_from_records(rows)
 
+    def test_rejects_same_source_step_across_scene_owner_boundaries(self):
+        rows = _candidate()
+        pads = [row for row in rows
+                if row["payload"].get("boundary") == "pad_consume"]
+        self.assertGreaterEqual(len(pads), 2)
+        pads[1]["source_tick"] = pads[0]["source_tick"]
+        with self.assertRaisesRegex(replay.WholeSessionReplayError, "multiple PAD consumes"):
+            replay.capture_from_records(rows)
+
     def test_pad_snapshot_helper_keeps_source_layout(self):
         self.assertEqual(semantics.pad_snapshot_bytes(_raw_pad_snapshot()), _whole_pad_state())
 

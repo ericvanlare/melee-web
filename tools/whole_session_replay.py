@@ -72,10 +72,6 @@ RUNTIME_CONTEXT_STATUS = (
 )
 
 SCENES = {"css": 1, "sss": 2, "match": 3, "results": 4, "prize": 5}
-OWNER_ENTRY_BOUNDARIES = {
-    "css_enter", "css_cancel_enter", "sss_enter", "entry", "results_enter",
-    "prize_mode_enter", "return_css",
-}
 LIFECYCLE_NAMES = set(semantics.WHOLE_OBSERVER_PCS)
 IDENTITY = re.compile(r"[A-Za-z0-9_.-]{1,128}\Z")
 
@@ -401,8 +397,7 @@ def _timeline(
     started = False
     finished = False
     last_seq = -1
-    owner_segment = -1
-    consumed_steps: set[tuple[int, int]] = set()
+    consumed_steps: set[int] = set()
     lifecycle_matches = {row["seq"]: row["payload"]["match_index"]
                          for row in _lifecycle_rows(records)}
     for index, row in enumerate(records):
@@ -435,8 +430,6 @@ def _timeline(
             next_scene = _scene_transition(boundary, scene)
             if next_scene is None:
                 _fail(f"source boundary {boundary} has no admitted scene owner")
-            if next_scene != scene or boundary in OWNER_ENTRY_BOUNDARIES:
-                owner_segment += 1
             scene = next_scene
             if scene is None:
                 _fail(f"source boundary {boundary} has no admitted scene owner")
@@ -457,12 +450,11 @@ def _timeline(
                 _fail("PAD was consumed outside the admitted whole-session lifecycle")
             if match != current_match:
                 _fail("PAD consume match_index disagrees with the active lifecycle")
-            step_key = (owner_segment, source_tick)
-            if step_key in consumed_steps:
+            if source_tick in consumed_steps:
                 _fail(
                     f"multiple PAD consumes share source step {source_tick} "
-                    f"within {scene} owner segment")
-            consumed_steps.add(step_key)
+                    "across the whole-session transport")
+            consumed_steps.add(source_tick)
             pads = _consumed_ports(row, index)
             frame_index = len(frames)
             frames.append({
