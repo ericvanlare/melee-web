@@ -764,6 +764,21 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
         self.assertEqual(report['status'], 'validation')
         self.assertIn(select, report['replay_pending_calls'])
 
+    def test_memory_and_artifact_replay_pending_reports_match_on_failure(self):
+        reports = []
+        for artifact_dir in (None, self.root / 'artifact-parity'):
+            rows, enters, returns = self._stream()
+            select = next(call for call, value in enters.items()
+                          if value['function'] == 'OSSetCurrentHeap')
+            returns[select]['result'] = 0
+            reports.append(self._run(
+                rows, enters, returns, profile=0xFFFFFFFF,
+                verified=self.verified(), artifact_dir=artifact_dir))
+        self.assertEqual([report['status'] for report in reports],
+                         ['validation', 'validation'])
+        self.assertEqual([report['replay_pending_calls'] for report in reports],
+                         [[0, 4], [0, 4]])
+
     def test_demo_owner_remains_incomplete_until_a_derived_pool_reset(self):
         rows, enters, returns = self._stream(with_fighters=True)
         end = rows[-1]

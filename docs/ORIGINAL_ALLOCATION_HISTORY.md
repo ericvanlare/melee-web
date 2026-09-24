@@ -392,10 +392,14 @@ permit dropping machine, lifecycle, or ownership fields.
 This is a read-only original allocation diagnostic. It observes source-owned
 boundaries and does not provide captured pointers, heap addresses, or history to
 the browser allocator, and it does not replace the MWRC whole-session PAD
-producer or replay consumer. Until a new repeated-ownership capture is retained,
-the [existing first-VS allocation receipt](evidence/original-allocation-compaction-v1.json)
-is the applicable evidence boundary; it does not claim repeated-VS ownership,
-browser-provider correctness, or full-session equivalence.
+producer or replay consumer. The [repeated-ownership receipt](evidence/original-allocation-repeated-ownership-v1.json)
+records independent original captures through the second VS entry and complete
+native/checked-Wasm allocation replay of that declared prefix. Results demo
+fighters use their explicit source wrappers; their ownership is retired only at
+a successful source pool reset. The second VS owner is still active, so this is
+not complete session teardown. The [first-VS receipt](evidence/original-allocation-compaction-v1.json)
+retains the earlier boundary. Neither receipt establishes browser-provider
+correctness or full-session equivalence.
 
 ## First VS initialization capture
 

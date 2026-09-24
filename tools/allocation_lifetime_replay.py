@@ -526,10 +526,15 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
             if record not in ('enter', 'return'):
                 continue
             call = enters[row['call']]
+            # Track the replay prefix in both in-memory and artifact modes.
+            # The source ``pending_calls`` field below remains the complete
+            # trace's ownership summary; this set describes work actually
+            # entered by this replay before a failure or successful return.
+            if record == 'enter':
+                pending_ids.add(call['call'])
             if bounded_state:
                 if record == 'enter':
                     active_enters[call['call']] = call
-                    pending_ids.add(call['call'])
                     parent = call.get('parent')
                     if parent is not None:
                         children.setdefault(parent, []).append(call)
@@ -1383,21 +1388,22 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
                     derived_payloads[output['payload']] = label
                     derived_handles[output['result']] = label
             completed_count += 1
-            if bounded_state and record == 'return':
+            if record == 'return':
                 # A returned child may still be needed by its active parent
                 # when that parent validates a wrapper-level result.  Keep
                 # the completed subtree until the parent returns, then drop
                 # all descendants in one step.  A top-level call has no
                 # consumer after its own return, so release its result too.
-                parent_id = call.get('parent')
-                if parent_id is None or parent_id not in active_enters:
-                    prune_closed_children(call['call'])
-                    derived_calls.pop(call['call'], None)
-                active_enters.pop(call['call'], None)
+                if bounded_state:
+                    parent_id = call.get('parent')
+                    if parent_id is None or parent_id not in active_enters:
+                        prune_closed_children(call['call'])
+                        derived_calls.pop(call['call'], None)
+                    active_enters.pop(call['call'], None)
                 # A return is replay-pending until all result, metadata and
                 # ownership checks above have succeeded.  Keeping this after
-                # the common tail preserves the failing return in bounded
-                # diagnostics without changing successful replay semantics.
+                # the common tail preserves the failing return in either
+                # replay mode without changing successful replay semantics.
                 pending_ids.discard(call['call'])
     except ReplayProblem as error:
         current_call = error.call or current_call
@@ -1542,7 +1548,7 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
     else:
         source_pending = []
         source_pending_error = 'trace end pending_calls is not a list'
-    replay_pending = sorted(pending_ids) if bounded_state else sorted(set(enters) - set(returns))
+    replay_pending = sorted(pending_ids)
     pending = source_pending
     stream_complete = (source_pending_error is None and end.get('status') == 'captured'
                        and not source_pending)

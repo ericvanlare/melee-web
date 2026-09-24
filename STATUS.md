@@ -1,5 +1,20 @@
 # Current status
 
+## Repeated VS allocation ownership reaches second match entry
+
+**Compiled / Source identified / Native traced / Retail compared** for recorded
+allocation fields and source operation order: native and checked-Wasm models
+replay all 3,857,302 calls from cold boot through the first four-Mario CPU9 match,
+Results, CSS/SSS and second VS entry. Two independent original captures are
+byte-identical. Explicit demo-fighter wrappers distinguish Results ownership
+from VS generations, and disk-backed replay retains every compared command and
+result. See the [scoped receipt](docs/evidence/original-allocation-repeated-ownership-v1.json)
+and [diagnostic controls](docs/ORIGINAL_ALLOCATION_HISTORY.md#repeated-vs-ownership-diagnostic-controls).
+The second VS owner remains active at this boundary. Complete three-match
+ownership, a live browser source-address provider, CPU register carry and
+full-session browser equivalence remain open. Pixels, PCM and live performance
+are separate gates. No deployment was performed.
+
 ## Source allocation replay derives first-VS fighter identities
 
 **Compiled / Source identified / Native traced / Retail compared** for the
@@ -11,8 +26,8 @@ handle identities and source-declared pools, including embedded pool members.
 See the [scoped receipt](docs/evidence/original-allocation-compaction-v1.json)
 and [remaining source-context boundaries](docs/ORIGINAL_ALLOCATION_HISTORY.md#first-vs-initialization-capture).
 The [earlier passive-capture receipt](docs/evidence/original-allocation-passive-v1.json)
-retains the previous first-compaction failure. Repeated ownership, copied payload
-contents, browser address/register context, full-session equivalence, pixels,
+retains the previous first-compaction failure. Copied payload contents,
+browser address/register context, full-session equivalence, pixels,
 PCM and live performance remain unproven. No deployment was performed.
 
 ## Reproducible whole-session CPU register boundary
@@ -27,7 +42,7 @@ comparison fields, first divergence, validation and retained failures are in the
 [diagnostic receipt](docs/evidence/whole-session-cpu-register-v1.json) and
 [register investigation](docs/CPU_REGISTER_COMPATIBILITY.md#reproducible-whole-session-register-diagnostics).
 
-This establishes a reproducible diagnostic boundary. The original allocation
+This establishes a reproducible diagnostic boundary. The live original allocation
 context and shared compiled register-carry implementation remain open;
 full-session browser equivalence, pixels, PCM and performance are not established.
 
