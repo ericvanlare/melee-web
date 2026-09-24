@@ -3,17 +3,23 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
-const {values} = parseArgs({options: Object.fromEntries(['url', 'playwright', 'disc', 'out'].map(name => [name, {type: 'string'}]))});
-if (!values.url || !values.playwright || !values.out) throw Error('Use --url ORIGIN --playwright PACKAGE_DIR --out LOCAL_DIR [--disc OWNED_DISC]');
-const {chromium} = await import(pathToFileURL(path.join(path.resolve(values.playwright), 'index.mjs')).href);
+import {createBrowserDriver} from '../scripts/browser_driver.mjs';
+import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
+const {values} = parseArgs({options: {
+  ...Object.fromEntries(['url', 'playwright', 'disc', 'out'].map(name => [name, {type: 'string'}])),
+  audio: {type: 'boolean', default: false},
+  headed: {type: 'boolean', default: false},
+}});
+if (!values.url || !values.out) throw Error('Use --url ORIGIN --out LOCAL_DIR [--playwright PACKAGE_DIR] [--disc OWNED_DISC] [--audio] [--headed]');
+const {chromium,browser:launchOptions} = await loadBrowserTools(values.playwright);
 await fs.mkdir(values.out, {recursive: true});
-const browser = await chromium.launch({channel: 'chrome', headless: false, chromiumSandbox: true});
+const browser = await chromium.launch(browserLaunchOptions(launchOptions, {headed: values.headed}));
 const context = await browser.newContext({viewport: {width: 1280, height: 960}});
 const page = await context.newPage(), origin = new URL(values.url).origin;
 const requests = [], errors = [], violations = [], sockets = [], audioEvents = [];
-const report = {schema: 'webmelee-public-player-browser-v1', browser: browser.version(), checks: [],
+const report = {schema: 'webmelee-public-player-browser-v1', browser: browser.version(), browser_mode: values.headed ? 'headed' : 'headless', checks: [],
+  profile: values.audio ? 'audio-player' : 'player',
   scope: 'Production entry, ordinary keyboard UI, lifecycle and application network smoke. No retail comparison, physical-controller, PCM or performance claim.'};
 page.on('request', request => requests.push({url: request.url(), method: request.method(), body: request.postData()}));
 page.on('pageerror', error => errors.push(error.message));
@@ -27,20 +33,14 @@ const cdp = await context.newCDPSession(page);
 await cdp.send('WebAudio.enable');
 for (const event of ['contextCreated', 'contextChanged', 'contextWillBeDestroyed']) cdp.on('WebAudio.' + event, data => audioEvents.push({event, data}));
 const check = async (name, run) => { await run(); report.checks.push(name); console.log(name); };
-const ready = () => page.locator('#choose-disc:not([disabled])').waitFor({timeout: 90000});
+const driver = createBrowserDriver(page, {surface:'public', timeoutMs:90000});
+const ready = driver.waitForImport;
 const shot = name => page.screenshot({path: path.join(values.out, name + '.png'), fullPage: true});
-const press = async key => { await page.keyboard.down(key); await page.waitForTimeout(120); await page.keyboard.up(key); await page.waitForTimeout(150); };
-const phase = value => page.waitForFunction(value => Module._melee_web_native_menu_phase() === value &&
-  Module._melee_web_native_menu_running() && !document.querySelector('#pause-game').disabled, value, {timeout: 90000});
+const press = key => driver.pressChord([key]);
+const phase = driver.waitForPhase;
 async function collectViolations() { violations.push(...await page.evaluate(() => window.releaseCspViolations)); }
-async function selectDisc(file) {
-  await page.locator('#choose-disc').click();
-  assert(await page.locator('#disc-continue').isDisabled());
-  await page.locator('#disc-ack').check();
-  const chooser = page.waitForEvent('filechooser');
-  await page.locator('#disc-continue').click();
-  await (await chooser).setFiles(file);
-}
+const selectDisc = driver.selectDisc;
+
 try {
   const response = await page.goto(values.url);
   assert.equal(response.status(), 200);
@@ -48,13 +48,39 @@ try {
   assert.equal(response.headers()['cross-origin-embedder-policy'], 'require-corp');
   assert.match(response.headers()['content-security-policy'], /'wasm-unsafe-eval'/);
   await ready();
+  assert.equal(await page.evaluate(() => Module._melee_web_native_menu_cache_idle()), 1,
+    'Import control must become enabled only after the native volatile cache is ready');
   await check('isolated WebGPU/Wasm startup and direct original-style player', async () => {
+    await page.locator('#loading-panel').waitFor({state: 'hidden', timeout: 30000});
+    const state = await page.evaluate(() => Module._melee_web_native_menu_cache_idle());
+    assert.equal(state, 1,
+      'The public renderer must open its volatile cache before consuming the bundled pipeline seed');
+    const selective = await page.evaluate(() => Module.pipelinePreparation || null);
+    if (selective) {
+      assert.equal(selective.policy, 'catalog');
+      assert.equal(selective.selected, 626);
+      assert.equal(selective.binding_sha256, '122eaece4fce109e9f2c958de8b0bb7315ccb670dab349eb2090da1f2fd589a6');
+      assert.equal(selective.unexpected_count, 0);
+      assert(await page.evaluate(() => Module.FS.stat('/initial_pipeline_cache.db').size > 0));
+      assert.deepEqual(await page.evaluate(() => Module.FS.readdir('/melee-render-cache').filter(name => !['.', '..'].includes(name))), [],
+        'Selective preparation retains descriptors in memory without a writable cache or IDBFS');
+    } else {
+      assert(await page.evaluate(() => Module.FS.stat('/melee-render-cache/pipeline_cache.db').size > 0),
+        'The ordinary bundled seed needs a writable document-local SQLite database');
+    }
     assert.equal(await page.evaluate(() => crossOriginIsolated && !!navigator.gpu), true);
     assert.equal(await page.locator('canvas').count(), 1);
     assert.equal(await page.locator('iframe,h1,header,footer,article').count(), 0);
     assert(await page.locator('#start-game').isDisabled());
     assert(await page.locator('#end-session').isDisabled());
-    assert.match(await page.locator('#edition').innerText(), /no audio/);
+    assert.equal(await page.locator('#brand').innerText(), 'WEBMELEE.GG');
+    assert.equal(await page.locator('#edition').innerText(), 'alpha');
+    assert.equal(await page.locator('#edition em').evaluate(node => getComputedStyle(node).fontStyle), 'italic');
+    if (values.audio) {
+      assert.equal(await page.locator('#audio-note,#audio-info,#audio-details').count(), 0);
+    } else assert.equal(await page.locator('#audio-note').textContent(), 'no audio ⓘlicensing issue, need to remove about 50 lines of Dolphin audio code still');
+    assert.deepEqual(await page.locator('#toolbar > *').evaluateAll(nodes => nodes.map(node => node.id)),
+      ['toolbar-brand', 'toolbar-actions', 'toolbar-meta']);
     assert.equal(await page.evaluate(() => typeof Module._melee_web_native_menu_replay_begin), 'undefined');
     assert.equal(await page.evaluate(() => typeof Module._melee_web_native_menu_diagnostics), 'undefined');
     assert.equal(await page.evaluate(() => typeof window.menuObservePlayer), 'undefined');
@@ -63,8 +89,14 @@ try {
   });
   await check('controls, focus and preferences survive a fresh document', async () => {
     await page.locator('#controls-open').click();
+    // This smoke drives the original menus with the keyboard, regardless of
+    // physical devices attached to the host running the browser.
+    await page.locator('#player-one-source').selectOption('keyboard');
+    await page.locator('#player-two-source').selectOption('off');
     await page.locator('#keyboard-layout').selectOption('boxx');
-    assert(await page.locator('#keyboard-two-option').isHidden());
+    assert(await page.locator('#boxx-source-note').isVisible());
+    assert(await page.locator('#player-two-source option[value="keyboard"]').isDisabled());
+    await page.waitForFunction(() => document.querySelector('#player-two-source-status').textContent === 'Off');
     await page.locator('#controls-close').click();
     await page.waitForFunction(() => document.activeElement.id === 'canvas');
     await collectViolations(); await page.reload(); await ready();
@@ -100,9 +132,10 @@ try {
   if (values.disc) {
     await check('owned-disc import, native preparation and original CSS', async () => {
       await selectDisc(values.disc);
-      await page.locator('#start-game:not([disabled])').waitFor({timeout: 90000});
+      await driver.waitForStart();
       assert(await page.locator('#error-dialog').isHidden());
-      await page.locator('#start-game').click(); await phase(1);
+      await driver.launch();
+      assert(await page.locator('#loading-panel').isHidden(), 'Loading feedback must retire before interactive CSS');
       await page.waitForFunction(() => document.activeElement.id === 'canvas');
       assert(await page.locator('#pause-game').isEnabled());
     });
@@ -119,18 +152,26 @@ try {
       await page.waitForTimeout(700);
       await press('o'); await phase(1);
     });
-    await check('Eject retires the document; a second silent import can launch', async () => {
+    await check('Eject retires the document; a second import can launch', async () => {
       await page.evaluate(() => { window.releaseOldDocumentMarker = true; });
-      await collectViolations(); await page.locator('#end-session').click(); await page.waitForFunction(() => !window.releaseOldDocumentMarker); await ready();
+      await collectViolations(); await driver.unload();
+      assert.equal(await page.evaluate(() => !!window.releaseOldDocumentMarker), false);
       assert(await page.locator('#start-game').isDisabled());
       assert.equal(await page.locator('#keyboard-layout').inputValue(), 'boxx');
-      await selectDisc(values.disc); await page.locator('#start-game:not([disabled])').waitFor({timeout: 90000});
-      await page.locator('#start-game').click(); await phase(1);
-      await page.locator('#end-session').click(); await ready();
+      await selectDisc(values.disc); await driver.waitForStart();
+      await driver.launch();
+      await driver.unload();
       assert(await page.locator('#start-game').isDisabled());
     });
-    assert.deepEqual(audioEvents, [], 'The audio-disabled public profile must never create a Web Audio context');
-    report.audio = 'Audio explicitly disabled. No Web Audio contexts were created during import, menus, pause/resume or second launch. No audio fidelity claim.';
+    if (values.audio) {
+      const created = audioEvents.filter(row => row.event === 'contextCreated');
+      assert.equal(created.length, 2, 'Each imported document must create exactly one audio context');
+      assert(created.every(row => row.data.context.sampleRate === 32000));
+      report.audio = 'One 32 kHz context per imported document. PCM and match transitions are checked by the separate audio lifecycle test; no fidelity claim.';
+    } else {
+      assert.deepEqual(audioEvents, [], 'The audio-disabled public profile must never create a Web Audio context');
+      report.audio = 'Audio explicitly disabled. No Web Audio contexts were created during import, menus, pause/resume or second launch. No audio fidelity claim.';
+    }
   } else report.disc = 'Not supplied; native import, menus and audio not exercised.';
   await check('legal pages use their readable document stylesheet and serve full notices', async () => {
     await collectViolations();
@@ -148,7 +189,7 @@ try {
     const notices = await page.request.get(origin + '/licenses/runtime-third-party.txt');
     assert.equal(notices.status(), 200); assert.match(await notices.text(), /Permission is hereby granted/);
   });
-  await check('only keyboard preferences persist; no application upload or background connections', async () => {
+  await check('keyboard-only session persists its preferences; no application upload or background connections', async () => {
     const storage = await page.evaluate(async () => ({local: Object.keys(localStorage), session: Object.keys(sessionStorage),
       indexed: await indexedDB.databases(), caches: await caches.keys(), workers: (await navigator.serviceWorker.getRegistrations()).length}));
     assert.deepEqual(storage, {local: ['melee-prototype-keyboard-v1'], session: [], indexed: [], caches: [], workers: 0});
@@ -159,7 +200,7 @@ try {
       const url = new URL(request.url);
       assert.equal(url.origin, origin); assert.equal(request.method, 'GET'); assert.equal(request.body, null);
       assert.equal(url.search, '');
-      assert.doesNotMatch(url.pathname, /dsp-coefficients|runtime-audio|audio-worklet|audio-ring/);
+      if (!values.audio) assert.doesNotMatch(url.pathname, /dsp-coefficients|runtime-audio|audio-worklet|audio-ring/);
       assert(['/', '/terms', '/privacy', '/copyright', '/notices'].includes(url.pathname) ||
         /^\/runtime\/[a-f0-9]+\/[a-z0-9/_.-]+$/i.test(url.pathname) || /^\/assets\/site\.[a-f0-9]+\.css$/.test(url.pathname), url.pathname);
     }
@@ -168,12 +209,13 @@ try {
   report.result = 'pass';
 } catch (error) {
   report.result = 'fail'; report.failure = error.message;
+  if (error.diagnostics) report.driverFailure = {step:error.step, ...error.diagnostics};
   report.state = await page.evaluate(() => ({status: document.querySelector('#status')?.textContent,
     error: document.querySelector('#error')?.textContent, native: window.Module?._melee_web_native_menu_message ? Module.UTF8ToString(Module._melee_web_native_menu_message()) : null})).catch(() => null);
   await shot('failure').catch(() => {}); throw error;
 } finally {
   report.errors = errors; report.csp = violations; report.audioEvents = audioEvents;
   await fs.writeFile(path.join(values.out, 'report.json'), JSON.stringify(report, null, 2) + '\n');
-  await browser.close();
+  driver.dispose(); await browser.close();
 }
 console.log(JSON.stringify({result: report.result, checks: report.checks.length, browser: report.browser}));

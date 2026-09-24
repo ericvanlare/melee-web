@@ -1,6 +1,9 @@
 """The canonical browser entry points must use the original menu player."""
 from pathlib import Path
+import json
+import re
 import subprocess
+import sys
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -11,11 +14,14 @@ class WebLaunchTests(unittest.TestCase):
         runtime = (ROOT / "web" / "runtime.html").read_text(encoding="utf-8")
         development = (ROOT / "web" / "runtime-development.mjs").read_text(encoding="utf-8")
         owner = (ROOT / "web" / "melee-runtime.mjs").read_text(encoding="utf-8")
+        prototype_adapter = (ROOT / "web" / "prototype-runtime-adapter.mjs").read_text(encoding="utf-8")
         self.assertIn('type="module" src="runtime-development.mjs"', runtime)
         self.assertIn("mountMeleeRuntime", development)
         self.assertIn("gameplay_menu_browser.js", development)
         self.assertIn("loadNativeGameDisc", owner)
         self.assertIn("_melee_web_native_menu_launch", owner)
+        self.assertIn("8: 'results'", owner)
+        self.assertIn("8: 'results'", prototype_adapter)
         for text in ("perf-metrics", "audio-metrics", "runtime-cache.js",
                      "Clear render cache + reload", "Run visible action/performance sweep"):
             self.assertIn(text, runtime)
@@ -41,11 +47,33 @@ class WebLaunchTests(unittest.TestCase):
         self.assertIn('href="viewer.html"', index)
         self.assertIn("melee_web_asset_open", viewer)
 
+    def test_native_game_manifest_matches_browser_allowlist(self):
+        browser = (ROOT / "src" / "gameplay_menu_browser.cpp").read_text(encoding="utf-8")
+        manifest = subprocess.run(
+            ["node", "--input-type=module", "-e",
+             "import {NATIVE_GAME_DISC_FILES} from './web/runtime-assets.mjs';"
+             "process.stdout.write(JSON.stringify(Object.keys(NATIVE_GAME_DISC_FILES)));"],
+            cwd=ROOT, check=True, capture_output=True, text=True,
+        )
+        native_block = re.search(
+            r"constexpr std::array<std::string_view,(\d+)> keys=\{(.*?)\};",
+            browser, re.S,
+        )
+        self.assertIsNotNone(native_block)
+        manifest_keys = set(json.loads(manifest.stdout))
+        authored_keys = re.findall(r'"([^"]*)"', native_block.group(2))
+        self.assertEqual(int(native_block.group(1)), len(authored_keys),
+                         "native upload allowlist must not include implicit empty entries")
+        native_keys = set(authored_keys)
+        self.assertEqual(native_keys, manifest_keys | {"dsp_coef.bin", "sislib_font.bin"},
+                         "native upload allowlist must match the disc manifest plus generated inputs")
+
     def test_runtime_builds_native_browser_target(self):
-        build = (ROOT / "scripts" / "build.py").read_text(encoding="utf-8")
+        sys.path.insert(0, str(ROOT / "scripts"))
+        from build import BUILD_TARGETS
         cmake = (ROOT / "cmake" / "FighterRuntime.cmake").read_text(encoding="utf-8")
-        self.assertIn('"runtime": ["gameplay_menu_browser"]', build)
-        self.assertIn('"all": ["gx_probe", "gameplay_checks", "gameplay_menu_browser"]', build)
+        self.assertEqual(BUILD_TARGETS["runtime"], ("gameplay_menu_browser",))
+        self.assertEqual(BUILD_TARGETS["all"], ("gx_probe", "gameplay_checks", "gameplay_menu_browser"))
         self.assertIn("HEAPU8,HEAP32,HEAPF32,UTF8ToString", cmake)
         self.assertIn("initial_pipeline_cache.db", cmake)
         self.assertIn("LINK_DEPENDS", cmake)
@@ -63,6 +91,88 @@ for(const name of ['jab','forward smash','down aerial','air dodge',
                    'Shield Breaker charge/release','Dancing Blade chain',
                    'Dolphin Slash','Counter'])if(!names.has(name))process.exit(2);
 if(inventory.cases.length<40 || inventory.minimumStageFrames<4200)process.exit(3);
+"""
+        subprocess.run(
+            ["node", "--input-type=module", "-e", script],
+            cwd=ROOT, check=True,
+        )
+
+    def test_roy_and_dr_mario_visible_action_inventories_use_source_ids(self):
+        script = """
+import {actionInventory} from './web/action-sweep.mjs';
+const hasExpectation=(inventory,first,last)=>inventory.cases.some(item=>
+  item.expect.some(([actualFirst,actualLast])=>actualFirst===first&&actualLast===last));
+const commonNames=new Set(['jab','forward smash','down aerial','air dodge',
+                           'wavedash left 10/10','wavedash right 10/10']);
+const dr=actionInventory(21), roy=actionInventory(26);
+if(!dr || dr.id!=='dr-mario-visible-actions-v1' || dr.fighter!=='Dr. Mario')process.exit(1);
+if(!roy || roy.id!=='roy-visible-actions-v1' || roy.fighter!=='Roy')process.exit(2);
+for(const inventory of [dr,roy]) {
+  const names=new Set(inventory.cases.map(item=>item.name));
+  for(const name of commonNames)if(!names.has(name))process.exit(3);
+  if(inventory.cases.length<45 || inventory.minimumStageFrames<4200)process.exit(4);
+}
+const drNames=new Set(dr.cases.map(item=>item.name));
+for(const name of ['Dr. Mario taunt','Megavitamin','Megavitamin (air)','Super Sheet',
+                   'Super Sheet (air)','Super Jump Punch','Super Jump Punch (air)',
+                   'Dr. Tornado','Dr. Tornado (air)'])if(!drNames.has(name))process.exit(7);
+const royNames=new Set(roy.cases.map(item=>item.name));
+for(const name of ['Flare Blade charge/release','Double-Edge Dance chain (representative)',
+                   'Blazer','Blazer (air)','Counter stance','Counter stance (air)'])
+  if(!royNames.has(name))process.exit(8);
+if(!hasExpectation(dr,341,342))process.exit(5);
+for(const id of [343,344,345,346,347,348,349,350])
+  if(!hasExpectation(dr,id,id))process.exit(5);
+for(const id of [341,342,343])if(!hasExpectation(roy,id,id))process.exit(6);
+if(!hasExpectation(roy,349,349) ||
+   !hasExpectation(roy,350,357))process.exit(6);
+for(const id of [367,368,369,371])if(!hasExpectation(roy,id,id))process.exit(6);
+"""
+        subprocess.run(
+            ["node", "--input-type=module", "-e", script],
+            cwd=ROOT, check=True,
+        )
+
+    def test_luigi_visible_inventory_keeps_distinct_source_moves(self):
+        script = """
+import assert from 'node:assert/strict';
+import {actionInventory} from './web/action-sweep.mjs';
+const inventory=actionInventory(17);
+assert.equal(inventory.id,'luigi-visible-actions-v1');
+assert.equal(inventory.cases.length,30);
+assert.equal(inventory.minimumStageFrames,5200);
+const moves=new Map(inventory.cases.map(item=>[item.name,item]));
+for(const [name,id] of [['Fireball',341],['Fireball (air)',342],
+  ['Super Jump Punch',355],['Super Jump Punch (air)',356],
+  ['Luigi Cyclone',357],['Luigi Cyclone (air)',358]])
+  assert.deepEqual(moves.get(name).expect,[[id,id]]);
+assert.deepEqual(moves.get('Green Missile charge/release').expect,[[343,344],[345,348]]);
+assert.deepEqual(moves.get('Green Missile (air)').expect,[[349,350],[351,354]]);
+"""
+        subprocess.run(["node", "--input-type=module", "-e", script],cwd=ROOT,check=True)
+
+    def test_link_and_young_link_visible_action_inventories_use_source_ids(self):
+        script = """
+import {actionInventory} from './web/action-sweep.mjs';
+const hasExpectation=(inventory,first,last)=>inventory.cases.some(item=>
+  item.expect.some(([actualFirst,actualLast])=>actualFirst===first&&actualLast===last));
+const commonNames=new Set(['jab','forward smash','down aerial','air dodge',
+                           'wavedash left 10/10','wavedash right 10/10']);
+const link=actionInventory(6), young=actionInventory(20);
+if(!link || link.id!=='link-visible-actions-v1' || link.fighter!=='Link')process.exit(1);
+if(!young || young.id!=='young-link-visible-actions-v1' || young.fighter!=='Young Link')process.exit(2);
+for(const inventory of [link,young]) {
+  const names=new Set(inventory.cases.map(item=>item.name));
+  for(const name of commonNames)if(!names.has(name))process.exit(3);
+  for(const name of ['Bow charge/release','Bow (air)','Boomerang','Boomerang (air)',
+                     'Spin Attack','Spin Attack (air)','Bomb','Bomb (air)'])
+    if(!names.has(name))process.exit(4);
+  if(inventory.cases.length<40 || inventory.minimumStageFrames<4200)process.exit(5);
+  if(!hasExpectation(inventory,344,346) || !hasExpectation(inventory,350,351) ||
+     !hasExpectation(inventory,353,354) || !hasExpectation(inventory,356,356) ||
+     !hasExpectation(inventory,357,357) || !hasExpectation(inventory,358,358) ||
+     !hasExpectation(inventory,359,359))process.exit(6);
+}
 """
         subprocess.run(
             ["node", "--input-type=module", "-e", script],

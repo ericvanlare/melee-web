@@ -1,0 +1,155 @@
+diff --git a/Source/Core/Core/Boot/Boot.cpp b/Source/Core/Core/Boot/Boot.cpp
+index 2ddadfec72..a770c0ddac 100644
+--- a/Source/Core/Core/Boot/Boot.cpp
++++ b/Source/Core/Core/Boot/Boot.cpp
+@@ -52,6 +52,7 @@
+ #include "Core/PowerPC/PPCAnalyst.h"
+ #include "Core/PowerPC/PPCSymbolDB.h"
+ #include "Core/PowerPC/PowerPC.h"
++#include "Core/PowerPC/ReferenceCaptureObserver.h"
+ #include "Core/System.h"
+ 
+ #include "DiscIO/Enums.h"
+@@ -522,6 +523,9 @@ bool CBoot::BootUp(Core::System& system, const Core::CPUThreadGuard& guard,
+     bool operator()(BootParameters::Disc& disc) const
+     {
+       NOTICE_LOG_FMT(BOOT, "Booting from disc: {}", disc.path);
++      if (ReferenceCapture::Observer::IsEnabled() &&
++          (!disc.volume || !ReferenceCapture::Observer::ValidateDiscDOL(*disc.volume)))
++        return false;
+       const DiscIO::VolumeDisc* volume =
+           SetDisc(system.GetDVDInterface(), std::move(disc.volume), disc.auto_disc_change_paths);
+       AchievementManager::GetInstance().LoadGame(volume);
+@@ -631,6 +635,10 @@ bool CBoot::BootUp(Core::System& system, const Core::CPUThreadGuard& guard,
+     bool operator()(const BootParameters::IPL& ipl) const
+     {
+       NOTICE_LOG_FMT(BOOT, "Booting GC IPL: {}", ipl.path);
++      if (ReferenceCapture::Observer::IsEnabled() &&
++          (!ipl.disc || !ipl.disc->volume ||
++          !ReferenceCapture::Observer::ValidateDiscDOL(*ipl.disc->volume)))
++        return false;
+       if (!File::Exists(ipl.path))
+       {
+         if (ipl.disc)
+diff --git a/Source/Core/Core/CMakeLists.txt b/Source/Core/Core/CMakeLists.txt
+index e411239d17..9462c78005 100644
+--- a/Source/Core/Core/CMakeLists.txt
++++ b/Source/Core/Core/CMakeLists.txt
+@@ -665,6 +665,8 @@ elseif(_M_ARM_64)
+     PowerPC/JitArm64/Jit_Util.cpp
+     PowerPC/JitArm64/Jit_Util.h
+     PowerPC/JitArm64/JitArm64_Tables.cpp
++    PowerPC/ReferenceCaptureObserver.cpp
++    PowerPC/ReferenceCaptureObserver.h
+     PowerPC/JitArmCommon/BackPatch.h
+   )
+ endif()
+diff --git a/Source/Core/Core/HW/EXI/EXI.cpp b/Source/Core/Core/HW/EXI/EXI.cpp
+index 144fdd57b9..73a91fead6 100644
+--- a/Source/Core/Core/HW/EXI/EXI.cpp
++++ b/Source/Core/Core/HW/EXI/EXI.cpp
+@@ -11,6 +11,7 @@
+ #include "Common/IOFile.h"
+ 
+ #include "Core/Config/MainSettings.h"
++#include "Core/Config/SessionSettings.h"
+ #include "Core/ConfigManager.h"
+ #include "Core/CoreTiming.h"
+ #include "Core/HW/EXI/EXI_Channel.h"
+@@ -171,6 +172,9 @@ void ExpansionInterfaceManager::Shutdown()
+ 
+   if (!m_using_overridden_sram)
+   {
++    if (!Config::Get(Config::SESSION_SAVE_DATA_WRITABLE))
++      return;
++
+     File::IOFile file(SConfig::GetInstance().m_strSRAM, "wb");
+     auto& sram = m_system.GetSRAM();
+     file.WriteArray(&sram, 1);
+diff --git a/Source/Core/Core/HW/GCMemcard/GCMemcardDirectory.cpp b/Source/Core/Core/HW/GCMemcard/GCMemcardDirectory.cpp
+index 791b471be4..18ba62fa1d 100644
+--- a/Source/Core/Core/HW/GCMemcard/GCMemcardDirectory.cpp
++++ b/Source/Core/Core/HW/GCMemcard/GCMemcardDirectory.cpp
+@@ -619,6 +619,9 @@ bool GCMemcardDirectory::SetUsedBlocks(int save_index)
+ 
+ void GCMemcardDirectory::FlushToFile()
+ {
++  if (!Config::Get(Config::SESSION_SAVE_DATA_WRITABLE))
++    return;
++
+   std::unique_lock l(m_write_mutex);
+   Memcard::DEntry invalid;
+   for (Memcard::GCIFile& save : m_saves)
+diff --git a/Source/Core/Core/PowerPC/JitArm64/Jit.cpp b/Source/Core/Core/PowerPC/JitArm64/Jit.cpp
+index 5b61528fae..a28adc3da2 100644
+--- a/Source/Core/Core/PowerPC/JitArm64/Jit.cpp
++++ b/Source/Core/Core/PowerPC/JitArm64/Jit.cpp
+@@ -36,6 +36,7 @@
+ #include "Core/PowerPC/JitCommon/ConstantPropagation.h"
+ #include "Core/PowerPC/JitInterface.h"
+ #include "Core/PowerPC/PowerPC.h"
++#include "Core/PowerPC/ReferenceCaptureObserver.h"
+ #include "Core/System.h"
+ 
+ using namespace Arm64Gen;
+@@ -1200,6 +1201,28 @@ bool JitArm64::DoJit(u32 em_address, JitBlock* b, u32 nextPC)
+   gpr.Start(js.gpa);
+   fpr.Start(js.fpa);
+ 
++  // A boundary callback exports the complete PowerPC GPR array.  A normal
++  // JIT block may discard dead cache entries before the callback, which
++  // intentionally leaves no recoverable value in either the host register or
++  // PPC state.  Keep all cache entries materializable for blocks containing a
++  // boundary; register pressure still causes ordinary cache eviction, which
++  // writes the value back to PPC state.
++  const bool observer_enabled = ReferenceCapture::Observer::IsEnabled();
++  bool observer_block = false;
++  if (observer_enabled)
++  {
++    for (u32 observer_index = 0; observer_index < code_block.m_num_instructions;
++         ++observer_index)
++    {
++      const PPCAnalyst::CodeOp& observer_op = m_code_buffer[observer_index];
++      if (!observer_op.skip && ReferenceCapture::Observer::IsBoundary(observer_op.address))
++      {
++        observer_block = true;
++        break;
++      }
++    }
++  }
++
+   m_constant_propagation.Clear();
+ 
+   if (!js.noSpeculativeConstantsAddresses.contains(js.blockStart))
+@@ -1289,6 +1312,22 @@ bool JitArm64::DoJit(u32 em_address, JitBlock* b, u32 nextPC)
+       }
+     }
+ 
++    // Emit the passive observer only for exact GALE01r2 boundary PCs.  Flush
++    // guest register caches so the callback sees the completed state GDB saw
++    // at each boundary; it never writes emulated memory or changes the op.
++    if (!op.skip && observer_enabled &&
++        ReferenceCapture::Observer::IsBoundary(op.address))
++    {
++      FlushCarry();
++      // ABI_CallFunction may clobber caller-saved host registers.  Flush all
++      // cached guest state before entering the observer and invalidate the
++      // cache entries so the next generated instruction reloads them.
++      gpr.Flush(FlushMode::All, ARM64Reg::INVALID_REG);
++      fpr.Flush(FlushMode::All, ARM64Reg::INVALID_REG);
++      ABI_CallFunction(&ReferenceCapture::Observer::OnBoundary, &m_system, op.address,
++                       &m_ppc_state);
++    }
++
+     if (HandleFunctionHooking(op.address))
+       break;
+ 
+@@ -1410,7 +1449,7 @@ bool JitArm64::DoJit(u32 em_address, JitBlock* b, u32 nextPC)
+         FlushCarry();
+ 
+       // If we have a register that will never be used again, discard or flush it.
+-      if (!bJITRegisterCacheOff)
++      if (!bJITRegisterCacheOff && !observer_block)
+       {
+         gpr.DiscardRegisters(op.gprDiscardable);
+         fpr.DiscardRegisters(op.fprDiscardable);

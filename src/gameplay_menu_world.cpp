@@ -1,6 +1,7 @@
 #include "gameplay_compat.h"
 #include "gameplay_menu_world.hpp"
 #include "runtime_archive_cache.hpp"
+#include "gameplay_asset_manifest.hpp"
 
 #include "dat_archive.hpp"
 #include "dat_menu_support.hpp"
@@ -13,7 +14,9 @@
 #include "gameplay_audio_stream_asset.hpp"
 #include "gameplay_bootstrap.h"
 #include "gameplay_font_atlas.h"
+#include "gameplay_rumble.h"
 #include "hsd_native_joint.h"
+#include "native_dat.hpp"
 
 extern "C" {
 #include <melee/lb/lbcardgame.h>
@@ -36,19 +39,6 @@ namespace melee_web {
 namespace {
 
 constexpr std::size_t kWorldHeapBytes = 32U * 1024U * 1024U;
-
-constexpr std::array<std::string_view, 21> kRequiredFiles = {
-    "MnSlChr.usd", "MnSlMap.usd", "SdSlChr.usd", "MnExtAll.usd",
-    "LbMcGame.usd", "NtMemAc.usd", "sislib_font.bin", "smash2.sem",
-    "dsp_coef.bin", "menu01.hps", "main.ssm", "mario.ssm", "fox.ssm", "falco.ssm", "mars.ssm", "pupupu.ssm",
-    "nr_select.ssm", "nr_title.ssm", "nr_name.ssm", "pokemon.ssm",
-    "end.ssm",
-};
-
-constexpr std::array<std::string_view, 11> kBankFiles = {
-    "main.ssm", "mario.ssm", "fox.ssm", "falco.ssm", "mars.ssm", "pupupu.ssm", "nr_select.ssm", "nr_title.ssm",
-    "nr_name.ssm", "pokemon.ssm", "end.ssm",
-};
 
 [[noreturn]] void fail(const char* message)
 {
@@ -83,12 +73,16 @@ struct GameplayMenuWorld::Storage {
     std::unique_ptr<DatSis> sis;
     std::unique_ptr<DatMenuSupport> card_icons;
     std::unique_ptr<DatMenuSupport> card_scene;
+    std::unique_ptr<NativeDatArena> rumble_arena;
+    MeleeWebRumble* rumble = nullptr;
+    bool rumble_published = false;
 
     std::span<const std::uint8_t> sem;
     std::span<const std::uint8_t> coefficients;
     std::span<const std::uint8_t> hps;
     std::span<const std::uint8_t> font_bytes;
-    std::array<std::span<const std::uint8_t>, kBankFiles.size()> bank_bytes;
+    const std::vector<std::string> bank_names=menu_audio_bank_names();
+    std::vector<std::span<const std::uint8_t>> bank_bytes;
 
     std::unique_ptr<GameplayAudioBank> audio_bank;
     std::unique_ptr<GameplayAudioStream> music;
@@ -115,7 +109,7 @@ struct GameplayMenuWorld::Storage {
 
     void load_archives(const RuntimeFiles& files)
     {
-        for (const auto name : kRequiredFiles) {
+        for (const auto& name : menu_asset_names()) {
 #if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
             // The public alpha carries no GPL resampler or DROM coefficients.
             // Keep the source file inventory explicit while letting the
@@ -146,6 +140,9 @@ struct GameplayMenuWorld::Storage {
         world_started = true;
         check(melee_web_native_world_enable(error, sizeof(error)), error,
               "Native menu HSD object lifetime setup failed");
+        check(melee_web_rumble_begin(rumble, error, sizeof(error)), error,
+              "Native menu rumble publication failed");
+        rumble_published = true;
 
         // These owners hydrate the exact source roots before publication. The
         // source files still own scene state, object creation, and animation.
@@ -188,8 +185,8 @@ struct GameplayMenuWorld::Storage {
     {
         if (archive_cache) {
             std::vector<std::shared_ptr<const DatAudioBank>> decoded;
-            decoded.reserve(kBankFiles.size());
-            for (const auto name : kBankFiles)
+            decoded.reserve(bank_names.size());
+            for (const auto& name : bank_names)
                 decoded.push_back(archive_cache->audio_bank(name));
             audio_bank = std::make_unique<GameplayAudioBank>(
                 sem, std::move(decoded), coefficients);
@@ -205,7 +202,7 @@ struct GameplayMenuWorld::Storage {
         check(residency != nullptr, error,
               "Native menu audio residency creation failed");
         for (std::size_t i = 0; i < bank_bytes.size(); ++i) {
-            const std::string path = "/audio/us/" + std::string(kBankFiles[i]);
+            const std::string path = "/audio/us/" + bank_names[i];
             const MeleeWebAudioResidencyAsset asset = {
                 path.c_str(), bank_bytes[i].data(), bank_bytes[i].size(),
                 100 + static_cast<int>(i),
@@ -235,6 +232,18 @@ struct GameplayMenuWorld::Storage {
         archive_cache = cache;
         load_archives(files);
 
+        const auto rumble_source = archive("LbRb.dat");
+        const auto symbols = rumble_source->public_symbols();
+        const auto root = std::find_if(symbols.begin(), symbols.end(),
+            [](const auto& symbol) { return symbol.name == "lbRumbleData"; });
+        if (root == symbols.end()) fail("Missing source lbRumbleData table");
+        if (rumble_source->next_target_offset(root->data_offset) -
+                root->data_offset != 40 * 8)
+            fail("GALE01r2 rumble table must contain 40 source rows");
+        rumble_arena = std::make_unique<NativeDatArena>(rumble_source);
+        rumble = melee_web_rumble_decode(rumble_arena->reader(),
+                                         root->data_offset, 40);
+
         font_bytes = std::span<const std::uint8_t>{require_file(files, "sislib_font.bin")};
         sem = std::span<const std::uint8_t>{require_file(files, "smash2.sem")};
 #if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
@@ -243,8 +252,9 @@ struct GameplayMenuWorld::Storage {
         coefficients = std::span<const std::uint8_t>{require_file(files, "dsp_coef.bin")};
 #endif
         hps = std::span<const std::uint8_t>{require_file(files, "menu01.hps")};
-        for (std::size_t i = 0; i < kBankFiles.size(); ++i)
-            bank_bytes[i] = std::span<const std::uint8_t>{require_file(files, kBankFiles[i])};
+        bank_bytes.reserve(bank_names.size());
+        for (const auto& name : bank_names)
+            bank_bytes.emplace_back(require_file(files, name));
 
         start_scene(GameplayMenuScene::Characters);
         start_audio();
@@ -288,6 +298,11 @@ struct GameplayMenuWorld::Storage {
 
     void close_scene(bool discard_card_globals)
     {
+        if (rumble_published) {
+            check(melee_web_rumble_end(rumble, error, sizeof(error)), error,
+                  "Native menu rumble close failed");
+            rumble_published = false;
+        }
         if (world_started) {
             check(melee_web_gameplay_shutdown(error, sizeof(error)), error,
                   "Native menu SDK world shutdown failed");

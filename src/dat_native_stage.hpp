@@ -2,6 +2,7 @@
 #include "dat_native_animation.hpp"
 #include "native_dat.hpp"
 #include "gameplay_stage_map.h"
+#include "gameplay_archive_sections.h"
 namespace melee_web {
 // Owns native source-stage map descriptors and every source-selected
 // animation. Does not publish them or imply particle execution is initialized.
@@ -19,6 +20,10 @@ public:
     void* yakumono()const noexcept;
     const std::vector<MeleeWebMapLightOverride>& light_overrides()const noexcept;
     const std::vector<DatParticleEvent>& particle_events()const noexcept;
+    const std::vector<MeleeWebArchiveSymbol>& public_symbols()const noexcept;
+    /* Global map_plit uses the same checked HSD animation grammar as map
+     * light descriptors. Borrows this owner's storage through LObj teardown. */
+    void* light_animation_table(uint32_t source_offset);
 private:
     struct Storage;
     std::unique_ptr<Storage> storage_;

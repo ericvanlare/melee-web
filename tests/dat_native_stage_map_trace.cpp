@@ -17,6 +17,14 @@ int main(int argc,char** argv){try{
    for(const auto& event:stage.particle_events())check(event.bank==30,"actual stage generator bank selector");
    check(melee_web_test_native_stage_map(stage.map_head(),stage.yakumono()),"original native map descriptors invalid");
    auto* publication=melee_web_stage_map_publish(stage.map_head(),error,sizeof(error));check(publication,error);
+   const auto& symbols=stage.public_symbols();
+   check(melee_web_stage_map_set_public(publication,symbols.data(),symbols.size(),error,sizeof(error)),error);
+   auto* source_archive=melee_web_archive_sections_open("GrNLa.dat");
+   check(melee_web_archive_sections_public(source_archive,"map_head")==stage.map_head()&&
+         melee_web_archive_sections_public(source_archive,"yakumono_param")==stage.yakumono(),
+         "Source public map/yakumono symbols preserve native owner identity");
+   check(!melee_web_stage_map_close(publication,error,sizeof(error)),"Public source consumer retains descriptor lifetime");
+   melee_web_archive_sections_release(source_archive);
    const auto& lights=stage.light_overrides();check(melee_web_stage_map_set_overrides(publication,lights.data(),lights.size(),error,sizeof(error)),error);
    for(const auto& light:lights){int found=-1;uint8_t flags=0xff;check(melee_web_stage_map_lookup_override(light.descriptor,&found,&flags)&&found==light.found&&flags==light.flags,"bounded source light identity lookup");}
    check(melee_web_stage_map_close(publication,error,sizeof(error)),error);

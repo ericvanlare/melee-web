@@ -30,6 +30,14 @@ void* melee_web_gameplay_heap_initialize(void* arena, size_t bytes,
 int melee_web_gameplay_heap_release(void* expected_arena,
                                    char* error, size_t error_size);
 
+/* Recreate the original OS heap over the exact owned arena after its previous
+ * heap handle has been destroyed. This resets the SDK free list and descriptor
+ * state in place, retaining the backing bytes just as a retail scene reset
+ * does. The caller must keep the arena owner and must not have a selected heap.
+ * The resulting handle is returned through out_heap. */
+int melee_web_gameplay_heap_recreate(void* expected_arena, int* out_heap,
+                                    char* error, size_t error_size);
+
 #ifdef __cplusplus
 }
 #endif

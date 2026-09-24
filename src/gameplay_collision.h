@@ -56,6 +56,11 @@ typedef struct MeleeWebCollisionReadiness {
  * fully initialized stage or a fighter physics simulation. The original GObj
  * userdata destructor releases storage automatically on world shutdown. */
 MeleeWebCollision* melee_web_collision_create(const MeleeWebCollisionInput*, char* error, size_t error_size);
+/* Results' original dummy-stage entry calls mpLibLoad(NULL) itself. Adopt
+ * its default-map arrays and original process so their ordinary GObj destructor
+ * releases the same storage before another scene may construct collision. */
+int melee_web_collision_source_available(void);
+MeleeWebCollision* melee_web_collision_adopt_dummy(char* error, size_t error_size);
 int melee_web_collision_readiness(MeleeWebCollision*, MeleeWebCollisionReadiness*, char* error, size_t error_size);
 int melee_web_collision_line(MeleeWebCollision*, int32_t line, MeleeWebCollisionLineResult*, char* error, size_t error_size);
 int melee_web_collision_floor(MeleeWebCollision*, int32_t starting_line, float x, float y,

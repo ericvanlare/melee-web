@@ -1,7 +1,5 @@
 name: Public shell release boundary
 on:
-  push:
-  pull_request:
   workflow_dispatch:
   release:
     types: [published]
@@ -25,7 +23,7 @@ jobs:
 
   public-player:
     # The native Emscripten build is intentionally a manual/release checkpoint;
-    # pull requests still exercise the fail-closed fixture and HTTP tests above.
+    # Verify exercises the same fail-closed fixture and HTTP tests on each PR.
     if: github.event_name == 'workflow_dispatch' || github.event_name == 'release'
     runs-on: ubuntu-24.04
     steps:

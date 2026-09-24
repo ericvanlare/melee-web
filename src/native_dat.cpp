@@ -40,6 +40,11 @@ NativeDatArena::NativeDatArena(std::shared_ptr<const DatArchive> archive)
         if (n > a.next_target_offset(o)-o) throw DatError("Native descriptor crosses referenced region at " + std::to_string(o));
         return b.data();
     };
+    s.api.extent = [](void* c,uint32_t o) {
+        const auto& a = *static_cast<Storage*>(c)->archive;
+        (void)a.range(o,1);
+        return a.next_target_offset(o)-o;
+    };
     s.api.allocate = [](void* c,size_t n,size_t width)->void* {
         auto& a = *static_cast<Storage*>(c);
         constexpr size_t limit = 32U*1024U*1024U;

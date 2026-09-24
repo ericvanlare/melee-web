@@ -92,6 +92,8 @@ void melee_web_action_load(Fighter* destination, Fighter* source, int motion, un
     }
     fprintf(stderr, "Owned action load failed: %s\n", error); abort();
 }
+void* melee_web_action_fighter_table(Fighter* fighter)
+{ return fighter ? fighter->x24 : NULL; }
 struct NativeCommandAllocation {
     union CmdUnion* native;
     uint32_t* canonical;
@@ -138,9 +140,11 @@ void* melee_web_commands_create(const MeleeWebCommandWord* words, size_t count)
             if (((word >> 23) & 7) >= 4) goto fail;
             result[i].set_hitbox_damage = (struct set_hitbox_damage){op, (word >> 23) & 7, word & 0x7fffff}; break;
         case 14:
+            if (((word >> 2) & 0xffffff) >= 4) goto fail;
             result[i].set_hitbox_x42_b57 = (struct set_hitbox_x42_b57){op,
                 (word >> 2) & 0xffffff, (word >> 1) & 1, word & 1}; break;
         case 15:
+            if ((word & 0x3ffffff) >= 4) goto fail;
             result[i].set_throw_flags = (struct set_throw_flags){op,word & 0x3ffffff}; break;
         case 20:
             result[i].set_throw_flags = (struct set_throw_flags){op,word & 0x3ffffff}; break;
@@ -321,22 +325,26 @@ struct MeleeWebNativeActionRows {
     char** symbols;
     uint8_t* blends;
     MeleeWebWaitChoice* waits;
+    size_t count;
 };
 MeleeWebNativeActionRows* melee_web_action_rows_create(const MeleeWebActionRow* rows, size_t count,
     const MeleeWebWaitChoice* waits, size_t wait_count)
 {
-    if (!rows || !count || count > 1024 || !waits || !wait_count || wait_count > count) return NULL;
+    if (!rows || !count || count > 1024 || (wait_count && !waits) || wait_count > count) return NULL;
     MeleeWebNativeActionRows* p = calloc(1, sizeof(*p)); if (!p) return NULL;
     p->rows = calloc(count, sizeof(*p->rows)); p->symbols = calloc(count + 1, sizeof(*p->symbols));
     p->blends = malloc(count * 2);
-    p->waits = calloc(wait_count + 1, sizeof(*p->waits));
-    if (!p->rows || !p->symbols || !p->blends || !p->waits) { melee_web_action_rows_destroy(p); return NULL; }
+    p->waits = wait_count ? calloc(wait_count + 1, sizeof(*p->waits)) : NULL;
+    p->count = count;
+    if (!p->rows || !p->symbols || !p->blends || (wait_count && !p->waits)) { melee_web_action_rows_destroy(p); return NULL; }
     for (size_t i = 0; i < count; ++i) {
-        if (!rows[i].symbol) { melee_web_action_rows_destroy(p); return NULL; }
-        const size_t symbol_size = strlen(rows[i].symbol) + 1;
-        p->symbols[i] = malloc(symbol_size);
-        if (!p->symbols[i]) { melee_web_action_rows_destroy(p); return NULL; }
-        memcpy(p->symbols[i], rows[i].symbol, symbol_size);
+        if (!rows[i].symbol && rows[i].size) { melee_web_action_rows_destroy(p); return NULL; }
+        if (rows[i].symbol) {
+            const size_t symbol_size = strlen(rows[i].symbol) + 1;
+            p->symbols[i] = malloc(symbol_size);
+            if (!p->symbols[i]) { melee_web_action_rows_destroy(p); return NULL; }
+            memcpy(p->symbols[i], rows[i].symbol, symbol_size);
+        }
         p->rows[i] = (struct Fighter_WaitAnimData){p->symbols[i], rows[i].offset, rows[i].size,
             rows[i].commands, rows[i].flags, rows[i].size ? (uint32_t)(uintptr_t)&p->rows[i] : 0};
         /* Match source archive identity across distinct motion rows. */
@@ -345,15 +353,21 @@ MeleeWebNativeActionRows* melee_web_action_rows_create(const MeleeWebActionRow* 
                 strcmp(rows[j].symbol, rows[i].symbol) == 0) { p->rows[i].x14 = p->rows[j].x14; break; }
         memcpy(p->blends + i * 2, rows[i].blend, 2);
     }
-    memcpy(p->waits, waits, wait_count * sizeof(*waits)); p->waits[wait_count] = (MeleeWebWaitChoice){UINT32_MAX, UINT32_MAX};
+    // A null source table repeats the current idle without consuming RNG
+    // (ftCo_8008A7A8). An allocated empty/sentinel table is not equivalent.
+    if(wait_count){
+        memcpy(p->waits, waits, wait_count * sizeof(*waits));
+        p->waits[wait_count] = (MeleeWebWaitChoice){UINT32_MAX, UINT32_MAX};
+    }
     return p;
 }
 void melee_web_action_rows_destroy(MeleeWebNativeActionRows* p)
 { if (p) {
-    if (p->symbols) for (size_t i = 0; p->rows && p->symbols[i]; ++i) free(p->symbols[i]);
+    if (p->symbols) for (size_t i = 0; i < p->count; ++i) free(p->symbols[i]);
     free(p->symbols); free(p->rows); free(p->blends); free(p->waits); free(p);
 } }
 void* melee_web_action_rows(MeleeWebNativeActionRows* p) { return p->rows; }
+size_t melee_web_action_row_count(const MeleeWebNativeActionRows* p) { return p ? p->count : 0; }
 void* melee_web_action_identity(MeleeWebNativeActionRows* p, size_t motion)
 { return (void*)(uintptr_t)p->rows[motion].x14; }
 void* melee_web_action_blends(MeleeWebNativeActionRows* p) { return p->blends; }
@@ -362,7 +376,21 @@ void* melee_web_action_waits(MeleeWebNativeActionRows* p) { return p->waits; }
 void melee_web_command_require_supported(uint32_t opcode)
 {
     switch (opcode) {
-    case 0: case 1: case 2: case 3: case 4: case 5: case 6: case 7: case 8: case 10: case 11: case 13: case 16: case 17: case 18: case 19: case 20: case 23: case 24: case 25: case 26: case 27: case 28: case 29: case 30: case 31: case 34: case 35: case 37: case 38: case 40: case 41: case 43: case 46: case 49: case 52: case 54: case 55: case 56: case 58: return;
+    // Adjust Hitbox Damage uses the already-decoded set_hitbox_damage fields
+    // and original ftAction_8007162C / ftColl_8007ABD0 (Link's down air).
+    case 12: return;
+    // Pichu's self-damage uses the signed 26-bit operand and original
+    // ftAction_80072BF4 / Fighter_TakeDamage_8006CC7C consumer.
+    case 51: return;
+    // Source ftAction_80071F78 assigns the decoded article-visibility bit
+    // directly to Fighter.x221E_b4 (Bowser's FallSpecial cleanup).
+    case 36: return;
+    // ftAction_80072894 feeds the decoded {index, divisor} pair into
+    // ftCommon_8007E83C, which scales the held parasol item's animation rate
+    // through the compiled item consumers (Peach's authored ItemParasol
+    // rows 316/317; the parasol item runtime is source-compiled).
+    case 42: return;
+    case 0: case 1: case 2: case 3: case 4: case 5: case 6: case 7: case 8: case 10: case 11: case 13: case 14: case 15: case 16: case 17: case 18: case 19: case 20: case 21: case 23: case 24: case 25: case 26: case 27: case 28: case 29: case 30: case 31: case 34: case 35: case 37: case 38: case 40: case 41: case 43: case 46: case 49: case 50: case 52: case 54: case 55: case 56: case 58: return;
     default:
         fprintf(stderr, "Unsupported native fighter command opcode %u\n", opcode);
         for (unsigned i = 0; i < 6; ++i) if (bindings[i].fighter)

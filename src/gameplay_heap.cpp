@@ -89,3 +89,30 @@ extern "C" int melee_web_gameplay_heap_release(void* expected_arena,
     clear_error(error, error_size);
     return 1;
 }
+
+extern "C" int melee_web_gameplay_heap_recreate(void* expected_arena,
+                                                 int* out_heap, char* error,
+                                                 size_t error_size)
+{
+    if (out_heap) *out_heap = -1;
+    if (!expected_arena || expected_arena != gameplay_owned_arena)
+        return heap_failure(error, error_size, "Gameplay does not own the expected SDK arena");
+    // Compare identity before dereferencing SDK metadata, which may have been
+    // replaced by an unauthorized external OSInitAlloc call.
+    if (!melee_web_gameplay_heap_owns(expected_arena))
+        return heap_failure(error, error_size, "SDK arena identity changed while gameplay owned it");
+    if (__OSCurrHeap != -1)
+        return heap_failure(error, error_size, "SDK still has a selected heap during arena reset");
+    for (int i = 0; i < sNumHeaps; ++i) {
+        if (sHeapArray[i].size >= 0 || sHeapArray[i].freeList || sHeapArray[i].allocated)
+            return heap_failure(error, error_size, "Destroy every SDK heap before resetting its arena");
+    }
+    if (!out_heap)
+        return heap_failure(error, error_size, "Arena reset requires an output heap handle");
+    const OSHeapHandle recreated = OSCreateHeap(sArenaStart, sArenaEnd);
+    if (recreated < 0)
+        return heap_failure(error, error_size, "Original SDK allocator could not recreate the arena heap");
+    *out_heap = recreated;
+    clear_error(error, error_size);
+    return 1;
+}

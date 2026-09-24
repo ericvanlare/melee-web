@@ -19,8 +19,9 @@ foreach(path IN LISTS native_paths)
 endforeach()
 add_library(fighter_source_runtime STATIC EXCLUDE_FROM_ALL ${fighter_paths}
   src/gameplay_retail_setup.c src/gameplay_retail_state.c src/gameplay_cpu_observation.c
+  src/gameplay_results_context.c src/gameplay_prize_context.c src/gameplay_save_profile.c
   src/gameplay_match_flow.c src/gameplay_hud.c src/gameplay_menu.c src/gameplay_menu_host.c src/gameplay_item_runtime.c src/gameplay_stage_items.c src/dat_item_commands.c src/gameplay_crowd.c src/gameplay_render.c src/gameplay_color_commands.c src/gameplay_match_rules.c src/gameplay_stage_visual.c src/gameplay_stage_map.c src/gameplay_stage_last.c src/gameplay_stage_profile.c src/gameplay_stage_story.c src/gameplay_effect_runtime.c
-  src/gameplay_stage_dream_land.c src/gameplay_audio.c src/gameplay_audio_bank_transport.c src/gameplay_audio_residency.c src/gameplay_audio_stream.c src/gameplay_io.cpp src/gameplay_audio_resample.c src/gameplay_audio_itd.c src/gameplay_audio_fx.c src/gameplay_audio_reverb.c
+  src/gameplay_stage_dream_land.c src/gameplay_stage_fountain.c src/gameplay_stage_old_yoshi.c src/gameplay_audio.c src/gameplay_audio_bank_transport.c src/gameplay_audio_residency.c src/gameplay_audio_stream.c src/gameplay_io.cpp src/gameplay_audio_resample.c src/gameplay_audio_itd.c src/gameplay_audio_fx.c src/gameplay_audio_reverb.c
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/axfx/axfx.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/axfx/reverb_std.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/src/dolphin/axfx/delay.c"
@@ -73,11 +74,14 @@ target_compile_options(fighter_source_runtime PRIVATE -ffunction-sections -fdata
   -include "${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h")
 target_link_libraries(fighter_source_runtime PUBLIC hsd_native_runtime aurora::pad)
 add_library(fighter_asset_runtime STATIC EXCLUDE_FROM_ALL
+  src/gameplay_results_assets.cpp src/gameplay_results_session.cpp src/dat_trophy_data.cpp
+  src/gameplay_result_motion_table.cpp
+  src/gameplay_prize_assets.cpp src/gameplay_prize_session.cpp
   src/gameplay_retail_recipe.cpp
   src/gameplay_replay_transport.cpp src/gameplay_replay_session.cpp
   src/runtime_archive_cache.cpp
   src/gameplay_audio_bank.cpp src/gameplay_audio_stream_asset.cpp src/dat_audio_stream.cpp src/dat_audio.cpp src/dat_audio_programs.cpp
-  src/gameplay_hud_assets.cpp src/dat_scene.cpp src/gameplay_menu_world.cpp src/gameplay_match_session.cpp src/dat_menu_support.cpp src/dat_shape_animation.cpp src/dat_sis.cpp src/dat_native_menu.cpp src/dat_item_article.cpp src/dat_stage_items.cpp src/gameplay_world.cpp src/dat_color_animation.cpp src/dat_native_stage.cpp src/dat_archive.cpp src/dat_common.cpp src/dat_native_joint.cpp src/rigid_model.cpp
+  src/gameplay_hud_assets.cpp src/gameplay_asset_manifest.cpp src/dat_scene.cpp src/gameplay_menu_world.cpp src/gameplay_match_session.cpp src/dat_menu_support.cpp src/dat_shape_animation.cpp src/dat_sis.cpp src/dat_native_menu.cpp src/dat_item_article.cpp src/dat_stage_items.cpp src/gameplay_world.cpp src/dat_color_animation.cpp src/dat_native_stage.cpp src/dat_archive.cpp src/dat_common.cpp src/dat_native_joint.cpp src/rigid_model.cpp
   src/dat_texture.cpp src/dat_material.cpp src/dat_material_animation.cpp
   src/native_dat.cpp src/gameplay_fighter_assets.cpp src/gameplay_action_store.cpp
   src/dat_commands.cpp src/dat_fighter_runtime.cpp src/dat_fighter.cpp
@@ -88,7 +92,7 @@ target_link_libraries(fighter_asset_runtime PUBLIC fighter_source_runtime)
 target_compile_options(fighter_asset_runtime PRIVATE -ffp-contract=off)
 
 # The public alpha has an explicitly silent audio policy.  Keep its source
-# graph separate from the development graph so the GPL-derived resampler is
+# graph separate from the development graph so the development resampler is
 # absent from both the compile commands and the final link closure.  The
 # normal fighter_source_runtime/fighter_asset_runtime targets remain exactly
 # as before for development, replay, and audio trace builds.
@@ -99,7 +103,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release" AND MELEE_WEB_PUBLIC_RUNTIME)
   target_include_directories(fighter_source_runtime_public PUBLIC src "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}"
     PRIVATE .deps/aurora/include .deps/melee/extern/dolphin/include)
   target_compile_definitions(fighter_source_runtime_public PUBLIC TARGET_PC
-    PRIVATE MELEE_WEB_MENU_MARIO_FD MELEE_WEB_PUBLIC_AUDIO_DISABLED)
+    PRIVATE MELEE_WEB_MENU_MARIO_FD MELEE_WEB_PUBLIC_AUDIO_DISABLED MELEE_WEB_PUBLIC_RUNTIME)
   target_compile_options(fighter_source_runtime_public PRIVATE -ffunction-sections -fdata-sections -ffp-contract=off
     -fno-builtin-sinf -fno-builtin-cosf -fno-builtin-tanf
     -fno-builtin-atanf -fno-builtin-atan2f -fno-builtin-acosf
@@ -111,6 +115,32 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release" AND MELEE_WEB_PUBLIC_RUNTIME)
   target_compile_definitions(fighter_asset_runtime_public PRIVATE MELEE_WEB_PUBLIC_AUDIO_DISABLED)
   target_compile_options(fighter_asset_runtime_public PRIVATE -ffp-contract=off)
   target_link_libraries(fighter_asset_runtime_public PUBLIC fighter_source_runtime_public)
+endif()
+
+# The hosted audio preview is a separate Release graph.  It keeps the public
+# path-redaction boundary and the production export surface, while retaining
+# the development audio provider (resampler, FX and stream) for listening.
+# Never retarget the silent public archives: their source graph and identity
+# proof are intentionally independent of this staging profile.
+if(CMAKE_BUILD_TYPE STREQUAL "Release" AND MELEE_WEB_AUDIO_PREVIEW_RUNTIME)
+  get_target_property(_audio_preview_source_files fighter_source_runtime SOURCES)
+  add_library(fighter_source_runtime_audio_preview STATIC EXCLUDE_FROM_ALL ${_audio_preview_source_files})
+  target_include_directories(fighter_source_runtime_audio_preview PUBLIC src "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}"
+    PRIVATE .deps/aurora/include .deps/melee/extern/dolphin/include)
+  target_compile_definitions(fighter_source_runtime_audio_preview PUBLIC TARGET_PC
+    PRIVATE MELEE_WEB_MENU_MARIO_FD MELEE_WEB_PUBLIC_RUNTIME MELEE_WEB_AUDIO_PREVIEW_RUNTIME)
+  target_compile_options(fighter_source_runtime_audio_preview PRIVATE -ffunction-sections -fdata-sections -ffp-contract=off
+    -fno-builtin-sinf -fno-builtin-cosf -fno-builtin-tanf
+    -fno-builtin-atanf -fno-builtin-atan2f -fno-builtin-acosf
+    -include "${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h")
+  target_link_libraries(fighter_source_runtime_audio_preview PUBLIC hsd_native_runtime aurora::pad)
+
+  get_target_property(_audio_preview_asset_files fighter_asset_runtime SOURCES)
+  add_library(fighter_asset_runtime_audio_preview STATIC EXCLUDE_FROM_ALL ${_audio_preview_asset_files})
+  target_compile_definitions(fighter_asset_runtime_audio_preview PRIVATE
+    MELEE_WEB_PUBLIC_RUNTIME MELEE_WEB_AUDIO_PREVIEW_RUNTIME)
+  target_compile_options(fighter_asset_runtime_audio_preview PRIVATE -ffp-contract=off)
+  target_link_libraries(fighter_asset_runtime_audio_preview PUBLIC fighter_source_runtime_audio_preview)
 endif()
 add_executable(fighter_runtime_probe EXCLUDE_FROM_ALL tests/fighter_runtime_probe.c tests/fighter_runtime_probe.cpp tests/gameplay_match_context_trace.c tests/gameplay_action_trace.c)
 target_link_libraries(fighter_runtime_probe PRIVATE fighter_asset_runtime)
@@ -139,7 +169,7 @@ foreach(trace bonus_data stage_numeric)
   set_target_properties(gameplay_${trace}_trace PROPERTIES SUFFIX ".js")
 endforeach()
 
-add_executable(gameplay_browser EXCLUDE_FROM_ALL src/gameplay_browser.cpp src/browser_input.cpp)
+add_executable(gameplay_browser EXCLUDE_FROM_ALL src/gameplay_browser.cpp src/browser_input.cpp src/browser_controllers.cpp)
 target_link_libraries(gameplay_browser PRIVATE fighter_asset_runtime aurora::main)
 target_compile_options(gameplay_browser PRIVATE -ffp-contract=off)
 target_link_options(gameplay_browser PRIVATE -sENVIRONMENT=web -sALLOW_MEMORY_GROWTH=1
@@ -157,9 +187,10 @@ else()
 endif()
 configure_file(web/runtime.html runtime.html @ONLY)
 configure_file(web/runtime-cache.js runtime-cache.js COPYONLY)
-foreach(module disc-image dsp-coefficients runtime-assets runtime-audio runtime-audio-assets match-flow match-menu action-sweep hitch-capture melee-runtime runtime-development)
+foreach(module disc-image disc-session dsp-coefficients runtime-assets runtime-audio runtime-audio-assets match-flow match-menu action-sweep hitch-capture melee-runtime runtime-development controller-input controller-panel controller-settings prototype-keyboard-layouts)
   configure_file(web/${module}.mjs ${module}.mjs COPYONLY)
 endforeach()
+configure_file(web/controller-settings.css controller-settings.css COPYONLY)
 configure_file(web/audio-ring.mjs audio-ring.mjs COPYONLY)
 configure_file(web/audio-worklet.js audio-worklet.js COPYONLY)
 
@@ -177,6 +208,14 @@ target_link_options(gameplay_audio_fx_trace PRIVATE -sENVIRONMENT=node -sNODERAW
   -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
 set_target_properties(gameplay_audio_fx_trace PROPERTIES SUFFIX ".js")
 
+add_executable(gameplay_stage_map_trace EXCLUDE_FROM_ALL tests/gameplay_stage_map_trace.c)
+target_link_libraries(gameplay_stage_map_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_stage_map_trace PRIVATE -UNDEBUG
+  "-include${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h")
+target_link_options(gameplay_stage_map_trace PRIVATE -sENVIRONMENT=node -sALLOW_MEMORY_GROWTH=1
+  -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1)
+set_target_properties(gameplay_stage_map_trace PROPERTIES SUFFIX ".js")
+
 add_executable(dat_native_stage_map_trace EXCLUDE_FROM_ALL
   tests/dat_native_stage_map_trace.cpp tests/dat_native_stage_map_trace.c)
 target_link_libraries(dat_native_stage_map_trace PRIVATE fighter_asset_runtime)
@@ -184,6 +223,24 @@ target_compile_options(dat_native_stage_map_trace PRIVATE -UNDEBUG)
 target_link_options(dat_native_stage_map_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
   -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
 set_target_properties(dat_native_stage_map_trace PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_pikachu_articles_trace EXCLUDE_FROM_ALL
+  tests/gameplay_pikachu_articles_trace.cpp tests/gameplay_pikachu_article_fields.c)
+target_link_libraries(gameplay_pikachu_articles_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_pikachu_articles_trace PRIVATE -UNDEBUG
+  "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
+target_link_options(gameplay_pikachu_articles_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_pikachu_articles_trace PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_koopa_flame_trace EXCLUDE_FROM_ALL
+  tests/koopa_flame_article_trace.cpp tests/koopa_flame_article_fields.c)
+target_link_libraries(gameplay_koopa_flame_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_koopa_flame_trace PRIVATE -UNDEBUG
+  "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
+target_link_options(gameplay_koopa_flame_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_koopa_flame_trace PROPERTIES SUFFIX ".js")
 
 add_executable(gameplay_audio_stream_trace EXCLUDE_FROM_ALL tests/gameplay_audio_stream_trace.cpp)
 target_link_libraries(gameplay_audio_stream_trace PRIVATE fighter_asset_runtime)
@@ -209,6 +266,36 @@ target_link_options(gameplay_stage_battlefield_trace PRIVATE --profiling-funcs
   -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
 set_target_properties(gameplay_stage_battlefield_trace PROPERTIES SUFFIX ".js")
 
+add_executable(gameplay_stage_temple_trace EXCLUDE_FROM_ALL
+  tests/gameplay_stage_temple_trace.cpp tests/gameplay_stage_temple_trace.c)
+target_link_libraries(gameplay_stage_temple_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_stage_temple_trace PRIVATE -UNDEBUG
+  "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
+target_link_options(gameplay_stage_temple_trace PRIVATE --profiling-funcs
+  -sENVIRONMENT=node -sNODERAWFS=1 -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1
+  -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_stage_temple_trace PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_stage_fountain_trace EXCLUDE_FROM_ALL
+  tests/gameplay_stage_fountain_trace.cpp tests/gameplay_stage_fountain_trace.c)
+target_link_libraries(gameplay_stage_fountain_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_stage_fountain_trace PRIVATE -UNDEBUG
+  "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
+target_link_options(gameplay_stage_fountain_trace PRIVATE --profiling-funcs
+  -sENVIRONMENT=node -sNODERAWFS=1 -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1
+  -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_stage_fountain_trace PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_stage_old_yoshi_trace EXCLUDE_FROM_ALL
+  tests/gameplay_stage_old_yoshi_trace.cpp tests/gameplay_stage_old_yoshi_trace.c)
+target_link_libraries(gameplay_stage_old_yoshi_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_stage_old_yoshi_trace PRIVATE -UNDEBUG
+  "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/gameplay_compat.h>")
+target_link_options(gameplay_stage_old_yoshi_trace PRIVATE --profiling-funcs
+  -sENVIRONMENT=node -sNODERAWFS=1 -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1
+  -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_stage_old_yoshi_trace PROPERTIES SUFFIX ".js")
+
 add_executable(gameplay_content_match_trace EXCLUDE_FROM_ALL
   tests/gameplay_content_match_trace.cpp tests/gameplay_content_match_state.c)
 target_link_libraries(gameplay_content_match_trace PRIVATE fighter_asset_runtime)
@@ -218,6 +305,13 @@ target_link_options(gameplay_content_match_trace PRIVATE --profiling-funcs
   -sENVIRONMENT=node -sNODERAWFS=1 -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1
   -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
 set_target_properties(gameplay_content_match_trace PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_music_profile_trace EXCLUDE_FROM_ALL tests/gameplay_music_profile_trace.cpp)
+target_link_libraries(gameplay_music_profile_trace PRIVATE fighter_asset_runtime)
+target_link_options(gameplay_music_profile_trace PRIVATE --profiling-funcs
+  -sENVIRONMENT=node -sNODERAWFS=1 -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1
+  -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_music_profile_trace PROPERTIES SUFFIX ".js")
 
 add_executable(gameplay_replay_trace EXCLUDE_FROM_ALL tests/gameplay_replay_trace.cpp)
 target_link_libraries(gameplay_replay_trace PRIVATE fighter_asset_runtime)
@@ -375,27 +469,37 @@ set_target_properties(native_menu_host_trace PROPERTIES SUFFIX ".js")
 # once the source CSS/SSS/match handoff passes acceptance.
 find_package(Python3 REQUIRED COMPONENTS Interpreter)
 set(initial_pipeline_cache "${CMAKE_CURRENT_BINARY_DIR}/initial_pipeline_cache.db")
+set(initial_pipeline_identity "${CMAKE_CURRENT_BINARY_DIR}/melee_pipeline_seed_identity.h")
 add_custom_command(
-  OUTPUT "${initial_pipeline_cache}"
+  OUTPUT "${initial_pipeline_cache}" "${initial_pipeline_identity}"
   COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/materialize_pipeline_cache.py"
     "${CMAKE_CURRENT_SOURCE_DIR}/web/initial_pipeline_cache.db.gz.b64" "${initial_pipeline_cache}"
+    --identity-header "${initial_pipeline_identity}"
   DEPENDS scripts/materialize_pipeline_cache.py web/initial_pipeline_cache.db.gz.b64
   VERBATIM)
-add_custom_target(gameplay_menu_pipeline_seed DEPENDS "${initial_pipeline_cache}")
-add_executable(gameplay_menu_browser EXCLUDE_FROM_ALL src/gameplay_menu_browser.cpp src/browser_input.cpp
+add_custom_target(gameplay_menu_pipeline_seed DEPENDS "${initial_pipeline_cache}" "${initial_pipeline_identity}")
+add_executable(gameplay_menu_browser EXCLUDE_FROM_ALL src/gameplay_menu_browser.cpp src/browser_input.cpp src/browser_controllers.cpp
   tests/native_menu_alarm_unavailable.c tests/native_menu_fighter_input.c tests/native_menu_stage_input.c)
 add_dependencies(gameplay_menu_browser gameplay_menu_pipeline_seed)
+target_include_directories(gameplay_menu_browser PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
 set_property(TARGET gameplay_menu_browser APPEND PROPERTY LINK_DEPENDS "${initial_pipeline_cache}")
 target_link_libraries(gameplay_menu_browser PRIVATE fighter_asset_runtime aurora::main)
 # Emscripten's mallinfo declaration extends its normal malloc.h via include_next.
 target_include_directories(gameplay_menu_browser SYSTEM PRIVATE "${EMSCRIPTEN_SYSROOT}/include/compat")
 target_compile_options(gameplay_menu_browser PRIVATE -ffp-contract=off)
+set(gameplay_menu_browser_exports "_main,_malloc,_free,_melee_web_native_asset_begin,_melee_web_native_asset_count,_melee_web_native_asset_name,_melee_web_native_asset_file,_melee_web_native_asset_commit,_melee_web_native_asset_abort,_melee_web_native_menu_file,_melee_web_native_menu_prepare,_melee_web_native_menu_launch,_melee_web_native_menu_replay,_melee_web_native_menu_replay_cursor,_melee_web_native_menu_replay_whole_session,_melee_web_native_menu_unload,_melee_web_native_menu_pause,_melee_web_native_menu_message,_melee_web_native_menu_running,_melee_web_native_menu_cache_idle,_melee_web_native_menu_phase,_melee_web_native_menu_confirm_check,_melee_web_native_menu_pad_sample,_melee_web_native_menu_pad_sample_full,_melee_web_native_menu_player_state,_melee_web_native_menu_drive_fighter,_melee_web_native_menu_drive_stage,_melee_web_native_menu_stock_check,_melee_web_native_menu_stock_check_ready,_melee_web_native_menu_diagnostics,_melee_web_native_menu_memory,_melee_web_css_observe,_melee_web_css_observe_setup,_melee_web_sss_observe,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_set_keyboard_port,_melee_web_input_message,_melee_web_native_menu_match_observe,_melee_web_css_observe_port")
+if(MELEE_WEB_PIPELINE_PROVENANCE)
+  # Emscripten consumes one complete export list. Keep every existing root
+  # and add the private collector commands only in this configuration.
+  string(APPEND gameplay_menu_browser_exports
+    ",_melee_web_provenance_set_case,_melee_web_provenance_drain,_melee_web_provenance_finish,_melee_web_provenance_status")
+endif()
 target_link_options(gameplay_menu_browser PRIVATE --profiling-funcs -sENVIRONMENT=web
   -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=134217728 -sSTACK_SIZE=8388608 -sEXIT_RUNTIME=0
   --preload-file "${initial_pipeline_cache}@/initial_pipeline_cache.db"
   -sEXPORTED_RUNTIME_METHODS=FS,IDBFS,addRunDependency,removeRunDependency,HEAPU8,HEAP32,HEAPF32,UTF8ToString
   -lidbfs.js
-  -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_melee_web_native_menu_file,_melee_web_native_menu_prepare,_melee_web_native_menu_launch,_melee_web_native_menu_replay,_melee_web_native_menu_replay_cursor,_melee_web_native_menu_unload,_melee_web_native_menu_pause,_melee_web_native_menu_message,_melee_web_native_menu_running,_melee_web_native_menu_cache_idle,_melee_web_native_menu_phase,_melee_web_native_menu_confirm_check,_melee_web_native_menu_pad_sample,_melee_web_native_menu_pad_sample_full,_melee_web_native_menu_player_state,_melee_web_native_menu_drive_fighter,_melee_web_native_menu_drive_stage,_melee_web_native_menu_stock_check,_melee_web_native_menu_stock_check_ready,_melee_web_native_menu_diagnostics,_melee_web_native_menu_memory,_melee_web_css_observe,_melee_web_sss_observe,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_set_keyboard_port,_melee_web_input_message)
+  "-sEXPORTED_FUNCTIONS=${gameplay_menu_browser_exports}")
 set_target_properties(gameplay_menu_browser PROPERTIES SUFFIX ".js")
 # Match the production/checked profiles of gameplay_browser above. Runtime
 # admission and source invariants remain explicit native checks in both builds.
@@ -413,9 +517,10 @@ configure_file(web/native-menu.html native-menu.html @ONLY)
 # Keep the development target above intact so replay and source-observation
 # checks retain their full instrumentation.
 if(CMAKE_BUILD_TYPE STREQUAL "Release" AND MELEE_WEB_PUBLIC_RUNTIME)
-  add_executable(gameplay_public EXCLUDE_FROM_ALL src/gameplay_menu_browser.cpp src/browser_input.cpp
+  add_executable(gameplay_public EXCLUDE_FROM_ALL src/gameplay_menu_browser.cpp src/browser_input.cpp src/browser_controllers.cpp
     tests/native_menu_alarm_unavailable.c tests/native_menu_fighter_input.c tests/native_menu_stage_input.c)
   add_dependencies(gameplay_public gameplay_menu_pipeline_seed)
+  target_include_directories(gameplay_public PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
   set_property(TARGET gameplay_public APPEND PROPERTY LINK_DEPENDS "${initial_pipeline_cache}")
   target_compile_definitions(gameplay_public PRIVATE MELEE_WEB_PUBLIC_RUNTIME)
   target_compile_definitions(gameplay_public PRIVATE MELEE_WEB_PUBLIC_AUDIO_DISABLED)
@@ -430,9 +535,33 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release" AND MELEE_WEB_PUBLIC_RUNTIME)
     --preload-file "${initial_pipeline_cache}@/initial_pipeline_cache.db"
     -sEXPORTED_RUNTIME_METHODS=FS,IDBFS,addRunDependency,removeRunDependency,HEAPU8,UTF8ToString
     -lidbfs.js
-    -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_melee_web_native_menu_file,_melee_web_native_menu_prepare,_melee_web_native_menu_launch,_melee_web_native_menu_unload,_melee_web_native_menu_pause,_melee_web_native_menu_message,_melee_web_native_menu_running,_melee_web_native_menu_phase,_melee_web_native_menu_cache_idle,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_set_keyboard_port,_melee_web_input_set_keyboard_layout)
+    -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_melee_web_native_asset_begin,_melee_web_native_asset_count,_melee_web_native_asset_name,_melee_web_native_asset_file,_melee_web_native_asset_commit,_melee_web_native_asset_abort,_melee_web_native_menu_file,_melee_web_native_menu_prepare,_melee_web_native_menu_launch,_melee_web_native_menu_unload,_melee_web_native_menu_pause,_melee_web_native_menu_message,_melee_web_native_menu_running,_melee_web_native_menu_phase,_melee_web_native_menu_cache_idle,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_set_keyboard_port,_melee_web_input_set_keyboard_layout)
   set_target_properties(gameplay_public PROPERTIES SUFFIX ".js")
   add_custom_target(runtime-public DEPENDS gameplay_public)
+endif()
+
+# Release staging profile with the same minimal browser API as gameplay_public.
+# Audio PCM is delivered by the existing synchronous menuAudio callback from
+# gameplay_menu_browser.cpp; no additional native export is permitted here.
+if(CMAKE_BUILD_TYPE STREQUAL "Release" AND MELEE_WEB_AUDIO_PREVIEW_RUNTIME)
+  add_executable(gameplay_audio_preview EXCLUDE_FROM_ALL src/gameplay_menu_browser.cpp src/browser_input.cpp src/browser_controllers.cpp
+    tests/native_menu_alarm_unavailable.c tests/native_menu_fighter_input.c tests/native_menu_stage_input.c)
+  add_dependencies(gameplay_audio_preview gameplay_menu_pipeline_seed)
+  target_include_directories(gameplay_audio_preview PRIVATE "${CMAKE_CURRENT_BINARY_DIR}")
+  set_property(TARGET gameplay_audio_preview APPEND PROPERTY LINK_DEPENDS "${initial_pipeline_cache}")
+  target_compile_definitions(gameplay_audio_preview PRIVATE MELEE_WEB_PUBLIC_RUNTIME MELEE_WEB_AUDIO_PREVIEW_RUNTIME)
+  target_link_libraries(gameplay_audio_preview PRIVATE fighter_asset_runtime_audio_preview aurora::main)
+  target_include_directories(gameplay_audio_preview SYSTEM PRIVATE "${EMSCRIPTEN_SYSROOT}/include/compat")
+  target_compile_options(gameplay_audio_preview PRIVATE -ffp-contract=off)
+  target_link_options(gameplay_audio_preview PRIVATE -sENVIRONMENT=web -sDYNAMIC_EXECUTION=0
+    -sALLOW_MEMORY_GROWTH=1 -sINITIAL_MEMORY=134217728 -sSTACK_SIZE=8388608 -sEXIT_RUNTIME=0
+    --preload-file "${initial_pipeline_cache}@/initial_pipeline_cache.db"
+    -sEXPORTED_RUNTIME_METHODS=FS,IDBFS,addRunDependency,removeRunDependency,HEAPU8,UTF8ToString
+    -lidbfs.js
+    -sEXPORTED_FUNCTIONS=_main,_malloc,_free,_melee_web_native_asset_begin,_melee_web_native_asset_count,_melee_web_native_asset_name,_melee_web_native_asset_file,_melee_web_native_asset_commit,_melee_web_native_asset_abort,_melee_web_native_menu_file,_melee_web_native_menu_prepare,_melee_web_native_menu_launch,_melee_web_native_menu_unload,_melee_web_native_menu_pause,_melee_web_native_menu_message,_melee_web_native_menu_running,_melee_web_native_menu_phase,_melee_web_native_menu_cache_idle,_melee_web_input_set_activity,_melee_web_input_set_keyboard,_melee_web_input_set_keyboard_port,_melee_web_input_set_keyboard_layout)
+  set_target_properties(gameplay_audio_preview PROPERTIES SUFFIX ".js")
+  target_link_options(gameplay_audio_preview PRIVATE -sASSERTIONS=0 -sSAFE_HEAP=0)
+  add_custom_target(runtime-audio-preview DEPENDS gameplay_audio_preview)
 endif()
 
 # Shared typed scene/model tables consumed by the original match interface.
@@ -441,3 +570,27 @@ target_link_libraries(dat_scene_trace PRIVATE fighter_asset_runtime)
 target_link_options(dat_scene_trace PRIVATE --profiling-funcs -sENVIRONMENT=node -sNODERAWFS=1
   -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSTACK_SIZE=8388608)
 set_target_properties(dat_scene_trace PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_results_assets_test EXCLUDE_FROM_ALL tests/gameplay_results_assets_test.cpp)
+target_link_libraries(gameplay_results_assets_test PRIVATE fighter_asset_runtime)
+target_link_options(gameplay_results_assets_test PRIVATE --profiling-funcs -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_results_assets_test PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_results_scene_trace EXCLUDE_FROM_ALL tests/gameplay_results_scene_trace.cpp)
+target_link_libraries(gameplay_results_scene_trace PRIVATE fighter_asset_runtime)
+target_link_options(gameplay_results_scene_trace PRIVATE --profiling-funcs -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_results_scene_trace PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_prize_assets_test EXCLUDE_FROM_ALL tests/gameplay_prize_assets_test.cpp)
+target_link_libraries(gameplay_prize_assets_test PRIVATE fighter_asset_runtime)
+target_link_options(gameplay_prize_assets_test PRIVATE --profiling-funcs -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_prize_assets_test PROPERTIES SUFFIX ".js")
+
+add_executable(gameplay_save_profile_trace EXCLUDE_FROM_ALL tests/gameplay_save_profile_trace.c)
+target_link_libraries(gameplay_save_profile_trace PRIVATE fighter_source_runtime)
+target_link_options(gameplay_save_profile_trace PRIVATE --profiling-funcs -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_save_profile_trace PROPERTIES SUFFIX ".js")

@@ -18,12 +18,12 @@ bool srt_channel(std::uint8_t type)
     return (type >= 1 && type <= 3) || (type >= 5 && type <= 10);
 }
 
-bool supported_channel(std::uint8_t type, bool allow_node)
+bool supported_channel(std::uint8_t type, bool native_action)
 {
-    // HSD_A_J_NODE is 11.  The original JObjUpdateFunc handles it as a
-    // visibility flag, but the generic pose bridge intentionally has no such
-    // output.  Only native fighter-action hydration opts into this channel.
-    return srt_channel(type) || (allow_node && type == 11);
+    // Original JObjUpdateFunc consumes NODE (11) and BRANCH (12) visibility.
+    // Only native fighter actions use that callback; the generic pose bridge
+    // cannot represent either visibility operation.
+    return srt_channel(type) || (native_action && (type == 11 || type == 12));
 }
 
 class Stream {
@@ -73,10 +73,10 @@ void check_format(std::uint8_t format)
 }
 
 void validate(const MeleeWebAnimationTrack& track, bool native_state_guard=false,
-              bool allow_node=false)
+              bool native_action=false)
 {
-    require(supported_channel(track.type, allow_node),
-            "Unsupported animation channel (requires ordinary joint SRT or native fighter node)");
+    require(supported_channel(track.type, native_action),
+            "Unsupported animation channel (requires ordinary joint SRT or native fighter visibility)");
     require(track.bytes && track.length > 0 && track.length <= 65535,
             "Animation track length is outside the FigaTrack limit");
     check_format(track.value_format);
@@ -115,7 +115,11 @@ void validate(const MeleeWebAnimationTrack& track, bool native_state_guard=false
     // FObj assigns op_intrp when loading the next datum. A single CON datum
     // reaches the guarded native FObjUpdateAnim terminal path with
     // op_intrp=NONE; a single LIN/SPL datum would still have no valid output.
-    require((native_state_guard && first_opcode == 1) || operands >= 2 || first_opcode == 6,
+    // Native fighter clips retain well-formed source streams, including
+    // dormant singleton tracks. Their reached output states are checked by
+    // the native FObjUpdateAnim guard; decoding does not certify every seek
+    // or action lifetime. Pose inspection has no such runtime boundary.
+    require(native_action || (native_state_guard && first_opcode == 1) || operands >= 2 || first_opcode == 6,
             "Animation interpolation requires a value pair or a key opcode");
 }
 } // namespace
@@ -154,9 +158,11 @@ extern "C" int melee_web_animation_validate_native_action_track(const MeleeWebAn
     try {
         require(track != nullptr, "Missing animation track");
         // Native action clips are sent through the original FigaTree/FObj
-        // path.  Keep the existing packed-stream and interpolation checks;
-        // only admit the source HSD_A_J_NODE visibility channel here.
-        validate(*track, false, true);
+        // path. Keep the packed-stream structural checks and admit the
+        // source NODE/BRANCH visibility channels here.
+        // FObjUpdateAnim still rejects any reached undefined interpolation
+        // output; no value is fabricated for unpaired LIN/SPL streams.
+        validate(*track, true, true);
         if (error && error_size) error[0] = '\0';
         return 1;
     } catch (const std::exception& exception) {
@@ -170,7 +176,7 @@ DatAnimation::DatAnimation(const DatArchive& archive, std::uint32_t root,
                            DatAnimationPolicy policy)
     : descriptor_offset(root)
 {
-    const bool allow_node = policy == DatAnimationPolicy::NativeFighterAction;
+    const bool native_action = policy == DatAnimationPolicy::NativeFighterAction;
     require((root & 3) == 0, "FigaTree descriptor is not aligned");
     (void) archive.range(root, 20);
     tree_type = archive.be32(root);
@@ -207,8 +213,9 @@ DatAnimation::DatAnimation(const DatArchive& archive, std::uint32_t root,
             DatAnimationTrack track{offset, archive.be16(offset + 2), record[4], record[5], record[6], {}};
             // Byte 7 is unnamed alignment padding in original FigaTrack.
             // lbAnim_InitFrames copies the named fields and never consumes it.
-            require(supported_channel(track.type, allow_node),
-                    "Unsupported animation channel (requires ordinary joint SRT or native fighter node)");
+            if (!supported_channel(track.type, native_action))
+                throw DatError("Unsupported animation channel "+std::to_string(track.type)+
+                               " (requires ordinary joint SRT or native fighter visibility)");
             require(!(channels & (1U << track.type)), "Animation node has duplicate SRT channels");
             channels |= 1U << track.type;
             require(length > 0, "Animation track is empty");
@@ -220,7 +227,7 @@ DatAnimation::DatAnimation(const DatArchive& archive, std::uint32_t root,
             track.bytes.assign(source.begin(), source.end());
             const MeleeWebAnimationTrack view{track.bytes.data(), track.bytes.size(), track.start_frame,
                 track.type, track.value_format, track.slope_format};
-            validate(view, false, allow_node);
+            validate(view, native_action, native_action);
             tracks.push_back(std::move(track));
         }
     }

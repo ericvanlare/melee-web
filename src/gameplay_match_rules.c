@@ -12,7 +12,9 @@
 extern void melee_web_match_source_refresh_ratio(void);
 extern int melee_web_match_init_source(StartMeleeData*);
 extern int melee_web_match_source_publish_result(void);
+extern void melee_web_match_source_result_reset(void);
 extern int melee_web_match_source_result_winners(int*, int[6]);
+extern int melee_web_match_source_result_data(MatchExitInfo*);
 struct MeleeWebMatchRules {lbl_8046B6A0_t saved;StaticPlayer players[6];StartMeleeData start;uint64_t generation;int initialized;};
 static MeleeWebMatchRules* active;
 static struct {
@@ -20,6 +22,7 @@ static struct {
     int outcome;
     int count;
     int winners[6];
+    MatchExitInfo data;
 } terminal;
 static int fail(char* e,size_t n,const char* message){if(e&&n)snprintf(e,n,"%s",message);return 0;}
 int melee_web_match_timer_supported(const struct StartMeleeRules* rules)
@@ -37,6 +40,7 @@ MeleeWebMatchRules* melee_web_match_rules_begin(char* e,size_t n){
     for(int i=0;i<6;i++)if(Player_GetEntity(i)){fail(e,n,"Initialize rules before source fighters");return NULL;}
     MeleeWebMatchRules* h=malloc(sizeof(*h));if(!h){fail(e,n,"Cannot allocate original rules scope");return NULL;}
     memset(&terminal,0,sizeof(terminal));
+    melee_web_match_source_result_reset();
     lbl_8046B6A0_t* data=gm_16AE_GetUnkData_0();h->saved=*data;h->generation=melee_web_gameplay_stats().generation;h->initialized=0;
     for(int i=0;i<6;i++){
         h->players[i]=*Player_GetPtrForSlot(i);
@@ -83,9 +87,15 @@ int melee_web_match_rules_publish_result(void)
     if(!melee_web_match_source_publish_result())return 0;
     int count=0;int winners[6];
     if(!melee_web_match_source_result_winners(&count,winners)||count<0||count>6)return 0;
+    if(!melee_web_match_source_result_data(&terminal.data))return 0;
     terminal.valid=1;terminal.outcome=gm_GetMatchOutcome();terminal.count=count;
     for(int i=0;i<6;i++)terminal.winners[i]=winners[i];
     return 1;
+}
+int melee_web_match_rules_terminal_data(MatchExitInfo* out)
+{
+    if(!terminal.valid||!out)return 0;
+    *out=terminal.data;return 1;
 }
 int melee_web_match_rules_terminal_result(int* outcome,int* count,int winners[6])
 {

@@ -15,9 +15,20 @@
 #include <cstdlib>
 #include <stdexcept>
 #include <set>
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+#include "pipeline_provenance_runtime.h"
+#include "gameplay_bootstrap.h"
+#include <melee/ft/kinds/ftCommon/forward.h>
+#endif
 extern "C" int lbAudioAx_80023F28(int);
 extern "C" int melee_web_vs_mode_begin(void);
 extern "C" int melee_web_vs_mode_end(void);
+extern "C" uint16_t* gmMainLib_GetUnlockedCharactersBitmaskPtr(void);
+extern "C" uint16_t* gmMainLib_8015EDA4(void);
+extern "C" int fn_8016E5C0(StartMeleeData*);
+extern "C" int melee_web_stage_select_music(int, int*, int*);
+extern "C" void melee_web_stage_commit_music(int, int);
+extern "C" const char* melee_web_audio_music_path(int);
 namespace melee_web {
 namespace {
 void check(int value,const char* error){if(!value)throw std::runtime_error(error);}
@@ -38,6 +49,8 @@ struct GameplayMatchSession::Storage {
     MeleeWebHud* hud=nullptr;
     MeleeWebMatchFlow* flow=nullptr;
     bool mode_owned=false;
+    bool profile_owned=false;
+    uint16_t saved_characters=0,saved_stages=0;
     ~Storage(){try{close();}catch(const std::exception& e){std::fprintf(stderr,"Match session teardown: %s\n",e.what());std::abort();}}
     const RuntimeFiles* runtime_files=nullptr;
     RuntimeArchiveCache* runtime_cache=nullptr;
@@ -80,11 +93,35 @@ struct GameplayMatchSession::Storage {
             content.costume_indices[i]=selection.players[i].costume;
         }
         check(melee_web_vs_mode_begin(),"Original VS mode is already owned");mode_owned=true;
+        if(selected.save_profile_present){
+            saved_characters=*gmMainLib_GetUnlockedCharactersBitmaskPtr();
+            saved_stages=*gmMainLib_8015EDA4();
+            *gmMainLib_GetUnlockedCharactersBitmaskPtr()=selected.unlocked_characters;
+            *gmMainLib_8015EDA4()=selected.unlocked_stages;
+            profile_owned=true;
+        }
         if(archive_cache)
             world=std::make_unique<GameplayWorld>(files,content,*archive_cache,
                                                   GameplayWorldConstruction::Deferred);
         else
             world=std::make_unique<GameplayWorld>(files,content);
+    }
+    void prepare_music(){
+        // fn_8016E730 selects music after constructing stage and fighters.
+        // It shares gameplay RNG, even in a silent public build. Decode only
+        // the chosen stream while preparation keeps the source clock stopped.
+        if(!selected.start.rules.x1_4){
+            int music_id=-1,alternate=0;
+            melee_web_stage_select_music(fn_8016E5C0(&selected.start),&music_id,&alternate);
+            const char* path=melee_web_audio_music_path(music_id);
+            check(path&&std::string_view(path).starts_with("/audio/"),
+                  "Original stage music has no supported disc path");
+            music_path=path;
+            const auto filename=music_path.substr(7);
+            check(runtime_files->contains(filename),"Selected original stage music was not imported");
+            music=std::make_unique<GameplayAudioStream>(bank->get(),music_path.c_str(),runtime_files->at(filename));
+            melee_web_stage_commit_music(music_id,alternate);
+        }
     }
     bool advance_construction(){
         char error[256]{};
@@ -126,9 +163,6 @@ struct GameplayMatchSession::Storage {
 #endif
             }
             check(melee_web_audio_enable_effects(bank->get(),error,sizeof(error)),error);
-            music_path="/audio/"+std::string(stage->music);
-            music=std::make_unique<GameplayAudioStream>(bank->get(),music_path.c_str(),runtime_files->at(stage->music));
-            check(lbAudioAx_80023F28(stage->music_id)==0,"Original selected stage music did not start");
             construction_phase=2;
             return false;
         }
@@ -155,7 +189,11 @@ struct GameplayMatchSession::Storage {
             MeleeWebRenderSettings settings{640,480,{0,25,180},{0,15,0},30,1,1000,(uint64_t(1)<<5)|(uint64_t(1)<<3)};
             render=melee_web_render_begin_match(&settings,error,sizeof(error));check(render!=nullptr,error);
             check(melee_web_render_use_match_passes(render,error,sizeof(error)),error);
-            hud=melee_web_hud_begin(selected.hud_layout,error,sizeof(error));check(hud!=nullptr,error);
+            hud=melee_web_hud_begin_with_music(selected.hud_layout,
+                [](void* context,char* message,size_t size)->int{
+                    try{static_cast<Storage*>(context)->prepare_music();return 1;}
+                    catch(const std::exception& e){if(message&&size)std::snprintf(message,size,"%s",e.what());return 0;}
+                },this,error,sizeof(error));check(hud!=nullptr,error);
             check(melee_web_render_use_scene_cameras(render,error,sizeof(error)),error);
             flow=melee_web_match_flow_begin(error,sizeof(error));check(flow!=nullptr,error);
             construction_phase=5;
@@ -190,6 +228,11 @@ struct GameplayMatchSession::Storage {
         }
         if(hud_assets){hud_assets->close();hud_assets.reset();}
         bank.reset();
+        if(profile_owned){
+            *gmMainLib_GetUnlockedCharactersBitmaskPtr()=saved_characters;
+            *gmMainLib_8015EDA4()=saved_stages;
+            profile_owned=false;
+        }
         if(mode_owned){check(melee_web_vs_mode_end(),"Original VS mode lost ownership");mode_owned=false;}
     }
 };
@@ -237,6 +280,49 @@ void GameplayMatchSession::draw(){
     check(melee_web_render_draw(storage_->render,error,sizeof(error)),error);
     check(melee_web_match_flow_present(storage_->flow,error,sizeof(error)),error);
 }
+#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
+MeleeWebPipelineSourceContext GameplayMatchSession::provenance_context() const {
+    MeleeWebPipelineSourceContext context{};
+    for(auto& player:context.players){player.motion_id=-1;player.stocks=-1;}
+    if(!storage_)return context;
+    context.scene=MELEE_WEB_PIPELINE_SCENE_MATCH;
+    context.phase=construction_complete()?MELEE_WEB_PIPELINE_PHASE_INTERACTIVE:MELEE_WEB_PIPELINE_PHASE_PREPARATION;
+    context.world_generation=melee_web_gameplay_generation();
+    // The match-flow clock begins after Entry/Ready. Provenance also needs
+    // those original source traversals, so use the world's traversal clock.
+    context.source_tick=melee_web_gameplay_provenance_tick();
+    context.stage=storage_->selected.start.rules.stkind;
+    context.ground=storage_->content.ground_kind;
+    context.hud_layout=storage_->selected.hud_layout;
+    context.active_player_count=storage_->content.player_count;
+    context.owner_kind=MELEE_WEB_PIPELINE_OWNER_ROUTE_COMPOSITE;
+    bool entry=false,dead=false,respawn=false;
+    for(unsigned i=0;i<context.active_player_count;++i){
+        const auto& selected=storage_->selected.start.players[i];
+        const auto* content=melee_web_fighter_content(selected.ckind);
+        auto& player=context.players[i];
+        player.character=selected.ckind;player.fighter_kind=storage_->content.fighter_kinds[i];
+        player.costume=selected.color;player.subcolor=selected.sub_color;
+        player.effect_bank=content?content->effect_bank:UINT32_MAX;
+        player.motion_id=-1;player.stocks=selected.stocks;
+        if(construction_complete()){
+            const auto state=player_stats(i);
+            player.motion_id=state.motion_id;player.stocks=state.stocks;
+            entry|=state.motion_id>=ftCo_MS_Entry&&state.motion_id<=ftCo_MS_EntryEnd;
+            dead|=state.motion_id>=ftCo_MS_DeadDown&&state.motion_id<=ftCo_MS_DeadUpFallHitCameraIce;
+            respawn|=state.motion_id>=ftCo_MS_Rebirth&&state.motion_id<=ftCo_MS_RebirthWait;
+        }
+    }
+    if(construction_complete()){
+        if(ending())context.phase=MELEE_WEB_PIPELINE_PHASE_ENDING;
+        else if(entry)context.phase=MELEE_WEB_PIPELINE_PHASE_ENTRY;
+        else if(!ready())context.phase=MELEE_WEB_PIPELINE_PHASE_READY;
+        else if(dead)context.phase=MELEE_WEB_PIPELINE_PHASE_DEATH;
+        else if(respawn)context.phase=MELEE_WEB_PIPELINE_PHASE_RESPAWN;
+    }
+    return context;
+}
+#endif
 bool GameplayMatchSession::ending()const{return storage_&&melee_web_match_flow_ending(storage_->flow);}
 bool GameplayMatchSession::complete()const{return storage_&&melee_web_match_flow_complete(storage_->flow);}
 bool GameplayMatchSession::paused()const{return storage_&&melee_web_match_flow_paused(storage_->flow);}

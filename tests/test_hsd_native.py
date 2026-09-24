@@ -35,6 +35,24 @@ class NativeJointDescriptorTests(unittest.TestCase):
                 self.assertIn("Local Mario metal graph:61 matching joints,8 DObj occurrences,21 PObjs passed",result.stdout)
 
 
+class NativeFighterOutputGuardTests(unittest.TestCase):
+    def test_terminal_singleton_output_is_defined_at_source_consumer(self):
+        targets = [ROOT / 'build' / directory / 'hsd_native_trace.js'
+                   for directory in ('browser', 'browser-release')]
+        targets = [path for path in targets if path.is_file()]
+        if not targets:
+            self.skipTest('Build hsd_native_trace for source interpolation guard checks')
+        target = max(targets, key=lambda path: path.stat().st_mtime)
+        for mode in ('--terminal-branch-linear', '--terminal-branch-spline',
+                     '--terminal-pass-endpoint', '--terminal-stop-ceil-endpoint'):
+            with self.subTest(mode=mode):
+                result = subprocess.run([str(node_runtime()), str(target), mode], cwd=ROOT,
+                                        capture_output=True, text=True, timeout=30)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn('original terminal branch visibility constant passed',
+                              result.stdout + result.stderr)
+
+
 class NativeJointRuntimeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):

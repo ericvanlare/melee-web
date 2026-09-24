@@ -1,4 +1,5 @@
 #include "fighter_binding.hpp"
+#include "fighter_binding.h"
 
 #include <algorithm>
 #include <numeric>
@@ -110,18 +111,38 @@ DatCommonFighterLayout::DatCommonFighterLayout(const DatArchive& archive, const 
 }
 
 DatFighterActions::DatFighterActions(const DatArchive& archive, const FighterCostume& costume)
+    : DatFighterActions(archive, costume, 0x0c, costume.motion_count) {}
+
+DatFighterActions::DatFighterActions(const DatArchive& archive, const FighterCostume& costume,
+                                     std::uint32_t table_field_offset,
+                                     std::uint32_t motion_count)
     : fighter_kind(costume.fighter_kind)
 {
     validate_costume(costume);
     const auto root = symbol_root(archive, costume.fighter_symbol);
     region(archive, root, 16);
-    const auto table = pointer(archive, root + 12, std::size_t(costume.motion_count) * 24);
-    region(archive, table, std::size_t(costume.motion_count) * 24);
-    for (std::uint32_t id = 0; id < costume.motion_count; ++id) {
+    require(table_field_offset <= 0x5c && !(table_field_offset & 3),
+            "Fighter action table field is outside the source ftData record");
+    const auto table_limit = table_field_offset == 0x14 ? 32U : 1024U;
+    require(motion_count > 0 && motion_count <= table_limit,
+            "Fighter action table count exceeds its checked source bound");
+    const auto table = pointer(archive, root + table_field_offset,
+                               std::size_t(motion_count) * 24);
+    region(archive, table, std::size_t(motion_count) * 24);
+    const auto blends = pointer(archive, root + table_field_offset + 4,
+                                std::size_t(motion_count) * 2);
+    region(archive, blends, std::size_t(motion_count) * 2);
+    for (std::uint32_t slot = blends & ~3U;
+         slot < blends + motion_count * 2; slot += 4) {
+        if (std::size_t(slot) + 4 <= archive.data().size())
+            require(!archive.has_relocation(slot),
+                    "Fighter blend bytes contain a relocation");
+    }
+    for (std::uint32_t id = 0; id < motion_count; ++id) {
         const auto offset = table + id * 24;
         const auto name = archive.pointer(offset);
         const auto start = archive.be32(offset + 4), size = archive.be32(offset + 8);
-        (void) archive.pointer(offset + 12); // Command bytes are not interpreted here.
+        const auto command = archive.pointer(offset + 12, 4);
         require(archive.be32(offset + 20) == 0 && !archive.pointer(offset + 20),
                 "Fighter action table contains a runtime-resolved address");
         if (!size) {
@@ -129,12 +150,29 @@ DatFighterActions::DatFighterActions(const DatArchive& archive, const FighterCos
             continue;
         }
         require(name.has_value(), "Nonempty fighter motion has no public symbol");
-        require(size >= 32 && size <= 0x8000 && start % 32 == 0 &&
+        // The authored demo archives can exceed the old 32 KiB inspection
+        // cap (Falco Win1 is 0x9c1e bytes). Preserve the DAT/container bounds;
+        // the consumer verifies this range against its actual archive bytes.
+        require(size >= 32 && start % 32 == 0 &&
                     start <= DatArchive::max_archive_bytes && size <= DatArchive::max_archive_bytes - start,
                 "Fighter motion archive range exceeds source or inspection limits");
-        actions.push_back({id, start, size, archive.be32(offset + 16), string_at(archive, *name)});
+        const auto blend = archive.range(blends + id * 2, 2);
+        actions.push_back({id, start, size, archive.be32(offset + 16), command,
+                           {blend[0], blend[1]}, string_at(archive, *name)});
     }
     require(!actions.empty(), "Fighter data has no nonempty motion archives");
+}
+
+std::uint32_t fighter_demo_motion_count(std::uint32_t kind) noexcept
+{
+    // Exact ftData_UnkIntPairs counts from the pinned source ftdata.c. These
+    // are the authored demo row bounds, not a guessed archive/table limit.
+    static constexpr std::uint8_t counts[] = {
+        16, 14, 14, 14, 18, 14, 14, 14, 14, 14, 14,
+        14, 14, 14, 14, 14, 14, 16, 14, 14, 14, 14,
+        14, 14, 14, 14, 14, 14, 14, 14, 14, 15, 14,
+    };
+    return kind < std::size(counts) ? counts[kind] : 0;
 }
 
 bool DatFighterActions::contains(std::string_view name) const noexcept
@@ -194,3 +232,11 @@ FighterAnimationBinding bind_fighter_animation(
     return binding;
 }
 } // namespace melee_web
+
+extern "C" int melee_web_fighter_costume_material_required(uint32_t kind,uint32_t costume)
+{
+    for(const auto& row:melee_web::fighter_costumes())
+        if(row.fighter_kind==kind && row.costume_index==costume)
+            return !row.material_animation_symbol.empty();
+    return -1;
+}

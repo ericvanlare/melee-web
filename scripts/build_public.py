@@ -44,7 +44,13 @@ PLAYER_RUNTIME_FILES = (
     "melee-runtime.mjs",
     "runtime-assets.mjs",
     "disc-image.mjs",
+    "disc-session.mjs",
     "prototype-keyboard-layouts.mjs",
+    "controller-input.mjs",
+    "controller-panel.mjs",
+    "controller-panel.css",
+    "controller-settings.mjs",
+    "controller-settings.css",
     "gameplay_public.js",
     "gameplay_public.wasm",
 )
@@ -53,7 +59,13 @@ PLAYER_SOURCE_RUNTIME_FILES = (
     "melee-runtime.mjs",
     "runtime-assets.mjs",
     "disc-image.mjs",
+    "disc-session.mjs",
     "prototype-keyboard-layouts.mjs",
+    "controller-input.mjs",
+    "controller-panel.mjs",
+    "controller-panel.css",
+    "controller-settings.mjs",
+    "controller-settings.css",
 )
 RUNTIME_IDENTITY_SCHEMA = "melee-web-runtime-public-build-v2"
 RUNTIME_IDENTITY_NAME = "runtime-public-identity.json"
@@ -62,12 +74,17 @@ RUNTIME_SOURCE_FILES = (
     "cmake/FighterRuntime.cmake",
     "patches/melee-gameplay.patch",
     "src/gameplay_menu_browser.cpp",
+    "src/gameplay_asset_manifest.cpp",
+    "src/gameplay_asset_manifest.hpp",
+    "src/runtime_asset_scope.hpp",
     "src/gameplay_menu_world.cpp",
     "src/gameplay_match_session.cpp",
     "src/gameplay_audio.c",
     "src/gameplay_audio_bank.cpp",
     "src/browser_input.cpp",
     "src/browser_input.h",
+    "src/browser_controllers.cpp",
+    "src/browser_controllers.h",
     "scripts/bootstrap.py",
     "scripts/build.py",
     "scripts/gameplay_bool.py",
@@ -83,7 +100,14 @@ RUNTIME_SOURCE_FILES = (
     "tests/native_menu_stage_input.c",
 )
 RUNTIME_REQUIRED_EXPORTS = (
-    "_main", "_malloc", "_free", "_melee_web_native_menu_file",
+    "_main", "_malloc", "_free",
+    "_melee_web_native_asset_begin",
+    "_melee_web_native_asset_count",
+    "_melee_web_native_asset_name",
+    "_melee_web_native_asset_file",
+    "_melee_web_native_asset_commit",
+    "_melee_web_native_asset_abort",
+    "_melee_web_native_menu_file",
     "_melee_web_native_menu_prepare", "_melee_web_native_menu_launch",
     "_melee_web_native_menu_unload", "_melee_web_native_menu_pause",
     "_melee_web_native_menu_message", "_melee_web_native_menu_running",
@@ -93,12 +117,14 @@ RUNTIME_REQUIRED_EXPORTS = (
 )
 RUNTIME_FORBIDDEN_EXPORTS = frozenset({
     "_melee_web_native_menu_replay", "_melee_web_native_menu_replay_cursor",
+    "_melee_web_native_menu_replay_whole_session",
     "_melee_web_native_menu_confirm_check", "_melee_web_native_menu_pad_sample",
     "_melee_web_native_menu_pad_sample_full", "_melee_web_native_menu_player_state",
     "_melee_web_native_menu_drive_fighter", "_melee_web_native_menu_drive_stage",
     "_melee_web_native_menu_stock_check", "_melee_web_native_menu_stock_check_ready",
     "_melee_web_native_menu_diagnostics", "_melee_web_native_menu_memory",
-    "_melee_web_css_observe", "_melee_web_sss_observe", "_melee_web_input_message",
+    "_melee_web_css_observe", "_melee_web_css_observe_setup", "_melee_web_sss_observe", "_melee_web_input_message",
+    "_melee_web_css_observe_port", "_melee_web_native_menu_match_observe",
 })
 PREPARED_GAMEPLAY_PATH = "build/gameplay-source"
 PREPARED_GAMEPLAY_PATCHES = {
@@ -112,6 +138,8 @@ RUNTIME_TOOLCHAIN_PATHS = frozenset({
     ".venv/bin/cmake",
     ".venv/bin/ninja",
 })
+RUNTIME_ARTIFACT_ROOTS = frozenset({"build/browser-public-release",
+                                    "build/browser-public-selective-release"})
 PIPELINE_SEED_PATHS = {
     "source": "web/initial_pipeline_cache.db.gz.b64",
     "materialized": "build/browser-public-release/initial_pipeline_cache.db",
@@ -418,7 +446,7 @@ def _validate_player_source(source: Path) -> dict[str, bytes]:
     if not css_text.strip() or re.search(r"url\s*[(]", css_text, re.I):
         raise BuildError("player.css must be non-empty and contain no external or embedded URLs")
     shell = result["player-shell.mjs"].decode("utf-8")
-    for import_path in ("../melee-runtime.mjs", "../prototype-keyboard-layouts.mjs"):
+    for import_path in ("../melee-runtime.mjs", "../controller-settings.mjs"):
         if not re.search(rf"(?:from|import)\s*[\"']{re.escape(import_path)}[\"']", shell):
             raise BuildError(f"player-shell.mjs is missing reviewed import {import_path}")
     return result
@@ -557,7 +585,7 @@ def _read_runtime_identity(runtime_dir: Path) -> tuple[dict[str, object], dict[s
         raise BuildError("runtime identity has unexpected or missing producer fields")
     if value.get("target") != "runtime-public" or value.get("configuration") != "Release":
         raise BuildError("runtime identity is not the Release runtime-public target")
-    if value.get("artifact_root") != "build/browser-public-release":
+    if not isinstance(value.get("artifact_root"), str) or value["artifact_root"] not in RUNTIME_ARTIFACT_ROOTS:
         raise BuildError("runtime identity artifact_root is not the reviewed public Release output")
     _validate_audio_policy(value)
     convention = value.get("upload_convention")
@@ -625,6 +653,9 @@ def _read_runtime_identity(runtime_dir: Path) -> tuple[dict[str, object], dict[s
 
 def _validate_audio_policy(identity: dict[str, object]) -> None:
     """Require the producer's source-bound proof that the alpha has no audio."""
+    artifact_root = identity.get("artifact_root")
+    if not isinstance(artifact_root, str) or artifact_root not in RUNTIME_ARTIFACT_ROOTS:
+        raise BuildError("runtime identity artifact_root is not the reviewed public Release output")
     policy = identity.get("audio_policy")
     expected_policy = {
         "mode": "disabled",
@@ -655,7 +686,7 @@ def _validate_audio_policy(identity: dict[str, object]) -> None:
     if not isinstance(ninja, dict) or set(ninja) != {
         "path", "target_statement_sha256", "source_archive_statement_sha256",
         "asset_archive_statement_sha256", "target_inputs", "source_archive_inputs", "asset_archive_inputs",
-    } or ninja.get("path") != "build/browser-public-release/build.ninja":
+    } or ninja.get("path") != f"{artifact_root}/build.ninja":
         raise BuildError("runtime identity audio_graph Ninja evidence is incomplete")
     ninja_path = _identity_repo_path(ninja["path"], "audio graph Ninja")
     if _is_symlink(ninja_path) or not ninja_path.is_file():
@@ -701,7 +732,7 @@ def _validate_audio_policy(identity: dict[str, object]) -> None:
     commands = proof.get("compile_commands")
     if not isinstance(commands, dict) or set(commands) != {
         "path", "public_audio_command_sha256", "public_audio_object", "public_resampler_compile_commands",
-    } or commands.get("path") != "build/browser-public-release/compile_commands.json":
+    } or commands.get("path") != f"{artifact_root}/compile_commands.json":
         raise BuildError("runtime identity audio_graph compile command evidence is incomplete")
     compile_path = _identity_repo_path(commands["path"], "audio graph compile commands")
     if _is_symlink(compile_path) or not compile_path.is_file():
@@ -733,7 +764,7 @@ def _validate_audio_policy(identity: dict[str, object]) -> None:
     depfile = proof.get("depfile")
     if not isinstance(depfile, dict) or set(depfile) != {"path", "present", "resampler_header_referenced"}:
         raise BuildError("runtime identity audio_graph depfile evidence is incomplete")
-    if depfile.get("path") != "build/browser-public-release/CMakeFiles/fighter_source_runtime_public.dir/src/gameplay_audio.c.o.d":
+    if depfile.get("path") != f"{artifact_root}/CMakeFiles/fighter_source_runtime_public.dir/src/gameplay_audio.c.o.d":
         raise BuildError("runtime identity audio_graph depfile path is invalid")
     depfile_path = _identity_repo_path(depfile["path"], "audio graph depfile")
     if _is_symlink(depfile_path):
@@ -761,7 +792,7 @@ def _validate_audio_policy(identity: dict[str, object]) -> None:
         raise BuildError("runtime identity audio_graph project Ninja is missing")
     try:
         deps_result = subprocess.run(
-            [str(ninja_path), "-C", "build/browser-public-release", "-t", "deps", ninja_deps["object"]],
+            [str(ninja_path), "-C", artifact_root, "-t", "deps", ninja_deps["object"]],
             cwd=ROOT, text=True, capture_output=True, check=False,
         )
     except OSError as exc:
@@ -867,9 +898,10 @@ def _validate_runtime_provenance(identity: dict[str, object]) -> None:
     seed = identity.get("pipeline_seed")
     if not isinstance(seed, dict):
         raise BuildError("runtime identity pipeline seed record is missing")
+    seed_paths = dict(PIPELINE_SEED_PATHS, materialized=f"{identity['artifact_root']}/initial_pipeline_cache.db")
     for key in ("source", "materialized"):
         part = seed.get(key)
-        if (not isinstance(part, dict) or part.get("path") != PIPELINE_SEED_PATHS[key]
+        if (not isinstance(part, dict) or part.get("path") != seed_paths[key]
                 or not isinstance(part.get("sha256"), str)):
             raise BuildError(f"runtime identity pipeline seed {key} record is invalid")
         path = _identity_repo_path(part["path"], f"pipeline seed {key}")
@@ -931,15 +963,22 @@ def _runtime_graph_hash(files: dict[str, bytes]) -> str:
     return hashlib.sha256(canonical).hexdigest()[:16]
 
 
-def _validate_runtime_graph(files: dict[str, bytes]) -> None:
+def _validate_runtime_graph(files: dict[str, bytes], *, audio: bool = False) -> None:
     """Validate the small public loader graph and reject evidence/upload code."""
     forbidden_modules = {
         "dsp-coefficients.mjs", "audio-worklet.js", "audio-ring.mjs",
         "runtime-audio-assets.mjs", "runtime-audio.mjs",
     }
-    if forbidden_modules.intersection(files):
+    if not audio and forbidden_modules.intersection(files):
         raise BuildError("public runtime graph contains a development audio module")
+    loader = "gameplay_audio_preview.js" if audio else "gameplay_public.js"
     for rel, data in files.items():
+        # Export checks alone cannot detect dormant diagnostics retained by
+        # internal replay references in a shared native archive.
+        if any(marker in data for marker in (
+            b"CPU_ADDRESS_AUDIT", b"melee-web-native-cpu-address-diagnostic",
+        )):
+            raise BuildError(f"CPU address diagnostic rejected in public runtime: {rel}")
         if rel.endswith((".mjs", ".js")):
             try:
                 text = data.decode("utf-8")
@@ -950,10 +989,10 @@ def _validate_runtime_graph(files: dict[str, bytes]) -> None:
             for name, pattern in FORBIDDEN_TEXT_PATTERNS:
                 if name in {"network API", "runtime/importer code", "file input", "persistent browser storage API"}:
                     continue
-                if rel == "gameplay_public.js" and name == "diagnostic code":
+                if rel == loader and name == "diagnostic code":
                     continue
                 matches = list(pattern.finditer(text))
-                if name == "private path" and rel == "gameplay_public.js":
+                if name == "private path" and rel == loader:
                     # Emscripten emits this fixed virtual HOME in its standard
                     # runtime boilerplate. Permit only the exact literal and
                     # only when it is not extended into another path.
@@ -968,19 +1007,29 @@ def _validate_runtime_graph(files: dict[str, bytes]) -> None:
                 raise BuildError(f"upload/evidence code rejected in runtime JavaScript: {rel}")
             if re.search(r"https?://|(?:from|import)\s*[\"'](?:https?:|//)", text, re.I):
                 raise BuildError(f"external runtime URL rejected in runtime JavaScript: {rel}")
-            if re.search(r"(?:dsp-coefficients|audio-worklet|audio-ring|runtime-audio)", text, re.I):
+            if not audio and re.search(r"(?:dsp-coefficients|audio-worklet|audio-ring|runtime-audio)", text, re.I):
                 raise BuildError(f"development audio module reference rejected in runtime JavaScript: {rel}")
     required_imports = {
-        "melee-runtime.mjs": ("./runtime-assets.mjs", "./gameplay_public.js"),
-        "runtime-assets.mjs": ("./disc-image.mjs",),
+        "melee-runtime.mjs": ("./runtime-assets.mjs", "./gameplay_public.js", "./controller-input.mjs"),
+        "runtime-assets.mjs": ("./disc-image.mjs", "./disc-session.mjs"),
+        "disc-session.mjs": ("./disc-image.mjs",),
+        "controller-settings.mjs": ("./prototype-keyboard-layouts.mjs", "./controller-panel.mjs", "./controller-settings.css"),
     }
+    if audio:
+        required_imports.update({
+            "audio-preview-runtime.mjs": ("./melee-runtime.mjs", "./runtime-audio-assets.mjs", "./runtime-audio.mjs", "./gameplay_audio_preview.js"),
+            "runtime-audio-assets.mjs": ("./disc-session.mjs", "./dsp-coefficients.mjs"),
+            "runtime-audio.mjs": ("audio-worklet.js",),
+            "audio-worklet.js": ("./audio-ring.mjs",),
+        })
     for rel, imports in required_imports.items():
         text = files[rel].decode("utf-8")
         for import_path in imports:
             if import_path not in text:
                 raise BuildError(f"runtime graph is missing {import_path} from {rel}")
-    if b"gameplay_public.wasm" not in files["gameplay_public.js"]:
-        raise BuildError("gameplay_public.js does not bind gameplay_public.wasm")
+    wasm_name = loader.removesuffix(".js") + ".wasm"
+    if wasm_name.encode() not in files[loader]:
+        raise BuildError(f"{loader} does not bind {wasm_name}")
     # A runtime data file is only admitted when declared by the producer.  It
     # may be binary, but it cannot be a renamed disc or archive.
     for rel, data in files.items():
@@ -1207,7 +1256,13 @@ def build(
             "melee-runtime.mjs": ROOT / "web" / "melee-runtime.mjs",
             "runtime-assets.mjs": ROOT / "web" / "runtime-assets.mjs",
             "disc-image.mjs": ROOT / "web" / "disc-image.mjs",
+            "disc-session.mjs": ROOT / "web" / "disc-session.mjs",
             "prototype-keyboard-layouts.mjs": ROOT / "web" / "prototype-keyboard-layouts.mjs",
+            "controller-input.mjs": ROOT / "web" / "controller-input.mjs",
+            "controller-panel.mjs": ROOT / "web" / "controller-panel.mjs",
+            "controller-panel.css": ROOT / "web" / "controller-panel.css",
+            "controller-settings.mjs": ROOT / "web" / "controller-settings.mjs",
+            "controller-settings.css": ROOT / "web" / "controller-settings.css",
         }
         for rel, path in source_runtime.items():
             if _is_symlink(path) or not path.is_file():

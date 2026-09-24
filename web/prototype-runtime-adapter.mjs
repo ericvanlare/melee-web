@@ -18,7 +18,7 @@ export function mountPrototypePlayer({root, onStatus = () => {}, onSceneChange =
     if (state.scene !== lastScene) { lastScene = state.scene; onSceneChange(state.scene); }
   };
   // These phases are the existing #status data-phase values, not simulation state.
-  const scenes = {1: 'character-select', 2: 'preparing', 3: 'stage-select', 4: 'preparing', 5: 'preparing', 6: 'closed', 7: 'match'};
+  const scenes = {1: 'character-select', 2: 'preparing', 3: 'stage-select', 4: 'preparing', 5: 'preparing', 6: 'closed', 7: 'match', 8: 'results'};
   function snapshot() {
     const message = $('status')?.textContent.trim() || 'Starting the player…';
     const phase = $('status')?.dataset.phase;
@@ -117,6 +117,14 @@ export function mountPrototypePlayer({root, onStatus = () => {}, onSceneChange =
     setKeyboardLayout(layout) {
       if (!['two', 'boxx'].includes(layout)) throw Error('Unknown keyboard layout.');
       if (!started || disposed) throw Error('Wait for the player before changing controls.');
+      const sharedSettings = frame.contentWindow?.meleeControllerSettings;
+      if (sharedSettings?.setLayout) {
+        // Keep the hidden runtime settings view in sync with the prototype
+        // host. Iframe overrides are explicitly session-only.
+        void sharedSettings.setLayout(layout, {persist: false}).catch(error => fail(error.message));
+        keyboardLayout = layout;
+        return;
+      }
       // Configuration only, on the same main thread as the existing input owner.
       // No frame scheduling or diagnostic PAD injection is involved.
       const setLayout = frame.contentWindow?.Module?._melee_web_input_set_keyboard_layout;

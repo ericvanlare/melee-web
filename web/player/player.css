@@ -31,9 +31,38 @@ html, body {
 
 #runtime-host {
   display: flex;
+  position: relative;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  position: relative;
+}
+#loading-panel {
+  position: absolute;
+  width: min(320px, calc(100% - 32px));
+  padding: 24px;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #111f;
+  color: #eee;
+  text-align: left;
+  pointer-events: none;
+}
+#loading-label {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 500;
+}
+#loading-progress {
+  display: block;
+  width: 100%;
+  height: 8px;
+  accent-color: #ddd;
+}
+#loading-detail {
+  margin: 12px 0 0;
+  color: #aaa;
+  font-size: 12px;
 }
 #canvas {
   display: block;
@@ -42,16 +71,53 @@ html, body {
   object-fit: contain;
   outline: none;
 }
-#toolbar a, #edition { color: #aaa; }
+#toolbar a, #edition, #brand, #audio-note { color: #aaa; }
+#brand { font-weight: 600; letter-spacing: 0.08em; }
 #toolbar a { margin-left: 6px; }
+#brand, #edition { text-align: left; }
+#audio-note { position: relative; display: inline-flex; align-items: center; gap: 2px; }
+#audio-info { padding: 0 3px; color: #aaa; background: transparent; border: 0; }
+#audio-details { display: none; position: absolute; z-index: 1; right: 0; bottom: calc(100% + 8px); width: min(320px, calc(100vw - 24px)); padding: 8px 10px; color: #000; background: #fff; border: 1px solid #888; border-radius: 2px; box-shadow: 0 2px 8px #0008; }
+#audio-info:hover + #audio-details, #audio-info:focus-visible + #audio-details, #audio-details.audio-details-open { display: block; }
+
+#idle-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 8%;
+  max-width: min(90%, 420px);
+  margin: 0;
+  padding: 8px 12px;
+  transform: translateX(-50%);
+  color: #fff;
+  background: #000b;
+  border: 1px solid #888;
+  border-radius: 3px;
+  text-align: center;
+  line-height: 1.4;
+  pointer-events: none;
+}
 
 #toolbar {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   padding: 8px;
+}
+
+#toolbar-brand, #toolbar-actions, #toolbar-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+#toolbar-brand { justify-content: flex-end; }
+#toolbar-meta { justify-content: flex-start; }
+
+@media (max-width: 1100px) {
+  #toolbar-brand, #toolbar-actions, #toolbar-meta { width: 100%; flex: 0 0 100%; justify-content: center; }
+  #toolbar-actions { flex-wrap: wrap; }
 }
 
 button {
@@ -83,7 +149,7 @@ progress {
 }
 
 dialog {
-  width: min(420px, calc(100% - 24px));
+  width: min(520px, calc(100% - 24px));
   max-height: calc(100dvh - 24px);
   overflow: auto;
   padding: 16px;
@@ -94,34 +160,6 @@ dialog {
 
 dialog::backdrop {
   background: #0009;
-}
-
-.keyboard-options {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-  margin-bottom: 14px;
-}
-
-table {
-  border-collapse: collapse;
-  width: 100%;
-  font-size: 12px;
-  text-align: left;
-}
-
-th, td {
-  padding: 6px;
-  border-bottom: 1px solid #ddd;
-}
-
-th {
-  font-weight: 500;
-}
-
-#controllers {
-  padding-left: 18px;
-  overflow-wrap: anywhere;
 }
 
 #error {

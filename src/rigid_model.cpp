@@ -159,23 +159,39 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
             continue;
         }
         if (color) {
-            // The original native PObj path consumes all six GX packed direct
-            // color encodings. RGB565/RGB8/RGBX8 carry GX_CLR_RGB while
-            // RGBA4/RGBA6/RGBA8 carry GX_CLR_RGBA. These bytes live in the
-            // display list, so no host vertex array is fabricated. Viewer
+            // The original native PObj path consumes all six GX packed color
+            // encodings. RGB565/RGB8/RGBX8 carry GX_CLR_RGB while
+            // RGBA4/RGBA6/RGBA8 carry GX_CLR_RGBA. Direct values live in the
+            // display list; indexed values use a packed color array. Viewer
             // imports retain the narrower direct RGBA8 contract.
             static constexpr uint32_t packed_widths[] = {2, 3, 4, 2, 3, 4};
-            const bool native_packed = policy == DatMaterialPolicy::NativeDescriptors &&
-                type < std::size(packed_widths) && count == (type >= 3 ? 1u : 0u);
-            const bool viewer_rgba8 = type == 5 && count == 1;
-            const uint32_t packed_width = type < std::size(packed_widths)
-                ? packed_widths[type] : 0;
-            if (mode != direct || (!native_packed && !viewer_rgba8) || frac != 0 ||
-                (stride != 0 && stride != packed_width && stride != 4))
-                reject("Only supported direct vertex color formats are accepted");
-            absent(a, d + 20, "Direct vertex colors cannot reference a vertex array");
+            if (type >= std::size(packed_widths) || count > 1 || frac != 0)
+                reject("Unsupported packed color component descriptor");
+            const uint32_t packed_width = packed_widths[type];
+            if (mode == direct) {
+                const bool native_packed = policy == DatMaterialPolicy::NativeDescriptors &&
+                    count == (type >= 3 ? 1u : 0u);
+                const bool viewer_rgba8 = type == 5 && count == 1;
+                if ((!native_packed && !viewer_rgba8) ||
+                    (stride != 0 && stride != packed_width && stride != 4))
+                    reject("Unsupported direct packed color descriptor");
+                absent(a, d + 20, "Direct vertex colors cannot reference a vertex array");
+                widths[i] = packed_width;
+                mesh.attributes.push_back({attr, mode, count, type, frac, stride, nullptr, 0});
+                continue;
+            }
+            if (policy != DatMaterialPolicy::NativeDescriptors ||
+                (mode != index8 && mode != index16))
+                reject("Indexed packed colors require the original native PObj path");
+            components[i] = 0; // Packed colors are not scalar geometry bounds.
             widths[i] = packed_width;
-            mesh.attributes.push_back({attr, mode, count, type, frac, stride, nullptr, 0});
+            if (stride < packed_width || stride > 255)
+                reject("Indexed packed color stride is out of range");
+            auto array = a.pointer(d + 20, packed_width);
+            if (!array) reject("Indexed packed color array pointer is null");
+            array_offsets[i] = *array;
+            mesh.attributes.push_back({attr, mode, count, type, frac, stride,
+                                       a.range(*array, packed_width).data(), 0});
             continue;
         }
         if (mode != index8 && mode != index16) reject("Only indexed vertex attributes are supported");
@@ -340,15 +356,19 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
                 reject("Nonzero commands after display-list padding");
             break;
         }
-        if (opcode != 0x80 && opcode != 0x90 && opcode != 0x98 && opcode != 0xA0)
-            reject("Unsupported display command or vertex format; only VAT0 surface primitives are accepted");
+        const bool native_line_or_point = policy == DatMaterialPolicy::NativeDescriptors &&
+            (opcode == 0xA8 || opcode == 0xB0 || opcode == 0xB8);
+        if (opcode != 0x80 && opcode != 0x90 && opcode != 0x98 && opcode != 0xA0 && !native_line_or_point)
+            reject("Unsupported display command or vertex format; expected an owned VAT0 primitive");
         if (bytes.size() - cursor < 2) reject("Truncated display primitive header");
         const auto count = uint32_t(bytes[cursor]) * 256 + bytes[cursor + 1];
         cursor += 2;
         if ((opcode == 0x80 && (count < 4 || count % 4)) ||
             (opcode == 0x90 && (count < 3 || count % 3)) ||
-            ((opcode == 0x98 || opcode == 0xA0) && count < 3))
-            reject("Invalid vertex count for surface primitive");
+            ((opcode == 0x98 || opcode == 0xA0) && count < 3) ||
+            (opcode == 0xA8 && (count < 2 || count % 2)) ||
+            (opcode == 0xB0 && count < 2) || (opcode == 0xB8 && count < 1))
+            reject("Invalid vertex count for primitive");
         if (++model.draw_packets > max_packets || count > max_vertices - model.submitted_vertices)
             reject("Model exceeds primitive or vertex budget");
         model.submitted_vertices += count;

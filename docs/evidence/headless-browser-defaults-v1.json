@@ -1,0 +1,380 @@
+{
+  "schema": "melee-web-headless-browser-defaults-v1",
+  "evidence_label": "Browser exercised",
+  "recorded_date_utc": "2026-09-24",
+  "implementation_commit": "ae9fa76089aad33cc6c434b493851c25563ea901",
+  "runtime_and_initial_harness_commit": "a093a7cbcbff890a45f154674822c72415b36db1",
+  "scope": "Routine browser utility, startup readiness and lack of observed desktop interruption on this machine; no gameplay admission or performance/equivalence claim.",
+  "machine": {
+    "os": "macOS 26.6",
+    "architecture": "arm64",
+    "model": "Mac16,10",
+    "browser": "153.0.8010.54",
+    "playwright": "1.62.1",
+    "gpu": {
+      "vendor": "apple",
+      "architecture": "metal-3",
+      "device": "",
+      "description": "",
+      "isFallbackAdapter": false,
+      "subgroupMinSize": 32,
+      "subgroupMaxSize": 32
+    }
+  },
+  "package": {
+    "schema": "melee-web-audio-player-package-v1",
+    "profile": "audio-player",
+    "source_sha": "a093a7cbcbff890a45f154674822c72415b36db1",
+    "runtime_hash": "d4dde78feedb9974",
+    "identity_sha256": "9c17fac1c1fbd45fc4ae48c8a4138f3983476c968a362080729a83b5a696b36e"
+  },
+  "checks": [
+    {
+      "scenario": "capabilities",
+      "result": "pass",
+      "scope": "Synthetic real-HTTP WebGPU readback/resize, input, files, downloads, diagnostics and screenshots",
+      "asserted_checks": 8,
+      "report": "work/headless-implementation/capabilities/report.json"
+    },
+    {
+      "scenario": "public-smoke",
+      "result": "pass",
+      "scope": "First enabled Import through original CSS and teardown; no cache preflight workaround",
+      "asserted_checks": 4,
+      "report": "work/headless-implementation/public-smoke/report.json"
+    },
+    {
+      "scenario": "public-player",
+      "result": "pass",
+      "scope": "Packaged public entry, source menus, controls, invalid-disc recovery, Eject/reimport and privacy",
+      "asserted_checks": 10,
+      "report": "work/headless-implementation/public-player/report.json"
+    },
+    {
+      "scenario": "audio-player",
+      "result": "pass",
+      "scope": "Nonzero 32 kHz PCM through CSS/SSS, Mario/FD, No Contest, second entry and teardown",
+      "asserted_checks": 11,
+      "report": "work/headless-implementation/audio-player/report.json"
+    },
+    {
+      "scenario": "mewtwo",
+      "result": "pass",
+      "scope": "Original CSS selection, SSS cancellation, Confusion capture/release and unload",
+      "asserted_checks": 5,
+      "report": "work/headless-implementation/mewtwo/report.json"
+    },
+    {
+      "scenario": "public-resize",
+      "result": "pass",
+      "scope": "Viewport/framebuffer resizing before initial Import readiness, after readiness and with controls open",
+      "asserted_checks": null,
+      "report": "work/headless-implementation/public-resize/report.json"
+    },
+    {
+      "scenario": "controller-native",
+      "result": "pass",
+      "scope": "Authored Gamepad values through real Wasm/Aurora PAD",
+      "asserted_checks": 9,
+      "report": "work/headless-implementation/controller-native/report.json"
+    },
+    {
+      "scenario": "controller-suggestion",
+      "result": "pass",
+      "scope": "Suggested mapping, live input, correction, swap, persistence and restore",
+      "asserted_checks": null,
+      "report": "work/headless-implementation/controller-suggestion/report.json"
+    },
+    {
+      "scenario": "controller-setup",
+      "result": "pass",
+      "scope": "All 18 wizard steps with authored hat inputs",
+      "asserted_checks": null,
+      "report": "work/headless-implementation/controller-setup/report.json"
+    },
+    {
+      "scenario": "controller-setup-signed",
+      "result": "pass",
+      "scope": "All 18 wizard steps with authored signed-axis D-pad inputs",
+      "asserted_checks": null,
+      "report": "work/headless-implementation/controller-setup-signed/report.json"
+    },
+    {
+      "scenario": "controller-development",
+      "result": "pass",
+      "scope": "Shared controller settings in the development player",
+      "asserted_checks": null,
+      "report": "work/headless-implementation/controller-development/report.json"
+    },
+    {
+      "scenario": "controller-public",
+      "result": "pass",
+      "scope": "Shared controller settings in the packaged public player",
+      "asserted_checks": null,
+      "report": "work/headless-implementation/controller-public/report.json"
+    },
+    {
+      "scenario": "public-shell",
+      "result": "pass",
+      "scope": "Maintenance shell, layout/fullscreen DOM, headers/CSP and privacy",
+      "asserted_checks": 7,
+      "report": "work/headless-implementation/public-shell/report.json"
+    },
+    {
+      "scenario": "prototype-browser-v2",
+      "result": "pass",
+      "scope": "Prototype startup, keyboard layouts, invalid-disc recovery, responsive layout and fullscreen DOM; no owned disc",
+      "asserted_checks": 7,
+      "report": "work/headless-implementation/prototype-browser-v2/report.json"
+    }
+  ],
+  "unit_suite": {
+    "result": "pass",
+    "tests": 1166,
+    "seconds": 187.543,
+    "skipped": 83,
+    "log": "work/headless-implementation/full-suite-v2.log"
+  },
+  "additional_checks": [
+    "Shared launch option/default resolution",
+    "Real HTTP/browser driver including smoke-command failure paths",
+    "Foreground guards and explicit opt-in argument validation without opening a headed window",
+    "17 runtime/scoped-owner tests and replay lifecycle including invalid cache-state rejection",
+    "Release development/audio runtime builds, native controller probe, production audio packaging and audit",
+    "Staged repository-content guard"
+  ],
+  "macos_ui_observation": {
+    "completed": true,
+    "samples": 1376,
+    "activationEvents": 0,
+    "frontmostSamples": 0,
+    "onScreenWindowObservations": [],
+    "windowListAvailable": true
+  },
+  "retained_failures": [
+    {
+      "artifact": "work/headless-implementation/prototype-browser/report.json",
+      "boundary": "Stale prototype expectation of four fighters and four stages; source inventory is seventeen/seven. Corrected assertion passes in prototype-browser-v2."
+    },
+    {
+      "artifact": "work/headless-implementation/package-audio.log",
+      "boundary": "Expected clean-source packaging guard rejected uncommitted source. Committed source then packaged/audited successfully; no bypass."
+    },
+    {
+      "artifact": "work/headless-implementation/replay-lifecycle.log",
+      "boundary": "New invalid-state fixture also injected an unrelated optional-cache failure callback. Corrected fixture isolates invalid state and passes in replay-lifecycle-v2.log."
+    }
+  ],
+  "previous_investigation": "docs/evidence/headless-browser-compatibility-v1.json",
+  "notes": [
+    "Audio report first check retains the old headed wording; browser_mode and launch are headless. The check label is corrected in the final harness without changing assertions.",
+    "Only test expectations/report wording/startup-resize coverage changed after the packaged runtime commit. Runtime and package bytes are bound separately.",
+    "Screenshots were inspected locally. No game images or owned inputs are published.",
+    "Foreground opt-in was checked through arguments/launch options; no new headed browser was opened.",
+    "The macOS observation concerns the owned regression browser process during this run, not all applications or every possible transient window."
+  ],
+  "open_gates": [
+    "Visible cold/warm timing and performance",
+    "Operating-system focus/fullscreen presentation",
+    "Physical controllers and hardware latency",
+    "Audible speaker output and original PCM fidelity",
+    "Original-game state/pixel equivalence and full gameplay admission"
+  ],
+  "artifacts": [
+    {
+      "path": "work/headless-implementation/capabilities/report.json",
+      "bytes": 6196,
+      "sha256": "45d21038e9ce4762acb67c58c26529477b46af8b106cc70a6970caa7c46fd052"
+    },
+    {
+      "path": "work/headless-implementation/public-smoke/report.json",
+      "bytes": 1238,
+      "sha256": "bc8b1a8848034a2c2f34b3e5e0b8a9ad03d0859f4d81fe939e27fd84af159b88"
+    },
+    {
+      "path": "work/headless-implementation/public-player/report.json",
+      "bytes": 13565,
+      "sha256": "fccf9986fda2d961e3cba1e77ffea7ddb8a9e820dfab558b14eb0257e8ed8f05"
+    },
+    {
+      "path": "work/headless-implementation/audio-player/report.json",
+      "bytes": 14521,
+      "sha256": "4d2d4c1b349edb549b2b8e87a4be22f3da493de03272325dfc0821ae088250ea"
+    },
+    {
+      "path": "work/headless-implementation/mewtwo/report.json",
+      "bytes": 12470,
+      "sha256": "991b3f5e308800c5c15a2a24b2b6ed13eeccc8e5e2cea26a04dcea652539097b"
+    },
+    {
+      "path": "work/headless-implementation/public-resize/report.json",
+      "bytes": 2989,
+      "sha256": "5a8764e5a3abebc08d549f96bede8cfc38a90d9d3532a5188b03aacc761251ab"
+    },
+    {
+      "path": "work/headless-implementation/controller-native/report.json",
+      "bytes": 880,
+      "sha256": "fbefaec04686f8b549e1f78a1d5747b558d086bf059bb0c4030b0a80b68566e8"
+    },
+    {
+      "path": "work/headless-implementation/controller-suggestion/report.json",
+      "bytes": 237,
+      "sha256": "11af8971cb2b735a52a33020fe31798884279ba3508e8b082b151befba46e7b7"
+    },
+    {
+      "path": "work/headless-implementation/controller-setup/report.json",
+      "bytes": 239,
+      "sha256": "dc2be28ab0a4a07168d271a92e11424ff949d295fca9afb8125a20673d3f162b"
+    },
+    {
+      "path": "work/headless-implementation/controller-setup-signed/report.json",
+      "bytes": 233,
+      "sha256": "44adb2e850e7b6f65b07e2b3eb314fbee135d832d81e6f003128a7cf2535ed6b"
+    },
+    {
+      "path": "work/headless-implementation/controller-development/report.json",
+      "bytes": 325,
+      "sha256": "de3466d16d08f7cbc7bc50aee6ab28fed40967cadccbcdaa695aa0b47e8c2747"
+    },
+    {
+      "path": "work/headless-implementation/controller-public/report.json",
+      "bytes": 320,
+      "sha256": "c48bc50c79a37cfb26ecfb125e19f2329e44ea1fb862737815d30bcb8be9b8cb"
+    },
+    {
+      "path": "work/headless-implementation/public-shell/report.json",
+      "bytes": 1909,
+      "sha256": "b6f163623fd70c55ff77930454363b1a815b9aba2ff3085a18332b1191451e1b"
+    },
+    {
+      "path": "work/headless-implementation/prototype-browser-v2/report.json",
+      "bytes": 701,
+      "sha256": "d64b8786106187c1eb8ac6b9b8020ee7832a07a8ccefb7a6ea1fd3ace93dfa3f"
+    },
+    {
+      "path": "work/headless-implementation/bootstrap.log",
+      "bytes": 1787,
+      "sha256": "9f983fb1679c53340fbd3186b14f959a10b4a884ceb0ffc3d37c4405e316550e"
+    },
+    {
+      "path": "work/headless-implementation/build-development.log",
+      "bytes": 766412,
+      "sha256": "2175d024eb493f4fb2ce1c853f5e1e7c2971ca606823883242fa5b1eb41174d6"
+    },
+    {
+      "path": "work/headless-implementation/build-development-final.log",
+      "bytes": 11535,
+      "sha256": "e2c91ed505cb5b3162097c531080e77b421e92155272b3e7ae896d79f66c11e3"
+    },
+    {
+      "path": "work/headless-implementation/build-audio.log",
+      "bytes": 803669,
+      "sha256": "e0dc6024eed01c711c64b813489e64a12be0b2253263ea51c89289c4e89e1231"
+    },
+    {
+      "path": "work/headless-implementation/build-audio-final.log",
+      "bytes": 11788,
+      "sha256": "a5e74cf822c76d50cacee50623c77be487093646c4fc98af475aaa3479370dff"
+    },
+    {
+      "path": "work/headless-implementation/build-controller.log",
+      "bytes": 10861,
+      "sha256": "47971d5678dbcc52ccac4d7d67443f25eacbab59f293140e707b6c6e8c9d41c6"
+    },
+    {
+      "path": "work/headless-implementation/package-audio-v1.log",
+      "bytes": 558,
+      "sha256": "21432985b5fa97d2850da9dbd00b652a9553a98b3a5347dae8e937b003a1c6e3"
+    },
+    {
+      "path": "work/headless-implementation/package-maintenance.log",
+      "bytes": 130,
+      "sha256": "e863537e5ea05a409b712b743228eccae355357077c22e65a24b68da36ba1273"
+    },
+    {
+      "path": "work/headless-implementation/prepare-prototype.log",
+      "bytes": 319,
+      "sha256": "ae49d84dfc19fdbd2ce6eb114613a037eddd6a9c7784fc3677545b6714b44690"
+    },
+    {
+      "path": "work/headless-implementation/foreground-guards.log",
+      "bytes": 87,
+      "sha256": "a4107f430f61726aea0e471ee845bba0439c21e4742513a116aee06b3b4ad8d8"
+    },
+    {
+      "path": "work/headless-implementation/browser-tools.log",
+      "bytes": 63,
+      "sha256": "cf9100cede112cfdc82f155f4ab6dc60a04a4d46f584030834fc6c53aa017c2d"
+    },
+    {
+      "path": "work/headless-implementation/runtime-owner-final.log",
+      "bytes": 3015,
+      "sha256": "a4cfe6bd516aae6f16591980145631e2deee52b69267fc336ae1f15bfeeeba5f"
+    },
+    {
+      "path": "work/headless-implementation/replay-lifecycle-v2.log",
+      "bytes": 99,
+      "sha256": "8b0e2bf7e977057d297114f748375dac6ce6c1c70120f8bd4284958d650f1158"
+    },
+    {
+      "path": "work/headless-implementation/full-suite-v2.log",
+      "bytes": 207450,
+      "sha256": "48e938164b49f139143cb711f43b3c6ef9100100207df68ac1ed1a77afc39775"
+    },
+    {
+      "path": "work/headless-implementation/content-guard-v2.log",
+      "bytes": 70,
+      "sha256": "e7ca84cb0387eb86319387ee4e598e5fdcdf1b650319c399527fbef0c39d2df4"
+    },
+    {
+      "path": "work/headless-implementation/development-build-sha256.json",
+      "bytes": 2333,
+      "sha256": "0995d09ab972029dd034ba2d4213bc1a86a21a01f11ff5c2676a9120d8865511"
+    },
+    {
+      "path": "work/headless-implementation/macos-ui-observation.json",
+      "bytes": 193,
+      "sha256": "df3d201f8925c6cb33e684bcf64394e1bb9bd7f9faa301a2aac001e5b293ac5f"
+    },
+    {
+      "path": "work/headless-implementation/regression-with-ui-monitor.mjs",
+      "bytes": 6823,
+      "sha256": "8560219034e38d4c5c6d3ec848acf11c65e82ea90c4795420b818a1c3a4795d9"
+    },
+    {
+      "path": "work/headless-implementation/audio-site-v1.manifest.json",
+      "bytes": 5900,
+      "sha256": "fdd4613b807f9c1f2016409f94b323fc0119b051867def574de2f8c63ff4fa9e"
+    },
+    {
+      "path": "work/browser-policy-headless-run1/browser-driver-real-http.log",
+      "bytes": 142,
+      "sha256": "0ae787208331befb0d3bc5eebef383786c11c2699022891586b4ea68315b408c"
+    },
+    {
+      "path": "work/browser-policy-headless-run1/browser-driver-unit.log",
+      "bytes": 356,
+      "sha256": "ef1a6ce1b8fc9aeb55f75001d623a87093ea0f90d6f8577d4db41e9e0a8acd54"
+    },
+    {
+      "path": "work/headless-validation/watch_browser_ui.m",
+      "bytes": 2581,
+      "sha256": "0846b6229e12d41071bfcae6136006e6bfac4fc92429500ac77e014a9054d849"
+    },
+    {
+      "path": "work/headless-implementation/prototype-browser/report.json",
+      "bytes": 2029,
+      "sha256": "5703b6037133efbd6042d61fc93719377d1c8bf55b36cb5e60b1c6443bff31cb"
+    },
+    {
+      "path": "work/headless-implementation/package-audio.log",
+      "bytes": 1381,
+      "sha256": "214e1194faeec969894991041f52e698aa4847bd65dbd666c114083082cbde8b"
+    },
+    {
+      "path": "work/headless-implementation/replay-lifecycle.log",
+      "bytes": 633,
+      "sha256": "4a6a5e26cea9287bfd5ae31710055a3abb00d9ab284e2ee353e09ec5fe7e3dcb"
+    }
+  ]
+}

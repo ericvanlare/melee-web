@@ -36,6 +36,12 @@ static void intro_finished(int unused)
 }
 MeleeWebHud* melee_web_hud_begin(unsigned layout, char* error, size_t size)
 {
+    return melee_web_hud_begin_with_music(layout, NULL, NULL, error, size);
+}
+MeleeWebHud* melee_web_hud_begin_with_music(unsigned layout,
+    int (*prepare_music)(void*, char*, size_t), void* context,
+    char* error, size_t size)
+{
     const uint64_t generation = melee_web_gameplay_stats().generation;
     if (owner || !generation || layout < 1 || layout > 6 || !Player_GetEntity(0) || !Player_GetEntity(1)) {
         fail(error, size, "Original HUD requires the owned two-player match");
@@ -63,6 +69,10 @@ MeleeWebHud* melee_web_hud_begin(unsigned layout, char* error, size_t size)
         return NULL;
     }
     hud->flash_owned = 1;
+    if (prepare_music && !prepare_music(context, error, size)) {
+        melee_web_hud_end(hud, NULL, 0);
+        return NULL;
+    }
     ifStatus_802F6EA4(3, -1, -1, 0, (Event) fn_8016B7B4,
                     (Event) intro_finished);
     ifTime_CreateTimers();

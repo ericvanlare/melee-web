@@ -3,6 +3,7 @@
 import copy
 import importlib.util
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -14,6 +15,10 @@ ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location("bootstrap", ROOT / "scripts/bootstrap.py")
 bootstrap = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(bootstrap)
+sys.path.insert(0, str(ROOT / "scripts"))
+import build_reference_dolphin
+sys.path.insert(0, str(ROOT / "tools"))
+import reference_capture_environment
 
 
 def git(path, *arguments):
@@ -90,6 +95,63 @@ class RepositoryTests(unittest.TestCase):
         self.assertEqual(bootstrap.patch_state(self.repo, self.patch), "applied")
         self.assertEqual((self.repo / ".git/index").read_bytes(), index)
         self.assertEqual(git(self.repo, "diff", "--cached"), "")
+
+    def prepare_patch_upgrade(self):
+        bootstrap.apply_patch(self.repo, self.patch)
+        git(self.repo, "add", "alpha.txt")
+        previous = git(self.repo, "write-tree")
+        git(self.repo, "reset", "--mixed", "--quiet", "HEAD")
+        (self.repo / "alpha.txt").write_text("updated reviewed patch\n")
+        self.patch.write_text(git(self.repo, "diff", "--binary") + "\n")
+        (self.repo / "alpha.txt").write_text("patched\n")
+        return previous
+
+    def test_recognized_patch_upgrade_preserves_index_and_unchanged_file_timestamps(self):
+        previous = self.prepare_patch_upgrade()
+        steady = self.repo / "other.txt"
+        os.utime(steady, ns=(1_000_000_000, 1_000_000_000))
+        index = (self.repo / ".git/index").read_bytes()
+        bootstrap.apply_patch(self.repo, self.patch, previous_tree=previous)
+        self.assertEqual((self.repo / "alpha.txt").read_text(), "updated reviewed patch\n")
+        self.assertEqual(steady.stat().st_mtime_ns, 1_000_000_000)
+        self.assertEqual(bootstrap.patch_state(self.repo, self.patch), "applied")
+        self.assertEqual((self.repo / ".git/index").read_bytes(), index)
+        changed_mtime = (self.repo / "alpha.txt").stat().st_mtime_ns
+        bootstrap.apply_patch(self.repo, self.patch, previous_tree=previous)
+        self.assertEqual((self.repo / "alpha.txt").stat().st_mtime_ns, changed_mtime)
+
+    def test_upgrade_requires_the_exact_recognized_previous_tree(self):
+        self.prepare_patch_upgrade()
+        before = git(self.repo, "diff", "--binary")
+        for previous in (None, "0" * 40):
+            with self.subTest(previous=previous), self.assertRaisesRegex(ValueError, "changes differ"):
+                bootstrap.apply_patch(self.repo, self.patch, previous_tree=previous)
+            self.assertEqual(git(self.repo, "diff", "--binary"), before)
+
+    def test_upgrade_refuses_unrelated_edits_without_changing_any_file(self):
+        previous = self.prepare_patch_upgrade()
+        (self.repo / "other.txt").write_text("unrelated local work\n")
+        before = git(self.repo, "diff", "--binary")
+        index = (self.repo / ".git/index").read_bytes()
+        with self.assertRaisesRegex(ValueError, "changes differ"):
+            bootstrap.apply_patch(self.repo, self.patch, previous_tree=previous)
+        self.assertEqual(git(self.repo, "diff", "--binary"), before)
+        self.assertEqual((self.repo / ".git/index").read_bytes(), index)
+
+    def test_upgrade_refuses_untracked_and_staged_work(self):
+        previous = self.prepare_patch_upgrade()
+        notes = self.repo / "notes.txt"
+        notes.write_text("keep these notes\n")
+        before = git(self.repo, "diff", "--binary")
+        with self.assertRaisesRegex(ValueError, "changes differ"):
+            bootstrap.apply_patch(self.repo, self.patch, previous_tree=previous)
+        git(self.repo, "add", "notes.txt")
+        index = (self.repo / ".git/index").read_bytes()
+        with self.assertRaisesRegex(ValueError, "staged changes"):
+            bootstrap.apply_patch(self.repo, self.patch, previous_tree=previous)
+        self.assertEqual(git(self.repo, "diff", "--binary"), before)
+        self.assertEqual(notes.read_text(), "keep these notes\n")
+        self.assertEqual((self.repo / ".git/index").read_bytes(), index)
 
     def test_refuses_patch_with_unrelated_local_change(self):
         bootstrap.apply_patch(self.repo, self.patch)
@@ -177,6 +239,26 @@ class LockTests(unittest.TestCase):
         for lock in invalid:
             with self.subTest(lock=lock), self.assertRaises(ValueError):
                 self.read(lock)
+
+    def test_dolphin_source_pin_is_explicit_and_matches_consumers(self):
+        dolphin = self.lock["reference_tools"]["dolphin"]
+        self.assertEqual(dolphin["kind"], "source")
+        self.assertNotIn("package", dolphin)
+        self.assertEqual(dolphin["commit"], build_reference_dolphin.PINNED_COMMIT)
+        self.assertEqual(dolphin["commit"], reference_capture_environment.DOLPHIN_REVISION)
+        self.assertEqual(self.read(self.lock), self.lock)
+
+    def test_rejects_unpinned_dolphin_source_commit(self):
+        lock = copy.deepcopy(self.lock)
+        lock["reference_tools"]["dolphin"]["commit"] = "main"
+        with self.assertRaisesRegex(ValueError, "reference tool commit"):
+            self.read(lock)
+
+    def test_rejects_unknown_reference_tool_kind(self):
+        lock = copy.deepcopy(self.lock)
+        lock["reference_tools"]["dolphin"]["kind"] = "binary"
+        with self.assertRaisesRegex(ValueError, "unsupported reference tool kind"):
+            self.read(lock)
 
     def test_invalid_build_jobs_fail_before_accessing_dependencies(self):
         for jobs in ("0", "-1", "invalid"):

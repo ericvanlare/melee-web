@@ -9,11 +9,12 @@ const artifacts=Object.fromEntries(BUILD_ARTIFACTS.map(name=>[name,hash(name)]))
 const profile={schema:'melee-web-hitch-browser-profile',version:1,artifacts,
   harness_artifacts:Object.fromEntries(HARNESS_ARTIFACTS.map(name=>[name,hash(name)]))};
 const manifest=BUILD_ARTIFACTS.map(name=>({path:path.resolve('frozen-build',name),sha256:artifacts[name]}));
-assert.equal(BUILD_ARTIFACTS.length,18);
-assert.equal(new Set(BUILD_ARTIFACTS).size,18);
-for (const name of ['runtime-development.mjs','melee-runtime.mjs','runtime-audio-assets.mjs','runtime-audio.mjs'])
+assert.equal(BUILD_ARTIFACTS.length,25);
+assert.equal(new Set(BUILD_ARTIFACTS).size,25);
+for (const name of ['disc-session.mjs','runtime-development.mjs','melee-runtime.mjs','runtime-audio-assets.mjs','runtime-audio.mjs','controller-input.mjs','controller-panel.mjs','controller-panel.css','controller-settings.mjs','controller-settings.css','prototype-keyboard-layouts.mjs'])
   assert(BUILD_ARTIFACTS.includes(name), `Extracted executable input must be frozen: ${name}`);
 assert(HARNESS_ARTIFACTS.includes('tools/browser_build_artifacts.json'));
+assert(HARNESS_ARTIFACTS.includes('scripts/browser_driver.mjs'));
 validateFrozenBuildProfile(profile,manifest);
 validateFrozenBuildProfile(profile,[...manifest].reverse());
 
@@ -58,7 +59,7 @@ try {
   };
   const machine={...profile,url:'http://127.0.0.1/runtime.html'};
   const observed=await verifyServedArtifacts(machine);
-  assert.equal(requests,18);
+  assert.equal(requests,25);
   for(const name of BUILD_ARTIFACTS)
     assert.deepEqual(observed[name],{sha256:hash(name),bytes:Buffer.byteLength(name)});
   globalThis.fetch=async()=>new Response('wrong executable');

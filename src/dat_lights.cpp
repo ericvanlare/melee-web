@@ -41,7 +41,8 @@ std::optional<uint8_t> read_dat_light_override(const DatArchive& a,uint32_t ligh
     }
     return std::nullopt;
 }
-DatLights::DatLights(const DatArchive& a,const std::string& symbol) {
+DatLights::DatLights(const DatArchive& a,const std::string& symbol,
+                     bool retain_animation_tables) {
     auto root=std::find_if(a.public_symbols().begin(),a.public_symbols().end(),
                          [&](const auto& s){return s.name==symbol;});
     if(root==a.public_symbols().end()) throw DatError("Stage light public symbol is missing");
@@ -56,7 +57,10 @@ DatLights::DatLights(const DatArchive& a,const std::string& symbol) {
         if(!list) {if(lights.empty()) throw DatError("Original light loader requires a nonempty light list"); return;}
         if(i==64) throw DatError("Stage light list exceeds resource budget");
         region(a,*list,8);
-        if(a.pointer(*list+4)) throw DatError("Stage light animation is unsupported");
+        auto animation_table = a.pointer(*list + 4, 4);
+        if(animation_table && !retain_animation_tables)
+            throw DatError("Stage light animation is unsupported");
+        if(animation_table) region(a, *animation_table, 4);
         auto d=a.pointer(*list,28); if(!d) throw DatError("Stage light descriptor is null");
         region(a,*d,28);
         if(!seen.insert(*d).second) throw DatError("Stage light list repeats a descriptor");
@@ -69,7 +73,7 @@ DatLights::DatLights(const DatArchive& a,const std::string& symbol) {
         if((out.flags&3)==1&&!out.has_position) throw DatError("Infinite stage light requires a position");
         auto shininess=a.pointer(*d+24,4);out.has_shininess=shininess.has_value();
         if(shininess){region(a,*shininess,4);out.shininess=finite(a,*shininess);}
-        lights.push_back(out);
+        lights.push_back(out); animation_tables.push_back(animation_table);
     }
 }
 }

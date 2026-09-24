@@ -50,11 +50,13 @@ continuing. It never retries an occupied slot. Reaching the fixed bound with no
 reproduction leaves the previous red open. Further experiments require a new,
 explained plan referencing the old failures; they cannot replace its results.
 
-The plan binds the development allowlist, exact recipes, frame counts, previous
+The plan binds the declared split role, allowlist, exact recipes, frame counts, previous
 red reports, executable build artifacts, browser/machine profile and runner.
 Every saved report/trace/terminal snapshot has an independently rechecked digest.
-The allowlist is declared from the development split; neither holdout is read
-or executed. A named target alone is insufficient evidence of its split role.
+Development plans use the development split and cannot execute holdout targets.
+A named target alone is insufficient evidence of its split role. The approved
+holdout protocol below uses a separate explicit role and preserves historical
+failed records as context.
 
 New captures require a newly frozen browser profile with the complete shared
 inventory in `tools/browser_build_artifacts.json`, including that inventory's
@@ -72,18 +74,22 @@ installation or browser download is required when using installed Chrome.
 Keep all local specs, profiles, recordings and disc paths under ignored `work/`.
 The initial automatic machine-profile collector uses macOS system tools; its
 recorded configuration must be extended explicitly for another host platform.
+Both commands require `--headed` because this protocol opens and focuses a
+desktop browser. Arrange a foreground session with the user or run on a
+separate test machine; routine functional checks use the headless harnesses in
+[Developer entry](DEVELOPMENT.md). Missing opt-in fails before capture work.
 
 1. Finish builds and tests. Start `scripts/serve.py` on loopback for the Release
    directory. Stop reference captures and profiling tools before unprofiled runs.
-2. Use `node scripts/run_hitch_matrix.mjs profile --out PROFILE --build BUILD
+2. Use `node scripts/run_hitch_matrix.mjs profile --headed --out PROFILE --build BUILD
    --browser-profile OWNED_PROFILE --url URL` to record the installed browser,
    ordinary scheduling settings, machine/power/display, renderer dimensions,
    artifact hashes and runner identity. This opens and closes an owned blank
    browser; it does not execute a replay.
-3. Create a local spec with only verified development recipes and the experiment's
+3. Create a local spec with verified recipes of the declared role and the experiment's
    predeclared slots; use `python scripts/hitch_capture.py plan --spec SPEC --output
    PLAN`. Review the generated plan before execution.
-4. Run `node scripts/run_hitch_matrix.mjs run --plan PLAN --disc DISC`. The driver
+4. Run `node scripts/run_hitch_matrix.mjs run --headed --plan PLAN --disc DISC`. The driver
    uses the ordinary file picker, replay selector and start button. It creates
    a separate headed browser profile, disables Playwright's focus emulation,
    keeps audio enabled and ordinary browser scheduling, and closes its browser
@@ -144,6 +150,37 @@ Classification never changes a failing measurement into a passing run.
 Both fresh holdouts stay closed until that review is complete. Then freeze the
 candidate build, seed, inputs and acceptance protocol and execute the holdouts.
 Failures become development regressions and require future replacement holdouts.
+
+### Approved current-runtime scope — 2026-09-19
+
+The project owner approved the scoped proposal in
+[the current development evidence](DEVELOPMENT_TIMING_20260919.md#remaining-acceptance-decision).
+For issue #33, the September 12 failure remains measured, failed and causally
+unassigned because its original trace lacks operation/client identity. It is
+retired as a blocker for this explicitly separate current-runtime holdout
+evaluation; it is not classified as external scheduling or declared fixed.
+
+Freeze the PR #38 runtime and seed already used for the completed development
+inventory before either reserved holdout is executed. Preserve their original
+held-out roles and source identities. Evaluate each holdout once under a fixed
+protocol, keeping original-reference/state work separate from unprofiled timing.
+All existing hard thresholds and source-accuracy rules remain unchanged. Retain
+every failure; no tuning against these inputs followed by another claimed
+holdout pass. Close #33 only if this current-runtime acceptance gate passes,
+with the historical evidence gap explicit in its completion record. This
+exception does not waive new failures or imply content, live-input, pixel/PCM
+or consecutive-match admission.
+
+The corresponding plan requires `role: "holdout"`, `holdout_allowlist`, an explicit
+holdout role on every target, and `identities.holdout_recipes`. It rejects mixed
+roles and profiler slots. A failed holdout closes the owned browser and leaves
+later slots unconsumed. Bind retained failed evidence in `identities.historical_context`; the
+`legacy_red_reports` list stays empty because those records are context for this
+separate gate. `identities.acceptance_scope` must identify a hashed structured
+owner-approval receipt, with `decision: "proceed"` and `approved_by: "owner"`.
+The receipt contents are checked when freezing and loading the plan. Earlier
+sealed development plans retain their original meaning when these new fields
+are absent.
 
 ## Consecutive-match track after holdouts
 

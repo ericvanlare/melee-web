@@ -36,6 +36,18 @@ int main(int argc,char** argv){try{
     f=Fixture();put(f.data,76,97);rejects([&]{DatLights bad(f.archive());});
     f=Fixture();put(f.data,24,32);rejects([&]{DatLights bad(f.archive());});
     f=Fixture();f.link(8,248);f.link(248,240);rejects([&]{DatLights bad(f.archive());});
+    /* A source LightList may carry an HSD_LightAnim* table. The default
+     * parser remains strict, while the explicit metadata path records only
+     * the checked table target in source order for later native hydration. */
+    f=Fixture();f.link(20,128);f.link(128,136);
+    rejects([&]{DatLights bad(f.archive());});
+    DatLights retained(f.archive(),"map_plit",true);
+    check(retained.animation_tables.size()==retained.lights.size() &&
+              retained.animation_tables.size()==2 &&
+              retained.animation_tables[0].has_value() &&
+              *retained.animation_tables[0]==128 &&
+              !retained.animation_tables[1].has_value(),
+          "Explicit stage light animation metadata is aligned and source ordered");
     f=Fixture();f.overrides=true;f.link(152,192);put(f.data,156,3);f.link(192,60);put(f.data,196,0xe0000000);f.link(200,32);f.link(160,208);
     check(read_dat_light_override(f.archive(),60)==0xe0,"Exact first override bits");
     check(read_dat_light_override(f.archive(),32)==0,"Exact ambient override bits");

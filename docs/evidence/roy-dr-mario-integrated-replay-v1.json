@@ -1,0 +1,206 @@
+{
+  "schema": "melee-web-roy-dr-mario-integrated-replay-v1",
+  "date": "2026-09-15",
+  "evidence_level": "retail compared: complete declared core state and CPU decision domains; expanded comparison fails",
+  "parent_head": "bbfc07b8db5782d1b87ac159be2f74328362728b",
+  "capture_manifest_sha256": "0407e4facda8745c1304e59a0bde5aa85dc54444854f7718de12c8cb7ff49dfa",
+  "bound_recipe_sha256": "cca6af8c7174a070cf044fc7653dd75061ffb0f9acab8e4393b001b30673d888",
+  "save_binding": {
+    "claims": {
+      "fixture_preserved": "pass",
+      "input_preserved": "pass",
+      "masks_from_save": "pass",
+      "port_equivalence": "not_claimed",
+      "save_checksum": "pass"
+    },
+    "fixture": {
+      "character_mask_offset": 32,
+      "checksum": "validated",
+      "gci_layout": "GALE01r2 prepared GCI",
+      "save_block": 1,
+      "sha256": "5ff16535045fed369206141dd326ec6f72519de69d6661ccfa7766341fdc0aed",
+      "stage_mask_offset": 34
+    },
+    "output_sha256": "cca6af8c7174a070cf044fc7653dd75061ffb0f9acab8e4393b001b30673d888",
+    "profile": {
+      "source": "decoded save block only",
+      "unlocked_characters": 2047,
+      "unlocked_characters_hex": "07ff",
+      "unlocked_stages": 448,
+      "unlocked_stages_hex": "01c0"
+    },
+    "recipe_sha256": "c5db0eb60832814bbeb9b457762c96e31f0270e5a1a32f73b03963f290b793b3",
+    "schema": "melee-web-retail-save-profile-binding",
+    "scope": "save-derived unlock masks bound to a v3 MWRC input recipe; no save editing or port-equivalence claim",
+    "status": "bound",
+    "transport": {
+      "frames": 6965,
+      "input_bytes": 307610,
+      "input_version": 3,
+      "magic": "MWRC",
+      "observation_version": 3,
+      "output_bytes": 307614,
+      "output_version": 4
+    },
+    "version": 1
+  },
+  "fixes": [
+    "Original stage-music selection consumes RNG at its original construction boundary using the exact recorded save unlock masks.",
+    "Roy dynamics extent is derived from authored motion blend selectors; all six relocated mode rows are decoded.",
+    "CPU preparation draws are labeled separately; no failed observations were discarded."
+  ],
+  "browser": {
+    "identity": {
+      "browser": "chrome",
+      "version": "153.0.8010.36",
+      "visible_browser": true
+    },
+    "artifact_sha256": {
+      "gameplay_menu_browser.js": "466140d067796f0fa6449a557fabc729b9b301b79e5cdd33ef6644177c6d7111",
+      "gameplay_menu_browser.wasm": "4a06e2380bffd20f25b3fa8a0b355f780e881eef046c56c08a4953e2e58f8ec4",
+      "gameplay_menu_browser.data": "cdf157ee0f1850884f07a71165fd2192177acb23c2c777313b719e70ea67546f",
+      "runtime-cache.js": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26",
+      "audio-worklet.js": "ef4374ac08f5bab821efa05cf5d252ca8e4b50647710d434e192beac3d7d7b4f"
+    },
+    "served_hashes_unchanged": true,
+    "errors": {
+      "errors": [],
+      "requests": []
+    },
+    "frames_compared": 6965,
+    "core": {
+      "active_player_count": "pass",
+      "entry": "pass",
+      "fighters": "pass",
+      "frame_count": "pass",
+      "inputs": "pass",
+      "match_frame": "pass",
+      "pad_state_hex": "pass",
+      "rng": "pass"
+    },
+    "cpu_domains": {
+      "camera": {
+        "first_divergence": {
+          "actual": "46ea6000",
+          "expected": "46800000",
+          "field": "camera.far_bits",
+          "phase": "frame",
+          "tick": 0
+        },
+        "status": "diverged"
+      },
+      "cpu": {
+        "first_divergence": null,
+        "status": "matched"
+      },
+      "hud": {
+        "first_divergence": null,
+        "status": "matched"
+      },
+      "magnifier": {
+        "first_divergence": null,
+        "status": "matched"
+      },
+      "match": {
+        "first_divergence": null,
+        "status": "matched"
+      },
+      "subject": {
+        "first_divergence": {
+          "actual": "bce87daf",
+          "expected": "bce87db0",
+          "field": "players[0].subject.bone_bits[2]",
+          "phase": "frame",
+          "tick": 64
+        },
+        "status": "diverged"
+      }
+    },
+    "match": {
+      "complete": true,
+      "outcome": 2,
+      "winner": 0
+    },
+    "final_stocks": [
+      3,
+      0
+    ],
+    "draw_alignment": {
+      "actual_count": 6965,
+      "expected_count": 6959,
+      "extra_in_actual": [
+        {
+          "ordinal": 1590,
+          "source_index": 1590
+        },
+        {
+          "ordinal": 2591,
+          "source_index": 2591
+        },
+        {
+          "ordinal": 3592,
+          "source_index": 3592
+        },
+        {
+          "ordinal": 4593,
+          "source_index": 4593
+        },
+        {
+          "ordinal": 5594,
+          "source_index": 5594
+        },
+        {
+          "ordinal": 6595,
+          "source_index": 6595
+        }
+      ],
+      "extra_in_actual_count": 6,
+      "matched_count": 6959,
+      "missing_from_actual": [],
+      "missing_from_actual_count": 0,
+      "scope": "source_draws_by_source_index",
+      "status": "misaligned"
+    },
+    "preparation_source_draws": 9,
+    "timing_observation": {
+      "worstBrowserCallbackMs": 218.77000001072884,
+      "worstNativeCallbackMs": 206.94,
+      "livePipelinesCreated": 23,
+      "livePipelinesQueued": 4,
+      "audioUnderrunFrames": 128,
+      "audioOverflowFrames": 0,
+      "wasmHeapGrowthBytes": 66846720,
+      "focusLost": false
+    },
+    "instrumented_timing_resumes": 1,
+    "timing_scope": "Instrumented state capture; performance acceptance fails and historical GPU stall remains open."
+  },
+  "tests": {
+    "release_runtime_build": "pass",
+    "native_700_tick_core_prefix": "exact",
+    "unit_suite": {
+      "run": 754,
+      "skipped": 37,
+      "failures": 0
+    },
+    "native_recipe_rejection_after_test_update": "pass"
+  },
+  "preserved_failures": [
+    "roy-dr-mario-retail-diagnostic-v1.json",
+    "roy-dr-mario-rng-cause-v1.json"
+  ],
+  "remaining": [
+    "Camera projection differs at tick0 due preparation source draws.",
+    "Bone transforms and subsequent camera arithmetic retain bit differences.",
+    "Original consumes batched PAD ticks and has six fewer source draws.",
+    "GPU staging waits, live pipelines and audio underruns remain observed.",
+    "Pixel, PCM, physical-controller, other-route and holdout acceptance is not claimed."
+  ],
+  "claims": {
+    "complete_core_and_cpu_decision_comparison": "pass",
+    "expanded_equivalence": "fail",
+    "performance_acceptance": "fail",
+    "production_deployed": false,
+    "human_holdouts_opened": false
+  }
+}

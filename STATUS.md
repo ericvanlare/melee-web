@@ -1,21 +1,704 @@
 # Current status
 
-The [original allocation-history experiment](docs/ORIGINAL_ALLOCATION_HISTORY.md)
-now replays the observed original heap and pool lifetimes. Two independent cold
-boots agree on all 276 calls, with 211 model operations and 94 derived allocation
-identities each. Two fresh partial menu runs replay 25,168 and 47,974 calls in
-native and checked Wasm; their first 23,397 calls agree before an explained
-controller-program difference. No allocator mismatch remains within those
-prefixes. The SSS readiness fix is verified through original SSS → CSS → rules.
+## Whole-session original observer
 
-The bounded save search found no eligible owned unlocked persistent card.
-Zero of six requested full scenario captures are complete; no fighter address
-has been derived, and CPU register-carry integration remains blocked on that
-context and caller/global/stack provenance. The local suite passes 723 tests
-(44 documented optional skips), including all 54 affected checks; runtime,
-graphics and fighter Release builds pass. Original source, frozen gold inputs,
-CPU integration and public deployment files remain unchanged. See the
-[continuation receipt](docs/evidence/original-allocation-history-v2.json).
+**Compiled / Source identified**: the passive observer completed consecutive
+original CSS → SSS → four-stock VS → Results → CSS captures. The
+[capture receipt](docs/evidence/whole-session-observer-pr57-v1.json) binds the
+source, build, four-player CPU workload, complete stream, decoder checks and
+retained failures. This is experimental capture infrastructure; independent
+repeatability, source-port comparison, pixels, PCM and performance remain
+separate gates.
+
+The [typed first-CSS profile receipt](docs/evidence/typed-profile-pr58-v1.json)
+binds original GameRules/SaveData decoding to the same completed capture.
+Profile consumption and browser equivalence remain separate checks.
+
+## Whole-session replay producer and bounded consumer evidence
+
+**Compiled / Source identified / Browser exercised**: PR59 adds an MWRC v8
+exporter, typed initial-context import and strict scene/input ownership checks.
+The original workload uses four level-9 Mario CPUs. Its bounded browser
+comparison exposes a CPU-input difference consistent with the existing source
+address/register-context limitation; whole-session equivalence remains open.
+Builds, tests, exact comparison scope and retained failures are in the
+[PR59 evidence receipt](docs/evidence/whole-session-replay-pr59-v1.json) and
+[whole-session section](docs/VERSUS_RETURN_LOOP.md#pr59-whole-session-producer-and-bounded-replay-evidence-2026-09-24).
+
+## Mewtwo capture and menu ownership repair
+
+The Mewtwo Confusion victim command rows and menu rumble/GObj lifetime repairs
+are validated at their declared boundaries. **Native traced**: the original
+menu/four-stock lifecycle completes twice with cancellation and teardown.
+**Browser exercised**: Release and RelWithDebInfo both select Mewtwo through
+the original CSS, cancel SSS, capture/release Mario with Confusion and unload.
+See the [merge review receipt](docs/evidence/mewtwo-crash-merge-review-v1.json)
+for exact builds, retained failures and integration checks. This repairs a
+crash; independent equivalence, full fighter admission and deployment are
+separate gates.
+
+## Non-disruptive agent browser checks
+
+Routine browser checks default to headless installed Chrome; foreground
+captures require explicit `--headed`. Agent guidance also covers temporary
+scripts. **Browser exercised**, bounded functional utility: GPU output,
+screenshots, input, diagnostics, player lifecycle and PCM inspection retain
+their scope in the [browser automation guide](docs/HEADLESS_BROWSER_VALIDATION.md).
+Initial Import now waits for renderer readiness from post-main native frames.
+The [implementation receipt](docs/evidence/headless-browser-defaults-v1.json)
+binds fresh builds, the full suite, passing migrated browser checks and the
+macOS observation with no test-browser window or focus interruption. The
+original [investigation receipt](docs/evidence/headless-browser-compatibility-v1.json)
+retains the early-import failure. Headless results do not admit gameplay or
+replace foreground timing, physical-device, audible-output or
+original-comparison evidence.
+
+## Ness and Peach development receipt
+
+The Ness and Peach development candidate has source construction, Results lifecycle,
+and bounded headless browser evidence recorded in the [PR61 receipt](docs/evidence/results-pr61-ness-peach-v1.json). The receipt also records the read-only four-door CSS observer and a bounded four-player CPU9 source prefix. Broad action, retail, original-equivalence, and timing/performance gates remain separate.
+
+## Donkey Kong platform shield-drop repair
+
+The Battlefield shield-drop crash from [issue #50](https://github.com/ericvanlare/melee-web/issues/50)
+is repaired. At the terminal of a fully consumed single-datum FObj track the
+original reaches `FObjUpdateAnim` with `op_intrp` still NONE and passes an
+uninitialized stack word to the callback — the same undefined-output class as the
+observed FD terminal single-CON case. The host now defines that terminal output
+as the authored last value (`p1`), which is what each interpolation type's own
+zero-duration path emits; parser state and flags stay untouched and every other
+undefined state still fails explicitly. **Focused checks**: the endpoint
+reproducer (`hsd_native_trace --terminal-{branch-linear,branch-spline,
+pass-endpoint,stop-ceil-endpoint}`) passes after panicking pre-fix; the
+Battlefield reducer that aborted at Pass frame 25 (`donkey-platform-pass-v2.log`
+state) now completes Pass motion 244 for all five costumes with pause and
+repeated teardown; both public and development menu contracts pass with
+`CKIND_DONKEY` re-enabled; Donkey's both-orientation FD lifecycle passes
+unchanged. **Suite**: local 1,129-test run passes with 55 skips (owned fixtures
+for some skipped checks live in other worktrees). Donkey is re-enabled in
+public character selection. The independent original Donkey Pass consumer
+capture remains the open confirmation item; see
+[Donkey Kong's measured scope](docs/DONKEY_KONG_PORT_NOTES.md).
+
+## Production audio release path
+
+PR #42 is merged on top of #49. The owner approved promoting replacement
+audio to production independently of Results PR #44. The production package
+now has an explicit `audio-player` identity and uses the same restricted Release
+audio runtime as the combined listening preview. Its auditor binds the native
+source/tool/seed identity, exact audio module inventory, production notices and
+hosting policy. The legacy silent profile remains available for rollback.
+See [production audio release](docs/AUDIO_PRODUCTION.md) for the commands and
+verification gates. The combined preview's existing evidence remains scoped to
+[its recorded browser and PCM checks](docs/evidence/audio-main-integration-v1.json);
+it does not establish full-match performance or original hardware fidelity.
+
+## Development audio replacement candidate
+
+The scalar resampler and browser coefficient generator have new implementations
+with recorded specifications and provenance. The coefficient output is unchanged
+byte for byte, and 7,488,064 scalar comparisons preserve the previous output,
+phase, history and source reads. This is regression evidence, not an original
+hardware accuracy pass. The [replacement record](docs/AUDIO_REPLACEMENT_EVIDENCE.md)
+also records an unverified original-DSP phase-writeback boundary and the retained
+coefficient-data provenance that still needs release review. The separate GPL
+Dolphin observer remains intact. The production release path is described above;
+repository visibility is unchanged.
+
+The owner-requested [audio listening preview](docs/AUDIO_PREVIEW.md) now includes
+main `979fd09` (PR #49) and its per-scene asset loading. **Browser exercised**:
+original CSS/SSS → Mario/Final Destination → ordinary pause/No Contest → CSS →
+a second match entry retains nonzero PCM at the connected worklet. Four complete
+asset scopes include the generated coefficients; outer pause/resume and Eject
+pass. Both Release builds and the full local suite pass. The
+[integration receipt](docs/evidence/audio-main-integration-v1.json) binds the
+new hosted bytes and checks. The earlier owner listening feedback remains bound
+to the preceding preview. Hardware PCM, broader gameplay and performance gates
+remain open.
+
+## September 20 production checkpoint
+
+Feature additions are paused at PR #49. The candidate exposes sixteen public
+fighters and seven stages; Donkey Kong's platform shield-drop crash is repaired
+on this branch (see [Donkey Kong's measured scope](docs/DONKEY_KONG_PORT_NOTES.md)),
+re-enabling him in public character selection pending the remaining
+[issue #50](https://github.com/ericvanlare/melee-web/issues/50) verification.
+Both public and development players now load exact scene asset scopes from a
+validated local disc session. That checkpoint's public audio was disabled.
+
+Both Release builds and the local 1,099-test suite pass (374.968 seconds,
+41 explicit skips). The since-removed Donkey restriction had passed 26 focused
+menu and release checks. The audited production candidate passes local HTTP checks,
+all ten public browser checks, two ordinary-key Mario/FD pause/No Contest
+round trips, Eject/reload and reimport. Public menu and Mario/FD scopes contain
+32/27 inputs and 18,448,886/19,073,578 bytes. A fresh drawn Mario/FD control
+matches all 240 declared updates and PAD-history fields against the independent
+original pair and retires all native scene/file owners afterward.
+
+Retained harness failures and an instrumented timing pause are recorded. Two
+controls with reduced duplicate callback logging pass the same route and 120
+further CSS ticks without a resume; the final control verifies hidden loading
+panels. These lifecycle checks do not establish performance or complete-game
+acceptance.
+PR #49 merged as `979fd09` and its exact staging-tested package was deployed to
+[production](https://bed694b0.webmelee.pages.dev). Both the immutable origin and
+webmelee.gg passed exact resource/header/route checks and ten public browser
+checks each. The owner also tested staging and reported multi-CPU loading lag
+as follow-up work. See the [release record on PR #49](https://github.com/ericvanlare/melee-web/pull/49),
+[release checkpoint](docs/PRODUCTION_CHECKPOINT_20260920.md) and
+[hash-bound receipt](docs/evidence/production-checkpoint-20260920-v1.json).
+
+The subsequent PR review's two P3 findings are corrected: reports reject
+untracked original-source files, and Fountain's music tuple matches its authored
+four words. All seven tuples and derived music sets pass owned-archive checks;
+both Release targets and the refreshed candidate audit pass. See the
+[review-fix receipt](docs/evidence/production-checkpoint-review-fixes-v1.json);
+final full-suite and pushed-head verification are recorded on PR #49.
+
+## September 21 production deployment
+
+Latest main `dab94e2` (PR #52 Donkey re-enablement, PR #53 Captain Falcon
+dive-catch admission, PR #54 repository readiness) is deployed to production as
+the audited `audio-player` package:
+[immutable origin](https://59cf5240.webmelee.pages.dev) and
+[webmelee.gg](https://webmelee.gg), deployment
+`59cf5240-7deb-4447-9d38-4435c85c519f`. The exact staged bytes were promoted
+unchanged from the verified staging deployment
+`3309b04e-87f1-4a1d-8f24-cf0129e00a52`. Hosted HTTP verification passed on all
+four checked origins (31 resources, 5 aliases each), and both headed browser
+checks (ten public-player and eleven audio/PCM cases including nonzero PCM
+through CSS → SSS → Mario/Final Destination → pause/No Contest → second entry)
+passed on the immutable production origin and the apex; several first attempts
+hit the shipped timing-guard pause on a loaded host and passed on idle-host
+retries with PCM flowing. The local 1,168-test suite passes with 74 documented
+asset-dependent skips. The same-session `a8d318f2` (main `4e521f6`), the PR #51
+audio release `aa3d4852` and the silent releases `bed694b0`/`516608f3` remain
+rollback targets. Hosted checks do not establish full-match performance,
+original pixel/PCM fidelity, physical controllers or broad gameplay admission,
+and the Falcon dive-catch browser interaction remains a separate gate; see the
+local deployment records under ignored `work/` and
+[public deployment](docs/PUBLIC_DEPLOYMENT.md).
+
+## Full-game integration branch
+
+`codex/full-game-integration` tracks the remaining offline vanilla game through
+[a versioned feature and source inventory](docs/FULL_GAME_PORT.md). The report
+retains all source functions and missing features; it does not turn compilation
+or declared feature status into an accepted-game percentage.
+
+The development player now imports scene-specific assets from one validated
+local disc session, closing source owners and releasing outgoing files before
+loading the next scene. A real browser check completes Mario/FD four-stock
+ending, Bowser/Mario Fountain pause and No Contest, both returns to original
+CSS, unload and restart. Delayed handoffs keep source steps stopped and retain
+zero outgoing file bytes. Menus use 18,452,982 native input bytes; Mario/FD uses
+19,077,674 and Bowser/Fountain 21,401,641. Unload clears all imported files.
+Wasm capacity still grows across the sequence; this is functional lifecycle
+evidence, not a memory plateau or performance pass. A fresh drawn Mario/FD
+replay matches all 240 declared updates and PAD-history fields against the
+independent original v2 pair. The earlier missing Bowser voice-bank unload
+crash and two driver/recipe failures remain retained; see
+[scene asset ownership](docs/SCENE_ASSET_LOADING.md).
+The public player now uses the same scoped import while excluding DSP
+coefficients. Four-player residency and broader mode/lifetime checks remain open.
+New additions are paused for a production checkpoint with sixteen public
+fighters and seven stages. Donkey is re-enabled in public selection after the
+platform shield-drop repair; the remaining
+[issue #50](https://github.com/ericvanlare/melee-web/issues/50) verification
+stays open.
+Both Release builds pass. The 1,096-test run took 366.767 seconds with
+41 skips and one stale artifact-count assertion; correcting that test yields
+four passing checks in the affected module. The original failed suite log is
+retained. Commit `3103b65` subsequently passed full GitHub verification in
+6m 04s across all jobs. See the
+[scene-loading checkpoint receipt](docs/evidence/full-game-checkpoint-asset-scope-v1.json).
+The refreshed legacy native transition comparison fails on a rumble flag and
+match-entry RNG; a HEAD-derived driver reproduces the same event rows with
+current libraries. Its setup/source reconciliation remains open separately;
+see [the retained transition limitation](docs/TRANSITION_EQUIVALENCE.md#september-20-refresh-limitation).
+
+Ganondorf is the first added development candidate. Fresh native checks pass
+both player orientations and all five costumes on Final Destination, including
+original combat, pause and teardown. The browser reaches original CSS/SSS and
+advancing Ganondorf gameplay. A reviewed 37-pipeline preload correction clears
+the 30-case, 5,200-frame drawn sweep with no hard timing/audio/pipeline failures;
+earlier cold failures remain retained. A following cold/warm pair passes all
+10,400 source frames with the same zero-failure counters at 640×480, DPR 1.
+An independently repeated original pair now matches all 603 declared native
+state updates after binding the actual save unlock profile. The legacy unbound
+recipe failure and headless camera mismatch remain retained; drawn comparison,
+complete ending and broader acceptance are open. See [Ganondorf scope and remaining gates](docs/GANONDORF_PORT_NOTES.md).
+Captain Falcon now passes native source lifecycles in both Captain/Mario player
+orders and all six costumes on Final Destination, including specials, stock
+loss/respawn, pause and repeated teardown. The integration preserves his
+original English costume resolution, indexed vertex colors and particle palette
+metadata. The browser completes all 30 action cases over 5,200 drawn frames;
+the first diagnostic run fails timing/audio/pipeline gates. After a reviewed
+35-descriptor preload correction, both cold/warm action sweeps pass all 10,400
+frames with zero hard failures. Startup and broader performance remain separate,
+and independent original comparison is pending; see
+[Captain Falcon's measured scope](docs/CAPTAIN_PORT_NOTES.md).
+Hyrule Temple passes two native stage-owner lifetimes, including scaled geometry,
+original map callbacks, light identity overrides, music candidates and teardown.
+Two original Ready/pause/No Contest match lifetimes also pass. The browser
+reaches advancing Temple gameplay, retaining an entry timing failure; a reviewed
+16-descriptor preload correction clears both cold/warm entry reruns without
+timing resumes. A cold startup long task remains visible, and the full action
+matrix and original comparison remain open; see
+[Temple evidence](docs/HYRULE_TEMPLE_PORT_NOTES.md).
+Luigi now passes native source lifecycles in both player orders and all four
+authored costumes. The selected-player fixture observes ground/aerial Fireball
+Articles, special-move entries, pause and repeated teardown. All 30 browser
+action cases pass over 5,200 drawn frames, retaining timing, audio and four
+live-pipeline failures. A reviewed six-descriptor preload update clears both
+5,200-frame cold/warm sweeps with zero hard failures. A fresh pair after the
+shared stage-light lifecycle correction also passes all 10,400 frames with
+zero hard failures; see [Luigi's evidence](docs/LUIGI_PORT_NOTES.md).
+Fountain of Dreams now reaches original map, reflection and star construction.
+Its shared changes preserve animated-light storage, exact reflection image
+identity and multiple map objects sharing one camera. Two 7,200-tick native scheduler
+and teardown lifetimes now pass, including moving collision and animated
+lights. Cold/warm browser entry now completes Ready/Go and 30 gameplay frames
+after a reviewed 28-pipeline preload correction. The cold run retains two
+browser long tasks; this is a functional-entry result, not a performance pass. See
+[Fountain's scope](docs/FOUNTAIN_OF_DREAMS_PORT_NOTES.md).
+Pikachu and Pichu are now enabled as development candidates, bringing the
+branch to thirteen fighters. Native fixtures pass both player orders and all
+four family costumes, including source jolt/Thunder creation and teardown,
+Pichu self-damage, pause and No Contest. Both browser discovery sweeps complete
+30 action cases over 5,600 frames; their failed cold timing/pipeline gates
+remain retained. A reviewed preload correction clears all four fresh cold/warm
+sweeps: 22,400 source frames with no hard failures, native target misses or
+heap growth. Shared fixes preserve complete-null effect
+rows and the signed self-damage command. See
+[their measured scope](docs/PIKACHU_PICHU_PORT_NOTES.md).
+Yoshi's Island 64 is the seventh development stage. Its native owner passes two
+5,000-tick source scheduler lifetimes, including cloud collapse/collision
+removal/reappearance, guest selection and teardown. Five Mario/Mario entry,
+pause and No Contest lifetimes also pass. The original browser menu route
+reaches advancing gameplay, retaining a cold entry stall and one diagnostic
+resume. Fresh cold/warm entry passes after the preload correction without
+resumes, gaps or audio underruns; one 69 ms cold browser long task remains.
+This is functional entry, not a stage-performance pass.
+The shared material loader now preserves the source base TLUT for
+TIMG-only animation; see [stage evidence](docs/YOSHIS_ISLAND_64_PORT_NOTES.md).
+Jigglypuff is the fourteenth development fighter. Native checks cover all five
+costume lifetimes, including original hat archives and dynamics, crouch
+animation variation, five aerial jumps and ground/air special states. The
+original browser CSS/SSS route passes 31 action cases in each cold/warm run:
+12,800 source frames with no action-window timing, audio, pipeline or heap-growth
+failures. Shared fixes retain the complete stored dynamics table separately
+from its active body count, the custom-part owner/cache and original crouch
+Wait selection. Earlier loader, blue-hat and input-recipe failures remain
+retained; see [Jigglypuff's measured scope](docs/JIGGLYPUFF_PORT_NOTES.md).
+The Jigglypuff checkpoint passes both Release builds and the 1,077-test suite
+in 346.034 seconds with 41 explicit skips. Fresh shared headless comparisons
+still match 603 Ganondorf/FD and 240 Mario/FD declared source updates. Its
+pipeline seed is unchanged; see the [Jigglypuff checkpoint receipt](docs/evidence/full-game-checkpoint-purin-v1.json).
+Donkey Kong is the fifteenth development candidate. Native checks pass both
+player orders and all five costumes, with first-lifetime ground/air specials
+and raw cargo grab/walk/throw. Shared fixes preserve branch visibility,
+source dynamics modes, mixed indexed/compressed texture animations and the
+carried fighter's original command graphs. Both browser discovery rounds
+complete 33 action cases and 7,000 frames; cold fails timing/audio/pipeline
+gates while warm passes. After a reviewed 15-descriptor preload correction,
+both fresh rounds pass all 14,000 action frames with zero hard failures.
+A separate Battlefield shield-drop probe exposed a real crash at the
+undefined terminal SPL0 animation output. That boundary is now repaired: the
+host defines the terminal single-datum output as the authored last value (the
+documented FD terminal-CON rule extended to the whole class), and the retained
+shield-drop reducer completes Pass motion 244 on the upper platform for all
+five costumes with pause and repeated teardown. Donkey is re-enabled in public
+character selection. Independent original consumer capture, ceiling lifetimes,
+original comparison and broader acceptance remain open; see
+[Donkey Kong's measured scope](docs/DONKEY_KONG_PORT_NOTES.md) and
+[issue #50](https://github.com/ericvanlare/melee-web/issues/50).
+The Donkey checkpoint passes both Release builds and the full 1,080-test suite
+in 358.963 seconds with 41 explicit skips. Fresh shared headless comparisons
+still match 603 Ganondorf/FD and 240 Mario/FD declared source updates. The
+receipt retains the failed cold discovery, the corrected pair, and the separate
+unresolved shield-drop crash; see the
+[current checkpoint receipt](docs/evidence/full-game-checkpoint-donkey-v1.json).
+Bowser is the sixteenth development fighter. Native Final Destination checks
+pass both player orders and all four costumes, including Flame creation and
+cleanup, ground/air Fortress and Bomb, and real ground/air capture and throws.
+The shared boundary now admits the victim's original command graphs and the
+source visibility cleanup command. Both browser discovery runs finish all
+30 cases; the cold timing/audio/pipeline failures remain retained. A reviewed
+36-descriptor preload correction clears the fresh cold/warm pair: 11,201
+source frames with zero action-window timing, audio, pipeline or heap-growth
+failures and no entry timing resumes. Independent original Bowser comparison,
+drawn capture interactions and broader acceptance remain open; see
+[Bowser's scope and evidence](docs/BOWSER_PORT_NOTES.md).
+The Bowser checkpoint passes both Release builds and 1,083 tests in 357.995
+seconds with 41 explicit skips. Fresh shared headless comparisons still
+match all 603 Ganondorf/FD and 240 Mario/FD declared source updates. The
+[Bowser checkpoint receipt](docs/evidence/full-game-checkpoint-koopa-v1.json)
+binds the builds, browser pair, review and retained failures. The Bowser
+checkpoint's full GitHub Verify completed in 6m 16s across all jobs;
+the preceding Donkey checkpoint completed in 6m 20s.
+Mewtwo is the seventeenth development fighter on `codex/mewtwo-integration`.
+Native Final Destination checks pass both player orders and all four
+costumes, including ground and aerial Shadow Ball charge with fresh-B-edge
+release and Article teardown, Teleport, Confusion and Disable lifetimes. The
+source contract preserves the 0x88 `ftMewtwoAttributes` extension, the
+two-slot Article table (Disable 0x6e, Shadow Ball 0x70 with twelve
+serialized special words and ten animation rows), effect bank 13 with four
+static rows and the authored four-TObj costume texture map: the match-stats
+eye telemetry now requires the runtime collection to match each fighter's
+authored texture map while keeping the two declared recorded slots and all
+existing comparison fields. The versioned `mewtwo-visible-actions-v1`
+inventory has 32 cases; a fresh-origin cold export supplied 12 new portable
+pipeline descriptors (zero payload conflicts, all 846 previous records
+preserved), producing the reviewed seed of one shader and 857 pipelines
+(SHA-256 `f85858ff99f368d38ca16fa18727a12f778d57543e2898d29507f92585db2c2b`).
+After that preload correction both fresh cold/warm rounds pass all 32 cases
+over 6,400 frames with zero hard-gate failures, native/browser maxima
+6.645/24.720 ms cold and 5.920/21.710 ms warm, and zero timing resumes or
+heap growth. The local 1,127-test suite passes in 278.909 seconds with 60
+documented optional skips. Independent original comparison, pixels, PCM,
+physical controllers, complete matches and broader performance remain open;
+the failed v5 cold discovery and its provenance, review and passing pair are
+retained under `work/full-game/`. See
+[Mewtwo's scope and evidence](docs/MEWTWO_PORT_NOTES.md) and the
+[current checkpoint receipt](docs/evidence/full-game-checkpoint-mewtwo-v1.json).
+After merging main (Donkey's re-enablement and the Captain Falcon dive
+catch), an independent review corrected the telemetry bounds to the original
+five-slot collector and the merged tree re-passes: 1,131 tests OK in final
+suite form with 57 documented skips, both native orientations, and a fresh
+cold/warm browser pair (all 32 cases, native/browser maxima 7.625/23.265 ms
+cold and 6.910/25.460 ms warm) with zero hard-gate failures.
+The preceding Pikachu/Pichu/Old Yoshi checkpoint passes both Release builds and 1,075
+tests in 334.490 seconds with 41 explicit skips. Fresh headless comparisons
+still match 603 Ganondorf/FD and 240 Mario/FD declared source updates; the
+new content has no independent original comparison yet. See the
+[Pikachu/Pichu/Old Yoshi receipt](docs/evidence/full-game-checkpoint-pikachu-old-yoshi-v1.json).
+The preceding Luigi/Fountain checkpoint passed both Release builds and 1,070 tests
+in 298.028 seconds with 41 explicit skips. The receipt names the exact browser
+build, the later Article validation guard, reference scope and retained failures;
+see [checkpoint validation](docs/evidence/full-game-checkpoint-luigi-fountain-v1.json).
+Results PR #44 and audio PR #42 remain separate draft dependencies. This branch
+work has not changed the deployed public alpha.
+
+## CI verification turnaround
+
+Three consecutive full PR verification runs completed in 6m 32s for a source
+change, 5m 49s for a test change and 8m 53s for a cold dependency change. The
+workflow uses standard Linux runners, partitions the existing targets/tests,
+and reuses only validated compiler-cache entries. All 895 previously passing
+baseline test IDs remain covered; deliberate build/test failures reject the
+aggregate, and a new PR revision cancels obsolete work. Automatic PR and main
+verification remain, with duplicate feature-branch push runs removed.
+See [CI timings, coverage, cache boundaries and cost](docs/CI_COST.md) for the
+measured evidence and retained outliers. This changes verification turnaround;
+gameplay accuracy and runtime performance keep their separate acceptance gates.
+
+## Historical GPU stall investigation
+
+A new exact-historical-runtime diagnostic on Chrome for Testing 153.0.8010.36
+reproduced a 104.370 ms native callback with 94.815 ms of staging waits. Its
+retained Chrome event excerpt identifies browser UI raster pipeline work;
+recovered native kernel evidence encloses the entire failure. The original
+full Chrome trace/report were lost during analysis, with partial observations
+and the recovered kernel recording retained explicitly. The second bounded
+slot did not reproduce the stall and failed focus. This is diagnostic evidence,
+not a fix or acceptance pass. See the [investigation and recovery limits](docs/BROWSER_RASTER_STALL.md).
+The original failure remains causally unassigned. The project owner approved a
+separate [current-runtime holdout gate](docs/HITCH_CAPTURE.md#approved-current-runtime-scope--2026-09-19)
+on September 19, retaining that historical failure and every hard threshold.
+Issue #33's approved current-runtime gate now passes. The first campaign failed
+on two live pipelines and remains preserved with its final three slots unstarted.
+PR #47 adds exactly the two recovered portable descriptors while preserving all
+626 previous records. Its 7,347-update development regression matches declared
+state and timer with zero live pipelines. Both Release builds, 1,006 tests
+(44 optional skips) and full GitHub Verify pass; Verify took 6m 06s.
+
+Two replacement inputs were reserved from header/input-only evidence before
+tuning. Independent original reference pairs and browser comparisons match
+6,432 Marth/Marth Battlefield and 8,561 Falco/Falco Final Destination declared
+state updates and exact timers. All four frozen unprofiled cold/warm runs pass:
+29,986 updates/draws, no native target misses, hard gaps, long tasks, audio
+underruns/overflows, live pipelines, timing resumes, focus losses or browser
+errors. Native/browser maxima are 13.695/29.000 ms on Apple M4, macOS 26.6.2,
+Chrome 153.0.8010.50, 640×480 at DPR 2. Preparation takes 149.600–166.200 ms;
+Marth retains 66,846,720 bytes of live heap growth and Falco zero. Both inputs
+exhaust their frozen cap before original match ending; neither is a complete
+original match. These are `per_tick` measurements, without original draw-cadence,
+live-controller, pixel or PCM admission. See the
+[failed campaign, correction and accepted replacement evidence](docs/CURRENT_RUNTIME_HOLDOUTS_20260919.md).
+
+PR #47 is merged and deployed at [webmelee.gg](https://webmelee.gg). Both
+production origins pass exact HTTP verification and all ten public browser
+checks. The public alpha remains deliberately silent; its hosted functional
+checks are separate from the audio-enabled development performance gate.
+See the [current release receipt](docs/evidence/public-marth-pipeline-release-v1.json).
+
+The current PR #38 development Release completed two cold/warm rounds on
+Fox/Marth Dream Land and Marth/Falco Yoshi's Story: 37,920 source updates/draws,
+zero hard hitch failures and one retained native target miss at 18.300 ms
+(worst browser interval 30.675 ms). A concurrent audio build interrupted the
+initial plan; its contended and incomplete attempts remain recorded, and a
+separately frozen six-slot recovery supplied the affected cache pairs and
+unfinished coverage. No historical failure was reclassified. See the
+[complete timing inventory, memory/preparation evidence and remaining decision](docs/DEVELOPMENT_TIMING_20260919.md).
+
+## Link and Young Link development candidate
+
+Link and Young Link are enabled through the original CSS/SSS and shared native
+runtime, merged in PR #32 at `2ee80ab`. Both retain their original
+identities, five costumes, attributes, actions, articles, sword effects and SSM
+files. Real-asset lifecycle checks cover both player orientations and all five
+costumes, including reconstruction and teardown.
+
+The physical four-stock Link/CPU2 Young Link recording on Yoshi's Story is
+**retail compared under its recorded controller-queue schedule**: all 7,070
+state updates and 7,064 draw boundaries match. The compared fields cover both
+fighters, input/PAD/RNG, CPU decisions, camera, subject bones, HUD, magnifier and
+match outcome. A fresh original replay independently matches 38,108 semantic
+events. Source fixes address hookshot stack corruption and restore the original
+inlined fused arithmetic; comparator fields and tolerances are unchanged.
+The final reviewed integration replay again matches all 7,070 updates and
+7,064 draws; the PR #32 integration suite passed 956 tests with 44 skips. That Release
+state capture records 145.105 ms native / 153.620 ms browser maxima, including
+140.830 ms of staging waits, and 342 audio underrun frames. It is not a
+performance pass; the earlier port receipt remains separate evidence.
+
+Performance, pixels, PCM, live scheduling and unexercised moves remain open;
+Young Link human-controlled retail coverage is not implied by this match.
+The PR #32 build was deployed at [webmelee.gg](https://webmelee.gg) as the silent
+alpha. Its exact hosted bytes and public browser smoke passed. Both Link/Young
+Link orientations also complete a bounded ordinary-keyboard functional smoke
+on staging, with cold timing pauses retained under
+[#33](https://github.com/ericvanlare/melee-web/issues/33); this does not broaden
+character or performance admission. See the
+[deployment receipt](docs/evidence/public-link-release-v1.json),
+[port notes](docs/LINK_PORT_NOTES.md)
+and [bounded evidence receipt](docs/evidence/link-young-link-replay-v1.json).
+
+The new [GPU compilation diagnosis](docs/LINK_GPU_STALL.md) correlates a
+482.785 ms Link staging wait with synchronous Metal compiler work for four
+missing first-draw descriptors. The reviewed seed preserves all existing records
+and adds 78 reviewed descriptors. Its full 7,070-update/7,064-draw state replay
+is exact with zero live pipeline creation; both Release builds, 957 tests
+(44 optional skips), package/HTTP audit and ten public browser checks pass.
+The state capture retains a browser gap and audio underruns. Four separate
+bounded public segments (both player orders cold/warm, 450 updates each) pass
+without timing pauses, live pipelines or native target misses; native/browser
+maxima are 11.370/25.245 ms. These silent functional checks do not establish
+full-match performance. The historical a822 stall remains unresolved. The first
+current-runtime holdout campaign failed; a separately frozen replacement
+campaign passes with the two-descriptor correction and fresh inputs recorded
+above. PR #38 is merged, and this
+fix remains deployed at [webmelee.gg](https://webmelee.gg). Its original production
+bytes and ten headed browser checks pass on both the immutable origin and apex;
+see the [PR #38 release receipt](docs/evidence/public-link-pipeline-release-v1.json).
+
+## Dr. Mario and Roy development candidates
+
+The two physical development recordings now pass complete visible browser
+comparison **under their recorded controller-queue schedule**: Roy/Doc on Final
+Destination matches 6,965 updates and 6,959 draws; Doc/Roy on Yoshi's matches
+11,077 updates and 11,067 draws. Fighter/input/PAD/RNG state, CPU decisions,
+camera, subject bones, HUD, magnifier and match outcomes all match the original.
+MWRC v6 carries independently observed nonempty input-queue snapshots as platform
+inputs; it does not claim original CPU interrupt or live scheduling equivalence.
+
+The first Yoshi's run exposed six tiny throw-position differences. Restoring the
+original three fused multiply-adds in `ftCommon_8007E3EC` resolves all six without
+changing comparator fields or tolerances. A 1.2-second scalar regression covers
+original operands and the failing unfused control. Deliberate host stalls also
+preserve the tested input-storage cases and both original Dolphin prefixes;
+physical capture under stress is not claimed.
+
+The final state runs measured 16.370/31.950 ms native/browser maxima on FD and
+20.045/57.730 ms on Yoshi's. Yoshi's has one native budget overrun, one browser
+gap and 22 audio underrun frames. Both runs still create first-use pipelines
+(27/35) and grow the heap. Performance is **not admitted**. The historical GPU
+stall, pixels, PCM and both unopened holdouts remain open. Release browser/native
+builds and 765 tests (36 documented skips) pass. No deployment was made.
+See [conditional replay scope](docs/RECORDED_QUEUE_REPLAY.md) and
+[exact evidence and retained failures](docs/evidence/recorded-queue-replay-v1.json).
+
+### Earlier startup-clock evidence and rejection
+
+Dr. Mario and Roy load their own original data through the shared Mario/Marth
+family adapters and are selectable through original CSS/SSS. Native lifecycle
+checks cover both orientations, five costumes, specials, damage and reconstruction.
+
+The user's physical Roy/CPU9 Dr. Mario capture now repeats exactly in Dolphin
+(6,965 source ticks, 37,825 semantic events). The latest complete visible browser
+replay matches every declared state domain: core fighter/input/RNG/PAD state,
+CPU decisions, camera, subject/bone transforms, HUD, magnifier and match result.
+Roy wins with three stocks, exactly as recorded. Repairs restore captured save
+unlock state and original music-selection RNG, Roy's six authored dynamics modes,
+source-free match preparation, and original fused joint/vector arithmetic.
+
+The latest bounded replay also matches **all 6,959 original source draws**, with
+all 6,965 state updates preserved. A passive original probe recovered the opening
+PAD/VI phase without changing guest state; MWRC v5 carries compact clock context.
+The periodic model predicts the later batches from source ticks 0–3, without a
+recorded draw-index skip list. Legacy recipes and live input keep their existing
+policy; live controller phase and other startup/VI configurations remain open.
+
+This instrumented run measured 16.050 ms native / 26.240 ms browser maxima, with
+zero pauses, overruns or audio underruns. The historical GPU staging stall remains
+open. Cold/warm performance, pixels, PCM, other routes and both unopened holdouts
+are not admitted. No production deployment was made. Release runtime/native
+builds, the 757-test suite (36 skips) and subsequent focused binding/decoder/report
+checks pass. See [clock replay evidence](docs/evidence/roy-dr-mario-clock-replay-v1.json),
+[clock format and scope](docs/RETAIL_DRAW_CLOCK.md), and
+[retained failures](docs/ROY_DR_MARIO_PORT_NOTES.md).
+
+**Independent clock validation failed on Doc/Roy at Yoshi’s:** the fresh original
+capture repeats exactly (11,077 updates, 11,067 draws, 58,668 typed semantic
+boundaries), but the initial-only model puts one batch seven updates too late.
+The original queue check at source 8,527 is delayed relative to the assumed
+constant VI poll offset and consumes two samples. Equal final draw counts do not
+establish exact cadence. Browser validation was deferred at this already-failing
+gate; the earlier Roy/Doc result remains valid only for its recorded case.
+See [independent rejection evidence](docs/evidence/doc-roy-yoshis-clock-validation-v1.json).
+A subsequent valid original prefix identifies an audio DMA interrupt preempting
+bookkeeping before the queue check; the delayed PAD processing is execution-time
+dependent. The binder now rejects this incorrect periodic prediction before
+packaging it. See [producer evidence](docs/evidence/original-audio-queue-delay-v1.json).
+
+## Reference Capture roster unlocks
+
+Reference Capture provisioning now defaults to all roster characters unlocked.
+Existing installations can select the new immutable private fixture with
+`--unlock-characters`, preserving the original save, configuration history,
+recordings, Dolphin binary, and physical-controller profile. The pinned GCI's
+character mask changes from `0x0024` to `0x07ff`; stage progress is unchanged.
+The encoded result matches the original HSD routines and passes the original
+C decoder. The installed 0.2.3 verifier accepts the new fixture, and an ordinary
+retail boot reaches the title/attract screen without a card error. A visual CSS
+check remains unverified because automated keyboard input did not reach Dolphin.
+Focused save/provisioning tests pass. With the pinned dependencies prepared,
+the complete 904-test suite passes (54 optional skips). The earlier attempt
+with missing dependencies remains preserved. This is save/provisioning evidence,
+not new gameplay or port acceptance.
+See the [upgrade procedure](docs/REFERENCE_CAPTURE_APP.md).
+
+The physical Falco/Marth/Yoshi replay now matches every declared fighter field
+across all 9,019 visible-browser ticks except 17 CPU-related input samples.
+Four original fused operations in `HSD_MtxSRT` remove the tick-473 position
+error; the first remaining core difference is CPU input at tick 901. Passive
+original probes establish its RNG-seed and fighter-pointer register producers,
+without using captured addresses as inputs or changing CPU integration. The
+1,199-tick 2P and 4,346-tick 3P browser core/CPU regressions remain exact.
+Camera, later subject rounding, draw scheduling and headless completion failures
+remain open. See the [causal audit and scoped evidence](docs/PHYSICAL_REPLAY_SRT.md).
+The installed capture app, PR #16, PR #20 and public deployment are unchanged.
+
+Reference Capture 0.2.3 adds startup cancellation and interrupted replay cleanup,
+CPU-sidecar binding to its core timeline and derived artifact, and exact Dolphin
+source-composition checks with atomic, repeatable provenance publication. The
+existing 9,019-tick physical browser trace passes the stronger binding checks and
+preserves its known CPU-input, camera, subject, and draw differences. This is
+validation-tool hardening; it does not fix those gameplay differences.
+
+Reference Capture 0.2.2 disables Dolphin’s stop-confirmation dialog for each
+capture/replay process. The installed app passes an ordinary boot/Stop Capture
+check: Dolphin exits without a dialog and the interrupted bundle remains
+incomplete. The saved profile and prior recordings remain unchanged. See the
+[application behavior](docs/REFERENCE_CAPTURE_APP.md).
+
+Reference Capture 0.2.1 imports the pinned private prepared save into Application
+Support and rejects external fixture locations before reading them. The original
+fixture and existing capture bundles remain unchanged. Guarded environment
+verification makes zero Documents-access attempts. One new operator-attested
+four-stock Falco versus level-6 CPU Marth match on Yoshi's Story replays through
+the preserved 0.2.0 tools after relocation: all 47,658 semantic events, 9,019
+source ticks and 9,011 draws match through result and teardown. This is an
+original-versus-original diagnostic pair, not port or performance acceptance.
+Older recordings require their matching tooling identity; a changed capture
+build is now rejected before launch. See the [bounded receipt](docs/evidence/reference-documents-migration-v1.json).
+
+Reference Capture 0.2.0 adds original Dolphin controller recording and replay
+from ordinary boot. A controller-driven four-stock Mario/level-1 Fox match on
+Final Destination records 61,838 SI operations and 66,231 observer events;
+two independent original replays match every declared semantic event, including
+1,639 gameplay ticks/draws and result/teardown. Its human-only recipe completes
+in native and visible browser execution with matching core state, RNG and CPU
+decisions. Camera, subject rounding and headless magnifier/draw differences
+remain explicit. All 886 tests pass (37 optional skips). This is bounded
+development evidence, without physical replay, performance or gold admission.
+Earlier captures lack the SI stream and require a new recording for faithful
+Dolphin replay. See the [bounded receipts](docs/evidence/reference-dolphin-replay-v1.json)
+and [input-stream contract](reference-capture/dolphin/INPUT_STREAM.md).
+
+The private [Reference Capture application](docs/REFERENCE_CAPTURE_APP.md)
+accepted its first operator-attested physical-controller session: four-stock
+Falco versus level-5 Marth on Yoshi's Story, with 35,519 ordered events and
+6,492 source ticks through result publication and teardown. Replaying only the
+human inputs in the visible browser completes all ticks with the same winner.
+The first core/CPU-output difference is index 5,057; RNG, PAD state, match timing,
+HUD and magnifier observations agree throughout. Camera, subject rounding and
+five extra draws remain separate failures. The headless native prefix stops
+after 5,704 ticks and first differs at index 1,482 because it omits the drawn
+magnifier dependency. This single capture does not establish repeatability:
+the bundle lacks a demonstrated Dolphin boot/menu replay route. Operator-reported
+choppiness remains open. All 867 repository tests pass with 37 optional skips;
+see the [bounded receipt](docs/evidence/reference-operator-session-v1.json).
+No gameplay fix or gold admission is claimed. PR #16 and its allocation evidence
+remain unchanged and unmerged.
+
+## Browser controllers
+
+The browser controller candidate adds browser-standard mapping, a suggested
+Mayflash 0079:1843 mapping for Chrome/macOS's 16-button/10-axis raw layout,
+individual binding corrections, and complete setup for unknown layouts. The
+suggestion adapts SDL definitions to the inspected USB descriptor and Chromium
+indexing; digital L/R clicks remain provisional. Separate GameCube trigger
+pressure/clicks and fast input-only browser regressions pass. The public player
+defaults to controllers when recognized, with per-player keyboard overrides in
+compact Controls settings. Session-local trigger-origin handling fixes activation
+with the attached Mayflash's nonzero rest values. The user reports that the
+physical Mayflash/OEM controller worked in the playable preview. PR #22 merged
+as `72def75a7c58292b5f7f2d3b04f70ad21b665f33` after both exact-head native CI
+runs and public checks passed. The fix is live at
+[webmelee.gg](https://webmelee.gg/); its immutable production artifact is
+[00ee2ca2.webmelee.pages.dev](https://00ee2ca2.webmelee.pages.dev). Hosted
+artifact, disc/menu lifecycle, controller and recovery checks pass. Digital
+L/R clicks, full physical gameplay and retail input precision remain unaccepted.
+
+A separate follow-up shares the compact Controls component between the public
+player and development `runtime.html`, including source choices, layout,
+preferences, optional remapping and focus behavior. Development diagnostics and
+audio remain separate.
+See [controller scope and verification](docs/CONTROLLERS.md).
+
+## Public runtime
+
+The user-approved renderer startup fix is now live at
+[webmelee.gg](https://webmelee.gg/). PR #18 merged with green exact-head CI;
+the production artifact and apex each passed HTTP verification and ten real
+browser UI checks. The runtime bytes match the accepted preview. This is a
+functional alpha release, without a startup-speedup or expanded gameplay
+acceptance claim. See the [production record](docs/RENDERER_PRODUCTION_PROMOTION.md).
+
+A separate [loading-feedback preview](docs/PUBLIC_LOADING_FEEDBACK.md) adds
+visible startup phases and bounded file-transfer batches. One local cold/warm
+Mario/FD lifecycle pair passes with zero unexpected pipelines, 7.335/8.960 ms
+native maxima and 24.010/27.305 ms browser gaps. Disc preparation measured
+2.149/2.010 seconds; this does not establish a cold-driver startup-speedup claim.
+The production renderer artifact remains unchanged by that follow-up.
+
+The following startup measurements and rejected hosted attempts are retained
+from the pre-promotion decision:
+
+The shared startup/complete-catalog fix passes local cold/warm Mario/FD and
+Falco/Battlefield with zero unexpected pipelines and native/browser maxima of
+9.805/27.350 ms. Required MEMFS setup now belongs to the shared player owner;
+the public alpha still has no IDBFS. Selecting all 508 verified descriptors
+removes the 18 misses in the earlier 280-member selection, whose
+[failure evidence remains preserved](docs/SELECTIVE_PIPELINE_ALPHA.md).
+The public build, 758-test suite (31 skips), and ten public UI checks pass.
+An immutable noindex staging preview is available, but the startup-speedup
+release remains **NO-GO**: one hosted cold pair measured 3075.557 ms disc-ready
+against PR15's 3078.824 ms, and two hosted input-selection failures prevent full
+hosted signoff. Production is unchanged. See the
+[scoped fix and fast verification loop](docs/RENDERER_STARTUP_FIX.md).
 
 The [source-address prerequisite](docs/SOURCE_ADDRESS_CONTEXT.md) models ordinary
 original SDK/HSD allocation identity and defined register-byte consumption,
@@ -41,6 +724,16 @@ The alpha is live at [webmelee.gg](https://webmelee.gg/) after tested legal-cont
 delivery before and after DNS migration and the exact artifact audit. Final apex
 HTTP/browser, HTTPS and canonical redirect checks pass. This does not assert
 broader gameplay stability.
+
+A public-only startup defect prevented the live alpha from consuming its bundled
+renderer seed: its writable MEMFS cache directory was missing. The unreleased
+candidate creates that directory without persistence or native changes. Four
+local cold/warm Mario/FD captures at DPR 1/2 complete with zero live pipeline
+creation; native interactive maxima are 7.33–8.80 ms. Hosted directory controls
+also remove live discovery, but first startup/disc-ready costs reach 21–24
+seconds and remain a renderer investigation item. The live deployment is
+unchanged. See the [five-way investigation](docs/PUBLIC_PERFORMANCE_INVESTIGATION.md)
+for failed prefixes, transition costs, exact profiles and the frozen candidate.
 
 Ordinary VS CPU levels 1–9 run in the shared compiled runtime used by both
 entry pages. The [CPU match development corpus](docs/CPU_MATCH_CORPUS.md) now

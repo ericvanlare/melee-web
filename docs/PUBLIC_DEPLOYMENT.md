@@ -6,23 +6,58 @@ Pause, Controls, Fullscreen and Eject call the shared player owner directly.
 About and legal information lives on linked document pages. There is no landing
 page, iframe, developer host, account, analytics or upload endpoint.
 
-The `player` profile packages a Release native build with a fixed public export
-surface. The `maintenance` profile packages the small nonplayable fallback.
-Never upload the repository, `web/`, a native build directory, an iframe staging
-package or accumulated `work/` files. Do not change repository visibility.
+The silent `player` profile packages a Release native build with a fixed public
+export surface. The authorized audio path packages a distinct `audio-player`
+profile through [the production audio runbook](AUDIO_PRODUCTION.md). The
+`maintenance` profile packages the small nonplayable fallback. Never upload the
+repository, `web/`, a native build directory, an iframe staging package or
+accumulated `work/` files. Do not change repository visibility.
 See `PUBLIC_RELEASE_REVIEW.md` for the executable/source rights assessment,
 the accepted alpha risk posture and the artifact/contact requirements.
 
-## Current launch state
+## Hosting and release history
 
-The initial silent alpha is live at **[webmelee.gg](https://webmelee.gg/)**.
+The public alpha is hosted at **[webmelee.gg](https://webmelee.gg/)**.
 The operator is **NaiadAI, LLC**; the public contact is **legal@webmelee.gg**.
 Actual Google Workspace alias delivery was verified before the nameserver
-change and again after migration, before custom-domain activation. The exact
-audited candidate is deployed to staging at
-[8e2cdf90.webmelee.pages.dev](https://8e2cdf90.webmelee.pages.dev) and to the
-production Pages environment at
-[928714aa.webmelee.pages.dev](https://928714aa.webmelee.pages.dev).
+change and again after migration, before custom-domain activation. The reviewed
+PR #47 two-descriptor pipeline-preparation fix (`e254401`, merged as `6fe77fa`)
+was deployed on September 19, 2026 (Pacific time) to staging at
+[0a3cfb39.webmelee-staging.pages.dev](https://0a3cfb39.webmelee-staging.pages.dev)
+and production at
+[61b8658f.webmelee.pages.dev](https://61b8658f.webmelee.pages.dev).
+The exact audited bytes passed HTTP verification and all ten public browser
+checks on both production origins. The separately frozen audio-enabled
+development Release passes the approved replacement holdout gate; its exact
+[state/timer and performance scope](CURRENT_RUNTIME_HOLDOUTS_20260919.md) does
+not establish public full-match, original draw-cadence, live-input, pixel or PCM
+admission. The [September 19 release receipt](evidence/public-marth-pipeline-release-v1.json)
+records identity, rollback and scoped verification. The preceding
+[PR #38 release receipt](evidence/public-link-pipeline-release-v1.json),
+[PR #32 release receipt](evidence/public-link-release-v1.json) and initial launch
+record below remain historical.
+
+The September 20 [PR #49 release](https://github.com/ericvanlare/melee-web/pull/49)
+expanded the public roster and added scoped scene loading. Its silent deployment
+is retained at [bed694b0.webmelee.pages.dev](https://bed694b0.webmelee.pages.dev)
+for rollback. Production audio uses the separate [audio release path](AUDIO_PRODUCTION.md);
+record its completed package and hosted checks with the corresponding release,
+and link that receipt before describing an audio deployment as verified here.
+
+The September 21 deployment of latest main `dab94e2` (PR #52 Donkey
+re-enablement, PR #53 Captain Falcon dive-catch admission, PR #54 repository
+readiness) promoted the audited `audio-player` package unchanged from staging
+deployment `3309b04e-87f1-4a1d-8f24-cf0129e00a52` to production deployment
+`59cf5240-7deb-4447-9d38-4435c85c519f`
+([immutable](https://59cf5240.webmelee.pages.dev), [apex](https://webmelee.gg)).
+HTTP verification passed on the staging immutable/stable origins, the
+production immutable origin and the apex; the ten public-player and eleven
+audio/PCM browser checks passed on both production origins. The same-session
+`a8d318f2` deployment of main `4e521f6`, the PR #51 audio release `aa3d4852`
+and the `bed694b0`/`516608f3` silent deployments remain rollback targets. The
+deployment records and per-origin reports live under ignored local `work/`;
+hosted checks do not widen the gameplay acceptance boundaries in
+[the accuracy contract](ACCURACY_CONTRACT.md).
 
 Namecheap saved `alan.ns.cloudflare.com` and `hadlee.ns.cloudflare.com` as the
 custom nameservers after the mail and artifact gates passed. Cloudflare serves
@@ -80,11 +115,20 @@ python3 scripts/audit_public.py --output build/player-candidate --manifest build
 
 The operator accepts the unresolved recovered-code risk for this alpha; that
 is recorded in `PUBLIC_RELEASE_REVIEW.md`, without a claim of legal clearance.
-The public artifact must exclude the GPL-derived audio implementations and pass
-its final audit. Legacy audio-enabled/v1 identities are rejected. The public
-page must retain both the audio-disabled disclosure and opcode-63 limitation. Production stays
+The silent public artifact must exclude the historical GPL-derived audio
+implementations and pass its final audit. Legacy audio-enabled/v1 identities
+are rejected by that profile. The silent public page must retain both the
+audio-disabled disclosure and opcode-63 limitation. Production stays
 non-indexed unless `--index-production` is deliberately chosen. A preview is
 marked in its browser title; it does not add a banner to the player.
+
+The commands above describe the silent `player` profile. The authorized
+`audio-player` candidate, its distinct schema/profile/project identity, the
+`webmelee-staging` → `webmelee` same-byte promotion, and its public-player and
+PCM browser checks are defined in [Production audio](AUDIO_PRODUCTION.md).
+That procedure keeps `stage_audio_preview.py` staging-only and retains the
+silent profile as rollback; record its package, HTTP, browser and deployment
+results in the release PR/receipt.
 
 Build a maintenance fallback with `--profile maintenance` and the same operator
 facts. It has disabled gameplay and no native files. Retain its audited output
@@ -149,8 +193,10 @@ Wasm/data loading. It is not an upload prevention rule: verify the actual
 application requests instead of claiming CSP blocks every same-origin POST.
 Wasm is served as `application/wasm`, data as `application/octet-stream`, and
 JS modules as JavaScript. Hashed runtime assets use immutable caching; HTML
-revalidates. Verify WebGPU, the absence of audio output, local file selection and fullscreen against
-these exact headers. Check that
+revalidates. For the silent profile, verify WebGPU, the absence of audio
+output, local file selection and fullscreen against these exact headers. For
+the audio profile, verify its declared audio graph and PCM checks alongside
+the same isolation and security headers. Check that
 Cloudflare has not injected Web Analytics, Zaraz or another script.
 
 Cloudflare [_redirects](https://developers.cloudflare.com/pages/configuration/redirects/)
@@ -298,8 +344,9 @@ loopback and never accepted for a hosted URL.
 The player browser check runs the real public graph through startup, controls,
 invalid-disc retry, acknowledged owned-disc import, native preparation, original
 CSS/SSS navigation, pause/resume, Eject/reload and another import/launch. For the
-initial silent alpha it requires zero audio contexts and no audio output; a
-future audio-enabled profile needs its own license and audio validation gates.
+silent profile it requires zero audio contexts and no audio output. The
+authorized audio profile uses its own audio validation procedure and does not
+inherit a silent-profile result.
 Inspect requests through the entire session: all application
 requests must be expected same-origin static GETs without bodies or queries;
 no disc bytes, derived assets, file names or local hashes may be transmitted.
@@ -307,17 +354,18 @@ Check WebSocket/beacon activity, cookies, local/session storage, IndexedDB,
 Cache Storage and service workers. Only keyboard preferences should persist.
 Do not put the local disc path or game screenshots in public evidence.
 
-If audio is restored later, a real audio graph alone is not proof of acoustic
-output or PCM equivalence. A menu smoke is not a complete match/performance
-result. Record any timing-guard pause
-and manual resume in the scoped evidence. Broad game content, mobile play,
-physical controllers, retail equivalence and uninterrupted performance remain
-separate acceptance work.
+For the audio profile, a real audio graph alone is not proof of acoustic output
+or PCM equivalence. A menu smoke is not a complete match/performance result.
+Record any timing-guard pause and manual resume in the scoped evidence. Broad
+game content, mobile play, physical controllers, retail equivalence and
+uninterrupted performance remain separate acceptance work.
 
 ## Reproduction, rollback and incident response
 
 Keep at least one verified production deployment and its full manifest. Retain the
 exact source-bound native files, identity, public output and operator config.
+For the audio rollout, keep the previously verified silent `runtime-public`
+deployment available as rollback until the audio package has its own receipts.
 A rebuild must pass its own identity/audit and reproduce the public bytes from
 that frozen native input. Independent native rebuilds can differ with compiler
 or graphics-port tooling and require a new comparison and verification; do not
@@ -349,9 +397,11 @@ The source checkpoint and runtime graph hash identify a candidate; branch names
 alone do not. Build a production-mode candidate once, audit it, upload those
 exact bytes to a staging branch and verify the immutable deployment URL. Then
 upload that same unchanged directory to the production branch and compare the
-returned immutable URL and apex to the same manifest. Record both deployment
-IDs and the prior production ID. HTML links to its own runtime hash, so an old
-page cannot accidentally load a newer runtime module during a rollout.
+returned immutable URL and apex to the same manifest. This same-byte rule is
+mandatory for the `audio-player` package; see [Production audio](AUDIO_PRODUCTION.md)
+for its exact wrapper and identity. Record both deployment IDs and the prior
+production ID. HTML links to its own runtime hash, so an old page cannot
+accidentally load a newer runtime module during a rollout.
 
 There is no automatic release of changing runtime heads. Normal development
 continues in the shared native code and `melee-runtime.mjs`; diagnostics attach

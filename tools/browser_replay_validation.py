@@ -132,8 +132,19 @@ def validate_hitch_capture(capture, metrics):
     validate_cache_sync_capture(capture)
 
 
-def validate_report(report, recipe_hash, frames, mode, cold=None, *, expected_winner=None):
+def validate_report(report, recipe_hash, frames, mode, cold=None, *, expected_winner=None,
+                    expected_draws=None, expected_scheduling=None):
     require(isinstance(report, dict), 'Browser report must be an object')
+    scheduling = report.get('input_scheduling', 'per_tick')
+    require(scheduling in ('per_tick', 'startup_clock', 'recorded_queue'), 'Unknown input scheduling scope')
+    if expected_scheduling is not None:
+        require(scheduling == expected_scheduling, 'Input scheduling scope mismatch')
+    if scheduling == 'recorded_queue':
+        require(mode == 'state_capture' and expected_scheduling == 'recorded_queue' and
+                report.get('scheduling_equivalence') == 'not_evaluated' and
+                type(expected_draws) is int and
+                all(key in report.get('metrics', {}) for key in ('sourceSteps', 'sourceDraws')),
+                'Recorded queue replay requires explicit conditional state comparison')
     paint = report.get('diagnostic_page_paint')
     require(paint is None or (isinstance(paint, dict) and paint.get('mode') == 'normal'
                              and paint.get('diagnostic_only') is False
@@ -170,7 +181,11 @@ def validate_report(report, recipe_hash, frames, mode, cold=None, *, expected_wi
     # carry both counters; never accept a partial or mismatched pair.
     if 'sourceSteps' in metrics or 'sourceDraws' in metrics:
         for key in ('sourceSteps', 'sourceDraws'):
-            require(type(metrics.get(key)) is int and metrics[key] == frames,
+            expected_count = (expected_draws if key == 'sourceDraws' and
+                              expected_draws is not None else frames)
+            require(type(expected_count) is int and 1 <= expected_count <= frames,
+                    'Invalid independently computed source count')
+            require(type(metrics.get(key)) is int and metrics[key] == expected_count,
                     'Source tick/draw count mismatch: ' + key)
     for key in ('browserCallbacks', 'nativeCallbacks'):
         require(type(metrics.get(key)) is int and metrics[key] > 0, 'Missing active callbacks')

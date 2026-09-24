@@ -28,6 +28,37 @@ struct Fixture {
         b[pub+8]='r';return std::make_shared<melee_web::DatArchive>(b);
     }
 };
+struct SharedTextureFixture : Fixture {
+    SharedTextureFixture() {
+        data.resize(512);
+        // Two independent texture AObjs use the same authored FObj bytes.
+        // The texture descriptors and AObjs remain distinct source records.
+        link(28, 220); // first TexAnim -> second TexAnim
+        put32(data, 224, 1); // second TexAnim source texture ID
+        link(228, 380); // second TexAnim -> second AObj
+        link(232, 68); // share the image table, not the descriptor
+        put32(data, 240, 2U << 16); // two images, no palettes
+        link(388, 76); // second AObj -> the same FObj as the first AObj
+    }
+};
+struct SharedMaterialFixture : Fixture {
+    SharedMaterialFixture() {
+        data.resize(512);
+        // Two material AObjs use the same authored FObj. The DObj chain is
+        // separate from the texture chain above so both local cycle guards
+        // are exercised independently.
+        link(12, 340);  // first DObj -> second DObj
+        link(16, 360);  // first DObj -> first material AObj
+        link(344, 380); // second DObj -> second material AObj
+        put32(data, 424, 4); // shared material FObj stream length
+        put32(data, 428, std::bit_cast<uint32_t>(10.0f));
+        data[432] = 10; data[433] = 0x85;
+        link(436, 440); // shared material FObj -> stream
+        std::copy(data.begin() + 96, data.begin() + 100, data.begin() + 440);
+        link(368, 420); // first AObj -> shared FObj
+        link(388, 420); // second AObj -> shared FObj
+    }
+};
 struct PairedFixture : Fixture {
     PairedFixture() {
         // Make both image and palette tables explicit and give the two
@@ -65,6 +96,33 @@ int main() {
             try {melee_web::DatMaterialAnimation invalid(bad.archive(),0,model);}catch(const melee_web::DatError&){failed=true;}
             check(failed,"malformed material animation must reject before native evaluation");
         };
+        auto rejected_for=[&](const auto& bad, const auto& checked_model) {
+            bool failed=false;
+            try {melee_web::DatMaterialAnimation invalid(bad.archive(),0,checked_model);}catch(const melee_web::DatError&){failed=true;}
+            check(failed,"malformed material animation must reject its local animation cycle");
+        };
+        MeleeWebNativeTextureDesc textures[2]{};
+        textures[0].source_id=0; textures[1].source_id=1;
+        MeleeWebNativeMaterialDesc multi_material=material;
+        multi_material.textures=textures; multi_material.material.texture_count=2;
+        MeleeWebNativeGraph texture_model{&joint,&dobj,nullptr,&multi_material,1,1,0,1,0};
+        SharedTextureFixture shared_texture;
+        melee_web::DatMaterialAnimation texture_alias(shared_texture.archive(),0,texture_model);
+        check(texture_alias.texture_animation_count()==2,
+              "independent texture AObjs may share one authored FObj");
+        SharedTextureFixture texture_cycle; texture_cycle.link(76,76);
+        rejected_for(texture_cycle,texture_model);
+
+        MeleeWebNativeDObjDesc material_dobjs[2]{};
+        material_dobjs[0].next=1; material_dobjs[0].pobj=UINT32_MAX;
+        material_dobjs[1].next=UINT32_MAX; material_dobjs[1].pobj=UINT32_MAX;
+        MeleeWebNativeGraph material_model{&joint,material_dobjs,nullptr,&material,1,2,0,1,0};
+        SharedMaterialFixture shared_material;
+        melee_web::DatMaterialAnimation material_alias(shared_material.archive(),0,material_model);
+        check(material_alias.descriptor() && material_alias.texture_animation_count()==1,
+              "independent material AObjs may share one authored FObj");
+        SharedMaterialFixture material_cycle; material_cycle.link(420,420);
+        rejected_for(material_cycle,material_model);
         for(unsigned channel=2;channel<=9;channel++){
             Fixture numeric;numeric.data[88]=channel;numeric.data[96]=0x12;
             melee_web::DatMaterialAnimation transform(numeric.archive(),0,model);
@@ -129,6 +187,10 @@ int main() {
         repeated.link(0xa00,0x4000);put32(repeated.data,0xa04,0x04000400);
         put32(repeated.data,0xa08,9); // 1024x1024 CI8, one checked image
         repeated.link(0xa20,0x104000);put32(repeated.data,0xa2c,1U<<16);
+        repeated.link(76,160);put32(repeated.data,164,4);
+        repeated.data[172]=10;repeated.data[173]=0x85;repeated.link(176,192);
+        std::copy(repeated.data.begin()+96,repeated.data.begin()+100,repeated.data.begin()+192);
+        repeated.data[195]=0; // independent TCLT keeps Cartesian validation
         melee_web::DatMaterialAnimation repeated_tables(repeated.archive(),0,model);
         check(repeated_tables.image_count()==256,"aliased image tables stay within actual validation work budget");
         repeated.data[0x4000]=1;rejected(repeated); // still rejects invalid indices
@@ -140,12 +202,52 @@ int main() {
         melee_web::DatMaterialAnimation synchronized(paired.archive(),0,model);
         check(synchronized.texture_animation_count()==1,
               "synchronized index/palette tracks use diagonal validation");
+
+        // HSD keeps the authored TCLT table even when a selected TIMG image
+        // is non-CI; setup ignores that TLUT for I/IA/RGB/CMPR images. The
+        // image table and palette table remain independently bounds-checked.
+        PairedFixture mixed_nonindexed;
+        put32(mixed_nonindexed.data,132,14); // image[1]: CMPR, not indexed
+        put16(mixed_nonindexed.data,476,1);  // one valid, unused TLUT entry
+        melee_web::DatMaterialAnimation mixed(mixed_nonindexed.archive(),0,model);
+        check(mixed.texture_animation_count()==1,
+              "nonindexed selected image preserves authored TCLT table");
+        auto mixed_bad_tlut = mixed_nonindexed;
+        put16(mixed_bad_tlut.data,476,0);
+        rejected(mixed_bad_tlut); // non-CI still requires a valid authored TLUT descriptor
+        auto mixed_bad_tclt = mixed_nonindexed;
+        mixed_bad_tclt.data[195]=64; // TCLT value 2, outside its two-entry table
+        rejected(mixed_bad_tclt); // table-index bounds remain enforced before setup
         PairedFixture divergent;
         divergent.data[195]=0; // TCLT selects a different second index
         rejected(divergent);
         PairedFixture out_of_range;
         put16(out_of_range.data,476,1); // selected image[1] index one is invalid
         rejected(out_of_range);
+
+        // An authored palette table alone does not select its entries.
+        // HSD_TObjAddAnim starts tlut_no at -1 and TIMG leaves it unchanged.
+        PairedFixture image_only;
+        image_only.relocations.erase(std::remove(image_only.relocations.begin(),
+            image_only.relocations.end(),76),image_only.relocations.end());
+        put32(image_only.data,76,0);
+        const uint16_t base_palette[2] = {0,0};
+        texture.texture.palette_data=base_palette;
+        texture.texture.palette_bytes=sizeof(base_palette);
+        texture.texture.palette_entries=2;
+        melee_web::DatMaterialAnimation base_tlut(image_only.archive(),0,model);
+        check(base_tlut.texture_animation_count()==1,
+              "TIMG-only animation keeps the source base palette");
+        auto absent_table=image_only;
+        absent_table.relocations.erase(std::remove(absent_table.relocations.begin(),
+            absent_table.relocations.end(),44),absent_table.relocations.end());
+        put32(absent_table.data,44,0);put32(absent_table.data,48,2U<<16);
+        melee_web::DatMaterialAnimation base_without_table(absent_table.archive(),0,model);
+        auto broken_unused=image_only;put16(broken_unused.data,476,0);
+        rejected(broken_unused); // unselected descriptors still need valid storage
+        texture.texture.palette_entries=1;rejected(image_only);
+        texture.texture.palette_entries=2;
+        texture.texture.palette_data=nullptr;rejected(image_only);
         std::cout<<"owned material animation topology/index/bounds checks passed\n";
     }catch(const std::exception& e){std::cerr<<e.what()<<'\n';return 1;}
 }

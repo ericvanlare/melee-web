@@ -1,0 +1,58 @@
+{
+  "schema": "melee-web-public-link-release-v1",
+  "date": "2026-09-19",
+  "source_commit": "2ee80ab70ac0d697a7abf7cdf337ca216908ea3b",
+  "reviewed_head": "e42fd88a8d1ee117f7c53d526d3303264ae54bc7",
+  "source_tree": "7d9b0d97f7d884895cbb6149887023deca158dbf",
+  "runtime_hash": "2022d4f4c720f5ea",
+  "manifest_sha256": "fa3614a3701cefa8a0e1c1f322cd9d1eb10483c5f7e22a9961431e492099a7ff",
+  "wasm_sha256": "daae149f48cfe84f4831159159445cc35152e75934f9049f7fa2cf32590235c6",
+  "public_files": 25,
+  "public_bytes": 14903672,
+  "staging_url": "https://eb434dfe.webmelee-staging.pages.dev",
+  "production_url": "https://ccff0e62.webmelee.pages.dev",
+  "apex": "https://webmelee.gg",
+  "production_deployment_id": "ccff0e62-aa8b-4295-8b3b-d3e978422e01",
+  "rollback_deployment_id": "df30399f-2e57-411d-87c3-1fc2a1b57b93",
+  "rollback_manifest_sha256": "56717f2ddeca21388ca8996ee930c8df17e341f969c07061fab83cc4054cba03",
+  "verification": {
+    "exact_staging_bytes_promoted": true,
+    "http_origins": [
+      "https://ccff0e62.webmelee.pages.dev",
+      "https://webmelee.gg"
+    ],
+    "exact_resources_per_origin": 23,
+    "missing_routes_per_origin": 32,
+    "headed_browser_checks_per_origin": 10,
+    "browser": "Chrome 153.0.8010.50",
+    "audio_contexts": 0,
+    "application_uploads": 0,
+    "staging_functional_routes": [
+      {
+        "route": "Link vs Young Link / Final Destination",
+        "cold_source_updates": 450,
+        "warm_source_updates": 450,
+        "cold_manual_resumes": 3,
+        "warm_manual_resumes": 0
+      },
+      {
+        "route": "Young Link vs Link / Final Destination",
+        "cold_source_updates": 450,
+        "warm_source_updates": 450,
+        "cold_manual_resumes": 2,
+        "warm_manual_resumes": 0
+      }
+    ]
+  },
+  "scope": "Browser exercised: public packaging, ordinary-keyboard CSS/SSS and bounded actions, Pause/Resume and Eject/reimport. No complete match, original-state comparison, pixels, PCM, physical-controller or performance admission from this deployment smoke.",
+  "retained_failure": {
+    "native_callback_ms": 600.31,
+    "staging_wait_ms": 583.415,
+    "source_updates_in_callback": 7,
+    "automatic_timing_pause": true,
+    "source": "Separate staging diagnostic without live screenshot/readback",
+    "issue": "https://github.com/ericvanlare/melee-web/issues/33"
+  },
+  "holdouts_opened": false,
+  "performance_admitted": false
+}

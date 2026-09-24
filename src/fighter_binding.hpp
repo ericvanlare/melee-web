@@ -1,6 +1,7 @@
 #pragma once
 
 #include "dat_animation.hpp"
+#include <array>
 #include <string_view>
 
 namespace melee_web {
@@ -30,13 +31,21 @@ struct DatCommonFighterLayout {
 
 struct DatFighterAction {
     std::uint32_t motion_id, container_offset, archive_bytes, motion_flags;
+    std::optional<std::uint32_t> command_offset;
+    std::array<std::uint8_t, 2> blend_dynamics{};
     std::string symbol;
 };
+// The source ftData keeps ordinary gameplay rows at ftData + 0x0c and the
+// demo/result rows at ftData + 0x14. Both tables use the same authored row
+// layout, but their motion IDs are separate source domains.
 class DatFighterActions {
 public:
     std::uint32_t fighter_kind;
     std::vector<DatFighterAction> actions;
     DatFighterActions(const DatArchive& fighter_data, const FighterCostume& costume);
+    DatFighterActions(const DatArchive& fighter_data, const FighterCostume& costume,
+                      std::uint32_t table_field_offset,
+                      std::uint32_t motion_count);
     [[nodiscard]] bool contains(std::string_view symbol) const noexcept;
     // Aliased motion records may share the same archive/name. Conflicting
     // offset/length aliases are rejected; the first source motion id is returned.
@@ -47,6 +56,7 @@ public:
     [[nodiscard]] std::span<const std::uint8_t>
     slice(std::span<const std::uint8_t> container, std::uint32_t motion_id) const;
 };
+[[nodiscard]] std::uint32_t fighter_demo_motion_count(std::uint32_t fighter_kind) noexcept;
 
 struct FighterAnimationBinding {
     std::uint32_t fighter_kind, costume_index, motion_id;

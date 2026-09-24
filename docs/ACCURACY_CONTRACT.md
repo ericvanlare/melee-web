@@ -66,6 +66,18 @@ or retail-reference result. The later MarioReady operation-55 representation
 defect is fixed, and fresh native whole-match routes pass on both admitted
 stages.
 
+Issue #34 extends the historical Results-skipping slice with original Results,
+optional Prize and retained source heap across successive matches. The draft
+now completes repeated ordinary-keyboard No Contest and normal four-stock
+returns in a visible browser, including the named fighter/stage rotation.
+Original profile initialization and normal elimination also pass focused
+native checks. Keyboard-only input validation is accepted for this PR;
+physical-controller and latency acceptance remain separate. Repeatable original
+comparisons, repeated lifecycle memory bounds
+and whole-loop performance remain open. See the [current return-loop evidence](
+VERSUS_RETURN_LOOP.md#profile-and-prize-integration-2026-09-20) for the precise
+scope and retained failures.
+
 ## Optimization policy
 
 - Keep source action logic, collision, damage, RNG consumption, object/process
@@ -96,11 +108,12 @@ stages.
 | Catch-up sampling | `gameplay_browser.cpp` and `gameplay_menu_browser.cpp` poll once per browser callback and may reuse that sample for multiple source steps | Specify and verify per-tick input acquisition and phase/order under actual browser constraints; never claim missing historical samples were recovered |
 | Catch-up output | Source audio has an independent bounded catch-up clock; CSS/SSS retain its fractional phase, while a true owner change pauses and re-primes the worklet | Explicit overload behavior plus measured input/audio timing; catch-up runs cannot count as uninterrupted performance acceptance |
 | Fixed 60.0 clock | Host clock and sample production currently use exactly 60 | Establish selected retail VI mode/cadence and input scheduling from reference evidence, including long-run drift; do not assume the nominal label proves exact cadence |
+| DSP direct-mode phase | The port retains phase; original DSP accumulator-dependent block writeback is not yet verified. The [audio replacement](AUDIO_REPLACEMENT_EVIDENCE.md) preserves existing port behavior | Compare a focused direct-to-filtered transition against the original DSP before claiming equivalence or a confirmed deviation |
 | DSP coefficients | Generated replacement DROM is approximately equivalent, not identical to hardware | Validate the audio path against an independent reference and obtain exact coefficient/input support if needed; identical approximations on both sides are not an independent oracle |
 | Native numerics | Bounded original jump, jab and stock traces exist; no complete match equivalence | Broaden bit-preserving semantic traces under identical initial conditions and input sequences; locate first divergence |
 | Match initialization | The supported native handoff carries full `StartMeleeData` through `fn_8016DCC0`, including ports, costumes/tints, four stocks and RNG; broader modes and configurations remain outside the validated slice | Compare exact supported original start configuration and extend the source initializer before broadening modes or claiming general start-state equivalence |
 | Original HUD | Original Ready/Go, damage/stocks and markers execute and render; source damage/intro/repeat-lifetime checks and two browser diagnostic loops pass, and Falco/Mario stock identities render on Battlefield | Compare authored interface rendering, timing and audio against the original; complete ordinary-input and reference checks beyond Mario/FD |
-| Match ending | Original supported VS ending callback, GAME!/Game Set interface/audio request, source process mask, pause/resume, No Contest and exit request are integrated; two Node cycles pass the source ending checks | Verify rendered/audio/reference behavior and broader source modes. Results routing remains skipped after the original exit; this does not claim full `gm_Scene_Vs_OnEnter` or retail scene-manager equivalence |
+| Match ending | Original supported VS ending callback, GAME!/Game Set interface/audio request, source process mask, pause/resume, No Contest and exit request are integrated; the draft original Results/Prize return route has scoped native and keyboard-browser evidence, including three normal Mario matches and the named four-match fighter/stage rotation | Complete original-game comparison and whole-loop timing. The historical Results-skipping checks do not establish this extended route or retail scene-manager equivalence |
 | Rendering | Native HSD/GX path renders the current match and browser original pause artwork/camera; no complete pixel equivalence | Reference camera, transforms, materials, blending, depth, effects, viewport and output timing on a declared baseline |
 | Device/latency acceptance | Keyboard Start and SSS cancellation pass; complete ordinary native-menu play, physical controllers and end-to-end latency remain unaccepted; cold timing pauses are observed | Real-device routing, disconnect/reconnect, simultaneous players, analog thresholds and independently measured latency; cold/warm long-match tests |
 
@@ -139,6 +152,12 @@ configuration; do not promise exact uninterrupted behavior from missing input.
    allowed browser/configuration and immutable build identity). Keep experimental
    options separate, expose failures, and seek community/organizer evaluation
    only when evidence supports it. A partial Mario/FD slice is not tournament-ready.
+
+For compiled gameplay replay, recorded controller-queue snapshots may be supplied
+as explicit platform input fixtures. Label such evidence conditional on that
+recorded schedule and retain exact game-state and source-boundary comparisons.
+It does not establish original CPU interrupt scheduling, live controller timing
+or performance acceptance. See [recorded queue replay](RECORDED_QUEUE_REPLAY.md).
 
 Acceptance is scenario- and field-scoped. Finite testing cannot prove every
 possible game state; report the precise verified scope and known failures rather

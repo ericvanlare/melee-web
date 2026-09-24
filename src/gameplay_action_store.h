@@ -25,6 +25,7 @@ int melee_web_action_bind(struct Fighter*, void* context, MeleeWebActionSelect,
     MeleeWebActionTransfer);
 void melee_web_action_unbind(struct Fighter*);
 void melee_web_action_load(struct Fighter* destination, struct Fighter* source, int motion, unsigned slot);
+void* melee_web_action_fighter_table(struct Fighter*);
 /* Canonical instruction words are decoded into original native named fields.
  * target is the native word index of a checked branch; UINT32_MAX otherwise. */
 typedef struct MeleeWebCommandWord { uint32_t word, target; } MeleeWebCommandWord;
@@ -47,6 +48,7 @@ MeleeWebNativeActionRows* melee_web_action_rows_create(const MeleeWebActionRow*,
     const MeleeWebWaitChoice*, size_t wait_count);
 void melee_web_action_rows_destroy(MeleeWebNativeActionRows*);
 void* melee_web_action_rows(MeleeWebNativeActionRows*);
+size_t melee_web_action_row_count(const MeleeWebNativeActionRows*);
 void* melee_web_action_identity(MeleeWebNativeActionRows*, size_t motion);
 void* melee_web_action_blends(MeleeWebNativeActionRows*);
 void* melee_web_action_waits(MeleeWebNativeActionRows*);

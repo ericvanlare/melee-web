@@ -1,0 +1,230 @@
+{
+  "application": {
+    "binary_sha256": "4c051d5e16bd683951cc11d55680e41f2885865de0c6a1d27cd846145c0aa8f3",
+    "build": "4",
+    "declares_documents_access": false,
+    "identity_sha256": "a716770d45fbaf9259718f8ef629b0affd1ec40f5704b3490b47e2e02808940c",
+    "version": "0.2.1"
+  },
+  "limits": [
+    "single physical recording and one exact original replay",
+    "port equivalence not established by the original pair",
+    "audio PCM, menu equivalence and virtual memory-card comparison remain uncovered",
+    "capture performance acceptance not claimed",
+    "prior captures require their preserved matching tooling identity"
+  ],
+  "migration": {
+    "bytes": 90244,
+    "configuration_change": "fixture path only; original settings archived privately",
+    "controller_mapping_preserved": true,
+    "documents_reads_in_guarded_environment_verification": 0,
+    "external_fixture_rejected_before_filesystem_read": true,
+    "fixture_sha256": {
+      "SRAM.raw": "3ebf0d88061ea04d1f757894ee36e27b3e10bb9102b1ae961a7c5c644e4d59db",
+      "USA/Card A/01-GALE-SuperSmashBros0110290334.gci": "f64c9e07e436221ffc76acac7116a70167b2a690a59d5c56c2469c6fb5f2a1e6"
+    },
+    "original_preserved": true,
+    "storage": "private Application Support/PreparedFixtures/<inventory-sha256>/GC"
+  },
+  "original_pair": {
+    "capture_application_identity_sha256": "2d79883c170c180ad7752f4eada4da9cb31eae6a4ee0f5b22d3432abcde5fa56",
+    "capture_application_version": "0.2.0",
+    "input_stream": {
+      "bytes": 850776,
+      "events": 21268,
+      "sha256": "abc10783718ee621463c9fc3607f788910f6b7c4904f7218c1926ecaa9f25071"
+    },
+    "observed_setup": {
+      "cpu_level": 6,
+      "cpu_p2": "Marth",
+      "human_p1": "Falco",
+      "stage": "Yoshi\u2019s Story",
+      "stocks": 4,
+      "timer": 0
+    },
+    "operator_attestation": "user reported a physical Falco versus Marth four-stock Yoshi\u2019s Story session",
+    "recording": {
+      "completion": {
+        "complete": true,
+        "missing_coverage": [
+          "audio_pcm",
+          "menu_equivalence",
+          "virtual_memory_card_comparison"
+        ],
+        "pad_polls": 10625,
+        "physical_controller_validation": "not_performed_by_automation",
+        "result": {
+          "outcome": 2,
+          "winners": [
+            0
+          ]
+        },
+        "source_draws": 9011,
+        "source_ticks": 9019
+      },
+      "manifest_sha256": "47a9bacbd062e178033b5e16e1913c8e4383544356fd793412a6a6abb9324416",
+      "observer_sha256": "76694b0153395f6aa344e2401d60192c21b50b852f9ddb25ec73ae04d967eec4",
+      "record_count": 47658,
+      "run_id": "a836cbff8a5249e289f334cfd120285c",
+      "session_id": "20260914T233827Z-f39104c2bb4e"
+    },
+    "replay": {
+      "completion": {
+        "complete": true,
+        "missing_coverage": [
+          "audio_pcm",
+          "menu_equivalence",
+          "virtual_memory_card_comparison"
+        ],
+        "pad_polls": 10625,
+        "physical_controller_validation": "not_performed_by_automation",
+        "result": {
+          "outcome": 2,
+          "winners": [
+            0
+          ]
+        },
+        "source_draws": 9011,
+        "source_ticks": 9019
+      },
+      "manifest_sha256": "18e317db1b83549499c2b28326773ee7d92efae018da8427d53ca4e5eb57584b",
+      "observer_sha256": "cb3764d4ab72522e23efb59406e132dc1f650ab087acfdd3fb5a80ed62d8b3db",
+      "record_count": 47658,
+      "run_id": "d0139d696c4f4d65928e6fe8deaf4e4d",
+      "session_id": "20260914T234915Z-d3d8a54c3e50"
+    },
+    "semantic": {
+      "addresses_compared": true,
+      "addresses_used_as_replay_inputs": false,
+      "domains": {
+        "camera": {
+          "first_divergence": null,
+          "records_a": 18031,
+          "records_b": 18031,
+          "status": "matched"
+        },
+        "cpu": {
+          "first_divergence": null,
+          "records_a": 18031,
+          "records_b": 18031,
+          "status": "matched"
+        },
+        "draw": {
+          "first_divergence": null,
+          "records_a": 18022,
+          "records_b": 18022,
+          "status": "matched"
+        },
+        "fighter": {
+          "first_divergence": null,
+          "records_a": 9019,
+          "records_b": 9019,
+          "status": "matched"
+        },
+        "hud": {
+          "first_divergence": null,
+          "records_a": 18031,
+          "records_b": 18031,
+          "status": "matched"
+        },
+        "magnifier": {
+          "first_divergence": null,
+          "records_a": 18031,
+          "records_b": 18031,
+          "status": "matched"
+        },
+        "match": {
+          "first_divergence": null,
+          "records_a": 9019,
+          "records_b": 9019,
+          "status": "matched"
+        },
+        "pad": {
+          "first_divergence": null,
+          "records_a": 29625,
+          "records_b": 29625,
+          "status": "matched"
+        },
+        "result": {
+          "first_divergence": null,
+          "records_a": 3,
+          "records_b": 3,
+          "status": "matched"
+        },
+        "rng": {
+          "first_divergence": null,
+          "records_a": 9019,
+          "records_b": 9019,
+          "status": "matched"
+        },
+        "scene": {
+          "first_divergence": null,
+          "records_a": 37668,
+          "records_b": 37668,
+          "status": "matched"
+        },
+        "setup": {
+          "first_divergence": null,
+          "records_a": 4,
+          "records_b": 4,
+          "status": "matched"
+        },
+        "source": {
+          "first_divergence": null,
+          "records_a": 9019,
+          "records_b": 9019,
+          "status": "matched"
+        },
+        "subject": {
+          "first_divergence": null,
+          "records_a": 18031,
+          "records_b": 18031,
+          "status": "matched"
+        },
+        "teardown": {
+          "first_divergence": null,
+          "records_a": 1,
+          "records_b": 1,
+          "status": "matched"
+        },
+        "transport": {
+          "first_divergence": null,
+          "records_a": 47658,
+          "records_b": 47658,
+          "status": "matched"
+        }
+      },
+      "first_divergence": null,
+      "ignored_fields": [],
+      "missing_coverage": [],
+      "records_a": 47658,
+      "records_b": 47658,
+      "status": "matched"
+    },
+    "status": "matched"
+  },
+  "preservation": {
+    "game_payloads_in_git": false,
+    "pr16_head": "22b71a0a81fa5bfdf7856f9a451c3f0081b01b6b",
+    "pr16_not_modified": true,
+    "public_deployment_changed": false
+  },
+  "schema": "webmelee-reference-documents-migration",
+  "scope": "private fixture relocation and one operator-recorded original Dolphin replay",
+  "source_sha256": {
+    "scripts/configure_reference_capture.py": "bdbf65be74c210e904cdea02aa9e2388bb8996de086d0168927c79eb35eda537",
+    "scripts/install_reference_capture.py": "8edd099301e87e8b9b9616f9420a02e47d709f22026245f362da808da99fc99b",
+    "scripts/reference_capture_app.py": "556a7d9532a6e6ba4a334b16935b508f244b5e72d81d9e173784fde1cf1c2efc",
+    "tests/test_reference_capture_app.py": "98b9fc4fc54b0b918227ae4405ae87fd8f136f4429ef815bb774549c24b0ab59",
+    "tests/test_reference_capture_configure.py": "097d31a1729d6cb3a9ca3e9a0008b8686bbb28a29a955f201c09a3ba465b8ee8",
+    "tests/test_reference_capture_environment.py": "88e3096feba72fbc463f63f51a8c39e433efa120bd67f33dfc2b1581bd4143ba",
+    "tools/reference_capture_environment.py": "48c10492d3e319d6df30a484ba5e720031b5d22b3d7370025ab7424a4ff56877"
+  },
+  "validation": {
+    "app_build": "passed",
+    "focused_log_sha256": "71f9c558c9aae022bc9e220a7358dd20b6942cea13ef2b039de8b9a5a08bb100",
+    "focused_tests": 90,
+    "prelaunch_tooling_mismatch": "rejected instead of reporting a gameplay divergence"
+  },
+  "version": 1
+}

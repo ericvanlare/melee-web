@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Headed, sequential replay driver. Only public page controls supply game input.
+/** Foreground-only, sequential replay driver. Pass --headed explicitly. Only public page controls supply game input.
  * A frozen Python ledger owns the repetition bound; this driver cannot retry slots.
  * Usage and evidence limitations: docs/HITCH_CAPTURE.md.
  */
@@ -9,6 +9,7 @@ import crypto from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
+import {createBrowserDriver} from './browser_driver.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const sha = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
@@ -22,6 +23,7 @@ export const BUILD_ARTIFACTS=Object.freeze(await read(new URL('../tools/browser_
 export const HARNESS_ARTIFACTS=Object.freeze([
   'scripts/hitch_capture.py','tools/hitch_capture.py','tools/browser_replay_validation.py',
   'tools/browser_build_artifacts.json',
+  'scripts/browser_driver.mjs',
 ]);
 const validSha=value=>typeof value==='string'&&/^[0-9a-f]{64}$/.test(value);
 function validateHashInventory(inventory,required,label) {
@@ -119,6 +121,21 @@ export function pagePaintCondition(slot) {
   if(!['normal','hidden'].includes(mode))throw Error('Unknown page-paint condition');
   if(mode==='hidden'&&slot.mode!=='profiler')throw Error('Hidden page painting is diagnostic only');
   return mode;
+}
+
+export function planRole(plan) {
+  const role=plan?.role===undefined?'development':plan.role;
+  if(role!=='development'&&role!=='holdout')throw Error('Unsupported hitch plan role');
+  const recipes=role==='holdout'?'holdout_recipes':'development_recipes';
+  if(!plan?.identities?.[recipes]||Array.isArray(plan.identities[recipes])||
+     typeof plan.identities[recipes]!=='object')
+    throw Error(`Missing ${recipes} for ${role} hitch plan`);
+  return {role,recipes};
+}
+
+export function stopAfterHoldoutFailure(role, finished) {
+  return role==='holdout' &&
+    (finished?.status!=='completed' || finished?.validation?.valid!==true);
 }
 
 export function verifyPagePaintReport(report,slot) {
@@ -292,6 +309,7 @@ async function publicReport(page, deadline) {
 
 async function run(options,pw) {
   const planPath=path.resolve(options.plan),plan=await read(planPath);
+  const planIdentity=planRole(plan);
   const machine=await read(plan.identities.profile.path);
   validateFrozenBuildProfile(machine,plan.identities.build_artifacts);
   for(const slot of plan.slots)pagePaintCondition(slot);
@@ -318,11 +336,12 @@ async function run(options,pw) {
       const started=ledger('start',['--slot',slot.slot_id]);
       const directory=started.attempt_dir;
       const deadline=Date.now()+plan.timeout_ms;
+      const driver=createBrowserDriver(page,{surface:'development',deadline});
       const errors=[],attachments=[];let tracing=false,reportPath=null,reason=null,replayStarted=false,traceWindow=null,traceReusable=true;
       const pageError=e=>errors.push({type:'pageerror',message:String(e),at:new Date().toISOString()});
       const consoleError=m=>{if(m.type()==='error')errors.push({type:'console',message:m.text(),location:m.location(),at:new Date().toISOString()});};
       page.on('pageerror',pageError);page.on('console',consoleError);
-      console.log(JSON.stringify({event:'started',slot:slot.slot_id,target:slot.target_id,mode:slot.mode,cache:slot.cache}));
+      console.log(JSON.stringify({event:'started',role:planIdentity.role,slot:slot.slot_id,target:slot.target_id,mode:slot.mode,cache:slot.cache}));
       try {
         // Fetch outside the source clock, after the durable slot reservation.
         // A server pointing to another build consumes a failed slot too.
@@ -336,13 +355,11 @@ async function run(options,pw) {
         await page.goto(url.href,{waitUntil:'load',timeout:remainingTimeout(deadline,60000)});
         await page.bringToFront();
         await cdp.send('Emulation.setFocusEmulationEnabled',{enabled:false});
-        await page.locator('#disc').setInputFiles(path.resolve(options.disc),{timeout:remainingTimeout(deadline,60000)});
-        while(!((await page.locator('#status').textContent({timeout:remainingTimeout(deadline)})).includes('Local menu data loaded.'))) {
-          if(Date.now()>deadline)throw Error('Disc preparation exceeded frozen wall-time bound');
-          await delay(remainingTimeout(deadline,500));
-        }
+        await driver.selectDisc(path.resolve(options.disc));
+        await driver.waitForStart();
         await page.getByText('Diagnostics',{exact:true}).click({timeout:remainingTimeout(deadline)});
-        const recipe=plan.identities.development_recipes[slot.target_id];
+        const recipe=plan.identities[planIdentity.recipes][slot.target_id];
+        if(!recipe)throw Error(`Missing ${planIdentity.recipes} identity for ${slot.target_id}`);
         await page.locator('#retail-replay-file').setInputFiles(recipe.path,{timeout:remainingTimeout(deadline)});
         await page.locator('#retail-replay-mode').selectOption('performance',{timeout:remainingTimeout(deadline)});
         if(slot.mode==='profiler'){
@@ -362,6 +379,10 @@ async function run(options,pw) {
           throw Error('Unprofiled slot unexpectedly enabled causal sync diagnostics');
       } catch(error) {
         reason=String(error.stack||error);
+        if(error.diagnostics){
+          const failurePath=path.join(directory,'driver-failure.json');
+          await save(failurePath,{step:error.step,...error.diagnostics});attachments.push(failurePath);
+        }
         // Stop a timed-out/failed replay through its public control and retain
         // its partial report. This is failure teardown, never a timing resume.
         if(replayStarted&&!reportPath)try {
@@ -371,6 +392,7 @@ async function run(options,pw) {
         }catch(teardownError){reason+='\nFailure teardown: '+String(teardownError);}
       }
       finally {
+        driver.dispose();
         if(tracing)try{
           const trace=await finalizeTrace(cdp,directory,settings,traceWindow);
           attachments.push(...trace.paths);traceReusable=trace.reusable;
@@ -393,6 +415,8 @@ async function run(options,pw) {
         const finished=ledger('finish',args);
         console.log(JSON.stringify({event:'finished',slot:slot.slot_id,status:finished.status,
           validation:finished.validation,summary:finished.performance_summary}));
+        if(stopAfterHoldoutFailure(planIdentity.role,finished))
+          throw Error('Holdout failed; browser closed. Remaining slots are unconsumed.');
         // A failed end could deliver a late completion for the wrong slot.
         // Preserve this attempt, then close the context without starting another.
         if(!traceReusable)throw Error('Trace state unresolved; browser closed. Remaining slots are unconsumed.');
@@ -405,9 +429,14 @@ async function run(options,pw) {
 }
 
 if(process.argv[1]&&path.resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
-  const {values,positionals}=parseArgs({allowPositionals:true,options:Object.fromEntries(
-    ['plan','disc','python','playwright','out','build','browser-profile','url','trace-detail'].map(k=>[k,{type:'string'}]))});
+  const {values,positionals}=parseArgs({allowPositionals:true,options:{
+    ...Object.fromEntries(['plan','disc','python','playwright','out','build','browser-profile','url','trace-detail']
+      .map(k=>[k,{type:'string'}])),
+    headed:{type:'boolean',default:false},
+  }});
   try {
+    if(!values.headed)
+      throw Error('Foreground browser access requires explicit --headed; no browser or capture artifacts were created.');
     const required=positionals[0]==='profile'?['out','build','browser-profile']:['plan','disc'];
     for(const key of required)if(!values[key])throw Error('Missing required --'+key+'; see docs/HITCH_CAPTURE.md');
     const pw=await playwright(values.playwright);

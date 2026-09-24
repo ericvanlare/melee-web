@@ -53,6 +53,7 @@ try:
         PREPARED_GAMEPLAY_PATCHES,
         RUNTIME_TOOLCHAIN_PATHS,
         PIPELINE_SEED_PATHS,
+        RUNTIME_ARTIFACT_ROOTS,
         _config,
         _headers,
         _redirects,
@@ -384,7 +385,7 @@ def _validate_player_runtime(output: Path, runtime: dict[str, Any], records: lis
     }
     if set(identity) != required_identity or identity.get("target") != "runtime-public" or identity.get("configuration") != "Release":
         _fail("player runtime identity does not match the producer contract")
-    if identity.get("artifact_root") != "build/browser-public-release":
+    if not isinstance(identity.get("artifact_root"), str) or identity["artifact_root"] not in RUNTIME_ARTIFACT_ROOTS:
         _fail("player runtime identity artifact_root is not the reviewed public Release output")
     try:
         _validate_audio_policy(identity)
@@ -437,7 +438,13 @@ def _validate_player_runtime(output: Path, runtime: dict[str, Any], records: lis
         "melee-runtime.mjs": ROOT / "web" / "melee-runtime.mjs",
         "runtime-assets.mjs": ROOT / "web" / "runtime-assets.mjs",
         "disc-image.mjs": ROOT / "web" / "disc-image.mjs",
+        "disc-session.mjs": ROOT / "web" / "disc-session.mjs",
         "prototype-keyboard-layouts.mjs": ROOT / "web" / "prototype-keyboard-layouts.mjs",
+        "controller-input.mjs": ROOT / "web" / "controller-input.mjs",
+        "controller-panel.mjs": ROOT / "web" / "controller-panel.mjs",
+        "controller-panel.css": ROOT / "web" / "controller-panel.css",
+        "controller-settings.mjs": ROOT / "web" / "controller-settings.mjs",
+        "controller-settings.css": ROOT / "web" / "controller-settings.css",
     }
     for rel in source_map:
         runtime_files[rel] = _read_output(output, f"{runtime_path}/{rel}", "player")
@@ -549,10 +556,11 @@ def _validate_player_runtime(output: Path, runtime: dict[str, Any], records: lis
     seed = identity.get("pipeline_seed")
     if not isinstance(seed, dict) or not isinstance(seed.get("source"), dict) or not isinstance(seed.get("materialized"), dict):
         _fail("player runtime pipeline seed identity is missing")
+    seed_paths = dict(PIPELINE_SEED_PATHS, materialized=f"{identity['artifact_root']}/initial_pipeline_cache.db")
     for key in ("source", "materialized"):
         part = seed[key]
         path_value, expected = part.get("path"), part.get("sha256")
-        if (path_value != PIPELINE_SEED_PATHS[key] or not isinstance(expected, str)
+        if (path_value != seed_paths[key] or not isinstance(expected, str)
                 or not re.fullmatch(r"[0-9a-f]{64}", expected)):
             _fail("player runtime pipeline seed fingerprint is invalid")
         path = _identity_path(path_value, f"pipeline seed {key}")

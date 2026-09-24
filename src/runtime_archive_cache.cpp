@@ -21,7 +21,12 @@ RuntimeArchiveCache::archive(std::string_view name, DatExternalPolicy policy)
         }
         return cached->second.archive;
     }
-    auto parsed = std::make_shared<const DatArchive>(file->second, policy);
+    std::shared_ptr<const DatArchive> parsed;
+    try {
+        parsed = std::make_shared<const DatArchive>(file->second, policy);
+    } catch (const DatError& error) {
+        throw DatError(std::string(name) + ": " + error.what());
+    }
     Entry entry;
     entry.archive = parsed;
     entry.baseline.assign(parsed->data().begin(), parsed->data().end());

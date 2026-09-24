@@ -1,0 +1,200 @@
+{
+  "schema": "melee-web-results-ness-peach-validation",
+  "version": 1,
+  "source_base_commit": "6ee805206b6cfb72818d5ae06c217fcaccd07e6c",
+  "scope": "Native source Results lifecycle, authored archive validation, read-only four-door CSS observation, and bounded headless source checks for Ness and Peach. This receipt does not establish original-game equivalence, rendered pixels, PCM, performance, natural match completion, or retail timing acceptance.",
+  "fixture_source": "Owned GALE01 revision 2 disc with the PR56 source-owned Results fixture for the existing enabled roster; extracted inputs remain under ignored assets-local directories.",
+  "focused_checks": [
+    {
+      "command": "node build/browser-release/gameplay_results_assets_test.js assets-local/pr61-results",
+      "local_path": "work/testlogs/pr61-results-assets-20260924.log",
+      "sha256": "280f1f474fded9f7fa8029da43de41bcbf0ddd26c1fc2a3a077d4c1db6c87bc0",
+      "result": "pass",
+      "scope": "91 authored Results clips across Mario, Dr. Mario, Fox, Falco, Marth, Roy, Link, Young Link, Ness, and Peach"
+    },
+    {
+      "command": "node build/browser-release/gameplay_results_scene_trace.js --real-enabled assets-local/pr61-results ../pr56/assets-local/results-fixtures assets-local/pr61-results",
+      "local_path": "work/testlogs/pr61-results-enabled-20260924.log",
+      "sha256": "e486715aee82f7a9d5ef7fdf9fcd0de3470524cf4c2e1ff772a54bd092332074",
+      "result": "pass",
+      "scope": "38 enabled-roster Results constructions across 19 fighters and both winner orientations"
+    },
+    {
+      "command": "node build/browser-release/gameplay_results_scene_trace.js --real-enabled-confirm assets-local/pr61-results ../pr56/assets-local/results-fixtures assets-local/pr61-results",
+      "local_path": "work/testlogs/pr61-results-enabled-confirm-20260924.log",
+      "sha256": "8acf0acf7737ff39be43341fdeabb9ee08434cbf1631b1e8a61983060d48f740",
+      "result": "pass",
+      "scope": "38 enabled-roster Results confirmations, source audio checks, and teardown checks across 19 fighters and both winner orientations"
+    },
+    {
+      "command": ".venv/bin/python -m unittest tests.test_gameplay_fighter_assets.GameplayFighterAssetsTests.test_scoped_constructor_storage_lifetime -v",
+      "result": "pass",
+      "scope": "Owning Script construction, source publication, independent teardown, and restart"
+    },
+    {
+      "command": "python3 menu key parser over src/gameplay_menu_browser.cpp",
+      "result": "pass",
+      "scope": "239 authored menu keys with mewtwo.ssm followed by PlNs.dat"
+    },
+    {
+      "command": ".venv/bin/python -m unittest discover -s tests -v",
+      "result": "pass (1223 tests, 85 optional fixture skips)",
+      "scope": "Merged tree including read-only CSS setup observer commit 6ee8052; 1223 tests run, 85 optional fixture tests skipped",
+      "local_path": "work/pr61-final-helper-full-suite-v1.log",
+      "sha256": "c86b4142b05671e849a78f9d1783d5770feb1eef0e0f00e244c393ce0312a41c"
+    }
+  ],
+  "native_fighter_traces": {
+    "result": "pass",
+    "scope": "Ness and Peach content traces in both player orientations against Mario; each reached source intro, costume, stage lifecycle, combat, pause, and repeat teardown",
+    "logs": [
+      "work/pr61-native-v2/ness-p1-mario-p2.log",
+      "work/pr61-native-v2/ness-p2-mario-p1.log",
+      "work/pr61-native-v2/peach-p1-mario-p2.log",
+      "work/pr61-native-v2/peach-p2-mario-p1.log"
+    ]
+  },
+  "browser_targeted": {
+    "launch": "Headless installed Chrome through scripts/browser_tools.mjs, local runtime server on port 8787, owned revision-2 disc",
+    "ness": {
+      "report": "work/pr61-targeted-headless-ness-final.json",
+      "sha256": "c9e5965dc2059764457c1557493604676ff1ed8a8a42d6ec7e597074ef7c6fb7",
+      "result": "pass",
+      "scope": "CSS to SSS to Final Destination match, grounded settle, PK Fire, PK Thunder, and PSI Magnet source motions",
+      "log": "work/pr61-targeted-headless-ness-final.log",
+      "log_sha256": "7175af13c4181c8e0855b29f44b654ae0cd9b74e8245ded5bc433eee5f3dfece",
+      "screenshot": "work/pr61-targeted-ness-final.png",
+      "screenshot_sha256": "0c033441af279333f806b49ccefb80a3304c6dc5d73c4684638a335aac57a843",
+      "screenshot_after_unload": "work/pr61-targeted-ness-final-unloaded.png",
+      "screenshot_after_unload_sha256": "fbf7332741e08f76281ad954376121e866b38935983340b8d6b3a5af95fac318",
+      "teardown": "pass: driver.unload reached phase 0/running 0; post-unload diagnostics had no runtime, page, console, or owner errors"
+    },
+    "peach": {
+      "report": "work/pr61-targeted-headless-peach-final.json",
+      "sha256": "77a5eb4dae022c36fe3daf4e6038653fba7c9ffc2731c132b5fad6e06e95c005",
+      "result": "pass",
+      "scope": "CSS to SSS to Final Destination match, grounded settle, Toad counter, vegetable pull, Bomber, and Parasol source motions",
+      "log": "work/pr61-targeted-headless-peach-final.log",
+      "log_sha256": "42a95423c19bd2caff801bf59a639c853b3a56fa98a735987534c78c92603a00",
+      "screenshot": "work/pr61-targeted-peach-final.png",
+      "screenshot_sha256": "102a296d1cbbf381b86ceb0c6fe75091f0522ea3fb610f2593500532ebcb8d45",
+      "screenshot_after_unload": "work/pr61-targeted-peach-final-unloaded.png",
+      "screenshot_after_unload_sha256": "c461195faa0ce60dd2978b04efd30fc7cde87fbe200310719b3db8bd8180c91d",
+      "teardown": "pass: driver.unload reached phase 0/running 0; post-unload diagnostics had no runtime, page, console, or owner errors"
+    },
+    "young_link": {
+      "report": "work/pr61-targeted-headless-young-link-final.json",
+      "sha256": "874cca082119ea96936ca107b89bf9a7899be3b528806d5e68b14bc7a1d89777",
+      "result": "pass",
+      "scope": "CSS to SSS to Final Destination match, grounded settle, Boomerang, Spin Attack, and Bomb source motions",
+      "log": "work/pr61-targeted-headless-young-link-final.log",
+      "log_sha256": "109766dff04055546296ea07844b0fe3e74d3676c31075b5f1859015aaeb8b03",
+      "screenshot": "work/pr61-targeted-young-link-final.png",
+      "screenshot_sha256": "a1e9eeba8efce45e2b57c1eb3d8711a7f7ecfd823a59a446a3a03d8819c38c34",
+      "screenshot_after_unload": "work/pr61-targeted-young-link-final-unloaded.png",
+      "screenshot_after_unload_sha256": "8966a3863fc9b1e3dea4901da2d1b9801c5f72a4e523d23ddac18f096bc47592",
+      "teardown": "pass: driver.unload reached phase 0/running 0; post-unload diagnostics had no runtime, page, console, or owner errors"
+    }
+  },
+  "browser_scope": "Bounded headless source-motion checks use the source-grounded idle settle and explicit driver.unload. Ness, Peach, and Young Link targeted actions pass with no page, console, runtime, or owner errors. A retained v2 attempt is explicitly not admitted: its matchInitial snapshot was null before semantic ready waiting, and its harness could automatically resume timing pauses. The superseding v3 harness uses raw native diagnostics, waits for ready source state, and never resumes. The four-player CPU9 workload now passes original CSS setup for Ness, Peach, Young Link, and Mario, then reaches ready source frame 0 and advances through 180 distinct samples to frame 204 with multiple source motions before explicit unload. The broad action sweep, retail, and timing/performance gates remain outside this receipt; no original-equivalence, pixel, PCM, natural-match-completion, or timing/performance claim is made.",
+  "deployed": false,
+  "runtime_artifacts": {
+    "configuration": "Release",
+    "served_root": "build/browser-release",
+    "harness": "work/pr61-targeted-actions-headless-final.mjs",
+    "harness_sha256": "f5def9e4c40b62a6367bd6d4277107a5f8a1f08bb227c8cfa80bd5c5e0e6d454",
+    "files": [
+      {
+        "path": "build/browser-release/runtime.html",
+        "sha256": "7dbdba45a72835799f02df323ce93e762ed3ad9d8941522ebe4d550913460172"
+      },
+      {
+        "path": "build/browser-release/gameplay_menu_browser.js",
+        "sha256": "d95f9068b581559e54bdafac99df82e243ec5541a58f8f4773eab1d4af4e48a6"
+      },
+      {
+        "path": "build/browser-release/gameplay_menu_browser.wasm",
+        "sha256": "d63372613b0da6113d9838c04d05cff204842fd4d70bdac131452caa09d85b5a"
+      },
+      {
+        "path": "build/browser-release/gameplay_menu_browser.data",
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      },
+      {
+        "path": "build/browser-release/runtime-development.mjs",
+        "sha256": "08302dc9a5cd031e70b02f95aad6e89b7c19830dfac0991e59ccb82cfe42359e"
+      }
+    ],
+    "build_log": "work/pr61-final-runtime-build-v1.log",
+    "build_log_sha256": "bcc95b508b345a210447b63eca37f01742aba6e9e80d20a35c7db2899e0cbce3"
+  },
+  "four_cpu9_browser": {
+    "result": "pass_bounded_setup_and_source_prefix",
+    "requested": "Headless original-menu attempt for Ness, Peach, Young Link, and Mario on Final Destination, four stocks, CPU level 9",
+    "report": "work/pr61-four-cpu9-headless-v3.json",
+    "report_sha256": "19f55529da8fa3ae98c3b8a47de0fd1f3cf00fb2eda0df77d4b4e62fa1e0fa89",
+    "harness": "work/pr61-four-cpu9-headless-v3.mjs",
+    "harness_sha256": "78f871f050fe9ef756963b5b360a5e6b87d110db497e0f7a9cb2e1adc2a10b0a",
+    "log": "work/pr61-four-cpu9-headless-v3.log",
+    "log_sha256": "3c7e49f785859a345980b4afa115c7896984c2b76497904c5eb0c8b644ed096b",
+    "screenshot": "work/pr61-four-cpu9-headless-v3.png",
+    "screenshot_sha256": "18bfef3c0fe062313502e2da397dc8e4a780128310dd19c50c0283c908e05294",
+    "screenshot_after_unload": "work/pr61-four-cpu9-headless-v3-unloaded.png",
+    "screenshot_after_unload_sha256": "366442283f67e218cdcb77397bacfe2c24acb950c84f4cccaf858ab91b832317",
+    "observed": "Source CSS selected Ness on door 0 and Peach on door 1, moved Young Link and Mario into doors 2 and 3, toggled all four doors to CPU, and set all four authored CPU sliders to level 9. After Final Destination entry, native diagnostics reported ready source frame 0; 180 distinct read-only source samples advanced to frame 204 and observed motions 356, 14, 44, 182, 233, 15, 16, 78, 24, 25, 69, 86, 65, and 70.",
+    "teardown": "pass: driver.unload reached phase 0/running 0; post-unload diagnostics had no runtime, page, console, or owner errors",
+    "prior_attempt": {
+      "report": "work/pr61-four-cpu9-headless-v2.json",
+      "report_sha256": "4d931e50d5bf86d6eaef8dd507b48b389045e19427dfda429a93f001b0f42755",
+      "result": "not_admitted",
+      "observed": "Retained v2 report had matchInitial null because it sampled before semantic ready state, and the v2 harness contained an automatic native timing-pause resume. It is retained as a failure artifact; v3 supersedes it with raw diagnostics, an explicit ready wait, and no resume."
+    }
+  },
+  "unrun_gates": [
+    "broad action sweep",
+    "retail gate",
+    "timing/performance gate"
+  ],
+  "final_build_review": {
+    "source_commit": "04c408e674f4a8f5a65722581d084634f3fe2a78",
+    "configuration": "Release",
+    "runtime": {
+      "result": "pass",
+      "log": {
+        "local_path": "work/pr61-final-runtime-build-v1.log",
+        "sha256": "bcc95b508b345a210447b63eca37f01742aba6e9e80d20a35c7db2899e0cbce3"
+      }
+    },
+    "public_runtime": {
+      "result": "pass",
+      "log": {
+        "local_path": "work/pr61-final-public-build-v1.log",
+        "sha256": "ec55f4385b157526f9a601545781b75538e7f55898e58b7d5b1d759cc1951578"
+      },
+      "identity": {
+        "local_path": "build/runtime-public-identity.json",
+        "sha256": "70f05eee9506a15b9abb289924676f2396b4613f74762137abf823b7517aa306"
+      }
+    },
+    "public_package": {
+      "result": "pass",
+      "command": "python3 scripts/build_public.py --profile player --mode preview --runtime-dir build/browser-public-release --output work/pr61-public-package-v1",
+      "log": {
+        "local_path": "work/pr61-final-public-audit-v2.log",
+        "sha256": "ca8452ddbdda37aa75217abded980d66b08ca522392a43d99b9657e02b22b608"
+      }
+    },
+    "scope": "Local compile and packaging checks only; no deployment. Browser observations remain bound to the runtime_artifacts hashes above; the later rebuild is a separate build check."
+  },
+  "ci_availability": {
+    "observed_head": "04c408e674f4a8f5a65722581d084634f3fe2a78",
+    "run": "https://github.com/ericvanlare/melee-web/actions/runs/35965201206",
+    "status": "jobs_not_started",
+    "reason": "GitHub account payment or spending-limit restriction",
+    "repository_content_job": 107522131636,
+    "runner_id": 0,
+    "steps": [],
+    "local_content_guard": "pass; 1120 tracked entries, zero findings",
+    "policy": "No billing, protection or check-result changes were made."
+  }
+}

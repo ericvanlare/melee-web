@@ -1,0 +1,99 @@
+{
+  "schema": "melee-web-public-marth-pipeline-release-v1",
+  "status": "deployed_and_verified",
+  "date": "2026-09-19",
+  "pull_request": "https://github.com/ericvanlare/melee-web/pull/47",
+  "merge_commit": "6fe77fafc653b44ed168a8f091ecef4dbfbbd84a",
+  "reviewed_source_commit": "e254401ff681159a7e156ba9329afcc3df861925",
+  "code_verification_commit": "713e45a8b6f67e00ef5fb88c045419a48c82c230",
+  "code_ci_run": "https://github.com/ericvanlare/melee-web/actions/runs/35476777202",
+  "production_url": "https://webmelee.gg",
+  "immutable_url": "https://61b8658f.webmelee.pages.dev",
+  "deployment_id": "61b8658f-7548-44d6-a788-0166d8053b0c",
+  "manifest_sha256": "be76fb247b35eb5f0896ea1cac95473070b3469a210cee2eb7f62218175f1010",
+  "runtime_hash": "3e0e9c9de16d8a53",
+  "files": 25,
+  "bytes": 15239544,
+  "pipeline_seed_sha256": "4bdb7c4a3e906d907d066f0c65041d7eb3472dc25c9d8c98be6e4946fdce560f",
+  "native_files": [
+    {
+      "path": "runtime/3e0e9c9de16d8a53/gameplay_public.data",
+      "sha256": "4bdb7c4a3e906d907d066f0c65041d7eb3472dc25c9d8c98be6e4946fdce560f",
+      "size": 2621440
+    },
+    {
+      "path": "runtime/3e0e9c9de16d8a53/gameplay_public.js",
+      "sha256": "7c92ed0f2cc60a6341ce65be3c66e441620397dc7a094b4e1f96039ef3bcf9de",
+      "size": 282988
+    },
+    {
+      "path": "runtime/3e0e9c9de16d8a53/gameplay_public.wasm",
+      "sha256": "dc72c9a0f6db5f02f02265fced8adc5c2835eb56997ef3fbeecf7bcc53fbcfe3",
+      "size": 12025439
+    }
+  ],
+  "staging": {
+    "immutable_url": "https://0a3cfb39.webmelee-staging.pages.dev",
+    "deployment_id": "0a3cfb39-0ee0-42e1-8a87-9ecce6416054",
+    "exact_same_candidate_bytes": true,
+    "http_result": "pass",
+    "verification_path": "work/issue33/marth-missing-pipelines/staging-deployment/verified.json",
+    "verification_sha256": "aea2707b0fb5381461a63939ebac711f3418113270a3fd292e42a50598cb8444"
+  },
+  "rollback": {
+    "deployment_id": "24f92d33-f61b-4772-80ef-244084cbb68c",
+    "immutable_url": "https://24f92d33.webmelee.pages.dev",
+    "manifest_sha256": "e3269d5d928b09207b5bb6a88d490fe46ba37b29c43dfa717b418a09d9cf6af7"
+  },
+  "verification": {
+    "browser-staging": {
+      "result": "pass",
+      "checks": 10,
+      "browser": "153.0.8010.50",
+      "report": "work/issue33/marth-missing-pipelines/browser-staging/report.json",
+      "report_sha256": "e76dd2265361ec6faaf5b495064cde9111ac6e73a19df4e70b302bd656d7c023"
+    },
+    "browser-production-apex": {
+      "result": "pass",
+      "checks": 10,
+      "browser": "153.0.8010.50",
+      "report": "work/issue33/marth-missing-pipelines/browser-production-apex/report.json",
+      "report_sha256": "e76dd2265361ec6faaf5b495064cde9111ac6e73a19df4e70b302bd656d7c023"
+    },
+    "browser-production-immutable": {
+      "result": "pass",
+      "checks": 10,
+      "browser": "153.0.8010.50",
+      "report": "work/issue33/marth-missing-pipelines/browser-production-immutable/report.json",
+      "report_sha256": "e76dd2265361ec6faaf5b495064cde9111ac6e73a19df4e70b302bd656d7c023"
+    },
+    "http-production-apex": {
+      "result": "pass",
+      "report": "work/issue33/marth-missing-pipelines/http-production-apex.json",
+      "report_sha256": "80a0a0bae0587ddb71750f452eac52e9c8267270e2c2d11b9307e7cf86c06f29",
+      "scope": "Exact hosted resources, security headers, legal routes and absent development/audio routes."
+    },
+    "http-production-immutable": {
+      "result": "pass",
+      "report": "work/issue33/marth-missing-pipelines/http-production-immutable.json",
+      "report_sha256": "d7d4422f1516575a513c56fbbe9ab2d1fbdfd33e96f0a965e45b35065b36bae2",
+      "scope": "Exact hosted resources, security headers, legal routes and absent development/audio routes."
+    }
+  },
+  "scope": "Silent functional alpha. Hosted checks cover original CSS/SSS, pause/resume, Eject/reload, second import and application network/storage behavior. No public full-match, live-controller, original draw-cadence, pixel or PCM admission. Historical September12 GPU stall remains unclassified under explicit owner-approved current-runtime scope.",
+  "date_timezone": "America/Los_Angeles",
+  "verification_recorded_at_utc": "2026-09-20T00:18:46.723991+00:00",
+  "code_ci_elapsed_seconds": 366,
+  "source_scope": "Seed correction passed both Release builds and 1,006 unit tests (44 optional skips). PR47 full GitHub Verify passed. Reviewed head and merge commit have identical trees. Later main commits are not included in this frozen release.",
+  "manifest_path": "work/issue33/marth-missing-pipelines/player-release.manifest.json",
+  "pipeline_seed_records": {
+    "shader": 1,
+    "pipeline": 627
+  },
+  "current_runtime_gate": {
+    "receipt": "docs/evidence/current-runtime-holdouts-20260919-v2.json",
+    "status_path": "work/issue33/replacement-holdouts/timing-status.json",
+    "status_sha256": "d8d4eb7365e9461f01ff52dc207fdf5efe2e573051ab065798888b81e27744e4",
+    "scope": "Separate audio-enabled development Release holdout state/timer and unprofiled cold/warm measurements; public build is separately compiled and deliberately silent."
+  }
+}

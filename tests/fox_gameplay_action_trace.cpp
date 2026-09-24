@@ -57,10 +57,11 @@ int main(int argc, char** argv)
         NativeDatArena arena(archive);
         std::uint32_t unresolved = 0;
         void* data = melee_web_fighter_data_decode(arena.reader(), fighter_root, 1, 4,
-            store.action_rows(), store.blend_rows(), store.wait_choices(), &unresolved);
-        if (!data || !melee_web_fighter_data_article(data, 0) ||
-            !melee_web_fighter_data_article(data, 1) || !melee_web_fighter_data_article(data, 2) ||
-            melee_web_fighter_data_article(data, 3))
+            static_cast<uint32_t>(store.runtime().actions().size()), store.action_rows(),
+            store.blend_rows(), store.wait_choices(), &unresolved);
+        if (!data || !melee_web_fighter_data_article(data, 1, 0) ||
+            !melee_web_fighter_data_article(data, 1, 1) || !melee_web_fighter_data_article(data, 1, 2) ||
+            melee_web_fighter_data_article(data, 1, 3))
             throw std::runtime_error("Fox native ftData did not preserve exact Article slots 0, 1 and 2");
         if (!(unresolved & (1U << 7)) || !(unresolved & (1U << 23)))
             throw std::runtime_error("Fox native ftData did not retain part-animation and metal ownership gates");

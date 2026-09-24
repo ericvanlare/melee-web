@@ -1,0 +1,322 @@
+{
+  "schema": "melee-web-roy-doc-render-preparation-v1",
+  "source_checkpoint": "5eb27bc63160ab185a866df6a9113ab5be1fc56f",
+  "runtime_source_checkpoint": "0910fd4a583a3e273f40c4628e40e6bcc90b3dda",
+  "base_seed_sha256": "cdf157ee0f1850884f07a71165fd2192177acb23c2c777313b719e70ea67546f",
+  "seed_sha256": "ac57c60cc4ee1076fd801707447b696dd5717e2bc6d9224c6fba8e2b08ff98fd",
+  "descriptor_count": 548,
+  "preserved_base_descriptors": 508,
+  "appended_descriptors": 40,
+  "existing_payload_conflicts": 0,
+  "dawn_driver_cache_included": false,
+  "raw_draw_provenance_in_artifact": false,
+  "exhaustive": false,
+  "scope": "Descriptor discovery from two complete visible recorded-queue matches. Cold/warm public performance and production promotion remain separate gates. Both original comparisons matched; prior timing failures remain preserved.",
+  "recordings": [
+    {
+      "route": "fd",
+      "status": "matched",
+      "updates": 6965,
+      "draws": 6959,
+      "capture_provenance_sha256": "d71738f7d29016805b4e5853dded9b4746d4f08e08bb33fce480f95186b49b63",
+      "comparison_sha256": "4cb47ea9cdd4559dca9a29f4e3b940707c7bb2692681173bfd93c11eab3e459a",
+      "review_sha256": "00df4269eb3983dd634a37b05e5332337dc89d2a5bad395dc61821710edc6518"
+    },
+    {
+      "route": "yoshis",
+      "status": "matched",
+      "updates": 11077,
+      "draws": 11067,
+      "capture_provenance_sha256": "215551e3d41620d10402b4d1d3923949c42703ba7935946e3f9f3672f996a7ae",
+      "comparison_sha256": "c55f58748a7347e3b3b39a4edbb7242337c495abddf288312fd0241a2143d673",
+      "review_sha256": "1212bac7664844ec0917b8e43e9438f7b65bfb1c2a3b72beb17f745bc5b171c6"
+    }
+  ],
+  "additional_action_capture_review": {
+    "roy_new_descriptors": 0,
+    "doc_new_descriptors": 0,
+    "scope": "Previously observed bounded visible action/special captures; no exhaustive coverage claim"
+  },
+  "descriptors": [
+    {
+      "config_sha256": "2e80b1b49587af4cbfd748359264adcfdfbbc6dda5c71476095ccb162071c919",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 169563010,
+      "type": 1
+    },
+    {
+      "config_sha256": "07e2cdb5ff2551b3390b680b2c21f279f01c08bc4350c83f8531ab6b21206fb6",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 269870137,
+      "type": 1
+    },
+    {
+      "config_sha256": "7236a0d1413f5ac099298e9be6a5be3cfdce955e6a9af8aae579f9e92683d28b",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 620958464,
+      "type": 1
+    },
+    {
+      "config_sha256": "c16832fe4345f6db972fa416b043f29a1fcfab03331a45e41cdd7ba5eabbab76",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 1159351868,
+      "type": 1
+    },
+    {
+      "config_sha256": "928375baa4337689decc58b7d72497c4abedfdeb7f2a1e99c21a61bc2d077bc4",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 1306311031,
+      "type": 1
+    },
+    {
+      "config_sha256": "ec90b277e8b27bbc9306529a4e047f132c075b9e1855f924c4a4d21c9f582aaf",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 1659865024,
+      "type": 1
+    },
+    {
+      "config_sha256": "e517ce477c14498eebc46d251730d92dbdbd16dc6727da24a91715a0f609194b",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 2102470146,
+      "type": 1
+    },
+    {
+      "config_sha256": "8f54b84a493aa9723e9f089d4372a2654731a4ce89687811ecf269d797dacc8e",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 2450720967,
+      "type": 1
+    },
+    {
+      "config_sha256": "3e46dd2b6fea35bb61c6276afab0977271f583b31653c44728bd1fca6afaa426",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 2470862496,
+      "type": 1
+    },
+    {
+      "config_sha256": "5ee9150fae779868a7d60b6db596d46072101fd838ec344baafe12183faa0501",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 2519423581,
+      "type": 1
+    },
+    {
+      "config_sha256": "8cee2a99c76e81df9a6588964c510abcdfff7bf2b2281c7b2c6680a2ccd9c0f8",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 2627801963,
+      "type": 1
+    },
+    {
+      "config_sha256": "66cb94ad80d265cbf1a397f0c3c8579ac97790d4cdfef5f760e406709ff283c3",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 2654730966,
+      "type": 1
+    },
+    {
+      "config_sha256": "eac90dec34b21aab0990535666080f3dbb6b2824ebdd6e878b04a1782f8d1867",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 2888940247,
+      "type": 1
+    },
+    {
+      "config_sha256": "b05bfe64fe6c447afee4290e2357bd0233f46f6af6d17aad1842c569a177f9c7",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 2994376442,
+      "type": 1
+    },
+    {
+      "config_sha256": "ed6cdc7131eef9584c3fd25b6474b580d416d1d2ccfed57f10008f2197820f06",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 3011894123,
+      "type": 1
+    },
+    {
+      "config_sha256": "dcdd8060eca6fa7c0499c8f6652d96c24a0b89497a736680d7daaffadabe16af",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 3142680908,
+      "type": 1
+    },
+    {
+      "config_sha256": "8df139aa5e8836663a2135efd48bb8c40f76d7910642852a13bc7ab082c24893",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 3171030383,
+      "type": 1
+    },
+    {
+      "config_sha256": "9c8b1dc7527d21e9fb82c3a36b8d7474250f98565bc8901ab4349cc9d7f5c381",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 3359398706,
+      "type": 1
+    },
+    {
+      "config_sha256": "38276da6c0210ea5f66808243dc3a6c081d0be24f26d508b06ec17874e7f9fb5",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 3576853868,
+      "type": 1
+    },
+    {
+      "config_sha256": "99f6992c546410233d1f3207c53e1f549f341a9efc4e43769aaf3855f715036a",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 3630340074,
+      "type": 1
+    },
+    {
+      "config_sha256": "4c6db683ce14d8a230af46c604f8f00689c124b3aa3c901beef4bd59ba75722b",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 3758052677,
+      "type": 1
+    },
+    {
+      "config_sha256": "5ca211f2327ad9ccb9d223e3c4eb41b3d836a3c332d307d578d84f0054d19ee6",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 3968773750,
+      "type": 1
+    },
+    {
+      "config_sha256": "5f86c6b2cd6920e74505e43b8f410a47ed2f2ac7c3a8421b6e73639b919da307",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 3969616621,
+      "type": 1
+    },
+    {
+      "config_sha256": "c0a8496085f0c4c47bd09c3c7d81bd272e9eb14598200b1bda31e3d3f74aa5db",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 4056319332,
+      "type": 1
+    },
+    {
+      "config_sha256": "6b43734afb3311270cdc91d90f6afdfd50d6eba32270571aa0729bb0a00af933",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 4134225458,
+      "type": 1
+    },
+    {
+      "config_sha256": "0a5c819931503b75c6a653783d2ae72a364c1b3d979eb44329d3079952512daf",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 4153781848,
+      "type": 1
+    },
+    {
+      "config_sha256": "4ef27797ba4a93105ccd6b6f3046780554ff079ad2c079e9a59df717788be68a",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 4165937145,
+      "type": 1
+    },
+    {
+      "config_sha256": "5625c354a626e7816ff066c2e1662e26529f48f64ca4615c7f616e8327e84a0f",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 206016174,
+      "type": 1
+    },
+    {
+      "config_sha256": "af751872d315be3e432100417d116dc56631df2525ea442d06d1607ba7d06245",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 264347549,
+      "type": 1
+    },
+    {
+      "config_sha256": "f8734aa87a5c1dfd156bdda8a81a821f3c4d545fce32ffc0094b0cd6d0b7f094",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 282987945,
+      "type": 1
+    },
+    {
+      "config_sha256": "ca9e4b524e33fb9164d4a3d220b01cbe7605da40ab98d78fc388ceee1ad3f68e",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 703758016,
+      "type": 1
+    },
+    {
+      "config_sha256": "84d2cfd963a958d55cfb3aea189da88d378a70fe21b94df2398def0af1cc5fa0",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 1122945463,
+      "type": 1
+    },
+    {
+      "config_sha256": "afe47917ce9c9912ad12bb31619cc04837b4998014bea27ed519ad03aacf6d4a",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 1341026575,
+      "type": 1
+    },
+    {
+      "config_sha256": "65cd8837afb1435eca2ca3ea0ff3208968433bca2e5956b5eed2089366060581",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 2108346194,
+      "type": 1
+    },
+    {
+      "config_sha256": "4ac31ca50eb7c396eabd256170157c23ac3938366b9266209e3c43645feb62e5",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 2218178504,
+      "type": 1
+    },
+    {
+      "config_sha256": "c0337d94d88584ac947b5a35b1746547b79eb48635944ea605e34593ad79a35e",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 2583630520,
+      "type": 1
+    },
+    {
+      "config_sha256": "64cd74b202cd0508f28b53afc2d60b27fd3baa6f523c417c36013fa9cdd50adf",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 2779679049,
+      "type": 1
+    },
+    {
+      "config_sha256": "4788f53e05d487fb0697a2c1519bcf0a1c625145aa8eb2ed987d112656ac78e0",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 3368370360,
+      "type": 1
+    },
+    {
+      "config_sha256": "85cb08575fefb3c8c576a97b3894c7f15e01a754b7c681a27b1c2b7f6fed27d0",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 3525152787,
+      "type": 1
+    },
+    {
+      "config_sha256": "2fbdcc149171c17d189026f1061fa2e18081091fe7cb4f51cad1e3a3b98b32d3",
+      "config_size": 2772,
+      "config_version": 65549,
+      "hash": 3744156202,
+      "type": 1
+    }
+  ]
+}

@@ -1,0 +1,1934 @@
+{
+  "schema": "melee-web-full-game-checkpoint-validation",
+  "version": 1,
+  "source_base_commit": "6e3bd08c33a0929647f7a9e9865c84bb8462dfe4",
+  "scope": "Fifteen development fighters and seven stages. Donkey FD native/action-window evidence only; Battlefield shield drop reaches an explicit undefined-output abort and remains broken. No whole-game, tournament, independent Donkey original-equivalence, pixel, PCM, physical-controller or deployment admission.",
+  "automated_suite": {
+    "local_path": "work/full-game/donkey-suite-v2.log",
+    "sha256": "a5728bf8152403c2cb227e5b637bf2e89db82e61e7a1a98e3abf23d11637550b",
+    "command": "python3 -m unittest discover -s tests -v",
+    "tests": 1080,
+    "seconds": 358.963,
+    "result": "pass",
+    "skips": 41,
+    "skip_reasons": {
+      "Bootstrap Aurora and a C++20 compiler for independent DSP comparison": 2,
+      "Build fighter targets before the typed support check": 1,
+      "Original stage trace target unavailable": 2,
+      "Build dat_scene_trace before the typed scene check": 1,
+      "Owned stage selection archive and pinned SDK required": 1,
+      "Build gameplay_audio_trace and provide local SSM/SEM/DSP coefficient fixtures": 2,
+      "Build fighter/audio stream target and supply optional owned HPS/SSM/SEM/coefficient inputs": 1,
+      "Build fighter targets before running the focused bonus_data trace": 1,
+      "Project SDK and Aurora build dependencies unavailable; run bootstrap/build": 4,
+      "Optional built combat trace and owned runtime assets required": 1,
+      "Common context trace unavailable; build gameplay first": 1,
+      "Owned menu, Fox/Falco and stage fixtures are required": 1,
+      "Owned Dr. Mario/Roy and stage fixtures are required": 1,
+      "Project SDK/Aurora build dependencies unavailable; run bootstrap/build": 1,
+      "Built stock trace and owned Mario costume archives required": 1,
+      "Built original player context trace required": 1,
+      "Optional built source trace and owned runtime assets required": 2,
+      "Optional built full-stage edge trace and owned runtime assets required": 2,
+      "Optional built timer trace and owned runtime assets required": 1,
+      "Build gameplay_music_profile_trace and provide owned menu/game assets": 1,
+      "Build fighter targets before the original SIS consumer check": 1,
+      "Original CSS target and owned local fixtures are required": 1,
+      "Build the native menu host and supply owned menu/game fixtures": 1,
+      "Build gameplay_rumble_trace and provide owned LbRb.dat": 1,
+      "Build fighter targets before running the focused stage_numeric trace": 1,
+      "Native HSD targets unavailable; run scripts/build.py --target gameplay": 1,
+      "Build the native_audio_banks fighter target first": 1,
+      "Build gameplay_pad_state_trace": 1,
+      "compiled private provenance fixture not supplied": 1,
+      "Optional pinned Dolphin source checkout is not installed": 2,
+      "pinned slippi-js fixtures are not checked out": 2
+    }
+  },
+  "machine": {
+    "hardware": "Apple M4",
+    "os": "macOS 26.6.2 (25G83)",
+    "browser": "153.0.8010.50",
+    "canvas_backing_pixels": [
+      640,
+      480
+    ],
+    "device_pixel_ratio": 1,
+    "development_audio": true,
+    "application_cache": "Cold origin reset, source world teardown and persistence, then complete warm application reload",
+    "driver_cache": "uncontrolled"
+  },
+  "browser_build": {
+    "local_path": "work/full-game/donkey-browser-build-v2/prototype-build.json",
+    "sha256": "51b47f771443df50b04f3d7f380f0fb13968f25a575b8f2d8c3948e57b501ae1",
+    "artifacts": {
+      "gameplay_menu_browser.js": "9e383ee772ff28663615d74277a97f60631594d0aef993552b48e9ee7e132a54",
+      "gameplay_menu_browser.wasm": "c4c37df5c81b646a44f37f195f6a77b7eb5c8bcbcb25a43c89cb623b941a7c49",
+      "gameplay_menu_browser.data": "5d8a4b2bff7dcf12da67ffb576895fbf786f0898e8df04e2c5d2393027b2650b",
+      "runtime.html": "7dbdba45a72835799f02df323ce93e762ed3ad9d8941522ebe4d550913460172",
+      "runtime-development.mjs": "1833a302d0e97976946d1880687cd79b3e9f23ecebafd2af08ca76b932a14b90",
+      "melee-runtime.mjs": "f5ad8fe145e60482099eef2baa9865b797d8f6047777794cf6f83eaed37968a4",
+      "controller-input.mjs": "3388c3784717bea4b582a8fa66100880cbbcf4a0adb767c000e0a9cc779c31c8",
+      "controller-panel.mjs": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95",
+      "controller-panel.css": "289ca851412aca5b7def53dc002e8b3a897f7524e37d7b2ba2065822e7b3c16e",
+      "controller-settings.mjs": "3679207e488927e1cbd30386123bc80f26b565bb84f29916506ab72074dbd4a2",
+      "controller-settings.css": "3ac5ef6bea09babcc557f49b109fd76194a0d6ee2f5195bc731d5e8b446fcf2f",
+      "prototype-keyboard-layouts.mjs": "88dbd2c00873bad67cee89b9094bf735e0be3dc89bb2dcd95ac14de2abc30745",
+      "runtime-cache.js": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26",
+      "audio-worklet.js": "ef4374ac08f5bab821efa05cf5d252ca8e4b50647710d434e192beac3d7d7b4f",
+      "audio-ring.mjs": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf",
+      "disc-image.mjs": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a",
+      "dsp-coefficients.mjs": "5176d1cf4400228f31dff428bcc8cd60d07694c0ceea1628a79ac19f3e112b4a",
+      "runtime-assets.mjs": "25741b4b6089a9f35e52c09e13afebcf12f973be9cdefe7c3cc77a1e66c5610a",
+      "runtime-audio-assets.mjs": "b9bfd3f841d73e4ee4987fc5ac7351832c4ae8eca48ba5cf9c95578a238c7dbc",
+      "runtime-audio.mjs": "d968d2b2f9b58d2ab5dc1a4720d2ad2114cfbcac44a888694da7850100546545",
+      "match-flow.mjs": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f",
+      "match-menu.mjs": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba",
+      "action-sweep.mjs": "10c85af4cc588e36c0266438fd77ece4c067594848d524fba95c6c9c00452669",
+      "hitch-capture.mjs": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3"
+    }
+  },
+  "release_builds": [
+    {
+      "local_path": "work/full-game/donkey-browser-build-v2.log",
+      "sha256": "f657318d05b1553493d1d2dd4fc9c2c1e7a42731a7ca47c29479de626a50a876",
+      "kind": "development",
+      "result": "pass",
+      "artifacts": [
+        {
+          "local_path": "build/browser-release/gameplay_menu_browser.js",
+          "sha256": "9e383ee772ff28663615d74277a97f60631594d0aef993552b48e9ee7e132a54",
+          "bytes": 285316
+        },
+        {
+          "local_path": "build/browser-release/gameplay_menu_browser.wasm",
+          "sha256": "c4c37df5c81b646a44f37f195f6a77b7eb5c8bcbcb25a43c89cb623b941a7c49",
+          "bytes": 13125590
+        },
+        {
+          "local_path": "build/browser-release/gameplay_menu_browser.data",
+          "sha256": "5d8a4b2bff7dcf12da67ffb576895fbf786f0898e8df04e2c5d2393027b2650b",
+          "bytes": 3366912
+        }
+      ]
+    },
+    {
+      "local_path": "work/full-game/donkey-public-build-v1.log",
+      "sha256": "df13dd5be5ba2f49570ff32494daa254aefa10ca0b35889687c9991ba844abca",
+      "kind": "public",
+      "result": "pass",
+      "artifacts": [
+        {
+          "local_path": "build/browser-public-release/gameplay_public.js",
+          "sha256": "82026d6006c5207b08d68fef1c253303dc18e7be70c62e92eef1e62232895f02",
+          "bytes": 283268
+        },
+        {
+          "local_path": "build/browser-public-release/gameplay_public.wasm",
+          "sha256": "47cdfde4736779ddbd63572c0faf51d63ff4abbdbd87d4cb64c73fbab5370575",
+          "bytes": 12380588
+        },
+        {
+          "local_path": "build/browser-public-release/gameplay_public.data",
+          "sha256": "5d8a4b2bff7dcf12da67ffb576895fbf786f0898e8df04e2c5d2393027b2650b",
+          "bytes": 3366912
+        }
+      ]
+    }
+  ],
+  "native_scope": "All five costumes and both player orientations on FD; first forward lifetime drives ground/air N/S/Hi, groundLw and raw cargo wait/walk/throw. Aerial N observed Full378 with stored source charge. Reverse orientation drives Mario combat against Donkey. Source Ready, pause, NoContest and repeated teardown pass. No Donkey original comparison.",
+  "native_evidence": [
+    {
+      "local_path": "work/full-game/donkey-focused-decoders-v3.log",
+      "sha256": "30794a196ca8613388bb92afd1d48fad9077c42d454da9206247c22e1e1c7a93"
+    },
+    {
+      "local_path": "work/full-game/donkey-animation-material-v3.log",
+      "sha256": "e71b17735f72f04a79a7fdddd99149b1e44c4ecb7cf466faf1ffd83f0db4e160"
+    },
+    {
+      "local_path": "work/full-game/donkey-native-output-guard-v4.log",
+      "sha256": "612f85fdb08aea070ce12eef145849b042267f8ac9d53e6896dfdd4c541c4cd8"
+    },
+    {
+      "local_path": "work/full-game/donkey-native-visibility-v3.log",
+      "sha256": "8b8dbc14378593e75abf633735c8f05ea6714c728e8f932a19cfa7288f23f41b"
+    },
+    {
+      "local_path": "work/full-game/donkey-native-entry-v6.log",
+      "sha256": "703711cab46ed016ba7af2496c6afdf455a698358dd0805b560df123a6115e48"
+    },
+    {
+      "local_path": "work/full-game/donkey-native-actions-v4.log",
+      "sha256": "447926754ccfa5e5968a21c4325eb6a513f86157111e6e3af436eba1618b5f68"
+    },
+    {
+      "local_path": "work/full-game/donkey-native-lifecycle-v1.log",
+      "sha256": "219b3024593ca620b1bfffbc65d44bec38cbf139ed6b84e1cb168fbb217ccf32"
+    },
+    {
+      "local_path": "work/full-game/donkey-menu-contract-v2.log",
+      "sha256": "e650c36841d3a89451213865fda3977c7a84ebab2a4b5b0469c7b88cd4e3f3a8"
+    }
+  ],
+  "browser_checks": {
+    "donkey": {
+      "local_path": "work/full-game/donkey-browser-discovery-v2/report.json",
+      "sha256": "547013721c960a005ecb96149b00497914d91573a9fbafbf491caf6ad2eb35eb",
+      "result": "scoped_pair_pass",
+      "rounds": [
+        {
+          "round": "cold",
+          "pass": true,
+          "cases": [
+            {
+              "name": "walk left/right",
+              "pass": true,
+              "sourceMotions": [
+                18,
+                15,
+                14
+              ]
+            },
+            {
+              "name": "dash left/right",
+              "pass": true,
+              "sourceMotions": [
+                20,
+                14
+              ]
+            },
+            {
+              "name": "crouch",
+              "pass": true,
+              "sourceMotions": [
+                39,
+                40,
+                41,
+                14
+              ]
+            },
+            {
+              "name": "jab",
+              "pass": true,
+              "sourceMotions": [
+                44,
+                14
+              ]
+            },
+            {
+              "name": "forward tilt",
+              "pass": true,
+              "sourceMotions": [
+                15,
+                53,
+                14
+              ]
+            },
+            {
+              "name": "up tilt",
+              "pass": true,
+              "sourceMotions": [
+                14,
+                56
+              ]
+            },
+            {
+              "name": "down tilt",
+              "pass": true,
+              "sourceMotions": [
+                14,
+                57,
+                41
+              ]
+            },
+            {
+              "name": "forward smash",
+              "pass": true,
+              "sourceMotions": [
+                60,
+                14
+              ]
+            },
+            {
+              "name": "up smash",
+              "pass": true,
+              "sourceMotions": [
+                63,
+                14
+              ]
+            },
+            {
+              "name": "down smash",
+              "pass": true,
+              "sourceMotions": [
+                64,
+                14
+              ]
+            },
+            {
+              "name": "dash attack",
+              "pass": true,
+              "sourceMotions": [
+                20,
+                50,
+                14
+              ]
+            },
+            {
+              "name": "shield",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                179,
+                180,
+                14
+              ]
+            },
+            {
+              "name": "forward roll",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                233,
+                14
+              ]
+            },
+            {
+              "name": "back roll",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                233,
+                14
+              ]
+            },
+            {
+              "name": "spot dodge",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                235,
+                14
+              ]
+            },
+            {
+              "name": "grab",
+              "pass": true,
+              "sourceMotions": [
+                212,
+                14
+              ]
+            },
+            {
+              "name": "neutral aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                65,
+                70,
+                14
+              ]
+            },
+            {
+              "name": "forward aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                66,
+                71,
+                14
+              ]
+            },
+            {
+              "name": "back aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                67,
+                42,
+                14
+              ]
+            },
+            {
+              "name": "up aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                68,
+                42,
+                14
+              ]
+            },
+            {
+              "name": "down aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                69,
+                74,
+                14
+              ]
+            },
+            {
+              "name": "air dodge",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                236,
+                43,
+                14
+              ]
+            },
+            {
+              "name": "Giant Punch partial charge/release",
+              "pass": true,
+              "sourceMotions": [
+                369,
+                370,
+                372,
+                14
+              ]
+            },
+            {
+              "name": "Giant Punch charge cancel",
+              "pass": true,
+              "sourceMotions": [
+                369,
+                370,
+                371,
+                14
+              ]
+            },
+            {
+              "name": "Giant Punch full charge/release",
+              "pass": true,
+              "sourceMotions": [
+                369,
+                370,
+                14,
+                373
+              ]
+            },
+            {
+              "name": "Giant Punch partial release (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                374,
+                375,
+                377,
+                372,
+                14
+              ]
+            },
+            {
+              "name": "Giant Punch cancel (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                374,
+                375,
+                376,
+                371,
+                14
+              ]
+            },
+            {
+              "name": "Giant Punch full release (air)",
+              "pass": true,
+              "sourceMotions": [
+                369,
+                370,
+                14,
+                24,
+                25,
+                378,
+                35,
+                43
+              ]
+            },
+            {
+              "name": "Headbutt",
+              "pass": true,
+              "sourceMotions": [
+                379,
+                14
+              ]
+            },
+            {
+              "name": "Headbutt (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                380,
+                379,
+                14
+              ]
+            },
+            {
+              "name": "Spinning Kong",
+              "pass": true,
+              "sourceMotions": [
+                381,
+                14
+              ]
+            },
+            {
+              "name": "Spinning Kong (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                382,
+                381,
+                14
+              ]
+            },
+            {
+              "name": "Hand Slap",
+              "pass": true,
+              "sourceMotions": [
+                383,
+                384,
+                385,
+                14
+              ]
+            }
+          ],
+          "geometry": {
+            "buffer": [
+              640,
+              480
+            ],
+            "css": [
+              900,
+              675
+            ],
+            "devicePixelRatio": 1,
+            "viewport": [
+              1280,
+              960
+            ],
+            "hidden": false,
+            "focused": true
+          },
+          "entry_timing_resumes": 0,
+          "failed_case": null,
+          "failures": [],
+          "metrics": {
+            "sourceFrames": 7000,
+            "browserCallbacks": 7000,
+            "worstBrowserCallbackMs": 23.005,
+            "browserCallbackGaps": 0,
+            "browserLongTasks": 0,
+            "browserLongTaskWorstMs": 0,
+            "nativeCallbacks": 7000,
+            "worstNativeCallbackMs": 8.265,
+            "nativeCallbacksOverBudget": 0,
+            "nativeCallbacksOver33ms": 0,
+            "audioUnderrunFrames": 0,
+            "livePipelinesQueued": 0,
+            "livePipelinesCreated": 0,
+            "liveTextureUploadBytes": 800768,
+            "liveStagingUsedBytes": 8362970072,
+            "peakStagingUsedBytes": 2406584,
+            "preparationPauses": 0,
+            "automaticTimingResumes": 0,
+            "focusLost": false,
+            "wasmHeapGrowthBytes": 0
+          }
+        },
+        {
+          "round": "warm",
+          "pass": true,
+          "cases": [
+            {
+              "name": "walk left/right",
+              "pass": true,
+              "sourceMotions": [
+                18,
+                15,
+                14
+              ]
+            },
+            {
+              "name": "dash left/right",
+              "pass": true,
+              "sourceMotions": [
+                20,
+                14
+              ]
+            },
+            {
+              "name": "crouch",
+              "pass": true,
+              "sourceMotions": [
+                39,
+                40,
+                41,
+                14
+              ]
+            },
+            {
+              "name": "jab",
+              "pass": true,
+              "sourceMotions": [
+                44,
+                14
+              ]
+            },
+            {
+              "name": "forward tilt",
+              "pass": true,
+              "sourceMotions": [
+                15,
+                53,
+                14
+              ]
+            },
+            {
+              "name": "up tilt",
+              "pass": true,
+              "sourceMotions": [
+                14,
+                56
+              ]
+            },
+            {
+              "name": "down tilt",
+              "pass": true,
+              "sourceMotions": [
+                14,
+                57,
+                41
+              ]
+            },
+            {
+              "name": "forward smash",
+              "pass": true,
+              "sourceMotions": [
+                60,
+                14
+              ]
+            },
+            {
+              "name": "up smash",
+              "pass": true,
+              "sourceMotions": [
+                63,
+                14
+              ]
+            },
+            {
+              "name": "down smash",
+              "pass": true,
+              "sourceMotions": [
+                64,
+                14
+              ]
+            },
+            {
+              "name": "dash attack",
+              "pass": true,
+              "sourceMotions": [
+                20,
+                50,
+                14
+              ]
+            },
+            {
+              "name": "shield",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                179,
+                180,
+                14
+              ]
+            },
+            {
+              "name": "forward roll",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                233,
+                14
+              ]
+            },
+            {
+              "name": "back roll",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                233,
+                14
+              ]
+            },
+            {
+              "name": "spot dodge",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                235,
+                14
+              ]
+            },
+            {
+              "name": "grab",
+              "pass": true,
+              "sourceMotions": [
+                212,
+                14
+              ]
+            },
+            {
+              "name": "neutral aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                65,
+                70,
+                14
+              ]
+            },
+            {
+              "name": "forward aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                66,
+                71,
+                14
+              ]
+            },
+            {
+              "name": "back aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                67,
+                42,
+                14
+              ]
+            },
+            {
+              "name": "up aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                68,
+                42,
+                14
+              ]
+            },
+            {
+              "name": "down aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                69,
+                74,
+                14
+              ]
+            },
+            {
+              "name": "air dodge",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                236,
+                43,
+                14
+              ]
+            },
+            {
+              "name": "Giant Punch partial charge/release",
+              "pass": true,
+              "sourceMotions": [
+                369,
+                370,
+                372,
+                14
+              ]
+            },
+            {
+              "name": "Giant Punch charge cancel",
+              "pass": true,
+              "sourceMotions": [
+                369,
+                370,
+                371,
+                14
+              ]
+            },
+            {
+              "name": "Giant Punch full charge/release",
+              "pass": true,
+              "sourceMotions": [
+                369,
+                370,
+                14,
+                373
+              ]
+            },
+            {
+              "name": "Giant Punch partial release (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                374,
+                375,
+                377,
+                372,
+                14
+              ]
+            },
+            {
+              "name": "Giant Punch cancel (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                374,
+                375,
+                376,
+                371,
+                14
+              ]
+            },
+            {
+              "name": "Giant Punch full release (air)",
+              "pass": true,
+              "sourceMotions": [
+                369,
+                370,
+                14,
+                24,
+                25,
+                378,
+                35,
+                43
+              ]
+            },
+            {
+              "name": "Headbutt",
+              "pass": true,
+              "sourceMotions": [
+                379,
+                14
+              ]
+            },
+            {
+              "name": "Headbutt (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                380,
+                379,
+                14
+              ]
+            },
+            {
+              "name": "Spinning Kong",
+              "pass": true,
+              "sourceMotions": [
+                381,
+                14
+              ]
+            },
+            {
+              "name": "Spinning Kong (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                382,
+                381,
+                14
+              ]
+            },
+            {
+              "name": "Hand Slap",
+              "pass": true,
+              "sourceMotions": [
+                383,
+                384,
+                385,
+                14
+              ]
+            }
+          ],
+          "geometry": {
+            "buffer": [
+              640,
+              480
+            ],
+            "css": [
+              900,
+              675
+            ],
+            "devicePixelRatio": 1,
+            "viewport": [
+              1280,
+              960
+            ],
+            "hidden": false,
+            "focused": true
+          },
+          "entry_timing_resumes": 0,
+          "failed_case": null,
+          "failures": [],
+          "metrics": {
+            "sourceFrames": 7000,
+            "browserCallbacks": 7001,
+            "worstBrowserCallbackMs": 23.095,
+            "browserCallbackGaps": 0,
+            "browserLongTasks": 0,
+            "browserLongTaskWorstMs": 0,
+            "nativeCallbacks": 7001,
+            "worstNativeCallbackMs": 8.61,
+            "nativeCallbacksOverBudget": 0,
+            "nativeCallbacksOver33ms": 0,
+            "audioUnderrunFrames": 0,
+            "livePipelinesQueued": 0,
+            "livePipelinesCreated": 0,
+            "liveTextureUploadBytes": 800768,
+            "liveStagingUsedBytes": 8360595924,
+            "peakStagingUsedBytes": 2547656,
+            "preparationPauses": 0,
+            "automaticTimingResumes": 0,
+            "focusLost": false,
+            "wasmHeapGrowthBytes": 0
+          }
+        }
+      ]
+    }
+  },
+  "scoped_code_review": {
+    "local_path": "work/full-game/donkey-scoped-code-review-v1.json",
+    "sha256": "147a4ac16c60ade17978f9ec1c2615d531fb7762de944fbe6d1c8fc0e8df87b2"
+  },
+  "retained_discovery": {
+    "donkey": {
+      "local_path": "work/full-game/donkey-browser-discovery-v1/report.json",
+      "sha256": "b0368322f909cc4ac882db982b2eee1da140064c386c09463e78ab12870faced",
+      "result": "scoped_pair_failed",
+      "rounds": [
+        {
+          "round": "cold",
+          "pass": false,
+          "cases": [
+            {
+              "name": "walk left/right",
+              "pass": true,
+              "sourceMotions": [
+                18,
+                15,
+                14
+              ]
+            },
+            {
+              "name": "dash left/right",
+              "pass": true,
+              "sourceMotions": [
+                20,
+                14
+              ]
+            },
+            {
+              "name": "crouch",
+              "pass": true,
+              "sourceMotions": [
+                39,
+                40,
+                41,
+                14
+              ]
+            },
+            {
+              "name": "jab",
+              "pass": true,
+              "sourceMotions": [
+                44,
+                14
+              ]
+            },
+            {
+              "name": "forward tilt",
+              "pass": true,
+              "sourceMotions": [
+                15,
+                53,
+                14
+              ]
+            },
+            {
+              "name": "up tilt",
+              "pass": true,
+              "sourceMotions": [
+                14,
+                56
+              ]
+            },
+            {
+              "name": "down tilt",
+              "pass": true,
+              "sourceMotions": [
+                14,
+                57,
+                41
+              ]
+            },
+            {
+              "name": "forward smash",
+              "pass": true,
+              "sourceMotions": [
+                60,
+                14
+              ]
+            },
+            {
+              "name": "up smash",
+              "pass": true,
+              "sourceMotions": [
+                63,
+                14
+              ]
+            },
+            {
+              "name": "down smash",
+              "pass": true,
+              "sourceMotions": [
+                64,
+                14
+              ]
+            },
+            {
+              "name": "dash attack",
+              "pass": true,
+              "sourceMotions": [
+                20,
+                50,
+                14
+              ]
+            },
+            {
+              "name": "shield",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                179,
+                180,
+                14
+              ]
+            },
+            {
+              "name": "forward roll",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                233,
+                14
+              ]
+            },
+            {
+              "name": "back roll",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                233,
+                14
+              ]
+            },
+            {
+              "name": "spot dodge",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                235,
+                14
+              ]
+            },
+            {
+              "name": "grab",
+              "pass": true,
+              "sourceMotions": [
+                212,
+                14
+              ]
+            },
+            {
+              "name": "neutral aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                65,
+                70,
+                14
+              ]
+            },
+            {
+              "name": "forward aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                66,
+                71,
+                14
+              ]
+            },
+            {
+              "name": "back aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                67,
+                42,
+                14
+              ]
+            },
+            {
+              "name": "up aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                68,
+                42,
+                14
+              ]
+            },
+            {
+              "name": "down aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                69,
+                74,
+                14
+              ]
+            },
+            {
+              "name": "air dodge",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                236,
+                43,
+                14
+              ]
+            },
+            {
+              "name": "Giant Punch partial charge/release",
+              "pass": true,
+              "sourceMotions": [
+                369,
+                370,
+                372,
+                14
+              ]
+            },
+            {
+              "name": "Giant Punch charge cancel",
+              "pass": true,
+              "sourceMotions": [
+                369,
+                370,
+                371,
+                14
+              ]
+            },
+            {
+              "name": "Giant Punch full charge/release",
+              "pass": true,
+              "sourceMotions": [
+                369,
+                370,
+                14,
+                373
+              ]
+            },
+            {
+              "name": "Giant Punch partial release (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                374,
+                375,
+                377,
+                372,
+                14
+              ]
+            },
+            {
+              "name": "Giant Punch cancel (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                374,
+                375,
+                376,
+                371,
+                14
+              ]
+            },
+            {
+              "name": "Giant Punch full release (air)",
+              "pass": true,
+              "sourceMotions": [
+                369,
+                370,
+                14,
+                24,
+                25,
+                378,
+                35,
+                43
+              ]
+            },
+            {
+              "name": "Headbutt",
+              "pass": true,
+              "sourceMotions": [
+                379,
+                14
+              ]
+            },
+            {
+              "name": "Headbutt (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                380,
+                379,
+                14
+              ]
+            },
+            {
+              "name": "Spinning Kong",
+              "pass": true,
+              "sourceMotions": [
+                381,
+                14
+              ]
+            },
+            {
+              "name": "Spinning Kong (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                382,
+                381,
+                14
+              ]
+            },
+            {
+              "name": "Hand Slap",
+              "pass": true,
+              "sourceMotions": [
+                383,
+                384,
+                385,
+                14
+              ]
+            }
+          ],
+          "geometry": {
+            "buffer": [
+              640,
+              480
+            ],
+            "css": [
+              900,
+              675
+            ],
+            "devicePixelRatio": 1,
+            "viewport": [
+              1280,
+              960
+            ],
+            "hidden": false,
+            "focused": true
+          },
+          "entry_timing_resumes": 0,
+          "failed_case": "acceptance",
+          "failures": [
+            "browser callback gap",
+            "native callback over 33.3 ms",
+            "audio underrun",
+            "live pipeline creation",
+            "automatic timing pause"
+          ],
+          "metrics": {
+            "sourceFrames": 7000,
+            "browserCallbacks": 6999,
+            "worstBrowserCallbackMs": 248.355,
+            "browserCallbackGaps": 3,
+            "browserLongTasks": 0,
+            "browserLongTaskWorstMs": 0,
+            "nativeCallbacks": 7013,
+            "worstNativeCallbackMs": 237.155,
+            "nativeCallbacksOverBudget": 3,
+            "nativeCallbacksOver33ms": 3,
+            "audioUnderrunFrames": 235,
+            "livePipelinesQueued": 0,
+            "livePipelinesCreated": 7,
+            "liveTextureUploadBytes": 800768,
+            "liveStagingUsedBytes": 8359611800,
+            "peakStagingUsedBytes": 4987920,
+            "preparationPauses": 0,
+            "automaticTimingResumes": 1,
+            "focusLost": false,
+            "wasmHeapGrowthBytes": 0
+          }
+        },
+        {
+          "round": "warm",
+          "pass": true,
+          "cases": [
+            {
+              "name": "walk left/right",
+              "pass": true,
+              "sourceMotions": [
+                18,
+                15,
+                14
+              ]
+            },
+            {
+              "name": "dash left/right",
+              "pass": true,
+              "sourceMotions": [
+                20,
+                14
+              ]
+            },
+            {
+              "name": "crouch",
+              "pass": true,
+              "sourceMotions": [
+                39,
+                40,
+                41,
+                14
+              ]
+            },
+            {
+              "name": "jab",
+              "pass": true,
+              "sourceMotions": [
+                44,
+                14
+              ]
+            },
+            {
+              "name": "forward tilt",
+              "pass": true,
+              "sourceMotions": [
+                15,
+                53,
+                14
+              ]
+            },
+            {
+              "name": "up tilt",
+              "pass": true,
+              "sourceMotions": [
+                14,
+                56
+              ]
+            },
+            {
+              "name": "down tilt",
+              "pass": true,
+              "sourceMotions": [
+                14,
+                57,
+                41
+              ]
+            },
+            {
+              "name": "forward smash",
+              "pass": true,
+              "sourceMotions": [
+                60,
+                14
+              ]
+            },
+            {
+              "name": "up smash",
+              "pass": true,
+              "sourceMotions": [
+                63,
+                14
+              ]
+            },
+            {
+              "name": "down smash",
+              "pass": true,
+              "sourceMotions": [
+                64,
+                14
+              ]
+            },
+            {
+              "name": "dash attack",
+              "pass": true,
+              "sourceMotions": [
+                20,
+                50,
+                14
+              ]
+            },
+            {
+              "name": "shield",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                179,
+                180,
+                14
+              ]
+            },
+            {
+              "name": "forward roll",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                233,
+                14
+              ]
+            },
+            {
+              "name": "back roll",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                233,
+                14
+              ]
+            },
+            {
+              "name": "spot dodge",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                235,
+                14
+              ]
+            },
+            {
+              "name": "grab",
+              "pass": true,
+              "sourceMotions": [
+                212,
+                14
+              ]
+            },
+            {
+              "name": "neutral aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                65,
+                70,
+                14
+              ]
+            },
+            {
+              "name": "forward aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                66,
+                71,
+                14
+              ]
+            },
+            {
+              "name": "back aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                67,
+                42,
+                14
+              ]
+            },
+            {
+              "name": "up aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                68,
+                42,
+                14
+              ]
+            },
+            {
+              "name": "down aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                69,
+                74,
+                14
+              ]
+            },
+            {
+              "name": "air dodge",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                236,
+                43,
+                14
+              ]
+            },
+            {
+              "name": "Giant Punch partial charge/release",
+              "pass": true,
+              "sourceMotions": [
+                369,
+                370,
+                372,
+                14
+              ]
+            },
+            {
+              "name": "Giant Punch charge cancel",
+              "pass": true,
+              "sourceMotions": [
+                369,
+                370,
+                371,
+                14
+              ]
+            },
+            {
+              "name": "Giant Punch full charge/release",
+              "pass": true,
+              "sourceMotions": [
+                369,
+                370,
+                14,
+                373
+              ]
+            },
+            {
+              "name": "Giant Punch partial release (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                374,
+                375,
+                377,
+                372,
+                14
+              ]
+            },
+            {
+              "name": "Giant Punch cancel (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                374,
+                375,
+                376,
+                371,
+                14
+              ]
+            },
+            {
+              "name": "Giant Punch full release (air)",
+              "pass": true,
+              "sourceMotions": [
+                369,
+                370,
+                14,
+                24,
+                25,
+                378,
+                35,
+                43
+              ]
+            },
+            {
+              "name": "Headbutt",
+              "pass": true,
+              "sourceMotions": [
+                379,
+                14
+              ]
+            },
+            {
+              "name": "Headbutt (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                380,
+                379,
+                14
+              ]
+            },
+            {
+              "name": "Spinning Kong",
+              "pass": true,
+              "sourceMotions": [
+                381,
+                14
+              ]
+            },
+            {
+              "name": "Spinning Kong (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                382,
+                381,
+                14
+              ]
+            },
+            {
+              "name": "Hand Slap",
+              "pass": true,
+              "sourceMotions": [
+                383,
+                384,
+                385,
+                14
+              ]
+            }
+          ],
+          "geometry": {
+            "buffer": [
+              640,
+              480
+            ],
+            "css": [
+              900,
+              675
+            ],
+            "devicePixelRatio": 1,
+            "viewport": [
+              1280,
+              960
+            ],
+            "hidden": false,
+            "focused": true
+          },
+          "entry_timing_resumes": 0,
+          "failed_case": null,
+          "failures": [],
+          "metrics": {
+            "sourceFrames": 7000,
+            "browserCallbacks": 7000,
+            "worstBrowserCallbackMs": 24.905,
+            "browserCallbackGaps": 0,
+            "browserLongTasks": 0,
+            "browserLongTaskWorstMs": 0,
+            "nativeCallbacks": 7000,
+            "worstNativeCallbackMs": 8.225,
+            "nativeCallbacksOverBudget": 0,
+            "nativeCallbacksOver33ms": 0,
+            "audioUnderrunFrames": 0,
+            "livePipelinesQueued": 0,
+            "livePipelinesCreated": 0,
+            "liveTextureUploadBytes": 800768,
+            "liveStagingUsedBytes": 8360229892,
+            "peakStagingUsedBytes": 2531056,
+            "preparationPauses": 0,
+            "automaticTimingResumes": 0,
+            "focusLost": false,
+            "wasmHeapGrowthBytes": 0
+          }
+        }
+      ]
+    }
+  },
+  "retained_native_failures": [
+    {
+      "local_path": "work/full-game/donkey-suite-v1.log",
+      "sha256": "ee4d0c06f3f63a60eacb84b7755c2b9053e2ada6a5bb2cb8482ea6c8933c2f68",
+      "reason": "1,080 tests with one stale menu fixture expecting Donkey to be unavailable; corrected invalid-selection and costume-bound checks pass separately."
+    },
+    {
+      "local_path": "work/full-game/donkey-native-entry-v1.log",
+      "sha256": "c702eb8db83094f69d7f9addc0467ea5ee993c048e1616d3f669317da2f51767",
+      "reason": "Native fighter animation channel boundary."
+    },
+    {
+      "local_path": "work/full-game/donkey-native-entry-v2.log",
+      "sha256": "dea87474ad98f27d24f18c39b5a1f911d6d5574d0f494c09961f8611dad576d9",
+      "reason": "WallDamage BRANCH12 was rejected."
+    },
+    {
+      "local_path": "work/full-game/donkey-native-entry-v3.log",
+      "sha256": "5d26978a7cb28caf0dfdddb878dee7129fb7db93001364232630c7e8ee1a2292",
+      "reason": "FallAerialF delayed singleton CON was rejected."
+    },
+    {
+      "local_path": "work/full-game/donkey-native-entry-v4.log",
+      "sha256": "5c8792faa0555e6b820eaf5f508ccc05c29d1cd965d91ff4a6c461cbde58b9f0",
+      "reason": "Pass singleton SPL0 was rejected at hydration; native undefined-output guard remains active."
+    },
+    {
+      "local_path": "work/full-game/donkey-native-entry-v5.log",
+      "sha256": "d6034678221aeb5f961ee4d795a49b3d4c31ff46d857cee6b34f48b3440bbd29",
+      "reason": "Mixed C8/CMPR costume animation incorrectly required indexed images throughout."
+    },
+    {
+      "local_path": "work/full-game/donkey-native-actions-v1.log",
+      "sha256": "92db20148aaa0a1143f415b8278a72fcf845a7770f1ed990bb16f66e901ca1ef",
+      "reason": "Fixture expected only partial air Giant Punch; source stored charge selected Full."
+    },
+    {
+      "local_path": "work/full-game/donkey-native-actions-v2.log",
+      "sha256": "de2bd906372713db42ca295f76342e116aaac086f0b3f4bf220e503f93feccfb",
+      "reason": "Transition diagnostic observes Full378; source charge is preserved in corrected recipe."
+    },
+    {
+      "local_path": "work/full-game/donkey-native-actions-v3.log",
+      "sha256": "7ab2c6e82fd5a52b99f51079609a754fc05f93f9f53df011dd8b51752ad79373",
+      "reason": "Cargo victim ShoulderedWait animation267 used a guarded unhydrated command row."
+    },
+    {
+      "local_path": "work/full-game/donkey-platform-pass-v1.log",
+      "sha256": "60be33ccd95161777dab6a4ce645a832ad98b96cc8b784009aa517d77431c95d",
+      "reason": "Fixture full-down input did not enter Pass; spot-dodge has source priority."
+    },
+    {
+      "local_path": "work/full-game/donkey-platform-pass-v2.log",
+      "sha256": "5e9202b09f273a1d13227709427952b28c8c07325c0c6186ea5b64e483469098",
+      "reason": "Raw shield/down-54 enters Pass244 on Battlefield; source animation209 reaches undefined BRANCH SPL0 output at frame25. Known runtime crash, unresolved."
+    }
+  ],
+  "pipeline_seed": {
+    "sha256": "5d8a4b2bff7dcf12da67ffb576895fbf786f0898e8df04e2c5d2393027b2650b",
+    "bytes": 3366912,
+    "shader_rows": 1,
+    "pipeline_rows": 809,
+    "changed": true,
+    "review": {
+      "local_path": "work/full-game/donkey-cache-review-v1.json",
+      "sha256": "8ef35c7520eb838570f57bf7019be3ce2fc547885cb65be6a40c841d2e004e76"
+    },
+    "base": {
+      "local_path": "work/full-game/donkey-pipeline-base-v1.db",
+      "sha256": "00beb96a91ac23bfc639d7fb25b9ff9feb886b48779384159efd525682ccc2d5"
+    },
+    "preserved_base_rows": 795,
+    "added_rows": [
+      {
+        "config_sha256": "18cd2700c3de09b63667183fe7d3e0c6c512fa16f87b810ffe4331283648824a",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 536,
+        "hash": 97692152,
+        "type": 1
+      },
+      {
+        "config_sha256": "50a66ab4739a4369f2328721a5c3fbe2ca924efecc8e3219d399f2c8fb8c5cda",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 477,
+        "hash": 321823645,
+        "type": 1
+      },
+      {
+        "config_sha256": "ab60283a05a363228fc47864c3fe3dd5a3630df695848d8c9780da888ef77e73",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 3213,
+        "hash": 375683054,
+        "type": 1
+      },
+      {
+        "config_sha256": "e638b06a11270bb874bb5fd26167be517cd0fc83f3dbba8ebb1ca7fe7cd83d16",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 536,
+        "hash": 549875714,
+        "type": 1
+      },
+      {
+        "config_sha256": "b80d2e57cb7cf8dadd45b88bb297d4f26d1834b7cb438428aae6531a5a903a5b",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 5436,
+        "hash": 837697306,
+        "type": 1
+      },
+      {
+        "config_sha256": "e541401cc7515af9fddf3d101994da33d3c5ecc8cf0343600629ea716d6f2b18",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 477,
+        "hash": 967444151,
+        "type": 1
+      },
+      {
+        "config_sha256": "fff8d9bd43db093e05302d07c7715e35ce91209e32ea64afb85324f8eb46145a",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 477,
+        "hash": 1465219714,
+        "type": 1
+      },
+      {
+        "config_sha256": "2c52c7771c668796a4aab0727b68ea9348d48c79786ddb17eb7adbe11c1d8b7b",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 477,
+        "hash": 1726898807,
+        "type": 1
+      },
+      {
+        "config_sha256": "21a4b90a98bf8a01020ede52008fd922eb51c15e77e1abc881aaa7501fbff500",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 3213,
+        "hash": 1857922491,
+        "type": 1
+      },
+      {
+        "config_sha256": "f07787b7fe8396776e3db0d51502f1c9c9f97969af200dd44b425241f2a2661f",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 3213,
+        "hash": 2070684716,
+        "type": 1
+      },
+      {
+        "config_sha256": "6968c3cea7e5b9719d78f279d47f75b154b90e880b7e4c1b3edaebdd78d80b78",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 536,
+        "hash": 2743504505,
+        "type": 1
+      },
+      {
+        "config_sha256": "a7f07607cfb33978ad718605c997679ceb54814c4b8a9c941ff1183428066b25",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 3213,
+        "hash": 2840622325,
+        "type": 1
+      },
+      {
+        "config_sha256": "34c53f4af95419bdfb55d612680cb744c7807102514b8be1b2c08aa817828a45",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 536,
+        "hash": 3195439480,
+        "type": 1
+      },
+      {
+        "config_sha256": "10feeca1206929b2d7dfb1a1f2af3e7468ffb40837b9093cdb4d88e16cc79350",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 3213,
+        "hash": 3898714416,
+        "type": 1
+      },
+      {
+        "config_sha256": "bebb671a6339f498b9eb6cbfbafdb55ebeb04190801b5f3b44235d62edb99ae5",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 5068,
+        "hash": 3938420648,
+        "type": 1
+      }
+    ],
+    "provenance": {
+      "local_path": "work/full-game/donkey-browser-discovery-v1/cold/cache-provenance.json",
+      "sha256": "899ae46c10a51a6a149dcea00838f407720bd18deff2bb0a45826e537ba602d5"
+    },
+    "scope": "Exactly 15 visible-entry/action descriptors added; all 795 old rows retained field-for-field. Driver cache and game assets excluded."
+  },
+  "import_budget": {
+    "local_path": "work/full-game/donkey-disc-budget-v1.json",
+    "sha256": "d552eb01b0a949cd922d90e7c0ce194e45cfcca5f2fae6f57a79f5732e6f985b",
+    "schema": "melee-web-owned-disc-import-budget-v1",
+    "files": 169,
+    "disc_bytes": 122864276,
+    "maximum_bundle_bytes": 134217728,
+    "remaining_bytes": 11353452,
+    "generated_font_and_coefficients_excluded": true,
+    "manifest_sha256": "25741b4b6089a9f35e52c09e13afebcf12f973be9cdefe7c3cc77a1e66c5610a"
+  },
+  "shared_original_regressions": [
+    {
+      "local_path": "work/full-game/ganondorf-native-donkey-v1/refresh-receipt.json",
+      "sha256": "238dce15f9cef8782065281275449d1e9fa9a55940aa33c534efb5f536a7775a",
+      "result": "declared_state_match",
+      "frames": 603,
+      "scope": "Declared headless state only; not source drawing, Donkey, complete match endings, pixels, PCM or live timing"
+    },
+    {
+      "local_path": "work/full-game/mario-fd-native-donkey-v1/refresh-receipt.json",
+      "sha256": "1df47a3f569095ce231832be69927f2f21310e812669f7f49c131ffcba83bf05",
+      "result": "declared_state_match",
+      "frames": 240,
+      "scope": "Declared headless state only; not source drawing, Donkey, complete match endings, pixels, PCM or live timing"
+    }
+  ],
+  "remaining_gates": [
+    "Resolve reproduced Battlefield Pass frame25 undefined-output crash against independent original consumer evidence; StopCeil remains unexercised",
+    "Full move/costume/stage interaction matrix",
+    "Independent original Donkey state, pixel and PCM comparison",
+    "Complete ordinary-input matches, physical controllers and live scheduling",
+    "Startup and sustained performance across supported content and hardware",
+    "Scene-scoped asset import for the full offline roster/stage/mode corpus",
+    "Results/audio draft dependencies and the remaining full-game inventory"
+  ],
+  "github_verification": {
+    "workflow": "Verify",
+    "run_id": 35527505979,
+    "url": "https://github.com/ericvanlare/melee-web/actions/runs/35527505979",
+    "head_commit": "16e4eb4707328a6fd6b5002b25a9a38ab81860d4",
+    "result": "pass",
+    "started_at": "2026-09-20T17:57:35Z",
+    "completed_at": "2026-09-20T18:03:55Z",
+    "seconds": 380.0,
+    "local_path": "work/full-game/donkey-github-verify-v1.json",
+    "sha256": "8acabae75fdf59604e39b1071f7e8ff2d798e4171bd32d7c260b097b011a9523"
+  }
+}

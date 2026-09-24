@@ -4,6 +4,8 @@
 #include <iostream>
 #include <iterator>
 extern "C" int melee_web_test_rumble_sequence(void);
+extern "C" int melee_web_test_rumble_queue(void);
+extern "C" int melee_web_test_rumble_clear(void);
 using namespace melee_web;
 static void check(bool b){if(!b)throw std::runtime_error("Rumble boundary check failed");}
 int main(int argc,char** argv){try{
@@ -21,7 +23,9 @@ int main(int argc,char** argv){try{
         check(melee_web_rumble_begin(decoded,error,sizeof(error)));
         check(!melee_web_rumble_begin(decoded,error,sizeof(error)));
         check(melee_web_test_rumble_sequence());
+        check(melee_web_test_rumble_queue());
         check(melee_web_rumble_end(decoded,error,sizeof(error)));
+        check(melee_web_test_rumble_clear());
         check(!melee_web_rumble_end(decoded,error,sizeof(error)));
     }
     const auto program=*archive->pointer(root,2);

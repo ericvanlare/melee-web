@@ -88,7 +88,7 @@ diff --git a/extern/CMakeLists.txt b/extern/CMakeLists.txt
 index e1feaca..5051b3e 100644
 --- a/extern/CMakeLists.txt
 +++ b/extern/CMakeLists.txt
-@@ -213,11 +213,29 @@ if (AURORA_ENABLE_GX)
+@@ -213,11 +213,36 @@ if (AURORA_ENABLE_GX)
      )
      target_include_directories(imgui PUBLIC ${imgui_SOURCE_DIR})
  
@@ -107,7 +107,14 @@ index e1feaca..5051b3e 100644
 +        "WGPUVertexBufferLayout buffer_layouts[1] = {};"
 +        _aurora_imgui_wgpu "${_aurora_imgui_wgpu}")
 +      set(_aurora_imgui_wgpu_source "${CMAKE_CURRENT_BINARY_DIR}/imgui_impl_wgpu_emdawn.cpp")
-+      file(WRITE "${_aurora_imgui_wgpu_source}" "${_aurora_imgui_wgpu}")
++      # Preserve the timestamp on unchanged output so reconfigure does not
++      # recompile this backend and relink every dependent trace.
++      if (EXISTS "${_aurora_imgui_wgpu_source}")
++        file(READ "${_aurora_imgui_wgpu_source}" _aurora_imgui_wgpu_previous)
++      endif ()
++      if (NOT EXISTS "${_aurora_imgui_wgpu_source}" OR NOT _aurora_imgui_wgpu_previous STREQUAL _aurora_imgui_wgpu)
++        file(WRITE "${_aurora_imgui_wgpu_source}" "${_aurora_imgui_wgpu}")
++      endif ()
 +    endif ()
      add_library(imgui_backends STATIC
        ${imgui_SOURCE_DIR}/backends/imgui_impl_sdl3.cpp
@@ -217,8 +224,130 @@ index 94504b1..ae5908f 100644
  const AuroraStats* aurora_get_stats();
  float aurora_get_fps();
  
+diff --git a/include/aurora/pipeline_prepare.h b/include/aurora/pipeline_prepare.h
+new file mode 100644
+index 0000000..df9fd74
+--- /dev/null
++++ b/include/aurora/pipeline_prepare.h
+@@ -0,0 +1,100 @@
++#pragma once
++
++/*
++ * This header exposes common pipeline preparation controls and the optional
++ * selective pipeline descriptor API. It is intentionally independent of
++ * MELEE_WEB_PIPELINE_PROVENANCE so a shipping build can use reviewed controls
++ * without enabling capture.
++ */
++#include <stddef.h>
++#include <stdint.h>
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++
++/* Enable complete draw resolution for non-selective development rendering. */
++int aurora_pipeline_set_complete_draws(int enabled);
++
++/* Return whether complete draw resolution is currently enabled. */
++int aurora_pipeline_complete_draws_enabled(void);
++
++/* Drain queued pipeline work without starting or clearing a render frame. */
++int aurora_pipeline_service_preparation(void);
++
++#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
++
++/* Values are the current aurora::gfx::ShaderType values. */
++enum {
++  AURORA_PIPELINE_SHADER_CLEAR = 0,
++  AURORA_PIPELINE_SHADER_GX = 1,
++  AURORA_PIPELINE_SHADER_RML = 2,
++};
++
++typedef struct AuroraPipelineDescriptor {
++  uint32_t type;
++  uint64_t pipeline_ref;
++  uint32_t config_version;
++  uint32_t config_size;
++  uint8_t sha256[32];
++} AuroraPipelineDescriptor;
++
++typedef enum AuroraPipelinePrepareState {
++  AURORA_PIPELINE_PREPARE_UNCONFIGURED = 0,
++  /* Selective mode is active but the first post-init union is not supplied. */
++  AURORA_PIPELINE_PREPARE_ENABLED_NO_REQUEST = 1,
++  AURORA_PIPELINE_PREPARE_VALIDATING = 2,
++  AURORA_PIPELINE_PREPARE_PENDING = 3,
++  AURORA_PIPELINE_PREPARE_READY = 4,
++  AURORA_PIPELINE_PREPARE_UNKNOWN_MEMBERSHIP = 5,
++  AURORA_PIPELINE_PREPARE_ERROR = 6,
++} AuroraPipelinePrepareState;
++
++typedef struct AuroraPipelinePrepareStatus {
++  uint32_t state;
++  uint8_t configured;
++  uint8_t valid;
++  uint8_t ready;
++  uint8_t reserved;
++  uint32_t requested_count;
++  uint32_t unique_count;
++  uint32_t accepted_count;
++  uint32_t ready_count;
++  uint32_t pending_count;
++  uint32_t unknown_count;
++  uint32_t error_count;
++  uint32_t invalid_index;
++  uint64_t retained_config_bytes;
++  uint32_t unexpected_count;
++  uint32_t deferred_count;
++} AuroraPipelinePrepareStatus;
++
++/* Arm selective mode. Call while the Aurora pipeline cache is stopped. */
++int aurora_pipeline_prepare_enable(void);
++
++/* Disable selective mode. Call while the Aurora pipeline cache is stopped. */
++int aurora_pipeline_prepare_disable(void);
++
++/*
++ * Replace the active allowed union. Call after cache initialization and before
++ * the next source/render operation. The array is copied before return.
++ */
++int aurora_prepare_pipeline_union(const AuroraPipelineDescriptor *entries,
++                                  size_t count);
++
++/* Prepare all descriptors in the verified, already imported catalog. This
++ * uses the same membership checks, queue and deduplication as an explicit union. */
++int aurora_prepare_pipeline_catalog(void);
++
++/* Read a synchronized status snapshot. Returns zero only for a null output. */
++int aurora_pipeline_prepare_status(AuroraPipelinePrepareStatus *out);
++
++/* Public alpha only: service deferred descriptors after the owner has paused
++ * its source clock. Lookup never constructs an undeclared pipeline. */
++int aurora_pipeline_prepare_deferred(void);
++
++#endif /* defined(MELEE_WEB_SELECTIVE_PIPELINES) */
++
++#ifdef __cplusplus
++}
++#endif
+diff --git a/include/dolphin/pad.h b/include/dolphin/pad.h
+index 252fca7..3e36937 100644
+--- a/include/dolphin/pad.h
++++ b/include/dolphin/pad.h
+@@ -221,6 +221,11 @@ s32 PADGetNativeButtonPressed(u32 port);
+ PADSignedNativeAxis PADGetNativeAxisPulled(u32 port);
+ void PADRestoreDefaultMapping(u32 port);
+ void PADBlockInput(bool block);
++/* Optional physical-input transport. A true result means a connected source,
++ * including a neutral source awaiting setup. Null restores SDL hardware input.
++ * Keyboard fallback, focus suppression and the existing PADClamp stay shared. */
++typedef BOOL (*PADPhysicalInputProvider)(u32 port, PADStatus* status);
++void PADSetPhysicalInputProvider(PADPhysicalInputProvider provider);
+ 
+ void PADSetVirtualStatus(u32 port, const PADStatus* status);
+ void PADClearVirtualStatus(u32 port);
 diff --git a/lib/aurora.cpp b/lib/aurora.cpp
-index 9430842..f93262b 100644
+index 9430842..7d9b3a1 100644
 --- a/lib/aurora.cpp
 +++ b/lib/aurora.cpp
 @@ -1,6 +1,10 @@
@@ -364,9 +493,10 @@ index 9430842..f93262b 100644
  #endif
 +  timing.outerPrepMs = phase_now_ms() - phaseStarted;
  
-   gfx::end_frame([rmlBindGroup = std::move(rmlBindGroup), rmlOverlay, viewport,
+-  gfx::end_frame([rmlBindGroup = std::move(rmlBindGroup), rmlOverlay, viewport,
 -                  imguiDrawData = std::move(imguiDrawData)](
 -                     wgpu::CommandEncoder& encoder, std::vector<gfx::AfterSubmitCallback> afterSubmitCallbacks) {
++  gfx::end_frame([rmlBindGroup = std::move(rmlBindGroup), rmlOverlay, sourceSize = presentSource.size,
 +                  imguiDrawData = std::move(imguiDrawData), timing](
 +                     wgpu::CommandEncoder& encoder, std::vector<gfx::AfterSubmitCallback> afterSubmitCallbacks,
 +                     AuroraStats& frameStats) mutable {
@@ -374,7 +504,42 @@ index 9430842..f93262b 100644
      wgpu::Texture currentTexture;
      wgpu::TextureView currentView;
      auto surfaceStatus = wgpu::SurfaceGetCurrentTextureStatus::Error;
-@@ -367,12 +448,21 @@ void end_frame() noexcept {
+@@ -307,6 +388,13 @@ void end_frame() noexcept {
+ 
+     const bool canPresent = currentTexture && currentView;
+     if (canPresent) {
++      // Browser canvas dimensions can change before SDL processes its resize
++      // event. Encode presentation against the acquired attachment, not the
++      // previous surface configuration, so viewport/scissor bounds stay valid.
++      const auto surfaceWidth = currentTexture.GetWidth();
++      const auto surfaceHeight = currentTexture.GetHeight();
++      const auto viewport = webgpu::calculate_present_viewport(surfaceWidth, surfaceHeight,
++                                                               sourceSize.width, sourceSize.height);
+       wgpu::BindGroup presentBindGroup;
+       if (rmlBindGroup && !rmlOverlay) {
+         presentBindGroup = rmlBindGroup;
+@@ -332,8 +420,7 @@ void end_frame() noexcept {
+         // Copy EFB -> XFB (swapchain)
+         pass.SetPipeline(webgpu::g_CopyPipeline);
+         pass.SetBindGroup(0, presentBindGroup, 0, nullptr);
+-        set_present_viewport(pass, viewport, webgpu::g_graphicsConfig.surfaceConfiguration.width,
+-                             webgpu::g_graphicsConfig.surfaceConfiguration.height);
++        set_present_viewport(pass, viewport, surfaceWidth, surfaceHeight);
+ 
+         pass.Draw(3);
+         if (rmlBindGroup && rmlOverlay) {
+@@ -358,8 +445,8 @@ void end_frame() noexcept {
+             .timestampWrites = webgpu::gpu_prof::pass_writes("ImGui"),
+         };
+         const auto pass = encoder.BeginRenderPass(&renderPassDescriptor);
+-        pass.SetViewport(0.f, 0.f, static_cast<float>(webgpu::g_graphicsConfig.surfaceConfiguration.width),
+-                         static_cast<float>(webgpu::g_graphicsConfig.surfaceConfiguration.height), 0.f, 1.f);
++        pass.SetViewport(0.f, 0.f, static_cast<float>(surfaceWidth),
++                         static_cast<float>(surfaceHeight), 0.f, 1.f);
+         imgui::render(pass, imguiDrawData);
+         pass.End();
+       }
+@@ -367,12 +454,21 @@ void end_frame() noexcept {
        Log.info("Skipping present; window not presentable");
      }
      webgpu::gpu_prof::frame_end(encoder);
@@ -396,7 +561,7 @@ index 9430842..f93262b 100644
      webgpu::gpu_prof::after_submit();
      if (canPresent && g_surface) {
        ZoneScopedN("Present");
-@@ -380,7 +470,12 @@ void end_frame() noexcept {
+@@ -380,7 +476,12 @@ void end_frame() noexcept {
        {
          window::SurfaceLock surfaceLock;
          if (window::is_presentable()) {
@@ -409,7 +574,7 @@ index 9430842..f93262b 100644
          }
        }
        if (status) {
-@@ -429,7 +524,7 @@ void end_frame() noexcept {
+@@ -429,7 +530,7 @@ void end_frame() noexcept {
      TracyPlotConfig("aurora: lastStorageSize", tracy::PlotFormatType::Memory, false, true, 0);
      TracyPlotConfig("aurora: lastTextureUploadSize", tracy::PlotFormatType::Memory, false, true, 0);
  
@@ -418,7 +583,7 @@ index 9430842..f93262b 100644
      TracyPlot("aurora: queuedPipelines", static_cast<int64_t>(stats.queuedPipelines));
      TracyPlot("aurora: createdPipelines", static_cast<int64_t>(stats.createdPipelines));
      TracyPlot("aurora: drawCallCount", static_cast<int64_t>(stats.drawCallCount));
-@@ -439,8 +534,25 @@ void end_frame() noexcept {
+@@ -439,8 +540,25 @@ void end_frame() noexcept {
      TracyPlot("aurora: lastIndexSize", static_cast<int64_t>(stats.lastIndexSize));
      TracyPlot("aurora: lastStorageSize", static_cast<int64_t>(stats.lastStorageSize));
      TracyPlot("aurora: lastTextureUploadSize", static_cast<int64_t>(stats.lastTextureUploadSize));
@@ -444,7 +609,7 @@ index 9430842..f93262b 100644
  #endif
  }
  } // namespace
-@@ -454,6 +566,33 @@ void aurora_shutdown() { aurora::shutdown(); }
+@@ -454,6 +572,33 @@ void aurora_shutdown() { aurora::shutdown(); }
  const AuroraEvent* aurora_update() { return aurora::update(); }
  bool aurora_begin_frame() { return aurora::begin_frame(); }
  void aurora_end_frame() { aurora::end_frame(); }
@@ -493,11 +658,106 @@ index 447ead8..8514c86 100644
  #elif defined(SDL_PLATFORM_WIN32)
    std::shared_ptr<wgpu::SurfaceSourceWindowsHWND> desc = std::make_shared<wgpu::SurfaceSourceWindowsHWND>();
    desc->hwnd = SDL_GetPointerProperty(props, SDL_PROP_WINDOW_WIN32_HWND_POINTER, nullptr);
+diff --git a/lib/dolphin/pad/pad.cpp b/lib/dolphin/pad/pad.cpp
+index 0a35990..11a6faf 100644
+--- a/lib/dolphin/pad/pad.cpp
++++ b/lib/dolphin/pad/pad.cpp
+@@ -292,6 +292,7 @@ constexpr PADCLampRegion ClampRegion{
+ };
+ 
+ bool g_initialized;
++PADPhysicalInputProvider g_physicalInputProvider = nullptr;
+ bool g_keyboardBindingsLoaded = false;
+ bool g_blockPAD = false;
+ bool g_suppressHeldOnRead = false;
+@@ -723,11 +724,13 @@ u32 PADRead(PADStatus* status) {
+   for (uint32_t i = 0; i < PAD_CHANMAX; ++i) {
+     memset(&status[i], 0, sizeof(PADStatus));
+     // Support device rumble on port 0 regardless of whether a controller is connected.
+-    if (device_rumble_available_for_port(i)) {
++    if (!g_physicalInputProvider && device_rumble_available_for_port(i)) {
+       rumbleSupport |= PAD_CHAN0_BIT;
+     }
+-    auto controller = aurora::input::get_controller_for_player(i);
+-    if (controller == nullptr && !g_keyboardBindings[i].m_mappingsSet && !g_virtualPadActive[i]) {
++    PADStatus physicalStatus{};
++    const bool physicalConnected = g_physicalInputProvider && g_physicalInputProvider(i, &physicalStatus);
++    auto controller = g_physicalInputProvider ? nullptr : aurora::input::get_controller_for_player(i);
++    if (!physicalConnected && controller == nullptr && !g_keyboardBindings[i].m_mappingsSet && !g_virtualPadActive[i]) {
+       status[i].err = PAD_ERR_NO_CONTROLLER;
+       g_suppressedButtons[i] = 0;
+       g_suppressLeftTrigger[i] = false;
+@@ -936,6 +939,12 @@ u32 PADRead(PADStatus* status) {
+       }
+     }
+ 
++    if (physicalConnected) {
++      // The provider has already normalized physical hardware. Never blend it
++      // with a second SDL mapping or keyboard input on the same port.
++      status[i] = physicalStatus;
++      status[i].err = PAD_ERR_NONE;
++    }
+     if (g_blockPAD) {
+       neutralize_status(status[i]);
+     } else {
+@@ -948,6 +957,11 @@ u32 PADRead(PADStatus* status) {
+   return rumbleSupport;
+ }
+ 
++void PADSetPhysicalInputProvider(PADPhysicalInputProvider provider) {
++  g_physicalInputProvider = provider;
++  g_suppressHeldOnRead = true;
++}
++
+ void PADSetVirtualStatus(const u32 port, const PADStatus* virtualStatus) {
+   if (port >= PAD_CHANMAX || virtualStatus == nullptr) {
+     return;
+@@ -973,6 +987,9 @@ void PADClearAllVirtualStatus() {
+ }
+ 
+ void PADControlMotor(const u32 chan, const u32 cmd) {
++  // This input-only provider reports no rumble support. Its port assignments
++  // are independent of SDL, so SDL/device feedback could target the wrong pad.
++  if (g_physicalInputProvider) return;
+   const auto controller = aurora::input::get_controller_for_player(chan);
+   if (should_use_device_rumble(chan, controller)) {
+     u16 low = 0;
+diff --git a/lib/gfx/encoding.cpp b/lib/gfx/encoding.cpp
+index b3054be..9fe8bd7 100644
+--- a/lib/gfx/encoding.cpp
++++ b/lib/gfx/encoding.cpp
+@@ -154,6 +154,9 @@ void render_pass(const wgpu::RenderPassEncoder& pass, FramePacket& frame, Render
+     } break;
+     case CommandType::Draw: {
+       auto& draw = cmd.data.draw;
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++      const melee_web::provenance::Execution provenance(draw.provenance);
++#endif
+       if (draw.encoder != nullptr) {
+         draw.encoder(draw.payload.data(), pass, passInfo);
+       }
+@@ -384,6 +387,9 @@ void copy_staging_to_high_water(wgpu::CommandEncoder& cmd, FramePacket& frame, c
+ 
+ namespace detail {
+ void encode_op(wgpu::CommandEncoder& cmd, FramePacket& frame, const FrameOp& op) {
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++  const melee_web::provenance::Execution provenance(op.provenance);
++#endif
+   copy_staging_to_high_water(cmd, frame, op);
+   switch (op.type) {
+   case FrameOpType::RenderPass:
 diff --git a/lib/gfx/frame.cpp b/lib/gfx/frame.cpp
-index 9fd83ef..6d17d1b 100644
+index 9fd83ef..157e619 100644
 --- a/lib/gfx/frame.cpp
 +++ b/lib/gfx/frame.cpp
-@@ -16,9 +16,12 @@
+@@ -1,3 +1,6 @@
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++#include "pipeline_provenance_runtime.h"
++#endif
+ #include "frame.hpp"
+ 
+ #include "depth_peek.hpp"
+@@ -16,9 +19,12 @@
  #include "../webgpu/gpu_prof.hpp"
  
  #include <array>
@@ -510,7 +770,7 @@ index 9fd83ef..6d17d1b 100644
  #include <deque>
  #include <mutex>
  #include <optional>
-@@ -27,6 +30,9 @@
+@@ -27,6 +33,9 @@
  #include <utility>
  #include <vector>
  
@@ -520,7 +780,7 @@ index 9fd83ef..6d17d1b 100644
  #include <tracy/Tracy.hpp>
  #include <magic_enum.hpp>
  
-@@ -36,6 +42,14 @@ using webgpu::g_device;
+@@ -36,6 +45,14 @@ using webgpu::g_device;
  using webgpu::g_instance;
  using webgpu::g_queue;
  
@@ -535,7 +795,7 @@ index 9fd83ef..6d17d1b 100644
  namespace {
  constexpr Module Log{"aurora::gfx"};
  
-@@ -49,6 +63,46 @@ enum class BufferMapState {
+@@ -49,6 +66,46 @@ enum class BufferMapState {
  
  std::array<wgpu::Buffer, StagingBufferCount> g_stagingBuffers;
  std::array<std::atomic<BufferMapState>, StagingBufferCount> g_mappingStates;
@@ -582,7 +842,7 @@ index 9fd83ef..6d17d1b 100644
  uint32_t g_frameIndex = UINT32_MAX;
  
  std::array<FramePacket, FrameSlotCount> g_framePackets;
-@@ -56,6 +110,99 @@ uint64_t g_nextFrameId = 1;
+@@ -56,6 +113,99 @@ uint64_t g_nextFrameId = 1;
  render_worker::FrameSlotPool g_frameSlots{FrameSlotCount};
  render_worker::FrameSlotPool g_stagingSlots{StagingBufferCount};
  
@@ -682,7 +942,7 @@ index 9fd83ef..6d17d1b 100644
  struct RuntimeDrawType {
    std::string label;
    DrawCallback draw = nullptr;
-@@ -179,7 +326,12 @@ void wait_for_gpu_progress(std::chrono::nanoseconds sleepDuration) {
+@@ -179,7 +329,12 @@ void wait_for_gpu_progress(std::chrono::nanoseconds sleepDuration) {
    if (render_worker::is_idle()) {
      enqueue_process_events();
    }
@@ -695,7 +955,7 @@ index 9fd83ef..6d17d1b 100644
  }
  
  void pace_frame_start() {
-@@ -239,6 +391,53 @@ void map_staging_buffer(size_t slot, bool releaseSlotOnCompletion = false) {
+@@ -239,6 +394,53 @@ void map_staging_buffer(size_t slot, bool releaseSlotOnCompletion = false) {
          }
        });
  }
@@ -749,7 +1009,17 @@ index 9fd83ef..6d17d1b 100644
  } // namespace
  
  namespace detail {
-@@ -385,6 +584,18 @@ void initialize() {
+@@ -374,6 +576,9 @@ void unregister_encoder_task_type(EncoderTaskId type) noexcept {
+ }
+ 
+ void initialize() {
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++  melee_web_provenance_renderer_begin();
++#endif
+   g_frameIndex = 0;
+   g_processEventsQueued.store(false, std::memory_order_release);
+   g_lastPresentNs.store(0, std::memory_order_release);
+@@ -385,6 +590,18 @@ void initialize() {
      g_presentTimes.clear();
    }
    render_worker::initialize();
@@ -768,7 +1038,7 @@ index 9fd83ef..6d17d1b 100644
    // This appears to take a while and blocks the render thread for periods of time
    // render_worker::set_event_pump([] {
    //   if (g_instance) {
-@@ -420,15 +631,22 @@ void initialize() {
+@@ -420,15 +637,22 @@ void initialize() {
                 "Shared Storage Buffer");
    for (size_t i = 0; i < g_stagingBuffers.size(); ++i) {
      const auto label = fmt::format("Staging Buffer {}", i);
@@ -791,7 +1061,7 @@ index 9fd83ef..6d17d1b 100644
  
    {
      constexpr std::array layoutEntries{
-@@ -519,6 +737,10 @@ void initialize() {
+@@ -519,6 +743,10 @@ void initialize() {
  }
  
  void shutdown() {
@@ -802,7 +1072,7 @@ index 9fd83ef..6d17d1b 100644
    render_worker::synchronize();
    render_worker::shutdown();
    g_processEventsQueued.store(false, std::memory_order_release);
-@@ -556,6 +778,20 @@ void shutdown() {
+@@ -556,12 +784,29 @@ void shutdown() {
    for (auto& packet : g_framePackets) {
      packet = {};
    }
@@ -823,7 +1093,16 @@ index 9fd83ef..6d17d1b 100644
    shutdown_recording();
    g_resources.staticBindGroup = {};
    g_resources.staticBindGroupLayout = {};
-@@ -584,49 +820,112 @@ bool wait_for_staging_buffer(size_t slot) {
+   g_resources.uniformBindGroup = {};
+   g_resources.uniformBindGroupLayout = {};
+   g_frameIndex = UINT32_MAX;
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++  melee_web_provenance_renderer_end();
++#endif
+   g_frameSlots.reset();
+   g_stagingSlots.reset();
+   for (auto& state : g_mappingStates) {
+@@ -584,49 +829,116 @@ bool wait_for_staging_buffer(size_t slot) {
    }
  }
  
@@ -913,6 +1192,10 @@ index 9fd83ef..6d17d1b 100644
    auto& frame = g_framePackets[frameSlot];
    frame = {};
    frame.frameId = g_nextFrameId++;
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++  melee_web_provenance_frame(frame.frameId);
++  frame.provenance = melee_web_provenance_current();
++#endif
    frame.frameIndex = g_frameIndex;
    frame.stagingBuffer = *stagingSlot;
 +#ifdef __EMSCRIPTEN__
@@ -940,7 +1223,7 @@ index 9fd83ef..6d17d1b 100644
    size_t bufferOffset = 0;
    const auto& stagingBuf = g_stagingBuffers[*stagingSlot];
    const auto mapBuffer = [&](ByteBuffer& buf, uint64_t size) {
-@@ -643,20 +942,71 @@ bool begin_frame() {
+@@ -643,20 +955,74 @@ bool begin_frame() {
    if constexpr (UseTextureBuffer) {
      mapBuffer(frame.textureUpload, TextureUploadSize);
    }
@@ -955,6 +1238,9 @@ index 9fd83ef..6d17d1b 100644
 +  timing.pipelineMs = phase_now_ms() - pipelineStarted;
 +  const double workerStarted = phase_now_ms();
    render_worker::enqueue_begin_frame(frame.frameId, [frameSlot] {
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++    const melee_web::provenance::Execution provenance(g_framePackets[frameSlot].provenance);
++#endif
 +#if defined(__EMSCRIPTEN__) && !defined(__EMSCRIPTEN_PTHREADS__)
 +    const double encoderStarted = phase_now_ms();
 +#endif
@@ -1012,7 +1298,7 @@ index 9fd83ef..6d17d1b 100644
    if (g_cpuFrameStart.time_since_epoch().count() != 0) {
      const auto cpuFrameTime = PresentClock::now() - g_cpuFrameStart;
      update_ema(g_cpuFrameTimeNs, duration_ns(cpuFrameTime));
-@@ -669,14 +1019,37 @@ void end_frame(EndFrameCallback callback) {
+@@ -669,14 +1035,40 @@ void end_frame(EndFrameCallback callback) {
    const uint64_t frameId = frame.frameId;
    end_pipeline_frame();
    ++g_frameIndex;
@@ -1028,6 +1314,9 @@ index 9fd83ef..6d17d1b 100644
 +#endif
 +  render_worker::enqueue_end_frame(frameId, [frameId, frameSlot, stagingSlot, callback = std::move(callback)]() mutable {
      auto& packet = g_framePackets[frameSlot];
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++    const melee_web::provenance::Execution provenance(packet.provenance);
++#endif
 +#ifdef __EMSCRIPTEN__
 +    // Queue writes are ordered before the command buffer submitted by the
 +    // caller below. The packet's staging ranges are append-only, so final
@@ -1052,19 +1341,19 @@ index 9fd83ef..6d17d1b 100644
      auto afterSubmitCallbacks = std::move(packet.afterSubmitCallbacks);
      packet = {};
      g_resources.stats.drawCallCount = stats.drawCallCount;
-@@ -686,15 +1059,86 @@ void end_frame(EndFrameCallback callback) {
+@@ -686,16 +1078,87 @@ void end_frame(EndFrameCallback callback) {
      g_resources.stats.lastIndexSize = stats.lastIndexSize;
      g_resources.stats.lastStorageSize = stats.lastStorageSize;
      g_resources.stats.lastTextureUploadSize = stats.lastTextureUploadSize;
 +    stats.lastEndFramePacketMs = phase_now_ms() - packetStarted;
 +    const double callbackStarted = phase_now_ms();
-     if (callback) {
--      callback(encoder, std::move(afterSubmitCallbacks));
++    if (callback) {
 +      callback(encoder, std::move(afterSubmitCallbacks), stats);
-     }
++    }
 +    stats.lastEndFrameCallbackMs = phase_now_ms() - callbackStarted;
 +#ifdef __EMSCRIPTEN__
-+    if (callback) {
+     if (callback) {
+-      callback(encoder, std::move(afterSubmitCallbacks));
 +      // The caller's callback finishes and submits the command buffer before
 +      // this completion observer is registered. Guard the slot pool against
 +      // a later Aurora shutdown/reinitialization resetting its ownership.
@@ -1084,7 +1373,7 @@ index 9fd83ef..6d17d1b 100644
 +      stats.lastEndFrameObserverMs = phase_now_ms() - observerStarted;
 +    } else {
 +      g_stagingSlots.release(stagingSlot);
-+    }
+     }
 +#endif
 +    stats.lastEndFrameCallbackResidualMs =
 +        stats.lastEndFrameCallbackMs -
@@ -1125,8 +1414,8 @@ index 9fd83ef..6d17d1b 100644
 +                  g_resources.stats.lastEndFrameCallbackMs + g_resources.stats.lastEndFrameObserverMs +
 +                  g_resources.stats.lastEndFrameTailMs);
 +#endif
-+}
-+
+ }
+ 
 +#ifdef __EMSCRIPTEN__
 +AuroraBrowserSubmissionStatus browser_submission_status() {
 +  enqueue_process_events();
@@ -1135,12 +1424,13 @@ index 9fd83ef..6d17d1b 100644
 +      static_cast<uint32_t>(StagingBufferCount - g_stagingSlots.free_count()),
 +      render_worker::is_idle() ? 0U : 1U,
 +  };
- }
++}
 +#endif
- 
++
  uint32_t current_frame() noexcept { return g_frameIndex; }
  
-@@ -734,5 +1178,11 @@ float calculate_fps() noexcept {
+ void after_submit() noexcept { depth_peek::after_submit(); }
+@@ -734,5 +1197,11 @@ float calculate_fps() noexcept {
  }
  } // namespace aurora::gfx
  
@@ -1180,11 +1470,77 @@ index 0b86ffe..8bcfe54 100644
  void end_frame(EndFrameCallback callback);
  uint32_t current_frame() noexcept;
  void after_submit() noexcept;
+diff --git a/lib/gfx/frame_packet.hpp b/lib/gfx/frame_packet.hpp
+index d50ce6a..8f7ded5 100644
+--- a/lib/gfx/frame_packet.hpp
++++ b/lib/gfx/frame_packet.hpp
+@@ -1,3 +1,6 @@
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++#include "pipeline_provenance_runtime.h"
++#endif
+ #pragma once
+ 
+ #include "pipeline_cache.hpp"
+@@ -32,9 +35,20 @@ struct CustomDrawCommand {
+ struct RenderPass;
+ using DrawEncoder = void (*)(void* payload, const wgpu::RenderPassEncoder& pass, const RenderPass& passInfo);
+ 
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++// The private GX payload carries copied context. Keep the public custom-draw
++// ABI and its input limit unchanged; only internal recorded draws need space.
++inline constexpr size_t RecordedDrawPayloadSize =
++    InlineDrawPayloadSize + sizeof(MeleeWebPipelineWorkContext) + sizeof(uint64_t);
++#else
++inline constexpr size_t RecordedDrawPayloadSize = InlineDrawPayloadSize;
++#endif
+ struct DrawCommand {
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++  MeleeWebPipelineWorkContext provenance{};
++#endif
+   DrawEncoder encoder = nullptr;
+-  alignas(std::max_align_t) std::array<std::byte, InlineDrawPayloadSize> payload{};
++  alignas(std::max_align_t) std::array<std::byte, RecordedDrawPayloadSize> payload{};
+ };
+ 
+ enum class CommandType {
+@@ -170,6 +184,9 @@ enum class FrameOpType : uint8_t {
+ };
+ 
+ struct FrameOp {
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++  MeleeWebPipelineWorkContext provenance{};
++#endif
+   FrameOpType type = FrameOpType::RenderPass;
+   uint32_t index = 0;
+   RenderPass* renderPass = nullptr;
+@@ -182,6 +199,9 @@ struct FrameOp {
+ using RenderPassList = std::deque<RenderPass>;
+ 
+ struct FramePacket {
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++  MeleeWebPipelineWorkContext provenance{};
++#endif
+   RenderPassList renderPasses;
+   std::deque<TextureCopy> textureCopies;
+   std::deque<EncoderTask> encoderTasks;
 diff --git a/lib/gfx/pipeline_cache.cpp b/lib/gfx/pipeline_cache.cpp
-index bff9b47..ed3c569 100644
+index bff9b47..52b5ffe 100644
 --- a/lib/gfx/pipeline_cache.cpp
 +++ b/lib/gfx/pipeline_cache.cpp
-@@ -5,6 +5,7 @@
+@@ -1,10 +1,20 @@
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++#include "pipeline_provenance_runtime.h"
++#endif
++#include <aurora/pipeline_prepare.h>
+ #include "pipeline_cache.hpp"
++#include "recording.hpp"
++
++#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
++#include "pipeline_prepare_state.hpp"
++#endif
+ 
+ #include "clear.hpp"
+ #include "resources.hpp"
  #include "hash.hpp"
  #include "../gx/pipeline.hpp"
  #include "../io.hpp"
@@ -1192,15 +1548,24 @@ index bff9b47..ed3c569 100644
  #ifdef AURORA_ENABLE_RMLUI
  #include "../rmlui/pipeline.hpp"
  #endif
-@@ -16,6 +17,7 @@
+@@ -14,12 +24,16 @@
+ #include <algorithm>
+ #include <atomic>
  #include <condition_variable>
++#include <cstring>
  #include <deque>
  #include <filesystem>
 +#include <list>
  #include <limits>
  #include <mutex>
  #include <optional>
-@@ -53,6 +55,33 @@ struct PipelineCacheWrite {
+ #include <thread>
++#include <utility>
++#include <vector>
+ 
+ #include <SDL3/SDL_iostream.h>
+ #include <absl/container/flat_hash_map.h>
+@@ -53,6 +67,33 @@ struct PipelineCacheWrite {
    uint32_t firstFrameUsed = UINT32_MAX;
  };
  
@@ -1234,13 +1599,17 @@ index bff9b47..ed3c569 100644
  struct SdlVfsSqliteFile {
    sqlite3_file base;
    SDL_IOStream* io = nullptr;
-@@ -80,12 +109,15 @@ static std::atomic_bool g_gpuCachePrunePending = false;
+@@ -80,14 +121,56 @@ static std::atomic_bool g_gpuCachePrunePending = false;
  static sqlite3* g_pipelineCacheDb = nullptr;
  static sqlite3_stmt* g_pipelineCacheLoadStmt = nullptr;
  static sqlite3_stmt* g_pipelineCacheUpsertStmt = nullptr;
 -static bool g_pipelineCacheBroken = false;
 +static std::atomic_bool g_pipelineCacheBroken = false;
 +static std::atomic_bool g_pipelineCachePersistenceError = false;
++static std::atomic_bool g_completeDraws = false;
++/* Guards the prepare mode lifecycle against both ordinary and selective
++ * cache instances.  This is protected by g_pipelineMutex. */
++static bool g_pipelineCacheInitialized = false;
  static std::thread g_pipelineCacheWriterThread;
  static std::condition_variable g_pipelineCacheWriterCv;
  static std::mutex g_pipelineCacheWriterMutex;
@@ -1251,8 +1620,45 @@ index bff9b47..ed3c569 100644
 +static std::atomic_bool g_deferredPipelineCacheWrites = false;
  static int g_sdlVfsRegisterResult = SQLITE_ERROR;
  
++#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
++static_assert(static_cast<uint32_t>(ShaderType::Clear) == AURORA_PIPELINE_SHADER_CLEAR);
++static_assert(static_cast<uint32_t>(ShaderType::GX) == AURORA_PIPELINE_SHADER_GX);
++static_assert(static_cast<uint32_t>(ShaderType::Rml) == AURORA_PIPELINE_SHADER_RML);
++
++/*
++ * Selective preparation is deliberately separate from provenance. It owns a
++ * bounded read-only seed registry and only permits an explicitly requested
++ * union through the live finder. All state below is protected by
++ * g_pipelineMutex; this keeps request replacement and finder gating atomic
++ * with the existing pipeline map.
++ */
++static bool g_selectivePipelineMode = false;
++static bool g_selectivePipelineActive = false;
++static selective::SeedDescriptorRegistry g_selectiveSeedRegistry;
++static selective::PipelineSelection g_selectivePipelineSelection;
++static std::vector<selective::DescriptorIdentity> g_deferredPipelineDescriptors;
++static AuroraPipelinePrepareStatus g_selectivePrepareStatus{
++    .state = AURORA_PIPELINE_PREPARE_UNCONFIGURED,
++    .configured = 0,
++    .valid = 0,
++    .ready = 0,
++    .reserved = 0,
++    .requested_count = 0,
++    .unique_count = 0,
++    .accepted_count = 0,
++    .ready_count = 0,
++    .pending_count = 0,
++    .unknown_count = 0,
++    .error_count = 0,
++    .invalid_index = UINT32_MAX,
++    .retained_config_bytes = 0,
++};
++#endif
++
  static SdlVfsSqliteFile* sdl_vfs_file(sqlite3_file* file) { return reinterpret_cast<SdlVfsSqliteFile*>(file); }
-@@ -357,7 +389,13 @@ static void enqueue_pipeline_cache_write(PipelineCacheWrite write) {
+ 
+ static sqlite3_vfs* default_vfs(sqlite3_vfs* vfs) { return static_cast<sqlite3_vfs*>(vfs->pAppData); }
+@@ -357,7 +440,13 @@ static void enqueue_pipeline_cache_write(PipelineCacheWrite write) {
  
    {
      std::lock_guard lock{g_pipelineCacheWriterMutex};
@@ -1267,7 +1673,552 @@ index bff9b47..ed3c569 100644
    }
    g_pipelineCacheWriterCv.notify_one();
  }
-@@ -703,7 +741,7 @@ static void seed_pipeline_cache() {
+@@ -418,15 +507,147 @@ static std::optional<PendingPipeline> take_pending_pipeline(PipelineRef hash) {
+   return std::nullopt;
+ }
+ 
+-static void notify_pipeline_ready(bool queued) {
+-  ++createdPipelines;
++#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
++static void selective_refresh_status_locked() noexcept;
++#endif
++
++static void notify_pipeline_ready(bool queued, bool valid = true) {
++  if (valid) {
++    ++createdPipelines;
++  }
+   if (queued && --queuedPipelines == 0 && g_gpuCachePrunePending.exchange(false, std::memory_order_acq_rel)) {
+     // Prune GPU cache entries after fully loading the pipeline cache.
+     webgpu::cache_prune();
+   }
++#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
++  if (valid) {
++    std::lock_guard guard{g_pipelineMutex};
++    selective_refresh_status_locked();
++  }
++#endif
++  g_pipelineReadyCv.notify_all();
++}
++
++#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
++static void selective_mark_unknown_locked() noexcept {
++  g_selectivePrepareStatus.valid = 0;
++  g_selectivePrepareStatus.ready = 0;
++  ++g_selectivePrepareStatus.unknown_count;
++  ++g_selectivePrepareStatus.error_count;
++  g_selectivePrepareStatus.state = AURORA_PIPELINE_PREPARE_UNKNOWN_MEMBERSHIP;
+   g_pipelineReadyCv.notify_all();
+ }
+ 
++static void selective_mark_error_locked() noexcept {
++  g_selectivePrepareStatus.valid = 0;
++  g_selectivePrepareStatus.ready = 0;
++  ++g_selectivePrepareStatus.error_count;
++  g_selectivePrepareStatus.state = AURORA_PIPELINE_PREPARE_ERROR;
++  g_pipelineReadyCv.notify_all();
++}
++
++static void selective_refresh_status_locked() noexcept {
++  if (!g_selectivePipelineMode || !g_selectivePipelineActive) {
++    return;
++  }
++  if (g_selectivePrepareStatus.state == AURORA_PIPELINE_PREPARE_ERROR ||
++      g_selectivePrepareStatus.state == AURORA_PIPELINE_PREPARE_UNKNOWN_MEMBERSHIP) {
++    return;
++  }
++  if (g_selectivePipelineSelection.size() == 0) {
++    g_selectivePrepareStatus.state = AURORA_PIPELINE_PREPARE_ENABLED_NO_REQUEST;
++    g_selectivePrepareStatus.valid = 0;
++    g_selectivePrepareStatus.ready = 0;
++    g_selectivePrepareStatus.accepted_count = 0;
++    g_selectivePrepareStatus.ready_count = 0;
++    g_selectivePrepareStatus.pending_count = 0;
++    return;
++  }
++
++  uint32_t readyCount = 0;
++  for (const auto& identity : g_selectivePipelineSelection.members()) {
++    const auto pipelineIt = g_pipelines.find(identity.key.pipelineRef);
++    if (pipelineIt != g_pipelines.end() && static_cast<bool>(pipelineIt->second.pipeline)) {
++      ++readyCount;
++    }
++  }
++  g_selectivePrepareStatus.accepted_count = static_cast<uint32_t>(g_selectivePipelineSelection.size());
++  g_selectivePrepareStatus.ready_count = readyCount;
++  g_selectivePrepareStatus.deferred_count = static_cast<uint32_t>(g_deferredPipelineDescriptors.size());
++  g_selectivePrepareStatus.pending_count = static_cast<uint32_t>(g_selectivePipelineSelection.size()) - readyCount +
++                                           g_selectivePrepareStatus.deferred_count;
++  g_selectivePrepareStatus.valid = 1;
++  if (readyCount == g_selectivePipelineSelection.size() && g_selectivePrepareStatus.pending_count == 0) {
++    g_selectivePrepareStatus.state = AURORA_PIPELINE_PREPARE_READY;
++    g_selectivePrepareStatus.ready = 1;
++  } else {
++    g_selectivePrepareStatus.state = AURORA_PIPELINE_PREPARE_PENDING;
++    g_selectivePrepareStatus.ready = 0;
++  }
++}
++
++template <typename PipelineConfig>
++static bool selective_pipeline_allowed(ShaderType type, PipelineRef hash, const PipelineConfig& config) {
++  std::lock_guard guard{g_pipelineMutex};
++  if (!g_selectivePipelineMode) {
++    return true;
++  }
++
++  const selective::DescriptorKey key{
++      .type = static_cast<uint32_t>(type),
++      .pipelineRef = hash,
++      .configVersion = static_cast<uint32_t>(config.version),
++  };
++  if (g_selectivePrepareStatus.state == AURORA_PIPELINE_PREPARE_ERROR ||
++      g_selectivePrepareStatus.state == AURORA_PIPELINE_PREPARE_UNKNOWN_MEMBERSHIP) {
++    return false;
++  }
++  if (!g_selectivePipelineActive) {
++    selective_mark_unknown_locked();
++    return false;
++  }
++  const auto activeIt = std::find_if(g_selectivePipelineSelection.members().begin(),
++                                     g_selectivePipelineSelection.members().end(),
++                                     [&](const selective::DescriptorIdentity& identity) {
++                                       return identity.key == key;
++                                     });
++  if (activeIt == g_selectivePipelineSelection.members().end()) {
++#if defined(MELEE_WEB_ALPHA_PIPELINE_FALLBACK)
++    // Retain only bounded descriptor bytes. GPU creation is deferred until the
++    // source owner explicitly pauses and services this queue.
++    const auto result = g_selectiveSeedRegistry.add_seed(key.type, key.pipelineRef, key.configVersion,
++        current_frame(), reinterpret_cast<const uint8_t*>(&config), sizeof(config));
++    if ((result != selective::RegistryInsertResult::Inserted &&
++         result != selective::RegistryInsertResult::Duplicate) ||
++        !g_selectiveSeedRegistry.global_refs_unique()) {
++      selective_mark_error_locked();
++      return false;
++    }
++    const auto* descriptor = g_selectiveSeedRegistry.find(key);
++    if (std::find(g_deferredPipelineDescriptors.begin(), g_deferredPipelineDescriptors.end(),
++                  descriptor->identity) == g_deferredPipelineDescriptors.end()) {
++      g_deferredPipelineDescriptors.push_back(descriptor->identity);
++      ++g_selectivePrepareStatus.unexpected_count;
++    }
++    g_selectivePrepareStatus.retained_config_bytes = g_selectiveSeedRegistry.total_config_bytes();
++    selective_refresh_status_locked();
++#else
++    selective_mark_unknown_locked();
++#endif
++    return false;
++  }
++
++  const auto* seedEntry = g_selectiveSeedRegistry.find(key);
++  if (seedEntry == nullptr || !(seedEntry->identity == *activeIt) ||
++      seedEntry->config.size() != sizeof(PipelineConfig) ||
++      std::memcmp(seedEntry->config.data(), &config, sizeof(PipelineConfig)) != 0) {
++    selective_mark_unknown_locked();
++    return false;
++  }
++  return true;
++}
++#endif
++
+ static PipelineRef g_lastPipelineRef = std::numeric_limits<PipelineRef>::max();
+ 
+ template <typename PipelineConfig>
+@@ -436,28 +657,65 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+   ZoneScoped;
+ 
+   const PipelineRef hash = xxh3_hash(config, static_cast<HashType>(type));
++#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
++  /* The selection gate must precede the last-reference fast path. */
++  if (!selective_pipeline_allowed(type, hash, config)) {
++    return hash;
++  }
++#endif
++  /* Complete development rendering must use the existing blocking path so
++   * first-use pipelines are created before the draw is encoded. */
++  if (g_completeDraws.load(std::memory_order_acquire) && priority == PipelinePriority::Normal) {
++    priority = PipelinePriority::Blocking;
++  }
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++  const auto observeLookup = [&](uint32_t kind, uint32_t outcome) {
++    melee_web::provenance::observe(kind, static_cast<uint32_t>(type), hash,
++                                  config.version, &config, sizeof(config), outcome);
++  };
++  if (priority == PipelinePriority::Background)
++    observeLookup(MELEE_WEB_PIPELINE_EVENT_IMPORT, MELEE_WEB_PIPELINE_OUTCOME_IMPORTED);
++#endif
+   const bool blocking = priority == PipelinePriority::Blocking;
+   if (!blocking && hash == g_lastPipelineRef) {
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++    if (priority != PipelinePriority::Background)
++      observeLookup(MELEE_WEB_PIPELINE_EVENT_LAST_REF, MELEE_WEB_PIPELINE_OUTCOME_LAST_REF);
++#endif
+     return g_lastPipelineRef;
+   }
+   g_lastPipelineRef = hash;
+   const uint32_t firstFrameUsed = firstFrameUsedOverride.value_or(current_frame());
+   bool notifyWorker = false;
+-  bool persist = priority != PipelinePriority::Background;
++#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
++  /* Selective mode has no writable cache database.  In particular, do not
++   * allocate a persistence record merely because a live lookup is normal or
++   * blocking priority. */
++  const bool persist = priority != PipelinePriority::Background && !g_selectivePipelineMode;
++#else
++  const bool persist = priority != PipelinePriority::Background;
++#endif
+   bool pipelineReady = false;
+   bool createdPipeline = false;
++  bool createdPipelineValid = true;
+   bool queued = false;
+   std::optional<PipelineCacheWrite> cacheWrite;
+   {
+     std::scoped_lock guard{g_pipelineMutex};
+     auto pipelineIt = g_pipelines.find(hash);
+     if (pipelineIt != g_pipelines.end()) {
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++      if (persist) observeLookup(MELEE_WEB_PIPELINE_EVENT_READY, MELEE_WEB_PIPELINE_OUTCOME_READY);
++#endif
+       pipelineReady = true;
+       if (persist && firstFrameUsed < pipelineIt->second.firstFrameUsed) {
+         pipelineIt->second.firstFrameUsed = firstFrameUsed;
+         cacheWrite = make_pipeline_cache_write(type, hash, config, firstFrameUsed);
+       }
+     } else if (g_pendingPipelines.contains(hash)) {
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++      if (persist) observeLookup(MELEE_WEB_PIPELINE_EVENT_PENDING, MELEE_WEB_PIPELINE_OUTCOME_PENDING);
++#endif
+       if (blocking && !g_hasPipelineThread) {
+         auto pending = take_pending_pipeline(hash);
+         if (pending) {
+@@ -467,12 +725,21 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+               cacheWrite = make_pipeline_cache_write(type, hash, config, firstFrameUsed);
+             }
+           }
+-          g_pipelines.try_emplace(hash, CachedPipeline{
+-                                            .pipeline = pending->create(),
+-                                            .firstFrameUsed = pending->firstFrameUsed,
+-                                        });
+-          pipelineReady = true;
+-          ++g_pipelinesPerFrame;
++          auto pipeline = pending->create();
++#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
++          if (g_selectivePipelineMode && !static_cast<bool>(pipeline)) {
++            selective_mark_error_locked();
++            createdPipelineValid = false;
++          } else
++#endif
++          {
++            g_pipelines.try_emplace(hash, CachedPipeline{
++                                              .pipeline = std::move(pipeline),
++                                              .firstFrameUsed = pending->firstFrameUsed,
++                                          });
++            pipelineReady = true;
++            ++g_pipelinesPerFrame;
++          }
+           createdPipeline = true;
+           queued = true;
+         }
+@@ -489,17 +756,32 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+         notifyWorker = priority != PipelinePriority::Background;
+       }
+     } else if (!g_hasPipelineThread && (blocking || g_pipelinesPerFrame < BuildPipelinesPerFrame)) {
+-      g_pipelines.try_emplace(hash, CachedPipeline{
+-                                        .pipeline = cb(),
+-                                        .firstFrameUsed = firstFrameUsed,
+-                                    });
+-      pipelineReady = true;
+-      if (persist) {
+-        cacheWrite = make_pipeline_cache_write(type, hash, config, firstFrameUsed);
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++      if (persist) observeLookup(MELEE_WEB_PIPELINE_EVENT_CREATE, MELEE_WEB_PIPELINE_OUTCOME_CREATED);
++#endif
++      auto pipeline = cb();
++#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
++      if (g_selectivePipelineMode && !static_cast<bool>(pipeline)) {
++        selective_mark_error_locked();
++        createdPipelineValid = false;
++      } else
++#endif
++      {
++        g_pipelines.try_emplace(hash, CachedPipeline{
++                                          .pipeline = std::move(pipeline),
++                                          .firstFrameUsed = firstFrameUsed,
++                                      });
++        pipelineReady = true;
++        if (persist) {
++          cacheWrite = make_pipeline_cache_write(type, hash, config, firstFrameUsed);
++        }
++        ++g_pipelinesPerFrame;
++        createdPipeline = true;
+       }
+-      ++g_pipelinesPerFrame;
+-      createdPipeline = true;
+     } else {
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++      if (persist) observeLookup(MELEE_WEB_PIPELINE_EVENT_PENDING, MELEE_WEB_PIPELINE_OUTCOME_PENDING);
++#endif
+       PendingPipeline pending{
+           .hash = hash,
+           .firstFrameUsed = firstFrameUsed,
+@@ -531,7 +813,7 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+   }
+ 
+   if (createdPipeline) {
+-    notify_pipeline_ready(queued);
++    notify_pipeline_ready(queued, createdPipelineValid);
+   }
+ 
+   if (notifyWorker) {
+@@ -540,7 +822,28 @@ static PipelineRef find_pipeline_impl(ShaderType type, const PipelineConfig& con
+ 
+   if (blocking && !pipelineReady) {
+     std::unique_lock lock{g_pipelineMutex};
++#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
++    g_pipelineReadyCv.wait(lock, [=] {
++      if (g_pipelines.contains(hash) || g_pipelineThreadEnd) {
++        return true;
++      }
++      /* A failed selective worker removes the pending entry.  Wake the
++       * blocking caller on that sticky failure instead of waiting forever. */
++      return g_selectivePipelineMode &&
++             (g_selectivePrepareStatus.state == AURORA_PIPELINE_PREPARE_ERROR ||
++              g_selectivePrepareStatus.state == AURORA_PIPELINE_PREPARE_UNKNOWN_MEMBERSHIP);
++    });
++    if (g_selectivePipelineMode &&
++        (g_selectivePrepareStatus.state == AURORA_PIPELINE_PREPARE_ERROR ||
++         g_selectivePrepareStatus.state == AURORA_PIPELINE_PREPARE_UNKNOWN_MEMBERSHIP) &&
++        !g_pipelines.contains(hash)) {
++      /* No cache record is certifiable after a selective failure. */
++      cacheWrite.reset();
++      return hash;
++    }
++#else
+     g_pipelineReadyCv.wait(lock, [=] { return g_pipelines.contains(hash) || g_pipelineThreadEnd; });
++#endif
+     auto pipelineIt = g_pipelines.find(hash);
+     if (pipelineIt != g_pipelines.end() && persist && firstFrameUsed < pipelineIt->second.firstFrameUsed) {
+       pipelineIt->second.firstFrameUsed = firstFrameUsed;
+@@ -620,6 +923,219 @@ static sqlite3* open_pipeline_cache_seed_db(const std::string& path) {
+   return seedDb;
+ }
+ 
++#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
++static bool selective_expected_layout(ShaderType type, uint32_t& configVersion, size_t& configSize) noexcept {
++  switch (type) {
++  case ShaderType::Clear:
++    configVersion = clear::ClearPipelineConfigVersion;
++    configSize = sizeof(clear::PipelineConfig);
++    return true;
++  case ShaderType::GX:
++    configVersion = gx::GXPipelineConfigVersion;
++    configSize = sizeof(gx::PipelineConfig);
++    return true;
++  case ShaderType::Rml:
++#ifdef AURORA_ENABLE_RMLUI
++    configVersion = rmlui::RmlPipelineConfigVersion;
++    configSize = sizeof(rmlui::PipelineConfig);
++    return true;
++#else
++    return false;
++#endif
++  }
++  return false;
++}
++
++template <typename PipelineConfig>
++static bool selective_seed_config_matches(ShaderType type, PipelineRef hash, uint32_t configVersion,
++                                          const uint8_t* configBlob, size_t configSize) noexcept {
++  if (configBlob == nullptr || configSize != sizeof(PipelineConfig)) {
++    return false;
++  }
++  PipelineConfig config{};
++  std::memcpy(&config, configBlob, sizeof(config));
++  return config.version == configVersion && xxh3_hash(config, static_cast<HashType>(type)) == hash;
++}
++
++static bool selective_seed_schema_valid(sqlite3* db) {
++  sqlite3_stmt* schemaInfo = nullptr;
++  auto ret = sqlite3_prepare_v2(db, "PRAGMA table_info(aurora_schema)", -1, &schemaInfo, nullptr);
++  if (ret != SQLITE_OK) {
++    return false;
++  }
++
++  size_t columnCount = 0;
++  bool valueColumnValid = false;
++  while ((ret = sqlite3_step(schemaInfo)) == SQLITE_ROW) {
++    ++columnCount;
++    const auto* name = reinterpret_cast<const char*>(sqlite3_column_text(schemaInfo, 1));
++    const auto* declaredType = reinterpret_cast<const char*>(sqlite3_column_text(schemaInfo, 2));
++    if (name != nullptr && declaredType != nullptr && std::strcmp(name, "value") == 0 &&
++        std::strcmp(declaredType, "INTEGER") == 0) {
++      valueColumnValid = true;
++    }
++  }
++  sqlite3_finalize(schemaInfo);
++  if (ret != SQLITE_DONE || columnCount != 1 || !valueColumnValid) {
++    return false;
++  }
++
++  sqlite3_stmt* schemaValue = nullptr;
++  ret = sqlite3_prepare_v2(db, "SELECT value FROM aurora_schema", -1, &schemaValue, nullptr);
++  if (ret != SQLITE_OK) {
++    return false;
++  }
++  size_t rowCount = 0;
++  bool valueMatches = false;
++  while ((ret = sqlite3_step(schemaValue)) == SQLITE_ROW) {
++    ++rowCount;
++    if (sqlite3_column_type(schemaValue, 0) == SQLITE_INTEGER &&
++        sqlite3_column_int64(schemaValue, 0) == PipelineCacheSchema) {
++      valueMatches = true;
++    }
++  }
++  sqlite3_finalize(schemaValue);
++  return ret == SQLITE_DONE && rowCount == 1 && valueMatches;
++}
++
++static bool selective_seed_registry_load() {
++  const auto seedPath = pipeline_cache_seed_path();
++  sqlite3* seedDb = open_pipeline_cache_seed_db(seedPath);
++  if (seedDb == nullptr) {
++    std::lock_guard guard{g_pipelineMutex};
++    selective_mark_error_locked();
++    g_pipelineCacheBroken = true;
++    return false;
++  }
++
++  if (!selective_seed_schema_valid(seedDb)) {
++    Log.error("Selective pipeline cache seed '{}' has an invalid schema row", seedPath);
++    sqlite3_close(seedDb);
++    std::lock_guard guard{g_pipelineMutex};
++    selective_mark_error_locked();
++    g_pipelineCacheBroken = true;
++    return false;
++  }
++
++  sqlite3_stmt* seedStmt = nullptr;
++  const auto closeSeed = [&] {
++    if (seedStmt != nullptr) {
++      sqlite3_finalize(seedStmt);
++      seedStmt = nullptr;
++    }
++    sqlite3_close(seedDb);
++  };
++  auto ret = sqlite3_prepare_v3(seedDb,
++                                "SELECT type, hash, config_version, config_size, config, first_frame_used "
++                                "FROM pipeline_cache ORDER BY type, hash",
++                                -1, 0, &seedStmt, nullptr);
++  if (ret != SQLITE_OK) {
++    Log.error("Failed to read selective pipeline cache seed '{}': {}", seedPath, sqlite3_errmsg(seedDb));
++    closeSeed();
++    std::lock_guard guard{g_pipelineMutex};
++    selective_mark_error_locked();
++    g_pipelineCacheBroken = true;
++    return false;
++  }
++
++  selective::SeedDescriptorRegistry registry;
++  bool invalid = false;
++  while ((ret = sqlite3_step(seedStmt)) == SQLITE_ROW) {
++    if (sqlite3_column_type(seedStmt, 0) != SQLITE_INTEGER ||
++        sqlite3_column_type(seedStmt, 1) != SQLITE_INTEGER ||
++        sqlite3_column_type(seedStmt, 2) != SQLITE_INTEGER ||
++        sqlite3_column_type(seedStmt, 3) != SQLITE_INTEGER ||
++        sqlite3_column_type(seedStmt, 4) != SQLITE_BLOB ||
++        sqlite3_column_type(seedStmt, 5) != SQLITE_INTEGER) {
++      invalid = true;
++      break;
++    }
++    const auto typeValue = sqlite3_column_int64(seedStmt, 0);
++    const auto hashValue = sqlite3_column_int64(seedStmt, 1);
++    const auto configVersionValue = sqlite3_column_int64(seedStmt, 2);
++    const auto configSizeValue = sqlite3_column_int64(seedStmt, 3);
++    const auto* configBlob = static_cast<const uint8_t*>(sqlite3_column_blob(seedStmt, 4));
++    const auto configBlobSize = sqlite3_column_bytes(seedStmt, 4);
++    const auto firstFrameUsedValue = sqlite3_column_int64(seedStmt, 5);
++    if (typeValue < 0 || typeValue > static_cast<sqlite3_int64>(AURORA_PIPELINE_SHADER_RML) ||
++        configVersionValue < 0 || configVersionValue > std::numeric_limits<uint32_t>::max() ||
++        configSizeValue < 0 || configSizeValue > std::numeric_limits<uint32_t>::max() || configBlobSize < 0 ||
++        firstFrameUsedValue < 0 || firstFrameUsedValue > std::numeric_limits<uint32_t>::max()) {
++      invalid = true;
++      break;
++    }
++
++    const auto type = static_cast<ShaderType>(typeValue);
++    uint32_t expectedVersion = 0;
++    size_t expectedSize = 0;
++    if (!selective_expected_layout(type, expectedVersion, expectedSize) ||
++        static_cast<uint32_t>(configVersionValue) != expectedVersion ||
++        static_cast<uint32_t>(configSizeValue) != expectedSize ||
++        configBlobSize != static_cast<int>(expectedSize) || configBlob == nullptr) {
++      invalid = true;
++      break;
++    }
++
++    const uint64_t rawHash = static_cast<uint64_t>(hashValue);
++    const auto hash = static_cast<PipelineRef>(rawHash);
++    if (static_cast<uint64_t>(hash) != rawHash) {
++      invalid = true;
++      break;
++    }
++    bool configMatches = false;
++    switch (type) {
++    case ShaderType::Clear:
++      configMatches = selective_seed_config_matches<clear::PipelineConfig>(
++          type, hash, expectedVersion, configBlob, static_cast<size_t>(configBlobSize));
++      break;
++    case ShaderType::GX:
++      configMatches = selective_seed_config_matches<gx::PipelineConfig>(
++          type, hash, expectedVersion, configBlob, static_cast<size_t>(configBlobSize));
++      break;
++#ifdef AURORA_ENABLE_RMLUI
++    case ShaderType::Rml:
++      configMatches = selective_seed_config_matches<rmlui::PipelineConfig>(
++          type, hash, expectedVersion, configBlob, static_cast<size_t>(configBlobSize));
++      break;
++#endif
++    }
++    if (!configMatches ||
++        registry.add_seed(static_cast<uint32_t>(type), static_cast<uint64_t>(hash), expectedVersion,
++                          static_cast<uint32_t>(firstFrameUsedValue), configBlob,
++                          static_cast<size_t>(configBlobSize)) != selective::RegistryInsertResult::Inserted) {
++      invalid = true;
++      break;
++    }
++  }
++  if (ret != SQLITE_DONE) {
++    invalid = true;
++  }
++  if (!invalid && !registry.global_refs_unique()) {
++    invalid = true;
++  }
++  closeSeed();
++
++  if (invalid || registry.size() == 0) {
++    Log.error("Selective pipeline cache seed '{}' failed bounded descriptor validation", seedPath);
++    std::lock_guard guard{g_pipelineMutex};
++    selective_mark_error_locked();
++    g_pipelineCacheBroken = true;
++    return false;
++  }
++
++  std::lock_guard guard{g_pipelineMutex};
++  g_selectiveSeedRegistry = std::move(registry);
++  g_selectivePrepareStatus.retained_config_bytes = g_selectiveSeedRegistry.total_config_bytes();
++  if (g_selectivePrepareStatus.state != AURORA_PIPELINE_PREPARE_ERROR &&
++      g_selectivePrepareStatus.state != AURORA_PIPELINE_PREPARE_UNKNOWN_MEMBERSHIP) {
++    g_selectivePrepareStatus.state = AURORA_PIPELINE_PREPARE_ENABLED_NO_REQUEST;
++    g_selectivePrepareStatus.valid = 0;
++    g_selectivePrepareStatus.ready = 0;
++  }
++  return true;
++}
++#endif
++
+ static void seed_pipeline_cache() {
+   if (g_pipelineCacheBroken || g_pipelineCacheDb == nullptr || g_pipelineCacheUpsertStmt == nullptr) {
+     return;
+@@ -703,7 +1219,7 @@ static void seed_pipeline_cache() {
      }
  
      if (!writeFailed && !readFailed) {
@@ -1276,7 +2227,7 @@ index bff9b47..ed3c569 100644
      }
    }
  
-@@ -792,7 +830,7 @@ INSERT INTO aurora_schema VALUES ({});)",
+@@ -792,7 +1308,7 @@ INSERT INTO aurora_schema VALUES ({});)",
      }
  
      if (!schemaFailed) {
@@ -1285,7 +2236,7 @@ index bff9b47..ed3c569 100644
      }
    }
  
-@@ -925,15 +963,22 @@ static void pipeline_cache_writer() {
+@@ -925,15 +1441,22 @@ static void pipeline_cache_writer() {
  #endif
  
    while (true) {
@@ -1312,7 +2263,7 @@ index bff9b47..ed3c569 100644
      }
  
      bool writeFailed = false;
-@@ -951,15 +996,27 @@ static void pipeline_cache_writer() {
+@@ -951,15 +1474,27 @@ static void pipeline_cache_writer() {
          }
  
          if (!writeFailed) {
@@ -1341,7 +2292,112 @@ index bff9b47..ed3c569 100644
    }
  }
  
-@@ -1081,10 +1138,15 @@ static void start_pipeline_cache_writer() {
+@@ -990,19 +1525,31 @@ static void pipeline_worker() {
+       source.pop_front();
+     }
+     auto result = pending.create();
++#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
++    const bool pipelineValid = static_cast<bool>(result);
++#else
++    constexpr bool pipelineValid = true;
++#endif
+     {
+       std::lock_guard lock{g_pipelineMutex};
+-      g_pipelines.try_emplace(pending.hash, CachedPipeline{
+-                                                .pipeline = std::move(result),
+-                                                .firstFrameUsed = pending.firstFrameUsed,
+-                                            });
++#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
++      if (g_selectivePipelineMode && !pipelineValid) {
++        selective_mark_error_locked();
++      } else
++#endif
++      {
++        g_pipelines.try_emplace(pending.hash, CachedPipeline{
++                                                  .pipeline = std::move(result),
++                                                  .firstFrameUsed = pending.firstFrameUsed,
++                                              });
++      }
+       g_pendingPipelines.erase(pending.hash);
+       hasMore = !g_pipelineQueue.empty() || !g_backgroundPipelineQueue.empty();
+     }
+     if (!g_hasPipelineThread) {
+       ++g_pipelinesPerFrame;
+     }
+-    notify_pipeline_ready(true);
++    notify_pipeline_ready(true, pipelineValid);
+   }
+ }
+ 
+@@ -1075,16 +1622,83 @@ static size_t load_pipeline_cache() {
+   return acceptedRows;
+ }
+ 
++#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
++template <typename PipelineConfig, typename CreateFn>
++static bool selective_queue_member(ShaderType type, const selective::SeedDescriptor& seed, CreateFn&& create) {
++  if (seed.config.size() != sizeof(PipelineConfig)) {
++    return false;
++  }
++
++  PipelineConfig config{};
++  std::memcpy(&config, seed.config.data(), sizeof(config));
++  if (config.version != seed.identity.key.configVersion ||
++      xxh3_hash(config, static_cast<HashType>(type)) != seed.identity.key.pipelineRef) {
++    return false;
++  }
++
++  {
++    std::lock_guard guard{g_pipelineMutex};
++    if (!g_selectivePipelineActive || !g_selectivePipelineMode || g_pipelineCacheBroken ||
++        g_selectivePrepareStatus.state == AURORA_PIPELINE_PREPARE_ERROR ||
++        g_selectivePrepareStatus.state == AURORA_PIPELINE_PREPARE_UNKNOWN_MEMBERSHIP ||
++        !g_selectivePipelineSelection.contains(seed.identity.key)) {
++      return false;
++    }
++    if (g_pipelines.contains(seed.identity.key.pipelineRef) || g_pendingPipelines.contains(seed.identity.key.pipelineRef)) {
++      return true;
++    }
++  }
++
++  find_pipeline_impl(type, config, [config, create] { return create(config); }, PipelinePriority::Background,
++                     seed.firstFrameUsed);
++  {
++    std::lock_guard guard{g_pipelineMutex};
++    return g_selectivePrepareStatus.state != AURORA_PIPELINE_PREPARE_ERROR &&
++           g_selectivePrepareStatus.state != AURORA_PIPELINE_PREPARE_UNKNOWN_MEMBERSHIP;
++  }
++}
++
++static bool selective_queue_member(const selective::DescriptorIdentity& identity) {
++  selective::SeedDescriptor seed;
++  {
++    std::lock_guard guard{g_pipelineMutex};
++    const auto* seedEntry = g_selectiveSeedRegistry.find(identity.key);
++    if (seedEntry == nullptr || !(seedEntry->identity == identity)) {
++      return false;
++    }
++    seed = *seedEntry;
++  }
++  /* Copying one config out of the registry is bounded by its seed row. */
++  switch (identity.key.type) {
++  case AURORA_PIPELINE_SHADER_CLEAR:
++    return selective_queue_member<clear::PipelineConfig>(ShaderType::Clear, seed, clear::create_pipeline);
++  case AURORA_PIPELINE_SHADER_GX:
++    return selective_queue_member<gx::PipelineConfig>(ShaderType::GX, seed, gx::create_pipeline);
++#ifdef AURORA_ENABLE_RMLUI
++  case AURORA_PIPELINE_SHADER_RML:
++    return selective_queue_member<rmlui::PipelineConfig>(ShaderType::Rml, seed, rmlui::create_pipeline);
++#endif
++  default:
++    return false;
++  }
++}
++#endif
++
+ static void start_pipeline_cache_writer() {
+   if (!prepare_pipeline_cache_db()) {
+     return;
    }
  
    g_pipelineCacheWriterStop = false;
@@ -1357,7 +2413,7 @@ index bff9b47..ed3c569 100644
    if (g_pipelineCacheWriterThread.joinable()) {
      {
        std::lock_guard lock{g_pipelineCacheWriterMutex};
-@@ -1096,7 +1158,11 @@ static void stop_pipeline_cache_writer() {
+@@ -1096,7 +1710,11 @@ static void stop_pipeline_cache_writer() {
      g_pipelineCacheWriterStop = false;
    }
  
@@ -1370,16 +2426,136 @@ index bff9b47..ed3c569 100644
  }
  
  template <>
-@@ -1118,6 +1184,8 @@ PipelineRef find_pipeline(ShaderType type, const rmlui::PipelineConfig& config,
+@@ -1117,11 +1735,59 @@ PipelineRef find_pipeline(ShaderType type, const rmlui::PipelineConfig& config,
+ #endif
  
  void initialize_pipeline_cache() {
++  // A last-reference hit is valid only within this cache's lifetime.
++  g_lastPipelineRef = std::numeric_limits<PipelineRef>::max();
    g_pipelineCacheBroken = false;
 +  g_pipelineCachePersistenceError = false;
 +  g_deferredPipelineCacheWrites = false;
    g_pipelineCacheWriterStop = false;
    g_pipelineThreadEnd = false;
    g_gpuCachePrunePending = false;
-@@ -1168,10 +1236,56 @@ void begin_pipeline_frame() {
+ 
++  {
++    std::lock_guard guard{g_pipelineMutex};
++    g_pipelineCacheInitialized = true;
++  }
++
++#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
++  bool selectiveMode = false;
++  {
++    std::lock_guard guard{g_pipelineMutex};
++    selectiveMode = g_selectivePipelineMode;
++    if (selectiveMode) {
++      const uint32_t previousState = g_selectivePrepareStatus.state;
++      const uint32_t previousUnknownCount = g_selectivePrepareStatus.unknown_count;
++      const uint32_t previousErrorCount = g_selectivePrepareStatus.error_count;
++      const bool preInitFailure =
++          previousState == AURORA_PIPELINE_PREPARE_ERROR || previousState == AURORA_PIPELINE_PREPARE_UNKNOWN_MEMBERSHIP;
++      g_selectivePipelineActive = true;
++      g_selectiveSeedRegistry.clear();
++      g_selectivePipelineSelection.clear();
++      g_deferredPipelineDescriptors.clear();
++      g_selectivePrepareStatus = AuroraPipelinePrepareStatus{
++          .state = preInitFailure ? previousState : AURORA_PIPELINE_PREPARE_VALIDATING,
++          .configured = 1,
++          .valid = 0,
++          .ready = 0,
++          .reserved = 0,
++          .requested_count = 0,
++          .unique_count = 0,
++          .accepted_count = 0,
++          .ready_count = 0,
++          .pending_count = 0,
++          .unknown_count = preInitFailure ? previousUnknownCount : 0,
++          .error_count = preInitFailure ? previousErrorCount : 0,
++          .invalid_index = UINT32_MAX,
++          .retained_config_bytes = 0,
++      };
++    } else {
++      g_selectivePipelineActive = false;
++    }
++  }
++#else
++  constexpr bool selectiveMode = false;
++#endif
++
+   if (webgpu::g_backendType == wgpu::BackendType::WebGPU) {
+     g_hasPipelineThread = false;
+   } else {
+@@ -1129,17 +1795,31 @@ void initialize_pipeline_cache() {
+     g_pipelineThread = std::thread(pipeline_worker);
+   }
+ 
+-  const size_t loadedCount = load_pipeline_cache();
++  size_t loadedCount = 0;
++#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
++  if (selectiveMode) {
++    /* Populate identity/config bytes only; no GPU pipeline is constructed. */
++    selective_seed_registry_load();
++  } else
++#endif
++  {
++    loadedCount = load_pipeline_cache();
++  }
+   if (!g_pipelineCacheBroken && loadedCount > 0) {
+     g_gpuCachePrunePending = true;
+   }
+ 
+-  if (!g_pipelineCacheBroken) {
++  if (!g_pipelineCacheBroken
++#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
++      && !selectiveMode
++#endif
++  ) {
+     start_pipeline_cache_writer();
+   }
+ }
+ 
+ void shutdown_pipeline_cache() {
++  g_completeDraws.store(false, std::memory_order_release);
+   if (g_hasPipelineThread) {
+     g_pipelineThreadEnd = true;
+     g_pipelineQueueCv.notify_all();
+@@ -1157,6 +1837,34 @@ void shutdown_pipeline_cache() {
+   g_pipelineQueue.clear();
+   g_backgroundPipelineQueue.clear();
+   g_pendingPipelines.clear();
++  g_lastPipelineRef = std::numeric_limits<PipelineRef>::max();
++
++  {
++    std::lock_guard guard{g_pipelineMutex};
++    g_pipelineCacheInitialized = false;
++#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
++    g_selectivePipelineActive = false;
++    g_selectiveSeedRegistry.clear();
++    g_selectivePipelineSelection.clear();
++  g_deferredPipelineDescriptors.clear();
++    g_selectivePrepareStatus = AuroraPipelinePrepareStatus{
++        .state = AURORA_PIPELINE_PREPARE_UNCONFIGURED,
++        .configured = 0,
++        .valid = 0,
++        .ready = 0,
++        .reserved = 0,
++        .requested_count = 0,
++        .unique_count = 0,
++        .accepted_count = 0,
++        .ready_count = 0,
++        .pending_count = 0,
++        .unknown_count = 0,
++        .error_count = 0,
++        .invalid_index = UINT32_MAX,
++        .retained_config_bytes = 0,
++    };
++#endif
++  }
+ 
+   queuedPipelines = 0;
+   createdPipelines = 0;
+@@ -1168,14 +1876,318 @@ void begin_pipeline_frame() {
    }
  }
  
@@ -1433,14 +2609,288 @@ index bff9b47..ed3c569 100644
 +    pipeline_cache_writer();
 +  }
 +#endif
++}
++
++extern "C" int aurora_pipeline_set_complete_draws(int enabled) {
++  if (enabled != 0 && enabled != 1) {
++    return 0;
++  }
++  if (detail::recording_active()) {
++    return 0;
++  }
++  std::lock_guard guard{g_pipelineMutex};
++  if (!g_pipelineCacheInitialized) {
++    return 0;
++  }
++#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
++  if (enabled != 0 && g_selectivePipelineMode) {
++    return 0;
++  }
++#endif
++  g_completeDraws.store(enabled != 0, std::memory_order_release);
++  return 1;
++}
++
++extern "C" int aurora_pipeline_complete_draws_enabled(void) {
++  return g_completeDraws.load(std::memory_order_acquire) ? 1 : 0;
++}
++
++extern "C" int aurora_pipeline_service_preparation(void) {
++  if (detail::recording_active()) {
++    return 0;
++  }
++  {
++    std::lock_guard guard{g_pipelineMutex};
++    if (!g_pipelineCacheInitialized) {
++      return 0;
++    }
++  }
++  if (!g_hasPipelineThread) {
++    begin_pipeline_frame();
++    end_pipeline_frame();
++  }
++  return 1;
  }
  
++#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
++extern "C" int aurora_pipeline_prepare_enable(void) {
++  std::lock_guard guard{g_pipelineMutex};
++  if (g_pipelineCacheInitialized || g_selectivePipelineActive) {
++    return 0;
++  }
++  g_selectivePipelineMode = true;
++  g_selectivePrepareStatus = AuroraPipelinePrepareStatus{
++      .state = AURORA_PIPELINE_PREPARE_ENABLED_NO_REQUEST,
++      .configured = 1,
++      .valid = 0,
++      .ready = 0,
++      .reserved = 0,
++      .requested_count = 0,
++      .unique_count = 0,
++      .accepted_count = 0,
++      .ready_count = 0,
++      .pending_count = 0,
++      .unknown_count = 0,
++      .error_count = 0,
++      .invalid_index = UINT32_MAX,
++      .retained_config_bytes = 0,
++  };
++  return 1;
++}
++
++extern "C" int aurora_pipeline_prepare_disable(void) {
++  std::lock_guard guard{g_pipelineMutex};
++  if (g_pipelineCacheInitialized || g_selectivePipelineActive) {
++    return 0;
++  }
++  g_selectivePipelineMode = false;
++  g_selectiveSeedRegistry.clear();
++  g_selectivePipelineSelection.clear();
++  g_deferredPipelineDescriptors.clear();
++  g_selectivePrepareStatus = AuroraPipelinePrepareStatus{
++      .state = AURORA_PIPELINE_PREPARE_UNCONFIGURED,
++      .configured = 0,
++      .valid = 0,
++      .ready = 0,
++      .reserved = 0,
++      .requested_count = 0,
++      .unique_count = 0,
++      .accepted_count = 0,
++      .ready_count = 0,
++      .pending_count = 0,
++      .unknown_count = 0,
++      .error_count = 0,
++      .invalid_index = UINT32_MAX,
++      .retained_config_bytes = 0,
++  };
++  return 1;
++}
++
++extern "C" int aurora_prepare_pipeline_union(const AuroraPipelineDescriptor* entries, size_t count) {
++  selective::PipelineSelection candidate;
++  size_t invalidIndex = std::numeric_limits<size_t>::max();
++  std::vector<selective::DescriptorIdentity> members;
++  {
++    std::lock_guard guard{g_pipelineMutex};
++    if (!g_selectivePipelineMode || !g_selectivePipelineActive || g_pipelineCacheBroken ||
++        g_selectivePrepareStatus.state == AURORA_PIPELINE_PREPARE_ERROR ||
++        g_selectivePrepareStatus.state == AURORA_PIPELINE_PREPARE_UNKNOWN_MEMBERSHIP) {
++      return 0;
++    }
++
++    const auto requestResult = candidate.replace(entries, count, g_selectiveSeedRegistry, &invalidIndex);
++    if (requestResult != selective::RequestResult::Accepted) {
++      g_selectivePrepareStatus.requested_count =
++          count > std::numeric_limits<uint32_t>::max() ? UINT32_MAX : static_cast<uint32_t>(count);
++      g_selectivePrepareStatus.invalid_index = invalidIndex > std::numeric_limits<uint32_t>::max()
++                                                   ? UINT32_MAX
++                                                   : static_cast<uint32_t>(invalidIndex);
++      if (requestResult == selective::RequestResult::Unknown) {
++        selective_mark_unknown_locked();
++      } else {
++        selective_mark_error_locked();
++      }
++      return 0;
++    }
++
++    g_selectivePipelineSelection = std::move(candidate);
++    g_selectivePrepareStatus.requested_count = static_cast<uint32_t>(count);
++    g_selectivePrepareStatus.unique_count = static_cast<uint32_t>(g_selectivePipelineSelection.size());
++    g_selectivePrepareStatus.accepted_count = 0;
++    g_selectivePrepareStatus.ready_count = 0;
++    g_selectivePrepareStatus.pending_count = 0;
++    g_selectivePrepareStatus.unknown_count = 0;
++    g_selectivePrepareStatus.error_count = 0;
++    g_selectivePrepareStatus.invalid_index = UINT32_MAX;
++    g_selectivePrepareStatus.valid = 1;
++    g_selectivePrepareStatus.ready = 0;
++    g_selectivePrepareStatus.state = AURORA_PIPELINE_PREPARE_PENDING;
++    members = g_selectivePipelineSelection.members();
++    selective_refresh_status_locked();
++  }
++
++  for (const auto& identity : members) {
++    if (!selective_queue_member(identity)) {
++      std::lock_guard guard{g_pipelineMutex};
++      selective_mark_error_locked();
++      return 0;
++    }
++  }
++  {
++    std::lock_guard guard{g_pipelineMutex};
++    /* Preparation calls are not live use; do not leak their last-ref state. */
++    g_lastPipelineRef = std::numeric_limits<PipelineRef>::max();
++    selective_refresh_status_locked();
++    if (g_selectivePrepareStatus.state == AURORA_PIPELINE_PREPARE_ERROR ||
++        g_selectivePrepareStatus.state == AURORA_PIPELINE_PREPARE_UNKNOWN_MEMBERSHIP) {
++      return 0;
++    }
++  }
++  return 1;
++}
++
++extern "C" int aurora_prepare_pipeline_catalog() {
++  std::vector<AuroraPipelineDescriptor> descriptors;
++  {
++    std::lock_guard guard{g_pipelineMutex};
++    if (!g_selectivePipelineMode || !g_selectivePipelineActive || g_pipelineCacheBroken ||
++        g_selectiveSeedRegistry.size() == 0) return 0;
++    descriptors.reserve(g_selectiveSeedRegistry.size());
++    for (const auto& seed : g_selectiveSeedRegistry.entries()) {
++      AuroraPipelineDescriptor descriptor{};
++      descriptor.type = seed.identity.key.type;
++      descriptor.pipeline_ref = seed.identity.key.pipelineRef;
++      descriptor.config_version = seed.identity.key.configVersion;
++      descriptor.config_size = seed.identity.configSize;
++      std::copy(seed.identity.sha256.begin(), seed.identity.sha256.end(), descriptor.sha256);
++      descriptors.push_back(descriptor);
++    }
++  }
++  return aurora_prepare_pipeline_union(descriptors.data(), descriptors.size());
++}
++
++extern "C" int aurora_pipeline_prepare_deferred() {
++#if defined(MELEE_WEB_ALPHA_PIPELINE_FALLBACK)
++  std::vector<selective::DescriptorIdentity> deferred;
++  {
++    std::lock_guard guard{g_pipelineMutex};
++    if (!g_selectivePipelineActive || !g_selectivePrepareStatus.valid ||
++        g_selectivePrepareStatus.error_count || g_pipelineCacheBroken) return 0;
++    if (g_deferredPipelineDescriptors.empty()) return 1;
++    std::vector<AuroraPipelineDescriptor> descriptors;
++    const auto append = [&](const selective::DescriptorIdentity& identity) {
++      AuroraPipelineDescriptor descriptor{};
++      descriptor.type = identity.key.type;
++      descriptor.pipeline_ref = identity.key.pipelineRef;
++      descriptor.config_version = identity.key.configVersion;
++      descriptor.config_size = identity.configSize;
++      std::copy(identity.sha256.begin(), identity.sha256.end(), descriptor.sha256);
++      descriptors.push_back(descriptor);
++    };
++    for (const auto& identity : g_selectivePipelineSelection.members()) append(identity);
++    for (const auto& identity : g_deferredPipelineDescriptors) append(identity);
++    if (g_selectivePipelineSelection.replace(descriptors.data(), descriptors.size(), g_selectiveSeedRegistry) !=
++        selective::RequestResult::Accepted) {
++      selective_mark_error_locked();
++      return 0;
++    }
++    deferred.swap(g_deferredPipelineDescriptors);
++    g_selectivePrepareStatus.unique_count = static_cast<uint32_t>(g_selectivePipelineSelection.size());
++    selective_refresh_status_locked();
++  }
++  // This may construct synchronously. The source owner must already be paused.
++  for (const auto& identity : deferred) {
++    if (!selective_queue_member(identity)) {
++      std::lock_guard guard{g_pipelineMutex};
++      selective_mark_error_locked();
++      return 0;
++    }
++  }
++  return 1;
++#else
++  return 0;
++#endif
++}
++
++extern "C" int aurora_pipeline_prepare_status(AuroraPipelinePrepareStatus* out) {
++  if (out == nullptr) {
++    return 0;
++  }
++  std::lock_guard guard{g_pipelineMutex};
++  if (g_pipelineCacheBroken && g_selectivePrepareStatus.state != AURORA_PIPELINE_PREPARE_UNKNOWN_MEMBERSHIP) {
++    selective_mark_error_locked();
++  }
++  selective_refresh_status_locked();
++  *out = g_selectivePrepareStatus;
++  return 1;
++}
++#endif
++
  bool get_pipeline(PipelineRef ref, wgpu::RenderPipeline& pipeline) {
+   std::lock_guard guard{g_pipelineMutex};
++#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
++  if (g_selectivePipelineMode) {
++    if (!g_selectivePipelineActive || g_selectivePrepareStatus.state == AURORA_PIPELINE_PREPARE_ERROR ||
++        g_selectivePrepareStatus.state == AURORA_PIPELINE_PREPARE_UNKNOWN_MEMBERSHIP) {
++      return false;
++    }
++    const auto selected = std::find_if(g_selectivePipelineSelection.members().begin(),
++                                       g_selectivePipelineSelection.members().end(),
++                                       [&](const selective::DescriptorIdentity& identity) {
++                                         return identity.key.pipelineRef == ref &&
++                                                g_selectiveSeedRegistry.find(identity.key) != nullptr;
++                                       });
++    if (selected == g_selectivePipelineSelection.members().end()) {
++#if defined(MELEE_WEB_ALPHA_PIPELINE_FALLBACK)
++      if (std::any_of(g_deferredPipelineDescriptors.begin(), g_deferredPipelineDescriptors.end(),
++                      [&](const selective::DescriptorIdentity& identity) { return identity.key.pipelineRef == ref; }))
++        return false;
++#endif
++      selective_mark_unknown_locked();
++      return false;
++    }
++  }
++#endif
+   const auto it = g_pipelines.find(ref);
+   if (it == g_pipelines.end()) {
+     return false;
 diff --git a/lib/gfx/pipeline_cache.hpp b/lib/gfx/pipeline_cache.hpp
-index 7eb4723..4d485ae 100644
+index 7eb4723..de393fd 100644
 --- a/lib/gfx/pipeline_cache.hpp
 +++ b/lib/gfx/pipeline_cache.hpp
-@@ -26,10 +26,19 @@ enum class ShaderType : uint8_t {
+@@ -2,6 +2,11 @@
+ 
+ #include "types.hpp"
+ 
++#if defined(MELEE_WEB_SELECTIVE_PIPELINES)
++#include <aurora/pipeline_prepare.h>
++#endif
++
++#include <cstddef>
+ #include <functional>
+ 
+ namespace aurora::gfx::clear {
+@@ -26,10 +31,19 @@ enum class ShaderType : uint8_t {
  
  using NewPipelineCallback = std::function<wgpu::RenderPipeline()>;
  
@@ -1542,8 +2992,379 @@ index 0000000..a1b71e6
 +};
 +
 +} // namespace aurora::gfx::detail
+diff --git a/lib/gfx/pipeline_prepare_state.hpp b/lib/gfx/pipeline_prepare_state.hpp
+new file mode 100644
+index 0000000..b629d3b
+--- /dev/null
++++ b/lib/gfx/pipeline_prepare_state.hpp
+@@ -0,0 +1,365 @@
++#pragma once
++
++/*
++ * GPU- and SQLite-free bounded state used by the selective pipeline cache.
++ * The cache owns seed configuration bytes internally; callers provide only
++ * typed descriptor identities.
++ */
++
++#include <aurora/pipeline_prepare.h>
++
++#include <algorithm>
++#include <array>
++#include <cstddef>
++#include <cstdint>
++#include <cstring>
++#include <iterator>
++#include <limits>
++#include <utility>
++#include <vector>
++
++namespace aurora::gfx::selective {
++
++constexpr size_t MaxSeedDescriptors = 1024;
++constexpr size_t MaxRetainedConfigBytes = 16u * 1024u * 1024u;
++
++using Sha256Digest = std::array<uint8_t, 32>;
++
++struct DescriptorKey {
++  uint32_t type = 0;
++  uint64_t pipelineRef = 0;
++  uint32_t configVersion = 0;
++
++  bool operator==(const DescriptorKey&) const = default;
++};
++
++struct DescriptorIdentity {
++  DescriptorKey key;
++  uint32_t configSize = 0;
++  Sha256Digest sha256{};
++
++  bool operator==(const DescriptorIdentity&) const = default;
++};
++
++struct SeedDescriptor {
++  DescriptorIdentity identity;
++  uint32_t firstFrameUsed = UINT32_MAX;
++  std::vector<uint8_t> config;
++};
++
++enum class RegistryInsertResult {
++  Inserted,
++  Duplicate,
++  Conflict,
++  Invalid,
++  Overflow,
++};
++
++enum class RequestResult {
++  Accepted,
++  Duplicate,
++  Unknown,
++  Conflict,
++  Invalid,
++  Overflow,
++};
++
++enum class GateResult {
++  Allowed,
++  Unknown,
++  ByteMismatch,
++};
++
++namespace detail {
++
++constexpr std::array<uint32_t, 64> Sha256RoundConstants{
++    0x428a2f98u, 0x71374491u, 0xb5c0fbcfu, 0xe9b5dba5u, 0x3956c25bu, 0x59f111f1u, 0x923f82a4u,
++    0xab1c5ed5u, 0xd807aa98u, 0x12835b01u, 0x243185beu, 0x550c7dc3u, 0x72be5d74u, 0x80deb1feu,
++    0x9bdc06a7u, 0xc19bf174u, 0xe49b69c1u, 0xefbe4786u, 0x0fc19dc6u, 0x240ca1ccu, 0x2de92c6fu,
++    0x4a7484aau, 0x5cb0a9dcu, 0x76f988dau, 0x983e5152u, 0xa831c66du, 0xb00327c8u, 0xbf597fc7u,
++    0xc6e00bf3u, 0xd5a79147u, 0x06ca6351u, 0x14292967u, 0x27b70a85u, 0x2e1b2138u, 0x4d2c6dfcu,
++    0x53380d13u, 0x650a7354u, 0x766a0abbu, 0x81c2c92eu, 0x92722c85u, 0xa2bfe8a1u, 0xa81a664bu,
++    0xc24b8b70u, 0xc76c51a3u, 0xd192e819u, 0xd6990624u, 0xf40e3585u, 0x106aa070u, 0x19a4c116u,
++    0x1e376c08u, 0x2748774cu, 0x34b0bcb5u, 0x391c0cb3u, 0x4ed8aa4au, 0x5b9cca4fu, 0x682e6ff3u,
++    0x748f82eeu, 0x78a5636fu, 0x84c87814u, 0x8cc70208u, 0x90befffau, 0xa4506cebu, 0xbef9a3f7u,
++    0xc67178f2u,
++};
++
++constexpr uint32_t rotate_right(uint32_t value, uint32_t amount) noexcept {
++  return (value >> amount) | (value << (32u - amount));
++}
++
++inline void sha256_block(const uint8_t* block, uint32_t (&state)[8]) noexcept {
++  uint32_t words[64]{};
++  for (size_t i = 0; i < 16; ++i) {
++    words[i] = (static_cast<uint32_t>(block[i * 4]) << 24) |
++              (static_cast<uint32_t>(block[i * 4 + 1]) << 16) |
++              (static_cast<uint32_t>(block[i * 4 + 2]) << 8) |
++              static_cast<uint32_t>(block[i * 4 + 3]);
++  }
++  for (size_t i = 16; i < 64; ++i) {
++    const uint32_t s0 = rotate_right(words[i - 15], 7) ^ rotate_right(words[i - 15], 18) ^ (words[i - 15] >> 3);
++    const uint32_t s1 = rotate_right(words[i - 2], 17) ^ rotate_right(words[i - 2], 19) ^ (words[i - 2] >> 10);
++    words[i] = words[i - 16] + s0 + words[i - 7] + s1;
++  }
++
++  uint32_t a = state[0];
++  uint32_t b = state[1];
++  uint32_t c = state[2];
++  uint32_t d = state[3];
++  uint32_t e = state[4];
++  uint32_t f = state[5];
++  uint32_t g = state[6];
++  uint32_t h = state[7];
++  for (size_t i = 0; i < 64; ++i) {
++    const uint32_t s1 = rotate_right(e, 6) ^ rotate_right(e, 11) ^ rotate_right(e, 25);
++    const uint32_t choose = (e & f) ^ ((~e) & g);
++    const uint32_t temp1 = h + s1 + choose + Sha256RoundConstants[i] + words[i];
++    const uint32_t s0 = rotate_right(a, 2) ^ rotate_right(a, 13) ^ rotate_right(a, 22);
++    const uint32_t majority = (a & b) ^ (a & c) ^ (b & c);
++    const uint32_t temp2 = s0 + majority;
++    h = g;
++    g = f;
++    f = e;
++    e = d + temp1;
++    d = c;
++    c = b;
++    b = a;
++    a = temp1 + temp2;
++  }
++  state[0] += a;
++  state[1] += b;
++  state[2] += c;
++  state[3] += d;
++  state[4] += e;
++  state[5] += f;
++  state[6] += g;
++  state[7] += h;
++}
++
++} // namespace detail
++
++inline Sha256Digest sha256(const uint8_t* data, size_t size) noexcept {
++  Sha256Digest digest{};
++  if ((data == nullptr && size != 0) || size > std::numeric_limits<uint64_t>::max() / 8u) {
++    return digest;
++  }
++
++  const uint64_t bitLength = static_cast<uint64_t>(size) * 8u;
++  uint32_t state[8]{0x6a09e667u, 0xbb67ae85u, 0x3c6ef372u, 0xa54ff53au,
++                    0x510e527fu, 0x9b05688cu, 0x1f83d9abu, 0x5be0cd19u};
++  const size_t fullSize = size - (size % 64);
++  for (size_t offset = 0; offset < fullSize; offset += 64) {
++    detail::sha256_block(data + offset, state);
++  }
++
++  const size_t remainder = size - fullSize;
++  std::array<uint8_t, 128> tail{};
++  if (remainder != 0) {
++    std::memcpy(tail.data(), data + fullSize, remainder);
++  }
++  tail[remainder] = 0x80;
++  const size_t tailSize = remainder < 56 ? 64 : 128;
++  for (size_t i = 0; i < 8; ++i) {
++    tail[tailSize - 1 - i] = static_cast<uint8_t>(bitLength >> (i * 8));
++  }
++  for (size_t offset = 0; offset < tailSize; offset += 64) {
++    detail::sha256_block(tail.data() + offset, state);
++  }
++  for (size_t i = 0; i < 8; ++i) {
++    digest[i * 4] = static_cast<uint8_t>(state[i] >> 24);
++    digest[i * 4 + 1] = static_cast<uint8_t>(state[i] >> 16);
++    digest[i * 4 + 2] = static_cast<uint8_t>(state[i] >> 8);
++    digest[i * 4 + 3] = static_cast<uint8_t>(state[i]);
++  }
++  return digest;
++}
++
++class SeedDescriptorRegistry {
++public:
++  RegistryInsertResult add_seed(uint32_t type, uint64_t pipelineRef, uint32_t configVersion,
++                                uint32_t firstFrameUsed, const uint8_t* config, size_t configSize) {
++    if (type > AURORA_PIPELINE_SHADER_RML || config == nullptr || configSize == 0 ||
++        configSize > std::numeric_limits<uint32_t>::max() || configSize > MaxRetainedConfigBytes) {
++      return RegistryInsertResult::Invalid;
++    }
++    DescriptorIdentity identity{
++        .key = {.type = type, .pipelineRef = pipelineRef, .configVersion = configVersion},
++        .configSize = static_cast<uint32_t>(configSize),
++        .sha256 = sha256(config, configSize),
++    };
++    for (const auto& entry : entries_) {
++      if (!(entry.identity.key == identity.key)) {
++        continue;
++      }
++      if (entry.identity == identity && entry.config.size() == configSize &&
++          std::memcmp(entry.config.data(), config, configSize) == 0) {
++        return RegistryInsertResult::Duplicate;
++      }
++      return RegistryInsertResult::Conflict;
++    }
++
++    if (entries_.size() >= MaxSeedDescriptors || totalConfigBytes_ > MaxRetainedConfigBytes - configSize) {
++      return RegistryInsertResult::Overflow;
++    }
++
++    SeedDescriptor entry{
++        .identity = identity,
++        .firstFrameUsed = firstFrameUsed,
++        .config = std::vector<uint8_t>(config, config + configSize),
++    };
++    totalConfigBytes_ += configSize;
++    entries_.push_back(std::move(entry));
++    return RegistryInsertResult::Inserted;
++  }
++
++  void clear() noexcept {
++    entries_.clear();
++    totalConfigBytes_ = 0;
++  }
++
++  [[nodiscard]] size_t size() const noexcept { return entries_.size(); }
++  [[nodiscard]] size_t total_config_bytes() const noexcept { return totalConfigBytes_; }
++  [[nodiscard]] const std::vector<SeedDescriptor>& entries() const noexcept { return entries_; }
++
++  [[nodiscard]] bool contains(const DescriptorKey& key) const noexcept { return find(key) != nullptr; }
++
++  /* The GPU cache is keyed only by pipelineRef.  Keep the generic typed
++   * registry permissive, but let the cache reject an ambiguous seed set
++   * before it can queue any GPU work. */
++  [[nodiscard]] bool global_refs_unique() const noexcept {
++    for (size_t i = 0; i < entries_.size(); ++i) {
++      for (size_t j = i + 1; j < entries_.size(); ++j) {
++        if (entries_[i].identity.key.pipelineRef == entries_[j].identity.key.pipelineRef &&
++            !(entries_[i].identity == entries_[j].identity)) {
++          return false;
++        }
++      }
++    }
++    return true;
++  }
++
++  [[nodiscard]] const SeedDescriptor* find(const DescriptorKey& key) const noexcept {
++    const auto it = std::find_if(entries_.begin(), entries_.end(), [&](const SeedDescriptor& entry) {
++      return entry.identity.key == key;
++    });
++    return it == entries_.end() ? nullptr : &*it;
++  }
++
++  [[nodiscard]] const SeedDescriptor* find(const DescriptorIdentity& identity) const noexcept {
++    const auto* entry = find(identity.key);
++    return entry != nullptr && entry->identity == identity ? entry : nullptr;
++  }
++
++  [[nodiscard]] GateResult gate(const DescriptorIdentity& identity, const uint8_t* config, size_t configSize) const
++      noexcept {
++    const auto* entry = find(identity.key);
++    if (entry == nullptr) {
++      return GateResult::Unknown;
++    }
++    if (!(entry->identity == identity) || config == nullptr || configSize != entry->config.size() ||
++        std::memcmp(entry->config.data(), config, configSize) != 0) {
++      return GateResult::ByteMismatch;
++    }
++    return GateResult::Allowed;
++  }
++
++private:
++  std::vector<SeedDescriptor> entries_;
++  size_t totalConfigBytes_ = 0;
++};
++
++class PipelineSelection {
++public:
++  RequestResult build(const AuroraPipelineDescriptor* descriptors, size_t count,
++                      const SeedDescriptorRegistry& registry, size_t* invalidIndex = nullptr) const {
++    if (invalidIndex != nullptr) {
++      *invalidIndex = std::numeric_limits<size_t>::max();
++    }
++    if (descriptors == nullptr && count != 0) {
++      return RequestResult::Invalid;
++    }
++    if (count == 0) {
++      return RequestResult::Invalid;
++    }
++    if (count > MaxSeedDescriptors) {
++      return RequestResult::Overflow;
++    }
++
++    std::vector<DescriptorIdentity> candidate;
++    candidate.reserve(count);
++    for (size_t i = 0; i < count; ++i) {
++      const AuroraPipelineDescriptor& descriptor = descriptors[i];
++      if (descriptor.type > AURORA_PIPELINE_SHADER_RML || descriptor.config_size == 0 ||
++          descriptor.config_size > MaxRetainedConfigBytes) {
++        if (invalidIndex != nullptr) {
++          *invalidIndex = i;
++        }
++        return RequestResult::Invalid;
++      }
++      DescriptorIdentity identity{
++          .key = {.type = descriptor.type, .pipelineRef = descriptor.pipeline_ref,
++                  .configVersion = descriptor.config_version},
++          .configSize = descriptor.config_size,
++      };
++      std::copy(std::begin(descriptor.sha256), std::end(descriptor.sha256), identity.sha256.begin());
++
++      if (std::find(candidate.begin(), candidate.end(), identity) != candidate.end()) {
++        continue;
++      }
++      if (std::find_if(candidate.begin(), candidate.end(), [&](const DescriptorIdentity& prior) {
++            return prior.key == identity.key;
++          }) != candidate.end()) {
++        if (invalidIndex != nullptr) {
++          *invalidIndex = i;
++        }
++        return RequestResult::Conflict;
++      }
++      if (registry.find(identity) == nullptr) {
++        if (invalidIndex != nullptr) {
++          *invalidIndex = i;
++        }
++        return RequestResult::Unknown;
++      }
++      candidate.push_back(identity);
++    }
++    return RequestResult::Accepted;
++  }
++
++  RequestResult replace(const AuroraPipelineDescriptor* descriptors, size_t count,
++                        const SeedDescriptorRegistry& registry, size_t* invalidIndex = nullptr) {
++    const auto result = build(descriptors, count, registry, invalidIndex);
++    if (result != RequestResult::Accepted) {
++      return result;
++    }
++
++    std::vector<DescriptorIdentity> candidate;
++    candidate.reserve(count);
++    for (size_t i = 0; i < count; ++i) {
++      DescriptorIdentity identity{
++          .key = {.type = descriptors[i].type, .pipelineRef = descriptors[i].pipeline_ref,
++                  .configVersion = descriptors[i].config_version},
++          .configSize = descriptors[i].config_size,
++      };
++      std::copy(std::begin(descriptors[i].sha256), std::end(descriptors[i].sha256), identity.sha256.begin());
++      if (std::find(candidate.begin(), candidate.end(), identity) == candidate.end()) {
++        candidate.push_back(identity);
++      }
++    }
++    members_ = std::move(candidate);
++    return RequestResult::Accepted;
++  }
++
++  void clear() noexcept { members_.clear(); }
++  [[nodiscard]] size_t size() const noexcept { return members_.size(); }
++  [[nodiscard]] const std::vector<DescriptorIdentity>& members() const noexcept { return members_; }
++  [[nodiscard]] bool contains(const DescriptorKey& key) const noexcept {
++    return std::any_of(members_.begin(), members_.end(),
++                       [&](const DescriptorIdentity& identity) { return identity.key == key; });
++  }
++
++private:
++  std::vector<DescriptorIdentity> members_;
++};
++
++} // namespace aurora::gfx::selective
 diff --git a/lib/gfx/recording.cpp b/lib/gfx/recording.cpp
-index d04db0f..f61b5e2 100644
+index d04db0f..9c583fd 100644
 --- a/lib/gfx/recording.cpp
 +++ b/lib/gfx/recording.cpp
 @@ -19,6 +19,7 @@
@@ -1562,7 +3383,42 @@ index d04db0f..f61b5e2 100644
  using namespace detail;
  
  namespace {
-@@ -634,7 +636,8 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
+@@ -213,6 +215,9 @@ StagingHighWater current_high_water(const FramePacket& frame) noexcept {
+ 
+ FrameOp capture_frame_op(FramePacket& frame, FrameOpType type, uint32_t index) {
+   FrameOp op{
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++      .provenance = melee_web_provenance_current(),
++#endif
+       .type = type,
+       .index = index,
+       .renderPass =
+@@ -327,9 +332,13 @@ void encode_draw(void* payload, const wgpu::RenderPassEncoder& pass, const Rende
+ 
+ template <auto Renderer, InlinePayload T>
+ DrawCommand make_draw_command(const T& data) {
+-  static_assert(sizeof(T) <= InlineDrawPayloadSize);
++  static_assert(sizeof(T) <= RecordedDrawPayloadSize);
+   static_assert(alignof(T) <= alignof(std::max_align_t));
+-  DrawCommand command{.encoder = encode_draw<Renderer, T>};
++  DrawCommand command{
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++      .provenance = melee_web_provenance_current(),
++#endif
++      .encoder = encode_draw<Renderer, T>};
+   std::memcpy(command.payload.data(), &data, sizeof(data));
+   return command;
+ }
+@@ -530,6 +539,8 @@ void enqueue_pass(FramePacket& frame, uint32_t passIndex) {
+ 
+ namespace detail {
+ 
++bool recording_active() noexcept { return g_recorder.active(); }
++
+ void begin_recording(FramePacket& packet, size_t frameSlot) {
+   CHECK(!g_recorder.active(), "A recording session is already active");
+   g_recorder.packet = &packet;
+@@ -634,7 +645,8 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
                                 wgpu::TexelCopyTextureInfo tex, wgpu::Extent3D size) {
    const auto copyBytesPerRow = AURORA_ALIGN(bytesPerRow, 256);
    auto& frame = current_frame_packet();
@@ -1572,7 +3428,7 @@ index d04db0f..f61b5e2 100644
      const auto range = push_texture_data(data, bytesPerRow, rowsPerImage);
      const wgpu::TexelCopyBufferLayout layout{
          .offset = range.offset,
-@@ -645,14 +648,43 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
+@@ -645,14 +657,43 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
      return;
    }
  
@@ -1617,7 +3473,7 @@ index d04db0f..f61b5e2 100644
    auto* dst = static_cast<uint8_t*>(buffer.GetMappedRange(0, uploadSize));
    for (uint32_t row = 0; row < rowsPerImage; ++row) {
      memcpy(dst, data, bytesPerRow);
-@@ -660,6 +692,7 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
+@@ -660,6 +701,7 @@ void queue_texture_upload_data(const uint8_t* data, uint32_t bytesPerRow, uint32
      dst += copyBytesPerRow;
    }
    buffer.Unmap();
@@ -1625,6 +3481,18 @@ index d04db0f..f61b5e2 100644
  
    const wgpu::TexelCopyBufferLayout layout{
        .offset = 0,
+diff --git a/lib/gfx/recording.hpp b/lib/gfx/recording.hpp
+index cd2b794..551fd6e 100644
+--- a/lib/gfx/recording.hpp
++++ b/lib/gfx/recording.hpp
+@@ -17,6 +17,7 @@ struct RecordedFrame {
+ void begin_recording(FramePacket& packet, size_t frameSlot);
+ RecordedFrame end_recording();
+ void shutdown_recording();
++bool recording_active() noexcept;
+ void increment_merged_draw_count() noexcept;
+ 
+ namespace testing {
 diff --git a/lib/gfx/render_worker.cpp b/lib/gfx/render_worker.cpp
 index 85783b6..2698e96 100644
 --- a/lib/gfx/render_worker.cpp
@@ -1728,10 +3596,91 @@ index 940d599..4b30013 100644
 +using EndFrameCallback = std::function<void(wgpu::CommandEncoder&, std::vector<AfterSubmitCallback>, AuroraStats&)>;
  } // namespace aurora::gfx
 diff --git a/lib/gx/command_processor.cpp b/lib/gx/command_processor.cpp
-index b0dce17..ae03ada 100644
+index b0dce17..65c1407 100644
 --- a/lib/gx/command_processor.cpp
 +++ b/lib/gx/command_processor.cpp
-@@ -457,7 +457,11 @@ static void push_gx_draw(GXPrimitive prim, GXVtxFmt fmt, u16 vtxCount, gfx::Rang
+@@ -1,3 +1,9 @@
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++#include "pipeline_provenance_runtime.h"
++#include "fifo.hpp"
++#include "../gfx/pipeline_cache.hpp"
++#include <optional>
++#endif
+ #include "command_processor.hpp"
+ 
+ #include "../gfx/depth_peek.hpp"
+@@ -215,8 +221,27 @@ static void handle_aurora(ByteReader& reader) noexcept;
+ ProcessResult process(const u8* data, u32 size) noexcept {
+   ZoneScoped;
+   ByteReader reader{{data, size}};
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++  std::optional<melee_web::provenance::Execution> provenance;
++  MeleeWebPipelineWorkContext provenanceContext{};
++#endif
+ 
+   while (!reader.empty()) {
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++    const auto nextContext = provenance_at(reader.data() + reader.offset());
++    // FIFO metadata is copied and immutable. Authenticate on each context
++    // change, keeping the same execution scope across its command span.
++    // Nested display lists have their own guard and restore this caller.
++    if (!provenance ||
++        nextContext.source.scope_id != provenanceContext.source.scope_id ||
++        nextContext.source.token_nonce != provenanceContext.source.token_nonce ||
++        nextContext.source.capture_generation != provenanceContext.source.capture_generation ||
++        nextContext.frame_id != provenanceContext.frame_id) {
++      provenance.reset();
++      provenance.emplace(nextContext);
++      provenanceContext = nextContext;
++    }
++#endif
+     const u8 cmd = reader.read<u8>();
+     u8 opcode = cmd & CP_OPCODE_MASK;
+ 
+@@ -276,6 +301,11 @@ ProcessResult process(const u8* data, u32 size) noexcept {
+ 
+     case CP_CMD_CALL_DL: {
+       // Call display list: 8 bytes (address + size)
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++      // GXCallDisplayList normally expands into FIFO bytes. A raw nested call
++      // is unsupported here; omitted draws must never certify route coverage.
++      melee_web_provenance_invalid(MELEE_WEB_PIPELINE_INVALID_INVALID_REQUEST);
++#endif
+       Log.warn("Ignoring nested GX_CMD_CALL_DL");
+       reader.skip(8);
+       break;
+@@ -411,6 +441,14 @@ static void push_gx_draw(GXPrimitive prim, GXVtxFmt fmt, u16 vtxCount, gfx::Rang
+       cache.bindGeneration = 0;
+     }
+   }
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++  else {
++    melee_web::provenance::observe(MELEE_WEB_PIPELINE_EVENT_DRAW_CACHE_REUSE,
++        static_cast<uint32_t>(gfx::ShaderType::GX), cache.pipelineRef,
++        cache.config.version, &cache.config, sizeof(cache.config),
++        MELEE_WEB_PIPELINE_OUTCOME_REUSED);
++  }
++#endif
+ 
+   const bool bindGroupsValid =
+       (state.dirty & DirtyTextures) == 0 && cache.bindGeneration == texture::current_bind_generation();
+@@ -452,12 +490,27 @@ static void push_gx_draw(GXPrimitive prim, GXVtxFmt fmt, u16 vtxCount, gfx::Rang
+     instanceCount = vtxCount;
+   }
+   cache.lastDrawFmt = fmt;
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++  const auto provenancePacket = melee_web_provenance_next_packet();
++  melee_web::provenance::observe(MELEE_WEB_PIPELINE_EVENT_PACKET_USE,
++      static_cast<uint32_t>(gfx::ShaderType::GX), cache.pipelineRef,
++      cache.config.version, &cache.config, sizeof(cache.config),
++      MELEE_WEB_PIPELINE_OUTCOME_USED, provenancePacket);
++#endif
+   gfx::push_draw_command(DrawData{
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++      .provenance = melee_web_provenance_current(),
++      .provenancePacket = provenancePacket,
++#endif
+       .pipeline = cache.pipelineRef,
        .vertRange = vertRange,
        .idxRange = idxRange,
        .uniformRange = cache.uniformRange,
@@ -1743,11 +3692,41 @@ index b0dce17..ae03ada 100644
        .vtxCount = vtxCount,
        .indexCount = numIndices,
        .instanceCount = instanceCount,
+@@ -505,6 +558,12 @@ static void draw_prim(GXPrimitive prim, GXVtxFmt fmt, u16 vtxCount, ByteReader&
+ 
+   // Try to merge with previous draw call
+   if (canMerge) {
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++    melee_web::provenance::observe(MELEE_WEB_PIPELINE_EVENT_MERGE,
++        static_cast<uint32_t>(gfx::ShaderType::GX), lastDraw->pipeline,
++        sDrawCache.config.version, &sDrawCache.config, sizeof(sDrawCache.config),
++        MELEE_WEB_PIPELINE_OUTCOME_MERGED, lastDraw->provenancePacket);
++#endif
+     u32 numIndices = 0;
+     gfx::Range idxRange;
+     static ByteBuffer idxBuf;
 diff --git a/lib/gx/fifo.cpp b/lib/gx/fifo.cpp
-index bcaba60..b20f78d 100644
+index bcaba60..388117d 100644
 --- a/lib/gx/fifo.cpp
 +++ b/lib/gx/fifo.cpp
-@@ -24,7 +24,13 @@ uint32_t sDlWritePos = 0;
+@@ -1,3 +1,6 @@
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++#include "pipeline_provenance_runtime.h"
++#endif
+ #include "fifo.hpp"
+ 
+ #include "../thread.hpp"
+@@ -8,6 +11,9 @@
+ #include <cstring>
+ #include <limits>
+ #include <mutex>
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++#include <vector>
++#endif
+ 
+ #include <tracy/Tracy.hpp>
+ 
+@@ -24,7 +30,13 @@ uint32_t sDlWritePos = 0;
  
  namespace {
  constexpr Module Log{"aurora::gx::fifo"};
@@ -1761,6 +3740,134 @@ index bcaba60..b20f78d 100644
  constexpr uint32_t kDrawBatchSize = 1;
  
  bool sFrameActive = false;
+@@ -33,6 +45,11 @@ std::atomic<uint64_t> sPublished{0};
+ std::atomic<uint64_t> sProcessed{0};
+ uint64_t sStreamBase = 0;
+ std::mutex sBufferMutex;
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++struct ProvenanceSpan { uint64_t offset; MeleeWebPipelineWorkContext context; };
++std::vector<ProvenanceSpan> sProvenance;
++constexpr size_t MaxProvenanceSpans = 4096;
++#endif
+ std::atomic<uint32_t> sWorkerWake{0};
+ thread::Thread sWorkerThread;
+ std::atomic<DrawDoneCallback> sDrawDoneCallback{nullptr};
+@@ -113,8 +130,52 @@ void stop_worker() {
+ 
+ ProcessingMode processing_mode() noexcept { return kProcessingMode; }
+ 
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++void provenance_note_write() {
++  const auto context = melee_web_provenance_current();
++  std::lock_guard lock{sBufferMutex};
++  const uint64_t offset = sStreamBase + detail::sBufferSize;
++  if (!sProvenance.empty()) {
++    const auto& previous = sProvenance.back().context;
++    if (previous.source.scope_id == context.source.scope_id &&
++        previous.source.token_nonce == context.source.token_nonce &&
++        previous.source.capture_generation == context.source.capture_generation &&
++        previous.frame_id == context.frame_id) return;
++    if (sProvenance.back().offset == offset) {
++      sProvenance.back().context = context;
++      return;
++    }
++  }
++  if (sProvenance.size() == MaxProvenanceSpans) {
++    melee_web_provenance_invalid(MELEE_WEB_PIPELINE_INVALID_OVERFLOW);
++    return;
++  }
++  sProvenance.push_back({offset, context});
++}
++
++MeleeWebPipelineWorkContext provenance_at(const void* command) {
++  // process_to holds sBufferMutex. Nested display-list processing inherits
++  // the copied call-site context; no game bytes or addresses are exported.
++  const auto address = reinterpret_cast<uintptr_t>(command);
++  const auto start = reinterpret_cast<uintptr_t>(detail::sBufferData);
++  if (address < start || address >= start + detail::sBufferSize)
++    return melee_web_provenance_current();
++  const auto offset = sStreamBase + (address - start);
++  const auto after = std::upper_bound(sProvenance.begin(), sProvenance.end(), offset,
++      [](uint64_t value, const ProvenanceSpan& span) { return value < span.offset; });
++  if (after == sProvenance.begin()) {
++    melee_web_provenance_invalid(MELEE_WEB_PIPELINE_INVALID_MISSING_CONTEXT);
++    return {};
++  }
++  return std::prev(after)->context;
++}
++#endif
++
+ void init() {
+   stop_worker();
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++  sProvenance.clear();
++#endif
+ 
+   constexpr uint32_t initialCapacity = 64 * 1024;
+   free(detail::sBufferData);
+@@ -264,6 +325,9 @@ void drain() {
+     std::lock_guard lock{sBufferMutex};
+     sStreamBase = target;
+     detail::sBufferSize = 0;
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++    sProvenance.clear();
++#endif
+   }
+   sPendingDraws = 0;
+ }
+@@ -279,6 +343,9 @@ void clear_buffer() {
+   sStreamBase = processed;
+   detail::sBufferSize = 0;
+   sPendingDraws = 0;
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++  sProvenance.clear();
++#endif
+ }
+ 
+ } // namespace aurora::gx::fifo
+diff --git a/lib/gx/fifo.hpp b/lib/gx/fifo.hpp
+index 0d6a5d8..510e6e7 100644
+--- a/lib/gx/fifo.hpp
++++ b/lib/gx/fifo.hpp
+@@ -1,3 +1,6 @@
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++#include "pipeline_provenance_runtime.h"
++#endif
+ #pragma once
+ 
+ #include "../internal.hpp"
+@@ -5,6 +8,11 @@
+ #include <cstring>
+ 
+ namespace aurora::gx::fifo {
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++// Metadata follows source writes without adding bytes or fences to the FIFO.
++void provenance_note_write();
++MeleeWebPipelineWorkContext provenance_at(const void* command);
++#endif
+ 
+ namespace detail {
+ extern uint8_t* sBufferData;
+@@ -36,6 +44,9 @@ void end_frame() noexcept;
+ void write_data_grow(const void* data, uint32_t length);
+ 
+ inline void write_data(const void* data, const uint32_t length) {
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++  if (!detail::sInDisplayList && length) provenance_note_write();
++#endif
+   if (!detail::sInDisplayList)
+     LIKELY {
+       if (length <= detail::sBufferCapacity - detail::sBufferSize)
+@@ -53,6 +64,9 @@ inline void write_data(const void* data, const uint32_t length) {
+ }
+ 
+ inline void write_u8(const uint8_t val) {
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++  if (!detail::sInDisplayList) provenance_note_write();
++#endif
+   if (!detail::sInDisplayList)
+     LIKELY {
+       if (detail::sBufferSize < detail::sBufferCapacity)
 diff --git a/lib/gx/gx.cpp b/lib/gx/gx.cpp
 index b12b327..0fbfa77 100644
 --- a/lib/gx/gx.cpp
@@ -1784,10 +3891,25 @@ index b12b327..0fbfa77 100644
      sPipelineLayout = g_device.CreatePipelineLayout(&desc);
    }
 diff --git a/lib/gx/pipeline.cpp b/lib/gx/pipeline.cpp
-index 0c3631c..4be6cda 100644
+index 0c3631c..3cf50c4 100644
 --- a/lib/gx/pipeline.cpp
 +++ b/lib/gx/pipeline.cpp
-@@ -27,7 +27,13 @@ void render(const DrawData& data, const wgpu::RenderPassEncoder& pass) {
+@@ -1,3 +1,6 @@
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++#include "pipeline_provenance_runtime.h"
++#endif
+ #include "pipeline.hpp"
+ 
+ #include "../gfx/encoding.hpp"
+@@ -22,12 +25,21 @@ wgpu::RenderPipeline create_pipeline(const PipelineConfig& config) {
+ }
+ 
+ void render(const DrawData& data, const wgpu::RenderPassEncoder& pass) {
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++  const melee_web::provenance::Execution provenance(data.provenance);
++#endif
+   if (!gfx::bind_pipeline(data.pipeline, pass)) {
+     return;
    }
  
    const auto& resources = gfx::detail::resources();
@@ -1802,10 +3924,25 @@ index 0c3631c..4be6cda 100644
    pass.SetBindGroup(1, resources.uniformBindGroup, offsets.size(), offsets.data());
    if (data.bindGroups.textureBindGroup) {
 diff --git a/lib/gx/pipeline.hpp b/lib/gx/pipeline.hpp
-index 1abcbd5..6b839c6 100644
+index 1abcbd5..c5fe2fa 100644
 --- a/lib/gx/pipeline.hpp
 +++ b/lib/gx/pipeline.hpp
-@@ -9,7 +9,11 @@ struct DrawData {
+@@ -1,3 +1,6 @@
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++#include "pipeline_provenance_runtime.h"
++#endif
+ #pragma once
+ 
+ #include "../gfx/types.hpp"
+@@ -5,11 +8,19 @@
+ 
+ namespace aurora::gx {
+ struct DrawData {
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++  MeleeWebPipelineWorkContext provenance{};
++  uint64_t provenancePacket = 0;
++#endif
+   gfx::PipelineRef pipeline;
    gfx::Range vertRange;
    gfx::Range idxRange;
    gfx::Range uniformRange;
@@ -1817,7 +3954,7 @@ index 1abcbd5..6b839c6 100644
    uint32_t vtxCount;
    uint32_t indexCount;
    uint32_t instanceCount;
-@@ -17,7 +21,13 @@ struct DrawData {
+@@ -17,7 +28,13 @@ struct DrawData {
    uint32_t dstAlpha;
  };
  
@@ -1909,10 +4046,17 @@ index 38db46b..abd3b23 100644
  
    explicit operator bool() const { return m_active; }
 diff --git a/lib/webgpu/gpu.cpp b/lib/webgpu/gpu.cpp
-index 592b8ab..5570baa 100644
+index 592b8ab..ad068b0 100644
 --- a/lib/webgpu/gpu.cpp
 +++ b/lib/webgpu/gpu.cpp
-@@ -73,6 +73,7 @@ static std::atomic_bool g_vsyncEnabled = true;
+@@ -1,3 +1,6 @@
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++#include "pipeline_provenance_runtime.h"
++#endif
+ #include "gpu.hpp"
+ 
+ #include <algorithm>
+@@ -73,6 +76,7 @@ static std::atomic_bool g_vsyncEnabled = true;
  
  namespace {
  
@@ -1920,7 +4064,7 @@ index 592b8ab..5570baa 100644
  AuroraLogLevel wgpu_log_level(wgpu::LoggingType type) {
    switch (type) {
    case wgpu::LoggingType::Verbose:
-@@ -92,6 +93,8 @@ void wgpu_log(wgpu::LoggingType type, wgpu::StringView message) {
+@@ -92,6 +96,8 @@ void wgpu_log(wgpu::LoggingType type, wgpu::StringView message) {
    Log.report(wgpu_log_level(type), "WebGPU message: {}", message);
  }
  
@@ -1929,7 +4073,7 @@ index 592b8ab..5570baa 100644
  struct ResampleUniformBlock {
    uint32_t samplerMode = 0;
    float frameWidth = 0.f;
-@@ -872,7 +875,9 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
+@@ -872,7 +878,9 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
              supportedLimits.minUniformBufferOffsetAlignment < 64 ? 64 : supportedLimits.minUniformBufferOffsetAlignment,
          .minStorageBufferOffsetAlignment =
              supportedLimits.minStorageBufferOffsetAlignment < 16 ? 16 : supportedLimits.minStorageBufferOffsetAlignment,
@@ -1939,7 +4083,7 @@ index 592b8ab..5570baa 100644
      };
      Log.info(
          "Using limits:"
-@@ -882,12 +887,11 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
+@@ -882,12 +890,11 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
          "\n  maxTextureArrayLayers: {}"
          "\n  maxStorageBuffersPerShaderStage: {}"
          "\n  minUniformBufferOffsetAlignment: {}"
@@ -1954,7 +4098,7 @@ index 592b8ab..5570baa 100644
      std::vector<wgpu::FeatureName> requiredFeatures;
      g_hasCoreFeatures = false;
      g_bcTexturesSupported = false;
-@@ -898,16 +902,21 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
+@@ -898,16 +905,21 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
      for (size_t i = 0; i < supportedFeatures.featureCount; ++i) {
        const auto feature = supportedFeatures.features[i];
        if (feature == wgpu::FeatureName::CoreFeaturesAndLimits || feature == wgpu::FeatureName::TextureCompressionBC ||
@@ -1978,7 +4122,7 @@ index 592b8ab..5570baa 100644
          }
          requiredFeatures.push_back(feature);
        }
-@@ -1006,7 +1015,9 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
+@@ -1006,9 +1018,14 @@ bool initialize(AuroraBackend auroraBackend, bool allowCpu) {
      if (!g_device) {
        return false;
      }
@@ -1987,7 +4131,22 @@ index 592b8ab..5570baa 100644
 +#endif
    }
    g_queue = g_device.GetQueue();
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++  melee_web_provenance_device_begin();
++#endif
  
+   const wgpu::Status status = g_surface.GetCapabilities(g_adapter, &g_surfaceCapabilities);
+   if (status != wgpu::Status::Success) {
+@@ -1068,6 +1085,9 @@ void shutdown() {
+   g_queue = {};
+   g_surface = {};
+   g_device = {};
++#if defined(MELEE_WEB_PIPELINE_PROVENANCE)
++  melee_web_provenance_device_end();
++#endif
+   g_adapter = {};
+   g_instance = {};
+   cache_shutdown();
 diff --git a/lib/window.cpp b/lib/window.cpp
 index 2a4aadf..540854e 100644
 --- a/lib/window.cpp
@@ -2002,3 +4161,120 @@ index 2a4aadf..540854e 100644
  #include "time_internal.hpp"
  #include "dolphin/vi/vi_internal.hpp"
  
+diff --git a/tests/pipeline_prepare_state_test.cpp b/tests/pipeline_prepare_state_test.cpp
+new file mode 100644
+index 0000000..17fb09e
+--- /dev/null
++++ b/tests/pipeline_prepare_state_test.cpp
+@@ -0,0 +1,111 @@
++#include "../lib/gfx/pipeline_prepare_state.hpp"
++
++#include <cassert>
++#include <cstdint>
++#include <cstring>
++#include <vector>
++
++using aurora::gfx::selective::DescriptorIdentity;
++using aurora::gfx::selective::GateResult;
++using aurora::gfx::selective::MaxSeedDescriptors;
++using aurora::gfx::selective::PipelineSelection;
++using aurora::gfx::selective::RegistryInsertResult;
++using aurora::gfx::selective::RequestResult;
++using aurora::gfx::selective::SeedDescriptorRegistry;
++
++static AuroraPipelineDescriptor descriptor(uint32_t type, uint64_t ref, uint32_t version,
++                                           const DescriptorIdentity& identity) {
++  AuroraPipelineDescriptor result{
++      .type = type,
++      .pipeline_ref = ref,
++      .config_version = version,
++      .config_size = identity.configSize,
++      .sha256 = {},
++  };
++  std::memcpy(result.sha256, identity.sha256.data(), identity.sha256.size());
++  return result;
++}
++
++int main() {
++  const uint8_t abc[] = {'a', 'b', 'c'};
++  const auto digest = aurora::gfx::selective::sha256(abc, sizeof(abc));
++  const uint8_t expected[] = {
++      0xba, 0x78, 0x16, 0xbf, 0x8f, 0x01, 0xcf, 0xea, 0x41, 0x41, 0x40, 0xde, 0x5d, 0xae, 0x22, 0x23,
++      0xb0, 0x03, 0x61, 0xa3, 0x96, 0x17, 0x7a, 0x9c, 0xb4, 0x10, 0xff, 0x61, 0xf2, 0x00, 0x15, 0xad,
++  };
++  assert(std::memcmp(digest.data(), expected, sizeof(expected)) == 0);
++
++  SeedDescriptorRegistry registry;
++  const uint8_t firstBytes[] = {1, 2, 3, 4};
++  assert(registry.add_seed(AURORA_PIPELINE_SHADER_GX, 0x11, 7, 12, firstBytes, sizeof(firstBytes)) ==
++         RegistryInsertResult::Inserted);
++  const auto* first = registry.find({.type = AURORA_PIPELINE_SHADER_GX, .pipelineRef = 0x11, .configVersion = 7});
++  assert(first != nullptr);
++  assert(registry.contains(first->identity.key));
++  assert(!registry.contains({.type = AURORA_PIPELINE_SHADER_GX, .pipelineRef = 0x12, .configVersion = 7}));
++  const DescriptorIdentity firstIdentity = first->identity;
++  assert(registry.add_seed(AURORA_PIPELINE_SHADER_GX, 0x11, 7, 12, firstBytes, sizeof(firstBytes)) ==
++         RegistryInsertResult::Duplicate);
++
++  const uint8_t changedBytes[] = {1, 2, 3, 5};
++  assert(registry.add_seed(AURORA_PIPELINE_SHADER_GX, 0x11, 7, 12, changedBytes, sizeof(changedBytes)) ==
++         RegistryInsertResult::Conflict);
++  assert(registry.add_seed(AURORA_PIPELINE_SHADER_CLEAR, 0x11, 7, 12, firstBytes, sizeof(firstBytes)) ==
++         RegistryInsertResult::Inserted);
++  assert(!registry.global_refs_unique()); // Typed registry permits it; GPU map identity does not.
++
++  SeedDescriptorRegistry uniqueRefs;
++  assert(uniqueRefs.add_seed(AURORA_PIPELINE_SHADER_GX, 0x12, 7, 12, firstBytes, sizeof(firstBytes)) ==
++         RegistryInsertResult::Inserted);
++  assert(uniqueRefs.global_refs_unique());
++
++  const AuroraPipelineDescriptor firstDescriptor = descriptor(AURORA_PIPELINE_SHADER_GX, 0x11, 7, firstIdentity);
++  const AuroraPipelineDescriptor duplicateDescriptor = firstDescriptor;
++  PipelineSelection selection;
++  assert(selection.replace(&firstDescriptor, 1, registry) == RequestResult::Accepted);
++  assert(selection.size() == 1);
++  assert(selection.contains(firstIdentity.key));
++  assert(!selection.contains({.type = AURORA_PIPELINE_SHADER_GX, .pipelineRef = 0x12, .configVersion = 7}));
++
++  AuroraPipelineDescriptor requestWithDuplicate[] = {firstDescriptor, duplicateDescriptor};
++  assert(selection.replace(requestWithDuplicate, 2, registry) == RequestResult::Accepted);
++  assert(selection.size() == 1);
++
++  const uint8_t wrongSha[] = {0xff, 0xee, 0xdd, 0xcc};
++  AuroraPipelineDescriptor wrongDescriptor = firstDescriptor;
++  std::memcpy(wrongDescriptor.sha256, wrongSha, sizeof(wrongSha));
++  assert(selection.replace(&wrongDescriptor, 1, registry) == RequestResult::Unknown);
++  assert(selection.size() == 1); // Failed replacement is atomic.
++
++  const DescriptorIdentity exact = firstIdentity;
++  assert(registry.gate(exact, firstBytes, sizeof(firstBytes)) == GateResult::Allowed);
++  assert(registry.gate(exact, changedBytes, sizeof(changedBytes)) == GateResult::ByteMismatch);
++  DescriptorIdentity unknown = exact;
++  unknown.key.pipelineRef = 0x99;
++  assert(registry.gate(unknown, firstBytes, sizeof(firstBytes)) == GateResult::Unknown);
++
++  SeedDescriptorRegistry bounded;
++  const uint8_t oneByte[] = {0};
++  for (size_t i = 0; i < MaxSeedDescriptors; ++i) {
++    assert(bounded.add_seed(AURORA_PIPELINE_SHADER_GX, i, 7, 0, oneByte, sizeof(oneByte)) ==
++           RegistryInsertResult::Inserted);
++  }
++  assert(bounded.size() == MaxSeedDescriptors);
++  assert(bounded.add_seed(AURORA_PIPELINE_SHADER_GX, MaxSeedDescriptors, 7, 0, oneByte, sizeof(oneByte)) ==
++         RegistryInsertResult::Overflow);
++
++  SeedDescriptorRegistry byteBounded;
++  const std::vector<uint8_t> sixteenKiB(16u * 1024u, 0);
++  for (size_t i = 0; i < MaxSeedDescriptors; ++i) {
++    assert(byteBounded.add_seed(AURORA_PIPELINE_SHADER_GX, i, 8, 0, sixteenKiB.data(), sixteenKiB.size()) ==
++           RegistryInsertResult::Inserted);
++  }
++  assert(byteBounded.total_config_bytes() == aurora::gfx::selective::MaxRetainedConfigBytes);
++  assert(byteBounded.add_seed(AURORA_PIPELINE_SHADER_CLEAR, 0x1234, 8, 0, oneByte, sizeof(oneByte)) ==
++         RegistryInsertResult::Overflow);
++
++  registry.clear();
++  assert(registry.size() == 0);
++  assert(registry.find(exact) == nullptr);
++  return 0;
++}

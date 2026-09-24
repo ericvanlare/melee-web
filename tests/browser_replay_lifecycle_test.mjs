@@ -8,11 +8,31 @@ const pause=page.slice(page.indexOf("$('pause').onclick="),page.indexOf("\n$('un
 const completion=page.slice(page.indexOf('window.menuReplayCompleted='),page.indexOf('\nwindow.menuReplayPoll='));
 assert(start&&pause&&completion);
 {
+ // Construction can fail before menuReplayStarted publishes a baseline.
+ // Its exact error must finish the replay on the next callback, not after
+ // the 15-minute watchdog, and teardown must not run reentrantly in Wasm.
+ const failed=page.split('\n').find(line=>line.startsWith('developmentHooks.preparationFailed='));
+ const poll=page.slice(page.indexOf('window.menuReplayPoll='),page.indexOf("\n$('retail-replay-start').onclick="));
+ const ended=[],display={files:[{}],dataset:{}};
+ const scope={developmentHooks:{},window:{},retailRun:{},ready:true,fatal:false,bundle:true,
+  replayLoading:false,$:()=>display,finishRetailReplay:reason=>ended.push(reason)};
+ vm.createContext(scope);vm.runInContext(failed+'\n'+poll,scope);
+ scope.developmentHooks.preparationFailed('PlLk.dat: invalid descriptor');
+ assert.equal(ended.length,0,'Teardown is deferred until the next poll');
+ assert.equal(scope.preparationSince,0);
+ assert.equal(display.dataset.runtimeError,'PlLk.dat: invalid descriptor');
+ scope.window.menuReplayPoll();
+ assert.deepEqual(ended,['PlLk.dat: invalid descriptor']);
+ scope.retailRun.finishing=true;scope.window.menuReplayPoll();
+ assert.equal(ended.length,1,'A failing replay cannot start teardown twice');
+}
+{
  const shared=fs.readFileSync(new URL('../web/melee-runtime.mjs',import.meta.url),'utf8');
+ const cacheReader=shared.slice(shared.indexOf('  function readNativeCacheIdle() {'),shared.indexOf('  function clearStartupTimeout() {'));
  const unload=shared.slice(shared.indexOf('  async function unloadAndSave() {'),shared.indexOf('  async function put('));
- assert(unload.includes('Module._melee_web_native_menu_cache_idle()'));
+ assert(unload.includes('boundary(readNativeCacheIdle)'));
  const flush=page.slice(page.indexOf('window.menuCacheWritesFlushed='),page.indexOf('\n};',page.indexOf('window.menuCacheWritesFlushed='))+3);
- for(const finalState of [1,-1]){
+ for(const finalState of [1,-1,2]){
   const events=[],display={};let idleCalls=0;
   const scope={window:{},prepared:true,callbacks:{menuPreparationCanceled:()=>events.push('cancel')},performance,
    emit:(name,message)=>{assert.equal(name,'cacheWriteFailed');display.textContent=message;},
@@ -23,7 +43,13 @@ assert(start&&pause&&completion);
     _melee_web_native_menu_cache_idle:()=>{events.push('idle-check');return idleCalls++?finalState:0;},
     markRuntimeCacheDirty(){this.runtimeCacheState.dirty=true;events.push('dirty');},
     saveRuntimeCache:async()=>{events.push('save');return true;}}};
-  vm.createContext(scope);vm.runInContext(unload+'\n'+flush,scope);
+  vm.createContext(scope);vm.runInContext(cacheReader+'\n'+unload+'\n'+flush,scope);
+  if(finalState===2){
+   await assert.rejects(scope.unloadAndSave(),/Invalid native cache idle state: 2/);
+   assert.equal(events.includes('save'),false,'Invalid cache state must not publish a saved cache');
+   assert.equal(display.textContent,undefined,'Invalid state is not an optional persistence failure');
+   continue;
+  }
   scope.window.menuCacheWritesFlushed({ok:finalState===1,flushed:true});
   assert.equal(await scope.unloadAndSave(),true,'Optional cache failure cannot undo successful source teardown');
   assert.deepEqual(events.filter(x=>['unload','audio-stopped','idle-check','save'].includes(x)),
@@ -111,7 +137,8 @@ assert(start&&pause&&completion);
 }
 {
  const logHook=page.slice(page.indexOf('    onLog(text,isError){'),page.indexOf('    onEvent(name,data){'));
- const moduleLine='const hooks={'+logHook+'}; var Module={print:text=>hooks.onLog(text,false),printErr:text=>hooks.onLog(text,true)};';
+ const replayLimits=page.match(/const RETAIL_REPLAY_(?:LEGACY_MAX_FRAMES|WHOLE_SESSION_MAX_FRAMES|STATE_RECORD_OVERHEAD|SESSION_RECORD_OVERHEAD|TIMER_RECORD_OVERHEAD|MAX_BYTES)[^;]*;/g).join('\n');
+ const moduleLine=replayLimits+'\nconst hooks={'+logHook+'}; var Module={print:text=>hooks.onLog(text,false),printErr:text=>hooks.onLog(text,true)};';
  const logged=[];
  const scope={$:()=>({}),retailRun:{observe:true,rows:[],timerRows:[]},
   log:text=>logged.push(text),stop(){}};
@@ -131,6 +158,17 @@ assert(start&&pause&&completion);
  scope.retailRun.observe=true;
  scope.retailRun.timerRows.length=36003;
  assert.throws(()=>scope.Module.printErr('TIMER_AUDIT '+timer),/record bound/);
+ scope.retailRun={observe:true,wholeSession:true,frames:46835,rows:[],timerRows:[]};
+ scope.retailRun.rows.length=108033;
+ scope.Module.print(state);
+ assert.equal(scope.retailRun.rows.length,108034,'v8 admits bounded per-span initialization records');
+ scope.retailRun.timerRows.length=108002;
+ scope.Module.printErr('TIMER_AUDIT '+timer);
+ assert.equal(scope.retailRun.timerRows.length,108003,'v8 timer capture keeps its three-budget record bound');
+ scope.retailRun.rows.length=108034;
+ assert.throws(()=>scope.Module.print(state),/record bound/);
+ scope.retailRun.timerRows.length=108003;
+ assert.throws(()=>scope.Module.printErr('TIMER_AUDIT '+timer),/record bound/);
 }
 {
  const memory=page.slice(page.indexOf('const replayMemorySnapshot='),page.indexOf('\nfunction replayMetrics('));
@@ -143,17 +181,18 @@ assert(start&&pause&&completion);
  assert.equal(vm.runInContext('replayMemorySnapshot().reason',scope),'unavailable');
  assert.equal(nativeCalls,1,'Optional diagnostics failure must not prevent replay evidence');
 }
-function harness(unload=true){
+function harness(unload=true,wholeSession=false){
  let resolveBytes;
  const pending=new Promise(resolve=>resolveBytes=resolve);
  const elements=new Map();
  const $=id=>{if(!elements.has(id))elements.set(id,{disabled:false,textContent:'',files:[],value:'performance',querySelectorAll:()=>[],replaceChildren(){},focus(){}});return elements.get(id);};
  $('retail-replay-file').files=[{size:1194,arrayBuffer:()=>pending}];
- const calls={native:0,unload:0,audio:0,paused:0,timingResets:0,failed:[]};
+ const calls={native:0,unload:0,audio:0,paused:0,timingResets:0,failed:[],launch:0};
  const scope={$,retailRun:null,replayLoading:false,ready:true,fatal:false,bundle:true,importing:false,
   replayEvidence:[],uiMessage:'',inputDirty:false,clearRenderCacheOnLoad:false,
   window:{},setTimeout:fn=>fn(),
-  TextEncoder,Uint8Array,URL,performance,replayHash:async()=> 'a'.repeat(64),
+  owner:{handle:{getState:()=>({state:'prepared'})}},
+  TextEncoder,Uint8Array,DataView,URL,performance,replayHash:async()=> 'a'.repeat(64),
   replayMemorySnapshot:()=>({wasm_heap_bytes:2048}),
   status:()=> 'teardown failed',unloadAndSave:async()=>{calls.unload++;return unload;},
   resetTiming:()=>{calls.timingResets++;},prepareAudio:async()=>{calls.audio++;},pauseAudioForPreparation:async()=>{},
@@ -162,9 +201,12 @@ function harness(unload=true){
   finishRetailReplay:async reason=>{calls.failed.push(reason);calls.completedRun=scope.retailRun;scope.retailRun=null;},
   Module:{HEAPU8:new Uint8Array(2048),_malloc:()=>1,_free(){},
    _melee_web_native_menu_replay:()=>{calls.native++;return 1;},
+   _melee_web_native_menu_replay_whole_session:()=>wholeSession?1:0,
+   _melee_web_native_menu_launch:()=>{calls.launch++;return 1;},
    _melee_web_native_menu_running:()=>1,
    _melee_web_native_menu_pause:()=>{calls.paused++;}}};
- vm.createContext(scope);vm.runInContext(start+'\n'+pause,scope);
+ const replayLimits=page.match(/const RETAIL_REPLAY_(?:LEGACY_MAX_FRAMES|WHOLE_SESSION_MAX_FRAMES|STATE_RECORD_OVERHEAD|SESSION_RECORD_OVERHEAD|TIMER_RECORD_OVERHEAD|MAX_BYTES)[^;]*;/g).join('\n');
+ vm.createContext(scope);vm.runInContext(replayLimits+'\n'+start+'\n'+pause,scope);
  return {$,scope,calls,resolveBytes,play:()=>$('retail-replay-start').onclick()};
 }
 {
@@ -187,7 +229,8 @@ function harness(unload=true){
 }
 {
  const h=harness();const first=h.play();const duplicate=h.play();
- assert.equal(h.scope.replayLoading,true);assert.equal(h.$('disc').disabled,true);
+ assert.equal(h.scope.replayLoading,true,'replayLoading is set before the first async read');
+ assert.equal(h.$('disc').disabled,true,'disc import is disabled during replay loading');
  h.resolveBytes(new ArrayBuffer(1194));await Promise.all([first,duplicate]);
  assert.equal(h.calls.unload,1);assert.equal(h.calls.native,1);assert.equal(h.scope.replayLoading,false);
  await h.play();assert.equal(h.calls.native,1,'An active replay cannot be replaced');
@@ -197,6 +240,31 @@ function harness(unload=true){
  assert.equal(h.calls.native,0);assert.equal(h.calls.audio,0);
  assert.equal(h.$('retail-replay-report').textContent,'teardown failed');
  assert.equal(h.scope.replayLoading,false);assert.equal(h.$('disc').disabled,false);
+}
+{
+ const h=harness(true,true);const playing=h.play();
+ const bytes=new ArrayBuffer(1194),header=new DataView(bytes);
+ header.setUint32(0,0x4d575243,false);header.setUint32(4,8,false);
+ h.resolveBytes(bytes);await playing;
+ assert.equal(h.calls.unload,0,'Whole-session replay retains the canonical prepared CSS assets');
+ assert.equal(h.calls.native,1);
+ assert.equal(h.calls.launch,1,'A whole-session recipe enters CSS through the ordinary launch');
+}
+{
+ const h=harness(true,true);
+ h.scope.owner.handle.getState=()=>({state:'match'});
+ const playing=h.play(),bytes=new ArrayBuffer(1194),header=new DataView(bytes);
+ header.setUint32(0,0x4d575243,false);header.setUint32(4,8,false);
+ h.resolveBytes(bytes);await playing;
+ assert.equal(h.calls.unload,0,'A rejected late upload must preserve the active match');
+ assert.equal(h.calls.native,0);assert.equal(h.calls.launch,0);
+ assert.equal(h.calls.failed.length,0,'No replay owner exists to tear down');
+ assert.match(h.$('retail-replay-report').textContent,/freshly imported disc/);
+}
+{
+ const h=harness();const playing=h.play();h.resolveBytes(new ArrayBuffer(1194));await playing;
+ assert.equal(h.calls.native,1);
+ assert.equal(h.calls.launch,0,'A single-match recipe keeps its direct match construction');
 }
 {
  const h=harness();h.scope.retailRun={observe:false};await h.$('pause').onclick();

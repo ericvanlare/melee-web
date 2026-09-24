@@ -13,6 +13,10 @@
 typedef struct NativeArticle {
     Article article;
     uint32_t magic, unresolved;
+    /* Registration roots retain a source model-descriptor presence bit even
+     * before publication.  A null x0_joint is legal only inside that
+     * descriptor; it must not turn an absent x10_modelDesc into a model. */
+    uint8_t model_desc_present;
     /* The source ItemStateArray is a variable-length descriptor tail in the
      * gameplay build. Keep the count beside the pointer so any source bridge
      * that indexes the tail can check its bound. */
@@ -67,8 +71,10 @@ void* melee_web_article_decode(const MeleeWebNativeDat* r,uint32_t root,uint32_t
         REGION(at,8); int count=(int)WORD(at); REQUIRE(count>=0 && count<=100,"Article dynamics count invalid");
         if(!count) { out->article.x14_dynamics=NEW(ItemDynamics,1); out->unresolved&=~(1U<<5); }
     }
-    /* Item creation unconditionally reaches modelDesc; a source null cannot
-     * accidentally turn a registration-only root into a creation-ready one. */
+    /* Item creation unconditionally reaches modelDesc. Preserve the source
+     * descriptor-presence fact so a legal null x0_joint cannot accidentally
+     * turn a registration-only root into a creation-ready one. */
+    out->model_desc_present = PTR(root+16,16) != UINT32_MAX;
     out->unresolved|=1U<<4;
     *unresolved=out->unresolved; return &out->article;
 }
@@ -84,19 +90,31 @@ void melee_web_article_require_ready(const void* article)
 }
 
 int melee_web_article_publish(const MeleeWebNativeDat* r,void* article,void* special,
-    const MeleeWebItemStateDesc* states,uint32_t count,void* joint,uint32_t bones,int32_t attach,uint8_t flags,char* error,size_t size)
+    const MeleeWebItemStateDesc* states,uint32_t count,void* joint,uint32_t bones,int32_t attach,uint8_t flags,
+    int joint_optional,char* error,size_t size)
 {
     NativeArticle* a=article;
-    if(!r||!a||a->magic!=ARTICLE_MAGIC||!special||!states||!count||count>64||!joint||
+    if(!r||!a||a->magic!=ARTICLE_MAGIC||(count&&!states)||(!count&&states)||count>64||
+       (joint_optional!=0&&joint_optional!=1)||(!joint&&!joint_optional)||
+       (joint_optional&&(joint||bones!=0||attach!=0))||!a->model_desc_present||
        bones>140||(a->unresolved&~((1U<<1)|(1U<<3)|(1U<<4)))){
         if(error&&size)snprintf(error,size,"Item graph publication requires checked registration root and complete fields");return 0;
+    }
+    if(joint_optional) {
+        for(uint32_t i=0;i<count;i++) {
+            if(states[i].animation||states[i].material||states[i].shape) {
+                if(error&&size)snprintf(error,size,"Null item model cannot publish animation, material or shape state data");
+                return 0;
+            }
+        }
     }
     /* ItemStateArray historically declared eight inline entries, but the
      * original Fox/Falco blaster roots carry a ninth, null descriptor. The
      * gameplay source patch makes this field a flexible tail; allocate the
      * exact number of source rows rather than indexing a fixed C array. */
-    struct ItemStateDesc* native_states=(struct ItemStateDesc*)r->allocate(
-        r->context,count,sizeof(struct ItemStateDesc));
+    // An all--1 source ItemStateTable (Hookshot) has no animation table.
+    struct ItemStateDesc* native_states=count?(struct ItemStateDesc*)r->allocate(
+        r->context,count,sizeof(struct ItemStateDesc)):NULL;
     ItemModelDesc* model=NEW(ItemModelDesc,1);
     for(uint32_t i=0;i<count;i++){
         native_states[i]=(struct ItemStateDesc){states[i].animation,states[i].material,states[i].shape,states[i].commands};

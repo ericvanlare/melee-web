@@ -18,7 +18,7 @@
 typedef struct NativeLight { HSD_LightDesc desc; HSD_WObjDesc position, interest; float shininess; LightList list; uint8_t override_ready, override_found, override_flags; } NativeLight;
 struct MeleeWebStageLights {
     NativeLight* lights; LightList** list; LightList** saved;
-    HSD_GObj* owner; uint32_t count; uint64_t generation; int attached;
+    HSD_GObj* owner; uint32_t count; uint64_t generation; int attached, loaded;
 };
 static MeleeWebStageLights* published;
 static int fail(char* e,size_t n,const char* s){if(e&&n)snprintf(e,n,"%s",s);return 0;}
@@ -52,9 +52,19 @@ MeleeWebStageLights* melee_web_stage_lights_create(const MeleeWebStageLightDesc*
     ok(e,n);return h;
 }
 int melee_web_stage_lights_set_override(MeleeWebStageLights* h,uint32_t index,int found,uint8_t flags,char* e,size_t n) {
-    if(!h||h->attached||index>=h->count||(found!=0&&found!=1)||(flags&~0xe0)||(!found&&flags))
+    if(!h||h->attached||h->loaded||index>=h->count||(found!=0&&found!=1)||(flags&~0xe0)||(!found&&flags))
         return fail(e,n,"Invalid or already published stage light override");
     NativeLight* l=&h->lights[index];l->override_ready=1;l->override_found=found;l->override_flags=flags;
+    return ok(e,n);
+}
+int melee_web_stage_lights_set_animations(MeleeWebStageLights* h,uint32_t index,
+                                          void* checked_table,char* e,size_t n) {
+    if(!h||h->attached||h->loaded||index>=h->count||!checked_table)
+        return fail(e,n,"Invalid or already published stage light animation table");
+    NativeLight* l=&h->lights[index];
+    if(l->list.anims)
+        return fail(e,n,"Stage light animation table was already attached");
+    l->list.anims=(HSD_LightAnim**)checked_table;
     return ok(e,n);
 }
 int melee_web_stage_lights_lookup_override(void* descriptor,int* found,uint8_t* flags) {
@@ -72,13 +82,13 @@ int melee_web_stage_lights_lookup_override(void* descriptor,int* found,uint8_t* 
 }
 void* melee_web_stage_lights_descriptors(MeleeWebStageLights* h){return h?h->list:NULL;}
 int melee_web_stage_lights_load(MeleeWebStageLights* h,char* e,size_t n){
-    if(!h||h->owner)return fail(e,n,"Stage lights missing or already loaded");
+    if(!h||h->owner||h->loaded)return fail(e,n,"Stage lights missing or already loaded");
     if(!melee_web_native_world_enable(e,n))return 0;
     HSD_GObj* owner=GObj_Create(12,3,0);
     if(!owner)return fail(e,n,"Cannot allocate stage light GObj");
     HSD_LObj* l=lb_80011AC4(h->list);
     if(!l){HSD_GObjPLink_80390228(owner);return fail(e,n,"Original light loader returned no lights");}
-    h->owner=owner;h->generation=melee_web_gameplay_stats().generation;
+    h->owner=owner;h->generation=melee_web_gameplay_stats().generation;h->loaded=1;
     HSD_GObjObject_80390A70(owner,HSD_GObj_LightKind,l);GObj_InitUserData(owner,0,removed,h);
     return ok(e,n);
 }

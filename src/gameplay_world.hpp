@@ -1,16 +1,28 @@
 #pragma once
 #include "gameplay_collision.h"
+#include "dat_menu_support.hpp"
 #include <array>
 #include <map>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 #include <cstdint>
 
 struct StartMeleeData;
 namespace melee_web {
 using RuntimeFiles = std::map<std::string, std::vector<uint8_t>, std::less<>>;
+// Source lbFileGetFullName treats a trailing-dot basename as a language
+// selector. This bridge applies its setting/saved-language rules and then
+// requires the selected archive to exist; it never changes source identity
+// by selecting another available locale.
+[[nodiscard]] std::string_view melee_web_runtime_file_name(
+    const RuntimeFiles&, std::string_view authored_name,
+    DatMenuSupportLanguage setting_language = DatMenuSupportLanguage::English,
+    DatMenuSupportLanguage saved_language = DatMenuSupportLanguage::English);
 class RuntimeArchiveCache;
+class DatArchive;
+enum class GameplayWorldPurpose { Match, Results };
 enum class GameplayWorldConstruction { Immediate, Deferred };
 // Original FTKind and GrKind values, never CSS/SSS grid indices. Defaults keep
 // existing Mario/FD probes scoped to their original fixture.
@@ -19,6 +31,7 @@ struct GameplayWorldSelection {
     std::array<unsigned,4> fighter_kinds{0,0,0,0};
     std::array<unsigned,4> costume_indices{0,0,0,0};
     int ground_kind=37;
+    GameplayWorldPurpose purpose=GameplayWorldPurpose::Match;
 };
 // Shared by the browser and source regression harness. Owns one original SDK
 // world and its assets. Match/render contexts must close before this owner.
@@ -38,6 +51,8 @@ public:
     void enable_full_stage(bool defer_start = false);
     void end_stage();
     void initialize_match(const StartMeleeData&);
+    void install_result_demo(unsigned fighter_kind, std::shared_ptr<const DatArchive>);
+    void verify_result_source_loads() const;
     MeleeWebCollision* collision() const;
     float floor_height(float x) const;
     std::array<float, 3> player_spawn(unsigned slot) const;

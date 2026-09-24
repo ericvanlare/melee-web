@@ -11,9 +11,12 @@ from check_gameplay import node_runtime
 class EffectContextTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.target=ROOT/"build/browser/gameplay_effect_banks_trace.js"
-        if not cls.target.is_file() or not (ROOT/".deps/emsdk/.emscripten").is_file():
+        targets=[ROOT/"build"/directory/"gameplay_effect_banks_trace.js"
+                 for directory in ("browser","browser-release")]
+        targets=[path for path in targets if path.is_file()]
+        if not targets or not (ROOT/".deps/emsdk/.emscripten").is_file():
             raise unittest.SkipTest("Effect trace unavailable; build gameplay_effect_banks_trace first")
+        cls.target=max(targets,key=lambda path:path.stat().st_mtime)
         cls.node=node_runtime()
 
     def run_trace(self,*args):
@@ -23,7 +26,9 @@ class EffectContextTests(unittest.TestCase):
         return result.stdout
 
     def test_authored_bank_bounds_lifetimes_and_restart(self):
-        self.assertIn("Original particle bank ownership, bounds, readiness and restoration passed",self.run_trace())
+        output=self.run_trace()
+        self.assertIn("Original particle bank ownership, bounds, readiness and restoration passed",output)
+        self.assertIn("Original particle palette low-byte format and complete source word passed",output)
 
     def test_local_common_descriptors_and_original_spline_path(self):
         asset=ROOT/"assets-local/next-gate/EfCoData.dat"
@@ -34,7 +39,20 @@ class EffectContextTests(unittest.TestCase):
         asset=ROOT/"assets-local/next-gate/EfMrData.dat"
         if not asset.is_file():
             self.skipTest("Local EfMrData.dat unavailable; proprietary assets are optional")
-        self.assertIn("two native models and animation graphs; original LoadSync/evaluation/restart passed",self.run_trace(asset))
+        self.assertIn("2 native model entries and animation graphs; original LoadSync/evaluation/restart passed",self.run_trace(asset))
+
+    def test_local_link_model_only_effects_and_native_animations(self):
+        asset=ROOT/"assets-local/link-verification/EfLkData.dat"
+        if not asset.is_file():
+            self.skipTest("Local EfLkData.dat unavailable; proprietary assets are optional")
+        self.assertIn("4 native model entries and animation graphs; original LoadSync/evaluation/restart passed",self.run_trace("--link",asset))
+
+    def test_local_pikachu_null_effect_row_and_original_restart(self):
+        asset=ROOT/"assets-local/full-game-pikachu/EfPkData.dat"
+        if not asset.is_file():
+            self.skipTest("Local EfPkData.dat unavailable; proprietary assets are optional")
+        self.assertIn("Pikachu bank7 six-entry model/null-row publication, animation, restart and detach passed",
+                      self.run_trace("--pikachu",asset))
 
 if __name__=="__main__":
     unittest.main()

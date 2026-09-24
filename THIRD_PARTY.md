@@ -2,12 +2,19 @@
 
 Dependencies are fetched separately and pinned in dependencies.lock.json.
 
-The public shell built by `scripts/build_public.py` ships none of the runtime
-components below. It contains only original HTML/CSS and a fullscreen script,
-uses device-provided system fonts and has no shipped package dependencies.
-Its public notices are in `web/public/notices.html`. This exclusion is not
-clearance for distributing a future playable build; see
-[the release review](docs/PUBLIC_RELEASE_REVIEW.md).
+The public player has separate silent and audio-enabled package identities;
+the optional maintenance shell has no runtime. See the exact artifact boundaries
+in [the release review](docs/PUBLIC_RELEASE_REVIEW.md) and
+[production audio](docs/AUDIO_PRODUCTION.md). The separate Dolphin reference
+application is outside either browser package.
+
+Repository publication also exposes tracked source, patches, generated material
+and history. The [first-pass source/license inventory](docs/SOURCE_LICENSE_INVENTORY.md)
+maps those boundaries. The root [license](LICENSE) now grants MIT only for the
+explicit [project-file scope](LICENSE_SCOPE.md). The
+[publication assessment](docs/PUBLICATION_PROVENANCE_ASSESSMENT.md) records the
+owner's choice to proceed on an internal review and accepted risk; it supplies
+no third-party permission.
 
 | Source | Role | License/notice |
 | --- | --- | --- |
@@ -20,23 +27,34 @@ clearance for distributing a future playable build; see
 Aurora fetches further dependencies (SDL, Dawn bindings, Abseil, fmt, ImGui,
 texture/image libraries, SQLite and Tracy). Their source notices remain with each
 download. License attribution for a distributable bundle must be assembled from the
-actual dependency graph before a playable public release. None is included in
-the independent public shell.
+actual dependency graph before a playable public release. The maintenance shell includes none of those runtime components.
 
 No Nintendo disc images, extracted assets, audio, textures or game executables
 are tracked. This repository does not grant rights to upstream code or game data.
 
-## Free DSP coefficient generator
+## Audio implementation and separate Dolphin reference tools
 
-`web/dsp-coefficients.mjs` adapts Dolphin’s free replacement coefficient
-generator at revision `a2efdf1197be8132674b90fe9cf4761df39752ed`:
-https://github.com/dolphin-emu/dolphin/blob/a2efdf1197be8132674b90fe9cf4761df39752ed/docs/DSP/free_dsp_rom/generate_coefs.py
+The current `src/gameplay_audio_resample.c/.h` and `web/dsp-coefficients.mjs`
+are replacement implementations. Their specifications, numerical compatibility
+evidence and limitations are recorded in
+[the audio replacement record](docs/AUDIO_REPLACEMENT_EVIDENCE.md).
+The coefficient generator preserves the existing approximation byte for byte,
+including numerical compatibility values from Dolphin's replacement DROM; this
+does not make the table original hardware data or close its provenance review.
+No generated coefficient binary is tracked. Current audio and coefficient data
+are excluded from the narrow root MIT grant; their provenance risk remains
+disclosed under the owner's repository-publication decision.
 
-Retain GPL-2.0-or-later attribution and upstream notices. The generated 4096-byte
-replacement is checked against SHA-256
-`d7741279c2e8ec5c5fb318f8fbdd6de6bf583520d288e836a5383233a4238179`.
-It is not a Nintendo hardware ROM dump and is only approximately equivalent.
-The source generator is included; no generated coefficient binary is tracked.
+Earlier versions of those source files adapted Dolphin revision
+`a2efdf1197be8132674b90fe9cf4761df39752ed`, under GPL-2.0-or-later.
+Their history and previously built artifacts retain that provenance and any
+applicable obligations. The [GPL text](docs/licenses/dolphin-gpl-2.0-or-later.txt)
+and historical release inventory remain available.
+
+The reference observer remains in `reference-capture/dolphin/`, with its
+[license inventory](reference-capture/dolphin/LICENSES.md), source notices and
+Dolphin patches intact. It builds a separate reference application; it is not
+linked into the browser player. Replacing player audio does not relicense it.
 
 ## B0XX-style keyboard mapping
 
@@ -47,16 +65,45 @@ The MIT notice is retained in [licenses/b0xx-ahk.txt](licenses/b0xx-ahk.txt).
 The default key positions come from the same project's `hotkeys.ini`.
 See [keyboard behavior and scope](docs/KEYBOARD_LAYOUTS.md).
 
+## Additional tracked-source origins
+
+`src/gameplay_fres.h` attributes its reciprocal-estimate table and integer steps
+to Andrew Church's `calc_fres` hardware test at
+[ppc750cl.s](https://achurch.org/cpu-tests/ppc750cl.s), described by the source
+header as public domain. The follow-up retrieved the primary source at SHA-256
+`9d15ef92ca0470a99bac72661f74a6f12e035bcd96a85819c761b5852ad097be`
+and verified its statement that no copyright is claimed. See the
+[assessment](docs/PUBLICATION_PROVENANCE_ASSESSMENT.md#andrew-church-reciprocal-estimate).
+This origin is separate from Aurora, Dolphin and Melee; no CC0 or MIT dedication
+is inferred from that source statement.
+
+The player audio replacement covers the resampler and coefficient generator.
+Other native files retain original-source translations: for example,
+`src/gameplay_audio_reverb.c` translates the original AXFX `HandleReverb`, and
+`src/gameplay_ps_math.c` preserves original paired-single instruction arithmetic.
+Original implementation includes, generated schemas and source-derived tables
+are listed in the [source/license inventory](docs/SOURCE_LICENSE_INVENTORY.md).
+Do not infer that all native code or audio is newly independent because those
+two audio implementations were replaced.
+
+The standalone `reference-capture/controller-probe/` target imports SDL3 and
+libusb static archives from the pinned reference build. The pinned Dolphin
+submodules identify SDL `5848e584a1b606de26e3dbd1c7e4ecbc34f807a6` (permissive
+SDL notice) and libusb `15a7ebb4d426c5ce196684347d2b7cafad862626`
+(LGPL-2.1-or-later). Their exact notice sources and remaining source/manifest
+correspondence work are recorded in the [inventory](docs/SOURCE_LICENSE_INVENTORY.md).
+The [SDL notice](docs/licenses/controller-probe-sdl-zlib.txt) and
+[libusb LGPL text](docs/licenses/controller-probe-libusb-lgpl-2.1-or-later.txt)
+are retained separately from the browser notices. Keep the probe binary local
+until its source identity and applicable relink/source delivery are verified.
+The browser runtime inventory does not establish that native probe binary's
+distribution requirements.
+
 ## Additional development-runtime release findings
 
-The September 2026 launch audit inspected the pinned source trees and build
-configuration. The following are **not shipped in the public shell**:
+The September 2026 launch audit identified the audio adaptations described
+above. The following upstream findings still apply:
 
-- `src/gameplay_audio_resample.c/.h` adapts Dolphin Emulator audio code and
-  retains GPL-2.0-or-later notices; see `src/gameplay_audio_provenance.md` and
-  [Dolphin's pinned source](https://github.com/dolphin-emu/dolphin/tree/a2efdf1197be8132674b90fe9cf4761df39752ed).
-  The combined runtime's corresponding-source and license obligations remain
-  a release review item, separate from Nintendo rights.
 - `cmake/FighterRuntime.cmake` also compiles recovered original platform code
   from Melee's `extern/dolphin`: `AXAlloc.c`, `AXVPB.c`, `AXCL.c`, `AXAux.c`,
   `axfx.c`, `delay.c` and `reverb_std.c`. That directory name refers to the
@@ -89,4 +136,5 @@ notices. Its `emdawnwebgpu` port pins package `v20260423.175430` and a SHA-512 i
 `tools/ports/emdawnwebgpu.py`; its declared notices include BSD-3-Clause and
 Emscripten MIT/NCSA. Preserve that port's actual notices in any future distribution.
 CMake/Ninja and Slippi JS are build/reference tools, not public-shell assets.
-No root license is chosen here and no recovered or upstream code is relicensed.
+The root license is limited to its allowlist; no recovered or upstream code is
+relicensed by the project.

@@ -1,0 +1,1952 @@
+{
+  "schema": "melee-web-full-game-checkpoint-validation",
+  "version": 1,
+  "source_base_commit": "16e4eb4707328a6fd6b5002b25a9a38ab81860d4",
+  "scope": "Sixteen development fighters and seven stages. Bowser Final Destination native and drawn action-window evidence only. No whole-game, independent Bowser original-equivalence, pixel, PCM, physical-controller or deployment admission. Donkey Battlefield shield-drop remains broken.",
+  "automated_suite": {
+    "local_path": "work/full-game/koopa-suite-v1.log",
+    "sha256": "072e916e2f8132f7441d633ff9b13d00c8aa05cdbd8874572266ff3fd0e654e2",
+    "command": "python3 -m unittest discover -s tests -v",
+    "tests": 1083,
+    "seconds": 357.995,
+    "result": "pass",
+    "skips": 41,
+    "skip_reasons": {
+      "Bootstrap Aurora and a C++20 compiler for independent DSP comparison": 2,
+      "Build fighter targets before the typed support check": 1,
+      "Original stage trace target unavailable": 2,
+      "Build dat_scene_trace before the typed scene check": 1,
+      "Owned stage selection archive and pinned SDK required": 1,
+      "Build gameplay_audio_trace and provide local SSM/SEM/DSP coefficient fixtures": 2,
+      "Build fighter/audio stream target and supply optional owned HPS/SSM/SEM/coefficient inputs": 1,
+      "Build fighter targets before running the focused bonus_data trace": 1,
+      "Project SDK and Aurora build dependencies unavailable; run bootstrap/build": 4,
+      "Optional built combat trace and owned runtime assets required": 1,
+      "Common context trace unavailable; build gameplay first": 1,
+      "Owned menu, Fox/Falco and stage fixtures are required": 1,
+      "Owned Dr. Mario/Roy and stage fixtures are required": 1,
+      "Project SDK/Aurora build dependencies unavailable; run bootstrap/build": 1,
+      "Built stock trace and owned Mario costume archives required": 1,
+      "Built original player context trace required": 1,
+      "Optional built source trace and owned runtime assets required": 2,
+      "Optional built full-stage edge trace and owned runtime assets required": 2,
+      "Optional built timer trace and owned runtime assets required": 1,
+      "Build gameplay_music_profile_trace and provide owned menu/game assets": 1,
+      "Build fighter targets before the original SIS consumer check": 1,
+      "Original CSS target and owned local fixtures are required": 1,
+      "Build the native menu host and supply owned menu/game fixtures": 1,
+      "Build gameplay_rumble_trace and provide owned LbRb.dat": 1,
+      "Build fighter targets before running the focused stage_numeric trace": 1,
+      "Native HSD targets unavailable; run scripts/build.py --target gameplay": 1,
+      "Build the native_audio_banks fighter target first": 1,
+      "Build gameplay_pad_state_trace": 1,
+      "compiled private provenance fixture not supplied": 1,
+      "Optional pinned Dolphin source checkout is not installed": 2,
+      "pinned slippi-js fixtures are not checked out": 2
+    }
+  },
+  "machine": {
+    "hardware": "Apple M4",
+    "os": "macOS 26.6.2 (25G83)",
+    "browser": "153.0.8010.50",
+    "canvas_backing_pixels": [
+      640,
+      480
+    ],
+    "device_pixel_ratio": 1,
+    "development_audio": true,
+    "application_cache": "Cold origin reset, source world teardown and persistence, then complete warm application reload",
+    "driver_cache": "uncontrolled"
+  },
+  "browser_build": {
+    "local_path": "work/full-game/koopa-browser-build-v2/prototype-build.json",
+    "sha256": "453b0b33ad6fc46b7ace3c589bc8866ad0ca90b299fcde4c8f4fa382cf01ebab",
+    "artifacts": {
+      "gameplay_menu_browser.js": "9302f74acaee9d2fb1a5a80117465b5d620f517d4e5a23b1173173fa4638da76",
+      "gameplay_menu_browser.wasm": "40c5345e2025875800469b8a9cf60aa5bcdccf1683fcd218aa20f858b1207443",
+      "gameplay_menu_browser.data": "8df6a998cef19b88a3eff0ee61f666e42791f5f73841818961aa3b224cad2c4b",
+      "runtime.html": "7dbdba45a72835799f02df323ce93e762ed3ad9d8941522ebe4d550913460172",
+      "runtime-development.mjs": "1833a302d0e97976946d1880687cd79b3e9f23ecebafd2af08ca76b932a14b90",
+      "melee-runtime.mjs": "f5ad8fe145e60482099eef2baa9865b797d8f6047777794cf6f83eaed37968a4",
+      "controller-input.mjs": "3388c3784717bea4b582a8fa66100880cbbcf4a0adb767c000e0a9cc779c31c8",
+      "controller-panel.mjs": "5b57eb0e4a3c68955e95d62ebe6e6d1187706a486c6b1627b2248eeec1550c95",
+      "controller-panel.css": "289ca851412aca5b7def53dc002e8b3a897f7524e37d7b2ba2065822e7b3c16e",
+      "controller-settings.mjs": "3679207e488927e1cbd30386123bc80f26b565bb84f29916506ab72074dbd4a2",
+      "controller-settings.css": "3ac5ef6bea09babcc557f49b109fd76194a0d6ee2f5195bc731d5e8b446fcf2f",
+      "prototype-keyboard-layouts.mjs": "88dbd2c00873bad67cee89b9094bf735e0be3dc89bb2dcd95ac14de2abc30745",
+      "runtime-cache.js": "09a76eed7352558ee64082a5c29e828c43444265e2974ba5fc0dc5aa7c6f3a26",
+      "audio-worklet.js": "ef4374ac08f5bab821efa05cf5d252ca8e4b50647710d434e192beac3d7d7b4f",
+      "audio-ring.mjs": "34321c93e9ff8642e227fe142536ef316f6622529033c0d386a5315d9c433faf",
+      "disc-image.mjs": "0ac86f2c5fa11a9e164f1e2d2a6eb2c7f083dcb799b158cb16de3081315fa90a",
+      "dsp-coefficients.mjs": "5176d1cf4400228f31dff428bcc8cd60d07694c0ceea1628a79ac19f3e112b4a",
+      "runtime-assets.mjs": "913efb97c896c2bbd3741aba72fd7c6b889ba732e8f3dee31c42042eb66d6e55",
+      "runtime-audio-assets.mjs": "b9bfd3f841d73e4ee4987fc5ac7351832c4ae8eca48ba5cf9c95578a238c7dbc",
+      "runtime-audio.mjs": "d968d2b2f9b58d2ab5dc1a4720d2ad2114cfbcac44a888694da7850100546545",
+      "match-flow.mjs": "71be0f720243bc83ce4c7ebd8e903dfffb802325fd589701ac4a592f4b6cab2f",
+      "match-menu.mjs": "ab17af8b04ac28a57f490e7f86fe5e3c45936c0147c3fa02e00eb91e11efd1ba",
+      "action-sweep.mjs": "1109eed5b5e481be9230198f479c040b6ff34fe599214ad6014dffbc3709c63a",
+      "hitch-capture.mjs": "ed0c673ac92f24623baf17c6ba3a654458c7edc287674bf317c9a432a24456a3"
+    }
+  },
+  "release_builds": [
+    {
+      "local_path": "work/full-game/koopa-browser-build-v3.log",
+      "sha256": "726fd2e8e8fb9d7b2ab7d9cc1bd0eec0d83fc4ed97012bbae19efe2a7da6191b",
+      "kind": "development",
+      "result": "pass",
+      "artifacts": [
+        {
+          "local_path": "build/browser-release/gameplay_menu_browser.js",
+          "sha256": "9302f74acaee9d2fb1a5a80117465b5d620f517d4e5a23b1173173fa4638da76",
+          "bytes": 285316
+        },
+        {
+          "local_path": "build/browser-release/gameplay_menu_browser.wasm",
+          "sha256": "40c5345e2025875800469b8a9cf60aa5bcdccf1683fcd218aa20f858b1207443",
+          "bytes": 13138661
+        },
+        {
+          "local_path": "build/browser-release/gameplay_menu_browser.data",
+          "sha256": "8df6a998cef19b88a3eff0ee61f666e42791f5f73841818961aa3b224cad2c4b",
+          "bytes": 3518464
+        }
+      ]
+    },
+    {
+      "local_path": "work/full-game/koopa-public-build-v1.log",
+      "sha256": "d0fefaa27531024c866db61fb615c99c8652c3d8f48ca0030f52a74a9efb5540",
+      "kind": "public",
+      "result": "pass",
+      "artifacts": [
+        {
+          "local_path": "build/browser-public-release/gameplay_public.js",
+          "sha256": "2d31e3c8c4909b52248a05c24951aae39b0dfdce0e17f93d37e8ceec61ef0f54",
+          "bytes": 283268
+        },
+        {
+          "local_path": "build/browser-public-release/gameplay_public.wasm",
+          "sha256": "17bb9740d341d849badcabbab5ea6050af6eaea9fe8f191be73e76d35e38776a",
+          "bytes": 12393598
+        },
+        {
+          "local_path": "build/browser-public-release/gameplay_public.data",
+          "sha256": "8df6a998cef19b88a3eff0ee61f666e42791f5f73841818961aa3b224cad2c4b",
+          "bytes": 3518464
+        }
+      ]
+    }
+  ],
+  "native_scope": {
+    "forward": "work/full-game/koopa-native-moves-v4.log",
+    "reverse": "work/full-game/koopa-native-reverse-v1.log",
+    "costumes": 4,
+    "forward_first_lifetime": [
+      "ground Flame damage and teardown",
+      "air Flame spawn followed by original landing/ground End and teardown",
+      "ground and air Fortress",
+      "ground and air Bomb descent/landing",
+      "ground capture/wait/forward throw",
+      "air capture/back throw"
+    ],
+    "remaining": [
+      "air Flame End without landing",
+      "every catch/pummel/throw variant",
+      "all-costume move matrix",
+      "all-stage interactions",
+      "independent original comparisons"
+    ],
+    "scope": "Both player orders and all four Bowser costumes; five lifetimes cover Mario costumes. First forward lifetime checks listed special branches. Reverse drives Mario combat against Bowser. Ready/pause/NoContest/reconstruction/teardown pass. No original Bowser comparison."
+  },
+  "native_evidence": [
+    {
+      "local_path": "work/full-game/koopa-portable-v1.log",
+      "sha256": "9338e8b47271e0cb13157e11c636af90f982b0a4fed0ee4d80b9615ab19cb21c"
+    },
+    {
+      "local_path": "work/full-game/koopa-native-data-v1.log",
+      "sha256": "cf7d9aaebfe68ae11b9c81b6ec809a5ef1ba7ad279582314a76a3c18c124ba94"
+    },
+    {
+      "local_path": "work/full-game/koopa-article-v1.log",
+      "sha256": "423d236d409b3ec54223762a5c28c352228dd0d55f7ebd736c7f0c3e07a999e6"
+    },
+    {
+      "local_path": "work/full-game/koopa-native-entry-v2.log",
+      "sha256": "9a8610e3b7ea236e1efa1ecab6c2ef336a46616a677ee456b20325f46c30f3dd"
+    },
+    {
+      "local_path": "work/full-game/koopa-native-moves-v4.log",
+      "sha256": "19a4e5bff58d98192d85c9b5b9fc63117f1467fd78df19a9649050124bd60c57"
+    },
+    {
+      "local_path": "work/full-game/koopa-native-reverse-v1.log",
+      "sha256": "2efddaedf61d6d418246849b41a7d8862fb50be990b128dcc20cd6c8f868c50b"
+    },
+    {
+      "local_path": "work/full-game/koopa-action-store-victim-v3.log",
+      "sha256": "35e76db1c9b26c797f6fcf9d42284d488eb2e5572adda4f69cf36f70895a345f"
+    },
+    {
+      "local_path": "work/full-game/koopa-manifest-v1.log",
+      "sha256": "9bfbd9fd0128510279cd58b9ea314bf3825e8d285b94176d86fe78b26e615fc1"
+    }
+  ],
+  "browser_checks": {
+    "bowser": {
+      "local_path": "work/full-game/koopa-browser-discovery-v2/report.json",
+      "sha256": "87b3c236a6b804926ec2ddd5bcbc69b9ef4d9c940d1a0285cea9d7994b7d0b81",
+      "result": "scoped_pair_pass",
+      "rounds": [
+        {
+          "round": "cold",
+          "pass": true,
+          "cases": [
+            {
+              "name": "walk left/right",
+              "pass": true,
+              "sourceMotions": [
+                18,
+                15,
+                14
+              ]
+            },
+            {
+              "name": "dash left/right",
+              "pass": true,
+              "sourceMotions": [
+                20,
+                14
+              ]
+            },
+            {
+              "name": "crouch",
+              "pass": true,
+              "sourceMotions": [
+                39,
+                40,
+                41,
+                14
+              ]
+            },
+            {
+              "name": "jab",
+              "pass": true,
+              "sourceMotions": [
+                44,
+                14
+              ]
+            },
+            {
+              "name": "forward tilt",
+              "pass": true,
+              "sourceMotions": [
+                15,
+                53,
+                14
+              ]
+            },
+            {
+              "name": "up tilt",
+              "pass": true,
+              "sourceMotions": [
+                14,
+                56
+              ]
+            },
+            {
+              "name": "down tilt",
+              "pass": true,
+              "sourceMotions": [
+                14,
+                57,
+                41
+              ]
+            },
+            {
+              "name": "forward smash",
+              "pass": true,
+              "sourceMotions": [
+                60,
+                14
+              ]
+            },
+            {
+              "name": "up smash",
+              "pass": true,
+              "sourceMotions": [
+                63,
+                14
+              ]
+            },
+            {
+              "name": "down smash",
+              "pass": true,
+              "sourceMotions": [
+                64,
+                14
+              ]
+            },
+            {
+              "name": "dash attack",
+              "pass": true,
+              "sourceMotions": [
+                20,
+                50,
+                14
+              ]
+            },
+            {
+              "name": "shield",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                179,
+                180,
+                14
+              ]
+            },
+            {
+              "name": "forward roll",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                233,
+                14
+              ]
+            },
+            {
+              "name": "back roll",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                233,
+                14
+              ]
+            },
+            {
+              "name": "spot dodge",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                235,
+                14
+              ]
+            },
+            {
+              "name": "grab",
+              "pass": true,
+              "sourceMotions": [
+                212,
+                14
+              ]
+            },
+            {
+              "name": "neutral aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                65,
+                42,
+                14
+              ]
+            },
+            {
+              "name": "forward aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                66,
+                42,
+                14
+              ]
+            },
+            {
+              "name": "back aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                67,
+                42,
+                14
+              ]
+            },
+            {
+              "name": "up aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                68,
+                42,
+                14
+              ]
+            },
+            {
+              "name": "down aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                69,
+                74,
+                14
+              ]
+            },
+            {
+              "name": "air dodge",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                236,
+                43,
+                14
+              ]
+            },
+            {
+              "name": "Fire Breath",
+              "pass": true,
+              "sourceMotions": [
+                341,
+                342,
+                343,
+                14
+              ]
+            },
+            {
+              "name": "Fire Breath (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                344,
+                345,
+                342,
+                343,
+                14
+              ]
+            },
+            {
+              "name": "Koopa Klaw",
+              "pass": true,
+              "sourceMotions": [
+                347,
+                14
+              ]
+            },
+            {
+              "name": "Koopa Klaw (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                353,
+                347,
+                14
+              ]
+            },
+            {
+              "name": "Whirling Fortress",
+              "pass": true,
+              "sourceMotions": [
+                359,
+                14
+              ]
+            },
+            {
+              "name": "Whirling Fortress (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                360,
+                35,
+                43,
+                14
+              ]
+            },
+            {
+              "name": "Bowser Bomb",
+              "pass": true,
+              "sourceMotions": [
+                361,
+                362,
+                363,
+                14
+              ]
+            },
+            {
+              "name": "Bowser Bomb (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                362,
+                363,
+                14
+              ]
+            }
+          ],
+          "geometry": {
+            "buffer": [
+              640,
+              480
+            ],
+            "css": [
+              900,
+              675
+            ],
+            "devicePixelRatio": 1,
+            "viewport": [
+              1280,
+              960
+            ],
+            "hidden": false,
+            "focused": true
+          },
+          "entry_timing_resumes": 0,
+          "failed_case": null,
+          "failures": [],
+          "metrics": {
+            "sourceFrames": 5600,
+            "browserCallbacks": 5600,
+            "worstBrowserCallbackMs": 23.405,
+            "browserCallbackGaps": 0,
+            "browserLongTasks": 0,
+            "browserLongTaskWorstMs": 0,
+            "nativeCallbacks": 5600,
+            "worstNativeCallbackMs": 8.445,
+            "nativeCallbacksOverBudget": 0,
+            "nativeCallbacksOver33ms": 0,
+            "audioUnderrunFrames": 0,
+            "livePipelinesQueued": 0,
+            "livePipelinesCreated": 0,
+            "liveTextureUploadBytes": 1224704,
+            "liveStagingUsedBytes": 7131362340,
+            "peakStagingUsedBytes": 2707632,
+            "preparationPauses": 0,
+            "automaticTimingResumes": 0,
+            "focusLost": false,
+            "wasmHeapGrowthBytes": 0
+          }
+        },
+        {
+          "round": "warm",
+          "pass": true,
+          "cases": [
+            {
+              "name": "walk left/right",
+              "pass": true,
+              "sourceMotions": [
+                18,
+                15,
+                14
+              ]
+            },
+            {
+              "name": "dash left/right",
+              "pass": true,
+              "sourceMotions": [
+                20,
+                14
+              ]
+            },
+            {
+              "name": "crouch",
+              "pass": true,
+              "sourceMotions": [
+                39,
+                40,
+                41,
+                14
+              ]
+            },
+            {
+              "name": "jab",
+              "pass": true,
+              "sourceMotions": [
+                44,
+                14
+              ]
+            },
+            {
+              "name": "forward tilt",
+              "pass": true,
+              "sourceMotions": [
+                15,
+                53,
+                14
+              ]
+            },
+            {
+              "name": "up tilt",
+              "pass": true,
+              "sourceMotions": [
+                14,
+                56
+              ]
+            },
+            {
+              "name": "down tilt",
+              "pass": true,
+              "sourceMotions": [
+                14,
+                57,
+                41
+              ]
+            },
+            {
+              "name": "forward smash",
+              "pass": true,
+              "sourceMotions": [
+                60,
+                14
+              ]
+            },
+            {
+              "name": "up smash",
+              "pass": true,
+              "sourceMotions": [
+                63,
+                14
+              ]
+            },
+            {
+              "name": "down smash",
+              "pass": true,
+              "sourceMotions": [
+                64,
+                14
+              ]
+            },
+            {
+              "name": "dash attack",
+              "pass": true,
+              "sourceMotions": [
+                20,
+                50,
+                14
+              ]
+            },
+            {
+              "name": "shield",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                179,
+                180,
+                14
+              ]
+            },
+            {
+              "name": "forward roll",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                233,
+                14
+              ]
+            },
+            {
+              "name": "back roll",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                233,
+                14
+              ]
+            },
+            {
+              "name": "spot dodge",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                235,
+                14
+              ]
+            },
+            {
+              "name": "grab",
+              "pass": true,
+              "sourceMotions": [
+                212,
+                14
+              ]
+            },
+            {
+              "name": "neutral aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                65,
+                42,
+                14
+              ]
+            },
+            {
+              "name": "forward aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                66,
+                42,
+                14
+              ]
+            },
+            {
+              "name": "back aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                67,
+                42,
+                14
+              ]
+            },
+            {
+              "name": "up aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                68,
+                42,
+                14
+              ]
+            },
+            {
+              "name": "down aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                69,
+                74,
+                14
+              ]
+            },
+            {
+              "name": "air dodge",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                236,
+                43,
+                14
+              ]
+            },
+            {
+              "name": "Fire Breath",
+              "pass": true,
+              "sourceMotions": [
+                341,
+                342,
+                343,
+                14
+              ]
+            },
+            {
+              "name": "Fire Breath (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                344,
+                345,
+                342,
+                343,
+                14
+              ]
+            },
+            {
+              "name": "Koopa Klaw",
+              "pass": true,
+              "sourceMotions": [
+                347,
+                14
+              ]
+            },
+            {
+              "name": "Koopa Klaw (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                353,
+                347,
+                14
+              ]
+            },
+            {
+              "name": "Whirling Fortress",
+              "pass": true,
+              "sourceMotions": [
+                359,
+                14
+              ]
+            },
+            {
+              "name": "Whirling Fortress (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                360,
+                35,
+                43,
+                14
+              ]
+            },
+            {
+              "name": "Bowser Bomb",
+              "pass": true,
+              "sourceMotions": [
+                361,
+                362,
+                363,
+                14
+              ]
+            },
+            {
+              "name": "Bowser Bomb (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                362,
+                363,
+                14
+              ]
+            }
+          ],
+          "geometry": {
+            "buffer": [
+              640,
+              480
+            ],
+            "css": [
+              900,
+              675
+            ],
+            "devicePixelRatio": 1,
+            "viewport": [
+              1280,
+              960
+            ],
+            "hidden": false,
+            "focused": true
+          },
+          "entry_timing_resumes": 0,
+          "failed_case": null,
+          "failures": [],
+          "metrics": {
+            "sourceFrames": 5601,
+            "browserCallbacks": 5601,
+            "worstBrowserCallbackMs": 25.995,
+            "browserCallbackGaps": 0,
+            "browserLongTasks": 0,
+            "browserLongTaskWorstMs": 0,
+            "nativeCallbacks": 5601,
+            "worstNativeCallbackMs": 9.115,
+            "nativeCallbacksOverBudget": 0,
+            "nativeCallbacksOver33ms": 0,
+            "audioUnderrunFrames": 0,
+            "livePipelinesQueued": 0,
+            "livePipelinesCreated": 0,
+            "liveTextureUploadBytes": 1224704,
+            "liveStagingUsedBytes": 7132987216,
+            "peakStagingUsedBytes": 2707632,
+            "preparationPauses": 0,
+            "automaticTimingResumes": 0,
+            "focusLost": false,
+            "wasmHeapGrowthBytes": 0
+          }
+        }
+      ]
+    }
+  },
+  "scoped_code_review": {
+    "local_path": "work/full-game/koopa-scoped-code-review-v2.json",
+    "sha256": "b4e84a43e1529524cb9aea718a63428368582f74e3fe788ecebe2d7fb77bedf4"
+  },
+  "retained_retracted_review": {
+    "local_path": "work/full-game/koopa-scoped-code-review-v1.json",
+    "sha256": "a3aeb99a487cdb2ca65fb597b691fc2471a11baa9e563cd6466b43a7b87387e2",
+    "disposition": "Retracted after source table verified MS versus SM distinction; v2 retains adjudication."
+  },
+  "retained_discovery": {
+    "bowser": {
+      "local_path": "work/full-game/koopa-browser-discovery-v1/report.json",
+      "sha256": "00b3bd0ccc0a8b0b087d1c426295d83561a3773f29dbe3b8aad131906ce5957a",
+      "result": "scoped_pair_failed",
+      "rounds": [
+        {
+          "round": "cold",
+          "pass": false,
+          "cases": [
+            {
+              "name": "walk left/right",
+              "pass": true,
+              "sourceMotions": [
+                18,
+                15,
+                14
+              ]
+            },
+            {
+              "name": "dash left/right",
+              "pass": true,
+              "sourceMotions": [
+                20,
+                18,
+                14
+              ]
+            },
+            {
+              "name": "crouch",
+              "pass": true,
+              "sourceMotions": [
+                39,
+                40,
+                41,
+                14
+              ]
+            },
+            {
+              "name": "jab",
+              "pass": true,
+              "sourceMotions": [
+                44,
+                14
+              ]
+            },
+            {
+              "name": "forward tilt",
+              "pass": true,
+              "sourceMotions": [
+                15,
+                53,
+                14
+              ]
+            },
+            {
+              "name": "up tilt",
+              "pass": true,
+              "sourceMotions": [
+                14,
+                56
+              ]
+            },
+            {
+              "name": "down tilt",
+              "pass": true,
+              "sourceMotions": [
+                14,
+                57,
+                41
+              ]
+            },
+            {
+              "name": "forward smash",
+              "pass": true,
+              "sourceMotions": [
+                60,
+                14
+              ]
+            },
+            {
+              "name": "up smash",
+              "pass": true,
+              "sourceMotions": [
+                63,
+                14
+              ]
+            },
+            {
+              "name": "down smash",
+              "pass": true,
+              "sourceMotions": [
+                64,
+                14
+              ]
+            },
+            {
+              "name": "dash attack",
+              "pass": true,
+              "sourceMotions": [
+                20,
+                50,
+                14
+              ]
+            },
+            {
+              "name": "shield",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                179,
+                180,
+                14
+              ]
+            },
+            {
+              "name": "forward roll",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                233,
+                14
+              ]
+            },
+            {
+              "name": "back roll",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                233,
+                14
+              ]
+            },
+            {
+              "name": "spot dodge",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                235,
+                14
+              ]
+            },
+            {
+              "name": "grab",
+              "pass": true,
+              "sourceMotions": [
+                212,
+                14
+              ]
+            },
+            {
+              "name": "neutral aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                65,
+                42,
+                14
+              ]
+            },
+            {
+              "name": "forward aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                66,
+                42,
+                14
+              ]
+            },
+            {
+              "name": "back aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                67,
+                42,
+                14
+              ]
+            },
+            {
+              "name": "up aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                68,
+                42,
+                14
+              ]
+            },
+            {
+              "name": "down aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                69,
+                74,
+                14
+              ]
+            },
+            {
+              "name": "air dodge",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                236,
+                43,
+                14
+              ]
+            },
+            {
+              "name": "Fire Breath",
+              "pass": true,
+              "sourceMotions": [
+                341,
+                342,
+                343,
+                14
+              ]
+            },
+            {
+              "name": "Fire Breath (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                344,
+                345,
+                342,
+                343,
+                14
+              ]
+            },
+            {
+              "name": "Koopa Klaw",
+              "pass": true,
+              "sourceMotions": [
+                347,
+                14
+              ]
+            },
+            {
+              "name": "Koopa Klaw (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                353,
+                347,
+                14
+              ]
+            },
+            {
+              "name": "Whirling Fortress",
+              "pass": true,
+              "sourceMotions": [
+                359,
+                14
+              ]
+            },
+            {
+              "name": "Whirling Fortress (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                360,
+                35,
+                43,
+                14
+              ]
+            },
+            {
+              "name": "Bowser Bomb",
+              "pass": true,
+              "sourceMotions": [
+                361,
+                362,
+                363,
+                14
+              ]
+            },
+            {
+              "name": "Bowser Bomb (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                362,
+                363,
+                14
+              ]
+            }
+          ],
+          "geometry": {
+            "buffer": [
+              640,
+              480
+            ],
+            "css": [
+              900,
+              675
+            ],
+            "devicePixelRatio": 1,
+            "viewport": [
+              1280,
+              960
+            ],
+            "hidden": false,
+            "focused": true
+          },
+          "entry_timing_resumes": 2,
+          "failed_case": "acceptance",
+          "failures": [
+            "browser callback gap",
+            "native callback over 33.3 ms",
+            "audio underrun",
+            "live pipeline creation",
+            "automatic timing pause"
+          ],
+          "metrics": {
+            "sourceFrames": 5601,
+            "browserCallbacks": 5605,
+            "worstBrowserCallbackMs": 628.02,
+            "browserCallbackGaps": 3,
+            "browserLongTasks": 0,
+            "browserLongTaskWorstMs": 0,
+            "nativeCallbacks": 5605,
+            "worstNativeCallbackMs": 615.295,
+            "nativeCallbacksOverBudget": 3,
+            "nativeCallbacksOver33ms": 3,
+            "audioUnderrunFrames": 149,
+            "livePipelinesQueued": 0,
+            "livePipelinesCreated": 18,
+            "liveTextureUploadBytes": 1224704,
+            "liveStagingUsedBytes": 7131754492,
+            "peakStagingUsedBytes": 4744896,
+            "preparationPauses": 0,
+            "automaticTimingResumes": 2,
+            "focusLost": false,
+            "wasmHeapGrowthBytes": 0
+          }
+        },
+        {
+          "round": "warm",
+          "pass": true,
+          "cases": [
+            {
+              "name": "walk left/right",
+              "pass": true,
+              "sourceMotions": [
+                18,
+                15,
+                14
+              ]
+            },
+            {
+              "name": "dash left/right",
+              "pass": true,
+              "sourceMotions": [
+                20,
+                14
+              ]
+            },
+            {
+              "name": "crouch",
+              "pass": true,
+              "sourceMotions": [
+                39,
+                40,
+                41,
+                14
+              ]
+            },
+            {
+              "name": "jab",
+              "pass": true,
+              "sourceMotions": [
+                44,
+                14
+              ]
+            },
+            {
+              "name": "forward tilt",
+              "pass": true,
+              "sourceMotions": [
+                15,
+                53,
+                14
+              ]
+            },
+            {
+              "name": "up tilt",
+              "pass": true,
+              "sourceMotions": [
+                14,
+                56
+              ]
+            },
+            {
+              "name": "down tilt",
+              "pass": true,
+              "sourceMotions": [
+                14,
+                57,
+                41
+              ]
+            },
+            {
+              "name": "forward smash",
+              "pass": true,
+              "sourceMotions": [
+                60,
+                14
+              ]
+            },
+            {
+              "name": "up smash",
+              "pass": true,
+              "sourceMotions": [
+                63,
+                14
+              ]
+            },
+            {
+              "name": "down smash",
+              "pass": true,
+              "sourceMotions": [
+                64,
+                14
+              ]
+            },
+            {
+              "name": "dash attack",
+              "pass": true,
+              "sourceMotions": [
+                20,
+                50,
+                14
+              ]
+            },
+            {
+              "name": "shield",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                179,
+                180,
+                14
+              ]
+            },
+            {
+              "name": "forward roll",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                233,
+                14
+              ]
+            },
+            {
+              "name": "back roll",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                233,
+                14
+              ]
+            },
+            {
+              "name": "spot dodge",
+              "pass": true,
+              "sourceMotions": [
+                182,
+                235,
+                14
+              ]
+            },
+            {
+              "name": "grab",
+              "pass": true,
+              "sourceMotions": [
+                212,
+                14
+              ]
+            },
+            {
+              "name": "neutral aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                65,
+                42,
+                14
+              ]
+            },
+            {
+              "name": "forward aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                66,
+                42,
+                14
+              ]
+            },
+            {
+              "name": "back aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                67,
+                42,
+                14
+              ]
+            },
+            {
+              "name": "up aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                68,
+                42,
+                14
+              ]
+            },
+            {
+              "name": "down aerial",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                69,
+                74,
+                14
+              ]
+            },
+            {
+              "name": "air dodge",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                236,
+                43,
+                14
+              ]
+            },
+            {
+              "name": "Fire Breath",
+              "pass": true,
+              "sourceMotions": [
+                341,
+                342,
+                343,
+                14
+              ]
+            },
+            {
+              "name": "Fire Breath (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                344,
+                345,
+                342,
+                343,
+                14
+              ]
+            },
+            {
+              "name": "Koopa Klaw",
+              "pass": true,
+              "sourceMotions": [
+                347,
+                14
+              ]
+            },
+            {
+              "name": "Koopa Klaw (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                353,
+                347,
+                14
+              ]
+            },
+            {
+              "name": "Whirling Fortress",
+              "pass": true,
+              "sourceMotions": [
+                359,
+                14
+              ]
+            },
+            {
+              "name": "Whirling Fortress (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                360,
+                35,
+                43,
+                14
+              ]
+            },
+            {
+              "name": "Bowser Bomb",
+              "pass": true,
+              "sourceMotions": [
+                361,
+                362,
+                363,
+                14
+              ]
+            },
+            {
+              "name": "Bowser Bomb (air)",
+              "pass": true,
+              "sourceMotions": [
+                24,
+                25,
+                362,
+                363,
+                14
+              ]
+            }
+          ],
+          "geometry": {
+            "buffer": [
+              640,
+              480
+            ],
+            "css": [
+              900,
+              675
+            ],
+            "devicePixelRatio": 1,
+            "viewport": [
+              1280,
+              960
+            ],
+            "hidden": false,
+            "focused": true
+          },
+          "entry_timing_resumes": 0,
+          "failed_case": null,
+          "failures": [],
+          "metrics": {
+            "sourceFrames": 5600,
+            "browserCallbacks": 5600,
+            "worstBrowserCallbackMs": 26.365,
+            "browserCallbackGaps": 0,
+            "browserLongTasks": 0,
+            "browserLongTaskWorstMs": 0,
+            "nativeCallbacks": 5600,
+            "worstNativeCallbackMs": 8.655,
+            "nativeCallbacksOverBudget": 0,
+            "nativeCallbacksOver33ms": 0,
+            "audioUnderrunFrames": 0,
+            "livePipelinesQueued": 0,
+            "livePipelinesCreated": 0,
+            "liveTextureUploadBytes": 1224704,
+            "liveStagingUsedBytes": 7129893116,
+            "peakStagingUsedBytes": 2724232,
+            "preparationPauses": 0,
+            "automaticTimingResumes": 0,
+            "focusLost": false,
+            "wasmHeapGrowthBytes": 0
+          }
+        }
+      ]
+    }
+  },
+  "retained_native_failures": [
+    {
+      "local_path": "work/full-game/koopa-native-entry-v1.log",
+      "sha256": "9e2bde11bcd51a477e78c7c598b0c9f09470b9febc7b144c23c4c42f88c4e16c",
+      "reason": "Observer lacked Bowser identity"
+    },
+    {
+      "local_path": "work/full-game/koopa-action-store-v1.log",
+      "sha256": "fdb06569d8463bc7d14f214ae030539e1bf0897ba6010232f34ee179843bf6da",
+      "reason": "Koopa test used store before declaration"
+    },
+    {
+      "local_path": "work/full-game/koopa-action-store-victim-v2.log",
+      "sha256": "56a3862f0aedaed0d362e782a126e489189096369d4823df4e4894d6b0901bf6",
+      "reason": "Focused extraction omitted newly tested original opcode36 consumer"
+    },
+    {
+      "local_path": "work/full-game/koopa-native-moves-v1.log",
+      "sha256": "eec500c6d13963f6d3f1407f6164bc397713d4f0b1507f998e4e2f5438497d5a",
+      "reason": "Single FD jump lands before aerial Flame End; corrected route explicitly tests source landing and ground End, aerial End remains unexercised"
+    },
+    {
+      "local_path": "work/full-game/koopa-native-moves-v2.log",
+      "sha256": "12d97bdd6c8c07c6062b774bf65572686e01b59789564477b34157c627e1c148",
+      "reason": "FallSpecial reached existing visibility command36 blocked by native admission guard"
+    },
+    {
+      "local_path": "work/full-game/koopa-native-moves-v3.log",
+      "sha256": "8b87b5f76cc70a1d4baab1f9e98a47e2fd4e514713184ad29fb3ef984bfeb296",
+      "reason": "Raw fixture chased thrown airborne Mario beyond stage; corrected input waits for source recovery before walking"
+    }
+  ],
+  "pipeline_seed": {
+    "sha256": "8df6a998cef19b88a3eff0ee61f666e42791f5f73841818961aa3b224cad2c4b",
+    "bytes": 3518464,
+    "shader_rows": 1,
+    "pipeline_rows": 845,
+    "changed": true,
+    "review": {
+      "local_path": "work/full-game/koopa-cache-review-v1.json",
+      "sha256": "26003761032620afab9fb386aad3fed5cc0b79ad0985971a8a8703af13f66dda"
+    },
+    "base": {
+      "local_path": "work/full-game/koopa-pipeline-base-v1.db",
+      "sha256": "5d8a4b2bff7dcf12da67ffb576895fbf786f0898e8df04e2c5d2393027b2650b"
+    },
+    "preserved_base_rows": 810,
+    "added_rows": [
+      {
+        "config_sha256": "87ad7089c28f6f30e98195641ef9ba492e801a03732a333e95ab0e29fd4fd063",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 444,
+        "hash": 306442521,
+        "type": 1
+      },
+      {
+        "config_sha256": "f5b3eec12b6ab0f94a0842e030923578e2ea0ee8c332975d019beed12a9fde8c",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 444,
+        "hash": 514309380,
+        "type": 1
+      },
+      {
+        "config_sha256": "62e44e4659ef83c4ab0e75967e2e27abe93b713694032b210775e5fec2849171",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 1480,
+        "hash": 563103828,
+        "type": 1
+      },
+      {
+        "config_sha256": "1d0d49be1be389c1b4063c591b5149a12fcd280081827d2163ab1ced9d662a43",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 1480,
+        "hash": 596922523,
+        "type": 1
+      },
+      {
+        "config_sha256": "002ac9a218e89973c9c9dba6e55da59881e90abf90b191a8d5c75d11a85e8b2d",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 503,
+        "hash": 677522127,
+        "type": 1
+      },
+      {
+        "config_sha256": "890e2dd3a434b6f1abe2256b162e2042e2ad8a4eb9952b66388618a9b58ab6f7",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 444,
+        "hash": 718902068,
+        "type": 1
+      },
+      {
+        "config_sha256": "044a91df21652ecade20f5af9972156b0365e162dc019b1995c0f245b3720eba",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 1865,
+        "hash": 744104217,
+        "type": 1
+      },
+      {
+        "config_sha256": "1707b3982aab9d9a900addd0835192149891b725312fe334cbeea3994dbe6334",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 444,
+        "hash": 901342054,
+        "type": 1
+      },
+      {
+        "config_sha256": "129c7b3afc3be1f1eb25ca3b436518f8b6751a5e897d5c32f4b0169c6d0ca4ea",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 3004,
+        "hash": 947054708,
+        "type": 1
+      },
+      {
+        "config_sha256": "3cea814ec3dae947ea728fb91568f7bdb4714e01e85cee786956963072077d3b",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 503,
+        "hash": 1208080982,
+        "type": 1
+      },
+      {
+        "config_sha256": "521e1f95c4a34f0e16088148e5f168cdd3726bd6b371722c7bfebf1f3a6a9c51",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 1480,
+        "hash": 1721945849,
+        "type": 1
+      },
+      {
+        "config_sha256": "4f390e41da612b0dc61100ae53f7d8827a308d1d1e782bb454c26bcaee2d1554",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 444,
+        "hash": 1750640417,
+        "type": 1
+      },
+      {
+        "config_sha256": "06997f8bb797932029a8cb5c0a9fc1eacc40416cd83be8738f1ebd5738b4dea6",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 4440,
+        "hash": 1800202482,
+        "type": 1
+      },
+      {
+        "config_sha256": "e33d56d79bc48e0e47d9c2d8e9c57991dcd2fe19c7b99a6dbcceddb29ab519c9",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 1865,
+        "hash": 1843887002,
+        "type": 1
+      },
+      {
+        "config_sha256": "e81b0ae2986171698034fa1e7a102b3bbe2cb984d08a1543e9211c80a2360aa1",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 444,
+        "hash": 1853874611,
+        "type": 1
+      },
+      {
+        "config_sha256": "c8b7b799a46c76a90988775f06b321708388b2b03bb92175f1ab553e6eebbc59",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 444,
+        "hash": 1866203118,
+        "type": 1
+      },
+      {
+        "config_sha256": "224bff89f33f6f9b8e01b33769a0e66aed6f42f5cbc3b6ca2f9a9525959eddeb",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 1865,
+        "hash": 1968617688,
+        "type": 1
+      },
+      {
+        "config_sha256": "9f64263ca8b2b55ab9952a7a18e3310c540075e50524c59536e1802ad6df57f2",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 4434,
+        "hash": 2039386302,
+        "type": 1
+      },
+      {
+        "config_sha256": "f536f15a33bc52d20bffe8aca6781a87c07ef71ca7c7d4b65146c3cafb9de71b",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 503,
+        "hash": 2062407012,
+        "type": 1
+      },
+      {
+        "config_sha256": "a69d323e650525aade6bf28f9e2c6818c61fea763317bc3a64f6af275927c3ef",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 1480,
+        "hash": 2092179378,
+        "type": 1
+      },
+      {
+        "config_sha256": "c211f319641ecc7aba5c87a873061843e1de8e2bf61fa689a1c4a41f4157a6a6",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 1480,
+        "hash": 2307145084,
+        "type": 1
+      },
+      {
+        "config_sha256": "3b91ddbbecddb1d968627a6649a4558239ea6e641e86e174ec18b800f221d1f8",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 1865,
+        "hash": 2385281629,
+        "type": 1
+      },
+      {
+        "config_sha256": "18cc200cc8830b6a65477f567c84bcf6543a6b1cc6eaa3ee416aad3f8f9d8d00",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 444,
+        "hash": 2494827592,
+        "type": 1
+      },
+      {
+        "config_sha256": "af48705ddd774f066812c03f1c1fe131f97da61dbef89e1ea01fb5d4c48b3661",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 1865,
+        "hash": 2511001059,
+        "type": 1
+      },
+      {
+        "config_sha256": "580ac6bcb3b334c285c273f6501d7df85d23124b38b3e1c61f04db7b1a89edff",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 1480,
+        "hash": 2641752758,
+        "type": 1
+      },
+      {
+        "config_sha256": "68a329a3d209b258406df8945b71f681e5a922593cf0b2b8d4fd60b912e8f2b1",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 503,
+        "hash": 2687030594,
+        "type": 1
+      },
+      {
+        "config_sha256": "63a35bfe293a1d62e9401eba1732381b0f07de90504761785e2fd8a81c0e42eb",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 444,
+        "hash": 2765905032,
+        "type": 1
+      },
+      {
+        "config_sha256": "f9fd4ed7eeb104de7e6c6edc506dedcb8ee5879d64d644014bbc496b7861fc51",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 1480,
+        "hash": 2803935814,
+        "type": 1
+      },
+      {
+        "config_sha256": "9b25b5be82bd2d71a47a984ccd8ece3175cc9c3a92ad6e7c04da13494cb51afd",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 1865,
+        "hash": 2873146978,
+        "type": 1
+      },
+      {
+        "config_sha256": "aaa8ca99ff600957b010bf5c847ed5edf6aded732d73f2f2d7592195ed73f6f3",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 444,
+        "hash": 2987986870,
+        "type": 1
+      },
+      {
+        "config_sha256": "b9ff573aeaad69e4f36b468759a8b589afb8add1a9f8bcce039c08f9e5a32cb9",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 503,
+        "hash": 3057428616,
+        "type": 1
+      },
+      {
+        "config_sha256": "131dc272bf137feb909cd64dc47ed4d05a9bae4b457c1a24293fb5f0a8ef2435",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 1865,
+        "hash": 3094803334,
+        "type": 1
+      },
+      {
+        "config_sha256": "73726028312ef7ace22ce03b3faad61dd9573aa0fe1500448424ef736b80c6f6",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 503,
+        "hash": 3121451272,
+        "type": 1
+      },
+      {
+        "config_sha256": "b26afafdaa1bb6e7ab99179836d4d1ca6d2a8f33cb2aaaf5293fb0a2ebd84957",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 503,
+        "hash": 3582982725,
+        "type": 1
+      },
+      {
+        "config_sha256": "992b3e66b3dd1bb8d30e3dfb20a27c52f86b738fceb57caa3b6ff06e70f2ea39",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 444,
+        "hash": 3722624966,
+        "type": 1
+      },
+      {
+        "config_sha256": "898320ee84a50b5bf78cf6a7ca1fd6a9e0824a90834bd1a4454b31efcf84e1b9",
+        "config_size": 2772,
+        "config_version": 65549,
+        "first_frame_used": 1480,
+        "hash": 4201201266,
+        "type": 1
+      }
+    ],
+    "provenance": {
+      "local_path": "work/full-game/koopa-browser-discovery-v1/cold/cache-provenance.json",
+      "sha256": "507962675f3980c53713f900755ed345e0dff9d55dbd57d8972784e642706420"
+    },
+    "scope": "36 portable visible-entry/action descriptors; previous 810 records preserved field-for-field. No driver cache or game assets."
+  },
+  "import_budget": {
+    "local_path": "work/full-game/koopa-disc-budget-v1.json",
+    "sha256": "f00cf6e857d7e11528a63fde7edc01fbf36077dfc242039cf06285afcfae5659",
+    "schema": "melee-web-owned-disc-import-budget-v1",
+    "files": 177,
+    "disc_bytes": 127314690,
+    "maximum_bundle_bytes": 134217728,
+    "remaining_bytes": 6903038,
+    "generated_font_and_coefficients_excluded": true,
+    "manifest_sha256": "913efb97c896c2bbd3741aba72fd7c6b889ba732e8f3dee31c42042eb66d6e55"
+  },
+  "shared_original_regressions": [
+    {
+      "local_path": "work/full-game/ganondorf-native-koopa-v1/refresh-receipt.json",
+      "sha256": "03fc9bb63462fe6b2ffc2758990b669674218d2adee7f5f621a9cb069f70962f",
+      "result": "declared_state_match",
+      "frames": 603,
+      "scope": "Declared headless shared state only; not Bowser, source drawing, complete endings, pixels, PCM or live timing."
+    },
+    {
+      "local_path": "work/full-game/mario-fd-native-koopa-v1/refresh-receipt.json",
+      "sha256": "259b4f2f8c2016feda0be2b99540e64996be2d9c6371e000366896aa3b411cfb",
+      "result": "declared_state_match",
+      "frames": 240,
+      "scope": "Declared headless shared state only; not Bowser, source drawing, complete endings, pixels, PCM or live timing."
+    }
+  ],
+  "remaining_gates": [
+    "Bowser air Flame End without landing, all catch/pummel/throw variants and the complete move/costume/stage matrix",
+    "Drawn side-capture/throw interactions; current browser side cases check startup",
+    "Independent original Bowser state, pixel and PCM comparisons",
+    "Complete ordinary-input matches, physical controllers and live scheduling",
+    "Startup and sustained performance across supported content and hardware",
+    "Resolve Donkey Battlefield Pass undefined terminal SPL0 crash using valid original consumer evidence",
+    "Scene-scoped asset import for the full offline roster/stage/mode corpus",
+    "Results/audio draft dependencies and the remaining full-game inventory"
+  ]
+}

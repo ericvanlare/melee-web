@@ -7,6 +7,7 @@ extern "C" {
 #endif
 typedef struct MeleeWebMatchRules MeleeWebMatchRules;
 struct StartMeleeRules;
+struct MatchExitInfo;
 /* Preserve disabled-timer behavior.  When enabled, admit only the ordinary
  * VS stock countdown produced by the retail Rule Plus menu: a positive whole
  * number of minutes (1..99), represented in the source payload as seconds,
@@ -26,6 +27,9 @@ int melee_web_match_rules_publish_result(void);
 /* Read the close-boundary source snapshot after the source player/rules
  * owner has been torn down. The cache is cleared at the next begin(). */
 int melee_web_match_rules_terminal_result(int* outcome,int* count,int winners[6]);
+/* Complete original VS OnExit payload retained across match teardown for
+ * the original Results scene. Cleared with the ranking cache at begin(). */
+int melee_web_match_rules_terminal_data(struct MatchExitInfo*);
 /* Original match outcome enum; a unique source winner is returned for stock
  * elimination or timeout, while source ties and unavailable rankings return
  * winner=-1. */

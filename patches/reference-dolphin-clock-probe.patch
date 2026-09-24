@@ -1,0 +1,113 @@
+--- a/Source/Core/Core/PowerPC/ReferenceCaptureObserver.cpp
++++ b/Source/Core/Core/PowerPC/ReferenceCaptureObserver.cpp
+@@ -20,6 +20,9 @@
+ #include "Common/DirectIOFile.h"
+ #include "Common/Crypto/SHA1.h"
+ #include "Core/HW/Memmap.h"
++#include "Core/CoreTiming.h"
++#include "Core/HW/SystemTimers.h"
++#include "Core/HW/VideoInterface.h"
+ #include "Core/PowerPC/PowerPC.h"
+ #include "Core/System.h"
+ #include "DiscIO/DiscUtils.h"
+@@ -212,6 +215,7 @@
+ struct Observer::Impl
+ {
+   Impl() = default;
++  bool clock_queue_after_vi = false;
+ 
+   ~Impl()
+   {
+@@ -428,10 +432,75 @@
+     }
+   }
+ 
++  void CaptureClock(Core::System* system, u32 pc, u32 source_tick, PowerPC::PowerPCState* state)
++  {
++    if (match_active)
++    {
++      std::array<u8, 0x78> cadence{};
++      std::array<u8, 0xc> queue{};
++      u32 retrace = 0;
++      if (!ReadBytes(system, 0x804329f0, cadence.size(), cadence.data()) ||
++          !ReadBytes(system, 0x804c1f78, queue.size(), queue.data()) ||
++          !ReadU32(system, 0x804d7420, &retrace))
++        return SetInvalid("clock diagnostic read failed"), void();
++      std::array<u8, 0x1f4> video{};
++      std::array<u8, 8> adjust{};
++      if (!ReadBytes(system, 0x804c1d80, video.size(), video.data()) ||
++          !ReadBytes(system, 0x800030d8, adjust.size(), adjust.data()))
++        return SetInvalid("clock video/adjust read failed"), void();
++      std::string video_words = "[";
++      for (size_t i = 0; i < video.size(); i += 4)
++      {
++        if (i) video_words += ",";
++        video_words += std::to_string(ReadBE32(video.data() + i));
++      }
++      video_words += "]";
++      const u64 time_adjust = (static_cast<u64>(ReadBE32(adjust.data())) << 32) |
++                              ReadBE32(adjust.data() + 4);
++      std::string words = "[";
++      for (size_t i = 0; i < cadence.size(); i += 4)
++      {
++        if (i) words += ",";
++        words += std::to_string(ReadBE32(cadence.data() + i));
++      }
++      words += "]";
++      std::string queue_bytes = "[";
++      for (size_t i = 0; i < queue.size(); ++i)
++      {
++        if (i) queue_bytes += ",";
++        queue_bytes += std::to_string(queue[i]);
++      }
++      queue_bytes += "]";
++      PushJson(Event::Progress,
++          std::string("{\"record\":\"clock_probe_v1\",\"clock_pc\":") +
++          std::to_string(pc) + ",\"core_ticks\":" +
++          std::to_string(system->GetCoreTiming().GetTicks()) + ",\"time_base\":" +
++          std::to_string(system->GetSystemTimers().GetFakeTimeBase()) +
++          ",\"retrace\":" + std::to_string(retrace) + ",\"vi_period\":" +
++          std::to_string(system->GetVideoInterface().GetTicksPerField()) +
++          ",\"cadence_words\":" + words + ",\"queue_bytes\":" + queue_bytes + ",\"video_words\":" + video_words + ",\"time_adjust\":" + std::to_string(time_adjust) + ",\"r3\":" + std::to_string(state->gpr[3]) + ",\"lr\":" + std::to_string(state->spr[8]) + "}",
++          pc, source_tick, draw_ordinal);
++    }
++
++  }
++
+   void Observe(Core::System* system, u32 pc, PowerPC::PowerPCState* state)
+   {
+     if (!Start() || invalid.load() || finish_requested.load())
+       return;
++    if (pc == 0x80375e18) clock_queue_after_vi = true;
++    if (pc == 0x803769d4 || pc == 0x80375c34 || pc == 0x80375e18 || pc == 0x800195fc)
++    {
++      u32 tick = 0;
++      if (match_active && (pc != 0x803769d4 || state->gpr[3] != 0 || clock_queue_after_vi))
++      {
++        if (!ReadU32(system, 0x80479d58, &tick))
++          return SetInvalid("clock source tick read failed"), void();
++        CaptureClock(system, pc, tick, state);
++        if (pc == 0x803769d4) clock_queue_after_vi = false;
++      }
++      return;
++    }
+     Boundary boundary;
+     if (!BoundaryForPC(pc, &boundary))
+       return;
+@@ -598,6 +667,8 @@
+       if (!AddSlice(system, SliceTag::SceneRequest, 0x80479d64, 4))
+         return SetInvalid("scene exit request is invalid"), void();
+     }
++
++    CaptureClock(system, pc, source_tick, state);
+ 
+     Slot* slot = Reserve(Event::Boundary, pc, source_tick, draw_ordinal);
+     if (!slot)
+@@ -957,6 +1028,7 @@
+ 
+ bool Observer::IsBoundary(u32 guest_pc)
+ {
++  if (guest_pc == 0x803769d4 || guest_pc == 0x80375c34 || guest_pc == 0x80375e18 || guest_pc == 0x800195fc) return true;
+   switch (guest_pc)
+   {
+   case 0x8034DD8C:

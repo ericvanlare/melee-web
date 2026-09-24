@@ -86,7 +86,8 @@ For each declared workload:
    makes no accuracy claim.
 5. Freeze the browser build with `scripts/prepare_prototype.py`, serve it with
    `scripts/serve.py`, and run `scripts/capture_cpu_browser.mjs` against the
-   real HTTP `runtime.html` URL. The script launches visible Chrome, imports
+   real HTTP `runtime.html` URL with `--headed`. Arrange this foreground session
+   with the user or use a separate test machine. The script launches visible Chrome, imports
    the local disc, uses the existing development replay controls, and retains
    exports, errors and playing/ending screenshots. It hashes each frozen
    artifact through real browser HTTP fetches before and after the match.

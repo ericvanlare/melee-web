@@ -103,7 +103,7 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
     auto& s = *storage_; s.archive = std::move(archive);
     require(bool(s.archive), "Material animation requires its archive owner");
     const auto& a = *s.archive;
-    std::set<uint32_t> joint_seen, material_seen, texture_seen, track_seen;
+    std::set<uint32_t> joint_seen, material_seen, texture_seen;
     size_t stream_bytes = 0, palette_validation_bytes = 0;
     std::map<uint32_t,uint32_t> image_max_indices;
     auto record = [&](uint32_t offset, size_t length) {
@@ -140,8 +140,6 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
             t.image_table[i] = &t.images[i];
         }
         t.palettes.resize(np); t.palette_table.resize(np);
-        for (const auto& im : images)
-            require(np || (im.format != 8 && im.format != 9 && im.format != 10), "Indexed animated image requires palettes");
         const auto ao = required(*offset+8,16); record(ao,16);
         const auto flags = a.be32(ao); const auto end = a.f32(ao+4);
         require(!(flags & ~0x30000000U) && std::isfinite(end) && end >= 0 && end <= 65535,
@@ -149,8 +147,12 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
         require(!a.pointer(ao+12), "Material animation object references are unsupported");
         t.animation.flags = flags; t.animation.end_frame = end;
         auto fo = a.pointer(ao+8,20); unsigned channels = 0;
+        // A source FObj may be shared by separate texture AObjs. Detect a
+        // cycle within this chain while allowing authored aliases across
+        // independent material channels.
+        std::set<uint32_t> texture_track_seen;
         while (fo) {
-            require(t.tracks.size()<24 && track_seen.insert(*fo).second, "Texture animation track cycle or count limit"); record(*fo,20);
+            require(t.tracks.size()<24 && texture_track_seen.insert(*fo).second, "Texture animation track cycle or count limit"); record(*fo,20);
             auto track = std::make_unique<NativeTrack>(); auto& f = track->descriptor;
             f.length = a.be32(*fo+4); f.startframe = a.f32(*fo+8);
             const auto fields = a.range(*fo+12,4); f.type=fields[0]; f.frac_value=fields[1]; f.frac_slope=fields[2];
@@ -201,11 +203,7 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
                 palette_track->descriptor.frac_value &&
             image_track->bytes == palette_track->bytes;
 
-        auto validate_image_palette = [&](uint32_t image_index,
-                                          uint32_t palette_index) {
-            const auto& im = images[image_index];
-            require(im.format == 8 || im.format == 9 || im.format == 10,
-                    "Palette animation requires indexed images");
+        auto maximum_index = [&](const DatTextureImage& im) {
             auto found = image_max_indices.find(im.descriptor_offset);
             if (found == image_max_indices.end()) {
                 palette_validation_bytes += im.bytes.size();
@@ -214,18 +212,58 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
                 found = image_max_indices.emplace(im.descriptor_offset,
                     dat_texture_max_palette_index(im)).first;
             }
-            const auto offset_palette = required(*pt + 4 * palette_index, 16);
-            const auto pal = read_dat_texture_palette_descriptor(
-                a, offset_palette, im.format);
-            require(found->second < pal.entries,
-                    "Image references an index outside its TLUT palette");
+            return found->second;
+        };
+        auto store_palette = [&](uint32_t palette_index, const DatTexturePalette& pal) {
             t.palettes[palette_index] = {
                 const_cast<uint8_t*>(pal.bytes.data()),
                 static_cast<GXTlutFmt>(pal.format), pal.source_name, pal.entries};
             t.palette_table[palette_index] = &t.palettes[palette_index];
         };
+        auto validate_image_palette = [&](uint32_t image_index,
+                                          uint32_t palette_index) {
+            const auto& im = images[image_index];
+            const bool indexed = im.format == 8 || im.format == 9 || im.format == 10;
+            const auto offset_palette = required(*pt + 4 * palette_index, 16);
+            // HSD_TObjUpdateFunc updates TIMG and TCLT independently. The
+            // selected TLUT is consumed by HSD_TObjSetup only for CI images;
+            // I/IA/RGB/CMPR images still require an authored TLUT descriptor
+            // and an in-range TCLT table index, but do not interpret palette
+            // entries for their pixels. Use the largest GX CI table capacity
+            // for this descriptor-only non-CI path.
+            const auto pal = read_dat_texture_palette_descriptor(
+                a, offset_palette, indexed ? im.format : 10);
+            if (indexed) {
+                const auto maximum = maximum_index(im);
+                if (maximum >= pal.entries)
+                    throw DatError("Animated image references an index outside its TLUT palette: texture=" +
+                        std::to_string(*offset) + " image=" + std::to_string(im.descriptor_offset) +
+                        " palette=" + std::to_string(offset_palette) + " image_index=" +
+                        std::to_string(image_index) + " palette_index=" + std::to_string(palette_index) +
+                        " maximum=" + std::to_string(maximum) + " entries=" +
+                        std::to_string(pal.entries));
+            }
+            store_palette(palette_index, pal);
+        };
 
-        if (synchronized_index_tracks) {
+        if (!palette_track) {
+            // HSD_TObjAddAnim resets tlut_no to -1. TIMG only changes the
+            // image; without TCLT, HSD_TObjSetup keeps the model's base TLUT.
+            // Retain every authored table descriptor, but do not pair these
+            // unselected palettes with animated images.
+            for (uint32_t p = 0; p < np; ++p)
+                store_palette(p, read_dat_texture_palette_descriptor(
+                    a, required(*pt + 4*p, 16), 10));
+            for (const auto& im : images) {
+                if (im.format != 8 && im.format != 9 && im.format != 10) continue;
+                const auto& base = native_texture->texture;
+                require(base.palette_data && base.palette_entries &&
+                        base.palette_bytes >= size_t(base.palette_entries)*2,
+                        "Indexed animated image requires the source base palette");
+                require(maximum_index(im) < base.palette_entries,
+                        "Animated image references an index outside its source base TLUT palette");
+            }
+        } else if (synchronized_index_tracks) {
             for (uint32_t i = 0; i < ni; ++i)
                 validate_image_palette(i, i);
         } else {
@@ -254,8 +292,11 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
                     "Material alpha animation flags or end frame are invalid");
             require(!a.pointer(*ao+12),"Material alpha animation object reference is unsupported");
             auto fo=a.pointer(*ao+8,20);unsigned material_channels=0;
+            // Separate material AObjs can share an authored FObj. The
+            // chain-local set still rejects a real next-pointer cycle.
+            std::set<uint32_t> material_track_seen;
             while(fo) {
-                require(n.tracks.size()<10&&track_seen.insert(*fo).second,"Material alpha animation duplicate track or cycle");
+                require(n.tracks.size()<10&&material_track_seen.insert(*fo).second,"Material alpha animation duplicate track or cycle");
                 record(*fo,20); auto track=std::make_unique<NativeTrack>(); auto& f=track->descriptor;
                 f.length=a.be32(*fo+4);f.startframe=a.f32(*fo+8);
                 const auto fields=a.range(*fo+12,4);f.type=fields[0];f.frac_value=fields[1];f.frac_slope=fields[2];

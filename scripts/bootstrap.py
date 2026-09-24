@@ -11,6 +11,11 @@ import venv
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# Pinned Aurora plus the reviewed patch preceding the ImGui timestamp fix.
+# Previous patch blob: 0bf4dc0e2e4370d4fbd01198c5851ccf23d0a26e.
+# Recognize this exact source tree, never an arbitrary locally modified checkout.
+AURORA_PREVIOUS_PATCH_TREE = "5c55151760b50ffb99d0f61b665a3cf3fab0efdf"
+
 
 def run(*args, cwd=ROOT):
     subprocess.run([str(arg) for arg in args], cwd=cwd, check=True)
@@ -53,6 +58,10 @@ def read_lock(root=ROOT):
             raise ValueError(f"{name}: missing reference tool URL")
         if not re.fullmatch(r"[0-9a-f]{40}", str(spec.get("commit", ""))):
             raise ValueError(f"{name}: reference tool commit must be a full lowercase Git SHA-1")
+        if spec.get("kind") == "source":
+            continue
+        if spec.get("kind") not in (None, "package"):
+            raise ValueError(f"{name}: unsupported reference tool kind")
         if not isinstance(spec.get("package"), str) or not spec["package"]:
             raise ValueError(f"{name}: missing reference package name")
         if not re.fullmatch(r"\d+\.\d+\.\d+", str(spec.get("version", ""))):
@@ -94,41 +103,56 @@ def require_clean(path):
         raise ValueError(f"{path.name}: contains local changes; refusing to overwrite or build")
 
 
-def patch_state(path, patch):
-    """Return clean/applied, refusing any changes beyond the reviewed patch."""
+def _patch_trees(path, patch):
+    """Identify pristine, reviewed and actual trees without changing the real index."""
     if not patch.is_file():
         raise ValueError(f"Missing reviewed patch: {patch}")
     if output("git", "diff", "--cached", "--name-only", cwd=path):
         raise ValueError(f"{path.name}: contains staged changes; refusing to apply or build")
-    # An isolated index computes the exact expected diff, without touching the
+    # An isolated index computes the exact expected tree, without touching the
     # checkout's working files or index. Reverse-apply alone accepts unrelated edits.
     with tempfile.TemporaryDirectory(prefix="melee-web-patch-") as temporary:
         env = dict(os.environ, GIT_INDEX_FILE=str(Path(temporary) / "index"))
         subprocess.run(["git", "read-tree", "HEAD"], cwd=path, env=env, check=True)
+        pristine = subprocess.check_output(["git", "write-tree"], cwd=path, env=env, text=True).strip()
         subprocess.run(["git", "apply", "--cached", str(patch.resolve())], cwd=path, env=env, check=True)
         expected = subprocess.check_output(
-            ["git", "diff", "--no-ext-diff", "--no-color", "--cached", "--binary", "HEAD"],
-            cwd=path, env=env,
-        )
+            ["git", "write-tree"], cwd=path, env=env, text=True,
+        ).strip()
         subprocess.run(["git", "read-tree", "HEAD"], cwd=path, env=env, check=True)
         # Include untracked additions in the comparison: a reviewed patch may add
         # files, while unrelated local files still make the comparison fail.
         subprocess.run(["git", "add", "--all", "--", "."], cwd=path, env=env, check=True)
         actual = subprocess.check_output(
-            ["git", "diff", "--no-ext-diff", "--no-color", "--cached", "--binary", "HEAD"],
-            cwd=path, env=env,
-        )
+            ["git", "write-tree"], cwd=path, env=env, text=True,
+        ).strip()
+    return pristine, expected, actual
+
+
+def patch_state(path, patch):
+    """Return clean/applied, refusing any changes beyond the reviewed patch."""
+    pristine, expected, actual = _patch_trees(path, patch)
     if actual == expected:
         return "applied"
-    if not actual:
+    if actual == pristine:
         return "clean"
     raise ValueError(f"{path.name}: changes differ from {patch.name}; refusing to overwrite or build")
 
 
-def apply_patch(path, patch):
-    if patch_state(path, patch) == "clean":
-        run("git", "apply", "--check", patch.resolve(), cwd=path)
-        run("git", "apply", patch.resolve(), cwd=path)
+def apply_patch(path, patch, *, previous_tree=None):
+    pristine, expected, actual = _patch_trees(path, patch)
+    if actual == expected:
+        return
+    if actual != pristine and actual != previous_tree:
+        raise ValueError(f"{path.name}: changes differ from {patch.name}; refusing to overwrite or build")
+    # Apply only the delta from an explicitly recognized tree. Reversing the
+    # whole old patch would touch unchanged sources and invalidate build caches.
+    delta = subprocess.check_output(
+        ["git", "diff", "--no-ext-diff", "--no-color", "--binary", actual, expected], cwd=path)
+    subprocess.run(["git", "apply", "--check", "-"], input=delta, cwd=path, check=True)
+    subprocess.run(["git", "apply", "-"], input=delta, cwd=path, check=True)
+    if patch_state(path, patch) != "applied":
+        raise ValueError(f"{path.name}: patch did not produce the exact reviewed tree")
 
 
 def verify_sources(root, lock):
@@ -157,7 +181,7 @@ def bootstrap(root=ROOT):
         path = ensure_repository(deps, name, spec)
         if name != "aurora":
             require_clean(path)
-    apply_patch(deps / "aurora", patch)
+    apply_patch(deps / "aurora", patch, previous_tree=AURORA_PREVIOUS_PATCH_TREE)
 
     env_dir = root / ".venv"
     if env_dir.is_symlink():

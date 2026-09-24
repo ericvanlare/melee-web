@@ -55,19 +55,34 @@ DatEffectEntries::DatEffectEntries(std::shared_ptr<const DatArchive> archive,std
     if(!root)throw DatError("Exact effect entry symbol is absent");
     const auto& a=*s.archive;
     if(8+size_t(count)*20>a.next_target_offset(*root)-*root)throw DatError("Effect entries cross their referenced region");
-    s.bank=std::make_unique<DatEffectBanks>(s.archive,symbol,bank);
+    const auto commands=a.pointer(*root,8),textures=a.pointer(*root+4,4);
+    if(bool(commands)!=bool(textures))throw DatError("Effect table has an incomplete particle bank pair");
+    // efAsync_LoadSync permits model-only effect tables: both particle roots
+    // are null (for example Link's authored sword effects).
+    if(commands)s.bank=std::make_unique<DatEffectBanks>(s.archive,symbol,bank);
     s.table=static_cast<Table*>(std::calloc(1,8+size_t(count)*20));
     if(!s.table)throw DatError("Cannot allocate native effect entries");
-    s.table->commands=melee_web_effect_bank_commands(s.bank->bank());
-    s.table->textures=melee_web_effect_bank_textures(s.bank->bank());
+    if(s.bank){
+        s.table->commands=melee_web_effect_bank_commands(s.bank->bank());
+        s.table->textures=melee_web_effect_bank_textures(s.bank->bank());
+    }
     for(uint32_t i=0;i<count;++i){
       try {
         auto owner=std::make_unique<Entry>();auto& e=*owner;const uint32_t at=*root+8+20*i;
         const float lifetime=a.f32(at);
         if(!std::isfinite(lifetime)||lifetime<0||lifetime>65535)throw DatError("Effect lifetime exceeds native source range");
+        auto& out=reinterpret_cast<EF_EffectDesc*>(s.table+1)[i];out.lifetime=lifetime;
         const auto model=a.pointer(at+4,64),animation=a.pointer(at+8,20),material=a.pointer(at+12,12);
-        if(!model)throw DatError("Effect static model has no joint descriptor");
         const auto shape=a.pointer(at+16,12);
+        if(!model){
+            // Source tables can retain an empty model row beside particle
+            // commands with the same numeric suffix (Pikachu's row 7005).
+            // Keep its index and exact zero descriptor; no model is invented.
+            if(lifetime!=0||animation||material||shape)
+                throw DatError("Effect null model row has a lifetime or animation descriptor");
+            s.entries.push_back(std::move(owner));
+            continue;
+        }
         e.model=std::make_unique<DatNativeJoint>(s.archive,*model);char error[256];
         e.native=melee_web_native_joint_hydrate(&e.model->graph(),error,sizeof(error));
         if(!e.native)throw DatError(error);
@@ -84,7 +99,6 @@ DatEffectEntries::DatEffectEntries(std::shared_ptr<const DatArchive> archive,std
         }
         if(material)e.material_animation=std::make_unique<DatMaterialAnimation>(s.archive,*material,e.model->graph());
         if(shape)e.shape_animation=std::make_unique<DatShapeAnimation>(s.archive,*shape,e.model->graph());
-        auto& out=reinterpret_cast<EF_EffectDesc*>(s.table+1)[i];out.lifetime=lifetime;
         out.model_desc.joint=static_cast<HSD_Joint*>(melee_web_native_joint_descriptor(e.native,error,sizeof(error)));
         out.model_desc.animjoint=e.animation?static_cast<HSD_AnimJoint*>(e.animation->descriptor()):nullptr;
         out.model_desc.matanim_joint=e.material_animation?static_cast<HSD_MatAnimJoint*>(e.material_animation->descriptor()):nullptr;
@@ -96,32 +110,44 @@ DatEffectEntries::DatEffectEntries(std::shared_ptr<const DatArchive> archive,std
     }
 }
 DatEffectEntries::~DatEffectEntries(){if(!detach(nullptr,0))std::terminate();}
-bool DatEffectEntries::load(char* error,size_t size){
+bool DatEffectEntries::publish_for_source(char* error,size_t size){
     auto& s=*storage_;
-    if(s.needs_particles&&!melee_web_effect_runtime_active())return fail(error,size,"Effect particle descriptors require the original callback runtime");
+    if(s.needs_particles&&!melee_web_effect_runtime_prepared())return fail(error,size,"Effect particle descriptors require an owned callback runtime");
     if(s.registration)return fail(error,size,"Effect entries are already published");
     if(efLib_EffectCount)return fail(error,size,"Live source effects prevent descriptor replacement");
     if(s.bank_index>=50)return fail(error,size,"Effect source bank index is invalid");
     auto& lookup=efAsync_DatEntries[s.bank_index];
     if(!lookup.ef_DAT_file||!lookup.effDataTable_name||s.symbol!=lookup.effDataTable_name)
         return fail(error,size,"Effect table does not match original source lookup");
-    if(!melee_web_effect_bank_attach(s.bank->bank(),error,size))return false;
+    if(s.bank&&!melee_web_effect_bank_attach(s.bank->bank(),error,size))return false;
     MeleeWebArchiveSymbol entry{lookup.ef_DAT_file,lookup.effDataTable_name,s.table};
     s.registration=melee_web_archive_sections_register(&entry,1,error,size);
-    if(!s.registration){melee_web_effect_bank_detach(s.bank->bank(),nullptr,0);return false;}
+    if(!s.registration){if(s.bank)melee_web_effect_bank_detach(s.bank->bank(),nullptr,0);return false;}
     s.previous_data=lookup.data;lookup.data=nullptr;
-    efAsync_LoadSync(int(s.bank_index));
+    if(error&&size)*error=0;return true;
+}
+bool DatEffectEntries::verify_source_load(char* error,size_t size){
+    auto& s=*storage_;
+    if(!s.registration)return fail(error,size,"Effect entries are not published");
+    const auto& lookup=efAsync_DatEntries[s.bank_index];
     s.ready=lookup.data==s.table+1;
     if(!s.ready)return fail(error,size,"Original effect loader did not publish owned entries");
     if(error&&size)*error=0;return true;
+}
+bool DatEffectEntries::load(char* error,size_t size){
+    if(storage_->needs_particles&&!melee_web_effect_runtime_active())
+        return fail(error,size,"Effect particle descriptors require the initialized original callback runtime");
+    if(!publish_for_source(error,size))return false;
+    efAsync_LoadSync(int(storage_->bank_index));
+    return verify_source_load(error,size);
 }
 bool DatEffectEntries::detach(char* error,size_t size){
     auto& s=*storage_;
     if(!s.registration)return true;
     if(efLib_EffectCount)return fail(error,size,"Live source effects prevent descriptor release");
     auto& lookup=efAsync_DatEntries[s.bank_index];
-    if(lookup.data!=s.table+1)return fail(error,size,"Effect lookup ownership changed");
-    if(!melee_web_effect_bank_detach(s.bank->bank(),error,size))return false;
+    if(lookup.data!=s.table+1&&(s.ready||lookup.data))return fail(error,size,"Effect lookup ownership changed");
+    if(s.bank&&!melee_web_effect_bank_detach(s.bank->bank(),error,size))return false;
     lookup.data=s.previous_data;
     if(!melee_web_archive_sections_close(s.registration,error,size))std::terminate();
     s.registration=nullptr;s.previous_data=nullptr;s.ready=false;
@@ -131,5 +157,5 @@ bool DatEffectEntries::entries_ready()const noexcept{return storage_->ready;}
 
 void* DatEffectEntries::table()const noexcept{return storage_->table;}
 uint32_t DatEffectEntries::entry_count()const noexcept{return uint32_t(storage_->entries.size());}
-MeleeWebEffectBank* DatEffectEntries::bank()const noexcept{return storage_->bank->bank();}
+MeleeWebEffectBank* DatEffectEntries::bank()const noexcept{return storage_->bank?storage_->bank->bank():nullptr;}
 }

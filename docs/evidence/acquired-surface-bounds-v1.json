@@ -1,0 +1,29 @@
+{
+  "schema": "webmelee-acquired-surface-bounds-v1",
+  "scope": "Visible public WebGPU presentation resize; no gameplay or performance acceptance",
+  "upstream_source_revision": "749d6ee7a22bdfab78c8ece9047bca5d79aa72ca",
+  "patch_sha256": "dcfc7d7220e99c5c244bdf54aed2ae9f14e930d5dd6ce30c028904c41124eb89",
+  "negative_control": {
+    "runtime_graph": "f873d9cbd23d74cb",
+    "manifest_sha256": "b40201be3a786a91d5f73cf8fc8df8f90114ecaea163a4d1762cabf3e67ea46b",
+    "prior_bounds": [
+      640,
+      480
+    ],
+    "acquired_attachment": [
+      320,
+      607
+    ],
+    "result": "WebGPU scissor validation abort on first narrow resize"
+  },
+  "candidate": {
+    "runtime_graph": "58460ceb5fba493d",
+    "manifest_sha256": "a409db35d78d498c4710cedcb39ffaada75b10e94efe15a079a2600d4c08cdc5",
+    "resize_observations": 14,
+    "observations_during_preparation": 13,
+    "browser_errors": 0,
+    "shared_controller_test": "pass",
+    "source_framebuffer_resizing_retained": true
+  },
+  "protected_payloads_in_receipt": false
+}

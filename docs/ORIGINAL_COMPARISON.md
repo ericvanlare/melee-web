@@ -94,8 +94,16 @@ callback's output stack slot.
 The host patch defines this terminal single-CON case using the authored value,
 with no change to parser state or flags. This preserves the observed FD visibility
 result; it deliberately does **not** reproduce incidental original stack bits.
-Other undefined interpolation states still fail explicitly, and native archive
-validation rejects unpaired LIN/SPL tracks. Parser regressions exercise delayed
+The same rule now covers every terminal single-datum stream: each interpolation
+type's own zero-duration path emits `p1` (CON at `time>=fterm`, LIN with its
+wait flag, SPL0/SPL/SLP at `fterm==0`), and KEY terminals are already defined by
+`FObjLaunchKeyData`. Donkey's Pass and StopCeil branch terminals were the first
+exercised SPL0 endpoints; their focused checks now pass and the platform-drop
+reducer completes. States outside that class still fail explicitly. Generic pose
+validation rejects unpaired LIN/SPL tracks; native fighter-action hydration
+retains structurally bounded streams and fails at the guarded consumer if
+undefined output is reached. See [Donkey's current
+boundary](DONKEY_KONG_PORT_NOTES.md). Parser regressions exercise delayed
 zero and one constants, early-callback rejection and invalid-state rejection.
 The two-world 36,000-frame FD probe passes every state and cycle restart.
 
