@@ -15,6 +15,24 @@ typedef struct MeleeWebGameplayStats {
     uint64_t generation; /* Changes when a fresh arena/world is created. */
 } MeleeWebGameplayStats;
 
+/* Backing allocation identity is stable across worlds while an application
+ * session owns the arena. It is numeric only for lifecycle diagnostics; no
+ * caller may dereference it. All fields are zero after final session release. */
+typedef struct MeleeWebGameplayAllocation {
+    uint64_t identity;
+    uint64_t generation;
+    uint64_t bytes;
+} MeleeWebGameplayAllocation;
+
+/* Reserve one backing arena for an application session. The arena is not
+ * initialized as an SDK heap until the first world starts. A session keeps the
+ * allocation and its payload bytes across world shutdown/startup; ordinary
+ * startup/shutdown retains its existing malloc/free behavior. */
+int melee_web_gameplay_session_begin(size_t heap_bytes, char* error, size_t error_size);
+int melee_web_gameplay_session_end(char* error, size_t error_size);
+int melee_web_gameplay_session_active(void);
+MeleeWebGameplayAllocation melee_web_gameplay_allocation(void);
+
 /* Owns a single isolated SDK heap and the HSD process tables. This nonrendering
  * bootstrap executes original allocation, object lifecycle and scheduling;
  * it does not initialize Fighter, stage, audio or graphics-object destructors.

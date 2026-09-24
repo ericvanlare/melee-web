@@ -240,6 +240,19 @@ else {
 }
 await pump(player.pause()); assert.equal(player.getState().paused, true);
 await pump(player.resume()); assert.equal(player.getState().running, true);
+phase = 8; running = true; window.menuFrame(true);
+assert.equal(player.getState().scene, 'results');
+assert.equal(player.getState().canPause, true, 'Results remains an active pausable scene');
+assert.equal(player.getState().canStart, false, 'Results cannot start a second route');
+await pump(player.pause()); assert.equal(player.getState().paused, true);
+await pump(player.resume()); assert.equal(player.getState().running, true);
+phase = 9; running = true; window.menuFrame(true);
+assert.equal(player.getState().scene, 'prize');
+assert.equal(player.getState().canPause, true, 'Prize remains an active pausable scene');
+assert.equal(player.getState().canStart, false, 'Prize cannot start a second route');
+await pump(player.pause()); assert.equal(player.getState().paused, true);
+await pump(player.resume()); assert.equal(player.getState().running, true);
+phase = 1; running = true; window.menuFrame(true);
 window.menuPreparation('Next source scene', true);
 assert.equal(window.menuAudioReadyForPreparation(), true, 'Same-owner transitions preserve continuous audio');
 assert.equal(player.getState().canPause, false);

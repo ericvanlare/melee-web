@@ -148,6 +148,7 @@ struct OwnedAdditionalCostume {
 };
 struct GameplayFighterAssets::Storage {
     std::shared_ptr<const DatArchive> fighter;
+    std::shared_ptr<const DatArchive> result_demo_archive;
     FighterCostume identity;
     std::unique_ptr<OwnedCostumePart> part;
     std::vector<uint8_t> animation;
@@ -377,7 +378,9 @@ struct GameplayFighterAssets::Storage {
         }
         if(!melee_web_fighter_data_set_part_animations(data,part_group_table.data(),part_group_count,
             &unresolved,error,sizeof(error)))throw DatError(error);
-        // Demo clips remain explicitly unavailable.
+        // Result demo clips are hydrated by a per-bind action store when the
+        // owner has an installed GmRstM* archive.  The ordinary fighter data
+        // graph remains shared by both modes.
         // All other ftData roots are required; Article spawning has its own gate.
         constexpr uint32_t neutral_unreached=(1U<<5)|(1U<<6);
         if(!data || (unresolved&~neutral_unreached))throw DatError("Creation-reachable fighter data is not hydrated: kind="+
@@ -389,14 +392,33 @@ struct GameplayFighterAssets::Storage {
             melee_web_native_joint_descriptor(native.get(),error,sizeof(error)),material?material->descriptor():nullptr,
             part?part->archive:nullptr,uint32_t(prototype.runtime().actions().size()),this,bind,unbind,error,sizeof(error));
         if(!scope)throw DatError(error);
+        if(!melee_web_fighter_assets_set_demo(scope,fighter_demo_motion_count(id.fighter_kind),
+            bind_demo,error,sizeof(error)))throw DatError(error);
     }
     static int bind(void* context,Fighter* fp,void** rows,void** blends,char* error,size_t size)
     {
         try {
             auto& s=*static_cast<Storage*>(context);
             for(size_t i=0;i<s.fighters.size();++i)if(!s.fighters[i]) {
-                auto actions=std::make_unique<GameplayActionStore>(s.fighter,s.identity,s.animation);
-                actions->bind(fp);*rows=actions->action_rows();*blends=actions->blend_rows();
+                auto actions=std::make_unique<GameplayActionStore>(s.fighter,s.identity,s.animation,
+                                                                    s.result_demo_archive);
+                actions->bind(fp);
+                *rows=actions->action_rows();*blends=actions->blend_rows();
+                s.bindings[i]=std::move(actions);s.fighters[i]=fp;return 1;
+            }
+            throw DatError("Per-Fighter asset retention capacity exceeded");
+        }catch(const std::exception& e){if(error&&size)std::snprintf(error,size,"%s",e.what());return 0;}
+    }
+    static int bind_demo(void* context,Fighter* fp,void** rows,void** blends,char* error,size_t size)
+    {
+        try {
+            auto& s=*static_cast<Storage*>(context);
+            for(size_t i=0;i<s.fighters.size();++i)if(!s.fighters[i]) {
+                auto actions=std::make_unique<GameplayActionStore>(s.fighter,s.identity,s.animation,
+                                                                    s.result_demo_archive);
+                actions->bind(fp);*rows=actions->demo_action_rows();*blends=actions->demo_blend_rows();
+                if(!*rows || !*blends)
+                    throw DatError("Result demo action tables are unavailable for this fighter");
                 s.bindings[i]=std::move(actions);s.fighters[i]=fp;return 1;
             }
             throw DatError("Per-Fighter asset retention capacity exceeded");
@@ -429,6 +451,12 @@ void GameplayFighterAssets::add_costume(std::shared_ptr<const DatArchive> archiv
        value->part?value->part->archive:nullptr,error,sizeof(error)))
         throw DatError(error);
     storage_->additional[id.costume_index]=std::move(value);
+}
+void GameplayFighterAssets::set_result_demo_archive(std::shared_ptr<const DatArchive> archive)
+{
+    if (!storage_ || live_fighters())
+        throw DatError("Result demo archive requires an idle fighter asset owner");
+    storage_->result_demo_archive = std::move(archive);
 }
 GameplayFighterAssets::~GameplayFighterAssets()
 {

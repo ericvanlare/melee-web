@@ -27,8 +27,11 @@ def snapshot():
 
 class PadSnapshotTests(unittest.TestCase):
     def test_native_codec_and_source_input_edges(self):
-        target=ROOT/'build/browser/gameplay_pad_state_trace.js'
-        if not target.is_file():self.skipTest('Build gameplay_pad_state_trace')
+        targets=[ROOT/'build'/build/'gameplay_pad_state_trace.js'
+                 for build in ('browser','browser-release')]
+        available=[target for target in targets if target.is_file()]
+        if not available:self.skipTest('Build gameplay_pad_state_trace')
+        target=max(available,key=lambda value:value.stat().st_mtime_ns)
         result=subprocess.run([str(node_runtime()),str(target)],capture_output=True,text=True,timeout=30)
         self.assertEqual(result.returncode,0,result.stdout+result.stderr)
         self.assertIn('held/released edges',result.stdout)

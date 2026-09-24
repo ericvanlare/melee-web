@@ -16,6 +16,9 @@ public:
     GameplayFighterAssets(const GameplayFighterAssets&)=delete;
     GameplayFighterAssets& operator=(const GameplayFighterAssets&)=delete;
     void add_costume(std::shared_ptr<const DatArchive>,const FighterCostume&);
+    // Install the source GmRstM* result archive before creating result demo
+    // Fighters. Ordinary match action stores remain on Pl*AJ data.
+    void set_result_demo_archive(std::shared_ptr<const DatArchive>);
     void close();
     uint32_t live_fighters() const noexcept;
     uint32_t unresolved_fields() const noexcept;

@@ -50,8 +50,13 @@ int main(void) {
                                         str(program), '-lm', '-o', str(executable)],
                                        capture_output=True, text=True, timeout=60)
                 self.assertEqual(built.returncode, 0, built.stdout + built.stderr)
-                run = subprocess.run([str(executable)], capture_output=True, text=True,
-                                     env=dict(os.environ, ASAN_OPTIONS='detect_leaks=0'), timeout=30)
+                try:
+                    run = subprocess.run([str(executable)], capture_output=True, text=True,
+                                         env=dict(os.environ, ASAN_OPTIONS='detect_leaks=0:symbolize=0'), timeout=30)
+                except subprocess.TimeoutExpired as error:
+                    stdout = error.stdout.decode(errors='replace') if isinstance(error.stdout, bytes) else error.stdout
+                    stderr = error.stderr.decode(errors='replace') if isinstance(error.stderr, bytes) else error.stderr
+                    self.fail(f'{name} negative control timed out; stdout={stdout!r} stderr={stderr!r}')
                 if name == 'fixed':
                     self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
                 else:

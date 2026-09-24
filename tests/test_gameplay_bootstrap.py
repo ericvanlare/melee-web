@@ -21,6 +21,9 @@ class GameplayBootstrapTests(unittest.TestCase):
     def test_generation_accessor_rejects_replaced_heap(self):
         self.run_trace("bootstrap_replaced")
 
+    def test_session_arena_retains_original_payload_between_worlds(self):
+        self.run_trace("retained_session")
+
     def run_trace(self, kind):
         sdk = ROOT / ".deps/emsdk"
         compiler = sdk / "upstream/emscripten"
@@ -47,7 +50,8 @@ class GameplayBootstrapTests(unittest.TestCase):
             source = prepare_sources(ROOT)
         original = source / "sysdolphin/baselib"
         c_sources = [ROOT / "src/gameplay_bootstrap.c", ROOT / "src/hsd_host_support.c",
-                     ROOT / ("tests/gameplay_bootstrap_trace.c" if kind.startswith("bootstrap")
+                     ROOT / ("tests/gameplay_bootstrap_trace.c"
+                             if kind in ("bootstrap", "bootstrap_replaced", "retained_session")
                              else "src/gameplay_fighter_probe.c")]
         c_sources.append(source / "melee/lb/lb_00F9.c")
         cpp_sources = []
@@ -86,13 +90,14 @@ class GameplayBootstrapTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             asset = ROOT / "assets-local/next-gate/PlCo.dat"
             arguments = [str(asset)] if kind == "fighter" and asset.is_file() else []
-            if kind == "bootstrap_replaced":
-                arguments = ["replaced_heap"]
+            if kind == "bootstrap_replaced": arguments = ["replaced_heap"]
+            if kind == "retained_session": arguments = ["retained_session"]
             result = subprocess.run([str(node), str(output), *arguments], cwd=directory, env=env,
                                     capture_output=True, text=True, timeout=30)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             expected = ("Gameplay generation accessor replacement guard: passed" if kind == "bootstrap_replaced"
-                        else "Original HSD gameplay-bootstrap scheduler trace: passed" if kind == "bootstrap" else
+                        else "Original gameplay session arena retention trace: passed" if kind == "retained_session" else
+                        "Original HSD gameplay-bootstrap scheduler trace: passed" if kind == "bootstrap" else
                         "Original Fighter input consumer and lifetime trace: passed")
             self.assertIn(expected, result.stdout)
             if kind == "fighter" and asset.is_file():

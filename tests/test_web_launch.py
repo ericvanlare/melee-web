@@ -14,11 +14,14 @@ class WebLaunchTests(unittest.TestCase):
         runtime = (ROOT / "web" / "runtime.html").read_text(encoding="utf-8")
         development = (ROOT / "web" / "runtime-development.mjs").read_text(encoding="utf-8")
         owner = (ROOT / "web" / "melee-runtime.mjs").read_text(encoding="utf-8")
+        prototype_adapter = (ROOT / "web" / "prototype-runtime-adapter.mjs").read_text(encoding="utf-8")
         self.assertIn('type="module" src="runtime-development.mjs"', runtime)
         self.assertIn("mountMeleeRuntime", development)
         self.assertIn("gameplay_menu_browser.js", development)
         self.assertIn("loadNativeGameDisc", owner)
         self.assertIn("_melee_web_native_menu_launch", owner)
+        self.assertIn("8: 'results'", owner)
+        self.assertIn("8: 'results'", prototype_adapter)
         for text in ("perf-metrics", "audio-metrics", "runtime-cache.js",
                      "Clear render cache + reload", "Run visible action/performance sweep"):
             self.assertIn(text, runtime)

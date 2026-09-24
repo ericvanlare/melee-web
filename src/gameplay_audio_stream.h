@@ -18,6 +18,10 @@ typedef struct MeleeWebAudioStream MeleeWebAudioStream;
 /* Borrows validated native HPS descriptors; owns byte transport and three slots.
  * Start is performed by the original lbAudio/AXDriver file-path call. */
 MeleeWebAudioStream* melee_web_audio_stream_begin(MeleeWebAudio*,const MeleeWebAudioStreamInput*,char*,size_t);
+/* The original HPS loader uses one file identity per selected path.  This
+ * registry keeps those identities separate while sharing the source's three
+ * decoded slots.  The inputs and their descriptors are borrowed until end. */
+MeleeWebAudioStream* melee_web_audio_stream_begin_registry(MeleeWebAudio*,const MeleeWebAudioStreamInput*,uint32_t,char*,size_t);
 int melee_web_audio_stream_end(MeleeWebAudioStream*,char*,size_t);
 int melee_web_audio_stream_pump_for(MeleeWebAudio*,char*,size_t);
 int melee_web_audio_stream_resolve(MeleeWebAudio*,uint32_t address,const MeleeWebAudioChannel**,uint32_t* base);

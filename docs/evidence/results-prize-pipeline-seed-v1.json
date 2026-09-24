@@ -1,0 +1,78 @@
+{
+  "schema": "melee-web-results-prize-pipeline-seed",
+  "version": 1,
+  "source_base_commit": "0e1e06c7d0b084378152e0af2ad1911dc84e6466",
+  "scope": "Reviewed append-only Aurora renderer metadata for the PR56 Results/Prize browser path. The candidate adds 26 type-1 descriptors to the prior 858-row seed, keeps existing payloads unchanged, and contains no Dawn driver cache. The source export covered seven ordinary keyboard four-stock matches with original Results/Prize/CSS returns followed by native unload/cache idle. It did not include source warmup ticks or draws and establishes no original equivalence, performance, or retail acceptance.",
+  "review": {
+    "status": "eligible_append_only_merge",
+    "candidate_new_rows": 26,
+    "preserved_base_rows": 858,
+    "payload_conflicts": 0,
+    "candidate_existing_first_frame_changes": 146,
+    "candidate_missing_base_rows": 229,
+    "dawn_driver_cache_included": false,
+    "source_record": "fresh-origin Results/Prize/CSS export from the reviewed issue34 seed-discovery run"
+  },
+  "seed": {
+    "path": "web/initial_pipeline_cache.db.gz.b64",
+    "encoded_bytes": 110658,
+    "encoded_sha256": "8aa03d3eca17d71b9eab9cf0b9ad60e45dd45ab5789441e48824da3ed5c7e839",
+    "decoded_bytes": 3674112,
+    "decoded_sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+  },
+  "materializer": {
+    "script": "scripts/materialize_pipeline_cache.py",
+    "command": "python3 scripts/materialize_pipeline_cache.py web/initial_pipeline_cache.db.gz.b64 <temporary-output> --identity-header <temporary-header>",
+    "expected_decoded_sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca",
+    "identity_header_sha256": "a753aec2629f9fdc62c042fc7269972fc455b08eae7d28072f2b0e1272a4391a"
+  },
+  "sqlite": {
+    "integrity_check": "ok",
+    "aurora_schema_values": [
+      1
+    ],
+    "pipeline_cache_groups": [
+      {
+        "type": 0,
+        "rows": 1,
+        "config_bytes": 64,
+        "config_version": 4,
+        "config_size": 64
+      },
+      {
+        "type": 1,
+        "rows": 883,
+        "config_bytes": 2447676,
+        "config_version": 65549,
+        "config_size": 2772
+      }
+    ],
+    "total_rows": 884
+  },
+  "validation": {
+    "seed_test_command": "python3 -m unittest tests.test_pipeline_cache_seed -v",
+    "seed_test_result": "pass (5 tests)",
+    "runtime_build_command": "python3 scripts/build.py --target runtime --configuration Release --jobs 2",
+    "runtime_build_log": "work/testlogs/pr56-runtime-release-build-seed-20260923.log",
+    "runtime_build_log_sha256": "093176e276c00bd7ac909c4bef0683b481a1f373ccc372f4dab2d175abb720c5",
+    "artifacts": {
+      "runtime.html": {
+        "bytes": 5007,
+        "sha256": "7dbdba45a72835799f02df323ce93e762ed3ad9d8941522ebe4d550913460172"
+      },
+      "gameplay_menu_browser.js": {
+        "bytes": 286955,
+        "sha256": "9757f35d17d12739d98a1ed327caee2797ede449fd1a36178b21b71ecda1fd67"
+      },
+      "gameplay_menu_browser.wasm": {
+        "bytes": 13580043,
+        "sha256": "4d952e2cfadaea4172693cd07d21157f75e731bbde9a6d9f543f6be22e305fc4"
+      },
+      "gameplay_menu_browser.data": {
+        "bytes": 3674112,
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      }
+    }
+  },
+  "deployed": false
+}

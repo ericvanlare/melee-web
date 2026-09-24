@@ -28,6 +28,37 @@ struct Fixture {
         b[pub+8]='r';return std::make_shared<melee_web::DatArchive>(b);
     }
 };
+struct SharedTextureFixture : Fixture {
+    SharedTextureFixture() {
+        data.resize(512);
+        // Two independent texture AObjs use the same authored FObj bytes.
+        // The texture descriptors and AObjs remain distinct source records.
+        link(28, 220); // first TexAnim -> second TexAnim
+        put32(data, 224, 1); // second TexAnim source texture ID
+        link(228, 380); // second TexAnim -> second AObj
+        link(232, 68); // share the image table, not the descriptor
+        put32(data, 240, 2U << 16); // two images, no palettes
+        link(388, 76); // second AObj -> the same FObj as the first AObj
+    }
+};
+struct SharedMaterialFixture : Fixture {
+    SharedMaterialFixture() {
+        data.resize(512);
+        // Two material AObjs use the same authored FObj. The DObj chain is
+        // separate from the texture chain above so both local cycle guards
+        // are exercised independently.
+        link(12, 340);  // first DObj -> second DObj
+        link(16, 360);  // first DObj -> first material AObj
+        link(344, 380); // second DObj -> second material AObj
+        put32(data, 424, 4); // shared material FObj stream length
+        put32(data, 428, std::bit_cast<uint32_t>(10.0f));
+        data[432] = 10; data[433] = 0x85;
+        link(436, 440); // shared material FObj -> stream
+        std::copy(data.begin() + 96, data.begin() + 100, data.begin() + 440);
+        link(368, 420); // first AObj -> shared FObj
+        link(388, 420); // second AObj -> shared FObj
+    }
+};
 struct PairedFixture : Fixture {
     PairedFixture() {
         // Make both image and palette tables explicit and give the two
@@ -65,6 +96,33 @@ int main() {
             try {melee_web::DatMaterialAnimation invalid(bad.archive(),0,model);}catch(const melee_web::DatError&){failed=true;}
             check(failed,"malformed material animation must reject before native evaluation");
         };
+        auto rejected_for=[&](const auto& bad, const auto& checked_model) {
+            bool failed=false;
+            try {melee_web::DatMaterialAnimation invalid(bad.archive(),0,checked_model);}catch(const melee_web::DatError&){failed=true;}
+            check(failed,"malformed material animation must reject its local animation cycle");
+        };
+        MeleeWebNativeTextureDesc textures[2]{};
+        textures[0].source_id=0; textures[1].source_id=1;
+        MeleeWebNativeMaterialDesc multi_material=material;
+        multi_material.textures=textures; multi_material.material.texture_count=2;
+        MeleeWebNativeGraph texture_model{&joint,&dobj,nullptr,&multi_material,1,1,0,1,0};
+        SharedTextureFixture shared_texture;
+        melee_web::DatMaterialAnimation texture_alias(shared_texture.archive(),0,texture_model);
+        check(texture_alias.texture_animation_count()==2,
+              "independent texture AObjs may share one authored FObj");
+        SharedTextureFixture texture_cycle; texture_cycle.link(76,76);
+        rejected_for(texture_cycle,texture_model);
+
+        MeleeWebNativeDObjDesc material_dobjs[2]{};
+        material_dobjs[0].next=1; material_dobjs[0].pobj=UINT32_MAX;
+        material_dobjs[1].next=UINT32_MAX; material_dobjs[1].pobj=UINT32_MAX;
+        MeleeWebNativeGraph material_model{&joint,material_dobjs,nullptr,&material,1,2,0,1,0};
+        SharedMaterialFixture shared_material;
+        melee_web::DatMaterialAnimation material_alias(shared_material.archive(),0,material_model);
+        check(material_alias.descriptor() && material_alias.texture_animation_count()==1,
+              "independent material AObjs may share one authored FObj");
+        SharedMaterialFixture material_cycle; material_cycle.link(420,420);
+        rejected_for(material_cycle,material_model);
         for(unsigned channel=2;channel<=9;channel++){
             Fixture numeric;numeric.data[88]=channel;numeric.data[96]=0x12;
             melee_web::DatMaterialAnimation transform(numeric.archive(),0,model);
