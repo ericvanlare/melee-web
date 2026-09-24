@@ -96,7 +96,7 @@
       "teardown": "pass: driver.unload reached phase 0/running 0; post-unload diagnostics had no runtime, page, console, or owner errors"
     }
   },
-  "browser_scope": "Bounded headless source-motion checks use the source-grounded idle settle and explicit driver.unload. Ness, Peach, and Young Link targeted actions pass with no page, console, runtime, or owner errors. The four-player CPU9 workload now passes original CSS setup for Ness, Peach, Young Link, and Mario, then reaches ready source frame 0 and advances through 180 distinct samples to frame 204 with multiple source motions before explicit unload. The broad action sweep, retail, and timing/performance gates remain outside this receipt; no original-equivalence, pixel, PCM, natural-match-completion, or timing/performance claim is made.",
+  "browser_scope": "Bounded headless source-motion checks use the source-grounded idle settle and explicit driver.unload. Ness, Peach, and Young Link targeted actions pass with no page, console, runtime, or owner errors. A retained v2 attempt is explicitly not admitted: its matchInitial snapshot was null before semantic ready waiting, and its harness could automatically resume timing pauses. The superseding v3 harness uses raw native diagnostics, waits for ready source state, and never resumes. The four-player CPU9 workload now passes original CSS setup for Ness, Peach, Young Link, and Mario, then reaches ready source frame 0 and advances through 180 distinct samples to frame 204 with multiple source motions before explicit unload. The broad action sweep, retail, and timing/performance gates remain outside this receipt; no original-equivalence, pixel, PCM, natural-match-completion, or timing/performance claim is made.",
   "deployed": false,
   "runtime_artifacts": {
     "configuration": "Release",
@@ -124,7 +124,9 @@
         "path": "build/browser-release/runtime-development.mjs",
         "sha256": "08302dc9a5cd031e70b02f95aad6e89b7c19830dfac0991e59ccb82cfe42359e"
       }
-    ]
+    ],
+    "build_log": "work/pr61-final-runtime-build-v1.log",
+    "build_log_sha256": "bcc95b508b345a210447b63eca37f01742aba6e9e80d20a35c7db2899e0cbce3"
   },
   "four_cpu9_browser": {
     "result": "pass_bounded_setup_and_source_prefix",
@@ -140,7 +142,13 @@
     "screenshot_after_unload": "work/pr61-four-cpu9-headless-v3-unloaded.png",
     "screenshot_after_unload_sha256": "366442283f67e218cdcb77397bacfe2c24acb950c84f4cccaf858ab91b832317",
     "observed": "Source CSS selected Ness on door 0 and Peach on door 1, moved Young Link and Mario into doors 2 and 3, toggled all four doors to CPU, and set all four authored CPU sliders to level 9. After Final Destination entry, native diagnostics reported ready source frame 0; 180 distinct read-only source samples advanced to frame 204 and observed motions 356, 14, 44, 182, 233, 15, 16, 78, 24, 25, 69, 86, 65, and 70.",
-    "teardown": "pass: driver.unload reached phase 0/running 0; post-unload diagnostics had no runtime, page, console, or owner errors"
+    "teardown": "pass: driver.unload reached phase 0/running 0; post-unload diagnostics had no runtime, page, console, or owner errors",
+    "prior_attempt": {
+      "report": "work/pr61-four-cpu9-headless-v2.json",
+      "report_sha256": "4d931e50d5bf86d6eaef8dd507b48b389045e19427dfda429a93f001b0f42755",
+      "result": "not_admitted",
+      "observed": "Retained v2 report had matchInitial null because it sampled before semantic ready state, and the v2 harness contained an automatic native timing-pause resume. It is retained as a failure artifact; v3 supersedes it with raw diagnostics, an explicit ready wait, and no resume."
+    }
   },
   "unrun_gates": [
     "broad action sweep",
