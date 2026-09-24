@@ -1,5 +1,13 @@
 # Current status
 
+## Original Synth parameters are derived independently
+
+**Compiled / Source identified / Native traced / Retail compared** for the single
+bank-size field in the [parameter probe](docs/SOURCE_SYNTH_PARAMETERS.md).
+The [scoped receipt](docs/evidence/source-synth-parameters-v1.json) distinguishes
+source-only checks, owned-DOL execution and the post-execution capture comparison.
+No Synth execution, allocation addresses, PCM or session equivalence is claimed.
+
 ## Original AX startup reaches first AI DMA
 
 **Compiled / Source identified / Native traced** for the [joined AX startup fixture](docs/SOURCE_AX_STARTUP.md).
