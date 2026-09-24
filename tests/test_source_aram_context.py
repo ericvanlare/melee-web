@@ -40,7 +40,7 @@ class SourceAramDifferentialTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         compiler = shutil.which(os.environ.get("CXX", "c++"))
-        sdk = ROOT / ".deps/emsdk"
+        sdk = (ROOT / ".deps/emsdk").resolve()
         cls.emcc = sdk / "upstream/emscripten/emcc.py"
         cls.emxx = sdk / "upstream/emscripten/em++.py"
         if (not compiler or not cls.emcc.is_file() or not cls.emxx.is_file()

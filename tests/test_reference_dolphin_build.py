@@ -134,11 +134,28 @@ class ReferenceDolphinBuildTests(unittest.TestCase):
                             "--build-dir", str(self.root / "build")])
             run.assert_not_called()
 
+    def test_allocation_profile_receipt_binds_recipe_and_rejects_missing_or_changed_identity(self):
+        source = BUILD.SOURCE_OVERLAY / "Core/PowerPC/ReferenceAllocationProfile.h"
+        header = self.root / "profile.h"
+        header.write_bytes(source.read_bytes())
+        value = BUILD.allocation_profile_provenance(header)
+        self.assertEqual(value["header_sha256"], BUILD.sha256(header))
+        self.assertEqual(value["generator_sha256"], BUILD.sha256(ROOT / "tools/generate_reference_allocation_profile.py"))
+        self.assertEqual(value["recipe_sha256"], BUILD.sha256(ROOT / "tools/retail_allocation_profile.py"))
+        header.write_text(source.read_text().replace("// Profile SHA-256:", "// Missing profile:"))
+        with self.assertRaisesRegex(SystemExit, "unambiguous Profile"):
+            BUILD.allocation_profile_provenance(header)
+        header.write_text(source.read_text().replace(value["source_revision"], "0" * 40))
+        with self.assertRaisesRegex(SystemExit, "pinned original"):
+            BUILD.allocation_profile_provenance(header)
+
     def test_repeated_receipt_publication_is_idempotent_and_collision_preserves_receipt(self):
         manifest = self.root / "receipt.json"
         archives = self.root / "archives"
         value = {"binary_sha256": "a" * 64, "source_revision": "synthetic"}
         archive = BUILD.publish_build_receipt(value, manifest, archives, self.overlay, self.patch_dir)
+        for name in ("generate_reference_allocation_profile.py", "retail_allocation_profile.py"):
+            self.assertEqual((archive / "tools" / name).read_bytes(), (ROOT / "tools" / name).read_bytes())
         original = manifest.read_bytes()
         self.assertEqual(json.loads(original)["provenance_archive"], str(archive))
         self.assertEqual((archive / manifest.name).read_bytes(), original)

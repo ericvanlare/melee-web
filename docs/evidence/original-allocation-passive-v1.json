@@ -1,0 +1,288 @@
+{
+  "schema": "melee-web-original-allocation-passive",
+  "version": 1,
+  "date": "2026-09-24",
+  "scope": "Read-only first-VS initialization allocation prefix; diagnostic model stops before fighter identity derivation.",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced"
+  ],
+  "scenario": {
+    "players": 4,
+    "fighter": "Mario",
+    "cpu_levels": [
+      9,
+      9,
+      9,
+      9
+    ],
+    "stocks": 4,
+    "stage": "Final Destination",
+    "route": "cold DOL boot through original CSS and SSS to first VS initialization",
+    "renderer": "Null",
+    "cpu": "JITARM64",
+    "speed": 2
+  },
+  "source": {
+    "melee_revision": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+    "dolphin_revision": "c77bbaa0f372c3f72281602a8b087206706542cb",
+    "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646"
+  },
+  "controller_input": {
+    "path": "work/session-equivalence-reference-v1/controller-input.mwri",
+    "bytes": 7207256,
+    "sha256": "f19e1a54a9aceda33217a1e272bc7ac0b78336bd243616a74f9573a9d8fbdcf5"
+  },
+  "profile": {
+    "path": "work/session-equivalence-allocation-profile-v1.json",
+    "bytes": 18308,
+    "sha256": "a0f3a2fd0adca44d66e6425a8f575db6dcddf294164c42b1114560c4565931d2"
+  },
+  "captures": [
+    {
+      "allocation": {
+        "path": "work/session-equivalence-allocation-prefix-v4/allocations.jsonl",
+        "bytes": 121285383,
+        "sha256": "0fd00f2b22c0d4683386589b39a03d5c5d058e4d7645e9fd95fa50e16e3c6ba0"
+      },
+      "result": {
+        "path": "work/session-equivalence-allocation-prefix-v4/result.json",
+        "bytes": 471,
+        "sha256": "21d604cc3d8b11a646bdecfd5d6802f98e2853af04116ccd47968f1f3adeede5"
+      },
+      "primary_prefix_comparison": {
+        "scope": "primary observation prefix only; full session unproven",
+        "compared_records": 6905,
+        "first_difference": null,
+        "terminal": {
+          "event": "end",
+          "payload": {
+            "status": "interrupted",
+            "natural": false
+          }
+        },
+        "prefix_sha256": "1c784796841e2c7011701b8912f41906c91f71684e2b9919dd423717ab13b39e",
+        "ignored_fields": [
+          "timestamp_ns",
+          "capture_id",
+          "sequence_id"
+        ],
+        "full_session_complete": false
+      },
+      "build": {
+        "path": "work/session-equivalence-allocation-build-v7.json",
+        "bytes": 3934,
+        "sha256": "381592a7cd1b2c700d57a0492eb509e973427ff3c3e188a2674d0cc5ff5674f2"
+      }
+    },
+    {
+      "allocation": {
+        "path": "work/session-equivalence-allocation-prefix-v5/allocations.jsonl",
+        "bytes": 121285383,
+        "sha256": "0fd00f2b22c0d4683386589b39a03d5c5d058e4d7645e9fd95fa50e16e3c6ba0"
+      },
+      "result": {
+        "path": "work/session-equivalence-allocation-prefix-v5/result.json",
+        "bytes": 471,
+        "sha256": "20013280c7e3114202a79ab135bac121921fe7d447142ffca4e20abb7a2ad726"
+      },
+      "primary_prefix_comparison": {
+        "scope": "primary observation prefix only; full session unproven",
+        "compared_records": 6994,
+        "first_difference": null,
+        "terminal": {
+          "event": "end",
+          "payload": {
+            "status": "interrupted",
+            "natural": false
+          }
+        },
+        "prefix_sha256": "a3562f3fd4fdf6d306e5ad33e30042853815c646de8568c85f4dc7e6dcdcb8ba",
+        "ignored_fields": [
+          "timestamp_ns",
+          "capture_id",
+          "sequence_id"
+        ],
+        "full_session_complete": false
+      },
+      "build": {
+        "path": "work/session-equivalence-allocation-build-v8.json",
+        "bytes": 3934,
+        "sha256": "2662fe8317d8a4dd41ef278e6c5237c8162639ce1002d0e330a1d1b666e22e2a"
+      }
+    },
+    {
+      "allocation": {
+        "path": "work/session-equivalence-allocation-prefix-v6/allocations.jsonl",
+        "bytes": 121285383,
+        "sha256": "0fd00f2b22c0d4683386589b39a03d5c5d058e4d7645e9fd95fa50e16e3c6ba0"
+      },
+      "result": {
+        "path": "work/session-equivalence-allocation-prefix-v6/result.json",
+        "bytes": 472,
+        "sha256": "d33eefd6807a6e5f7dae42ca3c0c9d1c1a402fa81a46d3ce088a0a06e8e0471a"
+      },
+      "primary_prefix_comparison": {
+        "scope": "primary observation prefix only; full session unproven",
+        "compared_records": 6939,
+        "first_difference": null,
+        "terminal": {
+          "event": "end",
+          "payload": {
+            "status": "interrupted",
+            "natural": false
+          }
+        },
+        "prefix_sha256": "a8af08536bd5888e076566319988fe4bd19b4b2c18c4b07abb641565f7d095df",
+        "ignored_fields": [
+          "timestamp_ns",
+          "capture_id",
+          "sequence_id"
+        ],
+        "full_session_complete": false
+      },
+      "build": {
+        "path": "work/session-equivalence-allocation-build-v11.json",
+        "bytes": 3934,
+        "sha256": "3b43b038cef5427a1b66d9d38b979f84e7af6735e4eea5f0dbd2da5d7e7cb78b"
+      }
+    }
+  ],
+  "allocation_comparison": {
+    "equal_bytes": true,
+    "records": 164416,
+    "calls": 82207,
+    "observed_fighter_constructions": 4,
+    "independently_derived_fighter_identities": 0,
+    "pending_calls": 0,
+    "boundary_complete": true,
+    "ownership_complete": false,
+    "full_session_complete": false,
+    "fresh_captures": 3
+  },
+  "retained_failures": [
+    {
+      "path": "work/session-equivalence-allocation-prefix-v1",
+      "reason": "Unobserved JIT-followed logical returns; return pairing failed."
+    },
+    {
+      "path": "work/session-equivalence-allocation-prefix-v2",
+      "reason": "128-slot queue overflow; replay also exposed incomplete OS heap metadata."
+    },
+    {
+      "path": "work/session-equivalence-allocation-prefix-v3",
+      "reason": "128-slot queue overflow after writer batching; bounded paused-writer reproducer added before increasing byte-bounded queue."
+    },
+    {
+      "path": "work/session-equivalence-allocation-build-v1.log",
+      "reason": "Patch context differed after SI input patch."
+    },
+    {
+      "path": "work/session-equivalence-allocation-build-v3.log",
+      "reason": "Dolphin disables C++ exceptions; startup error handling corrected."
+    },
+    {
+      "path": "work/session-equivalence-allocation-model-tests-v1.log",
+      "reason": "Noncanonical local SDK path through worktree symlink."
+    },
+    {
+      "path": "work/session-equivalence-pr16-full-suite-v1.log",
+      "reason": "Local .deps symlink rejected by pinned-source verification and noncanonical SDK cache paths; replaced with local APFS dependency copy before rerun."
+    },
+    {
+      "path": "work/session-equivalence-allocation-build-v9.log",
+      "reason": "Source archive refused overwrite after whitespace-only cleanup produced same binary SHA; preserved original archive and created separate final source archive."
+    }
+  ],
+  "not_established": [
+    "Asynchronous handle compaction",
+    "Source-derived fighter identities in this capture",
+    "Repeated fighter ownership and teardown",
+    "Source address provider and register carry in browser runtime",
+    "Full-session browser equivalence",
+    "Pixels or PCM equivalence",
+    "Live timing or foreground performance"
+  ],
+  "deployed": false,
+  "artifact_paths": "Relative to lead checkout; raw traces, inputs and builds remain ignored.",
+  "replay": {
+    "status": "unsupported",
+    "scope": "allocation_lifetime_prefix",
+    "completion_scope": "vs_enter_prefix",
+    "complete": false,
+    "boundary_complete": true,
+    "ownership_complete": false,
+    "calls_replayed": 50718,
+    "calls_seen": 82207,
+    "model_actions": 46411,
+    "checked_wasm_matches_native": true,
+    "first_unsupported": {
+      "call": 50719,
+      "function": "lbMemory_8001529C",
+      "kind": "unsupported",
+      "reason": "model rejected source operation: async_move_required",
+      "sequence": 101438
+    },
+    "replay_hashes": {
+      "actions_sha256": "8f1909d883b9c72e4da0cf1094f7e7341cd331e2bdfb293592d4a44393bb45d0",
+      "identities_sha256": "40b12fd50fc59eeb1f07233699bf13aa93a5354f71ac611c7e8488858246e7a4",
+      "outputs_sha256": "2614f25270fb1c6ff57ef3388b202760ebc1dbe5c5dd4a66c7e16a7199486527"
+    },
+    "derived_allocation_identities": 24687,
+    "report": {
+      "path": "work/session-equivalence-allocation-prefix-v5/replay.json",
+      "bytes": 18157518,
+      "sha256": "dae6c477d117d9e1ef6704ee8dfc4c29a80f8cff84fe6681a43e969a515e18ef"
+    }
+  },
+  "final_build": {
+    "path": "work/session-equivalence-allocation-build-v11.json",
+    "bytes": 3934,
+    "sha256": "3b43b038cef5427a1b66d9d38b979f84e7af6735e4eea5f0dbd2da5d7e7cb78b",
+    "binary_sha256": "aed37b4f6df6fd5ed243d075d3556740d4e8e9ce843c7c23ac22d8095cac19b5",
+    "note": "Final retained-capacity queue accounting; source archive bound by build manifest."
+  },
+  "validation": {
+    "full_suite": {
+      "tests": 1301,
+      "passed": 1210,
+      "optional_skips": 91,
+      "seconds": 250.845,
+      "log": {
+        "path": "work/session-equivalence-pr16-full-suite-v2.log",
+        "bytes": 232550,
+        "sha256": "7e57dd5fff277d7f34bfb295a579fb7787abc1f4e8e212a2febcbdae4a26aaf1"
+      },
+      "note": "Full suite preceded final queue capacity-accounting correction; focused compiled observer tests and another original capture validate that correction."
+    },
+    "allocator_component_tests": {
+      "tests": 43,
+      "result": "pass",
+      "log": {
+        "path": "work/session-equivalence-allocation-model-tests-v2.log",
+        "bytes": 7952,
+        "sha256": "8db54f914b704aa3c0d8cc57414e750b27d524cdb6a7d52401a36faa865dd8cc"
+      }
+    },
+    "content_guard": {
+      "tracked_entries": 1195,
+      "findings": 0,
+      "log": {
+        "path": "work/session-equivalence-pr16-content-guard-v2.log",
+        "bytes": 70,
+        "sha256": "ed767d50bf3bb163382c24cb49fe9471f9a28b2e3e43f5000d3d681837c4ef3b"
+      }
+    },
+    "links": "New local links valid; pre-existing ignored STATUS work/scene-entry-profile.md is absent in this checkout.",
+    "final_observer_tests": {
+      "tests": 4,
+      "result": "pass",
+      "log": {
+        "path": "work/session-equivalence-allocation-observer-final-tests.log",
+        "bytes": 776,
+        "sha256": "2196ed1d2cbee2fa6455f68ff8cb2d0cbf3b8112c25aee424cfd4f1170d4e6d5"
+      }
+    }
+  }
+}

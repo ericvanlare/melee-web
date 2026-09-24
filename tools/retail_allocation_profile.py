@@ -103,8 +103,10 @@ def build_profile(dol_path: Path, symbols_path: Path) -> dict:
     initial = {name: int.from_bytes(dol.read(symbols[name]["address"], 4), "big")
                for name in ("seed_ptr", "__OSArenaLo", "current_heap",
                             "iparam_audio_heap_size", "iparam_heap_max_num")}
+    entry_word = int.from_bytes(dol.read(dol.entry, 4), "big")
     return {"schema": "melee-web-original-allocation-profile", "version": 1,
             "dol_sha1": DOL_SHA1, "source_revision": SOURCE_REVISION,
             "symbols_sha256": hashlib.sha256(symbols_path.read_bytes()).hexdigest(),
-            "entry": dol.entry, "functions": functions, "globals": globals_,
+            "entry": dol.entry, "entry_word": entry_word,
+            "functions": functions, "globals": globals_,
             "initial_dol_words": initial}

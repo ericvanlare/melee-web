@@ -32,6 +32,19 @@ unconditional return instruction in the selected function. Runtime instruction
 checks reject mismatched entry/return boundaries. These are diagnostics for
 this exact original executable, not a shipped PowerPC interpreter.
 
+The passive `ReferenceAllocation::Observer` backend in
+`reference-capture/dolphin/source/Core/PowerPC/ReferenceAllocationObserver.cpp`
+uses the generated identity-only profile from
+`tools/generate_reference_allocation_profile.py`. `Arm()` performs profile and
+path validation without guest reads; `Start()` is then called only for the
+verified original DOL entry word. The observer validates each generated
+function body hash, records bounded read-only metadata on verified entries and
+returns, and writes off the emulation callback through a finite ring. Its
+`boundary_complete` marker becomes true only at the verified return from the
+first `gm_Scene_Vs_OnEnter` after all source-thread stacks reconcile. That
+prefix boundary is separate from whole-session or ownership completion and does
+not provide observed pointers as replay inputs.
+
 `tools/reference_allocation_capture.py` installs all allocation breakpoints
 before continuing. Its optional stream can accompany the existing reference
 collector; a future controller-driven application can reuse that stream without
@@ -278,3 +291,50 @@ affected collector/context/native/Wasm/replay checks pass within that suite.
 Runtime, graphics, and fighter Release builds pass. Exact-head CI results are
 recorded on the draft PR after publication. No public deployment files or CPU
 integration path changed.
+
+## Passive application companion
+
+The passive allocation diagnostic is a companion to `MWRC_ENABLE=1`, with the
+normal owned-disc observer configuration and exact input replay. Set
+`MWRC_ALLOCATION_OUTPUT` to a fresh local JSONL path. A requested allocation
+failure invalidates the capture; it is never silently dropped. Allocation-only
+callbacks do not add primary MWRO events. The JIT also observes the logical
+return boundary when it follows an unconditional BLR within a block.
+
+Regenerate or verify the tracked identity table with the owned profile:
+
+```sh
+python3 tools/generate_reference_allocation_profile.py --profile work/session-equivalence-allocation-profile-v1.json --output reference-capture/dolphin/source/Core/PowerPC/ReferenceAllocationProfile.h --check
+```
+
+The profile JSON and raw allocation history stay under ignored work evidence.
+The tracked header contains only names, identities, bounds, instruction words
+and hashes. Its comments bind the original DOL, pinned source and symbol input.
+The reference build archives the generator and profile recipe alongside the
+header, patch series and hash-bound build receipt. None of this metadata is a
+runtime source-address provider.
+
+## First VS initialization capture
+
+The [passive allocation receipt](evidence/original-allocation-passive-v1.json)
+records three fresh original cold boots driven by the same immutable SI input
+recording: four Mario CPU9 players, four stocks, Final Destination. All three
+allocation streams end at the first verified VS-entry return and are byte
+identical. They include all four fighter constructions. Those addresses remain
+observations: the model currently stops before reaching their derivation, at
+the first asynchronous `lbMemory_8001529C` compaction request. Native and checked
+Wasm agree through the preceding modeled operations. In the replay report,
+`completion_scope` describes the captured source boundary; only the status,
+completed-call count and ownership evidence describe how far replay validated.
+
+The next model boundary is the source compaction callback and its asynchronous
+transfer lifecycle. It must preserve callback order and independently derive
+moved handle payloads before comparison; completing the whole move eagerly or
+copying observed pointers would not establish equivalence. Original VS preload
+rebuilds the main HSD heap, but retained game heaps, preload caches and audio/ARAM
+owners still constrain its bounds. The browser therefore also needs an
+independent source-context provider, followed by register-carry integration.
+
+This evidence is a first-VS allocation prefix. It does not establish repeated
+fighter ownership, full-session browser agreement, pixel or PCM agreement, or
+performance. The diagnostic tools can be used while these gates remain open.

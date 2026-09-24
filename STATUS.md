@@ -1,5 +1,17 @@
 # Current status
 
+## Original allocation capture reaches VS initialization
+
+**Compiled / Source identified / Native traced**: the passive allocation
+companion now reaches first VS initialization through original menus with four
+Mario CPU9 players. Three fresh cold boots produce identical allocation streams,
+including four fighter constructions. The independently rooted native and
+checked-Wasm models agree until the first unsupported asynchronous handle
+compaction; fighter addresses have been observed but not yet derived. See the
+[scoped receipt](docs/evidence/original-allocation-passive-v1.json) and
+[remaining source-context boundaries](docs/ORIGINAL_ALLOCATION_HISTORY.md#first-vs-initialization-capture).
+No browser gameplay fix or full-session equivalence is claimed.
+
 ## Reproducible whole-session CPU register boundary
 
 **Compiled / Source identified / Native traced / Browser exercised**: a fresh
