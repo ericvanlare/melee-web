@@ -227,5 +227,6 @@ source-context and call-site work above.
 The [original ARQ completion boundary](SOURCE_ARQ_COMPLETION.md) now exercises
 the pinned SDK queue against checked owned memory spans and deferred transfer
 completion. Its scoped source tests cover priority, cancellation, callback
-reentry and interrupt masking. It is not yet connected to original DevCom,
-audio startup or the live browser source context.
+reentry and interrupt masking. The [standalone DevCom boundary](SOURCE_DEVCOM_STARTUP.md)
+connects the first direct type-3 request to the validated startup heap. Full
+audio startup and the live browser source context remain open.
