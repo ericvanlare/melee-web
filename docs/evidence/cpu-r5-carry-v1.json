@@ -1,0 +1,72 @@
+{
+  "schema": "melee-web-cpu-r5-carry-evidence",
+  "version": 1,
+  "evidence_labels": [
+    "Compiled",
+    "Source identified"
+  ],
+  "scope": "Typed source seed-word carry and lifetime validation; synthetic fighter identity, no production CPU hooks.",
+  "implementation_sha256": {
+    "src/gameplay_cpu_r5_carry.c": "2106e3783699a81a13863ea6213ff15abf4e3523d56e6aa4afbfb3deac1f6e4b",
+    "src/gameplay_cpu_r5_carry.h": "d63d10259cb38f8ece778cbdc38182ca8da6f67c29303ba338c8e37c75603f4b",
+    "tools/cpu_r5_source_context.py": "da8c976e3975668b8b5323a19af1403b084609916912a31cd4d8425b3b9d70c2",
+    "tests/gameplay_cpu_r5_carry_trace.c": "9d7c8fce67fa16ce2e636907467c912de26a98c67a7f9992378c0505c841407d",
+    "tests/gameplay_cpu_r5_source_trace.c": "1844191eddd1bf63f30d1ce444934b0e5d37856a47bcd43835d52977d34d578f",
+    "tests/test_gameplay_cpu_r5_carry.py": "3b03dbbda435c04a582016afc3c4155be85977eb704bcc500d4ff7e378c376d2",
+    "tests/test_cpu_r5_source_context.py": "d11ec332ea2bd74eadb24b62c1edf88ed79410a196fe61a97a3b443c2f049b28"
+  },
+  "source": {
+    "schema": "melee-web-cpu-r5-carry-test",
+    "version": 2,
+    "random_source_sha256": "c1ee9c4317a48b59021c23b901e97fe7ad794f148d6ab98783ecfcadcdd566e6",
+    "random_source_sha256_after": "c1ee9c4317a48b59021c23b901e97fe7ad794f148d6ab98783ecfcadcdd566e6",
+    "source_wasm_compiled": true,
+    "synthetic_fighter_identity": true,
+    "independently_derived_seed": true,
+    "retail_provenance": false,
+    "owned_seed_provenance": {
+      "dol_sha1": "08e0bf20134dfcb260699671004527b2d6bb1a45",
+      "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+      "source_revision": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+      "symbols_sha256": "214477d5b27989a9675c4b881f4db2dad5eeaada39dbac17c57c70d5ba84d579",
+      "disc_boot_header_sha256": "534aa103305522a5b4ac70acac2c38e8c672e8ca9a9c473311e8c46a7fcc0520",
+      "apploader_sha256": "05e584735bb81f45e8506ee76fc1a78b143dc2f6dd3f2fc82b015010dc6448dd",
+      "derivation": "owned_disc_apploader_and_dol_sda_no_capture_inputs"
+    }
+  },
+  "focused": {
+    "tests": 6,
+    "passed": 6,
+    "receipt": "work/cpu-r5-carry-evidence/run-ms_77d9t/receipt.json",
+    "receipt_sha256": "2abe549d23c859b8053aae6580086f3575e255f130b592e21b95d5769a5a2033",
+    "log": "work/cpu-r5-carry-evidence/focused-after-deps.log"
+  },
+  "full_suite": {
+    "status": "passed",
+    "tests": 1385,
+    "passed": 1292,
+    "skipped": 93,
+    "seconds": 311.412,
+    "log": "work/cpu-r5-carry-evidence/full-suite-owned-provisioned-v1.log",
+    "log_sha256": "eec7fb7e583c662e137a13d85e29424bb4302fcd7868a14ea6bd3153faba31a4"
+  },
+  "retained_failures": [
+    {
+      "path": "work/cpu-r5-carry-evidence/full-suite-owned-merge-v2.log",
+      "reason": "Isolated checkout lacked pinned dependencies and prepared sources;7failures33errors152skips; not accepted."
+    },
+    {
+      "path": "work/cpu-r5-carry-evidence/run-2a_2pakn/receipt.json",
+      "reason": "Superseded receipt incorrectly called fighter identity non-synthetic when only seed binding was owned-derived; corrected receipt above."
+    }
+  ],
+  "limits": [
+    "C caller attestation is trusted input, not independently verified by C module.",
+    "Source fighter identity must eventually come from live source allocation binding.",
+    "Every CPU dispatch must invalidate unknown carry; no runtime hook exists.",
+    "Floor-query, standings-object and other reaching definitions remain unsupported.",
+    "Original random.c execution does not establish original CPU call-site behavior.",
+    "No browser, full-session, PCM, pixel, performance or physical-input claim."
+  ],
+  "deployed": false
+}

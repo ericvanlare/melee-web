@@ -1,5 +1,13 @@
 # Current status
 
+## CPU source-word ownership prerequisite
+
+**Compiled / Source identified** for the [typed CPU carry boundary](docs/CPU_R5_CARRY.md).
+The owned-input adapter derives the RNG seed identity independently; the fighter
+identity in these tests remains synthetic. The [scoped receipt](docs/evidence/cpu-r5-carry-v1.json)
+records generation checks and source compilation. Live allocation binding and
+CPU call-site hooks remain open; the first session divergence is unchanged.
+
 ## Original DSP startup protocol boundary
 
 The [DSP startup fixture](docs/SOURCE_DSP_INIT_PROFILE.md) executes original SDK
