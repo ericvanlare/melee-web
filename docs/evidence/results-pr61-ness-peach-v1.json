@@ -1,8 +1,8 @@
 {
   "schema": "melee-web-results-ness-peach-validation",
   "version": 1,
-  "source_base_commit": "adae193",
-  "scope": "Native source Results lifecycle and authored archive validation for Ness and Peach after merging the reviewed Results pipeline and enabled-roster harness. This receipt does not establish original-game equivalence, rendered pixels, PCM, performance, or four-CPU level-9 acceptance.",
+  "source_base_commit": "97df810dfaeb07be55a3ef4ed4d148edd0f69756",
+  "scope": "Native source Results lifecycle and authored archive validation for Ness and Peach after merging the reviewed Results pipeline, enabled-roster harness, and origin/main fc1184a. This receipt does not establish original-game equivalence, rendered pixels, PCM, performance, or four-CPU level-9 acceptance.",
   "fixture_source": "Owned GALE01 revision 2 disc with the PR56 source-owned Results fixture for the existing enabled roster; extracted inputs remain under ignored assets-local directories.",
   "focused_checks": [
     {
@@ -38,8 +38,10 @@
     },
     {
       "command": ".venv/bin/python -m unittest discover -s tests -v",
-      "result": "pass (1176 tests, 85 optional fixture skips)",
-      "scope": "Merged tree at origin/main 77d78b7 with the Ness/Peach changes"
+      "result": "pass (1223 tests, 85 optional fixture skips)",
+      "scope": "Merged tree at origin/main fc1184a with the Ness/Peach changes; 1223 tests passed and 85 optional fixture tests skipped",
+      "local_path": "work/testlogs/pr61-fullsuite-20260924.log",
+      "sha256": "23ecc712b95729d93e3627d51c60c799e2a0bfb7e39b8f46f50b7b6f388c15e0"
     }
   ],
   "native_fighter_traces": {
@@ -55,24 +57,88 @@
   "browser_targeted": {
     "launch": "Headless installed Chrome through scripts/browser_tools.mjs, local runtime server on port 8787, owned revision-2 disc",
     "ness": {
-      "report": "work/pr61-targeted-headless-ness.json",
-      "sha256": "0afa8723fa61e7d66a101e77449a1fe2e8843e33df474b4c959d7d9b66e12771",
+      "report": "work/pr61-targeted-headless-ness-final.json",
+      "sha256": "9bc72e175eb8a4743be3176476364b889677505c1eedad8fe7deb5674e700f05",
       "result": "pass",
-      "scope": "CSS to SSS to Final Destination match, grounded settle, PK Fire, PK Thunder, and PSI Magnet source motions"
+      "scope": "CSS to SSS to Final Destination match, grounded settle, PK Fire, PK Thunder, and PSI Magnet source motions",
+      "log": "work/pr61-targeted-headless-ness-final.log",
+      "log_sha256": "5e057a48ea2785b845503710d5a6bbb9455221e214f8ff57141b5e04c509b97b",
+      "screenshot": "work/pr61-targeted-ness-final.png",
+      "screenshot_sha256": "16b8b6dbcb66e4c972e3baad544e4f0562eb19b208057fffe40da15746325c56",
+      "screenshot_after_unload": "work/pr61-targeted-ness-final-unloaded.png",
+      "screenshot_after_unload_sha256": "f6d2ff83a19ba617fe92fa8c9977cfc749662280cab0d6cce02d74aab5b49644",
+      "teardown": "pass: driver.unload reached phase 0/running 0; post-unload diagnostics had no runtime, page, console, or owner errors"
     },
     "peach": {
-      "report": "work/pr61-targeted-headless-peach.json",
-      "sha256": "c7e2305af3b0ad64fad7470de377b996b4987d4311fa98ec96c47a04606c77ae",
+      "report": "work/pr61-targeted-headless-peach-final.json",
+      "sha256": "e948c31a11aa76ad5188a4fe867efb753bab092792e59146ebe7413ff66dd832",
       "result": "pass",
-      "scope": "CSS to SSS to Final Destination match, grounded settle, Toad counter, vegetable pull, Bomber, and Parasol source motions"
+      "scope": "CSS to SSS to Final Destination match, grounded settle, Toad counter, vegetable pull, Bomber, and Parasol source motions",
+      "log": "work/pr61-targeted-headless-peach-final.log",
+      "log_sha256": "4a25d5e1418555315dfef4be10d2fac15daa18c84b9122d2e29de3bf06ff6094",
+      "screenshot": "work/pr61-targeted-peach-final.png",
+      "screenshot_sha256": "e1a84b40c98eea7837f7c797ba4914f671531fed69b06b5250306c5ef1189f6c",
+      "screenshot_after_unload": "work/pr61-targeted-peach-final-unloaded.png",
+      "screenshot_after_unload_sha256": "fee43f91692b1f89586f7da2e1914e5a0044deb5e1a4345b3714db2c19f6ca26",
+      "teardown": "pass: driver.unload reached phase 0/running 0; post-unload diagnostics had no runtime, page, console, or owner errors"
     },
     "young_link": {
-      "report": "work/pr61-targeted-headless-young-link.json",
-      "sha256": "c158501ed2ad43757fa89e87c9d5cb40ff0858c6220639a4773cfc728bd73149",
+      "report": "work/pr61-targeted-headless-young-link-final.json",
+      "sha256": "354faed18ac1340fbef5f25cd52402af0ffe9cb89e9a7e46ffaebc81b17b55bb",
       "result": "pass",
-      "scope": "CSS to SSS to Final Destination match, grounded settle, Boomerang, Spin Attack, and Bomb source motions"
+      "scope": "CSS to SSS to Final Destination match, grounded settle, Boomerang, Spin Attack, and Bomb source motions",
+      "log": "work/pr61-targeted-headless-young-link-final.log",
+      "log_sha256": "109766dff04055546296ea07844b0fe3e74d3676c31075b5f1859015aaeb8b03",
+      "screenshot": "work/pr61-targeted-young-link-final.png",
+      "screenshot_sha256": "9f5498627f7eda60efd1aad702563955e4f385d8e3453156e40c24ce0eef7e1c",
+      "screenshot_after_unload": "work/pr61-targeted-young-link-final-unloaded.png",
+      "screenshot_after_unload_sha256": "17d7428b17052abf513dc5ea38de28978738feaa4ce0a97bcd70428d72f1e1",
+      "teardown": "pass: driver.unload reached phase 0/running 0; post-unload diagnostics had no runtime, page, console, or owner errors"
     }
   },
-  "browser_scope": "These are bounded headless source-motion checks after a source-grounded idle settle. The broad action sweep and timing/performance gates remain outside this receipt; no original-equivalence, pixel, PCM, or four-CPU level-9 claim is made.",
-  "deployed": false
+  "browser_scope": "These are bounded headless source-motion checks after a source-grounded idle settle. Each targeted run records the exact Release runtime hashes, harness/log/screenshot hashes, and explicit unload diagnostics. The four-player CPU9 workload is blocked by the current helper scope described in four_cpu9_browser. The broad action sweep, retail, and timing/performance gates remain outside this receipt; no original-equivalence, pixel, PCM, or four-CPU level-9 claim is made.",
+  "deployed": false,
+  "runtime_artifacts": {
+    "configuration": "Release",
+    "served_root": "build/browser-release",
+    "harness": "work/pr61-targeted-actions-headless-final.mjs",
+    "harness_sha256": "f5def9e4c40b62a6367bd6d4277107a5f8a1f08bb227c8cfa80bd5c5e0e6d454",
+    "files": [
+      {
+        "path": "build/browser-release/runtime.html",
+        "sha256": "7dbdba45a72835799f02df323ce93e762ed3ad9d8941522ebe4d550913460172"
+      },
+      {
+        "path": "build/browser-release/gameplay_menu_browser.js",
+        "sha256": "01892439060d019e38862e7931e954bedcbd1bfc146492e52234e9ccbf5c1703"
+      },
+      {
+        "path": "build/browser-release/gameplay_menu_browser.wasm",
+        "sha256": "cc330a012cde97c39e0d870f465a9ee82534257e0cab18a5995455009eff2ebf"
+      },
+      {
+        "path": "build/browser-release/gameplay_menu_browser.data",
+        "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca"
+      }
+    ]
+  },
+  "four_cpu9_browser": {
+    "result": "blocked_helper_scope",
+    "requested": "Headless original-menu attempt for Ness, Peach, Young Link, and Mario on Final Destination, four stocks, CPU level 9",
+    "report": "work/pr61-four-cpu9-headless.json",
+    "report_sha256": "78891670cfd1b80e3ee7c8f4de5eb8dc87dcc30938a0347f5f3107d4274f2868",
+    "harness": "work/pr61-four-cpu9-headless.mjs",
+    "harness_sha256": "6c40a5b9aca13e1676dbaad2b4e12732147746937662fa55758563e1bccb89bc",
+    "log": "work/pr61-four-cpu9-headless.log",
+    "log_sha256": "a378fd666558fd33b8a0107005bbe2db74bc28ff13449cc6766d93cbb3e38e03",
+    "screenshot": "work/pr61-four-cpu9-headless.png",
+    "screenshot_sha256": "23324ab3b63c8191bba0172127b039bfe85b24beff3930484463a07a861add06",
+    "observed": "Original CSS loaded and unloaded cleanly. Port 2 PAD was rejected by the exported helper, player 2 observation returned null, and the host config selected the source two-player default; no four-player CPU9 claim is made.",
+    "teardown": "pass: driver.unload reached phase 0/running 0; post-unload diagnostics had no runtime, page, console, or owner errors"
+  },
+  "unrun_gates": [
+    "broad action sweep",
+    "retail gate",
+    "timing/performance gate"
+  ]
 }

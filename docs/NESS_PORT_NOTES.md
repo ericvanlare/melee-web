@@ -1,7 +1,7 @@
 # Ness development checkpoint
 
 Ness is integrated as a development candidate on
-`codex/enable-ness-peach-yl`, with current `origin/main` (`bbfd9f0`) merged
+`codex/enable-ness-peach-yl`, with current `origin/main` (`fc1184a`) merged
 locally before validation. This
 checkpoint preserves the original `CKIND_NESS` (0x0B) / `FTKIND_NESS` (8)
 identity, four costumes and authored source callbacks. It is **not**
@@ -117,8 +117,9 @@ interpreter:
 
 - **Opcode 16** (`it_8027978C`) consumes its command word plus one operand
   word, plus a second operand word when the sub-opcode in source bits 25..18
-  is 0..2 (three words total); the decoder consumed one, so every subsequent
-  dispatch walked into operand bytes.
+  is 0..2 or 10..11 (three words total); every other sub-opcode consumes two
+  words. The decoder consumed one, so every subsequent dispatch walked into
+  operand bytes.
 - **Opcode 10** (`it_80278F2C`) consumes five words; the decoder consumed one.
 - Common opcodes 5/6/7/8/9 (subroutine, return, goto, SetTimerAnimation,
   flash) were rejected outright; 5/7 additionally require following the

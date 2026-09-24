@@ -1,7 +1,7 @@
 # Peach development checkpoint
 
 Peach is integrated as a development candidate on
-`codex/enable-ness-peach-yl`, with current `origin/main` (`bbfd9f0`) and the
+`codex/enable-ness-peach-yl`, with current `origin/main` (`fc1184a`) and the
 Ness commits merged locally before validation. This checkpoint
 preserves the original `CKIND_PEACH` (0x0C) / `FTKIND_PEACH` (9) identity, five
 costumes and authored source callbacks. It is **not** independent original
