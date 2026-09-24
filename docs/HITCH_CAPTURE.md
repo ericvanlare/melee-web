@@ -74,10 +74,14 @@ installation or browser download is required when using installed Chrome.
 Keep all local specs, profiles, recordings and disc paths under ignored `work/`.
 The initial automatic machine-profile collector uses macOS system tools; its
 recorded configuration must be extended explicitly for another host platform.
+Both commands require `--headed` because this protocol opens and focuses a
+desktop browser. Arrange a foreground session with the user or run on a
+separate test machine; routine functional checks use the headless harnesses in
+[Developer entry](DEVELOPMENT.md). Missing opt-in fails before capture work.
 
 1. Finish builds and tests. Start `scripts/serve.py` on loopback for the Release
    directory. Stop reference captures and profiling tools before unprofiled runs.
-2. Use `node scripts/run_hitch_matrix.mjs profile --out PROFILE --build BUILD
+2. Use `node scripts/run_hitch_matrix.mjs profile --headed --out PROFILE --build BUILD
    --browser-profile OWNED_PROFILE --url URL` to record the installed browser,
    ordinary scheduling settings, machine/power/display, renderer dimensions,
    artifact hashes and runner identity. This opens and closes an owned blank
@@ -85,7 +89,7 @@ recorded configuration must be extended explicitly for another host platform.
 3. Create a local spec with verified recipes of the declared role and the experiment's
    predeclared slots; use `python scripts/hitch_capture.py plan --spec SPEC --output
    PLAN`. Review the generated plan before execution.
-4. Run `node scripts/run_hitch_matrix.mjs run --plan PLAN --disc DISC`. The driver
+4. Run `node scripts/run_hitch_matrix.mjs run --headed --plan PLAN --disc DISC`. The driver
    uses the ordinary file picker, replay selector and start button. It creates
    a separate headed browser profile, disables Playwright's focus emulation,
    keeps audio enabled and ordinary browser scheduling, and closes its browser

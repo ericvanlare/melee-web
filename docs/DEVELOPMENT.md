@@ -20,9 +20,15 @@ isolation headers are present:
 python3 scripts/serve.py --directory build/browser
 ```
 
-Keep the tab visible for timing work. Browser graphics require a real browser;
-the viewer's synthetic triangle and parser checks are useful smoke targets but
-are not gameplay evidence.
+Routine checks use headless installed Chrome so agents can render, inspect,
+take screenshots and drive input without opening a desktop window. Use the
+shared browser tools for ad hoc scripts too. Do not retry failures in a visible
+browser automatically. `--headed` explicitly opts into a foreground session;
+arrange it with the user when required. Keep timing work on its visible-browser
+protocol. The [browser automation guide](HEADLESS_BROWSER_VALIDATION.md)
+records the tested scope and remaining foreground gates. The viewer's synthetic
+triangle and parser checks are useful smoke targets but are not gameplay
+evidence.
 
 For a short readiness and teardown probe, use the shared smoke harness. It can
 optionally import an owned disc and reach CSS; it records failures and teardown

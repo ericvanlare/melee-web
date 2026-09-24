@@ -8,18 +8,21 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {parseArgs} from 'node:util';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
-import {loadBrowserTools} from '../scripts/browser_tools.mjs';
+import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 
 const {values} = parseArgs({
-  options: Object.fromEntries(['url', 'playwright', 'disc', 'out'].map(name => [name, {type: 'string'}])),
+  options: {
+    ...Object.fromEntries(['url', 'playwright', 'disc', 'out'].map(name => [name, {type: 'string'}])),
+    headed: {type: 'boolean', default: false},
+  },
 });
 if (!values.url || !values.disc || !values.out) {
-  throw Error('Use --url ORIGIN --disc AUTHORIZED_DISC --out LOCAL_DIR [--playwright PACKAGE_DIR]');
+  throw Error('Use --url ORIGIN --disc AUTHORIZED_DISC --out LOCAL_DIR [--playwright PACKAGE_DIR] [--headed]');
 }
 
 const {chromium, browser: launchOptions} = await loadBrowserTools(values.playwright);
 await fs.mkdir(values.out, {recursive: true});
-const browser = await chromium.launch({...launchOptions, headless: false, chromiumSandbox: true});
+const browser = await chromium.launch(browserLaunchOptions(launchOptions, {headed: values.headed}));
 const context = await browser.newContext({viewport: {width: 1280, height: 960}});
 const page = await context.newPage();
 const origin = new URL(values.url).origin;
@@ -27,6 +30,7 @@ const requests = [], errors = [], violations = [], sockets = [], audioEvents = [
 const report = {
   schema: 'webmelee-audio-preview-browser-v1',
   browser: browser.version(),
+  browser_mode: values.headed ? 'headed' : 'headless',
   scope: 'Authorized local disc through original CSS, SSS and supported Mario/Final Destination match; Web Audio lifecycle and PCM transport only. No long replay or performance claim.',
   checks: [],
   audio: {phases: {}, cdp: []},

@@ -20,6 +20,8 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   documentClaimed = true;
   const assetBase = new URL('.', loaderUrl);
   let ready = false, fatal = false, destroyed = false, bundle = false, prepared = false, hasLocalData = false;
+  let startupCacheReady = false;
+  let startupTimeoutHandle = null;
   let busy = '', message = '', progress = null, inputDirty = true, lastState = '';
   let loading = Object.freeze({phase: 'boot', message: 'Starting player…', complete: 0, total: 0});
   let preparationLabel = '', preparationKeepsAudio = false;
@@ -43,6 +45,31 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   const status = () => ready ? Module.UTF8ToString(Module._melee_web_native_menu_message()) : 'Starting WebGPU…';
   const check = result => { if (!result) throw Error(status()); return result; };
   const numericProgress = (value, fallback = 0) => Number.isFinite(Number(value)) ? Math.max(0, Math.floor(Number(value))) : fallback;
+  function readNativeCacheIdle() {
+    const idle = Module._melee_web_native_menu_cache_idle;
+    if (typeof idle !== 'function') throw Error('The native renderer-cache readiness service is unavailable. Reload to recover.');
+    const state = idle();
+    if (![1, 0, -1].includes(state)) throw Error(`Invalid native cache idle state: ${state}`);
+    return state;
+  }
+  function clearStartupTimeout() {
+    if (startupTimeoutHandle !== null) {
+      clearTimeout(startupTimeoutHandle);
+      startupTimeoutHandle = null;
+    }
+  }
+  function refreshStartupCacheReadiness() {
+    if (!ready || startupCacheReady || fatal || destroyed) return;
+    let state;
+    try { state = readNativeCacheIdle(); }
+    catch (error) { stop(error); return; }
+    // Native -1 means the optional renderer cache failed; it is still safe to
+    // import the disc, and unloadAndSave preserves that failure explicitly.
+    if (state !== 0) {
+      startupCacheReady = true;
+      clearStartupTimeout();
+    }
+  }
   function setLoading(phase, text, complete, total) {
     const normalizedTotal = Math.max(0, numericProgress(total));
     const normalizedComplete = Math.min(normalizedTotal, numericProgress(complete));
@@ -53,6 +80,18 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     if (!ready) return;
     if (['disc', 'handoff', 'native'].includes(loading?.phase)) return;
     const preparation = Module.pipelinePreparation;
+    if (!startupCacheReady) {
+      if (preparation && typeof preparation === 'object' && preparation.ready !== true) {
+        const selected = numericProgress(preparation.selected);
+        const pending = numericProgress(preparation.pending);
+        const total = pending > 0 ? Math.max(selected, pending) : 0;
+        const complete = total > 0 ? Math.max(0, total - pending) : 0;
+        setLoading('catalog', 'Preparing graphics…', complete, total);
+      } else if (loading?.phase === 'boot' || loading?.phase === 'catalog') {
+        setLoading('catalog', 'Preparing graphics…', 0, 0);
+      }
+      return;
+    }
     if (!preparation || typeof preparation !== 'object') {
       if (loading?.phase === 'boot' || loading?.phase === 'catalog') loading = null;
       return;
@@ -81,8 +120,8 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     return Object.freeze({version: 1, state, scene, phase, running, paused, audio: audio ? 'enabled' : 'disabled',
       message: message || preparationLabel || status(), progress, loading,
       ready, bundle, busy: !!busy, requiresReload: destroyed || fatal,
-      canImport: ready && !fatal && !destroyed && !busy && !preparationLabel,
-      canStart: ready && bundle && !active && !fatal && !destroyed && !busy && !preparationLabel,
+      canImport: ready && startupCacheReady && !fatal && !destroyed && !busy && !preparationLabel,
+      canStart: ready && startupCacheReady && bundle && !active && !fatal && !destroyed && !busy && !preparationLabel,
       canPause: active && !fatal && !destroyed && !busy && !preparationLabel,
       canUnload: ready && (bundle || hasLocalData) && !fatal && !destroyed && !busy,
     });
@@ -95,6 +134,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   function stop(error) {
     if (fatal || destroyed) return;
     fatal = true; message = String(error?.message || error || 'Player stopped. Reload to recover.');
+    clearStartupTimeout();
     discSession?.close(); discSession = null;
     preparationLabel = ''; preparationKeepsAudio = false; loading = null;
     syncAudio();
@@ -104,8 +144,9 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   }
   const boundary = run => fatal || destroyed ? Promise.reject(Error('Reload after the player stopped.')) :
     new Promise((resolve, reject) => commands.push({run, resolve, reject}));
-  async function operation(name, run) {
+  async function operation(name, run, requireStartupCache = false) {
     if (!ready || fatal || destroyed) throw Error('The player is unavailable. Reload to recover.');
+    if (requireStartupCache && !startupCacheReady) throw Error('Graphics are still preparing. Wait for startup preparation to finish.');
     if (busy) throw Error('Wait for the current player operation to finish.');
     busy = name; message = ''; progress = null; publish();
     let timeout;
@@ -157,7 +198,14 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
     },
     menuAssetScopeReleased(receipt) { emit('assetScopeReleased', receipt); },
     menuRenderCacheSettled() { Module.markRuntimeCacheDirty?.(); emit('cacheSettled'); },
-    menuFrame(wasRunning) { if (!ready || fatal || destroyed) return; syncAudio(); publish(); emit('frame', wasRunning); },
+    menuFrame(wasRunning) {
+      if (!ready || fatal || destroyed) return;
+      // Emscripten's onRuntimeInitialized precedes main/Aurora initialization.
+      // Only a real native frame can establish renderer-cache readiness.
+      refreshStartupCacheReadiness();
+      if (fatal || destroyed) return;
+      syncAudio(); publish(); emit('frame', wasRunning);
+    },
   };
   for (const [name, callback] of Object.entries(callbacks)) window[name] = callback;
   function listen(type, listener) { window.addEventListener(type, listener, true); listeners.push([type, listener]); }
@@ -294,7 +342,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
         } finally {
           if (['disc', 'handoff'].includes(loading?.phase)) { loading = null; refreshCatalogLoading(); }
         }
-      });
+      }, true);
     },
     prepare() { return operation('preparing', async () => { if (!bundle) throw Error('Select a disc first.'); await prepareNativeResources(); }); },
     start() {
@@ -322,6 +370,7 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
         stop(error);
         throw error;
       } finally {
+        clearStartupTimeout();
         destroyed = true; syncAudio();
         discSession?.close(); discSession = null;
         try { await audio?.destroy(); }
@@ -351,7 +400,13 @@ export async function mountMeleeRuntime({canvas, onState = () => {}, onError = (
   publish();
   const loader = document.createElement('script'); loader.src = String(loaderUrl);
   loader.onerror = () => stop(Error('The player files could not load. Reload to retry.'));
-  const timeout = setTimeout(() => stop(Error('Player startup timed out.')), startupTimeout);
+  startupTimeoutHandle = setTimeout(() => stop(Error(ready && !startupCacheReady ?
+    'Renderer preparation timed out. Reload to recover.' : 'Player startup timed out.')), startupTimeout);
   document.head.append(loader);
-  try { await startup; return handle; } finally { clearTimeout(timeout); }
+  try { await startup; return handle; }
+  finally {
+    if (startupCacheReady || fatal || destroyed) {
+      clearStartupTimeout();
+    }
+  }
 }

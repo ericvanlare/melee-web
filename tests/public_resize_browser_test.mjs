@@ -3,16 +3,18 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
+import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 
-const {values} = parseArgs({options: Object.fromEntries(
-  ['url', 'playwright', 'out'].map(name => [name, {type: 'string'}]))});
+const {values} = parseArgs({options: {
+  ...Object.fromEntries(['url', 'playwright', 'out'].map(name => [name, {type: 'string'}])),
+  headed: {type: 'boolean', default: false},
+}});
 if (!values.url || !values.playwright || !values.out)
-  throw Error('Use --url ORIGIN --playwright PACKAGE_DIR --out NEW_DIRECTORY');
+  throw Error('Use --url ORIGIN --playwright PACKAGE_DIR --out NEW_DIRECTORY [--headed]');
 await fs.mkdir(values.out, {recursive: false});
-const {chromium} = await import(pathToFileURL(path.join(path.resolve(values.playwright), 'index.mjs')).href);
-const browser = await chromium.launch({channel: 'chrome', headless: false});
+const {chromium, browser: launchOptions} = await loadBrowserTools(values.playwright);
+const browser = await chromium.launch(browserLaunchOptions(launchOptions, {headed: values.headed}));
 const page = await browser.newPage({viewport: {width: 1100, height: 800}});
 const errors = [], observations = [];
 page.on('pageerror', error => errors.push(error.stack || error.message));
@@ -49,7 +51,7 @@ try {
     'Exercise actual framebuffer resizing, not only CSS scaling');
   await page.screenshot({path: path.join(values.out, 'narrow.png')});
   await fs.writeFile(path.join(values.out, 'report.json'), JSON.stringify({
-    result: 'pass', browser: browser.version(), observations, errors,
+    result: 'pass', browser: browser.version(), browser_mode: values.headed ? 'headed' : 'headless', observations, errors,
     scope: 'Real WebGPU presentation resizing during startup and with controls open; no disc or gameplay claim',
   }, null, 2));
 } catch (error) {

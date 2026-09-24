@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/** Visible CPU match capture through the existing development runtime UI.
+/** Foreground-only CPU match capture through the existing development runtime UI.
  * Retains partial traces and page failures. No CPU decisions are supplied.
  * Timing is reported by the host but is not admitted by this state run.
  */
@@ -13,9 +13,12 @@ import {installCpuBrowserModuleCapture} from './cpu_browser_module_capture.mjs';
 const {values: options} = parseArgs({options: {
   ...Object.fromEntries(['url','disc','recipe','out','playwright'].map(name => [name, {type:'string'}])),
   timeout: {type:'string', default:'900000'},
+  headed: {type:'boolean', default:false},
 }});
+if (!options.headed)
+  throw Error('Foreground browser access requires explicit --headed; no browser or capture artifacts were created.');
 if (!options.url || !options.disc || !options.recipe || !options.out)
-  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc PATH --recipe PATH --out NEW_DIRECTORY [--playwright PACKAGE_DIR]');
+  throw Error('Use --url http://127.0.0.1:PORT/runtime.html --disc PATH --recipe PATH --out NEW_DIRECTORY --headed [--playwright PACKAGE_DIR]');
 const url = new URL(options.url);
 if (!['http:', 'https:'].includes(url.protocol) || !url.pathname.endsWith('/runtime.html'))
   throw Error('A real HTTP development runtime.html URL is required');
