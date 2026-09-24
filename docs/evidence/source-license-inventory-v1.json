@@ -1,0 +1,676 @@
+{
+  "schema": "melee-web-source-license-inventory-v1",
+  "review_date": "2026-09-20",
+  "reviewed_commit": "11410f31be0930f8a69a3ff358527286a8f19c2a",
+  "upstream_main_commit": "2c2b687f5bb7dbfcb3c75dc0394c04bb97f2114d",
+  "scope": "First-pass tracked-tree and named-source provenance inventory. Not a license grant, ownership attestation, legal clearance, complete similarity audit, or post-link SBOM.",
+  "method": [
+    "Enumerated tracked paths at reviewed_commit.",
+    "Searched tracked source for notices, adaptation references, and direct implementation includes.",
+    "Read named source/generator/patch records and existing provenance documents.",
+    "Inspected pinned upstream Melee root, Aurora MIT license, Slippi LGPL license, and Dolphin coefficient generator through GitHub.",
+    "Visually inspected the three tracked PNG documentation images."
+  ],
+  "limitations": [
+    "No local .deps checkouts; no dependency bootstrap or runtime build.",
+    "Project-license candidate does not establish ownership or absence of third-party material.",
+    "Whole-tree directory coverage is not a file-by-file origin or history attestation.",
+    "Historical GPL source is identified by existing provenance and retained Git history, not relicensed by this report.",
+    "Direct retrieval of the Andrew Church hardware-test URL returned HTTP 403; public-domain dedication remains unverified.",
+    "Private pipeline certificate/coverage inputs were not exported or inspected in this pass."
+  ],
+  "tracked_tree": {
+    "file_count": 1037,
+    "path_list_sha256": "4da2808b9ae9943638c88a61c90929e9a2dcfc6f0aaba0810f03fda2c51b4978",
+    "top_level_file_counts": {
+      ".gitattributes": 1,
+      ".github": 2,
+      ".gitignore": 1,
+      "AGENTS.md": 1,
+      "CMakeLists.txt": 1,
+      "README.md": 1,
+      "STATUS.md": 1,
+      "THIRD_PARTY.md": 1,
+      "cmake": 2,
+      "dependencies.lock.json": 1,
+      "docs": 141,
+      "licenses": 1,
+      "patches": 4,
+      "reference-capture": 19,
+      "scripts": 73,
+      "src": 281,
+      "tests": 413,
+      "tools": 49,
+      "web": 44
+    }
+  },
+  "dependency_pins": {
+    "repositories": {
+      "aurora": {
+        "url": "https://github.com/encounter/aurora.git",
+        "commit": "749d6ee7a22bdfab78c8ece9047bca5d79aa72ca"
+      },
+      "melee": {
+        "url": "https://github.com/doldecomp/melee.git",
+        "commit": "b43912cc78606f96c9569f5d6229bc9d7e265ea5"
+      },
+      "emsdk": {
+        "url": "https://github.com/emscripten-core/emsdk.git",
+        "commit": "5eb0bde7585670252e8ba05e9d361627bffd08b5"
+      }
+    },
+    "reference_tools": {
+      "dolphin": {
+        "kind": "source",
+        "url": "https://github.com/dolphin-emu/dolphin.git",
+        "commit": "c77bbaa0f372c3f72281602a8b087206706542cb"
+      },
+      "slippi-js": {
+        "url": "https://github.com/project-slippi/slippi-js.git",
+        "commit": "ff815345e641836a331191320c0f6eae21542a5f",
+        "package": "@slippi/slippi-js",
+        "version": "9.1.3"
+      }
+    },
+    "historical_audio_dolphin": "a2efdf1197be8132674b90fe9cf4761df39752ed",
+    "b0xx_ahk": "7c070f8e0f135c8108cfb0af9a37dc6809070b15",
+    "reference_native_submodules": {
+      "dolphin_parent": "c77bbaa0f372c3f72281602a8b087206706542cb",
+      "sdl": "5848e584a1b606de26e3dbd1c7e4ecbc34f807a6",
+      "libusb": "15a7ebb4d426c5ce196684347d2b7cafad862626"
+    }
+  },
+  "direct_implementation_includes": [
+    {
+      "path": "src/gameplay_collision.c",
+      "git_blob": "a6a50193cd03ce4e006ce058938fae7086c6a05b",
+      "implementation_includes": [
+        "melee/mp/mplib.c"
+      ]
+    },
+    {
+      "path": "src/gameplay_heap.cpp",
+      "git_blob": "f63fc7a1fdb9161727f10d171dd40e5bf51105e0",
+      "implementation_includes": [
+        "../.deps/aurora/lib/dolphin/os/OSAlloc.cpp"
+      ]
+    },
+    {
+      "path": "src/hsd_host_support.c",
+      "git_blob": "d4ece8d66a4cf8f059118fd09c216623b712806c",
+      "implementation_includes": [
+        "hsd_debug.c"
+      ]
+    },
+    {
+      "path": "src/hsd_inspection_camera.c",
+      "git_blob": "b46eeb37fafaf952969c828087f2112ae7b4cc19",
+      "implementation_includes": [
+        "sysdolphin/baselib/cobj.c"
+      ]
+    },
+    {
+      "path": "src/hsd_inspection_lights.c",
+      "git_blob": "93a293797284c9de274e37e337fc04d940ee44a4",
+      "implementation_includes": [
+        "sysdolphin/baselib/lobj.c"
+      ]
+    },
+    {
+      "path": "src/hsd_material_bridge.c",
+      "git_blob": "35e261784a4786a08134603e84b522daa47f4088",
+      "implementation_includes": [
+        "sysdolphin/baselib/tobj.c"
+      ]
+    },
+    {
+      "path": "src/hsd_native_camera.c",
+      "git_blob": "8b076bdafd4446d7b323532c9b76b0a02ee4a221",
+      "implementation_includes": [
+        "sysdolphin/baselib/cobj.c"
+      ]
+    },
+    {
+      "path": "src/hsd_native_common.c",
+      "git_blob": "c4bedcfac7b701c1512768f596d32c3759cee775",
+      "implementation_includes": [
+        "melee/ft/ft_0C8C.c",
+        "melee/ft/ftCo_800C7CA0.c"
+      ]
+    },
+    {
+      "path": "src/hsd_native_pobj.c",
+      "git_blob": "64835ec0baafac17f9b124423878dd47f1d45b57",
+      "implementation_includes": [
+        "sysdolphin/baselib/pobj.c"
+      ]
+    },
+    {
+      "path": "src/hsd_pobj_bridge.c",
+      "git_blob": "43a06927644be9906d55fc5bbcede6793f1c173f",
+      "implementation_includes": [
+        "sysdolphin/baselib/pobj.c"
+      ]
+    },
+    {
+      "path": "tests/gameplay_registry_trace.c",
+      "git_blob": "93861a73926acb9c5710ef03349a855a16508233",
+      "implementation_includes": [
+        "melee/ft/ftdata.c"
+      ]
+    },
+    {
+      "path": "tests/source_address_oracle.c",
+      "git_blob": "26e8af8941be1da8312bdc60ae0c6619e67161c0",
+      "implementation_includes": [
+        "../.deps/melee/extern/dolphin/src/dolphin/os/OSAlloc.c",
+        "../.deps/melee/src/sysdolphin/baselib/memory.c",
+        "../.deps/melee/src/sysdolphin/baselib/objalloc.c"
+      ]
+    }
+  ],
+  "named_origin_observations": [
+    {
+      "id": "recovered-runtime-patch",
+      "classification": "recovered-source adaptation",
+      "files": [
+        {
+          "path": "patches/melee-gameplay.patch",
+          "git_blob": "b5ad1725a9e6c3fb1d0f907436aa129ed5f2cb90",
+          "sha256": "c272d6fa344e74c6bfa81e0cb28a69aa5fbce1e6637879e56f635e6a0ef8587c"
+        },
+        {
+          "path": "scripts/gameplay_sources.py",
+          "git_blob": "440b72ffadbea3dee5095dc8a485bfcf885bca1d",
+          "sha256": "78ee8e9dabbbce27e104f7be76f46bd967d406998366d7e5f635b5593730fd7e"
+        },
+        {
+          "path": "CMakeLists.txt",
+          "git_blob": "e7ad91511f6f5e80a916596219781b3ebc57378e",
+          "sha256": "f849917cb66afdbf0c8c1cf904f0c8b36201c60a2119862bef3dc6489cb752fe"
+        },
+        {
+          "path": "cmake/FighterRuntime.cmake",
+          "git_blob": "c244a52c885474c1138288f625590e4aaa8f8e6d",
+          "sha256": "03783dd6a6b76f42be39c4d65a4baeb3dab0d6aa7f86e3df1774537e61d365ca"
+        }
+      ]
+    },
+    {
+      "id": "original-sdk-translations",
+      "classification": "mixed/source-derived; license treatment unresolved",
+      "files": [
+        {
+          "path": "src/gameplay_audio_reverb.c",
+          "git_blob": "73d0559b5d442852d1176b8af848a60717214515",
+          "sha256": "c37083881c965e3c92cbf0cf2e497880970e5baceeb32c8139c3f0ac4c257c5f"
+        },
+        {
+          "path": "src/gameplay_ps_math.c",
+          "git_blob": "b1f8f9b5982e4cec884f20473b12dc9a4cc2d38b",
+          "sha256": "0f68dd4bb51a5af4d7505d7b6d006de172c80597dc9db7ac4e1e8970e9bf1940"
+        },
+        {
+          "path": "src/gameplay_ps_math.h",
+          "git_blob": "e35981d4a606dd08d95aa2a1be22786b4db1870b",
+          "sha256": "3c5b28f760b5410188551209ce8a2a97e37b2c73df24ea60e8f78c7e0f2286de"
+        },
+        {
+          "path": "src/gameplay_trig.h",
+          "git_blob": "46462e2cc73e615369e997b4b474bf9049c65300",
+          "sha256": "f5d724d31a79b3e42cfbe2a7a07a63184b9636481b2653d9d3ff8c1ad7c82014"
+        },
+        {
+          "path": "src/gameplay_hookshot_math.h",
+          "git_blob": "45c5c47d63880ff2cce1b49962c1b49875a7ac6a",
+          "sha256": "43d44d7bdaed473fae40e96362d426c09a75b48e485f193911e45e8806cfa346"
+        },
+        {
+          "path": "src/gameplay_audio_itd.c",
+          "git_blob": "1dc10abc568bade6adfe0ee82ebb35e41934ef71",
+          "sha256": "937ef25b589aa534252bf1e4c30fd429053144b83405c2e669beeebb4af00922"
+        },
+        {
+          "path": "src/gameplay_audio_provenance.md",
+          "git_blob": "8c1fc8c2c579b75e9a2afb6d1c65373594c4c416",
+          "sha256": "251878031dfca13a30d6d413847dfa698c700c774551650c46e1918b49f34012"
+        }
+      ]
+    },
+    {
+      "id": "generated-melee-declarations",
+      "classification": "source-derived generated or manually hydrated declarations",
+      "files": [
+        {
+          "path": "src/common_schema.h",
+          "git_blob": "63749b890e0e427c09e20c62411df37349e9d8e8",
+          "sha256": "1d9fc41a42307d960d0320941c6c8dd1d42d1b1dff02889349a03d082f9aa50c"
+        },
+        {
+          "path": "src/fighter_registry.inc",
+          "git_blob": "b52f5c693c646477aa45be0b3ffb0c38cca0ad95",
+          "sha256": "ae8706e41df6e62771440d183a479f7d0e443ecb3ee09079e5bac011f5cb4aee"
+        },
+        {
+          "path": "scripts/generate_common_schema.py",
+          "git_blob": "bd5c8c2d7a7b5fd3bcc96854e4e2809682bfecad",
+          "sha256": "cd2472fe2ed91cb002e7030be7c842011259e6163c0192daaaadae95fc2573ff"
+        },
+        {
+          "path": "scripts/generate_fighter_registry.py",
+          "git_blob": "814bc330641cb524e83bdbfa3cde0ec46ac0bec6",
+          "sha256": "862dfa5429f4cee8cbad6127f4429c3f997490ba9f257395ee4b74444ed3d677"
+        },
+        {
+          "path": "src/gameplay_donkey_schema.h",
+          "git_blob": "f24532a53ca85a309aff8b10311cc8f8204b8b4b",
+          "sha256": "3539dd0ced9119a8aac9ad3a2311716ba79400b0d5a99da673e38e0cb0b3bcdb"
+        },
+        {
+          "path": "src/gameplay_koopa_schema.h",
+          "git_blob": "c0f503ce8fc7a31289d0260d127c49be2975613d",
+          "sha256": "701ec166c3b016c39c70b78ab01aea105c39ee8d7e499467c4689ed1df6f0eb9"
+        },
+        {
+          "path": "src/gameplay_luigi_schema.h",
+          "git_blob": "f81c65f38141d33892a9e8b64ba71ac0f11c0ca9",
+          "sha256": "9af626aff1018f2025f6810d8b09fc30836d9ef607d880de91234a8d7c5e7f41"
+        },
+        {
+          "path": "src/gameplay_pikachu_schema.h",
+          "git_blob": "b3ce68f2de9ac5b9cb7c374e9f6cd760000e0698",
+          "sha256": "82a336d89148e2100782cb000cc0088d1e4c05a5874992b20dca5f390c1cc7f2"
+        },
+        {
+          "path": "src/gameplay_purin_schema.h",
+          "git_blob": "9858fcda630c94f06d3a9959105d3dc3a2363360",
+          "sha256": "4ea07c14f66f51f463db61c2bdc17007938de4f2e1581333efbfe23d0553a215"
+        }
+      ]
+    },
+    {
+      "id": "aurora-adaptation",
+      "classification": "upstream MIT plus project integration",
+      "files": [
+        {
+          "path": "patches/aurora-browser.patch",
+          "git_blob": "1e936ff823b34bd6b4a6e0926028cdcace72abf4",
+          "sha256": "e2e2720090b24192a603ad33516a47721bb82fe977a10aa51b89dfdfc3c80020"
+        },
+        {
+          "path": "src/gameplay_heap.cpp",
+          "git_blob": "f63fc7a1fdb9161727f10d171dd40e5bf51105e0",
+          "sha256": "b01a0593b97481edec443c6655de1293be09ab86f846c0a9c924710c16fa4055"
+        },
+        {
+          "path": "docs/licenses/aurora-mit.txt",
+          "git_blob": "baf2790cc2a65e1a61bc50d0e7220988f6f483ad",
+          "sha256": "40c03cee04cda570d1029b85b6c2ee7ba78431ab1a754b9d912091d73b8ecb18"
+        }
+      ]
+    },
+    {
+      "id": "b0xx-mapping",
+      "classification": "identified MIT adaptation",
+      "files": [
+        {
+          "path": "src/boxx_input.h",
+          "git_blob": "73d4f18e6d9c3dda9908c87b683a1d9215b5c22d",
+          "sha256": "38f378d4d76160fb1ff98da358343f62d38c5da73af075e1e854edc2f163246c"
+        },
+        {
+          "path": "web/prototype-keyboard-layouts.mjs",
+          "git_blob": "fd046d4adfc49e5ad19f80cb2ed57935639fac3e",
+          "sha256": "88dbd2c00873bad67cee89b9094bf735e0be3dc89bb2dcd95ac14de2abc30745"
+        },
+        {
+          "path": "docs/KEYBOARD_LAYOUTS.md",
+          "git_blob": "c493d54dd7a19a35360622e2c652fc9d858c8a04",
+          "sha256": "da1f8492e4df6c0a7558d09eeeb5065a918c41dd66101ca1c381d14f2c17a550"
+        },
+        {
+          "path": "licenses/b0xx-ahk.txt",
+          "git_blob": "053df6c550bd4b8e3638b89623ba95220e8b5730",
+          "sha256": "fc4f057a1c694c97e11592c7214ab6d2a831128c7e0995ec8767d91244612470"
+        }
+      ]
+    },
+    {
+      "id": "reciprocal-estimate",
+      "classification": "public-domain claim in source header; external dedication not verified",
+      "files": [
+        {
+          "path": "src/gameplay_fres.h",
+          "git_blob": "321b87576902e5b1155f924ed8955562c0be12ea",
+          "sha256": "cd57c3a8fab1244a1f2e8a9554c2772262a80f39cd39add6e400eb29bd140682"
+        }
+      ]
+    },
+    {
+      "id": "replacement-audio",
+      "classification": "replacement implementation and retained numerical provenance unresolved",
+      "files": [
+        {
+          "path": "src/gameplay_audio_resample.c",
+          "git_blob": "bcad9a6fa582e390c7065767510af7c763d0ff64",
+          "sha256": "7114bb1e0edca4f3d6ecfdf1eb646070eff4655682d8f9bec3bbd8250245a2b3"
+        },
+        {
+          "path": "src/gameplay_audio_resample.h",
+          "git_blob": "a5848e8c1f55a31e84fc673d3cc7636e9f441fc7",
+          "sha256": "c44691cfdb5dda8931ae55749f75edd32403078d261f0a4f9d58c55a50126fcb"
+        },
+        {
+          "path": "web/dsp-coefficients.mjs",
+          "git_blob": "a00f246da935fb883e85d32bbfc59f273807f4e6",
+          "sha256": "13cbc7d48e7e26f3093a4f6e4f0d3763b56288668ddf54b523b283b6b44f86d1"
+        },
+        {
+          "path": "docs/AUDIO_REPLACEMENT_EVIDENCE.md",
+          "git_blob": "3abd5a934517ca9f1ba79a387e5b8f4a981f7cfd",
+          "sha256": "54b242a2692fc87d2fb8366d97e946b681a205a4f131996eefc90eee09d7675e"
+        },
+        {
+          "path": "docs/AUDIO_FILTER_DESIGN.md",
+          "git_blob": "45849d5fd15585aa1a1adc4e72516dbd2fbb5c88",
+          "sha256": "731c6420be6d2de88cc0adb207b58960fe8cc161bedeb0a3b7343d67189d8acd"
+        },
+        {
+          "path": "scripts/check_audio_compatibility.py",
+          "git_blob": "9ed5563931b978de43839aa1ee9e6cb5b508a67b",
+          "sha256": "0684b6327879d3e64388b5b5b6fff922e2dbe0fe26c65c694c84835d7c026afd"
+        }
+      ]
+    },
+    {
+      "id": "renderer-metadata",
+      "classification": "Generated renderer data/identities; preparation header binds an older seed and private inputs. Rights and regeneration limits recorded.",
+      "files": [
+        {
+          "path": "web/initial_pipeline_cache.db.gz.b64",
+          "git_blob": "4a608a7ac9f02644d232ee6af3c2b7ce7046cc93",
+          "sha256": "6e5feac7f48421eacf5f4215fecd9d8f219bd49164c8689ca6820bcd0f48c349"
+        },
+        {
+          "path": "src/pipeline_preparation.generated.hpp",
+          "git_blob": "9429267d28a299f9d226be2dd06c94db853cd3e2",
+          "sha256": "088007a5b8ae54913758c88a12fa2d4086a05550a40347daf3f8c25c3387f069"
+        },
+        {
+          "path": "scripts/generate_pipeline_preparation.py",
+          "git_blob": "7b81780e06333fdf7ad2edeba6cc8e142df19cb6",
+          "sha256": "6c4e6f09fd288a14a321c094ffff36dfc48ed4ce7c0850136a32e033205ee9e1"
+        },
+        {
+          "path": "scripts/materialize_pipeline_cache.py",
+          "git_blob": "d83bfd73345011f65dbed912f90b4cbfa3159ac8",
+          "sha256": "3d89eb8ab0d5688e03dddeb600ad842368ab51426ffc87f5b48f6660f947da28"
+        },
+        {
+          "path": "docs/PIPELINE_PREPARATION.md",
+          "git_blob": "3a4b828e34a1a1af9ae16da3eac548d09708a3b5",
+          "sha256": "ec5a80c67fe7a751cb84f415dd6da5c9dc5be099753446a56f49f408855e84cf"
+        }
+      ]
+    },
+    {
+      "id": "dolphin-observer",
+      "classification": "known GPL observer component; support-file scope needs review",
+      "files": [
+        {
+          "path": "reference-capture/dolphin/INPUT_STREAM.md",
+          "git_blob": "902f17dad38c5a70e01b6c19f7d9995f8320c1e2",
+          "sha256": "d93e11f34d6d6a359f9d997da2e86af76f143f6906ebf9f3341fd88712c80adc"
+        },
+        {
+          "path": "reference-capture/dolphin/LICENSES.md",
+          "git_blob": "61bd723eea2ec60741b7c3859327fbde721e373a",
+          "sha256": "e798cc33260e91f84842a590b6b2630962fd9bb6c692d4036833a355fb8e2097"
+        },
+        {
+          "path": "reference-capture/dolphin/README.md",
+          "git_blob": "ad2b162e4036924acfa8f0cddc23ac737709359a",
+          "sha256": "3832840c6f835b76a9b3c4b112e6b04b233f5c7365309b6628ecf9a78dec7ddf"
+        },
+        {
+          "path": "reference-capture/dolphin/patches/0001-jitarm64-reference-observer.patch",
+          "git_blob": "181eeb3a61fedfdc6aab63c14913aa6c52e4799e",
+          "sha256": "d3f1b4b91e32349c2db972f4c4333cb8cc0376da36bb8e68d20b267a9c454878"
+        },
+        {
+          "path": "reference-capture/dolphin/patches/0002-si-input-stream.patch",
+          "git_blob": "d7e4827a81dcb77179309c18aa7577dd8706b2f6",
+          "sha256": "ed5c75bef33648478727ff1c900aa6f225656e595e7e2b6478a6cf118a3d2338"
+        },
+        {
+          "path": "reference-capture/dolphin/reference_observer_stream.py",
+          "git_blob": "5e1d0a6ccb9a0b48f277b12b29c7845ed6487421",
+          "sha256": "cde0fc86d73529bf47847056e5024793ac387513bc83e2ad5bf133c68f3410bc"
+        },
+        {
+          "path": "reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.cpp",
+          "git_blob": "9b64059405bd60a01f4113f4fce363046343d79d",
+          "sha256": "e22d74211cf701b120775484aae018918a5bc88b5a7b372636a007e0a93f4a45"
+        },
+        {
+          "path": "reference-capture/dolphin/source/Core/PowerPC/ReferenceCaptureObserver.h",
+          "git_blob": "49aa88cface5ea38743e40502544dc59bf61aec9",
+          "sha256": "c09703d138a02bb8ffe637d391992f1d075d28203358fe3cc7b85e8f532c43a1"
+        },
+        {
+          "path": "reference-capture/dolphin/source/Core/PowerPC/ReferenceInputStream.cpp",
+          "git_blob": "3df85962e075cd6b4de56c2b9c5c6ba07e59d60e",
+          "sha256": "804221033f7468529b8e6e3fbe842779a6c98113d07af12d5e76942c1d6457c9"
+        },
+        {
+          "path": "reference-capture/dolphin/source/Core/PowerPC/ReferenceInputStream.h",
+          "git_blob": "f0b20ac424e520e705501d2a518ee473b50378b3",
+          "sha256": "9332bad0da26b079175e33f5cb1d7c10f8337c9151ecc38c045e5ac8df604dbc"
+        },
+        {
+          "path": "patches/reference-dolphin-clock-probe.patch",
+          "git_blob": "066ebcc9c7ecbcd7bd00aaeb2fd3f5f3833cfaa1",
+          "sha256": "05ac3868c328b1f3f6616c0a8a597cdb00215bff23a12a81fe340ed81ef4e4af"
+        },
+        {
+          "path": "patches/reference-dolphin-clock-delay-probe.patch",
+          "git_blob": "c52958bab86b40ba35c9bfdbd51b2c037f83d917",
+          "sha256": "92f961921d81a46c13257ae1d82e72612db36b184367b8c3c848bf16b920d324"
+        },
+        {
+          "path": "docs/licenses/dolphin-gpl-2.0-or-later.txt",
+          "git_blob": "9efa6fbc962836e243e20f7f23db062e2c077d28",
+          "sha256": "edaef632cbb643e4e7a221717a6c441a4c1a7c918e6e4d56debc3d8739b233f6"
+        }
+      ]
+    },
+    {
+      "id": "native-controller-probe",
+      "classification": "Project-maintained probe; pinned SDL permissive terms and libusb LGPL-2.1-or-later. Native notice/source correspondence remains open.",
+      "files": [
+        {
+          "path": "reference-capture/controller-probe/CMakeLists.txt",
+          "git_blob": "39b7f6e57598b555f35326b0ff23f66f203cb49b",
+          "sha256": "d360e16fcc4ae9ebd7d94bc2d6c86dfaebbd26089874d1844246c23b8689127b"
+        },
+        {
+          "path": "reference-capture/controller-probe/README.md",
+          "git_blob": "5f7f34a59c0ea8be909756fd4f63397ee989a3bc",
+          "sha256": "7e723130d97ada7d3b6079eeb0184c1ac8bf0739965eb8d08f868aa68417c2ce"
+        },
+        {
+          "path": "reference-capture/controller-probe/main.cpp",
+          "git_blob": "6e9a8d3281d198e7651ae82996deb16ce2bb05b7",
+          "sha256": "20491332a6cf25ac38d39d6f90b05bbdfde0904eb986c9f1723f4168bdc964c0"
+        },
+        {
+          "path": "scripts/build_reference_controller_probe.py",
+          "git_blob": "d0b00a18a44c12fd6ba9d24937966a5bd5cef099",
+          "sha256": "7512fbddf29cafbb8b004d12784cb947a8b18681c1858913d083a2bade497756"
+        },
+        {
+          "path": "scripts/install_reference_controller_probe.py",
+          "git_blob": "799b6511cf4687a828f6f77bea50ed7bd97a8fba",
+          "sha256": "db7cbc19a2cbe6eb0ff8d59f22cf364f13f180b357d9eeab02b5203b38508ab3"
+        }
+      ]
+    },
+    {
+      "id": "slippi-reference",
+      "classification": "project parser candidate; separate reference dependency",
+      "files": [
+        {
+          "path": "tools/slippi_format.py",
+          "git_blob": "e069c737c89fe5048dae985a8cd0a6630fa4529a",
+          "sha256": "a2df2e3a489c57eb807d97323c09cf0c495ed7cf7e80fd5461b5bb8c77599956"
+        },
+        {
+          "path": "dependencies.lock.json",
+          "git_blob": "dc86528bd5be383ef6f1635d8486d5d7b96685f4",
+          "sha256": "b49bad1048d13ba05da31e5269bda4bed9fba04ed7a3fe96da8aa97390748d2d"
+        },
+        {
+          "path": "tests/test_slippi_format.py",
+          "git_blob": "e1eed1f2f891f68a630f62fd26dcbee08fbf8843",
+          "sha256": "54309a6f11dabdaa4935909acbaa2418cdb124dd7038402770a4742be03d0674"
+        },
+        {
+          "path": "tests/test_slippi_timeline.py",
+          "git_blob": "05142503134cd596b0de6238812b6c61a32a641f",
+          "sha256": "c686a38096e2bdb7809972d654996996152749b510293a97b2f0c5f34e120cda"
+        }
+      ]
+    },
+    {
+      "id": "documentation-images",
+      "classification": "visually inspected empty project player shell/toolbar",
+      "files": [
+        {
+          "path": "docs/images/player-toolbar-centered.png",
+          "git_blob": "793d10b155825d3a87745ebb08300ed5b404052d",
+          "sha256": "f3f0e869ae1f50c41a04cf1b3e347515e403eccef9ff94ca57cf5f658e664bcb"
+        },
+        {
+          "path": "docs/images/public-shell-desktop.png",
+          "git_blob": "08ad52d2872215c498df6bbffe8057965cbeb5d9",
+          "sha256": "cf6a29cedcd1d7003ab97a9635d85de591fef24269241039b1167d7451cccd47"
+        },
+        {
+          "path": "docs/images/public-shell-mobile.png",
+          "git_blob": "1a456ca1a8e9e19a21694ce43d8632ba8a6a1858",
+          "sha256": "723a74f180c62d6bec0c854206b5c56c3340fb00f1aa581550e0cc2dcfd86624"
+        }
+      ]
+    },
+    {
+      "id": "initial-proposed-mit-scope",
+      "classification": "Complete implementations read; project-license candidates pending rights-holder confirmation; no grant made.",
+      "files": [
+        {
+          "path": "scripts/browser_tools.mjs",
+          "git_blob": "bc7ad0dbc57bc550bd97d1e3b2ed29918fd0d9d9",
+          "sha256": "79f238286b956d2e7767bfc6bdd1cd03af91e97a321b684e5f0272d6c849a664"
+        },
+        {
+          "path": "scripts/serve.py",
+          "git_blob": "6330486e6ebbc2e406e54bc73fcf84a5cfa1de1b",
+          "sha256": "32734f1515420190408c565b66d9e907331e1d3c711307d4ff61ec810ad1eea4"
+        },
+        {
+          "path": "scripts/ci_verify.py",
+          "git_blob": "e0cbb85f30888f1fa5794e506e56630b98eb9860",
+          "sha256": "3cccc2f1f62cf7cf5340ca5075503db8dd2ec1ba1332fa3f5515e33890de50ce"
+        },
+        {
+          "path": "scripts/ci_aggregate.py",
+          "git_blob": "14126f0209538d634de721a1ff0d5095d3b646f6",
+          "sha256": "8b5e470bd0e9eeb0ab4adbddd42bd414332dbc710a25a5820b3ee4652d5d5548"
+        },
+        {
+          "path": "scripts/ci_report.py",
+          "git_blob": "2529a05b98bddcd69e587ad1b09047c9d87813b2",
+          "sha256": "c31b4f403897a1395d747306cb6357b5614084b8e3547a4119712c9efc9b89cb"
+        }
+      ]
+    },
+    {
+      "id": "prior-notice-and-seed-inventories",
+      "classification": "Reviewed baseline prose; historical seed descriptions corrected by this documentation pass.",
+      "files": [
+        {
+          "path": "docs/licenses/PLAYABLE_RUNTIME_NOTICES.md",
+          "git_blob": "b7ba9190a13048ddb7b91fc0885e2319c552a23a",
+          "sha256": "dcd9bad12886f1b0822ebe0f42ddfd27a980d3b8272a7737ab473c3eac597486"
+        },
+        {
+          "path": "docs/PUBLIC_RELEASE_REVIEW.md",
+          "git_blob": "61682fc34b86bb7103690770c9df6925deee9143",
+          "sha256": "1de2562080e831f4f1d7110793f99c0567cf865bd65706f18ace0b0828cafb49"
+        },
+        {
+          "path": "THIRD_PARTY.md",
+          "git_blob": "0f3cc34b764a0646875b49723f8d0364c5745788",
+          "sha256": "325cda6c7c2ea780daf20c17f8f0758ee3d868d87d50e4c40b7b8a16201e060a"
+        }
+      ]
+    }
+  ],
+  "reviewed_upstream_sources": [
+    {
+      "url": "https://github.com/doldecomp/melee/tree/b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+      "observation": "Pinned root listing contains no repository-wide LICENSE file."
+    },
+    {
+      "url": "https://github.com/encounter/aurora/blob/749d6ee7a22bdfab78c8ece9047bca5d79aa72ca/LICENSE",
+      "observation": "MIT text with Luke Street copyright."
+    },
+    {
+      "url": "https://github.com/project-slippi/slippi-js/blob/ff815345e641836a331191320c0f6eae21542a5f/LICENSE",
+      "observation": "LGPL version 3 text; existing project inventory identifies LGPL-3.0-or-later."
+    },
+    {
+      "url": "https://github.com/dolphin-emu/dolphin/blob/a2efdf1197be8132674b90fe9cf4761df39752ed/docs/DSP/free_dsp_rom/generate_coefs.py",
+      "observation": "Filter generator with compatibility overlays; duplicate/zero entries differ from the port effective overlay count."
+    },
+    {
+      "url": "https://github.com/dolphin-emu/dolphin/blob/a2efdf1197be8132674b90fe9cf4761df39752ed/docs/DSP/free_dsp_rom/dsp_rom_readme.txt",
+      "observation": "Describes coefficient approximation and compatibility corrections for GBA microcode."
+    },
+    {
+      "url": "https://achurch.org/cpu-tests/ppc750cl.s",
+      "observation": "Fetch failed with HTTP 403; source header attribution only."
+    },
+    {
+      "url": "https://github.com/project-slippi/slippi-js/blob/ff815345e641836a331191320c0f6eae21542a5f/package.json",
+      "observation": "Pinned package declares LGPL-3.0-or-later and version 9.1.3."
+    },
+    {
+      "url": "https://github.com/dolphin-emu/dolphin/tree/c77bbaa0f372c3f72281602a8b087206706542cb/Externals/libusb/libusb",
+      "observation": "Gitlink resolves to libusb 15a7ebb4d426c5ce196684347d2b7cafad862626."
+    },
+    {
+      "url": "https://github.com/dolphin-emu/dolphin/tree/c77bbaa0f372c3f72281602a8b087206706542cb/Externals/SDL/SDL",
+      "observation": "Gitlink resolves to SDL 5848e584a1b606de26e3dbd1c7e4ecbc34f807a6."
+    },
+    {
+      "url": "https://github.com/libusb/libusb/blob/15a7ebb4d426c5ce196684347d2b7cafad862626/COPYING",
+      "observation": "Contains LGPL version 2.1 text."
+    },
+    {
+      "url": "https://github.com/libusb/libusb/blob/15a7ebb4d426c5ce196684347d2b7cafad862626/libusb/core.c",
+      "observation": "Source header grants LGPL version 2.1 or any later version."
+    },
+    {
+      "url": "https://github.com/libsdl-org/SDL/blob/5848e584a1b606de26e3dbd1c7e4ecbc34f807a6/LICENSE.txt",
+      "observation": "Retains Sam Lantinga notice and SDL permissive terms."
+    }
+  ],
+  "pipeline_binding_observation": {
+    "decoded_seed_sha256": "8df6a998cef19b88a3eff0ee61f666e42791f5f73841818961aa3b224cad2c4b",
+    "materializer_expected_sha256": "8df6a998cef19b88a3eff0ee61f666e42791f5f73841818961aa3b224cad2c4b",
+    "preparation_header_seed_sha256": "cdf157ee0f1850884f07a71165fd2192177acb23c2c777313b719e70ea67546f",
+    "preparation_header_matches_current_seed": false,
+    "selective_pipeline_option_default": "OFF",
+    "scope": "Source/identity observation only; not evidence of an active runtime failure."
+  }
+}

@@ -131,12 +131,6 @@ int melee_web_menu_character_available(int ckind)
     /* Availability is intentionally narrower than the retail unlock table.
      * All CSS entries may be unlocked by the host; only implemented source
      * owners are admitted to this development boundary. */
-#if defined(MELEE_WEB_PUBLIC_RUNTIME)
-    /* Issue #50: the original platform-drop animation still reaches an
-     * unresolved terminal SPL0 consumer. Retain the development owner, but
-     * exclude this known crash from public selection until it is repaired. */
-    if (ckind == CKIND_DONKEY) return 0;
-#endif
     return melee_web_fighter_content(ckind) != NULL;
 }
 

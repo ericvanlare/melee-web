@@ -261,6 +261,83 @@ void real_koopa(const char* path)
     });
     std::cout << "Koopa 0xa0 attributes, signed/unsigned words, authored dynamics and open Flame Article boundary: passed\n";
 }
+void real_mewtwo(const char* path)
+{
+    const auto identity = resolve_fighter_costume("PlyMewtwo5K_Share_joint");
+    check(identity.fighter_kind == 16 && identity.motion_count == 314,
+          "Mewtwo source identity or authored action count changed");
+    auto bytes = read_real_archive(path);
+    auto archive = std::make_shared<const DatArchive>(bytes);
+    const auto runtime = std::make_shared<const DatFighterRuntime>(archive, identity);
+    check(runtime->actions().size() == 314 && runtime->mewtwo_attributes(),
+          "Mewtwo action count or exact extension is missing");
+    check(!runtime->mario_attributes() && !runtime->donkey_attributes() &&
+          !runtime->koopa_attributes() && !runtime->pikachu_attributes() &&
+          !runtime->purin_attributes() && !runtime->luigi_attributes() &&
+          !runtime->fox_attributes() && !runtime->mars_attributes(),
+          "Mewtwo extension was aliased to another fighter schema");
+    check(sizeof(MeleeWebMewtwoAttributes) == 0x88 &&
+          archive->next_target_offset(runtime->extension_offset()) - runtime->extension_offset() == 0x88,
+          "Mewtwo extension does not retain its exact 0x88 source bound");
+    const auto& attributes = *runtime->mewtwo_attributes();
+    check(attributes.shadowball_charge_cycles == 7.0f &&
+          attributes.shadowball_ground_recoil_x == -0.2f &&
+          attributes.shadowball_air_recoil_x == -0.4f &&
+          attributes.shadowball_charge_iterations == 16 &&
+          attributes.shadowball_release_lag == 0,
+          "Mewtwo Shadow Ball counters or floats changed");
+    check(attributes.confusion_air_boost == 1.5f && attributes.confusion_bone_id == 2U &&
+          attributes.confusion_max_damage == 50 &&
+          attributes.confusion_offset_x == 0.0f && attributes.confusion_offset_y == 8.5f &&
+          attributes.confusion_offset_z == 10.0f && attributes.confusion_size == 10.0f &&
+          attributes.confusion_damage_multiplier == 1.5f &&
+          attributes.confusion_speed_multiplier == 1.0f && attributes.confusion_behavior == 0,
+          "Mewtwo Confusion reflection record changed");
+    check(attributes.teleport_vel_div_x == 2.0f && attributes.teleport_vel_div_y == 2.0f &&
+          attributes.teleport_gravity == 0.04f &&
+          attributes.teleport_terminal_velocity == 0.75f &&
+          attributes.teleport_duration == 10 && attributes.teleport_x54_unk2 == 3.0f &&
+          attributes.teleport_stick_range_min == 0.5f &&
+          attributes.teleport_momentum == 2.0f && attributes.teleport_momentum_add == 3.0f &&
+          attributes.teleport_drift == 0.6f && attributes.teleport_angle_clamp == 45 &&
+          attributes.teleport_momentum_end_mul == 0.2f &&
+          attributes.teleport_freefall_mobility == 0.4f &&
+          attributes.teleport_landing_lag == 30.0f,
+          "Mewtwo Teleport floats or counters changed");
+    check(attributes.disable_gravity == 0.08f &&
+          attributes.disable_terminal_velocity == 1.0f &&
+          attributes.disable_offset_x == 4.5f && attributes.disable_offset_y == 4.5f,
+          "Mewtwo Disable floats changed");
+    check(runtime->dynamics().active_bone_count == 1 && runtime->dynamics().bones.size() == 1 &&
+          runtime->dynamics().spheres.empty() && runtime->dynamics().animation_table_offset &&
+          *runtime->dynamics().animation_table_offset == 0x29b0,
+          "Mewtwo authored dynamics descriptor was omitted or fabricated");
+    // Drive the actual decoder with negative Shadow Ball/Teleport counters so
+    // these source categories cannot silently become float storage.
+    auto typed = bytes;
+    put32(typed, 0x20 + runtime->extension_offset() + 0x0c, 0xfffffff0U);
+    put32(typed, 0x20 + runtime->extension_offset() + 0x10, 0xffffffffU);
+    put32(typed, 0x20 + runtime->extension_offset() + 0x50, 0xfffffff6U);
+    put32(typed, 0x20 + runtime->extension_offset() + 0x68, 0xffffffd3U);
+    DatFighterRuntime typed_runtime(std::make_shared<const DatArchive>(typed), identity);
+    const auto& typed_attributes = *typed_runtime.mewtwo_attributes();
+    check(typed_attributes.shadowball_charge_iterations == -16 &&
+          typed_attributes.shadowball_release_lag == -1 &&
+          typed_attributes.teleport_duration == -10 &&
+          typed_attributes.teleport_angle_clamp == -45,
+          "Mewtwo signed decoder changed source bits");
+    auto malformed = read_real_archive(path);
+    put32(malformed, 0x20 + runtime->extension_offset(), 0x7fc00000U);
+    rejects([&] {
+        (void) DatFighterRuntime(std::make_shared<const DatArchive>(malformed), identity);
+    });
+    malformed = read_real_archive(path);
+    put32(malformed, 0x20 + runtime->root_offset() + 4, runtime->root_offset());
+    rejects([&] {
+        (void) DatFighterRuntime(std::make_shared<const DatArchive>(malformed), identity);
+    });
+    std::cout << "Mewtwo 0x88 attributes, signed counters, reflection record, authored dynamics and Disable/Shadow Ball Article boundary: passed\n";
+}
 void real_luigi(const char* path, const char* effect_path)
 {
     const auto identity = resolve_fighter_costume("PlyLuigi5K_Share_joint");
@@ -428,6 +505,10 @@ int main(int argc, char** argv)
         }
         if (argc == 3 && std::string_view(argv[1]) == "real_koopa") {
             real_koopa(argv[2]);
+            return 0;
+        }
+        if (argc == 3 && std::string_view(argv[1]) == "real_mewtwo") {
+            real_mewtwo(argv[2]);
             return 0;
         }
         if (argc == 4 && std::string_view(argv[1]) == "real_luigi") {

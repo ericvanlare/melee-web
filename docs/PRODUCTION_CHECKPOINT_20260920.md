@@ -18,6 +18,14 @@ availability and final match validation reject him; development retains his
 implementation. [Issue #50](https://github.com/ericvanlare/melee-web/issues/50)
 tracks repair and re-enablement. The original consumer guard remains intact.
 
+*Addendum, September 20 (later the same day):* the terminal SPL0 boundary is
+repaired on `fix-dk-platform-drop-bug`
+([PR #52](https://github.com/ericvanlare/melee-web/pull/52)); the host defines
+the terminal single-datum output as the authored last value and Donkey returns
+to public selection. The exclusion text above records the checkpoint decision
+at PR #49 and is no longer the current state. The independent original
+Pass-consumer capture remains open under issue #50.
+
 The public asset owner imports 32 menu inputs, then the exact selected match
 scope while source ticks and draws are stopped. It closes source owners and
 decoded caches before replacing file bytes. Public descriptors and the disc

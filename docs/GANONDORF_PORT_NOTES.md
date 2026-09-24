@@ -128,5 +128,9 @@ independent original comparison, all costume/opponent render states, reviewed
 pipeline coverage, cold/warm performance, complete match endings and repeated
 menu loops, pixels, PCM and physical input. Catch/throw follow-ups need actual
 opponent interactions; entering a special does not establish those branches.
+The shared dive-catch admission covers the common CaptureCaptain row 276
+command stream for both Captain-family catchers; a live Dark Dive catch
+interaction remains unexercised.
+
 The [whole-game inventory](FULL_GAME_PORT.md) keeps this candidate separate
 from full fighter admission.
