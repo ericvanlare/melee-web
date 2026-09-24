@@ -6,11 +6,11 @@ observer's pad_consume boundary.  Lifecycle boundaries assign each consumed
 sample to the source scene that was active at that point.  No CPU observation,
 host input, or intended menu schedule is used as an input.
 
-This producer is deliberately stricter than the v8 reader.  It requires two
-complete, independently identified streams, the same source setup/profile, and
-the same ordered source-consumed PAD history.  It rejects missing boundaries,
-unsupported phases, changed setups, and any partial stream before creating an
-MWRC file.
+Single mode validates one complete source-consumed workload without claiming
+repeatability. Pair mode additionally requires independently identified streams
+with identical source setup/profile and ordered source-consumed PAD history.
+Both reject missing boundaries, unsupported phases, changed setups, and partial
+streams before creating an MWRC file.
 """
 
 from __future__ import annotations
@@ -68,7 +68,7 @@ EXPECTED_OBSERVER_SCHEMA = "melee-web-passive-dolphin-observer"
 SCHEMA = "melee-web-whole-session-replay-candidate"
 SCHEMA_VERSION = 1
 SCOPE = (
-    "original source-consumed PAD repeatability and scoped MWRC v8 whole-session "
+    "original source-consumed PAD and scoped MWRC v8 whole-session "
     "workload; no CPU-decision input, port-equivalence, performance, pixel, PCM, "
     "or tournament-admission claim"
 )
@@ -538,10 +538,34 @@ def _sha256_file(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _project_replay_records(records: Iterable[Mapping[str, Any]]) -> Iterable[Mapping[str, Any]]:
+    """Retain replay evidence without buffering unrelated per-frame RAM dumps.
+
+    The path caller feeds this only decoded ``iter_records`` output: every raw
+    record has already passed its CRC, contiguous sequence, descriptor bounds
+    and transport checks. Keep every envelope and boundary (including draws),
+    so lifecycle ordering, frame ownership and status counters remain checked.
+    Only high-volume observations unused by the input-only exporter lose their
+    RAM/register payload; the immutable raw stream remains their evidence.
+    """
+    diagnostic = {"pad_poll", "source_tick", "draw_enter", "draw_return"}
+    for row in records:
+        payload = row.get("payload", {})
+        if row.get("event") == "boundary" and payload.get("boundary") in diagnostic:
+            projected = dict(row)
+            projected["payload"] = {
+                key: value for key, value in payload.items()
+                if key not in {"slices", "gprs"}
+            }
+            yield projected
+        else:
+            yield row
+
+
 def capture_from_path(path: str | Path, status_path: str | Path | None = None) -> dict[str, Any]:
     candidate = Path(path).expanduser().resolve()
     try:
-        rows = list(iter_records(candidate))
+        rows = list(_project_replay_records(iter_records(candidate)))
     except Exception as error:
         raise WholeSessionReplayError(f"cannot decode raw observer stream {candidate}: {error}") from error
     capture = capture_from_records(rows, str(candidate))

@@ -239,11 +239,28 @@ class WholeSessionReplayTests(unittest.TestCase):
             replay.capture_from_records(rows)
 
     def test_four_player_setup_is_admitted_with_typed_css_context(self):
-        capture = replay.capture_from_records(_candidate())
-        capture["declared_setup"]["players"].append(
-            copy.deepcopy(capture["declared_setup"]["players"][1]))
+        rows = _candidate()
+        for row in rows:
+            if row.get("payload", {}).get("boundary") != "entry":
+                continue
+            item = next(item for item in row["payload"]["slices"]
+                        if item["name"] == "match_setup")
+            raw = bytearray.fromhex(item["hex"])
+            for port in range(4):
+                base = 0x60 + port * 0x24
+                raw[base:base + 5] = bytes([8, 1, 4, port, 0])
+                raw[base + 14:base + 16] = bytes([4, 9])
+            item["hex"] = raw.hex()
+        capture = replay.capture_from_records(rows)
         payload, transport = replay.encode_v8(capture)
-        self.assertTrue(payload)
+        offset = replay.HEADER.size + replay.CONTEXT_HEADER.size + replay.CONTEXT_BYTES
+        encoded = payload[offset:offset + replay.GAME_INFO_SIZE]
+        decoded = replay._decode_setup(encoded.hex())
+        self.assertEqual(len(decoded["players"]), 4)
+        self.assertEqual([p["port"] for p in decoded["players"]], [1, 2, 3, 4])
+        self.assertTrue(all(p["player_type"] == 1 and p["cpu_level"] == 9
+                            for p in decoded["players"]))
+        self.assertEqual(encoded.hex(), capture["setup_hex"])
         self.assertEqual(transport["version"], 8)
 
     def test_v8_accepts_three_legacy_budgets_with_bounded_transport_size(self):
@@ -333,6 +350,37 @@ class WholeSessionReplayTests(unittest.TestCase):
 
     def test_pad_snapshot_helper_keeps_source_layout(self):
         self.assertEqual(semantics.pad_snapshot_bytes(_raw_pad_snapshot()), _whole_pad_state())
+
+    def test_path_projection_preserves_transport_and_rejects_corrupt_diagnostics(self):
+        rows = _candidate()
+        draw = next(row for row in rows
+                    if row.get("payload", {}).get("boundary") == "draw_return")
+        draw["payload"]["slices"].append({
+            "name": "fighter_head", "address": 0x80580000,
+            "size": 0x10000, "hex": "a5" * 0x10000,
+        })
+        expected = replay.capture_from_records(rows)
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "large-diagnostic.mwro"
+            _write_raw(path, rows)
+            projected = list(replay._project_replay_records(observer_stream.iter_records(path)))
+            self.assertEqual(len(projected), len(rows))
+            projected_draw = next(row for row in projected
+                                  if row.get("payload", {}).get("boundary") == "draw_return")
+            self.assertNotIn("slices", projected_draw["payload"])
+            self.assertNotIn("gprs", projected_draw["payload"])
+            self.assertEqual(projected_draw["seq"], draw["seq"])
+            actual = replay.capture_from_path(path)
+            for field in ("identity", "lifecycle", "first_css", "setup_hex", "frames", "spans"):
+                self.assertEqual(actual[field], expected[field], field)
+            # A bad CRC in precisely the discarded diagnostic data must fail
+            # before projection; input-only scope is not a malformed-row waiver.
+            raw = bytearray(path.read_bytes())
+            offset = raw.index(bytes.fromhex("a5" * 64))
+            raw[offset] ^= 1
+            path.write_bytes(raw)
+            with self.assertRaisesRegex(replay.WholeSessionReplayError, "CRC|checksum"):
+                replay.capture_from_path(path)
 
     def test_export_pair_reads_raw_mwro_and_writes_sidecar(self):
         rows_a = _candidate()
