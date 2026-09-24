@@ -1,0 +1,357 @@
+{
+  "schema": "melee-web-whole-session-cpu-register-diagnostic",
+  "version": 1,
+  "date": "2026-09-24",
+  "scope": "Reproducible original observations and first browser divergence for three natural four-Mario CPU9 four-stock Final Destination matches. No source identity provider or gameplay compatibility fix is installed.",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced",
+    "Browser exercised"
+  ],
+  "base_commit": "de048792af1144c23a5d10d28fe2270cab430d82",
+  "scenario": {
+    "fighter": "Mario",
+    "players": 4,
+    "cpu_levels": [
+      9,
+      9,
+      9,
+      9
+    ],
+    "stage": "Final Destination",
+    "stocks": 4,
+    "natural_matches": 3,
+    "route": "original CSS -> SSS -> VS -> Results -> CSS, repeated three times",
+    "original_renderer": "Null",
+    "original_cpu": "JITARM64",
+    "reference_speed": 2,
+    "browser": "headless installed Chrome; functional state comparison only"
+  },
+  "reference": {
+    "baseline": {
+      "path": "work/session-equivalence-reference-v1/capture.mwro",
+      "bytes": 1555401454,
+      "sha256": "18531db0d92fead60044deacef9eedc22d7cb5c19773faa63a6c9df7528546f5"
+    },
+    "control": {
+      "path": "work/session-equivalence-control-v1/capture.mwro",
+      "bytes": 1555401526,
+      "sha256": "409d4d1c74060a3f999ae644ff23cf9a0746462ff1ae1516c966a3e431df7b01"
+    },
+    "probe": {
+      "path": "work/session-equivalence-probe-v1/capture.mwro",
+      "bytes": 1555401526,
+      "sha256": "3fc46be00ed5769a82c76037bddd35a8672d924ee4a1b8b500e675f31ce5efdd"
+    },
+    "controller_input": {
+      "path": "work/session-equivalence-reference-v1/controller-input.mwri",
+      "bytes": 7207256,
+      "sha256": "f19e1a54a9aceda33217a1e272bc7ac0b78336bd243616a74f9573a9d8fbdcf5"
+    },
+    "input_validation": {
+      "version": 1,
+      "sha256": "f19e1a54a9aceda33217a1e272bc7ac0b78336bd243616a74f9573a9d8fbdcf5",
+      "bytes": 7207256,
+      "events": 180180,
+      "first_emulated_tick": 123552,
+      "last_emulated_tick": 365217441739,
+      "ports": {
+        "0": 90090,
+        "1": 90090
+      },
+      "operations": {
+        "pad_status": 180180,
+        "adapter_connection": 0
+      },
+      "complete": true
+    },
+    "statuses": {
+      "baseline": {
+        "state": "completed",
+        "event_count": 205741,
+        "last_seq": 205740,
+        "source_tick": 444,
+        "draw_ordinal": 10800,
+        "completed": true,
+        "invalid": false,
+        "error": null
+      },
+      "control": {
+        "state": "completed",
+        "event_count": 205741,
+        "last_seq": 205740,
+        "source_tick": 444,
+        "draw_ordinal": 10800,
+        "completed": true,
+        "invalid": false,
+        "error": null
+      },
+      "probe": {
+        "state": "completed",
+        "event_count": 205741,
+        "last_seq": 205740,
+        "source_tick": 444,
+        "draw_ordinal": 10800,
+        "completed": true,
+        "invalid": false,
+        "error": null
+      }
+    },
+    "control_comparison": {
+      "path": "work/session-equivalence-control-v1/comparison.json",
+      "bytes": 817,
+      "sha256": "9338b422f863df65ae9633d9a7a8640aa7e44c5d305a24288e238750038170a5"
+    },
+    "probe_comparison": {
+      "path": "work/session-equivalence-probe-v1/comparison.json",
+      "bytes": 815,
+      "sha256": "5d8d3c149fc9339f436ccfdec707dd2633ba46e7069503182c35255aaf57ad18"
+    },
+    "compared_records": 205741,
+    "ignored_comparison_fields": [
+      "host timestamp_ns",
+      "capture_id",
+      "sequence_id"
+    ],
+    "result": "all declared primary observation records agree in both fresh original replays",
+    "paired_input_only_recipe": {
+      "path": "work/session-equivalence-control-v1/paired-candidate.mwrc",
+      "bytes": 1877246,
+      "sha256": "e1cc93725525e52e7d9be198337e54d103bb1a9b027156252b69f9ed3f975f0e"
+    },
+    "paired_export_receipt": {
+      "path": "work/session-equivalence-control-v1/paired-candidate.json",
+      "bytes": 58031,
+      "sha256": "6500922f2506a6dec50c628a9d731b18db85d2033f4c348c226eb55a67eafb45"
+    }
+  },
+  "builds": {
+    "baseline_binary_sha256": "4d9ef9c6419e7b415dcf24600f9a7b96ab20b194743a6ee7728cd5d03574e5c1",
+    "probe_binary_sha256": "600d07396a4fbea3bb6daa6e4a3e71ef6c65addab4aa8dbfc7120659183642c3",
+    "probe_source_sha256": "5e7a554f8f726d303328782e61df27f5b1ee554b0d8aa38d0106a5a691ccf261",
+    "probe_build_manifest": {
+      "path": "work/session-equivalence-probe-build-v1.json",
+      "bytes": 2828,
+      "sha256": "593449e80d1a0861d617967cccb93a40a57f423dcdd14cd1c2e76607a5fdb3c4"
+    },
+    "probe_build_log": {
+      "path": "work/session-equivalence-probe-build-v1.log",
+      "bytes": 21170,
+      "sha256": "5cc6231ee5f4eb35930095b520d0470a009c21b665839c0a958a7f5db07fb54a"
+    },
+    "browser_build_log": {
+      "path": "work/session-equivalence-runtime-build-v3.log",
+      "bytes": 155179,
+      "sha256": "c8b4fe605d2650e9409a55f19a486ddfdb0e542dfa3b7edcafd2278e7c63dc95"
+    },
+    "browser_runtime_identity": {
+      "head": "de048792af1144c23a5d10d28fe2270cab430d82",
+      "files": [
+        {
+          "file": "runtime.html",
+          "bytes": 5007,
+          "sha256": "7dbdba45a72835799f02df323ce93e762ed3ad9d8941522ebe4d550913460172",
+          "http_bytes_equal": true
+        },
+        {
+          "file": "runtime-development.mjs",
+          "bytes": 52213,
+          "sha256": "81f064e90d398b2e86a4b9a44443d178dd02f3223d880cd13e7952c35dd68408",
+          "http_bytes_equal": true
+        },
+        {
+          "file": "gameplay_menu_browser.js",
+          "bytes": 287302,
+          "sha256": "d6d3daa653e245e98a7464ed2bc52df9be4337e28c4dc791d40e7d80f27fc5c7",
+          "http_bytes_equal": true
+        },
+        {
+          "file": "gameplay_menu_browser.wasm",
+          "bytes": 13670016,
+          "sha256": "0c1073c80f980a4747bd52e8cbe9f979f2488a6cfc033e1309ca8494de520be2",
+          "http_bytes_equal": true
+        },
+        {
+          "file": "gameplay_menu_browser.data",
+          "bytes": 3674112,
+          "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca",
+          "http_bytes_equal": true
+        }
+      ],
+      "harness_sha256": "8759f025e21d5a0efc9a7ff3903db4a0485323bed14221a47394f3a3d34efb72"
+    }
+  },
+  "probe": {
+    "artifact": {
+      "path": "work/session-equivalence-probe-v1/cpu-registers.jsonl",
+      "bytes": 17825676,
+      "sha256": "e76db60583685ffb78834e6bd2772c0b4e6efa47e4bd7811d85a8164cca0b126"
+    },
+    "format": "One JSON object despite historical .jsonl artifact suffix; future launcher uses .json",
+    "capture_id": "session-equivalence-probe-replay-v1-4cb4a0eb9b674b298a57ed52177d4903",
+    "sequence_id": "d74fd21d67404f9a9be35a9c6d5fd8bb",
+    "match": 0,
+    "first_tick": 1768,
+    "last_tick": 1784,
+    "record_count": 1189,
+    "window_complete": true,
+    "fields": "LR, GPR0-31, raw FPR0-6, bounded stack, seed, fighter head/CPU/flags; excludes CR/CTR/XER and other FPRs",
+    "reduction": {
+      "path": "work/session-equivalence-probe-v1/register-reduction.json",
+      "bytes": 27393,
+      "sha256": "5217349be121b40904ba62e36f9f8026112fba694df9c5503f6d8001ec0a5844"
+    },
+    "reaching_definitions": [
+      {
+        "record": 554,
+        "pc": "0x800ae21c",
+        "r5": "0x804ee844",
+        "meaning": "before hitlag RNG call"
+      },
+      {
+        "record": 555,
+        "pc": "0x800ae220",
+        "r5": "0x804d5f90",
+        "meaning": "seed pointer after RNG call"
+      },
+      {
+        "record": 566,
+        "pc": "0x800ac74c",
+        "r5": "0x804d5f90",
+        "meaning": "command 0x80 consumes low byte 0x90 (-112)"
+      },
+      {
+        "record": 569,
+        "pc": "0x800ac75c",
+        "r5": "0x80d1bf80",
+        "r30": "0x80d1bf80",
+        "meaning": "command 0x81 consumes fighter pointer low byte 0x80 (-128)"
+      }
+    ]
+  },
+  "browser": {
+    "first_match_comparison": {
+      "path": "work/session-equivalence-browser-v2/first-match-comparison.json",
+      "bytes": 14826,
+      "sha256": "5ed0644c941cf26ee17a8734e42c3065f4c9e05c65af6dcb878e2b30681d0ea0"
+    },
+    "port_trace": {
+      "path": "work/session-equivalence-browser-v2/retail-port.jsonl",
+      "bytes": 22235768,
+      "sha256": "ef946ed1be6cb13a648114902b598032a1ef474d2dbc7df34fd61358687907c8"
+    },
+    "harness": {
+      "path": "work/session-equivalence-browser-v2/harness.mjs",
+      "bytes": 14889,
+      "sha256": "8759f025e21d5a0efc9a7ff3903db4a0485323bed14221a47394f3a3d34efb72"
+    },
+    "screenshot": {
+      "path": "work/session-equivalence-browser-v2/final.png",
+      "bytes": 99709,
+      "sha256": "accda9fc2a22820121f71d95027ee3bfa97cae613742a53969c28ddd4cbc8746"
+    },
+    "first_difference": {
+      "fighters": {
+        "reference_seq": 15623,
+        "reference_tick": 1776,
+        "port_index": 3234,
+        "fields": [
+          {
+            "slot": 3,
+            "field": "input_hex",
+            "reference": "bf600000bf800000bf7e000000000000bf7e0000000000000000000000000000000000000000000000000000000000003f80000000000000000000008000002000000000000000008000002000000000010000010000010000fefe003fbbff0000ffff0228ffffffafff00ff",
+            "port": "0000000000000000bf7e000000000000bf7e0000000000000000000000000000000000000000000000000000000000003f80000000000000000000008000002000000000000000008000002000000000fefe00fefe00012a000000003fbbff0000ffff0228ffffffafff00ff"
+          }
+        ]
+      }
+    },
+    "scope": "Declared core/PAD/RNG/source-draw fields agree through tick1775, first input difference tick1776 at slot3; CPU decisions are never replay inputs. Browser prefixes intentionally stopped; final-session completion report remains failed/incomplete.",
+    "prefix_runs": [
+      "work/session-equivalence-browser-v1",
+      "work/session-equivalence-browser-v2"
+    ]
+  },
+  "validation": {
+    "probe_helpers": {
+      "path": "work/session-equivalence-probe-tests-v4.log",
+      "bytes": 569,
+      "sha256": "ab709a33832c86d38686fa0993c6287b4a75562792a9351e84740b0e92d4b547"
+    },
+    "existing_observer": {
+      "path": "work/session-equivalence-observer-tests-v1.log",
+      "bytes": 2303,
+      "sha256": "6346f9e7a80fc849826dfb1f6b510820d6522f0bb4139fecd22e3604f7018ae0"
+    },
+    "probe_lifecycle_and_json": {
+      "path": "work/session-equivalence-probe-lifecycle-tests-v2.log",
+      "bytes": 289,
+      "sha256": "67fbe9c151f1750cee6bbe50ca45c1ddf5f2b949c689da537f2a12ae8f77a911"
+    },
+    "native_menu_rebuild": {
+      "path": "work/session-equivalence-native-menu-build-v3.log",
+      "bytes": 195,
+      "sha256": "9096f41ef0589aff7c1f9c59362b83ef3a788d2c2d2a198a3f1087bf4cac276c"
+    },
+    "native_menu_regression": {
+      "path": "work/session-equivalence-native-menu-tests-v6.log",
+      "bytes": 787,
+      "sha256": "4f66cb64901ff4edfa503e8375079dbe0d8bfc4cd41e0defe60e1cf822055a96"
+    },
+    "owned_bank_preflight": {
+      "path": "work/session-equivalence-menu-bank-preflight.json",
+      "bytes": 5622,
+      "sha256": "7dbffe24b72835802224d1551a1b889ae14e0909a61ef39c4deb961ed134f841"
+    },
+    "first_full_suite": {
+      "log": {
+        "path": "work/session-equivalence-full-suite-v1.log",
+        "bytes": 223947,
+        "sha256": "1b45b8b72b5c00f040ec0df0903b730e0bf39cd1cec87222e5fad5d53cc1afec"
+      },
+      "tests": 1260,
+      "skipped": 63,
+      "failures": 1,
+      "cause": "Stale native_menu_host_trace binary did not recognize current link-css-unload-v1. After rebuild, missing local banks were supplied and all26 source menu-bank identities verified against owned disc; focused case passes."
+    },
+    "menu_loop_fixture_preflight": {
+      "path": "work/session-equivalence-menu-loop-preflight.json",
+      "bytes": 140,
+      "sha256": "b397d3da6b2f6ac54e7a371303f14c9ea8901d534522519be1424b52bf309f6f"
+    },
+    "menu_loop_test_fix": "After No Contest, all recipes select the requested SSS tile through ordinary raw PAD input; original random hover can differ after Results. Strict selection assertion retained; gameplay unchanged.",
+    "final_full_suite": {
+      "result": "pass",
+      "tests": 1260,
+      "seconds": 349.403,
+      "skipped": 63,
+      "log": {
+        "path": "work/session-equivalence-full-suite-v3.log",
+        "bytes": 223352,
+        "sha256": "38584df4eca013810bbfa9a5cefcfd23474f35bdd63ece1eca695e5fef5f73c0"
+      }
+    }
+  },
+  "retained_failures": [
+    "work/session-equivalence-runtime-build-v1.log",
+    "work/session-equivalence-runtime-build-v2.log",
+    "work/session-equivalence-probe-tests-v1.log",
+    "work/session-equivalence-probe-tests-v2.log",
+    "work/session-equivalence-full-suite-v1.log",
+    "work/session-equivalence-native-menu-test-v1.log",
+    "work/session-equivalence-native-menu-test-v2.log",
+    "work/session-equivalence-native-menu-test-v3.log",
+    "work/session-equivalence-full-suite-v2.log",
+    "work/session-equivalence-native-menu-tests-v5.log"
+  ],
+  "not_established": [
+    "Original source allocation history through fighter creation",
+    "Shared compiled source address and register-carry integration",
+    "Browser full-session equivalence",
+    "Pixels or PCM equivalence",
+    "Live timing, physical controllers, foreground performance",
+    "Holdout or content admission"
+  ],
+  "deployed": false,
+  "local_artifacts": "Paths relative to lead checkout; raw memory/disc/build artifacts remain ignored."
+}
