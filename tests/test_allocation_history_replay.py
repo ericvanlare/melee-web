@@ -45,15 +45,15 @@ class AllocationHistoryReplayTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.temp.cleanup()
 
-    def test_profile_versions_accept_legacy_and_callback_coverage_only(self):
+    def test_profile_versions_accept_legacy_callback_and_demo_coverage_only(self):
         path = self.root / "profile-version.json"
-        for version in (1, 2, 3, True, None, "2"):
+        for version in (1, 2, 3, 4, 3.0, True, None, "2"):
             with self.subTest(version=version):
                 path.write_text(json.dumps({
                     "schema": "melee-web-original-allocation-profile",
                     "version": version, "functions": [],
                 }))
-                if type(version) is int and version in (1, 2):
+                if type(version) is int and version in (1, 2, 3):
                     self.assertEqual(load_profile(path)["version"], version)
                 else:
                     with self.assertRaises(ReplayProblem):

@@ -17,9 +17,15 @@ import re
 import sys
 
 try:
-    from .retail_allocation_profile import DOL_SHA1, FUNCTIONS, GLOBALS, PROFILE_VERSION, SOURCE_REVISION
+    from .retail_allocation_profile import (
+        DOL_SHA1, FUNCTIONS, GLOBALS, LEGACY_FUNCTIONS, LEGACY_PROFILE_VERSION,
+        PROFILE_VERSION, SOURCE_REVISION,
+    )
 except ImportError:
-    from retail_allocation_profile import DOL_SHA1, FUNCTIONS, GLOBALS, PROFILE_VERSION, SOURCE_REVISION
+    from retail_allocation_profile import (
+        DOL_SHA1, FUNCTIONS, GLOBALS, LEGACY_FUNCTIONS, LEGACY_PROFILE_VERSION,
+        PROFILE_VERSION, SOURCE_REVISION,
+    )
 
 
 PROFILE_SCHEMA = "melee-web-original-allocation-profile"
@@ -39,11 +45,18 @@ def _integer(value: object, field: str, *, maximum: int = 0xFFFFFFFF) -> int:
     return value
 
 
+def _functions_for_version(version: object) -> dict[str, int]:
+    if type(version) is int and version == PROFILE_VERSION:
+        return FUNCTIONS
+    if type(version) is int and version == LEGACY_PROFILE_VERSION:
+        return LEGACY_FUNCTIONS
+    raise ValueError("unsupported allocation profile version")
+
+
 def validate_profile(value: object) -> dict:
     if not isinstance(value, dict) or value.get("schema") != PROFILE_SCHEMA:
         raise ValueError("unsupported allocation profile schema")
-    if value.get("version") != PROFILE_VERSION:
-        raise ValueError("unsupported allocation profile version")
+    functions_table = _functions_for_version(value.get("version"))
     if value.get("dol_sha1") != DOL_SHA1:
         raise ValueError("profile DOL identity differs from the pinned GALE01r2 DOL")
     if value.get("source_revision") != SOURCE_REVISION:
@@ -57,22 +70,22 @@ def validate_profile(value: object) -> dict:
     if not entry_word:
         raise ValueError("profile entry_word must be a nonzero instruction word")
     functions = value.get("functions")
-    if not isinstance(functions, list) or len(functions) != len(FUNCTIONS):
-        raise ValueError(f"profile must contain exactly {len(FUNCTIONS)} functions")
+    if not isinstance(functions, list) or len(functions) != len(functions_table):
+        raise ValueError(f"profile must contain exactly {len(functions_table)} functions")
     names = set()
     addresses = set()
     for index, function in enumerate(functions):
         if not isinstance(function, dict):
             raise ValueError(f"functions[{index}] is not an object")
         name = function.get("name")
-        if name not in FUNCTIONS or name in names:
+        if name not in functions_table or name in names:
             raise ValueError(f"functions[{index}] has an unexpected or duplicate name")
         names.add(name)
         address = _integer(function.get("address"), f"functions[{index}].address")
         size = _integer(function.get("size"), f"functions[{index}].size", maximum=0x100000)
         entry_word = _integer(function.get("entry_word"), f"functions[{index}].entry_word")
         argc = _integer(function.get("argc"), f"functions[{index}].argc", maximum=8)
-        if not address or address % 4 or not size or size % 4 or argc != FUNCTIONS[name]:
+        if not address or address % 4 or not size or size % 4 or argc != functions_table[name]:
             raise ValueError(f"functions[{index}] has an invalid aligned body")
         if address < 0x80000000 or address + size > 0x81800000:
             raise ValueError(f"functions[{index}] body is outside bounded MEM1")
@@ -90,7 +103,7 @@ def validate_profile(value: object) -> dict:
         body_hash = function.get("body_sha256")
         if not isinstance(body_hash, str) or not HEX256.fullmatch(body_hash):
             raise ValueError(f"functions[{index}].body_sha256 is not a SHA-256 identity")
-    if names != set(FUNCTIONS):
+    if names != set(functions_table):
         raise ValueError("profile function set differs from the pinned source table")
 
     globals_value = value.get("globals")
@@ -122,6 +135,10 @@ def _c_string(value: str) -> str:
 
 
 def render_header(profile: dict, profile_sha256: str) -> str:
+    if type(profile.get("version")) is not int or profile["version"] != PROFILE_VERSION:
+        raise ValueError(
+            "legacy allocation profiles are replay-readable but cannot render the current observer header"
+        )
     functions = profile["functions"]
     globals_value = profile["globals"]
     entry_word = _integer(profile["entry_word"], "entry_word")

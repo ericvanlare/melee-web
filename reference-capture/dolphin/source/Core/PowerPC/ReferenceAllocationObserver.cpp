@@ -8,6 +8,7 @@
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <limits>
@@ -18,6 +19,7 @@
 #include <utility>
 
 #include <mbedtls/sha256.h>
+#include <zlib.h>
 
 #include "Common/DirectIOFile.h"
 #include "Core/HW/Memmap.h"
@@ -30,12 +32,13 @@ namespace
 {
 constexpr char kExpectedDolSha1[] = "08e0bf20134dfcb260699671004527b2d6bb1a45";
 constexpr char kExpectedSourceRevision[] = "b43912cc78606f96c9569f5d6229bc9d7e265ea5";
-constexpr size_t kFunctionCount = 50;
+constexpr size_t kFunctionCount = 52;
 constexpr size_t kGlobalCount = 23;
 constexpr size_t kMaxThreads = 16;
 constexpr size_t kMaxDepth = 64;
 constexpr size_t kRingSize = 8192;
 constexpr size_t kMaxEvents = 2'000'000;
+constexpr size_t kMaxConfiguredEvents = 100'000'000;
 constexpr size_t kMaxReads = 256;
 constexpr size_t kMaxDescriptors = 32;
 constexpr size_t kMaxPayload = 64 * 1024;
@@ -210,6 +213,15 @@ struct State
   u32 call_count = 0;
   u32 repeated_stops = 0;
   bool boundary_complete = false;
+  u32 vs_target = 1;
+  u32 vs_entries = 0;
+  u32 vs_exits = 0;
+  bool stop_at_exit = false;
+  bool target_complete = false;
+  bool active_owner = false;
+  bool ownership_complete = false;
+  u64 max_events = kMaxEvents;
+  bool gzip_output = false;
   std::array<ThreadStack, kMaxThreads> threads{};
   LastStop last_stop;
 };
@@ -320,6 +332,147 @@ bool AppendMachineJson(std::string* output, const Machine& machine)
          Append(output, "}");
 }
 
+class OutputStream final
+{
+public:
+  OutputStream(const std::string& path, bool gzip)
+      : output_(path, File::AccessMode::Write, File::OpenMode::Create), gzip_(gzip)
+  {
+    if (!gzip_)
+      return;
+    if (!output_.IsOpen())
+    {
+      failed_ = true;
+      return;
+    }
+    if (deflateInit2(&stream_, Z_BEST_SPEED, Z_DEFLATED, 15 + 16, 8,
+                     Z_DEFAULT_STRATEGY) != Z_OK)
+    {
+      failed_ = true;
+      return;
+    }
+    initialized_ = true;
+  }
+
+  ~OutputStream()
+  {
+    if (initialized_)
+      deflateEnd(&stream_);
+  }
+
+  bool IsOpen() const
+  {
+    return output_.IsOpen() && !failed_ && (!gzip_ || initialized_);
+  }
+
+  bool Write(const u8* data, size_t size)
+  {
+    if (!IsOpen())
+      return false;
+    if (!gzip_)
+      return output_.Write(data, size);
+
+    while (size != 0)
+    {
+      const uInt chunk = static_cast<uInt>(std::min<size_t>(size, std::numeric_limits<uInt>::max()));
+      stream_.next_in = const_cast<Bytef*>(reinterpret_cast<const Bytef*>(data));
+      stream_.avail_in = chunk;
+      while (stream_.avail_in != 0)
+      {
+        stream_.next_out = compressed_.data();
+        stream_.avail_out = static_cast<uInt>(compressed_.size());
+        const int result = deflate(&stream_, Z_NO_FLUSH);
+        if (result != Z_OK || !WriteCompressed())
+        {
+          failed_ = true;
+          return false;
+        }
+      }
+      data += chunk;
+      size -= chunk;
+    }
+    return true;
+  }
+
+  bool Flush()
+  {
+    if (!IsOpen())
+      return false;
+    if (!gzip_)
+      return output_.Flush();
+
+    int result = Z_OK;
+    do
+    {
+      stream_.next_in = nullptr;
+      stream_.avail_in = 0;
+      stream_.next_out = compressed_.data();
+      stream_.avail_out = static_cast<uInt>(compressed_.size());
+      result = deflate(&stream_, Z_SYNC_FLUSH);
+      if ((result != Z_OK && result != Z_BUF_ERROR) || !WriteCompressed())
+      {
+        failed_ = true;
+        return false;
+      }
+    } while (stream_.avail_out == 0);
+    return output_.Flush();
+  }
+
+  bool Finish()
+  {
+    if (!IsOpen())
+      return false;
+    if (!gzip_)
+      return output_.Flush() && output_.Close();
+
+    int result = Z_OK;
+    do
+    {
+      stream_.next_in = nullptr;
+      stream_.avail_in = 0;
+      stream_.next_out = compressed_.data();
+      stream_.avail_out = static_cast<uInt>(compressed_.size());
+      result = deflate(&stream_, Z_FINISH);
+      if ((result != Z_OK && result != Z_STREAM_END) || !WriteCompressed())
+      {
+        failed_ = true;
+        return false;
+      }
+    } while (result != Z_STREAM_END);
+    const int end_result = deflateEnd(&stream_);
+    initialized_ = false;
+    const bool flushed = output_.Flush();
+    const bool closed = output_.Close();
+    if (end_result != Z_OK)
+      failed_ = true;
+    return end_result == Z_OK && flushed && closed;
+  }
+
+  bool Close()
+  {
+    if (initialized_)
+    {
+      deflateEnd(&stream_);
+      initialized_ = false;
+    }
+    return output_.Close();
+  }
+
+private:
+  bool WriteCompressed()
+  {
+    const size_t produced = compressed_.size() - stream_.avail_out;
+    return produced == 0 || output_.Write(compressed_.data(), produced);
+  }
+
+  File::DirectIOFile output_;
+  bool gzip_ = false;
+  bool initialized_ = false;
+  bool failed_ = false;
+  z_stream stream_{};
+  std::array<Bytef, 64 * 1024> compressed_{};
+};
+
 class Backend
 {
 public:
@@ -327,10 +480,10 @@ public:
   {
     if (state_.writer.joinable())
     {
-      // Process teardown is an ordinary (non-natural) finish. Preserve a
-      // first-VS boundary that was already completed, matching Finish(false)
-      // instead of rewriting the terminal result to incomplete.
-      state_.natural.store(state_.boundary_complete);
+      // Process teardown is an ordinary (non-natural) finish. Preserve the
+      // requested stop boundary, rather than treating the first
+      // VS entry as complete for an opt-in repeated-ownership capture.
+      state_.natural.store(state_.target_complete);
       state_.finish_requested.store(true);
       state_.writer.join();
     }
@@ -349,6 +502,10 @@ public:
       return false;
     state_.profile = profile;
     state_.output_path = std::string(output_path);
+    state_.gzip_output = state_.output_path.size() >= 3 &&
+                         state_.output_path.ends_with(".gz");
+    if (!ConfigureCaptureScope())
+      return false;
     if (!ValidateProfile() || !IsSafePath(output_path))
     {
       Fail("allocation observer arm identity or output validation failed");
@@ -392,10 +549,18 @@ public:
       Fail("allocation observer boot context is outside bounded MEM1");
       return false;
     }
-    std::string header = "{\"record\":\"header\",\"schema\":\"melee-web-original-allocation-history\","
-                         "\"version\":1,\"start\":\"original_dol_entry\","
-                         "\"writes_game_state\":false,\"profile_sha256\":\"";
-    if (!Append(&header, state_.profile.profile_sha256) || !Append(&header, "\",\"initial_pc\":"))
+    std::string header =
+        "{\"record\":\"header\",\"schema\":\"melee-web-original-allocation-history\","
+        "\"version\":1,\"start\":\"original_dol_entry\",\"scope\":\"vs_ownership\","
+        "\"vs_target\":";
+    if (!AppendNumber(&header, state_.vs_target) || !Append(&header, ",\"stop_at\":\"") ||
+        !Append(&header, state_.stop_at_exit ? "exit" : "entry") ||
+        !Append(&header, "\",\"max_events\":") ||
+        !AppendNumber(&header, state_.max_events) ||
+        !Append(&header, ",\"compression\":\"") ||
+        !Append(&header, state_.gzip_output ? "gzip" : "none") ||
+        !Append(&header, "\",\"writes_game_state\":false,\"profile_sha256\":\"") ||
+        !Append(&header, state_.profile.profile_sha256) || !Append(&header, "\",\"initial_pc\":"))
     {
       Fail("allocation observer header exceeded its bound");
       return false;
@@ -503,6 +668,15 @@ public:
     bool has_parent = false;
     if (entering)
     {
+      if (function->name && std::string_view(function->name) == "gm_Scene_Vs_OnEnter" &&
+          (state_.active_owner || HasFunctionFrame(function_index)))
+        return Fail("allocation observer VS entry is reentrant for an active source owner");
+      if (function->name && std::string_view(function->name) == "gm_Scene_Vs_OnExit" &&
+          !state_.active_owner)
+        return Fail("allocation observer VS exit has no active source owner");
+      if (function->name && std::string_view(function->name) == "gm_Scene_Vs_OnExit" &&
+          HasFunctionFrame(function_index))
+        return Fail("allocation observer VS exit is reentrant for an active source owner");
       argc = function->argc;
       for (u32 index = 0; index < argc; ++index)
         args[index] = state->gpr[3 + index];
@@ -603,12 +777,40 @@ public:
     else
     {
       --stack->depth;
-      if (function->name && std::string_view(function->name) == "gm_Scene_Vs_OnEnter" &&
-          StacksEmpty())
+      if (function->name)
       {
-        state_.boundary_complete = true;
-        state_.natural.store(true);
-        state_.finish_requested.store(true);
+        const std::string_view name(function->name);
+        if ((name == "gm_Scene_Vs_OnEnter" || name == "gm_Scene_Vs_OnExit") &&
+            !StacksEmpty())
+          return Fail("allocation observer VS boundary returned with other source calls active");
+        if (!StacksEmpty())
+          return;
+        if (name == "gm_Scene_Vs_OnEnter")
+        {
+          state_.boundary_complete = true;
+          ++state_.vs_entries;
+          state_.active_owner = true;
+          if (!state_.stop_at_exit && state_.vs_entries >= state_.vs_target)
+          {
+            state_.target_complete = true;
+            state_.natural.store(true);
+            state_.finish_requested.store(true);
+          }
+        }
+        else if (name == "gm_Scene_Vs_OnExit")
+        {
+          if (!state_.active_owner || state_.vs_exits >= state_.vs_entries)
+            return Fail("allocation observer VS exit has no active source owner");
+          ++state_.vs_exits;
+          state_.active_owner = false;
+          if (state_.stop_at_exit && state_.vs_exits >= state_.vs_target)
+          {
+            state_.ownership_complete = true;
+            state_.target_complete = true;
+            state_.natural.store(true);
+            state_.finish_requested.store(true);
+          }
+        }
       }
     }
   }
@@ -623,11 +825,11 @@ public:
       state_.lifecycle_cv.wait(lifecycle_lock,
                                [this] { return state_.callbacks_in_flight == 0; });
       started = state_.started.load(std::memory_order_acquire);
-      if (natural && !state_.boundary_complete)
-        Fail("allocation observer natural finish precedes the first VS entry return");
-      // A caller may perform ordinary teardown with Finish(false) after the
-      // first VS boundary already completed. Preserve that terminal result.
-      state_.natural.store(state_.boundary_complete);
+      if (natural && !state_.target_complete)
+        Fail("allocation observer natural finish precedes the requested VS ownership boundary");
+      // A caller may perform ordinary teardown after a completed requested
+      // boundary. Do not promote a partial repeated-ownership stream.
+      state_.natural.store(state_.target_complete);
     }
     if (state_.writer.joinable())
       state_.writer.join();
@@ -643,6 +845,66 @@ public:
   }
 
 private:
+  bool ConfigureCaptureScope()
+  {
+    state_.vs_target = 1;
+    state_.stop_at_exit = false;
+    state_.max_events = kMaxEvents;
+    const char* target = std::getenv("MWRC_ALLOCATION_VS_TARGET");
+    if (target && *target)
+    {
+      u32 value = 0;
+      for (const unsigned char character : std::string_view(target))
+      {
+        if (character < '0' || character > '9' || value > 16)
+        {
+          Fail("MWRC_ALLOCATION_VS_TARGET must be a decimal count from 1 through 16");
+          return false;
+        }
+        value = value * 10 + static_cast<u32>(character - '0');
+      }
+      if (value == 0 || value > 16)
+      {
+        Fail("MWRC_ALLOCATION_VS_TARGET must be a decimal count from 1 through 16");
+        return false;
+      }
+      state_.vs_target = value;
+    }
+    const char* stop_at = std::getenv("MWRC_ALLOCATION_STOP_AT");
+    if (stop_at && *stop_at)
+    {
+      if (std::string_view(stop_at) == "exit")
+        state_.stop_at_exit = true;
+      else if (std::string_view(stop_at) != "entry")
+      {
+        Fail("MWRC_ALLOCATION_STOP_AT must be entry or exit");
+        return false;
+      }
+    }
+    const char* max_events = std::getenv("MWRC_ALLOCATION_MAX_EVENTS");
+    if (max_events && *max_events)
+    {
+      u64 value = 0;
+      for (const unsigned char character : std::string_view(max_events))
+      {
+        if (character < '0' || character > '9' ||
+            value > (kMaxConfiguredEvents - static_cast<u64>(character - '0')) / 10)
+        {
+          Fail("MWRC_ALLOCATION_MAX_EVENTS must be a decimal count from 1 through 100000000");
+          return false;
+        }
+        value = value * 10 + static_cast<u64>(character - '0');
+      }
+      if (value == 0 || value > kMaxConfiguredEvents)
+      {
+        Fail("MWRC_ALLOCATION_MAX_EVENTS must be a decimal count from 1 through 100000000");
+        return false;
+      }
+      state_.max_events = value;
+    }
+    return true;
+  }
+
   bool ValidateProfile() const
   {
     const BoundProfile& profile = state_.profile;
@@ -801,6 +1063,17 @@ private:
   {
     return std::all_of(state_.threads.begin(), state_.threads.end(),
                        [](const ThreadStack& stack) { return stack.depth == 0; });
+  }
+
+  bool HasFunctionFrame(u32 function_index) const
+  {
+    return std::any_of(state_.threads.begin(), state_.threads.end(),
+                       [function_index](const ThreadStack& stack) {
+                         return std::any_of(stack.frames.begin(), stack.frames.begin() + stack.depth,
+                                            [function_index](const CallFrame& frame) {
+                                              return frame.function_index == function_index;
+                                            });
+                       });
   }
 
   bool ReadGlobalWord(Core::System* system, std::string_view name, u32* value) const
@@ -1128,7 +1401,8 @@ private:
           !add("handle_words", [&] { return AppendWords(output, handle_words.data(), count); }))
         return false;
     }
-    if (return_value && function == "Fighter_Create" && *return_value)
+    if (return_value && (function == "Fighter_Create" || function == "ftDemo_CreateFighter") &&
+        *return_value)
     {
       u32 fighter = 0;
       u8 slot = 0;
@@ -1197,7 +1471,7 @@ private:
     while (true)
     {
       const u64 sequence = state_.next_sequence.load(std::memory_order_relaxed);
-      if (sequence >= kMaxEvents)
+      if (sequence >= state_.max_events)
       {
         Fail("allocation observer event budget or payload bound exceeded");
         return false;
@@ -1249,7 +1523,7 @@ private:
     }
   }
 
-  bool EmitWriter(std::string row, File::DirectIOFile& output)
+  bool EmitWriter(std::string row, OutputStream& output)
   {
     if (row.size() > kMaxPayload)
       return false;
@@ -1313,8 +1587,7 @@ private:
 
   void WriterMain()
   {
-    File::DirectIOFile output(state_.output_path, File::AccessMode::Write,
-                              File::OpenMode::Create);
+    OutputStream output(state_.output_path, state_.gzip_output);
     if (!output.IsOpen())
       Fail("allocation observer output could not be created exclusively");
     std::array<char, kWriterBatchBytes> batch{};
@@ -1334,6 +1607,12 @@ private:
         Fail("allocation observer output write failed");
         if (!output.Close())
           Fail("allocation observer output close failed after a write failure");
+      }
+      else if (!output.Flush())
+      {
+        Fail("allocation observer output flush failed");
+        if (!output.Close())
+          Fail("allocation observer output close failed after a flush failure");
       }
       return written;
     };
@@ -1404,34 +1683,42 @@ private:
           if (!error_written)
             Fail("allocation observer error record could not be written");
         }
-        const bool complete = state_.natural.load() && !state_.invalid.load() && !pending;
+        const bool complete = state_.natural.load() && state_.target_complete &&
+                              !state_.invalid.load() && !pending;
         if (output.IsOpen())
         {
           if (!output.Flush())
             Fail("allocation observer output flush failed before final record");
           std::string end = "{\"record\":\"end\",\"status\":\"";
           const bool final_complete = complete && !state_.invalid.load();
-          end += final_complete
-                     ? "captured"
-                     : ((state_.invalid.load() || !state_.boundary_complete) ? "incomplete"
-                                                                              : "error");
+          const bool incomplete = state_.invalid.load() || !state_.boundary_complete ||
+                                  !state_.target_complete;
+          end += final_complete ? "captured" : (incomplete ? "incomplete" : "error");
           end += "\",\"error\":";
           const std::string error = ErrorText();
           if (error.empty())
             end += "null";
           else
             end += "\"" + JsonEscape(error) + "\"";
-          end += ",\"pending_calls\":" + PendingJson() + ",\"calls\":" +
+          end += ",\"scope\":\"vs_ownership\",\"vs_target\":" +
+                 std::to_string(state_.vs_target) + ",\"stop_at\":\"" +
+                 (state_.stop_at_exit ? "exit" : "entry") + "\",\"max_events\":" +
+                 std::to_string(state_.max_events) + ",\"compression\":\"" +
+                 (state_.gzip_output ? "gzip" : "none") + "\",\"target_complete\":" +
+                 (state_.target_complete ? "true" : "false") + ",\"vs_entries\":" +
+                 std::to_string(state_.vs_entries) + ",\"vs_exits\":" +
+                 std::to_string(state_.vs_exits) + ",\"active_owner\":" +
+                 (state_.active_owner ? "true" : "false") + ",\"pending_calls\":" + PendingJson() +
+                 ",\"calls\":" +
                  std::to_string(state_.call_count) + ",\"repeated_stops\":" +
                  std::to_string(state_.repeated_stops) + ",\"boundary_complete\":" +
                  (state_.boundary_complete ? "true" : "false") +
-                 ",\"ownership_complete\":false}";
+                 ",\"ownership_complete\":" +
+                 (state_.ownership_complete ? "true" : "false") + "}";
           if (!EmitWriter(std::move(end), output))
             Fail("allocation observer final record could not be written");
-          if (!output.Flush())
-            Fail("allocation observer output flush failed");
-          if (!output.Close())
-            Fail("allocation observer output close failed");
+          if (!output.Finish())
+            Fail("allocation observer output finalization failed");
         }
         return;
       }

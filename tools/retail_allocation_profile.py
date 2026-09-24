@@ -12,7 +12,7 @@ from pathlib import Path
 
 DOL_SHA1 = "08e0bf20134dfcb260699671004527b2d6bb1a45"
 SOURCE_REVISION = "b43912cc78606f96c9569f5d6229bc9d7e265ea5"
-PROFILE_VERSION = 2
+PROFILE_VERSION = 3
 
 # Argument counts follow the pinned original declarations. These are observation
 # boundaries, not replacement implementations of the functions.
@@ -38,7 +38,16 @@ FUNCTIONS = {
     "gm_Scene_Vs_OnEnter": 1, "gm_Scene_Vs_OnExit": 1,
     "fn_80015184": 2, "lbMemory_80015320": 4, "lbDvd_80017A80": 1,
     "HSD_DevComARAMCallback": 1, "HSD_DevComRequest": 8,
+    # This source wrapper initializes the demo-mode fighter allocation pool
+    # used again when the retail session returns to a match. Keep it as an
+    # explicit source boundary rather than treating that pool as a VS-only
+    # Fighter_FirstInitialize allocation.
+    "ftDemo_CreateFighter": 1,
+    "ftDemo_ObjAllocInit": 0,
 }
+LEGACY_PROFILE_VERSION = 2
+LEGACY_FUNCTIONS = {name: argc for name, argc in FUNCTIONS.items()
+                    if name not in {"ftDemo_CreateFighter", "ftDemo_ObjAllocInit"}}
 GLOBALS = ("HeapArray", "NumHeaps", "ArenaStart", "ArenaEnd",
            "__OSArenaLo", "__OSArenaHi", "seed", "seed_ptr",
            "fighter_alloc_data", "obj_heap", "current_heap", "__OSCurrHeap",

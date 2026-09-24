@@ -21,6 +21,7 @@ import sys
 import tempfile
 from dataclasses import dataclass
 from typing import Any, Iterable
+import zlib
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -154,139 +155,281 @@ def load_context(path: Path | None, overrides: dict[str, int | None],
     return result
 
 
-def load_trace(path: Path) -> tuple[dict[str, Any], list[dict[str, Any]], dict[int, dict[str, Any]], dict[int, dict[str, Any]]]:
+def load_trace(path: Path, *, disk_backed: bool | None = None,
+               disk_threshold: int = 100_000,
+               temp_directory: Path | None = None):
+    """Read and validate an allocation trace without retaining large rows.
+
+    ``disk_backed=False`` preserves the historical list/dict result exactly.
+    With ``True`` every row is stored in a temporary compressed SQLite index.
+    The default automatically migrates after ``disk_threshold`` records, so
+    small fixtures keep their old cheap representation while large plain or
+    gzip JSONL captures stay bounded in memory.
+    """
+    try:
+        from .allocation_trace_store import TraceStoreError, new_disk_store
+    except ImportError:  # Executing this file directly from the repository.
+        from allocation_trace_store import TraceStoreError, new_disk_store
+    import gzip
+
+    if disk_backed not in (None, True, False):
+        raise ValueError("disk_backed must be true, false, or None")
+    if isinstance(disk_threshold, bool) or not isinstance(disk_threshold, int) or disk_threshold < 0:
+        raise ValueError("disk_threshold must be a nonnegative integer")
+
     header: dict[str, Any] | None = None
     rows: list[dict[str, Any]] = []
     enters: dict[int, dict[str, Any]] = {}
     returns: dict[int, dict[str, Any]] = {}
-    try:
-        stream = path.open()
-    except OSError as error:
-        raise ReplayProblem("input", f"cannot read allocation trace {path}: {error}") from error
-    with stream:
-        for lineno, line in enumerate(stream, 1):
-            if not line.strip():
-                continue
-            try:
-                row = json.loads(line)
-            except json.JSONDecodeError as error:
-                raise ReplayProblem("stream", f"trace line {lineno} is invalid JSON: {error}") from error
-            if not isinstance(row, dict):
-                raise ReplayProblem("stream", f"trace line {lineno} is not an object")
-            record = row.get("record")
-            if record == "header":
-                if header is not None or rows:
-                    raise ReplayProblem("stream", f"trace line {lineno} has a misplaced header")
-                header = row
-            elif record == "enter":
-                if header is None:
-                    raise ReplayProblem("stream", f"trace line {lineno} precedes the header")
-                call = parse_u32(row.get("call"), f"trace line {lineno}.call")
-                if call in enters:
-                    raise ReplayProblem("stream", f"duplicate entry for call {call}")
-                enters[call] = row
-            elif record == "return":
-                call = parse_u32(row.get("call"), f"trace line {lineno}.call")
-                if call in returns:
-                    raise ReplayProblem("stream", f"duplicate return for call {call}")
-                returns[call] = row
-            elif record in ("end", "error", "repeated_stop"):
-                pass
-            else:
-                raise ReplayProblem("stream", f"trace line {lineno} has unsupported record {record!r}")
-            rows.append(row)
-    if header is None:
-        raise ReplayProblem("stream", "allocation trace has no header")
-    if header.get("schema") != "melee-web-original-allocation-history" or header.get("version") != 1:
-        raise ReplayProblem("stream", "unsupported allocation trace schema or version")
-    sequences = [row.get("sequence") for row in rows]
-    if any(isinstance(value, bool) or not isinstance(value, int) or value < 0 for value in sequences):
-        raise ReplayProblem("stream", "allocation trace has a missing or invalid sequence")
-    if sequences != list(range(len(rows))):
-        raise ReplayProblem("stream", "allocation trace sequence is not contiguous from zero")
-    if rows[0].get("record") != "header":
-        raise ReplayProblem("stream", "allocation trace header is not the first record")
-    end_rows = [row for row in rows if row.get("record") == "end"]
-    if len(end_rows) > 1 or (end_rows and rows[-1] is not end_rows[0]):
-        raise ReplayProblem("stream", "allocation trace end record is duplicated or not final")
-    for row in rows:
-        if row.get("record") == "error" and not isinstance(row.get("error"), str):
-            raise ReplayProblem("stream", "allocation trace error record lacks a textual reason")
-        if row.get("record") == "end":
-            if row.get("status") not in ("captured", "incomplete", "error"):
-                raise ReplayProblem("stream", "allocation trace end status is invalid")
-            if not isinstance(row.get("calls"), int) or row.get("calls") < 0:
-                raise ReplayProblem("stream", "allocation trace end call count is invalid")
-            if "pending_calls" in row and not isinstance(row.get("pending_calls"), list):
-                raise ReplayProblem("stream", "allocation trace end pending_calls is invalid")
-            if row.get("status") == "captured" and row.get("calls") != len(enters):
-                raise ReplayProblem("stream", "captured trace end call count differs from entries")
-    # Validate the complete per-thread call nesting before replay can consume
-    # any allocator result. A return that merely has a known call id is not
-    # sufficient: the source collector's stack boundary must also agree.
+    store = None
+    using_disk = disk_backed is True or (disk_backed is None and disk_threshold == 0)
+    row_count = 0
+    last_row: dict[str, Any] | None = None
+    end_row: dict[str, Any] | None = None
+    end_sequence: int | None = None
+    has_error_record = False
     stacks: dict[Any, list[int]] = {}
-    for row in rows:
-        record = row.get("record")
-        if record == "enter":
-            call = parse_u32(row.get("call"), "trace enter.call")
-            thread = row.get("thread")
-            stack = stacks.setdefault(thread, [])
-            parent = row.get("parent")
-            if parent is not None:
-                parent_id = parse_u32(parent, "trace enter.parent")
-                if parent_id not in enters or enters[parent_id].get("sequence", -1) >= row.get("sequence", 0):
-                    raise ReplayProblem("stream", "trace enter parent is not an earlier entry")
-                parent_entry = enters[parent_id]
-                if parent_entry.get("thread") != thread:
-                    raise ReplayProblem("stream", "trace enter parent is on a different source thread")
-                if not stack or stack[-1] != parent_id:
-                    raise ReplayProblem("stream", "trace enter parent is not the current source call")
-            elif stack:
-                raise ReplayProblem("stream", "trace nested enter is missing its current-call parent")
-            stack.append(call)
-        elif record == "return":
-            call = parse_u32(row.get("call"), "trace return.call")
-            entry = enters.get(call)
-            if entry is None:
-                raise ReplayProblem("stream", f"return {call} has no entry")
-            if row.get("thread") != entry.get("thread"):
-                raise ReplayProblem("stream", f"return {call} thread differs from entry")
-            if row.get("function") != entry.get("function"):
-                raise ReplayProblem("stream", f"return {call} function differs from entry")
-            stack = stacks.setdefault(row.get("thread"), [])
-            if not stack or stack[-1] != call:
-                raise ReplayProblem("stream", f"return {call} is not the top source call")
-            stack.pop()
-    end_status = end_rows[0].get("status") if end_rows else None
+
+    def migrate() -> None:
+        nonlocal store, using_disk, rows, enters, returns
+        if using_disk:
+            return
+        store = new_disk_store(directory=temp_directory)
+        for old_row in rows:
+            store.add(old_row)
+        rows.clear()
+        enters.clear()
+        returns.clear()
+        using_disk = True
+
+    def maybe_migrate() -> None:
+        if not using_disk and disk_backed is None and row_count >= disk_threshold:
+            migrate()
+
+    def contains(table: str, call: int) -> bool:
+        if using_disk:
+            return bool(store._mapping_contains(table, call))
+        return call in (enters if table == "enters" else returns)
+
+    def get_entry(call: int):
+        if using_disk:
+            try:
+                return store._mapping_row("enters", call)
+            except KeyError:
+                return None
+            except TraceStoreError as error:
+                if store is not None:
+                    store.close()
+                raise ReplayProblem("stream", f"cannot read allocation trace store: {error}") from error
+        return enters.get(call)
+
+    def add_row(row: dict[str, Any]) -> None:
+        nonlocal row_count, last_row
+        maybe_migrate()
+        if using_disk:
+            store.add(row)
+        else:
+            rows.append(row)
+        row_count += 1
+        last_row = row
+
+    def remember_enter(call: int, row: dict[str, Any]) -> None:
+        if not using_disk:
+            enters[call] = row
+
+    def remember_return(call: int, row: dict[str, Any]) -> None:
+        if not using_disk:
+            returns[call] = row
+
+    def stack_for(thread: Any) -> list[int]:
+        try:
+            return stacks.setdefault(thread, [])
+        except TypeError as error:
+            raise ReplayProblem("stream", "allocation trace thread identity is not hashable") from error
+
+    if using_disk:
+        try:
+            store = new_disk_store(directory=temp_directory)
+        except TraceStoreError as error:
+            raise ReplayProblem("stream", f"cannot create allocation trace store: {error}") from error
+
+    def open_stream():
+        if path.name.lower().endswith((".gz", ".gzip")):
+            return gzip.open(path, "rt", encoding="utf-8")
+        return path.open("r", encoding="utf-8")
+
+    try:
+        try:
+            stream = open_stream()
+        except OSError as error:
+            raise ReplayProblem("input", f"cannot read allocation trace {path}: {error}") from error
+        with stream:
+            for lineno, line in enumerate(stream, 1):
+                if not line.strip():
+                    continue
+                try:
+                    row = json.loads(line)
+                except json.JSONDecodeError as error:
+                    raise ReplayProblem("stream", f"trace line {lineno} is invalid JSON: {error}") from error
+                if not isinstance(row, dict):
+                    raise ReplayProblem("stream", f"trace line {lineno} is not an object")
+                sequence = row.get("sequence")
+                if (isinstance(sequence, bool) or not isinstance(sequence, int)
+                        or sequence != row_count):
+                    raise ReplayProblem(
+                        "stream",
+                        f"trace line {lineno} has non-contiguous sequence {sequence!r}; expected {row_count}",
+                    )
+                record = row.get("record")
+                if record == "header":
+                    if header is not None or row_count:
+                        raise ReplayProblem("stream", f"trace line {lineno} has a misplaced header")
+                    header = row
+                    add_row(row)
+                elif record == "enter":
+                    if header is None:
+                        raise ReplayProblem("stream", f"trace line {lineno} precedes the header")
+                    call = parse_u32(row.get("call"), f"trace line {lineno}.call")
+                    if contains("enters", call):
+                        raise ReplayProblem("stream", f"duplicate entry for call {call}")
+                    add_row(row)
+                    remember_enter(call, row)
+                    thread = row.get("thread")
+                    stack = stack_for(thread)
+                    parent = row.get("parent")
+                    if parent is not None:
+                        parent_id = parse_u32(parent, "trace enter.parent")
+                        parent_entry = get_entry(parent_id)
+                        if parent_entry is None or parent_entry.get("sequence", -1) >= row.get("sequence", 0):
+                            raise ReplayProblem("stream", "trace enter parent is not an earlier entry")
+                        if parent_entry.get("thread") != thread:
+                            raise ReplayProblem("stream", "trace enter parent is on a different source thread")
+                        if not stack or stack[-1] != parent_id:
+                            raise ReplayProblem("stream", "trace enter parent is not the current source call")
+                    elif stack:
+                        raise ReplayProblem("stream", "trace nested enter is missing its current-call parent")
+                    stack.append(call)
+                elif record == "return":
+                    call = parse_u32(row.get("call"), f"trace line {lineno}.call")
+                    if contains("returns", call):
+                        raise ReplayProblem("stream", f"duplicate return for call {call}")
+                    add_row(row)
+                    remember_return(call, row)
+                    entry = get_entry(call)
+                    if entry is None:
+                        raise ReplayProblem("stream", f"return {call} has no entry")
+                    if row.get("thread") != entry.get("thread"):
+                        raise ReplayProblem("stream", f"return {call} thread differs from entry")
+                    if row.get("function") != entry.get("function"):
+                        raise ReplayProblem("stream", f"return {call} function differs from entry")
+                    stack = stack_for(row.get("thread"))
+                    if not stack or stack[-1] != call:
+                        raise ReplayProblem("stream", f"return {call} is not the top source call")
+                    stack.pop()
+                elif record in ("end", "error", "repeated_stop"):
+                    if record == "error" and not isinstance(row.get("error"), str):
+                        raise ReplayProblem("stream", "allocation trace error record lacks a textual reason")
+                    add_row(row)
+                    if record == "end":
+                        if end_row is not None:
+                            raise ReplayProblem("stream", "allocation trace end record is duplicated or not final")
+                        end_row = row
+                        end_sequence = row.get("sequence")
+                    if record == "error":
+                        has_error_record = True
+                else:
+                    raise ReplayProblem("stream", f"trace line {lineno} has unsupported record {record!r}")
+    except ReplayProblem:
+        if store is not None:
+            store.close()
+        raise
+    except (OSError, EOFError, UnicodeError, TraceStoreError, zlib.error) as error:
+        if store is not None:
+            store.close()
+        message = str(error)
+        if path.name.lower().endswith((".gz", ".gzip")):
+            message = f"cannot read allocation trace gzip {path}: {message}"
+        else:
+            message = f"cannot read allocation trace {path}: {message}"
+        raise ReplayProblem("stream", message) from error
+
+    def reject(message: str) -> None:
+        if store is not None:
+            store.close()
+        raise ReplayProblem("stream", message)
+
+    def parse_pending(value: Any, context: str) -> int:
+        try:
+            return parse_u32(value, context)
+        except ReplayProblem as error:
+            reject(error.message)
+            raise AssertionError("unreachable")
+
+    if header is None:
+        reject("allocation trace has no header")
+    if (header.get("schema") != "melee-web-original-allocation-history"
+            or type(header.get("version")) is not int
+            or header.get("version") != 1):
+        reject("unsupported allocation trace schema or version")
+    if row_count == 0 or header.get("record") != "header":
+        reject("allocation trace header is not the first record")
+    # Sequence continuity is checked while reading. Validate end/error fields
+    # after the complete stream so captured-count and pending-stack checks use
+    # the final indexes without retaining all rows.
+    if end_row is not None:
+        if end_sequence != row_count - 1:
+            reject("allocation trace end record is duplicated or not final")
+        if end_row.get("status") not in ("captured", "incomplete", "error"):
+            reject("allocation trace end status is invalid")
+        if not isinstance(end_row.get("calls"), int) or isinstance(end_row.get("calls"), bool) or end_row.get("calls") < 0:
+            reject("allocation trace end call count is invalid")
+        if "pending_calls" in end_row and not isinstance(end_row.get("pending_calls"), list):
+            reject("allocation trace end pending_calls is invalid")
+        try:
+            enter_count = len(enters) if not using_disk else store.mapping_count("enters")
+        except TraceStoreError as error:
+            reject(f"cannot read allocation trace store: {error}")
+        if end_row.get("status") == "captured" and end_row.get("calls") != enter_count:
+            reject("captured trace end call count differs from entries")
+    end_status = end_row.get("status") if end_row is not None else None
     unclosed = sorted(call for stack in stacks.values() for call in stack)
-    if end_rows:
-        end_pending = end_rows[0].get("pending_calls")
+    if end_row is not None:
+        end_pending = end_row.get("pending_calls")
         if end_pending is not None:
             declared_pending = []
+            seen_pending = set()
             for value in end_pending:
                 if isinstance(value, dict):
-                    pending_id = parse_u32(value.get("call"), "trace end.pending_calls.call")
-                    entry = enters.get(pending_id)
+                    pending_id = parse_pending(value.get("call"), "trace end.pending_calls.call")
+                    entry = get_entry(pending_id)
                     if entry is None:
-                        raise ReplayProblem("stream", "trace end.pending_calls references an unknown call")
+                        reject("trace end.pending_calls references an unknown call")
                     for field in ("function", "thread", "sp", "lr", "args", "parent"):
                         if field in value and value.get(field) != entry.get(field):
-                            raise ReplayProblem("stream", f"trace end.pending_calls disagrees with entry field {field}")
+                            reject(f"trace end.pending_calls disagrees with entry field {field}")
                 else:
-                    # Synthetic fixtures may use the compact call-id form;
-                    # retail collector output carries the full entry object.
-                    pending_id = parse_u32(value, "trace end.pending_calls")
+                    pending_id = parse_pending(value, "trace end.pending_calls")
+                if pending_id in seen_pending:
+                    reject("trace end pending_calls contains a duplicate call")
+                seen_pending.add(pending_id)
                 declared_pending.append(pending_id)
-            if len(set(declared_pending)) != len(declared_pending):
-                raise ReplayProblem("stream", "trace end pending_calls contains a duplicate call")
             declared_pending.sort()
             if declared_pending != unclosed:
-                raise ReplayProblem("stream", "trace end pending_calls differs from the source call stacks")
+                reject("trace end pending_calls differs from the source call stacks")
         if end_status == "captured":
             if unclosed:
-                raise ReplayProblem("stream", "captured trace end has unfinished source calls")
-            if any(row.get("record") == "error" for row in rows):
-                raise ReplayProblem("stream", "captured trace end cannot contain an error record")
+                reject("captured trace end has unfinished source calls")
+            if has_error_record:
+                reject("captured trace end cannot contain an error record")
+    if using_disk:
+        try:
+            return (header, *store.views())
+        except TraceStoreError as error:
+            store.close()
+            raise ReplayProblem("stream", f"cannot finalize allocation trace store: {error}") from error
+        except Exception:
+            store.close()
+            raise
     return header, rows, enters, returns
 
 
@@ -297,7 +440,7 @@ def load_profile(path: Path) -> dict[str, Any]:
         raise ReplayProblem("input", f"cannot read allocation profile {path}: {error}") from error
     if not isinstance(value, dict) or value.get("schema") != "melee-web-original-allocation-profile":
         raise ReplayProblem("input", "unsupported allocation profile schema")
-    if (type(value.get("version")) is not int or value["version"] not in (1, 2)
+    if (type(value.get("version")) is not int or value["version"] not in (1, 2, 3)
             or not isinstance(value.get("functions"), list)):
         raise ReplayProblem("input", "unsupported allocation profile version")
     return value
@@ -474,15 +617,21 @@ def validate_boot_observation(header: dict[str, Any], boot: dict[str, Any], entr
             raise ReplayProblem("provenance", f"observed boot {key} differs from independent original context")
 
 
-def replay(trace: Path, profile_path: Path, context_path: Path | None,
-           overrides: dict[str, int | None], dol: Path | None, symbols: Path | None,
-           *, checked_wasm: bool = False, require_complete: bool = False,
-           verified_context: dict[str, Any] | None = None) -> dict[str, Any]:
-    profile = load_profile(profile_path)
-    retail = not str(profile.get("source_revision", "")).startswith("synthetic-")
+def _replay_impl(trace: Path, profile_path: Path, context_path: Path | None,
+                 overrides: dict[str, int | None], dol: Path | None, symbols: Path | None,
+                 *, checked_wasm: bool = False, require_complete: bool = False,
+                 verified_context: dict[str, Any] | None = None,
+                 artifact_dir: Path | None = None,
+                 _loaded_trace=None, _profile=None, _retail=None) -> dict[str, Any]:
+    profile = _profile if _profile is not None else load_profile(profile_path)
+    retail = (_retail if _retail is not None
+              else not str(profile.get("source_revision", "")).startswith("synthetic-"))
     if retail and verified_context is None:
         raise ReplayProblem("provenance", "retail replay requires independently derived boot context")
-    header, rows, enters, returns = load_trace(trace)
+    if _loaded_trace is None:
+        header, rows, enters, returns = load_trace(trace)
+    else:
+        header, rows, enters, returns = _loaded_trace
     validate_provenance(header, profile, profile_path, dol, symbols)
     if retail:
         identities = verified_context.get("identities", {})
@@ -505,7 +654,7 @@ def replay(trace: Path, profile_path: Path, context_path: Path | None,
         from .allocation_lifetime_replay import replay_lifetimes
         return replay_lifetimes(trace, profile_path, profile, header, rows, enters, returns,
                                 context, verified_context, checked_wasm=checked_wasm,
-                                require_complete=require_complete)
+                                require_complete=require_complete, artifact_dir=artifact_dir)
 
     expected_names = {item.get("name") for item in profile.get("functions", []) if isinstance(item, dict)}
     supported_names = expected_names | CONTEXT_ONLY | set(UNSUPPORTED_AT_ENTRY)
@@ -1062,6 +1211,36 @@ def replay(trace: Path, profile_path: Path, context_path: Path | None,
     return result
 
 
+def _close_trace_views(views) -> None:
+    """Close disk-backed load_trace views without affecting legacy lists."""
+    for view in views:
+        close = getattr(view, "close", None)
+        if close is not None:
+            close()
+
+
+def replay(trace: Path, profile_path: Path, context_path: Path | None,
+           overrides: dict[str, int | None], dol: Path | None, symbols: Path | None,
+           *, checked_wasm: bool = False, require_complete: bool = False,
+           verified_context: dict[str, Any] | None = None,
+           artifact_dir: Path | None = None) -> dict[str, Any]:
+    """Load a trace, run replay, and explicitly release disk-backed views."""
+    profile = load_profile(profile_path)
+    retail = not str(profile.get("source_revision", "")).startswith("synthetic-")
+    if retail and verified_context is None:
+        raise ReplayProblem("provenance", "retail replay requires independently derived boot context")
+    loaded = load_trace(trace)
+    try:
+        return _replay_impl(
+            trace, profile_path, context_path, overrides, dol, symbols,
+            checked_wasm=checked_wasm, require_complete=require_complete,
+            verified_context=verified_context, artifact_dir=artifact_dir,
+            _loaded_trace=loaded, _profile=profile, _retail=retail,
+        )
+    finally:
+        _close_trace_views(loaded[1:])
+
+
 def parser() -> argparse.ArgumentParser:
     result = argparse.ArgumentParser(description=__doc__)
     result.add_argument("--trace", "--allocations", "--stream", dest="trace", type=Path,
@@ -1083,6 +1262,8 @@ def parser() -> argparse.ArgumentParser:
                         help="pinned original source root used for boot-root derivation")
     result.add_argument("--checked-wasm", action="store_true", help="also run the checked Wasm driver")
     result.add_argument("--require-complete", action="store_true")
+    result.add_argument("--artifact-dir", type=Path,
+                        help="directory for bounded replay actions/outputs/identity artifacts")
     return result
 
 
@@ -1115,7 +1296,7 @@ def main(argv: list[str] | None = None) -> int:
                          "lbmemory_arena_hi": args.lbmemory_arena_hi},
                         args.dol, args.symbols, checked_wasm=args.checked_wasm,
                         require_complete=args.require_complete,
-                        verified_context=verified_context)
+                        verified_context=verified_context, artifact_dir=args.artifact_dir)
     except ReplayProblem as error:
         report = {"schema": "melee-web-original-allocation-replay", "version": 1,
                   "status": error.kind, "complete": False, "error": error.message}
