@@ -16,17 +16,12 @@ Profile consumption and browser equivalence remain separate checks.
 
 ## Whole-session replay producer and bounded consumer evidence
 
-PR59 now has a source-faithful MWRC v8 single-capture exporter and strict
-transport decoder. The retained v15 original workload contains three natural
-four-player Mario CPU9/Final Destination/four-stock matches, 46,835
-source-consumed PAD frames and 12 contiguous spans. The export and native
-decode-only checks pass, while independent repeatability remains unclaimed.
-The final headless production prefix compares exact core state, RNG, PAD
-history, match frame and draw batches through source tick 1,131, then records
-the first fighter-input difference at tick 1,132 / port index 2,472. The route
-is not accepted as whole-session equivalence; the known CPU
-address/register-context limitation remains open. The full 1,257-test suite
-passes with 80 skips and the affected Release builds pass. See the
+**Compiled / Source identified / Browser exercised**: PR59 adds an MWRC v8
+exporter, typed initial-context import and strict scene/input ownership checks.
+The original workload uses four level-9 Mario CPUs. Its bounded browser
+comparison exposes a CPU-input difference consistent with the existing source
+address/register-context limitation; whole-session equivalence remains open.
+Builds, tests, exact comparison scope and retained failures are in the
 [PR59 evidence receipt](docs/evidence/whole-session-replay-pr59-v1.json) and
 [whole-session section](docs/VERSUS_RETURN_LOOP.md#pr59-whole-session-producer-and-bounded-replay-evidence-2026-09-24).
 

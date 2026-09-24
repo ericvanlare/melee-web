@@ -1,7 +1,7 @@
 {
   "schema": "melee-web-whole-session-replay-pr59-evidence",
   "version": 1,
-  "scope": "Source-identified MWRC v8 production/export and bounded headless browser diagnostics for PR #59. The single original capture and transport decoder pass; the browser route stops at a declared CPU input divergence. This receipt makes no full-session equivalence, pixel, PCM, performance, repeatability or admission claim.",
+  "scope": "Source-identified MWRC v8 export and bounded headless browser diagnostics for PR #59. The single original capture and transport decoder pass. The bounded browser comparison identifies a CPU input divergence; production prefixes stop intentionally. No full-session equivalence, pixel, PCM, performance, repeatability or admission claim.",
   "producer": {
     "tool": "tools/whole_session_replay.py",
     "format": "MWRC v8 with context schema 2",
@@ -16,7 +16,12 @@
       "character": "Mario",
       "cpu_kind": 4,
       "cpu_level": 9,
-      "costumes": [0, 1, 2, 3],
+      "costumes": [
+        0,
+        1,
+        2,
+        3
+      ],
       "stage": 32,
       "stock_count": 4,
       "route": "CSS -> SSS -> VS -> Results -> CSS, repeated three times"
@@ -39,7 +44,7 @@
   },
   "transport_verification": {
     "decode_only": {
-      "path": "work/pr59-final-candidate-decode-v1.json",
+      "path": "work/pr59/work/pr59-final-candidate-decode-v1.json",
       "sha256": "b9ccb68b0f7bb3b3e4eb1201bf268729647888c1018e057b4a7b39b9c169daca",
       "result": "pass",
       "frame_count": 46835,
@@ -48,7 +53,7 @@
       "players": "four CPU kind 4, level 9 rows preserved"
     },
     "native_focused_tests": {
-      "path": "work/pr59-final-retail-decoder-v4.log",
+      "path": "work/pr59/work/pr59-final-retail-decoder-v4.log",
       "sha256": "a5eea18d4c0081e0207c84d491bd42335c9257c9389fbceb50e555f929550842",
       "result": "pass",
       "tests": 3,
@@ -64,7 +69,10 @@
       "result": "fail",
       "report_sha256": "34e38f31940dee4bdfa2b8b10591eb7597c8cbe511ce9aa69be447cb100e0adc",
       "failure": "Full replay failed at the first Results boundary, source cursor 16938, before the e45a108 PAD-history repair.",
-      "retained_prefix_comparison_sha256": "e4718bb0556ebf320384971fe08f238af53c9559e76da2ecd2e227beb81a4edb"
+      "retained_prefix_comparison_sha256": "e4718bb0556ebf320384971fe08f238af53c9559e76da2ecd2e227beb81a4edb",
+      "browser_report_sha256": "44710944293c7477bd386ccf210990427df9767d07373cc06759f0c0f4350c9a",
+      "runtime_identity_sha256": "4c0a753c8c36c7e8a39364649a78a93fc68a10eba30dde6b39dd781606d71f05",
+      "retained_prefix_comparison_file": "first-match-prefix-comparison.json"
     },
     "v13": {
       "runtime_head": "e45a108e3d72e1f626efb19f822b5ed3ff6de7ee",
@@ -73,14 +81,15 @@
       "report_sha256": "3179ed3842a26059c5596a37fd05636c87be3ef8be8ec925d60ebc1b626ba904",
       "requested_cursor": 2700,
       "observed_cursor": 2704,
-      "first_declared_difference": "source tick 1132 / port index 2472, fighter input"
+      "first_declared_difference": "source tick 1132 / port index 2472, fighter input",
+      "browser_report_sha256": "9548325324e6b823819aa3afd9c9ff326dec799999746f72398804cad4d036d6",
+      "runtime_identity_sha256": "83db917b603266f00665365c258375dd7ebf0d28660c485a674675d8f1abc568"
     },
     "v14": {
       "runtime_head": "9ae0f8c421f1155a7beb8657eab81d7074e6fe4d",
       "path": "work/pr59/work/whole-session-browser-root-v14",
       "result": "fail: bounded intentional prefix with temporary read-only CPU companion",
       "report_sha256": "f92f2c7dfda06a7e18a0ffab1bcc620555f9a26061b717e5b2e5c039c936b1ac",
-      "cpu_prefix_sha256": "368ad6a4eae80617c5eaab683b6dffc1327df4da6555299392d572bb7c2cf19e",
       "requested_cursor": 2700,
       "observed_cursor": 2710,
       "declared_prefix": "CPU, camera and HUD fields exact through source tick 1131",
@@ -90,7 +99,13 @@
         "source_tick": 1132,
         "port_index": 2472
       },
-      "interpretation": "Read-only diagnostic consistent with the known missing source address/register context; it does not prove a new cause or authorize a compatibility rule."
+      "interpretation": "Read-only diagnostic consistent with the known missing source address/register context; it does not prove a new cause or authorize a compatibility rule.",
+      "browser_report_sha256": "61e21ae0d21cfb321a274e6b59d891489bb16ab248693a8c1e0a9b4794acba7f",
+      "runtime_identity_sha256": "c88c60422eb8fb3476a68a0e576edc20407f0b1eedb5cfbd37a923ac9822cd73",
+      "cpu_prefix_comparison_file": "cpu-prefix-comparison.json",
+      "cpu_prefix_comparison_sha256": "368ad6a4eae80617c5eaab683b6dffc1327df4da6555299392d572bb7c2cf19e",
+      "diagnostic_patch_sha256": "d8e22691ae0caeaca09530a5ff3cc08d5359573dbeb3f95f3f820b22fe0a8752",
+      "production_change": "Temporary read-only CPU observer patch removed before final production build."
     },
     "v15": {
       "path": "work/pr59/work/whole-session-browser-root-v15",
@@ -104,7 +119,7 @@
       "path": "work/pr59/work/whole-session-browser-root-v16",
       "result": "fail: bounded intentional prefix",
       "report_sha256": "cf341578bd834e97ab9d73791a3228403ab75a933bdd6d98160c974b34650751",
-      "browser_report_sha256": "bbc6811dd35d0508245e595f3fd096f7462f63576daaf888512bdf94c3c710555",
+      "browser_report_sha256": "bbc6811dd35d050824e595f3fd096f7462f63576daaf888512bdf94c3c710555",
       "first_match_comparison_sha256": "9b1494908774466b784c530a18abb3bc04d15284ceebce25c9a2d87fad243f3e",
       "retail_port_sha256": "e506a7a1b03e49de89972a8273975f2ae95c542e70e47ae4938105fde46efcec",
       "requested_cursor": 2700,
@@ -112,7 +127,44 @@
       "frames_compared": 1134,
       "declared_prefix": "Core state, RNG, PAD history, match frame and draw batches exact through source tick 1131; zero instrumented timing resumes and clean source unload",
       "first_declared_difference": "source tick 1132 / port index 2472, fighter input",
-      "failure_scope": "Intentional incomplete replay; final CSS was not entered and the report correctly retained incomplete-input/source-count failures."
+      "failure_scope": "Intentional incomplete replay; final CSS was not entered and the report correctly retained incomplete-input/source-count failures.",
+      "runtime_identity_sha256": "7c1dab745eb7c886a1e5ee4a6b91dc06d63bd8d033d67523fcf18e22e25053ad",
+      "served_files": [
+        {
+          "file": "runtime.html",
+          "bytes": 5007,
+          "sha256": "7dbdba45a72835799f02df323ce93e762ed3ad9d8941522ebe4d550913460172",
+          "http_bytes_equal": true
+        },
+        {
+          "file": "runtime-development.mjs",
+          "bytes": 52213,
+          "sha256": "81f064e90d398b2e86a4b9a44443d178dd02f3223d880cd13e7952c35dd68408",
+          "http_bytes_equal": true
+        },
+        {
+          "file": "gameplay_menu_browser.js",
+          "bytes": 287302,
+          "sha256": "7d6ea0e4b1f26f1404e316d65de704fbc16f7d148e1446be08c64a4fa9ad6b39",
+          "http_bytes_equal": true
+        },
+        {
+          "file": "gameplay_menu_browser.wasm",
+          "bytes": 13671348,
+          "sha256": "90e3ae95475f9e82e3ca09e6322e77ffb400ed566e2f2a02a375908198f54077",
+          "http_bytes_equal": true
+        },
+        {
+          "file": "gameplay_menu_browser.data",
+          "bytes": 3674112,
+          "sha256": "255ca0597aa8866d3346ecb1dd9c412f4a19cfce82f33377a164513c522c53ca",
+          "http_bytes_equal": true
+        }
+      ],
+      "harness_sha256": "8759f025e21d5a0efc9a7ff3903db4a0485323bed14221a47394f3a3d34efb72",
+      "served_hashes_unchanged": true,
+      "runtime_after_sha256": "3dfb377fe95445519fdd0cdf3986812c05bfd363d93e24c39d7b6cdef6c8e88c",
+      "retail_port_bytes": 8327942
     }
   },
   "implementation_scope": {
@@ -132,20 +184,22 @@
       "tests": 1257,
       "skips": 80,
       "seconds": 217.936,
-      "log_path": "work/pr59-final-full-suite-v2.log",
-      "log_sha256": "c3677556714dba472586a3e563af1bbf004a33e9802cf0bc1879d801b3c35e6"
+      "log_path": "work/pr59/work/pr59-final-full-suite-v2.log",
+      "log_sha256": "1c3677556714dba472586a3e563af1bbf004a33e9802cf0bc1879d801b3c35e6"
     },
     "affected_release_builds": {
       "result": "pass",
-      "runtime_log_path": "work/pr59-final-runtime-build-v2.log",
+      "runtime_log_path": "work/pr59/work/pr59-final-runtime-build-v2.log",
       "runtime_log_sha256": "75d0ed5c76b16f70e5ec0e8fd773be74e5c7985aeec7ea58d355773a1ae6a755",
-      "retail_trace_log_path": "work/pr59-final-retail-trace-build-v2.log",
+      "retail_trace_log_path": "work/pr59/work/pr59-final-retail-trace-build-v2.log",
       "retail_trace_log_sha256": "0920114cc67b6c0b3fbf46f9ceb1a350ec68e1c270b84d0018e5d19ddc67d5e6",
-      "public_runtime_log_path": "work/pr59-final-public-build-v2.log",
+      "public_runtime_log_path": "work/pr59/work/pr59-final-public-build-v2.log",
       "public_runtime_log_sha256": "a2a65ceedf449f853f95dd33f225255543d2d5b7972cb673ad025b534bb99b16",
-      "package_log_path": "work/pr59-public-package-v2.log",
+      "package_log_path": "work/pr59/work/pr59-public-package-v2.log",
       "package_log_sha256": "9059f4d4bf8c04580a5870cccbfa8d2349de8903e2a8dc9b461f7448176c3299"
-    }
+    },
+    "production_code_head": "0d8dba76d2fcbd313de52bcc35e2bfdb1693aa89"
   },
-  "deployed": false
+  "deployed": false,
+  "artifact_path_base": "Paths are relative to the lead checkout; the PR59 build/test worktree is work/pr59. Local capture and build artifacts remain ignored."
 }

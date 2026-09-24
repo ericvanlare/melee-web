@@ -556,11 +556,13 @@ partitioned into 3,346 callbacks with source work and 81 without it. This
 supports the narrow seed correction; it is one reduced diagnostic, not a new
 whole-sequence cold/warm acceptance matrix. Earlier failures remain retained.
 
-### Resume boundary after the usage-conservation checkpoint
+### Historical resume boundary after the usage-conservation checkpoint
 
-Prize and repeated keyboard match returns are functional. Finish the independent
+At this checkpoint, Prize and repeated keyboard match returns were functional.
+The outstanding draft instruction was to finish the independent
 original-comparison and whole-loop timing gates before marking #34 complete or
-merging this draft. No physical controller is required for this PR.
+merging the original Results draft. PR59's later infrastructure scope and still
+open accuracy gates are recorded below. No physical controller was required.
 
 The next original-comparison implementation is a typed first-CSS context and
 continuous whole-session input replay, reusing the current observer and scene
@@ -646,8 +648,8 @@ tick 1,131; the first declared difference is fighter input at source tick 1,132
 all source objects/processes, uses zero instrumented timing resumes and retains
 the incomplete-input failure. The v14 read-only CPU companion records the
 corresponding command 80/81 operand difference, `809081e0098e017f7f` in the
-source and `80008100098e017f7f` in the port. This remains the known source
-address/register-context limitation documented in the [CPU register
+source and `80008100098e017f7f` in the port. This is consistent with the known
+source address/register-context limitation documented in the [CPU register
 compatibility investigation](CPU_REGISTER_COMPATIBILITY.md); it does not prove
 a new cause or authorize a compatibility rule.
 
