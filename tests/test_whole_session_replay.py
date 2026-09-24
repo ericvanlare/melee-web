@@ -269,13 +269,25 @@ class WholeSessionReplayTests(unittest.TestCase):
         with self.assertRaisesRegex(replay.WholeSessionReplayError, "multiple PAD consumes"):
             replay.capture_from_records(rows)
 
-    def test_rejects_same_source_step_across_scene_owner_boundaries(self):
+    def test_allows_source_step_reset_across_scene_owner_boundaries(self):
         rows = _candidate()
         pads = [row for row in rows
                 if row["payload"].get("boundary") == "pad_consume"]
         self.assertGreaterEqual(len(pads), 2)
         pads[1]["source_tick"] = pads[0]["source_tick"]
-        with self.assertRaisesRegex(replay.WholeSessionReplayError, "multiple PAD consumes"):
+        capture = replay.capture_from_records(rows)
+        self.assertEqual(capture["frames"][0]["source_tick"],
+                         capture["frames"][1]["source_tick"])
+
+    def test_rejects_two_consumes_in_one_scene_instance(self):
+        rows = _candidate()
+        first = next(index for index, row in enumerate(rows)
+                     if row["payload"].get("boundary") == "pad_consume")
+        rows.insert(first + 1, copy.deepcopy(rows[first]))
+        for seq, row in enumerate(rows):
+            row["seq"] = seq
+        with self.assertRaisesRegex(replay.WholeSessionReplayError,
+                                    r"multiple PAD consumes.*css scene instance"):
             replay.capture_from_records(rows)
 
     def test_pad_snapshot_helper_keeps_source_layout(self):

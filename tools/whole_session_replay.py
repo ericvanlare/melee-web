@@ -397,6 +397,14 @@ def _timeline(
     started = False
     finished = False
     last_seq = -1
+    # The source frame counter is scoped to the active scene.  It restarts at
+    # zero when the original game enters CSS, SSS, VS, Results, or Prize, so a
+    # process-wide set would reject valid samples from later scenes.  Keep a
+    # generation for each lifecycle-owned scene instance and clear the set
+    # when that owner changes.  Within one instance, however, two consumes at
+    # the same source step still mean that the observer cannot express the
+    # source update ordering and must be rejected.
+    scene_instance = 0
     consumed_steps: set[int] = set()
     lifecycle_matches = {row["seq"]: row["payload"]["match_index"]
                          for row in _lifecycle_rows(records)}
@@ -430,6 +438,9 @@ def _timeline(
             next_scene = _scene_transition(boundary, scene)
             if next_scene is None:
                 _fail(f"source boundary {boundary} has no admitted scene owner")
+            if next_scene != scene:
+                scene_instance += 1
+                consumed_steps.clear()
             scene = next_scene
             if scene is None:
                 _fail(f"source boundary {boundary} has no admitted scene owner")
@@ -453,7 +464,7 @@ def _timeline(
             if source_tick in consumed_steps:
                 _fail(
                     f"multiple PAD consumes share source step {source_tick} "
-                    "across the whole-session transport")
+                    f"within {scene} scene instance {scene_instance}")
             consumed_steps.add(source_tick)
             pads = _consumed_ports(row, index)
             frame_index = len(frames)
