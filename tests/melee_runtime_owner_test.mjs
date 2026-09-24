@@ -8,10 +8,17 @@ import {createRuntimeAudio} from '../web/runtime-audio.mjs';
 const withAudio = !process.argv.includes('--silent');
 const cacheUnavailable = process.argv.includes('--cache-unavailable');
 const failMkdir = process.argv.includes('--mkdir-failure');
+const startupCacheDelay = process.argv.includes('--startup-cache-delay');
+const startupCacheError = process.argv.includes('--startup-cache-error');
+const startupCacheTimeout = process.argv.includes('--startup-cache-timeout');
+const invalidCacheService = process.argv.includes('--invalid-cache-service');
+const missingCacheService = process.argv.includes('--missing-cache-service');
 if (cacheUnavailable) await import('../web/runtime-cache.js');
 const original = await fs.readFile(new URL('../web/melee-runtime.mjs', import.meta.url), 'utf8');
 const source = original.replace("import {loadNativeGameDisc} from './runtime-assets.mjs';", 'const loadNativeGameDisc = globalThis.testDiscReader;');
-let phase = 0, running = false, nextPointer = 16, cacheWaits = 0, audioClosed = false;
+let phase = 0, running = false, nextPointer = 16,
+  cacheWaits = startupCacheDelay ? 2 : startupCacheTimeout ? Number.MAX_SAFE_INTEGER : 0, audioClosed = false;
+let rendererStarted = false, cacheIdleCalls = 0;
 let failedFile = null, serviceBatch = 0;
 const calls = [], states = [], listeners = new Map();
 Object.defineProperty(globalThis, 'navigator', {value: {gpu: {}}, configurable: true});
@@ -69,7 +76,8 @@ const mounted = mountMeleeRuntime({canvas, createAudio: withAudio ? createRuntim
     };
     globalThis.installRuntimeCache(module, event => calls.push(['cacheReport', event]));
   } : undefined,
-  onState: state => states.push(state), onOwner: context => { owner = context; }});
+  onState: state => states.push(state), onOwner: context => { owner = context; },
+  startupTimeout: startupCacheTimeout ? 10 : undefined});
 assert.equal(states.at(-1).state, 'booting');
 assert.deepEqual(states[0].loading, {phase: 'boot', message: 'Starting player…', complete: 0, total: 0});
 const directories = new Set();
@@ -119,15 +127,66 @@ Object.assign(Module, {
   _melee_web_native_menu_launch() { calls.push(['launch']); phase = 1; running = true; return 1; },
   _melee_web_native_menu_unload() { calls.push(['unload']); phase = 0; running = false; return 1; },
   _melee_web_native_menu_pause(value) { calls.push(['pause', value]); running = !value; /* native API is void */ },
-  _melee_web_native_menu_cache_idle: () => cacheWaits-- <= 0 ? 1 : 0,
+  _melee_web_native_menu_cache_idle: () => {
+    ++cacheIdleCalls;
+    if (!rendererStarted) return 1;
+    return invalidCacheService ? 2 : startupCacheError ? -1 : cacheWaits-- <= 0 ? 1 : 0;
+  },
   _melee_web_input_set_keyboard(value) { calls.push(['keyboard', value]); },
   _melee_web_input_set_keyboard_port(port, value) { calls.push(['keyboardPort', port, value]); },
   _melee_web_input_set_activity(focused, visible) { calls.push(['activity', focused, visible]); },
   _melee_web_input_set_keyboard_layout(value) { calls.push(['layout', value]); return 1; },
 });
+if (missingCacheService) delete Module._melee_web_native_menu_cache_idle;
+if (startupCacheDelay) assert.equal(Module._melee_web_native_menu_cache_idle(), 1,
+  'The pre-main cache status is not used as startup readiness');
 Module.onRuntimeInitialized();
-const player = await mounted;
+let player = await mounted;
+const cacheCallsBeforeMainFrame = cacheIdleCalls;
+assert.equal(cacheCallsBeforeMainFrame, startupCacheDelay ? 1 : 0,
+  'Runtime initialization must not poll cache readiness before the main frame');
+assert.equal(player.getState().canImport, false,
+  'Import remains disabled until the first post-main frame reports cache readiness');
+rendererStarted = true;
+window.menuFrame(false);
+if (startupCacheTimeout) {
+  assert.equal(player.getState().canImport, false);
+  await new Promise(resolve => setTimeout(resolve, 25));
+  assert.equal(player.getState().requiresReload, true, 'Pending startup cache work must fail at the startup deadline');
+  assert.match(player.getState().message, /Renderer preparation timed out/);
+  console.log('Shared runtime owner: pending startup cache work fails at the bounded readiness deadline.');
+  process.exit(0);
+} else if (startupCacheDelay) {
+  assert.equal(states.at(-1).canImport, false, 'Initial import stays disabled while native cache work is pending');
+  assert.equal(states.at(-1).loading?.phase, 'catalog');
+  await assert.rejects(player.importDisc({name: 'too-early.iso'}), /still preparing/);
+  for (let i = 0; !player.getState().canImport && i < 20; i++) {
+    window.menuFrame(false);
+    await new Promise(resolve => setTimeout(resolve, 1));
+  }
+  assert.equal(player.getState().canImport, true, 'Startup cache readiness must settle through native frame callbacks');
+  phase = 1; running = true;
+  cacheWaits = 2;
+  window.menuFrame(true);
+  assert.equal(player.getState().scene, 'css');
+  assert.equal(player.getState().canImport, true, 'Active-scene cache work does not revoke import eligibility');
+  phase = 0; running = false;
+  window.menuFrame(false);
+} else if (missingCacheService) {
+  assert.equal(player.getState().requiresReload, true);
+  assert.match(player.getState().message, /renderer-cache readiness service is unavailable/);
+  assert.equal(states.at(-1).canImport, false);
+  console.log('Shared runtime owner: missing required cache readiness service fails explicitly.');
+  process.exit(0);
+} else if (invalidCacheService) {
+  assert.equal(player.getState().requiresReload, true);
+  assert.match(player.getState().message, /Invalid native cache idle state/);
+  assert.equal(states.at(-1).canImport, false);
+  console.log('Shared runtime owner: invalid cache readiness state fails explicitly.');
+  process.exit(0);
+}
 assert.equal(player.getState().canImport, true);
+if (startupCacheError) assert.equal(player.getState().canImport, true, 'Native cache error remains optional for import eligibility');
 Module.pipelinePreparation = {ready: false, selected: 4, pending: 4};
 window.menuFrame(false);
 assert.deepEqual(player.getState().loading, {phase: 'catalog', message: 'Preparing graphics…', complete: 0, total: 4});

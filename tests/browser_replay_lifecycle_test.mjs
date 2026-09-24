@@ -28,10 +28,11 @@ assert(start&&pause&&completion);
 }
 {
  const shared=fs.readFileSync(new URL('../web/melee-runtime.mjs',import.meta.url),'utf8');
+ const cacheReader=shared.slice(shared.indexOf('  function readNativeCacheIdle() {'),shared.indexOf('  function clearStartupTimeout() {'));
  const unload=shared.slice(shared.indexOf('  async function unloadAndSave() {'),shared.indexOf('  async function put('));
- assert(unload.includes('Module._melee_web_native_menu_cache_idle()'));
+ assert(unload.includes('boundary(readNativeCacheIdle)'));
  const flush=page.slice(page.indexOf('window.menuCacheWritesFlushed='),page.indexOf('\n};',page.indexOf('window.menuCacheWritesFlushed='))+3);
- for(const finalState of [1,-1]){
+ for(const finalState of [1,-1,2]){
   const events=[],display={};let idleCalls=0;
   const scope={window:{},prepared:true,callbacks:{menuPreparationCanceled:()=>events.push('cancel')},performance,
    emit:(name,message)=>{assert.equal(name,'cacheWriteFailed');display.textContent=message;},
@@ -42,7 +43,13 @@ assert(start&&pause&&completion);
     _melee_web_native_menu_cache_idle:()=>{events.push('idle-check');return idleCalls++?finalState:0;},
     markRuntimeCacheDirty(){this.runtimeCacheState.dirty=true;events.push('dirty');},
     saveRuntimeCache:async()=>{events.push('save');return true;}}};
-  vm.createContext(scope);vm.runInContext(unload+'\n'+flush,scope);
+  vm.createContext(scope);vm.runInContext(cacheReader+'\n'+unload+'\n'+flush,scope);
+  if(finalState===2){
+   await assert.rejects(scope.unloadAndSave(),/Invalid native cache idle state: 2/);
+   assert.equal(events.includes('save'),false,'Invalid cache state must not publish a saved cache');
+   assert.equal(display.textContent,undefined,'Invalid state is not an optional persistence failure');
+   continue;
+  }
   scope.window.menuCacheWritesFlushed({ok:finalState===1,flushed:true});
   assert.equal(await scope.unloadAndSave(),true,'Optional cache failure cannot undo successful source teardown');
   assert.deepEqual(events.filter(x=>['unload','audio-stopped','idle-check','save'].includes(x)),
