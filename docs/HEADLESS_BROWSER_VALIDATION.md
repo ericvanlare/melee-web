@@ -89,8 +89,9 @@ enabled. It failed with `Pending renderer work did not drain. Reload to recover.
 The report remains a failure. A smaller no-disc probe observed that the import
 control became usable before `_melee_web_native_menu_cache_idle()` returned 1.
 
-The existing `tests/public_player_browser_test.mjs` already waits for that
-cache-ready state before importing. Its full headless run passed unchanged.
+At the investigation's base revision, `tests/public_player_browser_test.mjs`
+already waited for that cache-ready state before importing. Its full headless
+run passed unchanged.
 Separate smoke and audio variants added the same semantic preflight and passed;
 they did not alter the renderer-drain deadline, simulation, input or assertions.
 This identified a startup readiness boundary; it did not prove that the failure
@@ -111,6 +112,27 @@ state remains distinct from a missing or invalid native service. Startup has a
 bounded failure, and the renderer-drain and simulation deadlines are unchanged.
 The public-player check asserts cache readiness as soon as Import is enabled,
 without a second readiness wait that could hide this regression.
+
+## Implementation validation
+
+The [implementation receipt](evidence/headless-browser-defaults-v1.json) binds
+fresh Release development/audio builds, the audited local public package, the
+full suite, and the actual migrated browser commands. The public smoke passes
+immediate enabled-control import without the investigation's extra cache wait.
+Public menus, audio processing, controller tooling, prototype UI, resizing and
+the original Mewtwo regression pass with screenshots and diagnostics retained.
+The synthetic probe uses hardware WebGPU on the recorded machine.
+
+The macOS monitor observed no activation, foreground samples or on-screen
+windows for the owned Mewtwo regression browser. Both foreground-only commands
+reject missing `--headed` before browser or capture work; explicit opt-in is
+tested through argument/launch configuration without opening a desktop window.
+
+Integration also corrected the prototype check's stale catalog expectations
+and the audio report's headed-only wording. The resize check now resizes during
+startup before waiting for the newly gated Import control, then retains its
+post-startup and controls-open checks. The original failure artifacts remain in
+the receipts. No deployment was performed.
 
 ## Evidence boundaries
 
