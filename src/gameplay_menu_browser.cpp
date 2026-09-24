@@ -281,7 +281,7 @@ constexpr std::array<std::string_view,239> keys={"LbBf.dat","GmPause.usd","IfAll
  "ff_fzero.hps",
  "ff_dk.hps",
  "ff_poke.hps","GmRstMNs.dat","GmRstMPe.dat","ff_nes.hps",
- "PlMt.dat","PlMtAJ.dat","PlMtNr.dat","PlMtRe.dat","PlMtBu.dat","PlMtGr.dat","EfMtData.dat","mewtwo.ssm"
+ "PlMt.dat","PlMtAJ.dat","PlMtNr.dat","PlMtRe.dat","PlMtBu.dat","PlMtGr.dat","EfMtData.dat","mewtwo.ssm",
  "PlNs.dat",
  "PlNsAJ.dat",
  "PlNsNr.dat",
