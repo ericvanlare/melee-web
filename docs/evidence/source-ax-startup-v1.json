@@ -1,0 +1,436 @@
+{
+  "schema": "melee-web-source-ax-startup",
+  "version": 1,
+  "date": "2026-09-24",
+  "base_commit": "64409bca06fe446f7137ea95038cebd18858316a",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced"
+  ],
+  "scope": "Original AIInit and AXInit through first AI DMA with checked modeled services; actual AX callbacks, no DSP firmware or PCM execution",
+  "source_files": [
+    {
+      "path": "tests/source_ax_startup_accessors.h",
+      "bytes": 3841,
+      "sha256": "d8a1a7bcec78b7d1800456270adaaa6ed1c0e699b56899679837919c50041dbd"
+    },
+    {
+      "path": "tests/source_ax_startup_profile.py",
+      "bytes": 22300,
+      "sha256": "2606dce55f6a6c261c999646da1b2eacd79a24bc4fb476b2168ffd9d351e9ea9"
+    },
+    {
+      "path": "tests/source_ax_startup_services.cpp",
+      "bytes": 28488,
+      "sha256": "9d5a19ba61c81def78193f902fecae4f8f7f1c6c38269259085510d101493664"
+    },
+    {
+      "path": "tests/source_ax_startup_services.h",
+      "bytes": 384,
+      "sha256": "d2af835a321810441fb70cf037a3dc2a2b19beaba04a129c00491cee01bac7c4"
+    },
+    {
+      "path": "tests/test_source_ax_startup_services.py",
+      "bytes": 10085,
+      "sha256": "9af5092fbae234a286d5e4e161e2c6412743214d7c87698cf5d85291a3753fcf"
+    },
+    {
+      "path": "patches/source-ax-startup-alignment.patch",
+      "bytes": 1450,
+      "sha256": "6d96569263dd4edd06276aff2d8453c7a0ffa329c55dc20d47c9a01b8ca34554"
+    },
+    {
+      "path": "patches/source-ax-startup-services.patch",
+      "bytes": 606,
+      "sha256": "f147f07a5097d0fee31b50c7547774e64ac5ee7e37309769cf13d77ff83c26d5"
+    }
+  ],
+  "original_sources": {
+    "extern/dolphin/src/dolphin/ai/ai.c": "cb8508338aa0c4b10b9134f2f51936618929fe8f63515e137a5ff2f2d4fcc0d9",
+    "extern/dolphin/src/dolphin/os/OSInterrupt.c": "69ba045af10aaede13f77fa1040af7fa6e79658e2d317bcee1afc5992d3fca7e",
+    "extern/dolphin/src/dolphin/dsp/dsp.c": "29a6864fb05a78a27e063f305844e2cf4f03af22f724863a14fbcff40ac18aa5",
+    "extern/dolphin/src/dolphin/dsp/dsp_task.c": "7b212710530cc6617d15e826c2de56caa59fb6e4bc702730812f50c2fb13964f",
+    "extern/dolphin/src/dolphin/ax/AX.c": "0ae9762d57ac25806d391302996ec68222514872678147635694127c350ed5df",
+    "extern/dolphin/src/dolphin/ax/AXAlloc.c": "d73f91a4b5f88bb5be3b51cf3e0c2e1c0951d7f3b7e6e31047609eca4ec951f3",
+    "extern/dolphin/src/dolphin/ax/AXVPB.c": "b7042d79ba6afd7aac1a475f78330fc8a6e9252a5f23ac281c086cf568b11c3b",
+    "extern/dolphin/src/dolphin/ax/AXSPB.c": "a07eff99ee0d751d80fe735dca3e8cca799b6be404b9cbd17b211e125aca49c1",
+    "extern/dolphin/src/dolphin/ax/AXAux.c": "13659fb4e81025a7acc82baa9afcdf5691bb589b89dfb3e9c8d7e42c5d6cfbe5",
+    "extern/dolphin/src/dolphin/ax/AXCL.c": "43294bf7887a327da3a2aedff42cc826e916c280ff67c12f7512a427a2272d25",
+    "extern/dolphin/src/dolphin/ax/AXOut.c": "8a6d6c138c6262a2a97a08759cddb984d86e85979d990e6bc1455a1eb7207aa4",
+    "extern/dolphin/src/dolphin/ax/AXProf.c": "ab820c816778df4d21be244647724e4ee54638fe0eedd4f5667ec30ebe854b23",
+    "extern/dolphin/src/dolphin/ax/DSPCode.c": "8807c54266535396ea190e40e370fa045a3461ddbe52c5a5ef09913e4baaddb9"
+  },
+  "source_unchanged": true,
+  "artifacts": [
+    {
+      "path": "work/source-ax-startup-services-heqe991r/ai-patch-apply.command.json",
+      "bytes": 300,
+      "sha256": "9f2a0a8892867c5c0c15559eee3c01917c7a9c7ac7ebecc4db8d1cdc896148e0"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/ai-patch-apply.returncode",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/ai-patch-apply.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/ai-patch-apply.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/ai-patch-check.command.json",
+      "bytes": 313,
+      "sha256": "6ada0061d28129dc6aeb16831aa307d69d63c0c775da354b614bccb5a1832936"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/ai-patch-check.returncode",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/ai-patch-check.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/ai-patch-check.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/ai.c",
+      "bytes": 10033,
+      "sha256": "671cf55b2cb2971d2df05aa5cac56921079e7fa330587adb736b87ad6cda246a"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/compile.command.json",
+      "bytes": 2826,
+      "sha256": "b32fc764de9a37ad2bff5b84774d7eb355ba36bde2fdac5dc056337916ac9f05"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/compile.returncode",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/compile.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/compile.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/profile-receipt.json",
+      "bytes": 19651,
+      "sha256": "c8fbf0832b24679a997c70420cdba7b6500be501f53020ea0e9bd4df7a549aca"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/receipt.json",
+      "bytes": 3484,
+      "sha256": "84053303c8abe2b968d5fd65591ece87e5c3624bacb2abb46789afa35e3d075c"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-bad-dma.command.json",
+      "bytes": 287,
+      "sha256": "7ba67507577c20993d66953137a2bb7126e48af0d88e5a53c7c5c9e57c3ae77a"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-bad-dma.returncode",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-bad-dma.stderr",
+      "bytes": 1748,
+      "sha256": "98d9ca57922dbfec6c6b705a77c9846b52bff2755874c7b01e606a99f426fdba"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-bad-dma.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-bad-image.command.json",
+      "bytes": 289,
+      "sha256": "fb0e95b54f58b0fee2327bf4b8498fce9e5f684bc402a5de7cc73cd3c0df3649"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-bad-image.returncode",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-bad-image.stderr",
+      "bytes": 1420,
+      "sha256": "e8c06986740eb477e8142fee68cfd47f96f19f18dc7a224e1672e05ec6cbc651"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-bad-image.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-bad-mail.command.json",
+      "bytes": 288,
+      "sha256": "42a9b32dd4f45aa7fc347ea8e1191aa18338b69536deb174fda7e32b1c0ca09c"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-bad-mail.returncode",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-bad-mail.stderr",
+      "bytes": 1458,
+      "sha256": "f718bbfd6375320b1478e7db081c1510eaace82a439ce832cce21290acd6d133"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-bad-mail.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-bad-task-callback.command.json",
+      "bytes": 297,
+      "sha256": "c4cb49828018e07b765b29f9828a7fea6a52e411a0067aae3a8128065ceec663"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-bad-task-callback.returncode",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-bad-task-callback.stderr",
+      "bytes": 1766,
+      "sha256": "e3acc37485a0ff39e1b166ff2ecf9ed12d4637c04521339cadaee08ff51aa6a7"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-bad-task-callback.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-bad-task-span.command.json",
+      "bytes": 293,
+      "sha256": "1c42e258e7987f02bbc2dfe5c672b2f2c37b053098fa522afa0ae94e4071f1e7"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-bad-task-span.returncode",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-bad-task-span.stderr",
+      "bytes": 1758,
+      "sha256": "7cf80a8a0e56653f8a48e5b03dcaffc1318c01e3601b09cfef41783f29257312"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-bad-task-span.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-global-masked-pump.command.json",
+      "bytes": 298,
+      "sha256": "47190e2ff133810860bc7f106b535f7a64ca873314cd0413143b3b06ac17968a"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-global-masked-pump.returncode",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-global-masked-pump.stderr",
+      "bytes": 1768,
+      "sha256": "3dc0bcce3fc0eda4067bd061be9bba1aa0e5305a84eb1987587b16f6ef6d687a"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-global-masked-pump.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-local-masked-pump.command.json",
+      "bytes": 297,
+      "sha256": "9876bcaa1c9d21e018c7f829e6d199c55bde574ccaa8155a20bb37504432cea7"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-local-masked-pump.returncode",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-local-masked-pump.stderr",
+      "bytes": 1768,
+      "sha256": "3dc0bcce3fc0eda4067bd061be9bba1aa0e5305a84eb1987587b16f6ef6d687a"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-local-masked-pump.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-masked-pump.command.json",
+      "bytes": 291,
+      "sha256": "6e02dc6be56eaa9e234015a45d48126390850cedd766bb8663c6ea9fbc223431"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-masked-pump.returncode",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-masked-pump.stderr",
+      "bytes": 1766,
+      "sha256": "2a55f67145b1e07096a23342997fbf3da9b11062b77a0f03acd3f262a24aba05"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-masked-pump.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-missing-cache.command.json",
+      "bytes": 293,
+      "sha256": "6676466711b0c336447c284bcff757979feb459251c791bd2b8a39fc491b069a"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-missing-cache.returncode",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-missing-cache.stderr",
+      "bytes": 1755,
+      "sha256": "d8b0378f016c19d71c377ac9e341f5b5df65278d1c9e5604cf9ee67611a1d08b"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-missing-cache.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-status-masked-pump.command.json",
+      "bytes": 298,
+      "sha256": "c0e9dcc3306c09ea712828e003f9a40a180d98cea346ace98a0e2e6209ea8b06"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-status-masked-pump.returncode",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-status-masked-pump.stderr",
+      "bytes": 1764,
+      "sha256": "e8ed32fa803d949b8e202bfd40b32537979075aba140dd1bc7adf6cea2061871"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-status-masked-pump.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-unknown.command.json",
+      "bytes": 287,
+      "sha256": "203ddfe2a09342a6a8a98f2e91fbfc4c0f3b182f1de621ea276dda4935a60835"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-unknown.returncode",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-unknown.stderr",
+      "bytes": 1417,
+      "sha256": "2905b88fe30afd2b4893bc2dbaed07009279c2ba1ae459ee4f73254d55089fcf"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-unknown.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-valid.command.json",
+      "bytes": 274,
+      "sha256": "c18ae5d56b7ec669ed0d052b22e10d49f5a2fad272206977857e68334044e466"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-valid.returncode",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-valid.stderr",
+      "bytes": 542,
+      "sha256": "01b8582705fa520f7e35665de31ed703f6d21142f53f819ad63086801867d010"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/run-valid.stdout",
+      "bytes": 249,
+      "sha256": "22d236ed4c614578d039bf388e5ccddc4f6da1801b43c988cf48981d99cfc207"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/source-hashes-before.json",
+      "bytes": 1453,
+      "sha256": "042325a9a0bbac2cc7cf7aaf256dc23a519ec9e5dfbc4370a1740297d4d5a6e7"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/source_ax_startup_services.js",
+      "bytes": 63777,
+      "sha256": "bb6cc3a7705d9244e34e13ff57f8270d10fa19a43788d7ed731aa1e89f026738"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/source_ax_startup_services.wasm",
+      "bytes": 111622,
+      "sha256": "fee4b7e947e3296c3f6a99e52807b6f258c867484d6eb149966356e7a9d75ad0"
+    },
+    {
+      "path": "work/source-ax-startup-services-heqe991r/source_ax_startup_services_generated.cpp",
+      "bytes": 59068,
+      "sha256": "dc99b0e5e35978fef2d313710ea6889c06277f96a9d0a9d6c7f9b4af55874831"
+    }
+  ],
+  "validation": {
+    "focused_tests_run": 3,
+    "negative_contract_cases": 10,
+    "unknown_mode_rejected": true,
+    "helper_tests_run": 2,
+    "full_suite": {
+      "tests_run": 1388,
+      "passed": 1294,
+      "skipped": 94,
+      "seconds": 299.092,
+      "log": {
+        "path": "work/ax-startup-full-suite-v1.log",
+        "bytes": 247873,
+        "sha256": "fdc903b646e125268699f651286de49c942907c69bd2cd87afb55eb2bceb6f4b"
+      }
+    }
+  },
+  "retained_failures": [
+    {
+      "path": "work/source-ax-startup-profile-fadhdz9o",
+      "reason": "Link-only SAFE_HEAP flag rejected during compile-only phase under Werror; instrumentation is now applied at final link."
+    },
+    {
+      "path": "work/ax-startup-hardened-focused-v1.log",
+      "reason": "Negative correctly rejected dispatch without masked owner, but runner expected obsolete message."
+    }
+  ],
+  "limits": [
+    "No original AX boundary comparison",
+    "No firmware, PCM, real timing or live browser gate",
+    "No original Synth, full audio/application allocation history or live Fighter source binding",
+    "First session divergence remains match0 tick1776 P4 input_hex"
+  ],
+  "deployed": false
+}
