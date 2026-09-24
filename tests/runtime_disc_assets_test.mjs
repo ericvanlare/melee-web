@@ -58,7 +58,9 @@ assert.equal(NATIVE_GAME_DISC_FILES['ness.ssm'],'audio/us/ness.ssm');
 for(const name of ['PlNs.dat','PlNsAJ.dat','PlNsNr.dat','PlNsYe.dat','PlNsBu.dat','PlNsGr.dat','EfNsData.dat'])
   assert.equal(NATIVE_GAME_DISC_FILES[name],name);
 assert.equal(NATIVE_GAME_DISC_FILES['peach.ssm'],'audio/us/peach.ssm');
-for(const name of ['PlPe.dat','PlPeAJ.dat','PlPeNr.dat','PlPeYe.dat','PlPeWh.dat','PlPeBu.dat','PlPeGr.dat','EfPeData.dat'])
+for(const name of ['PlPe.dat','PlPeAJ.dat','PlPeNr.dat','PlPeYe.dat','PlPeWh.dat','PlPeBu.dat','PlPeGr.dat','EfPeData.dat']) {
+  assert.equal(NATIVE_GAME_DISC_FILES[name],name);
+}
 assert.equal(NATIVE_GAME_DISC_FILES['mewtwo.ssm'],'audio/us/mewtwo.ssm');
 for(const name of ['PlMt.dat','PlMtAJ.dat','PlMtNr.dat','PlMtRe.dat','PlMtBu.dat','PlMtGr.dat','EfMtData.dat'])
   assert.equal(NATIVE_GAME_DISC_FILES[name],name);

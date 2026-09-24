@@ -121,7 +121,7 @@ void source_fighter_closure()
         CKIND_EMBLEM, CKIND_LINK, CKIND_CLINK, CKIND_CAPTAIN, CKIND_GANON,
         CKIND_LUIGI, CKIND_PIKACHU, CKIND_PICHU, CKIND_PURIN, CKIND_DONKEY,
         CKIND_KOOPA, CKIND_NESS, CKIND_PEACH,
-        CKIND_KOOPA, CKIND_MEWTWO,
+        CKIND_MEWTWO,
     };
     for (const int character : characters) {
         const auto* content = melee_web_fighter_content(character);
