@@ -2,13 +2,16 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
 import {mayflashMacPad} from './controller-fixtures.mjs';
-const {values}=parseArgs({options:Object.fromEntries(['url','playwright','out'].map(n=>[n,{type:'string'}]))});
-if(!values.url||!values.playwright||!values.out)throw Error('Use --url ORIGIN --playwright PACKAGE_DIR --out LOCAL_DIR');
-const {chromium}=await import(pathToFileURL(path.join(path.resolve(values.playwright),'index.mjs')));
-const browser=await chromium.launch({channel:'chrome',headless:false});
+import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
+const {values}=parseArgs({options:{
+  ...Object.fromEntries(['url','playwright','out'].map(n=>[n,{type:'string'}])),
+  headed:{type:'boolean',default:false},
+}});
+if(!values.url||!values.playwright||!values.out)throw Error('Use --url ORIGIN --playwright PACKAGE_DIR --out LOCAL_DIR [--headed]');
+const {chromium,browser:launchOptions}=await loadBrowserTools(values.playwright);
+const browser=await chromium.launch(browserLaunchOptions(launchOptions,{headed:values.headed}));
 const page=await browser.newPage({viewport:{width:1100,height:800}}),errors=[];
 page.on('pageerror',e=>errors.push(e.message));page.setDefaultTimeout(10000);
 const pad=mayflashMacPad();pad.axes[3]=32*2/255-1;pad.axes[4]=34*2/255-1;
@@ -90,7 +93,7 @@ try{
   await page.locator('#controls-close').click();
   await page.waitForFunction(()=>document.activeElement.id==='canvas');
   assert.deepEqual(errors,[]);
-  await fs.writeFile(path.join(values.out,'report.json'),JSON.stringify({scope:`${development?'Development':'Public'} player default controller activation, shared compact settings, both mixed player directions, keyboard for both, persisted choice, legacy compatibility, B0XX and restored input; authored Gamepad samples, no disc/gameplay acceptance`,result:'pass',errors},null,2));
+  await fs.writeFile(path.join(values.out,'report.json'),JSON.stringify({scope:`${development?'Development':'Public'} player default controller activation, shared compact settings, both mixed player directions, keyboard for both, persisted choice, legacy compatibility, B0XX and restored input; authored Gamepad samples, no disc/gameplay acceptance`,result:'pass',browser_mode:values.headed?'headed':'headless',errors},null,2));
   console.log(`${development?'Development':'Public'} player shared controller settings pass.`);
 }catch(error){
   await fs.writeFile(path.join(values.out,'failure.txt'),String(error)+'\n'+await page.locator('body').innerText());

@@ -205,6 +205,9 @@ const mounted = mountMeleeRuntime({
   },
 });
 owner.Module.onRuntimeInitialized();
+// The native cache service is sampled from the first post-main frame. Keep
+// this controlled owner on the same boundary as the real browser loop.
+window.menuFrame(false);
 const player = await mounted;
 
 const nativeServiceCommands = window.menuServiceCommands;

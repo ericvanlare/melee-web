@@ -6,14 +6,15 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {parseArgs} from 'node:util';
 import {createBrowserDriver} from './browser_driver.mjs';
-import {loadBrowserTools} from './browser_tools.mjs';
+import {browserLaunchOptions, loadBrowserTools} from './browser_tools.mjs';
 
 const {values}=parseArgs({options:{
   ...Object.fromEntries(['url','surface','disc','out','playwright','timeout'].map(name=>[name,{type:'string'}])),
+  headed:{type:'boolean',default:false},
   help:{type:'boolean'},
 }});
 if(values.help){
-  console.log('Usage: node scripts/browser_smoke.mjs --url HTTP_URL --surface development|public --out NEW_DIRECTORY [--disc OWNED_DISC] [--playwright PACKAGE_DIR] [--timeout 90000]');
+  console.log('Usage: node scripts/browser_smoke.mjs --url HTTP_URL --surface development|public --out NEW_DIRECTORY [--disc OWNED_DISC] [--playwright PACKAGE_DIR] [--timeout 90000] [--headed]');
   process.exit(0);
 }
 if(!values.url||!values.out||!['development','public'].includes(values.surface))throw Error('Expected --url, --surface development|public and --out; see --help');
@@ -28,8 +29,9 @@ const report={schema:'melee-web-browser-smoke-v1',scope:'Readiness and optional 
   build_identity:'Not established by this probe; use the existing frozen-build/HTTP audit for acceptance.'};
 let browser,driver;
 try {
-  browser=await chromium.launch({...launchOptions,headless:false,chromiumSandbox:true,timeout});
+  browser=await chromium.launch(browserLaunchOptions(launchOptions,{headed:values.headed,timeout}));
   report.browser=browser.version();
+  report.browser_mode=values.headed?'headed':'headless';
   const page=await browser.newPage({viewport:{width:1280,height:960}});
   driver=createBrowserDriver(page,{surface:values.surface,timeoutMs:timeout,deadline:Date.now()+timeout});
   const response=await page.goto(values.url,{timeout});
