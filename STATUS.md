@@ -1,36 +1,16 @@
 # Current status
 
-## Peach development checkpoint
+## Mewtwo capture and menu ownership repair
 
-Peach is integrated as a development candidate with her original
-`CKIND_PEACH`/`FTKIND_PEACH` identity, five costumes, the unique 0xC0
-`ftPe_DatAttrs` extension, authored dynamics `dynamicsNum=9` with 86 mode rows
-(the 0x100 whole-chain cutoff is source-cited), five Article slots (Explode,
-Turnip, Parasol, Toad, ToadSpore), model-only effect bank 15 (one row) and
-`peach.ssm`. The real-asset attribute boundary test and the Battlefield
-lifecycle trace pass end to end in Release and RelWithDebInfo, both player
-orientations and all five costumes, including ground/aerial Toad and vegetable
-article lifetimes, the Parasol article lifetime and the authored Float state.
-Shared repairs surfaced by Peach: eye-telemetry base-palette ownership proof
-for animation-replaced images and fighter command opcode 42 (parasol item
-rate). Browser frames, original comparison, pixels, PCM and performance are
-not run; Toad spores and float-aerial interactions need their own evidence;
-see [Peach's retained scope](docs/PEACH_PORT_NOTES.md).
-
-## Ness development checkpoint
-
-Ness is integrated as a development candidate with his original
-`CKIND_NESS`/`FTKIND_NESS` identity, four costumes, the unique 0xDC
-`ftNessAttributes` extension, empty authored dynamics, null Wait table,
-eleven authored Article slots, model-only effect bank 10 (four rows, entries
-0-2 consumed) and `ness.ssm`. The real-asset attribute boundary test passes
-and the native FD lifecycle trace passes end to end after the item-command
-decoder repair (source-cited shared repairs: exact consumed lengths for item
-opcodes 10/16, admission of common opcodes 5-9 with followed jump targets,
-tolerance of the source's unbalanced SetLoop, the item opcode 16 admission,
-cross-boundary item script tails and the unclamped original TObj blending
-constant). Browser frames, original comparison, pixels, PCM and performance
-are not run; see [Ness's scope](docs/NESS_PORT_NOTES.md).
+The Mewtwo Confusion victim command rows and menu rumble/GObj lifetime repairs
+are validated at their declared boundaries. **Native traced**: the original
+menu/four-stock lifecycle completes twice with cancellation and teardown.
+**Browser exercised**: Release and RelWithDebInfo both select Mewtwo through
+the original CSS, cancel SSS, capture/release Mario with Confusion and unload.
+See the [merge review receipt](docs/evidence/mewtwo-crash-merge-review-v1.json)
+for exact builds, retained failures and integration checks. This repairs a
+crash; independent equivalence, full fighter admission and deployment are
+separate gates.
 
 ## Donkey Kong platform shield-drop repair
 
