@@ -93,10 +93,10 @@ void menu_contract()
 {
     const auto names = menu_asset_names();
 #if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
-    check(names.size()==35, "Silent menu descriptor excludes only DSP coefficients");
+    check(names.size()==36, "Silent menu descriptor excludes only DSP coefficients");
     check(!has(names,"dsp_coef.bin"), "Public scope must not request DSP coefficients");
 #else
-    check(names.size()==36, "Menu descriptor must include each admitted CSS voice bank");
+    check(names.size()==37, "Menu descriptor must include each admitted CSS voice bank");
     check(has(names,"dsp_coef.bin"), "Development scope requires DSP coefficients");
 #endif
     for(const auto name:{"MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd",
