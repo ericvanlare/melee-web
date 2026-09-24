@@ -1,5 +1,13 @@
 # Current status
 
+## Original AR and ARQ share checked DMA ownership
+
+**Compiled / Source identified / Native traced** for the [AR service fixture](docs/SOURCE_AUDIO_AR_SERVICES.md).
+Original size probing and deferred ARQ completion execute through checked cache,
+interrupt-mask and SDK context services. The [scoped receipt](docs/evidence/source-audio-ar-services-v1.json)
+records negative ownership controls. Shared AX/Synth integration and full-session
+equivalence remain open; this component does not establish PCM or timing.
+
 ## Original Synth parameters are derived independently
 
 **Compiled / Source identified / Native traced / Retail compared** for the single

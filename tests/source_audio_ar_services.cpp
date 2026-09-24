@@ -56,6 +56,7 @@ struct CacheSpan {
     uint32_t length = 0;
     bool valid = false;
     bool published = false;
+    uint64_t generation = 1;
     unsigned char visible[32]{};
 };
 /* ARChecksize has exactly three temporary aligned source buffers. Their
@@ -208,7 +209,7 @@ void set_dma_busy(void* user, int busy)
 }
 
 unsigned char* resolve_mainmem(void*, uint32_t address, uint32_t length,
-                               MeleeWebSourceAudioArTransferType type)
+                               MeleeWebSourceAudioArTransferType type, uint64_t* generation)
 {
     require(type == kMramToAram || type == kAramToMram,
             "AR DMA direction is outside the authored source contract");
@@ -220,6 +221,8 @@ unsigned char* resolve_mainmem(void*, uint32_t address, uint32_t length,
     require(span, "main-memory span is outside the owned cache spans");
     if (type == kMramToAram)
         require(span->published, "DMA consumed an unpublished source cache span");
+    require(generation && span->generation, "invalid span generation");
+    *generation = span->generation;
     return span->visible;
 }
 
@@ -522,7 +525,10 @@ int main(int argc, char** argv)
         std::strcmp(mode, "cpu-masked-pump") == 0 ||
         std::strcmp(mode, "irq-masked-pump") == 0 ||
         std::strcmp(mode, "bad-span") == 0 ||
-        std::strcmp(mode, "bad-mode") == 0;
+        std::strcmp(mode, "bad-mode") == 0 ||
+        std::strcmp(mode, "recycled-span") == 0 ||
+        std::strcmp(mode, "absent-deferred") == 0 ||
+        std::strcmp(mode, "reinitialize") == 0;
     require(known_mode, "unknown source audio AR fixture mode");
     state = {};
     service = {};
@@ -569,9 +575,10 @@ int main(int argc, char** argv)
     require(ARCheckInit() == 1 && ARGetSize() == sizeof(aram),
             "ARInit did not establish the declared 16 MiB profile");
     if (std::strcmp(mode, "bad-span") == 0) {
+        uint64_t generation = 0;
         (void)resolve_mainmem(&state,
                               static_cast<uint32_t>(reinterpret_cast<uintptr_t>(source)) + 1,
-                              sizeof(source), MELEE_WEB_SOURCE_AUDIO_AR_MRAM_TO_ARAM);
+                              sizeof(source), MELEE_WEB_SOURCE_AUDIO_AR_MRAM_TO_ARAM, &generation);
         die("misaligned source span was accepted");
     }
     if (std::strcmp(mode, "bad-mode") == 0) {
@@ -595,6 +602,10 @@ int main(int argc, char** argv)
     state.current_context = &state.context;
     if (std::strcmp(mode, "missing-publication") != 0)
         flush_range(&state, source, sizeof(source));
+    if (std::strcmp(mode, "absent-deferred") == 0) {
+        ARStartDMA(ARAM_DIR_MRAM_TO_ARAM, (u32)(uintptr_t)source, sizeof(aram), sizeof(source));
+        die("absent physical ARAM accepted for deferred request");
+    }
     ARQPostRequest(&request, 7, ARAM_DIR_MRAM_TO_ARAM, ARQ_PRIORITY_LOW,
                    (u32)(uintptr_t)source, destination, sizeof(source), callback);
     require(callback_count == 0, "ARQ callback ran inline during submission");
@@ -604,6 +615,11 @@ int main(int argc, char** argv)
             "deferred source ARQ request lost its DSP busy status");
     require(std::memcmp(aram + destination, source, sizeof(source)) != 0,
             "deferred ARQ transfer copied bytes inline during submission");
+    if (std::strcmp(mode, "recycled-span") == 0) ++borrowed_source_span.generation;
+    if (std::strcmp(mode, "reinitialize") == 0) {
+        melee_web_source_audio_ar_initialize(&service, &platform, aram, sizeof(aram), 0x04000000);
+        die("active service reinitialization accepted");
+    }
     if (std::strcmp(mode, "irq-masked-pump") == 0)
         state.global_mask |= OS_INTERRUPTMASK_DSP_ARAM;
     if (std::strcmp(mode, "cpu-masked-pump") == 0) {
