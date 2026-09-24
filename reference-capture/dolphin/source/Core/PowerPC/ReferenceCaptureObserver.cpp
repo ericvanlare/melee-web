@@ -182,6 +182,9 @@ enum class SliceTag : u16
   MenuCssDoors = 44,
   MenuMainFlow = 45,
   MenuMainInput = 46,
+  MenuCssModel = 47,
+  MenuCssLiveState = 48,
+  MenuCssSlider = 49,
 };
 
 struct SliceRef
@@ -516,6 +519,104 @@ struct Observer::Impl
     return AddSlice(system, SliceTag::SceneKind, scene_pointer, 1);
   }
 
+  bool ReadCssJoint(Core::System* system, u32 root, u8 index, u32* result) const
+  {
+    // Read-only equivalent of the traversal order in lb_80011E24. The
+    // authored CSSDoor joint index is a u8, so at most 256 visited nodes
+    // can precede the requested node. HSD_JObj INSTANCE nodes skip children.
+    std::array<u32, 256> visited{};
+    u32 node = root;
+    for (u32 ordinal = 0; node && ordinal <= index; ++ordinal)
+    {
+      for (u32 previous = 0; previous < ordinal; ++previous)
+        if (visited[previous] == node)
+          return false;
+      visited[ordinal] = node;
+      if (ordinal == index)
+      {
+        *result = node;
+        return true;
+      }
+      u32 flags = 0, child = 0, next = 0;
+      if (!ReadU32(system, node + 0x14, &flags) ||
+          !ReadU32(system, node + 0x10, &child) ||
+          !ReadU32(system, node + 8, &next))
+        return false;
+      if (!(flags & (1u << 12)) && child)
+        node = child;
+      else if (next)
+        node = next;
+      else
+      {
+        // Every ancestor must be one of the nodes already traversed.
+        u32 parent = node;
+        node = 0;
+        for (u32 ascent = 0; ascent <= ordinal; ++ascent)
+        {
+          if (!ReadU32(system, parent + 0xc, &parent))
+            return false;
+          if (!parent)
+            break;
+          bool seen = false;
+          for (u32 previous = 0; previous <= ordinal; ++previous)
+            seen |= visited[previous] == parent;
+          if (!seen || !ReadU32(system, parent + 8, &next))
+            return false;
+          if (next)
+          {
+            node = next;
+            break;
+          }
+          if (ascent == ordinal)
+            return false;
+        }
+      }
+    }
+    return false;
+  }
+
+  bool AddCssCpuSteeringSlices(Core::System* system)
+  {
+    u32 css = 0, root = 0;
+    if (!ReadU32(system, 0x804d6cb0, &css) ||
+        !ReadU32(system, 0x804d6cc0, &root))
+      return false;
+    if (!css || !root)
+      return true; // CSS OnEnter has not published its owners yet.
+    u8 match_type = 0;
+    if (!ReadBytes(system, css + 2, 1, &match_type))
+      return false;
+    if (match_type != 0)
+      return true; // These controls belong to ordinary VS_MELEE.
+    if (!AddSlice(system, SliceTag::MenuCssLiveState, css, 0xf0))
+      return false;
+    for (u32 port = 0; port < 4; ++port)
+    {
+      u32 model = 0;
+      if (!ReadU32(system, 0x804a0bd0 + port * 4, &model))
+        return false;
+      if (!model)
+        continue;
+      // CSSCharModel stores authored token positions at +8/+c; no guest
+      // function is called and no controller or gameplay state is changed.
+      if (!AddSlice(system, SliceTag::MenuCssModel, model, 0x18,
+                    static_cast<u16>(port)))
+        return false;
+      for (u32 variant = 0; variant < 2; ++variant)
+      {
+        u8 index = 0;
+        u32 joint = 0;
+        if (!ReadBytes(system, CSS_DOORS_STATE + port * 0x24 + 7 + variant,
+                       1, &index) ||
+            !ReadCssJoint(system, root, index, &joint) ||
+            !AddSlice(system, SliceTag::MenuCssSlider, joint, 0x74,
+                      static_cast<u16>(port * 2 + variant)))
+          return false;
+      }
+    }
+    return true;
+  }
+
   bool AddMenuSteeringSlices(Core::System* system)
   {
     // mnmain.h: MenuFlow (0x18) and MenuInputState (8), at the
@@ -531,6 +632,8 @@ struct Observer::Impl
     if (scene_kind == 1 &&
         (!AddSlice(system, SliceTag::MenuMainFlow, 0x804a04f0, 0x18) ||
          !AddSlice(system, SliceTag::MenuMainInput, 0x804d6bc8, 8)))
+      return false;
+    if (scene_kind == 8 && !AddCssCpuSteeringSlices(system))
       return false;
     // Steering evidence for the ordinary menu route: the highlighted stage
     // index, the authored stage kind it points at, and each CSS cursor. Every
@@ -803,6 +906,9 @@ struct Observer::Impl
       }
       else if (boundary == Boundary::CssEnter)
       {
+        u8 current_mode = 0;
+        if (!ReadBytes(system, 0x80479d30, 1, &current_mode) || current_mode != 0x02)
+          return SetInvalid("whole-session first CSS is not ordinary GM_VS"), void();
         if (whole_phase != 0)
         {
           return SetInvalid("whole-session CSS enter was missing or out of order"), void();

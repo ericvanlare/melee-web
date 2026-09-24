@@ -14,6 +14,76 @@ SOURCE = ROOT / "reference-capture" / "dolphin" / "source" / "Core" / "PowerPC" 
 
 
 class ReferenceDolphinObserverTests(unittest.TestCase):
+    def test_css_joint_reader_preserves_source_traversal_and_rejects_cycles(self) -> None:
+        compiler = shutil.which("clang++") or shutil.which("g++")
+        if compiler is None:
+            self.skipTest("A native C++ compiler is not installed")
+        source = SOURCE.read_text(encoding="utf-8")
+        method = source[source.index("  bool ReadCssJoint("):
+                        source.index("  bool AddCssCpuSteeringSlices(")]
+        harness = r'''
+#include <array>
+#include <cassert>
+#include <cstdint>
+#include <unordered_map>
+using u8 = uint8_t;
+using u32 = uint32_t;
+namespace Core { struct System {}; }
+struct Reader {
+  std::unordered_map<u32, u32> memory;
+  bool ReadU32(Core::System*, u32 address, u32* result) const {
+    const auto found = memory.find(address);
+    if (found == memory.end()) return false;
+    *result = found->second;
+    return true;
+  }
+  void node(u32 address, u32 parent, u32 child, u32 next, u32 flags = 0) {
+    memory[address + 8] = next;
+    memory[address + 12] = parent;
+    memory[address + 16] = child;
+    memory[address + 20] = flags;
+  }
+''' + method + r'''
+};
+int main() {
+  Reader reader;
+  // Root -> A -> C,D ; root's second child B is an instance whose child E
+  // must be skipped, as in lb_80011E24's authored joint numbering.
+  reader.node(0x100, 0, 0x200, 0);
+  reader.node(0x200, 0x100, 0x400, 0x300);
+  reader.node(0x300, 0x100, 0x600, 0, 1u << 12);
+  reader.node(0x400, 0x200, 0, 0x500);
+  reader.node(0x500, 0x200, 0, 0);
+  reader.node(0x600, 0x300, 0, 0);
+  const u32 expected[] = {0x100, 0x200, 0x400, 0x500, 0x300};
+  for (u8 index = 0; index < 5; ++index) {
+    u32 found = 0;
+    assert(reader.ReadCssJoint(nullptr, 0x100, index, &found));
+    assert(found == expected[index]);
+  }
+  u32 found = 0;
+  assert(!reader.ReadCssJoint(nullptr, 0x100, 5, &found));
+  assert(!reader.ReadCssJoint(nullptr, 0x100, 255, &found));
+  reader.memory[0x500 + 12] = 0x500; // Parent cycle.
+  assert(!reader.ReadCssJoint(nullptr, 0x100, 4, &found));
+  reader.memory[0x500 + 12] = 0x200;
+  reader.memory[0x500 + 8] = 0x200; // Child/sibling cycle.
+  assert(!reader.ReadCssJoint(nullptr, 0x100, 4, &found));
+  reader.memory[0x500 + 8] = 0;
+  reader.memory[0x500 + 12] = 0x700; // Unvisited parent.
+  assert(!reader.ReadCssJoint(nullptr, 0x100, 4, &found));
+}
+'''
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary)
+            (path / "reader.cpp").write_text(harness)
+            built = subprocess.run([compiler, "-std=c++17", "-Wall", "-Werror",
+                                    str(path / "reader.cpp"), "-o", str(path / "reader")],
+                                   capture_output=True, text=True)
+            self.assertEqual(built.returncode, 0, built.stderr)
+            checked = subprocess.run([str(path / "reader")], capture_output=True, text=True)
+            self.assertEqual(checked.returncode, 0, checked.stderr)
+
     def test_patch_applies_to_clean_pinned_checkout(self) -> None:
         checkout = ROOT / ".deps" / "reference-dolphin"
         if not checkout.exists():

@@ -122,6 +122,9 @@ SLICE_NAMES = {
     44: "menu_css_doors",
     45: "menu_main_flow",
     46: "menu_main_input",
+    47: "menu_css_model",
+    48: "menu_css_live_state",
+    49: "menu_css_slider",
 }
 
 
