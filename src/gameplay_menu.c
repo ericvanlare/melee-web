@@ -824,3 +824,18 @@ const VsModeData* melee_web_menu_ready_vs(const MeleeWebMenuSession* session)
     }
     return &session->match_vs;
 }
+
+int melee_web_menu_commit_results(MeleeWebMenuSession* session,
+                                  const VsModeData* vs,
+                                  const uint8_t ko_counts[GM_MAX_PLAYERS],
+                                  char* error, size_t error_size)
+{
+    if (!session_live(session, error, error_size) || !vs || !ko_counts ||
+        session->css_open || session->sss_open ||
+        session->phase != MELEE_WEB_MENU_READY)
+        return fail(error, error_size, "Results commit requires closed source menus");
+    session->css.vs = *vs;
+    session->sss.vs = *vs;
+    memcpy(session->css_ko_counts, ko_counts, sizeof(session->css_ko_counts));
+    return ok(error, error_size);
+}

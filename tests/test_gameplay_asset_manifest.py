@@ -39,6 +39,7 @@ class GameplayAssetManifestTests(unittest.TestCase):
                    str(ROOT / "src/dat_animation.cpp"),
                    str(ROOT / "src/fighter_binding.cpp"),
                    str(ROOT / "src/gameplay_asset_manifest.cpp"),
+                   str(ROOT / "src/gameplay_result_motion_table.cpp"),
                    str(ROOT / "tests/gameplay_asset_manifest_test.cpp"),
                    "-o", str(cls.binary)]
         cls.compile_command = command
@@ -60,7 +61,7 @@ class GameplayAssetManifestTests(unittest.TestCase):
         result = subprocess.run([str(self.binary)], cwd=ROOT,
                                 capture_output=True, text=True, timeout=20)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("Source menu/match asset descriptors", result.stdout)
+        self.assertIn("Source menu/match/results asset descriptors", result.stdout)
 
     def test_public_descriptor_excludes_only_coefficients(self):
         public = Path(self.temp.name) / "gameplay_asset_manifest_public_test"

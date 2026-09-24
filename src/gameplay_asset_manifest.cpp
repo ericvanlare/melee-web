@@ -2,6 +2,7 @@
 
 #include "dat_archive.hpp"
 #include "gameplay_content.h"
+#include "gameplay_result_motion_table.hpp"
 #include "fighter_binding.hpp"
 #include <melee/pl/forward.h>
 #include <algorithm>
@@ -174,6 +175,40 @@ void add_stage_music(std::vector<std::string>& result, int stage_kind)
     }
 }
 
+void add_selection_fighter_assets(std::vector<std::string>& result,
+                                  const MeleeWebMenuMatchSelection& selection)
+{
+    // Both the match and the Results scene that follows it resolve the same
+    // source fighter identities, so the descriptor keeps one loop here.
+    const unsigned active = active_player_count(selection);
+    std::vector<unsigned> fighter_kinds;
+    for (unsigned i = 0; i < active; ++i) {
+        const auto* content = melee_web_fighter_content(selection.start.players[i].ckind);
+        if (std::find(fighter_kinds.begin(), fighter_kinds.end(),
+                      content->fighter_kind) == fighter_kinds.end())
+            fighter_kinds.push_back(content->fighter_kind);
+    }
+    for (const auto fighter_kind : fighter_kinds) {
+        const auto* content = melee_web_fighter_content_by_kind(fighter_kind);
+        const auto* neutral = source_costume(fighter_kind, 0);
+        if (!content || !neutral) reject("Source fighter identity is incomplete");
+        add_unique(result, neutral->fighter_filename);
+        add_unique(result, neutral->animation_filename);
+        add_unique(result, runtime_name(neutral->model_filename));
+        add_unique(result, content->effect_archive);
+        add_unique(result, content->audio_bank);
+        for (unsigned i = 0; i < active; ++i) {
+            if (content->fighter_kind !=
+                melee_web_fighter_content(selection.start.players[i].ckind)->fighter_kind)
+                continue;
+            const auto* costume = source_costume(fighter_kind,
+                                                  selection.start.players[i].color);
+            if (!costume) reject("Selected source costume is incomplete");
+            add_unique(result, runtime_name(costume->model_filename));
+        }
+    }
+}
+
 } // namespace
 
 std::vector<std::string> menu_asset_names()
@@ -217,38 +252,69 @@ match_asset_names(const MeleeWebMenuMatchSelection& selection)
         add_unique(result, name);
     for (const auto name : kMatchCommonAudio) add_unique(result, name);
 
-    const unsigned active = active_player_count(selection);
-    std::vector<unsigned> fighter_kinds;
-    for (unsigned i = 0; i < active; ++i) {
-        const auto* content = melee_web_fighter_content(selection.start.players[i].ckind);
-        if (std::find(fighter_kinds.begin(), fighter_kinds.end(),
-                      content->fighter_kind) == fighter_kinds.end())
-            fighter_kinds.push_back(content->fighter_kind);
-    }
-    for (const auto fighter_kind : fighter_kinds) {
-        const auto* content = melee_web_fighter_content_by_kind(fighter_kind);
-        const auto* neutral = source_costume(fighter_kind, 0);
-        if (!content || !neutral) reject("Source fighter identity is incomplete");
-        add_unique(result, neutral->fighter_filename);
-        add_unique(result, neutral->animation_filename);
-        add_unique(result, runtime_name(neutral->model_filename));
-        add_unique(result, content->effect_archive);
-        add_unique(result, content->audio_bank);
-        for (unsigned i = 0; i < active; ++i) {
-            if (content->fighter_kind !=
-                melee_web_fighter_content(selection.start.players[i].ckind)->fighter_kind)
-                continue;
-            const auto* costume = source_costume(fighter_kind,
-                                                  selection.start.players[i].color);
-            if (!costume) reject("Selected source costume is incomplete");
-            add_unique(result, runtime_name(costume->model_filename));
-        }
-    }
+    add_selection_fighter_assets(result, selection);
 
     const auto* stage = melee_web_stage_content(selection.start.rules.stkind);
     add_unique(result, stage->archive);
     if (stage->audio_bank) add_unique(result, stage->audio_bank);
     add_stage_music(result, stage->stage_kind);
+    return result;
+}
+
+std::vector<std::string>
+results_asset_names(const MeleeWebMenuMatchSelection& selection)
+{
+    check_selection(selection);
+
+    std::vector<std::string> result;
+    result.reserve(64);
+    // gmResult runs over the same source world as the match it reports on, so
+    // the shared item/effect/HUD compatibility files are requested again.
+    for (const auto name : std::array<std::string_view, 11>{
+             "PlCo.dat", "ItCo.usd", "EfCoData.dat", "PdPm.dat", "LbRb.dat",
+             "sislib_font.bin", "IfAll.usd", "IfCoGet.dat", "SdIntro.dat",
+             "GmPause.usd", "LbBf.dat"})
+        add_unique(result, name);
+    for (const auto name : kMatchCommonAudio) add_unique(result, name);
+    add_selection_fighter_assets(result, selection);
+    // The source scene loader owns these roots; no stage archive or stage
+    // music is requested because Results has no stage.
+    for (const auto* name : {"GmRst.usd", "SdRst.usd", "TyDatai.usd",
+                             "LbMcGame.usd", "NtMemAc.usd"})
+        add_unique(result, name);
+    {
+        const unsigned active = active_player_count(selection);
+        for (unsigned i = 0; i < active; ++i) {
+            const auto* content =
+                melee_web_fighter_content(selection.start.players[i].ckind);
+            const auto spec = result_motion_archive_spec(content->fighter_kind);
+            if (spec.archive.empty())
+                reject("Results fighter has no authored gm_1601 result archive");
+            add_unique(result, spec.archive);
+        }
+    }
+    // Authored ckind victory themes in gm_1601; the winner is chosen by the
+    // source Results callbacks after the scene runs.
+    for (const auto* name : {"ff_mario.hps", "ff_fox.hps", "ff_emb.hps",
+                             "ff_link.hps", "ff_fzero.hps", "ff_dk.hps",
+                             "ff_poke.hps"})
+        add_unique(result, name);
+    return result;
+}
+
+std::vector<std::string> prize_asset_names()
+{
+    std::vector<std::string> result;
+    result.reserve(24);
+    // Prize runs its own source world over the authored IfPrize/SdPrize
+    // scene data, the trophy tables and the card/name-entry archives.
+    for (const auto* name : {"IfPrize.usd", "SdPrize.usd", "TyDatai.usd",
+                             "LbMcGame.usd", "NtMemAc.usd", "sislib_font.bin"})
+        add_unique(result, name);
+    for (const auto name : kMatchCommonAudio) add_unique(result, name);
+    // Toy_803124BC plays the three authored s_info voice streams.
+    for (const auto* name : {"s_info1.hps", "s_info2.hps", "s_info3.hps"})
+        add_unique(result, name);
     return result;
 }
 

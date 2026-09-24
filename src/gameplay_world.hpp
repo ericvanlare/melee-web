@@ -21,6 +21,8 @@ using RuntimeFiles = std::map<std::string, std::vector<uint8_t>, std::less<>>;
     DatMenuSupportLanguage setting_language = DatMenuSupportLanguage::English,
     DatMenuSupportLanguage saved_language = DatMenuSupportLanguage::English);
 class RuntimeArchiveCache;
+class DatArchive;
+enum class GameplayWorldPurpose { Match, Results };
 enum class GameplayWorldConstruction { Immediate, Deferred };
 // Original FTKind and GrKind values, never CSS/SSS grid indices. Defaults keep
 // existing Mario/FD probes scoped to their original fixture.
@@ -29,6 +31,7 @@ struct GameplayWorldSelection {
     std::array<unsigned,4> fighter_kinds{0,0,0,0};
     std::array<unsigned,4> costume_indices{0,0,0,0};
     int ground_kind=37;
+    GameplayWorldPurpose purpose=GameplayWorldPurpose::Match;
 };
 // Shared by the browser and source regression harness. Owns one original SDK
 // world and its assets. Match/render contexts must close before this owner.
@@ -48,6 +51,8 @@ public:
     void enable_full_stage(bool defer_start = false);
     void end_stage();
     void initialize_match(const StartMeleeData&);
+    void install_result_demo(unsigned fighter_kind, std::shared_ptr<const DatArchive>);
+    void verify_result_source_loads() const;
     MeleeWebCollision* collision() const;
     float floor_height(float x) const;
     std::array<float, 3> player_spawn(unsigned slot) const;

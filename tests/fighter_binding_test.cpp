@@ -38,16 +38,20 @@ struct Common : ArchiveFixture {
 };
 struct Actions : ArchiveFixture {
     static constexpr uint32_t table = 32;
+    static constexpr uint32_t blends = 8000;
     static constexpr uint32_t row(uint32_t id) { return table + id * 24; }
-    Actions() : ArchiveFixture(7520, "ftDataMario") {
-        link(12, table);
+    Actions() : ArchiveFixture(10000, "ftDataMario") {
+        link(12, table); link(16, blends);
         const std::string wait = "source_exact_wait", walk = "source_exact_walk";
-        std::copy(wait.begin(), wait.end(), data.begin() + 7320);
-        std::copy(walk.begin(), walk.end(), data.begin() + 7360);
+        std::copy(wait.begin(), wait.end(), data.begin() + 9000);
+        std::copy(walk.begin(), walk.end(), data.begin() + 9040);
         for (auto id : {2U, 6U}) {
-            link(row(id), 7320); put32(data, row(id) + 8, 64);
+            link(row(id), 9000); put32(data, row(id) + 8, 64);
         }
-        link(row(7), 7360); put32(data, row(7) + 4, 64); put32(data, row(7) + 8, 96);
+        link(row(7), 9040); put32(data, row(7) + 4, 64); put32(data, row(7) + 8, 96);
+        data[blends + 2 * 2] = 3; data[blends + 2 * 2 + 1] = 4;
+        data[blends + 6 * 2] = 5; data[blends + 6 * 2 + 1] = 6;
+        data[blends + 7 * 2] = 7; data[blends + 7 * 2 + 1] = 8;
         put32(data, row(6) + 16, 0x80000000);
     }
     DatFighterActions read() const { return {archive(), mario()}; }
@@ -99,8 +103,11 @@ void action_membership() {
           actions.actions[1].motion_id == 6 && actions.actions[2].motion_id == 7,
           "empty motion slots are filtered without renumbering source IDs");
     check(actions.find("source_exact_wait", 64).motion_id == 2 &&
-          actions.actions[1].motion_flags == 0x80000000 && actions.contains("source_exact_walk"),
-          "shared archive aliases retain distinct flags and exact source names");
+          actions.actions[1].motion_flags == 0x80000000 && actions.contains("source_exact_walk") &&
+          actions.actions[0].blend_dynamics == std::array<uint8_t, 2>{3, 4} &&
+          actions.actions[1].blend_dynamics == std::array<uint8_t, 2>{5, 6} &&
+          actions.actions[2].blend_dynamics == std::array<uint8_t, 2>{7, 8},
+          "shared archive aliases retain flags, blend metadata and exact source names");
     rejects([&] { (void) actions.find("source_exact_wait", 63); });
     rejects([&] { (void) actions.find("invented_prefix_ACTION_Wait", 64); });
     Actions fixture; put32(fixture.data, Actions::row(6) + 4, 32);
@@ -109,13 +116,24 @@ void action_membership() {
         fixture = Actions(); put32(fixture.data, Actions::row(0) + field, 32);
         rejects([&] { (void) fixture.read(); });
     }
-    fixture = Actions(); fixture.link(Actions::row(0), 7320);
+    fixture = Actions(); fixture.link(Actions::row(0), 9000);
     rejects([&] { (void) fixture.read(); });
-    fixture = Actions(); put32(fixture.data, Actions::row(2) + 8, 0x8001);
+    fixture = Actions(); put32(fixture.data, Actions::row(2) + 8, DatArchive::max_archive_bytes + 1);
     rejects([&] { (void) fixture.read(); });
+    fixture = Actions(); put32(fixture.data, Actions::row(2) + 8, 0x9c1e);
+    const auto large = fixture.read();
+    const Bytes large_container(0x9c1e);
+    large.validate_container(large_container);
+    check(large.slice(large_container, 2).size() == large_container.size(),
+          "authored demo archives above 32 KiB retain their complete range");
+    rejects([&] { large.validate_container(std::span(large_container).first(0x9c1d)); });
     fixture = Actions(); put32(fixture.data, Actions::row(2) + 4, 1);
     rejects([&] { (void) fixture.read(); });
     fixture = Actions(); fixture.unlink(Actions::row(2));
+    rejects([&] { (void) fixture.read(); });
+    fixture = Actions(); fixture.link(Actions::blends, 0);
+    rejects([&] { (void) fixture.read(); });
+    fixture = Actions(); fixture.link(16, 9600);
     rejects([&] { (void) fixture.read(); });
 }
 void container_slicing() {
@@ -146,12 +164,24 @@ void binding_order() {
     rejects([&] { (void) bind_fighter_animation(mario(), common, actions, "PlyFox5K_Share_joint",
                     2, "source_exact_wait", Fixture().animation(), 64); });
 }
+void demo_motion_counts() {
+    const std::array<uint32_t, 33> source_counts{
+        16, 14, 14, 14, 18, 14, 14, 14, 14, 14, 14,
+        14, 14, 14, 14, 14, 14, 16, 14, 14, 14, 14,
+        14, 14, 14, 14, 14, 14, 14, 14, 14, 15, 14,
+    };
+    for (uint32_t kind = 0; kind < source_counts.size(); ++kind)
+        check(fighter_demo_motion_count(kind) == source_counts[kind],
+              "demo motion count differs from authored ftData_UnkIntPairs");
+    check(fighter_demo_motion_count(33) == 0,
+          "unknown fighter kinds have no demo motion table");
+}
 }
 int main(int argc, char** argv) {
     const std::map<std::string, std::function<void()>> cases{
         {"registry_identity", registry_identity}, {"common_layout", common_layout},
         {"action_membership", action_membership}, {"container_slicing", container_slicing},
-        {"binding_order", binding_order}};
+        {"binding_order", binding_order}, {"demo_motion_counts", demo_motion_counts}};
     if (argc != 2 || !cases.contains(argv[1])) return 2;
     try { cases.at(argv[1])(); }
     catch (const std::exception& error) { std::cerr << error.what() << '\n'; return 1; }
