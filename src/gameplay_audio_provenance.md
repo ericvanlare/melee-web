@@ -95,3 +95,11 @@ selected by the original stage/BGM tables; no media transcoding is used.
 The decoded block representation retains each source offset, next pointer,
 coefficients, predictor and history. Native source-header hydration replaces
 only big-endian field representation and incompatible callback casts.
+## Repository publication disposition
+
+The owner accepted an internal publication review on September 20, 2026.
+Current behavior is retained and current audio/data remain outside the initial
+root MIT grant. Historical GPL provenance remains intact. See the
+[assessment](../docs/PUBLICATION_PROVENANCE_ASSESSMENT.md#d3-current-audio-and-gpl-history)
+and [license scope](../LICENSE_SCOPE.md). This repository decision does not
+establish permission or corresponding-source delivery for a new binary release.

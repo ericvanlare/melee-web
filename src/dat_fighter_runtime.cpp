@@ -132,6 +132,16 @@ DatFighterRuntime::DatFighterRuntime(std::shared_ptr<const DatArchive> archive, 
 #define READ_KOOPA(at, type, name, original) koopa_->name = read_##type(data, extension_ + at);
         MELEE_WEB_KOOPA_ATTRIBUTE_FIELDS(READ_KOOPA)
 #undef READ_KOOPA
+    } else if (costume_->fighter_kind == 16) {
+        // Mewtwo's source extension is a distinct 0x88 ABI. Preserve the
+        // Shadow Ball iteration/release, Teleport duration and angle clamp,
+        // and the Confusion reflection bone id as integer words; the
+        // reflection behavior byte stays unsigned.
+        region(data, extension_, MELEE_WEB_MEWTWO_ATTRIBUTE_BYTES);
+        mewtwo_.emplace();
+#define READ_MEWTWO(at, type, name, original) mewtwo_->name = read_##type(data, extension_ + at);
+        MELEE_WEB_MEWTWO_ATTRIBUTE_FIELDS(READ_MEWTWO)
+#undef READ_MEWTWO
     } else if (costume_->fighter_kind == 17) {
         // Luigi has a distinct 0x98 source extension; do not alias Mario's
         // fields just because both fighters are in the Mario family.

@@ -1,0 +1,74 @@
+{
+  "schema": "melee-web-compiler-cache-publication-review-v1",
+  "reviewed_at": "2026-09-21",
+  "run_url": "https://github.com/ericvanlare/melee-web/actions/runs/35560432544",
+  "identity": {
+    "cache_key": "compiler-Linux-ARM64-v3-9220cfa67a6a0d0f08c20023eb69fa6d550449796274f352e92f2447e079c889-shared-e8c756a72fe49ea4ec5b6eae7dbd88907142070c",
+    "workflow_commit": "8dd8dc3b7afc63e00c3d685e809d684a2f5dc5dc",
+    "run_id": "35560432544"
+  },
+  "cache_api_identity": {
+    "id": 7915620026,
+    "ref": "refs/heads/main",
+    "size_in_bytes": 130608415
+  },
+  "inspection": {
+    "status": "passed",
+    "schema": "melee-web-compiler-cache-audit-v1",
+    "scanner_sha256": "80f508ee18cca8fabcad936e2eb530670e9e1ac4eee3e4d22aa3acd56d62588c",
+    "ccache": {
+      "name": "ccache",
+      "version": "4.9.1"
+    },
+    "bounds": {
+      "command_timeout_seconds": 15,
+      "max_command_output_bytes": 4194304,
+      "max_decoded_file_bytes": 16777216,
+      "max_decoded_files": 32,
+      "max_decoded_total_bytes": 67108864,
+      "max_entry_bytes": 67108864,
+      "max_metadata_file_bytes": 1048576,
+      "resource_file_bytes": 67108864,
+      "resource_memory_bytes": 268435456
+    },
+    "cache": {
+      "entries": 3092,
+      "manifest_entries": 1532,
+      "regular_files": 3380,
+      "result_entries": 1560
+    },
+    "decoded_type_counts": {
+      "depfile": 1559,
+      "diagnostic": 245,
+      "wasm_relocatable": 1560
+    },
+    "scan_counts": {
+      "runner_path": 10421
+    },
+    "findings": []
+  },
+  "compressed_entry_bytes": 130572024,
+  "decoded_member_bytes": 267756885,
+  "full_report_sha256": "1e5d7facaa83ce16da48aab768694f9a72f7ec2cbd3de6d8f94cc3227aa9fb48",
+  "compile_graph": {
+    "source_head": "1dca8ac86fe49054d3a9df0a6c48bb85bdc9aa52",
+    "compdb_sha256": "9b43431db3fb53d3e163a54769a58c7ead5ea1ab52ecf70a0a656c833705d4d8",
+    "rows": 1770,
+    "objects": {
+      "count": 1676,
+      "sha256": "8961bc08bff23b4267b409e6cd5ce656131701dc6fd2fc236cc3cd8654a03697"
+    },
+    "cacheable_objects": {
+      "count": 1467,
+      "sha256": "35b7429ca92f3dfc5c12a5845f749d77e1d343c8634e96e0122fc8d58712ec94"
+    },
+    "seed_selector_sha256": "a2f4c019c6f3045f76e36a5dba707395f657d9c349746c4d5491616dc58080f9"
+  },
+  "disposition": "Retain ordinary compiler caching with a fresh v4 namespace; remove unreviewed private-era caches once at authorized publication cutover.",
+  "limits": [
+    "Only the selected existing cache identity was byte-inspected; this is not an audit of all historical keys or future cache payloads.",
+    "Bounded secret/path patterns and output-format classification do not prove absence of arbitrary secrets/assets or grant source/distribution rights.",
+    "These are mixed-project CI intermediates, including recovered source/current audio; no blanket MIT grant or new playable/native release authorization.",
+    "Standalone audit success is not normal PR verification or CI turnaround acceptance."
+  ]
+}

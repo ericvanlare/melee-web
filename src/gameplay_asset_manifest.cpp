@@ -15,7 +15,7 @@ namespace {
 
 constexpr auto kMenuFiles = std::to_array<std::string_view>({
     "MnSlChr.usd", "MnSlMap.usd", "SdSlChr.usd", "MnExtAll.usd",
-    "LbMcGame.usd", "NtMemAc.usd", "sislib_font.bin", "smash2.sem",
+    "LbMcGame.usd", "NtMemAc.usd", "LbRb.dat", "sislib_font.bin", "smash2.sem",
 #if !defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
     "dsp_coef.bin",
 #endif
@@ -296,7 +296,8 @@ results_asset_names(const MeleeWebMenuMatchSelection& selection)
     // Authored ckind victory themes in gm_1601; the winner is chosen by the
     // source Results callbacks after the scene runs.
     for (const auto* name : {"ff_mario.hps", "ff_fox.hps", "ff_emb.hps",
-                             "ff_link.hps"})
+                             "ff_link.hps", "ff_fzero.hps", "ff_dk.hps",
+                             "ff_poke.hps"})
         add_unique(result, name);
     return result;
 }

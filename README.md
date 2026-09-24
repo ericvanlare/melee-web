@@ -40,6 +40,7 @@ is the original CSS/SSS player; `viewer.html` is the separate asset inspector.
 For the full validation matrix, focused gameplay targets, local asset extraction,
 public packaging and reference capture, use [Developer entry](docs/DEVELOPMENT.md)
 and the linked boundary documents.
+For contribution and pull-request requirements, read [Contributing](CONTRIBUTING.md).
 
 ## Evidence and scope
 
@@ -70,3 +71,8 @@ bounded PR #42 browser evidence.
 
 This project is independent of Nintendo, doldecomp and Aurora. Preserve upstream
 source provenance and notices; see [third-party notices](THIRD_PARTY.md).
+The [root MIT grant](LICENSE) covers only the explicit
+[project-file scope](LICENSE_SCOPE.md). It does not cover recovered game/SDK
+material, current audio/data, or the combined player. See the
+[publication assessment](docs/PUBLICATION_PROVENANCE_ASSESSMENT.md) for those
+boundaries and the owner's accepted publication risk.

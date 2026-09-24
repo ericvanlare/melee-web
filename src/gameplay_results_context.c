@@ -141,6 +141,15 @@ static int baseline_has(const MeleeWebResultsContext* context, HSD_GObj* object)
     return 0;
 }
 
+static HSD_GObj* first_new_object_on_link(const MeleeWebResultsContext* context,
+                                          unsigned link)
+{
+    for (HSD_GObj* object = ((HSD_GObj**) HSD_GObj_Entities)[link]; object;
+         object = object->next)
+        if (!baseline_has(context, object)) return object;
+    return NULL;
+}
+
 static int capture_baseline(MeleeWebResultsContext* context, char* error, size_t size)
 {
     uint32_t count = 0;
@@ -168,8 +177,14 @@ static int capture_baseline(MeleeWebResultsContext* context, char* error, size_t
 static int delete_new_objects(MeleeWebResultsContext* context, char* error, size_t size)
 {
     /* Original Items can retain a fighter owner during their destructor. */
-    while (((HSD_GObj**) HSD_GObj_Entities)[9])
-        Item_8026A8EC(((HSD_GObj**) HSD_GObj_Entities)[9]);
+    while (HSD_GObjLibInitData.p_link_max >= 9) {
+        HSD_GObj* item = first_new_object_on_link(context, 9);
+        if (!item) break;
+        if (HSD_GObj_804D781C || HSD_GObj_804D7814 || HSD_GObj_804D7818)
+            return fail(error, size,
+                        "Results item teardown entered from an active source callback");
+        Item_8026A8EC(item);
+    }
     /* Release demo fighters through the registered original destructor before
      * releasing their asset/action owners or the source camera pool. */
     for (unsigned slot = 0; slot < 6; ++slot) {
@@ -485,6 +500,9 @@ int melee_web_results_context_end(MeleeWebResultsContext* context,
      * the original next-scene preload. */
     Toy_803127D4();
     tyDisplay_8031C8B8();
+    HSD_PadRumbleRemoveAll();
+    for (unsigned i = 0; i < 4; ++i) HSD_PadRumbleOffN(i);
+    HSD_PadRumbleInterpret();
     restore_pad_and_source_globals(context);
     lb_8001D1F4();
     lb_8001C5A4();

@@ -2,13 +2,13 @@
 
 Donkey Kong's typed fighter data, all five costumes and bounded native move
 lifetimes now execute on the full-game branch. A corrected cold/warm Final
-Destination action sweep passes. **Platform shield drop still crashes** at an
-undefined original animation-output boundary; the candidate is not complete.
-Independent original comparison remains open. For the September 20 production
-checkpoint, Donkey is disabled in public character selection and the final
-match handoff, while his development implementation remains available.
-[Issue #50](https://github.com/ericvanlare/melee-web/issues/50) tracks the crash
-and the verification required before public re-enablement.
+Destination action sweep passes. The **platform shield-drop crash is repaired**:
+the terminal single-datum animation boundary that aborted Pass motion 244 is now
+defined as the authored last value (see the FObj terminal rule below), and the
+Battlefield shield-drop reducer completes Pass across all five costumes.
+Independent original comparison remains open. [Issue
+#50](https://github.com/ericvanlare/melee-web/issues/50) tracks the remaining
+verification for full re-enablement evidence.
 
 ## Source data and shared behavior
 
@@ -37,11 +37,20 @@ output. This is not proof that every action or seek is executable.
 
 In particular, Pass animation 209 and StopCeil animation 214 each contain a
 singleton SPL0 branch track whose delay equals its clip end (25 and 8).
-The original non-loop AObj interprets that endpoint before stopping. Synthetic
-original-consumer tests retain the explicit failure at both endpoints; no
-fallback value or skipped callback was added. The actual Pass lifetime now
-reproduces this failure on Battlefield. StopCeil remains unexercised. The
-existing terminal-CON compatibility deviation remains documented in [original comparison](ORIGINAL_COMPARISON.md).
+The original non-loop AObj interprets that endpoint before stopping. At that
+terminal the original passes an uninitialized stack word to the visibility
+callback, exactly like the documented FD terminal single-CON case. The host now
+defines the terminal single-datum output as the authored last value: each
+interpolation type's own zero-duration path emits `p1`, so the branch keeps its
+authored visibility (zero hides the branch) without changing parser state or
+flags. The retained reducer drives Donkey Pass motion 244 on the Battlefield
+upper platform through the endpoint; it previously aborted at frame 25 with
+`interpolation=0 op=3 state=2 length=3 offset=3 term=0 p1=0` and now completes
+all five costumes with pause and repeated teardown. StopCeil shares the same
+stream shape and is covered by the focused terminal test. The existing
+terminal-CON compatibility deviation remains documented in [original
+comparison](ORIGINAL_COMPARISON.md). An independent original-consumer capture
+of Donkey Pass is still the open confirmation item tracked by issue #50.
 
 The neutral costume's texture-animation table contains C8 and CMPR images
 with synchronized TIMG/TCLT tracks. The original TObj renderer consumes a

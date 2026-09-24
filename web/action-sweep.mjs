@@ -216,6 +216,36 @@ const koopa=[
   koopaAir('Bowser Bomb (air)',[[362,362],[363,363]],0,-80),
 ];
 
+// Mewtwo's Shadow Ball charges through its source Start/Loop motions and
+// releases from a fresh B edge; the shield cancel and full-charge release are
+// separate recipes. These are entry/release paths, not hit-interaction
+// coverage.
+// Mewtwo's authored Turn motion outlasts the shared walk windows, so both
+// walk directions need longer holds before the Walk states appear. No source
+// timing or state is changed by the diagnostic recipe.
+const mewtwoCommon=common.map(row=>row.name==='walk left/right' ?
+  {...row,inputs:[input(60,0,-30),input(8),input(60,0,30),input(60)]}:row);
+
+const mewtwo=[
+  ground('Shadow Ball partial charge/release',[[341,341],[342,342],[345,345]],
+    input(1,PAD.B),input(45),input(1,PAD.B),input(240)),
+  ground('Shadow Ball full charge/release',[[341,341],[342,342],[343,343],[345,345]],
+    input(1,PAD.B),input(300),input(1,PAD.B),input(240)),
+  {name:'Shadow Ball charge cancel',expect:[[341,341],[342,342],[344,344]],settle:true,
+    inputs:[input(1,PAD.B),input(45),input(1,PAD.L,0,0,0,0,255),input(240)]},
+  {name:'Shadow Ball (air)',expect:[[346,346],[347,347],[350,350]],settle:true,
+    // A held X through the three-tick jump squat takes the full hop; the
+    // short hop ends before the source Start/Loop charge gate completes.
+    inputs:[input(10,PAD.X),input(4),input(1,PAD.B),input(20),input(1,PAD.B),input(240)]},
+  ground('Confusion',[[351,351]],input(1,PAD.B,80),input(180)),
+  aerialSpecial('Confusion (air)',[[352,352]],80),
+  ground('Teleport',[[353,353]],input(1,PAD.B,0,80),input(240)),
+  {name:'Teleport (air)',expect:[[356,356]],settle:true,
+    inputs:[input(2,PAD.X),input(4),input(1,PAD.B,0,80),input(240)]},
+  ground('Disable',[[359,359]],input(1,PAD.B,0,-80),input(180)),
+  aerialSpecial('Disable (air)',[[360,360]],0,-80),
+];
+
 export const actionInventories=new Map([
  [18,{id:'marth-visible-actions-v1',fighter:'Marth',minimumStageFrames:4200,cases:[...common,...wavedashes,...marth]}],
  [21,{id:'dr-mario-visible-actions-v1',fighter:'Dr. Mario',minimumStageFrames:4800,cases:[...common,...wavedashes,...drMario]}],
@@ -230,6 +260,7 @@ export const actionInventories=new Map([
  [15,{id:'jigglypuff-visible-actions-v1',fighter:'Jigglypuff',minimumStageFrames:6400,cases:[...common,...purin]}],
  [3,{id:'donkey-kong-visible-actions-v1',fighter:'Donkey Kong',minimumStageFrames:7000,cases:[...common,...donkey]}],
  [5,{id:'bowser-visible-actions-v1',fighter:'Bowser',minimumStageFrames:5600,cases:[...koopaCommon,...koopa]}],
+ [16,{id:'mewtwo-visible-actions-v1',fighter:'Mewtwo',minimumStageFrames:6400,cases:[...mewtwoCommon,...mewtwo]}],
 ]);
 
 export function actionInventory(fighterKind){return actionInventories.get(fighterKind)||null;}

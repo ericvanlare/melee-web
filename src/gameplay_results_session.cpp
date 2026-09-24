@@ -52,8 +52,29 @@ const VictoryMusic* victory_music(int ckind)
         return &music;
     }
     case CKIND_LINK:
-    case CKIND_CLINK: {
+    case CKIND_CLINK:
+    case CKIND_GANON: {
         static constexpr VictoryMusic music{0x15, "/audio/ff_link.hps"};
+        return &music;
+    }
+    case CKIND_CAPTAIN: {
+        static constexpr VictoryMusic music{0x11, "/audio/ff_fzero.hps"};
+        return &music;
+    }
+    case CKIND_DONKEY: {
+        static constexpr VictoryMusic music{0x0d, "/audio/ff_dk.hps"};
+        return &music;
+    }
+    case CKIND_KOOPA:
+    case CKIND_LUIGI: {
+        static constexpr VictoryMusic music{0x16, "/audio/ff_mario.hps"};
+        return &music;
+    }
+    case CKIND_MEWTWO:
+    case CKIND_PIKACHU:
+    case CKIND_PICHU:
+    case CKIND_PURIN: {
+        static constexpr VictoryMusic music{0x18, "/audio/ff_poke.hps"};
         return &music;
     }
     default: return nullptr;
