@@ -173,6 +173,21 @@ def _write_raw(path: Path, rows: list[dict]) -> None:
     path.write_bytes(output)
 
 
+class _RepeatedFrames:
+    """Bounded lazy sequence for exercising the v8 transport ceiling."""
+
+    def __init__(self, frame: dict, count: int):
+        self.frame = frame
+        self.count = count
+
+    def __len__(self):
+        return self.count
+
+    def __iter__(self):
+        for _ in range(self.count):
+            yield self.frame
+
+
 class WholeSessionReplayTests(unittest.TestCase):
     def test_normalizes_source_consumed_inputs_and_encodes_v8_context(self):
         capture = replay.capture_from_records(_candidate())
@@ -230,6 +245,32 @@ class WholeSessionReplayTests(unittest.TestCase):
         payload, transport = replay.encode_v8(capture)
         self.assertTrue(payload)
         self.assertEqual(transport["version"], 8)
+
+    def test_v8_accepts_three_legacy_budgets_with_bounded_transport_size(self):
+        capture = replay.capture_from_records(_candidate())
+        first = capture["frames"][0]
+        count = replay.V8_MAX_FRAMES
+        capture["frames"] = _RepeatedFrames(first, count)
+        capture["spans"] = [{"scene": replay.SCENES["css"], "first_frame": 0,
+                              "last_frame": count - 1}]
+        payload, transport = replay.encode_v8(capture)
+        self.assertEqual(transport["frame_count"], count)
+        self.assertEqual(len(payload), 4775526)
+        self.assertEqual(replay.LEGACY_MAX_FRAMES, 36000)
+
+    def test_v8_rejects_frames_above_its_bounded_cap(self):
+        capture = replay.capture_from_records(_candidate())
+        capture["frames"] = _RepeatedFrames(capture["frames"][0],
+                                             replay.V8_MAX_FRAMES + 1)
+        with self.assertRaisesRegex(replay.WholeSessionReplayError, "108000"):
+            replay.encode_v8(capture)
+
+    def test_v8_rejects_span_index_outside_input_timeline(self):
+        capture = replay.capture_from_records(_candidate())
+        capture["spans"][0]["last_frame"] = len(capture["frames"])
+        with self.assertRaisesRegex(replay.WholeSessionReplayError,
+                                    "span last_frame"):
+            replay.encode_v8(capture)
 
     def test_rejects_missing_source_consumption(self):
         rows = _candidate()

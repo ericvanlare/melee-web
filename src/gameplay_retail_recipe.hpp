@@ -97,10 +97,20 @@ constexpr size_t kRetailReplayContextBytes = kRetailReplayGameRulesBytes +
     kRetailReplayKoCountsBytes;
 constexpr size_t kRetailReplayMaxSpans = 32;
 constexpr size_t kRetailReplaySpanBytes = 12;
-constexpr size_t kRetailReplayMaxBytes = 16 + 4 + 8 + 36000 * 9 + 0x138 +
-    kRetailReplayContextHeaderBytes + kRetailReplayContextBytes +
-    MELEE_WEB_PAD_STATE_BYTES + 36000 * 44 + 2 +
+constexpr uint32_t kRetailReplayLegacyMaxFrames = 36000;
+constexpr uint32_t kRetailReplayWholeSessionMaxFrames = 108000;
+constexpr size_t kRetailReplayLegacyMaxBytes = 20 + 8 +
+    kRetailReplayLegacyMaxFrames * 9 + 0x138 + MELEE_WEB_PAD_STATE_BYTES +
+    kRetailReplayLegacyMaxFrames * 44;
+constexpr size_t kRetailReplayWholeSessionMaxBytes = 16 + 4 +
+    kRetailReplayContextHeaderBytes + kRetailReplayContextBytes + 0x138 +
+    MELEE_WEB_PAD_STATE_BYTES + kRetailReplayWholeSessionMaxFrames * 44 + 2 +
     kRetailReplayMaxSpans * kRetailReplaySpanBytes;
+// The browser must admit the largest supported format before the native
+// reader applies its version-specific frame and exact-size checks.
+constexpr size_t kRetailReplayMaxBytes =
+    kRetailReplayWholeSessionMaxBytes > kRetailReplayLegacyMaxBytes
+        ? kRetailReplayWholeSessionMaxBytes : kRetailReplayLegacyMaxBytes;
 RetailReplayRecipe read_retail_replay(std::span<const uint8_t>);
 
 // Diagnostic JSON output; callers must disable this instrumentation for timing

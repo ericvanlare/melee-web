@@ -43,7 +43,13 @@ PAD_STATE_BYTES = 822
 PAD_SEMANTIC_SIZE = 11
 PORT_COUNT = 4
 FRAME_INPUT_SIZE = PORT_COUNT * PAD_SEMANTIC_SIZE
-MAX_FRAMES = 36000
+# Legacy MWRC readers and producers remain capped at one ten-minute source
+# budget.  Whole-session v8 carries three such budgets in one bounded
+# workload, while keeping its cap explicit so callers cannot accidentally
+# widen an older format.
+LEGACY_MAX_FRAMES = 36000
+V8_MAX_FRAMES = 108000
+MAX_FRAMES = V8_MAX_FRAMES
 MAX_SPANS = 32
 HEADER = struct.Struct(">4sIIIHH")
 CONTEXT_HEADER = struct.Struct(">HHI")
@@ -487,8 +493,8 @@ def _timeline(
         _fail("whole-session stream did not return to CSS after its final match")
     if not frames:
         _fail("whole-session stream contains no source-consumed PAD samples")
-    if len(frames) > MAX_FRAMES:
-        _fail(f"source-consumed PAD sample count exceeds {MAX_FRAMES}")
+    if len(frames) > V8_MAX_FRAMES:
+        _fail(f"source-consumed PAD sample count exceeds {V8_MAX_FRAMES}")
     if not 1 <= len(spans) <= MAX_SPANS:
         _fail(f"whole-session span count must be between 1 and {MAX_SPANS}")
     next_frame = 0
@@ -585,8 +591,8 @@ def encode_v8(capture: Mapping[str, Any]) -> tuple[bytes, dict[str, Any]]:
     """Encode one checked normalized capture as MWRC v8."""
     frames = capture["frames"]
     spans = capture["spans"]
-    if not 1 <= len(frames) <= MAX_FRAMES:
-        _fail(f"frame count must be between 1 and {MAX_FRAMES}")
+    if not 1 <= len(frames) <= V8_MAX_FRAMES:
+        _fail(f"frame count must be between 1 and {V8_MAX_FRAMES}")
     if not 1 <= len(spans) <= MAX_SPANS:
         _fail(f"span count must be between 1 and {MAX_SPANS}")
     setup = _hex_bytes(capture["setup_hex"], GAME_INFO_SIZE, "source setup")

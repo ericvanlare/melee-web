@@ -66,6 +66,8 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
     result.version = input.u32();
     check(result.version >= 1 && result.version <= kRetailReplayVersion,
           "Unsupported reference input version");
+    const auto max_frames = result.version == 8
+        ? kRetailReplayWholeSessionMaxFrames : kRetailReplayLegacyMaxFrames;
     /* Version 7 was emitted by the provisional producer before the runtime
      * could install the source's first-CSS context.  Accepting its bytes and
      * silently entering CSS would make the declared PAD/RNG context inert, so
@@ -91,13 +93,14 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
         clock.next_pad = input.u64(); clock.first_vi_poll = input.u64();
         clock.startup_draws = input.u32();
         check(input.u32() == 0, "Unsupported clock context flags");
-        check(count && count <= 36000, "Reference input frame count is outside its bounds");
+        check(count && count <= max_frames,
+              "Reference input frame count is outside its bounds");
         result.draw_boundaries = clock.boundaries(count);
     }
     if (result.version == 6) {
         const auto batches = input.u32();
         check(input.u32() == 0, "Unsupported recorded input-queue flags");
-        check(count && count <= 36000 && batches && batches <= count,
+        check(count && count <= max_frames && batches && batches <= count,
               "Invalid recorded input-queue size");
         clock_bytes = 8 + size_t(batches) * 9;
         check(bytes.size() == 20 + clock_bytes + 0x138 + MELEE_WEB_PAD_STATE_BYTES + size_t(count) * 44,
@@ -132,10 +135,10 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
     if (result.version == 8)
         // The whole-session span table follows the frames; its own length is
         // validated once the table has been read.
-        check(count && count <= 36000 && bytes.size() >= envelope_bytes + 2,
+        check(count && count <= max_frames && bytes.size() >= envelope_bytes + 2,
               "Whole-session input size disagrees with its transport");
     else
-        check(count && count <= 36000 && bytes.size() == envelope_bytes,
+        check(count && count <= max_frames && bytes.size() == envelope_bytes,
               "Reference input frame count disagrees with its size");
     for (auto& byte : result.setup) byte = input.u8();
     char error[256]{};
@@ -194,6 +197,8 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
             span.last_frame = input.u32();
             check(span.scene >= kRetailReplayCss && span.scene <= kRetailReplayPrize,
                   "Whole-session span scene is not an admitted scene");
+            check(span.first_frame < count && span.last_frame < count,
+                  "Whole-session span frame index is outside its bounds");
             check(span.first_frame == next_frame && span.last_frame >= span.first_frame,
                   "Whole-session spans must be ordered and contiguous");
             next_frame = span.last_frame + 1;

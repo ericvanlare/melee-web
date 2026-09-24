@@ -198,7 +198,11 @@ $('retail-replay-start').onclick=async()=>{
  replayLoading=true;$('retail-replay-start').disabled=$('disc').disabled=$('launch').disabled=true;
  try{
   if(window.meleeHitchCaptureLoading)await window.meleeHitchCaptureLoading;if(window.meleeHitchCaptureLoadError&&hitchCaptureFromUrl)throw Error(`Hitch capture unavailable: ${window.meleeHitchCaptureLoadError}`);
-  const file=$('retail-replay-file').files[0];if(!file||file.size<328||file.size>1909162)throw Error('Invalid bounded MWRC input recipe');
+  // Native parsing applies the legacy 36,000-frame limit and the v8
+  // whole-session 108,000-frame limit after reading the version. This upload
+  // bound admits the largest checked v8 envelope without widening legacy
+  // formats or allowing an unbounded allocation.
+  const file=$('retail-replay-file').files[0];if(!file||file.size<328||file.size>4775526)throw Error('Invalid bounded MWRC input recipe');
   const bytes=new Uint8Array(await file.arrayBuffer()),hash=await replayHash(bytes),observe=$('retail-replay-mode').value==='state';
   if(!await unloadAndSave())throw Error(status());resetTiming(false);await prepareAudio();await pauseAudioForPreparation();
   for(const old of $('retail-replay-downloads').querySelectorAll('a'))URL.revokeObjectURL(old.href);$('retail-replay-downloads').replaceChildren();replayEvidence=[];$('save-replay-evidence').disabled=true;
