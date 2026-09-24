@@ -1,0 +1,52 @@
+{
+  "schema": "melee-web-results-ness-peach-validation",
+  "version": 1,
+  "source_base_commit": "adae193",
+  "scope": "Native source Results lifecycle and authored archive validation for Ness and Peach after merging the reviewed Results pipeline and enabled-roster harness. This receipt does not establish original-game equivalence, rendered pixels, PCM, performance, or four-CPU level-9 acceptance.",
+  "fixture_source": "Owned GALE01 revision 2 disc with the PR56 source-owned Results fixture for the existing enabled roster; extracted inputs remain under ignored assets-local directories.",
+  "focused_checks": [
+    {
+      "command": "node build/browser-release/gameplay_results_assets_test.js assets-local/pr61-results",
+      "local_path": "work/testlogs/pr61-results-assets-20260924.log",
+      "sha256": "280f1f474fded9f7fa8029da43de41bcbf0ddd26c1fc2a3a077d4c1db6c87bc0",
+      "result": "pass",
+      "scope": "91 authored Results clips across Mario, Dr. Mario, Fox, Falco, Marth, Roy, Link, Young Link, Ness, and Peach"
+    },
+    {
+      "command": "node build/browser-release/gameplay_results_scene_trace.js --real-enabled assets-local/pr61-results ../pr56/assets-local/results-fixtures assets-local/pr61-results",
+      "local_path": "work/testlogs/pr61-results-enabled-20260924.log",
+      "sha256": "e486715aee82f7a9d5ef7fdf9fcd0de3470524cf4c2e1ff772a54bd092332074",
+      "result": "pass",
+      "scope": "38 enabled-roster Results constructions across 19 fighters and both winner orientations"
+    },
+    {
+      "command": "node build/browser-release/gameplay_results_scene_trace.js --real-enabled-confirm assets-local/pr61-results ../pr56/assets-local/results-fixtures assets-local/pr61-results",
+      "local_path": "work/testlogs/pr61-results-enabled-confirm-20260924.log",
+      "sha256": "8acf0acf7737ff39be43341fdeabb9ee08434cbf1631b1e8a61983060d48f740",
+      "result": "pass",
+      "scope": "38 enabled-roster Results confirmations, source audio checks, and teardown checks across 19 fighters and both winner orientations"
+    },
+    {
+      "command": ".venv/bin/python -m unittest tests.test_gameplay_fighter_assets.GameplayFighterAssetsTests.test_scoped_constructor_storage_lifetime -v",
+      "result": "pass",
+      "scope": "Owning Script construction, source publication, independent teardown, and restart"
+    },
+    {
+      "command": "python3 menu key parser over src/gameplay_menu_browser.cpp",
+      "result": "pass",
+      "scope": "239 authored menu keys with mewtwo.ssm followed by PlNs.dat"
+    }
+  ],
+  "native_fighter_traces": {
+    "result": "pass",
+    "scope": "Ness and Peach content traces in both player orientations against Mario; each reached source intro, costume, stage lifecycle, combat, pause, and repeat teardown",
+    "logs": [
+      "work/pr61-native-v2/ness-p1-mario-p2.log",
+      "work/pr61-native-v2/ness-p2-mario-p1.log",
+      "work/pr61-native-v2/peach-p1-mario-p2.log",
+      "work/pr61-native-v2/peach-p2-mario-p1.log"
+    ]
+  },
+  "browser_scope": "The existing headless smoke and action evidence reaches original CSS to SSS to match for Ness, Peach, and Young Link. The broad action sweep closed before a complete report, and the targeted Peach action probe stalled; no complete move or original-equivalence claim is made.",
+  "deployed": false
+}

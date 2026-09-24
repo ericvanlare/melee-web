@@ -1,7 +1,7 @@
 # Ness development checkpoint
 
 Ness is integrated as a development candidate on
-`codex/enable-ness-peach-yl`, with current `origin/main` (`842457a`) merged
+`codex/enable-ness-peach-yl`, with current `origin/main` (`bbfd9f0`) merged
 locally before validation. This
 checkpoint preserves the original `CKIND_NESS` (0x0B) / `FTKIND_NESS` (8)
 identity, four costumes and authored source callbacks. It is **not**
@@ -15,7 +15,8 @@ change.
 | 2. Source contract | Passed | `work/NessPrep/ness_source_contract.md` (byte-level, parser-backed); re-verified during implementation |
 | 3. Real construction | **Passed** | `work/pr61-native-v2/ness-p1-mario-p2.log` and `ness-p2-mario-p1.log`: Release `gameplay_content_match_trace`, stage kind 32, both orientations exit 0 after the decoder ownership/stack repair — data/article/effect-bank construction, PK Flash ground+aerial charge/fire lifetimes, PK Fire ground+air lifetimes, Yo-Yo smash, all four costumes, combat, pause and repeat teardown ("Mixed source content intro, costumes, stage lifecycle, combat, pause and repeat teardown passed") |
 | 4. First advancing browser frames | **Partial** | Owned browser harness reached original CSS → SSS → match for Ness, Peach and Young Link; the headed Ness targeted receipt observed PK Fire and PK Thunder source motions. The broad action sweep closed its renderer before producing a complete report, so this is not a complete move or original-equivalence gate. |
-| Integration (build + suite) | **Passed for this batch** | Release runtime and content trace rebuilt after the decoder repair; focused fighter-asset, manifest and launch tests pass (one stage-asset test is skipped when its local asset is absent); runtime disc checks pass. |
+| Results lifecycle | **Passed** | `docs/evidence/results-pr61-ness-peach-v1.json`: authored Ness Results clips plus 38 enabled-roster constructions/confirmations and teardown checks. |
+| Integration (build + suite) | **Passed for this batch** | Release runtime and Results targets rebuilt after the decoder repair; focused fighter-asset, Results, manifest and launch tests pass (one stage-asset test is skipped when its local asset is absent); runtime disc checks pass. |
 | Comparison / pixels / PCM / performance | Not run | Separate gates, untouched |
 
 ## Source data and shared boundaries
