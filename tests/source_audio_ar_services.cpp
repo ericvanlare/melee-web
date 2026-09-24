@@ -442,6 +442,10 @@ UnsupportedRegisterBank melee_web_audio_ar_pi_regs;
 #undef __OSUnmaskInterrupts
 #undef OSPhysicalToCached
 #undef __cntlzw
+#undef __MEMRegs
+#undef __AIRegs
+#undef __EXIRegs
+#undef __PIRegs
 #define __OSUnmaskInterrupts melee_web_source_os_unmask
 #define OSPhysicalToCached(address) melee_web_audio_ar_physical_cached(address)
 #define __cntlzw(value) melee_web_audio_ar_cntlzw(value)
