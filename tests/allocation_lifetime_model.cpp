@@ -4,6 +4,7 @@
 #include "source_game_heap_context.hpp"
 
 #include <algorithm>
+#include <iterator>
 
 namespace {
 namespace game_heap = melee_web::source_game_heap;
@@ -14,6 +15,14 @@ struct LifetimeModel : Model {
     std::vector<game_heap::Descriptor> descriptors;
     std::map<std::uint32_t, Address> pool_descriptors;
     std::map<std::string, Address> references;
+    std::map<std::string, std::uint32_t> reference_heaps;
+    std::map<std::string, std::uint32_t> reference_pools;
+    struct PoolBacking {
+        std::uint32_t heap;
+        Address base;
+        std::uint64_t bytes;
+    };
+    std::map<std::uint32_t, std::vector<PoolBacking>> pool_backings;
     Registry registry;
     std::map<std::uint32_t, std::pair<std::uint32_t, std::uint32_t>> inactive_heads;
     std::uint32_t os_limit = 0, descriptor_base = 0;
@@ -128,6 +137,27 @@ struct LifetimeModel : Model {
         inactive_heads[id] = {state.free.empty() ? 0 : state.free.front().start.value(),
                               state.allocated.empty() ? 0 : state.allocated.front().start.value()};
         target.clear();
+        for (auto it = reference_heaps.begin(); it != reference_heaps.end();) {
+            if (it->second == id) {
+                references.erase(it->first);
+                // A pool object can retain the same backing heap identity as
+                // its allocation.  Retire the pool ownership together with
+                // the heap reference; looking the heap up after this loop
+                // would miss it because reference_heaps is already erased.
+                reference_pools.erase(it->first);
+                it = reference_heaps.erase(it);
+            } else {
+                ++it;
+            }
+        }
+        for (auto it = pool_backings.begin(); it != pool_backings.end();) {
+            auto& backings = it->second;
+            backings.erase(std::remove_if(backings.begin(), backings.end(),
+                [id](const PoolBacking& backing) { return backing.heap == id; }),
+                backings.end());
+            if (backings.empty()) it = pool_backings.erase(it);
+            else ++it;
+        }
     }
 
     void emit_handle_words(HandleAddress identity)
@@ -156,6 +186,17 @@ struct LifetimeModel : Model {
                       << ",\"payload\":" << it->second.value() << '}';
             handle_labels.erase(it->first);
             it = payload_labels.erase(it);
+        }
+        // A destroyed source handle may have had no payloads, so the payload
+        // walk above would otherwise leave its diagnostic labels alive for
+        // the rest of a long replay.  Labels are provenance only; once the
+        // source descriptor is retired, retaining them would both consume
+        // memory and make stale identities look usable.
+        for (auto it = handle_labels.begin(); it != handle_labels.end();) {
+            const auto found = std::find_if(active.begin(), active.end(),
+                [&](const auto& item) { return item.identity == it->second; });
+            if (found == active.end()) it = handle_labels.erase(it);
+            else ++it;
         }
         std::cout << ']';
     }
@@ -297,13 +338,22 @@ struct LifetimeModel : Model {
         if (op == "raw_alloc") {
             const auto id = number(field(line, "heap"));
             const auto result = heap(id).allocate(number(field(line, "requested")));
-            if (result.status == Status::ok) references[field(line, "label")] = result.address;
+            if (result.status == Status::ok) {
+                const auto label = field(line, "label");
+                references[label] = result.address;
+                reference_heaps[label] = id;
+            }
             emit_begin(op, status_name(result.status).c_str());
             std::cout << ",\"address\":" << result.address.value();
             emit_os(); std::cout << "}\n"; return;
         }
         if (op == "raw_free") {
-            const auto status = heap(number(field(line, "heap"))).release(reference(field(line, "label")));
+            const auto label = field(line, "label");
+            const auto status = heap(number(field(line, "heap"))).release(reference(label));
+            if (status == Status::ok) {
+                references.erase(label);
+                reference_heaps.erase(label);
+            }
             emit_begin(op, status_name(status).c_str()); emit_os(); std::cout << "}\n"; return;
         }
         if (op == "pool_reset") {
@@ -312,8 +362,20 @@ struct LifetimeModel : Model {
             auto& target = pools[id];
             if (!target) target = std::make_unique<ObjectPool>(heap(static_cast<std::uint32_t>(hsd_selected)));
             const auto status = target->reset(number(field(line, "size")), number(field(line, "align")));
-            if (status == Status::ok)
+            if (status == Status::ok) {
+                pool_heaps[id] = static_cast<std::uint32_t>(hsd_selected);
+                pool_backings.erase(id);
+                for (auto it = reference_pools.begin(); it != reference_pools.end();) {
+                    if (it->second == id) {
+                        references.erase(it->first);
+                        reference_heaps.erase(it->first);
+                        it = reference_pools.erase(it);
+                    } else {
+                        ++it;
+                    }
+                }
                 require(registry.initialize(pool_descriptors.at(id)) == Status::ok, "source pool registry reset failed");
+            }
             emit_begin(op, status_name(status).c_str());
             if (status == Status::ok) emit_pool(id);
             std::cout << "}\n"; return;
@@ -329,8 +391,13 @@ struct LifetimeModel : Model {
             const auto id = number(field(line, "pool"));
             const auto count = number(field(line, "count"));
             const auto backing = reference(field(line, "label"));
-            const auto status = pool(id).adopt_backing(heap(number(field(line, "heap"))), backing, count);
-            if (status == Status::ok) object_remain -= pool(id).state().size * count;
+            const auto backing_heap = number(field(line, "heap"));
+            const auto status = pool(id).adopt_backing(heap(backing_heap), backing, count);
+            if (status == Status::ok) {
+                object_remain -= pool(id).state().size * count;
+                pool_backings[id].push_back({backing_heap, backing,
+                    std::uint64_t(pool(id).state().size) * count});
+            }
             emit_begin(op, status_name(status).c_str());
             std::cout << ",\"result\":" << (status == Status::ok ? count : 0);
             if (status == Status::ok) emit_pool(id);
@@ -339,14 +406,46 @@ struct LifetimeModel : Model {
         if (op == "pool_pop") {
             const auto id = number(field(line, "pool"));
             const auto result = pool(id).allocate_existing();
-            if (result.status == Status::ok) references[field(line, "label")] = result.address;
+            std::uint32_t backing_heap = 0;
+            if (result.status == Status::ok) {
+                const auto label = field(line, "label");
+                const auto& backings = pool_backings[id];
+                const auto found = std::find_if(backings.begin(), backings.end(),
+                    [&](const PoolBacking& backing) {
+                        const auto address = std::uint64_t(result.address.value());
+                        return address >= backing.base.value() &&
+                               address < std::uint64_t(backing.base.value()) + backing.bytes;
+                    });
+                const auto second = found == backings.end() ? found :
+                    std::find_if(std::next(found), backings.end(),
+                        [&](const PoolBacking& backing) {
+                            const auto address = std::uint64_t(result.address.value());
+                            return address >= backing.base.value() &&
+                                   address < std::uint64_t(backing.base.value()) + backing.bytes;
+                        });
+                require(found != backings.end() && second == backings.end(),
+                        "pool object lacks a unique derived backing heap");
+                backing_heap = found->heap;
+                references[label] = result.address;
+                reference_heaps[label] = found->heap;
+                reference_pools[label] = id;
+            }
             emit_begin(op, status_name(result.status).c_str());
             std::cout << ",\"address\":" << result.address.value();
+            if (result.status == Status::ok) {
+                std::cout << ",\"backing_heap\":" << backing_heap;
+            }
             emit_pool(id); std::cout << "}\n"; return;
         }
         if (op == "pool_release") {
             const auto id = number(field(line, "pool"));
-            const auto status = pool(id).release(reference(field(line, "label")));
+            const auto label = field(line, "label");
+            const auto status = pool(id).release(reference(label));
+            if (status == Status::ok) {
+                references.erase(label);
+                reference_heaps.erase(label);
+                reference_pools.erase(label);
+            }
             emit_begin(op, status_name(status).c_str()); emit_pool(id); std::cout << "}\n"; return;
         }
         if (op == "game_init") {
@@ -470,10 +569,21 @@ struct LifetimeModel : Model {
             require(owner.status == game_heap::HeapStatus::create && owner.type != 0,
                     "game heap is not a created handle owner");
             if (op == "game_handle_free") {
-                const auto address = payload(field(line, "label"));
+                const auto label = field(line, "label");
+                const auto address = payload(label);
                 const auto status = handles.free_payload(HandleAddress(owner.handle.value()), address);
                 emit_begin(op, handle_status_name(status));
-                if (status == HandleStatus::ok) emit_retired_payloads();
+                if (status == HandleStatus::ok) {
+                    emit_retired_payloads();
+                    // A payload label and its handle label describe the same
+                    // allocation result.  Both become stale after the source
+                    // free, while the owning handle itself remains active.
+                    // emit_retired_payloads normally removes these because
+                    // the allocation descriptor is inactive; erase again so
+                    // this stays safe if that diagnostic list is narrowed.
+                    payload_labels.erase(label);
+                    handle_labels.erase(label);
+                }
                 std::cout << ",\"owner\":" << owner.handle.value()
                           << ",\"payload\":" << address.value() << "}\n";
                 return;

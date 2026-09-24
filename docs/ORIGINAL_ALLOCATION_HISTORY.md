@@ -79,6 +79,15 @@ DevCom completion. Generations reject stale callbacks and unfinished teardown.
 The model moves identities, not payload bytes, and does not implement transport
 scheduling or validate copied contents.
 
+Profile version 3 adds `ftDemo_ObjAllocInit` and `ftDemo_CreateFighter`.
+Results initializes and constructs demo fighters through these original wrappers,
+which share the fighter pool with VS gameplay. Replay tracks their pool generation
+and independently joins each derived Fighter and GObj allocation. Demo owners do
+not increment VS lifecycle counts. A fighter-pool reset or allocation without its
+explicit source wrapper remains unsupported. Version-2 profiles retain their exact
+original function inventory for replay input validation; only v3 profiles can render
+the current observer header.
+
 Diagnostic replay compares manager fields at entry and return, including nested
 callbacks. The original manager retains its copy fields after completion and
 clears only its active size; a nested no-op compaction may replace the global
@@ -244,6 +253,21 @@ stack or handle global inconsistent with the static source layout. Numeric roots
 remain available only for explicitly synthetic tests. A successful prefix report
 always has `complete: false`; `--require-complete` fails for this bounded model.
 
+For long captures, accept the original `.jsonl.gz` directly and add
+`--artifact-dir "$WORK/allocation-replay"` with a fresh output directory. Large
+input streams use a temporary compressed SQLite index. Artifact mode retains
+every model command, output and derived identity in indexed JSONL files instead
+of keeping the entire history in memory or embedding it in the summary report.
+The report links those files with counts and hashes; its canonical sequence
+hashes use the same representation as the in-memory path. Checked Wasm consumes
+the retained commands and compares every output in order. Preserve the artifact
+directory alongside the report.
+
+The trace index reserves 2 GiB of free disk space and has an 8 GiB database
+budget. Each replay spool has a 4 GiB budget, and the checked-model subprocess
+has explicit storage and time bounds. Exhausting a bound is an incomplete
+diagnostic with a retained failure, never a reason to drop comparison fields.
+
 ## Model and test boundaries
 
 The OS heap/HSD pool component now supports explicit descriptor resets, registry
@@ -334,6 +358,44 @@ and hashes. Its comments bind the original DOL, pinned source and symbol input.
 The reference build archives the generator and profile recipe alongside the
 header, patch series and hash-bound build receipt. None of this metadata is a
 runtime source-address provider.
+
+### Repeated-VS ownership diagnostic controls
+
+The passive observer keeps its default first-VS-entry boundary unless the
+following opt-in variables are set alongside the existing verified `MWRC_ENABLE=1`
+launch contract:
+
+```sh
+export MWRC_ALLOCATION_OUTPUT="$WORK/allocations.jsonl.gz"
+export MWRC_ALLOCATION_VS_TARGET=2
+export MWRC_ALLOCATION_STOP_AT=entry
+export MWRC_ALLOCATION_MAX_EVENTS=100000000
+```
+
+`MWRC_ALLOCATION_VS_TARGET` accepts 1 through 16. `MWRC_ALLOCATION_STOP_AT`
+accepts `entry` or `exit`; target 2 at `entry` records the first VS exit and
+second VS entry, while target 3 at `exit` requires three observed VS exits before
+the ownership-complete status is reported. `MWRC_ALLOCATION_MAX_EVENTS` accepts
+1 through 100,000,000 and defaults to 2,000,000. The bound counts every emitted
+queued JSONL record, including the header. Error and terminal records remain
+writable after the budget is exhausted; invalid values fail before the observer
+arms.
+
+A path ending in `.gz` enables the observer's lossless gzip stream. Existing
+writer flushes use gzip synchronization points so a consumer can inspect a
+growing stream, and final acceptance still requires the terminal `end` record,
+the captured status, and a valid gzip end-of-file. A path without that suffix
+retains the ordinary uncompressed JSONL format. Preserve all records and
+metadata when projecting or transporting the stream; compression does not
+permit dropping machine, lifecycle, or ownership fields.
+
+This is a read-only original allocation diagnostic. It observes source-owned
+boundaries and does not provide captured pointers, heap addresses, or history to
+the browser allocator, and it does not replace the MWRC whole-session PAD
+producer or replay consumer. Until a new repeated-ownership capture is retained,
+the [existing first-VS allocation receipt](evidence/original-allocation-compaction-v1.json)
+is the applicable evidence boundary; it does not claim repeated-VS ownership,
+browser-provider correctness, or full-session equivalence.
 
 ## First VS initialization capture
 

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import gzip
 import json
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -11,6 +13,8 @@ import unittest
 from tools.generate_reference_allocation_profile import (
     FUNCTIONS,
     GLOBALS,
+    LEGACY_FUNCTIONS,
+    LEGACY_PROFILE_VERSION,
     PROFILE_SCHEMA,
     PROFILE_VERSION,
     render_header,
@@ -84,7 +88,7 @@ using u32 = std::uint32_t;
 namespace {
 constexpr const char* kDol = "08e0bf20134dfcb260699671004527b2d6bb1a45";
 constexpr const char* kRevision = "b43912cc78606f96c9569f5d6229bc9d7e265ea5";
-constexpr std::array<const char*, 50> kNames = {{
+constexpr std::array<const char*, 52> kNames = {{
   "ARInit", "ARAlloc", "ARFree", "ARGetSize", "OSInitAlloc", "OSCreateHeap",
   "OSDestroyHeap", "OSSetCurrentHeap", "OSAllocFromHeap", "OSFreeToHeap",
   "OSSetArenaLo", "OSSetArenaHi", "OSAllocFromArenaLo", "OSAllocFromArenaHi",
@@ -97,7 +101,8 @@ constexpr std::array<const char*, 50> kNames = {{
   "lbMemory_8001529C", "lbMemory_800154D4", "lbMemory_800155A4",
   "Fighter_FirstInitialize_80067A84", "Fighter_Create", "gm_Scene_Vs_OnEnter",
   "gm_Scene_Vs_OnExit", "fn_80015184", "lbMemory_80015320", "lbDvd_80017A80",
-  "HSD_DevComARAMCallback", "HSD_DevComRequest"
+  "HSD_DevComARAMCallback", "HSD_DevComRequest", "ftDemo_CreateFighter",
+  "ftDemo_ObjAllocInit"
 }};
 constexpr std::array<const char*, 23> kGlobals = {{
   "HeapArray", "NumHeaps", "ArenaStart", "ArenaEnd", "__OSArenaLo", "__OSArenaHi",
@@ -107,18 +112,19 @@ constexpr std::array<const char*, 23> kGlobals = {{
   "__AR_Size", "__AR_StackPointer", "__AR_FreeBlocks", "__AR_BlockLength",
   "__AR_init_flag"
 }};
-constexpr std::array<u32, 50> kArgc = {{
+constexpr std::array<u32, 52> kArgc = {{
   2, 1, 1, 0, 3, 2, 1, 1, 2, 2, 1, 1, 2, 2, 0, 2, 1, 2, 1, 2, 3, 2, 1, 2, 2,
-  1, 1, 0, 2, 0, 2, 2, 3, 0, 2, 1, 2, 2, 3, 2, 0, 0, 1, 1, 1, 2, 4, 1, 1, 8
+  1, 1, 0, 2, 0, 2, 2, 3, 0, 2, 1, 2, 2, 3, 2, 0, 0, 1, 1, 1, 2, 4, 1, 1, 8,
+  1, 0
 }};
 
 struct Fixture {
   Core::System system;
   PowerPC::PowerPCState cpu;
-  std::array<FunctionIdentity, 50> functions{};
+  std::array<FunctionIdentity, 52> functions{};
   std::array<GlobalIdentity, 23> globals{};
-  std::array<u32, 50> returns{};
-  std::array<u32, 50> args{};
+  std::array<u32, 52> returns{};
+  std::array<u32, 52> args{};
   BoundProfile profile{};
 
   Fixture() {
@@ -162,6 +168,10 @@ int Run(std::string_view mode, const char* output) {
   Fixture fixture;
   if (mode == "range") {
     fixture.globals[0].address = 0x81800000u;
+    assert(!Observer::Arm(fixture.profile, output));
+    return 0;
+  }
+  if (mode == "invalid-config") {
     assert(!Observer::Arm(fixture.profile, output));
     return 0;
   }
@@ -334,6 +344,35 @@ int Run(std::string_view mode, const char* output) {
     assert(!Observer::Finish(false));
     return 0;
   }
+  if (mode == "demo-fighter") {
+    const u32 gobj = 0x8002c000u;
+    const u32 fighter = 0x8002d000u;
+    fixture.system.memory.Write(gobj + 0x2cu, fighter);
+    fixture.system.memory.Write(fighter + 0x4u, 7u);
+    fixture.system.memory.Write(fighter + 0xcu, 0x02000000u);
+    fixture.cpu.gpr[3] = 0x8002a000u;
+    fixture.cpu.pc = fixture.functions[50].address;
+    Observer::Observe(&fixture.system, fixture.cpu.pc, &fixture.cpu);
+    fixture.cpu.gpr[3] = gobj;
+    fixture.cpu.pc = fixture.returns[50];
+    Observer::Observe(&fixture.system, fixture.cpu.pc, &fixture.cpu);
+    fixture.cpu.pc = fixture.functions[51].address;
+    Observer::Observe(&fixture.system, fixture.cpu.pc, &fixture.cpu);
+    fixture.cpu.pc = fixture.returns[51];
+    Observer::Observe(&fixture.system, fixture.cpu.pc, &fixture.cpu);
+    assert(Observer::Finish(false));
+    return 0;
+  }
+  if (mode == "demo-fighter-invalid") {
+    fixture.cpu.pc = fixture.functions[50].address;
+    Observer::Observe(&fixture.system, fixture.cpu.pc, &fixture.cpu);
+    fixture.cpu.gpr[3] = 0xffffffffu;
+    fixture.cpu.pc = fixture.returns[50];
+    Observer::Observe(&fixture.system, fixture.cpu.pc, &fixture.cpu);
+    assert(Observer::Error().find("metadata escaped") != std::string::npos);
+    assert(!Observer::Finish(false));
+    return 0;
+  }
   const auto emit_burst_pair = [&](size_t index) {
     fixture.cpu.gpr[3] = 0x80020000u + static_cast<u32>(index * 4);
     fixture.cpu.pc = fixture.functions[0].address;
@@ -392,6 +431,73 @@ int Run(std::string_view mode, const char* output) {
     fixture.cpu.pc = fixture.returns[vs];
     Observer::Observe(&fixture.system, fixture.cpu.pc, &fixture.cpu);
     assert(Observer::Finish(true));
+    return 0;
+  }
+  const auto invoke_vs = [&](size_t index) {
+    fixture.cpu.pc = fixture.functions[index].address;
+    fixture.cpu.spr[8] = 0x8000beefu;
+    Observer::Observe(&fixture.system, fixture.cpu.pc, &fixture.cpu);
+    fixture.cpu.pc = fixture.returns[index];
+    Observer::Observe(&fixture.system, fixture.cpu.pc, &fixture.cpu);
+    assert(Observer::Error().empty());
+  };
+  if (mode == "vs-reentry") {
+    invoke_vs(43);
+    invoke_vs(44);
+    invoke_vs(43);
+    assert(Observer::Finish(false));
+    return 0;
+  }
+  if (mode == "vs-interrupted") {
+    invoke_vs(43);
+    invoke_vs(44);
+    assert(Observer::Finish(false));
+    return 0;
+  }
+  if (mode == "vs-three-exits") {
+    for (int generation = 0; generation < 3; ++generation) {
+      invoke_vs(43);
+      invoke_vs(44);
+    }
+    assert(Observer::Finish(false));
+    return 0;
+  }
+  if (mode == "vs-unmatched-exit") {
+    fixture.cpu.pc = fixture.functions[44].address;
+    Observer::Observe(&fixture.system, fixture.cpu.pc, &fixture.cpu);
+    assert(Observer::Error().find("no active source owner") != std::string::npos);
+    assert(!Observer::Finish(false));
+    return 0;
+  }
+  if (mode == "vs-reentrant-entry") {
+    fixture.cpu.pc = fixture.functions[43].address;
+    Observer::Observe(&fixture.system, fixture.cpu.pc, &fixture.cpu);
+    fixture.cpu.gpr[1] -= 4;
+    Observer::Observe(&fixture.system, fixture.cpu.pc, &fixture.cpu);
+    assert(Observer::Error().find("reentrant") != std::string::npos);
+    assert(!Observer::Finish(false));
+    return 0;
+  }
+  if (mode == "vs-duplicate-exit") {
+    invoke_vs(43);
+    invoke_vs(44);
+    fixture.cpu.pc = fixture.functions[44].address;
+    Observer::Observe(&fixture.system, fixture.cpu.pc, &fixture.cpu);
+    assert(Observer::Error().find("no active source owner") != std::string::npos);
+    assert(!Observer::Finish(false));
+    return 0;
+  }
+  if (mode == "vs-overlap-return") {
+    fixture.cpu.pc = fixture.functions[43].address;
+    Observer::Observe(&fixture.system, fixture.cpu.pc, &fixture.cpu);
+    fixture.system.memory.Write(0x800000e4u, 0x80000200u);
+    fixture.cpu.pc = fixture.functions[0].address;
+    Observer::Observe(&fixture.system, fixture.cpu.pc, &fixture.cpu);
+    fixture.system.memory.Write(0x800000e4u, 0x80000100u);
+    fixture.cpu.pc = fixture.returns[43];
+    Observer::Observe(&fixture.system, fixture.cpu.pc, &fixture.cpu);
+    assert(Observer::Error().find("other source calls active") != std::string::npos);
+    assert(!Observer::Finish(false));
     return 0;
   }
   return 2;
@@ -527,10 +633,20 @@ class ReferenceAllocationObserverTests(unittest.TestCase):
         profile = synthetic_profile()
         self.assertIs(validate_profile(profile), profile)
         rendered = render_header(profile, "a" * 64)
-        self.assertIn("std::array<FunctionIdentity, 50>", rendered)
+        self.assertIn("std::array<FunctionIdentity, 52>", rendered)
         self.assertIn("std::array<GlobalIdentity, 23>", rendered)
         self.assertIn("a" * 64, rendered)
         self.assertIn("0x12340000", rendered)
+
+    def test_profile_generator_keeps_version_two_inventory_replay_readable(self) -> None:
+        profile = synthetic_profile()
+        profile["version"] = LEGACY_PROFILE_VERSION
+        profile["functions"] = [function for function in profile["functions"]
+                                if function["name"] in LEGACY_FUNCTIONS]
+        self.assertEqual(len(profile["functions"]), 50)
+        self.assertIs(validate_profile(profile), profile)
+        with self.assertRaisesRegex(ValueError, "cannot render the current observer header"):
+            render_header(profile, "a" * 64)
 
     def test_profile_rejects_unpinned_body_or_return_shape(self) -> None:
         profile = synthetic_profile()
@@ -582,16 +698,45 @@ class ReferenceAllocationObserverTests(unittest.TestCase):
             built = subprocess.run(
                 [compiler, "-std=c++20", "-fno-exceptions", "-Wall", "-Wextra", "-Werror",
                  "-I", str(temp), "-I", str(ROOT / "reference-capture/dolphin/source"),
-                 str(OBSERVER), str(component), "-o", str(binary)],
+                 str(OBSERVER), str(component), "-lz", "-o", str(binary)],
                 capture_output=True, text=True, timeout=120,
             )
             self.assertEqual(built.returncode, 0, built.stderr)
+            def run_mode(mode: str, output_name: str | None = None,
+                         **environment: str) -> subprocess.CompletedProcess[str]:
+                env = os.environ.copy()
+                for key in ("MWRC_ALLOCATION_VS_TARGET", "MWRC_ALLOCATION_STOP_AT",
+                            "MWRC_ALLOCATION_MAX_EVENTS"):
+                    env.pop(key, None)
+                env.update(environment)
+                output = temp / (output_name or (mode + ".jsonl"))
+                return subprocess.run([str(binary), mode, str(output)],
+                                      capture_output=True, text=True, timeout=20, env=env)
+
             for mode in ("range", "wrong-instruction", "missing-return", "unmatched-return",
                          "null-state", "finish-race", "write-failure", "fighter-invalid",
-                         "paused-burst", "queue-overflow", "compaction-invalid"):
-                checked = subprocess.run([str(binary), mode, str(temp / (mode + ".jsonl"))],
-                                         capture_output=True, text=True, timeout=20)
+                         "demo-fighter", "demo-fighter-invalid",
+                         "paused-burst", "queue-overflow", "compaction-invalid",
+                         "vs-unmatched-exit", "vs-reentrant-entry", "vs-overlap-return"):
+                checked = run_mode(mode)
                 self.assertEqual(checked.returncode, 0, f"{mode}: {checked.stderr}")
+            demo_rows = [json.loads(line) for line in
+                         (temp / "demo-fighter.jsonl").read_text().splitlines()]
+            demo_return = next(row for row in demo_rows
+                               if row["record"] == "return" and row["function"] == "ftDemo_CreateFighter")
+            self.assertEqual(demo_return["observed"]["fighter"],
+                             {"gobj": 0x8002c000, "address": 0x8002d000,
+                              "slot": 2, "kind": 7})
+            checked = run_mode("write-failure", output_name="write-failure.jsonl.gz")
+            self.assertEqual(checked.returncode, 0, f"write-failure gzip: {checked.stderr}")
+            checked = run_mode("vs-duplicate-exit", MWRC_ALLOCATION_VS_TARGET="2")
+            self.assertEqual(checked.returncode, 0, f"vs-duplicate-exit: {checked.stderr}")
+            overlap = [json.loads(line) for line in
+                       (temp / "vs-overlap-return.jsonl").read_text().splitlines()]
+            overlap_end = overlap[-1]
+            self.assertEqual(overlap_end["status"], "incomplete")
+            self.assertFalse(overlap_end["target_complete"])
+            self.assertFalse(overlap_end["boundary_complete"])
             overflow_rows = [json.loads(line) for line in
                              (temp / "queue-overflow.jsonl").read_text().splitlines()]
             overflow_sequences = [row["sequence"] for row in overflow_rows]
@@ -659,6 +804,78 @@ class ReferenceAllocationObserverTests(unittest.TestCase):
             self.assertTrue(end["boundary_complete"])
             self.assertFalse(end["ownership_complete"])
             self.assertEqual(end["status"], "captured")
+            self.assertEqual(end["scope"], "vs_ownership")
+            self.assertEqual(end["vs_target"], 1)
+            self.assertEqual(end["stop_at"], "entry")
+            self.assertTrue(end["target_complete"])
+            self.assertEqual(end["vs_entries"], 1)
+            self.assertEqual(end["vs_exits"], 0)
+            self.assertTrue(end["active_owner"])
+            self.assertEqual(end["max_events"], 2_000_000)
+
+            output = temp / "vs-gzip.jsonl.gz"
+            checked = run_mode("vs-reentry", output_name=output.name,
+                               MWRC_ALLOCATION_VS_TARGET="2",
+                               MWRC_ALLOCATION_MAX_EVENTS="10000")
+            self.assertEqual(checked.returncode, 0, checked.stderr)
+            with gzip.open(output, "rt", encoding="utf-8") as compressed:
+                rows = [json.loads(line) for line in compressed]
+            self.assertEqual(rows[0]["record"], "header")
+            self.assertEqual(rows[0]["compression"], "gzip")
+            self.assertEqual(rows[0]["max_events"], 10_000)
+            self.assertEqual(rows[-1]["record"], "end")
+            self.assertEqual(rows[-1]["compression"], "gzip")
+            self.assertEqual(rows[-1]["max_events"], 10_000)
+            self.assertEqual([row["sequence"] for row in rows], list(range(len(rows))))
+
+            output = temp / "vs-reentry.jsonl"
+            checked = run_mode("vs-reentry", MWRC_ALLOCATION_VS_TARGET="2")
+            self.assertEqual(checked.returncode, 0, checked.stderr)
+            end = [json.loads(line) for line in output.read_text().splitlines()][-1]
+            self.assertEqual(end["status"], "captured")
+            self.assertEqual(end["vs_target"], 2)
+            self.assertEqual(end["stop_at"], "entry")
+            self.assertTrue(end["target_complete"])
+            self.assertEqual(end["vs_entries"], 2)
+            self.assertEqual(end["vs_exits"], 1)
+            self.assertTrue(end["active_owner"])
+            self.assertFalse(end["ownership_complete"])
+
+            output = temp / "vs-interrupted.jsonl"
+            checked = run_mode("vs-interrupted", MWRC_ALLOCATION_VS_TARGET="2")
+            self.assertEqual(checked.returncode, 0, checked.stderr)
+            end = [json.loads(line) for line in output.read_text().splitlines()][-1]
+            self.assertEqual(end["status"], "incomplete")
+            self.assertFalse(end["target_complete"])
+            self.assertEqual(end["vs_entries"], 1)
+            self.assertEqual(end["vs_exits"], 1)
+            self.assertFalse(end["active_owner"])
+            self.assertFalse(end["ownership_complete"])
+
+            output = temp / "vs-three-exits.jsonl"
+            checked = run_mode("vs-three-exits", MWRC_ALLOCATION_VS_TARGET="3",
+                               MWRC_ALLOCATION_STOP_AT="exit")
+            self.assertEqual(checked.returncode, 0, checked.stderr)
+            end = [json.loads(line) for line in output.read_text().splitlines()][-1]
+            self.assertEqual(end["status"], "captured")
+            self.assertEqual(end["vs_target"], 3)
+            self.assertEqual(end["stop_at"], "exit")
+            self.assertTrue(end["target_complete"])
+            self.assertEqual(end["vs_entries"], 3)
+            self.assertEqual(end["vs_exits"], 3)
+            self.assertFalse(end["active_owner"])
+            self.assertTrue(end["ownership_complete"])
+
+            invalid = run_mode("invalid-config", MWRC_ALLOCATION_VS_TARGET="17")
+            self.assertEqual(invalid.returncode, 0, invalid.stderr)
+            invalid = run_mode("invalid-config", MWRC_ALLOCATION_STOP_AT="middle")
+            self.assertEqual(invalid.returncode, 0, invalid.stderr)
+            invalid = run_mode("invalid-config", MWRC_ALLOCATION_MAX_EVENTS="0")
+            self.assertEqual(invalid.returncode, 0, invalid.stderr)
+            invalid = run_mode("invalid-config", MWRC_ALLOCATION_MAX_EVENTS="100000001")
+            self.assertEqual(invalid.returncode, 0, invalid.stderr)
+            invalid = run_mode("invalid-config", MWRC_ALLOCATION_MAX_EVENTS="not-a-count")
+            self.assertEqual(invalid.returncode, 0, invalid.stderr)
 
 
 if __name__ == "__main__":

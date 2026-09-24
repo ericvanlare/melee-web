@@ -22,11 +22,11 @@ from .allocation_history_replay import (
 
 
 class StreamModel:
-    def __init__(self):
+    def __init__(self, *, action_sink=None, output_sink=None):
         self.drivers = []
         self.processes = []
-        self.actions = []
-        self.outputs = []
+        self.actions = action_sink if action_sink is not None else []
+        self.outputs = output_sink if output_sink is not None else []
         try:
             # Checked Wasm consumes the frozen command stream after native replay.
             driver = ModelDriver(source=ROOT / 'tests/allocation_lifetime_model.cpp',
@@ -167,7 +167,7 @@ def validate_metadata_shape(row: dict, call: dict, *, required: bool):
 def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dict,
                      rows: list[dict], enters: dict[int, dict], returns: dict[int, dict],
                      context: dict, verified: dict, *, checked_wasm: bool,
-                     require_complete: bool) -> dict:
+                     require_complete: bool, artifact_dir: Path | None = None) -> dict:
     layout = validate_layout(verified)
     retail = not profile['source_revision'].startswith('synthetic-')
     pool_ids = {address: index for index, (_, address) in
@@ -175,19 +175,40 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
     descriptors = layout['lbheap_descriptors']
     if not descriptors or descriptors[-1] != [6, 0, 0, 0]:
         raise ReplayProblem('provenance', 'original game-heap descriptor sentinel differs')
-    model = StreamModel()
+    bounded_state = artifact_dir is not None
+    action_store = output_store = identity_store = None
+    if bounded_state:
+        try:
+            from .allocation_replay_spool import JsonSpool
+        except ImportError as error:
+            raise ReplayProblem('input', 'artifact replay requires allocation_replay_spool.py') from error
+        artifact_dir = Path(artifact_dir)
+        artifact_dir.mkdir(parents=True, exist_ok=True)
+        action_store = JsonSpool(artifact_dir, 'actions')
+        output_store = JsonSpool(artifact_dir, 'outputs')
+        identity_store = JsonSpool(artifact_dir, 'identities')
+    model = (StreamModel(action_sink=action_store, output_sink=output_store)
+             if bounded_state else StreamModel())
     observed_labels: dict[int, str] = {}
+    observed_heaps: dict[int, int] = {}
+    observed_pools: dict[int, int] = {}
+    pool_heaps: dict[int, int] = {}
+    pool_backings: dict[int, list[tuple[int, int, int]]] = {}
     derived_calls: dict[int, dict] = {}
     derived_payloads: dict[int, str] = {}
     derived_handles: dict[int, str] = {}
-    completed = []
-    identities = []
+    completed_count = 0
+    identities = identity_store if identity_store is not None else []
     ownership_events = []
     fighter_owners = {}
+    demo_owners = {}
     children: dict[int, list[dict]] = {}
-    for call in enters.values():
-        if call.get('parent') is not None:
-            children.setdefault(call['parent'], []).append(call)
+    active_enters: dict[int, dict] = {}
+    if not bounded_state:
+        for call in enters.values():
+            if call.get('parent') is not None:
+                children.setdefault(call['parent'], []).append(call)
+    pending_ids: set[int] = set()
     stage = verified['stages']
     arena_lows = iter([stage['linker_arena_lo'], stage['os_arena_lo'], stage['after_xfb'],
                        stage['os_init_alloc_lo'], context['arena_start'], context['arena_end']])
@@ -200,6 +221,7 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
     aram_depth = 0
     aram_lengths = []
     first_problem = None
+    stream_error_reason = None
     repeated_counts = {}
     modeled_functions = set()
     static_pool_descriptors = {
@@ -207,14 +229,22 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
         for name, address in layout['pool_descriptors'].items()
     }
     fighter_pool_address = static_pool_descriptors.get('fighter_alloc_data')
+    gobj_pool_address = static_pool_descriptors.get('gobj_alloc_data')
     fighter_initialized = False
+    fighter_initialized_scene_generation = None
     fighter_pool_generation = None
     fighter_initialize_call = None
+    fighter_pool_init_call = None
+    demo_pool_generation = None
+    demo_initialize_call = None
+    demo_pool_init_call = None
+    demo_initialized = False
     scene_active = False
     scene_generation = 0
     scene_enter_call = None
     scene_exit_call = None
     scene_enter_completed = False
+    scene_exit_completed = False
     supported = {
         'OSSetArenaLo', 'OSSetArenaHi', 'OSAllocFromArenaLo', 'HSD_AllocateFifo',
         'HSD_AllocateXFB', 'OSInitAlloc', 'OSCreateHeap', 'OSDestroyHeap',
@@ -227,6 +257,7 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
         'lbHeap_80015F3C', 'lbHeap_800158D0', 'lbHeap_80015900', 'lbHeap_80015BD0',
         'lbHeap_80015D6C', 'lbHeap_80015CA8', 'lbMemFreeToHeap', 'HSD_CreateMainHeap', 'HSD_OSInit',
         'Fighter_FirstInitialize_80067A84', 'Fighter_Create',
+        'ftDemo_ObjAllocInit', 'ftDemo_CreateFighter',
         'gm_Scene_Vs_OnEnter', 'gm_Scene_Vs_OnExit',
         'fn_80015184', 'lbMemory_80015320', 'lbDvd_80017A80',
         'HSD_DevComRequest', 'HSD_DevComARAMCallback',
@@ -270,7 +301,10 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
 
     def run(op, call, **fields):
         modeled_functions.add(call.get('function'))
-        output = model.run({'op': op, **fields}, call)
+        try:
+            output = model.run({'op': op, **fields}, call)
+        except OSError as error:
+            raise ReplayProblem('resource', f'allocation replay artifact write failed: {error}', call=call) from error
         for retired in output.get('retired_payloads', []):
             derived_payloads.pop(retired['payload'], None)
             derived_handles.pop(retired['handle'], None)
@@ -294,9 +328,12 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
         equal(row['result'], output[field], 'source allocation result', call)
         if output[field]:
             observed_labels[row['result']] = label
-            identities.append({'call': call['call'], 'sequence': row['sequence'],
-                               'function': call['function'], 'label': label,
-                               'derived': output[field]})
+            try:
+                identities.append({'call': call['call'], 'sequence': row['sequence'],
+                                   'function': call['function'], 'label': label,
+                                   'derived': output[field]})
+            except OSError as error:
+                raise ReplayProblem('resource', f'allocation replay artifact write failed: {error}', call=call) from error
         derived_calls[call['call']] = dict(output, label=label)
 
     def known(address, call):
@@ -328,6 +365,26 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
 
         visit(call['call'])
         return matches
+
+    def prune_closed_children(call_id):
+        """Drop completed descendants while retaining this call's result.
+
+        Wrapper validation runs at the parent's return boundary.  Its direct
+        child entry and derived result must remain available until then, while
+        descendants of a completed call cannot affect any later source
+        operation.  This keeps artifact-mode replay proportional to the
+        largest live source wrapper instead of the whole trace.
+        """
+        nested = children.pop(call_id, [])
+        for child in nested:
+            prune_closed_subtree(child['call'])
+
+    def prune_closed_subtree(call_id):
+        nested = children.pop(call_id, [])
+        for child in nested:
+            prune_closed_subtree(child['call'])
+        derived_calls.pop(call_id, None)
+        active_enters.pop(call_id, None)
 
     def wrapper_observation(row, call, field):
         observed = row.get('observed')
@@ -446,6 +503,10 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
             descriptors=' '.join(str(word) for desc in descriptors[:-1] for word in desc))
         for row in rows:
             record = row['record']
+            if record == 'error':
+                if stream_error_reason is None:
+                    stream_error_reason = row.get('error') or 'allocation trace contains an error record'
+                continue
             if record == 'repeated_stop':
                 original_sequence = row.get('original_sequence')
                 if (type(original_sequence) is not int or original_sequence < 0
@@ -465,6 +526,13 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
             if record not in ('enter', 'return'):
                 continue
             call = enters[row['call']]
+            if bounded_state:
+                if record == 'enter':
+                    active_enters[call['call']] = call
+                    pending_ids.add(call['call'])
+                    parent = call.get('parent')
+                    if parent is not None:
+                        children.setdefault(parent, []).append(call)
             current_call = call
             function = call['function']
             if not isinstance(call.get('args'), list):
@@ -476,7 +544,7 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
             if function in declarations and len(args) != declarations[function]['argc']:
                 raise ReplayProblem('stream', 'source argument count differs from pinned function profile', call=call)
             compare_compaction(row, call)
-            ancestors = call_chain(call, enters)
+            ancestors = call_chain(call, active_enters if bounded_state else enters)
             names = [parent['function'] for parent in ancestors]
             label = f"call_{call['call']}"
             if record == 'enter':
@@ -494,27 +562,55 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
                 elif function in ('lbHeap_80015BD0', 'lbHeap_80015CA8', 'lbHeap_80015D6C'):
                     derived_calls[call['call']] = run('game_owner', call, index=args[0])
                 elif function == 'Fighter_FirstInitialize_80067A84':
-                    # This diagnostic prefix models one source initialization.
-                    # A later VS generation may call this again, but accepting
-                    # that reset requires a separately captured ownership
-                    # contract; do not infer reuse from this prefix.
-                    if fighter_initialized or fighter_initialize_call is not None:
+                    if not scene_active:
                         raise ReplayProblem('unsupported',
-                                            'fighter pool initialization repeats an existing source generation',
+                                            'fighter initialization is outside an active VS scene owner',
+                                            call=call)
+                    if fighter_initialize_call is not None:
+                        raise ReplayProblem('unsupported',
+                                            'fighter pool initialization reenters an existing source generation',
                                             call=call)
                     if fighter_pool_address is None:
                         raise ReplayProblem('unsupported',
                                             'fighter initialization lacks the independently identified fighter_alloc_data pool',
                                             call=call)
+                    if fighter_initialized and not scene_exit_completed:
+                        raise ReplayProblem('unsupported',
+                                            'fighter pool initialization reenters before the prior VS owner exited',
+                                            call=call)
+                    # Fighter_FirstInitialize is called once for each VS
+                    # setup.  The source resets the fighter pool here; the
+                    # previous generation is retired by the completed VS
+                    # exit/main-heap teardown, so no guessed Fighter_Free
+                    # callback is required in this diagnostic model.
+                    fighter_initialized = False
+                    fighter_pool_init_call = None
                     fighter_initialize_call = call['call']
+                elif function == 'ftDemo_ObjAllocInit':
+                    if demo_initialize_call is not None:
+                        raise ReplayProblem('unsupported',
+                                            'demo fighter pool initialization reenters an existing source generation',
+                                            call=call)
+                    # ftDemo_ObjAllocInit calls Fighter_800679B0 directly,
+                    # outside the VS owner.  Its fighter_alloc_data reset is
+                    # a separate, explicitly named demo generation.
+                    demo_initialized = False
+                    demo_pool_init_call = None
+                    demo_initialize_call = call['call']
                 elif function == 'Fighter_Create':
-                    if not fighter_initialized or fighter_pool_generation is None:
+                    if (not fighter_initialized or fighter_pool_generation is None
+                            or fighter_initialized_scene_generation != scene_generation):
                         raise ReplayProblem('unsupported',
                                             'Fighter_Create has no completed fighter pool generation',
                                             call=call)
                     if not scene_active:
                         raise ReplayProblem('unsupported',
                                             'Fighter_Create is outside an active VS scene owner', call=call)
+                elif function == 'ftDemo_CreateFighter':
+                    if demo_initialize_call is not None or not demo_initialized or demo_pool_generation is None:
+                        raise ReplayProblem('unsupported',
+                                            'ftDemo_CreateFighter has no completed demo fighter pool generation',
+                                            call=call)
                 elif function == 'gm_Scene_Vs_OnEnter':
                     if scene_active:
                         raise ReplayProblem('unsupported',
@@ -722,13 +818,19 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
                                         'Fighter_FirstInitialize has ambiguous fighter_alloc_data pool initialization',
                                         call=call)
                 init = fighter_inits[0]
+                if fighter_pool_init_call != init['call']:
+                    raise ReplayProblem('unsupported',
+                                        'Fighter_FirstInitialize pool generation was not opened by its source pool init',
+                                        call=call)
                 if init['call'] not in derived_calls or derived_calls[init['call']].get('pool_generation') is None:
                     raise ReplayProblem('unsupported',
                                         'fighter_alloc_data pool initialization has no derived model generation',
                                         call=call)
                 fighter_pool_generation = derived_calls[init['call']]['pool_generation']
                 fighter_initialized = True
+                fighter_initialized_scene_generation = scene_generation
                 fighter_initialize_call = None
+                fighter_pool_init_call = None
                 derived_calls[call['call']] = {
                     'wrapper': 'Fighter_FirstInitialize_80067A84',
                     'pool_generation': fighter_pool_generation,
@@ -737,54 +839,126 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
                     'kind': 'fighter_pool_init', 'call': call['call'], 'sequence': row['sequence'],
                     'pool': fighter_pool_address, 'generation': fighter_pool_generation,
                 })
-            elif function == 'Fighter_Create':
-                if not scene_active or fighter_pool_generation is None:
+            elif function == 'ftDemo_ObjAllocInit':
+                if demo_initialize_call != call['call']:
                     raise ReplayProblem('unsupported',
-                                        'Fighter_Create return has no active source ownership generation',
+                                        'demo fighter pool initialization return does not close its source generation',
                                         call=call)
+                init_calls = descendants(call, {'HSD_ObjAllocInit'})
+                fighter_inits = [item for item in init_calls
+                                 if first_argument(item, 'pool') == fighter_pool_address]
+                if not fighter_inits:
+                    raise ReplayProblem('unsupported',
+                                        'ftDemo_ObjAllocInit lacks a nested fighter_alloc_data pool initialization',
+                                        call=call)
+                if len(fighter_inits) != 1:
+                    raise ReplayProblem('unsupported',
+                                        'ftDemo_ObjAllocInit has ambiguous fighter_alloc_data pool initialization',
+                                        call=call)
+                init = fighter_inits[0]
+                if demo_pool_init_call != init['call']:
+                    raise ReplayProblem('unsupported',
+                                        'ftDemo_ObjAllocInit pool generation was not opened by its source pool init',
+                                        call=call)
+                derived = derived_calls.get(init['call'])
+                if not derived or derived.get('pool_generation') is None:
+                    raise ReplayProblem('unsupported',
+                                        'demo fighter pool initialization has no derived model generation',
+                                        call=call)
+                demo_pool_generation = derived['pool_generation']
+                demo_initialized = True
+                demo_initialize_call = None
+                demo_pool_init_call = None
+                derived_calls[call['call']] = {
+                    'wrapper': 'ftDemo_ObjAllocInit',
+                    'pool_generation': demo_pool_generation,
+                }
+            elif function in ('Fighter_Create', 'ftDemo_CreateFighter'):
+                demo_owner = function == 'ftDemo_CreateFighter'
+                if demo_owner:
+                    if (not demo_initialized or demo_pool_generation is None
+                            or demo_initialize_call is not None):
+                        raise ReplayProblem('unsupported',
+                                            'ftDemo_CreateFighter return has no completed demo ownership generation',
+                                            call=call)
+                    owner_generation = demo_pool_generation
+                    owner_kind = 'demo'
+                else:
+                    if (not scene_active or fighter_pool_generation is None
+                            or fighter_initialized_scene_generation != scene_generation):
+                        raise ReplayProblem('unsupported',
+                                            'Fighter_Create return has no active source ownership generation',
+                                            call=call)
+                    owner_generation = fighter_pool_generation
+                    owner_kind = 'vs'
                 allocation_calls = descendants(call, {'HSD_ObjAlloc'})
                 if not allocation_calls:
                     raise ReplayProblem('unsupported',
-                                        'Fighter_Create lacks a nested HSD_ObjAlloc source allocation', call=call)
+                                        f'{function} lacks a nested HSD_ObjAlloc source allocation', call=call)
                 fighter_allocations = [item for item in allocation_calls
                                        if first_argument(item, 'pool') == fighter_pool_address]
                 if not fighter_allocations:
                     raise ReplayProblem('unsupported',
-                                        'Fighter_Create nested allocations use no independent fighter_alloc_data pool',
+                                        f'{function} nested allocations use no independent fighter_alloc_data pool',
                                         call=call)
                 if len(fighter_allocations) != 1:
                     raise ReplayProblem('unsupported',
-                                        'Fighter_Create has ambiguous fighter_alloc_data nested allocations', call=call)
+                                        f'{function} has ambiguous fighter_alloc_data nested allocations', call=call)
                 allocation = fighter_allocations[0]
                 allocation_derived = derived_calls.get(allocation['call'])
                 if not allocation_derived or not allocation_derived.get('address'):
                     raise ReplayProblem('unsupported',
-                                        'Fighter_Create fighter allocation lacks a derived source address', call=call)
-                if allocation_derived.get('pool_generation') != fighter_pool_generation:
+                                        f'{function} fighter allocation lacks a derived source address', call=call)
+                if allocation_derived.get('pool_generation') != owner_generation:
                     raise ReplayProblem('unsupported',
-                                        'Fighter_Create fighter allocation belongs to an inconsistent pool generation',
+                                        f'{function} fighter allocation belongs to an inconsistent pool generation',
                                         call=call)
+                if gobj_pool_address is None:
+                    raise ReplayProblem('unsupported',
+                                        f'{function} lacks the independently identified gobj_alloc_data pool',
+                                        call=call)
+                gobj_allocations = [item for item in allocation_calls
+                                    if first_argument(item, 'pool') == gobj_pool_address]
+                if not gobj_allocations:
+                    raise ReplayProblem('unsupported',
+                                        f'{function} lacks a nested gobj_alloc_data source allocation',
+                                        call=call)
+                if len(gobj_allocations) != 1:
+                    raise ReplayProblem('unsupported',
+                                        f'{function} has ambiguous gobj_alloc_data nested allocations', call=call)
+                gobj_allocation = gobj_allocations[0]
+                gobj_derived = derived_calls.get(gobj_allocation['call'])
+                if not gobj_derived or not gobj_derived.get('address'):
+                    raise ReplayProblem('unsupported',
+                                        f'{function} GObj allocation lacks a derived source address', call=call)
                 fighter = wrapper_observation(row, call, 'fighter')
                 require_u32_fields(fighter, ('gobj', 'address', 'slot', 'kind'), call)
                 gobj = parse_u32(row.get('result'), 'Fighter_Create GObj result')
-                equal(fighter['gobj'], gobj, 'Fighter_Create GObj identity', call)
+                equal(fighter['gobj'], gobj, f'{function} GObj identity', call)
+                equal(gobj, gobj_derived['address'],
+                      f'{function} GObj allocation identity', call)
                 equal(fighter['address'], allocation_derived['address'],
-                      'Fighter_Create fighter identity', call)
+                      f'{function} fighter identity', call)
                 if gobj == 0 or fighter['address'] == 0:
-                    raise ReplayProblem('validation', 'Fighter_Create returned a null source identity', call=call)
-                if gobj in fighter_owners or fighter['address'] in {
-                        owner['fighter'] for owner in fighter_owners.values()}:
+                    raise ReplayProblem('validation', f'{function} returned a null source identity', call=call)
+                all_owners = [*fighter_owners.values(), *demo_owners.values()]
+                if gobj in {owner['gobj'] for owner in all_owners} or fighter['address'] in {
+                        owner['fighter'] for owner in all_owners}:
                     raise ReplayProblem('unsupported',
-                                        'Fighter_Create reuses a fighter identity in the active source generation',
+                                        f'{function} reuses a fighter identity in the active source generation',
                                         call=call)
                 owner = {
                     'gobj': gobj, 'fighter': fighter['address'], 'slot': fighter['slot'],
-                    'fighter_kind': fighter['kind'], 'generation': scene_generation,
-                    'pool_generation': fighter_pool_generation, 'call': call['call'],
+                    'fighter_kind': fighter['kind'], 'generation': scene_generation if not demo_owner else None,
+                    'pool_generation': owner_generation, 'owner_kind': owner_kind,
+                    'call': call['call'],
                 }
-                fighter_owners[gobj] = owner
-                derived_calls[call['call']] = {'wrapper': 'Fighter_Create', **owner}
-                ownership_events.append({'kind': 'fighter_create', 'sequence': row['sequence'], **owner})
+                if not demo_owner:
+                    fighter_owners[gobj] = owner
+                    ownership_events.append({'kind': 'fighter_create', 'sequence': row['sequence'], **owner})
+                else:
+                    demo_owners[gobj] = owner
+                derived_calls[call['call']] = {'wrapper': function, **owner}
             elif function == 'gm_Scene_Vs_OnEnter':
                 if scene_enter_call != call['call'] or not scene_active:
                     raise ReplayProblem('unsupported',
@@ -820,6 +994,7 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
                 scene_enter_call = None
                 scene_exit_call = None
                 scene_enter_completed = False
+                scene_exit_completed = True
                 derived_calls[call['call']] = {
                     'wrapper': 'gm_Scene_Vs_OnExit', 'generation': scene_generation,
                 }
@@ -861,6 +1036,18 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
                     raise ReplayProblem('unsupported', 'additional SDK heap lifetime requires source-owned request binding', call=call)
                 output = run('hsd_replace_destroy', call)
                 equal(args, output['args'], 'destroyed HSD heap', call)
+                destroyed_heap = output['args'][0]
+                for address, heap_id in list(observed_heaps.items()):
+                    if heap_id == destroyed_heap:
+                        observed_heaps.pop(address, None)
+                        observed_labels.pop(address, None)
+                        observed_pools.pop(address, None)
+                for pool, backings in list(pool_backings.items()):
+                    remaining = [backing for backing in backings if backing[0] != destroyed_heap]
+                    if remaining:
+                        pool_backings[pool] = remaining
+                    else:
+                        pool_backings.pop(pool, None)
             elif function == 'OSSetCurrentHeap':
                 output = run('os_select_hsd', call)
                 equal(args, output['args'], 'selected SDK heap', call)
@@ -886,6 +1073,8 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
                     equal(args[1], wrapper['args'][1], 'game allocation size', call)
                 output = run('raw_alloc', call, heap=args[0], requested=args[1], label=label)
                 pointer(row, output, 'address', label, call)
+                if output.get('status') == 'ok':
+                    observed_heaps[row['result']] = args[0]
                 derived_calls[call['call']]['heap'] = args[0]
             elif function == 'OSFreeToHeap':
                 if 'HSD_Free' in names:
@@ -896,7 +1085,12 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
                     equal(owner['type'], 0, 'OS-backed game release type', call)
                     equal(args[0], owner['id'], 'OS-backed game release heap', call)
                     equal(args[1], wrapper['args'][1], 'game released pointer', call)
-                output = run('raw_free', call, heap=args[0], label=known(args[1], call))
+                label = known(args[1], call)
+                output = run('raw_free', call, heap=args[0], label=label)
+                if output.get('status') == 'ok':
+                    observed_labels.pop(args[1], None)
+                    observed_heaps.pop(args[1], None)
+                    observed_pools.pop(args[1], None)
                 derived_calls[call['call']] = output
             elif function == 'HSD_MemAlloc':
                 child = descendant(call, {'OSAllocFromHeap'})
@@ -914,26 +1108,63 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
                                         'fighter initialization lacks the independently identified fighter_alloc_data pool',
                                         call=call)
                 pool = pool_id(args, call)
+                pool_heaps[pool] = hsd_heap
+                for address, old_pool in list(observed_pools.items()):
+                    if old_pool == pool:
+                        observed_pools.pop(address, None)
+                        observed_labels.pop(address, None)
+                        observed_heaps.pop(address, None)
                 if args[0] == fighter_pool_address:
-                    if fighter_initialize_call is None or 'Fighter_FirstInitialize_80067A84' not in names:
-                        raise ReplayProblem('unsupported',
-                                            'fighter_alloc_data pool initialization lacks its Fighter_FirstInitialize owner',
-                                            call=call)
-                    if fighter_pool_generation is not None and fighter_initialize_call is not None:
-                        # A second pool initialization inside one wrapper is
-                        # ambiguous even if the allocator model can reset it.
-                        prior = [item for item in descendants(enters[fighter_initialize_call],
-                                                               {'HSD_ObjAllocInit'})
-                                 if item['call'] != call['call']
-                                 and first_argument(item, 'pool') == fighter_pool_address]
-                        if prior:
-                            raise ReplayProblem('unsupported',
-                                                'fighter_alloc_data pool initialization changes generation more than once',
-                                                call=call)
+                    is_vs_owner = ('Fighter_FirstInitialize_80067A84' in names)
+                    is_demo_owner = ('ftDemo_ObjAllocInit' in names)
+                    if is_vs_owner == is_demo_owner:
+                        raise ReplayProblem(
+                            'unsupported',
+                            'fighter_alloc_data pool initialization lacks one explicit VS or demo owner',
+                            call=call)
+                    if is_vs_owner:
+                        if fighter_initialize_call is None:
+                            raise ReplayProblem(
+                                'unsupported',
+                                'fighter_alloc_data pool initialization lacks its Fighter_FirstInitialize owner',
+                                call=call)
+                        if fighter_pool_init_call is not None:
+                            # A second pool initialization inside one wrapper
+                            # is ambiguous even if the allocator can reset it.
+                            raise ReplayProblem(
+                                'unsupported',
+                                'fighter_alloc_data pool initialization changes VS generation more than once',
+                                call=call)
+                    else:
+                        if demo_initialize_call is None:
+                            raise ReplayProblem(
+                                'unsupported',
+                                'fighter_alloc_data pool initialization lacks its ftDemo_ObjAllocInit owner',
+                                call=call)
+                        if demo_pool_init_call is not None:
+                            raise ReplayProblem(
+                                'unsupported',
+                                'fighter_alloc_data pool initialization changes demo generation more than once',
+                                call=call)
                 output = run('pool_reset', call, pool=pool, size=args[1], align=args[2])
+                if output.get('status') == 'ok':
+                    pool_backings.pop(pool, None)
+                    # A successful source pool reset is the independently
+                    # observed retirement boundary for demo fighter owners.
+                    # Do not clear them merely when the wrapper is entered:
+                    # an incomplete/reset-failed wrapper must remain visible
+                    # as pending ownership.
+                    if args[0] == fighter_pool_address and demo_owners:
+                        demo_owners.clear()
                 if args[0] == fighter_pool_address:
-                    fighter_pool_generation = (fighter_pool_generation or 0) + 1
-                    derived_calls[call['call']] = dict(output, pool_generation=fighter_pool_generation)
+                    if 'ftDemo_ObjAllocInit' in names:
+                        demo_pool_init_call = call['call']
+                        demo_pool_generation = (demo_pool_generation or 0) + 1
+                        derived_calls[call['call']] = dict(output, pool_generation=demo_pool_generation)
+                    else:
+                        fighter_pool_init_call = call['call']
+                        fighter_pool_generation = (fighter_pool_generation or 0) + 1
+                        derived_calls[call['call']] = dict(output, pool_generation=fighter_pool_generation)
             elif function == '_HSD_ObjAllocForgetMemory':
                 output = run('pool_registry_forget', call)
                 equal(args, output['args'], 'object pool forget bounds', call)
@@ -942,27 +1173,86 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
                 output = run('pool_adopt', call, pool=pool_id(args, call), count=args[1],
                              label=child['label'], heap=child['heap'])
                 equal(row['result'], output['result'], 'pool refill count', call)
+                if output.get('status') == 'ok':
+                    pool = pool_id(args, call)
+                    pool_words = output.get('pool_words')
+                    if not isinstance(pool_words, list) or len(pool_words) < 9:
+                        raise ReplayProblem('model', 'pool refill lacks its derived object size', call=call)
+                    pool_backings.setdefault(pool, []).append(
+                        (child['heap'], child['address'], pool_words[8] * args[1]))
             elif function == 'HSD_ObjAlloc':
-                if ('Fighter_Create' in names and fighter_pool_address is None):
+                if (('Fighter_Create' in names or 'ftDemo_CreateFighter' in names)
+                        and fighter_pool_address is None):
                     raise ReplayProblem('unsupported',
-                                        'Fighter_Create lacks the independently identified fighter_alloc_data pool',
+                                        'fighter wrapper lacks the independently identified fighter_alloc_data pool',
                                         call=call)
                 if args[0] == fighter_pool_address:
-                    if fighter_initialize_call is not None or not fighter_initialized:
+                    has_demo_owner = any(parent['function'] == 'ftDemo_CreateFighter'
+                                         for parent in ancestors)
+                    has_vs_owner = any(parent['function'] == 'Fighter_Create'
+                                       for parent in ancestors)
+                    if has_demo_owner == has_vs_owner:
                         raise ReplayProblem('unsupported',
-                                            'fighter_alloc_data allocation occurs before pool initialization completes',
-                                            call=call)
-                    if not any(parent['function'] == 'Fighter_Create' for parent in ancestors):
-                        raise ReplayProblem('unsupported',
-                                            'fighter_alloc_data allocation lacks a Fighter_Create wrapper owner',
+                                            'fighter_alloc_data allocation lacks one explicit VS or demo owner',
                                             call=call)
                 pool = pool_id(args, call)
                 output = run('pool_pop', call, pool=pool, label=label)
                 pointer(row, output, 'address', label, call)
+                if output.get('status') == 'ok':
+                    observed_pools[row['result']] = pool
+                    backing_heap = output.get('backing_heap')
+                    if (type(backing_heap) is not int or isinstance(backing_heap, bool)
+                            or not 0 <= backing_heap <= 0xFFFFFFFF):
+                        raise ReplayProblem(
+                            'model',
+                            'pool allocation lacks the model-derived backing heap identity',
+                            call=call)
+                    backings = pool_backings.get(pool)
+                    if backings:
+                        matches = [heap_id for heap_id, base, size in backings
+                                   if base <= row['result'] < base + size]
+                        if len(matches) != 1 or matches[0] != backing_heap:
+                            raise ReplayProblem(
+                                'model',
+                                'pool object lacks a unique derived backing heap',
+                                call=call)
+                        observed_heaps[row['result']] = backing_heap
+                    else:
+                        # The native model derives this identity from its
+                        # authored pool backing table.  A selected heap is
+                        # not a valid substitute, even for a retail trace
+                        # whose refill metadata is incomplete.
+                        if retail:
+                            raise ReplayProblem(
+                                'model',
+                                'retail pool allocation lacks an authored backing span',
+                                call=call)
+                        observed_heaps[row['result']] = backing_heap
                 if args[0] == fighter_pool_address:
-                    derived_calls[call['call']]['pool_generation'] = fighter_pool_generation
+                    demo_owner = any(parent['function'] == 'ftDemo_CreateFighter'
+                                     for parent in ancestors)
+                    vs_owner = any(parent['function'] == 'Fighter_Create'
+                                   for parent in ancestors)
+                    if demo_owner == vs_owner:
+                        raise ReplayProblem(
+                            'unsupported',
+                            'fighter_alloc_data allocation lacks one explicit VS or demo owner',
+                            call=call)
+                    generation = demo_pool_generation if demo_owner else fighter_pool_generation
+                    initialized = demo_initialized if demo_owner else fighter_initialized
+                    if not initialized or generation is None:
+                        raise ReplayProblem(
+                            'unsupported',
+                            'fighter_alloc_data allocation occurs before its owned pool generation',
+                            call=call)
+                    derived_calls[call['call']]['pool_generation'] = generation
             elif function == 'HSD_ObjFree':
-                output = run('pool_release', call, pool=pool_id(args, call), label=known(args[1], call))
+                label = known(args[1], call)
+                output = run('pool_release', call, pool=pool_id(args, call), label=label)
+                if output.get('status') == 'ok':
+                    observed_labels.pop(args[1], None)
+                    observed_heaps.pop(args[1], None)
+                    observed_pools.pop(args[1], None)
             elif function in ('ARInit', 'ARAlloc', 'ARFree', 'ARGetSize'):
                 table = layout['aram_stack_table']
                 if function == 'ARInit':
@@ -1066,6 +1356,8 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
                              label=derived_payloads[args[1]])
                 equal(args, [output['owner'], output['payload']], 'released handle owner and payload', call)
                 equal(args[1], ancestors[0]['args'][1], 'game wrapper released payload', call)
+                if output.get('status') == 'ok':
+                    derived_payloads.pop(args[1], None)
                 derived_calls[call['call']] = output
             elif function == 'lbHeap_80015900':
                 output = run('game_end', call)
@@ -1090,14 +1382,28 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
                 if function == 'lbMemory_80014FC8':
                     derived_payloads[output['payload']] = label
                     derived_handles[output['result']] = label
-            completed.append(call['call'])
+            completed_count += 1
+            if bounded_state and record == 'return':
+                # A returned child may still be needed by its active parent
+                # when that parent validates a wrapper-level result.  Keep
+                # the completed subtree until the parent returns, then drop
+                # all descendants in one step.  A top-level call has no
+                # consumer after its own return, so release its result too.
+                parent_id = call.get('parent')
+                if parent_id is None or parent_id not in active_enters:
+                    prune_closed_children(call['call'])
+                    derived_calls.pop(call['call'], None)
+                active_enters.pop(call['call'], None)
+                # A return is replay-pending until all result, metadata and
+                # ownership checks above have succeeded.  Keeping this after
+                # the common tail preserves the failing return in bounded
+                # diagnostics without changing successful replay semantics.
+                pending_ids.discard(call['call'])
     except ReplayProblem as error:
         current_call = error.call or current_call
         first_problem = {'kind': error.kind, 'reason': error.message,
                          'call': current_call.get('call'), 'sequence': current_call.get('sequence'),
                          'function': current_call.get('function')}
-    finally:
-        model.close()
     wasm_matches = None
     wasm_problem = None
     if checked_wasm:
@@ -1105,27 +1411,153 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
         try:
             driver = ModelDriver(wasm=True, source=ROOT / 'tests/allocation_lifetime_model.cpp',
                                  extra_impls=[ROOT / 'src/source_game_heap_context.cpp'])
-            wasm_outputs = driver.run([json.dumps(action['command']) for action in model.actions])
-            wasm_matches = wasm_outputs == model.outputs
-            if not wasm_matches:
-                mismatch = next((index for index, (a, b) in enumerate(zip(wasm_outputs, model.outputs)) if a != b),
-                                min(len(wasm_outputs), len(model.outputs)))
-                action = model.actions[min(mismatch, len(model.actions) - 1)]
-                wasm_problem = dict(action, kind='validation', reason='checked Wasm differs from native model')
-                wasm_problem.pop('command', None)
+            if bounded_state:
+                from .allocation_replay_spool import run_checked_file_model
+                checked = run_checked_file_model(
+                    driver.runner, ROOT, model.actions, model.outputs,
+                    Path(artifact_dir) / 'checked-wasm', timeout=1800)
+                wasm_matches = checked['matches']
+                mismatch = checked.get('mismatch_index')
+                check_error = checked.get('error')
+                stderr_path = checked.get('stderr')
+                if check_error is not None:
+                    wasm_problem = {
+                        'kind': 'model', 'reason': str(check_error),
+                        'stderr_path': str(stderr_path) if stderr_path else None,
+                        'call': current_call.get('call'), 'sequence': current_call.get('sequence'),
+                        'function': current_call.get('function'),
+                    }
+                elif not wasm_matches:
+                    if mismatch is None:
+                        raise ReplayProblem('model', 'checked Wasm mismatch lacks an index')
+                    if mismatch == len(model.actions):
+                        wasm_problem = {
+                            'kind': 'validation',
+                            'reason': 'checked Wasm output length differs from native model',
+                            'call': current_call.get('call'), 'sequence': current_call.get('sequence'),
+                            'function': current_call.get('function'),
+                        }
+                    else:
+                        action = model.actions[mismatch]
+                        wasm_problem = dict(action, kind='validation',
+                                            reason='checked Wasm differs from native model')
+                        wasm_problem.pop('command', None)
+            else:
+                wasm_outputs = driver.run([json.dumps(action['command']) for action in model.actions])
+                wasm_matches = wasm_outputs == model.outputs
+                if not wasm_matches:
+                    mismatch = next((index for index, (a, b) in enumerate(zip(wasm_outputs, model.outputs)) if a != b),
+                                    min(len(wasm_outputs), len(model.outputs)))
+                    if mismatch == len(model.actions):
+                        wasm_problem = {
+                            'kind': 'validation',
+                            'reason': 'checked Wasm output length differs from native model',
+                            'call': current_call.get('call'), 'sequence': current_call.get('sequence'),
+                            'function': current_call.get('function'),
+                        }
+                    else:
+                        action = model.actions[mismatch]
+                        wasm_problem = dict(action, kind='validation',
+                                            reason='checked Wasm differs from native model')
+                        wasm_problem.pop('command', None)
         except ReplayProblem as error:
             wasm_problem = {'kind': error.kind, 'reason': error.message,
                              'call': current_call.get('call'), 'sequence': current_call.get('sequence'),
                              'function': current_call.get('function')}
+        except OSError as error:
+            wasm_problem = {'kind': 'resource', 'reason': f'checked Wasm artifact setup failed: {error}',
+                            'call': current_call.get('call'), 'sequence': current_call.get('sequence'),
+                            'function': current_call.get('function')}
         finally:
             if driver is not None:
                 driver.close()
+    artifact_receipts = None
+    artifact_problem = None
+    if bounded_state:
+        artifact_receipts = {}
+        try:
+            for name, store in (('actions', action_store), ('outputs', output_store),
+                                ('identities', identity_store)):
+                artifact_receipts[name] = store.receipt()
+        except OSError as error:
+            artifact_problem = {
+                'kind': 'resource',
+                'reason': f'allocation replay artifact receipt failed: {error}',
+                'call': current_call.get('call'), 'sequence': current_call.get('sequence'),
+                'function': current_call.get('function'),
+            }
+    cleanup_problem = None
+    try:
+        model.close()
+    except OSError as error:
+        cleanup_problem = {
+            'kind': 'resource', 'reason': f'allocation replay model cleanup failed: {error}',
+            'call': current_call.get('call'), 'sequence': current_call.get('sequence'),
+            'function': current_call.get('function'),
+        }
+    if bounded_state:
+        for store in (action_store, output_store, identity_store):
+            try:
+                store.close()
+            except OSError as error:
+                cleanup_problem = cleanup_problem or {
+                    'kind': 'resource', 'reason': f'allocation replay artifact cleanup failed: {error}',
+                    'call': current_call.get('call'), 'sequence': current_call.get('sequence'),
+                    'function': current_call.get('function'),
+                }
     if first_problem is None and wasm_problem is not None:
         first_problem = wasm_problem
+    if first_problem is None and artifact_problem is not None:
+        first_problem = artifact_problem
+    if first_problem is None and cleanup_problem is not None:
+        first_problem = cleanup_problem
     end = next((row for row in reversed(rows) if row['record'] == 'end'), {})
-    pending = sorted(set(enters) - set(returns))
-    stream_complete = (end.get('status') == 'captured' and not pending
-                       and not any(row['record'] == 'error' for row in rows))
+    # ``pending_ids`` is only the replayed prefix in artifact mode: an early
+    # model failure leaves later source entries unseen and would otherwise
+    # falsely turn a complete captured trace into an incomplete trace.  The
+    # end record is validated by load_trace against the complete source call
+    # stacks, so its pending_calls field is the source-truth summary.  Keep a
+    # separate replay-prefix view for diagnostics.
+    source_pending_value = end.get('pending_calls')
+    source_pending_error = None
+    if source_pending_value is None:
+        source_pending = sorted(set(enters) - set(returns))
+    elif isinstance(source_pending_value, list):
+        source_pending = []
+        seen_source_pending = set()
+        for item in source_pending_value:
+            value = item.get('call') if isinstance(item, dict) else item
+            if type(value) is not int or isinstance(value, bool) or value < 0:
+                source_pending_error = 'trace end pending_calls contains an invalid call identity'
+                break
+            if value in seen_source_pending:
+                source_pending_error = 'trace end pending_calls contains a duplicate call identity'
+                break
+            if value not in enters:
+                source_pending_error = 'trace end pending_calls references an unknown call identity'
+                break
+            seen_source_pending.add(value)
+            source_pending.append(value)
+        source_pending = sorted(source_pending)
+    else:
+        source_pending = []
+        source_pending_error = 'trace end pending_calls is not a list'
+    replay_pending = sorted(pending_ids) if bounded_state else sorted(set(enters) - set(returns))
+    pending = source_pending
+    stream_complete = (source_pending_error is None and end.get('status') == 'captured'
+                       and not source_pending)
+    if first_problem is None and stream_error_reason is not None:
+        first_problem = {
+            'kind': 'stream', 'reason': stream_error_reason,
+            'call': current_call.get('call'), 'sequence': current_call.get('sequence'),
+            'function': current_call.get('function'),
+        }
+    if first_problem is None and source_pending_error is not None:
+        first_problem = {
+            'kind': 'stream', 'reason': source_pending_error,
+            'call': current_call.get('call'), 'sequence': current_call.get('sequence'),
+            'function': current_call.get('function'),
+        }
     boundary_flag = end.get('boundary_complete')
     scoped_prefix_complete = False
     if first_problem is None:
@@ -1185,7 +1617,9 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
                 'sequence': current_call.get('sequence'),
                 'function': current_call.get('function'),
             }
-    ownership_complete = not (scene_active or fighter_initialize_call is not None or scene_exit_call is not None)
+    ownership_complete = not (scene_active or fighter_initialize_call is not None
+                              or scene_exit_call is not None or demo_initialize_call is not None
+                              or demo_owners)
     # The source collector publishes its own lifecycle scope at the end of the
     # stream.  Preserve an explicit incomplete ownership result even when the
     # replay stops earlier on an unsupported operation and therefore has no
@@ -1194,19 +1628,122 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
     source_ownership_complete = end.get('ownership_complete')
     if type(source_ownership_complete) is bool:
         ownership_complete = ownership_complete and source_ownership_complete
+    # New VS-target captures publish their bounded ownership contract in the
+    # end record.  Validate it against the independently observed wrapper
+    # events; otherwise a target that stopped early could be mistaken for a
+    # complete generation (or a target count could silently be ignored).
+    target_fields = {'scope', 'vs_target', 'stop_at', 'target_complete',
+                     'vs_entries', 'vs_exits', 'active_owner'}
+    target_header_fields = {'scope', 'vs_target', 'stop_at'}
+    ownership_target = None
+    if first_problem is None and (target_fields & set(end) or target_header_fields & set(header)):
+        ownership_target = {
+            'header': {field: header.get(field) for field in sorted(target_header_fields)},
+            'end': {field: end.get(field) for field in sorted(target_fields)},
+        }
+        target_error = None
+        if end.get('scope') != 'vs_ownership':
+            target_error = 'VS ownership target has an unknown scope'
+        for field in ('scope', 'vs_target', 'stop_at'):
+            if field not in header:
+                target_error = target_error or f'VS ownership header lacks {field}'
+            elif field not in end:
+                target_error = target_error or f'VS ownership end record lacks {field}'
+            elif header.get(field) != end.get(field):
+                target_error = target_error or f'VS ownership header {field} differs from end record'
+        target = end.get('vs_target')
+        stop_at = end.get('stop_at')
+        target_complete = end.get('target_complete')
+        source_entries = end.get('vs_entries')
+        source_exits = end.get('vs_exits')
+        active_owner = end.get('active_owner')
+        source_target_ownership = end.get('ownership_complete')
+        header_target = header.get('vs_target')
+        if (type(header_target) is not int or isinstance(header_target, bool)
+                or header_target not in range(1, 17)):
+            target_error = target_error or 'VS ownership header vs_target must be an integer from 1 through 16'
+        if (type(target) is not int or isinstance(target, bool) or target not in range(1, 17)):
+            target_error = target_error or 'VS ownership target must be an integer from 1 through 16'
+        if stop_at not in {'entry', 'exit'}:
+            target_error = target_error or 'VS ownership target stop_at must be entry or exit'
+        if type(target_complete) is not bool:
+            target_error = target_error or 'VS ownership target_complete must be boolean'
+        if any(type(value) is not int or isinstance(value, bool) or value < 0
+               for value in (source_entries, source_exits)):
+            target_error = target_error or 'VS ownership entry and exit counts must be non-negative integers'
+        if type(active_owner) is not bool:
+            target_error = target_error or 'VS ownership active_owner must be boolean'
+        if type(source_target_ownership) is not bool:
+            target_error = target_error or 'VS ownership ownership_complete must be boolean'
+        observed_entries = sum(event['kind'] == 'vs_enter' for event in ownership_events)
+        observed_exits = sum(event['kind'] == 'vs_exit' for event in ownership_events)
+        if target_error is None and (source_entries != observed_entries or source_exits != observed_exits):
+            target_error = 'VS ownership counts differ from replayed source lifecycle events'
+        if target_error is None and active_owner != (observed_entries > observed_exits):
+            target_error = 'VS ownership active_owner differs from replayed scene state'
+        if target_error is None and target_complete:
+            expected_exits = target if stop_at == 'exit' else target - 1
+            if source_entries != target or source_exits != expected_exits:
+                target_error = 'completed VS ownership target has inconsistent entry/exit counts'
+            elif stop_at == 'entry' and not active_owner:
+                target_error = 'completed VS entry target must retain its active owner'
+            elif stop_at == 'exit' and active_owner:
+                target_error = 'completed VS exit target must have no active owner'
+            elif source_target_ownership != (stop_at == 'exit'):
+                target_error = 'completed VS ownership target has inconsistent ownership_complete'
+        elif target_error is None and source_target_ownership:
+            target_error = 'incomplete VS ownership target cannot claim ownership_complete'
+        if target_error is None and not target_complete and end.get('status') == 'captured':
+            target_error = 'incomplete VS ownership target cannot have captured status'
+        if target_error is not None:
+            first_problem = {
+                'kind': 'stream', 'reason': target_error,
+                'call': current_call.get('call'), 'sequence': current_call.get('sequence'),
+                'function': current_call.get('function'),
+            }
     source_prefix_complete = boundary_flag is True and not ownership_complete
+    observed_target_count = end.get('vs_entries')
+    if not (type(observed_target_count) is int and not isinstance(observed_target_count, bool)):
+        observed_target_count = sum(event['kind'] == 'vs_enter' for event in ownership_events)
+    repeated_target = observed_target_count > 1
+    if scoped_prefix_complete or source_prefix_complete:
+        completion_scope = 'repeated_vs_enter_prefix' if repeated_target else 'vs_enter_prefix'
+    elif ownership_complete:
+        completion_scope = 'repeated_vs_ownership_exit' if repeated_target else 'ownership_exit'
+    else:
+        completion_scope = None
+    if bounded_state:
+        action_value = artifact_receipts.get('actions')
+        output_value = artifact_receipts.get('outputs')
+        identity_value = artifact_receipts.get('identities')
+        replay_hashes = {
+            'actions_sha256': (artifact_receipts.get('actions') or {}).get('canonical_array_sha256'),
+            'outputs_sha256': (artifact_receipts.get('outputs') or {}).get('canonical_array_sha256'),
+            'identities_sha256': (artifact_receipts.get('identities') or {}).get('canonical_array_sha256'),
+        }
+    else:
+        action_value = model.actions
+        output_value = model.outputs
+        identity_value = identities
+        replay_hashes = {
+            'actions_sha256': canonical_sha256(model.actions),
+            'outputs_sha256': canonical_sha256(model.outputs),
+            'identities_sha256': canonical_sha256(identities),
+        }
     report = {
         'schema': 'melee-web-original-allocation-replay', 'version': 2,
         'status': ('validated_prefix' if stream_complete else 'incomplete_prefix') if first_problem is None else first_problem['kind'],
         'complete': False, 'scope': 'allocation_lifetime_prefix',
         'trace_complete': stream_complete, 'trace_end_status': end.get('status'),
-        'calls_seen': len(enters), 'calls_replayed': len(completed), 'pending_calls': pending,
+        'calls_seen': len(enters), 'calls_replayed': completed_count,
+        'pending_calls': pending, 'replay_pending_calls': replay_pending,
         'all_captured_calls_replayed': first_problem is None and stream_complete,
         'boundary_complete': boundary_flag if type(boundary_flag) is bool else None,
-        'completion_scope': ('vs_enter_prefix' if (scoped_prefix_complete or source_prefix_complete) else
-                             'ownership_exit' if ownership_complete else None),
+        'completion_scope': completion_scope,
+        'ownership_target': ownership_target,
         'model_actions': len(model.actions), 'pointer_aliases': len(identities),
-        'derived_identities': identities, 'replay_actions': model.actions, 'model_outputs': model.outputs,
+        'derived_identities': identity_value, 'replay_actions': action_value, 'model_outputs': output_value,
+        'artifact_receipts': artifact_receipts,
         # Wrapper observations are diagnostic ownership joins.  They are kept
         # separate from allocator identities so a captured fighter pointer can
         # never become a model allocation input.
@@ -1215,9 +1752,7 @@ def replay_lifetimes(trace: Path, profile_path: Path, profile: dict, header: dic
         'checked_wasm_matches_native': wasm_matches,
         'checked_wasm_problem': wasm_problem,
         'modeled_functions': sorted(name for name in modeled_functions if name),
-        'replay_hashes': {'actions_sha256': canonical_sha256(model.actions),
-                          'outputs_sha256': canonical_sha256(model.outputs),
-                          'identities_sha256': canonical_sha256(identities)},
+        'replay_hashes': replay_hashes,
         'derived_context': context,
         'boot_context_provenance': {'mode': 'independent_boot', **verified},
         'provenance': {'dol_sha1': profile['dol_sha1'], 'source_revision': profile['source_revision'],

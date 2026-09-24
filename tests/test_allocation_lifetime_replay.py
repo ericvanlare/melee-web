@@ -75,6 +75,8 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
         "HSD_DevComRequest": 8,
         "Fighter_FirstInitialize_80067A84": 0,
         "Fighter_Create": 1,
+        "ftDemo_ObjAllocInit": 0,
+        "ftDemo_CreateFighter": 1,
         "gm_Scene_Vs_OnEnter": 1,
         "gm_Scene_Vs_OnExit": 1,
     }
@@ -141,7 +143,7 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
     def _row(record, sequence, **fields):
         return {"record": record, "sequence": sequence, **fields}
 
-    def _stream(self, *, with_fighters=False, with_exit=True):
+    def _stream(self, *, with_fighters=False, with_exit=True, generations=1):
         rows = [self._row("header", 0, schema="synthetic-lifetime", version=1)]
         enters = {}
         returns = {}
@@ -189,25 +191,32 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
         ret(raw, 0x2040)
         ret(mem, 0x2040)
         if with_fighters:
-            vs_enter = enter("gm_Scene_Vs_OnEnter", [0x7100])
-            fighter_init = enter("Fighter_FirstInitialize_80067A84", [], vs_enter)
-            fighter_pool = enter("HSD_ObjAllocInit", [0x9000, 0x100, 4], fighter_init)
-            ret(fighter_pool, 0)
-            ret(fighter_init, 0)
+            for _ in range(generations):
+                vs_enter = enter("gm_Scene_Vs_OnEnter", [0x7100])
+                fighter_init = enter("Fighter_FirstInitialize_80067A84", [], vs_enter)
+                fighter_pool = enter("HSD_ObjAllocInit", [0x9000, 0x100, 4], fighter_init)
+                ret(fighter_pool, 0)
+                ret(fighter_init, 0)
 
-            create = enter("Fighter_Create", [0x7200], vs_enter)
-            fighter_alloc = enter("HSD_ObjAlloc", [0x9000], create)
-            ret(fighter_alloc, 0x3000)
-            ret(create, 0x7300, {"fighter": {
-                "gobj": 0x7300, "address": 0x3000, "slot": 0, "kind": 0x12,
-            }})
-            ret(vs_enter, 0, {"globals": {
-                "seed_ptr": 0x804D5F90, "ArenaStart": 0x1000,
-                "ArenaEnd": 0x20000, "HeapArray": 0x80400000, "NumHeaps": 2,
-            }, "r2": 0x804DE00, "r13": 0x804D5F00})
-            if with_exit:
-                vs_exit = enter("gm_Scene_Vs_OnExit", [0x7400])
-                ret(vs_exit, 0)
+                create = enter("Fighter_Create", [0x7200], vs_enter)
+                # Fighter_Create first obtains its HSD GObj from the independently
+                # declared gobj_alloc_data pool, then obtains Fighter from
+                # fighter_alloc_data.  The two joins must remain source-derived;
+                # the wrapper's observed addresses are comparison-only.
+                gobj_alloc = enter("HSD_ObjAlloc", [0x9100], create)
+                ret(gobj_alloc, 0x7300)
+                fighter_alloc = enter("HSD_ObjAlloc", [0x9000], create)
+                ret(fighter_alloc, 0x3000)
+                ret(create, 0x7300, {"fighter": {
+                    "gobj": 0x7300, "address": 0x3000, "slot": 0, "kind": 0x12,
+                }})
+                ret(vs_enter, 0, {"globals": {
+                    "seed_ptr": 0x804D5F90, "ArenaStart": 0x1000,
+                    "ArenaEnd": 0x20000, "HeapArray": 0x80400000, "NumHeaps": 2,
+                }, "r2": 0x804DE00, "r13": 0x804D5F00})
+                if with_exit:
+                    vs_exit = enter("gm_Scene_Vs_OnExit", [0x7400])
+                    ret(vs_exit, 0)
         rows.append(self._row("end", sequence, status="captured", calls=call_id))
         return rows, enters, returns
 
@@ -337,7 +346,7 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
         return rows, enters, returns
 
     def _run(self, rows, enters, returns, *, profile, verified,
-             checked_wasm=False):
+             checked_wasm=False, artifact_dir=None):
         profile_path, profile_value = self.profile(current_heap=profile)
         trace_path = self.root / "trace.jsonl"
         trace_path.write_text("\n".join(json.dumps(row, sort_keys=True) for row in rows) + "\n")
@@ -345,6 +354,7 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
             trace_path, profile_path, profile_value, rows[0], rows,
             enters, returns, self.CONTEXT, verified,
             checked_wasm=checked_wasm, require_complete=False,
+            artifact_dir=artifact_dir,
         )
 
     def _run_fighter(self, rows, enters, returns, *, verified=None):
@@ -373,7 +383,9 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
                     output = {"op": op, "status": "ok", "size": command["size"],
                               "align_mask": command["align"] - 1}
                 elif op == "pool_pop":
-                    output = {"op": op, "status": "ok", "address": 0x3000,
+                    output = {"op": op, "status": "ok",
+                              "address": (0x7300 if command["pool"] == 2 else 0x3000),
+                              "backing_heap": 1,
                               "used": 1, "free_count": 0, "peak": 1}
                 else:
                     output = {"op": op, "status": "ok"}
@@ -390,7 +402,7 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
             return replay_lifetimes(
                 trace_path, profile_path, profile_value, rows[0], rows,
                 enters, returns, self.CONTEXT, verified or self.verified(pools={
-                    "fighter_alloc_data": 0x9000,
+                    "fighter_alloc_data": 0x9000, "gobj_alloc_data": 0x9100,
                 }), checked_wasm=False, require_complete=False,
             )
 
@@ -484,6 +496,58 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
             self._run_async_model(commands=commands, tail=[
                 {"op": "game_handle_free", "index": 1, "label": "first"},
             ])
+
+    def test_pool_refill_tracks_actual_mixed_heap_backing_after_replacement(self):
+        commands = self._async_model_commands()
+        commands[0]['pools'] = '1 36864'
+        select = next(index for index, command in enumerate(commands)
+                      if command['op'] == 'os_select_hsd')
+        commands[select + 1:select + 1] = [
+            {'op': 'pool_reset', 'pool': 1, 'size': 64, 'align': 32},
+            {'op': 'raw_alloc', 'heap': 0, 'requested': 128, 'label': 'backing'},
+            {'op': 'pool_adopt', 'pool': 1, 'count': 1,
+             'label': 'backing', 'heap': 0},
+            {'op': 'pool_pop', 'pool': 1, 'label': 'first'},
+            {'op': 'pool_release', 'pool': 1, 'label': 'first'},
+        ]
+        current = next(index for index, command in enumerate(commands)
+                       if command['op'] == 'game_new_current')
+        commands.insert(current + 1, {'op': 'pool_pop', 'pool': 1, 'label': 'second'})
+        second_replacement = [
+            {'op': 'game_begin'},
+            {'op': 'hsd_replace_begin'},
+            {'op': 'pool_registry_forget'},
+            {'op': 'hsd_replace_destroy'},
+            {'op': 'hsd_replace_create'},
+            {'op': 'os_select_hsd'},
+            {'op': 'object_heap_set'},
+            {'op': 'hsd_replace_end'},
+            {'op': 'game_destroy_current'},
+            {'op': 'game_new_current', 'label': 'current2'},
+            # The object came from heap 0.  Looking it up against heap 1
+            # should return a normal source unknown-allocation result rather
+            # than losing the label during heap-1 teardown.
+            {'op': 'raw_free', 'heap': 1, 'label': 'second'},
+        ]
+        commands.extend(second_replacement)
+        result = self._run_async_model(commands=commands)
+        self.assertEqual(result[-1]['op'], 'raw_free')
+        self.assertEqual(result[-1]['status'], 'unknown_allocation')
+
+    def test_native_pool_pop_publishes_derived_backing_heap(self):
+        commands = self._async_model_commands()
+        commands[0]['pools'] = '1 36864'
+        commands.extend([
+            {'op': 'pool_reset', 'pool': 1, 'size': 64, 'align': 32},
+            {'op': 'raw_alloc', 'heap': 0, 'requested': 128, 'label': 'backing'},
+            {'op': 'pool_adopt', 'pool': 1, 'count': 1,
+             'label': 'backing', 'heap': 0},
+            {'op': 'pool_pop', 'pool': 1, 'label': 'object'},
+        ])
+        result = self._run_async_model(commands=commands)
+        pop = next(item for item in reversed(result) if item['op'] == 'pool_pop')
+        self.assertEqual(pop['status'], 'ok')
+        self.assertEqual(pop['backing_heap'], 0)
 
     def test_async_compaction_end_rejects_unfinished_callback(self):
         with self.assertRaises(ReplayProblem):
@@ -598,6 +662,88 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
         self.assertTrue(any(action["command"]["op"] == "pool_reset"
                             for action in report["replay_actions"]))
 
+    def test_demo_pool_reset_requires_and_records_explicit_demo_owner(self):
+        rows, enters, returns = self._stream()
+        end = rows[-1]
+        demo_call = max(enters) + 1
+        pool_call = demo_call + 1
+        demo_enter = self._row(
+            'enter', end['sequence'], call=demo_call,
+            function='ftDemo_ObjAllocInit', args=[], parent=None, thread=0)
+        pool_enter = self._row(
+            'enter', end['sequence'] + 1, call=pool_call,
+            function='HSD_ObjAllocInit', args=[0x9000, 0x100, 4],
+            parent=demo_call, thread=0)
+        pool_return = self._row(
+            'return', end['sequence'] + 2, call=pool_call,
+            function='HSD_ObjAllocInit', result=0, observed={}, thread=0)
+        demo_return = self._row(
+            'return', end['sequence'] + 3, call=demo_call,
+            function='ftDemo_ObjAllocInit', result=0, observed={}, thread=0)
+        end['sequence'] += 4
+        end['calls'] = pool_call + 1
+        rows[-1:-1] = [demo_enter, pool_enter, pool_return, demo_return]
+        enters[demo_call] = demo_enter
+        enters[pool_call] = pool_enter
+        returns[pool_call] = pool_return
+        returns[demo_call] = demo_return
+        report = self._run(rows, enters, returns, profile=0xFFFFFFFF,
+                           verified=self.verified(pools={'fighter_alloc_data': 0x9000}))
+        self.assertEqual(report['status'], 'validated_prefix')
+        self.assertTrue(any(action['command']['op'] == 'pool_reset'
+                            for action in report['replay_actions']))
+
+    def test_demo_create_joins_independent_gobj_and_fighter_allocations(self):
+        rows, enters, returns = self._stream(with_fighters=True)
+        end = rows[-1]
+        call_id = max(enters) + 1
+        sequence = end['sequence']
+
+        def enter(function, args, parent=None):
+            nonlocal call_id, sequence
+            call = call_id
+            row = self._row('enter', sequence, call=call, function=function,
+                            args=args, parent=parent, thread=0)
+            enters[call] = row
+            rows.insert(-1, row)
+            call_id += 1
+            sequence += 1
+            return call
+
+        def ret(call, result=0, observed=None):
+            nonlocal sequence
+            row = self._row('return', sequence, call=call,
+                            function=enters[call]['function'], result=result,
+                            observed=observed or {}, thread=0)
+            returns[call] = row
+            rows.insert(-1, row)
+            sequence += 1
+
+        demo = enter('ftDemo_ObjAllocInit', [])
+        pool = enter('HSD_ObjAllocInit', [0x9000, 0x100, 4], demo)
+        ret(pool)
+        ret(demo)
+        create = enter('ftDemo_CreateFighter', [0x7200])
+        gobj = enter('HSD_ObjAlloc', [0x9100], create)
+        ret(gobj, 0x7300)
+        fighter = enter('HSD_ObjAlloc', [0x9000], create)
+        ret(fighter, 0x3000)
+        ret(create, 0x7300, {'fighter': {
+            'gobj': 0x7300, 'address': 0x3000, 'slot': 0, 'kind': 0x12,
+        }})
+        end['sequence'] = sequence
+        end['calls'] = call_id
+        report = self._run_fighter(rows, enters, returns,
+                                   verified=self.verified(pools={
+                                       'fighter_alloc_data': 0x9000,
+                                       'gobj_alloc_data': 0x9100,
+                                   }))
+        self.assertEqual(report['status'], 'validated_prefix')
+        self.assertFalse(any(event.get('owner_kind') == 'demo'
+                             for event in report['ownership_events']))
+        self.assertTrue(any(action['command']['op'] == 'pool_reset'
+                            for action in report['replay_actions']))
+
     def test_changed_observed_pointer_fails_without_becoming_model_input(self):
         rows, enters, returns = self._stream()
         raw_return = next(row for row in rows
@@ -607,6 +753,64 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
                            verified=self.verified())
         self.assertEqual(report["status"], "validation")
         self.assertEqual(report["first_unsupported"]["function"], "OSAllocFromHeap")
+
+    def test_bounded_replay_keeps_failing_return_pending(self):
+        rows, enters, returns = self._stream()
+        select = next(call for call, value in enters.items()
+                      if value['function'] == 'OSSetCurrentHeap')
+        returns[select]['result'] = 0
+        report = self._run(rows, enters, returns, profile=0xFFFFFFFF,
+                           verified=self.verified(), artifact_dir=self.root / 'artifact')
+        self.assertEqual(report['status'], 'validation')
+        self.assertIn(select, report['replay_pending_calls'])
+
+    def test_demo_owner_remains_incomplete_until_a_derived_pool_reset(self):
+        rows, enters, returns = self._stream(with_fighters=True)
+        end = rows[-1]
+        call_id = max(enters) + 1
+        sequence = end['sequence']
+
+        def enter(function, args, parent=None):
+            nonlocal call_id, sequence
+            call = call_id
+            row = self._row('enter', sequence, call=call, function=function,
+                            args=args, parent=parent, thread=0)
+            enters[call] = row
+            rows.insert(-1, row)
+            call_id += 1
+            sequence += 1
+            return call
+
+        def ret(call, result=0, observed=None):
+            nonlocal sequence
+            row = self._row('return', sequence, call=call,
+                            function=enters[call]['function'], result=result,
+                            observed=observed or {}, thread=0)
+            returns[call] = row
+            rows.insert(-1, row)
+            sequence += 1
+
+        demo = enter('ftDemo_ObjAllocInit', [])
+        pool = enter('HSD_ObjAllocInit', [0x9000, 0x100, 4], demo)
+        ret(pool)
+        ret(demo)
+        create = enter('ftDemo_CreateFighter', [0x7200])
+        gobj = enter('HSD_ObjAlloc', [0x9100], create)
+        ret(gobj, 0x7300)
+        fighter = enter('HSD_ObjAlloc', [0x9000], create)
+        ret(fighter, 0x3000)
+        ret(create, 0x7300, {'fighter': {
+            'gobj': 0x7300, 'address': 0x3000, 'slot': 0, 'kind': 0x12,
+        }})
+        end['sequence'] = sequence
+        end['calls'] = call_id
+        report = self._run_fighter(rows, enters, returns,
+                                   verified=self.verified(pools={
+                                       'fighter_alloc_data': 0x9000,
+                                       'gobj_alloc_data': 0x9100,
+                                   }))
+        self.assertEqual(report['status'], 'validated_prefix')
+        self.assertFalse(report['ownership_complete'])
         commands = [action["command"] for action in report["replay_actions"]]
         raw = next(command for command in commands if command["op"] == "raw_alloc")
         self.assertNotIn("address", raw)
@@ -701,6 +905,80 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
         final = compact_ops.index("game_handle_compact_callback", devcom + 1)
         self.assertLess(devcom, final)
 
+    def test_artifact_mode_spools_actions_outputs_and_identities_losslessly(self):
+        rows, enters, returns = self._stream()
+        with tempfile.TemporaryDirectory() as directory:
+            report = self._run(rows, enters, returns, profile=0xFFFFFFFF,
+                               verified=self.verified(), checked_wasm=True,
+                               artifact_dir=Path(directory))
+            self.assertTrue(report['checked_wasm_matches_native'])
+            self.assertEqual(report['status'], 'validated_prefix')
+            self.assertEqual(report['model_actions'], report['artifact_receipts']['actions']['count'])
+            self.assertEqual(report['model_actions'], report['artifact_receipts']['outputs']['count'])
+            self.assertEqual(report['pointer_aliases'], report['artifact_receipts']['identities']['count'])
+            self.assertEqual(report['replay_hashes']['actions_sha256'],
+                             report['artifact_receipts']['actions']['canonical_array_sha256'])
+            self.assertIsInstance(report['replay_actions'], dict)
+            self.assertEqual(report['replay_actions']['count'], report['model_actions'])
+            self.assertIsInstance(report['model_outputs'], dict)
+
+    def test_artifact_failure_preserves_complete_source_trace_status(self):
+        rows, enters, returns = self._stream()
+        bad_call = max(enters) + 1
+        bad_enter = self._row(
+            'enter', rows[-1]['sequence'], call=bad_call,
+            function='UnsupportedSourceBoundary', args=[], parent=None, thread=0)
+        bad_return = self._row(
+            'return', bad_enter['sequence'] + 1, call=bad_call,
+            function=bad_enter['function'], result=0, observed={}, thread=0)
+        rows[-1]['sequence'] += 2
+        rows[-1]['calls'] = bad_call + 1
+        rows[-1]['pending_calls'] = []
+        rows[-1:-1] = [bad_enter, bad_return]
+        enters[bad_call] = bad_enter
+        returns[bad_call] = bad_return
+        with tempfile.TemporaryDirectory() as directory:
+            report = self._run(rows, enters, returns, profile=0xFFFFFFFF,
+                               verified=self.verified(), artifact_dir=Path(directory))
+        self.assertEqual(report['status'], 'unsupported')
+        self.assertTrue(report['trace_complete'])
+        self.assertEqual(report['pending_calls'], [])
+        self.assertEqual(report['replay_pending_calls'], [bad_call])
+        self.assertFalse(report['all_captured_calls_replayed'])
+
+    def test_vs_target_header_rejects_bool_and_asymmetric_end_schema(self):
+        rows, enters, returns = self._stream(with_fighters=True, with_exit=False)
+        rows[0].update({'scope': 'vs_ownership', 'vs_target': True, 'stop_at': 'entry'})
+        rows[-1].update({
+            'scope': 'vs_ownership', 'vs_target': 1, 'stop_at': 'entry',
+            'target_complete': True, 'vs_entries': 1, 'vs_exits': 0,
+            'active_owner': True, 'boundary_complete': True,
+            'ownership_complete': False,
+        })
+        report = self._run_fighter(rows, enters, returns)
+        self.assertEqual(report['status'], 'stream')
+        self.assertIn('header vs_target', report['first_unsupported']['reason'])
+
+        rows[0]['vs_target'] = 1
+        del rows[-1]['stop_at']
+        report = self._run_fighter(rows, enters, returns)
+        self.assertEqual(report['status'], 'stream')
+        self.assertIn('end record lacks stop_at', report['first_unsupported']['reason'])
+
+    def test_interrupted_repeated_target_reports_observed_single_entry_scope(self):
+        rows, enters, returns = self._stream(with_fighters=True, with_exit=False)
+        rows[0].update({'scope': 'vs_ownership', 'vs_target': 2, 'stop_at': 'entry'})
+        rows[-1].update({
+            'status': 'interrupted', 'scope': 'vs_ownership', 'vs_target': 2,
+            'stop_at': 'entry', 'target_complete': False, 'vs_entries': 1,
+            'vs_exits': 0, 'active_owner': True, 'boundary_complete': True,
+            'ownership_complete': False,
+        })
+        report = self._run_fighter(rows, enters, returns)
+        self.assertEqual(report['status'], 'incomplete_prefix')
+        self.assertEqual(report['completion_scope'], 'vs_enter_prefix')
+        self.assertEqual(report['ownership_target']['end']['vs_entries'], 1)
+
     def test_compaction_manager_is_a_comparison_target(self):
         rows, enters, returns = self._replacement_stream(include_compaction=True)
         entry = next(row for row in rows if row.get('record') == 'enter' and
@@ -766,6 +1044,116 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
         # address is present in any command sent to the model.
         self.assertNotIn("3000", json.dumps(report["replay_actions"], sort_keys=True).lower())
 
+    def test_repeated_vs_generations_reset_source_ownership_after_exit(self):
+        rows, enters, returns = self._stream(with_fighters=True, generations=2)
+        rows[0].update({"scope": "vs_ownership", "vs_target": 2, "stop_at": "exit"})
+        rows[-1].update({
+            "scope": "vs_ownership", "vs_target": 2, "stop_at": "exit",
+            "target_complete": True, "vs_entries": 2, "vs_exits": 2,
+            "active_owner": False, "boundary_complete": True,
+            "ownership_complete": True,
+        })
+
+        report = self._run_fighter(rows, enters, returns)
+
+        self.assertEqual(report["status"], "validated_prefix")
+        self.assertFalse(report["complete"])
+        self.assertEqual(report["completion_scope"], "repeated_vs_ownership_exit")
+        self.assertTrue(report["ownership_complete"])
+        self.assertEqual(
+            [event["kind"] for event in report["ownership_events"]],
+            ["vs_enter", "fighter_pool_init", "fighter_create", "vs_enter_complete", "vs_exit",
+             "vs_enter", "fighter_pool_init", "fighter_create", "vs_enter_complete", "vs_exit"],
+        )
+        generations = [event["generation"] for event in report["ownership_events"]
+                       if event["kind"] == "fighter_create"]
+        self.assertEqual(generations, [1, 2])
+        pool_generations = [event["generation"] for event in report["ownership_events"]
+                            if event["kind"] == "fighter_pool_init"]
+        self.assertEqual(pool_generations, [1, 2])
+
+    def test_repeated_vs_generation_rejects_duplicate_pool_reset_before_exit(self):
+        rows, enters, returns = self._stream(with_fighters=True, generations=2)
+        second_init = [call for call in enters.values()
+                       if call["function"] == "Fighter_FirstInitialize_80067A84"][1]
+        call_id = max(enters) + 1
+        sequence = next(row["sequence"] for row in rows
+                        if row.get("record") == "return" and row.get("call") == second_init["call"])
+        duplicate = {"record": "enter", "sequence": sequence, "call": call_id,
+                     "function": "HSD_ObjAllocInit", "args": [0x9000, 0x100, 4],
+                     "parent": second_init["call"], "thread": 0}
+        duplicate_return = {"record": "return", "sequence": sequence + 1,
+                            "call": call_id, "function": duplicate["function"],
+                            "result": 0, "observed": {}, "thread": 0}
+        insert_at = next(index for index, row in enumerate(rows)
+                         if row.get("record") == "return" and row.get("call") == second_init["call"])
+        rows[insert_at:insert_at] = [duplicate, duplicate_return]
+        enters[call_id] = duplicate
+        returns[call_id] = duplicate_return
+
+        report = self._run_fighter(rows, enters, returns)
+
+        self.assertEqual(report["status"], "unsupported")
+        self.assertIn("more than once", report["first_unsupported"]["reason"])
+
+    def test_repeated_vs_generation_rejects_stale_fighter_before_new_pool_init(self):
+        rows, enters, returns = self._stream(with_fighters=True, generations=2)
+        second_init = [call for call in enters.values()
+                       if call["function"] == "Fighter_FirstInitialize_80067A84"][1]
+        second_pool = next(call for call in enters.values()
+                           if call.get("parent") == second_init["call"])
+        removed = {second_init["call"], second_pool["call"]}
+        rows = [row for row in rows if row.get("call") not in removed]
+        for call in removed:
+            enters.pop(call)
+            returns.pop(call)
+
+        report = self._run_fighter(rows, enters, returns)
+
+        self.assertEqual(report["status"], "unsupported")
+        self.assertEqual(report["first_unsupported"]["function"], "Fighter_Create")
+        self.assertIn("completed fighter pool generation", report["first_unsupported"]["reason"])
+
+    def test_vs_target_metadata_requires_source_counts_and_owner_state(self):
+        rows, enters, returns = self._stream(with_fighters=True, with_exit=False)
+        rows[0].update({"scope": "vs_ownership", "vs_target": 1, "stop_at": "entry"})
+        rows[-1].update({
+            "scope": "vs_ownership", "vs_target": 1, "stop_at": "entry",
+            "target_complete": True, "vs_entries": 1, "vs_exits": 0,
+            "active_owner": True, "boundary_complete": True,
+            "ownership_complete": False,
+        })
+
+        report = self._run_fighter(rows, enters, returns)
+
+        self.assertEqual(report["status"], "validated_prefix")
+        self.assertEqual(report["completion_scope"], "vs_enter_prefix")
+        self.assertFalse(report["ownership_complete"])
+
+        rows[-1]["vs_exits"] = 1
+        rejected = self._run_fighter(rows, enters, returns)
+        self.assertEqual(rejected["status"], "stream")
+        self.assertIn("counts differ", rejected["first_unsupported"]["reason"])
+
+        rows[-1]["vs_exits"] = 0
+        rows[-1]["target_complete"] = False
+        rejected = self._run_fighter(rows, enters, returns)
+        self.assertEqual(rejected["status"], "stream")
+        self.assertIn("cannot have captured status", rejected["first_unsupported"]["reason"])
+
+    def test_fighter_create_requires_independent_gobj_pool_identity(self):
+        rows, enters, returns = self._stream(with_fighters=True)
+        create_return = next(row for row in rows
+                             if row.get("record") == "return"
+                             and row.get("function") == "Fighter_Create")
+        create_return["result"] = 0x7400
+        create_return["observed"]["fighter"]["gobj"] = 0x7400
+
+        report = self._run_fighter(rows, enters, returns)
+
+        self.assertEqual(report["status"], "validation")
+        self.assertIn("GObj allocation identity", report["first_unsupported"]["reason"])
+
     def test_vs_enter_boundary_can_complete_an_allocation_prefix_only(self):
         rows, enters, returns = self._stream(with_fighters=True, with_exit=False)
         rows[-1]["boundary_complete"] = True
@@ -798,9 +1186,9 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
         rows[-1]["boundary_complete"] = True
         create = next(call for call in enters.values()
                       if call["function"] == "Fighter_Create")
-        nested = next(call for call in enters.values()
-                      if call.get("parent") == create["call"])
-        removed = {create["call"], nested["call"]}
+        nested = [call for call in enters.values()
+                  if call.get("parent") == create["call"]]
+        removed = {create["call"], *(call["call"] for call in nested)}
         rows = [row for row in rows if row.get("call") not in removed]
         for call in removed:
             enters.pop(call)
@@ -848,22 +1236,24 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
         self.assertEqual(report["completion_scope"], "vs_enter_prefix")
 
     def test_fighter_wrapper_rejects_missing_or_wrong_static_pool(self):
-        rows, enters, returns = self._stream(with_fighters=True)
+        rows, enters, returns = self._stream(with_fighters=True, with_exit=False)
         report = self._run_fighter(rows, enters, returns, verified=self.verified())
         self.assertEqual(report["status"], "unsupported")
         self.assertIn("fighter_alloc_data", report["first_unsupported"]["reason"])
 
         rows, enters, returns = self._stream(with_fighters=True)
         fighter_alloc = next(call for call in enters.values()
-                             if call["function"] == "HSD_ObjAlloc")
-        fighter_alloc["args"][0] = 0x9100
-        verified = self.verified(pools={"fighter_alloc_data": 0x9000, "other_pool": 0x9100})
+                             if call["function"] == "HSD_ObjAlloc"
+                             and call["args"] == [0x9000])
+        fighter_alloc["args"][0] = 0x9200
+        verified = self.verified(pools={"fighter_alloc_data": 0x9000,
+                                        "gobj_alloc_data": 0x9100, "wrong_pool": 0x9200})
         report = self._run_fighter(rows, enters, returns, verified=verified)
         self.assertEqual(report["status"], "unsupported")
         self.assertIn("no independent fighter_alloc_data pool", report["first_unsupported"]["reason"])
 
     def test_fighter_wrapper_rejects_ambiguous_or_inconsistent_generation(self):
-        rows, enters, returns = self._stream(with_fighters=True)
+        rows, enters, returns = self._stream(with_fighters=True, with_exit=False)
         first = next(call for call in enters.values()
                      if call["function"] == "Fighter_FirstInitialize_80067A84")
         # Add a second same-pool initialization inside the same wrapper.  The
@@ -885,7 +1275,7 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
         self.assertEqual(report["status"], "unsupported")
         self.assertIn("more than once", report["first_unsupported"]["reason"])
 
-        rows, enters, returns = self._stream(with_fighters=True)
+        rows, enters, returns = self._stream(with_fighters=True, with_exit=False)
         fighter_init = next(call for call in enters.values()
                             if call["function"] == "Fighter_FirstInitialize_80067A84")
         sequence = max(row["sequence"] for row in rows) + 1
@@ -902,7 +1292,7 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
         returns[call_id] = repeated_return
         report = self._run_fighter(rows, enters, returns)
         self.assertEqual(report["status"], "unsupported")
-        self.assertIn("existing source generation", report["first_unsupported"]["reason"])
+        self.assertIn("prior VS owner exited", report["first_unsupported"]["reason"])
 
     def test_fighter_wrapper_rejects_observed_join_mismatch(self):
         rows, enters, returns = self._stream(with_fighters=True)
