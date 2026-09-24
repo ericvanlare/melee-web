@@ -14,6 +14,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -292,6 +293,27 @@ def copy_overlay(source: Path, destination: Path) -> None:
         shutil.copy2(file, target)
 
 
+def allocation_profile_provenance(header: Path) -> dict[str, str]:
+    text = header.read_text(encoding="utf-8")
+    fields = {}
+    for label, key, width in (("DOL SHA-1", "dol_sha1", 40),
+                              ("Source revision", "source_revision", 40),
+                              ("Symbols SHA-256", "symbols_sha256", 64),
+                              ("Profile SHA-256", "profile_sha256", 64)):
+        matches = re.findall(r"^// " + re.escape(label) + r": ([0-9a-f]{" + str(width) + r"})$",
+                             text, re.MULTILINE)
+        if len(matches) != 1:
+            raise SystemExit("allocation profile lacks unambiguous " + label)
+        fields[key] = matches[0]
+    expected_source = json.loads((ROOT / "dependencies.lock.json").read_text())["repositories"]["melee"]["commit"]
+    if fields["dol_sha1"] != "08e0bf20134dfcb260699671004527b2d6bb1a45" or fields["source_revision"] != expected_source:
+        raise SystemExit("allocation profile differs from the pinned original identity")
+    fields["header_sha256"] = sha256(header)
+    fields["generator_sha256"] = sha256(ROOT / "tools/generate_reference_allocation_profile.py")
+    fields["recipe_sha256"] = sha256(ROOT / "tools/retail_allocation_profile.py")
+    return fields
+
+
 def archive_provenance(archive_root: Path, binary_sha: str, manifest: Path,
                        source_overlay: Path, patch_dir: Path, *,
                        manifest_bytes: bytes | None = None) -> Path:
@@ -308,6 +330,8 @@ def archive_provenance(archive_root: Path, binary_sha: str, manifest: Path,
         (manifest, archive / manifest.name, manifest_bytes),
         (Path(__file__), archive / Path(__file__).name, None),
     ]
+    for name in ("generate_reference_allocation_profile.py", "retail_allocation_profile.py"):
+        files.append((ROOT / "tools" / name, archive / "tools" / name, None))
     files.extend((patch, archive / "patches" / patch.name, None)
                  for patch in sorted(patch_dir.glob("*.patch")))
     for file in sorted(source_overlay.rglob("*")):
@@ -483,6 +507,8 @@ def main(argv: list[str] | None = None) -> int:
         },
         "observer_patch_sha256": [sha256(patch) for patch in sorted(PATCH_DIR.glob("*.patch"))],
         "observer_source_overlay_sha256": overlay_hashes,
+        "allocation_profile": allocation_profile_provenance(
+            SOURCE_OVERLAY / "Core/PowerPC/ReferenceAllocationProfile.h"),
         "composed_source_diff_sha256": hashlib.sha256(composed_diff).hexdigest(),
         "observer_identity": observer_identity,
         "observer_identity_sha256": hashlib.sha256(

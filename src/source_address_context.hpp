@@ -73,6 +73,29 @@ private:
     std::uint64_t generation_ = 0;
 };
 
+// The original objalloc registry is a singly linked list threaded through
+// each descriptor's `next` word.  ForgetMemory clears only the global head;
+// descriptor words, including stale next links, remain untouched until a
+// later HSD_ObjAllocInit overwrites that descriptor.  This identity-only
+// model keeps that distinction explicit for source-bound callers.
+class Registry {
+public:
+    Status initialize(Address descriptor);
+    void forget_memory();
+    std::optional<Address> head() const { return head_; }
+    std::optional<Address> next(Address descriptor) const;
+    bool known(Address descriptor) const;
+private:
+    struct Node {
+        Address descriptor;
+        std::optional<Address> next;
+    };
+    std::vector<Node> nodes_;
+    std::optional<Address> head_;
+    Node* find(Address descriptor);
+    const Node* find(Address descriptor) const;
+};
+
 struct PoolState {
     std::uint32_t size = 0, align_mask = 0;
     std::uint32_t used = 0, peak = 0;
@@ -91,21 +114,48 @@ public:
     ObjectPool& operator=(const ObjectPool&) = delete;
     ObjectPool(ObjectPool&&) = delete;
     ObjectPool& operator=(ObjectPool&&) = delete;
-    // May initialize again after a heap-generation change. In-place original
-    // HSD_ObjAllocInit resets and imports of existing pools are not supported.
+    // HSD_ObjAllocInit is an in-place descriptor reset. Existing OS backing
+    // cells stay reserved by their source heaps, while this descriptor drops
+    // its free/live chains and backing ownership; the next refill uses the
+    // selected HSD heap.
     Status initialize(std::uint32_t size, std::uint32_t alignment,
                       bool dedicated_heap = false, bool number_limit = false,
                       bool heap_limit = false);
+    Status reset(std::uint32_t size, std::uint32_t alignment,
+                 bool dedicated_heap = false, bool number_limit = false,
+                 bool heap_limit = false);
     Status add_free(std::uint32_t count);
+    Status add_free(std::uint32_t count, Heap& selected_heap);
+    // The caller has already replayed HSD_MemAlloc/OSAllocFromHeap and
+    // supplies its independently-derived payload identity.  This operation
+    // adopts that existing cell without allocating again, then performs only
+    // HSD_ObjAllocAddFree's descriptor linking step.
+    Status adopt_backing(Heap& selected_heap, Address backing,
+                         std::uint32_t count);
     Allocation allocate();
+    Allocation allocate(Heap& selected_heap);
+    // Pop-only HSD_ObjAlloc path.  It never performs an implicit refill.
+    Allocation allocate_existing();
     Status release(Address object);
     const PoolState& state() const { return state_; }
 private:
+    struct Backing {
+        Heap* heap = nullptr;
+        std::uint64_t generation = 0;
+        Address payload;
+    };
     Heap& heap_;
     PoolState state_;
     bool initialized_ = false;
-    std::uint64_t heap_generation_ = 0;
+    std::uint64_t initialized_generation_ = 0;
+    std::vector<Backing> backings_;
     bool context_available() const;
+    bool context_available(Heap& selected_heap) const;
+    Status link_backing(Heap& selected_heap, Address backing,
+                        std::uint32_t count);
+    Status configure(std::uint32_t size, std::uint32_t alignment,
+                     bool dedicated_heap, bool number_limit, bool heap_limit,
+                     bool require_new_generation);
 };
 
 // A known source zero and an unavailable register are different states.

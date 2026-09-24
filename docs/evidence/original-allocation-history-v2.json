@@ -1,0 +1,1388 @@
+{
+  "acceptance_gate": "blocked_before_full_scenario_capture",
+  "builds": [
+    {
+      "command": [
+        "python3",
+        "scripts/build.py",
+        "--target",
+        "runtime",
+        "--configuration",
+        "Release",
+        "--jobs",
+        "4"
+      ],
+      "exit_code": 0,
+      "log_sha256": "149316e39b77fcd416375a272bb6c8d381cba688164690777a2c723830095de7",
+      "seconds": 26.73243633301172
+    },
+    {
+      "command": [
+        "python3",
+        "scripts/build.py",
+        "--target",
+        "graphics",
+        "--configuration",
+        "Release",
+        "--jobs",
+        "4"
+      ],
+      "exit_code": 0,
+      "log_sha256": "32c6e66194a2c142885a9e051660fab7ddb47d5ce8637b38bcdb1807d4e6e2a3",
+      "seconds": 16.11180716699164
+    },
+    {
+      "command": [
+        "python3",
+        "scripts/build.py",
+        "--target",
+        "fighter",
+        "--configuration",
+        "Release",
+        "--jobs",
+        "4"
+      ],
+      "exit_code": 0,
+      "log_sha256": "2289a9e8419d24b5c3feb88c76cc7b427502ffa72c8d1b0f9921a99255147bc8",
+      "seconds": 31.256058541999664
+    }
+  ],
+  "captures": [
+    {
+      "allocations_sha256": "0fd891e01ad45e600e6b4f23485b92c848374bfbe4377f72847abf1c02108883",
+      "calls": 276,
+      "capture_status": "captured_diagnostic",
+      "failure": null,
+      "inputs_unchanged": true,
+      "name": "boot-v9",
+      "observed_function_counts": {
+        "ARAlloc": 4,
+        "ARFree": 1,
+        "ARGetSize": 2,
+        "ARInit": 1,
+        "HSD_AllocateFifo": 1,
+        "HSD_AllocateXFB": 1,
+        "HSD_CreateMainHeap": 1,
+        "HSD_MemAlloc": 66,
+        "HSD_OSInit": 1,
+        "HSD_ObjAlloc": 16,
+        "HSD_ObjAllocAddFree": 16,
+        "HSD_ObjAllocInit": 33,
+        "HSD_ObjSetHeap": 2,
+        "HSD_SetHeap": 16,
+        "OSAllocFromArenaLo": 1,
+        "OSAllocFromHeap": 73,
+        "OSCreateHeap": 3,
+        "OSDestroyHeap": 1,
+        "OSInitAlloc": 1,
+        "OSSetArenaHi": 1,
+        "OSSetArenaLo": 6,
+        "OSSetCurrentHeap": 2,
+        "_HSD_ObjAllocForgetMemory": 1,
+        "lbHeap_800158D0": 5,
+        "lbHeap_80015900": 1,
+        "lbHeap_80015BD0": 10,
+        "lbHeap_80015D6C": 1,
+        "lbHeap_80015F3C": 1,
+        "lbMemory_80014E24": 2,
+        "lbMemory_80014FC8": 2,
+        "lbMemory_8001529C": 1,
+        "lbMemory_800154D4": 1,
+        "lbMemory_800155A4": 1,
+        "lbMemory_8001564C": 1
+      },
+      "outputs": {
+        "allocations.jsonl": "0fd891e01ad45e600e6b4f23485b92c848374bfbe4377f72847abf1c02108883",
+        "dolphin.log": "30ab1f9862587f8dfc8441a810435e376b832789e112b0c1db42190486b3678c",
+        "gdb.log": "f4f01f55921cd763a1877e0f0bcf91a60f73855defaa9d7b29f693c89f27e22e",
+        "launch.json": "25cd9a31171199516a8bdaeaf89cc1e956e8d4a9ad4c449eba976a9de11f5786",
+        "processes.json": "ef4bf985e24f647b6682435edbcce3c7e277d4f3c4503c42687ecc61d56f5496"
+      },
+      "owned_evidence_outputs": {
+        "allocation-profile.json": "d4a31b97ac6a51edba890dd59946a8915ffc674496c372036702bc26787519ef",
+        "gdb-commands.txt": "129700143f394b2f966f328fe5a10e3cd3f9ca776e42987875df2d724cc1b162",
+        "gdb-control.py": "9b8d0c64dd86507dae30a8db139a60de1f1c3abb4f75388c9bbcff3a79da37a3",
+        "independent-boot-context.json": "030c0566d9ea4af645d6e1344a3437c5bd609f11be17098728b5c4c11b62ce0f",
+        "input-plan.json": "3f9067a0edf388fd9a579b853e44eeca51e769853281ac301b2a4631e234d925",
+        "menu-target.json": "ccf05d7342270b7958523ab6442061cf8bb3e6f5485982c5e4fe640da5781382",
+        "provenance.json": "b9bf12b7eacead6e78ca88e6d5d1939309b1e32e6b06ee1f6cd8b026bbd0c08a",
+        "scenario.json": "47eea34486f2b42ace1c7fa006e5632ba4ab50cc5f25b34e33a323c586c2f7f8"
+      },
+      "profile_sha256": "d4a31b97ac6a51edba890dd59946a8915ffc674496c372036702bc26787519ef",
+      "result_sha256": "c21363b43924c4ea1e21b3fb7f36691029cb4053e7af91965391772315f94574",
+      "rows": 554,
+      "unhit_functions": [
+        "Fighter_Create",
+        "Fighter_FirstInitialize_80067A84",
+        "HSD_Free",
+        "HSD_ObjFree",
+        "OSAllocFromArenaHi",
+        "OSFreeToHeap",
+        "gm_Scene_Vs_OnEnter",
+        "gm_Scene_Vs_OnExit",
+        "lbHeap_80015CA8",
+        "lbMemFreeToHeap",
+        "lbMemory_80014EEC"
+      ]
+    },
+    {
+      "allocations_sha256": "0fd891e01ad45e600e6b4f23485b92c848374bfbe4377f72847abf1c02108883",
+      "calls": 276,
+      "capture_status": "captured_diagnostic",
+      "failure": null,
+      "inputs_unchanged": true,
+      "name": "boot-v10",
+      "observed_function_counts": {
+        "ARAlloc": 4,
+        "ARFree": 1,
+        "ARGetSize": 2,
+        "ARInit": 1,
+        "HSD_AllocateFifo": 1,
+        "HSD_AllocateXFB": 1,
+        "HSD_CreateMainHeap": 1,
+        "HSD_MemAlloc": 66,
+        "HSD_OSInit": 1,
+        "HSD_ObjAlloc": 16,
+        "HSD_ObjAllocAddFree": 16,
+        "HSD_ObjAllocInit": 33,
+        "HSD_ObjSetHeap": 2,
+        "HSD_SetHeap": 16,
+        "OSAllocFromArenaLo": 1,
+        "OSAllocFromHeap": 73,
+        "OSCreateHeap": 3,
+        "OSDestroyHeap": 1,
+        "OSInitAlloc": 1,
+        "OSSetArenaHi": 1,
+        "OSSetArenaLo": 6,
+        "OSSetCurrentHeap": 2,
+        "_HSD_ObjAllocForgetMemory": 1,
+        "lbHeap_800158D0": 5,
+        "lbHeap_80015900": 1,
+        "lbHeap_80015BD0": 10,
+        "lbHeap_80015D6C": 1,
+        "lbHeap_80015F3C": 1,
+        "lbMemory_80014E24": 2,
+        "lbMemory_80014FC8": 2,
+        "lbMemory_8001529C": 1,
+        "lbMemory_800154D4": 1,
+        "lbMemory_800155A4": 1,
+        "lbMemory_8001564C": 1
+      },
+      "outputs": {
+        "allocations.jsonl": "0fd891e01ad45e600e6b4f23485b92c848374bfbe4377f72847abf1c02108883",
+        "dolphin.log": "30ab1f9862587f8dfc8441a810435e376b832789e112b0c1db42190486b3678c",
+        "gdb.log": "f4f01f55921cd763a1877e0f0bcf91a60f73855defaa9d7b29f693c89f27e22e",
+        "launch.json": "9eb64ef5df4d2603f763a6328a942cd7dd50805e1c3701e876754cbad1603f03",
+        "processes.json": "15a5594d670e1478e24787d88d85a4dfe46a02c3561212a5050335af18012f50"
+      },
+      "owned_evidence_outputs": {
+        "allocation-profile.json": "d4a31b97ac6a51edba890dd59946a8915ffc674496c372036702bc26787519ef",
+        "gdb-commands.txt": "68486c42f139d6ecd54d92bb1a3edf81e1d66bb596102f3f935aa3d0612d1fd4",
+        "gdb-control.py": "fad84cf7e6cd225798ad06e29f2e324d979224b5ae278908ef7d729a4ee6f39e",
+        "independent-boot-context.json": "030c0566d9ea4af645d6e1344a3437c5bd609f11be17098728b5c4c11b62ce0f",
+        "input-plan.json": "3f9067a0edf388fd9a579b853e44eeca51e769853281ac301b2a4631e234d925",
+        "menu-target.json": "ccf05d7342270b7958523ab6442061cf8bb3e6f5485982c5e4fe640da5781382",
+        "provenance.json": "b9bf12b7eacead6e78ca88e6d5d1939309b1e32e6b06ee1f6cd8b026bbd0c08a",
+        "scenario.json": "47eea34486f2b42ace1c7fa006e5632ba4ab50cc5f25b34e33a323c586c2f7f8"
+      },
+      "profile_sha256": "d4a31b97ac6a51edba890dd59946a8915ffc674496c372036702bc26787519ef",
+      "result_sha256": "d4cf478ced9157e4f4b3de7e5b42d62637676d21531a62f9acb86728cec7c521",
+      "rows": 554,
+      "unhit_functions": [
+        "Fighter_Create",
+        "Fighter_FirstInitialize_80067A84",
+        "HSD_Free",
+        "HSD_ObjFree",
+        "OSAllocFromArenaHi",
+        "OSFreeToHeap",
+        "gm_Scene_Vs_OnEnter",
+        "gm_Scene_Vs_OnExit",
+        "lbHeap_80015CA8",
+        "lbMemFreeToHeap",
+        "lbMemory_80014EEC"
+      ]
+    },
+    {
+      "allocations_sha256": "11e78f4abfdb698b5d7303e268b46f5e7f48648058273e032e1aea930fe13c1c",
+      "calls": 25168,
+      "capture_status": "failed",
+      "failure": "Python Exception <class 'RuntimeError'>: original SSS did not expose cursor/cooldown readiness: cursor=2160651776 cooldown=0 menu=0005",
+      "inputs_unchanged": true,
+      "name": "menu-prefix-a",
+      "observed_function_counts": {
+        "ARAlloc": 4,
+        "ARFree": 1,
+        "ARGetSize": 2,
+        "ARInit": 1,
+        "HSD_AllocateFifo": 1,
+        "HSD_AllocateXFB": 1,
+        "HSD_CreateMainHeap": 6,
+        "HSD_Free": 9,
+        "HSD_MemAlloc": 5160,
+        "HSD_OSInit": 1,
+        "HSD_ObjAlloc": 6980,
+        "HSD_ObjAllocAddFree": 4133,
+        "HSD_ObjAllocInit": 128,
+        "HSD_ObjFree": 3233,
+        "HSD_ObjSetHeap": 7,
+        "HSD_SetHeap": 92,
+        "OSAllocFromArenaLo": 1,
+        "OSAllocFromHeap": 5172,
+        "OSCreateHeap": 8,
+        "OSDestroyHeap": 6,
+        "OSFreeToHeap": 9,
+        "OSInitAlloc": 1,
+        "OSSetArenaHi": 1,
+        "OSSetArenaLo": 6,
+        "OSSetCurrentHeap": 7,
+        "_HSD_ObjAllocForgetMemory": 6,
+        "lbHeap_800158D0": 43,
+        "lbHeap_80015900": 6,
+        "lbHeap_80015BD0": 64,
+        "lbHeap_80015CA8": 6,
+        "lbHeap_80015D6C": 13,
+        "lbHeap_80015F3C": 1,
+        "lbMemory_80014E24": 7,
+        "lbMemory_80014EEC": 2,
+        "lbMemory_80014FC8": 24,
+        "lbMemory_8001529C": 13,
+        "lbMemory_800154D4": 6,
+        "lbMemory_800155A4": 6,
+        "lbMemory_8001564C": 1
+      },
+      "outputs": {
+        "allocations.jsonl": "11e78f4abfdb698b5d7303e268b46f5e7f48648058273e032e1aea930fe13c1c",
+        "dolphin.log": "30ab1f9862587f8dfc8441a810435e376b832789e112b0c1db42190486b3678c",
+        "gdb.log": "5ce9424edf29e0165720ae41ddc56ca2bd982b1f3e5fb0697abaff969ce25fda",
+        "launch.json": "bead75ed881b70971ebdf69babb1dc3af039f0fc743c6cbbd3da990cc2cce5bc",
+        "processes.json": "46ae6174b0d8d49c6bd1681cf336b8ad99cb2435865ad57587a19e36312665de"
+      },
+      "owned_evidence_outputs": {
+        "allocation-profile.json": "d4a31b97ac6a51edba890dd59946a8915ffc674496c372036702bc26787519ef",
+        "cold-boot-input-commands.jsonl": "4c41ec6504e8faeb85982f43e271a8cc3434bf01917c87bdbe3c04384d43dbe2",
+        "gdb-commands.txt": "4a3cf6270a2599d19ce3ecad878668f0570a97235f7bc8c174b65da9f02476df",
+        "gdb-control.py": "bc54a4a56acffdd383ecd43e272d5f3ad90413d2cbf352770489773e96e3e1e0",
+        "independent-boot-context.json": "030c0566d9ea4af645d6e1344a3437c5bd609f11be17098728b5c4c11b62ce0f",
+        "input-plan.json": "3f9067a0edf388fd9a579b853e44eeca51e769853281ac301b2a4631e234d925",
+        "menu-driver.py": "a387999a70160f40e6acfeb3ddd5fc4f5b0a19dd71f8856dbcde446972e365a8",
+        "menu-target.json": "ccf05d7342270b7958523ab6442061cf8bb3e6f5485982c5e4fe640da5781382",
+        "provenance.json": "b9bf12b7eacead6e78ca88e6d5d1939309b1e32e6b06ee1f6cd8b026bbd0c08a",
+        "scenario.json": "47eea34486f2b42ace1c7fa006e5632ba4ab50cc5f25b34e33a323c586c2f7f8"
+      },
+      "profile_sha256": "d4a31b97ac6a51edba890dd59946a8915ffc674496c372036702bc26787519ef",
+      "result_sha256": "b05fc1e737885d5009e48181ed2a094acb7ea56d53ab0f0ba8942aef0f5c6cd6",
+      "rows": 50349,
+      "unhit_functions": [
+        "Fighter_Create",
+        "Fighter_FirstInitialize_80067A84",
+        "OSAllocFromArenaHi",
+        "gm_Scene_Vs_OnEnter",
+        "gm_Scene_Vs_OnExit",
+        "lbMemFreeToHeap"
+      ]
+    },
+    {
+      "allocations_sha256": "dc7a9e3ae3e3eabc1d09ce3a77bb3c3845078761ad1986342dbcdfb9b59f83df",
+      "calls": 47974,
+      "capture_status": "failed",
+      "failure": "declared 600-second capture wall limit expired during rules setup",
+      "inputs_unchanged": true,
+      "name": "menu-prefix-b",
+      "observed_function_counts": {
+        "ARAlloc": 4,
+        "ARFree": 1,
+        "ARGetSize": 2,
+        "ARInit": 1,
+        "HSD_AllocateFifo": 1,
+        "HSD_AllocateXFB": 1,
+        "HSD_CreateMainHeap": 8,
+        "HSD_Free": 50,
+        "HSD_MemAlloc": 8558,
+        "HSD_OSInit": 1,
+        "HSD_ObjAlloc": 14257,
+        "HSD_ObjAllocAddFree": 6830,
+        "HSD_ObjAllocInit": 166,
+        "HSD_ObjFree": 8983,
+        "HSD_ObjSetHeap": 9,
+        "HSD_SetHeap": 160,
+        "OSAllocFromArenaLo": 1,
+        "OSAllocFromHeap": 8571,
+        "OSCreateHeap": 10,
+        "OSDestroyHeap": 8,
+        "OSFreeToHeap": 51,
+        "OSInitAlloc": 1,
+        "OSSetArenaHi": 1,
+        "OSSetArenaLo": 6,
+        "OSSetCurrentHeap": 9,
+        "_HSD_ObjAllocForgetMemory": 8,
+        "lbHeap_800158D0": 57,
+        "lbHeap_80015900": 8,
+        "lbHeap_80015BD0": 90,
+        "lbHeap_80015CA8": 28,
+        "lbHeap_80015D6C": 13,
+        "lbHeap_80015F3C": 1,
+        "lbMemFreeToHeap": 14,
+        "lbMemory_80014E24": 7,
+        "lbMemory_80014EEC": 4,
+        "lbMemory_80014FC8": 24,
+        "lbMemory_8001529C": 13,
+        "lbMemory_800154D4": 8,
+        "lbMemory_800155A4": 8,
+        "lbMemory_8001564C": 1
+      },
+      "outputs": {
+        "allocations.jsonl": "dc7a9e3ae3e3eabc1d09ce3a77bb3c3845078761ad1986342dbcdfb9b59f83df",
+        "dolphin.log": "30ab1f9862587f8dfc8441a810435e376b832789e112b0c1db42190486b3678c",
+        "gdb.log": "37ac91192b510647f5f8f00d3f89ac7d23a26a920f3ab7b955b682d9b5188cc3",
+        "launch.json": "dc4991037dbeb28a4bf73895ebbfda02da8785216dd92996a3015a721461e1fb",
+        "processes.json": "8435de54ab35f5d28f1c91f85604d2072a149cf3d64e566312ee1f2330390e48"
+      },
+      "owned_evidence_outputs": {
+        "allocation-profile.json": "d4a31b97ac6a51edba890dd59946a8915ffc674496c372036702bc26787519ef",
+        "checkpoint-setup.json": "a3d4ab08044382985fa341b323351a3a78cc0fdff575829d444a744da90c32a1",
+        "cold-boot-input-commands.jsonl": "463960e9d4116bcf35ce4ec63f848b7458f15d110101b9071f8fddc7f79031d1",
+        "gdb-commands.txt": "e4981c8be9d35aa7bcef9740148ef26c2e350275dc593d8eee6d07407d9e3380",
+        "gdb-control.py": "f72adfda13176a49ef651710b435e3b6fdb0b61dba7ad5353f1f76296a9b2aba",
+        "independent-boot-context.json": "030c0566d9ea4af645d6e1344a3437c5bd609f11be17098728b5c4c11b62ce0f",
+        "input-plan.json": "3f9067a0edf388fd9a579b853e44eeca51e769853281ac301b2a4631e234d925",
+        "menu-driver.py": "9791a9a94739710d5d182142296b543dc035a9e279411241746a90fa525b96e3",
+        "menu-target.json": "ccf05d7342270b7958523ab6442061cf8bb3e6f5485982c5e4fe640da5781382",
+        "provenance.json": "b9bf12b7eacead6e78ca88e6d5d1939309b1e32e6b06ee1f6cd8b026bbd0c08a",
+        "scenario.json": "47eea34486f2b42ace1c7fa006e5632ba4ab50cc5f25b34e33a323c586c2f7f8"
+      },
+      "profile_sha256": "d4a31b97ac6a51edba890dd59946a8915ffc674496c372036702bc26787519ef",
+      "result_sha256": "1c6c2df6c880dc952cafb813967bb53b42a9dbe134be07f71a66bfdea3a2f565",
+      "rows": 95966,
+      "unhit_functions": [
+        "Fighter_Create",
+        "Fighter_FirstInitialize_80067A84",
+        "OSAllocFromArenaHi",
+        "gm_Scene_Vs_OnEnter",
+        "gm_Scene_Vs_OnExit"
+      ]
+    }
+  ],
+  "ci": {
+    "current_head_results": "Recorded on the draft PR after exact-head push and pull_request Verify runs complete"
+  },
+  "component_checks": [
+    {
+      "bounds": [
+        "0x10000000",
+        "0x12000000",
+        "0x62a000",
+        "0x162a000"
+      ],
+      "events": 13,
+      "exact": true,
+      "files": {
+        "native.jsonl": "6a6a3024aa3a81ed43f1813ad3b3f339db6b8b855ab150935da98522b7eb62f1",
+        "operations.txt": "36b6040c164f7b30cfeec8b5ac2dd08202e0abb796688ae0e86dd2aff34ce3be",
+        "oracle.jsonl": "6a6a3024aa3a81ed43f1813ad3b3f339db6b8b855ab150935da98522b7eb62f1",
+        "wasm.jsonl": "6a6a3024aa3a81ed43f1813ad3b3f339db6b8b855ab150935da98522b7eb62f1"
+      },
+      "fixture": "components-game-final/test_lifecycle_order_and_preserved_recreation-1d1e7a425073",
+      "oracle_source_sha256": "01c80d426e5b53659b5b430493b51d8d46a21f88840ac9a17dba769a6a14b96e",
+      "receipt_sha256": "0b926d2f18cd3829925724836b586947f810ef19754081bea2471c8026f3ff17",
+      "schema": "melee-source-game-heap-component-comparison",
+      "synthetic": true,
+      "version": 1
+    },
+    {
+      "bounds": [
+        "0x31000000",
+        "0x33000000",
+        "0x72a000",
+        "0x172a000"
+      ],
+      "events": 13,
+      "exact": true,
+      "files": {
+        "native.jsonl": "6a6a3024aa3a81ed43f1813ad3b3f339db6b8b855ab150935da98522b7eb62f1",
+        "operations.txt": "36b6040c164f7b30cfeec8b5ac2dd08202e0abb796688ae0e86dd2aff34ce3be",
+        "oracle.jsonl": "6a6a3024aa3a81ed43f1813ad3b3f339db6b8b855ab150935da98522b7eb62f1",
+        "wasm.jsonl": "6a6a3024aa3a81ed43f1813ad3b3f339db6b8b855ab150935da98522b7eb62f1"
+      },
+      "fixture": "components-game-final/test_lifecycle_order_and_preserved_recreation-253aba9fae11",
+      "oracle_source_sha256": "01c80d426e5b53659b5b430493b51d8d46a21f88840ac9a17dba769a6a14b96e",
+      "receipt_sha256": "b7c71935d623e8d01ce4c9d8223c75759290e93cb82e926bfb67643223abf10c",
+      "schema": "melee-source-game-heap-component-comparison",
+      "synthetic": true,
+      "version": 1
+    },
+    {
+      "bounds": [
+        "0x21000000",
+        "0x23000000",
+        "0x72a000",
+        "0x172a000"
+      ],
+      "events": 6,
+      "exact": true,
+      "files": {
+        "native.jsonl": "517805a8a5600f9fb8b5478705dc387664124b84b316bc33a431f21b0d7d2ef6",
+        "operations.txt": "663fa4253b60dc3e2b3ed25ee9616e231d40ad2e5e8b07e3e91be28e65713f95",
+        "oracle.jsonl": "517805a8a5600f9fb8b5478705dc387664124b84b316bc33a431f21b0d7d2ef6",
+        "wasm.jsonl": "517805a8a5600f9fb8b5478705dc387664124b84b316bc33a431f21b0d7d2ef6"
+      },
+      "fixture": "components-game-final/test_relocated_roots_and_invalid_index-23631b0f2a50",
+      "oracle_source_sha256": "01c80d426e5b53659b5b430493b51d8d46a21f88840ac9a17dba769a6a14b96e",
+      "receipt_sha256": "0f88502c176d0df48e7d1f2be530cb0d680e23ae3ff7f34307334d96edb2ec30",
+      "schema": "melee-source-game-heap-component-comparison",
+      "synthetic": true,
+      "version": 1
+    },
+    {
+      "base": "0x102000",
+      "commands": {
+        "guards_checked_wasm": [
+          "node",
+          "lifetime.js",
+          "0x102000"
+        ],
+        "guards_native": [
+          "lifetime-native",
+          "0x102000"
+        ],
+        "model_checked_wasm": [
+          "node",
+          "model.js",
+          "0x102000"
+        ],
+        "native": [
+          "model-native",
+          "0x102000"
+        ],
+        "original_checked_wasm": [
+          "node",
+          "oracle.js",
+          "0x102000"
+        ]
+      },
+      "events": 15,
+      "exact": true,
+      "files": {
+        "guards-checked-wasm.txt": "7bfa3d95a9f49ecbdad88b91710dddeb72f468ca99d58e372b646e031d24ec70",
+        "guards-native.txt": "7bfa3d95a9f49ecbdad88b91710dddeb72f468ca99d58e372b646e031d24ec70",
+        "model-checked-wasm.jsonl": "5b540fff93a9008dd6e9a3f69f25e3e4112ddcfee4f7b421cacd7de25e9f2719",
+        "native.jsonl": "5b540fff93a9008dd6e9a3f69f25e3e4112ddcfee4f7b421cacd7de25e9f2719",
+        "operations.txt": "50ee259dbd80178e3bb1ba712512e616902f5adc307b0b6fa88ade7b4344802c",
+        "original-checked-wasm.jsonl": "5b540fff93a9008dd6e9a3f69f25e3e4112ddcfee4f7b421cacd7de25e9f2719"
+      },
+      "fixture": "components-pool-final/test_original_ordinary_pool_reset_and_selected_refill_match-00102000",
+      "receipt_sha256": "22f490db9746403b7d4d13e55000c2061acc559e8612ea36781231755b8b9ba1",
+      "retail_admission": false,
+      "schema": "melee-source-pool-lifetime-component-comparison",
+      "source_hashes": {
+        ".deps/melee/extern/dolphin/src/dolphin/os/OSAlloc.c": "5868c5806827534297e0b8f3dca1eff89d70b8caa1ed6f8b18914023aaba1df8",
+        ".deps/melee/src/sysdolphin/baselib/memory.c": "ac09d32fc260614e7e65ba38013fe5ac95f64ba1686baa16c81c9b11a25fdb0a",
+        ".deps/melee/src/sysdolphin/baselib/objalloc.c": "b986ad5ea00a6b9d73de000641b46cb0aa3513208e6097c4bc21ab986b04357f",
+        "src/source_address_context.cpp": "523b4fd9e96ccceb6557fe3f5f11b37347706f8fe95dc1c41f4b1fbbea3c8511",
+        "src/source_address_context.hpp": "343e9b021a3c00dc1b662ebcb63e4f687601dc16bd5d96f03548e526aa819bcf",
+        "tests/source_pool_lifetime_model.cpp": "163a31a0f9e4d95d785e7c1213b937d8606807a509bb2811c0a1b9e8fc32e403",
+        "tests/source_pool_lifetime_oracle.c": "7f7ae54e8fb3321ff3222e46338087a34fa2faaa88eaeef0517b738b3bb26756",
+        "tests/source_pool_lifetime_test.cpp": "910cd3891767be5f585a763cfab8d699ed04c1ff431a336b0ecbfd8c47dddae2",
+        "tests/test_source_pool_lifetime.py": "d63152e083d9275591a1c9fe63bc223ab8ed4d900ffc54da6f7ea8011175bb78"
+      },
+      "synthetic": true,
+      "version": 1
+    },
+    {
+      "base": "0x34561220",
+      "commands": {
+        "guards_checked_wasm": [
+          "node",
+          "lifetime.js",
+          "0x34561220"
+        ],
+        "guards_native": [
+          "lifetime-native",
+          "0x34561220"
+        ],
+        "model_checked_wasm": [
+          "node",
+          "model.js",
+          "0x34561220"
+        ],
+        "native": [
+          "model-native",
+          "0x34561220"
+        ],
+        "original_checked_wasm": [
+          "node",
+          "oracle.js",
+          "0x34561220"
+        ]
+      },
+      "events": 15,
+      "exact": true,
+      "files": {
+        "guards-checked-wasm.txt": "7bfa3d95a9f49ecbdad88b91710dddeb72f468ca99d58e372b646e031d24ec70",
+        "guards-native.txt": "7bfa3d95a9f49ecbdad88b91710dddeb72f468ca99d58e372b646e031d24ec70",
+        "model-checked-wasm.jsonl": "7365530349029266fcfbf56c4f9b1c6dd20d7c5d53b10358f36fa5db04810d9b",
+        "native.jsonl": "7365530349029266fcfbf56c4f9b1c6dd20d7c5d53b10358f36fa5db04810d9b",
+        "operations.txt": "50ee259dbd80178e3bb1ba712512e616902f5adc307b0b6fa88ade7b4344802c",
+        "original-checked-wasm.jsonl": "7365530349029266fcfbf56c4f9b1c6dd20d7c5d53b10358f36fa5db04810d9b"
+      },
+      "fixture": "components-pool-final/test_original_ordinary_pool_reset_and_selected_refill_match-34561220",
+      "receipt_sha256": "2e267ec2c574caeea89768c1b0b90ac00ff7bdaf1fedf1214e519267cd29992e",
+      "retail_admission": false,
+      "schema": "melee-source-pool-lifetime-component-comparison",
+      "source_hashes": {
+        ".deps/melee/extern/dolphin/src/dolphin/os/OSAlloc.c": "5868c5806827534297e0b8f3dca1eff89d70b8caa1ed6f8b18914023aaba1df8",
+        ".deps/melee/src/sysdolphin/baselib/memory.c": "ac09d32fc260614e7e65ba38013fe5ac95f64ba1686baa16c81c9b11a25fdb0a",
+        ".deps/melee/src/sysdolphin/baselib/objalloc.c": "b986ad5ea00a6b9d73de000641b46cb0aa3513208e6097c4bc21ab986b04357f",
+        "src/source_address_context.cpp": "523b4fd9e96ccceb6557fe3f5f11b37347706f8fe95dc1c41f4b1fbbea3c8511",
+        "src/source_address_context.hpp": "343e9b021a3c00dc1b662ebcb63e4f687601dc16bd5d96f03548e526aa819bcf",
+        "tests/source_pool_lifetime_model.cpp": "163a31a0f9e4d95d785e7c1213b937d8606807a509bb2811c0a1b9e8fc32e403",
+        "tests/source_pool_lifetime_oracle.c": "7f7ae54e8fb3321ff3222e46338087a34fa2faaa88eaeef0517b738b3bb26756",
+        "tests/source_pool_lifetime_test.cpp": "910cd3891767be5f585a763cfab8d699ed04c1ff431a336b0ecbfd8c47dddae2",
+        "tests/test_source_pool_lifetime.py": "d63152e083d9275591a1c9fe63bc223ab8ed4d900ffc54da6f7ea8011175bb78"
+      },
+      "synthetic": true,
+      "version": 1
+    },
+    {
+      "base": "0x456701c0",
+      "commands": {
+        "guards_checked_wasm": [
+          "node",
+          "lifetime.js",
+          "0x456701c0"
+        ],
+        "guards_native": [
+          "lifetime-native",
+          "0x456701c0"
+        ],
+        "model_checked_wasm": [
+          "node",
+          "model.js",
+          "0x456701c0"
+        ],
+        "native": [
+          "model-native",
+          "0x456701c0"
+        ],
+        "original_checked_wasm": [
+          "node",
+          "oracle.js",
+          "0x456701c0"
+        ]
+      },
+      "events": 15,
+      "exact": true,
+      "files": {
+        "guards-checked-wasm.txt": "7bfa3d95a9f49ecbdad88b91710dddeb72f468ca99d58e372b646e031d24ec70",
+        "guards-native.txt": "7bfa3d95a9f49ecbdad88b91710dddeb72f468ca99d58e372b646e031d24ec70",
+        "model-checked-wasm.jsonl": "de210f9c374c537583542f1f0fd1ad81e1cee67f6b569a561c0bdb879e1ee1df",
+        "native.jsonl": "de210f9c374c537583542f1f0fd1ad81e1cee67f6b569a561c0bdb879e1ee1df",
+        "operations.txt": "50ee259dbd80178e3bb1ba712512e616902f5adc307b0b6fa88ade7b4344802c",
+        "original-checked-wasm.jsonl": "de210f9c374c537583542f1f0fd1ad81e1cee67f6b569a561c0bdb879e1ee1df"
+      },
+      "fixture": "components-pool-final/test_original_ordinary_pool_reset_and_selected_refill_match-456701c0",
+      "receipt_sha256": "1d13f740dc2b31d8c07c29b55d288b71ab6723f78523c748b76deb1ea8de9802",
+      "retail_admission": false,
+      "schema": "melee-source-pool-lifetime-component-comparison",
+      "source_hashes": {
+        ".deps/melee/extern/dolphin/src/dolphin/os/OSAlloc.c": "5868c5806827534297e0b8f3dca1eff89d70b8caa1ed6f8b18914023aaba1df8",
+        ".deps/melee/src/sysdolphin/baselib/memory.c": "ac09d32fc260614e7e65ba38013fe5ac95f64ba1686baa16c81c9b11a25fdb0a",
+        ".deps/melee/src/sysdolphin/baselib/objalloc.c": "b986ad5ea00a6b9d73de000641b46cb0aa3513208e6097c4bc21ab986b04357f",
+        "src/source_address_context.cpp": "523b4fd9e96ccceb6557fe3f5f11b37347706f8fe95dc1c41f4b1fbbea3c8511",
+        "src/source_address_context.hpp": "343e9b021a3c00dc1b662ebcb63e4f687601dc16bd5d96f03548e526aa819bcf",
+        "tests/source_pool_lifetime_model.cpp": "163a31a0f9e4d95d785e7c1213b937d8606807a509bb2811c0a1b9e8fc32e403",
+        "tests/source_pool_lifetime_oracle.c": "7f7ae54e8fb3321ff3222e46338087a34fa2faaa88eaeef0517b738b3bb26756",
+        "tests/source_pool_lifetime_test.cpp": "910cd3891767be5f585a763cfab8d699ed04c1ff431a336b0ecbfd8c47dddae2",
+        "tests/test_source_pool_lifetime.py": "d63152e083d9275591a1c9fe63bc223ab8ed4d900ffc54da6f7ea8011175bb78"
+      },
+      "synthetic": true,
+      "version": 1
+    }
+  ],
+  "cpu_register_carry_integration": {
+    "prerequisites": [
+      "Owned persistent original save with required roster and stages unlocked",
+      "Two complete original menu-driven captures for each frozen development scenario",
+      "Every observed fighter and relevant global identity independently derived",
+      "Source-to-host ownership and caller/global/stack provenance"
+    ],
+    "ready": false
+  },
+  "evidence_scope": "Original allocation diagnostic only; no CPU fix or gameplay acceptance",
+  "focused_checks": {
+    "execution": "Included in the final complete repository suite; no separate duplicate invocation",
+    "full_suite_log_sha256": "99cb7162e7bc3777197f0eba1c9a762c9fbed36728bd3190bbfbc424be2718a7",
+    "passed": 54,
+    "results": [
+      {
+        "status": "ok",
+        "test": "test_allocation_capture.AllocationCaptureTests.test_changed_non_argument_register_at_retrap_is_a_failure"
+      },
+      {
+        "status": "ok",
+        "test": "test_allocation_capture.AllocationCaptureTests.test_duplicate_required_symbol_rejected"
+      },
+      {
+        "status": "ok",
+        "test": "test_allocation_capture.AllocationCaptureTests.test_late_attach_rejected"
+      },
+      {
+        "status": "ok",
+        "test": "test_allocation_capture.AllocationCaptureTests.test_live_nested_call_cannot_be_certified_complete"
+      },
+      {
+        "status": "ok",
+        "test": "test_allocation_capture.AllocationCaptureTests.test_observed_result_is_separate_from_call_inputs"
+      },
+      {
+        "status": "ok",
+        "test": "test_allocation_capture.AllocationCaptureTests.test_thread_interleaving_keeps_independent_nesting"
+      },
+      {
+        "status": "ok",
+        "test": "test_allocation_capture.AllocationCaptureTests.test_unchanged_remote_retrap_is_retained_without_a_second_allocation"
+      },
+      {
+        "status": "ok",
+        "test": "test_allocation_capture.AllocationCaptureTests.test_unmatched_return_retains_error_and_rejects_completion"
+      },
+      {
+        "status": "ok",
+        "test": "test_allocation_history_replay.AllocationHistoryReplayTests.test_boot_observations_only_validate_independent_roots"
+      },
+      {
+        "status": "ok",
+        "test": "test_allocation_history_replay.AllocationHistoryReplayTests.test_native_and_checked_wasm_model_drivers_agree"
+      },
+      {
+        "status": "ok",
+        "test": "test_allocation_history_replay.AllocationHistoryReplayTests.test_native_model_rejects_refill_on_different_selected_heap"
+      },
+      {
+        "status": "ok",
+        "test": "test_allocation_history_replay.AllocationHistoryReplayTests.test_native_model_replays_lbmemory_handle_identity_and_payload"
+      },
+      {
+        "status": "ok",
+        "test": "test_allocation_history_replay.AllocationHistoryReplayTests.test_observed_heap_bounds_cannot_define_roots"
+      },
+      {
+        "status": "ok",
+        "test": "test_allocation_history_replay.AllocationHistoryReplayTests.test_repeated_debugger_stop_is_validated_and_not_replayed"
+      },
+      {
+        "status": "ok",
+        "test": "test_allocation_history_replay.AllocationHistoryReplayTests.test_replays_independent_boot_prefix_and_reports_reset_boundary"
+      },
+      {
+        "status": "ok",
+        "test": "test_allocation_history_replay.AllocationHistoryReplayTests.test_retail_api_rejects_unverified_numeric_context"
+      },
+      {
+        "status": "ok",
+        "test": "test_allocation_history_replay.AllocationHistoryReplayTests.test_trace_rejects_noncontiguous_or_misnested_streams"
+      },
+      {
+        "status": "ok",
+        "test": "test_allocation_lifetime_replay.AllocationLifetimeReplayTests.test_changed_observed_pointer_fails_without_becoming_model_input"
+      },
+      {
+        "status": "ok",
+        "test": "test_allocation_lifetime_replay.AllocationLifetimeReplayTests.test_changed_pool_descriptor_is_rejected_before_pool_reset"
+      },
+      {
+        "status": "ok",
+        "test": "test_allocation_lifetime_replay.AllocationLifetimeReplayTests.test_game_handle_allocation_and_free_use_derived_payload_identity"
+      },
+      {
+        "status": "ok",
+        "test": "test_allocation_lifetime_replay.AllocationLifetimeReplayTests.test_layout_rejects_duplicate_pool_identities"
+      },
+      {
+        "status": "ok",
+        "test": "test_allocation_lifetime_replay.AllocationLifetimeReplayTests.test_layout_rejects_malformed_or_out_of_order_game_descriptors"
+      },
+      {
+        "status": "ok",
+        "test": "test_allocation_lifetime_replay.AllocationLifetimeReplayTests.test_malformed_repeated_stop_is_explicit_stream_failure"
+      },
+      {
+        "status": "ok",
+        "test": "test_allocation_lifetime_replay.AllocationLifetimeReplayTests.test_native_replay_uses_manual_pointer_identity_and_pool_reset"
+      },
+      {
+        "status": "ok",
+        "test": "test_allocation_lifetime_replay.AllocationLifetimeReplayTests.test_native_source_mismatch_survives_checked_wasm_failure"
+      },
+      {
+        "status": "ok",
+        "test": "test_allocation_lifetime_replay.AllocationLifetimeReplayTests.test_replacement_lifecycle_rejects_changed_derived_bounds"
+      },
+      {
+        "status": "ok",
+        "test": "test_allocation_lifetime_replay.AllocationLifetimeReplayTests.test_retail_metadata_requires_expected_fields_and_lengths"
+      },
+      {
+        "status": "ok",
+        "test": "test_original_boot_context.OriginalBootContextTests.test_linker_pair_relocates_with_signed_low_half"
+      },
+      {
+        "status": "ok",
+        "test": "test_original_boot_context.OriginalBootContextTests.test_mismatched_linker_register_is_rejected"
+      },
+      {
+        "status": "ok",
+        "test": "test_original_boot_context.OriginalBootContextTests.test_only_relative_linked_calls_are_resolved"
+      },
+      {
+        "status": "ok",
+        "test": "test_original_boot_context.OriginalBootContextTests.test_register_dependent_literal_is_rejected"
+      },
+      {
+        "status": "ok",
+        "test": "test_retail_allocation_menu.RetailAllocationMenuTests.test_cold_sss_readiness_uses_source_cursor_and_cooldown"
+      },
+      {
+        "status": "ok",
+        "test": "test_retail_allocation_menu.RetailAllocationMenuTests.test_driver_compiles_and_exposes_bounded_cold_route"
+      },
+      {
+        "status": "ok",
+        "test": "test_retail_allocation_menu.RetailAllocationMenuTests.test_driver_has_no_game_memory_or_register_writes_or_state_load"
+      },
+      {
+        "status": "ok",
+        "test": "test_retail_allocation_menu.RetailAllocationMenuTests.test_driver_routes_only_through_pinned_source_scenes"
+      },
+      {
+        "status": "ok",
+        "test": "test_retail_allocation_menu.RetailAllocationMenuTests.test_generated_command_log_is_real_jsonl_with_newline_records"
+      },
+      {
+        "status": "ok",
+        "test": "test_retail_allocation_menu.RetailAllocationMenuTests.test_input_command_log_is_explicit_and_reproducible"
+      },
+      {
+        "status": "ok",
+        "test": "test_retail_allocation_menu.RetailAllocationMenuTests.test_missing_character_is_bounded_source_availability_failure"
+      },
+      {
+        "status": "ok",
+        "test": "test_retail_allocation_menu.RetailAllocationMenuTests.test_source_driver_aliases_stay_identical"
+      },
+      {
+        "status": "ok",
+        "test": "test_retail_allocation_menu.RetailAllocationMenuTests.test_sss_readiness_accepts_stale_main_menu_cooldown"
+      },
+      {
+        "status": "ok",
+        "test": "test_source_address_context.NativeSourceAddressTests.test_context_lifetime_invalid_inputs_and_all_register_bytes"
+      },
+      {
+        "status": "ok",
+        "test": "test_source_address_context.SourceAddressDifferentialTests.test_context_and_register_guards_in_wasm"
+      },
+      {
+        "status": "ok",
+        "test": "test_source_address_context.SourceAddressDifferentialTests.test_fragmented_source_histories_at_multiple_source_bases"
+      },
+      {
+        "status": "ok",
+        "test": "test_source_address_context.SourceAddressDifferentialTests.test_original_hsd_refill_lifo_and_interleaved_os_ownership"
+      },
+      {
+        "status": "ok",
+        "test": "test_source_address_context.SourceAddressDifferentialTests.test_source_first_fit_split_threshold_exhaustion_and_coalescing"
+      },
+      {
+        "status": "ok",
+        "test": "test_source_aram_context.SourceAramDifferentialTests.test_capacity_and_exhaustion_do_not_mutate_stack"
+      },
+      {
+        "status": "ok",
+        "test": "test_source_aram_context.SourceAramDifferentialTests.test_layout_and_alignment_guards_in_native_and_checked_wasm"
+      },
+      {
+        "status": "ok",
+        "test": "test_source_aram_context.SourceAramDifferentialTests.test_portable_stack_shape_and_lifo_matches_original"
+      },
+      {
+        "status": "ok",
+        "test": "test_source_game_heap_context.SourceGameHeapDifferentialTests.test_lifecycle_order_and_preserved_recreation"
+      },
+      {
+        "status": "ok",
+        "test": "test_source_game_heap_context.SourceGameHeapDifferentialTests.test_relocated_roots_and_invalid_index"
+      },
+      {
+        "status": "ok",
+        "test": "test_source_handle_context.SourceHandleDifferentialTests.test_fragmentation_and_descriptor_reuse_in_mem1"
+      },
+      {
+        "status": "ok",
+        "test": "test_source_handle_context.SourceHandleDifferentialTests.test_layout_and_source_domain_guards"
+      },
+      {
+        "status": "ok",
+        "test": "test_source_handle_context.SourceHandleDifferentialTests.test_portable_allocation_shape_matches_original"
+      },
+      {
+        "status": "ok",
+        "test": "test_source_pool_lifetime.SourcePoolLifetimeDifferentialTests.test_original_ordinary_pool_reset_and_selected_refill_match"
+      }
+    ],
+    "skipped": 0,
+    "tests": 54
+  },
+  "frozen_inputs": {
+    "all_unchanged": true,
+    "checked_files": 2666,
+    "continuation_audit": {
+      "changed": [],
+      "checked_files": 2666,
+      "source_guard": "passed",
+      "unchanged": true
+    },
+    "gold_corpus_files": 15,
+    "manifest_sha256": "1e0452ac292786ca5d4d0542fced7111b66c65aff53fcfd9c441d11907f0498f",
+    "original_source_files": 2651
+  },
+  "full_repository_suite": {
+    "log_sha256": "99cb7162e7bc3777197f0eba1c9a762c9fbed36728bd3190bbfbc424be2718a7",
+    "result": "passed",
+    "seconds": 231.091,
+    "skipped": 44,
+    "tests": 723
+  },
+  "independent_boot_comparison": {
+    "calls_each": 276,
+    "identities_each": 94,
+    "model_actions_each": 211,
+    "model_actions_outputs_identities_identical": true,
+    "raw_streams_byte_identical": true
+  },
+  "independent_boot_definition": {
+    "boot": {
+      "aram_size": 16777216,
+      "arena_hi": 2172619456,
+      "arena_lo": 0,
+      "bi2": 2172611264,
+      "memory_size": 25165824
+    },
+    "conditions": [
+      "pinned Dolphin default GameCube memory",
+      "no original debugger monitor",
+      "original DOL entry, no savestate",
+      "default NTSC render mode"
+    ],
+    "derivation": "owned_disc_apploader_and_dol_no_capture_inputs",
+    "identities": {
+      "apploader_sha256": "05e584735bb81f45e8506ee76fc1a78b143dc2f6dd3f2fc82b015010dc6448dd",
+      "bi2_sha256": "7294bc146d7ad38f7fd8b02038e563dc9380ff272b66e9bd215631def4fd6cec",
+      "disc_boot_header_sha256": "534aa103305522a5b4ac70acac2c38e8c672e8ca9a9c473311e8c46a7fcc0520",
+      "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+      "dolphin_boot_source_sha256": "ed6e86f6bb58b443a0e22e03dddaed22966bf5d7fb09a2d5de4130648e5479b5",
+      "dolphin_revision": "c77bbaa0f372c3f72281602a8b087206706542cb",
+      "source_revision": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+      "source_sha256": {
+        "extern/dolphin/src/dolphin/ar/ar.c": "dc2ad84463413ef6b91a8f8fe8acefb26ed35743d63dd85bf6590cec28d95cc8",
+        "extern/dolphin/src/dolphin/os/OS.c": "bd7e8934d81b31bb48c92c1ef7bbf104ce8a203142915895491ad607c2d95203",
+        "extern/dolphin/src/dolphin/os/OSAlloc.c": "5868c5806827534297e0b8f3dca1eff89d70b8caa1ed6f8b18914023aaba1df8",
+        "src/melee/db/dberror.c": "72d6faae47d1eddb1a1dbb1f18b3d2131269f389095e8fbf7b900a3ff07cb14d",
+        "src/melee/gm/gmmain.c": "88803337a230b1b9cff6c211c501e6fc05b18a58ef6d4de0756dab4454209a69",
+        "src/melee/lb/lbheap.c": "01c80d426e5b53659b5b430493b51d8d46a21f88840ac9a17dba769a6a14b96e",
+        "src/melee/lb/lbmemory.c": "ae5d116c931db0788f8532014ad0ab7009c5a711ced6028302e4c97573126fc2",
+        "src/sysdolphin/baselib/initialize.c": "396cf5e84a310cf8e6f0f29db4f3419b63c0ea2c57aacbb7b2a01fe413d6d28d"
+      },
+      "symbols_sha256": "214477d5b27989a9675c4b881f4db2dad5eeaada39dbac17c57c70d5ba84d579"
+    },
+    "mode": "independent_boot",
+    "root": {
+      "aram_base": 16384,
+      "aram_size": 16777216,
+      "arena_hi": 2172619456,
+      "arena_lo": 2154155008,
+      "audio_heap_size": 524288,
+      "heap_max_num": 4
+    },
+    "schema": "melee-web-original-boot-context",
+    "stages": {
+      "after_crash": 2152664064,
+      "after_xfb": 2153892864,
+      "crash_allocation_alignment": 4,
+      "crash_allocation_base": 2152655872,
+      "crash_allocation_size": 8192,
+      "fifo_size": 262144,
+      "framebuffer_begin": 2152664064,
+      "framebuffer_count": 2,
+      "framebuffer_size": 614400,
+      "linker_arena_lo": 2152664064,
+      "os_arena_lo": 2152655872,
+      "os_init_alloc_lo": 2154155008,
+      "stack_top": 2152655872
+    },
+    "static_layout": {
+      "aram_stack_table": {
+        "address": 2151889956,
+        "kind": "object",
+        "section": ".bss",
+        "size": 64
+      },
+      "lbheap_descriptors": [
+        [
+          2,
+          1,
+          6,
+          2048
+        ],
+        [
+          3,
+          1,
+          2,
+          5212160
+        ],
+        [
+          4,
+          2,
+          6,
+          6599680
+        ],
+        [
+          5,
+          4,
+          6,
+          9881600
+        ],
+        [
+          6,
+          0,
+          0,
+          0
+        ]
+      ],
+      "lbmemory_allocator": 2151880880,
+      "pool_descriptors": {
+        "@3402": 2151559268,
+        "HSD_Mtx_804C2310": 2152473360,
+        "HSD_Mtx_804C233C": 2152473404,
+        "HSD_PSAppSrt_804D10B0": 2152534192,
+        "HSD_SObjLib_804D10E0": 2152534240,
+        "InterruptPrioTable": 2151686936,
+        "Player_AllocData": 2152040416,
+        "aobj_alloc_data": 2152466560,
+        "chan_alloc_data": 2152466512,
+        "dlist_alloc_data": 2152474028,
+        "efAsync_AllocData": 2152042400,
+        "efLib_AllocData": 2152042160,
+        "fighter_alloc_data": 2152042448,
+        "fighter_dat_attrs_alloc_data": 2152042492,
+        "fighter_dobj_list_alloc_data": 2152042580,
+        "fighter_parts_alloc_data": 2152042536,
+        "fighter_x2040_alloc_data": 2152042624,
+        "fighter_x59C_alloc_data": 2152042668,
+        "fobj_alloc_data": 2152466648,
+        "gobj_alloc_data": 2152522636,
+        "gobjproc_alloc_data": 2152522680,
+        "grCs_803B7EFC": 2151382780,
+        "hsd_iddata": 2152473536,
+        "it_803F6E3C": 2151640636,
+        "it_803F6E68": 2151640680,
+        "item_alloc_data": 2152336352,
+        "item_dynamic_bones_alloc_data": 2152336396,
+        "item_link_alloc_data": 2152336440,
+        "lbSnap_803BACC8": 2151394504,
+        "lbl_804336A0": 2151888544,
+        "lbl_80433710": 2151888656,
+        "memReport": 2152466772,
+        "render_alloc_data": 2152466424,
+        "robj_alloc_data": 2152473448,
+        "rvalue_alloc_data": 2152473492,
+        "shadow_alloc_data": 2152474072,
+        "slist_alloc_data": 2152473984,
+        "tevreg_alloc_data": 2152466468,
+        "un_804A2688": 2152343176,
+        "zlist_alloc_data": 2152466712
+      }
+    },
+    "version": 1
+  },
+  "menu_prefix_comparison": {
+    "common_completed_calls": 23397,
+    "common_rows": 46807,
+    "comparison_fields": [
+      "record",
+      "function",
+      "call",
+      "parent",
+      "args",
+      "result",
+      "observed"
+    ],
+    "difference_explanation": "The corrected second controller program presses B at original SSS frame 31. The first program remains neutral in its erroneous readiness wait. The first differing allocation at call23397 follows that intentional input/context difference; the histories are not a full-scenario determinism pair.",
+    "first_different_controller_command": [
+      null,
+      {
+        "command": "SET MAIN .5 .5",
+        "event": "pad_command",
+        "port": 1,
+        "scene_frame": 19,
+        "scene_kind": 9
+      }
+    ],
+    "first_differing_boundaries": [
+      {
+        "call": 23397,
+        "function": "HSD_ObjFree",
+        "record": "enter",
+        "sequence": 46807,
+        "source_scene_frame": 34
+      },
+      {
+        "call": 23397,
+        "function": "lbHeap_80015CA8",
+        "record": "enter",
+        "sequence": 46807,
+        "source_scene_frame": 33
+      }
+    ],
+    "matching_controller_commands": 113,
+    "same_full_controller_program": false
+  },
+  "model_source_sha256": {
+    "src/source_address_context.cpp": "523b4fd9e96ccceb6557fe3f5f11b37347706f8fe95dc1c41f4b1fbbea3c8511",
+    "src/source_address_context.hpp": "343e9b021a3c00dc1b662ebcb63e4f687601dc16bd5d96f03548e526aa819bcf",
+    "src/source_aram_context.cpp": "2c206337227ee32a476150a7cddfffe2e4e774f6c84c0915da8c1fd9506f8102",
+    "src/source_aram_context.hpp": "9b369385a376dfb988523e16e90dfb5ea4f0dfd5791fb7154d9b201a2ddedbab",
+    "src/source_game_heap_context.cpp": "bcd99c4d3ea16195cf203030b3b869298c9d65b9a163954a66e7f85c8ab90340",
+    "src/source_game_heap_context.hpp": "3654a183045d169d86451b3e4b22ff2035426cfff697fde636969d669d334381",
+    "src/source_handle_context.cpp": "cdb51a553cdf6fb249b89d185678b7b1173d4cb393613949424ba965c95ad697",
+    "src/source_handle_context.hpp": "dfedf02f33c55a9d2637178dc8fe4edad64176554ec612a60a71feac481586c8",
+    "tests/allocation_lifetime_model.cpp": "de2b6eefa0c5c5e5ee4b9b98152bb92e84538f43efd3b6c1ef84d743b283ba8e",
+    "tests/allocation_model_support.hpp": "b30b4745da0b810764dc9e810aff3b7bcfbd9250fb1fe5f8472834a1f9cd679c",
+    "tools/allocation_history_replay.py": "298b47f3529345b045a2d1847deb54fc7036db069454c7c3cb3f5fa95ccc0343",
+    "tools/allocation_lifetime_replay.py": "008c4cdd6be54c8050e2e7c201e5fa7c3482d426152c572b8a5002eaba8e9865",
+    "tools/retail_allocation_menu.py": "8ae26779657dbe2a3df0b29db1327c84d08e8c4b65ff7141a3cfcb0e82883e27"
+  },
+  "pr13": {
+    "exact_head_verify_runs": [
+      34766457600,
+      34766460171
+    ],
+    "merge_commit": "2dfeaf73d76f8342f4bb93682ed78600e999f575",
+    "merge_method": "normal merge commit",
+    "merge_tree_equals_reviewed_tree": true,
+    "postmerge_verify_conclusion": "success",
+    "postmerge_verify_run": 34768907509,
+    "previous_main": "e24e296fdcdb3f67a0d371e94732870acefcef96",
+    "published_branch_preserved": true,
+    "reviewed_head": "edccdd37a206f73ff1cbbf66577554aa706c8218"
+  },
+  "prior_receipt_sha256": "8cbfb598a9e5b0d5075107f3617358e32d7cf10e3cebd781496e8ab866ca575e",
+  "public_boundary": {
+    "deployed": false,
+    "deployment_files_changed": false,
+    "gameplay_integration_changed": false
+  },
+  "replay": [
+    {
+      "all_captured_calls_replayed": true,
+      "calls_replayed": 276,
+      "calls_seen": 276,
+      "checked_wasm_matches_native": true,
+      "checked_wasm_problem": null,
+      "complete": false,
+      "model_actions": 211,
+      "name": "boot-v9",
+      "pending_calls": [],
+      "pointer_aliases": 94,
+      "replay_hashes": {
+        "actions_sha256": "2c5f28b56cb31be4d8a5509b3039f63fbfa6d41f1e0c7e6d7464cbff515c81a9",
+        "identities_sha256": "df7507016f14f4bc30695e13f0426ce529f4d45cbc765db497552ef59d8094e9",
+        "outputs_sha256": "22a647c6188b3baf957e65347162862265333aea819f1b94ce4f3fa9c95af05f"
+      },
+      "report_sha256": "7db373135568b7ebcaf91cb9ecf63769ac35d6e4ea4fec32950fdb328d5ef037",
+      "scenario_gate": "not_evaluated_no_complete_scenario_receipt",
+      "scope": "allocation_lifetime_prefix",
+      "status": "validated_prefix",
+      "trace_complete": true
+    },
+    {
+      "all_captured_calls_replayed": true,
+      "calls_replayed": 276,
+      "calls_seen": 276,
+      "checked_wasm_matches_native": true,
+      "checked_wasm_problem": null,
+      "complete": false,
+      "model_actions": 211,
+      "name": "boot-v10",
+      "pending_calls": [],
+      "pointer_aliases": 94,
+      "replay_hashes": {
+        "actions_sha256": "2c5f28b56cb31be4d8a5509b3039f63fbfa6d41f1e0c7e6d7464cbff515c81a9",
+        "identities_sha256": "df7507016f14f4bc30695e13f0426ce529f4d45cbc765db497552ef59d8094e9",
+        "outputs_sha256": "22a647c6188b3baf957e65347162862265333aea819f1b94ce4f3fa9c95af05f"
+      },
+      "report_sha256": "7db373135568b7ebcaf91cb9ecf63769ac35d6e4ea4fec32950fdb328d5ef037",
+      "scenario_gate": "not_evaluated_no_complete_scenario_receipt",
+      "scope": "allocation_lifetime_prefix",
+      "status": "validated_prefix",
+      "trace_complete": true
+    },
+    {
+      "all_captured_calls_replayed": false,
+      "calls_replayed": 25168,
+      "calls_seen": 25168,
+      "checked_wasm_matches_native": true,
+      "checked_wasm_problem": null,
+      "complete": false,
+      "model_actions": 20070,
+      "name": "menu-prefix-a",
+      "pending_calls": [],
+      "pointer_aliases": 12189,
+      "replay_hashes": {
+        "actions_sha256": "b870e016328c425ed4aaa0fafda98ca6a177fc51dd0b1ebd619ac54cdf2b2bf2",
+        "identities_sha256": "8d98e3e79af2a8888cf3f5f1d0a44a7de0b2d380fe79c817ba7db4bb6964efcf",
+        "outputs_sha256": "19b13d39010d1574cbffd5aea8a78d3b382ffc3177d6bfa3fa841ff2dc81d37a"
+      },
+      "report_sha256": "da25440da744868b0d258389e23c1eeded049f16abd35d28966ba85ef7cc4f91",
+      "scenario_gate": "not_evaluated_no_complete_scenario_receipt",
+      "scope": "allocation_lifetime_prefix",
+      "status": "incomplete_prefix",
+      "trace_complete": false
+    },
+    {
+      "all_captured_calls_replayed": false,
+      "calls_replayed": 47974,
+      "calls_seen": 47974,
+      "checked_wasm_matches_native": true,
+      "checked_wasm_problem": null,
+      "complete": false,
+      "model_actions": 39489,
+      "name": "menu-prefix-b",
+      "pending_calls": [],
+      "pointer_aliases": 22867,
+      "replay_hashes": {
+        "actions_sha256": "2d19aeaaff2c4cf5d4455289474c353e50c2710258acdbc17dfc0222312ef521",
+        "identities_sha256": "cb1af62508ac34bc23ed907a24425be6e568b03dc9a966971d2a6f05d067ac61",
+        "outputs_sha256": "11c4ba431d2477d07d4f9a548285e314817f71a35e2cc62b7e4d789756ce66fe"
+      },
+      "report_sha256": "10ee4c9fe16e6c3b8798f40f37cd4c89c591a584c847f24afeb3bb2ed0cf2e0c",
+      "scenario_gate": "not_evaluated_no_complete_scenario_receipt",
+      "scope": "allocation_lifetime_prefix",
+      "status": "incomplete_prefix",
+      "trace_complete": false
+    }
+  ],
+  "retained_replay_attempts": [
+    {
+      "attempt": "live-prefix-v1/report.json",
+      "calls_replayed": 567,
+      "first_problem": null,
+      "sha256": "2912a4aa6e656365cc8b90c415093e6336cf71ff01517e4d5cf9b6b26d86d8c4",
+      "status": "validated_prefix"
+    },
+    {
+      "attempt": "live-prefix-v2/report.json",
+      "calls_replayed": 1879,
+      "first_problem": {
+        "call": 1878,
+        "function": "HSD_ObjAllocAddFree",
+        "kind": "unsupported",
+        "reason": "model rejected source operation: missing_context",
+        "sequence": 3756
+      },
+      "sha256": "b2b134574befae44a7d098a5e5bb8ac4bb5193c70215826826aa78168c1f76b3",
+      "status": "unsupported"
+    },
+    {
+      "attempt": "live-prefix-v3/report.json",
+      "calls_replayed": 17361,
+      "first_problem": {
+        "call": 17361,
+        "function": "lbHeap_80015CA8",
+        "kind": "unsupported",
+        "reason": "no source binding for observed function lbHeap_80015CA8",
+        "sequence": 34734
+      },
+      "sha256": "5450c5f678728b563ad7f9d74cfd1c23f1dd9ff6cf8029b598eeaab87076acbd",
+      "status": "unsupported"
+    },
+    {
+      "attempt": "live-prefix-v4/report.json",
+      "calls_replayed": 24892,
+      "first_problem": null,
+      "sha256": "606bb6d9c0dcbf460bbab61f160aee4fe5745642fef8b1c8862c64297181c3e7",
+      "status": "incomplete_prefix"
+    },
+    {
+      "attempt": "replay-v1/boot-v9.json",
+      "calls_replayed": 276,
+      "first_problem": null,
+      "sha256": "e8604b8282e437acad5c2e174a638489755f7c09ca349023af2f383c989cce7c",
+      "status": "validated_prefix"
+    },
+    {
+      "attempt": "replay-v2/boot-v10.json",
+      "calls_replayed": 8,
+      "first_problem": {
+        "call": 9,
+        "function": "OSInitAlloc",
+        "kind": "model",
+        "reason": "allocator driver stopped: ",
+        "sequence": 18
+      },
+      "sha256": "04b13ecfa0286fee8c3a0efb004084dd0bf9abeeef9e5ab257fb749605dec299",
+      "status": "model"
+    },
+    {
+      "attempt": "replay-v2/boot-v9.json",
+      "calls_replayed": 8,
+      "first_problem": {
+        "call": 9,
+        "function": "OSInitAlloc",
+        "kind": "model",
+        "reason": "allocator driver stopped: ",
+        "sequence": 18
+      },
+      "sha256": "04b13ecfa0286fee8c3a0efb004084dd0bf9abeeef9e5ab257fb749605dec299",
+      "status": "model"
+    },
+    {
+      "attempt": "replay-v3/boot-v10.json",
+      "calls_replayed": 276,
+      "first_problem": null,
+      "sha256": "d50a5443be51ac202678b61da0a348ec30c1565f167ad24c48e6c46d73f6024b",
+      "status": "validated_prefix"
+    },
+    {
+      "attempt": "replay-v3/boot-v9.json",
+      "calls_replayed": 276,
+      "first_problem": null,
+      "sha256": "d50a5443be51ac202678b61da0a348ec30c1565f167ad24c48e6c46d73f6024b",
+      "status": "validated_prefix"
+    },
+    {
+      "attempt": "replay-v3/two-a-v3.json",
+      "calls_replayed": 31,
+      "first_problem": {
+        "call": 32,
+        "function": "lbMemory_80014E24",
+        "kind": "validation",
+        "reason": "initial handle bounds differs: observed [6463136, 16777216], derived [None, 16777216]",
+        "sequence": 64
+      },
+      "sha256": "4394c1bdfe32010c344494b15cb9a9e57fc1cd8b7db682b79b6300ffe69e9e18",
+      "status": "validation"
+    },
+    {
+      "attempt": "replay-v4/boot-v9.json",
+      "calls_replayed": 276,
+      "first_problem": null,
+      "sha256": "60673bd4b9b4ea1f1eb4dd99030f3064ba41216d78a08ea235214b7176cd9777",
+      "status": "validated_prefix"
+    },
+    {
+      "attempt": "replay-v5/boot-v10.json",
+      "calls_replayed": 276,
+      "first_problem": null,
+      "sha256": "53fd56caf419f742a2fbb170032b04388e530dd5c2013a5197a78964d11f945b",
+      "status": "validated_prefix"
+    },
+    {
+      "attempt": "replay-v5/boot-v9.json",
+      "calls_replayed": 276,
+      "first_problem": null,
+      "sha256": "53fd56caf419f742a2fbb170032b04388e530dd5c2013a5197a78964d11f945b",
+      "status": "validated_prefix"
+    },
+    {
+      "attempt": "replay-v5/menu-prefix-a.json",
+      "calls_replayed": 25168,
+      "first_problem": null,
+      "sha256": "dbea378273f4313a9b724077e89dbd1cb210df489c594e7e896ecb0e7c5f678a",
+      "status": "incomplete_prefix"
+    },
+    {
+      "attempt": "replay-v6/boot-v10.json",
+      "calls_replayed": 276,
+      "first_problem": null,
+      "sha256": "7db373135568b7ebcaf91cb9ecf63769ac35d6e4ea4fec32950fdb328d5ef037",
+      "status": "validated_prefix"
+    },
+    {
+      "attempt": "replay-v6/boot-v9.json",
+      "calls_replayed": 276,
+      "first_problem": null,
+      "sha256": "7db373135568b7ebcaf91cb9ecf63769ac35d6e4ea4fec32950fdb328d5ef037",
+      "status": "validated_prefix"
+    },
+    {
+      "attempt": "replay-v6/menu-prefix-a.json",
+      "calls_replayed": 25168,
+      "first_problem": null,
+      "sha256": "da25440da744868b0d258389e23c1eeded049f16abd35d28966ba85ef7cc4f91",
+      "status": "incomplete_prefix"
+    },
+    {
+      "attempt": "replay-v6/menu-prefix-b.json",
+      "calls_replayed": 29736,
+      "first_problem": {
+        "call": 29737,
+        "function": "lbMemFreeToHeap",
+        "kind": "unsupported",
+        "reason": "no source binding for observed function lbMemFreeToHeap",
+        "sequence": 59488
+      },
+      "sha256": "e03c6cfa991b5c969184a7c4c0ddd5f7f74d0f1e1b2bc18a6a2eb312a9152dd5",
+      "status": "unsupported"
+    },
+    {
+      "attempt": "replay-v7/menu-prefix-b.json",
+      "calls_replayed": 47974,
+      "first_problem": null,
+      "sha256": "10ee4c9fe16e6c3b8798f40f37cd4c89c591a584c847f24afeb3bb2ed0cf2e0c",
+      "status": "incomplete_prefix"
+    }
+  ],
+  "retained_test_invocation_failure": {
+    "log_sha256": "d66e06012ecd18b93693a41dddf969a66b5cc45992ef665cfdad31dbfe501f46",
+    "reason": "Two mistyped unittest module names; corrected invocation passed all 29 then-current checks"
+  },
+  "save_search": {
+    "eligible_unlocked_save_found": false,
+    "files": 1010,
+    "manifest_sha256": "aa37848d61c36ac399d1b48587446dc9ab0ce70990e4299043e0c7eae64474b1",
+    "ordinary_play_procedure": "docs/OWNED_SAVE_PREREQUISITE.md",
+    "original_menu_unlock_verification": false,
+    "unique_gci": 5,
+    "unique_raw": 11,
+    "unique_sav": 14
+  },
+  "scenario_status": [
+    {
+      "case": "2p-mario-fox1-fd",
+      "completed_new_captures": 0,
+      "fighter_addresses_derived": 0,
+      "fighter_addresses_observed": 0,
+      "status": "requires_owned_unlocked_persistent_save",
+      "ticks": 1199
+    },
+    {
+      "case": "3p-marth-falco5-mario9-yoshis",
+      "completed_new_captures": 0,
+      "fighter_addresses_derived": 0,
+      "fighter_addresses_observed": 0,
+      "status": "requires_owned_unlocked_persistent_save",
+      "ticks": 4346
+    },
+    {
+      "case": "4p-fox-mario3-marth6-falco8-dreamland",
+      "completed_new_captures": 0,
+      "fighter_addresses_derived": 0,
+      "fighter_addresses_observed": 0,
+      "status": "requires_owned_unlocked_persistent_save",
+      "ticks": 3838
+    }
+  ],
+  "schema": "melee-web-original-allocation-history-evidence",
+  "version": 2
+}

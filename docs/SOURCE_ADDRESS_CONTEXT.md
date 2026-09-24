@@ -118,19 +118,23 @@ these test files.
 This is a general model of the supported allocation operations, not a complete
 model of the game's memory system. In particular:
 
-- `OSInitAlloc` descriptor placement, multiple heaps/current-heap selection,
-  `OSAllocFixed`, `OSAddToHeap`, and original boot/scene heap orchestration are not
-  replayed by the model. The test oracle declares its own initial heap bounds.
+- The heap component receives explicit bounds. The separate
+  [allocation-history experiment](ORIGINAL_ALLOCATION_HISTORY.md) derives original
+  `OSInitAlloc` placement and replays observed heap selection and replacement.
+  `OSAllocFixed` and `OSAddToHeap` remain unsupported and unobserved in its current
+  traces. Synthetic component oracles declare their own initial heap bounds.
 - `Heap::restore` checks structure, not provenance. Gaps may represent prior
   fixed reservations, but every gap and cell must come from an independently
   attested complete source context. Valid structure alone does not admit a
   fabricated snapshot. No accepted retail heap snapshot provider exists yet.
 - A heap snapshot does not serialize HSD pool ownership or free chains. Resuming
-  an existing pool and same-generation `HSD_ObjAllocInit` resets are unsupported.
-  Restored allocated cells must not be treated as resumable pool state.
+  an existing pool from a snapshot remains unsupported. Explicit `ObjectPool::reset`
+  now models in-place `HSD_ObjAllocInit`; adopting a backing cell requires its
+  separately replayed OS allocation, rather than a restored-address assumption.
 - Dedicated HSD bump heaps and number/heap limit flags return
   `unsupported_configuration`; the OS path cannot stand in for them. The model
-  does not expose the global `obj_heap.remain` bookkeeping used by other modes.
+  leaves the ordinary global `obj_heap.remain` bookkeeping to the diagnostic
+  lifetime adapter; that bookkeeping does not enable those unsupported modes.
 - Payload memory, source-to-host bindings, original SDA/global and stack
   identities, and call-site reaching definitions/clobbers are not implemented.
   `RegisterWord` is a representation, not an analysis of those call sites.
