@@ -1,0 +1,75 @@
+{
+  "schema": "melee-web-typed-profile-observer-validation",
+  "version": 1,
+  "source_commit": "655277034c949bc20fc2af1cc170c364005ed034",
+  "scope": "Source identified and Compiled: typed original first-CSS profile decoding from a complete passive capture. No original-versus-port comparison, independent repeatability, PCM, pixel, performance or admission claim.",
+  "capture_receipt": "whole-session-observer-pr57-v1.json",
+  "typed_fields": {
+    "game_rules": {
+      "tag": 38,
+      "bytes": 24,
+      "sha256": "2333c3edd30de1c26db8fa7d3fd6e483baa84fa4fd7617bc1c08b99997b2b8a1"
+    },
+    "save_data": {
+      "tag": 39,
+      "bytes": 21992,
+      "sha256": "baec644ba45f11fcba2d932590cd9c4fc19bda7770ebe81ce8f046c5ce55eacd"
+    },
+    "boundary": "first css_enter, before the original scene callback",
+    "observer_seq": 3613,
+    "profile_masks": {
+      "characters": 2047,
+      "stages": 448
+    },
+    "rng": 3980218793,
+    "decoded_groups": [
+      "boundary",
+      "game_rules",
+      "match_counters",
+      "trophy_category_flags",
+      "trophy_count",
+      "trophy_flags",
+      "unlocked_characters",
+      "unlocked_features",
+      "unlocked_stages"
+    ],
+    "raw_profile_policy": "Private profile bytes, name banks and copied memory-card inputs remain ignored local artifacts; this receipt contains hashes and bounded nonpersonal fields only."
+  },
+  "decoder": {
+    "result": "pass",
+    "sidecar": {
+      "local_path": "work/reference-css-context-v15/candidate-v2.json",
+      "sha256": "8b5d40dfb0da94c0745b447490fdbf1bb9e6dca9938f63d073b99cc10b922aff"
+    },
+    "raw_sha256": "cebb4c619ac0d249ffc75491888772a91ec7d14bae72e7decc25f2b4e7bb3c5e",
+    "validation": "Exact GameRules/SaveData slice sizes and typed field ranges are checked before publication. Source-consumed workload retains the first-CSS context without turning CPU decisions into inputs."
+  },
+  "integration": {
+    "command": "python3 -m unittest discover -s tests -v",
+    "tests": 1208,
+    "skips": 86,
+    "result": "pass",
+    "log": {
+      "local_path": "work/pr58-full-suite-v1.log",
+      "sha256": "4fb94bc642a011c9f89d8ebf01694f6d510d1ea565e750cd56d809e4e3cb7ce6"
+    }
+  },
+  "build": {
+    "manifest": {
+      "local_path": "work/sequence-reference-build-v8.json",
+      "sha256": "428d1ab1708b05b4716a3c94bff4dd4bde3f7a2e19f43d8d1d12cb58202d159f"
+    },
+    "log": {
+      "local_path": "work/sequence-reference-build-v8-retry.log",
+      "sha256": "649ab219a338a4b173ec1cf11899e9961e8f7a116af3ee1ac16903fce0ed0188"
+    },
+    "composition": "Same original observer build and capture as #57, with the typed profile overlay from #58."
+  },
+  "open_gates": [
+    "Typed profile consumption and whole-session replay in #59",
+    "Independent repeatability and original-versus-port comparison",
+    "Persistent profile mutations across a fully compared session",
+    "Pixels, PCM, live scheduling and performance"
+  ],
+  "deployed": false
+}
