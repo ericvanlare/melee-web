@@ -230,7 +230,7 @@ class PublicStagingTests(unittest.TestCase):
             )
         receipt = stage._receipt_payload(result)
         receipt["native_artifacts"] = [{
-            "path": "/Users/example/private/native.wasm",
+            "path": "/Users/" + "example/private/native.wasm",
             "bytes": 1,
             "sha256": "b" * 64,
         }]

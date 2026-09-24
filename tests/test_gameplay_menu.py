@@ -1,4 +1,4 @@
-"""Compile the native menu lifecycle contract with strict scene stubs."""
+"""Compile the native menu lifecycle contract with source GObj ordering."""
 from pathlib import Path
 import os
 import subprocess
@@ -15,7 +15,7 @@ class GameplayMenuContractTests(unittest.TestCase):
     def test_lifecycle_boundary_and_return_contract(self):
         self.run_contract(public=False)
 
-    def test_public_donkey_exclusion_at_css_and_final_match_handoff(self):
+    def test_public_donkey_selection_at_css_and_final_match_handoff(self):
         self.run_contract(public=True)
 
     def run_contract(self, *, public):
@@ -33,7 +33,8 @@ class GameplayMenuContractTests(unittest.TestCase):
             output = Path(directory) / "gameplay_menu_contract.js"
             result = subprocess.run(
                 [
-                    str(compiler), "-Wall", "-Wextra", "-Werror", "-DAURORA",
+                    str(compiler), "-Wall", "-Wextra", "-Werror",
+                    "-Wno-unused-variable", "-DAURORA",
                     *(["-DMELEE_WEB_PUBLIC_RUNTIME"] if public else []),
                     "-DTARGET_PC", "-I", str(ROOT / "src"), "-I",
                     str(ROOT / "build/gameplay-source/src"), "-I",
@@ -44,6 +45,7 @@ class GameplayMenuContractTests(unittest.TestCase):
                     str(ROOT / "src/gameplay_compat.h"),
                     str(ROOT / "src/gameplay_menu.c"),
                     str(ROOT / "src/gameplay_match_rules.c"),
+                    str(ROOT / ".deps/melee/src/sysdolphin/baselib/gobjplink.c"),
                     str(ROOT / "tests/native_menu_fighter_input.c"),
                     str(ROOT / "tests/gameplay_menu_trace.c"),
                     "-sENVIRONMENT=node", "-sEXIT_RUNTIME=1", "-o", str(output),

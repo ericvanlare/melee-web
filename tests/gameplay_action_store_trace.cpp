@@ -159,6 +159,14 @@ void verify_common_appeals(std::shared_ptr<const DatArchive> archive, const Byte
                   store.runtime().action(motion).command_offset.has_value(),
               "Koopa victim source command presence changed");
     }
+    if (costume.fighter_kind == 2 || costume.fighter_kind == 25) {
+        // Captain/Ganondorf dive catches run the common CaptureCaptain
+        // submotion row 276 on the catcher's own store.
+        check(store.command_ready(276), "Captain-family dive-catch CaptureCaptain command graph is not admitted");
+        check(store.runtime().commands(276).has_value() ==
+                  store.runtime().action(276).command_offset.has_value(),
+              "Captain-family dive-catch source command presence changed");
+    }
     if (costume.fighter_kind == 5) {
         check(costume.motion_count == 316, "Koopa authored action count changed");
         for (unsigned motion = 295; motion < costume.motion_count; ++motion) {
@@ -166,6 +174,15 @@ void verify_common_appeals(std::shared_ptr<const DatArchive> archive, const Byte
             check(store.runtime().commands(motion).has_value() ==
                       store.runtime().action(motion).command_offset.has_value(),
                   "Koopa self-motion source command presence changed");
+        }
+    }
+    if (costume.fighter_kind == 16) {
+        check(costume.motion_count == 314, "Mewtwo authored action count changed");
+        for (unsigned motion = 295; motion < costume.motion_count; ++motion) {
+            check(store.command_ready(motion), "Mewtwo self-motion graph is not admitted");
+            check(store.runtime().commands(motion).has_value() ==
+                      store.runtime().action(motion).command_offset.has_value(),
+                  "Mewtwo self-motion source command presence changed");
         }
     }
     unsigned expected_command_mask = 0;
@@ -324,6 +341,8 @@ int main(int argc, char** argv)
             for (unsigned kind : {12U, 23U})
                 if (kinds.contains(kind))
                     std::cout << "Pikachu-family kind " << kind << " authored self-motion rows 295/319: passed\n";
+            if (kinds.contains(16))
+                std::cout << "Mewtwo kind 16 authored self-motion rows 295/313: passed\n";
         }
     } catch (const std::exception& e) { std::cerr << e.what() << '\n'; return 1; }
 }

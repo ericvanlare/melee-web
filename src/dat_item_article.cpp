@@ -30,6 +30,13 @@ ArticleSchema schema(uint32_t kind)
     // Koopa's Flame uses six source floats, one serialized state row, and
     // the source-valid null-joint ItemModelDesc form.
     case It_Kind_Koopa_Flame:return {24,1,true};
+    // Mewtwo's Disable is the authored two-float itMDisableAttributes record
+    // (lifetime and horizontal velocity) with one serialized state row.
+    case It_Kind_Mewtwo_Disable:return {8,1,true};
+    // Shadow Ball's serialized special record is twelve words; the doldecomp
+    // header's x30..x3C tail is not serialized by the disc record. Ten
+    // serialized animation rows back the eighteen callback states.
+    case It_Kind_Mewtwo_ShadowBall:return {0x30,10,true};
     // Seven original pill motion states select six serialized animation rows,
     // including the throw/catch sequences used by Dr. Mario's taunt.
     case It_Kind_DrMario_Vitamin:return {20,6,true};

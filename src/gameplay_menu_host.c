@@ -16,6 +16,7 @@
 #include <melee/lb/lbcardgame.h>
 #include <melee/lb/lblanguage.h>
 #include <sysdolphin/baselib/controller.h>
+#include <sysdolphin/baselib/rumble.h>
 #include <sysdolphin/baselib/displayfunc.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/initialize.h>
@@ -199,6 +200,10 @@ int melee_web_menu_host_tick(MeleeWebMenuHost* h,const PADStatus raw[4],char* e,
     if(HSD_PadLibData.queue!=&h->queue||HSD_PadLibData.qcount)return fail(e,n,"Native menu raw PAD queue is not idle");
     memset(&h->queue,0,sizeof(h->queue));memcpy(h->queue.stat,raw,sizeof(h->queue.stat));
     HSD_PadLibData.qread=HSD_PadLibData.qwrite=0;HSD_PadLibData.qcount=1;
+    /* Supplied raw samples replace PADRead, not the rumble interpreter that
+     * precedes it in HSD_PadRenewRawStatus. Match stepping uses this same
+     * source boundary; menu confirmations must advance and release requests. */
+    HSD_PadRumbleInterpret();
     HSD_PadRenewMasterStatus();HSD_PadRenewCopyStatus();HSD_PadRenewGameStatus();
     if(HSD_PadLibData.qcount)return fail(e,n,"Source PAD processing did not consume its sample");
     gm_EvaluateAllControllerInputs();return melee_web_menu_tick(h->session,e,n);

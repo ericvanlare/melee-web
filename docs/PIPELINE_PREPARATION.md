@@ -1,5 +1,18 @@
 # Compact pipeline preparation union
 
+## Current publication boundary
+
+The tracked preparation header is **stale development metadata**: it binds
+seed `cdf157ee0f1850884f07a71165fd2192177acb23c2c777313b719e70ea67546f`,
+which differs from the active seed identified by the
+[materializer](../scripts/materialize_pipeline_cache.py).
+`MELEE_WEB_SELECTIVE_PIPELINES` remains off by default. Do not use the old
+header as a certificate for the current release or enable that path without
+regenerating and validating it from matching certified inputs. This is a
+separate performance-preparation task; the publication pass preserves the
+metadata and its known limitation. See the
+[provenance assessment](PUBLICATION_PROVENANCE_ASSESSMENT.md#generated-aurora-renderer-metadata).
+
 `scripts/generate_pipeline_preparation.py` joins an explicit list of already
 certified requirement/coverage sidecar pairs into one conservative preparation
 union. The certificate and coverage inputs remain private evidence. The output

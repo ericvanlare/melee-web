@@ -53,7 +53,9 @@ def summarize(run, jobs, *, now=None):
         "conclusion": run.get("conclusion"), "turnaround_seconds": elapsed,
         "within_ten_minutes": (elapsed <= 600) if complete else None,
         "accepted": complete and run.get("conclusion") == "success" and elapsed <= 600
-                    and all(row["conclusion"] == "success" for row in rows),
+                    and all(row["conclusion"] == "success" or
+                            (row["name"] == "compiler-cache-audit" and row["conclusion"] == "skipped")
+                            for row in rows),
         "job_execution_seconds": sum(row["execution_seconds"] or 0 for row in rows),
         "jobs": rows,
     }

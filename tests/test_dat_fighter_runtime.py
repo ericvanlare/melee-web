@@ -51,6 +51,15 @@ class DatFighterRuntimeTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("Koopa 0xa0 attributes", result.stdout)
 
+    def test_real_mewtwo_attribute_boundary(self):
+        asset = ROOT / "assets-local/full-game-mewtwo/PlMt.dat"
+        if not asset.is_file():
+            self.skipTest("owned Mewtwo fighter archive is unavailable")
+        result = subprocess.run([str(self.binary), "real_mewtwo", str(asset)],
+                                capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("Mewtwo 0x88 attributes", result.stdout)
+
     def test_real_luigi_attribute_boundary(self):
         asset = ROOT / "assets-local/full-game-luigi/PlLg.dat"
         effects = ROOT / "assets-local/full-game-luigi/EfLgData.dat"

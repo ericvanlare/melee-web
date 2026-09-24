@@ -183,6 +183,9 @@ int melee_web_prize_context_end(MeleeWebPrizeContext* c, char* e, size_t n)
     lb_8001D1F4(); lb_8001C5A4();
     if_Scene_Prize_EnterData = c->saved_payload;
     if (!melee_web_prize_source_end()) return fail(e, n, "Prize source state cannot be restored");
+    HSD_PadRumbleRemoveAll();
+    for (unsigned i = 0; i < 4; ++i) HSD_PadRumbleOffN(i);
+    HSD_PadRumbleInterpret();
     HSD_PadLibData = c->saved_library;
     memcpy(HSD_PadGameStatus, c->saved_game, sizeof(c->saved_game));
     memcpy(HSD_PadMasterStatus, c->saved_master, sizeof(c->saved_master));
