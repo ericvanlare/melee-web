@@ -1,0 +1,386 @@
+{
+  "schema": "melee-web-source-audio-ar-services",
+  "version": 1,
+  "date": "2026-09-24",
+  "base_commit": "4df3e8c54ec2f71a8c283924a4f51fd7b832464f",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced"
+  ],
+  "scope": "Original ARInit and deferred ARQ completion with checked modeled cache, interrupt and context services",
+  "source_files": [
+    {
+      "path": "src/source_audio_ar_services.c",
+      "bytes": 13493,
+      "sha256": "ac6e0dc5ab9c69a5b2c81a58f2141d6b510a9ee57833c0d3e143d514d11e634c"
+    },
+    {
+      "path": "src/source_audio_ar_services.h",
+      "bytes": 4386,
+      "sha256": "c0e94b9b4eabdf96c6bc71213cfcdebcf61e9f30781397d0b7d19789cddf2f59"
+    },
+    {
+      "path": "tests/source_audio_ar_services.cpp",
+      "bytes": 26338,
+      "sha256": "419195ac1cf27134c32553acc8a3bc43a85e1a16a611df099ff22f7afbfe987c"
+    },
+    {
+      "path": "tests/source_audio_ar_services_include/dolphin.h",
+      "bytes": 2595,
+      "sha256": "42e4ab81afa0d5a66cf00dd08dc393f88be394dcf37549b5b950a8a9b14a8e5f"
+    },
+    {
+      "path": "tests/source_audio_ar_services_include/dolphin/ar.h",
+      "bytes": 1668,
+      "sha256": "b71e4f29625409283aa32678c03f266324531b2e0a20375adcabd561ee4fe6a1"
+    },
+    {
+      "path": "tests/test_source_audio_ar_services.py",
+      "bytes": 8715,
+      "sha256": "7868133460afed90b7457d949e57d33318f73faac56473c4d5c1a6c1aef3bc38"
+    }
+  ],
+  "execution_receipt": {
+    "scope": "Original ARInit and ARQ with declared modeled services; no live AX/Synth/session claim",
+    "source_hashes_before": {
+      ".deps/melee/extern/dolphin/src/dolphin/os/OSInterrupt.c": "69ba045af10aaede13f77fa1040af7fa6e79658e2d317bcee1afc5992d3fca7e",
+      ".deps/melee/extern/dolphin/src/dolphin/ar/ar.c": "dc2ad84463413ef6b91a8f8fe8acefb26ed35743d63dd85bf6590cec28d95cc8",
+      ".deps/melee/extern/dolphin/src/dolphin/ar/arq.c": "b8ce29ad2773743b3f657cc1203799baad5efcc65d8381beb60f4922b37a1be1"
+    },
+    "source_hashes_after": {
+      ".deps/melee/extern/dolphin/src/dolphin/os/OSInterrupt.c": "69ba045af10aaede13f77fa1040af7fa6e79658e2d317bcee1afc5992d3fca7e",
+      ".deps/melee/extern/dolphin/src/dolphin/ar/ar.c": "dc2ad84463413ef6b91a8f8fe8acefb26ed35743d63dd85bf6590cec28d95cc8",
+      ".deps/melee/extern/dolphin/src/dolphin/ar/arq.c": "b8ce29ad2773743b3f657cc1203799baad5efcc65d8381beb60f4922b37a1be1"
+    },
+    "wasm_sha256": "0145caccad2752b9d35bed5c9c564b661f6c249efd72914cbdf3e0611456e0b6",
+    "generated_ar_sha256": "e826106ba77fcc2e52dbe440db8e3a0389698af417b7355916b5f96a8d5655c3",
+    "generated_provider_sha256": "332c97f4aee280c193e1031e81de2d12b92bf2b46261aab97c31ff101e40a383"
+  },
+  "artifacts": [
+    {
+      "path": "work/source-audio-ar-services-i0983543/absent-deferred.command.json",
+      "bytes": 273,
+      "sha256": "e48cbfe5b747ec59802bc55dcccf64fe845c630ffebbd93253471876e2bc77a8"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/absent-deferred.exit",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/absent-deferred.stderr",
+      "bytes": 1868,
+      "sha256": "89a16b66fcadd583aa671a9419f221ae0ca97ee80d9f43d24110dafd81993f66"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/absent-deferred.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/ar_compat.c",
+      "bytes": 12034,
+      "sha256": "e826106ba77fcc2e52dbe440db8e3a0389698af417b7355916b5f96a8d5655c3"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/bad-mode.command.json",
+      "bytes": 266,
+      "sha256": "3393cda0fd68883fbcc9ec4297f940e39f1c8cf0c1fb16548ac1c027e6f7e9e3"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/bad-mode.exit",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/bad-mode.stderr",
+      "bytes": 1862,
+      "sha256": "4ea4fbe9515d28f76e847c381c8fb61cc6de1647baba6e926d46cf2e60b9bffe"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/bad-mode.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/bad-span.command.json",
+      "bytes": 266,
+      "sha256": "bdc9d118d8c4dc51688fff0a41e79246b3ea3b66c8ef6f9b9197c6b53e6daba9"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/bad-span.exit",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/bad-span.stderr",
+      "bytes": 1990,
+      "sha256": "00b4227983a8fb7b85d623b5c7c0453fee9cc5a768968c5b10f9f708c737964a"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/bad-span.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/compile.command.json",
+      "bytes": 1403,
+      "sha256": "dc870991618aa8e60bc3a23443fab82cd206cf5ff6e2c8dee07d54b38ddab1fc"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/compile.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/compile.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/compile.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/cpu-masked-pump.command.json",
+      "bytes": 273,
+      "sha256": "5f9fd078e042d51ab1e0c426c44900c310e1945dfda1be1e2e250e9e5cf2b40d"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/cpu-masked-pump.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/cpu-masked-pump.stderr",
+      "bytes": 180,
+      "sha256": "1b6f516e85037670871aab43e8ee8db2ddc5eb137343c7d6e75d20939fc5326b"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/cpu-masked-pump.stdout",
+      "bytes": 32,
+      "sha256": "5a279ffb3730faaf629bcd689e1fc4394f992271d42e408d179d3556b55ecbd6"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/irq-masked-pump.command.json",
+      "bytes": 273,
+      "sha256": "427b8d3825d3b559d2d45c93bf15923b273ceb994a3912b1a8fcd6435ca1f01e"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/irq-masked-pump.exit",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/irq-masked-pump.stderr",
+      "bytes": 1880,
+      "sha256": "11dbb37467bb45f9f566929d4ad685d72ccb182b000b27c12bb194f9f62dedfe"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/irq-masked-pump.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/missing-publication.command.json",
+      "bytes": 277,
+      "sha256": "4348b226e52fd34024c3fd8ab22df23ca3ba124f26c1113687bb0f952ac37520"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/missing-publication.exit",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/missing-publication.stderr",
+      "bytes": 2069,
+      "sha256": "9386e39b8ead45f71961ebea4ea88be5c3e86873b9df0b6fee22dc17c5ce35ab"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/missing-publication.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/no-inline.command.json",
+      "bytes": 267,
+      "sha256": "db26fe26df92bdcc253c34ced72f99154448fbaf99e9af624a6ed9cff2d47ac9"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/no-inline.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/no-inline.stderr",
+      "bytes": 180,
+      "sha256": "1b6f516e85037670871aab43e8ee8db2ddc5eb137343c7d6e75d20939fc5326b"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/no-inline.stdout",
+      "bytes": 32,
+      "sha256": "5a279ffb3730faaf629bcd689e1fc4394f992271d42e408d179d3556b55ecbd6"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/receipt.json",
+      "bytes": 1196,
+      "sha256": "9f5acd071476823416a1871847016182098335ef773d09d108f85619feb3bdd5"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/recycled-span.command.json",
+      "bytes": 271,
+      "sha256": "f69c620b33652650734ab1a06b6a7f5cbab7dbef97c863fa47a42f0416c3fe7f"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/recycled-span.exit",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/recycled-span.stderr",
+      "bytes": 1865,
+      "sha256": "2b98a5d856c058404011cec7dc00340a81c67957f1c13b5ad1930877317583f3"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/recycled-span.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/reinitialize.command.json",
+      "bytes": 270,
+      "sha256": "0338886097e6c0e17f8e8e2f0d11af0f5a863e2b8bdb3f490c7cfc7ce572b412"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/reinitialize.exit",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/reinitialize.stderr",
+      "bytes": 1880,
+      "sha256": "65c0493ade67a38cf23b3fb79cd068a4188a7424adcec70bb3af0ab78c778786"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/reinitialize.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/services.js",
+      "bytes": 61604,
+      "sha256": "b706164642784180f760e60c57bb729fccffce97aa7ed907032c820e5d6e0cde"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/services.wasm",
+      "bytes": 252095,
+      "sha256": "0145caccad2752b9d35bed5c9c564b661f6c249efd72914cbdf3e0611456e0b6"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/services_generated.cpp",
+      "bytes": 31243,
+      "sha256": "332c97f4aee280c193e1031e81de2d12b92bf2b46261aab97c31ff101e40a383"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/stale-probe-span.command.json",
+      "bytes": 274,
+      "sha256": "ccadbf0500f994a8ad8b704ecfe8f7e7de4c8c9a936730c8f8fcb1a345849aaf"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/stale-probe-span.exit",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/stale-probe-span.stderr",
+      "bytes": 2069,
+      "sha256": "9386e39b8ead45f71961ebea4ea88be5c3e86873b9df0b6fee22dc17c5ce35ab"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/stale-probe-span.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/unknown.command.json",
+      "bytes": 265,
+      "sha256": "d71990c6012511d671f5e9ff4835282d47dd45da2e7ec2e68b2eefca7d3abffa"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/unknown.exit",
+      "bytes": 2,
+      "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/unknown.stderr",
+      "bytes": 1721,
+      "sha256": "9e89c09d32812d8aebe1cf75bea5d29993cd985ec140ac527c3d6dfd1f15244e"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/unknown.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/valid.command.json",
+      "bytes": 263,
+      "sha256": "57d5774fa99e0b821eb91b639b3afd399ac233fdca1c293bf03f0b08c5b6d534"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/valid.exit",
+      "bytes": 2,
+      "sha256": "9a271f2a916b0b6ee6cecb2426f0b3206ef074578be55d9bc94f6f3fe3ab86aa"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/valid.stderr",
+      "bytes": 180,
+      "sha256": "1b6f516e85037670871aab43e8ee8db2ddc5eb137343c7d6e75d20939fc5326b"
+    },
+    {
+      "path": "work/source-audio-ar-services-i0983543/valid.stdout",
+      "bytes": 32,
+      "sha256": "5a279ffb3730faaf629bcd689e1fc4394f992271d42e408d179d3556b55ecbd6"
+    }
+  ],
+  "validation": {
+    "focused_log": {
+      "path": "work/source-audio-ar-root-focused-v5.log",
+      "bytes": 724,
+      "sha256": "e7d1da815c6a7c36a8b12d0a03534ee3e1e12829d47b7da68ccdb3181b4b2dd6"
+    },
+    "focused_tests": 4,
+    "positive_modes": 3,
+    "negative_cases_including_unknown": 9,
+    "full_suite": {
+      "run": 1398,
+      "passed": 1301,
+      "skipped": 97,
+      "seconds": 326.766,
+      "log": {
+        "path": "work/source-audio-ar-full-suite-v1.log",
+        "bytes": 249604,
+        "sha256": "e66bf96659362bc577dd00d21383322cf38824da8106bfde90d4e915c944fd7c"
+      },
+      "note": "Runner was loaded before three final negative cases were added; final focused run separately executes all nine, and full suite compiles final C/C++ provider."
+    }
+  },
+  "retained_failures": [
+    {
+      "path": "work/source-audio-ar-services-wh1pjumj",
+      "reason": "Positional platform fields exchanged raise and dispatch; replaced with named assignments."
+    },
+    {
+      "path": "work/source-audio-ar-services-twwnwmk8",
+      "reason": "Original SDK register macros required explicit undef before checked proxies."
+    }
+  ],
+  "limits": [
+    "Declared 16 MiB ARAM profile; modeled completion schedule is not hardware timing",
+    "No joined AX/Synth execution, original boundary comparison, PCM or live browser claim",
+    "No full application allocation history or live Fighter binding",
+    "Session first divergence remains match0 tick1776 P4 input_hex"
+  ],
+  "deployed": false
+}
