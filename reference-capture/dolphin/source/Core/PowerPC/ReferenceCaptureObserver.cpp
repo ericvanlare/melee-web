@@ -44,6 +44,7 @@ constexpr size_t MAX_SLICES = 64;
 constexpr size_t MAX_RAW = 192 * 1024;
 constexpr u32 PAD_READ_HSD_CALLER = 0x80376A28;
 constexpr u32 MENU_AUDIO_STREAM_START = 0x8038E8EC;
+constexpr u32 CSS_ENTER_RETURN = 0x802669F0;
 // Menu steering sources, as the retail menu owners read them:
 // mnStageSel_803F06D0 is the 30-entry authored stage list (stride 0x1C, stage
 // kind at +0xB), mnStageSel_804D6CAE is the highlighted index, and
@@ -615,6 +616,11 @@ struct Observer::Impl
         (!AddSlice(system, SliceTag::MenuMainFlow, 0x804a04f0, 0x18) ||
          !AddSlice(system, SliceTag::MenuMainInput, 0x804d6bc8, 8)))
       return false;
+    // Source menu globals survive arena teardown. PAD interrupts can run
+    // inside OnEnter while those globals still point into the old arena.
+    // Publish CSS steering only after the verified OnEnter return.
+    if (scene_kind == 8 && whole_session_enabled() && !css_steering_ready)
+      return true;
     if (scene_kind == 8 && !AddCssCpuSteeringSlices(system))
       return false;
     // Menu globals retain pointers after their scene arena is reclaimed.
@@ -870,6 +876,14 @@ struct Observer::Impl
   {
     if (!Start() || invalid.load() || finish_requested.load())
       return;
+    if (whole_session_enabled() && pc == CSS_ENTER_RETURN)
+    {
+      u32 word = 0;
+      if (!ReadU32(system, pc, &word) || word != 0x4e800020 || whole_phase != 1)
+        return SetInvalid("CSS steering readiness lacks its verified source return"), void();
+      css_steering_ready = true;
+      return;
+    }
     if (whole_session_enabled() && pc == MENU_AUDIO_STREAM_START)
     {
       ++audio_owner_epoch;
@@ -900,6 +914,9 @@ struct Observer::Impl
         boundary == Boundary::SssEnter || boundary == Boundary::SssExit ||
         boundary == Boundary::ReturnCss)
     {
+      if (boundary == Boundary::CssEnter || boundary == Boundary::CssCancelEnter ||
+          boundary == Boundary::ReturnCss || boundary == Boundary::CssExit)
+        css_steering_ready = false;
       if (boundary == Boundary::ReturnCss)
       {
         if (whole_phase != 6 || (!pending_next_match && !awaiting_final_css))
@@ -1200,8 +1217,12 @@ struct Observer::Impl
         {
           if (!vs_exit_seen || vs_exit_return_seen)
             return SetInvalid("VS exit return is missing or duplicated"), void();
-          if (!AddSessionSlices(system))
-            return SetInvalid("VS exit return did not expose PAD/RNG state"), void();
+          // gm_Scene_Vs_OnExit populates EndMeleeData during the callback.
+          // Keep its entry snapshot diagnostic, and publish the completed
+          // result only at the verified return instruction.
+          if (!AddSessionSlices(system) ||
+              !AddSlice(system, SliceTag::Result, result_pointer + 0xc, 0x28))
+            return SetInvalid("VS exit return did not expose result/PAD/RNG state"), void();
           vs_exit_return_seen = true;
           result_seen = true;
           // Gameplay observations end at the original VS exit. Results has
@@ -1642,6 +1663,7 @@ struct Observer::Impl
   u32 whole_session_matches = 0;
   u32 audio_owner_epoch = 0;
   u32 match_index = 0;
+  bool css_steering_ready = false;
   u32 whole_phase = 0;  // CSS, SSS, VS, completed match, or return CSS.
   bool pending_next_match = false;
   bool awaiting_final_css = false;
@@ -1729,6 +1751,7 @@ bool Observer::IsBoundary(u32 guest_pc)
   case 0x8039157C:
   case 0x801A4B70:
   case 0x8026688C:
+  case 0x802669F0:
   case 0x80266D70:
   case 0x8025A998:
   case 0x8025BBD0:

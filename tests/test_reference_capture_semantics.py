@@ -219,7 +219,7 @@ def _decoded_observer_rows(match_count=3, *, include_prize=False,
         for kind, _name in match_kinds:
             stream_bytes += _observer_frame(
                 3, sequence,
-                _observer_boundary(kind, match_index, result=kind in (17, 23)),
+                _observer_boundary(kind, match_index, result=kind in (17, 18, 23)),
                 pc=pcs[kind], source_tick=sequence, draw_ordinal=sequence)
             sequence += 1
     with tempfile.TemporaryDirectory() as directory:
@@ -462,6 +462,32 @@ class ReferenceCaptureSemanticsTests(unittest.TestCase):
                          report["matches"][2]["scene_reset_seq"] + 1)
         self.assertEqual(report["capture_identity"],
                          {"capture_id": "capture-36", "sequence_id": "sequence-36"})
+
+    def test_observer_adapter_requires_completed_return_result(self):
+        records = _decoded_observer_rows()
+        returned = next(row for row in records
+                        if row.get("payload", {}).get("boundary") == "vs_exit_return")
+        returned["payload"]["slices"] = [
+            item for item in returned["payload"]["slices"] if item["name"] != "result"]
+        with self.assertRaisesRegex(semantics.WholeSessionSemanticError,
+                                    "VS exit return lacks its completed source Result"):
+            semantics.validate_whole_session_observer_records(records)
+
+    def test_observer_adapter_preserves_repeated_results_process_frames(self):
+        records = _decoded_observer_rows()
+        position = next(i for i, row in enumerate(records)
+                        if row.get("payload", {}).get("boundary") == "results_gobj")
+        repeated = deepcopy(records[position])
+        records.insert(position + 1, repeated)
+        report = semantics.validate_whole_session_observer_records(records)
+        self.assertEqual(report["matches"][0]["boundary_order"].count("results_gobj"), 2)
+        records.pop(position + 1)
+        exit_position = next(i for i, row in enumerate(records)
+                             if row.get("payload", {}).get("boundary") == "results_exit")
+        records.insert(exit_position + 1, repeated)
+        with self.assertRaisesRegex(semantics.WholeSessionSemanticError,
+                                    "out-of-order source lifecycle"):
+            semantics.validate_whole_session_observer_records(records)
 
     def test_observer_adapter_requires_source_loaded_profile_masks(self):
         records = _decoded_observer_rows()

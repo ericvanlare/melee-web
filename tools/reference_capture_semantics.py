@@ -1103,7 +1103,17 @@ def validate_whole_session_observer_records(records, *, transition_trace=None):
                 "scene_teardown", "prize_scene_enter", "prize_scene_exit",
                 "prize_mode_exit", "return_css",
             ]
-        if [name for name in suffix if name != "draw_return"] != expected_suffix:
+        # Results GObj processing runs every source frame. Preserve every
+        # record in the report, but treat only its contiguous run as one
+        # lifecycle phase; a callback outside that phase remains an error.
+        lifecycle_suffix = []
+        for name in suffix:
+            if name == "draw_return":
+                continue
+            if name == "results_gobj" and lifecycle_suffix[-1:] == [name]:
+                continue
+            lifecycle_suffix.append(name)
+        if lifecycle_suffix != expected_suffix:
             raise WholeSessionSemanticError(
                 f"match {match_index} has an out-of-order source lifecycle")
         vs_exit_position = route_names.index("vs_exit")
@@ -1118,17 +1128,18 @@ def validate_whole_session_observer_records(records, *, transition_trace=None):
         if not draws_before_exit:
             raise WholeSessionSemanticError(
                 f"match {match_index} has no final draw before VS exit")
-        result_row = route_rows[vs_exit_position]
+        result_row = route_rows[route_names.index("vs_exit_return")]
         if not any(item["name"] == "result"
                    for item in result_row["payload"].get("slices", [])):
             raise WholeSessionSemanticError(
-                f"match {match_index} VS exit lacks its source Result slice")
+                f"match {match_index} VS exit return lacks its completed source Result slice")
         reports.append({
             "match_index": match_index,
             "boundary_order": names,
             "startup_prize_prelude": startup_prize,
             "final_draw_seq": draws_before_exit[-1]["seq"],
-            "vs_exit_seq": result_row["seq"],
+            "vs_exit_seq": route_rows[vs_exit_position]["seq"],
+            "vs_exit_return_seq": result_row["seq"],
             "scene_reset_seq": next(
                 row["seq"] for row in rows_for_match
                 if row["payload"]["boundary"] == "scene_teardown"),
