@@ -11,6 +11,11 @@
 #include <melee/gm/forward.h>
 #include <melee/gr/forward.h>
 #include <sysdolphin/baselib/random.h>
+extern "C" {
+#include <melee/lb/lb_013B.h>
+#include <sysdolphin/baselib/rumble.h>
+extern HSD_RumbleData HSD_Rumble_804C22E0[4];
+}
 #include <bit>
 #include <cmath>
 #include <filesystem>
@@ -166,7 +171,20 @@ int main(int argc,char** argv){try{
    check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);
   };
   const unsigned first_css_neutral=retail_fd_recipe&&cycle==0?187:120;
-  for(unsigned t=0;t<first_css_neutral;t++)check(tick()==1,"Unexpected CSS transition");
+  if(!retail_fd_recipe){
+   // Owned LbRb row zero ends after four motor-on samples and one hard stop.
+   // Exercise the menu host's normal raw-sample boundary, without adding
+   // simulation steps or claiming physical actuator behavior.
+   lb_80014574(0,0x4d57,0,0);
+   check(HSD_Rumble_804C22E0[0].nb_list==1,
+         "Menu startup did not publish an available source rumble pool");
+  }
+  for(unsigned t=0;t<first_css_neutral;t++){
+   check(tick()==1,"Unexpected CSS transition");
+   if(!retail_fd_recipe&&t==5)
+    check(HSD_Rumble_804C22E0[0].nb_list==0,
+          "Menu raw samples did not advance and release the source rumble program");
+  }
   uint32_t initial_music_completed=0,initial_music_revisited=0;
   check(melee_web_audio_stream_progress(world->audio(),&initial_music_completed,
                                          &initial_music_revisited)&&

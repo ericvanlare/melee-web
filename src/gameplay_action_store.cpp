@@ -72,6 +72,10 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     // SM_CaptureDamageKoopa..SM_ThrownKoopaAirB; the native action store is
     // indexed by those authored submotion rows, so retain exactly SM 278..283.
     group(278,283);
+    /* Mewtwo's side special capture drives the common ThrownMewtwo rows on
+     * its victim. These source command graphs belong to every possible
+     * victim action store, like Koopa's capture rows above. */
+    group(292,293);
     group(286,291);                              // shield-break knockdown
     if (mario) group(295,302);                   // Mario/Dr. Mario specials; taunts use common rows 239/240 above
     else if (link_family) group(295,313);        // Link-family action tables end at 313

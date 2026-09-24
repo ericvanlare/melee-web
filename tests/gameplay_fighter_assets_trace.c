@@ -140,16 +140,32 @@ int assets_test_item_commands(void)
         return 0;
     }
     melee_web_item_commands_destroy(commands);
-    /* it_8027978C advances over two operand unions even for an ignored
-     * high sub-opcode. A following invalid opcode therefore remains after
-     * the complete three-word command. */
-    const uint32_t texture[]={(16U<<26)|(10U<<18),0x12345678,63U<<26,0};
-    commands=melee_web_item_commands_create(texture,4);
-    if(!commands || commands[3].Command_00.code!=0){
-        if(commands)melee_web_item_commands_destroy(commands);
-        return 0;
+    /* it_8027978C has three-word forms for sub 0..2 and 10..11, and
+     * two-word forms for every other sub-opcode. Keep a valid END immediately
+     * after each authored form so an over-consumption changes the observed
+     * command boundary. */
+    const unsigned two_operand_subs[]={0,1,2,10,11};
+    for(size_t n=0;n<sizeof(two_operand_subs)/sizeof(two_operand_subs[0]);++n){
+        const uint32_t texture[]={
+            (16U<<26)|(two_operand_subs[n]<<18),0x12345678,0x87654321,0};
+        commands=melee_web_item_commands_create(texture,4);
+        if(!commands || commands[3].Command_00.code!=0){
+            if(commands)melee_web_item_commands_destroy(commands);
+            return 0;
+        }
+        melee_web_item_commands_destroy(commands);
     }
-    melee_web_item_commands_destroy(commands);
+    const unsigned one_operand_subs[]={3,9,12,255};
+    for(size_t n=0;n<sizeof(one_operand_subs)/sizeof(one_operand_subs[0]);++n){
+        const uint32_t texture[]={
+            (16U<<26)|(one_operand_subs[n]<<18),0x12345678,0};
+        commands=melee_web_item_commands_create(texture,3);
+        if(!commands || commands[2].Command_00.code!=0){
+            if(commands)melee_web_item_commands_destroy(commands);
+            return 0;
+        }
+        melee_web_item_commands_destroy(commands);
+    }
     return ok;
 }
 MeleeWebFighterAssetScope* assets_test_begin(void* rows,void* blends,void* waits,void* context,

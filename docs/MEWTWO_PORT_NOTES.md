@@ -99,6 +99,46 @@ broader performance remain open. Follow the [full-game
 inventory](FULL_GAME_PORT.md) and [accuracy contract](ACCURACY_CONTRACT.md)
 for the remaining product boundary.
 
+## Staging side-special crash (fixed 2026-09-21)
+
+A staging report showed the player stopping ("Player stopped. Reload to
+recover.") exactly when side-specialing with Mewtwo. Three fixes went into
+commit `1af6c92`; each is retained with its reproduction:
+
+1. **Mewtwo's side special is a source command grab.** When Confusion's hit
+   connects on the ground, `ftCo_800BCF18` runs `CaptureMewtwo` and the victim
+   enters the common `ThrownMewtwo`/`ThrownMewtwoAir` submotions (SM 292/293).
+   Those command rows were never admitted to any action store, so the victim's
+   row dispatched the unsupported-command sentinel and aborted mid-match.
+   They are now admitted for every store under the same rule as Koopa's
+   capture rows: these source command graphs belong to every possible victim.
+   The trace regression is `Mewtwo ground Confusion capture lifetime passed`
+   in `gameplay_content_match_trace` (runs per costume cycle, both Mario and
+   Young Link opponents).
+2. **The source boot-time rumble interpreter pool was missing.** Source
+   `gmMain_8015FD24` installs a 12-entry rumble list pool before any scene
+   runs; the port only installed it inside match begin, leaving the pad
+   library's `rumble_info` uninitialized for every menu scene. The world
+   now installs the pool at startup (`melee_web_rumble_begin`), matching the
+   source boot.
+3. **Menu scene gobjs leaked into later scenes.** The original game-mode
+   layer re-initializes the HSD gobj library at every scene change
+   (`gm_801A4BD4`); the retained one-world port does not, so CSS gobjs —
+   including the confirm-tag processor `fn_80262F44` whose confirm rumble
+   faults against the next world's rumble state — kept running inside the
+   match. The menu host now snapshots each gobj list head when a scene's
+   original enter runs and destroys exactly the gobjs created since that
+   snapshot when the scene leaves, using the source's own per-gobj teardown
+   primitive.
+
+The reproduction evidence is retained under `work/full-game/`: the runtime
+reflect sweep (`mewtwo-sideb-probe/progress.log`) reproduces the staging
+stop on the pre-fix build — the aborting chain was
+`melee_web_command_require_supported` ← `ftAction_80073240` ←
+`Fighter_ChangeMotionState` ← `ftCo_800BD0E8` (`CaptureMewtwo`/`ThrownMewtwo`)
+— and the post-fix Release sweep completes all 15 rounds; the local suite
+runs 1,131 tests OK (`mewtwo-crashfix-suite-v5.log`).
+
 ## Operator note
 
 A stale served build (a RelWithDebInfo binary left in `build/browser` while

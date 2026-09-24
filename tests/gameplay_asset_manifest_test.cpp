@@ -100,7 +100,7 @@ void menu_contract()
     check(has(names,"dsp_coef.bin"), "Development scope requires DSP coefficients");
 #endif
     for(const auto name:{"MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd",
-                         "LbMcGame.usd","NtMemAc.usd","sislib_font.bin","smash2.sem",
+                         "LbMcGame.usd","NtMemAc.usd","LbRb.dat","sislib_font.bin","smash2.sem",
                          "menu01.hps"})
         check(std::find(names.begin(),names.end(),name)!=names.end(),"Missing menu resource");
     const auto banks=menu_audio_bank_names();

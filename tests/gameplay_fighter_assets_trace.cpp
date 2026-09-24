@@ -3,6 +3,8 @@
 #include "dat_item_commands.hpp"
 #include "fighter_runtime_fixture.hpp"
 #include <cstdio>
+#include <cstring>
+#include <cstdint>
 #include <iostream>
 using namespace fighter_runtime_test;
 extern "C" {
@@ -55,6 +57,17 @@ int main() {
          * this, so the decoder mirrors the runtime instead of rejecting it. */
         check(DatItemCommands().decode(script({(3U<<26)|1,0}),0)!=nullptr,
               "Unbalanced SetLoop decodes like the original interpreter");
+        Bytes branch_data(20);
+        put32(branch_data,0,5U<<26);put32(branch_data,4,16);put32(branch_data,8,0);
+        put32(branch_data,12,0);put32(branch_data,16,0);
+        auto branch_archive=std::make_shared<const DatArchive>(pack(branch_data,{4},"branch"));
+        DatItemCommands branch_decoder;
+        auto* branch_commands=static_cast<std::uint8_t*>(branch_decoder.decode(*branch_archive,0));
+        auto word=[&](std::size_t index){std::uint32_t value;std::memcpy(&value,branch_commands+index*4,4);return value;};
+        check(branch_commands && (word(0)&0x3f)==5 &&
+              word(1)==static_cast<std::uint32_t>(reinterpret_cast<std::uintptr_t>(branch_commands)+12) &&
+              (word(2)&0x3f)==0 && (word(3)&0x3f)==0,
+              "Subroutine return points past its pointer operand before the target body");
         FighterFixture f;put32(f.data,f.command_a,0);f.unlink(f.command_a+4);put32(f.data,f.command_b,0);
         auto archive=std::make_shared<const DatArchive>(f.file());
         for(unsigned restart=0;restart<2;++restart) {

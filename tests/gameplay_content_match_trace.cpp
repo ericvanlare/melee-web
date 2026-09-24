@@ -379,6 +379,77 @@ int main(int argc,char** argv){try{
         check(std::abs(match.player_stats(1).position[0]-match.player_stats(0).position[0])<attack_distance,
               "Raw input did not bring the selected fighter within neutral-special range");
         check(match.player_stats(0).ground_or_air==0,"Selected fighter left the ground before the laser check");
+            // Confusion capture: the source side special is a command grab
+            // on contact (ftCo_800BCF18 -> CaptureMewtwo), and the victim
+            // enters the common ThrownMewtwo submotions. A staging crash
+            // report showed the player stopping exactly on this capture,
+            // whose command rows the action store had never admitted.
+            if(mewtwo){
+                raw[0].button=0;raw[0].stickX=raw[0].stickY=0;
+                for(unsigned n=0;n<720;n++){
+                    const auto state=match.player_stats(0);
+                    if(state.ground_or_air==0&&state.motion_id==14)break;
+                    tick();
+                }
+                // Close to contact range so the Confusion hit connects, then
+                // stop: the capture is a command grab on contact.
+                for(unsigned n=0;n<120;n++){
+                    const auto p1=match.player_stats(0),p2=match.player_stats(1);
+                    if(std::abs(p2.position[0]-p1.position[0])<16.0f)break;
+                    raw[0].stickX=p2.position[0]>p1.position[0]?80:-80;tick();
+                }
+                raw[0].stickX=0;
+                // The dash momentum must settle before the side special edge
+                // registers; a running capture input was consumed by the run
+                // state in the failing staging flow.
+                for(unsigned n=0;n<120;n++){
+                    if(match.player_stats(0).motion_id==14)break;
+                    tick();
+                }
+                std::cout<<"Mewtwo capture pre-B p1="<<match.player_stats(0).motion_id
+                    <<" x="<<match.player_stats(0).position[0]
+                    <<" p2="<<match.player_stats(1).motion_id
+                    <<" p2x="<<match.player_stats(1).position[0]<<std::endl;
+                raw[0].button=PAD_BUTTON_B;
+                raw[0].stickX=match.player_stats(1).position[0]>match.player_stats(0).position[0]?80:-80;
+                tick();
+                raw[0].button=0;raw[0].stickX=0;
+                bool entered=false,captured=false;
+                for(unsigned n=0;n<240&&!(entered&&captured);n++){
+                    tick();
+                    entered|=match.player_stats(0).motion_id==ftMt_MS_SpecialS;
+                    captured|=match.player_stats(1).motion_id==ftCo_MS_ThrownMewtwo;
+                }
+                check(entered,"Mewtwo capture recipe did not enter its side special");
+                check(captured,"Mewtwo Confusion hit did not run its source capture on the victim");
+                // Tick through the source capture lifetime and release.
+                for(unsigned n=0;n<400;n++){
+                    tick();
+                    if(match.player_stats(1).motion_id!=ftCo_MS_ThrownMewtwo)break;
+                }
+                /* The release leaves the victim launched; settle both fighters
+                 * so the recipes that follow observe a grounded idle
+                 * opponent, as their own positioning already re-closes the
+                 * range. */
+                raw[1].button=0;raw[1].stickX=0;
+                for(unsigned n=0;n<120;n++){raw[1].stickY=-80;tick();}
+                raw[1].stickY=0;
+                for(unsigned n=0;n<600;n++){
+                    const auto p2=match.player_stats(1);
+                    if(p2.ground_or_air==0&&p2.motion_id==14)break;
+                    tick();
+                }
+                raw[0].button=0;raw[0].stickX=raw[0].stickY=0;
+                for(unsigned n=0;n<720;n++){
+                    const auto state=match.player_stats(0);
+                    if(state.ground_or_air==0&&state.motion_id==14)break;
+                    tick();
+                }
+                check(match.player_stats(0).ground_or_air==0&&
+                      match.player_stats(0).motion_id==14,
+                      "Mewtwo capture recipe did not settle to grounded Wait");
+                std::cout<<"Mewtwo ground Confusion capture lifetime passed"<<std::endl;
+            }
         if (cycle==0&&doctor) {
             /* Dr. Mario's up taunt is a fighter-owned source action.  It also
              * exercises ftDr_Init_80149910, which installs the shared Mario
@@ -1059,6 +1130,8 @@ int main(int argc,char** argv){try{
                 std::cout<<"Mewtwo "<<(air?"air":"ground")<<" Disable lifetime passed"<<std::endl;
             }
             std::cout<<fighter_content->name<<" original N/air-N/S/Hi/Lw lifecycle branches executed"<<std::endl;
+
+
         }else if(cycle==0&&donkey){
             // The common neutral loop above already proves grounded Giant
             // Punch damage and an authored N state.  This branch drives the

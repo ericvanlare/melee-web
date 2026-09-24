@@ -1,15 +1,12 @@
 #include <melee/lb/lb_013B.h>
 #include <sysdolphin/baselib/controller.h>
 #include <sysdolphin/baselib/rumble.h>
-#include <string.h>
 extern HSD_RumbleData HSD_Rumble_804C22E0[4];
 int melee_web_test_rumble_sequence(void)
 {
-    PadLibData previous = HSD_PadLibData;
-    HSD_RumbleData saved[4];
-    memcpy(saved,HSD_Rumble_804C22E0,sizeof(saved));
-    HSD_PadRumbleListData pool[12] = {0};
-    HSD_PadRumbleInit(12,pool);
+    /* Use the world's published pool, as a CSS confirm does. A test-owned
+     * pool would hide missing world initialization. */
+    if (HSD_PadLibData.rumble_info.max_list != 12) return 0;
     lb_80014574(0,123,0,0);
     HSD_RumbleData* port = &HSD_Rumble_804C22E0[0];
     int valid = port->nb_list == 1 && port->listdatap != NULL;
@@ -27,7 +24,19 @@ int melee_web_test_rumble_sequence(void)
     }
     HSD_PadRumbleRemoveAll();
     valid &= port->nb_list==0;
-    HSD_PadLibData=previous;
-    memcpy(HSD_Rumble_804C22E0,saved,sizeof(saved));
     return valid;
+}
+
+int melee_web_test_rumble_queue(void)
+{
+    lb_80014574(0,124,0,0);
+    return HSD_Rumble_804C22E0[0].nb_list == 1;
+}
+
+int melee_web_test_rumble_clear(void)
+{
+    for (unsigned i=0;i<4;i++)
+        if (HSD_Rumble_804C22E0[i].nb_list ||
+            HSD_Rumble_804C22E0[i].listdatap) return 0;
+    return 1;
 }
