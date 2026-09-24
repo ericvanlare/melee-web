@@ -112,10 +112,14 @@ non-final teardown advances to the next match, whose next record is
 completion. Results process records carry the original PAD/input snapshot,
 RNG pointer/value, and Result payload slices. No guest memory is written.
 
-CSS/SSS raw hooks run at function entry. Enter records read their source
-argument because the scene's static pointer has not yet been assigned; exit
-records read the live static pointer. These are not the completed-callback
-events used by the existing transition comparator. The required join must
+CSS and SSS enter hooks and the CSS exit hook run at function entry. Enter
+records read their source argument because the scene's static pointer has not
+yet been assigned; CSS exit reads the live static pointer. SSS exit runs at
+its verified return instruction, after the original callback writes its route.
+VS exit entry retains a diagnostic pre-callback Result; VS exit return carries
+the completed Result. Entry-hook menu audio is likewise pre-callback state.
+These scopes remain distinct from the completed-callback events used by the
+existing transition comparator. The required join must
 retain that distinction, including the final return-CSS entry.
 
 `validate_whole_session_observer_records` in
