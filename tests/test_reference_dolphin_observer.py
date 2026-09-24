@@ -14,6 +14,63 @@ SOURCE = ROOT / "reference-capture" / "dolphin" / "source" / "Core" / "PowerPC" 
 
 
 class ReferenceDolphinObserverTests(unittest.TestCase):
+    def test_scene_reset_classifier_distinguishes_menu_match_results_and_prize(self) -> None:
+        compiler = shutil.which("clang++") or shutil.which("g++")
+        if compiler is None:
+            self.skipTest("A native C++ compiler is not installed")
+        source = SOURCE.read_text(encoding="utf-8")
+        classifier = source[source.index("  enum class SceneResetAction"):
+                            source.index("  void Observe(Core::System*")]
+        harness = r"""
+#include <cassert>
+struct ObserverState {
+  bool match_active = false, result_seen = false, vs_exit_seen = false;
+  bool vs_exit_return_seen = false, vs_mode_exit_seen = false;
+  bool results_enter_seen = false, results_gobj_seen = false;
+  bool results_exit_seen = false, results_mode_exit_seen = false;
+  bool prize_scene_exit_seen = false, prize_mode_exit_seen = false;
+  int whole_phase = 0;
+""" + classifier + r"""
+};
+int main() {
+  using Action = ObserverState::SceneResetAction;
+  ObserverState state;
+  for (int phase : {0, 2, 4, 8}) {
+    state.whole_phase = phase;
+    assert(state.ClassifyWholeSceneReset() == Action::Ignore);
+  }
+  for (int phase : {1, 3, 5, 6, 7}) {
+    state.whole_phase = phase;
+    assert(state.ClassifyWholeSceneReset() == Action::Invalid);
+  }
+  state.match_active = true; state.whole_phase = 5;
+  state.result_seen = state.vs_exit_seen = state.vs_exit_return_seen = true;
+  assert(state.ClassifyWholeSceneReset() == Action::Invalid);
+  state.vs_mode_exit_seen = true;
+  assert(state.ClassifyWholeSceneReset() == Action::BeginResults);
+  state.results_enter_seen = true;
+  assert(state.ClassifyWholeSceneReset() == Action::Invalid);
+  state.results_gobj_seen = state.results_exit_seen = true;
+  assert(state.ClassifyWholeSceneReset() == Action::Invalid);
+  state.results_mode_exit_seen = true;
+  assert(state.ClassifyWholeSceneReset() == Action::FinishResults);
+  state.match_active = false; state.whole_phase = 6;
+  assert(state.ClassifyWholeSceneReset() == Action::Invalid);
+  state.prize_scene_exit_seen = state.prize_mode_exit_seen = true;
+  assert(state.ClassifyWholeSceneReset() == Action::Ignore);
+}
+"""
+        harness = "#include <initializer_list>\n" + harness
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary)
+            (path / "reset.cpp").write_text(harness)
+            built = subprocess.run([compiler, "-std=c++17", "-Wall", "-Werror",
+                                    str(path / "reset.cpp"), "-o", str(path / "reset")],
+                                   capture_output=True, text=True)
+            self.assertEqual(built.returncode, 0, built.stderr)
+            checked = subprocess.run([str(path / "reset")], capture_output=True, text=True)
+            self.assertEqual(checked.returncode, 0, checked.stderr)
+
     def test_css_joint_reader_preserves_source_traversal_and_rejects_cycles(self) -> None:
         compiler = shutil.which("clang++") or shutil.which("g++")
         if compiler is None:
