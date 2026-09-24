@@ -583,24 +583,43 @@ offsets for that region disagree with each other; the report keeps
 `persistent_record_semantics` as explicit missing coverage instead of guessing
 them.
 
-Whole-session input replay is implemented on the consumer side. Recipe version
-7 is the opt-in form: it keeps the version-4 envelope and appends a span table
-(`u16` count, then `u8` scene, `u8` zero, `u16` zero, `u32` first frame, `u32`
-last frame per span) that must be ordered, contiguous and cover every input
-frame. The browser accepts that form from a used source heap instead of
-requiring a fresh application, feeds the one continuous pad history to
-whichever owner is running, advances the cursor once per simulation step, and
-fails when the owner is not the scene the span declared. Every other recipe
-version still requires a fresh application, because a single-match recipe
-cannot be treated as a whole-session replay by concatenating recipes. What is
-not here yet is the producer: a whole-session recipe has to come from a
-whole-session capture (the sequence capture and input plan), so the mode has no
-captured input yet and no browser route run exercises it.
+Whole-session input replay now uses MWRC version 8, context schema 2. It carries
+original first-CSS GameRules, SaveData, CSSData and KO fields alongside the PAD
+history and RNG seed. The native owner translates the PowerPC scalar fields
+into the generated host layouts before original CSS entry; guest callback
+pointers are rejected. Version 7 and the incomplete schema 1 context are
+rejected. The span table must be contiguous, cover every source-consumed sample,
+and name the source owner active at each step. V8 is bounded to 108,000 frames
+and 32 spans; legacy recipes retain their 36,000-frame bound.
+
+The replay must start from a fresh prepared application. It retains that
+prepared CSS owner and the one source arena across subsequent scenes. Starting
+from a used source heap or an already active scene is rejected. Each native
+step consumes the next sample exactly once and rejects a declared scene that
+does not match its current owner. These are transport and ownership checks;
+they do not establish source-state, draw, pixel or audio agreement.
+
+Instrumented v8 output has its own `melee-web-port-session-diagnostic` schema.
+It records supplied inputs, source scene, RNG and PAD history at every step,
+plus fighter state during VS. Match-only CPU and draw-state observers are not
+run for menu scenes, and this diagnostic stream is not accepted as a legacy
+single-match comparison. Completion requires the final original Results/Prize
+return to enter CSS and finish preparation without inventing further PAD ticks.
+
+`tools/whole_session_replay.py` is the producer. It validates complete passive
+streams and derives only source-consumed PAD inputs, with the observed scene
+boundaries and first-CSS context. Single-capture mode makes no repeatability
+claim; pair mode additionally checks independently identified captures. Raw
+record CRCs and descriptors are validated before large diagnostic-only slices
+are discarded from the in-memory export projection. The completed original
+four-player CPU workload is bound by the
+[observer receipt](evidence/whole-session-observer-pr57-v1.json); browser replay
+and original-versus-port equivalence require their own evidence.
 
 Results comparison also needs full typed MatchEnd/standings and the source
 post-OnEnter display state. The current observer's 0x28-byte result prefix does
-not cover player standings. No importer, new Results snapshot or whole-session
-browser replay was implemented at this checkpoint. Two independent original
+not cover player standings. Typed first-CSS import and whole-session replay
+infrastructure do not close that Results comparison gap. Two independent original
 captures per named sequence, browser comparisons, repeated rotation allocation
 bounds and a fresh frozen cold/warm matrix remain open. Run the required final
 full suite, affected public build and CI after these changes settle; focused
