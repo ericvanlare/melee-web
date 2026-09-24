@@ -70,6 +70,11 @@
       "path": "scripts/ci_verify.py",
       "bytes": 10231,
       "sha256": "364dd5de2e7222ff2b0cf384f1e1f8c629c76626eb7763e350fddc5d593ac5ea"
+    },
+    {
+      "path": "tests/source_devcom_oracle_include/dolphin.h",
+      "bytes": 168,
+      "sha256": "1f3cf227aa0de0de281fba3a002390af7423225340b69366b594f998e1e79886"
     }
   ],
   "original_sources": [
