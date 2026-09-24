@@ -500,6 +500,16 @@ void enter_world(){
  char error[256]{};const bool prepared=world!=nullptr;
  if(!prepared)world=std::make_unique<melee_web::GameplayMenuWorld>(files,*archive_cache);
  const double constructed=emscripten_get_now();
+ if(replay&&replay->whole_session()&&
+    melee_web_menu_host_phase(host)==MELEE_WEB_MENU_CREATED){
+  check(replay->initial_css&&replay->initial_input,
+        "Whole-session replay is missing its first-CSS source context");
+  check(melee_web_menu_host_apply_replay_context(
+      host,replay->seed,replay->pad_bytes.data(),
+      replay->initial_css->css_data.data(),replay->initial_css->ko_counts.data(),
+      replay->initial_css->game_rules.data(),replay->initial_css->save_data.data(),
+      error,sizeof(error)),error);
+ }
  check(melee_web_menu_host_enter(host,world->audio(),error,sizeof(error)),error);host_entered=true;world_exposed=true;
  const double entered=emscripten_get_now();
  report_construction("scene-enter",started,constructed,entered,before,aurora_stats_snapshot());

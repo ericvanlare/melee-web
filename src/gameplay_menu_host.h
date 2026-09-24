@@ -29,6 +29,16 @@ typedef struct MeleeWebMenuMatchSelection {
  * Enter only after GameplayMenuWorld has published its native assets. */
 MeleeWebMenuHost* melee_web_menu_host_create(char*,size_t);
 int melee_web_menu_host_enter(MeleeWebMenuHost*,MeleeWebAudio*,char*,size_t);
+/* Install the copied first-CSS source context before the initial scene is
+ * entered.  Rules/save ranges are observer PowerPC bytes and are translated
+ * by the save/profile owner; the PAD state is semantic wire data and is
+ * applied without transferring any live queue or rumble pointer. */
+int melee_web_menu_host_apply_replay_context(
+    MeleeWebMenuHost*, uint32_t random_seed,
+    const uint8_t pad_state[MELEE_WEB_PAD_STATE_BYTES],
+    const uint8_t css_data[0x148], const uint8_t ko_counts[GM_MAX_PLAYERS],
+    const uint8_t game_rules[0x18], const uint8_t save_data[0x55E8],
+    char*, size_t);
 /* Original raw PAD processing, scene callback, audio control and scheduler.
  * Returns 1 while active, 3 on an original transition request, 0 on failure. */
 int melee_web_menu_host_tick(MeleeWebMenuHost*,const PADStatus[4],char*,size_t);

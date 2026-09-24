@@ -320,8 +320,37 @@ int main(void)
         char error[128];
         MeleeWebMenuSession* session =
             melee_web_menu_session_create(&runtime, NULL, error, sizeof(error));
-        if (!session || !melee_web_menu_enter_css(session, error, sizeof(error)))
+        uint8_t css_context[0x148] = {0};
+        uint8_t ko_counts[GM_MAX_PLAYERS] = {1, 2, 3, 4, 5, 6};
+        css_context[0] = 0;
+        css_context[1] = 1;
+        css_context[2] = VS_MELEE;
+        css_context[4] = 0x80;
+        css_context[5] = 0x54;
+        css_context[6] = 0;
+        css_context[7] = 0;
+        css_context[0x10] = 2 << 2;
+        css_context[0x10 + 0x0B] = 2;
+        css_context[0x10 + 0x0E] = 0;
+        css_context[0x10 + 0x0F] = MELEE_WEB_MENU_FD_ST_KIND;
+        memset(css_context + 0x10 + 0x20, 0xff, 8);
+        for (int i = 0; i < GM_MAX_PLAYERS; ++i) {
+            const size_t base = 0x70 + (size_t) i * 0x24;
+            css_context[base] = i == 1 ? CKIND_FOX : CKIND_MARIO;
+            css_context[base + 1] = i < 2 ? Gm_PKind_Human : Gm_PKind_NA;
+            css_context[base + 4] = 0;
+            css_context[base + 0x0C] = i < 2 ? 0x80 : 0;
+            css_context[base + 0x18] = 0x3f;
+            css_context[base + 0x1C] = 0x80;
+            css_context[base + 0x20] = 0x00;
+        }
+        if (!session || !melee_web_menu_apply_reference_css_context(
+                session, css_context, ko_counts, error, sizeof(error)) ||
+            !melee_web_menu_enter_css(session, error, sizeof(error)))
             return 59;
+        if (active_css->unk_0x0 != 1 || active_css->vs.start.players[1].ckind != CKIND_FOX ||
+            active_css->ko_counts[0] != 1 || active_css->ko_counts[5] != 6)
+            return 108;
         active_css->vs.start.players[1].slot_type = Gm_PKind_Cpu;
         active_css->vs.start.players[1].cpu_kind = 4;
         active_css->vs.start.players[1].cpu_level = 9;

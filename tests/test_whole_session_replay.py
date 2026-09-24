@@ -61,6 +61,17 @@ def _pad_consume(match_index: int, value: int, source_tick: int) -> dict:
 
 def _candidate(capture_id: str = "capture-a", sequence_id: str = "sequence-a"):
     rows = copy.deepcopy(_decoded_observer_rows())
+    # Keep the fixture's published masks consistent with its typed SaveData,
+    # as the v8 reader checks both source ranges at the transport boundary.
+    for row in rows:
+        payload = row.get("payload", {})
+        if payload.get("boundary") != "css_enter":
+            continue
+        for item in payload.get("slices", []):
+            if item.get("name") == "profile_save_data":
+                raw = bytearray.fromhex(item["hex"])
+                raw[0:4] = bytes.fromhex("07ff01c0")
+                item["hex"] = raw.hex()
     rows.append({"seq": 0, "source_tick": 0, "draw_ordinal": 0, "event": "end",
                  "payload": {"status": "completed", "natural": True}})
     handshake = rows[0]["payload"]
@@ -163,7 +174,7 @@ def _write_raw(path: Path, rows: list[dict]) -> None:
 
 
 class WholeSessionReplayTests(unittest.TestCase):
-    def test_normalizes_source_consumed_inputs_and_encodes_v7(self):
+    def test_normalizes_source_consumed_inputs_and_encodes_v8_context(self):
         capture = replay.capture_from_records(_candidate())
         self.assertEqual(len(capture["frames"]), 12)
         self.assertEqual(capture["frames"][0]["scene"], "css")
@@ -172,15 +183,53 @@ class WholeSessionReplayTests(unittest.TestCase):
         self.assertEqual(capture["frames"][3]["scene"], "results")
         self.assertEqual(capture["first_css"]["rng"], 0x12345678)
         self.assertEqual(capture["first_css"]["pad_state_hex"], _whole_pad_state())
-        payload, transport = replay.encode_v7(capture)
+        payload, transport = replay.encode_v8(capture)
         magic, version, seed, frame_count, characters, stages = replay.HEADER.unpack_from(payload)
-        self.assertEqual((magic, version, seed, frame_count), (b"MWRC", 7, 0x12345678, 12))
+        self.assertEqual((magic, version, seed, frame_count), (b"MWRC", 8, 0x12345678, 12))
         self.assertEqual((characters, stages), (0x07FF, 0x01C0))
-        span_offset = replay.HEADER.size + replay.GAME_INFO_SIZE + replay.PAD_STATE_BYTES + 12 * 44
+        context_offset = replay.HEADER.size
+        context_version, context_flags, context_size = replay.CONTEXT_HEADER.unpack_from(
+            payload, context_offset)
+        self.assertEqual((context_version, context_flags, context_size),
+                         (2, 0, replay.CONTEXT_BYTES))
+        self.assertEqual(payload[context_offset + replay.CONTEXT_HEADER.size:
+                                context_offset + replay.CONTEXT_HEADER.size + 0x18].hex(),
+                         capture["first_css"]["game_rules_hex"])
+        css_offset = (context_offset + replay.CONTEXT_HEADER.size +
+                      replay.semantics.GAME_RULES_SIZE + replay.semantics.SAVE_DATA_SIZE)
+        self.assertEqual(payload[css_offset:css_offset + replay.CSS_DATA_SIZE].hex(),
+                         capture["first_css"]["css_data_hex"])
+        span_offset = (replay.HEADER.size + replay.CONTEXT_HEADER.size +
+                       replay.CONTEXT_BYTES + replay.GAME_INFO_SIZE +
+                       replay.PAD_STATE_BYTES + 12 * 44)
         span_count = struct.unpack_from(">H", payload, span_offset)[0]
         self.assertEqual(span_count, len(capture["spans"]))
         self.assertEqual(len(payload), span_offset + 2 + span_count * replay.SPAN.size)
         self.assertEqual(transport["frame_count"], 12)
+
+    def test_provisional_v7_is_rejected_at_producer_boundary(self):
+        capture = replay.capture_from_records(_candidate())
+        with self.assertRaisesRegex(replay.WholeSessionReplayError,
+                                    "v7 cannot carry first-CSS source context"):
+            replay.encode_v7(capture)
+
+    def test_partial_first_css_context_is_rejected(self):
+        rows = _candidate()
+        first = next(row for row in rows
+                     if row["payload"].get("boundary") == "css_enter")
+        first["payload"]["slices"] = [item for item in first["payload"]["slices"]
+                                        if item["name"] != "menu_css_context"]
+        with self.assertRaisesRegex(replay.WholeSessionReplayError,
+                                    "typed CSSData context"):
+            replay.capture_from_records(rows)
+
+    def test_four_player_setup_is_admitted_with_typed_css_context(self):
+        capture = replay.capture_from_records(_candidate())
+        capture["declared_setup"]["players"].append(
+            copy.deepcopy(capture["declared_setup"]["players"][1]))
+        payload, transport = replay.encode_v8(capture)
+        self.assertTrue(payload)
+        self.assertEqual(transport["version"], 8)
 
     def test_rejects_missing_source_consumption(self):
         rows = _candidate()
@@ -237,11 +286,11 @@ class WholeSessionReplayTests(unittest.TestCase):
             result = replay.export_pair(first, second, output, sidecar)
             self.assertTrue(output.is_file())
             self.assertTrue(sidecar.is_file())
-            self.assertEqual(result["transport"]["version"], 7)
-            self.assertEqual(result["claims"]["runtime_initial_css_context"],
-                             replay.RUNTIME_CONTEXT_GATE)
             self.assertEqual(json.loads(sidecar.read_text())["claims"]
                              ["source_consumed_pad_repeatability"], "pass")
+        self.assertEqual(result["transport"]["version"], 8)
+        self.assertEqual(result["claims"]["runtime_initial_css_context"],
+                         replay.RUNTIME_CONTEXT_STATUS)
 
     def test_export_single_marks_repeatability_as_unevaluated(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -255,7 +304,7 @@ class WholeSessionReplayTests(unittest.TestCase):
             self.assertEqual(result["claims"]["source_consumed_pad_repeatability"],
                              "not_evaluated")
             self.assertEqual(result["claims"]["runtime_initial_css_context"],
-                             replay.RUNTIME_CONTEXT_GATE)
+                             replay.RUNTIME_CONTEXT_STATUS)
             self.assertEqual(json.loads(sidecar.read_text())["claims"]
                              ["independent_execution_identity"], "not_evaluated")
 

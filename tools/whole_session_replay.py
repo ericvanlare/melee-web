@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Derive a checked MWRC v7 recipe from two raw whole-session observer streams.
+"""Derive a checked MWRC v8 recipe from raw whole-session observer streams.
 
 The only replay inputs admitted here are bytes from the source PAD queue at the
 observer's pad_consume boundary.  Lifecycle boundaries assign each consumed
 sample to the source scene that was active at that point.  No CPU observation,
 host input, or intended menu schedule is used as an input.
 
-This producer is deliberately stricter than the v7 reader.  It requires two
+This producer is deliberately stricter than the v8 reader.  It requires two
 complete, independently identified streams, the same source setup/profile, and
 the same ordered source-consumed PAD history.  It rejects missing boundaries,
 unsupported phases, changed setups, and any partial stream before creating an
@@ -36,7 +36,8 @@ from retail_setup_validation import _decode_setup  # noqa: E402
 
 
 MAGIC = b"MWRC"
-MWRC_VERSION = 7
+MWRC_VERSION = 8
+LEGACY_WHOLE_SESSION_VERSION = 7
 GAME_INFO_SIZE = 0x138
 PAD_STATE_BYTES = 822
 PAD_SEMANTIC_SIZE = 11
@@ -45,6 +46,12 @@ FRAME_INPUT_SIZE = PORT_COUNT * PAD_SEMANTIC_SIZE
 MAX_FRAMES = 36000
 MAX_SPANS = 32
 HEADER = struct.Struct(">4sIIIHH")
+CONTEXT_HEADER = struct.Struct(">HHI")
+CONTEXT_VERSION = 2
+CSS_DATA_SIZE = 0x148
+KO_COUNTS_SIZE = 6
+CONTEXT_BYTES = (semantics.GAME_RULES_SIZE + semantics.SAVE_DATA_SIZE +
+                 CSS_DATA_SIZE + KO_COUNTS_SIZE)
 SPAN = struct.Struct(">BBHII")
 
 EXPECTED_DOL_SHA1 = "08e0bf20134dfcb260699671004527b2d6bb1a45"
@@ -55,13 +62,13 @@ EXPECTED_OBSERVER_SCHEMA = "melee-web-passive-dolphin-observer"
 SCHEMA = "melee-web-whole-session-replay-candidate"
 SCHEMA_VERSION = 1
 SCOPE = (
-    "original source-consumed PAD repeatability and scoped MWRC v7 whole-session "
+    "original source-consumed PAD repeatability and scoped MWRC v8 whole-session "
     "workload; no CPU-decision input, port-equivalence, performance, pixel, PCM, "
     "or tournament-admission claim"
 )
-RUNTIME_CONTEXT_GATE = (
-    "blocked_pending_runtime_initial_css_context: current v7 consumer does not "
-    "apply the declared first-CSS PAD/RNG/profile context before entering CSS"
+RUNTIME_CONTEXT_STATUS = (
+    "v8 carries source first-CSS PAD/RNG/GameRules/SaveData/CSSData/KO context "
+    "for the typed consumer; end-to-end runtime equivalence remains unevaluated"
 )
 
 SCENES = {"css": 1, "sss": 2, "match": 3, "results": 4, "prize": 5}
@@ -74,7 +81,7 @@ IDENTITY = re.compile(r"[A-Za-z0-9_.-]{1,128}\Z")
 
 
 class WholeSessionReplayError(ValueError):
-    """The raw streams cannot be admitted as a complete MWRC v7 workload."""
+    """The raw streams cannot be admitted as a complete MWRC v8 workload."""
 
 
 def _fail(message: str) -> None:
@@ -246,6 +253,35 @@ def _first_css_context(records: list[Mapping[str, Any]]) -> dict[str, Any]:
         raise WholeSessionReplayError(f"first CSS profile context is invalid: {error}") from error
     if profile_context is None:
         _fail("first CSS lacks typed profile game-rules/save-data context")
+    _, raw_rules = _slice(row, "profile_game_rules", semantics.GAME_RULES_SIZE,
+                          "first CSS")
+    _, raw_save = _slice(row, "profile_save_data", semantics.SAVE_DATA_SIZE,
+                         "first CSS")
+    if int.from_bytes(raw_save[0:2], "big") != masks["characters"] or \
+            int.from_bytes(raw_save[2:4], "big") != masks["stages"]:
+        _fail("first CSS profile masks disagree with typed SaveData")
+    try:
+        css_item, raw_css = _slice(row, "menu_css_context", CSS_DATA_SIZE, "first CSS")
+    except WholeSessionReplayError as error:
+        raise WholeSessionReplayError(
+            f"first CSS lacks typed CSSData context: {error}") from error
+    css_pointer = _gpr(row["payload"], 3, "first CSS")
+    if css_item.get("address") != css_pointer:
+        _fail("first CSS CSSData slice address disagrees with source r3")
+    if raw_css[2] != 0 or raw_css[3] != 0:
+        _fail("first CSS CSSData is not an ordinary initial VS context")
+    if any(raw_css[0x10 + 0x38:0x10 + 0x5C]):
+        _fail("first CSS CSSData contains unsupported callback or private pointers")
+    ko_pointer = int.from_bytes(raw_css[4:8], "big")
+    if not ko_pointer:
+        _fail("first CSS CSSData has no source KO-count owner")
+    try:
+        ko_item, raw_ko = _slice(row, "menu_css_ko_counts", KO_COUNTS_SIZE, "first CSS")
+    except WholeSessionReplayError as error:
+        raise WholeSessionReplayError(
+            f"first CSS lacks typed CSS KO-count context: {error}") from error
+    if ko_item.get("address") != ko_pointer:
+        _fail("first CSS KO-count slice address disagrees with CSSData")
     pad_item, raw_pad = _slice(row, "pad_snapshot", 0x358, "first CSS")
     if pad_item.get("address") != 0x804C1F84:
         _fail("first CSS PAD snapshot escaped the pinned source address")
@@ -265,6 +301,10 @@ def _first_css_context(records: list[Mapping[str, Any]]) -> dict[str, Any]:
         "pad_state_hex": pad_state_hex,
         "profile_masks": masks,
         "profile_context": profile_context,
+        "game_rules_hex": raw_rules.hex(),
+        "save_data_hex": raw_save.hex(),
+        "css_data_hex": raw_css.hex(),
+        "ko_counts_hex": raw_ko.hex(),
         "profile_game_rules_sha256": _slice_hash(row, "profile_game_rules",
                                                   semantics.GAME_RULES_SIZE, "first CSS"),
         "profile_save_data_sha256": _slice_hash(row, "profile_save_data",
@@ -306,7 +346,7 @@ def _match_setups(records: list[Mapping[str, Any]], match_count: int) -> tuple[s
             except (KeyError, TypeError, ValueError) as error:
                 raise WholeSessionReplayError(f"source setup is unsupported: {error}") from error
         elif current != setup_hex:
-            _fail("source StartMeleeData changed between matches; MWRC v7 has one setup")
+            _fail("source StartMeleeData changed between matches; MWRC v8 has one setup")
     return setup_hex, declared
 
 
@@ -529,13 +569,17 @@ def _recipe_key(capture: Mapping[str, Any]) -> tuple[Any, ...]:
         first_css["profile_masks"]["stages"],
         first_css["profile_game_rules_sha256"],
         first_css["profile_save_data_sha256"],
+        first_css["game_rules_hex"],
+        first_css["save_data_hex"],
+        first_css["css_data_hex"],
+        first_css["ko_counts_hex"],
         frames,
         spans,
     )
 
 
-def encode_v7(capture: Mapping[str, Any]) -> tuple[bytes, dict[str, Any]]:
-    """Encode one checked normalized capture as MWRC v7."""
+def encode_v8(capture: Mapping[str, Any]) -> tuple[bytes, dict[str, Any]]:
+    """Encode one checked normalized capture as MWRC v8."""
     frames = capture["frames"]
     spans = capture["spans"]
     if not 1 <= len(frames) <= MAX_FRAMES:
@@ -554,6 +598,14 @@ def encode_v7(capture: Mapping[str, Any]) -> tuple[bytes, dict[str, Any]]:
                           "unlocked character mask", 0, 0xFFFF)
     stages = _integer(capture["first_css"]["profile_masks"]["stages"],
                       "unlocked stage mask", 0, 0xFFFF)
+    game_rules = _hex_bytes(capture["first_css"].get("game_rules_hex"),
+                            semantics.GAME_RULES_SIZE, "first CSS GameRules")
+    save_data = _hex_bytes(capture["first_css"].get("save_data_hex"),
+                           semantics.SAVE_DATA_SIZE, "first CSS SaveData")
+    css_data = _hex_bytes(capture["first_css"].get("css_data_hex"),
+                          CSS_DATA_SIZE, "first CSS CSSData")
+    ko_counts = _hex_bytes(capture["first_css"].get("ko_counts_hex"),
+                           KO_COUNTS_SIZE, "first CSS KO counts")
     input_bytes = _input_bytes(capture)
     if len(input_bytes) != len(frames) * FRAME_INPUT_SIZE:
         _fail("source-consumed PAD bytes do not match frame count")
@@ -571,10 +623,13 @@ def encode_v7(capture: Mapping[str, Any]) -> tuple[bytes, dict[str, Any]]:
         _fail("whole-session spans do not cover every frame at encoding")
     payload = bytearray(HEADER.pack(MAGIC, MWRC_VERSION, seed, len(frames),
                                     characters, stages))
-    payload += setup + initial_pad + input_bytes + span_bytes
-    expected = HEADER.size + GAME_INFO_SIZE + PAD_STATE_BYTES + len(input_bytes) + len(span_bytes)
+    payload += CONTEXT_HEADER.pack(CONTEXT_VERSION, 0, CONTEXT_BYTES)
+    payload += (game_rules + save_data + css_data + ko_counts + setup +
+                initial_pad + input_bytes + span_bytes)
+    expected = (HEADER.size + CONTEXT_HEADER.size + CONTEXT_BYTES + GAME_INFO_SIZE +
+                PAD_STATE_BYTES + len(input_bytes) + len(span_bytes))
     if len(payload) != expected:
-        _fail("generated MWRC v7 size does not match its source timeline")
+        _fail("generated MWRC v8 size does not match its source timeline")
     return bytes(payload), {
         "version": MWRC_VERSION,
         "seed": seed,
@@ -582,6 +637,16 @@ def encode_v7(capture: Mapping[str, Any]) -> tuple[bytes, dict[str, Any]]:
         "input_bytes_sha256": hashlib.sha256(input_bytes).hexdigest(),
         "output_sha256": hashlib.sha256(payload).hexdigest(),
     }
+
+
+def encode_v7(capture: Mapping[str, Any]) -> tuple[bytes, dict[str, Any]]:
+    """Reject the provisional whole-session format explicitly.
+
+    Keeping this symbol makes callers fail at the producer boundary instead of
+    accidentally writing a payload that the v8 consumer must ignore.
+    """
+    del capture
+    _fail("MWRC v7 cannot carry first-CSS source context; use encode_v8")
 
 
 def _output_paths(output_path: str | Path, sidecar_path: str | Path | None,
@@ -620,6 +685,8 @@ def _capture_report(capture: Mapping[str, Any],
         "first_css": {
             key: capture["first_css"][key]
             for key in ("rng", "pad_state_hex", "profile_masks",
+                        "game_rules_hex", "save_data_hex", "css_data_hex",
+                        "ko_counts_hex",
                         "profile_game_rules_sha256", "profile_save_data_sha256",
                         "observer_seq", "source_tick")
         },
@@ -634,13 +701,13 @@ def _capture_report(capture: Mapping[str, Any],
 def export_single(capture_path: str | Path, output_path: str | Path,
                   sidecar_path: str | Path | None = None,
                   status_path: str | Path | None = None) -> dict[str, Any]:
-    """Write a valid v7 workload from one complete source capture.
+    """Write a valid v8 workload from one complete source capture.
 
     This mode proves transport completeness and source ownership only. It
     intentionally does not claim independent execution or repeatability.
     """
     capture = capture_from_path(capture_path, status_path)
-    payload, transport = encode_v7(capture)
+    payload, transport = encode_v8(capture)
     source = Path(capture_path).expanduser().resolve()
     output, sidecar = _output_paths(output_path, sidecar_path, (source,))
     result = {
@@ -654,7 +721,7 @@ def export_single(capture_path: str | Path, output_path: str | Path,
             "reference_repeatability": "not_evaluated",
             "source_consumed_pad_repeatability": "not_evaluated",
             "independent_execution_identity": "not_evaluated",
-            "runtime_initial_css_context": RUNTIME_CONTEXT_GATE,
+            "runtime_initial_css_context": RUNTIME_CONTEXT_STATUS,
             "port_equivalence": "not_evaluated",
             "performance": "not_evaluated",
             "pixels": "not_evaluated",
@@ -670,7 +737,7 @@ def export_pair(first_path: str | Path, second_path: str | Path, output_path: st
                 sidecar_path: str | Path | None = None,
                 status_a: str | Path | None = None,
                 status_b: str | Path | None = None) -> dict[str, Any]:
-    """Validate two independent streams and write a v7 recipe plus provenance."""
+    """Validate two independent streams and write a v8 recipe plus provenance."""
     first = Path(first_path).expanduser().resolve()
     second = Path(second_path).expanduser().resolve()
     if first == second:
@@ -685,7 +752,7 @@ def export_pair(first_path: str | Path, second_path: str | Path, output_path: st
         _fail("capture A and capture B declare different whole-session match counts")
     if _recipe_key(capture_a) != _recipe_key(capture_b):
         _fail("independent whole-session streams are not source-consumed repeatable")
-    payload, transport = encode_v7(capture_a)
+    payload, transport = encode_v8(capture_a)
     output, sidecar = _output_paths(output_path, sidecar_path, (first, second))
     input_report = _capture_report(capture_a, transport)
     input_report["capture_a"] = input_report.pop("capture")
@@ -701,7 +768,7 @@ def export_pair(first_path: str | Path, second_path: str | Path, output_path: st
             "reference_repeatability": "pass",
             "source_consumed_pad_repeatability": "pass",
             "independent_execution_identity": "checked_by_distinct_ids_and_bytes",
-            "runtime_initial_css_context": RUNTIME_CONTEXT_GATE,
+            "runtime_initial_css_context": RUNTIME_CONTEXT_STATUS,
             "port_equivalence": "not_evaluated",
             "performance": "not_evaluated",
             "pixels": "not_evaluated",
@@ -719,7 +786,7 @@ def _main(argv: list[str]) -> int:
     parser.add_argument("capture_b", nargs="?", type=Path, help="second raw MWRO stream")
     parser.add_argument("--single", action="store_true",
                         help="export one complete stream without a repeatability claim")
-    parser.add_argument("--output", required=True, type=Path, help="new MWRC v7 output path")
+    parser.add_argument("--output", required=True, type=Path, help="new MWRC v8 output path")
     parser.add_argument("--sidecar", type=Path, help="new JSON provenance sidecar path")
     parser.add_argument("--status-a", type=Path, help="observer status for capture A")
     parser.add_argument("--status-b", type=Path, help="observer status for capture B")

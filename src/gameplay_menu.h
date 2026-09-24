@@ -125,6 +125,14 @@ int melee_web_menu_abort(MeleeWebMenuSession*, char* error, size_t error_size);
 MeleeWebMenuPhase melee_web_menu_phase(const MeleeWebMenuSession*);
 const CSSData* melee_web_menu_css(const MeleeWebMenuSession*);
 const SSSData* melee_web_menu_sss(const MeleeWebMenuSession*);
+/* Install a copied first-CSS source object before scene entry.  The object is
+ * PowerPC big-endian CSSData; scalar fields are translated through the
+ * generated source layout, while the source KO pointer is replaced with the
+ * session-owned six-byte array.  Guest callback/private pointers are not
+ * portable and are rejected unless they are absent. */
+int melee_web_menu_apply_reference_css_context(
+    MeleeWebMenuSession*, const uint8_t css_data[0x148],
+    const uint8_t ko_counts[GM_MAX_PLAYERS], char*, size_t);
 /* Returns the separate VS-entry payload after the original source adapter has
  * applied persistent rules, stocks, item settings and rumble. */
 const VsModeData* melee_web_menu_ready_vs(const MeleeWebMenuSession*);

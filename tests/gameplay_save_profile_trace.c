@@ -126,6 +126,50 @@ int main(void)
           "explicit authored roster setup was not applied");
     check(save->x1B40[0] == 0 && save->x1B4C[0] == 0,
           "roster setup seeded achievement flags");
+    {
+        unsigned char source_rules[0x18] = { 0 };
+        unsigned char source_save[0x55E8] = { 0 };
+        source_rules[0x00] = 0x01;
+        source_rules[0x01] = 0x34;
+        source_rules[0x02] = 0x00;
+        source_rules[0x03] = 0x02;
+        source_rules[0x04] = 0x03;
+        source_rules[0x14] = 0xFF;
+        source_rules[0x15] = 0xFF;
+        source_rules[0x16] = 0xFF;
+        source_rules[0x17] = 0xF9; /* signed unk_14 = -7 */
+        source_save[0x00] = 0x07; source_save[0x01] = 0xFF;
+        source_save[0x02] = 0x01; source_save[0x03] = 0xC0;
+        source_save[0x04] = 0x04;
+        source_save[0x448] = 0x03; /* item frequency in gmm_x1CB0 */
+        source_save[0x450] = 0x11; source_save[0x451] = 0x22;
+        source_save[0x460] = 0x00; source_save[0x461] = 0x00;
+        source_save[0x462] = 0x01; source_save[0x463] = 0xC0;
+        source_save[0x468] = 0x00; source_save[0x469] = 0x05;
+        source_save[0x06C4] = 0x12; source_save[0x06C5] = 0x34;
+        source_save[0x06C4 + 0x7A] = 0x80;
+        source_save[0x06C4 + 0x7C] = 0x81;
+        source_save[0x06C4 + 0x7D] = 0x40;
+        source_save[0x06C4 + 0x7E] = 0x11;
+        source_save[0x06C4 + 0x7F] = 0x22;
+        check_error(melee_web_save_profile_owner_apply_reference_context(
+                        profile, source_rules, source_save, error, sizeof(error)), error);
+        check(gmMainLib_GetGameRules()->mode == 0 &&
+                  gmMainLib_GetGameRules()->stock_count == 3 &&
+                  gmMainLib_GetGameRules()->unk_14 == -7,
+              "first-CSS GameRules source endian translation failed");
+        check(save->unlocked_characers_bitmask == 0x07FF &&
+                  save->x186A == 0x01C0 && save->x186C == 4 &&
+                  save->x1CB0.item_freq == 3 &&
+                  save->x1CB0.item_mask == 0x1122000000000000ULL &&
+                  save->x1CB0.stage_mask == 0x01C0 && save->trophy_count == 5 &&
+                  save->x1F2C[0].fighter_kos[0] == 0x1234 &&
+                  save->x1F2C[0].x7A.u8 == 0x80 &&
+                  save->x1F2C[0].x7C.b0 == 1 &&
+                  save->x1F2C[0].x7C.b789 == 5 &&
+                  save->x1F2C[0].x7C.x7E == 0x1122,
+              "first-CSS SaveData source endian translation failed");
+    }
     mutate_original_profile();
     check_error(melee_web_save_profile_owner_live(profile, error, sizeof(error)), error);
     check(!melee_web_save_profile_owner_destroy(profile, error, sizeof(error)),

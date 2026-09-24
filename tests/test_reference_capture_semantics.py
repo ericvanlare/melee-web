@@ -180,10 +180,43 @@ def _typed_profile_context_slices(kind):
     return bytes(rules), bytes(save)
 
 
+def _typed_css_context_slices(kind):
+    """Complete source CSSData plus its authored six-byte KO owner."""
+    if kind != 13:
+        return b"", b""
+    css_address = 0x80530000
+    ko_address = 0x80540000
+    start = bytearray.fromhex(_whole_setup()["start_melee_hex"])
+    # Initial ordinary VS CSS is a two-human, untimed character-select
+    # payload.  The test keeps all pointer/callback bytes zero so the runtime
+    # decoder can prove its known-owner translation independently.
+    start[0] = 2 << 2
+    start[0x0E:0x10] = (0x20).to_bytes(2, "big")
+    for index in range(6):
+        base = 0x60 + index * 0x24
+        if index < 2:
+            start[base] = 8
+            start[base + 1] = 0
+            start[base + 2] = 0
+            start[base + 4] = 0
+            start[base + 0x0C] = 0x80
+        else:
+            start[base + 1] = 3
+    css = bytearray(0x148)
+    css[0:2] = (1).to_bytes(2, "big")
+    css[2] = 0
+    css[3] = 0
+    css[4:8] = ko_address.to_bytes(4, "big")
+    css[8:16] = bytes.fromhex("ffffffff00000000")
+    css[0x10:] = start
+    return bytes(css), bytes.fromhex("010203040506")
+
+
 def _observer_boundary(kind, match_index, *, result=False):
     raw = b"result" if result else b"state"
     tag = 15 if result else 31
     rules, save = _typed_profile_context_slices(kind)
+    css, ko = _typed_css_context_slices(kind)
     # Descriptors and payload bytes share one order: the reader rejects a gap
     # or a reordered slice, so the typed context follows the existing masks.
     published = [(tag, 0, 0x80479D98 if result else 0x804D6CC0, raw),
@@ -191,9 +224,14 @@ def _observer_boundary(kind, match_index, *, result=False):
                  (37, 0, 0x8045C53A, b"\x01\xc0")]
     if rules:
         published += [(38, 0, 0x804D1850, rules), (39, 0, 0x804D1868, save)]
+    if css:
+        published += [(50, 0, 0x80530000, css), (51, 0, 0x80540000, ko)]
     prefix = observer_stream.BOUNDARY.pack(
         kind, observer_stream.WHOLE_SESSION_FLAG, 0x80300000, 32, len(published), 0)
-    gprs = struct.pack("<32I", *range(32))
+    registers = list(range(32))
+    if css:
+        registers[3] = 0x80530000
+    gprs = struct.pack("<32I", *registers)
     offset = (observer_stream.BOUNDARY.size + 32 * 4 +
               observer_stream.SLICE.size * len(published))
     descriptors = b""

@@ -36,6 +36,15 @@ struct MeleeWebMenuSession {
     int gobj_snapshot_active;
 };
 
+_Static_assert(sizeof(StartMeleeRules) == 0x60,
+               "Source StartMeleeRules layout changed; update CSS decoder");
+_Static_assert(sizeof(PlayerInitData) == 0x24,
+               "Source PlayerInitData layout changed; update CSS decoder");
+_Static_assert(sizeof(StartMeleeData) == 0x138,
+               "Source StartMeleeData layout changed; update CSS decoder");
+_Static_assert(sizeof(CSSData) == 0x148 && offsetof(CSSData, vs) == 0x08,
+               "Source CSSData layout changed; update CSS decoder");
+
 static MeleeWebMenuSession* owner;
 
 static int fail(char* error, size_t error_size, const char* message);
@@ -182,6 +191,148 @@ static int ok(char* error, size_t error_size)
     return 1;
 }
 
+/* CSSData is observed in the source's PowerPC byte order.  The browser
+ * target has the same generated layouts but a little-endian data bus, so
+ * copying the 0x148-byte object would reverse every scalar and retain guest
+ * callback addresses.  Decode the authored fields one by one and install
+ * owner pointers below. */
+static u16 reference_be16(const uint8_t* bytes)
+{
+    return (u16) bytes[0] << 8 | bytes[1];
+}
+
+static u32 reference_be32(const uint8_t* bytes)
+{
+    return (u32) bytes[0] << 24 | (u32) bytes[1] << 16 |
+           (u32) bytes[2] << 8 | bytes[3];
+}
+
+static u64 reference_be64(const uint8_t* bytes)
+{
+    return (u64) reference_be32(bytes) << 32 | reference_be32(bytes + 4);
+}
+
+static float reference_be_float(const uint8_t* bytes)
+{
+    const u32 bits = reference_be32(bytes);
+    float value;
+    memcpy(&value, &bits, sizeof(value));
+    return value;
+}
+
+static void decode_reference_rules(StartMeleeRules* target,
+                                   const uint8_t source[0x60])
+{
+    memset(target, 0, sizeof(*target));
+    target->match_kind = source[0] >> 5;
+    target->x0_3 = (source[0] >> 2) & 7;
+    target->timer_enabled = (source[0] >> 1) & 1;
+    target->timer_counts_up = source[0] & 1;
+    target->x1_0 = (source[1] >> 7) & 1;
+    target->x1_1 = (source[1] >> 6) & 1;
+    target->x1_2 = (source[1] >> 5) & 1;
+    target->x1_3 = (source[1] >> 4) & 1;
+    target->x1_4 = (source[1] >> 3) & 1;
+    target->x1_5 = (source[1] >> 2) & 1;
+    target->timer_shows_hours = (source[1] >> 1) & 1;
+    target->friendly_fire = source[1] & 1;
+    target->is_stock = (source[2] >> 7) & 1;
+    target->x2_1 = (source[2] >> 6) & 1;
+    target->x2_2 = (source[2] >> 5) & 1;
+    target->single_button = (source[2] >> 4) & 1;
+    target->disable_pausing = (source[2] >> 3) & 1;
+    target->x2_5 = (source[2] >> 2) & 1;
+    target->x2_6 = (source[2] >> 1) & 1;
+    target->x2_7 = source[2] & 1;
+    target->x3_0 = (source[3] >> 7) & 1;
+    target->x3_1 = (source[3] >> 6) & 1;
+    target->x3_2 = (source[3] >> 5) & 1;
+    target->x3_3 = (source[3] >> 4) & 1;
+    target->x3_4 = (source[3] >> 3) & 1;
+    target->x3_5 = (source[3] >> 2) & 1;
+    target->x3_6 = (source[3] >> 1) & 1;
+    target->x3_7 = source[3] & 1;
+    target->x4_0 = (source[4] >> 7) & 1;
+    target->is_vs = (source[4] >> 6) & 1;
+    target->x4_2 = (source[4] >> 5) & 1;
+    target->x4_3 = (source[4] >> 4) & 1;
+    target->x4_4 = (source[4] >> 3) & 1;
+    target->x4_5 = (source[4] >> 2) & 1;
+    target->x4_6 = (source[4] >> 1) & 1;
+    target->x4_7 = source[4] & 1;
+    target->x5_0 = (source[5] >> 7) & 1;
+    target->x5_1 = (source[5] >> 6) & 1;
+    target->x5_2 = (source[5] >> 5) & 1;
+    target->x5_3 = (source[5] >> 4) & 1;
+    target->x5_4 = (source[5] >> 3) & 1;
+    target->x5_5 = (source[5] >> 2) & 1;
+    target->x5_6 = (source[5] >> 1) & 1;
+    target->x5_7 = source[5] & 1;
+    target->x6 = source[6];
+    target->x7 = source[7];
+    target->is_teams = source[8];
+    target->x9 = source[9];
+    target->xA = source[10];
+    target->xB = (s8) source[11];
+    target->xC = (s8) source[12];
+    target->xD = source[13];
+    target->stkind = reference_be16(source + 14);
+    target->time_limit = reference_be32(source + 16);
+    target->x14 = source[20];
+    target->x18 = reference_be32(source + 24);
+    target->x1C_pad[0] = reference_be32(source + 28);
+    target->x20 = reference_be64(source + 32);
+    target->x28 = (int) reference_be32(source + 40);
+    target->x2C = reference_be_float(source + 44);
+    target->x30 = reference_be_float(source + 48);
+    target->game_speed = reference_be_float(source + 52);
+    /* Source callback/data pointers occupy [0x38, 0x60).  The caller rejects
+     * them before this decoder runs; all corresponding owner fields remain
+     * zero, which is the only portable translation for the CSS entry object. */
+}
+
+static void decode_reference_player(PlayerInitData* target,
+                                    const uint8_t source[0x24])
+{
+    memset(target, 0, sizeof(*target));
+    target->ckind = (s8) source[0];
+    target->slot_type = source[1];
+    target->stocks = (s8) source[2];
+    target->color = source[3];
+    target->slot = source[4];
+    target->x5 = (s8) source[5];
+    target->spawn_dir = (s8) source[6];
+    target->sub_color = source[7];
+    target->handicap = (s8) source[8];
+    target->team = source[9];
+    target->nametag = source[10];
+    target->xB = source[11];
+    target->rumble_enabled = (source[12] >> 7) & 1;
+    target->xC_b1 = (source[12] >> 6) & 1;
+    target->xC_b2 = (source[12] >> 5) & 1;
+    target->xC_b3 = (source[12] >> 4) & 1;
+    target->vs_invisible = (source[12] >> 3) & 1;
+    target->xC_b5 = (source[12] >> 2) & 1;
+    target->xC_b6 = (source[12] >> 1) & 1;
+    target->xC_b7 = source[12] & 1;
+    target->xD_b0 = (source[13] >> 7) & 1;
+    target->xD_b1 = (source[13] >> 6) & 1;
+    target->xD_b2 = (source[13] >> 5) & 1;
+    target->xD_b3 = (source[13] >> 4) & 1;
+    target->xD_b4 = (source[13] >> 3) & 1;
+    target->xD_b5 = (source[13] >> 2) & 1;
+    target->xD_b6 = (source[13] >> 1) & 1;
+    target->xD_b7 = source[13] & 1;
+    target->cpu_kind = source[14];
+    target->cpu_level = source[15];
+    target->x10 = reference_be16(source + 16);
+    target->x12 = reference_be16(source + 18);
+    target->hp = reference_be16(source + 20);
+    target->attack_ratio = reference_be_float(source + 24);
+    target->defense_ratio = reference_be_float(source + 28);
+    target->model_scale = reference_be_float(source + 32);
+}
+
 static int session_live(const MeleeWebMenuSession* session, char* error,
                         size_t error_size)
 {
@@ -190,6 +341,66 @@ static int session_live(const MeleeWebMenuSession* session, char* error,
         return fail(error, error_size, "Menu session is not the live owner");
     }
     return 1;
+}
+
+int melee_web_menu_apply_reference_css_context(
+    MeleeWebMenuSession* session, const uint8_t source[0x148],
+    const uint8_t ko_counts[GM_MAX_PLAYERS], char* error, size_t error_size)
+{
+    CSSData decoded;
+
+    if (!session_live(session, error, error_size) || source == NULL ||
+        ko_counts == NULL || session->phase != MELEE_WEB_MENU_CREATED ||
+        session->css_open || session->sss_open)
+    {
+        return fail(error, error_size,
+                    "First-CSS context requires an unentered menu session");
+    }
+    if (source[2] != VS_MELEE || source[3] != 0)
+    {
+        return fail(error, error_size,
+                    "First-CSS context is not an ordinary initial VS CSS");
+    }
+    /* StartMeleeRules begins at CSSData+0x10.  The source callbacks, Events,
+     * x54 and x58 are all guest addresses in [rules+0x38,rules+0x60); no
+     * replay owner can safely retain them across a browser scene boundary. */
+    for (size_t i = 0; i < 0x24; ++i) {
+        if (source[0x10 + 0x38 + i] != 0)
+            return fail(error, error_size,
+                        "First-CSS context contains an unsupported source callback or pointer");
+    }
+
+    memset(&decoded, 0, sizeof(decoded));
+    decoded.unk_0x0 = reference_be16(source);
+    decoded.match_type = source[2];
+    decoded.pending_scene_change = source[3];
+    decoded.vs.loser = (s8) source[8];
+    decoded.vs.ordered_stage_index = (s8) source[9];
+    decoded.vs.winner = (s8) source[10];
+    decoded.vs.unk_0x3 = source[11];
+    decoded.vs.unk_0x4 = source[12];
+    decoded.vs.unk_0x5 = source[13];
+    decoded.vs.unk_0x6 = source[14];
+    decoded.vs.unk_0x7 = source[15];
+    decode_reference_rules(&decoded.vs.start.rules, source + 0x10);
+    for (size_t i = 0; i < GM_MAX_PLAYERS; ++i) {
+        decode_reference_player(&decoded.vs.start.players[i],
+                                source + 0x70 + i * 0x24);
+    }
+    memcpy(session->css_ko_counts, ko_counts, GM_MAX_PLAYERS);
+    decoded.ko_counts = session->css_ko_counts;
+    decoded.vs.start.rules.on_unpause_override = NULL;
+    decoded.vs.start.rules.on_pause_override = NULL;
+    decoded.vs.start.rules.check_for_pauser_override = NULL;
+    decoded.vs.start.rules.on_match_start = NULL;
+    decoded.vs.start.rules.on_frame_start = NULL;
+    decoded.vs.start.rules.on_frame_end = NULL;
+    decoded.vs.start.rules.on_match_end = NULL;
+    decoded.vs.start.rules.x54 = NULL;
+    decoded.vs.start.rules.x58 = NULL;
+    session->css = decoded;
+    session->sss.vs = decoded.vs;
+    return ok(error, error_size);
 }
 
 static int check_runtime(MeleeWebMenuSession* session, MeleeWebMenuScene scene,

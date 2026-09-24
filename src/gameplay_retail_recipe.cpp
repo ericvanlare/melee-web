@@ -64,7 +64,14 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
     check(input.u32() == 0x4d575243, "Unsupported reference input format");
     RetailReplayRecipe result;
     result.version = input.u32();
-    check(result.version >= 1 && result.version <= 7, "Unsupported reference input version");
+    check(result.version >= 1 && result.version <= kRetailReplayVersion,
+          "Unsupported reference input version");
+    /* Version 7 was emitted by the provisional producer before the runtime
+     * could install the source's first-CSS context.  Accepting its bytes and
+     * silently entering CSS would make the declared PAD/RNG context inert, so
+     * fail at the transport boundary with an actionable migration error. */
+    check(result.version != 7,
+          "Whole-session MWRC v7 is unsupported: re-export with v8 first-CSS context");
     result.seed = input.u32();
     const auto count = input.u32();
     const size_t profile_bytes = result.version >= 4 ? 4 : 0;
@@ -76,6 +83,8 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
         unlocked_stages = input.u16();
     }
     size_t clock_bytes = result.version == 5 ? 40 : 0;
+    const size_t context_bytes = result.version == 8
+        ? kRetailReplayContextHeaderBytes + kRetailReplayContextBytes : 0;
     if (result.version == 5) {
         RetailDrawClock clock;
         clock.pad_period = input.u64(); clock.vi_period = input.u64();
@@ -102,9 +111,25 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
         }
         result.draw_boundaries = retail_queue_boundaries(events, count);
     }
-    const size_t envelope_bytes = 16 + profile_bytes + clock_bytes + 0x138 +
+    const size_t envelope_bytes = 16 + profile_bytes + clock_bytes + context_bytes + 0x138 +
         (result.version >= 2 ? MELEE_WEB_PAD_STATE_BYTES : 0) + size_t(count) * 44;
-    if (result.version == 7)
+    if (result.version == 8) {
+        check(input.u16() == kRetailReplayContextVersion && input.u16() == 0,
+              "Unsupported whole-session first-CSS context header");
+        check(input.u32() == kRetailReplayContextBytes,
+              "Whole-session first-CSS context size disagrees with its transport");
+        result.initial_css = std::make_unique<RetailReplayInitialCssContext>();
+        for (auto& byte : result.initial_css->game_rules) byte = input.u8();
+        for (auto& byte : result.initial_css->save_data) byte = input.u8();
+        for (auto& byte : result.initial_css->css_data) byte = input.u8();
+        for (auto& byte : result.initial_css->ko_counts) byte = input.u8();
+        check((uint16_t(result.initial_css->save_data[0]) << 8 |
+               result.initial_css->save_data[1]) == unlocked_characters &&
+              (uint16_t(result.initial_css->save_data[2]) << 8 |
+               result.initial_css->save_data[3]) == unlocked_stages,
+              "Whole-session profile masks disagree with first-CSS SaveData");
+    }
+    if (result.version == 8)
         // The whole-session span table follows the frames; its own length is
         // validated once the table has been read.
         check(count && count <= 36000 && bytes.size() >= envelope_bytes + 2,
@@ -153,7 +178,7 @@ RetailReplayRecipe read_retail_replay(std::span<const uint8_t> bytes) {
         }
         std::copy_n(bytes.data() + offset, frame.bytes.size(), frame.bytes.data());
     }
-    if (result.version == 7) {
+    if (result.version == 8) {
         const auto span_count = input.u16();
         check(span_count >= 1 && span_count <= kRetailReplayMaxSpans,
               "Whole-session span count is outside its bounds");

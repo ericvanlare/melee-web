@@ -33,6 +33,18 @@ struct RetailReplaySpan {
     uint32_t last_frame = 0;
 };
 
+/* The bytes in this block are copied from the observer's PowerPC guest
+ * ranges.  They stay explicitly endian tagged at this boundary; the menu
+ * owner translates the source layouts before installing them in its native
+ * backing.  Keeping the ranges here rather than passing a guest pointer is
+ * what makes a replay safe across scene teardown. */
+struct RetailReplayInitialCssContext {
+    std::array<uint8_t, 0x18> game_rules{};
+    std::array<uint8_t, 0x55E8> save_data{};
+    std::array<uint8_t, 0x148> css_data{};
+    std::array<uint8_t, GM_MAX_PLAYERS> ko_counts{};
+};
+
 // Controller input, initialization and (v6) recorded platform queue inputs.
 // Expected game-state observations never enter the runtime.
 struct RetailReplayRecipe {
@@ -45,11 +57,12 @@ struct RetailReplayRecipe {
     std::vector<RetailReplayInput> frames;
     std::vector<bool> draw_boundaries;
     std::vector<RetailReplaySpan> spans;
-    // Version 7 is the opt-in whole-session form: one continuous pad history
-    // with a declared scene span table. It retains one source arena instead of
-    // requiring a fresh application, and it is the only version that may span
-    // the menu chain around a match.
-    bool whole_session() const { return version == 7; }
+    std::unique_ptr<RetailReplayInitialCssContext> initial_css;
+    // Version 8 is the opt-in whole-session form: one continuous pad history
+    // with a declared scene span table and copied first-CSS source context. It
+    // retains one source arena instead of requiring a fresh application, and
+    // it is the only version that may span the menu chain around a match.
+    bool whole_session() const { return version == 8; }
     unsigned scheduling_mode() const { return version == 6 ? 2 : version == 5 ? 1 : 0; }
     std::size_t expected_draws() const {
         if (draw_boundaries.empty()) return frames.size();
@@ -66,13 +79,28 @@ struct RetailReplayRecipe {
  * shared PAD/VI startup clock context. V6 replaces that context with u32 batch
  * count, u32 zero flags, then (u64 relative CPU poll time, u8 available samples)
  * per input-queue snapshot. No expected game states or draw indexes are stored.
- * V7 keeps the v4 envelope and appends a whole-session span table after the
- * frames: u16 span count, then per span u8 scene, u8 zero, u16 zero,
- * u32 first frame, u32 last frame. */
+ * V7 was the provisional whole-session envelope and is intentionally rejected
+ * by the reader because it cannot carry first-CSS source context. V8 keeps
+ * the v4 envelope, then adds a fixed context header (u16 schema=2, u16
+ * flags=0, u32 context_bytes), the source GameRules, SaveData, complete
+ * CSSData entry object and six-byte KO array, and finally the whole-session
+ * span table. Schema 1 is rejected because it cannot initialize CSS. */
+constexpr uint32_t kRetailReplayVersion = 8;
+constexpr uint16_t kRetailReplayContextVersion = 2;
+constexpr size_t kRetailReplayGameRulesBytes = 0x18;
+constexpr size_t kRetailReplaySaveDataBytes = 0x55E8;
+constexpr size_t kRetailReplayCssDataBytes = 0x148;
+constexpr size_t kRetailReplayKoCountsBytes = GM_MAX_PLAYERS;
+constexpr size_t kRetailReplayContextHeaderBytes = 8;
+constexpr size_t kRetailReplayContextBytes = kRetailReplayGameRulesBytes +
+    kRetailReplaySaveDataBytes + kRetailReplayCssDataBytes +
+    kRetailReplayKoCountsBytes;
 constexpr size_t kRetailReplayMaxSpans = 32;
 constexpr size_t kRetailReplaySpanBytes = 12;
 constexpr size_t kRetailReplayMaxBytes = 16 + 4 + 8 + 36000 * 9 + 0x138 +
-    MELEE_WEB_PAD_STATE_BYTES + 36000 * 44 + 2 + kRetailReplayMaxSpans * kRetailReplaySpanBytes;
+    kRetailReplayContextHeaderBytes + kRetailReplayContextBytes +
+    MELEE_WEB_PAD_STATE_BYTES + 36000 * 44 + 2 +
+    kRetailReplayMaxSpans * kRetailReplaySpanBytes;
 RetailReplayRecipe read_retail_replay(std::span<const uint8_t>);
 
 // Diagnostic JSON output; callers must disable this instrumentation for timing
