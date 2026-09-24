@@ -2,14 +2,20 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {pathToFileURL} from 'node:url';
+import {parseArgs} from 'node:util';
+import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 
-const args = Object.fromEntries(process.argv.slice(2).reduce((rows, value, index, all) =>
-  value.startsWith('--') ? [...rows, [value.slice(2), all[index + 1]]] : rows, []));
+const {values: args} = parseArgs({options: {
+  url: {type: 'string'},
+  playwright: {type: 'string'},
+  out: {type: 'string'},
+  headed: {type: 'boolean', default: false},
+  'index-production': {type: 'boolean', default: false},
+}});
 if (!args.url || !args.playwright || !args.out) throw Error('Use --url URL --playwright MODULE_DIR --out LOCAL_DIR');
-const {chromium} = await import(pathToFileURL(path.join(args.playwright, 'index.mjs')));
+const {chromium, browser: launchOptions} = await loadBrowserTools(args.playwright);
 await fs.mkdir(args.out, {recursive: true});
-const browser = await chromium.launch({channel: 'chrome', headless: args.headed !== 'true'});
+const browser = await chromium.launch(browserLaunchOptions(launchOptions, {headed: args.headed}));
 const context = await browser.newContext({viewport: {width: 1280, height: 1000}});
 const page = await context.newPage();
 const origin = new URL(args.url).origin;
@@ -20,7 +26,7 @@ await page.addInitScript(() => {
   window.shellCspViolations = [];
   document.addEventListener('securitypolicyviolation', event => window.shellCspViolations.push({directive: event.violatedDirective, blocked: event.blockedURI}));
 });
-const report = {schema: 'webmelee-public-shell-browser-v1', browser: browser.version(), checks: [], gameplay: 'unavailable; no disc import or preparation was attempted'};
+const report = {schema: 'webmelee-public-shell-browser-v1', browser: browser.version(), browser_mode: args.headed ? 'headed' : 'headless', checks: [], gameplay: 'unavailable; no disc import or preparation was attempted'};
 const pass = name => report.checks.push(name);
 function checkPageResponse(response, pathname) {
   assert.equal(response.status(), 200);
@@ -32,7 +38,7 @@ function checkPageResponse(response, pathname) {
   assert.equal(headers['referrer-policy'], 'no-referrer');
   assert.equal(headers['x-frame-options'], 'DENY');
   assert.match(headers['permissions-policy'], /fullscreen=\(self\)/);
-  if (args['index-production'] !== 'true' || new URL(origin).hostname.endsWith('.pages.dev')) {
+  if (!args['index-production'] || new URL(origin).hostname.endsWith('.pages.dev')) {
     assert.match(headers['x-robots-tag'], /noindex/);
   }
 }

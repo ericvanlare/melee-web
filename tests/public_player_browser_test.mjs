@@ -5,19 +5,20 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {parseArgs} from 'node:util';
 import {createBrowserDriver} from '../scripts/browser_driver.mjs';
-import {loadBrowserTools} from '../scripts/browser_tools.mjs';
+import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 const {values} = parseArgs({options: {
   ...Object.fromEntries(['url', 'playwright', 'disc', 'out'].map(name => [name, {type: 'string'}])),
   audio: {type: 'boolean', default: false},
+  headed: {type: 'boolean', default: false},
 }});
-if (!values.url || !values.out) throw Error('Use --url ORIGIN --out LOCAL_DIR [--playwright PACKAGE_DIR] [--disc OWNED_DISC] [--audio]');
+if (!values.url || !values.out) throw Error('Use --url ORIGIN --out LOCAL_DIR [--playwright PACKAGE_DIR] [--disc OWNED_DISC] [--audio] [--headed]');
 const {chromium,browser:launchOptions} = await loadBrowserTools(values.playwright);
 await fs.mkdir(values.out, {recursive: true});
-const browser = await chromium.launch({...launchOptions, headless: false, chromiumSandbox: true});
+const browser = await chromium.launch(browserLaunchOptions(launchOptions, {headed: values.headed}));
 const context = await browser.newContext({viewport: {width: 1280, height: 960}});
 const page = await context.newPage(), origin = new URL(values.url).origin;
 const requests = [], errors = [], violations = [], sockets = [], audioEvents = [];
-const report = {schema: 'webmelee-public-player-browser-v1', browser: browser.version(), checks: [],
+const report = {schema: 'webmelee-public-player-browser-v1', browser: browser.version(), browser_mode: values.headed ? 'headed' : 'headless', checks: [],
   profile: values.audio ? 'audio-player' : 'player',
   scope: 'Production entry, ordinary keyboard UI, lifecycle and application network smoke. No retail comparison, physical-controller, PCM or performance claim.'};
 page.on('request', request => requests.push({url: request.url(), method: request.method(), body: request.postData()}));
@@ -47,13 +48,11 @@ try {
   assert.equal(response.headers()['cross-origin-embedder-policy'], 'require-corp');
   assert.match(response.headers()['content-security-policy'], /'wasm-unsafe-eval'/);
   await ready();
+  assert.equal(await page.evaluate(() => Module._melee_web_native_menu_cache_idle()), 1,
+    'Import control must become enabled only after the native volatile cache is ready');
   await check('isolated WebGPU/Wasm startup and direct original-style player', async () => {
     await page.locator('#loading-panel').waitFor({state: 'hidden', timeout: 30000});
-    const cacheState=await page.waitForFunction(() => {
-      const state=Module._melee_web_native_menu_cache_idle();
-      return state===0?false:{state};
-    }, null, {timeout: 30000});
-    const {state}=await cacheState.jsonValue();await cacheState.dispose();
+    const state = await page.evaluate(() => Module._melee_web_native_menu_cache_idle());
     assert.equal(state, 1,
       'The public renderer must open its volatile cache before consuming the bundled pipeline seed');
     const selective = await page.evaluate(() => Module.pipelinePreparation || null);

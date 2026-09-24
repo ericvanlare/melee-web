@@ -3,13 +3,16 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
-const {values} = parseArgs({options:Object.fromEntries(['url','playwright','disc','out'].map(name => [name,{type:'string'}]))});
-if (!values.url || !values.out) throw Error('Use --url http://127.0.0.1:PORT/prototype.html --out work/prototype-browser [--disc PATH] [--playwright PACKAGE_DIR]');
-const {chromium} = values.playwright ? await import(pathToFileURL(path.join(path.resolve(values.playwright),'index.mjs')).href) : await import('playwright');
+import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
+const {values} = parseArgs({options:{
+  ...Object.fromEntries(['url','playwright','disc','out'].map(name => [name,{type:'string'}])),
+  headed:{type:'boolean',default:false},
+}});
+if (!values.url || !values.out) throw Error('Use --url http://127.0.0.1:PORT/prototype.html --out work/prototype-browser [--disc PATH] [--playwright PACKAGE_DIR] [--headed]');
+const {chromium, browser: launchOptions} = await loadBrowserTools(values.playwright);
 await fs.mkdir(values.out,{recursive:true});
-const browser = await chromium.launch({channel:'chrome',headless:false,chromiumSandbox:true});
+const browser = await chromium.launch(browserLaunchOptions(launchOptions,{headed:values.headed}));
 const failures=[], errors=[], posts=[], checks=[];
 let failureState = null;
 let timingResumes = 0;
@@ -34,8 +37,9 @@ try {
     assert.equal(new URL(page.frames()[1].url()).search,'');
     assert(await page.locator('#end-session').isDisabled());
     const content = await (await page.request.get(new URL('prototype-content.json', values.url).href)).json();
-    assert.equal(content.fighters.length,4);
-    assert.equal(content.stages.length,4);
+    // Match the source-backed inventory checked by test_prototype.py.
+    assert.equal(content.fighters.length,17);
+    assert.equal(content.stages.length,7);
   });
   await screenshot('desktop');
   await check('controls dialog keyboard toggles and game focus',async()=>{
@@ -331,7 +335,7 @@ try {
   }).catch(()=>null)));
   await screenshot('failure');
 } finally {
-  await fs.writeFile(path.join(values.out,'report.json'),JSON.stringify({schema:'melee-web-prototype-ui-check-v1',browser:browser.version(),checks,failures,errors,posts,failureState,timing_resumes:timingResumes,owned_disc_used:!!values.disc,gameplay_admission:false,performance_admission:false},null,2)+'\n');
+  await fs.writeFile(path.join(values.out,'report.json'),JSON.stringify({schema:'melee-web-prototype-ui-check-v1',browser:browser.version(),browser_mode:values.headed?'headed':'headless',checks,failures,errors,posts,failureState,timing_resumes:timingResumes,owned_disc_used:!!values.disc,gameplay_admission:false,performance_admission:false},null,2)+'\n');
   await browser.close();
 }
 if (failures.length) { console.error(failures.join('\n')); process.exitCode=1; }
