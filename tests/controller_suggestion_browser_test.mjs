@@ -2,13 +2,13 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {pathToFileURL} from 'node:url';
 import {parseArgs} from 'node:util';
 import {mayflashMacPad} from './controller-fixtures.mjs';
+import {browserLaunchOptions, loadBrowserTools} from '../scripts/browser_tools.mjs';
 const {values} = parseArgs({options:Object.fromEntries(['url','playwright','out'].map(n=>[n,{type:'string'}]))});
 if (!values.url || !values.playwright || !values.out) throw Error('Use --url ORIGIN --playwright PACKAGE_DIR --out LOCAL_DIR');
-const {chromium} = await import(pathToFileURL(path.join(path.resolve(values.playwright),'index.mjs')));
-const browser = await chromium.launch({channel:'chrome',headless:true});
+const {chromium, browser: launchOptions} = await loadBrowserTools(values.playwright);
+const browser = await chromium.launch(browserLaunchOptions(launchOptions));
 const page = await browser.newPage({viewport:{width:1100,height:1000}}), errors=[];
 page.setDefaultTimeout(8000);page.on('pageerror',e=>errors.push(e.message));
 await page.addInitScript(()=>{
@@ -56,7 +56,7 @@ try {
   assert.match(await page.locator('[data-binding="R"]').innerText(),/Button 5/);
   assert.match(await page.locator('[data-binding="X"]').innerText(),/Button 0/);
   assert.deepEqual(errors,[]);
-  await fs.writeFile(path.join(values.out,'report.json'),JSON.stringify({scope:'Constructed HID-shaped Mayflash suggestion, live X, 18 visible bindings, individual correction, swap, persistence and restore; not physical acceptance',seconds:(performance.now()-started)/1000,errors},null,2));
+  await fs.writeFile(path.join(values.out,'report.json'),JSON.stringify({scope:'Constructed HID-shaped Mayflash suggestion, live X, 18 visible bindings, individual correction, swap, persistence and restore; not physical acceptance',browser_mode:'headless',seconds:(performance.now()-started)/1000,errors},null,2));
   console.log('Suggested Mayflash mapping, live input, individual correction, swap, reload and restore pass.');
 } catch(error) {
   await fs.writeFile(path.join(values.out,'failure.txt'),String(error)+'\n'+await page.locator('body').innerText());
