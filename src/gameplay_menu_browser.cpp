@@ -726,8 +726,10 @@ bool finish_asset_handoff(){
   match=std::make_unique<melee_web::GameplayMatchSession>(files,asset_selection,*archive_cache,
       melee_web::GameplayMatchConstruction::Deferred,*replay->initial_input);
  }else{
+  const MeleeWebPadState* input=melee_web_menu_host_input(host);
+  check(input!=nullptr,"Original SSS did not retain PAD history for asset match handoff");
   match=std::make_unique<melee_web::GameplayMatchSession>(files,asset_selection,*archive_cache,
-      melee_web::GameplayMatchConstruction::Deferred);
+      melee_web::GameplayMatchConstruction::Deferred,*input);
  }
  running=false;
  return false;
