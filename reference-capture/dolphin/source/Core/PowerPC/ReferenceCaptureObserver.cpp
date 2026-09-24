@@ -43,6 +43,43 @@ constexpr size_t RING_PAYLOAD = 256 * 1024;
 constexpr size_t MAX_SLICES = 64;
 constexpr size_t MAX_RAW = 192 * 1024;
 constexpr u32 PAD_READ_HSD_CALLER = 0x80376A28;
+constexpr u32 CSS_ENTER_RETURN = 0x802669F0;
+// Menu steering sources, as the retail menu owners read them:
+// mnStageSel_803F06D0 is the 30-entry authored stage list (stride 0x1C, stage
+// kind at +0xB), mnStageSel_804D6CAE is the highlighted index, and
+// mnCharSel_804A0BC0 holds one CSS cursor pointer per port.
+constexpr u32 STAGE_SELECT_TABLE = 0x803F06D0;
+constexpr size_t STAGE_SELECT_STRIDE = 0x1C;
+constexpr size_t STAGE_SELECT_COUNT = 30;
+constexpr size_t STAGE_SELECT_KIND_OFFSET = 0xB;
+constexpr u32 STAGE_SELECT_INDEX = 0x804D6CAE;
+constexpr u32 CSS_CURSOR_POINTERS = 0x804A0BC0;
+// mnCharSel_803F0DFC is the authored CSS door state (0x90 bytes: four 0x24
+// entries carrying each port's selected icon and door coordinates).
+constexpr u32 CSS_DOORS_STATE = 0x803F0DFC;
+constexpr size_t CSS_DOORS_BYTES = 0x90;
+constexpr size_t CSS_CURSOR_BYTES = 0x14;
+constexpr size_t CSS_CURSOR_PORTS = 4;
+constexpr u32 MENU_AUDIO_STREAM_START = 0x8038E8EC;
+// Authored gmm_x0 layout behind gmMainLib_804D3EE0. gmMainLib_GetSaveData
+// returns &gmm_x0.thing, whose block the retail accessors read at +0x1868:
+// GameRules is the asserted 0x18-byte rules block at +0x1850, so the save
+// block starts at +0x1868 and its asserted 0x55E8 bytes end at the +0x6E50
+// trailing pad. (The decomp's own /* 0x1898 */ comment on that member
+// contradicts both ASSERT_SIZE(struct GameRules, 0x18) and the 0x6E50 pad, so
+// the observer keeps the arithmetic-consistent offset and reads the block the
+// accessors actually use.) The observer copies these ranges as authored; field
+// and packed-bit interpretation belongs to the offline decoder.
+constexpr u32 PROFILE_ROOT_GLOBAL = 0x804D3EE0;
+constexpr u32 PROFILE_GAME_RULES_OFFSET = 0x1850;
+constexpr size_t PROFILE_GAME_RULES_SIZE = 0x18;
+constexpr u32 PROFILE_SAVE_DATA_OFFSET = 0x1868;
+constexpr size_t PROFILE_SAVE_DATA_SIZE = 0x55E8;
+constexpr u32 PROFILE_LAST_BYTE_OFFSET =
+    PROFILE_SAVE_DATA_OFFSET + PROFILE_SAVE_DATA_SIZE - 1;
+constexpr u16 WHOLE_SESSION_FLAG = 1;
+constexpr u32 WHOLE_SESSION_MIN_MATCHES = 3;
+constexpr u32 WHOLE_SESSION_MAX_MATCHES = 64;
 
 constexpr std::array<u8, 32> EXPECTED_DOL_SHA256_BYTES = {
     0xdc, 0x21, 0x50, 0x45, 0x13, 0x42, 0x43, 0x50, 0xbd, 0xa1, 0x7a,
@@ -76,6 +113,24 @@ enum class Boundary : u16
   ResultReturn = 10,
   SceneTeardown = 11,
   SceneExit = 12,
+  CssEnter = 13,
+  CssExit = 14,
+  SssEnter = 15,
+  SssExit = 16,
+  VsExit = 17,
+  VsExitReturn = 18,
+  VsModeExit = 19,
+  ResultsEnter = 20,
+  ResultsExit = 21,
+  ResultsModeExit = 22,
+  ResultsGObjProcess = 23,
+  ReturnCss = 24,
+  CssCancelEnter = 25,
+  PrizeModeEnter = 26,
+  PrizeSceneEnter = 27,
+  PrizeSceneExit = 28,
+  PrizeModeExit = 29,
+  StartupPrizeModeExit = 30,
 };
 
 enum class SliceTag : u16
@@ -110,6 +165,29 @@ enum class SliceTag : u16
   CameraObjectPointer = 28,
   SceneRequest = 29,
   SceneFrame = 30,
+  MenuCssState = 31,
+  MenuSssState = 32,
+  MenuAudio = 33,
+  MenuAudioVoice = 34,
+  MenuSssRoute = 35,
+  ProfileCharacters = 36,
+  ProfileStages = 37,
+  ProfileGameRules = 38,
+  ProfileSaveData = 39,
+  // 40 takes the next free number after the typed profile tags so no shipped
+  // tag is ever renumbered.
+  SceneKind = 40,
+  StageSelectIndex = 41,
+  StageSelectKind = 42,
+  MenuCssCursor = 43,
+  MenuCssDoors = 44,
+  MenuMainFlow = 45,
+  MenuMainInput = 46,
+  MenuCssModel = 47,
+  MenuCssLiveState = 48,
+  MenuCssSlider = 49,
+  MenuCssContext = 50,
+  MenuCssKoCounts = 51,
 };
 
 struct SliceRef
@@ -207,6 +285,38 @@ bool ActivationRequested()
          Env("MWRC_SOURCE_REV") == "GALE01r2";
 }
 
+u32 WholeSessionMatchCount()
+{
+  const std::string value = Env("MWRC_WHOLE_SESSION_MATCHES");
+  if (value.empty())
+    return 0;
+  u32 result = 0;
+  for (const char digit : value)
+  {
+    if (digit < '0' || digit > '9' || result > WHOLE_SESSION_MAX_MATCHES / 10)
+      return 0;
+    result = result * 10 + static_cast<u32>(digit - '0');
+    if (result > WHOLE_SESSION_MAX_MATCHES)
+      return 0;
+  }
+  return result >= WHOLE_SESSION_MIN_MATCHES ? result : 0;
+}
+
+bool ValidIdentity(std::string_view value)
+{
+  if (value.empty() || value.size() > 128)
+    return false;
+  for (const unsigned char character : value)
+  {
+    if (!((character >= 'a' && character <= 'z') ||
+          (character >= 'A' && character <= 'Z') ||
+          (character >= '0' && character <= '9') || character == '-' || character == '_' ||
+          character == '.'))
+      return false;
+  }
+  return true;
+}
+
 }  // namespace
 
 struct Observer::Impl
@@ -231,18 +341,47 @@ struct Observer::Impl
       SetInvalid("MWRC_OUTPUT must name a fresh stream");
       return false;
     }
+    whole_session_matches = WholeSessionMatchCount();
+    capture_id = Env("MWRC_CAPTURE_ID");
+    sequence_id = Env("MWRC_SEQUENCE_ID");
     // Dolphin builds with exceptions disabled.  std::thread reports an
     // unavailable worker by terminating; there is no catchable error path.
     writer = std::thread([this] { WriterMain(); });
-    PushJson(Event::Handshake,
-             std::string("{\"schema\":\"melee-web-passive-dolphin-observer\",\"version\":1,")
-                 + "\"dolphin_commit\":\"" + EXPECTED_COMMIT + "\",\"dol_sha1\":\"" +
-                 EXPECTED_DOL + "\",\"dol_sha256\":\"" + EXPECTED_DOL_SHA256 +
-                 "\",\"cpu\":\"JITARM64\",\"writes_guest_memory\":false,"
-                 "\"ring_capacity\":" + std::to_string(RING_SIZE) + "}");
-    PushJson(Event::Start,
-             std::string("{\"status\":\"recording\",\"source_revision\":\"GALE01r2\",")
-                 + "\"boundaries\":\"typed-existing-retail-harness\"}");
+    if (!Env("MWRC_WHOLE_SESSION_MATCHES").empty() && whole_session_matches == 0)
+    {
+      SetInvalid("MWRC_WHOLE_SESSION_MATCHES must be a decimal count from 3 through 64");
+      return false;
+    }
+    if (whole_session_enabled() && (!ValidIdentity(capture_id) || !ValidIdentity(sequence_id)))
+    {
+      SetInvalid("whole-session capture and sequence IDs must be safe non-empty strings");
+      return false;
+    }
+    std::string handshake =
+        std::string("{\"schema\":\"melee-web-passive-dolphin-observer\",\"version\":1,") +
+        "\"dolphin_commit\":\"" + EXPECTED_COMMIT + "\",\"dol_sha1\":\"" + EXPECTED_DOL +
+        "\",\"dol_sha256\":\"" + EXPECTED_DOL_SHA256 +
+        "\",\"cpu\":\"JITARM64\",\"writes_guest_memory\":false,\"ring_capacity\":" +
+        std::to_string(RING_SIZE);
+    if (whole_session_enabled())
+      handshake += ",\"whole_session\":true,\"match_count\":" +
+                   std::to_string(whole_session_matches) + ",\"capture_id\":\"" +
+                   JsonEscape(capture_id) + "\",\"sequence_id\":\"" +
+                   JsonEscape(sequence_id) + "\"";
+    handshake += "}";
+    PushJson(Event::Handshake, handshake);
+    std::string start =
+        "{\"status\":\"recording\",\"source_revision\":\"GALE01r2\",\"boundaries\":\""
+        "typed-existing-retail-harness";
+    if (whole_session_enabled())
+      start += "\",\"whole_session\":true,\"match_count\":" +
+               std::to_string(whole_session_matches) + ",\"capture_id\":\"" +
+               JsonEscape(capture_id) + "\",\"sequence_id\":\"" +
+               JsonEscape(sequence_id) + "\"";
+    else
+      start += "\"";
+    start += "}";
+    PushJson(Event::Start, start);
     return !invalid.load();
   }
 
@@ -352,7 +491,264 @@ struct Observer::Impl
     return true;
   }
 
-  static bool BoundaryForPC(u32 pc, Boundary* boundary)
+  bool ReadProfileRoot(Core::System* system, u32* main_data) const
+  {
+    // gmMainLib_804D3EE0 points at the source-owned gmm_x0. The retail
+    // gmMainLib_GetSaveData/15ED8C/15EDA4 instruction bodies load the save
+    // block at +0x1868 and its first two u16 masks at +0/+2.
+    return ReadU32(system, PROFILE_ROOT_GLOBAL, main_data) && *main_data != 0;
+  }
+
+  bool AddProfileSlices(Core::System* system)
+  {
+    u32 main_data = 0;
+    if (!ReadProfileRoot(system, &main_data) || main_data > UINT32_MAX - 0x186a ||
+        !AddSlice(system, SliceTag::ProfileCharacters, main_data + 0x1868, 2) ||
+        !AddSlice(system, SliceTag::ProfileStages, main_data + 0x186a, 2))
+      return false;
+    return true;
+  }
+
+  bool AddSceneKindSlice(Core::System* system)
+  {
+    // 0x804D6720 holds the source scene object; its first byte is the scene
+    // kind the source routing and menu owners branch on. Capture it beside the
+    // routing bytes so a capture can be steered without guest memory access.
+    // The scene object does not exist before the first scene is created, so an
+    // absent pointer omits the slice instead of invalidating the boundary.
+    u32 scene_pointer = 0;
+    if (!ReadU32(system, 0x804d6720, &scene_pointer) || !scene_pointer)
+      return true;
+    return AddSlice(system, SliceTag::SceneKind, scene_pointer, 1);
+  }
+
+  bool ReadCssJoint(Core::System* system, u32 root, u8 index, u32* result) const
+  {
+    // Read-only equivalent of the traversal order in lb_80011E24. The
+    // authored CSSDoor joint index is a u8, so at most 256 visited nodes
+    // can precede the requested node. HSD_JObj INSTANCE nodes skip children.
+    std::array<u32, 256> visited{};
+    u32 node = root;
+    for (u32 ordinal = 0; node && ordinal <= index; ++ordinal)
+    {
+      for (u32 previous = 0; previous < ordinal; ++previous)
+        if (visited[previous] == node)
+          return false;
+      visited[ordinal] = node;
+      if (ordinal == index)
+      {
+        *result = node;
+        return true;
+      }
+      u32 flags = 0, child = 0, next = 0;
+      if (!ReadU32(system, node + 0x14, &flags) ||
+          !ReadU32(system, node + 0x10, &child) ||
+          !ReadU32(system, node + 8, &next))
+        return false;
+      if (!(flags & (1u << 12)) && child)
+        node = child;
+      else if (next)
+        node = next;
+      else
+      {
+        // Every ancestor must be one of the nodes already traversed.
+        u32 parent = node;
+        node = 0;
+        for (u32 ascent = 0; ascent <= ordinal; ++ascent)
+        {
+          if (!ReadU32(system, parent + 0xc, &parent))
+            return false;
+          if (!parent)
+            break;
+          bool seen = false;
+          for (u32 previous = 0; previous <= ordinal; ++previous)
+            seen |= visited[previous] == parent;
+          if (!seen || !ReadU32(system, parent + 8, &next))
+            return false;
+          if (next)
+          {
+            node = next;
+            break;
+          }
+          if (ascent == ordinal)
+            return false;
+        }
+      }
+    }
+    return false;
+  }
+
+  bool AddCssCpuSteeringSlices(Core::System* system)
+  {
+    u32 css = 0, root = 0;
+    if (!ReadU32(system, 0x804d6cb0, &css) ||
+        !ReadU32(system, 0x804d6cc0, &root))
+      return false;
+    if (!css || !root)
+      return true; // CSS OnEnter has not published its owners yet.
+    u8 match_type = 0;
+    if (!ReadBytes(system, css + 2, 1, &match_type))
+      return false;
+    if (match_type != 0)
+      return true; // These controls belong to ordinary VS_MELEE.
+    // CSSData: 8-byte menu header, 8-byte VsModeData header, then the
+    // complete 0x138-byte StartMeleeData (including all six source slots).
+    if (!AddSlice(system, SliceTag::MenuCssLiveState, css, 0x148))
+      return false;
+    for (u32 port = 0; port < 4; ++port)
+    {
+      u32 model = 0;
+      if (!ReadU32(system, 0x804a0bd0 + port * 4, &model))
+        return false;
+      if (!model)
+        continue;
+      // CSSCharModel stores authored token positions at +8/+c; no guest
+      // function is called and no controller or gameplay state is changed.
+      if (!AddSlice(system, SliceTag::MenuCssModel, model, 0x18,
+                    static_cast<u16>(port)))
+        return false;
+      for (u32 variant = 0; variant < 2; ++variant)
+      {
+        u8 index = 0;
+        u32 joint = 0;
+        if (!ReadBytes(system, CSS_DOORS_STATE + port * 0x24 + 7 + variant,
+                       1, &index) ||
+            !ReadCssJoint(system, root, index, &joint) ||
+            !AddSlice(system, SliceTag::MenuCssSlider, joint, 0x74,
+                      static_cast<u16>(port * 2 + variant)))
+          return false;
+      }
+    }
+    return true;
+  }
+
+  bool AddMenuSteeringSlices(Core::System* system)
+  {
+    // mnmain.h: MenuFlow (0x18) and MenuInputState (8), at the
+    // GALE01r2 symbols mn_804A04F0 and mn_804D6BC8. The original main
+    // menu rejects input during its source cooldown; observing that boundary
+    // avoids treating a wall-clock delay as proof that an input was accepted.
+    u32 scene_pointer = 0;
+    u8 scene_kind = 0;
+    if (!ReadU32(system, 0x804d6720, &scene_pointer) || !scene_pointer)
+      return true;
+    if (!ReadBytes(system, scene_pointer, 1, &scene_kind))
+      return false;
+    if (scene_kind == 1 &&
+        (!AddSlice(system, SliceTag::MenuMainFlow, 0x804a04f0, 0x18) ||
+         !AddSlice(system, SliceTag::MenuMainInput, 0x804d6bc8, 8)))
+      return false;
+    // Source menu globals survive arena teardown. PAD interrupts can run
+    // inside OnEnter while those globals still point into the old arena.
+    // Publish CSS steering only after the verified OnEnter return.
+    if (scene_kind == 8 && whole_session_enabled() && !css_steering_ready)
+      return true;
+    if (scene_kind == 8 && !AddCssCpuSteeringSlices(system))
+      return false;
+    // Menu globals retain pointers after their scene arena is reclaimed.
+    // Observe each steering owner only in its live source menu scene.
+    u8 stage_index = 0;
+    if (scene_kind == 9 && ReadBytes(system, STAGE_SELECT_INDEX, 1, &stage_index))
+    {
+      if (!AddSlice(system, SliceTag::StageSelectIndex, STAGE_SELECT_INDEX, 1))
+        return false;
+      if (stage_index < STAGE_SELECT_COUNT)
+      {
+        const u32 kind_address = STAGE_SELECT_TABLE +
+            static_cast<u32>(stage_index) * STAGE_SELECT_STRIDE + STAGE_SELECT_KIND_OFFSET;
+        if (!AddSlice(system, SliceTag::StageSelectKind, kind_address, 1))
+          return false;
+      }
+    }
+    if (scene_kind != 8)
+      return true;
+    if (!AddSlice(system, SliceTag::MenuCssDoors, CSS_DOORS_STATE, CSS_DOORS_BYTES))
+      return false;
+    for (u32 port = 0; port < CSS_CURSOR_PORTS; ++port)
+    {
+      u32 cursor = 0;
+      if (!ReadU32(system, CSS_CURSOR_POINTERS + port * 4, &cursor))
+        return false;
+      if (!cursor)
+        continue;
+      if (!AddSlice(system, SliceTag::MenuCssCursor, cursor, CSS_CURSOR_BYTES,
+                    static_cast<u16>(port)))
+        return false;
+    }
+    return true;
+  }
+
+  bool AddProfileContextSlices(Core::System* system)
+  {
+    // Typed first-CSS context. Every CSS entry publishes the authored rules
+    // and save block once, so the offline comparison can bind the profile the
+    // first CSS ran with instead of only the two unlock masks. The save block
+    // contains the persistent fighter records and name banks, so they are not
+    // captured a second time.
+    u32 main_data = 0;
+    if (!ReadProfileRoot(system, &main_data) ||
+        main_data > UINT32_MAX - PROFILE_LAST_BYTE_OFFSET ||
+        !AddSlice(system, SliceTag::ProfileGameRules,
+                  main_data + PROFILE_GAME_RULES_OFFSET, PROFILE_GAME_RULES_SIZE) ||
+        !AddSlice(system, SliceTag::ProfileSaveData,
+                  main_data + PROFILE_SAVE_DATA_OFFSET, PROFILE_SAVE_DATA_SIZE))
+      return false;
+    return true;
+  }
+
+  bool AddSessionSlices(Core::System* system)
+  {
+    u32 rng_pointer = 0;
+    return AddProfileSlices(system) &&
+           AddSlice(system, SliceTag::PadSnapshot, 0x804c1f84, 0x358) &&
+           AddSlice(system, SliceTag::SceneRouting, 0x80479d30, 6) &&
+           AddSlice(system, SliceTag::SceneFrame, 0x80479d58, 4) &&
+           AddSceneKindSlice(system) &&
+           AddSlice(system, SliceTag::RngPointer, 0x804d5f94, 4) &&
+           ReadU32(system, 0x804d5f94, &rng_pointer) && rng_pointer &&
+           AddSlice(system, SliceTag::RngValue, rng_pointer, 4);
+  }
+
+  bool AddMenuSlices(Core::System* system, Boundary boundary, u32 entry_argument)
+  {
+    const bool css = boundary == Boundary::CssEnter || boundary == Boundary::CssCancelEnter ||
+                     boundary == Boundary::CssExit ||
+                     boundary == Boundary::ReturnCss;
+    const u32 pointer_address = css ? 0x804d6cb0 : 0x804d6c90;
+    const bool entering = boundary == Boundary::CssEnter ||
+                          boundary == Boundary::CssCancelEnter ||
+                          boundary == Boundary::SssEnter ||
+                          boundary == Boundary::ReturnCss;
+    // These raw hooks run at function entry, before OnEnter assigns the
+    // scene's static pointer. Use its actual argument for entry records;
+    // exit records use the pointer published by that original initializer.
+    // Completed menu callbacks still require the transition-trace join.
+    u32 state_pointer = entry_argument;
+    if ((!entering && !ReadU32(system, pointer_address, &state_pointer)) || !state_pointer ||
+        state_pointer > UINT32_MAX - 0x10 ||
+        !AddSlice(system, css ? SliceTag::MenuCssState : SliceTag::MenuSssState,
+                  state_pointer + 0x10, 0xf0) ||
+        (!css && (state_pointer > UINT32_MAX - 4 ||
+                  !AddSlice(system, SliceTag::MenuSssRoute, state_pointer + 4, 1))) ||
+        !AddSlice(system, SliceTag::MenuAudio, 0x803bb300, 0x40) ||
+        !AddSlice(system, SliceTag::MenuAudioVoice, 0x804d6038, 4) ||
+        (css && entering && !AddProfileContextSlices(system)) ||
+        !AddSessionSlices(system))
+      return false;
+    if (css)
+    {
+      u32 ko_counts = 0;
+      if (!AddSlice(system, SliceTag::MenuCssContext, state_pointer, 0x148) ||
+          !ReadU32(system, state_pointer + 4, &ko_counts) || !ko_counts ||
+          // gmvsmelee.c owns ko_counts[GM_MAX_PLAYERS], including the two
+          // non-CSS source slots. Preserve the complete authored array.
+          !AddSlice(system, SliceTag::MenuCssKoCounts, ko_counts, 6))
+        return false;
+    }
+    return true;
+  }
+
+  static bool BoundaryForPC(u32 pc, bool whole_session, Boundary* boundary)
   {
     switch (pc)
     {
@@ -381,10 +777,10 @@ struct Observer::Impl
       *boundary = Boundary::DrawReturn;
       return true;
     case 0x8016e9c8:
-      *boundary = Boundary::ResultEnter;
+      *boundary = whole_session ? Boundary::VsExit : Boundary::ResultEnter;
       return true;
     case 0x8016ebbc:
-      *boundary = Boundary::ResultReturn;
+      *boundary = whole_session ? Boundary::VsExitReturn : Boundary::ResultReturn;
       return true;
     case 0x8039157c:
       *boundary = Boundary::SceneTeardown;
@@ -392,6 +788,50 @@ struct Observer::Impl
     case 0x801a4b70:
       *boundary = Boundary::SceneExit;
       return true;
+    case 0x8026688c:
+      *boundary = Boundary::CssEnter;
+      return whole_session;
+    case 0x80266d70:
+      *boundary = Boundary::CssExit;
+      return whole_session;
+    case 0x8025a998:
+      *boundary = Boundary::SssEnter;
+      return whole_session;
+    case 0x8025bbd0:
+      // The original OnExit writes start_game before returning. Its entry
+      // still holds the old route and would classify A-confirm as cancel.
+      *boundary = Boundary::SssExit;
+      return whole_session;
+    case 0x801a5af0:
+      *boundary = Boundary::VsModeExit;
+      return whole_session;
+    case 0x80177368:
+      *boundary = Boundary::ResultsEnter;
+      return whole_session;
+    case 0x80177704:
+      *boundary = Boundary::ResultsExit;
+      return whole_session;
+    case 0x801a5f64:
+      *boundary = Boundary::ResultsModeExit;
+      return whole_session;
+    case 0x80179350:
+      *boundary = Boundary::ResultsGObjProcess;
+      return whole_session;
+    case 0x801bfcfc:
+      *boundary = Boundary::PrizeModeEnter;
+      return whole_session;
+    case 0x802febe0:
+      *boundary = Boundary::PrizeSceneEnter;
+      return whole_session;
+    case 0x802fed10:
+      *boundary = Boundary::PrizeSceneExit;
+      return whole_session;
+    case 0x801a6308:
+      *boundary = Boundary::PrizeModeExit;
+      return whole_session;
+    case 0x801bff7c:
+      *boundary = Boundary::StartupPrizeModeExit;
+      return whole_session;
     default:
       return false;
     }
@@ -417,9 +857,28 @@ struct Observer::Impl
     case 0x8016ebbc:
     case 0x8039157c:
     case 0x801a4b70:
+    case 0x8025bbd0:
       return word == 0x4e800020;
     case 0x8016e9c8:
       return word == 0x7c0802a6;
+    case 0x8026688c:
+    case 0x80266d70:
+    case 0x8025a998:
+    case 0x801a5af0:
+    case 0x80177368:
+    case 0x80177704:
+    case 0x801a5f64:
+    case 0x80179350:
+    case 0x801bfcfc:
+    case 0x802febe0:
+    case 0x801a6308:
+    case 0x801bff7c:
+      // These source function entries are pinned to the owned DOL's
+      // prologue word.  The digest check establishes the remaining bytes.
+      return word == 0x7c0802a6;
+    case 0x802fed10:
+      // The retail Prize scene has an empty OnExit callback (blr at entry).
+      return word == 0x4e800020;
     default:
       // The pinned DOL digest has already established the exact source for
       // boundary PCs whose neighboring words are not part of the harness's
@@ -428,13 +887,56 @@ struct Observer::Impl
     }
   }
 
+  enum class SceneResetAction { Ignore, BeginResults, FinishResults, Invalid };
+
+  SceneResetAction ClassifyWholeSceneReset() const
+  {
+    // gm_801A4014 initializes a fresh GObj arena for EVERY scene, after the
+    // mode's on_enter and before the scene's on_enter. Menu transitions do
+    // not complete a match; the first reset after VS releases its fighters.
+    if (!match_active)
+    {
+      if (whole_phase == 0 || whole_phase == 2 || whole_phase == 4 || whole_phase == 8)
+        return SceneResetAction::Ignore;
+      if (whole_phase == 6 && prize_scene_exit_seen && prize_mode_exit_seen)
+        return SceneResetAction::Ignore;
+      return SceneResetAction::Invalid;
+    }
+    if (whole_phase != 5 || !result_seen || !vs_exit_seen || !vs_exit_return_seen ||
+        !vs_mode_exit_seen)
+      return SceneResetAction::Invalid;
+    if (!results_enter_seen && !results_gobj_seen && !results_exit_seen &&
+        !results_mode_exit_seen)
+      return SceneResetAction::BeginResults;
+    if (results_enter_seen && results_gobj_seen && results_exit_seen && results_mode_exit_seen)
+      return SceneResetAction::FinishResults;
+    return SceneResetAction::Invalid;
+  }
+
   void Observe(Core::System* system, u32 pc, PowerPC::PowerPCState* state)
   {
     if (!Start() || invalid.load() || finish_requested.load())
       return;
-    Boundary boundary;
-    if (!BoundaryForPC(pc, &boundary))
+    if (whole_session_enabled() && pc == CSS_ENTER_RETURN)
+    {
+      u32 word = 0;
+      if (!ReadU32(system, pc, &word) || word != 0x4e800020 || whole_phase != 1)
+        return SetInvalid("CSS steering readiness lacks its verified source return"), void();
+      css_steering_ready = true;
       return;
+    }
+    if (whole_session_enabled() && pc == MENU_AUDIO_STREAM_START)
+    {
+      ++audio_owner_epoch;
+      return;
+    }
+    Boundary boundary;
+    if (!BoundaryForPC(pc, whole_session_enabled(), &boundary))
+      return;
+    if (whole_session_enabled() && boundary == Boundary::CssEnter && whole_phase == 6)
+      boundary = Boundary::ReturnCss;
+    else if (whole_session_enabled() && boundary == Boundary::CssEnter && whole_phase == 8)
+      boundary = Boundary::CssCancelEnter;
     if (!BoundaryInstructionMatches(system, pc))
     {
       SetInvalid("observer boundary instruction is not resident in the pinned DOL");
@@ -448,7 +950,69 @@ struct Observer::Impl
     }
     raw_size = 0;
     slice_count = 0;
-    if (boundary == Boundary::PadPoll)
+    if (boundary == Boundary::CssEnter || boundary == Boundary::CssCancelEnter ||
+        boundary == Boundary::CssExit ||
+        boundary == Boundary::SssEnter || boundary == Boundary::SssExit ||
+        boundary == Boundary::ReturnCss)
+    {
+      if (boundary == Boundary::CssEnter || boundary == Boundary::CssCancelEnter ||
+          boundary == Boundary::ReturnCss || boundary == Boundary::CssExit)
+        css_steering_ready = false;
+      if (boundary == Boundary::ReturnCss)
+      {
+        if (whole_phase != 6 || (!pending_next_match && !awaiting_final_css))
+          return SetInvalid("whole-session return CSS was missing or out of order"), void();
+        whole_phase = awaiting_final_css ? 7 : 1;
+      }
+      else if (boundary == Boundary::CssEnter)
+      {
+        u8 current_mode = 0;
+        if (!ReadBytes(system, 0x80479d30, 1, &current_mode) || current_mode != 0x02)
+          return SetInvalid("whole-session first CSS is not ordinary GM_VS"), void();
+        if (whole_phase != 0)
+        {
+          return SetInvalid("whole-session CSS enter was missing or out of order"), void();
+        }
+        if (startup_prize_pending)
+          return SetInvalid("whole-session CSS enter preceded startup Prize mode exit"), void();
+        whole_phase = 1;
+      }
+      else if (boundary == Boundary::CssCancelEnter)
+      {
+        if (whole_phase != 8)
+        {
+          return SetInvalid("whole-session canceled CSS enter was missing or out of order"),
+                 void();
+        }
+        whole_phase = 1;
+      }
+      else if (boundary == Boundary::CssExit)
+      {
+        if (whole_phase != 1)
+          return SetInvalid("whole-session CSS exit was missing or out of order"), void();
+        whole_phase = 2;
+      }
+      else if (boundary == Boundary::SssEnter)
+      {
+        if (whole_phase != 2)
+          return SetInvalid("whole-session SSS enter was missing or out of order"), void();
+        whole_phase = 3;
+      }
+      else
+      {
+        if (whole_phase != 3)
+          return SetInvalid("whole-session SSS exit was missing or out of order"), void();
+        u32 sss_pointer = 0;
+        u8 route = 0;
+        if (!ReadU32(system, 0x804d6c90, &sss_pointer) || !sss_pointer ||
+            sss_pointer > UINT32_MAX - 4 || !ReadBytes(system, sss_pointer + 4, 1, &route))
+          return SetInvalid("whole-session SSS exit did not expose its source route"), void();
+        whole_phase = route ? 4 : 8;
+      }
+      if (!AddMenuSlices(system, boundary, state->gpr[3]))
+        return SetInvalid("menu boundary did not expose its pinned state/audio slices"), void();
+    }
+    else if (boundary == Boundary::PadPoll)
     {
       u32 caller = 0;
       if (state->gpr[1] > UINT32_MAX - 0x54 ||
@@ -461,7 +1025,9 @@ struct Observer::Impl
           !AddSlice(system, SliceTag::PadSnapshot, 0x804c1f84, 0x358) ||
           !AddSlice(system, SliceTag::RetraceCount, 0x804d7420, 4) ||
           !AddSlice(system, SliceTag::SourceVICount, 0x804a7f98, 4) ||
-          !AddSlice(system, SliceTag::SceneRouting, 0x80479d30, 6))
+          !AddSlice(system, SliceTag::SceneRouting, 0x80479d30, 6) ||
+          !AddSceneKindSlice(system) ||
+          !AddMenuSteeringSlices(system))
         return SetInvalid("PAD poll did not expose its bounded four-port slices"), void();
     }
     else if (boundary == Boundary::PadConsume)
@@ -479,6 +1045,17 @@ struct Observer::Impl
     {
       if (boundary == Boundary::Entry)
       {
+        u8 current_mode = 0;
+        if (whole_session_enabled() &&
+            !ReadBytes(system, 0x80479d30, 1, &current_mode))
+          return SetInvalid("VS entry did not expose source mode routing"), void();
+        // Opening movie attract demos reuse the VS constructor and can run
+        // while the outer routing record still names GM_OPENING_MV. They are
+        // pre-CSS source coverage, not the supported SSS-to-match route.
+        if (whole_session_enabled() && current_mode == 0x18 && whole_phase == 0)
+          return;
+        if (whole_session_enabled() && (current_mode != 0x02 || whole_phase != 4))
+          return SetInvalid("whole-session VS entry was missing its SSS route"), void();
         setup_pointer = state->gpr[3];
         if (!setup_pointer || !AddSlice(system, SliceTag::MatchSetup, setup_pointer, 0x138))
           return SetInvalid("VS entry did not expose its source setup"), void();
@@ -488,9 +1065,24 @@ struct Observer::Impl
             !AddSlice(system, SliceTag::RngValue, rng_pointer, 4) ||
             !AddSlice(system, SliceTag::PadSnapshot, 0x804c1f84, 0x358))
           return SetInvalid("VS entry did not expose its bounded initial state"), void();
+        if (!AddProfileSlices(system))
+          return SetInvalid("VS entry did not expose its loaded profile masks"), void();
         setup_ready = false;
         result_seen = false;
         result_pointer = 0;
+        vs_exit_seen = false;
+        vs_exit_return_seen = false;
+        vs_mode_exit_seen = false;
+        results_enter_seen = false;
+        results_gobj_seen = false;
+        results_exit_seen = false;
+        results_mode_exit_seen = false;
+        completed_match_pending_prize = false;
+        startup_prize_pending = false;
+        prize_mode_enter_seen = false;
+        prize_scene_enter_seen = false;
+        prize_scene_exit_seen = false;
+        prize_mode_exit_seen = false;
         fighter_present.fill(false);
         fighter_pointers.fill(0);
         cpu_slots.fill(false);
@@ -499,9 +1091,12 @@ struct Observer::Impl
         if (!setup)
           return SetInvalid("source setup pointer is invalid"), void();
         // The same entry routine is also used by title-screen attract demos.
-        // Keep that entry record, but only arm match capture for the original
-        // VS setup bit.  Genuine VS setups retain the existing role checks.
-        match_active = (setup[4] & 0x40) != 0;
+        // Their setup can carry the ordinary VS bit, so the source mode is
+        // part of the guard: the whole-session contract arms only the
+        // ordinary GM_VS route reached from SSS. Keep the legacy observer's
+        // setup-only behavior when whole-session capture is disabled.
+        match_active = (setup[4] & 0x40) != 0 &&
+                      (!whole_session_enabled() || current_mode == 0x02);
         active_slot_count = 0;
         if (match_active)
         {
@@ -520,6 +1115,8 @@ struct Observer::Impl
               return SetInvalid("VS setup has an unexpected trailing port"), void();
           }
         }
+        if (whole_session_enabled())
+          whole_phase = 5;
       }
       else
       {
@@ -573,9 +1170,160 @@ struct Observer::Impl
       if (boundary == Boundary::ResultReturn)
         result_seen = true;
     }
+    else if (boundary == Boundary::VsExit || boundary == Boundary::VsExitReturn ||
+             boundary == Boundary::VsModeExit || boundary == Boundary::ResultsEnter ||
+             boundary == Boundary::ResultsExit || boundary == Boundary::ResultsModeExit ||
+             boundary == Boundary::ResultsGObjProcess || boundary == Boundary::PrizeModeEnter ||
+             boundary == Boundary::PrizeSceneEnter || boundary == Boundary::PrizeSceneExit ||
+             boundary == Boundary::PrizeModeExit || boundary == Boundary::StartupPrizeModeExit)
+    {
+      if (boundary == Boundary::PrizeModeEnter || boundary == Boundary::PrizeSceneEnter ||
+          boundary == Boundary::PrizeSceneExit || boundary == Boundary::PrizeModeExit ||
+          boundary == Boundary::StartupPrizeModeExit)
+      {
+        // The mode's Prize on_enter precedes the arena reset into its scene.
+        // Arm that handoff from the already ordered Results exit hooks; the
+        // following reset still publishes the final Results teardown.
+        const bool entering_prize_from_results = boundary == Boundary::PrizeModeEnter &&
+            match_active && whole_phase == 5 && results_gobj_seen && results_exit_seen &&
+            results_mode_exit_seen;
+        if (entering_prize_from_results)
+          completed_match_pending_prize = true;
+        if (!whole_session_enabled() || (match_active && !entering_prize_from_results) ||
+            (!completed_match_pending_prize && !startup_prize_pending && whole_phase != 0))
+          return SetInvalid("whole-session Prize hook occurred outside a completed match"), void();
+        if (boundary == Boundary::PrizeModeEnter)
+        {
+          if (prize_mode_enter_seen || prize_scene_enter_seen || prize_scene_exit_seen ||
+              (completed_match_pending_prize && startup_prize_pending) ||
+              !AddSessionSlices(system))
+            return SetInvalid("Prize mode enter is missing its completed Results handoff"), void();
+          if (!completed_match_pending_prize)
+            startup_prize_pending = true;
+          prize_mode_enter_seen = true;
+        }
+        else if (boundary == Boundary::PrizeSceneEnter)
+        {
+          if (!prize_mode_enter_seen || prize_scene_enter_seen || !AddSessionSlices(system))
+            return SetInvalid("Prize scene enter is missing its ordered mode hook"), void();
+          prize_scene_enter_seen = true;
+        }
+        else if (boundary == Boundary::PrizeSceneExit)
+        {
+          if (!prize_scene_enter_seen || prize_scene_exit_seen || !AddSessionSlices(system))
+            return SetInvalid("Prize scene exit is missing its ordered scene hook"), void();
+          prize_scene_exit_seen = true;
+        }
+        else if (boundary == Boundary::StartupPrizeModeExit)
+        {
+          if (!startup_prize_pending || !prize_scene_exit_seen || prize_mode_exit_seen ||
+              !AddSessionSlices(system))
+            return SetInvalid("startup Prize mode exit is missing its ordered scene hook"), void();
+          prize_mode_exit_seen = true;
+          startup_prize_pending = false;
+        }
+        else
+        {
+          if (startup_prize_pending || !completed_match_pending_prize ||
+              !prize_scene_exit_seen || prize_mode_exit_seen || !AddSessionSlices(system))
+            return SetInvalid("Prize mode exit is missing its ordered scene hook"), void();
+          prize_mode_exit_seen = true;
+          completed_match_pending_prize = false;
+          startup_prize_pending = false;
+        }
+      }
+      else
+      {
+        u8 current_mode = 0;
+        if (whole_session_enabled() && !match_active && whole_phase == 0 &&
+            ReadBytes(system, 0x80479d30, 1, &current_mode) && current_mode == 0x18)
+          return;
+        // Only VS exit still owns playable fighter state. Its return retires
+        // those pointers; the ordered mode/Results hooks remain part of this
+        // match until Results teardown and must not require them to be live.
+        if (!whole_session_enabled() || !match_active ||
+            (boundary == Boundary::VsExit && !setup_ready))
+          return SetInvalid("whole-session source hook occurred outside an active VS match"), void();
+        if (boundary == Boundary::VsExit)
+        {
+          if (vs_exit_seen)
+            return SetInvalid("duplicate gm_Scene_Vs_OnExit hook"), void();
+          result_pointer = 0x80479d98;
+          if (!AddSlice(system, SliceTag::Result, result_pointer + 0xc, 0x28) ||
+              !AddSessionSlices(system))
+            return SetInvalid("VS exit did not expose its pinned result/session slices"), void();
+          vs_exit_seen = true;
+        }
+        else if (boundary == Boundary::VsExitReturn)
+        {
+          if (!vs_exit_seen || vs_exit_return_seen)
+            return SetInvalid("VS exit return is missing or duplicated"), void();
+          // gm_Scene_Vs_OnExit populates EndMeleeData during the callback.
+          // Keep its entry snapshot diagnostic, and publish the completed
+          // result only at the verified return instruction.
+          if (!AddSessionSlices(system) ||
+              !AddSlice(system, SliceTag::Result, result_pointer + 0xc, 0x28))
+            return SetInvalid("VS exit return did not expose result/PAD/RNG state"), void();
+          vs_exit_return_seen = true;
+          result_seen = true;
+          // Gameplay observations end at the original VS exit. Results has
+          // its own source hooks and must never reuse these fighter pointers.
+          setup_ready = false;
+        }
+        else if (boundary == Boundary::VsModeExit)
+        {
+          if (!vs_exit_return_seen || vs_mode_exit_seen || !AddSessionSlices(system))
+            return SetInvalid("VS mode exit is missing its ordered source hook"), void();
+          vs_mode_exit_seen = true;
+        }
+        else if (boundary == Boundary::ResultsEnter)
+        {
+          if (!vs_mode_exit_seen || results_enter_seen || !AddSessionSlices(system))
+            return SetInvalid("Results enter is missing its ordered source hook"), void();
+          results_enter_seen = true;
+        }
+        else if (boundary == Boundary::ResultsExit)
+        {
+          if (!results_enter_seen || !results_gobj_seen || results_exit_seen ||
+              !AddSessionSlices(system))
+            return SetInvalid("Results exit is missing its ordered source hook"), void();
+          results_exit_seen = true;
+        }
+        else if (boundary == Boundary::ResultsModeExit)
+        {
+          if (!results_exit_seen || !results_gobj_seen || results_mode_exit_seen ||
+              !AddSessionSlices(system))
+            return SetInvalid("Results mode exit is missing its ordered source hook"), void();
+          results_mode_exit_seen = true;
+        }
+        else
+        {
+          if (!results_enter_seen || results_exit_seen || !AddSessionSlices(system) ||
+              !AddSlice(system, SliceTag::Result, 0x80479d98 + 0xc, 0x28))
+            return SetInvalid("Results GObj process did not expose input/RNG/result state"), void();
+          results_gobj_seen = true;
+        }
+      }
+    }
     else if (boundary == Boundary::SceneTeardown)
     {
-      if (!match_active || !result_seen)
+      if (whole_session_enabled())
+      {
+        const SceneResetAction reset = ClassifyWholeSceneReset();
+        if (reset == SceneResetAction::Ignore)
+          return;
+        if (reset == SceneResetAction::BeginResults)
+        {
+          setup_ready = false;
+          fighter_present.fill(false);
+          fighter_pointers.fill(0);
+          return;
+        }
+        if (reset == SceneResetAction::Invalid)
+          return SetInvalid("whole-session scene reset is missing an ordered VS/Results hook"),
+                 void();
+      }
+      else if (!match_active || !result_seen)
         return;
       const u8* count_ptr = system->GetMemory().GetPointerForRange(0x804ce380, 1);
       u32 list_heads = 0;
@@ -588,6 +1336,12 @@ struct Observer::Impl
         return SetInvalid("scene teardown entity lists are invalid"), void();
       if (!AddSlice(system, SliceTag::SceneRouting, 0x80479d30, 6))
         return SetInvalid("scene teardown routing bytes are invalid"), void();
+      if (whole_session_enabled() && !AddSessionSlices(system))
+        return SetInvalid("whole-session scene reset did not expose PAD/RNG state"), void();
+      if (whole_session_enabled())
+        whole_phase = 6;
+      if (whole_session_enabled())
+        completed_match_pending_prize = true;
     }
     else if (boundary == Boundary::SceneExit)
     {
@@ -604,7 +1358,7 @@ struct Observer::Impl
       return;
     u8* out = slot->payload.data();
     PutU16(out, static_cast<u16>(boundary));
-    PutU16(out, 0);
+    PutU16(out, whole_session_enabled() ? WHOLE_SESSION_FLAG : 0);
     PutU32(out, state->spr[8]);
     PutU32(out, 32);
     PutU32(out, static_cast<u32>(slice_count));
@@ -625,17 +1379,59 @@ struct Observer::Impl
       PutU32(descriptor, raw_offset);
       raw_offset += slice.size;
     }
-    if (static_cast<size_t>(out - slot->payload.data()) + raw_size > slot->payload.size())
+    const size_t metadata_size = whole_session_enabled() ? 12 : 0;
+    if (static_cast<size_t>(out - slot->payload.data()) + raw_size + metadata_size >
+        slot->payload.size())
       return SetInvalid("observer boundary payload exceeds its bounded slot"), void();
     std::memcpy(out, raw.data(), raw_size);
     out += raw_size;
+    if (whole_session_enabled())
+    {
+      PutU16(out, static_cast<u16>(match_index));
+      PutU16(out, static_cast<u16>(boundary));
+      PutU32(out, audio_owner_epoch);
+      PutU32(out, 0);
+    }
     slot->payload_size = static_cast<u32>(out - slot->payload.data());
     slot->checksum = CRC32(slot->payload.data(), slot->payload_size);
     Publish(slot);
     if (boundary == Boundary::DrawReturn)
       ++draw_ordinal;
     if (boundary == Boundary::SceneTeardown && result_seen)
-      RequestComplete();
+    {
+      if (!whole_session_enabled())
+      {
+        RequestComplete();
+      }
+      else if (match_index + 1 >= whole_session_matches)
+      {
+        // The declared sequence is complete only after the source has
+        // re-entered CSS following the final Results teardown.
+        awaiting_final_css = true;
+        match_active = false;
+      }
+      else
+      {
+        // Keep the completed match index on the return-to-CSS boundary.  The
+        // next CSS enter advances it, so menu rows and source rows retain the
+        // same index at each observed boundary.
+        pending_next_match = true;
+        match_active = false;
+      }
+    }
+    if (boundary == Boundary::ReturnCss)
+    {
+      if (awaiting_final_css)
+      {
+        awaiting_final_css = false;
+        RequestComplete();
+      }
+      else if (pending_next_match)
+      {
+        ++match_index;
+        pending_next_match = false;
+      }
+    }
   }
 
   void SetInvalid(std::string reason)
@@ -905,6 +1701,30 @@ struct Observer::Impl
   bool result_seen = false;
   u32 result_pointer = 0;
   u32 draw_ordinal = 0;
+  u32 whole_session_matches = 0;
+  u32 audio_owner_epoch = 0;
+  u32 match_index = 0;
+  bool css_steering_ready = false;
+  u32 whole_phase = 0;  // CSS, SSS, VS, completed match, or return CSS.
+  bool pending_next_match = false;
+  bool awaiting_final_css = false;
+  bool vs_exit_seen = false;
+  bool vs_exit_return_seen = false;
+  bool vs_mode_exit_seen = false;
+  bool results_enter_seen = false;
+  bool results_gobj_seen = false;
+  bool results_exit_seen = false;
+  bool results_mode_exit_seen = false;
+  bool completed_match_pending_prize = false;
+  bool startup_prize_pending = false;
+  bool prize_mode_enter_seen = false;
+  bool prize_scene_enter_seen = false;
+  bool prize_scene_exit_seen = false;
+  bool prize_mode_exit_seen = false;
+  std::string capture_id;
+  std::string sequence_id;
+
+  bool whole_session_enabled() const { return whole_session_matches != 0; }
 };
 
 Observer::Observer() : m_impl(new Impl) {}
@@ -971,6 +1791,22 @@ bool Observer::IsBoundary(u32 guest_pc)
   case 0x8016EBBC:
   case 0x8039157C:
   case 0x801A4B70:
+  case 0x8026688C:
+  case 0x802669F0:
+  case 0x80266D70:
+  case 0x8025A998:
+  case 0x8025BBD0:
+  case 0x801A5AF0:
+  case 0x80177368:
+  case 0x80177704:
+  case 0x801A5F64:
+  case 0x80179350:
+  case 0x801BFCFC:
+  case 0x802FEBE0:
+  case 0x802FED10:
+  case 0x801A6308:
+  case 0x801BFF7C:
+  case 0x8038E8EC:
     return true;
   default:
     return false;

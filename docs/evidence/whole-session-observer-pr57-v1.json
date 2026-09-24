@@ -1,0 +1,283 @@
+{
+  "schema": "melee-web-whole-session-observer-validation",
+  "version": 1,
+  "scope": "Compiled and Source identified: experimental passive original-game capture completed three natural four-player CPU level-9 Mario / Final Destination / four-stock matches, each through original Results back to CSS. This is capture completeness and decoder evidence, not a comparison against the source port or an admission receipt.",
+  "source": {
+    "observer_commit": "3f74ed854e6678a72f1becbfcf1fd842e6df8c81",
+    "typed_profile_commit": "655277034c949bc20fc2af1cc170c364005ed034",
+    "exporter_commit": "a38abf5",
+    "build_composition": "Observer #57 plus typed profile #58; shared original capture also feeds the separate #59 consumer validation."
+  },
+  "build": {
+    "configuration": "Release",
+    "cpu": "JITARM64",
+    "dolphin_commit": "c77bbaa0f372c3f72281602a8b087206706542cb",
+    "observer_identity": {
+      "cpu": "JITARM64",
+      "dol_sha1": "08e0bf20134dfcb260699671004527b2d6bb1a45",
+      "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+      "game_revision": "GALE01r2",
+      "writes_guest_memory": false
+    },
+    "observer_patch_sha256": [
+      "da3f3d6c305aaee2e95f2530a28cd8ffc9ec81d4fb02511462606997f02f690a",
+      "ed5c75bef33648478727ff1c900aa6f225656e595e7e2b6478a6cf118a3d2338"
+    ],
+    "observer_source_overlay_sha256": {
+      "Core/PowerPC/ReferenceCaptureObserver.cpp": "c194cdd4bf53a256e82c8042299ef7c4d90951b8822d12ad4495fc87bf9261ca",
+      "Core/PowerPC/ReferenceCaptureObserver.h": "c09703d138a02bb8ffe637d391992f1d075d28203358fe3cc7b85e8f532c43a1",
+      "Core/PowerPC/ReferenceInputStream.cpp": "804221033f7468529b8e6e3fbe842779a6c98113d07af12d5e76942c1d6457c9",
+      "Core/PowerPC/ReferenceInputStream.h": "9332bad0da26b079175e33f5cb1d7c10f8337c9151ecc38c045e5ac8df604dbc"
+    },
+    "composed_source_diff_sha256": "2d28a1c7a7b3a78fea62d2dc767c1b55337c220b0f11891a3bc133bcc4e54c81",
+    "writes_guest_memory": false
+  },
+  "binary": {
+    "local_path": "work/sequence-reference-build-v8/Binaries/dolphin-emu-nogui",
+    "sha256": "4d9ef9c6419e7b415dcf24600f9a7b96ab20b194743a6ee7728cd5d03574e5c1"
+  },
+  "build_manifest": {
+    "local_path": "work/sequence-reference-build-v8.json",
+    "sha256": "428d1ab1708b05b4716a3c94bff4dd4bde3f7a2e19f43d8d1d12cb58202d159f"
+  },
+  "build_log": {
+    "local_path": "work/sequence-reference-build-v8-retry.log",
+    "sha256": "649ab219a338a4b173ec1cf11899e9961e8f7a116af3ee1ac16903fce0ed0188"
+  },
+  "fixture": {
+    "disc": "Owned USA revision 1.02 GALE01 revision-2 CISO; local only",
+    "initial_gci_sha256": "39171db67ec4e6b85837107f7cd7e1231402e239ec7f74bfc9efa35d5a2879ce",
+    "initial_sram_sha256": "49dee06d38cb76aaa8f90bfb2e937face180243d1a170078b4e13226b012f82c",
+    "isolation": "Copied private profile with save-data writes disabled; ordinary Pipe controller input changes menu options and CPU settings."
+  },
+  "capture": {
+    "raw": {
+      "local_path": "work/reference-css-context-v15/capture.mwro",
+      "bytes": 1746482598,
+      "sha256": "cebb4c619ac0d249ffc75491888772a91ec7d14bae72e7decc25f2b4e7bb3c5e"
+    },
+    "status": {
+      "state": "completed",
+      "event_count": 229552,
+      "last_seq": 229551,
+      "source_tick": 458,
+      "draw_ordinal": 14780,
+      "completed": true,
+      "invalid": false,
+      "error": null
+    },
+    "status_evidence": {
+      "local_path": "work/reference-css-context-v15/status.json",
+      "sha256": "3292a5b4e15e0e9c60315cc639a9d7b64ba0e260bcdda7e5a4e4fc398e080be3"
+    },
+    "report": {
+      "local_path": "work/reference-css-context-v15/report.json",
+      "sha256": "050c7469c77101d06f5258cdd2f4cc881e2818da4682d203103f8d79d4845f63"
+    },
+    "harness": {
+      "local_path": "work/reference-css-probe-v15.py",
+      "sha256": "f26a4d12f6f9041f2c4e89159504b7f65bc8c5e84134efc886e4104c0ea473ac"
+    },
+    "intentions": {
+      "local_path": "work/reference-css-context-v15/input-intentions.jsonl",
+      "sha256": "1978bad50d2d6e7734b6eff706031a4d650034672a179c2326ff0c82f206b3d8"
+    },
+    "log": {
+      "local_path": "work/reference-css-probe-v15.log",
+      "sha256": "46158c4d49e233be7b306e7dc8408486b71bb455d01701a83fa41c69b40a52a3"
+    },
+    "match_count": 3,
+    "setup": {
+      "damage_ratio_bits": "3f800000",
+      "disable_pausing": false,
+      "game_speed_bits": "3f800000",
+      "is_stock": true,
+      "is_teams": false,
+      "item_frequency": -1,
+      "item_mask_hex": "ffffffffffffffff",
+      "match_kind": 1,
+      "players": [
+        {
+          "character_kind": 8,
+          "costume": 0,
+          "cpu_kind": 4,
+          "cpu_level": 9,
+          "player_type": 1,
+          "port": 1,
+          "rumble_enabled": false,
+          "stocks": 4
+        },
+        {
+          "character_kind": 8,
+          "costume": 1,
+          "cpu_kind": 4,
+          "cpu_level": 9,
+          "player_type": 1,
+          "port": 2,
+          "rumble_enabled": false,
+          "stocks": 4
+        },
+        {
+          "character_kind": 8,
+          "costume": 2,
+          "cpu_kind": 4,
+          "cpu_level": 9,
+          "player_type": 1,
+          "port": 3,
+          "rumble_enabled": false,
+          "stocks": 4
+        },
+        {
+          "character_kind": 8,
+          "costume": 3,
+          "cpu_kind": 4,
+          "cpu_level": 9,
+          "player_type": 1,
+          "port": 4,
+          "rumble_enabled": false,
+          "stocks": 4
+        }
+      ],
+      "stage": 32,
+      "time_limit_seconds": 0,
+      "timer_counts_up": false,
+      "timer_enabled": false
+    },
+    "route": "CSS -> SSS -> VS -> Results -> CSS, repeated three times; natural stock endings, no forced no-contest",
+    "renderer": "Null (headless observer)",
+    "emulation_speed": 2,
+    "timing_note": "Diagnostic acceleration only; original source frame rate and arithmetic unchanged. No wall-clock or performance claim."
+  },
+  "decoder_cross_check": {
+    "result": "pass",
+    "consumer_pr": 59,
+    "source_consumed_frames": 46835,
+    "scene_spans": [
+      {
+        "first_frame": 0,
+        "last_frame": 1088,
+        "scene": 1
+      },
+      {
+        "first_frame": 1089,
+        "last_frame": 1339,
+        "scene": 2
+      },
+      {
+        "first_frame": 1340,
+        "last_frame": 16937,
+        "scene": 3
+      },
+      {
+        "first_frame": 16938,
+        "last_frame": 17393,
+        "scene": 4
+      },
+      {
+        "first_frame": 17394,
+        "last_frame": 17546,
+        "scene": 1
+      },
+      {
+        "first_frame": 17547,
+        "last_frame": 17797,
+        "scene": 2
+      },
+      {
+        "first_frame": 17798,
+        "last_frame": 30741,
+        "scene": 3
+      },
+      {
+        "first_frame": 30742,
+        "last_frame": 31174,
+        "scene": 4
+      },
+      {
+        "first_frame": 31175,
+        "last_frame": 31330,
+        "scene": 1
+      },
+      {
+        "first_frame": 31331,
+        "last_frame": 31583,
+        "scene": 2
+      },
+      {
+        "first_frame": 31584,
+        "last_frame": 46376,
+        "scene": 3
+      },
+      {
+        "first_frame": 46377,
+        "last_frame": 46834,
+        "scene": 4
+      }
+    ],
+    "raw_crc_sequence_descriptor_validation": "pass for entire stream",
+    "candidate": {
+      "local_path": "work/reference-css-context-v15/candidate-v2.mwrc",
+      "sha256": "5651fa8f6638c9dc39d7d4b6863ae414740da951da092104228924660a488ba2"
+    },
+    "sidecar": {
+      "local_path": "work/reference-css-context-v15/candidate-v2.json",
+      "sha256": "8b5d40dfb0da94c0745b447490fdbf1bb9e6dca9938f63d073b99cc10b922aff"
+    },
+    "scope": "One complete workload; independent repeatability and browser replay are separate gates."
+  },
+  "integration": {
+    "command": "python3 -m unittest discover -s tests -v",
+    "tests": 1203,
+    "skips": 86,
+    "result": "pass",
+    "log": {
+      "local_path": "work/pr57-full-suite-v3.log",
+      "sha256": "a9513b9ee92f976ad483ce6db061c06c59c4ac615fc07be57f88ec15b25713f2"
+    }
+  },
+  "retained_failures": [
+    {
+      "evidence": {
+        "local_path": "work/reference-css-context-v12/status.json",
+        "sha256": "b6e8a7f4ac54575516a0ebaf29f44373b3066858a9a36a26e8696c7912bd6c81"
+      },
+      "reason": "VS-mode exit incorrectly required live fighter setup after VS-exit-return retired it; corrected boundary ownership."
+    },
+    {
+      "evidence": {
+        "local_path": "work/reference-css-context-v13/status.json",
+        "sha256": "05d17f94bc158b16e2dd1de0fe9d737d5b6d055b220ce23c3255087fd75aa021"
+      },
+      "reason": "A PAD interrupt during CSS OnEnter read stale model globals; steering now waits for the verified original OnEnter return."
+    },
+    {
+      "evidence": {
+        "local_path": "work/reference-css-context-v14/report.json",
+        "sha256": "38cc8d809e65eabe5f66d5da880e2cbbe668463a654331242b07cae923ef976f"
+      },
+      "reason": "Harness retained an old FD highlight after the next SSS index had no stage slice; invalidated cached highlight before the successful v15 capture."
+    },
+    {
+      "evidence": {
+        "local_path": "work/pr57-full-suite-v1.log",
+        "sha256": "f8929e5910e191b234ea6ce9bf438c06445a642cfc1334621ed6461c64f30948"
+      },
+      "reason": "Intermediate test expected the previous SSS hook while the return-boundary fix was being implemented; final stable suite passes."
+    },
+    {
+      "evidence": {
+        "local_path": "work/sequence-reference-build-v8.log",
+        "sha256": "0031a7b09ec9bb3b0df4581ad68adfdb9a3e90d4d903851e9c489851f3827f55"
+      },
+      "reason": "Build launched with an unresolved merge conflict; resolved source composition and rebuilt successfully."
+    }
+  ],
+  "open_gates": [
+    "Independent original-repeat capture and source-port state comparison",
+    "Complete transition/audio join admission",
+    "Pixels and PCM",
+    "Browser live scheduling and performance",
+    "Full-game and tournament admission"
+  ],
+  "deployed": false
+}
