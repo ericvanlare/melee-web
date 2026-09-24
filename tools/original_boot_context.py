@@ -190,6 +190,7 @@ def derive_boot_context(dol_path: Path, disc_path: Path, symbols_path: Path,
                    "crash_allocation_alignment": crash_align,
                    "crash_allocation_base": crash_base, "after_crash": after_crash,
                    "framebuffer_count": buffers, "framebuffer_size": framebuffer_size,
+                   "framebuffer_width": width, "framebuffer_height": height,
                    "framebuffer_begin": xfb_begin, "after_xfb": after_xfb,
                    "fifo_size": fifo_size, "os_init_alloc_lo": init_lo},
         "static_layout": {
