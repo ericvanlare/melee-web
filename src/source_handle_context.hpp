@@ -46,6 +46,31 @@ enum class Status {
     unknown_payload,
     exhausted,
     async_move_required,
+    compact_started,
+    compact_in_progress,
+    compact_complete,
+    missing_callback,
+    reentrant_compaction,
+    invalid_transition,
+    invalid_generation,
+    cancelled,
+    mutation_blocked,
+};
+
+enum class TransferKind {
+    none,
+    ram_alarm,
+    devcom_1b,
+};
+
+enum class CompactPhase {
+    idle,
+    awaiting_callback,
+    waiting_ram_alarm,
+    waiting_devcom,
+    awaiting_completion,
+    complete,
+    rejected,
 };
 
 struct HandleResult {
@@ -73,6 +98,46 @@ struct Snapshot {
     std::vector<HandleView> active;
     std::uint32_t allocations = 0;
     std::uint32_t max_allocations = 0;
+};
+
+// These are source addresses and source-state identities, never host
+// pointers. A move's destination is published at source move-start, while its
+// payload becomes usable only after the corresponding asynchronous completion.
+struct CompactMove {
+    Address handle;
+    Address source;
+    Address destination;
+    Address next;
+    std::uint32_t size = 0; // OSRoundUp32B(handle->x8_hi)
+    std::uint32_t offset = 0;
+    std::uint32_t generation = 0;
+    TransferKind transfer = TransferKind::none;
+};
+
+struct CompactState {
+    CompactPhase phase = CompactPhase::idle;
+    Address heap;
+    Address callback;
+    std::uint32_t callback_arg = 0;
+    Address callback_handle;
+    std::uint32_t callback_generation = 0;
+    Address cursor;
+    CompactMove move;
+    bool callback_invoked = false;
+};
+
+struct CompactBeginResult {
+    Status status = Status::missing_context;
+    bool started = false;
+    CompactState state;
+};
+
+struct CompactStepResult {
+    Status status = Status::missing_context;
+    std::uint32_t copied = 0;
+    bool transfer_complete = false;
+    bool callback_invoked = false;
+    CompactState state;
 };
 
 class Context {
@@ -107,11 +172,22 @@ public:
     Status destroy(Address heap);
     Status destroy_current();
 
-    // lbMemory_8001529C. Contiguous children are a complete no-op. A gap is
-    // reported explicitly until the source async move path is observed and
-    // implemented.
+    // lbMemory_8001529C's old fail-closed diagnostic view. It does not mutate
+    // source placement or pretend that an asynchronous move completed.
     Status compact(Address heap);
     Status compact_current();
+
+    // Source-shaped asynchronous compaction. The lbHeap_80015D6C heap-index
+    // bypass belongs to the game wrapper; this allocator API models direct
+    // lbMemory_8001529C and therefore has no heap-index policy.
+    CompactBeginResult compact_begin(Address heap, Address callback,
+                                     std::uint32_t callback_arg);
+    CompactStepResult compact_ram_alarm_chunk(std::uint32_t generation);
+    CompactStepResult compact_callback_transition(std::uint32_t generation,
+                                                   bool cancelled = false);
+    CompactStepResult compact_devcom_complete(std::uint32_t generation,
+                                              bool cancelled = false);
+    const CompactState& compact_state() const { return compact_; }
 
 private:
     struct Record {
@@ -139,6 +215,14 @@ private:
     void push_heap_handle(Record& record);
     std::vector<Address> follow(Address head, std::size_t bound) const;
 
+    static std::uint32_t round32(std::uint32_t size);
+    bool issue_generation(std::uint32_t& generation);
+    bool validate_chain(const Record& owner) const;
+    CompactStepResult invalid_step(Status status) const;
+    CompactStepResult transfer_completed(TransferKind transfer,
+                                         std::uint32_t generation);
+    CompactStepResult start_move(Record& handle);
+
     Layout layout_{};
     Arena arena_{};
     std::vector<Record> records_;
@@ -148,6 +232,9 @@ private:
     std::uint32_t allocations_ = 0;
     std::uint32_t max_allocations_ = 0;
     bool initialized_ = false;
+    CompactState compact_{};
+    Address compact_cursor_{};
+    std::uint32_t next_generation_ = 1;
 };
 
 const char* status_name(Status status);

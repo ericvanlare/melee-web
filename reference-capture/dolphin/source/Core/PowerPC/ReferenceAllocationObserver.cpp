@@ -15,6 +15,7 @@
 #include <string>
 #include <string_view>
 #include <thread>
+#include <utility>
 
 #include <mbedtls/sha256.h>
 
@@ -29,7 +30,7 @@ namespace
 {
 constexpr char kExpectedDolSha1[] = "08e0bf20134dfcb260699671004527b2d6bb1a45";
 constexpr char kExpectedSourceRevision[] = "b43912cc78606f96c9569f5d6229bc9d7e265ea5";
-constexpr size_t kFunctionCount = 45;
+constexpr size_t kFunctionCount = 50;
 constexpr size_t kGlobalCount = 23;
 constexpr size_t kMaxThreads = 16;
 constexpr size_t kMaxDepth = 64;
@@ -808,6 +809,163 @@ private:
     return global && global->size >= 4 && ReadWord(system, global->address, value);
   }
 
+  bool ReadGlobalOffset(Core::System* system, std::string_view name, u32 offset, u32* value) const
+  {
+    const GlobalIdentity* global = FindGlobal(state_.profile, name);
+    if (!global || offset > global->size || global->size - offset < sizeof(u32) ||
+        static_cast<u64>(global->address) + offset > std::numeric_limits<u32>::max())
+      return false;
+    return ReadWord(system, global->address + offset, value);
+  }
+
+  bool AppendHandleMetadata(Core::System* system, u32 handle, bool include_prev,
+                            std::string* output)
+  {
+    if (handle == 0)
+      return Append(output, "null");
+    std::array<u8, 16> bytes{};
+    const size_t size = include_prev ? 16 : 12;
+    if (!IsMem1Read(handle, size) || !ReadBytes(system, handle, size, bytes.data()))
+      return false;
+    const auto word = [&](size_t index) {
+      return (static_cast<u32>(bytes[index * 4]) << 24) |
+             (static_cast<u32>(bytes[index * 4 + 1]) << 16) |
+             (static_cast<u32>(bytes[index * 4 + 2]) << 8) | bytes[index * 4 + 3];
+    };
+    if (!Append(output, "{\"pointer\":") || !AppendNumber(output, handle) ||
+        !Append(output, ",\"x0_next\":") || !AppendNumber(output, word(0)) ||
+        !Append(output, ",\"x4_lo\":") || !AppendNumber(output, word(1)) ||
+        !Append(output, ",\"x8_hi\":") || !AppendNumber(output, word(2)))
+      return false;
+    if (include_prev &&
+        (!Append(output, ",\"xC_prev\":") || !AppendNumber(output, word(3))))
+      return false;
+    return Append(output, "}");
+  }
+
+  bool AppendCompactionManager(Core::System* system, std::string* output)
+  {
+    constexpr std::array<std::pair<std::string_view, u32>, 9> fields = {{
+        {"src", 0x6c8}, {"dst", 0x6cc}, {"size", 0x6d0}, {"offset", 0x6d4},
+        {"callback_arg", 0x6d8}, {"callback", 0x6dc}, {"x6E0", 0x6e0},
+        {"x6E4", 0x6e4}, {"x6E8", 0x6e8},
+    }};
+    std::array<u32, fields.size()> values{};
+    for (size_t index = 0; index < fields.size(); ++index)
+    {
+      if (!ReadGlobalOffset(system, "lbMemory_804318B0", fields[index].second, &values[index]))
+        return false;
+    }
+    const u32 size = values[2];
+    const u32 offset = values[3];
+    if (size != 0 && offset > size)
+      return false;
+    const u32 remaining = size == 0 ? 0 : size - offset;
+    const u32 chunk = std::min<u32>(remaining, 0x19000);
+    if (!Append(output, "{\"src\":") || !AppendNumber(output, values[0]) ||
+        !Append(output, ",\"dst\":") || !AppendNumber(output, values[1]) ||
+        !Append(output, ",\"size\":") || !AppendNumber(output, size) ||
+        !Append(output, ",\"offset\":") || !AppendNumber(output, offset) ||
+        !Append(output, ",\"remaining\":") || !AppendNumber(output, remaining) ||
+        !Append(output, ",\"chunk\":") || !AppendNumber(output, chunk) ||
+        !Append(output, ",\"callback_arg\":") || !AppendNumber(output, values[4]) ||
+        !Append(output, ",\"callback\":") || !AppendNumber(output, values[5]) ||
+        !Append(output, ",\"x6E0\":") || !AppendNumber(output, values[6]) ||
+        !Append(output, ",\"x6E4\":") || !AppendNumber(output, values[7]) ||
+        !Append(output, ",\"x6E8\":") || !AppendNumber(output, values[8]))
+      return false;
+    return Append(output, "}");
+  }
+
+  bool AppendCompactionObserved(Core::System* system, std::string_view function,
+                                const std::array<u32, 8>& args, u32 argc,
+                                const u32* return_value, std::string* output)
+  {
+    const bool is_memory = function == "lbMemory_8001529C" || function == "lbMemory_80015320";
+    const bool is_alarm = function == "fn_80015184";
+    const bool is_preload = function == "lbDvd_80017A80";
+    if (!is_memory && !is_alarm && !is_preload)
+      return false;
+    const u32 expected_argc = function == "lbMemory_8001529C" ? 3 :
+                              function == "lbMemory_80015320" ? 4 :
+                              function == "fn_80015184" ? 2 : 1;
+    if (argc != expected_argc || !Append(output, "{\"phase\":\""))
+      return false;
+    if (!Append(output, return_value ? "return" : "entry") || !Append(output, "\""))
+      return false;
+    if (return_value)
+    {
+      if (!Append(output, ",\"return\":") || !AppendNumber(output, *return_value))
+        return false;
+    }
+    if (is_memory)
+    {
+      if (!Append(output, ",\"manager\":") || !AppendCompactionManager(system, output))
+        return false;
+      const u32 handle = function == "lbMemory_8001529C" ? args[0] : args[1];
+      if (!Append(output, ",\"handle\":") ||
+          !AppendHandleMetadata(system, handle, function == "lbMemory_8001529C", output))
+        return false;
+      if (function == "lbMemory_8001529C")
+      {
+        if (!Append(output, ",\"callback\":") || !AppendNumber(output, args[1]) ||
+            !Append(output, ",\"callback_arg\":") || !AppendNumber(output, args[2]))
+          return false;
+      }
+      else
+      {
+        if (args[3] > 1)
+          return false;
+        if (!Append(output, ",\"callback_arg\":") || !AppendNumber(output, args[2]) ||
+            !Append(output, ",\"cancel\":") || !Append(output, args[3] ? "true" : "false"))
+          return false;
+      }
+    }
+    else if (is_alarm)
+    {
+      if (!Append(output, ",\"manager\":") || !AppendCompactionManager(system, output) ||
+          !Append(output, ",\"alarm\":") || !AppendNumber(output, args[0]) ||
+          !Append(output, ",\"context\":") || !AppendNumber(output, args[1]))
+        return false;
+    }
+    else if (!Append(output, ",\"callback_arg\":") || !AppendNumber(output, args[0]))
+    {
+      return false;
+    }
+    return Append(output, "}");
+  }
+
+  bool AppendDevComObserved(std::string_view function, const std::array<u32, 8>& args, u32 argc,
+                            const u32* return_value, std::string* output)
+  {
+    const bool request = function == "HSD_DevComRequest";
+    const bool callback = function == "HSD_DevComARAMCallback";
+    if (!request && !callback)
+      return false;
+    if (argc != (request ? 8 : 1) || !Append(output, "{\"phase\":\""))
+      return false;
+    if (!Append(output, return_value ? "return" : "entry") || !Append(output, "\""))
+      return false;
+    if (return_value && (!Append(output, ",\"return\":") || !AppendNumber(output, *return_value)))
+      return false;
+    if (request)
+    {
+      constexpr std::array<std::string_view, 8> names = {
+          "file", "src", "dest", "size", "type", "priority", "callback", "callback_arg"};
+      for (size_t index = 0; index < names.size(); ++index)
+      {
+        if (!Append(output, ",\"") || !Append(output, names[index]) || !Append(output, "\":") ||
+            !AppendNumber(output, args[index]))
+          return false;
+      }
+    }
+    else if (!Append(output, ",\"request\":") || !AppendNumber(output, args[0]))
+    {
+      return false;
+    }
+    return Append(output, "}");
+  }
+
   bool AppendObjectField(std::string* output, bool* first, std::string_view name)
   {
     if (!*first && !Append(output, ","))
@@ -861,6 +1019,21 @@ private:
       return body();
     };
     const std::string_view function(name ? name : "");
+    if (function == "lbMemory_8001529C" || function == "lbMemory_80015320" ||
+        function == "fn_80015184" || function == "lbDvd_80017A80")
+    {
+      if (!add("compaction", [&] {
+            return AppendCompactionObserved(system, function, args, argc, return_value, output);
+          }))
+        return false;
+    }
+    if (function == "HSD_DevComARAMCallback" || function == "HSD_DevComRequest")
+    {
+      if (!add("devcom", [&] {
+            return AppendDevComObserved(function, args, argc, return_value, output);
+          }))
+        return false;
+    }
     if (function == "ARInit" || function == "ARAlloc" || function == "ARFree" ||
         function == "ARGetSize")
     {

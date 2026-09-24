@@ -14,8 +14,10 @@ import sys
 
 try:
     from .retail_allocation_profile import Dol, read_symbols, SOURCE_REVISION
+    from .source_pool_inventory import build_pool_inventory
 except ImportError:
     from retail_allocation_profile import Dol, read_symbols, SOURCE_REVISION
+    from source_pool_inventory import build_pool_inventory
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -37,11 +39,26 @@ SOURCE_FILES = (
     "src/melee/gm/gmmain.c", "src/melee/db/dberror.c",
     "src/sysdolphin/baselib/initialize.c",
     "src/melee/lb/lbheap.c", "src/melee/lb/lbmemory.c",
+    "src/sysdolphin/baselib/devcom.c",
 )
 
 
 def sha256(data):
     return hashlib.sha256(data).hexdigest()
+
+
+def zero_initialized_manager(dol, symbol):
+    """Derive manager roots from the owned DOL's zero-initialized BSS range."""
+    base, size = symbol['address'], symbol['size']
+    bss, length = struct.unpack_from('>II', dol.raw, 0xD8)
+    if (symbol.get('section') != '.bss' or size != 0x6F0 or
+            not bss <= base < base + size <= bss + length <= 0x100000000):
+        raise ValueError('original handle allocator is not wholly in declared BSS')
+    if any(start < base + size and base < start + length
+           for start, length, _ in dol.sections):
+        raise ValueError('original handle allocator overlaps initialized DOL data')
+    return dict.fromkeys(('src', 'dst', 'size', 'offset', 'callback_arg',
+                          'callback', 'x6E0', 'x6E4', 'x6E8'), 0)
 
 
 def signed16(word):
@@ -156,7 +173,10 @@ def derive_boot_context(dol_path: Path, disc_path: Path, symbols_path: Path,
             heap_count = literal(main[at - 1], 4)
         elif selector == 3:
             raise ValueError("unhandled original audio heap parameter override")
+    pool_inventory = build_pool_inventory(source_root / 'src', symbols_path)
     source_hashes = {name: sha256((source_root / name).read_bytes()) for name in SOURCE_FILES}
+    source_hashes.update({'src/' + item['path']: item['sha256']
+                          for item in pool_inventory['source_files']})
     return {
         "schema": "melee-web-original-boot-context", "version": 1,
         "derivation": "owned_disc_apploader_and_dol_no_capture_inputs",
@@ -173,10 +193,14 @@ def derive_boot_context(dol_path: Path, disc_path: Path, symbols_path: Path,
                    "framebuffer_begin": xfb_begin, "after_xfb": after_xfb,
                    "fifo_size": fifo_size, "os_init_alloc_lo": init_lo},
         "static_layout": {
-            "pool_descriptors": {name: item["address"] for name, item in symbols.items()
-                                 if item["kind"] == "object" and item["size"] == 44},
+            "pool_descriptors": {name: item["address"]
+                                 for name, item in pool_inventory['pools'].items()},
+            "pool_inventory": pool_inventory,
             "aram_stack_table": symbols["ar_stack$1962"],
             "lbmemory_allocator": symbols["lbMemory_804318B0"]["address"],
+            "lbmemory_initial_manager": zero_initialized_manager(dol, symbols["lbMemory_804318B0"]),
+            "devcom_initial_request_counter": int.from_bytes(dol.read(
+                symbols["HSD_DevCom_804D6050"]["address"], 4), "big"),
             "lbheap_descriptors": [list(row) for row in struct.iter_unpack(">4I", dol.read(
                 symbols["lbHeap_803BA380"]["address"], symbols["lbHeap_803BA380"]["size"]))],
         },

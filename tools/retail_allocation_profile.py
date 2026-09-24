@@ -12,6 +12,7 @@ from pathlib import Path
 
 DOL_SHA1 = "08e0bf20134dfcb260699671004527b2d6bb1a45"
 SOURCE_REVISION = "b43912cc78606f96c9569f5d6229bc9d7e265ea5"
+PROFILE_VERSION = 2
 
 # Argument counts follow the pinned original declarations. These are observation
 # boundaries, not replacement implementations of the functions.
@@ -35,6 +36,8 @@ FUNCTIONS = {
     "lbMemory_800154D4": 2, "lbMemory_800155A4": 0,
     "Fighter_FirstInitialize_80067A84": 0, "Fighter_Create": 1,
     "gm_Scene_Vs_OnEnter": 1, "gm_Scene_Vs_OnExit": 1,
+    "fn_80015184": 2, "lbMemory_80015320": 4, "lbDvd_80017A80": 1,
+    "HSD_DevComARAMCallback": 1, "HSD_DevComRequest": 8,
 }
 GLOBALS = ("HeapArray", "NumHeaps", "ArenaStart", "ArenaEnd",
            "__OSArenaLo", "__OSArenaHi", "seed", "seed_ptr",
@@ -104,7 +107,7 @@ def build_profile(dol_path: Path, symbols_path: Path) -> dict:
                for name in ("seed_ptr", "__OSArenaLo", "current_heap",
                             "iparam_audio_heap_size", "iparam_heap_max_num")}
     entry_word = int.from_bytes(dol.read(dol.entry, 4), "big")
-    return {"schema": "melee-web-original-allocation-profile", "version": 1,
+    return {"schema": "melee-web-original-allocation-profile", "version": PROFILE_VERSION,
             "dol_sha1": DOL_SHA1, "source_revision": SOURCE_REVISION,
             "symbols_sha256": hashlib.sha256(symbols_path.read_bytes()).hexdigest(),
             "entry": dol.entry, "entry_word": entry_word,

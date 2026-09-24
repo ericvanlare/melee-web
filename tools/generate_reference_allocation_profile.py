@@ -17,13 +17,12 @@ import re
 import sys
 
 try:
-    from .retail_allocation_profile import DOL_SHA1, FUNCTIONS, GLOBALS, SOURCE_REVISION
+    from .retail_allocation_profile import DOL_SHA1, FUNCTIONS, GLOBALS, PROFILE_VERSION, SOURCE_REVISION
 except ImportError:
-    from retail_allocation_profile import DOL_SHA1, FUNCTIONS, GLOBALS, SOURCE_REVISION
+    from retail_allocation_profile import DOL_SHA1, FUNCTIONS, GLOBALS, PROFILE_VERSION, SOURCE_REVISION
 
 
 PROFILE_SCHEMA = "melee-web-original-allocation-profile"
-PROFILE_VERSION = 1
 HEX256 = re.compile(r"^[0-9a-fA-F]{64}$")
 
 

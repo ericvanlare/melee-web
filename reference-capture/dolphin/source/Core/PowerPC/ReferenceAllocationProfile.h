@@ -3,7 +3,7 @@
 // DOL SHA-1: 08e0bf20134dfcb260699671004527b2d6bb1a45
 // Source revision: b43912cc78606f96c9569f5d6229bc9d7e265ea5
 // Symbols SHA-256: 214477d5b27989a9675c4b881f4db2dad5eeaada39dbac17c57c70d5ba84d579
-// Profile SHA-256: a0f3a2fd0adca44d66e6425a8f575db6dcddf294164c42b1114560c4565931d2
+// Profile SHA-256: 302aa8dd3026a378f71ca4d68cb15415ff8da8609b3ce0b49a25639cb9f8012b
 #pragma once
 #include <array>
 #include "Core/PowerPC/ReferenceAllocationObserver.h"
@@ -53,7 +53,12 @@ inline constexpr std::array<u32, 1> kReturns41 = {{0x80067ab8u}};
 inline constexpr std::array<u32, 1> kReturns42 = {{0x800693a8u}};
 inline constexpr std::array<u32, 1> kReturns43 = {{0x8016e9c4u}};
 inline constexpr std::array<u32, 1> kReturns44 = {{0x8016ebbcu}};
-inline constexpr std::array<FunctionIdentity, 45> kFunctions = { {
+inline constexpr std::array<u32, 1> kReturns45 = {{0x80015298u}};
+inline constexpr std::array<u32, 1> kReturns46 = {{0x800154b8u}};
+inline constexpr std::array<u32, 1> kReturns47 = {{0x80017aacu}};
+inline constexpr std::array<u32, 1> kReturns48 = {{0x8038ecd8u}};
+inline constexpr std::array<u32, 1> kReturns49 = {{0x8038f950u}};
+inline constexpr std::array<FunctionIdentity, 50> kFunctions = { {
   {"ARInit", 0x80350e9cu, 0x000000f4u, 0x7c0802a6u, 2, kReturns0.data(), static_cast<u32>(kReturns0.size()), "7ff72977174513f962039820909640d9d5597ee148341d914808c6f1a51e7098"},
   {"ARAlloc", 0x80350dc0u, 0x00000068u, 0x7c0802a6u, 1, kReturns1.data(), static_cast<u32>(kReturns1.size()), "b146a5c6dc168e35495b1c58171801b991ba8797901c28ffd0aa0729db38e51f"},
   {"ARFree", 0x80350e28u, 0x00000074u, 0x7c0802a6u, 1, kReturns2.data(), static_cast<u32>(kReturns2.size()), "dc307f4b3db9f125c7e75d32d40145c210521b077a3a447282abb62d3eaa4251"},
@@ -99,6 +104,11 @@ inline constexpr std::array<FunctionIdentity, 45> kFunctions = { {
   {"Fighter_Create", 0x80068e98u, 0x00000514u, 0x7c0802a6u, 1, kReturns42.data(), static_cast<u32>(kReturns42.size()), "f50b9d1de0aa4be8369fabfbf6c488c9f31a5e0abbb9046cad1b01e5d74bd448"},
   {"gm_Scene_Vs_OnEnter", 0x8016e934u, 0x00000094u, 0x7c0802a6u, 1, kReturns43.data(), static_cast<u32>(kReturns43.size()), "5243c130467b4409ec38235e0487329dde795fe21cea8ce94612f7522f4dd940"},
   {"gm_Scene_Vs_OnExit", 0x8016e9c8u, 0x000001f8u, 0x7c0802a6u, 1, kReturns44.data(), static_cast<u32>(kReturns44.size()), "b5bc15da8b120443b35036d6d49b7249119d517a09e7974accd28fc871919ce3"},
+  {"fn_80015184", 0x80015184u, 0x00000118u, 0x7c0802a6u, 2, kReturns45.data(), static_cast<u32>(kReturns45.size()), "f3b53d6a64562a5d80308b831dcab56b933cd266fa6b94b9aab90f127c195774"},
+  {"lbMemory_80015320", 0x80015320u, 0x0000019cu, 0x7c0802a6u, 4, kReturns46.data(), static_cast<u32>(kReturns46.size()), "cc99f2b34697144fdf29ca43f26642406e8c154b6d312b9246ce28fde595cd4d"},
+  {"lbDvd_80017A80", 0x80017a80u, 0x00000030u, 0x7c0802a6u, 1, kReturns47.data(), static_cast<u32>(kReturns47.size()), "9dd8e2c8ff8af3a65a6d4ebff1da716825954918a011d6f7981ed22cb2d91cc6"},
+  {"HSD_DevComARAMCallback", 0x8038ebccu, 0x00000110u, 0x7c0802a6u, 1, kReturns48.data(), static_cast<u32>(kReturns48.size()), "e537a493a3669043a944b6902da13395be397187d0c4e7ea96ecda7b17c1f1ea"},
+  {"HSD_DevComRequest", 0x8038f6d4u, 0x00000280u, 0x7c0802a6u, 8, kReturns49.data(), static_cast<u32>(kReturns49.size()), "219bba0d0b6aede387879888140d014f207907ac5d77b76dc0be792b0b166d77"},
 }};
 inline constexpr std::array<GlobalIdentity, 23> kGlobals = { {
   {"HeapArray", 0x804d7360u, 0x00000004u},
@@ -128,7 +138,7 @@ inline constexpr std::array<GlobalIdentity, 23> kGlobals = { {
 inline const BoundProfile kProfile{
   "08e0bf20134dfcb260699671004527b2d6bb1a45",
   "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
-  "a0f3a2fd0adca44d66e6425a8f575db6dcddf294164c42b1114560c4565931d2",
+  "302aa8dd3026a378f71ca4d68cb15415ff8da8609b3ce0b49a25639cb9f8012b",
   0x8000522cu,
   0x48000115u,
   kFunctions.data(), static_cast<u32>(kFunctions.size()),

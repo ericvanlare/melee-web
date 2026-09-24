@@ -1,0 +1,785 @@
+{
+  "schema": "melee-web-original-allocation-compaction",
+  "version": 1,
+  "date": "2026-09-24",
+  "scope": "Recorded-order allocation metadata from cold DOL entry through first original VS-entry return; address-only asynchronous compaction and fighter identity derivation.",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced",
+    "Retail compared"
+  ],
+  "scenario": {
+    "players": 4,
+    "fighter": "Mario",
+    "cpu_levels": [
+      9,
+      9,
+      9,
+      9
+    ],
+    "stocks": 4,
+    "stage": "Final Destination",
+    "route": "cold DOL boot through original CSS and SSS to first VS initialization",
+    "renderer": "Null",
+    "cpu": "JITARM64",
+    "speed": 2
+  },
+  "source": {
+    "melee_revision": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+    "dolphin_revision": "c77bbaa0f372c3f72281602a8b087206706542cb",
+    "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646"
+  },
+  "controller_input": {
+    "path": "work/session-equivalence-reference-v1/controller-input.mwri",
+    "bytes": 7207256,
+    "sha256": "f19e1a54a9aceda33217a1e272bc7ac0b78336bd243616a74f9573a9d8fbdcf5"
+  },
+  "profile": {
+    "path": "work/session-equivalence-allocation-profile-v2.json",
+    "bytes": 19963,
+    "sha256": "302aa8dd3026a378f71ca4d68cb15415ff8da8609b3ce0b49a25639cb9f8012b"
+  },
+  "build": {
+    "path": "work/session-equivalence-compaction-build-v1.json",
+    "bytes": 3934,
+    "sha256": "6815005b60802cc88fa4ce749c36b1b6e1a9d02d63d7f39979b55cd22984fe43"
+  },
+  "binary_sha256": "417e14b2c55b41a7f8f7c62c8a24b8018cb6b7a75c19e20e0c387f83b82dcc3e",
+  "captures": [
+    {
+      "allocation": {
+        "path": "work/session-equivalence-compaction-prefix-v1/allocations.jsonl",
+        "bytes": 121798607,
+        "sha256": "aca83517cb3be0727860ae78f5739177f5fe753391ace4af6a839916e65b63ef"
+      },
+      "result": {
+        "path": "work/session-equivalence-compaction-prefix-v1/result.json",
+        "bytes": 470,
+        "sha256": "b6783529eeb9a94205ce5584b9072420c21edde5b5535cf1d31628d301bc9a72"
+      },
+      "primary_prefix_comparison": {
+        "scope": "primary observation prefix only; full session unproven",
+        "compared_records": 6984,
+        "first_difference": null,
+        "terminal": {
+          "event": "end",
+          "payload": {
+            "status": "interrupted",
+            "natural": false
+          }
+        },
+        "prefix_sha256": "0afae82767e77cee94f2b66a7a8bde46275a5b932bea90be148450edabaad780",
+        "ignored_fields": [
+          "timestamp_ns",
+          "capture_id",
+          "sequence_id"
+        ],
+        "full_session_complete": false
+      }
+    },
+    {
+      "allocation": {
+        "path": "work/session-equivalence-compaction-prefix-v2/allocations.jsonl",
+        "bytes": 121798607,
+        "sha256": "aca83517cb3be0727860ae78f5739177f5fe753391ace4af6a839916e65b63ef"
+      },
+      "result": {
+        "path": "work/session-equivalence-compaction-prefix-v2/result.json",
+        "bytes": 471,
+        "sha256": "b8bc9932b487d86832f79ee3ba1024804069a15adbc9b97c4132cab23d0c7638"
+      },
+      "primary_prefix_comparison": {
+        "scope": "primary observation prefix only; full session unproven",
+        "compared_records": 6979,
+        "first_difference": null,
+        "terminal": {
+          "event": "end",
+          "payload": {
+            "status": "interrupted",
+            "natural": false
+          }
+        },
+        "prefix_sha256": "33b9aaeeb2dc7373cc487b14f96f095dc102df78ab7d60f4aef87a54a3822386",
+        "ignored_fields": [
+          "timestamp_ns",
+          "capture_id",
+          "sequence_id"
+        ],
+        "full_session_complete": false
+      }
+    }
+  ],
+  "equal_allocation_bytes": true,
+  "prior_profile_projection": {
+    "path": "work/session-equivalence-compaction-prefix-v1/original-allocation-projection-comparison.json",
+    "bytes": 516,
+    "sha256": "9191e90172a8f0282bbcc67f06cd5d9f4c2b2227fd22ee035a292049ec2fd8f4"
+  },
+  "replay": {
+    "status": "validated_prefix",
+    "scope": "allocation_lifetime_prefix",
+    "completion_scope": "vs_enter_prefix",
+    "complete": false,
+    "boundary_complete": true,
+    "ownership_complete": false,
+    "all_captured_calls_replayed": true,
+    "calls_replayed": 82518,
+    "calls_seen": 82518,
+    "model_actions": 72095,
+    "checked_wasm_matches_native": true,
+    "checked_wasm_problem": null,
+    "replay_hashes": {
+      "actions_sha256": "03c26a1f18b6f5b53a274a9aa7520ea7afb7eb60c952e969ca3d30dc637a985d",
+      "identities_sha256": "8ea5ed2db97061f587706c9866f89ec0d8756cf646ad3c1c4ec8afc473e728b7",
+      "outputs_sha256": "70780e671cc81757d8b90e0b9cf4b6d6c4cb106e544639790a01e990b2b96507"
+    },
+    "report": {
+      "path": "work/session-equivalence-compaction-prefix-v2/replay-final-v1.json",
+      "bytes": 29163799,
+      "sha256": "c4d7cda92ac4c85b387266a4309686746a434cb086cae44b3683c9dbf2973375"
+    },
+    "derived_allocation_identities": 40321,
+    "fighter_identities": [
+      {
+        "call": 68188,
+        "fighter": 2160507360,
+        "fighter_kind": 0,
+        "generation": 1,
+        "gobj": 2160507264,
+        "kind": "fighter_create",
+        "pool_generation": 1,
+        "sequence": 142153,
+        "slot": 0
+      },
+      {
+        "call": 71077,
+        "fighter": 2160750432,
+        "fighter_kind": 0,
+        "generation": 1,
+        "gobj": 2160750336,
+        "kind": "fighter_create",
+        "pool_generation": 1,
+        "sequence": 147443,
+        "slot": 1
+      },
+      {
+        "call": 73722,
+        "fighter": 2160990592,
+        "fighter_kind": 0,
+        "generation": 1,
+        "gobj": 2160990496,
+        "kind": "fighter_create",
+        "pool_generation": 1,
+        "sequence": 152729,
+        "slot": 2
+      },
+      {
+        "call": 76365,
+        "fighter": 2161229696,
+        "fighter_kind": 0,
+        "generation": 1,
+        "gobj": 2161229600,
+        "kind": "fighter_create",
+        "pool_generation": 1,
+        "sequence": 158019,
+        "slot": 3
+      }
+    ],
+    "first_unsupported": null
+  },
+  "comparison_fields": [
+    "SDK heap heads/sizes",
+    "HSD pool descriptors and refill/object identities",
+    "ARAM stack metadata",
+    "game heap and handle descriptors",
+    "compaction manager entry/return fields",
+    "DevCom request IDs and compaction transfer arguments",
+    "fighter pool generations and constructed fighter/GObj identities"
+  ],
+  "compaction_boundary_counts": {
+    "requests": 22,
+    "memory_callbacks": 10,
+    "RAM_alarm_chunks": 18,
+    "DVD_completions": 2
+  },
+  "source_context": {
+    "derivation": "owned_disc_apploader_and_dol_no_capture_inputs",
+    "identities": {
+      "apploader_sha256": "05e584735bb81f45e8506ee76fc1a78b143dc2f6dd3f2fc82b015010dc6448dd",
+      "bi2_sha256": "7294bc146d7ad38f7fd8b02038e563dc9380ff272b66e9bd215631def4fd6cec",
+      "disc_boot_header_sha256": "534aa103305522a5b4ac70acac2c38e8c672e8ca9a9c473311e8c46a7fcc0520",
+      "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+      "dolphin_boot_source_sha256": "ed6e86f6bb58b443a0e22e03dddaed22966bf5d7fb09a2d5de4130648e5479b5",
+      "dolphin_revision": "c77bbaa0f372c3f72281602a8b087206706542cb",
+      "source_revision": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+      "source_sha256": {
+        "extern/dolphin/src/dolphin/ar/ar.c": "dc2ad84463413ef6b91a8f8fe8acefb26ed35743d63dd85bf6590cec28d95cc8",
+        "extern/dolphin/src/dolphin/os/OS.c": "bd7e8934d81b31bb48c92c1ef7bbf104ce8a203142915895491ad607c2d95203",
+        "extern/dolphin/src/dolphin/os/OSAlloc.c": "5868c5806827534297e0b8f3dca1eff89d70b8caa1ed6f8b18914023aaba1df8",
+        "src/melee/db/dberror.c": "72d6faae47d1eddb1a1dbb1f18b3d2131269f389095e8fbf7b900a3ff07cb14d",
+        "src/melee/ef/efasync.c": "56eb819c15045f7d2f33d67cf030aa1b8ab20fc84d122e1568ac4b1a314fa3bd",
+        "src/melee/ef/efdata.c": "dbeba19f81d237dd752a081e318dc2d27404c5e7be71effd3ecbfbbc9e45a044",
+        "src/melee/ft/fighter.c": "41cdefd477ba20c6c4a7ab9643ed0916305be38dbc1c0d8af281c36732963b7f",
+        "src/melee/gm/gmmain.c": "88803337a230b1b9cff6c211c501e6fc05b18a58ef6d4de0756dab4454209a69",
+        "src/melee/if/textlib_1.c": "e219685daaa43522af77fc1fac7a1aaab4dcb91a1daf98ab91d311e91a7260ca",
+        "src/melee/it/item.c": "e3bc13c32430f98884199ebc9e3d2b5951d57a17d552b2e7b815cd25b77f26d5",
+        "src/melee/lb/lb_0219.c": "c0c58d40bcbb2ffa901a1bea284943a51852fdb1620e073e68a350f1c966989b",
+        "src/melee/lb/lbaudio_ax.static.h": "9db87e298a942ac3b7a5f047b0dbba6c31a9939e3128a4a29676e7dae409578e",
+        "src/melee/lb/lbheap.c": "01c80d426e5b53659b5b430493b51d8d46a21f88840ac9a17dba769a6a14b96e",
+        "src/melee/lb/lbmemory.c": "ae5d116c931db0788f8532014ad0ab7009c5a711ced6028302e4c97573126fc2",
+        "src/melee/pl/player.c": "1d3bf43ad9071026f5c7bb056a8227cb2c29c9a33b922411142bd371abb623e4",
+        "src/sysdolphin/baselib/aobj.c": "3a99a90a0bf63b4c11f3b08ffa1bb087a3667db20499fa93a7e470d6bcb4a3d4",
+        "src/sysdolphin/baselib/devcom.c": "aea7c93eb7be895f2c159568e0a9a1ed91f914aad5ed11130aa677c02d1d18cb",
+        "src/sysdolphin/baselib/displayfunc.c": "2522b6aaaf0ff9cdc14c2da6bb688d9133c79722e67b1497f54a2a0600262fd0",
+        "src/sysdolphin/baselib/fobj.c": "fa24a983f583ce31e0f8c809fe9084d4df7c5c4eb57be2d8a044537f790f32e9",
+        "src/sysdolphin/baselib/generator.c": "ab5b2b19222a24f9d4b030c7f64653da756c8fd8be6413952f8ac91f68300884",
+        "src/sysdolphin/baselib/generator.h": "86e83045581c39dccfe1aa8278ea11066431f5df8a1342cbfc3eef20332b1456",
+        "src/sysdolphin/baselib/gobj.c": "a8eb5cd248fac8a0e0f3f8d0491c91efbf185329655e2042ba1250c7883de75c",
+        "src/sysdolphin/baselib/id.c": "4a97a6c75c848ca98f01298aa9a8c15715dfba597ef0c644c2779310a3a2e3bc",
+        "src/sysdolphin/baselib/initialize.c": "396cf5e84a310cf8e6f0f29db4f3419b63c0ea2c57aacbb7b2a01fe413d6d28d",
+        "src/sysdolphin/baselib/list.c": "254624d5a0725954bdd67babfb78b7a9422dd14e42e034028e512557da2b8daf",
+        "src/sysdolphin/baselib/mtx.c": "f310c0e473efa52037f5ddaaaa415f1b705915c853b3a071241ede2a548941ac",
+        "src/sysdolphin/baselib/objalloc.h": "b38e62a6ecfc35fb5f05b0987d7b3479787d2010af23eb37a11d7bfc6027d3f3",
+        "src/sysdolphin/baselib/particle.c": "12857a1954beef2167cbd4160ff5592487273462fecdae651df406d679a7af8f",
+        "src/sysdolphin/baselib/psappsrt.c": "7ed3ff2a4d270a51e06f6ff86961d6ec1ee4d7510d11e33eb06e023db86561db",
+        "src/sysdolphin/baselib/robj.c": "ba5a6c39f94473fc6525c7dcc71ba3fe9e1f5d74bb6896c35847cf76f91a7697",
+        "src/sysdolphin/baselib/shadow.c": "07c16c48bd1a987ae91385c0f0c81037a1c7d07de56ed72bd87269ede03e939c",
+        "src/sysdolphin/baselib/sobjlib.c": "9a4919f99937544cdd4b6f1015bf60e5cafd622b82b0159c957299200fa3a5aa",
+        "src/sysdolphin/baselib/tev.c": "45b020ccce8ce5a094c27b9827242e8a0778cf23bf92cfb87340dfbca78c22e3"
+      },
+      "symbols_sha256": "214477d5b27989a9675c4b881f4db2dad5eeaada39dbac17c57c70d5ba84d579"
+    },
+    "pool_inventory": {
+      "object_size": 44,
+      "object_type": "HSD_ObjAllocData",
+      "pools": {
+        "HSD_Mtx_804C2310": {
+          "address": 2152473360,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 10,
+          "declaration_source": "sysdolphin/baselib/mtx.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "HSD_Mtx_804C233C": {
+          "address": 2152473404,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 11,
+          "declaration_source": "sysdolphin/baselib/mtx.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "HSD_PSAppSrt_804D10B0": {
+          "address": 2152534192,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 10,
+          "declaration_source": "sysdolphin/baselib/psappsrt.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "HSD_SObjLib_804D10E0": {
+          "address": 2152534240,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 30,
+          "declaration_source": "sysdolphin/baselib/sobjlib.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "Player_AllocData": {
+          "address": 2152040416,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 81,
+          "declaration_source": "melee/pl/player.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "aobj_alloc_data": {
+          "address": 2152466560,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 21,
+          "declaration_source": "sysdolphin/baselib/aobj.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "chan_alloc_data": {
+          "address": 2152466512,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 22,
+          "declaration_source": "sysdolphin/baselib/tev.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "dlist_alloc_data": {
+          "address": 2152474028,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 10,
+          "declaration_source": "sysdolphin/baselib/list.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "efAsync_AllocData": {
+          "address": 2152042400,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 21,
+          "declaration_source": "melee/ef/efasync.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "efLib_AllocData": {
+          "address": 2152042160,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 3,
+          "declaration_source": "melee/ef/efdata.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "fighter_alloc_data": {
+          "address": 2152042448,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 103,
+          "declaration_source": "melee/ft/fighter.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "fighter_dat_attrs_alloc_data": {
+          "address": 2152042492,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 104,
+          "declaration_source": "melee/ft/fighter.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "fighter_dobj_list_alloc_data": {
+          "address": 2152042580,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 106,
+          "declaration_source": "melee/ft/fighter.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "fighter_parts_alloc_data": {
+          "address": 2152042536,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 105,
+          "declaration_source": "melee/ft/fighter.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "fighter_x2040_alloc_data": {
+          "address": 2152042624,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 107,
+          "declaration_source": "melee/ft/fighter.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "fighter_x59C_alloc_data": {
+          "address": 2152042668,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 108,
+          "declaration_source": "melee/ft/fighter.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "fobj_alloc_data": {
+          "address": 2152466648,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 8,
+          "declaration_source": "sysdolphin/baselib/fobj.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "gobj_alloc_data": {
+          "address": 2152522636,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 273,
+          "declaration_source": "sysdolphin/baselib/gobj.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "gobjproc_alloc_data": {
+          "address": 2152522680,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 272,
+          "declaration_source": "sysdolphin/baselib/gobj.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "hsd_804D0F60": {
+          "address": 2152533856,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 59,
+          "declaration_source": "sysdolphin/baselib/particle.c",
+          "declaration_type": "hsd_804D0F60_t",
+          "storage_size": 48,
+          "type_source": "sysdolphin/baselib/generator.h"
+        },
+        "hsd_804D0F90": {
+          "address": 2152533904,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 20,
+          "declaration_source": "sysdolphin/baselib/generator.c",
+          "declaration_type": "hsd_804D0F60_t",
+          "storage_size": 48,
+          "type_source": "sysdolphin/baselib/generator.h"
+        },
+        "hsd_iddata": {
+          "address": 2152473536,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 7,
+          "declaration_source": "sysdolphin/baselib/id.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "item_alloc_data": {
+          "address": 2152336352,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 101,
+          "declaration_source": "melee/it/item.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "item_dynamic_bones_alloc_data": {
+          "address": 2152336396,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 103,
+          "declaration_source": "melee/it/item.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "item_link_alloc_data": {
+          "address": 2152336440,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 105,
+          "declaration_source": "melee/it/item.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "lbl_804336A0": {
+          "address": 2151888544,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 25,
+          "declaration_source": "melee/lb/lb_0219.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "lbl_80433710": {
+          "address": 2151888656,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 88,
+          "declaration_source": "melee/lb/lbaudio_ax.static.h",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "render_alloc_data": {
+          "address": 2152466424,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 20,
+          "declaration_source": "sysdolphin/baselib/tev.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "robj_alloc_data": {
+          "address": 2152473448,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 20,
+          "declaration_source": "sysdolphin/baselib/robj.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "rvalue_alloc_data": {
+          "address": 2152473492,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 21,
+          "declaration_source": "sysdolphin/baselib/robj.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "shadow_alloc_data": {
+          "address": 2152474072,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 24,
+          "declaration_source": "sysdolphin/baselib/shadow.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "slist_alloc_data": {
+          "address": 2152473984,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 9,
+          "declaration_source": "sysdolphin/baselib/list.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "tevreg_alloc_data": {
+          "address": 2152466468,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 21,
+          "declaration_source": "sysdolphin/baselib/tev.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "un_804A2688": {
+          "address": 2152343176,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 22,
+          "declaration_source": "melee/if/textlib_1.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        },
+        "zlist_alloc_data": {
+          "address": 2152466712,
+          "data_offset": 0,
+          "data_size": 44,
+          "declaration_line": 34,
+          "declaration_source": "sysdolphin/baselib/displayfunc.c",
+          "declaration_type": "HSD_ObjAllocData",
+          "storage_size": 44,
+          "type_source": "sysdolphin/baselib/objalloc.h"
+        }
+      },
+      "schema": "melee-web-source-pool-inventory",
+      "source_files": [
+        {
+          "path": "melee/ef/efasync.c",
+          "sha256": "56eb819c15045f7d2f33d67cf030aa1b8ab20fc84d122e1568ac4b1a314fa3bd"
+        },
+        {
+          "path": "melee/ef/efdata.c",
+          "sha256": "dbeba19f81d237dd752a081e318dc2d27404c5e7be71effd3ecbfbbc9e45a044"
+        },
+        {
+          "path": "melee/ft/fighter.c",
+          "sha256": "41cdefd477ba20c6c4a7ab9643ed0916305be38dbc1c0d8af281c36732963b7f"
+        },
+        {
+          "path": "melee/if/textlib_1.c",
+          "sha256": "e219685daaa43522af77fc1fac7a1aaab4dcb91a1daf98ab91d311e91a7260ca"
+        },
+        {
+          "path": "melee/it/item.c",
+          "sha256": "e3bc13c32430f98884199ebc9e3d2b5951d57a17d552b2e7b815cd25b77f26d5"
+        },
+        {
+          "path": "melee/lb/lb_0219.c",
+          "sha256": "c0c58d40bcbb2ffa901a1bea284943a51852fdb1620e073e68a350f1c966989b"
+        },
+        {
+          "path": "melee/lb/lbaudio_ax.static.h",
+          "sha256": "9db87e298a942ac3b7a5f047b0dbba6c31a9939e3128a4a29676e7dae409578e"
+        },
+        {
+          "path": "melee/pl/player.c",
+          "sha256": "1d3bf43ad9071026f5c7bb056a8227cb2c29c9a33b922411142bd371abb623e4"
+        },
+        {
+          "path": "sysdolphin/baselib/aobj.c",
+          "sha256": "3a99a90a0bf63b4c11f3b08ffa1bb087a3667db20499fa93a7e470d6bcb4a3d4"
+        },
+        {
+          "path": "sysdolphin/baselib/displayfunc.c",
+          "sha256": "2522b6aaaf0ff9cdc14c2da6bb688d9133c79722e67b1497f54a2a0600262fd0"
+        },
+        {
+          "path": "sysdolphin/baselib/fobj.c",
+          "sha256": "fa24a983f583ce31e0f8c809fe9084d4df7c5c4eb57be2d8a044537f790f32e9"
+        },
+        {
+          "path": "sysdolphin/baselib/generator.c",
+          "sha256": "ab5b2b19222a24f9d4b030c7f64653da756c8fd8be6413952f8ac91f68300884"
+        },
+        {
+          "path": "sysdolphin/baselib/generator.h",
+          "sha256": "86e83045581c39dccfe1aa8278ea11066431f5df8a1342cbfc3eef20332b1456"
+        },
+        {
+          "path": "sysdolphin/baselib/gobj.c",
+          "sha256": "a8eb5cd248fac8a0e0f3f8d0491c91efbf185329655e2042ba1250c7883de75c"
+        },
+        {
+          "path": "sysdolphin/baselib/id.c",
+          "sha256": "4a97a6c75c848ca98f01298aa9a8c15715dfba597ef0c644c2779310a3a2e3bc"
+        },
+        {
+          "path": "sysdolphin/baselib/list.c",
+          "sha256": "254624d5a0725954bdd67babfb78b7a9422dd14e42e034028e512557da2b8daf"
+        },
+        {
+          "path": "sysdolphin/baselib/mtx.c",
+          "sha256": "f310c0e473efa52037f5ddaaaa415f1b705915c853b3a071241ede2a548941ac"
+        },
+        {
+          "path": "sysdolphin/baselib/objalloc.h",
+          "sha256": "b38e62a6ecfc35fb5f05b0987d7b3479787d2010af23eb37a11d7bfc6027d3f3"
+        },
+        {
+          "path": "sysdolphin/baselib/particle.c",
+          "sha256": "12857a1954beef2167cbd4160ff5592487273462fecdae651df406d679a7af8f"
+        },
+        {
+          "path": "sysdolphin/baselib/psappsrt.c",
+          "sha256": "7ed3ff2a4d270a51e06f6ff86961d6ec1ee4d7510d11e33eb06e023db86561db"
+        },
+        {
+          "path": "sysdolphin/baselib/robj.c",
+          "sha256": "ba5a6c39f94473fc6525c7dcc71ba3fe9e1f5d74bb6896c35847cf76f91a7697"
+        },
+        {
+          "path": "sysdolphin/baselib/shadow.c",
+          "sha256": "07c16c48bd1a987ae91385c0f0c81037a1c7d07de56ed72bd87269ede03e939c"
+        },
+        {
+          "path": "sysdolphin/baselib/sobjlib.c",
+          "sha256": "9a4919f99937544cdd4b6f1015bf60e5cafd622b82b0159c957299200fa3a5aa"
+        },
+        {
+          "path": "sysdolphin/baselib/tev.c",
+          "sha256": "45b020ccce8ce5a094c27b9827242e8a0778cf23bf92cfb87340dfbca78c22e3"
+        }
+      ],
+      "symbols_sha256": "214477d5b27989a9675c4b881f4db2dad5eeaada39dbac17c57c70d5ba84d579",
+      "version": 1
+    }
+  },
+  "validation": {
+    "full_suite": {
+      "tests": 1316,
+      "passed": 1225,
+      "optional_skips": 91,
+      "seconds": 265.878,
+      "log": {
+        "path": "work/session-equivalence-compaction-full-suite-v1.log",
+        "bytes": 235263,
+        "sha256": "ab0b86f96436f86f4b43ec3f0126254dcc19f153aa91365b1bdb889f369c6b54"
+      },
+      "note": "Full suite started before final source-pool inventory integration; final context tests and complete checked replay separately validate that integration."
+    },
+    "final_context_tests": {
+      "tests": 13,
+      "result": "pass",
+      "log": {
+        "path": "work/session-equivalence-compaction-context-tests-v1.log",
+        "bytes": 2322,
+        "sha256": "f597aa83f1fcaa4903e9c52c78157ecf899a44a88ea004651f61fb97163c6c36"
+      }
+    },
+    "lifetime_tests": {
+      "tests": 25,
+      "result": "pass",
+      "log": {
+        "path": "work/session-equivalence-compaction-replay-tests-v5.log",
+        "bytes": 4915,
+        "sha256": "9585bba77b21ed5ef467d74e4ad45f0f428c2307aece62a3c04077b2c8b86d3f"
+      }
+    },
+    "component_tests": {
+      "tests": 28,
+      "result": "pass",
+      "log": {
+        "path": "work/session-equivalence-compaction-components-v1.log",
+        "bytes": 5009,
+        "sha256": "a0db507a6062c2471a4eb6efcb4be384e3d8bca057af9de761167f01dacf8553"
+      }
+    }
+  },
+  "retained_failures": [
+    {
+      "path": "work/session-equivalence-compaction-prefix-v1/replay-exploratory-v1.json",
+      "reason": "Profile decoder rejected new version before callback replay."
+    },
+    {
+      "path": "work/session-equivalence-compaction-prefix-v1/replay-exploratory-v2.json",
+      "reason": "Compaction wrapper lacked a derived heap owner; reduced original prefix and source-shaped owner binding added."
+    },
+    {
+      "path": "work/session-equivalence-compaction-prefix-v1/replay-exploratory-v3.json",
+      "reason": "Nested no-op compaction inside DVD completion replaced global state before return; fixed with per-call entry tokens and regression."
+    },
+    {
+      "path": "work/session-equivalence-compaction-prefix-v1/replay-checked-v1.json",
+      "reason": "Size-only pool inventory omitted embedded allocator members; replaced by source declaration inventory."
+    },
+    {
+      "path": "work/session-equivalence-compaction-replay-tests-v2.log",
+      "reason": "Intermediate replay edit had an indentation error; corrected before tests and capture replay."
+    }
+  ],
+  "not_established": [
+    "Copied payload contents",
+    "DevCom transport scheduling",
+    "Repeated fighter ownership and teardown",
+    "Runtime source address provider or register carry",
+    "Full-session browser equivalence",
+    "Pixels or PCM equivalence",
+    "Live timing or foreground performance"
+  ],
+  "deployed": false,
+  "artifact_paths": "Relative to lead checkout; original data, captures and binaries remain ignored."
+}

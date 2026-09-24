@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
 from tools.allocation_history_replay import (
-    ModelDriver, ReplayProblem, load_trace, parse_u32, replay, validate_boot_observation,
+    ModelDriver, ReplayProblem, load_profile, load_trace, parse_u32, replay, validate_boot_observation,
 )
 
 
@@ -44,6 +44,20 @@ class AllocationHistoryReplayTests(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.temp.cleanup()
+
+    def test_profile_versions_accept_legacy_and_callback_coverage_only(self):
+        path = self.root / "profile-version.json"
+        for version in (1, 2, 3, True, None, "2"):
+            with self.subTest(version=version):
+                path.write_text(json.dumps({
+                    "schema": "melee-web-original-allocation-profile",
+                    "version": version, "functions": [],
+                }))
+                if type(version) is int and version in (1, 2):
+                    self.assertEqual(load_profile(path)["version"], version)
+                else:
+                    with self.assertRaises(ReplayProblem):
+                        load_profile(path)
 
     def profile(self):
         profile = {

@@ -297,7 +297,8 @@ def load_profile(path: Path) -> dict[str, Any]:
         raise ReplayProblem("input", f"cannot read allocation profile {path}: {error}") from error
     if not isinstance(value, dict) or value.get("schema") != "melee-web-original-allocation-profile":
         raise ReplayProblem("input", "unsupported allocation profile schema")
-    if value.get("version") != 1 or not isinstance(value.get("functions"), list):
+    if (type(value.get("version")) is not int or value["version"] not in (1, 2)
+            or not isinstance(value.get("functions"), list)):
         raise ReplayProblem("input", "unsupported allocation profile version")
     return value
 
