@@ -1,0 +1,17 @@
+{
+  "name": "main updates only by ericvanlare through pull requests",
+  "target": "branch",
+  "enforcement": "active",
+  "bypass_actors": [
+    {"actor_id": 1350618, "actor_type": "User", "bypass_mode": "pull_request"}
+  ],
+  "conditions": {
+    "ref_name": {"include": ["refs/heads/main"], "exclude": []}
+  },
+  "rules": [
+    {"type": "creation"},
+    {"type": "update", "parameters": {"update_allows_fetch_and_merge": false}},
+    {"type": "deletion"},
+    {"type": "non_fast_forward"}
+  ]
+}

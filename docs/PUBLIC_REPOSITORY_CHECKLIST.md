@@ -1,20 +1,23 @@
 # Public repository readiness checklist
 
 This is the working checklist for [issue #2](https://github.com/ericvanlare/melee-web/issues/2).
-It prepares the repository for public visibility and contributions. Changing
-visibility remains a separate owner action; this checklist does not authorize
+The owner authorized the [public transition](PUBLICATION_CUTOVER.md) on
+September 25, 2026 UTC; the repository is now public. The
+[cutover receipt](evidence/publication-cutover-v1.json) records the settings and
+verification scope. This checklist does not authorize
 deployment, history rewriting, or deletion of evidence.
 
 The starting review was conducted on September 20, 2026 against GitHub `main`
 at [`2c2b687f5bb7dbfcb3c75dc0394c04bb97f2114d`](https://github.com/ericvanlare/melee-web/commit/2c2b687f5bb7dbfcb3c75dc0394c04bb97f2114d).
-Observations below describe that checkpoint. Recheck the eventual publication
-commit and live repository settings before closing the checklist.
+Historical inventory sections retain that checkpoint's scope. The cutover
+record above supplies the later publication commit and applied settings.
 
 The [post-handoff publication checkpoint](PUBLICATION_CHECKPOINT.md) refreshes
 history, GitHub-content, source provenance and controls after PR #79 merged and
 runtime work stopped. It continues the [September 24 preparation](PUBLICATION_PRE_FREEZE.md).
-Its receipts are a baseline for the remaining delta audit; they do not check
-off the final freeze, visibility or activation steps below.
+Its receipts preserve the pre-opening baseline. The later
+[cutover record](PUBLICATION_CUTOVER.md) supports the completed freeze,
+visibility and activation steps below.
 
 Public package audits cover selected deployment files. Repository publication
 also exposes source, patches, reference tools, generated material, reachable
@@ -36,8 +39,8 @@ owner later wants it.
 
 The [history review](REPOSITORY_HISTORY_AUDIT.md),
 [GitHub-surface audit](GITHUB_PUBLICATION_AUDIT.md), and
-[cutover procedure](PUBLICATION_CUTOVER.md) distinguish completed preparation
-from activation and final verification. No visibility change is recorded here.
+[cutover record](PUBLICATION_CUTOVER.md) distinguish historical preparation
+from the completed visibility change and applied controls.
 
 Suggested sequence: ownership and license inventory; audio disposition;
 repository safeguards and contributor documents; preparation of GitHub controls;
@@ -139,7 +142,7 @@ They do not scan all tracked repository content or all historical branches.
 The [guard and exception guide](REPOSITORY_CONTENT_CHECK.md) documents the
 implemented snapshot boundary, exact hash policy, focused real-Git tests and
 limits. [Verify](../.github/workflows/verify.yml) includes the guard in the
-`browser-build` aggregate; requiring that aggregate in GitHub is still open in
+`browser-build` aggregate, now required by the applied main protection in
 section 5. A passing content exception does not establish licensing clearance.
 The earlier missing-dependency failures are retained under ignored
 `work/public-readiness/safeguards-first-pass/`. After bootstrapping the pinned
@@ -154,9 +157,8 @@ hashes; raw logs remain under `work/public-readiness/final-validation/`.
 The initial reviewed tree had no contributor or security-reporting documents.
 [CONTRIBUTING.md](../CONTRIBUTING.md) and the
 [PR template](../.github/pull_request_template.md) now cover the contribution
-workflow. [SECURITY.md](../SECURITY.md) selects GitHub private vulnerability
-reporting and accurately states its current availability limit. Activation and
-verification remain public-cutover steps.
+workflow. [SECURITY.md](../SECURITY.md) selects the enabled GitHub private
+vulnerability-reporting route and links the observed verification scope.
 
 - [x] Add `CONTRIBUTING.md` with supported prerequisites and setup/build/test
   commands, linking to [build and play](BUILD_AND_PLAY.md) and
@@ -169,10 +171,11 @@ verification remain public-cutover steps.
   source/provenance basis, and validation results and limitations.
 - [x] Prepare `SECURITY.md` for native/Wasm asset-parser and other vulnerabilities,
   selecting GitHub's private reporting form without inventing an inbox.
-- [ ] Verify the reporting mechanism is enabled and usable; the prepared policy
-  is not evidence that the private reporting form is available.
-- [ ] If selecting GitHub private vulnerability reporting, prepare the policy
-  and enable/verify the feature during public cutover. See
+- [x] Verify private reporting is enabled, the public reporting button is present,
+  and it directs an anonymous visitor to GitHub sign-in for the private form.
+  The authenticated form/submission and email delivery were not exercised;
+  the owner subscription is enabled and not ignored.
+- [x] Enable and read back private vulnerability reporting during public cutover. See
   [GitHub's reporting setup](https://docs.github.com/en/code-security/how-tos/report-and-fix-vulnerabilities/configure-vulnerability-reporting/configure-for-a-repository).
 
 ## 5. GitHub controls for public contributions
@@ -183,14 +186,13 @@ queried for a private repository. Read-only default workflow permissions and
 SHA-pinned actions were already configured.
 
 - [x] Prepare [concrete main/fork/workflow policies](PUBLICATION_CUTOVER.md).
-- [ ] Enable `main` protection: require the aggregate
+- [x] Enable `main` protection: require the aggregate
   `browser-build` check, restrict force pushes and deletion, and choose an
   appropriate reviewed-change policy.
-- [ ] Verify protections through GitHub after configuring them. Use an eligible
-  plan beforehand or make activation and verification explicit cutover steps.
-- [ ] Choose and verify approval requirements for external fork workflows once
-  the public-repository settings become available.
-- [ ] Verify the [reviewed cached workflow](COMPILER_CACHE_REVIEW.md), then
+- [x] Read back active main protection and the separate exact-user access
+  ruleset. Only `ericvanlare` may merge through PRs; required CI still applies.
+- [x] Require approval for all external contributors' fork workflows.
+- [x] Verify the [reviewed cached workflow](COMPILER_CACHE_REVIEW.md), then
   quiesce Actions and remove old private compiler caches before visibility
   changes. Preserve cache metadata and retained logs/reports; verify the cache
   inventory is empty before re-enabling public CI. Future compiler caching
@@ -200,7 +202,7 @@ SHA-pinned actions were already configured.
   external services.
 - [x] Verify the guard is included in the `browser-build` dependency gate and
   that the gate rejects failed/skipped dependencies. Making the aggregate
-  required through GitHub still needs the activation steps above.
+  required through GitHub is covered by the applied readback above.
 
 ## 6. Final publication checkpoint and cutover
 
@@ -214,7 +216,7 @@ their payloads are outside the zero-findings claim. This is a bounded review,
 not comprehensive legal/security clearance. Recheck new material at the final
 publication checkpoint, including CI generated after this inventory.
 
-- [ ] Freeze the intended publication commit and list all branches, tags,
+- [x] Freeze the intended publication commit and list all branches, tags,
   reachable history, and other repository surfaces that will become public.
 - [x] Audit the recorded source/history and GitHub checkpoint for game inputs,
   secrets, personal paths and provenance gaps; scope, unavailable expired
@@ -224,13 +226,13 @@ publication checkpoint, including CI generated after this inventory.
   Use the verified account's noreply identity for this pass's new commit without
   changing another worktree's configuration. Existing addresses remain in
   history as documented in the cutover decision.
-- [ ] Validate the final code checkpoint using its applicable tests/builds and
+- [x] Validate the final code checkpoint using its applicable tests/builds and
   retain CI evidence. Keep README and evidence links accurate for that commit;
   preserve experimental status and the separate accuracy/performance gates.
-- [ ] Reconcile issue #2 with this checklist, link completed work and decisions,
+- [x] Reconcile issue #2 with this checklist, link completed work and decisions,
   and record deliberate deferrals. Keep [STATUS.md](../STATUS.md) as the current
   gameplay evidence index rather than duplicating its measurements here.
-- [ ] Record the owner's separate visibility decision. During cutover, activate
+- [x] Record the owner's separate visibility decision. During cutover, activate
   and verify the protections, fork approvals, and reporting features that were
   unavailable while private.
 

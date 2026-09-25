@@ -1,13 +1,14 @@
 # Current status
 
-## Repository publication preparation
+## Repository public; main changes restricted to the owner
 
-The [publication checkpoint](docs/PUBLICATION_CHECKPOINT.md) refreshes source,
-history, GitHub-content and controls evidence after the runtime work stopped
-and PR #79 merged. Final preparation integration, the frozen publication
-inventory and the authorized visibility transition remain separate steps. The
-repository is still private; this is not gameplay admission or a new hosted/native
-release.
+The [publication record](docs/PUBLICATION_CUTOVER.md) and
+[cutover receipt](docs/evidence/publication-cutover-v1.json) record the authorized
+public transition after the final audit. Only `ericvanlare` can merge into
+`main`, through PRs with current required CI; direct updates, force pushes and
+deletion are blocked. Private-era caches were cleared, and reporting and
+contribution controls were enabled. This changes no gameplay admission or
+hosted/native release scope.
 
 ## Audio and memory fixture complete; equivalence investigation paused
 

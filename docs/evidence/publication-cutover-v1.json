@@ -1,0 +1,298 @@
+{
+  "schema": "melee-web-publication-cutover-v1",
+  "observed_at_utc": "2026-09-25T02:55:46.390393+00:00",
+  "repository": "ericvanlare/melee-web",
+  "visibility": "public",
+  "publication_commit": "7d3a8a7e1b0d9bd0e2ed840982010abb65ef9213",
+  "publication_ci": {
+    "run_id": 36080615358,
+    "url": "https://github.com/ericvanlare/melee-web/actions/runs/36080615358",
+    "conclusion": "success",
+    "required_check": "browser-build",
+    "app_id": 15368
+  },
+  "authorization": "Owner explicitly approved publication and required only their account, including agents acting as that account, to change main.",
+  "pre_cutover_delta": {
+    "remote_refs_unchanged": 126,
+    "workflow_run_identities_unchanged": 599,
+    "artifact_digests_unchanged": 2059,
+    "issue_comments_unchanged": 9,
+    "new_issue_records": 0,
+    "releases": 0,
+    "only_issue_text_delta": "previously retained and scanned issue #2 final checkpoint update"
+  },
+  "access": {
+    "owner": "ericvanlare",
+    "owner_user_id": 1350618,
+    "collaborators": [
+      "ericvanlare"
+    ],
+    "pending_invitations": 0,
+    "deploy_keys": 0,
+    "webhooks": 0,
+    "ruleset_id": 23976041,
+    "ruleset_url": "https://github.com/ericvanlare/melee-web/rules/23976041",
+    "target": [
+      "refs/heads/main"
+    ],
+    "enforcement": "active",
+    "bypass_actors": [
+      {
+        "actor_id": 1350618,
+        "actor_type": "User",
+        "bypass_mode": "pull_request"
+      }
+    ],
+    "current_user_can_bypass": "pull_requests_only",
+    "rules": [
+      "creation",
+      "update",
+      "deletion",
+      "non_fast_forward"
+    ],
+    "apps_teams_roles_deploy_keys_on_bypass_list": 0,
+    "integration_inventory_limit": "The gh OAuth credential cannot enumerate all GitHub App installations. No integration is granted a bypass; owner-authorized credentials can administer repository settings."
+  },
+  "main_protection": {
+    "pull_requests_required": true,
+    "required_approving_review_count": 0,
+    "required_status_checks": {
+      "strict": true,
+      "checks": [
+        {
+          "context": "browser-build",
+          "app_id": 15368
+        }
+      ]
+    },
+    "enforce_admins": true,
+    "conversation_resolution": true,
+    "force_pushes": false,
+    "deletions": false,
+    "direct_update_test": {
+      "kind": "owner-authenticated no-op REST ref update to current main SHA",
+      "result": "rejected",
+      "http_status": 422,
+      "message": "Changes must be made through a pull request.",
+      "main_unchanged": true
+    },
+    "pending_ci_merge_test": {
+      "pull_request": 80,
+      "head_commit": "3378d03ef5ea1f34eeca863b61f296f56cda5a0a",
+      "result": "rejected",
+      "http_status": 405,
+      "message": "Required status check \"browser-build\" is expected.",
+      "pull_request_remained_open": true
+    }
+  },
+  "cache_cleanup": {
+    "observed_at": "2026-09-25T02:47:31.976879+00:00",
+    "actions_disabled_verified": true,
+    "active_runs": 0,
+    "deleted_cache_entries": 58,
+    "deleted_cache_bytes": 10669478371,
+    "remaining_cache_entries": 0,
+    "logs_and_artifacts_deleted": false
+  },
+  "actions": {
+    "enabled": true,
+    "allowed_actions": "all",
+    "sha_pinning_required": true,
+    "default_workflow_permissions": "read",
+    "can_approve_pull_request_reviews": false,
+    "external_fork_workflow_approval": "all_external_contributors",
+    "review": "Only pull_request verification plus owner-controlled manual/release workflow; no pull_request_target, workflow_run, deployment secrets, OIDC or write token in the inspected workflows."
+  },
+  "security": {
+    "private_vulnerability_reporting": true,
+    "secret_scanning": "enabled",
+    "secret_scanning_push_protection": "enabled",
+    "dependency_alerts": "enabled",
+    "owner_subscription": {
+      "subscribed": true,
+      "ignored": false,
+      "scope": "all repository activity"
+    },
+    "reporting_browser": {
+      "browser": "installed Chrome",
+      "headless": true,
+      "report_submitted": false,
+      "security_page_status": 200,
+      "reporting_href": "/ericvanlare/melee-web/security/advisories/new",
+      "reporting_destination": "https://github.com/login?return_to=https%3A%2F%2Fgithub.com%2Fericvanlare%2Fmelee-web%2Fsecurity%2Fadvisories%2Fnew",
+      "login_required": true,
+      "private_form_visible": false,
+      "scope": "Anonymous public reporting link and authenticated-entry redirect verified; no authenticated report was created or submitted."
+    },
+    "authenticated_form_or_submission_exercised": false,
+    "email_preferences_or_delivery_verified": false,
+    "open_secret_alerts_at_check": 0,
+    "open_dependency_alerts_at_check": 0,
+    "dependency_alerts_readback_http_status": 204
+  },
+  "retained_failures": [
+    {
+      "path": "work/publication-cutover-20260925/main-protection-write.json",
+      "disposition": "GitHub API rejected simultaneous contexts and checks in the prepared payload; corrected policy uses checks only and was applied/read back."
+    },
+    {
+      "path": "work/publication-cutover-20260925/reporting-browser-failure.json",
+      "disposition": "Initial browser assertion ran before client navigation completed. The corrected probe waits for the destination URL and input, and passed headlessly."
+    }
+  ],
+  "normalization_note": "GitHub omits the explicitly false update_allows_fetch_and_merge field in its ruleset readback. No true exception is present, and this repository has no upstream fork.",
+  "followup": "Issue #2 now records the public transition and explicit verification limits. This documentation/policy PR must pass required CI under the new protections. Its resulting main SHA and final issue closure are retained after merge without changing this historical publication receipt.",
+  "limits": [
+    "The preceding bounded publication audits and accepted source/license limits still apply, including 392 expired artifact payloads that were unavailable.",
+    "This is no claim of universal security, third-party permission or new gameplay/binary-release validation.",
+    "The reporting check verifies the public button and sign-in destination plus enabled API state. It does not exercise an authenticated advisory form, submit a report or verify email delivery.",
+    "Only credentials acting as the owner are admitted to main PR merges. The owner retains the ability to administer repository settings; account or credential compromise is outside this access-control check."
+  ],
+  "evidence_files": [
+    {
+      "path": "work/publication-cutover-20260925/authorization.json",
+      "bytes": 431,
+      "sha256": "294f7a4320eb6a92fc6c4d1c8ff687a7d7f8956a039aec1ed742440e30610fa1"
+    },
+    {
+      "path": "work/publication-cutover-20260925/pre-cutover-delta.json",
+      "bytes": 261,
+      "sha256": "c3ee14efa5d29ba1b4e21da1c9bc6eaffe4cc85912bfdfc9b8c09ca7de1c6a65"
+    },
+    {
+      "path": "work/publication-cutover-20260925/quiesce-result.json",
+      "bytes": 253,
+      "sha256": "1c62633fc353f18e1850949c5158278cfaa49c05fe82f9e7fce160fd22f24d37"
+    },
+    {
+      "path": "work/publication-cutover-20260925/cache-inventory-before.json",
+      "bytes": 22300,
+      "sha256": "699a1b049598f90fef3a9bbb5f9367b9edbb054c921b45fba49455936d8a7415"
+    },
+    {
+      "path": "work/publication-cutover-20260925/cache-inventory-empty.json",
+      "bytes": 37,
+      "sha256": "6b0b42052a75987810c770389c23c5886bc955c8e023c9b577b04d5c66370a12"
+    },
+    {
+      "path": "work/publication-cutover-20260925/visibility-public-readback.json",
+      "bytes": 6019,
+      "sha256": "9589236ae2f2e6e1a70211ffde5daaa0e9bb2c3db91a96fe9c1e84031fb6584f"
+    },
+    {
+      "path": "work/publication-cutover-20260925/anonymous-repository.json",
+      "bytes": 5830,
+      "sha256": "faea7ec0813f1721bb3d177c0d6828e6d4a3cec4044b39b612b444911343c4cd"
+    },
+    {
+      "path": "work/publication-cutover-20260925/main-protection-verified.json",
+      "bytes": 1279,
+      "sha256": "b40328810cdaab3261666c8a6dc85d2e42b05e6e1c9a810cec958109ea2d6939"
+    },
+    {
+      "path": "work/publication-cutover-20260925/main-owner-rule-verified.json",
+      "bytes": 792,
+      "sha256": "fdb0589a8c416c3cbdce3c05582cecb05f6ab5cd35362a372530d8e54b922025"
+    },
+    {
+      "path": "work/publication-cutover-20260925/fork-approval-readback.json",
+      "bytes": 47,
+      "sha256": "9e1d311f9e8df080b0bbe40f03f338e85b91fc7fdc74c703927ef237fdda4528"
+    },
+    {
+      "path": "work/publication-cutover-20260925/workflow-permissions-readback.json",
+      "bytes": 80,
+      "sha256": "f6e178fc1e56cf43900da383f85398b61de9ae61c6b8433116c1856605745924"
+    },
+    {
+      "path": "work/publication-cutover-20260925/private-reporting-readback.json",
+      "bytes": 16,
+      "sha256": "26b3426b2593763c96d0890b4a77a0bbf66d13fc512b0c6b138a23c290f30a2a"
+    },
+    {
+      "path": "work/publication-cutover-20260925/secret-protection-readback.json",
+      "bytes": 6017,
+      "sha256": "67758804c6efa551e95c0f3ad6811d2df5f3bfb791e15066a04928d4ef82fe80"
+    },
+    {
+      "path": "work/publication-cutover-20260925/owner-notifications-readback.json",
+      "bytes": 227,
+      "sha256": "cfea79f1479b8503dc5c63a1a4e8d20ba948ac72f8d43b65fdddd65009513594"
+    },
+    {
+      "path": "work/publication-cutover-20260925/actions-reenabled-readback.json",
+      "bytes": 68,
+      "sha256": "cda4ec59adc22ede75866cb57bfbf92ea5d982ecfb6446f36b30c9217f550ea3"
+    },
+    {
+      "path": "work/publication-cutover-20260925/publication-check-runs.json",
+      "bytes": 77089,
+      "sha256": "d4b527d63b09e4da516a8d43f3945c8d77812315eb86d1041afda4d3cfa440e8"
+    },
+    {
+      "path": "work/publication-cutover-20260925/direct-main-noop-test.json",
+      "bytes": 153,
+      "sha256": "04f7bea0124df3abe1c1812438923adffaee0f9fd99dd101bee38f264f69d46e"
+    },
+    {
+      "path": "work/publication-cutover-20260925/reporting-browser-check-v2.json",
+      "bytes": 530,
+      "sha256": "9a567d474d5d9e9ab0fa15d4b6798f3379cbb780b016ca2e8522f957008c4da9"
+    },
+    {
+      "path": "work/publication-cutover-20260925/public-security-page-v2.png",
+      "bytes": 154774,
+      "sha256": "ec8afe7a43ff7db47a630bec4e3fd0bf8dbc33ae11125aa3f21379609ae2a773"
+    },
+    {
+      "path": "work/publication-cutover-20260925/reporting-entry-v2.png",
+      "bytes": 29853,
+      "sha256": "534b3ff9e233ba3c1c7dd6cbee629feb76d8418aae39a7a57bdd1e0678a32c01"
+    },
+    {
+      "path": "work/publication-cutover-20260925/collaborators.json",
+      "bytes": 1072,
+      "sha256": "da1f0e77f63d47e67134d9614296e0af70d79e098e8e41c69c1e39ab392327fc"
+    },
+    {
+      "path": "work/publication-cutover-20260925/invitations.json",
+      "bytes": 2,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "path": "work/publication-cutover-20260925/deploy-keys.json",
+      "bytes": 2,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "path": "work/publication-cutover-20260925/hooks.json",
+      "bytes": 2,
+      "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+    },
+    {
+      "path": "work/publication-cutover-20260925/pre-cutover-text-check.json",
+      "bytes": 598,
+      "sha256": "2fbcc263841f9e63bef38598d48082b698e69cebd280bc8e78d4c647ea4ff759"
+    },
+    {
+      "path": "work/publication-cutover-20260925/secret-alerts.json",
+      "bytes": 4,
+      "sha256": "cf1cbb66a638b4860a516671fb74850e6ccf787fe6c4c8d29e9c04efe880bd05"
+    },
+    {
+      "path": "work/publication-cutover-20260925/dependency-alerts.json",
+      "bytes": 4,
+      "sha256": "cf1cbb66a638b4860a516671fb74850e6ccf787fe6c4c8d29e9c04efe880bd05"
+    },
+    {
+      "path": "work/publication-cutover-20260925/pending-ci-merge-test.json",
+      "bytes": 205,
+      "sha256": "0fd02f36bcda747cca7ee720dde17ecb474046345ab6a2bae6da9c64afb0c0b1"
+    },
+    {
+      "path": "work/publication-cutover-20260925/vulnerability-alerts-http-readback.txt",
+      "bytes": 1192,
+      "sha256": "d77c17f772595c36ae71a360b3cdf89e0be4e62573ccda5e66fed2b01112d8af"
+    }
+  ]
+}
