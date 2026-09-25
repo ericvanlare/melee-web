@@ -982,6 +982,7 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     const unsigned item_slots=(kind==FTKIND_POPO||kind==FTKIND_NANA)?3:
                                kind==FTKIND_GAMEWATCH?11:
                                (kind==FTKIND_LINK||kind==FTKIND_CLINK)?7:
+                               kind==FTKIND_KIRBY?5:
                                kind==FTKIND_SEAK?4:
                                kind==FTKIND_ZELDA?2:
                                (kind==FTKIND_LUIGI||kind==FTKIND_KOOPA)?1:
@@ -1025,8 +1026,9 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
                 }
                 const bool link_joint=i==6&&(kind==FTKIND_LINK||kind==FTKIND_CLINK);
                 const bool yoshi_joint=i==3&&kind==FTKIND_YOSHI;
+                const bool kirby_joint=i==4&&kind==FTKIND_KIRBY;
                 const bool gamewatch_parts=kind==FTKIND_GAMEWATCH&&i==10;
-                const size_t minimum=(link_joint||yoshi_joint)?64:gamewatch_parts?
+                const size_t minimum=(link_joint||yoshi_joint||kirby_joint)?64:gamewatch_parts?
                     (size_t)d->x8->x0.model_num*sizeof(FtPartsVisLookup):24;
                 uint32_t p=PTR(at+i*4,minimum), article_unresolved;
                 /* Link's seventh entry is the source HSD_Joint descriptor used by
@@ -1037,7 +1039,10 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
                         "Link part descriptor is missing");
                 } else if(yoshi_joint) {
                     REQUIRE(p!=UINT32_MAX,
-                        "Yoshi special-N source joint is missing");
+                            "Yoshi special-N source joint is missing");
+                } else if(kirby_joint) {
+                    REQUIRE(p!=UINT32_MAX,
+                            "Kirby swallowed-star source joint is missing");
                 } else if(gamewatch_parts) {
                     REQUIRE(p!=UINT32_MAX,
                             "Game & Watch part-visibility descriptor is missing");
@@ -1128,7 +1133,7 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     for(unsigned i=0;i<sizeof(ready)/sizeof(ready[0]);++i) {
         /* Keep the Link part descriptor unresolved until its source HSD_Joint
          * has been converted to the native 32-bit descriptor ABI. */
-        if(ready[i]==18 && (kind==FTKIND_LINK||kind==FTKIND_CLINK||kind==FTKIND_YOSHI)) continue;
+        if(ready[i]==18 && (kind==FTKIND_LINK||kind==FTKIND_CLINK||kind==FTKIND_YOSHI||kind==FTKIND_KIRBY)) continue;
         *unresolved &= ~(1U<<ready[i]);
     }
     if(actions) *unresolved &= ~(1U<<3);
@@ -1144,7 +1149,7 @@ void* melee_web_fighter_data_article(void* data, uint32_t kind, uint32_t index)
      * ftNs_Init_OnLoad. Every other family keeps the source seven-slot
      * array bound (Link's slot 6 is a joint, never an Article). */
     if (index >= (kind==FTKIND_NESS||kind==FTKIND_GAMEWATCH?11U:6U) ||
-        (kind==FTKIND_YOSHI&&index==3) ||
+        (kind==FTKIND_YOSHI&&index==3) || (kind==FTKIND_KIRBY&&index==4) ||
         (kind==FTKIND_GAMEWATCH&&index==10)) return NULL;
     return ((ftData*)data)->x48_items[index];
 }
@@ -1170,6 +1175,19 @@ int melee_web_fighter_data_set_yoshi_joint(void* data,void* joint,uint32_t* unre
         "Yoshi special-N joint requires Egg Lay's owned model descriptor");
     d->x48_items[3]=joint;*unresolved&=~(1U<<18);if(error&&size)*error=0;return 1;
 #undef YOSHI_JOINT_REQUIRE
+}
+
+int melee_web_fighter_data_set_kirby_joint(void* data,void* joint,uint32_t* unresolved,
+    char* error,size_t size)
+{
+    ftData* d=data;
+#define KIRBY_JOINT_REQUIRE(c,m) do { if(!(c)){if(error&&size)snprintf(error,size,"%s",m);return 0;} } while(0)
+    KIRBY_JOINT_REQUIRE(d&&d->x48_items&&joint&&unresolved&&(*unresolved&(1U<<18))&&
+        d->x48_items[0]&&d->x48_items[1]&&d->x48_items[2]&&d->x48_items[3]&&
+        !d->x48_items[4],
+        "Kirby swallowed-star joint requires four source Articles and its unresolved fifth x48 joint root");
+    d->x48_items[4]=joint;*unresolved&=~(1U<<18);if(error&&size)*error=0;return 1;
+#undef KIRBY_JOINT_REQUIRE
 }
 
 int melee_web_fighter_data_set_metal(void* data,void* joint,uint32_t costumes,

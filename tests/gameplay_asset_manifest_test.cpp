@@ -4,6 +4,7 @@
 #include "fighter_binding.hpp"
 #include "gameplay_content.h"
 #include "gameplay_result_motion_table.hpp"
+#include "gameplay_kirby_copy_assets.hpp"
 #include <melee/pl/forward.h>
 
 #include <algorithm>
@@ -20,6 +21,44 @@
 #include <vector>
 
 using namespace melee_web;
+
+// The manifest test isolates the descriptor from source-runtime linkage. The
+// real source-table expansion and HSD owner are exercised by the compiled
+// match trace with disc-extracted Kirby donor archives.
+namespace melee_web {
+std::vector<KirbyCopyArchiveRequirement>
+kirby_copy_archive_requirements(const MeleeWebMenuMatchSelection& value)
+{
+    for (unsigned slot = 0; slot < GM_MAX_PLAYERS; ++slot) {
+        if (value.start.players[slot].slot_type == Gm_PKind_NA) break;
+        if (value.start.players[slot].ckind == CKIND_KIRBY)
+            return {{"PlKbCpGw.dat", "ftDataKirbyCopyGamewatch",
+                     FTKIND_GAMEWATCH, false},
+                    {"PlKbNrCpGw.dat", "PlyKirbyGw_Share_joint",
+                     FTKIND_GAMEWATCH, true},
+                    {"PlKbNrCpGw.dat", "PlyKirbyGw_Share_matanim_joint",
+                     FTKIND_GAMEWATCH, true}};
+    }
+    return {};
+}
+
+std::vector<KirbyCopyEffectRequirement>
+kirby_copy_effect_requirements(const MeleeWebMenuMatchSelection& value)
+{
+    bool has_kirby = false;
+    std::vector<KirbyCopyEffectRequirement> result;
+    for (unsigned slot = 0; slot < GM_MAX_PLAYERS; ++slot) {
+        const auto ckind = value.start.players[slot].ckind;
+        if (value.start.players[slot].slot_type == Gm_PKind_NA) break;
+        has_kirby |= ckind == CKIND_KIRBY;
+        if (ckind == CKIND_FOX)
+            result.push_back({"EfKbFx.dat", "effKirbyFoxDataTable", 33});
+        if (ckind == CKIND_POPONANA)
+            result.push_back({"EfKbIc.dat", "effKirbyIceDataTable", 46});
+    }
+    return has_kirby ? result : std::vector<KirbyCopyEffectRequirement>{};
+}
+} // namespace melee_web
 
 namespace {
 
@@ -209,6 +248,31 @@ void source_stage_music()
     }
 }
 
+void kirby_copy_manifest_closure()
+{
+    const auto kirby_vs_gw = selection(St_Kind_Last, CKIND_KIRBY,
+                                       CKIND_GAMEWATCH);
+    const auto match = match_asset_names(kirby_vs_gw);
+    check(has(match, "PlKbCpGw.dat") && has(match, "PlKbNrCpGw.dat"),
+          "Kirby match descriptor omitted the donor copy/costume archives");
+    check(!has(results_asset_names(kirby_vs_gw), "PlKbCpGw.dat"),
+          "Results descriptor incorrectly extends the Kirby match preload scope");
+    check(!has(match_asset_names(selection(St_Kind_Last, CKIND_GAMEWATCH,
+                                            CKIND_MARIO)), "PlKbCpGw.dat"),
+          "Non-Kirby match descriptor requested copy archives");
+    check(has(match_asset_names(selection(St_Kind_Last, CKIND_KIRBY,
+                                           CKIND_FOX)), "EfKbFx.dat"),
+          "Kirby/Fox match descriptor omitted its source copy-effect bank");
+    check(has(match_asset_names(selection(St_Kind_Last, CKIND_KIRBY,
+                                           CKIND_POPONANA)), "EfKbIc.dat"),
+          "Kirby/Ice Climbers match descriptor omitted its source copy-effect bank");
+    check(!has(match_asset_names(selection(St_Kind_Last, CKIND_FOX,
+                                            CKIND_POPONANA)), "EfKbFx.dat") &&
+          !has(match_asset_names(selection(St_Kind_Last, CKIND_FOX,
+                                            CKIND_POPONANA)), "EfKbIc.dat"),
+          "Non-Kirby match descriptor requested Kirby copy-effect banks");
+}
+
 void rejects_invalid_without_mutation()
 {
     auto value = selection(St_Kind_Last, CKIND_MARIO, CKIND_MARIO);
@@ -297,6 +361,7 @@ int main(int argc, char** argv)
         source_fighter_closure();
         results_fighter_closure();
         source_stage_music();
+        kirby_copy_manifest_closure();
         rejects_invalid_without_mutation();
         std::cout << "Source menu/match/results asset descriptors, fighter/archive closure, authored music candidates, and rejection boundaries: passed\n";
         return 0;

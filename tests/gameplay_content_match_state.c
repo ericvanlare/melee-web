@@ -1,6 +1,7 @@
 #include "gameplay_compat.h"
 #include <melee/pl/player.h>
 #include <melee/ft/types.h>
+#include <melee/ft/kinds/ftKirby/ftkirby.h>
 #include <melee/ft/kinds/ftDonkey/forward.h>
 #include <melee/ft/kinds/ftKoopa/forward.h>
 #include <melee/ft/kinds/ftCommon/forward.h>
@@ -93,6 +94,35 @@ int melee_web_test_entity_state(unsigned slot,unsigned index,int* kind,int* moti
     if(grounded)*grounded=fighter->ground_or_air==0;
     if(has_skeleton)*has_skeleton=fighter->x8AC_animSkeleton!=NULL;
     return 1;
+}
+int melee_web_test_entity_position(unsigned slot,unsigned index,float* x,float* y){
+    HSD_GObj* entity=Player_GetEntityAtIndex((int)slot,(int)index);
+    if(!entity||!entity->user_data||!x||!y)return 0;
+    Fighter* fighter=entity->user_data;
+    *x=fighter->cur_pos.x;*y=fighter->cur_pos.y;
+    return 1;
+}
+int melee_web_test_entity_damage(unsigned slot,unsigned index,float* damage){
+    HSD_GObj* entity=Player_GetEntityAtIndex((int)slot,(int)index);
+    if(!entity||!entity->user_data||!damage)return 0;
+    *damage=((Fighter*)entity->user_data)->dmg.x1830_percent;
+    return 1;
+}
+int melee_web_test_active_fighter_kind(unsigned slot){
+    HSD_GObj* entity=Player_GetEntity(slot);
+    return entity&&entity->user_data?((Fighter*)entity->user_data)->kind:-1;
+}
+int melee_web_test_kirby_copy_kind(unsigned slot){
+    HSD_GObj* entity=Player_GetEntity(slot);
+    if(!entity||!entity->user_data)return -1;
+    Fighter* fighter=entity->user_data;
+    return fighter->kind==FTKIND_KIRBY?fighter->u.kb.hat.kind:-1;
+}
+int melee_web_test_fighter_owns_victim(unsigned slot,unsigned victim_slot){
+    HSD_GObj* entity=Player_GetEntity(slot);
+    HSD_GObj* victim=Player_GetEntity(victim_slot);
+    if(!entity||!entity->user_data||!victim)return 0;
+    return ((Fighter*)entity->user_data)->victim_gobj==victim;
 }
 int melee_web_test_item_count(int kind){return it_8026B3C0((ItemKind)kind);}
 

@@ -3,6 +3,7 @@
 #include "dat_archive.hpp"
 #include "gameplay_content.h"
 #include "gameplay_result_motion_table.hpp"
+#include "gameplay_kirby_copy_assets.hpp"
 #include "fighter_binding.hpp"
 #include <melee/pl/forward.h>
 #include <algorithm>
@@ -264,6 +265,10 @@ match_asset_names(const MeleeWebMenuMatchSelection& selection)
     for (const auto name : kMatchCommonAudio) add_unique(result, name);
 
     add_selection_fighter_assets(result, selection);
+    for (const auto& archive : kirby_copy_archive_requirements(selection))
+        add_unique(result, archive.filename);
+    for (const auto& effect : kirby_copy_effect_requirements(selection))
+        add_unique(result, effect.filename);
 
     const auto* stage = melee_web_stage_content(selection.start.rules.stkind);
     add_unique(result, stage->archive);

@@ -163,6 +163,8 @@ struct GameplayFighterAssets::Storage {
     std::array<std::unique_ptr<DatItemArticle>,11> articles;
     std::unique_ptr<DatNativeJoint> link_part_model;
     std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> link_part_native{nullptr,destroy_joint};
+    std::unique_ptr<DatNativeJoint> kirby_copy_star_model;
+    std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> kirby_copy_star_native{nullptr,destroy_joint};
     DatNativeJoint model;
     std::unique_ptr<DatMaterialAnimation> material;
     std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> native;
@@ -200,6 +202,7 @@ struct GameplayFighterAssets::Storage {
             prototype.action_rows(),prototype.blend_rows(),prototype.wait_choices(),&unresolved);
         const bool link=id.fighter_kind==FTKIND_LINK||id.fighter_kind==FTKIND_CLINK;
         const uint32_t item_table_bytes=link?28:
+            id.fighter_kind==FTKIND_KIRBY?20:
             (id.fighter_kind==FTKIND_POPO||id.fighter_kind==FTKIND_NANA)?12:
             id.fighter_kind==FTKIND_ZELDA?8:
             id.fighter_kind==FTKIND_SEAK?16:
@@ -350,6 +353,18 @@ struct GameplayFighterAssets::Storage {
             auto* registered=melee_web_fighter_data_article(data,id.fighter_kind,item.index);
             if(!registered)throw DatError("Fighter item Article registration identity is missing");
             articles[item.index]=std::make_unique<DatItemArticle>(fighter,*article_root,item.kind,registered);
+        }
+        if(id.fighter_kind==FTKIND_KIRBY) {
+            const auto joint_root=fighter->pointer(*item_table+4*4,64);
+            if(!joint_root)throw DatError("Kirby swallowed-star x48 joint root is missing");
+            kirby_copy_star_model=std::make_unique<DatNativeJoint>(fighter,*joint_root);
+            kirby_copy_star_native.reset(melee_web_native_joint_hydrate(
+                &kirby_copy_star_model->graph(),error,sizeof(error)));
+            if(!kirby_copy_star_native)throw DatError(error);
+            void* joint=melee_web_native_joint_descriptor(kirby_copy_star_native.get(),error,sizeof(error));
+            if(!joint)throw DatError(error);
+            if(!melee_web_fighter_data_set_kirby_joint(data,joint,&unresolved,error,sizeof(error)))
+                throw DatError(error);
         }
         if(id.fighter_kind==FTKIND_YOSHI) {
             const auto joint_root=fighter->pointer(*item_table+3*4,64);

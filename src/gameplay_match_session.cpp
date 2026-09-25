@@ -10,6 +10,7 @@
 #include "gameplay_hud.h"
 #include "gameplay_match_flow.h"
 #include "gameplay_fighter_assets.h"
+#include "gameplay_kirby_copy_assets.hpp"
 #include "gameplay_hud_assets.hpp"
 #include <cstdio>
 #include <cstdlib>
@@ -46,6 +47,7 @@ struct GameplayMatchSession::Storage {
     MeleeWebMatchContext* match=nullptr;
     MeleeWebRender* render=nullptr;
     std::unique_ptr<GameplayHudAssets> hud_assets;
+    std::unique_ptr<GameplayKirbyCopyAssets> kirby_copy_assets;
     MeleeWebHud* hud=nullptr;
     MeleeWebMatchFlow* flow=nullptr;
     bool mode_owned=false;
@@ -73,6 +75,8 @@ struct GameplayMatchSession::Storage {
         check(selection.hud_layout == selection.start.rules.x0_3,
               "Match compatibility settings differ from source payload");
         runtime_files=&files;runtime_cache=archive_cache;selected=selection;
+        if(selection_uses_kirby(selection))
+            kirby_copy_assets=std::make_unique<GameplayKirbyCopyAssets>(files,selection);
         stage=melee_web_stage_content(selection.start.rules.stkind);
         check(stage!=nullptr,"Match stage has no source runtime owner");
         content.ground_kind=stage->ground_kind;
@@ -186,6 +190,7 @@ struct GameplayMatchSession::Storage {
         }
         if(construction_phase==3){
             check(melee_web_match_create_fighters_intro(match,error,sizeof(error)),error);
+            if(kirby_copy_assets)kirby_copy_assets->activate();
             construction_phase=4;
             return false;
         }
@@ -225,6 +230,7 @@ struct GameplayMatchSession::Storage {
             check(melee_web_match_end(match,error,sizeof(error)),error);match=nullptr;
             check_fighter_asset_ownership("after-match-end");
         }
+        if(kirby_copy_assets){kirby_copy_assets->close();kirby_copy_assets.reset();}
         music.reset();
         if(world){
             check_fighter_asset_ownership("before-world-close");

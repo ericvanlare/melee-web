@@ -62,6 +62,7 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     // graphs only, not readiness of every original world service they invoke.
     command_motions_ = {0,1,2,3,6};
     auto group=[&](uint32_t first,uint32_t last){for(uint32_t id=first;id<=last;++id)command_motions_.insert(id);};
+    command_motions_.insert(284);                    // ftCo_SM_ThrownCopyStar (motion state 291 selects submotion 284)
     group(7,31);group(34,77);                     // locomotion through grounded/aerial attacks and landings
     // Link-family bombs enter the common light-item pickup/throw actions.
     // Opponents may also catch and throw those same original items.

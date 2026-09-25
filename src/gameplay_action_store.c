@@ -394,8 +394,9 @@ void melee_web_command_require_supported(uint32_t opcode)
     default:
         fprintf(stderr, "Unsupported native fighter command opcode %u\n", opcode);
         for (unsigned i = 0; i < 6; ++i) if (bindings[i].fighter)
-            fprintf(stderr, "Bound fighter %u: motion %d, animation %d\n", i,
-                    bindings[i].fighter->motion_id, bindings[i].fighter->anim_id);
+            fprintf(stderr, "Bound fighter %u: kind %d motion %d animation %d\n", i,
+                    bindings[i].fighter->kind,bindings[i].fighter->motion_id,
+                    bindings[i].fighter->anim_id);
         abort();
     }
 }

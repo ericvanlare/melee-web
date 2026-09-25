@@ -123,6 +123,26 @@ export const NATIVE_GAME_DISC_FILES=Object.freeze({
   'PlKb.dat':'PlKb.dat','PlKbAJ.dat':'PlKbAJ.dat','PlKbNr.dat':'PlKbNr.dat',
   'PlKbYe.dat':'PlKbYe.dat','PlKbBu.dat':'PlKbBu.dat','PlKbRe.dat':'PlKbRe.dat',
   'PlKbGr.dat':'PlKbGr.dat','PlKbWh.dat':'PlKbWh.dat','EfKbData.dat':'EfKbData.dat',
+  // Kirby's ftKb_Init_803CA9D0 source table names every copy-action DAT.
+  // The five source costume-zero hat roots come from ftKb_Init_803CB3E8 and
+  // its referenced Fighter_CostumeStrings rows.
+  ...Object.fromEntries([
+    'PlKbCpMr.dat','PlKbCpFx.dat','PlKbCpCa.dat','PlKbCpDk.dat',
+    'PlKbCpKp.dat','PlKbCpLk.dat','PlKbCpSk.dat','PlKbCpNs.dat',
+    'PlKbCpPe.dat','PlKbCpPp.dat','PlKbCpPk.dat','PlKbCpSs.dat',
+    'PlKbCpYs.dat','PlKbCpPr.dat','PlKbCpMt.dat','PlKbCpLg.dat',
+    'PlKbCpMs.dat','PlKbCpZd.dat','PlKbCpCl.dat','PlKbCpDr.dat',
+    'PlKbCpFc.dat','PlKbCpPc.dat','PlKbCpGw.dat','PlKbCpGn.dat',
+    'PlKbCpFe.dat','PlKbNrCpDk.dat','PlKbNrCpPr.dat','PlKbNrCpMt.dat',
+    'PlKbNrCpFc.dat','PlKbNrCpGw.dat',
+  ].map(name=>[name,name])),
+  // Kirby's ftKb_Init_803CB46C and efAsync_DatEntries source tables name
+  // these copy-specific effect banks independently of the donor's own bank.
+  ...Object.fromEntries([
+    'EfKbMs.dat','EfKbZd.dat','EfKbMr.dat','EfKbFx.dat','EfKbSs.dat',
+    'EfKbPk.dat','EfKbLg.dat','EfKbCa.dat','EfKbDk.dat','EfKbKp.dat',
+    'EfKbIc.dat','EfKbGn.dat','EfKbFe.dat',
+  ].map(name=>[name,name])),
   'GmRstMKb.dat':'GmRstMKb.dat','kirby.ssm':'audio/us/kirby.ssm',
   'PlSs.dat':'PlSs.dat','PlSsAJ.dat':'PlSsAJ.dat','PlSsNr.dat':'PlSsNr.dat',
   'PlSsPi.dat':'PlSsPi.dat','PlSsBk.dat':'PlSsBk.dat','PlSsGr.dat':'PlSsGr.dat',

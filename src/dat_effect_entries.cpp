@@ -54,7 +54,8 @@ DatEffectEntries::DatEffectEntries(std::shared_ptr<const DatArchive> archive,std
     for(const auto& entry:s.archive->public_symbols())if(entry.name==symbol)root=entry.data_offset;
     if(!root)throw DatError("Exact effect entry symbol is absent");
     const auto& a=*s.archive;
-    if(8+size_t(count)*20>a.next_target_offset(*root)-*root)throw DatError("Effect entries cross their referenced region");
+    const auto source_region=a.next_target_offset(*root)-*root;
+    if(8+size_t(count)*20>source_region)throw DatError("Effect table bank "+std::to_string(bank)+" symbol "+std::string(symbol)+" declares "+std::to_string(count)+" entries but its source-referenced region is "+std::to_string(source_region)+" bytes");
     const auto commands=a.pointer(*root,8),textures=a.pointer(*root+4,4);
     if(bool(commands)!=bool(textures))throw DatError("Effect table has an incomplete particle bank pair");
     // efAsync_LoadSync permits model-only effect tables: both particle roots

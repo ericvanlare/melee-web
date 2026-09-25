@@ -15,8 +15,19 @@
 #include <melee/ft/kinds/ftLuigi/forward.h>
 #include <melee/ft/kinds/ftPikachu/forward.h>
 #include <melee/ft/kinds/ftPurin/forward.h>
+#include <melee/ft/kinds/ftGameWatch/forward.h>
+#include <melee/ft/kinds/ftKirby/forward.h>
+#include <melee/ft/kinds/ftPopo/forward.h>
+#include <melee/ft/kinds/ftSamus/forward.h>
+#include <melee/ft/kinds/ftYoshi/forward.h>
+#include <melee/ft/kinds/ftZelda/forward.h>
+#include <melee/ft/kinds/ftSeak/forward.h>
 #include <melee/ft/kinds/ftCommon/forward.h>
 #include <melee/it/forward.h>
+extern "C" {
+#include <melee/gm/forward.h>
+#include <melee/pl/forward.h>
+}
 #include <filesystem>
 #include <fstream>
 #include <array>
@@ -26,9 +37,15 @@
 #include <cmath>
 #include <algorithm>
 #include <optional>
+#include <string>
 
 extern "C" int melee_web_test_content_player(unsigned,int,int,unsigned);
 extern "C" int melee_web_test_entity_state(unsigned,unsigned,int*,int*,int*,int*);
+extern "C" int melee_web_test_entity_position(unsigned,unsigned,float*,float*);
+extern "C" int melee_web_test_entity_damage(unsigned,unsigned,float*);
+extern "C" int melee_web_test_active_fighter_kind(unsigned);
+extern "C" int melee_web_test_kirby_copy_kind(unsigned);
+extern "C" int melee_web_test_fighter_owns_victim(unsigned,unsigned);
 extern "C" int melee_web_test_donkey_cargo(unsigned,int);
 extern "C" int melee_web_test_koopa_capture(unsigned,int);
 extern "C" int melee_web_test_item_count(int);
@@ -36,7 +53,7 @@ extern "C" int melee_web_test_purin_anim_id(int);
 extern "C" int melee_web_test_quake_start(int);
 extern "C" int melee_web_test_quake_translated(void);
 extern "C" int melee_web_story_state(uint32_t*,unsigned*,int*,int*,int*,int*);
-static void check(bool value,const char* message){if(!value)throw std::runtime_error(message);}
+static void check(bool value,const std::string& message){if(!value)throw std::runtime_error(message);}
 using PadStateOwner=std::unique_ptr<MeleeWebPadState,decltype(&melee_web_pad_state_free)>;
 static PadStateOwner zelda_sheik_transform_input(){
     std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> bytes{};
@@ -64,7 +81,8 @@ int main(int argc,char** argv){try{
     if(argc<3||argc>7)throw std::runtime_error("Expected owned menu/game directories and optional StKind/P1 CKind/P2 CKind/trace scope");
     const bool entry_only=argc==7&&std::string(argv[6])=="--entry-only";
     const bool platform_pass=argc==7&&std::string(argv[6])=="--platform-pass";
-    if(argc==7&&!entry_only&&!platform_pass)throw std::runtime_error("Unknown source match trace scope");
+    const bool action_coverage=argc==7&&std::string(argv[6])=="--character-actions";
+    if(argc==7&&!entry_only&&!platform_pass&&!action_coverage)throw std::runtime_error("Unknown source match trace scope");
     melee_web::RuntimeFiles files;
     for(const auto* root:{argv[1],argv[2]})for(const auto& entry:std::filesystem::directory_iterator(root)){
         if(!entry.is_regular_file())continue;
@@ -127,8 +145,19 @@ int main(int argc,char** argv){try{
     check(opponent_content,"Selected opponent has no admitted source content");
     selection.start.players[0].ckind=fighter_ckind;
     selection.start.players[1].ckind=opponent_ckind;
-    const unsigned costume_cycles=fighter_content->costumes>opponent_content->costumes?
-        fighter_content->costumes:opponent_content->costumes;
+    const bool ice_action_case=action_coverage&&fighter_ckind==CKIND_POPONANA;
+    if(ice_action_case){
+        auto& opponent=selection.start.players[1];
+        opponent.slot_type=Gm_PKind_Cpu;opponent.cpu_kind=4;opponent.cpu_level=9;
+        opponent.rumble_enabled=0;
+    }
+    const bool kirby_action_case=action_coverage&&fighter_ckind==CKIND_KIRBY;
+    if(kirby_action_case){
+        check(opponent_ckind==CKIND_GAMEWATCH,
+              "Kirby copy action probe requires Game & Watch as its scoped donor family");
+    }
+    const unsigned costume_cycles=action_coverage?1:(fighter_content->costumes>opponent_content->costumes?
+        fighter_content->costumes:opponent_content->costumes);
     for(unsigned cycle=0;cycle<costume_cycles;cycle++){
         const unsigned fighter_color=cycle%fighter_content->costumes;
         selection.start.players[0].color=fighter_color;
@@ -137,29 +166,33 @@ int main(int argc,char** argv){try{
         selection.players[0]={0,4,fighter_color,0};
         selection.players[1]={1,4,opponent_color,0};
         const bool transformation_form=fighter_ckind==CKIND_ZELDA||fighter_ckind==CKIND_SEAK;
+        const bool startup_transform=transformation_form&&!action_coverage;
         std::cout<<"Construct mixed content stage="<<selection.start.rules.stkind<<" costume="<<cycle<<std::endl;
         std::optional<melee_web::GameplayMatchSession> match_owner;
-        if(transformation_form){
+        if(startup_transform){
             auto initial_input=zelda_sheik_transform_input();
             match_owner.emplace(files,selection,*initial_input);
         }else match_owner.emplace(files,selection);
         auto& match=*match_owner;
-        PADStatus raw[4]{};raw[2].err=raw[3].err=PAD_ERR_NO_CONTROLLER;
+        const unsigned match_player_count=2U;
+        PADStatus raw[4]{};if(match_player_count<3)raw[2].err=PAD_ERR_NO_CONTROLLER;
+        if(ice_action_case)raw[1].err=PAD_ERR_NO_CONTROLLER;
+        raw[3].err=PAD_ERR_NO_CONTROLLER;
         float pcm[1068];unsigned phase=0;
         auto tick=[&](){
             match.tick(raw);phase+=32000;const auto count=phase/60;phase%=60;
             check(melee_web_audio_render(match.audio(),pcm,count,error,sizeof(error)),error);
-            for(unsigned i=0;i<2;i++){const auto state=match.player_stats(i);
+            for(unsigned i=0;i<match_player_count;i++){const auto state=match.player_stats(i);
                 check(std::isfinite(state.position[0])&&std::isfinite(state.position[1]),"Nonfinite fighter state");}};
         for(unsigned n=0;!match.ready()&&n<600;n++)tick();
         check(match.ready(),"Original Ready did not finish");
-        const int active_fighter_ckind=transformation_form?
+        const int active_fighter_ckind=startup_transform?
             (fighter_ckind==CKIND_ZELDA?CKIND_SEAK:CKIND_ZELDA):fighter_ckind;
         const auto* active_fighter_content=melee_web_fighter_content(active_fighter_ckind);
         check(active_fighter_content&&melee_web_test_content_player(0,active_fighter_ckind,
               active_fighter_content->fighter_kind,fighter_color),
               "Original selected-fighter identity/costume/icon differs after source startup transform");
-        if(transformation_form)
+        if(startup_transform)
             std::cout<<"Source held-A startup transformed "<<fighter_content->name<<" to "
                      <<active_fighter_content->name<<" before Fighter_Create"<<std::endl;
         if(fighter_ckind==CKIND_POPONANA){
@@ -175,7 +208,263 @@ int main(int argc,char** argv){try{
         check(melee_web_test_content_player(1,opponent_ckind,opponent_content->fighter_kind,opponent_color),"Original opponent identity/costume/icon differs");
         check(match.player_stats(0).stocks==4&&match.player_stats(1).stocks==4,
               "Source stock initialization changed for the selected content pair");
-        if(platform_pass){
+        if(action_coverage){
+            auto neutral=[&](){for(unsigned i=0;i<4;i++){
+                raw[i].button=0;raw[i].stickX=raw[i].stickY=0;}};
+            auto settle_primary=[&](){
+                neutral();
+                for(unsigned n=0;n<720;n++){
+                    const auto state=match.player_stats(0);
+                    if(state.ground_or_air==0&&state.motion_id==ftCo_MS_Wait)return;
+                    tick();
+                }
+                const auto state=match.player_stats(0);
+                check(false,"Action coverage did not return the selected fighter to grounded Wait; motion="+
+                      std::to_string(state.motion_id)+" ground_or_air="+
+                      std::to_string(state.ground_or_air)+" active_kind="+
+                      std::to_string(melee_web_test_active_fighter_kind(0))+" stocks="+
+                      std::to_string(state.stocks)+" damage="+
+                      std::to_string(state.damage_percent)+" position="+
+                      std::to_string(state.position[0])+","+
+                      std::to_string(state.position[1]));
+            };
+            if(fighter_ckind==CKIND_GAMEWATCH){
+                bool chef=false,sausage=false;
+                for(unsigned n=0;n<180&&!(chef&&sausage);n++){
+                    raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
+                    chef|=match.player_stats(0).motion_id==ftGw_MS_SpecialN;
+                    sausage|=melee_web_test_item_count(It_Kind_GameWatch_Chef)>0;
+                }
+                neutral();
+                check(chef&&sausage,"Game & Watch Chef did not enter its source motion and create a sausage");
+                for(unsigned n=0;n<600&&melee_web_test_item_count(It_Kind_GameWatch_Chef)>0;n++)tick();
+                check(melee_web_test_item_count(It_Kind_GameWatch_Chef)==0,
+                      "Game & Watch Chef article did not clear through its source lifetime");
+                std::cout<<"Game & Watch action coverage: Chef motion/article lifetime passed; other specials unverified"<<std::endl;
+            }else if(fighter_ckind==CKIND_SAMUS){
+                bool bomb=false,down_motion=false;
+                for(unsigned n=0;n<120&&!bomb;n++){
+                    raw[0].stickY=-80;raw[0].button=n==0?PAD_BUTTON_B:0;tick();
+                    const int motion=match.player_stats(0).motion_id;
+                    down_motion|=motion==ftSs_MS_SpecialLw||motion==ftSs_MS_SpecialAirLw||
+                                 motion==ftSs_MS_SpecialLwBomb||motion==ftSs_MS_SpecialAirLwBomb;
+                    bomb|=melee_web_test_item_count(It_Kind_Samus_Bomb)>0;
+                }
+                neutral();
+                check(down_motion&&bomb,"Samus down-B did not enter its source action and create a bomb");
+                for(unsigned n=0;n<900&&melee_web_test_item_count(It_Kind_Samus_Bomb)>0;n++)tick();
+                check(melee_web_test_item_count(It_Kind_Samus_Bomb)==0,
+                      "Samus bomb did not clear through its source lifetime");
+                std::cout<<"Samus action coverage: down-B Bomb article lifetime passed; other specials unverified"<<std::endl;
+            }else if(fighter_ckind==CKIND_YOSHI){
+                settle_primary();
+                bool near_target=false;
+                for(unsigned n=0;n<360;n++){
+                    const auto self=match.player_stats(0),target=match.player_stats(1);
+                    const float dx=target.position[0]-self.position[0];
+                    const float dy=target.position[1]-self.position[1];
+                    if(std::fabs(dx)<7.0f&&std::fabs(dy)<5.0f){near_target=true;break;}
+                    raw[0].stickX=std::fabs(dx)<5.0f?0:(dx>0?80:-80);
+                    raw[0].stickY=std::fabs(dy)<4.0f?0:(dy>0?60:-60);tick();
+                }
+                check(near_target,"Yoshi neutral-B case did not reach the target's collision spacing");
+                neutral();settle_primary();
+                bool egg_lay_motion=false,egg_lay_article=false;
+                for(unsigned n=0;n<180&&!(egg_lay_motion&&egg_lay_article);n++){
+                    raw[0].button=n==0?PAD_BUTTON_B:0;tick();
+                    const int motion=match.player_stats(0).motion_id;
+                    egg_lay_motion|=motion>=ftYs_MS_SpecialN1&&motion<=ftYs_MS_SpecialN2_1;
+                    egg_lay_article|=melee_web_test_item_count(It_Kind_Yoshi_EggLay)>0;
+                }
+                neutral();
+                check(egg_lay_motion,"Yoshi neutral-B did not enter an authored Egg Lay source motion");
+                std::cout<<"Yoshi action coverage: neutral-B Egg Lay source motion passed; victim capture/article="
+                         <<(egg_lay_article?"observed":"not observed")
+                         <<"; other specials unverified"<<std::endl;
+            }else if(fighter_ckind==CKIND_ZELDA||fighter_ckind==CKIND_SEAK){
+                const int start_kind=fighter_ckind==CKIND_ZELDA?FTKIND_ZELDA:FTKIND_SEAK;
+                check(melee_web_test_active_fighter_kind(0)==start_kind,
+                      "Down-B test did not begin in the requested original fighter form");
+                int current=start_kind;
+                for(unsigned change=0;change<4;change++){
+                    const int wanted=current==FTKIND_ZELDA?FTKIND_SEAK:FTKIND_ZELDA;
+                    raw[0].stickY=-80;raw[0].button=PAD_BUTTON_B;tick();neutral();
+                    bool down_motion=false,transformed=false;
+                    for(unsigned n=0;n<240&&!transformed;n++){
+                        const int motion=match.player_stats(0).motion_id;
+                        down_motion|=motion==ftZd_MS_SpecialLw||motion==ftZd_MS_SpecialLw2||
+                                     motion==ftSk_MS_SpecialLw||motion==ftSk_MS_SpecialLw2;
+                        transformed=melee_web_test_active_fighter_kind(0)==wanted;
+                        if(!transformed)tick();
+                    }
+                    if(!down_motion||!transformed)
+                        std::cout<<"Zelda/Sheik transition miss from="<<current
+                                 <<" wanted="<<wanted
+                                 <<" active="<<melee_web_test_active_fighter_kind(0)
+                                 <<" motion="<<match.player_stats(0).motion_id
+                                 <<" down_motion="<<down_motion<<std::endl;
+                    check(down_motion&&transformed,
+                          "In-match down-B did not complete the requested Zelda/Sheik form change");
+                    current=wanted;
+                    std::cout<<"Zelda/Sheik down-B transformation="<<change+1
+                             <<" active_kind="<<current<<std::endl;
+                    // The source transformation leaves the active form in
+                    // Common_Sleep, not the ordinary grounded Wait motion.
+                    // Keep the match alive and verify ground/stock state;
+                    // requiring Wait here prevents the repeated down-B probe
+                    // from reaching its next source transition.
+                    neutral();
+                    for(unsigned n=0;n<90;n++)tick();
+                    const auto transformed_state=match.player_stats(0);
+                    check(transformed_state.ground_or_air==0&&
+                          transformed_state.stocks==4,
+                          "Zelda/Sheik transformation did not preserve the grounded four-stock fighter lifecycle");
+                }
+                check(current==start_kind&&match.player_stats(0).stocks==4,
+                      "Repeated down-B transformation did not return to its starting form and stock");
+                std::cout<<"Zelda/Sheik action coverage: both in-match down-B directions, repeated twice, passed; startup held-A is separate"<<std::endl;
+            }else if(fighter_ckind==CKIND_POPONANA){
+                float popo_x=0,popo_y=0,nana_x=0,nana_y=0;
+                check(melee_web_test_entity_position(0,0,&popo_x,&popo_y)&&
+                      melee_web_test_entity_position(0,1,&nana_x,&nana_y),
+                      "Ice Climbers pair positions are unavailable");
+                const float before=std::hypot(popo_x-nana_x,popo_y-nana_y);
+                bool up_special=false;float farthest=before;
+                for(unsigned n=0;n<180;n++){
+                    raw[0].stickY=80;raw[0].button=n==0?PAD_BUTTON_B:0;tick();
+                    int kind=-1,motion=-1,grounded=0,skeleton=0;
+                    float px=0,py=0,nx=0,ny=0;
+                    up_special|=melee_web_test_entity_state(0,0,&kind,&motion,&grounded,&skeleton)&&
+                        motion>=ftPp_MS_SpecialHiStart_0&&motion<=ftPp_MS_SpecialHi_5;
+                    if(melee_web_test_entity_position(0,0,&px,&py)&&
+                       melee_web_test_entity_position(0,1,&nx,&ny))
+                        farthest=std::max(farthest,std::hypot(px-nx,py-ny));
+                }
+                neutral();
+                check(up_special&&farthest>before+3.0f,
+                      "Ice Climbers Belay did not produce a source up-special and separated partner positions");
+                std::cout<<"Ice Climbers action coverage: Belay separated Popo/Nana from "<<before
+                         <<" to "<<farthest<<" units"<<std::endl;
+                float max_partner_damage=0;
+                bool partner_died=false,partner_removed=false,primary_survived=true;
+                unsigned observed_ticks=0;
+                for(;observed_ticks<7200&&!match.complete();observed_ticks++){
+                    tick();
+                    const auto primary=match.player_stats(0);
+                    if(primary.stocks==0||melee_web_test_active_fighter_kind(0)!=FTKIND_POPO){
+                        primary_survived=false;break;
+                    }
+                    int partner_kind=-1,partner_motion=-1,partner_grounded=0,partner_skeleton=0;
+                    if(!melee_web_test_entity_state(0,1,&partner_kind,&partner_motion,
+                                                    &partner_grounded,&partner_skeleton)){
+                        partner_removed=true;break;
+                    }
+                    float damage=0;
+                    if(melee_web_test_entity_damage(0,1,&damage))
+                        max_partner_damage=std::max(max_partner_damage,damage);
+                    partner_died=partner_motion>=ftCo_MS_DeadDown&&
+                                 partner_motion<=ftCo_MS_DeadUpFallHitCameraIce;
+                    if(partner_died)break;
+                }
+                bool primary_lifecycle=false,partner_present_after=false;
+                int partner_motion_after=-1;
+                if(partner_died||partner_removed){
+                    for(unsigned n=0;n<180&&!match.complete();n++)tick();
+                    int primary_kind=-1,primary_motion=-1,primary_grounded=0,primary_skeleton=0;
+                    primary_lifecycle=melee_web_test_entity_state(0,0,&primary_kind,&primary_motion,
+                                &primary_grounded,&primary_skeleton)&&
+                                primary_kind==FTKIND_POPO&&match.player_stats(0).stocks>0;
+                    int partner_kind=-1,partner_motion=-1,partner_grounded=0,partner_skeleton=0;
+                    partner_present_after=melee_web_test_entity_state(0,1,&partner_kind,&partner_motion,
+                                                    &partner_grounded,&partner_skeleton);
+                    if(partner_present_after)partner_motion_after=partner_motion;
+                }
+                std::cout<<"Ice Climbers partner-lifecycle probe: source CPU9 opponent ticks="
+                         <<observed_ticks<<" Nana max_damage="<<max_partner_damage
+                         <<" death_motion="<<partner_died<<" entity_removed="<<partner_removed
+                         <<" Popo_survived="<<primary_survived
+                         <<" Popo_stock_and_entity_after="<<primary_lifecycle
+                         <<" Nana_present_after="<<partner_present_after
+                         <<" Nana_motion_after="<<partner_motion_after<<std::endl;
+                check(partner_died||partner_removed,
+                      "Ice Climbers CPU9 probe did not exercise Nana death or source entity removal");
+                check(primary_survived&&primary_lifecycle&&(!partner_died||partner_present_after),
+                      "Ice Climbers partner loss did not preserve the leader and complete its 180-tick follow-up lifecycle");
+            }else if(kirby_action_case){
+                const auto acquire=[&](unsigned target_slot,int donor_kind){
+                    for(unsigned n=0;n<360;n++){
+                        const auto self=match.player_stats(0),target=match.player_stats(target_slot);
+                        const float dx=target.position[0]-self.position[0];
+                        const float dy=target.position[1]-self.position[1];
+                        if(std::fabs(dx)<7.0f&&std::fabs(dy)<5.0f)break;
+                        raw[0].stickX=std::fabs(dx)<5.0f?0:(dx>0?80:-80);
+                        raw[0].stickY=std::fabs(dy)<4.0f?0:(dy>0?60:-60);tick();
+                    }
+                    neutral();settle_primary();
+                    bool captured=false;
+                    for(unsigned n=0;n<240&&!captured;n++){
+                        raw[0].button=n==0?PAD_BUTTON_B:0;tick();
+                        const int target_motion=match.player_stats(target_slot).motion_id;
+                        captured=melee_web_test_fighter_owns_victim(0,target_slot)||
+                            target_motion==ftCo_MS_CaptureKirby||
+                            target_motion==ftCo_MS_CaptureWaitKirby||
+                            target_motion==ftCo_MS_ThrownKirbyStar||
+                            target_motion==ftCo_MS_ThrownCopyStar||
+                            target_motion==ftCo_MS_ThrownKirby;
+                    }
+                    neutral();
+                    check(captured,"Kirby inhale did not reach the source capture/swallow transition for donor slot "+
+                          std::to_string(target_slot));
+                    for(unsigned n=0;n<360&&match.player_stats(0).motion_id!=ftKb_MS_EatWait;n++)tick();
+                    check(match.player_stats(0).motion_id==ftKb_MS_EatWait,
+                          "Kirby capture did not settle into EatWait; motion="+
+                          std::to_string(match.player_stats(0).motion_id)+" target_motion="+
+                          std::to_string(match.player_stats(target_slot).motion_id)+" owns_victim="+
+                          std::to_string(melee_web_test_fighter_owns_victim(0,target_slot)));
+                    raw[0].button=PAD_BUTTON_B;tick();neutral();
+                    for(unsigned n=0;n<240&&melee_web_test_kirby_copy_kind(0)!=donor_kind;n++)tick();
+                    check(melee_web_test_kirby_copy_kind(0)==donor_kind,
+                          "Kirby EatWait B did not acquire the donor's source copy ability; motion="+
+                          std::to_string(match.player_stats(0).motion_id)+" copy_kind="+
+                          std::to_string(melee_web_test_kirby_copy_kind(0)));
+                    std::cout<<"Kirby acquired donor FighterKind="<<donor_kind
+                             <<" from slot="<<target_slot<<std::endl;
+                };
+                const auto use_copy=[&](int donor_kind){
+                    bool copied_move=false;
+                    for(unsigned n=0;n<180&&!copied_move;n++){
+                        raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
+                        const int motion=match.player_stats(0).motion_id;
+                        if(donor_kind==FTKIND_GAMEWATCH)
+                            copied_move=motion==ftKb_MS_GwSpecialN||
+                                melee_web_test_item_count(It_Kind_Kirby_GameWatchChefPan)>0;
+                        else if(donor_kind==FTKIND_MARIO)
+                            copied_move=motion==ftKb_MS_MrSpecialN||
+                                melee_web_test_item_count(It_Kind_Mario_Fire)>0;
+                        else if(donor_kind==FTKIND_SAMUS)
+                            copied_move=motion>=ftKb_MS_SsSpecialNStart&&
+                                motion<=ftKb_MS_SsSpecialN;
+                    }
+                    neutral();
+                    check(copied_move,"Kirby did not execute the source neutral special for donor "+
+                          std::to_string(donor_kind));
+                };
+                acquire(1,FTKIND_GAMEWATCH);use_copy(FTKIND_GAMEWATCH);
+                bool lost=false;
+                for(unsigned n=0;n<120&&!lost;n++){
+                    raw[0].button=n==0?PAD_BUTTON_DOWN:0;tick();
+                    lost=melee_web_test_kirby_copy_kind(0)==FTKIND_KIRBY;
+                }
+                neutral();
+                check(lost,"Kirby down taunt did not lose the Game & Watch copy ability through its source path");
+                acquire(1,FTKIND_GAMEWATCH);use_copy(FTKIND_GAMEWATCH);
+                check(melee_web_test_kirby_copy_kind(0)==FTKIND_GAMEWATCH,
+                      "Kirby did not replace its lost Game & Watch ability through the source path");
+                std::cout<<"Kirby action coverage: Game & Watch acquire/use/loss/replacement and match teardown path passed; Mario, Samus and other donor effect families unverified"<<std::endl;
+            }else{
+                check(false,"--character-actions is only defined for the newly admitted source fighters");
+            }
+        }else if(platform_pass){
             check(selection.start.rules.stkind==St_Kind_Battle&&
                   opponent_content->fighter_kind==FTKIND_DONKEY,
                   "Platform Pass probe requires Battlefield with Donkey in P2");

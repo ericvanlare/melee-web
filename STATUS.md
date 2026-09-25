@@ -1,5 +1,14 @@
 # Current status
 
+## Remaining fighter candidate — PR #86
+
+Current per-character coverage, original CPU9 captures, rendered browser
+failures, and explicit open gates are recorded in
+[Remaining fighter port notes](docs/REMAINING_FIGHTERS_PORT_NOTES.md). The
+original A/B menu captures completed, but A repeatability failed, B repeatability
+is unavailable, the port matches did not complete, and no original-versus-port
+comparison or admission is claimed.
+
 ## Repository public; main changes restricted to the owner
 
 The [publication record](docs/PUBLICATION_CUTOVER.md) and

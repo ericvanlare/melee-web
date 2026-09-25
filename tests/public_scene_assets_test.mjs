@@ -71,6 +71,22 @@ try {
   assert.equal(NATIVE_GAME_DISC_FILES['PlCo.dat'], 'PlCo.dat');
   assert.equal(NATIVE_GAME_DISC_FILES['main.ssm'], 'audio/us/main.ssm');
   assert.equal(Object.hasOwn(NATIVE_GAME_DISC_FILES, 'dsp_coef.bin'), false);
+  const kirbyCopyArchives = [
+    'PlKbCpMr.dat','PlKbCpFx.dat','PlKbCpCa.dat','PlKbCpDk.dat',
+    'PlKbCpKp.dat','PlKbCpLk.dat','PlKbCpSk.dat','PlKbCpNs.dat',
+    'PlKbCpPe.dat','PlKbCpPp.dat','PlKbCpPk.dat','PlKbCpSs.dat',
+    'PlKbCpYs.dat','PlKbCpPr.dat','PlKbCpMt.dat','PlKbCpLg.dat',
+    'PlKbCpMs.dat','PlKbCpZd.dat','PlKbCpCl.dat','PlKbCpDr.dat',
+    'PlKbCpFc.dat','PlKbCpPc.dat','PlKbCpGw.dat','PlKbCpGn.dat',
+    'PlKbCpFe.dat','PlKbNrCpDk.dat','PlKbNrCpPr.dat','PlKbNrCpMt.dat',
+    'PlKbNrCpFc.dat','PlKbNrCpGw.dat',
+    'EfKbMs.dat','EfKbZd.dat','EfKbMr.dat','EfKbFx.dat','EfKbSs.dat',
+    'EfKbPk.dat','EfKbLg.dat','EfKbCa.dat','EfKbDk.dat','EfKbKp.dat',
+    'EfKbIc.dat','EfKbGn.dat','EfKbFe.dat',
+  ];
+  for (const name of kirbyCopyArchives)
+    assert.equal(NATIVE_GAME_DISC_FILES[name], name,
+      `source Kirby copy archive must resolve to its exact FST path: ${name}`);
 
   const session = await openNativeGameDiscSession('owned-disc');
   const progress = [];

@@ -254,7 +254,7 @@ PADStatus diagnostic_pad{};
 unsigned diagnostic_pad_port=0,diagnostic_pad_remaining=0;
 std::array<float,1068> pcm;
 alignas(32) unsigned char fifo[64*1024];
-constexpr std::array<std::string_view,314> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","EfFxData.dat","falco.ssm","GrNBa.dat","sp_zako.hps","hyaku.hps","hyaku2.hps","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","fox.ssm","GrSt.dat","ystory.hps","PlMs.dat","PlMsAJ.dat","PlMsNr.dat","PlMsRe.dat","PlMsGr.dat","PlMsBk.dat","PlMsWh.dat","EfMsData.dat","mars.ssm","GrOp.dat","old_kb.hps","pupupu.ssm","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sislib_font.bin",
+constexpr std::array<std::string_view,357> keys={"LbBf.dat","GmPause.usd","IfAll.usd","IfCoGet.dat","SdIntro.dat","PlCo.dat","PlMr.dat","PlMrNr.dat","PlMrAJ.dat","GrNLa.dat","ItCo.usd","EfMrData.dat","EfCoData.dat","PdPm.dat","LbRb.dat","sp_end.hps","PlMrYe.dat","PlMrBk.dat","PlMrBu.dat","PlMrGr.dat","PlFc.dat","PlFcAJ.dat","PlFcNr.dat","PlFcRe.dat","PlFcBu.dat","PlFcGr.dat","EfFxData.dat","falco.ssm","GrNBa.dat","sp_zako.hps","hyaku.hps","hyaku2.hps","PlFx.dat","PlFxAJ.dat","PlFxNr.dat","PlFxOr.dat","PlFxLa.dat","PlFxGr.dat","fox.ssm","GrSt.dat","ystory.hps","PlMs.dat","PlMsAJ.dat","PlMsNr.dat","PlMsRe.dat","PlMsGr.dat","PlMsBk.dat","PlMsWh.dat","EfMsData.dat","mars.ssm","GrOp.dat","old_kb.hps","pupupu.ssm","MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd","LbMcGame.usd","NtMemAc.usd","menu01.hps","nr_select.ssm","nr_title.ssm","nr_name.ssm","pokemon.ssm","end.ssm","smash2.sem","main.ssm","mario.ssm","dsp_coef.bin","sislib_font.bin",
  "PlDr.dat","PlDrAJ.dat","PlDrNr.dat","PlDrRe.dat","PlDrBu.dat","PlDrGr.dat","PlDrBk.dat","drmario.ssm",
  "PlFe.dat","PlFeAJ.dat","PlFeNr.dat","PlFeRe.dat","PlFeBu.dat","PlFeGr.dat","PlFeYe.dat","EfFeData.dat","emblem.ssm",
  "PlLk.dat","PlLkAJ.dat","PlLkNr.dat","PlLkRe.dat","PlLkBu.dat","PlLkBk.dat","PlLkWh.dat",
@@ -321,6 +321,15 @@ constexpr std::array<std::string_view,314> keys={"LbBf.dat","GmPause.usd","IfAll
  "peach.ssm",
  "PlKb.dat","PlKbAJ.dat","PlKbNr.dat","PlKbYe.dat","PlKbBu.dat","PlKbRe.dat",
  "PlKbGr.dat","PlKbWh.dat","EfKbData.dat","kirby.ssm","GmRstMKb.dat",
+ // Kirby's source copy move and hat roots, plus copy-specific effect banks.
+ "PlKbCpMr.dat","PlKbCpFx.dat","PlKbCpCa.dat","PlKbCpDk.dat","PlKbCpKp.dat",
+ "PlKbCpLk.dat","PlKbCpSk.dat","PlKbCpNs.dat","PlKbCpPe.dat","PlKbCpPp.dat",
+ "PlKbCpPk.dat","PlKbCpSs.dat","PlKbCpYs.dat","PlKbCpPr.dat","PlKbCpMt.dat",
+ "PlKbCpLg.dat","PlKbCpMs.dat","PlKbCpZd.dat","PlKbCpCl.dat","PlKbCpDr.dat",
+ "PlKbCpFc.dat","PlKbCpPc.dat","PlKbCpGw.dat","PlKbCpGn.dat","PlKbCpFe.dat",
+ "PlKbNrCpDk.dat","PlKbNrCpPr.dat","PlKbNrCpMt.dat","PlKbNrCpFc.dat","PlKbNrCpGw.dat",
+ "EfKbMs.dat","EfKbZd.dat","EfKbMr.dat","EfKbFx.dat","EfKbSs.dat","EfKbPk.dat",
+ "EfKbLg.dat","EfKbCa.dat","EfKbDk.dat","EfKbKp.dat","EfKbIc.dat","EfKbGn.dat","EfKbFe.dat",
  "samus.ssm","yoshi.ssm","zs.ssm","GmRstMSs.dat","GmRstMZd.dat","GmRstMSk.dat",
  "PlGw.dat","PlGwAJ.dat","PlGwNr.dat","gw.ssm",
  "PlSs.dat","PlSsAJ.dat","PlSsNr.dat","PlSsPi.dat","PlSsBk.dat","PlSsGr.dat","PlSsLa.dat","EfSsData.dat",
