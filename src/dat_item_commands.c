@@ -41,6 +41,11 @@ void* melee_web_item_commands_create(const uint32_t* words,size_t count){
          * one-word layout to their itcmd variable setters. */
         case 14:case 17:case 18:case 19:
             out[i].set_throw_flags=(struct set_throw_flags){op,w&0x3ffffff};break;
+        /* Item opcode 21 dispatches to it_80279888, which forwards the two
+         * 13-bit source fields to the owning fighter. Repack for the native
+         * little-endian bitfield layout consumed by the original handler. */
+        case 21:
+            out[i].unk33=(struct unk33){op,(w>>13)&0x1fff,w&0x1fff};break;
         /* Opcode 16 (it_8027978C) reads its sub-opcode from source bits
          * 25..18 of the command word (big-endian itAnimlistCmdUnk.opcode).
          * The native handler reads the same field from native bits 6..13,

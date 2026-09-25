@@ -3,6 +3,7 @@
 #include "gameplay_match_session.hpp"
 #include "gameplay_menu.h"
 #include "gameplay_content.h"
+#include "gameplay_pad_state.h"
 #include <melee/ft/kinds/ftMario/forward.h>
 #include <melee/ft/kinds/ftMars/forward.h>
 #include <melee/ft/kinds/ftCaptain/forward.h>
@@ -18,12 +19,16 @@
 #include <melee/it/forward.h>
 #include <filesystem>
 #include <fstream>
+#include <array>
 #include <iostream>
+#include <memory>
 #include <stdexcept>
 #include <cmath>
 #include <algorithm>
+#include <optional>
 
 extern "C" int melee_web_test_content_player(unsigned,int,int,unsigned);
+extern "C" int melee_web_test_entity_state(unsigned,unsigned,int*,int*,int*,int*);
 extern "C" int melee_web_test_donkey_cargo(unsigned,int);
 extern "C" int melee_web_test_koopa_capture(unsigned,int);
 extern "C" int melee_web_test_item_count(int);
@@ -32,6 +37,29 @@ extern "C" int melee_web_test_quake_start(int);
 extern "C" int melee_web_test_quake_translated(void);
 extern "C" int melee_web_story_state(uint32_t*,unsigned*,int*,int*,int*,int*);
 static void check(bool value,const char* message){if(!value)throw std::runtime_error(message);}
+using PadStateOwner=std::unique_ptr<MeleeWebPadState,decltype(&melee_web_pad_state_free)>;
+static PadStateOwner zelda_sheik_transform_input(){
+    std::array<uint8_t,MELEE_WEB_PAD_STATE_BYTES> bytes{};
+    const auto put_u32=[&](size_t offset,uint32_t value){
+        for(unsigned byte=0;byte<4;++byte)
+            bytes[offset+byte]=static_cast<uint8_t>(value>>(24-8*byte));
+    };
+    // Source match PAD setup: default repeat/dead-zone values with the exact
+    // per-match stick and analog-L/R overrides from gameplay_match_context.c.
+    put_u32(0,45);put_u32(4,8);bytes[9]=30;
+    bytes[16]=80;bytes[18]=1;bytes[19]=140;bytes[22]=255;
+    bytes[24]=80;bytes[25]=bytes[26]=255;
+    for(unsigned bank=0;bank<3;++bank)for(unsigned slot=0;slot<4;++slot)
+        bytes[30+(bank*4+slot)*66+64]=1;
+    constexpr size_t copy_status=30+4*66;
+    constexpr uint32_t button=PAD_BUTTON_A;
+    put_u32(copy_status,button);
+    char error[128]{};
+    PadStateOwner state(melee_web_pad_state_decode(bytes.data(),bytes.size(),error,sizeof(error)),
+                        melee_web_pad_state_free);
+    check(bool(state),error);
+    return state;
+}
 int main(int argc,char** argv){try{
     if(argc<3||argc>7)throw std::runtime_error("Expected owned menu/game directories and optional StKind/P1 CKind/P2 CKind/trace scope");
     const bool entry_only=argc==7&&std::string(argv[6])=="--entry-only";
@@ -108,17 +136,42 @@ int main(int argc,char** argv){try{
         selection.start.players[1].color=opponent_color;
         selection.players[0]={0,4,fighter_color,0};
         selection.players[1]={1,4,opponent_color,0};
+        const bool transformation_form=fighter_ckind==CKIND_ZELDA||fighter_ckind==CKIND_SEAK;
         std::cout<<"Construct mixed content stage="<<selection.start.rules.stkind<<" costume="<<cycle<<std::endl;
-        melee_web::GameplayMatchSession match(files,selection);
+        std::optional<melee_web::GameplayMatchSession> match_owner;
+        if(transformation_form){
+            auto initial_input=zelda_sheik_transform_input();
+            match_owner.emplace(files,selection,*initial_input);
+        }else match_owner.emplace(files,selection);
+        auto& match=*match_owner;
         PADStatus raw[4]{};raw[2].err=raw[3].err=PAD_ERR_NO_CONTROLLER;
         float pcm[1068];unsigned phase=0;
-        auto tick=[&](){match.tick(raw);phase+=32000;const auto count=phase/60;phase%=60;
+        auto tick=[&](){
+            match.tick(raw);phase+=32000;const auto count=phase/60;phase%=60;
             check(melee_web_audio_render(match.audio(),pcm,count,error,sizeof(error)),error);
             for(unsigned i=0;i<2;i++){const auto state=match.player_stats(i);
                 check(std::isfinite(state.position[0])&&std::isfinite(state.position[1]),"Nonfinite fighter state");}};
         for(unsigned n=0;!match.ready()&&n<600;n++)tick();
         check(match.ready(),"Original Ready did not finish");
-        check(melee_web_test_content_player(0,fighter_ckind,fighter_content->fighter_kind,fighter_color),"Original selected-fighter identity/costume/icon differs");
+        const int active_fighter_ckind=transformation_form?
+            (fighter_ckind==CKIND_ZELDA?CKIND_SEAK:CKIND_ZELDA):fighter_ckind;
+        const auto* active_fighter_content=melee_web_fighter_content(active_fighter_ckind);
+        check(active_fighter_content&&melee_web_test_content_player(0,active_fighter_ckind,
+              active_fighter_content->fighter_kind,fighter_color),
+              "Original selected-fighter identity/costume/icon differs after source startup transform");
+        if(transformation_form)
+            std::cout<<"Source held-A startup transformed "<<fighter_content->name<<" to "
+                     <<active_fighter_content->name<<" before Fighter_Create"<<std::endl;
+        if(fighter_ckind==CKIND_POPONANA){
+            int primary_kind=-1,partner_kind=-1,primary_motion=-1,partner_motion=-1;
+            int primary_grounded=0,partner_grounded=0,primary_skeleton=0,partner_skeleton=0;
+            check(melee_web_test_entity_state(0,0,&primary_kind,&primary_motion,&primary_grounded,&primary_skeleton)&&
+                  melee_web_test_entity_state(0,1,&partner_kind,&partner_motion,&partner_grounded,&partner_skeleton)&&
+                  primary_kind==FTKIND_POPO&&partner_kind==FTKIND_NANA&&primary_skeleton&&partner_skeleton,
+                  "Ice Climbers source player must own distinct Popo and Nana fighter entities");
+            std::cout<<"Ice pair primary="<<primary_kind<<"/"<<primary_motion<<"/"<<primary_grounded
+                     <<" partner="<<partner_kind<<"/"<<partner_motion<<"/"<<partner_grounded<<std::endl;
+        }
         check(melee_web_test_content_player(1,opponent_ckind,opponent_content->fighter_kind,opponent_color),"Original opponent identity/costume/icon differs");
         check(match.player_stats(0).stocks==4&&match.player_stats(1).stocks==4,
               "Source stock initialization changed for the selected content pair");

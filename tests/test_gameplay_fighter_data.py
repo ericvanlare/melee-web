@@ -125,6 +125,15 @@ class GameplayFighterDataTests(unittest.TestCase):
                             self.assertIn("Native Donkey 0x74 ABI, exact dynamics and null Article table: passed",
                                           result.stdout)
             print(result.stdout, end="")
+            gamewatch_asset = ROOT / "assets-local/next-gate/PlGw.dat"
+            gamewatch_container = ROOT / "assets-local/next-gate/PlGwAJ.dat"
+            if gamewatch_asset.is_file() and gamewatch_container.is_file():
+                gamewatch = subprocess.run([str(node), str(output), "--gamewatch",
+                    str(gamewatch_asset), str(gamewatch_container)], cwd=directory,
+                    env=env, capture_output=True, text=True, timeout=30)
+                self.assertEqual(gamewatch.returncode, 0, gamewatch.stdout + gamewatch.stderr)
+                self.assertIn("Native Game & Watch 0x94 attributes", gamewatch.stdout)
+                print(gamewatch.stdout, end="")
             koopa_asset = ROOT / "assets-local/full-game-koopa/PlKp.dat"
             if koopa_asset.is_file():
                 koopa = subprocess.run([str(node), str(output), "--koopa", str(koopa_asset)],

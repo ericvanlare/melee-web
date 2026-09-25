@@ -10,6 +10,12 @@
 #include <functional>
 #include <set>
 #include <map>
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wwrite-strings"
+extern "C" {
+#include <melee/ft/ftparts.h>
+}
+#pragma GCC diagnostic pop
 namespace melee_web {
 namespace {
 void require(bool c,const char* why){if(!c)throw DatError(why);}
@@ -24,22 +30,33 @@ struct DatNativeAnimation::Storage {
     bool indexable=false;
     std::vector<DatParticleEvent> particle_events;
 };
-DatNativeAnimation::DatNativeAnimation(std::shared_ptr<const DatArchive> archive,uint32_t root,const MeleeWebNativeGraph& graph,DatNativeAnimationPolicy policy,std::span<void* const> native_joint_descriptors)
+DatNativeAnimation::DatNativeAnimation(std::shared_ptr<const DatArchive> archive,uint32_t root,const MeleeWebNativeGraph& graph,DatNativeAnimationPolicy policy,std::span<void* const> native_joint_descriptors,DatNativeAnimationTopology topology)
     :storage_(std::make_unique<Storage>())
 {
     auto& s=*storage_;s.archive=std::move(archive);
     require(bool(s.archive)&&graph.joints&&graph.root<graph.joint_count,"Native joint animation requires archive and checked model");
+    const bool part_animation=topology==DatNativeAnimationTopology::FighterParts;
     const auto& a=*s.archive;std::set<uint32_t> visited,tracks;size_t stream_bytes=0;
     auto record=[&](uint32_t o,size_t n){require(!(o&3),"Native animation descriptor is unaligned");(void)a.range(o,n);
         require(n<=a.next_target_offset(o)-o,"Native animation descriptor crosses a referenced region");};
     std::map<HSD_AnimJoint*,uint32_t> indices;
     bool contiguous=graph.root==0;
-    std::function<HSD_AnimJoint*(std::optional<uint32_t>,uint32_t)> visit;
-    visit=[&](std::optional<uint32_t> at,uint32_t joint)->HSD_AnimJoint*{
+    std::function<HSD_AnimJoint*(std::optional<uint32_t>,uint32_t,uint32_t)> visit;
+    visit=[&](std::optional<uint32_t> at,uint32_t joint,uint32_t depth)->HSD_AnimJoint*{
         // Original AddAnimAll allows a missing subtree, leaving those joints
         // without an animation; a present subtree must map to real joints.
         if(!at)return nullptr;
-        require(joint<graph.joint_count&&s.nodes.size()<256&&visited.insert(*at).second,"Native animation topology/cycle/count is invalid");
+        if(part_animation) {
+            // ftAnim_GetNextAnimJointInTree uses a 30-entry depth stack, and
+            // Fighter.parts is allocated at the exact MAX_FT_PARTS source
+            // capacity. Part-animation trees are not the model JObj graph.
+            require(depth<30&&s.nodes.size()<MAX_FT_PARTS,
+                    "Native part animation exceeds source Fighter_Part traversal capacity");
+        } else {
+            require(joint<graph.joint_count&&s.nodes.size()<256,
+                    "Native animation topology/cycle/count is invalid");
+        }
+        require(visited.insert(*at).second,"Native animation topology/cycle/count is invalid");
         record(*at,20);require(!a.pointer(*at+12),"Native RObj animation is unsupported");
         const auto flags=a.be32(*at+16);require(!(flags&~1u),"Native animation joint flags are unsupported");
         auto owner=std::make_unique<Node>();auto& n=*owner;n.descriptor.flags=flags;
@@ -110,11 +127,24 @@ DatNativeAnimation::DatNativeAnimation(std::shared_ptr<const DatArchive> archive
             require(!reference||(channels&(UINT64_C(1)<<4)),"Spline object reference requires an original PATH channel");
             n.descriptor.aobjdesc=&n.animation;
         }
-        auto* result=&n.descriptor;indices[result]=joint;contiguous=contiguous&&*at==root+joint*20;s.nodes.push_back(std::move(owner));
-        result->child=visit(a.pointer(*at,20),graph.joints[joint].child);
-        result->next=visit(a.pointer(*at+4,20),graph.joints[joint].next);return result;
+        auto* result=&n.descriptor;
+        if(!part_animation) {
+            indices[result]=joint;contiguous=contiguous&&*at==root+joint*20;
+        }
+        s.nodes.push_back(std::move(owner));
+        // ftData's part-animation records are consumed as an authored ordered
+        // Fighter_Part list, not as a mirror of the model JObj child/sibling
+        // graph. Preserve their own HSD_AnimJoint topology and bound the
+        // traversal by that checked source list.
+        result->child=visit(a.pointer(*at,20),part_animation?0:graph.joints[joint].child,depth+1);
+        result->next=visit(a.pointer(*at+4,20),part_animation?0:graph.joints[joint].next,depth);return result;
     };
-    auto* tree=visit(root,graph.root);s.indexed.resize(graph.joint_count);
+    auto* tree=visit(root,part_animation?0:graph.root,0);
+    if(part_animation) {
+        s.root=tree;
+        return;
+    }
+    s.indexed.resize(graph.joint_count);
     for(const auto& [old,index]:indices){
         auto& out=s.indexed[index];out=*old;
         out.child=old->child?&s.indexed.at(indices.at(old->child)):nullptr;

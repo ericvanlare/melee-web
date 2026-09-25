@@ -140,6 +140,14 @@ int assets_test_item_commands(void)
         commands[1].set_hitbox_scale.value==384 && commands[2].Command_00.value==2 &&
         commands[3].Command_00.code==4;
     melee_web_item_commands_destroy(commands);
+    const uint32_t owner_command[]={(21U<<26)|(0x12aU<<13)|0x35U,0};
+    commands=melee_web_item_commands_create(owner_command,2);
+    if(!commands || commands[0].unk33.opcode!=21 || commands[0].unk33.unk0!=0x12a ||
+       commands[0].unk33.unk1!=0x35 || commands[1].Command_00.code!=0){
+        if(commands)melee_web_item_commands_destroy(commands);
+        return 0;
+    }
+    melee_web_item_commands_destroy(commands);
     const uint32_t invalid[]={(13U<<26)|(4U<<23),0};
     commands=melee_web_item_commands_create(invalid,2);
     if(commands){melee_web_item_commands_destroy(commands);return 0;}

@@ -139,8 +139,12 @@ struct GameplayMatchSession::Storage {
             for(unsigned i=0;i<content.player_count;++i){
                 const auto kind=content.fighter_kinds[i];
                 const auto* dependency=melee_web_fighter_content_by_kind(kind);
-                if(fighter_banks.insert(dependency->audio_bank).second)
-                    bank_names.emplace_back(dependency->audio_bank);
+                for(unsigned identity=0;identity<melee_web_fighter_kind_count(dependency->character_kind);++identity){
+                    const auto* owner=melee_web_fighter_content_by_kind(
+                        melee_web_fighter_kind_at(dependency->character_kind,identity));
+                    if(fighter_banks.insert(owner->audio_bank).second)
+                        bank_names.emplace_back(owner->audio_bank);
+                }
             }
             if(stage->audio_bank)bank_names.emplace_back(stage->audio_bank);
             if(runtime_cache){

@@ -326,6 +326,10 @@ void geometry(const DatArchive& a, uint32_t offset, RigidMesh& mesh, RigidModel&
             reject("Bump texture requires an interleaved GX_VA_NBT stream");
         if ((texture.source_flags & 15U) == 1) {
             if (!has_normal) reject("Reflection texture requires normal coordinates");
+        } else if ((texture.source_flags & 15U) == 2 &&
+                   policy == DatMaterialPolicy::NativeDescriptors) {
+            // Native HSD computes TEX_COORD_HILIGHT from the active light and
+            // camera in TObjSetupMtx; it does not index a model UV attribute.
         } else if (!has_attribute(va_tex0 + texture.source - 4)) {
             reject("Texture requires a missing UV vertex source");
         }

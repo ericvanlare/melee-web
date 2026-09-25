@@ -73,6 +73,7 @@ void verify(std::shared_ptr<const DatArchive> archive, const Bytes& container, b
         for(auto id:{37U,41U,52U,60U,66U,72U,77U,177U,199U,221U,242U,247U,250U,253U}) check(store.command_ready(id),"Explicit normal action group readiness");
         for(auto id:{295U,296U,297U,298U,299U,300U,301U,302U}) check(store.command_ready(id),"Mario special script operands ready independently of Article services");
         check(store.command_ready(238), "Original EntryStart command graph is ready");
+        check(store.command_ready(277), "Yoshi Egg capture victim command graph is ready");
         check(action_test_load(fp,238,1)>0, "Original EntryStart clip loads");
         check(action_test_commands(store.action_rows(),238,false), "Original Mario EntryStart END executes");
         check(!store.command_ready(138),"Unchecked item shoot script remains gated");
@@ -353,7 +354,12 @@ int main(int argc, char** argv)
         put32(finite.data,finite_root+8,0x10000000);put32(finite.data,finite_root+12,0);
         DatCommands finite_commands(std::make_shared<const DatArchive>(finite.file()),std::span(&finite_root,1));
         check(finite_commands.word_count()==4,"Finite loop validates original two-slot stack semantics");
-        for(uint32_t invalid:{0x0c000000U,0x10000000U,0x0c001001U}){
+        put32(finite.data,finite_root,0x0c001f40); // Kirby SpecialNLoop's authored 8000-count SetLoop.
+        DatCommands long_finite_commands(std::make_shared<const DatArchive>(finite.file()),
+                                         std::span(&finite_root,1));
+        check(long_finite_commands.word_count()==4,
+              "Long finite loop retains its four source words without unrolling 8000 iterations");
+        for(uint32_t invalid:{0x0c000000U,0x10000000U}){
             put32(finite.data,finite_root,invalid);
             rejects([&]{DatCommands bad(std::make_shared<const DatArchive>(finite.file()),std::span(&finite_root,1));});
         }

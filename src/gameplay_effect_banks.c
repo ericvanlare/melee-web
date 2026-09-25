@@ -99,12 +99,21 @@ MeleeWebEffectBank* melee_web_effect_bank_decode_roots(const MeleeWebNativeDat* 
     h->textures=NEW(groups+1,int);h->textures[0]=(int)groups;
     uint32_t* offsets=NEW(count,uint32_t);
     for(uint32_t i=0;i<count;++i){
+        const uint32_t slot=cb+header+4*i;
+        /* psInitDataBankLocate relocates version-40 command rows only when
+         * their authored relative pointer is nonzero, and its command lookup
+         * later skips null HSD_PSCmdList entries. Keep those source holes as
+         * null rows instead of treating them as malformed offsets. */
+        if(WORD(slot)==0){offsets[i]=0;continue;}
         offsets[i]=relative(d,cb,command_bytes,cb+header+4*i,0x3d);
         REQUIRE(offsets[i]>=cb+header+4*count,"Particle command overlaps its pointer table");
     }
     for(uint32_t i=0;i<count;++i){
+        HSD_PSCmdList** command_table=(HSD_PSCmdList**)(h->commands+header/4);
+        if(!offsets[i]){command_table[i]=NULL;continue;}
         uint32_t end=cb+command_bytes;
-        for(uint32_t j=0;j<count;++j)if(offsets[j]>offsets[i]&&offsets[j]<end)end=offsets[j];
+        for(uint32_t j=0;j<count;++j)
+            if(offsets[j]&&offsets[j]>offsets[i]&&offsets[j]<end)end=offsets[j];
         const uint32_t at=offsets[i],length=end-at;
         REQUIRE(length>=0x3d&&length<=65536,"Particle command stream region exceeds bounds");
         HSD_PSCmdList* cmd=d->allocate(d->context,1,length);
@@ -117,7 +126,7 @@ MeleeWebEffectBank* melee_web_effect_bank_decode_roots(const MeleeWebNativeDat* 
             memcpy((char*)cmd+field,&value,4);
         }
         memcpy(cmd->cmdList,d->region(d->context,at+0x3c,length-0x3c),length-0x3c);
-        ((HSD_PSCmdList**)(h->commands+header/4))[i]=cmd;
+        command_table[i]=cmd;
     }
     for(uint32_t i=0;i<groups;++i){
         const uint32_t at=relative(d,tb,texture_bytes,tb+4+4*i,0x18);

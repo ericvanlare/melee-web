@@ -94,10 +94,10 @@ void menu_contract()
 {
     const auto names = menu_asset_names();
 #if defined(MELEE_WEB_PUBLIC_AUDIO_DISABLED)
-    check(names.size()==36, "Silent menu descriptor excludes only DSP coefficients");
+    check(names.size()==42, "Silent menu descriptor excludes only DSP coefficients");
     check(!has(names,"dsp_coef.bin"), "Public scope must not request DSP coefficients");
 #else
-    check(names.size()==37, "Menu descriptor must include each admitted CSS voice bank");
+    check(names.size()==43, "Menu descriptor must include each admitted CSS voice bank");
     check(has(names,"dsp_coef.bin"), "Development scope requires DSP coefficients");
 #endif
     for(const auto name:{"MnSlChr.usd","MnSlMap.usd","SdSlChr.usd","MnExtAll.usd",
@@ -122,7 +122,8 @@ void source_fighter_closure()
         CKIND_EMBLEM, CKIND_LINK, CKIND_CLINK, CKIND_CAPTAIN, CKIND_GANON,
         CKIND_LUIGI, CKIND_PIKACHU, CKIND_PICHU, CKIND_PURIN, CKIND_DONKEY,
         CKIND_KOOPA, CKIND_NESS, CKIND_PEACH,
-        CKIND_MEWTWO,
+        CKIND_MEWTWO, CKIND_GAMEWATCH, CKIND_KIRBY, CKIND_POPONANA, CKIND_SAMUS,
+        CKIND_YOSHI, CKIND_ZELDA, CKIND_SEAK,
     };
     for (const int character : characters) {
         const auto* content = melee_web_fighter_content(character);
@@ -143,7 +144,8 @@ void source_fighter_closure()
         check(selected != fighter_costumes().end(), "Selected costume is absent from registry");
         check(has(names, logical_model(selected->model_filename)),
               "Selected costume model is absent from descriptor");
-        check(has(names, content->effect_archive) && has(names, content->audio_bank),
+        check((!content->effect_archive || has(names, content->effect_archive)) &&
+              has(names, content->audio_bank),
               "Selected fighter effect/audio closure is incomplete");
         no_duplicates(names);
     }
@@ -167,6 +169,10 @@ void results_fighter_closure()
         {CKIND_DONKEY, "ff_dk.hps"}, {CKIND_KOOPA, "ff_mario.hps"},
         {CKIND_MEWTWO, "ff_poke.hps"}, {CKIND_NESS, "ff_nes.hps"},
         {CKIND_PEACH, "ff_mario.hps"},
+        {CKIND_GAMEWATCH, "ff_flat.hps"}, {CKIND_KIRBY, "ff_kirby.hps"},
+        {CKIND_POPONANA, "ff_ice.hps"}, {CKIND_SAMUS, "ff_samus.hps"},
+        {CKIND_YOSHI, "ff_yoshi.hps"}, {CKIND_ZELDA, "ff_link.hps"},
+        {CKIND_SEAK, "ff_link.hps"},
     };
     for (const auto& expected : fighters) {
         const auto* content = melee_web_fighter_content(expected.character);
@@ -218,7 +224,7 @@ void rejects_invalid_without_mutation()
     value = selection(St_Kind_Last, CKIND_MARIO, CKIND_MARIO);
     value.player_count = 1;
     rejects([&] { (void)match_asset_names(value); });
-    value = selection(St_Kind_Last, CKIND_KIRBY, CKIND_MARIO);
+    value = selection(St_Kind_Last, CKIND_MASTERH, CKIND_MARIO);
     rejects([&] { (void)match_asset_names(value); });
     value = selection(St_Kind_Last, CKIND_MARIO, CKIND_MARIO, 5, 0);
     rejects([&] { (void)match_asset_names(value); });

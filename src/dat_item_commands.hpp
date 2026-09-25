@@ -62,7 +62,7 @@ public:
                     count=(sub<=2||sub==10||sub==11)?3:2;
                 }
                 else if(op!=0&&op!=1&&op!=2&&op!=3&&op!=4&&op!=5&&op!=6&&op!=7&&op!=8&&op!=9&&op!=12&&
-                        op!=13&&op!=14&&op!=15&&op!=17&&op!=18&&op!=19)
+                        op!=13&&op!=14&&op!=15&&op!=17&&op!=18&&op!=19&&op!=21)
                     throw DatError("Item command opcode " + std::to_string(op) +
                                    " is outside checked capabilities at source offset " +
                                    std::to_string(at));

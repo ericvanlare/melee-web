@@ -22,7 +22,7 @@ export const NATIVE_MENU_DISC_FILES=Object.freeze({
   'menu01.hps':'audio/menu01.hps','smash2.sem':'audio/us/smash2.sem',
   ...Object.fromEntries(['main','nr_select','nr_title','nr_name','pokemon','end',
     'captain','dk','fox','koopa','link','luigi','mario','mars','ness','peach','pikachu','purin',
-    'mewtwo','falco','clink','drmario','emblem','pichu','ganon','pupupu']
+    'mewtwo','falco','clink','drmario','emblem','pichu','ganon','pupupu','kirby','samus','yoshi','zs','gw','ice']
     .map(name=>[name+'.ssm','audio/us/'+name+'.ssm']))
 });
 export const NATIVE_GAME_DISC_FILES=Object.freeze({
@@ -31,7 +31,7 @@ export const NATIVE_GAME_DISC_FILES=Object.freeze({
   'LbBf.dat':'LbBf.dat',
   'GmRst.usd':'GmRst.usd','SdRst.usd':'SdRst.usd','TyDatai.usd':'TyDatai.usd',
   's_info1.hps':'audio/s_info1.hps','s_info2.hps':'audio/s_info2.hps','s_info3.hps':'audio/s_info3.hps','IfPrize.usd':'IfPrize.usd','SdPrize.usd':'SdPrize.usd',
-  ...Object.fromEntries(['Mr','Dr','Fx','Fc','Ms','Fe','Lk','Cl','Ca','Dk','Gn','Kp','Lg','Mt','Ns','Pe','Pk','Pc','Pr']
+  ...Object.fromEntries(['Mr','Dr','Fx','Fc','Ms','Fe','Lk','Cl','Ca','Dk','Gn','Kp','Lg','Mt','Ns','Pe','Pk','Pc','Pr','Gw','Kb','Ss','Zd','Sk']
     .map(kind=>[`GmRstM${kind}.dat`,`GmRstM${kind}.dat`])),
   ...Object.fromEntries(['mario','fox','emb','link','fzero','dk','poke','nes']
     .map(name=>[`ff_${name}.hps`,`audio/ff_${name}.hps`])),
@@ -116,6 +116,39 @@ export const NATIVE_GAME_DISC_FILES=Object.freeze({
   'PlMt.dat':'PlMt.dat','PlMtAJ.dat':'PlMtAJ.dat','PlMtNr.dat':'PlMtNr.dat',
   'PlMtRe.dat':'PlMtRe.dat','PlMtBu.dat':'PlMtBu.dat','PlMtGr.dat':'PlMtGr.dat',
   'EfMtData.dat':'EfMtData.dat','mewtwo.ssm':'audio/us/mewtwo.ssm',
+  // Game & Watch has one authored shared costume model, ten Article roots,
+  // and no fighter-specific effect table in ftData_UnkBytePerCharacter.
+  'PlGw.dat':'PlGw.dat','PlGwAJ.dat':'PlGwAJ.dat','PlGwNr.dat':'PlGwNr.dat',
+  'GmRstMGw.dat':'GmRstMGw.dat','gw.ssm':'audio/us/gw.ssm',
+  'PlKb.dat':'PlKb.dat','PlKbAJ.dat':'PlKbAJ.dat','PlKbNr.dat':'PlKbNr.dat',
+  'PlKbYe.dat':'PlKbYe.dat','PlKbBu.dat':'PlKbBu.dat','PlKbRe.dat':'PlKbRe.dat',
+  'PlKbGr.dat':'PlKbGr.dat','PlKbWh.dat':'PlKbWh.dat','EfKbData.dat':'EfKbData.dat',
+  'GmRstMKb.dat':'GmRstMKb.dat','kirby.ssm':'audio/us/kirby.ssm',
+  'PlSs.dat':'PlSs.dat','PlSsAJ.dat':'PlSsAJ.dat','PlSsNr.dat':'PlSsNr.dat',
+  'PlSsPi.dat':'PlSsPi.dat','PlSsBk.dat':'PlSsBk.dat','PlSsGr.dat':'PlSsGr.dat',
+  'PlSsLa.dat':'PlSsLa.dat','EfSsData.dat':'EfSsData.dat','samus.ssm':'audio/us/samus.ssm',
+  'GmRstMSs.dat':'GmRstMSs.dat',
+  // Yoshi uses three registered Articles; x48[3] is Egg Lay's source joint.
+  'PlYs.dat':'PlYs.dat','PlYsAJ.dat':'PlYsAJ.dat','PlYsNr.dat':'PlYsNr.dat',
+  'PlYsRe.dat':'PlYsRe.dat','PlYsBu.dat':'PlYsBu.dat','PlYsYe.dat':'PlYsYe.dat',
+  'PlYsPi.dat':'PlYsPi.dat','PlYsAq.dat':'PlYsAq.dat','EfYsData.dat':'EfYsData.dat',
+  'yoshi.ssm':'audio/us/yoshi.ssm','GmRstMYs.dat':'GmRstMYs.dat',
+  // Zelda and Sheik are source-owned transformation forms with separate
+  // fighter/action/costume/effect/result archives and one shared voice bank.
+  'PlZd.dat':'PlZd.dat','PlZdAJ.dat':'PlZdAJ.dat','PlZdNr.dat':'PlZdNr.dat',
+  'PlZdRe.dat':'PlZdRe.dat','PlZdBu.dat':'PlZdBu.dat','PlZdGr.dat':'PlZdGr.dat','PlZdWh.dat':'PlZdWh.dat',
+  'PlSk.dat':'PlSk.dat','PlSkAJ.dat':'PlSkAJ.dat','PlSkNr.dat':'PlSkNr.dat',
+  'PlSkRe.dat':'PlSkRe.dat','PlSkBu.dat':'PlSkBu.dat','PlSkGr.dat':'PlSkGr.dat','PlSkWh.dat':'PlSkWh.dat',
+  'EfZdData.dat':'EfZdData.dat','GmRstMZd.dat':'GmRstMZd.dat','GmRstMSk.dat':'GmRstMSk.dat',
+  // Popo and Nana are separate source FTKinds under one selectable identity.
+  'PlPp.dat':'PlPp.dat','PlPpAJ.dat':'PlPpAJ.dat','PlPpNr.dat':'PlPpNr.dat',
+  'PlPpGr.dat':'PlPpGr.dat','PlPpOr.dat':'PlPpOr.dat','PlPpRe.dat':'PlPpRe.dat',
+  'PlNn.dat':'PlNn.dat','PlNnAJ.dat':'PlNnAJ.dat','PlNnNr.dat':'PlNnNr.dat',
+  'PlNnYe.dat':'PlNnYe.dat','PlNnAq.dat':'PlNnAq.dat','PlNnWh.dat':'PlNnWh.dat',
+  'EfIcData.dat':'EfIcData.dat','GmRstMPn.dat':'GmRstMPn.dat','ice.ssm':'audio/us/ice.ssm',
+  'ff_flat.hps':'audio/ff_flat.hps','ff_ice.hps':'audio/ff_ice.hps',
+  'ff_kirby.hps':'audio/ff_kirby.hps','ff_samus.hps':'audio/ff_samus.hps',
+  'ff_yoshi.hps':'audio/ff_yoshi.hps',
 });
 export function loadNativeGameDisc(file,report=()=>{}) {
   return loadDiscBundle(file,report,NATIVE_GAME_DISC_FILES);

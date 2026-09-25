@@ -26,10 +26,12 @@ int melee_web_fighter_data_check_purin_part(void* data,uint32_t costume,
     uint32_t dobj_count,char* error,size_t error_size);
 int melee_web_fighter_data_set_link_part(void* data,void* joint,uint32_t* unresolved,
     char* error,size_t error_size);
+int melee_web_fighter_data_set_yoshi_joint(void* data,void* joint,uint32_t* unresolved,
+    char* error,size_t error_size);
 /* Publish the owned guard pose descriptor; source x0[2] aliases Joint.child.
  * The descriptor owner must outlive source fighters, like the costume owner. */
 void melee_web_fighter_data_set_guard(const MeleeWebNativeDat*,uint32_t root,
-    void* data,void* joint,uint32_t* unresolved);
+    uint32_t kind,void* data,void* joint,uint32_t* unresolved);
 int melee_web_fighter_data_set_part_animations(void* data,void* groups,
     uint32_t group_count,uint32_t* unresolved,char* error,size_t error_size);
 /* Borrow the checked native metal descriptor until every source Fighter is

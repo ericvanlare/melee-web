@@ -27,6 +27,14 @@ ResultMotionArchiveSpec result_motion_archive_spec(std::uint32_t fighter_kind)
     case FTKIND_PIKACHU: return {"GmRstMPk.dat", "ftDemoResultMotionFilePikachu"};
     case FTKIND_PICHU:   return {"GmRstMPc.dat", "ftDemoResultMotionFilePichu"};
     case FTKIND_PURIN:   return {"GmRstMPr.dat", "ftDemoResultMotionFilePurin"};
+    case FTKIND_GAMEWATCH:return {"GmRstMGw.dat", "ftDemoResultMotionFileGamewatch"};
+    case FTKIND_KIRBY:   return {"GmRstMKb.dat", "ftDemoResultMotionFileKirby"};
+    case FTKIND_POPO:    return {"GmRstMPn.dat", "ftDemoResultMotionFilePopo"};
+    case FTKIND_NANA:    return {"GmRstMPn.dat", "ftDemoResultMotionFileNana"};
+    case FTKIND_SAMUS:   return {"GmRstMSs.dat", "ftDemoResultMotionFileSamus"};
+    case FTKIND_YOSHI:   return {"GmRstMYs.dat", "ftDemoResultMotionFileYoshi"};
+    case FTKIND_ZELDA:   return {"GmRstMZd.dat", "ftDemoResultMotionFileZelda"};
+    case FTKIND_SEAK:    return {"GmRstMSk.dat", "ftDemoResultMotionFileSeak"};
     default:             return {};
     }
 }

@@ -1,6 +1,8 @@
 #include "gameplay_fighter_data.h"
 #include <melee/ft/types.h>
 #include <melee/ft/kinds/ftPurin/types.h>
+#include <melee/ft/kinds/ftGameWatch/types.h>
+#include <melee/ft/dobjlist.h>
 #include <melee/ft/kinds/ftDonkey/types.h>
 #include <melee/ft/kinds/ftKoopa/types.h>
 #include <melee/ft/ftwaitanim.h>
@@ -10,6 +12,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #define CHECK(c) do { if(!(c)) { fprintf(stderr,"fighter data check failed: %s\n",#c); abort(); } } while(0)
 void melee_web_test_fighter_data(void* data,int actual) {
     ftData* d=data;
@@ -61,7 +64,7 @@ void melee_web_test_fighter_data(void* data,int actual) {
 void melee_web_test_guard_data(const MeleeWebNativeDat* r,uint32_t root,void* data,uint32_t* mask) {
     HSD_Joint child={0},joint={0}; joint.child=&child;
     ftData* d=data;
-    melee_web_fighter_data_set_guard(r,root,d,&joint,mask);
+    melee_web_fighter_data_set_guard(r,root,FTKIND_MARIO,d,&joint,mask);
     CHECK(d->x20&&d->x20->x0[2]==&child&&d->x20->x8==0&& !(*mask&(1U<<8)));
     d->x20=NULL; /* The test's borrowed descriptor expires here. */
 }
@@ -79,6 +82,52 @@ void melee_web_test_donkey_data(void* data) {
           attrs->cargo_hold.x28_LANDING_LAG==15.0f);
     for(unsigned i=0;i<7;++i) CHECK(!d->x48_items[i]);
     for(unsigned i=0;i<6;++i) CHECK(!melee_web_fighter_data_article(data,FTKIND_DONKEY,i));
+}
+
+int melee_web_test_gamewatch_data(const MeleeWebNativeDat* r,uint32_t root,void* data) {
+    ftData* d=data;
+    if(!d||!d->ext_attr||!d->x48_items||!d->x8)return 0;
+    ftGameWatchAttributes* attrs=d->ext_attr;
+    uint32_t at=r->pointer(r->context,root+4,sizeof(*attrs));
+    if(at==UINT32_MAX||sizeof(*attrs)!=0x94)return 0;
+    uint32_t bits=r->word(r->context,at);float width;
+    memcpy(&width,&bits,sizeof(width));
+    if(memcmp(&attrs->x0_GAMEWATCH_WIDTH,&width,sizeof(width)))return 0;
+    for(unsigned color=0;color<4;++color) {
+        const uint32_t off=at+4+color*4;
+        if(attrs->x4_GAMEWATCH_COLOR[color].r!=r->byte(r->context,off)||
+           attrs->x4_GAMEWATCH_COLOR[color].g!=r->byte(r->context,off+1)||
+           attrs->x4_GAMEWATCH_COLOR[color].b!=r->byte(r->context,off+2)||
+           attrs->x4_GAMEWATCH_COLOR[color].a!=r->byte(r->context,off+3))return 0;
+    }
+    FtPartsVisLookup* lookup=d->x48_items[10];
+    const uint32_t source_items=r->pointer(r->context,root+0x48,44);
+    if(!lookup||source_items==UINT32_MAX||!d->x8->x0.model_num)return 0;
+    const uint32_t source_lookup=r->pointer(r->context,source_items+40,
+        (size_t)d->x8->x0.model_num*sizeof(FtPartsVisLookup));
+    if(source_lookup==UINT32_MAX)return 0;
+    for(unsigned i=0;i<d->x8->x0.model_num;++i) {
+        if(lookup[i].x0<0||lookup[i].x0!=(int)r->word(r->context,source_lookup+i*8))return 0;
+        if(lookup[i].x0) {
+            const uint32_t source_variants=r->pointer(r->context,source_lookup+i*8+4,
+                (size_t)lookup[i].x0*sizeof(TempS));
+            if(source_variants==UINT32_MAX||!lookup[i].x4)return 0;
+            for(int j=0;j<lookup[i].x0;++j) {
+                const uint32_t row=source_variants+(uint32_t)j*sizeof(TempS);
+                if(lookup[i].x4[j].x0<0||lookup[i].x4[j].x0!=(int)r->word(r->context,row))return 0;
+                const uint32_t count=(uint32_t)lookup[i].x4[j].x0;
+                if(count) {
+                    const uint32_t indices=r->pointer(r->context,row+4,count);
+                    if(indices==UINT32_MAX||!lookup[i].x4[j].x4)return 0;
+                    for(unsigned k=0;k<count;++k)
+                        if(lookup[i].x4[j].x4[k]!=r->byte(r->context,indices+k))return 0;
+                }
+            }
+        }
+    }
+    for(unsigned i=0;i<10;++i)
+        if(!melee_web_fighter_data_article(data,FTKIND_GAMEWATCH,i))return 0;
+    return !melee_web_fighter_data_article(data,FTKIND_GAMEWATCH,10);
 }
 
 void melee_web_test_koopa_data(void* data,int typed) {

@@ -75,6 +75,56 @@ ArticleSchema schema(uint32_t kind)
     // [-1, 0, 0] and the DAT carries one serialized animation descriptor.
     case It_Kind_Pikachu_Thunder:
     case It_Kind_Pichu_Thunder:return {12,1,true};
+    // Game & Watch's article records carry one source-owned joint descriptor
+    // pointer (except Chef's typed 0x74-byte record); serialize the callback
+    // state rows individually from it_3F2F.c's source tables.
+    case It_Kind_GameWatch_Greenhouse:return {4,4,true};
+    case It_Kind_GameWatch_Manhole:return {4,1,true};
+    case It_Kind_GameWatch_Fire:return {4,1,true};
+    case It_Kind_GameWatch_Parachute:return {4,2,true};
+    case It_Kind_GameWatch_Turtle:return {4,2,true};
+    case It_Kind_GameWatch_Breath:return {4,2,true};
+    case It_Kind_GameWatch_Judge:return {4,1,true};
+    case It_Kind_GameWatch_Panic:return {4,2,true};
+    case It_Kind_GameWatch_Chef:return {0x74,2,true};
+    case It_Kind_GameWatch_Rescue:return {4,2,true};
+    // Kirby's ftKb_Init_OnLoad Article order. Cutter Beam has four float
+    // scalars, Hammer and Unk2 have no special record. The PlKb DAT's Unk1
+    // Article authors only its consumed lifetime float; Unk2's common ItemAttr
+    // begins immediately at the following word and is a separate root.
+    case It_Kind_Kirby_CBeam:return {0x10,1,true};
+    case It_Kind_Kirby_Hammer:return {0,1,false};
+    case It_Kind_Unk1:return {4,1,true};
+    case It_Kind_Unk2:return {0,1,false};
+    // Popo's serialized source state arrays are one row for Ice and Blizzard,
+    // and absent for the GumStrings Article. Their special records retain the
+    // exact itCharItems.h layouts, including GumStrings' two source Joints.
+    case It_Kind_IceClimber_Ice:return {0x34,1,true};
+    case It_Kind_IceClimber_Blizzard:return {0x14,1,true};
+    case It_Kind_IceClimber_GumStrings:return {0x2C,0,true};
+    // Samus's four source Article roots are registered in ftSs_Init_OnLoad.
+    // These are serialized descriptor rows (not callback state counts): Bomb
+    // carries two, Charge Shot nine, Missile four, and Grapple Beam none.
+    case It_Kind_Samus_Bomb:return {0x1C,2,true};
+    case It_Kind_Samus_Charge:return {0x20,9,true};
+    case It_Kind_Samus_Missile:return {0x40,4,true};
+    case It_Kind_Samus_GBeam:return {0xB0,0,true};
+    // Yoshi's Egg Throw and Star use their exact float pairs with two and
+    // one serialized animation rows. Egg Lay's spawning callback supplies
+    // its attributes directly, and its Article owns the x48[3] joint root.
+    case It_Kind_Yoshi_EggThrow:return {8,2,true};
+    case It_Kind_Yoshi_Star:return {8,1,true};
+    case It_Kind_Yoshi_EggLay:return {0,0,false};
+    // Zelda's Din Fire projectile/explosion consume their exact authored
+    // twelve-float and five-float source records.
+    case It_Kind_Zelda_DinFire:return {0x30,2,true};
+    case It_Kind_Zelda_DinFire_Explode:return {0x14,1,true};
+    // Sheik's Needle, held Needle, smoke and Chain use the source item tables;
+    // the Chain retains its two model joints in its 0x6C attribute record.
+    case It_Kind_Seak_NeedleThrow:return {0x0C,5,true};
+    case It_Kind_Seak_NeedleHeld:return {4,1,true};
+    case It_Kind_Seak_Vanish:return {0,1,false};
+    case It_Kind_Seak_Chain:return {0x6C,0,true};
     case It_Kind_Pikachu_TJolt_Ground:
     case It_Kind_Pichu_TJolt_Ground:return {16,2,true};
     case It_Kind_Pikachu_TJolt_Air:
@@ -115,10 +165,23 @@ bool pointer_field(uint32_t kind,uint32_t offset)
         (offset>=0x4c&&offset<0x64&&((offset-0x4c)%4==0));
     case It_Kind_Link_Arrow:
     case It_Kind_CLink_Arrow:return offset==0x24||offset==0x28;
+    case It_Kind_GameWatch_Greenhouse:
+    case It_Kind_GameWatch_Manhole:
+    case It_Kind_GameWatch_Fire:
+    case It_Kind_GameWatch_Parachute:
+    case It_Kind_GameWatch_Turtle:
+    case It_Kind_GameWatch_Breath:
+    case It_Kind_GameWatch_Judge:
+    case It_Kind_GameWatch_Panic:
+    case It_Kind_GameWatch_Chef:
+    case It_Kind_GameWatch_Rescue:return offset==0;
     // The Yo-Yo's serialized record ends with the original HSD_Joint string,
     // HSD_Joint yoyo and HSD_MatAnimJoint material pointers. The asset owner
     // hydrates them into native descriptors below.
     case It_Kind_Ness_Yoyo:return offset==0x50||offset==0x54||offset==0x58;
+    case It_Kind_IceClimber_GumStrings:return offset==0x24||offset==0x28;
+    case It_Kind_Seak_Chain:return offset==0x64||offset==0x68;
+    case It_Kind_Samus_GBeam:return offset>=0x64&&offset<=0xAC&&((offset-0x64)%4==0);
     default:return false;
     }
 }
@@ -138,6 +201,12 @@ bool float_field(uint32_t kind,uint32_t offset)
     // counts at 0x00..0x08, rotation frames at 0x40..0x4C) beside the float
     // scalars at 0x0C..0x3C.
     case It_Kind_Ness_Yoyo:return offset>=0xC&&offset<=0x3C;
+    case It_Kind_IceClimber_Ice:return offset<0x20||offset==0x24||offset==0x28;
+    case It_Kind_IceClimber_Blizzard:return true;
+    case It_Kind_IceClimber_GumStrings:return offset==0x8||offset==0xC||offset==0x14;
+    case It_Kind_Seak_Chain:return offset>=0x10&&offset<=0x60;
+    case It_Kind_Samus_Charge:return offset!=0x4;
+    case It_Kind_Samus_GBeam:return offset!=0xC&&offset!=0x34;
     default:return true;
     }
 }
@@ -155,12 +224,17 @@ struct DatItemArticle::Storage {
     NativeDatArena arena;
     std::unique_ptr<DatNativeJoint> model;
     std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy)> native{nullptr,destroy};
+    void* model_joint=nullptr;
     std::vector<std::unique_ptr<DatNativeJoint>> special_models;
     using SpecialNative = std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy)>;
     std::vector<SpecialNative> special_native;
     std::vector<std::unique_ptr<DatNativeAnimation>> animations;
     std::vector<std::unique_ptr<DatMaterialAnimation>> materials;
     std::vector<std::unique_ptr<DatShapeAnimation>> shapes;
+    // Samus's itSamusGrappleAttributes stores HSD_AnimJoint**,
+    // HSD_MatAnimJoint**, and HSD_ShapeAnimJoint**. Preserve those source
+    // pointer-to-pointer owners for every item-user lifetime.
+    std::vector<std::unique_ptr<void*>> indirect_animation_slots;
     DatItemCommands commands;
     std::unique_ptr<MeleeWebItemStateDesc[]> states;
     uint32_t count=0;
@@ -178,6 +252,17 @@ DatItemArticle::DatItemArticle(std::shared_ptr<const DatArchive> archive,uint32_
                            " crosses source region (requested "+std::to_string(size)+" bytes)");
         (void)a.range(at,size);
     };
+    auto record_special=[&](uint32_t at,size_t size){
+        // Bomb/Missile command and state roots can target words inside their
+        // source-declared itSamus*Attributes records. DAT target intervals
+        // therefore are not allocation extents for these four known source
+        // structs; keep this exception restricted to the exact pinned schemas
+        // and still require the complete bytes to exist in the archive.
+        const bool samus=kind==It_Kind_Samus_Bomb||kind==It_Kind_Samus_Charge||
+            kind==It_Kind_Samus_Missile||kind==It_Kind_Samus_GBeam;
+        if(samus) (void)a.range(at,size);
+        else record(at,size);
+    };
     auto pointer=[&](uint32_t at,size_t size){
         auto p=a.pointer(at,size);
         if(!p) {
@@ -192,7 +277,7 @@ DatItemArticle::DatItemArticle(std::shared_ptr<const DatArchive> archive,uint32_
     if(special_size) {
         special_at=a.pointer(root+4,special_size);
         require(special_at||!article_schema.special_required,"Required item special attributes missing");
-        if(special_at)record(*special_at,special_size);
+        if(special_at)record_special(*special_at,special_size);
     }
     const auto* reader=s.arena.reader();
     void* special=special_size&&special_at?
@@ -215,6 +300,23 @@ DatItemArticle::DatItemArticle(std::shared_ptr<const DatArchive> archive,uint32_
         uint32_t value=a.be32(scalar_at);
         if(float_field(kind,i))require(std::isfinite(a.f32(scalar_at)),"Item special scalar is nonfinite");
         std::memcpy(static_cast<uint8_t*>(special)+i,&value,4);
+    }
+    const bool gamewatch_item=kind==It_Kind_GameWatch_Greenhouse||
+        kind==It_Kind_GameWatch_Manhole||kind==It_Kind_GameWatch_Fire||
+        kind==It_Kind_GameWatch_Parachute||kind==It_Kind_GameWatch_Turtle||
+        kind==It_Kind_GameWatch_Breath||kind==It_Kind_GameWatch_Judge||
+        kind==It_Kind_GameWatch_Panic||kind==It_Kind_GameWatch_Chef||
+        kind==It_Kind_GameWatch_Rescue;
+    if(gamewatch_item) {
+        require(special_at.has_value(),"Game & Watch Article has no special record");
+        const auto payload=a.pointer(*special_at);
+        require(payload.has_value(),"Game & Watch Article special payload is missing");
+        /* it_8027CE64 stores this value in the Game & Watch item-variable
+         * union; the decompiled item consumers never dereference it. Keep the
+         * pointer on the exact immutable, archive-owned source payload instead
+         * of interpreting its source-specific descriptor as a HSD joint. */
+        const auto bytes=a.range(*payload,1);
+        write_native_pointer(special,0,const_cast<uint8_t*>(bytes.data()));
     }
     uint32_t at=pointer(root+16,16);
     const auto model_root=a.pointer(at,64);
@@ -245,6 +347,7 @@ DatItemArticle::DatItemArticle(std::shared_ptr<const DatArchive> archive,uint32_
         require(bool(s.native),error);
         joint=melee_web_native_joint_descriptor(s.native.get(),error,sizeof(error));
         require(joint,error);
+        s.model_joint=joint;
         for(uint32_t j=0;j<graph.joint_count;j++){
             void* d=melee_web_native_joint_descriptor_at(s.native.get(),j,graph.joints[j].source_offset,error,sizeof(error));require(d,error);descriptors.push_back(d);
         }
@@ -261,6 +364,11 @@ DatItemArticle::DatItemArticle(std::shared_ptr<const DatArchive> archive,uint32_
         write_native_pointer(special,offset,descriptor);
         DatNativeJoint* result=model.get();s.special_models.push_back(std::move(model));
         s.special_native.push_back(std::move(owner));return result;
+    };
+    auto optional_special_joint=[&](uint32_t offset)->DatNativeJoint* {
+        require(bool(special_at),"Optional item special joint has no special attributes");
+        if(!a.pointer(*special_at+offset,4))return nullptr;
+        return special_joint(offset);
     };
     auto hydrate_joint_descriptors=[&](const MeleeWebNativeGraph& value,MeleeWebNativeJoint* owner) {
         std::vector<void*> result;result.reserve(value.joint_count);
@@ -294,6 +402,29 @@ DatItemArticle::DatItemArticle(std::shared_ptr<const DatArchive> archive,uint32_
             write_native_pointer(special,slot,descriptor);s.shapes.push_back(std::move(animation));
         }
     };
+    auto indirect_special_animation=[&](uint32_t slot,const MeleeWebNativeGraph& value,
+                                         MeleeWebNativeJoint* owner,unsigned type) {
+        require(bool(special_at),"Indirect item animation has no special attributes");
+        if(auto target=a.pointer(*special_at+slot,20)) {
+            auto descriptors=hydrate_joint_descriptors(value,owner);
+            void* descriptor=nullptr;
+            if(type==0) {
+                auto animation=std::make_unique<DatNativeAnimation>(archive,*target,value,
+                    DatNativeAnimationPolicy::Transforms,descriptors);
+                descriptor=animation->descriptor();s.animations.push_back(std::move(animation));
+            } else if(type==1) {
+                auto animation=std::make_unique<DatMaterialAnimation>(archive,*target,value);
+                descriptor=animation->descriptor();s.materials.push_back(std::move(animation));
+            } else {
+                auto animation=std::make_unique<DatShapeAnimation>(archive,*target,value);
+                descriptor=animation->descriptor();s.shapes.push_back(std::move(animation));
+            }
+            require(descriptor,"Indirect item animation descriptor is null");
+            auto cell=std::make_unique<void*>(descriptor);
+            write_native_pointer(special,slot,cell.get());
+            s.indirect_animation_slots.push_back(std::move(cell));
+        }
+    };
     if(kind==It_Kind_Link_HShot||kind==It_Kind_CLink_HShot) {
         for(const auto offset:{0x54U,0x58U,0x5cU}) (void)special_joint(offset);
     } else if(kind==It_Kind_Link_Arrow||kind==It_Kind_CLink_Arrow) {
@@ -319,6 +450,37 @@ DatItemArticle::DatItemArticle(std::shared_ptr<const DatArchive> archive,uint32_
         auto yoyo_joint=special_joint(0x54);
         (void)string_joint;
         special_material(0x58,yoyo_joint->graph());
+    } else if(kind==It_Kind_IceClimber_GumStrings) {
+        (void)special_joint(0x24);
+        (void)special_joint(0x28);
+    } else if(kind==It_Kind_Seak_Chain) {
+        (void)special_joint(0x64);
+        (void)special_joint(0x68);
+    } else if(kind==It_Kind_Samus_GBeam) {
+        const uint32_t joints[]={0x64,0x68,0x6C,0x70};
+        const uint32_t anims[]={0x74,0x80,0x8C,0x98};
+        const uint32_t mats[]={0x78,0x84,0x90,0x9C};
+        const uint32_t shapes[]={0x7C,0x88,0x94,0xA0};
+        for(unsigned i=0;i<4;i++) {
+            auto model=optional_special_joint(joints[i]);
+            if(!model) {
+                require(!a.pointer(*special_at+anims[i])&&!a.pointer(*special_at+mats[i])&&
+                        !a.pointer(*special_at+shapes[i]),
+                        "Grapple Beam animation points to an absent source joint");
+                continue;
+            }
+            MeleeWebNativeJoint* owner=nullptr;
+            for(size_t j=0;j<s.special_models.size();j++)
+                if(s.special_models[j].get()==model)owner=s.special_native[j].get();
+            require(owner,"Grapple Beam joint owner is missing");
+            indirect_special_animation(anims[i],model->graph(),owner,0);
+            indirect_special_animation(mats[i],model->graph(),owner,1);
+            indirect_special_animation(shapes[i],model->graph(),owner,2);
+        }
+        // The final triplet animates the Article's own model graph.
+        indirect_special_animation(0xA4,graph,s.native.get(),0);
+        indirect_special_animation(0xA8,graph,s.native.get(),1);
+        indirect_special_animation(0xAC,graph,s.native.get(),2);
     }
     s.count=article_schema.state_count;
     if(s.count){at=pointer(root+12,s.count*16);s.states=std::make_unique<MeleeWebItemStateDesc[]>(s.count);}
@@ -351,4 +513,5 @@ DatItemArticle::DatItemArticle(std::shared_ptr<const DatArchive> archive,uint32_
 }
 DatItemArticle::~DatItemArticle()=default;
 uint32_t DatItemArticle::state_count()const noexcept{return storage_->count;}
+void* DatItemArticle::model_joint_descriptor()const noexcept{return storage_->model_joint;}
 }

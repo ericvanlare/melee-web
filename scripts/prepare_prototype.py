@@ -29,7 +29,8 @@ def content_manifest(source):
         match = re.search(r'static const MeleeWeb' + kind + r'Content rows\[\] = \{(.*?)\n    \};', source, re.S)
         if not match:
             raise ValueError(f'Native {kind} content table was not found')
-        lines = [line.strip() for line in match[1].splitlines() if line.strip()]
+        table_body = re.sub(r'/\*.*?\*/', '', match[1], flags=re.S)
+        lines = [line.strip() for line in table_body.splitlines() if line.strip()]
         pattern = (r'\{\s*(CKIND_\w+),\s*FTKIND_\w+,\s*\d+,\s*"([^"]+)".*\},'
                    if kind == 'Fighter' else r'\{\s*(St_Kind_\w+),\s*Gr_Kind_\w+,\s*"([^"]+)".*\},')
         rows = []

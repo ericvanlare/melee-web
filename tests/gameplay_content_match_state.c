@@ -55,6 +55,14 @@ static const MeleeWebSourceIdentity* melee_web_source_identity(int ckind){
         {CKIND_NESS, FTKIND_NESS, ICONHUD_NESS},
         {CKIND_PEACH, FTKIND_PEACH, ICONHUD_PEACH},
         {CKIND_MEWTWO, FTKIND_MEWTWO, ICONHUD_MEWTWO},
+        {CKIND_GAMEWATCH, FTKIND_GAMEWATCH, ICONHUD_GAMEWATCH},
+        {CKIND_KIRBY, FTKIND_KIRBY, ICONHUD_KIRBY},
+        {CKIND_POPONANA, FTKIND_POPO, ICONHUD_POPONANA},
+        {CKIND_SAMUS, FTKIND_SAMUS, ICONHUD_SAMUS},
+        {CKIND_YOSHI, FTKIND_YOSHI, ICONHUD_YOSHI},
+        {CKIND_ZELDA, FTKIND_ZELDA, ICONHUD_ZELDA},
+        /* gm_80168B34 uses stock icon 0x19 for the live Sheik FTKind. */
+        {CKIND_SEAK, FTKIND_SEAK, 0x19},
     };
     for (unsigned i=0;i<sizeof(rows)/sizeof(rows[0]);++i)
         if (rows[i].character==(CharacterKind)ckind) return &rows[i];
@@ -74,6 +82,17 @@ int melee_web_test_content_player(unsigned slot,int ckind,int kind,unsigned cost
     const float icon=identity->stock_icon+30*costume;
     return fighter&&fighter->kind==identity->fighter&&Player_GetPlayerCharacter(slot)==identity->character&&
         Player_GetCostumeId(slot)==costume&&gm_80168BF8(slot)==icon;
+}
+int melee_web_test_entity_state(unsigned slot,unsigned index,int* kind,int* motion,
+                                int* grounded,int* has_skeleton){
+    HSD_GObj* entity=Player_GetEntityAtIndex((int)slot,(int)index);
+    if(!entity||!entity->user_data)return 0;
+    Fighter* fighter=entity->user_data;
+    if(kind)*kind=fighter->kind;
+    if(motion)*motion=fighter->motion_id;
+    if(grounded)*grounded=fighter->ground_or_air==0;
+    if(has_skeleton)*has_skeleton=fighter->x8AC_animSkeleton!=NULL;
+    return 1;
 }
 int melee_web_test_item_count(int kind){return it_8026B3C0((ItemKind)kind);}
 

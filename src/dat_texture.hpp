@@ -53,9 +53,9 @@ struct DatTexture {
 // palette words. Returned byte spans require the archive to remain alive.
 // Supports up to eight ordinary UV/reflection TObjs with full finite SRT,
 // repeat/wrap modes, standard HSD color/alpha operations and diffuse, specular,
-// ambient or extension lightmaps. Native descriptor reads also preserve the
-// original TEX_BUMP flag for the HSD bump texgen/emboss path; the viewer policy
-// continues to reject that source behavior. Raw flags/blend values are preserved
+// ambient or extension lightmaps. Native descriptor reads also preserve HSD
+// hilight texgen and TEX_BUMP for the original HSD highlight/bump paths; the
+// viewer policy continues to reject those source behaviors. Raw flags/blend values are preserved
 // for the original HSD expression compiler; no effective-operation approximation
 // is made. Custom classes/active TEV, toon, shadow and highlight coordinate modes
 // remain unsupported. Referenced-region bounds are conservative, not allocation
