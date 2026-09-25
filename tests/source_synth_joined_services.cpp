@@ -17,6 +17,7 @@ extern "C" {
 #include <dolphin/ai.h>
 #include <dolphin/dsp.h>
 #include <dolphin/ax.h>
+#include <dolphin/axfx.h>
 #include <dolphin/ar.h>
 #include <dolphin/dvd.h>
 #include <dolphin/hw_regs.h>
@@ -30,8 +31,19 @@ extern "C" unsigned melee_web_source_devcom_spans(
 extern "C" void HSD_SynthInit(int dsp_size, int voices, int stream_size,
                                int bank_size);
 extern "C" int HSD_Synth_804D6018;
+#if defined(MELEE_WEB_SOURCE_LBAUDIO_STARTUP)
+#include "source_lbaudio_startup_accessors.h"
+extern "C" void lbAudioAx_8002838C(void);
+#endif
 /* The authored MSL bool is a four-byte int, unlike C++ bool. */
 extern "C" int HSD_DevComIsBusy(int);
+#if defined(MELEE_WEB_SOURCE_LBAUDIO_STARTUP)
+extern "C" void melee_web_audio_program_check(const u32*)
+{
+    std::fputs("source lbAudio startup cannot execute an SFX command stream\n", stderr);
+    std::abort();
+}
+#endif
 extern "C" unsigned melee_web_source_synth_sram_reads(void);
 extern "C" void melee_web_source_synth_sram_initialize(
     const unsigned char* settings, unsigned length);
@@ -178,7 +190,8 @@ struct ArSpan {
 ArSpan g_ar_probe_spans[3];
 ArSpan g_devcom_spans[2];
 u64 g_next_span_generation = 1;
-alignas(32) u32 g_ar_block_lengths[16]{};
+alignas(32) u32 g_fixture_ar_block_lengths[16]{};
+u32* g_ar_block_lengths = g_fixture_ar_block_lengths;
 u32 g_ar_submitted_before_synth = 0;
 long g_audio_heap_before = -1, g_audio_heap_after = -1;
 
@@ -372,7 +385,8 @@ void reset() {
     g_ar_pending = false;
     g_prepared = false;
     g_synth_started = false;
-    std::memset(g_ar_block_lengths, 0, sizeof(g_ar_block_lengths));
+    std::memset(g_fixture_ar_block_lengths, 0, sizeof(g_fixture_ar_block_lengths));
+    g_ar_block_lengths = g_fixture_ar_block_lengths;
     std::memset(g_aram, 0xA5, sizeof(g_aram));
     for (ArSpan& span : g_ar_probe_spans) span = {};
     for (ArSpan& span : g_devcom_spans) span = {};
@@ -415,14 +429,38 @@ extern "C" {
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wbitwise-op-parentheses"
 #define ARRegisterDMACallback melee_web_source_synth_joined_original_register
+#define ARInit melee_web_source_original_ar_init
 #define ARQCallback ARDMACallback
 #define OSPhysicalToUncached(address) melee_web_source_synth_joined::ar_physical_to_uncached(nullptr, address)
 extern "C" {
 /* MELEE_WEB_PINNED_AR_SOURCE */
 }
+#undef ARInit
 #undef OSPhysicalToUncached
 #undef ARQCallback
 #undef ARRegisterDMACallback
+extern "C" u32 ARInit(u32* block_lengths, u32 block_count)
+{
+    using namespace melee_web_source_synth_joined;
+    require(block_lengths != nullptr && block_count == 16,
+            "source ARInit requires its authored allocation stack");
+    require(!g_ar_probe_active && ARCheckInit() == 0,
+            "source ARInit may execute only once");
+    g_ar_block_lengths = block_lengths;
+    g_ar_probe_stack_top = static_cast<u32>(emscripten_stack_get_current());
+    g_ar_probe_active = true;
+    const u32 base = melee_web_source_original_ar_init(block_lengths, block_count);
+    require(base == 0x4000u && ARCheckInit() != 0 && ARGetSize() == sizeof(g_aram),
+            "source ARInit did not establish the declared ARAM profile");
+    expire_ar_probe_spans();
+    require(melee_web_source_audio_ar_set_phase(
+                &g_ar_service, MELEE_WEB_SOURCE_AUDIO_AR_DEFERRED) == 0,
+            "source AR service did not enter deferred ARQ phase");
+    g_ar_submitted_before_synth =
+        melee_web_source_audio_ar_submitted_count(&g_ar_service);
+    return base;
+}
+
 extern "C" ARDMACallback ARRegisterDMACallback(ARDMACallback callback)
 {
     return melee_web_source_synth_joined_original_register(callback);
@@ -828,19 +866,10 @@ int prepare()
     /* __ARChecksize waits for the authored SDRAM-ready bit before issuing its
      * five synchronous probes.  The AR service owns all later register I/O. */
     g_dsp_regs.values[11] = 1;
-    g_ar_probe_stack_top = static_cast<u32>(emscripten_stack_get_current());
-    g_ar_probe_active = true;
-    require(ARInit(g_ar_block_lengths, 16) == 0x4000u,
-            "source ARInit returned an unexpected user base");
-    require(ARCheckInit() != 0 && ARGetSize() == sizeof(g_aram),
-            "source ARInit did not establish the declared ARAM profile");
-    expire_ar_probe_spans();
+#if !defined(MELEE_WEB_SOURCE_LBAUDIO_STARTUP)
+    ARInit(g_fixture_ar_block_lengths, 16);
     ARQInit();
-    require(melee_web_source_audio_ar_set_phase(
-                &g_ar_service, MELEE_WEB_SOURCE_AUDIO_AR_DEFERRED) == 0,
-            "source AR service did not enter deferred ARQ phase");
-    g_ar_submitted_before_synth =
-        melee_web_source_audio_ar_submitted_count(&g_ar_service);
+#endif
     g_prepared = true;
     return 0;
 }
@@ -858,12 +887,57 @@ int begin_synth(int dsp_size, int voices, int stream_size, int bank_size,
 
     /* HSD_SynthInit is the source entry.  It calls AXInit itself, so this
      * boundary intentionally does not perform a separate AXInit first. */
+#if !defined(MELEE_WEB_SOURCE_LBAUDIO_STARTUP)
     AIInit(nullptr);
-    require(AICheckInit() != FALSE, "source AIInit did not complete");
+#endif
     require(HSD_Synth_804D6018 >= 0, "source audio heap was not initialized");
     g_audio_heap_before = OSCheckHeap(HSD_Synth_804D6018);
     require(g_audio_heap_before > 0, "source audio heap failed its pre-Synth check");
+#if defined(MELEE_WEB_SOURCE_LBAUDIO_STARTUP)
+    lbAudioAx_8002838C();
+    MeleeWebSourceLBAudioSnapshot audio{};
+    require(melee_web_source_lbaudio_snapshot(&audio) == 1,
+            "original lbAudio snapshot unavailable");
+    require(audio.ar_stack_address == static_cast<uint32_t>(reinterpret_cast<uintptr_t>(g_ar_block_lengths)) &&
+                audio.ar_stack_entries == 16,
+            "original lbAudio AR stack ownership mismatch");
+    require(audio.driver_call_count == 1 &&
+                audio.driver_voices == static_cast<uint32_t>(dsp_size) &&
+                audio.driver_priority == static_cast<uint32_t>(voices) &&
+                audio.driver_sample_rate == static_cast<uint32_t>(stream_size) &&
+                audio.driver_aram_size == static_cast<uint32_t>(bank_size),
+            "original lbAudio driver call differs from independently derived expected values");
+    require(audio.fx_count == 2 && audio.fx_success[0] == 1 && audio.fx_success[1] == 1 &&
+                audio.fx_sizes[0] == 53u * 1024u &&
+                audio.fx_sizes[1] == 71u * 1024u &&
+                audio.fx_addresses[0] != 0 && audio.fx_addresses[1] != 0 &&
+                audio.fx_addresses[0] != audio.fx_addresses[1],
+            "original lbAudio auxiliary buffer ownership mismatch");
+    require(audio.bank_call_count == 3 && audio.bank_total_size == bank_size,
+            "original lbAudio SFX bank partition mismatch");
+    uint64_t bank_sum = 0;
+    for (unsigned i = 0; i < 3; ++i) {
+        require(audio.bank_descriptor_sizes[i] > 0 &&
+                    audio.bank_call_sizes[i] == static_cast<uint32_t>(audio.bank_descriptor_sizes[i]),
+                "original lbAudio bank call differs from authored descriptor");
+        bank_sum += audio.bank_call_sizes[i];
+    }
+    require(bank_sum == static_cast<uint32_t>(bank_size),
+            "original lbAudio bank sizes do not cover the derived reservation");
+    require(audio.sfx_state_counters[0] == -1 && audio.sfx_state_counters[1] == 0 &&
+                audio.sfx_state_counters[2] == 0 && audio.sfx_state_counters[3] == 0,
+            "original lbAudio SFX counters were not initialized");
+    for (unsigned table = 0; table < 4; ++table)
+        for (unsigned i = 0; i < 0x38; ++i)
+            require(audio.bookkeeping[table][i] == -1,
+                    "original lbAudio SFX bookkeeping was not initialized");
+    std::printf("{\"kind\":\"source_lbaudio_startup\",\"driver_calls\":%u,\"fx_bytes\":[%u,%u],\"bank_sizes\":[%u,%u,%u],\"bookkeeping_entries\":224,\"runtime_claim\":false}\n",
+                audio.driver_call_count, audio.fx_sizes[0], audio.fx_sizes[1],
+                audio.bank_call_sizes[0], audio.bank_call_sizes[1], audio.bank_call_sizes[2]);
+#else
     HSD_SynthInit(dsp_size, voices, stream_size, bank_size);
+#endif
+    require(AICheckInit() != FALSE, "source AIInit did not complete");
     g_audio_heap_after = OSCheckHeap(HSD_Synth_804D6018);
     require(g_audio_heap_after >= 0 && g_audio_heap_after < g_audio_heap_before,
             "source DevCom did not allocate from the original audio heap");
@@ -999,6 +1073,15 @@ int run(int dsp_size, int voices, int stream_size, int bank_size,
         const char* mode)
 {
     const char* selected = mode ? mode : "valid";
+#if defined(MELEE_WEB_SOURCE_LBAUDIO_STARTUP)
+    if (std::strcmp(selected, "unsupported-chorus-init") == 0) AXFXChorusInit(nullptr);
+    if (std::strcmp(selected, "unsupported-chorus-shutdown") == 0) AXFXChorusShutdown(nullptr);
+    if (std::strcmp(selected, "unsupported-chorus-callback") == 0) AXFXChorusCallback(nullptr, nullptr);
+    if (std::strcmp(selected, "unsupported-reverb-hi-init") == 0) AXFXReverbHiInit(nullptr);
+    if (std::strcmp(selected, "unsupported-reverb-hi-shutdown") == 0) AXFXReverbHiShutdown(nullptr);
+    if (std::strcmp(selected, "unsupported-reverb-hi-callback") == 0) AXFXReverbHiCallback(nullptr, nullptr);
+    if (std::strcmp(selected, "unexpected-sfx-command") == 0) melee_web_audio_program_check(nullptr);
+#endif
     require(std::strcmp(selected, "") == 0 ||
                 std::strcmp(selected, "valid") == 0 ||
                 std::strcmp(selected, "bad-dma") == 0 ||
@@ -1112,4 +1195,13 @@ extern "C" int melee_web_source_synth_joined_begin_synth(
 extern "C" int melee_web_source_synth_joined_pump(void)
 {
     return melee_web_source_synth_joined::pump();
+}
+
+extern "C" void melee_web_source_synth_aram_state(unsigned* stack, unsigned* free_blocks)
+{
+    using namespace melee_web_source_synth_joined;
+    require(g_synth_started && stack != nullptr && free_blocks != nullptr,
+            "AR state read requires the completed source startup owner");
+    *stack = static_cast<unsigned>(__AR_StackPointer);
+    *free_blocks = static_cast<unsigned>(__AR_FreeBlocks);
 }

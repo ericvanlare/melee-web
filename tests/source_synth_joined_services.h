@@ -20,6 +20,8 @@ int melee_web_source_synth_joined_begin_synth(
     int dsp_size, int voices, int stream_size, int bank_size,
     const unsigned char* sram_settings, unsigned sram_length);
 int melee_web_source_synth_joined_pump(void);
+/* Read original AR allocator state after the joined source startup. */
+void melee_web_source_synth_aram_state(unsigned* stack, unsigned* free_blocks);
 
 #ifdef __cplusplus
 }
