@@ -14,11 +14,13 @@ historical reports and receipts linked there remain authoritative for their
 declared scope. This README does not repeat pass counts, timings or deployment
 state that can go stale.
 
-The product goal is full vanilla Melee without a PowerPC interpreter or JIT. The
-next acceptance deliverable is original in-game CSS → original SSS → a four-stock
-Mario-versus-Mario Final Destination match → original CSS. Accuracy, performance,
-rendering, audio, input and lifecycle are separate gates. Read the [accuracy
-contract](docs/ACCURACY_CONTRACT.md) before broadening the supported path.
+The product goal is full vanilla Melee without a PowerPC interpreter or JIT.
+The active [Reliable local versus v1 milestone](https://github.com/ericvanlare/melee-web/milestone/1)
+targets original CSS → original SSS → four-stock Mario-versus-Mario on Final
+Destination → original Results → original CSS for three consecutive matches
+without reloading. The [roadmap](docs/ROADMAP.md) orders the work; accuracy,
+performance, rendering, audio, input and lifecycle remain separate gates.
+Read the [accuracy contract](docs/ACCURACY_CONTRACT.md) before broadening scope.
 
 Game content is supplied locally from an owned USA revision 1.02 GALE01 revision-2
 disc. The browser reads required ranges in the tab; disc images and extracted

@@ -9,11 +9,15 @@ technical accuracy and event acceptance.
 
 ## First deliverable
 
-Original in-game character select → original in-game stage select → playable
-four-stock Mario versus Mario on Final Destination → original character select.
-Skip the results screen. Preserve the original menu assets, animation, cursor,
-confirmation and transition behavior for the supported path. HTML imitations,
-static screenshots and a forced-stage bypass do not satisfy this deliverable.
+Original in-game character select → original in-game stage select → three
+consecutive playable four-stock Mario versus Mario matches on Final Destination,
+returning through original Results after each match → original character select.
+Preserve the original menu assets, animation, cursor, confirmation and
+transition behavior for the supported path. HTML imitations, static screenshots
+and a forced-stage bypass do not satisfy this deliverable. The former
+Results-skipping route is historical partial evidence and does not satisfy this
+milestone.
+The current priority and milestone sequence are tracked in the [roadmap](ROADMAP.md).
 
 Both players use human input. Retain four stocks across the loop. All characters
 are unlocked in the intended default profile, while unsupported characters and
@@ -35,9 +39,10 @@ linked asset alone is not acceptance evidence.
 The native CSS/SSS chain is the canonical player path. The temporary HTML
 selection UI is removed from the player flow; useful developer diagnostics and
 the legacy native-menu URL redirect remain. The complete loop needs normal input
-testing, original selection/configuration handoff, KO/respawn/outcome, and a
-second match after returning. A link probe or automatically scripted match is
-only partial evidence.
+testing, original selection/configuration handoff, KO/respawn/outcome, original
+Results confirmation and return after each match, and three consecutive matches
+in one session. A link probe or an automatically scripted match is only partial
+evidence.
 
 Each requested CSS, SSS or match transition may enter an explicit preparation
 phase. The phase must be visible, wait for the audio transport's disabled-state
@@ -54,27 +59,31 @@ families across every hydrated costume. The evidence is recorded in
 `work/native-active-telemetry-run.log`. The Release browser also passes original pause/resume and two four-stock
 diagnostic loops with three respawns and return to CSS. These use raw-PAD
 diagnostics, not physical input; cold runs have shown timing pauses. This validates the
-accepted Mario/Final Destination slice and narrower Falco/Battlefield source and
-rendering scopes. It does not establish full
+historical Results-skipping Mario/Final Destination slice and narrower Falco/Battlefield
+source and rendering scopes. It does not establish the current three-match Results
+deliverable, full
 `gm_Scene_Vs_OnEnter` or retail scene-manager equivalence, and it is not
 tournament acceptance.
 
-The scoped [scene-entry profile](../work/scene-entry-profile.md) records the
-measured preparation and first-use phases. It is application/driver-cache
-evidence from an isolated run, not a clean cold-cache, uninterrupted full-match
-or retail-reference result. The later MarioReady operation-55 representation
+The historical scene-entry profile was recorded at the ignored local path
+`work/scene-entry-profile.md`; that report is unavailable in this checkout.
+Its summary in STATUS describes isolated application/driver-cache preparation,
+not current acceptance or a clean cold-cache, uninterrupted full-match or
+retail-reference result. The later MarioReady operation-55 representation
 defect is fixed, and fresh native whole-match routes pass on both admitted
 stages.
 
 Issue #34 extends the historical Results-skipping slice with original Results,
-optional Prize and retained source heap across successive matches. The draft
+optional Prize and retained source heap across successive matches. Merged PR #44
 now completes repeated ordinary-keyboard No Contest and normal four-stock
 returns in a visible browser, including the named fighter/stage rotation.
 Original profile initialization and normal elimination also pass focused
 native checks. Keyboard-only input validation is accepted for this PR;
 physical-controller and latency acceptance remain separate. Repeatable original
 comparisons, repeated lifecycle memory bounds
-and whole-loop performance remain open. See the [current return-loop evidence](
+and whole-loop performance remain open. Further equivalence investigation is
+owner-paused; planning this milestone does not restart it. See the [current
+return-loop evidence](
 VERSUS_RETURN_LOOP.md#profile-and-prize-integration-2026-09-20) for the precise
 scope and retained failures.
 
@@ -113,7 +122,7 @@ scope and retained failures.
 | Native numerics | Bounded original jump, jab and stock traces exist; no complete match equivalence | Broaden bit-preserving semantic traces under identical initial conditions and input sequences; locate first divergence |
 | Match initialization | The supported native handoff carries full `StartMeleeData` through `fn_8016DCC0`, including ports, costumes/tints, four stocks and RNG; broader modes and configurations remain outside the validated slice | Compare exact supported original start configuration and extend the source initializer before broadening modes or claiming general start-state equivalence |
 | Original HUD | Original Ready/Go, damage/stocks and markers execute and render; source damage/intro/repeat-lifetime checks and two browser diagnostic loops pass, and Falco/Mario stock identities render on Battlefield | Compare authored interface rendering, timing and audio against the original; complete ordinary-input and reference checks beyond Mario/FD |
-| Match ending | Original supported VS ending callback, GAME!/Game Set interface/audio request, source process mask, pause/resume, No Contest and exit request are integrated; the draft original Results/Prize return route has scoped native and keyboard-browser evidence, including three normal Mario matches and the named four-match fighter/stage rotation | Complete original-game comparison and whole-loop timing. The historical Results-skipping checks do not establish this extended route or retail scene-manager equivalence |
+| Match ending | Original supported VS ending callback, GAME!/Game Set interface/audio request, source process mask, pause/resume, No Contest and exit request are integrated; the merged original Results/Prize return route has scoped native and keyboard-browser evidence, including three normal Mario matches and the named four-match fighter/stage rotation | Complete original-game comparison and whole-loop timing. The historical Results-skipping checks do not establish this extended route or retail scene-manager equivalence |
 | Rendering | Native HSD/GX path renders the current match and browser original pause artwork/camera; no complete pixel equivalence | Reference camera, transforms, materials, blending, depth, effects, viewport and output timing on a declared baseline |
 | Device/latency acceptance | Keyboard Start and SSS cancellation pass; complete ordinary native-menu play, physical controllers and end-to-end latency remain unaccepted; cold timing pauses are observed | Real-device routing, disconnect/reconnect, simultaneous players, analog thresholds and independently measured latency; cold/warm long-match tests |
 
@@ -167,12 +176,15 @@ behavior, including quirks relied upon in competitive play.
 ## Existing issue boundaries
 
 - [#1: deterministic comparison](https://github.com/ericvanlare/melee-web/issues/1)
-  is the basis for expanding state evidence. Reuse the existing reference setup
-  and comparison work; do not build a parallel oracle or claim the whole issue is
-  complete from a menu smoke test.
+  is the basis for expanding state evidence when that investigation resumes.
+  Further equivalence investigation is owner-paused; planning this milestone
+  does not restart it. Reuse the existing reference setup and comparison work;
+  do not build a parallel oracle or claim the whole issue is complete from a menu
+  smoke test.
 - [#2: publication readiness](https://github.com/ericvanlare/melee-web/issues/2)
-  tracks licensing, provenance and safeguards. Keep the repository private;
-  this deliverable does not resolve or authorize publication.
+  is closed after the authorized public transition. The [publication cutover
+  record](PUBLICATION_CUTOVER.md) remains the source for licensing, provenance
+  and safeguards; this deliverable does not change publication scope.
 - [#3: coverage reporting](https://github.com/ericvanlare/melee-web/issues/3)
   will separate compiled, reference-tested and accepted scope. Save reproducible
   evidence now, but defer dashboard implementation during native-menu work.

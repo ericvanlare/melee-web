@@ -1,7 +1,15 @@
-# Core gameplay loop and the first menus
+# Historical core gameplay and first-menu integration
 
-The browser now runs a two-player Mario stock match on Final Destination.
-The active deliverable is original in-game CSS → original SSS → a playable
+The active work queue is the [roadmap](ROADMAP.md) and its Reliable local
+versus v1 milestone. This page preserves early implementation notes; statements
+about the next step, missing menu integration, or a Results-skipping deliverable
+below describe that earlier checkpoint and are not current instructions.
+[STATUS](../STATUS.md) links current evidence. Do not restart these historical
+tasks without identifying a current issue and reproducer.
+
+At this historical checkpoint, the browser ran a two-player Mario stock match
+on Final Destination. The then-active deliverable was original CSS → original
+SSS → a playable
 four-stock Mario/FD match → original CSS, while preserving the
 [accuracy contract](ACCURACY_CONTRACT.md). Direct disc import, native menu
 archives, scene lifetime and transitions are integrated. The runtime also has

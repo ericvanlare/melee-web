@@ -5,6 +5,13 @@ the detailed contracts, not a second status report. `STATUS.md` is the current
 evidence index; follow its links for measurements, retained failures and exact
 receipts instead of copying numbers into this page.
 
+Choose work from the [roadmap](ROADMAP.md) and its
+[Reliable local versus v1 milestone](https://github.com/ericvanlare/melee-web/milestone/1).
+GitHub issues own bounded tasks and completion criteria; this entry owns command
+routing. The milestone's session comparison remains owner-paused until explicitly
+resumed; independent controller/playback preparation and bounded research can
+proceed. Do not infer an accuracy pass from a closed implementation issue.
+
 ## Start with the task you are doing
 
 Use the [build, play and inspect guide](BUILD_AND_PLAY.md) for setup and player
@@ -118,7 +125,15 @@ remove compared fields or report an equal callback/tick total as cadence
 equivalence. Preserve original arithmetic, float bits, save/music RNG and source
 draw ordering.
 
-## Before handoff
+## Execution contract and handoff
+
+Before an execution task, record its observable outcome/failure, smallest next
+experiment, exact pass criteria, exclusions, existing solutions checked and
+stopping rule in the issue. After two experiments at one boundary, reduce the
+reproducer or request a bounded review before another long run. Reference the
+acceptance issue from component PRs without auto-closing it until all its gates
+pass. Keep new evidence in STATUS and scoped reports rather than copying it into
+the roadmap or another status document.
 
 For code, run focused boundary checks, the full suite, the affected build and a
 diff review. For documentation, validate local links and paths and inspect the

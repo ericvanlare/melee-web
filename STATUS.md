@@ -1,5 +1,21 @@
 # Current status
 
+## Active priorities and remaining acceptance
+
+The [roadmap](docs/ROADMAP.md) orders work under
+[Reliable local versus v1](https://github.com/ericvanlare/melee-web/milestone/1).
+[#82](https://github.com/ericvanlare/melee-web/issues/82) owns the remaining
+whole-session comparison and remains owner-paused;
+[#83](https://github.com/ericvanlare/melee-web/issues/83) owns the supported
+physical-controller profile and
+[#84](https://github.com/ericvanlare/melee-web/issues/84) owns uninterrupted
+three-match audio/performance. [#81](https://github.com/ericvanlare/melee-web/issues/81)
+is bounded parallel comparison research outside the milestone.
+This is planning, not new runtime or deployment evidence. Closed #34 records
+implementation history; the linked scoped receipts below and new acceptance
+issues determine which properties are established. Earlier Results-skipping
+and silent-alpha checkpoints retain their historical scope.
+
 ## Repository public; main changes restricted to the owner
 
 The [publication record](docs/PUBLICATION_CUTOVER.md) and
@@ -1273,7 +1289,8 @@ and Aurora's pipeline queue remain quiet for two callbacks. The live clock arms
 on a later callback. Pipelines or uploads first encountered during a match enter
 the same frozen render-preparation gate and resume automatically; unrelated clock
 overruns retain the explicit hitch pause. Preparation time is reported separately,
-and the scoped [scene-entry profile](work/scene-entry-profile.md) measured
+and the historical scene-entry profile (`work/scene-entry-profile.md`, an ignored
+local report unavailable in this checkout) was recorded as measuring
 106.555 ms for initial resource preparation, 83.140 ms for isolated SSS owner
 construction and 160.100 ms for isolated match construction. Its 7,604 active
 callbacks had a 24.200 ms worst callback, no callback above 33.3 ms and zero
