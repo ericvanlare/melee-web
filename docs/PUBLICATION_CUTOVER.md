@@ -6,8 +6,48 @@ September 20, 2026. [The assessment](PUBLICATION_PROVENANCE_ASSESSMENT.md) and
 unresolved rights risk; it does not establish third-party permission. It does
 not authorize a new hosted player or native-binary release.
 
-Repository visibility is still private. The following sequence makes the
-remaining operational steps concrete; it is not a record that they happened.
+## Completed public transition: September 25, 2026 UTC
+
+The owner authorized public visibility and required that only `ericvanlare`
+(including agents using that account) can change `main`. The repository was
+made public at commit `7d3a8a7e1b0d9bd0e2ed840982010abb65ef9213`, after
+[Verify run 36080615358](https://github.com/ericvanlare/melee-web/actions/runs/36080615358)
+and the final source/history/GitHub delta checks passed within their recorded
+scope. The [cutover receipt](evidence/publication-cutover-v1.json) binds the
+applied settings, readbacks, cache cleanup and verification limits.
+
+Actions was disabled, no active runs remained, and all 58 private-era compiler
+caches were removed. The API returned zero caches before visibility changed.
+Logs, artifacts and audit evidence were retained. Actions was then restored
+with full-SHA action pinning, read-only tokens and approval required for every
+external contributor's fork workflow.
+
+The active [owner-only main ruleset](https://github.com/ericvanlare/melee-web/rules/23976041)
+restricts creation, updates, deletion and non-fast-forward changes. Its only
+bypass actor is GitHub user ID `1350618` (`ericvanlare`), and that bypass works
+only through pull requests. No role, team, app or deploy key receives a bypass.
+The separate classic protection still requires a current successful
+`browser-build` from GitHub Actions app `15368`, resolved conversations and PRs,
+including for the owner. Force pushes and deletion remain disabled. A no-op
+direct ref-update attempt using the owner's credentials was rejected with
+"Changes must be made through a pull request"; main remained unchanged.
+
+The collaborator inventory contained only the owner, with no pending invites,
+deploy keys or webhooks. Secret scanning, secret push protection, dependency
+alerts and private vulnerability reporting are enabled. The owner is subscribed
+to repository activity and is not ignoring notifications. The public reporting
+button and its GitHub sign-in destination were verified with headless installed
+Chrome. No report was submitted; the authenticated form, email preferences and
+email delivery were not exercised. See [SECURITY.md](../SECURITY.md).
+
+The GitHub API rejected the old combination of an empty `contexts` list and
+`checks` in the prepared protection payload. The applied and retained policy
+uses `checks` alone. GitHub also omits the explicitly false
+`update_allows_fetch_and_merge` parameter in ruleset readback; the update rule
+is active, the repository is not a fork, and no upstream-sync exception is enabled.
+
+The procedures below describe how to repeat these checks. Their earlier
+private-plan observations are historical, superseded by the applied readbacks.
 
 Use the [post-handoff checkpoint](PUBLICATION_CHECKPOINT.md) and its exact
 inventories to carry reviewed evidence forward after the runtime work stopped.
@@ -82,6 +122,21 @@ Rebase pending work onto that workflow before running it publicly; older
 workflow versions must not republish unreviewed local inputs or private-era caches.
 
 ## Apply controls during the public transition
+
+The owner-specific access policy is separate from the required-CI policy, so
+permission to merge does not grant permission to bypass CI. For this repository,
+update the existing ruleset rather than creating duplicates:
+
+```sh
+gh api --method PUT repos/ericvanlare/melee-web/rulesets/23976041 \
+  --input .github/publication/main-owner-rule.json
+gh api repos/ericvanlare/melee-web/rulesets/23976041
+```
+
+Verify that enforcement is active, `refs/heads/main` is the only target, and
+`User` ID `1350618` with `pull_request` mode is the only bypass actor. Do not
+replace this with an administrator-role or integration bypass. The owner can
+administer these settings; credentials acting as the owner retain that authority.
 
 The prepared policies require pull requests, current green aggregate CI,
 resolved review conversations, and no force pushes/deletion, including for

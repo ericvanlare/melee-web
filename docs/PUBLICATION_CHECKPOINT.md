@@ -1,5 +1,9 @@
 # Publication checkpoint after the runtime handoff
 
+Historical pre-opening checkpoint: the owner subsequently authorized the
+[public transition](PUBLICATION_CUTOVER.md). Its applied-controls receipt and
+issue #2 carry the final state; the observations below retain their original scope.
+
 The runtime work has stopped and PR [#79](https://github.com/ericvanlare/melee-web/pull/79)
 is merged. This September 25, 2026 UTC review uses main
 `60372b468dbe98f2b73bcc690a4ed35273eead91` as its source baseline and
