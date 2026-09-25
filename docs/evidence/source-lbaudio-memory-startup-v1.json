@@ -1,0 +1,522 @@
+{
+  "schema": "melee-web-source-lbaudio-memory-startup-v1",
+  "scope": "Original lbAudioAx initialization, first deferred DevCom completion, lbMemory root and lbHeap descriptor initialization in a bounded Node/Wasm fixture. No browser or full-session result.",
+  "source_revision": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+  "owned_run": {
+    "path": "work/wrapup-owned-v1/receipt.json",
+    "bytes": 65320,
+    "sha256": "ff1ab9f2c9020cf0b7be283bac21b1117a62038d8d54f683cfca49cb0cb0206b"
+  },
+  "runtime": {
+    "path": "work/wrapup-owned-v1/joined.js",
+    "js_sha256": "a9e6c2cc0056358c79f4041f853efd199e9d8b53f0d242b8c0bc65adedd7bb57",
+    "wasm_sha256": "3bddb72c2c32d4439a95c221ef18b1af9bfc57764b600a49ec47f8c84dcd0e5b",
+    "runtime_claim": false
+  },
+  "run": {
+    "status": "pass",
+    "stdout_sha256": "85c45d89bbd5ed76229afe240d6ebf5ed82c81f033a93dd334a9a5b01346c137",
+    "stderr_sha256": "a020c9e966f1dd008b3311a68c60e3c6c4479ce1c737ffad5b509386cf3f0116"
+  },
+  "observations": [
+    {
+      "schema": "melee-web-original-startup-fixture",
+      "version": 1,
+      "status": "boundary_reached",
+      "boundary": "hsd_os_id_obj",
+      "next_source_boundary": "lbAudioAx_8002838C",
+      "arena": {
+        "crash": 2152655872,
+        "after_crash": 2152664064,
+        "xfb_begin": 2152664064,
+        "after_xfb": 2153892864,
+        "fifo_begin": 2153892864,
+        "after_fifo": 2154155008,
+        "fifo_bound": true,
+        "hsd_next_lo": 2154679360,
+        "hsd_next_hi": 2172619456
+      },
+      "heap": {
+        "descriptor_bytes": 48,
+        "audio_bounds": "derived_from_measured_hsd_next_lo",
+        "audio_handle": 0,
+        "audio_begin": 2154155072,
+        "audio_end": 2154679360,
+        "main_handle": 1,
+        "main_begin": 2154679360,
+        "main_end": 2172619456,
+        "main_free": 17940064
+      },
+      "object_pools": [
+        {
+          "name": "slist",
+          "size": 8,
+          "align": 4,
+          "used": 0,
+          "free": 0,
+          "peak": 0
+        },
+        {
+          "name": "dlist",
+          "size": 12,
+          "align": 4,
+          "used": 0,
+          "free": 0,
+          "peak": 0
+        },
+        {
+          "name": "aobj",
+          "size": 28,
+          "align": 4,
+          "used": 0,
+          "free": 0,
+          "peak": 0
+        },
+        {
+          "name": "fobj",
+          "size": 48,
+          "align": 4,
+          "used": 0,
+          "free": 0,
+          "peak": 0
+        },
+        {
+          "name": "id",
+          "size": 12,
+          "align": 4,
+          "used": 0,
+          "free": 0,
+          "peak": 0
+        },
+        {
+          "name": "vec",
+          "size": 12,
+          "align": 4,
+          "used": 0,
+          "free": 0,
+          "peak": 0
+        },
+        {
+          "name": "mtx",
+          "size": 48,
+          "align": 4,
+          "used": 0,
+          "free": 0,
+          "peak": 0
+        },
+        {
+          "name": "robj",
+          "size": 28,
+          "align": 4,
+          "used": 0,
+          "free": 0,
+          "peak": 0
+        },
+        {
+          "name": "rvalue",
+          "size": 12,
+          "align": 4,
+          "used": 0,
+          "free": 0,
+          "peak": 0
+        },
+        {
+          "name": "render",
+          "size": 28,
+          "align": 4,
+          "used": 0,
+          "free": 0,
+          "peak": 0
+        },
+        {
+          "name": "tevreg",
+          "size": 20,
+          "align": 4,
+          "used": 0,
+          "free": 0,
+          "peak": 0
+        },
+        {
+          "name": "chan",
+          "size": 48,
+          "align": 4,
+          "used": 0,
+          "free": 0,
+          "peak": 0
+        },
+        {
+          "name": "shadow",
+          "size": 40,
+          "align": 4,
+          "used": 0,
+          "free": 0,
+          "peak": 0
+        },
+        {
+          "name": "zlist",
+          "size": 72,
+          "align": 4,
+          "used": 0,
+          "free": 0,
+          "peak": 0
+        }
+      ],
+      "source_aram": {
+        "base": 16384,
+        "size": 16777216,
+        "initialized": false
+      },
+      "omitted_services": [
+        "VI",
+        "HSD_GXInit",
+        "DVD",
+        "retrace",
+        "AI",
+        "AX",
+        "ARInit",
+        "lbMemory",
+        "lbHeap"
+      ]
+    },
+    {
+      "kind": "source_lbaudio_startup",
+      "driver_calls": 1,
+      "fx_bytes": [
+        54272,
+        72704
+      ],
+      "bank_sizes": [
+        2045824,
+        911456,
+        3291584
+      ],
+      "bookkeeping_entries": 224,
+      "runtime_claim": false
+    },
+    {
+      "kind": "source_synth_allocations",
+      "aram_blocks": [
+        1280,
+        6248864,
+        196608
+      ],
+      "aram_next": 6463136,
+      "aram_free_blocks": 13,
+      "audio_heap_before": 524256,
+      "audio_heap_after": 523648,
+      "sram_reads": 1,
+      "deferred_bytes_verified": 1280
+    },
+    {
+      "kind": "source_synth_joined",
+      "boundary": "synth_devcom_arq_complete",
+      "ai_init": true,
+      "ax_init_owned_by_synth": true,
+      "ai_dma_enabled": true,
+      "ai_dma_bytes": 640,
+      "dsp_boot_mails": 10,
+      "dsp_init_callback": 1,
+      "dsp_image_bytes": 6624,
+      "dsp_image_hash": 1317702433,
+      "ar_init_submissions": 18,
+      "synth_arq_submissions": 1,
+      "arq_pumps": 1,
+      "runtime_claim": false
+    },
+    {
+      "kind": "source_post_audio_startup",
+      "aram_stack": 6463136,
+      "aram_free_blocks": 13,
+      "root_handle_index": 0,
+      "root_handle_words": [
+        0,
+        6463136,
+        16777216,
+        0
+      ],
+      "game_heap_words": [
+        2154679360,
+        2172619456,
+        6463136,
+        16777216,
+        4294967295,
+        4294967295,
+        0,
+        0,
+        1,
+        1,
+        1,
+        4294967295,
+        4294967295,
+        0,
+        0,
+        1,
+        1,
+        1,
+        4294967295,
+        4294967295,
+        2154679360,
+        2048,
+        1,
+        1,
+        1,
+        4294967295,
+        4294967295,
+        2154681408,
+        5212160,
+        1,
+        1,
+        1,
+        4294967295,
+        4294967295,
+        2166019776,
+        6599680,
+        2,
+        1,
+        1,
+        4294967295,
+        4294967295,
+        6463136,
+        9881600,
+        4,
+        1,
+        1
+      ],
+      "free_mem_index": 0,
+      "free_heap_index": 1,
+      "runtime_claim": false
+    }
+  ],
+  "original_comparison": {
+    "scope": "Retail compared: post-audio root handle and heap descriptor words only. Independently executed source output compared after execution. No browser, fighter identity, PCM, timing or full-session claim.",
+    "target_sha256": "e728670db1c40265dcccb24ede18fa85e3907c80f7de896addfc7b3b10c4e47d",
+    "stdout_sha256": "85c45d89bbd5ed76229afe240d6ebf5ed82c81f033a93dd334a9a5b01346c137",
+    "checks": [
+      {
+        "field": "root_handle_words",
+        "count": 4,
+        "equal": true
+      },
+      {
+        "field": "game_heap_words",
+        "count": 46,
+        "equal": true
+      }
+    ],
+    "compared_scalar_fields": 50,
+    "status": "pass",
+    "first_session_divergence_unchanged": 1776
+  },
+  "negative_cases": [
+    {
+      "mode": "bad-dma",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "43ba3addbb1fd5ad71ac0e9e7865a40c549603833b92e8304f974b1d81d637cc"
+    },
+    {
+      "mode": "bad-image",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "22347c5bfb9446db47a75797481260e564df2317b30506c8f1f1df241f1ba945"
+    },
+    {
+      "mode": "bad-mail",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "705b7946ac1fc13eef7c1a73fed60e4789ec24deb136ee8dccf4823f57298330"
+    },
+    {
+      "mode": "masked-pump",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "bca4cf70fd8b9b8fd82d4c7cfc7864c64ac860887b1f9cf662bb95e9cb2e1767"
+    },
+    {
+      "mode": "missing-cache",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "aa06c69fec0db61becdb67189cecc87e7ffe97ab592f9a7876450c56c57d085d"
+    },
+    {
+      "mode": "bad-task-callback",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "60be7a651c114b286f8baea125056e28a9cfea21c30df0632a81b3c9fb017b1c"
+    },
+    {
+      "mode": "bad-task-span",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "5d86d964b41b21a1138f7e9db8d24f254e1589617573e37d7fe691d493ef33b0"
+    },
+    {
+      "mode": "global-masked-pump",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "fdf171833fa602ddaa6007b039d8d74c72def4e4c4a4d46cfc5910e83efc48fa"
+    },
+    {
+      "mode": "local-masked-pump",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "fdf171833fa602ddaa6007b039d8d74c72def4e4c4a4d46cfc5910e83efc48fa"
+    },
+    {
+      "mode": "status-masked-pump",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "12662fa61868484d13bf44a9453d2088be9858a90a4349815433537dac97fa17"
+    },
+    {
+      "mode": "unknown",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "b1323b9bb332e27c9e35f2085e69d7b012904acccd367c0bf51bd67840f6867f"
+    },
+    {
+      "mode": "unsupported-chorus-init",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "8797bd4da3a467d3ba5900b697fdd67781033601176b1ea8066edd38b6f127a9"
+    },
+    {
+      "mode": "unsupported-chorus-shutdown",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "f18ce88b3facb5d6b71270ab50309e31559f47769be04c59d09298df13551f5b"
+    },
+    {
+      "mode": "unsupported-chorus-callback",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "a1221c0d99340f4b2906c9fc28557a3368ddccad751a7862d5962fa6185f7d82"
+    },
+    {
+      "mode": "unsupported-reverb-hi-init",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "7662b3e4d96a1a8657c1de983e43064c4188e1478458a694c479831495524a10"
+    },
+    {
+      "mode": "unsupported-reverb-hi-shutdown",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "e9aacf34217aab61f7ed470fe675a7d6b92d5b7f7db444f63e24b9c559038f56"
+    },
+    {
+      "mode": "unsupported-reverb-hi-callback",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "079210c4ec07b124dfc35c9cfc44b1b18dc5967fd3e54934f659ef0ad8599c6f"
+    },
+    {
+      "mode": "unexpected-sfx-command",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "fe16a78dd2bfe2a51743aaf83183f49c2bbd168378711ee715809c4083c9ce85"
+    }
+  ],
+  "validation": {
+    "full_suite": {
+      "ran": 1446,
+      "passed": 1357,
+      "skipped": 89,
+      "seconds": 342.725,
+      "log": {
+        "path": "work/wrapup-full-suite-v1.log",
+        "bytes": 256501,
+        "sha256": "61afa895834734ff442fc1bc021bd4f9e0959a3891f340e3733147671b6b689d"
+      }
+    },
+    "final_post_audio_focused": {
+      "passed": 4,
+      "log": {
+        "path": "work/wrapup-post-audio-focused-v1.log",
+        "bytes": 850,
+        "sha256": "b2d2d3fa963b570ec588f2e489862bf9535602b77f8879ad19b819427166cba0"
+      }
+    },
+    "affected_build": {
+      "target": "hsd_native_runtime",
+      "status": "pass",
+      "log": {
+        "path": "work/wrapup-build-v1.log",
+        "bytes": 63,
+        "sha256": "c2ed93ffd93c840755c0e91392ae593b1b52de9b7aaf6c208123feaceb1dde2e"
+      }
+    },
+    "content_guard": {
+      "findings": 0,
+      "entries": 1303
+    },
+    "note": "Full suite started before the final post-audio symbol-inventory regression was added; final focused tests recompile and reject forged symbol inventories. Fresh owned execution uses final source and validators. Final CI must pass before merge."
+  },
+  "limits": [
+    "Investigation paused by owner; first session mismatch remains match0 tick1776 P4 input_hex.",
+    "No original comparison of FX/SFX state or PCM.",
+    "No scene heap creation, persistent preload profile or live fighter allocation binding.",
+    "No browser, timing, pixels, DSP firmware or full-session equivalence.",
+    "No deployment."
+  ],
+  "retained_failures": [
+    "work/lbaudio-link-v1: stale profile after helper revision; rebuilt profile",
+    "work/lbaudio-link-v2: unresolved unsupported FX/SFX services; use explicit failing providers",
+    "work/post-audio-allocations-snapshot-failure-v1: missing shared accessor helper; corrected declaration scope"
+  ],
+  "source_hashes": {
+    "tests/source_synth_joined_services.cpp": "bacdf732249e5243b1a6562df5cf94997af648e90ef3ff2ba96e674f398c127b",
+    "tests/source_synth_joined_services.h": "ab0dd04f5c2dd95c29c68dbbbdb2bede297ffe512b4f87e65134f779a7149a9d",
+    "tests/source_synth_joined_trace.cpp": "93fd750fdafcd81c82a080dc290e0a173364bb8a36ab76436ea4a3b19aaaf6b2",
+    "src/source_audio_ar_services.c": "ac6e0dc5ab9c69a5b2c81a58f2141d6b510a9ee57833c0d3e143d514d11e634c",
+    "patches/source-ai-callback-stack.patch": "715201a54db1bc32a9951ca86b8f2eba70d80f9d093a8832ca61fa98a8f577f1",
+    "src/source_audio_ar_services.h": "c0e94b9b4eabdf96c6bc71213cfcdebcf61e9f30781397d0b7d19789cddf2f59",
+    "tests/original_startup_alloc_trace.cpp": "9736e0f6e19ae9434d14684183dc2f0120033906613c83d532743a94e9ed18ab",
+    "tests/original_startup_osmemory.cpp": "077c4fe63e27b0fa41cf776c50cd73abfe04869bbb95020a8fa2be26022a0601",
+    "tests/source_synth_joined_sram.c": "f00ac1fc988994759701ae2f7e68bd6a724d154e7f9a6bc7d65bf5f32ca88d1a",
+    "tests/source_synth_joined_accessors.h": "ed6a484d451da299310aa3d9aa0f9ee38087f5f7bdd8795d47622a5a9c596fe2",
+    "tools/source_synth_joined_startup.py": "66311dbffbb42e12a33ba3f67e1079f95a417691c169a333a567d94892cad94c",
+    "tools/source_synth_joined_runtime.py": "520302eb63298a2616b9609a4a847a15b226c1e2fac7f772dab10ea8d83b8c40",
+    "CMakeLists.txt": "1cdf9fc64130ad16cae4c4d3f881a150b1721c3571c5574b5938bdbab75e9ab2",
+    "src/gameplay_audio_fx.c": "7efcd25f80a84f2b6dea6f94ca853d807ba49737b9873c606702ff1f411e8caa",
+    ".deps/melee/extern/dolphin/src/dolphin/ai/ai.c": "cb8508338aa0c4b10b9134f2f51936618929fe8f63515e137a5ff2f2d4fcc0d9",
+    ".deps/melee/extern/dolphin/src/dolphin/dsp/dsp.c": "29a6864fb05a78a27e063f305844e2cf4f03af22f724863a14fbcff40ac18aa5",
+    ".deps/melee/extern/dolphin/src/dolphin/dsp/dsp_task.c": "7b212710530cc6617d15e826c2de56caa59fb6e4bc702730812f50c2fb13964f",
+    ".deps/melee/extern/dolphin/src/dolphin/ar/ar.c": "dc2ad84463413ef6b91a8f8fe8acefb26ed35743d63dd85bf6590cec28d95cc8",
+    ".deps/melee/extern/dolphin/src/dolphin/ar/arq.c": "b8ce29ad2773743b3f657cc1203799baad5efcc65d8381beb60f4922b37a1be1",
+    ".deps/melee/extern/dolphin/src/dolphin/os/OSInterrupt.c": "69ba045af10aaede13f77fa1040af7fa6e79658e2d317bcee1afc5992d3fca7e",
+    "tools/source_lbaudio_startup.py": "3e4aa73d774132f93b3035f4c1c1623637ab1571b0b11be78b6aab0211452610",
+    "tools/source_post_audio_allocations.py": "8dc569badf06fa699c567f6ac69895f76c55974c4bac0018df668c7f3ceff662",
+    "tests/source_lbaudio_startup_accessors.h": "1297bf097d0117ea8339ff719ae57c1f3fbdadf36b9e4bad581ed1f650a607dc",
+    "tests/source_post_audio_allocations_accessors.h": "25e0fe8dad594878aed2304b128bd85e192b1944827849f5d6c9f5d346133723",
+    "tests/test_source_lbaudio_joined_runtime.py": "43d1c2b819e0ebe5f3e24b50926b778ff08dd928b3a53eaa11c415331b0bac4b",
+    "tests/test_source_post_audio_allocations.py": "0f61bc08bbc36e57bcb5c600802bcf2eadcb703dbda69ee48591b7289d7695d7"
+  },
+  "artifacts": [
+    {
+      "path": "work/wrapup-owned-v1/receipt.json",
+      "bytes": 65320,
+      "sha256": "ff1ab9f2c9020cf0b7be283bac21b1117a62038d8d54f683cfca49cb0cb0206b"
+    },
+    {
+      "path": "work/wrapup-owned-v1/run.stdout",
+      "bytes": 2891,
+      "sha256": "85c45d89bbd5ed76229afe240d6ebf5ed82c81f033a93dd334a9a5b01346c137"
+    },
+    {
+      "path": "work/wrapup-owned-v1/run.stderr",
+      "bytes": 722,
+      "sha256": "a020c9e966f1dd008b3311a68c60e3c6c4479ce1c737ffad5b509386cf3f0116"
+    },
+    {
+      "path": "work/wrapup-owned-v1/link.command.json",
+      "bytes": 12750,
+      "sha256": "1ae7b281291ceac12980b2fb7202af9d493052536791e48fa5b784d17ed03b4d"
+    },
+    {
+      "path": "work/wrapup-owned-v1/link.stderr",
+      "bytes": 143,
+      "sha256": "1fc9dac585483fcf59eed684bab3c3c71103f1efd832cf475bcb09b0ea0435b9"
+    }
+  ]
+}

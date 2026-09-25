@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include "Core/PowerPC/ReferenceCaptureObserver.h"
+#include "Core/PowerPC/ReferenceAllocationObserver.h"
+#include "Core/PowerPC/ReferenceAllocationProfile.h"
 #include "Core/PowerPC/ReferenceInputStream.h"
 
 #include <array>
@@ -359,6 +361,12 @@ bool ValidIdentity(std::string_view value)
   return true;
 }
 
+bool AllocationConfigured()
+{
+  static const bool configured = !Env("MWRC_ALLOCATION_OUTPUT").empty();
+  return configured;
+}
+
 struct CpuProbePoint
 {
   const char* label;
@@ -532,6 +540,8 @@ struct Observer::Impl
   ~Impl()
   {
     Stop();
+    if (AllocationConfigured() && ReferenceAllocation::Observer::IsInitialized())
+      ReferenceAllocation::Observer::Finish(false);
   }
 
   bool Start()
@@ -2037,6 +2047,10 @@ struct Observer::Impl
       {
         if (!InputStream::WaitComplete())
           SetInvalid("input stream did not complete successfully");
+        if (AllocationConfigured() &&
+            !ReferenceAllocation::Observer::Finish(natural_completion.load()))
+          SetInvalid("allocation diagnostic did not complete: " +
+                     ReferenceAllocation::Observer::Error());
         if (cpu_probe_configured && cpu_probe_valid && !cpu_probe_written)
         {
           WriteCpuProbe();
@@ -2241,8 +2255,22 @@ bool Observer::ValidateDiscDOL(const DiscIO::VolumeDisc& volume)
   if (mbedtls_sha256_ret(dol.data(), dol.size(), sha256.data(), 0) != 0 ||
       sha256 != EXPECTED_DOL_SHA256_BYTES)
     return false;
-  return Common::SHA1::CalculateDigest(dol) == EXPECTED_DOL_SHA1_BYTES &&
-         InputStream::Initialize();
+  if (Common::SHA1::CalculateDigest(dol) != EXPECTED_DOL_SHA1_BYTES ||
+      !InputStream::Initialize())
+    return false;
+  const std::string allocation_output = Env("MWRC_ALLOCATION_OUTPUT");
+  if (allocation_output.empty())
+    return true;
+  for (const char* other : {"MWRC_OUTPUT", "MWRC_STATUS", "MWRC_CPU_PROBE_OUTPUT",
+                            "MWRC_INPUT_RECORD", "MWRC_INPUT_REPLAY"})
+  {
+    if (allocation_output == Env(other))
+      return false;
+  }
+  // Arm while boot still owns the DOL, before any of its blocks are compiled.
+  // The module reads guest memory only at the verified DOL-entry callback.
+  return ReferenceAllocation::Observer::Arm(ReferenceAllocation::Generated::kProfile,
+                                            allocation_output);
 }
 
 void Observer::Fail(const char* reason)
@@ -2256,7 +2284,7 @@ bool Observer::IsEnabled()
   return enabled;
 }
 
-bool Observer::IsBoundary(u32 guest_pc)
+static bool IsCaptureBoundary(u32 guest_pc)
 {
   switch (guest_pc)
   {
@@ -2297,11 +2325,26 @@ bool Observer::IsBoundary(u32 guest_pc)
   }
 }
 
+bool Observer::IsBoundary(u32 guest_pc)
+{
+  return IsCaptureBoundary(guest_pc) ||
+         (AllocationConfigured() && ReferenceAllocation::Observer::IsBoundary(guest_pc));
+}
+
 void Observer::OnBoundary(Core::System* system, u32 guest_pc, PowerPC::PowerPCState* state)
 {
   if (!IsEnabled() || !system || !state)
     return;
-  Instance().Observe(system, guest_pc, state);
+  if (AllocationConfigured())
+  {
+    ReferenceAllocation::Observer::Observe(system, guest_pc, state);
+    const std::string allocation_error = ReferenceAllocation::Observer::Error();
+    if (!allocation_error.empty())
+      Instance().m_impl->SetInvalid("allocation diagnostic failed: " + allocation_error);
+  }
+  // Allocation-only callbacks must not start or extend the primary stream.
+  if (IsCaptureBoundary(guest_pc))
+    Instance().Observe(system, guest_pc, state);
 }
 
 void Observer::Observe(Core::System* system, u32 guest_pc, PowerPC::PowerPCState* state)

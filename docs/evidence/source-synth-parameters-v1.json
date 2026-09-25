@@ -1,0 +1,155 @@
+{
+  "schema": "melee-web-source-synth-parameters-evidence",
+  "version": 1,
+  "date": "2026-09-24",
+  "base_commit": "b15b0dc985a4e028ab72df20fc429ac6c1ddb448",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced",
+    "Retail compared"
+  ],
+  "scope": "Original selection and startup call-argument derivation; Retail compared only for one bank allocation size after execution",
+  "source_revision": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+  "source_files": [
+    {
+      "path": "tools/source_synth_parameters.py",
+      "bytes": 25596,
+      "sha256": "48a9e36b429e042772f97dfff8080866748b1d7e256c9ab916443eb17a8f5256"
+    },
+    {
+      "path": "tests/test_source_synth_parameters.py",
+      "bytes": 6280,
+      "sha256": "d16e51bd1ffa30ee91ac1ca1a6afd43cca35b8629efc2f1f39da045dbbd9d980"
+    }
+  ],
+  "owned_dol": {
+    "sha1": "08e0bf20134dfcb260699671004527b2d6bb1a45",
+    "sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646"
+  },
+  "source_inputs": {
+    "config/GALE01/symbols.txt": "214477d5b27989a9675c4b881f4db2dad5eeaada39dbac17c57c70d5ba84d579",
+    "extern/dolphin/include/dolphin/ax.h": "4c355504b9901229681da12080a6a6214e5a9b111d1834988c8a1b00651a2c9e",
+    "src/melee/lb/lbaudio_ax.c": "11e237a0af742dee1502cdab1454191301179af2f9030958324dec0886ccf5dc",
+    "src/melee/lb/lbaudio_ax.static.h": "9db87e298a942ac3b7a5f047b0dbba6c31a9939e3128a4a29676e7dae409578e",
+    "src/MSL/stdbool.h": "0265041ee1108a45dc88b724b887533b1d89169ee4089f9e6567063b2015797e",
+    "source_revision": "b43912cc78606f96c9569f5d6229bc9d7e265ea5"
+  },
+  "source_inputs_unchanged": true,
+  "result": {
+    "bank_size_total": 6248864,
+    "bank_sizes": [
+      2045824,
+      911456,
+      3291584
+    ],
+    "driver_call": [
+      64,
+      0,
+      64,
+      6248864
+    ]
+  },
+  "artifacts": [
+    {
+      "path": "work/source-synth-owned-root-v1.json",
+      "bytes": 3170,
+      "sha256": "b2bf8dad8c6204c8582979263084e6a1d259e436540121c27543e0cc4e5a4fcc"
+    },
+    {
+      "path": "work/source-synth-owned-root-v1/command.json",
+      "bytes": 731,
+      "sha256": "7667e7df256647e371fc1b553ae6eb0bd85005f379a6423ed1583142c3508187"
+    },
+    {
+      "path": "work/source-synth-owned-root-v1/compile.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-synth-owned-root-v1/compile.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-synth-owned-root-v1/include/stdbool.h",
+      "bytes": 367,
+      "sha256": "0265041ee1108a45dc88b724b887533b1d89169ee4089f9e6567063b2015797e"
+    },
+    {
+      "path": "work/source-synth-owned-root-v1/run-command.json",
+      "bytes": 192,
+      "sha256": "e7efc90b78b67c99a5a5cd04a635bd11505407b803942649fec8bcc057121cb4"
+    },
+    {
+      "path": "work/source-synth-owned-root-v1/run.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-synth-owned-root-v1/run.stdout",
+      "bytes": 98,
+      "sha256": "7c087bbd18a3a35d09dcb1abf921dcc22c0ad5e9f575e7005573d16d37920a71"
+    },
+    {
+      "path": "work/source-synth-owned-root-v1/source_synth_parameter_fixture.c",
+      "bytes": 6342,
+      "sha256": "e57c0f94587ab4d7d552625a6cf292208dc3e7c2513c0f626dbf3f5fc67624cc"
+    },
+    {
+      "path": "work/source-synth-owned-root-v1/source_synth_parameter_fixture.js",
+      "bytes": 59247,
+      "sha256": "09f39918257d5978c96320e9bc1e3ed67e31426329d8ca695708a3b1fe93ee74"
+    },
+    {
+      "path": "work/source-synth-owned-root-v1/source_synth_parameter_fixture.wasm",
+      "bytes": 21428,
+      "sha256": "47e9b10c45ccc983e428248158e715e17530bb36cb160bab7be1a2aae260ceef"
+    }
+  ],
+  "comparison": {
+    "scope": "post-execution comparison of one derived bank size; no allocation history, AR execution or session equivalence claim",
+    "derived_sha256": "b2bf8dad8c6204c8582979263084e6a1d259e436540121c27543e0cc4e5a4fcc",
+    "observed_sha256": "e728670db1c40265dcccb24ede18fa85e3907c80f7de896addfc7b3b10c4e47d",
+    "capture_sha256": "7fa6fe225d1e1d33de24e32505afc765c199bd1ab92919ea298aa618180bb6ee",
+    "observed_call": 34,
+    "derived_total": 6248864,
+    "observed_argument": 6248864,
+    "checks": {
+      "derived_bank_total_equals_observed_ARAlloc_argument": true,
+      "shifted_total_negative_rejected": true
+    }
+  },
+  "validation": {
+    "owned_focused_tests_run": 6,
+    "owned_focused_log": {
+      "path": "work/source-synth-parameters-root-focused-v1.log",
+      "bytes": 1082,
+      "sha256": "7ab974523e7a79dbcaedcbf342277234f9ce4e5fa5e43e46f8c70ac6c050b21f"
+    },
+    "full_suite": {
+      "base_commit": "64409bca06fe446f7137ea95038cebd18858316a",
+      "tests_run": 1391,
+      "passed": 1294,
+      "skipped": 97,
+      "seconds": 296.127,
+      "log": {
+        "path": "work/source-synth-parameters-full-suite-v1.log",
+        "bytes": 248582,
+        "sha256": "f0f2267abe5bd45a134911c893453d14dbe4c9047a0acdc76ef75243d6649ea5"
+      }
+    },
+    "integration": "AX prerequisite added after local component suite; combined tree is checked in CI before merge"
+  },
+  "retained_superseded_runs": [
+    "work/source-synth-parameters-run-v6.json",
+    "work/source-synth-parameters-run-v11.json"
+  ],
+  "correction": "Earlier C++ parameter fixture used host one-byte bool; accepted fixture compiles C with exact original MSL four-byte bool and static assertions. Earlier source provenance checks were strengthened before acceptance.",
+  "limits": [
+    "No AXDriver or HSD_SynthInit execution",
+    "No allocation address or complete allocation-order validation",
+    "No PCM, live browser, timing or full-session claim"
+  ],
+  "deployed": false
+}

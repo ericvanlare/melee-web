@@ -1,0 +1,433 @@
+{
+  "schema": "melee-web-original-allocation-repeated-ownership",
+  "version": 1,
+  "date": "2026-09-24",
+  "scope": "Recorded-order allocation metadata from cold original DOL entry through first VS, Results/CSS/SSS and second VS-entry return. No live browser context or full-session acceptance.",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced",
+    "Retail compared"
+  ],
+  "scenario": {
+    "players": 4,
+    "fighter": "Mario",
+    "cpu_levels": [
+      9,
+      9,
+      9,
+      9
+    ],
+    "stocks": 4,
+    "stage": "Final Destination",
+    "renderer": "Null",
+    "cpu": "JITARM64",
+    "speed": 2
+  },
+  "source": {
+    "melee_revision": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+    "dolphin_revision": "c77bbaa0f372c3f72281602a8b087206706542cb",
+    "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646"
+  },
+  "controller_input": {
+    "path": "work/session-equivalence-reference-v1/controller-input.mwri",
+    "bytes": 7207256,
+    "sha256": "f19e1a54a9aceda33217a1e272bc7ac0b78336bd243616a74f9573a9d8fbdcf5"
+  },
+  "profile": {
+    "path": "work/session-equivalence-allocation-profile-v3.json",
+    "bytes": 20631,
+    "sha256": "30e6ccc981d5e8eea6d5c88381bfc3df5a3b1103599c2b632ddb48580165bf65"
+  },
+  "build": {
+    "path": "work/session-equivalence-lifetimes-build-v5.json",
+    "bytes": 3950,
+    "sha256": "47543d2b9e5457cec6938fb1ca1fae5471124a670edb8d73fdd91a246dc4b3c0"
+  },
+  "capture_build": {
+    "path": "work/session-equivalence-lifetimes-build-v3.json",
+    "bytes": 3934,
+    "sha256": "37690f1755625ae635b2a5f795c45460ae2e6ab8a1a258c3b2f44d15c1a665d0"
+  },
+  "binary_sha256": "27bdba887e9e40d064048657b67166f5009bf576531b9a536032c109adfe4df6",
+  "build_note": "Final generator rejects legacy header rendering; final build produces the identical captured executable. Failed provenance-archive collision is retained; final generator archive has its own owned directory.",
+  "captures": [
+    {
+      "allocation": {
+        "path": "work/session-equivalence-lifetimes-prefix-v4/allocations.jsonl.gz",
+        "bytes": 492996942,
+        "sha256": "7fa6fe225d1e1d33de24e32505afc765c199bd1ab92919ea298aa618180bb6ee"
+      },
+      "result": {
+        "path": "work/session-equivalence-lifetimes-prefix-v4/result.json",
+        "bytes": 788,
+        "sha256": "884bfbc016d1aa05aa6ba716e5cc4a30c23d0146766e9eff7346b4ae69b076a8"
+      },
+      "end": {
+        "active_owner": true,
+        "boundary_complete": true,
+        "calls": 3857302,
+        "compression": "gzip",
+        "error": null,
+        "max_events": 100000000,
+        "ownership_complete": false,
+        "pending_calls": [],
+        "record": "end",
+        "repeated_stops": 0,
+        "scope": "vs_ownership",
+        "sequence": 7714605,
+        "status": "captured",
+        "stop_at": "entry",
+        "target_complete": true,
+        "vs_entries": 2,
+        "vs_exits": 1,
+        "vs_target": 2
+      },
+      "primary_prefix_comparison": {
+        "scope": "primary observation prefix only; full session unproven",
+        "compared_records": 76771,
+        "first_difference": null,
+        "terminal": {
+          "event": "end",
+          "payload": {
+            "status": "interrupted",
+            "natural": false
+          }
+        },
+        "prefix_sha256": "e3c9fc05b76d5d12d7c0c3994355406f21c5de58835471530901f3f91400d210",
+        "ignored_fields": [
+          "timestamp_ns",
+          "capture_id",
+          "sequence_id"
+        ],
+        "full_session_complete": false
+      }
+    },
+    {
+      "allocation": {
+        "path": "work/session-equivalence-lifetimes-prefix-v5/allocations.jsonl.gz",
+        "bytes": 492996942,
+        "sha256": "7fa6fe225d1e1d33de24e32505afc765c199bd1ab92919ea298aa618180bb6ee"
+      },
+      "result": {
+        "path": "work/session-equivalence-lifetimes-prefix-v5/result.json",
+        "bytes": 790,
+        "sha256": "3cd7ae30481f1c260f3d5f3e4c08db932db93bb901857279fd26c5d0f2a8540a"
+      },
+      "end": {
+        "active_owner": true,
+        "boundary_complete": true,
+        "calls": 3857302,
+        "compression": "gzip",
+        "error": null,
+        "max_events": 100000000,
+        "ownership_complete": false,
+        "pending_calls": [],
+        "record": "end",
+        "repeated_stops": 0,
+        "scope": "vs_ownership",
+        "sequence": 7714605,
+        "status": "captured",
+        "stop_at": "entry",
+        "target_complete": true,
+        "vs_entries": 2,
+        "vs_exits": 1,
+        "vs_target": 2
+      },
+      "primary_prefix_comparison": {
+        "scope": "primary observation prefix only; full session unproven",
+        "compared_records": 76776,
+        "first_difference": null,
+        "terminal": {
+          "event": "end",
+          "payload": {
+            "status": "interrupted",
+            "natural": false
+          }
+        },
+        "prefix_sha256": "0d7e5b2772bca2d895cbe2395c2e51743804357058cbeb248569796ada1ab127",
+        "ignored_fields": [
+          "timestamp_ns",
+          "capture_id",
+          "sequence_id"
+        ],
+        "full_session_complete": false
+      }
+    }
+  ],
+  "equal_allocation_bytes": true,
+  "replay": {
+    "status": "validated_prefix",
+    "scope": "allocation_lifetime_prefix",
+    "completion_scope": "repeated_vs_enter_prefix",
+    "complete": false,
+    "trace_complete": true,
+    "boundary_complete": true,
+    "ownership_complete": false,
+    "all_captured_calls_replayed": true,
+    "calls_seen": 3857302,
+    "calls_replayed": 3857302,
+    "model_actions": 3832265,
+    "pointer_aliases": 1926239,
+    "checked_wasm_matches_native": true,
+    "checked_wasm_problem": null,
+    "replay_hashes": {
+      "actions_sha256": "d68f934b973c9a1bf101e3b4fea977e376f63d21a71649b7f57f46bff74a94b7",
+      "identities_sha256": "8343caa63d6384a33bbebb3c573d621a7d4ff31759b75fda2357284d0d504e6c",
+      "outputs_sha256": "aaf9816a586d1d6d47b34242398daf885d8677a0e8ced3ea9022839335361b4c"
+    },
+    "first_unsupported": null,
+    "ownership_events": [
+      {
+        "call": 66211,
+        "fighter_pool_generation": null,
+        "generation": 1,
+        "kind": "vs_enter",
+        "sequence": 132423
+      },
+      {
+        "call": 68136,
+        "generation": 1,
+        "kind": "fighter_pool_init",
+        "pool": 2152042448,
+        "sequence": 136343
+      },
+      {
+        "call": 68188,
+        "fighter": 2160507360,
+        "fighter_kind": 0,
+        "generation": 1,
+        "gobj": 2160507264,
+        "kind": "fighter_create",
+        "owner_kind": "vs",
+        "pool_generation": 1,
+        "sequence": 142153,
+        "slot": 0
+      },
+      {
+        "call": 71077,
+        "fighter": 2160750432,
+        "fighter_kind": 0,
+        "generation": 1,
+        "gobj": 2160750336,
+        "kind": "fighter_create",
+        "owner_kind": "vs",
+        "pool_generation": 1,
+        "sequence": 147443,
+        "slot": 1
+      },
+      {
+        "call": 73722,
+        "fighter": 2160990592,
+        "fighter_kind": 0,
+        "generation": 1,
+        "gobj": 2160990496,
+        "kind": "fighter_create",
+        "owner_kind": "vs",
+        "pool_generation": 1,
+        "sequence": 152729,
+        "slot": 2
+      },
+      {
+        "call": 76365,
+        "fighter": 2161229696,
+        "fighter_kind": 0,
+        "generation": 1,
+        "gobj": 2161229600,
+        "kind": "fighter_create",
+        "owner_kind": "vs",
+        "pool_generation": 1,
+        "sequence": 158019,
+        "slot": 3
+      },
+      {
+        "call": 66211,
+        "fighter_pool_generation": 1,
+        "generation": 1,
+        "kind": "vs_enter_complete",
+        "sequence": 165036
+      },
+      {
+        "call": 3753108,
+        "fighters": 4,
+        "generation": 1,
+        "kind": "vs_exit",
+        "sequence": 7506218
+      },
+      {
+        "call": 3840995,
+        "fighter_pool_generation": 1,
+        "generation": 2,
+        "kind": "vs_enter",
+        "sequence": 7681991
+      },
+      {
+        "call": 3842920,
+        "generation": 2,
+        "kind": "fighter_pool_init",
+        "pool": 2152042448,
+        "sequence": 7685911
+      },
+      {
+        "call": 3842972,
+        "fighter": 2160507360,
+        "fighter_kind": 0,
+        "generation": 2,
+        "gobj": 2160507264,
+        "kind": "fighter_create",
+        "owner_kind": "vs",
+        "pool_generation": 2,
+        "sequence": 7691721,
+        "slot": 0
+      },
+      {
+        "call": 3845861,
+        "fighter": 2160750432,
+        "fighter_kind": 0,
+        "generation": 2,
+        "gobj": 2160750336,
+        "kind": "fighter_create",
+        "owner_kind": "vs",
+        "pool_generation": 2,
+        "sequence": 7697011,
+        "slot": 1
+      },
+      {
+        "call": 3848506,
+        "fighter": 2160990592,
+        "fighter_kind": 0,
+        "generation": 2,
+        "gobj": 2160990496,
+        "kind": "fighter_create",
+        "owner_kind": "vs",
+        "pool_generation": 2,
+        "sequence": 7702297,
+        "slot": 2
+      },
+      {
+        "call": 3851149,
+        "fighter": 2161229696,
+        "fighter_kind": 0,
+        "generation": 2,
+        "gobj": 2161229600,
+        "kind": "fighter_create",
+        "owner_kind": "vs",
+        "pool_generation": 2,
+        "sequence": 7707587,
+        "slot": 3
+      },
+      {
+        "call": 3840995,
+        "fighter_pool_generation": 2,
+        "generation": 2,
+        "kind": "vs_enter_complete",
+        "sequence": 7714604
+      }
+    ],
+    "artifact_receipts": {
+      "actions": {
+        "canonical_array_sha256": "d68f934b973c9a1bf101e3b4fea977e376f63d21a71649b7f57f46bff74a94b7",
+        "count": 3832265,
+        "max_bytes": 4294967296,
+        "path": "work/session-equivalence-lifetimes-prefix-v4/replay-artifacts-v1/actions.jsonl",
+        "sha256": "9dd0ec0b21cf8c6a2d2797c575cc2d53edbe843039f314238eebe94e1d9504ba"
+      },
+      "identities": {
+        "canonical_array_sha256": "8343caa63d6384a33bbebb3c573d621a7d4ff31759b75fda2357284d0d504e6c",
+        "count": 1926239,
+        "max_bytes": 4294967296,
+        "path": "work/session-equivalence-lifetimes-prefix-v4/replay-artifacts-v1/identities.jsonl",
+        "sha256": "756763af9f060635680ee5c1fca22781138726a9a7c7a3f0fc97a83c5904a85b"
+      },
+      "outputs": {
+        "canonical_array_sha256": "aaf9816a586d1d6d47b34242398daf885d8677a0e8ced3ea9022839335361b4c",
+        "count": 3832265,
+        "max_bytes": 4294967296,
+        "path": "work/session-equivalence-lifetimes-prefix-v4/replay-artifacts-v1/outputs.jsonl",
+        "sha256": "0716fe941d77ab0c52c3eb5ea99aa4044aee04f11838b46744512a3cdd2f8c13"
+      }
+    },
+    "pending_calls": [],
+    "replay_pending_calls": []
+  },
+  "replay_report": {
+    "path": "work/session-equivalence-lifetimes-prefix-v4/replay-v1.json",
+    "bytes": 25792,
+    "sha256": "8bff9dbe346e7245a15499038c4cf9dcbad13ef47579c534bd5efbc1133b40c9"
+  },
+  "replay_source_revision": "997b5ea7364f860d801434b346ba9a55fea2180c",
+  "replay_source_sha256": {
+    "tools/allocation_history_replay.py": "66070c6e49fd2ecab06b8ba3015af0103861c237046a1d973c5ff62a64e5bbf1",
+    "tools/allocation_lifetime_replay.py": "d2a2207c087d88b627b1a60b08a2496cab20fafb94cff474ed265879becfa593",
+    "tools/allocation_replay_spool.py": "9429e77c973cc303cf83ff817af3c9e21ccddfce37dd5ee1a4dbb74450974b41",
+    "tools/allocation_trace_store.py": "1f9f860006396f4477e063dcb0b620c8dfa66da360b28ed398cf6e59d587136a",
+    "tests/allocation_lifetime_model.cpp": "96dfc63990e9a8e32fa7c8f7e17cd74d93a0a0e2a4047aebb195e7ce5a1e9ff8",
+    "src/source_address_context.cpp": "523b4fd9e96ccceb6557fe3f5f11b37347706f8fe95dc1c41f4b1fbbea3c8511",
+    "src/source_game_heap_context.cpp": "bcd99c4d3ea16195cf203030b3b869298c9d65b9a163954a66e7f85c8ab90340"
+  },
+  "final_reporting_fix": "After the full replay checkpoint, pending-call tracking was unified between memory and artifact modes. Successful replay results remain empty in both modes; focused failure regression checks parity.",
+  "validation": {
+    "full_suite": {
+      "tests": 1354,
+      "passed": 1262,
+      "optional_skips": 92,
+      "seconds": 270.853,
+      "log": {
+        "path": "work/session-equivalence-repeated-full-suite-v3.log",
+        "bytes": 242026,
+        "sha256": "9a3be23c29713c2f71e82f589a01a120af6693df708b3770856f3a79e7b7af53"
+      }
+    },
+    "focused_lifetime": {
+      "tests": 40,
+      "result": "pass",
+      "log": {
+        "path": "work/session-equivalence-lifetime-review-tests-v1.log",
+        "bytes": 99,
+        "sha256": "8796406973736708cff44afc26cf2e78f9f0a55b9f55e94e08f518850b50c66c"
+      }
+    },
+    "final_reporting_fix": {
+      "result": "pass",
+      "log": {
+        "path": "work/session-equivalence-pending-report-tests-v1.log",
+        "bytes": 480,
+        "sha256": "7a355bc2b393cf7008bff9bb7ae14bf323d7b35f90327ff25b5f676ec34ac61d"
+      }
+    }
+  },
+  "retained_failures": [
+    {
+      "path": "work/session-equivalence-lifetimes-prefix-v1/result.json",
+      "reason": "Original uncompressed diagnostic reached its declared 2,000,000-event cap before first VS exit; retained lossless gzip and incomplete report."
+    },
+    {
+      "path": "work/session-equivalence-lifetimes-prefix-v2/replay-v1.json",
+      "reason": "Old profile lacked explicit Results demo fighter owner; first unsupported HSD_ObjAllocInit at call3754575. New profile observes original demo wrappers."
+    },
+    {
+      "path": "work/session-equivalence-lifetimes-build-v4.log",
+      "reason": "Existing binary-keyed archive rejected changed generator provenance; preserved prior archive and used separate final-generator archive."
+    }
+  ],
+  "not_established": [
+    "Copied payload contents or transport scheduling",
+    "Complete three-match allocation ownership",
+    "Live runtime source-address provider or CPU register carry",
+    "Full-session browser state equivalence",
+    "Pixels or PCM equivalence",
+    "Live timing or foreground performance"
+  ],
+  "deployed": false,
+  "artifact_paths": "Relative to lead checkout; original data, captures, streams and binaries remain ignored.",
+  "replay_resource_measurement": {
+    "wall_seconds": 702.99,
+    "maximum_resident_set_bytes": 592445440,
+    "peak_memory_footprint_bytes": 580584264,
+    "log": {
+      "path": "work/session-equivalence-lifetimes-prefix-v4/replay-v1.log",
+      "bytes": 777,
+      "sha256": "6d430a825f735f648d2f6d5f18fce3510e08ce472fa7a5775a37b9107a3fa94e"
+    }
+  }
+}

@@ -1,0 +1,54 @@
+# Checked downstream transform for the pinned Dolphin ai.c used by the
+# source AIInit oracle. It changes only the unreachable PowerPC callback-stack
+# assembly to a fail-closed C stub; non-NULL callback stacks remain unsupported.
+# Apply with git apply --check before git apply, and verify the pinned source hash.
+--- a/ai.c
++++ b/ai.c
+@@ -36,7 +36,7 @@
+ static void __AI_set_stream_sample_rate(u32 rate);
+ static void __AIDHandler(__OSInterrupt interrupt, OSContext *context);
+ static void __AISHandler(__OSInterrupt interrupt, OSContext *context);
+-static void __AICallbackStackSwitch(void *cb);
++static void __AICallbackStackSwitch(AIDCallback cb);
+ static void __AI_SRC_INIT(void);
+ 
+ AIDCallback AIRegisterDMACallback(AIDCallback callback)
+@@ -335,32 +335,12 @@
+     OSSetCurrentContext(context);
+ }
+ 
+-static asm void __AICallbackStackSwitch(register void *cb)
+-{
+-    nofralloc
+-    mflr r0
+-    stw r0, 0x4(r1)
+-    stwu r1, -0x18(r1)
+-    stw r31, 0x14(r1)
+-    mr r31, r3
+-    lis r5, __OldStack@ha
+-    addi r5, r5, __OldStack@l
+-    stw r1, 0x0(r5)
+-    lis r5, __CallbackStack@ha
+-    addi r5, r5, __CallbackStack@l
+-    lwz r1, 0x0(r5)
+-    subi r1, r1, 0x8
+-    mtlr r31
+-    blrl
+-    lis r5, __OldStack@ha
+-    addi r5, r5, __OldStack@l
+-    lwz r1, 0x0(r5)
+-    lwz r0, 0x1c(r1)
+-    lwz r31, 0x14(r1)
+-    addi r1, r1, 0x18
+-    mtlr r0
+-    blr
+-}
++static void __AICallbackStackSwitch(AIDCallback cb)
++{
++    (void) cb;
++    OSPanic(__FILE__, 0x344, "AI callback stack is unsupported by this oracle");
++}
++
+ 
+ void __AI_SRC_INIT(void)
+ {

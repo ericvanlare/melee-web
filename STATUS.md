@@ -8,6 +8,147 @@ change, frozen publication inventory and authorized visibility transition remain
 separate steps. The repository is still private; this is not gameplay admission
 or a new hosted/native release.
 
+## Audio and memory fixture complete; equivalence investigation paused
+
+**Compiled / Source identified / Native traced / Retail compared** within the
+[original audio and memory fixture](docs/SOURCE_LBAUDIO_MEMORY_STARTUP.md).
+The [scoped receipt](docs/evidence/source-lbaudio-memory-startup-v1.json) records
+original initialization and the post-execution memory-descriptor comparison.
+The owner paused further equivalence investigation. The first session mismatch
+remains match 0, tick 1776, P4 `input_hex`; live fighter identities and CPU
+call-site integration remain incomplete. No browser progress or deployment.
+
+## Original Synth startup joins shared audio ownership
+
+**Compiled / Source identified / Native traced / Retail compared** for the
+[bounded joined Synth fixture](docs/SOURCE_SYNTH_JOINED_STARTUP.md).
+Original Synth owns AX initialization and its first deferred DevCom request
+completes through the original AR/ARQ handlers. The
+[scoped receipt](docs/evidence/source-synth-joined-startup-v1.json) limits the
+original comparison to three AR reservation sizes, final stack and free count.
+The later fixture above extends audio initialization through memory descriptors;
+live fighter allocation binding and full-session equivalence remain open. This does not establish PCM, timing or browser behavior.
+
+## Original AR and ARQ share checked DMA ownership
+
+**Compiled / Source identified / Native traced** for the [AR service fixture](docs/SOURCE_AUDIO_AR_SERVICES.md).
+Original size probing and deferred ARQ completion execute through checked cache,
+interrupt-mask and SDK context services. The [scoped receipt](docs/evidence/source-audio-ar-services-v1.json)
+records negative ownership controls. The later Synth fixture above joins this
+owner; full-session equivalence remains open; this component does not establish PCM or timing.
+
+## Original Synth parameters are derived independently
+
+**Compiled / Source identified / Native traced / Retail compared** for the single
+bank-size field in the [parameter probe](docs/SOURCE_SYNTH_PARAMETERS.md).
+The [scoped receipt](docs/evidence/source-synth-parameters-v1.json) distinguishes
+source-only checks, owned-DOL execution and the post-execution capture comparison.
+No Synth execution, allocation addresses, PCM or session equivalence is claimed.
+
+## Original AX startup reaches first AI DMA
+
+**Compiled / Source identified / Native traced** for the [joined AX startup fixture](docs/SOURCE_AX_STARTUP.md).
+Original AX units and the original DSP handler initialize the actual AX task and
+enable its first DMA through checked modeled services. The
+[scoped receipt](docs/evidence/source-ax-startup-v1.json) records validation and
+negative controls. DSP firmware, PCM, full Synth/application startup and live
+browser integration remain open; this does not establish session equivalence.
+
+## CPU source-word ownership prerequisite
+
+**Compiled / Source identified** for the [typed CPU carry boundary](docs/CPU_R5_CARRY.md).
+The owned-input adapter derives the RNG seed identity independently; the fighter
+identity in these tests remains synthetic. The [scoped receipt](docs/evidence/cpu-r5-carry-v1.json)
+records generation checks and source compilation. Live allocation binding and
+CPU call-site hooks remain open; the first session divergence is unchanged.
+
+## Original DSP startup protocol boundary
+
+The [DSP startup fixture](docs/SOURCE_DSP_INIT_PROFILE.md) executes original SDK
+boot/task/handler routines with checked mailbox, interrupt and context services.
+The [scoped receipt](docs/evidence/source-dsp-init-profile-v1.json) records synthetic
+protocol validation. The later AX fixture above joins original AXOut; DSP
+firmware, PCM and live browser integration remain open. Full-session equivalence is not established.
+
+## Original AIInit component boundary
+
+The [AIInit fixture](docs/SOURCE_AI_INIT_PROFILE.md) executes original SDK startup
+against a bounded GameCube Audio Interface profile. Its startup snapshot is
+separate from synthetic DMA programming and calibration checks; the
+[scoped receipt](docs/evidence/source-ai-init-profile-v1.json) records validation.
+This standalone result excludes the later AX fixture above, full audio startup
+and live browser source bindings.
+Full-session equivalence remains open.
+
+## Original ARInit profile boundary
+
+The [bounded ARInit oracle](docs/SOURCE_AR_INIT_PROFILE.md) executes original
+size probes through checked DSP-register, cache and ARAM services. Its owned
+run agrees on six original runtime relations and two derived input fields; the later allocation
+sequence is synthetic. See the [scoped receipt](docs/evidence/source-ar-init-profile-v1.json).
+This remains separate from DevCom, AI/AX, application startup and live browser
+source identities. Full-session equivalence is still open. No deployment.
+
+## First original DevCom request joins the validated startup heap
+
+**Compiled / Source identified / Native traced / Retail compared** for the
+standalone first type-3 request and its declared HSD audio-allocation fields.
+The source queue also passes scoped deferred completion and node-reuse checks.
+See the [boundary](docs/SOURCE_DEVCOM_STARTUP.md) and
+[receipt](docs/evidence/source-devcom-startup-v1.json). Full synth/audio startup,
+remaining ARAM reservations and live session integration remain open.
+
+## Original HSD startup executes from independently derived boot roots
+
+**Compiled / Source identified / Native traced / Retail compared** for the
+standalone checked-Wasm allocation boundary: original source routines execute
+XFB/FIFO and HSD heap/component initialization using owned-disc boot data.
+The comparison and exact limits are in the
+[scoped receipt](docs/evidence/original-startup-allocation-v1.json).
+Original audio allocation effects, game-heap/scene ownership, live browser
+source identities and register carry remain open. This is not full-session
+browser equivalence. No deployment was performed.
+
+## Native HSD component pools share world initialization
+
+**Compiled / Source identified / Native traced** for the bounded component-pool
+lifecycle: native scene owners share the original component initialization order
+instead of reinitializing Shadow and ZList at individual entries. See the
+[scoped receipt](docs/evidence/native-pool-initialization-v1.json) for lifecycle
+checks, the diagnostic browser prefix and retained failures. This does not
+provide live original heap identities or CPU register carry; full-session
+browser equivalence remains open. No deployment was performed.
+
+## Repeated VS allocation ownership reaches second match entry
+
+**Compiled / Source identified / Native traced / Retail compared** for recorded
+allocation fields and source operation order: native and checked-Wasm models
+replay all 3,857,302 calls from cold boot through the first four-Mario CPU9 match,
+Results, CSS/SSS and second VS entry. Two independent original captures are
+byte-identical. Explicit demo-fighter wrappers distinguish Results ownership
+from VS generations, and disk-backed replay retains every compared command and
+result. See the [scoped receipt](docs/evidence/original-allocation-repeated-ownership-v1.json)
+and [diagnostic controls](docs/ORIGINAL_ALLOCATION_HISTORY.md#repeated-vs-ownership-diagnostic-controls).
+The second VS owner remains active at this boundary. Complete three-match
+ownership, a live browser source-address provider, CPU register carry and
+full-session browser equivalence remain open. Pixels, PCM and live performance
+are separate gates. No deployment was performed.
+
+## Source allocation replay derives first-VS fighter identities
+
+**Compiled / Source identified / Native traced / Retail compared** for the
+declared allocation fields and recorded operation order: native and checked-Wasm
+models now replay the entire first-VS initialization prefix and derive all four
+Mario CPU9 fighter identities. Two fresh original captures are byte-identical.
+The replay compares asynchronous compaction manager transitions, relocated
+handle identities and source-declared pools, including embedded pool members.
+See the [scoped receipt](docs/evidence/original-allocation-compaction-v1.json)
+and [remaining source-context boundaries](docs/ORIGINAL_ALLOCATION_HISTORY.md#first-vs-initialization-capture).
+The [earlier passive-capture receipt](docs/evidence/original-allocation-passive-v1.json)
+retains the previous first-compaction failure. Copied payload contents,
+browser address/register context, full-session equivalence, pixels,
+PCM and live performance remain unproven. No deployment was performed.
+
 ## Reproducible whole-session CPU register boundary
 
 **Compiled / Source identified / Native traced / Browser exercised**: a fresh
@@ -20,7 +161,7 @@ comparison fields, first divergence, validation and retained failures are in the
 [diagnostic receipt](docs/evidence/whole-session-cpu-register-v1.json) and
 [register investigation](docs/CPU_REGISTER_COMPATIBILITY.md#reproducible-whole-session-register-diagnostics).
 
-This establishes a reproducible diagnostic boundary. The original allocation
+This establishes a reproducible diagnostic boundary. The live original allocation
 context and shared compiled register-carry implementation remain open;
 full-session browser equivalence, pixels, PCM and performance are not established.
 

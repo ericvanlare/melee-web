@@ -1,0 +1,431 @@
+{
+  "schema": "melee-web-source-synth-joined-startup",
+  "version": 1,
+  "date": "2026-09-24",
+  "base_commit": "c986db2b2b488123279aa2dacc7b9cb911247454",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced",
+    "Retail compared"
+  ],
+  "scope": "Original HSD_SynthInit, its AXInit and first deferred DevCom request on joined modeled services; original comparison limited to five AR allocation fields",
+  "source_files": [
+    {
+      "path": "tests/source_synth_joined_accessors.h",
+      "bytes": 1301,
+      "sha256": "ed6a484d451da299310aa3d9aa0f9ee38087f5f7bdd8795d47622a5a9c596fe2"
+    },
+    {
+      "path": "tests/source_synth_joined_services.cpp",
+      "bytes": 50426,
+      "sha256": "718e9e57266fad9a4cf199ed8e796d92363f9faf9e1762f2e7f2391446550ef0"
+    },
+    {
+      "path": "tests/source_synth_joined_services.h",
+      "bytes": 990,
+      "sha256": "3b0c0bdd5e51a67fb12f234a9660b653f882bfcafbb721005f9d647a510e06f0"
+    },
+    {
+      "path": "tests/source_synth_joined_sram.c",
+      "bytes": 2133,
+      "sha256": "f00ac1fc988994759701ae2f7e68bd6a724d154e7f9a6bc7d65bf5f32ca88d1a"
+    },
+    {
+      "path": "tests/source_synth_joined_trace.cpp",
+      "bytes": 1789,
+      "sha256": "c245970a5bcfa5aad1a043825a4501bf205334a1cd1730f226ad4401838cc2eb"
+    },
+    {
+      "path": "tests/test_source_synth_joined_runtime.py",
+      "bytes": 8613,
+      "sha256": "b843f8ac014a599f373a853e3e4705a96aff1a2962cf3988bc5b23c20950d45c"
+    },
+    {
+      "path": "tests/test_source_synth_joined_startup.py",
+      "bytes": 5292,
+      "sha256": "7625b41c3c049641107ce15708f641efcf6a512ed19d85f112561ab6d56ad5f4"
+    },
+    {
+      "path": "tools/source_synth_joined_runtime.py",
+      "bytes": 39294,
+      "sha256": "62e2798c0fa6510abc3e42fbd04b3ad326af2e17ce65d8e717852c2fae914144"
+    },
+    {
+      "path": "tools/source_synth_joined_startup.py",
+      "bytes": 35866,
+      "sha256": "66311dbffbb42e12a33ba3f67e1079f95a417691c169a333a567d94892cad94c"
+    }
+  ],
+  "source_hashes": {
+    "tests/source_synth_joined_services.cpp": "718e9e57266fad9a4cf199ed8e796d92363f9faf9e1762f2e7f2391446550ef0",
+    "tests/source_synth_joined_services.h": "3b0c0bdd5e51a67fb12f234a9660b653f882bfcafbb721005f9d647a510e06f0",
+    "tests/source_synth_joined_trace.cpp": "c245970a5bcfa5aad1a043825a4501bf205334a1cd1730f226ad4401838cc2eb",
+    "src/source_audio_ar_services.c": "ac6e0dc5ab9c69a5b2c81a58f2141d6b510a9ee57833c0d3e143d514d11e634c",
+    "patches/source-ai-callback-stack.patch": "715201a54db1bc32a9951ca86b8f2eba70d80f9d093a8832ca61fa98a8f577f1",
+    "src/source_audio_ar_services.h": "c0e94b9b4eabdf96c6bc71213cfcdebcf61e9f30781397d0b7d19789cddf2f59",
+    "tests/original_startup_alloc_trace.cpp": "9736e0f6e19ae9434d14684183dc2f0120033906613c83d532743a94e9ed18ab",
+    "tests/original_startup_osmemory.cpp": "077c4fe63e27b0fa41cf776c50cd73abfe04869bbb95020a8fa2be26022a0601",
+    "tests/source_synth_joined_sram.c": "f00ac1fc988994759701ae2f7e68bd6a724d154e7f9a6bc7d65bf5f32ca88d1a",
+    "tests/source_synth_joined_accessors.h": "ed6a484d451da299310aa3d9aa0f9ee38087f5f7bdd8795d47622a5a9c596fe2",
+    "tools/source_synth_joined_startup.py": "66311dbffbb42e12a33ba3f67e1079f95a417691c169a333a567d94892cad94c",
+    "tools/source_synth_joined_runtime.py": "62e2798c0fa6510abc3e42fbd04b3ad326af2e17ce65d8e717852c2fae914144",
+    "CMakeLists.txt": "1cdf9fc64130ad16cae4c4d3f881a150b1721c3571c5574b5938bdbab75e9ab2",
+    ".deps/melee/extern/dolphin/src/dolphin/ai/ai.c": "cb8508338aa0c4b10b9134f2f51936618929fe8f63515e137a5ff2f2d4fcc0d9",
+    ".deps/melee/extern/dolphin/src/dolphin/dsp/dsp.c": "29a6864fb05a78a27e063f305844e2cf4f03af22f724863a14fbcff40ac18aa5",
+    ".deps/melee/extern/dolphin/src/dolphin/dsp/dsp_task.c": "7b212710530cc6617d15e826c2de56caa59fb6e4bc702730812f50c2fb13964f",
+    ".deps/melee/extern/dolphin/src/dolphin/ar/ar.c": "dc2ad84463413ef6b91a8f8fe8acefb26ed35743d63dd85bf6590cec28d95cc8",
+    ".deps/melee/extern/dolphin/src/dolphin/ar/arq.c": "b8ce29ad2773743b3f657cc1203799baad5efcc65d8381beb60f4922b37a1be1",
+    ".deps/melee/extern/dolphin/src/dolphin/os/OSInterrupt.c": "69ba045af10aaede13f77fa1040af7fa6e79658e2d317bcee1afc5992d3fca7e"
+  },
+  "source_hashes_unchanged": true,
+  "runtime": {
+    "path": "work/source-synth-owned-final-v4/joined.js",
+    "js_sha256": "a845cc99d0ad3f9a82b42a55a71dfd6e6cff11b5c4e5e7ed5c9b8f364cafb61d",
+    "wasm_sha256": "b8a66dcf9f27d6795c0c67e0c732e1955b6a8ba234a27885239939edf9f9d716",
+    "runtime_claim": false
+  },
+  "input_plan": {
+    "arguments": [
+      "valid",
+      "64",
+      "0",
+      "64",
+      "6248864",
+      "work/source-synth-owned-final-v4/owned-sram-settings.bin",
+      "--mem1",
+      "25165824",
+      "--aram",
+      "16777216",
+      "--arena_hi",
+      "2172619456",
+      "--arena_lo",
+      "2152655872",
+      "--crash_size",
+      "8192",
+      "--crash_align",
+      "4",
+      "--crash_base",
+      "2152655872",
+      "--after_crash",
+      "2152664064",
+      "--xfb_count",
+      "2",
+      "--xfb_size",
+      "614400",
+      "--fb_width",
+      "640",
+      "--fb_height",
+      "480",
+      "--xfb_begin",
+      "2152664064",
+      "--after_xfb",
+      "2153892864",
+      "--fifo_size",
+      "262144",
+      "--init_lo",
+      "2154155008",
+      "--heap_max",
+      "4",
+      "--audio_size",
+      "524288",
+      "--aram_base",
+      "16384"
+    ],
+    "boot": {
+      "derivation": "owned_disc_apploader_and_dol_no_capture_inputs",
+      "sha256": "53bc65be42d69f2c5a1c455c530177e1dfe1469d407cc239b11ad65d85dda441"
+    },
+    "parameters": {
+      "source_revision": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+      "sha256": "830343dd332a40ecd5dbecdf9fe16635d5e30055b796d51601ced038b4a13975"
+    },
+    "sram": {
+      "envelope": {
+        "path": "SRAM.raw",
+        "bytes": 68,
+        "sha256": "49dee06d38cb76aaa8f90bfb2e937face180243d1a170078b4e13226b012f82c"
+      },
+      "settings": {
+        "path": "work/source-synth-owned-final-v4/owned-sram-settings.bin",
+        "bytes": 64,
+        "sha256": "09e038130b2ccb3767b9000f1e6d465b2aced4907a6c26b1cea5d86207aaf029"
+      },
+      "envelope_bytes": 68,
+      "settings_offset": 4,
+      "settings_bytes": 64,
+      "flags_offset": 19,
+      "settings_sha256": "09e038130b2ccb3767b9000f1e6d465b2aced4907a6c26b1cea5d86207aaf029",
+      "sdk_layout": "OSSram offset=4, flags=19, asserted by source_synth_joined_sram.c"
+    },
+    "driver_call": [
+      64,
+      0,
+      64,
+      6248864
+    ],
+    "synthetic": false,
+    "owned_inputs": {
+      "dol": {
+        "path": "main.dol",
+        "bytes": 4425184,
+        "sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646"
+      },
+      "disc": {
+        "path": "Super Smash Bros. Melee (USA) (En,Ja) (Rev 2).ciso",
+        "bytes": 1449165376,
+        "sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c"
+      },
+      "symbols": {
+        "path": ".deps/melee/config/GALE01/symbols.txt",
+        "bytes": 2754630,
+        "sha256": "214477d5b27989a9675c4b881f4db2dad5eeaada39dbac17c57c70d5ba84d579"
+      },
+      "source_root": ".deps/melee"
+    }
+  },
+  "run": {
+    "status": "pass",
+    "stdout_sha256": "d898d068beba3111c418c9500beb3567d2a8ea349e6edfcf1bd0653b2beb6898",
+    "stderr_sha256": "e87968ba0f5e9ac4f385e1aa09767d1555265f7ab0cfc1e558f6eaf53736fe0e"
+  },
+  "observations": [
+    {
+      "kind": "source_synth_allocations",
+      "aram_blocks": [
+        1280,
+        6248864,
+        196608
+      ],
+      "aram_next": 6463136,
+      "aram_free_blocks": 13,
+      "audio_heap_before": 524256,
+      "audio_heap_after": 523648,
+      "sram_reads": 1,
+      "deferred_bytes_verified": 1280
+    },
+    {
+      "kind": "source_synth_joined",
+      "boundary": "synth_devcom_arq_complete",
+      "ai_init": true,
+      "ax_init_owned_by_synth": true,
+      "ai_dma_enabled": true,
+      "ai_dma_bytes": 640,
+      "dsp_boot_mails": 10,
+      "dsp_init_callback": 1,
+      "dsp_image_bytes": 6624,
+      "dsp_image_hash": 1317702433,
+      "ar_init_submissions": 18,
+      "synth_arq_submissions": 1,
+      "arq_pumps": 1,
+      "runtime_claim": false
+    }
+  ],
+  "original_comparison": {
+    "scope": "Post-execution original comparison only: three AR reservation sizes, final source AR stack and remaining block count. No captured values configure execution.",
+    "capture_sha256": "7fa6fe225d1e1d33de24e32505afc765c199bd1ab92919ea298aa618180bb6ee",
+    "target_sha256": "e728670db1c40265dcccb24ede18fa85e3907c80f7de896addfc7b3b10c4e47d",
+    "candidate_sha256": "d898d068beba3111c418c9500beb3567d2a8ea349e6edfcf1bd0653b2beb6898",
+    "matched_scalar_fields": 5,
+    "expected": {
+      "aram_blocks": [
+        1280,
+        6248864,
+        196608
+      ],
+      "aram_next": 6463136,
+      "aram_free_blocks": 13
+    },
+    "negative_bank_size_plus32_rejected": true,
+    "negative_final_stack_plus32_rejected": true,
+    "limits": [
+      "No full lbAudioAx/AXDriver/SFX/FX startup",
+      "No live timing, pixels, PCM or full-session equivalence"
+    ]
+  },
+  "negative_cases": [
+    {
+      "mode": "bad-dma",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "bc90a0151a1d62e697a16b855eeefd74c756a4a5da971b41caf8e29525e48d49"
+    },
+    {
+      "mode": "bad-image",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "6e1323f148269ce987f31d95d5175db7e561bb6685e355e38a3e2fe7a47e8366"
+    },
+    {
+      "mode": "bad-mail",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "90b6d518e81bcc9e6c7b3c2d599ba00a0e68e76ecc8d8eaa79c823a746c107e0"
+    },
+    {
+      "mode": "masked-pump",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "a690f11a93e57c1da0690504f97bac8802990c635a81f4749145bf1f4b620e70"
+    },
+    {
+      "mode": "missing-cache",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "e9112a67745da30e957cf6c1fa35758dd8f5592f4382b27cec2bcb740e6abf38"
+    },
+    {
+      "mode": "bad-task-callback",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "c486b915bd48e75e6c556b7d88130bf3d409c74e8ab3c5464c9f8d992e0ebd05"
+    },
+    {
+      "mode": "bad-task-span",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "dfc80215dbdd824bb87d6ed406b34320dc4c7ae3b3776e5440828877694ed2e7"
+    },
+    {
+      "mode": "global-masked-pump",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "88fff7aa1eff56c916bf3e30c449bb25d902dd901ce81b4f3c02763bb7b2a678"
+    },
+    {
+      "mode": "local-masked-pump",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "88fff7aa1eff56c916bf3e30c449bb25d902dd901ce81b4f3c02763bb7b2a678"
+    },
+    {
+      "mode": "status-masked-pump",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "bec9b9e1b0abf7cc12996e1027e418cc21b7a4a9275b29676d6067f45a536cfc"
+    },
+    {
+      "mode": "unknown",
+      "exit": 1,
+      "stdout_sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387",
+      "stderr_sha256": "2d9d008581a67b8ee6d2b02f72da65d78995d960b3c2e6028fdc4c0c810cab53"
+    }
+  ],
+  "negative_contract": [
+    {
+      "mode": "bad-dma",
+      "diagnostic_contains": "AI DMA points outside AX output buffer"
+    },
+    {
+      "mode": "bad-image",
+      "diagnostic_contains": "AX DSP image mutation did not reach the source validator"
+    },
+    {
+      "mode": "bad-mail",
+      "diagnostic_contains": "DSP boot mail mismatch"
+    },
+    {
+      "mode": "masked-pump",
+      "diagnostic_contains": "DSP interrupt dispatched without masked interrupt owner"
+    },
+    {
+      "mode": "missing-cache",
+      "diagnostic_contains": "AX output buffer was not published before DMA"
+    },
+    {
+      "mode": "bad-task-callback",
+      "diagnostic_contains": "DSP task callback identity does not match AXOut source"
+    },
+    {
+      "mode": "bad-task-span",
+      "diagnostic_contains": "DSP task IRAM span does not match source image"
+    },
+    {
+      "mode": "global-masked-pump",
+      "diagnostic_contains": "DSP interrupt dispatched while globally or locally masked"
+    },
+    {
+      "mode": "local-masked-pump",
+      "diagnostic_contains": "DSP interrupt dispatched while globally or locally masked"
+    },
+    {
+      "mode": "status-masked-pump",
+      "diagnostic_contains": "DSP interrupt pending without enabled DSP status bits"
+    },
+    {
+      "mode": "unknown",
+      "diagnostic_contains": "unknown joined Synth startup mode"
+    }
+  ],
+  "validation": {
+    "full_suite": {
+      "ran": 1430,
+      "passed": 1341,
+      "skipped": 89,
+      "seconds": 344.06,
+      "log": {
+        "path": "work/source-synth-full-suite-v1.log",
+        "bytes": 253737,
+        "sha256": "41889e49149df5c197e3a8e60474a812c03d34c9877595e0ef86d92eb1eada3b"
+      }
+    },
+    "focused": {
+      "ran": 14,
+      "passed": 14,
+      "log": {
+        "path": "work/source-synth-focused-final-v2.log",
+        "bytes": 2554,
+        "sha256": "96f1adc176fd2cfaee64b146d78b8f25c8198ce754d77234ea0e1b555584542a"
+      }
+    },
+    "note": "Full suite loaded Python modules before final path normalization and provenance checks; final focused tests exercise relative paths, header and builder mutations, and redirected outputs. The final owned run uses the final builder. The checked C/C++ bodies are unchanged. Configured runtime tests explicitly skip on environments without CMake dependencies."
+  },
+  "artifacts": [
+    {
+      "path": "work/source-synth-owned-final-v4/receipt.json",
+      "bytes": 50457,
+      "sha256": "b90fb990636d1f4ec3d054c1f5ea341f5b1276600841f539899a64a1bf43a4ec"
+    },
+    {
+      "path": "work/source-synth-owned-final-v4/run.stdout",
+      "bytes": 2218,
+      "sha256": "d898d068beba3111c418c9500beb3567d2a8ea349e6edfcf1bd0653b2beb6898"
+    },
+    {
+      "path": "work/source-synth-owned-final-v4/run.stderr",
+      "bytes": 722,
+      "sha256": "e87968ba0f5e9ac4f385e1aa09767d1555265f7ab0cfc1e558f6eaf53736fe0e"
+    },
+    {
+      "path": "work/source-synth-owned-final-v4/link.command.json",
+      "bytes": 12108,
+      "sha256": "7d39680b9e12fe3c29465f6ecb78ae9e54c60467f461ddb9837998885c16f622"
+    },
+    {
+      "path": "work/source-synth-owned-final-v4/link.stderr",
+      "bytes": 143,
+      "sha256": "1fc9dac585483fcf59eed684bab3c3c71103f1efd832cf475bcb09b0ea0435b9"
+    },
+    {
+      "path": "work/source-synth-owned-final-v4/hsd-native-runtime.stdout",
+      "bytes": 63,
+      "sha256": "c2ed93ffd93c840755c0e91392ae593b1b52de9b7aaf6c208123feaceb1dde2e"
+    }
+  ],
+  "retained_failures": [
+    "work/joined-runtime-v1: DevCom span exact-length check rejected a valid source subrange; corrected checked containment",
+    "work/joined-runtime-v3: strict format mismatch; corrected explicit types",
+    "work/source-synth-runtime-root-focused-v1.log: AI compatibility transform omitted; restored reviewed patch",
+    "work/source-synth-runtime-root-focused-v2.log: patch subprocess omitted timeout; reduced to service-generation reproducer",
+    "work/source-synth-runtime-root-focused-v3.log: compiler Python entrypoint launched directly; use current Python",
+    "work/source-synth-owned-final-v1: relative artifact paths failed during link from configured build; normalize paths before subprocesses"
+  ],
+  "limits": [
+    "No full lbAudioAx/AXDriver/SFX/FX startup",
+    "No DVD, scene/preload or live fighter allocation binding",
+    "No DSP firmware, PCM, live timing or browser validation",
+    "Top-level completion context and source-published relay spans only; no general nested context or inbound audio DMA claim",
+    "First session divergence remains match 0 tick 1776 P4 input_hex; no session-equivalence claim",
+    "No deployment"
+  ]
+}

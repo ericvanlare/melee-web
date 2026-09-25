@@ -1,0 +1,242 @@
+{
+  "schema": "melee-web-original-startup-allocation",
+  "version": 1,
+  "date": "2026-09-24",
+  "scope": "Fresh checked-Wasm HSD allocation boundary from independently derived owned boot data. Not full retail startup or a live browser context.",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced",
+    "Retail compared"
+  ],
+  "base_commit": "dd4880f13d6ac9a04cb388dba7d05ac1c9cd72b1",
+  "source_files": [
+    {
+      "path": "CMakeLists.txt",
+      "bytes": 17936,
+      "sha256": "b11198a367545973e0add3b8c6bfc08c9eb238ad222c269f8ecb64f404642656"
+    },
+    {
+      "path": "patches/melee-gameplay.patch",
+      "bytes": 344276,
+      "sha256": "11ad8d7956015241be4a148ec92b2644bb3e0b4b1f44f6f014717407d12e66fd"
+    },
+    {
+      "path": "tools/original_boot_context.py",
+      "bytes": 11254,
+      "sha256": "f5752452051a3e66084026bd5f28ba9210dee40d5c2dd11795deef79612b1979"
+    },
+    {
+      "path": "tools/original_startup_fixture.py",
+      "bytes": 10462,
+      "sha256": "cd423735dc250f8faa1cc7ba9a214d19f9077308319d5613950debeabf0893cc"
+    },
+    {
+      "path": "src/original_startup_compat.h",
+      "bytes": 595,
+      "sha256": "5f25ca78680e41b1e50f47e7f44f815a9e8e7e6ba4e7d73aba92e79f2001ac51"
+    },
+    {
+      "path": "tests/original_startup_alloc_trace.cpp",
+      "bytes": 17690,
+      "sha256": "9736e0f6e19ae9434d14684183dc2f0120033906613c83d532743a94e9ed18ab"
+    },
+    {
+      "path": "tests/original_startup_osmemory.cpp",
+      "bytes": 1101,
+      "sha256": "077c4fe63e27b0fa41cf776c50cd73abfe04869bbb95020a8fa2be26022a0601"
+    },
+    {
+      "path": "tests/test_original_startup_fixture.py",
+      "bytes": 5158,
+      "sha256": "7af92b71caac77a3323c25ea41382ba09eae8d7ffeeb5a64698b989d01788d6c"
+    }
+  ],
+  "input_derivation": {
+    "method": "derive_boot_context using owned DOL/disc and pristine pinned source; no capture inputs",
+    "boot": {
+      "path": "work/session-equivalence-startup-boot-v1.json",
+      "bytes": 24207,
+      "sha256": "4f894f4120f606dc2650c9fb0c9fac4988414cbc8f7a13143a2e1072b5b1e5ab"
+    },
+    "implementation": {
+      "path": "tools/original_boot_context.py",
+      "bytes": 11254,
+      "sha256": "f5752452051a3e66084026bd5f28ba9210dee40d5c2dd11795deef79612b1979"
+    }
+  },
+  "provider": {
+    "kind": "Fixture-scoped pinned Aurora OSMemory.cpp with aligned zeroed allocation before real OSInit. Original source-to-host mapping retained.",
+    "source": {
+      "path": ".deps/aurora/lib/dolphin/os/OSMemory.cpp",
+      "bytes": 4377,
+      "sha256": "4464ce818124cb84f313b63c75892d22249bd300ba8bb345cab322d7f8c8e153"
+    },
+    "bridge": {
+      "path": "tests/original_startup_osmemory.cpp",
+      "bytes": 1101,
+      "sha256": "077c4fe63e27b0fa41cf776c50cd73abfe04869bbb95020a8fa2be26022a0601"
+    },
+    "abi": "Wasm32; original release allocator descriptor layout",
+    "build_configuration": "Debug with ASSERTIONS=2 and SAFE_HEAP=1"
+  },
+  "validation": {
+    "build": {
+      "path": "work/original-startup-root-final-build.log",
+      "bytes": 63,
+      "sha256": "c2ed93ffd93c840755c0e91392ae593b1b52de9b7aaf6c208123feaceb1dde2e"
+    },
+    "executables": [
+      {
+        "path": "work/session-equivalence-startup-real-v2/original_startup_alloc_trace.js",
+        "bytes": 436082,
+        "sha256": "5116b5005e8cd63fbbadec2255e5313b215980c9066ace41aee25bd7cef2a7e7"
+      },
+      {
+        "path": "work/session-equivalence-startup-real-v2/original_startup_alloc_trace.wasm",
+        "bytes": 31351762,
+        "sha256": "b2dc3b1905e851e21dd0d930ad675fc1bc8ac57425b5b844947339246825941d"
+      }
+    ],
+    "fresh_run": {
+      "entry": "run_owned_fixture",
+      "status": {
+        "path": "work/session-equivalence-startup-real-v2/status.json",
+        "bytes": 100,
+        "sha256": "efc10af1ae44d57365db776868b7540b6dffed82569b8d0bc26ffb2ec040e1e9"
+      },
+      "stdout": {
+        "path": "work/session-equivalence-startup-real-v2/stdout.txt",
+        "bytes": 1669,
+        "sha256": "d818ec28e1d60482a5872cd49e4e45bd8154f0136b51ce48ea6e883f1445b387"
+      },
+      "stderr": {
+        "path": "work/session-equivalence-startup-real-v2/stderr.txt",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "observations": {
+        "path": "work/session-equivalence-startup-real-v2/observations.json",
+        "bytes": 2708,
+        "sha256": "718bb08d7afd7b7f6d122c466e3fb958c9ab899679b015c9f4b2123e558c29cb"
+      }
+    },
+    "original_comparison": {
+      "status": "match",
+      "field_groups": 15,
+      "pool_count": 14,
+      "report": {
+        "path": "work/session-equivalence-startup-real-v2/comparison.json",
+        "bytes": 807,
+        "sha256": "d3258e97cfea37139e3c0dbfd5f8ccb19251e0468d46066cc40a7f42343ff2fb"
+      },
+      "comparator": {
+        "path": "work/session-equivalence-compare-startup.py",
+        "bytes": 2842,
+        "sha256": "fc00f34675b0ba4fa2e793aaaeefe479dfce0f60f8d4afc6d5cf78120ba16a54"
+      },
+      "reference": {
+        "path": "work/session-equivalence-original-startup-validation-targets-v1.json",
+        "bytes": 30000,
+        "sha256": "e728670db1c40265dcccb24ede18fa85e3907c80f7de896addfc7b3b10c4e47d"
+      },
+      "reference_capture_sha256": "7fa6fe225d1e1d33de24e32505afc765c199bd1ab92919ea298aa618180bb6ee",
+      "input_policy": "Original capture read only by the post-run comparator; never passed to the fixture."
+    },
+    "negative_comparator": {
+      "status": "expected_mismatch",
+      "mutation": "main heap begin shifted by 32 bytes",
+      "report": {
+        "path": "work/session-equivalence-startup-real-v2/negative-comparison.json",
+        "bytes": 925,
+        "sha256": "ac9d84479b8fdca3750ea97dc40f30235196615d74b3960faaf7ae38d6096098"
+      }
+    },
+    "direct_guards": {
+      "cases": 8,
+      "all_exit_codes": 2,
+      "report": {
+        "path": "work/original-startup-fixture-direct-guards.json",
+        "bytes": 1168,
+        "sha256": "5e6934ddd68774b96ce1a4ecf8362f04cfc30b598e619e90b9d7df0f228184ae"
+      }
+    },
+    "fixture_only_symbols": {
+      "path": "work/original-startup-fixture-link-symbols.log",
+      "bytes": 913,
+      "sha256": "8b2b96e408724886d17e9281ebbadc4ca1c05939a33dbf077f02e47feb987285"
+    },
+    "measurement_policy": "Crash/XFB/FIFO output values echo independently derived inputs only after equality checks against actual source allocations/arena positions. HSD roots, heap handles, free space and pool metadata are read from runtime state; audio begin is explicitly derived from measured HSD next-lo.",
+    "full_suite": {
+      "command": "python3 -m unittest discover -s tests -v",
+      "tests": 1364,
+      "passed": 1272,
+      "skipped": 92,
+      "seconds": 299.709,
+      "exit_code": 0,
+      "log": {
+        "path": "work/original-startup-full-suite-v1.log",
+        "bytes": 243740,
+        "sha256": "2c2bd9fd6d750b1a8109b862f04f48d7664810cfaa1b45be830fc047c1a7a0ea"
+      }
+    },
+    "staged_content": {
+      "findings": 0,
+      "log": {
+        "path": "work/original-startup-content-staged-v1.log",
+        "bytes": 70,
+        "sha256": "1b4b5d09f40e0c9aa9687b0de7eddf7d57efe23f2e1b738619e26e19061a6c08"
+      }
+    },
+    "added_document_links": {
+      "path": "work/original-startup-added-links-v1.log",
+      "bytes": 282,
+      "sha256": "9a09b545702a12033e2230e6395f2c29e0d448807ea4d06b864930c41d4ec017"
+    }
+  },
+  "retained_failures": [
+    {
+      "description": "Root initially selected unconfigured build/ rather than author build/fixture; no compilation occurred.",
+      "artifact": {
+        "path": "work/root-startup-first-build.log",
+        "bytes": 28,
+        "sha256": "229f90d3c919e8949959f349733dba7c5a2ef9c240c87663fe61e20ac363e36e"
+      }
+    },
+    {
+      "description": "Bare cmake unavailable on PATH; explicit environment executable used thereafter. This is a retained summary of the setup failure.",
+      "artifact": {
+        "path": "work/original-startup-fixture-build-command-not-found.log",
+        "bytes": 206,
+        "sha256": "5fe5b3a37e83b787f4d396ef3cd4eeb2e0b0b3dc36089ae977ecf505796fd855"
+      }
+    }
+  ],
+  "exploratory_prior_run": {
+    "scope": "Earlier source before final guard/internal-entry review; not final-source acceptance.",
+    "provenance": {
+      "path": "work/session-equivalence-startup-real-v1/provenance.json",
+      "bytes": 540,
+      "sha256": "45c73e46ce3a182235da4b343f0b20710fd0648b314585801ad6cf1df713937e"
+    },
+    "comparison": {
+      "path": "work/session-equivalence-startup-real-v1/comparison.json",
+      "bytes": 763,
+      "sha256": "ab94511401bb6203363628a1d2172d82c9c1497cd295265d6efd71b283a83e92"
+    },
+    "negative_comparator": {
+      "path": "work/session-equivalence-startup-real-v1/negative-comparison.json",
+      "bytes": 881,
+      "sha256": "4bfceb9db87622b53bb8153f9394334c286e35f0c4a407b2cfdd170e45eeafbc"
+    }
+  },
+  "limits": [
+    "The crash-handler span is reserved from decoded size/alignment; exception-handler installation is omitted.",
+    "Full VI/DVD/retrace and HSD graphics setup are outside this allocation target. Aurora GXInit binds the FIFO, with no rendering claim.",
+    "Audio/ARAM startup, DevCom completion, lbMemory/lbHeap, preload and scene ownership are not executed.",
+    "Source-to-host fighter bindings and register carry remain open.",
+    "Full-session browser state equivalence, pixels, PCM and live performance are not established.",
+    "No deployment.",
+    "The owned boot derives an aligned arena high bound. Unaligned synthetic bounds can pass adapter capacity checks but fail explicitly at the fixture HSD boundary after allocation; no synthetic unaligned execution is admitted."
+  ]
+}

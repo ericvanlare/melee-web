@@ -141,41 +141,172 @@ std::optional<std::uint32_t> Heap::referent_size(Address payload) const
     return {};
 }
 
+Registry::Node* Registry::find(Address descriptor)
+{
+    const auto found = std::find_if(nodes_.begin(), nodes_.end(),
+        [descriptor](const Node& node) { return node.descriptor == descriptor; });
+    return found == nodes_.end() ? nullptr : &*found;
+}
+
+const Registry::Node* Registry::find(Address descriptor) const
+{
+    const auto found = std::find_if(nodes_.begin(), nodes_.end(),
+        [descriptor](const Node& node) { return node.descriptor == descriptor; });
+    return found == nodes_.end() ? nullptr : &*found;
+}
+
+Status Registry::initialize(Address descriptor)
+{
+    if (!descriptor.value()) return Status::invalid_request;
+    if (!find(descriptor)) nodes_.push_back({descriptor, {}});
+
+    // removeAll(data): unlink this descriptor from the currently reachable
+    // list, without touching any orphaned descriptor's stale next word.
+    std::optional<Address> previous;
+    std::optional<Address> cursor = head_;
+    while (cursor) {
+        Node* current = find(*cursor);
+        if (!current) break; // Internal state cannot be repaired from a bad link.
+        if (current->descriptor == descriptor) {
+            if (previous) {
+                Node* predecessor = find(*previous);
+                if (predecessor) predecessor->next = current->next;
+            } else {
+                head_ = current->next;
+            }
+            break;
+        }
+        previous = cursor;
+        cursor = current->next;
+    }
+
+    Node* node = find(descriptor);
+    node->next = head_;
+    head_ = descriptor;
+    return Status::ok;
+}
+
+void Registry::forget_memory()
+{
+    // _HSD_ObjAllocForgetMemory intentionally does not walk descriptors.
+    head_.reset();
+}
+
+std::optional<Address> Registry::next(Address descriptor) const
+{
+    const Node* node = find(descriptor);
+    return node ? node->next : std::nullopt;
+}
+
+bool Registry::known(Address descriptor) const
+{
+    return find(descriptor) != nullptr;
+}
+
 Status ObjectPool::initialize(std::uint32_t size, std::uint32_t align,
                               bool dedicated_heap, bool number_limit, bool heap_limit)
 {
+    return configure(size, align, dedicated_heap, number_limit, heap_limit, true);
+}
+
+Status ObjectPool::reset(std::uint32_t size, std::uint32_t align,
+                         bool dedicated_heap, bool number_limit, bool heap_limit)
+{
+    return configure(size, align, dedicated_heap, number_limit, heap_limit, false);
+}
+
+Status ObjectPool::configure(std::uint32_t size, std::uint32_t align,
+                             bool dedicated_heap, bool number_limit, bool heap_limit,
+                             bool require_new_generation)
+{
     if (dedicated_heap || number_limit || heap_limit) return Status::unsupported_configuration;
-    if (initialized_ && heap_generation_ == heap_.generation()) return Status::invalid_context;
     if (!heap_.initialized()) return Status::missing_context;
+    if (require_new_generation && initialized_ &&
+        initialized_generation_ == heap_.generation())
+        return Status::invalid_context;
     if (size < 4 || !align || (align & (align - 1)))
         return Status::invalid_request;
     const auto rounded = (std::uint64_t(size) + align - 1) & ~std::uint64_t(align - 1);
     if (rounded > largest_cell - header) return Status::invalid_request;
+    // HSD_ObjAllocInit is a descriptor reset, not a heap-generation test.
+    // It is valid in place after allocations: old OS cells remain owned by
+    // the source heap, while the descriptor forgets their object chains.
     state_ = {};
     state_.size = std::uint32_t(rounded);
     state_.align_mask = align - 1;
     initialized_ = true;
-    heap_generation_ = heap_.generation();
+    initialized_generation_ = heap_.generation();
+    // HSD_ObjAllocInit abandons the descriptor's object chains.  The source
+    // OS heap still owns the old cells, represented by Heap::pool_backing_,
+    // but this descriptor must not retain them as live ownership after a
+    // reset.  In particular, a later heap recreation must be refillable after
+    // this one reset rather than being blocked by an orphaned old generation.
+    backings_.clear();
     return Status::ok;
 }
 
 bool ObjectPool::context_available() const
 {
-    return initialized_ && heap_.initialized() && heap_generation_ == heap_.generation();
+    if (!initialized_) return false;
+    for (const auto& backing : backings_) {
+        if (!backing.heap || !backing.heap->initialized() ||
+            backing.heap->generation() != backing.generation)
+            return false;
+    }
+    return true;
 }
 
 Status ObjectPool::add_free(std::uint32_t count)
 {
-    if (!context_available()) return Status::missing_context;
+    return add_free(count, heap_);
+}
+
+bool ObjectPool::context_available(Heap& selected_heap) const
+{
+    return context_available() && selected_heap.initialized();
+}
+
+Status ObjectPool::add_free(std::uint32_t count, Heap& selected_heap)
+{
+    if (!context_available(selected_heap)) return Status::missing_context;
     const auto bytes = std::uint64_t(state_.size) * count;
     if (!count || bytes > largest_cell - header) return Status::invalid_request;
-    const auto allocation = heap_.allocate(std::uint32_t(bytes));
+    const auto allocation = selected_heap.allocate(std::uint32_t(bytes));
     if (allocation.status != Status::ok) return allocation.status;
-    heap_.pool_backing_.push_back(allocation.address);
+    const auto status = link_backing(selected_heap, allocation.address, count);
+    if (status != Status::ok) return status;
+    return Status::ok;
+}
+
+Status ObjectPool::adopt_backing(Heap& selected_heap, Address backing,
+                                 std::uint32_t count)
+{
+    if (!context_available(selected_heap)) return Status::missing_context;
+    if (!backing.value() || !count) return Status::invalid_request;
+    const auto bytes = std::uint64_t(state_.size) * count;
+    if (bytes > largest_cell - header) return Status::invalid_request;
+    const auto capacity = selected_heap.referent_size(backing);
+    if (!capacity) return Status::unknown_allocation;
+    if (*capacity < bytes) return Status::invalid_request;
+    if (std::find(selected_heap.pool_backing_.begin(),
+                  selected_heap.pool_backing_.end(), backing) !=
+        selected_heap.pool_backing_.end())
+        return Status::invalid_request;
+    return link_backing(selected_heap, backing, count);
+}
+
+Status ObjectPool::link_backing(Heap& selected_heap, Address backing,
+                                std::uint32_t count)
+{
+    const auto bytes = std::uint64_t(state_.size) * count;
+    const auto capacity = selected_heap.referent_size(backing);
+    if (!capacity || *capacity < bytes) return Status::invalid_request;
+    selected_heap.pool_backing_.push_back(backing);
+    backings_.push_back({&selected_heap, selected_heap.generation(), backing});
     std::vector<Address> added;
     added.reserve(count + state_.free.size());
     for (std::uint32_t i = 0; i < count; ++i)
-        added.emplace_back(allocation.address.value() + state_.size * i);
+        added.emplace_back(backing.value() + state_.size * i);
     added.insert(added.end(), state_.free.begin(), state_.free.end());
     state_.free = std::move(added);
     return Status::ok;
@@ -183,11 +314,23 @@ Status ObjectPool::add_free(std::uint32_t count)
 
 Allocation ObjectPool::allocate()
 {
+    return allocate(heap_);
+}
+
+Allocation ObjectPool::allocate(Heap& selected_heap)
+{
     if (!context_available()) return {Status::missing_context, {}};
     if (state_.free.empty()) {
-        const auto status = add_free(1);
+        const auto status = add_free(1, selected_heap);
         if (status != Status::ok) return {status, {}};
     }
+    return allocate_existing();
+}
+
+Allocation ObjectPool::allocate_existing()
+{
+    if (!context_available()) return {Status::missing_context, {}};
+    if (state_.free.empty()) return {Status::exhausted, {}};
     const Address result = state_.free.front();
     state_.free.erase(state_.free.begin());
     state_.live.push_back(result);

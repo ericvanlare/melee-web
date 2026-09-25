@@ -10,10 +10,130 @@
 #include <sysdolphin/baselib/pobj.h>
 #include <sysdolphin/baselib/aobj.h>
 #include <sysdolphin/baselib/fobj.h>
+#include <sysdolphin/baselib/list.h>
+#include <sysdolphin/baselib/mtx.h>
+#include <sysdolphin/baselib/robj.h>
+#include <sysdolphin/baselib/tev.h>
+#include <sysdolphin/baselib/displayfunc.h>
+#include <sysdolphin/baselib/shadow.h>
 #include <stdlib.h>
 #define CHECK(c) do { if (!(c)) { fprintf(stderr, "CHECK failed: %s at %d\n", #c, __LINE__); abort(); } } while (0)
 #include <stdio.h>
 #include <string.h>
+
+extern HSD_ObjAllocData zlist_alloc_data;
+
+static void check_component_pool(HSD_ObjAllocData* data)
+{
+    CHECK(data != NULL && data->size != 0);
+    CHECK(data->used == 0 && data->free == 0 && data->peak == 0);
+}
+
+static void component_pool_lifecycle(void)
+{
+    char error[256];
+    CHECK(melee_web_gameplay_startup(4U * 1024U * 1024U, error, sizeof(error)));
+    CHECK(melee_web_native_world_enable(error, sizeof(error)));
+
+    /* This is the allocation-only portion of the source HSD_ObjInit call;
+     * validate it through compiled public pools rather than captured output. */
+    check_component_pool(HSD_SListGetAllocData());
+    check_component_pool(HSD_DListGetAllocData());
+    check_component_pool(HSD_AObjGetAllocData());
+    check_component_pool(HSD_FObjGetAllocData());
+    check_component_pool(HSD_IDGetAllocData());
+    check_component_pool(HSD_VecGetAllocData());
+    check_component_pool(HSD_MtxGetAllocData());
+    check_component_pool(HSD_RObjGetAllocData());
+    check_component_pool(HSD_RvalueObjGetAllocData());
+    check_component_pool(HSD_RenderGetAllocData());
+    check_component_pool(HSD_TevRegGetAllocData());
+    check_component_pool(HSD_ChanGetAllocData());
+    check_component_pool(HSD_ShadowGetAllocData());
+    check_component_pool(&zlist_alloc_data);
+
+    HSD_SList* slist = HSD_SListAlloc();
+    HSD_DList* dlist = HSD_ObjAlloc(HSD_DListGetAllocData());
+    HSD_AObj* aobj = HSD_AObjAlloc();
+    HSD_FObj* fobj = HSD_FObjAlloc();
+    void* vec = HSD_VecAlloc();
+    void* mtx = HSD_MtxAlloc();
+    HSD_RObj* robj = HSD_RObjAlloc();
+    HSD_Rvalue* rvalue = HSD_RvalueAlloc();
+    void* render = HSD_ObjAlloc(HSD_RenderGetAllocData());
+    void* tevreg = HSD_ObjAlloc(HSD_TevRegGetAllocData());
+    void* chan = HSD_ObjAlloc(HSD_ChanGetAllocData());
+    HSD_Shadow* shadow = HSD_ShadowAlloc();
+    void* zlist = HSD_ObjAlloc(&zlist_alloc_data);
+    CHECK(slist && dlist && aobj && fobj && vec && mtx && robj && rvalue &&
+          render && tevreg && chan && shadow && zlist);
+    static int id_payload;
+    HSD_IDInsertToTable(NULL, 0x13579BDFU, &id_payload);
+    CHECK(HSD_IDGetData(0x13579BDFU, NULL) == &id_payload &&
+          HSD_IDGetAllocData()->used == 1);
+
+    /* A second enable in one world must not reset live pools. */
+    CHECK(melee_web_native_world_enable(error, sizeof(error)));
+    CHECK(HSD_SListGetAllocData()->used == 1 && HSD_DListGetAllocData()->used == 1 &&
+          HSD_AObjGetAllocData()->used == 1 && HSD_FObjGetAllocData()->used == 1 &&
+          HSD_IDGetAllocData()->used == 1 &&
+          HSD_VecGetAllocData()->used == 1 && HSD_MtxGetAllocData()->used == 1 &&
+          HSD_RObjGetAllocData()->used == 1 && HSD_RvalueObjGetAllocData()->used == 1 &&
+          HSD_RenderGetAllocData()->used == 1 && HSD_TevRegGetAllocData()->used == 1 &&
+          HSD_ChanGetAllocData()->used == 1 && HSD_ShadowGetAllocData()->used == 1 &&
+          zlist_alloc_data.used == 1);
+
+    HSD_SList* second = HSD_SListAlloc();
+    CHECK(second && HSD_SListGetAllocData()->used == 2);
+    HSD_ObjFree(HSD_SListGetAllocData(), second);
+    HSD_ObjFree(HSD_SListGetAllocData(), slist);
+    HSD_ObjFree(HSD_DListGetAllocData(), dlist);
+    HSD_AObjFree(aobj);
+    HSD_FObjFree(fobj);
+    HSD_VecFree(vec);
+    HSD_MtxFree(mtx);
+    HSD_RObjFree(robj);
+    HSD_RvalueRemove(rvalue);
+    HSD_ObjFree(HSD_RenderGetAllocData(), render);
+    HSD_ObjFree(HSD_TevRegGetAllocData(), tevreg);
+    HSD_ObjFree(HSD_ChanGetAllocData(), chan);
+    HSD_ShadowRemove(shadow);
+    HSD_ObjFree(&zlist_alloc_data, zlist);
+    HSD_IDRemoveByIDFromTable(NULL, 0x13579BDFU);
+    CHECK(HSD_SListGetAllocData()->used == 0 && HSD_DListGetAllocData()->used == 0 &&
+          HSD_AObjGetAllocData()->used == 0 && HSD_FObjGetAllocData()->used == 0 &&
+          HSD_IDGetAllocData()->used == 0 &&
+          HSD_VecGetAllocData()->used == 0 && HSD_MtxGetAllocData()->used == 0 &&
+          HSD_RObjGetAllocData()->used == 0 && HSD_RvalueObjGetAllocData()->used == 0 &&
+          HSD_RenderGetAllocData()->used == 0 && HSD_TevRegGetAllocData()->used == 0 &&
+          HSD_ChanGetAllocData()->used == 0 && HSD_ShadowGetAllocData()->used == 0 &&
+          zlist_alloc_data.used == 0);
+
+    CHECK(melee_web_gameplay_shutdown(error, sizeof(error)));
+    CHECK(melee_web_gameplay_startup(4U * 1024U * 1024U, error, sizeof(error)));
+    CHECK(melee_web_native_world_enable(error, sizeof(error)));
+    check_component_pool(HSD_SListGetAllocData());
+    check_component_pool(HSD_ShadowGetAllocData());
+    check_component_pool(&zlist_alloc_data);
+    CHECK(melee_web_gameplay_shutdown(error, sizeof(error)));
+    puts("HSD component pool initialization/order/restart trace: passed");
+}
+
+static void reject_live_display_pool_replacement(void)
+{
+    char error[256];
+    CHECK(melee_web_gameplay_startup(4U * 1024U * 1024U, error, sizeof(error)));
+    HSD_ZListInitAllocData();
+    void* zlist = HSD_ObjAlloc(&zlist_alloc_data);
+    CHECK(zlist && zlist_alloc_data.used == 1);
+    CHECK(!melee_web_native_world_enable(error, sizeof(error)));
+    CHECK(strstr(error, "Z-list") != NULL && zlist_alloc_data.used == 1);
+    HSD_ObjFree(&zlist_alloc_data, zlist);
+    CHECK(zlist_alloc_data.used == 0);
+    CHECK(melee_web_native_world_enable(error, sizeof(error)));
+    CHECK(melee_web_gameplay_shutdown(error, sizeof(error)));
+    puts("native HSD rejects live Z-list replacement before pool reset: passed");
+}
 
 /* Native NODE affects one joint; BRANCH affects its subtree only. */
 static void original_visibility_channels(void)
@@ -228,6 +348,8 @@ int main(int argc, char** argv)
         return 0;
     }
     CHECK(argc == 1);
+    reject_live_display_pool_replacement();
+    component_pool_lifecycle();
     char error[256];
     for (unsigned iteration = 0; iteration < 2; ++iteration) {
         CHECK(melee_web_gameplay_startup(4U * 1024U * 1024U, error, sizeof(error)));

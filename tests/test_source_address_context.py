@@ -51,7 +51,7 @@ class NativeSourceAddressTests(unittest.TestCase):
 class SourceAddressDifferentialTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        sdk = ROOT / ".deps/emsdk"
+        sdk = (ROOT / ".deps/emsdk").resolve()
         cls.emcc = sdk / "upstream/emscripten/emcc.py"
         cls.emxx = sdk / "upstream/emscripten/em++.py"
         cls.original = [ROOT / ".deps/melee" / path for path in SOURCES]

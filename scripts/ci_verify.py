@@ -38,6 +38,7 @@ LINKED_TESTS = {
     "gameplay": (
         "test_hsd_native.NativeJointRuntimeTests",
         "test_gameplay_common_context",
+        "test_source_devcom_startup",
     ),
     "effects": (
         "test_gameplay_effects", "test_gameplay_bonus_data", "test_gameplay_stage_numeric",
@@ -54,6 +55,8 @@ REQUIRED_TESTS = {
         "test_hsd_native.NativeJointRuntimeTests.test_original_allocation_callback_rejection_and_restart",
         "test_hsd_native.NativeJointRuntimeTests.test_replacement_heap_is_never_used_for_teardown",
         "test_gameplay_common_context.CommonContextTests.test_original_material_owners_restore_all_common_globals",
+        "test_source_devcom_startup.SourceDevComStartupTests.test_source_prefix_and_deferred_devcom_recycling",
+        "test_source_devcom_startup.SourceDevComStartupTests.test_fresh_process_rejects_malformed_source_geometry",
     ),
     "effects": (
         "test_gameplay_effects.EffectContextTests.test_authored_bank_bounds_lifetimes_and_restart",

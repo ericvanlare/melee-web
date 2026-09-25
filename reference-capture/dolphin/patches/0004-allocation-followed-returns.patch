@@ -1,0 +1,35 @@
+--- a/Source/Core/Core/PowerPC/JitArm64/Jit.cpp
++++ b/Source/Core/Core/PowerPC/JitArm64/Jit.cpp
+@@ -37,6 +37,7 @@
+ #include "Core/PowerPC/JitInterface.h"
+ #include "Core/PowerPC/PowerPC.h"
+ #include "Core/PowerPC/ReferenceCaptureObserver.h"
++#include "Core/PowerPC/ReferenceAllocationObserver.h"
+ #include "Core/System.h"
+ 
+ using namespace Arm64Gen;
+@@ -1215,7 +1216,8 @@
+          ++observer_index)
+     {
+       const PPCAnalyst::CodeOp& observer_op = m_code_buffer[observer_index];
+-      if (!observer_op.skip && ReferenceCapture::Observer::IsBoundary(observer_op.address))
++      if ((!observer_op.skip || ReferenceAllocation::Observer::IsBoundary(observer_op.address)) &&
++          ReferenceCapture::Observer::IsBoundary(observer_op.address))
+       {
+         observer_block = true;
+         break;
+@@ -1315,9 +1317,13 @@
+     // Emit the passive observer only for exact GALE01r2 boundary PCs.  Flush
+     // guest register caches so the callback sees the completed state GDB saw
+     // at each boundary; it never writes emulated memory or changes the op.
+-    if (!op.skip && observer_enabled &&
++    // PPCAnalyst follows some unconditional BLRs inside this block. Their
++    // machine state still exists at this source position even though no host
++    // branch is emitted. Allocation entry/return pairing needs that boundary.
++    if (observer_enabled && (!op.skip || ReferenceAllocation::Observer::IsBoundary(op.address)) &&
+         ReferenceCapture::Observer::IsBoundary(op.address))
+     {
++      ASSERT(!op.skip || op.inst.hex == 0x4e800020);
+       FlushCarry();
+       // ABI_CallFunction may clobber caller-saved host registers.  Flush all
+       // cached guest state before entering the observer and invalidate the

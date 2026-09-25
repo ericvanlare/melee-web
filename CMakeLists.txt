@@ -103,7 +103,7 @@ if(EMSCRIPTEN)
   add_library(hsd_native_runtime STATIC src/hsd_texture_bounds.c src/hsd_native_camera.c src/hsd_native_arrays.c src/hsd_native_pobj.c src/hsd_native_joint.c src/hsd_native_common.c
     src/gameplay_stage_context.c src/gameplay_common_context.c "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/melee/lb/lbspdisplay.c")
   foreach(unit class object hash id list jobj dobj mobj tobj texp texpdag tev
-      displayfunc state aobj fobj robj wobj lobj spline mtx util quatlib
+      displayfunc state aobj fobj robj shadow wobj lobj spline mtx util quatlib
       bytecode perf random)
     target_sources(hsd_native_runtime PRIVATE "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/${unit}.c")
   endforeach()
@@ -121,6 +121,61 @@ if(EMSCRIPTEN)
   target_link_options(gameplay_common_context_trace PRIVATE -sENVIRONMENT=node -sEXIT_RUNTIME=1
     -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
   set_target_properties(gameplay_common_context_trace PROPERTIES SUFFIX ".js")
+  # A fresh checked-Wasm32 process for source-derived cold-boot allocation
+  # validation.  This target intentionally stops at the HSD allocation
+  # boundary: source audio/AI/AX startup and lbMemory/lbHeap are not silently
+  # replaced by ARAM-only setup when their authored providers are unavailable.
+  add_executable(original_startup_alloc_trace
+    tests/original_startup_osmemory.cpp
+    tests/original_startup_alloc_trace.cpp
+    # Compile the prepared source unit here so its fixture-only wrapper shares
+    # the private HSD state with this executable.  gameplay_runtime still
+    # carries the ordinary source object, but the direct object satisfies all
+    # initialize.c symbols before that archive can be extracted.
+    "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/initialize.c"
+    "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/synth.c")
+  target_link_libraries(original_startup_alloc_trace PRIVATE hsd_native_runtime)
+  target_include_directories(original_startup_alloc_trace PRIVATE src "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/.deps/aurora/include"
+    "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/include")
+  target_compile_definitions(original_startup_alloc_trace PRIVATE TARGET_PC MELEE_WEB_GAMEPLAY
+    MELEE_WEB_ORIGINAL_STARTUP_FIXTURE)
+  target_compile_options(original_startup_alloc_trace PRIVATE -ffunction-sections -fdata-sections -ffp-contract=off
+    -fno-builtin-sinf -fno-builtin-cosf -fno-builtin-tanf -fno-builtin-atanf
+    -fno-builtin-atan2f -fno-builtin-acosf
+    "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/original_startup_compat.h>"
+    "$<$<COMPILE_LANGUAGE:CXX>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/original_startup_compat.h>")
+  target_link_options(original_startup_alloc_trace PRIVATE -sENVIRONMENT=node -sEXIT_RUNTIME=1
+    -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608 -sINITIAL_MEMORY=134217728)
+  set_target_properties(original_startup_alloc_trace PROPERTIES SUFFIX ".js")
+  # Execute one real source HSD_DevCom type-3 request after the fresh HSD
+  # allocation boundary.  The pinned arq.c/devcom.c bodies remain unchanged;
+  # the fixture supplies only checked relay/ARAM storage and deferred pump
+  # ownership.  AX/AI/DSP, lbAudioAx, lbMemory, and lbHeap stay explicit
+  # omitted boundaries until their authored providers are available.
+  add_executable(source_devcom_trace
+    tests/source_devcom_trace.cpp
+    tests/source_devcom_backend.c
+    tests/original_startup_osmemory.cpp
+    src/source_arq_context.c
+    "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/initialize.c"
+    "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/synth.c")
+  target_link_libraries(source_devcom_trace PRIVATE hsd_native_runtime)
+  target_include_directories(source_devcom_trace PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/source_devcom_oracle_include"
+    src "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/.deps/aurora/include"
+    "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/../extern/dolphin/include")
+  target_compile_definitions(source_devcom_trace PRIVATE TARGET_PC MELEE_WEB_GAMEPLAY
+    MELEE_WEB_ORIGINAL_STARTUP_FIXTURE)
+  target_compile_options(source_devcom_trace PRIVATE -ffunction-sections -fdata-sections
+    -ffp-contract=off -fno-builtin-sinf -fno-builtin-cosf -fno-builtin-tanf
+    -fno-builtin-atanf -fno-builtin-atan2f -fno-builtin-acosf
+    "$<$<COMPILE_LANGUAGE:C>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/original_startup_compat.h>"
+    "$<$<COMPILE_LANGUAGE:CXX>:-include;${CMAKE_CURRENT_SOURCE_DIR}/src/original_startup_compat.h>")
+  target_link_options(source_devcom_trace PRIVATE -sENVIRONMENT=node -sEXIT_RUNTIME=1
+    -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608 -sINITIAL_MEMORY=134217728)
+  set_target_properties(source_devcom_trace PROPERTIES SUFFIX ".js")
   add_executable(hsd_native_trace tests/hsd_native_trace.c)
   target_link_libraries(hsd_native_trace PRIVATE hsd_native_runtime)
   target_compile_options(hsd_native_trace PRIVATE -ffp-contract=off
@@ -163,7 +218,7 @@ if(EMSCRIPTEN)
     -sALLOW_MEMORY_GROWTH=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
   set_target_properties(gameplay_probe PROPERTIES SUFFIX ".js")
   include(cmake/FighterRuntime.cmake)
-  add_custom_target(gameplay_checks DEPENDS gameplay_scheduler_trace gameplay_abi_trace gameplay_collision_trace gameplay_probe hsd_native_trace hsd_native_dat_probe gameplay_stage_lights_trace gameplay_common_context_trace)
+  add_custom_target(gameplay_checks DEPENDS gameplay_scheduler_trace gameplay_abi_trace gameplay_collision_trace gameplay_probe hsd_native_trace hsd_native_dat_probe gameplay_stage_lights_trace gameplay_common_context_trace original_startup_alloc_trace source_devcom_trace)
 endif()
 
 if(NOT EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/.deps/aurora/CMakeLists.txt")

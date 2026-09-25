@@ -1,0 +1,278 @@
+{
+  "schema": "melee-web-source-devcom-startup",
+  "version": 1,
+  "date": "2026-09-24",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced",
+    "Retail compared"
+  ],
+  "scope": "Fresh HSD prefix plus a direct source type-3 DevCom request. Does not execute original synth startup or ARInit/ARAlloc.",
+  "base_commit": "055e41ba7e6fbefb7a9749ab20a7f905c5399885",
+  "source_files": [
+    {
+      "path": "CMakeLists.txt",
+      "bytes": 19787,
+      "sha256": "1cdf9fc64130ad16cae4c4d3f881a150b1721c3571c5574b5938bdbab75e9ab2"
+    },
+    {
+      "path": "patches/melee-gameplay.patch",
+      "bytes": 344420,
+      "sha256": "b4f99bc9e9593d505b12a9ec387690fb48f821fab2f5e3ae403bfa1088b30d67"
+    },
+    {
+      "path": "src/source_devcom_context.h",
+      "bytes": 319,
+      "sha256": "1b82d9db12d583c13c02cbdfa456c1215afa6d7c213bfae3556c274a48759050"
+    },
+    {
+      "path": "tests/source_devcom_backend.c",
+      "bytes": 14352,
+      "sha256": "beb6eee0b62b1aad212e97fb61db0fb4df86b098fba8399d4d6244f18eb58a4a"
+    },
+    {
+      "path": "tests/source_devcom_trace.cpp",
+      "bytes": 519,
+      "sha256": "aefa9b52562a2b5999657c97a8e4519b81cf85ba42986a6ab30ee932d7448628"
+    },
+    {
+      "path": "tests/source_devcom_oracle_include/dolphin/ar.h",
+      "bytes": 1411,
+      "sha256": "e01321c578ce4e8fe9cf56561d17a9bf433120a6f5fd97af884b5502c112fc61"
+    },
+    {
+      "path": "tests/test_source_devcom_startup.py",
+      "bytes": 7192,
+      "sha256": "8c94ac267198f3a8f055ddadcbe73c45a87672ff4a3f841731ec9d15222a4acb"
+    },
+    {
+      "path": "tests/original_startup_alloc_trace.cpp",
+      "bytes": 17690,
+      "sha256": "9736e0f6e19ae9434d14684183dc2f0120033906613c83d532743a94e9ed18ab"
+    },
+    {
+      "path": "tests/original_startup_osmemory.cpp",
+      "bytes": 1101,
+      "sha256": "077c4fe63e27b0fa41cf776c50cd73abfe04869bbb95020a8fa2be26022a0601"
+    },
+    {
+      "path": "src/source_arq_context.c",
+      "bytes": 7769,
+      "sha256": "0f7f3f49f0a260dee960354513bd0da56f35b6daec80ff1ef1c2e7b479452ffe"
+    },
+    {
+      "path": "src/source_arq_context.h",
+      "bytes": 2736,
+      "sha256": "22f7bd5fe65523d14da98d58d5e371e3418653836389961118ad73997dbe7823"
+    },
+    {
+      "path": "scripts/ci_verify.py",
+      "bytes": 10231,
+      "sha256": "364dd5de2e7222ff2b0cf384f1e1f8c629c76626eb7763e350fddc5d593ac5ea"
+    },
+    {
+      "path": "tests/source_devcom_oracle_include/dolphin.h",
+      "bytes": 168,
+      "sha256": "1f3cf227aa0de0de281fba3a002390af7423225340b69366b594f998e1e79886"
+    }
+  ],
+  "original_sources": [
+    {
+      "path": ".deps/melee/src/sysdolphin/baselib/devcom.c",
+      "bytes": 14614,
+      "sha256": "aea7c93eb7be895f2c159568e0a9a1ed91f914aad5ed11130aa677c02d1d18cb"
+    },
+    {
+      "path": ".deps/melee/src/sysdolphin/baselib/devcom.static.h",
+      "bytes": 1088,
+      "sha256": "31b71c3fcafe77aa74058b7a853cf6fd766fd0574e1a17911dfc738d86a3d86e"
+    },
+    {
+      "path": ".deps/melee/src/sysdolphin/baselib/synth.c",
+      "bytes": 48249,
+      "sha256": "a8a45a3b66ea559ad945979ccfeb1eeb873d11210bd241ad0dfffaa14beefca6"
+    },
+    {
+      "path": ".deps/melee/extern/dolphin/src/dolphin/ar/arq.c",
+      "bytes": 7735,
+      "sha256": "b8ce29ad2773743b3f657cc1203799baad5efcc65d8381beb60f4922b37a1be1"
+    }
+  ],
+  "runtime_input_policy": "Only independently derived owned-disc/DOL boot inputs via run_owned_fixture. Captured rows are post-run comparison inputs only.",
+  "executables": [
+    {
+      "path": "work/session-equivalence-devcom-real-v3/source_devcom_trace.js",
+      "bytes": 436073,
+      "sha256": "6837427ffe58ab27dcae2b95183903858404a9e766b64098cf86948921101b85"
+    },
+    {
+      "path": "work/session-equivalence-devcom-real-v3/source_devcom_trace.wasm",
+      "bytes": 31412580,
+      "sha256": "69ce35078fc577dc9fcac1594e0ed77be0f8c87897f879597bd358711725769e"
+    }
+  ],
+  "owned_run": {
+    "stdout": {
+      "path": "work/session-equivalence-devcom-real-v3/stdout.txt",
+      "bytes": 2392,
+      "sha256": "80b3d15faf1161e5680d9b725af66e799149cc36fff70c44e6960cbbc09c9075"
+    },
+    "stderr": {
+      "path": "work/session-equivalence-devcom-real-v3/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "status": {
+      "path": "work/session-equivalence-devcom-real-v3/status.json",
+      "bytes": 93,
+      "sha256": "6ab7779eebef82506a820cc44c9f596b079c4d85e778bb970ba1dfc20e8160fe"
+    },
+    "hsd": {
+      "path": "work/session-equivalence-devcom-real-v3/hsd.json",
+      "bytes": 2708,
+      "sha256": "718bb08d7afd7b7f6d122c466e3fb958c9ab899679b015c9f4b2123e558c29cb"
+    },
+    "devcom": {
+      "path": "work/session-equivalence-devcom-real-v3/devcom.json",
+      "bytes": 968,
+      "sha256": "325ee5f3cb857a91a333d35b26553cf96e391dc7f60b024cb62ca5b9b72773e7"
+    }
+  },
+  "comparison": {
+    "hsd_groups": 15,
+    "devcom_groups": 7,
+    "hsd": {
+      "path": "work/session-equivalence-devcom-real-v3/hsd-comparison.json",
+      "bytes": 797,
+      "sha256": "9955df9e729613570f30aa81195faed4114eda3f9f7ee7196ee11ccd3c993e14"
+    },
+    "devcom": {
+      "path": "work/session-equivalence-devcom-real-v3/devcom-comparison.json",
+      "bytes": 549,
+      "sha256": "f5cfd0e430e8d16b986552ed156eb9974f6718e34ff0685997d42093cb779113"
+    },
+    "comparator": {
+      "path": "work/session-equivalence-compare-devcom.py",
+      "bytes": 1646,
+      "sha256": "f87bce9555e4fe118985e30a5fd924994bd4d635b518a22b39e62e29cfae82dc"
+    },
+    "reference": {
+      "path": "work/session-equivalence-original-startup-validation-targets-v1.json",
+      "bytes": 30000,
+      "sha256": "e728670db1c40265dcccb24ede18fa85e3907c80f7de896addfc7b3b10c4e47d"
+    },
+    "negative_control": {
+      "path": "work/session-equivalence-devcom-real-v3/negative-comparison.json",
+      "bytes": 674,
+      "sha256": "9a2e4cde4a729b8af735e10c6fae22a16b4deb81007be6b7185ce97ab3966e67"
+    }
+  },
+  "validation": {
+    "build": {
+      "path": "work/source-devcom-build-final-v2.log",
+      "bytes": 22073,
+      "sha256": "b4325c9b6839ed7bdad1efa5718f6ae2d19dbf5c25d5c97cf9070e0a320a2d38"
+    },
+    "focused_tests": {
+      "tests": 2,
+      "passed": 2,
+      "log": {
+        "path": "work/source-devcom-focused-v2.log",
+        "bytes": 424,
+        "sha256": "120c712ccfe877bd27bb3715891236aa37c8b608810fe30f2b1122dd516ffa32"
+      }
+    },
+    "abi_reproducer": {
+      "path": "work/source-devcom-abi-repro-v1.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "ci_routing": {
+      "tests": 33,
+      "skipped": 1,
+      "passed": 32,
+      "log": {
+        "path": "work/source-devcom-ci-routing-v1.log",
+        "bytes": 7103,
+        "sha256": "7a95195b9c66b42fbd3b6ddd96ed3961458fa4dd4a5fbbfa254cf9fb75a75eb7"
+      },
+      "required_after_build": [
+        "test_source_prefix_and_deferred_devcom_recycling",
+        "test_fresh_process_rejects_malformed_source_geometry"
+      ]
+    },
+    "full_suite": {
+      "command": "python3 -m unittest discover -s tests -v",
+      "tests": 1368,
+      "passed": 1276,
+      "skipped": 92,
+      "seconds": 274.698,
+      "exit_code": 0,
+      "log": {
+        "path": "work/source-devcom-full-suite-v2.log",
+        "bytes": 244368,
+        "sha256": "28840249b6198b3f90c1a7bd1fb5f8ed9096fa3d7a57f205d7d0da843d96b127"
+      }
+    },
+    "staged_content": {
+      "findings": 0,
+      "log": {
+        "path": "work/source-devcom-content-v1.log",
+        "bytes": 70,
+        "sha256": "34f4fa7380f22fa2775ddabd04491a137fd270dbbf98ee08e4f2b26d1e3af667"
+      }
+    },
+    "added_links": {
+      "path": "work/source-devcom-links-v1.log",
+      "bytes": 431,
+      "sha256": "529059839bc1aaed6f5f778b0b75f297666200997fd45a45a259c6b97b45ae37"
+    },
+    "prior_alignment_suite": {
+      "path": "work/source-devcom-full-suite-v1.log",
+      "bytes": 244367,
+      "sha256": "0327fc981a0918973792c590cc680d95464548dbc6bfc3e38260f22d5e31b02a"
+    }
+  },
+  "retained_preparation_failures": [
+    {
+      "path": "work/source-devcom-configure-v1.log",
+      "bytes": 53,
+      "sha256": "b1d74507cc3e0e9acefe31bc2c9ea537497d54d064d0edb7e533092a6de94fff"
+    },
+    {
+      "path": "work/source-devcom-backend-compile-v1.log",
+      "bytes": 3587,
+      "sha256": "2bc9c678cca39a0a93b1b99f612af4bc7b3b511a8154ca356b9c05ccfda8f581"
+    },
+    {
+      "path": "work/source-devcom-backend-cmake-v2.log",
+      "bytes": 6127,
+      "sha256": "e675b90c3bfd4c5e6508938ec38eff92e0372dceebec77c77f024c507bde27dd"
+    },
+    {
+      "path": "work/source-devcom-link-v1.log",
+      "bytes": 608170,
+      "sha256": "bbf0297d93fae46e664b491a18613539c6f510852caa1c2c1960189a8338e5d2"
+    },
+    {
+      "path": "work/source-devcom-link-v2.log",
+      "bytes": 11293,
+      "sha256": "daad8df557b38b4fd2220a595c6f60e95830a7618e0973410ad4a2fb31454bd6"
+    }
+  ],
+  "failure_resolution": [
+    "Use explicit available CMake and correct generated-source paths.",
+    "Declare fail-closed DVD guards before source inclusion; preserve source32-bit boolean callback ABI (small ABI reproducer passes).",
+    "Declare authored ARAlloc and fail if this direct-request target reaches it.",
+    "Use original HSD audio allocator in fixture targets; implement checked explicit relay publication and fail on unsupported cache invalidation."
+  ],
+  "limits": [
+    "The synth-shaped request uses the declared source ARAM base directly; no original AR reservation has been executed.",
+    "The second request and masked/repeated-completion checks are synthetic source-execution evidence, not original startup events.",
+    "Relay host-address tokens are not original static-global identities. DMA-visible publication storage is fixture-owned.",
+    "Completion timing, cache hardware, AI/AX/DSP, DVD, full lbAudioAx startup, lbMemory/lbHeap and scene history are not established.",
+    "Live browser source identities, CPU carry, full-session equivalence, pixels, PCM and performance remain open.",
+    "No deployment."
+  ]
+}

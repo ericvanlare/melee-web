@@ -258,9 +258,10 @@ int main() {
         self.assertIn("completed_match_pending_prize", source)
         self.assertIn("StartupPrizeModeExit", source)
         self.assertIn("startup Prize mode exit", source)
-        hook_predicate = source[source.index("bool Observer::IsBoundary"):
+        hook_predicate = source[source.index("static bool IsCaptureBoundary"):
                                 source.index("void Observer::OnBoundary")]
         self.assertIn("case 0x801BFF7C:", hook_predicate)
+        self.assertIn("return IsCaptureBoundary(guest_pc) ||", hook_predicate)
         self.assertIn("MWRC_CAPTURE_ID", source)
         self.assertIn("MWRC_SEQUENCE_ID", source)
         self.assertIn("MENU_AUDIO_STREAM_START", source)

@@ -1,0 +1,660 @@
+{
+  "acceptance_gate": "blocked_before_full_scenario_capture",
+  "attempts": [
+    {
+      "attempt": "boot-v1",
+      "error": "'expected_setup'",
+      "inputs_unchanged": true,
+      "result_sha256": "97626760b79b449002d91471c06fa0298e77912845c845c9eb54b0882951cc8a",
+      "status": "failed"
+    },
+    {
+      "allocations_sha256": "0fd891e01ad45e600e6b4f23485b92c848374bfbe4377f72847abf1c02108883",
+      "attempt": "boot-v10",
+      "inputs_unchanged": true,
+      "result_sha256": "d4cf478ced9157e4f4b3de7e5b42d62637676d21531a62f9acb86728cec7c521",
+      "rows": 554,
+      "status": "captured_diagnostic"
+    },
+    {
+      "attempt": "boot-v2",
+      "error": "corpus input plan exceeds its bounded capture cap",
+      "inputs_unchanged": true,
+      "result_sha256": "9d71075c74aaf18fe20f2129ed4649d4afea4dfa4741e952e0705acd883a7b74",
+      "status": "failed"
+    },
+    {
+      "allocations_sha256": "9b705dd4647e0adb7bba573f4e2d20fe551271ea2736a773fa6a5cf081f1d83e",
+      "attempt": "boot-v3",
+      "inputs_unchanged": true,
+      "result_sha256": "819c22b01f9af638a2f57496e20c517d9d6e36bc776b8436030c2da06c1857de",
+      "rows": 490,
+      "status": "captured_diagnostic"
+    },
+    {
+      "allocations_sha256": "8d13dda3f413c8d46965dbcfab102cae21b8b1e19e5d481829d9e44f81839a2f",
+      "attempt": "boot-v4",
+      "inputs_unchanged": true,
+      "result_sha256": "3229a276ebda366c19f38e95bbe39df0d036045071e101182d397921586ca68f",
+      "rows": 528,
+      "status": "captured_diagnostic"
+    },
+    {
+      "allocations_sha256": "70735746f91598cb88e7f3e8ba4c797e7718ee4af9ca1a1f65b51c8fd406f87c",
+      "attempt": "boot-v5",
+      "inputs_unchanged": true,
+      "result_sha256": "d14a3701afb517d3f2931aef56e3d19e2b9fd6f0f511144c5a7dcaeb92ed3df9",
+      "rows": 544,
+      "status": "captured_diagnostic"
+    },
+    {
+      "allocations_sha256": "70735746f91598cb88e7f3e8ba4c797e7718ee4af9ca1a1f65b51c8fd406f87c",
+      "attempt": "boot-v6",
+      "inputs_unchanged": true,
+      "result_sha256": "70d2e2489672109eb63863dd684fed1c9619b6c52c6067295525867f85d0285e",
+      "rows": 544,
+      "status": "captured_diagnostic"
+    },
+    {
+      "allocations_sha256": "0fd891e01ad45e600e6b4f23485b92c848374bfbe4377f72847abf1c02108883",
+      "attempt": "boot-v7",
+      "inputs_unchanged": true,
+      "result_sha256": "5f59b59e112399981e47a2a54f4989d7ffcf0792dd4b559c519150dd5ecaf4ff",
+      "rows": 554,
+      "status": "captured_diagnostic"
+    },
+    {
+      "allocations_sha256": "0fd891e01ad45e600e6b4f23485b92c848374bfbe4377f72847abf1c02108883",
+      "attempt": "boot-v8",
+      "inputs_unchanged": true,
+      "result_sha256": "27d641e64be4d578d5db396a329a48edb5df31afe86699e607ea6f40549f556b",
+      "rows": 554,
+      "status": "captured_diagnostic"
+    },
+    {
+      "allocations_sha256": "0fd891e01ad45e600e6b4f23485b92c848374bfbe4377f72847abf1c02108883",
+      "attempt": "boot-v9",
+      "inputs_unchanged": true,
+      "result_sha256": "c21363b43924c4ea1e21b3fb7f36691029cb4053e7af91965391772315f94574",
+      "rows": 554,
+      "status": "captured_diagnostic"
+    },
+    {
+      "allocations_sha256": "adf5bf39e2a2ea951bc8ff68b83fe496b6c6de365df334306f72eb7ee6c9a223",
+      "attempt": "four-a-v1",
+      "error": "GDB capture failed; preserved gdb.log",
+      "inputs_unchanged": true,
+      "original_failure": "Python Exception <class 'RuntimeError'>: Character 9 not available",
+      "result_sha256": "7071f5549400cde52a73da6fb79b0aec6e449e1d553f1140cdc3dbb344b6738e",
+      "rows": 34547,
+      "status": "failed"
+    },
+    {
+      "allocations_sha256": "23815eec01d7975a495571481c0509975a0286c2cafb5ee7f08750dcf2ae79fe",
+      "attempt": "three-a-v1",
+      "error": "GDB capture failed; preserved gdb.log",
+      "inputs_unchanged": true,
+      "original_failure": "Python Exception <class 'RuntimeError'>: Character 9 not available",
+      "result_sha256": "c3771a917027ea02999ae6ad71c998c29373a3256daa5a2d628cf245e41d3b7e",
+      "rows": 31576,
+      "status": "failed"
+    },
+    {
+      "attempt": "two-a-v1",
+      "error": "Expected template-user directory did not exist; preparation stopped.",
+      "inputs_unchanged": true,
+      "result_sha256": "23baff8689e8c58ab9adae146f98cceb0ff598fc8ccef3390aa276ac0b1e87f6",
+      "status": "failed"
+    },
+    {
+      "allocations_sha256": "966c4908ad775e8c7db454197e2a36f4be1216e9b7d865fcc0e8c977c43d7372",
+      "attempt": "two-a-v2",
+      "error": "GDB capture failed; preserved gdb.log",
+      "inputs_unchanged": true,
+      "original_failure": "Python Exception <class 'RuntimeError'>: allocation observer failed during menu preparation: repeated allocator entry without a source return",
+      "result_sha256": "f68c99805e2fd96fcab5a2f4ec09bac3cea596e5ed9c9c5b4853c9be26fdfaa3",
+      "rows": 13781,
+      "status": "failed"
+    },
+    {
+      "allocations_sha256": "d4ac08850b9284d001569bddae216407c58f599cab04017b6f84fd3f5c1f9ec8",
+      "attempt": "two-a-v3",
+      "error": "GDB capture failed; preserved gdb.log",
+      "inputs_unchanged": true,
+      "original_failure": "Python Exception <class 'RuntimeError'>: SSS did not return to CSS: scene=9 mode=020201010000",
+      "result_sha256": "ea44f1b94a8ff7d3ad810329431a0eabe5e6c25f26a8037d3d63cea01b5cdd15",
+      "rows": 60807,
+      "status": "failed"
+    }
+  ],
+  "builds": {
+    "fighter": {
+      "configuration": "Release",
+      "log_sha256": "4e4251530788adff551e79fca06fb1203076f95a4209fae0fe1245ec1eaaaf22",
+      "result": "passed"
+    },
+    "graphics": {
+      "configuration": "Release",
+      "log_sha256": "d48d8345606dd404bb2f862e6fad444803cf5c43127c19ca2059a01849f5bc3d",
+      "result": "passed"
+    },
+    "runtime": {
+      "configuration": "Release",
+      "log_sha256": "a0d0ab6c8fec40a9a8d9cdaa55f6909c4d73449634853c0c22af448a0343ec38",
+      "result": "passed"
+    }
+  },
+  "component_checks": [
+    {
+      "bases": 3,
+      "events_per_stream": 290,
+      "exact": true,
+      "files": {
+        "native-00000000.jsonl": "7538d7edf815940bd2838fed91c7f59e9bf2f64653efa2fbdb6ed22755a3e0c2",
+        "native-00000001.jsonl": "7538d7edf815940bd2838fed91c7f59e9bf2f64653efa2fbdb6ed22755a3e0c2",
+        "native-00000002.jsonl": "7538d7edf815940bd2838fed91c7f59e9bf2f64653efa2fbdb6ed22755a3e0c2",
+        "operations-0.txt": "0b417f3ac377bc4d8f1edf9b4483f9f19bf4ef8d77f9be254962328e99fda815",
+        "operations-1.txt": "db7bf3e694b4bd47011fbe9aabfa00921d02a4e7b7f419b1897de95fdd5c31de",
+        "operations-2.txt": "59254bac266da5d1366e77ad804585b9253425a3b1d7ecc134831e026846fef3",
+        "operations.txt": "0b417f3ac377bc4d8f1edf9b4483f9f19bf4ef8d77f9be254962328e99fda815",
+        "original-0.jsonl": "7538d7edf815940bd2838fed91c7f59e9bf2f64653efa2fbdb6ed22755a3e0c2",
+        "original-1.jsonl": "7538d7edf815940bd2838fed91c7f59e9bf2f64653efa2fbdb6ed22755a3e0c2",
+        "original-2.jsonl": "7538d7edf815940bd2838fed91c7f59e9bf2f64653efa2fbdb6ed22755a3e0c2",
+        "wasm-00000000.jsonl": "7538d7edf815940bd2838fed91c7f59e9bf2f64653efa2fbdb6ed22755a3e0c2",
+        "wasm-00000001.jsonl": "7538d7edf815940bd2838fed91c7f59e9bf2f64653efa2fbdb6ed22755a3e0c2",
+        "wasm-00000002.jsonl": "7538d7edf815940bd2838fed91c7f59e9bf2f64653efa2fbdb6ed22755a3e0c2"
+      },
+      "model_targets": [
+        "native ASan/UBSan",
+        "checked Wasm ASSERTIONS=2 SAFE_HEAP=1"
+      ],
+      "original_oracle": "untouched pinned source compiled under wasm32",
+      "original_source_sha256": "ae5d116c931db0788f8532014ad0ab7009c5a711ced6028302e4c97573126fc2",
+      "receipt_sha256": "78ef087abe022e85163201013654e8549288686e1468f65f6e62124cf3070eaa",
+      "test": "test_fragmentation_and_descriptor_reuse_in_mem1-0b417f3ac377"
+    },
+    {
+      "bases": 3,
+      "events_per_stream": 14,
+      "exact": true,
+      "files": {
+        "native-00000000.jsonl": "8cf03cbb18d514334ceebc9b58c23e91dbcf77265eea0b6efc198c6e9683f782",
+        "native-00000001.jsonl": "8cf03cbb18d514334ceebc9b58c23e91dbcf77265eea0b6efc198c6e9683f782",
+        "native-00000002.jsonl": "8cf03cbb18d514334ceebc9b58c23e91dbcf77265eea0b6efc198c6e9683f782",
+        "operations-0.txt": "aa59975a5a7af694250add2441ddea916283b686725fd736dbd270cbfdbcad88",
+        "operations-1.txt": "05070b5d02a19171f5bd30ef8127f068692be1e64659fc59bcacd66f9ad8e3d5",
+        "operations-2.txt": "06f7e4eb05b6d01c8048dbdf902694a7b03628b192d6f794df111b19cd67affe",
+        "operations.txt": "aa59975a5a7af694250add2441ddea916283b686725fd736dbd270cbfdbcad88",
+        "original-0.jsonl": "8cf03cbb18d514334ceebc9b58c23e91dbcf77265eea0b6efc198c6e9683f782",
+        "original-1.jsonl": "8cf03cbb18d514334ceebc9b58c23e91dbcf77265eea0b6efc198c6e9683f782",
+        "original-2.jsonl": "8cf03cbb18d514334ceebc9b58c23e91dbcf77265eea0b6efc198c6e9683f782",
+        "wasm-00000000.jsonl": "8cf03cbb18d514334ceebc9b58c23e91dbcf77265eea0b6efc198c6e9683f782",
+        "wasm-00000001.jsonl": "8cf03cbb18d514334ceebc9b58c23e91dbcf77265eea0b6efc198c6e9683f782",
+        "wasm-00000002.jsonl": "8cf03cbb18d514334ceebc9b58c23e91dbcf77265eea0b6efc198c6e9683f782"
+      },
+      "model_targets": [
+        "native ASan/UBSan",
+        "checked Wasm ASSERTIONS=2 SAFE_HEAP=1"
+      ],
+      "original_oracle": "untouched pinned source compiled under wasm32",
+      "original_source_sha256": "ae5d116c931db0788f8532014ad0ab7009c5a711ced6028302e4c97573126fc2",
+      "receipt_sha256": "631eb785227ebf6ed0131a8f97590a88dbb162f9a3be8754dfa4dd31685153fb",
+      "test": "test_portable_allocation_shape_matches_original-aa59975a5a7a"
+    },
+    {
+      "bases": 3,
+      "events_per_stream": 10,
+      "exact": true,
+      "files": {
+        "native-00000000.jsonl": "1446725e71c864d28152d826b4eee007e2e26e36ccc832435e6aade1a4b3b12c",
+        "native-00000001.jsonl": "1446725e71c864d28152d826b4eee007e2e26e36ccc832435e6aade1a4b3b12c",
+        "native-00000002.jsonl": "1446725e71c864d28152d826b4eee007e2e26e36ccc832435e6aade1a4b3b12c",
+        "operations.txt": "95d551425e3f061d6eed39db8fd396cfd22ae3078ea098a403c0bffbb54eadf6",
+        "original-0.jsonl": "1446725e71c864d28152d826b4eee007e2e26e36ccc832435e6aade1a4b3b12c",
+        "original-1.jsonl": "1446725e71c864d28152d826b4eee007e2e26e36ccc832435e6aade1a4b3b12c",
+        "original-2.jsonl": "1446725e71c864d28152d826b4eee007e2e26e36ccc832435e6aade1a4b3b12c",
+        "wasm-00000000.jsonl": "1446725e71c864d28152d826b4eee007e2e26e36ccc832435e6aade1a4b3b12c",
+        "wasm-00000001.jsonl": "1446725e71c864d28152d826b4eee007e2e26e36ccc832435e6aade1a4b3b12c",
+        "wasm-00000002.jsonl": "1446725e71c864d28152d826b4eee007e2e26e36ccc832435e6aade1a4b3b12c"
+      },
+      "model_targets": [
+        "native ASan/UBSan",
+        "checked Wasm ASSERTIONS=2 SAFE_HEAP=1"
+      ],
+      "original_oracle": "untouched pinned source compiled under wasm32",
+      "original_source_sha256": "dc2ad84463413ef6b91a8f8fe8acefb26ed35743d63dd85bf6590cec28d95cc8",
+      "receipt_sha256": "a1b3385a8671958f2413f399abc8d520ae74ed06d466663c52f865876f6c7533",
+      "test": "test_portable_stack_shape_and_lifo_matches_original-95d551425e3f"
+    }
+  ],
+  "configured_boundaries": {
+    "ARAlloc": 1,
+    "ARFree": 1,
+    "ARGetSize": 0,
+    "ARInit": 2,
+    "Fighter_Create": 1,
+    "Fighter_FirstInitialize_80067A84": 0,
+    "HSD_AllocateFifo": 1,
+    "HSD_AllocateXFB": 2,
+    "HSD_CreateMainHeap": 2,
+    "HSD_Free": 1,
+    "HSD_MemAlloc": 1,
+    "HSD_OSInit": 0,
+    "HSD_ObjAlloc": 1,
+    "HSD_ObjAllocAddFree": 2,
+    "HSD_ObjAllocInit": 3,
+    "HSD_ObjFree": 2,
+    "HSD_ObjSetHeap": 2,
+    "HSD_SetHeap": 1,
+    "OSAllocFromArenaHi": 2,
+    "OSAllocFromArenaLo": 2,
+    "OSAllocFromHeap": 2,
+    "OSCreateHeap": 2,
+    "OSDestroyHeap": 1,
+    "OSFreeToHeap": 2,
+    "OSInitAlloc": 3,
+    "OSSetArenaHi": 1,
+    "OSSetArenaLo": 1,
+    "OSSetCurrentHeap": 1,
+    "_HSD_ObjAllocForgetMemory": 2,
+    "gm_Scene_Vs_OnEnter": 1,
+    "gm_Scene_Vs_OnExit": 1,
+    "lbHeap_800158D0": 2,
+    "lbHeap_80015900": 0,
+    "lbHeap_80015BD0": 2,
+    "lbHeap_80015CA8": 2,
+    "lbHeap_80015D6C": 3,
+    "lbHeap_80015F3C": 0,
+    "lbMemFreeToHeap": 2,
+    "lbMemory_80014E24": 2,
+    "lbMemory_80014EEC": 1,
+    "lbMemory_80014FC8": 2,
+    "lbMemory_8001529C": 3,
+    "lbMemory_800154D4": 2,
+    "lbMemory_800155A4": 0,
+    "lbMemory_8001564C": 0
+  },
+  "cpu_register_carry_integration": "not sufficient; original game heap lifecycle context and full scenario captures remain required; gameplay path unchanged",
+  "evidence_scope": [
+    "Source identified: independent disc/apploader/DOL boot roots",
+    "Retail compared: paired boot allocation identities only",
+    "Compiled: native and checked-Wasm allocator components"
+  ],
+  "final_focused_checks": {
+    "log_sha256": "216097a30797837a9148292956d790a950259eb09d1365f883cbb304a0a3de59",
+    "result": "passed",
+    "tests": 29
+  },
+  "frozen_inputs": {
+    "all_unchanged": true,
+    "checked_files": 2666,
+    "gold_corpus_files": 15,
+    "manifest_sha256": "1e0452ac292786ca5d4d0542fced7111b66c65aff53fcfd9c441d11907f0498f",
+    "original_source_files": 2651
+  },
+  "full_repository_suite": {
+    "log_sha256": "08f5d43f853ec86cb0651b8e9289dffd9e0cfd0581b826d51960f0aa80ddc4d7",
+    "result": "passed",
+    "seconds": 205.927,
+    "skipped": 44,
+    "tests": 709
+  },
+  "independent_boot_comparison": {
+    "calls_per_run": 276,
+    "compared": "Complete raw JSONL streams, byte-for-byte, including machine context and source counters.",
+    "function_entry_counts": {
+      "ARAlloc": 4,
+      "ARFree": 1,
+      "ARGetSize": 2,
+      "ARInit": 1,
+      "HSD_AllocateFifo": 1,
+      "HSD_AllocateXFB": 1,
+      "HSD_CreateMainHeap": 1,
+      "HSD_MemAlloc": 66,
+      "HSD_OSInit": 1,
+      "HSD_ObjAlloc": 16,
+      "HSD_ObjAllocAddFree": 16,
+      "HSD_ObjAllocInit": 33,
+      "HSD_ObjSetHeap": 2,
+      "HSD_SetHeap": 16,
+      "OSAllocFromArenaLo": 1,
+      "OSAllocFromHeap": 73,
+      "OSCreateHeap": 3,
+      "OSDestroyHeap": 1,
+      "OSInitAlloc": 1,
+      "OSSetArenaHi": 1,
+      "OSSetArenaLo": 6,
+      "OSSetCurrentHeap": 2,
+      "_HSD_ObjAllocForgetMemory": 1,
+      "lbHeap_800158D0": 5,
+      "lbHeap_80015900": 1,
+      "lbHeap_80015BD0": 10,
+      "lbHeap_80015D6C": 1,
+      "lbHeap_80015F3C": 1,
+      "lbMemory_80014E24": 2,
+      "lbMemory_80014FC8": 2,
+      "lbMemory_8001529C": 1,
+      "lbMemory_800154D4": 1,
+      "lbMemory_800155A4": 1,
+      "lbMemory_8001564C": 1
+    },
+    "match": true,
+    "raw_streams_identical": true,
+    "rows_per_run": 554,
+    "runs": [
+      {
+        "collector_sha256": "60768b9b37e389c46b98b2244dbe23c14e2809672a1d18aae536dc3eb0579936",
+        "dolphin_pid": 65619,
+        "files": {
+          "allocations.jsonl": "0fd891e01ad45e600e6b4f23485b92c848374bfbe4377f72847abf1c02108883",
+          "gdb.log": "f4f01f55921cd763a1877e0f0bcf91a60f73855defaa9d7b29f693c89f27e22e",
+          "processes.json": "ef4bf985e24f647b6682435edbcce3c7e277d4f3c4503c42687ecc61d56f5496",
+          "result.json": "c21363b43924c4ea1e21b3fb7f36691029cb4053e7af91965391772315f94574"
+        },
+        "frozen_input_count": 45,
+        "gdb_pid": 65621,
+        "identity": {
+          "background_input": true,
+          "cheats": false,
+          "cpu": "Interpreter64",
+          "cpu_thread": false,
+          "disc_dol_sha1": "08e0bf20134dfcb260699671004527b2d6bb1a45",
+          "disc_image_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+          "dol_sha1": "08e0bf20134dfcb260699671004527b2d6bb1a45",
+          "dolphin_binary_sha256": "dc3e63c85a2c7f96d3c055a48ecf78d31216eac4642ba1c4733c873dda803264",
+          "dolphin_ini_canonical_sha256": "fcd97ef46f18eb2eb8fa6d0e1fcc3348b6356c19d2d507215c25db62d1b24034",
+          "dolphin_version": "2606a",
+          "external_save_hashes": {
+            "SRAM.raw": "c3b57ae53de14bc1d5de157d4435e16bc59a195e08fba93d8d7fa2c97c1048d9",
+            "USA/Card A/01-GALE-SuperSmashBros0110290334.gci": "83aaacc5f5a1e1264af98ecfe965a7a15a6d6fb47567055bf837686ab827c19a"
+          },
+          "fixed_rtc": 1704067200,
+          "gcpad_ini_sha256": "6db027b512a2679e16cd3a8b59023edf3bf57a6bb7cf6194c3dc5f6b2fc9ea7f",
+          "source_revision": "b43912cc78606f96c9569f5d6229bc9d7e265ea5"
+        },
+        "independent_context_sha256": "030c0566d9ea4af645d6e1344a3437c5bd609f11be17098728b5c4c11b62ce0f",
+        "inputs_unchanged": true,
+        "profile_sha256": "d4a31b97ac6a51edba890dd59946a8915ffc674496c372036702bc26787519ef",
+        "run_id": "80108ed8781f485dbe6ea01bbc08ddb1",
+        "started_at": "2026-09-13T17:38:00.269767+00:00",
+        "status": "captured_diagnostic"
+      },
+      {
+        "collector_sha256": "60768b9b37e389c46b98b2244dbe23c14e2809672a1d18aae536dc3eb0579936",
+        "dolphin_pid": 65620,
+        "files": {
+          "allocations.jsonl": "0fd891e01ad45e600e6b4f23485b92c848374bfbe4377f72847abf1c02108883",
+          "gdb.log": "f4f01f55921cd763a1877e0f0bcf91a60f73855defaa9d7b29f693c89f27e22e",
+          "processes.json": "15a5594d670e1478e24787d88d85a4dfe46a02c3561212a5050335af18012f50",
+          "result.json": "d4cf478ced9157e4f4b3de7e5b42d62637676d21531a62f9acb86728cec7c521"
+        },
+        "frozen_input_count": 45,
+        "gdb_pid": 65622,
+        "identity": {
+          "background_input": true,
+          "cheats": false,
+          "cpu": "Interpreter64",
+          "cpu_thread": false,
+          "disc_dol_sha1": "08e0bf20134dfcb260699671004527b2d6bb1a45",
+          "disc_image_sha256": "b7de482eb955c8a96b6746dfa043b69ae7bf6c7c2a09ac382b9da126faa7055c",
+          "dol_sha1": "08e0bf20134dfcb260699671004527b2d6bb1a45",
+          "dolphin_binary_sha256": "dc3e63c85a2c7f96d3c055a48ecf78d31216eac4642ba1c4733c873dda803264",
+          "dolphin_ini_canonical_sha256": "fcd97ef46f18eb2eb8fa6d0e1fcc3348b6356c19d2d507215c25db62d1b24034",
+          "dolphin_version": "2606a",
+          "external_save_hashes": {
+            "SRAM.raw": "c3b57ae53de14bc1d5de157d4435e16bc59a195e08fba93d8d7fa2c97c1048d9",
+            "USA/Card A/01-GALE-SuperSmashBros0110290334.gci": "83aaacc5f5a1e1264af98ecfe965a7a15a6d6fb47567055bf837686ab827c19a"
+          },
+          "fixed_rtc": 1704067200,
+          "gcpad_ini_sha256": "6db027b512a2679e16cd3a8b59023edf3bf57a6bb7cf6194c3dc5f6b2fc9ea7f",
+          "source_revision": "b43912cc78606f96c9569f5d6229bc9d7e265ea5"
+        },
+        "independent_context_sha256": "030c0566d9ea4af645d6e1344a3437c5bd609f11be17098728b5c4c11b62ce0f",
+        "inputs_unchanged": true,
+        "profile_sha256": "d4a31b97ac6a51edba890dd59946a8915ffc674496c372036702bc26787519ef",
+        "run_id": "7065975de7c448fbb6e097db88e8ee9e",
+        "started_at": "2026-09-13T17:38:00.269816+00:00",
+        "status": "captured_diagnostic"
+      }
+    ]
+  },
+  "independent_boot_definition": {
+    "boot": {
+      "aram_size": 16777216,
+      "arena_hi": 2172619456,
+      "arena_lo": 0,
+      "bi2": 2172611264,
+      "memory_size": 25165824
+    },
+    "conditions": [
+      "pinned Dolphin default GameCube memory",
+      "no original debugger monitor",
+      "original DOL entry, no savestate",
+      "default NTSC render mode"
+    ],
+    "derivation": "owned_disc_apploader_and_dol_no_capture_inputs",
+    "identities": {
+      "apploader_sha256": "05e584735bb81f45e8506ee76fc1a78b143dc2f6dd3f2fc82b015010dc6448dd",
+      "bi2_sha256": "7294bc146d7ad38f7fd8b02038e563dc9380ff272b66e9bd215631def4fd6cec",
+      "disc_boot_header_sha256": "534aa103305522a5b4ac70acac2c38e8c672e8ca9a9c473311e8c46a7fcc0520",
+      "dol_sha256": "dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646",
+      "dolphin_boot_source_sha256": "ed6e86f6bb58b443a0e22e03dddaed22966bf5d7fb09a2d5de4130648e5479b5",
+      "dolphin_revision": "c77bbaa0f372c3f72281602a8b087206706542cb",
+      "source_revision": "b43912cc78606f96c9569f5d6229bc9d7e265ea5",
+      "source_sha256": {
+        "extern/dolphin/src/dolphin/ar/ar.c": "dc2ad84463413ef6b91a8f8fe8acefb26ed35743d63dd85bf6590cec28d95cc8",
+        "extern/dolphin/src/dolphin/os/OS.c": "bd7e8934d81b31bb48c92c1ef7bbf104ce8a203142915895491ad607c2d95203",
+        "extern/dolphin/src/dolphin/os/OSAlloc.c": "5868c5806827534297e0b8f3dca1eff89d70b8caa1ed6f8b18914023aaba1df8",
+        "src/melee/db/dberror.c": "72d6faae47d1eddb1a1dbb1f18b3d2131269f389095e8fbf7b900a3ff07cb14d",
+        "src/melee/gm/gmmain.c": "88803337a230b1b9cff6c211c501e6fc05b18a58ef6d4de0756dab4454209a69",
+        "src/melee/lb/lbheap.c": "01c80d426e5b53659b5b430493b51d8d46a21f88840ac9a17dba769a6a14b96e",
+        "src/melee/lb/lbmemory.c": "ae5d116c931db0788f8532014ad0ab7009c5a711ced6028302e4c97573126fc2",
+        "src/sysdolphin/baselib/initialize.c": "396cf5e84a310cf8e6f0f29db4f3419b63c0ea2c57aacbb7b2a01fe413d6d28d"
+      },
+      "symbols_sha256": "214477d5b27989a9675c4b881f4db2dad5eeaada39dbac17c57c70d5ba84d579"
+    },
+    "root": {
+      "aram_base": 16384,
+      "aram_size": 16777216,
+      "arena_hi": 2172619456,
+      "arena_lo": 2154155008,
+      "audio_heap_size": 524288,
+      "heap_max_num": 4
+    },
+    "schema": "melee-web-original-boot-context",
+    "stages": {
+      "after_crash": 2152664064,
+      "after_xfb": 2153892864,
+      "crash_allocation_alignment": 4,
+      "crash_allocation_base": 2152655872,
+      "crash_allocation_size": 8192,
+      "fifo_size": 262144,
+      "framebuffer_begin": 2152664064,
+      "framebuffer_count": 2,
+      "framebuffer_size": 614400,
+      "linker_arena_lo": 2152664064,
+      "os_arena_lo": 2152655872,
+      "os_init_alloc_lo": 2154155008,
+      "stack_top": 2152655872
+    },
+    "static_layout": {
+      "aram_stack_table": {
+        "address": 2151889956,
+        "kind": "object",
+        "section": ".bss",
+        "size": 64
+      },
+      "lbheap_descriptors": [
+        [
+          2,
+          1,
+          6,
+          2048
+        ],
+        [
+          3,
+          1,
+          2,
+          5212160
+        ],
+        [
+          4,
+          2,
+          6,
+          6599680
+        ],
+        [
+          5,
+          4,
+          6,
+          9881600
+        ],
+        [
+          6,
+          0,
+          0,
+          0
+        ]
+      ],
+      "lbmemory_allocator": 2151880880,
+      "pool_descriptors": {
+        "@3402": 2151559268,
+        "HSD_Mtx_804C2310": 2152473360,
+        "HSD_Mtx_804C233C": 2152473404,
+        "HSD_PSAppSrt_804D10B0": 2152534192,
+        "HSD_SObjLib_804D10E0": 2152534240,
+        "InterruptPrioTable": 2151686936,
+        "Player_AllocData": 2152040416,
+        "aobj_alloc_data": 2152466560,
+        "chan_alloc_data": 2152466512,
+        "dlist_alloc_data": 2152474028,
+        "efAsync_AllocData": 2152042400,
+        "efLib_AllocData": 2152042160,
+        "fighter_alloc_data": 2152042448,
+        "fighter_dat_attrs_alloc_data": 2152042492,
+        "fighter_dobj_list_alloc_data": 2152042580,
+        "fighter_parts_alloc_data": 2152042536,
+        "fighter_x2040_alloc_data": 2152042624,
+        "fighter_x59C_alloc_data": 2152042668,
+        "fobj_alloc_data": 2152466648,
+        "gobj_alloc_data": 2152522636,
+        "gobjproc_alloc_data": 2152522680,
+        "grCs_803B7EFC": 2151382780,
+        "hsd_iddata": 2152473536,
+        "it_803F6E3C": 2151640636,
+        "it_803F6E68": 2151640680,
+        "item_alloc_data": 2152336352,
+        "item_dynamic_bones_alloc_data": 2152336396,
+        "item_link_alloc_data": 2152336440,
+        "lbSnap_803BACC8": 2151394504,
+        "lbl_804336A0": 2151888544,
+        "lbl_80433710": 2151888656,
+        "memReport": 2152466772,
+        "render_alloc_data": 2152466424,
+        "robj_alloc_data": 2152473448,
+        "rvalue_alloc_data": 2152473492,
+        "shadow_alloc_data": 2152474072,
+        "slist_alloc_data": 2152473984,
+        "tevreg_alloc_data": 2152466468,
+        "un_804A2688": 2152343176,
+        "zlist_alloc_data": 2152466712
+      }
+    },
+    "version": 1
+  },
+  "pr13": {
+    "exact_head_verify_runs": [
+      34766457600,
+      34766460171
+    ],
+    "merge_commit": "2dfeaf73d76f8342f4bb93682ed78600e999f575",
+    "merge_method": "normal merge commit",
+    "merge_tree_equals_reviewed_tree": true,
+    "postmerge_verify_conclusion": "success",
+    "postmerge_verify_run": 34768907509,
+    "previous_main": "e24e296fdcdb3f67a0d371e94732870acefcef96",
+    "published_branch_preserved": true,
+    "reviewed_head": "edccdd37a206f73ff1cbbf66577554aa706c8218"
+  },
+  "replay": [
+    {
+      "calls_replayed": 33,
+      "calls_seen": 276,
+      "checked_wasm_matches_native": true,
+      "complete": false,
+      "context_provenance": "independent_boot",
+      "first_unsupported": {
+        "call": 55,
+        "function": "lbHeap_80015900",
+        "reason": "game-heap transient/persistent partition and replacement lifetime orchestration is not implemented",
+        "sequence": 111
+      },
+      "model_actions": 33,
+      "pointer_aliases": 13,
+      "replay_hashes": {
+        "actions_sha256": "30a28b1abbf3a37dbcd561f8bb8c279e6a0422a7ed2876ef8442523a123f665e",
+        "outputs_sha256": "12cc4faaa571cb2637721ca4324a8b5f00ebbfeb1fadab640de39d789c59b537"
+      },
+      "report_sha256": "f70502c95728ebb03ad9bae47202a549320921689d9e137147a06edd4eba2c96",
+      "scope": "boot_prefix",
+      "status": "validated_prefix"
+    },
+    {
+      "calls_replayed": 33,
+      "calls_seen": 276,
+      "checked_wasm_matches_native": true,
+      "complete": false,
+      "context_provenance": "independent_boot",
+      "first_unsupported": {
+        "call": 55,
+        "function": "lbHeap_80015900",
+        "reason": "game-heap transient/persistent partition and replacement lifetime orchestration is not implemented",
+        "sequence": 111
+      },
+      "model_actions": 33,
+      "pointer_aliases": 13,
+      "replay_hashes": {
+        "actions_sha256": "30a28b1abbf3a37dbcd561f8bb8c279e6a0422a7ed2876ef8442523a123f665e",
+        "outputs_sha256": "12cc4faaa571cb2637721ca4324a8b5f00ebbfeb1fadab640de39d789c59b537"
+      },
+      "report_sha256": "f70502c95728ebb03ad9bae47202a549320921689d9e137147a06edd4eba2c96",
+      "scope": "boot_prefix",
+      "status": "validated_prefix"
+    }
+  ],
+  "save_prerequisite": {
+    "character_unlock_mask": "0000",
+    "gci_sha256": "83aaacc5f5a1e1264af98ecfe965a7a15a6d6fb47567055bf837686ab827c19a",
+    "observed_failure": "Original cold-boot CSS rejects requested Marth. Prior SSS checkpoints contain availability absent from this persistent save.",
+    "required_input": "Owned persistent save with Marth, Falco, Final Destination and Dream Land available",
+    "stage_unlock_mask": "0000"
+  },
+  "scenario_status": [
+    {
+      "case": "2p-mario-fox1-fd",
+      "completed_new_captures": 0,
+      "fighter_addresses_derived": 0,
+      "fighter_addresses_observed": 0,
+      "status": "requires_owned_unlocked_persistent_save",
+      "ticks": 1199
+    },
+    {
+      "case": "3p-marth-falco5-mario9-yoshis",
+      "completed_new_captures": 0,
+      "fighter_addresses_derived": 0,
+      "fighter_addresses_observed": 0,
+      "status": "requires_owned_unlocked_persistent_save",
+      "ticks": 4346
+    },
+    {
+      "case": "4p-fox-mario3-marth6-falco8-dreamland",
+      "completed_new_captures": 0,
+      "fighter_addresses_derived": 0,
+      "fighter_addresses_observed": 0,
+      "status": "requires_owned_unlocked_persistent_save",
+      "ticks": 3838
+    }
+  ],
+  "schema": "melee-web-original-allocation-experiment",
+  "version": 1
+}

@@ -1,6 +1,7 @@
 #include "gameplay_prize_context.h"
 #include "gameplay_bootstrap.h"
 #include "gameplay_menu_host.h"
+#include "hsd_native_joint.h"
 #include <melee/gm/gm_1A36.h>
 #include <melee/gm/types.h>
 #include <melee/if/if_2FD9.h>
@@ -12,7 +13,6 @@
 #include <melee/ty/toy.h>
 #include <melee/ty/tydisplay.h>
 #include <sysdolphin/baselib/controller.h>
-#include <sysdolphin/baselib/displayfunc.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/gobjplink.h>
 #include <sysdolphin/baselib/initialize.h>
@@ -74,6 +74,7 @@ MeleeWebPrizeContext* melee_web_prize_context_begin(MeleeWebMenuHost* host,
         !melee_web_audio_is_active(audio) || !melee_web_audio_generation(audio) ||
         melee_web_gameplay_stats().objects)
         return fail(e, n, "Prize requires an empty prepared world and active audio"), NULL;
+    if(!melee_web_native_world_enable(e,n))return NULL;
     MeleeWebPrizeContext* c = calloc(1, sizeof(*c));
     if (!c) return fail(e, n, "Cannot allocate original Prize context"), NULL;
     if (!melee_web_prize_source_begin()) {
@@ -105,7 +106,6 @@ MeleeWebPrizeContext* melee_web_prize_context_begin(MeleeWebMenuHost* host,
     /* Typed history includes the original clamping, edge and repeat policy. */
     melee_web_pad_state_apply(input);
     lbAudioAx_8002835C();
-    HSD_ZListInitAllocData();
     /* gm_1A3F preloadState uses 0x4800 for GS_PRIZE_INTERFACE. */
     HSD_SisLib_803A6048(0x4800);
     lb_8001C5A4(); lb_8001D1F4();

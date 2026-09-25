@@ -118,25 +118,63 @@ these test files.
 This is a general model of the supported allocation operations, not a complete
 model of the game's memory system. In particular:
 
-- `OSInitAlloc` descriptor placement, multiple heaps/current-heap selection,
-  `OSAllocFixed`, `OSAddToHeap`, and original boot/scene heap orchestration are not
-  replayed by the model. The test oracle declares its own initial heap bounds.
+- The heap component receives explicit bounds. The separate
+  [allocation-history experiment](ORIGINAL_ALLOCATION_HISTORY.md) derives original
+  `OSInitAlloc` placement and replays observed heap selection and replacement.
+  `OSAllocFixed` and `OSAddToHeap` remain unsupported and unobserved in its current
+  traces. Synthetic component oracles declare their own initial heap bounds.
 - `Heap::restore` checks structure, not provenance. Gaps may represent prior
   fixed reservations, but every gap and cell must come from an independently
   attested complete source context. Valid structure alone does not admit a
   fabricated snapshot. No accepted retail heap snapshot provider exists yet.
 - A heap snapshot does not serialize HSD pool ownership or free chains. Resuming
-  an existing pool and same-generation `HSD_ObjAllocInit` resets are unsupported.
-  Restored allocated cells must not be treated as resumable pool state.
+  an existing pool from a snapshot remains unsupported. Explicit `ObjectPool::reset`
+  now models in-place `HSD_ObjAllocInit`; adopting a backing cell requires its
+  separately replayed OS allocation, rather than a restored-address assumption.
 - Dedicated HSD bump heaps and number/heap limit flags return
   `unsupported_configuration`; the OS path cannot stand in for them. The model
-  does not expose the global `obj_heap.remain` bookkeeping used by other modes.
+  leaves the ordinary global `obj_heap.remain` bookkeeping to the diagnostic
+  lifetime adapter; that bookkeeping does not enable those unsupported modes.
 - Payload memory, source-to-host bindings, original SDA/global and stack
   identities, and call-site reaching definitions/clobbers are not implemented.
   `RegisterWord` is a representation, not an analysis of those call sites.
 - The original HSD memory-allocation failure assertion is not replaced. The
   synthetic valid pool histories avoid that failure; model exhaustion is an
   explicit result to be handled by a future integration boundary.
+
+## Native component initialization boundary
+
+The native world initializes the public HSD component pools once per world
+in the order authored by `HSD_ObjInit`: List, AObj, FObj, ID, Vec, Mtx,
+RObj, Render, Shadow and ZList, following `HSD_IDSetup`. Scene owners reuse
+that initialization instead of resetting Shadow or ZList at individual scene
+entries. Ownership guards and world teardown remain required; initialization
+must not erase a live owner.
+
+This is the component-pool portion of startup only. `HSD_InitComponent` also
+requires original OS arena/heap, framebuffer/FIFO and platform services that
+the current browser bootstrap does not supply. The pool change does not derive
+original fighter addresses or implement CPU register carry. Its scoped checks
+and retained failures are in the
+[native initialization receipt](evidence/native-pool-initialization-v1.json).
+
+## Standalone original HSD startup boundary
+
+The checked-Wasm allocation fixture starts a fresh source-owned MEM1 context
+from independently decoded owned-disc boot geometry. It reserves the decoded
+crash-handler span, then executes original XFB/FIFO allocation and the HSD
+OS/ID/object initializers. Its partial HSD entry is compiled only into this fixture;
+ordinary gameplay cannot invoke it. Aurora supplies the OS and GX services,
+with a fixture-scoped aligned, zeroed MEM1 allocator used before `OSInit`.
+
+The comparison covers declared arena boundaries, HSD heap identities and
+component-pool metadata. It does not execute full retail platform startup,
+audio, ARAM initialization, game heaps or scene ownership. In particular,
+the original audio startup retains allocations before `lbMemory` and
+`lbHeap`; direct ARAM initialization would skip those effects. See the
+[scoped startup receipt](evidence/original-startup-allocation-v1.json) for
+source/build identity, original comparison, negative controls and retained
+failures. The browser still needs its own integrated source-context provider.
 
 ## Remaining dependency before CPU integration
 
@@ -183,3 +221,35 @@ outputs, source-address overrides or match-specific stick rules. The prerequisit
 adds no dependency on page layout, frame scheduling or public deployment. It
 should be reviewed as groundwork; resolving tick 2,495 still requires the
 source-context and call-site work above.
+
+## Deferred source ARQ prerequisite
+
+The [original ARQ completion boundary](SOURCE_ARQ_COMPLETION.md) now exercises
+the pinned SDK queue against checked owned memory spans and deferred transfer
+completion. Its scoped source tests cover priority, cancellation, callback
+reentry and interrupt masking. The [standalone DevCom boundary](SOURCE_DEVCOM_STARTUP.md)
+connects the first direct type-3 request to the validated startup heap. Full
+audio startup and the live browser source context remain open.
+
+The [original ARInit profile](SOURCE_AR_INIT_PROFILE.md) separately executes
+the source hardware-size probes and allocator initialization from declared
+owned boot inputs. It has not yet joined the DevCom or live browser providers.
+
+The [DSP startup protocol fixture](SOURCE_DSP_INIT_PROFILE.md) validates original
+SDK task and interrupt handling behind checked synthetic services. It does not
+execute AXOut, DSP firmware or the remaining application allocation history.
+
+The [original AIInit fixture](SOURCE_AI_INIT_PROFILE.md) separately checks the
+source Audio Interface startup boundary. Its owned synthetic DMA programming
+does not establish live audio buffers, AX/DSP initialization or full-session
+equivalence.
+
+## Typed CPU carry prerequisite
+
+The [CPU r5 sidecar](CPU_R5_CARRY.md) separates known seed-global words, explicit
+zero and unavailable values. Its owner token checks world, source allocation
+and sidecar lifetime generations. The [scoped receipt](evidence/cpu-r5-carry-v1.json)
+records an owned seed derivation and an explicitly synthetic fighter identity.
+This does not supply a live Fighter binding or execute the source CPU dispatch
+path. Runtime publish/consume hooks and all unsupported reaching definitions
+remain open.

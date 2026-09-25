@@ -1,0 +1,13 @@
+diff --git a/Source/Core/Core/CMakeLists.txt b/Source/Core/Core/CMakeLists.txt
+--- a/Source/Core/Core/CMakeLists.txt
++++ b/Source/Core/Core/CMakeLists.txt
+@@ -665,6 +665,9 @@ elseif(_M_ARM_64)
+     PowerPC/JitArm64/Jit_Util.cpp
+     PowerPC/JitArm64/Jit_Util.h
+     PowerPC/JitArm64/JitArm64_Tables.cpp
++    PowerPC/ReferenceAllocationObserver.cpp
++    PowerPC/ReferenceAllocationObserver.h
++    PowerPC/ReferenceAllocationProfile.h
+     PowerPC/ReferenceCaptureObserver.cpp
+     PowerPC/ReferenceCaptureObserver.h
+     PowerPC/ReferenceInputStream.cpp

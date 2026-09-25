@@ -1,0 +1,207 @@
+{
+  "schema": "melee-web-source-ai-init-profile",
+  "version": 1,
+  "date": "2026-09-24",
+  "base_commit": "a38b422bff256a94420adebc914b970ca26e7f53",
+  "evidence_labels": [
+    "Compiled",
+    "Source identified",
+    "Native traced",
+    "Retail compared"
+  ],
+  "scope": "Standalone AIInit(NULL) under a declared AudioInterfaceManager reset profile; not integrated browser audio",
+  "source_files": [
+    {
+      "path": "tests/source_ai_init_profile.cpp",
+      "bytes": 22427,
+      "sha256": "4bf562102712b44aa3da5aed64b37286123b279cbd34a7ee5bbe8ff493de463f"
+    },
+    {
+      "path": "tests/test_source_ai_init_profile.py",
+      "bytes": 19041,
+      "sha256": "f425aefc273714c813c9ff7c1238d9c3c0e98ee42cac695314dc0b046dd7ee64"
+    },
+    {
+      "path": "patches/source-ai-callback-stack.patch",
+      "bytes": 1559,
+      "sha256": "715201a54db1bc32a9951ca86b8f2eba70d80f9d093a8832ca61fa98a8f577f1"
+    }
+  ],
+  "original_sources": [
+    {
+      "path": ".deps/melee/extern/dolphin/src/dolphin/ai/ai.c",
+      "bytes": 10409,
+      "sha256": "cb8508338aa0c4b10b9134f2f51936618929fe8f63515e137a5ff2f2d4fcc0d9"
+    },
+    {
+      "path": ".deps/melee/extern/dolphin/src/dolphin/os/OSInterrupt.c",
+      "bytes": 15229,
+      "sha256": "69ba045af10aaede13f77fa1040af7fa6e79658e2d317bcee1afc5992d3fca7e"
+    }
+  ],
+  "startup_snapshot": {
+    "kind": "ai_init_return",
+    "ai_init_flag": true,
+    "ai_control": 70,
+    "ai_volume": 0,
+    "ai_sample_count": 0,
+    "ai_trigger": 0,
+    "bound_32khz": 1276,
+    "bound_48khz": 1701,
+    "min_wait": 1701,
+    "max_wait": 2551,
+    "buffer": 121,
+    "stream_callback_null": true,
+    "dma_callback_null": true,
+    "callback_stack_null": true,
+    "unmask_requested": 75497472,
+    "unmask_previous": 4227858431,
+    "dsp_control": 16,
+    "handler_5_is_AIDHandler": true,
+    "handler_8_is_AISHandler": true,
+    "sample_reads": 0,
+    "sample_advances": 0,
+    "time_reads": 0,
+    "interrupt_restore_calls": 2,
+    "interrupts_enabled": true
+  },
+  "artifacts": [
+    {
+      "path": "work/source-ai-init-profile/work/ai-init-profile-5gei19wg/ai-init-profile.js",
+      "bytes": 62773,
+      "sha256": "224586eaaffe8172bc0e9c444415c48d45aa830c3da7347bd0a626db1d127b58"
+    },
+    {
+      "path": "work/source-ai-init-profile/work/ai-init-profile-5gei19wg/ai-init-profile.wasm",
+      "bytes": 39709,
+      "sha256": "6988cf4dcaf9c437042ea3aa1ffbe5c77c4b3cbb17a2fa8a576a352bf3493684"
+    },
+    {
+      "path": "work/source-ai-init-profile/work/ai-init-profile-5gei19wg/ai_source_generated.c",
+      "bytes": 10033,
+      "sha256": "671cf55b2cb2971d2df05aa5cac56921079e7fa330587adb736b87ad6cda246a"
+    },
+    {
+      "path": "work/source-ai-init-profile/work/ai-init-profile-5gei19wg/os_interrupt_source_generated.c",
+      "bytes": 4940,
+      "sha256": "df3e6cb5900968eb7f61f66cddce5033619638728b7930c86971840b0c32bd38"
+    },
+    {
+      "path": "work/source-ai-init-profile/work/ai-init-profile-5gei19wg/compile.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-ai-init-profile/work/ai-init-profile-5gei19wg/compile.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work/source-ai-init-profile/work/ai-init-profile-5gei19wg/run.stdout",
+      "bytes": 1178,
+      "sha256": "c08e22c91e522901ef84fddb5d30426d240639c0154b6c8492afb02ccfbab5bf"
+    },
+    {
+      "path": "work/source-ai-init-profile/work/ai-init-profile-5gei19wg/run.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "validation": {
+    "repository_content": {
+      "path": "work/ai-init-content-corrected-v1.log",
+      "bytes": 70,
+      "sha256": "1aef1d0e4d0e9d50cb8c12335ca439d83f83328625c441429b0866d2ca2ea8d2"
+    },
+    "documentation": "All added local links resolve; staged diff whitespace check passed.",
+    "full_suite": {
+      "tests": 1377,
+      "passed": 1284,
+      "skipped": 93,
+      "seconds": 272.83,
+      "exit_code": 0,
+      "new_component_tests_executed": 4,
+      "log": {
+        "path": "work/ai-init-full-suite-corrected-v1.log",
+        "bytes": 246028,
+        "sha256": "8418d483adb65ec9e3afca65373b55d1be3fe3530073d762bc0f16b9ebf6076a"
+      },
+      "scope": "All final executable files frozen before discovery. Linked DevCom fixture unavailable locally; required CI linked gate remains active."
+    }
+  },
+  "limits": [
+    "No AI callback, DSP firmware, AX startup, DMA consumption, PCM or hardware timing validation.",
+    "Synthetic calibration does not establish original calibration timing.",
+    "No live source-address bindings, application startup or full-session equivalence.",
+    "No deployment."
+  ],
+  "hardware_profile_sources": [
+    {
+      "path": "HW/AudioInterface.cpp",
+      "revision": "c77bbaa0f372c3f72281602a8b087206706542cb",
+      "bytes": 11780,
+      "sha256": "614793f4868d4a3be07ee58ebbb9ba4fbbd9da4da4da68973df8131d9bdb0606"
+    }
+  ],
+  "retained_first_comparison": {
+    "result": "control-register mismatch: original 0x46, incomplete fixture 0x42; other 12 compared fields match",
+    "cause": "Missing original OSUnmaskInterrupts -> SetInterruptMask hardware writes",
+    "report": {
+      "path": "work/ai-init-comparison-v1.json",
+      "bytes": 1843,
+      "sha256": "1e6250b40ddb9a85d1ce8dc341de9b1cca301651694d31d071e2a66e7b784bbf"
+    },
+    "pre_correction_full_suite": {
+      "tests": 1377,
+      "passed": 1284,
+      "skipped": 93,
+      "seconds": 325.975,
+      "exit_code": 0,
+      "new_component_tests_executed": 4,
+      "log": {
+        "path": "work/ai-init-full-suite-final-v1.log",
+        "bytes": 246025,
+        "sha256": "7a4f645ea02fd191f43939a21058560c66c6e9acad92324e58d733f29d8007dc"
+      }
+    }
+  },
+  "original_capture": {
+    "packet": {
+      "path": "work/source-ar-init-profile/work/ai-init-capture-v1/out/ai-init.jsonl",
+      "bytes": 2453,
+      "sha256": "208580fe1a50c1de37ed49f26891ed860ce42f3972aed19663b240ed05a54b8f"
+    },
+    "receipt": {
+      "path": "work/source-ar-init-profile/work/ai-init-capture-v1/receipt.json",
+      "bytes": 3057,
+      "sha256": "9ae9e02be24cfb6d0298ff0f7476f9397d771be6237bf238e5b49ae2f3f00815"
+    },
+    "scope": "AIInit verified entry/return only; primary MWRO interrupted after independent AI completion"
+  },
+  "comparison": {
+    "field_groups": 16,
+    "scope": "Four AI registers, nine private source fields, two installed handler identities, cleared-mask-bit relation",
+    "all_match": true,
+    "shifted_private_bound_rejected": true,
+    "runtime_capture_inputs": false,
+    "report": {
+      "path": "work/ai-init-comparison-final-v1.json",
+      "bytes": 2251,
+      "sha256": "f492d7154ecdffa8da15a4180a6e1e365f7af2b8690b80f4deb87fdcc1f9b574"
+    },
+    "comparator": {
+      "path": "work/compare-ai-init-v1.py",
+      "bytes": 3153,
+      "sha256": "1c5a006ca09d95cc26a69fa30776629d1c4ef82ea0f149617b6b1f6a7cd11464"
+    }
+  },
+  "adaptation": "Original AI body with checked callback-stack failure patch; exact SetInterruptMask and __OSUnmaskInterrupts source slices unchanged, routed through checked register/physical-mask proxies. No PPC interpreter.",
+  "profile": {
+    "ai_reset_control": 66,
+    "global_disabled_mask": 4294967295,
+    "local_disabled_mask": 0,
+    "dsp_control_reset": 0,
+    "absolute_masks_retail_compared": false,
+    "dsp_registers_retail_compared": false
+  }
+}

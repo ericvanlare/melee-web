@@ -3988,14 +3988,14 @@ diff --git a/src/sysdolphin/baselib/synth.c b/src/sysdolphin/baselib/synth.c
                                             float mix_main, float mix_auxA,
                                             float mix_auxB);
  
-+#if defined(MELEE_WEB_GAMEPLAY)
++#if defined(MELEE_WEB_GAMEPLAY) && !defined(MELEE_WEB_ORIGINAL_STARTUP_FIXTURE)
 +extern void* melee_web_audio_heap_alloc(size_t size);
 +extern void melee_web_audio_heap_free(void* ptr);
 +#endif
 +
  void* HSD_AudioMalloc(size_t size)
  {
-+#if defined(MELEE_WEB_GAMEPLAY)
++#if defined(MELEE_WEB_GAMEPLAY) && !defined(MELEE_WEB_ORIGINAL_STARTUP_FIXTURE)
 +    return melee_web_audio_heap_alloc(size);
 +#else
      void* p = OSAllocFromHeap(HSD_Synth_804D6018, size);
@@ -4006,7 +4006,7 @@ diff --git a/src/sysdolphin/baselib/synth.c b/src/sysdolphin/baselib/synth.c
  
  void HSD_AudioFree(void* ptr)
  {
-+#if defined(MELEE_WEB_GAMEPLAY)
++#if defined(MELEE_WEB_GAMEPLAY) && !defined(MELEE_WEB_ORIGINAL_STARTUP_FIXTURE)
 +    melee_web_audio_heap_free(ptr);
 +#else
      OSFreeToHeap(HSD_Synth_804D6018, ptr);
@@ -9080,3 +9080,37 @@ diff --git a/src/melee/gm/gmmain_lib.c b/src/melee/gm/gmmain_lib.c
      }
      lbAudioAx_80028690();
      gmMainLib_8015F500();
+--- a/src/sysdolphin/baselib/initialize.h
++++ b/src/sysdolphin/baselib/initialize.h
+@@ -29,6 +29,9 @@
+ } HSD_InitParam;
+ 
+ void HSD_InitComponent(void);
++#ifdef MELEE_WEB_ORIGINAL_STARTUP_FIXTURE
++void HSD_AllocationInit(void);
++#endif
+ void HSD_GXSetFifoObj(GXFifoObj* fifo);
+ void** HSD_AllocateXFB(s32 nbuffer, GXRenderModeObj* rm);
+ GXFifoObj* HSD_AllocateFifo(u32 size);
+--- a/src/sysdolphin/baselib/initialize.c
++++ b/src/sysdolphin/baselib/initialize.c
+@@ -252,6 +252,19 @@
+     GXSetFieldMode(rmode->field_rendering, rmode->xfbHeight < rmode->viHeight);
+ }
+ 
++#ifdef MELEE_WEB_ORIGINAL_STARTUP_FIXTURE
++/* The allocation-only checked-Wasm fixture deliberately stops before the
++ * platform VI/GX/DVD/retrace work in HSD_InitComponent. Keep this wrapper in
++ * the original TU so its private HSD_OSInit/HSD_ObjInit state is shared with
++ * HSD_AllocateXFB/Fifo and HSD_CreateMainHeap. */
++void HSD_AllocationInit(void)
++{
++    HSD_OSInit();
++    HSD_IDSetup();
++    HSD_ObjInit();
++}
++#endif
++
+ void HSD_Init_803755A8(void)
+ {
+     // Does nothing, but need to force a comparison to make this match

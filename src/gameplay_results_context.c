@@ -4,6 +4,7 @@
 #include "gameplay_collision.h"
 #include "gameplay_fighter_assets.h"
 #include "gameplay_match_clock.h"
+#include "hsd_native_joint.h"
 
 #include <melee/cm/camera.h>
 #include <melee/cm/types.h>
@@ -25,7 +26,6 @@
 #include <melee/ty/tydisplay.h>
 #include <melee/ty/types.h>
 #include <sysdolphin/baselib/controller.h>
-#include <sysdolphin/baselib/displayfunc.h>
 #include <sysdolphin/baselib/gobj.h>
 #include <sysdolphin/baselib/gobjplink.h>
 #include <sysdolphin/baselib/initialize.h>
@@ -323,6 +323,12 @@ MeleeWebResultsContext* melee_web_results_context_begin(
         free(context);
         return fail(error, error_size, "Results requires an idle source camera and shadow pool"), NULL;
     }
+    /* Native HSD initialization resets component allocator metadata. Complete
+     * source ownership checks before allowing that destructive boundary. */
+    if (!melee_web_native_world_enable(error, error_size)) {
+        free(context);
+        return NULL;
+    }
     if (!capture_baseline(context, error, error_size)) {
         free(context);
         return NULL;
@@ -359,7 +365,6 @@ MeleeWebResultsContext* melee_web_results_context_begin(
             HSD_PadCopyStatus[i] = default_status_data;
     melee_web_pad_state_apply(input);
     lbAudioAx_8002835C();
-    HSD_ZListInitAllocData();
     HSD_SisLib_803A6048(0xC000);
     lb_8001C5A4();
     lb_8001D1F4();
@@ -368,7 +373,6 @@ MeleeWebResultsContext* melee_web_results_context_begin(
      * by the original save storage. */
     Toy_803127D4();
     tyDisplay_8031C8B8();
-    HSD_ShadowInitAllocData();
     melee_web_bg_flash_save_state();
     context->flash_saved = 1;
     gm_Scene_Results_OnEnter(&context->match);

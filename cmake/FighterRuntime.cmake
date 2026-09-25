@@ -44,7 +44,6 @@ add_library(fighter_source_runtime STATIC EXCLUDE_FROM_ALL ${fighter_paths}
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/axdriver.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/controller.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/rumble.c"
-  "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/shadow.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/video.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/fog.c"
   "${MELEE_WEB_GAMEPLAY_SOURCE_DIR}/sysdolphin/baselib/synth.c"

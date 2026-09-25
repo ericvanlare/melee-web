@@ -1,0 +1,14 @@
+# The pinned AXVPB.c expression uses the SDK OS_BUS_CLOCK low-memory macro in
+# its own C translation unit.  This fixture binds that authored clock read to
+# the independently derived 162 MHz machine profile; the C++ provider macro
+# cannot change a separately compiled AXVPB object.
+diff --git a/extern/dolphin/src/dolphin/ax/AXVPB.c b/extern/dolphin/src/dolphin/ax/AXVPB.c
+index 0000000..0000000 100644
+--- a/extern/dolphin/src/dolphin/ax/AXVPB.c
++++ b/extern/dolphin/src/dolphin/ax/AXVPB.c
+@@ -1,3 +1,5 @@
+ #include "__ax.h"
++#undef __OSBusClock
++#define __OSBusClock 162000000u
+ 
+ #include <dolphin.h>
