@@ -119,6 +119,17 @@ EXPECTED_NEGATIVE_DIAGNOSTICS = {
 }
 
 
+LBAUDIO_NEGATIVE_DIAGNOSTICS = {
+    "unsupported-chorus-init": "Native audio effect unavailable: AXFXChorusInit",
+    "unsupported-chorus-shutdown": "Native audio effect unavailable: AXFXChorusShutdown",
+    "unsupported-chorus-callback": "Native audio effect unavailable: AXFXChorusCallback",
+    "unsupported-reverb-hi-init": "Native audio effect unavailable: AXFXReverbHiInit",
+    "unsupported-reverb-hi-shutdown": "Native audio effect unavailable: AXFXReverbHiShutdown",
+    "unsupported-reverb-hi-callback": "Native audio effect unavailable: AXFXReverbHiCallback",
+    "unexpected-sfx-command": "source lbAudio startup cannot execute an SFX command stream",
+}
+
+
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -453,11 +464,12 @@ def validate_negative_results(path: Path | None = None) -> list[dict[str, Any]]:
 
 
 def run_negative_matrix(node: Path, runtime_path: Path,
-                        input_plan: dict[str, Any], work: Path) -> list[dict[str, Any]]:
+                        input_plan: dict[str, Any], work: Path,
+                        diagnostics: dict[str, str] = EXPECTED_NEGATIVE_DIAGNOSTICS) -> list[dict[str, Any]]:
     """Execute every current fail-closed mode against the newly linked binary."""
 
     rows: list[dict[str, Any]] = []
-    for mode, expected in EXPECTED_NEGATIVE_DIAGNOSTICS.items():
+    for mode, expected in diagnostics.items():
         arguments = list(input_plan["arguments"])
         arguments[0] = mode
         result = _run([str(node), str(runtime_path), *arguments], cwd=work,
@@ -490,6 +502,7 @@ def _source_hashes() -> dict[str, str]:
              ROOT / "tools/source_synth_joined_startup.py",
              ROOT / "tools/source_synth_joined_runtime.py",
              ROOT / "CMakeLists.txt",
+             ROOT / "src/gameplay_audio_fx.c",
              MELEE / "extern/dolphin/src/dolphin/ai/ai.c",
              MELEE / "extern/dolphin/src/dolphin/dsp/dsp.c",
              MELEE / "extern/dolphin/src/dolphin/dsp/dsp_task.c",
@@ -566,7 +579,8 @@ def _refresh_hsd_native_runtime(build_dir: Path, work: Path, jobs: int = 2) -> N
         )
 
 
-def _compile_services(profile: dict[str, Any], work: Path) -> dict[str, Path]:
+def _compile_services(profile: dict[str, Any], work: Path, *, lbaudio: bool = False,
+                      post_audio: bool = False) -> dict[str, Path]:
     evidence = Path(profile["evidence_dir"])
     if not evidence.is_dir():
         raise JoinedRuntimeError("profile evidence directory is unavailable")
@@ -580,6 +594,8 @@ def _compile_services(profile: dict[str, Any], work: Path) -> dict[str, Path]:
                  "-Wno-array-parameter", "-Wno-unused-parameter", "-Wno-unused-variable",
                  "-Wno-unused-function", "-Wno-unused-but-set-variable",
                  *(item for include in includes for item in (f"-I{include}",))]
+    if lbaudio:
+        cxx_flags.append("-DMELEE_WEB_SOURCE_LBAUDIO_STARTUP")
     services_object = work / "services.o"
     command = [sys.executable, str(startup.EMXX), *cxx_flags, "-c", str(generated), "-o", str(services_object)]
     result = _run(command, cwd=ROOT, work=work, label="services", timeout=180)
@@ -593,11 +609,24 @@ def _compile_services(profile: dict[str, Any], work: Path) -> dict[str, Path]:
     if result.returncode:
         raise JoinedRuntimeError(f"AR service compile failed; see {work / 'ar-service.stderr'}")
     trace_object = work / "trace.o"
-    command = [sys.executable, str(startup.EMXX), *startup._compile_cpp_flags(evidence), str(SOURCE_TRACE), "-o", str(trace_object)]
+    trace_flags = startup._compile_cpp_flags(evidence)
+    if post_audio:
+        trace_flags.append("-DMELEE_WEB_SOURCE_POST_AUDIO_STARTUP")
+    command = [sys.executable, str(startup.EMXX), *trace_flags, str(SOURCE_TRACE), "-o", str(trace_object)]
     result = _run(command, cwd=ROOT, work=work, label="trace", timeout=180)
     if result.returncode:
         raise JoinedRuntimeError(f"trace compile failed; see {work / 'trace.stderr'}")
-    return {"services": services_object, "ar_service": ar_object, "trace": trace_object}
+    objects = {"services": services_object, "ar_service": ar_object, "trace": trace_object}
+    if lbaudio:
+        fx_object = work / "fx_unreachable.o"
+        command = [sys.executable, str(startup.EMCC),
+                   *startup._compile_flags(evidence, axfx=False),
+                   str(ROOT / "src/gameplay_audio_fx.c"), "-o", str(fx_object)]
+        result = _run(command, cwd=ROOT, work=work, label="fx-unreachable", timeout=120)
+        if result.returncode:
+            raise JoinedRuntimeError(f"unreachable FX provider compile failed; see {work / 'fx-unreachable.stderr'}")
+        objects["fx_unreachable"] = fx_object
+    return objects
 
 
 def _profile_objects(profile: dict[str, Any]) -> list[Path]:
@@ -623,7 +652,9 @@ def build_runtime(profile_path: Path, *, build_dir: Path = BUILD_DEFAULT,
                   inputs: dict[str, Path] | None = None,
                   synthetic_inputs: bool = False,
                   owned_inputs: dict[str, Path] | None = None,
-                  jobs: int = 2) -> dict[str, Any]:
+                  jobs: int = 2,
+                  lbaudio_profile: Path | None = None,
+                  post_audio_profile: Path | None = None) -> dict[str, Any]:
     """Compile/link the joined runtime and optionally run its input-bound trace."""
 
     profile_path = profile_path.absolute()
@@ -640,9 +671,24 @@ def build_runtime(profile_path: Path, *, build_dir: Path = BUILD_DEFAULT,
     _refresh_hsd_native_runtime(build_dir, artifact, jobs=jobs)
     archive_records = [_file_record(path) for path in _runtime_archives(build_dir)]
     source_before = _source_hashes()
-    objects = _compile_services(profile, artifact)
+    lbaudio = None
+    if lbaudio_profile is not None:
+        from tools import source_lbaudio_startup
+        lbaudio = source_lbaudio_startup.validate_profile(lbaudio_profile)
+    post_audio = None
+    if post_audio_profile is not None:
+        if lbaudio is None:
+            raise JoinedRuntimeError("post-audio startup requires the original complete lbAudio owner")
+        from tools import source_post_audio_allocations
+        post_audio = source_post_audio_allocations.validate_profile(post_audio_profile)
+    objects = _compile_services(profile, artifact, lbaudio=lbaudio is not None,
+                                post_audio=post_audio is not None)
     direct_objects = [objects["trace"], objects["services"], objects["ar_service"]]
     profile_objects = _profile_objects(profile)
+    if lbaudio is not None:
+        direct_objects.extend([Path(lbaudio["object"]["path"]), objects["fx_unreachable"]])
+    if post_audio is not None:
+        direct_objects.extend(Path(row["object"]) for row in post_audio["units"].values())
     link = [sys.executable, str(startup.EMXX), "-O2", "-g", "-DNDEBUG", "-fexceptions",
             "-sASYNCIFY=1", "-sENVIRONMENT=node", "-sEXIT_RUNTIME=1", "-sASSERTIONS=2",
             "-sSAFE_HEAP=1", "-sSTACK_SIZE=8388608", "-sINITIAL_MEMORY=134217728",
@@ -652,6 +698,10 @@ def build_runtime(profile_path: Path, *, build_dir: Path = BUILD_DEFAULT,
     result = _run(link, cwd=build_dir, work=artifact, label="link", timeout=300)
     if result.returncode:
         raise JoinedRuntimeError(f"joined runtime link failed; see {artifact / 'link.stderr'}")
+    if post_audio is not None and source_post_audio_allocations.validate_profile(post_audio_profile) != post_audio:
+        raise JoinedRuntimeError("post-audio profile changed during link")
+    if lbaudio is not None and source_lbaudio_startup.validate_profile(lbaudio_profile) != lbaudio:
+        raise JoinedRuntimeError("lbAudio profile changed during link")
     if [_file_record(path) for path in _runtime_archives(build_dir)] != archive_records:
         raise JoinedRuntimeError("runtime archives changed during link")
     source_after = _source_hashes()
@@ -669,6 +719,13 @@ def build_runtime(profile_path: Path, *, build_dir: Path = BUILD_DEFAULT,
                     "wasm_sha256": sha256(artifact / "joined.wasm"), "runtime_claim": False},
         "negative_results": {"expected_cases": validate_negative_results()},
     }
+    if lbaudio is not None:
+        receipt["lbaudio_profile"] = _file_record(lbaudio_profile)
+        receipt["scope"] = "original lbAudioAx initialization and first deferred completion"
+        receipt["driver_argument_role"] = "Expected values only; the raw source routine owns the actual driver call"
+    if post_audio is not None:
+        receipt["post_audio_profile"] = _file_record(post_audio_profile)
+        receipt["scope"] = "original lbAudioAx, deferred completion, lbMemory and lbHeap descriptor startup"
     if run:
         if synthetic_inputs:
             if not inputs:
@@ -695,8 +752,14 @@ def build_runtime(profile_path: Path, *, build_dir: Path = BUILD_DEFAULT,
         receipt["input_plan"] = receipt_plan
         receipt["run"] = {"status": "pass", "stdout_sha256": sha256(artifact / "run.stdout"),
                            "stderr_sha256": sha256(artifact / "run.stderr")}
+        diagnostics = dict(EXPECTED_NEGATIVE_DIAGNOSTICS)
+        if lbaudio is not None:
+            diagnostics.update(LBAUDIO_NEGATIVE_DIAGNOSTICS)
+        receipt["negative_results"]["expected_cases"] = [
+            {"mode": mode, "diagnostic_contains": diagnostic}
+            for mode, diagnostic in diagnostics.items()]
         receipt["negative_results"]["runs"] = run_negative_matrix(
-            node, artifact / "joined.js", input_plan, artifact
+            node, artifact / "joined.js", input_plan, artifact, diagnostics
         )
     (artifact / "receipt.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
     return receipt
@@ -707,6 +770,8 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--profile", type=Path, required=True)
+    parser.add_argument("--lbaudio-profile", type=Path)
+    parser.add_argument("--post-audio-profile", type=Path)
     parser.add_argument("--build-dir", type=Path, default=BUILD_DEFAULT)
     parser.add_argument("--artifact-dir", type=Path)
     parser.add_argument("--run", action="store_true")
@@ -731,4 +796,6 @@ if __name__ == "__main__":
     print(json.dumps(build_runtime(args.profile, build_dir=args.build_dir,
                                    artifact_dir=args.artifact_dir, run=args.run,
                                    synthetic_inputs=args.synthetic_inputs,
-                                   owned_inputs=owned, jobs=args.jobs), indent=2))
+                                   owned_inputs=owned, jobs=args.jobs,
+                                   lbaudio_profile=args.lbaudio_profile,
+                                   post_audio_profile=args.post_audio_profile), indent=2))

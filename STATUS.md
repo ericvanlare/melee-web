@@ -1,5 +1,15 @@
 # Current status
 
+## Audio and memory fixture complete; equivalence investigation paused
+
+**Compiled / Source identified / Native traced / Retail compared** within the
+[original audio and memory fixture](docs/SOURCE_LBAUDIO_MEMORY_STARTUP.md).
+The [scoped receipt](docs/evidence/source-lbaudio-memory-startup-v1.json) records
+original initialization and the post-execution memory-descriptor comparison.
+The owner paused further equivalence investigation. The first session mismatch
+remains match 0, tick 1776, P4 `input_hex`; live fighter identities and CPU
+call-site integration remain incomplete. No browser progress or deployment.
+
 ## Original Synth startup joins shared audio ownership
 
 **Compiled / Source identified / Native traced / Retail compared** for the
@@ -8,8 +18,8 @@ Original Synth owns AX initialization and its first deferred DevCom request
 completes through the original AR/ARQ handlers. The
 [scoped receipt](docs/evidence/source-synth-joined-startup-v1.json) limits the
 original comparison to three AR reservation sizes, final stack and free count.
-Complete audio-driver startup, live fighter allocation binding and full-session
-equivalence remain open. This does not establish PCM, timing or browser behavior.
+The later fixture above extends audio initialization through memory descriptors;
+live fighter allocation binding and full-session equivalence remain open. This does not establish PCM, timing or browser behavior.
 
 ## Original AR and ARQ share checked DMA ownership
 
