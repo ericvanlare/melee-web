@@ -1,5 +1,9 @@
 # Publication preparation before the final freeze
 
+Historical checkpoint: the runtime handoff has since landed. Continue with the
+[post-handoff publication checkpoint](PUBLICATION_CHECKPOINT.md) and its newer
+receipts; the observations below retain their original scope and date.
+
 This September 24, 2026 checkpoint prepares [issue #2](https://github.com/ericvanlare/melee-web/issues/2)
 while the final runtime change is still in progress. Its source baseline is
 `de048792af1144c23a5d10d28fe2270cab430d82`. It is not the publication commit.

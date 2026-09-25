@@ -1,6 +1,6 @@
 # Repository history audit
 
-The [September 24 pre-freeze refresh](PUBLICATION_PRE_FREEZE.md) records the
+The [post-handoff publication checkpoint](PUBLICATION_CHECKPOINT.md) records the
 newer ref inventory and finding dispositions separately. The original review
 below remains historical evidence; neither snapshot freezes future refs.
 

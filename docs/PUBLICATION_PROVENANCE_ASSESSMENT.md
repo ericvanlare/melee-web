@@ -13,6 +13,30 @@ into ownership, permission, a public-domain dedication, or a license. The
 operator should publish the boundaries below as facts and avoid describing the
 combined game, recovered source, renderer data, or current audio as cleared.
 
+## Delta note: source and observer additions through September 25, 2026
+
+This note supplements the historical September 20 assessment; it does not
+change that assessment's reviewed tree or convert its risk treatment into
+clearance. The subsequent source delta was reviewed through main commit
+`60372b468dbe98f2b73bcc690a4ed35273eead91`, from the bounded provenance base
+`836a11f90c7259e2b8348deaaa304b89d21247c4`.
+
+The delta adds a downstream allocation observer and two overlays for Dolphin
+commit `c77bbaa0f372c3f72281602a8b087206706542cb`:
+
+| Added path family | Delta treatment |
+| --- | --- |
+| `reference-capture/dolphin/source/Core/PowerPC/ReferenceAllocationObserver.cpp`, `.h`, `ReferenceAllocationProfile.h` | Keep the observer under its GPL-2.0-or-later reference boundary. The profile is generated identity metadata and hashes only; it does not embed original executable bodies or grant rights in its DOL/source inputs. |
+| `reference-capture/dolphin/patches/0003-allocation-observer.patch`, `0004-allocation-followed-returns.patch` | Preserve as downstream Dolphin overlays with the pinned commit, patch hashes and corresponding-source manifest. |
+| `patches/melee-source-ar-init-cxx.patch`, `source-ai-callback-stack.patch`, `source-ax-startup-alignment.patch`, `source-ax-startup-services.patch` | Preserve as downstream transforms against pinned Melee revision `b43912cc78606f96c9569f5d6229bc9d7e265ea5` and its original SDK/platform units. Patch authorship does not relicense recovered context. |
+| `src/source_*`, `tests/source_*_oracle_include/**`, source oracle programs, and allocation/source-startup scripts and tools | Treat as mixed project orchestration, source-bound adapters, source-derived declarations and generated observations. Their fixture scope does not support a directory-wide originality or MIT assertion. |
+
+The delta adds no tracked disc, DOL, SRAM, audio, extracted asset or game
+executable. Existing D1–D4 dispositions therefore remain in force: no new
+rights conclusion, ownership assertion or blanket license is made for the
+source-derived fixtures, generated identity data, current audio or recovered
+Melee/SDK material.
+
 ## Disposition
 
 | Decision | Defensible publication treatment at this review | Status and remaining risk |

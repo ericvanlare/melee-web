@@ -1,0 +1,110 @@
+{
+  "schema": "melee-web-publication-freeze-discussions-v1",
+  "repository": "ericvanlare/melee-web",
+  "observed_at_utc": "2026-09-25T00:46:05.346137Z",
+  "repository_snapshot": {
+    "private": true,
+    "visibility": "private",
+    "default_branch": "main",
+    "has_issues": true,
+    "has_wiki": false,
+    "has_discussions": false,
+    "allow_forking": true,
+    "open_issues_count": 11,
+    "updated_at": "2026-09-25T00:38:27Z",
+    "pushed_at": "2026-09-25T00:38:21Z",
+    "community_health_percentage": 85
+  },
+  "scope": [
+    "issue and pull-request bodies",
+    "issue and pull-request comments",
+    "issue events",
+    "pull-request reviews and review comments",
+    "repository commit comments",
+    "repository releases and release assets",
+    "wiki and Discussions availability",
+    "recognized GitHub attachment URL inventory",
+    "bounded high-confidence secret and personal-path scan"
+  ],
+  "counts": {
+    "issues_all_records": 79,
+    "issue_only_records": 16,
+    "pull_request_records": 63,
+    "issue_comments": 9,
+    "issue_events": 236,
+    "pull_request_reviews": 0,
+    "pull_request_review_comments": 0,
+    "repository_commit_comments": 0,
+    "releases": 0,
+    "release_assets": 0
+  },
+  "attachment_inventory": {
+    "recognized_url_occurrences": 0,
+    "unique_urls": 0,
+    "downloaded": 0,
+    "download_cap_bytes": 67108864,
+    "raw_url_values_retained_under": "work/publication-freeze-20260925/discussions/raw"
+  },
+  "availability": {
+    "discussions": {
+      "http_status": 410,
+      "raw": "work/publication-freeze-20260925/discussions/raw/discussions.json",
+      "sha256": "5b3deb495e78e6b5a8aefea72dce8ba2c69f7ea87caa32ac4c99d3ca0e037c07"
+    },
+    "wiki": {
+      "http_status": 404,
+      "raw": "work/publication-freeze-20260925/discussions/raw/wiki-pages.json",
+      "sha256": "94a6901aa5a1433ec95b43518500da68714e6e3520e72fd75f1b7a8f2338ae74"
+    }
+  },
+  "secret_scan": {
+    "raw_json_files": 433,
+    "safe_download_files": 0,
+    "secret_rule_matches": 0,
+    "nonrunner_personal_path_matches": 0,
+    "runner_path_matches": 0,
+    "rules": [
+      "private key",
+      "AWS access key",
+      "GitHub token",
+      "Slack token",
+      "API secret",
+      "sensitive assignment",
+      "Users/home path classification"
+    ],
+    "limitation": "Pattern-bounded evidence; not universal secret, rights, or publication clearance."
+  },
+  "manifest": {
+    "scope": "all regular files below work/publication-freeze-20260925/discussions excluding the receipt and report",
+    "excluded_paths": [
+      "work/publication-freeze-20260925/discussions/publication-freeze-discussions-receipt.json",
+      "work/publication-freeze-20260925/discussions/report.md"
+    ],
+    "file_count": 435,
+    "bytes": 2700661,
+    "sha256": "3c179fe19f85f50436ef0ab56f21dd1922e8d72a294106190fd70a79efebc49f",
+    "algorithm": "sha256(path\\tbytes\\tsha256\\n) over sorted file_hashes"
+  },
+  "evidence_hashes": {
+    "raw_file_count": 433,
+    "raw_bytes": 2653127,
+    "repository_json_sha256": "5c944fa8063d3572d5e6ffc074975bfa8047bd8d5715e677285566cd230980f2",
+    "issues_all_json_sha256": "0478a7ac9b8efd475a47a8f7ad57571d7de68a852c2db513ab876c2c3bfdbe1b",
+    "issue_2_json_sha256": "17c2e3c82470f383c1d536ec6bab6b71cb634ee3ec7912de3f04ac0d99986c24",
+    "pr_64_json_sha256": "3f5b9670c7dd5b3c31290f3013113e97f36cd47b6c2a3c761abfcc06a90c2423",
+    "pr_79_json_sha256": "3b389bd167fc7a03d868184ade0f2f641c0da275466e87f31e5a5c2dfaaa1940",
+    "releases_json_sha256": "cf1cbb66a638b4860a516671fb74850e6ccf787fe6c4c8d29e9c04efe880bd05",
+    "repository_commit_comments_json_sha256": "cf1cbb66a638b4860a516671fb74850e6ccf787fe6c4c8d29e9c04efe880bd05",
+    "community_profile_json_sha256": "bbd6889138089a92197c7cf33245ed06b50eab4b8bb77d696c77b89421fe252f",
+    "detailed_receipt_sha256": "81b79f25afe29acf731a25dce873306901e3a2bb679ff436c9b0406e71fd2fa1",
+    "detailed_report_sha256": "19ac4c9e30364f6fed613d29ecbdb19cde938429b29d6a70a60742e130512ea4"
+  },
+  "raw_evidence_root": "work/publication-freeze-20260925/discussions",
+  "limits": [
+    "No Actions logs, artifacts, caches, branches, tags, or commit-history refs were fetched.",
+    "The API exposes no separate attachment collection; unlinked uploads cannot be enumerated here.",
+    "Wiki and Discussions availability can change after repository visibility changes.",
+    "This baseline includes PR #64 and issue #2 before final lead updates; those updates and the final publication delta require a rescan."
+  ],
+  "pending_final_delta": "Lead updates to PR #64 and issue #2 remain pending, followed by a final readback and rescan."
+}

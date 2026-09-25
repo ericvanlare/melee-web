@@ -1,0 +1,135 @@
+{
+  "schema": "melee-web-publication-freeze-actions-v1",
+  "repository": "ericvanlare/melee-web",
+  "source_baseline": "60372b468dbe98f2b73bcc690a4ed35273eead91",
+  "publication_commit": null,
+  "method": "Paginated read-only API inventories; hash-verified reuse of prior inspections with matching artifact digests and run attempt/head/update identities; bounded ZIP/TAR scans of new archives without extraction or execution. A completed-main-run supplement closes the one active run in the baseline.",
+  "baseline_observed_at": "2026-09-25T00:48:12.357140+00:00",
+  "inventory": {
+    "workflow_runs": 597,
+    "baseline_artifacts": 2024,
+    "baseline_completed_runs": 596,
+    "baseline_active_run_ids": [
+      36078461171
+    ],
+    "new_log_downloads": 35,
+    "new_artifact_downloads": 483,
+    "download_failures": 0,
+    "reused_archives": 1710
+  },
+  "main_ci_supplement": {
+    "run_id": 36078461171,
+    "head_sha": "60372b468dbe98f2b73bcc690a4ed35273eead91",
+    "conclusion": "success",
+    "archives": 15,
+    "artifacts": 14,
+    "artifact_api_sha256_matches": 14,
+    "expired_artifacts": 0,
+    "overlapping_baseline_archives": 7,
+    "audit_path": "work/publication-freeze-20260925/github/preparation-ci-36078461171/audit.json",
+    "audit_sha256": "1dec9403f8d548b0fc2274141aaaad2d6a23be70f31b204bd1fc14f3f493d06e"
+  },
+  "combined_inspection": {
+    "archive_count": 2236,
+    "run_logs_inspected": 597,
+    "artifacts_inspected": 1639,
+    "artifact_digest_mismatches": 0,
+    "parser_errors": 0,
+    "counts": {
+      "unsafe_paths": 0,
+      "links": 0,
+      "special_members": 0,
+      "scan_limit_hits": 0,
+      "incomplete_members": 0,
+      "unexpected_content_members": 0,
+      "tar_nonempty_members": 0,
+      "zip_members": 9363,
+      "zip_bytes": 1373477194,
+      "read_bytes": 1373477194,
+      "text_members": 8901,
+      "nested_tar_archives": 462,
+      "tar_members": 462,
+      "json_members": 1087
+    },
+    "patterns": {
+      "secret:private_key": 0,
+      "secret:aws_access_key": 0,
+      "secret:github_token": 0,
+      "secret:slack_token": 0,
+      "secret:api_secret": 0,
+      "secret:sensitive_assignment": 0,
+      "runner-path": 2931960
+    }
+  },
+  "unavailable": {
+    "artifacts": 392,
+    "all_expired": true,
+    "identities_in": "work/publication-freeze-20260925/github/reports/archive-scan-v1.json",
+    "identity_list_sha256": "4115b69223fc1bb1f567e381cf97721456c2f364c7fb7f164b2254fd7d6a78a3",
+    "disposition": "Previously expired payloads unavailable to both inspections remain outside the result; no retained payload or failure was deleted."
+  },
+  "scanner": {
+    "archive_scanner_sha256": "ab5a1b3aa938c7f8de98aa1f1ee0facfbe31dedd5a80a3b59deba537904cf1ce",
+    "pattern_scanner_sha256": "4b72458604fa188653df42604128b9e38d037505449ef733e78b73c1cee815e1",
+    "max_member_scan_bytes": 33554432
+  },
+  "evidence_files": [
+    {
+      "path": "work/publication-freeze-20260925/github/reports/archive-scan-v1.json",
+      "bytes": 1880762,
+      "sha256": "4980e4e4628eaeb989feab881e104a107c94ce7e5198beefba7dd6730a251f50"
+    },
+    {
+      "path": "work/publication-freeze-20260925/github/preparation-ci-36078461171/audit.json",
+      "bytes": 10611,
+      "sha256": "1dec9403f8d548b0fc2274141aaaad2d6a23be70f31b204bd1fc14f3f493d06e"
+    },
+    {
+      "path": "work/publication-freeze-20260925/github/raw/runs-pages.json",
+      "bytes": 7496055,
+      "sha256": "6a2beb6a7d94260976d50b0bcbdc815208680be21ac314ec7166bc01b43a92e9"
+    },
+    {
+      "path": "work/publication-freeze-20260925/github/raw/artifacts-pages.json",
+      "bytes": 1416146,
+      "sha256": "a3662efd56ba5c8df2848b4e7222c59d116457f4c3dd690e462cc1c49f98271b"
+    },
+    {
+      "path": "work/publication-freeze-20260925/github/reports/downloads.json",
+      "bytes": 102932,
+      "sha256": "d72aa256328b84511c5e53d49bfbca2714b99709626a482a6e590076ea2cb2a6"
+    },
+    {
+      "path": "work/publication-freeze-20260925/github/reports/reused-archives.json",
+      "bytes": 1630250,
+      "sha256": "758ff4d961cc3cd67229a18c8611f32b5a39a76905a0dad84fd3ed210d0ea599"
+    },
+    {
+      "path": "work/publication-freeze-20260925/github/reports/delta-plan-summary.json",
+      "bytes": 221,
+      "sha256": "f0ba5958faa14ad98029e3672ee5767f69d2b555932147628e922bac770ae515"
+    },
+    {
+      "path": "work/publication-freeze-20260925/github/tools/prepare_delta.py",
+      "bytes": 3214,
+      "sha256": "f5abe1fb891d1c40769ea9c58f906fac8d964f17c3afeb80f4d190705305629e"
+    },
+    {
+      "path": "work/publication-freeze-20260925/github/tools/download_delta.py",
+      "bytes": 2125,
+      "sha256": "f01f528604b08ea9c3297781e23c3d8d4078c16f5ae159ed5652b895e49e3682"
+    },
+    {
+      "path": "work/publication-freeze-20260925/github/tools/scan_delta.py",
+      "bytes": 3422,
+      "sha256": "1f5a270f7cf1f02def24c5fa7d2a009a882fbda7df93f39d7a4bb263a5ff47cf"
+    }
+  ],
+  "limits": [
+    "Pattern-bounded inspection is not universal secret, rights, or publication clearance.",
+    "Nested TARs inspected here contain directory entries only; no nonempty TAR member was cleared by inference.",
+    "Only API-inventoried run logs and artifact payloads whose bytes were retained or downloadable are covered; persistent compiler cache payloads are excluded.",
+    "Preparation PR and final merged-main CI after this checkpoint require a separately retained delta inspection.",
+    "No archive was executed, no remote setting or cache changed, and no visibility change occurred."
+  ]
+}

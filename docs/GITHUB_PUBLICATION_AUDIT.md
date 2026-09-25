@@ -7,7 +7,7 @@ review of GitHub history and publication surfaces before visibility changes. The
 sanitized machine-readable
 receipt is [github-publication-audit-v1.json](evidence/github-publication-audit-v1.json).
 
-The [September 24 pre-freeze refresh](PUBLICATION_PRE_FREEZE.md) has separate
+The [post-handoff publication checkpoint](PUBLICATION_CHECKPOINT.md) has separate
 receipts for current discussions, Actions payloads and settings. Keep this
 September 20 record as historical evidence; its inventory and control values
 are not the latest observation.

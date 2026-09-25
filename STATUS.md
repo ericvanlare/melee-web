@@ -2,11 +2,12 @@
 
 ## Repository publication preparation
 
-The [pre-freeze preparation](docs/PUBLICATION_PRE_FREEZE.md) refreshes the
-publication-content and GitHub-controls evidence after PR #54. The final runtime
-change, frozen publication inventory and authorized visibility transition remain
-separate steps. The repository is still private; this is not gameplay admission
-or a new hosted/native release.
+The [publication checkpoint](docs/PUBLICATION_CHECKPOINT.md) refreshes source,
+history, GitHub-content and controls evidence after the runtime work stopped
+and PR #79 merged. Final preparation integration, the frozen publication
+inventory and the authorized visibility transition remain separate steps. The
+repository is still private; this is not gameplay admission or a new hosted/native
+release.
 
 ## Audio and memory fixture complete; equivalence investigation paused
 
