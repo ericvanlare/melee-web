@@ -8,6 +8,12 @@ not authorize a new hosted player or native-binary release.
 
 Repository visibility is still private. The following sequence makes the
 remaining operational steps concrete; it is not a record that they happened.
+
+Use the [post-handoff checkpoint](PUBLICATION_CHECKPOINT.md) and its exact
+inventories to carry reviewed evidence forward after the runtime work stopped.
+Recheck all subsequent changes, including the preparation PR itself and its CI,
+at the actual publication freeze.
+
 GitHub returned a plan-related 403 for private main-branch protection and a 404
 for private vulnerability reporting. Their activation and verification must be
 part of the public transition, or follow a separately chosen plan upgrade.

@@ -1,5 +1,14 @@
 # Current status
 
+## Repository publication preparation
+
+The [publication checkpoint](docs/PUBLICATION_CHECKPOINT.md) refreshes source,
+history, GitHub-content and controls evidence after the runtime work stopped
+and PR #79 merged. Final preparation integration, the frozen publication
+inventory and the authorized visibility transition remain separate steps. The
+repository is still private; this is not gameplay admission or a new hosted/native
+release.
+
 ## Audio and memory fixture complete; equivalence investigation paused
 
 **Compiled / Source identified / Native traced / Retail compared** within the

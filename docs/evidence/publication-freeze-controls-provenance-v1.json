@@ -1,0 +1,181 @@
+{
+  "schema": "melee-web-publication-freeze-controls-provenance-v1",
+  "observed_at_utc": "2026-09-25T00:47:13Z",
+  "repository": "ericvanlare/melee-web",
+  "audit_context": {
+    "branch": "codex/publication-pre-freeze",
+    "local_head": "398044147b012bcc15a7a525ef7621e05de297e4",
+    "remote_main": "60372b468dbe98f2b73bcc690a4ed35273eead91",
+    "delta_base": "836a11f90c7259e2b8348deaaa304b89d21247c4",
+    "working_tree_at_audit_start": "clean",
+    "working_tree_note": "No tracked files were edited by this audit. Retained API responses and reused focused logs are under ignored work/publication-freeze-20260925/controls/.",
+    "runtime_tests_or_builds": "not_run",
+    "github_mutations": "none",
+    "branch_switches": "none"
+  },
+  "provenance_delta": {
+    "from": "836a11f90c7259e2b8348deaaa304b89d21247c4",
+    "to": "60372b468dbe98f2b73bcc690a4ed35273eead91",
+    "files_changed": 191,
+    "insertions": 41167,
+    "deletions": 55,
+    "new_files": 170,
+    "area_counts": {
+      "docs_including_evidence": 32,
+      "src": 22,
+      "tests": 100,
+      "tools": 19,
+      "patches": 5,
+      "reference_capture_dolphin": 6,
+      "scripts": 4,
+      "cmake_and_build_config": 2,
+      "status": 1
+    },
+    "provenance_observations": [
+      "The new src and CMake paths extend the mixed native/source-derived runtime boundary. They are not in the explicit root MIT allowlist.",
+      "The new tests include 31 compatibility headers under tests/source_*_include/. They are fixture adapters and source-bound ABI/layout declarations used with pinned SDK or recovered implementations; a test or oracle name does not establish independent ownership.",
+      "The four new top-level source patches carry recovered SDK/source context and downstream transformations. Their project-authored hunks do not relicense the patch context.",
+      "The new AR/AI/AX/DSP/DevCom/LBAudio/Synth startup fixtures and source-derived tables extend the original SDK/audio boundary for diagnostics; they do not clear current player audio, historical GPL audio or generated coefficient provenance and do not add a root-license exception.",
+      "The six reference-capture/dolphin paths add a downstream allocation observer, two Dolphin overlays, and a generated identity-only profile. The three source files carry SPDX GPL-2.0-or-later notices; the profile embeds identity metadata and no original executable bodies.",
+      "The 18 new docs/evidence JSON files contain source hashes, derived observations and validation metadata. No tracked disc, DOL, SRAM, extracted asset, audio payload or executable was added; owned inputs remain external under documented ignored paths.",
+      "dependencies.lock.json, THIRD_PARTY.md, LICENSE_SCOPE.md, docs/SOURCE_LICENSE_INVENTORY.md, docs/PUBLICATION_PROVENANCE_ASSESSMENT.md and reference-capture/dolphin/LICENSES.md were unchanged in this delta."
+    ],
+    "no_new_root_license_grant": true,
+    "post_audit_documentation_amendments": "The four focused provenance documents were amended after this delta snapshot; their final hashes and links are recorded in provenance_amendments_addressed below."
+  },
+  "provenance_amendments_addressed": [
+    {
+      "file": "THIRD_PARTY.md",
+      "link": "../../THIRD_PARTY.md",
+      "sha256": "30738bc7c18540caed2933bbc9ea5ac0e240e293ae198f0e8f52e1b7d52f5ed4",
+      "status": "addressed",
+      "change": "Named the allocation observer/profile, Dolphin overlays, pinned commit, GPL boundary, source-bound startup fixtures and four Melee/SDK patches without adding rights conclusions."
+    },
+    {
+      "file": "docs/SOURCE_LICENSE_INVENTORY.md",
+      "link": "../SOURCE_LICENSE_INVENTORY.md",
+      "sha256": "0ecc8b71cc33e986b58f2921968b04dc9623ac02fa08c1b117fde9f932fc4dc4",
+      "status": "addressed",
+      "change": "Added concrete rows for the allocation observer/profile and overlays, four top-level source patches, source-bound fixture headers/oracles, and allocation/startup scripts and tools."
+    },
+    {
+      "file": "reference-capture/dolphin/LICENSES.md",
+      "link": "../../reference-capture/dolphin/LICENSES.md",
+      "sha256": "3448b2958a8a825c11a0cb635a153b1fdc4445a8c6956cbdccce7292ccd5bf44",
+      "status": "addressed",
+      "change": "Enumerated the allocation overlays and observer/profile sources, clarified generated identity-only metadata, and bound them to the corresponding-source manifest."
+    },
+    {
+      "file": "docs/PUBLICATION_PROVENANCE_ASSESSMENT.md",
+      "link": "../PUBLICATION_PROVENANCE_ASSESSMENT.md",
+      "sha256": "5d6256fd700d3b4241ba3ec0b609051d564ed9d882a3a9247618788aa043bc48",
+      "status": "addressed",
+      "change": "Added a dated delta note with exact source pins and file families while preserving the historical assessment and unresolved D1-D4 treatment."
+    }
+  ],
+  "provenance_amendments_not_required": [
+    {
+      "file": "LICENSE_SCOPE.md",
+      "basis": "Existing exclusions already cover recovered Melee/SDK material, patch context, source-derived declarations/tables, generated evidence/data and the separate GPL Dolphin observer. No additional root MIT path was inferred."
+    },
+    {
+      "file": "CONTRIBUTING.md",
+      "basis": "Existing setup guidance already requires pinned bootstrap inputs, ignored assets-local/work paths, preserved notices and explicit provenance/evidence limits."
+    },
+    {
+      "file": "SECURITY.md",
+      "basis": "The existing caveat accurately says private vulnerability reporting is unverified and must be enabled and read back during cutover; the current API still returns 404."
+    }
+  ],
+  "live_controls": {
+    "repository": {
+      "visibility": "private",
+      "default_branch": "main",
+      "main_sha": "60372b468dbe98f2b73bcc690a4ed35273eead91",
+      "main_protected": false,
+      "branch_protection_api": {"status": 403, "message": "Upgrade to GitHub Pro or make this repository public to enable this feature."},
+      "rulesets_api": {"status": 403, "message": "Upgrade to GitHub Pro or make this repository public to enable this feature."}
+    },
+    "security_and_contributor_features": {
+      "fork_pr_contributor_approval": {"status": 422, "message": "Validation Failed"},
+      "private_vulnerability_reporting": {"status": 404, "message": "Not Found"},
+      "vulnerability_alerts": {"status": 404, "message": "Vulnerability alerts are disabled."},
+      "automated_security_fixes": {"enabled": false, "paused": false},
+      "security_reporting_caveat": "No private reporting route is verified while the repository is private; do not direct security reports to public issues or PRs."
+    },
+    "actions": {
+      "enabled": true,
+      "allowed_actions": "all",
+      "sha_pinning_required": true,
+      "default_workflow_permissions": "read",
+      "can_approve_pull_request_reviews": false,
+      "workflow_paths": [".github/workflows/public-release.yml", ".github/workflows/verify.yml"]
+    }
+  },
+  "ci_binding": {
+    "workflow": {
+      "path": ".github/workflows/verify.yml",
+      "sha256": "aad94512c5cb5b643dc12ca25c31f3834c69b4031ec545d7efeff17866d08c2e",
+      "uses_lines_checked": 24,
+      "all_full_sha_pinned": true,
+      "permissions": {"contents": "read", "actions": "read"}
+    },
+    "aggregate_guard": {
+      "check_name": "browser-build",
+      "app_id": 15368,
+      "needs": ["repository-content", "units", "partitions", "public-shell"],
+      "guard": "The browser-build job fails when any dependency result is not success and ci_aggregate.py requires current GITHUB_SHA, exact targets, nonempty discovery, disjoint unit selections and matching discovery hash.",
+      "source_test_route": "Full unittest discovery runs after configuration in unit shards; the gameplay linked partition explicitly includes test_source_devcom_startup and the aggregate covers the complete discovered inventory."
+    },
+    "current_main_run": {
+      "run_id": 36078461171,
+      "run_number": 429,
+      "head_sha": "60372b468dbe98f2b73bcc690a4ed35273eead91",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/ericvanlare/melee-web/actions/runs/36078461171",
+      "observed_jobs": {
+        "completed_success": ["repository-content", "verify (unit-0)", "public-shell", "verify (runtime)", "verify (graphics)", "verify (gameplay)", "verify (fighter)", "verify (effects)", "verify (menus)"],
+        "completed_skipped": ["compiler-cache-audit"],
+        "in_progress": [],
+        "browser_build": "completed_success"
+      },
+      "publication_binding": "browser-build completed successfully on 60372b468dbe98f2b73bcc690a4ed35273eead91 with GitHub Actions app id 15368. This satisfies the current main CI binding; a later final publication SHA still needs its own run."
+    },
+    "source_validation_current_sha": "No source-specific receipt is stamped to 60372b4. The successful run's full discovery and linked DevCom route are CI evidence for this SHA; the bounded source receipts below remain historical and retain their stated limits.",
+    "prior_source_validation": [
+      {"receipt": "docs/evidence/source-synth-joined-startup-v1.json", "base_commit": "c986db2b2b488123279aa2dacc7b9cb911247454", "sha256": "2aea4de2839b7e1fa0a3ab8ba69f500ac7f57eeb1d6500c2353175743593a959", "limit": "Bounded original HSD_SynthInit/AXInit/first deferred DevCom fixture; no full startup, live allocation binding, PCM, timing, browser or full-session claim."},
+      {"receipt": "docs/evidence/original-startup-allocation-v1.json", "base_commit": "dd4880f13d6ac9a04cb388dba7d05ac1c9cd72b1", "sha256": "9d04c8f5aa2d32d93d525559af674bb0f92dc5f9706a66a61208ff9013515972", "limit": "Fresh checked-Wasm HSD allocation boundary only; no full retail startup, source-to-host fighter binding, session equivalence, pixels, PCM or performance."},
+      {"receipt": "docs/evidence/whole-session-cpu-register-v1.json", "base_commit": "de048792af1144c23a5d10d28fe2270cab430d82", "sha256": "c7deb87e3567664bbebb4cc7c1c170642a626dd4be46baf63929c87016518b3e", "limit": "Three natural four-Mario CPU9 observations and first browser divergence; no source identity provider or gameplay compatibility fix."}
+    ],
+    "runtime_proof_boundary": "Those receipts are scoped evidence on earlier commits. This audit ran no runtime/build validation and makes no new equivalence, pixel, PCM or performance claim for 60372b4."
+  },
+  "cache_inventory": {
+    "entries": 58,
+    "total_size_bytes": 10677000805,
+    "main_ref_entries": 22,
+    "main_ref_size_bytes": 4077461438,
+    "payloads_inspected": false,
+    "no_cache_mutation": true
+  },
+  "raw_evidence_manifest": {
+    "path": "work/publication-freeze-20260925/controls/manifest.json",
+    "sha256": "6a87b675690b85d71f36dd47b108a2ccd257c337eed48e5eb300c436e60d5a8a",
+    "algorithm": "sha256",
+    "files_verified": 69,
+    "contents": "Read-only GitHub API JSON responses, status/error sidecars, and three reused focused-test logs. The manifest excludes itself.",
+    "focused_test_logs": [
+      {"path": "focused-tests/repository-content-check.log", "origin": "work/publication-pre-freeze/controls/repository-content-check.log", "sha256": "654202d595c3270a49da338f517cabf086f646d33fc1caaf7857232a97831653", "scope": "1130-entry content check at prior preparation baseline de048792; not rerun here."},
+      {"path": "focused-tests/content-tests.log", "origin": "work/publication-pre-freeze/content-tests.log", "sha256": "df47c1c3d0c4222a1492b980780381906d5ffb9de3916cb78b4ffe11ff715dae", "scope": "Repository content regression tests from prior preparation; not rerun here."},
+      {"path": "focused-tests/test_ci_aggregate.log", "origin": "work/publication-pre-freeze/controls/test_ci_aggregate.log", "sha256": "34849a2bcf2504e718cdf68efccc03a0c4436b244d65eecf48b78c37eeea3d42", "scope": "Nine aggregate-guard unit tests from prior preparation; not rerun here."}
+    ]
+  },
+  "pending_cutover_gates": [
+    "Review and stage the addressed provenance amendments in the final preparation merge; do not extend the root MIT allowlist.",
+    "For the final publication SHA, bind a fresh successful browser-build check (app 15368) plus the aggregate report to that exact SHA; run 36078461171 only validates current main 60372b4.",
+    "At the final preparation merge, refresh content/history/discussion/actions inventories and reconcile docs/PUBLICATION_PRE_FREEZE.md, STATUS.md and the source/provenance records with the frozen SHA.",
+    "Keep the repository private pending the owner's visibility decision. At authorized cutover, read back branch protection/rulesets, fork approval and private vulnerability reporting after the current private-plan/API limitations are resolved.",
+    "At authorized cutover only, stop new Actions work, wait for active jobs, retain the final cache inventory and perform the documented cache cleanup; this audit did not pause, delete or mutate anything."
+  ],
+  "conclusion": "The existing broad provenance exclusions remain accurate, and no raw owned input or new dependency pin was added. The named source/license amendments are addressed in the linked files, and main 60372b4 has a successful browser-build aggregate check. The future final publication SHA remains pending its own exact-SHA CI, fresh inventories and authorized cutover."
+}

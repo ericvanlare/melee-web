@@ -56,6 +56,33 @@ The reference observer remains in `reference-capture/dolphin/`, with its
 Dolphin patches intact. It builds a separate reference application; it is not
 linked into the browser player. Replacing player audio does not relicense it.
 
+The September 25, 2026 source-startup and allocation delta adds the downstream
+allocation observer at
+`reference-capture/dolphin/source/Core/PowerPC/ReferenceAllocationObserver.cpp`
+and `.h`, the generated identity-only
+`reference-capture/dolphin/source/Core/PowerPC/ReferenceAllocationProfile.h`,
+and overlays
+`reference-capture/dolphin/patches/0003-allocation-observer.patch` and
+`0004-allocation-followed-returns.patch`. These files are bound to Dolphin
+commit `c77bbaa0f372c3f72281602a8b087206706542cb`; the observer sources retain
+GPL-2.0-or-later SPDX headers. The profile contains function/global identity
+metadata and hashes, not original executable bodies. Keep this observer,
+overlays, profile and corresponding-source manifest inside the separate
+Dolphin/reference boundary; this entry grants no rights in recovered Melee,
+SDK or source-derived data.
+
+The same delta adds source-bound AR/AI/AX/DSP/DevCom/LBAudio/Synth fixtures,
+compatibility headers and orchestration under `src/`, `tests/`, `scripts/` and
+`tools/`, plus the downstream patches
+`patches/melee-source-ar-init-cxx.patch`,
+`patches/source-ai-callback-stack.patch`,
+`patches/source-ax-startup-alignment.patch` and
+`patches/source-ax-startup-services.patch`. They use or transform the pinned
+Melee source revision `b43912cc78606f96c9569f5d6229bc9d7e265ea5` and its
+original SDK/platform units. Their generated observations and identity tables
+remain source-derived and outside the narrow root MIT scope; no raw owned
+disc, DOL, SRAM, audio or extracted asset is tracked.
+
 ## B0XX-style keyboard mapping
 
 `src/boxx_input.h` adapts the coordinate tables and directional state rules from

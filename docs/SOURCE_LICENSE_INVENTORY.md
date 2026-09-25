@@ -20,6 +20,16 @@ Reviewed source: `11410f31be0930f8a69a3ff358527286a8f19c2a`, based on main
 files to their Git blobs and records the scope and limitations of this pass.
 Current gameplay evidence remains in [STATUS.md](../STATUS.md).
 
+### Current delta note: September 25, 2026
+
+The reviewed-tree receipt above is historical. The named rows below were
+extended for main `60372b468dbe98f2b73bcc690a4ed35273eead91` from the bounded
+source delta base `836a11f90c7259e2b8348deaaa304b89d21247c4`. See the current
+[publication checkpoint](PUBLICATION_CHECKPOINT.md) and the
+[controls/provenance receipt](evidence/publication-freeze-controls-provenance-v1.json)
+for that delta's file-family map, exact pins and limits. This addendum does not
+change the historical receipt's scope or grant rights in newly named material.
+
 ## Recommended approach
 
 Use **MIT for confirmed project-authored, separable code and documentation**,
@@ -129,6 +139,9 @@ implementation needs a different review.
 | `web/initial_pipeline_cache.db.gz.b64` | Generated Aurora renderer descriptor database; [release review](PUBLIC_RELEASE_REVIEW.md) records its game-related provenance | Treat as generated renderer metadata with its own inventory/rights decision, rather than ordinary authored JS or a raw retail asset. Revalidate the exact seed at publication |
 | `src/pipeline_preparation.generated.hpp` | [Generator](../scripts/generate_pipeline_preparation.py) joins certified requirement/coverage inputs; [preparation guide](PIPELINE_PREPARATION.md) keeps those inputs private | Generated descriptor identities bound to an older seed, not the current materialized seed. Regeneration and certification against a new seed require the appropriate inputs; private captures need not become public |
 | `reference-capture/dolphin/source/Core/PowerPC/Reference{CaptureObserver,InputStream}.*` and observer/input patches | Dolphin `c77bbaa0f372c3f72281602a8b087206706542cb`; source headers declare GPL-2.0-or-later; [license record](../reference-capture/dolphin/LICENSES.md) identifies reconstruction | Separate known GPL component. Preserve notices, changes and full GPL text; source publication and distributing an observer binary have different deliverables |
+| `reference-capture/dolphin/source/Core/PowerPC/ReferenceAllocationObserver.{cpp,h}`, `ReferenceAllocationProfile.h`, and `reference-capture/dolphin/patches/0003-allocation-observer.patch`, `0004-allocation-followed-returns.patch` | Downstream allocation observer and JIT boundary overlays for Dolphin `c77bbaa0f372c3f72281602a8b087206706542cb`; the profile is generated from an operator-supplied DOL and pinned source symbols and embeds identity metadata only | Keep the observer and overlays under the separate GPL-2.0-or-later Dolphin/reference boundary with corresponding-source records. Treat the profile as source-derived generated metadata; it does not relicense the recovered DOL, Melee/SDK source or the profile inputs |
+| `patches/melee-source-ar-init-cxx.patch`, `patches/source-ai-callback-stack.patch`, `patches/source-ax-startup-alignment.patch`, `patches/source-ax-startup-services.patch` | Downstream fixture transforms against pinned Melee revision `b43912cc78606f96c9569f5d6229bc9d7e265ea5` and its original SDK/platform units; each patch preserves a checked source boundary for a narrow oracle | Patch hunks authored by the project do not relicense recovered context or SDK code. Keep target revision, patch identity and the unresolved Melee/SDK treatment together; do not add these paths to the root MIT allowlist by inference |
+| `src/source_*`, `src/original_startup_compat.h`, `tests/source_*_oracle_include/**`, `tests/source_*_oracle.c`, `tests/source_*_trace.cpp`, `scripts/capture_allocation_history.py`, `scripts/replay_allocation_history.py`, and the allocation/source-startup tools under `tools/` | Source-bound adapters, minimal ABI/layout compatibility headers, allocation-history tooling and generated-profile/replay helpers that compile, execute or derive observations from pinned Melee/SDK/Dolphin units; the 2026-09-25 delta adds AR/AI/AX/DSP/DevCom/LBAudio/Synth and allocation families | Review project orchestration separately from source-derived declarations, expectations and generated data. Preserve source hashes and external-input boundaries; no file-family or fixture label supplies a project-wide MIT grant |
 | `patches/reference-dolphin-clock-probe.patch`, `patches/reference-dolphin-clock-delay-probe.patch` | Downstream diagnostics modify the GPL observer; the standard builder selects `reference-capture/dolphin/patches/`, not these top-level patches | Historical/optional Dolphin-context patches; identify exact applicable base and modification notices. Do not describe them as automatically included in the current standard reference build |
 | `reference-capture/controller-probe/CMakeLists.txt` | Imports SDL `5848e584a1b606de26e3dbd1c7e4ecbc34f807a6` and libusb `15a7ebb4d426c5ce196684347d2b7cafad862626`, the pinned Dolphin submodule revisions | SDL permissive notice and libusb LGPL-2.1-or-later source headers verified upstream. Complete native notice delivery and applicable source/relink materials for a distributed probe; browser SDL's excluded native backends do not establish this probe's obligations |
 | `tools/slippi_format.py` and Slippi conformance checks | Parser references the Slippi format specification; `dependencies.lock.json` pins `slippi-js` `9.1.3` at `ff815345e641836a331191320c0f6eae21542a5f` as a reference tool | Pinned `package.json` declares LGPL-3.0-or-later and the license file contains LGPLv3. It is not linked into gameplay. A conformance comparison alone does not assign LGPL to an independently authored parser |
@@ -194,6 +207,9 @@ of a combined program containing covered code and recovered material.
 - [x] Identify follow-ups beyond the resampler: original SDK translations,
   reciprocal-estimate attribution, pipeline regeneration limits, and the native
   probe's static dependency closure.
+- [x] Add the September 2026 allocation observer, source-startup patch and
+  source-bound fixture families to the named provenance map without extending
+  the root MIT scope.
 - [ ] Review an affirmative file/portion license allowlist, starting with
   separable orchestration, UI and documentation; confirm ownership before
   applying the proposed project license.

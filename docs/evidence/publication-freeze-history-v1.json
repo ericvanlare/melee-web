@@ -1,0 +1,163 @@
+{
+  "schema": "melee-web-publication-freeze-history-v1",
+  "observed_at": "2026-09-25T00:42:25.093507+00:00",
+  "repository": "ericvanlare/melee-web",
+  "freeze_inputs": {
+    "local_head": "398044147b012bcc15a7a525ef7621e05de297e4",
+    "main_head": "60372b468dbe98f2b73bcc690a4ed35273eead91",
+    "previous_audit_head": "de048792af1144c23a5d10d28fe2270cab430d82",
+    "namespace": "refs/publication-audit/freeze-20260925",
+    "policy_ref": "HEAD",
+    "policy_commit": "398044147b012bcc15a7a525ef7621e05de297e4"
+  },
+  "audit_binding": {
+    "full_audit_path": "work/publication-freeze-20260925/history/history-audit-v1.json",
+    "full_audit_sha256": "fa4b13c57c5413580a3b104a7cf6a146081c84cec097e0140f0ad662f5e42147",
+    "scanner_sha256": "912169fe0053794c528fd2fc08397f40fc35f9d37144108dbf8292c948204898",
+    "content_guard_sha256": "af90151fe591db67ea35680c985a337099dfe49ab40f0647e6c800fa457adf99",
+    "policy_sha256": "2c02e879172a9adb22848610a9a4f3d2c820f1900e477373f0a440b0bbb55eeb"
+  },
+  "root_inventory": {
+    "count": 128,
+    "branch_heads": 63,
+    "pull_refs": 64,
+    "tags": 0,
+    "exact_root_inventory_sha256": "681d13c4c353eb1ff3b8722b3757ef33590490011214d5e25d83626fca4b9b72",
+    "full_exact_roots_in": "work/publication-freeze-20260925/history/history-audit-v1.json",
+    "metadata_findings": 0,
+    "commit_email_hash_count": 5,
+    "commit_email_hashes_sha256": "4a17e1fba871709e614da9495c71c03c7112a650d2fe860df1b1bfca8e62113d"
+  },
+  "history_inventory": {
+    "commits": 489,
+    "trees": 422,
+    "path_blob_pairs": 4332,
+    "regular_blobs": 4329,
+    "unique_regular_blob_bytes": 81471964
+  },
+  "finding_comparison": {
+    "current_total": 42,
+    "current_counts": {
+      "binary_content": 6,
+      "encoded_payload": 23,
+      "personal_path": 13
+    },
+    "current_metadata_findings": 0,
+    "current_finding_set_sha256": "5eee33161ccea9bbb29fd73ee84542ac66a7e1d384f347e254b5bddc04c79262",
+    "previous_audit_path": "work/publication-pre-freeze/history/history-audit-v1.json",
+    "previous_audit_sha256": "6835d9535741fba34e6679a60c8e2ecff86739ff28c691b8977e20121ebdcab1",
+    "previous_total": 42,
+    "new_finding_keys": [],
+    "removed_finding_keys": [],
+    "dispositions": {
+      "binary_content": "Six historical reviewed project UI PNG versions remain under the existing disposition; no new binary path/blob pairing was found.",
+      "encoded_payload": "Twenty-three historical generated Aurora renderer seed versions remain under the existing provenance review; the current active seed remains covered by its exact policy exception.",
+      "personal_path": "Thirteen historical synthetic test-fixture matches remain under the existing nonfunctional-fixture disposition.",
+      "metadata": "No commit or tag metadata finding."
+    }
+  },
+  "root_delta": {
+    "added": [
+      "heads/codex/full-session-equivalence",
+      "heads/codex/live-source-pool-initialization",
+      "heads/codex/original-startup-fixture",
+      "heads/codex/publication-pre-freeze",
+      "heads/codex/repeated-source-ownership",
+      "heads/codex/source-ai-init-profile",
+      "heads/codex/source-ar-init-profile",
+      "heads/codex/source-arq-completion",
+      "heads/codex/source-audio-ar-services",
+      "heads/codex/source-audio-startup-complete",
+      "heads/codex/source-ax-startup-profile",
+      "heads/codex/source-cpu-r5-carry",
+      "heads/codex/source-devcom-startup",
+      "heads/codex/source-dsp-init-profile",
+      "heads/codex/source-handle-compaction",
+      "heads/codex/source-synth-joined-startup",
+      "heads/codex/source-synth-parameters",
+      "pull/63/head",
+      "pull/64/head",
+      "pull/64/merge",
+      "pull/65/head",
+      "pull/66/head",
+      "pull/67/head",
+      "pull/68/head",
+      "pull/69/head",
+      "pull/70/head",
+      "pull/71/head",
+      "pull/72/head",
+      "pull/73/head",
+      "pull/74/head",
+      "pull/75/head",
+      "pull/76/head",
+      "pull/77/head",
+      "pull/78/head",
+      "pull/79/head"
+    ],
+    "removed": ["pull/16/merge"],
+    "changed": {
+      "HEAD": {
+        "from": "de048792af1144c23a5d10d28fe2270cab430d82",
+        "to": "398044147b012bcc15a7a525ef7621e05de297e4"
+      },
+      "heads/main": {
+        "from": "de048792af1144c23a5d10d28fe2270cab430d82",
+        "to": "60372b468dbe98f2b73bcc690a4ed35273eead91"
+      },
+      "heads/codex/original-allocation-history": {
+        "from": "22b71a0a81fa5bfdf7856f9a451c3f0081b01b6b",
+        "to": "b38470e4d8868561d015b3e0a0ff1e0d33f63ec0"
+      },
+      "pull/16/head": {
+        "from": "22b71a0a81fa5bfdf7856f9a451c3f0081b01b6b",
+        "to": "b38470e4d8868561d015b3e0a0ff1e0d33f63ec0"
+      }
+    }
+  },
+  "new_reachable_content": {
+    "path_blob_pairs": 215,
+    "distinct_paths": 162,
+    "exact_new_pair_inventory_sha256": "1847898fff6a8bd4c7158ef8ec615989643e892ca1e14561e684338c64cd3800",
+    "regular_utf8_pairs": 215,
+    "non_regular_pairs": 0,
+    "binary_or_non_utf8_pairs": 0,
+    "max_pair_bytes": 344420,
+    "extension_counts": {
+      "c": 16,
+      "cmake": 1,
+      "cpp": 23,
+      "h": 26,
+      "hpp": 1,
+      "json": 21,
+      "md": 46,
+      "patch": 8,
+      "py": 70,
+      "txt": 3
+    },
+    "bounded_pattern_hits": {
+      "private_key": 0,
+      "aws_access_key": 0,
+      "github_token": 0,
+      "slack_token": 0,
+      "api_secret": 0,
+      "sensitive_assignment": 0,
+      "personal_path": 0,
+      "encoded_payload": 0
+    },
+    "source_fixture_disposition": "New source/profile/oracle and allocation files are tracked text, including Dolphin/reference declarations, tests, tools, patches and evidence JSON. They do not receive a new MIT grant: LICENSE_SCOPE.md excludes unlisted files, source-derived/game-derived material and the separate GPL observer boundary. Existing source-specific receipts record their declared input identities and limitations.",
+    "generated_fixture_disposition": "No newly reachable binary, archive, renderer seed, raw game asset or generated binary fixture was found. Evidence JSON may mention ignored generated outputs, but those outputs are not tracked in the selected histories."
+  },
+  "actionable_publication_gap": {
+    "status": "non_blocking_provenance_followup",
+    "finding": "docs/SOURCE_LICENSE_INVENTORY.md remains a first-pass inventory based on an older main/tree and does not individually enumerate the 162 newly reachable source/profile/oracle/allocation path names.",
+    "control": "The current LICENSE_SCOPE.md explicitly grants no rights to unlisted files and excludes source-derived, game-derived, generated/data and GPL material, so the gap does not create a new permissive-license claim.",
+    "followup": "Before public visibility, either retain the explicit exclusion as the intentional treatment or extend the source/provenance inventory for the new additions; do not broaden the MIT allowlist by directory pattern."
+  },
+  "limits": [
+    "Only selected reachable Git histories and tag annotations are covered; the exact selected roots are bound by the full audit hash above.",
+    "No reflogs, unreachable objects, server-only refs, discussions, Actions material, LFS payload retrieval or alternate encodings are covered.",
+    "The content guard's pattern and size limits apply; zero findings is not rights or security clearance.",
+    "No branch checkout, commit, GitHub mutation, remote ref mutation, cache, Actions or visibility change was performed.",
+    "This receipt does not establish runtime equivalence, gameplay, performance, pixel, PCM or release-package evidence."
+  ]
+}

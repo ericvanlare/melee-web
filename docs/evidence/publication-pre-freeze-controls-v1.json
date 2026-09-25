@@ -1,0 +1,236 @@
+{
+  "schema": "melee-web-publication-pre-freeze-controls-v1",
+  "observed_at_utc": "2026-09-24T14:47:24Z",
+  "repository": "ericvanlare/melee-web",
+  "local_baseline": {
+    "branch": "codex/publication-pre-freeze",
+    "sha": "de048792af1144c23a5d10d28fe2270cab430d82",
+    "working_tree_at_audit_start": "clean",
+    "working_tree_at_receipt_update": "lead_untracked_artifacts_present",
+    "lead_untracked_artifacts_seen_after_audit": [
+      "docs/PUBLICATION_PRE_FREEZE.md",
+      "docs/evidence/publication-pre-freeze-actions-v1.json",
+      "docs/evidence/publication-pre-freeze-history-v1.json"
+    ],
+    "state_scope": "The clean state applies to the first audit snapshot; subsequent shared-worktree documentation edits are not part of this baseline receipt."
+  },
+  "remote_repository": {
+    "visibility": "private",
+    "default_branch": "main",
+    "main_sha": "de048792af1144c23a5d10d28fe2270cab430d82",
+    "main_branch_protected": false,
+    "allow_forking": true,
+    "has_issues": true,
+    "has_wiki": false,
+    "has_discussions": false,
+    "branch_count": 46,
+    "tag_count": 0,
+    "release_count": 0
+  },
+  "actions": {
+    "settings": {
+      "enabled": true,
+      "allowed_actions": "all",
+      "sha_pinning_required": true
+    },
+    "workflow_permissions": {
+      "default_workflow_permissions": "read",
+      "can_approve_pull_request_reviews": false
+    },
+    "workflow_count": 2,
+    "workflow_paths": [
+      ".github/workflows/verify.yml",
+      ".github/workflows/public-release.yml"
+    ],
+    "action_reference_check": {
+      "uses_lines_checked": 28,
+      "all_full_sha_pinned": true
+    }
+  },
+  "feature_availability": {
+    "main_branch_protection": {
+      "state": "unavailable_private_plan",
+      "http_status": 403
+    },
+    "repository_rulesets": {
+      "state": "unavailable_private_plan",
+      "http_status": 403
+    },
+    "fork_pr_contributor_approval": {
+      "state": "unavailable_private_repository",
+      "http_status": 422
+    },
+    "private_vulnerability_reporting": {
+      "state": "unavailable_or_not_enabled",
+      "http_status": 404
+    },
+    "vulnerability_alerts": {
+      "state": "disabled",
+      "http_status": 404
+    },
+    "automated_security_fixes": {
+      "enabled": false,
+      "paused": false
+    }
+  },
+  "cache_inventory": {
+    "entries": 70,
+    "total_size_bytes": 10924373351,
+    "main_ref_entries": 13,
+    "main_ref_size_bytes": 1780925917,
+    "payloads_inspected": false,
+    "raw_inventory": "work/publication-pre-freeze/controls/caches.json"
+  },
+  "all_repository_actions_runs": {
+    "run_count_observed": 560,
+    "completed": 559,
+    "in_progress": 1,
+    "queued": 0,
+    "non_completed_runs": [
+      {
+        "run_id": 36014448789,
+        "workflow": "Verify",
+        "status": "in_progress",
+        "head_branch": "codex/full-session-equivalence",
+        "head_sha": "071e0329b11cebeb53b36a0ba11eb0b535183def",
+        "url": "https://github.com/ericvanlare/melee-web/actions/runs/36014448789"
+      }
+    ],
+    "raw_inventory": "work/publication-pre-freeze/controls/all-runs.json"
+  },
+  "main_ci": {
+    "latest_verify_run": {
+      "run_id": 35970499795,
+      "run_number": 391,
+      "head_sha": "de048792af1144c23a5d10d28fe2270cab430d82",
+      "status": "completed",
+      "conclusion": "success",
+      "job_count": 18,
+      "url": "https://github.com/ericvanlare/melee-web/actions/runs/35970499795"
+    },
+    "required_check": {
+      "name": "browser-build",
+      "status": "completed",
+      "conclusion": "success",
+      "head_sha": "de048792af1144c23a5d10d28fe2270cab430d82",
+      "app_id": 15368,
+      "app_slug": "github-actions",
+      "check_run_id": 107655768349,
+      "url": "https://github.com/ericvanlare/melee-web/actions/runs/35970499795/job/107655768349"
+    },
+    "job_results": {
+      "repository-content": "success",
+      "unit_partitions": [
+        "verify (unit-0): success",
+        "verify (unit-1): success"
+      ],
+      "build_partitions": [
+        "verify (runtime): success",
+        "verify (graphics): success",
+        "verify (gameplay): success",
+        "verify (fighter): success",
+        "verify (effects): success",
+        "verify (menus): success"
+      ],
+      "public_shell": "success",
+      "browser_build": "success",
+      "compiler_cache_audit": "skipped"
+    },
+    "aggregate_guards": {
+      "workflow_needs": [
+        "repository-content",
+        "units",
+        "partitions",
+        "public-shell"
+      ],
+      "needs_result_guard": "browser-build fails when any dependency result is not success",
+      "report_groups": [
+        "unit-0",
+        "unit-1",
+        "runtime",
+        "graphics",
+        "gameplay",
+        "fighter",
+        "effects",
+        "menus"
+      ],
+      "report_guard": "ci_aggregate.py requires every report, exact GITHUB_SHA, exact targets, nonempty discovery, disjoint unit selections, and matching discovery hash",
+      "focused_test_status": "9 passed"
+    },
+    "unrelated_check_suite_observation": {
+      "app_id": 85455,
+      "app_slug": "cloudflare-workers-and-pages",
+      "status": "queued",
+      "conclusion": null,
+      "has_check_runs": false,
+      "scope": "Separate from the required browser-build check"
+    }
+  },
+  "content_guard": {
+    "ref": "de048792af1144c23a5d10d28fe2270cab430d82",
+    "tracked_entries_checked": 1130,
+    "findings": 0,
+    "status": "passed"
+  },
+  "raw_evidence_manifest": {
+    "path": "work/publication-pre-freeze/controls/manifest.json",
+    "sha256": "72c73514d90de1174f4044d2c505d9d1b3ca0681bf6d67dd0ec6028c81fafba1",
+    "algorithm": "sha256",
+    "files_verified": 71,
+    "contents": "All retained API response JSON, API error/status sidecars, and focused-test logs, including repository-content-check.log and test_ci_aggregate.log.",
+    "verification": "Every listed file matched its recorded digest at receipt update. The manifest excludes itself."
+  },
+  "provenance_delta_since_merge": {
+    "from_sha": "0b556cf21fd9e0669dd3a17f8898db9191188322",
+    "to_sha": "de048792af1144c23a5d10d28fe2270cab430d82",
+    "new_file_counts": {
+      "docs": 16,
+      "src": 19,
+      "tests": 20,
+      "tools": 2
+    },
+    "scope_observation": "The delta adds Results/Prize/save/replay/observer source, tests, evidence records and an expanded renderer seed. These remain outside the explicit root MIT allowlist; the existing recovered-source, current-audio, generated-metadata and GPL observer boundaries continue to describe them.",
+    "publication_boundary_files_changed": false,
+    "unchanged_boundary_files": [
+      "LICENSE",
+      "LICENSE_SCOPE.md",
+      "THIRD_PARTY.md",
+      "dependencies.lock.json",
+      "docs/PUBLICATION_CUTOVER.md",
+      "docs/PUBLIC_REPOSITORY_CHECKLIST.md",
+      "docs/PUBLICATION_PROVENANCE_ASSESSMENT.md",
+      "docs/SOURCE_LICENSE_INVENTORY.md",
+      "reference-capture/dolphin/LICENSES.md"
+    ],
+    "renderer_seed": {
+      "path": "web/initial_pipeline_cache.db.gz.b64",
+      "content_policy_hash_updated": true,
+      "review_receipt": "docs/evidence/results-prize-pipeline-seed-v1.json"
+    },
+    "license_scope_action": "No amendment is required before the runtime freeze unless the owner elects to grant additional paths; unlisted additions receive no new root MIT grant."
+  },
+  "security_reporting_caveat": "SECURITY.md remains accurate: the private vulnerability form is the intended route once available, but the current endpoint returned 404 and no alternate private inbox is verified. Do not publish vulnerability details in public channels until a private route is enabled and tested.",
+  "contributor_setup": {
+    "contributing": "present",
+    "pull_request_template": "present",
+    "security_policy": "present_with_private_reporting_caveat",
+    "license_boundary": "LICENSE_SCOPE.md grants MIT only to its explicit file list and excludes recovered game/SDK material, current audio/data, generated metadata and the separate GPL observer."
+  },
+  "pending_cutover_gates": [
+    "Complete the final runtime change, freeze the intended publication SHA, inventory all branches/tags/reachable history and rerun the history and GitHub-surface audits against that exact state.",
+    "Retain exact-head CI and repository-content evidence for the frozen SHA; the current baseline run is evidence only for de048792af1144c23a5d10d28fe2270cab430d82.",
+    "Once the plan or public visibility enables it, apply and read back main protection/rulesets with strict browser-build app binding, administrator enforcement, conversation resolution and no force-push/deletion.",
+    "Enable and verify approval of workflows from all external fork contributors.",
+    "Quiesce Actions, wait for active and queued runs to finish or be deliberately stopped, retain a fresh cache inventory, remove private-era caches, verify zero entries, then re-enable the reviewed workflow.",
+    "Enable and verify private vulnerability reporting and maintainer notifications, then update SECURITY.md's availability wording.",
+    "Record the owner's visibility decision, reconcile issue #2, and retain the deliberate rights and distribution deferrals."
+  ],
+  "actionable_observations": [
+    "Main is currently unprotected and protection/ruleset APIs are unavailable under the private plan.",
+    "The current cache inventory is nonempty and its payloads were not inspected; cache cleanup remains a cutover gate.",
+    "One Verify run is currently in progress on codex/full-session-equivalence; the cutover must wait for it to complete or be deliberately stopped before cache cleanup.",
+    "The private vulnerability reporting route and external-fork approval setting remain unavailable; SECURITY.md must retain its caveat until verified.",
+    "A separate Cloudflare check suite is queued without check runs on the baseline; scope or resolve it during the final remote-surface review if it remains pending."
+  ],
+  "raw_control_directory": "work/publication-pre-freeze/controls"
+}
