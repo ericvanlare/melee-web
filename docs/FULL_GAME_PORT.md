@@ -16,6 +16,10 @@ services, custom content and non-vanilla revisions are later scope. The
 inventory keeps those exclusions explicit so a missing offline feature cannot
 be mistaken for an online or product-extras task.
 
+The current local-versus priority and milestone are tracked in the
+[roadmap](ROADMAP.md); this inventory does not duplicate its changing acceptance
+details.
+
 The fighter census has one row for each source selectable identity through
 `CKIND_PLAYABLE_COUNT` (including separate Zelda/Sheik identities and the
 single Ice Climbers selection that constructs Popo and Nana). The VS-stage census has one row for each named `StKind` from
@@ -52,9 +56,10 @@ reports remain the authority for runtime claims. `STATUS.md` is the changing
 evidence index; this document and the JSON point to it and to retained receipts
 without copying its measurements.
 
-## Integration order
+## Long-term integration order
 
-Work on `codex/full-game-integration` in small, reviewable slices. A slice may
+Follow the active roadmap before choosing a full-game expansion. Work from
+current main in a dedicated branch with small, reviewable slices. A slice may
 own a bounded set of inventory rows and its implementation/evidence, while the
 lead owns central build integration, cross-row dependency decisions and final
 validation.
@@ -79,9 +84,9 @@ validation.
    an aggregate claim.
 4. Add the original menu graph and persistence boundaries: title/main menu,
    CSS/SSS, rules/name screens, match ending, Results, unlocks, trophies,
-   gallery and save/memory-card recovery. Results draft PR #44 and audio draft
-   PR #42 are inventory dependencies; Results is tracked by issue #34. Neither
-   draft is merged or counted as acceptance here.
+   gallery and save/memory-card recovery. Merged Results PR #44 and merged audio
+   PR #42 are inventory dependencies; Results is tracked by issue #34. Their
+   merged status does not convert inventory rows into accepted gameplay.
 5. Port the source-owned single-player graph: Classic, Adventure, All-Star,
    Event Matches, Training, How-To, Multi-Man, Target Test, Home-Run and related
    Stadium/tournament flows. Then add opening/staff/movie playback and the
@@ -138,17 +143,14 @@ Ganondorf is a `partial` development candidate with scoped native lifecycle
 and browser-entry evidence in [its port notes](GANONDORF_PORT_NOTES.md). Keep unused, route-only, event-only and boss entities visible rather
 than silently dropping them.
 
-The branch now has sixteen development fighters, including Bowser's scoped
-native and browser action checks in [his port notes](BOWSER_PORT_NOTES.md).
-Every added fighter retains `partial` acceptance. The development player now
-uses [scene-specific asset scopes](SCENE_ASSET_LOADING.md)
-with explicit source teardown and asynchronous reads while its clock is stopped.
-The public player now uses the same scoped ownership boundary and excludes
-DSP coefficients. The production checkpoint exposes sixteen fighters: Donkey
-Kong is re-enabled in public selection after his platform shield-drop crash was
-repaired; [issue #50](https://github.com/ericvanlare/melee-web/issues/50) keeps
-the remaining verification open. New feature additions are paused for this release
-checkpoint; four-player residency and additional modes remain open.
+Current development and deployed inventories, fighter-specific limitations and
+release identities belong in [STATUS](../STATUS.md), not a copied roster count
+here. Integrated content is not automatically admitted. The player uses
+[scene-specific asset scopes](SCENE_ASSET_LOADING.md) with explicit source
+teardown and asynchronous reads while its clock is stopped. The
+[production audio release path](AUDIO_PRODUCTION.md) defines the audio-player
+profile and silent rollback separately. Refer to their scoped receipts before
+making residency, audio, mode or broader gameplay claims.
 
 ## Validation before handoff
 

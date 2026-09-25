@@ -1,129 +1,97 @@
-# Acceptance milestones
+# Acceptance roadmap
 
-The goal is full vanilla Melee compiled to WebAssembly, without an emulator.
-The first playable milestone is a local **Mario-versus-Mario stock match on
-Final Destination at 60 fps**. Progress is measured by original runtime behavior,
-not the number of supported inspection assets.
+The goal is full vanilla Melee compiled to WebAssembly, preserving original
+behavior without a shipped PowerPC interpreter or JIT. Complete and verify the
+supported playing experience before expanding scope.
 
-The immediate validation order is fixed: run the bounded development
-[hitch-capture matrix](HITCH_CAPTURE.md), resolve the retained performance red
-causally or classify external scheduling with correlated evidence, freeze the
-candidate, and then execute the two untouched holdouts. Native 16.67 ms target
-misses remain visible separately from browser callback gaps; the 33.3 ms hard
-failure threshold stays unchanged.
+This page owns priority and execution order. GitHub issues own bounded tasks and
+completion criteria; [STATUS](../STATUS.md) owns observed results and scoped
+receipts. Closed implementation issues do not establish every acceptance gate.
 
-For #33, the owner approved a separate
-[current-runtime holdout gate](HITCH_CAPTURE.md#approved-current-runtime-scope--2026-09-19)
-while retaining the September 12 failure as causally unresolved. This bounded
-exception leaves all new-failure thresholds and later milestones unchanged.
+## Now — Reliable local versus v1
 
-After those holdouts, the public four-character/four-stage loop still requires
-the separate [consecutive-match validation track](HITCH_CAPTURE.md#consecutive-match-track-after-holdouts).
-Use whole-sequence original references and retain source heap history through
-CSS/SSS and successive completed matches. A fresh-process replay pass cannot
-substitute for this gate, or for the separate controller, visual, PCM and latency
-checks.
+The active [milestone](https://github.com/ericvanlare/melee-web/milestone/1)
+targets one frozen desktop configuration and this ordinary player route:
 
-## 0 — Rendering and runtime foundation
+**Original CSS → original SSS → four-stock Mario versus Mario on Final
+Destination → original Results → original CSS, for three consecutive matches
+without reloading.**
 
-Established: pinned tools/source, original HSD model/material/skin/animation
-rendering, local asset import and browser PAD sampling. The separate Wasm runtime
-now passes original `Fighter_Create` → source Fall/Wait settling → 120 neutral
-Wait ticks → unload → restart, four times across two complete SDK worlds.
-See [the runtime gate](FIGHTER_RUNTIME.md) and [STATUS.md](../STATUS.md).
+Use two human players for physical-input and uninterrupted-play checks. The
+retained four-Mario CPU9 three-match reference is a separate original-versus-browser
+comparison. Neither substitutes for the other. Preserve source heap/RNG history;
+do not splice fresh-process captures or reset the page to make a sequence pass.
 
-In progress: this same source runtime is connected to browser presentation and
-fixed-tick controller input. Authored Final Destination stage objects, Mario
-items/effects, stock outcomes and the renderer cache are integrated. Cold
-first-use preparation, audible and physical controller checks, broader rendered
-combat and original-game state comparisons remain. This checkpoint does not
-satisfy milestone 1.
+| Work | Owner | Execution boundary |
+| --- | --- | --- |
+| First session divergence and complete reference sequence | [#82](https://github.com/ericvanlare/melee-web/issues/82), child of [#6](https://github.com/ericvanlare/melee-web/issues/6) | Owner-paused until explicitly resumed; planning does not restart it |
+| One two-controller profile and measured latency | [#83](https://github.com/ericvanlare/melee-web/issues/83), child of [#35](https://github.com/ericvanlare/melee-web/issues/35) | Prepare the existing tools/profile, then arrange the physical session |
+| Uninterrupted three-match audio and performance | [#84](https://github.com/ericvanlare/melee-web/issues/84), child of #35 | Share the controller candidate/profile; use the existing cold/warm sequence protocol |
+| Fixed comparison of other browser ports | [#81](https://github.com/ericvanlare/melee-web/issues/81) | Parallel research outside the milestone; never blocks a known fix |
 
-## 1 — Playable local stock match
+Start with retained evidence, profile/scenario preparation and known player
+failures. Reduce a failure before expanding instrumentation. Study relevant
+existing implementations with source/attribution links as part of each fix.
+Do not create another replay framework, general benchmark platform or open-ended
+competitor audit. After two experiments at one boundary, reduce the reproducer
+or request a bounded review before another long run.
 
-Launch Mario versus Mario on Final Destination from user-supplied local data.
-Both local players must use the original action/state, input, physics, collision,
-attack and damage paths. Validate movement, jump/landing, shields/grabs/attacks,
-KO, stock loss, respawn, match outcome and restart, with required audio behavior.
-Direct launch is historical partial evidence. The active first deliverable now
-requires original in-game CSS → original SSS → four-stock Mario/FD → original CSS,
-without a results screen. See [the accuracy contract](ACCURACY_CONTRACT.md).
+### Finish line
 
-The normal browser launch now uses the authored Final Destination player markers
-`(-60, 10, 0)` and `(60, 10, 0)` through the original Ground API. Close-range
-`+/-20` coordinates remain diagnostic fixtures. The latest local suite reports
-262 tests passed without skips in 219.703 seconds; the historical 192-test
-checkpoint is retained only as an earlier validation point.
+Freeze Release artifacts, machine/OS/browser/display/power profile, controllers,
+input/scenario inventory and criteria before final runs. Existing protocols and
+thresholds apply; the issue bodies define finite attempt plans. A new failure
+needs a reduced diagnosis and an explicit new campaign, not silent retries.
 
-Compare recorded original-game and port state at fixed simulation boundaries:
-positions, actions, damage, stocks, RNG and outcome. Preserve original 60 Hz
-simulation independent of presentation. Missing services fail explicitly; do not
-substitute handwritten movement or successful runtime stubs.
+Close the milestone only when #82, #83 and #84 have their declared evidence and
+the final candidate retains all three gates. Link exact receipts from STATUS.
+Component fixes do not close acceptance issues; relevant changes after a receipt
+require scoped revalidation. Report source-state agreement, physical input/latency,
+audible continuity and performance separately.
 
-Reference hardware selected from the development machine: Apple M4, Mac16,12,
-32 GiB RAM, macOS 26.6.2 (25G83). The latest saved-cache full-stage run was
-captured in Chrome 152's IAB at DPR1 at
-1280×960 records 14,452 ticks, 17.63 ms recent p95, 30.50 ms worst interval,
-zero intervals above 33.3 ms and zero audio underruns. The saved-cache stock
-run records 1,985 ticks, three respawns, four losses, P2 victory, 22.23 ms worst
-interval, zero intervals above 33.3 ms and zero audio underruns.
-Measure cold and warm release-build frame intervals, CPU/GPU work where
-available, input latency, audio underruns, loading stalls and memory high-water.
-The frame budget is approximately 16.7 ms with headroom; warm timing does not
-establish cold first-use acceptance.
+Verify KO/respawn, outcome/Results, pause/resume, No Contest recovery, loading,
+audio ownership and teardown within the named profile. Report preparation,
+memory and failures separately from active play. Original framebuffer/hardware
+PCM equivalence, all-device support and tournament acceptance remain separate
+under #35 and the [accuracy contract](ACCURACY_CONTRACT.md).
 
-The optional renderer-only `/melee-render-cache` uses IDBFS, saves after native
-unload when the pipeline queue is idle, and restores 81 cached pipelines before
-assets on the next page startup. Game assets are not persisted. The first cold
-visit still has unresolved rendering stalls. Browser audio uses a 1536-sample
-prefill and per-frame transport gating; the saved-cache runs had no underruns.
-Internal framebuffer scale is explicitly 640×480 at 1× and 1280×960 at 2×;
-presentation density does not define the internal resolution.
-Battlefield now runs its original scene-level stage lifecycle and checked scaled
-marker/collision paths. Additional non-FD stages still need their own callback,
-reservation, data and lifecycle evidence; FD uses direct player-index respawns.
+Routine browser work stays headless through shared tools. Foreground timing,
+physical controllers and audible checks require an arranged foreground session
+or a separate machine; otherwise the gate remains unrun. See
+[browser validation](HEADLESS_BROWSER_VALIDATION.md) and
+[consecutive-match timing](HITCH_CAPTURE.md#consecutive-match-track-after-holdouts).
+Do not relax accuracy rules to meet the milestone.
 
-Scene entry now uses an explicit preparation boundary through the normal GX path,
-independent of match simulation. Unchanged source frames discover texture uploads
-and pipelines while the clock is stopped, and the runtime requires two quiet
-callbacks before arming. First-use render work discovered during a match enters
-the same automatic gate. Aurora still exposes CPU pipeline-queue drainage but no
-browser GPU completion boundary; acceptance must account for that distinction.
-The local persisted cache is useful evidence, not a universal first-visit fix.
-Runtime diagnostics can sample queue-completion callback latency at most once per
-60 submitted frames, with only one sample outstanding. Sampling is off by default,
-never waits for the GPU, and drops prior-match results on restart. Its latency
-includes browser callback scheduling; compare it with CPU phases and long tasks
-rather than treating it as a GPU timer.
+## Next — Broaden the verified experience
 
-## 2 — Complete versus loop
+Choose a named rotation from already integrated fighters/stages before adding
+content. Extend original comparisons, repeated-match ownership and physical
+cold/warm play using the [fighter](ADDING_CHARACTERS.md) and
+[stage](ADDING_STAGES.md) checkpoints.
 
-The next scoped menu gate after core-loop stabilization is Mario-only character
-selection → Final Destination-only stage selection → stock match → return.
-Keep the initial rules to stocks; the full options menu can follow. Build through
-shared original menu and roster interfaces so Falco, the first planned expansion,
-does not require a separate flow.
+Broaden live sampling/source-draw validation under
+[#28](https://github.com/ericvanlare/melee-web/issues/28), controller routing
+under [#5](https://github.com/ericvanlare/melee-web/issues/5), and independent
+visual/PCM/device acceptance under #35. Defects blocking v1 are fixed during Now;
+completing every broad umbrella is not a v1 prerequisite.
 
-Local disc import → menus → character/stage selection → controlled matches →
-results → menus. Expand fighters, stages, items and four-player scenarios through
-the same source runtime, preserving accuracy and performance regressions.
+## Later — Complete vanilla, then optional features
 
-## 3 — Full vanilla game
+Use the [full-game inventory](FULL_GAME_PORT.md) for remaining content, rules,
+menus, saves, single-player modes, movies and collections. Broader browser/device
+support follows a stable reference profile. Netplay and custom content follow
+the vanilla boundary in [#9](https://github.com/ericvanlare/melee-web/issues/9).
+A coverage dashboard supports this work; it is not a playable-slice prerequisite.
 
-All original modes, movies, saves, controller routing, failure recovery and
-browser lifecycle behavior. Broaden browser support after the reference
-implementation is stable. Custom fighters, netplay and product extras are later
-projects. See [NEXT_PHASE.md](NEXT_PHASE.md) for the immediate work boundaries.
+## Historical scope
 
-## Initial public alpha audio follow-up
+[#34](https://github.com/ericvanlare/melee-web/issues/34) is closed Results/return
+implementation history; #82–#84 own remaining v1 acceptance.
+[#33](https://github.com/ericvanlare/melee-web/issues/33) has a scoped
+[holdout result](CURRENT_RUNTIME_HOLDOUTS_20260919.md); preserve earlier failed
+campaigns and the unresolved historical cause. It does not validate new sequences.
 
-The initial public alpha deliberately disables audio output to exclude the
-Dolphin-derived resampler and DSP coefficient generator. Development retains
-its current audio implementation and accuracy tests. Before restoring public
-audio, implement independently authored permissive replacements or fulfill the
-applicable source-license obligations; then validate voice/cursor timing,
-SSM/HPS loops and bank lifetimes, source transitions, repeated teardown, emitted
-PCM against an independent original reference, and visible cold/warm playback.
-Full audio fidelity remains open. Silent-alpha checks do not satisfy audio
-acceptance, and the existing opcode-63 CPU-action abort remains a separate
-known gameplay limitation.
+The earlier Mario/FD route skipped Results and the initial alpha was silent.
+Original Results is now required and [production audio](AUDIO_PRODUCTION.md)
+has an audited release path; these facts do not establish full-game fidelity.
+[Early menu notes](NEXT_PHASE.md) remain history, not an alternative work queue.

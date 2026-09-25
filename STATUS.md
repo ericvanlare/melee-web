@@ -22,6 +22,15 @@ not establish audible quality, PCM or pixel equivalence, foreground timing,
 input latency, physical-controller acceptance, performance, or full-game menu
 coverage.
 
+## Current acceptance boundaries
+
+The supported CSS → SSS → Mario/Final Destination → Results → CSS route is
+covered by the scoped receipts below. Remaining acceptance is independent across
+original comparison, live and physical input, visual output, audio fidelity and
+sustained performance. The [roadmap](docs/ROADMAP.md), [accuracy contract](docs/ACCURACY_CONTRACT.md)
+and [performance/accuracy playbook](docs/PERFORMANCE_AND_ACCURACY.md) define
+those boundaries; this section adds no new runtime or deployment evidence.
+
 ## Repository public; main changes restricted to the owner
 
 The [publication record](docs/PUBLICATION_CUTOVER.md) and
@@ -1371,7 +1380,8 @@ and Aurora's pipeline queue remain quiet for two callbacks. The live clock arms
 on a later callback. Pipelines or uploads first encountered during a match enter
 the same frozen render-preparation gate and resume automatically; unrelated clock
 overruns retain the explicit hitch pause. Preparation time is reported separately,
-and the scoped [scene-entry profile](work/scene-entry-profile.md) measured
+and the historical scene-entry profile (`work/scene-entry-profile.md`, an ignored
+local report unavailable in this checkout) was recorded as measuring
 106.555 ms for initial resource preparation, 83.140 ms for isolated SSS owner
 construction and 160.100 ms for isolated match construction. Its 7,604 active
 callbacks had a 24.200 ms worst callback, no callback above 33.3 ms and zero
