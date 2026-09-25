@@ -75,6 +75,14 @@
       "http_status": 422,
       "message": "Changes must be made through a pull request.",
       "main_unchanged": true
+    },
+    "pending_ci_merge_test": {
+      "pull_request": 80,
+      "head_commit": "3378d03ef5ea1f34eeca863b61f296f56cda5a0a",
+      "result": "rejected",
+      "http_status": 405,
+      "message": "Required status check \"browser-build\" is expected.",
+      "pull_request_remained_open": true
     }
   },
   "cache_cleanup": {
@@ -119,7 +127,8 @@
     "authenticated_form_or_submission_exercised": false,
     "email_preferences_or_delivery_verified": false,
     "open_secret_alerts_at_check": 0,
-    "open_dependency_alerts_at_check": 0
+    "open_dependency_alerts_at_check": 0,
+    "dependency_alerts_readback_http_status": 204
   },
   "retained_failures": [
     {
@@ -132,7 +141,7 @@
     }
   ],
   "normalization_note": "GitHub omits the explicitly false update_allows_fetch_and_merge field in its ruleset readback. No true exception is present, and this repository has no upstream fork.",
-  "followup": "This documentation/policy PR records the actual transition and must pass required CI under the new protections. Its resulting main SHA and final issue #2 reconciliation are retained after merge without changing this historical publication receipt.",
+  "followup": "Issue #2 now records the public transition and explicit verification limits. This documentation/policy PR must pass required CI under the new protections. Its resulting main SHA and final issue closure are retained after merge without changing this historical publication receipt.",
   "limits": [
     "The preceding bounded publication audits and accepted source/license limits still apply, including 392 expired artifact payloads that were unavailable.",
     "This is no claim of universal security, third-party permission or new gameplay/binary-release validation.",
@@ -274,6 +283,16 @@
       "path": "work/publication-cutover-20260925/dependency-alerts.json",
       "bytes": 4,
       "sha256": "cf1cbb66a638b4860a516671fb74850e6ccf787fe6c4c8d29e9c04efe880bd05"
+    },
+    {
+      "path": "work/publication-cutover-20260925/pending-ci-merge-test.json",
+      "bytes": 205,
+      "sha256": "0fd02f36bcda747cca7ee720dde17ecb474046345ab6a2bae6da9c64afb0c0b1"
+    },
+    {
+      "path": "work/publication-cutover-20260925/vulnerability-alerts-http-readback.txt",
+      "bytes": 1192,
+      "sha256": "d77c17f772595c36ae71a360b3cdf89e0be4e62573ccda5e66fed2b01112d8af"
     }
   ]
 }

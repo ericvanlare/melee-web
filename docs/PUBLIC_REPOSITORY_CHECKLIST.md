@@ -9,14 +9,15 @@ deployment, history rewriting, or deletion of evidence.
 
 The starting review was conducted on September 20, 2026 against GitHub `main`
 at [`2c2b687f5bb7dbfcb3c75dc0394c04bb97f2114d`](https://github.com/ericvanlare/melee-web/commit/2c2b687f5bb7dbfcb3c75dc0394c04bb97f2114d).
-Observations below describe that checkpoint. Recheck the eventual publication
-commit and live repository settings before closing the checklist.
+Historical inventory sections retain that checkpoint's scope. The cutover
+record above supplies the later publication commit and applied settings.
 
 The [post-handoff publication checkpoint](PUBLICATION_CHECKPOINT.md) refreshes
 history, GitHub-content, source provenance and controls after PR #79 merged and
 runtime work stopped. It continues the [September 24 preparation](PUBLICATION_PRE_FREEZE.md).
-Its receipts are a baseline for the remaining delta audit; they do not check
-off the final freeze, visibility or activation steps below.
+Its receipts preserve the pre-opening baseline. The later
+[cutover record](PUBLICATION_CUTOVER.md) supports the completed freeze,
+visibility and activation steps below.
 
 Public package audits cover selected deployment files. Repository publication
 also exposes source, patches, reference tools, generated material, reachable
@@ -38,8 +39,8 @@ owner later wants it.
 
 The [history review](REPOSITORY_HISTORY_AUDIT.md),
 [GitHub-surface audit](GITHUB_PUBLICATION_AUDIT.md), and
-[cutover procedure](PUBLICATION_CUTOVER.md) distinguish completed preparation
-from activation and final verification. No visibility change is recorded here.
+[cutover record](PUBLICATION_CUTOVER.md) distinguish historical preparation
+from the completed visibility change and applied controls.
 
 Suggested sequence: ownership and license inventory; audio disposition;
 repository safeguards and contributor documents; preparation of GitHub controls;
@@ -228,7 +229,7 @@ publication checkpoint, including CI generated after this inventory.
 - [x] Validate the final code checkpoint using its applicable tests/builds and
   retain CI evidence. Keep README and evidence links accurate for that commit;
   preserve experimental status and the separate accuracy/performance gates.
-- [ ] Reconcile issue #2 with this checklist, link completed work and decisions,
+- [x] Reconcile issue #2 with this checklist, link completed work and decisions,
   and record deliberate deferrals. Keep [STATUS.md](../STATUS.md) as the current
   gameplay evidence index rather than duplicating its measurements here.
 - [x] Record the owner's separate visibility decision. During cutover, activate
