@@ -92,6 +92,21 @@ work, separate from the screen-KO float mismatch. Diagnostic checkpoint
 logs without weakening rejection. Browser reports retain actual served hashes,
 GPU checks and repository state; dirty test/document changes are not hidden.
 
+The diagnostic rerun (`work/pr86-carry-diagnostic-a-r1/report.json`) completed
+one natural A match, then identified the rejected carry specifically as Nana
+(kind 11, slot 2, secondary entity 1) at match-two source frame 1865. It is not
+the earlier item-draw or Samus CatchWait crash. `559d0c2` adds the owned-DOL
+audited follower motion/null-item definitions with live leases and checked
+return scope; unsupported item-address and bypass routes still reject. The
+three actual-source/profile checks and source-context/collision traces pass.
+The first rerun in `work/pr86-nana-carry-a-two-match-r1/` instead exposed a
+new patch-composition regression: preceding hunks moved the ordinary B24B8
+frame hook onto B1EF0's similar locals. Fox then rejected a carry at frame 695.
+The isolated pre-change patch confirms the old placement was correct.
+`baa72ee` anchors the hunk to its exact function name; the added prepared-source
+placement check fails before and passes after. This failure remains retained,
+not credited to the shared runtime task.
+
 ## Character action checklist
 
 Construction results refer to real-asset source traces that execute source ticks
@@ -101,8 +116,8 @@ browser match supplements these checks; it does not prove each listed action.
 | Character | Content/construction | Targeted action coverage | Still unverified / failed |
 | --- | --- | --- | --- |
 | Game & Watch | **Native traced** in mixed-content lifecycle and rendered in both A matches. Ten authored Articles pass the real visibility/ownership regression. | Chef source motion, sausage Article creation/lifetime/teardown. | Other specials, defense/recovery, damage/KO and broader action inventory. |
-| Kirby | **Native traced** against Fox across all six costumes with repeated construction/teardown; rendered in both A matches. Copied-part visibility counts/IDs and Game & Watch's secondary texture-animation pair are source-adapted and checked against live DObj visibility. | **Passed for Mario, Popo/Ice Climbers, Game & Watch, Fox, and Samus donors:** inhale acquisition, a source-created copied-neutral-special Article, up-appeal copy loss, reacquisition/replacement and match teardown. G&W additionally passes copied Chef/Pan Article ownership and visibility. The Samus row resolves `EfKbSs.dat` group 0's raw palette address `0x80A8812A` to the exact 512 bytes in owned `ItCo.usd` (SHA-256 `5d62efd6437149335b9eef87624ae1253ba7bb260fb08cbae04a3d9215eacd11`, file offset `0x264A2A`, DAT data offset `0x264A0A`; palette SHA-256 `99036809572a8b9d2d5918b85600320f18ab1440d165ca8e9855a53726af0ec9`). Subtracting the raw file offset from the guest address implies an archive base of `0x80823700` (`0x80823720` for the DAT data section). A generic checked source-address-region resolver now owns/copies external bytes and rejects unmapped or out-of-range pointers; no row is omitted or coerced. The five-donor tracked regression passes acquisition, Article use, loss, replacement and teardown. A headless Metal replay of the exact Kirby/Samus PAD workload completed all 41,036 input events; bounded match-0 probes over ticks 310–491 saw no bank-34 particle generation or TLUT call during that captured interval, so effect-specific particle pixels remain unverified. Its process exited 133 on shutdown with `Failed to allocate MTLBuffer` after observer/input completion; no screenshot/pixel claim is made. Other normals/defense/recovery/damage/KO remain open. |
-| Ice Climbers (Popo/Nana) | **Native traced** as two distinct source entities with repeated lifecycle; rendered in both A matches. | Belay separates the pair; a CPU9 opponent kills Nana, who enters Sleep while Popo survives. **Correction:** the old test incorrectly accepted Nana staying asleep after Popo's stock loss. Verified original A match 0 re-enters Rebirth for both entities at ticks 5732 and 8716 after Nana's earlier Sleep. The port's `Player_80032070` consumed a transformation flag through an out-of-object cast beyond the `PdPm.dat` string. The real table-owner repair passes a reduced compiled Player regression; real-asset rejoin validation is in progress. | Other specials/recovery and broader damage/KO cases remain unverified. The earlier non-rejoin acceptance is withdrawn. |
+| Kirby | **Native traced** against Fox across all six costumes with repeated construction/teardown; rendered in historical A matches. Copied-part visibility counts/IDs and Game & Watch's secondary texture-animation pair are source-adapted and checked against live DObj visibility. | Six donors pass acquisition, copied use, up-appeal loss, same-donor reacquisition and teardown: Mario, Popo/Nana, G&W, Fox, Samus and Captain. The first five create their copied Articles; Captain's Falcon Punch enters the copied motion and damages its victim. A separate three-player case verifies true Mario→Fox replacement and use. The Ice observer identifies actual victim ownership across both entities; Nana maps to the Popo copy family. G&W additionally checks Chef/Pan ownership and visibility. | Nineteen donor families listed below remain unverified. Other normals/defense/recovery/damage/KO and copied-particle pixel equivalence remain open. |
+| Ice Climbers (Popo/Nana) | **Native traced** as two distinct source entities with repeated lifecycle; rendered in historical A matches. | Belay separates the pair. The strengthened CPU9 case observes Nana death→Sleep while Popo retains his stock, later Popo stock loss, both entities in Rebirth, Nana damage reset and resumed gameplay, then teardown. The original A capture also demonstrates paired rejoin after Sleep. | Other specials/recovery and broader damage/KO cases remain unverified. The earlier acceptance of Nana remaining permanently asleep after Popo's stock loss is withdrawn. |
 | Samus | **Native traced** in mixed-content lifecycle and rendered in both B matches. The authored fifth `x48` grapple joint owns its 34-joint graph and 25 sibling-instance references. | Down-B creates and clears Bomb. Raw-Z captures Mario into CatchWait; a fresh throw input consumes the grapple joint and enters the source throw path; mixed teardown passes. | Other specials, recovery, broader damage/KO coverage. The Kirby-copy palette owner is now resolved; effect-specific particle pixels remain unverified (Kirby row). |
 | Yoshi | **Native traced** in mixed-content lifecycle and rendered in both B matches. | Neutral-B captures Mario into `ftCo_MS_CaptureYoshi`, transitions to `ftCo_MS_YoshiEgg`, and naturally releases to `ftCo_MS_Fall` at action frame 243, with no injected fighter state. | Other specials, recovery, damage/KO; the tested path is fighter-victim capture, not the separate item-target Egg Lay branch. |
 | Zelda | **Native traced** in mixed-content lifecycle and selected in both B browser matches. | Four in-match down-B transformations (two each direction) preserve grounded/four-stock lifecycle. | Broader moves/recovery/damage/KO. Held-A startup form selection is not counted as down-B transformation coverage. |
@@ -113,12 +128,29 @@ Falcon, Donkey Kong, Koopa, Link, Sheik, Ness, Peach, Popo, Pikachu, Samus,
 Yoshi, Jigglypuff, Mewtwo, Luigi, Marth, Zelda, Young Link, Dr. Mario, Falco,
 Pichu, Game & Watch, Ganon and Roy. Nana uses the Popo source copy family; the
 Zelda/Sheik pair shares a source copy/effect identity. Targeted donor action
-coverage passes for Mario, Fox, Popo, Game & Watch, and Samus. The following
-source donor families remain unverified for acquisition/use/loss/replacement: Captain Falcon, Donkey
+coverage passes for Mario, Fox, Popo/Nana, Game & Watch, Samus and Captain Falcon.
+The following source donor families remain unverified for acquisition/use/loss/replacement: Donkey
 Kong, Koopa, Link, Sheik, Ness, Peach, Pikachu, Yoshi, Jigglypuff, Mewtwo,
 Luigi, Marth, Zelda, Young Link, Dr. Mario, Falco, Pichu, Ganon, and Roy. The
 source donor inventory is from
 `.deps/melee/src/melee/ft/kinds/ftKirby/ftkirbydata.c`.
+
+The strengthened action fixtures are checkpoint `cbee4ed`; all four focused
+tests (including donor subcases) pass in
+`work/pr86-distinctive-kirby-focused-r4.log`. This distinguishes same-donor
+reacquisition from the separate Mario→Fox replacement test.
+
+Kirby's Samus copy resolves `EfKbSs.dat` group 0's raw palette address
+`0x80A8812A` to 512 bytes in owned `ItCo.usd` (archive SHA-256
+`5d62efd6437149335b9eef87624ae1253ba7bb260fb08cbae04a3d9215eacd11`,
+file offset `0x264A2A`, data offset `0x264A0A`; palette SHA-256
+`99036809572a8b9d2d5918b85600320f18ab1440d165ca8e9855a53726af0ec9`).
+These imply source archive/data bases `0x80823700`/`0x80823720`. The checked
+source-address-region resolver copies external bytes and rejects unmapped or
+out-of-range pointers. The retained headless Metal Kirby/Samus replay consumed
+41,036 input events, but bounded ticks 310–491 saw no bank-34 particle generation
+or TLUT call. Shutdown exited 133 with `Failed to allocate MTLBuffer`.
+Effect-specific particle pixels remain unverified; this is not a pixel pass.
 
 Retained targeted logs include `work/pr86-kirby-mario-donor-r1.log`,
 `work/pr86-kirby-ice-donor-r1.log`,
