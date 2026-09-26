@@ -16,6 +16,25 @@ from retail_allocation_profile import Dol, read_symbols
 
 
 class NanaSourceCarryTests(unittest.TestCase):
+    def test_prepared_frame_hooks_are_in_the_audited_source_functions(self):
+        path = ROOT / "build/gameplay-source/src/melee/ft/kinds/ftCommon/ftCo_0A01.c"
+        if not path.is_file():
+            self.skipTest("prepared pinned gameplay source required")
+        text = path.read_text()
+        owners = {
+            "CPU_STATE_18": "ftCo_800B24B8",
+            "CPU_NANA_FOLLOW": "ftCo_800B101C",
+            "CPU_NANA_FOLLOW_CHECK": "ftCo_800B0E98",
+            "CPU_STATE_DISPATCH": "ftCo_800B2AFC",
+            "CPU_CALLBACK": "ftCo_800B3900",
+        }
+        for frame, name in owners.items():
+            hook = f"MELEE_WEB_SOURCE_FRAME(MELEE_WEB_SOURCE_FRAME_{frame})"
+            self.assertEqual(text.count(hook), 1)
+            begin = re.search(rf"\n(?:void|melee_source_bool) {name}\([^;]+?\)\n\{{", text).start()
+            end = text.index("\n}\n", begin)
+            self.assertIn(hook, text[begin:end], f"{frame} attached to the wrong source function")
+
     def test_actual_follower_entry_rejects_bypassed_producers(self):
         compiler = shutil.which("clang")
         source = ROOT / "build/gameplay-source/src"

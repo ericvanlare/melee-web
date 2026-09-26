@@ -9641,7 +9641,11 @@ diff --git a/src/melee/ft/kinds/ftCommon/ftCo_0A01.c b/src/melee/ft/kinds/ftComm
  
      temp_r31 = &fp->cpu;
      temp_r31->xF9_b2 = true;
-@@ -7901,6 +7927,7 @@
+@@ -7897,10 +7923,11 @@
+ void ftCo_800B24B8(Fighter* fp)
+ {
+     struct CpuFighter* data = &fp->cpu;
+     Vec3 sp28;
      s32 cmd;
      Fighter* target;
      PAD_STACK(0x14);
