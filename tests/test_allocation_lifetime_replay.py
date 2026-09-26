@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 from unittest import mock
 
@@ -81,9 +82,33 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
         "gm_Scene_Vs_OnExit": 1,
     }
 
+    @classmethod
+    def setUpClass(cls):
+        cls._model_builds = {}
+        cls.addClassCleanup(cls._model_builds.clear)
+
+    @classmethod
+    def _model_driver(cls, *, wasm=False, source, extra_impls=()):
+        # Share only compiled files. ModelDriver.run and StreamModel still
+        # start a fresh process for every case, with no shared replay state.
+        key = (wasm, source, tuple(extra_impls))
+        if key not in cls._model_builds:
+            driver = ModelDriver(wasm=wasm, source=source, extra_impls=key[2])
+            cls.addClassCleanup(driver.close)
+            # Replay closes its borrowed driver; the class owns its files.
+            cls._model_builds[key] = SimpleNamespace(
+                runner=driver.runner, run=driver.run, close=lambda: None,
+            )
+        return cls._model_builds[key]
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="allocation lifetime replay ")
         self.root = Path(self.temp.name)
+        driver_patch = mock.patch(
+            "tools.allocation_lifetime_replay.ModelDriver", self._model_driver,
+        )
+        driver_patch.start()
+        self.addCleanup(driver_patch.stop)
 
     def tearDown(self):
         self.temp.cleanup()
@@ -448,7 +473,7 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
     def _run_async_model(self, *, wasm=False, commands=None, tail=()):
         driver = None
         try:
-            driver = ModelDriver(
+            driver = self._model_driver(
                 wasm=wasm,
                 source=ROOT / "tests/allocation_lifetime_model.cpp",
                 extra_impls=[ROOT / "src/source_game_heap_context.cpp"],
@@ -743,6 +768,12 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
                              for event in report['ownership_events']))
         self.assertTrue(any(action['command']['op'] == 'pool_reset'
                             for action in report['replay_actions']))
+        self.assertFalse(report['ownership_complete'])
+        commands = [action["command"] for action in report["replay_actions"]]
+        raw = next(command for command in commands if command["op"] == "raw_alloc")
+        self.assertNotIn("address", raw)
+        self.assertNotIn("result", raw)
+        self.assertNotIn("DEADBEEF", json.dumps(report, sort_keys=True).upper())
 
     def test_changed_observed_pointer_fails_without_becoming_model_input(self):
         rows, enters, returns = self._stream()
@@ -753,16 +784,6 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
                            verified=self.verified())
         self.assertEqual(report["status"], "validation")
         self.assertEqual(report["first_unsupported"]["function"], "OSAllocFromHeap")
-
-    def test_bounded_replay_keeps_failing_return_pending(self):
-        rows, enters, returns = self._stream()
-        select = next(call for call, value in enters.items()
-                      if value['function'] == 'OSSetCurrentHeap')
-        returns[select]['result'] = 0
-        report = self._run(rows, enters, returns, profile=0xFFFFFFFF,
-                           verified=self.verified(), artifact_dir=self.root / 'artifact')
-        self.assertEqual(report['status'], 'validation')
-        self.assertIn(select, report['replay_pending_calls'])
 
     def test_memory_and_artifact_replay_pending_reports_match_on_failure(self):
         reports = []
@@ -778,59 +799,6 @@ class AllocationLifetimeReplayTests(unittest.TestCase):
                          ['validation', 'validation'])
         self.assertEqual([report['replay_pending_calls'] for report in reports],
                          [[0, 4], [0, 4]])
-
-    def test_demo_owner_remains_incomplete_until_a_derived_pool_reset(self):
-        rows, enters, returns = self._stream(with_fighters=True)
-        end = rows[-1]
-        call_id = max(enters) + 1
-        sequence = end['sequence']
-
-        def enter(function, args, parent=None):
-            nonlocal call_id, sequence
-            call = call_id
-            row = self._row('enter', sequence, call=call, function=function,
-                            args=args, parent=parent, thread=0)
-            enters[call] = row
-            rows.insert(-1, row)
-            call_id += 1
-            sequence += 1
-            return call
-
-        def ret(call, result=0, observed=None):
-            nonlocal sequence
-            row = self._row('return', sequence, call=call,
-                            function=enters[call]['function'], result=result,
-                            observed=observed or {}, thread=0)
-            returns[call] = row
-            rows.insert(-1, row)
-            sequence += 1
-
-        demo = enter('ftDemo_ObjAllocInit', [])
-        pool = enter('HSD_ObjAllocInit', [0x9000, 0x100, 4], demo)
-        ret(pool)
-        ret(demo)
-        create = enter('ftDemo_CreateFighter', [0x7200])
-        gobj = enter('HSD_ObjAlloc', [0x9100], create)
-        ret(gobj, 0x7300)
-        fighter = enter('HSD_ObjAlloc', [0x9000], create)
-        ret(fighter, 0x3000)
-        ret(create, 0x7300, {'fighter': {
-            'gobj': 0x7300, 'address': 0x3000, 'slot': 0, 'kind': 0x12,
-        }})
-        end['sequence'] = sequence
-        end['calls'] = call_id
-        report = self._run_fighter(rows, enters, returns,
-                                   verified=self.verified(pools={
-                                       'fighter_alloc_data': 0x9000,
-                                       'gobj_alloc_data': 0x9100,
-                                   }))
-        self.assertEqual(report['status'], 'validated_prefix')
-        self.assertFalse(report['ownership_complete'])
-        commands = [action["command"] for action in report["replay_actions"]]
-        raw = next(command for command in commands if command["op"] == "raw_alloc")
-        self.assertNotIn("address", raw)
-        self.assertNotIn("result", raw)
-        self.assertNotIn("DEADBEEF", json.dumps(report, sort_keys=True).upper())
 
     def test_changed_pool_descriptor_is_rejected_before_pool_reset(self):
         rows, enters, returns = self._stream()

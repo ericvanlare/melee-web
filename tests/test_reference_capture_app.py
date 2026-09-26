@@ -442,21 +442,6 @@ class ReferenceCaptureAppTests(unittest.TestCase):
         self.assertEqual(app.status["state"], "failed")
         self.assertIn("Unknown capture action", app.status["message"])
 
-    def test_malformed_command_envelope_is_visible_as_failed_status(self):
-        events = []
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            app = APP.Supervisor(root / "environment.json", root=root, emit=events.append)
-            try:
-                # This is the same envelope rule used by the JSONL main loop;
-                # an operator error is surfaced rather than ignored.
-                with self.assertRaises(ValueError):
-                    value = {"command": "verify", "extra": True}
-                    if set(value) != {"command"}:
-                        raise ValueError("Invalid command envelope")
-            finally:
-                app.close()
-
     def test_dolphin_command_forces_isolated_user_and_read_only_session(self):
         settings = {"paths": {"dolphin": "/private/Dolphin", "disc": "/private/game.iso",
                                 "fixture_gc": "/private/fixture"}}
