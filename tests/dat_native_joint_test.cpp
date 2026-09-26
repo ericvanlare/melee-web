@@ -57,6 +57,15 @@ int main(int argc,char** argv) {
         check(g.materials[0].source_offset==0 && g.materials[0].material.texture_count==1,"shared relocated-zero material hydrated exactly once");
         check(g.dobjs[0].material==g.dobjs[1].material && g.dobjs[0].pobj==g.dobjs[1].pobj,"shared descriptors retain original identity");
         check(g.materials[0].textures[0].source_offset==380 && g.materials[0].textures[0].texture.image_bytes==32,"texture metadata and byte bound survive");
+        check(!g.materials[0].textures[0].has_tev,"absent TEV stays absent");
+        Fixture inactive; inactive.data.resize(576); inactive.link(380+88,544);
+        std::fill_n(inactive.data.begin()+544,28,0xff);
+        melee_web::DatNativeJoint inactive_graph(inactive.archive(),24);
+        const auto& inactive_texture=inactive_graph.graph().materials[0].textures[0];
+        check(inactive_texture.has_tev && inactive_texture.tev_active==0 &&
+              std::all_of(std::begin(inactive_texture.tev_fields),std::end(inactive_texture.tev_fields),
+                          [](uint8_t value){return value==0xff;}),
+              "native graph retains inactive TEV descriptor bytes and presence");
         archive.reset(); // Native input owner must retain all borrowed payloads.
         check(g.pobjs[0].geometry.display_byte_size==32 && static_cast<const uint8_t*>(g.pobjs[0].geometry.display)[0]==0x90,"archive lifetime retained");
         f.link(88+8,24);

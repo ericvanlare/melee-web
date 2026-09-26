@@ -41,7 +41,8 @@ struct DatTexture {
     std::array<float, 3> rotation{}, scale{}, translation{};
     std::uint8_t repeat_s = 0, repeat_t = 0;
     std::optional<std::uint32_t> lod_descriptor_offset;
-    // Active-zero descriptors do not affect original HSD expression generation.
+    // Active-zero descriptors still have original HSD allocation/ownership.
+    // The viewer records their identity; native_tev also retains their bytes.
     std::optional<std::uint32_t> inactive_tev_descriptor_offset;
     DatTextureImage image;
     std::optional<DatTexturePalette> palette;

@@ -8,8 +8,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-void lbBgFlash_80021C48(unsigned int, unsigned int) {}
-
 int assets_test_item_backward_handlers(void* entry)
 {
     union CmdUnion* root=(union CmdUnion*)entry;

@@ -45,45 +45,49 @@ typedef struct MeleeWebCpuSourceGlobalBinding {
 } MeleeWebCpuSourceGlobalBinding;
 
 /* This identity must come from the live source fighter allocation model. The
- * field is a source word, never a host pointer; the low-level API trusts the
- * caller to supply a live identity from the owned source context. */
+ * consumer only observes the signed low byte of r30, so the adapter supplies
+ * that byte directly. host_owner is an opaque host-side owner identity; it is
+ * deliberately separate from the source address and is checked together with
+ * the world/allocation generations. */
 typedef struct MeleeWebCpuSourceFighterIdentity {
-    uint32_t source_word;
+    int8_t low_byte;
+    uint8_t live;
+    uint8_t reserved[6];
+    uint64_t host_owner;
     uint64_t world_generation;
     uint64_t allocation_generation;
-    uint8_t live;
-    uint8_t reserved[7];
 } MeleeWebCpuSourceFighterIdentity;
 
 /* Opaque-in-practice owner capability returned by begin.  A caller must keep
- * this exact token and pass it to every transition.  World generation and
- * source fighter words alone are insufficient because a fighter allocation
- * can be reused at the same address within one world. */
+ * this exact token and pass it to every transition.  The host owner identity,
+ * world generation and allocation generation distinguish reuse; the carry
+ * lifetime distinguishes a retired sidecar token. */
 typedef struct MeleeWebCpuR5Token {
+    uint64_t host_owner;
     uint64_t world_generation;
     uint64_t allocation_generation;
     uint64_t carry_lifetime;
-    uint32_t source_fighter_word;
     uint8_t valid;
     uint8_t reserved[7];
 } MeleeWebCpuR5Token;
 
 typedef struct MeleeWebCpuWord {
-    uint32_t source_word;
-    uint64_t world_generation;
-    uint64_t allocation_generation;
-    uint64_t carry_lifetime;
+    int8_t low_byte;
     uint8_t known;
     uint8_t kind;
     uint8_t source_id;
-    uint8_t reserved;
-} MeleeWebCpuWord;
-
-typedef struct MeleeWebCpuR5Carry {
+    uint8_t reserved[4];
+    uint64_t host_owner;
     uint64_t world_generation;
     uint64_t allocation_generation;
     uint64_t carry_lifetime;
-    uint32_t source_fighter_word;
+} MeleeWebCpuWord;
+
+typedef struct MeleeWebCpuR5Carry {
+    uint64_t host_owner;
+    uint64_t world_generation;
+    uint64_t allocation_generation;
+    uint64_t carry_lifetime;
     uint8_t active;
     uint8_t reserved[7];
     MeleeWebCpuWord r5;

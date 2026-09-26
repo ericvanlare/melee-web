@@ -5,6 +5,7 @@
 #include "gameplay_audio_stream_asset.hpp"
 #include <array>
 #include "gameplay_bootstrap.h"
+#include "gameplay_source_files_runtime.hpp"
 #include "gameplay_font_atlas.h"
 #include "hsd_native_joint.h"
 #include <cstdio>
@@ -23,10 +24,13 @@ struct GameplayPrizeSession::Storage {
     std::unique_ptr<GameplayAudioStream> music;
     MeleeWebFontAtlas* font = nullptr;
     MeleeWebPrizeContext* context = nullptr;
+    MeleeWebSourceFileScope* source_files = nullptr;
     void start(const RuntimeFiles& files, MeleeWebMenuHost* host,
                uint32_t seed, const MeleeWebPadState& input)
     {
         char error[256]{};
+        source_files = begin_source_files(files, error, sizeof(error));
+        check(source_files != nullptr, error);
         check(melee_web_gameplay_startup(32U * 1024U * 1024U, error, sizeof(error)), error);
         world = true;
         check(melee_web_native_world_enable(error, sizeof(error)), error);
@@ -73,6 +77,10 @@ struct GameplayPrizeSession::Storage {
             font = nullptr;
         }
         if (assets) { assets->close(); assets.reset(); }
+        if (source_files) {
+            check(melee_web_source_files_end(source_files, error, sizeof(error)), error);
+            source_files = nullptr;
+        }
         bank.reset();
     }
     ~Storage()

@@ -85,22 +85,28 @@ uint32_t melee_web_article_unresolved(const void* article)
 }
 void melee_web_article_require_ready(const void* article)
 {
+    NativeArticle* a=(NativeArticle*)article;
+    if(a&&a->magic==ARTICLE_MAGIC&&a->article.x0_common_attr)
+        a->unresolved&=~1U;
     uint32_t mask=melee_web_article_unresolved(article);
     if(mask) { fprintf(stderr,"Item creation requires hydrated Article graph (unresolved mask 0x%x)\n",mask); abort(); }
 }
 
 int melee_web_article_publish(const MeleeWebNativeDat* r,void* article,void* special,
     const MeleeWebItemStateDesc* states,uint32_t count,void* joint,uint32_t bones,int32_t attach,uint8_t flags,
-    int joint_optional,char* error,size_t size)
+    int joint_form,char* error,size_t size)
 {
     NativeArticle* a=article;
+    uint32_t allowed_unresolved=(1U<<1)|(1U<<3)|(1U<<4);
+    if(joint_form==2)allowed_unresolved|=1U;
     if(!r||!a||a->magic!=ARTICLE_MAGIC||(count&&!states)||(!count&&states)||count>64||
-       (joint_optional!=0&&joint_optional!=1)||(!joint&&!joint_optional)||
-       (joint_optional&&(joint||bones!=0||attach!=0))||!a->model_desc_present||
-       bones>140||(a->unresolved&~((1U<<1)|(1U<<3)|(1U<<4)))){
+       (joint_form<0||joint_form>2)||(!joint&&!joint_form)||
+       (joint_form==1&&(joint||bones!=0||attach!=0))||
+       (joint_form==2&&(joint||bones!=1||attach!=0))||!a->model_desc_present||
+       bones>140||(a->unresolved&~allowed_unresolved)){
         if(error&&size)snprintf(error,size,"Item graph publication requires checked registration root and complete fields");return 0;
     }
-    if(joint_optional) {
+    if(joint_form) {
         for(uint32_t i=0;i<count;i++) {
             if(states[i].animation||states[i].material||states[i].shape) {
                 if(error&&size)snprintf(error,size,"Null item model cannot publish animation, material or shape state data");
@@ -122,5 +128,8 @@ int melee_web_article_publish(const MeleeWebNativeDat* r,void* article,void* spe
     model->x0_joint=joint;model->x4_bone_count=bones;model->x8_bone_attach_id=attach;model->xC_bit_field=flags;
     a->article.x4_specialAttributes=special;a->article.xC_itemStates=(ItemStateArray*)native_states;a->article.x10_modelDesc=model;
     a->state_count=count;
-    a->unresolved=0;if(error&&size)*error=0;return 1;
+    /* Random Pokémon's common attributes are intentionally installed by the
+     * original Yaku article constructor immediately before item creation. */
+    a->unresolved=joint_form==2?(a->unresolved&1U):0;
+    if(error&&size)*error=0;return 1;
 }

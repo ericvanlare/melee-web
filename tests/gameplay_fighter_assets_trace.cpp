@@ -1,10 +1,12 @@
 #include "gameplay_fighter_assets.h"
 #include "gameplay_action_store.hpp"
 #include "dat_item_commands.hpp"
+#include "dat_stage_yaku.hpp"
 #include "fighter_runtime_fixture.hpp"
 #include <cstdio>
 #include <cstring>
 #include <cstdint>
+#include <fstream>
 #include <iostream>
 using namespace fighter_runtime_test;
 extern "C" {
@@ -36,8 +38,9 @@ struct Context {
         for(size_t i=0;i<2;++i)if(self.fighters[i]==fp){self.stores[i]->unbind();self.fighters[i]=nullptr;return;}
     }
 };
-int main() {
+int main(int argc,char** argv) {
     try {
+        check(argc<=2,"optional stage DAT path expected");
         check(assets_test_item_commands(),"Item loop and resize words match source bitfield consumers");
         auto script=[](std::initializer_list<uint32_t> words){
             Bytes data(words.size()*4);size_t at=0;
@@ -58,6 +61,46 @@ int main() {
          * this, so the decoder mirrors the runtime instead of rejecting it. */
         check(DatItemCommands().decode(script({(3U<<26)|1,0}),0)!=nullptr,
               "Unbalanced SetLoop decodes like the original interpreter");
+        Bytes yaku_data(0x2c);
+        put32(yaku_data,4,0x10);
+        put32(yaku_data,0x10,(11U<<26)|6);
+        auto yaku_archive=std::make_shared<const DatArchive>(
+            pack(yaku_data,{4},"ALDYakuAll"));
+        DatStageYaku yaku(yaku_archive,0);
+        const auto* yaku_rows=static_cast<void* const*>(yaku.native_data());
+        check(yaku_rows[0]==nullptr&&yaku_rows[1]!=nullptr&&
+              yaku_rows[2]==nullptr&&yaku_rows[7]==nullptr,
+              "ALDYakuAll retains source indexes and a null-terminated eight-row native table");
+        Bytes overfull_yaku(40);
+        std::vector<uint32_t> yaku_slots;
+        for(uint32_t i=0;i<9;i++){
+            put32(overfull_yaku,i*4,36);
+            yaku_slots.push_back(i*4);
+        }
+        auto overfull_yaku_archive=std::make_shared<const DatArchive>(
+            pack(overfull_yaku,yaku_slots,"ALDYakuAll"));
+        bool overfull_yaku_rejected=false;
+        try{DatStageYaku bad(overfull_yaku_archive,0);}
+        catch(const DatError&){overfull_yaku_rejected=true;}
+        check(overfull_yaku_rejected,
+              "ALDYakuAll rejects scripts beyond the source Random article state rows");
+        if(argc==2){
+            std::ifstream input(argv[1],std::ios::binary);
+            check(bool(input),"open actual source stage DAT");
+            Bytes bytes((std::istreambuf_iterator<char>(input)),{});
+            auto source_stage=std::make_shared<const DatArchive>(std::move(bytes));
+            auto root=std::find_if(source_stage->public_symbols().begin(),
+                source_stage->public_symbols().end(),[](const auto& entry){
+                    return entry.name=="ALDYakuAll";
+                });
+            check(root!=source_stage->public_symbols().end(),
+                  "actual stage archive publishes ALDYakuAll");
+            DatStageYaku source_yaku(source_stage,root->data_offset);
+            const auto* source_rows=static_cast<void* const*>(source_yaku.native_data());
+            check(source_rows[0]==nullptr&&source_rows[1]!=nullptr&&
+                  source_rows[2]==nullptr,
+                  "actual source Random-item command at index one hydrates and terminates at two");
+        }
         bool unmatched_return=false;
         try{DatItemCommands bad;bad.decode(script({6U<<26,0}),0);}catch(const DatError&){unmatched_return=true;}
         check(unmatched_return,"Item decoder rejects an unmatched subroutine return");

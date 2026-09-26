@@ -16,6 +16,11 @@ int melee_web_match_timer_supported(const struct StartMeleeRules*);
 /* Owns original match globals; source defaults plus explicit local stock rules.
  * This does not create the match manager, timer, HUD or result processes. */
 MeleeWebMatchRules* melee_web_match_rules_begin(char*,size_t);
+/* Preserve source VS startup order when a complete menu payload is available
+ * before later stage-dependent spawn setup. */
+int melee_web_match_rules_prepare_from_menu(MeleeWebMatchRules*,
+                                            const StartMeleeData*,char*,size_t);
+int melee_web_match_rules_finish_from_menu(MeleeWebMatchRules*,char*,size_t);
 /* Copy and validate the complete menu payload, then invoke the original
  * fn_8016DCC0 boundary before any source fighter exists. */
 int melee_web_match_rules_init_from_menu(MeleeWebMatchRules*,

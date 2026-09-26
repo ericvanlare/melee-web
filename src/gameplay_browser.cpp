@@ -247,23 +247,35 @@ static int launch_game(bool fixture){
         // Scale the internal EFB, not the high-DPI presentation window. A 1x
         // setting must not silently become 2x on a Retina display.
         VISetFrameBufferScale(float(render_scale));
-        world=std::make_unique<GameplayWorld>(files);char error[256];
+        GameplayWorldSelection selection{};
+        MeleeWebPlayerSettings players[2]{};
+        for(unsigned i=0;i<2;++i){
+            players[i]={i,i,fixture?4U:selected_stocks,{0,0,0},1.0f};
+            selection.source_players[i]=players[i];
+        }
+        selection.begin_source_match=true;
+        selection.source_camera_subjects=70;
+        selection.source_random_seed=0x13579bdf;
+        world=std::make_unique<GameplayWorld>(files,selection,
+                                              GameplayWorldConstruction::SourceOrdered);char error[256];
+        match=world->take_match_context();
+        render=world->take_render_context();
+        while(!world->advance_construction()){}
         audio_bank=std::make_unique<GameplayAudioBank>(files.at("smash2.sem"),
             std::vector<std::span<const uint8_t>>{files.at("main.ssm"),files.at("mario.ssm")},files.at("dsp_coef.bin"));
         require(melee_web_audio_enable_effects(audio_bank->get(),error,sizeof(error)),error);
         music=std::make_unique<GameplayAudioStream>(audio_bank->get(),"/audio/sp_end.hps",files.at("sp_end.hps"));
         require(lbAudioAx_80023F28(78)==0,"Original Final Destination music did not start");
-        MeleeWebPlayerSettings players[2]{};
+        world->enable_full_stage();
+        require(melee_web_match_attach_collision(match,world->collision(),error,sizeof(error)),error);
         for(unsigned i=0;i<2;++i){
             auto position=world->player_spawn(i);
             if(fixture){position={i?20.0f:-20.0f,0,0};position[1]=world->floor_height(position[0])+1;}
-            players[i]={i,i,fixture?4U:selected_stocks,{position[0],position[1],position[2]},position[0]<0?1.0f:-1.0f};
+            require(melee_web_match_set_player_start(match,i,position.data(),position[0]<0?1.0f:-1.0f,error,sizeof(error)),error);
         }
-        match=melee_web_match_begin_players(players,2,70,0x13579bdf,world->collision(),error,sizeof(error));require(match!=nullptr,error);
         require(melee_web_match_create_fighters(match,error,sizeof(error)),error);
         MeleeWebRenderSettings settings{640,480,{0,25,180},{0,15,0},30,1,1000,(uint64_t(1)<<5)|(uint64_t(1)<<3)};
-        render=melee_web_render_begin_match(&settings,error,sizeof(error));require(render!=nullptr,error);
-        world->enable_full_stage();
+        require(melee_web_render_finish_match_camera(render,&settings,error,sizeof(error)),error);
         require(melee_web_render_use_match_passes(render,error,sizeof(error)),error);
         running=true;simulation_clock.reset();message="Original two-player runtime running.";return 1;
     }catch(const std::exception& e){message=e.what();running=false;return 0;}

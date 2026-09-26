@@ -108,10 +108,6 @@ int main(int argc, char** argv)
             MeleeWebRender* camera = nullptr;
             bool cycle_complete = false;
             try {
-            const auto first = world.player_spawn(0);
-            const auto second = world.player_spawn(1);
-            for (float value : first) check(std::isfinite(value), "Battlefield spawn is nonfinite");
-            for (float value : second) check(std::isfinite(value), "Battlefield spawn is nonfinite");
             /* The regular match path starts the original stage manager. This
              * is required for grBattle's delayed background transitions. */
             MeleeWebMatchSettings match_settings{};
@@ -123,6 +119,11 @@ int main(int argc, char** argv)
             match = melee_web_match_begin(&match_settings, world.collision(),
                                           error, sizeof(error));
             check(match != nullptr, error);
+            world.enable_full_stage();
+            const auto first = world.player_spawn(0);
+            const auto second = world.player_spawn(1);
+            for (float value : first) check(std::isfinite(value), "Battlefield spawn is nonfinite");
+            for (float value : second) check(std::isfinite(value), "Battlefield spawn is nonfinite");
             check(melee_web_match_create_fighter(match, error, sizeof(error)), error);
             MeleeWebRenderSettings render_settings{
                 640, 480, {0, 35, 190}, {0, 5, 0}, 45, 1, 2000,
@@ -130,8 +131,6 @@ int main(int argc, char** argv)
             camera = melee_web_render_begin_match(&render_settings,
                                                   error, sizeof(error));
             check(camera != nullptr, error);
-            world.enable_full_stage();
-
             const float expected_first[3] = {0, 8, 0};
             const float expected_second[3] = {0, 62.4f, 0};
             for (unsigned axis = 0; axis < 3; ++axis) {

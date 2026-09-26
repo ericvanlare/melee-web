@@ -191,10 +191,10 @@ DatTexture read_texture(const DatArchive& archive, std::uint32_t offset, bool na
         // set. Preserve this descriptor's identity; its inactive byte fields
         // are intentionally not interpreted as GX commands.
         const auto active=archive.be32(*tev+28);
+        const auto fields=archive.range(*tev,28);
         if(active && !native_descriptors) reject("Active custom texture TEV expressions are unsupported");
         if(!active) result.inactive_tev_descriptor_offset=*tev;
         else {
-            const auto fields=archive.range(*tev,28);
             if(active&~0xc0000fffU) reject("Native texture TEV active flags are unsupported");
             for(unsigned channel=0;channel<2;++channel) if(active&(1u<<(30+channel))) {
                 if(fields[channel]>1||fields[2+channel]>2||fields[4+channel]>3||fields[6+channel]>1)
@@ -206,6 +206,10 @@ DatTexture read_texture(const DatArchive& archive, std::uint32_t offset, bool na
                     if(!valid) reject("Native texture TEV input is unsupported by original expression compiler");
                 }
             }
+        }
+        // HSD_TObjLoadDesc owns an HSD_TObjTev even when active is zero.
+        // Keep its bytes and allocation lifetime for native source consumers.
+        if(native_descriptors){
             DatTextureTev value;std::copy(fields.begin(),fields.end(),value.fields.begin());value.active=active;
             result.native_tev=value;
         }

@@ -10,12 +10,21 @@ extern HSD_RumbleData HSD_Rumble_804C22E0[4];
 struct MeleeWebRumble {
     struct Fighter_804D653C_t* rows;
     struct Fighter_804D653C_t* previous;
+    int source_published;
     RumbleInfo previous_info;
     HSD_RumbleData previous_ports[4];
     HSD_PadRumbleListData lists[12];
 };
 extern struct Fighter_804D653C_t* melee_web_rumble_exchange(struct Fighter_804D653C_t*);
+extern int melee_web_rumble_source_table_matches(const void* expected);
 static MeleeWebRumble* active;
+static MeleeWebRumble* source_owner;
+
+int melee_web_rumble_source_ready(void)
+{
+    return source_owner && source_owner->rows &&
+           melee_web_rumble_source_table_matches(source_owner->rows);
+}
 
 MeleeWebRumble* melee_web_rumble_decode(const MeleeWebNativeDat* r,
                                        uint32_t root, unsigned rows)
@@ -66,9 +75,22 @@ MeleeWebRumble* melee_web_rumble_decode(const MeleeWebNativeDat* r,
     return h;
 }
 
+int melee_web_rumble_publish_source(MeleeWebRumble* h, char* e, size_t n)
+{
+    if (!h || active || source_owner || !h->rows) {
+        if (e && n) snprintf(e, n, "Rumble source owner missing or already published");
+        return 0;
+    }
+    h->previous = melee_web_rumble_exchange(h->rows);
+    h->source_published = 1;
+    source_owner = h;
+    return 1;
+}
+
 int melee_web_rumble_begin(MeleeWebRumble* h, char* e, size_t n)
 {
-    if (!h || active) {
+    if (!h || active || (source_owner && source_owner != h) || !h->rows ||
+        (source_owner == h && !melee_web_rumble_source_ready())) {
         if (e && n) snprintf(e, n, "Rumble data owner missing or already active");
         return 0;
     }
@@ -80,16 +102,26 @@ int melee_web_rumble_begin(MeleeWebRumble* h, char* e, size_t n)
     h->previous_info = HSD_PadLibData.rumble_info;
     memcpy(h->previous_ports, HSD_Rumble_804C22E0, sizeof(h->previous_ports));
     HSD_PadRumbleInit(12, h->lists);
-    h->previous = melee_web_rumble_exchange(h->rows); active = h;
+    if (!source_owner) {
+        h->previous = melee_web_rumble_exchange(h->rows);
+        h->source_published = 0;
+        source_owner = h;
+    }
+    active = h;
     return 1;
 }
 
 int melee_web_rumble_end(MeleeWebRumble* h, char* e, size_t n)
 {
-    if (!h || h != active) {
+    if (!h || (h != active && !(h == source_owner && h->source_published))) {
         if (e && n) snprintf(e, n, "Rumble data publication lost ownership");
         return 0;
     }
+    if (!melee_web_rumble_source_ready()) {
+        if (e && n) snprintf(e, n, "Rumble source table no longer matches its decoded owner");
+        return 0;
+    }
+    if (h != active) return 1;
     /* Source programs borrow this owner's decoded arena. Release those
      * pointers and stop the actuator before restoring the enclosing scope. */
     HSD_PadRumbleRemoveAll();
@@ -97,6 +129,43 @@ int melee_web_rumble_end(MeleeWebRumble* h, char* e, size_t n)
     HSD_PadRumbleInterpret();
     HSD_PadLibData.rumble_info = h->previous_info;
     memcpy(HSD_Rumble_804C22E0, h->previous_ports, sizeof(h->previous_ports));
-    melee_web_rumble_exchange(h->previous); active = NULL;
+    active = NULL;
+    if (!h->source_published) {
+        melee_web_rumble_exchange(h->previous);
+        source_owner = NULL;
+    }
+    return 1;
+}
+
+void* melee_web_rumble_source_rows(MeleeWebRumble* h)
+{
+    return h ? h->rows : NULL;
+}
+
+int melee_web_rumble_clear_source(MeleeWebRumble* h, char* e, size_t n)
+{
+    if (!h || (source_owner && source_owner != h)) {
+        if (e && n) snprintf(e, n, "Rumble source rows cannot be cleared while their owner is active");
+        return 0;
+    }
+    return melee_web_rumble_clear_source_rows(h->rows, e, n);
+}
+
+int melee_web_rumble_clear_source_rows(void* expected_rows, char* e, size_t n)
+{
+    if (!expected_rows || active ||
+        (source_owner && (source_owner->rows != expected_rows ||
+                          !melee_web_rumble_source_ready()))) {
+        if (e && n) snprintf(e, n, "Rumble source rows cannot be cleared while their owner is active");
+        return 0;
+    }
+    struct Fighter_804D653C_t* previous = melee_web_rumble_exchange(NULL);
+    if (previous != expected_rows) {
+        melee_web_rumble_exchange(previous);
+        if (e && n) snprintf(e, n, "Source rumble manager no longer points at this world's typed rows");
+        return 0;
+    }
+    source_owner = NULL;
+    if (e && n) e[0] = '\0';
     return 1;
 }

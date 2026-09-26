@@ -198,7 +198,7 @@ void melee_web_fighter_assets_bind_created(Fighter* fp)
         if(!actions || !blends)fatal("Per-Fighter action tables were not retained");
         fp->x24=actions;fp->x28=blends;
         owner->fighters[i]=fp;
-        fp->x590=fp->x598=NULL;fp->x59C=fp->x5A0=NULL;fp->x5A4=fp->x5A8=NULL;fp->x58C=owner->motion_count;
+        fp->x590=fp->x598=NULL;fp->x5A4=fp->x5A8=NULL;fp->x58C=owner->motion_count;
         /* The original character OnLoad callback publishes its Article
          * identities after it initializes dat_attrs.  The owned registry is
          * already live by then, so this bind boundary only installs the

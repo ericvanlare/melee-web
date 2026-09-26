@@ -122,8 +122,19 @@ int melee_web_match_two_player_trace(MeleeWebCollision* collision,
     invalid[1]=players[1];invalid[1].controller=invalid[0].controller;
     if((context=melee_web_match_begin_players(invalid,2,70,1,collision,error,size)))goto cleanup;
     for(unsigned cycle=0;cycle<2;cycle++){
-        context=melee_web_match_begin_players(players,2,70,1,collision,error,size);
-        if(!context||!melee_web_match_create_fighters(context,error,size))goto cleanup;
+        context=melee_web_match_begin_players(players,2,70,1,cycle?collision:NULL,error,size);
+        if(!context)goto cleanup;
+        if(cycle==0){
+            MeleeWebMatchStats pending;
+            if(melee_web_match_player_stats(context,0,&pending,error,size)){
+                snprintf(error,size,"Unattached source-ordered match allowed a collision-dependent query");goto cleanup;
+            }
+            if(!melee_web_match_attach_collision(context,collision,error,size))goto cleanup;
+            if(melee_web_match_attach_collision(context,collision,error,size)){
+                snprintf(error,size,"Match accepted a second collision owner");goto cleanup;
+            }
+        }
+        if(!melee_web_match_create_fighters(context,error,size))goto cleanup;
         MeleeWebMatchStats stats[2];uint32_t settle=0;
         for(;;){
             int ready=1;

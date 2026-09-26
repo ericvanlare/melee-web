@@ -10,15 +10,28 @@ deletion are blocked. Private-era caches were cleared, and reporting and
 contribution controls were enabled. This changes no gameplay admission or
 hosted/native release scope.
 
-## Audio and memory fixture complete; equivalence investigation paused
+## CPU source context integrated; full-session equivalence remains open
 
 **Compiled / Source identified / Native traced / Retail compared** within the
-[original audio and memory fixture](docs/SOURCE_LBAUDIO_MEMORY_STARTUP.md).
-The [scoped receipt](docs/evidence/source-lbaudio-memory-startup-v1.json) records
-original initialization and the post-execution memory-descriptor comparison.
-The owner paused further equivalence investigation. The first session mismatch
-remains match 0, tick 1776, P4 `input_hex`; live fighter identities and CPU
-call-site integration remain incomplete. No browser progress or deployment.
+[CPU source-context runtime boundary](docs/CPU_SOURCE_CONTEXT_RUNTIME.md).
+The [scoped receipt](docs/evidence/cpu-source-context-runtime-v2.json) records
+live source Fighter identities and both known register-carry routes in the
+browser. The inactive-TEV descriptor repair restores all four original Fighter
+identities. Independent review then exposed false carry admission on pruned and
+sloped floor queries; publication now follows executed definitions and clobbers,
+including all three caller RNG sites and the audited continuation.
+Fresh probe-free v63 agrees on every first-match setup/tick record (13,482
+records through reference tick 13480), plus 2,351 second-match records through
+tick 2349. This covers ticks 1776, 1778 and 4598 with unchanged exact state fields,
+original Results → CSS return and second-match reconstruction. Integrated floor,
+callback and joint-lookup regressions pass; the full suite ran 1,461 tests with
+89 skipped (1,372 executed successfully). Full-session, draw-cadence, pixel, PCM
+and foreground-timing equivalence remain unclaimed.
+No merge or deployment.
+
+The earlier [audio/memory fixture](docs/SOURCE_LBAUDIO_MEMORY_STARTUP.md) and
+[receipt](docs/evidence/source-lbaudio-memory-startup-v1.json) remain valid for
+their own standalone scope.
 
 ## Original Synth startup joins shared audio ownership
 
@@ -61,8 +74,8 @@ browser integration remain open; this does not establish session equivalence.
 **Compiled / Source identified** for the [typed CPU carry boundary](docs/CPU_R5_CARRY.md).
 The owned-input adapter derives the RNG seed identity independently; the fighter
 identity in these tests remains synthetic. The [scoped receipt](docs/evidence/cpu-r5-carry-v1.json)
-records generation checks and source compilation. Live allocation binding and
-CPU call-site hooks remain open; the first session divergence is unchanged.
+records generation checks and source compilation. The runtime integration above supersedes this checkpoint's missing live
+allocation binding and call-site hooks; its component receipt remains historical.
 
 ## Original DSP startup protocol boundary
 

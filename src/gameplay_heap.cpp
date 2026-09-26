@@ -1,9 +1,14 @@
 #include "gameplay_heap.h"
+#include "gameplay_source_memory_runtime.h"
 
 /* The isolated gameplay target substitutes this TU for Aurora's OSAlloc TU.
  * All SDK implementations remain original. Sharing their TU allows an explicit
  * ownership/reset boundary without exporting or guessing private heap layouts. */
+#define OSAllocFromHeap melee_web_gameplay_original_OSAllocFromHeap
+#define OSFreeToHeap melee_web_gameplay_original_OSFreeToHeap
 #include "../.deps/aurora/lib/dolphin/os/OSAlloc.cpp"
+#undef OSAllocFromHeap
+#undef OSFreeToHeap
 
 #include <cstdio>
 #include <limits>
@@ -29,6 +34,30 @@ extern "C" int melee_web_gameplay_heap_available(void)
     return gameplay_owned_arena == nullptr && sHeapArray == nullptr &&
            sNumHeaps == 0 && sArenaStart == nullptr && sArenaEnd == nullptr &&
            __OSCurrHeap == -1;
+}
+
+/* Track the original allocator's live main-heap requests in source-address
+ * space. Host payloads remain ordinary Wasm pointers; only the shadow heap's
+ * independently derived GALE01r2 addresses can become source identities. */
+extern "C" void* melee_web_gameplay_original_OSAllocFromHeap(OSHeapHandle heap,
+                                                              u32 size);
+extern "C" void melee_web_gameplay_original_OSFreeToHeap(OSHeapHandle heap,
+                                                          void* ptr);
+
+extern "C" void* OSAllocFromHeap(OSHeapHandle heap, u32 size)
+{
+    void* result = melee_web_gameplay_original_OSAllocFromHeap(heap, size);
+    if (result && !melee_web_source_memory_alloc(heap, result, size)) {
+        melee_web_gameplay_original_OSFreeToHeap(heap, result);
+        return nullptr;
+    }
+    return result;
+}
+
+extern "C" void OSFreeToHeap(OSHeapHandle heap, void* ptr)
+{
+    if (ptr) (void) melee_web_source_memory_free(heap, ptr);
+    melee_web_gameplay_original_OSFreeToHeap(heap, ptr);
 }
 
 extern "C" int melee_web_gameplay_heap_owns(const void* expected_arena)

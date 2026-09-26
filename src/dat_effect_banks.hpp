@@ -15,6 +15,9 @@ public:
     DatEffectBanks(const DatEffectBanks&)=delete;
     DatEffectBanks& operator=(const DatEffectBanks&)=delete;
     MeleeWebEffectBank* bank() const noexcept;
+    /* Source-compatible post-decode roots for grDatFiles and Ground. */
+    void* command_root() const noexcept;
+    void* texture_root() const noexcept;
     MeleeWebEffectBank* alias(uint32_t bank);
 private:
     NativeDatArena arena_;

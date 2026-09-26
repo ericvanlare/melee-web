@@ -1,8 +1,10 @@
+#include "gameplay_effect_banks_bootstrap_test_stub.h"
 #include "dat_effect_banks.hpp"
 #include "dat_effect_entries.hpp"
 #include "hsd_native_joint.h"
 #include "gameplay_bootstrap.h"
 #include "gameplay_effect_runtime.h"
+#include "gameplay_source_files.h"
 #include "gameplay_compat.h"
 #include "gameplay_effect_runtime.h"
 #pragma GCC diagnostic push
@@ -36,6 +38,18 @@ extern HSD_Particle* hsd_804D0908[16];
 using Bytes=std::vector<uint8_t>;
 static char error[256];
 static void check(bool ok,const char* why){if(!ok)throw std::runtime_error(std::string(why)+": "+error);}
+class SourceFileScope {
+    MeleeWebSourceFileScope* scope;
+public:
+    SourceFileScope(const char* name,const Bytes& bytes) {
+        const MeleeWebSourceFileInput file{name,bytes.data(),bytes.size()};
+        scope=melee_web_source_files_begin(&file,1,error,sizeof(error));
+        check(scope,"source effect file registry");
+    }
+    ~SourceFileScope() {
+        if(!melee_web_source_files_end(scope,error,sizeof(error)))std::terminate();
+    }
+};
 static void put32(Bytes& b,uint32_t o,uint32_t v){for(unsigned i=0;i<4;++i)b.at(o+i)=uint8_t(v>>(24-8*i));}
 static Bytes effect_table_fixture(uint32_t lifetime_bits,int nonnull_descriptor=-1){
     // A one-row effect table rooted at data offset zero.  The optional
@@ -145,7 +159,10 @@ static void registration(std::shared_ptr<const melee_web::DatArchive> archive,co
     const auto saved_alias_tex=psTexGroupArray[30];
     for(unsigned pass=0;pass<2;++pass){
         check(melee_web_gameplay_startup(4U*1024U*1024U,error,sizeof(error)),"source world startup");
+        check(!melee_web_effect_bank_is_published(1),"native particle bank starts unpublished");
         check(melee_web_effect_bank_attach(owner.bank(),error,sizeof(error)),"original psInitDataBankLoad");
+        check(melee_web_effect_bank_is_published(1)&&!melee_web_effect_bank_is_published(65),
+              "checked native particle bank publishes only its owned source slot");
         auto* alias=owner.alias(30);
         check(!melee_web_effect_bank_has_command(30,1000),"unpublished authored dependency rejected");
         check(melee_web_effect_bank_attach(alias,error,sizeof(error)),"second source bank registration");
@@ -165,6 +182,7 @@ static void registration(std::shared_ptr<const melee_web::DatArchive> archive,co
         check(!melee_web_effect_bank_detach(owner.bank(),error,sizeof(error)),"live particle prevents bank release");hsd_804D0908[0]=nullptr;
         hsd_804D78E0=1;check(!melee_web_effect_bank_detach(owner.bank(),error,sizeof(error)),"live generator prevents bank release");hsd_804D78E0=0;
         check(melee_web_effect_bank_detach(owner.bank(),error,sizeof(error)),"bank detach");
+        check(!melee_web_effect_bank_is_published(1),"detached native particle bank is no longer a source-load candidate");
         check(ptclref_804D0E5C[30]!=saved_alias,"alias remains registered independently");
         check(melee_web_effect_bank_detach(alias,error,sizeof(error)),"alias detach");
         check(ptclref_804D0E5C[30]==saved_alias&&psTexGroupArray[30]==saved_alias_tex,"alias restored");
@@ -206,6 +224,28 @@ static void effect_entries(std::shared_ptr<const melee_web::DatArchive> archive,
         check(melee_web_gameplay_shutdown(error,sizeof(error)),"effect world shutdown");
     }
     std::cout<<(model_only?"Local Link effects: ":"Local Mario effects: ")<<count<<" native model entries and animation graphs; original LoadSync/evaluation/restart passed\n";
+}
+static void reload_after_source_init(){
+    melee_web::DatEffectBanks owner(std::make_shared<melee_web::DatArchive>(fixture()),"r",1);
+    check(melee_web_gameplay_startup(4U*1024U*1024U,error,sizeof(error)),"reload world startup");
+    check(melee_web_effect_bank_attach(owner.bank(),error,sizeof(error)),"reserve reload owner");
+    hsd_80398A08(0);
+    check(!melee_web_effect_bank_has_command(1,1000),"source initializer cleared the command lookup");
+    check(!melee_web_effect_bank_load_owned(1,owner.texture_root(),owner.command_root(),error,sizeof(error)),
+          "foreign roots cannot replace the registered bank");
+    psCmdListArray[1]=1;
+    check(!melee_web_effect_bank_load_owned(1,owner.command_root(),owner.texture_root(),error,sizeof(error))&&
+          psCmdListArray[1]==1&&!ptclref_804D0E5C[1],"partial foreign publication is rejected without mutation");
+    psCmdListArray[1]=0;
+    check(melee_web_effect_bank_load_owned(1,owner.command_root(),owner.texture_root(),error,sizeof(error)),
+          "reload owned roots after the complete source reset");
+    check(melee_web_effect_bank_has_command(1,1000)&&ptclref_804D0E5C[1][1000]->life==16&&
+          psTexGroupArray[1][0]->texTable[0][0]==0x73,"source command and texture consumers see the restored authored bank");
+    check(melee_web_effect_bank_detach(owner.bank(),error,sizeof(error)),"restored bank detaches");
+    check(!melee_web_effect_bank_load_owned(1,owner.command_root(),owner.texture_root(),error,sizeof(error)),
+          "retired owner cannot reload a bank");
+    check(melee_web_gameplay_shutdown(error,sizeof(error)),"reload world teardown");
+    std::cout<<"Source particle reset/reload preserves typed roots and rejects foreign ownership\n";
 }
 static void pikachu_entries(std::shared_ptr<const melee_web::DatArchive> archive){
     constexpr unsigned bank=7,count=6;
@@ -262,6 +302,8 @@ static void deferred_effect_entries(std::shared_ptr<const melee_web::DatArchive>
     check(melee_web_effect_runtime_prepare(error,sizeof(error)),"reserve deferred original effect runtime");
     check(!melee_web_effect_runtime_active(),"deferred effect reservation is not source initialization");
     check(owner.publish_for_source(error,sizeof(error)),"publish deferred effect descriptors");
+    check(melee_web_effect_bank_is_published(1),
+        "source effect table publishes its checked native particle bank before original LoadSync");
     check(!owner.entries_ready()&&!efAsync_DatEntries[1].data,
         "deferred publication waits for the original source loader");
     /* This is the authored scene boundary: one source initializer creates both
@@ -275,6 +317,8 @@ static void deferred_effect_entries(std::shared_ptr<const melee_web::DatArchive>
     efAsync_LoadSync(1);
     check(owner.verify_source_load(error,sizeof(error))&&owner.entries_ready(),
         "original deferred effect loader published owned data");
+    check(melee_web_effect_bank_has_command(1,1000),
+        "original deferred loader restored the particle command table after efLib_Init");
     check(efAsync_DatEntries[1].data!=previous,"deferred effect lookup changed on source load");
     efLib_EffectCount=1;
     check(!owner.detach(error,sizeof(error)),"live deferred source effect blocks detach");
@@ -282,6 +326,8 @@ static void deferred_effect_entries(std::shared_ptr<const melee_web::DatArchive>
     check(melee_web_effect_runtime_end(error,sizeof(error)),"deferred effect runtime teardown");
     check(!links[11]&&!links[12],"deferred effect processes tear down with source runtime");
     check(owner.detach(error,sizeof(error))&&!owner.entries_ready(),"deferred effect descriptor detach");
+    check(!melee_web_effect_bank_is_published(1),
+        "source LoadSync bank ownership is removed with the matching descriptor scope");
     check(efAsync_DatEntries[1].data==previous,"deferred effect lookup restored");
     check(melee_web_gameplay_shutdown(error,sizeof(error)),"deferred effect world shutdown");
     std::cout<<"Deferred Mario effects: source initializer, GObj/process publication, source LoadSync and teardown passed\n";
@@ -322,6 +368,7 @@ int main(int argc,char** argv){
     try{
         null_effect_row_boundaries();
         registration(std::make_shared<melee_web::DatArchive>(fixture()),"r",false);
+        reload_after_source_init();
         palette_format_word();
         for(unsigned mutation=0;mutation<5;++mutation){
             auto bytes=fixture();
@@ -344,14 +391,17 @@ int main(int argc,char** argv){
         }else if(argc==3&&std::string(argv[1])=="--link"){
             std::ifstream file(argv[2],std::ios::binary);check(bool(file),"open Link effect archive");
             Bytes bytes((std::istreambuf_iterator<char>(file)),{});
+            SourceFileScope files(efAsync_DatEntries[6].ef_DAT_file,bytes);
             effect_entries(std::make_shared<melee_web::DatArchive>(bytes),true);
         }else if(argc==3&&std::string(argv[1])=="--pikachu"){
             std::ifstream file(argv[2],std::ios::binary);check(bool(file),"open Pikachu effect archive");
             Bytes bytes((std::istreambuf_iterator<char>(file)),{});
+            SourceFileScope files(efAsync_DatEntries[7].ef_DAT_file,bytes);
             pikachu_entries(std::make_shared<melee_web::DatArchive>(bytes));
         }else if(argc==2){
             std::ifstream file(argv[1],std::ios::binary);check(bool(file),"open optional effect archive");
             Bytes bytes((std::istreambuf_iterator<char>(file)),{});
+            SourceFileScope files(efAsync_DatEntries[1].ef_DAT_file,bytes);
             registration(std::make_shared<melee_web::DatArchive>(bytes),"effMarioDataTable",true);
             deferred_effect_entries(std::make_shared<melee_web::DatArchive>(bytes));
             effect_entries(std::make_shared<melee_web::DatArchive>(bytes));

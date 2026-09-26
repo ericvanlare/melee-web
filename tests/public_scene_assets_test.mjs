@@ -69,19 +69,20 @@ try {
   const {NATIVE_GAME_DISC_FILES, openNativeGameDiscSession} =
     await import(`${pathToFileURL(modulePath).href}?public-test`);
   assert.equal(NATIVE_GAME_DISC_FILES['PlCo.dat'], 'PlCo.dat');
+  assert.equal(NATIVE_GAME_DISC_FILES['LbRf.dat'], 'LbRf.dat');
   assert.equal(NATIVE_GAME_DISC_FILES['main.ssm'], 'audio/us/main.ssm');
   assert.equal(Object.hasOwn(NATIVE_GAME_DISC_FILES, 'dsp_coef.bin'), false);
 
   const session = await openNativeGameDiscSession('owned-disc');
   const progress = [];
-  const files = await session.readScope(['PlCo.dat', 'sislib_font.bin'],
+  const files = await session.readScope(['PlCo.dat', 'LbRf.dat', 'sislib_font.bin'],
     event => progress.push(event));
-  assert.deepEqual(scopeCalls, [[['PlCo.dat', 'PlCo.dat']]],
+  assert.deepEqual(scopeCalls, [[['PlCo.dat', 'PlCo.dat'], ['LbRf.dat', 'LbRf.dat']]],
     'logical names map to the exact native FST paths');
-  assert.deepEqual([...files.keys()], ['PlCo.dat', 'sislib_font.bin']);
+  assert.deepEqual([...files.keys()], ['PlCo.dat', 'LbRf.dat', 'sislib_font.bin']);
   assert.deepEqual([...files.get('sislib_font.bin')], [0x51, 0x52]);
-  assert.deepEqual(progress.map(event => event.phase), ['validate', 'read', 'complete']);
-  assert.equal(progress.at(-1).complete, 2);
+  assert.deepEqual(progress.map(event => event.phase), ['validate', 'read', 'read', 'complete']);
+  assert.equal(progress.at(-1).complete, 3);
   assert.equal(readCalls, 1);
   assert.equal(metadataCalls, 1);
 

@@ -8,7 +8,6 @@
 #include <melee/if/iftime.h>
 #include <melee/pl/player.h>
 #include <melee/lb/lblanguage.h>
-#include <sysdolphin/baselib/sislib.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -59,8 +58,6 @@ MeleeWebHud* melee_web_hud_begin_with_music(unsigned layout,
     lbLang_SetLanguageSetting(LANG_US);
     lbLang_SetSavedLanguage(LANG_US);
     owner = hud;
-    /* gm_1A3F's original default gameplay scene preparation size. */
-    HSD_SisLib_803A6048(0x4800);
     ifAll_802F390C();
     /* fn_8016E730 creates the authored screen-flash system after ifAll. */
     if (!melee_web_bg_flash_begin()) {
@@ -113,7 +110,6 @@ int melee_web_hud_end(MeleeWebHud* hud, char* error, size_t size)
         return fail(error, size, "Original screen-flash ownership changed");
     hud->flash_owned = 0;
     ifAll_802F3A64();
-    HSD_SisLib_803A5FBC();
     *ifAll_GetArchive() = hud->previous_archive;
     lbLang_SetLanguageSetting(hud->previous_language);
     lbLang_SetSavedLanguage(hud->previous_saved_language);

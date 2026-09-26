@@ -27,13 +27,14 @@ extern void* melee_web_camera_state(void);
 extern HSD_CObj* cm_804D6464;
 extern HSD_ObjAllocData zlist_alloc_data;
 extern int melee_web_native_camera_restore_current(void*,void*);
+extern HSD_CObj* melee_web_source_devtext_camera(void);
 struct MeleeWebRender {
     uint64_t generation;
     HSD_GObj* gobj;
     HSD_CObj* camera;
-    HSD_GObj* view_owner;
     HSD_CObj* view_camera;
     int original_controller;
+    int match_camera_ready;
     int match_passes;
     int scene_cameras;
     MeleeWebRenderSettings settings;
@@ -83,6 +84,15 @@ int melee_web_render_update(MeleeWebRender* h,const MeleeWebRenderSettings* s,ch
 static MeleeWebRender* begin_render(const MeleeWebRenderSettings* s,int original,char* e,size_t n)
 {
     if(!valid(s,e,n))return NULL;
+    if(original){
+        MeleeWebRender* h=melee_web_render_prepare_match_camera(e,n);
+        if(!h)return NULL;
+        if(!melee_web_render_finish_match_camera(h,s,e,n)){
+            melee_web_render_end(h,NULL,0);
+            return NULL;
+        }
+        return h;
+    }
     Camera* source=melee_web_camera_state();
     if(owner||source->gobj||cm_804D6464){fail(e,n,"Original camera storage already has an owner");return NULL;}
     if(zlist_alloc_data.used){fail(e,n,"Native render cannot replace an existing Z-list pool");return NULL;}
@@ -90,35 +100,51 @@ static MeleeWebRender* begin_render(const MeleeWebRenderSettings* s,int original
     uint64_t generation=melee_web_gameplay_generation();
     MeleeWebRender* h=calloc(1,sizeof(*h));if(!h){fail(e,n,"Cannot allocate native render owner");return NULL;}
     h->generation=generation;
-    if(original){
-        Camera_80030688();
-        h->gobj=source->gobj;h->camera=h->gobj->hsd_obj;
-        h->view_camera=cm_804D6464;h->original_controller=1;h->settings=*s;
-        // Source creates its independent unshaken view camera without a GObj.
-        // Give it the same registered camera destructor as the primary CObj.
-        h->view_owner=GObj_Create(HSD_GOBJ_CLASS_CAMERA,0,0);
-        HSD_GObjObject_80390A70(h->view_owner,HSD_GObj_CameraKind,h->view_camera);
-        HSD_CObjSetViewportfx4(h->camera,0,s->width,0,s->height);
-        HSD_CObjSetScissorx4(h->camera,0,s->width,0,s->height);
-        Camera_80030730(Ground_801C20D0());
-        Ground_EnableMatchCamera();Camera_8002F3AC();
-        owner=h;
-    }else{
-        h->gobj=GObj_Create(HSD_GOBJ_CLASS_CAMERA,0,0);
-        if(!h->gobj){free(h);fail(e,n,"Cannot allocate original camera GObj");return NULL;}
-        h->camera=HSD_CObjAlloc();h->view_camera=h->camera;
-        HSD_GObjObject_80390A70(h->gobj,HSD_GObj_CameraKind,h->camera);
-        source->gobj=h->gobj;cm_804D6464=h->camera;owner=h;
-        if(!melee_web_render_update(h,s,e,n)){melee_web_render_end(h,NULL,0);return NULL;}
-    }
+    h->gobj=GObj_Create(HSD_GOBJ_CLASS_CAMERA,0,0);
+    if(!h->gobj){free(h);fail(e,n,"Cannot allocate original camera GObj");return NULL;}
+    h->camera=HSD_CObjAlloc();h->view_camera=h->camera;
+    HSD_GObjObject_80390A70(h->gobj,HSD_GObj_CameraKind,h->camera);
+    source->gobj=h->gobj;cm_804D6464=h->camera;owner=h;
+    if(!melee_web_render_update(h,s,e,n)){melee_web_render_end(h,NULL,0);return NULL;}
     ok(e,n);return h;
 }
 MeleeWebRender* melee_web_render_begin(const MeleeWebRenderSettings* s,char* e,size_t n){return begin_render(s,0,e,n);}
 MeleeWebRender* melee_web_render_begin_match(const MeleeWebRenderSettings* s,char* e,size_t n){return begin_render(s,1,e,n);}
+MeleeWebRender* melee_web_render_prepare_match_camera(char* e,size_t n)
+{
+    Camera* source=melee_web_camera_state();
+    if(owner||source->gobj||cm_804D6464){fail(e,n,"Original camera storage already has an owner");return NULL;}
+    if(zlist_alloc_data.used){fail(e,n,"Native render cannot replace an existing Z-list pool");return NULL;}
+    if(!melee_web_native_world_enable(e,n))return NULL;
+    MeleeWebRender* h=calloc(1,sizeof(*h));
+    if(!h){fail(e,n,"Cannot allocate native render owner");return NULL;}
+    h->generation=melee_web_gameplay_generation();
+    Camera_80030688();
+    h->gobj=source->gobj;h->camera=h->gobj?h->gobj->hsd_obj:NULL;
+    h->view_camera=cm_804D6464;h->original_controller=1;
+    if(!h->gobj||!h->camera||!h->view_camera||h->camera==h->view_camera){
+        free(h);fail(e,n,"Original VS camera creation did not publish both camera objects");return NULL;
+    }
+    owner=h;ok(e,n);return h;
+}
+int melee_web_render_finish_match_camera(MeleeWebRender* h,const MeleeWebRenderSettings* s,char* e,size_t n)
+{
+    if(!live(h,e,n)||!valid(s,e,n))return 0;
+    if(!h->original_controller||h->match_camera_ready)
+        return fail(e,n,"Original VS camera settings require one prepared camera owner");
+    if(HSD_GObjLibInitData.gx_link_max<63&&(s->gx_links>>(HSD_GObjLibInitData.gx_link_max+1)))
+        return fail(e,n,"Render GX links exceed the owned source registry");
+    HSD_CObjSetViewportfx4(h->camera,0,(float)s->width,0,(float)s->height);
+    HSD_CObjSetScissorx4(h->camera,0,s->width,0,s->height);
+    Camera_80030730(Ground_801C20D0());
+    Ground_EnableMatchCamera();Camera_8002F3AC();
+    h->settings=*s;h->match_camera_ready=1;
+    return ok(e,n);
+}
 int melee_web_render_use_match_passes(MeleeWebRender* h,char* e,size_t n)
 {
     if(!live(h,e,n))return 0;
-    if(h->drawing||!h->original_controller||!h->gobj->render_cb)
+    if(h->drawing||!h->original_controller||!h->match_camera_ready||!h->gobj->render_cb)
         return fail(e,n,"Complete draw passes require the idle original match camera");
     h->match_passes=1;return ok(e,n);
 }
@@ -133,6 +159,8 @@ int melee_web_render_draw(MeleeWebRender* h,char* e,size_t n)
 {
     BOUNDARY("render ownership");
     if(!live(h,e,n))return 0;
+    if(h->original_controller&&!h->match_camera_ready)
+        return fail(e,n,"Original match camera cannot draw before Ground camera setup");
     if(h->drawing)return fail(e,n,"Native render frame is not reentrant");
     BOUNDARY("select lights");
     if(!melee_web_stage_lights_select_current(e,n))return 0;
@@ -193,13 +221,21 @@ int melee_web_render_draw(MeleeWebRender* h,char* e,size_t n)
      * camera belongs to this SDK world's registered camera list before
      * restoring the caller; CObjEndCurrent intentionally retains it. */
     HSD_CObj* final_camera=HSD_CObjGetCurrent();
-    int camera_owned=final_camera==h->camera;
+    int camera_owned=final_camera==h->camera||
+                     final_camera==melee_web_source_devtext_camera();
     if(h->scene_cameras){
-        for(HSD_GObj* camera=HSD_GObjGXLinkHead[HSD_GObjLibInitData.gx_link_max+1];
-            camera;camera=camera->next_gx){
-            if(camera->obj_kind==HSD_GObj_CameraKind&&camera->hsd_obj==final_camera)
-                camera_owned=1;
-        }
+        /* Original VS scene-manager startup creates a DevText camera on GX
+         * link 17. Source render callbacks can leave that valid camera current
+         * after the special max-link traversal, so ownership must be checked
+         * against every live source GObj, not only the max-link camera list. */
+        for(unsigned link=0;link<=HSD_GObjLibInitData.p_link_max&&!camera_owned;++link)
+            for(HSD_GObj* camera=((HSD_GObj**)HSD_GObj_Entities)[link];
+                camera;camera=camera->next){
+                if(camera->obj_kind==HSD_GObj_CameraKind&&camera->hsd_obj==final_camera){
+                    camera_owned=1;
+                    break;
+                }
+            }
     }
     int restored=camera_owned&&melee_web_native_camera_restore_current(final_camera,previous);
     *HSD_VIGetRenderMode()=old_mode;HSD_StartRender(pass);
@@ -212,10 +248,16 @@ int melee_web_render_end(MeleeWebRender* h,char* e,size_t n)
 {
     if(!h)return 1;if(!live(h,e,n))return 0;
     if(h->drawing)return fail(e,n,"Cannot release the camera during drawing");
-    if(HSD_CObjGetCurrent()==h->camera&&!melee_web_native_camera_restore_current(h->camera,NULL))
+    HSD_CObj* current=HSD_CObjGetCurrent();
+    if((current==h->camera||current==h->view_camera)&&
+       !melee_web_native_camera_restore_current(current,NULL))
         return fail(e,n,"Cannot release the active camera");
+    if(h->original_controller&&
+       (!HSD_GObj_804D7810||!HSD_GObj_804D7810[HSD_GObj_CameraKind]))
+        return fail(e,n,"Original camera kind has no registered HSD destructor");
     cm_804D6464=NULL;((Camera*)melee_web_camera_state())->gobj=NULL;
     HSD_GObjPLink_80390228(h->gobj);
-    if(h->view_owner)HSD_GObjPLink_80390228(h->view_owner);
+    if(h->original_controller)
+        HSD_GObj_804D7810[HSD_GObj_CameraKind]((HSD_Obj*)h->view_camera);
     owner=NULL;free(h);return ok(e,n);
 }

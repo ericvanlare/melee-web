@@ -91,6 +91,18 @@ static size_t draws, preparation_draws, used;
  * root->bone), including local SRT and 3x4 matrix values for every node. */
 static char line[65536];
 #define MELEE_WEB_MATRIX_AUDIT_MAX_ANCESTORS 64
+int melee_web_cpu_observation_available(void)
+{
+#ifdef __EMSCRIPTEN__
+    return EM_ASM_INT({
+        return typeof window !== 'undefined' &&
+            window.__meleeCaptureWholeSessionCpuObservation === true &&
+            typeof window.meleeCpuObservation === 'function';
+    });
+#else
+    return 0;
+#endif
+}
 static void put(const char* format, ...)
 {
     va_list args; va_start(args, format);

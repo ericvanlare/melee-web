@@ -273,6 +273,12 @@ MeleeWebResultsContext* melee_web_results_context_begin(
         return fail(error, error_size,
                     "Results requires a prepared world, active audio, and free Ground storage"), NULL;
     if (!melee_web_fighter_assets_check_owned("Results begin", error, error_size)) return NULL;
+    /* Match teardown has completed. Mirror gm_1A3F's preloadState boundary:
+     * retire scene-heap trophy aliases before checking that the Results scene
+     * starts with no previous Toy archive owners. The source routine clears
+     * aliases only; persistent trophy/profile state remains in save storage. */
+    Toy_803127D4();
+    tyDisplay_8031C8B8();
     if (_Toy_sbss_804D6ED0 || _Toy_sbss_804D6ECC || Toy_sbss_804D6EC8 ||
         _Toy_sbss_804D6EC4 || _Toy_sbss_804D6EC0 || _Toy_sbss_804D6EBC ||
         _Toy_sbss_804D6EB8 || _Toy_sbss_804D6EB4 || Toy_sbss_804D6EB0 ||
@@ -368,11 +374,6 @@ MeleeWebResultsContext* melee_web_results_context_begin(
     HSD_SisLib_803A6048(0xC000);
     lb_8001C5A4();
     lb_8001D1F4();
-    /* preloadState resets these scene-heap aliases before the source scene
-     * loads its trophy tables. Persistent trophy/profile values remain owned
-     * by the original save storage. */
-    Toy_803127D4();
-    tyDisplay_8031C8B8();
     melee_web_bg_flash_save_state();
     context->flash_saved = 1;
     gm_Scene_Results_OnEnter(&context->match);

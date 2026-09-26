@@ -1,5 +1,7 @@
 #include "gameplay_collision.h"
 #include "gameplay_bootstrap.h"
+#include "gameplay_source_context.h"
+#include <sysdolphin/baselib/memory.h>
 #include <melee/gr/ground.h>
 #include <melee/gr/types.h>
 #include <melee/mp/mplib.h>
@@ -27,6 +29,72 @@ static MeleeWebCollisionLine lines[] = {
 static const MeleeWebCollisionJoint joint = {{{0, 3}, {3, 1}, {4, 0}, {4, 0}, {0, 0}}, -10, 0, 10, 5, {0, 4}};
 static MeleeWebCollisionInput input = {
     vertices, 4, lines, 4, &joint, 1, {{0, 3}, {3, 1}, {4, 0}, {4, 0}, {0, 0}}, 0, Gr_Kind_Last, 2.0F};
+static Vec2 source_vertices[] = {{-10, 0}, {0, 0}, {0, 0}, {10, 5}};
+static MapLine source_lines[] = {
+    {0, 1, -1, 1, -1, 1, 1, 0x104},
+    {1, 2, 0, 2, 0, 2, 1, 0x104},
+    {2, 3, 1, -1, 1, -1, 1, 0x205},
+    {3, 0, -1, -1, -1, -1, 2, 6},
+};
+static MapJoint source_joints[] = {
+    {0, 3, 3, 1, 4, 0, 4, 0, 0, 0, -10, 0, 10, 5, 0, 4},
+};
+static MapCollData source_map = {
+    source_vertices, 4, source_lines, 4, 0, 3, 3, 1, 4, 0, 4, 0, 0, 0,
+    source_joints, 1, 0,
+};
+
+static void source_loaded_case(void)
+{
+    GroundParam saved = {0}; saved.y = 2.0F;
+    GroundParam* prior_param = stage_info.param;
+    MapCollData* prior_data = stage_info.coll_data;
+    GrKind prior_kind = stage_info.grkind;
+    stage_info.param = &saved;
+    stage_info.grkind = Gr_Kind_Last;
+    stage_info.coll_data = &source_map;
+
+    /* Match retail Stage_8022524C: load the source descriptor and construct
+     * the original updater before attaching the explicit storage owner. */
+    mpLibLoad(&source_map);
+    mpLib_80058820();
+    MeleeWebCollision* owner = melee_web_collision_adopt_loaded(
+        &input, error, sizeof(error));
+    check(owner != NULL, "retail-loaded MapCollData and updater are adopted");
+    check(melee_web_collision_retire_unadopted(&source_map,error,sizeof(error)),
+          "stage retirement leaves successfully adopted collision alive");
+    check(mpLib_8004D164() == &source_map &&
+              ((HSD_GObj**) HSD_GObj_Entities)[6]->user_data == owner,
+          "adopted owner retains the source descriptor and original updater");
+    MeleeWebCollisionLineResult line;
+    check(melee_web_collision_line(owner, 0, &line, error, sizeof(error)) &&
+              line.v0[0] == -20 && line.v1[0] == 0 && line.next == 2,
+          "adopted source lines retain original load/prune results");
+    check(melee_web_collision_destroy(owner, error, sizeof(error)),
+          "adopted source updater releases its loaded storage");
+    check(mpLib_8004D164() == NULL && mpGetGroundCollVtx() == NULL &&
+              mpGetGroundCollLine() == NULL && mpGetGroundCollJoint() == NULL,
+          "adopted source teardown clears original collision globals");
+    const MeleeWebGameplayStats before=melee_web_gameplay_stats();
+    mpLibLoad(&source_map);
+    mpLib_80058820();
+    MeleeWebCollisionInput invalid=input; invalid.stage_scale=INFINITY;
+    check(!melee_web_collision_adopt_loaded(&invalid,error,sizeof(error)),
+          "invalid input rejects after original source loading");
+    check(!melee_web_collision_retire_unadopted(&input,error,sizeof(error)),
+          "rollback rejects a different source map identity");
+    check(melee_web_collision_retire_unadopted(&source_map,error,sizeof(error)),
+          "failed source adoption rolls back original storage and updater");
+    check(melee_web_collision_source_available()&&
+              melee_web_gameplay_stats().objects==before.objects&&
+              melee_web_gameplay_stats().processes==before.processes,
+          "rollback leaves collision ready for another construction");
+    check(melee_web_collision_retire_unadopted(&source_map,error,sizeof(error)),
+          "already retired source collision rollback is idempotent");
+    stage_info.param = prior_param;
+    stage_info.coll_data = prior_data;
+    stage_info.grkind = prior_kind;
+}
 
 static void source_dummy_case(void)
 {
@@ -67,6 +135,117 @@ static void source_dummy_case(void)
           "source collision storage is available again after GObj destruction");
 }
 
+/* Exercise the production floor body and skipped-conversion consumer together.
+ * A hit result alone says nothing about the last executed r5 definition. */
+static int floor_callback_calls;
+static int floor_callback_reject = -1;
+static melee_source_bool floor_callback(Fighter_GObj* gobj, int line)
+{
+    (void) gobj;
+    ++floor_callback_calls;
+    return line != floor_callback_reject;
+}
+
+static void floor_carry_case(void* fighter, const char* label, float x,
+                             float ay, float by, int skip, int callback,
+                             int expected_hit, int expected_known)
+{
+    const MeleeWebSourceFrameId ids[] = {
+        MELEE_WEB_SOURCE_FRAME_CPU_STATE_DISPATCH,
+        MELEE_WEB_SOURCE_FRAME_CPU_STATE_18,
+        MELEE_WEB_SOURCE_FRAME_CPU_FLOOR_QUERY,
+    };
+    MeleeWebSourceFrameGuard frames[3] = {{0}};
+    for (int i = 0; i < 3; ++i) melee_web_source_frame_enter(&frames[i], ids[i]);
+    /* Entry must replace a previous known seed even on an all-pruned query. */
+    check(melee_web_source_context_publish_seed_r5(), "seed before floor query");
+    Vec3 pos, normal;
+    int line = -1;
+    u32 flags = 0;
+    floor_callback_calls = 0;
+    int hit = mpCheckFloor(x, ay, x, by, 0, &pos, &line, &flags, &normal,
+                          skip, -1, -1, callback ? floor_callback : NULL, NULL);
+    MeleeWebSourceRegisterWord value = melee_web_source_context_r5();
+    for (int i = 2; i >= 0; --i) melee_web_source_frame_leave(&frames[i]);
+    int8_t sx = 99, sy = 99;
+    int accepted = melee_web_source_context_resolve_skipped(fighter, &sx, &sy);
+    printf("floor carry %s: hit=%d line=%d known=%d accepted=%d callbacks=%d\n",
+           label, hit, line, value.known, accepted, floor_callback_calls);
+    check(hit == expected_hit && value.known == expected_known &&
+              accepted == expected_known, label);
+    if (expected_known) {
+        check(value.kind == MELEE_WEB_SOURCE_REGISTER_STACK_LOCAL &&
+                  sy == (int8_t) value.source_word,
+              "executed floor-local definition reaches the consumer");
+    } else {
+        check(value.kind == MELEE_WEB_SOURCE_REGISTER_UNKNOWN && sx == 99 && sy == 99,
+              "unsupported definition rejects without supplying stick bytes");
+    }
+    check(!callback || floor_callback_calls == 2, "callback order covers both lines");
+}
+
+static void source_floor_carry_cases(void)
+{
+    MeleeWebCollisionLine carry_lines[] = {
+        {0, 1, -1, -1, -1, -1, 1, 0x104},
+        {2, 3, -1, -1, -1, -1, 1, 0x205},
+    };
+    const MeleeWebCollisionJoint carry_joint = {
+        {{0, 2}, {2, 0}, {2, 0}, {2, 0}, {0, 0}}, -10, 0, 10, 5, {0, 4}};
+    MeleeWebCollisionInput carry_input = {
+        vertices, 4, carry_lines, 2, &carry_joint, 1,
+        {{0, 2}, {2, 0}, {2, 0}, {2, 0}, {0, 0}}, 0, Gr_Kind_Last, 1.0F};
+    MeleeWebCollision* owner = melee_web_collision_create(&carry_input,error,sizeof(error));
+    check(owner != NULL, "floor carry collision construction");
+    void* fighter = HSD_MemAlloc(0x3000);
+    MeleeWebSourceFighterAddress lease;
+    check(melee_web_source_memory_fighter_acquire(fighter, 0x23ec, &lease),
+          "floor carry live source Fighter lease");
+    check(melee_web_source_context_begin_tick(melee_web_gameplay_generation()),
+          "floor carry scheduler context");
+    MeleeWebSourceFrameGuard frames[3] = {{0}};
+    melee_web_source_frame_enter(&frames[0], MELEE_WEB_SOURCE_FRAME_GOBJ_DISPATCH);
+    melee_web_source_frame_enter(&frames[1], MELEE_WEB_SOURCE_FRAME_FIGHTER_CPU_CALLBACK);
+    check(melee_web_source_context_enter_fighter(fighter), "floor carry Fighter binding");
+    melee_web_source_frame_enter(&frames[2], MELEE_WEB_SOURCE_FRAME_CPU_CALLBACK);
+    floor_carry_case(fighter, "flat-hit", -5, 20, -10, 1, 0, 1, 1);
+    floor_carry_case(fighter, "flat-miss-upward", -5, -10, 20, 1, 0, 0, 1);
+    floor_carry_case(fighter, "flat-miss-horizontal", 5, 20, -10, 1, 0, 0, 1);
+    floor_carry_case(fighter, "all-joints-pruned", -1000, 20, -10, -1, 0, 0, 0);
+    floor_carry_case(fighter, "sloped-last-hit", 5, 20, -10, -1, 0, 1, 0);
+    floor_carry_case(fighter, "flat-hit-sloped-last-miss", -5, 20, -10, -1, 0, 1, 0);
+    floor_callback_reject = 1;
+    floor_carry_case(fighter, "flat-hit-last-callback-rejects", -5, 20, -10, -1, 1, 1, 0);
+    floor_callback_reject = -1;
+    floor_carry_case(fighter, "flat-hit-last-callback-before-skip", -5, 20, -10, 1, 1, 1, 0);
+    check(melee_web_collision_destroy(owner,error,sizeof(error)), "ordered floor teardown");
+    MeleeWebCollisionLine first = carry_lines[0];
+    carry_lines[0] = carry_lines[1]; carry_lines[1] = first;
+    owner = melee_web_collision_create(&carry_input,error,sizeof(error));
+    check(owner != NULL, "reverse floor iteration construction");
+    floor_carry_case(fighter, "sloped-hit-later-flat-miss", 5, 20, -10, -1, 0, 1, 1);
+    floor_callback_reject = 0;
+    floor_carry_case(fighter, "rejected-callback-later-flat-hit", -5, 20, -10, -1, 1, 1, 1);
+    MeleeWebSourceFrameGuard query[3] = {{0}};
+    melee_web_source_frame_enter(&query[0], MELEE_WEB_SOURCE_FRAME_CPU_STATE_DISPATCH);
+    melee_web_source_frame_enter(&query[1], MELEE_WEB_SOURCE_FRAME_CPU_STATE_18);
+    melee_web_source_frame_enter(&query[2], MELEE_WEB_SOURCE_FRAME_CPU_FLOOR_QUERY);
+    check(melee_web_source_context_publish_seed_r5(), "seed before joint query");
+    check(mpJointFromLine(-1) == -1 && melee_web_source_context_r5().known,
+          "joint query -1 early return preserves carry");
+    check(mpJointFromLine(0) == 0 && !melee_web_source_context_r5().known,
+          "executed joint lookup clobbers carry regardless of selected stage");
+    for (int i = 2; i >= 0; --i) melee_web_source_frame_leave(&query[i]);
+    int8_t sx, sy;
+    check(!melee_web_source_context_resolve_skipped(fighter, &sx, &sy),
+          "joint-array carry is rejected by the production consumer");
+    for (int i = 2; i >= 0; --i) melee_web_source_frame_leave(&frames[i]);
+    check(melee_web_source_context_end_tick(), "floor carry tick end");
+    check(melee_web_source_memory_fighter_release(fighter), "floor carry lease release");
+    HSD_Free(fighter);
+    check(melee_web_collision_destroy(owner,error,sizeof(error)), "floor carry teardown");
+}
+
 int main(void)
 {
     check(!melee_web_collision_create(&input, error, sizeof(error)), "uninitialized world rejects");
@@ -86,6 +265,8 @@ int main(void)
     invalid = input; invalid.line_count = 1537;
     check(!melee_web_collision_create(&invalid, error, sizeof(error)), "source line capacity enforced before reads");
     source_dummy_case();
+    source_loaded_case();
+    source_floor_carry_cases();
     lines[2].next0 = 0;
     check(!melee_web_collision_create(&input, error, sizeof(error)), "cyclic island chains reject before original traversal");
     lines[2].next0 = -1;

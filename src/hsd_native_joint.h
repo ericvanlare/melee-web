@@ -66,6 +66,9 @@ typedef struct MeleeWebNativeJointStats {
  * checked input payloads alive until every source-created JObj is destroyed.
  * The descriptor pointer is HSD_Joint*, the object pointer is HSD_JObj*. */
 int melee_web_native_world_enable(char* error, size_t error_size);
+/* Initialize native HSD descriptor/object allocators before the original VS
+ * scene manager creates its camera and text GObjs. */
+int melee_web_native_world_prepare_vs_manager(char* error, size_t error_size);
 MeleeWebNativeJoint* melee_web_native_joint_hydrate(const MeleeWebNativeGraph*, char*, size_t);
 void* melee_web_native_joint_descriptor(MeleeWebNativeJoint*, char*, size_t);
 void* melee_web_native_joint_descriptor_at(MeleeWebNativeJoint*,uint32_t index,uint32_t expected_source_offset,char*,size_t);
