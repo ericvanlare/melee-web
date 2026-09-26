@@ -7,11 +7,13 @@ match loops, comparison limits, and explicit open gates are recorded in
 [Remaining fighter port notes](docs/REMAINING_FIGHTERS_PORT_NOTES.md). Both
 original A/B references are repeatable over their verified source-consumed PAD
 workloads. Headless Chrome completed two natural Results→CSS loops per lineup
-with no page errors. The supported per-tick original-versus-port comparisons
-were run without relaxing state/draw fields; each first stops on a scene
-divergence (A: input 13,414, original match frame 11,916; B: input 13,329,
-original match frame 11,971; source expects Results while the port remains in
-Match). Scheduling equivalence is not evaluated, and the new fighters remain an
+with no page errors on the historical character branch. These runs predate
+reconciliation with main's PR #89. The per-tick whole-session harness checks
+scene progression and completion counters, but does not compare fighter state
+or capture port draw state. It stops at scene mismatches (A: input 13,414, port
+match frame 11,916; B: input 13,329, port match frame 11,971; source expects
+Results while the port remains in Match). An earlier claim of state/draw
+comparison was incorrect. Scheduling equivalence is not evaluated, and the new fighters remain an
 unfinished development candidate: broader move/recovery/damage/KO and donor
 coverage remain open. The five-donor Kirby acquisition/use/loss/replacement
 matrix now passes, including Samus's checked ItCo external palette owner; its

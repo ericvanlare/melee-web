@@ -7,14 +7,27 @@ an unfinished development candidate, not admitted or fully playable. Real-asset
 construction, targeted distinctive actions, two rendered four-CPU9 match loops
 per requested lineup, and repeatable original references are now available.
 The browser matches are functional rendered evidence, not original equivalence.
-Both supported original-versus-port comparisons stop at a natural match-duration
-scene divergence. The Samus-donor palette now resolves through a checked
+Both whole-session replays stop at a scene mismatch; their harness does not
+establish the earliest gameplay-state divergence. The Samus-donor palette now resolves through a checked
 cross-archive source-address map; particle-pixel use remains unverified.
 
 Evidence labels follow the
 [performance/accuracy playbook](PERFORMANCE_AND_ACCURACY.md). Raw disc data,
 extracts, captures, screenshots and run logs remain local and ignored under
 `work/` / `assets-local/`; this note contains no personal input paths.
+
+## Baseline and evidence provenance
+
+The pre-reconciliation source checkpoint is
+`55f1b7e6c9a0b96b253271d1561aeb7c6225feb5`. It contains the character fixes and
+final-suite corrections described below. The retained browser/action runs were
+produced during that implementation, before integration of main merge
+`aecc3e64def3090bdfc33d0eb66058df998ef14d` (PR #89). The older browser reports do
+not record an exact source commit or runtime hash; they must not be retroactively
+claimed as clean-checkout validation of `55f1b7e` or the reconciled branch.
+All results below are historical until explicitly replaced by a fresh,
+commit-and-build-bound reconciliation receipt. Original capture repeatability
+remains independently bound to the preserved capture/recipe identities.
 
 ## Character action checklist
 
@@ -94,20 +107,26 @@ pixel/PCM equivalence, foreground timing, physical-controller acceptance or
 performance evidence. Timing interruptions were explicitly resumed at the same
 source frame; they are not hidden or converted into a performance pass.
 
-Once the valid repeatable references were available, both original-versus-port
-whole-session replays were run with the retained state/draw fields and without
-weakening comparison criteria:
+Once the valid repeatable references were available, both whole-session recipes
+were replayed in the browser. This harness checks the scene expected for each
+consumed input, completion, and source tick/draw totals. Its
+`melee-web-port-session-diagnostic` header explicitly declares
+`cpu_observations: not_captured` and `draw_state: not_captured`. Match diagnostic
+rows contain RNG, match clock, PAD history and primary Fighter fields, but these
+rows are not compared to the original state snapshots. Secondary entities are
+also absent from this port diagnostic. The immutable original MWRO streams do
+retain secondary entities and before/after draw slices. The earlier statement
+that these runs compared or preserved all port state/draw fields was incorrect.
 
 | Lineup | Receipt and first observed divergence | Scheduling/result scope |
 | --- | --- | --- |
-| A | `work/pr86-a-original-port-comparison-r2/retail-browser-report.json`: recipe input 13,414, original match frame 11,916; expected source scene Results (4), observed port Match (3). | `input_scheduling: per_tick`; CPU decisions are excluded as inputs and recomputed. `scheduling_equivalence: not_evaluated`. The scene mismatch stops the run before the full input timeline and complete tick/draw counts; this is not a scalar-field first mismatch or a fighter attribution. |
-| B | `work/pr86-b-original-port-comparison-r1/report.json` and `progress.json`: recipe input 13,329, original match frame 11,971; expected source scene Results (4), observed port Match (3). | Same per-tick recorded PAD scope; CPU decisions recomputed; scheduling equivalence not evaluated. The harness stops before full state/draw counts. The Sheik pose-root crash is absent in this rebuilt run; this remaining difference is match-duration/scene progression, not evidence of that crash or a specific fighter cause. |
+| A | `work/pr86-a-original-port-comparison-r2/retail-browser-report.json`: recipe input 13,414, port match frame 11,916; expected source scene Results (4), observed port Match (3). | `input_scheduling: per_tick`; CPU decisions are excluded as inputs and recomputed. `scheduling_equivalence: not_evaluated`. The scene mismatch stops the run before the full input timeline and complete tick/draw counts; this is not a scalar-field first mismatch or a fighter attribution. |
+| B | `work/pr86-b-original-port-comparison-r1/report.json` and `progress.json`: recipe input 13,329, port match frame 11,971; expected source scene Results (4), observed port Match (3). | Same per-tick recorded PAD scope; CPU decisions recomputed; scheduling equivalence not evaluated. The harness stops before completing the timeline. The Sheik pose-root crash is absent in this rebuilt run; a specific cause of the scene progression difference is not established. |
 
-These are supported but **failing, partial** original comparisons. They identify
-the exact earliest gate divergence; they do not establish a later scalar/state
-or draw-field divergence because scene validation stops first. The reported
-source tick/draw-count failures are downstream of the incomplete replay, not a
-reason to omit or relax fields. Headless replay does not establish foreground
+These are **failing, partial scene-progression comparisons**. They identify the
+first checked scene mismatch, not the earliest scalar/state or draw divergence.
+Those comparisons were never performed by this harness. The reported source
+tick/draw-count failures are downstream of the incomplete replay. Headless replay does not establish foreground
 timing or physical input acceptance.
 
 An existing-roster four-Mario boundary control also diverges at the same scene
@@ -121,8 +140,10 @@ comparisons pass.
 
 ## Remaining gates
 
-1. Reduce the Results-versus-Match duration divergence to a smaller causal
-   case and compare unchanged source state/draw fields up to that boundary.
+1. Integrate current main including PR #89, validate character/runtime ownership
+   on the reconciled branch, and establish a fresh browser baseline. Then find
+   the earliest observable state mismatch with explicit capture/comparison scope
+   before reducing a causal boundary.
    The four-Mario control shows the scene mismatch also occurs with the existing
    roster, in the opposite direction; no single cause is established. Keep this
    separate from the tick-1776 investigation.
