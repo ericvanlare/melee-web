@@ -654,6 +654,20 @@ diff --git a/src/melee/cm/camera.c b/src/melee/cm/camera.c
      depth_factor_y = Stage_GetCamZoomRate();
      depth_factor_x = Stage_GetCamMaxDepth() - depth_factor_y;
  
+@@ -954,10 +983,11 @@
+             (bounds->z_pos - Stage_GetCamZoomRate()) / depth_factor_x;
+     }
+ 
++    /* GALE01r2 8002A230/234: depth scaling uses fmadds before the fmuls. */
+     depth_factor_y =
+-        (depth_ratio * (cm_803BCCA0.x5C - cm_803BCCA0.x54)) + cm_803BCCA0.x54;
++        fmaf(depth_ratio, cm_803BCCA0.x5C - cm_803BCCA0.x54, cm_803BCCA0.x54);
+     depth_factor_x =
+-        (depth_ratio * (cm_803BCCA0.x60 - cm_803BCCA0.x58)) + cm_803BCCA0.x58;
++        fmaf(depth_ratio, cm_803BCCA0.x60 - cm_803BCCA0.x58, cm_803BCCA0.x58);
+     Camera_80030DE4(depth_factor_x * (input_x * viewport_x_scale),
+                     depth_factor_y * (input_y * viewport_y_scale));
+     cm_80452C68.xA4 = 0.0f;
 @@ -3524,8 +3553,12 @@
      cm_80452C68.x2D0.angle_left = Stage_GetCamAngleRadiansLeft();
      cm_80452C68.x2D0.unk28 = Stage_GetPauseCamZPosMin();
