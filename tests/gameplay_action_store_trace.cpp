@@ -32,6 +32,7 @@ int action_test_opcode50_consumer(void);
 int action_test_opcode51_consumer(void);
 int action_test_opcode21_consumer(void);
 int action_test_opcode36_consumer(void);
+int action_test_opcode53_consumer(void);
 int action_test_common_operands(void);
 int action_test_falco_operands(void);
 int action_test_wind_operands(void);
@@ -302,6 +303,7 @@ int main(int argc, char** argv)
         check(action_test_opcode51_consumer(),"Opcode 51 signed self-damage consumer and native admission");
         check(action_test_opcode21_consumer(),"Opcode 21 throw-flag consumer and native admission");
         check(action_test_opcode36_consumer(),"Opcode 36 source article-visibility consumer and native admission");
+        check(action_test_opcode53_consumer(),"Opcode 53 source fighter-flag consumer and native admission");
         check(action_test_common_operands(),"Common attack operands and original finite-loop execution");
         check(action_test_falco_operands(),"Falco special opcode schemas retain source fields and canonical words");
         check(action_test_wind_operands(),"Marth wind command decodes source fields and reaches ftCo_8009E714");

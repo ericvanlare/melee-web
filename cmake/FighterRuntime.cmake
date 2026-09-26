@@ -232,6 +232,14 @@ target_link_options(gameplay_pikachu_articles_trace PRIVATE -sENVIRONMENT=node -
   -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
 set_target_properties(gameplay_pikachu_articles_trace PROPERTIES SUFFIX ".js")
 
+add_executable(gameplay_gamewatch_visibility_trace EXCLUDE_FROM_ALL
+  tests/gameplay_gamewatch_visibility_trace.cpp)
+target_link_libraries(gameplay_gamewatch_visibility_trace PRIVATE fighter_asset_runtime)
+target_compile_options(gameplay_gamewatch_visibility_trace PRIVATE -UNDEBUG)
+target_link_options(gameplay_gamewatch_visibility_trace PRIVATE -sENVIRONMENT=node -sNODERAWFS=1
+  -sALLOW_MEMORY_GROWTH=1 -sEXIT_RUNTIME=1 -sASSERTIONS=2 -sSAFE_HEAP=1 -sSTACK_SIZE=8388608)
+set_target_properties(gameplay_gamewatch_visibility_trace PROPERTIES SUFFIX ".js")
+
 add_executable(gameplay_koopa_flame_trace EXCLUDE_FROM_ALL
   tests/koopa_flame_article_trace.cpp tests/koopa_flame_article_fields.c)
 target_link_libraries(gameplay_koopa_flame_trace PRIVATE fighter_asset_runtime)

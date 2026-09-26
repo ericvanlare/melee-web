@@ -80,6 +80,78 @@ static ResultsMatchInfo make_results_match(int opponent_ckind,
     return result;
 }
 
+static void check_results_teardown();
+static std::array<std::uint8_t, MELEE_WEB_PAD_STATE_BYTES>
+neutral_pad_snapshot();
+
+static ResultsMatchInfo make_results_lineup(std::span<const int> ckind)
+{
+    ResultsMatchInfo result{};
+    result.match_end.outcome = OUTCOME_ELIMINATION;
+    result.match_end.match_kind = 0;
+    result.match_end.is_teams = 0;
+    result.match_end.n_winners = 1;
+    for (auto& player : result.match_end.player_standings)
+        player.slot_type = Gm_PKind_NA;
+    for (std::size_t slot = 0; slot < ckind.size(); ++slot) {
+        const auto* fighter = melee_web_fighter_content(ckind[slot]);
+        if (!fighter) throw std::runtime_error("Results lineup has an unknown character kind");
+        auto& player = result.match_end.player_standings[slot];
+        player.slot_type = Gm_PKind_Human;
+        player.ckind = static_cast<s8>(fighter->character_kind);
+        player.ftkind = static_cast<s8>(fighter->fighter_kind);
+        player.x3 = 0;
+        player.x4 = 0;
+        player.is_big_loser = slot == 0 ? 0 : 1;
+        player.is_small_loser = slot == 0 ? 0 : 1;
+        player.team = 0;
+        player.stocks = 0;
+    }
+    result.match_end.winners[0] = 0;
+    return result;
+}
+
+static int run_real_lineup(const melee_web::RuntimeFiles& files,
+                           std::span<const int> roster,
+                           const char* roster_name)
+{
+    char error[256]{};
+    if (!melee_web_gameplay_session_begin(32U * 1024U * 1024U,
+                                          error, sizeof(error)))
+        throw std::runtime_error(error);
+    bool ended = false;
+    try {
+        const auto input_bytes = neutral_pad_snapshot();
+        std::unique_ptr<MeleeWebPadState, decltype(&melee_web_pad_state_free)> input(
+            melee_web_pad_state_decode(input_bytes.data(), input_bytes.size(),
+                                       error, sizeof(error)),
+            melee_web_pad_state_free);
+        if (!input) throw std::runtime_error(error);
+        const auto result = make_results_lineup(roster);
+        std::cout << "Results " << roster_name << " four-source lineup..."
+                  << std::flush;
+        melee_web::GameplayResultsSession session(files, result, 0x13579bdfU,
+                                                   *input);
+        if (session.source_frames() != 0)
+            throw std::runtime_error("Results scene advanced during construction");
+        PADStatus neutral[4]{};
+        neutral[2].err = neutral[3].err = -1;
+        for (unsigned tick = 0; tick < 2; ++tick) session.tick(neutral);
+        if (session.source_frames() != 2 || session.requested())
+            throw std::runtime_error("Short Results tick changed source transition state");
+        session.close();
+        check_results_teardown();
+        if (!melee_web_gameplay_session_end(error, sizeof(error)))
+            throw std::runtime_error(error);
+        ended = true;
+        std::cout << "ok; all four participant demo owners constructed and closed\n";
+        return 0;
+    } catch (...) {
+        if (!ended) melee_web_gameplay_session_end(error, sizeof(error));
+        throw;
+    }
+}
+
 static void check_results_teardown()
 {
     if (melee_web_gameplay_world_exists() || HSD_GObj_Entities ||
@@ -231,7 +303,9 @@ int main(int argc,char** argv){try{
                               command == "--real-enabled-confirm";
     const bool confirm = command == "--real-eight-confirm" ||
                          command == "--real-enabled-confirm";
-    const bool real_roster = real_eight || real_enabled;
+    const bool lineup_a = command == "--lineup-a";
+    const bool lineup_b = command == "--lineup-b";
+    const bool real_roster = real_eight || real_enabled || lineup_a || lineup_b;
     if ((!real_roster && argc != 3) || (real_roster && argc != 5))
         throw std::runtime_error(real_roster ?
             "Expected --real-eight/--real-enabled[-confirm] <common/fighter> <Results shared/music> <Results fighters>" :
@@ -240,17 +314,30 @@ int main(int argc,char** argv){try{
     const int first_directory = real_roster ? 2 : 1;
     for (int directory = first_directory; directory < argc; ++directory)
         load_directory(files, argv[directory]);
+    if (lineup_a || lineup_b) {
+        constexpr std::array<int, 4> a = {
+            CKIND_GAMEWATCH, CKIND_KIRBY, CKIND_POPONANA, CKIND_FOX,
+        };
+        constexpr std::array<int, 4> b = {
+            CKIND_SAMUS, CKIND_YOSHI, CKIND_ZELDA, CKIND_FALCO,
+        };
+        return run_real_lineup(files, lineup_a ? std::span<const int>(a) :
+                                                 std::span<const int>(b),
+                               lineup_a ? "A" : "B");
+    }
     if (real_roster) {
         constexpr std::array<int, 8> real_eight_opponents = {
             CKIND_MARIO, CKIND_DRMARIO, CKIND_FOX, CKIND_FALCO,
             CKIND_MARS, CKIND_EMBLEM, CKIND_LINK, CKIND_CLINK,
         };
-        constexpr std::array<int, 19> real_enabled_opponents = {
+        constexpr std::array<int, 26> real_enabled_opponents = {
             CKIND_MARIO, CKIND_FOX, CKIND_FALCO, CKIND_MARS,
             CKIND_DRMARIO, CKIND_EMBLEM, CKIND_LINK, CKIND_CLINK,
             CKIND_CAPTAIN, CKIND_GANON, CKIND_LUIGI, CKIND_PIKACHU,
             CKIND_PICHU, CKIND_PURIN, CKIND_DONKEY, CKIND_KOOPA,
-            CKIND_MEWTWO, CKIND_NESS, CKIND_PEACH,
+            CKIND_MEWTWO, CKIND_NESS, CKIND_PEACH, CKIND_GAMEWATCH,
+            CKIND_KIRBY, CKIND_POPONANA, CKIND_SAMUS, CKIND_YOSHI,
+            CKIND_ZELDA, CKIND_SEAK,
         };
         const auto opponents = real_enabled
             ? std::span<const int>(real_enabled_opponents)

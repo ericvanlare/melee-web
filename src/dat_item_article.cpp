@@ -13,6 +13,7 @@ extern "C" {
 }
 #pragma GCC diagnostic pop
 #include <cmath>
+#include <cstddef>
 #include <cstring>
 namespace melee_web {
 namespace {
@@ -22,7 +23,8 @@ struct ArticleSchema { uint32_t special_bytes, state_count; bool special_require
 ArticleSchema schema(uint32_t kind)
 {
     switch(kind) {
-    case It_Kind_Mario_Fire:return {20,1,true};
+    case It_Kind_Mario_Fire:
+    case It_Kind_Kirby_MarioFire:return {20,1,true};
     // Luigi's fireball uses the shared five-float source type selectively:
     // its callback consumes x0, x4 and xC, while x8/x10 belong to Mario's
     // distinct fireball record. The authored Luigi region is four floats.
@@ -87,6 +89,12 @@ ArticleSchema schema(uint32_t kind)
     case It_Kind_GameWatch_Judge:return {4,1,true};
     case It_Kind_GameWatch_Panic:return {4,2,true};
     case It_Kind_GameWatch_Chef:return {0x74,2,true};
+    // The copied chef uses the same authored attributes/state layout, but its
+    // Article and model are owned by PlKbCpGw.dat rather than PlGw.dat.
+    case It_Kind_Kirby_GameWatchChef:return {0x74,2,true};
+    // The copy Pan Article has a source-owned visibility/render descriptor but
+    // no serialized animation rows; its callback table is the source C table.
+    case It_Kind_Kirby_GameWatchChefPan:return {4,0,true};
     case It_Kind_GameWatch_Rescue:return {4,2,true};
     // Kirby's ftKb_Init_OnLoad Article order. Cutter Beam has four float
     // scalars, Hammer and Unk2 have no special record. The PlKb DAT's Unk1
@@ -100,13 +108,17 @@ ArticleSchema schema(uint32_t kind)
     // and absent for the GumStrings Article. Their special records retain the
     // exact itCharItems.h layouts, including GumStrings' two source Joints.
     case It_Kind_IceClimber_Ice:return {0x34,1,true};
+    // Kirby's copied Ice shot uses itClimbersice.c with the same authored
+    // itClimbersIceAttributes and state row, but has a distinct ItemKind.
+    case It_Kind_Kirby_IceClimberIce:return {0x34,1,true};
     case It_Kind_IceClimber_Blizzard:return {0x14,1,true};
     case It_Kind_IceClimber_GumStrings:return {0x2C,0,true};
     // Samus's four source Article roots are registered in ftSs_Init_OnLoad.
     // These are serialized descriptor rows (not callback state counts): Bomb
     // carries two, Charge Shot nine, Missile four, and Grapple Beam none.
     case It_Kind_Samus_Bomb:return {0x1C,2,true};
-    case It_Kind_Samus_Charge:return {0x20,9,true};
+    case It_Kind_Samus_Charge:
+    case It_Kind_Kirby_SamusCharge:return {0x20,9,true};
     case It_Kind_Samus_Missile:return {0x40,4,true};
     case It_Kind_Samus_GBeam:return {0xB0,0,true};
     // Yoshi's Egg Throw and Star use their exact float pairs with two and
@@ -132,9 +144,11 @@ ArticleSchema schema(uint32_t kind)
     case It_Kind_Mario_Cape:
     case It_Kind_DrMario_Sheet:return {4,2,true};
     case It_Kind_Fox_Laser:
-    case It_Kind_Falco_Laser:return {40,2,true};
+    case It_Kind_Falco_Laser:
+    case It_Kind_Kirby_FoxLaser:return {40,2,true};
     case It_Kind_Fox_Blaster:
-    case It_Kind_Falco_Blaster:return {40,9,true};
+    case It_Kind_Falco_Blaster:
+    case It_Kind_Kirby_FoxBlaster:return {40,9,true};
     case It_Kind_Fox_Illusion:
     case It_Kind_Falco_Phantasm:return {8,3,true};
     case It_Kind_Heiho:return {24,3,true};
@@ -174,6 +188,8 @@ bool pointer_field(uint32_t kind,uint32_t offset)
     case It_Kind_GameWatch_Judge:
     case It_Kind_GameWatch_Panic:
     case It_Kind_GameWatch_Chef:
+    case It_Kind_Kirby_GameWatchChef:
+    case It_Kind_Kirby_GameWatchChefPan:
     case It_Kind_GameWatch_Rescue:return offset==0;
     // The Yo-Yo's serialized record ends with the original HSD_Joint string,
     // HSD_Joint yoyo and HSD_MatAnimJoint material pointers. The asset owner
@@ -202,10 +218,12 @@ bool float_field(uint32_t kind,uint32_t offset)
     // scalars at 0x0C..0x3C.
     case It_Kind_Ness_Yoyo:return offset>=0xC&&offset<=0x3C;
     case It_Kind_IceClimber_Ice:return offset<0x20||offset==0x24||offset==0x28;
+    case It_Kind_Kirby_IceClimberIce:return offset<0x20||offset==0x24||offset==0x28;
     case It_Kind_IceClimber_Blizzard:return true;
     case It_Kind_IceClimber_GumStrings:return offset==0x8||offset==0xC||offset==0x14;
     case It_Kind_Seak_Chain:return offset>=0x10&&offset<=0x60;
     case It_Kind_Samus_Charge:return offset!=0x4;
+    case It_Kind_Kirby_SamusCharge:return offset!=0x4;
     case It_Kind_Samus_GBeam:return offset!=0xC&&offset!=0x34;
     default:return true;
     }
@@ -217,6 +235,94 @@ void write_native_pointer(void* destination,std::size_t offset,void* value)
     require(address<=UINT32_MAX,"Native item descriptor pointer exceeds source width");
     const auto encoded=static_cast<uint32_t>(address);
     std::memcpy(static_cast<uint8_t*>(destination)+offset,&encoded,sizeof(encoded));
+}
+uint8_t reverse_source_bit_order(uint8_t value)
+{
+    value=static_cast<uint8_t>(((value&0x55U)<<1U)|((value&0xAAU)>>1U));
+    value=static_cast<uint8_t>(((value&0x33U)<<2U)|((value&0xCCU)>>2U));
+    return static_cast<uint8_t>((value<<4U)|(value>>4U));
+}
+void* hydrate_gamewatch_visibility(const MeleeWebNativeDat* r,
+                                   const DatArchive& archive,
+                                   uint32_t source, uint32_t joint_count)
+{
+    struct NativeVisibility {
+        uint16_t x0, pad2;
+        uint8_t* x4;
+        uint16_t x8, padA;
+        uint8_t* xC;
+        int32_t x10, x14;
+        uint8_t x18, pad19[3];
+        float x1C, x20, x24, x28, x2C, x30, x34, x38;
+    };
+    static_assert(sizeof(void*) == 4 && sizeof(NativeVisibility) == 0x3C);
+    /* Article.x4 points at the relocated self-pointer in x10. That pointer
+     * names a source-endian descriptor; item rendering consumes its two
+     * count/index lists, flags and collision vectors as native fields. */
+    (void) archive.range(source, sizeof(NativeVisibility));
+    auto* vars = static_cast<NativeVisibility*>(
+        r->allocate(r->context, 1, sizeof(NativeVisibility)));
+    auto copy_indices = [&](uint32_t count_offset, uint32_t pointer_offset,
+                            uint16_t& count, uint8_t*& indices) {
+        count = r->half(r->context, source + count_offset);
+        require(count <= 100 && count <= joint_count,
+                "Game & Watch visibility list exceeds its source model");
+        const uint32_t target = r->pointer(r->context, source + pointer_offset, count);
+        if (count == 0) {
+            require(target == UINT32_MAX,
+                    "Empty Game & Watch visibility list has a source pointer");
+            indices = NULL;
+            return;
+        }
+        require(target != UINT32_MAX,
+                "Game & Watch visibility list pointer is missing");
+        (void) archive.range(target, count);
+        indices = static_cast<uint8_t*>(
+            r->allocate(r->context, count, sizeof(uint8_t)));
+        for (uint16_t i = 0; i < count; ++i) {
+            indices[i] = r->byte(r->context, target + i);
+            require(indices[i] < joint_count,
+                    "Game & Watch visibility bone exceeds its source model");
+        }
+    };
+    copy_indices(0, 4, vars->x0, vars->x4);
+    copy_indices(8, 12, vars->x8, vars->xC);
+    require(r->pointer(r->context, source + 0x10, sizeof(NativeVisibility)) == source,
+            "Game & Watch visibility descriptor lost its authored self-pointer");
+    write_native_pointer(vars, offsetof(NativeVisibility, x10), vars);
+    vars->x14 = static_cast<int32_t>(r->word(r->context, source + 0x14));
+    // UnkFlagStruct's b0..b7 are MSB-first in the PPC source ABI. This build's
+    // native C bitfields are LSB-first, so map the authored bit identities,
+    // not merely the byte value.
+    vars->x18 = reverse_source_bit_order(r->byte(r->context, source + 0x18));
+    constexpr uint32_t collision_offsets[]{0x1C,0x20,0x24,0x28,
+                                            0x2C,0x30,0x34,0x38};
+    float* collision_fields[]{&vars->x1C,&vars->x20,&vars->x24,&vars->x28,
+                              &vars->x2C,&vars->x30,&vars->x34,&vars->x38};
+    for(size_t i=0;i<8;++i) {
+        const uint32_t offset=collision_offsets[i];
+        if(archive.has_relocation(source+offset)) {
+            // The copied Pan's authored render record uses relocation-backed
+            // words in this tail. Source bitfield order says its collision
+            // overlay is disabled; retain each pointer identity for fidelity,
+            // and reject a future source record that makes that overlay live.
+            require((vars->x18&0x03U)==0,
+                    "Game & Watch collision pointer is live as a source scalar");
+            const auto target=archive.pointer(source+offset,0);
+            require(target.has_value(),
+                    "Game & Watch collision pointer target is missing");
+            void* identity=const_cast<uint8_t*>(archive.range(*target,0).data());
+            write_native_pointer(collision_fields[i],0,identity);
+            continue;
+        }
+        const uint32_t bits=r->word(r->context,source+offset);
+        float value;
+        std::memcpy(&value,&bits,sizeof(value));
+        require(std::isfinite(value),
+                "Game & Watch visibility scalar is nonfinite");
+        *collision_fields[i]=value;
+    }
+    return vars;
 }
 }
 struct DatItemArticle::Storage {
@@ -282,6 +388,7 @@ DatItemArticle::DatItemArticle(std::shared_ptr<const DatArchive> archive,uint32_
     const auto* reader=s.arena.reader();
     void* special=special_size&&special_at?
         reader->allocate(reader->context,special_size/4,4):nullptr;
+    std::optional<uint32_t> gamewatch_visibility_source;
     uint32_t first_special_word=0;
     if(kind==It_Kind_Heiho&&special_at){
         require(sizeof(void*)==4,"Heiho Article hydration requires the 32-bit gameplay target");
@@ -306,17 +413,13 @@ DatItemArticle::DatItemArticle(std::shared_ptr<const DatArchive> archive,uint32_
         kind==It_Kind_GameWatch_Parachute||kind==It_Kind_GameWatch_Turtle||
         kind==It_Kind_GameWatch_Breath||kind==It_Kind_GameWatch_Judge||
         kind==It_Kind_GameWatch_Panic||kind==It_Kind_GameWatch_Chef||
-        kind==It_Kind_GameWatch_Rescue;
+        kind==It_Kind_Kirby_GameWatchChef||
+        kind==It_Kind_Kirby_GameWatchChefPan||kind==It_Kind_GameWatch_Rescue;
     if(gamewatch_item) {
         require(special_at.has_value(),"Game & Watch Article has no special record");
-        const auto payload=a.pointer(*special_at);
+        const auto payload=a.pointer(*special_at,0x3C);
         require(payload.has_value(),"Game & Watch Article special payload is missing");
-        /* it_8027CE64 stores this value in the Game & Watch item-variable
-         * union; the decompiled item consumers never dereference it. Keep the
-         * pointer on the exact immutable, archive-owned source payload instead
-         * of interpreting its source-specific descriptor as a HSD joint. */
-        const auto bytes=a.range(*payload,1);
-        write_native_pointer(special,0,const_cast<uint8_t*>(bytes.data()));
+        gamewatch_visibility_source=*payload;
     }
     uint32_t at=pointer(root+16,16);
     const auto model_root=a.pointer(at,64);
@@ -353,6 +456,11 @@ DatItemArticle::DatItemArticle(std::shared_ptr<const DatArchive> archive,uint32_
         }
     }
     const auto& graph=*graph_ptr;
+    if(gamewatch_visibility_source) {
+        void* visibility=hydrate_gamewatch_visibility(reader,a,
+            *gamewatch_visibility_source,graph.joint_count);
+        write_native_pointer(special,0,visibility);
+    }
 
     auto special_joint=[&](uint32_t offset)->DatNativeJoint* {
         require(bool(special_at),"Item special joint has no special attributes");

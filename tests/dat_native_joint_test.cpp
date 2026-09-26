@@ -3,7 +3,10 @@
 #include <bit>
 #include <iostream>
 #include <fstream>
+#include <map>
+#include <set>
 #include <stdexcept>
+#include <string_view>
 #include <vector>
 using Bytes = std::vector<uint8_t>;
 static void check(bool c, const char* m) { if (!c) throw std::runtime_error(m); }
@@ -48,8 +51,51 @@ struct Fixture {
         return std::make_shared<melee_web::DatArchive>(b);
     }
 };
+struct SharedJointFixture {
+    Bytes data=Bytes(320);
+    std::vector<uint32_t> relocations;
+    void link(uint32_t slot,uint32_t target){put32(data,slot,target);relocations.push_back(slot);}
+    SharedJointFixture(){
+        // Two sibling model nodes point at the same authored child subtree.
+        // HSD_JObjLoadJoint expands each reference into its own runtime JObj.
+        link(24+8,88); link(88+8,216); link(88+12,152); link(152+8,216);
+    }
+    std::shared_ptr<const melee_web::DatArchive> archive()const{
+        const uint32_t table=32+uint32_t(data.size()),pubs=table+uint32_t(relocations.size())*4;
+        Bytes bytes(pubs+13);put32(bytes,0,uint32_t(bytes.size()));put32(bytes,4,uint32_t(data.size()));
+        put32(bytes,8,uint32_t(relocations.size()));put32(bytes,12,1);
+        std::copy(data.begin(),data.end(),bytes.begin()+32);
+        for(unsigned i=0;i<relocations.size();++i)put32(bytes,table+4*i,relocations[i]);
+        put32(bytes,pubs,24);bytes[pubs+8]='r';bytes[pubs+9]='o';bytes[pubs+10]='o';bytes[pubs+11]='t';
+        return std::make_shared<melee_web::DatArchive>(bytes);
+    }
+};
+struct InstanceJointFixture {
+    Bytes data=Bytes(320);
+    std::vector<uint32_t> relocations;
+    void link(uint32_t slot,uint32_t target){put32(data,slot,target);relocations.push_back(slot);}
+    InstanceJointFixture(){
+        // The instance points forward to a joint later in the authored
+        // sibling chain. The target is not its child; HSD resolves its source
+        // identity after loading the complete chain.
+        link(24+8,88);
+        put32(data,88+4,0x1080);
+        link(88+8,216);link(88+12,152);
+        link(152+12,216);
+    }
+    std::shared_ptr<const melee_web::DatArchive> archive()const{
+        const uint32_t table=32+uint32_t(data.size()),pubs=table+uint32_t(relocations.size())*4;
+        Bytes bytes(pubs+13);put32(bytes,0,uint32_t(bytes.size()));put32(bytes,4,uint32_t(data.size()));
+        put32(bytes,8,uint32_t(relocations.size()));put32(bytes,12,1);
+        std::copy(data.begin(),data.end(),bytes.begin()+32);
+        for(unsigned i=0;i<relocations.size();++i)put32(bytes,table+4*i,relocations[i]);
+        put32(bytes,pubs,24);bytes[pubs+8]='r';bytes[pubs+9]='o';bytes[pubs+10]='o';bytes[pubs+11]='t';
+        return std::make_shared<melee_web::DatArchive>(bytes);
+    }
+};
 int main(int argc,char** argv) {
     try {
+        bool rejected=false;
         Fixture f; auto archive=f.archive();
         melee_web::DatNativeJoint native(archive,24); const auto& g=native.graph();
         check(g.joint_count==2 && g.dobj_count==2 && g.pobj_count==1 && g.material_count==1,"complete graph identities");
@@ -57,10 +103,28 @@ int main(int argc,char** argv) {
         check(g.materials[0].source_offset==0 && g.materials[0].material.texture_count==1,"shared relocated-zero material hydrated exactly once");
         check(g.dobjs[0].material==g.dobjs[1].material && g.dobjs[0].pobj==g.dobjs[1].pobj,"shared descriptors retain original identity");
         check(g.materials[0].textures[0].source_offset==380 && g.materials[0].textures[0].texture.image_bytes==32,"texture metadata and byte bound survive");
+        SharedJointFixture shared;
+        melee_web::DatNativeJoint expanded(shared.archive(),24);
+        const auto& eg=expanded.graph();
+        check(eg.joint_count==5&&eg.joints[0].child==1&&eg.joints[1].child==2&&
+              eg.joints[1].next==3&&eg.joints[3].child==4&&
+              eg.joints[2].source_offset==216&&eg.joints[4].source_offset==216,
+              "shared authored child subtree expands to two source-ordered runtime JObjs");
+        InstanceJointFixture instance_fixture;
+        melee_web::DatNativeJoint instance_graph(instance_fixture.archive(),24);
+        const auto& ig=instance_graph.graph();
+        check(ig.joint_count==4&&ig.joints[0].child==1&&
+              ig.joints[1].child==UINT32_MAX&&ig.joints[1].next==2&&ig.joints[2].next==3&&
+              ig.joints[1].instance_target==&ig.joints[3]&&ig.joints[3].source_offset==216,
+              "JOBJ_INSTANCE retains a forward sibling-chain identity without becoming a child edge");
+        shared.link(216+8,88);
+        rejected=false;
+        try{melee_web::DatNativeJoint cycle(shared.archive(),24);}catch(const melee_web::DatError&){rejected=true;}
+        check(rejected,"ancestor cycles remain rejected while non-ancestral shared children expand");
         archive.reset(); // Native input owner must retain all borrowed payloads.
         check(g.pobjs[0].geometry.display_byte_size==32 && static_cast<const uint8_t*>(g.pobjs[0].geometry.display)[0]==0x90,"archive lifetime retained");
         f.link(88+8,24);
-        bool rejected=false;
+        rejected=false;
         try { melee_web::DatNativeJoint cycle(f.archive(),24); } catch(const melee_web::DatError&) {rejected=true;}
         check(rejected,"cyclic graph rejected before native loader");
         Fixture unsupported; put32(unsupported.data,24+4,0x1080);
@@ -87,6 +151,10 @@ int main(int argc,char** argv) {
             try { melee_web::RigidModel viewer(billboard.archive(),24,"axis billboard"); } catch(const melee_web::DatError&) { rejected=true; }
             check(rejected,"inspection viewer rejects axis billboard");
         }
+        Fixture translucent;put32(translucent.data,24+4,0x80000);
+        melee_web::DatNativeJoint native_translucent(translucent.archive(),24);
+        check(native_translucent.graph().joints[0].flags==0x80000,
+              "native source retains the JOBJ_XLU display-function bit");
         put32(billboard.data,24+4,0xa80);rejected=false;
         try { melee_web::DatNativeJoint invalid(billboard.archive(),24); } catch(const melee_web::DatError&) { rejected=true; }
         check(rejected,"undefined mixed billboard mode rejected");
@@ -142,7 +210,62 @@ int main(int argc,char** argv) {
         }
         if(argc==3){
             auto read=[](const char* path){std::ifstream file(path,std::ios::binary);check(bool(file),"open local native graph");
-                Bytes bytes((std::istreambuf_iterator<char>(file)),{});return std::make_shared<melee_web::DatArchive>(bytes);};
+                Bytes bytes((std::istreambuf_iterator<char>(file)),{});return std::make_shared<melee_web::DatArchive>(bytes,melee_web::DatExternalPolicy::ResolveNull);};
+            if(std::string_view(argv[1])=="--samus") {
+                auto fighter=read(argv[2]);
+                auto symbol=[](const auto& a,const char* name){for(const auto& s:a.public_symbols())if(s.name==name)return s.data_offset;
+                    throw std::runtime_error("exact Samus fighter symbol absent");};
+                const auto data=symbol(*fighter,"ftDataSamus");
+                const auto table=fighter->pointer(data+0x48,20);
+                check(bool(table),"Samus five-entry x48 table present");
+                const auto grapple=fighter->pointer(*table+16,16);
+                check(bool(grapple),"Samus grapple descriptor present");
+                const auto joint=fighter->pointer(*grapple,64);
+                check(bool(joint),"Samus grapple model joint present");
+                melee_web::DatNativeJoint native(fighter,*joint);
+                uint32_t instances=0,target_occurrences=0;std::set<uint32_t> instance_targets;
+                for(uint32_t i=0;i<native.graph().joint_count;++i) {
+                    const auto& descriptor=native.graph().joints[i];
+                    if(descriptor.source_offset==109352)++target_occurrences;
+                    if(descriptor.flags&0x1000U) {
+                        ++instances;
+                        const auto source_target=fighter->pointer(descriptor.source_offset+8,64);
+                        check(descriptor.child==UINT32_MAX&&descriptor.instance_target&&source_target&&
+                              descriptor.instance_target->source_offset==*source_target,
+                              "Samus instance resolves to its source target identity");
+                        instance_targets.insert(*source_target);
+                    }
+                }
+                check(native.graph().joint_count==34&&instances==25&&target_occurrences==1&&
+                      !instance_targets.empty(),"Samus grapple authored sibling chain and forward instance identity");
+                std::cout<<"Samus grapple native graph: 34 joints, 25 JOBJ_INSTANCE refs resolve to "
+                         <<instance_targets.size()<<" authored sibling identities\n";
+            } else if(std::string_view(argv[1])=="--yoshi") {
+                auto fighter=read(argv[2]);
+                auto symbol=[](const auto& a,const char* name){for(const auto& s:a.public_symbols())if(s.name==name)return s.data_offset;
+                    throw std::runtime_error("exact Yoshi fighter symbol absent");};
+                const auto data=symbol(*fighter,"ftDataYoshi");
+                const auto table=fighter->pointer(data+0x48,16);
+                check(bool(table),"Yoshi four-entry x48 Article table present");
+                const auto article=fighter->pointer(*table,24);
+                const auto model=article?fighter->pointer(*article+16,16):std::nullopt;
+                const auto joint=model?fighter->pointer(*model,64):std::nullopt;
+                check(bool(joint),"Yoshi EggThrow model joint present");
+                melee_web::DatNativeJoint native(fighter,*joint);
+                uint32_t instances=0;
+                for(uint32_t i=0;i<native.graph().joint_count;++i) {
+                    const auto& descriptor=native.graph().joints[i];
+                    if(descriptor.flags&0x1000U) {
+                        ++instances;
+                        const auto source_target=fighter->pointer(descriptor.source_offset+8,64);
+                        check(source_target&&descriptor.instance_target&&
+                              descriptor.instance_target->source_offset==*source_target,
+                              "Yoshi EggThrow instance resolves to its authored joint identity");
+                    }
+                }
+                std::cout<<"Yoshi EggThrow native model: "<<native.graph().joint_count
+                         <<" joints, "<<instances<<" source instance references passed\n";
+            } else {
             auto fighter=read(argv[1]),costume=read(argv[2]);
             auto symbol=[](const auto& a,const char* name){for(const auto& s:a.public_symbols())if(s.name==name)return s.data_offset;
                 throw std::runtime_error("exact local Mario symbol absent");};
@@ -164,6 +287,7 @@ int main(int argc,char** argv) {
             for(uint32_t i=0;i<gg.joint_count;i++)
                 check(gg.joints[i].child==cg.joints[i].child&&gg.joints[i].next==cg.joints[i].next,"actual guard/costume topology");
             std::cout<<"Local Mario metal graph:61 matching joints,8 DObj occurrences,21 PObjs passed\n";
+            }
         }else check(argc==1,"unexpected native descriptor test arguments");
         std::cout<<"typed native graph identity/lifetime/rejection checks passed\n";
     } catch(const std::exception& e) { std::cerr<<e.what()<<'\n'; return 1; }

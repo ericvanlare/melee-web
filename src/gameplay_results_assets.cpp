@@ -74,13 +74,16 @@ bool is_result_action(std::string_view symbol)
 
 std::shared_ptr<const DatArchive> nested_result_archive(
     const std::shared_ptr<const DatArchive>& outer,
-    const DatFighterAction& action)
+    const DatFighterAction& action, std::uint32_t root_offset)
 {
     const auto bytes = outer->data();
-    require(action.container_offset <= bytes.size() &&
-                action.archive_bytes <= bytes.size() - action.container_offset,
+    require(root_offset <= bytes.size() &&
+                action.container_offset <= bytes.size() - root_offset,
+            "Result demo archive root-relative offset exceeds GmRstM data");
+    const auto nested_offset = std::size_t{root_offset} + action.container_offset;
+    require(action.archive_bytes <= bytes.size() - nested_offset,
             "Result demo archive range exceeds GmRstM data");
-    const auto selected = bytes.subspan(action.container_offset,
+    const auto selected = bytes.subspan(nested_offset,
                                         action.archive_bytes);
     return std::make_shared<const DatArchive>(selected);
 }
@@ -91,6 +94,7 @@ struct GameplayResultsAssets::Storage {
     struct FighterResult {
         std::string archive_name;
         std::string root_symbol;
+        std::uint32_t root_offset = 0;
         std::shared_ptr<const DatArchive> archive;
         std::vector<GameplayResultDemoClip> clips;
     };
@@ -127,15 +131,15 @@ struct GameplayResultsAssets::Storage {
         const auto kind = identity.fighter_kind;
         auto& result = fighters.at(kind);
         const auto& motion_root = public_symbol(*result.archive, spec.root);
-        require(motion_root.data_offset == 0,
-                "Result motion root is not the authored archive base");
+        result.root_offset = motion_root.data_offset;
         const DatFighterActions source_actions(
             *archives.at(std::string(identity.fighter_filename)), identity,
             0x14, fighter_demo_motion_count(kind));
         std::set<std::string> found;
         for (const auto& action : source_actions.actions) {
             if (!is_result_action(action.symbol)) continue;
-            auto nested = nested_result_archive(result.archive, action);
+            auto nested = nested_result_archive(result.archive, action,
+                                                result.root_offset);
             const auto& root = public_symbol(*nested, action.symbol);
             auto animation = std::make_shared<const DatAnimation>(
                 *nested, root.data_offset, DatAnimationPolicy::NativeFighterAction);
@@ -177,6 +181,7 @@ struct GameplayResultsAssets::Storage {
                          DatExternalPolicy::ResolveNull);
             fighters.emplace(identity.fighter_kind, FighterResult{
                 std::string(spec.archive), std::string(spec.root),
+                0,
                 archives.at(std::string(spec.archive)), {}});
         }
         require(selected.contains(primary_kind),
@@ -225,7 +230,8 @@ struct GameplayResultsAssets::Storage {
         for (const auto& [kind, result] : fighters) {
             (void) kind;
             symbols.push_back({result.archive_name.c_str(), result.root_symbol.c_str(),
-                               const_cast<std::uint8_t*>(result.archive->data().data())});
+                               const_cast<std::uint8_t*>(
+                                   result.archive->data().data() + result.root_offset)});
         }
         symbols.push_back({"TyDatai.usd", "tyInitModelTbl", trophy_models.data()});
         symbols.push_back({"TyDatai.usd", "tyInitModelDTbl", trophy_models_d.data()});

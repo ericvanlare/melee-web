@@ -16,6 +16,9 @@ typedef struct MeleeWebNativeDat {
     uint8_t (*byte)(void*, uint32_t);
     uint32_t (*pointer)(void*, uint32_t, size_t);
     const void* (*region)(void*, uint32_t, size_t);
+    /* Resolve a checked byte range in another source archive's retail address
+     * window. NULL means no owned source archive maps the entire range. */
+    const void* (*source_region)(void*, uint32_t, size_t);
     void* (*allocate)(void*, size_t, size_t);
     void (*reject)(void*, const char*);
     /* Bytes to the next authored reference target, for variable-length tables. */

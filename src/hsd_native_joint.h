@@ -22,6 +22,8 @@ typedef struct MeleeWebNativeJointDesc {
     float rotation[3], scale[3], translation[3], inverse_bind[3][4];
     uint8_t has_inverse_bind;
     const MeleeWebNativeSplineDesc* spline;
+    /* JOBJ_INSTANCE targets another descriptor identity in this graph. */
+    const struct MeleeWebNativeJointDesc* instance_target;
 } MeleeWebNativeJointDesc;
 typedef struct MeleeWebNativeDObjDesc {
     uint32_t source_offset, next, material, pobj;

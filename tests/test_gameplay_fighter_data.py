@@ -37,14 +37,15 @@ class GameplayFighterDataTests(unittest.TestCase):
             directory = Path(directory)
             output = directory / "fighter_data.js"
             common = ["-O1", "-fexceptions", "-DTARGET_PC", "-ffunction-sections", "-fdata-sections", "-ffp-contract=off",
-                      "-I", str(ROOT / "src"), "-I", str(ROOT / ".deps/aurora/include")]
+                      "-I", str(ROOT / "src"), "-I", str(ROOT / ".deps/aurora/include"),
+                      "-I", str(source)]
             commands = [
                 [sys.executable, str(compiler / "emcc.py"), *common, "-std=c11", "-I", str(source),
                  "-include", str(ROOT / "src/gameplay_compat.h"), "-c",
                  str(ROOT / "src/gameplay_fighter_data.c"), str(ROOT / "src/gameplay_article_data.c"),
                  str(ROOT / "src/gameplay_action_store.c"), str(ROOT / "tests/gameplay_fighter_data_trace.c")],
                 [sys.executable, str(compiler / "em++.py"), *common, "-std=c++20", "-c",
-                 *[str(ROOT / "src" / (name+".cpp")) for name in ("dat_archive","native_dat","dat_animation","fighter_binding","dat_fighter_runtime","dat_commands","gameplay_action_store")],
+                 *[str(ROOT / "src" / (name+".cpp")) for name in ("dat_archive","native_dat","dat_animation","fighter_binding","dat_fighter_runtime","dat_commands","gameplay_result_motion_table","gameplay_action_store")],
                  str(ROOT / "tests/gameplay_fighter_data_trace.cpp"), "-o", str(directory / "invalid.o")],
             ]
             # One object per source, including distinct C/C++ trace basenames.

@@ -27,9 +27,13 @@
 extern "C" {
 #include <melee/gm/forward.h>
 #include <melee/pl/forward.h>
+#include <sysdolphin/baselib/gobj.h>
 }
 #include <filesystem>
 #include <fstream>
+#include <cstring>
+#include <cstddef>
+#include <cstdint>
 #include <array>
 #include <iostream>
 #include <memory>
@@ -44,13 +48,76 @@ extern "C" int melee_web_test_entity_state(unsigned,unsigned,int*,int*,int*,int*
 extern "C" int melee_web_test_entity_position(unsigned,unsigned,float*,float*);
 extern "C" int melee_web_test_entity_damage(unsigned,unsigned,float*);
 extern "C" int melee_web_test_active_fighter_kind(unsigned);
+extern "C" int melee_web_test_invoke_dormant_zelda_transform(unsigned);
 extern "C" int melee_web_test_kirby_copy_kind(unsigned);
+extern "C" int melee_web_test_apply_kirby_copy_visibility(unsigned);
 extern "C" int melee_web_test_fighter_owns_victim(unsigned,unsigned);
 extern "C" int melee_web_test_donkey_cargo(unsigned,int);
 extern "C" int melee_web_test_koopa_capture(unsigned,int);
 extern "C" int melee_web_test_item_count(int);
 extern "C" int melee_web_test_purin_anim_id(int);
 extern "C" int melee_web_test_quake_start(int);
+
+struct DiagnosticJObj {
+    std::uint8_t source_object[8];
+    DiagnosticJObj* next;
+    DiagnosticJObj* parent;
+    DiagnosticJObj* child;
+};
+struct HSD_Generator {
+    HSD_Generator* next;
+    std::uint32_t kind;
+    float random,count;
+    HSD_JObj* jobj;
+    std::uint16_t genLife,type;
+    std::uint8_t bank,linkNo,texGroup,dummy;
+    std::uint16_t idnum,life;
+    std::uint8_t* cmdList;
+    std::uint8_t source_fields_to_numChild[0x2c];
+    std::uint32_t numChild;
+};
+static_assert(offsetof(DiagnosticJObj,child)==0x10);
+static_assert(offsetof(HSD_Generator,jobj)==0x10&&offsetof(HSD_Generator,numChild)==0x50);
+extern "C" HSD_Generator* hsd_804D78FC;
+extern "C" std::uint16_t hsd_804D78E0;
+
+static bool jobj_has_root(DiagnosticJObj* root,DiagnosticJObj* target){
+    for(unsigned visited=0;target&&visited<512;visited++,target=target->parent)
+        if(root==target)return true;
+    return false;
+}
+
+static void dump_terminal_generators(){
+    auto* objects=reinterpret_cast<HSD_GObj**>(HSD_GObj_Entities);
+    constexpr unsigned link_count=sizeof(HSD_GObjList)/sizeof(HSD_GObj*);
+    for(HSD_Generator* gen=hsd_804D78FC;gen;gen=gen->next){
+        std::cout<<"Terminal generator bank="<<unsigned(gen->bank)<<" id="<<gen->idnum
+                 <<" kind=0x"<<std::hex<<gen->kind<<" type=0x"<<gen->type<<std::dec
+                 <<" children="<<gen->numChild<<" life="<<gen->life<<" genLife="<<gen->genLife
+                 <<" link="<<unsigned(gen->linkNo)<<" jobj="<<gen->jobj
+                 <<" cmd="<<static_cast<void*>(gen->cmdList)<<std::endl;
+        bool found=false;
+        if(!gen->jobj)continue;
+        for(unsigned link=0;link<link_count;link++)for(HSD_GObj* object=objects[link];object;object=object->next){
+            if(object->classifier!=HSD_GOBJ_CLASS_FIGHTER&&object->classifier!=HSD_GOBJ_CLASS_STAGE&&
+               object->classifier!=HSD_GOBJ_CLASS_GROUND)continue;
+            if(!jobj_has_root(reinterpret_cast<DiagnosticJObj*>(GET_JOBJ(object)),
+                              reinterpret_cast<DiagnosticJObj*>(gen->jobj)))continue;
+            found=true;
+            std::cout<<"Terminal generator owner class="<<object->classifier<<" link="<<unsigned(link)
+                     <<" plink="<<unsigned(object->p_link)<<" gobj="<<object;
+            if(object->classifier==HSD_GOBJ_CLASS_FIGHTER&&object->user_data){
+                const auto* fighter=static_cast<const std::uint8_t*>(object->user_data);
+                std::int32_t kind=0,motion=0;std::uint8_t player=0;
+                std::memcpy(&kind,fighter+4,sizeof(kind));std::memcpy(&player,fighter+12,sizeof(player));
+                std::memcpy(&motion,fighter+16,sizeof(motion));
+                std::cout<<" fighter="<<kind<<" player="<<unsigned(player)<<" motion="<<motion;
+            }
+            std::cout<<std::endl;
+        }
+        if(!found)std::cout<<"Terminal generator JObj has no live fighter/stage/item/effect GObj owner"<<std::endl;
+    }
+}
 extern "C" int melee_web_test_quake_translated(void);
 extern "C" int melee_web_story_state(uint32_t*,unsigned*,int*,int*,int*,int*);
 static void check(bool value,const std::string& message){if(!value)throw std::runtime_error(message);}
@@ -81,7 +148,19 @@ int main(int argc,char** argv){try{
     if(argc<3||argc>7)throw std::runtime_error("Expected owned menu/game directories and optional StKind/P1 CKind/P2 CKind/trace scope");
     const bool entry_only=argc==7&&std::string(argv[6])=="--entry-only";
     const bool platform_pass=argc==7&&std::string(argv[6])=="--platform-pass";
-    const bool action_coverage=argc==7&&std::string(argv[6])=="--character-actions";
+    const bool slot2_transform=argc==7&&std::string(argv[6])=="--slot2-transform";
+    const bool slot2_cpu_match=argc==7&&std::string(argv[6])=="--slot2-cpu-match";
+    const bool lineup_a_cpu_match=argc==7&&std::string(argv[6])=="--lineup-a-cpu-match";
+    const bool lineup_b_catch_prefix=argc==7&&std::string(argv[6])=="--lineup-b-catch-prefix";
+    const bool a_natural_terminal=argc==7&&std::string(argv[6])=="--a-natural-terminal";
+    const bool a_prefix_teardown=argc==7&&std::string(argv[6])=="--a-prefix-teardown";
+    const bool b_natural_terminal=argc==7&&std::string(argv[6])=="--b-natural-terminal";
+    const bool mario_natural_terminal=argc==7&&std::string(argv[6])=="--mario-natural-terminal";
+    const bool fox_cpu_prefix=argc==7&&std::string(argv[6])=="--fox-cpu-prefix";
+    const bool natural_terminal=a_natural_terminal||b_natural_terminal||mario_natural_terminal;
+    const bool cpu9_match=slot2_cpu_match||lineup_a_cpu_match||lineup_b_catch_prefix||
+                          natural_terminal||a_prefix_teardown;
+    const bool action_coverage=(argc==7&&std::string(argv[6])=="--character-actions")||slot2_transform||cpu9_match||fox_cpu_prefix;
     if(argc==7&&!entry_only&&!platform_pass&&!action_coverage)throw std::runtime_error("Unknown source match trace scope");
     melee_web::RuntimeFiles files;
     for(const auto* root:{argv[1],argv[2]})for(const auto& entry:std::filesystem::directory_iterator(root)){
@@ -145,6 +224,45 @@ int main(int argc,char** argv){try{
     check(opponent_content,"Selected opponent has no admitted source content");
     selection.start.players[0].ckind=fighter_ckind;
     selection.start.players[1].ckind=opponent_ckind;
+    if(slot2_transform||slot2_cpu_match){
+        selection.start.players[2].ckind=CKIND_ZELDA;
+        selection.start.players[2].color=0;
+    }
+    if(cpu9_match){
+        if(lineup_a_cpu_match||a_natural_terminal||a_prefix_teardown){
+            selection.start.players[0].ckind=CKIND_GAMEWATCH;
+            selection.start.players[1].ckind=CKIND_KIRBY;
+            selection.start.players[2].ckind=CKIND_POPONANA;
+            selection.start.players[3].ckind=CKIND_FOX;
+        }else if(mario_natural_terminal){
+            for(unsigned i=0;i<4;i++)selection.start.players[i].ckind=CKIND_MARIO;
+        }else{
+            selection.start.players[0].ckind=CKIND_SAMUS;
+            selection.start.players[1].ckind=CKIND_YOSHI;
+            selection.start.players[2].ckind=CKIND_ZELDA;
+            selection.start.players[3].ckind=CKIND_FALCO;
+        }
+        for(unsigned i=0;i<4;i++){
+            selection.start.players[i].slot_type=Gm_PKind_Cpu;
+            selection.start.players[i].cpu_kind=4;
+            selection.start.players[i].cpu_level=9;
+            selection.start.players[i].rumble_enabled=0;
+            selection.players[i]={static_cast<uint32_t>(i),4,0,0};
+        }
+    }else if(slot2_transform){
+        selection.start.players[2].slot_type=Gm_PKind_Human;
+    }
+    if(fox_cpu_prefix){
+        check(fighter_ckind==CKIND_FOX&&opponent_ckind==CKIND_MARIO,
+              "Fox command prefix requires the Fox-vs-Mario source control pair");
+        for(unsigned i=0;i<2;i++){
+            selection.start.players[i].slot_type=Gm_PKind_Cpu;
+            selection.start.players[i].cpu_kind=4;
+            selection.start.players[i].cpu_level=9;
+            selection.start.players[i].rumble_enabled=0;
+            selection.players[i]={static_cast<uint32_t>(i),4,0,0};
+        }
+    }
     const bool ice_action_case=action_coverage&&fighter_ckind==CKIND_POPONANA;
     if(ice_action_case){
         auto& opponent=selection.start.players[1];
@@ -153,8 +271,10 @@ int main(int argc,char** argv){try{
     }
     const bool kirby_action_case=action_coverage&&fighter_ckind==CKIND_KIRBY;
     if(kirby_action_case){
-        check(opponent_ckind==CKIND_GAMEWATCH,
-              "Kirby copy action probe requires Game & Watch as its scoped donor family");
+        check(opponent_ckind==CKIND_GAMEWATCH||opponent_ckind==CKIND_POPONANA||
+                  opponent_ckind==CKIND_MARIO||opponent_ckind==CKIND_SAMUS||
+                  opponent_ckind==CKIND_FOX,
+              "Kirby copy action probe requires a scoped Game & Watch, Ice Climbers, Mario, Samus, or Fox donor");
     }
     const unsigned costume_cycles=action_coverage?1:(fighter_content->costumes>opponent_content->costumes?
         fighter_content->costumes:opponent_content->costumes);
@@ -165,6 +285,7 @@ int main(int argc,char** argv){try{
         selection.start.players[1].color=opponent_color;
         selection.players[0]={0,4,fighter_color,0};
         selection.players[1]={1,4,opponent_color,0};
+        if(slot2_transform)selection.players[2]={2,4,0,0};
         const bool transformation_form=fighter_ckind==CKIND_ZELDA||fighter_ckind==CKIND_SEAK;
         const bool startup_transform=transformation_form&&!action_coverage;
         std::cout<<"Construct mixed content stage="<<selection.start.rules.stkind<<" costume="<<cycle<<std::endl;
@@ -174,7 +295,7 @@ int main(int argc,char** argv){try{
             match_owner.emplace(files,selection,*initial_input);
         }else match_owner.emplace(files,selection);
         auto& match=*match_owner;
-        const unsigned match_player_count=2U;
+        const unsigned match_player_count=cpu9_match?4U:(slot2_transform?3U:2U);
         PADStatus raw[4]{};if(match_player_count<3)raw[2].err=PAD_ERR_NO_CONTROLLER;
         if(ice_action_case)raw[1].err=PAD_ERR_NO_CONTROLLER;
         raw[3].err=PAD_ERR_NO_CONTROLLER;
@@ -186,8 +307,10 @@ int main(int argc,char** argv){try{
                 check(std::isfinite(state.position[0])&&std::isfinite(state.position[1]),"Nonfinite fighter state");}};
         for(unsigned n=0;!match.ready()&&n<600;n++)tick();
         check(match.ready(),"Original Ready did not finish");
+        const int selected_fighter_ckind=cpu9_match?
+            selection.start.players[0].ckind:fighter_ckind;
         const int active_fighter_ckind=startup_transform?
-            (fighter_ckind==CKIND_ZELDA?CKIND_SEAK:CKIND_ZELDA):fighter_ckind;
+            (fighter_ckind==CKIND_ZELDA?CKIND_SEAK:CKIND_ZELDA):selected_fighter_ckind;
         const auto* active_fighter_content=melee_web_fighter_content(active_fighter_ckind);
         check(active_fighter_content&&melee_web_test_content_player(0,active_fighter_ckind,
               active_fighter_content->fighter_kind,fighter_color),
@@ -205,9 +328,45 @@ int main(int argc,char** argv){try{
             std::cout<<"Ice pair primary="<<primary_kind<<"/"<<primary_motion<<"/"<<primary_grounded
                      <<" partner="<<partner_kind<<"/"<<partner_motion<<"/"<<partner_grounded<<std::endl;
         }
-        check(melee_web_test_content_player(1,opponent_ckind,opponent_content->fighter_kind,opponent_color),"Original opponent identity/costume/icon differs");
+        const int selected_opponent_ckind=cpu9_match?
+            selection.start.players[1].ckind:opponent_ckind;
+        const auto* selected_opponent_content=melee_web_fighter_content(selected_opponent_ckind);
+        check(selected_opponent_content&&melee_web_test_content_player(1,selected_opponent_ckind,
+              selected_opponent_content->fighter_kind,selection.start.players[1].color),
+              "Original opponent identity/costume/icon differs");
         check(match.player_stats(0).stocks==4&&match.player_stats(1).stocks==4,
               "Source stock initialization changed for the selected content pair");
+        if(a_prefix_teardown){
+            for(unsigned n=0;n<600;n++)tick();
+            check(hsd_804D78FC!=nullptr,"Final Destination prefix did not create its original stage particle generator");
+            std::cout<<"A source prefix reached "<<match.source_frames()
+                     <<" frames with live original stage generators="<<hsd_804D78E0<<std::endl;
+            dump_terminal_generators();
+            match.close();match.close();
+            std::cout<<"A source prefix teardown after effect runtime passed"<<std::endl;
+            continue;
+        }
+        if(natural_terminal){
+            std::cout<<"Natural terminal source reducer begin; lineup="
+                     <<(a_natural_terminal?"A":b_natural_terminal?"B":"four-Mario control")
+                     <<" source_frame="<<match.source_frames()<<std::endl;
+            for(unsigned n=0;n<180000&&!match.complete();n++){
+                tick();
+                if(n%600==599){
+                    std::cout<<"Natural terminal source progress frame="<<match.source_frames()<<" stocks=";
+                    for(unsigned i=0;i<4;i++)std::cout<<(i?",":"")<<match.player_stats(i).stocks;
+                    std::cout<<std::endl;
+                }
+            }
+            check(match.complete(),"Four-player CPU9 source reducer did not naturally complete");
+            int winner=-1;const int outcome=match.outcome(winner);
+            std::cout<<"Natural terminal source outcome="<<outcome<<" winner="<<winner
+                     <<" source_frame="<<match.source_frames()<<"; closing source owners"<<std::endl;
+            dump_terminal_generators();
+            match.close();match.close();
+            std::cout<<"Natural terminal source teardown passed"<<std::endl;
+            continue;
+        }
         if(action_coverage){
             auto neutral=[&](){for(unsigned i=0;i<4;i++){
                 raw[i].button=0;raw[i].stickX=raw[i].stickY=0;}};
@@ -228,7 +387,74 @@ int main(int argc,char** argv){try{
                       std::to_string(state.position[0])+","+
                       std::to_string(state.position[1]));
             };
-            if(fighter_ckind==CKIND_GAMEWATCH){
+            if(fox_cpu_prefix){
+                std::cout<<"Two-player Fox/Mario CPU9 command-prefix probe begin"<<std::endl;
+                for(unsigned n=0;n<8000;n++){
+                    tick();
+                    if(n%300==299)
+                        std::cout<<"Fox/Mario source frame="<<match.source_frames()
+                                 <<" Fox motion="<<match.player_stats(0).motion_id
+                                 <<" Mario motion="<<match.player_stats(1).motion_id
+                                 <<std::endl;
+                }
+                std::cout<<"Fox/Mario CPU9 prefix completed 8000 ticks without an unsupported command"
+                         <<std::endl;
+            }else if(cpu9_match){
+                std::cout<<"Four-player CPU9 source reproduction begin; lineup="
+                         <<(lineup_a_cpu_match||a_natural_terminal||a_prefix_teardown?"A":"B")<<" source_frame="
+                         <<match.source_frames()<<std::endl;
+                const unsigned prefix_ticks=lineup_b_catch_prefix?3600:12000;
+                bool samus_catchwait_with_beam=false;
+                for(unsigned n=0;n<prefix_ticks;n++){
+                    tick();
+                    if(n%300==299){
+                        std::cout<<"CPU9 source progress frame="<<match.source_frames()<<" stocks=";
+                        for(unsigned i=0;i<4;i++)std::cout<<(i?",":"")<<match.player_stats(i).stocks;
+                        std::cout<<" Zelda_motion="<<match.player_stats(2).motion_id
+                                 <<" active_kind="<<melee_web_test_active_fighter_kind(2)
+                                 <<" Samus_motion="<<match.player_stats(0).motion_id
+                                 <<" Samus_beams="<<melee_web_test_item_count(It_Kind_Samus_GBeam)
+                                 <<std::endl;
+                    }
+                    samus_catchwait_with_beam|=match.player_stats(0).motion_id==ftCo_MS_CatchWait&&
+                        melee_web_test_item_count(It_Kind_Samus_GBeam)>0;
+                }
+                std::cout<<"Four-player CPU9 source reproduction completed ticks="<<prefix_ticks
+                         <<" observed_Samus_CatchWait_with_beam="<<samus_catchwait_with_beam
+                         <<"; no source state is injected"<<std::endl;
+            }else if(slot2_transform){
+                check(melee_web_test_active_fighter_kind(2)==FTKIND_ZELDA,
+                      "Third-player transformation repro did not begin as Zelda");
+                int current=FTKIND_ZELDA;
+                for(unsigned change=0;change<4;change++){
+                    const int wanted=current==FTKIND_ZELDA?FTKIND_SEAK:FTKIND_ZELDA;
+                    raw[2].stickY=-80;raw[2].button=PAD_BUTTON_B;tick();neutral();
+                    bool down_motion=false,transformed=false;
+                    for(unsigned n=0;n<240&&!transformed;n++){
+                        const int motion=match.player_stats(2).motion_id;
+                        down_motion|=motion==ftZd_MS_SpecialLw||motion==ftZd_MS_SpecialLw2||
+                                     motion==ftSk_MS_SpecialLw||motion==ftSk_MS_SpecialLw2;
+                        transformed=melee_web_test_active_fighter_kind(2)==wanted;
+                        if(!transformed)tick();
+                    }
+                    check(down_motion&&transformed,
+                          "Third-player in-match down-B transformation did not complete");
+                    current=wanted;
+                    std::cout<<"Third-player Zelda/Sheik down-B form="<<current
+                             <<" source_frame="<<match.source_frames()<<std::endl;
+                    if(current==FTKIND_SEAK){
+                        check(melee_web_test_invoke_dormant_zelda_transform(2),
+                              "Dormant Zelda transform callback replaced active Sheik");
+                        check(match.player_stats(2).stocks==4,
+                              "Dormant Zelda callback changed the active form's stocks");
+                        std::cout<<"Dormant Zelda callback ignored while Sheik remains active"
+                                 <<std::endl;
+                    }
+                    neutral();for(unsigned n=0;n<90;n++)tick();
+                    check(match.player_stats(2).stocks==4,
+                          "Third-player Zelda/Sheik transform changed source stocks");
+                }
+            }else if(fighter_ckind==CKIND_GAMEWATCH){
                 bool chef=false,sausage=false;
                 for(unsigned n=0;n<180&&!(chef&&sausage);n++){
                     raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
@@ -255,7 +481,56 @@ int main(int argc,char** argv){try{
                 for(unsigned n=0;n<900&&melee_web_test_item_count(It_Kind_Samus_Bomb)>0;n++)tick();
                 check(melee_web_test_item_count(It_Kind_Samus_Bomb)==0,
                       "Samus bomb did not clear through its source lifetime");
-                std::cout<<"Samus action coverage: down-B Bomb article lifetime passed; other specials unverified"<<std::endl;
+                // Reproduce the historical Samus CatchWait failure at the
+                // source-owned throw-article boundary: walk into ordinary
+                // grab range, capture with raw Z, then choose a throw with a
+                // fresh stick edge. ftCo_800DD4B0 calls
+                // ftSs_Init_CreateThrowGrappleBeam, which loads the fifth
+                // x48 joint and its four authored throw animations.
+                settle_primary();
+                bool near_target=false;
+                for(unsigned n=0;n<480&&!near_target;n++){
+                    const auto self=match.player_stats(0),target=match.player_stats(1);
+                    const float dx=target.position[0]-self.position[0];
+                    const float dy=target.position[1]-self.position[1];
+                    near_target=std::fabs(dx)<8.0f&&std::fabs(dy)<3.0f&&
+                                self.ground_or_air==0&&target.ground_or_air==0;
+                    if(near_target)break;
+                    raw[0].stickX=std::fabs(dx)<1.5f?0.0f:(dx>0?40.0f:-40.0f);
+                    raw[0].stickY=0;raw[0].button=0;tick();
+                }
+                neutral();
+                check(near_target,
+                      "Samus throw reproducer did not approach the static target; x="+
+                      std::to_string(match.player_stats(0).position[0])+"/"+
+                      std::to_string(match.player_stats(1).position[0]));
+                settle_primary();
+                bool captured=false;
+                for(unsigned n=0;n<360&&!captured;n++){
+                    raw[0].button=n%20==0?PAD_TRIGGER_Z:0;
+                    raw[0].stickX=raw[0].stickY=0;
+                    tick();
+                    captured=match.player_stats(0).motion_id==ftCo_MS_CatchWait&&
+                             melee_web_test_fighter_owns_victim(0,1);
+                }
+                check(captured,
+                      "Samus raw Z did not capture the nearby victim into source CatchWait; motion="+
+                      std::to_string(match.player_stats(0).motion_id)+" victim="+
+                      std::to_string(melee_web_test_fighter_owns_victim(0,1)));
+                raw[0].button=0;raw[0].stickX=raw[0].stickY=0;tick();
+                const auto held=match.player_stats(0);
+                const auto victim=match.player_stats(1);
+                raw[0].stickX=victim.position[0]>held.position[0]?80:-80;
+                tick();
+                const int throw_motion=match.player_stats(0).motion_id;
+                check(throw_motion==ftCo_MS_ThrowF||throw_motion==ftCo_MS_ThrowB,
+                      "Samus CatchWait stick edge did not enter source ThrowF/ThrowB and load its authored grapple joint; motion="+
+                      std::to_string(throw_motion));
+                raw[0].stickX=0;
+                for(unsigned n=0;n<120;n++)tick();
+                std::cout<<"Samus action coverage: down-B Bomb lifetime and raw-Z capture -> "
+                         <<"CatchWait -> source throw animation with authored grapple joint passed; other specials unverified"
+                         <<std::endl;
             }else if(fighter_ckind==CKIND_YOSHI){
                 settle_primary();
                 bool near_target=false;
@@ -263,24 +538,52 @@ int main(int argc,char** argv){try{
                     const auto self=match.player_stats(0),target=match.player_stats(1);
                     const float dx=target.position[0]-self.position[0];
                     const float dy=target.position[1]-self.position[1];
-                    if(std::fabs(dx)<7.0f&&std::fabs(dy)<5.0f){near_target=true;break;}
-                    raw[0].stickX=std::fabs(dx)<5.0f?0:(dx>0?80:-80);
-                    raw[0].stickY=std::fabs(dy)<4.0f?0:(dy>0?60:-60);tick();
+                    if(std::fabs(dx)<3.5f&&std::fabs(dy)<4.0f){near_target=true;break;}
+                    // Walk into tongue range with a low analog magnitude so
+                    // the source run acceleration does not carry Yoshi past
+                    // the idle target before the Egg Lay hitbox is active.
+                    raw[0].stickX=std::fabs(dx)<2.0f?0:(dx>0?40:-40);
+                    raw[0].stickY=std::fabs(dy)<2.0f?0:(dy>0?40:-40);tick();
                 }
-                check(near_target,"Yoshi neutral-B case did not reach the target's collision spacing");
+                if(!near_target){
+                    const auto self=match.player_stats(0),target=match.player_stats(1);
+                    check(false,"Yoshi neutral-B case did not reach collision spacing; delta="+
+                          std::to_string(target.position[0]-self.position[0])+","+
+                          std::to_string(target.position[1]-self.position[1]));
+                }
                 neutral();settle_primary();
-                bool egg_lay_motion=false,egg_lay_article=false;
-                for(unsigned n=0;n<180&&!(egg_lay_motion&&egg_lay_article);n++){
+                bool egg_lay_motion=false,victim_captured=false,victim_in_egg=false;
+                bool victim_released=false;
+                int last_yoshi_motion=-1,last_target_motion=-1;
+                for(unsigned n=0;n<480&&!victim_released;n++){
                     raw[0].button=n==0?PAD_BUTTON_B:0;tick();
                     const int motion=match.player_stats(0).motion_id;
                     egg_lay_motion|=motion>=ftYs_MS_SpecialN1&&motion<=ftYs_MS_SpecialN2_1;
-                    egg_lay_article|=melee_web_test_item_count(It_Kind_Yoshi_EggLay)>0;
+                    const int target_motion=match.player_stats(1).motion_id;
+                    const bool owns_victim=melee_web_test_fighter_owns_victim(0,1)!=0;
+                    victim_captured|=owns_victim||target_motion==ftCo_MS_CaptureYoshi;
+                    victim_in_egg|=target_motion==ftCo_MS_YoshiEgg;
+                    victim_released=victim_in_egg&&target_motion==ftCo_MS_Fall&&!owns_victim;
+                    if(motion!=last_yoshi_motion||target_motion!=last_target_motion){
+                        const auto self=match.player_stats(0),target=match.player_stats(1);
+                        std::cout<<"Yoshi Egg Lay frame="<<n<<" motion="<<motion
+                                 <<" target_motion="<<target_motion<<" delta="
+                                 <<target.position[0]-self.position[0]<<","<<
+                                   target.position[1]-self.position[1]<<" owns="
+                                 <<owns_victim<<std::endl;
+                        last_yoshi_motion=motion;last_target_motion=target_motion;
+                    }
                 }
                 neutral();
                 check(egg_lay_motion,"Yoshi neutral-B did not enter an authored Egg Lay source motion");
-                std::cout<<"Yoshi action coverage: neutral-B Egg Lay source motion passed; victim capture/article="
-                         <<(egg_lay_article?"observed":"not observed")
-                         <<"; other specials unverified"<<std::endl;
+                check(victim_captured&&victim_in_egg&&victim_released,
+                      "Yoshi Egg Lay did not complete victim capture, egg state, and natural Fall release; captured="+
+                      std::to_string(victim_captured)+" egg="+std::to_string(victim_in_egg)+
+                      " released="+std::to_string(victim_released)+" target_motion="+
+                      std::to_string(match.player_stats(1).motion_id));
+                std::cout<<"Yoshi action coverage: neutral-B captured Mario into ftCo_MS_CaptureYoshi,"
+                         <<" entered ftCo_MS_YoshiEgg, then naturally released to ftCo_MS_Fall;"
+                         <<" other specials unverified"<<std::endl;
             }else if(fighter_ckind==CKIND_ZELDA||fighter_ckind==CKIND_SEAK){
                 const int start_kind=fighter_ckind==CKIND_ZELDA?FTKIND_ZELDA:FTKIND_SEAK;
                 check(melee_web_test_active_fighter_kind(0)==start_kind,
@@ -322,6 +625,51 @@ int main(int argc,char** argv){try{
                 }
                 check(current==start_kind&&match.player_stats(0).stocks==4,
                       "Repeated down-B transformation did not return to its starting form and stock");
+                if(fighter_ckind==CKIND_SEAK){
+                    settle_primary();
+                    bool side_special=false,chain_created=false;
+                    for(unsigned n=0;n<180&&!chain_created;n++){
+                        raw[0].stickX=80;raw[0].stickY=0;
+                        raw[0].button=n==0?PAD_BUTTON_B:0;tick();
+                        const int motion=match.player_stats(0).motion_id;
+                        side_special|=motion==ftSk_MS_SpecialSStart||motion==ftSk_MS_SpecialS||
+                                       motion==ftSk_MS_SpecialSEnd;
+                        chain_created=melee_web_test_item_count(It_Kind_Seak_Chain)>0;
+                    }
+                    neutral();
+                    check(side_special&&chain_created,
+                          "Sheik side-B did not complete its authored ground-chain pose blend and create the chain Article");
+                    for(unsigned n=0;n<600&&
+                            melee_web_test_item_count(It_Kind_Seak_Chain)>0;n++)tick();
+                    check(melee_web_test_item_count(It_Kind_Seak_Chain)==0,
+                          "Sheik Chain Article did not clear through its source lifecycle");
+                    settle_primary();
+                    raw[0].button=PAD_BUTTON_X;tick();raw[0].button=0;
+                    bool airborne=false;
+                    for(unsigned n=0;n<90&&!airborne;n++){
+                        tick();const auto state=match.player_stats(0);
+                        airborne=state.ground_or_air==1&&state.position[1]>2.0f;
+                    }
+                    check(airborne,"Sheik air side-B probe did not reach a source airborne state");
+                    bool air_side_special=false,air_chain_created=false;
+                    for(unsigned n=0;n<180&&!air_chain_created;n++){
+                        raw[0].stickX=80;raw[0].stickY=0;
+                        raw[0].button=n==0?PAD_BUTTON_B:0;tick();
+                        const int motion=match.player_stats(0).motion_id;
+                        air_side_special|=motion==ftSk_MS_SpecialAirSStart||
+                                          motion==ftSk_MS_SpecialAirS||
+                                          motion==ftSk_MS_SpecialAirSEnd;
+                        air_chain_created=melee_web_test_item_count(It_Kind_Seak_Chain)>0;
+                    }
+                    neutral();
+                    check(air_side_special&&air_chain_created,
+                          "Sheik air side-B did not consume its authored air pose root and create the Chain Article");
+                    for(unsigned n=0;n<600&&
+                            melee_web_test_item_count(It_Kind_Seak_Chain)>0;n++)tick();
+                    check(melee_web_test_item_count(It_Kind_Seak_Chain)==0,
+                          "Sheik air Chain Article did not clear through its source lifecycle");
+                    std::cout<<"Sheik action coverage: repeated down-B both ways, ground/air side-B pose blends, Chain Article creation and teardown passed; other specials unverified"<<std::endl;
+                }
                 std::cout<<"Zelda/Sheik action coverage: both in-match down-B directions, repeated twice, passed; startup held-A is separate"<<std::endl;
             }else if(fighter_ckind==CKIND_POPONANA){
                 float popo_x=0,popo_y=0,nana_x=0,nana_y=0;
@@ -390,20 +738,78 @@ int main(int argc,char** argv){try{
                       "Ice Climbers CPU9 probe did not exercise Nana death or source entity removal");
                 check(primary_survived&&primary_lifecycle&&(!partner_died||partner_present_after),
                       "Ice Climbers partner loss did not preserve the leader and complete its 180-tick follow-up lifecycle");
+                if(partner_died&&partner_present_after){
+                    check(partner_motion_after==ftCo_MS_Sleep,
+                          "Ice Climbers Nana did not enter the source Sleep state after her death animation");
+                    const int stocks_before_respawn=match.player_stats(0).stocks;
+                    bool primary_stock_lost=false;
+                    for(unsigned n=0;n<7200&&!match.complete()&&!primary_stock_lost;n++){
+                        const auto primary=match.player_stats(0);
+                        // Ordinary source controller input walks Popo off the
+                        // nearer FD edge. The first resulting stock event
+                        // ends this input recipe before it can repeat.
+                        raw[0].stickX=primary.position[0]>=0?80:-80;
+                        raw[0].stickY=0;
+                        tick();
+                        primary_stock_lost=
+                            match.player_stats(0).stocks<stocks_before_respawn;
+                    }
+                    neutral();
+                    check(primary_stock_lost,
+                          "Ice Climbers source input did not produce Popo's next natural stock/respawn transition");
+                    bool primary_rebirthed=false;
+                    bool primary_alive_after_respawn=false;
+                    bool partner_remained_sleeping=true;
+                    int partner_motion_after_respawn=-1;
+                    for(unsigned n=0;n<360&&!match.complete();n++){
+                        tick();
+                        int primary_kind=-1,primary_motion=-1,primary_grounded=0,primary_skeleton=0;
+                        int partner_kind=-1,partner_motion=-1,partner_grounded=0,partner_skeleton=0;
+                        const bool primary_present=melee_web_test_entity_state(
+                            0,0,&primary_kind,&primary_motion,&primary_grounded,&primary_skeleton);
+                        const bool partner_present=melee_web_test_entity_state(
+                            0,1,&partner_kind,&partner_motion,&partner_grounded,&partner_skeleton);
+                        if(partner_present)partner_motion_after_respawn=partner_motion;
+                        primary_rebirthed|=primary_motion==ftCo_MS_Rebirth||
+                                           primary_motion==ftCo_MS_RebirthWait;
+                        primary_alive_after_respawn|=primary_present&&
+                            primary_kind==FTKIND_POPO&&match.player_stats(0).stocks>0&&
+                            primary_motion!=ftCo_MS_Sleep;
+                        partner_remained_sleeping&=partner_present&&
+                            partner_kind==FTKIND_NANA&&partner_motion==ftCo_MS_Sleep;
+                    }
+                    std::cout<<"Ice Climbers Nana source lifecycle: death animation -> Sleep, Popo stock "
+                             <<stocks_before_respawn<<" -> "<<match.player_stats(0).stocks
+                             <<", Popo rebirth="<<primary_rebirthed
+                             <<", alive_after_respawn="<<primary_alive_after_respawn
+                             <<", Nana motion="<<partner_motion_after_respawn
+                             <<", remained_sleeping="<<partner_remained_sleeping<<std::endl;
+                    // Player_80031AD0 constructs both original entities at
+                    // player setup. Ordinary stock respawn changes Popo's
+                    // motion; it does not reconstruct or wake a Nana already
+                    // marked dead by ftCo_800BFD04. Sleep has empty source
+                    // Anim/IASA callbacks, so a surviving Nana GObj alone is
+                    // not evidence that she should rejoin.
+                    check(primary_rebirthed&&primary_alive_after_respawn&&
+                          partner_remained_sleeping,
+                          "Ice Climbers stock respawn did not preserve Popo and Nana's source dead/sleep lifecycle");
+                }
             }else if(kirby_action_case){
                 const auto acquire=[&](unsigned target_slot,int donor_kind){
+                    const float approach_gap=donor_kind==FTKIND_FOX?4.0f:7.0f;
+                    const float stick_dead_zone=donor_kind==FTKIND_FOX?3.0f:5.0f;
                     for(unsigned n=0;n<360;n++){
                         const auto self=match.player_stats(0),target=match.player_stats(target_slot);
                         const float dx=target.position[0]-self.position[0];
                         const float dy=target.position[1]-self.position[1];
-                        if(std::fabs(dx)<7.0f&&std::fabs(dy)<5.0f)break;
-                        raw[0].stickX=std::fabs(dx)<5.0f?0:(dx>0?80:-80);
+                        if(std::fabs(dx)<approach_gap&&std::fabs(dy)<5.0f)break;
+                        raw[0].stickX=std::fabs(dx)<stick_dead_zone?0:(dx>0?80:-80);
                         raw[0].stickY=std::fabs(dy)<4.0f?0:(dy>0?60:-60);tick();
                     }
                     neutral();settle_primary();
                     bool captured=false;
                     for(unsigned n=0;n<240&&!captured;n++){
-                        raw[0].button=n==0?PAD_BUTTON_B:0;tick();
+                        raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
                         const int target_motion=match.player_stats(target_slot).motion_id;
                         captured=melee_web_test_fighter_owns_victim(0,target_slot)||
                             target_motion==ftCo_MS_CaptureKirby||
@@ -413,8 +819,20 @@ int main(int argc,char** argv){try{
                             target_motion==ftCo_MS_ThrownKirby;
                     }
                     neutral();
-                    check(captured,"Kirby inhale did not reach the source capture/swallow transition for donor slot "+
-                          std::to_string(target_slot));
+                    if(!captured){
+                        const auto self=match.player_stats(0),target=match.player_stats(target_slot);
+                        throw std::runtime_error(
+                            "Kirby inhale did not reach the source capture/swallow transition for donor slot "+
+                            std::to_string(target_slot)+"; self motion="+
+                            std::to_string(self.motion_id)+" stocks="+
+                            std::to_string(self.stocks)+" xy="+
+                            std::to_string(self.position[0])+","+
+                            std::to_string(self.position[1])+" target motion="+
+                            std::to_string(target.motion_id)+" stocks="+
+                            std::to_string(target.stocks)+" xy="+
+                            std::to_string(target.position[0])+","+
+                            std::to_string(target.position[1]));
+                    }
                     for(unsigned n=0;n<360&&match.player_stats(0).motion_id!=ftKb_MS_EatWait;n++)tick();
                     check(match.player_stats(0).motion_id==ftKb_MS_EatWait,
                           "Kirby capture did not settle into EatWait; motion="+
@@ -429,38 +847,71 @@ int main(int argc,char** argv){try{
                           std::to_string(melee_web_test_kirby_copy_kind(0)));
                     std::cout<<"Kirby acquired donor FighterKind="<<donor_kind
                              <<" from slot="<<target_slot<<std::endl;
+                    if(donor_kind==FTKIND_GAMEWATCH){
+                        check(melee_web_test_apply_kirby_copy_visibility(0),
+                              "Kirby copy did not publish a drawable secondary part-visibility lookup");
+                        std::cout<<"Kirby copied-part visibility draw applied using the live fighter DObj list"
+                                 <<std::endl;
+                    }
                 };
                 const auto use_copy=[&](int donor_kind){
                     bool copied_move=false;
+                    int copied_article_kind=-1;
+                    const auto article_live=[&](int kind){
+                        if(melee_web_test_item_count(kind)<=0)return false;
+                        copied_article_kind=kind;
+                        return true;
+                    };
                     for(unsigned n=0;n<180&&!copied_move;n++){
                         raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
-                        const int motion=match.player_stats(0).motion_id;
                         if(donor_kind==FTKIND_GAMEWATCH)
-                            copied_move=motion==ftKb_MS_GwSpecialN||
-                                melee_web_test_item_count(It_Kind_Kirby_GameWatchChefPan)>0;
+                            copied_move=article_live(It_Kind_Kirby_GameWatchChef)||
+                                article_live(It_Kind_Kirby_GameWatchChefPan);
                         else if(donor_kind==FTKIND_MARIO)
-                            copied_move=motion==ftKb_MS_MrSpecialN||
-                                melee_web_test_item_count(It_Kind_Mario_Fire)>0;
+                            copied_move=article_live(It_Kind_Kirby_MarioFire);
                         else if(donor_kind==FTKIND_SAMUS)
-                            copied_move=motion>=ftKb_MS_SsSpecialNStart&&
-                                motion<=ftKb_MS_SsSpecialN;
+                            copied_move=article_live(It_Kind_Kirby_SamusCharge);
+                        else if(donor_kind==FTKIND_POPO)
+                            copied_move=article_live(It_Kind_Kirby_IceClimberIce);
+                        else if(donor_kind==FTKIND_FOX)
+                            copied_move=article_live(It_Kind_Kirby_FoxLaser)||
+                                article_live(It_Kind_Kirby_FoxBlaster);
                     }
                     neutral();
                     check(copied_move,"Kirby did not execute the source neutral special for donor "+
                           std::to_string(donor_kind));
+                    std::cout<<"Kirby copied neutral special created source Article kind="
+                             <<copied_article_kind<<" live_count="
+                             <<melee_web_test_item_count(copied_article_kind)<<std::endl;
                 };
-                acquire(1,FTKIND_GAMEWATCH);use_copy(FTKIND_GAMEWATCH);
+                const int donor_kind=opponent_ckind==CKIND_POPONANA?FTKIND_POPO:
+                    opponent_ckind==CKIND_GAMEWATCH?FTKIND_GAMEWATCH:
+                    opponent_ckind==CKIND_MARIO?FTKIND_MARIO:
+                    opponent_ckind==CKIND_SAMUS?FTKIND_SAMUS:FTKIND_FOX;
+                acquire(1,donor_kind);
+                use_copy(donor_kind);
+                settle_primary();
                 bool lost=false;
                 for(unsigned n=0;n<120&&!lost;n++){
-                    raw[0].button=n==0?PAD_BUTTON_DOWN:0;tick();
+                    // Melee's Kirby copy-loss path is source-owned by the
+                    // up-appeal entry (ftCo_800DEBD0), not the down taunt.
+                    raw[0].button=n==0?PAD_BUTTON_UP:0;tick();
                     lost=melee_web_test_kirby_copy_kind(0)==FTKIND_KIRBY;
                 }
                 neutral();
-                check(lost,"Kirby down taunt did not lose the Game & Watch copy ability through its source path");
-                acquire(1,FTKIND_GAMEWATCH);use_copy(FTKIND_GAMEWATCH);
-                check(melee_web_test_kirby_copy_kind(0)==FTKIND_GAMEWATCH,
-                      "Kirby did not replace its lost Game & Watch ability through the source path");
-                std::cout<<"Kirby action coverage: Game & Watch acquire/use/loss/replacement and match teardown path passed; Mario, Samus and other donor effect families unverified"<<std::endl;
+                check(lost,"Kirby up appeal did not lose its copy ability through the source path; motion="+
+                      std::to_string(match.player_stats(0).motion_id)+" copy_kind="+
+                      std::to_string(melee_web_test_kirby_copy_kind(0)));
+                acquire(1,donor_kind);use_copy(donor_kind);
+                check(melee_web_test_kirby_copy_kind(0)==donor_kind,
+                      "Kirby did not replace its lost copy ability through the source path");
+                const char* donor_name=donor_kind==FTKIND_POPO?"Ice Climbers":
+                    donor_kind==FTKIND_GAMEWATCH?"Game & Watch":
+                    donor_kind==FTKIND_MARIO?"Mario":
+                    donor_kind==FTKIND_SAMUS?"Samus":"Fox";
+                std::cout<<"Kirby action coverage: "<<donor_name
+                         <<" acquire/use/loss/replacement and match teardown path passed; other donor families unverified"
+                         <<std::endl;
             }else{
                 check(false,"--character-actions is only defined for the newly admitted source fighters");
             }

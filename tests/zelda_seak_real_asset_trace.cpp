@@ -67,8 +67,17 @@ static void check_form(const char* fighter_path, const char* animation_path,
     const uint32_t attribute_bytes = kind == 19 ? 0xA8 : 0x74;
     if (archive->next_target_offset(*attributes) - *attributes < attribute_bytes)
         throw std::runtime_error("source special attribute record is shorter than its ABI");
-    const auto article_table = archive->pointer(fighter + 0x48, article_count * 4);
+    const auto article_table = archive->pointer(fighter + 0x48, kind == 7 ? 24 : article_count * 4);
     if (!article_table) throw std::runtime_error("source OnLoad Article table is absent");
+    if (kind == 7) {
+        for (const uint32_t index : {4U, 5U}) {
+            const auto pose = archive->pointer(*article_table + index * 4, 64);
+            if (!pose || archive->next_target_offset(*pose) - *pose != 64 ||
+                !archive->pointer(*pose + 8, 64))
+                throw std::runtime_error("Sheik side-special x48 pose graph is missing at slot " +
+                                         std::to_string(index));
+        }
+    }
     for (uint32_t index = 0; index < article_count; ++index) {
         const auto article = archive->pointer(*article_table + index * 4, 24);
         if (!article)

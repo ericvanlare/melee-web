@@ -3,133 +3,152 @@
 ## Disposition
 
 These six selectable characters (seven source forms including Zelda/Sheik) are
-an **unfinished development candidate, not admitted or fully playable**. Source
-identity/content wiring and several bounded native actions are present. The
-requested headless original captures completed, but the port has not completed
-either match, returned through CSS, or produced a supported original-versus-port
-comparison. The current hard blockers are the rendered A/B runtime failures,
-Kirby's copied-ability path, and unresolved Ice Climbers partner lifecycle.
+an unfinished development candidate, not admitted or fully playable. Real-asset
+construction, targeted distinctive actions, two rendered four-CPU9 match loops
+per requested lineup, and repeatable original references are now available.
+The browser matches are functional rendered evidence, not original equivalence.
+Both supported original-versus-port comparisons stop at a natural match-duration
+scene divergence. The Samus-donor palette now resolves through a checked
+cross-archive source-address map; particle-pixel use remains unverified.
 
-Evidence labels below are scoped per the
+Evidence labels follow the
 [performance/accuracy playbook](PERFORMANCE_AND_ACCURACY.md). Raw disc data,
-extracts, captures, screenshots, and run logs remain local and ignored under
+extracts, captures, screenshots and run logs remain local and ignored under
 `work/` / `assets-local/`; this note contains no personal input paths.
 
 ## Character action checklist
 
-Construction results refer to rebuilt real-asset native source traces on Final
-Destination that reached source ticks and their stated lifecycle boundary.
-Targeted action runs select costume zero; only the Kirby-vs-Fox base trace names
-an all-six-costume sweep here. These do not establish browser playability or
-retail equivalence.
+Construction results refer to real-asset source traces that execute source ticks
+and teardown. Targeted action runs use costume zero unless noted. A passing
+browser match supplements these checks; it does not prove each listed action.
 
 | Character | Content/construction | Targeted action coverage | Still unverified / failed |
 | --- | --- | --- | --- |
-| Game & Watch | **Native traced** in the mixed-content lifecycle target. | Chef reaches the source motion and creates/destroys the Chef article. | Other specials, normals, defense, recovery, hit/KO, and browser match. |
-| Kirby | **Native traced** against Fox over all six costumes with repeated construction/teardown. | **Failed** while attempting the required Game & Watch donor path: execution reaches `ftKb_SpecialNDrink_Anim` then aborts in `ftParts_8007487C` / `HSD_DObjSetFlags` while setting copied-part visibility. The source-root `FtPartsDesc.model_num` conversion gets past the earlier count assertion but does not resolve this crash. | Copy acquisition, copied move, loss, replacement, and teardown are not passed. Only Game & Watch donor was attempted; Mario, Samus, and the remaining donor families are unverified. Kirby copy ownership is a required integration path, not an optional roster add-on. |
-| Ice Climbers (Popo/Nana) | **Native traced** as two separate source entities; common lifecycle and reconstruction run. | Belay source up-special is observed; partner distance increases from 10 to 91.2236 units. Nana enters a source death motion against a source CPU9 opponent (maximum observed partner damage 63.3). Popo retains its entity and stock through a 180-tick follow-up. | Nana remains present after those 180 ticks (motion 11); removal/rejoin/respawn semantics are unresolved. Other specials and subsequent partner lifecycle are unverified. |
-| Samus | **Native traced** in the mixed-content lifecycle target. | Down-B creates and tears down a Bomb article. | Other specials, normals, defense, recovery, hit/KO, and browser match. |
-| Yoshi | **Native traced** in the mixed-content lifecycle target. | Neutral-B reaches the authored Egg Lay source motion. | Victim capture and Egg article were not observed; other specials, normals, defense, recovery, hit/KO, and browser match. |
-| Zelda | **Native traced** in the mixed-content lifecycle target. | In-match down-B changes Zelda to Sheik and back; four switches were observed across both directions, twice each, retaining grounded/four-stock state. | Broader moves and browser match. Held-A startup selection is separately tested and is not used as evidence for this down-B result. |
-| Sheik | **Native traced** in the mixed-content lifecycle target. | Started as Sheik; in-match down-B changed Sheik to Zelda and back, four switches observed across both directions, twice each, retaining grounded/four-stock state. | Broader moves and browser match. |
+| Game & Watch | **Native traced** in mixed-content lifecycle and rendered in both A matches. Ten authored Articles pass the real visibility/ownership regression. | Chef source motion, sausage Article creation/lifetime/teardown. | Other specials, defense/recovery, damage/KO and broader action inventory. |
+| Kirby | **Native traced** against Fox across all six costumes with repeated construction/teardown; rendered in both A matches. Copied-part visibility counts/IDs and Game & Watch's secondary texture-animation pair are source-adapted and checked against live DObj visibility. | **Passed for Mario, Popo/Ice Climbers, Game & Watch, Fox, and Samus donors:** inhale acquisition, a source-created copied-neutral-special Article, up-appeal copy loss, reacquisition/replacement and match teardown. G&W additionally passes copied Chef/Pan Article ownership and visibility. The Samus row resolves `EfKbSs.dat` group 0's raw palette address `0x80A8812A` to the exact 512 bytes in owned `ItCo.usd` (SHA-256 `5d62efd6437149335b9eef87624ae1253ba7bb260fb08cbae04a3d9215eacd11`, file offset `0x264A2A`, DAT data offset `0x264A0A`; palette SHA-256 `99036809572a8b9d2d5918b85600320f18ab1440d165ca8e9855a53726af0ec9`). Subtracting the raw file offset from the guest address implies an archive base of `0x80823700` (`0x80823720` for the DAT data section). A generic checked source-address-region resolver now owns/copies external bytes and rejects unmapped or out-of-range pointers; no row is omitted or coerced. The five-donor tracked regression passes acquisition, Article use, loss, replacement and teardown. A headless Metal replay of the exact Kirby/Samus PAD workload completed all 41,036 input events; bounded match-0 probes over ticks 310–491 saw no bank-34 particle generation or TLUT call during that captured interval, so effect-specific particle pixels remain unverified. Its process exited 133 on shutdown with `Failed to allocate MTLBuffer` after observer/input completion; no screenshot/pixel claim is made. Other normals/defense/recovery/damage/KO remain open. |
+| Ice Climbers (Popo/Nana) | **Native traced** as two distinct source entities with repeated lifecycle; rendered in both A matches. | Belay separates the pair (10 to 91.2236 source units). A CPU9 opponent kills Nana; she finishes her death motion in source `ftCo_MS_Sleep`, while Popo survives. Ordinary source input then loses Popo's stock: Popo rebirths, Nana remains asleep. Decomp `Player_80032070` only re-rebirths Nana when her source dead flag is set; this observed non-rejoin behavior is consistent with that lifecycle, not evidence of an entity-persistence defect. Teardown passes. | Other specials, recovery, partner rejoin after other causes, damage/KO cases beyond this Nana-death/Popo-stock sequence. |
+| Samus | **Native traced** in mixed-content lifecycle and rendered in both B matches. The authored fifth `x48` grapple joint owns its 34-joint graph and 25 sibling-instance references. | Down-B creates and clears Bomb. Raw-Z captures Mario into CatchWait; a fresh throw input consumes the grapple joint and enters the source throw path; mixed teardown passes. | Other specials, recovery, broader damage/KO coverage. The Kirby-copy palette owner is now resolved; effect-specific particle pixels remain unverified (Kirby row). |
+| Yoshi | **Native traced** in mixed-content lifecycle and rendered in both B matches. | Neutral-B captures Mario into `ftCo_MS_CaptureYoshi`, transitions to `ftCo_MS_YoshiEgg`, and naturally releases to `ftCo_MS_Fall` at action frame 243, with no injected fighter state. | Other specials, recovery, damage/KO; the tested path is fighter-victim capture, not the separate item-target Egg Lay branch. |
+| Zelda | **Native traced** in mixed-content lifecycle and selected in both B browser matches. | Four in-match down-B transformations (two each direction) preserve grounded/four-stock lifecycle. | Broader moves/recovery/damage/KO. Held-A startup form selection is not counted as down-B transformation coverage. |
+| Sheik | **Native traced** as an in-match Zelda form and as a starting form; no assertion during the rebuilt B browser run. | Repeated down-B both directions; ground and air side-B each consume their distinct authored pose roots, create the Chain Article, and pass source Article teardown. | Broader moves/recovery/damage/KO. B's CSS lineup selects Zelda at the shared icon, so the browser matches do not claim an independently selected Sheik CSS slot. |
 
-Retained native logs: `work/fighter-action-checks-v1/{gamewatch,ice-climbers,
-samus,yoshi,zelda,sheik,kirby-base-vs-fox-relocation-schema,
-kirby-copy-gw-v4}.log`. These are diagnostic receipts in the local checkout,
-not checked-in assets or substitute for the failed action assertions.
+The source `ftKb_Init_803CA9D0` copy-root table includes Mario, Fox, Captain
+Falcon, Donkey Kong, Koopa, Link, Sheik, Ness, Peach, Popo, Pikachu, Samus,
+Yoshi, Jigglypuff, Mewtwo, Luigi, Marth, Zelda, Young Link, Dr. Mario, Falco,
+Pichu, Game & Watch, Ganon and Roy. Nana uses the Popo source copy family; the
+Zelda/Sheik pair shares a source copy/effect identity. Targeted donor action
+coverage passes for Mario, Fox, Popo, Game & Watch, and Samus. The following
+source donor families remain unverified for acquisition/use/loss/replacement: Captain Falcon, Donkey
+Kong, Koopa, Link, Sheik, Ness, Peach, Pikachu, Yoshi, Jigglypuff, Mewtwo,
+Luigi, Marth, Zelda, Young Link, Dr. Mario, Falco, Pichu, Ganon, and Roy. The
+source donor inventory is from
+`.deps/melee/src/melee/ft/kinds/ftKirby/ftkirbydata.c`.
 
-## Original-menu CPU9 captures
+Retained targeted logs include `work/pr86-kirby-mario-donor-r1.log`,
+`work/pr86-kirby-ice-donor-r1.log`,
+`work/fighter-action-checks-v1/kirby-copy-gw-v4.log`,
+`work/pr86-kirby-donor-matrix-test-r1.log` and the per-donor
+`work/pr86-kirby-*-article-r1.log` records,
+`work/pr86-ice-climbers-lifecycle-r2.log`,
+`work/pr86-samus-catchwait-reproducer-r1.log`,
+`work/pr86-sheik-ground-air-side-special-r1.log`, and the Yoshi victim-capture
+trace under `work/`. These are local diagnostic receipts, not retail comparisons.
+The tracked `test_remaining_fighter_distinctive_actions_and_lifecycle` case in
+`tests/test_gameplay_content_match.py` reruns the Game & Watch, Ice Climbers,
+Samus, Yoshi, Zelda and Sheik branches. The separate tracked Kirby donor matrix
+now runs five real donor cases, including Samus's external ItCo palette owner;
+both focused tests passed in `work/pr86-kirby-external-owner-r1.log`.
 
-Both lineups were driven through the original CSS/SSS route using headless
-Dolphin and the available local profile/save/SRAM copied into isolated user
-directories. The capture driver was adapted in the task's ignored work area;
-retained resources were not overwritten. Reports verify the actual setup, not
-just intended cursor input. Both captures use GALE01 revision 2 and Null video;
-they contain source state/draw/lifecycle evidence only, not pixel, PCM,
-foreground timing, controller, performance, or port-equivalence evidence.
+## Original-menu CPU9 captures and repeatability
 
-| Run | Verified setup | Outcome |
+Both lineups were set up through original CSS/SSS controller input on the owned
+GALE01 revision-2 image. Reports verify actual fighter identities, CPU9 levels,
+four stocks and Final Destination, rather than intended cursor movements. The
+original capture used Null video: these are source state/draw/lifecycle
+references, not pixel or PCM references.
+
+| Lineup | Repeatable source evidence | Scope |
 | --- | --- | --- |
-| `work/fighter-cpu9-lineup-a-reference-neutral-01` | Game & Watch, Kirby, Ice Climbers, Fox; CPU9 ×4; four stocks; stage 32 (Final Destination). | Three natural matches, Results, and return-CSS boundaries; completed status. Capture id `fighter-A-neutral-20260925-v1`, DOL SHA-256 `dc21504513424350bda17a7c65e82371b45112a5dfc1e9f2749a8b7ab0eff646`. |
-| `work/fighter-cpu9-lineup-a-reference-neutral-03` | Same verified lineup and rules. | A second three-match natural capture completed. It is not a strict repeatability pass. |
-| `work/fighter-cpu9-lineup-a-repeatability-v2` | Strict pair gate over the two completed A captures. | **Failed** with `independent whole-session streams are not source-consumed repeatable`; no recipe was emitted. Do not treat either A capture as repeatable reference evidence. |
-| `work/fighter-cpu9-lineup-b-zelda-neutral-01` | Samus, Yoshi, Zelda, Falco; CPU9 ×4; four stocks; stage 32 (Final Destination). | Three natural matches, Results, and return-CSS boundaries; completed status. Capture id `fighter-B-zelda-neutral-20260925-v1`, same DOL SHA-256. |
-| `work/fighter-cpu9-lineup-b-zelda-neutral-03` | Menu snapshots confirm the same B lineup/rules. | **Failed reference repeat attempt**: passive observer rejects fighter creation at source tick 252 with `fighter creation exposed an invalid source slot`; no completed run or second reference. This is an observer boundary rejection, not a failed original setup. |
+| A: Game & Watch, Kirby, Ice Climbers, Fox | `work/fighter-reference-a-valid-pair.mwrc` / `.json`, independent source sessions #04/#06. | Pass: exact source-consumed PAD/workload repeatability over 42,492 frames, three natural matches and Results/CSS returns. Decoded MWRO records are exact after excluding only host timestamp and per-run capture/sequence IDs. Independent #04/#05 differed at a source-consumed CSS PAD sample; replay #04/#06 resolves repeatability without calling it CPU nondeterminism. |
+| B: Samus, Yoshi, Zelda, Falco | `work/fighter-reference-b-valid-pair.mwrc` / `.json`, independent source sessions #08/#09. | Pass: exact source-consumed PAD/workload repeatability over 45,226 frames, three natural matches and Results/CSS returns. The observer now preserves both Zelda/Sheik Fighter entities sharing one source slot; the earlier observer rejection was an observer limitation, not invalid source setup. |
 
-The successful original captures establish that the local automated original-menu
-route is available. They are not references for port correctness. Zelda and
-Sheik are both covered by the in-match transformation trace above; the
-successful B original lineup specifically selected Zelda.
+These valid references are evidence for the stated source setup/workload only;
+they are not evidence that the browser agrees with retail.
 
-## Rendered browser attempts and comparison scope
+## Rendered browser matches and original comparison
 
-Installed headless Chrome ran against a real loopback HTTP server with WebGPU
-rendering enabled. Screenshots and page/native diagnostics were retained. A
-bounded A prefix advanced through the rendered Final Destination match to source
-cursor 1633 (`work/fighter-browser-a-lineup-prefix-06`). It was intentionally
-stopped at that cursor and is **not** a completed match or clean teardown.
+Installed headless Chrome 153 rendered the original CSS/SSS route and gameplay
+over a real loopback HTTP server. Both scenarios used four source-confirmed CPU9
+fighters, four stocks and Final Destination; each ran two natural matches, each
+reached Results, returned through ordinary Enter input to CSS, and started the
+second match. End diagnostics show CSS live with prior match/Results owners
+absent. No page errors or native-command errors were recorded.
 
-The full attempts did not finish:
+| Scenario | Receipt | Outcome |
+| --- | --- | --- |
+| A: Game & Watch, Kirby, Ice Climbers, Fox | `work/pr86-browser-a-two-match-r1/report.json` plus retained `initial-css.png`, SSS/stage, source-frame, natural-Results and returned-CSS screenshots. | Pass: two natural rendered matches (port source frames 10,482 and 15,596), both Results→CSS returns, second match started; 27 timing pause/resume interruptions were observed and recorded. |
+| B: Samus, Yoshi, Zelda, Falco | `work/pr86-browser-b-two-match-r4/report.json` plus the corresponding CSS/SSS/stage, source-frame, natural-Results and returned-CSS screenshots. | Pass: two natural rendered matches (port source frames 14,616 and 16,939), both Results→CSS returns, second match started; 147 timing pause/resume interruptions were observed and recorded. Sheik's ground/air/down-B paths are instead established by the targeted source-action trace; B's shared CSS icon selects Zelda. |
 
-- A (`work/fighter-browser-a-lineup-prefix-04`): incomplete at source cursor
-  1640 with `memory access out of bounds` in the draw path
-  `it_8026EECC -> HSD_GObj_80390ED0 -> fn_800301D0`. The item kind/root cause
-  was not isolated; this is not attributed to Game & Watch's Chef action.
-- B (`work/fighter-browser-b-zelda-short-03`): incomplete at source cursor
-  1614 (about gameplay source frame 11) with an HSD assertion at
-  `jobj.h:382` in `ftCo_CatchWait_IASA` while Samus is P1. This identifies the
-  failing common-action boundary; it does not establish whether the defect is
-  Samus-specific or shared more broadly.
+These are rendered functional match/return results, not uninterrupted timing,
+pixel/PCM equivalence, foreground timing, physical-controller acceptance or
+performance evidence. Timing interruptions were explicitly resumed at the same
+source frame; they are not hidden or converted into a performance pass.
 
-A fresh bounded A run on the final rebuilt Release runtime
-(`work/fighter-browser-a-lineup-prefix-09`) captured a rendered FD frame at
-source cursor 1637, then hit the same draw-path memory error by cursor 1640.
-The runtime had disabled Unload after abort, so the harness's cleanup click
-timed out; retain the first runtime error as the failure, not that secondary
-cleanup timeout. The screenshot is an actual rendered prefix, not a completed
-match or pixel comparison.
+Once the valid repeatable references were available, both original-versus-port
+whole-session replays were run with the retained state/draw fields and without
+weakening comparison criteria:
 
-Both use `input_scheduling: per_tick`; `scheduling_equivalence` is
-`not_evaluated`. The reports retain partial source state/draw data, but both
-fail before full input completion, teardown, Results, or return CSS. Therefore
-there is **no supported original-versus-port state comparison or first-field
-divergence result** yet. Headless Null-video original captures are not pixel
-references; headless Chrome screenshots confirm rendering only. These runs
-also do not establish PCM, foreground timing, physical-controller acceptance,
-or performance.
+| Lineup | Receipt and first observed divergence | Scheduling/result scope |
+| --- | --- | --- |
+| A | `work/pr86-a-original-port-comparison-r2/retail-browser-report.json`: recipe input 13,414, original match frame 11,916; expected source scene Results (4), observed port Match (3). | `input_scheduling: per_tick`; CPU decisions are excluded as inputs and recomputed. `scheduling_equivalence: not_evaluated`. The scene mismatch stops the run before the full input timeline and complete tick/draw counts; this is not a scalar-field first mismatch or a fighter attribution. |
+| B | `work/pr86-b-original-port-comparison-r1/report.json` and `progress.json`: recipe input 13,329, original match frame 11,971; expected source scene Results (4), observed port Match (3). | Same per-tick recorded PAD scope; CPU decisions recomputed; scheduling equivalence not evaluated. The harness stops before full state/draw counts. The Sheik pose-root crash is absent in this rebuilt run; this remaining difference is match-duration/scene progression, not evidence of that crash or a specific fighter cause. |
 
-Retained browser evidence includes `work/fighter-browser-a-lineup-prefix-04/`,
-`work/fighter-browser-a-lineup-prefix-09/` (`prefix.png` and reports), and
-`work/fighter-browser-b-zelda-short-03/` (`report.json`,
-`retail-browser-report.json`, `page.txt`, `failure.txt`, and `final.png`), plus
-the deliberately bounded prefix folder above. The Mario baseline-control attempt
-did not complete and is not a successful control.
+These are supported but **failing, partial** original comparisons. They identify
+the exact earliest gate divergence; they do not establish a later scalar/state
+or draw-field divergence because scene validation stops first. The reported
+source tick/draw-count failures are downstream of the incomplete replay, not a
+reason to omit or relax fields. Headless replay does not establish foreground
+timing or physical input acceptance.
 
-## Next gates
+An existing-roster four-Mario boundary control also diverges at the same scene
+gate in the opposite direction: `work/fighter-browser-mario-boundary-control-01/retail-browser-report.json`
+stops at input 14,592 with the source still in Match while the port has entered
+Results. This makes match-duration/scene divergence non-exclusive to the new
+roster, but does not identify one shared cause or establish a downstream state
+or draw match. Its scheduling scope is also per-tick with equivalence not
+evaluated; this is a bounded control receipt, not evidence that the new-fighter
+comparisons pass.
 
-1. Fix/reduce the observed common-action and rendered draw failures with focused
-   reproducers; only then retry the full A/B browser matches and CSS returns.
-2. Complete Kirby Game & Watch copy acquisition/use/loss/replacement/teardown,
-   then target additional donor families. Do not waive copy behavior.
-3. Resolve Ice Climbers partner death follow-up and entity lifecycle; expand
-   targeted actions for every new fighter.
-4. Obtain a valid independent B reference and repeatable A/B inputs before any
-   retail comparison. Compare the existing declared source state and draw fields
-   without relaxing the gate; first divergence remains unreported until a full
-   supported pair exists.
-5. Keep separate gates open for ordinary CSS/SSS return loops, complete
-   move/action inventory, pixels, PCM, foreground timing, physical controllers,
-   performance, and admission.
+## Remaining gates
 
-This PR remains one open PR. No merge or deployment is authorized by these
-results.
+1. Reduce the Results-versus-Match duration divergence to a smaller causal
+   case and compare unchanged source state/draw fields up to that boundary.
+   The four-Mario control shows the scene mismatch also occurs with the existing
+   roster, in the opposite direction; no single cause is established. Keep this
+   separate from the tick-1776 investigation.
+2. Broaden focused moves/recovery/damage/KO coverage where still listed above,
+   especially Kirby donor families still named unverified. Do not infer those
+   actions from CPU9 matches. The captured Samus copied-special interval did not
+   call the bank-34 particle generator or wrapped-address TLUT; this scoped
+   negative does not establish all particle visuals.
+3. Keep pixels, PCM, foreground scheduling, physical controllers, performance
+   and admission separate and unclaimed.
+
+PR #86 remains the single open PR. No merge or deployment has been made.
+Evidence does not support “fully playable,” equivalence, or task completion.
 
 ## Integration checks
 
-After the Kirby native/browser manifest closure was corrected, the final
-`python3 -m unittest discover -s tests` run completed 1,442 tests with 88
-optional skips and no failures (`work/fighter-final-suite-v3.log`). The Release
-runtime target and the native `gameplay_content_match_trace` target both built.
-Focused asset-manifest, fighter-asset, fighter-data, runtime-disc, web-launch,
-and public-scene checks passed. These integration checks do not change the
-character-specific failures and gates above.
+An earlier full-suite run recorded 1,442 tests (1,354 pass, 88 optional skips).
+The first 1,465-test run found six failures: four ad-hoc compile fixtures
+omitted `gameplay_result_motion_table.cpp`, a direct material-animation graph
+path lacked the 256-joint bound, and four new CPU probes were absent from the
+pinned profile. Those were fixed and focused regressions passed. The next clean
+run recorded 1,465 tests, 78 skips and one fixture-only compile failure:
+Fountain and Old-Yoshi synthetic readers used positional `MeleeWebNativeDat`
+initializers that omitted the new `source_region` callback. Both now use named
+initializers; the focused Fountain test and strict Old-Yoshi syntax check pass.
+The final clean run passed: 1,465 tests in 445.966 seconds, 78 optional skips,
+zero failures (`work/pr86-final-suite-r3.log`). The affected Release runtime and
+content-trace builds also pass. The focused Wasm batch passes five Kirby donors
+plus all six distinctive-action branches.

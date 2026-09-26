@@ -161,6 +161,26 @@
       "label": "randf_return",
       "address": "0x8038057c",
       "expected_word": "0x4e800020"
+    },
+    {
+      "label": "samus_effect_bank_locate",
+      "address": "0x80398614",
+      "expected_word": "0xa0c30000"
+    },
+    {
+      "label": "samus_effect_bank_load",
+      "address": "0x803984f4",
+      "expected_word": "0x7c0802a6"
+    },
+    {
+      "label": "gx_init_tlut",
+      "address": "0x8033f024",
+      "expected_word": "0x38000000"
+    },
+    {
+      "label": "samus_effect_particle_spawn",
+      "address": "0x80398c04",
+      "expected_word": "0x7c0802a6"
     }
   ],
   "extra_memory": [

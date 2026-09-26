@@ -1,18 +1,42 @@
 #include "native_dat.hpp"
 #include <cstdlib>
+#include <utility>
 #include <vector>
 namespace melee_web {
 struct NativeDatArena::Storage {
     std::shared_ptr<const DatArchive> archive;
+    std::vector<NativeDatSourceRegion> source_regions;
     std::vector<void*> allocations;
     size_t bytes = 0;
     MeleeWebNativeDat api{};
     ~Storage() { for (auto* p : allocations) std::free(p); }
 };
 NativeDatArena::NativeDatArena(std::shared_ptr<const DatArchive> archive)
+    : NativeDatArena(std::move(archive), {})
+{
+}
+
+NativeDatArena::NativeDatArena(std::shared_ptr<const DatArchive> archive,
+                               std::vector<NativeDatSourceRegion> source_regions)
     : storage_(std::make_unique<Storage>()) {
     if (!archive) throw DatError("Native descriptor archive is null");
     auto& s = *storage_; s.archive = std::move(archive);
+    s.source_regions = std::move(source_regions);
+    for (std::size_t i = 0; i < s.source_regions.size(); ++i) {
+        const auto& region = s.source_regions[i];
+        if (!region.archive || region.archive->data().empty() ||
+            region.source_data_address > UINT32_MAX - region.archive->data().size())
+            throw DatError("Native source archive address region is invalid");
+        const std::uint64_t first = region.source_data_address;
+        const std::uint64_t last = first + region.archive->data().size();
+        for (std::size_t j = 0; j < i; ++j) {
+            const auto& prior = s.source_regions[j];
+            const std::uint64_t prior_first = prior.source_data_address;
+            const std::uint64_t prior_last = prior_first + prior.archive->data().size();
+            if (first < prior_last && prior_first < last)
+                throw DatError("Native source archive address regions overlap");
+        }
+    }
     s.api.context = &s;
     s.api.word = [](void* c,uint32_t o) {
         const auto& a = *static_cast<Storage*>(c)->archive;
@@ -39,6 +63,23 @@ NativeDatArena::NativeDatArena(std::shared_ptr<const DatArchive> archive)
         const auto b = a.range(o,n);
         if (n > a.next_target_offset(o)-o) throw DatError("Native descriptor crosses referenced region at " + std::to_string(o));
         return b.data();
+    };
+    s.api.source_region = [](void* c,uint32_t address,size_t n)->const void* {
+        const auto& regions = static_cast<Storage*>(c)->source_regions;
+        for (const auto& region : regions) {
+            if (address < region.source_data_address) continue;
+            const auto offset = std::size_t(address - region.source_data_address);
+            const auto bytes = region.archive->data();
+            if (offset > bytes.size() || n > bytes.size() - offset) continue;
+            try {
+                if (n > region.archive->next_target_offset(static_cast<std::uint32_t>(offset)) - offset)
+                    continue;
+                return region.archive->range(static_cast<std::uint32_t>(offset), n).data();
+            } catch (const DatError&) {
+                continue;
+            }
+        }
+        return nullptr;
     };
     s.api.extent = [](void* c,uint32_t o) {
         const auto& a = *static_cast<Storage*>(c)->archive;

@@ -102,8 +102,10 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
 {
     auto& s = *storage_; s.archive = std::move(archive);
     require(bool(s.archive), "Material animation requires its archive owner");
+    require(model.joint_count <= 256,
+            "Material animation model exceeds the native 256-joint budget");
     const auto& a = *s.archive;
-    std::set<uint32_t> joint_seen, material_seen, texture_seen;
+    std::set<uint32_t> material_seen, texture_seen;
     size_t stream_bytes = 0, palette_validation_bytes = 0;
     std::map<uint32_t,uint32_t> image_max_indices;
     auto record = [&](uint32_t offset, size_t length) {
@@ -327,7 +329,7 @@ DatMaterialAnimation::DatMaterialAnimation(std::shared_ptr<const DatArchive> arc
     std::function<HSD_MatAnimJoint*(std::optional<uint32_t>,uint32_t)> joint_tree;
     joint_tree = [&](std::optional<uint32_t> offset,uint32_t joint) -> HSD_MatAnimJoint* {
         if (!offset) { require(joint==UINT32_MAX,"Material animation joint topology is incomplete"); return nullptr; }
-        require(joint<model.joint_count && s.joints.size()<256 && joint_seen.insert(*offset).second,
+        require(joint<model.joint_count && s.joints.size()<model.joint_count,
                 "Material animation joint topology/cycle/count is invalid"); record(*offset,12);
         auto j=std::make_unique<HSD_MatAnimJoint>(); auto* result=j.get();indices[result]=joint;contiguous=contiguous&&*offset==root+joint*12;s.joints.push_back(std::move(j));
         result->matanim=material_chain(a.pointer(*offset+8,16),model.joints[joint].dobj);

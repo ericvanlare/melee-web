@@ -51,6 +51,7 @@ class SamusRealAssetTests(unittest.TestCase):
             result = subprocess.run([str(binary), *(str(assets / name) for name in ordered)],
                                     capture_output=True, text=True, timeout=60)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("four Articles plus grapple throw joint/four animations", result.stdout)
             self.assertIn("effect bank 2/count 4", result.stdout)
 
 

@@ -66,7 +66,7 @@ class GameplayFighterAssetsTests(unittest.TestCase):
                 [sys.executable, str(compiler / "em++.py"), *common, "-std=c++20",
                  "-I", str(source), "-I", str(ROOT / ".deps/melee/src"),
                  "-include", str(ROOT / "src/gameplay_compat.h"), "-c",
-                 *[str(ROOT / "src" / (name+".cpp")) for name in ("dat_archive","dat_animation","fighter_binding","dat_fighter_runtime","dat_commands","gameplay_action_store")],
+                 *[str(ROOT / "src" / (name+".cpp")) for name in ("dat_archive","dat_animation","fighter_binding","dat_fighter_runtime","dat_commands","gameplay_result_motion_table","gameplay_action_store")],
                  str(ROOT / "tests/gameplay_fighter_assets_trace.cpp"), "-o", str(directory / "invalid.o")],
             ]
             # One object per source, including distinct C/C++ trace basenames.

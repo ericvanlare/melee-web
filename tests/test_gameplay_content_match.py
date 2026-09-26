@@ -34,7 +34,86 @@ class ContentMatchTests(unittest.TestCase):
         result = subprocess.run([str(node_runtime()), str(target), *map(str, arguments)],
                                 cwd=ROOT, capture_output=True, text=True, timeout=180)
         self.assertEqual(result.returncode, 0, (result.stdout + result.stderr)[-6000:])
-        self.assertIn(expected, result.stdout)
+        expectations = (expected,) if isinstance(expected, str) else expected
+        for item in expectations:
+            self.assertIn(item, result.stdout)
+
+    def test_kirby_donor_effect_banks_release_after_world_particles(self):
+        menu, game = ROOT / "assets-local/native-menus", ROOT / "assets-local/next-gate"
+        required = (
+            menu / "MnSlChr.usd", menu / "main.ssm", menu / "mario.ssm",
+            menu / "smash2.sem", menu / "dsp_coef.bin",
+            game / "GrNLa.dat", game / "PlGw.dat", game / "PlKb.dat",
+            game / "PlPp.dat", game / "PlFx.dat", game / "EfKbIc.dat",
+            game / "kirby.ssm", game / "ice.ssm",
+        )
+        if not all(path.is_file() for path in required):
+            self.skipTest("Owned A-lineup and Kirby/Ice donor fixtures are required")
+        self.run_trace(
+            "gameplay_content_match_trace",
+            [menu, game, 32, 20, 8, "--a-prefix-teardown"],
+            "A source prefix teardown after effect runtime passed")
+
+    def test_kirby_copy_article_use_loss_replacement_and_teardown_by_donor(self):
+        menu, game = ROOT / "assets-local/native-menus", ROOT / "assets-local/next-gate"
+        common = (
+            menu / "MnSlChr.usd", menu / "main.ssm", menu / "mario.ssm",
+            menu / "smash2.sem", menu / "dsp_coef.bin",
+            game / "GrNLa.dat", game / "ItCo.usd", game / "PlKb.dat", game / "kirby.ssm",
+        )
+        cases = (
+            ("Game & Watch", 3, ("PlGw.dat", "PlGwAJ.dat", "PlKbCpGw.dat", "EfKbData.dat")),
+            ("Ice Climbers", 14, ("PlPp.dat", "PlPpAJ.dat", "PlKbCpPp.dat", "EfKbIc.dat")),
+            ("Mario", 8, ("PlMr.dat", "PlMrAJ.dat", "PlKbCpMr.dat", "EfKbMr.dat")),
+            ("Samus", 16, ("PlSs.dat", "PlSsAJ.dat", "PlKbCpSs.dat", "EfKbSs.dat")),
+            ("Fox", 2, ("PlFx.dat", "PlFxAJ.dat", "PlKbCpFx.dat", "EfKbFx.dat")),
+        )
+        if not all(path.is_file() for path in common):
+            self.skipTest("Owned menu, Final Destination and Kirby source fixtures are required")
+        for donor, ckind, names in cases:
+            with self.subTest(donor=donor):
+                required = tuple(game / name for name in names)
+                if not all(path.is_file() for path in required):
+                    self.skipTest(f"Owned {donor} donor source fixtures are required")
+                self.run_trace(
+                    "gameplay_content_match_trace",
+                    [menu, game, 32, 4, ckind, "--character-actions"],
+                    ("Kirby copied neutral special created source Article kind=",
+                     f"Kirby action coverage: {donor} acquire/use/loss/replacement and match teardown path passed"))
+
+    def test_remaining_fighter_distinctive_actions_and_lifecycle(self):
+        menu, game = ROOT / "assets-local/native-menus", ROOT / "assets-local/next-gate"
+        common = (
+            menu / "MnSlChr.usd", menu / "main.ssm", menu / "mario.ssm",
+            menu / "smash2.sem", menu / "dsp_coef.bin",
+            game / "GrNLa.dat", game / "ItCo.usd", game / "PlMr.dat", game / "PlMrAJ.dat",
+        )
+        cases = (
+            ("Game & Watch", 3, ("PlGw.dat", "PlGwAJ.dat", "PlGwNr.dat", "gw.ssm"),
+             ("Game & Watch action coverage: Chef motion/article lifetime passed",)),
+            ("Ice Climbers", 14, ("PlPp.dat", "PlPpAJ.dat", "PlPpNr.dat", "PlPpRe.dat", "ice.ssm"),
+             ("Ice Climbers action coverage: Belay separated Popo/Nana",
+              "death_motion=1", "Popo_stock_and_entity_after=1",
+              "Nana_present_after=1")),
+            ("Samus", 16, ("PlSs.dat", "PlSsAJ.dat", "EfSsData.dat", "samus.ssm"),
+             ("Samus action coverage: down-B Bomb lifetime", "CatchWait -> source throw animation")),
+            ("Yoshi", 17, ("PlYs.dat", "PlYsAJ.dat", "EfYsData.dat", "yoshi.ssm"),
+             ("Yoshi action coverage: neutral-B captured Mario",)),
+            ("Zelda", 18, ("PlZd.dat", "PlZdAJ.dat", "PlSk.dat", "PlSkAJ.dat",
+                            "EfZdData.dat", "zs.ssm"),
+             ("Zelda/Sheik action coverage: both in-match down-B directions",)),
+            ("Sheik", 19, ("PlZd.dat", "PlZdAJ.dat", "PlSk.dat", "PlSkAJ.dat",
+                            "EfZdData.dat", "zs.ssm"),
+             ("Sheik action coverage: repeated down-B both ways, ground/air side-B",
+              "Zelda/Sheik action coverage: both in-match down-B directions")),
+        )
+        required = (*common, *(game / name for _, _, names, _ in cases for name in names))
+        if not all(path.is_file() for path in required):
+            self.skipTest("Owned menu, FD, Mario and remaining-fighter action fixtures are required")
+        for fighter, ckind, _, expected in cases:
+            with self.subTest(fighter=fighter):
+                self.run_trace("gameplay_content_match_trace",
+                               [menu, game, 32, ckind, 8, "--character-actions"], expected)
 
     def test_admitted_fighter_and_stage_source_lifecycles(self):
         menu, game = ROOT / "assets-local/native-menus", ROOT / "assets-local/next-gate"

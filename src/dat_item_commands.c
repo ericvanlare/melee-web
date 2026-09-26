@@ -68,13 +68,15 @@ void* melee_web_item_commands_create(const uint32_t* words,size_t count){
             }
             i+=extra;break;
         }
-        /* Opcode 10 (it_80278F2C) consumes five words. The handler reads
-         * arg2 from the first word's dispatch half (native bits 0..9 carry
-         * source bits 22..31), then four words whose halfwords the original
-         * reads in the opposite order, so each halveswaps. */
+        /* Opcode 10 (it_80278F2C) consumes five words. The source stores the
+         * ten-bit joint argument in bits 25..16 beside its six-bit opcode.
+         * Keep the opcode in the native dispatch field and the joint in the
+         * native command payload; the PC handler reads that payload directly.
+         * The four following words retain their source halfword order. */
         case 10:{
             if(i+4>=count)goto fail;
-            ((uint32_t*)&out[i])[0]=w>>22;
+            out[i].Command_00.code=10;
+            out[i].Command_00.value=(w>>16)&0x3ff;
             for(unsigned k=1;k<5;k++){
                 uint32_t v=words[i+k];
                 ((uint32_t*)&out[i+k])[0]=((v&0xffff)<<16)|(v>>16);

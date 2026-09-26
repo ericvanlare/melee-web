@@ -409,15 +409,19 @@ void invalid_joint_graphs()
         fixture.link(Fixture::joint + offset, Fixture::joint);
         rejects([&] { (void) fixture.model(); });
     }
-    // Two parent chains may share geometry, but sharing a joint descriptor is
-    // ambiguous parentage and requires HSD instance semantics we do not support.
+    // Source HSD_Joint graphs may reuse an immutable child descriptor under
+    // distinct parents; the original loader expands each reference to a JObj.
     Fixture shared;
     add_joint(shared, 320);
     add_joint(shared, 384);
     shared.link(Fixture::joint + 8, 320);
     shared.link(Fixture::joint + 12, 384);
     shared.link(384 + 8, 320);
-    rejects([&] { (void) shared.model(); });
+    const auto expanded=shared.model();
+    check(expanded.joints.size()==4&&expanded.joints[1].descriptor_offset==320&&
+          expanded.joints[3].descriptor_offset==320&&expanded.joints[1].parent==0&&
+          expanded.joints[3].parent==2,
+          "shared authored joint descriptor expands into separate occurrence-owned JObjs");
     for (const auto offset : {20U, 32U, 44U}) {
         for (const auto bits : {0x7f800000U, 0xff800000U, 0x7fc00001U}) {
             Fixture fixture;

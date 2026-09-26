@@ -41,6 +41,26 @@ const VictoryMusic* victory_music(int ckind)
         static constexpr VictoryMusic music{0x16, "/audio/ff_mario.hps"};
         return &music;
     }
+    case CKIND_GAMEWATCH: {
+        static constexpr VictoryMusic music{0x0f, "/audio/ff_flat.hps"};
+        return &music;
+    }
+    case CKIND_KIRBY: {
+        static constexpr VictoryMusic music{0x14, "/audio/ff_kirby.hps"};
+        return &music;
+    }
+    case CKIND_POPONANA: {
+        static constexpr VictoryMusic music{0x13, "/audio/ff_ice.hps"};
+        return &music;
+    }
+    case CKIND_SAMUS: {
+        static constexpr VictoryMusic music{0x19, "/audio/ff_samus.hps"};
+        return &music;
+    }
+    case CKIND_YOSHI: {
+        static constexpr VictoryMusic music{0x1d, "/audio/ff_yoshi.hps"};
+        return &music;
+    }
     case CKIND_FOX:
     case CKIND_FALCO: {
         static constexpr VictoryMusic music{0x10, "/audio/ff_fox.hps"};
@@ -53,7 +73,9 @@ const VictoryMusic* victory_music(int ckind)
     }
     case CKIND_LINK:
     case CKIND_CLINK:
-    case CKIND_GANON: {
+    case CKIND_GANON:
+    case CKIND_ZELDA:
+    case CKIND_SEAK: {
         static constexpr VictoryMusic music{0x15, "/audio/ff_link.hps"};
         return &music;
     }

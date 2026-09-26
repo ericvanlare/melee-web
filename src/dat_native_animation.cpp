@@ -56,7 +56,8 @@ DatNativeAnimation::DatNativeAnimation(std::shared_ptr<const DatArchive> archive
             require(joint<graph.joint_count&&s.nodes.size()<256,
                     "Native animation topology/cycle/count is invalid");
         }
-        require(visited.insert(*at).second,"Native animation topology/cycle/count is invalid");
+        require(!part_animation||visited.insert(*at).second,
+                "Native part-animation topology/cycle/count is invalid");
         record(*at,20);require(!a.pointer(*at+12),"Native RObj animation is unsupported");
         const auto flags=a.be32(*at+16);require(!(flags&~1u),"Native animation joint flags are unsupported");
         auto owner=std::make_unique<Node>();auto& n=*owner;n.descriptor.flags=flags;

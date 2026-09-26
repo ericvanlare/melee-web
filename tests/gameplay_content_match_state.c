@@ -2,10 +2,12 @@
 #include <melee/pl/player.h>
 #include <melee/ft/types.h>
 #include <melee/ft/kinds/ftKirby/ftkirby.h>
+#include <melee/ft/kinds/ftZelda/ftzeldaspeciallw.h>
 #include <melee/ft/kinds/ftDonkey/forward.h>
 #include <melee/ft/kinds/ftKoopa/forward.h>
 #include <melee/ft/kinds/ftCommon/forward.h>
 #include <melee/ft/ftdata.h>
+#include <melee/ft/ftparts.h>
 #include <melee/gm/gm_1601.h>
 #include <melee/it/it_26B1.h>
 #include <melee/mn/forward.h>
@@ -14,6 +16,7 @@
 #include <melee/cm/camera.h>
 #include <melee/cm/types.h>
 #include <math.h>
+#include <stdio.h>
 extern void* melee_web_camera_state(void);
 int melee_web_test_quake_start(int variant){
     const unsigned before=melee_web_gameplay_stats().objects;
@@ -112,11 +115,35 @@ int melee_web_test_active_fighter_kind(unsigned slot){
     HSD_GObj* entity=Player_GetEntity(slot);
     return entity&&entity->user_data?((Fighter*)entity->user_data)->kind:-1;
 }
+int melee_web_test_invoke_dormant_zelda_transform(unsigned slot){
+    HSD_GObj* entity=Player_GetEntityAtIndex((int)slot,1);
+    if(!entity||!entity->user_data||((Fighter*)entity->user_data)->kind!=FTKIND_ZELDA)
+        return 0;
+    ftZd_SpecialLw_8013AEAC(entity);
+    return melee_web_test_active_fighter_kind(slot)==FTKIND_SEAK;
+}
 int melee_web_test_kirby_copy_kind(unsigned slot){
     HSD_GObj* entity=Player_GetEntity(slot);
     if(!entity||!entity->user_data)return -1;
     Fighter* fighter=entity->user_data;
     return fighter->kind==FTKIND_KIRBY?fighter->u.kb.hat.kind:-1;
+}
+int melee_web_test_apply_kirby_copy_visibility(unsigned slot){
+    HSD_GObj* entity=Player_GetEntity(slot);
+    if(!entity||!entity->user_data)return 0;
+    Fighter* fighter=entity->user_data;
+    if(fighter->kind!=FTKIND_KIRBY||
+       fighter->u.kb.hat.kind!=FTKIND_GAMEWATCH||
+       fighter->u.kb.hat.x14.data==NULL||
+       fighter->x5AC.xC[4]==NULL||
+       fighter->u.kb.hat.x24.xC[4]!=fighter->x5AC.xC[4]||
+       fighter->u.kb.hat.x24.model_num==0||
+       fighter->u.kb.hat.x24.model_num>=fighter->x5AC.model_num)return 0;
+    const unsigned body_models=fighter->x5AC.model_num;
+    ftParts_800750C8(fighter,4,0);
+    if(fighter->x5AC.model_num!=body_models)return 0;
+    ftParts_800750C8(fighter,4,1);
+    return fighter->x5AC.model_num==body_models&&!fighter->x5AC.cleared[4];
 }
 int melee_web_test_fighter_owns_victim(unsigned slot,unsigned victim_slot){
     HSD_GObj* entity=Player_GetEntity(slot);

@@ -351,7 +351,10 @@ struct GameplayWorld::Storage {
             check(purpose==GameplayWorldPurpose::Results?
                 melee_web_effect_runtime_prepare(error,sizeof(error)):
                 melee_web_effect_runtime_begin(error,sizeof(error)),error);effect_started=true;
-            common_effects=std::make_unique<DatEffectEntries>(archive("EfCoData.dat"),"effCommonDataTable",0,47,true);
+            const std::vector<NativeDatSourceRegion> particle_source_regions{{
+                gale01r2_itco_data_address,archive("ItCo.usd")}};
+            common_effects=std::make_unique<DatEffectEntries>(archive("EfCoData.dat"),
+                "effCommonDataTable",0,47,true,particle_source_regions);
             check(purpose==GameplayWorldPurpose::Results?
                 common_effects->publish_for_source(error,sizeof(error)):
                 common_effects->load(error,sizeof(error)),error);
@@ -363,7 +366,8 @@ struct GameplayWorld::Storage {
                 /* Fighter effect tables may carry the original packed particle
                  * callback channel (Falco bank 3 entry 1 does). */
                 auto effect=std::make_unique<DatEffectEntries>(archive(dependency->effect_archive),
-                    dependency->effect_symbol,dependency->effect_bank,dependency->effect_count,true);
+                    dependency->effect_symbol,dependency->effect_bank,dependency->effect_count,
+                    true,particle_source_regions);
                 check(purpose==GameplayWorldPurpose::Results?effect->publish_for_source(error,sizeof(error)):
                     effect->load(error,sizeof(error)),error);effects.push_back(std::move(effect));
             }
@@ -470,7 +474,7 @@ struct GameplayWorld::Storage {
                 throw DatError("Original source mutated immutable archive: "+name);
         }
     }
-    void close(){
+    void close(const std::function<void()>& after_effect_runtime_end = {}){
         for(const auto& [kind,fighter]:fighters)
             if(fighter->live_fighters())throw DatError("Close all fighter/render contexts before the runtime world");
         end_stage();
@@ -481,6 +485,7 @@ struct GameplayWorld::Storage {
         stage_items.reset();
         item_colors.reset();item_arena.reset();
         if(effect_started){check(melee_web_effect_runtime_end(error,sizeof(error)),error);effect_started=false;}
+        if(after_effect_runtime_end)after_effect_runtime_end();
         if(stage_map){check(melee_web_stage_map_close(stage_map,error,sizeof(error)),error);stage_map=nullptr;}
         stage_effects.reset();
         if(stage_native){check(melee_web_native_joint_destroy(stage_native,error,sizeof(error)),error);stage_native=nullptr;}
@@ -542,7 +547,9 @@ void GameplayWorld::verify_result_source_loads()const{
     check(storage_->common_effects->verify_source_load(error,sizeof(error)),error);
     for(const auto& effect:storage_->effects)check(effect->verify_source_load(error,sizeof(error)),error);
 }
-void GameplayWorld::close(){storage_->close();}
+void GameplayWorld::close(const std::function<void()>& after_effect_runtime_end){
+    storage_->close(after_effect_runtime_end);
+}
 MeleeWebCollision* GameplayWorld::collision()const{return storage_->collision;}
 float GameplayWorld::floor_height(float x)const{
     MeleeWebCollisionFloorResult floor;char error[256];

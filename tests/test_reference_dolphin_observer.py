@@ -14,6 +14,103 @@ SOURCE = ROOT / "reference-capture" / "dolphin" / "source" / "Core" / "PowerPC" 
 
 
 class ReferenceDolphinObserverTests(unittest.TestCase):
+    def test_fighter_create_preserves_paired_fighter_entities_per_source_slot(self) -> None:
+        compiler = shutil.which("clang++") or shutil.which("g++")
+        if compiler is None:
+            self.skipTest("A native C++ compiler is not installed")
+        source = SOURCE.read_text(encoding="utf-8")
+        methods = source[source.index("  bool ReadFighterSourceSlot("):
+                         source.index("  bool ReadU32(")]
+        create_start = source.index("    else if (boundary == Boundary::FighterCreate)")
+        create_end = source.index("    else if (boundary == Boundary::SourceTick", create_start)
+        boundary = source[create_start:create_end]
+        self.assertIn("FighterEntitySliceFlags(slot, entity_index)", boundary)
+        self.assertIn("RegisterFighterEntity(slot, fighter, kind, &entity_index)", boundary)
+        self.assertIn("ReadU32(system, gobj + 0x2c, &fighter)", boundary)
+        self.assertIn("ReadU32(system, fighter + 0x4, &kind)", boundary)
+        self.assertIn("SliceTag::FighterCreateContext, gobj, 0x30, flags", boundary)
+        self.assertIn("SliceTag::FighterHead, fighter, 0x100, flags", boundary)
+        self.assertNotIn("fighter_present[slot])", boundary)
+        match_slices = source[source.index("  bool AddMatchSlices("):
+                              source.index("  bool ReadProfileRoot(")]
+        self.assertIn("entity_index < fighter_entity_count[slot]", match_slices)
+        self.assertIn("fighter_entity_pointers[slot][entity_index]", match_slices)
+        harness = r"""
+#include <array>
+#include <cassert>
+#include <cstddef>
+#include <cstdint>
+using u8 = uint8_t;
+using u32 = uint32_t;
+using u16 = uint16_t;
+namespace Core { struct System {}; }
+struct Reader {
+  std::array<u8, 256> memory{};
+  std::array<u32, 4> fighter_pointers{};
+  std::array<bool, 4> fighter_present{};
+  std::array<std::array<u32, 2>, 4> fighter_entity_pointers{};
+  std::array<std::array<u32, 2>, 4> fighter_entity_kinds{};
+  std::array<u8, 4> fighter_entity_count{};
+  bool IsMem1Range(u32 address, size_t size) const {
+    return address >= 0x100 && address <= 0x200 && size <= 0x200 - address;
+  }
+  bool ReadBytes(Core::System*, u32 address, size_t size, u8* output) const {
+    if (!IsMem1Range(address, size)) return false;
+    for (size_t i = 0; i < size; ++i) output[i] = memory[address - 0x100 + i];
+    return true;
+  }
+""" + methods + r"""
+};
+int main() {
+  Reader reader;
+  Core::System system;
+  const std::array<u32, 5> addresses = {0x100, 0x120, 0x140, 0x160, 0x180};
+  const std::array<u32, 5> kinds = {13, 14, 19, 7, 20};
+  const std::array<u8, 5> slots = {0, 1, 2, 2, 3};
+  for (size_t i = 0; i < addresses.size(); ++i) {
+    const u32 base = addresses[i] - 0x100;
+    reader.memory[base + 4] = static_cast<u8>(kinds[i] >> 24);
+    reader.memory[base + 5] = static_cast<u8>(kinds[i] >> 16);
+    reader.memory[base + 6] = static_cast<u8>(kinds[i] >> 8);
+    reader.memory[base + 7] = static_cast<u8>(kinds[i]);
+    reader.memory[base + 12] = slots[i];
+    u8 slot = 0xff;
+    assert(reader.ReadFighterSourceSlot(&system, addresses[i], &slot));
+    assert(slot == slots[i]);
+    u32 entity_index = 0xff;
+    assert(reader.RegisterFighterEntity(slot, addresses[i], kinds[i], &entity_index));
+    assert(entity_index == (i == 3 ? 1u : 0u));
+    assert(reader.FighterEntitySliceFlags(slot, entity_index) ==
+           static_cast<u16>(slot | (entity_index << 8)));
+  }
+  assert(reader.fighter_entity_count[2] == 2);
+  assert(reader.fighter_entity_pointers[2][0] == addresses[2]);
+  assert(reader.fighter_entity_pointers[2][1] == addresses[3]);
+  assert(reader.fighter_entity_kinds[2][0] == 19);
+  assert(reader.fighter_entity_kinds[2][1] == 7);
+  assert(reader.fighter_pointers[2] == addresses[2]);
+  assert(reader.fighter_present[2]);
+  assert(reader.FighterEntitySliceFlags(2, 0) == 2);
+  assert(reader.FighterEntitySliceFlags(2, 1) == 0x102);
+  u32 entity_index = 0;
+  assert(!reader.RegisterFighterEntity(0, 0x1a0, 13, &entity_index));
+  assert(!reader.RegisterFighterEntity(0, addresses[0], 23, &entity_index));
+  assert(!reader.RegisterFighterEntity(2, 0x1a0, 23, &entity_index));
+  assert(!reader.RegisterFighterEntity(4, 0x1a0, 23, &entity_index));
+  u8 invalid_slot = 0xff;
+  assert(!reader.ReadFighterSourceSlot(&system, 0x1f4, &invalid_slot));
+}
+"""
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary)
+            (path / "slot.cpp").write_text(harness)
+            built = subprocess.run([compiler, "-std=c++17", "-Wall", "-Werror",
+                                    str(path / "slot.cpp"), "-o", str(path / "slot")],
+                                   capture_output=True, text=True)
+            self.assertEqual(built.returncode, 0, built.stderr)
+            checked = subprocess.run([str(path / "slot")], capture_output=True, text=True)
+            self.assertEqual(checked.returncode, 0, checked.stderr)
+
     def test_scene_reset_classifier_distinguishes_menu_match_results_and_prize(self) -> None:
         compiler = shutil.which("clang++") or shutil.which("g++")
         if compiler is None:

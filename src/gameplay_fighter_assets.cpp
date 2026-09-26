@@ -3,6 +3,7 @@
 #include "gameplay_fighter_data.h"
 #include "gameplay_archive_sections.h"
 #include "dat_item_article.hpp"
+#include "dat_material_animation.hpp"
 #include "dat_native_animation.hpp"
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wwrite-strings"
@@ -55,6 +56,68 @@ struct OwnedPartAnimationGroup {
     std::vector<uint8_t> parts;
     std::vector<std::unique_ptr<DatNativeAnimation>> owners;
     std::vector<void*> animations;
+};
+struct NativeSamusGrapple {
+    void* joint=nullptr;
+    void** throw_animations=nullptr;
+    void* animation=nullptr;
+    void* material_animation=nullptr;
+};
+static_assert(sizeof(NativeSamusGrapple)==4*sizeof(void*));
+struct OwnedSamusGrapple {
+    static constexpr uint32_t throw_count=4;
+    DatNativeJoint model;
+    std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> native_model{nullptr,destroy_joint};
+    std::vector<void*> joint_descriptors;
+    std::array<std::unique_ptr<DatNativeAnimation>,throw_count> throw_owners;
+    std::array<void*,throw_count> throw_descriptors{};
+    std::unique_ptr<DatNativeAnimation> animation_owner;
+    std::unique_ptr<DatMaterialAnimation> material_owner;
+    NativeSamusGrapple descriptor{};
+
+    OwnedSamusGrapple(std::shared_ptr<const DatArchive> archive,uint32_t root)
+        :model(archive,required_joint(archive,root))
+    {
+        const auto& graph=model.graph();
+        char error[256];
+        native_model.reset(melee_web_native_joint_hydrate(&graph,error,sizeof(error)));
+        if(!native_model)throw DatError(error);
+        joint_descriptors.reserve(graph.joint_count);
+        for(uint32_t i=0;i<graph.joint_count;++i) {
+            void* value=melee_web_native_joint_descriptor_at(native_model.get(),i,
+                graph.joints[i].source_offset,error,sizeof(error));
+            if(!value)throw DatError(error);
+            joint_descriptors.push_back(value);
+        }
+        const auto table=archive->pointer(root+4,throw_count*4);
+        if(!table)throw DatError("Samus grapple throw-animation table is missing");
+        for(uint32_t i=0;i<throw_count;++i) {
+            const auto source=archive->pointer(*table+i*4,20);
+            if(!source)throw DatError("Samus grapple throw animation is missing");
+            throw_owners[i]=std::make_unique<DatNativeAnimation>(archive,*source,graph,
+                DatNativeAnimationPolicy::Transforms,joint_descriptors);
+            throw_descriptors[i]=throw_owners[i]->descriptor();
+        }
+        if(const auto source=archive->pointer(root+8,20))
+            animation_owner=std::make_unique<DatNativeAnimation>(archive,*source,graph,
+                DatNativeAnimationPolicy::Transforms,joint_descriptors);
+        if(const auto source=archive->pointer(root+12,24))
+            material_owner=std::make_unique<DatMaterialAnimation>(archive,*source,graph);
+        descriptor={melee_web_native_joint_descriptor(native_model.get(),error,sizeof(error)),
+                    throw_descriptors.data(),
+                    animation_owner?animation_owner->descriptor():nullptr,
+                    material_owner?material_owner->descriptor():nullptr};
+        if(!descriptor.joint)throw DatError(error);
+    }
+
+private:
+    static uint32_t required_joint(const std::shared_ptr<const DatArchive>& archive,uint32_t root)
+    {
+        if(!archive)throw DatError("Samus grapple archive is missing");
+        const auto joint=archive->pointer(root,64);
+        if(!joint)throw DatError("Samus grapple joint root is missing");
+        return *joint;
+    }
 };
 }
 // The source Purin OnLoad resolves a costume hat from HSD_Archive, then
@@ -165,6 +228,10 @@ struct GameplayFighterAssets::Storage {
     std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> link_part_native{nullptr,destroy_joint};
     std::unique_ptr<DatNativeJoint> kirby_copy_star_model;
     std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> kirby_copy_star_native{nullptr,destroy_joint};
+    std::unique_ptr<OwnedSamusGrapple> samus_grapple;
+    std::unique_ptr<DatNativeJoint> seak_ground_chain_model,seak_air_chain_model;
+    std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> seak_ground_chain_native{nullptr,destroy_joint},
+        seak_air_chain_native{nullptr,destroy_joint};
     DatNativeJoint model;
     std::unique_ptr<DatMaterialAnimation> material;
     std::unique_ptr<MeleeWebNativeJoint,decltype(&destroy_joint)> native;
@@ -205,11 +272,12 @@ struct GameplayFighterAssets::Storage {
             id.fighter_kind==FTKIND_KIRBY?20:
             (id.fighter_kind==FTKIND_POPO||id.fighter_kind==FTKIND_NANA)?12:
             id.fighter_kind==FTKIND_ZELDA?8:
-            id.fighter_kind==FTKIND_SEAK?16:
+            id.fighter_kind==FTKIND_SEAK?24:
             (id.fighter_kind==FTKIND_LUIGI||id.fighter_kind==FTKIND_KOOPA)?4:
             (id.fighter_kind==FTKIND_PURIN||id.fighter_kind==FTKIND_MEWTWO)?8:
             (id.fighter_kind==FTKIND_PIKACHU||id.fighter_kind==FTKIND_PICHU)?12:
             (id.fighter_kind==FTKIND_NESS||id.fighter_kind==FTKIND_GAMEWATCH)?44:
+            id.fighter_kind==FTKIND_SAMUS?20:
             id.fighter_kind==FTKIND_PEACH?20:16;
         const auto item_table=fighter->pointer(fighter_root+0x48,item_table_bytes);
         struct ItemIdentity { uint32_t index,kind; };
@@ -366,6 +434,13 @@ struct GameplayFighterAssets::Storage {
             if(!melee_web_fighter_data_set_kirby_joint(data,joint,&unresolved,error,sizeof(error)))
                 throw DatError(error);
         }
+        if(id.fighter_kind==FTKIND_SAMUS) {
+            const auto grapple_root=fighter->pointer(*item_table+4*4,16);
+            if(!grapple_root)throw DatError("Samus fifth x48 grapple descriptor root is missing");
+            samus_grapple=std::make_unique<OwnedSamusGrapple>(fighter,*grapple_root);
+            if(!melee_web_fighter_data_set_samus_grapple(data,&samus_grapple->descriptor,
+                    &unresolved,error,sizeof(error)))throw DatError(error);
+        }
         if(id.fighter_kind==FTKIND_YOSHI) {
             const auto joint_root=fighter->pointer(*item_table+3*4,64);
             const auto egg_lay_root=fighter->pointer(*item_table+2*4,24);
@@ -388,6 +463,26 @@ struct GameplayFighterAssets::Storage {
             if(!melee_web_fighter_data_set_link_part(data,
                 melee_web_native_joint_descriptor(link_part_native.get(),error,sizeof(error)),
                 &unresolved,error,sizeof(error)))throw DatError(error);
+        }
+        if(id.fighter_kind==FTKIND_SEAK) {
+            const auto ground_root=fighter->pointer(*item_table+4*4,64);
+            const auto air_root=fighter->pointer(*item_table+5*4,64);
+            if(!ground_root||!air_root)
+                throw DatError("Sheik side-special ground/air pose joint roots are missing");
+            seak_ground_chain_model=std::make_unique<DatNativeJoint>(fighter,*ground_root);
+            seak_air_chain_model=std::make_unique<DatNativeJoint>(fighter,*air_root);
+            seak_ground_chain_native.reset(melee_web_native_joint_hydrate(
+                &seak_ground_chain_model->graph(),error,sizeof(error)));
+            if(!seak_ground_chain_native)throw DatError(error);
+            seak_air_chain_native.reset(melee_web_native_joint_hydrate(
+                &seak_air_chain_model->graph(),error,sizeof(error)));
+            if(!seak_air_chain_native)throw DatError(error);
+            if(!melee_web_fighter_data_set_seak_joint(data,4,
+                    melee_web_native_joint_descriptor(seak_ground_chain_native.get(),error,sizeof(error)),
+                    &unresolved,error,sizeof(error)))throw DatError(error);
+            if(!melee_web_fighter_data_set_seak_joint(data,5,
+                    melee_web_native_joint_descriptor(seak_air_chain_native.get(),error,sizeof(error)),
+                    &unresolved,error,sizeof(error)))throw DatError(error);
         }
         const auto metal_root=fighter->pointer(root(*fighter,id.fighter_symbol)+0x5c,64);
         if(!metal_root)throw DatError("Fighter constructor requires its original metal graph");

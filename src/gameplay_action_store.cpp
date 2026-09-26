@@ -1,4 +1,5 @@
 #include "gameplay_action_store.hpp"
+#include "gameplay_result_motion_table.hpp"
 #include <algorithm>
 #include <cstdio>
 #include <set>
@@ -149,6 +150,16 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
     std::vector<std::pair<DatFighterAction, std::shared_ptr<const DatAnimation>>> hydrated_results;
     std::vector<std::optional<DatFighterAction>> result_table;
     if (result_motion_) {
+        const auto result_spec = result_motion_archive_spec(costume.fighter_kind);
+        require(!result_spec.root.empty(),
+                "Fighter has no source Results motion root");
+        const auto root = std::find_if(
+            result_motion_->public_symbols().begin(),
+            result_motion_->public_symbols().end(),
+            [&](const auto& symbol) { return symbol.name == result_spec.root; });
+        require(root != result_motion_->public_symbols().end(),
+                "Fighter Results archive is missing its source motion root");
+        const auto result_root_offset = root->data_offset;
         const DatFighterActions demo_actions(*archive, costume, 0x14,
                                               fighter_demo_motion_count(costume.fighter_kind));
         result_table.resize(fighter_demo_motion_count(costume.fighter_kind));
@@ -161,11 +172,24 @@ GameplayActionStore::GameplayActionStore(std::shared_ptr<const DatArchive> archi
             if (!action.archive_bytes) continue;
             result_expected.insert(action.symbol);
             const auto bytes = result_motion_->data();
-            require(action.container_offset <= bytes.size() &&
-                        action.archive_bytes <= bytes.size() - action.container_offset,
+            require(result_root_offset <= bytes.size() &&
+                        action.container_offset <= bytes.size() - result_root_offset,
+                    "Result demo action offset exceeds its authored public root");
+            const auto nested_offset = std::size_t{result_root_offset} +
+                                       action.container_offset;
+            require(action.archive_bytes <= bytes.size() - nested_offset,
                     "Result demo action range exceeds its authored archive");
-            auto nested = std::make_shared<const DatArchive>(bytes.subspan(
-                action.container_offset, action.archive_bytes));
+            std::shared_ptr<const DatArchive> nested;
+            try {
+                nested = std::make_shared<const DatArchive>(
+                    bytes.subspan(nested_offset, action.archive_bytes));
+            } catch (const DatError& error) {
+                throw DatError("Result demo action " + action.symbol +
+                    " for fighter kind " + std::to_string(costume.fighter_kind) +
+                    " at archive offset " + std::to_string(nested_offset) +
+                    " (root " + std::to_string(result_root_offset) + "): " +
+                    error.what());
+            }
             const auto root = std::find_if(nested->public_symbols().begin(),
                                            nested->public_symbols().end(),
                                            [&](const auto& symbol) {

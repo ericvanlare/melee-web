@@ -2,12 +2,21 @@
 
 ## Remaining fighter candidate — PR #86
 
-Current per-character coverage, original CPU9 captures, rendered browser
-failures, and explicit open gates are recorded in
-[Remaining fighter port notes](docs/REMAINING_FIGHTERS_PORT_NOTES.md). The
-original A/B menu captures completed, but A repeatability failed, B repeatability
-is unavailable, the port matches did not complete, and no original-versus-port
-comparison or admission is claimed.
+Current per-character coverage, original CPU9 references, rendered browser
+match loops, comparison limits, and explicit open gates are recorded in
+[Remaining fighter port notes](docs/REMAINING_FIGHTERS_PORT_NOTES.md). Both
+original A/B references are repeatable over their verified source-consumed PAD
+workloads. Headless Chrome completed two natural Results→CSS loops per lineup
+with no page errors. The supported per-tick original-versus-port comparisons
+were run without relaxing state/draw fields; each first stops on a scene
+divergence (A: input 13,414, original match frame 11,916; B: input 13,329,
+original match frame 11,971; source expects Results while the port remains in
+Match). Scheduling equivalence is not evaluated, and the new fighters remain an
+unfinished development candidate: broader move/recovery/damage/KO and donor
+coverage remain open. The five-donor Kirby acquisition/use/loss/replacement
+matrix now passes, including Samus's checked ItCo external palette owner; its
+effect-specific particle pixels are not established. The final full suite
+passes (1,465 tests, 78 optional skips). No admission or merge is claimed.
 
 ## Repository public; main changes restricted to the owner
 

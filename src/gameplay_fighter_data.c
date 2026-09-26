@@ -983,7 +983,8 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
                                kind==FTKIND_GAMEWATCH?11:
                                (kind==FTKIND_LINK||kind==FTKIND_CLINK)?7:
                                kind==FTKIND_KIRBY?5:
-                               kind==FTKIND_SEAK?4:
+                               kind==FTKIND_SAMUS?5:
+                               kind==FTKIND_SEAK?6:
                                kind==FTKIND_ZELDA?2:
                                (kind==FTKIND_LUIGI||kind==FTKIND_KOOPA)?1:
                                (kind==FTKIND_PIKACHU||kind==FTKIND_PICHU)?3:
@@ -1027,8 +1028,10 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
                 const bool link_joint=i==6&&(kind==FTKIND_LINK||kind==FTKIND_CLINK);
                 const bool yoshi_joint=i==3&&kind==FTKIND_YOSHI;
                 const bool kirby_joint=i==4&&kind==FTKIND_KIRBY;
+                const bool samus_grapple=i==4&&kind==FTKIND_SAMUS;
+                const bool seak_special_joint=(i==4||i==5)&&kind==FTKIND_SEAK;
                 const bool gamewatch_parts=kind==FTKIND_GAMEWATCH&&i==10;
-                const size_t minimum=(link_joint||yoshi_joint||kirby_joint)?64:gamewatch_parts?
+                const size_t minimum=(link_joint||yoshi_joint||kirby_joint||seak_special_joint)?64:samus_grapple?16:gamewatch_parts?
                     (size_t)d->x8->x0.model_num*sizeof(FtPartsVisLookup):24;
                 uint32_t p=PTR(at+i*4,minimum), article_unresolved;
                 /* Link's seventh entry is the source HSD_Joint descriptor used by
@@ -1043,6 +1046,12 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
                 } else if(kirby_joint) {
                     REQUIRE(p!=UINT32_MAX,
                             "Kirby swallowed-star source joint is missing");
+                } else if(samus_grapple) {
+                    REQUIRE(p!=UINT32_MAX,
+                            "Samus grapple throw descriptor is missing");
+                } else if(seak_special_joint) {
+                    REQUIRE(p!=UINT32_MAX,
+                            "Sheik side-special pose joint is missing");
                 } else if(gamewatch_parts) {
                     REQUIRE(p!=UINT32_MAX,
                             "Game & Watch part-visibility descriptor is missing");
@@ -1133,7 +1142,7 @@ void* melee_web_fighter_data_decode(const MeleeWebNativeDat* r,uint32_t root,
     for(unsigned i=0;i<sizeof(ready)/sizeof(ready[0]);++i) {
         /* Keep the Link part descriptor unresolved until its source HSD_Joint
          * has been converted to the native 32-bit descriptor ABI. */
-        if(ready[i]==18 && (kind==FTKIND_LINK||kind==FTKIND_CLINK||kind==FTKIND_YOSHI||kind==FTKIND_KIRBY)) continue;
+        if(ready[i]==18 && (kind==FTKIND_LINK||kind==FTKIND_CLINK||kind==FTKIND_YOSHI||kind==FTKIND_KIRBY||kind==FTKIND_SAMUS||kind==FTKIND_SEAK)) continue;
         *unresolved &= ~(1U<<ready[i]);
     }
     if(actions) *unresolved &= ~(1U<<3);
@@ -1188,6 +1197,37 @@ int melee_web_fighter_data_set_kirby_joint(void* data,void* joint,uint32_t* unre
         "Kirby swallowed-star joint requires four source Articles and its unresolved fifth x48 joint root");
     d->x48_items[4]=joint;*unresolved&=~(1U<<18);if(error&&size)*error=0;return 1;
 #undef KIRBY_JOINT_REQUIRE
+}
+
+int melee_web_fighter_data_set_samus_grapple(void* data,void* grapple,uint32_t* unresolved,
+    char* error,size_t size)
+{
+    ftData* d=data;
+    if(!d||!d->x48_items||!grapple||!unresolved||!(*unresolved&(1U<<18))||
+       !d->x48_items[0]||!d->x48_items[1]||!d->x48_items[2]||!d->x48_items[3]||
+       d->x48_items[4]) {
+        if(error&&size) snprintf(error,size,"Samus grapple descriptor requires four source Articles and its unresolved fifth x48 root");
+        return 0;
+    }
+    d->x48_items[4]=grapple;*unresolved&=~(1U<<18);if(error&&size)*error=0;return 1;
+}
+
+int melee_web_fighter_data_set_seak_joint(void* data,uint32_t index,void* joint,
+    uint32_t* unresolved,char* error,size_t size)
+{
+    ftData* d=data;
+    if(!d||!d->x48_items||!joint||!unresolved||!(*unresolved&(1U<<18))||
+       (index!=4&&index!=5)||!d->x48_items[0]||!d->x48_items[1]||
+       !d->x48_items[2]||!d->x48_items[3]||d->x48_items[index]||
+       !((HSD_Joint*)joint)->child) {
+        if(error&&size) snprintf(error,size,
+            "Sheik side-special pose requires its authored x48[4]/x48[5] child-joint descriptor");
+        return 0;
+    }
+    d->x48_items[index]=joint;
+    if(d->x48_items[4]&&d->x48_items[5]) *unresolved&=~(1U<<18);
+    if(error&&size)error[0]=0;
+    return 1;
 }
 
 int melee_web_fighter_data_set_metal(void* data,void* joint,uint32_t costumes,

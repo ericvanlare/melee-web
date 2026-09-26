@@ -5,6 +5,9 @@
 #include "dat_effect_entries.hpp"
 #include "dat_material_animation.hpp"
 #include "dat_native_joint.hpp"
+#include "dat_item_article.hpp"
+#include "native_dat.hpp"
+#include "gameplay_article_data.h"
 #include "gameplay_archive_sections.h"
 #include "gameplay_content.h"
 #include "gameplay_menu_host.h"
@@ -13,6 +16,8 @@
 #pragma GCC diagnostic ignored "-Wwrite-strings"
 extern "C" {
 #include <melee/ft/forward.h>
+#include <melee/ft/dobjlist.h>
+#include <melee/it/forward.h>
 #include <melee/ef/efasync.h>
 #include <melee/ef/types.h>
 #include <melee/pl/forward.h>
@@ -116,6 +121,12 @@ void write_native32(std::vector<std::uint8_t>& bytes, std::size_t offset,
     std::memcpy(bytes.data() + offset, &value, sizeof(value));
 }
 
+void write_native16(std::vector<std::uint8_t>& bytes, std::size_t offset,
+                    std::uint16_t value)
+{
+    std::memcpy(bytes.data() + offset, &value, sizeof(value));
+}
+
 void adapt_for_native_source_parser(std::vector<std::uint8_t>& bytes,
                                     const DatArchive& checked)
 {
@@ -157,9 +168,10 @@ void adapt_for_native_source_parser(std::vector<std::uint8_t>& bytes,
 
 void adapt_kirby_copy_parts_count(std::vector<std::uint8_t>& bytes,
                                   const DatArchive& archive,
-                                  const KirbyCopyArchiveRequirement& root)
+                                  const KirbyCopyArchiveRequirement& root,
+                                  const std::vector<unsigned>& costume_ids)
 {
-    if (root.costume_root) return;
+    if (root.costume_root || costume_ids.empty()) return;
 
     const auto& symbol = public_root(archive, root.symbol);
     // Some copy roots are the FtPartsDesc itself; others begin with the
@@ -168,20 +180,156 @@ void adapt_kirby_copy_parts_count(std::vector<std::uint8_t>& bytes,
     // from a neighboring fighter's row.
     const std::uint32_t model_count_offset =
         archive.has_relocation(symbol.data_offset) ? 4U : 0U;
-    const auto region_end = archive.next_target_offset(symbol.data_offset);
-    if (region_end < symbol.data_offset ||
-        region_end - symbol.data_offset < model_count_offset + 4U)
+    const std::uint32_t descriptor = symbol.data_offset + model_count_offset;
+    try {
+        (void)archive.range(descriptor, 8);
+    } catch (const DatError&) {
         reject("Kirby copy FtPartsDesc model count escapes its authored source root");
+    }
 
-    const auto count = read_be32(bytes, 0x20U + symbol.data_offset +
-                                      model_count_offset);
+    const auto count = archive.be32(descriptor);
     if (count > 11U)
         reject("Kirby copy source FtPartsDesc model count exceeds ftParts bounds: " +
                root.symbol + " DAT+" + std::to_string(symbol.data_offset) +
                " field+" + std::to_string(model_count_offset) + " value=" +
                std::to_string(count));
-    write_native32(bytes, 0x20U + symbol.data_offset + model_count_offset,
-                   count);
+    write_native32(bytes, 0x20U + descriptor, count);
+    constexpr std::uint32_t kirby_costume_count = 6;
+    const auto max_costume = *std::max_element(costume_ids.begin(),
+                                               costume_ids.end());
+    if (max_costume >= kirby_costume_count)
+        reject("Kirby selected costume exceeds the source costume table");
+
+    // The Game & Watch copy root also publishes the source ftData_x8_x8
+    // texture-animation pair immediately after its FtPartsDesc. LOAD_HAT
+    // passes the address of that pair (root+8) to ftAnim_80070200; convert its
+    // authored count and validate only the source-selected costume rows.
+    if (model_count_offset == 0 &&
+        archive.has_relocation(symbol.data_offset + 12U)) {
+        const auto tobj_count=archive.be32(symbol.data_offset+8U);
+        constexpr auto tobj_capacity=sizeof(
+            ((CostumeTObjList*)nullptr)->costume_tobjs)/sizeof(HSD_TObj*);
+        if(tobj_count>tobj_capacity)
+            reject("Kirby copy source texture-animation count exceeds the source TObj list bound: "+
+                   root.symbol);
+        write_native32(bytes,0x20U+symbol.data_offset+8U,tobj_count);
+        const auto rows=archive.pointer(symbol.data_offset+12U,
+                                        (max_costume+1U)*4U);
+        if(!rows)
+            reject("Kirby copy source texture-animation costume table is missing: "+
+                   root.symbol);
+        for(const auto costume_value:costume_ids) {
+            const auto costume=static_cast<std::uint32_t>(costume_value);
+            const auto list=archive.pointer(*rows+costume*4U,
+                                             std::size_t{tobj_count}*2U);
+            if(tobj_count&&!list)
+                reject("Kirby copy source texture-animation list is missing: "+
+                       root.symbol);
+            for(std::uint32_t i=0;i<tobj_count;i++)
+                write_native16(bytes,0x20U+*list+i*2U,
+                               archive.be16(*list+i*2U));
+        }
+    }
+
+    // ftKb_CostumeList is the source's six-entry Kirby costume table. Each
+    // FtPartsDesc visibility row has four FtPartsVisLookup pointers; each
+    // lookup then owns model_num {variant_count, TempS*} rows. The PPC HSD
+    // archive loader relocates those pointers but does not byte-swap the
+    // counts, so the original ftParts routines otherwise interpret (for
+    // example) BE 1 and 7 as 0x01000000 and 0x07000000 on this host.
+    constexpr std::uint32_t visibility_slots_per_costume = 4;
+    constexpr std::uint32_t visibility_pointer_bytes = 4;
+    constexpr std::uint32_t lookup_row_bytes = 8;
+    constexpr std::uint32_t variant_row_bytes = 8;
+    constexpr std::uint32_t source_visibility_variant_limit = 128;
+    constexpr std::uint32_t source_visibility_index_limit = 124;
+    constexpr std::uint32_t costume_row_bytes =
+        visibility_slots_per_costume * visibility_pointer_bytes;
+    const auto table = archive.pointer(
+        descriptor + 4,
+        (max_costume + 1U) * costume_row_bytes);
+    if (!table)
+        reject("Kirby copy FtPartsDesc visibility table is missing: " +
+               root.symbol);
+    // Rows are source-selected by Kirby's actual CSS costume id. Several are
+    // themselves relocation targets (notably Popo's), so next_target_offset
+    // is not an array extent here. Validate only the selected rows' byte range
+    // and leave every unconsumed source row untouched.
+    for (const auto costume_value : costume_ids) {
+        const auto costume = static_cast<std::uint32_t>(costume_value);
+        for (std::uint32_t slot = 0; slot < visibility_slots_per_costume; ++slot) {
+            const auto pointer_slot = *table + costume * costume_row_bytes +
+                                      slot * visibility_pointer_bytes;
+            const auto lookup = archive.pointer(
+                pointer_slot, std::size_t{count} * lookup_row_bytes);
+            if (!lookup || count == 0) continue;
+
+            for (std::uint32_t model = 0; model < count; ++model) {
+                const auto row = *lookup + model * lookup_row_bytes;
+                const auto variants = archive.be32(row);
+                if (variants > source_visibility_variant_limit)
+                    reject("Kirby copy part-visibility variant count exceeds the source selector bound: " +
+                           root.symbol);
+                write_native32(bytes, 0x20U + row, variants);
+                const auto entries = archive.pointer(
+                    row + 4, std::size_t{variants} * variant_row_bytes);
+                if (variants == 0) continue;
+                if (!entries)
+                    reject("Kirby copy part-visibility variant rows are missing: " +
+                           root.symbol);
+
+                for (std::uint32_t variant = 0; variant < variants; ++variant) {
+                    const auto entry = *entries + variant * variant_row_bytes;
+                    const auto indices_count = archive.be32(entry);
+                    if (indices_count > source_visibility_index_limit)
+                        reject("Kirby copy part-visibility index count exceeds the source DObj bound: " +
+                               root.symbol);
+                    write_native32(bytes, 0x20U + entry, indices_count);
+                    const auto indices = archive.pointer(entry + 4, indices_count);
+                    if (indices_count == 0) continue;
+                    if (!indices)
+                        reject("Kirby copy part-visibility indices are missing: " +
+                               root.symbol);
+                }
+            }
+        }
+    }
+
+    // The Game & Watch copy callback also switches the secondary visibility
+    // lookup stored in KirbyHatStruct::hat_dynamics[3]. That authored table
+    // uses the same FtPartsVisLookup/TempS layout as FtPartsDesc::vis_table,
+    // but lives at the source root's +0x18 pointer field and is consumed by
+    // ftParts_80074D7C after copy acquisition.
+    if (root.fighter_kind == FTKIND_GAMEWATCH) {
+        constexpr std::uint32_t special_lookup_pointer_offset = 0x18;
+        const auto lookup = archive.pointer(
+            symbol.data_offset + special_lookup_pointer_offset,
+            std::size_t{count} * lookup_row_bytes);
+        if (!lookup)
+            reject("Kirby Game & Watch secondary part-visibility lookup is missing");
+        for (std::uint32_t model = 0; model < count; ++model) {
+            const auto row = *lookup + model * lookup_row_bytes;
+            const auto groups = archive.be32(row);
+            if (groups > source_visibility_variant_limit)
+                reject("Kirby Game & Watch secondary visibility group count exceeds the source bound");
+            write_native32(bytes, 0x20U + row, groups);
+            const auto entries = archive.pointer(
+                row + 4, std::size_t{groups} * variant_row_bytes);
+            if (groups == 0) continue;
+            if (!entries)
+                reject("Kirby Game & Watch secondary visibility entries are missing");
+            for (std::uint32_t group = 0; group < groups; ++group) {
+                const auto entry = *entries + group * variant_row_bytes;
+                const auto indices_count = archive.be32(entry);
+                if (indices_count > source_visibility_index_limit)
+                    reject("Kirby Game & Watch secondary visibility index count exceeds the source DObj bound");
+                write_native32(bytes, 0x20U + entry, indices_count);
+                if (indices_count != 0 &&
+                    !archive.pointer(entry + 4, indices_count))
+                    reject("Kirby Game & Watch secondary visibility indices are missing");
+            }
+        }
+    }
 }
 
 void add_requirement(std::vector<KirbyCopyArchiveRequirement>& result,
@@ -297,6 +445,12 @@ struct GameplayKirbyCopyAssets::Storage {
         std::vector<std::uint8_t> bytes;
         std::unique_ptr<HSD_Archive> native;
         std::shared_ptr<const DatArchive> checked;
+        std::unique_ptr<NativeDatArena> article_arena;
+        std::vector<std::unique_ptr<DatItemArticle>> copy_articles;
+        std::unique_ptr<DatNativeJoint> copy_hat_model;
+        std::unique_ptr<MeleeWebNativeJoint, decltype(&destroy_joint)>
+            native_copy_hat_model{nullptr, &destroy_joint};
+        void* copy_hat_joint_descriptor = nullptr;
         std::unique_ptr<DatNativeJoint> costume_model;
         std::unique_ptr<MeleeWebNativeJoint, decltype(&destroy_joint)>
             native_costume_model{nullptr, &destroy_joint};
@@ -311,6 +465,8 @@ struct GameplayKirbyCopyAssets::Storage {
 
     std::vector<KirbyCopyArchiveRequirement> requirements;
     std::vector<KirbyCopyEffectRequirement> effect_requirements;
+    std::vector<NativeDatSourceRegion> particle_source_regions;
+    std::vector<unsigned> kirby_costumes;
     std::map<std::string, OwnedArchive, std::less<>> archives;
     std::vector<OwnedEffect> effects;
     std::vector<MeleeWebArchiveSymbol> symbols;
@@ -322,8 +478,29 @@ struct GameplayKirbyCopyAssets::Storage {
     {
         if (!contains_kirby(selection)) return;
 
+        for (unsigned player = 0; player < GM_MAX_PLAYERS; ++player) {
+            const auto& slot = selection.start.players[player];
+            if (slot.slot_type == Gm_PKind_NA) break;
+            if (slot.ckind != CKIND_KIRBY) continue;
+            const auto costume = static_cast<unsigned>(slot.color);
+            if (costume >= 6U)
+                reject("Kirby selected costume is outside ftKb_CostumeList");
+            if (std::find(kirby_costumes.begin(), kirby_costumes.end(), costume) ==
+                kirby_costumes.end())
+                kirby_costumes.push_back(costume);
+        }
+        if (kirby_costumes.empty())
+            reject("Kirby copy assets have no source-selected Kirby costume");
+
         requirements = kirby_copy_archive_requirements(selection);
         effect_requirements = kirby_copy_effect_requirements(selection);
+        if (const auto common_items = files.find("ItCo.usd");
+            common_items != files.end()) {
+            auto item_archive = std::make_shared<const DatArchive>(
+                common_items->second, DatExternalPolicy::PreserveUnresolved);
+            particle_source_regions.push_back({gale01r2_itco_data_address,
+                                                std::move(item_archive)});
+        }
 
         for (const auto& requirement : requirements) {
             if (archives.contains(requirement.filename)) continue;
@@ -347,7 +524,8 @@ struct GameplayKirbyCopyAssets::Storage {
             adapt_for_native_source_parser(owned.bytes, *checked);
             for (const auto& root : requirements)
                 if (root.filename == requirement.filename)
-                    adapt_kirby_copy_parts_count(owned.bytes, *checked, root);
+                    adapt_kirby_copy_parts_count(owned.bytes, *checked, root,
+                                                 kirby_costumes);
             owned.native = std::make_unique<HSD_Archive>();
             std::memset(owned.native.get(), 0, sizeof(HSD_Archive));
             lbArchive_InitializeDAT(owned.native.get(), owned.bytes.data(),
@@ -355,6 +533,129 @@ struct GameplayKirbyCopyAssets::Storage {
             if (!owned.native->data)
                 reject("Original HSD parser did not initialize Kirby archive " +
                        requirement.filename);
+            for (const auto& root : requirements) {
+                if (root.filename != requirement.filename || root.costume_root)
+                    continue;
+                const auto root_offset = owned.public_offsets.at(root.symbol);
+                // KirbyHatStruct starts with its authored HSD_Joint pointer;
+                // roots without that relocation are FtPartsDesc-only records.
+                // Keep the decoded graph alive and publish a checked native
+                // descriptor for the original ftKb_LoadHat consumer.
+                if (checked->has_relocation(root_offset)) {
+                    const auto joint = checked->pointer(root_offset, 64);
+                    if (!joint)
+                        reject("Kirby copied hat source joint is missing: " +
+                               root.symbol);
+                    owned.copy_hat_model =
+                        std::make_unique<DatNativeJoint>(checked, *joint);
+                    char joint_error[256]{};
+                    owned.native_copy_hat_model.reset(
+                        melee_web_native_joint_hydrate(
+                            &owned.copy_hat_model->graph(), joint_error,
+                            sizeof(joint_error)));
+                    if (!owned.native_copy_hat_model) reject(joint_error);
+                    owned.copy_hat_joint_descriptor =
+                        melee_web_native_joint_descriptor(
+                            owned.native_copy_hat_model.get(), joint_error,
+                            sizeof(joint_error));
+                    if (!owned.copy_hat_joint_descriptor) reject(joint_error);
+                    static_assert(sizeof(void*) == 4,
+                                  "Native Kirby joint descriptors require the gameplay ABI");
+                    const auto address = reinterpret_cast<std::uintptr_t>(
+                        owned.copy_hat_joint_descriptor);
+                    if (address > UINT32_MAX)
+                        reject("Kirby copied hat joint exceeds source pointer width");
+                    const auto encoded = static_cast<std::uint32_t>(address);
+                    std::memcpy(static_cast<std::uint8_t*>(owned.native->data) +
+                                    root_offset,
+                                &encoded, sizeof(encoded));
+                }
+                struct CopyArticle { std::uint32_t field; std::uint32_t kind; };
+                static constexpr CopyArticle mario_articles[]{
+                    // ftKb_SpecialN_800F16D0 reads g->x0->xC directly.
+                    {0x0C, It_Kind_Kirby_MarioFire},
+                };
+                static constexpr CopyArticle samus_articles[]{
+                    // The source registers hats[FTKIND_SAMUS]->
+                    // hat_dynamics[0] as Kirby's copied Charge Shot.
+                    {0x0C, It_Kind_Kirby_SamusCharge},
+                };
+                static constexpr CopyArticle gamewatch_articles[]{
+                    {0x20, It_Kind_Kirby_GameWatchChef},
+                    {0x24, It_Kind_Kirby_GameWatchChefPan},
+                };
+                static constexpr CopyArticle popo_articles[]{
+                    // ftKb_SpecialN_800F16D0 registers
+                    // hats[FTKIND_POPO]->hat_dynamics[0].
+                    {0x0C, It_Kind_Kirby_IceClimberIce},
+                };
+                static constexpr CopyArticle fox_articles[]{
+                    // ftKb_Init_800EE528 registers the first two Fox
+                    // hat_dynamics as Kirby's copied Laser and Blaster.
+                    {0x0C, It_Kind_Kirby_FoxLaser},
+                    {0x10, It_Kind_Kirby_FoxBlaster},
+                };
+                const CopyArticle* copy_articles = nullptr;
+                std::size_t copy_article_count = 0;
+                if (root.fighter_kind == FTKIND_MARIO &&
+                    requirement.filename == "PlKbCpMr.dat" &&
+                    root.symbol == "ftDataKirbyCopyMario") {
+                    copy_articles = mario_articles;
+                    copy_article_count = 1;
+                } else if (root.fighter_kind == FTKIND_SAMUS &&
+                           requirement.filename == "PlKbCpSs.dat" &&
+                           root.symbol == "ftDataKirbyCopySamus") {
+                    copy_articles = samus_articles;
+                    copy_article_count = 1;
+                } else if (root.fighter_kind == FTKIND_GAMEWATCH &&
+                    requirement.filename == "PlKbCpGw.dat" &&
+                    root.symbol == "ftDataKirbyCopyGamewatch") {
+                    copy_articles = gamewatch_articles;
+                    copy_article_count = 2;
+                } else if (root.fighter_kind == FTKIND_POPO &&
+                           requirement.filename == "PlKbCpPp.dat" &&
+                           root.symbol == "ftDataKirbyCopyPopo") {
+                    copy_articles = popo_articles;
+                    copy_article_count = 1;
+                } else if (root.fighter_kind == FTKIND_FOX &&
+                           requirement.filename == "PlKbCpFx.dat" &&
+                           root.symbol == "ftDataKirbyCopyFox") {
+                    copy_articles = fox_articles;
+                    copy_article_count = 2;
+                } else {
+                    continue;
+                }
+                owned.article_arena = std::make_unique<NativeDatArena>(checked);
+                static_assert(sizeof(void*) == 4,
+                              "Native copy Article pointers require the gameplay ABI");
+                for (std::size_t article_index = 0;
+                     article_index < copy_article_count; ++article_index) {
+                    const auto [field_offset, kind] = copy_articles[article_index];
+                    const auto article_root = checked->pointer(
+                        root_offset + field_offset, 24);
+                    if (!article_root)
+                        reject("Kirby copied Article root is missing at source field +" +
+                               std::to_string(field_offset));
+                    std::uint32_t unresolved = 0;
+                    void* registered = melee_web_article_decode(
+                        owned.article_arena->reader(), *article_root,
+                        &unresolved);
+                    if (!registered)
+                        reject("Kirby copied Article registration root could not be decoded");
+                    owned.copy_articles.push_back(std::make_unique<DatItemArticle>(
+                        checked, *article_root, kind, registered));
+                    if (melee_web_article_unresolved(registered) != 0)
+                        reject("Kirby copied Article did not publish a complete source graph");
+                    const auto address = reinterpret_cast<std::uintptr_t>(registered);
+                    if (address > UINT32_MAX)
+                        reject("Kirby copied Article exceeds the source pointer width");
+                    const auto encoded = static_cast<std::uint32_t>(address);
+                    std::memcpy(static_cast<std::uint8_t*>(owned.native->data) +
+                                    root_offset + field_offset,
+                                &encoded, sizeof(encoded));
+                    (void)unresolved;
+                }
+            }
             archives.emplace(requirement.filename, std::move(owned));
         }
 
@@ -368,9 +669,14 @@ struct GameplayKirbyCopyAssets::Storage {
             owned.archive = std::make_shared<const DatArchive>(input->second);
             const auto entry_count = source_effect_entry_count(
                 *owned.archive, requirement.symbol);
-            owned.entries = std::make_unique<DatEffectEntries>(
-                owned.archive, requirement.symbol, requirement.effect_bank,
-                entry_count, true);
+            try {
+                owned.entries = std::make_unique<DatEffectEntries>(
+                    owned.archive, requirement.symbol, requirement.effect_bank,
+                    entry_count, true, particle_source_regions);
+            } catch(const DatError& error) {
+                throw DatError("Kirby donor effect archive "+requirement.filename+
+                    " table "+requirement.symbol+": "+error.what());
+            }
             effects.push_back(std::move(owned));
         }
 
@@ -421,6 +727,10 @@ struct GameplayKirbyCopyAssets::Storage {
                     native_data = archive.costume_joint_descriptor;
                 else if (costume[0].matanim_joint_name == requirement.symbol)
                     native_data = archive.costume_matanim->descriptor();
+            } else if (archive.copy_hat_joint_descriptor) {
+                // The checked owner replaced KirbyHatStruct::hat_joint in the
+                // mutable native HSD image; its public root remains the
+                // original source structure and the owner outlives the cache.
             }
             symbols.push_back({requirement.filename.c_str(),
                                requirement.symbol.c_str(),
@@ -506,6 +816,7 @@ struct GameplayKirbyCopyAssets::Storage {
         archives.clear();
         requirements.clear();
         effect_requirements.clear();
+        kirby_costumes.clear();
         symbols.clear();
     }
 

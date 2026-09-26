@@ -47,7 +47,7 @@ class FoxGameplayActionTests(unittest.TestCase):
                          ROOT / "src/gameplay_article_data.c", ROOT / "tests/fox_gameplay_data_trace.c"]
             cpp_sources = [ROOT / "src" / (name + ".cpp") for name in
                            ("dat_archive", "dat_animation", "fighter_binding", "dat_fighter_runtime",
-                            "dat_commands", "gameplay_action_store", "native_dat")]
+                            "dat_commands", "gameplay_result_motion_table", "gameplay_action_store", "native_dat")]
             cpp_sources.append(ROOT / "tests/fox_gameplay_action_trace.cpp")
             objects = []
             for src in c_sources:

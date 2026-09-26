@@ -37,7 +37,8 @@ class GameplayActionStoreTests(unittest.TestCase):
             directory = Path(directory)
             output = directory / "actions.js"
             common = ["-O1", "-fexceptions", "-DTARGET_PC", "-ffunction-sections", "-fdata-sections", "-ffp-contract=off",
-                      "-I", str(ROOT / "src"), "-I", str(ROOT / ".deps/aurora/include")]
+                      "-I", str(ROOT / "src"), "-I", str(ROOT / ".deps/aurora/include"),
+                      "-I", str(source)]
             # Extract exact original consumers to avoid linking unreachable effects,
             # audio and match services through the full ftAction dispatch table.
             text = (source / "melee/ft/ftaction.c").read_text()
@@ -56,6 +57,7 @@ class GameplayActionStoreTests(unittest.TestCase):
                 'void ftAnim_800704F0(HSD_GObj*, int, float);\nvoid ft_8008A1B8(HSD_GObj*, int);\nvoid ftColl_8007AFC8(HSD_GObj*, int);\n'
                 + function("ftAction_80071708") + '\n' + function("ftAction_80071784") + '\n' + function("ftAction_80071908") + '\n' + function("ftAction_80071974") + '\n' + function("ftAction_80072BF4") + '\n' + function("ftAction_80072B94") + '\n' + function("ftAction_80073008") + '\n' + function("ftAction_80071820") + '\n' + function("ftAction_800726F4") + '\n' + function("ftAction_80072C6C") + '\n' + function("ftAction_80073118")
                 + '\n' + function("ftAction_80071F78")
+                + '\n' + function("ftAction_80072CB0")
                 + '\nstatic void (*ftAction_803C06E8[49])(HSD_GObj*, CommandInfo*) = '
                 '{[30]=ftAction_800726F4,[42]=ftAction_80072C6C};\n'
                 + function("ftAction_80073240"))
@@ -66,7 +68,8 @@ class GameplayActionStoreTests(unittest.TestCase):
                  str(source / "melee/ft/ftdata.c"), str(source / "melee/ft/ft_0DF0.c"), str(source / "melee/lb/lbanim.c"), str(source / "melee/lb/lbcommand.c")],
                 [sys.executable, str(compiler / "em++.py"), *common, "-std=c++20", "-c",
                  *[str(ROOT / "src" / (name + ".cpp")) for name in
-                   ("dat_archive", "dat_animation", "fighter_binding", "dat_fighter_runtime", "dat_commands", "gameplay_action_store")],
+                   ("dat_archive", "dat_animation", "fighter_binding", "dat_fighter_runtime", "dat_commands",
+                    "gameplay_result_motion_table", "gameplay_action_store")],
                  str(ROOT / "tests/gameplay_action_store_trace.cpp")],
             ]
             commands.insert(0, [sys.executable, str(compiler / "emcc.py"), *common, "-std=c11", "-I", str(source),

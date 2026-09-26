@@ -1,5 +1,7 @@
 #include "gameplay_effect_banks.h"
 #include "gameplay_bootstrap.h"
+#include <sysdolphin/baselib/generator.h>
+#include <sysdolphin/baselib/psstructs.h>
 #include <sysdolphin/baselib/particle.h>
 #include <math.h>
 #include <stdio.h>
@@ -49,9 +51,43 @@ static int success(char* e,size_t n){if(e&&n)e[0]=0;return 1;}
 static uint32_t relative(const MeleeWebNativeDat* d,uint32_t base,uint32_t length,uint32_t slot,size_t bytes)
 {
     const uint32_t offset=WORD(slot);
-    REQUIRE(offset && !(offset&3) && offset<=length && bytes<=length-offset && base<=UINT32_MAX-offset,
-            "Particle bank relative pointer is null, unaligned or outside its bank");
+    if(!offset || (offset&3) || offset>length || bytes>length-offset ||
+       base>UINT32_MAX-offset) {
+        char message[192];
+        snprintf(message,sizeof(message),
+            "Particle bank relative pointer invalid: base=%u length=%u slot=%u offset=%u bytes=%zu",
+            base,length,slot,offset,bytes);
+        d->reject(d->context,message);
+        return 0;
+    }
     d->region(d->context,base+offset,bytes);return base+offset;
+}
+static const void* texture_payload(const MeleeWebNativeDat* d,uint32_t base,
+    uint32_t length,uint32_t slot,size_t bytes,int palette)
+{
+    const uint32_t offset=WORD(slot);
+    if(offset && !(offset&3) && offset<=length && bytes<=length-offset &&
+       base<=UINT32_MAX-offset) {
+        const uint32_t source=base+offset;
+        REQUIRE(!(source&31),"Particle bank tiled payload is not 32-byte aligned");
+        return d->region(d->context,source,bytes);
+    }
+    const void* external=d->source_region?
+        d->source_region(d->context,offset,bytes):NULL;
+    if(!external) {
+        char message[192];
+        snprintf(message,sizeof(message),
+            "Particle payload has no owned source address mapping: address=0x%08x bytes=%zu",
+            offset,bytes);
+        d->reject(d->context,message);
+        return NULL;
+    }
+    /* GALE01r2's external C8 TLUT reference is a valid u16-aligned source
+     * address, but not bank-relative or 32-byte aligned. The source archive
+     * owner has already checked its full 512-byte range and reference extent. */
+    REQUIRE(palette ? !(offset&1) : !(offset&31),
+            "External particle payload has invalid source alignment");
+    return external;
 }
 static size_t tiled_bytes(const MeleeWebNativeDat* d,uint32_t format,uint32_t width,uint32_t height)
 {
@@ -148,10 +184,10 @@ MeleeWebEffectBank* melee_web_effect_bank_decode_roots(const MeleeWebNativeDat* 
         group->palnum=palnum;group->palflag=palflag;
         for(uint32_t t=0;t<images+palettes;++t){
             const size_t bytes=t<images?image_size:(format==8?32:512);
-            const uint32_t source=relative(d,tb,texture_bytes,at+0x18+4*t,bytes);
-            REQUIRE(!(source&31),"Particle tiled payload is not32-byte aligned");
+            const void* source=texture_payload(d,tb,texture_bytes,
+                                               at+0x18+4*t,bytes,t>=images);
             group->texTable[t]=d->allocate(d->context,1,bytes);
-            memcpy(group->texTable[t],d->region(d->context,source,bytes),bytes);
+            memcpy(group->texTable[t],source,bytes);
         }
         ((HSD_PSTexGroup**)(h->textures+1))[i]=group;
         h->stats.images+=images;h->stats.palettes+=palettes;
@@ -184,7 +220,17 @@ int melee_web_effect_bank_detach(MeleeWebEffectBank* h,char* e,size_t n)
     if(published[b]!=h||hsd_804D0948[b]||psNumCmdList[b]||texture_count!=(int)h->stats.texture_groups||psTexGroupArray[b]!=(HSD_PSTexGroup**)(h->textures+1)||ptclref_804D0E5C[b]!=commands||
        psCmdListArray[b]!=(int)(h->stats.first_command+h->stats.command_count))
         return fail(e,n,"Particle bank publication was replaced by another owner");
-    if(hsd_804D78E0)return fail(e,n,"Remove original generators before releasing their banks");
+    if(hsd_804D78E0){
+        const HSD_Generator* generator=hsd_804D78FC;
+        if(e&&n&&generator)snprintf(e,n,
+            "Remove original generators before releasing bank %u (live=%u first=%u/%u type=0x%x children=%u job=%p)",
+            b,hsd_804D78E0,generator->bank,generator->idnum,generator->type,
+            generator->numChild,(void*)generator->jobj);
+        else if(e&&n)snprintf(e,n,
+            "Remove original generators before releasing bank %u (live=%u list=null)",
+            b,hsd_804D78E0);
+        return 0;
+    }
     for(unsigned i=0;i<16;++i)if(hsd_804D0908[i])
         return fail(e,n,"Remove original particles before releasing their banks");
     hsd_804D0948[b]=h->saved_ref;psTexGroupArray[b]=h->saved_textures;psNumCmdList[b]=h->saved_forms;

@@ -30,6 +30,10 @@ int melee_web_fighter_data_set_yoshi_joint(void* data,void* joint,uint32_t* unre
     char* error,size_t error_size);
 int melee_web_fighter_data_set_kirby_joint(void* data,void* joint,uint32_t* unresolved,
     char* error,size_t error_size);
+int melee_web_fighter_data_set_samus_grapple(void* data,void* grapple,uint32_t* unresolved,
+    char* error,size_t error_size);
+int melee_web_fighter_data_set_seak_joint(void* data,uint32_t index,void* joint,
+    uint32_t* unresolved,char* error,size_t error_size);
 /* Publish the owned guard pose descriptor; source x0[2] aliases Joint.child.
  * The descriptor owner must outlive source fighters, like the costume owner. */
 void melee_web_fighter_data_set_guard(const MeleeWebNativeDat*,uint32_t root,

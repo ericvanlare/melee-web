@@ -230,12 +230,19 @@ struct GameplayMatchSession::Storage {
             check(melee_web_match_end(match,error,sizeof(error)),error);match=nullptr;
             check_fighter_asset_ownership("after-match-end");
         }
-        if(kirby_copy_assets){kirby_copy_assets->close();kirby_copy_assets.reset();}
         music.reset();
         if(world){
             check_fighter_asset_ownership("before-world-close");
-            world->verify_immutable_archives();world->close();world.reset();
+            world->verify_immutable_archives();
+            world->close([this]{
+                /* Kirby donor effect tables share HSD's global live-generator
+                 * guard. Release their banks only after the world's original
+                 * particle runtime has removed stage/fighter generators. */
+                if(kirby_copy_assets){kirby_copy_assets->close();kirby_copy_assets.reset();}
+            });
+            world.reset();
         }
+        if(kirby_copy_assets){kirby_copy_assets->close();kirby_copy_assets.reset();}
         if(hud_assets){hud_assets->close();hud_assets.reset();}
         bank.reset();
         if(profile_owned){
