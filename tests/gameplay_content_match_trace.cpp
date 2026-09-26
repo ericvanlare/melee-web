@@ -49,10 +49,12 @@ extern "C" int melee_web_test_entity_state(unsigned,unsigned,int*,int*,int*,int*
 extern "C" int melee_web_test_entity_position(unsigned,unsigned,float*,float*);
 extern "C" int melee_web_test_entity_damage(unsigned,unsigned,float*);
 extern "C" int melee_web_test_active_fighter_kind(unsigned);
+extern "C" int melee_web_test_active_fighter_state(unsigned,int*,int*,float*,float*);
 extern "C" int melee_web_test_invoke_dormant_zelda_transform(unsigned);
 extern "C" int melee_web_test_kirby_copy_kind(unsigned);
 extern "C" int melee_web_test_apply_kirby_copy_visibility(unsigned);
 extern "C" int melee_web_test_fighter_owns_victim(unsigned,unsigned);
+extern "C" int melee_web_test_entity_owns_entity(unsigned,unsigned,unsigned,unsigned);
 extern "C" int melee_web_test_donkey_cargo(unsigned,int);
 extern "C" int melee_web_test_koopa_capture(unsigned,int);
 extern "C" int melee_web_test_item_count(int);
@@ -150,6 +152,10 @@ int main(int argc,char** argv){try{
     const bool entry_only=argc==7&&std::string(argv[6])=="--entry-only";
     const bool platform_pass=argc==7&&std::string(argv[6])=="--platform-pass";
     const bool slot2_transform=argc==7&&std::string(argv[6])=="--slot2-transform";
+    const bool kirby_mario_fox_replacement=argc==7&&
+        std::string(argv[6])=="--kirby-mario-fox-replacement";
+    const bool ice_cpu_lifecycle=argc==7&&
+        std::string(argv[6])=="--ice-cpu-lifecycle";
     const bool slot2_cpu_match=argc==7&&std::string(argv[6])=="--slot2-cpu-match";
     const bool lineup_a_cpu_match=argc==7&&std::string(argv[6])=="--lineup-a-cpu-match";
     const bool lineup_b_catch_prefix=argc==7&&std::string(argv[6])=="--lineup-b-catch-prefix";
@@ -160,8 +166,9 @@ int main(int argc,char** argv){try{
     const bool fox_cpu_prefix=argc==7&&std::string(argv[6])=="--fox-cpu-prefix";
     const bool natural_terminal=a_natural_terminal||b_natural_terminal||mario_natural_terminal;
     const bool cpu9_match=slot2_cpu_match||lineup_a_cpu_match||lineup_b_catch_prefix||
-                          natural_terminal||a_prefix_teardown;
-    const bool action_coverage=(argc==7&&std::string(argv[6])=="--character-actions")||slot2_transform||cpu9_match||fox_cpu_prefix;
+                          natural_terminal||a_prefix_teardown||ice_cpu_lifecycle;
+    const bool action_coverage=(argc==7&&std::string(argv[6])=="--character-actions")||
+        slot2_transform||kirby_mario_fox_replacement||cpu9_match||fox_cpu_prefix;
     if(argc==7&&!entry_only&&!platform_pass&&!action_coverage)throw std::runtime_error("Unknown source match trace scope");
     melee_web::RuntimeFiles files;
     for(const auto* root:{argv[1],argv[2]})for(const auto& entry:std::filesystem::directory_iterator(root)){
@@ -234,8 +241,16 @@ int main(int argc,char** argv){try{
         selection.start.players[2].ckind=CKIND_ZELDA;
         selection.start.players[2].color=0;
     }
+    if(kirby_mario_fox_replacement){
+        check(fighter_ckind==CKIND_KIRBY&&opponent_ckind==CKIND_MARIO,
+              "Kirby Mario-to-Fox copy replacement requires Kirby in P1 and Mario in P2");
+        selection.start.players[2].ckind=CKIND_FOX;
+        selection.start.players[2].color=0;
+        selection.start.players[2].slot_type=Gm_PKind_Human;
+        selection.start.players[2].rumble_enabled=0;
+    }
     if(cpu9_match){
-        if(lineup_a_cpu_match||a_natural_terminal||a_prefix_teardown){
+        if(lineup_a_cpu_match||a_natural_terminal||a_prefix_teardown||ice_cpu_lifecycle){
             selection.start.players[0].ckind=CKIND_GAMEWATCH;
             selection.start.players[1].ckind=CKIND_KIRBY;
             selection.start.players[2].ckind=CKIND_POPONANA;
@@ -277,10 +292,19 @@ int main(int argc,char** argv){try{
     }
     const bool kirby_action_case=action_coverage&&fighter_ckind==CKIND_KIRBY;
     if(kirby_action_case){
-        check(opponent_ckind==CKIND_GAMEWATCH||opponent_ckind==CKIND_POPONANA||
+        check(opponent_ckind==CKIND_CAPTAIN||opponent_ckind==CKIND_GAMEWATCH||
+                  opponent_ckind==CKIND_POPONANA||
                   opponent_ckind==CKIND_MARIO||opponent_ckind==CKIND_SAMUS||
-                  opponent_ckind==CKIND_FOX,
-              "Kirby copy action probe requires a scoped Game & Watch, Ice Climbers, Mario, Samus, or Fox donor");
+              opponent_ckind==CKIND_FOX,
+              "Kirby copy action probe requires a scoped Captain, Game & Watch, Ice Climbers, Mario, Samus, or Fox donor");
+        if(opponent_ckind==CKIND_POPONANA){
+            // Keep the Ice donor on a real neutral PAD instead of letting its
+            // CPU drift off Final Destination between Kirby's first copy and
+            // the reacquisition probe. Kirby still performs every action via
+            // the ordinary source PAD path.
+            selection.start.players[1].slot_type=Gm_PKind_Human;
+            selection.start.players[1].rumble_enabled=0;
+        }
     }
     const unsigned costume_cycles=action_coverage?1:(fighter_content->costumes>opponent_content->costumes?
         fighter_content->costumes:opponent_content->costumes);
@@ -291,7 +315,8 @@ int main(int argc,char** argv){try{
         selection.start.players[1].color=opponent_color;
         selection.players[0]={0,4,fighter_color,0};
         selection.players[1]={1,4,opponent_color,0};
-        if(slot2_transform)selection.players[2]={2,4,0,0};
+        if(slot2_transform||kirby_mario_fox_replacement)
+            selection.players[2]={2,4,0,0};
         const bool transformation_form=fighter_ckind==CKIND_ZELDA||fighter_ckind==CKIND_SEAK;
         const bool startup_transform=transformation_form&&!action_coverage;
         std::cout<<"Construct mixed content stage="<<selection.start.rules.stkind<<" costume="<<cycle<<std::endl;
@@ -301,7 +326,8 @@ int main(int argc,char** argv){try{
             match_owner.emplace(files,selection,*initial_input);
         }else match_owner.emplace(files,selection);
         auto& match=*match_owner;
-        const unsigned match_player_count=cpu9_match?4U:(slot2_transform?3U:2U);
+        const unsigned match_player_count=cpu9_match?4U:
+            ((slot2_transform||kirby_mario_fox_replacement)?3U:2U);
         PADStatus raw[4]{};if(match_player_count<3)raw[2].err=PAD_ERR_NO_CONTROLLER;
         if(ice_action_case)raw[1].err=PAD_ERR_NO_CONTROLLER;
         raw[3].err=PAD_ERR_NO_CONTROLLER;
@@ -342,6 +368,13 @@ int main(int argc,char** argv){try{
               "Original opponent identity/costume/icon differs");
         check(match.player_stats(0).stocks==4&&match.player_stats(1).stocks==4,
               "Source stock initialization changed for the selected content pair");
+        if(kirby_mario_fox_replacement){
+            const auto* third_content=melee_web_fighter_content(CKIND_FOX);
+            check(third_content&&melee_web_test_content_player(2,CKIND_FOX,
+                  third_content->fighter_kind,selection.start.players[2].color)&&
+                  match.player_stats(2).stocks==4,
+                  "Mario-to-Fox copy replacement requires a live original Fox in slot 2");
+        }
         if(a_prefix_teardown){
             for(unsigned n=0;n<600;n++)tick();
             check(hsd_804D78FC!=nullptr,"Final Destination prefix did not create its original stage particle generator");
@@ -393,6 +426,31 @@ int main(int argc,char** argv){try{
                       std::to_string(state.position[0])+","+
                       std::to_string(state.position[1]));
             };
+            const auto assert_active_transform_observation=[&](unsigned slot){
+                int entity_kind=-1,entity_motion=-1;
+                float entity_x=0.0f,entity_y=0.0f;
+                check(melee_web_test_active_fighter_state(
+                          slot,&entity_kind,&entity_motion,&entity_x,&entity_y),
+                      "Player_GetEntity active transform state is unavailable");
+                check(melee_web_test_active_fighter_kind(slot)==entity_kind,
+                      "Player_GetEntity kind and active-state observations disagree");
+                check(entity_kind==FTKIND_ZELDA||entity_kind==FTKIND_SEAK,
+                      "Active transform observation is not Zelda or Sheik");
+                const auto stats=match.player_stats(slot);
+                check(match.fighter_kind(slot)==entity_kind&&stats.fighter_kind==entity_kind,
+                      "GameplayMatchSession fighter identity disagrees with Player_GetEntity; slot="+
+                      std::to_string(slot)+" session="+std::to_string(match.fighter_kind(slot))+
+                      " stats="+std::to_string(stats.fighter_kind)+
+                      " Player_GetEntity="+std::to_string(entity_kind));
+                check(stats.motion_id==entity_motion&&stats.position[0]==entity_x&&
+                      stats.position[1]==entity_y,
+                      "GameplayMatchSession stats do not describe the active transformed entity; slot="+
+                      std::to_string(slot)+" session motion/position="+
+                      std::to_string(stats.motion_id)+"/"+std::to_string(stats.position[0])+","+
+                      std::to_string(stats.position[1])+" active entity="+
+                      std::to_string(entity_motion)+"/"+std::to_string(entity_x)+","+
+                      std::to_string(entity_y));
+            };
             if(fox_cpu_prefix){
                 std::cout<<"Two-player Fox/Mario CPU9 command-prefix probe begin"<<std::endl;
                 for(unsigned n=0;n<8000;n++){
@@ -407,8 +465,143 @@ int main(int argc,char** argv){try{
                          <<std::endl;
             }else if(cpu9_match){
                 std::cout<<"Four-player CPU9 source reproduction begin; lineup="
-                         <<(lineup_a_cpu_match||a_natural_terminal||a_prefix_teardown?"A":"B")<<" source_frame="
+                         <<(lineup_a_cpu_match||a_natural_terminal||a_prefix_teardown||ice_cpu_lifecycle?"A":"B")<<" source_frame="
                          <<match.source_frames()<<std::endl;
+                if(ice_cpu_lifecycle){
+                    check(melee_web_test_content_player(2,CKIND_POPONANA,FTKIND_POPO,0)&&
+                          match.player_stats(2).stocks==4,
+                          "Ice CPU lifecycle requires the A-lineup Popo/Nana pair in source slot 2");
+                    const auto is_death_motion=[](int motion){
+                        return motion>=ftCo_MS_DeadDown&&motion<=ftCo_MS_DeadUpFallHitCameraIce;
+                    };
+                    const auto is_rebirth_motion=[](int motion){
+                        return motion==ftCo_MS_Rebirth||motion==ftCo_MS_RebirthWait;
+                    };
+                    bool nana_died_while_popo_alive=false;
+                    bool nana_slept_while_popo_alive=false;
+                    bool popo_stock_lost_after_nana_sleep=false;
+                    bool pair_rebirthed=false,nana_damage_reset=false;
+                    bool nana_resumed_gameplay=false;
+                    bool nana_death_armed=true;
+                    int popo_stocks_at_nana_death=-1;
+                    int popo_stocks_at_nana_sleep=-1;
+                    unsigned nana_death_frame=0,nana_sleep_frame=0,popo_stock_loss_frame=0;
+                    unsigned pair_rebirth_frame=0,nana_resume_frame=0;
+                    unsigned observed_ticks=0;
+                    for(;observed_ticks<18000&&!match.complete();observed_ticks++){
+                        tick();
+                        const auto popo=match.player_stats(2);
+                        int popo_kind=-1,popo_motion=-1,popo_grounded=0,popo_skeleton=0;
+                        int nana_kind=-1,nana_motion=-1,nana_grounded=0,nana_skeleton=0;
+                        const bool popo_present=melee_web_test_entity_state(
+                            2,0,&popo_kind,&popo_motion,&popo_grounded,&popo_skeleton);
+                        const bool nana_present=melee_web_test_entity_state(
+                            2,1,&nana_kind,&nana_motion,&nana_grounded,&nana_skeleton);
+                        check(popo_present&&nana_present&&popo_kind==FTKIND_POPO&&
+                              nana_kind==FTKIND_NANA&&popo_skeleton&&nana_skeleton,
+                              "Ice CPU lifecycle lost the source Popo/Nana entity pair before rejoin");
+                        if(nana_died_while_popo_alive&&!nana_slept_while_popo_alive&&
+                                popo.stocks!=popo_stocks_at_nana_death){
+                            std::cout<<"Ice CPU lifecycle: discarded Nana death candidate because "
+                                     <<"Popo stocks changed before Nana Sleep ("
+                                     <<popo_stocks_at_nana_death<<" -> "<<popo.stocks<<")"
+                                     <<std::endl;
+                            nana_died_while_popo_alive=false;
+                            nana_death_frame=0;
+                            popo_stocks_at_nana_death=-1;
+                            nana_death_armed=false;
+                        }
+                        if(!nana_death_armed&&!is_death_motion(nana_motion)&&
+                                nana_motion!=ftCo_MS_Sleep&&!is_rebirth_motion(nana_motion))
+                            nana_death_armed=true;
+                        if(nana_death_armed&&!nana_died_while_popo_alive&&
+                                is_death_motion(nana_motion)&&
+                                popo.stocks>0&&!is_death_motion(popo_motion)&&
+                                popo_motion!=ftCo_MS_Sleep){
+                            nana_died_while_popo_alive=true;
+                            nana_death_frame=match.source_frames();
+                            popo_stocks_at_nana_death=popo.stocks;
+                            std::cout<<"Ice CPU lifecycle: Nana death while Popo alive source_frame="
+                                     <<nana_death_frame<<" Popo stocks="<<popo.stocks
+                                     <<" Popo motion="<<popo_motion<<std::endl;
+                        }
+                        if(nana_died_while_popo_alive&&!nana_slept_while_popo_alive&&
+                                nana_motion==ftCo_MS_Sleep&&popo.stocks==popo_stocks_at_nana_death&&
+                                popo.stocks>0&&
+                                !is_death_motion(popo_motion)&&popo_motion!=ftCo_MS_Sleep){
+                            nana_slept_while_popo_alive=true;
+                            nana_sleep_frame=match.source_frames();
+                            popo_stocks_at_nana_sleep=popo.stocks;
+                            std::cout<<"Ice CPU lifecycle: Nana Sleep while Popo alive source_frame="
+                                     <<nana_sleep_frame<<" Popo stocks="<<popo_stocks_at_nana_sleep
+                                     <<" Popo motion="<<popo_motion
+                                     <<" (unchanged since Nana death)"<<std::endl;
+                        }
+                        if(nana_slept_while_popo_alive&&!popo_stock_lost_after_nana_sleep&&
+                                popo.stocks<popo_stocks_at_nana_sleep){
+                            popo_stock_lost_after_nana_sleep=true;
+                            popo_stock_loss_frame=match.source_frames();
+                            std::cout<<"Ice CPU lifecycle: subsequent Popo stock loss source_frame="
+                                     <<popo_stock_loss_frame<<" stocks="<<popo.stocks<<std::endl;
+                        }
+                        if(popo_stock_lost_after_nana_sleep){
+                            const bool popo_rebirth=popo_present&&popo_kind==FTKIND_POPO&&
+                                is_rebirth_motion(popo_motion);
+                            const bool nana_rebirth=nana_present&&nana_kind==FTKIND_NANA&&
+                                is_rebirth_motion(nana_motion);
+                            if(!pair_rebirthed&&popo_rebirth&&nana_rebirth){
+                                pair_rebirthed=true;
+                                pair_rebirth_frame=match.source_frames();
+                                float damage=-1.0f;
+                                nana_damage_reset=melee_web_test_entity_damage(2,1,&damage)&&
+                                    damage==0.0f;
+                                std::cout<<"Ice CPU lifecycle: both entities Rebirth, Nana damage="
+                                         <<damage<<" source_frame="<<pair_rebirth_frame<<std::endl;
+                            }
+                            if(pair_rebirthed&&nana_present&&nana_kind==FTKIND_NANA&&
+                                    nana_motion>ftCo_MS_RebirthWait&&
+                                    nana_motion!=ftCo_MS_Sleep&&!is_death_motion(nana_motion)&&
+                                    nana_skeleton){
+                                nana_resumed_gameplay=true;
+                                nana_resume_frame=match.source_frames();
+                                std::cout<<"Ice CPU lifecycle: Nana resumed gameplay motion="
+                                         <<nana_motion<<" after RebirthWait source_frame="
+                                         <<nana_resume_frame<<std::endl;
+                            }
+                        }
+                        if(nana_slept_while_popo_alive&&popo_stock_lost_after_nana_sleep&&
+                                pair_rebirthed&&nana_damage_reset&&nana_resumed_gameplay)break;
+                        if(observed_ticks%600==599){
+                            std::cout<<"Ice CPU lifecycle progress source_frame="<<match.source_frames()
+                                     <<" stocks=";
+                            for(unsigned i=0;i<4;i++)std::cout<<(i?",":"")<<match.player_stats(i).stocks;
+                            std::cout<<" Popo_motion="<<popo_motion<<" Nana_motion="<<nana_motion
+                                     <<" Nana_damage=";
+                            float damage=-1.0f;
+                            if(melee_web_test_entity_damage(2,1,&damage))std::cout<<damage;
+                            else std::cout<<"unavailable";
+                            std::cout<<std::endl;
+                        }
+                    }
+                    std::cout<<"Ice CPU lifecycle summary: ticks="<<observed_ticks
+                             <<" Nana_alive_death="<<nana_died_while_popo_alive
+                             <<" Nana_sleep_alive="<<nana_slept_while_popo_alive
+                             <<" Popo_stock_after_sleep="<<popo_stock_lost_after_nana_sleep
+                             <<" both_rebirth="<<pair_rebirthed
+                             <<" Nana_damage_reset="<<nana_damage_reset
+                             <<" Nana_resumed="<<nana_resumed_gameplay
+                             <<" frames="<<nana_death_frame<<","<<nana_sleep_frame<<","<<
+                               popo_stock_loss_frame<<","<<pair_rebirth_frame<<","<<
+                               nana_resume_frame<<std::endl;
+                    check(nana_died_while_popo_alive&&nana_slept_while_popo_alive&&
+                          popo_stock_lost_after_nana_sleep&&pair_rebirthed&&
+                          nana_damage_reset&&nana_resumed_gameplay,
+                          "Four-CPU9 A lineup did not complete Nana-alone death/Sleep, subsequent Popo stock loss, pair Rebirth, and Nana gameplay reset within 18000 source ticks");
+                    match.close();match.close();
+                    std::cout<<"Ice CPU lifecycle repeated teardown passed without gameplay state injection"
+                             <<std::endl;
+                    continue;
+                }
                 const unsigned prefix_ticks=lineup_b_catch_prefix?3600:12000;
                 bool samus_catchwait_with_beam=false;
                 for(unsigned n=0;n<prefix_ticks;n++){
@@ -431,6 +624,7 @@ int main(int argc,char** argv){try{
             }else if(slot2_transform){
                 check(melee_web_test_active_fighter_kind(2)==FTKIND_ZELDA,
                       "Third-player transformation repro did not begin as Zelda");
+                assert_active_transform_observation(2);
                 int current=FTKIND_ZELDA;
                 for(unsigned change=0;change<4;change++){
                     const int wanted=current==FTKIND_ZELDA?FTKIND_SEAK:FTKIND_ZELDA;
@@ -446,6 +640,7 @@ int main(int argc,char** argv){try{
                     check(down_motion&&transformed,
                           "Third-player in-match down-B transformation did not complete");
                     current=wanted;
+                    assert_active_transform_observation(2);
                     std::cout<<"Third-player Zelda/Sheik down-B form="<<current
                              <<" source_frame="<<match.source_frames()<<std::endl;
                     if(current==FTKIND_SEAK){
@@ -457,9 +652,12 @@ int main(int argc,char** argv){try{
                                  <<std::endl;
                     }
                     neutral();for(unsigned n=0;n<90;n++)tick();
+                    assert_active_transform_observation(2);
                     check(match.player_stats(2).stocks==4,
                           "Third-player Zelda/Sheik transform changed source stocks");
                 }
+                std::cout<<"Third-player active Player_GetEntity/session stats agreed after every form change"
+                         <<std::endl;
             }else if(fighter_ckind==CKIND_GAMEWATCH){
                 bool chef=false,sausage=false;
                 for(unsigned n=0;n<180&&!(chef&&sausage);n++){
@@ -594,6 +792,7 @@ int main(int argc,char** argv){try{
                 const int start_kind=fighter_ckind==CKIND_ZELDA?FTKIND_ZELDA:FTKIND_SEAK;
                 check(melee_web_test_active_fighter_kind(0)==start_kind,
                       "Down-B test did not begin in the requested original fighter form");
+                assert_active_transform_observation(0);
                 int current=start_kind;
                 for(unsigned change=0;change<4;change++){
                     const int wanted=current==FTKIND_ZELDA?FTKIND_SEAK:FTKIND_ZELDA;
@@ -615,6 +814,7 @@ int main(int argc,char** argv){try{
                     check(down_motion&&transformed,
                           "In-match down-B did not complete the requested Zelda/Sheik form change");
                     current=wanted;
+                    assert_active_transform_observation(0);
                     std::cout<<"Zelda/Sheik down-B transformation="<<change+1
                              <<" active_kind="<<current<<std::endl;
                     // The source transformation leaves the active form in
@@ -624,6 +824,7 @@ int main(int argc,char** argv){try{
                     // from reaching its next source transition.
                     neutral();
                     for(unsigned n=0;n<90;n++)tick();
+                    assert_active_transform_observation(0);
                     const auto transformed_state=match.player_stats(0);
                     check(transformed_state.ground_or_air==0&&
                           transformed_state.stocks==4,
@@ -631,6 +832,8 @@ int main(int argc,char** argv){try{
                 }
                 check(current==start_kind&&match.player_stats(0).stocks==4,
                       "Repeated down-B transformation did not return to its starting form and stock");
+                std::cout<<"Active Player_GetEntity/session stats agreed after every Zelda/Sheik form change"
+                         <<std::endl;
                 if(fighter_ckind==CKIND_SEAK){
                     settle_primary();
                     bool side_special=false,chain_created=false;
@@ -699,136 +902,111 @@ int main(int argc,char** argv){try{
                       "Ice Climbers Belay did not produce a source up-special and separated partner positions");
                 std::cout<<"Ice Climbers action coverage: Belay separated Popo/Nana from "<<before
                          <<" to "<<farthest<<" units"<<std::endl;
-                float max_partner_damage=0;
-                bool partner_died=false,partner_removed=false,primary_survived=true;
-                unsigned observed_ticks=0;
-                for(;observed_ticks<7200&&!match.complete();observed_ticks++){
-                    tick();
-                    const auto primary=match.player_stats(0);
-                    if(primary.stocks==0||melee_web_test_active_fighter_kind(0)!=FTKIND_POPO){
-                        primary_survived=false;break;
-                    }
-                    int partner_kind=-1,partner_motion=-1,partner_grounded=0,partner_skeleton=0;
-                    if(!melee_web_test_entity_state(0,1,&partner_kind,&partner_motion,
-                                                    &partner_grounded,&partner_skeleton)){
-                        partner_removed=true;break;
-                    }
-                    float damage=0;
-                    if(melee_web_test_entity_damage(0,1,&damage))
-                        max_partner_damage=std::max(max_partner_damage,damage);
-                    partner_died=partner_motion>=ftCo_MS_DeadDown&&
-                                 partner_motion<=ftCo_MS_DeadUpFallHitCameraIce;
-                    if(partner_died)break;
-                }
-                bool primary_lifecycle=false,partner_present_after=false;
-                int partner_motion_after=-1;
-                if(partner_died||partner_removed){
-                    for(unsigned n=0;n<180&&!match.complete();n++)tick();
-                    int primary_kind=-1,primary_motion=-1,primary_grounded=0,primary_skeleton=0;
-                    primary_lifecycle=melee_web_test_entity_state(0,0,&primary_kind,&primary_motion,
-                                &primary_grounded,&primary_skeleton)&&
-                                primary_kind==FTKIND_POPO&&match.player_stats(0).stocks>0;
-                    int partner_kind=-1,partner_motion=-1,partner_grounded=0,partner_skeleton=0;
-                    partner_present_after=melee_web_test_entity_state(0,1,&partner_kind,&partner_motion,
-                                                    &partner_grounded,&partner_skeleton);
-                    if(partner_present_after)partner_motion_after=partner_motion;
-                }
-                std::cout<<"Ice Climbers partner-lifecycle probe: source CPU9 opponent ticks="
-                         <<observed_ticks<<" Nana max_damage="<<max_partner_damage
-                         <<" death_motion="<<partner_died<<" entity_removed="<<partner_removed
-                         <<" Popo_survived="<<primary_survived
-                         <<" Popo_stock_and_entity_after="<<primary_lifecycle
-                         <<" Nana_present_after="<<partner_present_after
-                         <<" Nana_motion_after="<<partner_motion_after<<std::endl;
-                check(partner_died||partner_removed,
-                      "Ice Climbers CPU9 probe did not exercise Nana death or source entity removal");
-                check(primary_survived&&primary_lifecycle&&(!partner_died||partner_present_after),
-                      "Ice Climbers partner loss did not preserve the leader and complete its 180-tick follow-up lifecycle");
-                if(partner_died&&partner_present_after){
-                    check(partner_motion_after==ftCo_MS_Sleep,
-                          "Ice Climbers Nana did not enter the source Sleep state after her death animation");
-                    const int stocks_before_respawn=match.player_stats(0).stocks;
-                    bool primary_stock_lost=false;
-                    for(unsigned n=0;n<7200&&!match.complete()&&!primary_stock_lost;n++){
-                        const auto primary=match.player_stats(0);
-                        // Ordinary source controller input walks Popo off the
-                        // nearer FD edge. The first resulting stock event
-                        // ends this input recipe before it can repeat.
-                        raw[0].stickX=primary.position[0]>=0?80:-80;
-                        raw[0].stickY=0;
-                        tick();
-                        primary_stock_lost=
-                            match.player_stats(0).stocks<stocks_before_respawn;
-                    }
-                    neutral();
-                    check(primary_stock_lost,
-                          "Ice Climbers source input did not produce Popo's next natural stock/respawn transition");
-                    bool primary_rebirthed=false;
-                    bool primary_alive_after_respawn=false;
-                    bool partner_remained_sleeping=true;
-                    int partner_motion_after_respawn=-1;
-                    for(unsigned n=0;n<360&&!match.complete();n++){
-                        tick();
-                        int primary_kind=-1,primary_motion=-1,primary_grounded=0,primary_skeleton=0;
-                        int partner_kind=-1,partner_motion=-1,partner_grounded=0,partner_skeleton=0;
-                        const bool primary_present=melee_web_test_entity_state(
-                            0,0,&primary_kind,&primary_motion,&primary_grounded,&primary_skeleton);
-                        const bool partner_present=melee_web_test_entity_state(
-                            0,1,&partner_kind,&partner_motion,&partner_grounded,&partner_skeleton);
-                        if(partner_present)partner_motion_after_respawn=partner_motion;
-                        primary_rebirthed|=primary_motion==ftCo_MS_Rebirth||
-                                           primary_motion==ftCo_MS_RebirthWait;
-                        primary_alive_after_respawn|=primary_present&&
-                            primary_kind==FTKIND_POPO&&match.player_stats(0).stocks>0&&
-                            primary_motion!=ftCo_MS_Sleep;
-                        partner_remained_sleeping&=partner_present&&
-                            partner_kind==FTKIND_NANA&&partner_motion==ftCo_MS_Sleep;
-                    }
-                    std::cout<<"Ice Climbers Nana source lifecycle: death animation -> Sleep, Popo stock "
-                             <<stocks_before_respawn<<" -> "<<match.player_stats(0).stocks
-                             <<", Popo rebirth="<<primary_rebirthed
-                             <<", alive_after_respawn="<<primary_alive_after_respawn
-                             <<", Nana motion="<<partner_motion_after_respawn
-                             <<", remained_sleeping="<<partner_remained_sleeping<<std::endl;
-                    // Player_80031AD0 constructs both original entities at
-                    // player setup. Ordinary stock respawn changes Popo's
-                    // motion; it does not reconstruct or wake a Nana already
-                    // marked dead by ftCo_800BFD04. Sleep has empty source
-                    // Anim/IASA callbacks, so a surviving Nana GObj alone is
-                    // not evidence that she should rejoin.
-                    check(primary_rebirthed&&primary_alive_after_respawn&&
-                          partner_remained_sleeping,
-                          "Ice Climbers stock respawn did not preserve Popo and Nana's source dead/sleep lifecycle");
-                }
             }else if(kirby_action_case){
-                const auto acquire=[&](unsigned target_slot,int donor_kind){
+                const auto acquire=[&](unsigned target_slot,int donor_kind,
+                                       const char* acquisition_phase,
+                                       int* captured_entity_index,
+                                       int* captured_entity_kind,
+                                       int* captured_entity_motion){
+                    if(captured_entity_index)*captured_entity_index=-1;
+                    if(captured_entity_kind)*captured_entity_kind=-1;
+                    if(captured_entity_motion)*captured_entity_motion=-1;
+                    const auto start_self=match.player_stats(0);
+                    const auto start_target=match.player_stats(target_slot);
+                    std::cout<<"Kirby donor acquisition phase="<<acquisition_phase
+                             <<" donor="<<donor_kind<<" start self="<<start_self.motion_id
+                             <<"/"<<start_self.position[0]<<","<<start_self.position[1]
+                             <<" target="<<start_target.motion_id<<"/"
+                             <<start_target.position[0]<<","<<start_target.position[1]
+                             <<std::endl;
                     const float approach_gap=donor_kind==FTKIND_FOX?4.0f:7.0f;
                     const float stick_dead_zone=donor_kind==FTKIND_FOX?3.0f:5.0f;
-                    for(unsigned n=0;n<360;n++){
+                    unsigned approach_ticks=0;
+                    bool in_range=false;
+                    for(;approach_ticks<360;approach_ticks++){
                         const auto self=match.player_stats(0),target=match.player_stats(target_slot);
                         const float dx=target.position[0]-self.position[0];
                         const float dy=target.position[1]-self.position[1];
-                        if(std::fabs(dx)<approach_gap&&std::fabs(dy)<5.0f)break;
+                        if(std::fabs(dx)<approach_gap&&std::fabs(dy)<5.0f){
+                            in_range=true;break;
+                        }
                         raw[0].stickX=std::fabs(dx)<stick_dead_zone?0:(dx>0?80:-80);
                         raw[0].stickY=std::fabs(dy)<4.0f?0:(dy>0?60:-60);tick();
                     }
                     neutral();settle_primary();
+                    const auto capture_self=match.player_stats(0);
+                    const auto capture_target=match.player_stats(target_slot);
+                    std::cout<<"Kirby donor acquisition phase="<<acquisition_phase
+                             <<" approach_ticks="<<approach_ticks<<" in_range="<<in_range
+                             <<" before_inhale self="<<capture_self.motion_id<<"/"
+                             <<capture_self.position[0]<<","<<capture_self.position[1]
+                             <<" target="<<capture_target.motion_id<<"/"
+                             <<capture_target.position[0]<<","<<capture_target.position[1]
+                             <<std::endl;
                     bool captured=false;
                     for(unsigned n=0;n<240&&!captured;n++){
                         raw[0].button=n%8==0?PAD_BUTTON_B:0;tick();
                         const int target_motion=match.player_stats(target_slot).motion_id;
-                        captured=melee_web_test_fighter_owns_victim(0,target_slot)||
-                            target_motion==ftCo_MS_CaptureKirby||
-                            target_motion==ftCo_MS_CaptureWaitKirby||
-                            target_motion==ftCo_MS_ThrownKirbyStar||
-                            target_motion==ftCo_MS_ThrownCopyStar||
-                            target_motion==ftCo_MS_ThrownKirby;
+                        const auto is_kirby_capture_motion=[](int motion){
+                            return motion==ftCo_MS_CaptureKirby||
+                                motion==ftCo_MS_CaptureWaitKirby||
+                                motion==ftCo_MS_ThrownKirbyStar||
+                                motion==ftCo_MS_ThrownCopyStar||
+                                motion==ftCo_MS_ThrownKirby;
+                        };
+                        int popo_kind=-1,popo_motion=-1,popo_grounded=0,popo_skeleton=0;
+                        const bool popo_present=melee_web_test_entity_state(
+                            target_slot,0,&popo_kind,&popo_motion,&popo_grounded,&popo_skeleton);
+                        const bool owns_popo=melee_web_test_entity_owns_entity(0,0,target_slot,0);
+                        bool nana_present=false,owns_nana=false;
+                        int nana_kind=-1,nana_motion=-1,nana_grounded=0,nana_skeleton=0;
+                        if(donor_kind==FTKIND_POPO){
+                            nana_present=melee_web_test_entity_state(
+                                target_slot,1,&nana_kind,&nana_motion,&nana_grounded,&nana_skeleton);
+                            owns_nana=melee_web_test_entity_owns_entity(0,0,target_slot,1);
+                        }
+                        const bool popo_transition=popo_present&&
+                            is_kirby_capture_motion(popo_motion);
+                        const bool nana_transition=nana_present&&
+                            is_kirby_capture_motion(nana_motion);
+                        captured=owns_popo||owns_nana||popo_transition||nana_transition||
+                            (donor_kind!=FTKIND_POPO&&
+                             (melee_web_test_fighter_owns_victim(0,target_slot)||
+                              is_kirby_capture_motion(target_motion)));
+                        if(captured){
+                            const bool nana_was_victim=owns_nana||
+                                (!owns_popo&&nana_transition&&!popo_transition);
+                            const int actual_index=nana_was_victim?1:0;
+                            const int actual_kind=nana_was_victim?nana_kind:popo_kind;
+                            const int actual_motion=nana_was_victim?nana_motion:popo_motion;
+                            if(captured_entity_index)*captured_entity_index=actual_index;
+                            if(captured_entity_kind)*captured_entity_kind=actual_kind;
+                            if(captured_entity_motion)*captured_entity_motion=actual_motion;
+                            std::cout<<"Kirby source capture observed phase="<<acquisition_phase
+                                     <<" victim_index="<<actual_index
+                                     <<" kind="<<actual_kind
+                                     <<" motion="<<actual_motion
+                                     <<" owns_Popo="<<owns_popo<<" owns_Nana="<<owns_nana
+                                     <<std::endl;
+                        }
                     }
                     neutral();
                     if(!captured){
                         const auto self=match.player_stats(0),target=match.player_stats(target_slot);
+                        int popo_kind=-1,popo_motion=-1,popo_grounded=0,popo_skeleton=0;
+                        int nana_kind=-1,nana_motion=-1,nana_grounded=0,nana_skeleton=0;
+                        const bool popo_present=melee_web_test_entity_state(
+                            target_slot,0,&popo_kind,&popo_motion,&popo_grounded,&popo_skeleton);
+                        const bool nana_present=donor_kind==FTKIND_POPO&&
+                            melee_web_test_entity_state(target_slot,1,&nana_kind,&nana_motion,
+                                                        &nana_grounded,&nana_skeleton);
+                        const bool owns_popo=melee_web_test_entity_owns_entity(
+                            0,0,target_slot,0);
+                        const bool owns_nana=donor_kind==FTKIND_POPO&&
+                            melee_web_test_entity_owns_entity(0,0,target_slot,1);
                         throw std::runtime_error(
-                            "Kirby inhale did not reach the source capture/swallow transition for donor slot "+
+                            "Kirby inhale failed during "+std::string(acquisition_phase)+
+                            " (source capture/swallow) for donor slot "+
                             std::to_string(target_slot)+"; self motion="+
                             std::to_string(self.motion_id)+" stocks="+
                             std::to_string(self.stocks)+" xy="+
@@ -837,22 +1015,41 @@ int main(int argc,char** argv){try{
                             std::to_string(target.motion_id)+" stocks="+
                             std::to_string(target.stocks)+" xy="+
                             std::to_string(target.position[0])+","+
-                            std::to_string(target.position[1]));
+                            std::to_string(target.position[1])+" Popo="+
+                            std::to_string(popo_present)+"/"+std::to_string(popo_kind)+"/"+
+                            std::to_string(popo_motion)+" Nana="+
+                            std::to_string(nana_present)+"/"+std::to_string(nana_kind)+"/"+
+                            std::to_string(nana_motion)+" owns_Popo="+
+                            std::to_string(owns_popo)+" owns_Nana="+
+                            std::to_string(owns_nana));
                     }
                     for(unsigned n=0;n<360&&match.player_stats(0).motion_id!=ftKb_MS_EatWait;n++)tick();
                     check(match.player_stats(0).motion_id==ftKb_MS_EatWait,
-                          "Kirby capture did not settle into EatWait; motion="+
+                          "Kirby "+std::string(acquisition_phase)+
+                          " capture did not settle into EatWait; motion="+
                           std::to_string(match.player_stats(0).motion_id)+" target_motion="+
                           std::to_string(match.player_stats(target_slot).motion_id)+" owns_victim="+
                           std::to_string(melee_web_test_fighter_owns_victim(0,target_slot)));
                     raw[0].button=PAD_BUTTON_B;tick();neutral();
                     for(unsigned n=0;n<240&&melee_web_test_kirby_copy_kind(0)!=donor_kind;n++)tick();
                     check(melee_web_test_kirby_copy_kind(0)==donor_kind,
-                          "Kirby EatWait B did not acquire the donor's source copy ability; motion="+
+                          "Kirby "+std::string(acquisition_phase)+
+                          " EatWait B did not acquire the donor's source copy ability; motion="+
                           std::to_string(match.player_stats(0).motion_id)+" copy_kind="+
                           std::to_string(melee_web_test_kirby_copy_kind(0)));
+                    if(donor_kind==FTKIND_POPO){
+                        check(captured_entity_index&&*captured_entity_index>=0&&
+                                  captured_entity_kind&&(*captured_entity_kind==FTKIND_POPO||
+                                                         *captured_entity_kind==FTKIND_NANA),
+                              "Kirby Ice copy lacks a retained Popo/Nana victim identity at capture");
+                        std::cout<<"Kirby Ice copy verified=FTKIND_POPO from captured entity index="
+                                 <<*captured_entity_index<<" kind="<<*captured_entity_kind
+                                 <<" motion_at_capture="<<(captured_entity_motion?
+                                     *captured_entity_motion:-1)<<std::endl;
+                    }
                     std::cout<<"Kirby acquired donor FighterKind="<<donor_kind
-                             <<" from slot="<<target_slot<<std::endl;
+                             <<" from slot="<<target_slot<<" phase="
+                             <<acquisition_phase<<std::endl;
                     if(donor_kind==FTKIND_GAMEWATCH){
                         check(melee_web_test_apply_kirby_copy_visibility(0),
                               "Kirby copy did not publish a drawable secondary part-visibility lookup");
@@ -861,6 +1058,60 @@ int main(int argc,char** argv){try{
                     }
                 };
                 const auto use_copy=[&](int donor_kind){
+                    if(donor_kind==FTKIND_CAPTAIN){
+                        // Falcon Punch has no copied Article. Reposition only
+                        // through the normal controller path so the source
+                        // motion and its real victim response are observable.
+                        for(unsigned n=0;n<240&&
+                                (match.player_stats(0).ground_or_air!=0||
+                                 match.player_stats(1).ground_or_air!=0);n++){
+                            neutral();tick();
+                        }
+                        auto self=match.player_stats(0);
+                        auto target=match.player_stats(1);
+                        const float retreat=target.position[0]>=self.position[0]?-60.0f:60.0f;
+                        for(unsigned n=0;n<8;n++){raw[0].stickX=retreat;tick();}
+                        neutral();
+                        bool aligned=false;
+                        for(unsigned n=0;n<180&&!aligned;n++){
+                            self=match.player_stats(0);target=match.player_stats(1);
+                            const float dx=target.position[0]-self.position[0];
+                            aligned=self.ground_or_air==0&&target.ground_or_air==0&&
+                                std::fabs(dx)<=6.0f&&
+                                std::fabs(target.position[1]-self.position[1])<5.0f;
+                            if(aligned)break;
+                            if(self.ground_or_air!=0||target.ground_or_air!=0){
+                                neutral();tick();continue;
+                            }
+                            raw[0].stickX=dx>=0.0f?60.0f:-60.0f;
+                            tick();
+                        }
+                        neutral();
+                        check(aligned,"Kirby could not controller-position the Captain donor in Falcon Punch range");
+
+                        const float victim_damage_before=match.player_stats(1).damage_percent;
+                        raw[0].button=PAD_BUTTON_B;tick();neutral();
+                        bool source_motion=false,victim_hit=false;
+                        unsigned action_ticks=0;
+                        const auto observe=[&](){
+                            const int motion=match.player_stats(0).motion_id;
+                            source_motion|=motion==ftKb_MS_CaSpecialN||
+                                motion==ftKb_MS_CaSpecialAirN;
+                            victim_hit|=match.player_stats(1).damage_percent>
+                                victim_damage_before;
+                        };
+                        observe();
+                        for(;action_ticks<120&&!(source_motion&&victim_hit);action_ticks++){
+                            tick();observe();
+                        }
+                        check(source_motion,"Kirby Captain copy did not enter ftKb_MS_CaSpecialN");
+                        check(victim_hit,"Kirby Falcon Punch did not damage its controller-positioned source victim");
+                        std::cout<<"Kirby copied Falcon Punch: source motion=ftKb_MS_CaSpecialN victim damage="
+                                 <<victim_damage_before<<" -> "
+                                 <<match.player_stats(1).damage_percent<<" action_ticks="
+                                 <<action_ticks<<std::endl;
+                        return;
+                    }
                     bool copied_move=false;
                     int copied_article_kind=-1;
                     const auto article_live=[&](int kind){
@@ -890,11 +1141,47 @@ int main(int argc,char** argv){try{
                              <<copied_article_kind<<" live_count="
                              <<melee_web_test_item_count(copied_article_kind)<<std::endl;
                 };
-                const int donor_kind=opponent_ckind==CKIND_POPONANA?FTKIND_POPO:
+                const int donor_kind=kirby_mario_fox_replacement?FTKIND_MARIO:
+                    opponent_ckind==CKIND_POPONANA?FTKIND_POPO:
+                    opponent_ckind==CKIND_CAPTAIN?FTKIND_CAPTAIN:
                     opponent_ckind==CKIND_GAMEWATCH?FTKIND_GAMEWATCH:
                     opponent_ckind==CKIND_MARIO?FTKIND_MARIO:
                     opponent_ckind==CKIND_SAMUS?FTKIND_SAMUS:FTKIND_FOX;
-                acquire(1,donor_kind);
+                const auto center_ice_donor=[&](){
+                    if(donor_kind!=FTKIND_POPO)return;
+                    // Move the controlled Popo inward with a real stick input so
+                    // Kirby's inhale/spit and the copied Ice shot have room to
+                    // resolve. If knockback leaves Popo airborne, try the source
+                    // jump while steering back toward midstage.
+                    bool centered=false;
+                    for(unsigned n=0;n<360&&!centered;n++){
+                        const auto donor=match.player_stats(1);
+                        centered=std::fabs(donor.position[0])<=30.0f&&
+                            donor.ground_or_air==0&&donor.motion_id==ftCo_MS_Wait;
+                        if(centered)break;
+                        raw[1].stickX=donor.position[0]>30.0f?-60:
+                            donor.position[0]<-30.0f?60:0;
+                        raw[1].button=donor.ground_or_air!=0&&n%24==0?
+                            PAD_BUTTON_X:0;
+                        tick();
+                    }
+                    raw[1].button=0;raw[1].stickX=raw[1].stickY=0;
+                    const auto donor=match.player_stats(1);
+                    check(centered,
+                          "Kirby Ice donor normal-PAD centering failed; motion="+
+                          std::to_string(donor.motion_id)+" x="+
+                          std::to_string(donor.position[0])+" y="+
+                          std::to_string(donor.position[1]));
+                    std::cout<<"Kirby Ice donor centered by PAD at x="<<donor.position[0]
+                             <<" motion="<<donor.motion_id<<std::endl;
+                };
+                if(donor_kind==FTKIND_POPO)
+                    std::cout<<"Kirby Ice donor slot=1 uses human PAD control"
+                             <<std::endl;
+                center_ice_donor();
+                int initial_capture_index=-1,initial_capture_kind=-1,initial_capture_motion=-1;
+                acquire(1,donor_kind,"initial acquisition",&initial_capture_index,
+                        &initial_capture_kind,&initial_capture_motion);
                 use_copy(donor_kind);
                 settle_primary();
                 bool lost=false;
@@ -908,16 +1195,33 @@ int main(int argc,char** argv){try{
                 check(lost,"Kirby up appeal did not lose its copy ability through the source path; motion="+
                       std::to_string(match.player_stats(0).motion_id)+" copy_kind="+
                       std::to_string(melee_web_test_kirby_copy_kind(0)));
-                acquire(1,donor_kind);use_copy(donor_kind);
-                check(melee_web_test_kirby_copy_kind(0)==donor_kind,
-                      "Kirby did not replace its lost copy ability through the source path");
-                const char* donor_name=donor_kind==FTKIND_POPO?"Ice Climbers":
-                    donor_kind==FTKIND_GAMEWATCH?"Game & Watch":
-                    donor_kind==FTKIND_MARIO?"Mario":
-                    donor_kind==FTKIND_SAMUS?"Samus":"Fox";
-                std::cout<<"Kirby action coverage: "<<donor_name
-                         <<" acquire/use/loss/replacement and match teardown path passed; other donor families unverified"
-                         <<std::endl;
+                if(kirby_mario_fox_replacement){
+                    int replacement_index=-1,replacement_kind=-1,replacement_motion=-1;
+                    acquire(2,FTKIND_FOX,"distinct-donor replacement",&replacement_index,
+                            &replacement_kind,&replacement_motion);
+                    use_copy(FTKIND_FOX);
+                    check(melee_web_test_kirby_copy_kind(0)==FTKIND_FOX,
+                          "Kirby did not acquire Fox after losing Mario's copy ability");
+                    std::cout<<"Kirby action coverage: Mario acquire/use, ordinary up-appeal copy loss, "
+                             <<"Fox distinct-donor acquire/use and match teardown path passed"
+                             <<std::endl;
+                }else{
+                    center_ice_donor();
+                    int reacquisition_index=-1,reacquisition_kind=-1,reacquisition_motion=-1;
+                    acquire(1,donor_kind,"same-donor reacquisition",&reacquisition_index,
+                            &reacquisition_kind,&reacquisition_motion);
+                    use_copy(donor_kind);
+                    check(melee_web_test_kirby_copy_kind(0)==donor_kind,
+                          "Kirby did not reacquire its lost copy ability through the source path");
+                    const char* donor_name=donor_kind==FTKIND_POPO?"Ice Climbers":
+                        donor_kind==FTKIND_GAMEWATCH?"Game & Watch":
+                        donor_kind==FTKIND_MARIO?"Mario":
+                        donor_kind==FTKIND_SAMUS?"Samus":
+                        donor_kind==FTKIND_CAPTAIN?"Captain/Falcon Punch":"Fox";
+                    std::cout<<"Kirby action coverage: "<<donor_name
+                             <<" acquire/use/loss/reacquisition and match teardown path passed; other donor families unverified"
+                             <<std::endl;
+                }
             }else{
                 check(false,"--character-actions is only defined for the newly admitted source fighters");
             }

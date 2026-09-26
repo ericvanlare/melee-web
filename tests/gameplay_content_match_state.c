@@ -115,6 +115,15 @@ int melee_web_test_active_fighter_kind(unsigned slot){
     HSD_GObj* entity=Player_GetEntity(slot);
     return entity&&entity->user_data?((Fighter*)entity->user_data)->kind:-1;
 }
+int melee_web_test_active_fighter_state(unsigned slot,int* kind,int* motion,
+                                        float* x,float* y){
+    HSD_GObj* entity=Player_GetEntity(slot);
+    if(!entity||!entity->user_data||!kind||!motion||!x||!y)return 0;
+    Fighter* fighter=entity->user_data;
+    *kind=fighter->kind;*motion=fighter->motion_id;
+    *x=fighter->cur_pos.x;*y=fighter->cur_pos.y;
+    return 1;
+}
 int melee_web_test_invoke_dormant_zelda_transform(unsigned slot){
     HSD_GObj* entity=Player_GetEntityAtIndex((int)slot,1);
     if(!entity||!entity->user_data||((Fighter*)entity->user_data)->kind!=FTKIND_ZELDA)
@@ -150,6 +159,13 @@ int melee_web_test_fighter_owns_victim(unsigned slot,unsigned victim_slot){
     HSD_GObj* victim=Player_GetEntity(victim_slot);
     if(!entity||!entity->user_data||!victim)return 0;
     return ((Fighter*)entity->user_data)->victim_gobj==victim;
+}
+int melee_web_test_entity_owns_entity(unsigned owner_slot,unsigned owner_index,
+                                      unsigned victim_slot,unsigned victim_index){
+    HSD_GObj* owner=Player_GetEntityAtIndex((int)owner_slot,(int)owner_index);
+    HSD_GObj* victim=Player_GetEntityAtIndex((int)victim_slot,(int)victim_index);
+    if(!owner||!owner->user_data||!victim)return 0;
+    return ((Fighter*)owner->user_data)->victim_gobj==victim;
 }
 int melee_web_test_item_count(int kind){return it_8026B3C0((ItemKind)kind);}
 
