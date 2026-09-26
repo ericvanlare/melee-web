@@ -10224,3 +10224,23 @@ diff --git a/src/melee/ft/types.h b/src/melee/ft/types.h
  };
  
  struct ft_800898B4_t {
+--- a/src/sysdolphin/baselib/cobj.c
++++ b/src/sysdolphin/baselib/cobj.c
+@@ -9,6 +9,17 @@
+ #include "displayfunc.h"
+ #include "initialize.h"
+ #include "mtx.h"
++#ifdef MELEE_WEB_GAMEPLAY
++/* The owned HSD camera path uses paired-single normalization, including
++ * vec_normalize_check below, and C_MTXLookAt calls PS vector routines.
++ * Keep this bridge local to the camera's audited SDK consumers. */
++#include "gameplay_ps_math.h"
++#undef PSVECNormalize
++#define PSVECNormalize melee_web_ps_vec_normalize
++#undef VECNormalize
++#define VECNormalize melee_web_ps_vec_normalize
++#define C_MTXLookAt melee_web_mtx_look_at
++#endif
+ #include "util.h"
+ #include "video.h"
+ #include "wobj.h"
