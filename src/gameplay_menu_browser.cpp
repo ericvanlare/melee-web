@@ -1528,7 +1528,7 @@ int melee_web_native_menu_player_state(unsigned player,int* fighter_kind,int* mo
  if(!fighter_kind||!motion_id||!ground_or_air||!source_frame||!position_x||!position_y||
     player>=4||!match||!match->ready())
   throw std::runtime_error("Player state requires a ready source match and valid output storage");
- const auto stats=match->player_stats(player);*fighter_kind=match->fighter_kind(player);
+ const auto stats=match->player_stats(player);*fighter_kind=stats.fighter_kind;
  *motion_id=stats.motion_id;*ground_or_air=stats.ground_or_air;*source_frame=match->source_frames();
  *position_x=stats.position[0];*position_y=stats.position[1];return 1;
 }catch(const std::exception& e){message=e.what();return 0;}}
@@ -1548,8 +1548,8 @@ const char* melee_web_native_menu_match_observe(){
   match->ready()?"true":"false",match->paused()?"true":"false",
   match->ending()?"true":"false",match->complete()?"true":"false",
   match->source_frames(),match->random_seed(),outcome,winner,
-  match->fighter_kind(0),p0.stocks,p0.motion_id,p0.ground_or_air,p0.position[0],p0.position[1],
-  match->fighter_kind(1),p1.stocks,p1.motion_id,p1.ground_or_air,p1.position[0],p1.position[1]);
+  p0.fighter_kind,p0.stocks,p0.motion_id,p0.ground_or_air,p0.position[0],p0.position[1],
+  p1.fighter_kind,p1.stocks,p1.motion_id,p1.ground_or_air,p1.position[0],p1.position[1]);
  return text;
  }catch(const std::exception& e){
   match_observer_error=e.what();

@@ -86,6 +86,8 @@ const diagnostic=()=>page.evaluate(()=>{
 async function screenshot(name){
   const file=path.join(output,`${name}.png`);
   await page.screenshot({path:file,fullPage:false});report.screenshots.push(file);
+  const canvas=path.join(output,`${name}-canvas.png`);
+  await page.locator('#canvas').screenshot({path:canvas});report.screenshots.push(canvas);
 }
 async function writeProgress(label){
   const state=await diagnostic();
@@ -358,8 +360,6 @@ async function runMatch(matchIndex,expected){
     memory_at_results:state.memory,players:expected.map(({name,kind})=>({name,kind,cpu:9,stocks:4}))};
   report.matches.push(result);
   report.phases.push({label:`match ${matchIndex} naturally reached Results/Prize`,phase:state.phase,match:state.match});
-  await writeProgress(`match-${matchIndex}-natural-results`);
-  await screenshot(`match-${matchIndex}-natural-results`);
   // Ordinary Start input advances authored Results/Prize routing. Stop only
   // when the actual source menu returns to CSS; never force a scene reset.
   const resumeResultsIfPaused=async state=>{
@@ -373,6 +373,24 @@ async function runMatch(matchIndex,expected){
     if(resumed.error)throw Error(`Results ${matchIndex} resume: ${resumed.error}`);
     return resumed;
   };
+  // Entry can be frame zero of the original fade. Retain a genuinely
+  // advancing Results scene before sending the continuation controller input.
+  const resultsDeadline=Date.now()+60000;
+  let resultsFrame=0;
+  while(Date.now()<resultsDeadline){
+    state=await resumeResultsIfPaused(await diagnostic());
+    if(state.error)throw Error(`Results ${matchIndex} advance: ${state.error}`);
+    assert(state.phase===8||state.phase===9,'Results advanced without continuation input');
+    const frame=state.diagnostics.match(/(?:Results|Prize) source frame: (\d+)/);
+    assert(frame,'Results/Prize source-frame diagnostic is unavailable');
+    resultsFrame=Number(frame[1]);
+    if(resultsFrame>=180)break;
+    await page.waitForTimeout(100);
+  }
+  assert(resultsFrame>=180,`Results ${matchIndex} did not advance through its source fade`);
+  result.rendered_results_source_frame=resultsFrame;
+  await writeProgress(`match-${matchIndex}-natural-results`);
+  await screenshot(`match-${matchIndex}-natural-results`);
   for(let pulse=0;pulse<48&&state.phase!==1;pulse++){
     state=await resumeResultsIfPaused(state);
     await driver.pressChord(['Enter'],{holdMs:160,releaseMs:120});

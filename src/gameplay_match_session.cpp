@@ -332,6 +332,7 @@ MeleeWebPipelineSourceContext GameplayMatchSession::provenance_context() const {
         player.motion_id=-1;player.stocks=selected.stocks;
         if(construction_complete()){
             const auto state=player_stats(i);
+            player.fighter_kind=state.fighter_kind;
             player.motion_id=state.motion_id;player.stocks=state.stocks;
             entry|=state.motion_id>=ftCo_MS_Entry&&state.motion_id<=ftCo_MS_EntryEnd;
             dead|=state.motion_id>=ftCo_MS_DeadDown&&state.motion_id<=ftCo_MS_DeadUpFallHitCameraIce;
@@ -366,7 +367,7 @@ uint32_t GameplayMatchSession::random_seed()const{
 }
 int GameplayMatchSession::fighter_kind(unsigned index)const{
     check(storage_&&storage_->match&&index<storage_->content.player_count,"Match player index is outside the active source match");
-    return storage_->content.fighter_kinds[index];
+    return player_stats(index).fighter_kind;
 }
 MeleeWebMatchStats GameplayMatchSession::player_stats(unsigned index)const{
     check(storage_&&storage_->match,"Match session is closed");char error[256]{};MeleeWebMatchStats stats{};
