@@ -80,6 +80,10 @@ extern "C" int melee_web_retail_setup(const uint8_t*, uint32_t,
     return 1;
 }
 extern "C" void melee_web_retail_state(void) { fake::write_state(); }
+extern "C" void melee_web_retail_entities(void) {
+    if (!fake::state_allowed) std::abort();
+    std::cout << ",\"fighter_entities\":[]";
+}
 extern "C" uint32_t melee_web_retail_rng(void) { ++fake::rng; return 123; }
 extern "C" uint32_t gm_GetFrameCount(void) { return 0; }
 extern "C" uint32_t gm_8016AEEC(void) { return 0; }
@@ -222,6 +226,8 @@ class RetailRecipeSceneTraceTests(unittest.TestCase):
                    if line.startswith("{")]
         self.assertEqual(records[0]["record"], "header")
         self.assertEqual(records[0]["schema"], "melee-web-port-session-diagnostic")
+        self.assertEqual(records[0]["version"], 2)
+        self.assertEqual(records[0]["fighter_entities"], "all_player_entity_slots")
         self.assertEqual(records[0]["cpu_observations"], "first_match_only")
         self.assertEqual(
             [record["record"] for record in records[1:10]],

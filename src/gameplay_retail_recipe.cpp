@@ -10,6 +10,7 @@
 extern "C" int melee_web_retail_setup(const uint8_t*, uint32_t,
     MeleeWebMenuMatchSelection*, char*, size_t);
 extern "C" void melee_web_retail_state(void);
+extern "C" void melee_web_retail_entities(void);
 extern "C" uint32_t melee_web_retail_rng(void);
 extern "C" uint32_t gm_GetFrameCount(void);
 extern "C" uint32_t gm_8016AEEC(void);
@@ -225,7 +226,7 @@ void retail_replay_session_initial(const RetailReplayRecipe& recipe) {
     whole_session_cpu_observation_started = false;
     whole_session_cpu_observation_finished = false;
     std::cout << "{\"record\":\"header\",\"schema\":\"melee-web-port-session-diagnostic\","
-        "\"version\":1,\"frames_requested\":" << recipe.frames.size()
+        "\"version\":2,\"fighter_entities\":\"all_player_entity_slots\",\"frames_requested\":" << recipe.frames.size()
         << ",\"comparison\":\"not_run\",\"cpu_observations\":\""
         << (whole_session_cpu_observation_requested ? "first_match_only" : "not_captured") << "\","
         "\"draw_state\":\"not_captured\"}\n";
@@ -234,7 +235,7 @@ void retail_replay_session_initial(const RetailReplayRecipe& recipe) {
 void retail_replay_initial(const RetailReplayRecipe& recipe, bool source_drawing) {
     if (recipe.whole_session()) {
         std::cout << "{\"record\":\"session_match_enter_complete\",";
-        melee_web_retail_state(); history(recipe); std::cout << "}\n";
+        melee_web_retail_state(); melee_web_retail_entities(); history(recipe); std::cout << "}\n";
         if (whole_session_cpu_observation_requested &&
             !whole_session_cpu_observation_started &&
             !whole_session_cpu_observation_finished) {
@@ -283,9 +284,10 @@ void retail_replay_frame(const RetailReplayRecipe& recipe, size_t index, unsigne
         std::cout << "\""; hex(std::span(frame.bytes).subspan(port * 11, 11)); std::cout << "\"";
     }
     std::cout << "],";
-    if (!recipe.whole_session() || scene == kRetailReplayMatch)
+    if (!recipe.whole_session() || scene == kRetailReplayMatch) {
         melee_web_retail_state();
-    else
+        if (recipe.whole_session()) melee_web_retail_entities();
+    } else
         std::cout << "\"rng\":" << melee_web_retail_rng();
     history(recipe); std::cout << "}\n";
     if (recipe.whole_session()) {

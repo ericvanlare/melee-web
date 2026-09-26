@@ -15,15 +15,9 @@ uint32_t melee_web_retail_rng(void){
     if(!seed_ptr)abort();
     return *seed_ptr;
 }
-void melee_web_retail_state(void){
-    if(!seed_ptr)abort();
-    printf("\"rng\":%u,\"match_frame\":%u,\"fighters\":[",*seed_ptr,gm_GetFrameCount());
-    for(unsigned slot=0;slot<4 && Player_GetPlayerSlotType(slot)!=Gm_PKind_NA;slot++){
-        StaticPlayer* p=Player_GetPtrForSlot(slot);
-        if(!p||!p->player_entity[0])abort();
-        Fighter* fp=p->player_entity[0]->user_data;
-        if(slot)printf(",");
-        printf("{\"slot\":%u,\"kind\":%u,\"motion\":%u,\"animation\":%u,\"ground_air\":%u,\"facing_bits\":\"%08x\",\"position_bits\":",slot,fp->kind,fp->motion_id,fp->anim_id,fp->ground_or_air,bits(fp->facing_dir));
+static void fighter_fields(unsigned slot,const Fighter* fp){
+        if(!fp)abort();
+        printf("\"slot\":%u,\"kind\":%u,\"motion\":%u,\"animation\":%u,\"ground_air\":%u,\"facing_bits\":\"%08x\",\"position_bits\":",slot,fp->kind,fp->motion_id,fp->anim_id,fp->ground_or_air,bits(fp->facing_dir));
         vec(&fp->cur_pos);printf(",\"velocity_bits\":");vec(&fp->self_vel);printf(",\"knockback_bits\":");vec(&fp->x8c_kb_vel);
         printf(",\"animation_frame_bits\":\"%08x\",\"animation_speed_bits\":\"%08x\",\"damage_bits\":\"%08x\",\"shield_bits\":\"%08x\",\"stocks\":%d,\"input_hex\":\"",bits(fp->cur_anim_frame),bits(fp->frame_speed_mul),bits(fp->dmg.x1830_percent),bits(fp->shield_health),Player_GetStocks(slot));
         // Input consists of 20 native four-byte words followed by 28 byte timers.
@@ -31,7 +25,34 @@ void melee_web_retail_state(void){
         _Static_assert(sizeof(fp->input)==0x50,"Fighter input layout changed");
         for(unsigned i=0;i<0x50;i+=4){uint32_t u;memcpy(&u,(const char*)&fp->input+i,4);printf("%08x",u);}
         for(unsigned i=0;i<0x1c;i++)printf("%02x",((const unsigned char*)&fp->x670_timer_lstick_tilt_x)[i]);
-        printf("\"}");
+        printf("\"");
+}
+void melee_web_retail_state(void){
+    if(!seed_ptr)abort();
+    printf("\"rng\":%u,\"match_frame\":%u,\"fighters\":[",*seed_ptr,gm_GetFrameCount());
+    for(unsigned slot=0;slot<4 && Player_GetPlayerSlotType(slot)!=Gm_PKind_NA;slot++){
+        StaticPlayer* p=Player_GetPtrForSlot(slot);
+        if(!p||!p->player_entity[0])abort();
+        if(slot)printf(",");
+        printf("{");fighter_fields(slot,p->player_entity[0]->user_data);printf("}");
+    }
+    printf("]");
+}
+// Whole-session diagnostic v2 retains each source entity ordinal. A dormant
+// Zelda/Sheik or Nana is not interchangeable with the slot's primary fighter.
+// Leave the legacy primary-only replay schema unchanged.
+void melee_web_retail_entities(void){
+    printf(",\"fighter_entities\":[");
+    unsigned emitted=0;
+    for(unsigned slot=0;slot<4 && Player_GetPlayerSlotType(slot)!=Gm_PKind_NA;slot++){
+        const StaticPlayer* p=Player_GetPtrForSlot(slot);
+        if(!p)abort();
+        for(unsigned entity=0;entity<sizeof(p->player_entity)/sizeof(p->player_entity[0]);entity++){
+            if(!p->player_entity[entity])continue;
+            if(emitted++)printf(",");
+            printf("{\"entity_index\":%u,",entity);
+            fighter_fields(slot,p->player_entity[entity]->user_data);printf("}");
+        }
     }
     printf("]");
 }
