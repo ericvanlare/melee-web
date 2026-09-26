@@ -12,6 +12,12 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class GameplayBootstrapTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.build_directory = tempfile.TemporaryDirectory(prefix="melee gameplay bootstrap ")
+        cls.addClassCleanup(cls.build_directory.cleanup)
+        cls.built_variants = set()
+
     def test_original_object_world_and_process_order(self):
         self.run_trace("bootstrap")
 
@@ -62,9 +68,13 @@ class GameplayBootstrapTests(unittest.TestCase):
         c_sources += [original / (name + ".c") for name in (
             "gobj", "gobjproc", "gobjplink", "gobjgxlink", "gobjobject", "gobjuserdata",
             "objalloc", "memory", "initialize")]
-        with tempfile.TemporaryDirectory(prefix="melee gameplay bootstrap ") as directory:
-            directory = Path(directory)
-            output = directory / "bootstrap.js"
+        # Only argv differs between the three bootstrap modes. Fighter has
+        # its own prepared sources, object files and NODERAWFS link option.
+        variant = "fighter" if kind == "fighter" else "bootstrap"
+        directory = Path(self.build_directory.name) / variant
+        output = directory / "bootstrap.js"
+        if variant not in self.built_variants:
+            directory.mkdir(exist_ok=True)
             # The real Aurora logger reads this process-local configuration.
             # No renderer or successful platform-function doubles are linked.
             fixture_config = directory / "aurora_config.cpp"
@@ -88,20 +98,23 @@ class GameplayBootstrapTests(unittest.TestCase):
                 *( ["-sNODERAWFS=1"] if kind == "fighter" else []),
                 "-o", str(output)], cwd=directory, env=env, capture_output=True, text=True, timeout=120)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            asset = ROOT / "assets-local/next-gate/PlCo.dat"
-            arguments = [str(asset)] if kind == "fighter" and asset.is_file() else []
-            if kind == "bootstrap_replaced": arguments = ["replaced_heap"]
-            if kind == "retained_session": arguments = ["retained_session"]
-            result = subprocess.run([str(node), str(output), *arguments], cwd=directory, env=env,
+            self.built_variants.add(variant)
+
+        asset = ROOT / "assets-local/next-gate/PlCo.dat"
+        arguments = [str(asset)] if kind == "fighter" and asset.is_file() else []
+        if kind == "bootstrap_replaced": arguments = ["replaced_heap"]
+        if kind == "retained_session": arguments = ["retained_session"]
+        with tempfile.TemporaryDirectory(prefix="melee gameplay bootstrap run ") as run_directory:
+            result = subprocess.run([str(node), str(output), *arguments], cwd=run_directory, env=env,
                                     capture_output=True, text=True, timeout=30)
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            expected = ("Gameplay generation accessor replacement guard: passed" if kind == "bootstrap_replaced"
-                        else "Original gameplay session arena retention trace: passed" if kind == "retained_session" else
-                        "Original HSD gameplay-bootstrap scheduler trace: passed" if kind == "bootstrap" else
-                        "Original Fighter input consumer and lifetime trace: passed")
-            self.assertIn(expected, result.stdout)
-            if kind == "fighter" and asset.is_file():
-                self.assertIn("Local PlCo typed root0 consumed by original walk predicate: passed", result.stdout)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        expected = ("Gameplay generation accessor replacement guard: passed" if kind == "bootstrap_replaced"
+                    else "Original gameplay session arena retention trace: passed" if kind == "retained_session" else
+                    "Original HSD gameplay-bootstrap scheduler trace: passed" if kind == "bootstrap" else
+                    "Original Fighter input consumer and lifetime trace: passed")
+        self.assertIn(expected, result.stdout)
+        if kind == "fighter" and asset.is_file():
+            self.assertIn("Local PlCo typed root0 consumed by original walk predicate: passed", result.stdout)
 
 
 if __name__ == "__main__":
