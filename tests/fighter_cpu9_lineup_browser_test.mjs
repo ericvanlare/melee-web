@@ -431,6 +431,14 @@ try{
   assert.equal(response?.status(),200,'runtime.html must load through the real HTTP server');
   assert.equal(response.headers()['cross-origin-opener-policy'],'same-origin');
   assert.equal(response.headers()['cross-origin-embedder-policy'],'require-corp');
+  report.gpu=await page.evaluate(async()=>{
+    const adapter=await navigator.gpu?.requestAdapter();
+    return {cross_origin_isolated:crossOriginIsolated,adapter_available:!!adapter,
+      info:adapter?{vendor:adapter.info.vendor,architecture:adapter.info.architecture,
+        device:adapter.info.device,description:adapter.info.description}:null};
+  });
+  assert(report.gpu.cross_origin_isolated&&report.gpu.adapter_available,
+    'Rendered validation requires an isolated page and a WebGPU adapter');
   await driver.waitForImport();
   await driver.selectDisc(values.disc);
   await driver.waitForStart();
