@@ -14,10 +14,12 @@ build or serve. Preserve the license and this scope when redistributing them.
 - `scripts/check_repository_content.py`
 - `scripts/audit_repository_history.py`
 - `scripts/audit_compiler_cache.py`
+- `scripts/compare_allocation_traces.py`
 - `scripts/summarize_browser_failure.py`
 - `tests/test_repository_content.py`
 - `tests/test_repository_history.py`
 - `tests/test_compiler_cache_audit.py`
+- `tests/test_allocation_trace_compare.py`
 - `tests/test_browser_failure_summary.py`
 - `.github/repository-content-policy.json`
 - `.github/pull_request_template.md`
@@ -29,6 +31,9 @@ build or serve. Preserve the license and this scope when redistributing them.
 - `SECURITY.md`
 - `LICENSE_SCOPE.md`
 - `docs/REPOSITORY_CONTENT_CHECK.md`
+- `docs/ALLOCATION_TRACE_COMPARISON.md`
+- `docs/DEVELOPMENT.md`
+- `docs/BROWSER_FAILURE_TRIAGE.md`
 - `docs/PUBLIC_REPOSITORY_CHECKLIST.md`
 - `docs/PUBLICATION_REVIEW_BRIEF.md`
 - `docs/PUBLICATION_PROVENANCE_ASSESSMENT.md`
@@ -36,16 +41,24 @@ build or serve. Preserve the license and this scope when redistributing them.
 - `docs/REPOSITORY_HISTORY_AUDIT.md`
 - `docs/GITHUB_PUBLICATION_AUDIT.md`
 - `docs/COMPILER_CACHE_REVIEW.md`
-- `docs/BROWSER_FAILURE_TRIAGE.md`
-- `docs/DEVELOPMENT.md`
+- `tools/allocation_trace_compare.py`
 - `tools/browser_failure_summary.py`
 
 The first five implementations were read and recorded in the
 [source inventory](docs/SOURCE_LICENSE_INVENTORY.md); their recorded authorship
-uses the repository owner's identity. The remaining entries are the publication
-work authored in this branch. The owner authorized proceeding with this scoped
-approach after the internal review. Git authorship is supporting provenance,
-not a warranty that third parties cannot assert a claim.
+uses the repository owner's identity. The publication safeguards, browser
+failure triage, and allocation-comparison files are separately scoped project
+work. The owner authorized proceeding with this file-by-file approach after
+internal review. Git authorship is supporting provenance, not a warranty that
+third parties cannot assert a claim.
+
+The allocation comparison CLI, comparator, synthetic tests, and usage note
+listed above were authored in this task from the repository's existing trace
+schemas and allocator documentation. The developer-entry link is an authored
+change to the existing developer guide. These files contain no retained trace
+rows, recovered game or SDK implementation, or generated capture output. This
+file-level provenance does not extend to the inputs read by the tool or other
+files in their directories.
 
 ## Exclusions and existing terms
 
