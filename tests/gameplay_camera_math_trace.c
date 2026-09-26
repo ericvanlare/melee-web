@@ -13,31 +13,57 @@
  * explicit instead of calling the production ppc_rsqrte wrapper.  The vector
  * operations follow GALE01r2 PSVECNormalize/PSVECCrossProduct; the LookAt
  * scalar sums follow C_MTXLookAt at 80342734. */
-static float oracle_rsqrte(float value)
+static double oracle_round_fc_25(double value)
 {
-    /* ppc_rsqrte is frsqrte followed by one Newton-Raphson step.  Naming the
-     * intermediate registers here makes the oracle's rounding boundaries
-     * visible while avoiding the production helper symbol. */
+    int exponent;
+    const double sign = value < 0.0 ? -1.0 : 1.0;
+    const double mantissa = frexp(fabs(value), &exponent);
+    const double scaled = mantissa * 33554432.0; /* 2^25 */
+    uint64_t lower = (uint64_t)scaled;
+    if (scaled - (double)lower >= 0.5)
+        ++lower; /* PPC's positive FC operand ties round upward. */
+    return sign * ldexp((double)lower / 33554432.0, exponent);
+}
+
+static float oracle_rsqrte(float value, int round_fc_operand)
+{
+    /* ppc_rsqrte is frsqrte followed by one Newton-Raphson step.  The true
+     * path rounds the estimate operand before its square; naming the
+     * intermediate registers here makes both paths visible while avoiding
+     * the production helper symbol. */
     const double estimate = frsqrte((double)value);
-    float nwork0 = (float)(estimate * estimate);
+    const double multiplier =
+        round_fc_operand ? oracle_round_fc_25(estimate) : estimate;
+    float nwork0 = (float)(estimate * multiplier);
     const float nwork1 = (float)(estimate * 0.5);
     nwork0 = fmaf(-nwork0, value, 3.0f);
     return nwork0 * nwork1;
 }
 
-static void oracle_normalize(const Vec* src, Vec* out)
+static void oracle_normalize_mode(const Vec* src, Vec* out,
+                                  int round_fc_operand)
 {
     const float lane_x = src->x * src->x;
     const float lane_z = fmaf(src->z, src->z, lane_x);
     const float lane_y = src->y * src->y;
     const float sqsum = lane_z + lane_y;
-    const float rsqrt = oracle_rsqrte(sqsum);
+    const float rsqrt = oracle_rsqrte(sqsum, round_fc_operand);
     const float lane_out_x = src->x * rsqrt;
     const float lane_out_y = src->y * rsqrt;
     const float lane_out_z = src->z * rsqrt;
     out->x = lane_out_x;
     out->y = lane_out_y;
     out->z = lane_out_z;
+}
+
+static void oracle_normalize(const Vec* src, Vec* out)
+{
+    oracle_normalize_mode(src, out, 1);
+}
+
+static void oracle_normalize_old_estimate_square(const Vec* src, Vec* out)
+{
+    oracle_normalize_mode(src, out, 0);
 }
 
 static void oracle_cross(const Vec* a, const Vec* b, Vec* out)
@@ -205,9 +231,13 @@ static void check_vectors(unsigned* fallback_differences)
     const unsigned corpus_count = sizeof(vector_corpus) / sizeof(vector_corpus[0]);
     unsigned normalize_fallback_differences = 0;
     unsigned cross_fallback_differences = 0;
+    unsigned old_estimate_differences = 0;
     for (unsigned i = 0; i < corpus_count; ++i) {
         Vec expected, actual, alias;
         oracle_normalize(&vector_corpus[i], &expected);
+        Vec old_estimate;
+        oracle_normalize_old_estimate_square(&vector_corpus[i], &old_estimate);
+        old_estimate_differences += !same_vec(&expected, &old_estimate);
         melee_web_ps_vec_normalize(&vector_corpus[i], &actual);
         assert(same_vec(&expected, &actual));
         Vec fallback;
@@ -256,8 +286,9 @@ static void check_vectors(unsigned* fallback_differences)
     }
     assert(normalize_fallback_differences > 0);
     assert(cross_fallback_differences > 0);
+    assert(old_estimate_differences > 0);
     *fallback_differences += normalize_fallback_differences +
-                             cross_fallback_differences;
+                             cross_fallback_differences + old_estimate_differences;
 }
 
 static void oracle_roll_zero_up(const Vec* eye_position, const Vec* target,

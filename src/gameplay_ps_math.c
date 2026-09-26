@@ -8,11 +8,25 @@
 void melee_web_ps_vec_normalize(const Vec* src, Vec* out)
 {
     /* GALE01r2 PSVECNormalize (80342DB8): z*z is fused into the
-     * rounded x*x lane, then the rounded y*y lane is added. Aurora's
-     * estimate helper retains the original frsqrte/Newton sequence. */
+     * rounded x*x lane, then the rounded y*y lane is added. */
     const float x = src->x, y = src->y, z = src->z;
     const float sum = fmaf(z, z, x * x) + y * y;
-    const float scale = ppc_rsqrte(sum);
+    const double estimate = frsqrte((double) sum);
+    /* frsqrte retains more than binary32 precision. The following fmuls
+     * rounds its FC operand to 25 significant bits before multiplication;
+     * rounding only the product gives a different Newton step at ties.
+     * A reciprocal-square-root estimate of a binary32 value cannot be a
+     * binary64 subnormal, so this fixed mask covers its entire finite range. */
+    uint64_t estimate_word;
+    memcpy(&estimate_word, &estimate, sizeof(estimate_word));
+    estimate_word = (estimate_word & UINT64_C(0xfffffffff8000000)) +
+                    (estimate_word & UINT64_C(0x08000000));
+    double multiplier;
+    memcpy(&multiplier, &estimate_word, sizeof(multiplier));
+    const float square = (float) (estimate * multiplier);
+    const float half = (float) (estimate * 0.5);
+    const float correction = -fmaf(square, sum, -3.0f);
+    const float scale = correction * half;
     out->x = x * scale;
     out->y = y * scale;
     out->z = z * scale;
