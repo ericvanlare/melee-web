@@ -96,7 +96,7 @@ class BrowserFailureSummaryTests(unittest.TestCase):
         self.assertEqual(summary["primary_runtime_error"]["message"].splitlines()[0],
                          "RuntimeError: memory access out of bounds")
         self.assertEqual(summary["follow_up_failures"][0]["category"], "cleanup_timeout")
-        self.assertEqual(summary["follow_up_failures"][0]["ordering"], "follow_up_to_replay")
+        self.assertEqual(summary["follow_up_failures"][0]["ordering"], "unknown")
         self.assertEqual(summary["run_outcome"]["classification"], "runtime_error_recorded")
         self.assertTrue((self.output() / "summary.json").exists())
         self.assertNotIn("private-inputs", (self.output() / "summary.json").read_text())
@@ -110,16 +110,47 @@ class BrowserFailureSummaryTests(unittest.TestCase):
         self.assertEqual(summary["run_outcome"]["classification"], "outcome_unknown")
 
     def test_deliberate_bounded_stop_is_not_inferred_to_be_a_crash(self):
-        _write_json(self.run / "report.json", _report(
+        report = _report(
             first_error=None,
             deliberate={"requested_cursor": 80, "observed_cursor": 82,
                         "reason": "bounded diagnostic prefix"},
             runtime_error="bounded prefix stop reached",
-        ))
+        )
+        report["final_snapshot"]["replay_report"]["failures"] = [
+            "incomplete input timeline", "source tick/draw count mismatch",
+        ]
+        _write_json(self.run / "report.json", report)
+        _write_json(self.run / "retail-browser-report.json", {
+            "complete": False,
+            "pass": False,
+            "failures": ["incomplete input timeline", "source tick/draw count mismatch"],
+        })
         summary = build_summary(self.run, self.output())
         self.assertIsNone(summary["primary_runtime_error"])
         self.assertEqual(summary["runtime_error_candidates"], [])
         self.assertEqual(summary["run_outcome"]["classification"], "deliberate_bounded_stop")
+
+    def test_timed_cursor_disagrees_with_untimestamped_final_snapshot(self):
+        report = _report(cursor=20, at_ms=30)
+        report["snapshots"] = [{"source_cursor": 10, "at_ms": 1}]
+        report["final_snapshot"].pop("at_ms")
+        _write_json(self.run / "report.json", report)
+        cursor = build_summary(self.run, self.output())["last_progress"]["source_cursor"]
+        self.assertIsNone(cursor["value"])
+        self.assertEqual(cursor["ordering"], "conflicting_with_untimestamped_observation")
+        self.assertEqual({item["value"] for item in cursor["observations"]}, {10, 20})
+
+    def test_multiple_untimestamped_snapshots_preserve_conflict(self):
+        report = _report()
+        report["snapshots"] = [
+            {"source_cursor": 10}, {"source_cursor": 20}, {"source_cursor": 10},
+        ]
+        report.pop("final_snapshot")
+        _write_json(self.run / "report.json", report)
+        cursor = build_summary(self.run, self.output())["last_progress"]["source_cursor"]
+        self.assertIsNone(cursor["value"])
+        self.assertEqual(cursor["ordering"], "conflicting_without_timestamps")
+        self.assertEqual({item["value"] for item in cursor["observations"]}, {10, 20})
 
     def test_source_cursor_and_match_frame_remain_distinct_from_session_index(self):
         _write_json(self.run / "report.json", _report(cursor=20, at_ms=30))
@@ -172,6 +203,24 @@ class BrowserFailureSummaryTests(unittest.TestCase):
         self.assertEqual(summary["runtime_error_order"], "ordering_unknown")
         self.assertTrue(any("runtime error chronology" in item
                             for item in summary["missing_evidence"]))
+
+    def test_retail_report_only_exposes_runtime_failure_candidate(self):
+        _write_json(self.run / "retail-browser-report.json", {
+            "complete": False,
+            "pass": False,
+            "failures": ["memory access out of bounds"],
+        })
+        summary = write_summary(self.run, self.output())
+        self.assertEqual(summary["run_outcome"]["result"], "fail")
+        self.assertIsNone(summary["primary_runtime_error"])
+        self.assertEqual(summary["runtime_error_order"], "ordering_unknown")
+        candidate = summary["runtime_error_candidates"][0]
+        self.assertEqual(candidate["evidence"]["artifact"], "retail-browser-report.json")
+        self.assertEqual(candidate["evidence"]["field"], "failures[0]")
+        markdown = (self.output() / "summary.md").read_text()
+        self.assertIn("retail-browser-report.json:failures[0]", markdown)
+        self.assertIn("memory access out of bounds", markdown)
+        self.assertNotIn("No runtime error is recorded", markdown)
 
     def test_cursor_conflict_at_same_timestamp_is_not_resolved_by_field_priority(self):
         report = _report(cursor=14, at_ms=20)

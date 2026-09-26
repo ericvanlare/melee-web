@@ -28,6 +28,10 @@ LOCAL_PATH = re.compile(r"(?P<path>/(?:Users|home)/[^\s\"'<>]+)")
 STACK_LINE = re.compile(r"^\s+at\s+.+$")
 ITEM_PREFIX = re.compile(r"^ITEMDRAW(?:-META|-OWNER|-HIDE)?\s+(.*)$")
 KEY_VALUE = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)=([^\s]+)")
+REPLAY_RUNTIME_FAILURE = re.compile(
+    r"memory access out of bounds|runtimeerror\b|runtime error\b|uncaught exception|"
+    r"hsd assertion|assert(?:ion)?\b|aborted\(\)|player stopped\. reload to recover\.", re.I
+)
 
 
 class SummaryError(ValueError):
@@ -173,15 +177,35 @@ def _latest_cursor(report: dict[str, Any] | None,
                           if isinstance(item, dict)
                           and isinstance(item.get("source_cursor"), int)
                           and not isinstance(item.get("source_cursor"), bool)]
-            if candidates:
-                latest = max(candidates, key=lambda item: (
-                    -math.inf if _number(item.get("at_ms")) is None
-                    else _number(item.get("at_ms"))))
-                observations.append({
-                    "source": "report.json:snapshots[]",
-                    "value": latest["source_cursor"],
-                    "at_ms": _number(latest.get("at_ms")),
-                })
+            timed_snapshots = [item for item in candidates
+                               if _number(item.get("at_ms")) is not None]
+            untimed_snapshots = [item for item in candidates
+                                 if _number(item.get("at_ms")) is None]
+            if timed_snapshots:
+                latest_time = max(_number(item.get("at_ms")) for item in timed_snapshots)
+                latest_values: set[int] = set()
+                for item in timed_snapshots:
+                    if _number(item.get("at_ms")) != latest_time:
+                        continue
+                    value = item["source_cursor"]
+                    if value not in latest_values:
+                        observations.append({"source": "report.json:snapshots[]",
+                                            "value": value, "at_ms": latest_time})
+                        latest_values.add(value)
+                differing = [item for item in untimed_snapshots
+                             if item["source_cursor"] not in latest_values]
+                for item in differing[:2]:
+                    observations.append({"source": "report.json:snapshots[] (untimestamped)",
+                                         "value": item["source_cursor"], "at_ms": None})
+            elif candidates:
+                first = candidates[0]
+                observations.append({"source": "report.json:snapshots[] (untimestamped)",
+                                     "value": first["source_cursor"], "at_ms": None})
+                differing = next((item for item in candidates[1:]
+                                  if item["source_cursor"] != first["source_cursor"]), None)
+                if differing is not None:
+                    observations.append({"source": "report.json:snapshots[] (untimestamped)",
+                                         "value": differing["source_cursor"], "at_ms": None})
         final_snapshot = report.get("final_snapshot")
         if (isinstance(final_snapshot, dict)
                 and isinstance(final_snapshot.get("source_cursor"), int)
@@ -208,6 +232,10 @@ def _latest_cursor(report: dict[str, Any] | None,
         if len(values) > 1:
             return {"value": None, "source": None, "observations": observations,
                     "ordering": "conflicting_at_latest_timestamp"}
+        if any(item["value"] not in values for item in observations
+               if item["at_ms"] is None):
+            return {"value": None, "source": None, "observations": observations,
+                    "ordering": "conflicting_with_untimestamped_observation"}
         chosen = latest[-1]
         return {"value": chosen["value"], "source": chosen["source"],
                 "observations": observations, "ordering": "timestamped"}
@@ -270,6 +298,22 @@ def _runtime_errors(report: dict[str, Any] | None) -> tuple[dict[str, Any] | Non
     if len(listed) > 1:
         return None, listed, "ordering_unknown"
     return None, [], "none_recorded"
+
+
+def _replay_runtime_failures(replay_report: dict[str, Any], artifact: str,
+                             field: str) -> list[dict[str, Any]]:
+    failures = replay_report.get("failures")
+    if not isinstance(failures, list):
+        return []
+    results = []
+    for index, message in enumerate(failures):
+        if not isinstance(message, str) or not REPLAY_RUNTIME_FAILURE.search(message):
+            continue
+        record = _error_record(message, source=artifact, field=f"{field}[{index}]")
+        if record is not None:
+            record["kind"] = "replay_report_failure"
+            results.append(record)
+    return results
 
 
 def _page_evidence(root: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -355,7 +399,7 @@ def _failure_evidence(report: dict[str, Any] | None, failure_text: str | None,
             "category": category,
             "message": text,
             "evidence": {"artifact": source},
-            "ordering": "follow_up_to_replay" if primary else "unknown",
+            "ordering": "unknown",
         })
     return results
 
@@ -466,14 +510,29 @@ def build_summary(run_directory: str | Path, output_directory: str | Path) -> di
     cursor = _latest_cursor(report, progress)
 
     replay_report: dict[str, Any] = {}
+    replay_report_artifact = "retail-browser-report.json"
+    replay_failures_field = "failures"
     if report and isinstance(report.get("final_snapshot"), dict):
         value = report["final_snapshot"].get("replay_report")
         if isinstance(value, dict):
             replay_report = value
+            replay_report_artifact = "report.json"
+            replay_failures_field = "final_snapshot.replay_report.failures"
     if not replay_report and report and isinstance(report.get("browser_report"), dict):
         replay_report = report["browser_report"]
+        replay_report_artifact = "report.json"
+        replay_failures_field = "browser_report.failures"
     if not replay_report and retail_report:
         replay_report = retail_report
+    replay_candidates = _replay_runtime_failures(
+        replay_report, replay_report_artifact, replay_failures_field)
+    candidate_messages = {item["message"] for item in runtime_candidates}
+    if primary:
+        candidate_messages.add(primary["message"])
+    runtime_candidates.extend(item for item in replay_candidates
+                              if item["message"] not in candidate_messages)
+    if not primary and runtime_candidates and ordering in ("none_recorded", "unavailable"):
+        ordering = "ordering_unknown"
 
     inputs = report.get("inputs") if report and isinstance(report.get("inputs"), dict) else {}
     identities: dict[str, Any] = {}
@@ -494,6 +553,11 @@ def build_summary(run_directory: str | Path, output_directory: str | Path) -> di
             break
 
     result = report.get("result") if report and isinstance(report.get("result"), str) else None
+    if result is None and retail_report and isinstance(retail_report.get("pass"), bool):
+        result = "pass" if retail_report["pass"] else "fail"
+    scope = (report.get("scope") if report and isinstance(report.get("scope"), str)
+             else retail_report.get("scope") if retail_report and isinstance(retail_report.get("scope"), str)
+             else None)
     complete = replay_report.get("complete") if isinstance(replay_report.get("complete"), bool) else None
     if primary or runtime_candidates:
         classification = "runtime_error_recorded" if primary else "runtime_error_order_unknown"
@@ -530,7 +594,7 @@ def build_summary(run_directory: str | Path, output_directory: str | Path) -> di
         missing.append("disc identity: hash not recorded")
     if build_identity is None:
         missing.append("build identity: not recorded")
-    if not isinstance(report.get("scope") if report else None, str):
+    if scope is None:
         missing.append("declared validation scope: not recorded")
     if not any(name in present for name in ("final.png", "prefix.png")):
         missing.append("screenshots: none retained")
@@ -553,7 +617,7 @@ def build_summary(run_directory: str | Path, output_directory: str | Path) -> di
         "run_outcome": {
             "result": result,
             "classification": classification,
-            "declared_scope": report.get("scope") if report else None,
+            "declared_scope": scope,
             "complete": complete,
             "diagnostic_only": True,
         },
@@ -635,9 +699,14 @@ def render_markdown(summary: dict[str, Any]) -> str:
             lines.append("- Stack:")
             lines.extend(f"  - `{frame}`" for frame in frames[:5])
     elif summary.get("runtime_error_order") in ("ordering_unknown", "conflicting_order"):
-        lines.append("- Multiple runtime errors are recorded, but available evidence does not establish which was first.")
-        for candidate in summary.get("runtime_error_candidates", [])[:4]:
-            lines.append(f"  - `{candidate['evidence']['field']}`: {_one_line(candidate['message'])}")
+        lines.append("- Available evidence does not establish the earliest runtime error; recorded candidates:")
+        candidates = summary.get("runtime_error_candidates", [])
+        if candidates:
+            for candidate in candidates[:4]:
+                evidence = candidate["evidence"]
+                lines.append(f"  - `{evidence['artifact']}:{evidence['field']}`: {_one_line(candidate['message'])}")
+        else:
+            lines.append("  - No runtime-error candidate was retained.")
     else:
         lines.append("- No runtime error is recorded in the available browser error fields.")
         if summary.get("final_runtime_status"):

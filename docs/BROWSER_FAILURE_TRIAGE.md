@@ -15,8 +15,9 @@ time; an incomplete final record is reported, while malformed interior records
 are rejected. Source artifacts are read-only. The output must not exist and
 must not overlap the input directory.
 
-The report distinguishes the browser's recorded first error from later harness
-or cleanup failures. It keeps the source cursor, session-frame index, match
+The report distinguishes the browser's recorded first error from harness or
+cleanup failures, and leaves their relative order unknown unless the artifacts
+establish it. It keeps the source cursor, session-frame index, match
 index, and match frame separate; unknown values remain unknown. Fighter kinds
 and motions remain numeric, and item/owner records appear only when present in
 the retained diagnostics. Artifact links point to files in the selected run.
