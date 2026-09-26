@@ -9598,6 +9598,49 @@ diff --git a/src/melee/ft/kinds/ftCommon/ftCo_0A01.c b/src/melee/ft/kinds/ftComm
      cur_cmd = data->x18;
      if (cur_cmd != 0x11) {
          motion_id = fp->motion_id;
+@@ -7383,6 +7383,9 @@
+     s32 var_r0_4;
+ 
+     temp_r5 = fp1->motion_id;
++    /* 800B0CA8: the executed source lwz r5,0x10(r4). */
++    (void) melee_web_source_context_publish_nana_motion_r5(fp0, fp1,
++                                                          temp_r5);
+     if (ftCo_800A3200(fp1) != 0) {
+         goto jmp_9c;
+     } else {
+@@ -7429,6 +7432,13 @@
+                 return false;
+             }
+             temp_r5_2 = fp0->item_gobj;
++            if (temp_r5_2 == NULL) {
++                (void) melee_web_source_context_publish_nana_empty_item_r5(fp0);
++            } else {
++                /* 800B0DB8 loads Item user_data into r5. A host pointer is
++                 * not its source identity; reject this unmodeled owner. */
++                melee_web_source_context_invalidate_r5_at(__func__, __LINE__);
++            }
+             if (temp_r5_2 != NULL) {
+                 temp_r0 = GET_ITEM(temp_r5_2)->kind;
+                 switch (temp_r0) {
+@@ -7483,6 +7493,7 @@
+ bool ftCo_800B0E98(Fighter* fp0, Fighter* fp1)
+ {
+     s32 temp_r0;
++    MELEE_WEB_SOURCE_FRAME(MELEE_WEB_SOURCE_FRAME_CPU_NANA_FOLLOW_CHECK);
+ 
+     if (ftCo_800B0CA8(fp0, fp1) != 0) {
+         struct CpuFighter* data = &fp0->cpu;
+@@ -7572,6 +7583,10 @@
+     Fighter* var_r29;
+ 
+     PAD_STACK(8);
++    MELEE_WEB_SOURCE_FRAME(MELEE_WEB_SOURCE_FRAME_CPU_NANA_FOLLOW);
++    /* Other follower branches have unaudited reaching definitions. Only
++     * the executed B0CA8 producer below may admit a Nana carry. */
++    melee_web_source_context_invalidate_r5_at(__func__, __LINE__);
+ 
+     temp_r31 = &fp->cpu;
+     temp_r31->xF9_b2 = true;
 @@ -7901,6 +7927,7 @@
      s32 cmd;
      Fighter* target;

@@ -19,6 +19,82 @@ static int fail(const char* message)
     if (melee_web_source_context_current_sp() != expected_sp)          \
         return fail("DOL-derived source frame SP mismatch")
 
+static int nana_producer(void* nana, void* popo, int empty_item, int direct)
+{
+    int8_t x, y;
+    ENTER(dispatch, MELEE_WEB_SOURCE_FRAME_CPU_STATE_DISPATCH, 0x804EE9C8u);
+    ENTER(follow, MELEE_WEB_SOURCE_FRAME_CPU_NANA_FOLLOW, 0x804EE978u);
+    if (melee_web_source_context_publish_floor_r5() ||
+        melee_web_source_context_publish_seed_r5() ||
+        melee_web_source_context_publish_nana_motion_r5(popo, nana, 253) ||
+        melee_web_source_context_publish_nana_motion_r5(nana, nana, 253))
+        return fail("Nana route admitted another route or wrong Fighter owner");
+    MeleeWebSourceFrameGuard check = {0};
+    if (!direct) {
+        melee_web_source_frame_enter(&check, MELEE_WEB_SOURCE_FRAME_CPU_NANA_FOLLOW_CHECK);
+        if (melee_web_source_context_current_sp() != 0x804EE958u)
+            return fail("Nana check frame differs from DOL");
+    }
+    if (!melee_web_source_context_publish_nana_motion_r5(nana, popo, 253))
+        return fail("Nana producer did not publish partner motion");
+    if (melee_web_source_context_resolve_skipped(nana, &x, &y))
+        return fail("Nana consumed carry before returning to the CPU callback");
+    if (!melee_web_source_context_publish_nana_motion_r5(nana, popo, 253))
+        return fail("executed Nana producer did not replace earlier rejection");
+    if (empty_item && !melee_web_source_context_publish_nana_empty_item_r5(nana))
+        return fail("Nana null-item load did not replace prior motion");
+    if (!direct) melee_web_source_frame_leave(&check);
+    melee_web_source_frame_leave(&follow);
+    melee_web_source_frame_leave(&dispatch);
+    return 0;
+}
+
+static int nana_carry(void* nana, void* popo, uint64_t generation)
+{
+    MeleeWebSourceFighterAddress address = {0};
+    int8_t x = 0, y = 0;
+    if (!melee_web_source_context_begin_tick(generation))
+        return fail("Nana context did not begin");
+    if (melee_web_source_context_publish_nana_motion_r5(nana, popo, 224) ||
+        melee_web_source_context_publish_nana_empty_item_r5(nana))
+        return fail("Nana producer accepted a missing source route");
+    ENTER(gobj, MELEE_WEB_SOURCE_FRAME_GOBJ_DISPATCH, 0x804EEAC8u);
+    ENTER(fighter, MELEE_WEB_SOURCE_FRAME_FIGHTER_CPU_CALLBACK, 0x804EEAB0u);
+    if (!melee_web_source_context_enter_fighter(nana))
+        return fail("Nana lease did not bind");
+    ENTER(cpu, MELEE_WEB_SOURCE_FRAME_CPU_CALLBACK, 0x804EEA90u);
+    if (nana_producer(nana, popo, 0, 1) ||
+        !melee_web_source_context_resolve_skipped(nana, &x, &y) || y != -3 ||
+        melee_web_source_context_r5().kind != MELEE_WEB_SOURCE_REGISTER_NANA_PARTNER_MOTION)
+        return fail("direct Nana leaf did not retain the partner motion low byte");
+    if (nana_producer(nana, popo, 1, 0) ||
+        !melee_web_source_context_resolve_skipped(nana, &x, &y) || y != 0 ||
+        melee_web_source_context_r5().kind != MELEE_WEB_SOURCE_REGISTER_NANA_EMPTY_ITEM)
+        return fail("Nana null-item definition did not survive check return");
+    melee_web_source_context_invalidate_r5_at("nana-held-item", 1);
+    if (melee_web_source_context_resolve_skipped(nana, &x, &y))
+        return fail("unsupported Item source pointer was silently accepted");
+    if (nana_producer(nana, popo, 0, 0) ||
+        !melee_web_source_memory_fighter_release(popo) ||
+        !melee_web_source_memory_fighter_acquire(popo, 0x23ecu, &address) ||
+        melee_web_source_context_resolve_skipped(nana, &x, &y))
+        return fail("stale partner generation reached the skipped conversion");
+    if (nana_producer(nana, popo, 0, 0) ||
+        !melee_web_source_context_resolve_skipped(nana, &x, &y) || y != -3)
+        return fail("Nana motion did not survive its audited returning call chain");
+    if (!melee_web_source_memory_fighter_release(nana) ||
+        !melee_web_source_memory_fighter_acquire(nana, 0x23ecu, &address) ||
+        melee_web_source_context_resolve_skipped(nana, &x, &y))
+        return fail("stale Nana generation reached the skipped conversion");
+    melee_web_source_frame_leave(&cpu);
+    melee_web_source_frame_leave(&fighter);
+    if (melee_web_source_context_r5().known)
+        return fail("Nana carry escaped its Fighter callback");
+    melee_web_source_frame_leave(&gobj);
+    if (!melee_web_source_context_end_tick()) return fail("Nana frames unbalanced");
+    return 0;
+}
+
 int main(void)
 {
     const uint64_t world_generation = 7;
@@ -146,6 +222,11 @@ int main(void)
         variant.source_address == fighter.source_address ||
         variant.allocation_generation == fighter.allocation_generation)
         return fail("second Fighter did not receive an independent source identity");
+    if (!melee_web_source_memory_fighter_acquire((void*) fighter_host, 0x23ecu,
+                                                &fighter) ||
+        nana_carry((void*) variant_host, (void*) fighter_host, world_generation) ||
+        !melee_web_source_memory_fighter_release((void*) fighter_host))
+        return fail("Nana carry owner/route lifecycle failed");
     if (!melee_web_source_context_begin_tick(world_generation))
         return fail("second source Fighter context did not begin");
     ENTER(gobj_variant, MELEE_WEB_SOURCE_FRAME_GOBJ_DISPATCH, 0x804EEAC8u);

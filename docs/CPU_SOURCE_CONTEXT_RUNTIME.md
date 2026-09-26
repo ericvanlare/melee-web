@@ -66,6 +66,28 @@ addition to a known reaching definition.
 
 ## Allocation and source consumers
 
+### Nana follower extension (PR #86)
+
+The four-player character run isolated an additional route: Nana's dispatch
+case 6 calls `ftCo_800B101C`, not the state-18 dispatch frame above. Its
+`ftCo_800B0CA8` leaf replaces the earlier floor-query residue with the partner's
+motion (`lwz r5,0x10(r4)`). Early returns retain that scalar. Otherwise the leaf
+loads Nana's held Item GObj: a null item defines zero; a nonnull item defines
+the Item's source user-data address, which remains explicitly unsupported.
+Host pointers are never substituted for it.
+
+The extension tracks B101C's 0x50 frame and B0E98's 0x20 frame and admits both
+audited leaf call sites. Motion carries require live Nana and partner leases;
+the null-item carry belongs to Nana. Consumption requires returning to the
+CPU callback. Entry invalidation rejects branches that skip the producer,
+including the missing-partner path. Existing floor/seed and charge-cancel
+rules remain unchanged. Owned-DOL profiles bind the executed definitions and
+preserving continuation. Actual-source leaf/bypass regressions and the
+source-context trace cover return-value-independent publication, wrong routes,
+unsupported item ownership, lease reuse and callback retirement. This is
+component evidence; fresh rendered match validation is tracked separately in
+the [character notes](REMAINING_FIGHTERS_PORT_NOTES.md).
+
 Mirroring allocation operations only works when original consumers execute in
 their original order. The integration restores scene-manager allocations,
 typed archive/file ownership, stage/collision/camera initialization, common

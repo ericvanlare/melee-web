@@ -16,12 +16,16 @@ typedef enum MeleeWebSourceFrameId {
     MELEE_WEB_SOURCE_FRAME_CPU_STATE_18,
     MELEE_WEB_SOURCE_FRAME_CPU_FLOOR_QUERY,
     MELEE_WEB_SOURCE_FRAME_MP_CHECK_FLOOR,
+    MELEE_WEB_SOURCE_FRAME_CPU_NANA_FOLLOW,
+    MELEE_WEB_SOURCE_FRAME_CPU_NANA_FOLLOW_CHECK,
 } MeleeWebSourceFrameId;
 
 typedef enum MeleeWebSourceRegisterKind {
     MELEE_WEB_SOURCE_REGISTER_UNKNOWN = 0,
     MELEE_WEB_SOURCE_REGISTER_SEED_GLOBAL = 1,
     MELEE_WEB_SOURCE_REGISTER_STACK_LOCAL = 2,
+    MELEE_WEB_SOURCE_REGISTER_NANA_PARTNER_MOTION = 3,
+    MELEE_WEB_SOURCE_REGISTER_NANA_EMPTY_ITEM = 4,
 } MeleeWebSourceRegisterKind;
 
 typedef struct MeleeWebSourceFrameGuard {
@@ -72,6 +76,13 @@ int melee_web_source_context_publish_floor_r5(void);
  * from the pinned GALE01r2 DOL profile, independently of the host pointer used
  * by the browser's isolated RNG owner. */
 int melee_web_source_context_publish_seed_r5(void);
+/* ftCo_800B0CA8 loads the live partner's motion, then (unless it returned
+ * early) the held Item GObj and its user_data. Only the scalar motion and
+ * null-item definitions are admitted here; no host pointer is a source word. */
+int melee_web_source_context_publish_nana_motion_r5(void* host_fighter,
+                                                    void* host_partner,
+                                                    int32_t motion);
+int melee_web_source_context_publish_nana_empty_item_r5(void* host_fighter);
 /* Resolve only the PPC skipped-conversion route. ftCo_800AC5A0 emits its
  * locals in reversed argument order: stick_y is command 80/r5 and stick_x is
  * command 81/r30. This API returns those source bytes in local-variable order. */

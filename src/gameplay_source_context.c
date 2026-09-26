@@ -25,11 +25,15 @@ static uint8_t fighter_valid;
 static MeleeWebSourceRegisterWord r5;
 static const char* r5_boundary = "reset";
 static uint32_t r5_line;
+static uintptr_t r5_partner_host;
+static uint64_t r5_partner_generation;
 
 static void clear_r5(void)
 {
     r5_boundary = "reset";
     r5_line = 0;
+    r5_partner_host = 0;
+    r5_partner_generation = 0;
     memset(&r5, 0, sizeof(r5));
     r5.kind = MELEE_WEB_SOURCE_REGISTER_UNKNOWN;
     r5.world_generation = world_generation;
@@ -54,6 +58,10 @@ static uint32_t frame_size(MeleeWebSourceFrameId frame)
         return MELEE_WEB_GALE01R2_FRAME_CPU_FLOOR_QUERY;
     case MELEE_WEB_SOURCE_FRAME_MP_CHECK_FLOOR:
         return MELEE_WEB_GALE01R2_FRAME_MP_CHECK_FLOOR;
+    case MELEE_WEB_SOURCE_FRAME_CPU_NANA_FOLLOW:
+        return MELEE_WEB_GALE01R2_FRAME_CPU_NANA_FOLLOW;
+    case MELEE_WEB_SOURCE_FRAME_CPU_NANA_FOLLOW_CHECK:
+        return MELEE_WEB_GALE01R2_FRAME_CPU_NANA_FOLLOW_CHECK;
     }
     return 0;
 }
@@ -81,6 +89,12 @@ static int expected_parent(MeleeWebSourceFrameId frame,
         break;
     case MELEE_WEB_SOURCE_FRAME_MP_CHECK_FLOOR:
         *parent = MELEE_WEB_SOURCE_FRAME_CPU_FLOOR_QUERY;
+        break;
+    case MELEE_WEB_SOURCE_FRAME_CPU_NANA_FOLLOW:
+        *parent = MELEE_WEB_SOURCE_FRAME_CPU_STATE_DISPATCH;
+        break;
+    case MELEE_WEB_SOURCE_FRAME_CPU_NANA_FOLLOW_CHECK:
+        *parent = MELEE_WEB_SOURCE_FRAME_CPU_NANA_FOLLOW;
         break;
     }
     return frame_depth != 0 && frames[frame_depth - 1].id == *parent;
@@ -308,17 +322,83 @@ int melee_web_source_context_publish_seed_r5(void)
     return 1;
 }
 
+static int nana_route_active(void* host_fighter)
+{
+    static const MeleeWebSourceFrameId expected[] = {
+        MELEE_WEB_SOURCE_FRAME_GOBJ_DISPATCH,
+        MELEE_WEB_SOURCE_FRAME_FIGHTER_CPU_CALLBACK,
+        MELEE_WEB_SOURCE_FRAME_CPU_CALLBACK,
+        MELEE_WEB_SOURCE_FRAME_CPU_STATE_DISPATCH,
+        MELEE_WEB_SOURCE_FRAME_CPU_NANA_FOLLOW,
+        MELEE_WEB_SOURCE_FRAME_CPU_NANA_FOLLOW_CHECK,
+    };
+    /* B0CA8 is a leaf: B101C calls it directly or through B0E98. */
+    if (!fighter_owner_live() || (uintptr_t) host_fighter != fighter_host ||
+        (frame_depth != 5 && frame_depth != 6)) return 0;
+    for (uint32_t i = 0; i < frame_depth; ++i)
+        if (frames[i].id != expected[i]) return 0;
+    return 1;
+}
+
+int melee_web_source_context_publish_nana_motion_r5(void* host_fighter,
+                                                    void* host_partner,
+                                                    int32_t motion)
+{
+    MeleeWebSourceFighterAddress partner = {0};
+    clear_r5();
+    if (!nana_route_active(host_fighter) || !host_partner ||
+        host_partner == host_fighter ||
+        !melee_web_source_memory_fighter_read(host_partner, &partner) ||
+        !partner.live || partner.world_generation != world_generation ||
+        !partner.allocation_generation) return 0;
+    r5.source_word = (uint32_t) motion;
+    r5.kind = MELEE_WEB_SOURCE_REGISTER_NANA_PARTNER_MOTION;
+    r5.known = 1;
+    r5_boundary = "nana-partner-motion";
+    r5_partner_host = (uintptr_t) host_partner;
+    r5_partner_generation = partner.allocation_generation;
+    return 1;
+}
+
+int melee_web_source_context_publish_nana_empty_item_r5(void* host_fighter)
+{
+    clear_r5();
+    if (!nana_route_active(host_fighter)) return 0;
+    /* The executed lwz loads an actual null GObj, not an assumed default. */
+    r5.source_word = 0;
+    r5.kind = MELEE_WEB_SOURCE_REGISTER_NANA_EMPTY_ITEM;
+    r5.known = 1;
+    r5_boundary = "nana-empty-item";
+    return 1;
+}
+
+static int r5_partner_live(void)
+{
+    MeleeWebSourceFighterAddress partner = {0};
+    if (r5.kind != MELEE_WEB_SOURCE_REGISTER_NANA_PARTNER_MOTION) return 1;
+    return r5_partner_host && r5_partner_generation &&
+        melee_web_source_memory_fighter_read((void*) r5_partner_host, &partner) &&
+        partner.live && partner.world_generation == world_generation &&
+        partner.allocation_generation == r5_partner_generation;
+}
+
 int melee_web_source_context_resolve_skipped(void* host_fighter,
                                               int8_t* stick_x,
                                               int8_t* stick_y)
 {
     if (!stick_x || !stick_y || !fighter_owner_live() ||
         !host_fighter || (uintptr_t) host_fighter != fighter_host ||
-        r5.known == 0 || r5.world_generation != world_generation ||
+        r5.known == 0 || !r5_partner_live() ||
+        r5.world_generation != world_generation ||
         r5.context_generation != context_generation ||
         r5.fighter_allocation_generation != fighter_allocation_generation ||
+        ((r5.kind == MELEE_WEB_SOURCE_REGISTER_NANA_PARTNER_MOTION ||
+          r5.kind == MELEE_WEB_SOURCE_REGISTER_NANA_EMPTY_ITEM) &&
+         frame_depth != 3) ||
         (r5.kind != MELEE_WEB_SOURCE_REGISTER_SEED_GLOBAL &&
-         r5.kind != MELEE_WEB_SOURCE_REGISTER_STACK_LOCAL) ||
+         r5.kind != MELEE_WEB_SOURCE_REGISTER_STACK_LOCAL &&
+         r5.kind != MELEE_WEB_SOURCE_REGISTER_NANA_PARTNER_MOTION &&
+         r5.kind != MELEE_WEB_SOURCE_REGISTER_NANA_EMPTY_ITEM) ||
         frame_depth < 3 ||
         frames[0].id != MELEE_WEB_SOURCE_FRAME_GOBJ_DISPATCH ||
         frames[1].id != MELEE_WEB_SOURCE_FRAME_FIGHTER_CPU_CALLBACK ||
