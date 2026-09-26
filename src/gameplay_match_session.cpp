@@ -60,9 +60,8 @@ struct GameplayMatchSession::Storage {
     GameplayWorldSelection content{};
     const MeleeWebStageContent* stage=nullptr;
     unsigned construction_phase=0;
-    const MeleeWebPadState* initial_input=nullptr;
     void begin(const RuntimeFiles& files,const MeleeWebMenuMatchSelection& selection,
-               RuntimeArchiveCache* archive_cache){
+               RuntimeArchiveCache* archive_cache,const MeleeWebPadState* initial_input=nullptr){
         unsigned player_count = selection.player_count != 0
                                     ? selection.player_count
                                     : melee_web_menu_active_player_count(&selection.start);
@@ -104,6 +103,7 @@ struct GameplayMatchSession::Storage {
         content.source_camera_subjects=70;
         content.source_random_seed=selection.random_seed;
         content.source_start_data=&selected.start;
+        content.source_initial_input=initial_input;
         check(melee_web_vs_mode_begin(),"Original VS mode is already owned");mode_owned=true;
         if(selected.save_profile_present){
             saved_characters=*gmMainLib_GetUnlockedCharactersBitmaskPtr();
@@ -118,6 +118,7 @@ struct GameplayMatchSession::Storage {
         else
             world=std::make_unique<GameplayWorld>(files,content,
                                                   GameplayWorldConstruction::SourceOrdered);
+        content.source_initial_input=nullptr;
         match=world->take_match_context();
         render=world->take_render_context();
     }
@@ -191,7 +192,6 @@ struct GameplayMatchSession::Storage {
              * spawn lookup to the authored map JObjs before any Fighter exists. */
             world->enable_full_stage(true);
             check(melee_web_match_attach_collision(match,world->collision(),error,sizeof(error)),error);
-            if(initial_input){check(melee_web_match_restore_input(match,initial_input,error,sizeof(error)),error);initial_input=nullptr;}
             world->initialize_match(selected.start);
             construction_phase=3;
             return false;
@@ -218,8 +218,8 @@ struct GameplayMatchSession::Storage {
         return true;
     }
     void start(const RuntimeFiles& files,const MeleeWebMenuMatchSelection& selection,
-               RuntimeArchiveCache* archive_cache){
-        begin(files,selection,archive_cache);
+               RuntimeArchiveCache* archive_cache,const MeleeWebPadState* initial_input=nullptr){
+        begin(files,selection,archive_cache,initial_input);
         while(!advance_construction()){}
     }
     void close(){
@@ -266,7 +266,7 @@ GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,const Melee
 GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,const MeleeWebMenuMatchSelection& selection,
                                            const MeleeWebPadState& initial_input)
     :storage_(std::make_unique<Storage>()){
-    storage_->initial_input=&initial_input;storage_->start(files,selection,nullptr);
+    storage_->start(files,selection,nullptr,&initial_input);
 }
 GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,
                                            const MeleeWebMenuMatchSelection& selection,
@@ -289,11 +289,10 @@ GameplayMatchSession::GameplayMatchSession(const RuntimeFiles& files,
                                            GameplayMatchConstruction construction,
                                            const MeleeWebPadState& initial_input)
     :storage_(std::make_unique<Storage>()){
-    storage_->initial_input=&initial_input;
     if(construction==GameplayMatchConstruction::Deferred)
-        storage_->begin(files,selection,&archive_cache);
+        storage_->begin(files,selection,&archive_cache,&initial_input);
     else
-        storage_->start(files,selection,&archive_cache);
+        storage_->start(files,selection,&archive_cache,&initial_input);
 }
 void GameplayMatchSession::close(){if(storage_){storage_->close();storage_.reset();}}
 void GameplayMatchSession::tick(const PADStatus raw[4]){

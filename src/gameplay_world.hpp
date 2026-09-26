@@ -44,6 +44,9 @@ struct GameplayWorldSelection {
     // startup applies fn_8016DCC0 between the original camera and refraction
     // boundaries, before it loads effects and stage-owned services.
     const StartMeleeData* source_start_data=nullptr;
+    // Borrowed only during construction, including SourceOrdered: restore the
+    // menu PAD history before fn_8016D8AC selects the held-A startup form.
+    const MeleeWebPadState* source_initial_input=nullptr;
     std::array<MeleeWebPlayerSettings,4> source_players{};
 };
 // Shared by the browser and source regression harness. Owns one original SDK

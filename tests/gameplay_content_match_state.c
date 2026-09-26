@@ -84,8 +84,14 @@ int melee_web_test_content_player(unsigned slot,int ckind,int kind,unsigned cost
         if(costume && (!fighter->u.pr.x2240.data || fighter->u.pr.x2248.model_num!=1))return 0;
     }
     const float icon=identity->stock_icon+30*costume;
-    return fighter&&fighter->kind==identity->fighter&&Player_GetPlayerCharacter(slot)==identity->character&&
+    const int valid=fighter&&fighter->kind==identity->fighter&&
+        Player_GetPlayerCharacter(slot)==identity->character&&
         Player_GetCostumeId(slot)==costume&&gm_80168BF8(slot)==icon;
+    if(!valid)fprintf(stderr,"Content identity slot=%u actual kind/character/color/icon=%d/%d/%u/%g expected=%d/%d/%u/%g\n",
+        slot,fighter?fighter->kind:-1,Player_GetPlayerCharacter(slot),
+        Player_GetCostumeId(slot),gm_80168BF8(slot),identity->fighter,
+        identity->character,costume,icon);
+    return valid;
 }
 int melee_web_test_entity_state(unsigned slot,unsigned index,int* kind,int* motion,
                                 int* grounded,int* has_skeleton){

@@ -455,6 +455,9 @@ struct GameplayWorld::Storage {
                 selection.player_count,selection.source_camera_subjects,
                 selection.source_random_seed,nullptr,error,sizeof(error));
             check(match_context!=nullptr,error);
+            if(selection.source_initial_input)
+                check(melee_web_match_restore_input(match_context,
+                    selection.source_initial_input,error,sizeof(error)),error);
             render_context=melee_web_render_prepare_match_camera(error,sizeof(error));
             check(render_context!=nullptr,error);
             if(source_start_data){

@@ -177,7 +177,9 @@ int melee_web_match_create_fighter(MeleeWebMatchContext* h,char* e,size_t n)
 }
 int melee_web_match_restore_input(MeleeWebMatchContext* h,const MeleeWebPadState* state,char* e,size_t n)
 {
-    if(!live(h,e,n))return 0;
+    /* Source player selection consumes PAD before the stage has installed
+     * collision. Require the live world/RNG/camera lease, not stage readiness. */
+    if(!owned(h,e,n))return 0;
     if(!state||h->ticks||h->input_restored||HSD_PadLibData.qcount)
         return fail(e,n,"Input history may be restored once before match initialization");
     for(uint32_t i=0;i<h->player_count;i++)
